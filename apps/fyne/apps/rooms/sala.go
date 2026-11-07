@@ -15,6 +15,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -29,7 +30,6 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	mx "git.sytue.eu/sytue/one/apps/nucleo/matrix"
-	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
 // Sala es Sytue Rooms CON DATOS: habla con el servicio y rellena la Pantalla. Es el
@@ -68,6 +68,7 @@ type Servicio interface {
 	Commands(ctx context.Context) ([]api.RoomsCommand, error)
 	ExecuteCommand(ctx context.Context, canal, linea string) (api.RoomsCommandResult, error)
 	NotifyPrefs(ctx context.Context) (api.RoomsNotifyPrefs, error)
+	SetNotifyPause(ctx context.Context, hasta time.Time) (api.RoomsNotifyPrefs, error)
 	PutNotifyPrefs(ctx context.Context, p api.RoomsNotifyPrefs) (api.RoomsNotifyPrefs, error)
 	MarkRead(ctx context.Context, canal string) error
 	React(ctx context.Context, mensaje, emoji string, poner bool) error
@@ -95,6 +96,7 @@ type Servicio interface {
 	Search(ctx context.Context, q string, limite int) ([]api.RoomsMessage, error)
 	CreateChannel(ctx context.Context, equipo, nombre, asunto string, privado bool) (api.RoomsChannel, error)
 	Browse(ctx context.Context, equipo, q string) ([]api.RoomsChannel, error)
+	ArchivedChannels(ctx context.Context, equipo string) ([]api.RoomsChannel, error)
 	OpenDirect(ctx context.Context, equipo string, personas []string) (api.RoomsChannel, error)
 	TeamMembers(ctx context.Context, equipo string) ([]api.RoomsMember, error)
 	ResolvePerson(ctx context.Context, consulta string) (api.RoomsPerson, error)
@@ -129,9 +131,11 @@ type Sala struct {
 	P       *Pantalla
 	S       Servicio
 	Cifrado *Cifrado
-	// Widget sólo recibe contadores del inventario completo ya pedido por Rooms.
-	Widget       widgets.Source
-	cargaCanales uint64
+	// AlCambiarDatos avisa al widget nativo de que el vivo ha traído un cambio que
+	// puede verse en él (un mensaje, un canal): su Fuente vuelve a contar (ADR 0078,
+	// enmienda del 2026-11-06). nil: nadie escucha.
+	AlCambiarDatos func()
+	cargaCanales   uint64
 	// Yo es el `sub` de quien ha entrado: decide qué reacciones y qué mensajes son
 	// suyos.
 	Yo string
@@ -204,6 +208,10 @@ type Sala struct {
 	// de dispositivos» no se ofrece.
 	Dispositivos func() (micros, altavoces, camaras []Opcion)
 	AudioDe      func(micro, altavoz string) llamada.Dispositivo
+	// AlCambiarNoLeidos recibe el total de no leídos de la sala (`TotalNoLeidos`)
+	// cada vez que cambia: es el número que va sobre el icono de la app, como el
+	// «(3)» del título de la pestaña en la web. Nil, nadie lo escucha.
+	AlCambiarNoLeidos func(int)
 	// PedirMicro pide el permiso del micrófono al abrir la antesala (Android); nil, no
 	// hace falta.
 	PedirMicro func() error
@@ -212,12 +220,9 @@ type Sala struct {
 	equipo  string
 	canales []api.RoomsChannel
 	// retiradas invalida el deshacer de una acción cuando llega una baja más reciente.
-	retiradas                 map[string]uint64
-	pend                      map[string]api.RoomsUnread
-	widgetVista               widgets.View
-	widgetCanalesCompletos    bool
-	widgetPendientesCompletos bool
-	abierto                   string
+	retiradas map[string]uint64
+	pend      map[string]api.RoomsUnread
+	abierto   string
 	// enlace es el canal (y el mensaje) de un aviso que llegó antes que la lista.
 	enlace   [2]string
 	mensajes []api.RoomsMessage
@@ -315,10 +320,32 @@ type Sala struct {
 	conmutador     *Conmutador
 	crearCanal     *CrearCanal
 	explorar       *Explorar
-	directo        *NuevoDirecto
-	reenviar       *Reenviar
-	compartir      *Compartir
-	selectorDrive  *ui.SelectorSuite
+	// noLeidos es el último total dicho a AlCambiarNoLeidos; -1, aún ninguno.
+	noLeidos int
+	// enFondo dice que la app no está en primer plano; noVistos, los ids de los
+	// mensajes que llegaron entretanto al canal abierto (`SumaNoVisto`), que suman al
+	// icono. Por id, como `noVistosRef` en la web: una trama repetida tras una
+	// reconexión no cuenta dos veces.
+	enFondo  bool
+	noVistos map[string]struct{}
+	// pausa es el fin de «Pausar avisos» en nanosegundos Unix; 0, sin pausa.
+	pausa atomic.Int64
+	// pausaTurno sube con cada escritura de la pausa (al pedirla y al confirmarla): una
+	// lectura lanzada antes de la última escritura llega con datos viejos y se descarta.
+	pausaTurno atomic.Int64
+	// pausaGuardando es `pauseSaving`: hay una escritura de la pausa en vuelo.
+	pausaGuardando bool
+	// edicionConFlecha dice que la edición abierta se pidió con ↑ desde el compositor:
+	// al cerrarla, el foco vuelve allí (`volverFocoRef` de MessageView).
+	edicionConFlecha bool
+	// archivados es la pestaña «Archivados» de explorar; archivadosCrudos, lo que dio
+	// el servicio, para devolver un canal a la barra tal cual al desarchivarlo.
+	archivados       *Archivados
+	archivadosCrudos []api.RoomsChannel
+	directo          *NuevoDirecto
+	reenviar         *Reenviar
+	compartir        *Compartir
+	selectorDrive    *ui.SelectorSuite
 	// directosCallados es la regla del Hub que calla los avisos de los directos.
 	directosCallados bool
 	// presencias es lo último que dijo el Hub de cada `sub`; pararPresencia, el sondeo.
@@ -353,6 +380,7 @@ func NuevaSala(p *Pantalla, s Servicio, yo string) *Sala {
 		Esperar:     esperar,
 		ctx:         context.Background(),
 		pend:        map[string]api.RoomsUnread{},
+		noLeidos:    -1,
 		retiradas:   map[string]uint64{},
 		escribiendo: map[string]map[string]string{},
 		caducan:     map[string]func(){},
@@ -403,6 +431,7 @@ func NuevaSala(p *Pantalla, s Servicio, yo string) *Sala {
 	p.Canal.Historial.AlGuardarEdicion = sa.GuardarEdicion
 	p.Canal.Historial.AlCancelarEdicion = sa.CancelarEdicion
 	p.Canal.Compositor.AlEnviar = sa.Enviar
+	p.Canal.Compositor.AlEditarUltimo = sa.EditarUltimo
 	p.Canal.Compositor.AlComando = sa.Comando
 	p.Canal.Compositor.AlComandoRemoto = sa.ComandoRemoto
 	p.Canal.Compositor.AlFormato = sa.guardarFormato
@@ -480,6 +509,7 @@ func (sa *Sala) Arrancar(ctx context.Context) {
 	sa.cargarBorradores()
 	sa.cargarComandos()
 	sa.cargarAvisosDirectos()
+	sa.cargarPausa()
 	sa.cargarBloqueados()
 	sa.cargarEmojisOrg()
 	sa.arrancada = true
@@ -589,7 +619,6 @@ func (sa *Sala) cargarCanales() {
 	l := sa.P.Lateral
 	l.EstadoCanales = Cargando
 	sa.P.Refrescar()
-	view := sa.Widget.View()
 	pedir(sa, sa.pedirLista, func(r lista, err error) {
 		if err != nil {
 			l.EstadoCanales = Error
@@ -600,9 +629,6 @@ func (sa *Sala) cargarCanales() {
 		sa.adminEquipo = r.adminEquipo
 		l.PuedeGestionarApps = r.adminEquipo // `canManageIntegrations`: admin de algún equipo
 		sa.ponerPendientes(r.pend)
-		sa.widgetVista = view
-		sa.widgetCanalesCompletos, sa.widgetPendientesCompletos = r.canalesCompletos, r.pendientesCompletos
-		sa.publicarWidget(view)
 		l.Categorias = l.Categorias[:0]
 		for _, c := range r.categorias {
 			l.Categorias = append(l.Categorias, Categoria{ID: c.ID, Nombre: c.Name, Orden: c.SortOrder, Plegada: c.Collapsed})
@@ -643,6 +669,64 @@ func (sa *Sala) pintarCanales() {
 	for _, c := range sa.canales {
 		l.Canales = append(l.Canales, sa.canalDe(c))
 	}
+	sa.decirNoLeidos()
+}
+
+// decirNoLeidos pasa el total a AlCambiarNoLeidos si ha cambiado: el de los canales
+// más lo que llegó al abierto con la app en segundo plano.
+func (sa *Sala) decirNoLeidos() {
+	if n := TotalNoLeidos(sa.P.Lateral.Canales) + len(sa.noVistos); n != sa.noLeidos {
+		sa.noLeidos = n
+		if sa.AlCambiarNoLeidos != nil {
+			sa.AlCambiarNoLeidos(n)
+		}
+	}
+}
+
+// SumaNoVisto es `sumaNoVisto` de lib/totalNoLeidos.ts: con la app en segundo plano,
+// un mensaje de otro que llega al canal abierto, fuera de un hilo y en un canal que no
+// está silenciado, suma al total: nadie lo está leyendo. «Segundo plano» en escritorio
+// es que la ventana pierde el foco (`AlFondo`), no que deje de verse como la pestaña
+// oculta de la web: el driver no lo distingue (ver el comentario de `sumaNoVisto`).
+func SumaNoVisto(enFondo bool, m api.RoomsMessage, yo string, c Canal) bool {
+	if !enFondo || m.AuthorSub == yo || m.ParentID != nil {
+		return false
+	}
+	return !c.Silenciado && c.Nivel != AvisarNada
+}
+
+// EnSegundoPlano apunta que la app ha dejado el primer plano (en escritorio, que la
+// ventana ha perdido el foco): desde ahora lo que llega al canal abierto suma al icono.
+func (sa *Sala) EnSegundoPlano() { sa.enFondo = true }
+
+// contarNoVisto suma al icono un mensaje del canal abierto si nadie lo está viendo.
+func (sa *Sala) contarNoVisto(carga json.RawMessage) {
+	var m api.RoomsMessage
+	if !sa.enFondo || json.Unmarshal(carga, &m) != nil {
+		return
+	}
+	i := slices.IndexFunc(sa.P.Lateral.Canales, func(c Canal) bool { return c.ID == sa.abierto })
+	if i < 0 || !SumaNoVisto(sa.enFondo, m, sa.Yo, sa.P.Lateral.Canales[i]) {
+		return
+	}
+	if sa.noVistos == nil {
+		sa.noVistos = map[string]struct{}{}
+	}
+	sa.noVistos[m.ID] = struct{}{}
+	sa.decirNoLeidos()
+}
+
+// TotalNoLeidos es `totalNoLeidos` de lib/totalNoLeidos.ts: los mensajes sin leer de
+// todos los canales menos los SILENCIADOS, que pidieron no llamar la atención.
+func TotalNoLeidos(cs []Canal) int {
+	total := 0
+	for _, c := range cs {
+		if c.Silenciado || c.Nivel == AvisarNada {
+			continue
+		}
+		total += max(0, c.SinLeer)
+	}
+	return total
 }
 
 // canalDe es `toChannel` con sus contadores.
@@ -675,7 +759,6 @@ func (sa *Sala) refrescarPendientes() {
 	if sa.equipo == "" {
 		return
 	}
-	view := sa.widgetVista
 	type resultado struct {
 		pend     []api.RoomsUnread
 		completo bool
@@ -695,8 +778,6 @@ func (sa *Sala) refrescarPendientes() {
 			return
 		}
 		sa.ponerPendientes(r.pend)
-		sa.widgetPendientesCompletos = r.completo
-		sa.publicarWidget(view)
 		sa.pintarCanales()
 		sa.P.Refrescar()
 	})
@@ -1177,14 +1258,9 @@ func (sa *Sala) abrir(c Canal) {
 }
 
 func (sa *Sala) darPorLeido(canal string) {
-	view := sa.widgetVista
 	pedir(sa, func(ctx context.Context) (struct{}, error) {
 		return struct{}{}, sa.S.MarkRead(ctx, canal)
-	}, func(_ struct{}, err error) {
-		if err == nil {
-			sa.publicarWidget(view)
-		}
-	})
+	}, func(struct{}, error) {})
 }
 
 func (sa *Sala) cargarMensajes(canal string, noLeidos int) {
@@ -1464,7 +1540,11 @@ func (sa *Sala) escuchar() {
 					return
 				}
 				sa.espera = min(max(2*sa.espera, ReconectarBase), ReconectarTope)
-				pararEspera = sa.Esperar(sa.espera, abrir)
+				// Tras el corte se relee también la pausa: pudo cambiar mientras tanto.
+				pararEspera = sa.Esperar(sa.espera, func() {
+					sa.cargarPausa()
+					abrir()
+				})
 			})
 		})
 	}
@@ -1644,10 +1724,21 @@ func (sa *Sala) Escribiendo() {
 	sa.Lanzar(func() { _ = sa.S.Typing(sa.ctx, canal) })
 }
 
+// avisaAlWidget dice qué tramas del vivo pueden cambiar lo que enseña el widget de
+// Rooms: un mensaje (o su baja), un cambio de canal y `ready`, que también llega al
+// RECONECTAR: lo que pasó durante el corte (mensajes, pendientes) no ha llegado como
+// trama, y Rooms no usa offline.Monitor, así que el Online de la suite no le avisa.
+func avisaAlWidget(tipo string) bool {
+	return tipo == api.RoomsReady || tipo == "message" || tipo == "message_deleted" || strings.HasPrefix(tipo, "channel_")
+}
+
 // alLlegar reparte una trama: lo del canal abierto recarga su final; lo de otro
 // canal, los contadores; y «escribiendo» apunta el nombre durante 5 s.
 func (sa *Sala) alLlegar(ev api.RoomsEvent) {
 	sa.chatDeLaLlamada(ev)
+	if sa.AlCambiarDatos != nil && avisaAlWidget(ev.Type) {
+		sa.AlCambiarDatos()
+	}
 	switch ev.Type {
 	case api.RoomsReady:
 		sa.espera = 0
@@ -1662,6 +1753,7 @@ func (sa *Sala) alLlegar(ev api.RoomsEvent) {
 			sa.recargarMensajes()
 			if ev.Type == "message" {
 				sa.borrarEscribiendo(ev.ChannelID, ev.Subject)
+				sa.contarNoVisto(ev.Payload)
 			}
 			return
 		}
@@ -2105,14 +2197,39 @@ func (sa *Sala) MarcarNoLeido(m Mensaje) {
 func (sa *Sala) Editar(m Mensaje) {
 	h := sa.P.Canal.Historial
 	h.EditandoID = m.ID
+	sa.edicionConFlecha = false
 	h.Refresh()
 }
 
-// CancelarEdicion la cierra sin tocar nada.
+// EditarUltimo es el `onEditLast` del compositor del canal: ↑ con la caja vacía abre
+// en edición el último mensaje propio, lo trae a la vista y le pasa el foco.
+func (sa *Sala) EditarUltimo() bool {
+	h := sa.P.Canal.Historial
+	m, ok := UltimoEditable(h.Mensajes, sa.Yo)
+	if !ok {
+		return false
+	}
+	// Si ya está en edición, solo se le devuelve el foco: Editar repinta las filas y
+	// la caja nacería otra vez con el texto original, perdiendo lo que se llevaba escrito.
+	if !EditandoYa(h.EditandoID, m.ID) {
+		sa.Editar(m)
+	}
+	sa.edicionConFlecha = true
+	h.EnfocarEdicion(fyne.CurrentApp().Driver().CanvasForObject(sa.P.Objeto()))
+	return true
+}
+
+// CancelarEdicion la cierra sin tocar nada. Si se abrió con ↑, el foco vuelve al
+// compositor (design.md §2.6, retorno de foco al cerrar): la caja de editar desaparece
+// y, sin esto, lo siguiente que se teclea no va a ninguna parte.
 func (sa *Sala) CancelarEdicion() {
 	h := sa.P.Canal.Historial
 	h.EditandoID = ""
 	h.Refresh()
+	if sa.edicionConFlecha {
+		sa.edicionConFlecha = false
+		sa.P.Canal.Compositor.enfocar()
+	}
 }
 
 // GuardarEdicion es `saveEdit` + `handleEdit`: un texto vacío o igual al de antes no
@@ -2837,9 +2954,25 @@ func (sa *Sala) AbrirExplorar() {
 	}
 	t := sa.P.T
 	e := NuevoExplorar(t)
+	a := sa.nuevosArchivados()
+	// Las dos pestañas de BrowseChannelsModal: explorar y «Archivados», que se piden al
+	// elegirla, como el panel de la web, que solo se monta activo.
+	pest := ui.NuevasPestanas([]string{t.T("browse.tabChannels", nil), t.T("archived.tab", nil)},
+		[]fyne.CanvasObject{e, a})
+	pest.AlCambiar = func(i int) {
+		if i == 1 {
+			sa.cargarArchivados(a)
+		}
+	}
+	a.Pestana = func() fyne.Focusable {
+		if p := pest.PestanaActiva(); p != nil {
+			return p
+		}
+		return nil
+	}
 	var d *ui.Dialogo
 	cerrar := ui.NuevoBoton(t.T("action.close", nil), func() { d.Cerrar() }).Con(ui.Secundario, ui.TallaMD)
-	d = ui.NuevoDialogo(t.T("browse.title", nil), e).Con(ui.DialogoMD, cerrar)
+	d = ui.NuevoDialogo(t.T("browse.title", nil), pest).Con(ui.DialogoMD, cerrar)
 	d.RotuloCerrar, d.Foco = t.T("action.close", nil), e.Caja()
 	vista, parar := 0, func() {}
 	buscar := func(q string) {
@@ -2883,9 +3016,100 @@ func (sa *Sala) AbrirExplorar() {
 			e.Refresh()
 		})
 	}
-	sa.explorar = e
+	sa.explorar, sa.archivados = e, a
 	d.Mostrar(c)
 	buscar("")
+}
+
+// nuevosArchivados es la pestaña «Archivados» con sus dos acciones cableadas.
+func (sa *Sala) nuevosArchivados() *Archivados {
+	t := sa.P.T
+	a := NuevosArchivados(t)
+	a.AlReintentar = func() { sa.cargarArchivados(a) }
+	// Al terminar, la fila deja de estar ocupada y el aviso dice qué falló, si falló.
+	cambiar := func(canal Canal, cambio api.RoomsChannelPatch, hecho func(api.RoomsChannel)) {
+		a.Ocupado[canal.ID], a.Aviso = true, ""
+		a.Refresh()
+		pedir(sa, func(ctx context.Context) (api.RoomsChannel, error) {
+			return sa.S.UpdateChannel(ctx, canal.ID, cambio)
+		}, func(nuevo api.RoomsChannel, err error) {
+			delete(a.Ocupado, canal.ID)
+			if err != nil {
+				a.Aviso = t.T(ClaveErrorArchivado(err), nil)
+			} else {
+				hecho(nuevo)
+			}
+			a.Refresh()
+		})
+	}
+	a.AlDesarchivar = func(canal Canal) {
+		no := false
+		// Si falla, el foco vuelve a su «Desarchivar»; si sale bien, a la fila que ocupa
+		// su sitio, o a la pestaña si la lista se queda vacía.
+		a.EnfocarTras(canal.ID, focoDesarchivar)
+		cambiar(canal, api.RoomsChannelPatch{Archived: &no}, func(nuevo api.RoomsChannel) {
+			i := slices.IndexFunc(sa.archivadosCrudos, func(c api.RoomsChannel) bool { return c.ID == canal.ID })
+			if i < 0 {
+				return
+			}
+			ids := make([]string, len(sa.archivadosCrudos))
+			for j, c := range sa.archivadosCrudos {
+				ids[j] = c.ID
+			}
+			a.EnfocarTras(FilaTrasQuitar(ids, canal.ID), focoDesarchivar)
+			vuelto := sa.archivadosCrudos[i]
+			vuelto.Archived = false
+			if nuevo.Name != "" {
+				vuelto.Name = nuevo.Name
+			}
+			sa.archivadosCrudos = slices.Delete(sa.archivadosCrudos, i, i+1)
+			sa.pintarArchivados(a)
+			sa.sumar(vuelto)
+		})
+	}
+	a.AlRenombrar = func(canal Canal, escrito string) {
+		nombre := NombreNuevo(canal.Nombre, escrito)
+		if nombre == "" {
+			return
+		}
+		cambiar(canal, api.RoomsChannelPatch{Name: &nombre}, func(nuevo api.RoomsChannel) {
+			for i := range sa.archivadosCrudos {
+				if sa.archivadosCrudos[i].ID == canal.ID {
+					sa.archivadosCrudos[i].Name = cmp.Or(nuevo.Name, nombre)
+				}
+			}
+			sa.archivadosCrudos = SoloArchivados(sa.P.Locale, sa.archivadosCrudos)
+			sa.pintarArchivados(a)
+		})
+	}
+	return a
+}
+
+// cargarArchivados pide los canales archivados del equipo y los pinta.
+func (sa *Sala) cargarArchivados(a *Archivados) {
+	a.Estado, a.Aviso, a.Renombrando, a.Borrador = Cargando, "", "", ""
+	a.Refresh()
+	equipo := sa.equipo
+	pedir(sa, func(ctx context.Context) ([]api.RoomsChannel, error) {
+		return sa.S.ArchivedChannels(ctx, equipo)
+	}, func(cs []api.RoomsChannel, err error) {
+		if err != nil {
+			a.Estado = Error
+			a.Refresh()
+			return
+		}
+		sa.archivadosCrudos = SoloArchivados(sa.P.Locale, cs)
+		sa.pintarArchivados(a)
+	})
+}
+
+// pintarArchivados pasa los canales crudos a la pestaña.
+func (sa *Sala) pintarArchivados(a *Archivados) {
+	a.Estado, a.Canales = Listo, a.Canales[:0]
+	for _, c := range sa.archivadosCrudos {
+		a.Canales = append(a.Canales, sa.canalDe(c))
+	}
+	a.Refresh()
 }
 
 // ---- «Nuevo mensaje» ----
@@ -3243,8 +3467,6 @@ func (sa *Sala) Olvidar() {
 	sa.mensajes = nil
 	sa.borradores = map[ambito]string{}
 	sa.canales = nil
-	sa.widgetVista = widgets.View{}
-	sa.widgetCanalesCompletos, sa.widgetPendientesCompletos = false, false
 	clear(sa.retiradas)
 	sa.roster = nil
 	sa.equipo = ""

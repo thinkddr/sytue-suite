@@ -42,6 +42,8 @@ import (
 // Parche es lo que cambia de una nota: el `ParcheDeNota` de la web. Un nil es «no lo
 // toques».
 type Parche struct {
+	// Tipo convierte una línea de texto en tarea o al revés (convertir.go).
+	Tipo      *string
 	Titulo    *string
 	Contenido *string
 	Marcada   *bool
@@ -58,6 +60,9 @@ type Parche struct {
 
 // sobre devuelve la nota con el parche aplicado, sin tocar la de entrada.
 func (pa Parche) sobre(n api.Note) api.Note {
+	if pa.Tipo != nil {
+		n.Kind = *pa.Tipo
+	}
 	if pa.Titulo != nil {
 		n.Title = *pa.Titulo
 	}
@@ -158,8 +163,13 @@ func (p *Pantalla) quitar(id string) {
 }
 
 // añadir mete una nota al final si no estaba ya: deshacer un borrado la devuelve con el
-// mismo ID, y dos «rehacer» seguidos no la pueden duplicar.
+// mismo ID, y dos «rehacer» seguidos no la pueden duplicar. Solo si es del cuaderno
+// abierto: el «Deshacer» de un aviso o Ctrl+Z pueden llegar con otro ya en pantalla, y
+// la nota vuelve al suyo, no a este (en la web, `borrarNota` mira `activeId`).
 func (p *Pantalla) añadir(n Nota) {
+	if n.Cuaderno != "" && n.Cuaderno != p.activo.ID {
+		return
+	}
 	if _, ya := p.nota(n.ID); !ya {
 		p.ponerNotas(append(slices.Clone(p.notas), n))
 	}
@@ -328,6 +338,9 @@ func (p *Pantalla) editarCon(id string, pa Parche, conHistorial bool, fusion str
 		// Se pinta ya lo que se va a guardar, EN CLARO: el criptograma es para el viaje.
 		vista := DeNota(pa.sobre(baseEnClaro(n)))
 		vista.Crudo = n.Crudo
+		if pa.Tipo != nil {
+			vista.Crudo.Kind = *pa.Tipo
+		}
 		p.reemplazar(vista)
 		p.Repintar()
 	})
@@ -353,6 +366,11 @@ func (p *Pantalla) editarCon(id string, pa Parche, conHistorial bool, fusion str
 		p.reemplazar(p.deNota(actualizada))
 		if conHistorial {
 			vuelta := previo(baseEnClaro(n))
+			// Una conversión se deshace con su tipo de antes: el título y el texto que
+			// vuelven son los de ese tipo (`previo` de editarNota).
+			if pa.Tipo != nil {
+				vuelta.Tipo = &n.Crudo.Kind
+			}
 			p.hist.Registrar(Accion{
 				Etiqueta: p.tr.T("history.edit", nil),
 				Deshacer: func() error { return p.editar(id, vuelta, false) },
@@ -546,11 +564,12 @@ func (p *Pantalla) borrar(id string, conHistorial bool) error {
 			return
 		}
 		if conHistorial {
-			p.hist.Registrar(Accion{
+			paso := p.hist.Registrar(Accion{
 				Etiqueta: p.tr.T("history.delete", nil),
 				Deshacer: func() error { return p.llamar(id, p.svc.RestoreNote, func() { p.añadir(n) }) },
 				Rehacer:  func() error { return p.borrar(id, false) },
 			}, "")
+			p.avisarConDeshacer(p.tr.T("note.trashed", nil), paso)
 			p.Repintar()
 		}
 	})
@@ -609,10 +628,11 @@ func (p *Pantalla) moverACuaderno(id string, destino Cuaderno, conHistorial bool
 			p.Repintar()
 			return
 		}
-		p.avisos.Notificar(ui.NuevoAviso(ui.AvisoExito,
-			p.tr.T("move.done", i18n.Vars{"name": destino.Titulo}), ""))
-		if conHistorial {
-			p.hist.Registrar(Accion{
+		hecho := p.tr.T("move.done", i18n.Vars{"name": destino.Titulo})
+		if !conHistorial {
+			p.avisos.Notificar(ui.NuevoAviso(ui.AvisoExito, hecho, ""))
+		} else {
+			paso := p.hist.Registrar(Accion{
 				Etiqueta: p.tr.T("history.move", nil),
 				Deshacer: func() error {
 					return p.llamar(id, func(ctx context.Context, id string) error {
@@ -630,6 +650,7 @@ func (p *Pantalla) moverACuaderno(id string, destino Cuaderno, conHistorial bool
 				},
 				Rehacer: func() error { return p.moverACuaderno(id, destino, false) },
 			}, "")
+			p.avisarConDeshacer(hecho, paso)
 		}
 		p.Repintar()
 	})
@@ -716,18 +737,7 @@ func (p *Pantalla) menuNota(n Nota, enArbol bool) *ui.Menu {
 	if !p.activo.Cifrado {
 		entrada("note.export", func() { p.dialogoExportarNota(n) })
 	}
-	if n.Tipo == "todo" {
-		if !n.Terminada() && !p.activo.Cifrado {
-			entrada("task.postpone", func() { p.dialogoPosponer(n.Crudo) })
-		}
-		cancelar := "task.cancel"
-		if n.Cancelada {
-			cancelar = "task.reopen"
-		}
-		entrada(cancelar, func() {
-			lanzar(func() error { return p.editar(n.ID, Parche{Cancelada: ptr(!n.Cancelada)}, true) })
-		})
-	}
+	p.entradasDeTarea(n, enArbol, func(clave string, f func()) { entrada(clave, f) })
 	if p.puedeCompartirNota(n) {
 		entrada("sharePeople.open", func() { p.compartirNota(n) })
 	}
@@ -744,6 +754,31 @@ func (p *Pantalla) menuNota(n Nota, enArbol bool) *ui.Menu {
 	m := ui.NuevoMenu(el...)
 	m.Rotulo = t("common.more", nil)
 	return m
+}
+
+// entradasDeTarea son las del «…» que van con el tipo: posponer y cancelar (o reactivar)
+// una tarea y, justo detrás, «Convertir en tarea» o «Convertir en texto», como en
+// NoteCard.tsx. La fila del árbol (NoteTree.tsx) no convierte.
+func (p *Pantalla) entradasDeTarea(n Nota, enArbol bool, entrada func(clave string, f func())) {
+	if n.Tipo == "todo" {
+		if !n.Terminada() && !p.activo.Cifrado {
+			entrada("task.postpone", func() { p.dialogoPosponer(n.Crudo) })
+		}
+		cancelar := "task.cancel"
+		if n.Cancelada {
+			cancelar = "task.reopen"
+		}
+		entrada(cancelar, func() {
+			lanzar(func() error { return p.editar(n.ID, Parche{Cancelada: ptr(!n.Cancelada)}, true) })
+		})
+	}
+	if !enArbol && p.puedeConvertir(n) {
+		convertir := "note.toTodo"
+		if n.Tipo == "todo" {
+			convertir = "note.toText"
+		}
+		entrada(convertir, func() { p.convertir(n.ID) })
+	}
 }
 
 // renombrar abre el campo del título en la tarjeta: Intro o salir guardan, Escape
@@ -859,6 +894,12 @@ func (p *Pantalla) descargar(nombre string, cuerpo io.Reader) {
 // guardarCuaderno es el `guardarCuaderno` de la web: crea (`id` vacío) o cambia, vuelve
 // a cargar el árbol y abre el cuaderno guardado.
 func (p *Pantalla) guardarCuaderno(id string, in api.NotebookInput) error {
+	return p.guardarCuadernoCon(id, in, "note.saveFailed")
+}
+
+// guardarCuadernoCon es guardarCuaderno con la clave del aviso si falla: «Mover
+// cuaderno a…» dice `move.failed`, como en la web, y no «no se ha podido guardar».
+func (p *Pantalla) guardarCuadernoCon(id string, in api.NotebookInput, fallo string) error {
 	if p.svc == nil || !p.hayRed() {
 		return nil
 	}
@@ -874,7 +915,7 @@ func (p *Pantalla) guardarCuaderno(id string, in api.NotebookInput) error {
 		nb, err = p.svc.UpdateNotebook(ctx, id, in)
 	}
 	if err != nil {
-		p.avisar(ui.AvisoPeligro, p.tr.T("note.saveFailed", nil), p.motivo(err))
+		p.avisar(ui.AvisoPeligro, p.tr.T(fallo, nil), p.motivo(err))
 		return err
 	}
 	c := DeCuaderno(nb)
@@ -915,6 +956,18 @@ func (p *Pantalla) borrarCuaderno(c Cuaderno) {
 // deshacer y rehacer son los botones de la barra y Ctrl+Z / Ctrl+Mayús+Z.
 func (p *Pantalla) deshacer() { p.historia(p.hist.Deshacer, "history.undone") }
 func (p *Pantalla) rehacer()  { p.historia(p.hist.Rehacer, "history.redone") }
+
+// avisarConDeshacer es el aviso de éxito con «Deshacer», que deshace ESE paso del
+// historial (Historial.DeshacerEsta) y no el último: entre el aviso y la pulsación puede
+// haber pasado otra cosa.
+func (p *Pantalla) avisarConDeshacer(titulo string, paso uint64) {
+	a := ui.NuevoAviso(ui.AvisoExito, titulo, "")
+	a.RotuloAccion = p.tr.T("history.undo", nil)
+	a.AlPulsarAccion = func() {
+		go p.historia(func() (string, error) { return p.hist.DeshacerEsta(paso) }, "history.undone")
+	}
+	p.avisos.Notificar(a)
+}
 
 func (p *Pantalla) historia(f func() (string, error), hecho string) {
 	etiqueta, err := f()

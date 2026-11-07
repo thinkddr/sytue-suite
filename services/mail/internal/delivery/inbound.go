@@ -489,6 +489,10 @@ func (in *Inbound) publishDelivered(ctx context.Context, tenant string, accountI
 	if campana && in.hubNotifier != nil && recipientSubject != "" {
 		in.hubNotifier.SendAsync(ctx, avisoDeLlegada(in.mailPublicURL, tenant, recipientSubject, m))
 	}
+	// Y la señal de cambios para el widget de Mail, aparte de la campana: sale también
+	// sin aviso (spam, Mail silenciado en el Hub), porque el contador de la Entrada
+	// cambia igual. Nil-safe y sin nada del mensaje.
+	in.hubNotifier.AvisarCambio(ctx, tenant, "mail", recipientSubject)
 }
 
 // avisoDeLlegada es el aviso del Hub de un correo que acaba de entrar: abre SU

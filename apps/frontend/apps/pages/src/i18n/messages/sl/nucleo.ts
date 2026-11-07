@@ -88,7 +88,7 @@ export const nucleo = {
   'new.progress': 'Koraki za ustvarjanje spletnega mesta',
   'new.go_to_step': 'Pojdi na korak {n}',
   'new.step_of': 'Korak {n} od {total}',
-  'app_settings.title': 'Nastavitve Sytue Web',
+  'app_settings.title': 'Nastavitve Sytue Webs',
   'new.search_title': 'Začnite pri svoji dejavnosti',
   'new.search_help':
     'Vpišite, s čim se ukvarjate, ali izberite skupino. Vsaka predloga že vsebuje besedila za vašo dejavnost: spremenite le ime, telefon, cene in fotografije.',
@@ -292,7 +292,7 @@ export const nucleo = {
   'domains.start_help':
     'Vnesite domeno, ki jo želite uporabljati. Potrebovali boste dostop do nastavitev DNS pri ponudniku, kjer ste jo kupili.',
   'domains.progress': 'Napredek povezovanja domene',
-  'domains.step.registered': 'Dodano v Sytue Web',
+  'domains.step.registered': 'Dodano v Sytue Webs',
   'domains.step.dns': 'DNS potrjen',
   'domains.step.https': 'HTTPS pripravljen',
   'domains.step.primary': 'Glavni naslov',

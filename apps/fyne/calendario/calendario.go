@@ -123,6 +123,24 @@ type Pantalla struct {
 	// cajonAbierto es el menú sacado como cajón en ventana estrecha.
 	cajonAbierto bool
 
+	// Ventana es el ancho de la ventana, que decide el mes del teléfono (< `ui.CorteSM`).
+	// Lo pone el armazón al medirse (`AlMedir`); 0 es «aún no se sabe» y no es compacto.
+	Ventana float32
+	// Ahora es el reloj de la pantalla: qué día es hoy. nil, `time.Now`.
+	Ahora func() time.Time
+	// mesPlegado es el asa del mes del teléfono: solo la semana elegida. Sobrevive a
+	// que la App reconstruya la pantalla, como `useState` en la web.
+	mesPlegado bool
+	// diaElegido y asaMes son el día elegido y el asa del último pintado del mes del
+	// teléfono: adonde vuelve el foco tras repintar si estaba en un día o en el asa.
+	diaElegido *diaCompacto
+	asaMes     *asaMes
+	// recEnCajon es la rama de recordatorios desplegada en el cajón del teléfono, y
+	// recCargando/recFallo el estado del sondeo, que la App copia aquí al pintar.
+	recEnCajon            bool
+	recCargando, recFallo bool
+	saltarRec, descartRec func(api.Reminder)
+
 	// Los avisos hacia fuera. Todos pueden ser nil.
 	AlIrHoy   func()
 	AlNavegar func(delta int)
@@ -152,6 +170,11 @@ type Pantalla struct {
 	Refresco            ui.RefrescoLista
 	// AlConmutarCajon abre o cierra el menú en ventana estrecha.
 	AlConmutarCajon func()
+	// AlRehacer pide reconstruir la pantalla FUERA del Layout: la ventana cruzó el corte
+	// del mes del teléfono.
+	AlRehacer func()
+	// AlPlegarMes repinta tras plegar o desplegar el mes del teléfono con el asa.
+	AlPlegarMes func()
 }
 
 // t es azúcar para no repetir el nil-check del traductor en cada rótulo.
@@ -190,6 +213,7 @@ func (p *Pantalla) visible(id string) bool {
 // Construir arma el árbol de la pantalla entera, listo para `SetContent`.
 func (p *Pantalla) Construir() fyne.CanvasObject {
 	a := ui.NuevoArmazon(p.contenido())
+	a.AlMedir = p.medirVentana
 	a.Menu = p.menu()
 	a.BarraMovil = p.nuevaBarraMovil()
 	a.CajonAbierto = p.cajonAbierto
@@ -261,7 +285,14 @@ func (p *Pantalla) cabecera() *CabeceraVista {
 	return NuevaCabeceraVista(p.Titulo(), izquierda, derecha)
 }
 
+// navegar es «anterior/siguiente» (los botones de la cabecera y las teclas `p`/`n`). En
+// el mes del teléfono es el mismo paso que deslizar: un mes desplegado, una semana
+// plegado, que es lo que se ve (`navigate` en CalendarApp.tsx).
 func (p *Pantalla) navegar(d int) {
+	if p.compacta() {
+		p.moverCompacto(d)
+		return
+	}
 	if p.AlNavegar != nil {
 		p.AlNavegar(d)
 	}
@@ -286,8 +317,12 @@ func contar(n int) string {
 	return string(d)
 }
 
-// contenido es la cabecera y, debajo, la vista o el estado que toque.
+// contenido es la cabecera y, debajo, la vista o el estado que toque. En el mes del
+// teléfono no hay cabecera de vista: lo suyo va en la barra móvil y en el cajón.
 func (p *Pantalla) contenido() fyne.CanvasObject {
+	if p.compacta() {
+		return p.conFranjas(p.vistaMesCompacta())
+	}
 	cuerpo := p.conFranjas(p.cuerpo())
 	cab := p.cabecera()
 	return container.New(&bajoCabecera{c: cab}, cab, cuerpo)

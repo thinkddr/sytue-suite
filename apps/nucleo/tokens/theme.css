@@ -329,6 +329,16 @@
       --sytue-topbar-pad: 1.5rem;
     }
   }
+  /* LA BARRA ÚNICA DEL TELÉFONO (TopBar con `movil`): el canalón lo pone el AIRE DE LOS
+     BOTONES, no la barra. Con el dedo cada uno mide 44 con un glifo de 18-24 dentro, y ese
+     aire ya deja el ☰ a 16 px del cristal y el avatar a 14 —lo que hacen iOS y Android—.
+     Con el 1rem encima eran 27 px por lado, y a 320 eso era justo lo que le faltaba al
+     mes de Calendar: «Σεπτέμβριος 2027» perdía el año al entrar la entrada a la suite. */
+  @media (max-width: 767.98px) {
+    .sytue-topbar[data-barra-unica] {
+      --sytue-topbar-pad: 0.25rem;
+    }
+  }
   .sytue-safe-workspace {
     padding-left: var(--sytue-safe-left);
     padding-right: var(--sytue-safe-right);

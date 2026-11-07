@@ -130,8 +130,25 @@ func (h *Hub) StreamNotifications(ctx context.Context, cada func(HubNotification
 // no se guarda ni sale en la campana.
 const EventoAvatar = "avatar"
 
+// EventoDatos es la señal de cambios (`hubnotify.EventoDatos`): algo de un producto
+// ha cambiado —en la web, en otro aparato, por otra persona, o al acabar un trabajo
+// del servidor— y su widget nativo tiene que volver a leer. `data` es
+// {"producto": "<producto>"}, el esquema de la app sin `sytue-` (ProductoDeDatos).
+const EventoDatos = "datos"
+
+// ProductoDeDatos saca el producto del `data` de EventoDatos; "" si no lo trae.
+func ProductoDeDatos(datos string) string {
+	var d struct {
+		Producto string `json:"producto"`
+	}
+	if json.Unmarshal([]byte(datos), &d) != nil {
+		return ""
+	}
+	return d.Producto
+}
+
 // Escuchar es StreamNotifications con los eventos de ESTADO además de los avisos:
-// `alEstado` recibe el nombre (`avatar`) y el `data` en crudo. nil, no se miran.
+// `alEstado` recibe el nombre (`avatar`, `datos`) y el `data` en crudo. nil, no se miran.
 func (h *Hub) Escuchar(ctx context.Context, cada func(HubNotification), alEstado func(evento, datos string)) error {
 	resp, err := h.c.Do(ctx, Request{
 		Path:   "/notifications/stream",
@@ -148,7 +165,7 @@ func (h *Hub) Escuchar(ctx context.Context, cada func(HubNotification), alEstado
 			if datos != "" && json.Unmarshal([]byte(datos), &n) == nil {
 				cada(n)
 			}
-		case evento == EventoAvatar && alEstado != nil:
+		case (evento == EventoAvatar || evento == EventoDatos) && alEstado != nil:
 			alEstado(evento, datos)
 		}
 	})
@@ -261,9 +278,19 @@ func (b HubBusqueda) Fallidos() []string {
 // en la URL, que es lo que el handler lee cuando no hay cuerpo, y así no depende de que
 // un proxy por medio sepa reenviar un método que no conoce.
 func (h *Hub) Search(ctx context.Context, texto string, limite int) (HubBusqueda, error) {
+	return h.SearchDesde(ctx, texto, limite, 0)
+}
+
+// SearchDesde es la página de la búsqueda que empieza en `desde`: el «Cargar más». El
+// Hub pagina sobre el AGREGADO ya ordenado (`offset`) y acota `limit` a su máximo, así
+// que la única forma de llegar a la página siguiente es su desplazamiento.
+func (h *Hub) SearchDesde(ctx context.Context, texto string, limite, desde int) (HubBusqueda, error) {
 	q := url.Values{"q": {texto}}
 	if limite > 0 {
 		q.Set("limit", strconv.Itoa(limite))
+	}
+	if desde > 0 {
+		q.Set("offset", strconv.Itoa(desde))
 	}
 	return JSON[HubBusqueda](ctx, h.c, Request{Path: "/search", Query: q})
 }

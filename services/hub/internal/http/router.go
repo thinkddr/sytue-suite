@@ -21,6 +21,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/personas"
 	"git.sytue.eu/sytue/one/services/hub/internal/config"
 	"git.sytue.eu/sytue/one/services/hub/internal/connectors"
+	"git.sytue.eu/sytue/one/services/hub/internal/despertar"
 	"git.sytue.eu/sytue/one/services/hub/internal/instaladores"
 	"git.sytue.eu/sytue/one/services/hub/internal/intents"
 	"git.sytue.eu/sytue/one/services/hub/internal/interpretar"
@@ -46,7 +47,10 @@ type Deps struct {
 	// Instaladores es el catálogo de instaladores nativos. Nil = no configurado.
 	Instaladores *instaladores.Catalogo
 	// Correo cuenta los correos sin leer para la campana. Nil = sin Mail.
-	Correo        *connectors.MailConnector
+	Correo *connectors.MailConnector
+	// Despertador despierta las apps de iOS cuando llega la señal de cambios. Nil =
+	// sin credenciales de Apple: el registro de aparatos sigue y nadie se despierta.
+	Despertador   *despertar.Despertador
 	ReadyCheckers []httpx.Checker
 }
 
@@ -78,6 +82,12 @@ func NewRouter(d Deps) http.Handler {
 	}
 	if d.Correo != nil {
 		h.correo = d.Correo
+	}
+	if d.Store != nil {
+		h.aparatos = d.Store
+	}
+	if d.Despertador != nil {
+		h.despertar = d.Despertador
 	}
 	if d.Cfg.IDNombresOrgsSecret != "" {
 		h.orgs = personas.NuevosNombresOrgs(d.Cfg.IDBaseURL, d.Cfg.IDNombresOrgsSecret)
@@ -128,6 +138,11 @@ func NewRouter(d Deps) http.Handler {
 		api.Put("/presence", h.Heartbeat)
 		api.Delete("/presence", h.Offline)
 		api.Get("/presence", h.QueryPresence) // ?subjects=a,b,c
+
+		// Los aparatos de iOS a los que despertar por su widget (aparatos.go). Es el
+		// único registro de la suite: las rutas homónimas de Rooms redirigen aquí.
+		api.Post("/me/push/apns", h.RegistrarAparato)
+		api.Post("/me/push/apns/forget", h.OlvidarAparatos)
 
 		// Intents cross-app (devuelven deep-links).
 		api.Post("/intents", h.ResolveIntent)

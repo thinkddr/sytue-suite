@@ -4,6 +4,8 @@
   "action.classified": "Flokkun · {name}",
   "action.classify": "Flokka",
   "action.copy": "Búa til afrit",
+  "action.copyLink": "Afrita tengil",
+  "action.copyLinkFailed": "Ekki tókst að afrita tengilinn.",
   "action.delete": "Færa í rusl",
   "action.desktopBody": "Ef það er ekki uppsett enn geturðu sótt það.",
   "action.desktopCta": "Sjá niðurhöl",
@@ -12,6 +14,7 @@
   "action.downloadName": "Sækja {name}",
   "action.downloadZip": "Sækja (ZIP)",
   "action.editorFailed": "Ritillinn gat ekki opnað þessa skrá.",
+  "action.linkCopied": "Tengill afritaður. Hann opnast aðeins þeim sem hafa þegar aðgang.",
   "action.mailFailed": "Ekki tókst að opna tölvupóstritilinn",
   "action.menu": "Aðgerðir fyrir {name}",
   "action.more": "Fleiri aðgerðir",
@@ -81,6 +84,14 @@
   "files.batch.moveTitle": {
     "one": "Færa {count} atriði",
     "other": "Færa {count} atriði"
+  },
+  "files.batch.restorePartial": {
+    "one": "Ekki tókst að endurheimta {count} atriði; það er enn í ruslinu.",
+    "other": "Ekki tókst að endurheimta {count} atriði; þau eru enn í ruslinu."
+  },
+  "files.batch.restored": {
+    "one": "{count} atriði endurheimt.",
+    "other": "{count} atriði endurheimt."
   },
   "files.batch.trashBody": {
     "one": "{count} atriði verður sent í ruslið. Þú getur endurheimt það þaðan.",
@@ -555,6 +566,17 @@
     "other": "{count} skrám hlaðið upp."
   },
   "team.upload.partial": "{uploaded} af {count} hlaðið upp.",
+  "trash.emptiedAll": "Ruslið var tæmt.",
+  "trash.emptyAll": "Tæma ruslið",
+  "trash.emptyAllBody": {
+    "one": "{count} atriði í ruslinu verður eytt endanlega ásamt útgáfusögunni. Engin leið er að endurheimta það eftir á.",
+    "other": "{count} atriðum í ruslinu verður eytt endanlega ásamt útgáfusögunni. Engin leið er að endurheimta þau eftir á."
+  },
+  "trash.emptyAllPartial": {
+    "one": "Ekki tókst að eyða {count} atriði; það er enn í ruslinu.",
+    "other": "Ekki tókst að eyða {count} atriðum; þau eru enn í ruslinu."
+  },
+  "trash.emptyAllTitle": "Tæma ruslið?",
   "trash.emptyBody": "Skrár og möppur sem þú eyðir birtast hér og hægt verður að endurheimta þær.",
   "trash.emptyTitle": "Ruslið er tómt",
   "trash.errorTitle": "Ekki tókst að hlaða ruslinu",

@@ -18,6 +18,8 @@ export const pl: Catalog = {
   'ui.openNav': 'Otwórz nawigację',
   'ui.closeNav': 'Zamknij nawigację',
   'ui.backToList': 'Wróć do listy',
+  'ui.suiteOpen': 'Sytue: aplikacje, wyszukiwanie, powiadomienia i konto',
+  'ui.suiteClose': 'Wróć do aplikacji',
   'ui.noResults': 'Brak wyników.',
   'ui.meter.almostFull': 'prawie pełne',
   'ui.meter.full': 'pełne',
@@ -60,6 +62,9 @@ export const pl: Catalog = {
   'shell.lock.reasonNotebook': 'otworzyć Twój zaszyfrowany notatnik',
   'shell.lock.faceIdUsage':
     'Sytue używa Face ID, aby odblokować Twoją sesję po otwarciu aplikacji.',
+  'shell.widgets.wake': 'Aktualizuj widżety, gdy aplikacja jest zamknięta',
+  'shell.widgets.wakeHelp':
+    'Gdy coś Twojego się zmieni, Sytue budzi aplikację pustym powiadomieniem Apple, aby odświeżyła swój widżet. Apple widzi, która to aplikacja i kiedy, nigdy to, co się zmieniło.',
   'shell.call.microphoneUsage':
     'Sytue Rooms używa mikrofonu tylko podczas rozmowy i tylko wtedy, gdy go włączysz.',
   'shell.call.cameraUsage':
@@ -188,7 +193,7 @@ export const pl: Catalog = {
     'Domena {domain} w serwisie {site} nie działa: sprawdź jej ustawienia',
   'notifications.kind.pages.erp.failed':
     'Zamówienie {number} z serwisu {site} nie dotarło do Sytue ERP',
-  'notifications.kind.pages.settings.changed': 'Zmiana ustawienia w Sytue Web: {actor}',
+  'notifications.kind.pages.settings.changed': 'Zmiana ustawienia w Sytue Webs: {actor}',
   'notifications.kind.pages.export.ready': 'Twój eksport serwisu {site} jest gotowy',
   'notifications.kind.pages.store.busy':
     'Sklep w serwisie {site} ma zbyt wiele zamówień oczekujących na płatność',
@@ -371,6 +376,8 @@ export const pl: Catalog = {
   'widgets.compose': 'Napisz',
   'widgets.storage': 'Miejsce',
   'widgets.create': 'Utwórz wydarzenie',
+  'widgets.updatedAgo': 'Zaktualizowano {time}',
+  'widgets.updatedAt': 'Zaktualizowano: {time}',
 
   'linkedServices.services': 'Usługi',
   'linkedServices.changed':
@@ -383,6 +390,7 @@ export const pl: Catalog = {
   'linkedServices.notGranted':
     'Nie przyznano dostępu do tej usługi. Połącz konto ponownie, aby wybrać uprawnienia.',
   'linkedServices.connected': 'Połączone usługi',
+  'linkedServices.exists': 'To konto było już połączone i jest teraz otwarte.',
   'linkedServices.providerData': 'Zmiany są zapisywane u dostawcy.',
   'linkedServices.writeUnknown':
     'Dostawca nie potwierdził zapisu. Odśwież i sprawdź stan przed ponowną próbą.',

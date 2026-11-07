@@ -65,7 +65,9 @@ type Eleccion struct {
 	// la medida natural de las casillas existentes. Lo usa un formulario estrecho.
 	AnchoEtiqueta float32
 	// Escalon es el de la etiqueta. Cero es text-base; los radios de Rooms usan text-sm.
-	Escalon   tema.Escalon
+	Escalon tema.Escalon
+	// Acento es el token del `accent-color` de la casilla marcada (vacío: `primary`).
+	Acento    string
 	AlCambiar func(bool)
 
 	inerte, enfocado, encima bool
@@ -251,15 +253,12 @@ func (e *Eleccion) MouseOut() { e.encima = false; e.Refresh() }
 // caja de línea de la etiqueta, así que hay que moverla. Se recolocan los dos
 // rectángulos desde cero en cada llamada —y no con un desplazamiento relativo—, porque
 // Layout se ejecuta en cada redimensión y un incremento se acumularía.
+//
+// La caja recuerda la posición: con trazo, el filete va a medio píxel hacia dentro de
+// `p` como lo pone Redimensionar en el origen, y un Pintar posterior no lo devuelve allí.
 func MoverCaja(c *Caja, p fyne.Position, tam fyne.Size) {
-	c.Redimensionar(tam)
-	objs := c.Objetos()
-	c.fuera.Move(p)
-	if len(objs) == 2 {
-		c.dentro.Move(fyne.NewPos(p.X+tema.Borde, p.Y+tema.Borde))
-		return
-	}
-	c.dentro.Move(p)
+	c.origen = p
+	c.colocar(tam)
 }
 
 // eleccionRenderer lleva la pieza de Chromium (PiezaCasilla), que tiene SIEMPRE sus tres
@@ -309,7 +308,7 @@ func (r *eleccionRenderer) Layout(t fyne.Size) {
 
 func (r *eleccionRenderer) Refresh() {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	r.pieza.Pintar(EstadoCasilla{Marcada: r.e.Marcada, Parcial: r.e.Parcial, Encima: r.e.encima && !r.e.inerte, Inerte: r.e.inerte}, v)
+	r.pieza.Pintar(EstadoCasilla{Marcada: r.e.Marcada, Parcial: r.e.Parcial, Encima: r.e.encima && !r.e.inerte, Inerte: r.e.inerte, Acento: r.e.Acento}, v)
 	r.aro.Pintar(v)
 	r.aro.Ver(r.e.enfocado)
 	envuelve := r.e.envuelveEn(r.e.Size().Width)

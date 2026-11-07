@@ -115,6 +115,13 @@ func (m *marco) colocar(origen fyne.Position, total fyne.Size, pos fyne.Position
 
 	radio := min(tema.Forma("radius-sheet"), tam.Width/2, tam.Height/2)
 	m.hoja.FillColor = tema.Color("sheet-bg", v)
+	// Sobre el cromo «papel» la hoja se separa del marco con un filete y no con la
+	// sombra, que era lo único que se veía de ella (appearance.css, `.sytue-sheet`).
+	papel := tema.EsPapel() && tema.EsMarco()
+	m.hoja.StrokeColor, m.hoja.StrokeWidth = color.Transparent, 0
+	if papel && !aSangre {
+		m.hoja.StrokeColor, m.hoja.StrokeWidth = tema.Color("border-subtle", v), 1
+	}
 	m.hoja.TopLeftCornerRadius, m.hoja.TopRightCornerRadius = radio, radio
 	m.hoja.BottomLeftCornerRadius, m.hoja.BottomRightCornerRadius = radio, radio
 	m.hoja.Move(pos)
@@ -138,7 +145,7 @@ func (m *marco) colocar(origen fyne.Position, total fyne.Size, pos fyne.Position
 		esconder(e, radio <= 0)
 		e.Refresh()
 	}
-	m.sombra.colocar(pos, tam, radio, !aSangre, v)
+	m.sombra.colocar(pos, tam, radio, !aSangre && !papel, v)
 }
 
 // mascara es el generador de la esquina `i`: el cuadrado del radio con el arco vaciado,
@@ -390,4 +397,16 @@ func lateralEn(o fyne.CanvasObject) *Lateral {
 		return lateralEn(v.Content)
 	}
 	return nil
+}
+
+// FondoHoja es el token de lo que va detrás del contenido de una app: la HOJA en Marco
+// (`sheet-bg`, que sobre el cromo «papel» es blanca con su filete y en el de color es el
+// propio `bg`) y el lienzo en Carril (`bg`). Nació en Notepads como `fondoPagina` y subió
+// aquí cuando la suite entera pasó a papel (ADR 0080): con `bg` a secas, el contenido se
+// veía gris dentro de la hoja blanca.
+func FondoHoja() string {
+	if tema.EsMarco() {
+		return "sheet-bg"
+	}
+	return "bg"
 }

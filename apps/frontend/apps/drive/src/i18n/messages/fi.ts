@@ -256,6 +256,11 @@ export const fi: AppCatalog<typeof en> = {
     one: '1 kohde siirrettiin roskakoriin.',
     other: '{count} kohdetta siirrettiin roskakoriin.',
   },
+  'files.batch.restored': { one: '1 kohde palautettiin.', other: '{count} kohdetta palautettiin.' },
+  'files.batch.restorePartial': {
+    one: '1 kohdetta ei voitu palauttaa, se on yhä roskakorissa.',
+    other: '{count} kohdetta ei voitu palauttaa, ne ovat yhä roskakorissa.',
+  },
   'files.batch.trashFailed': 'Valintaa ei voitu siirtää roskakoriin.',
   'files.batch.moveTitle': { one: 'Siirrä 1 kohde', other: 'Siirrä {count} kohdetta' },
   'files.batch.moveDone': { one: '1 kohde siirrettiin.', other: '{count} kohdetta siirrettiin.' },
@@ -270,6 +275,9 @@ export const fi: AppCatalog<typeof en> = {
   'action.rename': 'Nimeä uudelleen',
   'action.move': 'Siirrä…',
   'action.copy': 'Tee kopio',
+  'action.copyLink': 'Kopioi linkki',
+  'action.linkCopied': 'Linkki kopioitiin. Se aukeaa vain niille, joilla on jo käyttöoikeus.',
+  'action.copyLinkFailed': 'Linkkiä ei voitu kopioida.',
   'action.shareLink': 'Jaa linkki',
   'action.openInApp': 'Avaa sovelluksessa',
   'action.openInEditor': 'Avaa editorissa',
@@ -487,6 +495,18 @@ export const fi: AppCatalog<typeof en> = {
   'trash.purged': '”{name}” poistettiin pysyvästi.',
   'trash.purgeDenied': 'Kohdetta ”{name}” ei voi poistaa',
   'trash.purgeFailed': 'Poistaminen ei onnistunut.',
+  'trash.emptyAll': 'Tyhjennä roskakori',
+  'trash.emptyAllTitle': 'Tyhjennetäänkö roskakori?',
+  'trash.emptyAllBody': {
+    one: 'Roskakorin kohde poistetaan lopullisesti versiohistorioineen. Sitä ei voi palauttaa jälkikäteen.',
+    other:
+      'Roskakorin {count} kohdetta poistetaan lopullisesti versiohistorioineen. Niitä ei voi palauttaa jälkikäteen.',
+  },
+  'trash.emptiedAll': 'Roskakori tyhjennettiin.',
+  'trash.emptyAllPartial': {
+    one: '1 kohdetta ei voitu poistaa, se on yhä roskakorissa.',
+    other: '{count} kohdetta ei voitu poistaa, ne ovat yhä roskakorissa.',
+  },
   'trash.purgeTitle': 'Poistetaanko pysyvästi?',
   'trash.purgeBodyFolder':
     'Kohteen ”{name}” ja kaiken sen sisällön tiedot pyyhitään Sytuen palvelimilta versiohistorioineen. Niitä ei voi palauttaa jälkikäteen, ei täältä eikä tuen kautta. Vastineeksi vapautat niiden viemän tilan.',

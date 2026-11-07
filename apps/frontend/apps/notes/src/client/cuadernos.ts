@@ -84,3 +84,55 @@ export function colocarCuaderno(
   });
   return cambios.some((c) => c.notebook.read_only) ? null : cambios;
 }
+
+/** La rama de un cuaderno: él y todo lo que cuelga de él, a cualquier nivel. */
+function ramaDe(notebooks: readonly Notebook[], id: string): Set<string> {
+  const rama = new Set([id]);
+  for (let cambio = true; cambio;) {
+    cambio = false;
+    for (const n of notebooks) {
+      if (n.parent_id && rama.has(n.parent_id) && !rama.has(n.id)) {
+        rama.add(n.id);
+        cambio = true;
+      }
+    }
+  }
+  return rama;
+}
+
+/**
+ * Dónde se puede colgar un cuaderno con «Mover cuaderno a…»: ni él ni su rama (sería
+ * un ciclo), ni uno de solo lectura, ni el padre que ya tiene (no movería nada).
+ */
+export function destinosDeCuaderno(notebooks: readonly Notebook[], id: string): Notebook[] {
+  const rama = ramaDe(notebooks, id);
+  const padre = notebooks.find((n) => n.id === id)?.parent_id ?? null;
+  return notebooks.filter((n) => !rama.has(n.id) && !n.read_only && n.id !== padre);
+}
+
+/**
+ * El plan de «Mover cuaderno a…»: al final de los hijos de `padre`, o de la raíz con
+ * `null`. Es el mismo plan que arrastrar y soltar; `null` si no se puede.
+ *
+ * En la raíz va detrás de TODAS (la mayor posición + 1024), también de las de solo
+ * lectura, y solo cambia él: colocarlo «detrás de la última escribible» podía dejarlo
+ * antes de una ajena y renumerar. Es el `entradaMoverCuaderno` de Fyne.
+ */
+export function moverCuadernoA(
+  notebooks: readonly Notebook[],
+  id: string,
+  padre: string | null,
+): CambioCuaderno[] | null {
+  if (padre !== null) return colocarCuaderno(notebooks, id, padre, 'inside');
+  const origen = notebooks.find((n) => n.id === id);
+  if (!origen || origen.read_only) return null;
+  if ((origen.parent_id ?? null) === null) return [];
+  const raices = notebooks.filter((n) => (n.parent_id ?? null) === null && n.id !== id);
+  const posicion = raices.length ? Math.max(...raices.map((n) => n.position)) + 1024 : 1024;
+  return [
+    {
+      notebook: origen,
+      input: { ...ajustesDelCuaderno(origen), parent_id: null, position: posicion },
+    },
+  ];
+}

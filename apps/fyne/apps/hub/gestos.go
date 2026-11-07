@@ -14,6 +14,15 @@ import (
 // onboarding and data-export forms deliberately keep their own input behaviour.
 func (v *Vista) Desplazable() fyne.CanvasObject {
 	scroll := container.NewVScroll(v.Objeto())
+	// Tras «Cargar más» el foco salta al primer resultado nuevo, más abajo: se trae a la
+	// vista. Antes se pone al día el alto del contenido, que acaba de crecer: con
+	// `scroll.Refresh()` no, que repinta la pantalla y rehace la fila recién enfocada.
+	v.buscar.AlRevelarFoco = func() {
+		if c := fyne.CurrentApp().Driver().CanvasForObject(scroll); c != nil {
+			scroll.Content.Resize(scroll.Content.MinSize().Max(scroll.Size()))
+			ui.MostrarFoco(scroll, c, 0)
+		}
+	}
 	return ui.RefrescarAlTirar(scroll, &ui.RefrescoLista{
 		Arriba: func() bool { return scroll.Offset.Y <= 0.5 },
 		Puede: func() bool {

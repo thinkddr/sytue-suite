@@ -66,6 +66,7 @@
   "common.remove": "Eemalda",
   "common.retry": "Proovi uuesti",
   "common.save": "Salvesta",
+  "day.noEvents": "Sel päeval pole sündmusi",
   "error.calendarsLoad": "Kalendreid ei õnnestunud laadida.",
   "error.eventsLoad": "Sündmusi ei õnnestunud laadida.",
   "event.ai": "Kirjeldage sündmust",
@@ -142,12 +143,19 @@
   "grid.blockAria": "{title}, {time}",
   "grid.continued": "{title} (jätkub)",
   "grid.createOn": "Loo sündmus kuupäevale {date}",
+  "grid.dayEvents": {
+    "one": "{date}, {count} sündmus",
+    "other": "{date}, {count} sündmust"
+  },
+  "grid.daySelected": "{label}, valitud",
   "grid.loadError": "Kalendrit ei õnnestunud laadida",
   "grid.loading": "Kalendri laadimine",
   "grid.more": {
     "one": "+{count} veel",
     "other": "+{count} veel"
   },
+  "grid.showMonth": "Näita kogu kuud",
+  "grid.showWeek": "Näita ainult seda nädalat",
   "grid.snapAria": {
     "one": "Lohistamise samm {count} minut. Vajutage muutmiseks.",
     "other": "Lohistamise samm {count} minutit. Vajutage muutmiseks."
@@ -160,6 +168,13 @@
     "one": "{count} min",
     "other": "{count} min"
   },
+  "grid.todayLabel": "Täna, {date}",
+  "grid.weekNumber": "Nädal {week}",
+  "guests.organizer": "Korraldaja",
+  "guests.status.accepted": "Osaleb",
+  "guests.status.declined": "Ei osale",
+  "guests.status.pending": "Ootab vastust",
+  "guests.status.tentative": "Võib-olla",
   "header.invitations": "Kutsed",
   "header.next": "Järgmine",
   "header.pending": {
@@ -197,6 +212,10 @@
   "nav.createEventOn": "Loo sündmus kuupäevale {date}",
   "nav.deleteSubscription": "Eemalda tellimus",
   "nav.manageResources": "Halda ruume ja seadmeid",
+  "nav.menuPending": {
+    "one": "Ava menüü, {count} ootel",
+    "other": "Ava menüü, {count} ootel"
+  },
   "nav.myCalendars": "Minu kalendrid",
   "nav.next": "Järgmine",
   "nav.nextMonth": "Järgmine kuu",
@@ -341,6 +360,7 @@
   "scope.following": "Seda ja järgnevaid",
   "scope.legend": "See sündmus kordub. Milliseid sündmusi muudatus puudutab?",
   "scope.this": "Ainult seda sündmust",
+  "search.allCalendars": "Kõik kalendrid",
   "search.error": "Otsingut ei õnnestunud lõpetada.",
   "search.events": "Otsi sündmusi",
   "search.loadMore": "Laadi rohkem",
@@ -349,6 +369,12 @@
     "other": "Kalendritest otsimiseks sisestage vähemalt {count} märki."
   },
   "search.noResults": "Päringule „{term}“ vasteid pole.",
+  "search.period": "Periood",
+  "search.period.any": "Igal ajal",
+  "search.period.month": "Sel kuul",
+  "search.period.past": "Möödunud",
+  "search.period.upcoming": "Tulevased",
+  "search.period.year": "Sel aastal",
   "search.placeholder": "Pealkiri, kirjeldus, asukoht või külaline…",
   "search.searching": "Otsimine…",
   "search.series": "Sari",
@@ -390,6 +416,14 @@
   "share.whoSeesNow": "Kes seda praegu näeb",
   "share.writerHint": "Lisaks vaatamisele loob, muudab ja kustutab sündmusi selles kalendris.",
   "share.writerLabel": "Näha ja muuta minu sündmusi",
+  "shortcuts.group.actions": "Toimingud",
+  "shortcuts.group.navigate": "Liikumine",
+  "shortcuts.group.views": "Vaated",
+  "shortcuts.help": "Näita seda loendit",
+  "shortcuts.next": "Järgmine periood",
+  "shortcuts.prev": "Eelmine periood",
+  "shortcuts.title": "Kiirklahvid",
+  "shortcuts.today": "Mine tänasele",
   "subscribe.aria": "Telli kalender URL-i kaudu",
   "subscribe.byUrl": "Telli URL-i kaudu (.ics)",
   "subscribe.defaultName": "Tellitud kalender",

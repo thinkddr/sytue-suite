@@ -12,6 +12,7 @@ package noteshttp
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -67,6 +68,11 @@ func NewRouter(d Deps) http.Handler {
 		api.Use(d.Verifier.RequireAuth)
 		api.Use(d.Verifier.RequireTenant)
 		api.Use(httpx.RateLimit(httpx.RateLimitConfig{Limiter: apiLimiter, KeyFunc: authn.RateKey}))
+		// La señal de cambios para el widget de Notepads (hubnotify.TrasEscribir). La
+		// vista previa de una copia de seguridad solo lee.
+		api.Use(h.hub.TrasEscribir(func(r *http.Request) bool {
+			return strings.HasSuffix(r.URL.Path, "/notebooks/preview")
+		}, "notes"))
 
 		// Cuadernos (el árbol de la barra lateral).
 		// «Exportar tus datos»: la entrega de los cuadernos (platform/pkg/portabilidad).

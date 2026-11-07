@@ -31,3 +31,4 @@
 "dataflow.item.events" = "Calendar";
 "dataflow.item.documents" = "Documents";
 "dataflow.item.contacts" = "Contacts";
+"widgets.updatedAgo" = "Updated %@";

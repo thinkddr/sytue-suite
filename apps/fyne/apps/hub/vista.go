@@ -11,7 +11,6 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -24,7 +23,6 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/auth"
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
-	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
 // Federado es lo que el Hub le pide al servicio: el abanico cross-app y qué productos
@@ -32,6 +30,7 @@ import (
 type Federado interface {
 	RecentDe(ctx context.Context, origenes []string, limite int) (api.HubBusqueda, error)
 	Search(ctx context.Context, texto string, limite int) (api.HubBusqueda, error)
+	SearchDesde(ctx context.Context, texto string, limite, desde int) (api.HubBusqueda, error)
 	Apps(ctx context.Context) ([]string, error)
 }
 
@@ -98,10 +97,8 @@ const (
 // carga, y meterlas todas en un widget con un `switch` dejaría los seis estados de las
 // seis pantallas en un solo Refresh.
 type Vista struct {
-	// Widget captures the adopted identity before reading the existing agenda.
-	Widget widgets.Source
-	t      *i18n.Translator
-	ahora  time.Time
+	t     *i18n.Translator
+	ahora time.Time
 	// abrir es quien delega en el sistema para abrir otra app o una dirección: la app
 	// en marcha, o un doble en los tests.
 	abrir  api.Abridor
@@ -131,6 +128,12 @@ type Vista struct {
 	ctxBandeja  context.Context
 	generacion  int
 	cargandoMas bool
+	// generacionBusqueda sube con cada búsqueda nueva y cargandoMasBusqueda evita dos
+	// «Cargar más resultados» a la vez: lo mismo que la bandeja, para `/buscar`. El
+	// bloqueo es de UNA búsqueda: una nueva lo suelta, o un «Cargar más» colgado de la
+	// anterior dejaría mudo el de la nueva hasta su plazo.
+	generacionBusqueda  int
+	cargandoMasBusqueda bool
 
 	// AlMostrar avisa de que se ha cambiado de pantalla: la ventana pone su título.
 	AlMostrar func(Destino)
@@ -159,12 +162,6 @@ type Vista struct {
 	portapapeles func() fyne.Clipboard
 	// orgs son mis organizaciones y el cambio de la activa (la sesión transversal).
 	orgs Organizador
-
-	widgetMu     sync.Mutex
-	widgetUnread *int64
-	widgetEvents *int64
-	widgetAgenda []widgets.Item
-	widgetRecent []widgets.Item
 }
 
 // Organizador es lo que «Tus datos» necesita para elegir de qué organización es la
@@ -300,6 +297,7 @@ func (v *Vista) Con(h Federado) *Vista {
 	v.actividad.AlReintentar = func() { go v.cargarActividad(v.actividad.Origen) }
 	v.buscar.AlBuscar = func(termino string) { go v.buscarTermino(termino) }
 	v.buscar.AlReintentar = func() { go v.buscarTermino(v.buscar.Termino) }
+	v.buscar.AlCargarMas = func() { go v.cargarMasBusqueda() }
 	return v
 }
 
@@ -640,10 +638,6 @@ func (v *Vista) org() string {
 
 // Arrancar lanza las cargas de la pantalla inicial.
 func (v *Vista) Arrancar() {
-	v.widgetMu.Lock()
-	v.widgetUnread, v.widgetEvents = nil, nil
-	v.widgetAgenda, v.widgetRecent = nil, nil
-	v.widgetMu.Unlock()
 	v.enUI(func() {
 		v.revisionRefresco++
 		v.lanzador.PuedeConectarAlmacen = false
@@ -751,17 +745,13 @@ func (v *Vista) cargarAgenda() {
 	ctx, cancelar := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancelar()
 
-	desde, hasta := LimitesDelDia(v.ahora)
-	view := v.Widget.View()
+	desde, hasta := api.LimitesDelDia(v.ahora)
 	var sinLeer int
 	var errCorreo error
 	var lecturas sync.WaitGroup
 	lecturas.Go(func() { sinLeer, errCorreo = v.agenda.SinLeer(ctx) })
 	eventos, errEventos := v.agenda.Hoy(ctx, desde, hasta)
 	lecturas.Wait()
-	if errCorreo == nil || errEventos == nil {
-		v.publicarAgendaWidget(ctx, view, sinLeer, errCorreo == nil, eventos, errEventos == nil)
-	}
 	v.enUI(func() {
 		a := Agenda{Eventos: eventos, SinLeer: sinLeer, HayCorreo: errCorreo == nil}
 		switch e := EstadoDe(errEventos); {
@@ -782,12 +772,8 @@ func (v *Vista) cargarReciente() {
 	ctx, cancelar := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancelar()
 
-	view := v.Widget.View()
 	v.enUI(func() { v.lanzador.Reciente.Estado = Cargando })
 	res, err := v.hub.RecentDe(ctx, nil, MaxRecientes)
-	if err == nil {
-		v.publicarRecienteWidget(ctx, view, res.Hits)
-	}
 	v.enUI(func() {
 		v.lanzador.Reciente.Items = res.Hits
 		switch e := EstadoDe(err); {
@@ -830,17 +816,74 @@ func (v *Vista) cargarActividad(origen string) {
 // buscarTermino lanza la búsqueda federada.
 func (v *Vista) buscarTermino(termino string) {
 	if termino == "" {
-		v.enUI(func() { v.buscar.Termino, v.buscar.Items, v.buscar.Estado = "", nil, Listo })
+		v.enUI(func() {
+			v.buscar.Termino, v.buscar.Items, v.buscar.Estado = "", nil, Listo
+			v.buscar.HayMas, v.buscar.Paginas, v.buscar.SinNovedad = false, 0, false
+			v.generacionBusqueda++
+			v.cargandoMasBusqueda = false
+		})
 		return
 	}
 	ctx, cancelar := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancelar()
 
-	v.enUI(func() { v.buscar.Termino, v.buscar.Estado = termino, Cargando })
-	res, err := v.hub.Search(ctx, termino, MaxActividad)
 	v.enUI(func() {
-		v.buscar.Items, v.buscar.Total, v.buscar.Fallidos = res.Hits, res.Total, res.Fallidos()
+		v.buscar.Termino, v.buscar.Estado = termino, Cargando
+		v.buscar.HayMas, v.buscar.Paginas, v.buscar.SinNovedad = false, 0, false
+		v.generacionBusqueda++
+		v.cargandoMasBusqueda = false
+	})
+	res, err := v.hub.Search(ctx, termino, PorPaginaBusqueda)
+	v.enUI(func() {
+		if v.buscar.Termino != termino {
+			return // otra búsqueda la ha adelantado
+		}
+		v.buscar.Items, v.buscar.Fallidos = res.Hits, res.Fallidos()
+		v.buscar.Total = TotalAMostrar(res, 1, res.Total, len(res.Hits))
+		v.buscar.Paginas = 1
+		v.buscar.HayMas = err == nil && HayMasBusqueda(res, 1)
 		v.buscar.Estado = EstadoDe(err)
+	})
+}
+
+// cargarMasBusqueda pide la página siguiente de la búsqueda en curso y la pega detrás
+// («Cargar más resultados»). Una página que llega para una búsqueda que ya no está no se
+// pega a la de ahora, y dos pulsaciones seguidas no piden dos veces la misma.
+func (v *Vista) cargarMasBusqueda() {
+	v.mu.Lock()
+	if v.cargandoMasBusqueda || !v.buscar.HayMas || v.buscar.Termino == "" {
+		v.mu.Unlock()
+		return
+	}
+	v.cargandoMasBusqueda = true
+	termino, paginas, gen := v.buscar.Termino, v.buscar.Paginas, v.generacionBusqueda
+	v.mu.Unlock()
+
+	ctx, cancelar := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancelar()
+	res, err := v.hub.SearchDesde(ctx, termino, PorPaginaBusqueda, paginas*PorPaginaBusqueda)
+	v.enUI(func() {
+		if gen != v.generacionBusqueda {
+			return // de una búsqueda que ya no está: ni se pega ni suelta el bloqueo de otra
+		}
+		v.cargandoMasBusqueda = false
+		b := v.buscar
+		antes := len(b.Items)
+		// Un fallo al pedir MÁS no borra lo que ya se ve: el botón sigue ahí, con el aviso.
+		if err == nil {
+			b.Items = UnirBusqueda(b.Items, res.Hits)
+			b.Fallidos = UnirFallidos(b.Fallidos, res.Fallidos())
+			b.Paginas = paginas + 1
+			b.Total = TotalAMostrar(res, b.Paginas, max(b.Total, res.Total, len(b.Items)), len(b.Items))
+			b.HayMas = HayMasBusqueda(res, b.Paginas)
+		}
+		b.SinNovedad = b.HayMas && len(b.Items) == antes
+		if b.focoEnMas {
+			b.focoEnMas, b.enfocarPendiente, b.enfocarRango = false, true, -1
+			if len(b.Items) > antes {
+				b.enfocarRango = antes
+			}
+		}
 	})
 }
 
@@ -867,97 +910,4 @@ func (v *Vista) enUI(f func()) {
 		}
 		v.bajadas.Refresh()
 	})
-}
-
-func (v *Vista) publicarAgendaWidget(ctx context.Context, view widgets.View, sinLeer int, okCorreo bool, eventos []EventoDeHoy, okEventos bool) {
-	v.widgetMu.Lock()
-	if okCorreo {
-		u := int64(max(sinLeer, 0))
-		v.widgetUnread = &u
-	}
-	if okEventos {
-		ev := int64(len(eventos))
-		v.widgetEvents = &ev
-		recortados := RecortarHoy(eventos)
-		agenda := make([]widgets.Item, 0, len(recortados))
-		for _, e := range recortados {
-			titulo := strings.TrimSpace(e.Resumen)
-			if titulo == "" {
-				continue
-			}
-			badge := e.Inicio.Format("15:04")
-			if e.TodoElDia {
-				badge = "HOY"
-			}
-			var startAt, endAt int64
-			if !e.Inicio.IsZero() && e.Inicio.Unix() > 0 {
-				startAt = e.Inicio.Unix()
-			}
-			if !e.Fin.IsZero() && e.Fin.Unix() > 0 {
-				endAt = e.Fin.Unix()
-			}
-			agenda = append(agenda, widgets.Item{
-				Title:   titulo,
-				Badge:   badge,
-				StartAt: startAt,
-				EndAt:   endAt,
-				Unread:  !HaTerminado(e, v.ahora),
-			})
-		}
-		v.widgetAgenda = widgets.SanitizeItems(agenda)
-	}
-	detalle := v.detalleWidgetBloqueado()
-	v.widgetMu.Unlock()
-	_ = view.PublicarDetalle(ctx, detalle)
-}
-
-func (v *Vista) publicarRecienteWidget(ctx context.Context, view widgets.View, hits []api.HubHit) {
-	recientes := make([]widgets.Item, 0, min(len(hits), widgets.MaxItems))
-	for _, h := range hits {
-		titulo := strings.TrimSpace(h.Title)
-		if titulo == "" {
-			continue
-		}
-		var startAt int64
-		if h.Timestamp != nil && !h.Timestamp.IsZero() && h.Timestamp.Unix() > 0 {
-			startAt = h.Timestamp.Unix()
-		}
-		recientes = append(recientes, widgets.Item{
-			Title:    titulo,
-			Subtitle: h.Kind,
-			Badge:    strings.ToUpper(h.Source),
-			StartAt:  startAt,
-		})
-		if len(recientes) >= widgets.MaxItems {
-			break
-		}
-	}
-	v.widgetMu.Lock()
-	v.widgetRecent = widgets.SanitizeItems(recientes)
-	tieneDatos := v.widgetUnread != nil || v.widgetEvents != nil || len(v.widgetAgenda) > 0 || len(v.widgetRecent) > 0
-	detalle := v.detalleWidgetBloqueado()
-	v.widgetMu.Unlock()
-	if tieneDatos {
-		_ = view.PublicarDetalle(ctx, detalle)
-	}
-}
-
-func (v *Vista) detalleWidgetBloqueado() widgets.Detail {
-	var d widgets.Detail
-	if v.widgetUnread != nil {
-		d.Counters = append(d.Counters, widgets.Counter{Kind: "unread", Value: *v.widgetUnread})
-	}
-	if v.widgetEvents != nil {
-		d.Counters = append(d.Counters, widgets.Counter{Kind: "events", Value: *v.widgetEvents})
-	}
-	combinados := make([]widgets.Item, 0, len(v.widgetAgenda)+len(v.widgetRecent))
-	combinados = append(combinados, v.widgetAgenda...)
-	combinados = append(combinados, v.widgetRecent...)
-	if len(combinados) > widgets.MaxItems {
-		combinados = combinados[:widgets.MaxItems]
-	}
-	if len(combinados) > 0 {
-		d.Items = slices.Clone(combinados)
-	}
-	return d
 }

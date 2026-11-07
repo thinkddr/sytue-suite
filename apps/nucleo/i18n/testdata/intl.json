@@ -1399,6 +1399,16 @@
         "Jul",
         "Oct"
       ],
+      "mes_suelto": [
+        "January",
+        "March",
+        "September",
+        "December",
+        "February",
+        "May",
+        "July",
+        "October"
+      ],
       "dia_corto": [
         "Mon 5 Jan",
         "Tue 31 Mar",
@@ -1550,6 +1560,16 @@
         "05",
         "07",
         "10"
+      ],
+      "mes_suelto": [
+        "януари",
+        "март",
+        "септември",
+        "декември",
+        "февруари",
+        "май",
+        "юли",
+        "октомври"
       ],
       "dia_corto": [
         "пн, 5.01",
@@ -1703,6 +1723,16 @@
         "čvc",
         "říj"
       ],
+      "mes_suelto": [
+        "leden",
+        "březen",
+        "září",
+        "prosinec",
+        "únor",
+        "květen",
+        "červenec",
+        "říjen"
+      ],
       "dia_corto": [
         "po 5. 1.",
         "út 31. 3.",
@@ -1854,6 +1884,16 @@
         "maj",
         "jul.",
         "okt."
+      ],
+      "mes_suelto": [
+        "januar",
+        "marts",
+        "september",
+        "december",
+        "februar",
+        "maj",
+        "juli",
+        "oktober"
       ],
       "dia_corto": [
         "man. 5. jan.",
@@ -2007,6 +2047,16 @@
         "Jul",
         "Okt"
       ],
+      "mes_suelto": [
+        "Januar",
+        "März",
+        "September",
+        "Dezember",
+        "Februar",
+        "Mai",
+        "Juli",
+        "Oktober"
+      ],
       "dia_corto": [
         "Mo., 5. Jan.",
         "Di., 31. März",
@@ -2158,6 +2208,16 @@
         "Μαΐ",
         "Ιουλ",
         "Οκτ"
+      ],
+      "mes_suelto": [
+        "Ιανουάριος",
+        "Μάρτιος",
+        "Σεπτέμβριος",
+        "Δεκέμβριος",
+        "Φεβρουάριος",
+        "Μάιος",
+        "Ιούλιος",
+        "Οκτώβριος"
       ],
       "dia_corto": [
         "Δευ 5 Ιαν",
@@ -2311,6 +2371,16 @@
         "jul",
         "oct"
       ],
+      "mes_suelto": [
+        "enero",
+        "marzo",
+        "septiembre",
+        "diciembre",
+        "febrero",
+        "mayo",
+        "julio",
+        "octubre"
+      ],
       "dia_corto": [
         "lun, 5 ene",
         "mar, 31 mar",
@@ -2462,6 +2532,16 @@
         "mai",
         "juuli",
         "okt"
+      ],
+      "mes_suelto": [
+        "jaanuar",
+        "märts",
+        "september",
+        "detsember",
+        "veebruar",
+        "mai",
+        "juuli",
+        "oktoober"
       ],
       "dia_corto": [
         "E, 5. jaan",
@@ -2615,6 +2695,16 @@
         "heinä",
         "loka"
       ],
+      "mes_suelto": [
+        "tammikuu",
+        "maaliskuu",
+        "syyskuu",
+        "joulukuu",
+        "helmikuu",
+        "toukokuu",
+        "heinäkuu",
+        "lokakuu"
+      ],
       "dia_corto": [
         "ma 5.1.",
         "ti 31.3.",
@@ -2766,6 +2856,16 @@
         "mai",
         "juil.",
         "oct."
+      ],
+      "mes_suelto": [
+        "janvier",
+        "mars",
+        "septembre",
+        "décembre",
+        "février",
+        "mai",
+        "juillet",
+        "octobre"
       ],
       "dia_corto": [
         "lun. 5 janv.",
@@ -2919,6 +3019,16 @@
         "Iúil",
         "DFómh"
       ],
+      "mes_suelto": [
+        "Eanáir",
+        "Márta",
+        "Meán Fómhair",
+        "Nollaig",
+        "Feabhra",
+        "Bealtaine",
+        "Iúil",
+        "Deireadh Fómhair"
+      ],
       "dia_corto": [
         "Luan 5 Ean",
         "Máirt 31 Márta",
@@ -3070,6 +3180,16 @@
         "svi",
         "srp",
         "lis"
+      ],
+      "mes_suelto": [
+        "siječanj",
+        "ožujak",
+        "rujan",
+        "prosinac",
+        "veljača",
+        "svibanj",
+        "srpanj",
+        "listopad"
       ],
       "dia_corto": [
         "pon, 5. sij",
@@ -3223,6 +3343,16 @@
         "júl.",
         "okt."
       ],
+      "mes_suelto": [
+        "január",
+        "március",
+        "szeptember",
+        "december",
+        "február",
+        "május",
+        "július",
+        "október"
+      ],
       "dia_corto": [
         "jan. 5., H",
         "márc. 31., K",
@@ -3374,6 +3504,16 @@
         "maí",
         "júl.",
         "okt."
+      ],
+      "mes_suelto": [
+        "janúar",
+        "mars",
+        "september",
+        "desember",
+        "febrúar",
+        "maí",
+        "júlí",
+        "október"
       ],
       "dia_corto": [
         "mán., 5. jan.",
@@ -3527,6 +3667,16 @@
         "lug",
         "ott"
       ],
+      "mes_suelto": [
+        "gennaio",
+        "marzo",
+        "settembre",
+        "dicembre",
+        "febbraio",
+        "maggio",
+        "luglio",
+        "ottobre"
+      ],
       "dia_corto": [
         "lun 5 gen",
         "mar 31 mar",
@@ -3678,6 +3828,16 @@
         "05",
         "07",
         "10"
+      ],
+      "mes_suelto": [
+        "sausis",
+        "kovas",
+        "rugsėjis",
+        "gruodis",
+        "vasaris",
+        "gegužė",
+        "liepa",
+        "spalis"
       ],
       "dia_corto": [
         "01-05, pr",
@@ -3831,6 +3991,16 @@
         "jūl.",
         "okt."
       ],
+      "mes_suelto": [
+        "janvāris",
+        "marts",
+        "septembris",
+        "decembris",
+        "februāris",
+        "maijs",
+        "jūlijs",
+        "oktobris"
+      ],
       "dia_corto": [
         "pirmd., 5. janv.",
         "otrd., 31. marts",
@@ -3982,6 +4152,16 @@
         "Mej",
         "Lul",
         "Ott"
+      ],
+      "mes_suelto": [
+        "Jannar",
+        "Marzu",
+        "Settembru",
+        "Diċembru",
+        "Frar",
+        "Mejju",
+        "Lulju",
+        "Ottubru"
       ],
       "dia_corto": [
         "Tne, 5 ta’ Jan",
@@ -4135,6 +4315,16 @@
         "jul",
         "okt"
       ],
+      "mes_suelto": [
+        "januar",
+        "mars",
+        "september",
+        "desember",
+        "februar",
+        "mai",
+        "juli",
+        "oktober"
+      ],
       "dia_corto": [
         "man. 5. jan.",
         "tir. 31. mars",
@@ -4286,6 +4476,16 @@
         "mei",
         "jul",
         "okt"
+      ],
+      "mes_suelto": [
+        "januari",
+        "maart",
+        "september",
+        "december",
+        "februari",
+        "mei",
+        "juli",
+        "oktober"
       ],
       "dia_corto": [
         "ma 5 jan",
@@ -4439,6 +4639,16 @@
         "lip",
         "paź"
       ],
+      "mes_suelto": [
+        "styczeń",
+        "marzec",
+        "wrzesień",
+        "grudzień",
+        "luty",
+        "maj",
+        "lipiec",
+        "październik"
+      ],
       "dia_corto": [
         "pon., 5 sty",
         "wt., 31 mar",
@@ -4590,6 +4800,16 @@
         "mai.",
         "jul.",
         "out."
+      ],
+      "mes_suelto": [
+        "janeiro",
+        "março",
+        "setembro",
+        "dezembro",
+        "fevereiro",
+        "maio",
+        "julho",
+        "outubro"
       ],
       "dia_corto": [
         "segunda, 5/01",
@@ -4743,6 +4963,16 @@
         "iul.",
         "oct."
       ],
+      "mes_suelto": [
+        "ianuarie",
+        "martie",
+        "septembrie",
+        "decembrie",
+        "februarie",
+        "mai",
+        "iulie",
+        "octombrie"
+      ],
       "dia_corto": [
         "lun., 5 ian.",
         "mar., 31 mar.",
@@ -4894,6 +5124,16 @@
         "máj",
         "júl",
         "okt"
+      ],
+      "mes_suelto": [
+        "január",
+        "marec",
+        "september",
+        "december",
+        "február",
+        "máj",
+        "júl",
+        "október"
       ],
       "dia_corto": [
         "po 5. 1.",
@@ -5047,6 +5287,16 @@
         "jul.",
         "okt."
       ],
+      "mes_suelto": [
+        "januar",
+        "marec",
+        "september",
+        "december",
+        "februar",
+        "maj",
+        "julij",
+        "oktober"
+      ],
       "dia_corto": [
         "pon., 5. jan.",
         "tor., 31. mar.",
@@ -5198,6 +5448,16 @@
         "maj",
         "juli",
         "okt."
+      ],
+      "mes_suelto": [
+        "januari",
+        "mars",
+        "september",
+        "december",
+        "februari",
+        "maj",
+        "juli",
+        "oktober"
       ],
       "dia_corto": [
         "mån 5 jan.",

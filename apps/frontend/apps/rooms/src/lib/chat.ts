@@ -60,6 +60,8 @@ export interface Channel {
    *  fuera (ADR 0040). Vive allí, así que no es de ningún equipo suyo: el sidebar la
    *  marca y no ofrece lo que solo tiene sentido en la propia organización. */
   external?: boolean;
+  /** Archivado: ya no sale en la barra; se ve y se restaura desde «Explorar canales». */
+  archived?: boolean;
 }
 
 /** Alguien de Sytue One encontrado por su @usuario o su correo (people:resolve):
@@ -472,6 +474,9 @@ export interface NotifyPrefs {
   keywords: string[];
   dndStart: number;
   dndEnd: number;
+  /** «Pausar avisos»: hasta cuándo (ISO 8601). Ausente, sin pausa. Solo se LEE aquí:
+   *  se fija con setNotifyPause, y guardar las palabras clave no la toca. */
+  pausedUntil?: string;
 }
 
 /** Prefs crudas del servicio Go (snake_case). */
@@ -479,11 +484,17 @@ interface RawNotifyPrefs {
   keywords?: string[];
   dnd_start?: number;
   dnd_end?: number;
+  paused_until?: string;
 }
 
 /** Mapea las prefs crudas del servicio Go a NotifyPrefs del UI. */
 export function toNotifyPrefs(p: RawNotifyPrefs): NotifyPrefs {
-  return { keywords: p.keywords ?? [], dndStart: p.dnd_start ?? 0, dndEnd: p.dnd_end ?? 0 };
+  return {
+    keywords: p.keywords ?? [],
+    dndStart: p.dnd_start ?? 0,
+    dndEnd: p.dnd_end ?? 0,
+    ...(p.paused_until ? { pausedUntil: p.paused_until } : {}),
+  };
 }
 
 /** Categoría cruda del servicio Go (snake_case). */
@@ -1218,6 +1229,12 @@ export function chatClient({ accessToken, userId }: ChatClientDeps) {
       );
     },
 
+    /** «Pausar avisos» hasta `until` (ISO 8601), o la quita con null; devuelve las
+     *  preferencias con la pausa ya saneada por el servicio. */
+    async setNotifyPause(until: string | null): Promise<NotifyPrefs> {
+      return toNotifyPrefs(await call<RawNotifyPrefs>('PUT', '/me/notify-pause', { until }));
+    },
+
     // ---- Ola 18: Web Push ----
 
     /** Clave pública VAPID (applicationServerKey del navegador). Vacía = push
@@ -1319,6 +1336,19 @@ export function chatClient({ accessToken, userId }: ChatClientDeps) {
         `/teams/${encodeURIComponent(first.id)}/channels/browse${qs}`,
       );
       return data.channels ?? [];
+    },
+
+    /** Canales ARCHIVADOS del team a los que pertenece el usuario (`?archived=1` trae
+     *  también los activos; aquí se quedan solo los archivados). */
+    async listArchivedChannels(): Promise<Channel[]> {
+      const { teams } = await call<{ teams: { id: string }[] }>('GET', '/teams');
+      const first = teams[0];
+      if (!first) return [];
+      const data = await call<{ channels: RawChannel[] }>(
+        'GET',
+        `/teams/${encodeURIComponent(first.id)}/channels?archived=1`,
+      );
+      return (data.channels ?? []).filter((c) => c.archived).map(toChannel);
     },
 
     /** Une al usuario a un canal público; devuelve el canal. */

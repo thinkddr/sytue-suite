@@ -293,6 +293,8 @@ type Caja struct {
 	relleno, borde color.NRGBA
 	radio          float32
 	tamano         fyne.Size
+	// origen es donde la dejó MoverCaja; Redimensionar la vuelve a (0,0).
+	origen fyne.Position
 }
 
 // NuevaCaja construye la caja. `radio` es el de la esquina exterior; la interior lleva
@@ -324,7 +326,7 @@ func (c *Caja) ConBorde(grosor float32) *Caja {
 		c.conBorde = false
 	}
 	c.Pintar(c.relleno, c.borde)
-	c.Redimensionar(c.tamano)
+	c.colocar(c.tamano)
 	return c
 }
 
@@ -373,23 +375,28 @@ func (c *Caja) Objetos() []fyne.CanvasObject {
 // el rasterizador de las esquinas entra en pánico con un lado negativo (visto en Docus
 // con −2).
 func (c *Caja) Redimensionar(t fyne.Size) {
+	c.origen = fyne.Position{}
+	c.colocar(t)
+}
+
+// colocar pone los dos rectángulos en `origen` con el tamaño pedido.
+func (c *Caja) colocar(t fyne.Size) {
 	t = fyne.NewSize(max(t.Width, 0), max(t.Height, 0))
 	c.tamano = t
+	o := c.origen
 	if c.trazo && c.conBorde && c.relleno.A != 0xff {
-		c.fuera.Move(fyne.NewPos(c.grosor/2, c.grosor/2))
+		c.fuera.Move(o.AddXY(c.grosor/2, c.grosor/2))
 		c.fuera.Resize(fyne.NewSize(max(t.Width-c.grosor, 0), max(t.Height-c.grosor, 0)))
 	} else {
-		if c.trazo {
-			c.fuera.Move(fyne.NewPos(0, 0))
-		}
+		c.fuera.Move(o)
 		c.fuera.Resize(t)
 	}
 	if !c.conBorde {
-		c.dentro.Move(fyne.NewPos(0, 0))
+		c.dentro.Move(o)
 		c.dentro.Resize(t)
 		return
 	}
-	c.dentro.Move(fyne.NewPos(c.grosor, c.grosor))
+	c.dentro.Move(o.AddXY(c.grosor, c.grosor))
 	// Nunca negativo: una caja con borde que todavía mide 0 —un widget recién creado al
 	// que aún no le ha llegado el layout— dejaba el relleno en −2 × −2, y el pintor de
 	// software de Fyne entra en pánico al rasterizar un rectángulo redondeado así.
@@ -424,7 +431,7 @@ func (c *Caja) Pintar(relleno, borde color.NRGBA) {
 			}
 		}
 		if c.trazo {
-			c.Redimensionar(c.tamano)
+			c.colocar(c.tamano)
 		}
 		c.fuera.Refresh()
 	}

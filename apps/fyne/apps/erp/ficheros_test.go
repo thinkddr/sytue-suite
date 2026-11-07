@@ -77,7 +77,9 @@ func TestSubirEImportarUsanElSelectorDelSistema(t *testing.T) {
 	defer mu.Unlock()
 	quiero := []string{
 		"/api/v1/adjuntos?modelo=factura_venta&nombre=factura.pdf&registro=f1 application/pdf %PDF",
-		"/api/v1/factura_venta/importar? text/csv ref,total\n",
+		// Primero la vista previa (`simular=1`) y, sin ventana en la que preguntar, la de verdad.
+		"/api/v1/factura_venta/importar?fichero=lista.csv&simular=1 text/csv ref,total\n",
+		"/api/v1/factura_venta/importar?fichero=lista.csv text/csv ref,total\n",
 	}
 	if strings.Join(vistas, "\n") != strings.Join(quiero, "\n") {
 		t.Errorf("peticiones:\n%s\nquiero:\n%s", strings.Join(vistas, "\n"), strings.Join(quiero, "\n"))

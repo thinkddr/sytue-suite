@@ -13,7 +13,6 @@ import "C" //nolint:gocritic // CGO exige importar C por separado
 
 import (
 	"log/slog"
-	"strings"
 	"sync"
 	"unsafe" //nolint:gocritic // dupImport falso positivo con import C
 
@@ -27,7 +26,7 @@ var puedeCompartirApple = sync.OnceValue(func() bool {
 })
 
 func cuentaCompartida(cuenta string) bool {
-	return (strings.HasPrefix(cuenta, "sesion-") || cuenta == CuentaBloqueo) && puedeCompartirApple()
+	return enGrupoSuite(cuenta) && puedeCompartirApple()
 }
 
 func cargarCuentaCompartida(cuenta string) (Tokens, error) {

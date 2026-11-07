@@ -70,6 +70,7 @@
   "common.remove": "Pašalinti",
   "common.retry": "Bandyti dar kartą",
   "common.save": "Išsaugoti",
+  "day.noEvents": "Šią dieną įvykių nėra",
   "error.calendarsLoad": "Nepavyko įkelti kalendorių.",
   "error.eventsLoad": "Nepavyko įkelti įvykių.",
   "event.ai": "Aprašykite įvykį",
@@ -148,6 +149,13 @@
   "grid.blockAria": "{title}, {time}",
   "grid.continued": "{title} (tęsinys)",
   "grid.createOn": "Sukurti įvykį {date}",
+  "grid.dayEvents": {
+    "one": "{date}, {count} įvykis",
+    "few": "{date}, {count} įvykiai",
+    "many": "{date}, {count} įvykio",
+    "other": "{date}, {count} įvykių"
+  },
+  "grid.daySelected": "{label}, pasirinkta",
   "grid.loadError": "Nepavyko įkelti kalendoriaus",
   "grid.loading": "Įkeliamas kalendorius",
   "grid.more": {
@@ -156,6 +164,8 @@
     "many": "Dar {count}",
     "other": "Dar {count}"
   },
+  "grid.showMonth": "Rodyti visą mėnesį",
+  "grid.showWeek": "Rodyti tik šią savaitę",
   "grid.snapAria": {
     "one": "Vilkimo žingsnis: {count} minutė. Paspauskite, kad pakeistumėte.",
     "few": "Vilkimo žingsnis: {count} minutės. Paspauskite, kad pakeistumėte.",
@@ -174,6 +184,13 @@
     "many": "{count} min.",
     "other": "{count} min."
   },
+  "grid.todayLabel": "Šiandien, {date}",
+  "grid.weekNumber": "Savaitė {week}",
+  "guests.organizer": "Organizatorius",
+  "guests.status.accepted": "Dalyvaus",
+  "guests.status.declined": "Nedalyvaus",
+  "guests.status.pending": "Laukiama atsakymo",
+  "guests.status.tentative": "Galbūt",
   "header.invitations": "Kvietimai",
   "header.next": "Kitas",
   "header.pending": {
@@ -213,6 +230,12 @@
   "nav.createEventOn": "Sukurti įvykį {date}",
   "nav.deleteSubscription": "Pašalinti prenumeratą",
   "nav.manageResources": "Tvarkyti patalpas ir įrangą",
+  "nav.menuPending": {
+    "one": "Atidaryti meniu, {count} laukia",
+    "few": "Atidaryti meniu, {count} laukia",
+    "many": "Atidaryti meniu, {count} laukia",
+    "other": "Atidaryti meniu, {count} laukia"
+  },
   "nav.myCalendars": "Mano kalendoriai",
   "nav.next": "Kitas",
   "nav.nextMonth": "Kitas mėnuo",
@@ -369,6 +392,7 @@
   "scope.following": "Šiam ir paskesniems",
   "scope.legend": "Šis įvykis kartojasi. Kuriems įvykiams taikomas pakeitimas?",
   "scope.this": "Tik šiam įvykiui",
+  "search.allCalendars": "Visi kalendoriai",
   "search.error": "Nepavyko užbaigti paieškos.",
   "search.events": "Ieškoti įvykių",
   "search.loadMore": "Įkelti daugiau",
@@ -379,6 +403,12 @@
     "other": "Norint ieškoti kalendoriuose, įveskite bent {count} simbolių."
   },
   "search.noResults": "Pagal „{term}“ nieko nerasta.",
+  "search.period": "Laikotarpis",
+  "search.period.any": "Bet kada",
+  "search.period.month": "Šį mėnesį",
+  "search.period.past": "Praėję",
+  "search.period.upcoming": "Būsimi",
+  "search.period.year": "Šiais metais",
   "search.placeholder": "Pavadinimas, aprašas, vieta ar pakviestas asmuo…",
   "search.searching": "Ieškoma…",
   "search.series": "Serija",
@@ -420,6 +450,14 @@
   "share.whoSeesNow": "Kas jį mato dabar",
   "share.writerHint": "Be peržiūros, kuria, keičia ir trina įvykius šiame kalendoriuje.",
   "share.writerLabel": "Matyti ir redaguoti mano įvykius",
+  "shortcuts.group.actions": "Veiksmai",
+  "shortcuts.group.navigate": "Naršymas",
+  "shortcuts.group.views": "Rodiniai",
+  "shortcuts.help": "Rodyti šį sąrašą",
+  "shortcuts.next": "Kitas laikotarpis",
+  "shortcuts.prev": "Ankstesnis laikotarpis",
+  "shortcuts.title": "Spartieji klavišai",
+  "shortcuts.today": "Eiti į šiandieną",
   "subscribe.aria": "Prenumeruoti kalendorių pagal URL",
   "subscribe.byUrl": "Prenumeruoti pagal URL (.ics)",
   "subscribe.defaultName": "Prenumeruojamas kalendorius",

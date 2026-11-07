@@ -31,3 +31,4 @@
 "dataflow.item.events" = "Kalendārs";
 "dataflow.item.documents" = "Dokumenti";
 "dataflow.item.contacts" = "Kontakti";
+"widgets.updatedAgo" = "Atjaunināts %@";

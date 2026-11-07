@@ -4,6 +4,7 @@
 package editor
 
 import (
+	"math"
 	"strconv"
 
 	"fyne.io/fyne/v2"
@@ -41,7 +42,10 @@ type BarraEstado struct {
 
 	ctx        *Contexto
 	menos, mas *BotonCinta
-	deslizador *widget.Slider
+	deslizador *ui.Deslizador
+	// porciento es el «100 %» de la barra, que se pulsa para volver al 100 (el
+	// `<button>` de StatusBar.tsx; Ctrl/Cmd+0 hace lo mismo).
+	porciento *ui.Enlace
 }
 
 var _ fyne.Widget = (*BarraEstado)(nil)
@@ -56,11 +60,36 @@ func NuevaBarraEstado(ctx *Contexto) *BarraEstado {
 	b.mas = NuevoBotonCinta(iconos.EdMas, ctx.Traducir("status.zoom.in"), func() {
 		ctx.AjustarZoom(+ZoomPaso)
 	})
-	b.deslizador = widget.NewSlider(ZoomMin, ZoomMax)
-	b.deslizador.Step = ZoomPaso
-	b.deslizador.Value = float64(ctx.Zoom)
-	b.deslizador.OnChanged = func(v float64) { ctx.PonerZoom(int(v)) }
+	// El `<input type="range">` de la suite y no `widget.Slider`: el carril de este era la
+	// superficie del tema y sobre la barra blanca no se veía.
+	// Como el `Step` de `widget.Slider`, solo avisa al cambiar de decena: cada aviso
+	// recompone el marco entero, y arrastrar dentro de la misma no cambia nada. El pulgar
+	// vuelve a su decena, que es lo que hace el `step={10}` de la web.
+	b.deslizador = ui.NuevoDeslizador(ZoomMin, ZoomMax, float64(ctx.Zoom), func(v float64) {
+		if z := zoomEnPaso(v); z != ctx.Zoom {
+			ctx.PonerZoom(z)
+			return
+		}
+		b.deslizador.Valor = float64(ctx.Zoom)
+	}).Con(ctx.Traducir("status.zoom"))
+	b.deslizador.Paso = ZoomPaso
+	b.deslizador.TextoValor = strconv.Itoa(ctx.Zoom) + " %"
+	b.porciento = ui.NuevoEnlace("", tema.TextoXS, ui.Normal, "text-muted", func() { ctx.PonerZoom(100) })
+	b.porciento.Boton, b.porciento.Liso = true, true
+	b.ponerPorciento()
 	return b
+}
+
+// zoomEnPaso redondea a la decena, como hacía el `Step` de `widget.Slider`.
+func zoomEnPaso(v float64) int {
+	return int(math.Round(v/ZoomPaso)) * ZoomPaso
+}
+
+// ponerPorciento pone el texto («130 %») y el nombre accesible, que empieza por lo que
+// se lee: quien manda por voz dice lo que ve.
+func (b *BarraEstado) ponerPorciento() {
+	b.porciento.Texto = strconv.Itoa(b.ctx.Zoom) + " %"
+	b.porciento.Nombre = b.ctx.Traducir("status.zoom.reset", i18n.Vars{"zoom": b.ctx.Zoom})
 }
 
 // AccessibilityRole la anuncia como contenedor con nombre.
@@ -88,21 +117,20 @@ func (b *BarraEstado) CreateRenderer() fyne.WidgetRenderer {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	tinta := tema.Color("text-muted", v)
 	r := &estadoRenderer{
-		b:         b,
-		fondo:     canvas.NewRectangle(tema.Color("surface", v)),
-		linea:     canvas.NewRectangle(tema.Color("border", v)),
-		posicion:  ui.Texto("", tema.TextoXS, ui.Normal, tinta),
-		palabras:  ui.Texto("", tema.TextoXS, ui.Normal, tinta),
-		porciento: ui.Texto("", tema.TextoXS, ui.Normal, tinta),
+		b:        b,
+		fondo:    canvas.NewRectangle(tema.Color("surface", v)),
+		linea:    canvas.NewRectangle(tema.Color("border", v)),
+		posicion: ui.Texto("", tema.TextoXS, ui.Normal, tinta),
+		palabras: ui.Texto("", tema.TextoXS, ui.Normal, tinta),
 	}
 	r.poner(v)
 	return r
 }
 
 type estadoRenderer struct {
-	b                             *BarraEstado
-	fondo, linea                  *canvas.Rectangle
-	posicion, palabras, porciento *canvas.Text
+	b                  *BarraEstado
+	fondo, linea       *canvas.Rectangle
+	posicion, palabras *canvas.Text
 }
 
 func (r *estadoRenderer) MinSize() fyne.Size { return r.b.MinSize() }
@@ -110,7 +138,7 @@ func (r *estadoRenderer) MinSize() fyne.Size { return r.b.MinSize() }
 func (r *estadoRenderer) Objects() []fyne.CanvasObject {
 	return []fyne.CanvasObject{
 		r.fondo, r.linea, r.posicion, r.palabras,
-		r.b.menos, r.b.deslizador, r.porciento, r.b.mas,
+		r.b.menos, r.b.deslizador, r.b.porciento, r.b.mas,
 	}
 }
 
@@ -124,8 +152,8 @@ func (r *estadoRenderer) poner(v tema.Variante) {
 	if c.Tipo == Documento {
 		r.palabras.Text = c.Traducir("status.words", i18n.Vars{"count": palabras})
 	}
-	r.porciento.Text = strconv.Itoa(c.Zoom) + " %"
-	for _, t := range []*canvas.Text{r.posicion, r.palabras, r.porciento} {
+	r.b.ponerPorciento()
+	for _, t := range []*canvas.Text{r.posicion, r.palabras} {
 		t.Color = tema.Color("text-muted", v)
 	}
 }
@@ -161,7 +189,10 @@ func (r *estadoRenderer) Layout(t fyne.Size) {
 	}
 	coloca(r.b.mas, LadoBotonEstado, LadoBotonEstado)
 	der -= AnchoPorciento
-	ui.ColocarTexto(r.porciento, tema.TextoXS, der, centroTexto)
+	// `w-10 text-center`: el botón mide su rótulo y va centrado en su hueco.
+	p := ui.MedidaEnlace(r.b.porciento)
+	r.b.porciento.Move(fyne.NewPos(der+(AnchoPorciento-p.Width)/2, tema.Borde+(alto-p.Height)/2))
+	r.b.porciento.Resize(p)
 	der -= HuecoCarril
 	coloca(r.b.deslizador, AnchoDeslizador, AltoDeslizador)
 	coloca(r.b.menos, LadoBotonEstado, LadoBotonEstado)
@@ -174,7 +205,8 @@ func (r *estadoRenderer) Refresh() {
 	r.poner(v)
 	r.b.menos.Inerte = r.b.ctx.Zoom <= ZoomMin
 	r.b.mas.Inerte = r.b.ctx.Zoom >= ZoomMax
-	r.b.deslizador.Value = float64(r.b.ctx.Zoom)
+	r.b.deslizador.Valor = float64(r.b.ctx.Zoom)
+	r.b.deslizador.TextoValor = strconv.Itoa(r.b.ctx.Zoom) + " %"
 	for _, o := range r.Objects() {
 		o.Refresh()
 	}

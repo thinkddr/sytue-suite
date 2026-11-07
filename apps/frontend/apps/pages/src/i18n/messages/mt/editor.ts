@@ -18,10 +18,10 @@ export const editor = {
   'editor.bases.desc': 'Ir-rekords ta’ veduta, kif inhuma bħalissa',
   'editor.bases.title': 'Tabella minn Sytue Bases',
   'editor.bases.prompt':
-    'Waħħal it-token ta’ konnessjoni għall-qari biss mogħtija lil Sytue Web. Id-data ta’ dik il-veduta ssir kontenut tas-sit u tkun pubblika ladarba tiġi ppubblikata.',
+    'Waħħal it-token ta’ konnessjoni għall-qari biss mogħtija lil Sytue Webs. Id-data ta’ dik il-veduta ssir kontenut tas-sit u tkun pubblika ladarba tiġi ppubblikata.',
   'editor.bases.confirm': 'Ġib il-veduta',
   'editor.bases.invalid':
-    'Dik il-konnessjoni mhijiex valida għal Sytue Web: tista’ tkun revokata, skaduta, jew mogħtija lil prodott jew organizzazzjoni oħra.',
+    'Dik il-konnessjoni mhijiex valida għal Sytue Webs: tista’ tkun revokata, skaduta, jew mogħtija lil prodott jew organizzazzjoni oħra.',
   'editor.bases.large':
     'Il-veduta ma tidħolx f’tabella tas-sit (massimu ta’ 50 ringiela u 8 kolonni). Ċekkinha f’Sytue Bases.',
   'editor.bases.forbidden':

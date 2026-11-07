@@ -1,15 +1,25 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Daniel Delgado Ramos
 //
-// La cabecera del cuaderno con la referencia de Twos: el día es la página y su
+// La cabecera del cuaderno como página de libreta: el día es la página y su
 // título sale UNA vez, la semana es una tira sin caja con un punto en los días que
 // tienen algo, y la captura es una sola fila. Poco cromo: los controles son
 // fantasma y lo que se lee es el texto. Todo lo que no es escribir va en dos líneas:
 // la del título (con ir de un día a otro) y la del año (con la vista).
 import type { JSX } from 'preact';
 import { createPortal } from 'preact/compat';
-import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { Button, Dropdown, Icon, IconButton, Input, MenuItem, cx, useAtajo } from '@sytue/ui';
+import { useEffect, useLayoutEffect, useRef, useState, type MutableRef } from 'preact/hooks';
+import {
+  Button,
+  Dropdown,
+  Icon,
+  IconButton,
+  Input,
+  MenuItem,
+  cx,
+  useAtajo,
+  useUltimo,
+} from '@sytue/ui';
 import { appUrl, orgActual } from '@sytue/config';
 import { intlTag, type Locale } from '@sytue/i18n';
 import type { DailyDay, Note, NoteInput, Notebook } from '@sytue/api-clients';
@@ -20,10 +30,12 @@ import {
   desplazarDia,
   ENFOQUES,
   expandirCaptura,
+  lineasDeCaptura,
+  MAX_LINEAS_PEGADAS,
+  MAX_TITULO_TAREA,
   type Enfoque,
 } from '../client/diario.js';
 import { PLANTILLAS, type Plantilla } from '../client/plantillas.js';
-import { Glyph } from './glyphs.js';
 import { dailyRange } from '../client/notesApi.js';
 import { AgendaDia, VISTAS_DIARIO, zonaDeDia, type VistaDiario } from './DiasVista.js';
 import type { CapturaPendiente } from '../client/cola.js';
@@ -70,6 +82,11 @@ interface Props {
   acciones?: JSX.Element | null | undefined;
   /** El mismo formulario se coloca al pie del panel, fuera del desplazador. */
   captureContainer?: HTMLElement | null;
+  /**
+   * Lo que se pega con varias líneas sobre el cuaderno (NoteCanvas) entra por aquí, como
+   * si se pegara en la captura. Devuelve si lo ha tomado: deshabilitada, no.
+   */
+  pegarRef?: MutableRef<((texto: string) => boolean) | null>;
 }
 
 /** El progreso del día: un aro pequeño y «2/5»; la frase entera, para quien no ve. */
@@ -136,6 +153,7 @@ export function NotebookDashboard({
   onDescartar,
   acciones,
   captureContainer,
+  pegarRef,
 }: Props): JSX.Element {
   const mountedRef = useRef(true);
   useLayoutEffect(
@@ -190,27 +208,70 @@ export function NotebookDashboard({
     day === date && notasPropiasCargadas
       ? { total: notes.length, pending: counts.pending }
       : marcas.get(day);
-  const submit = async () => {
+  /**
+   * Guarda lo que hay en la captura: una nota por línea, de una en una y en orden. La
+   * captura se vacía según salen, y para en el primer fallo o a las cincuenta: lo que
+   * no ha salido se queda escrito. Si mientras tanto se escribe otra cosa en ella, se
+   * para también y lo escrito no se toca. `cuantas`: las primeras líneas y no más (lo
+   * pegado sobre el cuaderno, que va delante de lo que ya hubiera en la captura).
+   */
+  const enviar = async (texto: string, cuantas = MAX_LINEAS_PEGADAS) => {
     if (saving || disabled) return;
-    const input = capturaRapida(draft, kind);
-    if (!input) return;
-    const enviado = draft;
+    const lineas = lineasDeCaptura(texto);
+    if (lineas.length === 0) return;
     setSaving(true);
+    let enCampo = texto;
+    let hechas = 0;
     try {
-      if (await onCapture(input)) {
-        if (borradorActualRef.current === enviado) {
-          borradorActualRef.current = '';
-          onDraft('');
-          if (mountedRef.current) setDraft('');
-        }
-        if (mountedRef.current) {
-          onEnfoque('all');
-        }
+      for (const linea of lineas.slice(0, Math.min(cuantas, MAX_LINEAS_PEGADAS))) {
+        const input = capturaRapida(linea, kind);
+        if (!input || !(await onCapture(input))) break;
+        hechas++;
+        if (borradorActualRef.current !== enCampo) break;
+        enCampo = lineas.slice(hechas).join('\n');
+        borradorActualRef.current = enCampo;
+        onDraft(enCampo);
+        if (!mountedRef.current) break;
+        setDraft(enCampo);
       }
+      if (hechas > 0 && mountedRef.current) onEnfoque('all');
     } finally {
       setSaving(false);
     }
   };
+  const submit = () => enviar(draft);
+  /**
+   * Pegar varias líneas en la captura es escribir una nota por línea. Una sola se pega
+   * como siempre, en el campo. El campo es de UNA línea: lo que se queda en él guarda
+   * sus saltos en el borrador y los enseña como espacios —como pega el navegador un
+   * texto de varias líneas en un campo así—, e Intro sigue sacando una nota por línea.
+   */
+  const pegar = (pegado: string, inicio: number, fin: number): boolean => {
+    if (disabled || lineasDeCaptura(pegado).length < 2) return false;
+    const valor = borradorActualRef.current;
+    const nuevo = valor.slice(0, inicio) + pegado.replace(/\r\n?/g, '\n') + valor.slice(fin);
+    changeDraft(nuevo);
+    void enviar(nuevo);
+    return true;
+  };
+  // Lo pegado sobre el cuaderno va DELANTE de lo que estuviera a medio escribir, y solo
+  // salen sus líneas: lo que la persona tenía en la captura no lo ha mandado nadie.
+  const pegarFuera = useUltimo((texto: string): boolean => {
+    const lineas = lineasDeCaptura(texto);
+    if (disabled || lineas.length < 2) return false;
+    const valor = borradorActualRef.current;
+    const nuevo = valor.trim() ? `${lineas.join('\n')}\n${valor}` : lineas.join('\n');
+    changeDraft(nuevo);
+    void enviar(nuevo, lineas.length);
+    return true;
+  });
+  useEffect(() => {
+    if (!pegarRef) return;
+    pegarRef.current = (texto) => pegarFuera.current(texto);
+    return () => {
+      pegarRef.current = null;
+    };
+  }, [pegarRef, pegarFuera]);
   const template = async (p: Plantilla) => {
     if (saving || disabled) return;
     setSaving(true);
@@ -295,7 +356,12 @@ export function NotebookDashboard({
             <div class="notes-day-row">
               <p class="notes-day-sub">
                 {fecha(date).getFullYear()}
-                {date === hoy ? ` · ${t('daily.today')}` : ''}
+                {date === hoy ? (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span class="notes-day-today">{t('daily.today')}</span>
+                  </>
+                ) : null}
               </p>
               {onVista ? (
                 <div class="notes-seg -mr-2" role="group" aria-label={t('daily.view')}>
@@ -354,8 +420,10 @@ export function NotebookDashboard({
                     {...(soltar ? { 'data-drop-day': day } : {})}
                     {...arrastre}
                   >
-                    <span class="notes-week-name">
-                      {d.toLocaleDateString(tag, { weekday: 'short' })}
+                    {/* La inicial, como en el margen de una agenda de papel: el nombre
+                        entero lo lee el `aria-label`. */}
+                    <span class="notes-week-name" aria-hidden="true">
+                      {d.toLocaleDateString(tag, { weekday: 'narrow' })}
                     </span>
                     <span class="notes-week-num">{d.getDate()}</span>
                     <span
@@ -391,16 +459,20 @@ export function NotebookDashboard({
               void submit();
             }}
           >
-            {/* El conmutador de tarea ocupa la columna del glifo de las filas: lo que se
-              escribe empieza donde empieza el texto de las notas. */}
+            {/* El conmutador de tarea ocupa la columna de las marcas de las filas y ES la
+              marca de la que va a nacer: la raya de una cosa o la casilla vacía de una
+              tarea. Lo que se escribe empieza donde empieza el texto de las notas. */}
             <IconButton
-              class="-ml-1"
               label={t('note.newTodo')}
               pressed={kind === 'todo'}
               disabled={disabled || saving}
               onClick={() => setKind(kind === 'todo' ? 'text' : 'todo')}
             >
-              <Glyph name="todo" size={16} />
+              <span class="notes-capture-kind" aria-hidden="true">
+                <span
+                  class={kind === 'todo' ? 'notes-capture-kind-box' : 'notes-capture-kind-dash'}
+                />
+              </span>
             </IconButton>
             <Input
               name="capture"
@@ -408,10 +480,16 @@ export function NotebookDashboard({
               aria-label={t('capture.label')}
               aria-describedby="notes-capture-hint"
               placeholder={t('capture.placeholder')}
-              value={draft}
+              value={draft.replaceAll('\n', ' ')}
               disabled={disabled}
-              maxLength={kind === 'todo' ? 400 : 10000}
+              maxLength={kind === 'todo' ? MAX_TITULO_TAREA : 10000}
               onInput={(e) => changeDraft(expandirCaptura(draft, e.currentTarget.value))}
+              onPaste={(e) => {
+                const campo = e.currentTarget;
+                const fin = campo.selectionEnd ?? campo.value.length;
+                const pegado = e.clipboardData?.getData('text/plain') ?? '';
+                if (pegar(pegado, campo.selectionStart ?? fin, fin)) e.preventDefault();
+              }}
             />
             <Dropdown
               label={t('template.label')}

@@ -17,10 +17,10 @@ export const editor = {
   'editor.bases.desc': 'Záznamy pohledu v aktuálním stavu',
   'editor.bases.title': 'Tabulka ze Sytue Bases',
   'editor.bases.prompt':
-    'Vložte token připojení jen pro čtení uděleného pro Sytue Web. Data z tohoto pohledu se stanou součástí obsahu webu a po publikování budou veřejná.',
+    'Vložte token připojení jen pro čtení uděleného pro Sytue Webs. Data z tohoto pohledu se stanou součástí obsahu webu a po publikování budou veřejná.',
   'editor.bases.confirm': 'Načíst pohled',
   'editor.bases.invalid':
-    'Toto připojení není pro Sytue Web platné: mohlo být odvoláno, vypršelo nebo bylo uděleno jinému produktu či organizaci.',
+    'Toto připojení není pro Sytue Webs platné: mohlo být odvoláno, vypršelo nebo bylo uděleno jinému produktu či organizaci.',
   'editor.bases.large':
     'Pohled se nevejde do tabulky na webu (nejvýše 50 řádků a 8 sloupců). Zužte jej v Sytue Bases.',
   'editor.bases.forbidden': 'Načíst data ze Sytue Bases na web může pouze správa organizace.',

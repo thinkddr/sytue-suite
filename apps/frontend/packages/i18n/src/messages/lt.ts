@@ -18,6 +18,8 @@ export const lt: Catalog = {
   'ui.openNav': 'Atidaryti navigaciją',
   'ui.closeNav': 'Uždaryti navigaciją',
   'ui.backToList': 'Grįžti į sąrašą',
+  'ui.suiteOpen': 'Sytue: programos, paieška, pranešimai ir paskyra',
+  'ui.suiteClose': 'Grįžti į programą',
   'ui.noResults': 'Rezultatų nėra.',
   'ui.meter.almostFull': 'beveik pilna',
   'ui.meter.full': 'pilna',
@@ -60,6 +62,9 @@ export const lt: Catalog = {
   'shell.lock.reasonNotebook': 'atidaryti jūsų užšifruotą užrašų knygelę',
   'shell.lock.faceIdUsage':
     'Sytue naudoja Face ID, kad atrakintų jūsų seansą, kai atidarote programėlę.',
+  'shell.widgets.wake': 'Atnaujinti valdiklius, kai programa uždaryta',
+  'shell.widgets.wakeHelp':
+    'Kai kas nors jūsų pasikeičia, Sytue pažadina programą tuščiu „Apple“ pranešimu, kad ji atnaujintų savo valdiklį. „Apple“ mato, kuri programa ir kada, bet niekada – kas pasikeitė.',
   'shell.call.microphoneUsage':
     '„Sytue Rooms“ mikrofoną naudoja tik skambučio metu ir tik tada, kai jį įjungiate.',
   'shell.call.cameraUsage':
@@ -190,7 +195,7 @@ export const lt: Catalog = {
     'Domenas {domain} svetainėje {site} neveikia: patikrinkite jo nustatymus',
   'notifications.kind.pages.erp.failed':
     'Užsakymas {number} iš svetainės {site} nepasiekė Sytue ERP',
-  'notifications.kind.pages.settings.changed': 'Sytue Web nustatymą pakeitė {actor}',
+  'notifications.kind.pages.settings.changed': 'Sytue Webs nustatymą pakeitė {actor}',
   'notifications.kind.pages.export.ready': 'Jūsų {site} eksportas paruoštas',
   'notifications.kind.pages.store.busy':
     'Parduotuvėje {site} per daug užsakymų, laukiančių apmokėjimo',
@@ -374,6 +379,8 @@ export const lt: Catalog = {
   'widgets.compose': 'Rašyti',
   'widgets.storage': 'Saugykla',
   'widgets.create': 'Kurti įvykį',
+  'widgets.updatedAgo': 'Atnaujinta {time}',
+  'widgets.updatedAt': 'Atnaujinta: {time}',
 
   'linkedServices.services': 'Paslaugos',
   'linkedServices.changed':
@@ -386,6 +393,7 @@ export const lt: Catalog = {
   'linkedServices.notGranted':
     'Prieiga prie šios paslaugos nesuteikta. Prijunkite paskyrą iš naujo ir pasirinkite leidimus.',
   'linkedServices.connected': 'Prijungtos paslaugos',
+  'linkedServices.exists': 'Ši paskyra jau buvo prijungta ir dabar atidaryta.',
   'linkedServices.providerData': 'Pakeitimai išsaugomi pas teikėją.',
   'linkedServices.writeUnknown':
     'Teikėjas nepatvirtino išsaugojimo. Prieš bandydami dar kartą atnaujinkite rodinį ir patikrinkite.',

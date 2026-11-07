@@ -122,7 +122,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: '%s',
-  description: 'Sitio exportado desde Sytue Web',
+  description: 'Sitio exportado desde Sytue Webs',
 };
 
 export default function RootLayout({
@@ -145,7 +145,7 @@ export default function HomePage() {
   return (
     <main style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
       <h1>%s</h1>
-      <p>Sitio exportado a Next.js (App Router) conectado a la API pública de Sytue Web.</p>
+      <p>Sitio exportado a Next.js (App Router) conectado a la API pública de Sytue Webs.</p>
     </main>
   );
 }
@@ -291,7 +291,7 @@ export function BotonComprar({ sku, qty = 1 }: BotonComprarProps) {
 	// 10. README.md
 	archivos["README.md"] = []byte(fmt.Sprintf(`# %s (Exportación Next.js)
 
-Este proyecto ha sido generado deterministamente desde **Sytue Web**.
+Este proyecto ha sido generado deterministamente desde **Sytue Webs**.
 
 ## Conexión con la API pública
 

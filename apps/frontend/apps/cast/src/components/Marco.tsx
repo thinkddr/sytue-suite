@@ -115,7 +115,7 @@ export function Marco({
             administra={usuario.roles.some((r) => r === 'owner' || r === 'admin')}
           />
         }
-        title={t('app.title')}
+        // Sin título: la barra del teléfono dice el nombre de marca del producto.
       >
         {contenido}
       </AppShell>

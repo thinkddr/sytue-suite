@@ -79,7 +79,7 @@ export const nucleo = {
   'new.progress': 'Стъпки за създаване на сайта',
   'new.go_to_step': 'Към стъпка {n}',
   'new.step_of': 'Стъпка {n} от {total}',
-  'app_settings.title': 'Настройки на Sytue Web',
+  'app_settings.title': 'Настройки на Sytue Webs',
   'new.search_title': 'Започнете с вида на вашия бизнес',
   'new.search_help':
     'Напишете с какво се занимавате или изберете група. Всеки шаблон вече съдържа подходящи текстове за вашата дейност: сменяте само името, телефона, цените и снимките.',
@@ -278,7 +278,7 @@ export const nucleo = {
   'domains.start_help':
     'Въведете домейна, който искате да използвате. Ще ви е нужен достъп до DNS настройките при доставчика, от когото сте го закупили.',
   'domains.progress': 'Напредък по свързването на домейна',
-  'domains.step.registered': 'Добавен в Sytue Web',
+  'domains.step.registered': 'Добавен в Sytue Webs',
   'domains.step.dns': 'DNS е потвърден',
   'domains.step.https': 'HTTPS е готов',
   'domains.step.primary': 'Основен адрес',

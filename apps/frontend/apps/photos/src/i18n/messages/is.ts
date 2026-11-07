@@ -132,6 +132,7 @@ export const is: AppCatalog<typeof en> = {
   'gallery.unselectMonth': 'Afvelja mánuð',
   'gallery.downloadSelected': 'Sækja',
   'gallery.downloading': 'Hafnar niðurhalsbeiðnir: {count}. Athugaðu niðurhal vafrans.',
+  'gallery.downloadingNative': { one: 'Sækir {count} mynd…', other: 'Sækir {count} myndir…' },
   'gallery.downloadCapped': 'Myndir utan þessarar lotu: {count}.',
   'gallery.newAlbum': 'Nýtt albúm',
   'gallery.newAlbumTitle': 'Nýtt albúm',
@@ -251,4 +252,20 @@ export const is: AppCatalog<typeof en> = {
   'aiBatch.excludeOrg': 'Undanþiggja stofnunina sjálfvirkri Sytue AI-keyrslu',
   'aiBatch.excludedHint':
     'Stofnunin er undanþegin sjálfvirkri Sytue AI-keyrslu. Nýjar myndir eru ekki unnar í bakgrunni fyrir tillögur eða líkindi.',
+  'album.rename': 'Endurnefna',
+  'album.renamePrompt': 'Heiti albúms',
+  'album.setCover': 'Nota sem forsíðu albúms',
+  'album.isCover': 'Þetta er forsíða albúmsins',
+  'album.coverSet': 'Forsíða albúmsins uppfærð',
+  'gallery.favorited': 'Bætt í uppáhald: {count}',
+  'gallery.unfavorited': 'Fjarlægt úr uppáhaldi: {count}',
+  'gallery.favoriteFailed': 'Myndir sem ekki tókst að breyta: {count}',
+  'gallery.noResults.title': 'Engar myndir passa við „{query}“',
+  'gallery.noResults.description':
+    'Prófaðu önnur orð eða hreinsaðu leitina til að sjá allar myndirnar þínar.',
+  'gallery.clearSearch': 'Hreinsa leit',
+  'viewer.counter': '{index} / {total}',
+  'viewer.counterMore': '{count}+',
+  'viewer.counterLabel': 'Mynd {index} af {total}',
+  'viewer.shortcutsJump': 'Home og End fara á fyrstu og síðustu myndina.',
 };

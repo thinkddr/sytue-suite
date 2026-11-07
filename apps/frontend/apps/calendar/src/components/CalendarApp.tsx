@@ -28,6 +28,7 @@ import {
   EmptyState,
   Illustration,
   esAtajoDeApp,
+  ShortcutsModal,
   useToast,
   ToastProvider,
   cx,
@@ -36,6 +37,7 @@ import {
   SidebarAction,
   Checkbox,
   Glifo,
+  useEstrecha,
 } from '@sytue/ui';
 import type { SytueUser } from '@sytue/auth';
 import {
@@ -58,7 +60,8 @@ import {
   type ViewMode,
   AGENDA_DAYS,
   addDays,
-  addMonths,
+  addMonthsClamped,
+  compactTitle,
   monthGrid,
   weekGrid,
   startOfDay,
@@ -73,7 +76,14 @@ import {
   dayMonthYearLabel,
   weekdayNarrowLabels,
 } from './dates.js';
-import { parseAlarms, parseAttendees, parseColor, parseRecurrence } from '../lib/ical.js';
+import { accionDeTecla, gruposDeAtajos } from '../lib/atajos.js';
+import {
+  guestPartstats,
+  parseAlarms,
+  parseAttendees,
+  parseColor,
+  parseRecurrence,
+} from '../lib/ical.js';
 import { CalendarGrid, DEFAULT_ACCENT, type GridEvent } from './CalendarGrid.js';
 import { EventModal, type EditingEvent } from './EventModal.js';
 import { EventPopover } from './EventPopover.js';
@@ -83,7 +93,9 @@ import { ResourcesModal } from './ResourcesModal.js';
 import { SubscribeModal } from './SubscribeModal.js';
 import { InvitationsModal } from './InvitationsModal.js';
 import { ScopeDialog } from './ScopeDialog.js';
-import { ReminderCenter } from './ReminderCenter.js';
+import { ReminderCenter, useRecordatorios } from './ReminderCenter.js';
+import { AccionesBarraCompacta, BloqueVistaMovil, MesCompacto } from './MesCompacto.js';
+import { SelectorVista } from './SelectorVista.js';
 import { SearchPanel } from './SearchPanel.js';
 import { fechaDelEnlace } from '../lib/search.js';
 import { useT } from '../i18n/index.js';
@@ -129,9 +141,6 @@ const HEADER_ICON_BTN =
 function KebabGlyph(): JSX.Element {
   return <Glifo d="M12 6h.01M12 12h.01M12 18h.01" size={16} />;
 }
-
-/** Tecla que conmuta cada vista (la misma letra que en Google Calendar). */
-const VIEW_KEY: Record<ViewMode, string> = { month: 'M', week: 'W', day: 'D', agenda: 'A' };
 
 /** Validación mínima de email para sanear los invitados del deep-link. */
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -225,6 +234,12 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
   const [seq, setSeq] = useState(0); // fuerza la recarga de eventos (guardar/reintentar)
   const [mode, setMode] = useState<ViewMode>('month');
   const [cursor, setCursor] = useState(new Date());
+  // El mes del teléfono: la vista de mes por debajo de `sm:` es el mes compacto, con su
+  // cabecera en la barra móvil y lo demás de la cabecera en el cajón. `plegado` es su
+  // asa (solo la semana elegida) y sobrevive a cambiar de mes y de vista.
+  const estrecha = useEstrecha();
+  const compacto = mode === 'month' && estrecha;
+  const [plegado, setPlegado] = useState(false);
   const [loadingCals, setLoadingCals] = useState(true);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -241,6 +256,8 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
   // Solo los administradores del tenant dan de alta/gestionan salas y recursos.
   const canManageResources = user.roles.includes('admin') || user.roles.includes('owner');
   const [searchOpen, setSearchOpen] = useState(false);
+  // La hoja de atajos de teclado («?»).
+  const [atajosOpen, setAtajosOpen] = useState(false);
   const [deleting, setDeleting] = useState<Calendar | null>(null);
   const [invitesOpen, setInvitesOpen] = useState(false);
   const [pendingInvites, setPendingInvites] = useState(0);
@@ -255,6 +272,16 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
   // Borrado de una serie recurrente desde la vista rápida, pendiente de alcance.
   const [deleteScope, setDeleteScope] = useState<GridEvent | null>(null);
   const toast = useToast();
+  // Los recordatorios se sondean UNA vez aquí: la campana de la cabecera y la fila del
+  // cajón (en el mes del teléfono) son dos presentaciones del mismo estado.
+  const recordatorios = useRecordatorios({
+    t,
+    locale,
+    onDeepLink: (d) => {
+      setCursor(d);
+      setMode('day');
+    },
+  });
 
   // Nº de invitaciones pendientes para el badge de la cabecera (carga inicial).
   useEffect(() => {
@@ -470,10 +497,14 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
     });
   }
 
+  // En el mes del teléfono, el mismo paso que deslizar: plegado es una semana, que es lo
+  // que se ve (`Pantalla.navegar` en Fyne).
   function navigate(delta: number): void {
     setCursor((c) =>
       mode === 'month'
-        ? addMonths(c, delta)
+        ? compacto && plegado
+          ? addDays(c, 7 * delta)
+          : addMonthsClamped(c, delta)
         : mode === 'agenda'
           ? addDays(c, delta * AGENDA_DAYS)
           : addDays(c, mode === 'week' ? delta * 7 : delta),
@@ -493,25 +524,26 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
       // aquí no se miraban: con un desplegable desplegado, pulsar «d» cambiaba de
       // vista por detrás del menú.
       if (!esAtajoDeApp(e)) return;
-      const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-      if (k === 't') setCursor(new Date());
-      else if (k === 'm') setMode('month');
-      else if (k === 'w') setMode('week');
-      else if (k === 'd') setMode('day');
-      else if (k === 'a') setMode('agenda');
-      else if (k === 'n' || k === 'j') navigate(1);
-      else if (k === 'p' || k === 'k') navigate(-1);
-      else if (k === 'c') openCreate(cursor);
-      else if (k === '/') setSearchOpen(true);
+      // La tabla de `lib/atajos.ts` es también la de la hoja de «?».
+      const accion = accionDeTecla(e.key);
+      if (accion === 'today') setCursor(new Date());
+      else if (accion === 'month' || accion === 'week' || accion === 'day' || accion === 'agenda')
+        setMode(accion);
+      else if (accion === 'next') navigate(1);
+      else if (accion === 'prev') navigate(-1);
+      else if (accion === 'create') openCreate(cursor);
+      else if (accion === 'search') setSearchOpen(true);
+      else if (accion === 'help') setAtajosOpen(true);
       else return;
       e.preventDefault();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
     // `navigate` y `openCreate` se redeclaran en cada render: el oyente se vuelve a
-    // enlazar cuando cambia lo que leen del cierre (vista, cursor y conectividad).
+    // enlazar cuando cambia lo que leen del cierre (vista, cursor, conectividad y el
+    // mes del teléfono con su asa).
     // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, cursor, offline]);
+  }, [mode, cursor, offline, compacto, plegado]);
 
   function openCreate(day: Date): void {
     if (offline) return;
@@ -558,7 +590,7 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
       ...(event.location ? { location: event.location } : {}),
       ...(event.description ? { description: event.description } : {}),
       ...(color ? { color } : {}),
-      ...(attendees.length ? { attendees } : {}),
+      ...(attendees.length ? { attendees, partstats: guestPartstats(event.ical) } : {}),
       ...(alarms.length ? { alarms } : {}),
     };
     await saveEvent({
@@ -585,7 +617,7 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
       ...(d.event.location ? { location: d.event.location } : {}),
       ...(d.event.description ? { description: d.event.description } : {}),
       ...(color ? { color } : {}),
-      ...(attendees.length ? { attendees } : {}),
+      ...(attendees.length ? { attendees, partstats: guestPartstats(d.event.ical) } : {}),
       ...(alarms.length ? { alarms } : {}),
     };
     const target: RecurTarget = {
@@ -826,11 +858,24 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
         </div>
       }
     >
+      {compacto ? (
+        <BloqueVistaMovil
+          t={t}
+          mode={mode}
+          onMode={setMode}
+          onBuscar={() => setSearchOpen(true)}
+          recordatorios={
+            <ReminderCenter t={t} locale={locale} estado={recordatorios} disparador="fila" />
+          }
+          invitaciones={pendingInvites}
+          onInvitaciones={() => setInvitesOpen(true)}
+        />
+      ) : null}
       <MiniMonth
         locale={locale}
         cursor={cursor}
         onPick={(day) => setCursor(day)}
-        onShift={(delta) => setCursor((c) => addMonths(c, delta))}
+        onShift={(delta) => setCursor((c) => addMonthsClamped(c, delta))}
       />
       <div class="mb-4">
         <div class="flex items-center justify-between pt-1 pr-1 pb-1.5 pl-2.5">
@@ -1054,139 +1099,137 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
       locale={locale}
     >
       {/* La topbar global ya la pinta la Sytue Shell: el AppShell ocupa el resto del viewport. */}
-      <AppShell topbar={null} class="h-[calc(100dvh-var(--spacing-topbar))]!" sidebar={sidebar}>
+      <AppShell
+        topbar={null}
+        class="h-[calc(100dvh-var(--spacing-topbar))]!"
+        sidebar={sidebar}
+        {...(compacto
+          ? {
+              // Sin color propio: el de la barra, que en «Marco» va sobre el marco de color.
+              mobileBarCenter: (
+                <h1 class="text-md truncate font-semibold">
+                  {compactTitle(locale, cursor, new Date())}
+                </h1>
+              ),
+              mobileBarActions: (
+                <AccionesBarraCompacta
+                  t={t}
+                  locale={locale}
+                  hoy={new Date()}
+                  cursor={cursor}
+                  offline={offline}
+                  onHoy={() => setCursor(new Date())}
+                  onCrear={() => openCreate(cursor)}
+                />
+              ),
+              // Lo pendiente del cajón (recordatorios e invitaciones), que en el
+              // teléfono ya no se ve en ninguna cabecera.
+              ...(recordatorios.lista.length + pendingInvites > 0
+                ? {
+                    mobileNavNotice: t('nav.menuPending', {
+                      count: recordatorios.lista.length + pendingInvites,
+                    }),
+                  }
+                : {}),
+            }
+          : {})}
+      >
         <div class="flex h-full flex-col">
           {/* En móvil la cabecera NO envuelve en dos filas: es UNA fila que se
               desplaza de lado (ver scrollX.ts en @sytue/ui). El salto de línea
               robaba media pantalla al calendario, que es lo caro en un teléfono. */}
-          <header
-            data-scroll-x
-            ref={cabecera.ref}
-            class={cx(
-              'bg-surface text-text border-border flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2.5',
-              FILA_UNICA_EN_MOVIL,
-              cabecera.queda && MASCARA_SCROLL_X,
-            )}
-          >
-            <div class="flex items-center gap-1">
-              {/* El atajo va en el `title`, no en el nombre accesible: un lector de
+          {compacto ? null : (
+            <header
+              data-scroll-x
+              ref={cabecera.ref}
+              class={cx(
+                'bg-surface text-text border-border flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2.5',
+                FILA_UNICA_EN_MOVIL,
+                cabecera.queda && MASCARA_SCROLL_X,
+                // `useEstrecha` arranca en false para que la hidratación vea el árbol del
+                // servidor: en el mes, por debajo de 640, esta cabecera solo se pintaría
+                // ese primer instante, antes de saltar al mes compacto. Se oculta.
+                mode === 'month' && 'max-sm:hidden',
+              )}
+            >
+              <div class="flex items-center gap-1">
+                {/* El atajo va en el `title`, no en el nombre accesible: un lector de
                   pantalla no navega por teclas de una sola letra y leer «(T)» tras
                   cada botón sería ruido. */}
+                <button
+                  type="button"
+                  title={t('header.shortcut', { label: t('header.today'), key: 'T' })}
+                  onClick={() => setCursor(new Date())}
+                  class={cx(
+                    'border-border-strong text-text rounded-control inline-flex h-8 items-center border px-3 text-sm font-semibold',
+                    'hover:bg-surface-sunken active:bg-surface-sunken transition-colors duration-150',
+                    HEADER_FOCUS,
+                  )}
+                >
+                  {t('header.today')}
+                </button>
+                <button
+                  type="button"
+                  aria-label={t('nav.prev')}
+                  title={t('header.shortcut', { label: t('nav.prev'), key: 'P' })}
+                  onClick={() => navigate(-1)}
+                  class={cx(HEADER_ICON_BTN, HEADER_FOCUS)}
+                >
+                  <Icon name="chevronLeft" />
+                </button>
+                <button
+                  type="button"
+                  aria-label={t('nav.next')}
+                  title={t('header.shortcut', { label: t('nav.next'), key: 'N' })}
+                  onClick={() => navigate(1)}
+                  class={cx(HEADER_ICON_BTN, HEADER_FOCUS)}
+                >
+                  <Icon name="chevronRight" />
+                </button>
+              </div>
+              <h1
+                class="sytue-h3 text-text min-w-0 truncate"
+                title={titleFor(mode, cursor, locale)}
+              >
+                {titleFor(mode, cursor, locale)}
+              </h1>
               <button
                 type="button"
-                title={t('header.shortcut', { label: t('header.today'), key: 'T' })}
-                onClick={() => setCursor(new Date())}
+                aria-label={t('search.events')}
+                title={t('header.shortcut', { label: t('search.events'), key: '/' })}
+                onClick={() => setSearchOpen(true)}
+                class={cx('ml-auto', HEADER_ICON_BTN, HEADER_FOCUS)}
+              >
+                <Icon name="search" size={18} />
+              </button>
+              <ReminderCenter t={t} locale={locale} estado={recordatorios} />
+              <button
+                type="button"
+                onClick={() => setInvitesOpen(true)}
                 class={cx(
-                  'border-border-strong text-text rounded-control inline-flex h-8 items-center border px-3 text-sm font-semibold',
+                  'border-border-strong text-text rounded-control inline-flex h-8 items-center gap-1.5 border px-3 text-sm font-semibold',
                   'hover:bg-surface-sunken active:bg-surface-sunken transition-colors duration-150',
                   HEADER_FOCUS,
                 )}
               >
-                {t('header.today')}
-              </button>
-              <button
-                type="button"
-                aria-label={t('nav.prev')}
-                title={t('header.shortcut', { label: t('nav.prev'), key: 'P' })}
-                onClick={() => navigate(-1)}
-                class={cx(HEADER_ICON_BTN, HEADER_FOCUS)}
-              >
-                <Icon name="chevronLeft" />
-              </button>
-              <button
-                type="button"
-                aria-label={t('nav.next')}
-                title={t('header.shortcut', { label: t('nav.next'), key: 'N' })}
-                onClick={() => navigate(1)}
-                class={cx(HEADER_ICON_BTN, HEADER_FOCUS)}
-              >
-                <Icon name="chevronRight" />
-              </button>
-            </div>
-            <h1 class="sytue-h3 text-text min-w-0 truncate" title={titleFor(mode, cursor, locale)}>
-              {titleFor(mode, cursor, locale)}
-            </h1>
-            <button
-              type="button"
-              aria-label={t('search.events')}
-              title={t('header.shortcut', { label: t('search.events'), key: '/' })}
-              onClick={() => setSearchOpen(true)}
-              class={cx('ml-auto', HEADER_ICON_BTN, HEADER_FOCUS)}
-            >
-              <Icon name="search" size={18} />
-            </button>
-            <ReminderCenter
-              t={t}
-              locale={locale}
-              onDeepLink={(d) => {
-                setCursor(d);
-                setMode('day');
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => setInvitesOpen(true)}
-              class={cx(
-                'border-border-strong text-text rounded-control inline-flex h-8 items-center gap-1.5 border px-3 text-sm font-semibold',
-                'hover:bg-surface-sunken active:bg-surface-sunken transition-colors duration-150',
-                HEADER_FOCUS,
-              )}
-            >
-              {/* `users`, no `bell`: la campana ya es el centro de recordatorios,
+                {/* `users`, no `bell`: la campana ya es el centro de recordatorios,
                   que vive justo a la izquierda — dos campanas seguidas con
                   significados distintos no distinguen nada. */}
-              <Icon name="users" size={16} />
-              {t('header.invitations')}
-              {pendingInvites > 0 ? (
-                <Badge
-                  count
-                  class="ml-1"
-                  aria-label={t('header.pending', { count: pendingInvites })}
-                >
-                  {pendingInvites}
-                </Badge>
-              ) : null}
-            </button>
-            <div
-              class="bg-bg-subtle inline-flex items-center gap-0.5 rounded-md p-0.5"
-              role="group"
-              aria-label={t('view.label')}
-            >
-              {(['month', 'week', 'day', 'agenda'] as ViewMode[]).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  aria-pressed={mode === m}
-                  title={t('header.shortcut', {
-                    label: t(`view.${m}` as const),
-                    key: VIEW_KEY[m],
-                  })}
-                  onClick={() => setMode(m)}
-                  class={cx(
-                    'h-7 rounded-sm px-2.5 text-sm font-semibold transition-colors duration-150',
-                    HEADER_FOCUS,
-                    mode === m
-                      ? // `primary-text` y no `primary`: el relleno no se reasigna en
-                        // oscuro, así que sobre `surface` oscuro daba 2,96:1. El rol de
-                        // texto sí invierte (7,83:1 en claro, 8,03:1 en oscuro).
-                        'bg-surface text-primary-text shadow-[var(--shadow-xs)]'
-                      : // El grupo es una píldora CLARA sobre el cromo grafito: al pasar
-                        // por encima el texto se oscurece; `text-text` (blanco) aquí
-                        // dejaba la etiqueta invisible sobre `bg-surface`.
-                        'text-text-muted hover:bg-surface hover:text-text',
-                  )}
-                >
-                  {m === 'month'
-                    ? t('view.month')
-                    : m === 'week'
-                      ? t('view.week')
-                      : m === 'day'
-                        ? t('view.day')
-                        : t('view.agenda')}
-                </button>
-              ))}
-            </div>
-          </header>
+                <Icon name="users" size={16} />
+                {t('header.invitations')}
+                {pendingInvites > 0 ? (
+                  <Badge
+                    count
+                    class="ml-1"
+                    aria-label={t('header.pending', { count: pendingInvites })}
+                  >
+                    {pendingInvites}
+                  </Badge>
+                ) : null}
+              </button>
+              <SelectorVista t={t} mode={mode} onChange={setMode} />
+            </header>
+          )}
           {/* La franja de solo lectura de cada calendario compartido de lector que está a
               la vista, con su «Pedir acceso de edición»; y, para el dueño que llega desde
               el aviso, la de quién se lo pide. Al conceder, el aviso del Hub la quita. */}
@@ -1219,7 +1262,46 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
           ) : null}
 
           <div class="min-h-0 flex-1 overflow-auto">
-            {loadingCals || (loadingEvents && shownEvents.length === 0) ? (
+            {compacto ? (
+              // La geometría no depende de los datos: cargando, la hoja es la misma sin
+              // puntos y la lista enseña su esqueleto; el error va en el sitio de la lista.
+              <MesCompacto
+                t={t}
+                locale={locale}
+                cursor={cursor}
+                hoy={new Date()}
+                events={shownEvents}
+                plegado={plegado}
+                onPlegar={() => setPlegado((v) => !v)}
+                cargando={loadingCals || (loadingEvents && shownEvents.length === 0)}
+                atenuado={loadingEvents && shownEvents.length > 0}
+                panel={
+                  !loadingCals && error ? (
+                    <div class="flex flex-1 items-start justify-center p-6">
+                      <EmptyState
+                        title={t('load.error')}
+                        description={error}
+                        illustration={<Illustration name="errorRetry" />}
+                        action={
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => (calendars.length === 0 ? loadCalendars() : reload())}
+                          >
+                            {t('common.retry')}
+                          </Button>
+                        }
+                      />
+                    </div>
+                  ) : undefined
+                }
+                onElegir={setCursor}
+                onMoverMes={(d) =>
+                  setCursor((c) => (plegado ? addDays(c, 7 * d) : addMonthsClamped(c, d)))
+                }
+                onSelectEvent={openQuickView}
+              />
+            ) : loadingCals || (loadingEvents && shownEvents.length === 0) ? (
               <GridSkeleton locale={locale} mode={mode} />
             ) : error ? (
               <div class="flex h-full items-center justify-center p-6">
@@ -1263,9 +1345,13 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
           </div>
         </div>
       </AppShell>
-      {/* Crear evento al alcance del pulgar: en móvil el menú lateral es un cajón cerrado. */}
-      {offline ? null : (
+      {/* Crear evento al alcance del pulgar: en móvil el menú lateral es un cajón cerrado.
+          En el mes del teléfono no: ahí crear es el «+» de la barra. */}
+      {offline || compacto ? null : (
         <MobileFab
+          // Lo mismo que la cabecera: en el mes por debajo de 640 solo asomaría el primer
+          // instante, antes de que `useEstrecha` resuelva.
+          class={mode === 'month' ? 'max-sm:hidden' : ''}
           label={t('nav.createEvent')}
           icon={<Icon name="plus" size={24} />}
           onClick={() => openCreate(cursor)}
@@ -1301,6 +1387,12 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
 
       <ResourcesModal t={t} open={resourcesOpen} onClose={() => setResourcesOpen(false)} />
 
+      <ShortcutsModal
+        open={atajosOpen}
+        title={t('shortcuts.title')}
+        groups={gruposDeAtajos(t)}
+        onClose={() => setAtajosOpen(false)}
+      />
       <SearchPanel
         t={t}
         locale={locale}
@@ -1466,7 +1558,10 @@ function GridSkeleton({ mode, locale }: { mode: ViewMode; locale: Locale }): JSX
         role="status"
         aria-busy="true"
         aria-label={t('loading.calendar')}
-        class="bg-surface flex h-full flex-col"
+        // Por debajo de 640 el mes es el compacto: esta rejilla de 6×7 solo asomaría el
+        // primer instante, antes de que `useEstrecha` resuelva (arranca en false por la
+        // hidratación). Se oculta y la geometría no salta.
+        class="bg-surface flex h-full flex-col max-sm:hidden"
       >
         <div class="border-border grid grid-cols-7 border-b">
           {Array.from({ length: 7 }, (_, i) => (

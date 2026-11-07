@@ -92,6 +92,17 @@ func TestLosAvisosQueImportanNoSeVanSolos(t *testing.T) {
 	}
 }
 
+// TestElAvisoConDeshacerDuraDiezSegundos: el de «Deshacer» (papelera, importación) es
+// UNO para toda la suite y dura los 10 s de `DURACION_DESHACER` de `@sytue/ui`, el
+// doble del de serie. Antes cada app tenía su copia (drive, contactos, erp).
+//
+// VISTO EN ROJO: con DuracionDeshacer a 5 s no da más tiempo que el de serie.
+func TestElAvisoConDeshacerDuraDiezSegundos(t *testing.T) {
+	if DuracionDeshacer != 10*time.Second || DuracionDeshacer <= DuracionDe(AvisoExito) {
+		t.Errorf("el aviso con «Deshacer» dura %v; la web le da 10 s", DuracionDeshacer)
+	}
+}
+
 // pilaQueSeVacia es una pila que descarta sus avisos al acabar el test. Sin eso, un
 // aviso de éxito deja un reloj de 5 s vivo que dispara en mitad de OTRO test: su
 // `Refresh` escribe la caché global de renderers de Fyne mientras el otro pinta, y

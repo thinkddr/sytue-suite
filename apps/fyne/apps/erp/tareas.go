@@ -149,7 +149,7 @@ func (t *Tareas) Objeto(v tema.Variante) fyne.CanvasObject {
 		}
 	}
 	o, alto := p.objeto()
-	return enPagina(o, alto, AnchoContenidoLista, MargenLista)
+	return enPagina(o, alto, AnchoContenidoLista)
 }
 
 // cabecera es el título, la frase y el conmutador de «Mías · De todos». En el móvil el
@@ -218,7 +218,7 @@ func (c *cabeceraTareas) Layout(_ []fyne.CanvasObject, t fyne.Size) {
 
 // lista es un grupo: `ul.rounded-lg.border.divide-y` con una fila por tarea.
 func (t *Tareas) lista(v tema.Variante, filas []api.ERPActividad, hoy string) (fyne.CanvasObject, float32) {
-	caja := ui.NuevaCaja(tema.Color("bg", v), tema.Color("border", v), radioTarjeta())
+	caja := ui.NuevaCaja(tema.Color(ui.FondoHoja(), v), tema.Color("border", v), radioTarjeta())
 	col := &columnaFilas{}
 	var hijos []fyne.CanvasObject
 	for i, a := range filas {
@@ -385,10 +385,11 @@ func (c *ConmutadorMias) Tapped(e *fyne.PointEvent) {
 // CreateRenderer construye el perfil y los dos rótulos.
 func (c *ConmutadorMias) CreateRenderer() fyne.WidgetRenderer {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	// El grupo no tiene fondo en la web: lo de detrás es la hoja, no `bg`.
 	r := &miasRenderer{
 		c:     c,
 		aro:   ui.NuevoAro(tema.RadioMD, ui.SinHueco, v),
-		caja:  ui.NuevaCaja(tema.Color("bg", v), tema.Color("border", v), tema.RadioMD),
+		caja:  ui.NuevaCaja(tema.Color(ui.FondoHoja(), v), tema.Color("border", v), tema.RadioMD),
 		sel:   canvas.NewRectangle(tema.Color("selected", v)),
 		mias:  ui.Texto(c.Mias, tema.TextoSM, pesoOpcion2(c.EnMias), tema.Color(tintaOpcion(c.EnMias, v), v)),
 		todos: ui.Texto(c.Todos, tema.TextoSM, pesoOpcion2(!c.EnMias), tema.Color(tintaOpcion(!c.EnMias, v), v)),
@@ -417,12 +418,19 @@ func (r *miasRenderer) Layout(t fyne.Size) {
 	a1 := anchoMias(r.c.Mias, r.c.EnMias)
 	a2 := anchoMias(r.c.Todos, !r.c.EnMias)
 	alto := t.Height - 2*tema.Borde
+	// El velo sigue la esquina de dentro del perfil por su lado de fuera: cuadrado,
+	// tapaba el borde redondeado en las dos esquinas de su extremo.
+	d := max(tema.RadioMD-tema.Borde, 0)
 	if r.c.EnMias {
 		r.sel.Move(fyne.NewPos(tema.Borde, tema.Borde))
 		r.sel.Resize(fyne.NewSize(a1, alto))
+		r.sel.TopLeftCornerRadius, r.sel.BottomLeftCornerRadius = d, d
+		r.sel.TopRightCornerRadius, r.sel.BottomRightCornerRadius = 0, 0
 	} else {
 		r.sel.Move(fyne.NewPos(tema.Borde+a1, tema.Borde))
 		r.sel.Resize(fyne.NewSize(a2, alto))
+		r.sel.TopLeftCornerRadius, r.sel.BottomLeftCornerRadius = 0, 0
+		r.sel.TopRightCornerRadius, r.sel.BottomRightCornerRadius = d, d
 	}
 	y := tema.Borde + MiasPY
 	ui.ColocarTexto(r.mias, tema.TextoSM, tema.Borde+MiasPX, y)

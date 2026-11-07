@@ -120,6 +120,17 @@ func sanearCondsFiltro(crudo map[string]any, c1, c2 int) map[string]CondFiltro {
 	return out
 }
 
+// operandoFiltro es `filterOperand`: el operando como número y, si se tecleó como fecha
+// («01/03/2026», «2026-03-01»), su serial, que es lo que guarda una celda de fecha: así
+// «entre 01/01/2026 y 31/01/2026» filtra enero. La fecha va primero porque «2026-03-01»
+// también tiene la forma de un número.
+func operandoFiltro(s string) (float64, bool) {
+	if n, ok := fechaTecleada(s); ok {
+		return n, true
+	}
+	return numeroEstricto(s)
+}
+
 // celdaFiltro es una `FilterCell`: el valor calculado de una celda del cuerpo y su estilo
 // manual.
 type celdaFiltro struct {
@@ -152,8 +163,8 @@ func evaluarFiltro(cond CondFiltro, celdas []celdaFiltro) []bool {
 			nums = append(nums, n)
 		}
 	}
-	aNum, hayA := numeroEstricto(cond.A)
-	bNum, hayB := numeroEstricto(cond.B)
+	aNum, hayA := operandoFiltro(cond.A)
+	bNum, hayB := operandoFiltro(cond.B)
 	aLow := strings.ToLower(strings.TrimSpace(cond.A))
 	var umbral float64
 	hayUmbral := false

@@ -294,6 +294,14 @@ export const es: AppCatalog<typeof en> = {
     one: 'Se envió 1 elemento a la papelera.',
     other: 'Se enviaron {count} elementos a la papelera.',
   },
+  'files.batch.restored': {
+    one: 'Se restauró 1 elemento.',
+    other: 'Se restauraron {count} elementos.',
+  },
+  'files.batch.restorePartial': {
+    one: 'No se pudo restaurar 1 elemento; sigue en la papelera.',
+    other: 'No se pudieron restaurar {count} elementos; siguen en la papelera.',
+  },
   'files.batch.trashFailed': 'No se pudo enviar la selección a la papelera.',
   'files.batch.moveTitle': { one: 'Mover 1 elemento', other: 'Mover {count} elementos' },
   'files.batch.moveDone': {
@@ -312,6 +320,9 @@ export const es: AppCatalog<typeof en> = {
   'action.rename': 'Renombrar',
   'action.move': 'Mover a…',
   'action.copy': 'Hacer una copia',
+  'action.copyLink': 'Copiar enlace',
+  'action.linkCopied': 'Enlace copiado. Solo lo abre quien ya tiene acceso.',
+  'action.copyLinkFailed': 'No se pudo copiar el enlace.',
   'action.shareLink': 'Compartir enlace',
   'action.openInApp': 'Abrir en la aplicación',
   'action.openInEditor': 'Abrir en el editor',
@@ -533,6 +544,18 @@ export const es: AppCatalog<typeof en> = {
   'trash.purged': 'Se eliminó «{name}» definitivamente.',
   'trash.purgeDenied': 'No se puede eliminar «{name}»',
   'trash.purgeFailed': 'No se pudo eliminar.',
+  'trash.emptyAll': 'Vaciar papelera',
+  'trash.emptyAllTitle': '¿Vaciar la papelera?',
+  'trash.emptyAllBody': {
+    one: 'Se borrará para siempre el elemento de la papelera, con su historial de versiones. No hay forma de recuperarlo después.',
+    other:
+      'Se borrarán para siempre los {count} elementos de la papelera, con su historial de versiones. No hay forma de recuperarlos después.',
+  },
+  'trash.emptiedAll': 'Se vació la papelera.',
+  'trash.emptyAllPartial': {
+    one: 'No se pudo eliminar 1 elemento; sigue en la papelera.',
+    other: 'No se pudieron eliminar {count} elementos; siguen en la papelera.',
+  },
   'trash.purgeTitle': '¿Eliminar definitivamente?',
   'trash.purgeBodyFolder':
     'Se borrará el contenido de «{name}» y de todo lo que hay dentro de los servidores de Sytue, junto con su historial de versiones. No hay forma de recuperarlo después, ni desde aquí ni desde soporte. A cambio, liberas el espacio que ocupaba.',

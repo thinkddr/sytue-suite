@@ -77,6 +77,10 @@ type BotonIcono struct {
 	// (`disabled:opacity-40 disabled:pointer-events-none` de la hoja). Un botón que
 	// no se puede usar y se ve igual es una diana que falla sin decir por qué.
 	Inerte bool
+	// Apagado es `aria-disabled` sin `disabled`: se ve como Inerte y no responde, pero
+	// SIGUE en el tabulador y con su pista, para que quien navega con el teclado oiga por
+	// qué no hace nada («Es la portada del álbum»). Un `disabled` de verdad se salta.
+	Apagado bool
 	// Rotulo es el nombre accesible, YA traducido. Obligatorio: un icono no dice nada
 	// a quien no lo ve.
 	Rotulo   string
@@ -119,10 +123,9 @@ func (b *BotonIcono) ponerPista(p *Pista) { b.pista = p }
 const (
 	// LadoIconoSM es `h-6 w-6 min-h-[24px] min-w-[24px]`: 21 subidos al suelo de WCAG.
 	LadoIconoSM float32 = 24
-	// LadoIconoMD es `h-7 w-7`: 24,5, no los 28 que dice su comentario en la web
-	// —ese comentario da por hecha una raíz de 16—.
+	// LadoIconoMD es `h-7 w-7`: 28 con la raíz de 16.
 	LadoIconoMD = 7 * 0.25 * tema.Rem
-	// LadoIconoLG es `h-8 w-8`: 28.
+	// LadoIconoLG es `h-8 w-8`: 32.
 	LadoIconoLG = 8 * 0.25 * tema.Rem
 )
 
@@ -174,7 +177,7 @@ func MedidaBotonIcono(lado float32) fyne.Size { return fyne.NewSize(lado, lado) 
 
 func (b *BotonIcono) colores(v tema.Variante) (fondo, trazo color.NRGBA) {
 	trazo = tema.Color(b.Trazo, v)
-	if b.Inerte {
+	if b.Inerte || b.Apagado {
 		// `disabled:` congela el reposo y baja la opacidad; no hay hover ni pulsado.
 		return color.NRGBA{}, atenuarCon(trazo, 0.4)
 	}
@@ -229,7 +232,7 @@ func (b *BotonIcono) dibujo(trazo color.NRGBA) *iconos.Dibujo {
 
 // Tapped es `onClick`.
 func (b *BotonIcono) Tapped(*fyne.PointEvent) {
-	if b.Inerte {
+	if b.Inerte || b.Apagado {
 		return
 	}
 	if c := fyne.CurrentApp().Driver().CanvasForObject(b); c != nil {
@@ -245,7 +248,7 @@ func (b *BotonIcono) MouseIn(*desktop.MouseEvent) {
 	// La pista sale también en un botón apagado, como el `title` de uno `disabled`: es
 	// donde se dice POR QUÉ lo está.
 	b.pista.alPuntero(true)
-	if b.Inerte {
+	if b.Inerte || b.Apagado {
 		return
 	}
 	b.encima = true
@@ -278,7 +281,7 @@ func (b *BotonIcono) MouseUp(*desktop.MouseEvent) {
 }
 
 func (b *BotonIcono) pulsacionDePuntero(pulsado bool) {
-	pulsado = pulsado && !b.Disabled()
+	pulsado = pulsado && !b.Disabled() && !b.Apagado
 	if b.pulsado == pulsado {
 		return
 	}
@@ -286,7 +289,7 @@ func (b *BotonIcono) pulsacionDePuntero(pulsado bool) {
 	b.Refresh()
 }
 
-func (b *BotonIcono) pulsacionDisponible() bool { return !b.Disabled() }
+func (b *BotonIcono) pulsacionDisponible() bool { return !b.Disabled() && !b.Apagado }
 
 // FocusGained enciende el aro.
 func (b *BotonIcono) FocusGained() {

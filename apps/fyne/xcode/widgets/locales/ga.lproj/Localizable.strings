@@ -31,3 +31,4 @@
 "dataflow.item.events" = "Féilire";
 "dataflow.item.documents" = "Doiciméid";
 "dataflow.item.contacts" = "Teagmhálaithe";
+"widgets.updatedAgo" = "Nuashonraithe %@";

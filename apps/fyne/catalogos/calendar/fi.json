@@ -66,6 +66,7 @@
   "common.remove": "Poista",
   "common.retry": "Yritä uudelleen",
   "common.save": "Tallenna",
+  "day.noEvents": "Ei tapahtumia tänä päivänä",
   "error.calendarsLoad": "Kalentereita ei voitu ladata.",
   "error.eventsLoad": "Tapahtumia ei voitu ladata.",
   "event.ai": "Kuvaile tapahtuma",
@@ -142,12 +143,19 @@
   "grid.blockAria": "{title}, {time}",
   "grid.continued": "{title} (jatkuu)",
   "grid.createOn": "Luo tapahtuma päivälle {date}",
+  "grid.dayEvents": {
+    "one": "{date}, {count} tapahtuma",
+    "other": "{date}, {count} tapahtumaa"
+  },
+  "grid.daySelected": "{label}, valittu",
   "grid.loadError": "Kalenteria ei voitu ladata",
   "grid.loading": "Ladataan kalenteria",
   "grid.more": {
     "one": "+{count} lisää",
     "other": "+{count} lisää"
   },
+  "grid.showMonth": "Näytä koko kuukausi",
+  "grid.showWeek": "Näytä vain tämä viikko",
   "grid.snapAria": {
     "one": "Vedon tarttuma {count} minuutti. Paina vaihtaaksesi.",
     "other": "Vedon tarttuma {count} minuuttia. Paina vaihtaaksesi."
@@ -160,6 +168,13 @@
     "one": "{count} min",
     "other": "{count} min"
   },
+  "grid.todayLabel": "Tänään, {date}",
+  "grid.weekNumber": "Viikko {week}",
+  "guests.organizer": "Järjestäjä",
+  "guests.status.accepted": "Osallistuu",
+  "guests.status.declined": "Ei osallistu",
+  "guests.status.pending": "Odottaa vastausta",
+  "guests.status.tentative": "Ehkä",
   "header.invitations": "Kutsut",
   "header.next": "Seuraava",
   "header.pending": {
@@ -197,6 +212,10 @@
   "nav.createEventOn": "Luo tapahtuma päivälle {date}",
   "nav.deleteSubscription": "Poista tilaus",
   "nav.manageResources": "Hallitse tiloja ja laitteita",
+  "nav.menuPending": {
+    "one": "Avaa valikko, {count} odottaa",
+    "other": "Avaa valikko, {count} odottaa"
+  },
   "nav.myCalendars": "Omat kalenterit",
   "nav.next": "Seuraava",
   "nav.nextMonth": "Seuraava kuukausi",
@@ -341,6 +360,7 @@
   "scope.following": "Tähän ja seuraaviin",
   "scope.legend": "Tämä tapahtuma toistuu. Mihin tapahtumiin muutos koskee?",
   "scope.this": "Vain tähän tapahtumaan",
+  "search.allCalendars": "Kaikki kalenterit",
   "search.error": "Hakua ei voitu suorittaa loppuun.",
   "search.events": "Hae tapahtumia",
   "search.loadMore": "Lataa lisää",
@@ -349,6 +369,12 @@
     "other": "Kirjoita vähintään {count} merkkiä hakeaksesi kalentereistasi."
   },
   "search.noResults": "Ei tuloksia haulla ”{term}”.",
+  "search.period": "Ajanjakso",
+  "search.period.any": "Milloin tahansa",
+  "search.period.month": "Tässä kuussa",
+  "search.period.past": "Menneet",
+  "search.period.upcoming": "Tulevat",
+  "search.period.year": "Tänä vuonna",
   "search.placeholder": "Otsikko, kuvaus, paikka tai vieras…",
   "search.searching": "Haetaan…",
   "search.series": "Sarja",
@@ -390,6 +416,14 @@
   "share.whoSeesNow": "Kuka näkee sen nyt",
   "share.writerHint": "Näkemisen lisäksi luo, muuttaa ja poistaa tapahtumia tässä kalenterissa.",
   "share.writerLabel": "Nähdä ja muokata tapahtumiani",
+  "shortcuts.group.actions": "Toiminnot",
+  "shortcuts.group.navigate": "Liikkuminen",
+  "shortcuts.group.views": "Näkymät",
+  "shortcuts.help": "Näytä tämä luettelo",
+  "shortcuts.next": "Seuraava jakso",
+  "shortcuts.prev": "Edellinen jakso",
+  "shortcuts.title": "Pikanäppäimet",
+  "shortcuts.today": "Siirry tähän päivään",
   "subscribe.aria": "Tilaa kalenteri URL-osoitteella",
   "subscribe.byUrl": "Tilaa URL-osoitteella (.ics)",
   "subscribe.defaultName": "Tilattu kalenteri",

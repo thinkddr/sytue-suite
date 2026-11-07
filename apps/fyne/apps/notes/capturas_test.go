@@ -140,6 +140,21 @@ func TestLasCapturasDeLaApp(t *testing.T) {
 			p.edicion.editor.Orden("b", "")
 			teclear(p.edicion.editor.zona, " urgente")
 		}},
+		// «[[» y «@» mientras se escribe: la lista de notas que enlazar y la de la gente.
+		{"escritorio-editando-enlazar", 1280, 800, "columns", func(p *Pantalla) {
+			n, _ := p.nota("n1")
+			p.abrirEditor(n)
+			teclear(p.edicion.editor.zona, " ver [[")
+		}},
+		{"escritorio-editando-mencion", 1280, 800, "columns", func(p *Pantalla) {
+			p.Directorio = api.NewDirectorio("http://127.0.0.1:9", nil, nil)
+			p.agendaMenciones().Poner([]api.Miembro{
+				{Email: "ana@sytue.eu", Nombre: "Ana Pérez"}, {Email: "andres@sytue.eu"}, {Email: "luis@sytue.eu", Nombre: "Luis"},
+			})
+			n, _ := p.nota("n1")
+			p.abrirEditor(n)
+			teclear(p.edicion.editor.zona, " avisar a @an")
+		}},
 		{"escritorio-editando-ancha", 1280, 800, "columns", func(p *Pantalla) {
 			n, _ := p.nota("n2")
 			p.abrirEditor(n)

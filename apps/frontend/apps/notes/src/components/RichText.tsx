@@ -6,7 +6,8 @@
  * del producto: lo que tenía el BasKet clásico de KDE (negrita, cursiva,
  * subrayado, tachado, color, alineación, listas, sangría, enlaces) y lo que le
  * faltaba (títulos hasta h5, cita, código, resaltado, deshacer y rehacer, y el
- * enlace a otra nota o a un título de otra nota escribiendo su nombre).
+ * enlace a otra nota o a un título de otra nota escribiendo su nombre, en la
+ * herramienta de enlaces o tras `[[`; y «@» para mencionar a alguien).
  *
  * Se apoya en el adaptador de edición compartido de `@sytue/ui`, el mismo que
  * usa el compositor de Sytue Mail: dos implementaciones del mismo gesto acaban
@@ -22,7 +23,7 @@
  * ponytail: si algún día hace falta conservarlo, lo que toca es un saneador de
  * allowlist en `@sytue/ui` (compartido con Mail), no relajar esto.
  */
-import type { JSX } from 'preact';
+import { Fragment, type JSX } from 'preact';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { createPortal } from 'preact/compat';
 import {
@@ -46,6 +47,7 @@ import {
   useMobileBack,
   atajoDelSistema,
 } from '@sytue/ui';
+import { candidatos, consultaMencion, moverActiva, type Persona } from '@sytue/shell';
 import {
   editingCommandEnabled,
   editingCommandState,
@@ -66,6 +68,7 @@ import { escapar } from '../client/captura.js';
 import { atajoMarkdown } from '../client/markdown.js';
 import {
   consultaDeBarra,
+  consultaDeEnlace,
   filtrarComandos,
   type Comando,
   type IdComando,
@@ -74,7 +77,7 @@ import { coincidenciasEn, liPlegable } from '../client/en-nota.js';
 import { Glyph, type GlyphName } from './glyphs.js';
 import { construirPeticion, leerRespuesta, type AccionIA } from '../lib/ai.js';
 import { bloquesDe, type Bloque } from '@sytue/ai';
-import { LinkTool, type FuentesDeEnlace } from './LinkTool.js';
+import { LinkTool, useOpcionesDeEnlace, type FuentesDeEnlace, type Opcion } from './LinkTool.js';
 
 interface Props {
   t: T;
@@ -148,6 +151,39 @@ const DIBUJO_COMANDO: Record<IdComando, { glyph?: GlyphName; icon?: 'text' | 'co
   regla: { icon: 'minus' },
   tabla: { glyph: 'table' },
 };
+
+/** Los tres menús que se abren al teclear: un bloque, una nota que enlazar, alguien. */
+type TipoMenu = 'cmd' | 'nota' | 'persona';
+
+/**
+ * Lo que abre cada menú y cómo se lee lo escrito tras ello. `[[` va primero: el nombre
+ * de una nota puede llevar « /», y mientras no se cierre se está buscando una nota.
+ */
+const DISPAROS: readonly (readonly [TipoMenu, string, (antes: string) => string | null])[] = [
+  ['nota', '[[', consultaDeEnlace],
+  ['persona', '@', consultaMencion],
+  ['cmd', '/', consultaDeBarra],
+];
+
+const ROTULO_MENU = {
+  cmd: 'slash.title',
+  nota: 'editor.linkNote',
+  persona: 'editor.mention',
+} as const;
+
+/** Una fila de cualquiera de los tres menús. */
+interface Sugerencia {
+  clave: string;
+  dibujo: JSX.Element;
+  rotulo: string;
+  /** El título dentro de la nota, tras «›». */
+  dentro?: string;
+  /** A la derecha y en gris: el atajo del comando, el cuaderno, el correo. */
+  detalle?: string;
+  /** El grupo al que pertenece (este cuaderno, otros cuadernos). */
+  grupo?: string;
+  elegir: () => void;
+}
 
 /** Id del cuadro de «Buscar en la nota», para darle el foco al abrirlo. */
 const ID_BUSCAR = 'notes-buscar-en-nota';
@@ -233,36 +269,93 @@ export function RichText({
     }
   };
 
-  // --- Menú de «/» ----------------------------------------------------------
+  // --- Menús al teclear -----------------------------------------------------
   //
-  // Se abre al escribir una barra al principio de una línea o tras un blanco
-  // (client/comandos.ts) y lo que se sigue escribiendo lo filtra. El texto se
-  // queda en la nota mientras tanto: si no se elige nada, «/» es una barra.
-  const [menuCmd, setMenuCmd] = useState<{
+  // Tres disparadores abren una lista junto al cursor: «/» al principio de una línea o
+  // tras un blanco, los bloques que se pueden poner ahí (client/comandos.ts); «[[», una
+  // nota que enlazar; «@», alguien a quien mencionar. Lo que se sigue escribiendo la
+  // filtra, y el texto se queda en la nota mientras tanto: si no se elige nada, es lo
+  // que se escribió. Las tres se llevan con el mismo teclado y se colocan igual.
+  const [menu, setMenu] = useState<{
+    tipo: TipoMenu;
     q: string;
     idx: number;
     x: number;
     y: number;
-    /** Encima de la barra: debajo no cabe (`max-h-72` son 252 px). */
+    /** Encima del disparador: debajo no cabe (`max-h-72` son 252 px). */
     arriba: boolean;
   } | null>(null);
-  // La barra a la que se dijo «no» con Escape: no se vuelve a abrir en ella.
+  // El disparador al que se dijo «no» con Escape: no se vuelve a abrir en él.
   const descartada = useRef<{ nodo: Node; off: number } | null>(null);
   const rotuloCmd = (c: Comando) => t(c.clave);
-  const opcionesCmd = menuCmd ? filtrarComandos(menuCmd.q, rotuloCmd) : [];
-  const menuCmdRef = useRef<HTMLDivElement>(null);
-  useFitInViewport(menuCmdRef, menuCmd, { vertical: true });
-  useMobileBack(!!menuCmd && opcionesCmd.length > 0, () => {
-    const b = barraEnCursor();
-    descartada.current = b ? { nodo: b.nodo, off: b.off } : null;
-    setMenuCmd(null);
+  // `[[`: la búsqueda de la herramienta de enlaces, la misma, sin Drive.
+  const notasMenu = useOpcionesDeEnlace(menu?.tipo === 'nota' ? menu.q : null, enlaces, false);
+  // `@`: la gente se pide a la primera arroba y se filtra aquí.
+  const [gente, setGente] = useState<readonly Persona[] | null>(null);
+  const pidiendoGente = menu?.tipo === 'persona' && gente === null;
+  const personas = enlaces?.personas;
+  useEffect(() => {
+    if (!pidiendoGente || !personas) return;
+    let vivo = true;
+    void personas().then((g) => vivo && setGente(g));
+    return () => {
+      vivo = false;
+    };
+  }, [pidiendoGente, personas]);
+  const sugerencias = ((): Sugerencia[] => {
+    if (menu?.tipo === 'cmd')
+      return filtrarComandos(menu.q, rotuloCmd).map((c) => {
+        const d = DIBUJO_COMANDO[c.id];
+        return {
+          clave: c.id,
+          dibujo: d.icon ? (
+            <Icon name={d.icon} size={15} />
+          ) : (
+            <Glyph name={d.glyph ?? 'note'} size={15} />
+          ),
+          rotulo: rotuloCmd(c),
+          detalle: `/${c.alias[0]}`,
+          elegir: () => ejecutarComando(c),
+        };
+      });
+    if (menu?.tipo === 'nota')
+      return notasMenu.opciones.map((o) => ({
+        clave: o.clave,
+        dibujo: <Glyph name={o.titulo ? 'heading' : 'note'} size={15} />,
+        rotulo: o.nota,
+        ...(o.titulo ? { dentro: o.titulo } : {}),
+        ...(o.cuaderno ? { detalle: o.cuaderno } : {}),
+        grupo: t(o.tipo === 'local' ? 'editor.linkThisNotebook' : 'editor.linkOtherNotebooks'),
+        elegir: () => enlazarNota(o),
+      }));
+    // Sin nada tras la arroba no se ofrece a nadie: una «@» suelta es una arroba.
+    if (menu?.tipo === 'persona' && menu.q)
+      return candidatos(gente ?? [], menu.q).map((p) => ({
+        clave: p.email,
+        dibujo: <Icon name="user" size={15} />,
+        rotulo: p.name ?? p.email,
+        ...(p.name ? { detalle: p.email } : {}),
+        elegir: () => mencionar(p),
+      }));
+    return [];
+  })();
+  // `[[` se ve aunque aún no haya nada: dice que busca, o que nada casa. Los otros dos,
+  // solo con algo que ofrecer.
+  const abierto = menu !== null && (sugerencias.length > 0 || menu.tipo === 'nota');
+  const activa = Math.min(menu?.idx ?? 0, Math.max(sugerencias.length - 1, 0));
+  const menuRef = useRef<HTMLDivElement>(null);
+  useFitInViewport(menuRef, abierto ? menu : null, { vertical: true });
+  useMobileBack(abierto, () => {
+    const d = disparoEnCursor();
+    descartada.current = d ? { nodo: d.nodo, off: d.off } : null;
+    setMenu(null);
   });
   // La fila activa a la vista: el menú se desplaza (`max-h-72`) y las flechas bajan.
-  const idActivo = menuCmd ? opcionesCmd[menuCmd.idx]?.id : undefined;
+  const claveActiva = abierto ? sugerencias[activa]?.clave : undefined;
   useEffect(() => {
-    if (idActivo)
-      document.getElementById(`notes-cmd-${idActivo}`)?.scrollIntoView({ block: 'nearest' });
-  }, [idActivo]);
+    if (claveActiva !== undefined)
+      document.getElementById(`notes-sug-${activa}`)?.scrollIntoView({ block: 'nearest' });
+  }, [claveActiva, activa]);
 
   // --- Burbuja de formato ---------------------------------------------------
   //
@@ -271,7 +364,7 @@ export function RichText({
   // la burbuja es para no tener que subir a buscarla.
   const [burbuja, setBurbuja] = useState<{ x: number; y: number } | null>(null);
   const burbujaRef = useRef<HTMLDivElement>(null);
-  useFitInViewport(burbujaRef, burbuja && !menuCmd ? burbuja : null, { vertical: true });
+  useFitInViewport(burbujaRef, burbuja && !menu ? burbuja : null, { vertical: true });
 
   // --- Buscar en la nota ----------------------------------------------------
   const [buscador, setBuscador] = useState<{ q: string; i: number } | null>(null);
@@ -577,6 +670,10 @@ export function RichText({
     setEnlaceAbierto(true);
   };
 
+  /** El enlace con su nombre en lugar de la selección, y un espacio para seguir fuera de él. */
+  const escribirEnlace = (url: string, label: string) =>
+    executeEditingCommand('insertHTML', `<a href="${escapar(url)}">${escapar(label)}</a>&nbsp;`);
+
   const insertarEnlace = (url: string, label: string) => {
     setEnlaceAbierto(false);
     enfocarTexto();
@@ -586,14 +683,20 @@ export function RichText({
     if (sel && !sel.isCollapsed) {
       executeEditingCommand('createLink', url);
     } else {
-      executeEditingCommand('insertHTML', `<a href="${escapar(url)}">${escapar(label)}</a>&nbsp;`);
+      escribirEnlace(url, label);
     }
     refrescar();
     emitir();
   };
 
-  /** La barra de «/» que hay justo antes del cursor, con su consulta; o null. */
-  const barraEnCursor = (): { nodo: Text; off: number; q: string } | null => {
+  /** El disparador («/», «[[» o «@») que hay justo antes del cursor, con su consulta; o null. */
+  const disparoEnCursor = (): {
+    tipo: TipoMenu;
+    nodo: Text;
+    off: number;
+    largo: number;
+    q: string;
+  } | null => {
     const raiz = ref.current;
     const sel = window.getSelection();
     if (!raiz || !sel || sel.rangeCount === 0 || !sel.isCollapsed) return null;
@@ -606,52 +709,86 @@ export function RichText({
     const antes = document.createRange();
     antes.setStart(raiz.contains(bloque) ? bloque : raiz, 0);
     antes.setEnd(nodo, rango.startOffset);
-    const q = consultaDeBarra(antes.toString());
-    const off = rango.startOffset - (q?.length ?? 0) - 1;
-    if (q === null || off < 0 || (nodo as Text).data[off] !== '/') return null;
-    return { nodo: nodo as Text, off, q };
+    const texto = antes.toString();
+    for (const [tipo, marca, consulta] of DISPAROS) {
+      // Sin cuaderno no hay notas que ofrecer, y sin gente (un cuaderno cifrado) a nadie.
+      if ((tipo === 'nota' && !enlaces) || (tipo === 'persona' && !personas)) continue;
+      const q = consulta(texto);
+      if (q === null) continue;
+      // La consulta no lleva su marca dentro: la última es la que abre. Y tiene que
+      // estar en el mismo nodo de texto que el cursor, o no hay rango que sustituir.
+      const largo = texto.length - texto.lastIndexOf(marca);
+      const off = rango.startOffset - largo;
+      if (off < 0 || !(nodo as Text).data.startsWith(marca, off)) continue;
+      return { tipo, nodo: nodo as Text, off, largo, q };
+    }
+    return null;
   };
 
-  const mirarMenuCmd = () => {
-    const b = barraEnCursor();
-    if (!b) {
+  const mirarMenu = () => {
+    const d = disparoEnCursor();
+    if (!d) {
       descartada.current = null;
-      setMenuCmd(null);
+      setMenu(null);
       return;
     }
-    const d = descartada.current;
+    const x = descartada.current;
     if (
-      (d && d.nodo === b.nodo && d.off === b.off) ||
-      filtrarComandos(b.q, rotuloCmd).length === 0
+      (x && x.nodo === d.nodo && x.off === d.off) ||
+      (d.tipo === 'cmd' && filtrarComandos(d.q, rotuloCmd).length === 0)
     ) {
-      setMenuCmd(null);
+      setMenu(null);
       return;
     }
     const r = document.createRange();
-    r.setStart(b.nodo, b.off);
-    r.setEnd(b.nodo, b.off + 1);
+    r.setStart(d.nodo, d.off);
+    r.setEnd(d.nodo, d.off + 1);
     const caja = r.getBoundingClientRect();
+    const ancho = d.tipo === 'cmd' ? 240 : 288;
     const arriba = caja.bottom + 4 + 260 > window.innerHeight && caja.top - 264 >= 0;
-    setMenuCmd((m) => ({
-      q: b.q,
-      idx: m && m.q === b.q ? m.idx : 0,
-      x: Math.max(8, Math.min(caja.left, window.innerWidth - 248)),
+    setMenu((m) => ({
+      tipo: d.tipo,
+      q: d.q,
+      idx: m && m.tipo === d.tipo && m.q === d.q ? m.idx : 0,
+      x: Math.max(8, Math.min(caja.left, window.innerWidth - ancho - 8)),
       y: arriba ? caja.top - 4 : caja.bottom + 4,
       arriba,
     }));
   };
 
-  /** Borra «/consulta» y aplica el comando con la misma orden que su botón. */
-  const ejecutarComando = (c: Comando) => {
-    const b = barraEnCursor();
-    setMenuCmd(null);
-    if (!b) return;
+  /** Selecciona lo escrito desde el disparador («/h», «[[pla», «@an») para sustituirlo. */
+  const tomarDisparo = (): boolean => {
+    const d = disparoEnCursor();
+    setMenu(null);
+    if (!d) return false;
     const sel = window.getSelection();
     const r = document.createRange();
-    r.setStart(b.nodo, b.off);
-    r.setEnd(b.nodo, b.off + 1 + b.q.length);
+    r.setStart(d.nodo, d.off);
+    r.setEnd(d.nodo, d.off + d.largo);
     sel?.removeAllRanges();
     sel?.addRange(r);
+    return true;
+  };
+
+  /** `[[consulta` se cambia por el enlace a la nota, el mismo que pone la herramienta de enlaces. */
+  const enlazarNota = (o: Opcion) => {
+    if (!tomarDisparo()) return;
+    escribirEnlace(o.url, o.label);
+    refrescar();
+    emitir();
+  };
+
+  /** «@an» se cambia por `@ana@empresa.es `, la forma con que el servicio avisa. */
+  const mencionar = (p: Persona) => {
+    if (!tomarDisparo()) return;
+    executeEditingCommand('insertText', `@${p.email} `);
+    refrescar();
+    emitir();
+  };
+
+  /** Borra «/consulta» y aplica el comando con la misma orden que su botón. */
+  const ejecutarComando = (c: Comando) => {
+    if (!tomarDisparo()) return;
     executeEditingCommand('delete');
     const bloque: Partial<Record<IdComando, string>> = {
       p: '<p>',
@@ -1137,10 +1274,10 @@ export function RichText({
           // al que la tabulación no llega.
           tabIndex={0}
           aria-multiline="true"
-          {...(menuCmd && opcionesCmd.length > 0
+          {...(abierto && sugerencias.length > 0
             ? {
-                'aria-controls': 'notes-menu-comandos',
-                'aria-activedescendant': `notes-cmd-${opcionesCmd[Math.min(menuCmd.idx, opcionesCmd.length - 1)]?.id ?? ''}`,
+                'aria-controls': 'notes-menu-sugerencias',
+                'aria-activedescendant': `notes-sug-${activa}`,
               }
             : {})}
           aria-label={ariaLabel}
@@ -1157,22 +1294,22 @@ export function RichText({
             guardarSeleccion();
             emitir();
             refrescar();
-            mirarMenuCmd();
+            mirarMenu();
           }}
           onBlur={() => {
             guardarSeleccion();
             emitir();
-            setMenuCmd(null);
+            setMenu(null);
           }}
           onKeyUp={() => {
             guardarSeleccion();
             refrescar();
-            mirarMenuCmd();
+            mirarMenu();
           }}
           onMouseUp={() => {
             guardarSeleccion();
             refrescar();
-            mirarMenuCmd();
+            mirarMenu();
           }}
           onClick={(e) => {
             const target = e.target as HTMLElement | null;
@@ -1195,27 +1332,25 @@ export function RichText({
           }}
           onKeyDown={(e) => {
             const mod = e.metaKey || e.ctrlKey;
-            // Con el menú de «/» abierto, las flechas, Intro, Tab y Escape son suyas.
-            if (menuCmd && opcionesCmd.length > 0 && !mod && !e.altKey) {
-              const n = opcionesCmd.length;
-              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            // Con un menú abierto, las flechas, Intro, Tab y Escape son suyas.
+            if (menu && abierto && !mod && !e.altKey) {
+              const n = sugerencias.length;
+              if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && n > 0) {
                 e.preventDefault();
-                const paso = e.key === 'ArrowDown' ? 1 : -1;
-                setMenuCmd({ ...menuCmd, idx: (menuCmd.idx + paso + n) % n });
+                setMenu({ ...menu, idx: moverActiva(activa, n, e.key) });
                 return;
               }
-              if (e.key === 'Enter' || e.key === 'Tab') {
+              if ((e.key === 'Enter' || e.key === 'Tab') && n > 0) {
                 e.preventDefault();
-                const c = opcionesCmd[Math.min(menuCmd.idx, n - 1)];
-                if (c) ejecutarComando(c);
+                sugerencias[activa]?.elegir();
                 return;
               }
               if (e.key === 'Escape') {
                 e.preventDefault();
                 e.stopPropagation();
-                const b = barraEnCursor();
-                descartada.current = b ? { nodo: b.nodo, off: b.off } : null;
-                setMenuCmd(null);
+                const d = disparoEnCursor();
+                descartada.current = d ? { nodo: d.nodo, off: d.off } : null;
+                setMenu(null);
                 return;
               }
             }
@@ -1339,61 +1474,84 @@ export function RichText({
             }
           }}
         />
-        {menuCmd && opcionesCmd.length > 0 && typeof document !== 'undefined'
+        {menu && abierto && typeof document !== 'undefined'
           ? createPortal(
               <div
-                ref={menuCmdRef}
-                class="fixed w-60"
+                ref={menuRef}
+                class={cx('fixed', menu.tipo === 'cmd' ? 'w-60' : 'w-72')}
                 style={{
                   zIndex: 'var(--z-dropdown)',
-                  left: `${menuCmd.x}px`,
-                  top: `${menuCmd.y}px`,
-                  transform: menuCmd.arriba ? 'translateY(-100%)' : undefined,
+                  left: `${menu.x}px`,
+                  top: `${menu.y}px`,
+                  transform: menu.arriba ? 'translateY(-100%)' : undefined,
                 }}
               >
-                <div
-                  id="notes-menu-comandos"
-                  role="listbox"
-                  aria-label={t('slash.title')}
-                  class="sytue-pop-in sytue-menu-surface border-border max-h-72 overflow-y-auto rounded-lg border p-1 shadow-[var(--shadow-md)]"
-                >
-                  {opcionesCmd.map((c, i) => {
-                    const d = DIBUJO_COMANDO[c.id];
-                    return (
-                      <div
-                        key={c.id}
-                        id={`notes-cmd-${c.id}`}
-                        role="option"
-                        tabIndex={-1}
-                        aria-selected={i === menuCmd.idx}
-                        class={cx(
-                          'text-text flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-sm',
-                          i === menuCmd.idx ? 'bg-selected' : 'hover:bg-bg-subtle',
-                        )}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          ejecutarComando(c);
-                        }}
-                        onMouseEnter={() => setMenuCmd({ ...menuCmd, idx: i })}
-                      >
-                        <span class="text-text-muted grid h-5 w-5 shrink-0 place-items-center">
-                          {d.icon ? (
-                            <Icon name={d.icon} size={15} />
-                          ) : (
-                            <Glyph name={d.glyph ?? 'note'} size={15} />
+                <div class="sytue-pop-in sytue-menu-surface border-border max-h-72 overflow-y-auto rounded-lg border p-1 shadow-[var(--shadow-md)]">
+                  <div
+                    id="notes-menu-sugerencias"
+                    role="listbox"
+                    aria-label={t(ROTULO_MENU[menu.tipo])}
+                  >
+                    {sugerencias.map((s, i) => (
+                      <Fragment key={s.clave}>
+                        {/* El rótulo de cada grupo va sobre su primera fila, sin llevarse
+                            el teclado: es texto, no una opción. */}
+                        {s.grupo && s.grupo !== sugerencias[i - 1]?.grupo ? (
+                          <p class="sytue-meta px-2.5 pt-1 pb-0.5" aria-hidden="true">
+                            {s.grupo}
+                          </p>
+                        ) : null}
+                        <div
+                          id={`notes-sug-${i}`}
+                          role="option"
+                          tabIndex={-1}
+                          aria-selected={i === activa}
+                          class={cx(
+                            'text-text flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-sm',
+                            i === activa ? 'bg-selected' : 'hover:bg-bg-subtle',
                           )}
-                        </span>
-                        <span class="min-w-0 flex-1 truncate">{rotuloCmd(c)}</span>
-                        <span class="sytue-meta shrink-0">/{c.alias[0]}</span>
-                      </div>
-                    );
-                  })}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            s.elegir();
+                          }}
+                          onMouseEnter={() => setMenu({ ...menu, idx: i })}
+                        >
+                          <span class="text-text-muted grid h-5 w-5 shrink-0 place-items-center">
+                            {s.dibujo}
+                          </span>
+                          <span class="min-w-0 flex-1 truncate">
+                            {s.rotulo}
+                            {s.dentro ? <span class="text-text-muted"> › {s.dentro}</span> : null}
+                          </span>
+                          {s.detalle ? (
+                            <span class="sytue-meta max-w-[45%] shrink-0 truncate">
+                              {s.detalle}
+                            </span>
+                          ) : null}
+                        </div>
+                      </Fragment>
+                    ))}
+                  </div>
+                  {menu.tipo === 'nota' && (sugerencias.length === 0 || notasMenu.buscando) ? (
+                    <p
+                      class="text-text-muted flex items-center gap-2 px-2.5 py-1.5 text-sm"
+                      role="status"
+                    >
+                      {notasMenu.buscando ? (
+                        <>
+                          <Spinner size={14} /> {t('editor.linkSearching')}
+                        </>
+                      ) : (
+                        t('editor.linkNoResults')
+                      )}
+                    </p>
+                  ) : null}
                 </div>
               </div>,
               document.body,
             )
           : null}
-        {burbuja && !menuCmd && typeof document !== 'undefined'
+        {burbuja && !menu && typeof document !== 'undefined'
           ? createPortal(
               <div
                 ref={burbujaRef}

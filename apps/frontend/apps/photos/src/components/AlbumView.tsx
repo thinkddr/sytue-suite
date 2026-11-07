@@ -1,12 +1,12 @@
 /**
- * Un álbum: su cuadrícula (las mismas teselas que la galería), el visor con el
- * mando de «quitar del álbum», compartirlo con personas de la organización o por
- * enlace, y borrarlo con el
- * diálogo de la casa: las fotos se quedan, así que no es destructivo de verdad.
+ * Un álbum: su cuadrícula (las mismas teselas que la galería), el visor con los
+ * mandos de «usar como portada» y «quitar del álbum», renombrarlo, compartirlo con
+ * personas de la organización o por enlace, y borrarlo con el diálogo de la casa:
+ * las fotos se quedan, así que no es destructivo de verdad.
  */
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { Button, Icon, IconButton, Spinner, useConfirm, withBase } from '@sytue/ui';
+import { Button, Icon, IconButton, Spinner, useConfirm, usePrompt, withBase } from '@sytue/ui';
 import { translate, type Locale } from '@sytue/i18n';
 import { CompartirConPersonas } from '@sytue/shell';
 import {
@@ -16,11 +16,15 @@ import {
   dejarDeCompartirAlbum,
   enlaceDelAlbum,
   fotosDelAlbum,
+  ponerPortada,
   quitarDelAlbum,
+  renombrarAlbum,
   type Album,
   type Foto,
 } from '../client/photosApi.js';
 import { useT } from '../i18n/index.js';
+import { posicionVisor } from '../lib/posicionVisor.js';
+import { esPortada, mandoPortada, tituloRenombrado } from '../lib/edicionAlbum.js';
 import { RUTA } from '../lib/ruta.js';
 import { Marco } from './Marco.js';
 import type { SytueUser } from '@sytue/auth';
@@ -39,6 +43,7 @@ export function AlbumView({
   hubBaseUrl: string;
 }): JSX.Element {
   const { confirmar, dialogo: dialogoConfirmar } = useConfirm();
+  const { preguntar, dialogo: dialogoPreguntar } = usePrompt();
   const t = useT(locale);
   const [al, setAl] = useState<Album | null>(null);
   const [fotos, setFotos] = useState<Foto[] | null>(null);
@@ -56,6 +61,44 @@ export function AlbumView({
       })
       .catch((e) => setError(String(e)));
   }, [id]);
+
+  /** Renombrar: el diálogo de la casa con el título de ahora escrito. */
+  const renombrar = async () => {
+    if (!al) return;
+    const nuevo = tituloRenombrado(
+      al.title,
+      await preguntar({
+        titulo: t('album.rename'),
+        mensaje: t('album.renamePrompt'),
+        valor: al.title,
+      }),
+    );
+    if (nuevo === null) return;
+    try {
+      setAl(await renombrarAlbum(id, nuevo));
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  /**
+   * Elegir portada desde el visor: es la foto que se está mirando, que es como se
+   * decide cuál representa al álbum. Antes la portada era siempre la primera que
+   * entró, sin forma de cambiarla. El resultado se dice también DENTRO del visor
+   * (`avisar`), como en Fyne: la cabecera del álbum queda detrás del modal y mientras
+   * está abierto ni se ve ni se anuncia.
+   */
+  const portada = async (foto: Foto, avisar: (texto: string) => void) => {
+    if (!al || esPortada(al, foto.id)) return;
+    try {
+      setAl(await ponerPortada(id, al.title, foto.id));
+      setAviso(t('album.coverSet'));
+      avisar(t('album.coverSet'));
+    } catch (e) {
+      setError(String(e));
+      avisar(String(e));
+    }
+  };
 
   const quitar = async (foto: Foto) => {
     try {
@@ -214,6 +257,15 @@ export function AlbumView({
                 {t('album.unshare')}
               </Button>
             ) : null}
+            <Button
+              variant="ghost"
+              size="sm"
+              leadingIcon={<Icon name="pen" />}
+              disabled={!al}
+              onClick={() => void renombrar()}
+            >
+              {t('album.rename')}
+            </Button>
             <Filete />
             <IconButton
               label={t('albums.delete')}
@@ -247,20 +299,43 @@ export function AlbumView({
             locale={locale}
             onClose={() => setAbierta(null)}
             vecinas={[fotos[abierta - 1], fotos[abierta + 1]]}
+            posicion={posicionVisor(abierta, fotos.length)}
+            onIr={setAbierta}
             onPrev={abierta > 0 ? () => setAbierta(abierta - 1) : undefined}
             onNext={abierta < fotos.length - 1 ? () => setAbierta(abierta + 1) : undefined}
             onDescribe={describir}
-            accion={
-              <Button
-                variant="ghost"
-                size="sm"
-                leadingIcon={<Icon name="minus" />}
-                title={t('albums.remove')}
-                onClick={() => void quitar(fotos[abierta]!)}
-              >
-                <span class="max-md:sr-only">{t('albums.remove')}</span>
-              </Button>
-            }
+            accion={(avisar) => (
+              <>
+                {/* En la que ya es la portada dice que lo es y va `aria-disabled`: no es
+                    un conmutador (pulsarlo otra vez no quita nada) y no se apaga del
+                    todo, porque un botón `disabled` se salta con el tabulador y el
+                    lector de pantalla no lo anuncia (`mandoPortada`). */}
+                {(() => {
+                  const mando = mandoPortada(al, fotos[abierta]!.id);
+                  return (
+                    <IconButton
+                      label={t(mando.clave)}
+                      size="lg"
+                      aria-disabled={mando.apagado ? 'true' : undefined}
+                      class={mando.apagado ? 'opacity-40' : undefined}
+                      disabled={!al}
+                      onClick={() => void portada(fotos[abierta]!, avisar)}
+                    >
+                      <Icon name="image" />
+                    </IconButton>
+                  );
+                })()}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  leadingIcon={<Icon name="minus" />}
+                  title={t('albums.remove')}
+                  onClick={() => void quitar(fotos[abierta]!)}
+                >
+                  <span class="max-md:sr-only">{t('albums.remove')}</span>
+                </Button>
+              </>
+            )}
           />
         ) : null}
         {conPersonas && al ? (
@@ -276,6 +351,7 @@ export function AlbumView({
           />
         ) : null}
         {dialogoConfirmar}
+        {dialogoPreguntar}
       </div>
     </Marco>
   );

@@ -132,6 +132,10 @@ export const bg: AppCatalog<typeof en> = {
   'gallery.downloadSelected': 'Изтегляне',
   'gallery.downloading':
     'Започнати заявки за изтегляне: {count}. Проверете изтеглянията в браузъра.',
+  'gallery.downloadingNative': {
+    one: 'Изтегляне на 1 снимка…',
+    other: 'Изтегляне на {count} снимки…',
+  },
   'gallery.downloadCapped': 'Снимки извън тази партида: {count}.',
   'gallery.newAlbum': 'Нов албум',
   'gallery.newAlbumTitle': 'Нов албум',
@@ -256,4 +260,20 @@ export const bg: AppCatalog<typeof en> = {
   'aiBatch.excludeOrg': 'Изключи организацията от автоматичния пакет на Sytue AI',
   'aiBatch.excludedHint':
     'Организацията е изключена от автоматичния пакет на Sytue AI. Снимките не се обработват във фонов режим за предложения или подобни.',
+  'album.rename': 'Преименуване',
+  'album.renamePrompt': 'Име на албума',
+  'album.setCover': 'Използване като корица на албума',
+  'album.isCover': 'Това е корицата на албума',
+  'album.coverSet': 'Корицата на албума е обновена',
+  'gallery.favorited': 'Добавени в любими: {count}',
+  'gallery.unfavorited': 'Премахнати от любими: {count}',
+  'gallery.favoriteFailed': 'Снимки, които не можаха да бъдат променени: {count}',
+  'gallery.noResults.title': 'Няма снимки, отговарящи на „{query}“',
+  'gallery.noResults.description':
+    'Опитайте с други думи или изчистете търсенето, за да видите всичките си снимки.',
+  'gallery.clearSearch': 'Изчистване на търсенето',
+  'viewer.counter': '{index} / {total}',
+  'viewer.counterMore': '{count}+',
+  'viewer.counterLabel': 'Снимка {index} от {total}',
+  'viewer.shortcutsJump': 'Home и End отиват на първата и последната снимка.',
 };

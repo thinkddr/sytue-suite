@@ -38,6 +38,8 @@ interface Props {
   onSelect: (id: string) => void;
   onNueva: () => void;
   onNuevaDentro: (padre: Note) => void;
+  /** El filtro oculta todas las notas que hay: el vacío lo dice y ofrece quitarlo. */
+  onQuitarFiltro?: (() => void) | undefined;
   onSacar: (note: Note) => void;
   onToggle: (note: Note, collapsed: boolean) => void;
   /** Cambia el título de una nota ya creada. Vacío = se deja el que tenía. */
@@ -88,7 +90,14 @@ export function NoteTree(p: Props): JSX.Element {
           </Button>
         ) : null}
       </div>
-      {arbol.length === 0 ? (
+      {arbol.length === 0 && p.onQuitarFiltro ? (
+        <div class="grid justify-items-start gap-2 p-4" data-sin-coincidencias="">
+          <p class="text-text-muted text-base">{p.t('filter.noMatches')}</p>
+          <Button size="sm" variant="secondary" onClick={p.onQuitarFiltro}>
+            {p.t('filter.clear')}
+          </Button>
+        </div>
+      ) : arbol.length === 0 ? (
         <p class="text-text-muted p-4 text-base">{p.t('empty.noNotes.title')}</p>
       ) : (
         <ul class="min-h-0 flex-1 overflow-auto p-2">

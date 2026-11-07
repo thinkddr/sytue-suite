@@ -12,6 +12,7 @@ import { useState } from 'preact/hooks';
 import { Dropdown, MenuItem, MenuSeparator, Button, Icon, cx } from '@sytue/ui';
 import { SELECTABLE_STATES, STATE_KEY, type PresenceState } from '../client/presenceApi.js';
 import { EXPIRY_OPTIONS, expiryAt, type StatusExpiry } from '../lib/status.js';
+import { DURACIONES_PAUSA, type DuracionPausa } from '../lib/pausa.js';
 import type { T } from '../i18n/index.js';
 
 /** Punto de color por estado (token de marca; el texto lo acompaña siempre). */
@@ -36,10 +37,19 @@ interface Props {
   dmError?: boolean;
   dmLegacy?: boolean;
   onRefreshDmNotify?: () => void;
+  /** Se llama al abrir el menú (antes de pintarlo): el padre relee lo que pueda haber
+   *  cambiado desde otro dispositivo, como la pausa de avisos. */
+  onOpen?: () => void;
   onDiscardLegacyDmNotify?: () => void;
   onToggleDmNotify: () => void;
   /** Abre el modal de preferencias de notificación (palabras clave + No molestar). */
   onOpenNotifySettings: () => void;
+  /** «Pausar avisos»: hasta cuándo, ya escrito en el idioma de quien mira; null, sin
+   *  pausa. */
+  pausedUntilLabel: string | null;
+  pauseSaving?: boolean;
+  /** Pausa con esa duración, o reanuda con null. */
+  onPause: (duracion: DuracionPausa | null) => void;
   /** Contadores de todos los canales y DM a cero, de un golpe. */
   onMarkAllRead: () => void;
   /** Abre el modal de integraciones (webhooks entrantes/salientes + bots, Ola 15). */
@@ -63,9 +73,13 @@ export function StatusMenu({
   dmError = false,
   dmLegacy = false,
   onRefreshDmNotify,
+  onOpen,
   onDiscardLegacyDmNotify,
   onToggleDmNotify,
   onOpenNotifySettings,
+  pausedUntilLabel,
+  pauseSaving = false,
+  onPause,
   onOpenIntegrations,
   onMarkAllRead,
   canManageIntegrations,
@@ -87,6 +101,7 @@ export function StatusMenu({
             setDraft(status); // reabre con el estado guardado vigente
             setExpiry('never');
             onRefreshDmNotify?.();
+            onOpen?.();
             onClick();
           }}
           {...aria}
@@ -228,6 +243,42 @@ export function StatusMenu({
           </Button>
         </div>
       ) : null}
+
+      {/* «Pausar avisos» (Slack «Pause notifications»): en pausa, cuándo acaba y cómo
+          reanudar; si no, las cinco duraciones bajo su título. */}
+      {pausedUntilLabel ? (
+        <>
+          <p class="text-text-muted px-3 py-1 text-xs" role="status">
+            {t('pause.until', { when: pausedUntilLabel })}
+          </p>
+          <MenuItem
+            disabled={pauseSaving}
+            onClick={() => onPause(null)}
+            icon={<Icon name="bell" size={16} />}
+          >
+            {t('pause.resume')}
+          </MenuItem>
+        </>
+      ) : (
+        <>
+          {/* Cada opción lleva el título en su nombre accesible: un lector de pantalla
+              que recorre el menú por sus ítems no pasa por el <p>, y oía «Durante 1 hora»
+              sin saber de qué (docs/design.md §2.6). */}
+          <p class="text-text-muted px-3 pt-1 text-xs font-medium" aria-hidden="true">
+            {t('pause.title')}
+          </p>
+          {DURACIONES_PAUSA.map((d) => (
+            <MenuItem
+              key={d}
+              disabled={pauseSaving}
+              onClick={() => onPause(d)}
+              aria-label={t('pause.optionAria', { option: t(`pause.${d}`) })}
+            >
+              {t(`pause.${d}`)}
+            </MenuItem>
+          ))}
+        </>
+      )}
 
       {/* Preferencias de notificación: palabras clave + No molestar (Ola 13). */}
       <MenuItem onClick={onOpenNotifySettings} icon={<Icon name="settings" size={16} />}>

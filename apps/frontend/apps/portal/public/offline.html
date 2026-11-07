@@ -1752,6 +1752,15 @@ html {
 :is(.sytue-frame-page, .sytue-sheet-page) {
   display: contents;
 }
+/* En «Carril», en el teléfono, la barra es de color (`.sytue-topbar-carril`) y la página
+   gris claro: lo que asoma al estirar la página —el rebote de iOS, tirar para refrescar—
+   y la zona segura de arriba es el LIENZO, y era ese gris, una franja clara encima de la
+   barra de color. El lienzo toma el color de la barra; el cuerpo conserva el suyo. */
+@media screen and (max-width: 767.98px) {
+  :root[data-forma='carril']:has(.sytue-topbar-carril) {
+    background: var(--sytue-sidebar-bg);
+  }
+}
 /* Solo en pantalla: impreso, un documento no lleva marco ni esquinas. */
 @media screen {
   /* El fondo del viewport también es el marco: los bordes seguros de iOS y el rebote
@@ -2006,6 +2015,64 @@ html {
 @media (min-width: 768px) {
   [data-forma='carril']:not(:has(nav:is(.bg-sidebar, .bg-rail))) .sytue-esquina-marca {
     width: fit-content;
+  }
+}
+
+/* ---- El CROMO «papel» (`data-cromo='papel'`, ADR 0079) ----
+   Un eje aparte del color y de la forma, que elige LA APP y no la persona: el marco, el
+   menú lateral y la barra dejan de ser de color y pasan a ser el fondo de la página, con
+   la tinta del texto; el color de marca se queda en la acción, el foco y «estás aquí».
+   La hoja es papel blanco con un filete en vez de sombra. Lo usa Sytue Notepads, que es
+   una libreta y no un panel de control.
+
+   Todo es `var()` de tokens de rol, así que vale igual en claro, oscuro, del sistema y
+   traslúcido sin un bloque por tema; los velos son la tinta al 5 y al 8 %, que oscurecen
+   en claro y aclaran en oscuro. `:is([data-theme], :not([data-theme]))` no filtra nada:
+   sube el peso a tres atributos para ganar al carril de cada color, que pesa dos o tres y
+   va antes en la cascada. Las nativas lo leen con `tokens.ElegirCromo("papel")`. */
+:root[data-cromo='papel']:is([data-theme], :not([data-theme])) {
+  --sytue-rail: var(--sytue-bg);
+  --sytue-sidebar-bg: var(--sytue-bg);
+  --sytue-sidebar-fg: var(--sytue-text);
+  --sytue-sidebar-fg-muted: var(--sytue-text-muted);
+  --sytue-sidebar-active-bg: color-mix(in srgb, var(--sytue-text) 8%, transparent);
+  --sytue-sidebar-active-fg: var(--sytue-text);
+  --sytue-sidebar-hover-bg: color-mix(in srgb, var(--sytue-text) 5%, transparent);
+  --sytue-sidebar-indicator: var(--sytue-primary);
+  --sytue-sidebar-primary: var(--sytue-primary);
+  --sytue-sidebar-on-primary: var(--sytue-on-primary);
+  --sytue-sidebar-primary-hover: var(--sytue-primary-hover);
+  --sytue-sidebar-primary-active: var(--sytue-primary-active);
+  --sytue-sidebar-focus: var(--sytue-focus-ring);
+  --sytue-chrome-focus: var(--sytue-focus-ring);
+  --sytue-sidebar-border: var(--sytue-border-subtle);
+  --sytue-sidebar-field: color-mix(in srgb, var(--sytue-text) 6%, transparent);
+  --sytue-nav-active-bg: var(--sytue-sidebar-active-bg);
+  --sytue-nav-active-fg: var(--sytue-sidebar-active-fg);
+  --sytue-frame-from: var(--sytue-bg);
+  --sytue-frame-to: var(--sytue-bg);
+  --sytue-sheet-bg: var(--sytue-surface);
+}
+/* Y los glifos, de una sola tinta: el relleno de acento del duotono es del cromo de color
+   (sobre papel, una mancha de marca en cada botón de la barra). Fuera del bloque de
+   tokens porque también hay que ganar al relleno que el carril pone en su menú, y porque
+   no es un color que las nativas lean de la hoja: allí lo decide `iconos` con
+   `tokens.EsPapel()`. Un icono sobre un relleno de color sigue con su tinta. */
+:root[data-cromo='papel'],
+:root[data-cromo='papel'] :is(.sytue-topbar-carril, .sytue-mobilebar, .bg-sidebar, .bg-rail) {
+  --sytue-glyph-fill: transparent;
+  --sytue-root-glyph-fill: transparent;
+}
+@media screen {
+  /* La hoja se separa del marco con un filete: sobre un marco casi blanco, la sombra de
+     Marco era lo único que se veía de ella. */
+  :root[data-cromo='papel']:not([data-forma='carril']) .sytue-sheet {
+    box-shadow: 0 0 0 1px var(--sytue-border-subtle);
+  }
+  /* El ítem activo es el velo y nada más: el contorno interior de Marco era para
+     separarlo de un marco de color. */
+  :root[data-cromo='papel']:not([data-forma='carril']) .sytue-nav-current:not(:focus-visible) {
+    box-shadow: none;
   }
 }
 

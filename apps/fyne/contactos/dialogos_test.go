@@ -11,8 +11,32 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 
+	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 )
+
+// TestLosGlifosDeLaCabeceraVanEnUnaTintaYUnTamano: «Acciones de la etiqueta» y
+// «Acciones de la libreta» son dos `ghost sm iconOnly` seguidos; en la web su glifo es
+// `currentColor`, el `text-primary-text` del fantasma, y los dos van a 16.
+// VISTO EN ROJO (2026-11-06): la etiqueta salía en `text` y a 18 junto a la libreta en
+// `primary-text` y a 16.
+func TestLosGlifosDeLaCabeceraVanEnUnaTintaYUnTamano(t *testing.T) {
+	test.NewTempApp(t)
+	p := pantallaDeMuestra(t)
+	p.EtiquetaActiva = "g1"
+	etiqueta, ok := p.accionesEtiqueta().(*ui.Boton)
+	libreta, ok2 := p.accionesLibreta().(*ui.Boton)
+	if !ok || !ok2 || etiqueta.Glifo == nil {
+		t.Fatal("faltan los dos disparadores de la cabecera")
+	}
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	if got, quiero := etiqueta.Glifo.Tinta(), tema.Color("primary-text", v); got != quiero {
+		t.Errorf("el glifo de la etiqueta va en %v y el fantasma pinta %v", got, quiero)
+	}
+	if etiqueta.TamIcono != libreta.TamIcono {
+		t.Errorf("la etiqueta mide %v y la libreta %v", etiqueta.TamIcono, libreta.TamIcono)
+	}
+}
 
 // campoDe busca el primer campo de texto de un árbol.
 func campoDe(o fyne.CanvasObject) *ui.Entrada {

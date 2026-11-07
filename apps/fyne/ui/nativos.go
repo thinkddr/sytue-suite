@@ -144,7 +144,12 @@ type PiezaCasilla struct {
 }
 
 // EstadoCasilla es lo que cambia de un pintado a otro.
-type EstadoCasilla struct{ Marcada, Parcial, Encima, Inerte bool }
+type EstadoCasilla struct {
+	Marcada, Parcial, Encima, Inerte bool
+	// Acento es el token del `accent-color` (vacío: `primary`, el `accent-primary` de
+	// Form.tsx). Lo cambia la tarea de una libreta, que hecha se apaga en gris.
+	Acento string
+}
 
 // NuevaPiezaCasilla crea la pieza. `nativa` es la casilla SIN `accent-color` (el azul de
 // Chromium); sin ella lleva `accent-primary`, que es lo que pone Form.tsx.
@@ -195,7 +200,11 @@ func (p *PiezaCasilla) Pintar(e EstadoCasilla, v tema.Variante) {
 	n := CasillaNativa(v)
 	// El tic lo decide Chromium por el acento, no la hoja: blanco sobre un acento oscuro y
 	// #3b3b3b sobre uno claro. No es `on-primary`.
-	acento, tic := tema.Color("primary", v), color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}
+	token := "primary"
+	if e.Acento != "" {
+		token = e.Acento
+	}
+	acento, tic := tema.Color(token, v), color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}
 	if acentoClaro(acento) {
 		tic = CasillaNativa(tema.Oscuro).Tic
 	}

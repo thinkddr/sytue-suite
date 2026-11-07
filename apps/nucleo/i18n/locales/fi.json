@@ -101,6 +101,7 @@
   "linkedServices.changed": "Tämä kohde on muuttunut palveluntarjoajallasi. Päivitä ennen kuin muokkaat sitä uudelleen.",
   "linkedServices.choose": "Valitse yhdistettävät palvelut. Palveluntarjoaja pyytää valittujen palvelujen käyttöoikeudet.",
   "linkedServices.connected": "Yhdistetyt palvelut",
+  "linkedServices.exists": "Tämä tili oli jo yhdistetty, ja se on nyt auki.",
   "linkedServices.keepAdmin": "Google Keep edellyttää Google Workspacen hallinnon hyväksymää määritystä. Henkilökohtaiset Gmail-tilit eivät voi yhdistää sitä.",
   "linkedServices.notGranted": "Tämän palvelun käyttöoikeutta ei myönnetty. Yhdistä tili uudelleen ja valitse sen käyttöoikeudet.",
   "linkedServices.notSupported": "Tämä palveluntarjoaja ei tarjoa tätä palvelua.",
@@ -169,7 +170,7 @@
   "notifications.kind.pages.order.oversold": "Tilaus {number} sivustolla {site} on maksettu, mutta tuotetta ei ole varastossa",
   "notifications.kind.pages.order.paid": "Uusi tilaus {number} sivustolla {site}",
   "notifications.kind.pages.payment.duplicated": "Kaksoismaksu tilauksessa {number} sivustolla {site}: toinen maksu palautetaan",
-  "notifications.kind.pages.settings.changed": "{actor} muutti Sytue Web -asetusta",
+  "notifications.kind.pages.settings.changed": "{actor} muutti Sytue Webs -asetusta",
   "notifications.kind.pages.store.busy": "Sivuston {site} verkkokaupassa on liian monta maksua odottavaa tilausta",
   "notifications.kind.pages.withdrawal.requested": "Tilauksen {number} peruuttamista on pyydetty sivustolla {site}",
   "notifications.kind.photos.album.added": "{actor} lisäsi kuvia albumiin ”{name}”",
@@ -301,6 +302,8 @@
   "shell.update.failedBody": "Yritä myöhemmin uudelleen tai lataa se portaalista.",
   "shell.update.install": "Päivitä versioon {version}",
   "shell.update.upToDate": "{app} on ajan tasalla",
+  "shell.widgets.wake": "Päivitä widgetit, kun sovellus on suljettu",
+  "shell.widgets.wakeHelp": "Kun jokin sinun tiedoistasi muuttuu, Sytue herättää sovelluksen tyhjällä Applen ilmoituksella, jotta se voi päivittää widgettinsä. Apple näkee, mikä sovellus ja milloin, ei koskaan sitä, mikä muuttui.",
   "ui.backToList": "Takaisin luetteloon",
   "ui.bulk.clear": "Tyhjennä valinta",
   "ui.bulk.region": "Valinnan toiminnot",
@@ -318,6 +321,8 @@
   "ui.review.edit": "Muokkaa",
   "ui.save": "Tallenna",
   "ui.selectRow": "Valitse rivi",
+  "ui.suiteClose": "Takaisin sovellukseen",
+  "ui.suiteOpen": "Sytue: sovellukset, haku, ilmoitukset ja tili",
   "ui.wizard.back": "Takaisin",
   "ui.wizard.cancel": "Peruuta",
   "ui.wizard.goToStep": "Takaisin vaiheeseen {n}: ",
@@ -336,5 +341,7 @@
   "widgets.pending": "Odottaa",
   "widgets.photos": "Kuvat",
   "widgets.rows": "Rivit",
-  "widgets.storage": "Tallennustila"
+  "widgets.storage": "Tallennustila",
+  "widgets.updatedAgo": "Päivitetty {time}",
+  "widgets.updatedAt": "Päivitetty: {time}"
 }

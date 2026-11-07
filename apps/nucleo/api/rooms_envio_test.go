@@ -164,6 +164,15 @@ func TestLosComandosHablanConElServicio(t *testing.T) {
 			_, _ = io.WriteString(w, "png")
 		case "PATCH /api/v1/channels/c1":
 			_, _ = io.WriteString(w, `{"id":"c1","topic":"nuevo"}`)
+		case "GET /api/v1/teams/t1/channels":
+			if r.URL.Query().Get("archived") != "1" {
+				t.Errorf("archivados sin ?archived=1: %s", r.URL.RawQuery)
+			}
+			_, _ = io.WriteString(w, `{"channels":[{"id":"c1","name":"general"},{"id":"a1","name":"viejo","archived":true}]}`)
+		case "PUT /api/v1/me/notify-pause":
+			_, _ = io.WriteString(w, `{"keywords":[],"dnd_start":0,"dnd_end":0,"paused_until":"2026-11-05T18:30:00Z"}`)
+		case "PATCH /api/v1/channels/a1":
+			_, _ = io.WriteString(w, `{"id":"a1","name":"viejo"}`)
 		default:
 			w.WriteHeader(http.StatusNoContent)
 		}
@@ -200,6 +209,26 @@ func TestLosComandosHablanConElServicio(t *testing.T) {
 	}
 	if got := cuerpos["PATCH /api/v1/channels/c1"]; got != `{"topic":"nuevo"}` {
 		t.Errorf("tema manda %s", got)
+	}
+	if as, err := r.ArchivedChannels(ctx, "t1"); err != nil || len(as) != 1 || as[0].ID != "a1" {
+		t.Errorf("archivados: %+v, %v", as, err)
+	}
+	no := false
+	if _, err := r.UpdateChannel(ctx, "a1", RoomsChannelPatch{Archived: &no}); err != nil {
+		t.Errorf("desarchivar: %v", err)
+	}
+	if got := cuerpos["PATCH /api/v1/channels/a1"]; got != `{"archived":false}` {
+		t.Errorf("desarchivar manda %s", got)
+	}
+	hasta := time.Date(2026, 11, 5, 19, 30, 0, 0, time.FixedZone("CET", 3600))
+	if p, err := r.SetNotifyPause(ctx, hasta); err != nil || p.PausedUntil == nil || !p.PausedUntil.Equal(hasta) {
+		t.Errorf("pausar: %+v, %v", p, err)
+	}
+	if got := cuerpos["PUT /api/v1/me/notify-pause"]; got != `{"until":"2026-11-05T18:30:00Z"}` {
+		t.Errorf("pausar manda %s", got)
+	}
+	if _, err := r.SetNotifyPause(ctx, time.Time{}); err != nil || cuerpos["PUT /api/v1/me/notify-pause"] != `{"until":null}` {
+		t.Errorf("reanudar manda %s (%v)", cuerpos["PUT /api/v1/me/notify-pause"], err)
 	}
 	if err := r.LeaveChannel(ctx, "c1"); err != nil || cuerpos["POST /api/v1/channels/c1/leave"] != "" {
 		t.Errorf("salir: %v", err)

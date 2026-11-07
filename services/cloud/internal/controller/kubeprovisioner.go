@@ -37,9 +37,9 @@ import (
 // coinciden con deploy/compose (una sola fuente de versión). En prod, ops debería
 // sobreescribirlas por digest sha256.
 const (
-	managedPostgresImage  = "postgres:18.6@sha256:bd5dfa494a5a259704365813dbfa5fa6b3e69be7348d43b547f540c730478583"
+	managedPostgresImage  = "postgres:18.6@sha256:e3d24f6906d0760bf4da0dae872415391ededefad23fd471c47dc53b0ddf3c42"
 	managedPostgrestImage = "postgrest/postgrest:v14.18@sha256:c7cd7e265a85b05248abf53f4473fcec7e327c282d0bd0cf60f1551996d09fcf"
-	managedRcloneImage    = "rclone/rclone:1.75.2@sha256:2687085f718d3c628f7fdfb77c52a1d344332aed543110bb88088f2c70d43eb5"
+	managedRcloneImage    = "rclone/rclone:1.76.0@sha256:7cbeec24a44f206067597c0368be4de90ae19a64d5113c7d1938bd737a81e466"
 )
 
 // Roles con los que PostgREST publica la base de datos del cliente, con el mismo

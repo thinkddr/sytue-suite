@@ -8,6 +8,7 @@ import type { JSX } from 'preact';
 import type { Locale } from '@sytue/i18n';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import {
+  Badge,
   Button,
   FieldGroup,
   Icon,
@@ -29,7 +30,16 @@ import {
   type Recurrence,
   type RecurrenceScope,
 } from '../client/calendarApi.js';
-import { buildAlarm, buildRRule, parseReminders, REMINDER_PRESETS } from '../lib/ical.js';
+import {
+  buildAlarm,
+  buildRRule,
+  guestPartstats,
+  parseGuests,
+  parseOrganizer,
+  parseReminders,
+  REMINDER_PRESETS,
+} from '../lib/ical.js';
+import { GUEST_TONE, GuestList, guestStatusLabel } from './GuestList.js';
 import { applyRecurringEdit, applyRecurringDelete, type RecurTarget } from '../lib/recurrence.js';
 import { ScopeDialog } from './ScopeDialog.js';
 import { AsistenteEvento } from './AsistenteEvento.js';
@@ -230,6 +240,22 @@ export function EventModal({
   }, [open, calUrl, defaultUrl]);
 
   const isEdit = Boolean(editing?.href);
+  // Al editar, la respuesta que ya dio cada invitado y quién organiza: se ven en las
+  // píldoras y sobre ellas. Los añadidos ahora no tienen respuesta y no la enseñan.
+  const respuestas = useMemo(
+    () =>
+      new Map(
+        (editing?.ical ? parseGuests(editing.ical) : []).map((g) => [
+          g.email.toLowerCase(),
+          g.status,
+        ]),
+      ),
+    [editing?.ical],
+  );
+  const organizer = useMemo(
+    () => (editing?.ical ? parseOrganizer(editing.ical) : null),
+    [editing?.ical],
+  );
   // Solo lectura (suscripción ICS): consulta sin edición. Un <fieldset disabled>
   // nativo deshabilita TODOS los controles del formulario de una vez.
   const readOnly = Boolean(editing?.readOnly);
@@ -346,6 +372,9 @@ export function EventModal({
         ? [...invitees, draft]
         : invitees;
     const recurrence = buildRecurrence(repeatFreq, repeatEnd, repeatCount, repeatUntil);
+    // Las respuestas que ya dieron los invitados viajan con el evento: guardar no las
+    // devuelve a «sin responder».
+    const partstats = guestPartstats(editing?.ical);
     // VALARM = recordatorios editados (minutos antes) + los no editables preservados.
     const alarms = [...reminders.map((m) => buildAlarm(m, summary.trim())), ...passthroughAlarms];
 
@@ -361,7 +390,7 @@ export function EventModal({
         ...(location ? { location } : {}),
         ...(description ? { description } : {}),
         ...(color ? { color } : {}),
-        ...(finalInvitees.length ? { attendees: finalInvitees } : {}),
+        ...(finalInvitees.length ? { attendees: finalInvitees, partstats } : {}),
         ...(alarms.length ? { alarms } : {}),
       };
       setScopePrompt({ op: 'edit', edited, rule: recurrence });
@@ -387,7 +416,7 @@ export function EventModal({
       ...(color ? { color } : {}),
       ...(conferenceUrl ? { conferenceUrl } : {}),
       ...(recurrence ? { recurrence } : {}),
-      ...(finalInvitees.length ? { attendees: finalInvitees } : {}),
+      ...(finalInvitees.length ? { attendees: finalInvitees, partstats } : {}),
       ...(alarms.length ? { alarms } : {}),
     };
     // Mover de calendario = crear en el destino (mismo UID) y borrar el original.
@@ -826,24 +855,37 @@ export function EventModal({
             htmlFor="ev-invitee"
             {...(inviteeError ? { error: inviteeError } : {})}
           >
+            {organizer && invitees.length > 0 ? (
+              <div class="mb-2">
+                <GuestList t={t} organizer={organizer} guests={[]} large />
+              </div>
+            ) : null}
             {invitees.length > 0 ? (
               <ul class="mb-2 flex flex-wrap gap-1.5" aria-label={t('event.guestsAdded')}>
-                {invitees.map((email) => (
-                  <li
-                    key={email}
-                    class="rounded-pill border-border bg-bg-subtle text-text inline-flex items-center gap-1 border py-0.5 pr-1 pl-2.5 text-sm"
-                  >
-                    <span class="max-w-[16rem] truncate">{email}</span>
-                    <button
-                      type="button"
-                      aria-label={t('event.guestRemove', { email })}
-                      onClick={() => removeInvitee(email)}
-                      class="text-text-muted hover:bg-danger-bg hover:text-danger-text sytue-focus-ring rounded-control grid h-5 w-5 place-items-center transition-colors"
+                {invitees.map((email) => {
+                  const respuesta = respuestas.get(email.toLowerCase());
+                  return (
+                    <li
+                      key={email}
+                      class="rounded-pill border-border bg-bg-subtle text-text inline-flex items-center gap-1 border py-0.5 pr-1 pl-2.5 text-sm"
                     >
-                      <Icon name="close" size={14} />
-                    </button>
-                  </li>
-                ))}
+                      <span class="max-w-[16rem] truncate">{email}</span>
+                      {respuesta ? (
+                        <Badge tone={GUEST_TONE[respuesta]} class="shrink-0">
+                          {guestStatusLabel(t, respuesta)}
+                        </Badge>
+                      ) : null}
+                      <button
+                        type="button"
+                        aria-label={t('event.guestRemove', { email })}
+                        onClick={() => removeInvitee(email)}
+                        class="text-text-muted hover:bg-danger-bg hover:text-danger-text sytue-focus-ring rounded-control grid h-5 w-5 place-items-center transition-colors"
+                      >
+                        <Icon name="close" size={14} />
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             ) : null}
             <Input

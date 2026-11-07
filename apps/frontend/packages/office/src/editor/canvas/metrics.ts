@@ -28,3 +28,10 @@ export const RULER_H = 20;
  */
 export const MIN_ZOOM = 25;
 export const MAX_ZOOM = 200;
+/** Paso del zoom: el de los botones −/+, el del deslizador y el de Ctrl/⌘ +/−. */
+export const ZOOM_STEP = 10;
+
+/** El zoom dentro de [MIN_ZOOM, MAX_ZOOM] y entero: una sola cuenta para todos sus controles. */
+export function clampZoom(next: number): number {
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(next)));
+}

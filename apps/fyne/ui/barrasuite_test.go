@@ -62,6 +62,10 @@ func barraPruebaA(t *testing.T, ancho float32) *BarraSuite {
 	// el `fyne.Do` del driver de pruebas no marshalla, así que su gorutina conforma
 	// texto a la vez que él y el conformador se cae con un índice fuera de rango.
 	t.Cleanup(b.Parar)
+	// En un teléfono, la cara de la SUITE de la barra única —la que se despliega desde la
+	// entrada—, que es la topbar de siempre con el ✕ delante: es la que miden estas
+	// pruebas. La cara de la app la mide barraunica_test.go.
+	b.suiteAbierta = true
 	tam := fyne.NewSize(ancho, AltoBarraSuite())
 	b.Resize(tam)
 	test.WidgetRenderer(b).Layout(tam)
@@ -250,7 +254,7 @@ func TestLaEsquinaDeMarcaSeCineSinMenuLateral(t *testing.T) {
 	barra := webref.Read(t, "apps/frontend/packages/ui/src/components/TopBar.tsx")
 	for _, c := range []struct{ fuente, trozo, porque string }{
 		{hoja, "  [data-forma='carril']:not(:has(nav:is(.bg-sidebar, .bg-rail))) .sytue-esquina-marca {\n    width: fit-content;", "sin menú lateral, la esquina se ciñe (desde 768)"},
-		{barra, `<div class="-ms-4 flex shrink-0 self-stretch md:w-[var(--spacing-sidebar)] lg:-ms-6">`, "la caja de fuera reserva el ancho del menú"},
+		{barra, `'-ms-4 flex shrink-0 self-stretch md:w-[var(--spacing-sidebar)] lg:-ms-6',`, "la caja de fuera reserva el ancho del menú"},
 		{barra, `<div class="sytue-esquina-marca bg-sidebar text-sidebar-fg flex w-full items-center gap-2 ps-4 pe-3">`, "la de dentro pinta, con su relleno"},
 	} {
 		if !strings.Contains(c.fuente, c.trozo) {
@@ -491,6 +495,10 @@ func TestElBuscadorVaCentradoEnElHueco(t *testing.T) {
 		b := barraPruebaA(t, ancho)
 		campo := b.buscador.campo
 		desde := AnchoEsquinaMarca(ancho, b.marca.Size().Width) + HuecoBarra
+		if ancho < Estrecho {
+			// En el teléfono, la cara de la suite: sin marca, el buscador tras el ✕.
+			desde = b.cerrarSuite.Position().X + b.cerrarSuite.Size().Width + HuecoBarra
+		}
 		hasta := b.avisos.boton.Position().X - HuecoBarra
 		centro := campo.Position().X + campo.Size().Width/2
 		if d := centro - (desde+hasta)/2; d > 0.25 || d < -0.25 {

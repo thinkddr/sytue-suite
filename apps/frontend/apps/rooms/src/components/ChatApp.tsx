@@ -5,7 +5,7 @@
  * mensajes nuevos por WebSocket (ticket del BFF). Envio optimista con reconciliacion.
  * Estetica Sytue, modo claro/oscuro. docs/CONVENTIONS.md §1, §5.
  */
-import type { JSX } from 'preact';
+import type { ComponentChildren, JSX } from 'preact';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'preact/hooks';
 import { lazy, Suspense } from 'preact/compat';
 import { nombreDeOrganizacion, SytueShell } from '@sytue/shell';
@@ -34,12 +34,19 @@ import {
   useUltimo,
   useAtajo,
   Glifo,
+  BarraMovil,
+  useBarraUnica,
 } from '@sytue/ui';
-import type { VirtualListHandle } from '@sytue/ui';
+import type { BarraMovilProps, VirtualListHandle } from '@sytue/ui';
 import type { SytueUser } from '@sytue/auth';
 import { MARCA_ORG, orgActual, RE_SLUG_ORG, rutaConOrg } from '@sytue/config';
 import { formatDateTime, type Locale } from '@sytue/i18n';
 import { roomsT } from '../i18n/index.js';
+import { ultimoEditable } from '../lib/editarUltimo.js';
+import { sumaNoVisto, tituloConNoLeidos, totalNoLeidos } from '../lib/totalNoLeidos.js';
+import { pausaActiva } from '../lib/pausa.js';
+import { usePreferenciasAviso } from '../lib/usePreferenciasAviso.js';
+import { formatSchedule, toLocalValue } from '../lib/schedule.js';
 import {
   listChannels,
   listMessages,
@@ -100,7 +107,6 @@ import {
   updateScheduled,
   cancelScheduled,
   listDrafts,
-  getNotifyPrefs,
   type Channel,
   type ChatMessage,
   type ChatEvent,
@@ -110,7 +116,6 @@ import {
   type ThreadSummary,
   type Category,
   type ScheduledMessage,
-  type NotifyPrefs,
   type Receipt,
   type CardVote,
   type Invitacion,
@@ -225,9 +230,9 @@ const PreJoin = lazy(() => import('./PreJoin.js').then((m) => ({ default: m.PreJ
 
 /** Icono de vídeo (24-grid, envoltorio `Glifo`) para el botón «Llamar»: @sytue/ui aún no
  *  expone un glifo de cámara, así que va inline como el resto de glyphs de Chat. */
-function VideoGlyph(): JSX.Element {
+function VideoGlyph({ size = 16 }: { size?: number }): JSX.Element {
   return (
-    <Glifo size={16}>
+    <Glifo size={size}>
       <path d="M23 7 16 12l7 5V7Z" />
       <rect x="1" y="5" width="15" height="14" rx="2" />
     </Glifo>
@@ -416,6 +421,37 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
   // y bandera de «viendo historial» (se saltó a un mensaje antiguo: cargamos una ventana
   // centrada, no el final). jumpTargetRef porta el objetivo del próximo (re)cargado.
   const [highlightId, setHighlightId] = useState<string | null>(null);
+  // El total de no leídos delante del título de la pestaña: «(3) Sytue Rooms». La
+  // base es el título que puso la página, leído una vez; al desmontar se devuelve.
+  // `noVistos` son los mensajes que llegaron al canal ABIERTO con la pestaña oculta
+  // (`sumaNoVisto`): nadie los leía, así que cuentan; al volver a la pestaña se borran.
+  // Se cuentan por id (`noVistosRef`): una trama `message` repetida —se reenvía tras
+  // una reconexión— no suma dos veces el mismo mensaje.
+  const tituloBaseRef = useRef<string | null>(null);
+  const noVistosRef = useRef(new Set<string>());
+  const [noVistos, setNoVistos] = useState(0);
+  useEffect(() => {
+    tituloBaseRef.current ??= document.title;
+    document.title = tituloConNoLeidos(tituloBaseRef.current, totalNoLeidos(channels) + noVistos);
+  }, [channels, noVistos]);
+  useEffect(() => {
+    const alVolver = (): void => {
+      if (document.visibilityState !== 'visible') return;
+      noVistosRef.current.clear();
+      setNoVistos(0);
+    };
+    document.addEventListener('visibilitychange', alVolver);
+    return () => document.removeEventListener('visibilitychange', alVolver);
+  }, []);
+  useEffect(
+    () => () => {
+      if (tituloBaseRef.current !== null) document.title = tituloBaseRef.current;
+    },
+    [],
+  );
+  // ↑ en el compositor vacío: qué mensaje abrir en edición (`n` distingue dos
+  // pulsaciones seguidas sobre el mismo, que si no serían el mismo estado).
+  const [editRequest, setEditRequest] = useState<{ id: string; n: number } | null>(null);
   const [viewingHistory, setViewingHistory] = useState(false);
   const viewingHistoryRef = useRef(false);
   viewingHistoryRef.current = viewingHistory;
@@ -684,14 +720,18 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
   const dmAlerts = useDmNotifications({ id: user.id, tenant: user.tenant ?? '' });
   const dmNotifyRef = useUltimo(dmAlerts.browserEnabled);
 
-  // Preferencias de notificación (Ola 13): palabras clave + ventana «No molestar». Se
-  // cargan una vez y viven en una ref para que el handler de WebSocket (montado una vez)
-  // consulte siempre el valor vigente sin re-suscribirse. El modal las edita/guarda.
-  const [notifyPrefs, setNotifyPrefs] = useState<NotifyPrefs>({
-    keywords: [],
-    dndStart: 0,
-    dndEnd: 0,
-  });
+  // Preferencias de notificación (Ola 13): palabras clave, ventana «No molestar» y
+  // «Pausar avisos». La ref la consulta el handler de WebSocket (montado una vez); el
+  // modal las edita/guarda. Lectura, relectura al volver y pausa: `usePreferenciasAviso`.
+  const {
+    notifyPrefs,
+    setNotifyPrefs,
+    recargar: recargarNotifyPrefs,
+    pausar: pausarAvisos,
+    pausaGuardando,
+  } = usePreferenciasAviso(() =>
+    toast.notify({ tone: 'danger', title: tRef.current('pause.failed') }),
+  );
   const notifyPrefsRef = useRef(notifyPrefs);
   notifyPrefsRef.current = notifyPrefs;
   const [notifySettingsOpen, setNotifySettingsOpen] = useState(false);
@@ -732,16 +772,6 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
       .then((d) => setBlocks(d.blocks))
       .catch(() => undefined); // degrada: nada plegado; el servidor sigue aplicándolo
     return () => ac.abort();
-  }, []);
-
-  useEffect(() => {
-    let live = true;
-    void getNotifyPrefs()
-      .then(({ prefs }) => live && setNotifyPrefs(prefs))
-      .catch(() => undefined); // degrada: sin palabras clave ni DND
-    return () => {
-      live = false;
-    };
   }, []);
 
   // Borradores: se traen los del SERVIDOR una vez al arrancar (lo empezado en otro
@@ -799,10 +829,11 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
     }
   }, []);
 
-  /** ¿Estoy dentro de mi ventana «No molestar» ahora (hora local)? Suprime avisos. */
+  /** ¿Estoy dentro de mi ventana «No molestar» ahora (hora local), o con los avisos en
+   *  pausa? Las dos cosas suprimen los avisos. */
   function inQuietHours(): boolean {
-    const { dndStart, dndEnd } = notifyPrefsRef.current;
-    return inDndWindow(localMinutesNow(), dndStart, dndEnd);
+    const { dndStart, dndEnd, pausedUntil } = notifyPrefsRef.current;
+    return pausaActiva(pausedUntil) || inDndWindow(localMinutesNow(), dndStart, dndEnd);
   }
 
   /** Lanza una notificación del navegador por una mención o palabra clave (fire-and-forget). */
@@ -1211,6 +1242,14 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
               );
               return capAtBottom([...withoutPending, msg]);
             });
+            const abierto = channelsRef.current.find((c) => c.id === msg.channelId);
+            if (
+              sumaNoVisto(document.visibilityState === 'hidden', msg, abierto) &&
+              !noVistosRef.current.has(msg.id)
+            ) {
+              noVistosRef.current.add(msg.id);
+              setNoVistos(noVistosRef.current.size);
+            }
           } else {
             // Canal inactivo, o el activo mientras se ve historial (ventana centrada, no el
             // final): NO se anexa —crearía un hueco—; solo sube el no leído del sidebar. El
@@ -1437,9 +1476,14 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
     };
   }, [active, messages, receipts, t]);
 
-  // Al cambiar de canal, sal de la edición de tema (no arrastrar el borrador).
+  // Al cambiar de canal, sal de la edición de tema (no arrastrar el borrador). Y olvida
+  // la petición de ↑: MessageView se desmonta al quedarse sin canal y su cuenta de
+  // atendidas vuelve a 0, así que una petición vieja abría sola la edición de aquel
+  // mensaje al volver al canal (al desarchivarlo, o al unirse de nuevo). MessageView
+  // olvida su atendida al ver el null, así que la cuenta puede volver a empezar en 1.
   useEffect(() => {
     setEditingTopic(false);
+    setEditRequest(null);
   }, [activeId]);
 
   // --- Ola 4: heartbeat de presencia propia (mientras Rooms está abierto) ---
@@ -3661,9 +3705,23 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
             dmError={dmAlerts.error}
             dmLegacy={dmAlerts.hasLegacy}
             onRefreshDmNotify={dmAlerts.refresh}
+            onOpen={() => {
+              // La etiqueta «en pausa hasta …» se calcula al pintar: repintar al abrir
+              // descarta una pausa que venció con el menú cerrado, y releer trae la
+              // de otro dispositivo.
+              setNotifyPrefs((p) => ({ ...p }));
+              recargarNotifyPrefs();
+            }}
             onDiscardLegacyDmNotify={dmAlerts.discardLegacy}
             onToggleDmNotify={dmAlerts.toggle}
             onOpenNotifySettings={() => setNotifySettingsOpen(true)}
+            pausedUntilLabel={
+              notifyPrefs.pausedUntil && pausaActiva(notifyPrefs.pausedUntil)
+                ? formatSchedule(locale, toLocalValue(Date.parse(notifyPrefs.pausedUntil)))
+                : null
+            }
+            pauseSaving={pausaGuardando}
+            onPause={pausarAvisos}
             onOpenIntegrations={() => setIntegrationsOpen(true)}
             onMarkAllRead={marcarTodoLeido}
             canManageIntegrations={canManageIntegrations}
@@ -3964,64 +4022,85 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
     </Sidebar>
   );
 
+  // El ☰ de los canales: en la topbar (BarraMovil) en el teléfono con la Sytue Shell,
+  // también cuando no hay canal abierto —antes, sin canal no había forma de abrir el
+  // cajón en el teléfono—; sin topbar, en la cabecera del canal, como siempre.
+  const menuCanales = {
+    id: menuBtnId,
+    controla: drawerId,
+    abierto: drawerOpen,
+    alPulsar: () => setDrawerOpen((v) => !v),
+    rotulo: t('sidebar.openChannels'),
+  };
+  // Resumen y búsqueda salen en la cabecera del canal (escritorio) y en la topbar del
+  // teléfono, cada una con los botones de su barra.
+  const botonResumen = (donde: 'cabecera' | 'ghost') =>
+    donde === 'ghost' ? (
+      <Button
+        variant="ghost"
+        size="sm"
+        iconOnly
+        aria-label={t('channel.summarize')}
+        disabled={resumiendo}
+        onClick={() => void ponmeAlDia()}
+      >
+        <Icon name="info" size={18} />
+      </Button>
+    ) : (
+      <button
+        type="button"
+        title={t('channel.summarize')}
+        aria-label={t('channel.summarize')}
+        disabled={resumiendo}
+        onClick={() => void ponmeAlDia()}
+        class="text-header-fg hover:bg-chrome-hover sytue-focus-ring rounded-control flex h-8 w-8 shrink-0 items-center justify-center disabled:opacity-50"
+      >
+        <Icon name="info" size={16} />
+      </button>
+    );
+  const botonBuscar = (donde: 'cabecera' | 'ghost') =>
+    donde === 'ghost' ? (
+      <Button
+        variant="ghost"
+        size="sm"
+        iconOnly
+        aria-pressed={rhsView === 'search'}
+        aria-label={t('channel.searchMessages')}
+        onClick={toggleSearchPanel}
+      >
+        <Icon name="search" size={18} />
+      </Button>
+    ) : (
+      <button
+        type="button"
+        aria-pressed={rhsView === 'search'}
+        aria-label={t('channel.searchMessages')}
+        title={t('channel.search')}
+        onClick={toggleSearchPanel}
+        class={cx(
+          'text-header-fg hover:bg-chrome-hover sytue-focus-ring rounded-control inline-flex h-8 w-8 items-center justify-center transition-colors duration-150',
+          rhsView === 'search' && 'bg-chrome-active',
+        )}
+      >
+        <Icon name="search" size={16} />
+      </button>
+    );
+
   const channelPanel = active ? (
     <div class="bg-surface flex h-full min-w-0 flex-1 flex-col">
       {/* Cabecera de canal en la banda de cabecera (`bg-header`): un paso de tinta
           bajo la topbar, así se lee como cabecera sin borde. docs/design.md §2. */}
-      <header class="bg-header text-header-fg flex h-14 shrink-0 items-center gap-3 px-4">
-        {/* Móvil (<768px): hamburguesa que abre el drawer de canales (equivale a «atrás»
-            a la lista). En ≥768px la sidebar está siempre visible, así que se oculta. */}
-        <button
-          id={menuBtnId}
-          type="button"
-          class="text-header-fg hover:bg-chrome-hover sytue-focus-ring rounded-control -ml-1 inline-flex h-8 w-8 shrink-0 items-center justify-center transition-colors duration-150 md:hidden"
-          aria-label={t('sidebar.openChannels')}
-          aria-expanded={drawerOpen}
-          aria-controls={drawerId}
-          onClick={() => setDrawerOpen(true)}
-        >
-          <Icon name="menu" size={16} />
-        </button>
-        {active.kind === 'direct' ? (
-          isGroupDm(active) ? (
-            <GroupAvatar px={32} />
-          ) : (
-            <Avatar
-              name={active.name}
-              size="sm"
-              {...(activePeerPresence
-                ? { presence: toPresenceStatus(activePeerPresence.state) }
-                : {})}
-            />
-          )
-        ) : (
-          <span
-            class="bg-chrome-hover text-md text-header-fg grid h-8 w-8 shrink-0 place-items-center rounded-md font-semibold"
-            aria-hidden="true"
-          >
-            #
-          </span>
-        )}
-        <div class="flex min-w-0 flex-1 flex-col justify-center">
-          <div class="flex min-w-0 items-center gap-2">
-            {/* El nombre del canal ES el disparador de su menú (Slack, Teams y
-                Mattermost lo hacen así). Sigue siendo el <h1> de la vista para los
-                lectores de pantalla: el botón va dentro, no en su lugar. También
-                permite borrar un chat privado desde la conversación abierta. */}
-            {/* El margen negativo que alinea el nombre con el borde va en el h1 y
-                NO en el botón: un margen negativo dentro resta de la anchura que
-                el h1 calcula para sí, y el botón —con `max-w-full`— quedaba 12px
-                más estrecho que su texto: «Aleat…» con media cabecera libre. */}
+      <CabeceraDeCanal
+        barra={{
+          menu: menuCanales,
+          // El nombre del canal sigue siendo el disparador de su menú (miembros, fijados,
+          // guardados, programados, salir): en el teléfono es el único camino a todo eso.
+          titulo: (
             <h1 class="-mx-1.5 min-w-0 truncate">
               <MessageMenu
                 label={t('channel.menuAria', { name: active.name })}
                 items={channelHeaderMenuItems(active)}
-                // `min-h-[24px]`: con `py-0.5` el disparador medía 21px de
-                // alto, por debajo del mínimo de WCAG 2.5.8 (AA) para lo que
-                // se toca. Y `min-h-6` no lo arreglaba: son 1,5 rem, que con la
-                // raíz a 14 vuelven a ser 21 (medido en producción, 2026-09-21). Es el nombre del canal, que en un teléfono es el
-                // camino a ajustes, miembros y salir del canal.
-                triggerClass="text-md text-header-fg hover:bg-chrome-hover active:bg-chrome-active inline-flex min-h-[24px] max-w-full items-center gap-1 truncate rounded-control px-1.5 py-0.5 leading-tight font-semibold transition-colors duration-150 sytue-focus-ring"
+                triggerClass="hover:bg-chrome-hover active:bg-chrome-active inline-flex min-h-[24px] max-w-full items-center gap-1 truncate rounded-control px-1.5 py-0.5 leading-tight font-semibold transition-colors duration-150 sytue-focus-ring-chrome"
                 trigger={
                   <>
                     <span class="truncate">{active.name}</span>
@@ -4030,238 +4109,331 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
                 }
               />
             </h1>
-            {active.kind === 'private' ? (
-              <span class="rounded-pill border-chrome-border text-header-fg shrink-0 border px-2 py-0.5 text-xs font-medium">
-                {t('channel.privateBadge')}
-              </span>
+          ),
+          acciones: (
+            <>
+              {botonResumen('ghost')}
+              {botonBuscar('ghost')}
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                aria-label={callBusy ? t('connection.connecting') : t('call.call')}
+                loading={callBusy}
+                onClick={startChannelCall}
+              >
+                {/* 18, como el resto de glifos de la barra (☰, buscar, ponme al día). */}
+                <VideoGlyph size={18} />
+              </Button>
+            </>
+          ),
+        }}
+        avisos={
+          callError || (puertaCerrada && puertaCerrada.channelId === activeId) ? (
+            <div
+              role="status"
+              class="border-border bg-selected text-text flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-1.5 text-sm md:hidden"
+            >
+              {callError ? t('call.startFailed') : null}
+              {puertaCerrada && puertaCerrada.channelId === activeId ? (
+                <>
+                  {puertaCerrada.llamado ? t('meet.knocked') : t('meet.roomLockedNotice')}
+                  {!puertaCerrada.llamado ? (
+                    <Button size="sm" variant="secondary" onClick={llamarALaPuerta}>
+                      {t('meet.knock')}
+                    </Button>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+          ) : null
+        }
+      >
+        {(enLaTopbar) => (
+          <header
+            class={cx(
+              'bg-header text-header-fg flex h-14 shrink-0 items-center gap-3 px-4',
+              // En el teléfono, con la Sytue Shell, la cabecera del canal sube a la topbar
+              // (BarraMovil): debajo no queda una segunda barra.
+              enLaTopbar && 'max-md:hidden',
+            )}
+          >
+            {/* Móvil (<768px) sin topbar que la acoja (app nativa): hamburguesa que abre el
+            drawer de canales. En ≥768px la sidebar está siempre visible. */}
+            {!enLaTopbar ? (
+              <button
+                id={menuBtnId}
+                type="button"
+                class="text-header-fg hover:bg-chrome-hover sytue-focus-ring rounded-control -ml-1 inline-flex h-8 w-8 shrink-0 items-center justify-center transition-colors duration-150 md:hidden"
+                aria-label={t('sidebar.openChannels')}
+                aria-expanded={drawerOpen}
+                aria-controls={drawerId}
+                onClick={() => setDrawerOpen(true)}
+              >
+                <Icon name="menu" size={16} />
+              </button>
             ) : null}
-          </div>
-          {/* DM: presencia del peer (estado + estado personalizado) bajo el nombre.
+            {active.kind === 'direct' ? (
+              isGroupDm(active) ? (
+                <GroupAvatar px={32} />
+              ) : (
+                <Avatar
+                  name={active.name}
+                  size="sm"
+                  {...(activePeerPresence
+                    ? { presence: toPresenceStatus(activePeerPresence.state) }
+                    : {})}
+                />
+              )
+            ) : (
+              <span
+                class="bg-chrome-hover text-md text-header-fg grid h-8 w-8 shrink-0 place-items-center rounded-md font-semibold"
+                aria-hidden="true"
+              >
+                #
+              </span>
+            )}
+            <div class="flex min-w-0 flex-1 flex-col justify-center">
+              <div class="flex min-w-0 items-center gap-2">
+                {/* El nombre del canal ES el disparador de su menú (Slack, Teams y
+                Mattermost lo hacen así). Sigue siendo el <h1> de la vista para los
+                lectores de pantalla: el botón va dentro, no en su lugar. También
+                permite borrar un chat privado desde la conversación abierta. */}
+                {/* El margen negativo que alinea el nombre con el borde va en el h1 y
+                NO en el botón: un margen negativo dentro resta de la anchura que
+                el h1 calcula para sí, y el botón —con `max-w-full`— quedaba 12px
+                más estrecho que su texto: «Aleat…» con media cabecera libre. */}
+                <h1 class="-mx-1.5 min-w-0 truncate">
+                  <MessageMenu
+                    label={t('channel.menuAria', { name: active.name })}
+                    items={channelHeaderMenuItems(active)}
+                    // `min-h-[24px]`: con `py-0.5` el disparador medía 21px de
+                    // alto, por debajo del mínimo de WCAG 2.5.8 (AA) para lo que
+                    // se toca. Y `min-h-6` no lo arreglaba: son 1,5 rem, que con la
+                    // raíz a 14 vuelven a ser 21 (medido en producción, 2026-09-21). Es el nombre del canal, que en un teléfono es el
+                    // camino a ajustes, miembros y salir del canal.
+                    triggerClass="text-md text-header-fg hover:bg-chrome-hover active:bg-chrome-active inline-flex min-h-[24px] max-w-full items-center gap-1 truncate rounded-control px-1.5 py-0.5 leading-tight font-semibold transition-colors duration-150 sytue-focus-ring"
+                    trigger={
+                      <>
+                        <span class="truncate">{active.name}</span>
+                        <Icon name="chevronDown" size={14} />
+                      </>
+                    }
+                  />
+                </h1>
+                {active.kind === 'private' ? (
+                  <span class="rounded-pill border-chrome-border text-header-fg shrink-0 border px-2 py-0.5 text-xs font-medium">
+                    {t('channel.privateBadge')}
+                  </span>
+                ) : null}
+              </div>
+              {/* DM: presencia del peer (estado + estado personalizado) bajo el nombre.
               Canal: tema, visible siempre y editable en línea para admins. Enter
               guarda, Esc cancela, blur confirma. */}
-          {active.kind === 'direct' ? (
-            isGroupDm(active) ? (
-              // Group DM: nº total de participantes (tú incluido); el h1 (active.name)
-              // ya lista a los OTROS miembros. title= muestra la lista completa al pasar.
-              <p
-                class="text-header-fg/80 truncate text-xs leading-tight"
-                title={t('dm.youAnd', { name: active.name })}
-              >
-                {t('dm.peopleCount', { count: (active.peers?.length ?? 0) + 1 })}
-              </p>
-            ) : (
-              <p class="text-header-fg/80 truncate text-xs leading-tight">
-                {t(STATE_KEY[activePeerPresence?.state ?? 'offline'])}
-                {activePeerPresence?.status ? ` · ${activePeerPresence.status}` : ''}
-              </p>
-            )
-          ) : editingTopic ? (
-            <input
-              type="text"
-              value={topicDraft}
-              // eslint-disable-next-line jsx-a11y/no-autofocus -- al editar el tema, el input toma el foco directamente
-              autoFocus
-              maxLength={280}
-              placeholder={t('channel.topicPlaceholder')}
-              onInput={(e) => setTopicDraft(e.currentTarget.value)}
-              onBlur={commitTopic}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  commitTopic();
-                } else if (e.key === 'Escape') {
-                  e.preventDefault();
-                  setEditingTopic(false);
-                }
-              }}
-              aria-label={t('channel.topicAria')}
-              // Marcador al 60 % y no al 50: sobre la tinta de la cabecera el 50 % daba
-              // 4,45:1, por debajo del 4,5 de WCAG 1.4.3 (el 60 %, 5,7).
-              class="border-header-fg/40 text-header-fg placeholder:text-header-fg/60 w-full border-b bg-transparent text-xs leading-tight focus:outline-none"
-            />
-          ) : active.topic ? (
-            isTeamAdmin && !active.external ? (
-              <button
-                type="button"
-                onClick={startEditTopic}
-                title={t('channel.editTopic')}
-                class="text-header-fg/80 hover:text-header-fg sytue-focus-ring truncate text-left text-xs leading-tight hover:underline"
-              >
-                {active.topic}
-              </button>
-            ) : (
-              <p class="text-header-fg/80 truncate text-xs leading-tight" title={active.topic}>
-                {active.topic}
-              </p>
-            )
-          ) : isTeamAdmin && !active.external ? (
-            <button
-              type="button"
-              onClick={startEditTopic}
-              class="text-header-fg/60 hover:text-header-fg sytue-focus-ring inline-flex items-center gap-1 self-start text-xs leading-tight"
-            >
-              <EditGlyph size={12} />
-              {t('channel.addTopic')}
-            </button>
-          ) : null}
-        </div>
+              {active.kind === 'direct' ? (
+                isGroupDm(active) ? (
+                  // Group DM: nº total de participantes (tú incluido); el h1 (active.name)
+                  // ya lista a los OTROS miembros. title= muestra la lista completa al pasar.
+                  <p
+                    class="text-header-fg/80 truncate text-xs leading-tight"
+                    title={t('dm.youAnd', { name: active.name })}
+                  >
+                    {t('dm.peopleCount', { count: (active.peers?.length ?? 0) + 1 })}
+                  </p>
+                ) : (
+                  <p class="text-header-fg/80 truncate text-xs leading-tight">
+                    {t(STATE_KEY[activePeerPresence?.state ?? 'offline'])}
+                    {activePeerPresence?.status ? ` · ${activePeerPresence.status}` : ''}
+                  </p>
+                )
+              ) : editingTopic ? (
+                <input
+                  type="text"
+                  value={topicDraft}
+                  // eslint-disable-next-line jsx-a11y/no-autofocus -- al editar el tema, el input toma el foco directamente
+                  autoFocus
+                  maxLength={280}
+                  placeholder={t('channel.topicPlaceholder')}
+                  onInput={(e) => setTopicDraft(e.currentTarget.value)}
+                  onBlur={commitTopic}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      commitTopic();
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault();
+                      setEditingTopic(false);
+                    }
+                  }}
+                  aria-label={t('channel.topicAria')}
+                  // Marcador al 60 % y no al 50: sobre la tinta de la cabecera el 50 % daba
+                  // 4,45:1, por debajo del 4,5 de WCAG 1.4.3 (el 60 %, 5,7).
+                  class="border-header-fg/40 text-header-fg placeholder:text-header-fg/60 w-full border-b bg-transparent text-xs leading-tight focus:outline-none"
+                />
+              ) : active.topic ? (
+                isTeamAdmin && !active.external ? (
+                  <button
+                    type="button"
+                    onClick={startEditTopic}
+                    title={t('channel.editTopic')}
+                    class="text-header-fg/80 hover:text-header-fg sytue-focus-ring truncate text-left text-xs leading-tight hover:underline"
+                  >
+                    {active.topic}
+                  </button>
+                ) : (
+                  <p class="text-header-fg/80 truncate text-xs leading-tight" title={active.topic}>
+                    {active.topic}
+                  </p>
+                )
+              ) : isTeamAdmin && !active.external ? (
+                <button
+                  type="button"
+                  onClick={startEditTopic}
+                  class="text-header-fg/60 hover:text-header-fg sytue-focus-ring inline-flex items-center gap-1 self-start text-xs leading-tight"
+                >
+                  <EditGlyph size={12} />
+                  {t('channel.addTopic')}
+                </button>
+              ) : null}
+            </div>
 
-        {/* Acciones de canal: Fijados (contador) y Guardados (cross-canal), + la
+            {/* Acciones de canal: Fijados (contador) y Guardados (cross-canal), + la
             llamada de vídeo. Botones sobre la cabecera sólida (bg-header).
             En <768px se quedan Buscar y Llamar: los seis juntos se salían 98px de
             un iPhone SE. Los retirados (miembros, fijados, guardados,
             programados) están todos en el menú del nombre del canal. */}
-        <div class="flex shrink-0 items-center gap-1">
-          {/* Facepile con contador: la puerta al roster que Slack/Teams/Mattermost
+            <div class="flex shrink-0 items-center gap-1">
+              {/* Facepile con contador: la puerta al roster que Slack/Teams/Mattermost
               ponen en la cabecera. Solo en canales (un DM no tiene roster gestionable).
               Los avatares son decorativos (aria-hidden): el botón ya se anuncia con el
               número de miembros. Si la carga falló se pinta solo el icono —sin contador
               inventado— para que el panel, que trae su «Reintentar», siga alcanzable. */}
-          <button
-            type="button"
-            title={t('channel.summarize')}
-            aria-label={t('channel.summarize')}
-            disabled={resumiendo}
-            onClick={() => void ponmeAlDia()}
-            class="text-header-fg hover:bg-chrome-hover sytue-focus-ring rounded-control flex h-8 w-8 shrink-0 items-center justify-center disabled:opacity-50"
-          >
-            <Icon name="info" size={16} />
-          </button>
-          {activeIsChannel && !rosterLoading ? (
-            <button
-              type="button"
-              aria-pressed={rhsView === 'members'}
-              aria-label={
-                roster.length > 0
-                  ? t('channel.membersCount', { count: roster.length })
-                  : t('channel.members')
-              }
-              title={t('channel.members')}
-              onClick={toggleMembersPanel}
-              class={cx(
-                'text-header-fg hover:bg-chrome-hover sytue-focus-ring rounded-control inline-flex h-8 items-center gap-1.5 px-2 transition-colors duration-150 max-md:hidden',
-                rhsView === 'members' && 'bg-chrome-active',
-              )}
-            >
-              {roster.length > 0 ? (
-                <>
-                  <span class="flex items-center" aria-hidden="true">
-                    {roster.slice(0, 3).map((m, i) => (
-                      <Avatar
-                        key={m.sub}
-                        name={m.name}
-                        size="xs"
-                        // El anillo del color de la cabecera separa los avatares
-                        // apilados sin sombras decorativas (el envoltorio mide lo mismo
-                        // que el avatar, así que basta redondearlo igual).
-                        class={cx(
-                          'rounded-md ring-2 ring-[var(--sytue-header-bg)]',
-                          i > 0 && '-ml-1.5',
-                        )}
-                      />
-                    ))}
-                  </span>
-                  <span class="text-xs font-semibold tabular-nums">{roster.length}</span>
-                </>
-              ) : (
-                <Icon name="users" size={16} />
-              )}
-            </button>
-          ) : null}
-          <button
-            type="button"
-            aria-pressed={rhsView === 'search'}
-            aria-label={t('channel.searchMessages')}
-            title={t('channel.search')}
-            onClick={toggleSearchPanel}
-            class={cx(
-              'text-header-fg hover:bg-chrome-hover sytue-focus-ring rounded-control inline-flex h-8 w-8 items-center justify-center transition-colors duration-150',
-              rhsView === 'search' && 'bg-chrome-active',
-            )}
-          >
-            <Icon name="search" size={16} />
-          </button>
-          <button
-            type="button"
-            aria-pressed={rhsView === 'pinned'}
-            aria-label={t('channel.pinnedCount', { count: pins.length })}
-            title={t('channel.pinned')}
-            onClick={togglePinnedPanel}
-            class={cx(
-              'text-header-fg hover:bg-chrome-hover sytue-focus-ring rounded-control inline-flex h-8 items-center gap-1 px-2 transition-colors duration-150 max-md:hidden',
-              rhsView === 'pinned' && 'bg-chrome-active',
-            )}
-          >
-            <PinGlyph size={16} />
-            {pins.length > 0 ? (
-              <span class="text-xs font-semibold tabular-nums">{pins.length}</span>
-            ) : null}
-          </button>
-          <button
-            type="button"
-            aria-label={t('channel.files')}
-            title={t('channel.files')}
-            onClick={openChannelFiles}
-            class="text-header-fg hover:bg-chrome-hover sytue-focus-ring rounded-control inline-flex h-8 w-8 items-center justify-center transition-colors duration-150 max-md:hidden"
-          >
-            <ClipGlyph size={16} />
-          </button>
-          <button
-            type="button"
-            aria-pressed={rhsView === 'saved'}
-            aria-label={t('channel.saved')}
-            title={t('channel.saved')}
-            onClick={toggleSavedPanel}
-            class={cx(
-              'text-header-fg hover:bg-chrome-hover sytue-focus-ring rounded-control inline-flex h-8 w-8 items-center justify-center transition-colors duration-150 max-md:hidden',
-              rhsView === 'saved' && 'bg-chrome-active',
-            )}
-          >
-            <BookmarkGlyph size={16} />
-          </button>
-          <button
-            type="button"
-            aria-pressed={rhsView === 'scheduled'}
-            aria-label={t('channel.scheduledMessages')}
-            title={t('channel.scheduled')}
-            onClick={toggleScheduledPanel}
-            class={cx(
-              'text-header-fg hover:bg-chrome-hover sytue-focus-ring rounded-control inline-flex h-8 w-8 items-center justify-center transition-colors duration-150 max-md:hidden',
-              rhsView === 'scheduled' && 'bg-chrome-active',
-            )}
-          >
-            <ClockGlyph size={16} />
-          </button>
-          <span class="bg-border mx-1 h-5 w-px max-md:hidden" aria-hidden="true" />
-          {callError ? (
-            <span class="text-header-fg/80 text-xs" role="status">
-              {t('call.startFailed')}
-            </span>
-          ) : null}
-          {/* La puerta cerrada NO es un fallo: tiene respuesta. Se dice qué pasa y
+              {botonResumen('cabecera')}
+              {activeIsChannel && !rosterLoading ? (
+                <button
+                  type="button"
+                  aria-pressed={rhsView === 'members'}
+                  aria-label={
+                    roster.length > 0
+                      ? t('channel.membersCount', { count: roster.length })
+                      : t('channel.members')
+                  }
+                  title={t('channel.members')}
+                  onClick={toggleMembersPanel}
+                  class={cx(
+                    'text-header-fg hover:bg-chrome-hover sytue-focus-ring rounded-control inline-flex h-8 items-center gap-1.5 px-2 transition-colors duration-150 max-md:hidden',
+                    rhsView === 'members' && 'bg-chrome-active',
+                  )}
+                >
+                  {roster.length > 0 ? (
+                    <>
+                      <span class="flex items-center" aria-hidden="true">
+                        {roster.slice(0, 3).map((m, i) => (
+                          <Avatar
+                            key={m.sub}
+                            name={m.name}
+                            size="xs"
+                            // El anillo del color de la cabecera separa los avatares
+                            // apilados sin sombras decorativas (el envoltorio mide lo mismo
+                            // que el avatar, así que basta redondearlo igual).
+                            class={cx(
+                              'rounded-md ring-2 ring-[var(--sytue-header-bg)]',
+                              i > 0 && '-ml-1.5',
+                            )}
+                          />
+                        ))}
+                      </span>
+                      <span class="text-xs font-semibold tabular-nums">{roster.length}</span>
+                    </>
+                  ) : (
+                    <Icon name="users" size={16} />
+                  )}
+                </button>
+              ) : null}
+              {botonBuscar('cabecera')}
+              <button
+                type="button"
+                aria-pressed={rhsView === 'pinned'}
+                aria-label={t('channel.pinnedCount', { count: pins.length })}
+                title={t('channel.pinned')}
+                onClick={togglePinnedPanel}
+                class={cx(
+                  'text-header-fg hover:bg-chrome-hover sytue-focus-ring rounded-control inline-flex h-8 items-center gap-1 px-2 transition-colors duration-150 max-md:hidden',
+                  rhsView === 'pinned' && 'bg-chrome-active',
+                )}
+              >
+                <PinGlyph size={16} />
+                {pins.length > 0 ? (
+                  <span class="text-xs font-semibold tabular-nums">{pins.length}</span>
+                ) : null}
+              </button>
+              <button
+                type="button"
+                aria-label={t('channel.files')}
+                title={t('channel.files')}
+                onClick={openChannelFiles}
+                class="text-header-fg hover:bg-chrome-hover sytue-focus-ring rounded-control inline-flex h-8 w-8 items-center justify-center transition-colors duration-150 max-md:hidden"
+              >
+                <ClipGlyph size={16} />
+              </button>
+              <button
+                type="button"
+                aria-pressed={rhsView === 'saved'}
+                aria-label={t('channel.saved')}
+                title={t('channel.saved')}
+                onClick={toggleSavedPanel}
+                class={cx(
+                  'text-header-fg hover:bg-chrome-hover sytue-focus-ring rounded-control inline-flex h-8 w-8 items-center justify-center transition-colors duration-150 max-md:hidden',
+                  rhsView === 'saved' && 'bg-chrome-active',
+                )}
+              >
+                <BookmarkGlyph size={16} />
+              </button>
+              <button
+                type="button"
+                aria-pressed={rhsView === 'scheduled'}
+                aria-label={t('channel.scheduledMessages')}
+                title={t('channel.scheduled')}
+                onClick={toggleScheduledPanel}
+                class={cx(
+                  'text-header-fg hover:bg-chrome-hover sytue-focus-ring rounded-control inline-flex h-8 w-8 items-center justify-center transition-colors duration-150 max-md:hidden',
+                  rhsView === 'scheduled' && 'bg-chrome-active',
+                )}
+              >
+                <ClockGlyph size={16} />
+              </button>
+              <span class="bg-border mx-1 h-5 w-px max-md:hidden" aria-hidden="true" />
+              {callError ? (
+                <span class="text-header-fg/80 text-xs" role="status">
+                  {t('call.startFailed')}
+                </span>
+              ) : null}
+              {/* La puerta cerrada NO es un fallo: tiene respuesta. Se dice qué pasa y
               se ofrece llamar; una vez llamado, el botón desaparece y queda el
               aviso de que el anfitrión ya lo sabe. */}
-          {puertaCerrada && puertaCerrada.channelId === activeId ? (
-            <span class="text-header-fg/80 flex items-center gap-2 text-xs" role="status">
-              {puertaCerrada.llamado ? t('meet.knocked') : t('meet.roomLockedNotice')}
-              {!puertaCerrada.llamado ? (
-                <Button size="sm" variant="secondary" onClick={llamarALaPuerta}>
-                  {t('meet.knock')}
-                </Button>
+              {puertaCerrada && puertaCerrada.channelId === activeId ? (
+                <span class="text-header-fg/80 flex items-center gap-2 text-xs" role="status">
+                  {puertaCerrada.llamado ? t('meet.knocked') : t('meet.roomLockedNotice')}
+                  {!puertaCerrada.llamado ? (
+                    <Button size="sm" variant="secondary" onClick={llamarALaPuerta}>
+                      {t('meet.knock')}
+                    </Button>
+                  ) : null}
+                </span>
               ) : null}
-            </span>
-          ) : null}
-          <Button
-            size="sm"
-            variant="primary"
-            leadingIcon={<VideoGlyph />}
-            loading={callBusy}
-            onClick={startChannelCall}
-          >
-            {callBusy ? t('connection.connecting') : t('call.call')}
-          </Button>
-        </div>
-      </header>
+              <Button
+                size="sm"
+                variant="primary"
+                leadingIcon={<VideoGlyph />}
+                loading={callBusy}
+                onClick={startChannelCall}
+              >
+                {callBusy ? t('connection.connecting') : t('call.call')}
+              </Button>
+            </div>
+          </header>
+        )}
+      </CabeceraDeCanal>
 
       {/* Banner discreto de «llamada en curso» bajo la cabecera: solo si hay presentes
           y no estás ya dentro de la llamada. Accesible (role=status; acción real, no
@@ -4298,6 +4470,7 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
         onOpenThread={openThread}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        editRequest={editRequest}
         pinnedIds={pinnedIds}
         savedIds={savedIds}
         onTogglePin={togglePin}
@@ -4359,6 +4532,12 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
         channelId={active.id}
         advanced
         onSend={handleSend}
+        onEditLast={() => {
+          const m = ultimoEditable(messages);
+          if (!m) return false;
+          setEditRequest((r) => ({ id: m.id, n: (r?.n ?? 0) + 1 }));
+          return true;
+        }}
         onCommand={runCommand}
         remoteCommands={remoteCommands}
         onRemoteCommand={runRemoteCommand}
@@ -4426,6 +4605,8 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
       accessToken={getAccessToken}
       locale={locale}
     >
+      {/* Sin canal abierto, la topbar del teléfono lleva al menos el ☰ de los canales. */}
+      {!active ? <BarraMovil menu={menuCanales} soloEnLaTopbar /> : null}
       {/* Sidebar oscura de canales + vista de canal (layout canonico bajo la
           topbar de la shell; misma geometria que AppShell). En <768px la sidebar es un
           drawer sobre overlay (Ola 18); en ≥768px va en flujo, como siempre. */}
@@ -4732,6 +4913,7 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
         open={browseOpen}
         onClose={() => setBrowseOpen(false)}
         onJoined={handleJoined}
+        onUnarchived={handleJoined}
         t={t}
       />
       {/* Ola 2B de paridad: crear canal (público/privado + tema). */}
@@ -4760,6 +4942,7 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
             titulo: t('shortcuts.group.write'),
             atajos: [
               { teclas: [t('key.enter')], descripcion: t('composer.hintSend') },
+              { teclas: ['↑'], descripcion: t('shortcuts.editLast') },
               { teclas: ['@'], descripcion: t('composer.hintMention') },
               { teclas: [':'], descripcion: t('composer.hintEmoji') },
               { teclas: ['/'], descripcion: t('composer.hintCommands') },
@@ -4861,5 +5044,29 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
       {dialogoConfirmar}
       {dialogoPreguntar}
     </SytueShell>
+  );
+}
+
+/**
+ * La cabecera del canal y su barra del teléfono. Con la Sytue Shell, en <768px la
+ * cabecera sube a la topbar (BarraMovil) y aquí solo queda, si hace falta, la franja de
+ * avisos de la llamada; sin ella (app nativa) la cabecera es la de siempre.
+ */
+function CabeceraDeCanal({
+  barra,
+  avisos,
+  children,
+}: {
+  barra: BarraMovilProps;
+  avisos: ComponentChildren;
+  children: (enLaTopbar: boolean) => ComponentChildren;
+}): JSX.Element {
+  const enLaTopbar = useBarraUnica();
+  return (
+    <>
+      {enLaTopbar ? <BarraMovil {...barra} soloEnLaTopbar /> : null}
+      {children(enLaTopbar)}
+      {enLaTopbar ? avisos : null}
+    </>
   );
 }

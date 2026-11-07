@@ -142,6 +142,12 @@ export const lt: AppCatalog<typeof en> = {
   'gallery.downloadSelected': 'Atsisiųsti',
   'gallery.downloading':
     'Pradėtos atsisiuntimo užklausos: {count}. Patikrinkite naršyklės atsisiuntimus.',
+  'gallery.downloadingNative': {
+    one: 'Atsisiunčiama {count} nuotrauka…',
+    few: 'Atsisiunčiamos {count} nuotraukos…',
+    many: 'Atsisiunčiama {count} nuotraukos…',
+    other: 'Atsisiunčiama {count} nuotraukų…',
+  },
   'gallery.downloadCapped': 'Į šį rinkinį neįtrauktos nuotraukos: {count}.',
   'gallery.newAlbum': 'Naujas albumas',
   'gallery.newAlbumTitle': 'Naujas albumas',
@@ -280,4 +286,20 @@ export const lt: AppCatalog<typeof en> = {
   'aiBatch.excludeOrg': 'Neįtraukti organizacijos į automatinį „Sytue AI“ paketą',
   'aiBatch.excludedHint':
     'Organizacija neįtraukta į automatinį „Sytue AI“ paketą. Naujos nuotraukos fone neapdorojamos pasiūlymams ar panašumams rasti.',
+  'album.rename': 'Pervadinti',
+  'album.renamePrompt': 'Albumo pavadinimas',
+  'album.setCover': 'Naudoti kaip albumo viršelį',
+  'album.isCover': 'Tai albumo viršelis',
+  'album.coverSet': 'Albumo viršelis atnaujintas',
+  'gallery.favorited': 'Pridėta prie mėgstamiausių: {count}',
+  'gallery.unfavorited': 'Pašalinta iš mėgstamiausių: {count}',
+  'gallery.favoriteFailed': 'Nuotraukos, kurių nepavyko pakeisti: {count}',
+  'gallery.noResults.title': 'Paieškai „{query}“ neatitinka jokia nuotrauka',
+  'gallery.noResults.description':
+    'Pabandykite kitus žodžius arba išvalykite paiešką, kad matytumėte visas savo nuotraukas.',
+  'gallery.clearSearch': 'Išvalyti paiešką',
+  'viewer.counter': '{index} / {total}',
+  'viewer.counterMore': '{count}+',
+  'viewer.counterLabel': 'Nuotrauka {index} iš {total}',
+  'viewer.shortcutsJump': 'Home ir End pereina į pirmą ir paskutinę nuotrauką.',
 };

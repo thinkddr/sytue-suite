@@ -101,6 +101,7 @@
   "linkedServices.changed": "Този елемент е променен при доставчика ви. Обновете, преди да го редактирате отново.",
   "linkedServices.choose": "Изберете какво да свържете. Доставчикът ще поиска разрешения за избраните услуги.",
   "linkedServices.connected": "Свързани услуги",
+  "linkedServices.exists": "Този акаунт вече беше свързан и е отворен.",
   "linkedServices.keepAdmin": "Google Keep изисква одобрена настройка от администрацията на Google Workspace. Лични профили в Gmail не могат да го свържат.",
   "linkedServices.notGranted": "Не е предоставен достъп до тази услуга. Свържете профила отново, за да изберете разрешенията му.",
   "linkedServices.notSupported": "Този доставчик не предлага тази услуга.",
@@ -169,7 +170,7 @@
   "notifications.kind.pages.order.oversold": "Поръчка {number} в {site} е платена, но няма наличност",
   "notifications.kind.pages.order.paid": "Нова поръчка {number} в {site}",
   "notifications.kind.pages.payment.duplicated": "Двойно плащане по поръчка {number} в {site}: второто се възстановява",
-  "notifications.kind.pages.settings.changed": "{actor} промени настройка на Sytue Web",
+  "notifications.kind.pages.settings.changed": "{actor} промени настройка на Sytue Webs",
   "notifications.kind.pages.store.busy": "Магазинът в {site} има твърде много поръчки, чакащи плащане",
   "notifications.kind.pages.withdrawal.requested": "Заявен е отказ по поръчка {number} в {site}",
   "notifications.kind.photos.album.added": "{actor} добави снимки в „{name}“",
@@ -301,6 +302,8 @@
   "shell.update.failedBody": "Опитайте отново по-късно или го изтеглете от портала.",
   "shell.update.install": "Актуализиране до версия {version}",
   "shell.update.upToDate": "{app} е с най-новата версия",
+  "shell.widgets.wake": "Обновяване на уиджетите при затворено приложение",
+  "shell.widgets.wakeHelp": "Когато нещо ваше се промени, Sytue събужда приложението с празно известие от Apple, за да обнови уиджета си. Apple вижда кое приложение и кога, но никога какво се е променило.",
   "ui.backToList": "Обратно към списъка",
   "ui.bulk.clear": "Изчистване на избора",
   "ui.bulk.region": "Действия за избраното",
@@ -318,6 +321,8 @@
   "ui.review.edit": "Редактиране",
   "ui.save": "Запазване",
   "ui.selectRow": "Избор на ред",
+  "ui.suiteClose": "Обратно към приложението",
+  "ui.suiteOpen": "Sytue: приложения, търсене, известия и профил",
   "ui.wizard.back": "Назад",
   "ui.wizard.cancel": "Отказ",
   "ui.wizard.goToStep": "Обратно към стъпка {n}: ",
@@ -336,5 +341,7 @@
   "widgets.pending": "Чакащи",
   "widgets.photos": "Снимки",
   "widgets.rows": "Редове",
-  "widgets.storage": "Хранилище"
+  "widgets.storage": "Хранилище",
+  "widgets.updatedAgo": "Обновено {time}",
+  "widgets.updatedAt": "Обновено: {time}"
 }

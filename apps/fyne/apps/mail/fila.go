@@ -372,14 +372,14 @@ func (f *FilaConversacion) CreateRenderer() fyne.WidgetRenderer {
 	// Los conmutadores son DOS botones cada uno y se enseña el que toca: el glifo
 	// cambia de dibujo (lleno o no, sobre abierto o cerrado) y no solo de color.
 	r.triaje = []*botonTriaje{
-		nuevoBotonTriaje(f, EstrellaD, false, "text", destacar),
+		nuevoBotonTriaje(f, EstrellaD, false, "primary-text", destacar),
 		nuevoBotonTriaje(f, EstrellaD, true, "warning-text", destacar),
-		nuevoBotonTriaje(f, LeidoD, false, "text", leido),
-		nuevoBotonTriaje(f, SinLeerD, false, "text", leido),
-		nuevoBotonTriaje(f, ArchivarD, false, "text", con(func(a *Acciones) func(Conversacion) { return a.Archivar })),
-		nuevoBotonTriaje(f, PapeleraD, false, "text", con(func(a *Acciones) func(Conversacion) { return a.Papelera })),
-		nuevoBotonTriaje(f, SpamD, false, "text", con(func(a *Acciones) func(Conversacion) { return a.Spam })),
-		nuevoBotonTriaje(f, SpamD, false, "text", con(func(a *Acciones) func(Conversacion) { return a.NoSpam })),
+		nuevoBotonTriaje(f, LeidoD, false, "primary-text", leido),
+		nuevoBotonTriaje(f, SinLeerD, false, "primary-text", leido),
+		nuevoBotonTriaje(f, ArchivarD, false, "primary-text", con(func(a *Acciones) func(Conversacion) { return a.Archivar })),
+		nuevoBotonTriaje(f, PapeleraD, false, "primary-text", con(func(a *Acciones) func(Conversacion) { return a.Papelera })),
+		nuevoBotonTriaje(f, SpamD, false, "primary-text", con(func(a *Acciones) func(Conversacion) { return a.Spam })),
+		nuevoBotonTriaje(f, SpamD, false, "primary-text", con(func(a *Acciones) func(Conversacion) { return a.NoSpam })),
 	}
 	botones := make([]fyne.CanvasObject, 0, len(r.triaje))
 	for _, b := range r.triaje {
@@ -717,12 +717,21 @@ func esTactil() bool {
 // pinta en la esquina superior izquierda del panel. Se vio en la captura del lector.
 func ponerEstado(viejo *ui.Vacio, titulo, desc string, accion fyne.CanvasObject) *ui.Vacio {
 	if viejo != nil && viejo.Titulo == titulo && viejo.Descripcion == desc &&
-		(viejo.Accion == nil) == (accion == nil) {
+		(viejo.Accion == nil) == (accion == nil) && textoDeAccion(viejo.Accion) == textoDeAccion(accion) {
 		return viejo
 	}
 	v := ui.NuevoVacio(titulo, desc)
 	v.Accion = accion
 	return v
+}
+
+// textoDeAccion es el rótulo del botón de un estado vacío: el mismo título puede
+// cambiar de acción (el vacío de un filtro pasa de «Ver todas» a «Cargar más»).
+func textoDeAccion(o fyne.CanvasObject) string {
+	if b, ok := o.(*ui.Boton); ok {
+		return b.Texto
+	}
+	return ""
 }
 
 // centrarVacio coloca el estado vacío CENTRADO en la caja, que es el `h-full` con

@@ -10,7 +10,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 )
 
-// LISTAS PLEGABLES, como en Twos y como en la web (client/en-nota.ts y app.css): un
+// LISTAS PLEGABLES, como en la web (client/en-nota.ts y app.css): un
 // elemento de lista con sublista se pliega, el plegado se guarda con la nota
 // (`<li class="plegada">`) y al LEERLA no se ve lo que cuelga de él, con «…» en su
 // lugar. En el editor se sigue viendo entero, con la viñeta en el color de marca como

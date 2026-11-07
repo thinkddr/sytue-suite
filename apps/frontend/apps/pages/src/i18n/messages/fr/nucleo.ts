@@ -84,7 +84,7 @@ export const nucleo = {
   'new.progress': 'Étapes de création du site',
   'new.go_to_step': 'Aller à l’étape {n}',
   'new.step_of': 'Étape {n} sur {total}',
-  'app_settings.title': 'Paramètres de Sytue Web',
+  'app_settings.title': 'Paramètres de Sytue Webs',
   'new.search_title': 'Commencez par votre type d’activité',
   'new.search_help':
     'Saisissez ce que vous faites ou choisissez un groupe. Chaque modèle contient déjà les textes de votre métier : il vous suffit de changer le nom, le téléphone, les prix et les photos.',
@@ -290,7 +290,7 @@ export const nucleo = {
   'domains.start_help':
     'Saisissez le domaine que vous voulez utiliser. Vous aurez besoin d’accéder aux paramètres DNS chez le fournisseur où vous l’avez acheté.',
   'domains.progress': 'Progression de la connexion du domaine',
-  'domains.step.registered': 'Ajouté à Sytue Web',
+  'domains.step.registered': 'Ajouté à Sytue Webs',
   'domains.step.dns': 'DNS vérifié',
   'domains.step.https': 'HTTPS prêt',
   'domains.step.primary': 'Adresse principale',

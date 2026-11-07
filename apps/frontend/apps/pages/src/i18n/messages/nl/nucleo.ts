@@ -81,7 +81,7 @@ export const nucleo = {
   'new.progress': 'Stappen om de site te maken',
   'new.go_to_step': 'Naar stap {n}',
   'new.step_of': 'Stap {n} van {total}',
-  'app_settings.title': 'Instellingen van Sytue Web',
+  'app_settings.title': 'Instellingen van Sytue Webs',
   'new.search_title': 'Begin met je soort bedrijf',
   'new.search_help':
     'Typ wat je doet of kies een groep. Elk sjabloon heeft al de teksten voor jouw vak: je past alleen de naam, het telefoonnummer, de prijzen en de foto’s aan.',
@@ -282,7 +282,7 @@ export const nucleo = {
   'domains.start_help':
     'Vul het domein in dat je wilt gebruiken. Je hebt toegang nodig tot de DNS-instellingen bij de provider waar je het hebt gekocht.',
   'domains.progress': 'Voortgang van de domeinkoppeling',
-  'domains.step.registered': 'Toegevoegd aan Sytue Web',
+  'domains.step.registered': 'Toegevoegd aan Sytue Webs',
   'domains.step.dns': 'DNS geverifieerd',
   'domains.step.https': 'HTTPS klaar',
   'domains.step.primary': 'Primair adres',

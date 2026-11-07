@@ -22,6 +22,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/clientip"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
+	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/platform/pkg/operador"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
 	"git.sytue.eu/sytue/one/services/cast/internal/config"
@@ -50,6 +51,9 @@ type Deps struct {
 	// esa cola contesta 403.
 	Operador      operador.Autorizar
 	ReadyCheckers []httpx.Checker
+	// Hub recibe la señal de cambios de cada escritura (hubnotify.TrasEscribir), para
+	// el widget nativo. nil: sin señal.
+	Hub *hubnotify.Client
 }
 
 // NewRouter construye el router completo de Sytue Cast.
@@ -105,6 +109,9 @@ func NewRouter(d Deps) http.Handler {
 			auth.Use(d.Verifier.RequireAuth)
 			auth.Use(d.Verifier.RequireTenant)
 			auth.Use(httpx.RateLimit(httpx.RateLimitConfig{Limiter: apiLimiter, KeyFunc: authn.RateKey}))
+			// La señal de cambios para el widget de Cast. Lo que acaba después —la
+			// transcodificación, el comienzo de un directo— avisa por su cuenta.
+			auth.Use(d.Hub.TrasEscribir(nil, "cast"))
 
 			// La subida del original va SIN el timeout de 30 s: dura lo que dure el fichero.
 			auth.Put("/videos/{id}/original", h.SubirOriginal)

@@ -31,10 +31,7 @@ type fakeService struct {
 	persona    service.Persona
 	personaErr error
 
-	// apnsToken guarda el token que le llegó al servicio: lo comprueba el test de
-	// registro del aparato de iOS.
-	apnsToken string
-	teams     []domain.Team
+	teams []domain.Team
 	// ownMessages son los mensajes propios, en orden, que pagina ListOwnMessages.
 	ownMessages []domain.Message
 	team        domain.Team
@@ -228,6 +225,14 @@ func (f *fakeService) PutNotifyPrefs(_ context.Context, _ string, p domain.Notif
 	return p, nil
 }
 
+func (f *fakeService) SetNotifyPause(_ context.Context, _ string, until *time.Time) (domain.NotifyPrefs, error) {
+	if f.err != nil {
+		return domain.NotifyPrefs{}, f.err
+	}
+	f.notifyPrefs.PausedUntil = until
+	return f.notifyPrefs, nil
+}
+
 func (f *fakeService) SetChannelPref(context.Context, uuid.UUID, string, string, *bool, *bool, *string) (domain.Channel, error) {
 	return f.channel, f.channelErr
 }
@@ -239,16 +244,6 @@ func (f *fakeService) SubscribePush(context.Context, string, domain.PushSubscrip
 }
 
 func (f *fakeService) UnsubscribePush(context.Context, string, string) error { return f.err }
-
-func (f *fakeService) RegisterAPNSDevice(_ context.Context, _, token string) error {
-	f.apnsToken = token
-	return f.err
-}
-
-func (f *fakeService) ForgetAPNSDevice(_ context.Context, _, token string) error {
-	f.apnsToken = token
-	return f.err
-}
 
 func (f *fakeService) ListJoinableChannels(context.Context, uuid.UUID, string, string, int) ([]domain.Channel, error) {
 	return nil, f.channelErr
@@ -477,6 +472,26 @@ func TestUnsubscribePushOK(t *testing.T) {
 	newHandlers(&fakeService{}).UnsubscribePush(rec, req(http.MethodPost, "/", `{"endpoint":"https://x/y"}`, claims(), nil))
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("code = %d, want 204", rec.Code)
+	}
+}
+
+// TestPutNotifyPause: el «hasta» llega al servicio y vuelve en las preferencias; una
+// pausa demasiado larga es un 400, no un 500.
+func TestPutNotifyPause(t *testing.T) {
+	f := &fakeService{}
+	rec := httptest.NewRecorder()
+	newHandlers(f).PutNotifyPause(rec, req(http.MethodPut, "/", `{"until":"2026-11-05T18:30:00Z"}`, claims(), nil))
+	if rec.Code != http.StatusOK || f.notifyPrefs.PausedUntil == nil ||
+		!f.notifyPrefs.PausedUntil.Equal(time.Date(2026, 11, 5, 18, 30, 0, 0, time.UTC)) {
+		t.Fatalf("code = %d, pausa %v", rec.Code, f.notifyPrefs.PausedUntil)
+	}
+	if got := decode(t, rec)["paused_until"]; got != "2026-11-05T18:30:00Z" {
+		t.Errorf("paused_until = %v", got)
+	}
+	rec = httptest.NewRecorder()
+	newHandlers(&fakeService{err: domain.ErrInvalidPause}).PutNotifyPause(rec, req(http.MethodPut, "/", `{"until":"2027-01-01T00:00:00Z"}`, claims(), nil))
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("una pausa demasiado larga da %d; quiero 400", rec.Code)
 	}
 }
 
@@ -1614,16 +1629,20 @@ func TestCallerFallsBackToEmail(t *testing.T) {
 	}
 }
 
-// El registro del aparato de iOS propaga el token y valida su forma en el servicio.
-func TestRegisterAPNSDevice(t *testing.T) {
-	f := &fakeService{}
-	rec := httptest.NewRecorder()
-	newHandlers(f).RegisterAPNSDevice(rec, req(http.MethodPost, "/",
-		`{"token":" abcdef0123456789abcdef0123456789 "}`, claims(), nil))
-	if rec.Code != http.StatusNoContent {
-		t.Fatalf("código = %d, quiero 204 (%s)", rec.Code, rec.Body.String())
-	}
-	if f.apnsToken != "abcdef0123456789abcdef0123456789" {
-		t.Fatalf("token = %q (debe llegar sin espacios)", f.apnsToken)
+// Las rutas de aparatos de iOS de Rooms redirigen (308: mismo método y cuerpo) a las
+// del Hub, que guarda el registro único: dicen dónde está cada una, y el cliente repite
+// la llamada allí con su token (otro host: `Authorization` no sigue la redirección).
+// Visto en rojo con un 302 y con el `forget` llevado a la ruta de registrar.
+func TestLasRutasDeAparatosRedirigenAlHub(t *testing.T) {
+	h := &Handlers{cfg: config.Config{HubPublicURL: "https://hub.sytue.eu/"}}
+	for ruta, quiere := range map[string]string{
+		"/api/v1/me/push/apns":        "https://hub.sytue.eu/api/v1/me/push/apns",
+		"/api/v1/me/push/apns/forget": "https://hub.sytue.eu/api/v1/me/push/apns/forget",
+	} {
+		rec := httptest.NewRecorder()
+		h.AparatosEnElHub(rec, req(http.MethodPost, ruta, `{"token":"ab"}`, claims(), nil))
+		if rec.Code != http.StatusPermanentRedirect || rec.Header().Get("Location") != quiere {
+			t.Errorf("%s: %d → %q, quiero 308 → %q", ruta, rec.Code, rec.Header().Get("Location"), quiere)
+		}
 	}
 }

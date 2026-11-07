@@ -797,7 +797,8 @@ func (p *pieFicha) Layout(_ []fyne.CanvasObject, t fyne.Size) {
 // --- El enlace de imprimir ----------------------------------------------------
 
 // EnlaceIcono es el `<a>` de imprimir: solo el icono de 14 con `px-2 py-1.5`, `rounded-md`
-// y `hover:bg-bg-subtle`. Medido: 28×24,5.
+// y `hover:bg-selected`. Medido: 28×24,5. Tinta y velo son los del fantasma de al lado:
+// con `text-text` era el único glifo negro de una fila en `primary-text`.
 type EnlaceIcono struct {
 	ui.Pulsable
 	Icono iconos.Icono
@@ -825,7 +826,7 @@ func (e *EnlaceIcono) CreateRenderer() fyne.WidgetRenderer {
 		e:     e,
 		aro:   ui.NuevoAro(tema.Forma("radius-control"), ui.SinHueco, v),
 		caja:  ui.NuevaCaja(sinColor, sinColor, tema.Forma("radius-control")),
-		icono: iconos.Trazo(e.Icono, 14, "text", v),
+		icono: iconos.Trazo(e.Icono, 14, "primary-text", v),
 	}
 	r.Refresh()
 	return r
@@ -854,7 +855,7 @@ func (r *enlaceIconoRenderer) Refresh() {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	fondo := color.NRGBA{}
 	if r.e.Encima() {
-		fondo = tema.Color("bg-subtle", v)
+		fondo = tema.Color("selected", v)
 	}
 	r.caja.Pintar(fondo, sinColor)
 	r.aro.Ver(r.e.Enfocado())

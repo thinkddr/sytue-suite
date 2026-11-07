@@ -18,6 +18,7 @@ import (
 	"github.com/google/uuid"
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
+	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/platform/pkg/keycrypto"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
 	"git.sytue.eu/sytue/one/platform/pkg/logsafe"
@@ -78,6 +79,9 @@ type wopiHandlers struct {
 	minter *wopi.Minter
 	// maxUpload acota PutFile igual que la subida nativa.
 	maxUpload int64
+	// hub manda la señal de cambios del widget de Drive tras guardar: el host WOPI no
+	// lleva el Bearer de Sytue ID y no pasa por TrasEscribir. Nil: sin señal.
+	hub *hubnotify.Client
 }
 
 // wopiLockStore es la superficie de bloqueo que consume el host. La satisface *store.Store.
@@ -264,6 +268,9 @@ func (h *wopiHandlers) putFile(w http.ResponseWriter, r *http.Request) {
 		wopiFail(w, r, http.StatusInternalServerError, fmt.Sprintf("guardar: %v", err))
 		return
 	}
+	// Lo guardado cambia la lista de recientes del widget de Drive de quien lo editó y
+	// del dueño del fichero, si es otro.
+	h.hub.AvisarCambio(r.Context(), claims.Tenant, "drive", claims.Subject, f.OwnerSub)
 	w.Header().Set("X-WOPI-ItemVersion", strconv.Itoa(nueva.Version))
 	w.WriteHeader(http.StatusOK)
 }

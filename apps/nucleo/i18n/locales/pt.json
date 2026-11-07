@@ -101,6 +101,7 @@
   "linkedServices.changed": "Este item foi alterado no seu fornecedor. Atualize antes de o editar novamente.",
   "linkedServices.choose": "Escolhe o que ligar. O teu fornecedor irá pedir as permissões dos serviços selecionados.",
   "linkedServices.connected": "Serviços ligados",
+  "linkedServices.exists": "Esta conta já estava ligada e está agora aberta.",
   "linkedServices.keepAdmin": "O Google Keep precisa de uma configuração aprovada pela administração do Google Workspace. As contas pessoais do Gmail não o podem ligar.",
   "linkedServices.notGranted": "Não foi concedido acesso a este serviço. Liga novamente a conta para escolher as permissões.",
   "linkedServices.notSupported": "Este fornecedor não oferece este serviço.",
@@ -169,7 +170,7 @@
   "notifications.kind.pages.order.oversold": "A encomenda {number} em {site} foi paga sem stock",
   "notifications.kind.pages.order.paid": "Nova encomenda {number} em {site}",
   "notifications.kind.pages.payment.duplicated": "Pagamento duplicado na encomenda {number} em {site}: o segundo está a ser reembolsado",
-  "notifications.kind.pages.settings.changed": "{actor} alterou uma definição do Sytue Web",
+  "notifications.kind.pages.settings.changed": "{actor} alterou uma definição do Sytue Webs",
   "notifications.kind.pages.store.busy": "A loja de {site} tem demasiadas encomendas a aguardar pagamento",
   "notifications.kind.pages.withdrawal.requested": "Foi pedida a livre resolução da encomenda {number} em {site}",
   "notifications.kind.photos.album.added": "{actor} adicionou fotografias a “{name}”",
@@ -301,6 +302,8 @@
   "shell.update.failedBody": "Tente novamente mais tarde ou transfira-a a partir do portal.",
   "shell.update.install": "Atualizar para a versão {version}",
   "shell.update.upToDate": "A {app} está atualizada",
+  "shell.widgets.wake": "Atualizar os widgets com a app fechada",
+  "shell.widgets.wakeHelp": "Quando algo seu muda, o Sytue acorda a app com uma notificação vazia da Apple para que atualize o seu widget. A Apple vê qual é a app e quando, nunca o que mudou.",
   "ui.backToList": "Voltar à lista",
   "ui.bulk.clear": "Limpar seleção",
   "ui.bulk.region": "Ações para a seleção",
@@ -318,6 +321,8 @@
   "ui.review.edit": "Editar",
   "ui.save": "Guardar",
   "ui.selectRow": "Selecionar linha",
+  "ui.suiteClose": "Voltar à aplicação",
+  "ui.suiteOpen": "Sytue: aplicações, pesquisa, notificações e conta",
   "ui.wizard.back": "Anterior",
   "ui.wizard.cancel": "Cancelar",
   "ui.wizard.goToStep": "Voltar ao passo {n}: ",
@@ -336,5 +341,7 @@
   "widgets.pending": "Pendentes",
   "widgets.photos": "Fotografias",
   "widgets.rows": "Linhas",
-  "widgets.storage": "Armazenamento"
+  "widgets.storage": "Armazenamento",
+  "widgets.updatedAgo": "Atualizado {time}",
+  "widgets.updatedAt": "Atualizado: {time}"
 }

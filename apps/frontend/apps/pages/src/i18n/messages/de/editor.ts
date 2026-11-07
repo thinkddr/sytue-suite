@@ -18,10 +18,10 @@ export const editor = {
   'editor.bases.desc': 'Die Datensätze einer Ansicht, so wie sie jetzt sind',
   'editor.bases.title': 'Tabelle aus Sytue Bases',
   'editor.bases.prompt':
-    'Fügen Sie das Token einer schreibgeschützten Verbindung ein, die für Sytue Web freigegeben wurde. Die Daten dieser Ansicht werden zu Inhalten der Website und sind nach dem Veröffentlichen öffentlich.',
+    'Fügen Sie das Token einer schreibgeschützten Verbindung ein, die für Sytue Webs freigegeben wurde. Die Daten dieser Ansicht werden zu Inhalten der Website und sind nach dem Veröffentlichen öffentlich.',
   'editor.bases.confirm': 'Ansicht übernehmen',
   'editor.bases.invalid':
-    'Diese Verbindung gilt nicht für Sytue Web: Sie wurde möglicherweise widerrufen, ist abgelaufen oder wurde für ein anderes Produkt oder eine andere Organisation freigegeben.',
+    'Diese Verbindung gilt nicht für Sytue Webs: Sie wurde möglicherweise widerrufen, ist abgelaufen oder wurde für ein anderes Produkt oder eine andere Organisation freigegeben.',
   'editor.bases.large':
     'Die Ansicht passt nicht in eine Website-Tabelle (höchstens 50 Zeilen und 8 Spalten). Grenzen Sie sie in Sytue Bases ein.',
   'editor.bases.forbidden':

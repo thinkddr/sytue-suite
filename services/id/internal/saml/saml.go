@@ -29,6 +29,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/beevik/etree"
 	csaml "github.com/crewjam/saml"
 
 	"git.sytue.eu/sytue/one/services/id/internal/domain"
@@ -166,13 +167,102 @@ func (s *SP) MakePost(relayState string) (requestID string, form []byte, err err
 // cert del IdP, Conditions NotBefore/NotOnOrAfter, AudienceRestriction==SPEntityID,
 // Recipient==ACS, e InResponseTo ∈ requestIDs) y extrae los atributos mapeados. El
 // llamante DEBE haber ejecutado r.ParseForm() antes (crewjam lee req.PostForm).
+//
+// Solo HTTP-POST: el binding de artefacto (SAMLart) no se publica en la metadata del
+// SP, y sin SAMLResponse no hay XML que comprobar después (ver nameIDDelEspacioSAML).
 func (s *SP) Authenticate(r *http.Request, requestIDs []string, p domain.IdentityProvider) (domain.FederatedClaims, error) {
-	assertion, err := s.inner.ParseResponse(r, requestIDs)
+	crudo := r.PostForm.Get("SAMLResponse")
+	if crudo == "" {
+		return domain.FederatedClaims{}, fmt.Errorf("%w: sin SAMLResponse", ErrAssertion)
+	}
+	assertion, err := s.parseResponse(r, requestIDs)
 	if err != nil {
 		// crewjam devuelve *InvalidResponseError con Error() estático: no filtra detalle.
 		return domain.FederatedClaims{}, fmt.Errorf("%w: %w", ErrAssertion, err)
 	}
+	if err := nameIDDelEspacioSAML(crudo, assertion); err != nil {
+		return domain.FederatedClaims{}, fmt.Errorf("%w: %w", ErrAssertion, err)
+	}
 	return extractClaims(p, assertion), nil
+}
+
+// parseResponse llama a crewjam sin dejar que un pánico suyo tire la petición:
+// GO-2026-6909 (crewjam/saml ≤ v0.5.1, sin versión corregida) desreferencia la
+// assertion sin comprobar nil, p. ej. una firmada sin <saml:Subject>.
+func (s *SP) parseResponse(r *http.Request, requestIDs []string) (a *csaml.Assertion, err error) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			a, err = nil, errors.New("respuesta SAML malformada")
+		}
+	}()
+	return s.inner.ParseResponse(r, requestIDs)
+}
+
+const nsAssertion = "urn:oasis:names:tc:SAML:2.0:assertion"
+
+// nameIDDelEspacioSAML cierra la otra mitad de GO-2026-6909. crewjam declara
+// Subject.NameID con la etiqueta a secas, así que encoding/xml lo rellena con un
+// NameID de CUALQUIER espacio de nombres: una assertion firmada sin <saml:NameID> y
+// con un <x:NameID> ajeno dentro del <saml:Subject> entraba con el sujeto que dijera
+// el ajeno. Aquí se relee la Response (sin clave de SP no hay assertions cifradas, así
+// que la validada está en claro) y se exige que la assertion devuelta sea una sola en
+// el documento y que su único NameID sea el de SAML y diga lo mismo.
+func nameIDDelEspacioSAML(b64 string, a *csaml.Assertion) error {
+	raw, err := base64.StdEncoding.DecodeString(b64)
+	if err != nil {
+		return errors.New("SAMLResponse no es base64")
+	}
+	doc := etree.NewDocument()
+	if err := doc.ReadFromBytes(raw); err != nil || doc.Root() == nil {
+		return errors.New("SAMLResponse ilegible")
+	}
+	var assertions []*etree.Element
+	pendientes := []*etree.Element{doc.Root()}
+	for len(pendientes) > 0 {
+		e := pendientes[len(pendientes)-1]
+		pendientes = pendientes[:len(pendientes)-1]
+		if e.Tag == "Assertion" && e.NamespaceURI() == nsAssertion && e.SelectAttrValue("ID", "") == a.ID {
+			assertions = append(assertions, e)
+		}
+		pendientes = append(pendientes, e.ChildElements()...)
+	}
+	if len(assertions) != 1 {
+		return errors.New("la assertion validada no es única en la Response")
+	}
+	subjects := hijos(assertions[0], "Subject")
+	if a.Subject == nil {
+		if len(subjects) != 0 {
+			return errors.New("hay un Subject que no se ha leído")
+		}
+		return nil
+	}
+	if len(subjects) != 1 || subjects[0].NamespaceURI() != nsAssertion {
+		return errors.New("la assertion no trae un único saml:Subject")
+	}
+	nameIDs := hijos(subjects[0], "NameID")
+	if a.Subject.NameID == nil {
+		if len(nameIDs) != 0 {
+			return errors.New("NameID sin leer")
+		}
+		return nil
+	}
+	if len(nameIDs) != 1 || nameIDs[0].NamespaceURI() != nsAssertion ||
+		strings.TrimSpace(nameIDs[0].Text()) != strings.TrimSpace(a.Subject.NameID.Value) {
+		return errors.New("el Subject no trae un único saml:NameID")
+	}
+	return nil
+}
+
+// hijos devuelve los hijos directos con ese nombre local, de cualquier espacio de
+// nombres: los ajenos cuentan, que son justo los que hay que ver.
+func hijos(e *etree.Element, local string) []*etree.Element {
+	var out []*etree.Element
+	for _, c := range e.ChildElements() {
+		if c.Tag == local {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 // extractClaims saca el NameID (sujeto externo) y mapea email/name/groups desde los

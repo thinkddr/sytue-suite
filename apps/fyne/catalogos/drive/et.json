@@ -4,6 +4,8 @@
   "action.classified": "Klassifikatsioon · {name}",
   "action.classify": "Klassifitseeri",
   "action.copy": "Tee koopia",
+  "action.copyLink": "Kopeeri link",
+  "action.copyLinkFailed": "Linki ei õnnestunud kopeerida.",
   "action.delete": "Teisalda prügikasti",
   "action.desktopBody": "Kui see pole veel installitud, saate selle alla laadida.",
   "action.desktopCta": "Vaata allalaadimisi",
@@ -12,6 +14,7 @@
   "action.downloadName": "Laadi alla {name}",
   "action.downloadZip": "Laadi alla (ZIP)",
   "action.editorFailed": "Redaktor ei saanud seda faili avada.",
+  "action.linkCopied": "Link on kopeeritud. See avaneb ainult neile, kellel juba on juurdepääs.",
   "action.mailFailed": "E-kirja koostamist ei õnnestunud avada",
   "action.menu": "Toimingud: {name}",
   "action.more": "Rohkem toiminguid",
@@ -81,6 +84,14 @@
   "files.batch.moveTitle": {
     "one": "Teisalda 1 üksus",
     "other": "Teisalda {count} üksust"
+  },
+  "files.batch.restorePartial": {
+    "one": "1 üksust ei õnnestunud taastada, see on endiselt prügikastis.",
+    "other": "{count} üksust ei õnnestunud taastada, need on endiselt prügikastis."
+  },
+  "files.batch.restored": {
+    "one": "1 üksus on taastatud.",
+    "other": "{count} üksust on taastatud."
   },
   "files.batch.trashBody": {
     "one": "1 üksus teisaldatakse prügikasti. Sealt saate selle taastada.",
@@ -555,6 +566,17 @@
     "other": "{count} faili on üles laaditud."
   },
   "team.upload.partial": "Üles laaditud {uploaded} / {count}.",
+  "trash.emptiedAll": "Prügikast on tühjendatud.",
+  "trash.emptyAll": "Tühjenda prügikast",
+  "trash.emptyAllBody": {
+    "one": "Prügikastis olev üksus kustutatakse jäädavalt koos versiooniajalooga. Hiljem pole seda võimalik taastada.",
+    "other": "Prügikastis olevad {count} üksust kustutatakse jäädavalt koos versiooniajalooga. Hiljem pole neid võimalik taastada."
+  },
+  "trash.emptyAllPartial": {
+    "one": "1 üksust ei õnnestunud kustutada, see on endiselt prügikastis.",
+    "other": "{count} üksust ei õnnestunud kustutada, need on endiselt prügikastis."
+  },
+  "trash.emptyAllTitle": "Kas tühjendada prügikast?",
   "trash.emptyBody": "Kustutatud failid ja kaustad ilmuvad siia ning neid saab taastada.",
   "trash.emptyTitle": "Prügikast on tühi",
   "trash.errorTitle": "Prügikasti ei õnnestunud laadida",

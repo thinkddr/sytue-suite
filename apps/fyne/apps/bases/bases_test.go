@@ -125,6 +125,62 @@ func boton(w fyne.Window, texto string) *ui.Boton {
 	return hallado
 }
 
+// menuMasDe es el botón «⋯» de la base o de la tabla que se llama `nombre`.
+func menuMasDe(w fyne.Window, nombre string) *ui.BotonIcono {
+	var hallado *ui.BotonIcono
+	recorrer(w.Canvas().Content(), func(o fyne.CanvasObject) {
+		if b, ok := o.(*ui.BotonIcono); ok && b.Rotulo == "Más acciones · "+nombre {
+			hallado = b
+		}
+	})
+	return hallado
+}
+
+// elementosDe abre el menú «⋯» de `nombre`, devuelve lo que ofrece y lo vuelve a cerrar.
+// Sin menú, nada.
+func elementosDe(t *testing.T, w fyne.Window, nombre string) []string {
+	t.Helper()
+	b := menuMasDe(w, nombre)
+	if b == nil {
+		return nil
+	}
+	test.Tap(b)
+	var out []string
+	for _, capa := range w.Canvas().Overlays().List() {
+		recorrer(capa, func(o fyne.CanvasObject) {
+			switch x := o.(type) {
+			case *ui.ElementoMenu:
+				out = append(out, x.Texto)
+			case *ui.Menu:
+				defer x.Cerrar()
+			}
+		})
+	}
+	return out
+}
+
+// pulsarEnMenu abre el menú «⋯» de `nombre` y pulsa su elemento `texto`.
+func pulsarEnMenu(t *testing.T, w fyne.Window, nombre, texto string) {
+	t.Helper()
+	b := menuMasDe(w, nombre)
+	if b == nil {
+		t.Fatalf("no hay un menú «⋯» de %s:\n%s", nombre, textos(w))
+	}
+	test.Tap(b)
+	var e *ui.ElementoMenu
+	for _, capa := range w.Canvas().Overlays().List() {
+		recorrer(capa, func(o fyne.CanvasObject) {
+			if x, ok := o.(*ui.ElementoMenu); ok && x.Texto == texto {
+				e = x
+			}
+		})
+	}
+	if e == nil {
+		t.Fatalf("el menú de %s no ofrece «%s»:\n%s", nombre, texto, textos(w))
+	}
+	test.Tap(e)
+}
+
 // textos son los rótulos y textos de lienzo que hay a la vista, capas incluidas.
 func textos(w fyne.Window) string {
 	var b strings.Builder
@@ -138,6 +194,14 @@ func textos(w fyne.Window) string {
 			b.WriteString(x.AccessibilityLabel() + "\n")
 		case *ui.Boton:
 			b.WriteString("[" + x.Texto + "]\n")
+		case *ui.BotonIcono:
+			b.WriteString("(" + x.Rotulo + ")\n")
+		case *ui.ElementoMenu:
+			b.WriteString("{" + x.Texto + "}\n")
+		case *ui.Selector:
+			if x.Elegida >= 0 && x.Elegida < len(x.Opciones) {
+				b.WriteString("‹" + x.Rotulo + ": " + x.Opciones[x.Elegida] + "›\n")
+			}
 		case *ui.Enlace:
 			b.WriteString(x.Texto + "\n")
 		case *ui.Insignia:
@@ -235,10 +299,13 @@ func TestCrearUnaBaseLaAbre(t *testing.T) {
 	}
 	capturar(t, w, "base-sin-tablas")
 	got := textos(w)
-	for _, quiero := range []string{"Clientes", "Esta base todavía no tiene tablas.", "[Renombrar base]", "[Borrar base]"} {
+	for _, quiero := range []string{"Clientes", "Esta base todavía no tiene tablas.", "[Añadir tabla]"} {
 		if !strings.Contains(got, quiero) {
 			t.Errorf("falta %q en:\n%s", quiero, got)
 		}
+	}
+	if got := elementosDe(t, w, "Clientes"); !slices.Equal(got, []string{"Renombrar base", "Añadir tabla", "Borrar base"}) {
+		t.Errorf("el menú de la base ofrece %q", got)
 	}
 	if p.nombre.Texto() != "" {
 		t.Error("el campo del nombre se queda escrito tras crear")
@@ -271,14 +338,14 @@ func TestLaBaseAbiertaSegunElRol(t *testing.T) {
 	test.Tap(tarjeta)
 	capturar(t, w, "base-propietario")
 	got := textos(w)
-	for _, quiero := range []string{"Todas las bases", "<Personas>", "<Empresas>", "[Renombrar base]", "[Borrar base]"} {
+	for _, quiero := range []string{"Todas las bases", "<Personas>", "<Empresas>", "[Compartir]", "(Más acciones · Clientes)"} {
 		if !strings.Contains(got, quiero) {
 			t.Errorf("falta %q en:\n%s", quiero, got)
 		}
 	}
 
 	// Renombrar: el diálogo trae el nombre y manda el nuevo con la descripción de siempre.
-	test.Tap(boton(w, "Renombrar base"))
+	pulsarEnMenu(t, w, "Clientes", "Renombrar base")
 	capturar(t, w, "base-renombrar")
 	var campo *ui.Entrada
 	for _, capa := range w.Canvas().Overlays().List() {
@@ -302,7 +369,7 @@ func TestLaBaseAbiertaSegunElRol(t *testing.T) {
 	}
 
 	// Borrar pregunta antes, y al confirmar vuelve a la lista.
-	test.Tap(boton(w, "Borrar base"))
+	pulsarEnMenu(t, w, "Clientes 2026", "Borrar base")
 	capturar(t, w, "base-borrar")
 	if d.vio("DELETE /bases/b1") {
 		t.Fatal("se ha borrado sin confirmar")
@@ -317,7 +384,7 @@ func TestLaBaseAbiertaSegunElRol(t *testing.T) {
 
 	// Quien solo lee no ve lo del propietario.
 	p.Abrir("b2")
-	if got := textos(w); strings.Contains(got, "[Renombrar base]") || strings.Contains(got, "[Borrar base]") {
+	if got := textos(w); strings.Contains(got, "Más acciones · Pedidos") || strings.Contains(got, "[Compartir]") {
 		t.Errorf("un lector ve los botones del propietario:\n%s", got)
 	}
 	// Y quien solo accede a una tabla (404 en la base) se queda con ella.

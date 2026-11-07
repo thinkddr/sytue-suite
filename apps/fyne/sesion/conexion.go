@@ -78,6 +78,12 @@ func ponerSoloLectura() {
 // lo pida.
 func (s *Suite) Conexion(producto string, privadas ...string) (*offline.Monitor, *http.Client) {
 	red := &offline.Monitor{}
+	// Recuperar la red es un disparador del widget: lo cambiado sin ella no llegó.
+	red.Subscribe(func(e offline.State) {
+		if e == offline.Online {
+			s.AvisarWidget()
+		}
+	})
 	t := &offline.Transport{
 		Base:          api.Transporte, // con plazo (FYS-11)
 		Owner:         s.dueñoCache,

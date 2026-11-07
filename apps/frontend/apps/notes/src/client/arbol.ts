@@ -74,7 +74,7 @@ export function descendientes(nodo: Nodo): string[] {
 
 /**
  * La lista tal como llega —el orden lo ha elegido quien mira—, con cada sublista justo
- * debajo de su nota y su profundidad, que es como se lee una lista en Twos. Lo que
+ * debajo de su nota y su profundidad, que es como se lee una lista con sangría. Lo que
  * cuelga de algo que no está a la vista (filtrado, o un ciclo en los datos) se queda
  * en la raíz, como en `construirArbol`.
  */

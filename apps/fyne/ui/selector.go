@@ -193,6 +193,13 @@ func (s *Selector) MinSize() fyne.Size {
 		return s.medidaPropia()
 	}
 	m := MedidaSelector(s.Talla, s.Ancho)
+	if s.Ancho <= 0 {
+		// Sin ancho, un `<select>` mide su opción más larga.
+		c, sel := medidasCampo[s.Talla], medidasSelector[s.Talla]
+		for _, o := range s.Opciones {
+			m.Width = max(m.Width, Medir(o, c.texto, Normal).Width+2*tema.Borde+c.margen+sel.derecha)
+		}
+	}
 	if s.Alto > 0 {
 		m.Height = s.Alto
 	}

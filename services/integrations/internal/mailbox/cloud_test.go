@@ -91,8 +91,8 @@ func TestGraphPagingAndInboxRole(t *testing.T) {
 	client := NewCloudClient(Account{Provider: "microsoft"}, cloudHTTP(func(r *http.Request) (*http.Response, error) {
 		calls = append(calls, r.URL.RequestURI())
 		switch r.URL.Path {
-		case "/v1.0/me/mailFolders/inbox":
-			return cloudReply(200, `{"id":"inbox-id"}`), nil
+		case "/v1.0/$batch":
+			return cloudReply(200, `{"responses":[{"id":"inbox","status":200,"body":{"id":"inbox-id"}}]}`), nil
 		case "/v1.0/me/mailFolders":
 			return cloudReply(200, `{"value":[{"id":"archive","displayName":"Archive"},{"id":"inbox-id","displayName":"Inbox"}]}`), nil
 		case "/v1.0/me/mailFolders/inbox-id/messages":
@@ -189,5 +189,97 @@ func TestOAuthIdentityDoesNotRequireAnyMailboxRequest(t *testing.T) {
 				t.Fatalf("identity requires mailbox: %#v %v calls=%d", profile, err, calls)
 			}
 		})
+	}
+}
+
+// Graph v1.0 no dice qué carpeta es cuál: sin pedir los nombres conocidos, Enviados,
+// Borradores, Correo no deseado y Elementos eliminados llegaban sin rol y el cliente
+// no podía traducirlas ni ordenarlas. Va en UN $batch, no en seis peticiones.
+func TestGraphFoldersCarryWellKnownRolesInOneBatch(t *testing.T) {
+	batches := 0
+	client := NewCloudClient(Account{Provider: "microsoft"}, cloudHTTP(func(r *http.Request) (*http.Response, error) {
+		switch r.URL.Path {
+		case "/v1.0/$batch":
+			batches++
+			var body struct {
+				Requests []struct {
+					ID, Method, URL string
+				} `json:"requests"`
+			}
+			if r.Method != http.MethodPost || json.NewDecoder(r.Body).Decode(&body) != nil || len(body.Requests) != 6 {
+				t.Fatalf("well-known folders not batched: %s %+v", r.Method, body)
+			}
+			return cloudReply(200, `{"responses":[
+				{"id":"inbox","status":200,"body":{"id":"in"}},
+				{"id":"sent","status":200,"body":{"id":"out"}},
+				{"id":"drafts","status":200,"body":{"id":"dr"}},
+				{"id":"junk","status":200,"body":{"id":"sp"}},
+				{"id":"trash","status":200,"body":{"id":"del"}},
+				{"id":"archive","status":404,"body":{"error":{"code":"ErrorFolderNotFound"}}},
+				{"id":"forged","status":200,"body":{"id":"mine"}}]}`), nil
+		case "/v1.0/me/mailFolders":
+			return cloudReply(200, `{"value":[{"id":"in","displayName":"Inbox","unreadItemCount":3},{"id":"out","displayName":"Sent Items"},{"id":"dr","displayName":"Drafts"},{"id":"sp","displayName":"Junk Email"},{"id":"del","displayName":"Deleted Items"},{"id":"mine","displayName":"Projects"}]}`), nil
+		}
+		t.Fatalf("unexpected request %s", r.URL)
+		return nil, ErrUnavailable
+	}))
+	folders, err := client.Folders(t.Context())
+	if err != nil || batches != 1 {
+		t.Fatalf("folders: %v, batches %d", err, batches)
+	}
+	got := map[string]string{}
+	for _, f := range folders {
+		got[f.ID] = f.Role
+	}
+	want := map[string]string{"in": "inbox", "out": "sent", "dr": "drafts", "sp": "junk", "del": "trash", "mine": ""}
+	for id, role := range want {
+		if got[id] != role {
+			t.Errorf("folder %s role %q, want %q", id, got[id], role)
+		}
+	}
+}
+
+func TestGraphFoldersWithoutInboxRoleAreNotTrusted(t *testing.T) {
+	client := NewCloudClient(Account{Provider: "microsoft"}, cloudHTTP(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Path == "/v1.0/$batch" {
+			return cloudReply(200, `{"responses":[{"id":"inbox","status":401,"body":{}}]}`), nil
+		}
+		t.Fatalf("listed folders after an unauthorized batch: %s", r.URL)
+		return nil, ErrUnavailable
+	}))
+	if _, err := client.Folders(t.Context()); !errors.Is(err, ErrAuth) {
+		t.Fatalf("unauthorized inbox: %v", err)
+	}
+}
+
+// labels.list de Gmail no trae contadores: sin labels.get de INBOX, la Entrada de una
+// cuenta de Gmail nunca decía cuántos tenía sin leer. Y si ese contador falla, las
+// carpetas siguen saliendo.
+func TestGmailInboxCarriesUnreadCount(t *testing.T) {
+	for _, counterFails := range []bool{false, true} {
+		client := NewCloudClient(Account{Provider: "gmail"}, cloudHTTP(func(r *http.Request) (*http.Response, error) {
+			switch r.URL.Path {
+			case "/gmail/v1/users/me/labels":
+				return cloudReply(200, `{"labels":[{"id":"INBOX","name":"INBOX","type":"system"},{"id":"SENT","name":"SENT","type":"system"},{"id":"UNREAD","name":"UNREAD","type":"system"},{"id":"Label_1","name":"Viajes","type":"user"}]}`), nil
+			case "/gmail/v1/users/me/labels/INBOX":
+				if counterFails {
+					return cloudReply(503, ""), nil
+				}
+				return cloudReply(200, `{"id":"INBOX","messagesTotal":40,"messagesUnread":7}`), nil
+			}
+			t.Fatalf("unexpected request %s", r.URL)
+			return nil, ErrUnavailable
+		}))
+		folders, err := client.Folders(t.Context())
+		if err != nil || len(folders) != 3 {
+			t.Fatalf("folders %#v: %v", folders, err)
+		}
+		inbox := folders[0]
+		if inbox.Role != "inbox" || (!counterFails && (inbox.Unread != 7 || inbox.Total != 40)) || (counterFails && inbox.Unread != 0) {
+			t.Fatalf("inbox counters (counter fails=%v): %#v", counterFails, inbox)
+		}
+		if folders[1].Role != "sent" || folders[1].Unread != 0 {
+			t.Fatalf("only the inbox pays an extra request: %#v", folders[1])
+		}
 	}
 }

@@ -45,6 +45,8 @@ type servicioDocs struct {
 	// sondeo (sin ellas, 404: la coedición sigue sin enterarse de nadie).
 	miembros string
 	remotas  string
+	// copias cuenta los «Hacer una copia» que llegan (POST /documents con copy_of).
+	copias int
 }
 
 func (s *servicioDocs) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -101,6 +103,10 @@ func (s *servicioDocs) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	case "GET /api/v1/documents":
 		_, _ = io.WriteString(w, `{"documents":[]}`)
+	case "POST /api/v1/documents":
+		s.copias++
+		w.WriteHeader(http.StatusCreated)
+		_, _ = io.WriteString(w, `{"document":{"id":"c1","kind":"document","title":"Copia"},"role":"owner"}`)
 	default:
 		w.WriteHeader(http.StatusNotFound)
 	}
@@ -297,6 +303,46 @@ func TestUnConflictoNoPisa(t *testing.T) {
 	}
 }
 
+// TestUnConflictoNoSeCopia: con un conflicto, lo escrito no ha llegado al servicio, y
+// «Hacer una copia» saldría sin ello pareciendo buena. No se copia (`makeCopy` de la
+// web: «copia: cambios sin guardar»). Sin conflicto, la copia sí sale.
+//
+// VISTO EN ROJO (2026-11-06): con el conflicto tomado por «sin cambios», se pedía la
+// copia y se abría.
+func TestUnConflictoNoSeCopia(t *testing.T) {
+	s := &servicioDocs{rol: "owner", html: "<p>Hola</p>", miembros: `[{"conn":"web-1","sub":"ana"}]`}
+	a, f := abrirParaEscribir(t, s)
+	s.mu.Lock()
+	s.autor = "otra-pestaña"
+	s.mu.Unlock()
+	f.escribir("!")
+	disparar(t)
+	if !a.abierto.conflicto {
+		t.Fatal("la prueba necesita el conflicto")
+	}
+	a.abierto.ctx.HacerCopia(nil)
+	fyne.DoAndWait(func() {})
+	s.mu.Lock()
+	copias := s.copias
+	s.mu.Unlock()
+	if copias != 0 {
+		t.Errorf("con el conflicto se ha copiado sin lo escrito (%d)", copias)
+	}
+	if a.abierto.id != "d1" {
+		t.Error("sin copia no se abre nada")
+	}
+
+	s2 := &servicioDocs{rol: "owner", html: "<p>Hola</p>"}
+	b, _ := abrirParaEscribir(t, s2)
+	b.abierto.ctx.HacerCopia(nil)
+	fyne.DoAndWait(func() {})
+	s2.mu.Lock()
+	defer s2.mu.Unlock()
+	if s2.copias != 1 {
+		t.Errorf("sin conflicto la copia tiene que salir (%d)", s2.copias)
+	}
+}
+
 // TestLoQueEscribeOtroSeFusiona: tras sembrar, una letra que otro mete en medio llega por
 // el sondeo, se fusiona en el folio sin tocar lo propio y el registro se reescribe con la
 // fusión, sin ops por carácter (la secuencia ya la tiene) ni marca. Se vio en ROJO sin
@@ -348,6 +394,12 @@ func TestDescargarGuardaAntesYDejaElFichero(t *testing.T) {
 	dir := t.TempDir()
 	a.carpeta = func() (string, error) { return dir, nil }
 	f.escribir("!")
+	if a.abierto.ctx.HacerCopia == nil {
+		t.Error("el menú Archivo no ofrece «Hacer una copia»")
+	}
+	if a.abierto.ctx.GuardarYa == nil {
+		t.Error("el chip de guardado en error no tiene con qué reintentar")
+	}
 	a.abierto.ctx.Exportar("ooxml")
 	s.mu.Lock()
 	guardados := len(s.ops)
@@ -386,6 +438,23 @@ func TestCtrlPImprimeElPDF(t *testing.T) {
 	}
 	if hay, _ := os.ReadDir(dir); len(hay) != 0 || a.abierto.ctx.Exportando != "" {
 		t.Errorf("imprimir no descarga nada ni se queda «Generando…»: %v, %q", hay, a.abierto.ctx.Exportando)
+	}
+}
+
+// TestElZoomConElTecladoEnElFolio: Ctrl/Cmd +, − y 0 con el foco en el folio mueven el
+// zoom del documento (el folio se queda los atajos antes que la ventana). VISTO EN ROJO
+// con `AtajoImprimir` en vez de `AtajoDelEditor` en `Folio.atajo`.
+func TestElZoomConElTecladoEnElFolio(t *testing.T) {
+	a, f := abrirParaEscribir(t, &servicioDocs{rol: "editor", html: "<p>Hola</p>"})
+	ctx := a.abierto.ctx
+	ctx.PonerZoom(100)
+	f.atajo(&desktop.CustomShortcut{KeyName: fyne.KeyEqual, Modifier: fyne.KeyModifierShortcutDefault})
+	if ctx.Zoom != 110 {
+		t.Fatalf("Ctrl+= en el folio deja el zoom en %d", ctx.Zoom)
+	}
+	f.atajo(&desktop.CustomShortcut{KeyName: fyne.Key0, Modifier: fyne.KeyModifierShortcutDefault})
+	if ctx.Zoom != 100 {
+		t.Errorf("Ctrl+0 en el folio deja el zoom en %d", ctx.Zoom)
 	}
 }
 

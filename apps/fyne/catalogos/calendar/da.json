@@ -66,6 +66,7 @@
   "common.remove": "Fjern",
   "common.retry": "Prøv igen",
   "common.save": "Gem",
+  "day.noEvents": "Ingen begivenheder denne dag",
   "error.calendarsLoad": "Kalenderne kunne ikke indlæses.",
   "error.eventsLoad": "Begivenhederne kunne ikke indlæses.",
   "event.ai": "Beskriv begivenheden",
@@ -142,12 +143,19 @@
   "grid.blockAria": "{title}, {time}",
   "grid.continued": "{title} (fortsat)",
   "grid.createOn": "Opret en begivenhed den {date}",
+  "grid.dayEvents": {
+    "one": "{date}, {count} begivenhed",
+    "other": "{date}, {count} begivenheder"
+  },
+  "grid.daySelected": "{label}, valgt",
   "grid.loadError": "Kalenderen kunne ikke indlæses",
   "grid.loading": "Indlæser kalenderen",
   "grid.more": {
     "one": "+{count} mere",
     "other": "+{count} mere"
   },
+  "grid.showMonth": "Vis hele måneden",
+  "grid.showWeek": "Vis kun denne uge",
   "grid.snapAria": {
     "one": "Fastgør trækning til {count} minut. Tryk for at ændre.",
     "other": "Fastgør trækning til {count} minutter. Tryk for at ændre."
@@ -160,6 +168,13 @@
     "one": "{count} min",
     "other": "{count} min"
   },
+  "grid.todayLabel": "I dag, {date}",
+  "grid.weekNumber": "Uge {week}",
+  "guests.organizer": "Arrangør",
+  "guests.status.accepted": "Deltager",
+  "guests.status.declined": "Deltager ikke",
+  "guests.status.pending": "Afventer svar",
+  "guests.status.tentative": "Måske",
   "header.invitations": "Invitationer",
   "header.next": "Næste",
   "header.pending": {
@@ -197,6 +212,10 @@
   "nav.createEventOn": "Opret begivenhed den {date}",
   "nav.deleteSubscription": "Fjern abonnement",
   "nav.manageResources": "Administrer lokaler og udstyr",
+  "nav.menuPending": {
+    "one": "Åbn menuen, {count} afventer",
+    "other": "Åbn menuen, {count} afventer"
+  },
   "nav.myCalendars": "Mine kalendere",
   "nav.next": "Næste",
   "nav.nextMonth": "Næste måned",
@@ -341,6 +360,7 @@
   "scope.following": "Denne og efterfølgende",
   "scope.legend": "Denne begivenhed gentages. Hvilke begivenheder gælder ændringen?",
   "scope.this": "Kun denne begivenhed",
+  "search.allCalendars": "Alle kalendere",
   "search.error": "Søgningen kunne ikke gennemføres.",
   "search.events": "Søg i begivenheder",
   "search.loadMore": "Indlæs flere",
@@ -349,6 +369,12 @@
     "other": "Skriv mindst {count} tegn for at søge i dine kalendere."
   },
   "search.noResults": "Ingen resultater for “{term}”.",
+  "search.period": "Periode",
+  "search.period.any": "Når som helst",
+  "search.period.month": "Denne måned",
+  "search.period.past": "Tidligere",
+  "search.period.upcoming": "Kommende",
+  "search.period.year": "I år",
   "search.placeholder": "Titel, beskrivelse, sted eller gæst…",
   "search.searching": "Søger…",
   "search.series": "Serie",
@@ -390,6 +416,14 @@
   "share.whoSeesNow": "Hvem der ser den nu",
   "share.writerHint": "Ud over at se dem opretter, ændrer og sletter personen begivenheder i kalenderen.",
   "share.writerLabel": "Se og redigere mine begivenheder",
+  "shortcuts.group.actions": "Handlinger",
+  "shortcuts.group.navigate": "Navigér",
+  "shortcuts.group.views": "Visninger",
+  "shortcuts.help": "Vis denne liste",
+  "shortcuts.next": "Næste periode",
+  "shortcuts.prev": "Forrige periode",
+  "shortcuts.title": "Tastaturgenveje",
+  "shortcuts.today": "Gå til i dag",
   "subscribe.aria": "Abonner på en kalender via URL",
   "subscribe.byUrl": "Abonner via URL (.ics)",
   "subscribe.defaultName": "Abonneret kalender",

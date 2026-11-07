@@ -133,6 +133,7 @@ export function SuperficiesDemo(props: {
     restoreVersion: nadaAsync,
     applyTheme: nadaAsync,
     exportAs: nadaAsync,
+    saveNow: nada,
     sourceRef: '',
     esPropietario: false,
     cursorDots: { aPuntos: () => null, aOffsets: () => null },

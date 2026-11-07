@@ -78,7 +78,7 @@ export const nucleo = {
   'new.progress': 'Saidi loomise sammud',
   'new.go_to_step': 'Mine sammule {n}',
   'new.step_of': 'Samm {n}/{total}',
-  'app_settings.title': 'Sytue Webi seaded',
+  'app_settings.title': 'Sytue Websi seaded',
   'new.search_title': 'Alustage oma tegevusalast',
   'new.search_help':
     'Kirjutage, millega tegelete, või valige rühm. Igas mallis on teie valdkonna tekstid juba olemas: muudate vaid nime, telefoninumbrit, hindu ja fotosid.',
@@ -277,7 +277,7 @@ export const nucleo = {
   'domains.start_help':
     'Sisestage domeen, mida soovite kasutada. Teil on vaja juurdepääsu DNS-seadetele teenusepakkuja juures, kust domeeni ostsite.',
   'domains.progress': 'Domeeni ühendamise edenemine',
-  'domains.step.registered': 'Lisatud Sytue Webi',
+  'domains.step.registered': 'Lisatud Sytue Websi',
   'domains.step.dns': 'DNS kinnitatud',
   'domains.step.https': 'HTTPS valmis',
   'domains.step.primary': 'Põhiaadress',

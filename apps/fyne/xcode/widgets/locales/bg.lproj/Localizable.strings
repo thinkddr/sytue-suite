@@ -31,3 +31,4 @@
 "dataflow.item.events" = "Календар";
 "dataflow.item.documents" = "Документи";
 "dataflow.item.contacts" = "Контакти";
+"widgets.updatedAgo" = "Обновено %@";

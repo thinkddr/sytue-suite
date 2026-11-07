@@ -66,6 +66,7 @@
   "common.remove": "Eltávolítás",
   "common.retry": "Újra",
   "common.save": "Mentés",
+  "day.noEvents": "Ezen a napon nincs esemény",
   "error.calendarsLoad": "A naptárakat nem sikerült betölteni.",
   "error.eventsLoad": "Az eseményeket nem sikerült betölteni.",
   "event.ai": "Írja le az eseményt",
@@ -142,12 +143,19 @@
   "grid.blockAria": "{title}, {time}",
   "grid.continued": "{title} (folytatás)",
   "grid.createOn": "Esemény létrehozása: {date}",
+  "grid.dayEvents": {
+    "one": "{date}, {count} esemény",
+    "other": "{date}, {count} esemény"
+  },
+  "grid.daySelected": "{label}, kijelölve",
   "grid.loadError": "A naptárat nem sikerült betölteni",
   "grid.loading": "A naptár betöltése",
   "grid.more": {
     "one": "+{count} további",
     "other": "+{count} további"
   },
+  "grid.showMonth": "A teljes hónap megjelenítése",
+  "grid.showWeek": "Csak ennek a hétnek a megjelenítése",
   "grid.snapAria": {
     "one": "Húzás igazítása {count} percre. Nyomja meg a módosításhoz.",
     "other": "Húzás igazítása {count} percre. Nyomja meg a módosításhoz."
@@ -160,6 +168,13 @@
     "one": "{count} perc",
     "other": "{count} perc"
   },
+  "grid.todayLabel": "Ma, {date}",
+  "grid.weekNumber": "{week}. hét",
+  "guests.organizer": "Szervező",
+  "guests.status.accepted": "Részt vesz",
+  "guests.status.declined": "Nem vesz részt",
+  "guests.status.pending": "Válaszra vár",
+  "guests.status.tentative": "Talán",
   "header.invitations": "Meghívók",
   "header.next": "Következő",
   "header.pending": {
@@ -197,6 +212,10 @@
   "nav.createEventOn": "Esemény létrehozása: {date}",
   "nav.deleteSubscription": "Feliratkozás eltávolítása",
   "nav.manageResources": "Termek és eszközök kezelése",
+  "nav.menuPending": {
+    "one": "Menü megnyitása, {count} függőben",
+    "other": "Menü megnyitása, {count} függőben"
+  },
   "nav.myCalendars": "Saját naptárak",
   "nav.next": "Következő",
   "nav.nextMonth": "Következő hónap",
@@ -341,6 +360,7 @@
   "scope.following": "Erre és a következőkre",
   "scope.legend": "Ez az esemény ismétlődik. Mely eseményekre vonatkozik a módosítás?",
   "scope.this": "Csak erre az eseményre",
+  "search.allCalendars": "Minden naptár",
   "search.error": "A keresést nem sikerült befejezni.",
   "search.events": "Események keresése",
   "search.loadMore": "Továbbiak betöltése",
@@ -349,6 +369,12 @@
     "other": "Írjon be legalább {count} karaktert a naptárakban való kereséshez."
   },
   "search.noResults": "Nincs találat erre: „{term}”.",
+  "search.period": "Időszak",
+  "search.period.any": "Bármikor",
+  "search.period.month": "Ebben a hónapban",
+  "search.period.past": "Korábbi",
+  "search.period.upcoming": "Közelgő",
+  "search.period.year": "Ebben az évben",
   "search.placeholder": "Cím, leírás, helyszín vagy vendég…",
   "search.searching": "Keresés…",
   "search.series": "Sorozat",
@@ -390,6 +416,14 @@
   "share.whoSeesNow": "Kik látják most",
   "share.writerHint": "A megtekintés mellett létrehoz, módosít és töröl eseményeket ebben a naptárban.",
   "share.writerLabel": "Láthatja és szerkesztheti az eseményeimet",
+  "shortcuts.group.actions": "Műveletek",
+  "shortcuts.group.navigate": "Navigálás",
+  "shortcuts.group.views": "Nézetek",
+  "shortcuts.help": "A lista megjelenítése",
+  "shortcuts.next": "Következő időszak",
+  "shortcuts.prev": "Előző időszak",
+  "shortcuts.title": "Billentyűparancsok",
+  "shortcuts.today": "Ugrás a mai napra",
   "subscribe.aria": "Feliratkozás naptárra URL-lel",
   "subscribe.byUrl": "Feliratkozás URL-lel (.ics)",
   "subscribe.defaultName": "Feliratkozott naptár",

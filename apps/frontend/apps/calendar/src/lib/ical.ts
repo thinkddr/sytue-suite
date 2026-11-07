@@ -50,6 +50,13 @@ export interface EventInput {
   /** Email del organizador (ORGANIZER). Normalmente, el usuario que crea. */
   organizer?: string | undefined;
   /**
+   * Respuesta YA DADA de cada invitado, por email en minúsculas (lo que devuelve
+   * `guestPartstats`). Sin ella, cada guardado volvía a poner a todos en
+   * NEEDS-ACTION: mover una reunión media hora borraba quién había dicho que sí.
+   * Los que no están aquí —los recién añadidos— salen a la espera.
+   */
+  partstats?: Record<string, string> | undefined;
+  /**
    * Bloques VALARM crudos (BEGIN:VALARM..END:VALARM) del evento: los que la UI
    * edita (recordatorios, ver buildAlarm) más los que conserva verbatim de un
    * cliente CalDAV externo (email/absolutos). Nunca inventados en creacion.
@@ -220,8 +227,12 @@ export function buildVevent(input: EventInput): string {
   if (input.organizer) lines.push(`ORGANIZER:mailto:${input.organizer}`);
   for (const email of input.attendees ?? []) {
     const addr = email.trim();
+    // Solo un token iCalendar (letras y guiones) vuelve al .ics: lo que no lo sea
+    // —o no esté— sale como NEEDS-ACTION, que es lo que pedía el invitado nuevo.
+    const previa = input.partstats?.[addr.toLowerCase()]?.toUpperCase() ?? '';
+    const partstat = /^[A-Z-]{1,32}$/.test(previa) ? previa : 'NEEDS-ACTION';
     if (addr)
-      lines.push(`ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${addr}`);
+      lines.push(`ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=${partstat};RSVP=TRUE:mailto:${addr}`);
   }
 
   // Passthrough VALARM: se reinyectan verbatim (solo se normaliza EOL a CRLF).
@@ -343,12 +354,114 @@ export function parseColor(ical: string): string | undefined {
   return named?.[1];
 }
 
-/** Extrae los emails de los ATTENDEE de un VEVENT crudo (para reabrir el modal). */
+/**
+ * Los emails de los ATTENDEE de un VEVENT crudo (para reabrir el modal y para
+ * conservarlos al mover un evento). Son los de `parseGuests`: los del maestro, sin
+ * los destinatarios de sus VALARM, que si no pasarían a ser invitados al guardar.
+ */
 export function parseAttendees(ical: string): string[] {
-  const out: string[] = [];
-  for (const m of ical.matchAll(/^ATTENDEE[^:]*:(?:mailto:)?(.+)$/gim)) {
-    const email = m[1]?.trim();
-    if (email) out.push(email);
+  return parseGuests(ical).map((g) => g.email);
+}
+
+/**
+ * La respuesta de un invitado tal y como la enseña la UI. El PARTSTAT de RFC 5545
+ * tiene más valores (DELEGATED, COMPLETED…), pero para una reunión solo importan
+ * cuatro: sí, quizá, no y «aún no ha contestado», que es también lo que vale para
+ * un valor que no se conoce.
+ */
+export type GuestStatus = 'accepted' | 'tentative' | 'declined' | 'pending';
+
+export interface Guest {
+  email: string;
+  /** El CN del ATTENDEE/ORGANIZER, si lo trae: «Ada Lovelace». */
+  name?: string | undefined;
+  status: GuestStatus;
+}
+
+/** PARTSTAT (cualquier caja) → la respuesta que pinta la UI. */
+export function guestStatus(partstat: string | undefined): GuestStatus {
+  switch ((partstat ?? '').trim().toUpperCase()) {
+    case 'ACCEPTED':
+      return 'accepted';
+    case 'TENTATIVE':
+      return 'tentative';
+    case 'DECLINED':
+      return 'declined';
+    default:
+      return 'pending';
+  }
+}
+
+/** Deshace el plegado de líneas de RFC 5545 §3.1 (CRLF + espacio o tabulador). */
+function unfold(ical: string): string {
+  return ical.replace(/\r?\n[ \t]/g, '');
+}
+
+/** Valor de un parámetro (`CN`, `PARTSTAT`) en la parte de parámetros de una línea. */
+function param(params: string, name: string): string | undefined {
+  const m = params.match(new RegExp(`;${name}=("[^"]*"|[^;:]*)`, 'i'));
+  const v = m?.[1]?.replace(/^"|"$/g, '').trim();
+  return v || undefined;
+}
+
+/** Las líneas `NAME;params:valor` de una propiedad, ya desplegadas. */
+function propLines(ical: string, name: string): { params: string; value: string }[] {
+  const out: { params: string; value: string }[] = [];
+  // Los parámetros pueden llevar «:» entre comillas (CN="Ada: equipo"): se saltan.
+  // La clase de fuera excluye también «"», para que un entrecomillado solo pueda
+  // leerse de una manera: si no, una línea que no casa (un valor vacío tras «:»)
+  // retrocede por todas las particiones posibles y congela la pestaña.
+  const re = new RegExp(`^${name}((?:;(?:"[^"]*"|[^;:"\r\n])*)*):(.+)$`, 'gim');
+  for (const m of unfold(ical).matchAll(re)) out.push({ params: m[1] ?? '', value: m[2]!.trim() });
+  return out;
+}
+
+function sinMailto(v: string): string {
+  return v.replace(/^mailto:/i, '').trim();
+}
+
+/**
+ * El primer VEVENT —el maestro—, desplegado y sin sus VALARM. Un VALARM con
+ * ACTION:EMAIL lleva ATTENDEE (a quién se manda el aviso), que no es un invitado: el
+ * servicio tampoco lo cuenta (go-ical lee solo las propiedades del VEVENT).
+ */
+function maestro(ical: string): string {
+  const plano = unfold(ical);
+  const vevent = plano.match(/BEGIN:VEVENT[\s\S]*?END:VEVENT/)?.[0] ?? plano;
+  return vevent.replace(/^BEGIN:VALARM[\s\S]*?^END:VALARM[^\n]*\n?/gm, '');
+}
+
+/**
+ * Los invitados de un VEVENT crudo con su respuesta: la lista de la vista rápida y
+ * de las píldoras del formulario. Solo el primer VEVENT —el maestro—; las
+ * excepciones de una serie llevan sus propios ATTENDEE y no se suman.
+ */
+export function parseGuests(ical: string): Guest[] {
+  const out: Guest[] = [];
+  for (const { params, value } of propLines(maestro(ical), 'ATTENDEE')) {
+    const email = sinMailto(value);
+    if (!email || out.some((g) => g.email.toLowerCase() === email.toLowerCase())) continue;
+    out.push({ email, name: param(params, 'CN'), status: guestStatus(param(params, 'PARTSTAT')) });
+  }
+  return out;
+}
+
+/** El ORGANIZER del VEVENT crudo, o null si no lo declara. */
+export function parseOrganizer(ical: string): { email: string; name?: string | undefined } | null {
+  const linea = propLines(maestro(ical), 'ORGANIZER')[0];
+  if (!linea) return null;
+  const email = sinMailto(linea.value);
+  return email ? { email, name: param(linea.params, 'CN') } : null;
+}
+
+/**
+ * Las respuestas ya dadas, por email en minúsculas, para devolverlas al .ics al
+ * guardar (`EventInput.partstats`). Solo las que no son «a la espera».
+ */
+export function guestPartstats(ical: string | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const g of ical ? parseGuests(ical) : []) {
+    if (g.status !== 'pending') out[g.email.toLowerCase()] = g.status.toUpperCase();
   }
   return out;
 }

@@ -18,6 +18,8 @@ export const mt: Catalog = {
   'ui.openNav': 'Iftaħ in-navigazzjoni',
   'ui.closeNav': 'Agħlaq in-navigazzjoni',
   'ui.backToList': 'Lura għal-lista',
+  'ui.suiteOpen': 'Sytue: apps, tfittxija, notifiki u kont',
+  'ui.suiteClose': 'Lura għall-app',
   'ui.noResults': 'L-ebda riżultat.',
   'ui.meter.almostFull': 'kważi mimli',
   'ui.meter.full': 'mimli',
@@ -59,6 +61,9 @@ export const mt: Catalog = {
     'Din l-app teħtieġ OpenGL 2.1 u d-driver grafiku ta’ dan il-kompjuter ma joffrihx ({detalle}). Installa jew aġġorna d-driver tal-karta grafika. Mingħajr karta grafika (desktop remot jew magna virtwali) ma tistax tinfetaħ.',
   'shell.lock.reasonNotebook': 'tiftaħ in-notebook kriptat tiegħek',
   'shell.lock.faceIdUsage': 'Sytue juża Face ID biex jiftaħ is-sessjoni tiegħek meta tiftaħ l-app.',
+  'shell.widgets.wake': 'Aġġorna l-widgets meta l-app tkun magħluqa',
+  'shell.widgets.wakeHelp':
+    'Meta xi ħaġa tiegħek tinbidel, Sytue tqajjem l-app b’notifika vojta ta’ Apple biex taġġorna l-widget tagħha. Apple tara liema app u meta, qatt x’inbidel.',
   'shell.call.microphoneUsage':
     'Sytue Rooms juża l-mikrofonu biss waqt sejħa, u biss meta tixgħelu.',
   'shell.call.cameraUsage': 'Sytue Rooms juża l-kamera biss waqt sejħa, u biss meta tixgħelha.',
@@ -174,7 +179,7 @@ export const mt: Catalog = {
   'notifications.kind.pages.domain.failed':
     'Id-dominju {domain} fuq {site} ma jaħdimx: iċċekkja s-settings tiegħu',
   'notifications.kind.pages.erp.failed': "L-ordni {number} fuq {site} ma waslitx f'Sytue ERP",
-  'notifications.kind.pages.settings.changed': "{actor} biddel setting ta' Sytue Web",
+  'notifications.kind.pages.settings.changed': "{actor} biddel setting ta' Sytue Webs",
   'notifications.kind.pages.export.ready': "L-esportazzjoni tiegħek ta' {site} hija lesta",
   'notifications.kind.pages.store.busy':
     'Il-ħanut fuq {site} għandu wisq ordnijiet li qed jistennew il-ħlas',
@@ -358,6 +363,8 @@ export const mt: Catalog = {
   'widgets.compose': 'Ikteb',
   'widgets.storage': 'Ħażna',
   'widgets.create': 'Oħloq avveniment',
+  'widgets.updatedAgo': 'Aġġornat {time}',
+  'widgets.updatedAt': 'Aġġornat: {time}',
 
   'linkedServices.services': 'Servizzi',
   'linkedServices.changed':
@@ -370,6 +377,7 @@ export const mt: Catalog = {
   'linkedServices.notGranted':
     'L-aċċess għal dan is-servizz ma ngħatax. Erġa’ qabbad il-kont biex tagħżel il-permessi tiegħu.',
   'linkedServices.connected': 'Servizzi mqabbda',
+  'linkedServices.exists': 'Dan il-kont kien diġà mqabbad u issa huwa miftuħ.',
   'linkedServices.providerData': 'Il-bidliet jiġu ssejvjati għand il-fornitur tiegħek.',
   'linkedServices.writeUnknown':
     'Il-fornitur ma kkonfermax jekk ġiex issejvjat. Aġġorna u ċċekkja qabel terġa’ tipprova.',

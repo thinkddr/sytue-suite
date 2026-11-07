@@ -48,10 +48,12 @@ var _ Remitente = (*api.Mail)(nil)
 
 // redaccion es el redactor abierto con su estado de trabajo.
 type redaccion struct {
-	r                   *Redactor
-	d                   *ui.Dialogo
-	guardar, enviar     *ui.Boton
-	descartar           *ui.Boton
+	r               *Redactor
+	d               *ui.Dialogo
+	guardar, enviar *ui.Boton
+	descartar       *ui.Boton
+	// reloj es «Programar envío»: oculto mientras el «De» es una cuenta externa.
+	reloj               *ui.BotonIcono
 	enviando, guardando bool
 	pararAuto           func()
 	// La libreta se pide una vez por redacción (`libreta !== null || fallo`).
@@ -81,6 +83,9 @@ func (b *Buzon) cargarIdentidad() {
 			return
 		}
 		b.principal, b.alias = ds[0], ds[1:]
+		// La dirección nombra el buzón de Sytue en «Buzones».
+		b.P.Menu.TituloSytue = b.principal
+		b.P.Refrescar()
 	})
 }
 
@@ -102,16 +107,35 @@ func (b *Buzon) opcionesDe() []string {
 	return out
 }
 
+// remitentesDe son las opciones del «De» con las cuentas externas que envían detrás
+// (`remitentes`): el resumen primero, que manda, y la recién conectada que aún no trae.
+func (b *Buzon) remitentesDe() []OpcionDe {
+	cuentas := make([]api.ExternalMailAccount, 0, len(b.resumenExternas)+len(b.cuentasDialogo))
+	for _, c := range b.resumenExternas {
+		cuentas = append(cuentas, c.ExternalMailAccount)
+	}
+	cuentas = append(cuentas, b.cuentasDialogo...)
+	return remitentes(b.opcionesDe(), cuentas)
+}
+
 // Redactar es «Redactar»: un mensaje nuevo con la firma debajo.
 //
 // En un buzón compartido con permiso de envío, sale desde su dirección (`openCompose`).
 func (b *Buzon) Redactar() {
+	// Con la carpeta de una cuenta a la vista, se escribe desde esa cuenta.
+	if b.redactarExterno() {
+		return
+	}
 	b.abrirRedactor(Borrador{De: b.deCompartido(), Cuerpo: ConFirma("", b.firma, false)})
 }
 
 // responder es `handleReply`: con el cuerpo COMPLETO si ya se leyó —si no, la cita
 // saldría cortada en el extracto—.
 func (b *Buzon) responder(m Mensaje, modo Respuesta) {
+	// Lo de una cuenta externa se contesta desde ella, que es a quien escribieron.
+	if b.responderExterno(m, modo) {
+		return
+	}
 	completo := ""
 	if c, ya := b.cuerpos[m.ID]; ya {
 		completo = c.Texto
@@ -169,12 +193,12 @@ func (b *Buzon) abrirRedactor(br Borrador) {
 	}
 	t := b.P.T
 	ancho := AnchoCuerpoDialogo(ui.DialogoLG, lienzo.Size().Width)
-	rd := &redaccion{r: NuevoRedactorEn(t, b.P.Locale, br, b.opcionesDe(), ancho, lienzo.Size().Width)}
+	rd := &redaccion{r: NuevoRedactorDe(t, b.P.Locale, br, b.remitentesDe(), ancho, lienzo.Size().Width)}
 	// Las herramientas y «Guardar borrador» son `Button variant="ghost" iconOnly`
 	// de talla por defecto (31,5); «Enviar» conserva el rótulo y la jerarquía principal.
 	rd.descartar = ui.NuevoBoton(t.T("compose.discard", nil), func() { b.descartar(rd) }).Con(ui.Fantasma, ui.TallaMD)
 	rd.descartar.Rotulo, rd.descartar.SoloIcono, rd.descartar.TamIcono = rd.descartar.Texto, true, TallaGlifoLector
-	rd.descartar.Glifo = Glifo(PapeleraD, TallaGlifoLector, "text", tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
+	rd.descartar.Glifo = Glifo(PapeleraD, TallaGlifoLector, "primary-text", tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
 	rd.guardar = ui.NuevoBoton(t.T("compose.saveDraft", nil), func() { b.guardarBorrador(rd, false, true) }).
 		Con(ui.Fantasma, ui.TallaMD)
 	rd.guardar.Rotulo, rd.guardar.SoloIcono, rd.guardar.Icono, rd.guardar.TamIcono =
@@ -184,9 +208,11 @@ func (b *Buzon) abrirRedactor(br Borrador) {
 	// abierto): por eso es el botón de icono del cromo, que sí sabe estar pulsado, con
 	// el lado de un `iconOnly` de talla por defecto.
 	reloj := ui.NuevoBotonIcono(iconos.Ninguno, t.T("compose.schedule", nil), nil)
-	reloj.Glifo = Glifo(RelojD, TallaGlifoLector, "text", tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
+	reloj.Glifo = Glifo(RelojD, TallaGlifoLector, "primary-text", tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
 	reloj.Lado, reloj.TamIcono, reloj.Radio = ui.AltoCampo(ui.CampoMD), TallaGlifoLector, tema.Forma("radius-control")
-	reloj.Trazo, reloj.TrazoEncima, reloj.FondoEncima, reloj.FondoActivo = "text", "", "bg-subtle", "border"
+	reloj.Trazo, reloj.TrazoEncima, reloj.FondoEncima, reloj.FondoActivo = "primary-text", "", "bg-subtle", "border"
+	// Abierto, `bg-selected text-text`: sin `FondoPulsado` no se veía nada.
+	reloj.FondoPulsado = "selected"
 	reloj.AlPulsar = func() {
 		rd.r.AlternarProgramar()
 		reloj.Pulsado = rd.r.verProgramar
@@ -201,7 +227,7 @@ func (b *Buzon) abrirRedactor(br Borrador) {
 	// recordada (en la web, por navegador; aquí, en las preferencias de la app).
 	formato := ui.NuevoBotonIcono(iconos.Texto, t.T("compose.formatting", nil), nil)
 	formato.Lado, formato.TamIcono, formato.Radio = ui.AltoCampo(ui.CampoMD), TallaGlifoLector, tema.Forma("radius-control")
-	formato.Trazo, formato.TrazoEncima, formato.FondoEncima, formato.FondoActivo = "text", "", "bg-subtle", "border"
+	formato.Trazo, formato.TrazoEncima, formato.FondoEncima, formato.FondoActivo = "primary-text", "", "bg-subtle", "border"
 	rd.r.VerFormato = b.formatoVisible()
 	formato.Pulsado = rd.r.VerFormato
 	formato.AlPulsar = func() {
@@ -214,8 +240,22 @@ func (b *Buzon) abrirRedactor(br Borrador) {
 		ancho: ancho, izquierda: []fyne.CanvasObject{formato, adjuntar, reloj, rd.descartar},
 		derecha: []fyne.CanvasObject{rd.guardar, rd.enviar},
 	}
+	cajaPie := container.New(pie, formato, adjuntar, reloj, rd.descartar, rd.guardar, rd.enviar)
+	// Programar es de la cola de Sytue: desde una cuenta externa no se ofrece.
+	rd.reloj = reloj
+	ponerReloj := func() {
+		if rd.r.B.Cuenta != "" {
+			reloj.Hide()
+		} else {
+			reloj.Show()
+		}
+		reloj.Pulsado = rd.r.verProgramar
+		cajaPie.Refresh()
+	}
+	ponerReloj()
+	rd.r.AlCambiarDe = ponerReloj
 	rd.d = ui.NuevoDialogo(TituloRedactor(t, br.Asunto, br.ID != ""), rd.r.Objeto()).
-		Con(ui.DialogoLG, container.New(pie, formato, adjuntar, reloj, rd.descartar, rd.guardar, rd.enviar))
+		Con(ui.DialogoLG, cajaPie)
 	rd.d.RotuloCerrar = t.T("ui.close", nil)
 	// Clic fuera y Escape GUARDAN y cierran; el aspa pregunta.
 	rd.d.AlCerrar = func() { b.cerrarGuardando(rd) }
@@ -466,7 +506,9 @@ func direccionesLaxas(s string) []string {
 // componer escribe el .eml. Un borrador admite direcciones a medias; un envío no.
 func (b *Buzon) componer(br Borrador, borrador bool) (de string, s eml.Salida, crudo []byte, err error) {
 	de = br.De
-	if de == "" {
+	// El de una cuenta externa no es de Sytue: su borrador se guarda en Sytue con la
+	// principal (el envío por la cuenta no pasa por aquí).
+	if de == "" || br.Cuenta != "" {
 		de = b.principal
 	}
 	s = eml.Salida{
@@ -492,7 +534,10 @@ func (b *Buzon) componer(br Borrador, borrador bool) (de string, s eml.Salida, c
 	return de, s, crudo, err
 }
 
-var errDireccion = errors.New("redactor: dirección no válida")
+var (
+	errDireccion       = errors.New("redactor: dirección no válida")
+	errDemasiadoGrande = errors.New("redactor: los adjuntos no caben por la cuenta externa")
+)
 
 // guardarBorrador es `doSave`. Silencioso es el autoguardado: no interrumpe con un
 // aviso por cada tecla, ya lo intentará el siguiente. Con `yCerrar`, es el botón
@@ -535,7 +580,8 @@ func (b *Buzon) guardarBorrador(rd *redaccion, silencioso, yCerrar bool) {
 // es la que se está mirando —la web la recarga siempre, y con ello cierra el hilo que
 // se estaba contestando—, y siempre los números del lateral.
 func (b *Buzon) alGuardarBorrador() {
-	if b.rolVista() == "drafts" {
+	// En «Todos los borradores» también: ahí está el borrador de Sytue que se guardó.
+	if b.rolVista() == "drafts" || b.externa != nil && b.externa.Unificado == "drafts" {
 		b.cargarLista()
 	}
 	b.refrescarContadores()
@@ -569,6 +615,10 @@ func (b *Buzon) enviar(rd *redaccion, sinAdjuntoConfirmado bool) {
 	// Los de Drive también cuentan (`attachments.length + files.length` en la web).
 	if !sinAdjuntoConfirmado && len(br.Adjuntos)+len(br.Drive) == 0 && MencionaAdjunto(br.Cuerpo) {
 		b.preguntarSinAdjunto(rd)
+		return
+	}
+	if br.Cuenta != "" {
+		b.enviarPorCuenta(rd, br)
 		return
 	}
 	de, s, crudo, err := b.componer(br, false)
@@ -611,6 +661,72 @@ func (b *Buzon) enviar(rd *redaccion, sinAdjuntoConfirmado bool) {
 			a.AlPulsarAccion = func() { b.deshacerEnvio(env.ID, reabrir) }
 		}
 		b.P.Notificar(a)
+	})
+}
+
+// enviarPorCuenta es enviar desde una cuenta externa: una sola vez por su proveedor
+// (`MailSend`, con `ExpectedAddress`), sin ventana de deshacer, que no hay cola que
+// retenga nada. Lo que pudo salir sin decirlo (5xx, sin respuesta) no se repite: el
+// redactor se queda abierto y el aviso pide mirar en Enviados. El borrador que el
+// autoguardado dejó en Sytue se borra al salir, como el de un envío de Sytue.
+func (b *Buzon) enviarPorCuenta(rd *redaccion, br Borrador) {
+	t := b.P.T
+	a, ok := b.cuentaExterna(br.Cuenta)
+	if !ok || !a.Capabilities.Send || b.CorreoExterno == nil {
+		// La cuenta se desconectó con el redactor abierto.
+		b.P.Avisar(ui.AvisoPeligro, t.T("compose.sendFailed", nil), t.T("compose.sendForbidden", nil))
+		return
+	}
+	html := ""
+	if br.HTML != "" {
+		html = HTMLConDrive(t, br.HTML, br.Drive)
+	}
+	out, err := salidaExterna(a.Address, br, TextoConDrive(t, br.Cuerpo, br.Drive), html)
+	switch {
+	case errors.Is(err, errDemasiadoGrande):
+		b.P.Avisar(ui.AvisoPeligro, t.T("compose.sendFailed", nil), t.T("externalMail.tooLarge", nil))
+		return
+	case err != nil:
+		b.avisarEnvio(err)
+		return
+	}
+	if rd.pararAuto != nil {
+		rd.pararAuto()
+	}
+	rd.enviando = true
+	b.pintarBotonesRedactor(rd)
+	id, icloud, cliente := a.InstanceID, a.IsICloud(), b.CorreoExterno
+	pedir(b, func(ctx context.Context) (api.ExternalMailSent, error) {
+		ctx, cancelar := context.WithTimeout(ctx, plazoCorreo)
+		defer cancelar()
+		return cliente.MailSend(ctx, id, out)
+	}, func(v api.ExternalMailSent, err error) {
+		rd.enviando = false
+		if err != nil {
+			b.pintarBotonesRedactor(rd)
+			var e *api.Error
+			if !errors.As(err, &e) || e.Status == 0 || e.Status >= 500 {
+				b.avisar(ui.AvisoAdvertencia, "externalMail.sendUnknown", nil)
+				return
+			}
+			b.P.Avisar(ui.AvisoPeligro, t.T("compose.sendFailed", nil), t.T(errorCorreo(err, icloud), nil))
+			return
+		}
+		if id := br.ID; id != "" { // el borrador del autoguardado ya no hace falta
+			ctx := b.ctx
+			b.Lanzar(func() {
+				if ctx.Err() == nil {
+					_ = b.S.Delete(ctx, id)
+				}
+			})
+		}
+		b.cerrar(rd)
+		b.alGuardarBorrador()
+		if v.SentCopySaved != nil && !*v.SentCopySaved {
+			b.avisar(ui.AvisoAdvertencia, "externalMail.sentNoCopy", nil)
+			return
+		}
+		b.avisar(ui.AvisoExito, "externalMail.sent", nil)
 	})
 }
 
@@ -720,8 +836,6 @@ func (b *Buzon) editarFirma() {
 func (b *Buzon) abrirAjuste(clave string) {
 	b.P.CerrarCajon()
 	switch clave {
-	case "external-mail":
-		b.abrirCorreoExterno()
 	case "signature":
 		b.editarFirma()
 	case "scheduled":

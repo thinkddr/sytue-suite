@@ -4,6 +4,8 @@
   "action.classified": "Classificação · {name}",
   "action.classify": "Classificar",
   "action.copy": "Fazer uma cópia",
+  "action.copyLink": "Copiar ligação",
+  "action.copyLinkFailed": "Não foi possível copiar a ligação.",
   "action.delete": "Mover para o lixo",
   "action.desktopBody": "Se ainda não a tem instalada, pode transferi-la.",
   "action.desktopCta": "Ver transferências",
@@ -12,6 +14,7 @@
   "action.downloadName": "Transferir {name}",
   "action.downloadZip": "Transferir (ZIP)",
   "action.editorFailed": "O editor não conseguiu abrir este ficheiro.",
+  "action.linkCopied": "Ligação copiada. Só abre para quem já tem acesso.",
   "action.mailFailed": "Não foi possível abrir o editor de e-mail",
   "action.menu": "Ações para {name}",
   "action.more": "Mais ações",
@@ -81,6 +84,14 @@
   "files.batch.moveTitle": {
     "one": "Mover {count} elemento",
     "other": "Mover {count} elementos"
+  },
+  "files.batch.restorePartial": {
+    "one": "Não foi possível restaurar {count} elemento; continua no lixo.",
+    "other": "Não foi possível restaurar {count} elementos; continuam no lixo."
+  },
+  "files.batch.restored": {
+    "one": "{count} elemento restaurado.",
+    "other": "{count} elementos restaurados."
   },
   "files.batch.trashBody": {
     "one": "{count} elemento será enviado para o lixo. Poderá restaurá-lo a partir de lá.",
@@ -555,6 +566,17 @@
     "other": "{count} ficheiros enviados."
   },
   "team.upload.partial": "{uploaded} de {count} enviados.",
+  "trash.emptiedAll": "O lixo foi esvaziado.",
+  "trash.emptyAll": "Esvaziar lixo",
+  "trash.emptyAllBody": {
+    "one": "O {count} elemento do lixo será apagado para sempre, juntamente com o histórico de versões. Depois não há forma de o recuperar.",
+    "other": "Os {count} elementos do lixo serão apagados para sempre, juntamente com o histórico de versões. Depois não há forma de os recuperar."
+  },
+  "trash.emptyAllPartial": {
+    "one": "Não foi possível eliminar {count} elemento; continua no lixo.",
+    "other": "Não foi possível eliminar {count} elementos; continuam no lixo."
+  },
+  "trash.emptyAllTitle": "Esvaziar o lixo?",
   "trash.emptyBody": "Os ficheiros e pastas que eliminar aparecerão aqui e poderá restaurá-los.",
   "trash.emptyTitle": "O lixo está vazio",
   "trash.errorTitle": "Não foi possível carregar o lixo",

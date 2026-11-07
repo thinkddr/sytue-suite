@@ -5,7 +5,6 @@ package bases
 
 import (
 	"strings"
-	"time"
 	"unicode"
 
 	"fyne.io/fyne/v2"
@@ -35,6 +34,9 @@ var (
 	maxCelda = 20 * float32(tema.Rem)
 	// altoCabeza es el `py-2` más la línea de `text-sm`.
 	altoCabeza = 2*tema.Espacio(2) + tema.TextoSM.Linea
+	// esquinaDentro es la esquina del marco por dentro del borde: la de la cabecera
+	// arriba y la de la última fila abajo (`overflow-auto` recorta en la web).
+	esquinaDentro = tema.RadioLG - tema.Borde
 	// ladoCasilla es el `h-4 w-4` de la casilla de una celda.
 	ladoCasilla = tema.Espacio(4)
 	// ladoIconoCabeza es el `size={14}` del glifo de tipo de cada cabecera, y
@@ -73,7 +75,10 @@ type rejilla struct {
 	AlElegirVarios func(r api.BasesRecord, campo api.BasesField)
 	// AlAdjuntos abre los ficheros de una celda de adjuntos (también quien solo lee).
 	AlAdjuntos func(r api.BasesRecord, campo api.BasesField)
-	AlBorrar   func(r api.BasesRecord)
+	// AlPegar escribe un bloque copiado de una hoja de cálculo desde una celda.
+	AlPegar func(desde celda, texto string)
+	// AlAbrir abre la ficha del registro: el botón de cada fila, también para quien lee.
+	AlAbrir func(r api.BasesRecord)
 	// AlMover avisa de que el foco ha cambiado de celda, con su caja dentro de la
 	// rejilla, para que quien desplaza la deje a la vista.
 	AlMover func(pos fyne.Position, tam fyne.Size)
@@ -94,7 +99,18 @@ type rejilla struct {
 	// Aviso es lo último que la rejilla ha dicho (el `role="status"` de la web): un
 	// valor que no encaja, un campo que se calcula solo.
 	Aviso string
-	r     *rejillaRenderer
+	// resaltada recuadra la rejilla mientras hay ficheros encima: se pueden soltar ahí.
+	resaltada bool
+	r         *rejillaRenderer
+}
+
+// Resaltar enciende o apaga el recuadro de «suelta aquí».
+func (g *rejilla) Resaltar(si bool) {
+	if g.resaltada == si {
+		return
+	}
+	g.resaltada = si
+	g.Refresh()
 }
 
 var (
@@ -286,13 +302,10 @@ func (g *rejilla) elegirOpcion(r api.BasesRecord, campo api.BasesField) {
 // abrirEditor pone el campo de texto encima de la celda, con lo que había o con la
 // letra que lo ha abierto.
 func (g *rejilla) abrirEditor(r api.BasesRecord, campo api.BasesField, inicial string) {
-	texto := textoDeValor(r.Data[campo.ID])
+	texto := textoParaEditar(campo, r.Data[campo.ID])
 	e := ui.NuevaEntrada("").Con(ui.CampoSM)
 	if campo.Kind == api.BasesKindDate {
 		e = ui.CampoFecha(ui.CampoSM)
-		if f, err := time.Parse("2006-01-02", texto); err == nil {
-			texto = ui.EscribirFecha(f)
-		}
 	}
 	if inicial != "" {
 		texto = inicial
@@ -352,18 +365,7 @@ func (g *rejilla) confirmar(devolver bool) bool {
 		g.cerrarEditor()
 		return true
 	}
-	texto := g.editor.Texto()
-	if campo.Kind == api.BasesKindDate {
-		// Se teclea como se escribe una fecha (05/10/2026) y viaja en ISO.
-		if f, vacia, vale := ui.LeerFecha(texto, time.UTC); vale && !vacia {
-			texto = f.Format("2006-01-02")
-		} else if vacia {
-			texto = ""
-		} else {
-			texto = "?"
-		}
-	}
-	valor, vale := valorDeTexto(campo, texto)
+	valor, vale := valorEscrito(campo, g.editor.Texto())
 	if !vale {
 		g.Aviso = g.t("grid.invalidValue")
 		g.editor.Invalida = true
@@ -380,15 +382,23 @@ func (g *rejilla) confirmar(devolver bool) bool {
 	return true
 }
 
-// Tapped enfoca la celda pulsada (y confirma lo que se estuviera editando en otra).
+// Tapped enfoca la celda pulsada (y confirma lo que se estuviera editando en otra). Un
+// toque sobre la celda que ya tiene el foco la edita, como en una hoja de cálculo: en un
+// teléfono el doble toque es torpe y además amplía.
 func (g *rejilla) Tapped(ev *fyne.PointEvent) {
 	c, ok := g.celdaEn(ev.Position)
-	if g.editando && !g.confirmar(true) {
+	editaba := g.editando
+	if editaba && !g.confirmar(true) {
 		return
 	}
+	otraVez := ok && g.enfocada && c == g.foco && !editaba
 	g.pedirFoco()
-	if ok {
-		g.enfocar(c)
+	if !ok {
+		return
+	}
+	g.enfocar(c)
+	if otraVez {
+		g.empezarEdicion("")
 	}
 }
 
@@ -444,12 +454,28 @@ func (g *rejilla) ponerEncima(fila int) {
 	}
 }
 
-// TypedShortcut es Ctrl+Inicio y Ctrl+Fin (⌘ en un Mac): la primera y la última celda.
-// Con un modificador pulsado el driver no manda la tecla por `TypedKey`, sino como atajo
-// al objeto con el foco (visto en una ventana real: por `TypedKey` no llegaba nunca).
+// TypedShortcut es copiar la celda, pegar un bloque desde ella, y Ctrl+Inicio y Ctrl+Fin
+// (⌘ en un Mac): la primera y la última celda. Con un modificador pulsado el driver no
+// manda la tecla por `TypedKey`, sino como atajo al objeto con el foco (visto en una
+// ventana real: por `TypedKey` no llegaba nunca).
 func (g *rejilla) TypedShortcut(s fyne.Shortcut) {
+	if g.editando {
+		return
+	}
+	switch x := s.(type) {
+	case *fyne.ShortcutCopy:
+		if r, campo, ok := g.actual(); ok && x.Clipboard != nil {
+			x.Clipboard.SetContent(g.textoCelda(r, campo))
+		}
+		return
+	case *fyne.ShortcutPaste:
+		if g.PuedeEditar && g.AlPegar != nil && x.Clipboard != nil {
+			g.AlPegar(g.foco, x.Clipboard.Content())
+		}
+		return
+	}
 	a, ok := s.(*desktop.CustomShortcut)
-	if !ok || g.editando || a.Modifier&(fyne.KeyModifierControl|fyne.KeyModifierSuper) == 0 {
+	if !ok || a.Modifier&(fyne.KeyModifierControl|fyne.KeyModifierSuper) == 0 {
 		return
 	}
 	if a.KeyName != fyne.KeyHome && a.KeyName != fyne.KeyEnd {

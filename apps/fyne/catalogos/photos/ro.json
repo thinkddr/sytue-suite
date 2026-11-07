@@ -1,9 +1,14 @@
 {
   "aiBatch.excludeOrg": "Exclude organizația din lotul automat Sytue AI",
   "aiBatch.excludedHint": "Organizația este exclusă din lotul automat Sytue AI. Fotografiile noi nu sunt procesate în fundal pentru sugestii sau asemănări.",
+  "album.coverSet": "Coperta albumului a fost actualizată",
+  "album.isCover": "Aceasta este coperta albumului",
   "album.linkCopied": "Link copiat",
   "album.newLink": "Link nou",
   "album.newLinkConfirm": "Creezi un link nou? Linkul actual nu va mai funcționa pentru cei care îl au deja.",
+  "album.rename": "Redenumește",
+  "album.renamePrompt": "Numele albumului",
+  "album.setCover": "Folosește ca copertă a albumului",
   "album.share": "Partajează",
   "album.shared": "Partajat",
   "album.unshare": "Oprește partajarea",
@@ -100,6 +105,7 @@
     "other": "{count} după data încărcării"
   },
   "gallery.cancelSelection": "Ieși din selecție",
+  "gallery.clearSearch": "Șterge căutarea",
   "gallery.describeCapped": "Se descriu doar primele {count} odată; rulați din nou pentru restul.",
   "gallery.describeNothing": "Fotografiile selectate au deja o descriere",
   "gallery.describeSelected": "Descrie cu Sytue AI",
@@ -108,7 +114,8 @@
   "gallery.describing": "Se descrie {done} din {total}…",
   "gallery.downloadCapped": "Fotografii din afara acestui lot: {count}.",
   "gallery.downloadSelected": "Descarcă",
-  "gallery.downloading": {
+  "gallery.downloading": "Solicitări de descărcare inițiate: {count}. Verificați descărcările din browser.",
+  "gallery.downloadingNative": {
     "one": "Se descarcă 1 fotografie…",
     "few": "Se descarcă {count} fotografii…",
     "other": "Se descarcă {count} de fotografii…"
@@ -117,6 +124,8 @@
   "gallery.empty.description": "Fotografiile din Sytue Drive vor apărea aici, ordonate după data la care au fost făcute.",
   "gallery.empty.title": "Nicio fotografie încă",
   "gallery.favorite": "Adaugă la favorite",
+  "gallery.favoriteFailed": "Fotografii care nu au putut fi modificate: {count}",
+  "gallery.favorited": "Adăugate la favorite: {count}",
   "gallery.likeTheseResults": "Și cele care seamănă",
   "gallery.moreLikeThese": "Mai multe ca acestea",
   "gallery.newAlbum": "Album nou",
@@ -128,6 +137,8 @@
   },
   "gallery.newAlbumTitle": "Album nou",
   "gallery.noExifDate": "Fără dată de captură: ordonate după data încărcării",
+  "gallery.noResults.description": "Încercați alte cuvinte sau ștergeți căutarea pentru a vedea toate fotografiile.",
+  "gallery.noResults.title": "Nicio fotografie nu corespunde cu „{query}”",
   "gallery.onlyImages": "Se pot adăuga doar imagini.",
   "gallery.open": "Deschide {name}",
   "gallery.openInEditor": "Editează {name}",
@@ -160,6 +171,7 @@
     "other": "{count} de fotografii mutate la coș"
   },
   "gallery.unfavorite": "Elimină din favorite",
+  "gallery.unfavorited": "Eliminate din favorite: {count}",
   "gallery.unselectMonth": "Deselectează luna",
   "gallery.uploadFailed": "Nu s-a putut încărca: {name}",
   "gallery.uploaded": {
@@ -207,6 +219,9 @@
   "viewer.askSend": "Întreabă",
   "viewer.canvasBackground": "Fundalul fotografiei",
   "viewer.close": "Închide",
+  "viewer.counter": "{index} / {total}",
+  "viewer.counterLabel": "Fotografia {index} din {total}",
+  "viewer.counterMore": "{count}+",
   "viewer.delete": "Mută la coș",
   "viewer.deleteConfirm": "Mutați această fotografie la coș? Fișierul rămâne în Sytue Drive.",
   "viewer.describe": "Descrie cu Sytue AI",
@@ -246,6 +261,7 @@
   "viewer.saveDescription": "Salvează",
   "viewer.savingDescription": "Se salvează…",
   "viewer.shortcuts": "Scurtături: săgeți pentru a schimba fotografia, spațiu pentru prezentare, I pentru informații, Z pentru dimensiune reală, Delete pentru coș.",
+  "viewer.shortcutsJump": "Home și End duc la prima și la ultima fotografie.",
   "viewer.similar": "Fotografii similare",
   "viewer.slideshow": "Prezentare",
   "viewer.slideshowStop": "Oprește prezentarea",

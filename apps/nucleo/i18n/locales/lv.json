@@ -101,6 +101,7 @@
   "linkedServices.changed": "Šis vienums ir mainījies pie jūsu pakalpojuma sniedzēja. Pirms atkārtotas rediģēšanas atsvaidziniet to.",
   "linkedServices.choose": "Izvēlieties, ko savienot. Pakalpojumu sniedzējs pieprasīs atlasīto pakalpojumu atļaujas.",
   "linkedServices.connected": "Savienotie pakalpojumi",
+  "linkedServices.exists": "Šis konts jau bija savienots, un tagad tas ir atvērts.",
   "linkedServices.keepAdmin": "Google Keep nepieciešama Google Workspace administrācijas apstiprināta konfigurācija. Personiskie Gmail konti to nevar savienot.",
   "linkedServices.notGranted": "Piekļuve šim pakalpojumam netika piešķirta. Savienojiet kontu vēlreiz, lai izvēlētos atļaujas.",
   "linkedServices.notSupported": "Šis pakalpojumu sniedzējs nepiedāvā šo pakalpojumu.",
@@ -170,7 +171,7 @@
   "notifications.kind.pages.order.oversold": "Pasūtījums {number} vietnē {site} apmaksāts bez krājumiem",
   "notifications.kind.pages.order.paid": "Jauns pasūtījums {number} vietnē {site}",
   "notifications.kind.pages.payment.duplicated": "Dubults maksājums par pasūtījumu {number} vietnē {site}: otrais tiek atmaksāts",
-  "notifications.kind.pages.settings.changed": "{actor} nomainīja Sytue Web iestatījumu",
+  "notifications.kind.pages.settings.changed": "{actor} nomainīja Sytue Webs iestatījumu",
   "notifications.kind.pages.store.busy": "Vietnes {site} veikalā ir pārāk daudz pasūtījumu, kas gaida apmaksu",
   "notifications.kind.pages.withdrawal.requested": "Pieprasīta atteikšanās no pasūtījuma {number} vietnē {site}",
   "notifications.kind.photos.album.added": "{actor} pievienoja fotoattēlus albumam „{name}”",
@@ -305,6 +306,8 @@
   "shell.update.failedBody": "Mēģiniet vēlreiz vēlāk vai lejupielādējiet to no portāla.",
   "shell.update.install": "Atjaunināt uz versiju {version}",
   "shell.update.upToDate": "{app} ir atjaunināta",
+  "shell.widgets.wake": "Atjaunināt logrīkus, kad lietotne ir aizvērta",
+  "shell.widgets.wakeHelp": "Kad kaut kas jūsu mainās, Sytue pamodina lietotni ar tukšu Apple paziņojumu, lai tā atjauninātu savu logrīku. Apple redz, kura lietotne un kad, bet nekad – kas mainījās.",
   "ui.backToList": "Atpakaļ uz sarakstu",
   "ui.bulk.clear": "Notīrīt atlasi",
   "ui.bulk.region": "Darbības ar atlasīto",
@@ -322,6 +325,8 @@
   "ui.review.edit": "Rediģēt",
   "ui.save": "Saglabāt",
   "ui.selectRow": "Atlasīt rindu",
+  "ui.suiteClose": "Atpakaļ uz lietotni",
+  "ui.suiteOpen": "Sytue: lietotnes, meklēšana, paziņojumi un konts",
   "ui.wizard.back": "Atpakaļ",
   "ui.wizard.cancel": "Atcelt",
   "ui.wizard.goToStep": "Atpakaļ uz {n}. soli: ",
@@ -340,5 +345,7 @@
   "widgets.pending": "Gaida",
   "widgets.photos": "Fotoattēli",
   "widgets.rows": "Rindas",
-  "widgets.storage": "Krātuve"
+  "widgets.storage": "Krātuve",
+  "widgets.updatedAgo": "Atjaunināts {time}",
+  "widgets.updatedAt": "Atjaunināts: {time}"
 }

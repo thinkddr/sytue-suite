@@ -172,7 +172,7 @@ func (q *VistaEquipos) lista(v tema.Variante) fyne.CanvasObject {
 		q.desplazable.Content = pagina
 		q.desplazable.Refresh()
 	}
-	return container.NewStack(canvas.NewRectangle(tema.Color("bg", v)), q.desplazable)
+	return container.NewStack(canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)), q.desplazable)
 }
 
 // contenidoLista es lo que va dentro de la tarjeta de la sección.
@@ -209,7 +209,7 @@ func (q *VistaEquipos) contenidoLista(v tema.Variante, ancho *float32) fyne.Canv
 		f.LadoGlifo, f.CajaGlifo = LadoGlifoEquipo, CajaGlifoEquipo
 		f.Meta = q.t(clavePuedes[u.Role])
 		// `sytue-meta mt-0.5 block`: lo que se puede hacer pasa de línea en un móvil en
-		// vez de cortarse. La fila va dentro del borde de la lista (`conMargen`).
+		// vez de cortarse. La fila va dentro del borde de la lista (`dentroDeCaja`).
 		f.MetaParte, f.AnchoDe = true, func() float32 { return *ancho - 2*tema.Borde }
 		f.RellenoY, f.Filete = RellenoYFilaUnidad, FileteArriba
 		if i == 0 {
@@ -229,7 +229,7 @@ func (q *VistaEquipos) contenidoLista(v tema.Variante, ancho *float32) fyne.Canv
 		filas = append(filas, f)
 	}
 	borde := ui.NuevaCaja(tema.Color("surface-raised", v), tema.Color("border", v), tema.RadioMD)
-	return container.New(&conMargen{m: tema.Borde}, append(borde.Objetos(), container.New(ui.Columna{}, filas...))...)
+	return dentroDeCaja(borde, tema.Borde, container.New(ui.Columna{}, filas...))
 }
 
 // FilasEsqueletoEquipos son las seis filas de carga de la lista.
@@ -474,7 +474,7 @@ func (q *VistaEquipos) cuerpoDetalle(v tema.Variante) fyne.CanvasObject {
 	escribe := q.Abierta.PuedeEscribir() && !q.SinRed()
 	switch {
 	case q.FaseDetalle == Cargando:
-		return container.NewStack(canvas.NewRectangle(tema.Color("bg", v)), container.NewVScroll(esqueletoFilas()))
+		return container.NewStack(canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)), container.NewVScroll(esqueletoFilas()))
 	case q.Denegada:
 		x := ui.NuevoVacio(q.t("team.detail.deniedTitle"), q.t("team.detail.deniedBody"))
 		x.Ilustracion = iconos.Trazo(iconos.Aviso, 40, "danger-text", v).Objeto()
@@ -517,7 +517,7 @@ func (q *VistaEquipos) cuerpoDetalle(v tema.Variante) fyne.CanvasObject {
 		q.desplazableDetalle.Content = contenido
 		q.desplazableDetalle.Refresh()
 	}
-	return container.NewStack(canvas.NewRectangle(tema.Color("bg", v)), q.desplazableDetalle)
+	return container.NewStack(canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)), q.desplazableDetalle)
 }
 
 // filaContenido es un elemento de la unidad: el glifo de 22 en su caja de 31,5 (carpeta

@@ -79,7 +79,7 @@ export const nucleo = {
   'new.progress': 'Sivuston luomisen vaiheet',
   'new.go_to_step': 'Siirry vaiheeseen {n}',
   'new.step_of': 'Vaihe {n}/{total}',
-  'app_settings.title': 'Sytue Web -asetukset',
+  'app_settings.title': 'Sytue Webs -asetukset',
   'new.search_title': 'Aloita yrityksesi toimialasta',
   'new.search_help':
     'Kirjoita mitä teet tai valitse ryhmä. Jokaisessa sivupohjassa on valmiit tekstit alallesi: vaihdat vain nimen, puhelinnumeron, hinnat ja kuvat.',
@@ -277,7 +277,7 @@ export const nucleo = {
   'domains.start_help':
     'Syötä verkkotunnus, jota haluat käyttää. Tarvitset pääsyn sen palveluntarjoajan DNS-asetuksiin, jolta ostit sen.',
   'domains.progress': 'Verkkotunnuksen yhdistämisen eteneminen',
-  'domains.step.registered': 'Lisätty Sytue Webiin',
+  'domains.step.registered': 'Lisätty Sytue Websiin',
   'domains.step.dns': 'DNS vahvistettu',
   'domains.step.https': 'HTTPS valmis',
   'domains.step.primary': 'Ensisijainen osoite',

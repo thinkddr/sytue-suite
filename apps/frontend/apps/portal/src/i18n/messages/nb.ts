@@ -55,6 +55,7 @@ export const nb: AppCatalog<typeof en> = {
   'inbox.markAll': 'Merk alle som lest',
   'inbox.loading': 'Laster inn varsler…',
   'inbox.unreadDot': 'Ulest',
+  'inbox.markRead': 'Merk som lest',
   'inbox.errorTitle': 'Varslene kunne ikke lastes inn',
   'inbox.errorBody': 'Huben svarer ikke akkurat nå. Prøv igjen om noen sekunder.',
   'inbox.retry': 'Prøv igjen',
@@ -675,6 +676,8 @@ export const nb: AppCatalog<typeof en> = {
   'search.partial': '{sources} svarte ikke, så noen resultater kan mangle. Prøv igjen om litt.',
   'search.partialJoin': ' og ',
   'search.showing': 'Viser {count} av {total} resultater.',
+  'search.loadMore': 'Last inn flere resultater',
+  'search.loadMoreFailed': 'Kunne ikke laste inn flere resultater. Prøv igjen.',
   'privacy.notice':
     'Vi selger ikke dataene dine og deler dem ikke med tredjeparter. Vi bruker dem ikke til å profilere deg, til reklame eller til å trene eller forbedre våre eller andres tjenester. De krypteres under overføring og lagring, og forlater vår europeiske infrastruktur bare når det er strengt nødvendig for å fakturere deg og i integrasjonene du slår på, der tredjeparten ber om godkjenningen din for dataene den skal bruke.',
 };

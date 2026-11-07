@@ -8,6 +8,7 @@ import (
 	"mime"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -122,7 +123,7 @@ func (a *App) descargarSeleccion() {
 	if len(fotos) == 0 || a.cli == nil || a.Guardar == nil {
 		return
 	}
-	a.g.aviso = a.v.T.T("gallery.downloading", i18n.Vars{"count": len(fotos)})
+	a.g.aviso = a.v.T.T("gallery.downloadingNative", i18n.Vars{"count": len(fotos)})
 	a.pintar()
 	gen := a.gen
 	a.enSesion(func(vida context.Context) {
@@ -173,6 +174,97 @@ func (a *App) tirarSeleccion() {
 		a.g.aviso = a.v.T.T("gallery.trashed", i18n.Vars{"count": len(hechas)})
 		if len(hechas) < len(ids) {
 			a.g.error = a.v.T.T("gallery.trashFailed", i18n.Vars{"count": len(ids) - len(hechas)})
+		}
+	})
+}
+
+// planFavoritas es qué hace el corazón de la barra con lo marcado (`planFavoritas` en
+// favoritasEnLote.ts): si TODAS son ya favoritas, las quita; si falta alguna, las marca.
+// Solo se piden las que cambian.
+//
+// Una marcada que no está en `fotos` tiene un corazón que no se conoce: entonces no se
+// puede decir que TODAS lo sean, y se marca (no cambia nada si ya lo era). Aquí `buscar`
+// vacía la selección y no llega a pasar; la regla es la de la web, donde sí.
+func planFavoritas(fotos []api.Photo, sel map[string]bool) (valor bool, ids []string) {
+	todas, alguna := true, false
+	cargada := make(map[string]bool, len(sel))
+	for _, f := range fotos {
+		if sel[f.ID] {
+			alguna = true
+			todas = todas && f.Favorite
+			cargada[f.ID] = true
+		}
+	}
+	var fuera []string
+	for id, si := range sel {
+		if si && !cargada[id] {
+			fuera = append(fuera, id)
+		}
+	}
+	sort.Strings(fuera)
+	valor = len(fuera) > 0 || !alguna || !todas
+	for _, f := range fotos {
+		if sel[f.ID] && f.Favorite != valor {
+			ids = append(ids, f.ID)
+		}
+	}
+	if valor {
+		ids = append(ids, fuera...)
+	}
+	return valor, ids
+}
+
+// conFavoritas es la lista tras el lote con SOLO las que el servicio aceptó: en
+// «Favoritas», desmarcar las saca; en las demás, cambia su corazón.
+func conFavoritas(fotos []api.Photo, hechas []string, valor, soloFavoritas bool) []api.Photo {
+	hecha := make(map[string]bool, len(hechas))
+	for _, id := range hechas {
+		hecha[id] = true
+	}
+	out := make([]api.Photo, 0, len(fotos))
+	for _, f := range fotos {
+		if hecha[f.ID] {
+			if soloFavoritas && !valor {
+				continue
+			}
+			f.Favorite = valor
+		}
+		out = append(out, f)
+	}
+	return out
+}
+
+// favoritasDeLaSeleccion es el corazón de la barra de selección: una llamada por foto
+// que cambia (el servicio no tiene lote), y la lista cambia con las que volvieron bien.
+// Mientras corre, otra pulsación no hace nada: con un doble clic el plan se calculaba
+// dos veces y cada foto se pedía dos veces.
+func (a *App) favoritasDeLaSeleccion() {
+	if len(a.g.seleccion) == 0 || a.g.marcandoFavoritas || a.cli == nil {
+		return
+	}
+	valor, ids := planFavoritas(a.g.fotos, a.g.seleccion)
+	solo := a.soloFavoritas()
+	a.g.marcandoFavoritas = true
+	a.pintar()
+	pedir(a, func(x context.Context, c *api.Photos) ([]string, error) {
+		var hechas []string
+		for _, id := range ids {
+			if c.SetFavorite(x, id, valor) == nil {
+				hechas = append(hechas, id)
+			}
+		}
+		return hechas, nil
+	}, func(hechas []string, _ error) {
+		a.g.marcandoFavoritas = false
+		a.g.fotos = conFavoritas(a.g.fotos, hechas, valor, solo)
+		a.g.seleccion = nil
+		clave := "gallery.unfavorited"
+		if valor {
+			clave = "gallery.favorited"
+		}
+		a.g.aviso = a.v.T.T(clave, i18n.Vars{"count": len(hechas)})
+		if len(hechas) < len(ids) {
+			a.g.error = a.v.T.T("gallery.favoriteFailed", i18n.Vars{"count": len(ids) - len(hechas)})
 		}
 	})
 }

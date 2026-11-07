@@ -197,7 +197,7 @@ func atributosPermitidos(z *html.Tokenizer, tag string, hasAttr bool) string {
 }
 
 // clasePermitida dice si una clase sobrevive: la fila y la casilla de una tarea, y
-// `plegada` en un `<li>`, que es la lista plegada (como en Twos): se guarda con la nota y
+// `plegada` en un `<li>`, que es la lista plegada: se guarda con la nota y
 // la lectura esconde su sublista.
 func clasePermitida(tag, valor string) bool {
 	return valor == "task-row" || valor == "task-checkbox" || (valor == "plegada" && tag == "li")

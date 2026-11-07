@@ -4,15 +4,11 @@
 package mail
 
 import (
-	"image/color"
+	"slices"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/driver/desktop"
-	"fyne.io/fyne/v2/widget"
 
-	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 )
 
@@ -42,6 +38,15 @@ func (b *Buzon) AtajoPersonalizado(s fyne.Shortcut) bool {
 // Atajos engancha el teclado de la web al lienzo de la ventana.
 func (b *Buzon) Atajos(c fyne.Canvas) {
 	c.SetOnTypedRune(func(r rune) { b.Atajo(c, r) })
+	// Escape va por la ranura de teclas sueltas, la que reciben las teclas sin nadie
+	// enfocado; lo que hubiera en ella sigue detrás. Las capas la envuelven al abrirse,
+	// así que con un diálogo o un menú puesto Escape es suyo antes que de la selección.
+	previa := c.OnTypedKey()
+	c.SetOnTypedKey(func(k *fyne.KeyEvent) {
+		if !b.TeclaSuelta(c, k) && previa != nil {
+			previa(k)
+		}
+	})
 	c.AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyComma, Modifier: fyne.KeyModifierShortcutDefault}, func(s fyne.Shortcut) {
 		b.AtajoPersonalizado(s)
 	})
@@ -76,6 +81,8 @@ func (b *Buzon) Atajo(c fyne.Canvas, r rune) bool {
 		}
 		modo := map[rune]Respuesta{'r': Responder, 'a': ResponderATodos, 'f': Reenviar}[r]
 		b.responder(abierta.Mensajes[0], modo)
+	case 'x', 'l', 'v':
+		return b.atajoDeSeleccion(r, hay)
 	case 's', 'e', '#':
 		h := map[rune]func(Conversacion){'s': a.Destacar, 'e': a.Archivar, '#': a.Papelera}[r]
 		if !hay || h == nil {
@@ -85,6 +92,52 @@ func (b *Buzon) Atajo(c fyne.Canvas, r rune) bool {
 	default:
 		return false
 	}
+	return true
+}
+
+// atajoDeSeleccion son «x» (marcar la del cursor), «l» (Etiquetar) y «v» (Mover a…).
+// Los dos menús son del hilo abierto y del buzón propio.
+func (b *Buzon) atajoDeSeleccion(r rune, hay bool) bool {
+	switch {
+	case r == 'x':
+		return b.marcarCursor()
+	case !hay || b.P.Bandeja.SoloLectura:
+		return false
+	case r == 'l':
+		return b.P.Lector.AbrirEtiquetar()
+	default:
+		return b.P.Lector.AbrirMover()
+	}
+}
+
+// TeclaSuelta atiende Escape: vacía la selección, y solo si hay algo marcado; sin
+// selección la tecla sigue su camino. Devuelve si era suya.
+func (b *Buzon) TeclaSuelta(c fyne.Canvas, k *fyne.KeyEvent) bool {
+	if k == nil || k.Name != fyne.KeyEscape || b.redaccion != nil ||
+		(c != nil && c.Overlays().Top() != nil) || b.P.Bandeja.CuantasMarcadas() == 0 {
+		return false
+	}
+	b.quitarSeleccion()
+	return true
+}
+
+// marcarCursor es «x»: la casilla de la conversación del cursor —la abierta, o la fila
+// donde se quedó j/k—, como un clic en ella, ancla del rango incluida.
+func (b *Buzon) marcarCursor() bool {
+	convs := b.P.Bandeja.Conversaciones
+	if b.P.Bandeja.SoloLectura || len(convs) == 0 {
+		return false
+	}
+	i := min(b.cursorAtajo, len(convs)-1)
+	if b.hiloID != "" {
+		// La abierta manda; si no está en la lista (abierta desde un aviso del Hub),
+		// no hay casilla que marcar, como en la web.
+		i = slices.IndexFunc(convs, func(c Conversacion) bool { return c.HiloID == b.hiloID })
+		if i < 0 {
+			return false
+		}
+	}
+	b.marcarFila(convs[i], i)
 	return true
 }
 
@@ -124,8 +177,7 @@ type grupoAtajos struct {
 	atajos []struct{ teclas, descripcion string }
 }
 
-// verAtajos abre la hoja. Es un diálogo `md` con los tres grupos de la web y el botón
-// «Cerrar» en el pie.
+// verAtajos abre la hoja (`ui.MostrarHojaAtajos`) con los tres grupos de la web.
 func (b *Buzon) verAtajos() {
 	lienzo := b.P.Lienzo()
 	if lienzo == nil {
@@ -146,121 +198,18 @@ func (b *Buzon) verAtajos() {
 		}},
 		{t.T("shortcuts.group.triage", nil), []struct{ teclas, descripcion string }{
 			fila("e", "shortcuts.archive"), fila("#", "shortcuts.trash"),
-			fila("s", "shortcuts.star"), fila("?", "shortcuts.help"),
+			fila("s", "shortcuts.star"), fila("x", "shortcuts.select"),
+			fila("Esc", "shortcuts.clearSelection"), fila("l", "shortcuts.label"),
+			fila("v", "shortcuts.move"), fila("?", "shortcuts.help"),
 		}},
 	}
-	ancho := AnchoCuerpoDialogo(ui.DialogoMD, lienzo.Size().Width)
-	secciones := make([]fyne.CanvasObject, 0, len(grupos))
+	hoja := make([]ui.GrupoDeAtajos, 0, len(grupos))
 	for _, g := range grupos {
-		secciones = append(secciones, nuevaSeccionAtajos(g, ancho))
-	}
-	var d *ui.Dialogo
-	cerrar := ui.NuevoBoton(t.T("ui.close", nil), func() { d.Cerrar() })
-	d = ui.NuevoDialogo(t.T("shortcuts.title", nil), container.New(ui.Columna{Hueco: huecoGruposAtajos}, secciones...)).
-		Con(ui.DialogoMD, cerrar)
-	d.RotuloCerrar = t.T("ui.close", nil)
-	d.Mostrar(lienzo)
-}
-
-// Las medidas de la hoja: grupos con `gap-5`, el rótulo en `sytue-overline mb-2`, filas
-// `flex items-center gap-4 py-1.5` separadas por `divide-y` a `border/60`, y cada tecla
-// `h-6 min-w-6 px-1.5 rounded border bg-bg-subtle text-xs` con `gap-1` entre ellas.
-const (
-	huecoGruposAtajos float32 = 5 * 0.25 * tema.Rem
-	bajoRotuloAtajos  float32 = 2 * 0.25 * tema.Rem
-	rellenoFilaAtajo  float32 = 1.5 * 0.25 * tema.Rem
-	huecoFilaAtajo    float32 = 4 * 0.25 * tema.Rem
-	ladoTecla         float32 = 6 * 0.25 * tema.Rem
-)
-
-// AltoFilaAtajo es una fila: su `py-1.5` y la tecla de 21 (que manda sobre el texto).
-var AltoFilaAtajo = 2*rellenoFilaAtajo + ladoTecla
-
-// seccionAtajos es un grupo de la hoja.
-type seccionAtajos struct {
-	widget.BaseWidget
-	g     grupoAtajos
-	ancho float32
-}
-
-func nuevaSeccionAtajos(g grupoAtajos, ancho float32) *seccionAtajos {
-	s := &seccionAtajos{g: g, ancho: ancho}
-	s.ExtendBaseWidget(s)
-	return s
-}
-
-func (s *seccionAtajos) MinSize() fyne.Size {
-	n := float32(len(s.g.atajos))
-	return fyne.NewSize(s.ancho, tema.TextoXS.Linea+bajoRotuloAtajos+n*AltoFilaAtajo+max(n-1, 0)*tema.Borde)
-}
-
-func (s *seccionAtajos) CreateRenderer() fyne.WidgetRenderer {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	r := &seccionAtajosRenderer{s: s, rotulo: ui.NuevoVersal(s.g.titulo, tema.TextoXS, ui.SemiNegrita, tema.Color("text-subtle", v))}
-	r.objetos = append(r.objetos, r.rotulo.Objetos()...)
-	for i, a := range s.g.atajos {
-		if i > 0 {
-			f := canvas.NewRectangle(veloDe(tema.Color("border", v), 0.6))
-			r.filetes = append(r.filetes, f)
-			r.objetos = append(r.objetos, f)
+		h := ui.GrupoDeAtajos{Titulo: g.titulo}
+		for _, a := range g.atajos {
+			h.Atajos = append(h.Atajos, ui.AtajoDeTeclado{Teclas: []string{a.teclas}, Descripcion: a.descripcion})
 		}
-		tecla := ui.NuevaTecla(a.teclas, tema.TextoXS, ui.Normal)
-		tecla.Fondo, tecla.Tinta, tecla.Borde = "bg-subtle", "text-muted", "border"
-		tecla.RellenoX, tecla.Radio = tema.Espacio(1.5), tema.RadioSM
-		tecla.Minimo = fyne.NewSize(ladoTecla, ladoTecla)
-		texto := ui.Texto(a.descripcion, tema.TextoSM, ui.Normal, tema.Color("text", v))
-		r.teclas, r.textos = append(r.teclas, tecla), append(r.textos, texto)
-		r.objetos = append(r.objetos, tecla, texto)
+		hoja = append(hoja, h)
 	}
-	r.Refresh()
-	return r
-}
-
-type seccionAtajosRenderer struct {
-	s       *seccionAtajos
-	rotulo  *ui.Versal
-	filetes []*canvas.Rectangle
-	teclas  []*ui.Tecla
-	textos  []*canvas.Text
-	objetos []fyne.CanvasObject
-}
-
-func (r *seccionAtajosRenderer) MinSize() fyne.Size           { return r.s.MinSize() }
-func (r *seccionAtajosRenderer) Objects() []fyne.CanvasObject { return r.objetos }
-func (r *seccionAtajosRenderer) Destroy()                     {}
-func (r *seccionAtajosRenderer) Layout(t fyne.Size) {
-	r.rotulo.Colocar(0, 0)
-	y := tema.TextoXS.Linea + bajoRotuloAtajos
-	for i := range r.teclas {
-		if i > 0 {
-			r.filetes[i-1].Move(fyne.NewPos(0, y))
-			r.filetes[i-1].Resize(fyne.NewSize(t.Width, tema.Borde))
-			y += tema.Borde
-		}
-		m := r.teclas[i].MinSize()
-		r.teclas[i].Move(fyne.NewPos(0, y+rellenoFilaAtajo))
-		r.teclas[i].Resize(m)
-		ui.ColocarTexto(r.textos[i], tema.TextoSM, m.Width+huecoFilaAtajo, y+(AltoFilaAtajo-tema.TextoSM.Linea)/2)
-		y += AltoFilaAtajo
-	}
-}
-
-func (r *seccionAtajosRenderer) Refresh() {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	r.rotulo.Pintar(tema.Color("text-subtle", v))
-	for _, f := range r.filetes {
-		f.FillColor = veloDe(tema.Color("border", v), 0.6)
-	}
-	for _, x := range r.textos {
-		x.Color = tema.Color("text", v)
-	}
-	for _, o := range r.objetos {
-		o.Refresh()
-	}
-}
-
-// veloDe es un color con su opacidad multiplicada: el `/60` de Tailwind.
-func veloDe(c color.NRGBA, a float32) color.NRGBA {
-	c.A = uint8(float32(c.A) * a)
-	return c
+	ui.MostrarHojaAtajos(lienzo, t.T("shortcuts.title", nil), t.T("ui.close", nil), hoja)
 }

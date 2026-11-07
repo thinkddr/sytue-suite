@@ -171,6 +171,13 @@ func (e *Error) RetryAfter() time.Duration {
 	return time.Duration(min(seconds, 86400) * float64(time.Second))
 }
 
+// Param es un parámetro de texto del error (`params`), o "" si no viene o no es
+// texto: p. ej. el `instance_id` de la cuenta que ya estaba en un 409.
+func (e *Error) Param(name string) string {
+	v, _ := e.cuerpo().Params[name].(string)
+	return v
+}
+
 // Campos son los errores por campo de una validación (`details.fields` de
 // `platform/pkg/validation`): clave del campo → mensaje. Vacío si el servicio no los da.
 func (e *Error) Campos() map[string]string {
@@ -208,6 +215,12 @@ type Request struct {
 	Header    http.Header
 	Body      []byte
 	Anonymous bool
+	// Lectura marca una consulta que va por POST (una búsqueda, un `:resolve`): no
+	// cuenta como escritura para ConAvisoDeEscritura.
+	Lectura bool
+	// SinAviso marca una escritura que no cambia lo que enseña el widget del producto
+	// (el autoguardado de un borrador, la subida previa de un adjunto).
+	SinAviso bool
 }
 
 // maxError acota lo que se guarda del cuerpo de un error.
@@ -244,6 +257,9 @@ func (c *Client) una(ctx context.Context, r Request) (*http.Response, string, er
 	var cuerpo io.Reader
 	if r.Body != nil {
 		cuerpo = bytes.NewReader(r.Body)
+	}
+	if r.Lectura || r.SinAviso {
+		ctx = SinAviso(ctx)
 	}
 	req, err := http.NewRequestWithContext(ctx, metodo, c.URL(r.Path, r.Query), cuerpo)
 	if err != nil {
@@ -340,6 +356,20 @@ func PostJSON[T any](ctx context.Context, c *Client, path string, cuerpo any) (T
 	}
 	return JSON[T](ctx, c, Request{
 		Method: http.MethodPost, Path: path, Body: datos,
+		Header: http.Header{"Content-Type": {"application/json"}},
+	})
+}
+
+// PostJSONLectura es PostJSON para una CONSULTA que va por POST: no avisa de
+// escritura (ConAvisoDeEscritura).
+func PostJSONLectura[T any](ctx context.Context, c *Client, path string, cuerpo any) (T, error) {
+	datos, err := json.Marshal(cuerpo)
+	if err != nil {
+		var cero T
+		return cero, err
+	}
+	return JSON[T](ctx, c, Request{
+		Method: http.MethodPost, Path: path, Body: datos, Lectura: true,
 		Header: http.Header{"Content-Type": {"application/json"}},
 	})
 }

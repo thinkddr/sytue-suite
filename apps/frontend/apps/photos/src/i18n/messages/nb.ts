@@ -130,6 +130,7 @@ export const nb: AppCatalog<typeof en> = {
   'gallery.downloadSelected': 'Last ned',
   'gallery.downloading':
     'Startede nedlastingsforespørsler: {count}. Sjekk nedlastingene i nettleseren.',
+  'gallery.downloadingNative': { one: 'Laster ned 1 bilde…', other: 'Laster ned {count} bilder…' },
   'gallery.downloadCapped': 'Bilder utenfor denne puljen: {count}.',
   'gallery.newAlbum': 'Nytt album',
   'gallery.newAlbumTitle': 'Nytt album',
@@ -252,4 +253,19 @@ export const nb: AppCatalog<typeof en> = {
   'aiBatch.excludeOrg': 'Utelukk organisasjonen fra den automatiske Sytue AI-kjøringen',
   'aiBatch.excludedHint':
     'Organisasjonen er utelukket fra den automatiske Sytue AI-kjøringen. Nye bilder behandles ikke i bakgrunnen for forslag eller likhet.',
+  'album.rename': 'Gi nytt navn',
+  'album.renamePrompt': 'Albumnavn',
+  'album.setCover': 'Bruk som albumomslag',
+  'album.isCover': 'Dette er albumomslaget',
+  'album.coverSet': 'Albumomslaget er oppdatert',
+  'gallery.favorited': 'Lagt til i favoritter: {count}',
+  'gallery.unfavorited': 'Fjernet fra favoritter: {count}',
+  'gallery.favoriteFailed': 'Bilder som ikke kunne endres: {count}',
+  'gallery.noResults.title': 'Ingen bilder samsvarer med «{query}»',
+  'gallery.noResults.description': 'Prøv andre ord, eller tøm søket for å se alle bildene dine.',
+  'gallery.clearSearch': 'Tøm søk',
+  'viewer.counter': '{index} / {total}',
+  'viewer.counterMore': '{count}+',
+  'viewer.counterLabel': 'Bilde {index} av {total}',
+  'viewer.shortcutsJump': 'Home og End går til det første og siste bildet.',
 };

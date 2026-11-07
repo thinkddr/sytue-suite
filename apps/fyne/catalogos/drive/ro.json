@@ -4,6 +4,8 @@
   "action.classified": "Clasificare · {name}",
   "action.classify": "Clasificați",
   "action.copy": "Faceți o copie",
+  "action.copyLink": "Copiați linkul",
+  "action.copyLinkFailed": "Linkul nu a putut fi copiat.",
   "action.delete": "Mutați în coșul de gunoi",
   "action.desktopBody": "Dacă nu ați instalat-o încă, o puteți descărca.",
   "action.desktopCta": "Vedeți descărcările",
@@ -12,6 +14,7 @@
   "action.downloadName": "Descărcați {name}",
   "action.downloadZip": "Descărcați (ZIP)",
   "action.editorFailed": "Editorul nu a putut deschide acest fișier.",
+  "action.linkCopied": "Linkul a fost copiat. Se deschide doar pentru cei care au deja acces.",
   "action.mailFailed": "Editorul de e-mail nu a putut fi deschis",
   "action.menu": "Acțiuni pentru {name}",
   "action.more": "Mai multe acțiuni",
@@ -84,6 +87,16 @@
     "one": "Mutați 1 element",
     "few": "Mutați {count} elemente",
     "other": "Mutați {count} de elemente"
+  },
+  "files.batch.restorePartial": {
+    "one": "1 element nu a putut fi restaurat și rămâne în coșul de gunoi.",
+    "few": "{count} elemente nu au putut fi restaurate și rămân în coșul de gunoi.",
+    "other": "{count} de elemente nu au putut fi restaurate și rămân în coșul de gunoi."
+  },
+  "files.batch.restored": {
+    "one": "1 element restaurat.",
+    "few": "{count} elemente restaurate.",
+    "other": "{count} de elemente restaurate."
   },
   "files.batch.trashBody": {
     "one": "1 element va fi mutat în coșul de gunoi. Îl puteți restaura de acolo.",
@@ -571,6 +584,19 @@
     "other": "{count} de fișiere încărcate."
   },
   "team.upload.partial": "{uploaded} din {count} încărcate.",
+  "trash.emptiedAll": "Coșul de gunoi a fost golit.",
+  "trash.emptyAll": "Goliți coșul de gunoi",
+  "trash.emptyAllBody": {
+    "one": "Elementul din coșul de gunoi va fi șters definitiv, împreună cu istoricul versiunilor. Nu va mai putea fi recuperat.",
+    "few": "Cele {count} elemente din coșul de gunoi vor fi șterse definitiv, împreună cu istoricul versiunilor. Nu vor mai putea fi recuperate.",
+    "other": "Cele {count} de elemente din coșul de gunoi vor fi șterse definitiv, împreună cu istoricul versiunilor. Nu vor mai putea fi recuperate."
+  },
+  "trash.emptyAllPartial": {
+    "one": "1 element nu a putut fi șters și rămâne în coșul de gunoi.",
+    "few": "{count} elemente nu au putut fi șterse și rămân în coșul de gunoi.",
+    "other": "{count} de elemente nu au putut fi șterse și rămân în coșul de gunoi."
+  },
+  "trash.emptyAllTitle": "Goliți coșul de gunoi?",
   "trash.emptyBody": "Fișierele și dosarele șterse vor apărea aici și le veți putea restaura.",
   "trash.emptyTitle": "Coșul de gunoi este gol",
   "trash.errorTitle": "Coșul de gunoi nu a putut fi încărcat",

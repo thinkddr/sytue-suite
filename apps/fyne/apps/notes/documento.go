@@ -150,7 +150,7 @@ type Bloque struct {
 	Crudo string
 	// Celda es la celda de tabla en la que está el bloque; sin tabla, fuera de ellas.
 	Celda Celda
-	// Plegada es el `class="plegada"` de un `<li>` (la lista plegada de Twos): al leer la
+	// Plegada es el `class="plegada"` de un `<li>` (la lista plegada): al leer la
 	// nota no se ve lo que cuelga de él (plegar.go).
 	Plegada bool
 }

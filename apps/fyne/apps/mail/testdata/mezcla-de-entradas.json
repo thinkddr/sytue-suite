@@ -1,0 +1,147 @@
+{
+  "_": "«Todos los buzones de entrada»: las páginas de cada buzón se mezclan por fecha (mezclarPorFecha en apps/frontend/apps/mail/src/components/vistaExterna.ts y en apps/fyne/apps/mail/vista_externa.go). Cada fuente trae lo pedido y no enseñado (pendientes, del más nuevo al más viejo, como lo da su servidor) y el cursor de su página siguiente. Se saca siempre el más nuevo de las cabezas, y se para en cuanto una fuente que aún tiene páginas se queda sin pendientes: lo siguiente podría ser suyo. La fecha empatada la decide el orden de las fuentes (Sytue primero) y la ilegible cuenta como la más vieja.",
+  "casos": [
+    {
+      "nombre": "una fuente sola sale entera y no queda nada",
+      "fuentes": [
+        {
+          "clave": "",
+          "cursor": "",
+          "pendientes": [
+            { "id": "s1", "fecha": "2026-11-06T10:00:00Z" },
+            { "id": "s2", "fecha": "2026-11-06T09:00:00Z" }
+          ]
+        }
+      ],
+      "salida": ["s1", "s2"],
+      "porPedir": [],
+      "quedan": false
+    },
+    {
+      "nombre": "dos fuentes se intercalan por fecha",
+      "fuentes": [
+        {
+          "clave": "",
+          "cursor": "",
+          "pendientes": [
+            { "id": "s1", "fecha": "2026-11-06T10:00:00Z" },
+            { "id": "s2", "fecha": "2026-11-06T08:00:00Z" }
+          ]
+        },
+        {
+          "clave": "gmail",
+          "cursor": "",
+          "pendientes": [
+            { "id": "g1", "fecha": "2026-11-06T09:00:00Z" },
+            { "id": "g2", "fecha": "2026-11-06T07:00:00Z" }
+          ]
+        }
+      ],
+      "salida": ["s1", "g1", "s2", "g2"],
+      "porPedir": [],
+      "quedan": false
+    },
+    {
+      "nombre": "se para donde una fuente con más páginas se queda sin pendientes",
+      "fuentes": [
+        {
+          "clave": "",
+          "cursor": "",
+          "pendientes": [
+            { "id": "s1", "fecha": "2026-11-06T10:00:00Z" },
+            { "id": "s2", "fecha": "2026-11-06T06:00:00Z" }
+          ]
+        },
+        {
+          "clave": "gmail",
+          "cursor": "g-2",
+          "pendientes": [
+            { "id": "g1", "fecha": "2026-11-06T09:00:00Z" },
+            { "id": "g2", "fecha": "2026-11-06T08:00:00Z" }
+          ]
+        }
+      ],
+      "salida": ["s1", "g1", "g2"],
+      "porPedir": ["gmail"],
+      "quedan": true
+    },
+    {
+      "nombre": "una fuente sin pendientes y con páginas se pide antes de sacar nada",
+      "fuentes": [
+        {
+          "clave": "",
+          "cursor": "",
+          "pendientes": [{ "id": "s1", "fecha": "2026-11-06T10:00:00Z" }]
+        },
+        { "clave": "icloud", "cursor": "i-1", "pendientes": [] }
+      ],
+      "salida": [],
+      "porPedir": ["icloud"],
+      "quedan": true
+    },
+    {
+      "nombre": "con la fecha empatada va antes la fuente que va antes, Sytue",
+      "fuentes": [
+        {
+          "clave": "",
+          "cursor": "",
+          "pendientes": [{ "id": "s1", "fecha": "2026-11-06T10:00:00Z" }]
+        },
+        {
+          "clave": "gmail",
+          "cursor": "",
+          "pendientes": [{ "id": "g1", "fecha": "2026-11-06T10:00:00Z" }]
+        }
+      ],
+      "salida": ["s1", "g1"],
+      "porPedir": [],
+      "quedan": false
+    },
+    {
+      "nombre": "una fecha ilegible cuenta como la más vieja y no reordena su fuente",
+      "fuentes": [
+        {
+          "clave": "",
+          "cursor": "",
+          "pendientes": [{ "id": "s1", "fecha": "2026-11-06T10:00:00Z" }]
+        },
+        {
+          "clave": "imap",
+          "cursor": "",
+          "pendientes": [
+            { "id": "x1", "fecha": "anteayer" },
+            { "id": "x2", "fecha": "2026-11-06T09:00:00Z" }
+          ]
+        }
+      ],
+      "salida": ["s1", "x1", "x2"],
+      "porPedir": [],
+      "quedan": false
+    },
+    {
+      "nombre": "las zonas horarias se comparan como instantes, no como texto",
+      "fuentes": [
+        {
+          "clave": "",
+          "cursor": "",
+          "pendientes": [{ "id": "s1", "fecha": "2026-11-06T10:00:00+02:00" }]
+        },
+        {
+          "clave": "gmail",
+          "cursor": "",
+          "pendientes": [{ "id": "g1", "fecha": "2026-11-06T09:00:00Z" }]
+        }
+      ],
+      "salida": ["g1", "s1"],
+      "porPedir": [],
+      "quedan": false
+    },
+    {
+      "nombre": "sin fuentes no hay nada que mezclar",
+      "fuentes": [],
+      "salida": [],
+      "porPedir": [],
+      "quedan": false
+    }
+  ]
+}

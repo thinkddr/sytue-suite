@@ -133,6 +133,7 @@ export const hu: AppCatalog<typeof en> = {
   'gallery.downloadSelected': 'Letöltés',
   'gallery.downloading':
     'Elindított letöltési kérések: {count}. Ellenőrizze a böngésző letöltéseit.',
+  'gallery.downloadingNative': { one: '1 fotó letöltése…', other: '{count} fotó letöltése…' },
   'gallery.downloadCapped': 'Ebből a kötegből kimaradó fényképek: {count}.',
   'gallery.newAlbum': 'Új album',
   'gallery.newAlbumTitle': 'Új album',
@@ -253,4 +254,20 @@ export const hu: AppCatalog<typeof en> = {
   'aiBatch.excludeOrg': 'Szervezet kizárása az automatikus Sytue AI-feldolgozásból',
   'aiBatch.excludedHint':
     'A szervezet ki van zárva az automatikus Sytue AI-feldolgozásból. Az új fényképeket nem dolgozzuk fel a háttérben javaslatokhoz vagy hasonlóságokhoz.',
+  'album.rename': 'Átnevezés',
+  'album.renamePrompt': 'Az album neve',
+  'album.setCover': 'Beállítás albumborítóként',
+  'album.isCover': 'Ez az album borítója',
+  'album.coverSet': 'Az albumborító frissült',
+  'gallery.favorited': 'Kedvencekhez adva: {count}',
+  'gallery.unfavorited': 'Kedvencek közül eltávolítva: {count}',
+  'gallery.favoriteFailed': 'Nem módosítható fotók: {count}',
+  'gallery.noResults.title': 'Egy fotó sem felel meg ennek: „{query}”',
+  'gallery.noResults.description':
+    'Próbáljon más szavakat, vagy törölje a keresést az összes fotó megtekintéséhez.',
+  'gallery.clearSearch': 'Keresés törlése',
+  'viewer.counter': '{index} / {total}',
+  'viewer.counterMore': '{count}+',
+  'viewer.counterLabel': 'Fotó: {index} / {total}',
+  'viewer.shortcutsJump': 'A Home és az End az első és az utolsó fotóra ugrik.',
 };

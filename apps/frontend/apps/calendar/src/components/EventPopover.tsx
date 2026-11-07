@@ -21,7 +21,7 @@
  */
 import type { JSX } from 'preact';
 import type { Locale } from '@sytue/i18n';
-import { useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import {
   Button,
   Icon,
@@ -34,6 +34,8 @@ import {
   useEnHoja,
 } from '@sytue/ui';
 import { EventNotes } from './EventNotes.js';
+import { GuestList } from './GuestList.js';
+import { parseGuests, parseOrganizer } from '../lib/ical.js';
 import type { GridEvent } from './CalendarGrid.js';
 import { eventInstant, parseTzid } from './dates.js';
 import { formatWhen } from '../lib/search.js';
@@ -113,6 +115,12 @@ export function EventPopover({
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   // En el teléfono, la hoja de los diálogos: el foco, Escape y el cierre los lleva `Modal`.
   const enHoja = useEnHoja();
+  // Quién organiza y qué ha contestado cada invitado: del iCalendar crudo, que es
+  // lo único que trae el evento de la rejilla. Una vez por evento, no en cada
+  // render (el popover se repinta al recolocarse).
+  const ical = event?.ical;
+  const organizer = useMemo(() => (ical ? parseOrganizer(ical) : null), [ical]);
+  const guests = useMemo(() => (ical ? parseGuests(ical) : []), [ical]);
   // «Atrás» cierra la vista rápida; en la hoja lo hace el `Modal`.
   useMobileBack(Boolean(event && anchor) && !enHoja, onClose);
 
@@ -240,7 +248,6 @@ export function EventPopover({
   const when = whenLabel(t, locale, event);
   const readOnly = Boolean(event.readOnly);
   const titulo = event.summary || t('event.untitled');
-
   // Las acciones de la hoja, en el pie del diálogo: «Eliminar» arriba y la pareja
   // Duplicar | Editar debajo, con el principal abajo a la derecha.
   const acciones = (): JSX.Element =>
@@ -328,6 +335,7 @@ export function EventPopover({
               </div>
             ) : null}
           </dl>
+          <GuestList t={t} organizer={organizer} guests={guests} large />
           {event.conferenceUrl ? (
             <Button
               href={event.conferenceUrl}
@@ -447,6 +455,14 @@ export function EventPopover({
           </div>
         ) : null}
       </dl>
+
+      {/* Quién organiza y qué ha contestado cada uno, bajo el detalle: es lo que se
+          mira para saber si la reunión sigue en pie. */}
+      {organizer || guests.length > 0 ? (
+        <div class="mt-2.5 pl-[18px]">
+          <GuestList t={t} organizer={organizer} guests={guests} />
+        </div>
+      ) : null}
 
       {/* Las notas vinculadas (Sytue Notepads) van pegadas al detalle y ANTES de las
           acciones: son contexto de la reunión —el acta, el guion—, no una acción

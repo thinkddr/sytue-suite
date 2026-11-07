@@ -575,7 +575,7 @@ func (f *FilaDrive) CreateRenderer() fyne.WidgetRenderer {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	r := &filaDriveRenderer{
 		f:         f,
-		base:      canvas.NewRectangle(tema.Color("bg", v)),
+		base:      canvas.NewRectangle(tema.Color(FondoHoja(), v)),
 		velo:      canvas.NewRectangle(color.NRGBA{}),
 		linea:     canvas.NewRectangle(tokens.ConAlfa(tema.Color("border", v), 0.6)),
 		tesela:    NuevaTeselaTipo(f.Extension, f.Carpeta, TeselaDrive),
@@ -772,7 +772,7 @@ func (r *filaDriveRenderer) Layout(t fyne.Size) {
 func (r *filaDriveRenderer) Refresh() {
 	f := r.f
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	r.base.FillColor = tema.Color("bg", v)
+	r.base.FillColor = tema.Color(FondoHoja(), v)
 	r.linea.FillColor = tokens.ConAlfa(tema.Color("border", v), 0.6)
 	for _, a := range r.anillo {
 		a.FillColor = tema.Color("primary", v)
@@ -864,8 +864,8 @@ func (c *CabeceraDrive) CreateRenderer() fyne.WidgetRenderer {
 	tinta := tema.Color("text-subtle", v)
 	r := &cabeceraDriveRenderer{
 		c:      c,
-		base:   canvas.NewRectangle(tema.Color("bg", v)),
-		sombra: canvas.NewRectangle(BordeSobre("border", "bg", v)),
+		base:   canvas.NewRectangle(tema.Color(FondoHoja(), v)),
+		sombra: canvas.NewRectangle(BordeSobre("border", FondoHoja(), v)),
 		nombre: NuevoVersal(c.Nombre, tema.TextoXS, SemiNegrita, tinta),
 		tamano: NuevoVersal(c.Tamano, tema.TextoXS, SemiNegrita, tinta),
 		fecha:  NuevoVersal(c.Fecha, tema.TextoXS, SemiNegrita, tinta),
@@ -937,8 +937,8 @@ func (r *cabeceraDriveRenderer) Layout(t fyne.Size) {
 
 func (r *cabeceraDriveRenderer) Refresh() {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	r.base.FillColor = tema.Color("bg", v)
-	r.sombra.FillColor = BordeSobre("border", "bg", v)
+	r.base.FillColor = tema.Color(FondoHoja(), v)
+	r.sombra.FillColor = BordeSobre("border", FondoHoja(), v)
 	tinta := tema.Color("text-subtle", v)
 	for _, e := range []*Versal{r.nombre, r.tamano, r.fecha} {
 		e.Pintar(tinta)

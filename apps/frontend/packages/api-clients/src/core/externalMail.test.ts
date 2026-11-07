@@ -1,7 +1,14 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 import { expect, test } from 'bun:test';
 import { HttpClient } from './http.js';
-import { ExternalMailClient } from './externalMail.js';
+import {
+  ExternalMailClient,
+  isICloudMail,
+  mailProviderName,
+  forgetMailConsent,
+  pendingMailConsent,
+  servesMail,
+} from './externalMail.js';
 test('mail consent uses the personal route and exact selected provider origin', async () => {
   for (const [provider, host] of [
     ['gmail', 'accounts.google.com'],
@@ -75,4 +82,104 @@ test('mail actions keep opaque IDs as query data and never replay sending', asyn
   ).rejects.toThrow();
   expect(calls.filter((call) => call.url.pathname.endsWith('/send'))).toHaveLength(1);
   expect(calls.every((call) => call.url.pathname.startsWith('/api/external-mail/'))).toBe(true);
+});
+test('Mail opens only accounts connected for mail', () => {
+  expect(servesMail({})).toBe(true);
+  expect(servesMail({ services: ['mail', 'calendar'] })).toBe(true);
+  expect(servesMail({ services: ['calendar', 'contacts'] })).toBe(false);
+  expect(servesMail({ services: [] })).toBe(false);
+});
+
+test('iCloud is told apart from other IMAP connections by its server', () => {
+  const server = (host: string) => ({
+    address: 'ana@icloud.com',
+    incoming: { host, port: 993, username: 'ana@icloud.com', security: 'tls' as const },
+    outgoing: { host: 'smtp.mail.me.com', port: 587, username: '', security: 'starttls' as const },
+  });
+  expect(isICloudMail({ provider: 'imap', configuration: server('IMAP.mail.me.com') })).toBe(true);
+  expect(isICloudMail({ provider: 'imap', configuration: server('imap.example.eu') })).toBe(false);
+  expect(isICloudMail({ provider: 'pop3', configuration: server('imap.mail.me.com') })).toBe(false);
+  expect(isICloudMail({ provider: 'imap' })).toBe(false);
+});
+
+// The list and the sidebar name an iCloud account as such, not as «IMAP».
+test('mailProviderName names the iCloud preset and every provider', () => {
+  const icloud = {
+    incoming: { host: 'imap.mail.me.com', port: 993, username: '', security: 'tls' as const },
+    outgoing: { host: 'smtp.mail.me.com', port: 587, username: '', security: 'starttls' as const },
+    address: 'ana@icloud.com',
+  };
+  expect(mailProviderName({ provider: 'imap', configuration: icloud })).toBe('iCloud Mail');
+  expect(mailProviderName({ provider: 'imap' })).toBe('IMAP');
+  expect(mailProviderName({ provider: 'yahoo' })).toBe('Yahoo Mail');
+});
+
+// Drafts are not listed: the return from a cancelled Outlook sign-in came back with Gmail.
+test('the provider of a sign-in in flight survives the trip to the provider', async () => {
+  const store = new Map<string, string>();
+  const previous = globalThis.sessionStorage;
+  globalThis.sessionStorage = {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => void store.set(key, value),
+    removeItem: (key: string) => void store.delete(key),
+  } as Storage;
+  try {
+    const api = new ExternalMailClient(
+      new HttpClient({
+        baseUrl: 'https://mail.test/api',
+        fetchImpl: async () =>
+          Response.json({
+            instance_id: 'draft-1',
+            authorize_url: 'https://login.microsoftonline.com/authorize?state=sealed',
+            scopes: [],
+          }),
+      }),
+    );
+    expect(pendingMailConsent('draft-1')).toBeUndefined();
+    await api.connect('microsoft', 'external-calendar', undefined, ['mail', 'calendar']);
+    const pending = {
+      instance_id: 'draft-1',
+      provider: 'microsoft',
+      services: ['mail', 'calendar'],
+    };
+    expect(pendingMailConsent('draft-1')).toEqual(pending);
+    expect(pendingMailConsent(null)).toEqual(pending);
+    expect(pendingMailConsent('other')).toBeUndefined();
+    forgetMailConsent();
+    expect(pendingMailConsent(null)).toBeUndefined();
+    store.set('sytue.external-mail.consent', '{"instance_id":"x","provider":"imap"}');
+    expect(pendingMailConsent('x')).toBeUndefined();
+    store.set('sytue.external-mail.consent', 'not json');
+    expect(pendingMailConsent()).toBeUndefined();
+  } finally {
+    globalThis.sessionStorage = previous;
+  }
+});
+test('the sidebar summary is one personal GET with no instance in it', async () => {
+  const calls: string[] = [];
+  const api = new ExternalMailClient(
+    new HttpClient({
+      baseUrl: 'https://mail.test/api',
+      fetchImpl: async (url, init) => {
+        calls.push(`${init?.method ?? 'GET'} ${String(url)}`);
+        return Response.json({
+          items: [
+            {
+              instance_id: 'own',
+              provider: 'imap',
+              name: 'Work',
+              address: 'ana@work.eu',
+              connected: true,
+              capabilities: {},
+              state: 'reconnect',
+              folders: [],
+            },
+          ],
+        });
+      },
+    }),
+  );
+  const summary = await api.summary();
+  expect(calls).toEqual(['GET https://mail.test/api/external-mail/summary']);
+  expect(summary.items[0]?.state).toBe('reconnect');
 });

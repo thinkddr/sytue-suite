@@ -107,7 +107,13 @@ func TestUnEnlaceEntranteLlegaAntesDeCargar(t *testing.T) {
 // esperar espera a que algo que corre en segundo plano se cumpla, con un tope.
 func esperar(t *testing.T, listo func() bool) {
 	t.Helper()
-	fin := time.Now().Add(10 * time.Second)
+	esperarDurante(t, 10*time.Second, listo)
+}
+
+// esperarDurante es esperar con otro tope, para lo que es lento a propósito.
+func esperarDurante(t *testing.T, tope time.Duration, listo func() bool) {
+	t.Helper()
+	fin := time.Now().Add(tope)
 	for !listo() {
 		if time.Now().After(fin) {
 			t.Fatal("no ha llegado a tiempo")

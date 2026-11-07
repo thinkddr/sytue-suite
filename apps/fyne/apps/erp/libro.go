@@ -4,6 +4,8 @@
 package erp
 
 import (
+	"slices"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
@@ -47,10 +49,77 @@ type Libro struct {
 	Asientos []api.ERPAsiento
 	// Balance es el sumas y saldos; nil, cargando.
 	Balance *api.ERPBalance
-	// Fallo es la banda roja de arriba (`m-6`), que en la web SUSTITUYE a la pantalla.
+	// Fallo es la banda roja que va debajo de la cabecera, en lugar del contenido.
 	Fallo string
 	// Ventana y Ocupado deciden el ancho, como en la lista.
 	Ventana float32
+	// Periodo es el corte elegido en el selector junto al título (periodo.go); vacío,
+	// «todo». AlPeriodo lo cambia y vuelve a pedir; nil, sin selector.
+	Periodo   string
+	AlPeriodo func(string)
+	// selPeriodo es el MISMO selector de una pintada a otra, como `Lista.buscador`:
+	// elegir repinta, y uno nuevo en cada Repintar dejaba el foco en el que ya no se ve
+	// —con las flechas había que volver con Tab a cada paso—. En la web el `<select>`
+	// conserva el foco.
+	selPeriodo *ui.Selector
+}
+
+// periodo es el elegido, con «todo» por defecto.
+func (b *Libro) periodo() string {
+	if b.Periodo == "" {
+		return "todo"
+	}
+	return b.Periodo
+}
+
+// cabecera es el `CabeceraPeriodo` de la web: el título y, a la derecha, el `<select>`
+// del período con las medidas del de la barra de lote. Es más bajo que el título, así
+// que la fila mide lo que el título.
+func (b *Libro) cabecera(clave string, v tema.Variante) fyne.CanvasObject {
+	titulo := ui.Texto(b.tr.T(clave, nil), tema.Texto2XL, ui.SemiNegrita, tema.Color("text", v))
+	if b.AlPeriodo == nil {
+		return textoSolo(titulo)
+	}
+	opciones := make([]string, len(Periodos))
+	for i, p := range Periodos {
+		opciones[i] = b.tr.T(rotuloPeriodo[p], nil)
+	}
+	if b.selPeriodo == nil {
+		b.selPeriodo = ui.NuevoSelector(nil, nil)
+	}
+	sel := b.selPeriodo
+	sel.Opciones, sel.AlElegir = opciones, func(i int) { b.AlPeriodo(Periodos[i]) }
+	sel.Elegida = max(slices.Index(Periodos, b.periodo()), 0)
+	sel.Propio = selectorPropio(CampoLote, AltoSelectLote)
+	sel.Ancho = AnchoSelectLote(opciones)
+	sel.Rotulo = b.tr.T("ledger.period", nil)
+	sel.Refresh()
+	return container.New(&cabeceraPeriodo{t: titulo, sel: sel}, titulo, sel)
+}
+
+// cabeceraPeriodo pone el título a la izquierda y el selector a la derecha, centrado.
+type cabeceraPeriodo struct {
+	t   *canvas.Text
+	sel *ui.Selector
+}
+
+func (c *cabeceraPeriodo) MinSize([]fyne.CanvasObject) fyne.Size {
+	return fyne.NewSize(0, tema.Texto2XL.Linea)
+}
+
+func (c *cabeceraPeriodo) Layout(_ []fyne.CanvasObject, t fyne.Size) {
+	ui.ColocarTexto(c.t, tema.Texto2XL, 0, (t.Height-tema.Texto2XL.Linea)/2)
+	m := c.sel.MinSize()
+	c.sel.Resize(m)
+	c.sel.Move(fyne.NewPos(t.Width-m.Width, (t.Height-m.Height)/2))
+}
+
+// claveVacio es `textoVacio`: con un corte puesto, «Nada asentado en este período».
+func (b *Libro) claveVacio() string {
+	if b.periodo() == "todo" {
+		return "ledger.empty"
+	}
+	return "ledger.emptyPeriod"
 }
 
 // anchoUtilDe es el `max-w-*` centrado en `main` menos su `px-6`.
@@ -64,18 +133,15 @@ func anchoUtilDe(ventana, maximo float32) float32 {
 
 // ObjetoLibro es el libro diario.
 func (b *Libro) ObjetoLibro(v tema.Variante) fyne.CanvasObject {
-	if o := b.fallo(v); o != nil {
-		return o
-	}
-	if b.Asientos == nil {
-		return enPagina(centrado(ui.NuevaRueda(22, "text-muted", v), AltoEsqueleto), AltoEsqueleto, AnchoContenidoLista, 0)
+	p := &pila{}
+	p.add(b.cabecera("nav.ledger", v), tema.Texto2XL.Linea, 0)
+	if b.pendiente(p, b.Asientos == nil, v) {
+		o, alto := p.objeto()
+		return enPagina(o, alto, AnchoContenidoLista)
 	}
 	ancho := anchoUtilDe(b.Ventana, AnchoContenidoLista)
-	p := &pila{}
-	titulo := ui.Texto(b.tr.T("nav.ledger", nil), tema.Texto2XL, ui.SemiNegrita, tema.Color("text", v))
-	p.add(textoSolo(titulo), tema.Texto2XL.Linea, 0)
 	if len(b.Asientos) == 0 {
-		o, alto := vacioLibro(b.tr, v)
+		o, alto := vacioLibro(b.tr, b.claveVacio(), v)
 		p.add(o, alto, TituloLibroMB)
 	}
 	for i, a := range b.Asientos {
@@ -87,12 +153,13 @@ func (b *Libro) ObjetoLibro(v tema.Variante) fyne.CanvasObject {
 		p.add(o, alto, arriba)
 	}
 	o, alto := p.objeto()
-	return enPagina(o, alto, AnchoContenidoLista, MargenLista)
+	return enPagina(o, alto, AnchoContenidoLista)
 }
 
-// vacioLibro es «Todavía no hay nada asentado», centrado con su `py-16`.
-func vacioLibro(tr *i18n.Translator, v tema.Variante) (fyne.CanvasObject, float32) {
-	t := ui.Texto(tr.T("ledger.empty", nil), tema.TextoSM, ui.Normal, tema.Color("text-muted", v))
+// vacioLibro es «Todavía no hay nada asentado» (o la clave que toque), centrado con su
+// `py-16`.
+func vacioLibro(tr *i18n.Translator, clave string, v tema.Variante) (fyne.CanvasObject, float32) {
+	t := ui.Texto(tr.T(clave, nil), tema.TextoSM, ui.Normal, tema.Color("text-muted", v))
 	alto := tema.TextoSM.Linea + 2*VacioLibroPY
 	return container.New(&alCentro{t: t, alto: alto}, t), alto
 }
@@ -114,51 +181,49 @@ func textoSolo(t *canvas.Text) fyne.CanvasObject {
 	return container.New(&textoEn1{t: t, alto: escalonDe(t).Linea}, t)
 }
 
-// fallo es la banda roja que la web pone EN LUGAR de la pantalla: `m-6 rounded-md px-4
-// py-3 text-sm`.
-func (b *Libro) fallo(v tema.Variante) fyne.CanvasObject {
-	if b.Fallo == "" {
-		return nil
+// AltoCargandoLibro es el `py-16` con la rueda de 22 de `Cargando` en Libro.tsx.
+var AltoCargandoLibro = 22 + 2*VacioLibroPY
+
+// pendiente pone, DEBAJO de la cabecera, la banda roja del fallo (`rounded-md px-4 py-3
+// text-sm`) o la rueda mientras carga, y dice si puso alguna. La cabecera con el
+// selector va SIEMPRE: pintar solo la rueda o solo el fallo quitaba el selector a cada
+// cambio de período, y con un período que fallaba no había forma de volver a «Todo».
+func (b *Libro) pendiente(p *pila, cargando bool, v tema.Variante) bool {
+	switch {
+	case b.Fallo != "":
+		bnd := &banda{
+			caja:     ui.NuevaCaja(tema.Color("danger-bg", v), sinColor, tema.RadioMD),
+			texto:    ui.Texto(b.Fallo, tema.TextoSM, ui.Normal, tema.Color("danger-text", v)),
+			completo: b.Fallo,
+		}
+		p.add(container.New(bnd, append(bnd.caja.Objetos(), bnd.texto)...), AltoBandaAviso, TituloLibroMB)
+	case cargando:
+		p.add(centrado(ui.NuevaRueda(22, "text-muted", v), AltoCargandoLibro), AltoCargandoLibro, TituloLibroMB)
+	default:
+		return false
 	}
-	bnd := &banda{
-		caja:     ui.NuevaCaja(tema.Color("danger-bg", v), sinColor, tema.RadioMD),
-		texto:    ui.Texto(b.Fallo, tema.TextoSM, ui.Normal, tema.Color("danger-text", v)),
-		completo: b.Fallo,
-	}
-	o := container.New(bnd, append(bnd.caja.Objetos(), bnd.texto)...)
-	return container.New(&conMargenes{m: MargenLista, alto: AltoBandaAviso}, o)
+	return true
 }
 
-// conMargenes pone su hijo con el mismo margen por los cuatro lados.
-type conMargenes struct{ m, alto float32 }
-
-func (c *conMargenes) MinSize([]fyne.CanvasObject) fyne.Size {
-	return fyne.NewSize(0, c.alto+2*c.m)
-}
-
-func (c *conMargenes) Layout(objs []fyne.CanvasObject, t fyne.Size) {
-	for _, o := range objs {
-		o.Move(fyne.NewPos(c.m, c.m))
-		o.Resize(fyne.NewSize(max(t.Width-2*c.m, 0), c.alto))
-	}
-}
-
-// enPagina centra un bloque de alto conocido en el `max-w-*` de `main`, con `py`.
-func enPagina(o fyne.CanvasObject, alto, maximo, py float32) fyne.CanvasObject {
-	return container.New(&pagina0{o: o, alto: alto, maximo: maximo, py: py}, o)
+// enPagina centra un bloque de alto conocido en el `max-w-*` de `main`, con su `px-6
+// py-6` (MargenLista).
+func enPagina(o fyne.CanvasObject, alto, maximo float32) fyne.CanvasObject {
+	return container.New(&pagina0{o: o, alto: alto, maximo: maximo}, o)
 }
 
 type pagina0 struct {
 	o            fyne.CanvasObject
 	alto, maximo float32
-	py           float32
 }
 
-func (p *pagina0) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(0, p.alto+2*p.py) }
+func (p *pagina0) MinSize([]fyne.CanvasObject) fyne.Size {
+	return fyne.NewSize(0, p.alto+2*MargenLista)
+}
+
 func (p *pagina0) Layout(_ []fyne.CanvasObject, t fyne.Size) {
 	caja := min(t.Width, p.maximo)
 	x := (t.Width-caja)/2 + MargenLista
-	p.o.Move(fyne.NewPos(x, p.py))
+	p.o.Move(fyne.NewPos(x, MargenLista))
 	p.o.Resize(fyne.NewSize(max(caja-2*MargenLista, 0), p.alto))
 }
 
@@ -167,25 +232,22 @@ func (p *pagina0) Layout(_ []fyne.CanvasObject, t fyne.Size) {
 // ObjetoBalance es el sumas y saldos: cuenta, debe, haber y saldo, y abajo los totales
 // con «Cuadra» o «No cuadra», que es lo primero que mira quien abre esta pantalla.
 func (b *Libro) ObjetoBalance(v tema.Variante) fyne.CanvasObject {
-	if o := b.fallo(v); o != nil {
-		return o
-	}
-	if b.Balance == nil {
-		return enPagina(centrado(ui.NuevaRueda(22, "text-muted", v), AltoEsqueleto), AltoEsqueleto, AnchoBalance, 0)
+	p := &pila{}
+	p.add(b.cabecera("nav.balance", v), tema.Texto2XL.Linea, 0)
+	if b.pendiente(p, b.Balance == nil, v) {
+		o, alto := p.objeto()
+		return enPagina(o, alto, AnchoBalance)
 	}
 	ancho := anchoUtilDe(b.Ventana, AnchoBalance)
-	p := &pila{}
-	titulo := ui.Texto(b.tr.T("nav.balance", nil), tema.Texto2XL, ui.SemiNegrita, tema.Color("text", v))
-	p.add(textoSolo(titulo), tema.Texto2XL.Linea, 0)
 	if len(b.Balance.Cuentas) == 0 {
-		o, alto := vacioLibro(b.tr, v)
+		o, alto := vacioLibro(b.tr, b.claveVacio(), v)
 		p.add(o, alto, TituloLibroMB)
 	} else {
 		o, alto := b.tablaBalance(v, ancho)
 		p.add(o, alto, TituloLibroMB)
 	}
 	o, alto := p.objeto()
-	return enPagina(o, alto, AnchoBalance, MargenLista)
+	return enPagina(o, alto, AnchoBalance)
 }
 
 // Altos de las filas del balance, medidos: la cabecera en versalitas (28,5 con medio

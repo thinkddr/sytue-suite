@@ -10,7 +10,7 @@ require (
 	github.com/alicebob/miniredis/v2 v2.40.0
 	github.com/beevik/etree v1.8.1
 	github.com/coder/websocket v1.8.15
-	github.com/crewjam/saml v0.5.1
+	github.com/crewjam/saml v0.5.2-0.20261106150424-8ec91e20a8dd
 	github.com/emersion/go-ical v0.0.0-20250609112844-439c63cef608
 	github.com/emersion/go-imap/v2 v2.0.0-beta.8
 	github.com/emersion/go-message v0.18.2

@@ -220,23 +220,15 @@ func (zonaLayout) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 // filaEnvio es un fichero de la cola (UploadQueue.tsx): el icono de su estado, el
 // título editable, el nombre y el tamaño, la barra o el estado, y sus mandos.
 func filaEnvio(v Vista, e Envio, d Subir) fyne.CanvasObject {
-	glifo, tinta := glifoVideo, "text-subtle"
+	glifo, tinta := iconos.Video, "text-subtle"
 	switch e.Fase {
 	case Fallida:
-		glifo, tinta = "", "danger-text"
+		glifo, tinta = iconos.Peligro, "danger-text"
 	case Procesando:
-		glifo, tinta = "", "success-text"
+		glifo, tinta = iconos.Tic, "success-text"
 	case Esperando, Subiendo:
 	}
-	var icono fyne.CanvasObject
-	switch {
-	case glifo != "":
-		icono = iconos.TrazoDeRuta(glifo, iconos.TallaSM, tema.Color(tinta, v.Variante)).Objeto()
-	case e.Fase == Fallida:
-		icono = iconos.Trazo(iconos.Peligro, iconos.TallaSM, tinta, v.Variante).Objeto()
-	default:
-		icono = iconos.Trazo(iconos.Tic, iconos.TallaSM, tinta, v.Variante).Objeto()
-	}
+	icono := iconos.Trazo(glifo, iconos.TallaSM, tinta, v.Variante).Objeto()
 	var estado fyne.CanvasObject
 	switch e.Fase {
 	case Subiendo:

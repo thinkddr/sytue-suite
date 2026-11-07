@@ -210,61 +210,19 @@ try {
     await dialog
       .getByRole("button", { name: "Connect account", exact: true })
       .click();
-    await expect(
-      dialog.getByRole("button", { name: "Synthetic email", exact: false }),
-    ).toBeVisible();
+    // Desde d3bf285c8 el diálogo ya no lleva mini-buzón, y desde 4f14ead17 la hoja
+    // se cierra sola al conectar y la Entrada se abre en el panel principal de Mail
+    // (que esta página de prueba no monta). Leer desde la cuenta lo cubren
+    // vistaExterna.test.ts y carpetas-externas.test.ts; el envío, remitentes.test.ts.
+    await expect(page.getByRole("dialog")).toHaveCount(0);
     expect(fixture.configCalls).toBe(2);
-    await dialog
-      .getByRole("button", { name: "Synthetic email", exact: false })
-      .click();
-    await expect(
-      dialog.getByText("Fixture body", { exact: true }),
-    ).toBeVisible();
-    expect(await page.locator('img[src*="tracking.invalid"]').count()).toBe(0);
-    await dialog.getByRole("button", { name: "Compose", exact: true }).click();
-    await dialog.locator('input[name="to"]').fill("recipient@example.eu");
-    await dialog.locator('input[name="bcc"]').fill("blind@example.eu");
-    await dialog
-      .locator('textarea[name="body"]')
-      .fill("Synthetic outgoing email");
-    fixture.setMode("unknown");
-    await dialog.getByRole("button", { name: "Send", exact: true }).click();
-    await expect(dialog.getByText(/server may have accepted/)).toBeVisible();
-    expect(fixture.sends).toBe(1);
-    await expect(dialog.locator('textarea[name="body"]')).toHaveValue(
-      "Synthetic outgoing email",
-    );
-    fixture.setMode("success");
-    await dialog.getByRole("button", { name: "Send", exact: true }).click();
-    await expect(
-      dialog.getByText(/copy could not be saved in Sent/),
-    ).toBeVisible();
-    expect(fixture.sends).toBe(2);
-    await expect(dialog.locator("textarea")).toHaveCount(0);
-    await page.screenshot({
-      path: `${OUT}/mailbox-${viewport.width}.png`,
-      fullPage: true,
-    });
-    await dialog.getByRole("button", { name: "Back", exact: true }).click();
-    await dialog
-      .getByRole("button", { name: "Connect account", exact: true })
-      .click();
-    await expect(dialog.locator('input[name="incoming_host"]')).toHaveValue(
-      "imap.example.eu",
-    );
-    await expect(dialog.locator('input[name="incoming_password"]')).toHaveValue(
-      "",
-    );
-    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
     expect(errors).toEqual([]);
     report.push({
       viewport,
       configAttempts: fixture.configCalls,
-      sends: fixture.sends,
       layout: "passed",
       accessibility: "passed",
       retry: "passed",
-      sentCopyWarning: "passed",
     });
     await fixture.context.close();
     const nueva = await browser.newContext({ viewport });
@@ -335,8 +293,10 @@ try {
   await oauthPage
     .getByRole("button", { name: "Add email account", exact: true })
     .click();
+  // Cancelar en el proveedor (oauth_error=denied) se dice como tal desde ee82b0caf
+  // («Sign-in was cancelled»), no como una contraseña rechazada.
   await expect(
-    oauthPage.getByRole("dialog").getByText(/Sign-in was not accepted/),
+    oauthPage.getByRole("dialog").getByText(/Sign-in was cancelled/),
   ).toBeVisible();
   expect(new URL(oauthPage.url()).search).toBe("");
   report.push({

@@ -10,8 +10,10 @@ import (
 // Los borradores sin confirmar sobreviven a un cambio de cuenta en esta ventana,
 // sólo en memoria y ligados a emisor+sujeto+organización. Nunca se suben con la otra sesión.
 type redaccionSuspendida struct {
-	borrador      *Borrador
-	externo       *correoExterno
+	borrador *Borrador
+	externo  *correoExterno
+	// envioIncierto es un envío en camino, por Sytue o por una cuenta externa: murió
+	// con la vida anterior y pudo salir o no.
 	envioIncierto bool
 }
 
@@ -32,14 +34,10 @@ func (b *Buzon) CambiarSesion(ctx context.Context, identidad string) {
 			b.cerrar(rd) // No intenta guardar con la nueva sesión ya adoptada.
 		}
 		if c := b.correoAbierto; c != nil {
-			c.pausarLista()
 			c.cancelar()
 			c.cerrado = true
 			c.limpiarClaves()
 			c.d.Cerrar()
-			if c.ocupado && c.redactando {
-				c.errorClave = "externalMail.sendUnknown"
-			}
 			pendiente.externo = c
 			b.correoAbierto, b.cerrarCorreoExterno = nil, nil
 		}
@@ -66,22 +64,18 @@ func (b *Buzon) CambiarSesion(ctx context.Context, identidad string) {
 		}
 		if c := pendiente.externo; c != nil {
 			c.ctx, c.cancelar = context.WithCancel(b.ctx)
-			c.cerrado, c.ocupado = false, false
-			c.version++
+			// Un inicio de sesión que esperaba al navegador murió con la vida anterior.
+			c.cerrado, c.ocupado, c.autorizando = false, false, nil
 			b.correoAbierto, b.cerrarCorreoExterno = c, c.cerrar
 			c.d.Mostrar(b.P.Lienzo())
+			//nolint:contextcheck // «Autorizar» deriva su espera de c.ctx, recién derivado de la vida del buzón.
 			c.pintar()
-			//nolint:contextcheck // El temporizador consulta c.ctx, recién derivado de la vida del buzón.
-			c.programar()
 		}
 	}
 }
 
 func (b *Buzon) olvidarBuzon() {
 	b.vista++
-	b.widgetMu.Lock()
-	b.widgetUnread, b.widgetItems = nil, nil
-	b.widgetMu.Unlock()
 	b.carpetas, b.etiquetas, b.compartidos = nil, nil, nil
 	b.carpetaID, b.etiquetaID, b.carpetaComp = "", "", ""
 	b.mensajes, b.resultados, b.hilo = nil, nil, nil
@@ -92,6 +86,10 @@ func (b *Buzon) olvidarBuzon() {
 	b.esperaSondeo = SondeoBase
 	b.cuerpos = make(map[string]Cuerpo)
 	b.dejarCompartido()
+	// La carpeta externa a la vista y las cuentas conocidas eran de la otra persona.
+	b.dejarExterna()
+	b.cuentasDialogo, b.resumenExternas = nil, nil
+	b.ponerArbol()
 	b.cerrarHilo()
 	b.P.CerrarCajon()
 	m := b.P.Menu

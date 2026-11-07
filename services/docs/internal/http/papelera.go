@@ -354,7 +354,11 @@ func (h *Handler) desdeDrive(w http.ResponseWriter, r *http.Request) {
 		if err := h.papelera.SincronizarConDrive(ctx, f.ID, f.OwnerSub, kind, f.State); err != nil {
 			log.From(ctx).Error("papelera: aplicar el estado de Drive", "file_id", logsafe.Text(f.ID), "error", err.Error())
 			fallidos++
+			continue
 		}
+		// Tirar, sacar o purgar el documento cambia los recientes del widget de su
+		// tipo, el del dueño. Llega aquí sin petición de Docs que lleve TrasEscribir.
+		h.hubNotifier.AvisarCambio(ctx, c.Tenant, origenDe(kind), f.OwnerSub)
 	}
 	if fallidos > 0 {
 		httpx.Fail(w, r, httpx.ErrInternal.WithMessage("Some files could not be applied."))

@@ -51,6 +51,9 @@ type Compartido struct {
 	ID, Direccion string
 	// Delegado es el buzón de una persona (icono de persona); si no, de equipo.
 	Delegado bool
+	// ICloud es una cuenta externa de iCloud: la nube en vez de la persona, como
+	// `ExternalAccountsSection` en la web.
+	ICloud bool
 }
 
 // ---- La vista de un buzón compartido ----
@@ -83,6 +86,8 @@ func (b *Buzon) ElegirCompartido(c Compartido) {
 		return
 	}
 	b.P.CerrarCajon()
+	b.P.Bandeja.Filtro = FiltroTodas // otra vista empieza sin filtro
+	b.dejarExterna()
 	x := b.compartidos[i]
 	b.compartido, b.carpetaComp = &x, ""
 	b.carpetaID, b.etiquetaID = "", ""

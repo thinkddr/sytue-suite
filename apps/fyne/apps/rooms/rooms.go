@@ -45,6 +45,7 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/fyne/catalogos"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
@@ -297,18 +298,12 @@ func nuevaSeccion(clave, claveTitulo string, canales []Canal) Seccion {
 	}
 }
 
-// sinLeerDe es `unreadOf`: respeta el nivel de aviso de cada canal, porque un contador
-// que suma lo silenciado convierte el plegado en una alarma permanente.
+// sinLeerDe es `unreadOf`: suma lo de cada canal con api.PendientesRooms, la regla que
+// comparte con el widget nativo de Rooms.
 func sinLeerDe(canales []Canal) int {
 	n := 0
 	for _, c := range canales {
-		switch {
-		case c.Nivel == AvisarNada || c.Silenciado:
-		case c.Nivel == AvisarMenciones:
-			n += c.Menciones
-		default:
-			n += c.SinLeer
-		}
+		n += api.PendientesRooms(c.Silenciado, nivelesAviso[c.Nivel].api, c.SinLeer, c.Menciones)
 	}
 	return n
 }

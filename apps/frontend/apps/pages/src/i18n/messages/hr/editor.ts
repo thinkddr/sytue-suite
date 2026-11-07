@@ -17,10 +17,10 @@ export const editor = {
   'editor.bases.desc': 'Zapisi prikaza onakvi kakvi su sada',
   'editor.bases.title': 'Tablica iz Sytue Basesa',
   'editor.bases.prompt':
-    'Zalijepite token veze samo za čitanje izdane za Sytue Web. Podaci tog prikaza postat će sadržaj web-mjesta i bit će javni nakon objave.',
+    'Zalijepite token veze samo za čitanje izdane za Sytue Webs. Podaci tog prikaza postat će sadržaj web-mjesta i bit će javni nakon objave.',
   'editor.bases.confirm': 'Dohvati prikaz',
   'editor.bases.invalid':
-    'Ta veza nije valjana za Sytue Web: možda je opozvana, istekla ili izdana za drugi proizvod ili organizaciju.',
+    'Ta veza nije valjana za Sytue Webs: možda je opozvana, istekla ili izdana za drugi proizvod ili organizaciju.',
   'editor.bases.large':
     'Prikaz ne stane u tablicu web-mjesta (najviše 50 redaka i 8 stupaca). Suzite ga u Sytue Basesu.',
   'editor.bases.forbidden':

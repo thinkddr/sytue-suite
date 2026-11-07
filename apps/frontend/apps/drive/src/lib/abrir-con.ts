@@ -14,7 +14,7 @@
  * DESTINO y no una importación.
  */
 // `appUrl` conoce host Y prefijo de cada producto (packages/config/src/tokens.ts).
-import { appUrl } from '@sytue/config';
+import { appUrl, driveFileUrl, driveFolderUrl } from '@sytue/config';
 import { carpetaDe } from './arrastrar.js';
 
 /** El producto que abre un fichero, o null si solo cabe previsualizarlo aquí. */
@@ -130,4 +130,22 @@ export function subibleACast(item: {
  */
 export function urlDeSubirACast(fileId: string, org?: string | null): string {
   return appUrl('cast', `upload?drive=${encodeURIComponent(fileId)}`, org);
+}
+
+/**
+ * El enlace de un fichero o una carpeta de cara a la persona: el que se copia con
+ * «Copiar enlace» y el que se publica en Rooms. Un fichero por su id (el canónico
+ * `/files/{id}` de la búsqueda federada) y una carpeta por su ruta (`?path=`), que es
+ * como navega esta app: `/files/{id}` es solo de ficheros. Es el `enlaceDe` de la app
+ * nativa.
+ *
+ * No es un enlace público: abre solo a quien ya tiene acceso. Un fichero sin id no
+ * tiene enlace estable (`null`), y entonces no se ofrece.
+ */
+export function enlaceInterno(
+  item: { id?: string | undefined; isDirectory: boolean; path: string },
+  org?: string | null,
+): string | null {
+  if (item.isDirectory) return driveFolderUrl(item.path, org);
+  return item.id ? driveFileUrl(item.id) : null;
 }

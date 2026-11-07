@@ -95,7 +95,7 @@ export function BarraSuperior({
           <span class="text-text max-w-[140px] truncate text-xs leading-tight font-semibold md:max-w-[200px]">
             {siteName || 'Sitio'}
           </span>
-          <span class="text-text-muted text-[10px]">Sytue Web</span>
+          <span class="text-text-muted text-[10px]">Sytue Webs</span>
         </div>
 
         <div class="bg-border h-5 w-px" />

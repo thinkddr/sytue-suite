@@ -105,11 +105,12 @@ func (p *Pantalla) opcionesDrive(ctx context.Context, q string) []opcionEnlace {
 const MarcaDrive = "Sytue Drive"
 
 // buscarFuera hace las dos búsquedas de la herramienta de enlaces a la vez —las notas de
-// los otros cuadernos y los ficheros de Drive— y devuelve cuando han vuelto las dos.
+// los otros cuadernos y, con `conDrive`, los ficheros de Drive— y devuelve cuando han
+// vuelto las dos. El `[[` del editor busca sin Drive, como la web.
 //
 // ponytail: la web pinta cada lista en cuanto llega la suya; aquí se espera a la más
 // lenta. Con dos servicios del mismo clúster la diferencia no se ve.
-func (p *Pantalla) buscarFuera(q string) (remotas, drive []opcionEnlace) {
+func (p *Pantalla) buscarFuera(q string, conDrive bool) (remotas, drive []opcionEnlace) {
 	ctx, cancelar := p.ctx()
 	defer cancelar()
 	var wg sync.WaitGroup
@@ -120,7 +121,9 @@ func (p *Pantalla) buscarFuera(q string) (remotas, drive []opcionEnlace) {
 			}
 		})
 	}
-	wg.Go(func() { drive = p.opcionesDrive(ctx, strings.TrimSpace(q)) })
+	if conDrive {
+		wg.Go(func() { drive = p.opcionesDrive(ctx, strings.TrimSpace(q)) })
+	}
 	wg.Wait()
 	return remotas, drive
 }

@@ -12,6 +12,13 @@ import { Icon, type IconName } from './Icon.js';
 
 export type ToastTone = 'success' | 'info' | 'warning' | 'danger';
 
+/**
+ * Lo que dura un aviso con «Deshacer» (la papelera, una importación): diez segundos y no
+ * los cinco de serie, porque deshacer hay que leerlo, decidirlo y alcanzarlo. Uno para
+ * toda la suite; espejo de `ui.DuracionDeshacer` en Fyne.
+ */
+export const DURACION_DESHACER = 10_000;
+
 export interface ToastInput {
   tone?: ToastTone;
   title: string;

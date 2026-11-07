@@ -156,10 +156,16 @@ var Cuadricula = ui.Rejilla{Fijas: 7}
 // PrimerDia es el lunes de la semana en la que cae el día 1 del mes del cursor, que es
 // donde arranca la rejilla (`monthGrid` de dates.ts).
 func PrimerDia(cursor time.Time, loc *time.Location) time.Time {
-	primero := time.Date(cursor.Year(), cursor.Month(), 1, 0, 0, 0, 0, loc)
+	return LunesDe(time.Date(cursor.Year(), cursor.Month(), 1, 0, 0, 0, 0, loc))
+}
+
+// LunesDe es el lunes de la semana de `t`, a la misma hora (`startOfWeek` de dates.ts):
+// la semana empieza en lunes, como decide la app. Es LA regla de «primer día de la
+// semana» del paquete; la usan la rejilla del mes, el rango de la semana, la semana
+// plegada del teléfono y sus teclas Inicio/Fin.
+func LunesDe(t time.Time) time.Time {
 	// Lunes = 0. `time.Weekday` pone el domingo en 0, así que se rota.
-	desde := (int(primero.Weekday()) + 6) % 7
-	return primero.AddDate(0, 0, -desde)
+	return t.AddDate(0, 0, -((int(t.Weekday()) + 6) % 7))
 }
 
 // Dias son los 42 días de la rejilla.

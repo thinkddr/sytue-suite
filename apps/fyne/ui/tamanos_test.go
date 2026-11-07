@@ -31,9 +31,9 @@ func TestLosTamanosSeEscribenConFormatBytes(t *testing.T) {
 	fragmento := regexp.MustCompile(`\.Snippet\b`)
 	// Quién puede leer `Snippet` y por qué.
 	excepciones := map[string]string{
-		"ui/barrabuscador.go":         "`DetalleHit` es quien decide entre el tamaño y el fragmento",
-		"apps/notes/paneles.go":       "es un `NoteHit` de Notes: su fragmento es texto de la nota, no un tamaño",
-		"apps/mail/correo_externo.go": "es un `ExternalMailMessage`: su fragmento es una vista previa de texto del correo, no un tamaño ni un `HubHit`",
+		"ui/barrabuscador.go":        "`DetalleHit` es quien decide entre el tamaño y el fragmento",
+		"apps/notes/paneles.go":      "es un `NoteHit` de Notes: su fragmento es texto de la nota, no un tamaño",
+		"apps/mail/vista_externa.go": "es un `ExternalMailMessage`: su fragmento es una vista previa de texto del correo, no un tamaño ni un `HubHit`",
 	}
 	var malos []string
 	vistos := map[string]bool{}

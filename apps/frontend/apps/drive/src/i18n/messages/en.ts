@@ -306,6 +306,11 @@ export const en = {
     one: '1 item sent to the trash.',
     other: '{count} items sent to the trash.',
   },
+  'files.batch.restored': { one: '1 item restored.', other: '{count} items restored.' },
+  'files.batch.restorePartial': {
+    one: '1 item could not be restored; it is still in the trash.',
+    other: '{count} items could not be restored; they are still in the trash.',
+  },
   'files.batch.trashFailed': 'The selection could not be sent to the trash.',
   'files.batch.moveTitle': { one: 'Move 1 item', other: 'Move {count} items' },
   'files.batch.moveDone': { one: '1 item moved.', other: '{count} items moved.' },
@@ -322,6 +327,9 @@ export const en = {
   'action.rename': 'Rename',
   'action.move': 'Move to…',
   'action.copy': 'Make a copy',
+  'action.copyLink': 'Copy link',
+  'action.linkCopied': 'Link copied. It only opens for people who already have access.',
+  'action.copyLinkFailed': 'The link could not be copied.',
   'action.shareLink': 'Share link',
   'action.openInApp': 'Open in the application',
   'action.openInEditor': 'Open in the editor',
@@ -550,6 +558,18 @@ export const en = {
   'trash.purged': '“{name}” was permanently deleted.',
   'trash.purgeDenied': '“{name}” cannot be deleted',
   'trash.purgeFailed': 'It could not be deleted.',
+  'trash.emptyAll': 'Empty trash',
+  'trash.emptyAllTitle': 'Empty the trash?',
+  'trash.emptyAllBody': {
+    one: 'The 1 item in the trash will be erased for good, with its version history. There is no way to get it back afterwards.',
+    other:
+      'The {count} items in the trash will be erased for good, with their version history. There is no way to get them back afterwards.',
+  },
+  'trash.emptiedAll': 'The trash was emptied.',
+  'trash.emptyAllPartial': {
+    one: '1 item could not be deleted and is still in the trash.',
+    other: '{count} items could not be deleted and are still in the trash.',
+  },
   'trash.purgeTitle': 'Delete permanently?',
   'trash.purgeBodyFolder':
     'The contents of “{name}” and of everything inside it will be erased from Sytue’s servers, along with their version history. There is no way to get it back afterwards, neither from here nor from support. In exchange, you free up the space it took.',

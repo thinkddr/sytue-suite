@@ -70,6 +70,7 @@ export const ga: AppCatalog<typeof en> = {
   'inbox.markAll': 'Marcáil gach ceann léite',
   'inbox.loading': 'Fógraí á lódáil…',
   'inbox.unreadDot': 'Gan léamh',
+  'inbox.markRead': 'Marcáil mar léite',
   'inbox.errorTitle': 'Níorbh fhéidir na fógraí a lódáil',
   'inbox.errorBody':
     'Níl an Hub ag freagairt faoi láthair. Bain triail eile as i gceann cúpla soicind.',
@@ -741,6 +742,8 @@ export const ga: AppCatalog<typeof en> = {
     "Níor fhreagair {sources}, mar sin d'fhéadfadh torthaí a bheith in easnamh. Bain triail eile as i gceann tamaillín.",
   'search.partialJoin': ' agus ',
   'search.showing': 'Ag taispeáint {count} as {total} toradh.',
+  'search.loadMore': 'Lódáil tuilleadh torthaí',
+  'search.loadMoreFailed': 'Níorbh fhéidir tuilleadh torthaí a lódáil. Bain triail eile as.',
   'privacy.notice':
     'Ní dhíolaimid do chuid sonraí agus ní thugaimid do thríú páirtithe iad. Ní úsáidimid iad chun próifíl a dhéanamh díot, le haghaidh fógraíochta, ná chun ár seirbhísí féin ná seirbhísí aon duine eile a thraenáil ná a fheabhsú. Tá siad criptithe agus iad á seoladh agus i mbun stórála, agus ní fhágann siad ár mbonneagar Eorpach ach a mhéid is fíor-riachtanach chun billeáil a dhéanamh ort agus sna comhtháthuithe a chuireann tú féin ar siúl, áit a n-iarrfaidh an tríú páirtí do chead maidir leis na sonraí a úsáidfidh sé.',
 };

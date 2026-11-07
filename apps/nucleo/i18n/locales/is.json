@@ -101,6 +101,7 @@
   "linkedServices.changed": "Þessu atriði hefur verið breytt hjá þjónustuveitunni þinni. Endurnýjaðu áður en þú breytir því aftur.",
   "linkedServices.choose": "Veldu hvað á að tengja. Þjónustuveitan mun biðja um heimildir fyrir valdar þjónustur.",
   "linkedServices.connected": "Tengdar þjónustur",
+  "linkedServices.exists": "Þessi reikningur var þegar tengdur og er nú opinn.",
   "linkedServices.keepAdmin": "Google Keep krefst samþykktrar uppsetningar frá umsýslu Google Workspace. Einkareikningar Gmail geta ekki tengt það.",
   "linkedServices.notGranted": "Aðgangur að þessari þjónustu var ekki veittur. Tengdu reikninginn aftur til að velja heimildir hans.",
   "linkedServices.notSupported": "Þessi þjónustuveita býður ekki upp á þessa þjónustu.",
@@ -169,7 +170,7 @@
   "notifications.kind.pages.order.oversold": "Pöntun {number} á {site} var greidd án þess að varan væri til á lager",
   "notifications.kind.pages.order.paid": "Ný pöntun {number} á {site}",
   "notifications.kind.pages.payment.duplicated": "Tvöföld greiðsla á pöntun {number} á {site}: seinni greiðslan er endurgreidd",
-  "notifications.kind.pages.settings.changed": "{actor} breytti stillingu í Sytue Web",
+  "notifications.kind.pages.settings.changed": "{actor} breytti stillingu í Sytue Webs",
   "notifications.kind.pages.store.busy": "Vefverslunin á {site} er með of margar pantanir sem bíða greiðslu",
   "notifications.kind.pages.withdrawal.requested": "Beðið var um riftun á pöntun {number} á {site}",
   "notifications.kind.photos.album.added": "{actor} bætti myndum við „{name}“",
@@ -301,6 +302,8 @@
   "shell.update.failedBody": "Reyndu aftur síðar eða sæktu hana af gáttinni.",
   "shell.update.install": "Uppfæra í útgáfu {version}",
   "shell.update.upToDate": "{app} er uppfært",
+  "shell.widgets.wake": "Uppfæra græjur þegar forritið er lokað",
+  "shell.widgets.wakeHelp": "Þegar eitthvað hjá þér breytist vekur Sytue forritið með tómri tilkynningu frá Apple svo það geti uppfært græjuna sína. Apple sér hvaða forrit og hvenær, aldrei hvað breyttist.",
   "ui.backToList": "Til baka í listann",
   "ui.bulk.clear": "Hreinsa val",
   "ui.bulk.region": "Aðgerðir fyrir valið",
@@ -318,6 +321,8 @@
   "ui.review.edit": "Breyta",
   "ui.save": "Vista",
   "ui.selectRow": "Velja röð",
+  "ui.suiteClose": "Til baka í forritið",
+  "ui.suiteOpen": "Sytue: forrit, leit, tilkynningar og aðgangur",
   "ui.wizard.back": "Til baka",
   "ui.wizard.cancel": "Hætta við",
   "ui.wizard.goToStep": "Til baka í skref {n}: ",
@@ -336,5 +341,7 @@
   "widgets.pending": "Í bið",
   "widgets.photos": "Myndir",
   "widgets.rows": "Raðir",
-  "widgets.storage": "Geymslurými"
+  "widgets.storage": "Geymslurými",
+  "widgets.updatedAgo": "Uppfært {time}",
+  "widgets.updatedAt": "Uppfært: {time}"
 }

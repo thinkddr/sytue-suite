@@ -44,6 +44,18 @@ type filterCond struct {
 	Color   string `json:"color,omitempty"`
 }
 
+// operandoFiltro es `filterOperand` de sheets/filtro.ts: el operando de una condición
+// como número, y si se tecleó como fecha («01/03/2026», «2026-03-01»), su serial, que es
+// lo que guarda una celda de fecha: así «entre 01/01/2026 y 31/01/2026» filtra enero.
+func operandoFiltro(s string) (float64, bool) {
+	if reFechaEs.MatchString(strings.TrimSpace(s)) {
+		if n, ok := parseFechaEs(s); ok {
+			return n, true
+		}
+	}
+	return parseNumES(s)
+}
+
 // parseNumES es `parseEsNumberStrict` del editor: un número tecleado a la española, y
 // nada si lleva letras o símbolos («A1», «$50», «12 kg» no son un número).
 func parseNumES(s string) (float64, bool) {
@@ -89,8 +101,8 @@ type columnaFiltro struct {
 
 func nuevaColumnaFiltro(c filterCond, cs []celdaFiltro) columnaFiltro {
 	f := columnaFiltro{c: c, a: strings.ToLower(strings.TrimSpace(c.A))}
-	f.aNum, f.aOK = parseNumES(c.A)
-	f.bNum, f.bOK = parseNumES(c.B)
+	f.aNum, f.aOK = operandoFiltro(c.A)
+	f.bNum, f.bOK = operandoFiltro(c.B)
 	var nums []float64
 	for _, x := range cs {
 		if n, ok := x.v.(float64); ok {

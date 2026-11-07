@@ -46,11 +46,15 @@ func TestAlbum_crearAnyadirOrdenarYQuitar(t *testing.T) {
 	if al.Fotos != 2 || al.PortadaID == nil || *al.PortadaID != a2.ID {
 		t.Fatalf("portada implícita: %+v", al)
 	}
-	al, err = st.RenombrarAlbum(ctx, al.ID, "u1", "Verano 2026", &a1.ID)
-	if err != nil || al.Titulo != "Verano 2026" || *al.PortadaID != a1.ID {
-		t.Fatalf("renombrar con portada: %+v %v", al, err)
+	al, renombrado, err := st.RenombrarAlbum(ctx, al.ID, "u1", "Verano 2026", &a1.ID)
+	if err != nil || al.Titulo != "Verano 2026" || *al.PortadaID != a1.ID || !renombrado {
+		t.Fatalf("renombrar con portada: %+v %v (renombrado %v)", al, err, renombrado)
 	}
-	if _, err := st.RenombrarAlbum(ctx, al.ID, "u1", "x", &a3.ID); !errors.Is(err, domain.ErrInvalidInput) {
+	// Solo la portada, con el título de siempre: no es un renombrado (no se avisa).
+	if al, renombrado, err = st.RenombrarAlbum(ctx, al.ID, "u1", "Verano 2026", &a2.ID); err != nil || renombrado || *al.PortadaID != a2.ID {
+		t.Fatalf("cambiar solo la portada: %+v %v (renombrado %v)", al, err, renombrado)
+	}
+	if _, _, err := st.RenombrarAlbum(ctx, al.ID, "u1", "x", &a3.ID); !errors.Is(err, domain.ErrInvalidInput) {
 		t.Fatalf("una portada que no está en el álbum debía rechazarse: %v", err)
 	}
 

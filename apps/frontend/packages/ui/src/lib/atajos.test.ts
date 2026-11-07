@@ -49,6 +49,20 @@ test('escribiendo, la tecla es del campo', () => {
   expect(enCampoDeTexto(null)).toBe(false);
 });
 
+// Una casilla o un botón enfocados con el ratón no son sitios donde se escriba: si
+// contaran, marcar con clic y pulsar Escape no vaciaba la selección de Mail.
+test('una casilla o un botón enfocados no se quedan la tecla', () => {
+  for (const type of ['checkbox', 'radio', 'button', 'submit', 'reset']) {
+    expect(esAtajoDeApp(tecla({ tagName: 'INPUT', type }))).toBe(true);
+  }
+  for (const type of ['text', 'search', 'email', 'number', '']) {
+    expect(esAtajoDeApp(tecla({ tagName: 'INPUT', type }))).toBe(false);
+  }
+  const casilla = document.createElement('input');
+  casilla.type = 'checkbox';
+  expect(enCampoDeTexto(casilla)).toBe(false);
+});
+
 test('con modificador la tecla es del navegador o del sistema', () => {
   for (const mod of ['ctrlKey', 'metaKey', 'altKey'] as const) {
     expect(esAtajoDeApp(tecla({ tagName: 'BODY' }, { [mod]: true }))).toBe(false);

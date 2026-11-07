@@ -6,6 +6,8 @@ package mail
 import (
 	"cmp"
 	"context"
+	"maps"
+	"net/url"
 	"slices"
 	"strings"
 
@@ -66,6 +68,10 @@ func (b *Buzon) ponerAcciones() {
 	b.P.Bandeja.ConVaciar = b.consultaVacia() && b.botonVaciarVisible()
 	if b.P.Bandeja.SoloLectura {
 		return // un buzón compartido o sin red: nada que confirmar en el servidor
+	}
+	if b.externa != nil && b.consulta == "" {
+		b.ponerAccionesExternas(a)
+		return
 	}
 	actual := b.carpetaVista()
 	a.Destacar, a.Leido = b.alternarDestacado, b.alternarLeido
@@ -137,6 +143,8 @@ func (b *Buzon) alternarLeido(c Conversacion) {
 // el servidor dice que no, cada uno vuelve a como ESTABA —no todos al contrario: en un
 // hilo a medio leer, deshacer «leído» no puede dejar sin leer los que ya lo estaban—.
 func (b *Buzon) marcarConvs(cs []Conversacion, marca string, poner bool, fallo string) {
+	// Los de una cuenta POP3, mezclados en un buzón unificado, no se marcan.
+	cs = slices.DeleteFunc(slices.Clone(cs), func(c Conversacion) bool { return b.sinAcciones(c.Ultimo.ID) })
 	ids := idsDe(cs)
 	if len(ids) == 0 {
 		return
@@ -150,8 +158,9 @@ func (b *Buzon) marcarConvs(cs []Conversacion, marca string, poner bool, fallo s
 		}
 	}
 	b.marcar(ids, marca, poner)
+	dirs := b.direccionesDeCuentas()
 	pedir(b, func(ctx context.Context) (struct{}, error) {
-		return struct{}{}, b.S.SetFlagMany(ctx, ids, marca, poner)
+		return struct{}{}, b.marcarEnServidor(ctx, ids, marca, poner, dirs)
 	}, func(_ struct{}, err error) {
 		if err != nil {
 			b.marcar(ids, marca, false)
@@ -161,7 +170,7 @@ func (b *Buzon) marcarConvs(cs []Conversacion, marca string, poner bool, fallo s
 		}
 		// SOLO con «leído»: es la única marca que mueve el número del lateral.
 		if marca == api.MailFlagSeen {
-			b.refrescarContadores()
+			b.refrescarContadoresDe(ids)
 		}
 	})
 }
@@ -193,8 +202,11 @@ func (b *Buzon) moverConvs(cs []Conversacion, dest Carpeta) {
 		return
 	}
 	vista := b.vista
+	// El origen se calcula ANTES de mover: después, el mensaje ya dice el destino.
+	origenes := origenesDeMovimiento(cs, b.carpetaVista(), dest.ID)
 	antes, antesR := b.quitarDeLaVista(cs)
 	b.pintarLista()
+	carpeta := RotuloCarpeta(b.P.T, dest.Nombre, dest.Rol)
 	pedir(b, func(ctx context.Context) (struct{}, error) {
 		return struct{}{}, b.S.MoveMany(ctx, ids, dest.ID)
 	}, func(_ struct{}, err error) {
@@ -203,8 +215,70 @@ func (b *Buzon) moverConvs(cs []Conversacion, dest Carpeta) {
 				b.mensajes, b.resultados = antes, antesR
 				b.pintarLista()
 			}
-			b.avisar(ui.AvisoPeligro, "error.move", i18n.Vars{"folder": RotuloCarpeta(b.P.T, dest.Nombre, dest.Rol)})
+			b.avisar(ui.AvisoPeligro, "error.move", i18n.Vars{"folder": carpeta})
 			return
+		}
+		b.refrescarContadores()
+		if len(origenes) > 0 {
+			b.avisarDeshacer(carpeta, origenes)
+		}
+	})
+}
+
+// origenesDeMovimiento es el de la web: los mensajes agrupados por la carpeta de la
+// que SALEN, para que «Deshacer» devuelva cada uno a la suya. En una búsqueda o una
+// etiqueta la vista cruza carpetas y un hilo tiene su respuesta en Enviados: volver
+// todo a la vista sería dejarla en Recibidos. Sin carpeta en el sobre se cae a la que
+// se mira; lo que ya estaba en el destino, o no tiene origen, no se toca.
+func origenesDeMovimiento(cs []Conversacion, vista, destino string) map[string][]string {
+	origenes := map[string][]string{}
+	for _, c := range cs {
+		for _, m := range c.Mensajes {
+			origen := cmp.Or(m.CarpetaID, vista)
+			if origen == "" || origen == destino {
+				continue
+			}
+			origenes[origen] = append(origenes[origen], m.ID)
+		}
+	}
+	return origenes
+}
+
+// avisarDeshacer es el aviso de un triaje confirmado, con «Deshacer»: archivar o
+// tirar con una tecla se hace sin querer.
+func (b *Buzon) avisarDeshacer(carpeta string, origenes map[string][]string) {
+	t := b.P.T
+	a := ui.NuevoAviso(ui.AvisoExito, t.T("triage.moved", i18n.Vars{"folder": carpeta}), "")
+	a.RotuloCerrar = t.T("ui.dismissNotification", nil)
+	a.RotuloAccion = t.T("compose.undo", nil)
+	a.AlPulsarAccion = func() { b.deshacerMovimiento(origenes) }
+	b.P.Notificar(a)
+}
+
+// deshacerMovimiento devuelve los mensajes a sus carpetas, una llamada en lote por
+// carpeta, y vuelve a pedir la lista y los números: el hilo vuelve a donde estaba sin
+// reconstruirlo a mano, que con varias carpetas sería adivinar. En una búsqueda lo que
+// se ve son los resultados, así que se relanza la búsqueda, y la carpeta de debajo
+// —que también perdió los movidos— se pide al salir de ella.
+func (b *Buzon) deshacerMovimiento(origenes map[string][]string) {
+	pedir(b, func(ctx context.Context) (struct{}, error) {
+		for _, carpeta := range slices.Sorted(maps.Keys(origenes)) {
+			if err := b.S.MoveMany(ctx, origenes[carpeta], carpeta); err != nil {
+				return struct{}{}, err
+			}
+		}
+		return struct{}{}, nil
+	}, func(_ struct{}, err error) {
+		if err != nil {
+			b.avisar(ui.AvisoPeligro, "error.undoMove", nil)
+		} else {
+			b.avisar(ui.AvisoExito, "triage.undone", nil)
+		}
+		if b.consulta != "" {
+			b.listaCaducada = true
+			b.buscarYa(b.consulta)
+		} else {
+			b.cargarLista()
 		}
 		b.refrescarContadores()
 	})
@@ -334,7 +408,8 @@ func AnchoCuerpoDialogo(t ui.TallaDialogo, lienzo float32) float32 {
 // servidor. Sin respuesta, no hay botón.
 func (b *Buzon) consultarBaja(id string) {
 	b.P.Lector.Baja, b.P.Lector.DandoDeBaja = false, false
-	if id == "" || b.P.Bandeja.SoloLectura {
+	// Uno de una cuenta externa no está en Sytue: su baja no se puede preguntar aquí.
+	if id == "" || b.P.Bandeja.SoloLectura || esExterno(id) {
 		return
 	}
 	hilo := b.hiloID
@@ -423,6 +498,30 @@ func (b *Buzon) crearEvento(m Mensaje) {
 		}
 	})
 }
+
+// compartirEnRooms es `handleShareToRooms`: la pantalla de compartir de Sytue Rooms
+// con el asunto y el ENLACE del correo como mensaje propuesto —nunca su cuerpo: la
+// sala puede tener gente que no debería leerlo—; allí se elige la sala y se publica.
+// Como en Drive nativo, la otra app se llama por su esquema (`api.RutaCompartir`) y
+// sin ella instalada se cae a la misma página en la web; el Hub solo compondría ese
+// enlace, y la autorización la aplica Rooms al publicar.
+func (b *Buzon) compartirEnRooms(m Mensaje) {
+	if b.Abridor == nil || m.ID == "" {
+		return
+	}
+	apex, org := cmp.Or(b.Apex, api.ApexProd), ""
+	if b.Org != nil {
+		org = b.Org()
+	}
+	ruta := api.RutaCompartir(api.Compartir{Origen: "mail", ID: m.ID, Texto: TextoParaRooms(
+		cmp.Or(m.Asunto, b.P.T.T("common.noSubject", nil)), api.AppURL(apex, "mail", org, "/messages/"+url.PathEscape(m.ID)))})
+	if api.AbrirEn(b.Abridor, apex, "rooms", org, ruta) != nil {
+		b.avisar(ui.AvisoPeligro, "reader.roomsFailed", nil)
+	}
+}
+
+// TextoParaRooms es `textoParaRooms` de la web: el asunto y, debajo, el enlace.
+func TextoParaRooms(asunto, enlace string) string { return asunto + "\n" + enlace }
 
 // crearReglaDesde es `crearReglaDesde` de MailApp: el asistente con el remitente del
 // último mensaje como condición y como nombre.

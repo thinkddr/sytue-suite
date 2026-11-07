@@ -215,6 +215,11 @@ type Boton struct {
 	Talla    Talla
 	// Ancho fija el ancho del botón (`fullWidth`). Con 0, el que pida el rótulo.
 	Ancho float32
+	// AlInicio es `justify-start`: el glifo y el rótulo arrancan en el relleno de la
+	// izquierda en vez de ir centrados. Solo se nota cuando el botón es más ancho que
+	// lo que lleva —un `w-full` en una columna que se lee como lista, como las
+	// carpetas de una cuenta externa en Mail—.
+	AlInicio bool
 	// Icono es el `leadingIcon`: el glifo que va ANTES del rótulo. `iconos.Ninguno`,
 	// no hay.
 	Icono iconos.Icono
@@ -228,7 +233,8 @@ type Boton struct {
 	// Es un puntero a un dibujo YA CONSTRUIDO y no una ruta porque el color del
 	// glifo puede no ser el del rótulo —la estrella de un destacado va en
 	// `warning-text` sobre un botón secundario—, y quien lo construye es quien lo
-	// sabe. Por eso el botón no lo tiñe: lo pinta tal y como se lo dan.
+	// sabe. Por eso el botón no lo tiñe: lo pinta tal y como se lo dan, salvo en el
+	// primario y el de peligro, donde va en la tinta del rótulo.
 	Glifo *iconos.Dibujo
 	// SoloIcono es `iconOnly`: la GEOMETRÍA cuadrada (`h-9 w-9 p-0`), no «hay un
 	// icono». Es lo mismo que dice su tipo en la web: el rótulo deja de pintarse y
@@ -538,7 +544,10 @@ func (b *Boton) CreateRenderer() fyne.WidgetRenderer {
 	tinta := b.pintura(colTexto, v)
 	switch {
 	case b.Glifo != nil:
-		r.delante, r.tenirDelante = b.Glifo, b.Atenuado
+		// Sobre el relleno del primario o del de peligro el glifo es `currentColor`
+		// como el rótulo, y se apaga con él; en el secundario puede ir en su color.
+		deColor := b.Variante == Primario || b.Variante == Peligro
+		r.delante, r.tenirDelante = b.Glifo, b.Atenuado || deColor
 		r.objetos = append(r.objetos, r.delante.Objeto())
 	case b.Icono != iconos.Ninguno:
 		r.delante, r.tenirDelante = iconos.TrazoConTinta(b.Icono, b.tamIcono(), tinta), true
@@ -813,7 +822,8 @@ func (r *botonRenderer) Layout(t fyne.Size) {
 		hueco = r.b.Hueco
 	}
 	ancho := Medir(r.b.Texto, e, pesoRotulo(r.b.Talla)).Width
-	// `justify-center`: el bloque entero (glifos + hueco + rótulo) va centrado.
+	// `justify-center`: el bloque entero (glifos + hueco + rótulo) va centrado, salvo
+	// con AlInicio.
 	bloque := bloqueBoton(ancho, glifos, lado, hueco)
 	margen := float32(0)
 	if r.b.Texto != "" && (r.delante != nil || r.rueda != nil) {
@@ -821,6 +831,9 @@ func (r *botonRenderer) Layout(t fyne.Size) {
 		bloque += margen
 	}
 	x := (t.Width - bloque) / 2
+	if r.b.AlInicio {
+		x = medidas[r.b.Talla].margen
+	}
 	if r.delante != nil || r.rueda != nil {
 		if r.delante != nil {
 			r.delante.Colocar(x, (t.Height-lado)/2, lado)

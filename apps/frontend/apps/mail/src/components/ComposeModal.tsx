@@ -3,11 +3,12 @@
  * Campos Para/CC/CCO con autocompletado de contactos (Sytue Contacts), asunto y
  * cuerpo RICH-TEXT (HTML). Envio via BFF (EmailSubmission; el CCO va oculto en el
  * sobre) y el intent del Hub "Adjuntar de Drive". Inserta la firma por cuenta al
- * redactar. El remitente lo fija el servidor con el usuario autenticado.
+ * redactar. El remitente lo fija el servidor con el usuario autenticado; el «De» de
+ * una cuenta externa sale por su proveedor (remitentes.ts).
  * docs/CONVENTIONS.md §1, §11.
  */
 import type { ComponentChildren, JSX } from 'preact';
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import {
   Button,
   ConfirmDialog,
@@ -61,6 +62,9 @@ import { LibretaModal, type Destinatario } from './LibretaModal.js';
 import { DrivePickerModal } from './DrivePickerModal.js';
 import { Glyph } from './glyphs.js';
 import { fileToAttachment, type FileAttachment } from '../client/attachments.js';
+import type { ExternalMailAccount } from '@sytue/api-clients';
+import { externalMailClient } from '../client/externalMail.js';
+import { enviarPorCuenta, remitenteElegido, remitentes } from './remitentes.js';
 
 export type { ComposeDraft };
 
@@ -259,6 +263,13 @@ interface Props {
    * la propiedad. Vacío/una sola ⇒ se envía desde la primaria (sin selector).
    */
   fromOptions?: string[] | undefined;
+  /**
+   * Las cuentas externas conectadas (fase B, punto 6): las que pueden enviar salen
+   * en el «De» detrás de las de Sytue, y elegir una manda el correo por su proveedor
+   * (`/external-mail/{id}/send`, con `expected_address`), sin deshacer ni programar,
+   * que son de la cola de Sytue. El borrador se sigue guardando en Sytue.
+   */
+  externalAccounts?: readonly ExternalMailAccount[] | undefined;
   /** Ventana de deshacer (s) tras «Enviar»; 0 = enviar sin retención (sin undo). */
   undoSeconds?: number | undefined;
   onClose: () => void;
@@ -279,6 +290,7 @@ export function ComposeModal({
   signature = '',
   initialDriveAttachments,
   fromOptions = [],
+  externalAccounts = [],
   undoSeconds = 0,
   onClose,
   onSaved,
@@ -290,9 +302,18 @@ export function ComposeModal({
   // aparece si hay alias (más de una opción). `primaryFrom` es un primitivo estable
   // para las deps del efecto (no la lista, que cambia de referencia por render).
   const primaryFrom = fromOptions[0] ?? '';
-  // «De» inicial: la compartida/delegada si el borrador la trae y está disponible
-  // (responder desde un buzón compartido); si no, la primaria. El servidor verifica.
-  const wantFrom = initial?.from && fromOptions.includes(initial.from) ? initial.from : primaryFrom;
+  // Las opciones del «De»: las de Sytue y, detrás, las cuentas externas que envían.
+  const opcionesDe = useMemo(
+    () => remitentes(fromOptions, externalAccounts),
+    [fromOptions, externalAccounts],
+  );
+  // «De» inicial: la compartida/delegada o la cuenta externa si el borrador la trae y
+  // está disponible (responder desde un buzón compartido o desde la cuenta a la que
+  // escribieron); si no, la primaria. El servidor verifica.
+  const wantFrom =
+    initial?.from && opcionesDe.some((o) => o.valor === initial.from)
+      ? initial.from
+      : (opcionesDe[0]?.valor ?? '');
   // Desplegada de serie: es la barra que compone el correo, y ocultarla por
   // defecto la escondía justo de quien no sabía que existía. Preferencia por
   // navegador: quien la cierra una vez no vuelve a verla salvo que la reabra.
@@ -306,6 +327,13 @@ export function ComposeModal({
       return n;
     });
   const [from, setFrom] = useState(wantFrom);
+  // Lo que enseña el desplegable es lo que se usa: un valor que ya no está (la cuenta
+  // se desconectó, o la copia del dispositivo es de antes) se queda en la primera.
+  const elegido = remitenteElegido(from, opcionesDe);
+  const cuentaDe = elegido?.cuenta
+    ? externalAccounts.find((c) => c.instance_id === elegido.cuenta)
+    : undefined;
+  const externalApi = useMemo(externalMailClient, []);
   const [to, setTo] = useState(initial?.to ?? '');
   const [cc, setCc] = useState(initial?.cc ?? '');
   const [bcc, setBcc] = useState('');
@@ -755,9 +783,8 @@ export function ComposeModal({
     onClose();
   }
 
-  // Reúne el payload de envío común a «Enviar» y «Programar» (validado).
-  // null = falta destinatario o carpeta Borradores (ya avisó al usuario).
-  function buildSendInput(): SendInput | null {
+  // «Para», validado en línea. null = falta (ya avisó al usuario).
+  function destinatarios(): EmailAddress[] | null {
     const recipients: EmailAddress[] = parseAddresses(to);
     if (recipients.length === 0) {
       // Validacion inline (icono + texto en el campo), no un toast. §5.3.
@@ -765,6 +792,14 @@ export function ComposeModal({
       document.getElementById('compose-to')?.focus();
       return null;
     }
+    return recipients;
+  }
+
+  // Reúne el payload de envío común a «Enviar» y «Programar» (validado).
+  // null = falta destinatario o carpeta Borradores (ya avisó al usuario).
+  function buildSendInput(): SendInput | null {
+    const recipients = destinatarios();
+    if (!recipients) return null;
     if (!draftMailboxId) {
       toast.notify({ tone: 'danger', title: t('compose.noDraftsFolder') });
       return null;
@@ -775,7 +810,9 @@ export function ComposeModal({
       ...(bcc ? { bcc: parseAddresses(bcc) } : {}),
       // Enviar-como: solo si se eligió un alias (distinto de la primaria). El
       // servidor valida la propiedad; una dirección ajena se rechaza.
-      ...(from && from !== primaryFrom ? { from } : {}),
+      ...(elegido && !elegido.cuenta && elegido.valor !== primaryFrom
+        ? { from: elegido.valor }
+        : {}),
       subject,
       htmlBody: composedHtml(),
       ...(files.length
@@ -805,8 +842,9 @@ export function ComposeModal({
       toast.notify({ tone: 'info', title: t('compose.sendOffline') });
       return;
     }
-    const input = buildSendInput();
-    if (!input) return;
+    // Por una cuenta externa no hace falta la carpeta Borradores de Sytue: basta «Para».
+    const input = cuentaDe ? undefined : buildSendInput();
+    if (input === null || (cuentaDe && !destinatarios())) return;
     if (
       !sinAdjuntosConfirmado &&
       attachments.length + files.length === 0 &&
@@ -815,6 +853,11 @@ export function ComposeModal({
       setSinAdjuntos(true);
       return;
     }
+    if (cuentaDe) {
+      await handleSendExternal(cuentaDe);
+      return;
+    }
+    if (!input) return;
     setSending(true);
     try {
       // Ventana de deshacer: el correo queda RETENIDO en la cola undoSeconds s; el
@@ -859,6 +902,41 @@ export function ComposeModal({
           title: t('compose.sendFailed'),
           ...(motivoDeEnvio(error) ? { description: t(motivoDeEnvio(error)!) } : {}),
         });
+      }
+    } finally {
+      setSending(false);
+    }
+  }
+
+  // Desde una cuenta externa: una sola vez por su proveedor, sin ventana de deshacer
+  // (no hay cola que retenga nada). Lo que pudo salir sin decirlo no se repite: el
+  // redactor se queda abierto y el aviso pide mirar en Enviados.
+  async function handleSendExternal(cuenta: ExternalMailAccount): Promise<void> {
+    setSending(true);
+    try {
+      const r = await enviarPorCuenta(externalApi, cuenta, {
+        to: parseAddresses(to),
+        cc: parseAddresses(cc),
+        bcc: parseAddresses(bcc),
+        subject,
+        text: composedTextForDraft(),
+        html: composedHtml(),
+        files,
+      });
+      if (r.tipo === 'enviado') {
+        await discardOpenDraft();
+        await removeLocalDraft();
+        onSaved?.();
+        onClose();
+        toast.notify(
+          r.copiaGuardada
+            ? { tone: 'success', title: t('externalMail.sent') }
+            : { tone: 'warning', title: t('externalMail.sentNoCopy') },
+        );
+      } else if (r.clave === 'externalMail.sendUnknown') {
+        toast.notify({ tone: 'warning', title: t(r.clave) });
+      } else {
+        toast.notify({ tone: 'danger', title: t('compose.sendFailed'), description: t(r.clave) });
       }
     } finally {
       setSending(false);
@@ -1004,25 +1082,28 @@ export function ComposeModal({
                   </>
                 )}
               </Dropdown>
-              <Button
-                variant="ghost"
-                iconOnly
-                aria-label={t('compose.schedule')}
-                title={t('compose.schedule')}
-                aria-expanded={showSchedule}
-                // `bg-selected`, no `bg-bg-subtle`: en tema oscuro `bg-subtle` es
-                // MÁS OSCURO que la superficie elevada del diálogo, así que el
-                // botón «activo» se veía como un agujero. `selected` es el token
-                // que conmuta con el tema y el mismo que enciende los botones de
-                // la barra de formato (aria-pressed:bg-selected).
-                class={showSchedule ? 'bg-selected text-text' : undefined}
-                disabled={sending || saving}
-                leadingIcon={<Glyph name="clock" size={16} />}
-                onClick={() => {
-                  setShowSchedule((v) => !v);
-                  if (!scheduleAt) setScheduleAt(toLocalInput(new Date(Date.now() + 3_600_000)));
-                }}
-              />
+              {/* Programar es de la cola de Sytue: desde una cuenta externa no se ofrece. */}
+              {cuentaDe ? null : (
+                <Button
+                  variant="ghost"
+                  iconOnly
+                  aria-label={t('compose.schedule')}
+                  title={t('compose.schedule')}
+                  aria-expanded={showSchedule}
+                  // `bg-selected`, no `bg-bg-subtle`: en tema oscuro `bg-subtle` es
+                  // MÁS OSCURO que la superficie elevada del diálogo, así que el
+                  // botón «activo» se veía como un agujero. `selected` es el token
+                  // que conmuta con el tema y el mismo que enciende los botones de
+                  // la barra de formato (aria-pressed:bg-selected).
+                  class={showSchedule ? 'bg-selected text-text' : undefined}
+                  disabled={sending || saving}
+                  leadingIcon={<Glyph name="clock" size={16} />}
+                  onClick={() => {
+                    setShowSchedule((v) => !v);
+                    if (!scheduleAt) setScheduleAt(toLocalInput(new Date(Date.now() + 3_600_000)));
+                  }}
+                />
+              )}
               {/* Descartar cierra sin autoguardar (bypassa handleClose). */}
               <Button
                 variant="ghost"
@@ -1083,7 +1164,7 @@ export function ComposeModal({
             inferior es el pelo siguiente de la misma serie, y el cuerpo del
             mensaje empieza justo debajo. */}
         <div class="flex flex-col">
-          {fromOptions.length > 1 ? (
+          {opcionesDe.length > 1 ? (
             /* «De» ES UNA FILA MÁS, no un apartado. Era el único campo con
                etiqueta en negrita encima y caja debajo, y encima estaba EL
                PRIMERO: lo primero que se veía al abrir el compositor era un
@@ -1100,12 +1181,12 @@ export function ComposeModal({
               <div class="max-w-64">
                 <Select
                   id="compose-from"
-                  value={from}
+                  value={elegido?.valor ?? ''}
                   onChange={(e) => setFrom(e.currentTarget.value)}
                 >
-                  {fromOptions.map((addr) => (
-                    <option key={addr} value={addr}>
-                      {addr}
+                  {opcionesDe.map((o) => (
+                    <option key={o.valor} value={o.valor}>
+                      {o.direccion}
                     </option>
                   ))}
                 </Select>
@@ -1302,7 +1383,7 @@ export function ComposeModal({
               </ul>
             </div>
           ) : null}
-          {showSchedule ? (
+          {showSchedule && !cuentaDe ? (
             /* Sin rótulo de apartado: decía «Programar envío» encima de un botón
                que dice «Programar envío», y el campo de dentro ya se llama «Fecha
                y hora». Tres textos para una sola pregunta. */

@@ -127,11 +127,19 @@ func (r *barraRenderer) Destroy()                     {}
 
 // Layout: `px-1.5` y el texto centrado en vertical por su caja de `leading-none`, que
 // en la web es el propio tamaño de letra.
+//
+// En el teléfono, `px-0.5` y el rótulo cortado sin «…», como la píldora compacta.
 func (r *barraRenderer) Layout(t fyne.Size) {
 	r.fondo.Resize(t)
-	ui.Truncar(r.texto, r.b.rotulo, tema.Texto2XS, ui.Medio, max(t.Width-2*espacio1p5, 0))
 	caja := tema.Texto2XS.Tam // `leading-none`
-	ui.ColocarTexto(r.texto, tema.Escalon{Tam: caja, Linea: caja}, espacio1p5, (t.Height-caja)/2)
+	pad := espacio1p5
+	if estrecha(r.b) {
+		pad = espacio0p5
+		ui.Cortar(r.texto, r.b.rotulo, tema.Texto2XS, ui.Medio, max(t.Width-2*pad, 0))
+	} else {
+		ui.Truncar(r.texto, r.b.rotulo, tema.Texto2XS, ui.Medio, max(t.Width-2*pad, 0))
+	}
+	ui.ColocarTexto(r.texto, tema.Escalon{Tam: caja, Linea: caja}, pad, (t.Height-caja)/2)
 	r.aro.Colocar(t)
 }
 

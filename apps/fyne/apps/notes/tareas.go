@@ -73,7 +73,7 @@ func (p *Pantalla) vistaTareas(v tema.Variante) fyne.CanvasObject {
 	for _, e := range estadosTarea {
 		estados = append(estados, segmento(t(e[1], nil), "", p.tareas.estado == e[0], v, func() { p.verTareas(e[0]) }))
 	}
-	derecha := container.New(filaCentro{hueco: tema.Espacio(0.5)}, estados...)
+	derecha := container.New(filaCentro{hueco: HuecoSegmento}, estados...)
 	var cuerpo fyne.CanvasObject
 	switch p.tareas.fase {
 	case Cargando:
@@ -159,7 +159,7 @@ func (p *Pantalla) filaTarea(x api.Tarea, v tema.Variante) fyne.CanvasObject {
 		}))
 	}
 	var mas *ui.BotonIcono
-	mas = ui.NuevoBotonIcono(iconos.Puntos, t("common.more", nil), func() {
+	mas = enVozBaja(ui.NuevoBotonIcono(iconos.Puntos, t("common.more", nil), func() {
 		el := []fyne.CanvasObject{ui.NuevoElementoMenu(t("tasks.openNotebook", nil), iconos.Ninguno, func() { p.abrirTarea(x) })}
 		if p.tareas.estado == api.TareaAbierta {
 			el = append(el, ui.NuevoElementoMenu(t("task.postpone", nil), iconos.Ninguno, func() { p.dialogoPosponer(x.Note) }))
@@ -174,7 +174,7 @@ func (p *Pantalla) filaTarea(x api.Tarea, v tema.Variante) fyne.CanvasObject {
 		m := ui.NuevoMenu(el...)
 		m.Rotulo = t("common.more", nil)
 		p.abrirMenu(mas, m)
-	})
+	}))
 	mas.Lado, mas.TamIcono = ui.LadoIconoSM, GlifoAccion
 	piezas = append(piezas, mas)
 	// `flex items-start gap-2 px-2 py-1.5`: el título es el que crece.

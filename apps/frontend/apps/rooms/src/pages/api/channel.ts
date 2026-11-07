@@ -6,7 +6,7 @@
  */
 import type { APIRoute } from 'astro';
 import { getApiSession } from '../../lib/session.js';
-import { chatClient } from '../../lib/chat.js';
+import { chatClient, chatFail } from '../../lib/chat.js';
 
 export const prerender = false;
 
@@ -49,8 +49,9 @@ export const POST: APIRoute = async (ctx) => {
       ...(payload.name !== undefined ? { name: payload.name } : {}),
     });
     return json({ channel });
-  } catch {
-    return json({ error: 'chat_error' }, 502);
+  } catch (err) {
+    // Los 4xx se preservan: sin permiso (403) y nombre ocupado (409) tienen su aviso.
+    return chatFail(err);
   }
 };
 

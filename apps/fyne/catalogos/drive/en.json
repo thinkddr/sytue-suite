@@ -4,6 +4,8 @@
   "action.classified": "Classification · {name}",
   "action.classify": "Classify",
   "action.copy": "Make a copy",
+  "action.copyLink": "Copy link",
+  "action.copyLinkFailed": "The link could not be copied.",
   "action.delete": "Move to trash",
   "action.desktopBody": "If you do not have it installed yet, you can download it.",
   "action.desktopCta": "See downloads",
@@ -12,6 +14,7 @@
   "action.downloadName": "Download {name}",
   "action.downloadZip": "Download (ZIP)",
   "action.editorFailed": "The editor could not open this file.",
+  "action.linkCopied": "Link copied. It only opens for people who already have access.",
   "action.mailFailed": "Could not open the email composer",
   "action.menu": "Actions for {name}",
   "action.more": "More actions",
@@ -81,6 +84,14 @@
   "files.batch.moveTitle": {
     "one": "Move 1 item",
     "other": "Move {count} items"
+  },
+  "files.batch.restorePartial": {
+    "one": "1 item could not be restored; it is still in the trash.",
+    "other": "{count} items could not be restored; they are still in the trash."
+  },
+  "files.batch.restored": {
+    "one": "1 item restored.",
+    "other": "{count} items restored."
   },
   "files.batch.trashBody": {
     "one": "1 item will be sent to the trash. You will be able to restore it from there.",
@@ -555,6 +566,17 @@
     "other": "{count} files uploaded."
   },
   "team.upload.partial": "{uploaded} of {count} uploaded.",
+  "trash.emptiedAll": "The trash was emptied.",
+  "trash.emptyAll": "Empty trash",
+  "trash.emptyAllBody": {
+    "one": "The 1 item in the trash will be erased for good, with its version history. There is no way to get it back afterwards.",
+    "other": "The {count} items in the trash will be erased for good, with their version history. There is no way to get them back afterwards."
+  },
+  "trash.emptyAllPartial": {
+    "one": "1 item could not be deleted and is still in the trash.",
+    "other": "{count} items could not be deleted and are still in the trash."
+  },
+  "trash.emptyAllTitle": "Empty the trash?",
   "trash.emptyBody": "The files and folders you delete will show up here and you will be able to restore them.",
   "trash.emptyTitle": "The trash is empty",
   "trash.errorTitle": "The trash could not be loaded",

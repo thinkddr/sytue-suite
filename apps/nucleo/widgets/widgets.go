@@ -18,6 +18,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
@@ -26,10 +27,32 @@ import (
 )
 
 const (
-	// Version is shared with the WidgetKit, Android and desktop providers.
-	Version = 1
-	// MaxAge bounds stale information even when the app cannot run in background.
-	MaxAge           = 30 * time.Minute
+	// Version is shared with the WidgetKit, Android and desktop providers. La 2 (del
+	// 2026-11-06) lleva en `generation` la ÉPOCA de identidad, no la marca de sesión, y
+	// vive hasta 24 h: los lectores solo aceptan la 2 (ADR 0078, enmienda).
+	Version = 2
+	// MaxAge es la caducidad máxima: pasado un día el widget se oculta. Los quince
+	// widgets enseñan «lo de hoy», y pasado un día enseñarían el hoy de ayer como si fuera
+	// el de hoy; es también el horizonte en que el sistema concede varias rondas en
+	// segundo plano a una app usada, y acota lo que enseña un teléfono olvidado. Por
+	// debajo, el lector enseña el último dato con «Actualizado hace X» (Rancio).
+	MaxAge = 24 * time.Hour
+	// Vigencia es la caducidad de lo que publica el Publicador: la máxima. Con la app
+	// viva su latido (10 min) lo renueva; con la app parada, el widget enseña el último
+	// dato con su antigüedad hasta MaxAge.
+	Vigencia = MaxAge
+	// Fresco: por debajo de esto el dato se considera vivo y el lector no dice de cuándo
+	// es. A partir de aquí es Rancio y lo dice.
+	Fresco = 15 * time.Minute
+	// RenovarTras: un payload idéntico, con la misma época, no se reescribe si el
+	// anterior tiene menos de esto. Pasado, se reescribe aunque no cambie nada, para
+	// que `updated_at` diga cuándo se comprobó (y el «Actualizado hace X» no mienta).
+	// Va con el latido del Publicador: una app abierta y quieta reescribe cada 10 min.
+	RenovarTras = 10 * time.Minute
+	// vidaParaReusar: tampoco se deja sin reescribir un snapshot que caducaría antes
+	// de la siguiente ronda del Publicador —su latido, más lo que puede esperar un
+	// aviso y lo que puede tardar la ronda—.
+	vidaParaReusar   = LatidoWidget + EsperaMaxWidget + PlazoWidget
 	MaxItems         = 8
 	MaxTitleBytes    = 120
 	MaxSubtitleBytes = 160
@@ -59,14 +82,33 @@ var (
 
 // Disponible dice si escribir un snapshot sirve de algo aquí. Sin lector no se escribe
 // ni se borra nada: ni ficheros que nadie lee ni el cerrojo de la suite en cada cambio.
-func Disponible() bool { return lector() }
+func Disponible() bool { return hayLector() }
+
+// lectorSimulado es lo que fija SimularLector: 0, nada (manda `lector`); 1, sí; 2, no.
+// Es atómico porque se restaura al acabar un test mientras aún puede correr un borrado
+// lanzado en segundo plano (ClearIf desde la suite), y `lector` no se toca después del
+// init de la plataforma.
+var lectorSimulado atomic.Int32
+
+func hayLector() bool {
+	switch lectorSimulado.Load() {
+	case 1:
+		return true
+	case 2:
+		return false
+	}
+	return lector()
+}
 
 // SimularLector es SOLO para tests de otros paquetes: hace como si hubiera un widget
 // nativo, para probar la publicación en Linux. Devuelve cómo dejarlo como estaba.
 func SimularLector(activo bool) (restaurar func()) {
-	anterior := lector
-	lector = func() bool { return activo }
-	return func() { lector = anterior }
+	v := int32(2)
+	if activo {
+		v = 1
+	}
+	anterior := lectorSimulado.Swap(v)
+	return func() { lectorSimulado.Store(anterior) }
 }
 
 // Notify asks the OS to reload its widgets; an empty bundle reloads the suite.
@@ -100,8 +142,8 @@ func StoragePercent(used, capacity int64) (Counter, bool) {
 }
 
 // Snapshot is a disposable view of counters and bounded visual items fetched by
-// an authenticated app. generation is the opaque settings marker, never a
-// subject, email or token.
+// an authenticated app. generation is the opaque identity epoch (ajustes.MarcarIdentidad;
+// en Android con el broker, su marca de widgets), never a subject, email or token.
 type Snapshot struct {
 	Version    int           `json:"version"`
 	Product    string        `json:"product"`
@@ -304,12 +346,70 @@ func daysInMonth(year, month int) int {
 
 // Scope is captured BEFORE fetching data. Publishing after a user switch, logout
 // or lock change fails closed, even when an older request finishes later.
+//
+// Lo que guarda es la ÉPOCA de identidad (ajustes.MarcarIdentidad), no la marca de
+// sesión: la marca cambia en cada renovación del token y dejaba sin publicar todo lo
+// capturado antes de renovar (ADR 0078, enmienda del 2026-11-06).
 type Scope struct{ generation string }
 
-// Capture binds a pending fetch to the session revision adopted by the app.
-// Pass Estado.GeneracionSesion, never a fresh settings read: the disk marker can
+// Capture binds a pending fetch to the identity epoch adopted by the app.
+// Pass Estado.EpocaSesion, never a fresh settings read: the disk epoch can
 // change before another process has adopted the corresponding identity.
-func Capture(adoptedGeneration string) Scope { return Scope{generation: adoptedGeneration} }
+func Capture(adoptedEpoch string) Scope { return Scope{generation: adoptedEpoch} }
+
+// vigente: la época capturada es la actual y el entorno deja enseñar (Entorno.permite).
+func (s Scope) vigente(e Entorno) bool {
+	return s.generation != "" && e.Epoca == s.generation && e.permite()
+}
+
+// Entorno es lo que un lector comprueba FUERA del snapshot antes de enseñarlo. Es el
+// mismo contrato en Go, en Swift (Snapshot.swift) y en Java (WidgetSnapshot.java), y
+// los tres lo prueban contra testdata/contrato.tsv.
+type Entorno struct {
+	// Epoca es la época de identidad actual (primera línea de `sesion.epoca`; en
+	// Android con el broker, su `marca_widgets`).
+	Epoca string
+	// Confirmada es la marca de sesión con la que se escribió esa época (cuarta línea
+	// de `sesion.epoca`). Marca es la `sesion.marca` actual. Si no coinciden, la última
+	// sesión la cambió una compilación que no conoce la época: no se enseña nada.
+	Confirmada, Marca string
+	// Cerrada: hay algún `*.cerrada` en la carpeta (AlmacenSesion: un cierre de sesión).
+	Cerrada bool
+	// Bloqueo: la persona pidió el bloqueo de la suite.
+	Bloqueo bool
+}
+
+func (e Entorno) permite() bool {
+	return !e.Bloqueo && !e.Cerrada && e.Epoca != "" && e.Marca != "" && e.Confirmada == e.Marca
+}
+
+// entornoActual lee el entorno del disco (y, en Android con el broker, del broker).
+func entornoActual() (Entorno, error) {
+	dir, err := ajustes.Carpeta()
+	if err != nil {
+		return Entorno{}, err
+	}
+	state := ajustes.Leer()
+	return Entorno{
+		Epoca: state.Epoca, Confirmada: state.EpocaConfirmada, Marca: state.Sesion,
+		Cerrada: hayCierre(dir), Bloqueo: state.Bloqueo,
+	}, nil
+}
+
+// hayCierre: algún `*.cerrada` en la carpeta de la suite. Si no se puede listar, como
+// si lo hubiera: falla cerrado.
+func hayCierre(dir string) bool {
+	entradas, err := os.ReadDir(dir)
+	if err != nil {
+		return true
+	}
+	for _, e := range entradas {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".cerrada") {
+			return true
+		}
+	}
+	return false
+}
 
 // View binds a pending data request to one app and its adopted session. It
 // contains no token, identity, network client or configurable destination.
@@ -335,21 +435,6 @@ func (s Source) View() View {
 		return View{}
 	}
 	return s()
-}
-
-// Publicar publishes only bounded counters the app has already loaded. Providers
-// never fetch private data; expiry limits background staleness.
-func (v View) Publicar(ctx context.Context, counters ...Counter) error {
-	return v.PublicarDetalle(ctx, Detail{Counters: counters})
-}
-
-// PublicarDetalle publishes bounded counters, sanitized visual items and/or a
-// calendar month grid that the app has already loaded.
-func (v View) PublicarDetalle(ctx context.Context, detail Detail) error {
-	if v.bundle == "" {
-		return ErrPrivate
-	}
-	return PublishDetail(ctx, v.bundle, v.product, v.scope, detail, 15*time.Minute)
 }
 
 func validCounters(counters []Counter) bool {
@@ -480,17 +565,21 @@ func path(bundle string) (string, error) {
 	return filepath.Join(dir, bundle+".json"), nil
 }
 
-// Publish atomically replaces one app's snapshot under the existing suite lock.
-// Writers share the same settings directory as native providers through the OS
-// App Group on Apple; Android providers use their own app's private directory.
-func Publish(ctx context.Context, bundle, product string, scope Scope, counters []Counter, age time.Duration) error {
-	return PublishDetail(ctx, bundle, product, scope, Detail{Counters: counters}, age)
-}
-
 // PublishDetail atomically replaces one app's snapshot (counters, visual items
-// and optional calendar grid) under the existing suite lock.
+// and optional calendar grid) under the existing suite lock. Writers share the
+// same settings directory as native providers through the OS App Group on Apple;
+// Android providers use their own app's private directory.
+//
+// Solo lo llama el Publicador (publicador.go): ninguna pantalla publica
+// (TestNadiePublicaWidgetsDesdeLaVista, en apps/fyne/sesion).
+//
+// La captura es de la ÉPOCA, y la época es lo que se escribe en `generation` (v2). Exige
+// lo mismo que el lector (Entorno): sin bloqueo, sin cierre y la época confirmada con la
+// marca actual. Una sesión cambiada por una compilación que no conoce la época falla
+// cerrado hasta que otra la adopte. Renovar el token no cambia la época: no invalida ni
+// la captura ni lo ya publicado.
 func PublishDetail(ctx context.Context, bundle, product string, scope Scope, detail Detail, age time.Duration) (result error) {
-	if !lector() {
+	if !hayLector() {
 		return ErrSinLector
 	}
 	if !api.EsProducto(product) || age <= 0 || age > MaxAge ||
@@ -512,22 +601,25 @@ func PublishDetail(ctx context.Context, bundle, product string, scope Scope, det
 			Notify(bundle)
 		}
 	}()
-	state := ajustes.Leer()
-	if state.Bloqueo || scope.generation == "" || state.Sesion != scope.generation {
+	entorno, err := entornoActual()
+	if err != nil {
+		return err
+	}
+	if !scope.vigente(entorno) {
 		return ErrPrivate
 	}
 	now := time.Now()
 	// Real-time deltas and repeated list refreshes can return the same payload.
-	// Keep the original observation/expiry and avoid exhausting WidgetKit's reload
-	// budget. A fresh authenticated fetch still renews the snapshot before the last
-	// third of its lifetime, and changed data is published immediately.
-	if previous, err := readFile(destination); err == nil && previous.reusable(product, state.Sesion, detail, now, age) {
+	// Skipping the write saves WidgetKit's reload budget, but only for RenovarTras
+	// and only under the same epoch: after that the snapshot is rewritten so
+	// updated_at («Actualizado hace X») and the expiry move forward.
+	if previous, err := readFile(destination); err == nil && previous.reusable(product, entorno, detail, now, age) {
 		return nil
 	}
 	s := Snapshot{
 		Version:    Version,
 		Product:    product,
-		Generation: scope.generation,
+		Generation: entorno.Epoca,
 		UpdatedAt:  now.Unix(),
 		ExpiresAt:  now.Add(age).Unix(),
 		Active:     true,
@@ -548,27 +640,72 @@ func PublishDetail(ctx context.Context, bundle, product string, scope Scope, det
 
 // reusable is called after validating the current session lock under the suite
 // lock. It cannot preserve another identity, stale data or an excessive lifetime.
-func (s Snapshot) reusable(product, generation string, detail Detail, now time.Time, age time.Duration) bool {
-	return s.Product == product && s.Visible(generation, false, now) &&
+func (s Snapshot) reusable(product string, e Entorno, detail Detail, now time.Time, age time.Duration) bool {
+	return s.Product == product && s.Visible(e, now) &&
 		slices.Equal(s.Counters, detail.Counters) &&
 		slices.Equal(s.Items, detail.Items) &&
 		equalCalendar(s.Calendar, detail.Calendar) &&
 		s.ExpiresAt <= now.Add(age).Unix() &&
-		s.UpdatedAt > now.Add(-age*2/3).Unix() && s.ExpiresAt >= now.Add(age/3).Unix()
+		s.UpdatedAt > now.Add(-RenovarTras).Unix() &&
+		s.ExpiresAt > now.Add(vidaParaReusar).Unix()
 }
 
-// Visible is also the contract implemented by native providers. Counters and
-// items are hidden for expired, future-dated, locked, mismatched or oversized snapshots.
-func (s Snapshot) Visible(generation string, locked bool, now time.Time) bool {
-	return !locked && s.Active && s.Version == Version && api.EsProducto(s.Product) &&
-		generation != "" && s.Generation == generation &&
+// Visible is also the contract implemented by native providers (testdata/contrato.tsv).
+// Counters and items are hidden for expired, future-dated, locked, closed, unconfirmed,
+// mismatched or oversized snapshots.
+func (s Snapshot) Visible(e Entorno, now time.Time) bool {
+	return e.permite() && s.Active && s.Version == Version && api.EsProducto(s.Product) &&
+		s.Generation == e.Epoca &&
 		s.UpdatedAt <= now.Unix()+5 && s.UpdatedAt > 0 &&
 		s.ExpiresAt > now.Unix() && s.ExpiresAt > s.UpdatedAt &&
 		s.ExpiresAt-s.UpdatedAt <= int64(MaxAge/time.Second) &&
 		validCounters(s.Counters) && validItems(s.Items) && validCalendar(s.Calendar)
 }
 
-// Read loads a widget snapshot only when its shared session marker is current.
+// Rancio dice si el lector tiene que decir de cuándo es el dato («Actualizado hace X»):
+// lleva Fresco o más sin comprobarse.
+func (s Snapshot) Rancio(now time.Time) bool {
+	return now.Unix()-s.UpdatedAt >= int64(Fresco/time.Second)
+}
+
+// Vigentes son los elementos que siguen valiendo a `now`, para un snapshot ya Visible.
+// Solo Calendar los recorta: quita los eventos que ya terminaron. Es la misma regla que
+// la Fuente de Calendar al publicar (fuentes/calendar.go), y la misma en Swift
+// (SytueWidgetTimeline.vigentes) y en Java (WidgetSnapshot.vigentes), que la prueban
+// contra testdata/contrato.tsv. En las demás apps los elementos no caducan solos.
+func Vigentes(items []Item, product string, now time.Time) []Item {
+	if product != "calendar" {
+		return items
+	}
+	var out []Item
+	for _, it := range items {
+		if vigente(it, now) {
+			out = append(out, it)
+		}
+	}
+	return out
+}
+
+// vigente: un evento con hora vale mientras no haya terminado (o no haya empezado). Uno
+// de día completo es FLOTANTE —el servicio lo guarda a medianoche UTC, y cae el mismo
+// día en cualquier zona (api.Instance.Day)—: vale hasta la medianoche LOCAL que sigue a
+// su último día, con el final exclusivo. Sin fechas, vale siempre.
+func vigente(it Item, now time.Time) bool {
+	if it.StartAt == 0 && it.EndAt == 0 {
+		return true
+	}
+	if !it.AllDay {
+		return it.EndAt > now.Unix() || it.StartAt >= now.Unix()
+	}
+	ultimo := it.StartAt
+	if it.EndAt > it.StartAt {
+		ultimo = it.EndAt - 1
+	}
+	d := time.Unix(ultimo, 0).UTC()
+	return now.Before(time.Date(d.Year(), d.Month(), d.Day()+1, 0, 0, 0, 0, now.Location()))
+}
+
+// Read loads a widget snapshot only when the reader would show it (Visible).
 // Native extensions implement the same checks without opening the keychain.
 func Read(bundle string) (Snapshot, error) {
 	filename, err := path(bundle)
@@ -579,8 +716,11 @@ func Read(bundle string) (Snapshot, error) {
 	if err != nil {
 		return Snapshot{}, err
 	}
-	state := ajustes.Leer()
-	if !s.Visible(state.Sesion, state.Bloqueo, time.Now()) {
+	entorno, err := entornoActual()
+	if err != nil {
+		return Snapshot{}, err
+	}
+	if !s.Visible(entorno, time.Now()) {
 		return Snapshot{}, ErrPrivate
 	}
 	return s, nil
@@ -613,17 +753,27 @@ func readFile(filename string) (Snapshot, error) {
 // Providers still check the marker and lock flag, so a failed removal cannot
 // make a stale snapshot visible to the next account.
 func Clear(ctx context.Context) error {
-	return clearSnapshots(ctx, nil)
+	return clearSnapshots(ctx, nil, "")
 }
 
-// ClearIf removes snapshots only while the adopted revision is still current.
+// ClearIf removes snapshots only while the adopted identity epoch is still current.
 // A late logout/lock callback must not erase a freshly connected account's data.
-func ClearIf(ctx context.Context, adoptedGeneration string) error {
-	return clearSnapshots(ctx, &adoptedGeneration)
+func ClearIf(ctx context.Context, adoptedEpoch string) error {
+	return clearSnapshots(ctx, &adoptedEpoch, "")
 }
 
-func clearSnapshots(ctx context.Context, expected *string) error {
-	if !lector() {
+// ClearBundleIf borra solo el snapshot de UNA app, con la misma condición que ClearIf.
+// Es lo que hace el Publicador cuando el servidor rechaza la sesión de esa app: no se
+// rota la época de las quince por un rechazo puntual de una.
+func ClearBundleIf(ctx context.Context, bundle, adoptedEpoch string) error {
+	if !bundlePattern.MatchString(bundle) {
+		return ErrInvalid
+	}
+	return clearSnapshots(ctx, &adoptedEpoch, bundle)
+}
+
+func clearSnapshots(ctx context.Context, expected *string, onlyBundle string) error {
+	if !hayLector() {
 		return nil
 	}
 	dir, err := ajustes.Carpeta()
@@ -634,8 +784,12 @@ func clearSnapshots(ctx context.Context, expected *string) error {
 	if err != nil {
 		return err
 	}
-	defer func() { release(); Notify("") }()
-	if expected != nil && ajustes.Leer().Sesion != *expected {
+	defer func() { release(); Notify(onlyBundle) }()
+	// Una época que no se deja leer sale vacía en ajustes.Leer, igual que sin sesión, y
+	// coincidiría con la de quien no tiene sesión: lanzada por iOS con el teléfono
+	// bloqueado, la app borraba así los widgets de las quince. Sin poder leerla no se
+	// sabe quién ha entrado, y no se borra nada.
+	if expected != nil && (ajustes.EpocaLegible() != nil || ajustes.Leer().Epoca != *expected) {
 		return ErrPrivate
 	}
 	entries, err := os.ReadDir(filepath.Join(dir, "widgets"))
@@ -647,7 +801,9 @@ func clearSnapshots(ctx context.Context, expected *string) error {
 	}
 	var failures []error
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") || !bundlePattern.MatchString(strings.TrimSuffix(entry.Name(), ".json")) {
+		bundle := strings.TrimSuffix(entry.Name(), ".json")
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") || !bundlePattern.MatchString(bundle) ||
+			onlyBundle != "" && bundle != onlyBundle {
 			continue
 		}
 		if err := os.Remove(filepath.Join(dir, "widgets", entry.Name())); err != nil && !errors.Is(err, os.ErrNotExist) {

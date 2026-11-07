@@ -505,7 +505,7 @@ func TestPurgar_esDeSuDuenyoYSeLlevaLoQueCuelga(t *testing.T) {
 	if _, err := st.AnyadirAlAlbum(ctx, al.ID, "u1", []uuid.UUID{a.ID}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.RenombrarAlbum(ctx, al.ID, "u1", "Con a", &a.ID); err != nil {
+	if _, _, err := st.RenombrarAlbum(ctx, al.ID, "u1", "Con a", &a.ID); err != nil {
 		t.Fatal(err)
 	}
 	if err := st.ALaPapelera(ctx, a.ID, "u1"); err != nil {

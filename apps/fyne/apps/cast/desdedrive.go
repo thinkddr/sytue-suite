@@ -24,12 +24,6 @@ import (
 // que el servicio rechazaría (no es un vídeo, pasa de 8 GiB, no cabe, no se ve) se sabe
 // al llegar, por `GET /videos:from-drive`, y no después de pulsar.
 
-// Glifos de los estados de DesdeDrive (`lock` y `warning` de Icon.tsx).
-const (
-	glifoCandado = "M8 10V7a4 4 0 0 1 8 0v3M5 11a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-8ZM12 14.5v2.5"
-	glifoAviso   = "M10.3 4.2 2.2 18a2 2 0 0 0 1.7 3h16.2a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0ZM12 9.5v4.5M12 17.5h.01"
-)
-
 // MotivoDrive es por qué no se puede subir (`MotivoDeDrive` de lib/desde-drive.ts).
 type MotivoDrive uint8
 
@@ -147,18 +141,18 @@ func PantallaDesdeDrive(v Vista, d DesdeDrive) *fyne.Container {
 	var cuerpo fyne.CanvasObject
 	switch {
 	case d.ID == "":
-		cuerpo = Vacio(v, glifoVideo, v.Traduce("upload.drive.empty.title"), v.Traduce("upload.drive.empty.description"), abrirDrive())
+		cuerpo = Vacio(v, iconos.Video, v.Traduce("upload.drive.empty.title"), v.Traduce("upload.drive.empty.description"), abrirDrive())
 	case d.Motivo == DriveSinConexion && d.Fichero == nil:
 		v.Estado = SinConexion
 		cuerpo = CuerpoDeEstado(v, nil)
 	case d.Motivo == DriveSinPermiso && d.Fichero == nil:
-		cuerpo = Vacio(v, glifoCandado, v.Traduce("upload.drive.forbidden.title"), v.Traduce("upload.drive.forbidden.description"), abrirDrive())
+		cuerpo = Vacio(v, iconos.Candado, v.Traduce("upload.drive.forbidden.title"), v.Traduce("upload.drive.forbidden.description"), abrirDrive())
 	case d.Motivo != DriveBien && d.Fichero == nil:
 		accion := abrirDrive()
 		if reintentable(d.Motivo) {
 			accion = ui.NuevoBoton(v.Traduce("errors.retry"), d.AlReintentar).Con(ui.Secundario, ui.TallaMD)
 		}
-		cuerpo = Vacio(v, glifoAviso, v.Traduce("upload.drive.error.title"), textoMotivo(v, d.Motivo, d.Libres), accion)
+		cuerpo = Vacio(v, iconos.Aviso, v.Traduce("upload.drive.error.title"), textoMotivo(v, d.Motivo, d.Libres), accion)
 	case d.Fichero == nil:
 		cuerpo = esqueletoDrive(v)
 	default:

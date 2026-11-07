@@ -53,6 +53,9 @@ func main() {
 	// La sesión, la apariencia y el idioma son TRANSVERSALES a las trece apps: esto lo
 	// lee de donde lo dejó la última que lo tocó. `Abrir` no habla con la red.
 	s := sesion.Abrir(a, "")
+	// El cromo «papel» de toda la suite (ADR 0080). Aquí y no en `sesion.Abrir`: las
+	// pruebas que abren sesión comprueban también el cromo de color.
+	tema.ElegirCromo(tema.CromoPapel)
 
 	idioma := s.Idioma()
 	tr, err := i18n.New(idioma, i18n.Common(), catalogos.Docs())
@@ -69,7 +72,7 @@ func main() {
 	// La portada de presentaciones y el editor hablan con el servicio con la sesión
 	// TRANSVERSAL: sin sesión, la portada lo dice y ofrece entrar.
 	d := diapos.NuevaApp(tr.T, idioma,
-		api.NewDocs(s.URL("docs"), s.Sesion, nil), api.NewSlides(s.URL("slides"), s.Sesion, nil))
+		api.NewDocs(s.URL("docs"), s.Sesion, s.ClienteConAviso(nil)), api.NewSlides(s.URL("slides"), s.Sesion, s.ClienteConAviso(nil)))
 	d.Asistir = api.NewIA(s.URL("ai"), s.Sesion, nil).Asistir // el panel «Asistente»
 	// Lo que copia «Compartir», como en Docus y Calcus: el editor en la web bajo la
 	// organización activa (ADR 0056) y el enlace público sin ella.
@@ -93,7 +96,9 @@ func main() {
 	}
 	// La galería de plantillas de «Crear nuevo» y su selector de tema (editor/plantillas.go).
 	d.Portada().ConPlantillas = true
-	d.Portada().Widget = s.CapturarWidget
+	// El widget nativo lo lee su propia Fuente, sin depender de la pantalla, y se
+	// vuelve a publicar tras cada escritura del cliente de arriba (ClienteConAviso).
+	s.PublicadorWidget(s.FuenteWidget(tr))
 	d.Portada().AlEntrar = func() {
 		go func() {
 			if err := s.Entrar(context.Background()); err == nil {
@@ -148,14 +153,16 @@ func main() {
 	}
 	w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.Slides).ConSinSesionPropia().Montar(d.Objeto()))
 	w.Resize(fyne.NewSize(1280, 800))
-	d.Arrancar()
+	// Con interfaz: lanzada por iOS solo para el widget no se pide la portada.
+	s.CuandoHayaEscena(d.Arrancar)
 
 	// El argumento es el JSON de un registro `doc:slides` del disco, que se guarda en ese
 	// mismo fichero. Un `.pptx` o un `.odp` también llega como argumento, pero ese lo
 	// convierte el servicio por `AceptarFicheros`, abajo; y en Linux y en Windows el
 	// sistema arranca también así las aperturas por esquema, que atienden los receptores.
+	// Es una carga: con escena, que en escritorio es ya.
 	if len(os.Args) > 1 && strings.EqualFold(filepath.Ext(os.Args[1]), ".json") {
-		abrirJSON(d, os.Args[1])
+		s.CuandoHayaEscena(func() { abrirJSON(d, os.Args[1]) })
 	}
 	// `sytue-slides:/edit?id=…` es el documento del servicio, el mismo que abre la web
 	// en `/diapos/edit?id=…` (el Hub lo emite desde lo reciente y la búsqueda): se lee y se

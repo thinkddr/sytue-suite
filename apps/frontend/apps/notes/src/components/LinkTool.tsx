@@ -17,6 +17,7 @@ import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Spinner, cx } from '@sytue/ui';
 import type { Note, NoteHit } from '@sytue/api-clients';
+import type { Persona } from '@sytue/shell';
 import type { T } from '../i18n/index.js';
 import { esURLWeb } from '../client/captura.js';
 import { slugDe, titulosDe, urlDeNota, type DestinoInterno } from '../client/enlaces.js';
@@ -26,7 +27,7 @@ import type { ClaroPorNota } from './NoteCanvas.js';
 import { Glyph } from './glyphs.js';
 import { plegar } from '@sytue/i18n';
 
-/** Lo que el editor necesita para ofrecer notas y títulos. */
+/** Lo que el editor necesita para ofrecer notas y títulos, y personas a las que mencionar. */
 export interface FuentesDeEnlace {
   notas: Note[];
   notebookId: string;
@@ -36,6 +37,11 @@ export interface FuentesDeEnlace {
   claro?: ClaroPorNota;
   /** La ficha de un enlace a otra nota, para la lectura (VistaPreviaEnlace.tsx). */
   previa?: (d: DestinoInterno) => Promise<VistaPrevia | null>;
+  /**
+   * La gente de la organización, para el «@» del editor. Sin ella no se ofrece: en un
+   * cuaderno cifrado el servicio no lee el texto y una mención no avisaría a nadie.
+   */
+  personas?: () => Promise<readonly Persona[]>;
 }
 
 export interface Eleccion {
@@ -43,7 +49,8 @@ export interface Eleccion {
   label: string;
 }
 
-interface Opcion {
+/** Una nota, un título dentro de una nota, una URL o un fichero de Drive que enlazar. */
+export interface Opcion {
   clave: string;
   url: string;
   /** Texto que se inserta si no había selección. */
@@ -67,6 +74,7 @@ function normaliza(s: string): string {
   return plegar(s);
 }
 
+/** Lo de este cuaderno, al instante. Sin consulta, sus notas por su nombre (sin sus títulos). */
 function opcionesLocales(q: string, f: FuentesDeEnlace): Opcion[] {
   const nq = normaliza(q);
   const out: Opcion[] = [];
@@ -83,7 +91,7 @@ function opcionesLocales(q: string, f: FuentesDeEnlace): Opcion[] {
         tipo: 'local',
       });
     }
-    for (const h of titulosDe(contenido)) {
+    for (const h of nq ? titulosDe(contenido) : []) {
       if (normaliza(h.texto).includes(nq)) {
         out.push({
           clave: `${n.id}#${h.slug}`,
@@ -152,28 +160,29 @@ export function opcionesDrive(items: Elegible[]): Opcion[] {
     }));
 }
 
-export function LinkTool({ t, fuentes, onPick, onClose }: Props): JSX.Element {
-  const [q, setQ] = useState('');
+/**
+ * Lo que casa con `consulta`: lo de este cuaderno al instante y, desde dos letras, lo
+ * de los demás cuadernos —y, con `drive`, los ficheros de Drive— con retardo. Es LA
+ * búsqueda de enlaces: la usan esta herramienta y el `[[` del editor (RichText), y
+ * dos búsquedas de lo mismo acabarían encontrando cosas distintas. `null`: no se busca.
+ */
+export function useOpcionesDeEnlace(
+  consulta: string | null,
+  fuentes: FuentesDeEnlace | undefined,
+  drive: boolean,
+): { opciones: Opcion[]; buscando: boolean } {
   const [remotas, setRemotas] = useState<Opcion[]>([]);
   const [driveOpciones, setDriveOpciones] = useState<Opcion[]>([]);
   const [buscando, setBuscando] = useState(false);
-  const [activa, setActiva] = useState(0);
-  const input = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
-
-  useEffect(() => {
-    input.current?.focus();
-  }, []);
-
-  const consulta = q.trim();
-  const esURL = esURLWeb(consulta);
-  const locales = fuentes && consulta && !esURL ? opcionesLocales(consulta, fuentes) : [];
+  const q = consulta?.trim() ?? null;
+  const locales = fuentes && q !== null ? opcionesLocales(q, fuentes) : [];
 
   // La búsqueda remota y de Drive va con retardo: escribir «informe» son siete pulsaciones
   // y siete viajes para seis resultados que nadie llegó a leer.
   useEffect(() => {
     clearTimeout(debounceRef.current);
-    if (!consulta || consulta.length < 2 || esURL) {
+    if (q === null || q.length < 2) {
       setRemotas([]);
       setDriveOpciones([]);
       setBuscando(false);
@@ -186,26 +195,47 @@ export function LinkTool({ t, fuentes, onPick, onClose }: Props): JSX.Element {
       if (fuentes) {
         promesas.push(
           fuentes
-            .buscar(consulta)
-            .then((hits) => vivo && setRemotas(opcionesRemotas(consulta, hits, fuentes)))
+            .buscar(q)
+            .then((hits) => vivo && setRemotas(opcionesRemotas(q, hits, fuentes)))
             .catch(() => vivo && setRemotas([])),
         );
       }
-      promesas.push(
-        listarDeLaSuite('drive', { q: consulta })
-          .then((res) => vivo && setDriveOpciones(opcionesDrive(res.items ?? [])))
-          .catch(() => vivo && setDriveOpciones([])),
-      );
+      if (drive) {
+        promesas.push(
+          listarDeLaSuite('drive', { q })
+            .then((res) => vivo && setDriveOpciones(opcionesDrive(res.items ?? [])))
+            .catch(() => vivo && setDriveOpciones([])),
+        );
+      }
       void Promise.allSettled(promesas).finally(() => vivo && setBuscando(false));
     }, 250);
     return () => {
       vivo = false;
     };
-  }, [consulta, esURL, fuentes]);
+  }, [q, fuentes, drive]);
 
+  return { opciones: [...locales, ...remotas, ...(drive ? driveOpciones : [])], buscando };
+}
+
+export function LinkTool({ t, fuentes, onPick, onClose }: Props): JSX.Element {
+  const [q, setQ] = useState('');
+  const [activa, setActiva] = useState(0);
+  const input = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    input.current?.focus();
+  }, []);
+
+  const consulta = q.trim();
+  const esURL = esURLWeb(consulta);
+  const { opciones: encontradas, buscando } = useOpcionesDeEnlace(
+    consulta && !esURL ? consulta : null,
+    fuentes,
+    true,
+  );
   const opciones: Opcion[] = esURL
     ? [{ clave: 'url', url: consulta, label: consulta, nota: consulta, tipo: 'url' }]
-    : [...locales, ...remotas, ...driveOpciones];
+    : encontradas;
   const elegir = (o: Opcion) => onPick({ url: o.url, label: o.label });
 
   return (

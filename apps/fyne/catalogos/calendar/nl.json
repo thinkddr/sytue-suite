@@ -66,6 +66,7 @@
   "common.remove": "Verwijderen",
   "common.retry": "Opnieuw proberen",
   "common.save": "Opslaan",
+  "day.noEvents": "Geen afspraken op deze dag",
   "error.calendarsLoad": "De agenda's konden niet worden geladen.",
   "error.eventsLoad": "De afspraken konden niet worden geladen.",
   "event.ai": "Beschrijf de afspraak",
@@ -142,12 +143,19 @@
   "grid.blockAria": "{title}, {time}",
   "grid.continued": "{title} (vervolg)",
   "grid.createOn": "Een afspraak maken op {date}",
+  "grid.dayEvents": {
+    "one": "{date}, {count} afspraak",
+    "other": "{date}, {count} afspraken"
+  },
+  "grid.daySelected": "{label}, geselecteerd",
   "grid.loadError": "De agenda kon niet worden geladen",
   "grid.loading": "De agenda laden",
   "grid.more": {
     "one": "+{count} meer",
     "other": "+{count} meer"
   },
+  "grid.showMonth": "Hele maand tonen",
+  "grid.showWeek": "Alleen deze week tonen",
   "grid.snapAria": {
     "one": "Slepen uitlijnen op {count} minuut. Druk om te wijzigen.",
     "other": "Slepen uitlijnen op {count} minuten. Druk om te wijzigen."
@@ -160,6 +168,13 @@
     "one": "{count} min",
     "other": "{count} min"
   },
+  "grid.todayLabel": "Vandaag, {date}",
+  "grid.weekNumber": "Week {week}",
+  "guests.organizer": "Organisator",
+  "guests.status.accepted": "Komt",
+  "guests.status.declined": "Komt niet",
+  "guests.status.pending": "Wacht op antwoord",
+  "guests.status.tentative": "Misschien",
   "header.invitations": "Uitnodigingen",
   "header.next": "Volgende",
   "header.pending": {
@@ -197,6 +212,10 @@
   "nav.createEventOn": "Afspraak maken op {date}",
   "nav.deleteSubscription": "Abonnement verwijderen",
   "nav.manageResources": "Ruimtes en apparatuur beheren",
+  "nav.menuPending": {
+    "one": "Menu openen, {count} openstaand",
+    "other": "Menu openen, {count} openstaand"
+  },
   "nav.myCalendars": "Mijn agenda's",
   "nav.next": "Volgende",
   "nav.nextMonth": "Volgende maand",
@@ -341,6 +360,7 @@
   "scope.following": "Deze en volgende afspraken",
   "scope.legend": "Deze afspraak wordt herhaald. Op welke afspraken is de wijziging van toepassing?",
   "scope.this": "Alleen deze afspraak",
+  "search.allCalendars": "Alle agenda's",
   "search.error": "De zoekopdracht kon niet worden voltooid.",
   "search.events": "Afspraken zoeken",
   "search.loadMore": "Meer laden",
@@ -349,6 +369,12 @@
     "other": "Typ minstens {count} tekens om in je agenda's te zoeken."
   },
   "search.noResults": "Geen resultaten voor “{term}”.",
+  "search.period": "Periode",
+  "search.period.any": "Altijd",
+  "search.period.month": "Deze maand",
+  "search.period.past": "Voorbij",
+  "search.period.upcoming": "Komend",
+  "search.period.year": "Dit jaar",
   "search.placeholder": "Titel, beschrijving, locatie of gast…",
   "search.searching": "Zoeken…",
   "search.series": "Reeks",
@@ -390,6 +416,14 @@
   "share.whoSeesNow": "Wie hem nu ziet",
   "share.writerHint": "Ziet ze niet alleen, maar maakt, wijzigt en verwijdert ook afspraken in deze agenda.",
   "share.writerLabel": "Mijn afspraken zien en bewerken",
+  "shortcuts.group.actions": "Acties",
+  "shortcuts.group.navigate": "Navigeren",
+  "shortcuts.group.views": "Weergaven",
+  "shortcuts.help": "Deze lijst tonen",
+  "shortcuts.next": "Volgende periode",
+  "shortcuts.prev": "Vorige periode",
+  "shortcuts.title": "Sneltoetsen",
+  "shortcuts.today": "Naar vandaag",
   "subscribe.aria": "Abonneren op een agenda via URL",
   "subscribe.byUrl": "Abonneren via URL (.ics)",
   "subscribe.defaultName": "Geabonneerde agenda",

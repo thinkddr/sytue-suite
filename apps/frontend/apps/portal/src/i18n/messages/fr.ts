@@ -71,6 +71,7 @@ export const fr: AppCatalog<typeof en> = {
   'inbox.markAll': 'Tout marquer comme lu',
   'inbox.loading': 'Chargement des notifications…',
   'inbox.unreadDot': 'Non lue',
+  'inbox.markRead': 'Marquer comme lu',
   'inbox.errorTitle': 'Impossible de charger les notifications',
   'inbox.errorBody': 'Le Hub ne répond pas pour le moment. Réessayez dans quelques secondes.',
   'inbox.retry': 'Réessayer',
@@ -754,6 +755,8 @@ export const fr: AppCatalog<typeof en> = {
     '{sources} n’a pas répondu, il peut donc manquer des résultats. Réessayez dans un instant.',
   'search.partialJoin': ' et ',
   'search.showing': '{count} résultats affichés sur {total}.',
+  'search.loadMore': 'Charger plus de résultats',
+  'search.loadMoreFailed': 'Impossible de charger plus de résultats. Réessayez.',
   'privacy.notice':
     'Nous ne vendons pas vos données et ne les cédons pas à des tiers. Nous ne les utilisons ni pour vous profiler, ni pour la publicité, ni pour entraîner ou améliorer nos services ou ceux d’autrui. Elles sont chiffrées en transit et au repos, et ne quittent notre infrastructure européenne que pour le strict nécessaire de la facturation et dans les intégrations que vous activez, où le tiers vous demandera votre accord sur les données utilisées.',
 };

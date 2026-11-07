@@ -31,6 +31,14 @@ type semillaDeCreacion struct {
 func (h *Handler) semillaDeCreacion(r *http.Request, req createDocumentReq, sourceRef, titulo string) (semillaDeCreacion, error) {
 	sem := semillaDeCreacion{kind: req.Kind, titulo: titulo, estado: domain.NewState()}
 	clave := strings.TrimSpace(req.Template)
+	if origen := strings.TrimSpace(req.CopyOf); origen != "" {
+		if clave != "" || sourceRef != "" {
+			// Una copia es un documento NUEVO y de un solo origen: ni se ancla a un
+			// fichero (sería idempotente) ni se mezcla con una plantilla.
+			return sem, httpx.ErrBadRequest.WithMessage(`"copy_of" cannot be combined with "template" or "source_ref".`)
+		}
+		return h.semillaDeCopia(r, sem, origen)
+	}
 	if clave == "" {
 		return sem, nil
 	}
@@ -64,6 +72,40 @@ func (h *Handler) semillaDeCreacion(r *http.Request, req createDocumentReq, sour
 	}
 	err = h.aplicarTemaAlCrear(r, req, &sem)
 	return sem, err
+}
+
+// semillaDeCopia es «Hacer una copia»: el contenido de ahora del documento `origen`, con
+// sus operaciones reescritas a nombre de un actor nuevo (las de la copia no pueden
+// compartir puntos con las del original). Comentarios, versiones y permisos NO viajan:
+// son del original. Pide el papel de lector, el mismo que leer el estado.
+func (h *Handler) semillaDeCopia(r *http.Request, sem semillaDeCreacion, origen string) (semillaDeCreacion, error) {
+	subj, ok := subjectFrom(r)
+	if !ok {
+		return sem, httpx.ErrUnauthorized
+	}
+	doc, _, err := h.svc.Authorize(r.Context(), origen, subj, domain.RoleViewer)
+	if err != nil {
+		return sem, err
+	}
+	estado, _, err := h.svc.LoadFull(r.Context(), subj, origen, h.hydrateFromS3)
+	if err != nil {
+		return sem, err
+	}
+	tok, err := domain.NewToken()
+	if err != nil {
+		return sem, err
+	}
+	sem.kind = doc.Kind
+	if sem.titulo == "" {
+		sem.titulo = doc.Title
+	}
+	sem.ops = domain.NewState().Diff(estado, "copia:"+tok[:16], 0, 0)
+	for _, op := range sem.ops {
+		if _, err := sem.estado.Apply(op); err != nil {
+			return sem, err
+		}
+	}
+	return sem, nil
 }
 
 // aplicarTemaAlCrear añade a la semilla la operación del tema pedido (`theme`), si lo hay.

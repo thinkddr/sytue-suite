@@ -66,6 +66,7 @@
   "common.remove": "Rimuovi",
   "common.retry": "Riprova",
   "common.save": "Salva",
+  "day.noEvents": "Nessun evento in questo giorno",
   "error.calendarsLoad": "Impossibile caricare i calendari.",
   "error.eventsLoad": "Impossibile caricare gli eventi.",
   "event.ai": "Descrivi l'evento",
@@ -142,12 +143,19 @@
   "grid.blockAria": "{title}, {time}",
   "grid.continued": "{title} (continua)",
   "grid.createOn": "Crea un evento il {date}",
+  "grid.dayEvents": {
+    "one": "{date}, {count} evento",
+    "other": "{date}, {count} eventi"
+  },
+  "grid.daySelected": "{label}, selezionato",
   "grid.loadError": "Impossibile caricare il calendario",
   "grid.loading": "Caricamento del calendario",
   "grid.more": {
     "one": "+{count} altro",
     "other": "+{count} altri"
   },
+  "grid.showMonth": "Mostra tutto il mese",
+  "grid.showWeek": "Mostra solo questa settimana",
   "grid.snapAria": {
     "one": "Aggancia il trascinamento a {count} minuto. Premi per cambiare.",
     "other": "Aggancia il trascinamento a {count} minuti. Premi per cambiare."
@@ -160,6 +168,13 @@
     "one": "{count} min",
     "other": "{count} min"
   },
+  "grid.todayLabel": "Oggi, {date}",
+  "grid.weekNumber": "Settimana {week}",
+  "guests.organizer": "Organizzatore",
+  "guests.status.accepted": "Parteciperà",
+  "guests.status.declined": "Non parteciperà",
+  "guests.status.pending": "In attesa di risposta",
+  "guests.status.tentative": "Forse",
   "header.invitations": "Inviti",
   "header.next": "Successivo",
   "header.pending": {
@@ -197,6 +212,10 @@
   "nav.createEventOn": "Crea evento il {date}",
   "nav.deleteSubscription": "Rimuovi sottoscrizione",
   "nav.manageResources": "Gestisci sale e risorse",
+  "nav.menuPending": {
+    "one": "Apri il menu, {count} in sospeso",
+    "other": "Apri il menu, {count} in sospeso"
+  },
   "nav.myCalendars": "I miei calendari",
   "nav.next": "Successivo",
   "nav.nextMonth": "Mese successivo",
@@ -341,6 +360,7 @@
   "scope.following": "Questo e i successivi",
   "scope.legend": "Questo evento si ripete. A quali eventi si applica la modifica?",
   "scope.this": "Solo questo evento",
+  "search.allCalendars": "Tutti i calendari",
   "search.error": "Impossibile completare la ricerca.",
   "search.events": "Cerca eventi",
   "search.loadMore": "Carica altri",
@@ -349,6 +369,12 @@
     "other": "Scrivi almeno {count} caratteri per cercare nei tuoi calendari."
   },
   "search.noResults": "Nessun risultato per «{term}».",
+  "search.period": "Periodo",
+  "search.period.any": "In qualsiasi momento",
+  "search.period.month": "Questo mese",
+  "search.period.past": "Passati",
+  "search.period.upcoming": "Prossimi",
+  "search.period.year": "Quest'anno",
   "search.placeholder": "Titolo, descrizione, luogo o partecipante…",
   "search.searching": "Ricerca…",
   "search.series": "Serie",
@@ -390,6 +416,14 @@
   "share.whoSeesNow": "Chi lo vede ora",
   "share.writerHint": "Oltre a vederli, crea, modifica ed elimina eventi di questo calendario.",
   "share.writerLabel": "Vedere e modificare i miei eventi",
+  "shortcuts.group.actions": "Azioni",
+  "shortcuts.group.navigate": "Muoversi",
+  "shortcuts.group.views": "Viste",
+  "shortcuts.help": "Mostra questa lista",
+  "shortcuts.next": "Periodo successivo",
+  "shortcuts.prev": "Periodo precedente",
+  "shortcuts.title": "Scorciatoie da tastiera",
+  "shortcuts.today": "Vai a oggi",
   "subscribe.aria": "Iscriviti a un calendario tramite URL",
   "subscribe.byUrl": "Iscriviti tramite URL (.ics)",
   "subscribe.defaultName": "Calendario sottoscritto",

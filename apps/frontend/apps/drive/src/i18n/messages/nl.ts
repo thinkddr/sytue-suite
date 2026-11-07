@@ -257,6 +257,11 @@ export const nl: AppCatalog<typeof en> = {
     one: '1 item naar de prullenbak gestuurd.',
     other: '{count} items naar de prullenbak gestuurd.',
   },
+  'files.batch.restored': { one: '1 item teruggezet.', other: '{count} items teruggezet.' },
+  'files.batch.restorePartial': {
+    one: '1 item kon niet worden teruggezet en staat nog in de prullenbak.',
+    other: '{count} items konden niet worden teruggezet en staan nog in de prullenbak.',
+  },
   'files.batch.trashFailed': 'De selectie kon niet naar de prullenbak worden gestuurd.',
   'files.batch.moveTitle': { one: '1 item verplaatsen', other: '{count} items verplaatsen' },
   'files.batch.moveDone': { one: '1 item verplaatst.', other: '{count} items verplaatst.' },
@@ -271,6 +276,9 @@ export const nl: AppCatalog<typeof en> = {
   'action.rename': 'Hernoemen',
   'action.move': 'Verplaatsen naar…',
   'action.copy': 'Kopie maken',
+  'action.copyLink': 'Link kopiëren',
+  'action.linkCopied': 'Link gekopieerd. Hij opent alleen voor wie al toegang heeft.',
+  'action.copyLinkFailed': 'De link kon niet worden gekopieerd.',
   'action.shareLink': 'Link delen',
   'action.openInApp': 'Openen in de applicatie',
   'action.openInEditor': 'Openen in de editor',
@@ -491,6 +499,18 @@ export const nl: AppCatalog<typeof en> = {
   'trash.purged': '“{name}” is definitief verwijderd.',
   'trash.purgeDenied': '“{name}” kan niet worden verwijderd',
   'trash.purgeFailed': 'Kon niet worden verwijderd.',
+  'trash.emptyAll': 'Prullenbak legen',
+  'trash.emptyAllTitle': 'Prullenbak legen?',
+  'trash.emptyAllBody': {
+    one: 'Het item in de prullenbak wordt definitief gewist, samen met de versiegeschiedenis. Daarna is er geen manier om het terug te halen.',
+    other:
+      'De {count} items in de prullenbak worden definitief gewist, samen met de versiegeschiedenis. Daarna is er geen manier om ze terug te halen.',
+  },
+  'trash.emptiedAll': 'De prullenbak is geleegd.',
+  'trash.emptyAllPartial': {
+    one: '1 item kon niet worden verwijderd en staat nog in de prullenbak.',
+    other: '{count} items konden niet worden verwijderd en staan nog in de prullenbak.',
+  },
   'trash.purgeTitle': 'Definitief verwijderen?',
   'trash.purgeBodyFolder':
     'De inhoud van “{name}” en van alles erin wordt van de servers van Sytue gewist, samen met de versiegeschiedenis. Daarna is er geen manier om het terug te halen, niet hier en niet via support. In ruil daarvoor maak je de ruimte vrij die het innam.',

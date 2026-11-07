@@ -11,6 +11,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
+	"git.sytue.eu/sytue/one/platform/pkg/log"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/calendar/internal/domain"
 )
@@ -188,6 +190,55 @@ func (s *Store) CalendarAccess(ctx context.Context, sub, email string, calendarI
 		return nil
 	})
 	return perm, err
+}
+
+// QuienesVen son quienes ven el calendario: su dueño y cada share, por su sujeto o,
+// si el share es por correo, por hubnotify.PorCorreo. Una consulta. Es a quién llega la
+// señal de cambios (hubnotify.EventoDatos) de lo que se escribe en él.
+func (s *Store) QuienesVen(ctx context.Context, calendarID uuid.UUID) ([]string, error) {
+	t := tenancy.MustFrom(ctx)
+	var out []string
+	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx,
+			`SELECT owner_sub, '' FROM calendars WHERE tenant=$1 AND id=$2 AND deleted_at IS NULL
+			 UNION ALL
+			 SELECT grantee_sub, grantee_email FROM calendar_shares WHERE tenant=$1 AND calendar_id=$2`,
+			t.Slug, calendarID)
+		if err != nil {
+			return fmt.Errorf("store: quiénes ven el calendario: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var sub, email string
+			if err := rows.Scan(&sub, &email); err != nil {
+				return err
+			}
+			switch {
+			case sub != "":
+				out = append(out, sub)
+			case email != "":
+				out = append(out, hubnotify.PorCorreo(email))
+			}
+		}
+		return rows.Err()
+	})
+	return out, err
+}
+
+// AvisarQuienesVen suma a la señal de la escritura en curso a quienes ven el
+// calendario (QuienesVen): lo que escribe en él una persona con quien se compartió lo
+// ve su dueño, y lo que escribe el dueño, quienes lo tienen compartido. Fuera de una
+// escritura con señal no consulta nada; si la consulta falla, se queda sin ellos.
+func (s *Store) AvisarQuienesVen(ctx context.Context, calendarID uuid.UUID) {
+	if !hubnotify.EnEscritura(ctx) {
+		return
+	}
+	quienes, err := s.QuienesVen(ctx, calendarID)
+	if err != nil {
+		log.From(ctx).Warn("calendar: quiénes ven el calendario", "error", err)
+		return
+	}
+	hubnotify.AvisarTambien(ctx, quienes...)
 }
 
 // SharedCalendar es un calendario compartido CON el usuario: el calendario del

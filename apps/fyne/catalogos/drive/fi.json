@@ -4,6 +4,8 @@
   "action.classified": "Luokitus · {name}",
   "action.classify": "Luokittele",
   "action.copy": "Tee kopio",
+  "action.copyLink": "Kopioi linkki",
+  "action.copyLinkFailed": "Linkkiä ei voitu kopioida.",
   "action.delete": "Siirrä roskakoriin",
   "action.desktopBody": "Jos et ole vielä asentanut sitä, voit ladata sen.",
   "action.desktopCta": "Katso lataukset",
@@ -12,6 +14,7 @@
   "action.downloadName": "Lataa {name}",
   "action.downloadZip": "Lataa (ZIP)",
   "action.editorFailed": "Editori ei voinut avata tätä tiedostoa.",
+  "action.linkCopied": "Linkki kopioitiin. Se aukeaa vain niille, joilla on jo käyttöoikeus.",
   "action.mailFailed": "Sähköpostin kirjoitusikkunaa ei voitu avata",
   "action.menu": "Toiminnot: {name}",
   "action.more": "Lisää toimintoja",
@@ -81,6 +84,14 @@
   "files.batch.moveTitle": {
     "one": "Siirrä 1 kohde",
     "other": "Siirrä {count} kohdetta"
+  },
+  "files.batch.restorePartial": {
+    "one": "1 kohdetta ei voitu palauttaa, se on yhä roskakorissa.",
+    "other": "{count} kohdetta ei voitu palauttaa, ne ovat yhä roskakorissa."
+  },
+  "files.batch.restored": {
+    "one": "1 kohde palautettiin.",
+    "other": "{count} kohdetta palautettiin."
   },
   "files.batch.trashBody": {
     "one": "1 kohde siirretään roskakoriin. Voit palauttaa sen sieltä.",
@@ -555,6 +566,17 @@
     "other": "{count} tiedostoa lähetetty."
   },
   "team.upload.partial": "{uploaded}/{count} lähetetty.",
+  "trash.emptiedAll": "Roskakori tyhjennettiin.",
+  "trash.emptyAll": "Tyhjennä roskakori",
+  "trash.emptyAllBody": {
+    "one": "Roskakorin kohde poistetaan lopullisesti versiohistorioineen. Sitä ei voi palauttaa jälkikäteen.",
+    "other": "Roskakorin {count} kohdetta poistetaan lopullisesti versiohistorioineen. Niitä ei voi palauttaa jälkikäteen."
+  },
+  "trash.emptyAllPartial": {
+    "one": "1 kohdetta ei voitu poistaa, se on yhä roskakorissa.",
+    "other": "{count} kohdetta ei voitu poistaa, ne ovat yhä roskakorissa."
+  },
+  "trash.emptyAllTitle": "Tyhjennetäänkö roskakori?",
   "trash.emptyBody": "Poistamasi tiedostot ja kansiot näkyvät täällä, ja voit palauttaa ne.",
   "trash.emptyTitle": "Roskakori on tyhjä",
   "trash.errorTitle": "Roskakoria ei voitu ladata",

@@ -65,6 +65,9 @@ func main() {
 	// La sesión, la apariencia y el idioma son TRANSVERSALES a las trece apps: esto lo
 	// lee de donde lo dejó la última que lo tocó. `Abrir` no habla con la red.
 	s := sesion.Abrir(a, "")
+	// El cromo «papel» de toda la suite (ADR 0080). Aquí y no en `sesion.Abrir`: las
+	// pruebas que abren sesión comprueban también el cromo de color.
+	tema.ElegirCromo(tema.CromoPapel)
 
 	tr, err := i18n.New(s.Idioma(), i18n.Common(), catalogos.Docs())
 	if err != nil {
@@ -77,9 +80,11 @@ func main() {
 	w := a.NewWindow("Sytue CertiPDF")
 	w.SetPadded(false)
 
-	pdf := api.NewPDF(s.URL("docs"), s.URL("drive"), s.Sesion, nil)
+	pdf := api.NewPDF(s.URL("docs"), s.URL("drive"), s.Sesion, s.ClienteConAviso(nil))
+	// El widget nativo lo lee su propia Fuente, sin depender de la pantalla, y se
+	// vuelve a publicar tras cada escritura del cliente de arriba (ClienteConAviso).
+	s.PublicadorWidget(s.FuenteWidget(tr))
 	p := certipdf.NuevaPantalla(tr.T)
-	p.Widget = s.CapturarWidget
 	// El Asistente va en directo al servicio de IA, por el ingress que el chart abre a
 	// las apps nativas; la web pasa por su BFF, que solo reenvía.
 	p.IA = api.NewIA(s.URL("ai"), s.Sesion, nil)
@@ -92,7 +97,6 @@ func main() {
 	// Lo que se anota va firmado con el nombre de quien ha entrado, como en la web: se
 	// pide a Sytue ID al entrar (el estado transversal solo lleva el `sub`).
 	s.AlCambiar(c.conocerAutor)
-	c.conocerAutor(s.Estado())
 	p.AlVolver = c.salir
 	// Lo que falle al abrir desde la propia ventana se enseña en ella: no hay enlace
 	// entrante al que devolverle el error.
@@ -123,10 +127,13 @@ func main() {
 	p.AlEscanear = c.escanear
 	w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.PDF).ConSinSesionPropia().Montar(p.Objeto()))
 	p.Atajos(w.Canvas())
-	// Sin documento es la portada de la web (`PortadaPdf`): lo que hay en la carpeta
-	// «PDF» de Drive.
-	p.MostrarPortada(pdf, tr.Locale())
 	w.Resize(fyne.NewSize(anchoInicial, altoInicial))
+	// Con interfaz: lanzada por iOS solo para el widget no se pide nada. Sin documento
+	// es la portada de la web (`PortadaPdf`): lo que hay en la carpeta «PDF» de Drive.
+	s.CuandoHayaEscena(func() {
+		c.conocerAutor(s.Estado())
+		p.MostrarPortada(pdf, tr.Locale())
+	})
 
 	// Un PDF pulsado en Drive llega como `sytue-pdf:/pdf?path=…&volver=…`: CertiPDF abre
 	// por RUTA y no por identificador, que es lo que acepta su página en la web. Si no

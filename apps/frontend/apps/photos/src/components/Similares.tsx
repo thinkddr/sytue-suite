@@ -32,6 +32,7 @@ import {
 import { RUTA } from '../lib/ruta.js';
 import { tituloSugerido } from '../lib/tituloAlbum.js';
 import { useT } from '../i18n/index.js';
+import { posicionVisor } from '../lib/posicionVisor.js';
 import { Marco } from './Marco.js';
 import { Miniatura, Visor } from './PhotosApp.js';
 import { Nav } from './Nav.js';
@@ -181,6 +182,8 @@ export function Similares({
             locale={locale}
             onClose={() => setAbierta(null)}
             vecinas={[fotos[abierta - 1], fotos[abierta + 1]]}
+            posicion={posicionVisor(abierta, fotos.length)}
+            onIr={setAbierta}
             onPrev={abierta > 0 ? () => setAbierta(abierta - 1) : undefined}
             onNext={abierta < fotos.length - 1 ? () => setAbierta(abierta + 1) : undefined}
           />

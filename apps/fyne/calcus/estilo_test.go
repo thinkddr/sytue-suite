@@ -231,6 +231,19 @@ func TestLosAtajosDeLaWeb(t *testing.T) {
 	if b, _, _ := r.L.Formato(3, 7); !b {
 		t.Error("Ctrl+B no pone la negrita")
 	}
+	// Ctrl/Cmd +, − y 0 con el foco en la rejilla: el zoom del libro, como en la web
+	// (VISTO EN ROJO con `AtajoImprimir` en vez de `AtajoDelEditor` en `atajo`).
+	r.Contexto = &editor.Contexto{Tipo: editor.Hoja, Zoom: 100}
+	r.TypedShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyEqual, Modifier: ctrl})
+	r.TypedShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyEqual, Modifier: ctrl})
+	r.TypedShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyMinus, Modifier: ctrl})
+	if r.Contexto.Zoom != 110 {
+		t.Errorf("Ctrl+= dos veces y Ctrl+− una dejan el zoom en %d", r.Contexto.Zoom)
+	}
+	r.TypedShortcut(&desktop.CustomShortcut{KeyName: fyne.Key0, Modifier: ctrl})
+	if r.Contexto.Zoom != 100 {
+		t.Errorf("Ctrl+0 deja el zoom en %d", r.Contexto.Zoom)
+	}
 }
 
 // TestLasCabecerasSeleccionanLaColumnaYLaFila: clicar la cabecera de una columna la

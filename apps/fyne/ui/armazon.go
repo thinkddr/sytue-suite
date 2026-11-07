@@ -118,8 +118,18 @@ type Armazon struct {
 	// ClavePreferenciaPanel es la clave en preferencias donde se persiste el ancho
 	// del panel (por ejemplo "sytue.mail.panel-width").
 	ClavePreferenciaPanel string
+	// AlMedir avisa del ancho del armazón —el de la ventana— cada vez que CAMBIA, para
+	// la pantalla que se compone distinto según él (el mes del teléfono de Calendar, por
+	// debajo de `CorteSM`). Llega desde Layout: quien lo reciba no debe reconstruir el
+	// árbol ahí mismo, sino pedirlo para después.
+	AlMedir func(ancho float32)
 
-	barra      *BarraMovil // la del armazón, cuando la app no trae ninguna
+	anchoMedido float32     // el último ancho avisado a AlMedir
+	barra       *BarraMovil // la del armazón, cuando la app no trae ninguna
+	// suite es la barra de la suite bajo la que lo ha colocado `BarraSuite.Montar`: en
+	// un teléfono su barra móvil sube a ella (la barra única). Si la app rehace el
+	// armazón sin que el montaje se vuelva a colocar, se busca en el lienzo.
+	suite      *BarraSuite
 	anchoPanel float32
 	separador  *separadorPanel
 	// entrada es lo que le falta al cajón para llegar a su sitio (`<= 0`): `sytue-drawer-in`,
@@ -260,9 +270,10 @@ func (a *Armazon) moverCajonEnVivo() {
 	}
 	posX := min(max(a.entrada, -ancho), 0)
 	progreso := min(max((ancho+posX)/ancho, 0), 1)
-	a.Menu.Move(fyne.NewPos(posX, 0))
+	desde := a.Menu.Position().Y // bajo la barra única, si la hay (colocarNavegacion)
+	a.Menu.Move(fyne.NewPos(posX, desde))
 	r.ponerFondoCajon(true, t.Width)
-	r.colocarAdornosCajon(posX, ancho, t.Height, progreso, true)
+	r.colocarAdornosCajon(posX, desde, ancho, t.Height-desde, progreso, true)
 	a.refrescarFlotantes()
 }
 
@@ -743,6 +754,10 @@ func (r *armazonRenderer) Layout(t fyne.Size) {
 	defer func() { sincronizarExclusionMenuMovil(lienzoDe(r.a)) }()
 	a := r.a
 	defer a.enlazarCajonMovil()
+	if a.AlMedir != nil && t.Width > 0 && t.Width != a.anchoMedido {
+		a.anchoMedido = t.Width
+		defer a.AlMedir(t.Width)
+	}
 	r.fondo.Resize(t)
 	estrecha := t.Width < Estrecho
 	// En Marco el panel y el contenido van en la HOJA, que se separa del borde derecho y
@@ -766,10 +781,7 @@ func (r *armazonRenderer) Layout(t fyne.Size) {
 	arriba := float32(0)
 	if bm := a.barraMovil(); bm != nil {
 		if b, es := bm.(*BarraMovil); es {
-			b.ConLista = a.Panel != nil
-			b.listaVisible = a.Panel != nil && !estrecha
-			b.CajonAbierto = a.CajonAbierto
-			b.Refresh()
+			a.prepararBarraMovil(b, estrecha)
 		}
 		h := bm.MinSize().Height
 		esconder(bm, !estrecha)
@@ -781,7 +793,13 @@ func (r *armazonRenderer) Layout(t fyne.Size) {
 	}
 	alto := max(t.Height-arriba-separa, 0)
 
-	x := r.colocarNavegacion(t, separa, estrecha, esCajon)
+	// Con la barra única el armazón empieza arriba del todo y su barra ES la de la suite:
+	// el cajón y el velo arrancan DEBAJO de ella, como `BAJO_LA_TOPBAR` de AppShell.tsx.
+	desde := float32(0)
+	if b, es := a.barraMovil().(*BarraMovil); es && b.enSuite {
+		desde = arriba
+	}
+	x := r.colocarNavegacion(t, separa, estrecha, esCajon, desde)
 
 	r.colocarMarco(t, x, arriba, separa, estrecha)
 
@@ -801,6 +819,26 @@ func (r *armazonRenderer) Layout(t fyne.Size) {
 	util := min(ancho-2*MargenContenido, tema.AnchoContenido)
 	a.Contenido.Move(fyne.NewPos(x+(ancho-util)/2, arriba+MargenContenido))
 	a.Contenido.Resize(fyne.NewSize(max(util, 0), max(alto-2*MargenContenido, 0)))
+}
+
+// prepararBarraMovil le dice a la barra móvil lo que depende del ancho: si hay lista, si
+// se ve, el cajón y —en un teléfono con la barra de la suite encima— que va DENTRO de
+// ella (la barra única), con la reserva de la entrada y el nombre del producto.
+func (a *Armazon) prepararBarraMovil(b *BarraMovil, estrecha bool) {
+	b.ConLista = a.Panel != nil
+	b.listaVisible = a.Panel != nil && !estrecha
+	b.CajonAbierto = a.CajonAbierto
+	b.enSuite, b.reservaSuite, b.tituloRespaldo = false, 0, ""
+	bs := a.suite
+	if bs == nil {
+		bs = barraSuiteDe(lienzoDe(a))
+	}
+	if estrecha && bs != nil {
+		b.enSuite = true
+		b.reservaSuite = canalonBarraUnica + LadoControlBarra() + huecoBarraUnica
+		b.tituloRespaldo = bs.nombreProducto()
+	}
+	b.Refresh()
 }
 
 // Las barras que configura cada app también pueden cambiar CajonAbierto y
@@ -859,7 +897,7 @@ func (r *armazonRenderer) colocarPanel(t fyne.Size, x, arriba, alto float32, est
 
 // colocarNavegacion pone el carril de iconos y el menú —fijo a la izquierda o cajón sobre
 // su velo— y devuelve dónde empieza lo que va a su derecha.
-func (r *armazonRenderer) colocarNavegacion(t fyne.Size, separa float32, estrecha, esCajon bool) float32 {
+func (r *armazonRenderer) colocarNavegacion(t fyne.Size, separa float32, estrecha, esCajon bool, desde float32) float32 {
 	a := r.a
 	x := separa
 	if a.Carril != nil {
@@ -886,31 +924,31 @@ func (r *armazonRenderer) colocarNavegacion(t fyne.Size, separa float32, estrech
 		if conCajon {
 			posX = min(max(a.desplazamientoCajon(true), -ancho), 0)
 		}
-		a.Menu.Move(fyne.NewPos(posX, 0))
-		a.Menu.Resize(fyne.NewSize(ancho, t.Height))
+		a.Menu.Move(fyne.NewPos(posX, desde))
+		a.Menu.Resize(fyne.NewSize(ancho, t.Height-desde))
 	}
 	r.ponerFondoCajon(conCajon, t.Width)
 	progreso := float32(0)
 	if conCajon && ancho > 0 {
 		progreso = min(max((ancho+posX)/ancho, 0), 1)
 	}
-	r.colocarAdornosCajon(posX, ancho, t.Height, progreso, conCajon)
+	r.colocarAdornosCajon(posX, desde, ancho, t.Height-desde, progreso, conCajon)
 	if !esCajon {
 		return ancho
 	}
 	// El cajón tapa el contenido, pero el contenido sigue ocupando su sitio: al
 	// cerrarlo no se recoloca nada.
-	r.velo.Move(fyne.NewPos(0, 0))
-	r.velo.Resize(t)
+	r.velo.Move(fyne.NewPos(0, desde))
+	r.velo.Resize(fyne.NewSize(t.Width, t.Height-desde))
 	return x
 }
 
-func (r *armazonRenderer) colocarAdornosCajon(posX, ancho, alto, progreso float32, conCajon bool) {
+func (r *armazonRenderer) colocarAdornosCajon(posX, desde, ancho, alto, progreso float32, conCajon bool) {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	activo := conCajon && progreso > 0
 	if activo {
 		r.sombraCajon.Objeto().Show()
-		r.sombraCajon.Ajustar(fyne.NewPos(posX, 0), fyne.NewSize(ancho, alto), v)
+		r.sombraCajon.Ajustar(fyne.NewPos(posX, desde), fyne.NewSize(ancho, alto), v)
 	} else {
 		r.sombraCajon.Objeto().Hide()
 	}
@@ -918,7 +956,7 @@ func (r *armazonRenderer) colocarAdornosCajon(posX, ancho, alto, progreso float3
 	esconder(r.bordeCajon, !conBorde)
 	if conBorde {
 		r.bordeCajon.FillColor = colorFileteLateral(v)
-		r.bordeCajon.Move(fyne.NewPos(posX+ancho-tema.Borde, 0))
+		r.bordeCajon.Move(fyne.NewPos(posX+ancho-tema.Borde, desde))
 		r.bordeCajon.Resize(fyne.NewSize(tema.Borde, alto))
 		r.bordeCajon.Refresh()
 	}

@@ -61,50 +61,52 @@ func TestMailReconciliarNoDuplicaUnDeltaEnCamino(t *testing.T) {
 	}
 }
 
-func TestCorreoExternoPausaLaListaYConservaElRedactor(t *testing.T) {
-	s := &correoFalso{}
-	c := correoDePrueba(t, s)
-	c.b.correoAbierto = c
+// La carpeta externa a la vista se vuelve a pedir cada 30 s (el proveedor no avisa),
+// pero no en segundo plano ni con algo abierto; al volver, sigue. VISTO EN ROJO
+// (2026-11-06) sin mirar `segundoPlano` en el reloj: el que ya estaba armado leía el
+// proveedor con la app en el fondo.
+func TestLaCarpetaExternaSePausaEnSegundoPlano(t *testing.T) {
+	s := &correoFalso{cuentas: cuentaGmailNueva()}
+	b := correoDePrueba(t, s).b
+	b.ctx = context.Background()
 	var relojes []func()
-	c.b.Esperar = func(_ time.Duration, f func()) func() {
+	b.Esperar = func(_ time.Duration, f func()) func() {
 		relojes = append(relojes, f)
 		return func() {}
 	}
-	c.programar()
-	reloj := relojes[0]
-	c.b.EnSegundoPlano()
-	for range 2 {
-		reloj()
+	b.cargarExternas()
+	b.ElegirExterna("nueva", "INBOX")
+	if s.lecturas() != 1 || len(relojes) != 1 {
+		t.Fatalf("abrir la carpeta: %d lecturas, %d relojes", s.lecturas(), len(relojes))
 	}
-	if s.reads != 0 || len(relojes) != 1 || c.ctx.Err() != nil {
-		t.Fatal("el fondo siguió consultando o canceló operaciones del correo externo")
+	b.EnSegundoPlano()
+	relojes[0]()
+	if s.lecturas() != 1 {
+		t.Fatal("el fondo siguió leyendo el proveedor")
 	}
-	c.redactando = true
-	c.texto.PonerTexto("borrador externo")
-	c.b.EnPrimerPlano()
-	if s.reads != 0 || c.texto.Texto() != "borrador externo" || !c.redactando {
-		t.Fatal("volver interrumpió la redacción")
-	}
-	c.redactando = false
+	b.EnPrimerPlano()
+	b.hiloID = "abierto"
 	relojes[len(relojes)-1]()
-	if s.reads != 1 {
-		t.Fatal("la lista externa no se reanudó tras terminar de redactar")
+	if s.lecturas() != 1 {
+		t.Fatal("con un mensaje abierto se recargó la lista debajo")
+	}
+	b.hiloID = ""
+	relojes[len(relojes)-1]()
+	if s.lecturas() != 2 {
+		t.Fatalf("el refresco no se reanudó: %d lecturas", s.lecturas())
 	}
 }
 
 func TestFondoNoCancelaEnvioExternoEnCamino(t *testing.T) {
 	s := &correoFalso{sent: api.ExternalMailSent{}}
-	c := correoDePrueba(t, s)
-	c.b.correoAbierto = c
-	c.redactando = true
-	c.campos["to"].PonerTexto("to@example.eu")
-	c.texto.PonerTexto("mensaje sintético")
+	b, rd := redactorDeCuenta(t, s)
+	rd.r.B.Para, rd.r.B.Cuerpo = "to@example.eu", "mensaje sintético"
 	var trabajo func()
-	c.b.Lanzar = func(f func()) { trabajo = f }
-	c.enviar()
-	c.b.EnSegundoPlano()
+	b.Lanzar = func(f func()) { trabajo = f }
+	b.enviar(rd, false)
+	b.EnSegundoPlano()
 	trabajo()
-	if s.sends != 1 || c.hayBorrador() || c.ctx.Err() != nil {
+	if s.sends != 1 || b.redaccion != nil {
 		t.Fatal("ir al fondo impidió el envío iniciado")
 	}
 }

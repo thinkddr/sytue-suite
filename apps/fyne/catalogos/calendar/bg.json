@@ -66,6 +66,7 @@
   "common.remove": "Премахване",
   "common.retry": "Опитайте пак",
   "common.save": "Запазване",
+  "day.noEvents": "Няма събития в този ден",
   "error.calendarsLoad": "Календарите не можаха да бъдат заредени.",
   "error.eventsLoad": "Събитията не можаха да бъдат заредени.",
   "event.ai": "Опишете събитието",
@@ -142,12 +143,19 @@
   "grid.blockAria": "{title}, {time}",
   "grid.continued": "{title} (продължение)",
   "grid.createOn": "Създаване на събитие на {date}",
+  "grid.dayEvents": {
+    "one": "{date}, {count} събитие",
+    "other": "{date}, {count} събития"
+  },
+  "grid.daySelected": "{label}, избран",
   "grid.loadError": "Календарът не можа да бъде зареден",
   "grid.loading": "Зареждане на календара",
   "grid.more": {
     "one": "+{count} още",
     "other": "+{count} още"
   },
+  "grid.showMonth": "Показване на целия месец",
+  "grid.showWeek": "Показване само на тази седмица",
   "grid.snapAria": {
     "one": "Прилепване при плъзгане: {count} минута. Натиснете за промяна.",
     "other": "Прилепване при плъзгане: {count} минути. Натиснете за промяна."
@@ -160,6 +168,13 @@
     "one": "{count} мин",
     "other": "{count} мин"
   },
+  "grid.todayLabel": "Днес, {date}",
+  "grid.weekNumber": "Седмица {week}",
+  "guests.organizer": "Организатор",
+  "guests.status.accepted": "Ще присъства",
+  "guests.status.declined": "Няма да присъства",
+  "guests.status.pending": "Без отговор",
+  "guests.status.tentative": "Може би",
   "header.invitations": "Покани",
   "header.next": "Следващ",
   "header.pending": {
@@ -197,6 +212,10 @@
   "nav.createEventOn": "Създаване на събитие на {date}",
   "nav.deleteSubscription": "Премахване на абонамента",
   "nav.manageResources": "Управление на зали и оборудване",
+  "nav.menuPending": {
+    "one": "Отваряне на менюто, {count} чакащо",
+    "other": "Отваряне на менюто, {count} чакащи"
+  },
   "nav.myCalendars": "Моите календари",
   "nav.next": "Следващ",
   "nav.nextMonth": "Следващ месец",
@@ -341,6 +360,7 @@
   "scope.following": "За това и следващите",
   "scope.legend": "Това събитие се повтаря. За кои събития важи промяната?",
   "scope.this": "Само за това събитие",
+  "search.allCalendars": "Всички календари",
   "search.error": "Търсенето не можа да бъде завършено.",
   "search.events": "Търсене на събития",
   "search.loadMore": "Зареждане на още",
@@ -349,6 +369,12 @@
     "other": "Въведете поне {count} знака, за да търсите в календарите си."
   },
   "search.noResults": "Няма резултати за „{term}“.",
+  "search.period": "Период",
+  "search.period.any": "По всяко време",
+  "search.period.month": "Този месец",
+  "search.period.past": "Минали",
+  "search.period.upcoming": "Предстоящи",
+  "search.period.year": "Тази година",
   "search.placeholder": "Заглавие, описание, място или поканено лице…",
   "search.searching": "Търсене…",
   "search.series": "Поредица",
@@ -390,6 +416,14 @@
   "share.whoSeesNow": "Кой го вижда сега",
   "share.writerHint": "Освен да ги вижда, създава, променя и изтрива събития в този календар.",
   "share.writerLabel": "Да вижда и редактира събитията ми",
+  "shortcuts.group.actions": "Действия",
+  "shortcuts.group.navigate": "Придвижване",
+  "shortcuts.group.views": "Изгледи",
+  "shortcuts.help": "Показване на този списък",
+  "shortcuts.next": "Следващ период",
+  "shortcuts.prev": "Предишен период",
+  "shortcuts.title": "Клавишни комбинации",
+  "shortcuts.today": "Към днес",
   "subscribe.aria": "Абониране за календар чрез URL",
   "subscribe.byUrl": "Абониране чрез URL (.ics)",
   "subscribe.defaultName": "Абониран календар",

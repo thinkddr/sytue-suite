@@ -24,6 +24,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/cache"
 	pcfg "git.sytue.eu/sytue/one/platform/pkg/config"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
+	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
 	"git.sytue.eu/sytue/one/platform/pkg/telemetry"
@@ -126,6 +127,7 @@ func run() error {
 		Store:    st,
 		Verifier: verifier,
 		CardDAV:  davHandler,
+		Hub:      hubnotify.New(cfg.HubBaseURL, cfg.HubInternalSecret),
 		ReadyCheckers: []httpx.Checker{
 			httpx.CheckerFunc{Label: "postgres", Fn: pool.Healthz},
 		},

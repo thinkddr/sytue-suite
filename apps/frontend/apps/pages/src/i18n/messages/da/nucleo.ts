@@ -78,7 +78,7 @@ export const nucleo = {
   'new.progress': 'Trin til at oprette webstedet',
   'new.go_to_step': 'Gå til trin {n}',
   'new.step_of': 'Trin {n} af {total}',
-  'app_settings.title': 'Indstillinger for Sytue Web',
+  'app_settings.title': 'Indstillinger for Sytue Webs',
   'new.search_title': 'Start med din type virksomhed',
   'new.search_help':
     'Skriv, hvad du laver, eller vælg en gruppe. Hver skabelon har allerede tekster til din branche: du ændrer kun navn, telefonnummer, priser og billeder.',
@@ -274,7 +274,7 @@ export const nucleo = {
   'domains.start_help':
     'Indtast det domæne, du vil bruge. Du skal have adgang til DNS-indstillingerne hos den udbyder, hvor du købte det.',
   'domains.progress': 'Status for tilknytning af domæne',
-  'domains.step.registered': 'Tilføjet til Sytue Web',
+  'domains.step.registered': 'Tilføjet til Sytue Webs',
   'domains.step.dns': 'DNS bekræftet',
   'domains.step.https': 'HTTPS klar',
   'domains.step.primary': 'Primær adresse',

@@ -148,6 +148,8 @@ func (h *Handlers) compartir(w http.ResponseWriter, r *http.Request, fn comparti
 		httpx.Fail(w, r, traducir(err))
 		return
 	}
+	// Aparece (o cambia de permiso) en el widget de quien lo recibe.
+	hubnotify.AvisarTambien(r.Context(), sujeto)
 	org := tenancy.MustFrom(r.Context()).Slug
 	if nueva && h.avisados.Primera(org+"|"+id.String()+"|"+sujeto) {
 		c, _ := authn.FromContext(r.Context())
@@ -204,6 +206,7 @@ func (h *Handlers) dejarDeCompartir(w http.ResponseWriter, r *http.Request, fn f
 		httpx.Fail(w, r, traducir(err))
 		return
 	}
+	hubnotify.AvisarTambien(r.Context(), sujeto) // y desaparece del suyo
 	httpx.NoContent(w)
 }
 

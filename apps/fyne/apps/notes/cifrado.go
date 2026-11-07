@@ -347,8 +347,9 @@ func (p *Pantalla) ReiniciarSesion() {
 	p.vista = VistaCuaderno
 	p.tareas = estadoTareas{}
 	p.notasDeOtros = nil
-	p.campoCaptura = nil
+	p.campoCaptura, p.capturaTexto = nil, ""
 	p.borradores = nil
+	p.agenda = nil // la gente es de la organización de antes
 	p.hist = Historial{}
 	p.edicion = nil
 	p.lienzo.Editor = nil

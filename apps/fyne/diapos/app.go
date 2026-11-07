@@ -267,6 +267,18 @@ func (a *App) AbrirID(id, titulo string) {
 	})
 }
 
+// guardarAntes es lo que hay que guardar antes de que el servicio lea la presentación
+// (exportar, hacer una copia): nil si no hay nada pendiente. También tras un guardado
+// fallido, que deja lo último sin guardar; y si vuelve a fallar devuelve el error, para
+// que no salga una copia sin los últimos cambios que parezca buena (como Calcus y como
+// `makeCopy` de la web).
+func (a *App) guardarAntes(ab *abierta) func() error {
+	if ab.auto == nil || (ab.ctx.Guardado != editor.Sucio && ab.ctx.Guardado != editor.FalloAlGuardar) {
+		return nil
+	}
+	return ab.auto.Volcar
+}
+
 // guardarAhora vuelca lo pendiente; corre fuera del hilo de la interfaz.
 func (a *App) guardarAhora(ab *abierta) {
 	if ab.auto != nil {
@@ -287,6 +299,11 @@ func (a *App) archivo(ab *abierta, id string, escribe bool) {
 	ctx.ExportarPlantilla = func(f string) { a.exportarCon(ab, id, f, true) }
 	ctx.Imprimir = func() { a.exportar(ab, id, editor.FormatoImprimir) }
 	ctx.Versiones = func(listo func([]api.DocVersion)) { srv.Versiones(id, listo) }
+	// «Hacer una copia», con cualquier papel, como la web: guarda lo pendiente y la abre.
+	ctx.HacerCopia = func(listo func()) {
+		srv.HacerCopia(api.Document{ID: id, Kind: api.DocSlides, Title: ctx.Titulo}, a.guardarAntes(ab),
+			func(d api.Document) { a.AbrirID(d.ID, d.Title) }, listo)
+	}
 	if escribe {
 		ctx.GuardarVersion = func(etiqueta string) { srv.GuardarVersion(id, etiqueta) }
 		ctx.RestaurarVersion = func(v api.DocVersion) {
@@ -329,10 +346,7 @@ func (a *App) exportarCon(ab *abierta, id, formato string, plantilla bool) {
 	}
 	ab.ctx.Exportando = formato
 	ab.marco.Recomponer()
-	var antes func() error
-	if ab.auto != nil && ab.ctx.Guardado == editor.Sucio {
-		antes = func() error { ab.auto.Ahora(); return nil }
-	}
+	antes := a.guardarAntes(ab)
 	descargar := a.servicio().Descargar
 	if plantilla {
 		descargar = a.servicio().DescargarPlantilla
@@ -381,10 +395,12 @@ func (a *App) poner(ab *abierta, titulo, contenido string, escribir bool, guarda
 	a.titulo(titulo)
 	if ab.ctx.SoloLectura {
 		// Lo que no se puede guardar no arma reloj ni cuenta cambios.
-		ab.ed.AlCambiar, ab.auto = nil, nil
+		ab.ed.AlCambiar, ab.auto, ab.ctx.GuardarYa = nil, nil, nil
 		ab.ctx.Refrescar()
 		return
 	}
+	// El chip de la cabecera, en error: guarda ya, fuera del hilo de la interfaz.
+	ab.ctx.GuardarYa = func() { a.lanzar(func() { a.guardarAhora(ab) }) }
 	var guardados uint64
 	ab.auto = &Autoguardado{
 		Espera: AutoguardadoMS * time.Millisecond,

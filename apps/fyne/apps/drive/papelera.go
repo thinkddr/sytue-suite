@@ -51,7 +51,9 @@ type VistaPapelera struct {
 	AlRestaurar  func(Elemento)
 	AlEliminar   func(Elemento)
 	AlReintentar func()
-	desplazable  *container.Scroll
+	// AlVaciar es «Vaciar papelera», de la cabecera: lo pide quien lo confirma.
+	AlVaciar    func()
+	desplazable *container.Scroll
 }
 
 // NuevaVistaPapelera crea la pantalla en su estado inicial: cargando.
@@ -91,7 +93,36 @@ func (p *VistaPapelera) Objeto(v tema.Variante) fyne.CanvasObject {
 	cab := ui.NuevaCabeceraApp(p.t("trash.title"))
 	cab.Subtitulo = p.t("trash.subtitle")
 	cab.Icono = iconos.Trazo(iconos.Papelera, ui.GlifoMenu, "text", v).Objeto()
+	if b := p.BotonVaciar(v); b != nil {
+		cab.Acciones = []fyne.CanvasObject{b}
+	}
 	return container.New(Pila{Elastico: 1}, cab, p.cuerpo(v))
+}
+
+// BotonVaciar es «Vaciar papelera» de la cabecera: fantasma, con la papelera en
+// `danger-text`, y solo si hay algo que vaciar. Pregunta antes (lo hace `AlVaciar`).
+func (p *VistaPapelera) BotonVaciar(v tema.Variante) *ui.Boton {
+	if p.Fase != Exito || len(p.Elementos) == 0 {
+		return nil
+	}
+	b := ui.NuevoBoton(p.t("trash.emptyAll"), func() {
+		if p.AlVaciar != nil {
+			p.AlVaciar()
+		}
+	}).Con(ui.Fantasma, ui.TallaSM)
+	b.Glifo = glifoCon(glifoPapelera, iconos.TallaSM, tema.Color("danger-text", v))
+	b.Inerte = p.Ocupado || p.SinRed()
+	return b
+}
+
+// ConfirmacionVaciar es el diálogo de «Vaciar papelera»: `sm`, irreversible y para
+// todo, así que dice cuántos elementos se pierden.
+func (p *VistaPapelera) ConfirmacionVaciar(v tema.Variante, alCancelar, alVaciar func()) *ui.Dialogo {
+	cuerpo := parrafo(v, p.t("trash.emptyAllBody", i18n.Vars{"count": len(p.Elementos)}))
+	d := ui.Confirmacion(p.t("trash.emptyAllTitle"), p.tr.T("ui.cancel", nil), p.t("trash.emptyAll"),
+		true, cuerpo, alCancelar, alVaciar)
+	d.RotuloCerrar = p.tr.T("ui.close", nil)
+	return d
 }
 
 func (p *VistaPapelera) cuerpo(v tema.Variante) fyne.CanvasObject {
@@ -144,7 +175,7 @@ func (p *VistaPapelera) listado(v tema.Variante) fyne.CanvasObject {
 	ayuda := ui.NuevaAyudaEnLinea(texto)
 
 	hijos := make([]fyne.CanvasObject, 0, 2+len(p.Elementos))
-	hijos = append(hijos, canvas.NewRectangle(tema.Color("bg", v)), ayuda)
+	hijos = append(hijos, canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)), ayuda)
 	l := &listaPapelera{ayuda: ayuda, ayudaAlto: ui.AltoAyudaEnLinea(ayuda, ancho)}
 	for _, e := range p.Elementos {
 		f := p.fila(v, e)
@@ -245,12 +276,10 @@ func (f *filaPapelera) Layout(_ []fyne.CanvasObject, t fyne.Size) {
 func conAlfaBorde(v tema.Variante) color.NRGBA { return tokens.ConAlfa(tema.Color("border", v), 0.6) }
 
 // parrafo reparte un texto en líneas de `text-base` y las devuelve como un objeto que
-// mide lo que ocupan. Es lo que va dentro de un diálogo de confirmación.
-func parrafo(v tema.Variante, texto string, ancho float32) fyne.CanvasObject {
-	if ancho <= 0 {
-		// El cuerpo de un diálogo `sm` mide 320 menos su `px-6`.
-		ancho = 320 - 2*tema.Espacio(6)
-	}
+// mide lo que ocupan. Es lo que va dentro de un diálogo de confirmación `sm`, cuyo
+// cuerpo mide 320 menos su `px-6`.
+func parrafo(v tema.Variante, texto string) fyne.CanvasObject {
+	ancho := float32(320 - 2*tema.Espacio(6))
 	lineas := ui.Repartir(texto, tema.TextoBase, ui.Normal, ancho)
 	p := &bloqueTexto{}
 	hijos := make([]fyne.CanvasObject, 0, len(lineas))
@@ -324,7 +353,7 @@ func (p *VistaPapelera) ConfirmacionPurga(v tema.Variante, e Elemento, alCancela
 	if e.Carpeta {
 		clave = "trash.purgeBodyFolder"
 	}
-	cuerpo := parrafo(v, p.t(clave, i18n.Vars{"name": e.Nombre}), 0)
+	cuerpo := parrafo(v, p.t(clave, i18n.Vars{"name": e.Nombre}))
 	d := ui.Confirmacion(p.t("trash.purgeTitle"), p.tr.T("ui.cancel", nil), p.t("trash.purge"),
 		true, cuerpo, alCancelar, alPurgar)
 	d.RotuloCerrar = p.tr.T("ui.close", nil)

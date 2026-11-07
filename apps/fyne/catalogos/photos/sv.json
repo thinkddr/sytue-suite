@@ -1,9 +1,14 @@
 {
   "aiBatch.excludeOrg": "Undanta organisationen från den automatiska Sytue AI-körningen",
   "aiBatch.excludedHint": "Organisationen är undantagen från den automatiska Sytue AI-körningen. Nya bilder bearbetas inte i bakgrunden för förslag eller likheter.",
+  "album.coverSet": "Albumomslaget har uppdaterats",
+  "album.isCover": "Det här är albumomslaget",
   "album.linkCopied": "Länk kopierad",
   "album.newLink": "Ny länk",
   "album.newLinkConfirm": "Skapa en ny länk? Den nuvarande länken slutar fungera för alla som redan har den.",
+  "album.rename": "Byt namn",
+  "album.renamePrompt": "Albumets namn",
+  "album.setCover": "Använd som albumomslag",
   "album.share": "Dela",
   "album.shared": "Delat",
   "album.unshare": "Sluta dela",
@@ -98,6 +103,7 @@
     "other": "{count} efter uppladdningsdatum"
   },
   "gallery.cancelSelection": "Avsluta markeringen",
+  "gallery.clearSearch": "Rensa sökning",
   "gallery.describeCapped": "Endast de första {count} beskrivs åt gången; kör igen för resten.",
   "gallery.describeNothing": "De markerade fotona har redan en beskrivning",
   "gallery.describeSelected": "Beskriv med Sytue AI",
@@ -106,7 +112,8 @@
   "gallery.describing": "Beskriver {done} av {total}…",
   "gallery.downloadCapped": "Foton utanför den här omgången: {count}.",
   "gallery.downloadSelected": "Ladda ner",
-  "gallery.downloading": {
+  "gallery.downloading": "Startade nedladdningsbegäranden: {count}. Kontrollera webbläsarens nedladdningar.",
+  "gallery.downloadingNative": {
     "one": "Laddar ner 1 foto…",
     "other": "Laddar ner {count} foton…"
   },
@@ -114,6 +121,8 @@
   "gallery.empty.description": "Foton från din Sytue Drive visas här, sorterade efter det datum de togs.",
   "gallery.empty.title": "Inga foton ännu",
   "gallery.favorite": "Lägg till i favoriter",
+  "gallery.favoriteFailed": "Bilder som inte kunde ändras: {count}",
+  "gallery.favorited": "Tillagda i favoriter: {count}",
   "gallery.likeTheseResults": "Och de som liknar dem",
   "gallery.moreLikeThese": "Fler som dessa",
   "gallery.newAlbum": "Nytt album",
@@ -124,6 +133,8 @@
   },
   "gallery.newAlbumTitle": "Nytt album",
   "gallery.noExifDate": "Inget fotograferingsdatum: sorterade efter uppladdningsdatum",
+  "gallery.noResults.description": "Prova andra ord eller rensa sökningen för att se alla dina bilder.",
+  "gallery.noResults.title": "Inga bilder matchar ”{query}”",
   "gallery.onlyImages": "Endast bilder kan läggas till.",
   "gallery.open": "Öppna {name}",
   "gallery.openInEditor": "Redigera {name}",
@@ -152,6 +163,7 @@
     "other": "{count} foton flyttade till papperskorgen"
   },
   "gallery.unfavorite": "Ta bort från favoriter",
+  "gallery.unfavorited": "Borttagna från favoriter: {count}",
   "gallery.unselectMonth": "Avmarkera månad",
   "gallery.uploadFailed": "Kunde inte ladda upp: {name}",
   "gallery.uploaded": {
@@ -198,6 +210,9 @@
   "viewer.askSend": "Fråga",
   "viewer.canvasBackground": "Fotots bakgrund",
   "viewer.close": "Stäng",
+  "viewer.counter": "{index} / {total}",
+  "viewer.counterLabel": "Bild {index} av {total}",
+  "viewer.counterMore": "{count}+",
   "viewer.delete": "Flytta till papperskorgen",
   "viewer.deleteConfirm": "Flytta det här fotot till papperskorgen? Filen finns kvar i Sytue Drive.",
   "viewer.describe": "Beskriv med Sytue AI",
@@ -237,6 +252,7 @@
   "viewer.saveDescription": "Spara",
   "viewer.savingDescription": "Sparar…",
   "viewer.shortcuts": "Kortkommandon: piltangenter för att byta foto, mellanslag för bildspel, I för info, Z för full storlek, Delete för papperskorgen.",
+  "viewer.shortcutsJump": "Home och End går till den första och sista bilden.",
   "viewer.similar": "Liknande foton",
   "viewer.slideshow": "Bildspel",
   "viewer.slideshowStop": "Stoppa bildspelet",

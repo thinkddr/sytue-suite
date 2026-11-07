@@ -279,11 +279,17 @@ export function Modal({
         // que la excepción se decide aquí: si el foco está en un combobox
         // desplegado, se deja pasar y que lo cierre quien lo abrió. El resto
         // sigue igual.
+        //
+        // La otra excepción es un campo que se declara dueño de su Escape con
+        // `data-escape-local`: la edición en línea de una fila (renombrar un canal
+        // archivado en Sytue Rooms) cancela la edición y devuelve la fila, en vez de
+        // cerrar el diálogo con todo lo demás. Quien lo pone se compromete a
+        // manejar la tecla; el siguiente Escape, ya fuera del campo, cierra.
         const activo = document.activeElement as HTMLElement | null;
         const enComboAbierto =
           activo?.getAttribute('role') === 'combobox' &&
           activo.getAttribute('aria-expanded') === 'true';
-        if (enComboAbierto) return;
+        if (enComboAbierto || activo?.hasAttribute('data-escape-local')) return;
         e.preventDefault();
         e.stopImmediatePropagation();
         onCloseRef.current();

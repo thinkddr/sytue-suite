@@ -54,37 +54,3 @@ func ValidPushSubscription(s PushSubscription) bool {
 	}
 	return true
 }
-
-// APNs «solo despertar» (app nativa de iOS).
-//
-// Apple es el ÚNICO camino para despertar una app de iOS y no tiene región europea,
-// así que lo que sale hacia allí se reduce a lo mínimo que existe: el token del
-// dispositivo y el momento. El aviso va VACÍO (`content-available`, sin título, sin
-// cuerpo, sin autor, sin canal): la app despierta y pide el contenido a nuestros
-// servidores, que sí están en la UE. En Android no hace falta nada de esto —la app
-// mantiene el flujo SSE del hub—, y por eso esto es solo iOS.
-
-// APNSTarget es un dispositivo de iOS al que despertar, con su dueño (Subject) para
-// poder limpiarlo si Apple reporta el token caduco (410 / BadDeviceToken).
-type APNSTarget struct {
-	Subject string
-	Token   string
-}
-
-// maxAPNSTokenLen acota la fila. Un token APNs son 32 bytes en hex (64 caracteres),
-// pero Apple se reserva alargarlo, así que el tope es holgado y no exacto.
-const maxAPNSTokenLen = 200
-
-// ValidAPNSToken valida la forma de un token de dispositivo: hexadecimal, no vacío y
-// acotado. Apple no publica más estructura que ésa.
-func ValidAPNSToken(token string) bool {
-	if len(token) < 32 || len(token) > maxAPNSTokenLen {
-		return false
-	}
-	for _, r := range token {
-		if (r < '0' || r > '9') && (r < 'a' || r > 'f') && (r < 'A' || r > 'F') {
-			return false
-		}
-	}
-	return true
-}

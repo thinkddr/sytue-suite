@@ -133,6 +133,10 @@ export const et: AppCatalog<typeof en> = {
   'gallery.downloadSelected': 'Laadi alla',
   'gallery.downloading':
     'Alustatud allalaadimistaotlused: {count}. Kontrollige brauseri allalaadimisi.',
+  'gallery.downloadingNative': {
+    one: '1 foto allalaadimine…',
+    other: '{count} foto allalaadimine…',
+  },
   'gallery.downloadCapped': 'Sellest partiist välja jäänud fotod: {count}.',
   'gallery.newAlbum': 'Uus album',
   'gallery.newAlbumTitle': 'Uus album',
@@ -257,4 +261,20 @@ export const et: AppCatalog<typeof en> = {
   'aiBatch.excludeOrg': 'Välista organisatsioon Sytue AI automaatsest pakktöötlusest',
   'aiBatch.excludedHint':
     'Organisatsioon on Sytue AI automaatsest pakktöötlusest välistatud. Uusi fotosid ei töödelda taustal soovituste ega sarnasuste leidmiseks.',
+  'album.rename': 'Nimeta ümber',
+  'album.renamePrompt': 'Albumi nimi',
+  'album.setCover': 'Kasuta albumi kaanena',
+  'album.isCover': 'See on albumi kaas',
+  'album.coverSet': 'Albumi kaas on uuendatud',
+  'gallery.favorited': 'Lemmikutesse lisatud: {count}',
+  'gallery.unfavorited': 'Lemmikutest eemaldatud: {count}',
+  'gallery.favoriteFailed': 'Fotod, mida ei õnnestunud muuta: {count}',
+  'gallery.noResults.title': 'Otsingule „{query}” ei vasta ükski foto',
+  'gallery.noResults.description':
+    'Proovige teisi sõnu või tühjendage otsing, et näha kõiki oma fotosid.',
+  'gallery.clearSearch': 'Tühjenda otsing',
+  'viewer.counter': '{index} / {total}',
+  'viewer.counterMore': '{count}+',
+  'viewer.counterLabel': 'Foto {index}/{total}',
+  'viewer.shortcutsJump': 'Home ja End viivad esimese ja viimase foto juurde.',
 };

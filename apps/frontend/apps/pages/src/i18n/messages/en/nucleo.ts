@@ -78,7 +78,7 @@ export const nucleo = {
   'new.progress': 'Steps to create the site',
   'new.go_to_step': 'Go to step {n}',
   'new.step_of': 'Step {n} of {total}',
-  'app_settings.title': 'Sytue Web settings',
+  'app_settings.title': 'Sytue Webs settings',
   'new.search_title': 'Start with your kind of business',
   'new.search_help':
     'Type what you do or pick a group. Every template already has the wording for your trade: you only change the name, the phone number, the prices and the photos.',
@@ -273,7 +273,7 @@ export const nucleo = {
   'domains.start_help':
     'Enter the domain you want to use. You will need access to the DNS settings at the provider where you bought it.',
   'domains.progress': 'Domain connection progress',
-  'domains.step.registered': 'Added to Sytue Web',
+  'domains.step.registered': 'Added to Sytue Webs',
   'domains.step.dns': 'DNS verified',
   'domains.step.https': 'HTTPS ready',
   'domains.step.primary': 'Primary address',

@@ -49,6 +49,9 @@ func main() {
 	// La sesión, la apariencia y el idioma son TRANSVERSALES a las trece apps: esto lo
 	// lee de donde lo dejó la última que lo tocó. `Abrir` no habla con la red.
 	s := sesion.Abrir(a, "")
+	// El cromo «papel» de toda la suite (ADR 0080). Aquí y no en `sesion.Abrir`: las
+	// pruebas que abren sesión comprueban también el cromo de color.
+	tema.ElegirCromo(tema.CromoPapel)
 
 	// El catálogo es el MISMO para Docus, Calcus y Diapos: en la web montan el mismo
 	// paquete de la ofimática (`@sytue/office`) y comparten los 2.195 mensajes. Una copia
@@ -65,7 +68,7 @@ func main() {
 	w.SetPadded(false)
 	// La portada y el editor hablan con el servicio con la sesión TRANSVERSAL: sin
 	// sesión, la portada lo dice y ofrece entrar; no se abre el navegador por sorpresa.
-	docs := api.NewDocs(s.URL("docs"), s.Sesion, nil)
+	docs := api.NewDocs(s.URL("docs"), s.Sesion, s.ClienteConAviso(nil))
 	d := docus.NuevaApp(tr.T, tr.Locale(), docs)
 	d.Ventana = w                  // «Pantalla completa» de Vista
 	d.Reclamos = s.Sesion.Reclamos // quién firma las marcas del control de cambios
@@ -86,7 +89,9 @@ func main() {
 	d.Asistir, d.Idioma = api.NewIA(s.URL("ai"), s.Sesion, nil).Asistir, string(s.Idioma()) // el panel «Asistente»
 	// La galería de plantillas de «Crear nuevo» y su selector de tema (editor/plantillas.go).
 	d.Portada().ConPlantillas = true
-	d.Portada().Widget = s.CapturarWidget
+	// El widget nativo lo lee su propia Fuente, sin depender de la pantalla, y se
+	// vuelve a publicar tras cada escritura del cliente de arriba (ClienteConAviso).
+	s.PublicadorWidget(s.FuenteWidget(tr))
 	d.Portada().AlEntrar = func() {
 		go func() {
 			if err := s.Entrar(context.Background()); err == nil {
@@ -104,7 +109,8 @@ func main() {
 	})
 	w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.Docs).ConSinSesionPropia().Montar(d.Objeto()))
 	w.Resize(fyne.NewSize(1280, 800))
-	d.Arrancar()
+	// Con interfaz: lanzada por iOS solo para el widget no se pide la portada.
+	s.CuandoHayaEscena(d.Arrancar)
 
 	// `sytue-docs:/docus/edit?id=…` es el documento del servicio, el mismo que abre la web:
 	// llega de «Abrir en la aplicación» del editor web, de la búsqueda y de los avisos.

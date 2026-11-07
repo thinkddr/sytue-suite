@@ -78,6 +78,8 @@ iossimulator) shift ;;
 # `empaquetar.sh plist-simulador <app>` imprime el Info.plist base de ese .app: el test
 # lo valida en cualquier sistema sin compilar nada.
 plist-simulador) shift ;;
+# `empaquetar.sh nombre-movil <app>` imprime el nombre bajo el icono en iOS y Android.
+nombre-movil) shift ;;
 # Expone la copia de metadatos canónicos para probar el plist efectivo sin un Mac.
 cifrado-apple) shift ;;
 # `empaquetar.sh verificar <artefacto> <goarch>` expone SOLO el guardián de
@@ -102,6 +104,9 @@ paquetes | publicables) shift ;;
 # `empaquetar.sh derechos-tienda <app> <equipo>` imprime los derechos (entitlements) con
 # los que esa app se firma para la Mac App Store: el test los mira sin un Mac.
 derechos-tienda | derechos-sesion) shift ;;
+# `empaquetar.sh refresco-ios <app>` imprime las órdenes de PlistBuddy del refresco del
+# widget en segundo plano de iOS (`plist_refresco`), o nada: el test las mira sin un Mac.
+refresco-ios) shift ;;
 # `empaquetar.sh widgets-apple` imprime «si» o «no»: el interruptor de WidgetKit y del App
 # Group de la suite (SYTUE_WIDGETS_APPLE de apps/fyne/xcode/Sytue.xcconfig). Lo pregunta
 # release-desktop.yml antes de traer perfiles de widgets y Developer ID.
@@ -126,6 +131,7 @@ xcode) shift ;;
   echo "     $0 derechos-sesion <app|directorio> <equipo de Apple> <ios|developerid>" >&2
   echo "     $0 derechos-archivos <app|directorio> <equipo de Apple> <ios|macos|app-ios>" >&2
   echo "     $0 widgets-apple   (si|no: SYTUE_WIDGETS_APPLE de apps/fyne/xcode/Sytue.xcconfig)" >&2
+  echo "     $0 refresco-ios <app|directorio>" >&2
   echo "     $0 plist-simulador <app>" >&2
   echo "     $0 cifrado-apple <Info.plist canónico> <Info.plist del artefacto>" >&2
   echo "     $0 verificar <artefacto> <goarch>" >&2
@@ -161,6 +167,27 @@ metadato() { # <dir> <clave> [sección]
   else
     sed -n "s/^[[:space:]]*$2[[:space:]]*=[[:space:]]*\"\([^\"]*\)\".*/\1/p" "$1/FyneApp.toml" | head -1
   fi
+}
+
+# EL NOMBRE BAJO EL ICONO EN EL TELÉFONO (CFBundleDisplayName en iOS, android:label en
+# Android). Ni iOS ni los lanzadores de Android dejan elegir letra, tamaño ni líneas: dan
+# ~12 caracteres en una línea y, si no caben, iOS APRIETA el espaciado hasta que el
+# espacio desaparece («SytueCalendar», visto en un iPhone el 2026-11-06) o corta con «…».
+# Por eso, en los nombres de más de 12 caracteres («Sytue Calendar», «Sytue Contacts»,
+# «Sytue CertiPDF», «Sytue Notepads») el espacio se cambia por un ESPACIO EN (U+2002), el
+# doble de ancho, que sigue viéndose apretado. Experimental, decidido por el dueño: en los
+# que caben se queda el espacio normal, que si no se vería más ancho que el resto, y en
+# escritorio, la tienda y Ajustes el nombre es el de siempre (`Name` del FyneApp.toml).
+nombre_movil() { # <dir de la app>
+  local n en
+  n="$(metadato "$1" Name)"
+  # El espacio en se escribe por sus bytes UTF-8: así no depende del locale del runner
+  # ni de que el editor lo conserve invisible en el fuente.
+  printf -v en '\xe2\x80\x82'
+  if [ "${#n}" -gt 12 ]; then
+    n="${n/ /$en}"
+  fi
+  printf '%s' "$n"
 }
 
 # --- LOS BUNDLES DE ESCRITORIO --------------------------------------------------
@@ -260,6 +287,43 @@ if [ "$plataforma" = widgets-apple ]; then
   exit 0
 fi
 
+# EL INTERRUPTOR DEL REFRESCO DEL WIDGET EN iOS: SYTUE_REFRESCO_APPLE en Sytue.xcconfig
+# (YES/NO), y además los widgets encendidos. Va aparte de SYTUE_WIDGETS_APPLE porque la
+# tarea la registra el driver del fork (parche 0016): con un tag sin él, el Info.plist
+# pediría un modo de fondo que nadie usa. La variable de entorno (1/0), para los tests.
+refresco_apple_activo() {
+  local valor="${SYTUE_REFRESCO_APPLE:-}"
+  [ -n "$valor" ] || valor="$(sed -n 's/^SYTUE_REFRESCO_APPLE = \([A-Z]*\)$/\1/p' "$FYNE/xcode/Sytue.xcconfig" 2>/dev/null)"
+  case "$valor" in
+  1 | YES) widgets_apple_activos ;;
+  0 | NO | '') return 1 ;;
+  *)
+    echo "::error::SYTUE_REFRESCO_APPLE vale «$valor»: solo YES/NO en Sytue.xcconfig (o 1/0 en el entorno)" >&2
+    exit 1
+    ;;
+  esac
+}
+
+# EL INTERRUPTOR DEL DESPERTAR DEL WIDGET EN iOS (push silencioso; enmienda del ADR 0039):
+# SYTUE_DESPERTAR_APPLE en Sytue.xcconfig (YES/NO), y además los widgets encendidos. Con él,
+# cada app con widget pide `remote-notification` en UIBackgroundModes (plist_refresco) y
+# `aps-environment` en sus derechos (derechos_sesion). Va aparte porque quien entrega el
+# token y el aviso es el driver del fork (parche 0017), y porque `aps-environment` exige la
+# capacidad Push en los quince App ID y perfiles regenerados: encendido antes, la firma
+# fallaría. La variable de entorno (1/0), para los tests.
+despertar_apple_activo() {
+  local valor="${SYTUE_DESPERTAR_APPLE:-}"
+  [ -n "$valor" ] || valor="$(sed -n 's/^SYTUE_DESPERTAR_APPLE = \([A-Z]*\)$/\1/p' "$FYNE/xcode/Sytue.xcconfig" 2>/dev/null)"
+  case "$valor" in
+  1 | YES) widgets_apple_activos ;;
+  0 | NO | '') return 1 ;;
+  *)
+    echo "::error::SYTUE_DESPERTAR_APPLE vale «$valor»: solo YES/NO en Sytue.xcconfig (o 1/0 en el entorno)" >&2
+    exit 1
+    ;;
+  esac
+}
+
 # El código y las firmas leen los mismos grupos. Un equipo distinto no debe
 # generar un paquete aparentemente válido que luego no puede abrir la sesión.
 grupos_sesion_apple() { # [equipo esperado]
@@ -330,7 +394,14 @@ derechos_sesion() { # <dir> <equipo> <ios|developerid>
   printf '</array>\n'
   printf '\t<key>keychain-access-groups</key><array><string>%s.%s</string><string>%s</string>' "$equipo" "$appid" "$GRUPO_LLAVERO_SUITE"
   [ "$(metadato "$1" archivos)" != si ] || printf '<string>%s.%s.shared</string>' "$equipo" "$appid"
-  printf '</array>\n</dict></plist>\n'
+  printf '</array>\n'
+  # El aviso silencioso del Hub que despierta la app para su widget (despertar_apple_activo):
+  # solo en iOS y en las apps con widget. `production` es el de TestFlight y la App Store,
+  # que es lo único que se firma aquí; el perfil tiene que autorizarlo (apple_perfil.py).
+  if [ "$modo" = ios ] && [ -n "$(metadato "$1" widget_acciones)" ] && despertar_apple_activo; then
+    printf '\t<key>aps-environment</key><string>production</string>\n'
+  fi
+  printf '</dict></plist>\n'
 }
 if [ "$plataforma" = derechos-sesion ]; then
   d="${1:?uso: $0 derechos-sesion <app|directorio> <equipo de Apple> <ios|developerid>}"
@@ -562,6 +633,7 @@ plist_simulador() { # <dir de la app>
 <key>CFBundleIdentifier</key><string>$appid</string>
 <key>CFBundleExecutable</key><string>sytue-$(basename "$1")</string>
 <key>CFBundleName</key><string>$nombre</string>
+<key>CFBundleDisplayName</key><string>$(nombre_movil "$1")</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleVersion</key><string>1</string>
 <key>CFBundleShortVersionString</key><string>1.0</string>
@@ -576,6 +648,10 @@ plist_simulador() { # <dir de la app>
 </dict></plist>
 P
 }
+if [ "$plataforma" = nombre-movil ]; then
+  nombre_movil "$FYNE/cmd/${1:?uso: $0 nombre-movil <app>}"
+  exit $?
+fi
 if [ "$plataforma" = plist-simulador ]; then
   plist_simulador "$FYNE/cmd/${1:?uso: $0 plist-simulador <app>}"
   exit $?
@@ -734,6 +810,41 @@ plist_documentos() { # <dir de la app>
     printf 'Add :UTImportedTypeDeclarations:%d:UTTypeTagSpecification:public.mime-type string %s\n' "$j" "$mime"
     j=$((j + 1))
   done
+}
+
+# EN iOS, EL REFRESCO DEL WIDGET EN SEGUNDO PLANO (BGAppRefreshTask; enmienda del ADR 0078):
+# `fetch` en UIBackgroundModes y el identificador de la tarea, `<App ID>.refresco`. Solo
+# con su interruptor (`refresco_apple_activo`, que exige también el de los widgets) y en
+# las apps con widget: sin lector, la app no tiene nada que refrescar. El fork de Fyne registra el PRIMERO de
+# BGTaskSchedulerPermittedIdentifiers (parche 0016) y la suite pide uno cada 30 min
+# (`sesion.CadaRefrescoEnFondo`). No es un derecho: no pide capacidad ni perfiles nuevos.
+# Una orden de PlistBuddy por línea; nada si no toca.
+#
+# UIBackgroundModes se escribe SOLO aquí: plist_apple borra el array ENTERO antes de
+# llamar a esto (para que apagar el interruptor lo quite de un plist incremental), así
+# que un modo puesto en otro sitio —la plantilla, otra función— desaparecería en silencio.
+# Un modo nuevo se añade a `modos`, como el `remote-notification` del despertar por aviso
+# silencioso (despertar_apple_activo). empaquetar-test.sh falla si la clave sale escrita en
+# otro sitio.
+plist_refresco() { # <dir de la app>
+  local appid i modos=()
+  [ -n "$(metadato "$1" widget_acciones)" ] || return 0
+  ! refresco_apple_activo || modos+=(fetch)
+  # El despertar por el aviso silencioso del Hub (despertar_apple_activo, parche 0017).
+  ! despertar_apple_activo || modos+=(remote-notification)
+  [ "${#modos[@]}" -gt 0 ] || return 0
+  appid="$(metadato "$1" ID)"
+  [ -n "$appid" ] || {
+    echo "::error::$1: FyneApp.toml sin ID" >&2
+    return 1
+  }
+  for i in "${!modos[@]}"; do
+    [ "$i" -gt 0 ] || echo 'Add :UIBackgroundModes array'
+    echo "Add :UIBackgroundModes:$i string ${modos[$i]}"
+  done
+  [ "${modos[0]}" != fetch ] ||
+    printf '%s\n' 'Add :BGTaskSchedulerPermittedIdentifiers array' \
+      "Add :BGTaskSchedulerPermittedIdentifiers:0 string $appid.refresco"
 }
 
 # En Windows «Abrir con» es el registro: un ProgID de la app y su nombre en
@@ -934,10 +1045,9 @@ derechos["com.apple.developer.associated-domains"] = [f"applinks:{sys.argv[4]}"]
 destino.write_bytes(plistlib.dumps(derechos))
 PY
   fi
-  # Los derechos se leen ANTES de reemplazar el ejecutable firmado de la CLI.
-  # Fyne tools 1.7.2 ignora --executable en iOS y enlaza con mínimo 7.0; la
-  # xcconfig solo arregla el envoltorio Xcode, no ese Mach-O ya compilado.
-  compilar_ios_paquete "$6" "$app" "$version" "$build" || return 1
+  # El ejecutable es el de `fyne package --target ios`, el camino oficial: ya no se
+  # recompila (fyne.io/tools 1.7.4 no admite `fyne build` para iOS). Se comprueba.
+  verificar_ios_paquete "$app" || return 1
   # La CLI escribe Info.plist con 0600 en su temporal; instalado pertenece a root
   # y Apple exige lectura pública (90255).
   chmod -R u+rwX,go+rX "$app"
@@ -1148,6 +1258,12 @@ if [ "$plataforma" = mesa-windows ]; then
   nsis_mesa "${1:?uso: $0 mesa-windows <carpeta>}"
   nsis_quitar_mesa
   exit 0
+fi
+if [ "$plataforma" = refresco-ios ]; then
+  d="${1:?uso: $0 refresco-ios <app|directorio>}"
+  [ -d "$d" ] || d="$FYNE/cmd/$1"
+  plist_refresco "$d"
+  exit $?
 fi
 if [ "$plataforma" = documentos-mac ] || [ "$plataforma" = registro-windows ]; then
   d="${1:?uso: $0 $plataforma <app|directorio>}"
@@ -1381,6 +1497,18 @@ verificar_aab() { # <aab> <paquete> <esquema> [«clase:tipo …» de los servici
     echo "::error::$1 no declara el proveedor nativo de widgets, el broker de sesión y sus recursos." >&2
     return 1
   fi
+  # El trabajo del widget con la app cerrada (RefrescoWidgets): sin BIND_JOB_SERVICE,
+  # JobScheduler no lo encola. Con el relevo de One (android-widgets.py, FONDO_GO), el
+  # trabajo pide red, y Android 14+ lo rechaza sin ACCESS_NETWORK_STATE.
+  if [ "$2" != eu.sytue.fyne.demo ] && ! grep -q 'android:name="eu.sytue.nativo.RefrescoWidgets"' <<<"$m"; then
+    echo "::error::$1 no declara RefrescoWidgets: el widget no se repintaría ni refrescaría con la app cerrada." >&2
+    return 1
+  fi
+  if grep -q 'android:name="eu.sytue.nativo.RelevoWidgets"' <<<"$m" &&
+    ! grep -q 'android:name="android.permission.ACCESS_NETWORK_STATE"' <<<"$m"; then
+    echo "::error::$1 releva los widgets sin ACCESS_NETWORK_STATE: Android 14+ no encolaría el trabajo con red." >&2
+    return 1
+  fi
   # El proveedor de la cámara de «Escanear» (clase Captura) va en las catorce.
   grep -q "android:authorities=\"$2.sytue.captura\"" <<<"$m" || {
     echo "::error::$1 no declara el proveedor $2.sytue.captura: «Escanear» no podría usar la cámara." >&2
@@ -1547,9 +1675,15 @@ incorporar_widgets_apple() { # <host .app> <fuentes> <ios|macappstore|developeri
     --insertar "$1" --destino "$3" --identidad "$4" ${opciones[@]+"${opciones[@]}"} "$(basename "$2")"
 }
 
-compilar_ios() { # <iphoneos|iphonesimulator> <salida> [opciones de fyne build]
-  local sdk="$1" salida="$2" minimo="${IPHONEOS_DEPLOYMENT_TARGET:-}" raiz_sdk cc cxx fl ld widgets_fl=""
+# EL BINARIO DE iOS SIN `fyne build` (2026-11-06): fyne.io/tools 1.7.4 ya no lo admite
+# para iOS y el paquete de TestFlight sale entero de `fyne package --target ios` (el camino
+# oficial). Quedan el Simulador y la fase de Xcode, que necesitan el binario suelto: aquí
+# se escriben sus metadatos con herramientas/metadatos (lo que `fyne build` inyectaba) y
+# se compila con `go build`, contra el Fyne de apps/fyne/go.mod (nuestro fork).
+compilar_ios() { # <iphoneos|iphonesimulator> <salida>
+  local sdk="$1" salida="$2" minimo="${IPHONEOS_DEPLOYMENT_TARGET:-}" raiz_sdk cc cxx fl ld widgets_fl="" etiquetas meta r=0
   shift 2
+  [ "$#" -eq 0 ] || { echo "::error::compilar_ios no admite opciones de fyne build: $*" >&2; return 1; }
   [ -n "$minimo" ] || minimo="$(minimo_ios)" || return 1
   # Aparte de cualquier export: dentro, un xcrun que falla no pararía el guion (SC2155).
   raiz_sdk="$(xcrun --sdk "$sdk" --show-sdk-path)" || return 1
@@ -1564,6 +1698,12 @@ compilar_ios() { # <iphoneos|iphonesimulator> <salida> [opciones de fyne build]
   fi
   fl="-isysroot $raiz_sdk $fl -arch arm64"
   [ -z "${SYTUE_WIDGET_PRODUCTOS:-}" ] || widgets_fl="$(enlace_widgets_apple '@executable_path/Frameworks')" || return 1
+  # Los metadatos con el Go del anfitrión: con GOOS=ios, `go run` compilaría la
+  # herramienta para el iPhone y no podría ejecutarla.
+  meta="$PWD/fyne_metadata_init.go"
+  [ ! -e "$meta" ] || { echo "::error::$meta ya existe: no se pisa un fichero que no es de esta compilación" >&2; return 1; }
+  etiquetas="$(env -u GOOS -u GOARCH -u CC -u CXX -u CGO_CFLAGS -u CGO_CXXFLAGS -u CGO_LDFLAGS -u GOFLAGS CGO_ENABLED=0 \
+    go -C "$FYNE" run ./herramientas/metadatos -dir "$PWD" -salida "$meta")" || { rm -f "$meta"; return 1; }
   (
     # shellcheck disable=SC2030 # a propósito: el subshell acota el export a esta compilación
     export GOOS=ios GOARCH=arm64 CGO_ENABLED=1 CGO_CFLAGS="$fl" CGO_CXXFLAGS="$fl" CGO_LDFLAGS="$fl${widgets_fl:+ $widgets_fl}" \
@@ -1572,16 +1712,20 @@ compilar_ios() { # <iphoneos|iphonesimulator> <salida> [opciones de fyne build]
       CGO_LDFLAGS_ALLOW="$(permiso_enlace_widgets_apple)"
       export CGO_LDFLAGS_ALLOW
     fi
-    objetivo=ios
-    compilar_fyne "$salida" "$@"
-  )
+    go build -tags "goolm${etiquetas:+,$etiquetas}" -o "$salida" .
+  ) || r=$?
+  rm -f "$meta"
+  return "$r"
 }
 
-verificar_minimo_ios() { # <ejecutable> <mínimo canónico>
+# Con `hasta`, el mínimo del Mach-O puede ser MENOR que el canónico, y el Info.plist
+# manda: es el binario de `fyne package`, que la CLI enlaza siempre con iOS 13.0
+# (mobile/build.go de fyne.io/tools) sin opción para cambiarlo. Nunca más alto.
+verificar_minimo_ios() { # <ejecutable> <mínimo canónico> [exacto|hasta]
   local cabecera tipo bibliotecas
   cabecera="$(xcrun vtool -show-build "$1")" || return 1
   tipo="$(xcrun otool -hv "$1")" || return 1
-  python3 - "$2" "$cabecera" "$tipo" <<'PY' || return 1
+  python3 - "$2" "$cabecera" "$tipo" "${3:-exacto}" <<'PY' || return 1
 import re, sys
 def version(v):
     return tuple((list(map(int, v.split('.'))) + [0, 0])[:3])
@@ -1593,7 +1737,10 @@ for comando, bloque in comandos:
     if not dato:
         sys.exit('::error::no se pudo leer el mínimo del Mach-O de iOS')
     vistos.append(dato.group(1))
-if not vistos or any(version(v) != version(sys.argv[1]) for v in vistos):
+if sys.argv[4] == 'hasta':
+    if not vistos or any(version(v) > version(sys.argv[1]) or version(v) < (13, 0, 0) for v in vistos):
+        sys.exit('::error::el Mach-O de iOS declara un mínimo fuera de 13.0..' + sys.argv[1] + ': ' + ', '.join(vistos))
+elif not vistos or any(version(v) != version(sys.argv[1]) for v in vistos):
     sys.exit('::error::el Mach-O de iOS no declara el mínimo canónico ' + sys.argv[1])
 tipos = []
 lineas = sys.argv[3].splitlines()
@@ -1611,54 +1758,27 @@ PY
     echo "::error::$1 enlaza Swift por @rpath sin soporte Swift empaquetado: no se publica." >&2
     return 1 ;;
   esac
-  echo "  mínimo real del Mach-O de iOS: $2; sin alias Swift por @rpath"
+  echo "  mínimo del Mach-O de iOS ${3:-exacto} $2; sin alias Swift por @rpath"
 }
 
-compilar_ios_paquete() { # <fuentes> <.app> <versión> <build>
-  local fuentes="$1" app="$2" minimo ejecutable clave valor nuevo
-  local metadata=(--release)
+verificar_ios_paquete() { # <.app>
+  local app="$1" minimo ejecutable
   minimo="$(minimo_ios)" || return 1
-  # package incrementa el Build original del TOML; no lo deja en --app-build ni
-  # --app-version. Solo cambian esos dos campos y el trap restaurar_toml repone
-  # después el original completo, también cuando falla el compilador.
-  python3 - "$fuentes/FyneApp.toml" "$3" "$4" <<'PY' || return 1
-import re, sys
-path, version, build = sys.argv[1:]
-with open(path, encoding='utf-8') as f:
-    texto = f.read()
-seccion = re.search(r'(?ms)^\[Details\][^\n]*\n(.*?)(?=^\[|\Z)', texto)
-if not seccion:
-    sys.exit('::error::FyneApp.toml no declara [Details]')
-detalles = seccion.group(1)
-for clave, patron, valor in [('Version', r'"[^"\n]*"', '"' + version + '"'), ('Build', r'[0-9]+', build)]:
-    detalles, n = re.subn(r'(?m)^([ \t]*' + clave + r'[ \t]*=[ \t]*)' + patron,
-                          lambda m: m.group(1) + valor, detalles)
-    if n != 1:
-        sys.exit('::error::[Details] debe declarar una sola ' + clave)
-with open(path, 'w', encoding='utf-8') as f:
-    f.write(texto[:seccion.start(1)] + detalles + texto[seccion.end(1):])
-PY
-  # --release lee [Release]. Los valores que la app usa en ejecución conservan
-  # esa tabla si existe y, si faltan, el valor canónico de [Development].
-  for clave in esquema client_id extensiones; do
-    if valor="$(metadato "$fuentes" "$clave" Release)" || valor="$(metadato "$fuentes" "$clave" Development)"; then
-      metadata+=(--metadata "$clave=$valor")
-    fi
-  done
   ejecutable="$(python3 -c 'import plistlib,sys; print(plistlib.load(open(sys.argv[1], "rb"))["CFBundleExecutable"])' "$app/Info.plist")" || return 1
-  # package dejó un Mach-O FAT (también con una sola slice). Go no reconoce su
-  # magic como objeto que pueda sobrescribir: se compila a una ruta nueva y solo
-  # se sustituye el ejecutable anterior después de verificar el resultado.
-  nuevo="$(mktemp -d "$app/.sytue-ios.XXXXXX")" || return 1
-  if (cd "$fuentes" && IPHONEOS_DEPLOYMENT_TARGET="$minimo" compilar_ios iphoneos "$nuevo/$ejecutable" "${metadata[@]}") &&
-    verificar_arquitectura "$nuevo/$ejecutable" arm64 &&
-    verificar_minimo_ios "$nuevo/$ejecutable" "$minimo" &&
-    mv -f "$nuevo/$ejecutable" "$app/$ejecutable"; then
-    rm -rf "$nuevo"
-    return 0
+  [ -f "$app/$ejecutable" ] || { echo "::error::fyne package no dejó el ejecutable $ejecutable en la app" >&2; return 1; }
+  # La CLI deja un Mach-O FAT aunque solo lleve arm64 (lipo -create). Se adelgaza a
+  # arm64 antes de verificarlo y de firmarlo: es el mismo código, y lo que no sea solo
+  # arm64 no pasa.
+  if [ "$(head -c 4 "$app/$ejecutable" | od -An -tx1 | tr -d ' \n')" = cafebabe ]; then
+    [ "$(xcrun lipo -archs "$app/$ejecutable")" = arm64 ] || {
+      echo "::error::el ejecutable de iOS trae $(xcrun lipo -archs "$app/$ejecutable"), no solo arm64" >&2
+      return 1
+    }
+    xcrun lipo "$app/$ejecutable" -thin arm64 -output "$app/$ejecutable.arm64" &&
+      mv -f "$app/$ejecutable.arm64" "$app/$ejecutable" || return 1
   fi
-  rm -rf "$nuevo"
-  return 1
+  verificar_arquitectura "$app/$ejecutable" arm64 &&
+    verificar_minimo_ios "$app/$ejecutable" "$minimo" hasta
 }
 
 # macOS UNIVERSAL DE VERDAD, desde el directorio de la app: un Intel que reciba solo arm64
@@ -1692,6 +1812,8 @@ compilar_mac() { # <salida> [--tags …]
 # el bucle de abajo y la fase de Xcode, y se puede repetir sobre el mismo plist (cada clave
 # se borra antes de escribirse: una compilación incremental de Xcode no lo regenera).
 #   - CFBundleURLTypes: el esquema con el que las demás apps la abren.
+#   - Solo iOS, con el interruptor del refresco (y el de los widgets): el refresco en
+#     segundo plano del widget (`plist_refresco`).
 #   - Solo macOS: los tipos de documento (`plist_documentos`; iOS no abre ficheros
 #     sueltos), y LSMinimumSystemVersion y la categoría, que la plantilla de la CLI graba
 #     mal (10.11 y «public.app-category.»; Go 1.27 exige 13).
@@ -1701,7 +1823,7 @@ compilar_mac() { # <salida> [--tags …]
 #     `llamadas`). El texto sale del catálogo común, en inglés en el plist y en cada idioma
 #     en su `InfoPlist.strings` (en macOS dentro de Contents/Resources).
 plist_apple() { # <macos|ios|iossimulator> <dir de la app> <Info.plist> <carpeta de recursos>
-  local p="$1" dir="$2" plist="$3" recursos="$4" appid esquema documentos o
+  local p="$1" dir="$2" plist="$3" recursos="$4" appid esquema documentos o refresco
   local claves=()
   appid="$(metadato "$dir" ID)"
   esquema="$(metadato "$dir" esquema)"
@@ -1727,11 +1849,23 @@ plist_apple() { # <macos|ios|iossimulator> <dir de la app> <Info.plist> <carpeta
     -c "Set :LSMinimumSystemVersion 13.0" \
     -c "Set :LSApplicationCategoryType public.app-category.productivity" "$plist"
   if [ "$p" != macos ]; then
+    # El nombre bajo el icono (ver nombre_movil). La plantilla de la CLI y la de Xcode
+    # ponen el Name tal cual.
+    /usr/libexec/PlistBuddy -c "Delete :CFBundleDisplayName" "$plist" >/dev/null 2>&1 || true
+    /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string $(nombre_movil "$dir")" "$plist"
     /usr/libexec/PlistBuddy -c "Delete :UIFileSharingEnabled" "$plist" >/dev/null 2>&1 || true
     /usr/libexec/PlistBuddy -c "Delete :LSSupportsOpeningDocumentsInPlace" "$plist" >/dev/null 2>&1 || true
     /usr/libexec/PlistBuddy \
       -c "Add :UIFileSharingEnabled bool true" \
       -c "Add :LSSupportsOpeningDocumentsInPlace bool true" "$plist"
+    # El refresco del widget (`plist_refresco`): se borra siempre, para que apagar el
+    # interruptor lo quite también de un plist incremental de Xcode.
+    refresco="$(plist_refresco "$dir")" || return 1
+    /usr/libexec/PlistBuddy -c "Delete :UIBackgroundModes" "$plist" >/dev/null 2>&1 || true
+    /usr/libexec/PlistBuddy -c "Delete :BGTaskSchedulerPermittedIdentifiers" "$plist" >/dev/null 2>&1 || true
+    if [ -n "$refresco" ]; then
+      while IFS= read -r o; do /usr/libexec/PlistBuddy -c "$o" "$plist"; done <<<"$refresco"
+    fi
     claves=(NSFaceIDUsageDescription=shell.lock.faceIdUsage)
   fi
   [ "$(metadato "$dir" llamadas)" != "si" ] || claves+=(NSMicrophoneUsageDescription=shell.call.microphoneUsage NSCameraUsageDescription=shell.call.cameraUsage)
@@ -2014,8 +2148,16 @@ android)
     "$dex_tmp/generated/eu/sytue/nativo/SesionFirmas.java" "$FYNE/android/prueba/eu/sytue/nativo/DrivePreferenciaPrueba.java"
   "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba" eu.sytue.nativo.DrivePreferenciaPrueba
   "$(command -v javac || echo "$JAVA_HOME/bin/javac")" --release 17 -encoding UTF-8 -nowarn -d "$dex_tmp/prueba" \
-    "$FYNE/android/java/eu/sytue/nativo/WidgetSnapshot.java" "$FYNE/android/prueba/eu/sytue/nativo/WidgetSnapshotPrueba.java"
-  "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba" eu.sytue.nativo.WidgetSnapshotPrueba
+    "$FYNE/android/java/eu/sytue/nativo/WidgetSnapshot.java" "$FYNE/android/prueba/eu/sytue/nativo/WidgetSnapshotPrueba.java" \
+    "$FYNE/android/prueba/eu/sytue/nativo/WidgetsBloqueoPrueba.java"
+  # El contrato del formato 2 es el mismo fichero que corren Go y Swift.
+  "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba" eu.sytue.nativo.WidgetSnapshotPrueba \
+    "$FYNE/../nucleo/widgets/testdata/contrato.tsv"
+  "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba" eu.sytue.nativo.WidgetsBloqueoPrueba
+  # Las reglas del refresco del widget con la app cerrada y del relevo de One.
+  "$(command -v javac || echo "$JAVA_HOME/bin/javac")" --release 17 -encoding UTF-8 -nowarn -d "$dex_tmp/prueba" \
+    "$FYNE/android/java/eu/sytue/nativo/RefrescoReglas.java" "$FYNE/android/prueba/eu/sytue/nativo/RefrescoReglasPrueba.java"
+  "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba" eu.sytue.nativo.RefrescoReglasPrueba
   "$(command -v javac || echo "$JAVA_HOME/bin/javac")" --release 17 -encoding UTF-8 -nowarn -d "$dex_tmp/prueba" \
     "$FYNE/android/java/eu/sytue/nativo/GestosRegion.java" "$FYNE/android/prueba/eu/sytue/nativo/GestosRegionPrueba.java"
   "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba" eu.sytue.nativo.GestosRegionPrueba
@@ -2135,6 +2277,7 @@ for app in "${apps[@]}"; do
   [ -f "$dir/FyneApp.toml" ] && cp "$dir/FyneApp.toml" "$ESCENARIO/toml/$app"
   appid="$(metadato "$dir" ID)"
   nombre="$(metadato "$dir" Name)"
+  nombre_icono="$(nombre_movil "$dir")" # android:label, ver nombre_movil
   esquema="$(metadato "$dir" esquema)"
   # Las apps con LLAMADAS (Rooms, y Cast al emitir) usan el micrófono: piden su permiso en Android y
   # declaran para qué en el Info.plist, o macOS e iOS las matan al abrirlo. Solo ellas:
@@ -2276,9 +2419,9 @@ for app in "${apps[@]}"; do
 	<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />$(for p in ${permisos_extra[@]+"${permisos_extra[@]}"}; do printf '\n\t<uses-permission android:name="%s" />' "$p"; done)$([ "$llamadas" != si ] || printf '\n\t<uses-feature android:name="android.hardware.camera" android:required="false" />\n\t<uses-feature android:name="android.hardware.microphone" android:required="false" />')
 ${1:+
 $1}
-	<application android:label="$nombre" android:debuggable="false">
+	<application android:label="$nombre_icono" android:debuggable="false">
 	<activity android:name="org.golang.app.GoNativeActivity"
-		android:label="$nombre"
+		android:label="$nombre_icono"
 		android:configChanges="orientation|keyboardHidden|uiMode|screenSize|smallestScreenSize|screenLayout"
 		android:exported="true"
 		android:launchMode="singleTask"
@@ -2390,6 +2533,21 @@ XML
       [ -n "$perfil_ios" ] || perfil_ios="$(bash "$AQUI/apple-firma.sh" perfil "$appid")" || exit 1
       echo "   perfil: $perfil_ios"
       extra=(--profile "$perfil_ios" --certificate "$SYTUE_IOS_IDENTIDAD" --release)
+      # Lo que la app lee en ejecución: con --release la CLI lee [Release], y lo que no
+      # esté ahí se toma de [Development]. Lo hacía la recompilación con `fyne build`;
+      # ahora va en el único compilado, el de `fyne package` (el último --metadata manda).
+      for clave in esquema client_id extensiones; do
+        if valor="$(metadato "$dir" "$clave" Release)" || valor="$(metadato "$dir" "$clave" Development)"; then
+          extra+=(--metadata "$clave=$valor")
+        fi
+      done
+      # El host de `fyne package` no enlaza el puente WidgetKit: lo abre la app con
+      # dlopen (apps/nucleo/widgets/notify_apple.go). Un tag anterior no sabe hacerlo y
+      # publicaría unos widgets que nunca se actualizan: se para aquí.
+      if [ -n "${SYTUE_WIDGET_PRODUCTOS:-}" ] && ! grep -q 'SYTUE_PUENTE_DLOPEN' "$RAIZ/apps/nucleo/widgets/notify_apple.go" 2>/dev/null; then
+        echo "::error::este tag no abre el puente WidgetKit por dlopen (apps/nucleo/widgets/notify_apple.go): con fyne package sus widgets no se actualizarían. Empaqueta un tag posterior." >&2
+        exit 1
+      fi
     fi
     # SIN `--src`: en móvil la herramienta lo rechaza («parameter --source-dir is
     # currently not supported for mobile builds») y hay que estar EN el
@@ -2408,7 +2566,9 @@ XML
     [ "$plataforma" = android ] &&
       entorno_movil=(GOFLAGS=-ldflags=-checklinkname=0 "CGO_LDFLAGS=-Wl,-z,max-page-size=16384")
     if [ "$plataforma" = ios ]; then
-      entorno_movil+=("XCODE_XCCONFIG_FILE=$ESCENARIO/ios.xcconfig")
+      # -trimpath como el resto de binarios: sin él, las rutas del Mac que compila
+      # quedan dentro del ejecutable que va a la tienda.
+      entorno_movil=(GOFLAGS=-trimpath "XCODE_XCCONFIG_FILE=$ESCENARIO/ios.xcconfig")
       [ -z "$xcrun_ios_previo" ] || entorno_movil+=("SYTUE_XCRUN_REAL=$xcrun_ios_previo" "PATH=$ESCENARIO/ios-xcrun:$PATH")
     fi
     (cd "$dir" && env "${entorno_movil[@]}" "$CLI" package --tags goolm "${comunes[@]}" ${extra[@]+"${extra[@]}"})

@@ -123,6 +123,12 @@ type EditorNota struct {
 	marca string
 	zona  *zonaEdicion
 	barra *fyne.Container
+	// barraLado es la barra de formato dentro de su `overflow-x-auto`: en el teléfono va en
+	// una fila y se desplaza de lado, en vez de comerse cuatro filas de la pantalla.
+	barraLado *ui.DesplazaLado
+	// Afuera devuelve el desplazador de la página: lo vertical que cae sobre la barra
+	// mueve la página, no la barra. Nil: lo vertical no hace nada sobre ella.
+	Afuera func() fyne.Scrollable
 	// barraTabla es la de las acciones de la tabla, que solo se ve en una celda.
 	barraTabla *fyne.Container
 	// fondoBarra y fileteBarra son el `bg-surface` y el `border-b` de la barra, y
@@ -175,13 +181,20 @@ type EditorNota struct {
 	// al lienzo de la ventana.
 	AlIrA func()
 
-	// menu es el de «/» abierto (comandos.go) y descartada, la barra a la que se dijo que
-	// no con Escape; burbuja, la de formato (burbuja.go); buscador, «Buscar en la nota»
-	// (buscar_nota.go).
+	// menu es el de «/», «[[» o «@» abierto (comandos.go) y descartada, el disparador al
+	// que se dijo que no con Escape; burbuja, la de formato (burbuja.go); buscador,
+	// «Buscar en la nota» (buscar_nota.go).
 	menu       *menuComandos
 	descartada *Pos
 	burbuja    *flotante
 	buscador   *buscadorNota
+	// enlaces es lo que ofrece «[[»: la búsqueda de la herramienta de enlaces, sin Drive.
+	// Sin ella (Mail, una nota compartida conmigo), «[[» es texto.
+	enlaces *busquedaEnlaces
+	// gente es la de la organización, para «@»; `listo` avisa cuando llega la que se ha
+	// pedido. Sin ella (un cuaderno cifrado, donde el servicio no lee a quién avisar;
+	// Mail), «@» es una arroba.
+	gente func(listo func()) []api.Miembro
 	// portal es donde van el menú y la burbuja para que nada los tape (flotante.go); sin
 	// él (Mail, las pruebas), van con el editor.
 	portal *portal
@@ -198,6 +211,13 @@ func NuevoEditorNota(tr *i18n.Translator, d *Documento, marcaDeAgua string) *Edi
 	e.cur = e.fin()
 	e.ancla = e.cur
 	e.barra = e.armarBarra()
+	e.barraLado = ui.NuevoDesplazaLado(e.barra, 0, func() fyne.Scrollable {
+		if e.Afuera != nil {
+			return e.Afuera()
+		}
+		return nil
+	})
+	e.barraLado.Medir = func(ancho float32) float32 { return altoDe(e.barra, ancho) }
 	e.barraTabla = e.armarBarraTabla()
 	e.barraTabla.Hidden = !e.enTabla()
 	e.burbuja = e.armarBurbuja()
@@ -449,16 +469,23 @@ func (e *EditorNota) aplicarEnlace(url, rotulo string) {
 			e.doc.Enlazar(a, b, url)
 			return
 		}
-		if rotulo == "" {
-			rotulo = url
-		}
-		estilo := estiloEn(e.bloqueActualDe(e.cur), e.cur.O)
-		inicio := e.cur
-		fin := e.doc.Insertar(e.cur, rotulo, estilo)
-		e.doc.Enlazar(inicio, fin, url)
-		e.cur = e.doc.Insertar(fin, "\u00a0", estilo)
-		e.ancla = e.cur
+		e.escribirEnlace(url, rotulo)
 	})
+}
+
+// escribirEnlace pone el enlace con su nombre donde está el cursor, y un espacio duro
+// para seguir escribiendo fuera de él (`escribirEnlace` de RichText.tsx). Es lo que
+// escriben la herramienta de enlaces sin selección y el `[[` (comandos.go).
+func (e *EditorNota) escribirEnlace(url, rotulo string) {
+	if rotulo == "" {
+		rotulo = url
+	}
+	estilo := estiloEn(e.bloqueActualDe(e.cur), e.cur.O)
+	inicio := e.cur
+	fin := e.doc.Insertar(e.cur, rotulo, estilo)
+	e.doc.Enlazar(inicio, fin, url)
+	e.cur = e.doc.Insertar(fin, "\u00a0", estilo)
+	e.ancla = e.cur
 }
 
 func (e *EditorNota) bloqueActual() Bloque { return e.bloqueActualDe(e.cur) }
@@ -920,8 +947,11 @@ func (e *EditorNota) armarBarra() *fyne.Container {
 		boton("tabla", TablaD, iconos.Ninguno, t("editor.table", nil), func() { e.Orden("tabla", "") }),
 	)
 	e.fondoBarra, e.fileteBarra = canvas.NewRectangle(color.NRGBA{}), canvas.NewRectangle(color.NRGBA{})
-	return container.New(&barraFlex{entera: -1, px: PXBarraEd, py: PYBarraEd, hueco: HuecoBarraEd},
-		append([]fyne.CanvasObject{e.fondoBarra, e.fileteBarra}, items...)...)
+	f := &barraFlex{
+		entera: -1, px: PXBarraEd, py: PYBarraEd, hueco: HuecoBarraEd,
+		filaUnica: func() bool { return anchoApp() < ui.CorteMD },
+	}
+	return container.New(f, append([]fyne.CanvasObject{e.fondoBarra, e.fileteBarra}, items...)...)
 }
 
 // armarBarraTabla es la barra de «Acciones de la tabla», que en la web sale SOLO con el
@@ -962,7 +992,7 @@ func (e *EditorNota) enTabla() bool {
 // barras son las barras que se ven, en su orden: la de formato y, con el cursor en una
 // celda, la de tabla.
 func (e *EditorNota) barras() []fyne.CanvasObject {
-	out := []fyne.CanvasObject{e.barra}
+	out := []fyne.CanvasObject{e.barraLado}
 	if e.buscador != nil {
 		out = append(out, e.buscador.barra)
 	}
@@ -1018,6 +1048,7 @@ func (e *EditorNota) refrescarBarra() {
 	}
 	e.bloqueBt.Refresh()
 	e.barra.Refresh()
+	e.barraLado.Refresh()
 	e.barraTabla.Refresh()
 }
 
@@ -1143,6 +1174,8 @@ type zonaEdicion struct {
 	maq      *Maquetado
 	ancho    float32
 	arrastre bool
+	// contexto es el doble toque y el menú contextual (editor_menu.go).
+	contexto contextoZona
 }
 
 var (
@@ -1325,6 +1358,9 @@ func (z *zonaEdicion) Tapped(ev *fyne.PointEvent) {
 			return
 		}
 	}
+	if z.dobleToque(ev.Position) {
+		return // el segundo toque selecciona la palabra (editor_menu.go)
+	}
 	if p, ok := z.posEn(ev.Position); ok {
 		z.e.hayX = false
 		z.e.moverA(p)
@@ -1391,6 +1427,9 @@ func (r *zonaRenderer) Layout(t fyne.Size) {
 	}
 	if z.enfocado && !z.e.haySeleccion() {
 		objs = append(objs, r.cursor(v)...)
+	}
+	if a := z.contexto.ancla; a != nil {
+		objs = append(objs, a) // de donde cuelga el menú contextual (editor_menu.go)
 	}
 	r.objetos = objs
 }

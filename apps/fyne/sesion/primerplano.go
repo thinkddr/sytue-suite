@@ -3,7 +3,11 @@
 
 package sesion
 
-import "fyne.io/fyne/v2"
+import (
+	"runtime"
+
+	"fyne.io/fyne/v2"
+)
 
 // # Volver a la app y dejarla en segundo plano
 //
@@ -49,6 +53,7 @@ func (s *Suite) engancharVida(a fyne.App) {
 
 // repartir llama a los apuntados, sin el cerrojo: uno de ellos puede apuntar a otro.
 func (s *Suite) repartir(vuelve bool) {
+	s.enFondo.Store(!vuelve)
 	s.mu.Lock()
 	lista := s.alFondo
 	if vuelve {
@@ -56,7 +61,52 @@ func (s *Suite) repartir(vuelve bool) {
 	}
 	quienes := append([]func(){}, lista...)
 	s.mu.Unlock()
+	if vuelve && s.PausaEnFondo() {
+		select {
+		case s.senalVuelta() <- struct{}{}:
+		default: // ya había una vuelta sin atender
+		}
+	}
 	for _, f := range quienes {
 		f()
 	}
+}
+
+// # Lo que dice que hay alguien sigue al primer plano (iOS)
+//
+// En iOS una app mandada al fondo se suspende, y hasta la tarea de refresco del widget
+// (fondo.go) no volvía a correr. Con ella, iOS la reanuda en segundo plano cada 30 min o
+// menos, y todo lo que estaba esperando vuelve a correr: el latido vencido publicaba «En
+// línea» de madrugada y el SSE de la barra se reconectaba. Por eso allí la presencia
+// (latir) y el SSE de la barra (ui.BarraSuite) se paran al dejar el primer plano y
+// vuelven con él, no con la escena: un despertar, frío o caliente, nunca late.
+//
+// En el escritorio «fondo» es solo que la ventana pierde el foco —se sigue estando en
+// línea y los avisos tienen que seguir llegando—, y en Android el SSE de la barra es por
+// donde llegan los avisos con la app al fondo (`eu.sytue.nativo.Avisos`): allí no se para.
+
+// plataformaQueDespierta es la que reanuda en segundo plano una app suspendida para su
+// widget (BGAppRefreshTask).
+const plataformaQueDespierta = runtime.GOOS == "ios"
+
+// PausaEnFondo dice si en esta plataforma lo que dice que hay alguien —la presencia, el
+// SSE de los avisos— se para con la app fuera del primer plano (AlFondo) y vuelve con
+// ella (AlVolver). Es la pregunta de ui.BarraSuite.
+func (s *Suite) PausaEnFondo() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.pausaEnFondo
+}
+
+// latidoEnPausa: la presencia no se publica ahora.
+func (s *Suite) latidoEnPausa() bool { return s.PausaEnFondo() && s.enFondo.Load() }
+
+// senalVuelta es el aviso a latir de que la app ha vuelto al primer plano.
+func (s *Suite) senalVuelta() chan struct{} {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.vuelta == nil {
+		s.vuelta = make(chan struct{}, 1)
+	}
+	return s.vuelta
 }

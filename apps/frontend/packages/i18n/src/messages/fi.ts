@@ -18,6 +18,8 @@ export const fi: Catalog = {
   'ui.openNav': 'Avaa navigointi',
   'ui.closeNav': 'Sulje navigointi',
   'ui.backToList': 'Takaisin luetteloon',
+  'ui.suiteOpen': 'Sytue: sovellukset, haku, ilmoitukset ja tili',
+  'ui.suiteClose': 'Takaisin sovellukseen',
   'ui.noResults': 'Ei tuloksia.',
   'ui.meter.almostFull': 'lähes täynnä',
   'ui.meter.full': 'täynnä',
@@ -59,6 +61,9 @@ export const fi: Catalog = {
     'Tämä sovellus tarvitsee OpenGL 2.1:n, eikä tämän tietokoneen näytönohjain tarjoa sitä ({detalle}). Asenna tai päivitä näytönohjaimen ajuri. Ilman näytönohjainta (etätyöpöytä tai virtuaalikone) sitä ei voi avata.',
   'shell.lock.reasonNotebook': 'avata salatun muistikirjasi',
   'shell.lock.faceIdUsage': 'Sytue avaa istuntosi lukituksen Face ID:llä, kun avaat sovelluksen.',
+  'shell.widgets.wake': 'Päivitä widgetit, kun sovellus on suljettu',
+  'shell.widgets.wakeHelp':
+    'Kun jokin sinun tiedoistasi muuttuu, Sytue herättää sovelluksen tyhjällä Applen ilmoituksella, jotta se voi päivittää widgettinsä. Apple näkee, mikä sovellus ja milloin, ei koskaan sitä, mikä muuttui.',
   'shell.call.microphoneUsage':
     'Sytue Rooms käyttää mikrofonia vain puhelun aikana ja vain, kun kytket sen päälle.',
   'shell.call.cameraUsage':
@@ -176,7 +181,7 @@ export const fi: Catalog = {
     'Verkkotunnus {domain} sivustolla {site} ei toimi: tarkista sen asetukset',
   'notifications.kind.pages.erp.failed':
     'Tilaus {number} sivustolta {site} ei päätynyt Sytue ERP:hen',
-  'notifications.kind.pages.settings.changed': '{actor} muutti Sytue Web -asetusta',
+  'notifications.kind.pages.settings.changed': '{actor} muutti Sytue Webs -asetusta',
   'notifications.kind.pages.export.ready': 'Sivuston {site} vientisi on valmis',
   'notifications.kind.pages.store.busy':
     'Sivuston {site} verkkokaupassa on liian monta maksua odottavaa tilausta',
@@ -364,6 +369,8 @@ export const fi: Catalog = {
   'widgets.compose': 'Kirjoita',
   'widgets.storage': 'Tallennustila',
   'widgets.create': 'Luo tapahtuma',
+  'widgets.updatedAgo': 'Päivitetty {time}',
+  'widgets.updatedAt': 'Päivitetty: {time}',
 
   'linkedServices.services': 'Palvelut',
   'linkedServices.changed':
@@ -376,6 +383,7 @@ export const fi: Catalog = {
   'linkedServices.notGranted':
     'Tämän palvelun käyttöoikeutta ei myönnetty. Yhdistä tili uudelleen ja valitse sen käyttöoikeudet.',
   'linkedServices.connected': 'Yhdistetyt palvelut',
+  'linkedServices.exists': 'Tämä tili oli jo yhdistetty, ja se on nyt auki.',
   'linkedServices.providerData': 'Muutokset tallennetaan palveluntarjoajalle.',
   'linkedServices.writeUnknown':
     'Palveluntarjoaja ei vahvistanut tallennusta. Päivitä näkymä ja tarkista ennen kuin yrität uudelleen.',

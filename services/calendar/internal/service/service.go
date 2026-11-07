@@ -49,8 +49,9 @@ type Service struct {
 	pub   EventPublisher
 	// subClient obtiene los feeds ICS suscritos SSRF-safe (barrera doble). Se
 	// construye una vez (pool de conexiones) y lo comparten el worker y el
-	// «refrescar ahora».
-	subClient *subscriptions.Client
+	// «refrescar ahora». Es la interfaz de *subscriptions.Client para que una prueba
+	// pueda servir un feed sin red (la barrera SSRF no deja llegar a un httptest).
+	subClient feedFetcher
 	// hub deja en la campana de cada invitado el aviso de su invitación. Nil: no avisa.
 	hub *hubnotify.Client
 	// correo manda las invitaciones iMIP a quien es de fuera (imip.go); nil, ninguna.
@@ -183,9 +184,16 @@ func (s *Service) requireCalendarRead(ctx context.Context, calendarID uuid.UUID)
 
 // requireCalendarWrite exige ESCRITURA (dueño|writer|manage); un reader recibe
 // ErrReadOnly (403) y sin acceso, ErrNotFound (404). Reusa assertShareWritable.
+//
+// Quien pasa la verja va a escribir en el calendario: lo verán su dueño y quienes lo
+// tienen compartido, y a todos les llega la señal de cambios (AvisarQuienesVen).
 func (s *Service) requireCalendarWrite(ctx context.Context, calendarID uuid.UUID) error {
 	sub, email := caller(ctx)
-	return s.assertShareWritable(ctx, sub, email, calendarID)
+	if err := s.assertShareWritable(ctx, sub, email, calendarID); err != nil {
+		return err
+	}
+	s.store.AvisarQuienesVen(ctx, calendarID)
+	return nil
 }
 
 // --- Calendarios ------------------------------------------------------------
@@ -270,6 +278,9 @@ func (s *Service) DeleteCalendar(ctx context.Context, id uuid.UUID) error {
 	if err := s.requireCalendarOwner(ctx, id); err != nil {
 		return err
 	}
+	// Antes de borrar, que los shares se van con el calendario: sus eventos salen
+	// también del widget de quienes lo tenían compartido.
+	s.store.AvisarQuienesVen(ctx, id)
 	if err := s.store.DeleteCalendar(ctx, id); err != nil {
 		return err
 	}

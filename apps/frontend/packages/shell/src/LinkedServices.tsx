@@ -9,6 +9,7 @@ import {
   ChoiceCard,
   FieldGroup,
   Icon,
+  InlineHelp,
   Input,
   Modal,
   Select,
@@ -22,6 +23,8 @@ import {
   HttpError,
   LinkedServicesClient,
   MAIL_PROVIDERS,
+  forgetMailConsent,
+  pendingMailConsent,
   type ExternalMailAccount,
   type ExternalMailAccounts,
   type LinkedService,
@@ -104,6 +107,8 @@ export function LinkedServices({ service, basePath, labels }: LinkedServicesProp
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // A notice, not an error: the account was already connected and nothing failed.
+  const [notice, setNotice] = useState('');
   const [reload, setReload] = useState(0);
   const [provider, setProvider] = useState<MailProvider>('gmail');
   const [setup, setSetup] = useState(false);
@@ -143,6 +148,7 @@ export function LinkedServices({ service, basePath, labels }: LinkedServicesProp
     setCollection('');
     setCollections([]);
     setError('');
+    setNotice('');
     setWriteBlocked(false);
   }
   function close(): void {
@@ -177,11 +183,24 @@ export function LinkedServices({ service, basePath, labels }: LinkedServicesProp
         const query = returned.current;
         const id = query.get('instance');
         const exact = result.items.find((item) => item.instance_id === id);
-        if (query.has('oauth_error')) {
+        if (
+          query.get('oauth_error') === 'exists' &&
+          exact?.connected &&
+          exact.services?.includes(service)
+        ) {
+          // The draft was discarded and `instance` is the account already there: open it.
+          resetView();
+          setAccount(exact);
+          setSetup(false);
+          setNotice(t('linkedServices.exists'));
+        } else if (query.has('oauth_error')) {
           setAccount(exact ?? null);
-          if (exact) {
-            setProvider(exact.provider);
-            setDrafts((previous) => ({ ...previous, [exact.provider]: exact.instance_id }));
+          // Drafts are not listed: a cancelled sign-in names its provider only
+          // through what this tab sent there, or the wizard came back with Gmail.
+          const draft = exact ?? pendingMailConsent(id);
+          if (draft) {
+            setProvider(draft.provider);
+            setDrafts((previous) => ({ ...previous, [draft.provider]: draft.instance_id }));
           }
           setSetup(true);
           setError(t('linkedServices.notGranted'));
@@ -219,6 +238,8 @@ export function LinkedServices({ service, basePath, labels }: LinkedServicesProp
             url.searchParams.delete(key);
           window.history.replaceState(window.history.state, '', url);
           returned.current = new URLSearchParams();
+          // The return is handled: a later one must not name this provider.
+          if (id || query.has('oauth_error')) forgetMailConsent();
         }
       })
       .catch((err) => {
@@ -466,6 +487,11 @@ export function LinkedServices({ service, basePath, labels }: LinkedServicesProp
           <p role="alert" class="text-danger mb-3 text-sm">
             {error}
           </p>
+        ) : null}
+        {notice && !error ? (
+          <div role="status" class="mb-3">
+            <InlineHelp tone="info">{notice}</InlineHelp>
+          </div>
         ) : null}
         {editor ? (
           <>

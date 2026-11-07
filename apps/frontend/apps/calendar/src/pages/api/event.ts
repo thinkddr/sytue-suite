@@ -49,6 +49,17 @@ export const POST: APIRoute = async (ctx) => {
   const exdates = (body.eventInput.exdates ?? []).filter(
     (e) => typeof e === 'string' && /^\d{8}(T\d{6}Z?)?$/.test(e),
   );
+  // Respuestas ya dadas de los invitados: solo las tres que alguien puede dar, y solo
+  // de los invitados de ESTE guardado. No abre nada nuevo —el dueño del calendario ya
+  // puede escribir el .ics que quiera por CalDAV—; solo evita borrarlas al guardar.
+  const partstats: Record<string, string> = {};
+  const lista = new Set(attendees.map((e) => e.toLowerCase()));
+  for (const [email, ps] of Object.entries(body.eventInput.partstats ?? {})) {
+    const valor = typeof ps === 'string' ? ps.toUpperCase() : '';
+    if (lista.has(email.toLowerCase()) && /^(ACCEPTED|TENTATIVE|DECLINED)$/.test(valor)) {
+      partstats[email.toLowerCase()] = valor;
+    }
+  }
   // TZID: solo un nombre IANA seguro (letras/dígitos/_ + - /). Se inyecta en
   // DTSTART;TZID=<tzid>:, así que se descarta cualquier valor que pudiera romper
   // el iCal (CRLF, «:», «;»). Ausente/invalido => el evento se emite en UTC.
@@ -76,7 +87,7 @@ export const POST: APIRoute = async (ctx) => {
     // ORGANIZER = usuario autenticado (el navegador no dicta el organizador).
     // Solo emitimos ORGANIZER/ATTENDEE si hay invitados, para no marcar como
     // "reunion" los eventos personales.
-    ...(attendees.length ? { attendees, organizer: session.user.email } : {}),
+    ...(attendees.length ? { attendees, organizer: session.user.email, partstats } : {}),
     ...(alarms.length ? { alarms } : {}),
     ...(exdates.length ? { exdates } : {}),
   };

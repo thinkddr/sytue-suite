@@ -258,6 +258,14 @@ export const sv: AppCatalog<typeof en> = {
     one: '1 objekt har skickats till papperskorgen.',
     other: '{count} objekt har skickats till papperskorgen.',
   },
+  'files.batch.restored': {
+    one: '1 objekt har återställts.',
+    other: '{count} objekt har återställts.',
+  },
+  'files.batch.restorePartial': {
+    one: '1 objekt kunde inte återställas och ligger kvar i papperskorgen.',
+    other: '{count} objekt kunde inte återställas och ligger kvar i papperskorgen.',
+  },
   'files.batch.trashFailed': 'Markeringen kunde inte skickas till papperskorgen.',
   'files.batch.moveTitle': { one: 'Flytta 1 objekt', other: 'Flytta {count} objekt' },
   'files.batch.moveDone': { one: '1 objekt har flyttats.', other: '{count} objekt har flyttats.' },
@@ -272,6 +280,9 @@ export const sv: AppCatalog<typeof en> = {
   'action.rename': 'Byt namn',
   'action.move': 'Flytta till…',
   'action.copy': 'Gör en kopia',
+  'action.copyLink': 'Kopiera länk',
+  'action.linkCopied': 'Länken har kopierats. Den öppnas bara för dem som redan har åtkomst.',
+  'action.copyLinkFailed': 'Länken kunde inte kopieras.',
   'action.shareLink': 'Dela länk',
   'action.openInApp': 'Öppna i programmet',
   'action.openInEditor': 'Öppna i redigeraren',
@@ -483,6 +494,18 @@ export const sv: AppCatalog<typeof en> = {
   'trash.purged': '”{name}” har raderats permanent.',
   'trash.purgeDenied': '”{name}” kan inte raderas',
   'trash.purgeFailed': 'Det gick inte att radera.',
+  'trash.emptyAll': 'Töm papperskorgen',
+  'trash.emptyAllTitle': 'Tömma papperskorgen?',
+  'trash.emptyAllBody': {
+    one: 'Objektet i papperskorgen raderas för gott, tillsammans med versionshistoriken. Det går inte att få tillbaka efteråt.',
+    other:
+      'De {count} objekten i papperskorgen raderas för gott, tillsammans med versionshistoriken. De går inte att få tillbaka efteråt.',
+  },
+  'trash.emptiedAll': 'Papperskorgen har tömts.',
+  'trash.emptyAllPartial': {
+    one: '1 objekt kunde inte raderas och ligger kvar i papperskorgen.',
+    other: '{count} objekt kunde inte raderas och ligger kvar i papperskorgen.',
+  },
   'trash.purgeTitle': 'Radera permanent?',
   'trash.purgeBodyFolder':
     'Innehållet i ”{name}” och i allt som finns i den raderas från Sytues servrar, tillsammans med versionshistoriken. Det går inte att få tillbaka efteråt, varken härifrån eller via supporten. I gengäld frigör du utrymmet det tog upp.',

@@ -72,6 +72,8 @@ type juego struct {
 type pedido struct {
 	color, app string
 	carril     bool
+	// papel es el cromo «papel» (`data-cromo='papel'`): lo elige la app, no la persona.
+	papel bool
 }
 
 // Se resuelve una vez, al cargar el paquete. Si la hoja trae algo que no se sabe leer,
@@ -101,6 +103,11 @@ const ColorDeCadaApp = "app"
 
 // FormaCarril es la forma que se elige; cualquier otro valor es Marco, la de la casa.
 const FormaCarril = "carril"
+
+// CromoPapel es el cromo que elige una app que es una libreta (Sytue Notepads): marco,
+// menú y barra en el fondo de la página, con la tinta del texto (ADR 0079). Cualquier
+// otro valor es el cromo de color de la suite.
+const CromoPapel = "papel"
 
 // eleccion es lo elegido. Bajo su cerrojo va también el mapa de juegos, que crece con el
 // primer «color de cada app» de un producto.
@@ -143,6 +150,24 @@ func ElegirForma(nombre string) bool {
 	defer eleccion.Unlock()
 	eleccion.carril = nombre == FormaCarril
 	return ponerEnVigor()
+}
+
+// ElegirCromo fija el cromo: "papel", o cualquier otra cosa —"" incluido— para el de
+// color de la suite. Lo dice la app una vez, al arrancar, como ElegirApp; devuelve si ha
+// cambiado algo.
+func ElegirCromo(nombre string) bool {
+	eleccion.Lock()
+	defer eleccion.Unlock()
+	eleccion.papel = nombre == CromoPapel
+	return ponerEnVigor()
+}
+
+// EsPapel dice si el cromo en vigor es «papel». Lo pregunta lo que la hoja no pinta con
+// un token: el relleno de acento de los glifos y la sombra de la hoja.
+func EsPapel() bool {
+	eleccion.Lock()
+	defer eleccion.Unlock()
+	return eleccion.papel
 }
 
 // EsCarril dice si la forma en vigor es Carril. Si no, es Marco.
@@ -238,7 +263,7 @@ func Names() []string {
 }
 
 var (
-	reSelectorTema = regexp.MustCompile(`\[data-(theme|color|app|forma)=["']([a-z]+)["']\]`)
+	reSelectorTema = regexp.MustCompile(`\[data-(theme|color|app|forma|cromo)=["']([a-z]+)["']\]`)
 	reComentario   = regexp.MustCompile(`(?s)/\*.*?\*/`)
 	reDecl         = regexp.MustCompile(`(?s)--sytue-([a-z0-9-]+)\s*:\s*(.*?);`)
 	reVar          = regexp.MustCompile(`var\(--sytue-([a-z0-9-]+)\)`)
@@ -367,6 +392,9 @@ func parseCrudasDe(apertura string, p pedido, hojas ...string) ([variantes]map[s
 		decl, err := apilar(limpias, bloque, delColor, delApp)
 		if err == nil {
 			apilarForma(decl, limpias, p.carril, bloque == traslucidoElegido)
+			if p.papel {
+				apilarBloque(decl, limpias, cromoPapel)
+			}
 		}
 		if err != nil {
 			return out, err
@@ -427,6 +455,18 @@ const (
 	formaMarcoTraslucido = "[data-theme='translucent']:not([data-forma='carril']) {"
 	formaCarril          = "[data-forma='carril'] {"
 )
+
+// La puerta del cromo «papel». En la hoja pesa tres atributos para ganar al carril de cada
+// color en cualquier tema, y por eso aquí va la ÚLTIMA: después de la forma.
+const cromoPapel = ":root[data-cromo='papel']:is([data-theme], :not([data-theme])) {"
+
+// apilarBloque añade lo que declara un bloque que solo trae alguna de las hojas.
+func apilarBloque(decl map[string]string, hojas []string, apertura string) {
+	for _, css := range hojas {
+		reasignado, _ := declaraciones(css, apertura)
+		maps.Copy(decl, reasignado)
+	}
+}
 
 // apilarForma añade a lo ya apilado los bloques de la forma, que van los últimos.
 func apilarForma(decl map[string]string, hojas []string, carril, traslucido bool) {

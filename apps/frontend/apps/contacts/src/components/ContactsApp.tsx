@@ -43,6 +43,7 @@ import {
   Glifo,
 } from '@sytue/ui';
 import type { SytueUser } from '@sytue/auth';
+import { appUrl } from '@sytue/config';
 import { contiene, intlTag, type Locale } from '@sytue/i18n';
 import { useT, type T } from '../i18n/index.js';
 import { BirthdaysModal } from './BirthdaysModal.js';
@@ -78,10 +79,12 @@ import {
 } from '../client/contactsApi.js';
 import { buildMergeInput, unionValues } from '../client/merge.js';
 import { findDuplicateGroups } from '../client/duplicates.js';
-import { downloadVcf, hasEmbeddedPhoto, importVcf } from '../client/vcard.js';
+import { downloadVcf, exportFilename, hasEmbeddedPhoto, importVcf } from '../client/vcard.js';
 import { getAccessToken } from '@sytue/auth/client';
 import { ContactModal, type EditingContact } from './ContactModal.js';
-import { ContactDetail } from './ContactDetail.js';
+import { ContactDetail, FavoriteToggle } from './ContactDetail.js';
+import { correosDe, enlaceCorreoATodos } from '../client/seleccion.js';
+import { avisarPapelera } from './avisoPapelera.js';
 
 interface Props {
   user: SytueUser;
@@ -313,14 +316,21 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
   async function toggleFav(contact: Contact): Promise<void> {
     const uid = cleanUid(contact.uid);
     const has = favorites.has(uid);
-    const next = new Set(favorites);
-    if (has) next.delete(uid);
-    else next.add(uid);
-    setFavorites(next);
+    // Con la estrella en cada fila hay varios destacados en vuelo a la vez: cada uno
+    // cambia y revierte SOLO su UID sobre el estado de ese momento, no sobre la
+    // instantánea de este cierre, que desharía en pantalla los aciertos de los otros.
+    const poner = (on: boolean) =>
+      setFavorites((prev) => {
+        const n = new Set(prev);
+        if (on) n.add(uid);
+        else n.delete(uid);
+        return n;
+      });
+    poner(!has);
     try {
       await toggleFavorite(uid, !has);
     } catch (err) {
-      setFavorites(favorites); // revertir
+      poner(has); // revertir
       throw err;
     }
   }
@@ -414,6 +424,15 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
   }
 
   const activeGroup = groups.find((g) => g.id === activeGroupId) ?? null;
+  // Los miembros cargados de la etiqueta activa, para su menú (correo y .vcf). Con un
+  // Set y memorizado: un `includes` por contacto era O(n·m) en cada pulsación.
+  const activeMembers = useMemo(() => {
+    if (!activeGroup) return [];
+    const set = new Set(activeGroup.members);
+    return contacts.filter((c) => set.has(c.uid));
+  }, [activeGroup, contacts]);
+  // La raíz de Mail con la org de la sesión (ADR 0056), como el «Enviar correo» de la ficha.
+  const mailBase = appUrl('mail', '', user.tenant);
 
   const filtered = useMemo(() => {
     const memberSet = activeGroup ? new Set(activeGroup.members) : null;
@@ -495,12 +514,17 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
     return hasEmbeddedPhoto(c.vcard) ? photoUrl(cleanUid(c.uid), c.etag) : undefined;
   }
 
-  /** Ejecuta una acción en lote y refresca lista/estado; el error lo avisa BatchBar. */
-  async function runBatch(fn: () => Promise<unknown>): Promise<void> {
-    await fn();
+  /** Lista, destacados y etiquetas otra vez: lo que puede cambiar una acción en lote. */
+  function refreshAll(): void {
     reload();
     reloadFavorites();
     reloadGroups();
+  }
+
+  /** Ejecuta una acción en lote y refresca lista/estado; el error lo avisa BatchBar. */
+  async function runBatch(fn: () => Promise<unknown>): Promise<void> {
+    await fn();
+    refreshAll();
   }
 
   // Abre la fusión sobre un grupo de duplicados: superviviente = 1.º, candidatos
@@ -708,6 +732,8 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
         // Titula la vista entera: es el h1 de la pagina (la ficha va en h2).
         level={1}
         title={t('list.title')}
+        // «Contactos» ya lo dice la barra del teléfono: ahí quedan solo las acciones.
+        repiteLaBarra
         actions={
           <div class="flex shrink-0 items-center gap-1.5">
             {/* Renombrar y eliminar la etiqueta, junto a la vista que filtra por
@@ -717,6 +743,8 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
               <LabelActions
                 t={t}
                 group={activeGroup}
+                members={activeMembers}
+                mailBase={mailBase}
                 onRename={() => setLabelModal({ open: true, editing: activeGroup })}
                 onDeleted={() => {
                   setActiveGroupId(null);
@@ -785,8 +813,11 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
           t={t}
           count={selectedContacts.length}
           uids={selectedUids}
+          contacts={selectedContacts}
+          mailBase={mailBase}
           groups={groups}
           onRun={runBatch}
+          onRefresh={refreshAll}
           onClear={clearSelection}
         />
       ) : null}
@@ -878,7 +909,7 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
               return (
                 <div
                   class={cx(
-                    'flex items-center gap-3 border-l-2 px-3 py-2 text-base transition-colors duration-150',
+                    'group flex items-center gap-3 border-l-2 px-3 py-2 text-base transition-colors duration-150',
                     isSelected
                       ? 'border-l-primary bg-selected'
                       : 'hover:bg-bg-subtle border-l-transparent',
@@ -921,12 +952,22 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
                         </span>
                       ) : null}
                     </span>
-                    {favorites.has(cleanUid(c.uid)) ? (
-                      <span class="text-warning-text shrink-0" title={t('list.starredTitle')}>
-                        <StarGlyph filled size={14} />
-                      </span>
-                    ) : null}
                   </button>
+                  {/* Destacar sin abrir la ficha: hermano del botón, como la casilla.
+                      Sin red la fila solo enseña la estrella de quien ya lo está. */}
+                  {!offline ? (
+                    <FavoriteToggle
+                      row
+                      t={t}
+                      contact={c}
+                      active={favorites.has(cleanUid(c.uid))}
+                      onToggle={toggleFav}
+                    />
+                  ) : favorites.has(cleanUid(c.uid)) ? (
+                    <span class="text-warning-text shrink-0" title={t('list.starredTitle')}>
+                      <StarGlyph filled size={14} />
+                    </span>
+                  ) : null}
                 </div>
               );
             }}
@@ -1224,19 +1265,46 @@ function VcardToolbar({
 }
 
 /**
+ * «Enviar correo a todos»: abre el redactor de Sytue Mail con un correo por persona
+ * (el principal) en «Para». Lo usan la barra de selección y el menú de la etiqueta.
+ * Sin ningún correo no abre un redactor vacío: lo dice; y si había más de los que
+ * caben en el enlace, avisa de que van los primeros.
+ */
+function enviarCorreoATodos(
+  toast: ReturnType<typeof useToast>,
+  t: T,
+  contactos: Contact[],
+  mailBase: string,
+): void {
+  const { correos, recortado } = correosDe(contactos);
+  if (correos.length === 0) {
+    toast.notify({ tone: 'info', title: t('batch.noEmail') });
+    return;
+  }
+  if (recortado)
+    toast.notify({ tone: 'warning', title: t('batch.emailCapped', { count: correos.length }) });
+  window.open(enlaceCorreoATodos(mailBase, correos), '_blank', 'noopener');
+}
+
+/**
  * LabelActions — cambiar el nombre y eliminar la etiqueta por la que se está
  * filtrando. Eliminarla NO tiene vuelta atrás (no hay papelera de etiquetas), así
  * que pregunta; los contactos no se tocan y el diálogo lo dice. Vive bajo la
  * Sytue Shell para poder usar useToast (mismo motivo que VcardToolbar).
  */
-function LabelActions({
+export function LabelActions({
   t,
   group,
+  members,
+  mailBase,
   onRename,
   onDeleted,
 }: {
   t: T;
   group: ContactGroup;
+  /** Los contactos de la libreta que llevan la etiqueta. */
+  members: Contact[];
+  mailBase: string;
   onRename: () => void;
   onDeleted: () => void;
 }): JSX.Element {
@@ -1283,12 +1351,35 @@ function LabelActions({
             disabled={busy}
             aria-label={t('label.actions')}
             title={t('label.actions')}
-            leadingIcon={<TagGlyph />}
+            // A 16, como el `user` de BookActions que va al lado.
+            leadingIcon={<TagGlyph size={16} />}
           />
         )}
       >
         {(close) => (
           <>
+            {/* Lo que se hace CON la etiqueta, antes de lo que se le hace a ella. */}
+            <MenuItem
+              disabled={members.length === 0}
+              onClick={() => {
+                close();
+                enviarCorreoATodos(toast, t, members, mailBase);
+              }}
+            >
+              {t('batch.emailAll')}
+            </MenuItem>
+            <MenuItem
+              disabled={members.length === 0}
+              onClick={() => {
+                close();
+                downloadVcf(
+                  exportFilename(group.name),
+                  members.map((c) => c.vcard),
+                );
+              }}
+            >
+              {t('batch.exportVcf')}
+            </MenuItem>
             <MenuItem
               onClick={() => {
                 close();
@@ -1413,9 +1504,9 @@ function BookActions({
 
 /** Icono de etiqueta (24-grid, envoltorio `Glifo`): @sytue/ui aún no expone un glifo
  *  «tag», así que va inline (mismo patrón que VideoGlyph en Chat). */
-function TagGlyph(): JSX.Element {
+function TagGlyph({ size = 18 }: { size?: number }): JSX.Element {
   return (
-    <Glifo size={18}>
+    <Glifo size={size}>
       <path d="M20.6 13.4 12 22l-9-9V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z" />
       <path d="M7.5 7.5h.01" />
     </Glifo>
@@ -2163,19 +2254,27 @@ function TrashModal({
  * Cada acción llama al BFF (una consulta `uid = ANY` en el servicio Go). Vive bajo
  * la Sytue Shell para usar useToast.
  */
-function BatchBar({
+export function BatchBar({
   t,
   count,
   uids,
+  contacts,
+  mailBase,
   groups,
   onRun,
+  onRefresh,
   onClear,
 }: {
   t: T;
   count: number;
   uids: string[];
+  /** Los marcados, enteros: el correo y la vCard de cada uno. */
+  contacts: Contact[];
+  mailBase: string;
   groups: ContactGroup[];
   onRun: (fn: () => Promise<unknown>) => Promise<void>;
+  /** Vuelve a traer lista, destacados y etiquetas (tras deshacer, con la barra ya cerrada). */
+  onRefresh: () => void;
   onClear: () => void;
 }): JSX.Element {
   const toast = useToast();
@@ -2186,6 +2285,29 @@ function BatchBar({
     try {
       await onRun(fn);
       toast.notify({ tone: 'success', title: okTitle });
+    } catch {
+      toast.notify({
+        tone: 'danger',
+        title: t('common.actionFailed'),
+        description: t('common.tryAgainSoon'),
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // A la papelera, con «Deshacer» en el aviso: el lote es donde más fácil se tira de
+  // más (un «seleccionar todo» con el filtro equivocado) y la papelera queda lejos.
+  async function trash(): Promise<void> {
+    const lote = [...uids];
+    setBusy(true);
+    try {
+      // Lo que el servicio dice que tiró, no los marcados: con eso se compara al deshacer.
+      let tirados = 0;
+      await onRun(async () => {
+        ({ trashed: tirados } = await batchTrash(lote));
+      });
+      avisarPapelera(toast, t, { title: t('batch.trashed', { count }) }, lote, tirados, onRefresh);
     } catch {
       toast.notify({
         tone: 'danger',
@@ -2212,6 +2334,26 @@ function BatchBar({
       onClear={onClear}
     >
       <div class="flex-1" />
+      {/* Lo que se hace CON la selección y no le cambia nada: no espera a `busy`. */}
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={() => enviarCorreoATodos(toast, t, contacts, mailBase)}
+      >
+        {t('batch.emailAll')}
+      </Button>
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={() =>
+          downloadVcf(
+            t('io.exportFilename'),
+            contacts.map((c) => c.vcard),
+          )
+        }
+      >
+        {t('batch.exportVcf')}
+      </Button>
       <Button
         variant="secondary"
         size="sm"
@@ -2290,12 +2432,7 @@ function BatchBar({
           </Dropdown>
         </>
       ) : null}
-      <Button
-        variant="danger"
-        size="sm"
-        disabled={busy}
-        onClick={() => void act(() => batchTrash(uids), t('batch.trashed', { count }))}
-      >
+      <Button variant="danger" size="sm" disabled={busy} onClick={() => void trash()}>
         {t('batch.toTrash')}
       </Button>
     </BulkActionBar>

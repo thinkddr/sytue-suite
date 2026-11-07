@@ -4,6 +4,8 @@
   "action.classified": "Klasifikacija · {name}",
   "action.classify": "Klasificiraj",
   "action.copy": "Izradi kopiju",
+  "action.copyLink": "Kopiraj poveznicu",
+  "action.copyLinkFailed": "Poveznicu nije moguće kopirati.",
   "action.delete": "Premjesti u otpad",
   "action.desktopBody": "Ako je još nemate instaliranu, možete je preuzeti.",
   "action.desktopCta": "Pogledajte preuzimanja",
@@ -12,6 +14,7 @@
   "action.downloadName": "Preuzmi {name}",
   "action.downloadZip": "Preuzmi (ZIP)",
   "action.editorFailed": "Uređivač nije mogao otvoriti ovu datoteku.",
+  "action.linkCopied": "Poveznica je kopirana. Otvara se samo onima koji već imaju pristup.",
   "action.mailFailed": "Nije moguće otvoriti sastavljanje e-poruke",
   "action.menu": "Radnje za {name}",
   "action.more": "Više radnji",
@@ -84,6 +87,16 @@
     "one": "Premjesti {count} stavku",
     "few": "Premjesti {count} stavke",
     "other": "Premjesti {count} stavki"
+  },
+  "files.batch.restorePartial": {
+    "one": "{count} stavku nije bilo moguće vratiti; i dalje je u otpadu.",
+    "few": "{count} stavke nije bilo moguće vratiti; i dalje su u otpadu.",
+    "other": "{count} stavki nije bilo moguće vratiti; i dalje su u otpadu."
+  },
+  "files.batch.restored": {
+    "one": "{count} stavka je vraćena.",
+    "few": "{count} stavke su vraćene.",
+    "other": "{count} stavki je vraćeno."
   },
   "files.batch.trashBody": {
     "one": "{count} stavka premjestit će se u otpad. Odande je možete vratiti.",
@@ -571,6 +584,19 @@
     "other": "Preneseno je {count} datoteka."
   },
   "team.upload.partial": "Preneseno: {uploaded} od {count}.",
+  "trash.emptiedAll": "Otpad je ispražnjen.",
+  "trash.emptyAll": "Isprazni otpad",
+  "trash.emptyAllBody": {
+    "one": "{count} stavka u otpadu bit će trajno obrisana zajedno s poviješću verzija. Poslije je više nije moguće vratiti.",
+    "few": "{count} stavke u otpadu bit će trajno obrisane zajedno s poviješću verzija. Poslije ih više nije moguće vratiti.",
+    "other": "{count} stavki u otpadu bit će trajno obrisano zajedno s poviješću verzija. Poslije ih više nije moguće vratiti."
+  },
+  "trash.emptyAllPartial": {
+    "one": "{count} stavku nije bilo moguće izbrisati; i dalje je u otpadu.",
+    "few": "{count} stavke nije bilo moguće izbrisati; i dalje su u otpadu.",
+    "other": "{count} stavki nije bilo moguće izbrisati; i dalje su u otpadu."
+  },
+  "trash.emptyAllTitle": "Isprazniti otpad?",
   "trash.emptyBody": "Izbrisane datoteke i mape pojavit će se ovdje i moći će se vratiti.",
   "trash.emptyTitle": "Otpad je prazan",
   "trash.errorTitle": "Otpad nije moguće učitati",

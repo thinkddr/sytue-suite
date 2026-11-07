@@ -476,3 +476,33 @@ func TestLaCajaSinBordeConservaElRadioDeCSS(t *testing.T) {
 		t.Errorf("la esquina rounded-sm sin borde pinta %v; Chromium la deja casi blanca", got)
 	}
 }
+
+// TestMoverCajaConTrazoDejaElFileteDentro: una caja con trazo colocada con MoverCaja
+// lleva el filete a medio píxel hacia dentro, como en el origen, y un Pintar posterior
+// no la devuelve a (0,0).
+//
+// VISTO EN ROJO (2026-11-06): el trazo quedaba en p, medio píxel fuera, y tras Pintar
+// en (0,5; 0,5) del padre.
+func TestMoverCajaConTrazoDejaElFileteDentro(t *testing.T) {
+	velo := color.NRGBA{R: 12, G: 99, B: 107, A: 40}
+	borde := color.NRGBA{R: 200, G: 200, B: 200, A: 255}
+	c := NuevaCaja(velo, borde, 6).ConTrazo()
+	p := fyne.NewPos(10, 20)
+	MoverCaja(c, p, fyne.NewSize(30, 30))
+	quiero := fyne.NewPos(p.X+tema.Borde/2, p.Y+tema.Borde/2)
+	if got := c.fuera.Position(); got != quiero {
+		t.Errorf("el trazo queda en %v y va en %v", got, quiero)
+	}
+	c.Pintar(velo, borde)
+	if got := c.fuera.Position(); got != quiero {
+		t.Errorf("tras Pintar el trazo queda en %v y va en %v", got, quiero)
+	}
+	if got, quiero := c.dentro.Position(), fyne.NewPos(p.X+tema.Borde, p.Y+tema.Borde); got != quiero {
+		t.Errorf("el relleno queda en %v y va en %v", got, quiero)
+	}
+	// Redimensionar sigue dejándola en el origen.
+	c.Redimensionar(fyne.NewSize(30, 30))
+	if got := c.fuera.Position(); got != fyne.NewPos(tema.Borde/2, tema.Borde/2) {
+		t.Errorf("Redimensionar deja el trazo en %v", got)
+	}
+}

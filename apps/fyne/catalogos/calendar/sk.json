@@ -70,6 +70,7 @@
   "common.remove": "Odobrať",
   "common.retry": "Skúsiť znova",
   "common.save": "Uložiť",
+  "day.noEvents": "V tento deň nie sú žiadne udalosti",
   "error.calendarsLoad": "Kalendáre sa nepodarilo načítať.",
   "error.eventsLoad": "Udalosti sa nepodarilo načítať.",
   "event.ai": "Opíšte udalosť",
@@ -148,6 +149,13 @@
   "grid.blockAria": "{title}, {time}",
   "grid.continued": "{title} (pokračovanie)",
   "grid.createOn": "Vytvoriť udalosť {date}",
+  "grid.dayEvents": {
+    "one": "{date}, {count} udalosť",
+    "few": "{date}, {count} udalosti",
+    "many": "{date}, {count} udalosti",
+    "other": "{date}, {count} udalostí"
+  },
+  "grid.daySelected": "{label}, vybraté",
   "grid.loadError": "Kalendár sa nepodarilo načítať",
   "grid.loading": "Načítava sa kalendár",
   "grid.more": {
@@ -156,6 +164,8 @@
     "many": "+{count} ďalších",
     "other": "+{count} ďalších"
   },
+  "grid.showMonth": "Zobraziť celý mesiac",
+  "grid.showWeek": "Zobraziť iba tento týždeň",
   "grid.snapAria": {
     "one": "Prichytávanie pri presúvaní: {count} minúta. Stlačením zmeníte.",
     "few": "Prichytávanie pri presúvaní: {count} minúty. Stlačením zmeníte.",
@@ -174,6 +184,13 @@
     "many": "{count} min",
     "other": "{count} min"
   },
+  "grid.todayLabel": "Dnes, {date}",
+  "grid.weekNumber": "Týždeň {week}",
+  "guests.organizer": "Organizátor",
+  "guests.status.accepted": "Príde",
+  "guests.status.declined": "Nepríde",
+  "guests.status.pending": "Čaká sa na odpoveď",
+  "guests.status.tentative": "Možno",
   "header.invitations": "Pozvánky",
   "header.next": "Ďalšie",
   "header.pending": {
@@ -213,6 +230,12 @@
   "nav.createEventOn": "Vytvoriť udalosť {date}",
   "nav.deleteSubscription": "Odobrať odber",
   "nav.manageResources": "Spravovať miestnosti a vybavenie",
+  "nav.menuPending": {
+    "one": "Otvoriť ponuku, {count} čaká",
+    "few": "Otvoriť ponuku, {count} čakajú",
+    "many": "Otvoriť ponuku, {count} čaká",
+    "other": "Otvoriť ponuku, {count} čaká"
+  },
   "nav.myCalendars": "Moje kalendáre",
   "nav.next": "Ďalšie",
   "nav.nextMonth": "Ďalší mesiac",
@@ -369,6 +392,7 @@
   "scope.following": "Tejto a nasledujúcich",
   "scope.legend": "Táto udalosť sa opakuje. Ktorých udalostí sa zmena týka?",
   "scope.this": "Iba tejto udalosti",
+  "search.allCalendars": "Všetky kalendáre",
   "search.error": "Hľadanie sa nepodarilo dokončiť.",
   "search.events": "Hľadať udalosti",
   "search.loadMore": "Načítať ďalšie",
@@ -379,6 +403,12 @@
     "other": "Na hľadanie v kalendároch napíšte aspoň {count} znakov."
   },
   "search.noResults": "Pre „{term}“ sa nič nenašlo.",
+  "search.period": "Obdobie",
+  "search.period.any": "Kedykoľvek",
+  "search.period.month": "Tento mesiac",
+  "search.period.past": "Minulé",
+  "search.period.upcoming": "Nadchádzajúce",
+  "search.period.year": "Tento rok",
   "search.placeholder": "Názov, popis, miesto alebo pozvaná osoba…",
   "search.searching": "Hľadá sa…",
   "search.series": "Séria",
@@ -420,6 +450,14 @@
   "share.whoSeesNow": "Kto ho teraz vidí",
   "share.writerHint": "Okrem prezerania aj vytvára, mení a odstraňuje udalosti v tomto kalendári.",
   "share.writerLabel": "Vidieť a upravovať moje udalosti",
+  "shortcuts.group.actions": "Akcie",
+  "shortcuts.group.navigate": "Pohyb",
+  "shortcuts.group.views": "Zobrazenia",
+  "shortcuts.help": "Zobraziť tento zoznam",
+  "shortcuts.next": "Nasledujúce obdobie",
+  "shortcuts.prev": "Predchádzajúce obdobie",
+  "shortcuts.title": "Klávesové skratky",
+  "shortcuts.today": "Prejsť na dnešok",
   "subscribe.aria": "Odoberať kalendár z adresy URL",
   "subscribe.byUrl": "Odoberať z URL (.ics)",
   "subscribe.defaultName": "Odoberaný kalendár",

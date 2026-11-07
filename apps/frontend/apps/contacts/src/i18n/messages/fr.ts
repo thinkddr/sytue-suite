@@ -46,6 +46,7 @@ export const fr: AppCatalog<typeof en> = {
   'common.actionFailed': 'Impossible de terminer l’action',
   'common.tryAgain': 'Réessayez.',
   'common.tryAgainSoon': 'Réessayez dans quelques secondes.',
+  'common.undo': 'Annuler',
 
   // --- Lista de contactos -------------------------------------------------
   'list.region': 'Liste des contacts',
@@ -53,6 +54,8 @@ export const fr: AppCatalog<typeof en> = {
   'list.search': 'Rechercher des contacts',
   'list.selectAll': 'Sélectionner tous les contacts visibles',
   'list.select': 'Sélectionner {name}',
+  'list.star': 'Ajouter {name} aux favoris',
+  'list.unstar': 'Retirer {name} des favoris',
   'list.starredTitle': 'Favori',
   'list.reviewDuplicates': 'Examiner les doublons ({count})',
   'list.count': { one: '{count} contact', other: '{count} contacts' },
@@ -176,6 +179,11 @@ export const fr: AppCatalog<typeof en> = {
   'trash.restoreFailed': 'Impossible de restaurer',
   'trash.purged': 'Contact supprimé définitivement',
   'trash.purgeFailed': 'Impossible de supprimer',
+  'trash.undone': 'Restauré depuis la corbeille',
+  'trash.undoFailed': 'Certains contacts n’ont pas pu être restaurés',
+  'trash.undoFailedHint': 'Ils sont toujours dans la Corbeille.',
+  'trash.undoFailedOne': 'Le contact n’a pas pu être restauré',
+  'trash.undoFailedOneHint': 'S’il n’est pas dans la Corbeille, il a été supprimé définitivement.',
 
   // --- Acciones en lote ---------------------------------------------------
   'batch.region': 'Actions sur la sélection',
@@ -199,6 +207,10 @@ export const fr: AppCatalog<typeof en> = {
     one: '{count} contact mis à la corbeille',
     other: '{count} contacts mis à la corbeille',
   },
+  'batch.emailAll': 'Écrire à tous',
+  'batch.exportVcf': 'Exporter (.vcf)',
+  'batch.noEmail': 'Aucun n’a d’adresse e-mail',
+  'batch.emailCapped': 'Seules les {count} premières adresses sont incluses',
 
   // --- Ficha del contacto -------------------------------------------------
   'detail.emptyTitle': 'Sélectionnez un contact',
@@ -210,6 +222,9 @@ export const fr: AppCatalog<typeof en> = {
   'detail.copyEmail': 'Copier l’adresse',
   'detail.emailCopied': 'Adresse copiée',
   'detail.copyFailed': 'Impossible de copier',
+  'detail.copyValue': 'Copier {value}',
+  'detail.phoneCopied': 'Numéro copié',
+  'detail.addressCopied': 'Adresse postale copiée',
   'detail.export': 'Exporter',
   'detail.merge': 'Fusionner avec…',
   'detail.moreActions': 'Plus d’actions',

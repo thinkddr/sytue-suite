@@ -105,8 +105,10 @@ export function Tareas({
           <h1 class="text-text text-lg font-semibold tracking-tight">{t('tasks.title')}</h1>
           <p class="text-text-muted mt-1 max-w-prose text-sm">{t('tasks.subtitle')}</p>
         </div>
+        {/* `overflow-hidden`: el velo del elegido es cuadrado y tapaba la esquina
+            redondeada del borde. */}
         <div
-          class="border-border inline-flex shrink-0 items-center rounded-md border"
+          class="border-border inline-flex shrink-0 items-center overflow-hidden rounded-md border"
           role="group"
           aria-label={t('tasks.title')}
         >

@@ -20,15 +20,23 @@ func estadoPlataforma(e Estado) Estado {
 	}
 	var estado struct {
 		Generacion       string `json:"generacion"`
+		MarcaWidgets     string `json:"marca_widgets"`
 		Bloqueo          bool   `json:"bloqueo"`
 		DriveDesactivado bool   `json:"drive_sistema_desactivado"`
 	}
 	texto, errEstado := sistema.EstadoSesionAndroid()
 	if err != nil || errEstado != nil || json.Unmarshal([]byte(texto), &estado) != nil {
 		e.Sesion, e.Bloqueo, e.DriveSistemaDesactivado = "", true, true
+		e.Epoca, e.EpocaConfirmada = "", ""
 		return e
 	}
 	e.Sesion, e.Bloqueo, e.DriveSistemaDesactivado = estado.Generacion, estado.Bloqueo, estado.DriveDesactivado
+	// Con el broker, la época de los widgets es la suya: `marca_widgets` es
+	// SHA-256("sytue-widgets\0" ‖ época del broker), que solo cambia con otra identidad, el
+	// bloqueo o una revocación. Es lo que compara Widgets.java, que no ve la
+	// `sesion.epoca` de cada app. El broker es la verdad: queda confirmada con su
+	// generación. Un broker anterior, sin la marca, deja la época vacía y nada se publica.
+	e.Epoca, e.EpocaConfirmada = estado.MarcaWidgets, estado.Generacion
 	return e
 }
 

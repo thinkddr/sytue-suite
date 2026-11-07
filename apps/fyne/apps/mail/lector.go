@@ -83,6 +83,11 @@ type Lector struct {
 	// el evento ya relleno. Nil, no hay botón. CreandoEvento es la petición en camino.
 	AlCrearEvento func(Mensaje)
 	CreandoEvento bool
+	// AlCompartirEnRooms es «Compartir en Rooms», en «Más acciones». Nil, no se ofrece.
+	AlCompartirEnRooms func(Mensaje)
+	// botonEtiquetar y botonMover son los disparadores de los menús del triaje, que
+	// los atajos «l» y «v» pulsan. Nil cuando la cabecera no los lleva.
+	botonEtiquetar, botonMover *ui.Boton
 	// Los adjuntos y el pie de cada mensaje: descargar, guardar en Drive (nil: no se
 	// ofrece) y el original. Guardando son los adjuntos en camino a Drive, por
 	// `claveAdjunto`: su botón se apaga mientras tanto.
@@ -148,12 +153,19 @@ func (x *Lector) cuerpoDe(id string) (Cuerpo, bool) {
 	return x.Cuerpo(id)
 }
 
-// tintaBoton es el token del rótulo de cada variante, que es el color del glifo.
+// tintaBoton es el token del rótulo de cada variante, que es el color del glifo
+// (`currentColor` en la web): `text-primary-text` en el fantasma y `on-primary` sobre
+// el relleno de marca, que el secundario también lleva. El de peligro es blanco
+// (`text-white` en Button.tsx), como su rótulo en `ui.Boton`.
 func tintaBoton(v ui.Variante) string {
-	if v == ui.Primario || v == ui.Peligro {
-		return "on-primary"
+	switch v {
+	case ui.Fantasma:
+		return "primary-text"
+	case ui.Peligro:
+		return "neutral-0"
+	case ui.Primario, ui.Secundario:
 	}
-	return "text"
+	return "on-primary"
 }
 
 // CreateRenderer compone cabecera, hilo y estado vacío.
@@ -161,7 +173,7 @@ func (x *Lector) CreateRenderer() fyne.WidgetRenderer {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	r := &lectorRenderer{
 		x:      x,
-		fondo:  canvas.NewRectangle(tema.Color("bg", v)),
+		fondo:  canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)),
 		banda:  canvas.NewRectangle(tema.Color("surface", v)),
 		filete: canvas.NewRectangle(tema.Color("border", v)),
 		cuenta: ui.NuevoRotulo("", tema.TextoSM, ui.Normal, "text-subtle"),
@@ -332,7 +344,8 @@ func (r *lectorRenderer) ponerBarra() {
 func (r *lectorRenderer) Refresh() {
 	x := r.x
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	r.fondo.FillColor = tema.Color("bg", v)
+	// La hoja y no `bg`: sobre papel, `bg` es el gris del lienzo dentro de la hoja blanca.
+	r.fondo.FillColor = tema.Color(ui.FondoHoja(), v)
 	r.banda.FillColor = tema.Color("surface", v)
 	r.filete.FillColor = tema.Color("border", v)
 

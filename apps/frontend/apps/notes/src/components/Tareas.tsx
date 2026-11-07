@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Daniel Delgado Ramos
 /**
- * «Tareas»: las tareas de todos los cuadernos en una lista, como en Twos. Se
+ * «Tareas»: las tareas de todos los cuadernos en una lista. Se
  * marcan, se cancelan y se posponen sin abrir su cuaderno; pulsar el título lo abre.
  */
 import type { JSX } from 'preact';

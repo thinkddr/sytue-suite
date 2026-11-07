@@ -18,6 +18,8 @@ export const it: Catalog = {
   'ui.openNav': 'Apri la navigazione',
   'ui.closeNav': 'Chiudi la navigazione',
   'ui.backToList': 'Torna all’elenco',
+  'ui.suiteOpen': 'Sytue: app, ricerca, notifiche e account',
+  'ui.suiteClose': 'Torna all’app',
   'ui.noResults': 'Nessun risultato.',
 
   'ui.meter.almostFull': 'quasi pieno',
@@ -63,6 +65,9 @@ export const it: Catalog = {
     'Questa app ha bisogno di OpenGL 2.1 e il driver grafico di questo computer non lo offre ({detalle}). Installa o aggiorna il driver della scheda grafica. Senza scheda grafica (desktop remoto o macchina virtuale) non può aprirsi.',
   'shell.lock.reasonNotebook': 'aprire il tuo quaderno cifrato',
   'shell.lock.faceIdUsage': 'Sytue usa Face ID per sbloccare la tua sessione quando apri l’app.',
+  'shell.widgets.wake': 'Aggiorna i widget con l’app chiusa',
+  'shell.widgets.wakeHelp':
+    'Quando cambia qualcosa di tuo, Sytue sveglia l’app con una notifica Apple vuota perché aggiorni il suo widget. Apple vede quale app e quando, mai che cosa è cambiato.',
   'shell.call.microphoneUsage':
     'Sytue Rooms usa il microfono solo durante una chiamata e solo se lo attivi.',
   'shell.call.cameraUsage':
@@ -179,7 +184,8 @@ export const it: Catalog = {
   'notifications.kind.pages.domain.failed':
     'Il dominio {domain} di {site} non funziona: controlla la sua configurazione',
   'notifications.kind.pages.erp.failed': 'L’ordine {number} di {site} non è arrivato a Sytue ERP',
-  'notifications.kind.pages.settings.changed': '{actor} ha modificato un’impostazione di Sytue Web',
+  'notifications.kind.pages.settings.changed':
+    '{actor} ha modificato un’impostazione di Sytue Webs',
   'notifications.kind.pages.export.ready': 'La tua esportazione di {site} è pronta',
   'notifications.kind.pages.store.busy':
     'Il negozio di {site} ha troppi ordini in attesa di pagamento',
@@ -367,6 +373,8 @@ export const it: Catalog = {
   'widgets.compose': 'Scrivi',
   'widgets.storage': 'Spazio di archiviazione',
   'widgets.create': 'Crea evento',
+  'widgets.updatedAgo': 'Aggiornato {time}',
+  'widgets.updatedAt': 'Aggiornato: {time}',
 
   'linkedServices.services': 'Servizi',
   'linkedServices.changed':
@@ -379,6 +387,7 @@ export const it: Catalog = {
   'linkedServices.notGranted':
     'L’accesso a questo servizio non è stato concesso. Collega di nuovo l’account per scegliere le autorizzazioni.',
   'linkedServices.connected': 'Servizi collegati',
+  'linkedServices.exists': 'Questo account era già collegato e ora è aperto.',
   'linkedServices.providerData': 'Le modifiche vengono salvate presso il fornitore.',
   'linkedServices.writeUnknown':
     'Il fornitore non ha confermato il salvataggio. Aggiorna e verifica prima di riprovare.',

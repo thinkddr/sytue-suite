@@ -7,10 +7,12 @@
  *   POST → guarda { keywords, dndStart, dndEnd } (JSON, no form, contra el CSRF de Astro
  *          dev; el servicio expone PUT server-to-server, aquí se hace POST desde el
  *          navegador). Devuelve las prefs saneadas por el backend.
+ *   POST { pausedUntil } → «Pausar avisos» hasta ese instante (ISO 8601), o la quita
+ *          con null. Va aparte para que guardar las palabras clave no la borre.
  */
 import type { APIRoute } from 'astro';
 import { getApiSession } from '../../lib/session.js';
-import { chatClient } from '../../lib/chat.js';
+import { chatClient, chatFail } from '../../lib/chat.js';
 
 export const prerender = false;
 
@@ -32,11 +34,27 @@ export const POST: APIRoute = async (ctx) => {
   const session = await getApiSession(ctx);
   if (!session) return json({ error: 'unauthenticated' }, 401);
 
-  let payload: { keywords?: unknown; dndStart?: unknown; dndEnd?: unknown };
+  let payload: { keywords?: unknown; dndStart?: unknown; dndEnd?: unknown; pausedUntil?: unknown };
   try {
     payload = (await ctx.request.json()) as typeof payload;
   } catch {
     return json({ error: 'invalid_json' }, 400);
+  }
+
+  if ('pausedUntil' in payload) {
+    const until = payload.pausedUntil;
+    if (until !== null && (typeof until !== 'string' || !Number.isFinite(Date.parse(until)))) {
+      return json({ error: 'invalid_pause' }, 400);
+    }
+    try {
+      const prefs = await chatClient({
+        accessToken: session.accessToken,
+        userId: session.user.id,
+      }).setNotifyPause(until);
+      return json({ prefs });
+    } catch (err) {
+      return chatFail(err);
+    }
   }
 
   // Sanea la forma en el borde; el backend hace el saneo canónico (dedupe/recorte/rango).

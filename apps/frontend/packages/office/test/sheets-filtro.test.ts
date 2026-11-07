@@ -29,6 +29,22 @@ test('mayor/menor/igual/distinto sobre números y texto', () => {
   expect(pasa({ op: 'ne', a: '20' })).toEqual([true, false, true, true, true, true]);
 });
 
+// «Entre fechas»: el operando tecleado como fecha es su serial (46037 = 15/01/2026,
+// 46068 = 15/02/2026). Mismos casos que TestPasaCondicion. VISTO EN ROJO con
+// `parseEsNumberStrict` a secas: «01/01/2026» no era un número y no pasaba nada.
+test('las fechas tecleadas en una condición son fechas', () => {
+  const fechas = col(46037, 46068, 'enero', '');
+  expect(pasa({ op: 'between', a: '01/01/2026', b: '31/01/2026' }, fechas)).toEqual([
+    true,
+    false,
+    false,
+    false,
+  ]);
+  expect(pasa({ op: 'gt', a: '2026-01-31' }, fechas)).toEqual([false, true, false, false]);
+  expect(pasa({ op: 'eq', a: '15/2/2026' }, fechas)).toEqual([false, true, false, false]);
+  expect(pasa({ op: 'eq', a: '31/02/2026' }, fechas)).toEqual([false, false, false, false]);
+});
+
 test('«A1» no es un número: «igual a A1» compara texto', () => {
   expect(pasa({ op: 'eq', a: 'A1' }, col(1, 'a1'))).toEqual([false, true]);
 });

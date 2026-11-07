@@ -76,7 +76,7 @@ async function reenviarError(res: Response): Promise<Response> {
   } catch {
     // no era JSON: se envuelve abajo
   }
-  return respuestaError(res.status, 'upstream_error', 'The Sytue Web service returned an error');
+  return respuestaError(res.status, 'upstream_error', 'The Sytue Webs service returned an error');
 }
 
 export const sha256 = (b: Uint8Array): string => createHash('sha256').update(b).digest('hex');
@@ -157,7 +157,7 @@ export function crearPublicar(deps: DepsPublicar): APIRoute {
       try {
         return await llamar(url, { ...init, signal: AbortSignal.timeout(ms) });
       } catch {
-        return respuestaError(503, 'service_unavailable', 'The Sytue Web service is unavailable');
+        return respuestaError(503, 'service_unavailable', 'The Sytue Webs service is unavailable');
       }
     };
 
@@ -174,7 +174,7 @@ export function crearPublicar(deps: DepsPublicar): APIRoute {
     if (!rSnap.ok) return reenviarError(rSnap);
     const snap = (await rSnap.json().catch(() => null)) as Snapshot | null;
     if (!snap?.ir || !snap.data || !ID_SITIO.test(snap.version_id)) {
-      return respuestaError(502, 'bad_gateway', 'The Sytue Web service sent an invalid snapshot');
+      return respuestaError(502, 'bad_gateway', 'The Sytue Webs service sent an invalid snapshot');
     }
 
     // 2. ¿El IR es el que este renderizador entiende?
@@ -216,7 +216,7 @@ export function crearPublicar(deps: DepsPublicar): APIRoute {
         !/^[0-9a-f]{32}$/.test(prev.token) ||
         prev.base_path !== `/_vista/${prev.token}`
       ) {
-        return respuestaError(502, 'bad_gateway', 'The Sytue Web service sent an invalid preview');
+        return respuestaError(502, 'bad_gateway', 'The Sytue Webs service sent an invalid preview');
       }
       token = prev.token;
       base = prev.base_path as `/_vista/${string}`;

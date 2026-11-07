@@ -66,6 +66,7 @@ interface Props {
   onChange: (
     id: string,
     patch: {
+      kind?: 'text' | 'todo';
       title?: string;
       content?: string;
       checked?: boolean;
@@ -99,8 +100,19 @@ interface Props {
   onNavigate?: (d: DestinoInterno) => void;
   /** Acción del estado vacío: crear la primera nota. */
   onCreateFirst?: () => void;
+  /**
+   * Hay notas, pero el filtro las oculta todas. Con esto el vacío dice «ninguna
+   * nota coincide» y ofrece quitar el filtro, en vez de fingir que el cuaderno
+   * está vacío e invitar a crear la primera.
+   */
+  onQuitarFiltro?: (() => void) | undefined;
   /** Lo que se suelta o se pega sobre el cuaderno nace como nota. */
   onCaptura?: (captura: Captura, posicion?: { x: number; y: number }) => void;
+  /**
+   * Un texto de varias líneas pegado sobre una lista va a la captura, que hace una nota
+   * por línea (NotebookDashboard). Devuelve si lo ha tomado; si no, es una nota de texto.
+   */
+  onPegarLineas?: ((texto: string) => boolean) | undefined;
   /** «Añadir al calendario» de una nota (fuera de cuadernos cifrados). */
   onCrearEvento?: ((note: Note) => void) | undefined;
   /** Soltar una nota sobre un día de la tira de la semana (`data-drop-day`) la lleva allí. */
@@ -141,7 +153,9 @@ export function NoteCanvas({
   onReminder,
   compartir,
   onCaptura,
+  onPegarLineas,
   onCreateFirst,
+  onQuitarFiltro,
   enlaces,
   onNavigate,
   onCrearEvento,
@@ -161,13 +175,13 @@ export function NoteCanvas({
   const [alturaLibre, setAlturaLibre] = useState(0);
 
   const libre = notebook.layout === 'free';
+  // En lista las notas son FILAS —en un día y en cualquier cuaderno—; la nota de un
+  // árbol, que llena su panel, es una hoja.
+  const enFilas = notebook.layout === 'list' && !llenar;
   // El orden en que se PINTAN: en lista, cada sublista justo debajo de su nota. Es
   // también el orden sobre el que se reordena al soltar, o el hueco elegido con el
   // puntero no sería el que se ve.
-  const enOrden =
-    notebook.layout === 'list' && !llenar
-      ? conSangria(notes)
-      : notes.map((note) => ({ note, nivel: 0 }));
+  const enOrden = enFilas ? conSangria(notes) : notes.map((note) => ({ note, nivel: 0 }));
   const confirmarOrden = useCallback(
     (cambios: Note[]) => {
       if (onReorder) onReorder(cambios);
@@ -491,17 +505,22 @@ export function NoteCanvas({
         )
           return;
       }
-      const c = interpretarCaptura(
-        e.clipboardData?.getData('text/plain') ?? '',
-        e.clipboardData?.getData('text/uri-list') ?? '',
-      );
+      const texto = e.clipboardData?.getData('text/plain') ?? '';
+      const uris = e.clipboardData?.getData('text/uri-list') ?? '';
+      // En una lista cada línea es una nota, como al pegar en la captura. En el lienzo
+      // libre y en columnas, un texto pegado es UNA tarjeta, que es lo que se ve allí.
+      if (enFilas && !uris.trim() && onPegarLineas?.(texto)) {
+        e.preventDefault();
+        return;
+      }
+      const c = interpretarCaptura(texto, uris);
       if (!c) return;
       e.preventDefault();
       onCaptura?.(c);
     };
     window.addEventListener('paste', alPegar);
     return () => window.removeEventListener('paste', alPegar);
-  }, [capturaActiva, onCaptura]);
+  }, [capturaActiva, onCaptura, onPegarLineas, enFilas]);
 
   const zonaDeCaptura = capturaActiva ? { onDragOver: arrastrarEncima, onDrop: soltar } : {};
 
@@ -514,9 +533,23 @@ export function NoteCanvas({
   }
 
   const diario = Boolean(notebook.daily_date) && notebook.layout === 'list';
-  // En lista las notas son FILAS —en un día y en cualquier cuaderno—; la nota de un
-  // árbol, que llena su panel, es una hoja.
-  const filas = notebook.layout === 'list' && !llenar;
+
+  // Vacío POR EL FILTRO: no es un cuaderno vacío, y ofrecer «Nueva nota» aquí
+  // mentiría. Se dice lo que pasa y se ofrece lo que lo arregla.
+  if (notes.length === 0 && onQuitarFiltro) {
+    return (
+      <div class="grid h-full place-items-center p-6" data-sin-coincidencias="">
+        <EmptyState
+          title={t('filter.noMatches')}
+          action={
+            <Button size="sm" variant="secondary" onClick={onQuitarFiltro}>
+              {t('filter.clear')}
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
 
   // Un día vacío no es un error ni un hueco que adornar: la captura está justo
   // encima, así que basta una línea en voz baja.
@@ -552,7 +585,7 @@ export function NoteCanvas({
 
   const tarjeta = (note: Note, nivel = 0) => (
     <NoteCard
-      diario={filas}
+      diario={enFilas}
       nivel={nivel}
       key={note.id}
       t={t}

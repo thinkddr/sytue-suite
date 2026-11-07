@@ -69,8 +69,17 @@ type Lote struct {
 	// vacío, no corre.
 	Describiendo string
 
+	// QuitarFavoritas es que TODO lo marcado es ya favorita: el corazón de la barra va
+	// lleno y dice «Quitar de favoritas» (`planFavoritas`).
+	QuitarFavoritas bool
+	// MarcandoFavoritas es que el lote del corazón está en vuelo: el botón va
+	// `loading` (rueda y fuera de la interacción) hasta que vuelvan las llamadas.
+	MarcandoFavoritas bool
+
 	AlNuevoAlbum, AlDescribir, AlParar, AlParecidas, AlDescargar, AlTirar func()
-	AlAnyadirA                                                            func(api.Album)
+	// AlFavoritas es el corazón: marca lo que falte o, si todas lo son, las quita.
+	AlFavoritas func()
+	AlAnyadirA  func(api.Album)
 }
 
 // Galeria son los datos de la línea de tiempo y de «Favoritas», que en la web son LA
@@ -105,6 +114,10 @@ type Galeria struct {
 	// no encontró NADA, y Ampliando lo inertiza mientras Sytue AI contesta.
 	Ampliar, Ampliando bool
 	AlAmpliar          func()
+	// SinResultados es lo buscado cuando no encontró nada: la galería enseña
+	// «Ninguna foto coincide con…» con «Borrar búsqueda». "", no toca.
+	SinResultados    string
+	AlBorrarBusqueda func()
 
 	AlAbrir     func(api.Photo)
 	AlAlternar  func(api.Photo)
@@ -121,6 +134,9 @@ type Galeria struct {
 	// arriba al desplazarse (`sticky`).
 	AlMes   func(cabecera, rejilla fyne.CanvasObject, g GrupoMes)
 	AlBarra func(barra fyne.CanvasObject)
+	// Afuera es el desplazador de la página: se lleva lo vertical que empieza encima de
+	// la barra de selección cuando esta se desplaza de lado (en el teléfono).
+	Afuera func() fyne.Scrollable
 }
 
 // AltoCentinela es el `h-16` del `<div ref={centinela}>` del final, donde gira la rueda
@@ -201,15 +217,8 @@ func PantallaGaleria(v Vista, d Galeria) *fyne.Container {
 	if d.Recuerdos != nil {
 		bloques = append(bloques, ui.Bloque{Obj: d.Recuerdos, Margen: SeparacionSeccion})
 	}
-	if d.Ampliar {
-		// `border-border mb-6 rounded-md border p-4`, la pista `mb-2 text-sm` y el botón.
-		b := ui.NuevoBoton(v.Traduce("gallery.searchWider"), d.AlAmpliar).Con(ui.Secundario, ui.TallaSM).ConIcono(iconos.Buscar, 0)
-		b.Inerte = d.Ampliando
-		caja := recuadro(v, "", "border", tema.RadioMD,
-			ui.Margen{Izq: tema.Espacio(4), Der: tema.Espacio(4), Arr: tema.Espacio(4), Abj: tema.Espacio(4)},
-			ui.PilaBloques(bloqueLargo(ui.NuevoParrafo(v.Traduce("gallery.searchWiderHint"), tema.TextoSM, ui.Normal, "text-muted", v.Variante), tema.Espacio(2)),
-				ui.Bloque{Obj: container.New(ui.FilaAuto{Hueco: 0, Derecha: 1}, b)}))
-		bloques = append(bloques, ui.Bloque{Obj: caja, Margen: SeparacionSeccion})
+	if d.SinResultados != "" {
+		bloques = append(bloques, ui.Bloque{Obj: vacioDeBusqueda(v, d), Margen: SeparacionSeccion})
 	}
 
 	for _, g := range d.Grupos {
@@ -221,6 +230,29 @@ func PantallaGaleria(v Vista, d Galeria) *fyne.Container {
 	}
 	bloques = append(bloques, ui.Bloque{Obj: centinela(v, d.Cargando)})
 	return Envolver(v, true, ui.PilaBloques(bloques...))
+}
+
+// vacioDeBusqueda es el `EmptyState` de una búsqueda sin aciertos: la ilustración
+// `emptySearch`, qué se buscó, y «Borrar búsqueda» (secundario, con la cruz) seguido de
+// «Buscar también por significado» (fantasma, con la lupa) mientras se pueda ampliar.
+func vacioDeBusqueda(v Vista, d Galeria) *ui.Vacio {
+	descripcion := "gallery.noResults.description"
+	if d.Ampliar {
+		descripcion = "gallery.searchWiderHint"
+	}
+	e := ui.NuevoVacio(v.T.T("gallery.noResults.title", i18n.Vars{"query": d.SinResultados}), v.Traduce(descripcion))
+	e.Ilustracion = iconos.Pintar(iconos.VacioBusqueda, v.Variante).A(AnchoIlustracion).Objeto()
+	mandos := []fyne.CanvasObject{
+		ui.NuevoBoton(v.Traduce("gallery.clearSearch"), d.AlBorrarBusqueda).Con(ui.Secundario, ui.TallaSM).ConIcono(iconos.Cerrar, 0),
+	}
+	if d.Ampliar {
+		b := ui.NuevoBoton(v.Traduce("gallery.searchWider"), d.AlAmpliar).Con(ui.Fantasma, ui.TallaSM).ConIcono(iconos.Buscar, 0)
+		b.Inerte = d.Ampliando
+		mandos = append(mandos, b)
+	}
+	// `flex items-center justify-center gap-2`: el estado vacío centra su acción.
+	e.Accion = container.New(ui.Fila{Hueco: tema.Espacio(2)}, mandos...)
+	return e
 }
 
 // botonAnyadir es «Añadir fotos», LA acción principal de la galería: `primary` (talla
@@ -319,12 +351,13 @@ func cabeceraMes(v Vista, g GrupoMes, d Galeria) fyne.CanvasObject {
 		hijos, piezas = append(hijos, b), append(piezas, b.Pieza())
 	}
 	fila := container.New(FilaEncoge{Hueco: tema.Espacio(3), RellenoY: tema.Espacio(2), Piezas: piezas}, hijos...)
-	return container.New(conFondo{}, canvas.NewRectangle(tema.Color(fondoCabeceraMes, v.Variante)), fila)
+	return container.New(conFondo{}, canvas.NewRectangle(tema.Color(fondoCabeceraMes(), v.Variante)), fila)
 }
 
-// fondoCabeceraMes es el `bg-bg` del `<h2>`: el color de la página, opaco para tapar
-// las fotos cuando va pegada. Era `bg-surface`, una banda blanca sobre el fondo.
-const fondoCabeceraMes = "bg"
+// fondoCabeceraMes es el `bg-[var(--sytue-sheet-bg)]` del `<h2>`: el color de la
+// página, opaco para tapar las fotos cuando va pegada. Era `bg-surface`, una banda
+// blanca sobre el fondo, y luego `bg-bg`, una banda gris sobre la hoja de papel.
+func fondoCabeceraMes() string { return ui.FondoHoja() }
 
 // conFondo pone el primer hijo (un rectángulo) de fondo a todo el ancho y el segundo
 // encima: el `bg-surface` del encabezado del mes, que en la web ocupa la sección entera.
@@ -389,11 +422,24 @@ func barraSeleccion(v Vista, d Galeria) fyne.CanvasObject {
 		mostrarMenu(v.Traduce("albums.addTo"), album, elems)
 	})
 
+	// El corazón dice lo que hará, como el de una foto: si todas lo son ya, quitarlas (y
+	// va lleno); si falta alguna, marcarlas.
+	claveFav := "gallery.favorite"
+	if l.QuitarFavoritas {
+		claveFav = "gallery.unfavorite"
+	}
+	favoritas := boton(claveFav, iconos.Corazon, l.AlFavoritas)
+	if l.QuitarFavoritas {
+		favoritas.Glifo = iconos.TrazoLleno(iconos.Corazon, ui.TamGlifoBoton, "text", v.Variante)
+	}
+	favoritas.Cargando = l.MarcandoFavoritas
+
 	describir := boton("gallery.describeSelected", iconos.Texto, l.AlDescribir)
 	hijos := []fyne.CanvasObject{
 		salir,
 		ParrafoEn(v.T.T("gallery.selectedCount", i18n.Vars{"count": n}), tema.TextoSM, ui.Medio, "text", v.Variante),
 		album,
+		favoritas,
 		describir,
 	}
 	if l.Describiendo != "" {
@@ -413,8 +459,14 @@ func barraSeleccion(v Vista, d Galeria) fyne.CanvasObject {
 		filete(v),
 		tirar,
 	)
-	// El recuento lleva `mr-auto`: lo que le sigue va empujado a la derecha.
-	cuerpo := container.New(ui.FilaAuto{Hueco: tema.Espacio(1), Derecha: 2, Partir: true, SaltoFila: tema.Espacio(1)}, hijos...)
+	// El recuento lleva `mr-auto`: lo que le sigue va empujado a la derecha. Por debajo
+	// de `md` es una fila que se desplaza de lado (`FILA_UNICA_EN_MOVIL`): partida en
+	// dos, la cabecera del mes pegada (TopeBajoBarra) quedaba debajo de la segunda.
+	movil := v.Ventana < ui.CorteMD
+	var cuerpo fyne.CanvasObject = container.New(ui.FilaAuto{Hueco: tema.Espacio(1), Derecha: 2, Partir: !movil, SaltoFila: tema.Espacio(1)}, hijos...)
+	if movil {
+		cuerpo = filaDeLado(cuerpo, "surface-raised", v.Variante, d.Afuera)
+	}
 	return conSombra(tema.SombraSM, tema.RadioMD, recuadro(v, "surface-raised", "border", tema.RadioMD,
 		ui.Margen{Izq: tema.Espacio(2), Der: tema.Espacio(2), Arr: tema.Espacio(1.5), Abj: tema.Espacio(1.5)}, cuerpo))
 }
@@ -678,6 +730,8 @@ type AlbumAbierto struct {
 	Aviso, Error string
 
 	AlVolver, AlCompartir, AlDejarDeCompartir, AlBorrar func()
+	// AlRenombrar abre el diálogo de «Renombrar»; nil: no se ofrece.
+	AlRenombrar func()
 	// AlCompartirConPersonas abre «Compartir con personas»; nil: no se ofrece.
 	AlCompartirConPersonas func()
 	AlAbrir                func(api.Photo)
@@ -685,7 +739,7 @@ type AlbumAbierto struct {
 }
 
 // PantallaAlbum es un álbum: cabecera con la vuelta, el título, el recuento y los mandos
-// de compartir y borrar, y debajo la cuadrícula.
+// de compartir, renombrar y borrar, y debajo la cuadrícula.
 
 func PantallaAlbum(v Vista, d AlbumAbierto) *fyne.Container {
 	titulo := ParrafoEn(d.Album.Title, tema.TextoLG, ui.SemiNegrita, "text", v.Variante)
@@ -708,6 +762,9 @@ func PantallaAlbum(v Vista, d AlbumAbierto) *fyne.Container {
 		ui.NuevoBoton(v.Traduce(compartirO(d.Album)), d.AlCompartir).Con(ui.Fantasma, ui.TallaSM).ConIcono(iconos.Enlace, 0))
 	if d.Album.Shared {
 		mandos = append(mandos, ui.NuevoBoton(v.Traduce("album.unshare"), d.AlDejarDeCompartir).Con(ui.Fantasma, ui.TallaSM))
+	}
+	if d.AlRenombrar != nil {
+		mandos = append(mandos, ui.NuevoBoton(v.Traduce("album.rename"), d.AlRenombrar).Con(ui.Fantasma, ui.TallaSM).ConIcono(iconos.Lapiz, 0))
 	}
 	borrar := ui.NuevoBotonIcono(iconos.Papelera, v.Traduce("albums.delete"), d.AlBorrar)
 	borrar.Lado, borrar.TamIcono = ui.LadoIconoLG, IconoMando
@@ -807,6 +864,20 @@ const huecoMandosAlbum = 1 * 0.25 * tema.Rem
 // galón delante. Era un enlace de texto con una flecha escrita («← Volver»).
 func botonVolver(v Vista, clave string, al func()) *ui.Boton {
 	return ui.NuevoBoton(v.Traduce(clave), al).Con(ui.Fantasma, ui.TallaSM).ConIcono(iconos.ChevronIzquierda, 0)
+}
+
+// botonPortada es «Usar como portada del álbum» en el visor de un álbum: el mando de 32
+// con la imagen. En la que ya es la portada dice que lo es y va Apagado (`aria-disabled`
+// en la web): no es un conmutador —pulsarlo otra vez no quita nada— y no se apaga del
+// todo, porque un mando inerte se salta con el tabulador y no diría cuál es la portada.
+func botonPortada(v Vista, portada bool, al func()) *ui.BotonIcono {
+	clave := "album.setCover"
+	if portada {
+		clave = "album.isCover"
+	}
+	b := mandoVisor(v, iconos.Imagen, clave, al)
+	b.Apagado = portada
+	return b
 }
 
 // botonQuitarDelAlbum es «Quitar del álbum» en un visor: de fantasma, con el `minus`
@@ -1182,7 +1253,7 @@ func PantallaPublica(v Vista, titulo string, cuantas int, fotos []api.Photo, alA
 	}
 	if cuerpo := CuerpoDeEstado(v, EstadoVacio(v, "gallery.empty.title", "gallery.empty.description", nil)); cuerpo != nil {
 		bloques = append(bloques, ui.Bloque{Obj: cuerpo})
-		return Envolver(v, false, ui.PilaBloques(bloques...))
+		return envolverSobre(v, "bg", false, ui.PilaBloques(bloques...))
 	}
 	hijos := make([]fyne.CanvasObject, len(fotos))
 	for i, f := range fotos {
@@ -1197,7 +1268,7 @@ func PantallaPublica(v Vista, titulo string, cuantas int, fotos []api.Photo, alA
 		ui.Bloque{Obj: container.New(filasDe(v, fotos), hijos...), Margen: tema.Espacio(8)},
 		ui.Bloque{Obj: container.New(centradoH{}, ParrafoEn(v.Traduce("public.by"), tema.TextoXS, ui.Normal, "text-subtle", v.Variante))},
 	)
-	return Envolver(v, false, ui.PilaBloques(bloques...))
+	return envolverSobre(v, "bg", false, ui.PilaBloques(bloques...))
 }
 
 // VisorPublico es esa foto abierta. En la web la tesela es un enlace a la variante

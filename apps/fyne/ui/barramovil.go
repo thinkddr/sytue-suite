@@ -3,6 +3,8 @@
 
 package ui
 
+// paridad-web: apps/frontend/packages/ui/src/components/BarraMovil.tsx
+
 import (
 	"image/color"
 
@@ -26,6 +28,19 @@ import (
 //	       dos veces). Sin lista, siempre.
 //	       Sin menú y sin detalle que cerrar, no hay botón.
 //
+// Y lo que el mes del teléfono de Calendar le pide (`mobileBarCenter`,
+// `mobileBarActions` y `mobileNavNotice` de AppShell):
+//
+//	TituloCentrado  el título en `text-md font-semibold`, centrado en el ancho ENTERO
+//	                de la barra y no en el hueco que dejan los botones: no baila según
+//	                cuántas acciones haya a cada lado
+//	Acciones        a la derecha (`ml-auto flex items-center gap-1`), con el borde en
+//	                el canalón `px-4` y la misma corrección táctil que la hamburguesa
+//	Aviso           el nombre del ☰ cerrado y un punto de 8 en la esquina del ICONO
+//	                (el color de señal: `sidebar-indicator` sobre el marco de color,
+//	                `indicator` sobre la superficie de Carril)
+//
+// Sin ninguno de los tres, la barra es la de siempre.
 // Los `px-4` son el mismo canalón que la topbar, para que la hamburguesa caiga en la
 // vertical de la marca de arriba.
 type BarraMovil struct {
@@ -43,6 +58,28 @@ type BarraMovil struct {
 	// `ui.backToList`.
 	RotuloAbrir, RotuloCerrar, RotuloVolver string
 	AlMenu, AlVolver                        func()
+	// TituloCentrado pinta el título en `text-md font-semibold` centrado en el ancho de
+	// la barra (`mobileBarCenter`) o, si así no cabe, lo más cerca del centro dentro del
+	// hueco entre el ☰ y las acciones; si ni ahí cabe, en `text-sm` antes de truncar.
+	TituloCentrado bool
+	// Acciones van a la derecha, cada una con su MinSize (`mobileBarActions`). Las que
+	// son botones de icono (`NuevoBotonBarraMovil`, o un widget que lo embebe) toman los
+	// tonos de la barra, como la hamburguesa.
+	Acciones []fyne.CanvasObject
+	// Aviso es el nombre accesible, ya traducido, del botón de menú cerrado cuando hay
+	// algo pendiente en el cajón, y pinta su punto (`mobileNavNotice`). Vacío: ni punto
+	// ni cambio de nombre.
+	Aviso string
+
+	// enSuite: va DENTRO de la barra de la suite, la barra única del teléfono (lo pone el
+	// armazón por orden de `BarraSuite.Montar`). Mide lo que la barra de la suite, pinta
+	// el carril y deja a la derecha `reservaSuite` para la entrada a la suite (el avatar),
+	// que pinta la barra de la suite por encima. Ver `TopBarMovil` en TopBar.tsx.
+	enSuite      bool
+	reservaSuite float32
+	// tituloRespaldo es el nombre del producto: lo que se lee en la barra única cuando la
+	// app no tiene título que enseñar (la lista de Mail, la de Contacts).
+	tituloRespaldo string
 
 	boton *BotonIcono // el de menú o volver: adonde vuelve el foco al cerrar el cajón
 	// listaVisible conserva EnDetalle y su callback al girar, pero ofrece el menú
@@ -56,9 +93,50 @@ var _ fyne.Widget = (*BarraMovil)(nil)
 var AltoBarraMovil = tema.Espacio(11)
 
 var (
-	canalonBarraMovil = tema.Espacio(4)   // px-4
-	huecoBarraMovil   = tema.Espacio(1.5) // gap-1.5
+	canalonBarraMovil  = tema.Espacio(4)   // px-4
+	huecoBarraMovil    = tema.Espacio(1.5) // gap-1.5
+	huecoAccionesMovil = tema.Espacio(1)   // gap-1 de las acciones
 )
+
+// LadoPuntoAvisoMovil es el `h-[8px] w-[8px]` del punto de pendientes del ☰, y
+// DesvioPuntoAvisoMovil lo que su esquina de arriba a la derecha se separa del centro del
+// botón (`top-[calc(50%-15px)] right-[calc(50%-15px)]`): la esquina del glifo de 18.
+const (
+	LadoPuntoAvisoMovil   float32 = 8
+	DesvioPuntoAvisoMovil float32 = 15
+)
+
+// LadoBotonBarraMovil es la caja de un botón de la barra: `ghost sm iconOnly`, que con
+// el dedo crece al objetivo táctil.
+func LadoBotonBarraMovil() float32 {
+	return MedidaBotonCon("", TallaSM, 0, 0, true, iconos.TallaMD).Width
+}
+
+// NuevoBotonBarraMovil es un botón de la barra móvil (`<Button variant="ghost" size="sm"
+// iconOnly>`): el de la hamburguesa y las acciones. Los tonos se los pone la barra.
+func NuevoBotonBarraMovil(icono iconos.Icono, nombre string, alPulsar func()) *BotonIcono {
+	b := NuevoBotonIcono(icono, nombre, alPulsar)
+	b.Lado = LadoBotonBarraMovil()
+	b.TamIcono = iconos.TallaMD
+	return b
+}
+
+// botonDeBarra lo cumple todo widget que embebe un BotonIcono: así una acción con dibujo
+// propio (la hoja de «Hoy» de Calendar) toma los tonos de la barra igual que un botón.
+type botonDeBarra interface{ botonIcono() *BotonIcono }
+
+func (b *BotonIcono) botonIcono() *BotonIcono { return b }
+
+// tonoBarraMovilEn pone los tokens de un botón de la barra: sobre la superficie en
+// Carril, y sobre el carril de color en Marco (`.sytue-mobilebar`) y en la barra única.
+func tonoBarraMovilEn(b *BotonIcono, carril bool) {
+	b.Trazo, b.TrazoEncima = "primary-text", "primary-text"
+	b.FondoEncima, b.FondoActivo, b.TokenAro = "selected", "selected", "focus-ring"
+	if carril {
+		b.Trazo, b.TrazoEncima = "sidebar-fg", "sidebar-fg"
+		b.FondoEncima, b.FondoActivo, b.TokenAro = "sidebar-active-bg", "sidebar-active-bg", "sidebar-focus"
+	}
+}
 
 // NuevaBarraMovil crea la barra.
 func NuevaBarraMovil() *BarraMovil {
@@ -73,19 +151,27 @@ func MedidaBarraMovil() fyne.Size { return fyne.NewSize(0, AltoBarraMovil) }
 // CreateRenderer compone fondo, filete, botón y título. Termina en Refresh (regla 7).
 func (b *BarraMovil) CreateRenderer() fyne.WidgetRenderer {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	boton := NuevoBotonIcono(iconos.Menu, "", nil)
-	boton.Lado = MedidaBotonCon("", TallaSM, 0, 0, true, iconos.TallaMD).Width
-	boton.TamIcono = iconos.TallaMD
+	boton := NuevoBotonBarraMovil(iconos.Menu, "", nil)
 	b.boton = boton
 	r := &barraMovilRenderer{
 		b:      b,
 		fondo:  canvas.NewRectangle(tema.Color("surface", v)),
 		filete: canvas.NewRectangle(tema.Color("border", v)),
 		boton:  boton,
-		titulo: Texto("", tema.TextoSM, SemiNegrita, tema.Color("text", v)),
+		titulo: Texto("", tallaTituloMovil(b), SemiNegrita, tema.Color("text", v)),
+		punto:  canvas.NewCircle(color.NRGBA{}),
 	}
 	r.Refresh()
 	return r
+}
+
+// tallaTituloMovil es la talla del título: `text-sm` junto al botón y `text-md` centrado
+// o dentro de la barra única.
+func tallaTituloMovil(b *BarraMovil) tema.Escalon {
+	if b.TituloCentrado || b.enSuite {
+		return tema.TextoMD
+	}
+	return tema.TextoSM
 }
 
 type barraMovilRenderer struct {
@@ -93,11 +179,25 @@ type barraMovilRenderer struct {
 	fondo, filete *canvas.Rectangle
 	boton         *BotonIcono
 	titulo        *canvas.Text
+	punto         *canvas.Circle
 }
 
-func (r *barraMovilRenderer) MinSize() fyne.Size { return MedidaBarraMovil() }
+func (r *barraMovilRenderer) MinSize() fyne.Size {
+	if r.b.enSuite {
+		return fyne.NewSize(0, AltoBarraSuite())
+	}
+	return MedidaBarraMovil()
+}
+
+// Medidas de la barra única: en el teléfono el canalón lo pone el AIRE de los botones
+// (`--sytue-topbar-pad: 0.25rem` y `gap-0.5` de TopBar.tsx), no la barra.
+var (
+	canalonBarraUnica = tema.Espacio(1)
+	huecoBarraUnica   = tema.Espacio(0.5)
+)
+
 func (r *barraMovilRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{r.fondo, r.filete, r.boton, r.titulo}
+	return append([]fyne.CanvasObject{r.fondo, r.filete, r.boton, r.titulo, r.punto}, r.b.Acciones...)
 }
 func (r *barraMovilRenderer) Destroy() {}
 
@@ -109,26 +209,98 @@ func (r *barraMovilRenderer) Layout(t fyne.Size) {
 	if !r.filete.Hidden {
 		linea = t.Height - tema.Borde
 	}
-	x := canalonBarraMovil
+	canalon, hueco, huecoAcciones := canalonBarraMovil, huecoBarraMovil, huecoAccionesMovil
+	if r.b.enSuite {
+		canalon, hueco, huecoAcciones = canalonBarraUnica, huecoBarraUnica, huecoBarraUnica
+	}
+	x := canalon
+	if r.b.enSuite && !r.boton.Visible() {
+		// Sin ☰, la barra de la suite pone la marca del producto en su sitio (ver
+		// `layoutTelefono`): el título empieza donde con ☰.
+		x += LadoBotonBarraMovil() + huecoBarraUnica
+	}
 	if r.boton.Visible() {
 		lado := r.boton.MinSize()
 		base := ladoSoloIcono(TallaSM)
 		// En táctil el área pulsable crece a 44 px sin desplazar la vertical del glifo
-		// respecto a la marca de la barra superior.
-		izquierda := max(canalonBarraMovil-max(lado.Width-base, 0)/2, 0)
+		// respecto a la marca de la barra superior. En la barra única no hay marca
+		// encima: el botón va al canalón.
+		izquierda := max(canalon-max(lado.Width-base, 0)/2, 0)
+		if r.b.enSuite {
+			izquierda = canalon
+		}
 		r.boton.Move(fyne.NewPos(izquierda, max((linea-lado.Height)/2, 0)))
 		r.boton.Resize(lado)
-		x = izquierda + lado.Width + huecoBarraMovil
+		x = izquierda + lado.Width + hueco
+		// El punto de pendientes, en la esquina del glifo (no de la caja, que con el
+		// dedo crece a 44).
+		cx, cy := izquierda+lado.Width/2, max((linea-lado.Height)/2, 0)+lado.Height/2
+		r.punto.Move(fyne.NewPos(cx+DesvioPuntoAvisoMovil-LadoPuntoAvisoMovil, cy-DesvioPuntoAvisoMovil))
+		r.punto.Resize(fyne.NewSize(LadoPuntoAvisoMovil, LadoPuntoAvisoMovil))
 	}
-	Truncar(r.titulo, r.tituloVisible(), tema.TextoSM, SemiNegrita, max(t.Width-canalonBarraMovil-x, 0))
-	ColocarTexto(r.titulo, tema.TextoSM, x, (linea-tema.TextoSM.Linea)/2)
+	// Las acciones, de derecha a izquierda desde el canalón (en la barra única, desde
+	// la entrada a la suite).
+	der := t.Width
+	if r.b.enSuite {
+		der -= r.b.reservaSuite
+	}
+	for i := len(r.b.Acciones) - 1; i >= 0; i-- {
+		a := r.b.Acciones[i]
+		m := a.MinSize()
+		switch {
+		case i < len(r.b.Acciones)-1:
+			der -= huecoAcciones
+		case r.b.enSuite:
+			der -= huecoAcciones
+		default:
+			der -= max(canalon-max(m.Width-ladoSoloIcono(TallaSM), 0)/2, 0)
+		}
+		der -= m.Width
+		a.Move(fyne.NewPos(der, max((linea-m.Height)/2, 0)))
+		a.Resize(m)
+	}
+	talla := tallaTituloMovil(r.b)
+	if !r.b.TituloCentrado {
+		Truncar(r.titulo, r.tituloVisible(), talla, SemiNegrita, max(der-canalon-x, 0))
+		ColocarTexto(r.titulo, talla, x, (linea-talla.Linea)/2)
+		return
+	}
+	// Centrado en el ancho entero si cabe. Si no, lo más cerca del centro que deja el
+	// lado más ocupado, dentro del hueco REAL entre el ☰ y las acciones, y truncado solo
+	// si ni el hueco le basta (ni en `text-sm`). Es la rejilla `minmax(max-content,1fr) minmax(0,max-content)
+	// minmax(max-content,1fr)` de AppShell. Hasta el 2026-11-07 truncaba a `ancho −
+	// 2·ocupado` aunque hubiera sitio a un lado: a 320, «Σεπτέμβριος 20…» perdía el año.
+	izq, dcha := x, der-hueco
+	if len(r.b.Acciones) == 0 && !r.b.enSuite {
+		dcha = t.Width - canalon - hueco // la columna vacía y su `gap`
+	}
+	// Y si ni en el hueco cabe en `text-md`, baja a `text-sm` antes de truncar: a 320 el
+	// año («2027») es lo que distingue otro año, y es lo primero que se comería el «…».
+	libre := max(dcha-izq, 0)
+	if Medir(r.tituloVisible(), talla, SemiNegrita).Width > libre {
+		talla = tema.TextoSM
+	}
+	r.titulo.TextSize = talla.Tam
+	ancho := Truncar(r.titulo, r.tituloVisible(), talla, SemiNegrita, libre)
+	pos := min(max((t.Width-ancho)/2, izq), max(dcha-ancho, izq))
+	ColocarTexto(r.titulo, talla, pos, (linea-talla.Linea)/2)
+}
+
+// conBoton dice si la barra lleva ☰ o «volver» (el mismo reparto que Refresh).
+func (b *BarraMovil) conBoton() bool {
+	return (b.EnDetalle && !b.listaVisible) || b.AlMenu != nil
 }
 
 func (r *barraMovilRenderer) tituloVisible() string {
+	t := ""
 	if r.b.EnDetalle || !r.b.ConLista {
-		return r.b.Titulo
+		t = r.b.Titulo
 	}
-	return ""
+	// En la barra única nunca se queda vacía: sin título, el nombre del producto.
+	if t == "" && r.b.enSuite {
+		return r.b.tituloRespaldo
+	}
+	return t
 }
 
 func (r *barraMovilRenderer) Refresh() {
@@ -137,19 +309,29 @@ func (r *barraMovilRenderer) Refresh() {
 	r.boton.Lado = MedidaBotonCon("", TallaSM, 0, 0, true, iconos.TallaMD).Width
 	r.fondo.FillColor = tema.Color("surface", v)
 	r.filete.FillColor = tema.Color("border", v)
-	// En Marco esta fila prolonga la barra de la suite (`.sytue-mobilebar`). El fondo
-	// lo pinta el armazón con el mismo degradado horizontal; la hoja empieza debajo.
-	r.filete.Hidden = tema.EsMarco()
 	r.titulo.Color = tema.Color("text", v)
-	r.boton.Trazo, r.boton.TrazoEncima = "primary-text", "primary-text"
-	r.boton.FondoEncima, r.boton.FondoActivo, r.boton.TokenAro = "selected", "selected", "focus-ring"
+	r.titulo.TextSize = tallaTituloMovil(b).Tam
+	carril := tema.EsMarco() || b.enSuite
+	tonoBarraMovilEn(r.boton, carril)
 	r.fondo.Show()
 	r.titulo.Show()
-	if tema.EsMarco() {
-		r.fondo.Hide()
+	r.punto.FillColor = tema.Color("indicator", v)
+	if carril {
+		// En Marco esta fila prolonga la barra de la suite (`.sytue-mobilebar`): el fondo
+		// lo pinta el armazón con el mismo degradado horizontal y la hoja empieza debajo.
+		// En la barra única ES la barra de la suite, del carril (`.sytue-topbar-carril`
+		// por debajo de 768).
+		r.fondo.FillColor = tema.Color(tokenFondoBarra(true), v)
+		r.fondo.Hidden = tema.EsMarco()
 		r.titulo.Color = tema.Color("sidebar-fg", v)
-		r.boton.Trazo, r.boton.TrazoEncima = "sidebar-fg", "sidebar-fg"
-		r.boton.FondoEncima, r.boton.FondoActivo, r.boton.TokenAro = "sidebar-active-bg", "sidebar-active-bg", "sidebar-focus"
+		r.punto.FillColor = tema.Color("sidebar-indicator", v)
+	}
+	r.filete.Hidden = carril
+	for _, a := range b.Acciones {
+		if bi, es := a.(botonDeBarra); es {
+			tonoBarraMovilEn(bi.botonIcono(), carril)
+			a.Refresh()
+		}
 	}
 	r.boton.Show()
 	switch {
@@ -159,9 +341,14 @@ func (r *barraMovilRenderer) Refresh() {
 		r.boton.Hide() // ni menú ni detalle: AppShell no pinta botón
 	case b.CajonAbierto:
 		r.boton.Icono, r.boton.Rotulo, r.boton.AlPulsar = iconos.Menu, b.RotuloCerrar, b.AlMenu
+	case b.Aviso != "":
+		r.boton.Icono, r.boton.Rotulo, r.boton.AlPulsar = iconos.Menu, b.Aviso, b.AlMenu
 	default:
 		r.boton.Icono, r.boton.Rotulo, r.boton.AlPulsar = iconos.Menu, b.RotuloAbrir, b.AlMenu
 	}
+	// El punto acompaña al nombre: solo con el menú cerrado y algo pendiente.
+	esconder(r.punto, b.Aviso == "" || !r.boton.Visible() || r.boton.Icono != iconos.Menu || b.CajonAbierto)
+	r.punto.Refresh()
 	r.fondo.Refresh()
 	r.filete.Refresh()
 	r.boton.Refresh()

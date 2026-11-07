@@ -164,6 +164,17 @@ func TestEditarUnAlbumCompartido(t *testing.T) {
 		t.Fatal("a Ada no le llega quién añadió fotos")
 	}
 
+	// Elegir la portada es el mismo PATCH con el título de siempre: no es un renombrado
+	// y a Ada no se le dice que Bob le ha «renombrado» el álbum a lo que ya se llamaba.
+	if w := pedir(h.RenombrarAlbum, "bob", http.MethodPatch, `{"title":"Viaje","coverAssetId":"`+deAda.ID.String()+`"}`, album); w.Code != http.StatusOK {
+		t.Fatalf("Bob elige la portada: %d %s", w.Code, w.Body)
+	}
+	select {
+	case n := <-avisos:
+		t.Fatalf("elegir la portada avisa de un renombrado: %+v", n)
+	case <-time.After(300 * time.Millisecond):
+	}
+
 	// Renombra sin ver el enlace de Ada (y a ella se le dice), y quita una foto que no es suya.
 	w := pedir(h.RenombrarAlbum, "bob", http.MethodPatch, `{"title":"Viaje a Donosti"}`, album)
 	if w.Code != http.StatusOK || strings.Contains(w.Body.String(), `"shared"`) || !strings.Contains(w.Body.String(), "Donosti") {

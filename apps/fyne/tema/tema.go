@@ -188,6 +188,17 @@ func FormaDeLosGuardianes() {
 // que pinta el color «el de cada app». Lo dice la barra de la suite al montarse.
 func ElegirApp(clave string) bool { return tokens.ElegirApp(clave) }
 
+// CromoPapel es el cromo de una libreta (ElegirCromo).
+const CromoPapel = tokens.CromoPapel
+
+// ElegirCromo fija el cromo de la app: "papel" pone el marco, el menú y la barra en el
+// fondo de la página con la tinta del texto (Sytue Notepads, ADR 0079); cualquier otra
+// cosa, el de color de la suite.
+func ElegirCromo(nombre string) bool { return tokens.ElegirCromo(nombre) }
+
+// EsPapel dice si el cromo en vigor es «papel».
+func EsPapel() bool { return tokens.EsPapel() }
+
 // AppElegida devuelve el producto en vigor para poder restaurar su apariencia.
 func AppElegida() string { return tokens.AppElegida() }
 

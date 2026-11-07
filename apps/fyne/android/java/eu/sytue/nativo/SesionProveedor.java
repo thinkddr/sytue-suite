@@ -163,6 +163,7 @@ public final class SesionProveedor extends ContentProvider {
             Bundle salida = new Bundle();
             salida.putString("broker", identidad);
             salida.putString("generacion", boveda.generacion());
+            salida.putString("marca_widgets", marcaWidgets(boveda.epoca()));
             salida.putBoolean(DrivePreferencia.CLAVE, boveda.driveDesactivado());
             KeyguardManager pantalla = getContext().getSystemService(KeyguardManager.class);
             salida.putBoolean("bloqueo", boveda.bloqueo() || pantallaCerrada
@@ -275,6 +276,18 @@ public final class SesionProveedor extends ContentProvider {
             // Binder exceptions must not include tokens, encrypted blobs or provider responses.
             throw new IllegalStateException("The shared session vault is unavailable");
         }
+    }
+
+    /**
+     * La marca de los widgets (formato 2, ADR 0078): cambia con la época de la bóveda —otra
+     * identidad, el bloqueo, una revocación—, no con cada renovación. Es una huella con
+     * dominio propio: la época en claro es la que ata los desafíos del dueño y no sale.
+     */
+    static String marcaWidgets(String epoca) {
+        if (epoca == null || epoca.isEmpty()) {
+            return "";
+        }
+        return SesionAndroid.sha256(("sytue-widgets\0" + epoca).getBytes(StandardCharsets.UTF_8));
     }
 
     private static void validarCuenta(String cuenta, Bundle entrada) {

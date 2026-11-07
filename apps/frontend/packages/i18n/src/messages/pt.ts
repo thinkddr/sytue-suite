@@ -18,6 +18,8 @@ export const pt: Catalog = {
   'ui.openNav': 'Abrir navegação',
   'ui.closeNav': 'Fechar navegação',
   'ui.backToList': 'Voltar à lista',
+  'ui.suiteOpen': 'Sytue: aplicações, pesquisa, notificações e conta',
+  'ui.suiteClose': 'Voltar à aplicação',
   'ui.noResults': 'Sem resultados.',
   'ui.meter.almostFull': 'quase cheio',
   'ui.meter.full': 'cheio',
@@ -59,6 +61,9 @@ export const pt: Catalog = {
     'Esta aplicação precisa de OpenGL 2.1 e o controlador gráfico deste computador não o oferece ({detalle}). Instale ou atualize o controlador da placa gráfica. Sem placa gráfica (ambiente de trabalho remoto ou máquina virtual) não pode abrir.',
   'shell.lock.reasonNotebook': 'abrir o seu caderno cifrado',
   'shell.lock.faceIdUsage': 'O Sytue usa o Face ID para desbloquear a sua sessão ao abrir a app.',
+  'shell.widgets.wake': 'Atualizar os widgets com a app fechada',
+  'shell.widgets.wakeHelp':
+    'Quando algo seu muda, o Sytue acorda a app com uma notificação vazia da Apple para que atualize o seu widget. A Apple vê qual é a app e quando, nunca o que mudou.',
   'shell.call.microphoneUsage':
     'O Sytue Rooms só usa o microfone durante uma chamada e só se o ativar.',
   'shell.call.cameraUsage': 'O Sytue Rooms só usa a câmara durante uma chamada e só se a ativar.',
@@ -168,7 +173,7 @@ export const pt: Catalog = {
   'notifications.kind.pages.domain.failed':
     'O domínio {domain} de {site} não está a funcionar: verifique a sua configuração',
   'notifications.kind.pages.erp.failed': 'A encomenda {number} de {site} não chegou ao Sytue ERP',
-  'notifications.kind.pages.settings.changed': '{actor} alterou uma definição do Sytue Web',
+  'notifications.kind.pages.settings.changed': '{actor} alterou uma definição do Sytue Webs',
   'notifications.kind.pages.export.ready': 'A sua exportação de {site} está pronta',
   'notifications.kind.pages.store.busy':
     'A loja de {site} tem demasiadas encomendas a aguardar pagamento',
@@ -351,6 +356,8 @@ export const pt: Catalog = {
   'widgets.compose': 'Escrever',
   'widgets.storage': 'Armazenamento',
   'widgets.create': 'Criar evento',
+  'widgets.updatedAgo': 'Atualizado {time}',
+  'widgets.updatedAt': 'Atualizado: {time}',
 
   'linkedServices.services': 'Serviços',
   'linkedServices.changed':
@@ -363,6 +370,7 @@ export const pt: Catalog = {
   'linkedServices.notGranted':
     'Não foi concedido acesso a este serviço. Liga novamente a conta para escolher as permissões.',
   'linkedServices.connected': 'Serviços ligados',
+  'linkedServices.exists': 'Esta conta já estava ligada e está agora aberta.',
   'linkedServices.providerData': 'As alterações são guardadas no teu fornecedor.',
   'linkedServices.writeUnknown':
     'O fornecedor não confirmou se foi guardado. Atualiza e verifica antes de tentares novamente.',

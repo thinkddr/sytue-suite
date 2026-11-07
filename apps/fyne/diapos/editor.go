@@ -1061,6 +1061,7 @@ func (c *carrilDiapos) rehacer() {
 		t := NuevaMiniatura(e.m, i, e.Elegir)
 		t.Activa, t.Variante = i == e.activa, e.variante()
 		t.AlMover = func(hasta int) { e.Mover(i, hasta) }
+		t.AlAtajo = e.ctx.AtajoDelEditor
 		t.Rotulo = func(clave string, n, total int) string {
 			return e.ctx.Traducir(clave, i18n.Vars{"n": n, "total": total})
 		}

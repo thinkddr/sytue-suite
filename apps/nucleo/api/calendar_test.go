@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"slices"
 	"strings"
 	"testing"
@@ -419,5 +420,36 @@ func TestLosRecordatoriosDelEvento(t *testing.T) {
 	var suelto Event
 	if err := json.Unmarshal([]byte(`{"id":"e2"}`), &suelto); err != nil || suelto.Reminders != nil {
 		t.Fatalf("un evento sin recordatorios en el JSON: %v %v", suelto.Reminders, err)
+	}
+}
+
+// TestLaBusquedaFiltraPorCalendarioYPeriodo: los filtros del buscador viajan como los
+// pide el servicio —`calendar` y `from`/`to` en RFC3339 UTC— y lo que va a cero no.
+func TestLaBusquedaFiltraPorCalendarioYPeriodo(t *testing.T) {
+	var pedidas []url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pedidas = append(pedidas, r.URL.Query())
+		_, _ = io.WriteString(w, `{"events":[],"next_cursor":""}`)
+	}))
+	defer srv.Close()
+	c := NewCalendars(srv.URL, nil, nil)
+	madrid, _ := time.LoadLocation("Europe/Madrid")
+	desde := time.Date(2026, 11, 1, 0, 0, 0, 0, madrid)
+	f := FiltroBusqueda{Calendario: "c1", Desde: desde, Hasta: desde.AddDate(0, 1, 0)}
+	if _, err := c.SearchEventsFiltrada(context.Background(), "comité", f, 20, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.SearchEventsPage(context.Background(), "comité", 20, ""); err != nil {
+		t.Fatal(err)
+	}
+	if len(pedidas) != 2 {
+		t.Fatalf("se hicieron %d peticiones", len(pedidas))
+	}
+	q := pedidas[0]
+	if q.Get("calendar") != "c1" || q.Get("from") != "2026-10-31T23:00:00Z" || q.Get("to") != "2026-11-30T23:00:00Z" {
+		t.Errorf("los filtros viajaron así: %v", q)
+	}
+	if q := pedidas[1]; q.Has("calendar") || q.Has("from") || q.Has("to") {
+		t.Errorf("sin filtros se pidió %v", q)
 	}
 }

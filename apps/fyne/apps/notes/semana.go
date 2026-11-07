@@ -9,6 +9,7 @@ package notes
 
 import (
 	"html"
+	"image/color"
 	"regexp"
 	"slices"
 	"strconv"
@@ -249,7 +250,7 @@ func (p *Pantalla) selectorVista(v tema.Variante) fyne.CanvasObject {
 			p.Repintar()
 		}))
 	}
-	return container.New(filaCentro{hueco: tema.Espacio(0.5)}, bs...)
+	return container.New(filaCentro{hueco: HuecoSegmento}, bs...)
 }
 
 // soltarEnDia es el final del asa de una nota del diario: si el puntero está sobre un
@@ -351,26 +352,31 @@ func (p *Pantalla) cabeceraEnDia(rotulo string, d time.Time, e tema.Escalon, v t
 		p.dia.vista = VistaDia
 		llamar1(p.lateral.AlDia, d.Format(time.DateOnly))
 	})
-	o.PX, o.Radio, o.Superficie = tema.Espacio(1), tema.RadioSM, "bg"
+	o.PX, o.Radio = tema.Espacio(1), tema.RadioSM
+	filaDePagina(o)
 	return container.New(ui.FilaAuto{Derecha: 1}, o)
 }
 
-// lineaNota es una nota en una línea: la casilla de una tarea o un punto, y su resumen.
+// lineaNota es una nota en una línea: la casilla de una tarea o la raya de una cosa, y su
+// resumen (`.notes-day-box` y `.notes-day-dot`).
 func (p *Pantalla) lineaNota(n api.Note, v tema.Variante) fyne.CanvasObject {
 	var marca fyne.CanvasObject
 	lado := tema.Espacio(3.5)
 	tinta := "text"
 	if n.Kind == "todo" {
 		caja := canvas.NewRectangle(tema.Color("surface", v))
-		caja.StrokeColor, caja.StrokeWidth, caja.CornerRadius = tema.Color("border-strong", v), tema.Borde, tema.Espacio(0.5)
+		caja.StrokeColor, caja.StrokeWidth, caja.CornerRadius = tema.Color("border-strong", v), BordeCasilla, 3
 		if n.Checked {
-			caja.FillColor, caja.StrokeColor = tema.Color("primary", v), tema.Color("primary", v)
+			// Hecha, en gris: `bg-text-subtle border-transparent`.
+			caja.FillColor, caja.StrokeColor = tema.Color("text-subtle", v), color.Transparent
 			tinta = "text-muted"
 		}
 		marca = caja
 	} else {
-		lado = tema.Espacio(1)
-		marca = canvas.NewCircle(tema.Color("text-subtle", v))
+		// La raya, a su escala (`h-[1.5px] w-2`), centrada en el sitio de la casilla.
+		r := raya(v)
+		r.SetMinSize(fyne.NewSize(tema.Espacio(2), GruesoRaya))
+		marca = container.NewCenter(r)
 	}
 	cuerpo := p.texto(resumenNota(n.Title, n.Content, maxResumen), tema.TextoSM, ui.Normal, tinta, v)
 	return container.New(filaMarca{lado: lado, hueco: tema.Espacio(2), ancho: tema.Espacio(3.5), pad: tema.Espacio(1)}, marca, cuerpo)

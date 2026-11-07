@@ -238,6 +238,9 @@ func (p *PestanaCinta) CreateRenderer() fyne.WidgetRenderer {
 	}
 	r.indicador.CornerRadius = GrosorIndicador / 2 // `rounded-full` sobre 1,75 de alto
 	r.objetos = append(r.aro.Objetos(), r.indicador, r.rotulo)
+	// El indicador nace transparente y solo Refresh lo pinta: la cinta rehace sus
+	// pestañas al cambiar de una a otra, y la nueva activa salía sin subrayado.
+	r.Refresh()
 	return r
 }
 

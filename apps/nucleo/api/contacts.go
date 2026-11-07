@@ -295,6 +295,34 @@ func (c *Contacts) VCard(ctx context.Context, id string) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
+// MaxLoteContactos es cuántos contactos admite una acción en lote del servicio
+// (`maxBatchUIDs` de services/contacts): quien tenga más, los parte en tandas.
+const MaxLoteContactos = 1000
+
+// TandaVCard es cuántas vCard pide quien exporta en cada BatchVCard. Menos que
+// MaxLoteContactos a propósito: cada tarjeta guardada puede llevar una foto de cientos
+// de KiB, y una respuesta de mil son decenas de MB que alguien tiene que tener en
+// memoria (el servicio las manda según las lee, pero quien recibe junta el fichero).
+const TandaVCard = 200
+
+// BatchVCard trae, en UNA petición, las vCard guardadas de esos contactos (por id, hasta
+// MaxLoteContactos), ya juntas en un `.vcf`. Los ajenos o borrados no vienen.
+func (c *Contacts) BatchVCard(ctx context.Context, ids []string) ([]byte, error) {
+	datos, err := json.Marshal(map[string]any{"ids": ids})
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.c.Do(ctx, Request{
+		Method: http.MethodPost, Path: "/contacts/batch/vcard", Body: datos,
+		Header: http.Header{"Content-Type": {"application/json"}, "Accept": {"text/vcard"}},
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	return io.ReadAll(resp.Body)
+}
+
 // CleanUID es el UID desnudo: el servicio guarda y devuelve los favoritos sin el
 // prefijo `urn:uuid:`, pero una vCard importada puede traerlo. Sin quitarlo, el cruce
 // entre la lista y los destacados no encuentra nada.
@@ -364,16 +392,29 @@ func (c *Contacts) SetFavorite(ctx context.Context, uid string, destacado bool) 
 	return err
 }
 
-// BatchFavorite destaca o desdestaca varios de una vez (hasta 1000).
+// BatchFavorite destaca o desdestaca varios de una vez (hasta MaxLoteContactos).
 func (c *Contacts) BatchFavorite(ctx context.Context, uids []string, destacado bool) error {
 	_, err := PostJSON[struct{}](ctx, c.c, "/contacts/batch/favorite", map[string]any{"uids": uids, "favorite": destacado})
 	return err
 }
 
-// BatchTrash manda varios a la papelera de una vez.
-func (c *Contacts) BatchTrash(ctx context.Context, uids []string) error {
-	_, err := PostJSON[struct{}](ctx, c.c, "/contacts/batch/trash", map[string]any{"uids": uids})
-	return err
+// BatchTrash manda varios a la papelera de una vez y dice cuántos se tiraron (un UID
+// que vive en dos libretas cuenta dos; los ajenos o ya borrados, ninguno).
+func (c *Contacts) BatchTrash(ctx context.Context, uids []string) (int, error) {
+	r, err := PostJSON[struct {
+		Trashed int `json:"trashed"`
+	}](ctx, c.c, "/contacts/batch/trash", map[string]any{"uids": uids})
+	return r.Trashed, err
+}
+
+// BatchRestore es el «Deshacer» de BatchTrash: devuelve de la papelera, en UNA
+// petición, lo último que se tiró de cada UID, y dice cuántos volvieron (comparable
+// con lo que devolvió BatchTrash).
+func (c *Contacts) BatchRestore(ctx context.Context, uids []string) (int, error) {
+	r, err := PostJSON[struct {
+		Restored int `json:"restored"`
+	}](ctx, c.c, "/contacts/batch/restore", map[string]any{"uids": uids})
+	return r.Restored, err
 }
 
 // TrashItem es un contacto borrado, tal y como lo lista la papelera.

@@ -47,6 +47,13 @@ type Opcion struct {
 	// Superficie es el token de lo que hay DEBAJO: el botón es transparente y se ve
 	// su padre. Vacío es `surface-raised`, el panel de un diálogo.
 	Superficie string
+	// VeloEncima pinta el `hover` como las líneas de la libreta: la tinta del texto al
+	// 4 % sobre la superficie, y no `bg-subtle` (`.notes-row:hover`).
+	VeloEncima bool
+	// SinFondo no pinta caja ni al pasar: se ve lo de debajo, y solo el aro de foco. Es
+	// la raya pulsable de una fila (tarjeta.go), que vive sobre el velo de la fila
+	// elegida o de la que tiene el puntero, y una caja opaca dejaría un cuadrado encima.
+	SinFondo bool
 	// Rotulo es el nombre accesible.
 	Rotulo string
 }
@@ -145,8 +152,12 @@ func (r *opcionRenderer) Refresh() {
 	// así que un relleno translúcido dejaría ver el color del borde en toda la caja.
 	fondo, borde := tema.Color(superficie, v), tema.Color("border", v)
 	switch {
+	case o.SinFondo:
+		fondo, borde = color.NRGBA{}, color.NRGBA{}
 	case o.Activa:
 		fondo, borde = tokens.SobreSRGB(o.FondoActivo, fondo), o.BordeActivo
+	case o.Encima() && !o.Inerte && o.VeloEncima:
+		fondo = tokens.SobreSRGB(tokens.ConAlfa(tema.Color("text", v), 0.04), fondo)
 	case o.Encima() && !o.Inerte:
 		fondo = tema.Color("bg-subtle", v) // hover:bg-bg-subtle
 	}

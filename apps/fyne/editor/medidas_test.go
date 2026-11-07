@@ -410,14 +410,13 @@ func TestElMarcoPasaDeCargandoAlLienzo(t *testing.T) {
 func TestLaCabeceraSigueAlContexto(t *testing.T) {
 	ctx := &Contexto{Tipo: Presentacion, Zoom: 100, Estado: Listo}
 	m := NuevoMarco(ctx, Genericas(), nil)
-	r := test.WidgetRenderer(m.cabecera).(*cabeceraRenderer)
 	ctx.Titulo, ctx.Guardado = "Trimestre", Sucio
 	ctx.Refrescar()
 	if m.cabecera.titulo.Texto() != "Trimestre" {
 		t.Errorf("el título de la cabecera es %q y el del contexto «Trimestre»", m.cabecera.titulo.Texto())
 	}
-	if r.estado.Text != "header.save.dirty" {
-		t.Errorf("el chip dice %q con el documento sucio", r.estado.Text)
+	if m.cabecera.chip.Texto != "header.save.dirty" {
+		t.Errorf("el chip dice %q con el documento sucio", m.cabecera.chip.Texto)
 	}
 }
 
@@ -452,7 +451,8 @@ func TestLaCintaReconstruidaSeColoca(t *testing.T) {
 // —sin marca, sin filete, sin «Descargar»—, el título se queda lo que dejan el chip y
 // «Compartir» y nada se pisa. Chromium mide los avances de Guardado hace 25 s
 // (107.08876 a 12/400) y Compartir (60.55406 a 13/600). Las clases de la
-// cabecera dan x48 y un ancho de 110.35718 a 390. VISTO EN ROJO sin el camino estrecho: a 360 «Descargar» tapaba el chip y
+// cabecera dan x48 y un ancho de 98.35718 a 390 (110.35718 hasta que el chip pasó a botón,
+// 2026-11-05: su `px-1.5` le quita 12 al título). VISTO EN ROJO sin el camino estrecho: a 360 «Descargar» tapaba el chip y
 // «Compartir» se montaba sobre el título.
 func TestLaCabeceraCabeEnUnMovil(t *testing.T) {
 	textos := map[string]string{
@@ -475,22 +475,23 @@ func TestLaCabeceraCabeEnUnMovil(t *testing.T) {
 		r.Layout(c.Size())
 		tit, com := c.titulo, c.compartir
 		finTitulo := tit.Position().X + tit.Size().Width
-		finChip := r.estado.Position().X + ui.Medir(r.estado.Text, tema.TextoXS, ui.Normal).Width
+		chip := c.chip
+		finChip := chip.Position().X + chip.Size().Width
 		switch {
 		case c.descargar.Visible() || c.marca.Objeto().Visible():
 			t.Errorf("a %.0f siguen «Descargar» o la marca", ancho)
-		case r.punto.Position().X < finTitulo+HuecoCabecera-0.5:
-			t.Errorf("a %.0f el chip empieza en %.2f y el título acaba en %.2f", ancho, r.punto.Position().X, finTitulo)
+		case chip.Position().X < finTitulo+HuecoCabecera-0.5:
+			t.Errorf("a %.0f el chip empieza en %.2f y el título acaba en %.2f", ancho, chip.Position().X, finTitulo)
 		case com.Position().X < finChip+HuecoCabecera-0.5:
-			t.Errorf("a %.0f «Compartir» empieza en %.2f y el chip acaba en %.2f (%q)", ancho, com.Position().X, finChip, r.estado.Text)
+			t.Errorf("a %.0f «Compartir» empieza en %.2f y el chip acaba en %.2f (%q)", ancho, com.Position().X, finChip, chip.Texto)
 		case com.Position().X+com.Size().Width > ancho-MargenCabecera+0.5:
 			t.Errorf("a %.0f «Compartir» se sale: acaba en %.2f", ancho, com.Position().X+com.Size().Width)
 		case tit.Size().Width < tema.Espacio(24)-0.5 || tit.Size().Width > 0.4*ancho+0.5:
 			t.Errorf("a %.0f el título mide %.2f, fuera de min-w-24 y max-w-[40vw]", ancho, tit.Size().Width)
 		}
 	}
-	if x, w := c.titulo.Position().X, c.titulo.Size().Width; abs32(x-48) > 0.5 || abs32(w-110.35718) > 2 {
-		t.Errorf("a 390 el título va en x %.2f con %.2f de ancho, y la cuenta CSS con avances Chromium lo pone en 48 con 110,35718", x, w)
+	if x, w := c.titulo.Position().X, c.titulo.Size().Width; abs32(x-48) > 0.5 || abs32(w-98.35718) > 2 {
+		t.Errorf("a 390 el título va en x %.2f con %.2f de ancho, y la cuenta CSS con avances Chromium lo pone en 48 con 98,35718", x, w)
 	}
 }
 

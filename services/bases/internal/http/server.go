@@ -86,6 +86,8 @@ func NewRouter(d Deps) http.Handler {
 		api.Use(d.Verifier.RequireTenant)
 		api.Use(d.Verifier.RequireOrgKind("org")) // una cuenta personal no entra
 		api.Use(httpx.RateLimit(httpx.RateLimitConfig{Limiter: limiter, KeyFunc: authn.RateKey}))
+		// La señal de cambios para el widget de Bases (hubnotify.TrasEscribir).
+		api.Use(d.Hub.TrasEscribir(nil, "bases"))
 		h.montar(api)
 	})
 	return r

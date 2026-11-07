@@ -29,11 +29,11 @@ struct SytueWidgetConfiguration {
 
     var productSymbol: String { SytueWidgetPalette.symbol(for: product) }
 
-    func snapshot(at date: Date) -> SytueWidgetSnapshot? {
+    func reading(at date: Date) -> SytueWidgetReading {
         guard !group.isEmpty,
-              let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group) else { return nil }
-        return SytueWidgetSnapshots.load(directory: container.appendingPathComponent("sytue"), bundle: bundle,
-                                         product: product, now: Int64(date.timeIntervalSince1970))
+              let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group) else { return .hidden }
+        return SytueWidgetSnapshots.reading(directory: container.appendingPathComponent("sytue"), bundle: bundle,
+                                            product: product, now: Int64(date.timeIntervalSince1970))
     }
 }
 
@@ -203,6 +203,24 @@ private enum SytueWidgetDates {
 struct SytueWidgetEntry: TimelineEntry {
     let date: Date
     let snapshot: SytueWidgetSnapshot?
+    // La lectura falló por la protección de datos: se pinta el marco con el marcador.
+    var isProtected = false
+
+    // Las filas que siguen valiendo a la fecha de ESTA entrada (widgets.Vigentes).
+    var items: [SytueWidgetItem] {
+        SytueWidgetTimeline.currentItems(snapshot, at: date, calendar: .autoupdatingCurrent)
+    }
+
+    // «Actualizado hace 20 min», calculado para la fecha de la entrada; nada si el dato es
+    // fresco (menos de 15 min).
+    var staleLabel: String? {
+        guard let snapshot, snapshot.isStale(now: Int64(date.timeIntervalSince1970)) else { return nil }
+        let relative = RelativeDateTimeFormatter()
+        relative.dateTimeStyle = .named
+        relative.unitsStyle = .short
+        return String(format: NSLocalizedString("widgets.updatedAgo", comment: ""),
+                      relative.localizedString(for: snapshot.updatedDate, relativeTo: date))
+    }
 }
 
 struct SytueWidgetProvider: TimelineProvider {
@@ -214,27 +232,31 @@ struct SytueWidgetProvider: TimelineProvider {
 
     func getSnapshot(in context: Context, completion: @escaping (SytueWidgetEntry) -> Void) {
         let date = Date()
-        completion(SytueWidgetEntry(date: date, snapshot: context.isPreview ? nil : configuration.snapshot(at: date)))
+        guard !context.isPreview else { return completion(SytueWidgetEntry(date: date, snapshot: nil)) }
+        let reading = configuration.reading(at: date)
+        completion(SytueWidgetEntry(date: date, snapshot: reading.snapshot, isProtected: reading.isProtected))
     }
 
+    // Formato 2 (ADR 0078): el snapshot vive hasta 24 h, así que la línea de tiempo se
+    // precalcula entera —el «Actualizado hace X», las medianoches, el fin de cada evento y
+    // la caducidad sin datos— con `.atEnd`: sin recargas periódicas que gasten el
+    // presupuesto. Recarga la app (reloadAllTimelines) cuando publica o borra.
     func getTimeline(in context: Context, completion: @escaping (Timeline<SytueWidgetEntry>) -> Void) {
         let date = Date()
-        let snapshot = configuration.snapshot(at: date)
-        var entries = [SytueWidgetEntry(date: date, snapshot: snapshot)]
-        // Precompute the private entry: expiry does not depend on the host app
-        // opening, a network request or another WidgetKit refresh being granted.
-        if let expiry = SytueWidgetTimeline.expiry(snapshot: snapshot, now: date) {
-            entries.append(SytueWidgetEntry(date: expiry, snapshot: nil))
+        let reading = configuration.reading(at: date)
+        switch SytueWidgetTimeline.plan(for: reading, now: date, calendar: .autoupdatingCurrent) {
+        case .entries(let dates, let expiry):
+            let entries = dates.map { SytueWidgetEntry(date: $0, snapshot: reading.snapshot) }
+                + [SytueWidgetEntry(date: expiry, snapshot: nil)]
+            completion(Timeline(entries: entries, policy: .atEnd))
+        case .protected(let retry):
+            // No es «no hay datos»: con el teléfono bloqueado el contenedor no se lee. Nada
+            // de entrada vacía de 24 h; se vuelve a pedir en 5 min.
+            completion(Timeline(entries: [SytueWidgetEntry(date: date, snapshot: nil, isProtected: true)],
+                                policy: .after(retry)))
+        case .empty:
+            completion(Timeline(entries: [SytueWidgetEntry(date: date, snapshot: nil)], policy: .never))
         }
-        var nextRefresh = date.addingTimeInterval(900)
-        if let midnight = Calendar.autoupdatingCurrent.nextDate(
-            after: date,
-            matching: DateComponents(hour: 0, minute: 0, second: 5),
-            matchingPolicy: .nextTime
-        ), midnight < nextRefresh {
-            nextRefresh = midnight
-        }
-        completion(Timeline(entries: entries, policy: .after(nextRefresh)))
     }
 }
 
@@ -821,7 +843,7 @@ struct SytueWidgetView: View {
                 brand: configuration.brandColor,
                 compact: true
             )
-            if let nextEvent = entry.snapshot?.visualItems.first {
+            if let nextEvent = entry.items.first {
                 Spacer(minLength: 0)
                 HStack(spacing: 4) {
                     Circle()
@@ -839,7 +861,7 @@ struct SytueWidgetView: View {
     }
 
     private var calendarMedium: some View {
-        let items = entry.snapshot?.visualItems ?? []
+        let items = entry.items
         return HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(SytueWidgetDates.monthTitle(for: entry.date))
@@ -907,7 +929,7 @@ struct SytueWidgetView: View {
     }
 
     private var calendarLarge: some View {
-        let items = entry.snapshot?.visualItems ?? []
+        let items = entry.items
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Image("Icon")
@@ -961,7 +983,7 @@ struct SytueWidgetView: View {
     }
 
     private var calendarExtraLarge: some View {
-        let items = entry.snapshot?.visualItems ?? []
+        let items = entry.items
         return HStack(alignment: .top, spacing: 18) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {
@@ -1033,7 +1055,7 @@ struct SytueWidgetView: View {
     // MARK: - General Visual Product Views (Mail, Drive, Notes, Rooms, Contacts, Docs, Sheets, Slides, PDF, Bases, ERP, Photos, Cast, Hub)
 
     private var productSmall: some View {
-        let items = entry.snapshot?.visualItems ?? []
+        let items = entry.items
         return VStack(alignment: .leading, spacing: 6) {
             headerBar(compact: true, showActions: false)
             if let pct = storagePercent {
@@ -1077,7 +1099,7 @@ struct SytueWidgetView: View {
     }
 
     private var productMedium: some View {
-        let items = entry.snapshot?.visualItems ?? []
+        let items = entry.items
         return VStack(alignment: .leading, spacing: 6) {
             headerBar(compact: false, showActions: true)
             if let pct = storagePercent {
@@ -1121,7 +1143,7 @@ struct SytueWidgetView: View {
     }
 
     private var productLarge: some View {
-        let items = entry.snapshot?.visualItems ?? []
+        let items = entry.items
         return VStack(alignment: .leading, spacing: 8) {
             headerBar(compact: false, showActions: true)
             if !nonStorageCounters.isEmpty {
@@ -1171,7 +1193,7 @@ struct SytueWidgetView: View {
     }
 
     private var productExtraLarge: some View {
-        let items = entry.snapshot?.visualItems ?? []
+        let items = entry.items
         return HStack(alignment: .top, spacing: 18) {
             VStack(alignment: .leading, spacing: 10) {
                 headerBar(compact: false, showActions: false)
@@ -1235,7 +1257,7 @@ struct SytueWidgetView: View {
     @ViewBuilder private var accessoryContent: some View {
         switch family {
         case .accessoryInline:
-            if let firstItem = entry.snapshot?.visualItems.first {
+            if let firstItem = entry.items.first {
                 Label(firstItem.title, systemImage: configuration.productSymbol)
                     .privacySensitive()
             } else if let counter = entry.snapshot?.counters.first {
@@ -1283,8 +1305,8 @@ struct SytueWidgetView: View {
                         .font(.headline)
                         .lineLimit(1)
                 }
-                if let items = entry.snapshot?.visualItems, !items.isEmpty {
-                    ForEach(Array(items.prefix(2).enumerated()), id: \.offset) { _, item in
+                if !entry.items.isEmpty {
+                    ForEach(Array(entry.items.prefix(2).enumerated()), id: \.offset) { _, item in
                         Text(item.title)
                             .font(.caption)
                             .lineLimit(1)
@@ -1301,20 +1323,37 @@ struct SytueWidgetView: View {
     }
     #endif
 
+    // El contenido con, debajo, de cuándo es el dato si ya no es fresco. Con la lectura
+    // protegida, el marco con el marcador: no se sabe qué hay, no «no hay nada».
+    @ViewBuilder private var framedContent: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            regularContent
+            if let stale = entry.staleLabel {
+                Text(stale)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+        }
+        .redacted(reason: entry.isProtected ? .placeholder : [])
+    }
+
     @ViewBuilder var body: some View {
         #if os(iOS)
         if #available(iOSApplicationExtension 16.0, *),
            [.accessoryRectangular, .accessoryCircular, .accessoryInline].contains(family) {
             accessoryContent
+                .redacted(reason: entry.isProtected ? .placeholder : [])
                 .modifier(SytueWidgetBackground(brand: configuration.brandColor))
                 .widgetURL(configuration.actions["open"])
         } else {
-            regularContent
+            framedContent
                 .modifier(SytueWidgetBackground(brand: configuration.brandColor))
                 .widgetURL(configuration.actions["open"])
         }
         #else
-        regularContent
+        framedContent
             .modifier(SytueWidgetBackground(brand: configuration.brandColor))
             .widgetURL(configuration.actions["open"])
         #endif

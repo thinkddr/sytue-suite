@@ -839,23 +839,75 @@ func TestElAvisoYSueltaParaAnyadirMidenLoQueLaWeb(t *testing.T) {
 }
 
 // TestLaCabeceraDelMesTieneElFondoDeLaWeb: el `bg-*` del `<h2>` del mes en PhotosApp.tsx
-// es el que pinta Fyne. El 2026-09-28 era `bg-surface`, una banda blanca sobre el
-// fondo de la página, y se cambió a `bg-bg` en los dos lados. VISTO EN ROJO con
-// `fondoCabeceraMes = "surface"`.
+// es el que pinta Fyne, en Marco y en Carril. El 2026-09-28 era `bg-surface`, una banda
+// blanca sobre el fondo de la página, y se cambió a `bg-bg` en los dos lados; sobre
+// papel, `bg-bg` era gris dentro de la hoja blanca y pasó a la hoja, salvo en Carril,
+// que no pinta hoja y sigue en el lienzo. VISTO EN ROJO con `fondoCabeceraMes = "surface"`
+// y, en Carril, con la web solo en `bg-[var(--sytue-sheet-bg)]` (blanca sobre gris).
 func TestLaCabeceraDelMesTieneElFondoDeLaWeb(t *testing.T) {
 	app := webref.Read(t, "apps/frontend/apps/photos/src/components/PhotosApp.tsx")
-	m := regexp.MustCompile(`'bg-([a-z-]+) text-text sticky`).FindStringSubmatch(app)
-	if m == nil {
+	h2 := regexp.MustCompile(`'text-text [^']*sticky[^']*'`).FindString(app)
+	if h2 == "" {
 		t.Fatal("no encuentro el `<h2>` del mes en PhotosApp.tsx")
 	}
-	v := vistaDePrueba(t, nil)
-	cab := cabeceraMes(v, GrupoMes{Titulo: "septiembre de 2026", Fotos: fotosDePrueba(1)}, Galeria{})
-	fondo, ok := cab.(*fyne.Container).Objects[0].(*fcanvas.Rectangle)
-	if !ok {
-		t.Fatal("la cabecera ya no lleva su fondo delante")
+	token := func(re string) string {
+		m := regexp.MustCompile(re).FindStringSubmatch(h2)
+		if m == nil {
+			t.Fatalf("el `<h2>` del mes (%s) no casa con %s", h2, re)
+		}
+		return m[1]
 	}
-	if fondo.FillColor != tema.Color(m[1], v.Variante) {
-		t.Errorf("la web pinta la cabecera con `bg-%s` y Fyne con %v", m[1], fondo.FillColor)
+	web := map[string]string{
+		"marco":  token(` bg-(?:\[var\(--sytue-)?([a-z-]+)\)?\]? `),
+		"carril": token(`in-data-\[forma=carril\]:bg-([a-z-]+) `),
+	}
+	tema.ElegirCromo(tema.CromoPapel)
+	t.Cleanup(func() { tema.ElegirForma(""); tema.ElegirCromo("") })
+	for _, forma := range []string{"marco", "carril"} {
+		tema.ElegirForma(forma)
+		v := vistaDePrueba(t, nil)
+		cab := cabeceraMes(v, GrupoMes{Titulo: "septiembre de 2026", Fotos: fotosDePrueba(1)}, Galeria{})
+		fondo, ok := cab.(*fyne.Container).Objects[0].(*fcanvas.Rectangle)
+		if !ok {
+			t.Fatal("la cabecera ya no lleva su fondo delante")
+		}
+		if fondo.FillColor != tema.Color(web[forma], v.Variante) {
+			t.Errorf("en %s la web pinta la cabecera con `%s` y Fyne con %v", forma, web[forma], fondo.FillColor)
+		}
+	}
+}
+
+// TestSobrePapelLaPaginaEsLaHoja: la galería, sus recuadros sin fondo y la cabecera del
+// mes son lo que en la web va dentro de la hoja del AppShell, blanca sobre papel; el
+// álbum público no lleva hoja y sigue en `bg`.
+//
+// VISTO EN ROJO (2026-11-06): con `bg` en Envolver, recuadro y la cabecera del mes, la
+// página entera salía gris donde la web es blanca.
+func TestSobrePapelLaPaginaEsLaHoja(t *testing.T) {
+	tema.ElegirForma("marco")
+	tema.ElegirCromo(tema.CromoPapel)
+	t.Cleanup(func() { tema.ElegirForma(""); tema.ElegirCromo("") })
+	v := vistaDePrueba(t, nil)
+	hoja, lienzo := tema.Color("sheet-bg", v.Variante), tema.Color("bg", v.Variante)
+	if hoja == lienzo {
+		t.Fatal("sobre papel la hoja y el lienzo deberían ser de dos colores")
+	}
+	fondoDe := func(c *fyne.Container) color.Color {
+		r, ok := c.Objects[0].(*fcanvas.Rectangle)
+		if !ok {
+			t.Fatal("el envoltorio ya no lleva su fondo delante")
+		}
+		return r.FillColor
+	}
+	if got := fondoDe(Envolver(v, true, ui.PilaBloques())); got != hoja {
+		t.Errorf("la página pinta %v y la hoja es %v", got, hoja)
+	}
+	if got := fondoDe(PantallaPublica(v, "Álbum", 0, nil, nil)); got != lienzo {
+		t.Errorf("el álbum público pinta %v y su `<body>` es %v", got, lienzo)
+	}
+	img := pintaPantallaA(t, nil, recuadro(v, "", "border", tema.RadioMD, ui.Margen{}, ui.PilaBloques()), 80, 40)
+	if got := px(img, 40, 20); !cerca(got, hoja) {
+		t.Errorf("un recuadro sin fondo pinta %v por dentro y la hoja es %v", got, hoja)
 	}
 }
 
@@ -864,5 +916,31 @@ func TestLaCabeceraDelMesTieneElFondoDeLaWeb(t *testing.T) {
 func TestLasPestanasDelEditorMiden38(t *testing.T) {
 	if AltoPestanaEditor != 38 {
 		t.Errorf("la pestaña mide %v; Chromium da 38", AltoPestanaEditor)
+	}
+}
+
+// TestEnElTelefonoLaBarraDeSeleccionEsUnaFila: por debajo de `md` la barra no se parte
+// (`FILA_UNICA_EN_MOVIL` de PhotosApp.tsx): se desplaza de lado y mide lo mismo que en el
+// escritorio, que es lo que cuenta TopeBajoBarra para pegar el mes debajo.
+//
+// VISTO EN ROJO (2026-11-06): a 393 px la barra se partía en dos filas y el mes pegado
+// quedaba tapado por la segunda.
+func TestEnElTelefonoLaBarraDeSeleccionEsUnaFila(t *testing.T) {
+	app := webref.Read(t, "apps/frontend/apps/photos/src/components/PhotosApp.tsx")
+	if !regexp.MustCompile(`FILA_UNICA_EN_MOVIL,\s+barraSeleccion\.queda`).MatchString(app) {
+		t.Fatal("la barra de selección de la web ya no es FILA_UNICA_EN_MOVIL")
+	}
+	sel := map[string]bool{}
+	for _, f := range fotosDePrueba(16) {
+		sel[f.ID] = true
+	}
+	alto := func(ventana float32) float32 {
+		v := vistaDePrueba(t, nil)
+		v.Ventana = ventana
+		barra := barraSeleccion(v, Galeria{EnSeleccion: true, Seleccion: sel})
+		return ui.AltoA(barra, ventana-2*tema.Espacio(4))
+	}
+	if movil, escritorio := alto(393), alto(1280); movil != escritorio {
+		t.Errorf("a 393 px la barra mide %v y en el escritorio %v: se ha partido", movil, escritorio)
 	}
 }

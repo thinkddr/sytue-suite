@@ -22,7 +22,7 @@ import type { EditorContext } from '../../types';
 import { RibbonButton, RibbonGroup, RibbonSelect, RibbonSeparator } from '../primitives';
 import { MacrosGroup } from '../MacrosGroup';
 import { ScriptsGroup } from '../ScriptsGroup';
-import { MIN_ZOOM, MAX_ZOOM } from '../../canvas/metrics';
+import { MIN_ZOOM, MAX_ZOOM, clampZoom } from '../../canvas/metrics';
 
 /* ---------- Zoom (§6.3: presets; el rango lo fija canvas/metrics) ---------- */
 
@@ -36,10 +36,6 @@ const ZOOM_PRESETS = [50, 75, 100, 125, 150, 200] as const;
 const ZOOM_OPTIONS = ZOOM_PRESETS.map((v) => ({ value: String(v), label: `${v} %` }));
 /** Aire visual (px) que se deja a cada lado del folio al ajustar al ancho. */
 const FIT_GAP = 48;
-
-function clampZoom(next: number): number {
-  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(next)));
-}
 
 /** El preset más cercano al zoom actual (§6.3: si no es un preset, se muestra el más próximo). */
 function nearestPreset(zoom: number): number {

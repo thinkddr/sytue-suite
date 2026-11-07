@@ -101,6 +101,7 @@
   "linkedServices.changed": "Táto položka sa u vášho poskytovateľa zmenila. Pred ďalšou úpravou ju obnovte.",
   "linkedServices.choose": "Vyberte, čo chcete pripojiť. Poskytovateľ požiada o povolenia pre vybrané služby.",
   "linkedServices.connected": "Pripojené služby",
+  "linkedServices.exists": "Tento účet už bol pripojený a je otvorený.",
   "linkedServices.keepAdmin": "Google Keep vyžaduje schválené nastavenie správy Google Workspace. Osobné účty Gmail ho pripojiť nemôžu.",
   "linkedServices.notGranted": "Prístup k tejto službe nebol udelený. Pripojte účet znova a vyberte jeho povolenia.",
   "linkedServices.notSupported": "Tento poskytovateľ túto službu neponúka.",
@@ -171,7 +172,7 @@
   "notifications.kind.pages.order.oversold": "Objednávka {number} na webe {site} bola zaplatená, ale tovar nie je na sklade",
   "notifications.kind.pages.order.paid": "Nová objednávka {number} na webe {site}",
   "notifications.kind.pages.payment.duplicated": "Dvojitá platba pri objednávke {number} na webe {site}: druhá sa vracia",
-  "notifications.kind.pages.settings.changed": "Zmena nastavenia v Sytue Web: {actor}",
+  "notifications.kind.pages.settings.changed": "Zmena nastavenia v Sytue Webs: {actor}",
   "notifications.kind.pages.store.busy": "Obchod na webe {site} má príliš veľa objednávok čakajúcich na platbu",
   "notifications.kind.pages.withdrawal.requested": "Žiadosť o odstúpenie od zmluvy pri objednávke {number} na webe {site}",
   "notifications.kind.photos.album.added": "{actor} pridal(a) fotky do „{name}“",
@@ -309,6 +310,8 @@
   "shell.update.failedBody": "Skúste to neskôr znova alebo si ju stiahnite z portálu.",
   "shell.update.install": "Aktualizovať na verziu {version}",
   "shell.update.upToDate": "{app} je aktuálna",
+  "shell.widgets.wake": "Aktualizovať widgety, aj keď je aplikácia zatvorená",
+  "shell.widgets.wakeHelp": "Keď sa u vás niečo zmení, Sytue prebudí aplikáciu prázdnym upozornením cez Apple, aby obnovila svoj widget. Apple vidí, o ktorú aplikáciu ide a kedy, nikdy nie, čo sa zmenilo.",
   "ui.backToList": "Späť na zoznam",
   "ui.bulk.clear": "Zrušiť výber",
   "ui.bulk.region": "Akcie pre výber",
@@ -326,6 +329,8 @@
   "ui.review.edit": "Upraviť",
   "ui.save": "Uložiť",
   "ui.selectRow": "Vybrať riadok",
+  "ui.suiteClose": "Späť do aplikácie",
+  "ui.suiteOpen": "Sytue: aplikácie, vyhľadávanie, oznámenia a účet",
   "ui.wizard.back": "Späť",
   "ui.wizard.cancel": "Zrušiť",
   "ui.wizard.goToStep": "Späť na krok {n}: ",
@@ -344,5 +349,7 @@
   "widgets.pending": "Čakajúce",
   "widgets.photos": "Fotky",
   "widgets.rows": "Riadky",
-  "widgets.storage": "Úložisko"
+  "widgets.storage": "Úložisko",
+  "widgets.updatedAgo": "Aktualizované {time}",
+  "widgets.updatedAt": "Aktualizované: {time}"
 }

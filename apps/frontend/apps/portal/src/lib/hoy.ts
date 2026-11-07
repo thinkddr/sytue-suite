@@ -35,3 +35,21 @@ export function haTerminado(e: EventoDeHoy, ahora: Date): boolean {
   const fin = new Date(e.end).getTime();
   return !Number.isNaN(fin) && fin < ahora.getTime();
 }
+
+/**
+ * La ruta, dentro de Calendar, que abre ESTE evento: la vista de día en su fecha
+ * (`?date=<inicio>`, y `all_day=1` si es de todo el día), que es el enlace de evento que
+ * Calendar atiende al montarse (`fechaDelEnlace`). Se compone con el inicio de la
+ * INSTANCIA y no con `/events/{id}`: ese resuelve el evento maestro, y una repetición de
+ * una serie llevaría al día de la primera.
+ *
+ * Un día completo puede llegar como `20260909` (iCalendar); Calendar lo quiere con
+ * guiones, así que se normaliza aquí.
+ */
+export function rutaDelEvento(e: EventoDeHoy): string {
+  const compacto = /^(\d{4})(\d{2})(\d{2})$/.exec(e.start);
+  const date = compacto ? `${compacto[1]}-${compacto[2]}-${compacto[3]}` : e.start;
+  const qs = new URLSearchParams({ date });
+  if (e.allDay) qs.set('all_day', '1');
+  return `/?${qs}`;
+}

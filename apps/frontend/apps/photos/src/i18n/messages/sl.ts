@@ -139,6 +139,12 @@ export const sl: AppCatalog<typeof en> = {
   'gallery.unselectMonth': 'Prekliči izbor meseca',
   'gallery.downloadSelected': 'Prenesi',
   'gallery.downloading': 'Začete zahteve za prenos: {count}. Preverite prenose v brskalniku.',
+  'gallery.downloadingNative': {
+    one: 'Prenašanje {count} fotografije…',
+    two: 'Prenašanje {count} fotografij…',
+    few: 'Prenašanje {count} fotografij…',
+    other: 'Prenašanje {count} fotografij…',
+  },
   'gallery.downloadCapped': 'Fotografije zunaj tega paketa: {count}.',
   'gallery.newAlbum': 'Nov album',
   'gallery.newAlbumTitle': 'Nov album',
@@ -276,4 +282,20 @@ export const sl: AppCatalog<typeof en> = {
   'aiBatch.excludeOrg': 'Izključi organizacijo iz samodejnega sklopa Sytue AI',
   'aiBatch.excludedHint':
     'Organizacija je izključena iz samodejnega sklopa Sytue AI. Nove fotografije se v ozadju ne obdelujejo za predloge ali podobnosti.',
+  'album.rename': 'Preimenuj',
+  'album.renamePrompt': 'Ime albuma',
+  'album.setCover': 'Uporabi kot naslovnico albuma',
+  'album.isCover': 'To je naslovnica albuma',
+  'album.coverSet': 'Naslovnica albuma je posodobljena',
+  'gallery.favorited': 'Dodano med priljubljene: {count}',
+  'gallery.unfavorited': 'Odstranjeno iz priljubljenih: {count}',
+  'gallery.favoriteFailed': 'Fotografije, ki jih ni bilo mogoče spremeniti: {count}',
+  'gallery.noResults.title': 'Nobena fotografija se ne ujema z »{query}«',
+  'gallery.noResults.description':
+    'Poskusite z drugimi besedami ali počistite iskanje, da vidite vse svoje fotografije.',
+  'gallery.clearSearch': 'Počisti iskanje',
+  'viewer.counter': '{index} / {total}',
+  'viewer.counterMore': '{count}+',
+  'viewer.counterLabel': 'Fotografija {index} od {total}',
+  'viewer.shortcutsJump': 'Home in End skočita na prvo in zadnjo fotografijo.',
 };

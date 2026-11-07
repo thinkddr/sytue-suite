@@ -5,12 +5,15 @@
  * Los comandos de «/»: al escribir una barra al principio de una línea, o
  * detrás de un blanco, sale un menú con los bloques que se pueden poner ahí
  * —título, tarea, lista, cita, código, divisor, tabla— y lo que se sigue
- * escribiendo lo filtra. Es lo que hacen Twos y Notion, y aplica las MISMAS
+ * escribiendo lo filtra. Es lo que hacen los editores de notas, y aplica las MISMAS
  * órdenes que la barra del editor: nada nuevo que deshacer ni que sanear.
  *
  * Aquí solo vive la decisión (qué comandos hay, cuándo se abre el menú y qué
  * deja cada consulta); el DOM lo toca RichText. Su espejo en el escritorio es
  * `comandos.go` de apps/fyne/apps/notes, con la misma lista en el mismo orden.
+ *
+ * Y la de su vecino `[[`, que abre la lista de notas que enlazar: el menú es el
+ * mismo, lo que cambia es qué ofrece.
  */
 import { contiene, plegar } from '@sytue/i18n';
 import type { NotesMessageKey } from '../i18n/index.js';
@@ -72,4 +75,20 @@ export function filtrarComandos(consulta: string, rotulo: (c: Comando) => string
   return COMANDOS.filter(
     (c) => contiene(rotulo(c), q) || c.alias.some((a) => plegar(a).startsWith(pq)),
   );
+}
+
+/** El tope de lo que se escribe tras `[[`: el nombre de una nota cabe; más largo ya no es buscarla. */
+const MAX_CONSULTA_ENLACE = 60;
+
+/**
+ * Si el texto del bloque antes del cursor acaba en un `[[` sin cerrar, lo escrito tras
+ * los corchetes (la consulta, quizá vacía); si no, null. Vale en cualquier sitio de la
+ * línea —«ver [[Presupuesto»— y la consulta admite espacios, que es como se llaman las
+ * notas. Un corchete la cierra: `[[x]]` ya no está buscando nada.
+ */
+export function consultaDeEnlace(antes: string): string | null {
+  const m = /\[\[([^[\]\n]*)$/.exec(antes.replace(/\u00a0/g, ' '));
+  if (!m) return null;
+  const q = m[1] ?? '';
+  return q.length <= MAX_CONSULTA_ENLACE ? q : null;
 }

@@ -18,6 +18,8 @@ export const bg: Catalog = {
   'ui.openNav': 'Отваряне на навигацията',
   'ui.closeNav': 'Затваряне на навигацията',
   'ui.backToList': 'Обратно към списъка',
+  'ui.suiteOpen': 'Sytue: приложения, търсене, известия и профил',
+  'ui.suiteClose': 'Обратно към приложението',
   'ui.noResults': 'Няма резултати.',
   'ui.meter.almostFull': 'почти пълно',
   'ui.meter.full': 'пълно',
@@ -60,6 +62,9 @@ export const bg: Catalog = {
   'shell.lock.reasonNotebook': 'отваряне на шифрования ви бележник',
   'shell.lock.faceIdUsage':
     'Sytue използва Face ID, за да отключи сесията ви, когато отворите приложението.',
+  'shell.widgets.wake': 'Обновяване на уиджетите при затворено приложение',
+  'shell.widgets.wakeHelp':
+    'Когато нещо ваше се промени, Sytue събужда приложението с празно известие от Apple, за да обнови уиджета си. Apple вижда кое приложение и кога, но никога какво се е променило.',
   'shell.call.microphoneUsage':
     'Sytue Rooms използва микрофона само по време на разговор и само ако го включите.',
   'shell.call.cameraUsage':
@@ -172,7 +177,7 @@ export const bg: Catalog = {
   'notifications.kind.pages.domain.failed':
     'Домейнът {domain} в {site} не работи: проверете настройките му',
   'notifications.kind.pages.erp.failed': 'Поръчка {number} в {site} не е стигнала до Sytue ERP',
-  'notifications.kind.pages.settings.changed': '{actor} промени настройка на Sytue Web',
+  'notifications.kind.pages.settings.changed': '{actor} промени настройка на Sytue Webs',
   'notifications.kind.pages.export.ready': 'Вашият експорт на {site} е готов',
   'notifications.kind.pages.store.busy':
     'Магазинът в {site} има твърде много поръчки, чакащи плащане',
@@ -354,6 +359,8 @@ export const bg: Catalog = {
   'widgets.compose': 'Писане',
   'widgets.storage': 'Хранилище',
   'widgets.create': 'Създаване на събитие',
+  'widgets.updatedAgo': 'Обновено {time}',
+  'widgets.updatedAt': 'Обновено: {time}',
 
   'linkedServices.services': 'Услуги',
   'linkedServices.changed':
@@ -366,6 +373,7 @@ export const bg: Catalog = {
   'linkedServices.notGranted':
     'Не е предоставен достъп до тази услуга. Свържете профила отново, за да изберете разрешенията му.',
   'linkedServices.connected': 'Свързани услуги',
+  'linkedServices.exists': 'Този акаунт вече беше свързан и е отворен.',
   'linkedServices.providerData': 'Промените се запазват при доставчика.',
   'linkedServices.writeUnknown':
     'Доставчикът не потвърди дали промените са запазени. Опреснете и проверете, преди да опитате отново.',

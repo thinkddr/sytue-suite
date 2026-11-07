@@ -3,13 +3,15 @@
  * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
  *
  * Glifos propios de Sytue Notepads: los que el catálogo de `@sytue/ui` todavía no
- * tiene (tipos de nota, disposiciones, formato de texto). Mismo trazo 1.7 y
- * mismo grid 24 que `Icon`, para que no se noten de otra familia.
+ * tiene (tipos de nota, disposiciones, formato de texto). Se pintan con `Glifo`,
+ * el mismo envoltorio que `Icon`: grid 24 y trazo de 1,5 px en pantalla a cualquier
+ * tamaño, para que no se noten de otra familia.
  *
  * No van a `@sytue/ui` porque hoy solo los usa esta app; el día que otra los
  * pida, ese es el momento de promoverlos.
  */
 import type { JSX } from 'preact';
+import { Glifo } from '@sytue/ui';
 
 const PATHS = {
   notebook: 'M6 4h11a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2ZM8.5 4v16',
@@ -80,22 +82,14 @@ export interface GlyphProps {
 }
 
 export function Glyph({ name, size = 18, class: cls, ...rest }: GlyphProps): JSX.Element {
+  // El trazo y el relleno los decide `Glifo`, como en el resto de la suite: aquí solo
+  // vive el dibujo. Sobre el cromo «papel» de Notepads el relleno de acento no se pinta.
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width={1.7}
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      class={cls ? `${cls} shrink-0` : 'shrink-0'}
-      role={rest['aria-label'] ? 'img' : undefined}
-      aria-hidden={rest['aria-label'] ? undefined : 'true'}
-      {...rest}
-    >
-      <path d={PATHS[name]} />
-    </svg>
+    <Glifo
+      d={PATHS[name]}
+      size={size}
+      {...(cls ? { class: cls } : {})}
+      {...(rest['aria-label'] ? { label: rest['aria-label'] } : {})}
+    />
   );
 }

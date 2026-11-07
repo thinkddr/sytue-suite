@@ -22,22 +22,16 @@
  * lápiz; con el ratón, el clic en la foto es el tamaño real (y arrastrar la foto no pasa
  * de foto en ningún visor de escritorio).
  *
- * La regla de deslizar es la de `decidir`, y es la MISMA en Fyne (`decidirDeslizamiento`
- * en `apps/fyne/apps/photos/deslizar.go`): mismos umbrales, mismo resultado. El
- * pellizco no tiene pareja allí: ver la nota de deslizar.go.
+ * La regla de deslizar es `decidirDeslizamiento` de @sytue/ui (lib/deslizar.ts), que
+ * subió de aquí cuando Calendar la necesitó para cambiar de mes: aquí se reexporta como
+ * `decidir`. Es la MISMA en Fyne (`ui.DecidirDeslizamiento`). El pellizco no tiene
+ * pareja allí: ver la nota de apps/fyne/apps/photos/deslizar.go.
  */
 import { useEffect, useState } from 'preact/hooks';
+import { DOMINIO_HORIZONTAL, decidirDeslizamiento } from '@sytue/ui';
 
-/** Lo menos que tiene que recorrer el dedo, en px, para pasar de foto. */
-export const RECORRIDO_MIN = 56;
-/** O esta fracción del ancho, si es mayor: en una tableta 56 px es un roce. */
-export const FRACCION_ANCHO = 0.18;
-/** Un golpe rápido pasa aunque recorra menos: px por milisegundo. */
-export const VELOCIDAD_RAPIDA = 0.5;
-/** Y aun rápido, al menos esto: un temblor no es un gesto. */
-export const RECORRIDO_RAPIDO = 24;
-/** Horizontal de verdad: |dx| tiene que pasar de |dy| por este factor. */
-export const DOMINIO_HORIZONTAL = 1.4;
+/** Qué hace un deslizamiento al soltar: −1 la anterior, 1 la siguiente, 0 nada. */
+export const decidir = decidirDeslizamiento;
 /** Hacia un lado sin foto la foto va a un cuarto del dedo: se nota que no hay más. */
 export const RESISTENCIA = 0.25;
 /** Lo más que se amplía con los dedos, sobre la foto encajada. */
@@ -49,19 +43,6 @@ export const DOBLE_MS = 300;
 export const DOBLE_PX = 24;
 /** Un toque que se mueve más de esto ya es un arrastre. */
 const TOQUE_PX = 10;
-
-/**
- * Qué hace un deslizamiento al soltar: −1 la anterior, 1 la siguiente, 0 nada. Hacia la
- * IZQUIERDA (dx < 0) se va a la siguiente, como pasar una página.
- */
-export function decidir(dx: number, dy: number, ancho: number, ms: number): -1 | 0 | 1 {
-  const ax = Math.abs(dx);
-  if (ax < DOMINIO_HORIZONTAL * Math.abs(dy)) return 0;
-  const lejos = ax >= Math.max(RECORRIDO_MIN, FRACCION_ANCHO * ancho);
-  const rapido = ax >= RECORRIDO_RAPIDO && ax / Math.max(ms, 1) >= VELOCIDAD_RAPIDA;
-  if (!lejos && !rapido) return 0;
-  return dx < 0 ? 1 : -1;
-}
 
 /**
  * La traslación de la foto ampliada, sin que su borde entre en el hueco: con la foto de

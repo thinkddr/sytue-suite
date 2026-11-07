@@ -9,7 +9,7 @@
 import type { JSX } from 'preact';
 import { imagenesEnLinea, resolverCidsEnLinea } from '../lib/cid.js';
 import { neutralizarProxyEnCuerpo, reescribirImagenesRemotas } from '../lib/remoteImage.js';
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import {
   Avatar,
   Button,
@@ -43,6 +43,8 @@ import {
   unsubscribe,
 } from '../client/mailApi.js';
 import type { Locale } from '@sytue/i18n';
+import type { ExternalMailAttachment } from '@sytue/api-clients';
+import { orgActual } from '@sytue/config';
 import { useT, type T } from '../i18n/index.js';
 import {
   displayName,
@@ -54,10 +56,51 @@ import {
   conversationLabels,
   hasRemoteContent,
   labelDot,
+  textoParaRooms,
+  abrirTrasPeticion,
   type Conversation,
   type ReplyMode,
 } from './utils.js';
 import { Glyph } from './glyphs.js';
+import { origenExterno, type OrigenExterno } from './vistaExterna.js';
+
+/**
+ * Un mensaje de una cuenta externa, leído del proveedor (`GET /external-mail/{id}/message`):
+ * su cuerpo y sus adjuntos, que llegan con sus bytes. No hay .eml en Sytue que bajar.
+ */
+export interface CuerpoExterno extends MessageBody {
+  adjuntos: ExternalMailAttachment[];
+}
+
+/** Lo que el lector tiene de un mensaje abierto: de Sytue, o de una cuenta externa. */
+type CuerpoLeido = MessageBody & { adjuntos?: ExternalMailAttachment[] };
+
+/** Guarda un adjunto externo, que ya trae sus bytes en base64. */
+function guardarAdjuntoExterno(adjunto: ExternalMailAttachment): void {
+  if (!adjunto.content_base64) return;
+  const binario = atob(adjunto.content_base64);
+  const bytes = Uint8Array.from(binario, (c) => c.charCodeAt(0));
+  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
+  const enlace = document.createElement('a');
+  enlace.href = url;
+  enlace.download = adjunto.name;
+  enlace.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/**
+ * Anclas de los atajos «l» (Etiquetar) y «v» (Mover a…): MailApp pulsa el disparador
+ * del menú por este atributo. Van aquí, junto a lo que las pinta, para que cambiar el
+ * marcado obligue a mirar el atajo.
+ */
+export const ATAJO_ETIQUETAR = 'etiquetar';
+export const ATAJO_MOVER = 'mover';
+
+/** El selector del disparador que pulsa un atajo del lector («l» o «v»); null si no es suyo. */
+export function disparadorDeAtajo(tecla: string): string | null {
+  const ancla = tecla === 'l' ? ATAJO_ETIQUETAR : tecla === 'v' ? ATAJO_MOVER : null;
+  return ancla ? `[data-atajo="${ancla}"]` : null;
+}
 
 interface Props {
   /** Lectura pura: responder conserva un borrador, el resto exige servidor. */
@@ -100,6 +143,12 @@ interface Props {
   labels: Label[];
   /** Aplica/quita una etiqueta a TODO el hilo abierto (N mensajes, en lote). */
   onToggleLabel: (conv: Conversation, labelId: string, add: boolean) => void;
+  /**
+   * Lee un mensaje de una cuenta externa (su id sale de `idExterno`). Con uno así
+   * abierto, el lector deja fuera lo que solo existe en Sytue: crear un evento, darse
+   * de baja, compartir en Rooms, reglas, etiquetas, guardar en Drive y el original.
+   */
+  cuerpoExterno?: ((origen: OrigenExterno) => Promise<CuerpoExterno>) | undefined;
 }
 
 export function MessageReader({
@@ -121,10 +170,12 @@ export function MessageReader({
   moveTargets,
   labels,
   onToggleLabel,
+  cuerpoExterno,
 }: Props): JSX.Element {
   const t = useT(locale);
   const toast = useToast();
   const [creatingEvent, setCreatingEvent] = useState(false);
+  const [sharingRooms, setSharingRooms] = useState(false);
 
   // Mensajes que se PINTAN, reciente→antiguo: el hilo completo si el servidor lo
   // dio (atraviesa carpetas), y si no los de la carpeta. Las acciones siguen
@@ -138,12 +189,21 @@ export function MessageReader({
   // último fuera tu propia respuesta desde Enviados.
   const latest = shown[0] ?? conversation?.latest ?? null;
   const latestId = latest?.id ?? null;
-  const [latestBody, setLatestBody] = useState<MessageBody | null>(null);
+  // Un mensaje de una cuenta externa: lo de Sytue (eventos, baja, Rooms, etiquetas)
+  // no existe para él.
+  const externo = latestId !== null && origenExterno(latestId) !== null;
+  const [latestBody, setLatestBody] = useState<CuerpoLeido | null>(null);
+  // El lector externo por ref: MailApp lo crea en cada pintada, y como dependencia
+  // volvería a pedir el cuerpo en cada una.
+  const cuerpoExternoRef = useRef(cuerpoExterno);
+  useLayoutEffect(() => {
+    cuerpoExternoRef.current = cuerpoExterno;
+  });
   useEffect(() => {
     setLatestBody(null);
     if (!latestId) return;
     let vigente = true;
-    getMessageBody(latestId)
+    leerCuerpo(latestId, cuerpoExternoRef.current)
       .then((b) => vigente && setLatestBody(b))
       .catch(() => {
         /* degrada al extracto */
@@ -159,7 +219,7 @@ export function MessageReader({
   const [unsubBusy, setUnsubBusy] = useState(false);
   useEffect(() => {
     setUnsub(null);
-    if (!latestId) return;
+    if (!latestId || origenExterno(latestId)) return;
     let vigente = true;
     getUnsubscribe(latestId)
       .then((u) => vigente && setUnsub(u))
@@ -228,24 +288,56 @@ export function MessageReader({
           [...latest.from, ...latest.to].map((a) => a.email.trim().toLowerCase()).filter(Boolean),
         ),
       ).join(',');
-      const result = await resolveIntent({
-        type: 'create-event-from-mail',
-        params: {
-          message_id: latest.id,
-          subject: latest.subject ?? '',
-          body: latest.preview ?? '',
-          ...(attendees ? { attendees } : {}),
-        },
+      // La pestaña se abre en el clic y recibe el deep-link al llegar (ver
+      // `abrirTrasPeticion`); sin deep-link el evento ya está creado.
+      const abierta = await abrirTrasPeticion(async () => {
+        const result = await resolveIntent({
+          type: 'create-event-from-mail',
+          params: {
+            message_id: latest.id,
+            subject: latest.subject ?? '',
+            body: latest.preview ?? '',
+            ...(attendees ? { attendees } : {}),
+          },
+        });
+        return result.url;
       });
-      if (result.url) {
-        window.open(result.url, '_blank', 'noopener');
-      } else {
-        toast.notify({ tone: 'success', title: t('reader.eventCreated') });
-      }
+      if (!abierta) toast.notify({ tone: 'success', title: t('reader.eventCreated') });
     } catch {
       toast.notify({ tone: 'danger', title: t('reader.eventFailed') });
     } finally {
       setCreatingEvent(false);
+    }
+  }
+
+  // «Compartir en Rooms» (intent share-to-chat, como Drive): el Hub compone el
+  // deep-link a la pantalla de compartir de Sytue Rooms con el asunto y el enlace del
+  // correo; allí se elige la sala y se publica. Se abre en otra pestaña, como «Crear
+  // evento»: compartir no es motivo para perder el correo que se estaba leyendo.
+  async function handleShareToRooms(): Promise<void> {
+    if (!latest || sharingRooms) return;
+    setSharingRooms(true);
+    try {
+      const abierta = await abrirTrasPeticion(async () => {
+        const result = await resolveIntent({
+          type: 'share-to-chat',
+          params: {
+            source: 'mail',
+            id: latest.id,
+            text: textoParaRooms(
+              latest.subject || t('common.noSubject'),
+              latest.id,
+              orgActual(import.meta.env.BASE_URL),
+            ),
+          },
+        });
+        return result.url;
+      });
+      if (!abierta) throw new Error('sin deep-link');
+    } catch {
+      toast.notify({ tone: 'danger', title: t('reader.roomsFailed') });
+    } finally {
+      setSharingRooms(false);
     }
   }
 
@@ -307,7 +399,7 @@ export function MessageReader({
           >
             <span class="max-md:sr-only">{t('reader.forward')}</span>
           </Button>
-          {!readOnly ? (
+          {!readOnly && !externo ? (
             <Button
               size="sm"
               variant="ghost"
@@ -411,7 +503,16 @@ export function MessageReader({
                 <MenuItem icon={<Glyph name="unread" />} onClick={() => onMarkUnread(conversation)}>
                   {t('action.markUnread')}
                 </MenuItem>
-                {onCreateRule ? (
+                {!externo ? (
+                  <MenuItem
+                    icon={<Glyph name="forward" />}
+                    disabled={sharingRooms}
+                    onClick={() => void handleShareToRooms()}
+                  >
+                    {t('reader.shareToRooms')}
+                  </MenuItem>
+                ) : null}
+                {onCreateRule && !externo ? (
                   <MenuItem
                     icon={<Glyph name="folder" />}
                     onClick={() => onCreateRule(conversation)}
@@ -437,53 +538,56 @@ export function MessageReader({
                   </MenuItem>
                 ) : null}
               </Dropdown>
-              <Dropdown
-                label={t('reader.labelConversation')}
-                align="end"
-                trigger={(p) => (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    leadingIcon={<Glyph name="tag" />}
-                    trailingIcon={<Icon name="chevronDown" size={16} />}
-                    {...p}
-                  >
-                    <span class="max-md:sr-only">{t('action.label')}</span>
-                  </Button>
-                )}
-              >
-                <div class="max-h-72 min-w-[220px] overflow-y-auto">
-                  {labels.length === 0 ? (
-                    <p class="text-text-subtle px-3 py-2 text-sm">{t('reader.noLabelsYet')}</p>
-                  ) : (
-                    labels.map((l) => {
-                      const on = appliedIds.has(l.id);
-                      return (
-                        <MenuItem
-                          key={l.id}
-                          aria-pressed={on}
-                          onClick={() => onToggleLabel(conversation, l.id, !on)}
-                        >
-                          <span class="flex flex-1 items-center gap-2">
-                            <span
-                              class="h-2.5 w-2.5 shrink-0 rounded-full"
-                              style={{ background: labelDot(l.color) }}
-                              aria-hidden="true"
-                            />
-                            <span class="flex-1 truncate">{l.name}</span>
-                            {on ? (
-                              <>
-                                <span class="sr-only">{t('reader.labelApplied')}</span>
-                                <Icon name="check" size={16} class="text-primary-text" />
-                              </>
-                            ) : null}
-                          </span>
-                        </MenuItem>
-                      );
-                    })
+              {!externo ? (
+                <Dropdown
+                  label={t('reader.labelConversation')}
+                  align="end"
+                  trigger={(p) => (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      leadingIcon={<Glyph name="tag" />}
+                      trailingIcon={<Icon name="chevronDown" size={16} />}
+                      data-atajo={ATAJO_ETIQUETAR}
+                      {...p}
+                    >
+                      <span class="max-md:sr-only">{t('action.label')}</span>
+                    </Button>
                   )}
-                </div>
-              </Dropdown>
+                >
+                  <div class="max-h-72 min-w-[220px] overflow-y-auto">
+                    {labels.length === 0 ? (
+                      <p class="text-text-subtle px-3 py-2 text-sm">{t('reader.noLabelsYet')}</p>
+                    ) : (
+                      labels.map((l) => {
+                        const on = appliedIds.has(l.id);
+                        return (
+                          <MenuItem
+                            key={l.id}
+                            aria-pressed={on}
+                            onClick={() => onToggleLabel(conversation, l.id, !on)}
+                          >
+                            <span class="flex flex-1 items-center gap-2">
+                              <span
+                                class="h-2.5 w-2.5 shrink-0 rounded-full"
+                                style={{ background: labelDot(l.color) }}
+                                aria-hidden="true"
+                              />
+                              <span class="flex-1 truncate">{l.name}</span>
+                              {on ? (
+                                <>
+                                  <span class="sr-only">{t('reader.labelApplied')}</span>
+                                  <Icon name="check" size={16} class="text-primary-text" />
+                                </>
+                              ) : null}
+                            </span>
+                          </MenuItem>
+                        );
+                      })
+                    )}
+                  </div>
+                </Dropdown>
+              ) : null}
               {moveTargets.length > 0 ? (
                 <Dropdown
                   label={t('reader.moveToFolder')}
@@ -494,6 +598,7 @@ export function MessageReader({
                       variant="ghost"
                       leadingIcon={<Glyph name="folder" />}
                       trailingIcon={<Icon name="chevronDown" size={16} />}
+                      data-atajo={ATAJO_MOVER}
                       {...p}
                     >
                       <span class="max-md:sr-only">{t('action.moveTo')}</span>
@@ -563,8 +668,9 @@ export function MessageReader({
           menú lateral ya se han llevado lo suyo), con un suelo de 44rem para que
           en portátiles no se estreche y un techo de 88rem para que en ultra
           panorámicas la línea de texto siga siendo legible. `min(100%, …)`
-          evita el desbordamiento cuando el panel es más estrecho que el suelo. */}
-      <div class="bg-bg @container min-h-0 flex-1 overflow-y-auto px-6 py-6 xl:px-8 2xl:px-10">
+          evita el desbordamiento cuando el panel es más estrecho que el suelo.
+          El fondo es el de la hoja: sobre papel, `bg-bg` es el gris del lienzo. */}
+      <div class="@container min-h-0 flex-1 overflow-y-auto bg-[var(--sytue-sheet-bg)] px-6 py-6 xl:px-8 2xl:px-10">
         <div class="mx-auto flex w-full max-w-[min(100%,clamp(44rem,92cqw,88rem))] flex-col gap-3">
           {ordered.map((msg) => (
             <ThreadMessage
@@ -575,6 +681,7 @@ export function MessageReader({
               defaultExpanded={msg.id === latest.id}
               prefetchedBody={msg.id === latest.id ? latestBody : null}
               onReply={onReply}
+              cuerpoExterno={cuerpoExterno}
             />
           ))}
         </div>
@@ -595,17 +702,24 @@ function ThreadMessage({
   defaultExpanded,
   prefetchedBody,
   onReply,
+  cuerpoExterno,
 }: {
   /** `t` y `locale` bajan por props desde el lector: nunca se detecta aquí. */
   t: T;
   locale: Locale;
   email: EmailSummary;
   defaultExpanded: boolean;
-  prefetchedBody: MessageBody | null;
+  prefetchedBody: CuerpoLeido | null;
   onReply: (email: EmailSummary, mode: ReplyMode, bodyText?: string) => void;
+  cuerpoExterno?: ((origen: OrigenExterno) => Promise<CuerpoExterno>) | undefined;
 }): JSX.Element {
+  const externo = origenExterno(email.id) !== null;
+  const cuerpoExternoRef = useRef(cuerpoExterno);
+  useLayoutEffect(() => {
+    cuerpoExternoRef.current = cuerpoExterno;
+  });
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const [body, setBody] = useState<MessageBody | null>(prefetchedBody);
+  const [body, setBody] = useState<CuerpoLeido | null>(prefetchedBody);
   const [attachments, setAttachments] = useState<AttachmentMeta[]>([]);
   // Índice del adjunto que se está guardando en Drive (null = ninguno). El trasvase
   // lo hace el servidor y puede tardar con un adjunto grande: sin esto, la persona
@@ -653,7 +767,7 @@ function ThreadMessage({
   useEffect(() => {
     if (!expanded || body) return;
     let vigente = true;
-    getMessageBody(email.id)
+    leerCuerpo(email.id, cuerpoExternoRef.current)
       .then((b) => vigente && setBody(b))
       .catch(() => {
         /* degrada al extracto */
@@ -663,9 +777,10 @@ function ThreadMessage({
     };
   }, [expanded, body, email.id]);
 
-  // Metadatos de adjuntos al expandir un mensaje que los tenga.
+  // Metadatos de adjuntos al expandir un mensaje que los tenga. Los de una cuenta
+  // externa llegan con el cuerpo, ya con sus bytes.
   useEffect(() => {
-    if (!expanded || !email.hasAttachment) return;
+    if (!expanded || !email.hasAttachment || externo) return;
     let vigente = true;
     listAttachments(email.id)
       .then((res) => vigente && setAttachments(res.attachments))
@@ -675,7 +790,7 @@ function ThreadMessage({
     return () => {
       vigente = false;
     };
-  }, [expanded, email.hasAttachment, email.id]);
+  }, [expanded, email.hasAttachment, email.id, externo]);
 
   const unread = !email.keywords.$seen;
 
@@ -764,7 +879,35 @@ function ThreadMessage({
             emailId={email.id}
             adjuntos={attachments}
           />
-          {email.hasAttachment && !soloFirmas ? (
+          {externo && body?.adjuntos?.length ? (
+            <div class="border-border mt-6 border-t pt-4">
+              <p class="sytue-overline text-text-subtle mb-2">
+                {t('reader.attachmentCount', { count: body.adjuntos.length })}
+              </p>
+              <ul class="flex flex-col gap-2">
+                {body.adjuntos.map((a, i) => (
+                  <li key={a.id ?? i} class="flex min-w-0 items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={!a.content_base64}
+                      title={t('reader.download', { name: a.name })}
+                      trailingIcon={<Glyph name="download" size={16} />}
+                      onClick={() => guardarAdjuntoExterno(a)}
+                    >
+                      <span class="truncate">{a.name}</span>
+                      {a.size ? (
+                        <span class="text-text-subtle shrink-0 tabular-nums">
+                          {formatBytes(locale, a.size)}
+                        </span>
+                      ) : null}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {!externo && email.hasAttachment && !soloFirmas ? (
             <div class="border-border mt-6 border-t pt-4">
               <p class="sytue-overline text-text-subtle mb-2">
                 {visibles.length
@@ -831,20 +974,36 @@ function ThreadMessage({
                 otro cliente o mandárselo a quien lo pida. Es un enlace y no un
                 botón porque la descarga la lleva el navegador: sin estado que
                 mantener aquí, y funciona con «guardar enlace como». */}
-            <a
-              href={rawDownloadUrl(email.id, email.subject)}
-              download
-              class="text-text-muted hover:bg-bg-subtle hover:text-text sytue-focus-ring rounded-control inline-flex items-center gap-2 px-3 py-1.5 text-sm transition-colors duration-150"
-              title={t('reader.downloadOriginalHint')}
-            >
-              <Glyph name="download" size={16} />
-              {t('reader.downloadOriginal')}
-            </a>
+            {!externo ? (
+              <a
+                href={rawDownloadUrl(email.id, email.subject)}
+                download
+                class="text-text-muted hover:bg-bg-subtle hover:text-text sytue-focus-ring rounded-control inline-flex items-center gap-2 px-3 py-1.5 text-sm transition-colors duration-150"
+                title={t('reader.downloadOriginalHint')}
+              >
+                <Glyph name="download" size={16} />
+                {t('reader.downloadOriginal')}
+              </a>
+            ) : null}
           </div>
         </div>
       ) : null}
     </Card>
   );
+}
+
+/**
+ * El cuerpo de un mensaje: del .eml de Sytue, o del proveedor si es de una cuenta
+ * externa (con sus adjuntos). Sin lector externo, uno externo no se pide a Sytue
+ * —su id no existe ahí—: se queda el extracto.
+ */
+function leerCuerpo(
+  id: string,
+  cuerpoExterno: ((origen: OrigenExterno) => Promise<CuerpoExterno>) | undefined,
+): Promise<CuerpoLeido> {
+  const origen = origenExterno(id);
+  if (!origen) return getMessageBody(id);
+  return cuerpoExterno ? cuerpoExterno(origen) : Promise.reject(new Error('sin lector externo'));
 }
 
 /**

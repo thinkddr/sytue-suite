@@ -42,6 +42,9 @@ func main() {
 	// La sesión, la apariencia y el idioma son TRANSVERSALES a las trece apps: esto lo
 	// lee de donde lo dejó la última que lo tocó. `Abrir` no habla con la red.
 	s := sesion.Abrir(a, "")
+	// El cromo «papel» de toda la suite (ADR 0080). Aquí y no en `sesion.Abrir`: las
+	// pruebas que abren sesión comprueban también el cromo de color.
+	tema.ElegirCromo(tema.CromoPapel)
 
 	t, err := i18n.New(s.Idioma(), i18n.Common(), catalogos.Contacts())
 	if err != nil {
@@ -51,8 +54,10 @@ func main() {
 	// Sin conexión, solo lectura: la caché «red primero» y su monitor son de la sesión.
 	// «Exportar tus datos» y el CSV son descargas, no listados, y no se guardan.
 	red, cliente := s.Conexion("contacts", "/api/v1/export")
-	c := contactos.NuevaApp(t, api.NewContacts(s.URL("contacts"), s.Sesion, cliente))
-	c.Widget = s.CapturarWidget
+	c := contactos.NuevaApp(t, api.NewContacts(s.URL("contacts"), s.Sesion, s.ClienteConAviso(cliente)))
+	// El widget nativo lo lee su propia Fuente, SIN la caché de trabajar sin conexión:
+	// lo que enseña tiene que ser lo que hay en el servicio.
+	s.PublicadorWidget(s.FuenteWidget(t))
 	c.Conexion(red)
 	// La libreta «Organización» sale de la agenda de Sytue ID. Sin la caché: es una
 	// sincronización, no un listado que haya que ver sin red.
@@ -98,7 +103,9 @@ func main() {
 		}
 		return s.URL("id") + "\x00" + e.Sujeto + "\x00" + s.Sesion.Organizacion()
 	}
-	actual := identidad(s.Estado())
+	// conEscena: hasta que corre lo de CuandoHayaEscena, el AlCambiar no carga; la
+	// escena carga con la identidad que ya ha apuntado (sesion.CuandoHayaEscena).
+	actual, conEscena := identidad(s.Estado()), false
 	s.AlCambiar(func(e sesion.Estado) {
 		siguiente := identidad(e)
 		if siguiente == actual {
@@ -106,15 +113,20 @@ func main() {
 		}
 		actual = siguiente
 		c.Vaciar()
-		if siguiente != "" {
+		if siguiente != "" && conEscena {
 			go c.Cargar()
 		}
 	})
-	if actual != "" {
-		go c.Cargar()
-	} else {
-		go func() { _ = s.Entrar(context.Background()) }()
-	}
+	// Con interfaz: lanzada por iOS solo para el widget, ni se carga ni se abre el
+	// navegador para entrar.
+	s.CuandoHayaEscena(func() {
+		conEscena = true
+		if actual != "" {
+			go c.Cargar()
+		} else {
+			go func() { _ = s.Entrar(context.Background()) }()
+		}
+	})
 	w.SetOnClosed(c.Cerrar)
 	s.Arrancar(context.Background())
 	w.ShowAndRun()

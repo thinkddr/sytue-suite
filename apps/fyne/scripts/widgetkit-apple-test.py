@@ -30,6 +30,7 @@ class ProductoTests(unittest.TestCase):
         self.arquitecturas = "arm64"
         self.tipo = "EXECUTE"
         self.simbolo = "_sytue_widgets_reload"
+        self.instalados = "_sytue_widgets_instalados"
         self._bundle("Sytue-rooms-Widgets.appex", "eu.sytue.rooms.widgets", True)
         self._bundle("SytueWidgetBridge.framework", "eu.sytue.widgetbridge", False)
 
@@ -48,7 +49,7 @@ class ProductoTests(unittest.TestCase):
         if argumentos[1] == "lipo":
             return self.arquitecturas
         if argumentos[1] == "nm":
-            return "0000000100 T " + self.simbolo + "\n"
+            return "0000000100 T " + self.simbolo + "\n0000000200 T " + self.instalados + "\n"
         if argumentos[1] == "otool":
             tipo = self.tipo if extension else "DYLIB"
             return ("Mach header\nmagic cputype cpusubtype caps filetype ncmds sizeofcmds flags\n"
@@ -83,6 +84,12 @@ class ProductoTests(unittest.TestCase):
     def test_puente_sin_exportacion_no_actualizaria_widgets(self):
         self.simbolo = "_otro_simbolo"
         with self.assertRaisesRegex(ValueError, "puente público"):
+            self.verificar()
+
+    def test_puente_sin_contar_los_widgets_no_despertaria_la_app(self):
+        # Visto en rojo sin la comprobación: el puente sin el contador pasaba.
+        self.instalados = "_otro_simbolo"
+        with self.assertRaisesRegex(ValueError, "cuenta los widgets"):
             self.verificar()
 
     def test_producto_macos_universal_con_minimo_13(self):

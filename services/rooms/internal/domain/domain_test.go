@@ -7,6 +7,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestValidName(t *testing.T) {
@@ -212,5 +213,32 @@ func TestNormalizeNotifyPrefs(t *testing.T) {
 	// DND acotado a [0..1439].
 	if got.DNDStart != 0 || got.DNDEnd != 1439 {
 		t.Fatalf("DND = %d..%d, quiero 0..1439", got.DNDStart, got.DNDEnd)
+	}
+}
+
+// TestNormalizeNotifyPause: sin «hasta» o ya pasado no hay pausa; hasta ocho días se
+// guarda en UTC y al segundo; más allá es un ErrInvalidInput.
+func TestNormalizeNotifyPause(t *testing.T) {
+	ahora := time.Date(2026, 11, 5, 17, 0, 0, 0, time.UTC)
+	if u, err := NormalizeNotifyPause(nil, ahora); !u.IsZero() || err != nil {
+		t.Errorf("sin hasta: %v, %v", u, err)
+	}
+	antes := ahora.Add(-time.Minute)
+	if u, err := NormalizeNotifyPause(&antes, ahora); !u.IsZero() || err != nil {
+		t.Errorf("ya pasado: %v, %v", u, err)
+	}
+	madrid := time.FixedZone("CET", 3600)
+	media := ahora.Add(30*time.Minute + 500*time.Millisecond).In(madrid)
+	u, err := NormalizeNotifyPause(&media, ahora)
+	if err != nil || u.Location() != time.UTC || !u.Equal(ahora.Add(30*time.Minute)) {
+		t.Errorf("media hora: %v, %v", u, err)
+	}
+	lunes := ahora.Add(7 * 24 * time.Hour)
+	if u, err := NormalizeNotifyPause(&lunes, ahora); err != nil || u.IsZero() {
+		t.Errorf("una semana: %v, %v", u, err)
+	}
+	lejos := ahora.Add(MaxNotifyPause + time.Minute)
+	if _, err := NormalizeNotifyPause(&lejos, ahora); !errors.Is(err, ErrInvalidInput) {
+		t.Errorf("más de ocho días: %v", err)
 	}
 }

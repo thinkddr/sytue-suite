@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
+	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/services/docs/internal/domain"
 	"git.sytue.eu/sytue/one/services/docs/internal/drive"
 )
@@ -37,6 +38,10 @@ type createDocumentReq struct {
 	// Sin plantilla no hay contenido que estilar y se ignora.
 	Theme        string `json:"theme,omitempty"`
 	BrandVersion int    `json:"brand_version,omitempty"`
+	// CopyOf es «Hacer una copia»: el documento nace con el contenido ACTUAL de ese otro
+	// (su tipo manda sobre `kind`; sin título, el suyo). Basta poder verlo: quien lo ve
+	// ya puede leer su estado entero, así que la copia no le da nada que no tuviera.
+	CopyOf string `json:"copy_of,omitempty"`
 }
 
 type documentResp struct {
@@ -81,6 +86,9 @@ func (h *Handler) createDocument(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, domain.ErrInvalidKind)
 		return
 	}
+	// Aquí sí se sabe el tipo: la señal de cambios va solo al widget de su app (el
+	// producto de la señal es el mismo que el de sus avisos).
+	hubnotify.CambioEn(r.Context(), origenDe(req.Kind))
 	// Con `source_ref` ya puesto el documento VIENE de un fichero que existe (es
 	// «abrir con Sytue Docs»): crearle otro sería duplicar el original y romper la
 	// idempotencia que da el índice único de la migración 0006.

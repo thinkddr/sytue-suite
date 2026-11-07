@@ -4,6 +4,8 @@
 package contactos
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -193,7 +195,7 @@ func TestLaBarraDeLoteMandaLosMarcadosALaPapelera(t *testing.T) {
 	for _, x := range b.Acciones {
 		rotulos = append(rotulos, x.Texto)
 	}
-	if quiero := []string{"Destacar", "Quitar destacado", "Añadir a etiqueta", "Quitar de etiqueta", "A papelera"}; !iguales(rotulos, quiero) {
+	if quiero := []string{"Enviar correo a todos", "Exportar (.vcf)", "Destacar", "Quitar destacado", "Añadir a etiqueta", "Quitar de etiqueta", "A papelera"}; !iguales(rotulos, quiero) {
 		t.Errorf("las acciones son %v y en la web %v", rotulos, quiero)
 	}
 	b.Acciones[len(b.Acciones)-1].AlPulsar()
@@ -228,5 +230,57 @@ func TestExportarLibretaYCSV(t *testing.T) {
 	}
 	if got := guardados["contactos.csv"]; got != "Name\r\nAna\r\n" {
 		t.Errorf("el CSV es %q (guardados: %v)", got, guardados)
+	}
+}
+
+// TestExportarUnaSeleccionEsUnaPeticionPorTanda: «Exportar (.vcf)» de la selección o de
+// una etiqueta trae las tarjetas en UNA petición por cada `api.TandaVCard`, no
+// una por contacto, y el `.vcf` las lleva todas en el orden de la selección.
+func TestExportarUnaSeleccionEsUnaPeticionPorTanda(t *testing.T) {
+	s := &servicioFalso{}
+	a := appDePrueba(t, s)
+	var vcf string
+	a.Descargas = func(_ string, contenido []byte) error { vcf = string(contenido); return nil }
+
+	tres := []api.Contact{persona("ana", "Ana"), persona("bruno", "Bruno"), persona("carla", "Carla")}
+	a.exportarContactos("sel.vcf", tres)
+	if len(s.escrituras) != 1 || s.escrituras[0].ruta != "POST /api/v1/contacts/batch/vcard" {
+		t.Fatalf("exportar tres contactos hizo %v, y debía ser UNA petición al lote", s.escrituras)
+	}
+	quiero := "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:ana\r\nEND:VCARD\r\n" +
+		"BEGIN:VCARD\r\nVERSION:4.0\r\nFN:bruno\r\nEND:VCARD\r\n" +
+		"BEGIN:VCARD\r\nVERSION:4.0\r\nFN:carla\r\nEND:VCARD\r\n"
+	if vcf != quiero {
+		t.Errorf("el .vcf es %q", vcf)
+	}
+
+	s.escrituras = nil
+	muchos := make([]api.Contact, api.TandaVCard+1)
+	for i := range muchos {
+		muchos[i] = persona(fmt.Sprintf("c%d", i), "C")
+	}
+	a.exportarContactos("etiqueta.vcf", muchos)
+	if len(s.escrituras) != 2 {
+		t.Errorf("exportar %d contactos hizo %d peticiones, y debían ser 2", len(muchos), len(s.escrituras))
+	}
+	if n := strings.Count(vcf, "BEGIN:VCARD"); n != len(muchos) {
+		t.Errorf("el .vcf lleva %d tarjetas de %d", n, len(muchos))
+	}
+}
+
+// TestExportarLoQueYaNoExisteAvisaYNoGuarda: si ninguno de los exportados sigue vivo
+// (borrados desde otro dispositivo), no se deja un .vcf vacío en silencio: sale el
+// aviso de fallo, como cuando la exportación no se puede hacer.
+func TestExportarLoQueYaNoExisteAvisaYNoGuarda(t *testing.T) {
+	s := &servicioFalso{vcardsBorradas: true}
+	a := appDePrueba(t, s)
+	guardado := false
+	a.Descargas = func(string, []byte) error { guardado = true; return nil }
+	a.exportarContactos("sel.vcf", []api.Contact{persona("ana", "Ana")})
+	if guardado {
+		t.Error("se ha guardado un .vcf vacío")
+	}
+	if av := a.avisos.Avisos(); len(av) != 1 {
+		t.Errorf("hay %d avisos y debería haber uno de fallo", len(av))
 	}
 }

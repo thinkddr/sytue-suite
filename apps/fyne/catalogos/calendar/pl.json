@@ -70,6 +70,7 @@
   "common.remove": "Usuń",
   "common.retry": "Ponów",
   "common.save": "Zapisz",
+  "day.noEvents": "Brak wydarzeń w tym dniu",
   "error.calendarsLoad": "Nie udało się wczytać kalendarzy.",
   "error.eventsLoad": "Nie udało się wczytać wydarzeń.",
   "event.ai": "Opisz wydarzenie",
@@ -148,6 +149,13 @@
   "grid.blockAria": "{title}, {time}",
   "grid.continued": "{title} (ciąg dalszy)",
   "grid.createOn": "Utwórz wydarzenie w dniu {date}",
+  "grid.dayEvents": {
+    "one": "{date}, {count} wydarzenie",
+    "few": "{date}, {count} wydarzenia",
+    "many": "{date}, {count} wydarzeń",
+    "other": "{date}, {count} wydarzenia"
+  },
+  "grid.daySelected": "{label}, wybrany",
   "grid.loadError": "Nie udało się wczytać kalendarza",
   "grid.loading": "Wczytywanie kalendarza",
   "grid.more": {
@@ -156,6 +164,8 @@
     "many": "+{count} więcej",
     "other": "+{count} więcej"
   },
+  "grid.showMonth": "Pokaż cały miesiąc",
+  "grid.showWeek": "Pokaż tylko ten tydzień",
   "grid.snapAria": {
     "one": "Przyciąganie przy przeciąganiu: {count} minuta. Naciśnij, aby zmienić.",
     "few": "Przyciąganie przy przeciąganiu: {count} minuty. Naciśnij, aby zmienić.",
@@ -174,6 +184,13 @@
     "many": "{count} min",
     "other": "{count} min"
   },
+  "grid.todayLabel": "Dziś, {date}",
+  "grid.weekNumber": "Tydzień {week}",
+  "guests.organizer": "Organizator",
+  "guests.status.accepted": "Weźmie udział",
+  "guests.status.declined": "Nie weźmie udziału",
+  "guests.status.pending": "Czeka na odpowiedź",
+  "guests.status.tentative": "Może",
   "header.invitations": "Zaproszenia",
   "header.next": "Następny",
   "header.pending": {
@@ -213,6 +230,12 @@
   "nav.createEventOn": "Utwórz wydarzenie w dniu {date}",
   "nav.deleteSubscription": "Usuń subskrypcję",
   "nav.manageResources": "Zarządzaj salami i sprzętem",
+  "nav.menuPending": {
+    "one": "Otwórz menu, {count} oczekujące",
+    "few": "Otwórz menu, {count} oczekujące",
+    "many": "Otwórz menu, {count} oczekujących",
+    "other": "Otwórz menu, {count} oczekującego"
+  },
   "nav.myCalendars": "Moje kalendarze",
   "nav.next": "Następny",
   "nav.nextMonth": "Następny miesiąc",
@@ -369,6 +392,7 @@
   "scope.following": "Tego i następnych",
   "scope.legend": "To wydarzenie się powtarza. Których wydarzeń dotyczy zmiana?",
   "scope.this": "Tylko tego wydarzenia",
+  "search.allCalendars": "Wszystkie kalendarze",
   "search.error": "Nie udało się ukończyć wyszukiwania.",
   "search.events": "Szukaj wydarzeń",
   "search.loadMore": "Wczytaj więcej",
@@ -379,6 +403,12 @@
     "other": "Wpisz co najmniej {count} znaku, aby przeszukać kalendarze."
   },
   "search.noResults": "Brak wyników dla „{term}”.",
+  "search.period": "Okres",
+  "search.period.any": "Dowolny termin",
+  "search.period.month": "W tym miesiącu",
+  "search.period.past": "Minione",
+  "search.period.upcoming": "Nadchodzące",
+  "search.period.year": "W tym roku",
   "search.placeholder": "Tytuł, opis, miejsce lub osoba zaproszona…",
   "search.searching": "Szukanie…",
   "search.series": "Seria",
@@ -420,6 +450,14 @@
   "share.whoSeesNow": "Kto widzi go teraz",
   "share.writerHint": "Oprócz oglądania tworzy, zmienia i usuwa wydarzenia w tym kalendarzu.",
   "share.writerLabel": "Widzieć i edytować moje wydarzenia",
+  "shortcuts.group.actions": "Działania",
+  "shortcuts.group.navigate": "Poruszanie się",
+  "shortcuts.group.views": "Widoki",
+  "shortcuts.help": "Pokaż tę listę",
+  "shortcuts.next": "Następny okres",
+  "shortcuts.prev": "Poprzedni okres",
+  "shortcuts.title": "Skróty klawiszowe",
+  "shortcuts.today": "Przejdź do dzisiaj",
   "subscribe.aria": "Subskrybuj kalendarz z adresu URL",
   "subscribe.byUrl": "Subskrybuj z URL (.ics)",
   "subscribe.defaultName": "Subskrybowany kalendarz",

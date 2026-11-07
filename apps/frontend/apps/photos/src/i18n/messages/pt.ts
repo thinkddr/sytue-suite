@@ -134,6 +134,10 @@ export const pt: AppCatalog<typeof en> = {
   'gallery.downloadSelected': 'Transferir',
   'gallery.downloading':
     'Pedidos de transferência iniciados: {count}. Verifique as transferências do navegador.',
+  'gallery.downloadingNative': {
+    one: 'A transferir {count} foto…',
+    other: 'A transferir {count} fotos…',
+  },
   'gallery.downloadCapped': 'Fotografias fora deste lote: {count}.',
   'gallery.newAlbum': 'Novo álbum',
   'gallery.newAlbumTitle': 'Novo álbum',
@@ -258,4 +262,20 @@ export const pt: AppCatalog<typeof en> = {
   'aiBatch.excludeOrg': 'Excluir a organização do lote automático do Sytue AI',
   'aiBatch.excludedHint':
     'A organização está excluída do lote automático do Sytue AI. As fotos novas não são processadas em segundo plano para sugestões nem semelhanças.',
+  'album.rename': 'Mudar o nome',
+  'album.renamePrompt': 'Nome do álbum',
+  'album.setCover': 'Usar como capa do álbum',
+  'album.isCover': 'Esta é a capa do álbum',
+  'album.coverSet': 'Capa do álbum atualizada',
+  'gallery.favorited': 'Adicionadas às favoritas: {count}',
+  'gallery.unfavorited': 'Removidas das favoritas: {count}',
+  'gallery.favoriteFailed': 'Fotos que não foi possível alterar: {count}',
+  'gallery.noResults.title': 'Nenhuma foto corresponde a «{query}»',
+  'gallery.noResults.description':
+    'Experimente outras palavras ou limpe a pesquisa para ver todas as suas fotos.',
+  'gallery.clearSearch': 'Limpar pesquisa',
+  'viewer.counter': '{index} / {total}',
+  'viewer.counterMore': '{count}+',
+  'viewer.counterLabel': 'Foto {index} de {total}',
+  'viewer.shortcutsJump': 'Home e End vão para a primeira e a última foto.',
 };

@@ -101,6 +101,7 @@
   "linkedServices.changed": "Šis elementas pasikeitė pas jūsų paslaugų teikėją. Prieš redaguodami dar kartą, atnaujinkite.",
   "linkedServices.choose": "Pasirinkite, ką prijungti. Teikėjas paprašys pasirinktoms paslaugoms reikalingų leidimų.",
   "linkedServices.connected": "Prijungtos paslaugos",
+  "linkedServices.exists": "Ši paskyra jau buvo prijungta ir dabar atidaryta.",
   "linkedServices.keepAdmin": "Google Keep reikia Google Workspace administracijos patvirtintos konfigūracijos. Asmeninės Gmail paskyros jo prijungti negali.",
   "linkedServices.notGranted": "Prieiga prie šios paslaugos nesuteikta. Prijunkite paskyrą iš naujo ir pasirinkite leidimus.",
   "linkedServices.notSupported": "Šis teikėjas šios paslaugos nesiūlo.",
@@ -171,7 +172,7 @@
   "notifications.kind.pages.order.oversold": "Užsakymas {number} svetainėje {site} apmokėtas, bet atsargų nėra",
   "notifications.kind.pages.order.paid": "Naujas užsakymas {number} svetainėje {site}",
   "notifications.kind.pages.payment.duplicated": "Dvigubas mokėjimas už užsakymą {number} svetainėje {site}: antrasis grąžinamas",
-  "notifications.kind.pages.settings.changed": "Sytue Web nustatymą pakeitė {actor}",
+  "notifications.kind.pages.settings.changed": "Sytue Webs nustatymą pakeitė {actor}",
   "notifications.kind.pages.store.busy": "Parduotuvėje {site} per daug užsakymų, laukiančių apmokėjimo",
   "notifications.kind.pages.withdrawal.requested": "Pateiktas prašymas atsisakyti užsakymo {number} svetainėje {site}",
   "notifications.kind.photos.album.added": "{actor} pridėjo nuotraukų į „{name}“",
@@ -309,6 +310,8 @@
   "shell.update.failedBody": "Bandykite vėliau arba atsisiųskite ją iš portalo.",
   "shell.update.install": "Atnaujinti į {version} versiją",
   "shell.update.upToDate": "{app} yra naujausios versijos",
+  "shell.widgets.wake": "Atnaujinti valdiklius, kai programa uždaryta",
+  "shell.widgets.wakeHelp": "Kai kas nors jūsų pasikeičia, Sytue pažadina programą tuščiu „Apple“ pranešimu, kad ji atnaujintų savo valdiklį. „Apple“ mato, kuri programa ir kada, bet niekada – kas pasikeitė.",
   "ui.backToList": "Grįžti į sąrašą",
   "ui.bulk.clear": "Išvalyti pasirinkimą",
   "ui.bulk.region": "Veiksmai pasirinktiems",
@@ -326,6 +329,8 @@
   "ui.review.edit": "Redaguoti",
   "ui.save": "Išsaugoti",
   "ui.selectRow": "Pasirinkti eilutę",
+  "ui.suiteClose": "Grįžti į programą",
+  "ui.suiteOpen": "Sytue: programos, paieška, pranešimai ir paskyra",
   "ui.wizard.back": "Atgal",
   "ui.wizard.cancel": "Atšaukti",
   "ui.wizard.goToStep": "Grįžti į {n} žingsnį: ",
@@ -344,5 +349,7 @@
   "widgets.pending": "Laukiama",
   "widgets.photos": "Nuotraukos",
   "widgets.rows": "Eilutės",
-  "widgets.storage": "Saugykla"
+  "widgets.storage": "Saugykla",
+  "widgets.updatedAgo": "Atnaujinta {time}",
+  "widgets.updatedAt": "Atnaujinta: {time}"
 }

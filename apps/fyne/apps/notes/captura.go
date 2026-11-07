@@ -39,23 +39,43 @@ func interpretarSoltado(texto string, urls []string) (api.NoteInput, bool) {
 	return interpretarCaptura(texto)
 }
 
-// pegar es Cmd/Ctrl+V sobre el cuaderno.
+// pegar es Cmd/Ctrl+V sobre el cuaderno. En una lista —un día o un cuaderno en lista—
+// cada línea es una nota, como al pegar en la captura (pegarLineas); en el lienzo libre
+// y en columnas, un texto pegado es UNA tarjeta, que es lo que se ve allí (NoteCanvas.tsx).
 func (p *Pantalla) pegar(s fyne.Shortcut) {
+	if texto, ok := p.pegadoSobreCuaderno(s); ok && p.enFilas() && p.pegarLineas(texto) {
+		return
+	}
 	if in, ok := p.captura(s); ok {
 		lanzar(func() error { return p.crear(in) })
 	}
 }
 
-// captura es la nota que crearía ese pegado. Pegar DENTRO de algo —un campo, el editor,
-// una tarjeta enfocada, un diálogo— sigue siendo pegar ahí: solo cuenta cuando nada tiene
-// el foco.
+// captura es la nota que crearía ese pegado como UNA tarjeta.
 func (p *Pantalla) captura(s fyne.Shortcut) (api.NoteInput, bool) {
+	texto, ok := p.pegadoSobreCuaderno(s)
+	if !ok {
+		return api.NoteInput{}, false
+	}
+	return interpretarCaptura(texto)
+}
+
+// pegadoSobreCuaderno es lo que se pega sobre el cuaderno. Pegar DENTRO de algo —un
+// campo, el editor, una tarjeta enfocada, un diálogo— sigue siendo pegar ahí: solo
+// cuenta cuando nada tiene el foco.
+func (p *Pantalla) pegadoSobreCuaderno(s fyne.Shortcut) (string, bool) {
 	pg, ok := s.(*fyne.ShortcutPaste)
 	if !ok || pg.Clipboard == nil || p.win == nil || p.vista != VistaCuaderno || p.activo.ID == "" ||
 		p.win.Canvas().Focused() != nil || p.win.Canvas().Overlays().Top() != nil || !p.hayRed() {
-		return api.NoteInput{}, false
+		return "", false
 	}
-	return interpretarCaptura(pg.Clipboard.Content())
+	return pg.Clipboard.Content(), true
+}
+
+// enFilas es el cuaderno pintado en FILAS (`enFilas` de NoteCanvas.tsx): en lista, sea un
+// día que se ve como día o un cuaderno corriente; en árbol la nota llena su panel.
+func (p *Pantalla) enFilas() bool {
+	return p.activo.Vista == Lista && (p.activo.Crudo.DailyDate == "" || p.vistaDiario() == VistaDia)
 }
 
 // Soltar es el `drop` del cuaderno (`soltar` de NoteCanvas.tsx): lo soltado se vuelve

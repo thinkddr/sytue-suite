@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Daniel Delgado Ramos
+#
+# LAS TIENDAS DE APPLE EN CODEMAGIC (vuelve el 2026-11-05, decisión del dueño):
+# iOS a TestFlight y macOS a la Mac App Store, sin enviar a revisión. Es el camino
+# por defecto de release-desktop.yml (job `tiendas-codemagic`); el Mac propio
+# (`motor=mac`) queda de respaldo. El .dmg notarizado y Android NO están aquí: el
+# .dmg solo se reconstruye en modo de recuperación (`solo_escritorio`, Mac propio) y
+# los AAB los compila y firma release-mobile.yml.
+#
+# NO HAY FIRMA EN ESTE FICHERO. El build ejecuta los pasos del job `tiendas` de
+# release-desktop.yml en el commit que lo encarga (SYTUE_PLOMERIA), con
+# .github/actions/apple/codemagic-pasos.py: una sola lógica para los dos caminos, y
+# los tests de contrato que la vigilan valen para los dos.
+#
+# CODEMAGIC SOLO COMPILA Y SUBE A APPLE (auditoría CI-03): no escribe en GitHub. El
+# SYTUE_GIT_TOKEN del grupo `git-sytue` basta con que LEA thinkddr/sytue-one y los
+# forks privados de Fyne; va en cada `git fetch`, no en un ~/.gitconfig.
+#
+# Lo que tiene que existir en Codemagic (no se configura desde aquí):
+#   - la app clonando de github.com/thinkddr/sytue-one (codemagic-lanzar.sh --app);
+#   - el grupo `git-sytue` con SYTUE_GIT_TOKEN (y, si los forks van aparte,
+#     SYTUE_GIT_FORKS_TOKEN);
+#   - el grupo `apple-firma` con CERTIFICATE_PRIVATE_KEY, la clave de nuestros
+#     certificados (la misma del secreto de GitHub);
+#   - la integración de App Store Connect llamada `Codemagic` (Team settings → Team
+#     integrations → Developer Portal), que da APP_STORE_CONNECT_ISSUER_ID,
+#     _KEY_IDENTIFIER y _PRIVATE_KEY.
+workflows:
+  tiendas-fyne:
+    name: Apps Fyne (TestFlight y Mac App Store)
+    instance_type: mac_mini_m2
+    # Una tienda por build (SYTUE_MODO=ios|mas): 15 apps de una tienda caben en el
+    # máximo de Codemagic, las dos juntas no.
+    max_build_duration: 120
+    environment:
+      groups:
+        - git-sytue
+        - apple-firma
+      vars:
+        SYTUE_GIT_REPO: thinkddr/sytue-one
+      xcode: latest
+    integrations:
+      app_store_connect: Codemagic
+    scripts:
+      - name: La plomería del commit que encarga
+        script: |
+          set -euo pipefail
+          [[ "${SYTUE_PLOMERIA:-}" =~ ^[0-9a-f]{40}$ ]] || { echo "falta SYTUE_PLOMERIA (lo pone codemagic-lanzar.sh)" >&2; exit 1; }
+          case "${SYTUE_MODO:-}" in ios | mas) ;; *) echo "SYTUE_MODO tiene que ser ios o mas" >&2; exit 1 ;; esac
+          cab="Authorization: Basic $(printf 'x-access-token:%s' "${SYTUE_GIT_TOKEN:?falta SYTUE_GIT_TOKEN en el grupo git-sytue}" | base64 | tr -d '\n')"
+          git -c "http.extraHeader=$cab" fetch -q --depth 1 "https://github.com/$SYTUE_GIT_REPO" "$SYTUE_PLOMERIA"
+          git checkout -q FETCH_HEAD
+          echo "plomería $SYTUE_PLOMERIA · compila $TAG · tienda $SYTUE_MODO"
+      - name: El job tiendas de release-desktop.yml
+        script: |
+          set -euo pipefail
+          python3 .github/actions/apple/codemagic-pasos.py .github/workflows/release-desktop.yml tiendas \
+            --saltar 'Marcar en la release la subida a TestFlight'

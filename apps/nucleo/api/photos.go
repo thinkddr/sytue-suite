@@ -356,6 +356,14 @@ func (p *Photos) RenameAlbum(ctx context.Context, id, titulo string) error {
 	return p.mandar(ctx, http.MethodPatch, "/albums/"+url.PathEscape(id), map[string]string{"title": titulo})
 }
 
+// PonerPortada elige la foto de portada de un álbum. Es el mismo PATCH que renombrar
+// (`ponerPortada` en photosApi.ts): el servicio exige el título en cada cambio, así que
+// va el de ahora. La foto tiene que estar en el álbum; si no, el servicio contesta 400.
+func (p *Photos) PonerPortada(ctx context.Context, id, titulo, foto string) error {
+	return p.mandar(ctx, http.MethodPatch, "/albums/"+url.PathEscape(id),
+		map[string]string{"title": titulo, "coverAssetId": foto})
+}
+
 // ShareAlbum abre el enlace público del álbum y devuelve su token (`/p/{token}`).
 func (p *Photos) ShareAlbum(ctx context.Context, id string) (string, error) {
 	r, err := JSON[struct {

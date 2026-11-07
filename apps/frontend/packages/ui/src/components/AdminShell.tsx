@@ -8,12 +8,10 @@
  */
 import type { ComponentChildren, JSX } from 'preact';
 import { useId, useRef, useState } from 'preact/hooks';
-import { useT } from '@sytue/i18n/preact';
 import { cx } from '../lib/cx.js';
 import { useNavDrawer } from '../lib/useNavDrawer.js';
 import { IndicadorRefrescoTactil, usePullToRefresh } from '../lib/usePullToRefresh.js';
-import { Button } from './Button.js';
-import { Icon } from './Icon.js';
+import { BarraMovil } from './BarraMovil.js';
 
 export interface AdminShellProps {
   /** Sidebar (típicamente un <Sidebar> de @sytue/ui). */
@@ -25,7 +23,6 @@ export interface AdminShellProps {
 }
 
 export function AdminShell({ sidebar, title, children, class: cls }: AdminShellProps): JSX.Element {
-  const t = useT();
   const [open, setOpen] = useState(false);
   const hojaRef = useRef<HTMLDivElement>(null);
   const refresco = usePullToRefresh(hojaRef);
@@ -95,30 +92,18 @@ export function AdminShell({ sidebar, title, children, class: cls }: AdminShellP
         {sidebar}
       </aside>
       <div class="sytue-sheet-column flex min-h-0 min-w-0 flex-1 flex-col">
-        {/* Barra móvil: única vía de abrir la nav en <768px.
-
-            `px-4`, EL MISMO CANALÓN QUE LA TOPBAR, para que el botón de menú
-            caiga en la línea vertical de la marca de arriba. Esta fila es byte a
-            byte la de `AppShell` salvo por esto: allí se corrigió y aquí se
-            quedó en `px-2` —7px reales, con la raíz de la suite en 14px—, así
-            que el cromo de Sytue Admin iba escalonado mientras el del resto ya
-            no. Dos copias de la misma fila divergiendo en un número es
-            exactamente lo que pasa cuando se copian. */}
-        <div class="sytue-mobilebar border-border bg-surface flex h-11 shrink-0 items-center gap-1.5 border-b px-4 md:hidden">
-          <Button
-            id={toggleId}
-            variant="ghost"
-            size="sm"
-            iconOnly
-            aria-label={open ? t('ui.closeNav') : t('ui.openNav')}
-            aria-expanded={open}
-            aria-controls={drawerId}
-            onClick={() => setOpen((v) => !v)}
-          >
-            <Icon name="menu" size={18} />
-          </Button>
-          {title ? <span class="truncate text-sm font-semibold">{title}</span> : null}
-        </div>
+        {/* Barra móvil: única vía de abrir la nav en <768px. Es la misma pieza que la
+            de AppShell (BarraMovil): con la Sytue Shell va dentro de su topbar, una sola
+            barra en el teléfono; sin ella, la barra de 44 de siempre. */}
+        <BarraMovil
+          menu={{
+            id: toggleId,
+            controla: drawerId,
+            abierto: open,
+            alPulsar: () => setOpen((v) => !v),
+          }}
+          titulo={title || undefined}
+        />
         {/* La hoja empieza debajo de la barra móvil, que forma parte del marco. */}
         <div ref={hojaRef} class="sytue-sheet relative flex min-h-0 min-w-0 flex-1">
           <IndicadorRefrescoTactil estado={refresco} />

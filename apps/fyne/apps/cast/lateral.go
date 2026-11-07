@@ -9,7 +9,6 @@ import (
 	"fyne.io/fyne/v2"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
-	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 )
 
@@ -25,17 +24,18 @@ const (
 	SecModeracion
 )
 
+// Los glifos son los de Nav.tsx, del catálogo compartido. Eran tres propios (una casa
+// rellena, un globo y unas ondas) que no eran los de la web.
 var destinos = []struct {
 	sec   Seccion
 	clave string
-	glifo string
 	icono iconos.Icono
 }{
-	{SecInicio, "nav.home", glifoInicio, iconos.Ninguno},
-	{SecExplorar, "nav.explore", "", iconos.Globo},
-	{SecEmitir, "nav.studio", glifoDirecto, iconos.Ninguno},
-	{SecSubir, "nav.upload", "", iconos.Subir},
-	{SecModeracion, "nav.moderation", "", iconos.Escudo},
+	{SecInicio, "nav.home", iconos.Inicio},
+	{SecExplorar, "nav.explore", iconos.Explorar},
+	{SecEmitir, "nav.studio", iconos.Emitir},
+	{SecSubir, "nav.upload", iconos.Subir},
+	{SecModeracion, "nav.moderation", iconos.Escudo},
 }
 
 // Lateral arma el carril con los cinco destinos. `activa` fuera
@@ -47,12 +47,7 @@ func Lateral(v Vista, activa Seccion, alIr func(Seccion)) fyne.CanvasObject {
 		if d.sec == activa {
 			tinta = "sidebar-fg"
 		}
-		var glifo fyne.CanvasObject
-		if d.glifo != "" {
-			glifo = iconos.TrazoDeRuta(d.glifo, ui.GlifoMenu, tema.Color(tinta, v.Variante)).Objeto()
-		} else {
-			glifo = iconos.Trazo(d.icono, ui.GlifoMenu, tinta, v.Variante).Objeto()
-		}
+		glifo := iconos.Trazo(d.icono, ui.GlifoMenu, tinta, v.Variante).Objeto()
 		sec := d.sec
 		f := ui.NuevaFilaLateral(v.Traduce(d.clave), glifo, func() {
 			if alIr != nil {

@@ -656,14 +656,29 @@ func (h *Handlers) Libro(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, r, http.StatusOK, map[string]any{"asientos": as})
 }
 
-// Balance devuelve el sumas y saldos por cuenta.
+// Balance devuelve el sumas y saldos por cuenta. Con `desde`, solo los movimientos
+// del período (el balance de un trimestre); sin él, todo lo asentado hasta `hasta`.
 func (h *Handlers) Balance(w http.ResponseWriter, r *http.Request) {
-	hasta, err := fechaOpcional(r.URL.Query().Get("hasta"))
+	q := r.URL.Query()
+	desde, err := fechaOpcional(q.Get("desde"))
+	if err != nil {
+		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("desde: YYYY-MM-DD"))
+		return
+	}
+	hasta, err := fechaOpcional(q.Get("hasta"))
 	if err != nil {
 		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("hasta: YYYY-MM-DD"))
 		return
 	}
-	saldos, err := h.store.Balance(r.Context(), hasta)
+	var saldos []store.SaldoCuenta
+	if desde.IsZero() {
+		saldos, err = h.store.Balance(r.Context(), hasta)
+	} else {
+		if hasta.IsZero() {
+			hasta = sinFin // abierto por arriba: lo que haya, aunque sea con fecha futura
+		}
+		saldos, err = h.store.BalanceEntre(r.Context(), desde, hasta)
+	}
 	if err != nil {
 		httpx.Fail(w, r, err)
 		return
@@ -786,6 +801,9 @@ func idsReferenciados(m *catalogo.Modelo, regs []store.Registro) []string {
 	}
 	return ids
 }
+
+// sinFin es el «hasta» de un período abierto por arriba.
+var sinFin = time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)
 
 func fechaOpcional(s string) (time.Time, error) {
 	if s == "" {

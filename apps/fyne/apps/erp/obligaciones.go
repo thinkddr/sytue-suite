@@ -490,7 +490,7 @@ func (o *Obligaciones) Objeto(v tema.Variante) fyne.CanvasObject {
 		p.add(ob, alto, ObligGap)
 	}
 	ob, alto := p.objeto()
-	return enPagina(ob, alto, AnchoObligaciones, MargenLista)
+	return enPagina(ob, alto, AnchoObligaciones)
 }
 
 func (o *Obligaciones) sm() bool { return o.Ventana == 0 || o.Ventana >= ui.CorteSM }
@@ -567,7 +567,7 @@ func (o *Obligaciones) pasoAnio(v tema.Variante) (fyne.CanvasObject, fyne.Size) 
 	mm := menos.MinSize()
 	at := wt + 2*AnioTextoPX
 	ancho, alto := 2*tema.Borde+2*mm.Width+at, mm.Height+2*tema.Borde
-	caja := ui.NuevaCaja(tema.Color("bg", v), tema.Color("border", v), tema.RadioMD)
+	caja := ui.NuevaCaja(tema.Color(ui.FondoHoja(), v), tema.Color("border", v), tema.RadioMD)
 	l := &lienzo{}
 	l.caja(caja, ancho, alto)
 	l.poner(menos, tema.Borde, tema.Borde, mm.Width, mm.Height)
@@ -637,7 +637,7 @@ func (o *Obligaciones) mes(v tema.Variante, m mes, ancho float32) (fyne.CanvasOb
 
 // listaEnCaja es `ul.rounded-*.border.divide-y`.
 func listaEnCaja(v tema.Variante, filas []bloque, radio float32) (fyne.CanvasObject, float32) {
-	caja := ui.NuevaCaja(tema.Color("bg", v), tema.Color("border", v), radio)
+	caja := ui.NuevaCaja(tema.Color(ui.FondoHoja(), v), tema.Color("border", v), radio)
 	col := &columnaFilas{}
 	var hijos []fyne.CanvasObject
 	for i, f := range filas {
@@ -671,7 +671,7 @@ func (o *Obligaciones) mesesPlegados(v tema.Variante, meses []mes, ancho float32
 	s.PX, s.PY, s.Marca, s.Radio = FilaOblPX, FilaOblPY, marcaDe(abierto), radioTarjeta()
 	ms := s.MinSize()
 	l := &lienzo{}
-	caja := ui.NuevaCaja(tema.Color("bg", v), tema.Color("border", v), radioTarjeta())
+	caja := ui.NuevaCaja(tema.Color(ui.FondoHoja(), v), tema.Color("border", v), radioTarjeta())
 	interior := ancho - 2*tema.Borde
 	alto := tema.Borde + ms.Height
 	var dentro []fyne.CanvasObject

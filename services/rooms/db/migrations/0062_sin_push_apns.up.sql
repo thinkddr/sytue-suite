@@ -1,0 +1,14 @@
+-- SPDX-License-Identifier: Apache-2.0
+-- Copyright (c) 2026 Daniel Delgado Ramos
+--
+-- El registro de aparatos de iOS pasa al Hub (`aparatos_apns`, mig. 0010 del Hub): uno
+-- solo para las quince apps nativas, con el bundle de cada una (ADR 0039, enmienda del
+-- 2026-11-06). `push_apns` (0032) no llegó a tener clientes —ninguna app registraba un
+-- token—, así que no hay filas que mudar. Las rutas `/me/push/apns` de Rooms
+-- redirigen al Hub.
+--
+-- La versión anterior, viva durante el rollout, no la toca: solo la leía con
+-- SYTUE_APNS_* puestas, que ningún chart ha dado nunca, y su ruta de registro no tenía
+-- clientes. Por eso no hace falta expand → contract.
+-- sytue:destructive-ok push_apns nunca tuvo filas ni lectores en producción (ver arriba)
+DROP TABLE IF EXISTS push_apns;

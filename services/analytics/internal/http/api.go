@@ -148,7 +148,7 @@ func (a *api) createSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if a.reservedHost(host) {
-		httpx.Fail(w, r, httpx.ErrForbidden.WithCode("host_reserved").WithMessage("This hostname is reserved for Sytue Web."))
+		httpx.Fail(w, r, httpx.ErrForbidden.WithCode("host_reserved").WithMessage("This hostname is reserved for Sytue Webs."))
 		return
 	}
 	allowlist, err := cleanAllowlist(req.EventAllowlist)

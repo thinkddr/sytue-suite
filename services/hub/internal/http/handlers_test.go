@@ -55,6 +55,8 @@ type fakeNotifier struct {
 	created domain.NewNotification
 	err     error
 	unread  int
+	// El último evento de estado publicado: nombre y datos.
+	evento, datos string
 }
 
 func (f *fakeNotifier) Create(_ context.Context, rec domain.NewNotification) (domain.Notification, error) {
@@ -71,7 +73,8 @@ func (f *fakeNotifier) CreateHistorico(context.Context, domain.NewHistorico) (st
 	return domain.HistoricoCreado, nil
 }
 
-func (f *fakeNotifier) PublishEvent(context.Context, string, string, string, json.RawMessage) error {
+func (f *fakeNotifier) PublishEvent(_ context.Context, _, _, evento string, datos json.RawMessage) error {
+	f.evento, f.datos = evento, string(datos)
 	return f.err
 }
 

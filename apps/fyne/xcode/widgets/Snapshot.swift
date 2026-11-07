@@ -83,7 +83,28 @@ struct SytueWidgetCalendar: Decodable, Equatable {
     var dayColors: [String: String] { day_colors ?? [:] }
 }
 
+// Lo que el lector comprueba FUERA del snapshot (widgets.Entorno en Go, formato 2): la
+// época de identidad (primera línea de `sesion.epoca`), la marca con que se confirmó
+// (cuarta), la `sesion.marca` actual, si hay un `*.cerrada` y el bloqueo de la suite.
+struct SytueWidgetEntorno: Equatable {
+    let epoca: String
+    let confirmada: String
+    let marca: String
+    let cerrada: Bool
+    let bloqueo: Bool
+
+    var permite: Bool {
+        !bloqueo && !cerrada && !epoca.isEmpty && !marca.isEmpty && confirmada == marca
+    }
+}
+
 struct SytueWidgetSnapshot: Decodable {
+    // El contrato común con Go y Java (apps/nucleo/widgets/testdata/contrato.tsv): solo el
+    // formato 2, como mucho 24 h, y a partir de 15 min el widget dice de cuándo es el dato.
+    static let version = 2
+    static let maxAge: Int64 = 86400
+    static let fresco: Int64 = 900
+
     let version: Int
     let product: String
     let generation: String
@@ -135,11 +156,11 @@ struct SytueWidgetSnapshot: Decodable {
         return true
     }
 
-    func isVisible(product expectedProduct: String, generation expectedGeneration: String, now: Int64) -> Bool {
-        guard version == 1, product == expectedProduct, active,
-              !expectedGeneration.isEmpty, generation == expectedGeneration,
+    func isVisible(product expectedProduct: String, entorno: SytueWidgetEntorno, now: Int64) -> Bool {
+        guard entorno.permite, version == Self.version, product == expectedProduct, active,
+              !generation.isEmpty, generation.utf8.count <= 128, generation == entorno.epoca,
               updated_at > 0, updated_at <= now + 5, expires_at > now,
-              expires_at > updated_at, expires_at - updated_at <= 1800,
+              expires_at > updated_at, expires_at - updated_at <= Self.maxAge,
               counters.count <= 12, visualItems.count <= 8 else { return false }
         var seen = Set<String>()
         for counter in counters {
@@ -174,6 +195,11 @@ struct SytueWidgetSnapshot: Decodable {
         }
         return true
     }
+
+    // Snapshot.Rancio: a partir de aquí el widget dice «Actualizado hace X».
+    func isStale(now: Int64) -> Bool { now - updated_at >= Self.fresco }
+
+    var updatedDate: Date { Date(timeIntervalSince1970: TimeInterval(updated_at)) }
 }
 
 enum SytueWidgetTimeline {
@@ -181,6 +207,116 @@ enum SytueWidgetTimeline {
         guard let snapshot else { return nil }
         let date = Date(timeIntervalSince1970: TimeInterval(snapshot.expires_at))
         return date > now ? date : nil
+    }
+
+    // widgets.Vigentes: en Calendar, un evento con hora vale mientras no haya terminado (o
+    // no haya empezado); uno de día completo es FLOTANTE —medianoche UTC— y vale hasta la
+    // medianoche local que sigue a su último día, con el final exclusivo. Sin fechas, vale.
+    static func isCurrent(_ item: SytueWidgetItem, now: Int64, calendar: Calendar) -> Bool {
+        if item.startAt == 0 && item.endAt == 0 { return true }
+        guard item.isAllDay else { return item.endAt > now || item.startAt >= now }
+        guard let end = allDayEnd(item, calendar: calendar) else { return false }
+        return now < Int64(end.timeIntervalSince1970)
+    }
+
+    static func allDayEnd(_ item: SytueWidgetItem, calendar: Calendar) -> Date? {
+        let last = item.endAt > item.startAt ? item.endAt - 1 : item.startAt
+        var utc = Calendar(identifier: .gregorian)
+        guard let zone = TimeZone(identifier: "UTC") else { return nil }
+        utc.timeZone = zone
+        let day = utc.dateComponents([.year, .month, .day], from: Date(timeIntervalSince1970: TimeInterval(last)))
+        guard let start = calendar.date(from: DateComponents(year: day.year, month: day.month, day: day.day)) else { return nil }
+        return calendar.date(byAdding: .day, value: 1, to: start)
+    }
+
+    static func currentItems(_ snapshot: SytueWidgetSnapshot?, at date: Date, calendar: Calendar) -> [SytueWidgetItem] {
+        guard let snapshot else { return [] }
+        guard snapshot.product == "calendar" else { return snapshot.visualItems }
+        let now = Int64(date.timeIntervalSince1970)
+        return snapshot.visualItems.filter { isCurrent($0, now: now, calendar: calendar) }
+    }
+
+    // Las entradas de una línea de tiempo `.atEnd`, precalculadas para que el widget cambie
+    // sin que nadie lo recargue: ahora; a los 15, 30 y 45 min y a la hora de la última
+    // comprobación, y después cada hora (el «Actualizado hace X»); cada medianoche (el
+    // «hoy» y la rejilla del mes); cuando termina cada evento (Vigentes). La última, la
+    // caducidad, va sin datos y la añade quien llama. Como mucho `maxEntries` en total.
+    static let maxEntries = 40
+
+    static func entryDates(snapshot: SytueWidgetSnapshot, now: Date, calendar: Calendar) -> [Date] {
+        guard let expiry = Self.expiry(snapshot: snapshot, now: now) else { return [] }
+        var dates = Set<Date>()
+        let updated = snapshot.updatedDate
+        for minutes in [15, 30, 45] {
+            dates.insert(updated.addingTimeInterval(TimeInterval(minutes * 60)))
+        }
+        var hour = updated.addingTimeInterval(3600)
+        while hour < expiry {
+            dates.insert(hour)
+            hour = hour.addingTimeInterval(3600)
+        }
+        var midnight = calendar.startOfDay(for: now)
+        while let next = calendar.date(byAdding: .day, value: 1, to: midnight), next < expiry {
+            dates.insert(next)
+            midnight = next
+        }
+        if snapshot.product == "calendar" {
+            for item in snapshot.visualItems {
+                if item.isAllDay {
+                    if let end = allDayEnd(item, calendar: calendar) { dates.insert(end) }
+                } else if item.endAt > 0 {
+                    dates.insert(Date(timeIntervalSince1970: TimeInterval(item.endAt)))
+                } else if item.startAt > 0 {
+                    dates.insert(Date(timeIntervalSince1970: TimeInterval(item.startAt + 1)))
+                }
+            }
+        }
+        let future = dates.filter { $0 > now && $0 < expiry }.sorted()
+        return [now] + future.prefix(maxEntries - 2)
+    }
+
+    // Qué línea de tiempo pide WidgetKit (Widgets.swift la traduce).
+    enum Plan: Equatable {
+        // Las fechas con datos y, al final, la caducidad sin ellos; política `.atEnd`.
+        case entries([Date], expiry: Date)
+        // La lectura falló por la protección de datos (el teléfono bloqueado): no es «no
+        // hay datos». Se pinta el marco con el marcador y se vuelve a pedir en 5 min, sin
+        // la entrada vacía de 24 h que borraría lo que ya había.
+        case protected(retry: Date)
+        // Sin datos que enseñar: nada que recargar hasta que la app publique o borre.
+        case empty
+    }
+
+    static let protectedRetry: TimeInterval = 5 * 60
+
+    static func plan(for reading: SytueWidgetReading, now: Date, calendar: Calendar) -> Plan {
+        switch reading {
+        case .visible(let snapshot):
+            guard let expiry = Self.expiry(snapshot: snapshot, now: now) else { return .empty }
+            return .entries(entryDates(snapshot: snapshot, now: now, calendar: calendar), expiry: expiry)
+        case .protected:
+            return .protected(retry: now.addingTimeInterval(protectedRetry))
+        case .hidden:
+            return .empty
+        }
+    }
+}
+
+// El resultado de leer: visible, oculto (no hay, caducado, de otra sesión, bloqueo de la
+// suite…) o protegido (el sistema no deja leer el contenedor: dispositivo bloqueado).
+enum SytueWidgetReading {
+    case visible(SytueWidgetSnapshot)
+    case hidden
+    case protected
+
+    var snapshot: SytueWidgetSnapshot? {
+        if case .visible(let snapshot) = self { return snapshot }
+        return nil
+    }
+
+    var isProtected: Bool {
+        if case .protected = self { return true }
+        return false
     }
 }
 
@@ -225,31 +361,69 @@ enum SytueWidgetSnapshots {
     // All paths are derived from signed bundle metadata. JSON cannot name a
     // file, account, server or URL. The extension never opens the Keychain.
     static func load(directory: URL, bundle: String, product: String, now: Int64) -> SytueWidgetSnapshot? {
-        guard bundle.range(of: #"^eu\.sytue\.[a-z][a-z0-9]*$"#, options: .regularExpression) != nil,
-              let marker = try? read(directory.appendingPathComponent("sesion.marca"), limit: 1024),
-              let generation = String(data: marker, encoding: .utf8), !generation.isEmpty,
-              unlocked(directory),
-              let data = try? read(directory.appendingPathComponent("widgets").appendingPathComponent(bundle + ".json"), limit: 16 << 10),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              validObjectStructure(object),
-              let snapshot = try? JSONDecoder().decode(SytueWidgetSnapshot.self, from: data),
-              snapshot.isVisible(product: product, generation: generation, now: now),
-              (try? read(directory.appendingPathComponent("sesion.marca"), limit: 1024)) == marker,
-              unlocked(directory) else { return nil }
-        return snapshot
+        reading(directory: directory, bundle: bundle, product: product, now: now).snapshot
     }
 
-    private static func unlocked(_ directory: URL) -> Bool {
+    static func reading(directory: URL, bundle: String, product: String, now: Int64) -> SytueWidgetReading {
+        guard bundle.range(of: #"^eu\.sytue\.[a-z][a-z0-9]*$"#, options: .regularExpression) != nil else { return .hidden }
+        do {
+            let before = try entorno(directory)
+            guard before.permite else { return .hidden }
+            let data = try read(directory.appendingPathComponent("widgets").appendingPathComponent(bundle + ".json"), limit: 16 << 10)
+            guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  validObjectStructure(object),
+                  let snapshot = try? JSONDecoder().decode(SytueWidgetSnapshot.self, from: data),
+                  snapshot.isVisible(product: product, entorno: before, now: now),
+                  try entorno(directory) == before else { return .hidden }
+            return .visible(snapshot)
+        } catch let error where isProtected(error) {
+            return .protected
+        } catch {
+            return .hidden
+        }
+    }
+
+    // Formato 2: la época y su confirmación de `sesion.epoca`, la `sesion.marca`, el
+    // bloqueo de `ajustes.json` y si queda algún `*.cerrada` (un cierre de sesión).
+    static func entorno(_ directory: URL) throws -> SytueWidgetEntorno {
+        let marker = try read(directory.appendingPathComponent("sesion.marca"), limit: 1024)
+        let epoch = try read(directory.appendingPathComponent("sesion.epoca"), limit: 1024)
+        let lines = (String(data: epoch, encoding: .utf8) ?? "").components(separatedBy: "\n")
+        let marca = String(data: marker, encoding: .utf8) ?? ""
+        guard lines.count == 5, lines[0].utf8.count == 32, lines[4].isEmpty else {
+            return SytueWidgetEntorno(epoca: "", confirmada: "", marca: marca, cerrada: true, bloqueo: true)
+        }
+        return SytueWidgetEntorno(epoca: lines[0], confirmada: lines[3], marca: marca,
+                                  cerrada: closed(directory), bloqueo: try !unlocked(directory))
+    }
+
+    // Listar no depende de la protección de datos; si no se puede, como si hubiera cierre.
+    private static func closed(_ directory: URL) -> Bool {
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path) else { return true }
+        return names.contains { $0.hasSuffix(".cerrada") }
+    }
+
+    // NSFileProtectionComplete con el dispositivo bloqueado: el fichero existe pero no se
+    // puede abrir. Distinto de «no existe», que es no tener datos.
+    static func isProtected(_ error: Error) -> Bool {
+        if let cocoa = error as? CocoaError, cocoa.code == .fileReadNoPermission { return true }
+        let ns = error as NSError
+        return ns.domain == NSPOSIXErrorDomain && (ns.code == 1 || ns.code == 13) // EPERM, EACCES
+    }
+
+    private static func unlocked(_ directory: URL) throws -> Bool {
         let url = directory.appendingPathComponent("ajustes.json")
         struct Preferences: Decodable { let bloqueo: Bool? }
+        let data: Data
         do {
-            let data = try read(url, limit: 16 << 10)
-            return try JSONDecoder().decode(Preferences.self, from: data).bloqueo != true
+            data = try read(url, limit: 16 << 10)
         } catch let error as CocoaError where error.code == .fileReadNoSuchFile || error.code == .fileNoSuchFile {
-            // A fresh profile may not have changed any preference yet. Other
-            // errors (including protected files while locked) stay private.
+            // A fresh profile may not have changed any preference yet.
             return true
-        } catch { return false }
+        }
+        // Malformed settings stay private; a protected read propagates as protected.
+        guard let preferences = try? JSONDecoder().decode(Preferences.self, from: data) else { return false }
+        return preferences.bloqueo != true
     }
 
     private enum ReadError: Error { case oversized }

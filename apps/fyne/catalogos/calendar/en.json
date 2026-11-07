@@ -66,6 +66,7 @@
   "common.remove": "Remove",
   "common.retry": "Retry",
   "common.save": "Save",
+  "day.noEvents": "No events on this day",
   "error.calendarsLoad": "The calendars could not be loaded.",
   "error.eventsLoad": "The events could not be loaded.",
   "event.ai": "Describe the event",
@@ -142,12 +143,19 @@
   "grid.blockAria": "{title}, {time}",
   "grid.continued": "{title} (continued from earlier)",
   "grid.createOn": "Create an event on {date}",
+  "grid.dayEvents": {
+    "one": "{date}, {count} event",
+    "other": "{date}, {count} events"
+  },
+  "grid.daySelected": "{label}, selected",
   "grid.loadError": "The calendar could not be loaded",
   "grid.loading": "Loading the calendar",
   "grid.more": {
     "one": "+{count} more",
     "other": "+{count} more"
   },
+  "grid.showMonth": "Show the whole month",
+  "grid.showWeek": "Show this week only",
   "grid.snapAria": {
     "one": "Snap dragging to {count} minute. Press to change.",
     "other": "Snap dragging to {count} minutes. Press to change."
@@ -160,6 +168,13 @@
     "one": "{count} min",
     "other": "{count} min"
   },
+  "grid.todayLabel": "Today, {date}",
+  "grid.weekNumber": "Week {week}",
+  "guests.organizer": "Organiser",
+  "guests.status.accepted": "Going",
+  "guests.status.declined": "Not going",
+  "guests.status.pending": "Awaiting reply",
+  "guests.status.tentative": "Maybe",
   "header.invitations": "Invitations",
   "header.next": "Next",
   "header.pending": {
@@ -197,6 +212,10 @@
   "nav.createEventOn": "Create event on {date}",
   "nav.deleteSubscription": "Remove subscription",
   "nav.manageResources": "Manage rooms and equipment",
+  "nav.menuPending": {
+    "one": "Open menu, {count} pending",
+    "other": "Open menu, {count} pending"
+  },
   "nav.myCalendars": "My calendars",
   "nav.next": "Next",
   "nav.nextMonth": "Next month",
@@ -341,6 +360,7 @@
   "scope.following": "This and following events",
   "scope.legend": "This event repeats. Which events does the change apply to?",
   "scope.this": "This event only",
+  "search.allCalendars": "All calendars",
   "search.error": "The search could not be completed.",
   "search.events": "Search events",
   "search.loadMore": "Load more",
@@ -349,6 +369,12 @@
     "other": "Type at least {count} characters to search your calendars."
   },
   "search.noResults": "No results for “{term}”.",
+  "search.period": "Period",
+  "search.period.any": "Any time",
+  "search.period.month": "This month",
+  "search.period.past": "Past",
+  "search.period.upcoming": "Upcoming",
+  "search.period.year": "This year",
   "search.placeholder": "Title, description, location or guest…",
   "search.searching": "Searching…",
   "search.series": "Series",
@@ -390,6 +416,14 @@
   "share.whoSeesNow": "Who sees it now",
   "share.writerHint": "As well as seeing them, creates, changes and deletes events in this calendar.",
   "share.writerLabel": "See and edit my events",
+  "shortcuts.group.actions": "Actions",
+  "shortcuts.group.navigate": "Move around",
+  "shortcuts.group.views": "Views",
+  "shortcuts.help": "Show this list",
+  "shortcuts.next": "Next period",
+  "shortcuts.prev": "Previous period",
+  "shortcuts.title": "Keyboard shortcuts",
+  "shortcuts.today": "Go to today",
   "subscribe.aria": "Subscribe to a calendar by URL",
   "subscribe.byUrl": "Subscribe by URL (.ics)",
   "subscribe.defaultName": "Subscribed calendar",

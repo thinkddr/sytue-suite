@@ -110,6 +110,31 @@ struct PruebaAccesoDrive {
         for id in ["sytue-drive." + identidad, "sytue-drive." + identidad + ".../", "otro." + identidad + "." + revision] {
             try comprobar(ContextoDrive(dominio: id) == nil, "el dominio no puede elegir una ruta fuera del índice autorizado")
         }
-        print("ok - File Provider: \(controles) controles de identidad, renovación y cierre local")
+        // Lo pasajero del servidor se reintenta; lo demás conserva su significado.
+        func respuesta(_ codigo: Int) -> URLResponse {
+            HTTPURLResponse(url: URL(string: "https://drive.ejemplo.eu/dav/")!, statusCode: codigo, httpVersion: "HTTP/1.1", headerFields: nil)!
+        }
+        func traduce(_ codigo: Int) -> Error? {
+            do { try DAV.comprobar(respuesta(codigo), metodo: "PROPFIND"); return nil } catch { return error }
+        }
+        func esProveedor(_ e: Error?, _ codigo: NSFileProviderError.Code) -> Bool {
+            (e as? NSFileProviderError)?.code == codigo
+        }
+        for codigo in [429, 502, 503, 504] {
+            try comprobar(esProveedor(traduce(codigo), .serverUnreachable), "HTTP \(codigo) es pasajero: el sistema debe reintentar")
+        }
+        try comprobar(traduce(207) == nil, "un 207 de PROPFIND es una respuesta buena")
+        try comprobar(esProveedor(traduce(401), .notAuthenticated), "un 401 pide volver a entrar")
+        try comprobar(esProveedor(traduce(404), .noSuchItem), "un 404 es que el elemento no existe")
+        try comprobar((traduce(500) as? URLError)?.code == .badServerResponse, "un 500 no se reintenta en bucle")
+        try comprobar(esProveedor(DAV.traducir(URLError(.timedOut)), .serverUnreachable), "sin red, el sistema reintenta")
+        // File Provider descarta errores de otros dominios: nada sale como URLError.
+        for codigo in [400, 405, 500] {
+            let dominio = (DAV.traducir(traduce(codigo)!) as NSError).domain
+            try comprobar(dominio == NSCocoaErrorDomain, "HTTP \(codigo) debe llegar al sistema en un dominio que admite")
+        }
+        try comprobar((DAV.traducir(URLError(.cannotParseResponse)) as NSError).domain == NSCocoaErrorDomain, "una respuesta ilegible no sale como URLError")
+        try comprobar(esProveedor(DAV.traducir(NSFileProviderError(.notAuthenticated)), .notAuthenticated), "un error de File Provider se conserva")
+        print("ok - File Provider: \(controles) controles de identidad, renovación, cierre local y respuestas HTTP")
     }
 }

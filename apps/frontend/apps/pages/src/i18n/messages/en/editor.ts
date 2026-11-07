@@ -17,10 +17,10 @@ export const editor = {
   'editor.bases.desc': 'The records of a view, as they are now',
   'editor.bases.title': 'Table from Sytue Bases',
   'editor.bases.prompt':
-    'Paste the token of a read-only connection granted to Sytue Web. The data of that view will become site content and will be public once published.',
+    'Paste the token of a read-only connection granted to Sytue Webs. The data of that view will become site content and will be public once published.',
   'editor.bases.confirm': 'Bring the view',
   'editor.bases.invalid':
-    'That connection is not valid for Sytue Web: it may be revoked, expired, or granted to another product or organisation.',
+    'That connection is not valid for Sytue Webs: it may be revoked, expired, or granted to another product or organisation.',
   'editor.bases.large':
     'The view does not fit in a site table (50 rows and 8 columns at most). Narrow it in Sytue Bases.',
   'editor.bases.forbidden': 'Only administrators can bring Sytue Bases data into a site.',

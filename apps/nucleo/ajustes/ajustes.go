@@ -90,6 +90,16 @@ type Ajustes struct {
 	// ficheros del equipo que abre con Docus, Calcus, Diapos o CertiPDF desde el sistema
 	// (FYP-02).
 	SubirAlAbrir bool `json:"subir_al_abrir,omitempty"`
+	// DespertarWidgets es «Actualizar los widgets con la app cerrada»: la persona deja
+	// que el Hub despierte las apps de iOS con un aviso vacío de Apple cuando cambia algo
+	// suyo (ADR 0039, enmienda del 2026-11-06). APAGADO por defecto: encenderlo es
+	// decirle a Apple qué app tiene algo nuevo y cuándo. Es de quien lo encendió, no del
+	// aparato: salir lo apaga (sesion.SalirConError).
+	DespertarWidgets bool `json:"despertar_widgets,omitempty"`
+	// DespertarDe es la huella de quien encendió DespertarWidgets (sesion.huellaDespertar,
+	// sin el sujeto en claro): con otra persona dentro cuenta como apagado, aunque la
+	// sesión anterior se acabara sin salir.
+	DespertarDe string `json:"despertar_de,omitempty"`
 }
 
 // Estado es todo lo transversal que otra app de la suite puede haber cambiado.
@@ -98,6 +108,10 @@ type Estado struct {
 	// Sesion es una marca OPACA: lo único que significa es que, si ha cambiado desde
 	// la última vez, la sesión guardada en el llavero ya no es la que se leyó.
 	Sesion string
+	// Epoca solo cambia cuando cambia QUIÉN ha entrado (epoca.go), no en cada
+	// renovación. EpocaConfirmada es la marca de sesión con la que se escribió: si no
+	// es Sesion, la sesión la cambió una compilación que no conoce la época.
+	Epoca, EpocaConfirmada string
 }
 
 // Carpeta es dónde vive todo esto, ya creada: `<config del usuario>/sytue`. En la
@@ -125,6 +139,9 @@ func Leer() Estado {
 	e := Estado{Ajustes: leerAjustes(dir)}
 	if crudo, err := os.ReadFile(filepath.Join(dir, ficheroSesion)); err == nil {
 		e.Sesion = string(crudo)
+	}
+	if epoca, err := leerEpoca(dir); err == nil {
+		e.Epoca, e.EpocaConfirmada = epoca.epoca, epoca.confirmada
 	}
 	return estadoPlataforma(e)
 }

@@ -9,6 +9,8 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 )
@@ -25,7 +27,11 @@ var (
 )
 
 // pildora es el `EventChip`: una píldora sobre `bg-subtle` con borde, el punto del
-// color del calendario y el resumen recortado.
+// color del calendario, la HORA de inicio (`text-muted font-medium tabular-nums`) y el
+// resumen recortado.
+//
+// La hora sale solo desde `sm:` (ventana de 640 o más, `hidden sm:inline`): en el
+// teléfono la celda mide unos 50 px y la hora se comería el título entero.
 //
 // El color del evento va en el PUNTO y no en el relleno. No es estética: el rótulo va
 // sobre `bg-subtle` con `text-text`, así que su contraste está garantizado pase lo que
@@ -63,6 +69,29 @@ func (p *pildora) resumen() string {
 	return p.m.SinTitulo
 }
 
+// hora es la de inicio en la zona de visualización: «08:00», con la convención del
+// idioma (`timeLabel`).
+func (p *pildora) hora() string {
+	return i18n.FormatTimeDigits(p.m.Locale, p.o.Start.In(p.m.zona()))
+}
+
+// estrecha dice si la ventana está por debajo de `sm:` (640), que es el teléfono en
+// vertical. Mide la VENTANA, como la media query, no el objeto (ver ui.CorteSM). Sin
+// lienzo todavía, la del escritorio.
+//
+// Lo usan la píldora (sin hora en estrecho) y la barra de día completo, que en la
+// franja de la semana y del día sí se pinta por debajo de 640 (vistahoraria.go). El mes
+// por debajo de 640 ya no es esta rejilla: es el mes del teléfono (vistamescompacta.go).
+func estrecha(o fyne.CanvasObject) bool {
+	if c := fyne.CurrentApp().Driver().CanvasForObject(o); c != nil {
+		return c.Size().Width < ui.CorteSM
+	}
+	return false
+}
+
+// conHora: la hora de inicio sale solo desde `sm:` (`hidden sm:inline`).
+func (p *pildora) conHora() bool { return !estrecha(p) }
+
 // AccessibilityLabel es el `title` de la web: el resumen del evento.
 func (p *pildora) AccessibilityLabel() string { return p.resumen() }
 
@@ -72,13 +101,14 @@ func (p *pildora) CreateRenderer() fyne.WidgetRenderer {
 		p:     p,
 		caja:  ui.NuevaCaja(tema.Color("bg-subtle", v), tema.Color("border", v), tema.RadioSM),
 		punto: canvas.NewRectangle(p.o.Color),
+		hora:  ui.Texto(p.hora(), tema.TextoXS, ui.Medio, tema.Color("text-muted", v)),
 		texto: ui.Texto(p.resumen(), tema.TextoXS, ui.Normal, tema.Color("text", v)),
 		aro:   ui.NuevoAro(tema.RadioSM, 0, v),
 	}
 	r.punto.CornerRadius = LadoPunto / 2
 	// El aro DELANTE: es relleno y la caja opaca le tapa el centro. Pintado encima,
 	// tapaba la píldora entera (regla de `ui.Aro.Antes`).
-	r.objetos = r.aro.Antes(append(r.caja.Objetos(), r.punto, r.texto)...)
+	r.objetos = r.aro.Antes(append(r.caja.Objetos(), r.punto, r.hora, r.texto)...)
 	r.aro.Ver(false)
 	r.Refresh() // regla 7 de `ui`
 	return r
@@ -88,6 +118,7 @@ type pildoraRenderer struct {
 	p       *pildora
 	caja    *ui.Caja
 	punto   *canvas.Rectangle
+	hora    *canvas.Text
 	texto   *canvas.Text
 	aro     *ui.Aro
 	objetos []fyne.CanvasObject
@@ -98,19 +129,30 @@ type pildoraRenderer struct {
 func (r *pildoraRenderer) MinSize() fyne.Size {
 	ancho := 2*espacio1p5 + LadoPunto + tema.Espacio(1.5) +
 		ui.Medir(r.p.resumen(), tema.TextoXS, ui.Normal).Width
+	if r.p.conHora() {
+		ancho += ui.Medir(r.p.hora(), tema.TextoXS, ui.Medio).Width + tema.Espacio(1.5)
+	}
 	return fyne.NewSize(ancho, AltoPildora)
 }
 
 func (r *pildoraRenderer) Objects() []fyne.CanvasObject { return r.objetos }
 func (r *pildoraRenderer) Destroy()                     {}
 
-// Layout coloca punto y rótulo dentro del `px-1.5 gap-1.5`.
+// Layout coloca punto, hora y rótulo dentro del `px-1.5 gap-1.5`. La hora es
+// `shrink-0`: lo que no cabe se recorta del título.
 func (r *pildoraRenderer) Layout(t fyne.Size) {
 	r.caja.Redimensionar(t)
 	x := espacio1p5 + tema.Borde
 	r.punto.Move(fyne.NewPos(x, (t.Height-LadoPunto)/2))
 	r.punto.Resize(fyne.NewSize(LadoPunto, LadoPunto))
 	x += LadoPunto + tema.Espacio(1.5)
+	if r.p.conHora() {
+		r.hora.Show()
+		ui.ColocarTexto(r.hora, tema.TextoXS, x, (t.Height-tema.TextoXS.Linea)/2)
+		x += ui.Medir(r.p.hora(), tema.TextoXS, ui.Medio).Width + tema.Espacio(1.5)
+	} else {
+		r.hora.Hide()
+	}
 	cabe := t.Width - x - espacio1p5 - tema.Borde
 	ui.Truncar(r.texto, r.p.resumen(), tema.TextoXS, ui.Normal, cabe)
 	ui.ColocarTexto(r.texto, tema.TextoXS, x, (t.Height-tema.TextoXS.Linea)/2)
@@ -127,6 +169,8 @@ func (r *pildoraRenderer) Refresh() {
 	r.caja.Pintar(relleno, borde)
 	r.punto.FillColor = r.p.o.Color
 	r.punto.Refresh()
+	r.hora.Color = tema.Color("text-muted", v)
+	r.hora.Refresh()
 	r.texto.Color = tema.Color("text", v)
 	r.texto.Refresh()
 	r.aro.Ver(r.p.Enfocado())

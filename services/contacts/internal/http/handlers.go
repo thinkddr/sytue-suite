@@ -61,7 +61,9 @@ type contactStore interface {
 
 	// Acciones en lote (multiseleccion), owner-scoped, una consulta por accion.
 	TrashContacts(ctx context.Context, subject string, uids []string) (int, error)
+	RestoreContacts(ctx context.Context, subject string, uids []string) (int, error)
 	SetFavorites(ctx context.Context, subject string, uids []string, on bool) (int, error)
+	EachCardByID(ctx context.Context, subject string, ids []uuid.UUID, fn func(card string) error) error
 	ModifyGroupMembers(ctx context.Context, subject string, groupID uuid.UUID, uids []string, add bool) (domain.Group, error)
 
 	// Foto de contacto (PHOTO embebida en la vCard), owner-scoped por UID.

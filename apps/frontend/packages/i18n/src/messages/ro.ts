@@ -18,6 +18,8 @@ export const ro: Catalog = {
   'ui.openNav': 'Deschide navigarea',
   'ui.closeNav': 'Închide navigarea',
   'ui.backToList': 'Înapoi la listă',
+  'ui.suiteOpen': 'Sytue: aplicații, căutare, notificări și cont',
+  'ui.suiteClose': 'Înapoi la aplicație',
   'ui.noResults': 'Niciun rezultat.',
   'ui.meter.almostFull': 'aproape plin',
   'ui.meter.full': 'plin',
@@ -60,6 +62,9 @@ export const ro: Catalog = {
   'shell.lock.reasonNotebook': 'deschide caietul tău criptat',
   'shell.lock.faceIdUsage':
     'Sytue folosește Face ID pentru a-ți debloca sesiunea când deschizi aplicația.',
+  'shell.widgets.wake': 'Actualizează widgeturile când aplicația e închisă',
+  'shell.widgets.wakeHelp':
+    'Când se schimbă ceva al tău, Sytue trezește aplicația cu o notificare Apple goală, ca să-și actualizeze widgetul. Apple vede ce aplicație și când, niciodată ce s-a schimbat.',
   'shell.call.microphoneUsage':
     'Sytue Rooms folosește microfonul doar în timpul unui apel și doar dacă îl activezi.',
   'shell.call.cameraUsage':
@@ -184,7 +189,7 @@ export const ro: Catalog = {
   'notifications.kind.pages.domain.failed':
     'Domeniul {domain} de pe {site} nu funcționează: verifică setările acestuia',
   'notifications.kind.pages.erp.failed': 'Comanda {number} de pe {site} nu a ajuns în Sytue ERP',
-  'notifications.kind.pages.settings.changed': '{actor} a modificat o setare din Sytue Web',
+  'notifications.kind.pages.settings.changed': '{actor} a modificat o setare din Sytue Webs',
   'notifications.kind.pages.export.ready': 'Exportul tău pentru {site} este gata',
   'notifications.kind.pages.store.busy':
     'Magazinul de pe {site} are prea multe comenzi care așteaptă plata',
@@ -367,6 +372,8 @@ export const ro: Catalog = {
   'widgets.compose': 'Compune',
   'widgets.storage': 'Stocare',
   'widgets.create': 'Creează eveniment',
+  'widgets.updatedAgo': 'Actualizat {time}',
+  'widgets.updatedAt': 'Actualizat: {time}',
 
   'linkedServices.services': 'Servicii',
   'linkedServices.changed':
@@ -379,6 +386,7 @@ export const ro: Catalog = {
   'linkedServices.notGranted':
     'Nu s-a acordat acces la acest serviciu. Conectează din nou contul pentru a alege permisiunile.',
   'linkedServices.connected': 'Servicii conectate',
+  'linkedServices.exists': 'Acest cont era deja conectat și acum este deschis.',
   'linkedServices.providerData': 'Modificările sunt salvate la furnizor.',
   'linkedServices.writeUnknown':
     'Furnizorul nu a confirmat salvarea. Reîmprospătează și verifică înainte de a încerca din nou.',

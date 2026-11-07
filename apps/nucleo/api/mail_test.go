@@ -445,7 +445,7 @@ func TestRenombrarYBorrarCarpetaVanPorJMAP(t *testing.T) {
 	if motivo, err := c.DeleteMailbox(ctx, "m2"); motivo != "mailboxHasEmail" || err != nil {
 		t.Errorf("borrar con correo dentro: %q %v", motivo, err)
 	}
-	if !strings.Contains(webref.Read(t, "services/mail/internal/jmap/jmap.go"), `pr.Post("/jmap", a.handleJMAP)`) {
+	if !strings.Contains(webref.Read(t, "services/mail/internal/jmap/jmap.go"), `pr.Method(http.MethodPost, "/jmap", a.jmapConSenal())`) {
 		t.Error("el servicio ya no atiende JMAP en POST /jmap: revisar Mail.mailboxSet")
 	}
 }

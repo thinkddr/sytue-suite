@@ -101,6 +101,7 @@
   "linkedServices.changed": "Athraíodh an mhír seo ag do sholáthraí. Athnuaigh sula gcuirfidh tú in eagar arís í.",
   "linkedServices.choose": "Roghnaigh cad atá le nascadh. Iarrfaidh do sholáthraí ceadanna do na seirbhísí roghnaithe.",
   "linkedServices.connected": "Seirbhísí nasctha",
+  "linkedServices.exists": "Bhí an cuntas seo nasctha cheana féin agus tá sé oscailte anois.",
   "linkedServices.keepAdmin": "Tá socrú ceadaithe ó riarachán Google Workspace de dhíth ar Google Keep. Ní féidir le cuntais phearsanta Gmail é a nascadh.",
   "linkedServices.notGranted": "Níor deonaíodh rochtain ar an tseirbhís seo. Nasc an cuntas arís chun a cheadanna a roghnú.",
   "linkedServices.notSupported": "Ní thairgeann an soláthraí seo an tseirbhís seo.",
@@ -169,7 +170,7 @@
   "notifications.kind.pages.order.oversold": "Íocadh ordú {number} ar {site} gan stoc",
   "notifications.kind.pages.order.paid": "Ordú nua {number} ar {site}",
   "notifications.kind.pages.payment.duplicated": "Íocaíocht dhúbailte ar ordú {number} ar {site}: tá an dara ceann á aisíoc",
-  "notifications.kind.pages.settings.changed": "D'athraigh {actor} socrú de chuid Sytue Web",
+  "notifications.kind.pages.settings.changed": "D'athraigh {actor} socrú de chuid Sytue Webs",
   "notifications.kind.pages.store.busy": "Tá an iomarca orduithe ag fanacht le híocaíocht ar an siopa ar {site}",
   "notifications.kind.pages.withdrawal.requested": "Iarradh aistarraingt ó ordú {number} ar {site}",
   "notifications.kind.photos.album.added": "Chuir {actor} grianghraif le “{name}”",
@@ -304,6 +305,8 @@
   "shell.update.failedBody": "Bain triail eile as ar ball nó íoslódáil ón tairseach é.",
   "shell.update.install": "Nuashonraigh go leagan {version}",
   "shell.update.upToDate": "Tá {app} cothrom le dáta",
+  "shell.widgets.wake": "Nuashonraigh na giuirléidí nuair atá an aip dúnta",
+  "shell.widgets.wakeHelp": "Nuair a athraíonn rud éigin de do chuid, dúisíonn Sytue an aip le fógra folamh ó Apple ionas go n-athnuafaidh sí a giuirléid. Feiceann Apple cén aip agus cathain, ach ní fheiceann sé riamh cad a d’athraigh.",
   "ui.backToList": "Ar ais chuig an liosta",
   "ui.bulk.clear": "Glan an roghnú",
   "ui.bulk.region": "Gníomhartha don roghnú",
@@ -321,6 +324,8 @@
   "ui.review.edit": "Cuir in eagar",
   "ui.save": "Sábháil",
   "ui.selectRow": "Roghnaigh ró",
+  "ui.suiteClose": "Ar ais chuig an aip",
+  "ui.suiteOpen": "Sytue: aipeanna, cuardach, fógraí agus cuntas",
   "ui.wizard.back": "Siar",
   "ui.wizard.cancel": "Cealaigh",
   "ui.wizard.goToStep": "Ar ais go céim {n}: ",
@@ -339,5 +344,7 @@
   "widgets.pending": "Ar feitheamh",
   "widgets.photos": "Grianghraif",
   "widgets.rows": "Rónna",
-  "widgets.storage": "Stóras"
+  "widgets.storage": "Stóras",
+  "widgets.updatedAgo": "Nuashonraithe {time}",
+  "widgets.updatedAt": "Nuashonraithe: {time}"
 }

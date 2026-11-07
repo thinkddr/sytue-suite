@@ -258,6 +258,14 @@ export const nb: AppCatalog<typeof en> = {
     one: '1 element er sendt til papirkurven.',
     other: '{count} elementer er sendt til papirkurven.',
   },
+  'files.batch.restored': {
+    one: '1 element er gjenopprettet.',
+    other: '{count} elementer er gjenopprettet.',
+  },
+  'files.batch.restorePartial': {
+    one: '1 element kunne ikke gjenopprettes og ligger fortsatt i papirkurven.',
+    other: '{count} elementer kunne ikke gjenopprettes og ligger fortsatt i papirkurven.',
+  },
   'files.batch.trashFailed': 'Utvalget kunne ikke sendes til papirkurven.',
   'files.batch.moveTitle': { one: 'Flytt 1 element', other: 'Flytt {count} elementer' },
   'files.batch.moveDone': { one: '1 element er flyttet.', other: '{count} elementer er flyttet.' },
@@ -272,6 +280,9 @@ export const nb: AppCatalog<typeof en> = {
   'action.rename': 'Gi nytt navn',
   'action.move': 'Flytt til…',
   'action.copy': 'Lag en kopi',
+  'action.copyLink': 'Kopier lenke',
+  'action.linkCopied': 'Lenken er kopiert. Den åpnes bare for dem som allerede har tilgang.',
+  'action.copyLinkFailed': 'Lenken kunne ikke kopieres.',
   'action.shareLink': 'Del lenke',
   'action.openInApp': 'Åpne i programmet',
   'action.openInEditor': 'Åpne i redigeringsprogrammet',
@@ -483,6 +494,18 @@ export const nb: AppCatalog<typeof en> = {
   'trash.purged': '«{name}» er slettet permanent.',
   'trash.purgeDenied': '«{name}» kan ikke slettes',
   'trash.purgeFailed': 'Det kunne ikke slettes.',
+  'trash.emptyAll': 'Tøm papirkurven',
+  'trash.emptyAllTitle': 'Tømme papirkurven?',
+  'trash.emptyAllBody': {
+    one: 'Elementet i papirkurven slettes for godt sammen med versjonsloggen. Det kan ikke hentes tilbake senere.',
+    other:
+      'De {count} elementene i papirkurven slettes for godt sammen med versjonsloggen. De kan ikke hentes tilbake senere.',
+  },
+  'trash.emptiedAll': 'Papirkurven er tømt.',
+  'trash.emptyAllPartial': {
+    one: '1 element kunne ikke slettes og ligger fortsatt i papirkurven.',
+    other: '{count} elementer kunne ikke slettes og ligger fortsatt i papirkurven.',
+  },
   'trash.purgeTitle': 'Slette permanent?',
   'trash.purgeBodyFolder':
     'Innholdet i «{name}» og i alt som ligger i den, slettes fra Sytues servere sammen med versjonsloggen. Det kan ikke hentes tilbake senere, verken herfra eller via kundestøtte. Til gjengjeld frigjør du plassen det tok.',

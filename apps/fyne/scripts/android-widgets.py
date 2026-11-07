@@ -31,7 +31,19 @@ LABELS = {
     "episodes": "widgets.episodes", "apps": "widgets.apps",
     "calendars": "widgets.calendars", "address_books": "widgets.address_books",
     "storage_percent": "widgets.storage",
+    # «Actualizado: 14:05»: en Android la hora absoluta, porque la vista se queda con el
+    # texto con que se pintó y nada garantiza repintarla al desbloquear (Widgets.java).
+    "updated_at": "widgets.updatedAt",
 }
+
+# El widget al día con la app cerrada (ADR 0078, enmienda del 2026-11-06, pieza 6): el
+# trabajo RefrescoWidgets va siempre; con FONDO_GO carga Go sin actividad y lee
+# (RefrescarSinVentana), y One releva la señal de cambios a las demás (RelevoWidgets).
+# ENCENDIDO el 2026-11-07 por decisión del dueño, ANTES de la prueba del runbook en un
+# teléfono («Android: el widget con la app cerrada»): si esa prueba falla, se vuelve a
+# False aquí y el trabajo vuelve a solo repintar. Se cambia AQUÍ, en un commit revisado;
+# nunca con una variable del runner.
+FONDO_GO = True
 
 
 def metadata(appdir):
@@ -57,6 +69,29 @@ def metadata(appdir):
         raise ValueError("catálogo nativo incompleto")
     return {"version": 1, "id": bundle, "name": details["Name"], "scheme": scheme,
             "product": product, "actions": actions, "locales": locales}
+
+
+def fondo(root, app, appid, go=FONDO_GO):
+    """El trabajo del widget y, con Go, el relevo de One y el permiso de red del trabajo."""
+    for name in ("eu.sytue.nativo.RefrescoWidgets", "eu.sytue.nativo.RelevoWidgets"):
+        if app.find("*[@" + ATTR + "name='" + name + "']") is not None:
+            raise ValueError("componente del refresco de widgets duplicado: " + name)
+    # BIND_JOB_SERVICE: solo el sistema puede arrancarlo, y JobScheduler no lo encola sin él.
+    service = ET.SubElement(app, "service", {ATTR + "name": "eu.sytue.nativo.RefrescoWidgets",
+        ATTR + "permission": "android.permission.BIND_JOB_SERVICE", ATTR + "exported": "false"})
+    ET.SubElement(service, "meta-data", {ATTR + "name": "eu.sytue.widgets.go",
+        ATTR + "value": "true" if go else "false"})
+    if not go:
+        return
+    # Exportado sin permiso a propósito: un permiso `signature` no vale entre quince apps
+    # con quince certificados. RelevoWidgets.call comprueba al llamante (One, firma fijada).
+    ET.SubElement(app, "provider", {ATTR + "name": "eu.sytue.nativo.RelevoWidgets",
+        ATTR + "authorities": appid + ".sytue.widgets", ATTR + "exported": "true",
+        ATTR + "grantUriPermissions": "false"})
+    # El trabajo con red (setRequiredNetworkType) lo exige desde Android 14.
+    red = "android.permission.ACCESS_NETWORK_STATE"
+    if root.find("uses-permission[@" + ATTR + "name='" + red + "']") is None:
+        root.insert(list(root).index(app), ET.Element("uses-permission", {ATTR + "name": red}))
 
 
 def write_xml(path, root):
@@ -129,6 +164,7 @@ def prepare(args):
         ET.SubElement(intent, "action", {ATTR + "name": "android.appwidget.action.APPWIDGET_UPDATE"})
         ET.SubElement(receiver, "meta-data", {ATTR + "name": "android.appwidget.provider",
             ATTR + "resource": "@xml/sytue_widget_info"})
+        fondo(root, app, config["id"])
         manifest = temp / "AndroidManifest.xml"
         write_xml(manifest, root)
         # El layout inicial también lleva el idioma del SO antes del primer callback.

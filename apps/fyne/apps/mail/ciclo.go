@@ -13,9 +13,7 @@ func (b *Buzon) EnSegundoPlano() {
 		b.pararSondeo()
 		b.pararSondeo = nil
 	}
-	if b.correoAbierto != nil {
-		b.correoAbierto.pausarLista()
-	}
+	b.pararRefrescoExterno()
 }
 
 // EnPrimerPlano reconcilia una vez sin cerrar el hilo ni el redactor. Si ya hay un
@@ -26,11 +24,6 @@ func (b *Buzon) EnPrimerPlano() {
 	}
 	b.segundoPlano = false
 	b.llegada()
-	if c := b.correoAbierto; c != nil && !c.cerrado {
-		if c.puedeActualizarLista() {
-			c.cargarMensajes(false)
-		} else {
-			c.programar()
-		}
-	}
+	// La carpeta externa a la vista vuelve a su refresco de 30 s: el proveedor no avisa.
+	b.programarExterna()
 }

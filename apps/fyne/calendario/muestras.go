@@ -290,21 +290,29 @@ func (r *muestraRenderer) Refresh() {
 //	<span class="max-w-[16rem] truncate">{email}</span>
 //	<button class="h-5 w-5 rounded-full text-text-muted hover:bg-danger-bg
 //	               hover:text-danger-text"><Icon close 14/></button>
-func nuevaPildoraInvitado(p *Pantalla, correo string, alQuitar func()) fyne.CanvasObject {
+func nuevaPildoraInvitado(p *Pantalla, correo, partstat string, alQuitar func()) fyne.CanvasObject {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	quitar := ui.NuevoBotonIcono(iconos.Cerrar, p.t("event.guestRemove", i18n.Vars{"email": correo}), alQuitar)
 	quitar.Lado, quitar.TamIcono, quitar.Radio = tema.Espacio(5), 14, tema.Forma("radius-control")
 	caja := ui.NuevaCaja(tema.Color("bg-subtle", v), tema.Color("border", v), tema.RadioPill)
 	texto := ui.Texto(correo, tema.TextoSM, ui.Normal, tema.Color("text", v))
-	return container.New(&pildoraLayout{caja: caja, texto: texto, correo: correo, boton: quitar},
-		append(caja.Objetos(), texto, quitar)...)
+	l := &pildoraLayout{caja: caja, texto: texto, correo: correo, boton: quitar}
+	objetos := append(caja.Objetos(), texto, quitar)
+	// La respuesta que ya dio, si la dio: la insignia entre la dirección y el aspa. Los
+	// recién añadidos no tienen y no la enseñan.
+	if partstat != "" {
+		l.insignia = p.insigniaInvitado(partstat)
+		objetos = append(objetos, l.insignia)
+	}
+	return container.New(l, objetos...)
 }
 
 type pildoraLayout struct {
-	caja   *ui.Caja
-	texto  *canvas.Text
-	correo string
-	boton  *ui.BotonIcono
+	caja     *ui.Caja
+	texto    *canvas.Text
+	correo   string
+	boton    *ui.BotonIcono
+	insignia *ui.Insignia
 }
 
 // anchoTexto es el del correo con su `max-w-[16rem]`.
@@ -312,9 +320,17 @@ func (l *pildoraLayout) anchoTexto() float32 {
 	return min(ui.Medir(l.correo, tema.TextoSM, ui.Normal).Width, tema.Espacio(64))
 }
 
+// anchoInsignia es la insignia y su `gap-1`; cero sin ella.
+func (l *pildoraLayout) anchoInsignia() float32 {
+	if l.insignia == nil {
+		return 0
+	}
+	return l.insignia.MinSize().Width + tema.Espacio(1)
+}
+
 func (l *pildoraLayout) MinSize([]fyne.CanvasObject) fyne.Size {
 	b := l.boton.MinSize()
-	return fyne.NewSize(2*tema.Borde+espacio2p5+l.anchoTexto()+tema.Espacio(1)+b.Width+tema.Espacio(1),
+	return fyne.NewSize(2*tema.Borde+espacio2p5+l.anchoTexto()+l.anchoInsignia()+tema.Espacio(1)+b.Width+tema.Espacio(1),
 		2*tema.Borde+2*espacio0p5+max(tema.TextoSM.Linea, b.Height))
 }
 
@@ -322,10 +338,17 @@ func (l *pildoraLayout) Layout(_ []fyne.CanvasObject, t fyne.Size) {
 	l.caja.Redimensionar(t)
 	x := tema.Borde + espacio2p5
 	b := l.boton.MinSize()
-	w := min(l.anchoTexto(), max(t.Width-x-tema.Espacio(1)-b.Width-tema.Espacio(1)-tema.Borde, 0))
+	w := min(l.anchoTexto(), max(t.Width-x-l.anchoInsignia()-tema.Espacio(1)-b.Width-tema.Espacio(1)-tema.Borde, 0))
 	ui.Truncar(l.texto, l.correo, tema.TextoSM, ui.Normal, w)
 	ui.ColocarTexto(l.texto, tema.TextoSM, x, (t.Height-tema.TextoSM.Linea)/2)
-	l.boton.Move(fyne.NewPos(x+w+tema.Espacio(1), (t.Height-b.Height)/2))
+	x += w
+	if l.insignia != nil {
+		m := l.insignia.MinSize()
+		l.insignia.Move(fyne.NewPos(x+tema.Espacio(1), (t.Height-m.Height)/2))
+		l.insignia.Resize(m)
+		x += l.anchoInsignia()
+	}
+	l.boton.Move(fyne.NewPos(x+tema.Espacio(1), (t.Height-b.Height)/2))
 	l.boton.Resize(b)
 }
 

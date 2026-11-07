@@ -25,6 +25,8 @@ func TestElSQLLlevaLaOrganizacion(t *testing.T) {
 			"notifications.go:OlvidarBuzon":     "Sytue ID retira una dirección y sus avisos se borran en todas las organizaciones; ruta interna, en transacción de mantenimiento",
 			"notifications.go:PurgeReadBefore":  "retención: purga los avisos leídos antiguos de todas las organizaciones, en segundo plano",
 			"presence.go:PurgeStalePresence":    "retención: purga la presencia caducada de todas las organizaciones, en segundo plano",
+			"aparatos.go:BarrerPendientes":      "el despertador reserva en segundo plano los despertares pendientes de todas las organizaciones; devuelve cada fila con su organización y no sale hacia fuera",
+			"aparatos.go:PurgarAparatos":        "retención: purga los aparatos de iOS que llevan un mes sin registrarse, en todas las organizaciones, en segundo plano",
 		},
 	})
 }

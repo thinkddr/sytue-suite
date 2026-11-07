@@ -76,6 +76,9 @@ export interface EventInput {
   conferenceUrl?: string;
   /** Emails de los invitados (ATTENDEE). */
   attendees?: string[];
+  /** Respuesta ya dada de cada invitado (email en minúsculas → PARTSTAT): guardar no
+   * la devuelve a «sin responder». Ver `guestPartstats`. */
+  partstats?: Record<string, string>;
   /** Bloques VALARM crudos: recordatorios editados + passthrough del externo. */
   alarms?: string[];
   /** EXDATE (tokens iCal) a arrastrar a una serie nueva al desgajar. */

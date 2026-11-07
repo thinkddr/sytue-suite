@@ -1,9 +1,14 @@
 {
   "aiBatch.excludeOrg": "Organisation vom automatischen Sytue-AI-Durchlauf ausschließen",
   "aiBatch.excludedHint": "Die Organisation ist vom automatischen Sytue-AI-Durchlauf ausgeschlossen. Fotos werden im Hintergrund nicht für Vorschläge oder Ähnlichkeiten verarbeitet.",
+  "album.coverSet": "Albumcover aktualisiert",
+  "album.isCover": "Das ist das Albumcover",
   "album.linkCopied": "Link kopiert",
   "album.newLink": "Neuer Link",
   "album.newLinkConfirm": "Einen neuen Link erstellen? Der aktuelle Link funktioniert dann für alle, die ihn schon haben, nicht mehr.",
+  "album.rename": "Umbenennen",
+  "album.renamePrompt": "Name des Albums",
+  "album.setCover": "Als Albumcover verwenden",
   "album.share": "Teilen",
   "album.shared": "Geteilt",
   "album.unshare": "Teilen beenden",
@@ -98,6 +103,7 @@
     "other": "{count} nach Upload-Datum"
   },
   "gallery.cancelSelection": "Auswahl beenden",
+  "gallery.clearSearch": "Suche löschen",
   "gallery.describeCapped": "Es werden nur {count} auf einmal beschrieben; starte es für den Rest erneut.",
   "gallery.describeNothing": "Die ausgewählten Fotos haben bereits eine Beschreibung",
   "gallery.describeSelected": "Mit Sytue AI beschreiben",
@@ -106,7 +112,8 @@
   "gallery.describing": "{done} von {total} werden beschrieben…",
   "gallery.downloadCapped": "Fotos außerhalb dieses Stapels: {count}.",
   "gallery.downloadSelected": "Herunterladen",
-  "gallery.downloading": {
+  "gallery.downloading": "Gestartete Downloadanfragen: {count}. Prüfen Sie die Downloads in Ihrem Browser.",
+  "gallery.downloadingNative": {
     "one": "1 Foto wird heruntergeladen…",
     "other": "{count} Fotos werden heruntergeladen…"
   },
@@ -114,6 +121,8 @@
   "gallery.empty.description": "Fotos aus deinem Sytue Drive erscheinen hier, geordnet nach Aufnahmedatum.",
   "gallery.empty.title": "Noch keine Fotos",
   "gallery.favorite": "Zu Favoriten hinzufügen",
+  "gallery.favoriteFailed": "Fotos, die nicht geändert werden konnten: {count}",
+  "gallery.favorited": "Zu Favoriten hinzugefügt: {count}",
   "gallery.likeTheseResults": "Und die ähnlich aussehen",
   "gallery.moreLikeThese": "Mehr wie diese",
   "gallery.newAlbum": "Neues Album",
@@ -124,6 +133,8 @@
   },
   "gallery.newAlbumTitle": "Neues Album",
   "gallery.noExifDate": "Kein Aufnahmedatum: nach Upload-Datum sortiert",
+  "gallery.noResults.description": "Versuche es mit anderen Wörtern oder lösche die Suche, um alle deine Fotos zu sehen.",
+  "gallery.noResults.title": "Keine Fotos passen zu „{query}“",
   "gallery.onlyImages": "Es können nur Bilder hinzugefügt werden.",
   "gallery.open": "{name} öffnen",
   "gallery.openInEditor": "{name} bearbeiten",
@@ -152,6 +163,7 @@
     "other": "{count} Fotos in den Papierkorb verschoben"
   },
   "gallery.unfavorite": "Aus Favoriten entfernen",
+  "gallery.unfavorited": "Aus Favoriten entfernt: {count}",
   "gallery.unselectMonth": "Monat abwählen",
   "gallery.uploadFailed": "Konnte nicht hochgeladen werden: {name}",
   "gallery.uploaded": {
@@ -198,6 +210,9 @@
   "viewer.askSend": "Fragen",
   "viewer.canvasBackground": "Fotohintergrund",
   "viewer.close": "Schließen",
+  "viewer.counter": "{index} / {total}",
+  "viewer.counterLabel": "Foto {index} von {total}",
+  "viewer.counterMore": "{count}+",
   "viewer.delete": "In den Papierkorb",
   "viewer.deleteConfirm": "Dieses Foto in den Papierkorb verschieben? Die Datei bleibt in Sytue Drive.",
   "viewer.describe": "Mit Sytue AI beschreiben",
@@ -237,6 +252,7 @@
   "viewer.saveDescription": "Speichern",
   "viewer.savingDescription": "Wird gespeichert…",
   "viewer.shortcuts": "Kürzel: Pfeile wechseln das Foto, Leertaste startet die Diashow, I zeigt die Infos, Z die Originalgröße, Entf verschiebt in den Papierkorb.",
+  "viewer.shortcutsJump": "Pos1 und Ende springen zum ersten und letzten Foto.",
   "viewer.similar": "Ähnliche Fotos",
   "viewer.slideshow": "Diashow",
   "viewer.slideshowStop": "Diashow beenden",

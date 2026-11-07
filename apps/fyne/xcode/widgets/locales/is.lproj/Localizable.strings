@@ -31,3 +31,4 @@
 "dataflow.item.events" = "Dagatal";
 "dataflow.item.documents" = "Skjöl";
 "dataflow.item.contacts" = "Tengiliðir";
+"widgets.updatedAgo" = "Uppfært %@";

@@ -285,11 +285,10 @@ def cache_perfiles():
 
 
 def perfil_ios_verificado(fichero, appid):
-    from apple_perfil import desde_archivo, validar_derechos
-    import tomllib
+    from apple_perfil import desde_archivo, leer_fyneapp, validar_derechos
     fyne = Path(__file__).resolve().parents[1]
     ficha = json.loads((fyne / "appstore/ficha.json").read_bytes())
-    ids = {tomllib.loads((fyne / "cmd" / app / "FyneApp.toml").read_text())["Details"]["ID"] for app in ficha["apps"]}
+    ids = {leer_fyneapp((fyne / "cmd" / app / "FyneApp.toml").read_text())["Details"]["ID"] for app in ficha["apps"]}
     exigir(appid in ids, "perfil_fuera_del_catalogo")
     perfil = desde_archivo(str(fichero), "ios")
     validar_derechos(perfil, appid, "ios", "group.eu.sytue.suite", "", ficha["equipo"] + ".eu.sytue.suite")

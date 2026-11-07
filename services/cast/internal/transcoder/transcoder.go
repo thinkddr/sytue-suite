@@ -39,6 +39,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
@@ -58,6 +59,15 @@ type Deps struct {
 	Servicio *service.Servicio
 	Cfg      config.Config
 	Logger   *slog.Logger
+	// Hub recibe la señal de cambios al acabar cada trabajo: el vídeo ya está listo
+	// (o ya no lo estará) y el widget de Cast de su dueño lo tiene que enseñar. nil =
+	// sin señal.
+	Hub *hubnotify.Client
+}
+
+// avisoCambio es la señal de cambios del Hub (hubnotify.Client.AvisarCambio).
+type avisoCambio interface {
+	AvisarCambio(ctx context.Context, tenant, producto string, subjects ...string)
 }
 
 // Objetos es lo que el trabajador necesita del almacén: leer la entrada, saber
@@ -113,6 +123,7 @@ type trabajador struct {
 	cola     Cola
 	objetos  Objetos
 	servicio *service.Servicio
+	cambios  avisoCambio // nil = sin señal
 	cfg      config.Config
 	logger   *slog.Logger
 	// quien es con qué nombre reclama (claimed_by): el hostname de la réplica.
@@ -167,8 +178,12 @@ func nuevo(d Deps, cola Cola, objetos Objetos) (*trabajador, error) {
 	if err != nil || quien == "" {
 		quien = "cast-transcoder"
 	}
+	var cambios avisoCambio
+	if d.Hub != nil {
+		cambios = d.Hub
+	}
 	return &trabajador{
-		cola: cola, objetos: objetos, servicio: d.Servicio, cfg: d.Cfg, logger: d.Logger,
+		cola: cola, objetos: objetos, servicio: d.Servicio, cambios: cambios, cfg: d.Cfg, logger: d.Logger,
 		quien: quien, ffmpeg: ffmpeg, ffprobe: ffprobe, latido: RutaLatido(d.Cfg),
 	}, nil
 }
@@ -243,6 +258,7 @@ func (w *trabajador) atender(ctx context.Context, j domain.Job) {
 			if w.servicio != nil {
 				w.servicio.DeclararCuota(cctx, v.Tenant)
 			}
+			w.avisarCambio(cctx, v)
 			registro.Info("transcoder: trabajo terminado",
 				"duracion", time.Since(inicio).Round(time.Millisecond).String(),
 				"video_ms", derefInt64(listo.DurationMS), "ancho", derefInt32(listo.Width), "alto", derefInt32(listo.Height),
@@ -260,8 +276,20 @@ func (w *trabajador) atender(ctx context.Context, j domain.Job) {
 		registro.Error("transcoder: el trabajo falló y no se pudo anotar", "motivo", motivo, "error", errF)
 		return
 	}
+	if !reintenta && v.Tenant != "" {
+		w.avisarCambio(cctx, v) // ya no se reintenta: el vídeo queda fallido
+	}
 	registro.Warn("transcoder: trabajo fallido", "motivo", motivo, "reintenta", reintenta,
 		"duracion", time.Since(inicio).Round(time.Millisecond).String())
+}
+
+// avisarCambio manda la señal de cambios al dueño del vídeo: el trabajo acabó después
+// de que la subida contestara, y lo que enseña su widget (el estado, la duración, la
+// cuota) ha cambiado desde entonces.
+func (w *trabajador) avisarCambio(ctx context.Context, v domain.Video) {
+	if w.cambios != nil {
+		w.cambios.AvisarCambio(ctx, v.Tenant, "cast", v.OwnerSub)
+	}
 }
 
 // esperar duerme `d` o hasta que el contexto termine, lo que llegue antes.

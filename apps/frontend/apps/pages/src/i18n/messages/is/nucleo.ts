@@ -79,7 +79,7 @@ export const nucleo = {
   'new.progress': 'Skref til að búa til vefsvæðið',
   'new.go_to_step': 'Fara í skref {n}',
   'new.step_of': 'Skref {n} af {total}',
-  'app_settings.title': 'Stillingar Sytue Web',
+  'app_settings.title': 'Stillingar Sytue Webs',
   'new.search_title': 'Byrjaðu á þinni tegund rekstrar',
   'new.search_help':
     'Skrifaðu hvað þú starfar við eða veldu flokk. Hvert sniðmát er þegar með texta fyrir þína grein: þú breytir aðeins nafni, símanúmeri, verði og myndum.',
@@ -279,7 +279,7 @@ export const nucleo = {
   'domains.start_help':
     'Sláðu inn lénið sem þú vilt nota. Þú þarft aðgang að DNS-stillingum hjá þjónustuaðilanum þar sem þú keyptir það.',
   'domains.progress': 'Framvinda lénstengingar',
-  'domains.step.registered': 'Bætt við Sytue Web',
+  'domains.step.registered': 'Bætt við Sytue Webs',
   'domains.step.dns': 'DNS staðfest',
   'domains.step.https': 'HTTPS tilbúið',
   'domains.step.primary': 'Aðalslóð',

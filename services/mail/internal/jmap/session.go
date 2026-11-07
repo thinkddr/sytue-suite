@@ -5,9 +5,11 @@ package jmap
 
 import (
 	"net/http"
+	"strings"
 
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
+	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 )
 
 // Capabilities JMAP soportadas (URNs RFC 8620/8621).
@@ -111,6 +113,7 @@ func (a *API) handleJMAP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp := jmapResponse{SessionState: "0", MethodResponses: make([][3]any, 0, len(req.MethodCalls))}
+	escribio := false
 	for _, call := range req.MethodCalls {
 		name, _ := call[0].(string)
 		callID := call[2]
@@ -121,9 +124,20 @@ func (a *API) handleJMAP(w http.ResponseWriter, r *http.Request) {
 			})
 			continue
 		}
+		escribio = escribio || metodoQueEscribe(name)
 		resp.MethodResponses = append(resp.MethodResponses, [3]any{name, result, callID})
 	}
+	// Un lote que solo lee (Email/get, Email/query…) no cambia el widget: sin señal.
+	if !escribio {
+		hubnotify.CambioEn(r.Context())
+	}
 	httpx.JSON(w, r, http.StatusOK, resp)
+}
+
+// metodoQueEscribe dice si un método JMAP cambia el buzón (RFC 8620 §5.3: los `*/set`;
+// RFC 8621 §4.8: Email/import), para la señal de cambios del widget.
+func metodoQueEscribe(name string) bool {
+	return strings.HasSuffix(name, "/set") || name == "Email/import"
 }
 
 // dispatch enruta un método JMAP individual a su implementación. Cubre los

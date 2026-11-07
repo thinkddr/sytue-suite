@@ -164,6 +164,9 @@ func NewRouter(d Deps) http.Handler {
 		api.Group(func(mail chi.Router) {
 			mail.Use(httpx.RateLimit(httpx.RateLimitConfig{Limiter: httpx.NewTokenBucket(2, 10), KeyFunc: authn.RateKey}))
 			mail.Get("/external-mail/accounts", h.ExternalMailAccounts)
+			// The summary asks every account's provider: a burst is a sidebar
+			// loading and reloading, not a client polling.
+			mail.With(httpx.RateLimit(httpx.RateLimitConfig{Limiter: httpx.NewTokenBucket(0.5, 10), KeyFunc: authn.RateKey})).Get("/external-mail/summary", h.ExternalMailSummary)
 			mail.With(httpx.RateLimit(httpx.RateLimitConfig{Limiter: httpx.NewTokenBucket(0.1, 4), KeyFunc: authn.RateKey})).Post("/external-mail/connect", h.ExternalMailConnect)
 			mail.With(httpx.RateLimit(httpx.RateLimitConfig{Limiter: httpx.NewTokenBucket(0.1, 4), KeyFunc: authn.RateKey})).Post("/external-mail/accounts", h.ExternalMailConfigure)
 			mail.Get("/external-mail/{instance}/folders", h.ExternalMailFolders)

@@ -18,6 +18,8 @@ export const hu: Catalog = {
   'ui.openNav': 'Navigáció megnyitása',
   'ui.closeNav': 'Navigáció bezárása',
   'ui.backToList': 'Vissza a listához',
+  'ui.suiteOpen': 'Sytue: alkalmazások, keresés, értesítések és fiók',
+  'ui.suiteClose': 'Vissza az alkalmazáshoz',
   'ui.noResults': 'Nincs találat.',
   'ui.meter.almostFull': 'majdnem tele',
   'ui.meter.full': 'tele',
@@ -60,6 +62,9 @@ export const hu: Catalog = {
   'shell.lock.reasonNotebook': 'a titkosított jegyzetfüzeted megnyitása',
   'shell.lock.faceIdUsage':
     'A Sytue a Face ID segítségével oldja fel a munkamenetedet, amikor megnyitod az appot.',
+  'shell.widgets.wake': 'Widgetek frissítése bezárt alkalmazás mellett',
+  'shell.widgets.wakeHelp':
+    'Ha valami megváltozik nálad, a Sytue egy üres Apple-értesítéssel felébreszti az alkalmazást, hogy frissítse a widgetjét. Az Apple azt látja, melyik alkalmazásról van szó és mikor, azt soha, hogy mi változott.',
   'shell.call.microphoneUsage':
     'A Sytue Rooms csak hívás közben használja a mikrofont, és csak akkor, ha bekapcsolod.',
   'shell.call.cameraUsage':
@@ -176,7 +181,7 @@ export const hu: Catalog = {
     'A(z) {domain} domain nem működik a(z) {site} webhelyen: ellenőrizd a beállításait',
   'notifications.kind.pages.erp.failed':
     'A(z) {site} webhely {number} rendelése nem jutott el a Sytue ERP-be',
-  'notifications.kind.pages.settings.changed': '{actor} módosította a Sytue Web egyik beállítását',
+  'notifications.kind.pages.settings.changed': '{actor} módosította a Sytue Webs egyik beállítását',
   'notifications.kind.pages.export.ready': 'A(z) {site} exportja elkészült',
   'notifications.kind.pages.store.busy':
     'A(z) {site} webáruházában túl sok a fizetésre váró rendelés',
@@ -362,6 +367,8 @@ export const hu: Catalog = {
   'widgets.compose': 'Levélírás',
   'widgets.storage': 'Tárhely',
   'widgets.create': 'Esemény létrehozása',
+  'widgets.updatedAgo': 'Frissítve {time}',
+  'widgets.updatedAt': 'Frissítve: {time}',
 
   'linkedServices.services': 'Szolgáltatások',
   'linkedServices.changed':
@@ -374,6 +381,7 @@ export const hu: Catalog = {
   'linkedServices.notGranted':
     'Ehhez a szolgáltatáshoz nem kaptál hozzáférést. Csatlakoztasd újra a fiókot az engedélyek kiválasztásához.',
   'linkedServices.connected': 'Csatlakoztatott szolgáltatások',
+  'linkedServices.exists': 'Ez a fiók már csatlakoztatva volt, és most meg van nyitva.',
   'linkedServices.providerData': 'A módosításokat a szolgáltató menti.',
   'linkedServices.writeUnknown':
     'A szolgáltató nem erősítette meg a mentést. Frissíts és ellenőrizd, mielőtt újra próbálkozol.',

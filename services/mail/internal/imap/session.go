@@ -15,6 +15,7 @@ import (
 	"github.com/emersion/go-imap/v2/imapserver"
 	"github.com/google/uuid"
 
+	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/mail/internal/domain"
@@ -29,6 +30,8 @@ type backend struct {
 	hostname          string
 	logger            *slog.Logger
 	maxAuthFailPerMin int
+	// hub recibe la señal de cambios de lo que se escribe por IMAP. nil = sin señal.
+	hub *hubnotify.Client
 }
 
 func (b *backend) newSession(conn *imapserver.Conn) (imapserver.Session, *imapserver.GreetingData, error) {
@@ -234,6 +237,16 @@ func (s *session) writeBody(mw *imapserver.FetchResponseWriter, m domain.Message
 
 // --- Modificación (STORE flags / EXPUNGE / MOVE) ---
 
+// cambio manda la señal de cambios del widget de Mail a la dueña del buzón: lo que
+// Thunderbird o Mail de iOS marcan, mueven o borran por aquí cambia la Entrada que
+// enseña. `n` es cuántos mensajes tocó la orden; sin ninguno, no hay señal. Va con
+// defer, para que una orden que falla a medias avise de lo que sí cambió.
+func (s *session) cambio(n *int) {
+	if *n > 0 {
+		s.be.hub.AvisarCambio(context.Background(), s.tenant, "mail", s.subject)
+	}
+}
+
 func (s *session) Store(w *imapserver.FetchWriter, numSet imap.NumSet, flags *imap.StoreFlags, options *imap.StoreOptions) error {
 	if s.selected == nil {
 		return &imap.Error{Type: imap.StatusResponseTypeBad, Text: "No mailbox selected"}
@@ -242,7 +255,10 @@ func (s *session) Store(w *imapserver.FetchWriter, numSet imap.NumSet, flags *im
 	if err != nil {
 		return err
 	}
+	tocados := 0
+	defer s.cambio(&tocados)
 	for _, sel := range resolveSet(msgs, numSet) {
+		tocados++ // applyStore puede fallar tras cambiar un flag de varios
 		if err := s.applyStore(sel.Msg, flags); err != nil {
 			return err
 		}
@@ -310,6 +326,7 @@ func (s *session) Expunge(w *imapserver.ExpungeWriter, uids *imap.UIDSet) error 
 	// Cada EXPUNGE renumera los mensajes posteriores (RFC 9051 §7.5.1): el
 	// número de secuencia reportado descuenta los ya expulsados en esta pasada.
 	expunged := 0
+	defer s.cambio(&expunged)
 	for i, m := range msgs {
 		if !m.HasFlag(domain.FlagDeleted) {
 			continue
@@ -341,11 +358,14 @@ func (s *session) Copy(numSet imap.NumSet, dest string) (*imap.CopyData, error) 
 		return nil, err
 	}
 	var srcUIDs, dstUIDs imap.UIDSet
+	copiados := 0
+	defer s.cambio(&copiados)
 	for _, sel := range resolveSet(msgs, numSet) {
 		newUID, err := s.be.store.CopyMessage(s.ctx(), sel.Msg.ID, destMb.ID)
 		if err != nil {
 			return nil, err
 		}
+		copiados++
 		srcUIDs.AddNum(imap.UID(sel.Msg.UID))
 		dstUIDs.AddNum(imap.UID(newUID))
 	}
@@ -368,10 +388,13 @@ func (s *session) Move(w *imapserver.MoveWriter, numSet imap.NumSet, dest string
 	if err != nil {
 		return err
 	}
+	movidos := 0
+	defer s.cambio(&movidos)
 	for _, sel := range resolveSet(msgs, numSet) {
 		if err := s.be.store.MoveMessage(s.ctx(), s.account, sel.Msg.ID, destMb.ID); err != nil {
 			return err
 		}
+		movidos++
 	}
 	return nil
 }
@@ -393,6 +416,8 @@ func (s *session) Delete(mailbox string) error {
 	if err := s.be.store.DeleteMailbox(s.ctx(), s.account, mb.ID); err != nil {
 		return mapIMAPErr(err)
 	}
+	borrada := 1 // con sus mensajes
+	s.cambio(&borrada)
 	return nil
 }
 

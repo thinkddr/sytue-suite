@@ -6,10 +6,7 @@ package calendario
 import (
 	"context"
 	"errors"
-	"fmt"
-	"image/color"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -18,7 +15,6 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
-	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 
 	"git.sytue.eu/sytue/one/apps/fyne/agenda"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
@@ -36,7 +32,7 @@ func Rango(v Vista, cursor time.Time, loc *time.Location) (desde, hasta time.Tim
 	case VistaAgenda:
 		return dia, dia.AddDate(0, 0, AgendaDias)
 	case VistaSemana:
-		lunes := dia.AddDate(0, 0, -((int(dia.Weekday()) + 6) % 7))
+		lunes := LunesDe(dia)
 		return lunes, lunes.AddDate(0, 0, 7)
 	case VistaDia:
 		return dia, dia.AddDate(0, 0, 1)
@@ -47,8 +43,7 @@ func Rango(v Vista, cursor time.Time, loc *time.Location) (desde, hasta time.Tim
 }
 
 // Desplazar es `navigate(delta)`: un mes, una semana, un día o una ventana de agenda.
-// `AddDate` desborda igual que `setMonth` de JS (31 de enero + 1 mes = 3 de marzo),
-// así que las dos apps llegan al mismo día.
+// El mes conserva el día recortado al último (MoverMes), como `addMonthsClamped`.
 func Desplazar(v Vista, cursor time.Time, delta int) time.Time {
 	switch v {
 	case VistaAgenda:
@@ -59,7 +54,17 @@ func Desplazar(v Vista, cursor time.Time, delta int) time.Time {
 		return cursor.AddDate(0, 0, delta)
 	case VistaMes:
 	}
-	return cursor.AddDate(0, delta, 0)
+	return MoverMes(cursor, delta)
+}
+
+// MoverMes es `addMonthsClamped` de dates.ts: `delta` meses conservando el día,
+// recortado al último del mes de destino, y la hora. `AddDate` desborda como `setMonth`
+// de JS (31 de enero + 1 mes = 3 de marzo), que es el salto que esto evita.
+func MoverMes(cursor time.Time, delta int) time.Time {
+	primero := time.Date(cursor.Year(), cursor.Month()+time.Month(delta), 1,
+		cursor.Hour(), cursor.Minute(), cursor.Second(), cursor.Nanosecond(), cursor.Location())
+	ultimo := time.Date(primero.Year(), primero.Month()+1, 0, 0, 0, 0, 0, cursor.Location()).Day()
+	return primero.AddDate(0, 0, min(cursor.Day(), ultimo)-1)
 }
 
 func inicioDelDia(t time.Time, loc *time.Location) time.Time {
@@ -102,9 +107,7 @@ type App struct {
 	// menú son baratos de rehacer, y así no hay dos verdades sobre qué se enseña.
 	P *Pantalla
 	// Cal es el cliente del servicio. nil: sin servicio (la pantalla se queda en carga).
-	Cal *api.Calendars
-	// Widget captura la sesión adoptada antes de cargar los calendarios completos.
-	Widget       widgets.Source
+	Cal          *api.Calendars
 	importarVida context.Context
 
 	// Correo es el de quien ha entrado: decide si un evento es una invitación que
@@ -144,16 +147,14 @@ type App struct {
 	recError       bool
 	recDescartados map[string]bool
 
-	conocidos      map[string]bool           // `knownUrls`: los calendarios ya vistos
-	porCal         map[string][]api.Instance // la caché de eventos, válida para `clave`
-	clave          string                    // el rango de la caché
-	secCal, secEv  int                       // secuencias de carga
-	cargandoCal    bool                      // `loadingCals`
-	cargandoEv     bool                      // `loadingEvents`
-	fallo          string                    // clave del error, o ""
-	prohibido      bool                      // el error fue un 403
-	widgetCompleta bool                      // propios y compartidos cargaron sin error
-	widgetVista    widgets.View              // sesión de esas listas y de su caché de eventos
+	conocidos     map[string]bool           // `knownUrls`: los calendarios ya vistos
+	porCal        map[string][]api.Instance // la caché de eventos, válida para `clave`
+	clave         string                    // el rango de la caché
+	secCal, secEv int                       // secuencias de carga
+	cargandoCal   bool                      // `loadingCals`
+	cargandoEv    bool                      // `loadingEvents`
+	fallo         string                    // clave del error, o ""
+	prohibido     bool                      // el error fue un 403
 }
 
 // NuevaApp conecta la pantalla con el servicio. Arranca en carga: hasta que no
@@ -170,16 +171,16 @@ func NuevaApp(p *Pantalla, cal *api.Calendars) *App {
 		recCargando:    true,
 		recDescartados: map[string]bool{},
 	}
-	p.AlIrHoy = func() { a.cambiar(func() { p.Cursor = time.Now() }) }
+	p.AlIrHoy = func() { a.cambiar(func() { p.Cursor = p.ahora() }) }
 	p.AlNavegar = func(d int) { a.cambiar(func() { p.Cursor = Desplazar(p.Vista, p.Cursor, d) }) }
-	p.AlDesplazarMes = func(d int) { a.cambiar(func() { p.Cursor = p.Cursor.AddDate(0, d, 0) }) }
+	p.AlDesplazarMes = func(d int) { a.cambiar(func() { p.Cursor = MoverMes(p.Cursor, d) }) }
 	p.AlElegirDia = func(d time.Time) { a.cambiar(func() { p.Cursor = d }) }
 	p.AlCambiarVista = func(v Vista) { a.cambiar(func() { p.Vista = v }) }
 	p.AlConmutarCalendario = a.conmutar
 	p.AlReintentar = a.reintentar
 	p.Refresco.Actualizar = a.Recargar
 	p.Refresco.Puede = func() bool {
-		return a.Cal != nil && !p.SinConexion && !a.cargandoCal && !a.cargandoEv && p.Vista == VistaAgenda
+		return a.Cal != nil && !p.SinConexion && !a.cargandoCal && !a.cargandoEv && (p.Vista == VistaAgenda || p.compacta())
 	}
 	p.Refresco.Revision = func() uint64 { return ui.RevisionLista(a.secEv) }
 	p.AlAbrirEvento = a.abrirVistaRapida
@@ -194,6 +195,12 @@ func NuevaApp(p *Pantalla, cal *api.Calendars) *App {
 	p.AlBuscar = a.abrirBusqueda
 	p.AlVerRecordatorios = a.abrirRecordatorios
 	p.AlConmutarCajon = func() { p.cajonAbierto = !p.cajonAbierto; a.pintar() }
+	// El mes del teléfono: cruzar el corte de 640 reconstruye la pantalla, pero NO dentro
+	// del Layout del armazón que lo mide; el asa repinta; y la rama de recordatorios del
+	// cajón salta y descarta como el panel de la campana.
+	p.AlRehacer = func() { a.lanzar(func() { a.enUI(a.pintar) }) }
+	p.AlPlegarMes = a.pintar
+	p.saltarRec, p.descartRec = a.saltarA, a.descartar
 	// En el teléfono, lo que se activa en el menú lo CIERRA (el `onClick` del `<aside>`
 	// de AppShell): elegir un día, cambiar de mes, crear… Conmutar un calendario no,
 	// que es una casilla y no un botón, y el kebab tampoco (`data-mantiene-nav`).
@@ -201,7 +208,7 @@ func NuevaApp(p *Pantalla, cal *api.Calendars) *App {
 		return func() { p.cajonAbierto = false; f() }
 	}
 	p.AlElegirDia = func(d time.Time) { p.cajonAbierto = false; a.cambiar(func() { p.Cursor = d }) }
-	p.AlDesplazarMes = func(d int) { p.cajonAbierto = false; a.cambiar(func() { p.Cursor = p.Cursor.AddDate(0, d, 0) }) }
+	p.AlDesplazarMes = func(d int) { p.cajonAbierto = false; a.cambiar(func() { p.Cursor = MoverMes(p.Cursor, d) }) }
 	p.AlCrearCalendario = cierra(p.AlCrearCalendario)
 	p.AlSuscribirse = cierra(p.AlSuscribirse)
 	a.raiz = container.NewStack()
@@ -245,39 +252,6 @@ func (a *App) PararImportador() {
 	if d := a.P.Importar; d != nil {
 		d.Parar()
 	}
-}
-
-// Atajo son las teclas de CalendarApp.tsx, las mismas que Apple Calendar y Google
-// Calendar. La ventana solo las entrega cuando nada tiene el foco —un campo o un diálogo
-// se quedan su tecla—, que es lo que hace `esAtajoDeApp` en la web.
-func (a *App) Atajo(r rune) bool {
-	p := a.P
-	switch r {
-	case 't', 'T':
-		p.AlIrHoy()
-	case 'm', 'M':
-		p.AlCambiarVista(VistaMes)
-	case 'w', 'W':
-		p.AlCambiarVista(VistaSemana)
-	case 'd', 'D':
-		p.AlCambiarVista(VistaDia)
-	case 'a', 'A':
-		p.AlCambiarVista(VistaAgenda)
-	case 'n', 'N', 'j', 'J':
-		p.AlNavegar(1)
-	case 'p', 'P', 'k', 'K':
-		p.AlNavegar(-1)
-	case 'c', 'C':
-		p.AbrirNuevoEvento()
-	case '/':
-		if p.AlBuscar == nil {
-			return false
-		}
-		p.AlBuscar()
-	default:
-		return false
-	}
-	return true
 }
 
 // cambiar aplica un cambio de cursor o de vista y pide lo que falte del rango nuevo.
@@ -332,10 +306,7 @@ func (a *App) cargarCalendarios() {
 	a.secCal++
 	sec := a.secCal
 	a.cargandoCal = true
-	a.widgetCompleta = false
 	a.pintar()
-	widget := a.Widget.View()
-	sinConexion := a.P.SinConexion
 	a.lanzar(func() {
 		ctx, parar := context.WithTimeout(context.Background(), 20*time.Second)
 		defer parar()
@@ -345,18 +316,6 @@ func (a *App) cargarCalendarios() {
 		lecturas.Go(func() { compartidos, errC = a.Cal.SharedWithMe(ctx) })
 		propios, err := a.Cal.List(ctx)
 		lecturas.Wait()
-		completa := err == nil && errC == nil && !sinConexion
-		if completa {
-			// Las ocurrencias sólo cubren la ventana visible; estas dos listas sí
-			// contienen todos los calendarios accesibles, incluidos los compartidos.
-			ids := make(map[string]struct{}, len(propios)+len(compartidos))
-			for _, lista := range [][]api.Calendar{propios, compartidos} {
-				for _, c := range lista {
-					ids[c.ID] = struct{}{}
-				}
-			}
-			_ = widget.Publicar(ctx, widgets.Counter{Kind: "calendars", Value: int64(len(ids))})
-		}
 		if errC != nil {
 			compartidos = nil
 		}
@@ -364,8 +323,6 @@ func (a *App) cargarCalendarios() {
 			if sec != a.secCal {
 				return // llegó otra carga después: esta es rancia
 			}
-			a.widgetCompleta = completa
-			a.widgetVista = widget
 			a.cargandoCal = false
 			if err != nil {
 				a.fallar("cal.error.loadCalendars", err)
@@ -375,7 +332,7 @@ func (a *App) cargarCalendarios() {
 			a.encender()
 			a.engancharPeticiones()
 			a.fallo = ""
-			a.cargarEventosConVista(widget)
+			a.cargarEventos()
 		})
 	})
 }
@@ -399,11 +356,10 @@ func (a *App) encender() {
 
 // cargarEventos es el efecto de eventos de la web: un `Instances` por calendario
 // visible que no esté ya en la caché del rango, todos en paralelo.
+//
+// No publica el widget: lo que enseña el widget no depende de lo que se esté mirando,
+// y lo lee su propia Fuente (apps/nucleo/widgets/fuentes, ADR 0078 enmendado).
 func (a *App) cargarEventos() {
-	a.cargarEventosConVista(a.widgetVista)
-}
-
-func (a *App) cargarEventosConVista(evWidget widgets.View) {
 	p := a.P
 	desde, hasta := Rango(p.Vista, p.Cursor, p.zona())
 	clave := desde.Format(time.RFC3339) + ".." + hasta.Format(time.RFC3339)
@@ -420,12 +376,8 @@ func (a *App) cargarEventosConVista(evWidget widgets.View) {
 	}
 	a.secEv++
 	sec := a.secEv
-	sinConexion := p.SinConexion
 	if len(faltan) == 0 || a.Cal == nil {
 		a.cargandoEv = false
-		if a.Cal != nil && !sinConexion && a.widgetCompleta {
-			a.publicarWidget(evWidget, desde, hasta)
-		}
 		a.pintar()
 		return
 	}
@@ -477,151 +429,9 @@ func (a *App) cargarEventosConVista(evWidget widgets.View) {
 			// Llegó lo guardado: el fantasma del bloque soltado ya no hace falta.
 			a.P.pendiente = nil
 			a.fallo = ""
-			if !sinConexion && a.widgetCompleta && !a.P.SinConexion {
-				a.publicarWidget(evWidget, desde, hasta)
-			}
 			a.pintar()
 		})
 	})
-}
-
-func hexColorDe(c color.Color) string {
-	if c == nil {
-		return ""
-	}
-	r, g, b, _ := c.RGBA()
-	return fmt.Sprintf("#%02x%02x%02x", r>>8&0xff, g>>8&0xff, b>>8&0xff)
-}
-
-// marcarDiasWidget añade a la cuadrícula del mes los días que ocupa [ini, finInc].
-func marcarDiasWidget(busy []int, colores map[int]string, ini, finInc, inicioMes, finMes time.Time, zona *time.Location, hex string) []int {
-	if finInc.Before(inicioMes) || !ini.Before(finMes) {
-		return busy
-	}
-	primero := ini
-	if primero.Before(inicioMes) {
-		primero = inicioMes
-	}
-	ultimo := finInc
-	if limiteMes := finMes.Add(-time.Nanosecond); ultimo.After(limiteMes) {
-		ultimo = limiteMes
-	}
-	for d := inicioDelDia(primero, zona).Day(); d <= inicioDelDia(ultimo, zona).Day(); d++ {
-		busy = append(busy, d)
-		if _, ok := colores[d]; !ok && hex != "" {
-			colores[d] = hex
-		}
-	}
-	return busy
-}
-
-// itemWidgetDe es la fila visual de un evento próximo: título, lugar, hora y color.
-func (a *App) itemWidgetDe(oc Ocurrencia, ini time.Time, hex string) widgets.Item {
-	titulo := strings.TrimSpace(oc.Event.Summary)
-	if titulo == "" {
-		titulo = a.P.t("event.untitled", nil)
-	}
-	insignia := ini.Format("15:04")
-	if oc.Event.AllDay {
-		insignia = ""
-	}
-	return widgets.Item{
-		Title:    titulo,
-		Subtitle: oc.Event.Location,
-		Badge:    insignia,
-		Color:    hex,
-		StartAt:  max(oc.Start.Unix(), 0),
-		EndAt:    max(oc.End.Unix(), 0),
-		AllDay:   oc.Event.AllDay,
-	}
-}
-
-// finInclusivoWidget descuenta el final exclusivo de un evento de día completo.
-func finInclusivoWidget(ini, fin time.Time, diaCompleto bool) time.Time {
-	if diaCompleto && fin.After(ini) && fin.Hour() == 0 && fin.Minute() == 0 && fin.Second() == 0 {
-		return fin.Add(-time.Nanosecond)
-	}
-	return fin
-}
-
-func (a *App) publicarWidget(view widgets.View, desde, hasta time.Time) {
-	if a.Widget == nil || !widgets.Disponible() {
-		return
-	}
-	todos := a.todos()
-	ids := make(map[string]struct{}, len(todos))
-	for _, c := range todos {
-		ids[c.ID] = struct{}{}
-	}
-	zona := a.P.zona()
-	ahora := time.Now().In(zona)
-	corte := ahora
-	if ahora.Before(desde) || !ahora.Before(hasta) {
-		corte = a.P.Cursor.In(zona)
-	}
-	inicioMes := time.Date(corte.Year(), corte.Month(), 1, 0, 0, 0, 0, zona)
-	finMes := inicioMes.AddDate(0, 1, 0)
-	hoyInicio := inicioDelDia(corte, zona)
-
-	ocs := Fundir(todos, a.P.Visibles, a.porCal, false)
-	sort.SliceStable(ocs, func(i, j int) bool {
-		if !ocs[i].Start.Equal(ocs[j].Start) {
-			return ocs[i].Start.Before(ocs[j].Start)
-		}
-		return ocs[i].End.Before(ocs[j].End)
-	})
-
-	busyDays, dayColors, rawItems, upcomingCount := a.eventosWidget(ocs, zona, corte, inicioMes, finMes, hoyInicio)
-
-	counters := []widgets.Counter{{Kind: "calendars", Value: int64(len(ids))}}
-	if upcomingCount > 0 {
-		counters = append(counters, widgets.Counter{Kind: "events", Value: upcomingCount})
-	}
-	detalle := widgets.Detail{
-		Counters: counters,
-		Items:    widgets.SanitizeItems(rawItems),
-		Calendar: widgets.BuildCalendarGrid(corte.Year(), corte.Month(), busyDays, dayColors),
-	}
-	a.lanzar(func() {
-		ctx, parar := context.WithTimeout(context.Background(), 5*time.Second)
-		defer parar()
-		_ = view.PublicarDetalle(ctx, detalle)
-	})
-}
-
-func (a *App) eventosWidget(ocs []Ocurrencia, zona *time.Location, corte, inicioMes, finMes, hoyInicio time.Time) ([]int, map[int]string, []widgets.Item, int64) {
-	var busyDays []int
-	dayColors := map[int]string{}
-	var rawItems []widgets.Item
-	var upcomingCount int64
-	for _, oc := range ocs {
-		if strings.EqualFold(oc.Event.Status, "CANCELLED") {
-			continue
-		}
-		ini, fin, finInc := fechasOcurrenciaWidget(oc, zona)
-		hex := hexColorDe(oc.Color)
-		busyDays = marcarDiasWidget(busyDays, dayColors, ini, finInc, inicioMes, finMes, zona, hex)
-		if !vigenteWidget(oc, ini, fin, finInc, corte, hoyInicio) {
-			continue
-		}
-		upcomingCount++
-		if len(rawItems) < widgets.MaxItems {
-			rawItems = append(rawItems, a.itemWidgetDe(oc, ini, hex))
-		}
-	}
-	return busyDays, dayColors, rawItems, upcomingCount
-}
-
-func fechasOcurrenciaWidget(oc Ocurrencia, zona *time.Location) (time.Time, time.Time, time.Time) {
-	ini, fin := oc.Start.In(zona), oc.End.In(zona)
-	return ini, fin, finInclusivoWidget(ini, fin, oc.Event.AllDay)
-}
-
-func vigenteWidget(oc Ocurrencia, ini, fin, finInc, corte, hoyInicio time.Time) bool {
-	if oc.Event.AllDay {
-		return !finInc.Before(hoyInicio)
-	}
-	return fin.After(corte) || !ini.Before(corte)
 }
 
 // sinAcceso: el servicio dice que ese calendario ya no es para esta persona (403) o
@@ -702,11 +512,34 @@ func (a *App) pintar() {
 	default:
 		p.Estado, p.Recargando = agenda.Exito, a.cargandoEv
 	}
+	p.recCargando, p.recFallo = a.recCargando, a.recError
 	if a.raiz == nil {
 		return
 	}
+	// Repintar rehace el árbol: si el foco estaba en un día o en el asa del mes del
+	// teléfono, el lienzo se quedaría enfocando un widget que ya no está (sin aro y con
+	// las flechas moviendo desde el día viejo). Se lleva a su pareja nueva: el día ELEGIDO
+	// —el foco sigue a la selección, venga de una flecha, de Intro o de `t`— o el asa.
+	// Es lo que hace la web al conservar el `<button>` del asa y con su `focus()` tras
+	// mover la selección.
+	c := a.lienzo()
+	var foco fyne.Focusable
+	if c != nil {
+		foco = c.Focused()
+	}
+	p.diaElegido, p.asaMes = nil, nil // si ya no hay mes del teléfono, no hay adónde volver
 	a.raiz.Objects = []fyne.CanvasObject{p.Construir(), a.capaFlotante(), a.avisos}
 	a.raiz.Refresh()
+	switch foco.(type) {
+	case *diaCompacto:
+		if p.diaElegido != nil {
+			ui.Enfocar(c, p.diaElegido)
+		}
+	case *asaMes:
+		if p.asaMes != nil {
+			ui.Enfocar(c, p.asaMes)
+		}
+	}
 }
 
 // ordenar deja las ocurrencias por inicio, ESTABLE: a igualdad manda el orden de los

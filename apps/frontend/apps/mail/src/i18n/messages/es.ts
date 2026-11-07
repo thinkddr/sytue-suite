@@ -32,6 +32,11 @@ export const es: AppCatalog<typeof en> = {
   'externalMail.port': 'Puerto',
   'externalMail.username': 'Usuario (tu dirección de correo si lo dejas vacío)',
   'externalMail.password': 'Contraseña o contraseña de aplicación',
+  'externalMail.icloudBody':
+    'iCloud Mail no acepta aquí la contraseña de tu cuenta de Apple. Crea una contraseña específica para apps en account.apple.com (Inicio de sesión y seguridad › Contraseñas específicas de app) y escríbela abajo.',
+  'externalMail.icloudLink': 'Abrir account.apple.com',
+  'externalMail.icloudAuthError':
+    'iCloud no ha aceptado la contraseña. Usa una contraseña específica de app, no la de tu cuenta de Apple.',
   'externalMail.smtpPassword': 'Contraseña SMTP (la de entrada si lo dejas vacío)',
   'externalMail.advanced': 'Opciones avanzadas',
   'externalMail.security': 'Seguridad de la conexión SMTP',
@@ -40,6 +45,10 @@ export const es: AppCatalog<typeof en> = {
     'Comprobaremos el acceso a los servidores de entrada y salida antes de guardar. No enviaremos ningún correo de prueba.',
   'externalMail.connect': 'Conectar cuenta',
   'externalMail.authorize': 'Continuar al proveedor',
+  'externalMail.reconnectNeeded': 'Requiere volver a iniciar sesión',
+  'externalMail.accountUnavailable': 'No se pudo conectar con esta cuenta. Reintentar',
+  'externalMail.someUnavailable':
+    'No se pudo conectar con algunas cuentas. Sus correos no están en esta lista.',
   'externalMail.add': 'Añadir cuenta de correo',
   'externalMail.empty': 'No hay cuentas de correo externas conectadas.',
   'externalMail.open': 'Abrir buzón',
@@ -52,6 +61,13 @@ export const es: AppCatalog<typeof en> = {
     'No se pudo verificar la conexión segura del servidor. Comprueba su nombre y certificado con tu proveedor de correo.',
   'externalMail.authError':
     'No se aceptó el inicio de sesión. Vuelve a conectar la cuenta o revisa el usuario y la contraseña de aplicación.',
+  'externalMail.cancelled': 'Se canceló el inicio de sesión. No se ha conectado nada.',
+  'externalMail.scopeMissing':
+    'No se permitió el acceso al correo. Vuelve a intentarlo y deja marcado el permiso de correo.',
+  'externalMail.timeout': 'Ese inicio de sesión ya no vale. Vuelve a intentarlo.',
+  'externalMail.exists': 'Esta cuenta de correo ya está conectada.',
+  'externalMail.connected': 'Se ha conectado la cuenta {account}.',
+  'externalMail.accountsError': 'No se pudieron cargar las cuentas de correo externas.',
   'externalMail.sendUnknown':
     'Es posible que el servidor haya aceptado este correo. Comprueba Enviados antes de volver a intentarlo para evitar duplicarlo.',
   'externalMail.blockedError':
@@ -60,25 +76,11 @@ export const es: AppCatalog<typeof en> = {
     'Este correo o sus adjuntos superan el límite de tamaño. Reduce los adjuntos y vuelve a intentarlo.',
   'externalMail.pop3Note':
     'POP3 permite leer la bandeja de entrada y enviar con SMTP. No permite usar carpetas remotas, marcas de lectura ni mover mensajes.',
-  'externalMail.refreshNote':
-    'Este buzón se actualiza cada 30 segundos mientras su lista de mensajes está abierta. El correo se conserva en tu proveedor.',
   'externalMail.sent': 'Tu proveedor ha aceptado el correo.',
   'externalMail.sentNoCopy':
     'El correo se ha aceptado, pero no se pudo guardar una copia en Enviados. No vuelvas a enviarlo.',
-  'externalMail.draftNote':
-    'Este borrador se conserva solo mientras esta ventana está abierta. Al cerrarla, se descarta.',
-  'externalMail.attach': 'Adjuntar archivos',
-  'externalMail.markUnread': 'Marcar como no leído',
-  'externalMail.markRead': 'Marcar como leído',
-  'externalMail.flag': 'Destacar mensaje',
-  'externalMail.unflag': 'Quitar destacado',
-  'externalMail.trash': 'Mover a la papelera',
-  'externalMail.noMessages': 'No hay mensajes en esta carpeta.',
-  'externalMail.discardDraft': '¿Descartar este borrador?',
   'externalMail.invalidConfiguration':
     'Introduce una dirección de correo válida, los nombres y puertos de ambos servidores y una contraseña.',
-  'externalMail.invalidRecipients':
-    'Revisa las direcciones de correo. Separa las direcciones con comas.',
 
   // --- Comunes ------------------------------------------------------------
   'common.retry': 'Reintentar',
@@ -108,6 +110,15 @@ export const es: AppCatalog<typeof en> = {
 
   // --- Barra lateral ------------------------------------------------------
   'nav.compose': 'Redactar',
+  'nav.mailboxes': 'Buzones',
+  'nav.allInboxes': 'Todos los buzones de entrada',
+  'nav.allDrafts': 'Todos los borradores',
+  'nav.allSent': 'Todos los enviados',
+  'nav.allArchive': 'Todo el archivo',
+  'nav.allJunk': 'Todo el spam',
+  'nav.allTrash': 'Toda la papelera',
+  'nav.sytueMailbox': 'Buzón de Sytue',
+  'nav.accountsIn': 'Cuentas de {mailbox}',
   'nav.folders': 'Carpetas',
   'nav.refresh': 'Actualizar',
   'nav.manageFolders': 'Gestionar carpetas',
@@ -132,6 +143,10 @@ export const es: AppCatalog<typeof en> = {
   'shortcuts.archive': 'Archivar',
   'shortcuts.trash': 'Mover a la papelera',
   'shortcuts.star': 'Destacar',
+  'shortcuts.select': 'Marcar la conversación',
+  'shortcuts.clearSelection': 'Quitar la selección',
+  'shortcuts.label': 'Etiquetar',
+  'shortcuts.move': 'Mover a…',
   'shortcuts.help': 'Ver esta lista',
   'nav.settings': 'Ajustes',
   'nav.signature': 'Firma',
@@ -242,6 +257,9 @@ export const es: AppCatalog<typeof en> = {
   'error.undoSend': 'No se pudo deshacer el envío',
   'error.undoSendGone': 'Ya no se puede deshacer; el correo ha salido',
   'undo.done': 'Envío deshecho',
+  'triage.moved': 'Movido a {folder}',
+  'triage.undone': 'Devuelto a donde estaba',
+  'error.undoMove': 'No se pudo devolver a donde estaba',
 
   // --- Lista de conversaciones --------------------------------------------
   'list.region': 'Conversaciones de {folder}',
@@ -255,6 +273,13 @@ export const es: AppCatalog<typeof en> = {
   'list.searchHint':
     'Operadores: from:, to:, subject:, has:attachment, is:unread, is:starred, after:2026-01-31, before:2026-03-01. Usa comillas para varias palabras.',
   'list.clearSearch': 'Limpiar búsqueda',
+  'filter.group': 'Filtros rápidos',
+  'filter.unread': 'No leídos',
+  'filter.starred': 'Destacados',
+  'filter.attachments': 'Con adjuntos',
+  'filter.emptyTitle': 'Nada de aquí cumple este filtro',
+  'filter.emptyDescription': 'Prueba con otro filtro o enseña todas las conversaciones.',
+  'filter.showAll': 'Ver todas',
   'list.selectAll': 'Seleccionar todas las conversaciones',
   'list.loading': 'Cargando conversaciones…',
   'list.errorTitle': 'No se pudo cargar el correo',
@@ -289,6 +314,8 @@ export const es: AppCatalog<typeof en> = {
   'reader.createEvent': 'Crear evento',
   'reader.eventCreated': 'Evento creado en Sytue Calendar',
   'reader.eventFailed': 'No se pudo crear el evento',
+  'reader.shareToRooms': 'Compartir en Rooms',
+  'reader.roomsFailed': 'No se pudo compartir en Rooms.',
   'reader.unsubscribe': 'Darse de baja',
   'reader.unsubscribeFailed': 'No se pudo completar la baja',
   'reader.unsubscribeSent': 'Solicitud de baja enviada',
@@ -423,6 +450,10 @@ export const es: AppCatalog<typeof en> = {
   'editor.font': 'Fuente',
   'editor.redo': 'Rehacer',
   'editor.undo': 'Deshacer',
+  'editor.cut': 'Cortar',
+  'editor.copy': 'Copiar',
+  'editor.paste': 'Pegar',
+  'editor.selectAll': 'Seleccionar todo',
   'editor.colorNone': 'Ninguno',
   'editor.colorYellow': 'Amarillo',
   'editor.colorViolet': 'Violeta',

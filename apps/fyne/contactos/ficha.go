@@ -207,8 +207,8 @@ func (p *Pantalla) elementosMas(c api.Contact, correo string) []fyne.CanvasObjec
 			}
 		})
 		accion("detail.copyEmail", func() {
-			if p.AlCopiarCorreo != nil {
-				p.AlCopiarCorreo(correo)
+			if p.AlCopiar != nil {
+				p.AlCopiar(correo, "detail.emailCopied")
 			}
 		})
 	}
@@ -228,8 +228,10 @@ func (p *Pantalla) elementosMas(c api.Contact, correo string) []fyne.CanvasObjec
 // guiones de más no informa de nada, que es por lo que la web tampoco los pinta.
 func (p *Pantalla) tarjetaDatos(c api.Contact, v tema.Variante) fyne.CanvasObject {
 	campos := []fyne.CanvasObject{
-		p.campo(p.t("field.email", nil), p.valoresTipados(correosTipados(c), "primary-text", "mailto:"), v, true),
-		p.campo(p.t("field.phone", nil), p.valoresTipados(telefonosTipados(c), "text", "tel:"), v, false),
+		p.campo(p.t("field.email", nil),
+			p.valoresTipados(correosTipados(c), "primary-text", "mailto:", "detail.emailCopied"), v, true),
+		p.campo(p.t("field.phone", nil),
+			p.valoresTipados(telefonosTipados(c), "text", "tel:", "detail.phoneCopied"), v, false),
 		p.campo(p.t("field.organization", nil), textoORaya(c.Organization), v, false),
 	}
 	if len(c.Addresses) > 0 {
@@ -322,9 +324,9 @@ func (p *Pantalla) rotuloDeTipo(tipo string, direccion bool) string {
 }
 
 // valoresTipados es la columna de correos o de teléfonos: cada uno como enlace
-// (`mailto:`/`tel:`, que abre el sistema, como el navegador) con su etiqueta al lado.
-// Sin valores, la raya.
-func (p *Pantalla) valoresTipados(vs []valorTipado, token, esquema string) fyne.CanvasObject {
+// (`mailto:`/`tel:`, que abre el sistema, como el navegador) con su etiqueta y su botón
+// de copiar al lado. Sin valores, la raya.
+func (p *Pantalla) valoresTipados(vs []valorTipado, token, esquema, copiado string) fyne.CanvasObject {
 	if len(vs) == 0 {
 		return textoORaya("")
 	}
@@ -337,7 +339,8 @@ func (p *Pantalla) valoresTipados(vs []valorTipado, token, esquema string) fyne.
 			}
 		})
 		filas = append(filas, container.New(filaTipada{},
-			enl, ui.NuevoRotulo(p.rotuloDeTipo(x.tipo, false), tema.TextoXS, ui.Normal, "text-subtle")))
+			enl, ui.NuevoRotulo(p.rotuloDeTipo(x.tipo, false), tema.TextoXS, ui.Normal, "text-subtle"),
+			p.botonCopiar(x.valor, x.valor, copiado)))
 	}
 	return agenda.EnColumna(HuecoValores, filas...)
 }
@@ -349,13 +352,35 @@ func (p *Pantalla) direcciones(ds []api.ContactAddress) fyne.CanvasObject {
 	for _, d := range ds {
 		postales := lineasPostales(d)
 		lineas := make([]fyne.CanvasObject, 0, len(postales)+1)
-		lineas = append(lineas, ui.NuevoRotulo(p.rotuloDeTipo(d.Type, true), tema.TextoXS, ui.Normal, "text-subtle"))
+		var primera string
+		if len(postales) > 0 {
+			primera = postales[0]
+		}
+		lineas = append(lineas, container.New(filaCentrada{Hueco: HuecoTipo},
+			ui.NuevoRotulo(p.rotuloDeTipo(d.Type, true), tema.TextoXS, ui.Normal, "text-subtle"),
+			p.botonCopiar(primera, strings.Join(postales, "\n"), "detail.addressCopied")))
 		for _, l := range postales {
 			lineas = append(lineas, ui.NuevoRotulo(l, tema.TextoBase, ui.Normal, "text"))
 		}
 		bloques = append(bloques, agenda.EnColumna(0, lineas...))
 	}
 	return agenda.EnColumna(HuecoDirecciones, bloques...)
+}
+
+// botonCopiar es `CopyValue`: el glifo de copiar, `sm` y apagado (`text-muted`),
+// siempre visible —uno que solo sale al pasar el puntero no existe para el teclado ni
+// para el dedo—. `rotulo` va en el nombre accesible, porque una ficha tiene varios
+// iguales; `valor` es lo que copia (la dirección, entera y en líneas).
+func (p *Pantalla) botonCopiar(rotulo, valor, copiado string) fyne.CanvasObject {
+	nombre := p.t("detail.copyValue", i18n.Vars{"value": rotulo})
+	b := ui.NuevoBotonIcono(iconos.Copias, nombre, func() {
+		if p.AlCopiar != nil {
+			p.AlCopiar(valor, copiado)
+		}
+	})
+	b.Lado, b.TamIcono = ui.LadoIconoSM, 14
+	b.Trazo, b.TrazoEncima = "text-muted", "text"
+	return ui.NuevaPista(nombre, b)
 }
 
 // lineasPostales es `addressLines`: calle, «CP ciudad», región y país, sin las vacías.
@@ -521,7 +546,12 @@ func (filaTipada) MinSize(objs []fyne.CanvasObject) fyne.Size {
 		return fyne.Size{}
 	}
 	a, b := objs[0].MinSize(), objs[1].MinSize()
-	return fyne.NewSize(a.Width+HuecoTipo+b.Width, max(a.Height, DesfaseTipo+b.Height))
+	m := fyne.NewSize(a.Width+HuecoTipo+b.Width, max(a.Height, DesfaseTipo+b.Height))
+	if len(objs) > 2 { // el botón de copiar, detrás de la etiqueta
+		c := objs[2].MinSize()
+		m = fyne.NewSize(m.Width+HuecoTipo+c.Width, max(m.Height, c.Height))
+	}
+	return m
 }
 
 func (filaTipada) Layout(objs []fyne.CanvasObject, t fyne.Size) {
@@ -534,6 +564,11 @@ func (filaTipada) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	objs[0].Resize(fyne.NewSize(ancho, a.Height))
 	objs[1].Move(fyne.NewPos(ancho+HuecoTipo, DesfaseTipo))
 	objs[1].Resize(b)
+	if len(objs) > 2 { // `self-center`: centrado en la línea del valor
+		c := objs[2].MinSize()
+		objs[2].Move(fyne.NewPos(ancho+HuecoTipo+b.Width+HuecoTipo, (a.Height-c.Height)/2))
+		objs[2].Resize(c)
+	}
 }
 
 // filaCentrada pone los hijos a su tamaño, en fila y centrados en vertical: el

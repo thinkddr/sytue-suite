@@ -87,6 +87,126 @@ func (s *Store) TrashContacts(ctx context.Context, subject string, uids []string
 	return n, nil
 }
 
+// RestoreContacts es el «Deshacer» de TrashContacts: revive, en UNA operacion, lo
+// ultimo que se tiro de cada UID del dueno. «Lo ultimo» son las filas borradas con
+// el deleted_at MAS RECIENTE de ese UID: el lote las marca todas con el mismo now(),
+// asi que vuelven las dos copias de un UID que vive en dos libretas, y no una copia
+// mas vieja que alguien tiro ayer. Se omiten (y no cuentan) los UID ajenos, los ya
+// purgados, los de una libreta borrada y los que chocarian con un vivo de su libreta
+// (mismo UID o mismo recurso CardDAV): esos se quedan en la papelera. Tampoco vuelve
+// un UID con una copia viva que alguien toco DESPUES de ese ultimo borrado: es que en
+// los diez segundos del aviso se recupero a mano (o se creo de nuevo), y entonces «lo
+// ultimo tirado» ya es una copia vieja de otro dia que nadie pidio revivir. Devuelve
+// cuantas filas volvieron, comparable con lo que devolvio TrashContacts.
+func (s *Store) RestoreContacts(ctx context.Context, subject string, uids []string) (int, error) {
+	t := tenancy.MustFrom(ctx)
+	uids = cleanUIDs(uids)
+	if len(uids) == 0 {
+		return 0, nil
+	}
+	var n int
+	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx,
+			`WITH cand AS (
+			   SELECT DISTINCT ON (c.address_book_id, c.uid)
+			          c.id, c.object_id, c.address_book_id, c.uid, c.deleted_at
+			   FROM contacts c
+			   JOIN address_books ab ON ab.id = c.address_book_id AND ab.tenant = c.tenant
+			   WHERE c.tenant=$1 AND ab.owner_sub=$2 AND ab.deleted_at IS NULL
+			     AND c.uid = ANY($3) AND c.deleted_at IS NOT NULL
+			   ORDER BY c.address_book_id, c.uid, c.deleted_at DESC, c.id DESC
+			 ),
+			 ultimo AS (
+			   SELECT cand.uid, max(cand.deleted_at) AS d FROM cand
+			   GROUP BY cand.uid
+			   HAVING NOT EXISTS (
+			     SELECT 1 FROM contacts v
+			     JOIN address_books vb ON vb.id = v.address_book_id AND vb.tenant = v.tenant
+			     WHERE v.tenant=$1 AND vb.owner_sub=$2 AND v.uid = cand.uid
+			       AND v.deleted_at IS NULL AND v.updated_at > max(cand.deleted_at))
+			 ),
+			 targets AS (
+			   SELECT cand.id, cand.object_id, cand.address_book_id
+			   FROM cand
+			   JOIN ultimo u ON u.uid = cand.uid AND u.d = cand.deleted_at
+			   JOIN card_objects o ON o.tenant=$1 AND o.id = cand.object_id
+			   WHERE NOT EXISTS (
+			     SELECT 1 FROM card_objects v
+			     WHERE v.tenant=$1 AND v.address_book_id = cand.address_book_id
+			       AND v.deleted_at IS NULL
+			       AND (v.uid = o.uid OR v.resource_name = o.resource_name))
+			 ),
+			 res_o AS (
+			   UPDATE card_objects SET deleted_at=NULL, updated_at=now()
+			   WHERE tenant=$1 AND id IN (SELECT object_id FROM targets)
+			   RETURNING id
+			 ),
+			 res_c AS (
+			   UPDATE contacts SET deleted_at=NULL, updated_at=now()
+			   WHERE tenant=$1 AND id IN (SELECT id FROM targets)
+			   RETURNING id
+			 ),
+			 bump AS (
+			   UPDATE address_books
+			   SET ctag=gen_random_uuid(), sync_token=sync_token+1, updated_at=now()
+			   WHERE tenant=$1 AND id IN (SELECT DISTINCT address_book_id FROM targets)
+			   RETURNING id
+			 )
+			 SELECT count(*) FROM res_c`,
+			t.Slug, subject, uids).Scan(&n)
+	})
+	if err != nil {
+		if uniqueViolation(err) {
+			return 0, domain.ErrConflict
+		}
+		return 0, fmt.Errorf("store: restaurar en lote: %w", err)
+	}
+	return n, nil
+}
+
+// EachCardByID entrega a fn, una a una y según las lee, la vCard GUARDADA (no una
+// regenerada: lleva la foto y los campos que Sytue no interpreta) de cada contacto vivo
+// del dueno con esos id, en el orden pedido, en UNA consulta. Los id ajenos, borrados o
+// de una libreta borrada se omiten en silencio, como en el resto de los lotes. Es la
+// exportacion de una seleccion. No las junta en un slice a proposito: mil tarjetas con
+// foto son decenas de MB, y el handler las escribe en la respuesta segun llegan. Si fn
+// devuelve error, se para y se devuelve ese error.
+func (s *Store) EachCardByID(ctx context.Context, subject string, ids []uuid.UUID, fn func(card string) error) error {
+	t := tenancy.MustFrom(ctx)
+	if len(ids) == 0 {
+		return nil
+	}
+	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx,
+			`SELECT o.data
+			 FROM contacts c
+			 JOIN address_books ab ON ab.id = c.address_book_id AND ab.tenant = c.tenant
+			 JOIN card_objects o ON o.id = c.object_id AND o.tenant = c.tenant
+			 WHERE c.tenant=$1 AND ab.owner_sub=$2 AND c.id = ANY($3::uuid[])
+			   AND c.deleted_at IS NULL AND o.deleted_at IS NULL AND ab.deleted_at IS NULL
+			 ORDER BY array_position($3::uuid[], c.id)`,
+			t.Slug, subject, ids)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var data string
+			if err := rows.Scan(&data); err != nil {
+				return err
+			}
+			if err := fn(data); err != nil {
+				return err
+			}
+		}
+		return rows.Err()
+	})
+	if err != nil {
+		return fmt.Errorf("store: vCards en lote: %w", err)
+	}
+	return nil
+}
+
 // SetFavorites destaca (on=true) o quita el destacado (on=false) de TODOS los
 // contactos vivos del dueno cuyos UID esten en la lista, en UNA sola UPDATE con
 // `uid = ANY`. Owner-scoped (subquery a address_books por owner_sub): los UID

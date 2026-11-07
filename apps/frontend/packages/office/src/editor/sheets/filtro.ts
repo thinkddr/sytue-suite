@@ -15,7 +15,7 @@
  */
 import type { CellValue } from '@sytue/formula';
 import type { CellStyle, FilterCondition, FilterOp, SheetAutoFilter } from '../types';
-import { formatCellValue, parseEsNumberStrict } from './format';
+import { formatCellValue, parseEsDate, parseEsNumberStrict } from './format';
 
 /** Los operadores, en el orden en que los enseña el menú. */
 export const FILTER_OPS: readonly FilterOp[] = [
@@ -119,6 +119,14 @@ export function sanitizeFilterConds(
 const num = (v: CellValue): number | null => (typeof v === 'number' ? v : null);
 
 /**
+ * El operando de una condición como número; y si se tecleó como fecha («01/03/2026»,
+ * «2026-03-01»), su nº de serie, que es lo que guarda una celda de fecha: así «entre
+ * 01/01/2026 y 31/01/2026» filtra enero. La fecha va primero porque «2026-03-01» también
+ * pasa la forma de un número. Espejo de `operandoFiltro` (services/docs y Fyne).
+ */
+export const filterOperand = (s: string): number | null => parseEsDate(s) ?? parseEsNumberStrict(s);
+
+/**
  * ¿Pasa cada celda la condición? Devuelve un booleano por celda (true = se ve). Los
  * N superiores y la media se calculan sobre TODA la columna del cuerpo, no sobre lo que
  * ya dejan pasar otras columnas (como el formato condicional).
@@ -126,8 +134,8 @@ const num = (v: CellValue): number | null => (typeof v === 'number' ? v : null);
 export function evalFilterColumn(cond: FilterCondition, cells: readonly FilterCell[]): boolean[] {
   const nums = cells.map((c) => num(c.v)).filter((n): n is number => n !== null);
   const a = cond.a ?? '';
-  const aNum = parseEsNumberStrict(a);
-  const bNum = parseEsNumberStrict(cond.b ?? '');
+  const aNum = filterOperand(a);
+  const bNum = filterOperand(cond.b ?? '');
   const aLow = a.trim().toLowerCase();
   let umbral: number | null = null;
   if ((cond.op === 'top' || cond.op === 'bottom') && nums.length > 0) {

@@ -282,6 +282,18 @@ export const sk: AppCatalog<typeof en> = {
     many: '{count} položky bolo presunutých do koša.',
     other: '{count} položiek bolo presunutých do koša.',
   },
+  'files.batch.restored': {
+    one: '1 položka bola obnovená.',
+    few: '{count} položky boli obnovené.',
+    many: '{count} položky bolo obnovených.',
+    other: '{count} položiek bolo obnovených.',
+  },
+  'files.batch.restorePartial': {
+    one: '1 položku sa nepodarilo obnoviť; zostáva v koši.',
+    few: '{count} položky sa nepodarilo obnoviť; zostávajú v koši.',
+    many: '{count} položky sa nepodarilo obnoviť; zostávajú v koši.',
+    other: '{count} položiek sa nepodarilo obnoviť; zostávajú v koši.',
+  },
   'files.batch.trashFailed': 'Výber sa nepodarilo presunúť do koša.',
   'files.batch.moveTitle': {
     one: 'Presunúť 1 položku',
@@ -306,6 +318,9 @@ export const sk: AppCatalog<typeof en> = {
   'action.rename': 'Premenovať',
   'action.move': 'Presunúť do…',
   'action.copy': 'Vytvoriť kópiu',
+  'action.copyLink': 'Kopírovať odkaz',
+  'action.linkCopied': 'Odkaz bol skopírovaný. Otvorí sa len osobám, ktoré už majú prístup.',
+  'action.copyLinkFailed': 'Odkaz sa nepodarilo skopírovať.',
   'action.shareLink': 'Zdieľať odkaz',
   'action.openInApp': 'Otvoriť v aplikácii',
   'action.openInEditor': 'Otvoriť v editore',
@@ -530,6 +545,22 @@ export const sk: AppCatalog<typeof en> = {
   'trash.purged': '„{name}“ bolo natrvalo odstránené.',
   'trash.purgeDenied': '„{name}“ nemožno odstrániť',
   'trash.purgeFailed': 'Odstránenie sa nepodarilo.',
+  'trash.emptyAll': 'Vyprázdniť kôš',
+  'trash.emptyAllTitle': 'Vyprázdniť kôš?',
+  'trash.emptyAllBody': {
+    one: 'Položka v koši sa natrvalo vymaže vrátane histórie verzií. Potom ju už nemožno získať späť.',
+    few: '{count} položky v koši sa natrvalo vymažú vrátane histórie verzií. Potom ich už nemožno získať späť.',
+    many: '{count} položky v koši sa natrvalo vymaže vrátane histórie verzií. Potom ich už nemožno získať späť.',
+    other:
+      '{count} položiek v koši sa natrvalo vymaže vrátane histórie verzií. Potom ich už nemožno získať späť.',
+  },
+  'trash.emptiedAll': 'Kôš bol vyprázdnený.',
+  'trash.emptyAllPartial': {
+    one: '1 položku sa nepodarilo odstrániť; zostáva v koši.',
+    few: '{count} položky sa nepodarilo odstrániť; zostávajú v koši.',
+    many: '{count} položky sa nepodarilo odstrániť; zostávajú v koši.',
+    other: '{count} položiek sa nepodarilo odstrániť; zostávajú v koši.',
+  },
   'trash.purgeTitle': 'Odstrániť natrvalo?',
   'trash.purgeBodyFolder':
     'Obsah „{name}“ a všetkého, čo je vo vnútri, sa vymaže zo serverov Sytue vrátane histórie verzií. Potom ho už nemožno získať späť, ani odtiaľto, ani cez podporu. Výmenou uvoľníte miesto, ktoré zaberal.',

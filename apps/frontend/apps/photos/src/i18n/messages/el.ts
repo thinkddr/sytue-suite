@@ -138,6 +138,7 @@ export const el: AppCatalog<typeof en> = {
   'gallery.downloadSelected': 'Λήψη',
   'gallery.downloading':
     'Αιτήματα λήψης που ξεκίνησαν: {count}. Ελέγξτε τις λήψεις του προγράμματος περιήγησης.',
+  'gallery.downloadingNative': { one: 'Λήψη 1 φωτογραφίας…', other: 'Λήψη {count} φωτογραφιών…' },
   'gallery.downloadCapped': 'Φωτογραφίες εκτός αυτής της παρτίδας: {count}.',
   'gallery.newAlbum': 'Νέο άλμπουμ',
   'gallery.newAlbumTitle': 'Νέο άλμπουμ',
@@ -266,4 +267,20 @@ export const el: AppCatalog<typeof en> = {
   'aiBatch.excludeOrg': 'Εξαίρεση του οργανισμού από την αυτόματη παρτίδα Sytue AI',
   'aiBatch.excludedHint':
     'Ο οργανισμός έχει εξαιρεθεί από την αυτόματη παρτίδα Sytue AI. Οι φωτογραφίες δεν αναλύονται στο παρασκήνιο για προτάσεις ή παρόμοιες.',
+  'album.rename': 'Μετονομασία',
+  'album.renamePrompt': 'Όνομα άλμπουμ',
+  'album.setCover': 'Χρήση ως εξώφυλλο άλμπουμ',
+  'album.isCover': 'Αυτό είναι το εξώφυλλο του άλμπουμ',
+  'album.coverSet': 'Το εξώφυλλο του άλμπουμ ενημερώθηκε',
+  'gallery.favorited': 'Προστέθηκαν στα αγαπημένα: {count}',
+  'gallery.unfavorited': 'Αφαιρέθηκαν από τα αγαπημένα: {count}',
+  'gallery.favoriteFailed': 'Φωτογραφίες που δεν ήταν δυνατό να αλλάξουν: {count}',
+  'gallery.noResults.title': 'Καμία φωτογραφία δεν ταιριάζει με «{query}»',
+  'gallery.noResults.description':
+    'Δοκιμάστε άλλες λέξεις ή διαγράψτε την αναζήτηση για να δείτε όλες τις φωτογραφίες σας.',
+  'gallery.clearSearch': 'Διαγραφή αναζήτησης',
+  'viewer.counter': '{index} / {total}',
+  'viewer.counterMore': '{count}+',
+  'viewer.counterLabel': 'Φωτογραφία {index} από {total}',
+  'viewer.shortcutsJump': 'Τα Home και End πηγαίνουν στην πρώτη και στην τελευταία φωτογραφία.',
 };

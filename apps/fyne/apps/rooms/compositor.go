@@ -144,6 +144,10 @@ type Compositor struct {
 	Remotos  []api.RoomsCommand
 
 	AlEnviar func(string)
+	// AlEditarUltimo es `onEditLast`: ↑ con la caja vacía abre en edición el último
+	// mensaje propio del canal. Devuelve false si no hay ninguno, y entonces la flecha
+	// hace lo de siempre. Nil en el compositor del hilo.
+	AlEditarUltimo func() bool
 	// AlComando despacha un comando integrado CON EFECTO (`onCommand`: presencia, tema,
 	// directo…) y AlComandoRemoto uno de servidor (`onRemoteCommand`). Sin ellos, el
 	// comando avisa «no disponible aquí» y no se envía, que es el compositor del hilo.
@@ -251,6 +255,15 @@ func (c *Compositor) tecla(k *fyne.KeyEvent) bool {
 			return true
 		default:
 		}
+	}
+	// ↑ con la caja vacía edita el último mensaje propio. Ctrl/Alt/Super+↑ no llega
+	// aquí en escritorio ni en wasm: el driver glfw lo convierte en un
+	// `desktop.CustomShortcut`. En móvil con teclado físico SÍ llega como ↑ a secas,
+	// porque el driver móvil (`typeDownCanvas`) descarta los modificadores; es deuda
+	// del fork (docs/roadmap.md, «Flecha arriba…»).
+	if k.Name == fyne.KeyUp && !c.area.Mayus() && c.Texto() == "" && len(c.Pendientes) == 0 &&
+		c.AlEditarUltimo != nil && c.AlEditarUltimo() {
+		return true
 	}
 	if k.Name != fyne.KeyReturn && k.Name != fyne.KeyEnter || c.area.Mayus() {
 		return false

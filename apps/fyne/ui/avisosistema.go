@@ -148,8 +148,11 @@ func (a *avisosBarra) anunciar(n api.HubNotification) {
 	a.mu.Lock()
 	ya = a.anunciados[n.ID] // otra rutina pudo adelantarse mientras se preguntaba
 	a.anunciados[n.ID] = true
+	callar := a.callar
 	a.mu.Unlock()
-	if ya {
+	// En pausa ([BarraSuite.CallarAvisosSi]) el aviso se da por anunciado y no sale: al
+	// acabar la pausa no suena de golpe lo que llegó mientras, como en Slack.
+	if ya || (callar != nil && callar()) {
 		return
 	}
 	// El texto es el del Hub, ya recortado por el servicio: el asunto de un correo o el
@@ -157,7 +160,7 @@ func (a *avisosBarra) anunciar(n api.HubNotification) {
 	m := app.Metadata()
 	// El título, en el idioma de esta máquina (`params`); el cuerpo es el del emisor.
 	titulo, cuerpo := TituloAviso(a.t, n), CuerpoAviso(a.t.Locale(), n)
-	if err := escritorio.Avisar(escritorio.Aviso{
+	if err := avisarSistema(escritorio.Aviso{
 		ID: m.ID, Nombre: m.Name, Esquema: m.Custom["esquema"], Titulo: titulo, Cuerpo: cuerpo,
 		// Con la app ya cerrada no hay `AlPulsar` que llamar: el aviso lleva su destino.
 		Destino:  escritorio.DestinoDe(n.ID, n.Source, n.URL),
@@ -166,6 +169,9 @@ func (a *avisosBarra) anunciar(n api.HubNotification) {
 		sesion.AvisoDeRespaldo(app, titulo, cuerpo)
 	}
 }
+
+// avisarSistema es quien saca el aviso de verdad; los guardianes lo sustituyen.
+var avisarSistema = escritorio.Avisar
 
 // abiertaEn es la pregunta de la regla 4 en esta plataforma. En el móvil no se puede
 // hacer y se contesta «abierta», que deja callado al Hub: mejor un aviso que falta que

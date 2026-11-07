@@ -442,12 +442,16 @@ func (c *dialogoCompartir) pintar() {
 	if strings.TrimSpace(c.clave.Texto()) != "" {
 		pistaClave = ui.NuevaPistaCampo(c.t("share.passwordSet")).ConTono(ui.AyudaExito)
 	}
+	// Las dos pistas van a dos renglones en su `w-56`: con el ancho, el mínimo los cuenta
+	// y «Crear el enlace» ya no pisa el segundo.
+	pistaCaduca.Ancho, pistaClave.Ancho = AnchoCampoCompartir, AnchoCampoCompartir
 	add(tema.Espacio(4), filaForm{
 		campos: []fyne.CanvasObject{
 			grupoCampo(c.t("share.until"), c.caduca, pistaCaduca),
 			grupoCampo(c.t("share.password"), c.clave, pistaClave),
 		},
 		anchos: []float32{AnchoCampoCompartir, AnchoCampoCompartir}, hueco: tema.Espacio(3),
+		apilada: c.enTelefono(), conSuAncho: true,
 	}.objeto())
 	crear := []fyne.CanvasObject{c.crear}
 	if c.bloqueaEtiqueta() {
@@ -462,7 +466,7 @@ func (c *dialogoCompartir) pintar() {
 	add(tema.Espacio(5), versalEnLinea(ui.NuevoVersal(c.t("share.liveHeading"), tema.TextoXS, ui.SemiNegrita, tema.Color("text-subtle", v))))
 	add(tema.Espacio(2), c.lista(v))
 	if len(c.comparticiones) > 0 {
-		add(tema.Espacio(2), ui.Texto(c.t("share.revokeNote"), tema.TextoXS, ui.Normal, tema.Color("text-subtle", v)))
+		add(tema.Espacio(2), notaMeta(c.t("share.revokeNote"), v))
 	}
 	c.cuerpo.Objects = []fyne.CanvasObject{container.New(&pilaSeparada{separas: separas, ancho: &c.anchoCuerpo}, bloques...)}
 	c.cuerpo.Refresh()
@@ -515,23 +519,22 @@ func (c *dialogoCompartir) panelCreado(v tema.Variante) fyne.CanvasObject {
 	dentro := container.New(&pilaSeparada{separas: []float32{0, tema.Espacio(2), tema.Espacio(2), tema.Espacio(1.5)}, ancho: &c.anchoPanel},
 		titulo, fila, texto, lineaTexto(nota, tema.TextoXS))
 	caja := ui.NuevaCaja(tema.Color("success-bg", v), tema.Color("success", v), tema.RadioMD)
-	return container.New(&conMargen{m: tema.Espacio(3) + tema.Borde}, append(caja.Objetos(), dentro)...)
+	return dentroDeCaja(caja, tema.Espacio(3)+tema.Borde, dentro)
 }
 
 // lista son las comparticiones vivas, o lo que haya en su lugar.
 func (c *dialogoCompartir) lista(v tema.Variante) fyne.CanvasObject {
-	borde := ui.NuevaCaja(color.NRGBA{}, tema.Color("border", v), tema.RadioMD)
+	borde := marcoLista(v, tema.RadioMD)
 	switch {
 	case c.comparticiones == nil && !c.falloLista:
 		r := ui.NuevaRueda(18, "text", v)
 		r.Rotulo = c.t("share.loadingLinks")
-		return container.New(&altoFijo{alto: tema.Espacio(16)}, append(borde.Objetos(), container.NewCenter(r))...)
+		return dentroDeCaja(borde, 0, container.New(&altoFijo{alto: tema.Espacio(16)}, container.NewCenter(r)))
 	case c.falloLista:
 		fondo := ui.NuevaCaja(tema.Color("bg-subtle", v), tema.Color("border", v), tema.RadioMD)
 		texto := lineaTexto(ui.Texto(c.t("share.loadFailed"), tema.TextoSM, ui.Normal, tema.Color("text-muted", v)), tema.TextoSM)
 		reintentar := ui.NuevoBoton(c.t("files.retry"), func() { c.p.enSegundoPlano(func() { c.recargar() }) }).Con(ui.Secundario, ui.TallaSM)
-		return container.New(&conMargenXY{x: tema.Espacio(3), y: tema.Espacio(2)},
-			append(fondo.Objetos(), container.NewBorder(nil, nil, texto, reintentar))...)
+		return dentroDeCajaXY(fondo, tema.Espacio(3), tema.Espacio(2), container.NewBorder(nil, nil, texto, reintentar))
 	case len(c.comparticiones) == 0:
 		clave := "share.emptyFile"
 		if c.el.Carpeta {
@@ -543,7 +546,7 @@ func (c *dialogoCompartir) lista(v tema.Variante) fyne.CanvasObject {
 	for i, s := range c.comparticiones {
 		filas = append(filas, c.filaCompartida(s, i > 0, v))
 	}
-	return container.New(&conMargen{m: tema.Borde}, append(borde.Objetos(), container.New(ui.Columna{}, filas...))...)
+	return dentroDeCaja(borde, tema.Borde, container.New(ui.Columna{}, filas...))
 }
 
 // filaCompartida es una compartición viva: `px-3 py-2 gap-3`, el glifo, a quién o qué
@@ -657,6 +660,9 @@ type filaForm struct {
 	// ancho, uno debajo de otro (`max-md:w-full max-md:mt-0` de la web). En una fila,
 	// el acceso de 176 cortaba «Solo mirar y descargar».
 	apilada bool
+	// conSuAncho, apilada, deja a cada campo su ancho fijo: es el `flex-wrap` de los
+	// `w-56`, que bajan de línea sin estirarse.
+	conSuAncho bool
 }
 
 func (f filaForm) objeto() fyne.CanvasObject {
@@ -705,6 +711,20 @@ func (f *filaForm) MinSize(objs []fyne.CanvasObject) fyne.Size {
 // ponytail: sin `flex-wrap`. A 360 la web baja el botón y el acceso a otra línea; aquí
 // el campo flexible se estrecha hasta su `min-w-56` y lo que no cabe se recorta.
 func (f *filaForm) Layout(_ []fyne.CanvasObject, t fyne.Size) {
+	if f.apilada && f.conSuAncho {
+		y := float32(0)
+		for i, c := range f.hijos() {
+			w := t.Width
+			if i < len(f.anchos) && f.anchos[i] > 0 {
+				w = min(f.anchos[i], t.Width)
+			}
+			h := c.MinSize().Height
+			c.Move(fyne.NewPos(0, y))
+			c.Resize(fyne.NewSize(w, h))
+			y += h + f.hueco
+		}
+		return
+	}
 	if f.apilada {
 		ui.Columna{Hueco: f.hueco}.Layout(f.hijos(), t)
 		return
@@ -899,45 +919,56 @@ func (campoYBoton) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	objs[1].Resize(b)
 }
 
-// conMargen pone los primeros objetos (la caja) a tamaño completo y el último con un
-// margen igual por los cuatro lados.
-type conMargen struct{ m float32 }
-
-func (c *conMargen) MinSize(objs []fyne.CanvasObject) fyne.Size {
-	m := objs[len(objs)-1].MinSize()
-	return fyne.NewSize(m.Width+2*c.m, m.Height+2*c.m)
+// dentroDeCaja pone la caja a todo el tamaño y el contenido a `m` de cada lado. La caja
+// se coloca con su propio Redimensionar: estirar sus rectángulos a mano dejaba el
+// relleno encima del borde (no se veía) o, sin relleno, el borde pintado entero.
+func dentroDeCaja(c *ui.Caja, m float32, dentro fyne.CanvasObject) fyne.CanvasObject {
+	return dentroDeCajaXY(c, m, m, dentro)
 }
 
-func (c *conMargen) Layout(objs []fyne.CanvasObject, t fyne.Size) {
-	for i, o := range objs {
-		if i == len(objs)-1 {
-			o.Move(fyne.NewPos(c.m, c.m))
-			o.Resize(fyne.NewSize(max(t.Width-2*c.m, 0), max(t.Height-2*c.m, 0)))
-			continue
-		}
-		o.Move(fyne.NewPos(0, 0))
-		o.Resize(t)
-	}
+// dentroDeCajaXY es dentroDeCaja con el `px`/`py` distintos.
+func dentroDeCajaXY(c *ui.Caja, x, y float32, dentro fyne.CanvasObject) fyne.CanvasObject {
+	return container.New(&cajaConMargen{caja: c, x: x, y: y}, append(c.Objetos(), dentro)...)
 }
 
-// conMargenXY es conMargen con el `px`/`py` distintos.
-type conMargenXY struct{ x, y float32 }
+// marcoLista es el `border rounded-*` de una lista de un diálogo: solo el filete, y
+// las filas sobre el panel.
+func marcoLista(v tema.Variante, radio float32) *ui.Caja {
+	return ui.NuevaCaja(color.NRGBA{}, tema.Color("border", v), radio).ConTrazo()
+}
 
-func (c *conMargenXY) MinSize(objs []fyne.CanvasObject) fyne.Size {
+type cajaConMargen struct {
+	caja *ui.Caja
+	x, y float32
+}
+
+func (c *cajaConMargen) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	m := objs[len(objs)-1].MinSize()
 	return fyne.NewSize(m.Width+2*c.x, m.Height+2*c.y)
 }
 
-func (c *conMargenXY) Layout(objs []fyne.CanvasObject, t fyne.Size) {
-	for i, o := range objs {
-		if i == len(objs)-1 {
-			o.Move(fyne.NewPos(c.x, c.y))
-			o.Resize(fyne.NewSize(max(t.Width-2*c.x, 0), max(t.Height-2*c.y, 0)))
-			continue
-		}
-		o.Move(fyne.NewPos(0, 0))
-		o.Resize(t)
+func (c *cajaConMargen) Layout(objs []fyne.CanvasObject, t fyne.Size) {
+	c.caja.Redimensionar(t)
+	o := objs[len(objs)-1]
+	o.Move(fyne.NewPos(c.x, c.y))
+	o.Resize(fyne.NewSize(max(t.Width-2*c.x, 0), max(t.Height-2*c.y, 0)))
+}
+
+// notaMeta es un `<p class="sytue-meta">`: `text-xs text-subtle`, y parte en líneas
+// como el párrafo que es. En una sola línea se cortaba en el borde del diálogo.
+func notaMeta(texto string, v tema.Variante) *ui.Parrafo {
+	return ui.NuevoParrafo(texto, tema.TextoXS, ui.Normal, "text-subtle", v)
+}
+
+// anchoSelectorOpciones es el de un `<select>` sin ancho: el de su opción más larga, con
+// el relleno y el hueco del chevron (MedidaSelector sin texto). Con el mínimo, «Gestión»
+// salía «G…».
+func anchoSelectorOpciones(opciones []string) float32 {
+	texto := float32(0)
+	for _, o := range opciones {
+		texto = max(texto, ui.Medir(o, tema.TextoBase, ui.Normal).Width)
 	}
+	return ui.MedidaSelector(ui.CampoMD, 0).Width - tema.Rem + texto
 }
 
 // altoFijo es un contenedor de un alto dado (`h-16`) con todo a tamaño completo.

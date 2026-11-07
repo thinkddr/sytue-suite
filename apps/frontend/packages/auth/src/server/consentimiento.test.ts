@@ -174,3 +174,21 @@ test('meeting return is derived from the sealed gateway section, never the callb
     );
   }
 });
+
+test('an account already connected returns to it, not to the discarded draft', async () => {
+  const route = rutaDeRetornoDeApp({
+    bff: bff(session(true), '/mail'),
+    section: 'external-mail',
+    finish: async () => ({
+      section: 'external-mail',
+      instance: 'discarded-draft',
+      existing: 'connected-account',
+      error: 'exists',
+    }),
+  });
+  const ctx = context('/mail/api/external-mail-finish?state=sealed&code=secret');
+  const target = new URL((await route(ctx)).headers.get('location')!, ctx.url);
+  expect(target.searchParams.get('connect-mail')).toBe('1');
+  expect(target.searchParams.get('instance')).toBe('connected-account');
+  expect(target.searchParams.get('oauth_error')).toBe('exists');
+});

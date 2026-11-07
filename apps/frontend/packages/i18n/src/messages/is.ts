@@ -18,6 +18,8 @@ export const is: Catalog = {
   'ui.openNav': 'Opna leiðsögn',
   'ui.closeNav': 'Loka leiðsögn',
   'ui.backToList': 'Til baka í listann',
+  'ui.suiteOpen': 'Sytue: forrit, leit, tilkynningar og aðgangur',
+  'ui.suiteClose': 'Til baka í forritið',
   'ui.noResults': 'Engar niðurstöður.',
   'ui.meter.almostFull': 'næstum fullt',
   'ui.meter.full': 'fullt',
@@ -60,6 +62,9 @@ export const is: Catalog = {
   'shell.lock.reasonNotebook': 'opna dulkóðuðu minnisbókina þína',
   'shell.lock.faceIdUsage':
     'Sytue notar Face ID til að aflæsa lotunni þinni þegar þú opnar forritið.',
+  'shell.widgets.wake': 'Uppfæra græjur þegar forritið er lokað',
+  'shell.widgets.wakeHelp':
+    'Þegar eitthvað hjá þér breytist vekur Sytue forritið með tómri tilkynningu frá Apple svo það geti uppfært græjuna sína. Apple sér hvaða forrit og hvenær, aldrei hvað breyttist.',
   'shell.call.microphoneUsage':
     'Sytue Rooms notar hljóðnemann aðeins í símtali og aðeins þegar þú kveikir á honum.',
   'shell.call.cameraUsage':
@@ -173,7 +178,7 @@ export const is: Catalog = {
   'notifications.kind.pages.domain.failed':
     'Lénið {domain} á {site} virkar ekki: athugaðu stillingar þess',
   'notifications.kind.pages.erp.failed': 'Pöntun {number} á {site} komst ekki til Sytue ERP',
-  'notifications.kind.pages.settings.changed': '{actor} breytti stillingu í Sytue Web',
+  'notifications.kind.pages.settings.changed': '{actor} breytti stillingu í Sytue Webs',
   'notifications.kind.pages.export.ready': 'Útflutningurinn þinn á {site} er tilbúinn',
   'notifications.kind.pages.store.busy':
     'Vefverslunin á {site} er með of margar pantanir sem bíða greiðslu',
@@ -358,6 +363,8 @@ export const is: Catalog = {
   'widgets.compose': 'Skrifa',
   'widgets.storage': 'Geymslurými',
   'widgets.create': 'Búa til viðburð',
+  'widgets.updatedAgo': 'Uppfært {time}',
+  'widgets.updatedAt': 'Uppfært: {time}',
 
   'linkedServices.services': 'Þjónustur',
   'linkedServices.changed':
@@ -370,6 +377,7 @@ export const is: Catalog = {
   'linkedServices.notGranted':
     'Aðgangur að þessari þjónustu var ekki veittur. Tengdu reikninginn aftur til að velja heimildir hans.',
   'linkedServices.connected': 'Tengdar þjónustur',
+  'linkedServices.exists': 'Þessi reikningur var þegar tengdur og er nú opinn.',
   'linkedServices.providerData': 'Breytingar eru vistaðar hjá þjónustuveitunni.',
   'linkedServices.writeUnknown':
     'Þjónustuveitan staðfesti ekki vistun. Endurnýjaðu og athugaðu áður en þú reynir aftur.',

@@ -9,8 +9,7 @@
  * (mismo diálogo que la cabecera: copiar enlace + toast).
  */
 import type { JSX } from 'preact';
-import { Dropdown, MenuItem, useConfirm, usePrompt, useToast } from '@sytue/ui';
-import { formatDateTime } from '@sytue/i18n';
+import { useConfirm, usePrompt, useToast } from '@sytue/ui';
 import {
   getEditorRoot,
   removeCommentMark,
@@ -22,6 +21,7 @@ import { withTrackFlag } from '../../trackchanges';
 import { ShareDialog } from '../../dialogs/ShareDialog';
 import { EditorIcon } from '../../icons';
 import type { EditorContext } from '../../types';
+import { MenuHistorial } from '../../HistorialVersiones';
 import { RibbonButton, RibbonGroup, RibbonSeparator } from '../primitives';
 
 /** Receta de foco visible del blueprint (§0.6): nunca outline:none sin reemplazo. */
@@ -134,19 +134,6 @@ export function ColaboracionTab({ ctx }: { ctx: EditorContext }): JSX.Element {
       .catch(() => toast.notify({ tone: 'danger', title: t('versions.saveError') }));
   };
 
-  const restaurarVersion = async (id: string): Promise<void> => {
-    const ok = await confirmar({
-      titulo: t('versions.restoreTitle'),
-      mensaje: t('versions.restoreConfirm'),
-      confirmLabel: t('versions.restoreAction'),
-    });
-    if (!ok) return;
-    void ctx
-      .restoreVersion(id)
-      .then(() => toast.notify({ tone: 'success', title: t('versions.restored') }))
-      .catch(() => toast.notify({ tone: 'danger', title: t('versions.restoreError') }));
-  };
-
   return (
     <>
       <RibbonGroup label={t('group.comments')}>
@@ -210,9 +197,9 @@ export function ColaboracionTab({ ctx }: { ctx: EditorContext }): JSX.Element {
           disabled={offline}
           onAction={() => void guardarVersion()}
         />
-        <Dropdown
-          label={t('versions.history')}
-          align="start"
+        {/* El desplegable es el mismo que abre el chip de guardado de la cabecera. */}
+        <MenuHistorial
+          ctx={ctx}
           trigger={(trigger) => (
             <button
               type="button"
@@ -220,35 +207,12 @@ export function ColaboracionTab({ ctx }: { ctx: EditorContext }): JSX.Element {
               title={t('versions.history')}
               {...trigger}
               disabled={offline}
-              onClick={() => {
-                // Al abrir, refrescar la lista (§6.3); reabrir también refresca.
-                if (!trigger['aria-expanded']) void ctx.loadVersions();
-                trigger.onClick();
-              }}
             >
               {t('versions.historyShort')}
               <EditorIcon name="chevronDown" size="sm" />
             </button>
           )}
-        >
-          {ctx.versions.length === 0 ? (
-            /* Texto estático (sin role=menuitem): no debe recibir foco del menú. */
-            <p class="text-text-muted px-2.5 py-2 text-sm">{t('versions.empty')}</p>
-          ) : (
-            ctx.versions.map((v) => (
-              <MenuItem key={v.id} onClick={() => void restaurarVersion(v.id)}>
-                {`${v.label || t('versions.untitled')} — ${formatDateTime(
-                  ctx.locale,
-                  v.created_at,
-                  {
-                    dateStyle: 'short',
-                    timeStyle: 'short',
-                  },
-                )}`}
-              </MenuItem>
-            ))
-          )}
-        </Dropdown>
+        />
         {ctx.esPropietario && <ActividadBoton ctx={ctx} />}
       </RibbonGroup>
 

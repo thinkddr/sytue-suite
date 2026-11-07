@@ -80,6 +80,8 @@ o reversibles sin coste no necesitan entrada.
 | 0066 | [El CI construye con un BuildKit sin root y propio, no con el builder clásico por el proxy de Docker](#0066)                                                 | accepted · completa el [0060](#0060)                                                 |
 | 0077 | [Rooms cifra en los dispositivos mediante Matrix; los canales externos conservan la protección real de su proveedor](#0077)                                  | accepted · excepción expresa a 0016, 0018 y retirada de motores AGPL                 |
 | 0078 | [Widgets nativos: contadores con caducidad en un App Group, Apple tras un interruptor y nada en Windows/Linux](#0078)                                        | accepted                                                                             |
+| 0079 | [Sytue Notepads sobre «papel»: un cromo neutro elegido por la app](#0079)                                                                                    | accepted                                                                             |
+| 0080 | [Toda la suite sobre «papel»: el cromo de Notepads pasa a las quince apps](#0080)                                                                            | accepted · amplía la [0079](#0079)                                                   |
 
 <a id="el-pivote-sytue-native-2026-07-01"></a>
 
@@ -2378,6 +2380,96 @@ cumple es peor que una excepción escrita. Quien no quiera ni eso puede apagar l
 necesidad, y no funciona sin Play Services). _Push de contenido en iOS_ con el texto en el aviso
 (se lo daríamos a Apple a cambio de ahorrar una petición). _Refresco en segundo plano_ sin APNs
 (lo decide iOS, tarda de minutos a horas: no sirve para una llamada ni para un DM).
+
+**Enmienda (2026-11-06): un único registro de aparatos, en el Hub, para despertar los
+widgets** (pieza 5 del [ADR 0078](#0078); escrita el 2026-11-07). El dueño decidió que,
+con la app cerrada, «la app se despierta en segundo plano» para que su widget enseñe lo de
+ahora. El refresco periódico (pieza 4) lo decide iOS y puede tardar horas; para que un
+evento creado en la web llegue al widget en minutos, el único camino en iOS sigue siendo
+APNs. Hasta ahora **ningún cliente registraba un token** (`push_apns` de Rooms estaba vacía)
+y el servidor no sabía qué aparatos tenía nadie.
+
+1. **Un registro, en el Hub** (`aparatos_apns`, mig. 0010): `tenant, subject, bundle, token,
+creado, visto, ultimo_push, pendiente`, con clave `(tenant, bundle, token)` —APNs da un
+   token por app y aparato—, RLS deny-by-default y la política de fusión. **Rooms pierde
+   `push_apns`** (mig. 0062; no había filas que mudar) y despierta, con la señal de cambios
+   del Hub y sin ruta nueva, a quien le cambia el contador del widget de Rooms
+   (`api.PendientesRooms`): los miembros del canal con el nivel por defecto, y con
+   «menciones» los mencionados (o todos, con @channel); silenciado, nadie. **No son los
+   destinatarios del Web Push** (mencionados y DM): aquél es una alerta, y esto, un aviso
+   vacío para que el contador no se quede atrás; por eso tampoco miran la pausa de avisos
+   ni los bloqueos (lo no leído de un bloqueado también suma), y lo escrito por una
+   integración o una tarjeta de sistema despierta aunque no avise. Como mucho 50 por
+   mensaje, los mencionados primero: en un canal mayor, los demás esperan al refresco
+   periódico (revisión del 2026-11-07; antes seguía al Web Push y un mensaje sin mención en
+   un canal no movía el widget). El enviador **se mueve** a `platform/pkg/apns`,
+   con el `apns-topic` en cada envío; `TestAPNSNoMandaNadaMasQueElDespertar` se muda con él
+   y ahora comprueba también que no sale ninguna cabecera `apns-*` de más.
+2. **Rutas.** `POST /api/v1/me/push/apns {bundle, token}` registra (bundle de la lista
+   cerrada de las quince apps, token hexadecimal; un token delegado no registra);
+   **`POST /api/v1/me/push/apns/forget`** borra: con `{token}`, ese; **sin cuerpo, todos los
+   aparatos de la persona** en esa organización. Un token delegado tampoco olvida (403):
+   sin cuerpo borraría todos los iPhone de la persona representada. Las rutas homónimas de Rooms redirigen
+   **308** al Hub hasta su baja, y solo dicen dónde está ahora: el Hub es otro host,
+   `Authorization` no sigue la redirección (net/http y fetch la quitan) y un `forget`
+   seguido sin token recibe un 401. Quien llame a Rooms repite la llamada al Hub con su
+   token; las apps ya llaman al Hub, y la promesa de arriba —«`forget` borra el aparato»—
+   vale en la URL del Hub. Y el borrado de cuenta
+   (ADR 0054) se lleva `aparatos_apns`.
+3. **Qué despierta.** La señal de cambios (`datos`, `{"producto"}` de lista cerrada) que el
+   Hub ya recibe de cada escritura: la réplica que la atiende busca los aparatos de la
+   persona con la app de ese producto (y One, `eu.sytue.one`, con lo que sale en su widget:
+   `mail` y `calendar` por sus contadores y su agenda, y lo que llena la actividad reciente
+   del Hub —Drive y lo que vive en él, Docus, Calcus, Diapos, certiDocs y Photos, más
+   Bases, ERP y Notes—; Contacts, Rooms y Cast no dan actividad reciente y no la despiertan).
+   **Como mucho un despertar cada 5 min por aparato**, reservado en la base de datos y no en
+   memoria —el Hub corre con dos réplicas—: un cambio marca `pendiente` y manda quien consigue
+   la fila con `UPDATE … WHERE ultimo_push < now() - 5 min RETURNING`; lo de dentro de la
+   ventana lo recoge un barrido cada minuto con la misma reserva (`SKIP LOCKED`). Lo fija una
+   prueba con dos pools contra el mismo PostgreSQL. `apns-expiration` a 1 h, el cuerpo de
+   siempre, y un 410 o `BadDeviceToken` borra el aparato. A quien solo se conoce por su correo
+   (un invitado de Calendar) no se le despierta: el registro va por sujeto.
+4. **Qué ve Apple, además de lo de arriba: qué app de la suite tiene algo nuevo** en ese
+   aparato (el `apns-topic`), y por tanto, aproximadamente, cuándo cambió el calendario o el
+   correo de esa persona. Sigue sin ver qué, ni de quién, ni cuánto.
+5. **Solo si la persona lo enciende.** «Actualizar los widgets con la app cerrada» está
+   **apagado por defecto**, vive en el menú de la cuenta de cada app (en iOS no hay bandeja
+   donde poner el de `ElementoBloqueo`) y solo aparece en compilaciones con
+   `SYTUE_DESPERTAR_APPLE = YES`; su texto de ayuda dice qué ve Apple. La app solo se
+   registra con el interruptor encendido, un widget suyo puesto, sesión y sin el bloqueo de
+   la suite; y se **olvida** (`forget` con su token) al salir —antes de revocar la sesión—, al
+   poner el bloqueo, al apagar el interruptor, antes de cambiar de organización (las filas
+   son de cada una y `forget` borra en la del token; al volver a entrar se registra en la
+   nueva) y al quitar su último widget. Los cuatro primeros son de las quince: la app en que ocurren olvida los tokens de todas, que guarda cada una en
+   `despertar-<bundle>` del **grupo del llavero de la suite** (en el privado de cada app, la
+   que salía solo veía el suyo); la lista es la cerrada de las quince y no el índice del
+   almacén, que es de cada app. Con sesión (apagar, el bloqueo), un token que el Hub no ha
+   olvidado —sin red— se queda y la app lo reintenta al volver; al salir se borra igual. **Salir
+   apaga el interruptor**: es el consentimiento de quien lo encendió, no del aparato, y se
+   guarda con su huella (`ajustes.DespertarDe`): con otra persona dentro cuenta como apagado
+   aunque la sesión de antes caducara sin salir. Un registro que sigue en camino cuando
+   llega el olvido se corta y su token se olvida también. Un aparato que no se vuelve a
+   registrar en 30 días se purga. **Lo que queda abierto:** si la sesión se acaba sin salir
+   (caduca o se revoca) y entra otra persona, las filas de la anterior siguen en el Hub —el
+   olvido va por sujeto y la sesión nueva no puede borrar las de otro—, y el aparato se
+   despierta con los cambios de la anterior hasta la purga, hasta que ella salga en otro
+   aparato (el `forget` sin cuerpo) o hasta que Apple dé el token por caduco. Lo que lee al
+   despertar es de la sesión nueva; lo que se filtra es cuándo cambian los datos de la otra
+   (security.md#apns-despertar).
+6. **La línea base UE crece, y esta es la decisión que lo documenta**
+   (`compliance/supply-chain/README.md`: «solo puede disminuir … sin una decisión
+   documentada»). `api.push.apple.com` (y su `sandbox`) entran en `providers.tsv` y
+   `blocked-baseline.tsv`, y `platform/pkg/apns` en `runtimeProviderSource`. **No es un
+   proveedor nuevo**: es el mismo envío que este ADR ya aceptaba, que hasta ahora vivía en
+   Rooms sin que el gate lo mirase.
+
+Sigue igual: el cuerpo constante, `background` y prioridad 5; Android sin terceros (ni FCM
+ni UnifiedPush); los tokens de sesión, solo en la app; macOS no aplica (`content-available`
+no lanza una app cerrada). **Estado**: el servidor está hecho y sin credenciales de Apple no
+despierta a nadie; en la app, el registro y el olvido van tras el parche `0017` del fork y
+`SYTUE_DESPERTAR_APPLE = YES` desde el 2026-11-07 (decisión del dueño, antes de sus pasos en
+Apple y en el Hub). Lo que falta es del dueño:
+[runbook](operations.md#despertar-widgets-ios). Seguridad: [§1.2](security.md#apns-despertar).
 
 ---
 
@@ -5501,3 +5593,365 @@ App Store sigue con el grupo antiguo. Encenderlo es un commit (el interruptor y
 `release-desktop` trae los perfiles de las apps y de sus widgets con `apple-perfiles.py`.
 Ningún widget se ha visto aún en un dispositivo; lo que falta está en
 [roadmap](roadmap.md#widgets-nativos-lo-que-falta).
+
+**Enmienda (2026-11-06): publicar tras cada cambio.** Petición del dueño: «los widgets
+nativos no se actualizan en tiempo real; al añadir un evento para hoy, no sale en el
+widget». La causa medida no era de ninguna app: `auth.Save` cambia `sesion.marca` en
+**cada** guardado de tokens, y Sytue ID rota el refresh cada ~15 min. La captura de la vista
+(`Capture(generación)`) dejaba de valer en la primera renovación, `PublishDetail` devolvía
+`ErrPrivate` y todas las apps lo descartaban: con Calendar abierta más de 15 min, crear un
+evento de hoy no publicaba nada. Además cada pantalla publicaba lo que tenía a la vista (el
+mes que se miraba, la carpeta abierta), desde rutinas sueltas que podían pisarse.
+
+Cambia (pieza 1 de 6, hecha):
+
+1. **La app publica tras cada cambio, con una lectura propia y acotada.** Sustituye a «la app
+   publica solo lo que ya ha pedido para su pantalla, nunca una petición extra». Cada app da
+   una `Fuente` (`apps/nucleo/widgets/fuentes`, sin Fyne) que lee lo justo para su widget
+   —como mucho 4 + N peticiones por ronda— y un único `widgets.Publicador` decide cuándo:
+   antirrebote de 1,5 s (una ráfaga publica como tarde a los 5 s), una ronda a la vez, y
+   **como mucho una ronda cada 30 s por escrituras**, que solo cuentan si son del cliente del
+   propio producto (`Suite.ClienteConAviso`; nunca presencia, avisos ni preferencias). Lo
+   disparan también entrar, quitar el bloqueo, volver a primer plano, recuperar la red, un
+   aviso del Hub del producto, el vivo de Mail y Rooms (también al reconectar), un latido de
+   10 min con la app viva y la medianoche. **Al pasar al fondo** se publica ya lo que el
+   antirrebote o la ventana de 30 s tuvieran aplazado (`PublicarPendiente`, 4 s): es cuando
+   se mira el widget, e iOS suspende la app segundos después. Las pantallas ya no publican (`TestNadiePublicaWidgetsDesdeLaVista`).
+2. **Lo publicado no depende de la pantalla.** Calendar lee el mes en curso de todos los
+   calendarios, Mail siempre Recibidos, Contacts y Notes la libreta o el cuaderno inicial,
+   Drive la raíz, los editores su lista sin búsqueda ni destacados.
+3. **La marca de la captura es la época de identidad.** `ajustes.MarcarIdentidad` escribe
+   `sesion.epoca` (azar de 128 bits, huellas saladas del emisor, cliente, sujeto y
+   organización, y la marca con la que se confirmó); solo rota si cambia quién o al cerrar
+   sesión. `PublishDetail` exige la época capturada y que esté confirmada con la marca actual,
+   y escribe en `generation` la marca **actual**: los lectores (Swift, Java) no cambian. Una
+   sesión cambiada por una compilación que no conoce la época falla cerrado hasta que otra
+   app la adopte y la confirme. La llaman `auth.Save` y `AlmacenSesion.Guardar` (siempre bajo
+   `CerrojoSesion`, por eso no lo toma ella) y la suite al adoptar una sesión.
+4. **Una sesión rechazada borra el widget de esa app** (`ClearBundleIf`); un fallo de red
+   conserva lo publicado, también si falla una lectura secundaria (la cuota, los directos,
+   los álbumes): solo un 403/404 publica sin ese dato. Un rechazo puntual no rota la época de las quince.
+
+Sigue igual: sin tokens, red ni Keychain en la extensión o el receptor; saneado y lista
+cerrada de `kind`; borrado al salir y al bloquear; el lector comprueba marca, caducidad y
+bloqueo; se captura antes de pedir; nada en Windows ni Linux; `NSFileProtectionComplete`;
+caducidad de 15 min (30 como máximo).
+
+Pendiente, cada pieza con su commit: (2) formato v2 con la época como marca, 24 h y
+«Actualizado hace X» en los lectores (hecha: enmienda siguiente); (3) señal `datos` del servidor, también al terminar
+los trabajos asíncronos de Photos, Cast y CertiPDF (hecha: la de la señal de cambios); (4) refresco en segundo plano en iOS
+sin presencia ni SSE (hecha en la suite, se enciende con el tag del fork: la enmienda del refresco); (5) push silencioso con un único registro APNs en el Hub (enmienda del
+[ADR 0039](#0039)); (6) Android sin actividad. Detalle en
+[roadmap](roadmap.md#widgets-nativos-lo-que-falta).
+
+**Enmienda (2026-11-07): formato 2, un día de vida y «Actualizado hace X»** (pieza 2 de 6,
+hecha). El dueño pidió que lo publicado no desaparezca a los 15–30 min: el widget enseña el
+último dato y dice de cuándo es.
+
+1. **Formato 2.** `generation` lleva la **época** (`sesion.epoca`), no la marca de sesión: una
+   renovación ya no invalida ni la captura ni lo publicado. Los tres lectores (Go
+   `Snapshot.Visible`, `Snapshot.swift`, `WidgetSnapshot.java`) aceptan **solo** la 2 y exigen
+   la misma regla: la época actual; **confirmada con la `sesion.marca` actual** (si la última
+   sesión la cambió una compilación que no conoce la época —las quince apps se actualizan por
+   separado—, se oculta); **ningún `*.cerrada`** en la carpeta; sin bloqueo; y como mucho
+   24 h entre `updated_at` y `expires_at`. Los casos son un único fichero,
+   `apps/nucleo/widgets/testdata/contrato.tsv`, que corren Go, Java y Swift; un test de Go
+   comprueba además que Swift y Java dicen `86400`, `900` y la versión 2.
+2. **24 h de caducidad**, y no menos: los quince widgets enseñan «lo de hoy», y pasado un día
+   enseñarían el hoy de ayer como si fuera el de hoy; con algo más corto (2 h) el widget se
+   vaciaría cada noche, que es lo que se pidió evitar. **Coste reconocido**: si la sesión se
+   revoca desde el servidor y la app no corre, el último dato puede seguir visible hasta 24 h
+   (antes, 30 min). Lo acotan el borrado al rechazarse la sesión, el bloqueo del dispositivo
+   y el despertar de las piezas 4–6 ([seguridad](security.md#widgets-24-h)).
+   `RenovarTras` pasa a 10 min, el latido del Publicador: `updated_at` dice cuándo se
+   comprobó.
+3. **«Actualizado hace X» a partir de 15 min** (`Snapshot.Rancio`). En iOS y macOS, la
+   línea de tiempo se precalcula entera con `.atEnd` —ahora; +15, +30, +45 min y cada hora
+   desde la comprobación; cada medianoche; el fin de cada evento; la caducidad sin datos—,
+   hasta 40 entradas y sin recargas periódicas: recarga la app al publicar. El rótulo es
+   `widgets.updatedAgo` con `RelativeDateTimeFormatter`, calculado para la fecha de cada
+   entrada. Si la lectura falla por la protección de datos (`NSFileProtectionComplete` con el
+   teléfono bloqueado), **no** se devuelve la entrada vacía: se pinta el marco con el marcador
+   y se vuelve a pedir a los 5 min. En Android el rótulo es la **hora absoluta**
+   (`widgets.updatedAt`, «Actualizado: 14:05»), siempre que hay datos: `RemoteViews` se queda
+   con el texto con que se pintó, y nada garantiza repintar al desbloquear, así que «hace X»
+   mentiría. Con el dispositivo bloqueado el receptor **no repinta** la pantalla de inicio
+   (que no se ve), salvo un anfitrión `KEYGUARD`, que se deja en blanco; y una alarma
+   `AlarmManager.RTC` (sin despertar ni permiso) repinta en el próximo cambio: fin de un
+   evento, medianoche o caducidad (a los 5 min si estaba bloqueado).
+4. **Calendar recorta sus filas en el lector** (`widgets.Vigentes`, la misma regla en los
+   tres): un evento con hora vale hasta que termina; uno de día completo es flotante
+   (medianoche UTC) y vale hasta la medianoche local que sigue a su último día. La rejilla es
+   la del mes de la entrada, con los días ocupados solo si el snapshot es de ese mes. La
+   Fuente de Calendar usa la misma regla: hasta ahora corría el día completo una hora en
+   Madrid y marcaba ocupado también el día siguiente.
+5. **Android con la sesión compartida**: el broker da `marca_widgets` =
+   SHA-256(«sytue-widgets\0» ‖ su época), que solo cambia con otra identidad, el bloqueo o
+   una revocación; es la época de los snapshots y lo que compara `Widgets.java`
+   (`SesionCompartida.marcaWidgets`). La época en claro del broker no sale: ata los
+   desafíos del dueño.
+
+Sigue igual que en la enmienda anterior; además, nada nuevo en la extensión o el receptor:
+ni red, ni Keychain, ni sesión. Pendiente: las piezas 3 a 6.
+
+**Enmienda (2026-11-07): la señal de cambios del servidor** (pieza 3 de 6, hecha). Con la
+app abierta, lo que cambiaba fuera de ella —en la web, en otro aparato, por otra persona, al
+acabar un trabajo del servidor— no llegaba al widget hasta el latido de 10 min.
+
+1. **Un evento de estado nuevo, `datos`**, con `{"producto": "<producto>"}` y nada más: sin
+   título, id ni contenido. El producto es el esquema de la app sin `sytue-` y sale de una
+   lista cerrada (`hubnotify.ProductosDeDatos`, atada a los `FyneApp.toml` por un test); el
+   Hub la valida y reescribe el cuerpo, así que un emisor no puede colar nada más por el
+   flujo. Como `avatar`, no se guarda ni sale en la campana.
+2. **Lo emite cada servicio en sus escrituras**, con un único middleware
+   (`hubnotify.TrasEscribir`, tras `RequireAuth`): un 2xx de POST, PUT, PATCH, DELETE o un
+   verbo WebDAV que escribe, a quien escribe. Lo que escribe a ritmo de tecla o no cambia
+   lo que enseña el widget va sin señal: los borradores y ajustes de Mail, las operaciones y
+   la presencia de un documento, la vista previa de una copia de Notepads, buscar GIF y el
+   borrador del compositor en Rooms (también en el cliente nativo, con `SinAviso`). Va también por CalDAV, CardDAV y WebDAV, que es por donde escribe la web de
+   Calendar y los teléfonos (con `MKCALENDAR`), y por las API de compatibilidad de Drive.
+   Mail la lleva en todas las puertas que cambian el buzón: la REST, `POST /jmap` (un lote
+   que solo lee la apaga con `CambioEn` sin productos), el IMAP y la entrega de un correo
+   nuevo, aparte del aviso de la campana (sale aunque Mail esté silenciado).
+   `TestCadaServicioMandaLaSenalDeCambios` exige que los once servicios lo monten con sus
+   productos (Drive también `pdf`; Docs `docs`, `sheets`, `slides` —la ruta no dice el
+   tipo; al crear sí, y va solo al suyo— y `pdf`).
+3. **Y a quienes ven lo escrito** (`hubnotify.AvisarTambien`): en Calendar, el dueño y cada
+   share del calendario en que se escribe, por REST o por CalDAV (`QuienesVen`, una
+   consulta, solo si hay señal en curso), y quien gana o pierde un share o ve borrar el
+   calendario; en el ERP, la responsable de una actividad que otra persona le pone o le
+   cierra; en CertiPDF, la
+   otra parte de una petición de firma (pedir, firmar, rechazar, cancelar); en Notepads y
+   Bases, la persona con quien se comparte o se deja de compartir.
+4. **Al acabar el trabajo asíncrono**, al dueño de lo procesado: el transcodificador de Cast
+   al terminar un trabajo (o al fallar ya sin reintento), el comienzo y el fin de un directo,
+   la pasada que completa el tipo y el tamaño de las fotos en Photos, y el refresco de una
+   suscripción ICS de Calendar cuyo feed cambió (un 304 no), a su dueño y sus shares; el aviso
+   de no entrega que la cola de Mail deja en la Entrada de quien envió; lo que la papelera de
+   Drive hace con el fichero de un documento (la puerta interna de Docs avisa al widget de su
+   tipo, al dueño), y lo que guarda un editor externo por WOPI, que no lleva el Bearer y no
+   pasa por el middleware (a quien edita y al dueño). Las miniaturas de
+   Photos se generan al pedirlas y el EXIF se lee al indexar, dentro de la escritura: no
+   tienen fin asíncrono que avisar.
+5. **Agrupada** por (organización, persona, producto) en 3 s: la primera sale en el acto y
+   las de dentro de la ventana, en una al cerrarla. En memoria, por réplica: es un ahorro, no
+   un tope.
+6. **La barra de Fyne la reenvía al publicador** (`alEstado` → `Suite.AvisoDelHub`), que solo
+   la atiende si el producto es el suyo (el Hub, también `mail` y `calendar`). La de su propio
+   producto le llega también a quien escribe: dentro de los 6 s de una escritura propia
+   (`VentanaEco`, el doble de la ventana de agrupación) es casi siempre su eco y respeta el
+   mínimo de 30 s (`Publicador.AvisarDelServidor`); fuera, se lee tras el antirrebote. Sin
+   eso, el autoguardado de una nota hacía una ronda cada 3 s. Una ronda que empieza después
+   de todo lo apuntado anula la espera al final de esa ventana: una escritura aislada con su
+   eco es una ronda, no dos. Lo que no se distingue es el cambio ajeno que llega dentro de
+   esos 6 s: espera al final de la ventana, como mucho 30 s.
+
+Sigue igual: nada nuevo en la extensión ni en el receptor; la señal no lleva datos de la
+persona; sin la app abierta no hay a quién entregarla hasta las piezas 4–6, que la usarán
+para despertar. Contacts recibe el secreto del Hub en su chart: hasta ahora no avisaba de
+nada.
+
+**Enmienda (2026-11-07): la app se despierta en iOS para su widget** (pieza 4 de 6, hecha
+en la suite; se enciende con el tag del fork). Con la app cerrada nadie republicaba: el
+widget enseñaba el último dato, con su antigüedad, hasta 24 h. Es la decisión del dueño
+«la app se despierta en segundo plano», en su parte periódica.
+
+1. **Una tarea de refresco** (`BGAppRefreshTask`), `<App ID>.refresco`, pedida como mínimo
+   cada 30 min al pasar a segundo plano y tras cada una (`sesion.CadaRefrescoEnFondo`):
+   cuándo corre lo decide iOS por el uso. La declaran `UIBackgroundModes = [fetch]` y
+   `BGTaskSchedulerPermittedIdentifiers` en el `Info.plist` de iOS de cada app con widget,
+   solo con `SYTUE_REFRESCO_APPLE = YES`, que exige `SYTUE_WIDGETS_APPLE = YES` y va aparte
+   porque quien registra la tarea es el fork: con un tag sin el parche, el plist pediría un
+   modo de fondo que nadie usa (App Review 2.5.4) (`empaquetar.sh plist_refresco`, desde
+   `plist_apple`, que escribe ese plist por Xcode y por la CLI: una fuente, no dos). No es un
+   derecho: no pide capacidades ni perfiles.
+2. **La despierta la app, no la extensión.** El driver del fork (parche `0016`,
+   `mobile.BackgroundDriver`: `LaunchedInBackground`, `OnFirstScene`,
+   `ProtectedDataAvailable` y `OnBackgroundRefresh`, en inglés como el resto del fork) da la
+   tarea a `Suite.RefrescarWidgetEnFondo`, la única entrada para todo lo que despierte la app
+   por su widget: la misma Fuente y el mismo Publicador, con el plazo de una ronda (20 s).
+   Si el sistema corta la tarea, se cancela y se le dice que falló en cuanto la ronda
+   vuelve, o a los 500 ms: completarla con el cerrojo de `ajustes` tomado (un `flock` en el
+   App Group) haría que iOS matara la app al suspenderla (0xdead10cc). La suite pide
+   esa API por aserción sobre el driver, y no por una función del fork: así compila con
+   cualquier tag, y sin ella hay escena desde el principio y todo es como antes.
+3. **Lanzada sin escena, la app no hace de app.** iOS corre el `main` entero de
+   `cmd/<app>`; hasta que conecta la primera escena solo corren el widget y el vigilante de
+   lo compartido. Esperan (`Suite.CuandoHayaEscena`) la presencia —un despertar **nunca**
+   publica «En línea»—, los avisos del sistema, el enchufe de URL, el SSE y la ficha de la
+   barra y las cargas de arranque de los quince `cmd`: la pantalla, el importador, el
+   navegador para entrar. Los `AlCambiar` de las apps se retienen y se avisan una vez al
+   conectar, antes que lo que esperaba a la escena; los del widget siguen sin escena. Lo
+   fijan `TestLosCmdCarganTrasLaEscena`, que sigue el `main` de cada `cmd`,
+   `TestLanzadaSinEscenaSoloRefrescaElWidget` y `TestLaBarraNoAbreElFlujoSinEscena`.
+   **Tampoco en caliente**: la app mandada al fondo sin deslizarla sigue en memoria, iOS la
+   reanuda para la tarea y lo que esperaba vuelve a correr —el latido vencido, el SSE que
+   se reconecta—. Por eso en iOS la presencia y el SSE de la barra siguen al **primer
+   plano**, no a la escena (`Suite.PausaEnFondo`): se paran al dejarlo y vuelven con él, y
+   al volver se late en el acto. En el escritorio (fondo es perder el foco) y en Android
+   (los avisos llegan por ese SSE con la app al fondo) no se paran. Lo fijan
+   `TestElDespertarEnCalienteNoLate` y `TestLaBarraCierraElFlujoAlFondoEnIOS`.
+4. **Con el dispositivo bloqueado no se lee nada.** El App Group es
+   `NSFileProtectionComplete` y la app no puede leer ni la sesión ni si la suite está
+   bloqueada: contesta `Aplazado` y pide otra tarea a los 5 min, que iOS no garantiza. En la
+   práctica **el refresco solo ocurre con el teléfono desbloqueado**, en uso con otra app;
+   bloqueado, el widget sigue con el último dato y «Actualizado hace X». No se rebaja la
+   clase de protección: rebajar solo `widgets/` no bastaría (también hay que leer
+   `ajustes.json`, `sesion.marca` y el Keychain) y rebajarlo todo debilita el reposo cifrado
+   de la app. Queda como decisión del dueño. Tampoco se lee sin sesión ni con el bloqueo de
+   la suite. Y **lo que no se ha podido leer no se borra**: lanzada en frío con el teléfono
+   bloqueado, la app queda «fuera» porque no lee la sesión, no porque no la haya. Ni su
+   primer aviso del widget borra (`ilegibleAlAbrir`), ni `ClearIf` borra con
+   `sesion.epoca` ilegible (`ajustes.EpocaLegible`); antes, la época ilegible salía vacía,
+   coincidía con la de «sin sesión» y se iban los widgets de las quince. Lo fijan
+   `TestLanzadaEnFrioBloqueadaNoBorraLosWidgets` y `TestSinPoderLeerLaEpocaNoSeBorraNada`.
+5. **El bloqueo de la suite se pide al conectar la escena, no en `Abrir`.** Sin interfaz no
+   hay Face ID que pedir —fallaría y la app saldría en cada refresco—, y con el teléfono
+   bloqueado ni siquiera se lee si está puesto. Así que, donde la app puede lanzarse sin
+   escena, `Abrir` no verifica: con el bloqueo puesto (o sin poder leerlo) la sesión
+   guardada **no se adopta** —tampoco cuando el vigilante la lee al desbloquear, ni en el
+   refresco, que con el bloqueo puesto no hace nada—, y al conectar la primera escena se
+   pide la verificación con lo que haya en disco, antes de las cargas y de las URL. Sin
+   esto, `UIBackgroundModes=fetch` abría un salto del bloqueo que sin lanzamientos de fondo
+   no existía. Lo fijan `TestElBloqueoSeExigeAlConectarAunqueAbrirNoLoLeyera` y
+   `TestLanzadaEnFondoNoVerificaHastaLaEscena`.
+
+Sigue igual: nada nuevo en la extensión; los tokens, solo en la app; macOS sin refresco (no
+tiene `BGAppRefreshTask`); Android sin cambios (pieza 6). Una app cerrada a mano en el
+multitarea no recibe tareas hasta que se vuelve a abrir. **Estado** (2026-11-07):
+encendido. El parche está en el fork (`v2.8.2-sytue.4`; la suite usa `.5`), con su
+Objective-C compilado y arrancado en el simulador por la matriz de UIKit, y
+`SYTUE_REFRESCO_APPLE = YES` ([runbook](operations.md#refresco-widgets-ios)); con un tag
+anterior `empaquetar-test.sh` no deja encenderlo. Sin probar en un iPhone ni pasado por App
+Review. Pendiente: la pieza 6.
+
+**Enmienda (2026-11-06), pieza 5: el aviso silencioso despierta la app por la misma
+puerta** (escrita el 2026-11-07). Cuando cambia algo del producto, el Hub manda un aviso
+vacío de APNs y la app lo atiende con `RefrescarWidgetEnFondo`, la misma entrada que el
+refresco periódico: sin presencia, sin SSE, sin leer con el teléfono bloqueado y
+contestando a iOS una sola vez (parche `0017` del fork). El registro de aparatos, el tope
+de un despertar cada 5 min por aparato, el interruptor de la persona (apagado por defecto)
+y lo que ve Apple están en la [enmienda del ADR 0039](#0039). Sigue igual todo lo de
+arriba; la extensión no gana red ni token. **Estado** (2026-11-07): el fork ya trae el parche
+(`v2.8.2-sytue.5`), y `SYTUE_DESPERTAR_APPLE = YES` desde el mismo día por decisión del
+dueño, antes de sus pasos (clave, Push en los App ID, perfiles, Secret del Hub): hasta que
+estén, la firma de iOS falla y el Hub no despierta a nadie ([runbook](operations.md#despertar-widgets-ios)).
+
+**Enmienda (2026-11-06), pieza 6: Android se despierta sin Google** (escrita el
+2026-11-07). Sin FCM, UnifiedPush ni ningún tercero (la regla UE de
+`compliance/supply-chain` y el [ADR 0039](#0039)):
+
+1. **Go sin actividad: sale.** `GoNativeActivity` ya carga la biblioteca con
+   `System.loadLibrary` antes de crear la actividad, y eso inicializa Go y corre los `init`
+   sin el `main`. Un `JobService` (`eu.sytue.nativo.RefrescoWidgets`) hace lo mismo y llama a
+   una entrada JNI (`apps/fyne/sesion/fondo_android.go`) que da `RefrescarSinVentana`: lee
+   la sesión guardada como `Abrir` (`leerSesionGuardada`, con el cliente de Sytue ID del
+   móvil), construye la Fuente de `fuentes.Registrada` (la misma que monta cada `cmd`, ahora
+   con `Suite.FuenteWidget`, y lo fija `TestLosCmdUsanLaFuenteRegistrada`) y publica una
+   ronda con un Publicador que se para al acabar. Sin `fyne.App`, sin Suite, sin presencia,
+   sin SSE, sin Hub (`TestSinVentanaPublicaConLaSesionGuardadaYNadaMas`). Con la app abierta
+   en el mismo proceso, se lo deja a su publicador. La puerta a Java, sin actividad, es la
+   de la propia entrada (`conRespaldo`: la de la actividad en cuanto existe). Probado en la
+   JVM del equipo con una `.so` c-shared de esa misma forma (la entrada real, con
+   `sistema` sustituido): sin `main`, llamada dos veces desde un hilo de trabajo, con
+   vuelta a Java desde otra rutina y una excepción de Java recogida como error. **No en un
+   teléfono.**
+2. **Cada hora, y con la señal de cambios.** El trabajo periódico va cada hora con 15 min
+   de holgura, con red y sin batería baja; lo encola el receptor del widget
+   (`Widgets.onUpdate`) y lo quita el último widget (`onDisabled`). Con el teléfono
+   bloqueado no se lee (como el receptor). La señal de cambios llega por el SSE del Hub, que
+   solo One mantiene con todo cerrado (`eu.sytue.nativo.Avisos`): One la **releva** a la app
+   del producto, que encola un trabajo suelto (como mucho uno por minuto; si está bloqueado,
+   se reintenta a los 5 min).
+3. **El relevo no es un broadcast con permiso de firma**, como decía el diseño: cada una de
+   las quince apps va firmada con **su** certificado de Play
+   (`android/session-signers.json`), un permiso `signature` no se puede conceder entre
+   ellas, y declararlo en las quince haría chocar las instalaciones
+   (`INSTALL_FAILED_DUPLICATE_PERMISSION`). Es una llamada **sin datos** al proveedor
+   `eu.sytue.nativo.RelevoWidgets` de la app (`<paquete>.sytue.widgets`), que comprueba al
+   llamante con el mismo límite que la sesión compartida (`SesionAndroid.llamante`: el UID
+   del Binder y el certificado fijado de cada paquete) y solo acepta a One; One, a su vez,
+   solo llama a un paquete del catálogo fijado cuyo proveedor sea ese y cuya firma sea la
+   suya. Lo que pasa de una app a otra es «algo tuyo ha cambiado»: ni producto, ni quién,
+   ni qué.
+
+Sigue igual: el receptor del widget sin red ni sesión (lee la app); el saneado, la lista
+cerrada de `kind`, la época y el bloqueo; nada con la suite bloqueada. **Estado**: encendido
+el 2026-11-07 por decisión del dueño, antes de la prueba en un teléfono (`FONDO_GO = True` en
+`apps/fyne/scripts/android-widgets.py`, y lo fija un test); antes de esa fecha, apagado
+(`FONDO_GO = False`). Apagado,
+el trabajo periódico solo repinta el rótulo y la caducidad (lo mismo que ya hacían
+`updatePeriodMillis` y la alarma RTC de la pieza 2) y no hay relevo. Se enciende en un
+commit revisado tras la prueba del [runbook](operations.md#widgets-android-fondo), en un
+teléfono: aquí no hay SDK ni NDK de Android, así que el Java se ha compilado contra el
+framework de Android 16 (el `android-all` de Robolectric) y la entrada en C contra el
+`jni.h` del JDK, pero ni el APK ni la `.so` de Android se han construido.
+
+<a id="0079"></a>
+
+## 0079 — Sytue Notepads sobre «papel»: un cromo neutro elegido por la app
+
+`accepted` · 2026-11-05 · rama `claude/epic-brown-cnv5mt` · amplía el eje de forma de la 0072
+
+**Problema.** Notepads es una libreta: se abre para escribir una línea y leerla. El marco de
+color de la suite —Marco o Carril, en el color de la casa, en cobalto o en el de la app—
+dominaba la pantalla: un lateral y una barra superior de color fuerte alrededor de unas
+pocas líneas de texto, el día abierto y la casilla hecha en el color de marca, y cada glifo
+de cada barra con su relleno de acento. Lo que se venía a leer era lo que menos se veía.
+
+**Decisión.**
+
+- **Un cuarto eje, el CROMO, que elige la app y no la persona.** `data-cromo="papel"` en el
+  `<html>` de Notepads (`AppLayout.astro`) y `tokens.ElegirCromo("papel")` al montar su
+  pantalla en Fyne. Un solo bloque en `branding/tokens/appearance.css` reasigna el marco, el
+  menú lateral y la barra al fondo de la página con la tinta del texto, deja la hoja en
+  `surface` con un filete en lugar de la sombra y lleva «estás aquí», la acción y el foco al
+  primario. Todo son `var()` de tokens de rol, así que vale en claro, oscuro, del sistema y
+  traslúcido sin un bloque por tema, y el color que elija la persona sigue en la acción.
+- **El bloque gana a cualquier carril** por peso (tres atributos) y por estar el último. El
+  intérprete nativo (`apps/nucleo/tokens`) lo apila también el último, después de la forma.
+- **Glifos de una sola tinta sobre papel.** `--sytue-glyph-fill: transparent` en la web y
+  `tokens.EsPapel()` en `iconos.acentoDeAhora`. Un acento pedido, un icono sobre un relleno
+  de color o una tinta de estado conservan su relleno.
+- **La libreta** (styles/app.css y su espejo en Fyne): cada nota es una línea con su marca
+  en una columna fija —una raya corta, o la casilla de una tarea— y el texto a 16 px; lo
+  hecho se apaga en gris; el día abierto es un círculo de tinta y «hoy», el único color de
+  la cabecera.
+
+**Descartado.** _Cambiar el marco de toda la suite_: las demás apps son paneles con mucha
+navegación y el marco de color las ordena; la decisión es de una app. _Una preferencia de la
+persona_: sería un cuarto selector en «Apariencia» para resolver un problema de una sola app.
+_Esconder el menú de la suite y pintar uno propio dentro de la hoja_: duplicaría la
+navegación, el cajón móvil y su accesibilidad.
+
+**Consecuencias.** Notepads se ve distinto del resto de la suite a propósito; quitar el
+atributo (y la llamada en `NuevaPantalla`) lo devuelve al marco de color sin tocar nada más.
+En Carril, el contenido de Notepads comparte el fondo del menú: solo los separa el filete del
+menú. Lo vigilan `TestElCromoPapelEsUnEjeAparte` (tokens nativos) y
+`TestSobrePapelElGlifoEsDeUnaTinta` (iconos).
+
+<a id="0080"></a>
+
+## 0080 — Toda la suite sobre «papel»: el cromo de Notepads pasa a las quince apps
+
+`accepted` · 2026-11-06 · rama `claude/epic-brown-cnv5mt` · amplía la [0079](#0079)
+
+**Problema.** La 0079 dejó el cromo «papel» solo en Notepads y descartó cambiar el marco de
+toda la suite. Vista la prueba de concepto sobre Drive y Contactos, el dueño pidió el mismo
+cromo en todas las apps (2026-11-06): el marco de color pesaba igual en un panel que en una
+libreta.
+
+**Decisión.** `data-cromo="papel"` en el `<html>` de cada app web (los `AppLayout`, el de
+Office, la consola y el panel de la nube; no la web pública) y
+`tema.ElegirCromo(tema.CromoPapel)` en el `main` de cada app nativa, justo después de
+`sesion.Abrir`. El bloque de `appearance.css` y su lectura en `apps/nucleo/tokens` no
+cambian: es el mismo eje, ahora encendido en todas.
+
+**Por qué en cada `main` y no en `sesion.Abrir`.** Las pruebas que abren sesión comprueban
+también el cromo de color (el relleno ámbar del carril, el degradado del traslúcido…), y la
+elección de cromo es global al proceso: hecha en `sesion.Abrir` se colaba en esas pruebas.
+
+**Consecuencias.** El marco de color sigue existiendo y probado; volver a él en una app es
+quitar el atributo y la llamada. Las apps que pintan su contenido sobre `bg` dentro de la
+hoja lo enseñan gris dentro del filete blanco de la hoja: se irán pasando a `sheet-bg` al
+tocarlas.

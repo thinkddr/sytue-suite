@@ -173,8 +173,9 @@ func panelEmision(v Vista, e Emision) fyne.CanvasObject {
 		if e.Fase == EmisionConectando {
 			rotulo = "studio.browser.connecting"
 		}
-		accion = ui.NuevoBoton(v.Traduce(rotulo), e.AlEmpezar).Con(ui.Primario, ui.TallaMD)
-		accion.Glifo = iconos.TrazoDeRuta(glifoDirecto, iconos.TallaSM, tema.Color("text", v.Variante))
+		// Del catálogo y no un `Glifo` a mano: el botón lo tiñe con su rótulo. Era un
+		// glifo en `text`, casi negro sobre el primario, y sin atenuar al estar inerte.
+		accion = ui.NuevoBoton(v.Traduce(rotulo), e.AlEmpezar).Con(ui.Primario, ui.TallaMD).ConIcono(iconos.Emitir, iconos.TallaSM)
 		accion.Cargando = e.Fase == EmisionConectando
 		accion.Inerte = !e.Listo() || e.Fase == EmisionConectando
 	}
@@ -374,12 +375,11 @@ func panelOBS(v Vista, d Emitir) fyne.CanvasObject {
 	if !d.ClaveVisible {
 		clave = strings.Repeat("•", min(len(clave), 24))
 	}
-	glifo, rotulo := glifoOjo, "studio.obs.show"
+	glifo, rotulo := iconos.Ojo, "studio.obs.show"
 	if d.ClaveVisible {
-		glifo, rotulo = glifoOjoNo, "studio.obs.hide"
+		glifo, rotulo = iconos.OjoTachado, "studio.obs.hide"
 	}
-	ver := ui.NuevoBotonIcono(iconos.Ninguno, v.Traduce(rotulo), d.AlVerClave)
-	ver.Glifo = iconos.TrazoDeRuta(glifo, iconos.TallaSM, tema.Color("text-muted", v.Variante))
+	ver := ui.NuevoBotonIcono(glifo, v.Traduce(rotulo), d.AlVerClave)
 	ver.Lado = ui.LadoIconoLG
 	claveFila := campoCopiable(v, v.Traduce("studio.obs.key"), clave, ver, d.AlCopiarClave)
 	regenerar := ui.NuevoBoton(v.Traduce("studio.obs.rotate"), d.AlRegenerar).Con(ui.Fantasma, ui.TallaSM)

@@ -296,6 +296,20 @@ export const ga: AppCatalog<typeof en> = {
     many: 'Míreanna curtha sa bhruscar: {count}.',
     other: 'Míreanna curtha sa bhruscar: {count}.',
   },
+  'files.batch.restored': {
+    one: 'Athchóiríodh mír amháin.',
+    two: 'Míreanna athchóirithe: {count}.',
+    few: 'Míreanna athchóirithe: {count}.',
+    many: 'Míreanna athchóirithe: {count}.',
+    other: 'Míreanna athchóirithe: {count}.',
+  },
+  'files.batch.restorePartial': {
+    one: 'Níorbh fhéidir mír amháin a athchóiriú; tá sí fós sa bhruscar.',
+    two: 'Míreanna nárbh fhéidir a athchóiriú: {count}. Tá siad fós sa bhruscar.',
+    few: 'Míreanna nárbh fhéidir a athchóiriú: {count}. Tá siad fós sa bhruscar.',
+    many: 'Míreanna nárbh fhéidir a athchóiriú: {count}. Tá siad fós sa bhruscar.',
+    other: 'Míreanna nárbh fhéidir a athchóiriú: {count}. Tá siad fós sa bhruscar.',
+  },
   'files.batch.trashFailed': 'Níorbh fhéidir an roghnúchán a chur sa bhruscar.',
   'files.batch.moveTitle': {
     one: 'Bog mír amháin',
@@ -322,6 +336,10 @@ export const ga: AppCatalog<typeof en> = {
   'action.rename': 'Athainmnigh',
   'action.move': 'Bog go…',
   'action.copy': 'Déan cóip',
+  'action.copyLink': 'Cóipeáil an nasc',
+  'action.linkCopied':
+    'Cóipeáladh an nasc. Ní osclaítear é ach do dhaoine a bhfuil rochtain acu cheana.',
+  'action.copyLinkFailed': 'Níorbh fhéidir an nasc a chóipeáil.',
   'action.shareLink': 'Comhroinn nasc',
   'action.openInApp': 'Oscail san fheidhmchlár',
   'action.openInEditor': 'Oscail san eagarthóir',
@@ -561,6 +579,24 @@ export const ga: AppCatalog<typeof en> = {
   'trash.purged': 'Scriosadh “{name}” go buan.',
   'trash.purgeDenied': 'Ní féidir “{name}” a scriosadh',
   'trash.purgeFailed': 'Níorbh fhéidir é a scriosadh.',
+  'trash.emptyAll': 'Folmhaigh an bruscar',
+  'trash.emptyAllTitle': 'An bruscar a fholmhú?',
+  'trash.emptyAllBody': {
+    one: 'Scriosfar an mhír sa bhruscar go buan, mar aon lena stair leaganacha. Ní bheidh aon bhealach í a fháil ar ais ina dhiaidh sin.',
+    two: 'Scriosfar na míreanna sa bhruscar go buan ({count}), mar aon lena stair leaganacha. Ní bheidh aon bhealach iad a fháil ar ais ina dhiaidh sin.',
+    few: 'Scriosfar na míreanna sa bhruscar go buan ({count}), mar aon lena stair leaganacha. Ní bheidh aon bhealach iad a fháil ar ais ina dhiaidh sin.',
+    many: 'Scriosfar na míreanna sa bhruscar go buan ({count}), mar aon lena stair leaganacha. Ní bheidh aon bhealach iad a fháil ar ais ina dhiaidh sin.',
+    other:
+      'Scriosfar na míreanna sa bhruscar go buan ({count}), mar aon lena stair leaganacha. Ní bheidh aon bhealach iad a fháil ar ais ina dhiaidh sin.',
+  },
+  'trash.emptiedAll': 'Folmhaíodh an bruscar.',
+  'trash.emptyAllPartial': {
+    one: 'Níorbh fhéidir mír amháin a scriosadh; tá sí fós sa bhruscar.',
+    two: 'Míreanna nárbh fhéidir a scriosadh: {count}. Tá siad fós sa bhruscar.',
+    few: 'Míreanna nárbh fhéidir a scriosadh: {count}. Tá siad fós sa bhruscar.',
+    many: 'Míreanna nárbh fhéidir a scriosadh: {count}. Tá siad fós sa bhruscar.',
+    other: 'Míreanna nárbh fhéidir a scriosadh: {count}. Tá siad fós sa bhruscar.',
+  },
   'trash.purgeTitle': 'Scrios go buan?',
   'trash.purgeBodyFolder':
     'Scriosfar ábhar “{name}” agus gach a bhfuil istigh ann ó fhreastalaithe Sytue, mar aon lena stair leaganacha. Ní bheidh aon bhealach é a fháil ar ais ina dhiaidh sin, ná as seo ná ón tacaíocht. Mar chúiteamh, saorann tú an spás a bhí á thógáil aige.',

@@ -45,7 +45,7 @@ type Inicio struct {
 // PantallaInicio monta «Inicio».
 func PantallaInicio(v Vista, d Inicio) *fyne.Container {
 	subir := ui.NuevoBoton(v.Traduce("nav.upload"), d.AlSubir).Con(ui.Primario, ui.TallaSM).ConIcono(iconos.Subir, iconos.TallaSM)
-	emitir := ui.NuevoBoton(v.Traduce("nav.studio"), d.AlEmitir).Con(ui.Secundario, ui.TallaSM)
+	emitir := ui.NuevoBoton(v.Traduce("nav.studio"), d.AlEmitir).Con(ui.Secundario, ui.TallaSM).ConIcono(iconos.Emitir, iconos.TallaSM)
 	acciones := []fyne.CanvasObject{emitir, subir}
 	if v.Estado == SinSesion || v.Ventana < ui.CorteSM {
 		// Sin sesión no hay nada que subir ni emitir: el botón es «Entrar». Y en un
@@ -56,7 +56,7 @@ func PantallaInicio(v Vista, d Inicio) *fyne.Container {
 		Obj:    Cabecera(v.Traduce("home.title"), "", acciones...),
 		Margen: HuecoSeccion,
 	}}
-	vacio := Vacio(v, glifoVideo, v.Traduce("home.empty.title"), v.Traduce("home.empty.description"),
+	vacio := Vacio(v, iconos.Video, v.Traduce("home.empty.title"), v.Traduce("home.empty.description"),
 		ui.NuevoBoton(v.Traduce("nav.upload"), d.AlSubir).Con(ui.Primario, ui.TallaSM))
 	if cuerpo := CuerpoDeEstado(v, vacio); cuerpo != nil {
 		return Pagina(v, append(bloques, ui.Bloque{Obj: cuerpo})...)
@@ -144,13 +144,13 @@ func PantallaExplorar(v Vista, d Explorar) *fyne.Container {
 			bloques[0].Obj = container.New(ui.FilaAuto{Hueco: tema.Espacio(4), Derecha: 1, Elastico: 1, Partir: true, SaltoFila: tema.Espacio(4)}, cabecera, buscador)
 		}
 	}
-	vacio := Vacio(v, glifoVideo, v.Traduce("explore.empty.title"), v.Traduce("explore.empty.description"), nil)
+	vacio := Vacio(v, iconos.Video, v.Traduce("explore.empty.title"), v.Traduce("explore.empty.description"), nil)
 	if cuerpo := CuerpoDeEstado(v, vacio); cuerpo != nil {
 		return Pagina(v, append(bloques, ui.Bloque{Obj: cuerpo})...)
 	}
 	directos, videos := Filtrar(d.Directos, d.Texto), Filtrar(d.Videos, d.Texto)
 	if len(directos)+len(videos) == 0 {
-		return Pagina(v, append(bloques, ui.Bloque{Obj: Vacio(v, glifoVideo,
+		return Pagina(v, append(bloques, ui.Bloque{Obj: Vacio(v, iconos.Video,
 			v.Traduce("explore.noMatch", i18n.Vars{"query": d.Texto}), "", nil)})...)
 	}
 	bloques = append(bloques, seccionVideos(v, v.Traduce("explore.live"), directos, d.AlAbrir)...)
@@ -236,7 +236,7 @@ func PantallaCanal(v Vista, d Canal) *fyne.Container {
 		}
 	}
 	bloques := []ui.Bloque{{Obj: cabecera, Margen: HuecoSeccion}}
-	vacio := Vacio(v, glifoVideo, v.Traduce("channel.empty.title"), v.Traduce("channel.empty.description"), nil)
+	vacio := Vacio(v, iconos.Video, v.Traduce("channel.empty.title"), v.Traduce("channel.empty.description"), nil)
 	if cuerpo := CuerpoDeEstado(v, vacio); cuerpo != nil {
 		return Pagina(v, append(bloques, ui.Bloque{Obj: cuerpo})...)
 	}

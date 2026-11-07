@@ -92,10 +92,10 @@ func TestLaBandejaMideLoQueDicenSusClases(t *testing.T) {
 		t.Errorf("de la primera fila a la segunda hay %v y tiene que haber %v", got, altoAvisoCompleto+tema.Borde)
 	}
 
-	// El punto de sin leer se PINTA en `primary`: `bg-primary h-2 w-2`, a la derecha y
-	// con su `mt-2`.
-	x := int(f0.Position().X + f0.Size().Width - MargenXAviso - LadoPuntoSinLeer/2)
-	y := int(f0.Position().Y + MargenYAviso + SangriaPuntoAviso + LadoPuntoSinLeer/2)
+	// El punto de sin leer se PINTA en `primary`: `bg-primary h-2 w-2`, en el centro de
+	// su botón (`p-2`), que va a la derecha de la fila con su `mt-3`.
+	x := int(f0.Position().X + ancho - LadoBotonLeido/2)
+	y := int(f0.Position().Y + MargenYAviso + LadoBotonLeido/2)
 	c, g, b, _ := img.At(x, y).RGBA()
 	got := color.NRGBA{R: uint8(c >> 8), G: uint8(g >> 8), B: uint8(b >> 8), A: 255}
 	if quiero := tema.Color("primary", tema.Claro); !parecido(got, quiero) {
@@ -506,5 +506,177 @@ func TestCargarMasConLaListaViva(t *testing.T) {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
+	v.Ir(AInicio)
+}
+
+// TestElPuntoMarcaUnoSinAbrirlo: el punto azul es un botón «Marcar como leído». Marca
+// ESE aviso —al Hub y en pantalla—, no abre nada aunque el aviso lleve a otra app, deja
+// los demás como estaban y, ya leído, el botón se va.
+//
+// Visto en ROJO a mano el 2026-11-05: enganchando el botón a `AlAbrir` en vez de a
+// `AlMarcarLeido`, pulsar el punto abre el correo y el test lo dice.
+func TestElPuntoMarcaUnoSinAbrirlo(t *testing.T) {
+	d := &buzonDoble{items: avisosDePrueba(), flujo: make(chan api.HubNotification)}
+	ab := &abridorDoble{}
+	v := NuevaVista(traductor(t), nil, time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC)).ConBuzon(d)
+	v.abrir = ab
+	lee := func(f func(a *Avisos) bool) func() bool {
+		return func() bool {
+			v.mu.Lock()
+			defer v.mu.Unlock()
+			return f(v.avisos)
+		}
+	}
+	botones := func() []*BotonLeido {
+		var out []*BotonLeido
+		fyne.DoAndWait(func() {
+			for _, o := range test.WidgetRenderer(v.avisos).Objects() {
+				if b, ok := o.(*BotonLeido); ok {
+					out = append(out, b)
+				}
+			}
+		})
+		return out
+	}
+	v.Ir(AAvisos)
+	esperar(t, "carga", lee(func(a *Avisos) bool { return a.Estado == Listo && len(a.Items) == 3 }))
+
+	bs := botones()
+	if len(bs) != 2 {
+		t.Fatalf("hay %d botones de punto y son dos avisos sin leer", len(bs))
+	}
+	if quiero := v.avisos.T.T("inbox.markRead", nil); bs[0].AccessibilityLabel() != quiero || quiero == "inbox.markRead" {
+		t.Errorf("el punto se llama %q y tiene que llamarse %q", bs[0].AccessibilityLabel(), quiero)
+	}
+	if bs[0].AccessibilityRole() != fyne.AccessibleRoleButton {
+		t.Error("el punto no se anuncia como botón")
+	}
+	test.Tap(bs[0]) // el del primero, que lleva a Mail
+	esperar(t, "marcarlo en el Hub", func() bool { return d.mira(func() bool { return slices.Equal(d.leidos, []string{"1"}) }) })
+	esperar(t, "marcarlo en pantalla", lee(func(a *Avisos) bool { return a.Items[0].Read }))
+	if !lee(func(a *Avisos) bool { return !a.Items[2].Read })() {
+		t.Error("marcar uno ha marcado también otro")
+	}
+	if len(ab.abiertas) != 0 {
+		t.Errorf("marcar como leído ha abierto %v", ab.abiertas)
+	}
+	if n := len(botones()); n != 1 {
+		t.Errorf("ya leído, quedan %d botones de punto y es uno", n)
+	}
+	v.Ir(AInicio)
+}
+
+// TestElPuntoVaDetrasDeSuFila: con Tab, cada «Marcar como leído» va justo detrás de su
+// aviso —fila, punto, fila, punto—, que es el orden del DOM en la web; y al marcar con el
+// foco puesto, el botón se va y el foco pasa a SU fila, no a ninguna parte.
+//
+// Visto en ROJO a mano el 2026-11-05: con los botones al final de `recomponer` (como
+// antes), el Tab desde la primera fila cae en la segunda; y sin `devolverFoco`, tras
+// marcar el foco se queda en nil. El test dice las dos cosas.
+func TestElPuntoVaDetrasDeSuFila(t *testing.T) {
+	d := &buzonDoble{items: avisosDePrueba(), flujo: make(chan api.HubNotification)}
+	v := NuevaVista(traductor(t), nil, time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC)).ConBuzon(d)
+	ven := test.NewWindow(v.avisos)
+	t.Cleanup(ven.Close)
+	ven.Resize(fyne.NewSize(1280, 800))
+	c := ven.Canvas()
+	v.Ir(AAvisos)
+	esperar(t, "carga", func() bool {
+		v.mu.Lock()
+		defer v.mu.Unlock()
+		return v.avisos.Estado == Listo && len(v.avisos.Items) == 3
+	})
+	var r *avisosRenderer
+	fyne.DoAndWait(func() { r = test.WidgetRenderer(v.avisos).(*avisosRenderer) })
+
+	var foco fyne.Focusable
+	fyne.DoAndWait(func() {
+		c.Focus(r.filas[0])
+		c.FocusNext()
+		foco = c.Focused()
+	})
+	if foco != fyne.Focusable(r.leidos[0]) {
+		t.Fatalf("Tab desde la primera fila va a %T y tenía que ir a su punto", foco)
+	}
+	fyne.DoAndWait(func() { r.leidos[0].TypedKey(&fyne.KeyEvent{Name: fyne.KeyReturn}) })
+	esperar(t, "el foco en su fila", func() bool {
+		var ok bool
+		fyne.DoAndWait(func() {
+			ok = len(r.filas) == 3 && r.ids[0] == "1" && c.Focused() == fyne.Focusable(r.filas[0])
+		})
+		return ok
+	})
+	v.Ir(AInicio)
+}
+
+// TestConSinLeerElFocoPasaAlVecino: con «Sin leer», el aviso marcado SALE de la lista con
+// su fila, y el foco pasa a la del siguiente —que ocupa ahora su puesto— o a la del
+// anterior si era el último. Como `MarcarLeido` en la web.
+//
+// Visto en ROJO a mano el 2026-11-06: sin el respaldo por puesto de `devolverFoco`, tras
+// marcar el foco se queda en nil.
+func TestConSinLeerElFocoPasaAlVecino(t *testing.T) {
+	ayer := time.Date(2026, 9, 20, 10, 0, 0, 0, time.UTC)
+	items := []api.HubNotification{
+		{ID: "a", Source: "mail", Title: "Uno", CreatedAt: ayer},
+		{ID: "b", Source: "mail", Title: "Dos", CreatedAt: ayer},
+		{ID: "c", Source: "mail", Title: "Tres", CreatedAt: ayer},
+	}
+	d := &buzonDoble{items: items, flujo: make(chan api.HubNotification)}
+	v := NuevaVista(traductor(t), nil, time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC)).ConBuzon(d)
+	ven := test.NewWindow(v.avisos)
+	t.Cleanup(ven.Close)
+	ven.Resize(fyne.NewSize(1280, 800))
+	c := ven.Canvas()
+	v.Ir(AAvisos)
+	esperar(t, "carga", func() bool {
+		v.mu.Lock()
+		defer v.mu.Unlock()
+		return v.avisos.Estado == Listo && len(v.avisos.Items) == 3
+	})
+	var r *avisosRenderer
+	fyne.DoAndWait(func() {
+		v.mu.Lock()
+		v.avisos.SoloSinLeer = true
+		v.mu.Unlock()
+		v.avisos.Refresh()
+		r = test.WidgetRenderer(v.avisos).(*avisosRenderer)
+	})
+
+	marcar := func(id string) {
+		t.Helper()
+		fyne.DoAndWait(func() {
+			for i, x := range r.ids {
+				if x == id {
+					c.Focus(r.leidos[i])
+					r.leidos[i].TypedKey(&fyne.KeyEvent{Name: fyne.KeyReturn})
+					return
+				}
+			}
+			t.Fatalf("no está la fila de %q", id)
+		})
+	}
+	enfocada := func(id string) func() bool {
+		return func() bool {
+			var ok bool
+			fyne.DoAndWait(func() {
+				for i, x := range r.ids {
+					if x == id {
+						ok = c.Focused() == fyne.Focusable(r.filas[i])
+					}
+				}
+			})
+			return ok
+		}
+	}
+
+	marcar("c") // el último: el foco va al anterior
+	esperar(t, "el foco en «b»", enfocada("b"))
+	marcar("a") // el primero: el foco va al siguiente, que ocupa su puesto
+	esperar(t, "el foco en «b»", func() bool {
+		var n int
+		fyne.DoAndWait(func() { n = len(r.filas) })
+		return n == 1 && enfocada("b")()
+	})
 	v.Ir(AInicio)
 }

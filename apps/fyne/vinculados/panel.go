@@ -8,6 +8,7 @@ package vinculados
 import (
 	"cmp"
 	"context"
+	"errors"
 	"slices"
 	"time"
 
@@ -40,6 +41,7 @@ type Panel struct {
 	ocupado, escrituraIncierta                             bool
 	reconectarNecesario                                    bool
 	fallo                                                  string
+	aviso                                                  string // informa, no es un fallo
 	paso                                                   string
 	cuentas                                                api.ExternalMailAccounts
 	pendienteProvider, pendienteID, esperadaID             string
@@ -133,7 +135,7 @@ func (p *Panel) Cerrar() {
 	p.inicio, p.fin = nil, nil
 	p.diaCompleto, p.nuevoRegistro = nil, false
 	p.actor, p.paso, p.cursor = "", "", ""
-	p.ocupado, p.escrituraIncierta, p.fallo = false, false, ""
+	p.ocupado, p.escrituraIncierta, p.fallo, p.aviso = false, false, "", ""
 	p.reconectarNecesario = false
 }
 
@@ -225,6 +227,15 @@ func (p *Panel) conectar(provider, instance string) {
 	p.trabajar(10*time.Minute, func(ctx context.Context) func() {
 		id, err := p.autorizar(ctx, provider, instance, services...)
 		return func() {
+			var exists *api.OAuthExistsError
+			if errors.As(err, &exists) {
+				// Esa cuenta ya estaba conectada para este servicio: el servidor borró
+				// el borrador, así que no se reintenta con él; se abre la que hay.
+				p.paso, p.pendienteProvider, p.pendienteID = "cuentas", "", ""
+				p.aviso = p.t("linkedServices.exists")
+				p.cargarCuentas(exists.Instance)
+				return
+			}
 			if err != nil {
 				if id != "" {
 					p.pendienteProvider, p.pendienteID = provider, id
@@ -268,6 +279,7 @@ func (p *Panel) cargarItems(mas bool) {
 	if mas {
 		cursor = p.cursor
 	}
+	p.aviso = ""
 	p.trabajar(30*time.Second, func(ctx context.Context) func() {
 		var eventos api.RemotePage[api.RemoteEvent]
 		var contactos api.RemotePage[api.RemoteContact]
@@ -308,6 +320,8 @@ func (p *Panel) pintar() {
 	var cuerpo []fyne.CanvasObject
 	if p.fallo != "" {
 		cuerpo = append(cuerpo, p.texto(p.fallo))
+	} else if p.aviso != "" {
+		cuerpo = append(cuerpo, p.texto(p.aviso))
 	}
 	if p.ocupado {
 		cuerpo = append(cuerpo, p.texto(p.t("ui.loading")))
@@ -343,6 +357,7 @@ func (p *Panel) pintar() {
 }
 
 func (p *Panel) volver() {
+	p.aviso = ""
 	switch p.paso {
 	case "proveedores":
 		p.paso = "cuentas"

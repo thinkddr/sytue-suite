@@ -341,10 +341,15 @@ func (h *Handler) Mount(r chi.Router) {
 		// «Pedir firma» a otra persona, de la organización (ADR 0051 §7) o de otra
 		// (ADR 0057): las rutas de una petición pasan a la organización donde vive
 		// para su destinatario de fuera.
-		pr.Post("/api/v1/pdf/signature-requests", h.pedirFirma)
+		//
+		// La señal de cambios para el widget de CertiPDF (sus pendientes de firmar), a
+		// quien pide y a quien firma (avisoDeFirma, cancelarPeticionFirma).
+		senalPDF := h.hubNotifier.TrasEscribir(nil, "pdf")
+		pr.With(senalPDF).Post("/api/v1/pdf/signature-requests", h.pedirFirma)
 		pr.Get("/api/v1/pdf/signature-requests", h.listarPeticionesFirma)
 		pr.Route("/api/v1/pdf/signature-requests/{id}", func(pf chi.Router) {
 			pf.Use(h.peticionEnAnfitrion)
+			pf.Use(senalPDF)
 			pf.Post("/sign", h.firmarPeticion)
 			pf.Post("/decline", h.rechazarPeticionFirma)
 			pf.Post("/open", h.abrirPeticionFirma)
@@ -377,12 +382,21 @@ func (h *Handler) Mount(r chi.Router) {
 
 		// La papelera de quien pide (papelera.go): restaurar y vaciar, atada a la de
 		// Drive.
+		//
+		// La señal de cambios para los widgets de Docus, Calcus y Diapos (los
+		// recientes): a los tres, porque la ruta no dice de qué tipo es el documento y
+		// averiguarlo costaría una lectura por escritura. Al crear sí se sabe, y
+		// createDocument la precisa (hubnotify.CambioEn). Sin señal lo que se escribe
+		// a ritmo de tecla (las operaciones de la edición, la presencia) y lo que no
+		// cambia la lista (vistas de filtro, exportaciones).
+		senalDocs := h.hubNotifier.TrasEscribir(sinSenalDeCambios, "docs", "sheets", "slides")
 		pr.Get("/api/v1/trash", h.listarPapelera)
-		pr.Delete("/api/v1/trash", h.vaciarPapelera)
-		pr.Post("/api/v1/trash/{id}/restore", h.restaurarDePapelera)
-		pr.Delete("/api/v1/trash/{id}", h.purgarDePapelera)
+		pr.With(senalDocs).Delete("/api/v1/trash", h.vaciarPapelera)
+		pr.With(senalDocs).Post("/api/v1/trash/{id}/restore", h.restaurarDePapelera)
+		pr.With(senalDocs).Delete("/api/v1/trash/{id}", h.purgarDePapelera)
 
 		pr.Route("/api/v1/documents", func(dr chi.Router) {
+			dr.Use(senalDocs)
 			dr.Get("/", h.listDocuments)
 			dr.Post("/", h.createDocument)
 
@@ -585,4 +599,17 @@ func hostsWopi(d Deps) []string {
 		return nil
 	}
 	return []string{"drive." + strings.TrimPrefix(host, "docs.")}
+}
+
+// sinSenalDeCambios son las escrituras de un documento que no cambian lo que enseñan
+// sus widgets (los recientes): van cada pocos segundos mientras se edita, o solo
+// atañen a quien las hace.
+func sinSenalDeCambios(r *http.Request) bool {
+	ruta := strings.TrimSuffix(r.URL.Path, "/")
+	for _, s := range []string{"/ops", "/presence", "/filter-views", "/exports"} {
+		if strings.HasSuffix(ruta, s) {
+			return true
+		}
+	}
+	return false
 }

@@ -31,7 +31,7 @@ mal() {
   fallos=1
 }
 
-if ! grep -qx 'replace fyne.io/fyne/v2 => github.com/thinkddr/fyne/v2 v2.8.2-sytue.3' "$FYNE/go.mod"; then
+if ! grep -qx 'replace fyne.io/fyne/v2 => github.com/thinkddr/fyne/v2 v2.8.2-sytue.5' "$FYNE/go.mod"; then
   mal "apps/fyne debe usar el fork mantenido con URL entrantes y geometría UIKit de Fyne v2.8.2"
 fi
 
@@ -334,6 +334,17 @@ else
   grep -q 'sytue-rooms-android.aab' <<<"$salida" || mal "publicables android falla sin decir qué AAB falta: $salida"
 fi
 # El versionCode: el del tag, creciente y sin colisiones.
+# El nombre bajo el icono en iOS y Android: los de más de 12 caracteres llevan un ESPACIO
+# EN (U+2002) para que iOS no lo apriete hasta borrarlo; los que caben, el espacio normal.
+en="$(printf '\xe2\x80\x82')"
+for c in calendar:"Sytue${en}Calendar" contacts:"Sytue${en}Contacts" certipdf:"Sytue${en}CertiPDF" \
+  notes:"Sytue${en}Notepads" hub:"Sytue Hub" calcus:"Sytue Calcus" mail:"Sytue Mail"; do
+  app="${c%%:*}" quiero="${c#*:}"
+  [ "$("$GUION" nombre-movil "$app" 2>&1)" = "$quiero" ] ||
+    mal "el nombre bajo el icono de $app es «$("$GUION" nombre-movil "$app" 2>&1)» y tiene que ser «$quiero»"
+done
+grep -q "<key>CFBundleDisplayName</key><string>Sytue${en}Calendar</string>" <<<"$("$GUION" plist-simulador calendar 2>&1)" ||
+  mal "el Info.plist del Simulador no lleva el nombre bajo el icono con el espacio en"
 [ "$("$GUION" version-code v3.6.23 2>&1)" = 3006023 ] ||
   mal "el versionCode de v3.6.23 no es 3006023: $("$GUION" version-code v3.6.23 2>&1)"
 anterior=0
@@ -679,7 +690,7 @@ fi
     ' "$GUION"
   done
   cat <<'SH'
-compilar_ios_paquete() { printf 'macho-go' >"$2/main"; chmod 0755 "$2/main"; }
+verificar_ios_paquete() { :; }
 incorporar_widgets_apple() { mkdir -p "$1/../../SwiftSupport/iphoneos"; }
 SH
 } >"$ipa_sin_firma/funciones.sh"
@@ -713,60 +724,43 @@ else
   mal "firmar_ipa rechaza un .app sin firma previa de xcodebuild: $(tail -2 "$ipa_sin_firma/salida")"
 fi
 
-# El Mach-O lo compila Go ANTES de Xcode: la xcconfig no cambia sus flags. Se
-# ejecutan los helpers reales con una CLI y un SDK de prueba; el mínimo del fixture
-# es 16 para detectar un 15 copiado, y el TOML simula el Build incrementado por CLI.
+# iOS POR EL CAMINO OFICIAL (2026-11-06): fyne.io/tools 1.7.4 no admite `fyne build`
+# para iOS. El paquete de TestFlight lo compila `fyne package` y aquí solo se verifica
+# (verificar_ios_paquete); el Simulador y la fase de Xcode compilan con `go build` y los
+# metadatos de herramientas/metadatos (compilar_ios). Se ejecutan las funciones reales
+# con un `go`, un `xcrun` y un SDK de prueba; el mínimo del fixture es 16 para detectar
+# un 15 copiado.
 ios_fixture="$tmp/ios-enlace"
 mkdir -p "$ios_fixture/bin" "$ios_fixture/fyne/xcode" "$ios_fixture/fuentes" "$ios_fixture/Sytue Rooms.app"
 printf 'IPHONEOS_DEPLOYMENT_TARGET = 16.0\n' >"$ios_fixture/fyne/xcode/Sytue.xcconfig"
-cat >"$ios_fixture/fuentes/FyneApp.toml" <<'TOML'
-# comentario que también debe conservarse
-[Details]
-Name = "Sytue Rooms"
-ID = "eu.sytue.rooms"
-Version = "0.1.0"
-Build = 99
-[Development]
-esquema = "sytue-rooms"
-client_id = "sytue-chat"
-extensiones = "txt"
-[Release]
-client_id = "cliente-release"
-extensiones = "json"
-propia = "se conserva"
-TOML
+printf '[Details]\nName = "Sytue Rooms"\nID = "eu.sytue.rooms"\n' >"$ios_fixture/fuentes/FyneApp.toml"
 python3 - "$ios_fixture/Sytue Rooms.app/Info.plist" <<'PY'
 import plistlib, sys
 with open(sys.argv[1], 'wb') as f:
     plistlib.dump({'CFBundleExecutable': 'main'}, f)
 PY
-# El wrapper firmado real es FAT. Go1.27 no permite sobrescribir ese magic;
-# compilar a un destino nuevo debe mantenerlo intacto hasta tener un Mach-O válido.
-printf '\312\376\272\276ejecutable-firmado-anterior' >"$ios_fixture/Sytue Rooms.app/main"
-cat >"$ios_fixture/bin/fyne" <<'SH'
+cat >"$ios_fixture/bin/go" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
-[ "$1" = build ] || exit 91
-printf '%s\n' "$@" >"$IOS_FIXTURE/argv"
-printf '%s\n' "$GOOS" "$GOARCH" "$CGO_ENABLED" "$CGO_CFLAGS" "$CGO_CXXFLAGS" "$CGO_LDFLAGS" "$GOFLAGS" >"$IOS_FIXTURE/entorno"
-cp FyneApp.toml "$IOS_FIXTURE/metadata.toml"
-salida=""
-while [ "$#" -gt 0 ]; do
-  if [ "$1" = -o ]; then salida="$2"; break; fi
-  shift
-done
-[ -n "$salida" ] || exit 96
-python3 - "$salida" <<'PY'
-import pathlib, sys
-p = pathlib.Path(sys.argv[1])
-if p.exists() and p.read_bytes()[:4] == bytes.fromhex('cafebabe'):
-    sys.exit('build output already exists and is not an object file')
-PY
-if [ "${IOS_FALLA_BUILD:-no}" = si ]; then
-  echo salida-parcial >"$salida"
-  exit 92
-fi
-cp "$IOS_BINARIO" "$salida"
+case "$1" in
+-C)
+  # go -C <fyne> run ./herramientas/metadatos -dir <app> -salida <fichero>
+  printf '%s\n' "$@" >"$IOS_FIXTURE/metadatos.argv"
+  printf '%s|%s\n' "${GOOS:-}" "${CC:-}" >"$IOS_FIXTURE/metadatos.entorno"
+  [ "${IOS_FALLA_METADATOS:-no}" = no ] || exit 81
+  salida=""; while [ "$#" -gt 0 ]; do [ "$1" = -salida ] && salida="$2"; shift; done
+  echo 'package main // metadatos de prueba' >"$salida"
+  echo "${IOS_ETIQUETAS:-}" ;;
+build)
+  [ -f fyne_metadata_init.go ] || exit 82
+  printf '%s\n' "$@" >"$IOS_FIXTURE/build.argv"
+  printf '%s\n' "$GOOS" "$GOARCH" "$CGO_ENABLED" "$CGO_CFLAGS" "$CGO_CXXFLAGS" "$CGO_LDFLAGS" "$GOFLAGS" >"$IOS_FIXTURE/entorno"
+  [ "${IOS_FALLA_BUILD:-no}" = no ] || exit 92
+  salida=""; while [ "$#" -gt 0 ]; do [ "$1" = -o ] && salida="$2"; shift; done
+  cp "$IOS_BINARIO" "$salida" ;;
+# `go version -m` (arquitectura_de) y lo demás, el Go de verdad.
+*) exec "$GO_REAL" "$@" ;;
+esac
 SH
 cat >"$ios_fixture/bin/xcrun" <<'SH'
 #!/usr/bin/env bash
@@ -779,12 +773,14 @@ case "$1" in
   -f) echo "/sdk/$4" ;;
   *) exit 94 ;;
   esac ;;
+lipo)
+  if [ "$2" = -archs ]; then echo "${IOS_LIPO_ARCHS:-arm64}"
+  else cp "$IOS_BINARIO" "$6"; fi ;;
 vtool)
-  : >"$IOS_FIXTURE/verificado"
   if [ "${IOS_MACHO_LEGACY:-no}" = si ]; then
-    printf 'Load command 1\n      cmd LC_VERSION_MIN_IPHONEOS\n  version %s\n      sdk 27.1\n' "${IOS_MINIMO_REAL:-16.0}"
+    printf 'Load command 1\n      cmd LC_VERSION_MIN_IPHONEOS\n  version %s\n      sdk 27.1\n' "${IOS_MINIMO_REAL:-13.0}"
   else
-    printf 'Load command 1\n      cmd LC_BUILD_VERSION\n  cmdsize 32\n platform IOS\n    minos %s\n      sdk 27.1\n   ntools 1\n     tool LD\n  version %s\n' "${IOS_MINIMO_REAL:-16.0}" "${IOS_VERSION_TOOL:-1222.1}"
+    printf 'Load command 1\n      cmd LC_BUILD_VERSION\n  cmdsize 32\n platform IOS\n    minos %s\n      sdk 27.1\n   ntools 1\n     tool LD\n  version 1222.1\n' "${IOS_MINIMO_REAL:-13.0}"
   fi ;;
 otool)
   if [ "$2" = -hv ]; then
@@ -799,32 +795,58 @@ esac
 SH
 chmod +x "$ios_fixture/bin"/*
 # Sin copia de implementación: se cargan las funciones del empaquetador de verdad.
-for funcion in metadato binario_de arquitectura_de verificar_arquitectura compilar_fyne minimo_ios enlace_widgets_apple permiso_enlace_widgets_apple compilar_ios verificar_minimo_ios compilar_ios_paquete; do
+for funcion in metadato binario_de arquitectura_de verificar_arquitectura minimo_ios enlace_widgets_apple permiso_enlace_widgets_apple compilar_ios verificar_minimo_ios verificar_ios_paquete; do
   sed -n "/^$funcion() {/,/^}/p" "$GUION"
 done >"$ios_fixture/funciones.sh"
-ejecutar_ios_fixture() {
-  PATH="$ios_fixture/bin:$PATH" CLI="$ios_fixture/bin/fyne" FYNE="$ios_fixture/fyne" \
-    IOS_FIXTURE="$ios_fixture" IOS_BINARIO="$arm64" \
-    bash -c 'set -euo pipefail; source "$1/funciones.sh"; compilar_ios_paquete "$1/fuentes" "$1/Sytue Rooms.app" 3.13.4 31' _ "$ios_fixture"
+grep -q '^compilar_ios() {' "$ios_fixture/funciones.sh" && grep -q '^verificar_ios_paquete() {' "$ios_fixture/funciones.sh" ||
+  mal "el test no encuentra compilar_ios o verificar_ios_paquete en empaquetar.sh"
+ios_compilar() { # el Simulador y la fase de Xcode: compilar_ios desde el directorio de la app
+  rm -f "${ios_fixture:?}/metadatos.argv" "${ios_fixture:?}/build.argv" "${ios_fixture:?}/entorno" "${ios_fixture:?}/salida.bin"
+  GO_REAL="$(command -v go)" PATH="$ios_fixture/bin:$PATH" FYNE="$ios_fixture/fyne" IOS_FIXTURE="$ios_fixture" IOS_BINARIO="$arm64" \
+    bash -c 'set -euo pipefail; source "$1/funciones.sh"; cd "$1/fuentes"; compilar_ios iphoneos "$1/salida.bin"' _ "$ios_fixture"
 }
-ejecutar_ios_fixture >"$ios_fixture/salida" 2>&1 ||
-  mal "la recompilación iOS no conserva su contrato: $(tail -2 "$ios_fixture/salida")"
-python3 - "$ios_fixture" <<'PY' || mal "el binario iOS perdería mínimo, versión o callback OAuth"
-import pathlib, re, sys
+ios_verificar() { # el paquete de TestFlight: lo que deja `fyne package`
+  cp "$arm64" "$ios_fixture/Sytue Rooms.app/main"
+  GO_REAL="$(command -v go)" PATH="$ios_fixture/bin:$PATH" FYNE="$ios_fixture/fyne" IOS_FIXTURE="$ios_fixture" IOS_BINARIO="$arm64" \
+    bash -c 'set -euo pipefail; source "$1/funciones.sh"; verificar_ios_paquete "$1/Sytue Rooms.app"' _ "$ios_fixture"
+}
+
+GOOS=linux ios_compilar >"$ios_fixture/salida" 2>&1 || mal "compilar_ios no compila el binario suelto de iOS: $(tail -2 "$ios_fixture/salida")"
+python3 - "$ios_fixture" <<'PY' || mal "el binario suelto de iOS perdería sus metadatos, su mínimo o su destino"
+import pathlib, sys
 p = pathlib.Path(sys.argv[1])
-args = (p / 'argv').read_text().splitlines()
+meta = (p / 'metadatos.argv').read_text().splitlines()
+assert meta[:4] == ['-C', str(p / 'fyne'), 'run', './herramientas/metadatos'], meta
+assert meta[meta.index('-dir') + 1] == str(p / 'fuentes'), meta
+assert meta[meta.index('-salida') + 1] == str(p / 'fuentes' / 'fyne_metadata_init.go'), meta
+# La herramienta corre con el Go del anfitrión, no con el entorno de iOS.
+assert (p / 'metadatos.entorno').read_text().strip() == '|', (p / 'metadatos.entorno').read_text()
+args = (p / 'build.argv').read_text().splitlines()
+assert args == ['build', '-tags', 'goolm', '-o', str(p / 'salida.bin'), '.'], args
 env = (p / 'entorno').read_text().splitlines()
 assert env[:3] == ['ios', 'arm64', '1'], env[:3]
 assert all('-miphoneos-version-min=16.0' in f and '-arch arm64' in f for f in env[3:6]), env[3:6]
-assert '--release' in args and args[args.index('--tags') + 1] == 'goolm', args
-assert 'esquema=sytue-rooms' in args and 'client_id=cliente-release' in args and 'extensiones=json' in args, args
-toml = (p / 'metadata.toml').read_text()
-assert re.search(r'^Version = "3.13.4"$', toml, re.M), toml
-assert re.search(r'^Build = 31$', toml, re.M), toml
-assert 'propia = "se conserva"' in toml and '# comentario que también debe conservarse' in toml, toml
+assert '-trimpath' in env[6], env[6]
+assert not (p / 'fuentes' / 'fyne_metadata_init.go').exists(), 'el fichero de metadatos se queda en el árbol'
 PY
+IOS_ETIQUETAS=release,migrated_fynedo ios_compilar >"$ios_fixture/salida" 2>&1 &&
+  grep -qx 'goolm,release,migrated_fynedo' "$ios_fixture/build.argv" ||
+  mal "compilar_ios no pasa a go build las etiquetas que daba fyne build"
+if IOS_FALLA_METADATOS=si ios_compilar >"$ios_fixture/salida" 2>&1; then
+  mal "compilar_ios compila sin metadatos cuando la herramienta falla"
+fi
+[ ! -e "$ios_fixture/build.argv" ] || mal "compilar_ios llega a go build sin metadatos"
+IOS_FALLA_BUILD=si ios_compilar >"$ios_fixture/salida" 2>&1 && mal "compilar_ios sigue aunque falle go build"
+[ ! -e "$ios_fixture/fuentes/fyne_metadata_init.go" ] || mal "un go build fallido deja fyne_metadata_init.go en el árbol"
+echo 'package main // de otro' >"$ios_fixture/fuentes/fyne_metadata_init.go"
+if ios_compilar >"$ios_fixture/salida" 2>&1; then mal "compilar_ios pisa un fyne_metadata_init.go que no es suyo"; fi
+grep -q 'de otro' "$ios_fixture/fuentes/fyne_metadata_init.go" || mal "compilar_ios borró un fyne_metadata_init.go ajeno"
+rm -f "${ios_fixture:?}/fuentes/fyne_metadata_init.go"
+if (PATH="$ios_fixture/bin:$PATH" FYNE="$ios_fixture/fyne" bash -c 'source "$1/funciones.sh"; cd "$1/fuentes"; compilar_ios iphoneos "$1/x" --release' _ "$ios_fixture") >/dev/null 2>&1; then
+  mal "compilar_ios acepta opciones de fyne build que ya no usa"
+fi
 mkdir -p "$ios_fixture/productos con espacios/SytueWidgetBridge.framework"
-SYTUE_WIDGET_PRODUCTOS="$ios_fixture/productos con espacios" ejecutar_ios_fixture >"$ios_fixture/salida" 2>&1 ||
+SYTUE_WIDGET_PRODUCTOS="$ios_fixture/productos con espacios" ios_compilar >"$ios_fixture/salida" 2>&1 ||
   mal "iOS no enlaza el puente WidgetKit: $(tail -2 "$ios_fixture/salida")"
 python3 - "$ios_fixture/entorno" <<'PY' || mal "el enlace Go descarta el puente público o no puede encontrarlo"
 import pathlib, sys
@@ -833,48 +855,51 @@ assert '-F "' in flags and 'productos con espacios"' in flags, flags
 assert '-Wl,-needed_framework,SytueWidgetBridge' in flags, flags
 assert '-Wl,-rpath,@executable_path/Frameworks' in flags, flags
 PY
-rm -rf "$ios_fixture/productos con espacios/SytueWidgetBridge.framework"
-if SYTUE_WIDGET_PRODUCTOS="$ios_fixture/productos con espacios" ejecutar_ios_fixture >"$ios_fixture/salida" 2>&1; then
+rmdir "$ios_fixture/productos con espacios/SytueWidgetBridge.framework"
+if SYTUE_WIDGET_PRODUCTOS="$ios_fixture/productos con espacios" ios_compilar >"$ios_fixture/salida" 2>&1; then
   mal "iOS compila un host con WidgetKit sin haber construido su framework"
 fi
-IOS_MACHO_LEGACY=si ejecutar_ios_fixture >"$ios_fixture/salida" 2>&1 ||
+
+# El paquete de TestFlight: el ejecutable de `fyne package`, enlazado con iOS 13.0 por la
+# CLI. Se admite un mínimo entre 13.0 y el canónico (16 en el fixture), nunca más alto.
+ios_verificar >"$ios_fixture/salida" 2>&1 || mal "verificar_ios_paquete rechaza el ejecutable de fyne package: $(tail -2 "$ios_fixture/salida")"
+IOS_MACHO_LEGACY=si ios_verificar >"$ios_fixture/salida" 2>&1 ||
   mal "iOS rechaza el mínimo válido de LC_VERSION_MIN_IPHONEOS"
-for tipo in OBJECT DYLIB; do
-  if IOS_TIPO_MACHO="$tipo" ejecutar_ios_fixture >"$ios_fixture/salida" 2>&1; then
-    mal "iOS acepta un Mach-O $tipo como ejecutable de la app"
+IOS_MINIMO_REAL=16.0 ios_verificar >"$ios_fixture/salida" 2>&1 || mal "iOS rechaza un mínimo igual al canónico"
+for minimo in 17.0 7.0; do
+  if IOS_MINIMO_REAL=$minimo ios_verificar >"$ios_fixture/salida" 2>&1; then
+    mal "iOS publica un Mach-O con mínimo $minimo (fuera de 13.0..16.0)"
   else
-    grep -q 'no es un ejecutable MH_EXECUTE' "$ios_fixture/salida" ||
-      mal "iOS no comprueba el tipo Mach-O $tipo"
+    grep -q 'mínimo fuera de 13.0..16.0' "$ios_fixture/salida" || mal "el rechazo del mínimo $minimo no explica qué se ha medido"
   fi
 done
-# Una clave Release vacía es explícita: no se sustituye por Development.
-python3 - "$ios_fixture/fuentes/FyneApp.toml" <<'PY'
-import pathlib, sys
-p = pathlib.Path(sys.argv[1])
-p.write_text(p.read_text().replace('extensiones = "json"', 'extensiones = ""'))
-PY
-ejecutar_ios_fixture >"$ios_fixture/salida" 2>&1 || mal "iOS no acepta un metadato Release vacío"
-grep -qx 'extensiones=' "$ios_fixture/argv" || mal "iOS sustituye un metadato Release vacío por Development"
-if IOS_MINIMO_REAL=7.0 IOS_VERSION_TOOL=16.0 ejecutar_ios_fixture >"$ios_fixture/salida" 2>&1; then
-  mal "iOS permite publicar un Mach-O con mínimo 7 aunque su Info.plist diga 16"
-else
-  grep -q 'Mach-O de iOS no declara el mínimo canónico' "$ios_fixture/salida" ||
-    mal "el rechazo del mínimo iOS no explica qué se ha medido"
-fi
-if IOS_ALIAS_SWIFT=si ejecutar_ios_fixture >"$ios_fixture/salida" 2>&1; then
+for tipo in OBJECT DYLIB; do
+  if IOS_TIPO_MACHO="$tipo" ios_verificar >"$ios_fixture/salida" 2>&1; then
+    mal "iOS acepta un Mach-O $tipo como ejecutable de la app"
+  else
+    grep -q 'no es un ejecutable MH_EXECUTE' "$ios_fixture/salida" || mal "iOS no comprueba el tipo Mach-O $tipo"
+  fi
+done
+if IOS_ALIAS_SWIFT=si ios_verificar >"$ios_fixture/salida" 2>&1; then
   mal "iOS permite publicar el alias Swift CoreMedia sin soporte Swift"
 else
   grep -q 'enlaza Swift por @rpath' "$ios_fixture/salida" || mal "el rechazo del alias Swift no se ha ejecutado"
 fi
-rm -f "$ios_fixture/verificado"
-cp "$ios_fixture/Sytue Rooms.app/main" "$ios_fixture/main.antes"
-IOS_FALLA_BUILD=si ejecutar_ios_fixture >"$ios_fixture/salida" 2>&1 &&
-  mal "iOS continúa aunque falle la recompilación del binario"
-[ ! -e "$ios_fixture/verificado" ] || mal "iOS comprueba un ejecutable viejo después de fallar su recompilación"
-cmp -s "$ios_fixture/Sytue Rooms.app/main" "$ios_fixture/main.antes" ||
-  mal "un fallo al recompilar iOS destruye el ejecutable anterior"
-[ -z "$(find "$ios_fixture/Sytue Rooms.app" -maxdepth 1 -name '.sytue-ios.*' -print)" ] ||
-  mal "la recompilación iOS deja su temporal dentro de la app firmada"
+# El FAT de una sola arquitectura que deja la CLI se adelgaza; uno con más, no pasa.
+printf '\312\376\272\276fat' >"$ios_fixture/fat"
+ios_fat() {
+  cp "$ios_fixture/fat" "$ios_fixture/Sytue Rooms.app/main"
+  GO_REAL="$(command -v go)" PATH="$ios_fixture/bin:$PATH" FYNE="$ios_fixture/fyne" IOS_FIXTURE="$ios_fixture" IOS_BINARIO="$arm64" \
+    bash -c 'set -euo pipefail; source "$1/funciones.sh"; verificar_ios_paquete "$1/Sytue Rooms.app"' _ "$ios_fixture"
+}
+if ios_fat >"$ios_fixture/salida" 2>&1; then
+  cmp -s "$ios_fixture/Sytue Rooms.app/main" "$arm64" || mal "verificar_ios_paquete no deja el ejecutable en su arm64"
+else
+  mal "verificar_ios_paquete no acepta el FAT arm64 de fyne package: $(tail -2 "$ios_fixture/salida")"
+fi
+if IOS_LIPO_ARCHS='arm64 x86_64' ios_fat >"$ios_fixture/salida" 2>&1; then
+  mal "verificar_ios_paquete publica un FAT con algo más que arm64"
+fi
 
 # --- 11. Empaquetar no reescribe el FyneApp.toml --------------------------------------
 # `fyne package` sube el Build y guarda el fichero sin comentarios. Con una CLI de
@@ -1742,6 +1767,14 @@ for activo in ('0', '1'):
             claves = [equipo + '.' + appid, llavero] + ([equipo + '.' + appid + '.shared'] if custom.get('archivos') == 'si' else [])
             assert p['keychain-access-groups'] == claves, (appid, modo, p)
             assert ('com.apple.security.device.camera' in p) == (modo == 'developerid' and custom.get('llamadas') == 'si')
+            # El despertar por aviso silencioso: `aps-environment` solo en iOS, con su
+            # interruptor y el de los widgets, y en las apps con widget. Visto en rojo
+            # escribiéndolo también en developerid.
+            for despertar in ('0', '1'):
+                d = plistlib.loads(subprocess.check_output(['bash', guion, 'derechos-sesion', str(toml.parent), equipo, modo],
+                                                           env=dict(entorno, SYTUE_DESPERTAR_APPLE=despertar)))
+                quiere = despertar == '1' and activo == '1' and modo == 'ios' and bool(custom.get('widget_acciones'))
+                assert d.get('aps-environment') == ('production' if quiere else None), (appid, modo, activo, despertar, d)
         tienda = plistlib.loads(subprocess.check_output(['bash', guion, 'derechos-tienda', str(toml.parent), equipo], env=entorno))
         assert tienda['com.apple.security.application-groups'] == [contenedor, llavero] + (['group.' + appid] if custom.get('archivos') == 'si' else []), (appid, activo)
 assert subprocess.run(['bash', guion, 'widgets-apple'], env=dict(os.environ, SYTUE_WIDGETS_APPLE='1'), capture_output=True, text=True).stdout == 'si\n'
@@ -1761,6 +1794,77 @@ esac
 grep -q 'SYTUE_WIDGETS_APPLE' "$RAIZ/.github/workflows/release-desktop.yml" &&
   ! grep -qE '^[[:space:]]+SYTUE_WIDGETS_APPLE:' "$RAIZ/.github/workflows/release-desktop.yml" ||
   mal "release-desktop.yml define SYTUE_WIDGETS_APPLE en el entorno o ya no lo consulta: el interruptor es el del tag"
+# EL REFRESCO DEL WIDGET EN iOS (BGAppRefreshTask): con su interruptor y el de los
+# widgets, `fetch` y `<App ID>.refresco` en cada app con widget; con cualquiera de los dos
+# apagado, o sin widget, nada. Y plist_apple lo aplica (y lo borra antes, para que
+# apagarlo lo quite de un plist incremental). El despertar va apagado aquí: tiene su
+# bloque abajo, y encenderlo en Sytue.xcconfig no debe romper este.
+for a in calendar mail hub; do
+  id="$(sed -n 's/^[[:space:]]*ID[[:space:]]*=[[:space:]]*"\(.*\)".*/\1/p' "$FYNE/cmd/$a/FyneApp.toml" | head -1)"
+  quiero="$(printf '%s\n' 'Add :UIBackgroundModes array' 'Add :UIBackgroundModes:0 string fetch' \
+    'Add :BGTaskSchedulerPermittedIdentifiers array' "Add :BGTaskSchedulerPermittedIdentifiers:0 string $id.refresco")"
+  [ "$(SYTUE_DESPERTAR_APPLE=0 SYTUE_WIDGETS_APPLE=1 SYTUE_REFRESCO_APPLE=1 "$GUION" refresco-ios "$a")" = "$quiero" ] ||
+    mal "con el refresco y los widgets de Apple, $a no pide el refresco en segundo plano ($id.refresco)"
+  [ -z "$(SYTUE_DESPERTAR_APPLE=0 SYTUE_WIDGETS_APPLE=0 SYTUE_REFRESCO_APPLE=1 "$GUION" refresco-ios "$a")" ] ||
+    mal "con los widgets de Apple apagados, $a pide el refresco en segundo plano"
+  [ -z "$(SYTUE_DESPERTAR_APPLE=0 SYTUE_WIDGETS_APPLE=1 SYTUE_REFRESCO_APPLE=0 "$GUION" refresco-ios "$a")" ] ||
+    mal "con el refresco apagado, $a pide el refresco en segundo plano"
+done
+[ -z "$(SYTUE_DESPERTAR_APPLE=0 SYTUE_WIDGETS_APPLE=1 SYTUE_REFRESCO_APPLE=1 "$GUION" refresco-ios demo)" ] || mal "una app sin widget pide el refresco en segundo plano"
+SYTUE_DESPERTAR_APPLE=0 SYTUE_WIDGETS_APPLE=1 SYTUE_REFRESCO_APPLE=quizá "$GUION" refresco-ios calendar >/dev/null 2>&1 &&
+  mal "SYTUE_REFRESCO_APPLE acepta un valor que no es YES/NO"
+# Lo versionado manda también aquí, y el interruptor no se enciende antes que el fork: con
+# el tag sin el parche 0016 nadie registra la tarea, y las quince apps pedirían a App
+# Review un modo de fondo sin usar. Visto en rojo con SYTUE_REFRESCO_APPLE = YES.
+refresco="$(sed -n 's/^SYTUE_REFRESCO_APPLE = \([A-Z]*\)$/\1/p' "$FYNE/xcode/Sytue.xcconfig")"
+case "$refresco" in YES | NO) ;; *) mal "Sytue.xcconfig no declara SYTUE_REFRESCO_APPLE (YES/NO) una vez: «$refresco»" ;; esac
+if grep -qE '^replace fyne\.io/fyne/v2 => github\.com/thinkddr/fyne/v2 v2\.8\.2-sytue\.[0-3]$' "$FYNE/go.mod"; then
+  [ "$refresco" = NO ] || mal "SYTUE_REFRESCO_APPLE encendido con un fork sin el parche 0016: nadie registraría la tarea"
+  [ -z "$(env -u SYTUE_REFRESCO_APPLE SYTUE_DESPERTAR_APPLE=0 SYTUE_WIDGETS_APPLE=1 "$GUION" refresco-ios calendar)" ] ||
+    mal "con el fork sin el parche 0016, el Info.plist de iOS pide el refresco en segundo plano"
+fi
+# EL DESPERTAR POR AVISO SILENCIOSO (APNs): con su interruptor y el de los widgets,
+# `remote-notification` detrás de `fetch` si también hay refresco, o solo; nada sin widget.
+for a in calendar mail hub; do
+  id="$(sed -n 's/^[[:space:]]*ID[[:space:]]*=[[:space:]]*"\(.*\)".*/\1/p' "$FYNE/cmd/$a/FyneApp.toml" | head -1)"
+  quiero="$(printf '%s\n' 'Add :UIBackgroundModes array' 'Add :UIBackgroundModes:0 string remote-notification')"
+  [ "$(SYTUE_WIDGETS_APPLE=1 SYTUE_REFRESCO_APPLE=0 SYTUE_DESPERTAR_APPLE=1 "$GUION" refresco-ios "$a")" = "$quiero" ] ||
+    mal "con el despertar y los widgets de Apple, $a no pide remote-notification"
+  quiero="$(printf '%s\n' 'Add :UIBackgroundModes array' 'Add :UIBackgroundModes:0 string fetch' \
+    'Add :UIBackgroundModes:1 string remote-notification' \
+    'Add :BGTaskSchedulerPermittedIdentifiers array' "Add :BGTaskSchedulerPermittedIdentifiers:0 string $id.refresco")"
+  [ "$(SYTUE_WIDGETS_APPLE=1 SYTUE_REFRESCO_APPLE=1 SYTUE_DESPERTAR_APPLE=1 "$GUION" refresco-ios "$a")" = "$quiero" ] ||
+    mal "con el refresco y el despertar, $a no pide los dos modos de fondo"
+  [ -z "$(SYTUE_WIDGETS_APPLE=0 SYTUE_REFRESCO_APPLE=0 SYTUE_DESPERTAR_APPLE=1 "$GUION" refresco-ios "$a")" ] ||
+    mal "con los widgets de Apple apagados, $a pide el despertar"
+done
+[ -z "$(SYTUE_WIDGETS_APPLE=1 SYTUE_DESPERTAR_APPLE=1 "$GUION" refresco-ios demo)" ] || mal "una app sin widget pide el despertar"
+SYTUE_WIDGETS_APPLE=1 SYTUE_DESPERTAR_APPLE=quizá "$GUION" refresco-ios calendar >/dev/null 2>&1 &&
+  mal "SYTUE_DESPERTAR_APPLE acepta un valor que no es YES/NO"
+# Y no se enciende antes que el fork: con el tag sin el parche 0017 nadie pide el token ni
+# atiende el aviso, y App Review vería un modo de fondo sin usar. Visto en rojo con
+# SYTUE_DESPERTAR_APPLE = YES.
+despertar="$(sed -n 's/^SYTUE_DESPERTAR_APPLE = \([A-Z]*\)$/\1/p' "$FYNE/xcode/Sytue.xcconfig")"
+case "$despertar" in YES | NO) ;; *) mal "Sytue.xcconfig no declara SYTUE_DESPERTAR_APPLE (YES/NO) una vez: «$despertar»" ;; esac
+if grep -qE '^replace fyne\.io/fyne/v2 => github\.com/thinkddr/fyne/v2 v2\.8\.2-sytue\.[0-4]$' "$FYNE/go.mod"; then
+  [ "$despertar" = NO ] || mal "SYTUE_DESPERTAR_APPLE encendido con un fork sin el parche 0017: nadie atendería el aviso"
+  # Por variable y no por tubería: con pipefail, el SIGPIPE de `grep -q` haría pasar
+  # un acierto por fallo (ci-sin-azar-test.sh).
+  plist_ios="$(env -u SYTUE_DESPERTAR_APPLE SYTUE_WIDGETS_APPLE=1 "$GUION" refresco-ios calendar)"
+  grep -q remote-notification <<<"$plist_ios" &&
+    mal "con el fork sin el parche 0017, el Info.plist de iOS pide remote-notification"
+fi
+grep -q 'refresco="$(plist_refresco "$dir")"' "$GUION" &&
+  grep -q 'PlistBuddy -c "Delete :BGTaskSchedulerPermittedIdentifiers"' "$GUION" ||
+  mal "plist_apple no aplica (ni borra antes) el refresco del widget"
+# Y UIBackgroundModes solo lo escribe plist_refresco: plist_apple borra el array entero, y
+# un modo que pusiera otro sitio (la plantilla de Xcode, otra función) se perdería. Tres
+# apariciones: las dos órdenes de plist_refresco y el Delete. Visto en rojo añadiendo un
+# `Add :UIBackgroundModes:1 string remote-notification` en plist_apple.
+[ "$(grep -o ':UIBackgroundModes' "$GUION" | wc -l | tr -d ' ')" = 3 ] &&
+  [ "$(awk '/^plist_refresco\(\)/,/^}/' "$GUION" | grep -o ':UIBackgroundModes' | wc -l | tr -d ' ')" = 2 ] &&
+  ! grep -rqs 'UIBackgroundModes' "$FYNE/xcode" "$FYNE/cmd" ||
+  mal "UIBackgroundModes se escribe fuera de plist_refresco: el Delete de plist_apple lo borraría"
 "$GUION" derechos-sesion hub ABCDE12345 ios >/dev/null 2>&1 && mal "la sesión acepta otro equipo Apple"
 "$GUION" derechos-sesion hub "$equipo" desconocido >/dev/null 2>&1 && mal "la sesión acepta una plataforma desconocida"
 # LA EXTENSIÓN FILE PROVIDER (Drive en el Finder y en Archivos): solo la app que declara

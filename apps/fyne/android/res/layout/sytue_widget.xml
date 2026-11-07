@@ -25,6 +25,10 @@
             android:textColor="@color/sytue_widget_action" android:maxLines="1"
             android:visibility="gone" />
     </LinearLayout>
+    <TextView android:id="@+id/sytue_widget_updated" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:layout_marginTop="2dp"
+        android:textSize="11sp" android:textColor="@color/sytue_widget_muted"
+        android:maxLines="1" android:ellipsize="end" android:visibility="gone" />
     <ImageView android:id="@+id/sytue_widget_visual" android:layout_width="match_parent"
         android:layout_height="0dp" android:layout_weight="1"
         android:layout_marginTop="4dp" android:layout_marginBottom="4dp"

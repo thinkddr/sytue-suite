@@ -31,3 +31,4 @@
 "dataflow.item.events" = "Ημερολόγιο";
 "dataflow.item.documents" = "Έγγραφα";
 "dataflow.item.contacts" = "Επαφές";
+"widgets.updatedAgo" = "Ενημερώθηκε %@";

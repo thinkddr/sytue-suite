@@ -18,6 +18,8 @@ export const ga: Catalog = {
   'ui.openNav': 'Oscail an nascleanúint',
   'ui.closeNav': 'Dún an nascleanúint',
   'ui.backToList': 'Ar ais chuig an liosta',
+  'ui.suiteOpen': 'Sytue: aipeanna, cuardach, fógraí agus cuntas',
+  'ui.suiteClose': 'Ar ais chuig an aip',
   'ui.noResults': 'Gan torthaí.',
   'ui.meter.almostFull': 'beagnach lán',
   'ui.meter.full': 'lán',
@@ -60,6 +62,9 @@ export const ga: Catalog = {
   'shell.lock.reasonNotebook': 'do leabhar nótaí criptithe a oscailt',
   'shell.lock.faceIdUsage':
     'Úsáideann Sytue Face ID chun do sheisiún a dhíghlasáil nuair a osclaíonn tú an aip.',
+  'shell.widgets.wake': 'Nuashonraigh na giuirléidí nuair atá an aip dúnta',
+  'shell.widgets.wakeHelp':
+    'Nuair a athraíonn rud éigin de do chuid, dúisíonn Sytue an aip le fógra folamh ó Apple ionas go n-athnuafaidh sí a giuirléid. Feiceann Apple cén aip agus cathain, ach ní fheiceann sé riamh cad a d’athraigh.',
   'shell.call.microphoneUsage':
     'Ní úsáideann Sytue Rooms an micreafón ach le linn glao, agus nuair a chasann tú air é.',
   'shell.call.cameraUsage':
@@ -179,7 +184,7 @@ export const ga: Catalog = {
   'notifications.kind.pages.domain.failed':
     'Níl an fearann {domain} ar {site} ag obair: seiceáil a shocruithe',
   'notifications.kind.pages.erp.failed': 'Níor shroich ordú {number} ar {site} Sytue ERP',
-  'notifications.kind.pages.settings.changed': "D'athraigh {actor} socrú de chuid Sytue Web",
+  'notifications.kind.pages.settings.changed': "D'athraigh {actor} socrú de chuid Sytue Webs",
   'notifications.kind.pages.export.ready': "Tá d'easpórtáil de {site} réidh",
   'notifications.kind.pages.store.busy':
     'Tá an iomarca orduithe ag fanacht le híocaíocht ar an siopa ar {site}',
@@ -369,6 +374,8 @@ export const ga: Catalog = {
   'widgets.compose': 'Cum',
   'widgets.storage': 'Stóras',
   'widgets.create': 'Cruthaigh imeacht',
+  'widgets.updatedAgo': 'Nuashonraithe {time}',
+  'widgets.updatedAt': 'Nuashonraithe: {time}',
 
   'linkedServices.services': 'Seirbhísí',
   'linkedServices.changed':
@@ -381,6 +388,7 @@ export const ga: Catalog = {
   'linkedServices.notGranted':
     'Níor deonaíodh rochtain ar an tseirbhís seo. Nasc an cuntas arís chun a cheadanna a roghnú.',
   'linkedServices.connected': 'Seirbhísí nasctha',
+  'linkedServices.exists': 'Bhí an cuntas seo nasctha cheana féin agus tá sé oscailte anois.',
   'linkedServices.providerData': 'Sábháiltear athruithe ag do sholáthraí.',
   'linkedServices.writeUnknown':
     'Níor dheimhnigh an soláthraí gur sábháladh é. Athnuaigh agus seiceáil sula ndéanann tú iarracht eile.',

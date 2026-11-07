@@ -104,3 +104,34 @@ test('locking removes decrypted previews even while their previous values remain
   expect(element.textContent).not.toContain('private preview');
   expect(element.textContent).not.toContain('legacy plaintext');
 });
+
+test('un filtro que oculta todas las notas lo dice y ofrece quitarlo', () => {
+  const element = host();
+  let quitado = 0;
+  render(
+    <NoteTree
+      t={((key: string) => key) as never}
+      locale="en"
+      notes={[]}
+      claro={{}}
+      bloqueado={false}
+      soloLectura
+      seleccionada={null}
+      onSelect={nothing}
+      onNueva={nothing}
+      onNuevaDentro={nothing}
+      onSacar={nothing}
+      onToggle={nothing}
+      onRenombrar={nothing}
+      onQuitarFiltro={() => quitado++}
+    />,
+    element,
+  );
+  expect(element.textContent).toContain('filter.noMatches');
+  expect(element.textContent).not.toContain('empty.noNotes.title');
+  const boton = [...element.querySelectorAll('button')].find(
+    (b) => b.textContent === 'filter.clear',
+  );
+  boton!.click();
+  expect(quitado).toBe(1);
+});

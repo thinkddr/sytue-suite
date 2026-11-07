@@ -101,6 +101,7 @@
   "linkedServices.changed": "Ten element zmienił się u Twojego dostawcy. Odśwież go przed ponowną edycją.",
   "linkedServices.choose": "Wybierz, co połączyć. Dostawca poprosi o uprawnienia do wybranych usług.",
   "linkedServices.connected": "Połączone usługi",
+  "linkedServices.exists": "To konto było już połączone i jest teraz otwarte.",
   "linkedServices.keepAdmin": "Google Keep wymaga konfiguracji zatwierdzonej przez administrację Google Workspace. Osobiste konta Gmail nie mogą go połączyć.",
   "linkedServices.notGranted": "Nie przyznano dostępu do tej usługi. Połącz konto ponownie, aby wybrać uprawnienia.",
   "linkedServices.notSupported": "Ten dostawca nie oferuje tej usługi.",
@@ -171,7 +172,7 @@
   "notifications.kind.pages.order.oversold": "Zamówienie {number} w serwisie {site} zostało opłacone, ale brakuje towaru",
   "notifications.kind.pages.order.paid": "Nowe zamówienie {number} w serwisie {site}",
   "notifications.kind.pages.payment.duplicated": "Podwójna płatność za zamówienie {number} w serwisie {site}: druga jest zwracana",
-  "notifications.kind.pages.settings.changed": "Zmiana ustawienia w Sytue Web: {actor}",
+  "notifications.kind.pages.settings.changed": "Zmiana ustawienia w Sytue Webs: {actor}",
   "notifications.kind.pages.store.busy": "Sklep w serwisie {site} ma zbyt wiele zamówień oczekujących na płatność",
   "notifications.kind.pages.withdrawal.requested": "Prośba o odstąpienie od umowy: zamówienie {number} w serwisie {site}",
   "notifications.kind.photos.album.added": "{actor} dodaje zdjęcia do „{name}”",
@@ -309,6 +310,8 @@
   "shell.update.failedBody": "Spróbuj ponownie później lub pobierz ją z portalu.",
   "shell.update.install": "Zaktualizuj do wersji {version}",
   "shell.update.upToDate": "{app}: masz najnowszą wersję",
+  "shell.widgets.wake": "Aktualizuj widżety, gdy aplikacja jest zamknięta",
+  "shell.widgets.wakeHelp": "Gdy coś Twojego się zmieni, Sytue budzi aplikację pustym powiadomieniem Apple, aby odświeżyła swój widżet. Apple widzi, która to aplikacja i kiedy, nigdy to, co się zmieniło.",
   "ui.backToList": "Wróć do listy",
   "ui.bulk.clear": "Wyczyść zaznaczenie",
   "ui.bulk.region": "Działania dla zaznaczenia",
@@ -326,6 +329,8 @@
   "ui.review.edit": "Edytuj",
   "ui.save": "Zapisz",
   "ui.selectRow": "Zaznacz wiersz",
+  "ui.suiteClose": "Wróć do aplikacji",
+  "ui.suiteOpen": "Sytue: aplikacje, wyszukiwanie, powiadomienia i konto",
   "ui.wizard.back": "Wstecz",
   "ui.wizard.cancel": "Anuluj",
   "ui.wizard.goToStep": "Wróć do kroku {n}: ",
@@ -344,5 +349,7 @@
   "widgets.pending": "Oczekujące",
   "widgets.photos": "Zdjęcia",
   "widgets.rows": "Wiersze",
-  "widgets.storage": "Miejsce"
+  "widgets.storage": "Miejsce",
+  "widgets.updatedAgo": "Zaktualizowano {time}",
+  "widgets.updatedAt": "Zaktualizowano: {time}"
 }

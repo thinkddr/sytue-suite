@@ -101,6 +101,7 @@
   "linkedServices.changed": "Det här objektet har ändrats hos din leverantör. Uppdatera innan du redigerar det igen.",
   "linkedServices.choose": "Välj vad du vill ansluta. Din leverantör ber om behörigheter för de valda tjänsterna.",
   "linkedServices.connected": "Anslutna tjänster",
+  "linkedServices.exists": "Det här kontot var redan anslutet och är nu öppnat.",
   "linkedServices.keepAdmin": "Google Keep kräver en godkänd konfiguration från Google Workspace-administrationen. Personliga Gmail-konton kan inte ansluta den.",
   "linkedServices.notGranted": "Åtkomst till den här tjänsten beviljades inte. Anslut kontot igen för att välja behörigheter.",
   "linkedServices.notSupported": "Den här leverantören erbjuder inte den här tjänsten.",
@@ -169,7 +170,7 @@
   "notifications.kind.pages.order.oversold": "Beställning {number} på {site} betalades utan lagersaldo",
   "notifications.kind.pages.order.paid": "Ny beställning {number} på {site}",
   "notifications.kind.pages.payment.duplicated": "Dubbel betalning på beställning {number} på {site}: den andra återbetalas",
-  "notifications.kind.pages.settings.changed": "{actor} har ändrat en inställning i Sytue Web",
+  "notifications.kind.pages.settings.changed": "{actor} har ändrat en inställning i Sytue Webs",
   "notifications.kind.pages.store.busy": "Webbutiken på {site} har för många beställningar som väntar på betalning",
   "notifications.kind.pages.withdrawal.requested": "Ångerrätt har åberopats för beställning {number} på {site}",
   "notifications.kind.photos.album.added": "{actor} har lagt till bilder i ”{name}”",
@@ -301,6 +302,8 @@
   "shell.update.failedBody": "Försök igen senare eller ladda ned den från portalen.",
   "shell.update.install": "Uppdatera till version {version}",
   "shell.update.upToDate": "{app} är uppdaterad",
+  "shell.widgets.wake": "Uppdatera widgetar när appen är stängd",
+  "shell.widgets.wakeHelp": "När något av ditt ändras väcker Sytue appen med en tom avisering från Apple så att den kan uppdatera sin widget. Apple ser vilken app och när, aldrig vad som har ändrats.",
   "ui.backToList": "Tillbaka till listan",
   "ui.bulk.clear": "Rensa markeringen",
   "ui.bulk.region": "Åtgärder för markeringen",
@@ -318,6 +321,8 @@
   "ui.review.edit": "Redigera",
   "ui.save": "Spara",
   "ui.selectRow": "Markera rad",
+  "ui.suiteClose": "Tillbaka till appen",
+  "ui.suiteOpen": "Sytue: appar, sök, aviseringar och konto",
   "ui.wizard.back": "Tillbaka",
   "ui.wizard.cancel": "Avbryt",
   "ui.wizard.goToStep": "Tillbaka till steg {n}: ",
@@ -336,5 +341,7 @@
   "widgets.pending": "Väntande",
   "widgets.photos": "Foton",
   "widgets.rows": "Rader",
-  "widgets.storage": "Lagring"
+  "widgets.storage": "Lagring",
+  "widgets.updatedAgo": "Uppdaterad {time}",
+  "widgets.updatedAt": "Uppdaterad: {time}"
 }

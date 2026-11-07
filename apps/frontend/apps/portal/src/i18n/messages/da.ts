@@ -56,6 +56,7 @@ export const da: AppCatalog<typeof en> = {
   'inbox.markAll': 'Markér alle som læst',
   'inbox.loading': 'Indlæser notifikationer…',
   'inbox.unreadDot': 'Ulæst',
+  'inbox.markRead': 'Markér som læst',
   'inbox.errorTitle': 'Notifikationerne kunne ikke indlæses',
   'inbox.errorBody': 'Hub svarer ikke lige nu. Prøv igen om et par sekunder.',
   'inbox.retry': 'Prøv igen',
@@ -671,6 +672,8 @@ export const da: AppCatalog<typeof en> = {
   'search.partial': '{sources} svarede ikke, så der kan mangle resultater. Prøv igen om lidt.',
   'search.partialJoin': ' og ',
   'search.showing': 'Viser {count} af {total} resultater.',
+  'search.loadMore': 'Indlæs flere resultater',
+  'search.loadMoreFailed': 'Flere resultater kunne ikke indlæses. Prøv igen.',
   'privacy.notice':
     'Vi sælger ikke dine data og videregiver dem ikke til tredjeparter. Vi bruger dem ikke til at profilere dig, til reklamer eller til at træne eller forbedre vores tjenester eller andres. De er krypteret under overførsel og i hvile og forlader kun vores europæiske infrastruktur i det omfang, det er strengt nødvendigt for at fakturere dig, og i de integrationer, du selv aktiverer, hvor tredjeparten beder om dit samtykke til de data, der bruges.',
 };

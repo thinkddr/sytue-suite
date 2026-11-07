@@ -65,6 +65,7 @@ export const sl: AppCatalog<typeof en> = {
   'inbox.markAll': 'Označi vse kot prebrano',
   'inbox.loading': 'Nalaganje obvestil…',
   'inbox.unreadDot': 'Neprebrano',
+  'inbox.markRead': 'Označi kot prebrano',
   'inbox.errorTitle': 'Obvestil ni bilo mogoče naložiti',
   'inbox.errorBody': 'Hub se trenutno ne odziva. Poskusite znova čez nekaj sekund.',
   'inbox.retry': 'Poskusi znova',
@@ -701,6 +702,8 @@ export const sl: AppCatalog<typeof en> = {
     'Brez odgovora: {sources}. Nekateri rezultati zato morda manjkajo. Poskusite znova čez trenutek.',
   'search.partialJoin': ' in ',
   'search.showing': 'Prikazano {count} od {total} rezultatov.',
+  'search.loadMore': 'Naloži več rezultatov',
+  'search.loadMoreFailed': 'Več rezultatov ni bilo mogoče naložiti. Poskusite znova.',
   'privacy.notice':
     'Vaših podatkov ne prodajamo in jih ne delimo s tretjimi osebami. Ne uporabljamo jih za profiliranje, oglaševanje ali za učenje oziroma izboljševanje naših ali tujih storitev. Šifrirani so med prenosom in shranjevanjem ter našo evropsko infrastrukturo zapustijo le, kadar je to nujno za izdajo računa, in v integracijah, ki jih vklopite, kjer vas tretja oseba zaprosi za soglasje za podatke, ki jih bo uporabila.',
 };

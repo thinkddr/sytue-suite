@@ -324,7 +324,7 @@ func (a *Asistente) Objeto(v tema.Variante) fyne.CanvasObject {
 		alto := 24 + 2*CargandoOblPY
 		p.add(centrado(ui.NuevaRueda(24, "text-muted", v), alto), alto, 0)
 		o, altoP := p.objeto()
-		return enPagina(o, altoP, AnchoAsistente, MargenLista)
+		return enPagina(o, altoP, AnchoAsistente)
 	}
 	p.add(textoSolo(ui.Texto(a.t("onboarding.title"), tema.TextoLG, ui.SemiNegrita, tema.Color("text", v))), tema.TextoLG.Linea, 0)
 	terminal := a.Paso == PasoListo
@@ -369,7 +369,7 @@ func (a *Asistente) Objeto(v tema.Variante) fyne.CanvasObject {
 		p.add(o, alto, ObligGap)
 	}
 	obj, altoP := p.objeto()
-	return enPagina(obj, altoP, AnchoAsistente, MargenLista)
+	return enPagina(obj, altoP, AnchoAsistente)
 }
 
 // ponerCampo es un campo con su rótulo, lo que mide y dónde va.
@@ -708,7 +708,7 @@ func (a *Asistente) recomendadas(v tema.Variante, rec []string, cw float32) (fyn
 	}
 	y += x0
 	// La caja va la primera, debajo de lo demás.
-	caja := ui.NuevaCaja(tema.Color("bg", v), tema.Color("border", v), radioTarjeta())
+	caja := ui.NuevaCaja(tema.Color(ui.FondoHoja(), v), tema.Color("border", v), radioTarjeta())
 	l.puestos = append([]puesto{{o: container.New(&soloCaja{caja}, caja.Objetos()...), w: cw, h: y}}, l.puestos...)
 	return l.objeto(y)
 }

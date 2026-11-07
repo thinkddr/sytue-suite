@@ -477,7 +477,9 @@ async function pruebasDeTeclado(page, ctx, producto) {
   }
 
   // 6. El menú «Archivo»: se abre con Enter, las flechas recorren, Escape devuelve el foco.
-  const archivo = page.locator('button[aria-haspopup="menu"]').first();
+  //    Se busca DENTRO de la cinta: el chip «Guardado hace…» de la cabecera también es un
+  //    disparador de menú (el historial) y va antes en el DOM (4f4f3d6b).
+  const archivo = page.locator('[data-ribbon] button[aria-haspopup="menu"]').first();
   if (await archivo.count()) {
     await archivo.focus();
     await page.keyboard.press('Enter');
@@ -487,6 +489,9 @@ async function pruebasDeTeclado(page, ctx, producto) {
     await page.keyboard.press('Escape');
     const vuelve = await page.evaluate(() => document.activeElement?.getAttribute('aria-haspopup') === 'menu');
     if (!vuelve) falla('teclado', ctx, 'Escape en el menú Archivo no devuelve el foco al botón');
+  } else {
+    // Sin esto, un selector que deja de casar (p. ej. si `data-ribbon` cambia) daría verde sin probar nada.
+    falla('teclado', ctx, 'no hay botón «Archivo» (aria-haspopup="menu") dentro de [data-ribbon]');
   }
 }
 

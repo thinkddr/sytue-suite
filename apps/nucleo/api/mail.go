@@ -506,7 +506,7 @@ func (m *Mail) conMensaje(ctx context.Context, metodo, ruta string, cuerpo map[s
 	}
 	// El servicio toma la cuenta del token: el `{accountId}` de la ruta no se mira.
 	resp, err := m.jmap.Do(ctx, Request{
-		Method: http.MethodPost, Path: "/jmap/upload/me", Body: crudo,
+		Method: http.MethodPost, Path: "/jmap/upload/me", Body: crudo, SinAviso: true,
 		Header: http.Header{"Content-Type": {"message/rfc822"}},
 	})
 	if err != nil {
@@ -657,6 +657,8 @@ func (m *Mail) SaveDraft(ctx context.Context, id, de string, crudo []byte) (Mail
 	if err != nil {
 		return MailMessage{}, err
 	}
+	// El autoguardado de un borrador no cambia la Entrada que enseña el widget.
+	r.SinAviso = true
 	return JSON[MailMessage](ctx, m.c, r)
 }
 

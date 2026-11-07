@@ -524,3 +524,39 @@ func TestUnFicheroAbreEnSuApp(t *testing.T) {
 		t.Errorf("en una búsqueda manda la ruta del servicio: %v", a.urls)
 	}
 }
+
+// TestElConmutadorDeVistaTieneElBordeEnteroYElOtroSegmentoLimpio: el segmento sin elegir
+// es la superficie (`text-text-muted` sin fondo) y el borde se ve en los cuatro lados, de
+// arriba a abajo del segmento elegido también.
+//
+// VISTO EN ROJO (2026-11-06): con el marco de dos rectángulos y relleno transparente, el
+// segmento sin elegir salía del color del borde (gris oscuro) y el elegido lo tapaba.
+func TestElConmutadorDeVistaTieneElBordeEnteroYElOtroSegmentoLimpio(t *testing.T) {
+	c := NuevoConmutadorVista("Lista", "Cuadrícula", nil)
+	w := test.NewWindow(c)
+	defer w.Close()
+	w.SetPadded(false)
+	m := MedidaConmutadorVista()
+	w.Resize(m)
+	img := w.Canvas().Capture()
+	escala := float32(img.Bounds().Dx()) / m.Width
+	px := func(x, y float32) color.NRGBA {
+		return color.NRGBAModel.Convert(img.At(int(x*escala), int(y*escala))).(color.NRGBA)
+	}
+	cerca := func(a, b color.NRGBA) bool {
+		d := func(x, y uint8) int { return max(int(x)-int(y), int(y)-int(x)) }
+		return d(a.R, b.R) < 24 && d(a.G, b.G) < 24 && d(a.B, b.B) < 24
+	}
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	borde := tema.Color("border-strong", v)
+	// En medio del segmento de la cuadrícula, lejos del glifo: superficie, no borde.
+	if p := px(m.Width-4, m.Height/2); cerca(p, borde) {
+		t.Errorf("el segmento sin elegir pinta %v, el color del borde", p)
+	}
+	// El borde de arriba encima del segmento elegido y el de la izquierda, a media altura.
+	for _, p := range []fyne.Position{{X: m.Width / 4, Y: 0.5}, {X: 0.5, Y: m.Height / 2}} {
+		if got := px(p.X, p.Y); !cerca(got, borde) {
+			t.Errorf("en %v el borde no se ve: %v", p, got)
+		}
+	}
+}

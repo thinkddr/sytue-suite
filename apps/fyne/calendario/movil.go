@@ -7,6 +7,8 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 )
@@ -17,11 +19,20 @@ import (
 // quedar al alcance del pulgar—. Las dos piezas son del catálogo; aquí solo se conectan.
 
 // nuevaBarraMovil es `ui.BarraMovil` con la hamburguesa. Calendar no le pasa título a
-// AppShell ni tiene lista y detalle, así que no hay «volver».
+// AppShell ni tiene lista y detalle, así que no hay «volver». En el mes del teléfono la
+// barra es su cabecera: `☰ · noviembre · [6] [+]`, y el ☰ avisa de lo pendiente del cajón.
 func (p *Pantalla) nuevaBarraMovil() *ui.BarraMovil {
 	b := ui.NuevaBarraMovil()
 	b.CajonAbierto = p.cajonAbierto
 	b.RotuloAbrir, b.RotuloCerrar = p.t("ui.openNav", nil), p.t("ui.closeNav", nil)
+	if p.compacta() {
+		b.TituloCentrado = true
+		b.Titulo = TituloCompacto(p.locale(), p.Cursor, p.ahora(), p.zona())
+		b.Acciones = p.accionesBarraCompacta()
+		if n := p.pendientesMenu(); n > 0 {
+			b.Aviso = p.t("nav.menuPending", i18n.Vars{"count": n})
+		}
+	}
 	b.AlMenu = func() {
 		if p.AlConmutarCajon != nil {
 			p.AlConmutarCajon()
@@ -35,7 +46,8 @@ func (p *Pantalla) nuevaBarraMovil() *ui.BarraMovil {
 // `z-20`).
 func (a *App) capaFlotante() *fyne.Container {
 	p := a.P
-	if p.SinConexion || p.cajonAbierto {
+	// En el mes del teléfono tampoco: ahí crear es el «+» de la barra.
+	if p.SinConexion || p.cajonAbierto || p.compacta() {
 		return container.New(ui.CapaFlotante{})
 	}
 	return container.New(ui.CapaFlotante{},

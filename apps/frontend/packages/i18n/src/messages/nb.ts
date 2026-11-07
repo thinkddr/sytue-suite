@@ -18,6 +18,8 @@ export const nb: Catalog = {
   'ui.openNav': 'Åpne navigasjonen',
   'ui.closeNav': 'Lukk navigasjonen',
   'ui.backToList': 'Tilbake til listen',
+  'ui.suiteOpen': 'Sytue: apper, søk, varsler og konto',
+  'ui.suiteClose': 'Tilbake til appen',
   'ui.noResults': 'Ingen resultater.',
   'ui.meter.almostFull': 'nesten fullt',
   'ui.meter.full': 'fullt',
@@ -59,6 +61,9 @@ export const nb: Catalog = {
     'Denne appen trenger OpenGL 2.1, og grafikkdriveren på denne datamaskinen tilbyr det ikke ({detalle}). Installer eller oppdater driveren til grafikkortet. Uten grafikkort (eksternt skrivebord eller virtuell maskin) kan den ikke åpnes.',
   'shell.lock.reasonNotebook': 'åpne den krypterte notatboken din',
   'shell.lock.faceIdUsage': 'Sytue bruker Face ID til å låse opp økten din når du åpner appen.',
+  'shell.widgets.wake': 'Oppdater moduler mens appen er lukket',
+  'shell.widgets.wakeHelp':
+    'Når noe av ditt endres, vekker Sytue appen med et tomt varsel fra Apple, slik at den kan oppdatere modulen sin. Apple ser hvilken app og når, aldri hva som er endret.',
   'shell.call.microphoneUsage':
     'Sytue Rooms bruker mikrofonen bare under en samtale, og bare når du slår den på.',
   'shell.call.cameraUsage':
@@ -170,7 +175,7 @@ export const nb: Catalog = {
     'Domenet {domain} på {site} fungerer ikke: sjekk innstillingene',
   'notifications.kind.pages.erp.failed':
     'Bestilling {number} på {site} kom ikke frem til Sytue ERP',
-  'notifications.kind.pages.settings.changed': '{actor} endret en innstilling i Sytue Web',
+  'notifications.kind.pages.settings.changed': '{actor} endret en innstilling i Sytue Webs',
   'notifications.kind.pages.export.ready': 'Eksporten din av {site} er klar',
   'notifications.kind.pages.store.busy':
     'Nettbutikken på {site} har for mange bestillinger som venter på betaling',
@@ -353,6 +358,8 @@ export const nb: Catalog = {
   'widgets.compose': 'Skriv',
   'widgets.storage': 'Lagring',
   'widgets.create': 'Opprett hendelse',
+  'widgets.updatedAgo': 'Oppdatert {time}',
+  'widgets.updatedAt': 'Oppdatert: {time}',
 
   'linkedServices.services': 'Tjenester',
   'linkedServices.changed':
@@ -365,6 +372,7 @@ export const nb: Catalog = {
   'linkedServices.notGranted':
     'Tilgang til denne tjenesten ble ikke gitt. Koble til kontoen på nytt for å velge tillatelser.',
   'linkedServices.connected': 'Tilkoblede tjenester',
+  'linkedServices.exists': 'Denne kontoen var allerede tilkoblet og er nå åpnet.',
   'linkedServices.providerData': 'Endringer lagres hos leverandøren din.',
   'linkedServices.writeUnknown':
     'Leverandøren bekreftet ikke lagringen. Oppdater og kontroller før du prøver igjen.',

@@ -56,6 +56,7 @@ export const et: AppCatalog<typeof en> = {
   'inbox.markAll': 'Märgi kõik loetuks',
   'inbox.loading': 'Teavituste laadimine…',
   'inbox.unreadDot': 'Lugemata',
+  'inbox.markRead': 'Märgi loetuks',
   'inbox.errorTitle': 'Teavitusi ei õnnestunud laadida',
   'inbox.errorBody': 'Hub ei vasta praegu. Proovige mõne sekundi pärast uuesti.',
   'inbox.retry': 'Proovi uuesti',
@@ -674,6 +675,8 @@ export const et: AppCatalog<typeof en> = {
     '{sources} ei vastanud, seega võib osa tulemusi puududa. Proovige mõne aja pärast uuesti.',
   'search.partialJoin': ' ja ',
   'search.showing': 'Kuvatud {count} tulemust {total}-st.',
+  'search.loadMore': 'Laadi rohkem tulemusi',
+  'search.loadMoreFailed': 'Rohkem tulemusi ei õnnestunud laadida. Proovi uuesti.',
   'privacy.notice':
     'Me ei müü teie andmeid ega anna neid kolmandatele isikutele. Me ei kasuta neid profileerimiseks, reklaamiks ega meie või kellegi teise teenuste treenimiseks või parandamiseks. Need on krüpteeritud nii edastamisel kui ka säilitamisel ja lahkuvad meie Euroopa taristust üksnes arveldamiseks hädavajalikus ulatuses ning teie sisselülitatud integratsioonides, kus kolmas osapool küsib teie nõusolekut kasutatavate andmete kohta.',
 };

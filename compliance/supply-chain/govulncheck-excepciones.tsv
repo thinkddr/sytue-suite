@@ -1,0 +1,7 @@
+# id	caduca	motivo
+# Avisos que govulncheck ve ALCANZADOS y que, sin versión corregida, se aceptan
+# hasta la fecha con una mitigación nuestra. Lo lee .github/actions/govulncheck/
+# accion.sh: un aviso que no está aquí, o cuya fecha ya pasó, sigue tumbando el
+# job. Al caducar se revisa si hay arreglo; no se alarga la fecha sin mirarlo.
+# La misma excepción va en osv-scanner.toml, que es otro escáner y otra lista.
+GO-2026-6909	2026-12-14	crewjam/saml ≤ v0.5.1 sin arreglo ni mantenimiento: services/id/internal/saml recupera el pánico y relee la Response para exigir un único saml:NameID (nameid_test.go)

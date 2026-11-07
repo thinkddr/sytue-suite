@@ -4,6 +4,8 @@
   "action.classified": "Klasifikācija · {name}",
   "action.classify": "Klasificēt",
   "action.copy": "Izveidot kopiju",
+  "action.copyLink": "Kopēt saiti",
+  "action.copyLinkFailed": "Saiti neizdevās nokopēt.",
   "action.delete": "Pārvietot uz atkritni",
   "action.desktopBody": "Ja tā vēl nav instalēta, varat to lejupielādēt.",
   "action.desktopCta": "Skatīt lejupielādes",
@@ -12,6 +14,7 @@
   "action.downloadName": "Lejupielādēt {name}",
   "action.downloadZip": "Lejupielādēt (ZIP)",
   "action.editorFailed": "Redaktors nevarēja atvērt šo failu.",
+  "action.linkCopied": "Saite nokopēta. Tā atveras tikai tiem, kam jau ir piekļuve.",
   "action.mailFailed": "E-pasta rakstīšanas logu neizdevās atvērt",
   "action.menu": "Darbības: {name}",
   "action.more": "Citas darbības",
@@ -84,6 +87,16 @@
     "zero": "Pārvietot {count} vienumus",
     "one": "Pārvietot {count} vienumu",
     "other": "Pārvietot {count} vienumus"
+  },
+  "files.batch.restorePartial": {
+    "zero": "{count} vienumus neizdevās atjaunot; tie joprojām ir atkritnē.",
+    "one": "{count} vienumu neizdevās atjaunot; tas joprojām ir atkritnē.",
+    "other": "{count} vienumus neizdevās atjaunot; tie joprojām ir atkritnē."
+  },
+  "files.batch.restored": {
+    "zero": "{count} vienumi atjaunoti.",
+    "one": "{count} vienums atjaunots.",
+    "other": "{count} vienumi atjaunoti."
   },
   "files.batch.trashBody": {
     "zero": "{count} vienumi tiks pārvietoti uz atkritni. No turienes tos varēsiet atjaunot.",
@@ -571,6 +584,19 @@
     "other": "Augšupielādēti {count} faili."
   },
   "team.upload.partial": "Augšupielādēti {uploaded} no {count}.",
+  "trash.emptiedAll": "Atkritne ir iztukšota.",
+  "trash.emptyAll": "Iztukšot atkritni",
+  "trash.emptyAllBody": {
+    "zero": "{count} vienumi atkritnē tiks neatgriezeniski izdzēsti kopā ar versiju vēsturi. Pēc tam tos vairs nevarēs atgūt.",
+    "one": "{count} vienums atkritnē tiks neatgriezeniski izdzēsts kopā ar versiju vēsturi. Pēc tam to vairs nevarēs atgūt.",
+    "other": "{count} vienumi atkritnē tiks neatgriezeniski izdzēsti kopā ar versiju vēsturi. Pēc tam tos vairs nevarēs atgūt."
+  },
+  "trash.emptyAllPartial": {
+    "zero": "{count} vienumus neizdevās izdzēst; tie joprojām ir atkritnē.",
+    "one": "{count} vienumu neizdevās izdzēst; tas joprojām ir atkritnē.",
+    "other": "{count} vienumus neizdevās izdzēst; tie joprojām ir atkritnē."
+  },
+  "trash.emptyAllTitle": "Iztukšot atkritni?",
   "trash.emptyBody": "Dzēstie faili un mapes parādīsies šeit, un tos varēs atjaunot.",
   "trash.emptyTitle": "Atkritne ir tukša",
   "trash.errorTitle": "Atkritni neizdevās ielādēt",

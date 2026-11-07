@@ -1,0 +1,149 @@
+{
+  "_": "Carpetas de una cuenta externa en Mail: cómo se ordenan, cómo se llaman y qué glifo llevan. Es el contrato de la web (sortMailboxes, mailboxLabel y mailboxGlyph de apps/frontend/apps/mail/src/components/utils.ts) y de Fyne (ordenarCarpetasExternas, RotuloCarpeta y GlifoCarpeta). Las 'carpetas' van en el orden en que las da el proveedor y con el rol que les pone services/integrations/internal/mailbox; 'esperado' es lo que se pinta, de arriba abajo. 'glifo' es la clave de glyphs.tsx.",
+  "casos": [
+    {
+      "nombre": "Gmail en español: las etiquetas del sistema llegan en mayúsculas y desordenadas, y la Ñ va detrás de la N",
+      "locale": "es",
+      "carpetas": [
+        { "id": "Label_3", "name": "Zeta" },
+        { "id": "TRASH", "name": "TRASH", "role": "trash" },
+        { "id": "SENT", "name": "SENT", "role": "sent" },
+        { "id": "Label_1", "name": "Ñandú" },
+        { "id": "INBOX", "name": "INBOX", "role": "inbox" },
+        { "id": "SPAM", "name": "SPAM", "role": "junk" },
+        { "id": "DRAFT", "name": "DRAFT", "role": "drafts" },
+        { "id": "Label_2", "name": "Nube" }
+      ],
+      "esperado": [
+        { "id": "INBOX", "rotulo": "Recibidos", "glifo": "unread" },
+        { "id": "DRAFT", "rotulo": "Borradores", "glifo": "folder" },
+        { "id": "SENT", "rotulo": "Enviados", "glifo": "forward" },
+        { "id": "SPAM", "rotulo": "Spam", "glifo": "spam" },
+        { "id": "TRASH", "rotulo": "Papelera", "glifo": "trash" },
+        { "id": "Label_2", "rotulo": "Nube", "glifo": "folder" },
+        { "id": "Label_1", "rotulo": "Ñandú", "glifo": "folder" },
+        { "id": "Label_3", "rotulo": "Zeta", "glifo": "folder" }
+      ]
+    },
+    {
+      "nombre": "La misma cuenta en inglés: la Ñ es una N con tilde y va delante de «Nube»",
+      "locale": "en",
+      "carpetas": [
+        { "id": "Label_3", "name": "Zeta" },
+        { "id": "TRASH", "name": "TRASH", "role": "trash" },
+        { "id": "SENT", "name": "SENT", "role": "sent" },
+        { "id": "Label_1", "name": "Ñandú" },
+        { "id": "INBOX", "name": "INBOX", "role": "inbox" },
+        { "id": "SPAM", "name": "SPAM", "role": "junk" },
+        { "id": "DRAFT", "name": "DRAFT", "role": "drafts" },
+        { "id": "Label_2", "name": "Nube" }
+      ],
+      "esperado": [
+        { "id": "INBOX", "rotulo": "Inbox", "glifo": "unread" },
+        { "id": "DRAFT", "rotulo": "Drafts", "glifo": "folder" },
+        { "id": "SENT", "rotulo": "Sent", "glifo": "forward" },
+        { "id": "SPAM", "rotulo": "Spam", "glifo": "spam" },
+        { "id": "TRASH", "rotulo": "Trash", "glifo": "trash" },
+        { "id": "Label_1", "rotulo": "Ñandú", "glifo": "folder" },
+        { "id": "Label_2", "rotulo": "Nube", "glifo": "folder" },
+        { "id": "Label_3", "rotulo": "Zeta", "glifo": "folder" }
+      ]
+    },
+    {
+      "nombre": "iCloud por IMAP en alemán: nombres de Apple con su rol SPECIAL-USE, y la Ä va con la A",
+      "locale": "de",
+      "carpetas": [
+        { "id": "Notes", "name": "Notes" },
+        {
+          "id": "Deleted Messages",
+          "name": "Deleted Messages",
+          "role": "trash"
+        },
+        { "id": "Archive", "name": "Archive", "role": "archive" },
+        { "id": "Sent Messages", "name": "Sent Messages", "role": "sent" },
+        { "id": "Ärger", "name": "Ärger" },
+        { "id": "Junk", "name": "Junk", "role": "junk" },
+        { "id": "Drafts", "name": "Drafts", "role": "drafts" },
+        { "id": "INBOX", "name": "INBOX", "role": "inbox" },
+        { "id": "Apfel", "name": "Apfel" }
+      ],
+      "esperado": [
+        { "id": "INBOX", "rotulo": "Posteingang", "glifo": "unread" },
+        { "id": "Drafts", "rotulo": "Entwürfe", "glifo": "folder" },
+        { "id": "Sent Messages", "rotulo": "Gesendet", "glifo": "forward" },
+        { "id": "Archive", "rotulo": "Archiv", "glifo": "archive" },
+        { "id": "Junk", "rotulo": "Spam", "glifo": "spam" },
+        { "id": "Deleted Messages", "rotulo": "Papierkorb", "glifo": "trash" },
+        { "id": "Apfel", "rotulo": "Apfel", "glifo": "folder" },
+        { "id": "Ärger", "rotulo": "Ärger", "glifo": "folder" },
+        { "id": "Notes", "rotulo": "Notes", "glifo": "folder" }
+      ]
+    },
+    {
+      "nombre": "La misma cuenta de iCloud en sueco: la Ä es una letra propia, detrás de la Z",
+      "locale": "sv",
+      "carpetas": [
+        { "id": "Notes", "name": "Notes" },
+        {
+          "id": "Deleted Messages",
+          "name": "Deleted Messages",
+          "role": "trash"
+        },
+        { "id": "Archive", "name": "Archive", "role": "archive" },
+        { "id": "Sent Messages", "name": "Sent Messages", "role": "sent" },
+        { "id": "Ärger", "name": "Ärger" },
+        { "id": "Junk", "name": "Junk", "role": "junk" },
+        { "id": "Drafts", "name": "Drafts", "role": "drafts" },
+        { "id": "INBOX", "name": "INBOX", "role": "inbox" },
+        { "id": "Apfel", "name": "Apfel" }
+      ],
+      "esperado": [
+        { "id": "INBOX", "rotulo": "Inkorg", "glifo": "unread" },
+        { "id": "Drafts", "rotulo": "Utkast", "glifo": "folder" },
+        { "id": "Sent Messages", "rotulo": "Skickat", "glifo": "forward" },
+        { "id": "Archive", "rotulo": "Arkiv", "glifo": "archive" },
+        { "id": "Junk", "rotulo": "Skräppost", "glifo": "spam" },
+        { "id": "Deleted Messages", "rotulo": "Papperskorg", "glifo": "trash" },
+        { "id": "Apfel", "rotulo": "Apfel", "glifo": "folder" },
+        { "id": "Notes", "rotulo": "Notes", "glifo": "folder" },
+        { "id": "Ärger", "rotulo": "Ärger", "glifo": "folder" }
+      ]
+    },
+    {
+      "nombre": "Outlook en italiano: un rol que Sytue no conoce conserva su nombre y va con las carpetas propias",
+      "locale": "it",
+      "carpetas": [
+        { "id": "AAMk-outbox", "name": "Outbox" },
+        { "id": "AAMk-junk", "name": "Junk Email", "role": "junk" },
+        { "id": "AAMk-history", "name": "Conversation History" },
+        { "id": "AAMk-drafts", "name": "Drafts", "role": "drafts" },
+        { "id": "AAMk-important", "name": "Important", "role": "important" },
+        { "id": "AAMk-deleted", "name": "Deleted Items", "role": "trash" },
+        { "id": "AAMk-archive", "name": "Archive", "role": "archive" },
+        { "id": "AAMk-sent", "name": "Sent Items", "role": "sent" },
+        { "id": "AAMk-inbox", "name": "Inbox", "role": "inbox" }
+      ],
+      "esperado": [
+        { "id": "AAMk-inbox", "rotulo": "Posta in arrivo", "glifo": "unread" },
+        { "id": "AAMk-drafts", "rotulo": "Bozze", "glifo": "folder" },
+        { "id": "AAMk-sent", "rotulo": "Posta inviata", "glifo": "forward" },
+        { "id": "AAMk-archive", "rotulo": "Archivio", "glifo": "archive" },
+        { "id": "AAMk-junk", "rotulo": "Spam", "glifo": "spam" },
+        { "id": "AAMk-deleted", "rotulo": "Cestino", "glifo": "trash" },
+        {
+          "id": "AAMk-history",
+          "rotulo": "Conversation History",
+          "glifo": "folder"
+        },
+        { "id": "AAMk-important", "rotulo": "Important", "glifo": "folder" },
+        { "id": "AAMk-outbox", "rotulo": "Outbox", "glifo": "folder" }
+      ]
+    },
+    {
+      "nombre": "POP3 solo tiene la bandeja de entrada",
+      "locale": "es",
+      "carpetas": [{ "id": "INBOX", "name": "INBOX", "role": "inbox" }],
+      "esperado": [{ "id": "INBOX", "rotulo": "Recibidos", "glifo": "unread" }]
+    }
+  ]
+}

@@ -162,7 +162,7 @@ func (r *Reenviar) CreateRenderer() fyne.WidgetRenderer {
 	texto := ui.NuevoParrafo(previa, tema.TextoSM, ui.Normal, "text", v)
 	texto.Lineas = 2
 	caja := ui.NuevaCaja(tema.Color("bg-subtle", v), tema.Color("border", v), tema.RadioMD)
-	vista := container.NewStack(append(caja.Objetos(),
+	vista := container.New(enCaja{caja}, append(caja.Objetos(),
 		container.New(ui.Margen{Izq: tema.Espacio(3), Arr: tema.Espacio(2), Der: tema.Espacio(3), Abj: tema.Espacio(2)},
 			container.New(ui.Columna{Hueco: tema.Espacio(0.5)}, autor, texto)))...)
 	r.col = container.New(ui.Columna{Hueco: tema.Espacio(0.5)})
@@ -370,8 +370,10 @@ func ListaLectores(t *i18n.Translator, l i18n.Locale, ls []api.RoomsReader, tota
 				ui.NuevoRotulo(i18n.FormatDateTime(l, r.ReadAt.Local()), escalonMeta, ui.Normal, "text-subtle"),
 				ui.NuevoRotulo(nombreDe(r.Name, r.Subject), tema.TextoSM, ui.Normal, "text"))))
 	}
-	caja := ui.NuevaCaja(color.NRGBA{}, tema.Color("border", v), tema.RadioMD)
-	lista := container.NewStack(append(caja.Objetos(), container.New(ui.Margen{Arr: tema.Borde, Abj: tema.Borde},
+	// `border rounded-md` sin fondo: el relleno transparente necesita ConTrazo, o el
+	// rectángulo del borde se ve macizo debajo de las filas.
+	caja := ui.NuevaCaja(color.NRGBA{}, tema.Color("border", v), tema.RadioMD).ConTrazo()
+	lista := container.New(enCaja{caja}, append(caja.Objetos(), container.New(ui.Margen{Arr: tema.Borde, Abj: tema.Borde},
 		container.New(ui.Columna{}, filas...)))...)
 	cuenta := ui.NuevoRotulo(t.T("message.seenByCount", i18n.Vars{"count": len(ls), "total": total}), escalonMeta, ui.Normal, "text-subtle")
 	return container.New(ui.Columna{Hueco: tema.Espacio(2)}, cuenta, lista)

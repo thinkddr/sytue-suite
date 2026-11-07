@@ -86,6 +86,11 @@ type Handlers struct {
 	correo buzonSinLeer
 	// orgs da el nombre visible de las organizaciones de fuera; nil sin Sytue ID.
 	orgs nombresOrgs
+	// aparatos es el registro de aparatos de iOS (aparatos.go); nil sin store.
+	aparatos registroAparatos
+	// despertar despierta las apps de iOS con la señal de cambios; nil sin
+	// credenciales de Apple.
+	despertar despertadorCambios
 }
 
 // buzonSinLeer es lo que se usa del conector de Mail (connectors.MailConnector).

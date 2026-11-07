@@ -101,6 +101,7 @@
   "linkedServices.changed": "Dette element er blevet ændret hos din udbyder. Opdater, før du redigerer det igen.",
   "linkedServices.choose": "Vælg, hvad du vil forbinde. Din udbyder beder om tilladelser til de valgte tjenester.",
   "linkedServices.connected": "Forbundne tjenester",
+  "linkedServices.exists": "Denne konto var allerede forbundet og er nu åbnet.",
   "linkedServices.keepAdmin": "Google Keep kræver en godkendt opsætning fra Google Workspace-administrationen. Personlige Gmail-konti kan ikke forbinde den.",
   "linkedServices.notGranted": "Der blev ikke givet adgang til denne tjeneste. Forbind kontoen igen for at vælge dens tilladelser.",
   "linkedServices.notSupported": "Denne udbyder tilbyder ikke denne tjeneste.",
@@ -169,7 +170,7 @@
   "notifications.kind.pages.order.oversold": "Ordre {number} på {site} blev betalt uden lagerbeholdning",
   "notifications.kind.pages.order.paid": "Ny ordre {number} på {site}",
   "notifications.kind.pages.payment.duplicated": "Dobbeltbetaling på ordre {number} på {site}: den anden bliver refunderet",
-  "notifications.kind.pages.settings.changed": "{actor} har ændret en indstilling i Sytue Web",
+  "notifications.kind.pages.settings.changed": "{actor} har ændret en indstilling i Sytue Webs",
   "notifications.kind.pages.store.busy": "Webshoppen på {site} har for mange ordrer, der afventer betaling",
   "notifications.kind.pages.withdrawal.requested": "Der er anmodet om fortrydelse af ordre {number} på {site}",
   "notifications.kind.photos.album.added": "{actor} har tilføjet billeder til »{name}«",
@@ -301,6 +302,8 @@
   "shell.update.failedBody": "Prøv igen senere, eller hent den fra portalen.",
   "shell.update.install": "Opdater til version {version}",
   "shell.update.upToDate": "{app} er opdateret",
+  "shell.widgets.wake": "Opdater widgets, mens appen er lukket",
+  "shell.widgets.wakeHelp": "Når noget af dit ændrer sig, vækker Sytue appen med en tom notifikation fra Apple, så den kan opdatere sin widget. Apple ser hvilken app og hvornår, aldrig hvad der er ændret.",
   "ui.backToList": "Tilbage til listen",
   "ui.bulk.clear": "Ryd markering",
   "ui.bulk.region": "Handlinger for det valgte",
@@ -318,6 +321,8 @@
   "ui.review.edit": "Rediger",
   "ui.save": "Gem",
   "ui.selectRow": "Vælg række",
+  "ui.suiteClose": "Tilbage til appen",
+  "ui.suiteOpen": "Sytue: apps, søgning, notifikationer og konto",
   "ui.wizard.back": "Tilbage",
   "ui.wizard.cancel": "Annuller",
   "ui.wizard.goToStep": "Tilbage til trin {n}: ",
@@ -336,5 +341,7 @@
   "widgets.pending": "Afventende",
   "widgets.photos": "Billeder",
   "widgets.rows": "Rækker",
-  "widgets.storage": "Lagerplads"
+  "widgets.storage": "Lagerplads",
+  "widgets.updatedAgo": "Opdateret {time}",
+  "widgets.updatedAt": "Opdateret: {time}"
 }

@@ -65,6 +65,7 @@ export const ro: AppCatalog<typeof en> = {
   'inbox.markAll': 'Marcați-le pe toate ca citite',
   'inbox.loading': 'Se încarcă notificările…',
   'inbox.unreadDot': 'Necitită',
+  'inbox.markRead': 'Marchează ca citit',
   'inbox.errorTitle': 'Notificările nu au putut fi încărcate',
   'inbox.errorBody': 'Hubul nu răspunde în acest moment. Încercați din nou peste câteva secunde.',
   'inbox.retry': 'Încercați din nou',
@@ -703,6 +704,8 @@ export const ro: AppCatalog<typeof en> = {
     '{sources} nu au răspuns, așa că pot lipsi rezultate. Încercați din nou peste puțin timp.',
   'search.partialJoin': ' și ',
   'search.showing': 'Se afișează {count} din {total} rezultate.',
+  'search.loadMore': 'Încarcă mai multe rezultate',
+  'search.loadMoreFailed': 'Nu s-au putut încărca mai multe rezultate. Încearcă din nou.',
   'privacy.notice':
     'Nu vindem datele dumneavoastră și nu le partajăm cu terți. Nu le folosim pentru profilare, publicitate sau pentru a antrena ori îmbunătăți serviciile noastre sau ale altora. Sunt criptate în tranzit și în repaus și ies din infrastructura noastră europeană doar când este strict necesar pentru facturare și în integrările pe care le activați, unde terțul vă va cere aprobarea pentru datele pe care le va folosi.',
 };

@@ -1,9 +1,14 @@
 {
   "aiBatch.excludeOrg": "Exclure l’organisation du lot automatique de Sytue AI",
   "aiBatch.excludedHint": "L’organisation est exclue du lot automatique de Sytue AI. Les nouvelles photos ne sont pas traitées en arrière-plan pour les suggestions ou les ressemblances.",
+  "album.coverSet": "Couverture de l’album mise à jour",
+  "album.isCover": "C’est la couverture de l’album",
   "album.linkCopied": "Lien copié",
   "album.newLink": "Nouveau lien",
   "album.newLinkConfirm": "Créer un nouveau lien ? Le lien actuel cessera de fonctionner pour les personnes qui l'ont déjà.",
+  "album.rename": "Renommer",
+  "album.renamePrompt": "Nom de l’album",
+  "album.setCover": "Utiliser comme couverture de l’album",
   "album.share": "Partager",
   "album.shared": "Partagé",
   "album.unshare": "Arrêter le partage",
@@ -98,6 +103,7 @@
     "other": "{count} par date d’envoi"
   },
   "gallery.cancelSelection": "Quitter la sélection",
+  "gallery.clearSearch": "Effacer la recherche",
   "gallery.describeCapped": "Seules {count} sont décrites à la fois ; relancez pour le reste.",
   "gallery.describeNothing": "Les photos choisies ont déjà une description",
   "gallery.describeSelected": "Décrire avec Sytue AI",
@@ -106,7 +112,8 @@
   "gallery.describing": "Description de {done} sur {total}…",
   "gallery.downloadCapped": "Photos hors de ce lot : {count}.",
   "gallery.downloadSelected": "Télécharger",
-  "gallery.downloading": {
+  "gallery.downloading": "Demandes de téléchargement lancées : {count}. Consultez les téléchargements de votre navigateur.",
+  "gallery.downloadingNative": {
     "one": "Téléchargement de {count} photo…",
     "other": "Téléchargement de {count} photos…"
   },
@@ -114,6 +121,8 @@
   "gallery.empty.description": "Les photos de votre Sytue Drive apparaîtront ici, classées par date de prise de vue.",
   "gallery.empty.title": "Pas encore de photos",
   "gallery.favorite": "Ajouter aux favorites",
+  "gallery.favoriteFailed": "Photos qui n’ont pas pu être modifiées : {count}",
+  "gallery.favorited": "Ajoutées aux favorites : {count}",
   "gallery.likeTheseResults": "Et celles qui se ressemblent",
   "gallery.moreLikeThese": "Plus comme celles-ci",
   "gallery.newAlbum": "Nouvel album",
@@ -124,6 +133,8 @@
   },
   "gallery.newAlbumTitle": "Nouvel album",
   "gallery.noExifDate": "Sans date de prise de vue : classée par date d’envoi",
+  "gallery.noResults.description": "Essayez d’autres mots ou effacez la recherche pour voir toutes vos photos.",
+  "gallery.noResults.title": "Aucune photo ne correspond à « {query} »",
   "gallery.onlyImages": "Seules les images peuvent être ajoutées.",
   "gallery.open": "Ouvrir {name}",
   "gallery.openInEditor": "Modifier {name}",
@@ -152,6 +163,7 @@
     "other": "{count} photos mises à la corbeille"
   },
   "gallery.unfavorite": "Retirer des favorites",
+  "gallery.unfavorited": "Retirées des favorites : {count}",
   "gallery.unselectMonth": "Désélectionner le mois",
   "gallery.uploadFailed": "Impossible d’envoyer : {name}",
   "gallery.uploaded": {
@@ -198,6 +210,9 @@
   "viewer.askSend": "Demander",
   "viewer.canvasBackground": "Arrière-plan de la photo",
   "viewer.close": "Fermer",
+  "viewer.counter": "{index} / {total}",
+  "viewer.counterLabel": "Photo {index} sur {total}",
+  "viewer.counterMore": "{count}+",
   "viewer.delete": "Mettre à la corbeille",
   "viewer.deleteConfirm": "Mettre cette photo à la corbeille ? Le fichier reste dans Sytue Drive.",
   "viewer.describe": "Décrire avec Sytue AI",
@@ -237,6 +252,7 @@
   "viewer.saveDescription": "Enregistrer",
   "viewer.savingDescription": "Enregistrement…",
   "viewer.shortcuts": "Raccourcis : flèches pour changer de photo, espace pour le diaporama, I pour les informations, Z pour la taille réelle, Suppr pour la corbeille.",
+  "viewer.shortcutsJump": "Début et Fin vont à la première et à la dernière photo.",
   "viewer.similar": "Photos similaires",
   "viewer.slideshow": "Diaporama",
   "viewer.slideshowStop": "Arrêter le diaporama",

@@ -400,7 +400,38 @@ func (c *cuentaBarra) preferencias(e sesion.Estado) fyne.CanvasObject {
 		c.fila("account.color", c.color(e)),
 		c.fila("account.forma", c.forma(e)),
 		c.idioma(e))
+	if d := c.despertar(e); d != nil {
+		columna.Add(d)
+	}
 	return container.New(sangria{X: MargenPreferencias, Y: tema.Espacio(2)}, columna)
+}
+
+// despertar es «Actualizar los widgets con la app cerrada» (ADR 0039 y 0078, enmiendas
+// del 2026-11-06): una casilla, APAGADA por defecto, con su ayuda debajo, que dice qué ve
+// Apple. Solo en iOS con SYTUE_DESPERTAR_APPLE y un widget que publicar
+// (Suite.DespertarDisponible), y con sesión; nil si no. Es de las quince, como el tema:
+// lo que se elige aquí vale en las otras. No va en la web: ahí no hay widgets.
+func (c *cuentaBarra) despertar(e sesion.Estado) fyne.CanvasObject {
+	if c.s == nil || !e.Dentro() || !c.s.DespertarDisponible() {
+		return nil
+	}
+	var casilla *Eleccion
+	casilla = NuevaCasilla(c.t.T("shell.widgets.wake", nil), func(encender bool) {
+		go func() {
+			if err := c.s.PonerDespertar(encender); err != nil {
+				// No se ha guardado: la casilla vuelve a decir lo que vale de verdad.
+				slog.Warn("cuenta: no se ha podido cambiar el despertar de los widgets", "error", err)
+				fyne.Do(func() {
+					casilla.Marcada = c.s.DespertarEncendido()
+					casilla.Refresh()
+				})
+			}
+		}()
+	})
+	casilla.Marcada = c.s.DespertarEncendido()
+	ayuda := NuevoParrafo(c.t.T("shell.widgets.wakeHelp", nil), tema.TextoXS, Normal, "text-subtle",
+		tema.De(fyne.CurrentApp().Settings().ThemeVariant())).A(anchoPreferenciasCuenta)
+	return container.New(Columna{Hueco: tema.Espacio(1)}, casilla, ayuda)
 }
 
 // fila es `flex flex-wrap items-center justify-between gap-x-3 gap-y-2`: el rótulo a la

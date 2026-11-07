@@ -68,6 +68,7 @@
   "common.remove": "Noņemt",
   "common.retry": "Mēģināt vēlreiz",
   "common.save": "Saglabāt",
+  "day.noEvents": "Šajā dienā nav notikumu",
   "error.calendarsLoad": "Kalendārus neizdevās ielādēt.",
   "error.eventsLoad": "Notikumus neizdevās ielādēt.",
   "event.ai": "Aprakstiet notikumu",
@@ -145,6 +146,12 @@
   "grid.blockAria": "{title}, {time}",
   "grid.continued": "{title} (turpinājums)",
   "grid.createOn": "Izveidot notikumu {date}",
+  "grid.dayEvents": {
+    "zero": "{date}, {count} notikumu",
+    "one": "{date}, {count} notikums",
+    "other": "{date}, {count} notikumi"
+  },
+  "grid.daySelected": "{label}, atlasīts",
   "grid.loadError": "Kalendāru neizdevās ielādēt",
   "grid.loading": "Ielādē kalendāru",
   "grid.more": {
@@ -152,6 +159,8 @@
     "one": "+{count} vēl",
     "other": "+{count} vēl"
   },
+  "grid.showMonth": "Rādīt visu mēnesi",
+  "grid.showWeek": "Rādīt tikai šo nedēļu",
   "grid.snapAria": {
     "zero": "Vilkšanas solis: {count} minūtes. Nospiediet, lai mainītu.",
     "one": "Vilkšanas solis: {count} minūte. Nospiediet, lai mainītu.",
@@ -167,6 +176,13 @@
     "one": "{count} min",
     "other": "{count} min"
   },
+  "grid.todayLabel": "Šodien, {date}",
+  "grid.weekNumber": "{week}. nedēļa",
+  "guests.organizer": "Organizators",
+  "guests.status.accepted": "Piedalīsies",
+  "guests.status.declined": "Nepiedalīsies",
+  "guests.status.pending": "Gaida atbildi",
+  "guests.status.tentative": "Varbūt",
   "header.invitations": "Uzaicinājumi",
   "header.next": "Nākamais",
   "header.pending": {
@@ -205,6 +221,11 @@
   "nav.createEventOn": "Izveidot notikumu {date}",
   "nav.deleteSubscription": "Noņemt abonementu",
   "nav.manageResources": "Pārvaldīt telpas un aprīkojumu",
+  "nav.menuPending": {
+    "zero": "Atvērt izvēlni, {count} gaida",
+    "one": "Atvērt izvēlni, {count} gaida",
+    "other": "Atvērt izvēlni, {count} gaida"
+  },
   "nav.myCalendars": "Mani kalendāri",
   "nav.next": "Nākamais",
   "nav.nextMonth": "Nākamais mēnesis",
@@ -355,6 +376,7 @@
   "scope.following": "Uz šo un nākamajiem",
   "scope.legend": "Šis notikums atkārtojas. Uz kuriem notikumiem attiecas izmaiņas?",
   "scope.this": "Tikai uz šo notikumu",
+  "search.allCalendars": "Visi kalendāri",
   "search.error": "Meklēšanu neizdevās pabeigt.",
   "search.events": "Meklēt notikumus",
   "search.loadMore": "Ielādēt vairāk",
@@ -364,6 +386,12 @@
     "other": "Lai meklētu kalendāros, ievadiet vismaz {count} rakstzīmes."
   },
   "search.noResults": "Nav rezultātu vaicājumam “{term}”.",
+  "search.period": "Periods",
+  "search.period.any": "Jebkurā laikā",
+  "search.period.month": "Šomēnes",
+  "search.period.past": "Pagājušie",
+  "search.period.upcoming": "Gaidāmie",
+  "search.period.year": "Šogad",
   "search.placeholder": "Nosaukums, apraksts, vieta vai uzaicinātā persona…",
   "search.searching": "Meklē…",
   "search.series": "Sērija",
@@ -405,6 +433,14 @@
   "share.whoSeesNow": "Kas to redz tagad",
   "share.writerHint": "Papildus skatīšanai izveido, maina un dzēš notikumus šajā kalendārā.",
   "share.writerLabel": "Redzēt un rediģēt manus notikumus",
+  "shortcuts.group.actions": "Darbības",
+  "shortcuts.group.navigate": "Pārvietošanās",
+  "shortcuts.group.views": "Skati",
+  "shortcuts.help": "Rādīt šo sarakstu",
+  "shortcuts.next": "Nākamais periods",
+  "shortcuts.prev": "Iepriekšējais periods",
+  "shortcuts.title": "Īsinājumtaustiņi",
+  "shortcuts.today": "Pāriet uz šodienu",
   "subscribe.aria": "Abonēt kalendāru pēc URL",
   "subscribe.byUrl": "Abonēt pēc URL (.ics)",
   "subscribe.defaultName": "Abonēts kalendārs",

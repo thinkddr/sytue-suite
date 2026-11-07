@@ -138,6 +138,13 @@ func (c *Contexto) preguntarVersion(desde fyne.CanvasObject) func() {
 // abrirHistorial es el Dropdown de «Historial»: pide las versiones al abrir
 // (`loadVersions`) y, al elegir una, confirma antes de restaurar.
 func (c *Contexto) abrirHistorial(disparador *ChipCinta) {
+	c.abrirHistorialEn(disparador, disparador.mostrarMenu)
+}
+
+// abrirHistorialEn es el desplegable del historial colgado de cualquier disparador: el
+// chip «Historial» de Colaboración y el de guardado de la cabecera abren el MISMO
+// (`MenuHistorial` de HistorialVersiones.tsx). `mostrar` lo cuelga de él.
+func (c *Contexto) abrirHistorialEn(disparador fyne.CanvasObject, mostrar func(*ui.Menu)) {
 	if c.Versiones == nil {
 		return
 	}
@@ -160,7 +167,7 @@ func (c *Contexto) abrirHistorial(disparador *ChipCinta) {
 		m := ui.NuevoMenu(elems...)
 		m.AlInicio = true
 		m.Rotulo = c.Traducir("versions.history")
-		disparador.mostrarMenu(m)
+		mostrar(m)
 	})
 }
 

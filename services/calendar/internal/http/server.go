@@ -17,6 +17,7 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
+	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/services/calendar/internal/config"
 	"git.sytue.eu/sytue/one/services/calendar/internal/service"
 )
@@ -28,6 +29,9 @@ type Deps struct {
 	Verifier      *authn.Verifier
 	CalDAV        http.Handler
 	ReadyCheckers []httpx.Checker
+	// Hub recibe la señal de cambios de cada escritura (hubnotify.TrasEscribir), para
+	// los widgets nativos. nil: sin señal.
+	Hub *hubnotify.Client
 }
 
 // Registrar los verbos WebDAV en chi ANTES de montar cualquier router CalDAV
@@ -40,8 +44,11 @@ func NewRouter(d Deps) http.Handler {
 	httpx.MountHealth(r, d.Cfg.Version, 3*time.Second, d.ReadyCheckers...)
 
 	h := &Handlers{svc: d.Service, cfg: d.Cfg}
+	// La señal de cambios va en las TRES puertas que escriben: la REST, la de
+	// compatibilidad y CalDAV, que es por donde guarda la web.
+	cambios := d.Hub.TrasEscribir(nil, "calendar")
 	tenantAuth := func(next http.Handler) http.Handler {
-		return d.Verifier.RequireAuth(d.Verifier.RequireTenant(next))
+		return d.Verifier.RequireAuth(d.Verifier.RequireTenant(cambios(next)))
 	}
 	// ponytail: cubo en memoria, o sea POR RÉPLICA (el tope real se multiplica por
 	// el número de instancias). Si hiciera falta que fuera del servicio entero,
@@ -61,6 +68,7 @@ func NewRouter(d Deps) http.Handler {
 		// Alto a propósito: corta el bucle desbocado y el volcado de la agenda
 		// entera, no el uso normal.
 		api.Use(httpx.RateLimit(httpx.RateLimitConfig{Limiter: apiLimiter, KeyFunc: authn.RateKey}))
+		api.Use(cambios)
 
 		// Calendarios (colecciones).
 		// «Exportar tus datos»: la entrega de la agenda (platform/pkg/portabilidad).
@@ -147,7 +155,7 @@ func NewRouter(d Deps) http.Handler {
 	// el MISMO servicio y el MISMO middleware de auth que /api/v1 (ver
 	// handlers_compat.go). Prefijos /compat/google y /compat/graph.
 	mountCompat(r, &compatHandlers{svc: d.Service, cfg: d.Cfg}, func(next http.Handler) http.Handler {
-		return d.Verifier.RequireGoogleAPIs(googleScopesLectura, googleScopesEscritura)(d.Verifier.RequireTenant(next))
+		return d.Verifier.RequireGoogleAPIs(googleScopesLectura, googleScopesEscritura)(d.Verifier.RequireTenant(cambios(next)))
 	}, tenantAuth)
 
 	// CalDAV (RFC 4791) bajo el prefijo configurado (por defecto /dav),

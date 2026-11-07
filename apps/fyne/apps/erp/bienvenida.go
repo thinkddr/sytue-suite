@@ -276,7 +276,7 @@ func (b *Bienvenida) Objeto(v tema.Variante) fyne.CanvasObject {
 	}
 	add(b.areas(v, ancho))
 	o, alto := p.objeto()
-	return enPagina(o, alto, AnchoContenidoLista, MargenLista)
+	return enPagina(o, alto, AnchoContenidoLista)
 }
 
 // cabecera es el saludo con la cuenta de áreas y la frase, y los tres accesos.

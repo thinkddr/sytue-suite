@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/services/calendar/internal/domain"
 	"git.sytue.eu/sytue/one/services/calendar/internal/store"
 )
@@ -36,6 +37,8 @@ func (s *Service) ShareCalendar(ctx context.Context, calendarID uuid.UUID, owner
 	if err != nil {
 		return domain.CalendarShare{}, err
 	}
+	// El calendario aparece en el widget de quien lo recibe.
+	hubnotify.AvisarTambien(ctx, hubnotify.PorCorreo(email))
 	s.publish(ctx, "calendar.share.created", map[string]any{
 		"calendar_id": calendarID, "permission": perm,
 	})
@@ -50,6 +53,9 @@ func (s *Service) ListCalendarShares(ctx context.Context, calendarID uuid.UUID, 
 // RevokeCalendarShare revoca un share (corta el acceso del destinatario). Solo el
 // dueño.
 func (s *Service) RevokeCalendarShare(ctx context.Context, calendarID, shareID uuid.UUID, ownerSub string) error {
+	// Antes de revocar, que después ya no está entre quienes lo ven: desaparece de su
+	// widget.
+	s.store.AvisarQuienesVen(ctx, calendarID)
 	if err := s.store.RevokeCalendarShare(ctx, calendarID, shareID, ownerSub); err != nil {
 		return err
 	}

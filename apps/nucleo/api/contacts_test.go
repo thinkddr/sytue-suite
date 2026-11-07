@@ -6,6 +6,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -170,6 +171,48 @@ func TestLasRutasDeEtiquetasLibretasYCSVSonLasDelServicio(t *testing.T) {
 	}
 }
 
+// TestTirarYDeshacerEnLoteCuentanLoQueDiceElServicio: «Deshacer» es UNA petición, a la
+// ruta que monta services/contacts, y los dos recuentos salen del servicio, no de la
+// lista de UID (un UID en dos libretas cuenta dos; uno ajeno, ninguno).
+func TestTirarYDeshacerEnLoteCuentanLoQueDiceElServicio(t *testing.T) {
+	var vistas []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cuerpo, _ := io.ReadAll(r.Body)
+		vistas = append(vistas, r.Method+" "+r.URL.Path+" "+strings.TrimSpace(string(cuerpo)))
+		switch r.URL.Path {
+		case "/api/v1/contacts/batch/trash":
+			_, _ = io.WriteString(w, `{"trashed":3}`)
+		case "/api/v1/contacts/batch/restore":
+			_, _ = io.WriteString(w, `{"restored":2}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+	c, ctx := NewContacts(srv.URL, nil, nil), context.Background()
+	if n, err := c.BatchTrash(ctx, []string{"u1", "u2"}); err != nil || n != 3 {
+		t.Fatalf("tirados %d, %v; want 3", n, err)
+	}
+	if n, err := c.BatchRestore(ctx, []string{"u1", "u2"}); err != nil || n != 2 {
+		t.Fatalf("restaurados %d, %v; want 2", n, err)
+	}
+	quiero := []string{
+		`POST /api/v1/contacts/batch/trash {"uids":["u1","u2"]}`,
+		`POST /api/v1/contacts/batch/restore {"uids":["u1","u2"]}`,
+	}
+	if strings.Join(vistas, "|") != strings.Join(quiero, "|") {
+		t.Errorf("peticiones:\n%s\ny el servicio espera:\n%s", strings.Join(vistas, "\n"), strings.Join(quiero, "\n"))
+	}
+	rutas := webref.Read(t, "services/contacts/internal/http/server.go")
+	for _, ruta := range []string{
+		`api.Post("/contacts/batch/trash", h.BatchTrash)`, `api.Post("/contacts/batch/restore", h.BatchRestore)`,
+	} {
+		if !strings.Contains(rutas, ruta) {
+			t.Errorf("services/contacts ya no monta %s", ruta)
+		}
+	}
+}
+
 // TestLaFotoVaPorUIDYSinFotoNoEsUnError: GET, PUT y DELETE de /contacts/photo con el
 // UID limpio; un 404 es «no tiene foto», no un fallo.
 func TestLaFotoVaPorUIDYSinFotoNoEsUnError(t *testing.T) {
@@ -287,5 +330,33 @@ func TestImportarLaTarjetaEnteraYLaOrganizacion(t *testing.T) {
 	// El servicio acepta la tarjeta por el mismo alta.
 	if m := webref.Read(t, "services/contacts/internal/http/handlers.go"); !strings.Contains(m, `tipo == "text/vcard"`) {
 		t.Error("services/contacts ya no acepta text/vcard en el alta")
+	}
+}
+
+// TestBatchVCardEsUnaPeticionALaRutaDelServicio: la exportación de una selección pide
+// las tarjetas por id en UNA petición, a la ruta que monta services/contacts, y devuelve
+// el `.vcf` tal cual.
+func TestBatchVCardEsUnaPeticionALaRutaDelServicio(t *testing.T) {
+	var vistas []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cuerpo, _ := io.ReadAll(r.Body)
+		vistas = append(vistas, r.Method+" "+r.URL.Path+" "+r.Header.Get("Accept")+" "+strings.TrimSpace(string(cuerpo)))
+		w.Header().Set("Content-Type", "text/vcard")
+		_, _ = io.WriteString(w, "BEGIN:VCARD\r\nFN:Ana\r\nEND:VCARD\r\n")
+	}))
+	defer srv.Close()
+	vcf, err := NewContacts(srv.URL, nil, nil).BatchVCard(context.Background(), []string{"c1", "c2"})
+	if err != nil || string(vcf) != "BEGIN:VCARD\r\nFN:Ana\r\nEND:VCARD\r\n" {
+		t.Fatalf("BatchVCard = %q, %v", vcf, err)
+	}
+	if quiero := `POST /api/v1/contacts/batch/vcard text/vcard {"ids":["c1","c2"]}`; len(vistas) != 1 || vistas[0] != quiero {
+		t.Errorf("peticiones %q, want [%q]", vistas, quiero)
+	}
+	if !strings.Contains(webref.Read(t, "services/contacts/internal/http/server.go"), `api.Post("/contacts/batch/vcard", h.BatchVCard)`) {
+		t.Error("services/contacts ya no monta /contacts/batch/vcard")
+	}
+	if !strings.Contains(webref.Read(t, "services/contacts/internal/http/batch_photo.go"),
+		fmt.Sprintf("const maxBatchUIDs = %d", MaxLoteContactos)) {
+		t.Errorf("MaxLoteContactos (%d) ya no es el tope del lote del servicio", MaxLoteContactos)
 	}
 }

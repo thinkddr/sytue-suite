@@ -48,6 +48,7 @@ export const de: AppCatalog<typeof en> = {
   'common.actionFailed': 'Aktion konnte nicht abgeschlossen werden',
   'common.tryAgain': 'Bitte erneut versuchen.',
   'common.tryAgainSoon': 'Bitte in einigen Sekunden erneut versuchen.',
+  'common.undo': 'Rückgängig',
 
   // --- Lista de contactos -------------------------------------------------
   'list.region': 'Kontaktliste',
@@ -55,6 +56,8 @@ export const de: AppCatalog<typeof en> = {
   'list.search': 'Kontakte suchen',
   'list.selectAll': 'Alle sichtbaren Kontakte auswählen',
   'list.select': '{name} auswählen',
+  'list.star': '{name} markieren',
+  'list.unstar': 'Markierung von {name} entfernen',
   'list.starredTitle': 'Markiert',
   'list.reviewDuplicates': 'Duplikate prüfen ({count})',
   'list.count': { one: '{count} Kontakt', other: '{count} Kontakte' },
@@ -177,6 +180,11 @@ export const de: AppCatalog<typeof en> = {
   'trash.restoreFailed': 'Wiederherstellen fehlgeschlagen',
   'trash.purged': 'Kontakt endgültig gelöscht',
   'trash.purgeFailed': 'Löschen fehlgeschlagen',
+  'trash.undone': 'Aus dem Papierkorb wiederhergestellt',
+  'trash.undoFailed': 'Einige Kontakte konnten nicht wiederhergestellt werden',
+  'trash.undoFailedHint': 'Sie liegen weiterhin im Papierkorb.',
+  'trash.undoFailedOne': 'Der Kontakt konnte nicht wiederhergestellt werden',
+  'trash.undoFailedOneHint': 'Wenn er nicht im Papierkorb liegt, wurde er endgültig gelöscht.',
 
   // --- Acciones en lote ---------------------------------------------------
   'batch.region': 'Aktionen für die Auswahl',
@@ -197,6 +205,10 @@ export const de: AppCatalog<typeof en> = {
     one: '{count} Kontakt in den Papierkorb verschoben',
     other: '{count} Kontakte in den Papierkorb verschoben',
   },
+  'batch.emailAll': 'E-Mail an alle',
+  'batch.exportVcf': 'Exportieren (.vcf)',
+  'batch.noEmail': 'Keiner von ihnen hat eine E-Mail-Adresse',
+  'batch.emailCapped': 'Nur die ersten {count} Adressen werden übernommen',
 
   // --- Ficha del contacto -------------------------------------------------
   'detail.emptyTitle': 'Kontakt auswählen',
@@ -208,6 +220,9 @@ export const de: AppCatalog<typeof en> = {
   'detail.copyEmail': 'E-Mail kopieren',
   'detail.emailCopied': 'E-Mail kopiert',
   'detail.copyFailed': 'Kopieren nicht möglich',
+  'detail.copyValue': '{value} kopieren',
+  'detail.phoneCopied': 'Telefonnummer kopiert',
+  'detail.addressCopied': 'Adresse kopiert',
   'detail.export': 'Exportieren',
   'detail.merge': 'Zusammenführen mit…',
   'detail.moreActions': 'Weitere Aktionen',

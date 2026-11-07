@@ -18,6 +18,8 @@ export const sk: Catalog = {
   'ui.openNav': 'Otvoriť navigáciu',
   'ui.closeNav': 'Zavrieť navigáciu',
   'ui.backToList': 'Späť na zoznam',
+  'ui.suiteOpen': 'Sytue: aplikácie, vyhľadávanie, oznámenia a účet',
+  'ui.suiteClose': 'Späť do aplikácie',
   'ui.noResults': 'Žiadne výsledky.',
   'ui.meter.almostFull': 'takmer plné',
   'ui.meter.full': 'plné',
@@ -60,6 +62,9 @@ export const sk: Catalog = {
   'shell.lock.reasonNotebook': 'otvoriť váš zašifrovaný zošit',
   'shell.lock.faceIdUsage':
     'Sytue používa Face ID na odomknutie vašej relácie pri otvorení aplikácie.',
+  'shell.widgets.wake': 'Aktualizovať widgety, aj keď je aplikácia zatvorená',
+  'shell.widgets.wakeHelp':
+    'Keď sa u vás niečo zmení, Sytue prebudí aplikáciu prázdnym upozornením cez Apple, aby obnovila svoj widget. Apple vidí, o ktorú aplikáciu ide a kedy, nikdy nie, čo sa zmenilo.',
   'shell.call.microphoneUsage':
     'Sytue Rooms používa mikrofón len počas hovoru a len keď ho zapnete.',
   'shell.call.cameraUsage': 'Sytue Rooms používa kameru len počas hovoru a len keď ju zapnete.',
@@ -187,7 +192,7 @@ export const sk: Catalog = {
     'Doména {domain} na webe {site} nefunguje: skontrolujte jej nastavenia',
   'notifications.kind.pages.erp.failed':
     'Objednávka {number} z webu {site} nedorazila do Sytue ERP',
-  'notifications.kind.pages.settings.changed': 'Zmena nastavenia v Sytue Web: {actor}',
+  'notifications.kind.pages.settings.changed': 'Zmena nastavenia v Sytue Webs: {actor}',
   'notifications.kind.pages.export.ready': 'Váš export webu {site} je hotový',
   'notifications.kind.pages.store.busy':
     'Obchod na webe {site} má príliš veľa objednávok čakajúcich na platbu',
@@ -368,6 +373,8 @@ export const sk: Catalog = {
   'widgets.compose': 'Napísať',
   'widgets.storage': 'Úložisko',
   'widgets.create': 'Vytvoriť udalosť',
+  'widgets.updatedAgo': 'Aktualizované {time}',
+  'widgets.updatedAt': 'Aktualizované: {time}',
 
   'linkedServices.services': 'Služby',
   'linkedServices.changed':
@@ -380,6 +387,7 @@ export const sk: Catalog = {
   'linkedServices.notGranted':
     'Prístup k tejto službe nebol udelený. Pripojte účet znova a vyberte jeho povolenia.',
   'linkedServices.connected': 'Pripojené služby',
+  'linkedServices.exists': 'Tento účet už bol pripojený a je otvorený.',
   'linkedServices.providerData': 'Zmeny sa ukladajú u poskytovateľa.',
   'linkedServices.writeUnknown':
     'Poskytovateľ nepotvrdil uloženie. Pred ďalším pokusom obnovte zobrazenie a overte stav.',

@@ -66,6 +66,7 @@
   "common.remove": "Fjern",
   "common.retry": "Prøv igjen",
   "common.save": "Lagre",
+  "day.noEvents": "Ingen hendelser denne dagen",
   "error.calendarsLoad": "Kalenderne kunne ikke lastes.",
   "error.eventsLoad": "Hendelsene kunne ikke lastes.",
   "event.ai": "Beskriv hendelsen",
@@ -142,12 +143,19 @@
   "grid.blockAria": "{title}, {time}",
   "grid.continued": "{title} (fortsatt)",
   "grid.createOn": "Opprett en hendelse {date}",
+  "grid.dayEvents": {
+    "one": "{date}, {count} hendelse",
+    "other": "{date}, {count} hendelser"
+  },
+  "grid.daySelected": "{label}, valgt",
   "grid.loadError": "Kalenderen kunne ikke lastes",
   "grid.loading": "Laster kalenderen",
   "grid.more": {
     "one": "+{count} til",
     "other": "+{count} til"
   },
+  "grid.showMonth": "Vis hele måneden",
+  "grid.showWeek": "Vis bare denne uken",
   "grid.snapAria": {
     "one": "Fest dra til {count} minutt. Trykk for å endre.",
     "other": "Fest dra til {count} minutter. Trykk for å endre."
@@ -160,6 +168,13 @@
     "one": "{count} min",
     "other": "{count} min"
   },
+  "grid.todayLabel": "I dag, {date}",
+  "grid.weekNumber": "Uke {week}",
+  "guests.organizer": "Arrangør",
+  "guests.status.accepted": "Deltar",
+  "guests.status.declined": "Deltar ikke",
+  "guests.status.pending": "Venter på svar",
+  "guests.status.tentative": "Kanskje",
   "header.invitations": "Invitasjoner",
   "header.next": "Neste",
   "header.pending": {
@@ -197,6 +212,10 @@
   "nav.createEventOn": "Opprett hendelse {date}",
   "nav.deleteSubscription": "Fjern abonnement",
   "nav.manageResources": "Administrer rom og utstyr",
+  "nav.menuPending": {
+    "one": "Åpne menyen, {count} venter",
+    "other": "Åpne menyen, {count} venter"
+  },
   "nav.myCalendars": "Mine kalendere",
   "nav.next": "Neste",
   "nav.nextMonth": "Neste måned",
@@ -341,6 +360,7 @@
   "scope.following": "Denne og påfølgende",
   "scope.legend": "Denne hendelsen gjentas. Hvilke hendelser gjelder endringen?",
   "scope.this": "Bare denne hendelsen",
+  "search.allCalendars": "Alle kalendere",
   "search.error": "Søket kunne ikke fullføres.",
   "search.events": "Søk i hendelser",
   "search.loadMore": "Last inn flere",
@@ -349,6 +369,12 @@
     "other": "Skriv minst {count} tegn for å søke i kalenderne dine."
   },
   "search.noResults": "Ingen resultater for «{term}».",
+  "search.period": "Periode",
+  "search.period.any": "Når som helst",
+  "search.period.month": "Denne måneden",
+  "search.period.past": "Tidligere",
+  "search.period.upcoming": "Kommende",
+  "search.period.year": "I år",
   "search.placeholder": "Tittel, beskrivelse, sted eller gjest…",
   "search.searching": "Søker…",
   "search.series": "Serie",
@@ -390,6 +416,14 @@
   "share.whoSeesNow": "Hvem som ser den nå",
   "share.writerHint": "I tillegg til å se dem oppretter, endrer og sletter personen hendelser i kalenderen.",
   "share.writerLabel": "Se og redigere hendelsene mine",
+  "shortcuts.group.actions": "Handlinger",
+  "shortcuts.group.navigate": "Naviger",
+  "shortcuts.group.views": "Visninger",
+  "shortcuts.help": "Vis denne listen",
+  "shortcuts.next": "Neste periode",
+  "shortcuts.prev": "Forrige periode",
+  "shortcuts.title": "Hurtigtaster",
+  "shortcuts.today": "Gå til i dag",
   "subscribe.aria": "Abonner på en kalender via URL",
   "subscribe.byUrl": "Abonner via URL (.ics)",
   "subscribe.defaultName": "Abonnert kalender",

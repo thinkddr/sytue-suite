@@ -19,6 +19,8 @@ export const de: Catalog = {
   'ui.openNav': 'Navigation öffnen',
   'ui.closeNav': 'Navigation schließen',
   'ui.backToList': 'Zurück zur Liste',
+  'ui.suiteOpen': 'Sytue: Apps, Suche, Benachrichtigungen und Konto',
+  'ui.suiteClose': 'Zurück zur App',
   'ui.noResults': 'Keine Ergebnisse.',
 
   'ui.meter.almostFull': 'fast voll',
@@ -67,6 +69,9 @@ export const de: Catalog = {
   'shell.lock.reasonNotebook': 'dein verschlüsseltes Notizbuch öffnen',
   'shell.lock.faceIdUsage':
     'Sytue verwendet Face ID, um deine Sitzung beim Öffnen der App zu entsperren.',
+  'shell.widgets.wake': 'Widgets bei geschlossener App aktualisieren',
+  'shell.widgets.wakeHelp':
+    'Wenn sich bei dir etwas ändert, weckt Sytue die App mit einer leeren Mitteilung über Apple, damit sie ihr Widget aktualisiert. Apple sieht, welche App und wann, aber nie, was sich geändert hat.',
   'shell.call.microphoneUsage':
     'Sytue Rooms verwendet das Mikrofon nur während eines Anrufs und nur, wenn du es einschaltest.',
   'shell.call.cameraUsage':
@@ -187,7 +192,7 @@ export const de: Catalog = {
   'notifications.kind.pages.erp.failed':
     'Bestellung {number} von {site} ist nicht bei Sytue ERP angekommen',
   'notifications.kind.pages.settings.changed':
-    '{actor} hat eine Einstellung von Sytue Web geändert',
+    '{actor} hat eine Einstellung von Sytue Webs geändert',
   'notifications.kind.pages.export.ready': 'Ihr Export von {site} ist fertig',
   'notifications.kind.pages.store.busy':
     'Der Shop auf {site} hat zu viele Bestellungen, die auf Zahlung warten',
@@ -379,6 +384,8 @@ export const de: Catalog = {
   'widgets.compose': 'Verfassen',
   'widgets.storage': 'Speicher',
   'widgets.create': 'Termin erstellen',
+  'widgets.updatedAgo': 'Aktualisiert {time}',
+  'widgets.updatedAt': 'Aktualisiert: {time}',
 
   'linkedServices.services': 'Dienste',
   'linkedServices.changed':
@@ -391,6 +398,7 @@ export const de: Catalog = {
   'linkedServices.notGranted':
     'Der Zugriff auf diesen Dienst wurde nicht gewährt. Verbinde das Konto erneut, um seine Berechtigungen auszuwählen.',
   'linkedServices.connected': 'Verbundene Dienste',
+  'linkedServices.exists': 'Dieses Konto war bereits verbunden und ist jetzt geöffnet.',
   'linkedServices.providerData': 'Änderungen werden bei deinem Anbieter gespeichert.',
   'linkedServices.writeUnknown':
     'Der Anbieter hat das Speichern nicht bestätigt. Aktualisiere die Ansicht und prüfe den Stand, bevor du es erneut versuchst.',

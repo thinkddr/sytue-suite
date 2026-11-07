@@ -55,7 +55,22 @@ export {
   hayDesplazamientoVerticalPrevio,
 } from './lib/usePullToRefresh.js';
 export type { EstadoRefrescoTactil, OpcionesRefrescoTactil } from './lib/usePullToRefresh.js';
-export { useEnHoja, CONSULTA_HOJA } from './lib/useEnHoja.js';
+export {
+  useEnHoja,
+  CONSULTA_HOJA,
+  useConsulta,
+  useEstrecha,
+  CONSULTA_ESTRECHA,
+} from './lib/useEnHoja.js';
+// Cuándo un arrastre horizontal pasa a lo siguiente (Photos, Calendar). Pareja en Fyne.
+export {
+  decidirDeslizamiento,
+  RECORRIDO_MIN,
+  FRACCION_ANCHO,
+  VELOCIDAD_RAPIDA,
+  RECORRIDO_RAPIDO,
+  DOMINIO_HORIZONTAL,
+} from './lib/deslizar.js';
 // La fila de barra que en móvil se desplaza en vez de envolver, y el aviso de
 // que queda contenido. Lo usan las barras de toda la suite; ver el módulo para
 // por qué va siempre acompañado de `data-scroll-x`.
@@ -136,6 +151,7 @@ export {
   CATALOGO,
   WORKHUB,
   appForKey,
+  nombreCorto,
   appsPresentables,
   hrefDe,
   puedeAdministrar,
@@ -278,7 +294,7 @@ export { EmptyState } from './components/EmptyState.js';
 export type { EmptyStateProps } from './components/EmptyState.js';
 export { PaginaNoEncontrada } from './components/PaginaNoEncontrada.js';
 export type { PaginaNoEncontradaProps } from './components/PaginaNoEncontrada.js';
-export { ToastProvider, useToast } from './components/Toast.js';
+export { DURACION_DESHACER, ToastProvider, useToast } from './components/Toast.js';
 export type { ToastInput, ToastTone } from './components/Toast.js';
 
 // Configuración guiada (asistentes paso a paso + páginas de ajustes).
@@ -316,7 +332,19 @@ export type {
   SidebarActionProps,
 } from './components/Sidebar.js';
 export { TopBar, TopBarButton } from './components/TopBar.js';
-export type { TopBarProps, TopBarButtonProps } from './components/TopBar.js';
+export type { TopBarProps, TopBarButtonProps, TopBarMovil } from './components/TopBar.js';
+export {
+  BarraMovil,
+  BarraUnicaContext,
+  SinBarraUnica,
+  useBarraUnica,
+} from './components/BarraMovil.js';
+export type {
+  BarraMovilProps,
+  BarraUnica,
+  DestinosBarra,
+  MenuBarraMovil,
+} from './components/BarraMovil.js';
 export { AppGrid } from './components/AppGrid.js';
 export type { AppGridProps } from './components/AppGrid.js';
 export { AppShell } from './components/AppShell.js';

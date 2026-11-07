@@ -65,6 +65,7 @@ export const pt: AppCatalog<typeof en> = {
   'inbox.markAll': 'Marcar todas como lidas',
   'inbox.loading': 'A carregar notificações…',
   'inbox.unreadDot': 'Por ler',
+  'inbox.markRead': 'Marcar como lido',
   'inbox.errorTitle': 'Não foi possível carregar as notificações',
   'inbox.errorBody':
     'O Hub não está a responder neste momento. Tente novamente dentro de alguns segundos.',
@@ -704,6 +705,8 @@ export const pt: AppCatalog<typeof en> = {
     '{sources} não responderam, por isso podem faltar resultados. Tente novamente daqui a pouco.',
   'search.partialJoin': ' e ',
   'search.showing': 'A mostrar {count} de {total} resultados.',
+  'search.loadMore': 'Carregar mais resultados',
+  'search.loadMoreFailed': 'Não foi possível carregar mais resultados. Tente novamente.',
   'privacy.notice':
     'Não vendemos os seus dados nem os partilhamos com terceiros. Não os usamos para definir perfis, para publicidade, nem para treinar ou melhorar os nossos serviços ou os de outros. São cifrados em trânsito e em repouso, e só saem da nossa infraestrutura europeia quando é estritamente necessário para faturar e nas integrações que ativar, em que o terceiro pedirá a sua autorização para os dados que vai usar.',
 };

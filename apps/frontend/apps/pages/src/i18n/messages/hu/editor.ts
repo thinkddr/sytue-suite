@@ -17,10 +17,10 @@ export const editor = {
   'editor.bases.desc': 'Egy nézet rekordjai a jelenlegi állapotukban',
   'editor.bases.title': 'Táblázat a Sytue Basesből',
   'editor.bases.prompt':
-    'Illessze be a Sytue Web számára engedélyezett, csak olvasható kapcsolat tokenjét. A nézet adatai a webhely tartalmává válnak, és a közzététel után nyilvánosak lesznek.',
+    'Illessze be a Sytue Webs számára engedélyezett, csak olvasható kapcsolat tokenjét. A nézet adatai a webhely tartalmává válnak, és a közzététel után nyilvánosak lesznek.',
   'editor.bases.confirm': 'Nézet áthozása',
   'editor.bases.invalid':
-    'Ez a kapcsolat nem érvényes a Sytue Webhez: lehet, hogy visszavonták, lejárt, vagy más terméknek, illetve szervezetnek engedélyezték.',
+    'Ez a kapcsolat nem érvényes a Sytue Webshez: lehet, hogy visszavonták, lejárt, vagy más terméknek, illetve szervezetnek engedélyezték.',
   'editor.bases.large':
     'A nézet nem fér el a webhely táblázatában (legfeljebb 50 sor és 8 oszlop). Szűkítse le a Sytue Basesben.',
   'editor.bases.forbidden':

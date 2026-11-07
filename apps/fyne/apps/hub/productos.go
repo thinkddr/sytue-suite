@@ -50,7 +50,7 @@ var Productos = []Producto{
 	{Marca: iconos.Rooms, Nombre: "Sytue Rooms"},
 	{Marca: iconos.Cast, Nombre: "Sytue Cast"},
 	{Marca: iconos.ERP, Nombre: "Sytue ERP"},
-	{Marca: iconos.Pages, Nombre: "Sytue Web"},
+	{Marca: iconos.Pages, Nombre: "Sytue Webs"},
 	{Marca: iconos.Bases, Nombre: "Sytue Bases"},
 	{Marca: iconos.Cloud, Nombre: "Sytue DevX"},
 	{Marca: iconos.Console, Nombre: "Sytue Admin"},

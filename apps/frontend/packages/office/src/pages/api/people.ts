@@ -13,6 +13,7 @@
  *       404 si no existe (o es de otra organización: no se distinguen).
  */
 import type { APIRoute } from 'astro';
+import { respuestaAgenda } from '@sytue/auth/server';
 import { agenda, resolverPersona } from '../../lib/directorio';
 import { json } from '../../lib/docsProxy';
 
@@ -29,8 +30,5 @@ export const GET: APIRoute = async (ctx) => {
       ...(persona.name ? { name: persona.name } : {}),
     });
   }
-  const personas = await agenda(ctx);
-  return json({
-    people: personas.map(({ email, name }) => ({ email, ...(name ? { name } : {}) })),
-  });
+  return respuestaAgenda(ctx, agenda);
 };

@@ -396,6 +396,9 @@ type Contexto struct {
 	Titulo string
 	// Guardado es lo que anuncia el chip de la cabecera.
 	Guardado Guardado
+	// GuardarYa guarda lo pendiente sin esperar (el `saveNow` de la web): el chip de la
+	// cabecera lo llama en error para reintentar. nil: el chip en error no se pulsa.
+	GuardarYa func()
 	// Estado es cuál de los seis estados pinta la pantalla.
 	Estado Estado
 	// SoloLectura lo enciende el cromo cuando el lienzo NO entendió el documento, y
@@ -477,6 +480,13 @@ type Contexto struct {
 	// GuardarVersion guarda una versión con esa etiqueta, que puede ir vacía. La
 	// pregunta —opcional, como en la web— la hace la cinta (`preguntarVersion`).
 	GuardarVersion func(etiqueta string)
+	// HacerCopia es «Hacer una copia» del menú Archivo: guarda lo pendiente, crea la copia
+	// en el servicio y la abre. nil: la entrada no sale (un fichero del disco no tiene de
+	// qué hacerse copia en el servicio). `listo` se llama al acabar, salga o no.
+	HacerCopia func(listo func())
+	// Copiando: hay una copia en curso y la entrada sale inerte, para que dos pulsaciones
+	// no creen dos copias (`copiando` de Ribbon.tsx). Lo lleva `copiar`.
+	Copiando bool
 	// GuardarEnDrive devuelve los cambios al fichero de Drive del que salió el
 	// documento; nil si no salió de ninguno, y entonces la entrada no se enseña.
 	GuardarEnDrive func()

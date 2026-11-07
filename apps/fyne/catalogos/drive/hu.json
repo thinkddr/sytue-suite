@@ -4,6 +4,8 @@
   "action.classified": "Besorolás · {name}",
   "action.classify": "Besorolás",
   "action.copy": "Másolat készítése",
+  "action.copyLink": "Hivatkozás másolása",
+  "action.copyLinkFailed": "A hivatkozást nem sikerült kimásolni.",
   "action.delete": "Áthelyezés a kukába",
   "action.desktopBody": "Ha még nincs telepítve, letöltheti.",
   "action.desktopCta": "Letöltések megtekintése",
@@ -12,6 +14,7 @@
   "action.downloadName": "{name} letöltése",
   "action.downloadZip": "Letöltés (ZIP)",
   "action.editorFailed": "A szerkesztő nem tudta megnyitni ezt a fájlt.",
+  "action.linkCopied": "A hivatkozás kimásolva. Csak azoknak nyílik meg, akiknek már van hozzáférésük.",
   "action.mailFailed": "Az e-mail-szerkesztőt nem sikerült megnyitni",
   "action.menu": "Műveletek: {name}",
   "action.more": "További műveletek",
@@ -81,6 +84,14 @@
   "files.batch.moveTitle": {
     "one": "1 elem áthelyezése",
     "other": "{count} elem áthelyezése"
+  },
+  "files.batch.restorePartial": {
+    "one": "1 elemet nem sikerült visszaállítani, továbbra is a kukában van.",
+    "other": "{count} elemet nem sikerült visszaállítani, továbbra is a kukában vannak."
+  },
+  "files.batch.restored": {
+    "one": "1 elem visszaállítva.",
+    "other": "{count} elem visszaállítva."
   },
   "files.batch.trashBody": {
     "one": "1 elem a kukába kerül. Onnan visszaállíthatja.",
@@ -555,6 +566,17 @@
     "other": "{count} fájl feltöltve."
   },
   "team.upload.partial": "{uploaded}/{count} feltöltve.",
+  "trash.emptiedAll": "A kuka kiürítve.",
+  "trash.emptyAll": "Kuka ürítése",
+  "trash.emptyAllBody": {
+    "one": "A kukában lévő elem a verzióelőzményekkel együtt véglegesen törlődik. Utána nincs mód a visszaszerzésére.",
+    "other": "A kukában lévő {count} elem a verzióelőzményekkel együtt véglegesen törlődik. Utána nincs mód a visszaszerzésükre."
+  },
+  "trash.emptyAllPartial": {
+    "one": "1 elemet nem sikerült törölni, továbbra is a kukában van.",
+    "other": "{count} elemet nem sikerült törölni, továbbra is a kukában vannak."
+  },
+  "trash.emptyAllTitle": "Kiüríti a kukát?",
   "trash.emptyBody": "A törölt fájlok és mappák itt jelennek meg, és visszaállíthatja őket.",
   "trash.emptyTitle": "A kuka üres",
   "trash.errorTitle": "A kukát nem sikerült betölteni",

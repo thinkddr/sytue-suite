@@ -44,7 +44,7 @@ func generarComercio(destino Destino, sitio *ir.Sitio, productos []domain.Produc
 		return map[string][]byte{
 			"README.md":                []byte(fmt.Sprintf("# %s para Shopware\n\nImporta `products.csv` desde Administración > Catálogo. El checkout lo gestiona Shopware.\n", nombre)),
 			"composer.json":            []byte(fmt.Sprintf("{\n  \"name\": \"sytue/pages-shopware\",\n  \"require\": {\"shopware/core\": %q}\n}\n", v)),
-			"src/Resources/theme.json": []byte("{\n  \"name\": \"Sytue Web\",\n  \"author\": \"Sytue\",\n  \"views\": [\"@Storefront\", \"@Plugins\", \"@SytuePages\"]\n}\n"),
+			"src/Resources/theme.json": []byte("{\n  \"name\": \"Sytue Webs\",\n  \"author\": \"Sytue\",\n  \"views\": [\"@Storefront\", \"@Plugins\", \"@SytuePages\"]\n}\n"),
 			"src/Resources/views/storefront/page/content/index.html.twig": []byte(fmt.Sprintf("{%% sw_extends '@Storefront/storefront/page/content/index.html.twig' %%}\n{%% block base_main %%}<main><h1>%s</h1></main>{%% endblock %%}\n", escaparTwig(nombre))),
 			"src/Resources/public/plugin.png":                             icono,
 			"products.csv":                                                catalogo,
@@ -55,14 +55,14 @@ func generarComercio(destino Destino, sitio *ir.Sitio, productos []domain.Produc
 			"README.md":                           []byte(fmt.Sprintf("# %s para Magento\n\nImporta `products.csv` desde System > Import. El checkout lo gestiona Magento.\n", nombre)),
 			"composer.json":                       []byte(fmt.Sprintf("{\n  \"name\": \"sytue/pages-magento\",\n  \"require\": {\"magento/framework\": %q}\n}\n", v)),
 			"registration.php":                    []byte("<?php\nuse Magento\\Framework\\Component\\ComponentRegistrar;\nComponentRegistrar::register(ComponentRegistrar::THEME, 'frontend/Sytue/pages', __DIR__);\n"),
-			"theme.xml":                           []byte("<theme xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"urn:magento:framework:Config/etc/theme.xsd\"><title>Sytue Web</title><parent>Magento/blank</parent></theme>\n"),
+			"theme.xml":                           []byte("<theme xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"urn:magento:framework:Config/etc/theme.xsd\"><title>Sytue Webs</title><parent>Magento/blank</parent></theme>\n"),
 			"Magento_Theme/layout/default.xml":    []byte("<page xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"urn:magento:framework:View/Layout/etc/page_configuration.xsd\"><body><referenceContainer name=\"content\"><block class=\"Magento\\Framework\\View\\Element\\Template\" name=\"sytue.pages\" template=\"Magento_Theme::pages.phtml\"/></referenceContainer></body></page>\n"),
 			"Magento_Theme/templates/pages.phtml": []byte(fmt.Sprintf("<main><h1>%s</h1></main>\n", escaparHTML(nombre))),
 			"products.csv":                        catalogo,
 		}, nil
 	case DestinoBigCommerce:
-		config, _ := json.MarshalIndent(map[string]any{"name": "Sytue Web", "version": "1.0.0", "meta": map[string]string{"author_name": "Sytue"}}, "", "  ")
-		schema, _ := json.MarshalIndent([]map[string]any{{"name": "Sytue Web", "settings": []any{}}}, "", "  ")
+		config, _ := json.MarshalIndent(map[string]any{"name": "Sytue Webs", "version": "1.0.0", "meta": map[string]string{"author_name": "Sytue"}}, "", "  ")
+		schema, _ := json.MarshalIndent([]map[string]any{{"name": "Sytue Webs", "settings": []any{}}}, "", "  ")
 		return map[string][]byte{
 			"README.md":                 []byte(fmt.Sprintf("# %s para BigCommerce\n\nCarga `products.csv` en Products > Import. El checkout lo gestiona BigCommerce.\n", nombre)),
 			"config.json":               append(config, '\n'),

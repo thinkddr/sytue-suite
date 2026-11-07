@@ -4,6 +4,7 @@
  *
  * POST /api/create  { kind: 'document'|'spreadsheet'|'presentation', title? }
  *                    { template: 'carta'|…|'org:<id>', template_version?, title? }
+ *                    { copy_of: '<id>', kind, title }   («Hacer una copia»)
  *
  * Crea un documento vacio en el servicio Go propio (docs.sytue.eu) usando el SDK
  * DocsClient (@sytue/api-clients) con el access token de la sesion. Devuelve el id
@@ -43,6 +44,7 @@ export const POST: APIRoute = async (ctx) => {
     template_version?: unknown;
     theme?: unknown;
     brand_version?: unknown;
+    copy_of?: unknown;
   };
   try {
     body = (await ctx.request.json()) as typeof body;
@@ -68,9 +70,15 @@ export const POST: APIRoute = async (ctx) => {
       ? body.brand_version
       : 0;
 
+  // «Hacer una copia»: el id del original. Solo un UUID: es un segmento que el servicio
+  // resuelve, y aquí no se le deja pasar nada más.
+  const copyOf = typeof body.copy_of === 'string' && esUuid(body.copy_of) ? body.copy_of : '';
+  if (body.copy_of !== undefined && !copyOf) return json({ error: 'invalid_copy_of' }, 400);
+  if (copyOf && template) return json({ error: 'invalid_body' }, 400);
+
   const rawTitle = typeof body.title === 'string' ? body.title.trim() : '';
   // Sin título, el de la plantilla (lo decide el servicio, ya traducido).
-  const title = rawTitle || (template ? '' : DEFAULT_TITLE[kind]);
+  const title = rawTitle || (template || copyOf ? '' : DEFAULT_TITLE[kind]);
 
   const client = new DocsClient({
     baseUrl: docsBaseUrl(),
@@ -89,7 +97,9 @@ export const POST: APIRoute = async (ctx) => {
             ...(theme ? { theme } : {}),
             ...(brandVersion > 0 ? { brandVersion } : {}),
           }
-        : { kind, title },
+        : copyOf
+          ? { kind, title, copyOf }
+          : { kind, title },
     );
     return json({ id: doc.id, title: doc.title, kind: doc.kind }, 201);
   } catch (e) {
@@ -104,6 +114,7 @@ export const POST: APIRoute = async (ctx) => {
     console.error('[docs] /api/create falló', {
       kind,
       template,
+      copyOf,
       title,
       error: e instanceof Error ? e.message : String(e),
     });

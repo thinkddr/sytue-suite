@@ -191,18 +191,9 @@ func run() error {
 		logger.Info("web push deshabilitado (sin SYTUE_VAPID_PUBLIC/PRIVATE)")
 	}
 
-	// APNs: la app nativa de iOS solo se puede despertar por Apple, así que el aviso
-	// que sale es VACÍO (ver service/apns.go). Sin credenciales queda deshabilitado.
-	apnsSender, err := service.NewAPNSSender(cfg)
-	if err != nil {
-		return fmt.Errorf("apns: %w", err)
-	}
-	if apnsSender != nil {
-		svc.SetAPNSSender(apnsSender)
-		logger.Info("aviso a iOS habilitado (APNs, solo despertar)")
-	} else {
-		logger.Info("aviso a iOS deshabilitado (sin SYTUE_APNS_*)")
-	}
+	// iOS se despierta desde el Hub, que guarda el registro único de aparatos y las
+	// credenciales de Apple (ADR 0039, enmienda del 2026-11-06): Rooms solo le dice a
+	// quién (service/push.go, despertarIOS).
 
 	if cfg.HubBaseURL != "" && cfg.HubInternalSecret != "" {
 		logger.Info("notificaciones a Sytue Hub habilitadas", "hub_url", cfg.HubBaseURL)

@@ -8,7 +8,6 @@ import (
 	"image"
 	"image/color"
 	"strconv"
-	"sync"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -21,7 +20,6 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/certificados"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
-	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
 /*
@@ -49,13 +47,6 @@ type TraductorVars = func(clave string, vars i18n.Vars) string
 
 // Pantalla es la vista completa de un PDF abierto.
 type Pantalla struct {
-	Widget         widgets.Source
-	widgetMu       sync.Mutex
-	widgetPending  *int64
-	widgetFiles    *int64
-	widgetFirmas   []widgets.Item
-	widgetReciente []widgets.Item
-
 	t     Traductor
 	tv    TraductorVars
 	barra *Barra

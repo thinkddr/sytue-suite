@@ -29,6 +29,15 @@ export const nb: AppCatalog<typeof en> = {
   'folder.junk': 'Søppelpost',
   'folder.archive': 'Arkiv',
   'nav.compose': 'Skriv',
+  'nav.mailboxes': 'Postbokser',
+  'nav.allInboxes': 'Alle innbokser',
+  'nav.allDrafts': 'Alle utkast',
+  'nav.allSent': 'Alle sendte',
+  'nav.allArchive': 'Hele arkivet',
+  'nav.allJunk': 'All søppelpost',
+  'nav.allTrash': 'Hele papirkurven',
+  'nav.sytueMailbox': 'Sytue-postboks',
+  'nav.accountsIn': 'Kontoer: {mailbox}',
   'nav.folders': 'Mapper',
   'nav.refresh': 'Oppdater',
   'nav.manageFolders': 'Administrer mapper',
@@ -53,6 +62,10 @@ export const nb: AppCatalog<typeof en> = {
   'shortcuts.archive': 'Arkiver',
   'shortcuts.trash': 'Flytt til papirkurven',
   'shortcuts.star': 'Stjernemerk',
+  'shortcuts.select': 'Merk samtalen',
+  'shortcuts.clearSelection': 'Fjern markeringen',
+  'shortcuts.label': 'Legg til etikett',
+  'shortcuts.move': 'Flytt til…',
   'shortcuts.help': 'Vis denne listen',
   'nav.settings': 'Innstillinger',
   'nav.signature': 'Signatur',
@@ -150,6 +163,9 @@ export const nb: AppCatalog<typeof en> = {
   'error.undoSend': 'Sendingen kunne ikke angres',
   'error.undoSendGone': 'Det er for sent å angre; meldingen er allerede sendt',
   'undo.done': 'Sendingen er angret',
+  'triage.moved': 'Flyttet til {folder}',
+  'triage.undone': 'Flyttet tilbake dit den var',
+  'error.undoMove': 'Kunne ikke flytte den tilbake',
   'list.region': 'Samtaler i {folder}',
   'list.fallbackName': 'E-post',
   'list.searchResults': 'Søkeresultater',
@@ -161,6 +177,13 @@ export const nb: AppCatalog<typeof en> = {
   'list.searchHint':
     'Operatorer: from:, to:, subject:, has:attachment, is:unread, is:starred, after:2026-01-31, before:2026-03-01. Bruk anførselstegn for flere ord.',
   'list.clearSearch': 'Tøm søket',
+  'filter.group': 'Hurtigfiltre',
+  'filter.unread': 'Uleste',
+  'filter.starred': 'Stjernemerkede',
+  'filter.attachments': 'Med vedlegg',
+  'filter.emptyTitle': 'Ingenting her passer til dette filteret',
+  'filter.emptyDescription': 'Prøv et annet filter, eller vis alle samtalene.',
+  'filter.showAll': 'Vis alle',
   'list.selectAll': 'Velg alle samtaler',
   'list.loading': 'Laster inn samtaler…',
   'list.errorTitle': 'E-posten din kunne ikke lastes inn',
@@ -190,6 +213,8 @@ export const nb: AppCatalog<typeof en> = {
   'reader.createEvent': 'Opprett hendelse',
   'reader.eventCreated': 'Hendelsen er opprettet i Sytue Calendar',
   'reader.eventFailed': 'Hendelsen kunne ikke opprettes',
+  'reader.shareToRooms': 'Del i Rooms',
+  'reader.roomsFailed': 'Det kunne ikke deles i Rooms.',
   'reader.unsubscribe': 'Avslutt abonnement',
   'reader.unsubscribeFailed': 'Avmeldingen kunne ikke fullføres',
   'reader.unsubscribeSent': 'Forespørsel om avmelding sendt',
@@ -317,6 +342,10 @@ export const nb: AppCatalog<typeof en> = {
   'editor.font': 'Skrift',
   'editor.redo': 'Gjør om',
   'editor.undo': 'Angre',
+  'editor.cut': 'Klipp ut',
+  'editor.copy': 'Kopier',
+  'editor.paste': 'Lim inn',
+  'editor.selectAll': 'Merk alt',
   'editor.colorNone': 'Ingen',
   'editor.colorYellow': 'Gul',
   'editor.colorViolet': 'Fiolett',
@@ -686,6 +715,11 @@ export const nb: AppCatalog<typeof en> = {
   'externalMail.port': 'Port',
   'externalMail.username': 'Brukernavn (e-postadresse hvis feltet er tomt)',
   'externalMail.password': 'Passord eller app-passord',
+  'externalMail.icloudBody':
+    'iCloud Mail godtar ikke passordet til Apple-kontoen din her. Opprett et appspesifikt passord på account.apple.com (Pålogging og sikkerhet › Appspesifikke passord), og skriv det inn nedenfor.',
+  'externalMail.icloudLink': 'Åpne account.apple.com',
+  'externalMail.icloudAuthError':
+    'iCloud godtok ikke passordet. Bruk et appspesifikt passord, ikke passordet til Apple-kontoen din.',
   'externalMail.smtpPassword':
     'SMTP-passord (samme som for innkommende e-post hvis feltet er tomt)',
   'externalMail.advanced': 'Avanserte alternativer',
@@ -695,6 +729,10 @@ export const nb: AppCatalog<typeof en> = {
     'Vi kontrollerer påloggingen til begge serverne før vi lagrer. Ingen testmelding blir sendt.',
   'externalMail.connect': 'Koble til konto',
   'externalMail.authorize': 'Fortsett til leverandøren',
+  'externalMail.reconnectNeeded': 'Logg på igjen for å se denne kontoen',
+  'externalMail.accountUnavailable': 'Fikk ikke kontakt med kontoen. Prøv igjen',
+  'externalMail.someUnavailable':
+    'Noen kontoer kunne ikke nås. E-postene deres er ikke i denne listen.',
   'externalMail.add': 'Legg til e-postkonto',
   'externalMail.empty': 'Ingen eksterne e-postkontoer tilkoblet.',
   'externalMail.open': 'Åpne postkasse',
@@ -707,6 +745,13 @@ export const nb: AppCatalog<typeof en> = {
     'Kunne ikke bekrefte den sikre tilkoblingen. Kontroller servernavnet og sertifikatet hos e-postleverandøren.',
   'externalMail.authError':
     'Påloggingen ble avvist. Koble til kontoen på nytt, eller kontroller brukernavn og app-passord.',
+  'externalMail.cancelled': 'Påloggingen ble avbrutt. Ingenting ble koblet til.',
+  'externalMail.scopeMissing':
+    'Tilgang til e-post ble ikke tillatt. Prøv igjen, og la tillatelsen for e-post være valgt.',
+  'externalMail.timeout': 'Den påloggingen er ikke lenger gyldig. Prøv igjen.',
+  'externalMail.exists': 'Denne e-postkontoen er allerede koblet til.',
+  'externalMail.connected': 'Kontoen {account} er nå koblet til.',
+  'externalMail.accountsError': 'De eksterne e-postkontoene kunne ikke lastes inn.',
   'externalMail.sendUnknown':
     'Serveren kan ha godtatt denne e-posten. Kontroller Sendt før du prøver igjen, slik at den ikke sendes to ganger.',
   'externalMail.blockedError':
@@ -715,23 +760,9 @@ export const nb: AppCatalog<typeof en> = {
     'Denne e-posten eller vedleggene overskrider størrelsesgrensen. Reduser vedleggene og prøv igjen.',
   'externalMail.pop3Note':
     'POP3 lar deg lese innboksen og sende via SMTP. Eksterne mapper, lesemarkeringer og flytting av meldinger er ikke tilgjengelig.',
-  'externalMail.refreshNote':
-    'Denne postkassen oppdateres hvert 30. sekund mens meldingslisten er åpen. E-post blir hos leverandøren.',
   'externalMail.sent': 'Leverandøren har godtatt e-posten.',
   'externalMail.sentNoCopy':
     'E-posten er godtatt, men en kopi kunne ikke lagres i Sendt. Ikke send den på nytt.',
-  'externalMail.draftNote':
-    'Dette utkastet lagres bare mens vinduet er åpent. Når du lukker det, slettes utkastet.',
-  'externalMail.attach': 'Legg ved filer',
-  'externalMail.markUnread': 'Merk som ulest',
-  'externalMail.markRead': 'Merk som lest',
-  'externalMail.flag': 'Legg til stjerne',
-  'externalMail.unflag': 'Fjern stjerne',
-  'externalMail.trash': 'Flytt til papirkurven',
-  'externalMail.noMessages': 'Ingen meldinger i denne mappen.',
-  'externalMail.discardDraft': 'Forkaste dette utkastet?',
   'externalMail.invalidConfiguration':
     'Skriv inn en gyldig e-postadresse, begge servernavnene og portene, og et passord.',
-  'externalMail.invalidRecipients':
-    'Kontroller mottakernes e-postadresser. Skill flere adresser med komma.',
 };

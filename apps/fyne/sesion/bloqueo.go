@@ -55,7 +55,7 @@ func desbloquear(e ajustes.Estado) desbloqueo {
 	if t, err := i18n.New(i18n.Negotiate(sistema.Idioma(), e.Idioma), i18n.Common()); err == nil {
 		motivo = t.T("shell.lock.reason", nil)
 	}
-	switch err := escritorio.Verificar(context.Background(), motivo); {
+	switch err := verificarDueno(context.Background(), motivo); {
 	case err == nil:
 		return verificado
 	case errors.Is(err, escritorio.ErrNoDisponible):
@@ -64,6 +64,10 @@ func desbloquear(e ajustes.Estado) desbloqueo {
 		return rechazado
 	}
 }
+
+// verificarDueno es escritorio.Verificar: las pruebas de fondo_test.go cuentan cuándo se
+// pide, que sin escena no puede ser nunca.
+var verificarDueno = escritorio.Verificar
 
 // pedirSytueIDAlAbrir aplica el bloqueo al abrir: sin bloqueo o verificado, sigue
 // (false); sin forma de verificar en este equipo, hay que entrar con la cuenta de
@@ -141,12 +145,23 @@ func (s *Suite) ElementoBloqueo(t *i18n.Translator, menu *fyne.Menu) *fyne.MenuI
 				slog.Info("sesion: el bloqueo no se cambia sin verificar al dueño", "error", err)
 				return
 			}
+			// Con el bloqueo puesto la sesión no se adopta sin el dueño, y sin ella no se
+			// podría olvidar nada: los aparatos de iOS de aquí se olvidan antes.
+			if quiere {
+				s.olvidarDespertares(context.Background(), true)
+			}
 			if err := marcarBloqueo(quiere); err != nil {
 				slog.Warn("sesion: no se ha podido guardar el bloqueo en el almacén seguro", "error", err)
+				if quiere {
+					s.levantarVetoDespertar() // sin bloqueo, lo olvidado se vuelve a registrar
+				}
 				return
 			}
 			if err := s.Poner(func(a *ajustes.Ajustes) { a.Bloqueo = quiere }); err != nil {
 				slog.Warn("sesion: no se ha podido guardar el bloqueo", "error", err)
+				if quiere {
+					s.levantarVetoDespertar()
+				}
 				return
 			}
 			fyne.Do(func() {

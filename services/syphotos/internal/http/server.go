@@ -86,6 +86,9 @@ func NewRouter(d Deps) http.Handler {
 		api.Use(d.Verifier.RequireAuth)
 		api.Use(d.Verifier.RequireTenant)
 		api.Use(httpx.RateLimit(httpx.RateLimitConfig{Limiter: apiLimiter, KeyFunc: authn.RateKey}))
+		// La señal de cambios para el widget de Photos (hubnotify.TrasEscribir). Lo que
+		// termina después de contestar —miniaturas, EXIF— avisa por su cuenta (avisarProcesada).
+		api.Use(h.hub.TrasEscribir(nil, "photos"))
 
 		// QUERY ADEMÁS DE GET en los dos que lo piden, y en ninguno más.
 		//

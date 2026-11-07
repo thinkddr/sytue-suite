@@ -1,0 +1,108 @@
+{
+  "_": "El «De» del redactor (fase B, punto 6): remitentes() en apps/frontend/apps/mail/src/components/remitentes.ts y en apps/fyne/apps/mail/remitentes.go. Primero las direcciones de Sytue (la principal, los alias y los buzones compartidos que dejan enviar, ya sin repetir) y después cada cuenta externa que puede enviar, en el orden de la lista; la primera vez que sale una instancia es la que cuenta. Una externa sin dirección no se puede ofrecer, y la que repite una dirección de Sytue tampoco: con dos «ana@ejemplo.eu» iguales en el desplegable no se sabría por dónde sale. elegir: lo que se elige con un valor; el que ya no está (la cuenta se desconectó) se queda en la primera, a la vista en el desplegable. sinImagenesCid: una cuenta externa no lleva imágenes dentro del texto (su envío no tiene Content-ID), así que salen como adjuntos y su <img src=\"cid:…\"> se quita del HTML.",
+  "casos": [
+    {
+      "nombre": "solo Sytue: la principal y los alias, como siempre",
+      "sytue": ["ana@sytue.eu", "ventas@sytue.eu"],
+      "externas": [],
+      "esperado": [
+        { "valor": "ana@sytue.eu", "direccion": "ana@sytue.eu", "cuenta": "" },
+        {
+          "valor": "ventas@sytue.eu",
+          "direccion": "ventas@sytue.eu",
+          "cuenta": ""
+        }
+      ],
+      "elegir": [
+        { "valor": "ventas@sytue.eu", "esperado": "ventas@sytue.eu" },
+        { "valor": "", "esperado": "ana@sytue.eu" }
+      ]
+    },
+    {
+      "nombre": "las externas que envían van detrás de Sytue, en el orden de la lista",
+      "sytue": ["ana@sytue.eu"],
+      "externas": [
+        { "instance_id": "g1", "address": "ana@gmail.com", "send": true },
+        { "instance_id": "o1", "address": "ana@outlook.com", "send": true }
+      ],
+      "esperado": [
+        { "valor": "ana@sytue.eu", "direccion": "ana@sytue.eu", "cuenta": "" },
+        { "valor": "externa:g1", "direccion": "ana@gmail.com", "cuenta": "g1" },
+        {
+          "valor": "externa:o1",
+          "direccion": "ana@outlook.com",
+          "cuenta": "o1"
+        }
+      ],
+      "elegir": [
+        { "valor": "externa:o1", "esperado": "externa:o1" },
+        { "valor": "externa:desconectada", "esperado": "ana@sytue.eu" }
+      ]
+    },
+    {
+      "nombre": "fuera la que no envía, la que no tiene dirección y la instancia repetida",
+      "sytue": ["ana@sytue.eu"],
+      "externas": [
+        { "instance_id": "cal", "address": "ana@gmail.com", "send": false },
+        { "instance_id": "borrador", "address": "", "send": true },
+        { "instance_id": "i1", "address": "ana@icloud.com", "send": true },
+        { "instance_id": "i1", "address": "otra@icloud.com", "send": true }
+      ],
+      "esperado": [
+        { "valor": "ana@sytue.eu", "direccion": "ana@sytue.eu", "cuenta": "" },
+        { "valor": "externa:i1", "direccion": "ana@icloud.com", "cuenta": "i1" }
+      ],
+      "elegir": [{ "valor": "externa:cal", "esperado": "ana@sytue.eu" }]
+    },
+    {
+      "nombre": "una externa con la dirección de un alias de Sytue no se repite",
+      "sytue": ["ana@sytue.eu", "Ana@Ejemplo.eu"],
+      "externas": [
+        { "instance_id": "imap", "address": "ana@ejemplo.eu", "send": true },
+        { "instance_id": "pop", "address": "luis@ejemplo.eu", "send": true }
+      ],
+      "esperado": [
+        { "valor": "ana@sytue.eu", "direccion": "ana@sytue.eu", "cuenta": "" },
+        {
+          "valor": "Ana@Ejemplo.eu",
+          "direccion": "Ana@Ejemplo.eu",
+          "cuenta": ""
+        },
+        {
+          "valor": "externa:pop",
+          "direccion": "luis@ejemplo.eu",
+          "cuenta": "pop"
+        }
+      ],
+      "elegir": [{ "valor": "externa:imap", "esperado": "ana@sytue.eu" }]
+    },
+    {
+      "nombre": "sin dirección de Sytue todavía, la externa es la única y la primera",
+      "sytue": [],
+      "externas": [
+        { "instance_id": "g1", "address": "ana@gmail.com", "send": true }
+      ],
+      "esperado": [
+        { "valor": "externa:g1", "direccion": "ana@gmail.com", "cuenta": "g1" }
+      ],
+      "elegir": [{ "valor": "ana@sytue.eu", "esperado": "externa:g1" }]
+    }
+  ],
+  "sinImagenesCid": [
+    {
+      "nombre": "la imagen del texto se quita y lo demás se queda",
+      "html": "<p>Hola</p><p><img src=\"cid:img1\" alt=\"\" style=\"max-width: 100%\"> y adiós</p>",
+      "esperado": "<p>Hola</p><p> y adiós</p>"
+    },
+    {
+      "nombre": "con comillas simples, sin comillas y en mayúsculas",
+      "html": "<IMG SRC='cid:a'><img alt=x src=cid:b><img src=\"CID:c\"/>",
+      "esperado": ""
+    },
+    {
+      "nombre": "una imagen https no es una parte del mensaje y se queda",
+      "html": "<img src=\"https://ejemplo.eu/logo.png\" alt=\"cid:no\">",
+      "esperado": "<img src=\"https://ejemplo.eu/logo.png\" alt=\"cid:no\">"
+    }
+  ]
+}

@@ -104,3 +104,38 @@ export function fechaDelEnlace(search: string): Date | null {
   const dia = startDate({ dtstart, all_day: p.get('all_day') === '1' } as EventSearchResult);
   return Number.isNaN(dia.getTime()) ? null : dia;
 }
+
+/**
+ * Periodos del filtro de la búsqueda. Pocos y con nombre, como los del buscador de
+ * Google Calendar: lo que se busca casi siempre es «el que viene» o «uno de este
+ * mes», no un rango a mano.
+ */
+export const SEARCH_PERIODS = ['any', 'upcoming', 'past', 'month', 'year'] as const;
+export type SearchPeriod = (typeof SEARCH_PERIODS)[number];
+
+/**
+ * El tramo [from, to) de un periodo, en RFC3339, para `/api/search`. Mes y año son
+ * los del calendario LOCAL (empiezan a las 00:00 de quien mira, no de UTC). El
+ * servicio cuenta como dentro un evento que se solapa con el tramo y una serie cuya
+ * recurrencia lo alcanza; «Próximos» incluye, pues, lo que está pasando ahora.
+ */
+export function periodRange(period: SearchPeriod, now: Date): { from?: string; to?: string } {
+  switch (period) {
+    case 'upcoming':
+      return { from: now.toISOString() };
+    case 'past':
+      return { to: now.toISOString() };
+    case 'month':
+      return {
+        from: new Date(now.getFullYear(), now.getMonth(), 1).toISOString(),
+        to: new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString(),
+      };
+    case 'year':
+      return {
+        from: new Date(now.getFullYear(), 0, 1).toISOString(),
+        to: new Date(now.getFullYear() + 1, 0, 1).toISOString(),
+      };
+    default:
+      return {};
+  }
+}

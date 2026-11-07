@@ -36,19 +36,46 @@ export class Historial {
    * primero —el estado previo a empezar a escribir— y se adopta el `rehacer`
    * del último, que es el texto tal como quedó.
    */
-  registrar(a: Accion, fusion?: string): void {
+  registrar(a: Accion, fusion?: string): Accion {
     const cima = this.pasado[this.pasado.length - 1];
     if (fusion !== undefined && cima?.fusion === fusion) {
       cima.rehacer = a.rehacer;
       this.futuro = [];
-      return;
+      return cima;
     }
     // El `fusion` solo se escribe si lo hay: con `exactOptionalPropertyTypes`,
     // una propiedad opcional no admite un `undefined` explícito.
-    this.pasado.push({ ...a, ...(fusion === undefined ? {} : { fusion }) });
+    const nueva: Registrada = { ...a, ...(fusion === undefined ? {} : { fusion }) };
+    this.pasado.push(nueva);
     if (this.pasado.length > this.limite) this.pasado.shift();
     // Lo que se podía rehacer deja de tener sentido: la rama cambió.
     this.futuro = [];
+    return nueva;
+  }
+
+  /**
+   * Deshace UNA acción concreta, la que devolvió `registrar`: es el «Deshacer» del
+   * aviso que sale tras eliminar o mover una nota. Si desde entonces se hizo otra
+   * cosa, deshacer «lo último» desharía la que no es; esta va a la suya.
+   *
+   * Devuelve `false` si ya no está (se deshizo con Ctrl+Z, o salió por el límite).
+   * Si era la de arriba pasa a rehacer, como con `deshacer()`; si no, se descarta:
+   * rehacerla encima de lo que vino después no tiene un sentido claro.
+   */
+  async deshacerEsta(a: Accion): Promise<boolean> {
+    const i = this.pasado.indexOf(a);
+    if (i < 0) return false;
+    const registrada = this.pasado[i]!;
+    const cima = i === this.pasado.length - 1;
+    this.pasado.splice(i, 1);
+    try {
+      await a.deshacer();
+    } catch (err) {
+      this.pasado.splice(i, 0, registrada);
+      throw err;
+    }
+    if (cima) this.futuro.push(registrada);
+    return true;
   }
 
   get siguienteDeshacer(): Accion | undefined {

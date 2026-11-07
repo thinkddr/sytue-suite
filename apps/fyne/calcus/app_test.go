@@ -170,6 +170,30 @@ func TestVolverGuardaLoQueQuedaPorGuardar(t *testing.T) {
 	}
 }
 
+// TestElChipEnErrorGuardaYa: el chip de la cabecera, con el guardado en error, reintenta
+// sin esperar al reloj (`GuardarYa`): lo escrito sale al servicio. VISTO EN ROJO sin el
+// gancho en `engancharGuardado` (el chip en error se quedaba inerte).
+func TestElChipEnErrorGuardaYa(t *testing.T) {
+	s := &servicioHojas{rol: "editor", lamport: 4, hoja: `{"active":0,"sheets":[{"name":"Datos","cells":{"A1":"10"}}]}`}
+	a := appDePrueba(t, s)
+	a.lanzar = func(f func()) { f() }
+	a.AbrirID("h1", "")
+	ab := a.abierto
+	if ab.ctx.GuardarYa == nil {
+		t.Fatal("con permiso de escritura, el chip no tiene con qué reintentar")
+	}
+	ab.lz.Rejilla.Seleccionar(1, 0, false)
+	ab.lz.Rejilla.Escribir("=A1*3")
+	ab.ctx.GuardarYa()
+	fyne.DoAndWait(func() {})
+	s.mu.Lock()
+	guardado := s.hoja
+	s.mu.Unlock()
+	if !strings.Contains(guardado, `"B1":"=A1*3"`) {
+		t.Errorf("guardar ya no ha mandado lo escrito: %s", guardado)
+	}
+}
+
 // TestCalcusAbreEnSoloLecturaLoQueNoPuedeEscribir: con papel de lector, o con algo que
 // el lienzo no sabe reescribir, la hoja se ve y no se escribe ni se guarda.
 func TestCalcusAbreEnSoloLecturaLoQueNoPuedeEscribir(t *testing.T) {
@@ -342,8 +366,8 @@ func TestDescargarUnaHojaGuardaAntesYDejaElFichero(t *testing.T) {
 	a.carpeta = func() (string, error) { return dir, nil }
 	a.AbrirID("h1", "")
 	ctx := a.abierto.ctx
-	if ctx.Exportar == nil || ctx.GuardarVersion != nil || ctx.Versiones == nil {
-		t.Fatal("un lector descarga y ve el historial, pero no guarda versiones")
+	if ctx.Exportar == nil || ctx.GuardarVersion != nil || ctx.Versiones == nil || ctx.HacerCopia == nil {
+		t.Fatal("un lector descarga, ve el historial y hace copias, pero no guarda versiones")
 	}
 	// Con el cerrojo: la franja del lector sigue preguntando al servicio en segundo plano
 	// (EdicionPedida lee `rol`), y escribirlo a pelo es una carrera con -race.

@@ -490,6 +490,7 @@ const intlFechas: Record<
     fecha_larga_hora: string[];
     fecha_completa: string[];
     mes_corto: string[];
+    mes_suelto: string[];
     dia_corto: string[];
     rango_semana: string[];
     rango_largo: string[];
@@ -544,6 +545,15 @@ for (const locale of LOCALES) {
       }),
     ),
     mes_corto: instantes.map((i) => new Date(i).toLocaleDateString(tag, { month: 'short', timeZone: 'UTC' })),
+    // El mes suelto de `monthLabel` (Calendar): la parte `month` de `{ month: 'long', year:
+    // 'numeric' }` y NO `{ month: 'long' }`, que en griego da el genitivo («Νοεμβρίου», «de
+    // noviembre») en vez del nominativo («Νοέμβριος»). En los otros 25 coinciden.
+    mes_suelto: instantes.map(
+      (i) =>
+        new Intl.DateTimeFormat(tag, { month: 'long', year: 'numeric', timeZone: 'UTC' })
+          .formatToParts(new Date(i))
+          .find((p) => p.type === 'month')?.value ?? '',
+    ),
     dia_corto: instantes.map((i) =>
       new Date(i).toLocaleDateString(tag, { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }),
     ),

@@ -1,4 +1,4 @@
-import { beforeEach, expect, test } from 'bun:test';
+import { afterAll, beforeEach, expect, test } from 'bun:test';
 import { appsRecordadas, recordarApps } from './useAppsDesplegadas.js';
 
 /*
@@ -7,12 +7,25 @@ import { appsRecordadas, recordarApps } from './useAppsDesplegadas.js';
  * —y el síntoma sería «me falta Drive», que nadie relaciona con esto—.
  */
 const almacen = new Map<string, string>();
+// defineProperty y no `globalThis.localStorage = …`: si otro fichero del mismo
+// proceso ha registrado happy-dom (MarcarLeido.test.tsx lo hace y no lo retira),
+// su localStorage es un getter sin setter y la asignación revienta con «Attempted
+// to assign to readonly property» según el orden en que Bun cargue los ficheros.
+const original = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
 beforeEach(() => {
   almacen.clear();
-  (globalThis as { localStorage?: unknown }).localStorage = {
-    getItem: (k: string) => almacen.get(k) ?? null,
-    setItem: (k: string, v: string) => void almacen.set(k, v),
-  };
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    writable: true,
+    value: {
+      getItem: (k: string) => almacen.get(k) ?? null,
+      setItem: (k: string, v: string) => void almacen.set(k, v),
+    },
+  });
+});
+afterAll(() => {
+  delete (globalThis as { localStorage?: unknown }).localStorage;
+  if (original) Object.defineProperty(globalThis, 'localStorage', original);
 });
 
 test('lo guardado se recupera tal cual', () => {

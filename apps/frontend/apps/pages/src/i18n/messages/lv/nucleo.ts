@@ -86,7 +86,7 @@ export const nucleo = {
   'new.progress': 'Vietnes izveides soļi',
   'new.go_to_step': 'Doties uz {n}. soli',
   'new.step_of': '{n}. solis no {total}',
-  'app_settings.title': 'Sytue Web iestatījumi',
+  'app_settings.title': 'Sytue Webs iestatījumi',
   'new.search_title': 'Sāciet ar savu darbības jomu',
   'new.search_help':
     'Ierakstiet savu nodarbošanos vai izvēlieties grupu. Katrā veidnē jau ir jūsu nozares teksti: jānomaina tikai nosaukums, tālrunis, cenas un fotoattēli.',
@@ -289,7 +289,7 @@ export const nucleo = {
   'domains.start_help':
     'Ievadiet domēnu, kuru vēlaties izmantot. Jums būs nepieciešama piekļuve DNS iestatījumiem pie pakalpojumu sniedzēja, kur to iegādājāties.',
   'domains.progress': 'Domēna savienošanas gaita',
-  'domains.step.registered': 'Pievienots Sytue Web',
+  'domains.step.registered': 'Pievienots Sytue Webs',
   'domains.step.dns': 'DNS verificēts',
   'domains.step.https': 'HTTPS gatavs',
   'domains.step.primary': 'Galvenā adrese',

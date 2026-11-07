@@ -366,7 +366,7 @@ func (s *Servicio) ejecutarDesign(ctx context.Context, job *domain.AIJob, in dom
 	}
 
 	sistema := fmt.Sprintf(
-		"Eres el diseñador de Sytue Web. Genera secciones para una página web moderna, atractiva y accesible en idioma %s.\n"+
+		"Eres el diseñador de Sytue Webs. Genera secciones para una página web moderna, atractiva y accesible en idioma %s.\n"+
 			"Tipos de sección válidos: %s.\nIconos válidos: %s.\n%s\n"+
 			"Devuelve únicamente un JSON válido que cumpla el esquema estricto proporcionado, con la propiedad 'sections'.",
 		in.Language,

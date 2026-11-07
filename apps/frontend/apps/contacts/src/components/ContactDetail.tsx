@@ -16,6 +16,7 @@ import {
   Dropdown,
   EmptyState,
   Icon,
+  IconButton,
   MenuItem,
   useToast,
   Illustration,
@@ -35,6 +36,7 @@ import {
 } from '../client/contactsApi.js';
 import { parseVcardDetails, type PostalAddress, type TypedValue } from '../lib/vcard.js';
 import { downloadVcf, exportFilename, hasEmbeddedPhoto } from '../client/vcard.js';
+import { correoPrincipal } from '../client/seleccion.js';
 
 /** Código de fallo de imagen -> clave de catálogo. */
 const PHOTO_ERROR_KEY: Record<ImageErrorCode, ContactsMessageKey> = {
@@ -65,7 +67,7 @@ function typeLabel(t: T, type: string, isAddress = false): string {
   return key ? t(key) : type;
 }
 
-/** Principal primero (orden estable): es el que abre «Enviar correo». */
+/** Principal primero (orden estable), para listar correos y teléfonos en la ficha. */
 function primaryFirst<V extends { primary?: boolean | undefined }>(list: V[]): V[] {
   return [...list].sort((a, b) => Number(b.primary ?? false) - Number(a.primary ?? false));
 }
@@ -183,10 +185,11 @@ export function ContactDetail({
   // Copiar al portapapeles sin traerse una utilidad entera: `writeText` es lo
   // único que hace falta, y si el navegador lo niega (contexto no seguro) se
   // dice, en vez de fallar en silencio.
-  const copiar = async (texto: string): Promise<void> => {
+  // `copiado` es el aviso de lo que se ha copiado: un correo, un teléfono o una dirección.
+  const copiar = async (texto: string, copiado: CopiedKey): Promise<void> => {
     try {
       await navigator.clipboard.writeText(texto);
-      toast.notify({ tone: 'success', title: t('detail.emailCopied') });
+      toast.notify({ tone: 'success', title: t(copiado) });
     } catch {
       toast.notify({ tone: 'danger', title: t('detail.copyFailed') });
     }
@@ -194,7 +197,8 @@ export function ContactDetail({
 
   const emails = primaryFirst(details.emails);
   const phones = primaryFirst(details.phones);
-  const primaryEmail = emails[0]?.value ?? contact.emails[0];
+  // El de «Enviar correo a todos»: una sola regla del principal para los dos botones.
+  const primaryEmail = correoPrincipal(contact);
   // `appUrl` y no `appDomains` a pelo: bajo el host de la organización cada app
   // vive tras su prefijo, y la raíz DESNUDA redirige a él PERDIENDO la query.
   // Medido en producción el 2026-09-09: `mail.sytue.eu/?to=…` acababa en
@@ -289,7 +293,7 @@ export function ContactDetail({
                   <MenuItem
                     onClick={() => {
                       close();
-                      void copiar(primaryEmail);
+                      void copiar(primaryEmail, 'detail.emailCopied');
                     }}
                   >
                     {t('detail.copyEmail')}
@@ -328,7 +332,12 @@ export function ContactDetail({
             {emails.length ? (
               <div class="flex flex-col gap-1">
                 {emails.map((e, i) => (
-                  <TypedRow key={`${e.value}-${i}`} t={t} value={e}>
+                  <TypedRow
+                    key={`${e.value}-${i}`}
+                    t={t}
+                    value={e}
+                    onCopy={() => void copiar(e.value, 'detail.emailCopied')}
+                  >
                     <a href={`mailto:${e.value}`} class={`${linkClass} text-primary-text`}>
                       {e.value}
                     </a>
@@ -343,7 +352,12 @@ export function ContactDetail({
             {phones.length ? (
               <div class="flex flex-col gap-1">
                 {phones.map((p, i) => (
-                  <TypedRow key={`${p.value}-${i}`} t={t} value={p}>
+                  <TypedRow
+                    key={`${p.value}-${i}`}
+                    t={t}
+                    value={p}
+                    onCopy={() => void copiar(p.value, 'detail.phoneCopied')}
+                  >
                     {/* tel: en una sola línea: un número partido no se marca. */}
                     <a href={`tel:${p.value}`} class={`${linkClass} text-text whitespace-nowrap`}>
                       {p.value}
@@ -367,7 +381,16 @@ export function ContactDetail({
               <div class="flex flex-col gap-2">
                 {details.addresses.map((a, i) => (
                   <div key={i}>
-                    <p class="sytue-meta">{typeLabel(t, a.type, true)}</p>
+                    <p class="sytue-meta flex items-center gap-x-2">
+                      {typeLabel(t, a.type, true)}
+                      <CopyValue
+                        t={t}
+                        value={addressLines(a)[0] ?? ''}
+                        onCopy={() =>
+                          void copiar(addressLines(a).join('\n'), 'detail.addressCopied')
+                        }
+                      />
+                    </p>
                     <p class="text-text">
                       {addressLines(a).map((line, li) => (
                         <span key={li} class="block">
@@ -502,17 +525,25 @@ function GroupChips({
  * con aria-pressed; la mutación es optimista en ContactsApp, aquí solo se
  * serializa la llamada en vuelo y se notifica el fallo. Sobrio: sin relleno de
  * color salvo el trazo/relleno de la propia estrella.
+ *
+ * `row` es la de la FILA de la lista: un `IconButton` de 24 (44 con el dedo) con la
+ * estrella de 14. Destacado se ve siempre; sin destacar, solo al pasar el puntero por
+ * la fila (`group-hover`) o al llegarle el foco, y SIEMPRE con puntero grueso, donde no
+ * hay «pasar por encima». Antes la fila solo pintaba la estrella y para destacar había
+ * que abrir la ficha.
  */
-function FavoriteToggle({
+export function FavoriteToggle({
   t,
   contact,
   active,
   onToggle,
+  row = false,
 }: {
   t: T;
   contact: Contact;
   active: boolean;
   onToggle: (contact: Contact) => Promise<void>;
+  row?: boolean;
 }): JSX.Element {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
@@ -530,6 +561,31 @@ function FavoriteToggle({
     } finally {
       setBusy(false);
     }
+  }
+
+  if (row) {
+    return (
+      <IconButton
+        size="sm"
+        // Con el nombre: en la lista hay uno por fila, y «Destacar» a secas repetido
+        // cien veces no dice de quién (como la casilla, `list.select`).
+        label={
+          active
+            ? t('list.unstar', { name: contact.fullName })
+            : t('list.star', { name: contact.fullName })
+        }
+        aria-pressed={active}
+        disabled={busy}
+        class={
+          active
+            ? 'text-warning-text! hover:text-warning-text!'
+            : 'text-text-muted! hover:text-text! opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100'
+        }
+        onClick={() => void handle()}
+      >
+        <StarGlyph filled={active} size={14} />
+      </IconButton>
+    );
   }
 
   return (
@@ -550,11 +606,11 @@ function FavoriteToggle({
 
 /** Estrella (24-grid, envoltorio `Glifo`). Rellena cuando el contacto está destacado; solo
  *  trazo cuando no. @sytue/ui no expone glifo «star», va inline (patrón TagGlyph). */
-function StarGlyph({ filled }: { filled: boolean }): JSX.Element {
+function StarGlyph({ filled, size = 18 }: { filled: boolean; size?: number }): JSX.Element {
   return (
     <Glifo
       d="M12 2.5l2.9 5.9 6.5.95-4.7 4.58 1.11 6.47L12 17.9l-5.81 3.06 1.11-6.47-4.7-4.58 6.5-.95L12 2.5z"
-      size={18}
+      size={size}
       fill={filled ? 'currentColor' : undefined}
     />
   );
@@ -646,17 +702,44 @@ function ContactPhoto({
 function TypedRow({
   t,
   value,
+  onCopy,
   children,
 }: {
   t: T;
   value: TypedValue;
+  onCopy: () => void;
   children: JSX.Element;
 }): JSX.Element {
   return (
     <span class="flex flex-wrap items-baseline gap-x-2">
       {children}
       <span class="sytue-meta">{typeLabel(t, value.type)}</span>
+      <CopyValue t={t} value={value.value} onCopy={onCopy} />
     </span>
+  );
+}
+
+/** El aviso de cada cosa que la ficha copia. */
+type CopiedKey = 'detail.emailCopied' | 'detail.phoneCopied' | 'detail.addressCopied';
+
+/**
+ * CopyValue — copiar un correo, un teléfono o una dirección con un clic, sin
+ * seleccionar el texto a mano (que en un enlace `mailto:`/`tel:` además lo abre).
+ * Siempre visible y apagado (`text-muted`): un control que solo sale al pasar el
+ * puntero no existe para el teclado ni para el dedo. El nombre accesible lleva el
+ * valor, porque una ficha tiene varios botones iguales.
+ */
+function CopyValue({ t, value, onCopy }: { t: T; value: string; onCopy: () => void }): JSX.Element {
+  return (
+    <IconButton
+      size="sm"
+      showTitle
+      label={t('detail.copyValue', { value })}
+      class="text-text-muted! hover:text-text! self-center"
+      onClick={onCopy}
+    >
+      <Icon name="copies" size={14} />
+    </IconButton>
   );
 }
 

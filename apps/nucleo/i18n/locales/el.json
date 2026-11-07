@@ -101,6 +101,7 @@
   "linkedServices.changed": "Αυτό το στοιχείο άλλαξε στον πάροχό σας. Κάντε ανανέωση πριν το επεξεργαστείτε ξανά.",
   "linkedServices.choose": "Επιλέξτε τι θέλετε να συνδέσετε. Ο πάροχος θα ζητήσει δικαιώματα για τις επιλεγμένες υπηρεσίες.",
   "linkedServices.connected": "Συνδεδεμένες υπηρεσίες",
+  "linkedServices.exists": "Αυτός ο λογαριασμός ήταν ήδη συνδεδεμένος και άνοιξε.",
   "linkedServices.keepAdmin": "Το Google Keep απαιτεί εγκεκριμένη ρύθμιση από τη διαχείριση του Google Workspace. Οι προσωπικοί λογαριασμοί Gmail δεν μπορούν να το συνδέσουν.",
   "linkedServices.notGranted": "Δεν παραχωρήθηκε πρόσβαση σε αυτή την υπηρεσία. Συνδέστε ξανά τον λογαριασμό για να επιλέξετε τα δικαιώματά του.",
   "linkedServices.notSupported": "Αυτός ο πάροχος δεν προσφέρει αυτή την υπηρεσία.",
@@ -169,7 +170,7 @@
   "notifications.kind.pages.order.oversold": "Η παραγγελία {number} στο {site} πληρώθηκε χωρίς απόθεμα",
   "notifications.kind.pages.order.paid": "Νέα παραγγελία {number} στο {site}",
   "notifications.kind.pages.payment.duplicated": "Διπλή πληρωμή στην παραγγελία {number} του {site}: η δεύτερη επιστρέφεται",
-  "notifications.kind.pages.settings.changed": "{actor} άλλαξε μια ρύθμιση του Sytue Web",
+  "notifications.kind.pages.settings.changed": "{actor} άλλαξε μια ρύθμιση του Sytue Webs",
   "notifications.kind.pages.store.busy": "Το κατάστημα του {site} έχει πάρα πολλές παραγγελίες που αναμένουν πληρωμή",
   "notifications.kind.pages.withdrawal.requested": "Ζητήθηκε υπαναχώρηση για την παραγγελία {number} του {site}",
   "notifications.kind.photos.album.added": "{actor} πρόσθεσε φωτογραφίες στο «{name}»",
@@ -301,6 +302,8 @@
   "shell.update.failedBody": "Δοκιμάστε ξανά αργότερα ή κατεβάστε το από την πύλη.",
   "shell.update.install": "Ενημέρωση στην έκδοση {version}",
   "shell.update.upToDate": "Το {app} είναι ενημερωμένο",
+  "shell.widgets.wake": "Ενημέρωση των widget με την εφαρμογή κλειστή",
+  "shell.widgets.wakeHelp": "Όταν αλλάζει κάτι δικό σας, το Sytue ξυπνά την εφαρμογή με μια κενή ειδοποίηση της Apple για να ανανεώσει το widget της. Η Apple βλέπει ποια εφαρμογή και πότε, ποτέ τι άλλαξε.",
   "ui.backToList": "Επιστροφή στη λίστα",
   "ui.bulk.clear": "Καθαρισμός επιλογής",
   "ui.bulk.region": "Ενέργειες για την επιλογή",
@@ -318,6 +321,8 @@
   "ui.review.edit": "Επεξεργασία",
   "ui.save": "Αποθήκευση",
   "ui.selectRow": "Επιλογή γραμμής",
+  "ui.suiteClose": "Επιστροφή στην εφαρμογή",
+  "ui.suiteOpen": "Sytue: εφαρμογές, αναζήτηση, ειδοποιήσεις και λογαριασμός",
   "ui.wizard.back": "Πίσω",
   "ui.wizard.cancel": "Ακύρωση",
   "ui.wizard.goToStep": "Επιστροφή στο βήμα {n}: ",
@@ -336,5 +341,7 @@
   "widgets.pending": "Σε αναμονή",
   "widgets.photos": "Φωτογραφίες",
   "widgets.rows": "Γραμμές",
-  "widgets.storage": "Αποθηκευτικός χώρος"
+  "widgets.storage": "Αποθηκευτικός χώρος",
+  "widgets.updatedAgo": "Ενημερώθηκε {time}",
+  "widgets.updatedAt": "Ενημέρωση: {time}"
 }

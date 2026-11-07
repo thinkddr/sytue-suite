@@ -230,7 +230,7 @@ func (c *Calendars) Invitations(ctx context.Context, soloPendientes bool) ([]Inv
 		// El ORGANIZER de iCalendar es una URI: quien invita se llama «ada@sytue.eu», no
 		// «mailto:ada@sytue.eu». El servicio lo limpia al crear el evento (cleanAddr),
 		// pero lo que entra por CalDAV llega tal cual.
-		r.Invitations[i].Organizer = sinMailto(inv.Organizer)
+		r.Invitations[i].Organizer = SinMailto(inv.Organizer)
 		if inv.EventID == "" || inv.Organization != "" {
 			continue
 		}
@@ -243,7 +243,9 @@ func (c *Calendars) Invitations(ctx context.Context, soloPendientes bool) ([]Inv
 	return r.Invitations, nil
 }
 
-func sinMailto(v string) string {
+// SinMailto quita el «mailto:» de una dirección de iCalendar (ORGANIZER, ATTENDEE):
+// quien organiza se llama «ada@sytue.eu», no «mailto:ada@sytue.eu».
+func SinMailto(v string) string {
 	v = strings.TrimSpace(v)
 	if len(v) >= len("mailto:") && strings.EqualFold(v[:len("mailto:")], "mailto:") {
 		return v[len("mailto:"):]
@@ -432,7 +434,30 @@ type Busqueda struct {
 // invitados), de `limite` en `limite` y a partir del cursor de la página anterior. Es el
 // buscador de eventos de la web (SearchPanel.tsx): una serie sale UNA vez, con su RRULE.
 func (c *Calendars) SearchEventsPage(ctx context.Context, texto string, limite int, cursor string) (Busqueda, error) {
+	return c.SearchEventsFiltrada(ctx, texto, FiltroBusqueda{}, limite, cursor)
+}
+
+// FiltroBusqueda acota la búsqueda de eventos: un calendario PROPIO (el servicio aísla
+// por dueño) y un tramo [Desde, Hasta). Lo que esté a cero no filtra.
+type FiltroBusqueda struct {
+	Calendario   string
+	Desde, Hasta time.Time
+}
+
+// SearchEventsFiltrada es SearchEventsPage con los filtros del buscador de la web
+// (`calendar`, `from` y `to` en RFC3339). El servicio cuenta como dentro del tramo un
+// evento que se solapa con él y una serie cuya recurrencia lo alcanza.
+func (c *Calendars) SearchEventsFiltrada(ctx context.Context, texto string, f FiltroBusqueda, limite int, cursor string) (Busqueda, error) {
 	q := url.Values{"q": {texto}}
+	if f.Calendario != "" {
+		q.Set("calendar", f.Calendario)
+	}
+	if !f.Desde.IsZero() {
+		q.Set("from", f.Desde.UTC().Format(time.RFC3339))
+	}
+	if !f.Hasta.IsZero() {
+		q.Set("to", f.Hasta.UTC().Format(time.RFC3339))
+	}
 	if limite > 0 {
 		q.Set("limit", strconv.Itoa(limite))
 	}

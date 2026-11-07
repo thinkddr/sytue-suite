@@ -22,6 +22,8 @@ export const de: AppCatalog<typeof en> = {
   'task.postponeFailed': 'Diese Aufgabe konnte nicht verschoben werden',
   'task.cancel': 'Aufgabe abbrechen',
   'task.reopen': 'Aufgabe wieder öffnen',
+  'note.toTodo': 'In Aufgabe umwandeln',
+  'note.toText': 'In Text umwandeln',
   'task.carried': 'Übertragen: {count}',
   'task.carriedFrom': 'Zuerst geplant für {date}',
   'daily.pendingLeft': 'Noch offen: {count}',
@@ -122,6 +124,10 @@ export const de: AppCatalog<typeof en> = {
   'notebook.emoji': 'Symbol',
   'notebook.color': 'Farbe',
   'notebook.move': 'Notizbuch verschieben',
+  'notebook.moveTo': 'Notizbuch verschieben nach…',
+  'notebook.toRoot': 'Oberste Ebene (ohne übergeordnetes Notizbuch)',
+  'notebook.noTarget':
+    'Es gibt keinen anderen Ort, an den dieses Notizbuch verschoben werden kann.',
   'notebook.title': 'Name',
 
   'layout.label': 'Anordnung',
@@ -192,6 +198,7 @@ export const de: AppCatalog<typeof en> = {
   'note.fromRooms': 'Rooms-Kanal',
   'note.fromNotes': 'Verweis auf eine andere Notiz',
   'note.delete': 'Notiz löschen',
+  'note.trashed': 'Notiz in den Papierkorb verschoben',
   'note.export': 'Exportieren…',
   'note.moveTo': 'In ein anderes Notizbuch verschieben…',
   'move.title': 'In ein Notizbuch verschieben',
@@ -278,6 +285,10 @@ export const de: AppCatalog<typeof en> = {
   'editor.highlight': 'Hervorheben',
   'editor.undo': 'Rückgängig',
   'editor.redo': 'Wiederholen',
+  'editor.cut': 'Ausschneiden',
+  'editor.copy': 'Kopieren',
+  'editor.paste': 'Einfügen',
+  'editor.selectAll': 'Alles auswählen',
   'editor.block': 'Textstil',
   'editor.paragraph': 'Absatz',
   'editor.h1': 'Überschrift 1',
@@ -312,6 +323,8 @@ export const de: AppCatalog<typeof en> = {
   'editor.linkSearching': 'Suche in anderen Notizbüchern…',
   'editor.linkThisNotebook': 'Dieses Notizbuch',
   'editor.linkOtherNotebooks': 'Andere Notizbücher',
+  'editor.linkNote': 'Notiz verknüpfen',
+  'editor.mention': 'Jemanden erwähnen',
   'editor.shortcut': '{label} ({keys})',
 
   'tags.title': 'Schlagwörter',
@@ -339,6 +352,9 @@ export const de: AppCatalog<typeof en> = {
   'search.placeholder': 'Alle Ihre Notizen durchsuchen',
   'search.results': { one: '{count} Treffer', other: '{count} Treffer' },
   'search.empty': 'Nichts gefunden',
+  'search.searching': 'Suche läuft…',
+  'search.failed':
+    'Die Suche konnte nicht abgeschlossen werden. Das heißt nicht, dass es nichts gibt.',
   'search.hint': 'Notizen ausserhalb des Index erscheinen hier nicht.',
   'search.hashtags': 'Hashtags',
 

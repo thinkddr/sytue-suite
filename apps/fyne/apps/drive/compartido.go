@@ -140,7 +140,7 @@ func (c *VistaCompartido) lista(v tema.Variante, filas []fyne.CanvasObject) fyne
 		c.desplazable.Content = contenido
 		c.desplazable.Refresh()
 	}
-	return container.NewStack(canvas.NewRectangle(tema.Color("bg", v)), c.desplazable)
+	return container.NewStack(canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)), c.desplazable)
 }
 
 // insignia es el `PermBadge` de un permiso.
@@ -417,7 +417,7 @@ func (b *botonTexto) CreateRenderer() fyne.WidgetRenderer {
 	r := &botonTextoRenderer{
 		b:     b,
 		aro:   ui.NuevoAro(tema.RadioMD, ui.SinHueco, v),
-		caja:  ui.NuevaCaja(color.NRGBA{}, color.NRGBA{}, tema.RadioMD),
+		caja:  cajaBotonTexto(b.borde, v),
 		texto: ui.Texto(b.texto, b.esc, b.peso, tema.Color("text-muted", v)),
 	}
 	r.objetos = append(r.aro.Objetos(), r.caja.Objetos()...)
@@ -437,6 +437,16 @@ func (b *botonTexto) CreateRenderer() fyne.WidgetRenderer {
 	r.objetos = append(r.objetos, r.texto)
 	r.Refresh()
 	return r
+}
+
+// cajaBotonTexto es el fondo del botón: con `border`, la caja nace con su filete —una
+// caja sin borde no lo gana después al pintarla—, y con trazo para que en reposo no
+// tape la barra.
+func cajaBotonTexto(borde bool, v tema.Variante) *ui.Caja {
+	if !borde {
+		return ui.NuevaCaja(color.NRGBA{}, color.NRGBA{}, tema.RadioMD)
+	}
+	return ui.NuevaCaja(color.NRGBA{}, tema.Color("border", v), tema.RadioMD).ConTrazo()
 }
 
 type botonTextoRenderer struct {

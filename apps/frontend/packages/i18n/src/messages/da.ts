@@ -18,6 +18,8 @@ export const da: Catalog = {
   'ui.openNav': 'Åbn navigation',
   'ui.closeNav': 'Luk navigation',
   'ui.backToList': 'Tilbage til listen',
+  'ui.suiteOpen': 'Sytue: apps, søgning, notifikationer og konto',
+  'ui.suiteClose': 'Tilbage til appen',
   'ui.noResults': 'Ingen resultater.',
   'ui.meter.almostFull': 'næsten fuld',
   'ui.meter.full': 'fuld',
@@ -59,6 +61,9 @@ export const da: Catalog = {
     'Denne app kræver OpenGL 2.1, og grafikdriveren på denne computer tilbyder det ikke ({detalle}). Installer eller opdater grafikkortets driver. Uden grafikkort (fjernskrivebord eller virtuel maskine) kan den ikke åbnes.',
   'shell.lock.reasonNotebook': 'åbne din krypterede notesbog',
   'shell.lock.faceIdUsage': 'Sytue bruger Face ID til at låse din session op, når du åbner appen.',
+  'shell.widgets.wake': 'Opdater widgets, mens appen er lukket',
+  'shell.widgets.wakeHelp':
+    'Når noget af dit ændrer sig, vækker Sytue appen med en tom notifikation fra Apple, så den kan opdatere sin widget. Apple ser hvilken app og hvornår, aldrig hvad der er ændret.',
   'shell.call.microphoneUsage':
     'Sytue Rooms bruger kun mikrofonen under et opkald, og kun når du slår den til.',
   'shell.call.cameraUsage':
@@ -170,7 +175,7 @@ export const da: Catalog = {
   'notifications.kind.pages.domain.failed':
     'Domænet {domain} på {site} virker ikke: tjek dets indstillinger',
   'notifications.kind.pages.erp.failed': 'Ordre {number} fra {site} nåede ikke frem til Sytue ERP',
-  'notifications.kind.pages.settings.changed': '{actor} har ændret en indstilling i Sytue Web',
+  'notifications.kind.pages.settings.changed': '{actor} har ændret en indstilling i Sytue Webs',
   'notifications.kind.pages.export.ready': 'Din eksport af {site} er klar',
   'notifications.kind.pages.store.busy':
     'Webshoppen på {site} har for mange ordrer, der afventer betaling',
@@ -352,6 +357,8 @@ export const da: Catalog = {
   'widgets.compose': 'Skriv',
   'widgets.storage': 'Lagerplads',
   'widgets.create': 'Opret begivenhed',
+  'widgets.updatedAgo': 'Opdateret {time}',
+  'widgets.updatedAt': 'Opdateret: {time}',
 
   'linkedServices.services': 'Tjenester',
   'linkedServices.changed':
@@ -364,6 +371,7 @@ export const da: Catalog = {
   'linkedServices.notGranted':
     'Der blev ikke givet adgang til denne tjeneste. Forbind kontoen igen for at vælge dens tilladelser.',
   'linkedServices.connected': 'Forbundne tjenester',
+  'linkedServices.exists': 'Denne konto var allerede forbundet og er nu åbnet.',
   'linkedServices.providerData': 'Ændringer gemmes hos din udbyder.',
   'linkedServices.writeUnknown':
     'Udbyderen bekræftede ikke, om det blev gemt. Opdater og kontrollér, før du prøver igen.',

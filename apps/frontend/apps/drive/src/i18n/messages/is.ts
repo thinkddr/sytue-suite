@@ -258,6 +258,14 @@ export const is: AppCatalog<typeof en> = {
     one: '{count} atriði sent í ruslið.',
     other: '{count} atriði send í ruslið.',
   },
+  'files.batch.restored': {
+    one: '{count} atriði endurheimt.',
+    other: '{count} atriði endurheimt.',
+  },
+  'files.batch.restorePartial': {
+    one: 'Ekki tókst að endurheimta {count} atriði; það er enn í ruslinu.',
+    other: 'Ekki tókst að endurheimta {count} atriði; þau eru enn í ruslinu.',
+  },
   'files.batch.trashFailed': 'Ekki tókst að senda valið í ruslið.',
   'files.batch.moveTitle': { one: 'Færa {count} atriði', other: 'Færa {count} atriði' },
   'files.batch.moveDone': { one: '{count} atriði fært.', other: '{count} atriði færð.' },
@@ -272,6 +280,9 @@ export const is: AppCatalog<typeof en> = {
   'action.rename': 'Endurnefna',
   'action.move': 'Færa í…',
   'action.copy': 'Búa til afrit',
+  'action.copyLink': 'Afrita tengil',
+  'action.linkCopied': 'Tengill afritaður. Hann opnast aðeins þeim sem hafa þegar aðgang.',
+  'action.copyLinkFailed': 'Ekki tókst að afrita tengilinn.',
   'action.shareLink': 'Deila tengli',
   'action.openInApp': 'Opna í forritinu',
   'action.openInEditor': 'Opna í ritlinum',
@@ -486,6 +497,18 @@ export const is: AppCatalog<typeof en> = {
   'trash.purged': '„{name}“ var eytt endanlega.',
   'trash.purgeDenied': 'Ekki er hægt að eyða „{name}“',
   'trash.purgeFailed': 'Ekki tókst að eyða.',
+  'trash.emptyAll': 'Tæma ruslið',
+  'trash.emptyAllTitle': 'Tæma ruslið?',
+  'trash.emptyAllBody': {
+    one: '{count} atriði í ruslinu verður eytt endanlega ásamt útgáfusögunni. Engin leið er að endurheimta það eftir á.',
+    other:
+      '{count} atriðum í ruslinu verður eytt endanlega ásamt útgáfusögunni. Engin leið er að endurheimta þau eftir á.',
+  },
+  'trash.emptiedAll': 'Ruslið var tæmt.',
+  'trash.emptyAllPartial': {
+    one: 'Ekki tókst að eyða {count} atriði; það er enn í ruslinu.',
+    other: 'Ekki tókst að eyða {count} atriðum; þau eru enn í ruslinu.',
+  },
   'trash.purgeTitle': 'Eyða endanlega?',
   'trash.purgeBodyFolder':
     'Efni „{name}“ og alls sem er í henni verður eytt af netþjónum Sytue ásamt útgáfusögunni. Engin leið er að endurheimta það eftir á, hvorki héðan né í gegnum þjónustuver. Í staðinn losnar plássið sem það tók.',

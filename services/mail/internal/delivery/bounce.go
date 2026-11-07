@@ -84,6 +84,9 @@ func (q *QueueWorker) notifySender(ctx context.Context, it domain.OutboundMessag
 	if err := q.store.InsertMessage(tctx, &m); err != nil {
 		return fmt.Errorf("bounce: persistir el aviso: %w", err)
 	}
+	// Un correo más en la Entrada, sin leer: la señal del widget de Mail, como la de
+	// cualquier correo que entra (Inbound.publishDelivered). Nil-safe.
+	q.hubNotifier.AvisarCambio(tctx, resolved.Tenant, "mail", resolved.Subject)
 	return nil
 }
 

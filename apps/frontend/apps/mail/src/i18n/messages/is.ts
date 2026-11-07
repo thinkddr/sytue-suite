@@ -29,6 +29,15 @@ export const is: AppCatalog<typeof en> = {
   'folder.junk': 'Ruslpóstur',
   'folder.archive': 'Safn',
   'nav.compose': 'Skrifa',
+  'nav.mailboxes': 'Pósthólf',
+  'nav.allInboxes': 'Öll innhólf',
+  'nav.allDrafts': 'Öll drög',
+  'nav.allSent': 'Allt sent',
+  'nav.allArchive': 'Allt safnið',
+  'nav.allJunk': 'Allur ruslpóstur',
+  'nav.allTrash': 'Allt ruslið',
+  'nav.sytueMailbox': 'Sytue-pósthólf',
+  'nav.accountsIn': 'Reikningar: {mailbox}',
   'nav.folders': 'Möppur',
   'nav.refresh': 'Uppfæra',
   'nav.manageFolders': 'Stjórna möppum',
@@ -53,6 +62,10 @@ export const is: AppCatalog<typeof en> = {
   'shortcuts.archive': 'Setja í safn',
   'shortcuts.trash': 'Færa í ruslið',
   'shortcuts.star': 'Stjörnumerkja',
+  'shortcuts.select': 'Velja samtalið',
+  'shortcuts.clearSelection': 'Hreinsa val',
+  'shortcuts.label': 'Merkja',
+  'shortcuts.move': 'Færa í…',
   'shortcuts.help': 'Sýna þennan lista',
   'nav.settings': 'Stillingar',
   'nav.signature': 'Undirskrift',
@@ -151,6 +164,9 @@ export const is: AppCatalog<typeof en> = {
   'error.undoSend': 'Ekki tókst að hætta við sendinguna',
   'error.undoSendGone': 'Of seint að hætta við; skilaboðin eru þegar farin',
   'undo.done': 'Hætt við sendingu',
+  'triage.moved': 'Fært í {folder}',
+  'triage.undone': 'Fært aftur á sinn stað',
+  'error.undoMove': 'Ekki tókst að færa til baka',
   'list.region': 'Samtöl í {folder}',
   'list.fallbackName': 'Póstur',
   'list.searchResults': 'Leitarniðurstöður',
@@ -162,6 +178,13 @@ export const is: AppCatalog<typeof en> = {
   'list.searchHint':
     'Virkjar: from:, to:, subject:, has:attachment, is:unread, is:starred, after:2026-01-31, before:2026-03-01. Notaðu gæsalappir fyrir fleiri en eitt orð.',
   'list.clearSearch': 'Hreinsa leit',
+  'filter.group': 'Flýtisíur',
+  'filter.unread': 'Ólesið',
+  'filter.starred': 'Stjörnumerkt',
+  'filter.attachments': 'Með viðhengjum',
+  'filter.emptyTitle': 'Ekkert hér passar við þessa síu',
+  'filter.emptyDescription': 'Prófaðu aðra síu eða sýndu öll samtöl.',
+  'filter.showAll': 'Sýna allt',
   'list.selectAll': 'Velja öll samtöl',
   'list.loading': 'Hleður samtölum…',
   'list.errorTitle': 'Ekki tókst að hlaða póstinum þínum',
@@ -194,6 +217,8 @@ export const is: AppCatalog<typeof en> = {
   'reader.createEvent': 'Búa til viðburð',
   'reader.eventCreated': 'Viðburður búinn til í Sytue Calendar',
   'reader.eventFailed': 'Ekki tókst að búa til viðburðinn',
+  'reader.shareToRooms': 'Deila í Rooms',
+  'reader.roomsFailed': 'Ekki tókst að deila í Rooms.',
   'reader.unsubscribe': 'Afskrá',
   'reader.unsubscribeFailed': 'Ekki tókst að ljúka afskráningunni',
   'reader.unsubscribeSent': 'Beiðni um afskráningu send',
@@ -321,6 +346,10 @@ export const is: AppCatalog<typeof en> = {
   'editor.font': 'Letur',
   'editor.redo': 'Endurgera',
   'editor.undo': 'Afturkalla',
+  'editor.cut': 'Klippa',
+  'editor.copy': 'Afrita',
+  'editor.paste': 'Líma',
+  'editor.selectAll': 'Velja allt',
   'editor.colorNone': 'Enginn',
   'editor.colorYellow': 'Gulur',
   'editor.colorViolet': 'Fjólublár',
@@ -689,6 +718,11 @@ export const is: AppCatalog<typeof en> = {
   'externalMail.port': 'Gátt',
   'externalMail.username': 'Notandanafn (netfang ef reiturinn er auður)',
   'externalMail.password': 'Aðgangsorð eða forritsaðgangsorð',
+  'externalMail.icloudBody':
+    'iCloud Mail tekur ekki við aðgangsorði Apple-reikningsins þíns hér. Búðu til forritssértækt aðgangsorð á account.apple.com (Innskráning og öryggi › Forritssértæk aðgangsorð) og sláðu það inn hér fyrir neðan.',
+  'externalMail.icloudLink': 'Opna account.apple.com',
+  'externalMail.icloudAuthError':
+    'iCloud tók ekki við aðgangsorðinu. Notaðu forritssértækt aðgangsorð, ekki aðgangsorð Apple-reikningsins þíns.',
   'externalMail.smtpPassword':
     'SMTP-aðgangsorð (sama og fyrir innkomandi póst ef reiturinn er auður)',
   'externalMail.advanced': 'Ítarlegir valkostir',
@@ -698,6 +732,10 @@ export const is: AppCatalog<typeof en> = {
     'Við athugum innskráningu á báða netþjóna áður en vistað er. Enginn prufupóstur verður sendur.',
   'externalMail.connect': 'Tengja reikning',
   'externalMail.authorize': 'Halda áfram til þjónustuaðila',
+  'externalMail.reconnectNeeded': 'Skráðu þig aftur inn til að sjá þennan reikning',
+  'externalMail.accountUnavailable': 'Ekki náðist í reikninginn. Reyna aftur',
+  'externalMail.someUnavailable':
+    'Ekki náðist í suma reikninga. Póstur þeirra er ekki á þessum lista.',
   'externalMail.add': 'Bæta við tölvupóstreikningi',
   'externalMail.empty': 'Engir ytri tölvupóstreikningar tengdir.',
   'externalMail.open': 'Opna pósthólf',
@@ -709,6 +747,13 @@ export const is: AppCatalog<typeof en> = {
     'Ekki tókst að staðfesta öruggu tenginguna. Athugaðu heiti netþjónsins og vottorðið hjá tölvupóstþjónustunni.',
   'externalMail.authError':
     'Innskráningu var hafnað. Tengdu reikninginn aftur eða athugaðu notandanafn og forritsaðgangsorð.',
+  'externalMail.cancelled': 'Hætt var við innskráningu. Ekkert var tengt.',
+  'externalMail.scopeMissing':
+    'Aðgangur að tölvupósti var ekki leyfður. Reyndu aftur og hafðu heimildina fyrir tölvupóst valda.',
+  'externalMail.timeout': 'Þessi innskráning gildir ekki lengur. Reyndu aftur.',
+  'externalMail.exists': 'Þessi tölvupóstreikningur er þegar tengdur.',
+  'externalMail.connected': 'Reikningurinn {account} er nú tengdur.',
+  'externalMail.accountsError': 'Ekki tókst að hlaða ytri tölvupóstreikningunum.',
   'externalMail.sendUnknown':
     'Netþjónninn kann að hafa tekið við þessum tölvupósti. Athugaðu Sent áður en þú reynir aftur svo hann verði ekki sendur tvisvar.',
   'externalMail.blockedError':
@@ -717,23 +762,9 @@ export const is: AppCatalog<typeof en> = {
     'Þessi tölvupóstur eða viðhengi hans fara yfir stærðarmörkin. Minnkaðu viðhengin og reyndu aftur.',
   'externalMail.pop3Note':
     'POP3 leyfir lestur innhólfs og sendingu með SMTP. Fjarmöppur, lesmerkingar og flutningur skeyta eru ekki í boði.',
-  'externalMail.refreshNote':
-    'Þetta pósthólf uppfærist á 30 sekúndna fresti meðan skeytalistinn er opinn. Tölvupósturinn helst hjá þjónustuaðilanum.',
   'externalMail.sent': 'Þjónustuaðilinn tók við tölvupóstinum.',
   'externalMail.sentNoCopy':
     'Tekið var við tölvupóstinum en ekki tókst að vista afrit í Sent. Ekki senda hann aftur.',
-  'externalMail.draftNote':
-    'Þessi drög eru aðeins geymd meðan glugginn er opinn. Þegar honum er lokað er drögunum eytt.',
-  'externalMail.attach': 'Hengja við skrár',
-  'externalMail.markUnread': 'Merkja sem ólesið',
-  'externalMail.markRead': 'Merkja sem lesið',
-  'externalMail.flag': 'Bæta við stjörnu',
-  'externalMail.unflag': 'Fjarlægja stjörnu',
-  'externalMail.trash': 'Færa í ruslið',
-  'externalMail.noMessages': 'Engin skeyti í þessari möppu.',
-  'externalMail.discardDraft': 'Henda þessum drögum?',
   'externalMail.invalidConfiguration':
     'Sláðu inn gilt netfang, heiti og gáttir beggja netþjóna og aðgangsorð.',
-  'externalMail.invalidRecipients':
-    'Athugaðu netföng viðtakenda. Aðskildu mörg netföng með kommum.',
 };

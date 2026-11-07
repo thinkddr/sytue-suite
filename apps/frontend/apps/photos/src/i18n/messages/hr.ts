@@ -138,6 +138,11 @@ export const hr: AppCatalog<typeof en> = {
   'gallery.downloadSelected': 'Preuzmi',
   'gallery.downloading':
     'Pokrenuti zahtjevi za preuzimanje: {count}. Provjerite preuzimanja u pregledniku.',
+  'gallery.downloadingNative': {
+    one: 'Preuzimanje {count} fotografije…',
+    few: 'Preuzimanje {count} fotografije…',
+    other: 'Preuzimanje {count} fotografija…',
+  },
   'gallery.downloadCapped': 'Fotografije izvan ove serije: {count}.',
   'gallery.newAlbum': 'Novi album',
   'gallery.newAlbumTitle': 'Novi album',
@@ -269,4 +274,20 @@ export const hr: AppCatalog<typeof en> = {
   'aiBatch.excludeOrg': 'Isključi organizaciju iz automatske obrade Sytue AI',
   'aiBatch.excludedHint':
     'Organizacija je isključena iz automatske obrade Sytue AI. Nove se fotografije ne obrađuju u pozadini za prijedloge ili sličnosti.',
+  'album.rename': 'Preimenuj',
+  'album.renamePrompt': 'Naziv albuma',
+  'album.setCover': 'Postavi kao naslovnicu albuma',
+  'album.isCover': 'Ovo je naslovnica albuma',
+  'album.coverSet': 'Naslovnica albuma je ažurirana',
+  'gallery.favorited': 'Dodano u favorite: {count}',
+  'gallery.unfavorited': 'Uklonjeno iz favorita: {count}',
+  'gallery.favoriteFailed': 'Fotografije koje nije bilo moguće promijeniti: {count}',
+  'gallery.noResults.title': 'Nijedna fotografija ne odgovara „{query}”',
+  'gallery.noResults.description':
+    'Pokušajte s drugim riječima ili očistite pretraživanje da biste vidjeli sve svoje fotografije.',
+  'gallery.clearSearch': 'Očisti pretraživanje',
+  'viewer.counter': '{index} / {total}',
+  'viewer.counterMore': '{count}+',
+  'viewer.counterLabel': 'Fotografija {index} od {total}',
+  'viewer.shortcutsJump': 'Home i End vode na prvu i posljednju fotografiju.',
 };

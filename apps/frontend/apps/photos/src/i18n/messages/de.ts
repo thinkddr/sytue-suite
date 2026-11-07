@@ -134,6 +134,10 @@ export const de: AppCatalog<typeof en> = {
   'gallery.downloadSelected': 'Herunterladen',
   'gallery.downloading':
     'Gestartete Downloadanfragen: {count}. Prüfen Sie die Downloads in Ihrem Browser.',
+  'gallery.downloadingNative': {
+    one: '1 Foto wird heruntergeladen…',
+    other: '{count} Fotos werden heruntergeladen…',
+  },
   'gallery.downloadCapped': 'Fotos außerhalb dieses Stapels: {count}.',
   'gallery.newAlbum': 'Neues Album',
   'gallery.newAlbumTitle': 'Neues Album',
@@ -258,4 +262,20 @@ export const de: AppCatalog<typeof en> = {
   'aiBatch.excludeOrg': 'Organisation vom automatischen Sytue-AI-Durchlauf ausschließen',
   'aiBatch.excludedHint':
     'Die Organisation ist vom automatischen Sytue-AI-Durchlauf ausgeschlossen. Fotos werden im Hintergrund nicht für Vorschläge oder Ähnlichkeiten verarbeitet.',
+  'album.rename': 'Umbenennen',
+  'album.renamePrompt': 'Name des Albums',
+  'album.setCover': 'Als Albumcover verwenden',
+  'album.isCover': 'Das ist das Albumcover',
+  'album.coverSet': 'Albumcover aktualisiert',
+  'gallery.favorited': 'Zu Favoriten hinzugefügt: {count}',
+  'gallery.unfavorited': 'Aus Favoriten entfernt: {count}',
+  'gallery.favoriteFailed': 'Fotos, die nicht geändert werden konnten: {count}',
+  'gallery.noResults.title': 'Keine Fotos passen zu „{query}“',
+  'gallery.noResults.description':
+    'Versuche es mit anderen Wörtern oder lösche die Suche, um alle deine Fotos zu sehen.',
+  'gallery.clearSearch': 'Suche löschen',
+  'viewer.counter': '{index} / {total}',
+  'viewer.counterMore': '{count}+',
+  'viewer.counterLabel': 'Foto {index} von {total}',
+  'viewer.shortcutsJump': 'Pos1 und Ende springen zum ersten und letzten Foto.',
 };

@@ -6,6 +6,7 @@
  */
 import type { ComponentChildren, JSX } from 'preact';
 import { cx } from '../lib/cx.js';
+import { useBarraUnica } from './BarraMovil.js';
 
 export interface SectionHeaderProps {
   /** Título de la sección. */
@@ -23,6 +24,13 @@ export interface SectionHeaderProps {
    * tamaño visual sigue siendo `sytue-h4`.
    */
   level?: 1 | 2 | 3 | 4 | 5 | 6;
+  /**
+   * El título dice lo mismo que la barra del teléfono (el nombre de la app: «Contactos»
+   * bajo «Contactos»). Con la barra única, por debajo de 768 el título se queda solo
+   * para el lector de pantalla —el h1 sigue ahí— y, si no hay acciones, la cabecera
+   * entera se va; con acciones, quedan ellas solas, alineadas a la derecha.
+   */
+  repiteLaBarra?: boolean;
   class?: string;
 }
 
@@ -32,8 +40,11 @@ export function SectionHeader({
   icon,
   actions,
   level = 2,
+  repiteLaBarra = false,
   class: cls,
 }: SectionHeaderProps): JSX.Element {
+  const unica = useBarraUnica();
+  const plegar = repiteLaBarra && unica;
   // Etiqueta real (h1..h6); el cast a un intrínseco concreto es seguro (todos
   // comparten atributos) y Preact renderiza la cadena real en runtime.
   const Heading = `h${level}` as 'h2';
@@ -44,6 +55,7 @@ export function SectionHeader({
     <div
       class={cx(
         'border-border bg-surface text-text flex min-h-12 flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2.5',
+        plegar && (actions ? 'max-md:min-h-0 max-md:justify-end' : 'max-md:hidden'),
         cls,
       )}
     >
@@ -52,7 +64,7 @@ export function SectionHeader({
       ) : null}
       {/* grow (basis auto), no flex-1 (basis 0): con basis 0 el título se encoge
           a cero y el salto de línea no llega a producirse. */}
-      <div class="min-w-0 grow">
+      <div class={cx('min-w-0 grow', plegar && 'max-md:sr-only')}>
         <Heading class="sytue-h4 truncate">{title}</Heading>
         {subtitle ? <p class="text-text-muted truncate text-sm">{subtitle}</p> : null}
       </div>

@@ -43,9 +43,12 @@ const (
 	LadoMarcaAviso float32 = 18
 	// SangriaMetaAviso es el `mt-1` de la línea «Mail · hace 5 min».
 	SangriaMetaAviso float32 = 1 * 0.25 * tema.Rem
-	// LadoPuntoSinLeer es el `h-2 w-2` del punto y SangriaPuntoAviso su `mt-2`.
+	// LadoPuntoSinLeer es el `h-2 w-2` del punto. El punto va en su botón «Marcar como
+	// leído» (`MarcarLeido` de @sytue/shell): `p-2` alrededor, una diana de 24 (WCAG
+	// 2.5.8), y su `mt-3` lo deja a la altura del `py-3` de la fila.
 	LadoPuntoSinLeer  float32 = 2 * 0.25 * tema.Rem
-	SangriaPuntoAviso float32 = 2 * 0.25 * tema.Rem
+	RellenoPuntoAviso float32 = 2 * 0.25 * tema.Rem
+	LadoBotonLeido            = LadoPuntoSinLeer + 2*RellenoPuntoAviso
 
 	// El esqueleto: `Skeleton circle 18px` y dos barras de 14px y 12px con `gap-2`. Son
 	// píxeles LITERALES en la web, no rem.
@@ -119,7 +122,17 @@ type Avisos struct {
 	HayMas      bool
 	AlCargarMas func()
 
-	AlAbrir       func(api.HubNotification)
+	AlAbrir func(api.HubNotification)
+	// AlMarcarLeido marca UNO como leído sin abrirlo: el punto azul, hecho botón.
+	AlMarcarLeido func(api.HubNotification)
+	// enfocarTras es el aviso cuya fila recibe el foco en el próximo repintado: el del
+	// punto que se acaba de pulsar con el foco puesto. El botón se va al marcarlo y, sin
+	// esto, el foco se quedaría en nada y el siguiente Tab empezaría desde arriba.
+	enfocarTras string
+	// enfocarPuesto es el puesto que esa fila ocupaba en la lista: si el aviso ya no se
+	// ve —con «Sin leer», leído sale—, el foco va a la que ahora ocupa ese puesto, la
+	// siguiente, o a la última si era el último.
+	enfocarPuesto int
 	AlMarcarTodas func()
 	AlSilenciar   func(origen string, silenciar bool)
 	AlReintentar  func()
@@ -197,8 +210,13 @@ type avisosRenderer struct {
 	esqueleto []fyne.CanvasObject
 	aviso     *ui.Vacio
 	filas     []*FilaAviso
-	filetes   []*canvas.Rectangle
-	mas       *ui.Boton
+	// leidos es el botón del punto de cada fila sin leer, a su par en `filas` (nil en
+	// las leídas). Van FUERA de la fila, como en la web: hermanos, y encima.
+	leidos []*BotonLeido
+	// ids es el aviso de cada fila, a su par en `filas`.
+	ids     []string
+	filetes []*canvas.Rectangle
+	mas     *ui.Boton
 
 	fileteReglas *canvas.Rectangle
 	tituloReglas *canvas.Text
@@ -225,7 +243,7 @@ func (r *avisosRenderer) rehacer() {
 	r.cabecera = nuevaCabecera(v, t.T("inbox.overline", nil), t.T("inbox.heading", nil), t.T("inbox.intro", nil))
 	r.cabecera.preparar(v, ancho)
 	r.hacerBarra(t)
-	r.esqueleto, r.aviso, r.filas, r.filetes, r.mas = nil, nil, nil, nil, nil
+	r.esqueleto, r.aviso, r.filas, r.filetes, r.mas, r.leidos, r.ids = nil, nil, nil, nil, nil, nil, nil
 
 	visibles := Visibles(a.Items, a.SoloSinLeer, a.Producto)
 	switch {
@@ -253,8 +271,21 @@ func (r *avisosRenderer) rehacer() {
 		}
 		r.aviso = Aviso(t, v, SinNada, textos, nil)
 	default:
-		for _, n := range visibles {
+		for puesto, n := range visibles {
 			r.filas = append(r.filas, r.filaDe(n, ancho))
+			r.ids = append(r.ids, n.ID)
+			var b *BotonLeido
+			if !n.Read {
+				b = NuevoBotonLeido(t.T("inbox.markRead", nil), func() {
+					if b.Enfocado() {
+						a.enfocarTras, a.enfocarPuesto = n.ID, puesto
+					}
+					if a.AlMarcarLeido != nil {
+						a.AlMarcarLeido(n)
+					}
+				})
+			}
+			r.leidos = append(r.leidos, b)
 		}
 		r.filetes = Divisores(v, len(r.filas))
 	}
@@ -354,8 +385,13 @@ func (r *avisosRenderer) recomponer() {
 	if r.aviso != nil {
 		r.objetos = append(r.objetos, r.aviso)
 	}
-	for _, f := range r.filas {
+	// Cada punto justo detrás de SU fila: Fyne recorre el foco en el orden de Objects(),
+	// y el de la web es el del DOM, fila, punto, fila, punto (docs/design.md §2.6).
+	for i, f := range r.filas {
 		r.objetos = append(r.objetos, f)
+		if b := r.leidos[i]; b != nil {
+			r.objetos = append(r.objetos, b)
+		}
 	}
 	for _, f := range r.filetes {
 		r.objetos = append(r.objetos, f)
@@ -379,6 +415,32 @@ func (r *avisosRenderer) Refresh() {
 	r.rehacer()
 	r.Layout(r.a.Size())
 	canvas.Refresh(r.a)
+	r.devolverFoco()
+}
+
+// devolverFoco lleva el foco a la fila del aviso que se acaba de marcar desde su punto
+// (`enfocarTras`), como `MarcarLeido` en la web. Si la fila ya no se ve —con «Sin leer»
+// el aviso leído sale de la lista—, va a la del aviso siguiente, que ocupa ahora su
+// puesto, o a la del anterior si era el último; como en la web.
+func (r *avisosRenderer) devolverFoco() {
+	id := r.a.enfocarTras
+	if id == "" {
+		return
+	}
+	r.a.enfocarTras = ""
+	c := fyne.CurrentApp().Driver().CanvasForObject(r.a)
+	if c == nil {
+		return
+	}
+	for i, f := range r.filas {
+		if r.ids[i] == id {
+			c.Focus(f)
+			return
+		}
+	}
+	if n := len(r.filas); n > 0 {
+		c.Focus(r.filas[min(r.a.enfocarPuesto, n-1)])
+	}
 }
 
 // AltoFilaEsqueleto es una fila de carga: `py-3` y la columna de dos barras con `gap-2`.
@@ -513,7 +575,12 @@ func (r *avisosRenderer) Layout(t fyne.Size) {
 		}
 		h := AltoFilaAviso(f, ancho)
 		f.Move(fyne.NewPos(x, fy))
-		f.Resize(fyne.NewSize(ancho, h))
+		f.Resize(fyne.NewSize(anchoFilaAviso(f, ancho), h))
+		if b := r.leidos[i]; b != nil {
+			// `mt-3`, a la derecha de la fila.
+			b.Move(fyne.NewPos(x+ancho-LadoBotonLeido, fy+MargenYAviso))
+			b.Resize(fyne.NewSize(LadoBotonLeido, LadoBotonLeido))
+		}
 		fy += h
 	}
 	if r.mas != nil {
@@ -579,12 +646,13 @@ type FilaAviso struct {
 	Titulo, Cuerpo, Meta string
 	Marca                iconos.Producto
 	Conocido             bool
-	// SinLeer pone el título en `font-semibold` y el punto de la derecha.
+	// SinLeer pone el título en `font-semibold` y deja sitio a la derecha para el botón
+	// del punto, que va fuera de la fila (`BotonLeido`).
 	SinLeer bool
 	// Enlace es que el aviso lleva a algún sitio: en la web es un `<a>`, y si no, un
 	// `<button>` que solo lo marca como leído.
 	Enlace bool
-	// RotuloPunto es el `aria-label` del punto («Sin leer»).
+	// RotuloPunto es el «Sin leer» que la fila dice para quien no ve el punto.
 	RotuloPunto string
 	// Ancho es el de la lista, que es el que decide en cuántas líneas cae el texto.
 	Ancho float32
@@ -631,35 +699,41 @@ func (f *FilaAviso) peso() ui.Peso {
 	return ui.Medio
 }
 
-// anchoTextoAviso es lo que le queda a la columna de texto en una fila de ese ancho.
-func anchoTextoAviso(ancho float32, sinLeer bool) float32 {
-	cabe := ancho - 2*MargenXAviso - LadoMarcaAviso - HuecoAviso
-	if sinLeer {
-		cabe -= HuecoAviso + LadoPuntoSinLeer
+// anchoFilaAviso es lo que ocupa la fila en una lista de ese ancho: `flex-1`, menos el
+// botón del punto si está sin leer.
+func anchoFilaAviso(f *FilaAviso, ancho float32) float32 {
+	if f.SinLeer {
+		return max(ancho-LadoBotonLeido, 1)
 	}
-	return max(cabe, 1)
+	return ancho
 }
 
-// AltoFilaAviso es lo que ocupa una fila a ese ancho: `py-3` y lo más alto de la marca
-// (con su `mt-0.5`), la columna de texto y el punto (con su `mt-2`).
+// anchoTextoAviso es lo que le queda a la columna de texto en una fila de ese ancho.
+func anchoTextoAviso(ancho float32) float32 {
+	return max(ancho-2*MargenXAviso-LadoMarcaAviso-HuecoAviso, 1)
+}
+
+// AltoFilaAviso es lo que ocupa una fila en una lista de ese ancho: `py-3` y lo más alto
+// de la marca (con su `mt-0.5`) y la columna de texto; y, sin leer, al menos el botón
+// del punto con su `mt-3`.
 func AltoFilaAviso(f *FilaAviso, ancho float32) float32 {
-	cabe := anchoTextoAviso(ancho, f.SinLeer)
+	cabe := anchoTextoAviso(anchoFilaAviso(f, ancho))
 	texto := float32(len(ui.Repartir(f.Titulo, tema.TextoSM, f.peso(), cabe))) * tema.TextoSM.Linea
 	if f.Cuerpo != "" {
 		texto += SangriaResumen + float32(len(ui.Repartir(f.Cuerpo, tema.TextoSM, ui.Normal, cabe)))*tema.TextoSM.Linea
 	}
 	texto += SangriaMetaAviso + tema.TextoXS.Linea
-	lado := max(texto, SangriaMarca+LadoMarcaAviso)
+	alto := 2*MargenYAviso + max(texto, SangriaMarca+LadoMarcaAviso)
 	if f.SinLeer {
-		lado = max(lado, SangriaPuntoAviso+LadoPuntoSinLeer)
+		alto = max(alto, MargenYAviso+LadoBotonLeido)
 	}
-	return 2*MargenYAviso + lado
+	return alto
 }
 
 // CreateRenderer compone la fila. Termina en Refresh (regla 7 de `ui.go`).
 func (f *FilaAviso) CreateRenderer() fyne.WidgetRenderer {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	cabe := anchoTextoAviso(f.Ancho, f.SinLeer)
+	cabe := anchoTextoAviso(anchoFilaAviso(f, f.Ancho))
 	r := &filaAvisoRenderer{
 		f:      f,
 		fondo:  canvas.NewRectangle(color.NRGBA{}),
@@ -679,10 +753,6 @@ func (f *FilaAviso) CreateRenderer() fyne.WidgetRenderer {
 		r.objetos = append(r.objetos, r.cuerpo)
 	}
 	r.objetos = append(r.objetos, r.meta)
-	if f.SinLeer {
-		r.punto = canvas.NewCircle(tema.Color("primary", v))
-		r.objetos = append(r.objetos, r.punto)
-	}
 	r.Refresh()
 	return r
 }
@@ -702,7 +772,6 @@ type filaAvisoRenderer struct {
 	marca          *iconos.Dibujo
 	titulo, cuerpo *ui.Parrafo
 	meta           *canvas.Text
-	punto          *canvas.Circle
 	objetos        []fyne.CanvasObject
 }
 
@@ -713,7 +782,7 @@ func (r *filaAvisoRenderer) MinSize() fyne.Size {
 func (r *filaAvisoRenderer) Objects() []fyne.CanvasObject { return r.objetos }
 func (r *filaAvisoRenderer) Destroy()                     {}
 
-// Layout coloca marca, columna de texto y punto, todo arriba (`items-start`).
+// Layout coloca marca y columna de texto, arriba (`items-start`).
 func (r *filaAvisoRenderer) Layout(t fyne.Size) {
 	r.aro.Colocar(t)
 	r.fondo.Resize(t)
@@ -722,7 +791,7 @@ func (r *filaAvisoRenderer) Layout(t fyne.Size) {
 		r.marca.Colocar(x, y+SangriaMarca, LadoMarcaAviso)
 	}
 	x += LadoMarcaAviso + HuecoAviso
-	cabe := anchoTextoAviso(t.Width, r.f.SinLeer)
+	cabe := anchoTextoAviso(t.Width)
 	alto := ui.AltoParrafo(r.titulo, cabe)
 	r.titulo.Move(fyne.NewPos(x, y))
 	r.titulo.Resize(fyne.NewSize(cabe, alto))
@@ -736,10 +805,6 @@ func (r *filaAvisoRenderer) Layout(t fyne.Size) {
 	}
 	ui.Truncar(r.meta, r.f.Meta, tema.TextoXS, ui.Normal, cabe)
 	ui.ColocarTexto(r.meta, tema.TextoXS, x, y+SangriaMetaAviso)
-	if r.punto != nil {
-		r.punto.Move(fyne.NewPos(t.Width-MargenXAviso-LadoPuntoSinLeer, MargenYAviso+SangriaPuntoAviso))
-		r.punto.Resize(fyne.NewSize(LadoPuntoSinLeer, LadoPuntoSinLeer))
-	}
 }
 
 // Refresh repinta con el estado del puntero y del foco.
@@ -751,8 +816,74 @@ func (r *filaAvisoRenderer) Refresh() {
 	r.aro.Ver(r.f.Enfocado())
 	r.meta.Color = tema.Color("text-subtle", v)
 	r.meta.Refresh()
-	if r.punto != nil {
-		r.punto.FillColor = tema.Color("primary", v)
-		r.punto.Refresh()
+}
+
+// ---- El punto, hecho botón ----
+
+// BotonLeido es el punto azul de un aviso sin leer como botón «Marcar como leído»: el
+// `MarcarLeido` de @sytue/shell. Marca ESE aviso sin abrirlo —abrirlo navega, y «Marcar
+// todas» se lleva por delante los demás—. `rounded-full p-2` con el punto de 8 en medio y
+// `hover:bg-chrome-hover`.
+type BotonLeido struct {
+	ui.Pulsable
+}
+
+var _ fyne.Widget = (*BotonLeido)(nil)
+
+// NuevoBotonLeido crea el botón; `rotulo` es su nombre accesible («Marcar como leído»).
+func NuevoBotonLeido(rotulo string, alPulsar func()) *BotonLeido {
+	b := &BotonLeido{}
+	b.Nombre = rotulo
+	b.AlPulsar = alPulsar
+	b.ExtendBaseWidget(b)
+	return b
+}
+
+// CreateRenderer compone el círculo del puntero, el aro de foco y el punto.
+func (b *BotonLeido) CreateRenderer() fyne.WidgetRenderer {
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	r := &botonLeidoRenderer{
+		b:     b,
+		fondo: canvas.NewCircle(color.NRGBA{}),
+		aro:   ui.NuevoAro(LadoBotonLeido/2, ui.SinHueco, v),
+		punto: canvas.NewCircle(tema.Color("primary", v)),
 	}
+	r.objetos = append(r.aro.Objetos(), r.fondo, r.punto)
+	r.Refresh()
+	return r
+}
+
+type botonLeidoRenderer struct {
+	b            *BotonLeido
+	fondo, punto *canvas.Circle
+	aro          *ui.Aro
+	objetos      []fyne.CanvasObject
+}
+
+func (r *botonLeidoRenderer) MinSize() fyne.Size {
+	return fyne.NewSize(LadoBotonLeido, LadoBotonLeido)
+}
+func (r *botonLeidoRenderer) Objects() []fyne.CanvasObject { return r.objetos }
+func (r *botonLeidoRenderer) Destroy()                     {}
+
+func (r *botonLeidoRenderer) Layout(t fyne.Size) {
+	r.aro.Colocar(t)
+	r.fondo.Move(fyne.NewPos(0, 0))
+	r.fondo.Resize(t)
+	r.punto.Move(fyne.NewPos((t.Width-LadoPuntoSinLeer)/2, (t.Height-LadoPuntoSinLeer)/2))
+	r.punto.Resize(fyne.NewSize(LadoPuntoSinLeer, LadoPuntoSinLeer))
+}
+
+// Refresh repinta con el estado del puntero y del foco.
+func (r *botonLeidoRenderer) Refresh() {
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	r.fondo.FillColor = color.NRGBA{}
+	if r.b.Encima() || r.b.Enfocado() {
+		r.fondo.FillColor = tema.Color("chrome-hover", v)
+	}
+	r.fondo.Refresh()
+	r.aro.Pintar(v)
+	r.aro.Ver(r.b.Enfocado())
+	r.punto.FillColor = tema.Color("primary", v)
+	r.punto.Refresh()
 }

@@ -1,0 +1,17 @@
+/* El CSS del banco de la barra única: el de la suite, el de cada app que monta (sus
+   reglas propias: el carril del ERP, el lienzo de Notepads…) y sus clases. */
+@import '@sytue/ui/styles.css';
+@import '../../../apps/mail/src/styles/app.css';
+@import '../../../apps/drive/src/styles/global.css';
+@import '../../../apps/rooms/src/styles/app.css';
+@import '../../../apps/cloud-dashboard/src/styles/app.css';
+@import '../../../apps/portal/src/styles/global.css';
+@import '../../../apps/pages/src/styles/app.css';
+@import '../../../apps/bases/src/styles/app.css';
+@import '../../../apps/photos/src/styles/app.css';
+@import '../../../apps/console/src/styles/app.css';
+@import '../../../apps/erp/src/styles/app.css';
+@import '../../../apps/notes/src/styles/app.css';
+@source '../../../apps/*/src/**/*.{astro,ts,tsx}';
+@source '../../office/src/**/*.{astro,ts,tsx}';
+@source './*.tsx';

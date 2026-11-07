@@ -76,6 +76,14 @@ type Bandeja struct {
 	Buscando bool
 	// Consulta es lo escrito en el campo de búsqueda.
 	Consulta string
+	// Filtro es el filtro rápido puesto (la lista ya llega filtrada) y AlFiltrar su
+	// cambio.
+	Filtro    FiltroRapido
+	AlFiltrar func(FiltroRapido)
+	// FiltroTope dice que el filtro ya pidió sus páginas automáticas sin encontrar
+	// nada y quedan más: el vacío ofrece «Cargar más» (AlSeguirFiltro).
+	FiltroTope     bool
+	AlSeguirFiltro func()
 	// AbiertaID es el hilo que el lector está enseñando.
 	AbiertaID string
 	// Marcadas son los hilos con la casilla puesta.
@@ -207,6 +215,7 @@ func (b *Bandeja) CreateRenderer() fyne.WidgetRenderer {
 		fondo:         canvas.NewRectangle(tema.Color("surface", v)),
 		filete:        canvas.NewRectangle(tema.Color("border", v)),
 		lineaBusqueda: canvas.NewRectangle(tema.Color("border", v)),
+		lineaFiltros:  canvas.NewRectangle(tema.Color("border", v)),
 		conteo:        ui.NuevoRotulo("", tema.TextoXS, ui.Normal, "text-subtle"),
 	}
 	r.vaciar = nuevoBotonVaciar(b.T.T("purge.emptyFolder", nil), func() {
@@ -233,6 +242,7 @@ func (b *Bandeja) CreateRenderer() fyne.WidgetRenderer {
 	}).Con(ui.Fantasma, ui.TallaSM)
 	r.limpiar.Rotulo, r.limpiar.Icono, r.limpiar.TamIcono = b.T.T("list.clearSearch", nil), iconos.Cerrar, 16
 	r.seleccion = nuevaBarraSeleccion(b.T, b.Lote)
+	r.filtros = b.botonesFiltro()
 
 	var lista *widget.List
 	lista = widget.NewList(
@@ -261,9 +271,12 @@ func (b *Bandeja) CreateRenderer() fyne.WidgetRenderer {
 	r.vacio = ui.NuevoVacio("", "")
 	b.r = r
 	r.objetos = []fyne.CanvasObject{
-		r.fondo, r.cabecera, r.busqueda, r.limpiar, r.lineaBusqueda, r.seleccion,
-		r.cuerpo, r.esqueleto, r.vacio, r.filete,
+		r.fondo, r.cabecera, r.busqueda, r.limpiar, r.lineaBusqueda, r.lineaFiltros,
 	}
+	for _, f := range r.filtros {
+		r.objetos = append(r.objetos, f)
+	}
+	r.objetos = append(r.objetos, r.seleccion, r.cuerpo, r.esqueleto, r.vacio, r.filete)
 	r.Refresh()
 	return r
 }
@@ -301,26 +314,27 @@ func (b *Bandeja) rellenar(f *FilaConversacion, i int, c Conversacion) {
 }
 
 type bandejaRenderer struct {
-	b                            *Bandeja
-	fondo, filete, lineaBusqueda *canvas.Rectangle
-	cabecera                     *ui.CabeceraApp
-	conteo                       *ui.Rotulo
-	busqueda                     *ui.Entrada
-	limpiar                      *ui.Boton
-	vaciar                       *botonVaciar
-	seleccion                    *BarraSeleccion
-	lista                        *widget.List
-	cuerpo                       fyne.CanvasObject
-	esqueleto                    *Esqueleto
-	vacio                        *ui.Vacio
-	objetos                      []fyne.CanvasObject
+	b                                          *Bandeja
+	fondo, filete, lineaBusqueda, lineaFiltros *canvas.Rectangle
+	filtros                                    []*ui.Boton
+	cabecera                                   *ui.CabeceraApp
+	conteo                                     *ui.Rotulo
+	busqueda                                   *ui.Entrada
+	limpiar                                    *ui.Boton
+	vaciar                                     *botonVaciar
+	seleccion                                  *BarraSeleccion
+	lista                                      *widget.List
+	cuerpo                                     fyne.CanvasObject
+	esqueleto                                  *Esqueleto
+	vacio                                      *ui.Vacio
+	objetos                                    []fyne.CanvasObject
 	// altos son las filas a las que se ha dado un alto propio (las que llevan chips),
 	// para devolverlas a los 83 cuando dejan de llevarlos.
 	altos map[int]float32
 }
 
 func (r *bandejaRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(ui.AnchoPanelBase, AltoCabeceraLista+AltoBusqueda)
+	return fyne.NewSize(ui.AnchoPanelBase, AltoCabeceraLista+AltoBusqueda+AltoFiltros)
 }
 
 func (r *bandejaRenderer) Objects() []fyne.CanvasObject { return r.objetos }
@@ -347,6 +361,7 @@ func (r *bandejaRenderer) Layout(t fyne.Size) {
 	r.lineaBusqueda.Move(fyne.NewPos(0, y+AltoBusqueda-tema.Borde))
 	r.lineaBusqueda.Resize(fyne.NewSize(dentro, tema.Borde))
 	y += AltoBusqueda
+	y = r.ponerFiltros(y, dentro)
 	if r.seleccion.Visible() {
 		r.seleccion.Move(fyne.NewPos(0, y))
 		r.seleccion.Resize(fyne.NewSize(dentro, AltoBarraSeleccion))
@@ -368,6 +383,8 @@ func (r *bandejaRenderer) Refresh() {
 	r.fondo.FillColor = tema.Color("surface", v)
 	r.filete.FillColor = tema.Color("border", v)
 	r.lineaBusqueda.FillColor = tema.Color("border", v)
+	r.lineaFiltros.FillColor = tema.Color("border", v)
+	r.pintarFiltros()
 
 	r.cabecera.Titulo = b.encabezado()
 	// El conteo solo se pinta con datos: durante la carga no hay nada que contar, y
@@ -460,6 +477,19 @@ func (r *bandejaRenderer) ponerVacio() {
 		titulo = t.T("forbidden.title", nil)
 		desc = t.T("forbidden.description", nil)
 	case Vacio:
+		if b.Filtro != FiltroTodas && b.AlFiltrar != nil {
+			titulo = t.T("filter.emptyTitle", nil)
+			desc = t.T("filter.emptyDescription", nil)
+			accion = ui.NuevoBoton(t.T("filter.showAll", nil), func() { b.AlFiltrar(FiltroTodas) }).
+				Con(ui.Secundario, ui.TallaSM)
+			// Tras el tope de páginas automáticas, seguir buscando lo decide quien mira:
+			// «Ver todas» sigue a mano pulsando el filtro activo de la franja.
+			if b.FiltroTope && b.AlSeguirFiltro != nil {
+				accion = ui.NuevoBoton(t.T("common.loadMore", nil), b.AlSeguirFiltro).
+					Con(ui.Secundario, ui.TallaSM)
+			}
+			break
+		}
 		if b.Buscando {
 			titulo = t.T("list.emptySearchTitle", i18n.Vars{"query": b.Consulta})
 			desc = t.T("list.emptySearchDescription", nil)

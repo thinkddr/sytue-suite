@@ -92,7 +92,7 @@ func (a *Archivo) Objeto(v tema.Variante) fyne.CanvasObject {
 	for _, c := range a.Cuadernos {
 		nombre := NuevaOpcion(c.Titulo, lineaTok(c.Titulo, tema.TextoBase, ui.Normal, "text", v),
 			func() { llamar1(a.AlAbrir, c) })
-		nombre.Superficie, nombre.Radio = "bg", tema.RadioSM
+		filaDePagina(nombre).Radio = tema.RadioSM
 		fila := []fyne.CanvasObject{
 			celdaFila(Glifo(CuadernoD, 14, "text-subtle", v)),
 			nombre,

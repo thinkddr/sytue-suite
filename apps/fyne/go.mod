@@ -17,6 +17,7 @@ require (
 	fyne.io/fyne/v2 v2.8.2
 	git.sytue.eu/sytue/one/apps/nucleo v0.0.0
 	git.wow.st/gmp/jni v0.0.0-20210610011705-34026c7e22d0
+	github.com/BurntSushi/toml v1.6.0
 	github.com/coder/websocket v1.8.15
 	github.com/fyne-io/oksvg v0.2.1-0.20260918172519-a9af55fa95d9
 	github.com/gen2brain/avif v0.6.0
@@ -53,7 +54,6 @@ require (
 	cel.dev/expr v0.25.2 // indirect
 	filippo.io/edwards25519 v1.2.0 // indirect
 	fyne.io/systray v1.12.3-0.20260810170012-af4e8e793ec4 // indirect
-	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/FyshOS/fancyfs v0.0.1 // indirect
 	github.com/anthonynsimon/bild v0.14.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
@@ -83,7 +83,7 @@ require (
 	github.com/jeandeaual/go-locale v0.0.0-20250612000132-0ef82f21eade // indirect
 	github.com/jsummers/gobmp v0.0.0-20230614200233-a9de23ed2e25 // indirect
 	github.com/jxskiss/base62 v1.1.0 // indirect
-	github.com/klauspost/compress v1.20.1 // indirect
+	github.com/klauspost/compress v1.20.3 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/lithammer/shortuuid/v4 v4.3.0 // indirect
 	github.com/livekit/mageutil v0.0.0-20250511045019-0f1ff63f7731 // indirect
@@ -154,7 +154,7 @@ replace git.sytue.eu/sytue/one/apps/nucleo => ../nucleo
 // móviles y geometría de la ventana UIKit al girar o redimensionar. El original
 // conserva BSD-3-Clause y las modificaciones Apache-2.0; parches y retirada en
 // upstream/README.md.
-replace fyne.io/fyne/v2 => github.com/thinkddr/fyne/v2 v2.8.2-sytue.3
+replace fyne.io/fyne/v2 => github.com/thinkddr/fyne/v2 v2.8.2-sytue.5
 
 // GLFW solo acepta FICHEROS soltados: su XDnD de X11 y su wl_data_device de Wayland
 // piden `text/uri-list` y nada más. El fork —el mismo commit que requiere Fyne, con un

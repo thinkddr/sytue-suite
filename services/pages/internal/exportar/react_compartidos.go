@@ -162,7 +162,7 @@ export default function App() {
   return (
     <main style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
       <h1>%s</h1>
-      <p>Sitio exportado desde Sytue Web conectado a la API pública.</p>
+      <p>Sitio exportado desde Sytue Webs conectado a la API pública.</p>
     </main>
   );
 }
@@ -304,11 +304,11 @@ export function BotonComprar({ sku, qty = 1 }: BotonComprarProps) {
 	// 12. README.md
 	archivos["README.md"] = []byte(fmt.Sprintf(`# %s (Exportación React SPA)
 
-Este proyecto ha sido generado deterministamente desde **Sytue Web**.
+Este proyecto ha sido generado deterministamente desde **Sytue Webs**.
 
 ## Conexión con la API pública
 
-La aplicación se comunica con el backend de tu tienda en Sytue Web a través de:
+La aplicación se comunica con el backend de tu tienda en Sytue Webs a través de:
 `+"```"+`
 %s/_pages/*
 `+"```"+`

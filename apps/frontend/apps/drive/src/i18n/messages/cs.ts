@@ -281,6 +281,18 @@ export const cs: AppCatalog<typeof en> = {
     many: '{count} položky bylo přesunuto do koše.',
     other: '{count} položek bylo přesunuto do koše.',
   },
+  'files.batch.restored': {
+    one: '1 položka byla obnovena.',
+    few: '{count} položky byly obnoveny.',
+    many: '{count} položky bylo obnoveno.',
+    other: '{count} položek bylo obnoveno.',
+  },
+  'files.batch.restorePartial': {
+    one: '1 položku se nepodařilo obnovit; zůstává v koši.',
+    few: '{count} položky se nepodařilo obnovit; zůstávají v koši.',
+    many: '{count} položky se nepodařilo obnovit; zůstávají v koši.',
+    other: '{count} položek se nepodařilo obnovit; zůstávají v koši.',
+  },
   'files.batch.trashFailed': 'Výběr se nepodařilo přesunout do koše.',
   'files.batch.moveTitle': {
     one: 'Přesunout 1 položku',
@@ -305,6 +317,9 @@ export const cs: AppCatalog<typeof en> = {
   'action.rename': 'Přejmenovat',
   'action.move': 'Přesunout do…',
   'action.copy': 'Vytvořit kopii',
+  'action.copyLink': 'Kopírovat odkaz',
+  'action.linkCopied': 'Odkaz zkopírován. Otevře se jen osobám, které už mají přístup.',
+  'action.copyLinkFailed': 'Odkaz se nepodařilo zkopírovat.',
   'action.shareLink': 'Sdílet odkaz',
   'action.openInApp': 'Otevřít v aplikaci',
   'action.openInEditor': 'Otevřít v editoru',
@@ -528,6 +543,22 @@ export const cs: AppCatalog<typeof en> = {
   'trash.purged': '„{name}“ bylo trvale smazáno.',
   'trash.purgeDenied': '„{name}“ nelze smazat',
   'trash.purgeFailed': 'Smazání se nezdařilo.',
+  'trash.emptyAll': 'Vysypat koš',
+  'trash.emptyAllTitle': 'Vysypat koš?',
+  'trash.emptyAllBody': {
+    one: 'Položka v koši bude navždy vymazána i s historií verzí. Poté ji už nelze získat zpět.',
+    few: '{count} položky v koši budou navždy vymazány i s historií verzí. Poté je už nelze získat zpět.',
+    many: '{count} položky v koši bude navždy vymazáno i s historií verzí. Poté je už nelze získat zpět.',
+    other:
+      '{count} položek v koši bude navždy vymazáno i s historií verzí. Poté je už nelze získat zpět.',
+  },
+  'trash.emptiedAll': 'Koš byl vysypán.',
+  'trash.emptyAllPartial': {
+    one: '1 položku se nepodařilo smazat; zůstává v koši.',
+    few: '{count} položky se nepodařilo smazat; zůstávají v koši.',
+    many: '{count} položky se nepodařilo smazat; zůstávají v koši.',
+    other: '{count} položek se nepodařilo smazat; zůstávají v koši.',
+  },
   'trash.purgeTitle': 'Trvale smazat?',
   'trash.purgeBodyFolder':
     'Obsah „{name}“ a všeho, co je uvnitř, bude vymazán ze serverů Sytue včetně historie verzí. Poté ho už nelze získat zpět, ani odsud, ani přes podporu. Výměnou uvolníte místo, které zabíral.',

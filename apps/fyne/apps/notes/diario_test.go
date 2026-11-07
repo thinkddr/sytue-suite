@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/test"
 	"fyne.io/fyne/v2/widget"
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
@@ -49,7 +51,7 @@ func TestEnfoquesMantienenAntepasadosYTerminanCiclos(t *testing.T) {
 	}
 }
 
-func TestLaSintaxisDeTwos(t *testing.T) {
+func TestLaSintaxisDeCaptura(t *testing.T) {
 	for texto, titulo := range map[string]string{"- Comprar pan": "Comprar pan", "[] Revisar": "Revisar"} {
 		in, ok := capturaRapida(texto, "text")
 		if !ok || in.Kind != "todo" || in.Title != titulo || in.Checked == nil || *in.Checked {
@@ -177,5 +179,39 @@ func TestLasCanceladasNoSonPendientesYOcultarConservaAntepasados(t *testing.T) {
 	}
 	if trasladosDe([]byte(`{"carry_count":3}`)) != 3 || trasladosDe([]byte(`{"carry_count":"3"}`)) != 0 {
 		t.Error("carry_count mal leído")
+	}
+}
+
+// TestUnaTareaLargaParteEnLaLibreta: en la libreta el título de una tarea larga parte en
+// líneas y la fila crece, como la web (`.notes-stream-note > header > h3 > button`); en
+// una tarjeta sigue recortándose en una.
+//
+// VISTO EN ROJO (2026-11-06): en la ventana real, a 393 de ancho, «Reservar mesa para el
+// cumpleaños …» salía cortada con elipsis y la fila medía una línea.
+func TestUnaTareaLargaParteEnLaLibreta(t *testing.T) {
+	larga := "Reservar mesa para el cumpleaños de la abuela el sábado por la noche"
+	medir := func(diario bool) (float32, *BotonTitulo) {
+		tj := NuevaTarjeta(trInterno(t), DeNota(api.Note{ID: "n", Kind: "todo", Title: larga}))
+		tj.Diario = diario
+		tj.AlRenombrar = func() {}
+		w := test.NewWindow(tj)
+		t.Cleanup(w.Close)
+		alto := MedidaTarjetaNota(tj, 320).Height
+		w.Resize(fyne.NewSize(320, alto))
+		tj.Resize(fyne.NewSize(320, alto))
+		_, titulo, _, _ := tj.cabecera(tema.Claro)
+		b, _ := titulo.(*BotonTitulo)
+		return alto, b
+	}
+	altoLibreta, b := medir(true)
+	altoTarjeta, _ := medir(false)
+	if b == nil || !b.Partir {
+		t.Fatal("en la libreta el título de una tarea no es un botón que parte")
+	}
+	if b.AltoPara(320) < 2*tema.TextoMD.Linea {
+		t.Fatalf("a 320 la tarea ocupa %v; quiero al menos dos líneas", b.AltoPara(320))
+	}
+	if altoLibreta < altoTarjeta+tema.TextoMD.Linea/2 {
+		t.Fatalf("la fila de la libreta mide %v, como una línea (la tarjeta, %v)", altoLibreta, altoTarjeta)
 	}
 }

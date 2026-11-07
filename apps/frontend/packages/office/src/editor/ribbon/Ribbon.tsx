@@ -33,6 +33,7 @@ import {
   useFitInViewport,
   useMobileBack,
   usePrompt,
+  useToast,
 } from '@sytue/ui';
 import { EditorIcon } from '../icons';
 import { MASCARA_SCROLL_X, useScrollRestante } from '@sytue/ui';
@@ -41,6 +42,7 @@ import { usePopoversFijos } from './popovers';
 import { BandaDesplegada } from './primitives';
 import { PlantillaOrgItems } from './PlantillaOrgItems';
 import { exportExt, fijarPdfAccesible, pdfAccesible } from '../exportName';
+import { r } from '../../lib/rutas';
 import type { DocsKey } from '../../i18n';
 import type { EditorContext } from '../types';
 import { pestanasDe } from '../pestanas';
@@ -352,12 +354,17 @@ export function Ribbon({ ctx }: { ctx: EditorContext }): JSX.Element {
  * Las extensiones las calcula `exportExt` con la misma correspondencia.
  */
 
+/** Las opciones del menú que reciben el foco: ni las `disabled` ni las `aria-disabled`. */
+export const OPCION_ACTIVA = '[role^="menuitem"]:not([disabled]):not([aria-disabled="true"])';
+
 function ArchivoMenu({ ctx }: { ctx: EditorContext }): JSX.Element {
   // Guardar versión pedía la etiqueta con el diálogo del navegador.
   const { preguntar, dialogo: dialogoPreguntar } = usePrompt();
   const [open, setOpen] = useState(false);
   useMobileBack(open, () => setOpen(false));
   const [exporting, setExporting] = useState(false);
+  const [copiando, setCopiando] = useState(false);
+  const toast = useToast();
   const [accesible, setAccesible] = useState(pdfAccesible);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -374,9 +381,7 @@ function ArchivoMenu({ ctx }: { ctx: EditorContext }): JSX.Element {
         return;
       }
       if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-      const items = Array.from(
-        rootRef.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]') ?? [],
-      );
+      const items = Array.from(rootRef.current?.querySelectorAll<HTMLElement>(OPCION_ACTIVA) ?? []);
       if (items.length === 0) return;
       e.preventDefault();
       const idx = items.indexOf(document.activeElement as HTMLElement);
@@ -386,8 +391,10 @@ function ArchivoMenu({ ctx }: { ctx: EditorContext }): JSX.Element {
     };
     document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onKey);
-    // Foco al primer elemento al abrir (mismo patrón que el Dropdown de @sytue/ui).
-    rootRef.current?.querySelector<HTMLElement>('[role^="menuitem"]')?.focus();
+    // Foco al primer elemento ACTIVO al abrir (mismo patrón que el Dropdown de @sytue/ui):
+    // un botón `disabled` no recibe el foco, y con la primera descarga inerte el foco se
+    // quedaba en «Archivo» (accesibilidad-office, 2026-11-06).
+    rootRef.current?.querySelector<HTMLElement>(OPCION_ACTIVA)?.focus();
     return () => {
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);
@@ -409,6 +416,20 @@ function ArchivoMenu({ ctx }: { ctx: EditorContext }): JSX.Element {
     });
     if (label === null) return;
     void ctx.createVersion(label || undefined);
+  };
+
+  /** «Hacer una copia»: guarda lo pendiente, crea la copia y la abre en su lugar. */
+  const hacerCopia = async (): Promise<void> => {
+    const makeCopy = ctx.makeCopy;
+    if (!makeCopy || copiando || ctx.connection === 'offline') return;
+    setCopiando(true);
+    try {
+      const id = await makeCopy(ctx.t('copy.title', { title: ctx.title }));
+      window.location.assign(r(`/edit?id=${encodeURIComponent(id)}`));
+    } catch {
+      toast.notify({ tone: 'danger', title: ctx.t('copy.error') });
+      setCopiando(false);
+    }
   };
 
   const exportar = async (
@@ -520,6 +541,15 @@ function ArchivoMenu({ ctx }: { ctx: EditorContext }): JSX.Element {
           >
             {ctx.t('file.rename')}
           </MenuItem>
+          {ctx.makeCopy ? (
+            <MenuItem
+              size="sm"
+              disabled={ctx.connection === 'offline' || copiando}
+              onClick={run(() => void hacerCopia())}
+            >
+              {ctx.t('copy.action')}
+            </MenuItem>
+          ) : null}
           {/* La biblioteca de plantillas de la organización: marcar este documento,
               publicar una versión o quitarlo (plantillas-1). */}
           <PlantillaOrgItems ctx={ctx} cerrar={() => setOpen(false)} />

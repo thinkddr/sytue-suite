@@ -100,3 +100,31 @@ test('sin sesión no se fusiona nada', async () => {
   expect((await h.deshacer())?.etiqueta).toBe('b');
   expect((await h.deshacer())?.etiqueta).toBe('a');
 });
+
+test('deshacerEsta deshace la acción del aviso aunque después se hiciera otra', async () => {
+  const r: string[] = [];
+  const h = new Historial();
+  const a = h.registrar(accion(r, 'a'));
+  h.registrar(accion(r, 'b'));
+  expect(await h.deshacerEsta(a)).toBe(true);
+  expect(r).toEqual(['undo a']);
+  // «b» sigue siendo lo siguiente que deshacer, y «a» ya no está para otra vez.
+  expect(h.siguienteDeshacer?.etiqueta).toBe('b');
+  expect(await h.deshacerEsta(a)).toBe(false);
+  expect(h.siguienteRehacer).toBeUndefined();
+});
+
+test('deshacerEsta de la última la deja para rehacer; si falla, sigue en su sitio', async () => {
+  const r: string[] = [];
+  const h = new Historial();
+  const a = h.registrar(accion(r, 'a'));
+  expect(await h.deshacerEsta(a)).toBe(true);
+  expect(h.siguienteRehacer?.etiqueta).toBe('a');
+
+  const mala = h.registrar(accion(r, 'mala', true));
+  h.registrar(accion(r, 'c'));
+  await expect(h.deshacerEsta(mala)).rejects.toThrow();
+  expect(h.siguienteDeshacer?.etiqueta).toBe('c');
+  await h.deshacer();
+  expect(h.siguienteDeshacer?.etiqueta).toBe('mala');
+});

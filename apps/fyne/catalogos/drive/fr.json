@@ -4,6 +4,8 @@
   "action.classified": "Classement · {name}",
   "action.classify": "Classer",
   "action.copy": "Faire une copie",
+  "action.copyLink": "Copier le lien",
+  "action.copyLinkFailed": "Impossible de copier le lien.",
   "action.delete": "Mettre à la corbeille",
   "action.desktopBody": "Si vous ne l’avez pas encore installée, vous pouvez la télécharger.",
   "action.desktopCta": "Voir les téléchargements",
@@ -12,6 +14,7 @@
   "action.downloadName": "Télécharger {name}",
   "action.downloadZip": "Télécharger (ZIP)",
   "action.editorFailed": "L’éditeur n’a pas pu ouvrir ce fichier.",
+  "action.linkCopied": "Lien copié. Il ne s’ouvre que pour les personnes qui ont déjà accès.",
   "action.mailFailed": "Impossible d’ouvrir le rédacteur d’e-mail",
   "action.menu": "Actions pour {name}",
   "action.more": "Plus d’actions",
@@ -81,6 +84,14 @@
   "files.batch.moveTitle": {
     "one": "Déplacer {count} élément",
     "other": "Déplacer {count} éléments"
+  },
+  "files.batch.restorePartial": {
+    "one": "{count} élément n’a pas pu être restauré et reste dans la corbeille.",
+    "other": "{count} éléments n’ont pas pu être restaurés et restent dans la corbeille."
+  },
+  "files.batch.restored": {
+    "one": "{count} élément restauré.",
+    "other": "{count} éléments restaurés."
   },
   "files.batch.trashBody": {
     "one": "{count} élément ira à la corbeille. Vous pourrez l’en sortir.",
@@ -555,6 +566,17 @@
     "other": "{count} fichiers téléversés."
   },
   "team.upload.partial": "{uploaded} sur {count} téléversés.",
+  "trash.emptiedAll": "La corbeille a été vidée.",
+  "trash.emptyAll": "Vider la corbeille",
+  "trash.emptyAllBody": {
+    "one": "L’élément de la corbeille sera effacé définitivement, avec son historique de versions. Il n’y aura aucun moyen de le récupérer ensuite.",
+    "other": "Les {count} éléments de la corbeille seront effacés définitivement, avec leur historique de versions. Il n’y aura aucun moyen de les récupérer ensuite."
+  },
+  "trash.emptyAllPartial": {
+    "one": "{count} élément n’a pas pu être supprimé et reste dans la corbeille.",
+    "other": "{count} éléments n’ont pas pu être supprimés et restent dans la corbeille."
+  },
+  "trash.emptyAllTitle": "Vider la corbeille ?",
   "trash.emptyBody": "Les fichiers et dossiers que vous supprimez apparaîtront ici et vous pourrez les restaurer.",
   "trash.emptyTitle": "La corbeille est vide",
   "trash.errorTitle": "Impossible de charger la corbeille",

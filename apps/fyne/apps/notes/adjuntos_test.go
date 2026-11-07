@@ -202,13 +202,17 @@ func TestLaNotaDocEnseñaElDocumento(t *testing.T) {
 	if cajas != 1 || !strings.Contains(todo, "Orden") || !strings.Contains(todo, p.tr.T("docs.openViewer", nil)) {
 		t.Errorf("la nota doc enseña %d cajas y %q", cajas, todo)
 	}
-	// La fila de la web usa ahora px-2 py-2. El iframe de 256 y «Abrir documento»
-	// conservan su gap-1.5; respecto a la tarjeta de 340 se quita p-3 con borde y
-	// se añade py-2 sin borde: 340 − 2·(12+1) + 2·8 = 330.
+	// La fila de la web es `px-2 py-1` y su cabecera lleva otro `padding-block: 0.25rem`:
+	// los mismos 8 px arriba y abajo que el `py-2` de antes. El iframe de 256 y «Abrir
+	// documento» conservan su gap-1.5; respecto a la tarjeta de 340 se quita p-3 con
+	// borde y se añaden esos 8 sin borde: 340 − 2·(12+1) + 2·8 = 330.
 	css := webref.Read(t, "apps/frontend/apps/notes/src/styles/app.css")
 	_, regla, existe := strings.Cut(css, ".notes-stream-note {")
 	regla, _, _ = strings.Cut(regla, "}")
-	if !existe || !strings.Contains(regla, "px-2 py-2") {
+	_, cabecera, conCabecera := strings.Cut(css, ".notes-stream-note > header {")
+	cabecera, _, _ = strings.Cut(cabecera, "}")
+	if !existe || !strings.Contains(regla, "px-2 py-1") ||
+		!conCabecera || !strings.Contains(cabecera, "padding-block: 0.25rem") {
 		t.Fatal("ha cambiado el relleno de la fila web: revisar su medida nativa")
 	}
 	if h := MedidaTarjetaNota(tj, 323.7).Height; h < 329.5 || h > 330.5 {

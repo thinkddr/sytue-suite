@@ -38,6 +38,9 @@ func main() {
 	// La sesión, la apariencia y el idioma son TRANSVERSALES a las trece apps: esto lo
 	// lee de donde lo dejó la última que lo tocó. `Abrir` no habla con la red.
 	s := sesion.Abrir(a, "")
+	// El cromo «papel» de toda la suite (ADR 0080). Aquí y no en `sesion.Abrir`: las
+	// pruebas que abren sesión comprueban también el cromo de color.
+	tema.ElegirCromo(tema.CromoPapel)
 
 	// El idioma lo decide el SISTEMA, igual que en la web lo decide el middleware:
 	// nunca se detecta dentro de una vista. Uno que la suite no sirva cae al inglés.
@@ -52,13 +55,17 @@ func main() {
 	// en cuanto hay alguien dentro; sin sesión, se abre Sytue ID en el navegador del
 	// sistema, que es lo que hace el middleware de la web al llegar sin cookie.
 	contactos := api.NewContacts(s.URL("contacts"), s.Sesion, nil)
-	b := mail.NuevoBuzon(p, api.NewMail(s.URL("mail"), s.Sesion, nil)).
+	b := mail.NuevoBuzon(p, api.NewMail(s.URL("mail"), s.Sesion, s.ClienteConAviso(nil))).
 		ConHub(api.NewHub(s.URL("hub"), s.Sesion, nil), a).
 		ConDrive(api.NewDrive(s.URL("drive"), s.Sesion, nil)).
 		ConContactos(contactos).
 		ConLibreta(contactos, s.URL("contacts"))
 	b.Abridor = a
-	b.Widget = s.CapturarWidget
+	b.Apex, b.Org = s.Apex(), s.Sesion.Organizacion
+	// El widget nativo lo lee su propia Fuente (siempre Recibidos) y se vuelve a
+	// publicar tras cada escritura de Mail y con lo que traiga el vivo del buzón.
+	s.PublicadorWidget(s.FuenteWidget(t))
+	b.AlCambiarDatos = s.AvisarWidget
 	s.AlFondo(b.EnSegundoPlano)
 	s.AlVolver(b.EnPrimerPlano)
 	ctx := context.Background()
@@ -163,11 +170,15 @@ func main() {
 	})
 	w.Resize(fyne.NewSize(1280, 744))
 	s.Arrancar(ctx)
-	if s.Estado().Dentro() {
-		arrancar(s.Estado())
-	} else {
-		go func() { _ = s.Entrar(ctx) }() // BLOQUEA hasta volver del navegador
-	}
+	// Con interfaz: lanzada por iOS solo para el widget, ni buzón ni el navegador para
+	// entrar.
+	s.CuandoHayaEscena(func() {
+		if s.Estado().Dentro() {
+			arrancar(s.Estado())
+		} else {
+			go func() { _ = s.Entrar(ctx) }() // BLOQUEA hasta volver del navegador
+		}
+	})
 	w.SetOnClosed(b.Parar)
 	w.ShowAndRun()
 }

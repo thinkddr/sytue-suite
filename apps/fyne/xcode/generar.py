@@ -92,15 +92,30 @@ def widgets_apple():
     los compilan), pero ningún host los lleva dentro ni pide el App Group: es la firma de
     antes de los widgets. La variable de entorno (1/0) es la de empaquetar.sh, para tests.
     """
-    valor = os.environ.get("SYTUE_WIDGETS_APPLE", "")
+    return interruptor_xcconfig("SYTUE_WIDGETS_APPLE")
+
+
+def despertar_apple():
+    """El despertar del widget por aviso silencioso en iOS (SYTUE_DESPERTAR_APPLE).
+
+    Lo mismo que `despertar_apple_activo` de empaquetar.sh, que es quien escribe
+    `aps-environment`: exige además los widgets. Con él, apple-widgets.py asegura la
+    capacidad Push Notifications en el App ID de cada host con widget.
+    """
+    return widgets_apple() and interruptor_xcconfig("SYTUE_DESPERTAR_APPLE")
+
+
+def interruptor_xcconfig(nombre):
+    """Un YES/NO de Sytue.xcconfig; la variable de entorno (1/0) manda, para tests."""
+    valor = os.environ.get(nombre, "")
     if not valor:
         with open(os.path.join(AQUI, "Sytue.xcconfig"), encoding="utf-8") as f:
-            valores = re.findall(r"^SYTUE_WIDGETS_APPLE = ([A-Z]+)$", f.read(), re.M)
+            valores = re.findall(r"^%s = ([A-Z]+)$" % nombre, f.read(), re.M)
         if len(valores) > 1:
-            sys.exit("Sytue.xcconfig declara SYTUE_WIDGETS_APPLE más de una vez")
+            sys.exit("Sytue.xcconfig declara %s más de una vez" % nombre)
         valor = valores[0] if valores else "NO"
     if valor not in ("1", "YES", "0", "NO"):
-        sys.exit("SYTUE_WIDGETS_APPLE vale «%s»: solo YES/NO (o 1/0 en el entorno)" % valor)
+        sys.exit("%s vale «%s»: solo YES/NO (o 1/0 en el entorno)" % (nombre, valor))
     return valor in ("1", "YES")
 
 
@@ -165,7 +180,8 @@ def idiomas_widgets():
     claves = (["widgets." + c for c in ("open", "compose", "create", "notes", "rows", "pending", "channels", "photos", "episodes", "apps", "calendars", "address_books", "storage")]
               + ["search.label"]
               + ["app." + a["marca"] + ".description" for a in apps() if a["widget_acciones"]]
-              + ["dataflow.item." + c for c in ("files", "events", "documents", "contacts")])
+              + ["dataflow.item." + c for c in ("files", "events", "documents", "contacts")]
+              + ["widgets.updatedAgo"])
     for nombre in sorted(os.listdir(carpeta)):
         if not nombre.endswith(".json"):
             continue
@@ -174,7 +190,13 @@ def idiomas_widgets():
         for clave in claves:
             if not isinstance(mensajes.get(clave), str) or not mensajes[clave]:
                 sys.exit("i18n/locales/%s no traduce %s" % (nombre, clave))
-        lineas = "".join("%s = %s;\n" % (json.dumps(k), json.dumps(mensajes[k], ensure_ascii=False)) for k in claves)
+        for clave in claves:
+            # «Actualizado {time}» con el «hace 20 min» de RelativeDateTimeFormatter: en
+            # Localizable.strings el hueco es %@ y no puede haber otro formato suelto.
+            if "%" in mensajes[clave] or (clave == "widgets.updatedAgo") != ("{time}" in mensajes[clave]):
+                sys.exit("i18n/locales/%s: %s no es un texto fijo con el hueco que toca" % (nombre, clave))
+        lineas = "".join("%s = %s;\n" % (json.dumps(k), json.dumps(mensajes[k].replace("{time}", "%@"), ensure_ascii=False))
+                         for k in claves)
         plural = mensajes.get("notifications.unread")
         if not isinstance(plural, dict) or not plural.get("other"):
             sys.exit("i18n/locales/%s no traduce notifications.unread" % nombre)

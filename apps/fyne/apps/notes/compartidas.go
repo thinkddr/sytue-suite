@@ -133,7 +133,8 @@ func (p *Pantalla) filaCompartida(n api.NotaCompartida, v tema.Variante) fyne.Ca
 		lineaTok(p.porQuien(n)+" · "+p.nivel(n), tema.TextoXS, ui.Normal, "text-subtle", v))
 	dentro := container.New(&filaElastica{hueco: tema.Espacio(2), elastico: 1, arriba: true}, glifoDeHit(n.Kind, v), texto)
 	o := NuevaOpcion(titulo, dentro, func() { p.abrirCompartida(n.ID) })
-	o.PX, o.PY, o.Superficie = tema.Espacio(2), tema.Espacio(1.5), "bg"
+	o.PX, o.PY = tema.Espacio(2), tema.Espacio(1.5)
+	filaDePagina(o)
 	return o
 }
 
@@ -181,6 +182,7 @@ func (p *Pantalla) abrirEditorCompartida(n Nota) {
 		return
 	}
 	ed := NuevoEditorNota(p.tr, n.Doc, p.tr.T("note.placeholder", nil))
+	ed.Afuera = p.afuera
 	s := &sesionEdicion{
 		nota: n.ID, editor: ed, compartida: true,
 		fusion: n.ID + ":" + strconv.FormatInt(time.Now().UnixNano(), 36),

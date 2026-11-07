@@ -152,6 +152,10 @@ spec:
                   key: secret
             - name: PUBLIC_URL
               value: "https://{{ include "sytue-rooms.host" . }}"
+            # Las rutas de aparatos de iOS (`/me/push/apns`) redirigen (308) a las del
+            # Hub, que guarda el registro único (ADR 0039, enmienda del 2026-11-06).
+            - name: HUB_PUBLIC_URL
+              value: "https://hub.{{ include "sytue-rooms.domain" . }}"
             {{- with .Values.config.channelMailDomain }}
             # Correo a canal: el MISMO dominio que el CHANNEL_MAIL_DOMAIN de Mail. Rooms
             # solo lo publica con el secreto de cada entrante (ver values.yaml).

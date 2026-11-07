@@ -318,6 +318,40 @@ func TestElEditorDeFynePintaDondeElNuestro(t *testing.T) {
 	}
 }
 
+// TestElCursorDeTextoSeVe: con el editor ENFOCADO y vacío, lo único que se pinta es el
+// cursor, una barra de AnchoCursor de ancho y el alto de una línea. Vigila las dos mitades
+// del arreglo del 2026-11-06: que el cursor existe (con inputBorder a 0 medía 0 de ancho
+// y no salía en ningún campo de la suite) y que el borde que Fyne traza con esa medida al
+// enfocar no vuelve (si sale, la tinta ocupa la caja entera).
+func TestElCursorDeTextoSeVe(t *testing.T) {
+	for _, multilinea := range []bool{false, true} {
+		ed := nuevoEditor(func(bool) {})
+		ed.MultiLine = multilinea
+		if !multilinea {
+			ed.Scroll = fyne.ScrollNone
+			ed.Wrapping = fyne.TextWrapOff
+		}
+		env := envolver(ed, &temaEditor{escalon: tema.TextoRaiz})
+		env.Move(fyne.NewPos(10, 10))
+		env.Resize(fyne.NewSize(280, 40))
+		if x0, _, _, _ := tinta(pinta(t, 300, 60, env), blanco()); x0 >= 0 {
+			t.Errorf("multilínea=%v: sin foco no debería pintarse nada y hay tinta desde x=%v", multilinea, x0)
+		}
+		ed.FocusGained()
+		x0, x1, y0, y1 := tinta(pinta(t, 300, 60, env), blanco())
+		if x0 < 0 {
+			t.Fatalf("multilínea=%v: el editor enfocado no pinta cursor", multilinea)
+		}
+		if ancho := x1 - x0 + 1; ancho > AnchoCursor+1 {
+			t.Errorf("multilínea=%v: la tinta mide %v de ancho (x %v–%v): eso es el borde de Fyne, no un cursor", multilinea, ancho, x0, x1)
+		}
+		if alto := y1 - y0 + 1; alto < tema.TextoRaiz.Tam {
+			t.Errorf("multilínea=%v: el cursor mide %v de alto y tiene que ocupar una línea", multilinea, alto)
+		}
+		ed.FocusLost()
+	}
+}
+
 // --------------------------------------------------------------------------------
 // 4. El área de texto
 // --------------------------------------------------------------------------------
@@ -785,10 +819,16 @@ func TestElWidgetRecibeElClic(t *testing.T) {
 // edición. Todo lo que Fyne pintaría por su cuenta está a cero.
 func TestElCromoDeFyneEstaApagado(t *testing.T) {
 	te := temaEditor{escalon: tema.TextoBase}
-	for _, n := range []fyne.ThemeSizeName{"inputBorder", "innerPadding", "padding", "inputRadius"} {
+	for _, n := range []fyne.ThemeSizeName{"innerPadding", "padding", "inputRadius"} {
 		if got := te.Size(n); got != 0 {
 			t.Errorf("el tema del editor deja %s en %v y tiene que ser 0, o Fyne pinta su propio cromo", n, got)
 		}
+	}
+	// inputBorder NO: es el ANCHO DEL CURSOR de texto (`moveCursor` de widget.Entry). A
+	// cero, el cursor no se veía en ningún campo; el borde que Fyne trazaría con él lo
+	// quita `sinBordeDeFyne` (TestElCursorDeTextoSeVe).
+	if got := te.Size("inputBorder"); got != AnchoCursor {
+		t.Errorf("el tema del editor deja inputBorder en %v y es el ancho del cursor, %v", got, AnchoCursor)
 	}
 	for _, n := range []fyne.ThemeColorName{"inputBorder", "inputBackground", "background"} {
 		if c, _ := te.Color(n, 0).(color.NRGBA); c.A != 0 {

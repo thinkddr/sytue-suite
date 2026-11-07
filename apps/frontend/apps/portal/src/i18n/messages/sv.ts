@@ -55,6 +55,7 @@ export const sv: AppCatalog<typeof en> = {
   'inbox.markAll': 'Markera alla som lästa',
   'inbox.loading': 'Läser in aviseringar…',
   'inbox.unreadDot': 'Oläst',
+  'inbox.markRead': 'Markera som läst',
   'inbox.errorTitle': 'Aviseringarna kunde inte läsas in',
   'inbox.errorBody': 'Hubben svarar inte just nu. Försök igen om några sekunder.',
   'inbox.retry': 'Försök igen',
@@ -674,6 +675,8 @@ export const sv: AppCatalog<typeof en> = {
     '{sources} svarade inte, så vissa resultat kan saknas. Försök igen om en stund.',
   'search.partialJoin': ' och ',
   'search.showing': 'Visar {count} av {total} resultat.',
+  'search.loadMore': 'Läs in fler resultat',
+  'search.loadMoreFailed': 'Det gick inte att läsa in fler resultat. Försök igen.',
   'privacy.notice':
     'Vi säljer inte dina uppgifter och delar dem inte med tredje part. Vi använder dem inte för att profilera dig, för reklam eller för att träna eller förbättra våra eller någon annans tjänster. De krypteras under överföring och lagring, och lämnar vår europeiska infrastruktur bara när det är absolut nödvändigt för att fakturera dig och i de integrationer du aktiverar, där tredje part ber om ditt godkännande för de uppgifter den använder.',
 };

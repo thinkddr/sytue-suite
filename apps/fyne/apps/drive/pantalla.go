@@ -15,7 +15,6 @@ import (
 	"net/http"
 	"slices"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -23,13 +22,13 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/driver/desktop"
 
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/peticion"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
-	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
 // SinGuardarSinConexion son las rutas de Drive que la caché «sin conexión» no guarda
@@ -52,8 +51,6 @@ type Pantalla struct {
 	tr  *i18n.Translator
 	red *offline.Monitor
 	win fyne.Window
-	// Widget sólo publica la cuota completa ya cargada para el medidor del carril.
-	Widget widgets.Source
 
 	seccion Seccion
 	// pedidoCompartido es lo compartido que abrir cuando llegue la lista (un aviso).
@@ -69,6 +66,9 @@ type Pantalla struct {
 	avisos        *ui.PilaAvisos
 
 	raiz *fyne.Container
+	// capaSubir es el «Subir» flotante del teléfono (`MobileFab` en FileBrowser.tsx):
+	// la capa existe siempre y se esconde fuera de «Mi unidad» o sin red.
+	capaSubir *fyne.Container
 	// Plazo es cuánto se espera a una petición. Se deja abierto para el guardián.
 	Plazo time.Duration
 
@@ -146,11 +146,6 @@ type Pantalla struct {
 	// AutorizarNube conecta una nube personal con el mismo consentimiento nativo y
 	// devuelve su instancia. Lo pone el `main`; nil, «Conectar» no hace nada.
 	AutorizarNube func(ctx context.Context, proveedor string) (string, error)
-
-	widgetMu         sync.Mutex
-	widgetCuota      *widgets.Counter
-	widgetCuotaLeida bool
-	widgetItems      []widgets.Item
 }
 
 // ConIntegraciones monta «Traer mis datos» con la pasarela: el bloque del pie del lateral
@@ -228,8 +223,19 @@ func (p *Pantalla) Objeto() fyne.CanvasObject {
 	}
 	arm := ui.NuevoArmazon(vista)
 	arm.Menu = p.lateral.Objeto(v)
-	p.raiz = container.New(&medidorVentana{al: p.alMedir}, arm, p.avisos)
+	// «Subir» al alcance del pulgar: en el teléfono el botón de la cabecera queda arriba
+	// del todo. Por debajo de 768 lo coloca `CapaFlotante`; por encima, no se ve.
+	p.capaSubir = container.New(ui.CapaFlotante{},
+		ui.NuevoBotonFlotante(p.tr.T("files.upload", nil), iconos.Subir, p.elegirYSubir))
+	p.capaSubir.Hidden = !p.conSubirFlotante()
+	p.raiz = container.New(&medidorVentana{al: p.alMedir}, arm, p.capaSubir, p.avisos)
 	return p.raiz
+}
+
+// conSubirFlotante dice si toca el «Subir» flotante: en «Mi unidad» y con red, que es
+// donde la web lo pinta (lo lleva el explorador, y sin red no se sube).
+func (p *Pantalla) conSubirFlotante() bool {
+	return p.seccion == MiUnidad && !p.explor.SinRed()
 }
 
 // medidorVentana es `container.NewStack` que además avisa del ancho que le toca.
@@ -327,6 +333,7 @@ func (p *Pantalla) Repintar() {
 	arm := ui.NuevoArmazon(p.vista(v))
 	arm.Menu = p.lateral.Objeto(v)
 	p.raiz.Objects[0] = arm
+	p.capaSubir.Hidden = !p.conSubirFlotante()
 	p.raiz.Refresh()
 }
 
@@ -422,9 +429,6 @@ func (p *Pantalla) Arrancar(dentro bool) {
 	}
 	p.dentro = dentro
 	if !dentro {
-		p.widgetMu.Lock()
-		p.widgetCuota, p.widgetCuotaLeida, p.widgetItems = nil, false, nil
-		p.widgetMu.Unlock()
 		p.explor.Fase, p.papelera.Fase = SinSesion, SinSesion
 		p.sec.recientes.Fase, p.sec.destacados.Fase = SinSesion, SinSesion
 		p.sec.compartido.Fase, p.sec.documentos.Fase = SinSesion, SinSesion
@@ -478,9 +482,6 @@ func (p *Pantalla) Sesion(dentro bool) {
 // Vuelve SIEMPRE arriba, como la web, que al recargar vacía la lista y la vuelve a
 // montar: tras subir o renombrar, lo nuevo se ve desde el principio.
 func (p *Pantalla) cargarCarpeta(id string) {
-	esRaiz := id == ""
-	view := p.Widget.View()
-	conRed := p.hayRed()
 	epoca := p.epoca.Add(1)
 	enHilo(func() {
 		p.explor.Fase = Cargando
@@ -508,9 +509,6 @@ func (p *Pantalla) cargarCarpeta(id string) {
 	}
 	hijos, err := p.svc.Children(ctx, id, "")
 	elementos := DeHijos(hijos)
-	if err == nil && esRaiz && conRed && p.hayRed() {
-		p.publicarArchivosWidget(ctx, view, elementos)
-	}
 	enHilo(func() {
 		if p.epoca.Load() != epoca {
 			return
@@ -589,25 +587,9 @@ func (p *Pantalla) cargarCuota() {
 	}
 	ctx, cancelar := p.ctx()
 	defer cancelar()
-	view := p.Widget.View()
 	q, err := p.svc.Quota(ctx)
 	if err != nil {
 		return
-	}
-	if p.hayRed() {
-		p.widgetMu.Lock()
-		p.widgetCuotaLeida = true
-		if counter, valid := widgets.StoragePercent(q.UsedBytes, q.LimitBytes); valid && !q.ExternalStorage {
-			c := counter
-			p.widgetCuota = &c
-		} else {
-			// La cuota de Sytue no mide el almacén externo. Sin capacidad conocida
-			// tampoco existe un porcentaje: retira la observación anterior.
-			p.widgetCuota = nil
-		}
-		detalle := p.detalleWidgetBloqueado()
-		p.widgetMu.Unlock()
-		_ = view.PublicarDetalle(ctx, detalle)
 	}
 	enHilo(func() {
 		p.lateral.Cuota = &Cuota{
@@ -617,66 +599,6 @@ func (p *Pantalla) cargarCuota() {
 		}
 		p.Repintar()
 	})
-}
-
-func (p *Pantalla) publicarArchivosWidget(ctx context.Context, view widgets.View, elementos []Elemento) {
-	items := itemsDriveParaWidget(p.tr.Locale(), elementos)
-	p.widgetMu.Lock()
-	p.widgetItems = items
-	tieneDatos := p.widgetCuotaLeida || len(p.widgetItems) > 0
-	detalle := p.detalleWidgetBloqueado()
-	p.widgetMu.Unlock()
-	if tieneDatos {
-		_ = view.PublicarDetalle(ctx, detalle)
-	}
-}
-
-func (p *Pantalla) detalleWidgetBloqueado() widgets.Detail {
-	var d widgets.Detail
-	if p.widgetCuota != nil {
-		d.Counters = []widgets.Counter{*p.widgetCuota}
-	}
-	if len(p.widgetItems) > 0 {
-		d.Items = slices.Clone(p.widgetItems)
-	}
-	return d
-}
-
-func itemsDriveParaWidget(l i18n.Locale, elementos []Elemento) []widgets.Item {
-	items := make([]widgets.Item, 0, min(len(elementos), widgets.MaxItems))
-	for _, el := range elementos {
-		nombre := strings.TrimSpace(el.Nombre)
-		if nombre == "" {
-			continue
-		}
-		badge := tamanoWidget(l, el.Tamano)
-		subtitulo := el.Tipo
-		if el.Carpeta {
-			badge = "DIR"
-			subtitulo = ""
-		}
-		var startAt int64
-		if !el.Modificado.IsZero() && el.Modificado.Unix() > 0 {
-			startAt = el.Modificado.Unix()
-		}
-		items = append(items, widgets.Item{
-			Title:    nombre,
-			Subtitle: subtitulo,
-			Badge:    badge,
-			StartAt:  startAt,
-		})
-		if len(items) >= widgets.MaxItems {
-			break
-		}
-	}
-	return widgets.SanitizeItems(items)
-}
-
-func tamanoWidget(l i18n.Locale, b int64) string {
-	if b < 0 {
-		return ""
-	}
-	return Tamano(l, b)
 }
 
 // cargarPapelera pide la papelera.
@@ -735,6 +657,7 @@ func (p *Pantalla) enganchar() {
 	}
 	t.AlRestaurar = func(el Elemento) { go p.restaurar(el) }
 	t.AlEliminar = p.pedirPurga
+	t.AlVaciar = p.pedirVaciar
 }
 
 // abrir entra en una carpeta, abre el fichero en SU aplicación, o lo descarga.
@@ -1066,7 +989,7 @@ func (p *Pantalla) papeleraLote() {
 	if len(sel) == 0 || p.win == nil {
 		return
 	}
-	cuerpo := parrafo(p.variante(), p.tr.T("files.batch.trashBody", i18n.Vars{"count": len(sel)}), 0)
+	cuerpo := parrafo(p.variante(), p.tr.T("files.batch.trashBody", i18n.Vars{"count": len(sel)}))
 	var d *ui.Dialogo
 	d = ui.Confirmacion(p.tr.T("files.batch.trashTitle", nil), p.tr.T("ui.cancel", nil),
 		p.tr.T("files.batch.trashCta", nil), true, cuerpo,
@@ -1085,7 +1008,8 @@ func (p *Pantalla) mandarAPapelera(sel []Elemento) {
 		p.avisar(ui.AvisoPeligro, p.tr.T("files.batch.trashFailed", nil), motivo(err))
 		return
 	}
-	p.avisar(ui.AvisoExito, p.tr.T("files.batch.trashDone", i18n.Vars{"count": lote.Total()}), "")
+	devolver := conID(sel)
+	enHilo(func() { p.avisos.Notificar(p.avisoLoteEnPapelera(lote.Total(), devolver)) })
 	p.cargarCarpeta(p.carpetaActual())
 }
 
@@ -1117,6 +1041,38 @@ func (p *Pantalla) purgar(el Elemento) {
 		return
 	}
 	p.avisar(ui.AvisoExito, p.tr.T("trash.purged", i18n.Vars{"name": el.Nombre}), "")
+	p.cargarPapelera()
+}
+
+// pedirVaciar confirma «Vaciar papelera», que es irreversible y para todo lo que hay.
+func (p *Pantalla) pedirVaciar() {
+	if p.win == nil {
+		return
+	}
+	todo := slices.Clone(p.papelera.Elementos)
+	var d *ui.Dialogo
+	d = p.papelera.ConfirmacionVaciar(p.variante(),
+		func() { d.Cerrar() },
+		func() { d.Cerrar(); go p.vaciarPapelera(todo) })
+	d.Mostrar(p.win.Canvas())
+}
+
+// vaciarPapelera purga cada elemento por su id, en tandas (`lote.go`): el servicio no
+// tiene «vaciar», y cada purga pasa por su autorización. Lo que se niega (hoy, la
+// retención legal) se queda y se dice cuántos. Corre en su propia rutina.
+func (p *Pantalla) vaciarPapelera(todo []Elemento) {
+	p.papeleraOcupada(true)
+	defer p.papeleraOcupada(false)
+	_, fallidos := EnTandas(conID(todo), func(el Elemento) error {
+		ctx, cancelar := p.ctx()
+		defer cancelar()
+		return p.svc.Purge(ctx, claseDe(el), el.ID)
+	}, EnParalelo)
+	if len(fallidos) == 0 {
+		p.avisar(ui.AvisoExito, p.tr.T("trash.emptiedAll", nil), "")
+	} else {
+		p.avisar(ui.AvisoPeligro, p.tr.T("trash.emptyAllPartial", i18n.Vars{"count": len(fallidos)}), "")
+	}
 	p.cargarPapelera()
 }
 

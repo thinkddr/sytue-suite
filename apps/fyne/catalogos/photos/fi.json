@@ -1,9 +1,14 @@
 {
   "aiBatch.excludeOrg": "Sulje organisaatio pois Sytue AI:n automaattierästä",
   "aiBatch.excludedHint": "Organisaatio on suljettu pois Sytue AI:n automaattierästä. Uusia kuvia ei käsitellä taustalla ehdotuksia tai samankaltaisuuksia varten.",
+  "album.coverSet": "Albumin kansikuva päivitetty",
+  "album.isCover": "Tämä on albumin kansikuva",
   "album.linkCopied": "Linkki kopioitu",
   "album.newLink": "Uusi linkki",
   "album.newLinkConfirm": "Luodaanko uusi linkki? Nykyinen linkki lakkaa toimimasta kaikilta, joilla se jo on.",
+  "album.rename": "Nimeä uudelleen",
+  "album.renamePrompt": "Albumin nimi",
+  "album.setCover": "Käytä albumin kansikuvana",
   "album.share": "Jaa",
   "album.shared": "Jaettu",
   "album.unshare": "Lopeta jakaminen",
@@ -98,6 +103,7 @@
     "other": "{count} latauspäivän mukaan"
   },
   "gallery.cancelSelection": "Lopeta valinta",
+  "gallery.clearSearch": "Tyhjennä haku",
   "gallery.describeCapped": "Kerralla kuvaillaan vain ensimmäiset {count}; aja uudelleen lopuille.",
   "gallery.describeNothing": "Valituilla kuvilla on jo kuvaus",
   "gallery.describeSelected": "Kuvaile Sytue AI:lla",
@@ -106,7 +112,8 @@
   "gallery.describing": "Kuvaillaan {done}/{total}…",
   "gallery.downloadCapped": "Tämän erän ulkopuolelle jääviä kuvia: {count}.",
   "gallery.downloadSelected": "Lataa",
-  "gallery.downloading": {
+  "gallery.downloading": "Aloitettuja latauspyyntöjä: {count}. Tarkista selaimen lataukset.",
+  "gallery.downloadingNative": {
     "one": "Ladataan 1 kuvaa…",
     "other": "Ladataan {count} kuvaa…"
   },
@@ -114,6 +121,8 @@
   "gallery.empty.description": "Sytue Driven kuvat näkyvät täällä kuvauspäivän mukaan järjestettyinä.",
   "gallery.empty.title": "Ei vielä kuvia",
   "gallery.favorite": "Lisää suosikkeihin",
+  "gallery.favoriteFailed": "Kuvat, joita ei voitu muuttaa: {count}",
+  "gallery.favorited": "Lisätty suosikkeihin: {count}",
   "gallery.likeTheseResults": "Ja niiden näköiset",
   "gallery.moreLikeThese": "Lisää tämänkaltaisia",
   "gallery.newAlbum": "Uusi albumi",
@@ -124,6 +133,8 @@
   },
   "gallery.newAlbumTitle": "Uusi albumi",
   "gallery.noExifDate": "Ei kuvauspäivää: järjestetty latauspäivän mukaan",
+  "gallery.noResults.description": "Kokeile muita sanoja tai tyhjennä haku nähdäksesi kaikki kuvasi.",
+  "gallery.noResults.title": "Haulla ”{query}” ei löytynyt kuvia",
   "gallery.onlyImages": "Vain kuvia voi lisätä.",
   "gallery.open": "Avaa {name}",
   "gallery.openInEditor": "Muokkaa kuvaa {name}",
@@ -152,6 +163,7 @@
     "other": "{count} kuvaa siirretty roskakoriin"
   },
   "gallery.unfavorite": "Poista suosikeista",
+  "gallery.unfavorited": "Poistettu suosikeista: {count}",
   "gallery.unselectMonth": "Poista kuukauden valinta",
   "gallery.uploadFailed": "Lataus epäonnistui: {name}",
   "gallery.uploaded": {
@@ -198,6 +210,9 @@
   "viewer.askSend": "Kysy",
   "viewer.canvasBackground": "Kuvan tausta",
   "viewer.close": "Sulje",
+  "viewer.counter": "{index} / {total}",
+  "viewer.counterLabel": "Kuva {index}/{total}",
+  "viewer.counterMore": "{count}+",
   "viewer.delete": "Siirrä roskakoriin",
   "viewer.deleteConfirm": "Siirretäänkö tämä kuva roskakoriin? Tiedosto säilyy Sytue Drivessa.",
   "viewer.describe": "Kuvaile Sytue AI:lla",
@@ -237,6 +252,7 @@
   "viewer.saveDescription": "Tallenna",
   "viewer.savingDescription": "Tallennetaan…",
   "viewer.shortcuts": "Pikanäppäimet: nuolet vaihtavat kuvaa, välilyönti käynnistää diaesityksen, I näyttää tiedot, Z täysikokoisena, Delete roskakoriin.",
+  "viewer.shortcutsJump": "Home ja End siirtyvät ensimmäiseen ja viimeiseen kuvaan.",
   "viewer.similar": "Samankaltaiset kuvat",
   "viewer.slideshow": "Diaesitys",
   "viewer.slideshowStop": "Pysäytä diaesitys",

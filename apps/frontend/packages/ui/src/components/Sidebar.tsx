@@ -5,7 +5,7 @@
  * del carril por la regla de `bg-sidebar` en tokens/appearance.css.
  * nav + aria-current="page", navegable por teclado. docs/design.md §1.0.1 / §2 / §9.
  */
-import type { ComponentChildren, JSX } from 'preact';
+import { toChildArray, type ComponentChildren, type JSX } from 'preact';
 import { useState } from 'preact/hooks';
 import { useT } from '@sytue/i18n/preact';
 import { cx } from '../lib/cx.js';
@@ -182,6 +182,13 @@ export interface SidebarItemProps {
   icon?: JSX.Element;
   label: string;
   active?: boolean;
+  /**
+   * Solo con `active`: `false` lo marca a la vista sin `aria-current="page"`. Para la
+   * fila que REPITE otra que ya lo lleva (la Entrada de Sytue dentro de «Todos los
+   * buzones de entrada», que es la misma de «Carpetas»): dos «página actual» en el
+   * mismo menú confunden al lector de pantalla.
+   */
+  ariaCurrent?: boolean;
   /** Conteo (no leidos). */
   count?: number;
   collapsed?: boolean;
@@ -197,6 +204,28 @@ export interface SidebarItemProps {
    * del sitio donde se escribió.
    */
   action?: JSX.Element;
+  /**
+   * Convierte el item en una rama que se despliega: `aria-expanded`, el chevron al
+   * final (después del contador) y, abierta, sus `children` debajo, sangrados hasta
+   * el rótulo. Es la fila de Apple Mail con su triángulo: «Todos los buzones de
+   * entrada» con la Entrada de cada cuenta, o una cuenta con sus carpetas.
+   * `undefined`: un item de los de siempre. Pulsarlo solo pliega y despliega, así
+   * que no cierra el cajón en móvil (`data-mantiene-nav`, como el rótulo de
+   * `SidebarSection`).
+   */
+  expanded?: boolean;
+  /**
+   * Solo con `expanded`: el triángulo va APARTE, como en Apple Mail. Pulsar la fila
+   * hace `onClick` —abrir «Todos los buzones de entrada»— y es un destino como
+   * cualquier otro (marca `active`, cierra el cajón); el chevron es un botón hermano,
+   * en la columna de `action`, con `aria-expanded` y `toggleLabel` por nombre, que
+   * pliega y despliega sin cerrar el cajón. Sin él, la fila entera pliega.
+   */
+  onToggle?: () => void;
+  /** Nombre accesible del triángulo de `onToggle`; distinto del de la fila. */
+  toggleLabel?: string;
+  /** Solo con `expanded`: los items que cuelgan de este, que se pintan si está abierto. */
+  children?: ComponentChildren;
 }
 
 export function SidebarItem({
@@ -204,12 +233,23 @@ export function SidebarItem({
   icon,
   label,
   active,
+  ariaCurrent = true,
   count,
   collapsed,
   disabled = false,
   onClick,
   action,
+  expanded,
+  onToggle,
+  toggleLabel,
+  children,
 }: SidebarItemProps): JSX.Element {
+  // Con `onToggle` la fila es un destino y el triángulo, su propio botón.
+  const toggle = expanded !== undefined && onToggle !== undefined && !collapsed;
+  const branch = expanded !== undefined && !onToggle;
+  // Lo que cuelga, solo si de verdad hay algo: un `[]` de un `map` vacío (una cuenta
+  // sin carpetas) dejaba un grupo vacío con su margen.
+  const hijos = expanded && !collapsed ? toChildArray(children) : [];
   const content = (
     <>
       {icon ? <span class="grid h-5 w-5 shrink-0 place-items-center">{icon}</span> : null}
@@ -222,6 +262,15 @@ export function SidebarItem({
           empuja el icono y el contador fuera del menú. */}
       {!collapsed ? <span class="line-clamp-2 min-w-0 flex-1 break-words">{label}</span> : null}
       {!collapsed && count ? <Badge count>{count}</Badge> : null}
+      {/* El chevron de la rama: el mismo `-rotate-90` del rótulo plegable de la
+          sección, para que «abierto» se lea igual en todo el carril. */}
+      {!collapsed && branch ? (
+        <Icon
+          name="chevronDown"
+          size={14}
+          class={cx('shrink-0 transition-transform duration-150', !expanded && '-rotate-90')}
+        />
+      ) : null}
     </>
   );
   const className = cx(
@@ -236,8 +285,8 @@ export function SidebarItem({
     'sytue-focus-ring-chrome',
     collapsed && 'justify-center',
     // Con acción, el relleno derecho deja su hueco: si no, un rótulo largo pasa
-    // por debajo del botón y el contador queda tapado.
-    action && !collapsed && 'pr-9',
+    // por debajo del botón y el contador queda tapado. El triángulo aparte, igual.
+    (action || toggle) && !collapsed && 'pr-9',
     disabled
       ? 'cursor-not-allowed font-medium opacity-50'
       : active
@@ -257,11 +306,11 @@ export function SidebarItem({
   return (
     // `relative` solo cuando hay acción: posicionar por defecto cambiaría el
     // contexto de apilamiento de todos los items de la suite sin necesidad.
-    <li class={cx(action && !collapsed && 'relative')}>
+    <li class={cx((action || toggle) && !collapsed && 'relative')}>
       {href ? (
         <a
           href={href}
-          aria-current={active ? 'page' : undefined}
+          aria-current={active && ariaCurrent ? 'page' : undefined}
           aria-disabled={disabled ? 'true' : undefined}
           title={titleAttr}
           class={className}
@@ -272,8 +321,10 @@ export function SidebarItem({
       ) : (
         <button
           type="button"
-          aria-current={active ? 'page' : undefined}
+          aria-current={active && ariaCurrent ? 'page' : undefined}
           aria-disabled={disabled ? 'true' : undefined}
+          aria-expanded={branch ? expanded : undefined}
+          data-mantiene-nav={branch ? true : undefined}
           disabled={disabled}
           title={titleAttr}
           class={cx(className, 'w-full text-left')}
@@ -282,7 +333,35 @@ export function SidebarItem({
           {content}
         </button>
       )}
-      {action && !collapsed ? (
+      {/* `ml-7`: el hueco del icono (`h-5 w-5`) y el `gap-2`, así el icono de lo que
+          cuelga cae bajo el rótulo de su rama. */}
+      {hijos.length > 0 ? (
+        <ul role="group" class="mt-0.5 ml-7 flex flex-col gap-0.5">
+          {hijos}
+        </ul>
+      ) : null}
+      {toggle ? (
+        // Arriba y no centrado en alto: abierta, la rama lleva debajo sus hijos dentro
+        // del mismo `li`. El `top` centra los 24 px del botón en la fila de 2,375rem.
+        <span class="absolute top-[calc((2.375rem-24px)/2)] right-1 pointer-coarse:top-[calc((max(44px,2.75rem)-24px)/2)]">
+          <button
+            type="button"
+            class={SIDEBAR_ACTION_CLASS}
+            aria-expanded={expanded}
+            aria-label={toggleLabel ?? label}
+            title={toggleLabel ?? label}
+            data-mantiene-nav
+            onClick={onToggle}
+          >
+            <Icon
+              name="chevronDown"
+              size={14}
+              class={cx('transition-transform duration-150', !expanded && '-rotate-90')}
+            />
+          </button>
+        </span>
+      ) : null}
+      {action && !collapsed && !toggle ? (
         // `right-1` es el mismo que el `pr-1` del encabezado de sección, y los
         // dos botones miden 24px: así caen en la MISMA columna que la rueda de
         // gestionar carpetas, que es lo que hace que la barra se lea como una

@@ -106,16 +106,19 @@ func (h *Handlers) RenombrarAlbum(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// La dueña, o quien lo tiene compartido para editar: lo decide el store (edicion.go).
-	al, err := h.store.RenombrarAlbum(r.Context(), id, sub(r), cuerpo.Title, cuerpo.CoverAssetID)
+	al, renombrado, err := h.store.RenombrarAlbum(r.Context(), id, sub(r), cuerpo.Title, cuerpo.CoverAssetID)
 	if err != nil {
 		httpx.Fail(w, r, traducir(err))
 		return
 	}
 	if al.Duenyo != sub(r) {
 		// El enlace es una credencial de la dueña: quien edita no lo ve. Y a ella se le
-		// dice quién le ha cambiado el título, que no lo hace a escondidas.
+		// dice quién le ha cambiado el título, que no lo hace a escondidas. Solo si
+		// cambió: elegir la portada manda el título de siempre y no es un renombrado.
 		al.Compartido = false
-		h.avisarRenombrado(r, al)
+		if renombrado {
+			h.avisarRenombrado(r, al)
+		}
 	}
 	httpx.JSON(w, r, http.StatusOK, aAlbumJSON(al))
 }

@@ -283,6 +283,18 @@ export const pl: AppCatalog<typeof en> = {
     many: '{count} elementów wysłano do kosza.',
     other: '{count} elementu wysłano do kosza.',
   },
+  'files.batch.restored': {
+    one: 'Przywrócono 1 element.',
+    few: 'Przywrócono {count} elementy.',
+    many: 'Przywrócono {count} elementów.',
+    other: 'Przywrócono {count} elementu.',
+  },
+  'files.batch.restorePartial': {
+    one: 'Nie udało się przywrócić 1 elementu; nadal jest w koszu.',
+    few: 'Nie udało się przywrócić {count} elementów; nadal są w koszu.',
+    many: 'Nie udało się przywrócić {count} elementów; nadal są w koszu.',
+    other: 'Nie udało się przywrócić {count} elementu; nadal są w koszu.',
+  },
   'files.batch.trashFailed': 'Nie udało się wysłać zaznaczenia do kosza.',
   'files.batch.moveTitle': {
     one: 'Przenieś 1 element',
@@ -307,6 +319,9 @@ export const pl: AppCatalog<typeof en> = {
   'action.rename': 'Zmień nazwę',
   'action.move': 'Przenieś do…',
   'action.copy': 'Utwórz kopię',
+  'action.copyLink': 'Kopiuj link',
+  'action.linkCopied': 'Skopiowano link. Otworzy go tylko ktoś, kto już ma dostęp.',
+  'action.copyLinkFailed': 'Nie udało się skopiować linku.',
   'action.shareLink': 'Udostępnij link',
   'action.openInApp': 'Otwórz w aplikacji',
   'action.openInEditor': 'Otwórz w edytorze',
@@ -535,6 +550,22 @@ export const pl: AppCatalog<typeof en> = {
   'trash.purged': '„{name}” usunięto na stałe.',
   'trash.purgeDenied': 'Nie można usunąć „{name}”',
   'trash.purgeFailed': 'Nie udało się usunąć.',
+  'trash.emptyAll': 'Opróżnij kosz',
+  'trash.emptyAllTitle': 'Opróżnić kosz?',
+  'trash.emptyAllBody': {
+    one: 'Element z kosza zostanie wymazany na zawsze razem z historią wersji. Potem nie da się go odzyskać.',
+    few: '{count} elementy z kosza zostaną wymazane na zawsze razem z historią wersji. Potem nie da się ich odzyskać.',
+    many: '{count} elementów z kosza zostanie wymazanych na zawsze razem z historią wersji. Potem nie da się ich odzyskać.',
+    other:
+      '{count} elementu z kosza zostanie wymazane na zawsze razem z historią wersji. Potem nie da się ich odzyskać.',
+  },
+  'trash.emptiedAll': 'Kosz został opróżniony.',
+  'trash.emptyAllPartial': {
+    one: 'Nie udało się usunąć 1 elementu; nadal jest w koszu.',
+    few: 'Nie udało się usunąć {count} elementów; nadal są w koszu.',
+    many: 'Nie udało się usunąć {count} elementów; nadal są w koszu.',
+    other: 'Nie udało się usunąć {count} elementu; nadal są w koszu.',
+  },
   'trash.purgeTitle': 'Usunąć na stałe?',
   'trash.purgeBodyFolder':
     'Zawartość „{name}” i wszystkiego, co jest w środku, zostanie wymazana z serwerów Sytue razem z historią wersji. Potem nie da się jej odzyskać ani stąd, ani przez pomoc techniczną. W zamian zwalniasz zajmowane miejsce.',

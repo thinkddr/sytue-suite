@@ -238,6 +238,11 @@ func (a *App) archivo(ab *abierto, escribe bool) {
 	ctx.ExportarPlantilla = func(f string) { a.exportarCon(ab, f, true) }
 	ctx.Imprimir = func() { a.exportar(ab, editor.FormatoImprimir) }
 	ctx.Versiones = func(listo func([]api.DocVersion)) { srv.Versiones(ab.id, listo) }
+	// «Hacer una copia», con cualquier papel, como la web: guarda lo pendiente y la abre.
+	ctx.HacerCopia = func(listo func()) {
+		srv.HacerCopia(api.Document{ID: ab.id, Kind: api.DocSheet, Title: ctx.Titulo}, a.guardarAntes(ab),
+			func(d api.Document) { a.AbrirID(d.ID, d.Title) }, listo)
+	}
 	if escribe {
 		ctx.GuardarVersion = func(etiqueta string) { srv.GuardarVersion(ab.id, etiqueta) }
 		ctx.RestaurarVersion = func(v api.DocVersion) {
@@ -274,26 +279,34 @@ func (a *App) exportar(ab *abierto, formato string) {
 	a.exportarCon(ab, formato, false)
 }
 
+// guardarAntes es lo que hay que guardar antes de que el servicio lea el libro (exportar,
+// hacer una copia): nil si no hay nada pendiente. Para el reloj del autoguardado aquí,
+// en el hilo de la interfaz, y guarda en la rutina de quien llame.
+func (a *App) guardarAntes(ab *abierto) func() error {
+	if ab.auto == nil {
+		return nil
+	}
+	ab.mu.Lock()
+	pendiente := ab.cambios > ab.guardados
+	ab.mu.Unlock()
+	if !pendiente {
+		return nil
+	}
+	ab.auto.Parar()
+	return func() error {
+		err := a.guardar(ab)
+		ab.auto.AlTerminar(err) // el chip, como tras un autoguardado
+		return err
+	}
+}
+
 func (a *App) exportarCon(ab *abierto, formato string, plantilla bool) {
 	if a.Svc == nil || ab.ctx.Exportando != "" {
 		return
 	}
 	ab.ctx.Exportando = formato
 	ab.marco.Recomponer()
-	var antes func() error
-	if ab.auto != nil {
-		ab.mu.Lock()
-		pendiente := ab.cambios > ab.guardados
-		ab.mu.Unlock()
-		if pendiente {
-			ab.auto.Parar()
-			antes = func() error {
-				err := a.guardar(ab)
-				ab.auto.AlTerminar(err) // el chip, como tras un autoguardado
-				return err
-			}
-		}
-	}
+	antes := a.guardarAntes(ab)
 	descargar := a.servicio().Descargar
 	if plantilla {
 		descargar = a.servicio().DescargarPlantilla
@@ -440,6 +453,8 @@ func (a *App) engancharGuardado(ab *abierto) {
 			})
 		},
 	}
+	// El chip de la cabecera, en error: guarda ya, fuera del hilo de la interfaz.
+	ab.ctx.GuardarYa = func() { a.lanzar(ab.auto.Ahora) }
 	ab.lz.AlCambiar = func() {
 		ab.mu.Lock()
 		ab.cambios++

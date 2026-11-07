@@ -231,6 +231,16 @@ func (p *Pestanas) Elegir(i int) {
 	}
 }
 
+// PestanaActiva es la pestaña elegida, para devolverle el foco cuando lo que lo tenía
+// en el panel desaparece (el `[role="tab"][aria-selected="true"]` de la web); nil
+// antes de pintarse.
+func (p *Pestanas) PestanaActiva() *Pestana {
+	if p.Activa < 0 || p.Activa >= len(p.pestanas) {
+		return nil
+	}
+	return p.pestanas[p.Activa]
+}
+
 // MedidaPestanas es la tira más, si hay panel, su `pt-4` y el alto del contenido.
 func MedidaPestanas(p *Pestanas) fyne.Size {
 	ancho := float32(0)

@@ -5,11 +5,12 @@ package notes
 
 import (
 	"fmt"
+	"image/color"
 	"math"
 	"strconv"
-	"strings"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
@@ -17,7 +18,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 )
 
-// Las piezas de una PÁGINA de Notepads, con la referencia de Twos (styles/app.css): una
+// Las piezas de una PÁGINA de Notepads, como libreta (styles/app.css): una
 // columna de lectura para el día, un cuaderno en lista y las páginas de Tareas, Fijadas,
 // Buscar, Archivo, Papelera y Compartido conmigo; el título escrito una vez y en grande,
 // filas sin caja y los controles en voz baja.
@@ -57,11 +58,12 @@ func (f filaCentro) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 // AltoSegmento es el `min-h-7` de `.notes-seg-item`.
 var AltoSegmento = tema.Espacio(7)
 
-// segmento es una opción del segmentado de Notepads (`.notes-seg-item`): texto en voz
-// baja y, la elegida, con un fondo suave. No es el Boton relleno: aquí no se ejecuta
-// nada, se elige qué se mira. `cuenta` es el número que la acompaña («Todas 11»), o "".
+// segmento es una opción del segmentado de Notepads (`.notes-seg-item`): una palabra
+// que se elige. La elegida va en tinta y las demás en gris, sin píldora: convertía cada
+// fila de opciones en una botonera. `cuenta` es el número que la acompaña («Todas 11»),
+// o "". Entre una y otra, `HuecoSegmento`.
 func segmento(rotulo, cuenta string, elegido bool, v tema.Variante, accion func()) *Opcion {
-	tinta, peso := "text-muted", ui.Normal
+	tinta, peso := "text-subtle", ui.Normal
 	if elegido {
 		tinta, peso = "text", ui.Medio
 	}
@@ -71,11 +73,65 @@ func segmento(rotulo, cuenta string, elegido bool, v tema.Variante, accion func(
 		piezas = append(piezas, lineaTok(cuenta, tema.TextoXS, ui.Normal, "text-subtle", v))
 		nombre += " " + cuenta
 	}
-	o := NuevaOpcion(nombre, container.New(filaCentro{hueco: tema.Espacio(1.5)}, piezas...), accion)
-	o.PX, o.PY = tema.Espacio(2), (AltoSegmento-tema.TextoSM.Linea)/2
-	o.Superficie = "bg"
-	o.Activa, o.FondoActivo = elegido, tema.Color("bg-subtle", v)
+	o := NuevaOpcion(nombre, container.New(filaCentro{hueco: tema.Espacio(1)}, piezas...), accion)
+	o.PX, o.PY = 0, (AltoSegmento-tema.TextoSM.Linea)/2
+	filaDePagina(o)
+	o.Activa, o.FondoActivo = elegido, color.NRGBA{}
 	return o
+}
+
+// filaDePagina deja una Opcion como una fila de una página (`.notes-row`): sobre el
+// papel y, al pasar, con el velo de tinta.
+func filaDePagina(o *Opcion) *Opcion {
+	o.Superficie, o.VeloEncima = ui.FondoHoja(), true
+	return o
+}
+
+// HuecoSegmento es el `gap-x-3` de `.notes-seg`.
+var HuecoSegmento = tema.Espacio(3)
+
+// enVozBaja deja un botón de la libreta en gris (`.notes-day-nav`, `.notes-capture`): el
+// glifo en `text-subtle` y en `text` al pasar, con el velo neutro y no el tinte de marca.
+func enVozBaja(b *ui.BotonIcono) *ui.BotonIcono {
+	b.Trazo, b.TrazoEncima, b.FondoEncima, b.FondoPulsado = "text-subtle", "text", "bg-subtle", "bg-subtle"
+	return b
+}
+
+// enVozBajaTodos aplica enVozBaja a los botones de icono de una fila de acciones.
+func enVozBajaTodos(objs []fyne.CanvasObject) []fyne.CanvasObject {
+	for _, o := range objs {
+		if b, es := o.(*ui.BotonIcono); es {
+			enVozBaja(b)
+		}
+	}
+	return objs
+}
+
+// Las medidas de la marca de una línea (`.notes-stream-bullet`, `.notes-capture-kind-*`):
+// la raya de una cosa, 10 × 1,5 con los extremos redondos, y la casilla de una tarea, 16
+// con esquinas de 4 y su borde de 1,5.
+var (
+	AnchoRaya    = tema.Espacio(2.5)
+	GruesoRaya   = float32(1.5)
+	LadoCasilla  = tema.Espacio(4)
+	RadioCasilla = float32(4)
+	BordeCasilla = float32(1.5)
+)
+
+// raya es la marca de una cosa: la raya corta, en `border-strong`.
+func raya(v tema.Variante) *canvas.Rectangle {
+	r := canvas.NewRectangle(tema.Color("border-strong", v))
+	r.CornerRadius = GruesoRaya / 2
+	r.SetMinSize(fyne.NewSize(AnchoRaya, GruesoRaya))
+	return r
+}
+
+// casillaVacia es la casilla de una tarea sin marcar, solo su borde.
+func casillaVacia(v tema.Variante) *canvas.Rectangle {
+	c := canvas.NewRectangle(color.Transparent)
+	c.StrokeColor, c.StrokeWidth, c.CornerRadius = tema.Color("border-strong", v), BordeCasilla, RadioCasilla
+	c.SetMinSize(fyne.NewSize(LadoCasilla, LadoCasilla))
+	return c
 }
 
 // ladoAro es el `size-3.5` del aro de progreso.
@@ -105,7 +161,8 @@ func arco(fraccion float64) string {
 func aroProgreso(hechas, total int, v tema.Variante) fyne.CanvasObject {
 	capas := []fyne.CanvasObject{iconos.TrazoDeRuta(arco(1), ladoAro, tema.Color("border", v)).Objeto()}
 	if hechas > 0 {
-		capas = append(capas, iconos.TrazoDeRuta(arco(float64(hechas)/float64(total)), ladoAro, tema.Color("primary", v)).Objeto())
+		// En gris, como el resto de la cabecera: lo hecho se retira, no se celebra.
+		capas = append(capas, iconos.TrazoDeRuta(arco(float64(hechas)/float64(total)), ladoAro, tema.Color("text-subtle", v)).Objeto())
 	}
 	aro := container.New(&lado{l: ladoAro}, capas...)
 	return container.New(filaCentro{hueco: tema.Espacio(1.5)}, aro,
@@ -123,17 +180,27 @@ func (c *lado) Layout(objs []fyne.CanvasObject, _ fyne.Size) {
 	}
 }
 
-// escalonTitulo es `text-2xl sm:text-3xl`: en el teléfono el título no se come media pantalla.
+// Los dos tamaños del título de una página (`.notes-page-title`): `text-[1.625rem]
+// leading-[2rem]` y, desde `sm`, `text-[1.875rem] leading-[2.375rem]`. Grande pero sin
+// gritar: es una libreta, no la cabecera de un panel.
+var (
+	TituloPaginaMovil = tema.Escalon{Tam: 1.625 * tema.Rem, Linea: 2 * tema.Rem}
+	TituloPagina      = tema.Escalon{Tam: 1.875 * tema.Rem, Linea: 2.375 * tema.Rem}
+)
+
+// escalonTitulo es el título que toca a este ancho: en el teléfono no se come media
+// pantalla.
 func (p *Pantalla) escalonTitulo() tema.Escalon {
 	if p.anchoVentana() >= ui.CorteSM {
-		return tema.Texto3XL
+		return TituloPagina
 	}
-	return tema.Texto2XL
+	return TituloPaginaMovil
 }
 
-// tituloPagina es el título de una página (`.notes-page-title`): grande, una sola vez.
+// tituloPagina es el título de una página (`.notes-page-title`): grande, en negrita y una
+// sola vez.
 func (p *Pantalla) tituloPagina(s string, v tema.Variante) fyne.CanvasObject {
-	return ui.NuevoParrafo(s, p.escalonTitulo(), ui.SemiNegrita, "text", v)
+	return ui.NuevoParrafo(s, p.escalonTitulo(), ui.Negrita, "text", v)
 }
 
 // cabeceraPagina es el título a la izquierda y, a la derecha, lo que la página ofrezca:
@@ -232,17 +299,18 @@ func celdaFila(dentro fyne.CanvasObject) fyne.CanvasObject {
 }
 
 // glifoDeHit es lo que abre la fila de un resultado: el glifo de una tarea o de un
-// enlace, y la viñeta para lo demás.
+// enlace, y la raya de una cosa para lo demás.
 func glifoDeHit(tipo string, v tema.Variante) fyne.CanvasObject {
 	if tipo == "todo" || tipo == "link" {
 		if d := GlifoDeTipo(tipo); d != "" {
 			return celdaFila(Glifo(d, 14, "text-subtle", v))
 		}
 	}
-	return celdaFila(punto(VinetaFila, tema.Color("text-subtle", v)))
+	return celdaFila(raya(v))
 }
 
-// rotuloGrupo es el rótulo de un grupo dentro de una página (`.notes-group`).
+// rotuloGrupo es el rótulo de un grupo dentro de una página (`.notes-group`): en gris y
+// con su mayúscula inicial, como un margen escrito a lápiz; no en versalitas.
 func rotuloGrupo(s string, v tema.Variante) fyne.CanvasObject {
-	return lineaTok(strings.ToUpper(s), tema.TextoXS, ui.Medio, "text-subtle", v)
+	return lineaTok(conMayuscula(s), tema.TextoSM, ui.Medio, "text-subtle", v)
 }

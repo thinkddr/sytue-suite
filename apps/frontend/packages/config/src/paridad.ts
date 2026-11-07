@@ -143,7 +143,7 @@ export interface FuncionParidad {
  * del registro, que solo cuenta lo que las nativas deben llegar a tener.
  */
 // 2026-10-01: +2 por el diario de Notes; código Fyne hecho, falta recorrido real.
-// 2026-10-02: +1 por la sintaxis de captura y los atajos del diario (al estilo Twos);
+// 2026-10-02: +1 por la sintaxis de captura y los atajos del diario (diario rápido);
 // código Fyne y capturas del driver hechos, falta verla en una ventana real.
 // 2026-10-02: +2 por las tareas de Notes (vista global; cancelar, posponer y trasladar).
 // 2026-10-02: +1 en móvil por los recordatorios de Notes; el escritorio, visto en ventana.
@@ -152,7 +152,7 @@ export interface FuncionParidad {
 // Notes; el código de Fyne va en la misma PR, falta verlo en una ventana real.
 // 2026-10-02: +1 por la captura y lectura sin conexión de Notes; código Fyne y tests
 // del driver hechos, falta recorrerla en una ventana real contra el servicio.
-// 2026-10-02: móvil +1 por el editor al estilo Twos de Notes (escritorio visto en ventana real).
+// 2026-10-02: móvil +1 por el editor rápido de Notes (escritorio visto en ventana real).
 // 2026-10-02: −14 en las dos por Sytue Web (solo web); ver más arriba.
 // 2026-10-04: +1 en las dos por las filas justificadas y la jerarquía de mandos de
 // Sytue Photos; el código de Fyne y sus tests del driver ya están, falta la ventana real.
@@ -179,7 +179,22 @@ export interface FuncionParidad {
 // filete, franja de objetivo con ratón, deslizar con el dedo y precarga de las vecinas): el
 // código de Fyne y sus tests del driver ya están, falta verlo en una ventana real.
 // The external-storage wizard and Rooms OAuth connections are web first (+2):
-export const TOPE_DEUDA = { escritorio: 45, movil: 67 } as const;
+// 2026-11-05: +1 en las dos por la papelera en lote de Drive (deshacer una selección y
+// vaciarla);
+// el código de Fyne y sus tests del driver ya están, falta verla en una ventana real.
+// 2026-11-05: +1 en las dos por las acciones rápidas de Contacts en la lista y la ficha
+// (deshacer el envío a la papelera, destacar desde la fila, correo y .vcf de la selección, copiar desde la ficha); el código de Fyne y sus tests del driver ya
+// están, falta verlas en una ventana real.
+// 2026-11-05: +3 en las dos por Notepads: la libreta sobre papel (cromo neutro, líneas con su
+// marca, cabecera del día y glifos de una tinta), pegar varias líneas en la captura y
+// convertir una línea en tarea o en texto, y `[[` y `@` en el editor; el código de Fyne,
+// sus tests del driver y las capturas del pintor de software ya están, falta verlo en una
+// ventana real y en un teléfono.
+// 2026-11-06: +1 en las dos por las cuentas externas de Mail (Gmail, Outlook, Yahoo,
+// iCloud, IMAP y POP3, con sus avisos y errores), que llegan a la web sin entrada en el
+// registro; el código de Fyne y sus tests del driver ya están, falta verlas en una
+// ventana real.
+export const TOPE_DEUDA = { escritorio: 51, movil: 73 } as const;
 
 /**
  * DÓNDE SE CIERRA LA DEUDA. Una sola sección y no tres cadenas: las tres que
@@ -215,6 +230,24 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     // propio sistema. Eso NO es deuda: es el diseño, y el gate lo vigila con
     // la regla `topbar-solo-web`. Lo que sí falta en las tres superficies de
     // Gio es el BUSCADOR federado, y por eso la fila sigue en 'planificado'.
+    // 2026-11-05: «Cargar más resultados» en `/buscar` cuando el Hub dice que quedan, la
+    // página siguiente por `offset` y sin repetir, en web (`unirPaginas`, `?paginas=`) y en
+    // la pantalla Buscar del Hub de Fyne (`UnirBusqueda`, `api.Hub.SearchDesde`). Código y
+    // tests del driver hechos; sin ventana real aún.
+    // 2026-11-06: aterriza en el primer resultado nuevo también en Fyne (foco y a la vista),
+    // avisa si una página falla o llega vacía (`search.loadMoreFailed`) y, sin más en el
+    // Hub, el «N de M» es lo enseñado (`totalAMostrar` / `TotalAMostrar`). Sin ventana real.
+    // 2026-11-07: BARRA ÚNICA en el teléfono: la topbar acoge la barra de la app (`BarraMovil`
+    // de @sytue/ui, portada desde AppShell, AdminShell, Rooms y ERP) y pliega la suite tras
+    // el avatar; en Fyne, `ui.BarraSuite` sube la `ui.BarraMovil` del armazón a su fila y
+    // despliega marca, buscador y campana con un ✕. Tests en las dos (happy-dom y driver);
+    // en Fyne sin teléfono real.
+    // 2026-11-07 (pulido): título en la misma x con ☰ o sin él (la marca del producto en su
+    // sitio), nombre de MARCA (`nombreCorto` / `NombreCorto`, el del FyneApp.toml; test
+    // `TestElNombreDeCadaProductoEsElDeLaWebYElDeSuToml`) sin repetir la cabecera de debajo
+    // (`repiteLaBarra` / `CabeceraApp.RepiteLaBarra`), sin franjas claras (banco
+    // `test/e2e/barra-unica.mjs` y `TestLaBarraUnicaNoDejaFranjasClaras`), y en Fyne la
+    // cara de la suite sin selector de apps (`TestFyneNoTieneSelectorDeApps`).
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,
@@ -280,6 +313,10 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     // Escritorio: visto en ventana real el 2026-10-05 (`ventana-real.sh`, Xvfb con el GL
     // de Mesa) en las catorce apps, a 1280 y a 360 y en los tres modos; la portada del Hub,
     // con el menú de «Más» abierto. Falta verlo en un teléfono.
+    // 2026-11-05: cada evento de «Hoy» es un enlace que abre ESE evento en Calendar (la
+    // vista de día en la fecha de la instancia), en web (`rutaDelEvento`) y Fyne
+    // (`RutaDelEvento`, `FilaEvento` pulsable). Tests del driver hechos; esta parte aún
+    // sin verla en ventana real.
     escritorio: 'si',
     movil: 'planificado',
     deuda: DEUDA_MOVIL,
@@ -335,6 +372,11 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     // barra con sondeo del Hub cada minuto (lo era en Gio, retirado) y aviso por
     // el centro de notificaciones del SO. La diferencia honesta con la web: ahí
     // el aviso es instantáneo (SSE); en nativo llega con el reloj del sondeo.
+    // 2026-11-05: en la bandeja del Hub el punto azul de un aviso sin leer es un botón
+    // «Marcar como leído» que marca ese solo, sin abrirlo: web (`MarcarLeido` de
+    // @sytue/shell) y Fyne (`BotonLeido`, `Vista.marcarLeido`). Sin ventana real aún.
+    // 2026-11-06: con «Sin leer» el aviso marcado sale de la lista, y el foco pasa a la fila
+    // del siguiente (o del anterior si era el último), en web y Fyne (`devolverFoco`).
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,
@@ -348,6 +390,20 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     web: true,
     // Código y tests del driver hechos (auditoría del 2026-10-01); falta verla en una
     // ventana real para subir el escritorio a 'si'.
+    // 2026-11-05: «Deshacer» en el aviso del triaje (archivar, papelera, spam, mover;
+    // fila, lector, teclas y lote), cada mensaje a su carpeta de origen, en web y en
+    // Fyne (`origenesDeMovimiento` en las dos, con sus tests). Sin ventana real aún.
+    // Diferencia a propósito, que no se ve: deshacer durante una búsqueda, la web
+    // vuelve a pedir la búsqueda y la carpeta de debajo en el acto; Fyne relanza la
+    // búsqueda y marca la carpeta (`listaCaducada`) para pedirla al salir de ella.
+    // Al salir de la búsqueda las dos listas quedan iguales.
+    // 2026-11-05: filtros rápidos de la lista (no leídos, destacados, con adjuntos) en
+    // web y Fyne (`filtrarConversaciones` / `FiltrarConversaciones`). Sin ventana real.
+    // 2026-11-06: el tope de páginas automáticas del filtro vacío no cuenta los
+    // repintados con una página en camino, en las dos (`pasoDelFiltroVacio` /
+    // `pintarLista`).
+    // 2026-11-05: atajos x (marcar), Esc (vaciar selección), l (Etiquetar) y v (Mover
+    // a…) en web y Fyne, y en la hoja de «?». Sin ventana real.
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,
@@ -359,6 +415,9 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     web: true,
     // Código y tests del driver hechos (auditoría del 2026-10-01); falta verla en una
     // ventana real para subir el escritorio a 'si'.
+    // 2026-11-05: «Compartir en Rooms» desde el lector — web por el intent
+    // share-to-chat del Hub, Fyne por el esquema de Rooms (`api.RutaCompartir`, como
+    // Drive nativo); el mismo texto (`textoParaRooms`). Sin ventana real aún.
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,
@@ -389,6 +448,16 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     producto: 'erp',
     web: true,
     // La lista y la ficha, de este modelo y de los demás; de momento solo lectura.
+    // 2026-11-05, en las dos superficies (`lib/importacion.ts`; en Fyne,
+    // `apps/erp/importacion.go`, mismos nombres):
+    //   · importar CSV con vista previa simulada y «Deshacer» del lote en el aviso.
+    //   · libro diario y sumas y saldos por período (`components/periodo.ts`; en Fyne,
+    //     `apps/erp/periodo.go`), con el selector junto al título.
+    //   · «Deshacer» en el aviso de «Movido a la papelera», de la ficha y del lote
+    //     (`lib/papelera.ts`; en Fyne, `apps/erp/papelera.go`).
+    //   · el estado vacío propio de la Papelera (`components/vacio.ts`; en Fyne,
+    //     `vacioDeLista` en `apps/erp/lista.go`).
+    // Código de Fyne y tests del driver hechos; falta verlo en una ventana real.
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,
@@ -429,6 +498,12 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     // ventana real, así que se queda en 'planificado'. Dos diferencias conocidas con
     // la web: «Seleccionar el mes» conserva su forma anterior (en la web ya es el
     // `Button` de la casa) y las pestañas no suben a 44 px con el dedo.
+    // La barra de selección lleva el corazón: «Añadir a favoritas» si falta alguna (solo
+    // pide las que cambian) o «Quitar de favoritas», lleno, si todas lo son. Web
+    // (`favoritasEnLote.ts`) y Fyne (`planFavoritas`), con tests en las dos.
+    // Una búsqueda sin aciertos es un estado vacío: «Ninguna foto coincide con…», con
+    // «Borrar búsqueda» (devuelve el foco al buscador) y ampliar mientras se pueda. Web
+    // (`sinResultados.ts`) y Fyne (`sinResultados`, `vacioDeBusqueda`), con tests.
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,
@@ -444,6 +519,12 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     // punto pulsado y el doble toque. El pellizco no tiene pareja en Fyne: su driver móvil
     // no dice de qué dedo es cada arrastre. El código de Fyne está hecho y pasa los tests
     // del driver; falta verlo en una ventana real.
+    // En el visor de un álbum, «Usar como portada del álbum» (pulsado en la que ya lo es)
+    // junto a «Quitar del álbum», y «Renombrar» en la cabecera del álbum: web
+    // (AlbumView.tsx) y Fyne (`ponerPortada`, `renombrarAlbum`), con tests en las dos.
+    // La cabecera del visor dice «12 / 240» («12 / 100+» con páginas por pedir) tras el
+    // nombre, e Inicio y Fin saltan a la primera y a la última cargada: web
+    // (`posicionVisor.ts`) y Fyne (`posicionVisor`, `saltoVisor`), con tests en las dos.
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,
@@ -492,6 +573,70 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     deuda: DEUDA_AMBAS,
   },
 
+  {
+    id: 'mail-cuentas-externas',
+    nombre:
+      'Cuentas externas en Mail (Gmail, Outlook, Yahoo, iCloud, IMAP y POP3) con sus avisos y errores',
+    producto: 'mail',
+    web: true,
+    // 2026-11-06: «Añadir cuenta» con OAuth (Gmail, Outlook, Yahoo), iCloud como preajuste
+    // de IMAP con contraseña de app, e IMAP/POP3 a mano; sin filas fantasma ni repetidas
+    // («ya conectada» abre la que hay y lleva el foco a ella), errores que dicen qué pasó
+    // (cancelado, sin permiso de correo, caducado) y solo las cuentas con buzón en Mail.
+    // Web y Fyne (`correo_externo.go`, con sus tests del driver). Sin ventana real aún.
+    // En Fyne el inicio de sesión espera al navegador 10 min (no los 45 s de una llamada),
+    // con «Cancelar» y el aspa activos mientras; en la web la página entera va al proveedor.
+    // Las carpetas de la cuenta salen traducidas, con glifo y en el orden del lateral, con
+    // vectores comunes (`apps/fyne/apps/mail/testdata/carpetas-externas.json`).
+    // El lateral: la sección «Cuentas de correo externas» va siempre y la primera, encima
+    // de «Carpetas», con «Añadir cuenta de correo» al final (web `ExternalAccountsSection`,
+    // Fyne `seccionExternas`; el alta ya no está en «Ajustes» de Fyne). Se actualiza al
+    // volver del proveedor y al conectar o desconectar, con el diálogo abierto, y si las
+    // cuentas no cargan lo dice con «Reintentar».
+    // iCloud: enlace a account.apple.com para la contraseña de app, aviso propio si el LOGIN
+    // falla (`externalMail.icloudAuthError`), «iCloud Mail» en la lista y la nube en el
+    // lateral; las carpetas de iCloud llegan con su rol por nombre o SPECIAL-USE.
+    // Fase B (estilo Apple Mail), en curso: el modelo puro del lateral (`arbolDeBuzones`:
+    // buzones unificados por rol y una sección por cuenta con estado y no leídos) en web
+    // (`components/buzones.ts`) y Fyne (`apps/mail/buzones.go`) con vectores comunes
+    // (`apps/fyne/apps/mail/testdata/arbol-de-buzones.json`), y el lateral lee
+    // `GET /external-mail/summary` (carpetas y no leídos de cada cuenta en una petición).
+    // El lateral ya lo dibuja (web `MailboxesSection`/`ExternalAccountsSection`, Fyne
+    // `seccionBuzones`/`seccionExternas`): «Buzones» arriba con Todos los buzones de
+    // entrada, Enviados… de todas las cuentas y Sytue, cada uno desplegable en la carpeta
+    // de cada cuenta, y cada cuenta como rama plegable con sus carpetas traducidas, glifo
+    // y contador, o «Requiere volver a iniciar sesión» / reintentar en su sitio. La rama
+    // es `SidebarItem expanded` en @sytue/ui.
+    // Una carpeta externa se abre en el panel principal, con la lista y el lector de
+    // siempre (web `selectedExternal` + `vistaExterna.ts`, Fyne `Buzon.externa` +
+    // `vista_externa.go`): leer, destacar, archivar, tirar, spam y «Mover a…» van al
+    // proveedor de su cuenta; responder y «Redactar» con su carpeta salen de ella, y una
+    // franja dice si hay que volver a
+    // iniciar sesión. «Todos los buzones de entrada» abre la Entrada de todas mezclada por
+    // fecha, con vectores comunes (`testdata/mezcla-de-entradas.json`); su triángulo va
+    // aparte (`SidebarItem onToggle`). El mini-buzón del diálogo se retiró. Un POP3
+    // mezclado ahí se lee sin triaje (`sinAccionesExternas` / `Buzon.sinAcciones`), y
+    // desconectar la cuenta a la vista vuelve a la Entrada de Sytue.
+    // El «De» del redactor de Sytue lista la principal, los alias y los compartidos y,
+    // detrás, cada cuenta externa que envía (`remitentes`, web `components/remitentes.ts`
+    // y Fyne `apps/mail/remitentes.go`, vectores en `testdata/remitentes.json`); con una
+    // externa elegida el correo sale por `/external-mail/{id}/send` con
+    // `expected_address`, sin deshacer ni «Programar», y las imágenes del texto van como
+    // adjuntos. Responder y «Redactar» desde una cuenta la preseleccionan; el redactor
+    // propio de la cuenta se retiró.
+    // Al terminar el alta la hoja se cierra, la Entrada de la cuenta queda elegida con su
+    // rama desplegada y un aviso dice qué cuenta se conectó (web `onOpenAccount(…, true)`
+    // + toast y `reveal` de `ExternalAccountsSection`; Fyne `cargarCuentas` + `Avisar`).
+    // «Todos los enviados» y «Todos los borradores» se abren también mezclados por fecha,
+    // con su triángulo aparte (`ROLES_MEZCLADOS` / `rolesMezclados`, vectores en
+    // `testdata/buzones-mezclados.json`); en «Todos los borradores» el de Sytue reabre el
+    // redactor y el de una cuenta se lee. Archivo, Spam y Papelera solo se despliegan. El
+    // refresco de 30 s pide solo las carpetas del buzón a la vista.
+    escritorio: 'planificado',
+    movil: 'planificado',
+    deuda: DEUDA_AMBAS,
+  },
+
   // --- Drive ---------------------------------------------------------------
   {
     id: 'drive-almacenamiento-externo',
@@ -505,6 +650,9 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
   {
     id: 'drive-subir-descargar',
     nombre: 'Subir y guardar en disco',
+    // 2026-11-05: «Subir» flotante en el teléfono (`MobileFab`; en Fyne,
+    // `BotonFlotante` en la `CapaFlotante` de la pantalla), en «Mi unidad» y con red.
+    // Código de Fyne y tests del driver hechos; falta verlo en un teléfono.
     producto: 'drive',
     web: true,
     escritorio: 'planificado',
@@ -518,6 +666,27 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     web: true,
     // Lo hacía la suite en Gio (retirada el 2026-09-23): el panel de enlaces,
     // crearlos y revocarlos, contra los mismos `/shares` del servicio que la web.
+    // 2026-11-05: «Copiar enlace» en el «⋯», detrás de «Compartir enlace»: el enlace
+    // interno (`enlaceInterno` en la web, `enlaceDe` en Fyne), también sin red. Código
+    // de Fyne y tests del driver hechos; falta verlo en una ventana real.
+    // 2026-11-06: también en el «⋯» de Recientes y Destacados, que en la web es el
+    // mismo `ActionsMenu` (en Fyne, `accionesPlano`).
+    escritorio: 'planificado',
+    movil: 'planificado',
+    deuda: DEUDA_AMBAS,
+  },
+  // La papelera en lote (2026-11-05): «Deshacer» en el aviso de «N elementos enviados
+  // a la papelera», con los 10 s del de un solo elemento, que restaura cada uno por su
+  // id en tandas de cuatro (`lib/lote.ts`; en Fyne, `apps/drive/lote.go`) y dice
+  // cuántos no volvieron. Y «Vaciar papelera» con su confirmación, que purga cada
+  // elemento por su id con el mismo `enTandas`/`EnTandas`. Código de Fyne y tests del
+  // driver hechos; falta verla en una ventana real. 2026-11-06: el «Deshacer» recarga
+  // lo que se ve al pulsarlo —otra carpeta, o la Papelera— y no lo de cuando se tiró.
+  {
+    id: 'drive-papelera-lote',
+    nombre: 'Papelera en lote: deshacer el envío de una selección y vaciarla',
+    producto: 'drive',
+    web: true,
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,
@@ -540,6 +709,40 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     deuda: `escritorio, y en móvil File Provider (iOS); SAF (Android) hecho sin ver en un teléfono — ${ROADMAP_NATIVAS}`,
   },
 
+  // --- Contacts ------------------------------------------------------------
+  // Las acciones rápidas de la lista y la ficha (2026-11-05). Contacts no tenía
+  // entrada propia: la app de Fyne (`apps/fyne/contactos`) se portó entera antes de
+  // que este registro anotara funciones sueltas.
+  //   · «Deshacer» en el aviso de «movido a la papelera», de uno (editor) o en lote
+  //     (`client/deshacer.ts`; en Fyne, `contactos/deshacer.go`, mismos nombres): UNA
+  //     petición a `/contacts/batch/restore`, que revive en el servicio lo último que
+  //     se tiró de cada UID, y el recuento contra lo que el lote dijo que tiró. Si en
+  //     esos diez segundos se recuperó a mano, no revive una copia más vieja (2026-11-06).
+  //   · Destacar desde la fila: estrella al pasar el puntero, siempre con el dedo
+  //     (`FavoriteToggle row`, botón con el nombre del contacto; en Fyne, `AlDestacar`
+  //     de `FilaContacto`, que ignora otro toque mientras va la petición de ese UID).
+  //     2026-11-06: en Fyne la estrella es un control propio (`estrellaFila`), con
+  //     parada de teclado, Intro/Espacio, nombre «Destacar a …» y visible con el foco,
+  //     como el `IconButton` de la web; antes era una zona del toque de la fila.
+  //   · «Enviar correo a todos» y «Exportar (.vcf)» sobre la selección y sobre la
+  //     etiqueta activa (`client/seleccion.ts`; en Fyne, `contactos/seleccion.go`).
+  //     La web exporta las vCard que ya tiene; Fyne, desde el 2026-11-06, en UNA
+  //     petición por tanda de doscientos (`/contacts/batch/vcard`, que el servicio
+  //     manda en streaming), no una por contacto; si no queda ninguno vivo, avisa en
+  //     vez de guardar un `.vcf` vacío.
+  //   · Copiar cada correo, teléfono o dirección de la ficha con un clic
+  //     (`CopyValue`; en Fyne, `botonCopiar` y `AlCopiar`).
+  // Código de Fyne y tests del driver hechos; falta verlas en una ventana real.
+  {
+    id: 'contacts-acciones-rapidas',
+    nombre: 'Acciones rápidas de la lista y la ficha de Contacts',
+    producto: 'contacts',
+    web: true,
+    escritorio: 'planificado',
+    movil: 'planificado',
+    deuda: DEUDA_AMBAS,
+  },
+
   // --- Calendar ------------------------------------------------------------
   {
     id: 'calendar-crear',
@@ -548,6 +751,31 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     web: true,
     // Código y tests del driver hechos (auditoría del 2026-10-01); falta verla en una
     // ventana real para subir el escritorio a 'si'.
+    // 2026-11-05: organizador e invitados con su respuesta (sí/quizá/no/sin responder)
+    // en la vista rápida y en las píldoras del formulario, y guardar ya no devuelve a
+    // todos a NEEDS-ACTION; web (`GuestList`, `parseGuests`) y Fyne
+    // (`seccionInvitados`). Sin ventana real aún. Diferencia aceptada: el organizador
+    // sale por su CN en la web (`parseOrganizer`) y por su dirección en Fyne, porque
+    // `api.Event.Organizer` no trae el CN (el servicio no lo guarda; ver roadmap).
+    // 2026-11-05: la búsqueda de eventos filtra por calendario propio y por periodo
+    // (cualquiera, próximos, pasados, este mes, este año) en web (`periodRange`) y Fyne
+    // (`rangoPeriodo`, `api.SearchEventsFiltrada`). Sin ventana real aún.
+    // 2026-11-05: la píldora de la vista de mes lleva la hora de inicio desde `sm:`
+    // (640 de ventana) en web (`EventChip`) y Fyne (`pildora.conHora`). Sin ventana real.
+    // 2026-11-05: «?» abre la hoja de atajos en web (`lib/atajos.ts` + `ShortcutsModal`) y
+    // Fyne (`calendario/atajos.go` + `ui.MostrarHojaAtajos`, la hoja de Mail subida a `ui`).
+    // 2026-11-06: por debajo de sm: la vista de mes es el mes compacto del teléfono (semanas
+    // que tocan el mes con su número ISO, puntos por evento, selección = cursor, lista del
+    // día, cabecera ☰ · mes · hoy · +, aviso de pendientes en ☰, deslizar sobre los días y
+    // asa) en web (`MesCompacto`, `modeloMesCompacto.ts`) y Fyne (`vistamescompacta.go`,
+    // `mescompacto.go`), con los mismos vectores V1–V14 a los dos lados. La píldora
+    // compacta de 9d1608ec5 se retira; la barra de día completo estrecha se queda porque la
+    // usa la franja de la semana de Fyne (vistahoraria.go:330): ahí la web es px-1.5 +
+    // truncate y Fyne px-0.5 + clip.
+    // 2026-11-07: el selector de vista del cajón es 2×2 (`SelectorVista rejilla` /
+    // `GrupoVista.Rejilla`), el título de la barra usa el hueco y baja a text-sm antes de
+    // truncar (`AppShell` / `ui.BarraMovil`), `n`/`p` dan el paso de lo que se ve y el
+    // primer pintado ya es compacto (`max-sm:hidden` / `VentanaInicial`).
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,
@@ -580,6 +808,12 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     nombre: 'Buscador de notas',
     producto: 'notes',
     web: true,
+    // Incluye el filtro del cuaderno: si oculta todas las notas que hay, el vacío dice
+    // «ninguna nota coincide» y ofrece «Quitar el filtro» (lienzo y árbol), en las dos
+    // superficies (`onQuitarFiltro` en NoteCanvas/NoteTree; `AlQuitarFiltro` en Fyne).
+    // La búsqueda dice «Buscando…», cuántos resultados hay, y un fallo como fallo (con
+    // «Reintentar»), no como «nada encontrado»; en la web el resultado se abre sin
+    // recargar la página (Fyne ya lo abría en la propia ventana).
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,
@@ -589,6 +823,8 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     nombre: 'Eliminar nota',
     producto: 'notes',
     web: true,
+    // Eliminar y mover de cuaderno dejan un aviso con «Deshacer» que deshace ESE paso
+    // del historial (`deshacerEsta` / `DeshacerEsta`), no el último: web y Fyne.
     // Código y tests del driver hechos (auditoría del 2026-10-01); falta verla en una
     // ventana real para subir el escritorio a 'si'.
     escritorio: 'planificado',
@@ -607,9 +843,9 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     deuda: DEUDA_AMBAS,
   },
   {
-    id: 'notes-editor-twos',
+    id: 'notes-editor-rapido',
     nombre:
-      'Editor al estilo Twos: comandos «/», burbuja de formato, buscar en la nota, listas plegables, «Ir a», resaltado de lo buscado y ficha de enlaces a notas',
+      'Editor rápido: comandos «/», burbuja de formato, buscar en la nota, listas plegables, «Ir a», resaltado de lo buscado y ficha de enlaces a notas',
     producto: 'notes',
     web: true,
     // Visto en una ventana real (Xvfb con GLFW y Mesa en el frontal, 2026-10-02).
@@ -670,6 +906,11 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     nombre: 'Archivar y desarchivar cuadernos, vista Archivo y búsqueda con archivados',
     producto: 'notes',
     web: true,
+    // Con la organización de cuadernos: «Mover cuaderno a…» (cambiar de padre o sacar a
+    // la raíz) sin arrastrar, con las mismas condiciones en las dos superficies
+    // (`puedeMoverCuaderno`). En la web en el «…» de la fila del árbol y de la página;
+    // en Fyne en el «…» de la página (`dialogoMoverCuaderno`), porque su fila del árbol
+    // lleva dos botones y no menú.
     // Visto en una ventana real (Xvfb en el frontal) el 2026-10-01.
     escritorio: 'si',
     movil: 'planificado',
@@ -732,6 +973,39 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     escritorio: 'si',
     movil: 'si',
   },
+  {
+    id: 'notes-libreta-papel',
+    nombre:
+      'Libreta sobre papel: cromo neutro, cada nota una línea con su marca, cabecera del día en voz baja y glifos de una sola tinta',
+    producto: 'notes',
+    web: true,
+    // Cromo «papel» (ADR 0079) en tokens nativos y Fyne con capturas del pintor de
+    // software en claro y oscuro, 1280 y 390; falta la ventana real y el teléfono.
+    escritorio: 'planificado',
+    movil: 'planificado',
+    deuda: DEUDA_AMBAS,
+  },
+  {
+    id: 'notes-captura-lineas-tarea',
+    nombre:
+      'Pegar varias líneas en la captura (una nota por línea) y convertir una línea en tarea o en texto',
+    producto: 'notes',
+    web: true,
+    // Fyne con `Entrada.AlPegar`/`Pegar` y convertir.go, con tests del driver.
+    escritorio: 'planificado',
+    movil: 'planificado',
+    deuda: DEUDA_AMBAS,
+  },
+  {
+    id: 'notes-editor-enlazar-mencionar',
+    nombre: '`[[` para enlazar otra nota y `@` para mencionar a alguien mientras se escribe',
+    producto: 'notes',
+    web: true,
+    // Fyne: un menú para «/», `[[` y «@» (comandos.go), reglas de mención en ui/menciones.go.
+    escritorio: 'planificado',
+    movil: 'planificado',
+    deuda: DEUDA_AMBAS,
+  },
   // --- Rooms ---------------------------------------------------------------
   {
     id: 'rooms-conexiones-oauth',
@@ -747,6 +1021,28 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     nombre: 'Canales y envío de mensajes',
     producto: 'rooms',
     web: true,
+    // 2026-11-05: «Pausar avisos» con duración (30 min, 1 h, 2 h, mañana, lunes) en
+    // web (`lib/pausa.ts`, StatusMenu) y Fyne (`pausa.go`, menú de estado), con la
+    // pausa en el servicio (mig. 0061) y tests en las dos. Cada duración lleva el
+    // título en su nombre accesible (`pause.optionAria`; en Fyne, `ElementoMenu.Rotulo`)
+    // y una relectura vieja no pisa la pausa recién puesta (`turnosDePausa`/`pausaTurno`).
+    // 2026-11-06: con una escritura en vuelo el menú va inerte en las dos
+    // (`pauseSaving` / `pausaGuardando`) y Fyne no lanza una segunda.
+    // 2026-11-05: total de no leídos en el título de la pestaña (web,
+    // `lib/totalNoLeidos.ts`) y sobre el icono de la app (Fyne, `TotalNoLeidos` +
+    // `BarraSuite.PonerInsignia`), con tests en las dos. Desde el 2026-11-06 cuenta
+    // también lo que llega al canal abierto en segundo plano (`sumaNoVisto`/`SumaNoVisto`).
+    // Por id en las dos (una trama repetida no suma dos veces). Diferencia que queda:
+    // «segundo plano» es pestaña oculta en la web y ventana sin foco en Fyne escritorio.
+    // 2026-11-05: pestaña «Archivados» de «Explorar canales» (verlos, renombrar y
+    // desarchivar) en web (`ArchivedChannels.tsx`) y Fyne (`archivados.go`), con tests en
+    // las dos; archivar sigue siendo solo de la web. 2026-11-06: en Fyne la fila que
+    // se renombra se reutiliza entre pintados (`enEdicion`), como el `<li>` con key.
+    // 2026-11-05: ↑ con la caja vacía edita tu último mensaje del canal, en web
+    // (`lib/editarUltimo.ts`) y en Fyne (`UltimoEditable`, `Sala.EditarUltimo`), con
+    // tests en las dos; sin ventana real todavía, así que los estados no cambian.
+    // 2026-11-06: cerrarla (Intro o Esc) devuelve el foco al compositor desde el que
+    // se pidió con ↑, en web (`volverFocoRef`) y Fyne (`edicionConFlecha`).
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,
@@ -775,6 +1071,9 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     nombre: 'Documentos: lista, crear, renombrar, borrar y destacar',
     producto: 'docs',
     web: true,
+    // «Hacer una copia» (2026-11-05), de los tres tipos: en la web desde el menú «Más
+    // acciones» de la tesela y desde Archivo; en Fyne, botón de la tesela y Archivo. El
+    // servicio copia el contenido (`copy_of`); el editor guarda antes lo pendiente.
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,
@@ -786,6 +1085,10 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     web: true,
     // Edita por bloques y guarda con su contador (`SaveContent` con dot y
     // lamport), enseña el historial de versiones y restaura una.
+    // Zoom con Ctrl/⌘ +, − y 0, y el «100 %» de la barra de estado que vuelve al 100
+    // de un clic (2026-11-05): el mismo marco en Docus, Calcus y Diapos, web y Fyne.
+    // El chip «Guardado hace…» de la cabecera abre el historial de versiones (el mismo
+    // menú que Colaboración) y, en error, reintenta el guardado (2026-11-05).
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,
@@ -830,6 +1133,9 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     // SOLO LECTURA a propósito, y dicho en el propio paquete: guardar espera a
     // que el modelo vaya y vuelva sin pérdida y haya un test que lo demuestre
     // con un libro real. Un documento de la gente no se corrompe nunca.
+    // Autofiltro por condición (2026-11-05): el formulario «Filtrar por condición…» del
+    // «▾» llega a Fyne (la web ya lo tenía), y los operandos tecleados como fecha filtran
+    // por fecha en la web, en Fyne y en el export del servicio.
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,

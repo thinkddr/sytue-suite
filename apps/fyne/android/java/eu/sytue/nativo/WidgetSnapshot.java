@@ -5,6 +5,7 @@ package eu.sytue.nativo;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -13,10 +14,19 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TimeZone;
 
-/** Contrato de apps/nucleo/widgets, sin dependencias de Android ni acceso a secretos. */
+/**
+ * Contrato de apps/nucleo/widgets (formato 2), sin dependencias de Android ni acceso a
+ * secretos. Los mismos casos que Go y Swift: apps/nucleo/widgets/testdata/contrato.tsv.
+ */
 public final class WidgetSnapshot {
-    public static final long MAX_AGE = 30 * 60;
+    /** Solo el formato 2: `generation` es la época de identidad, no la marca de sesión. */
+    public static final long VERSION = 2;
+    /** Caducidad máxima, 24 h: pasado un día el «hoy» sería el de ayer (ADR 0078). */
+    public static final long MAX_AGE = 86400;
+    /** Por debajo de 15 min el dato se considera vivo (Snapshot.Rancio en Go). */
+    public static final long FRESCO = 900;
     public static final int MAX_BYTES = 16 * 1024;
     public static final int MAX_ITEMS = 8;
     private static final long MAX_TIMESTAMP = 10_000_000_000L;
@@ -71,6 +81,31 @@ public final class WidgetSnapshot {
                     : Collections.unmodifiableList(new ArrayList<>(busyDays));
             this.dayColors = dayColors == null ? Collections.emptyMap()
                     : Collections.unmodifiableMap(new HashMap<>(dayColors));
+        }
+    }
+
+    /**
+     * Lo que el lector comprueba FUERA del snapshot (widgets.Entorno en Go): la época
+     * actual, la marca con que se confirmó, la marca de sesión actual, si hay un cierre
+     * (`*.cerrada`) y el bloqueo de la suite.
+     */
+    public static final class Entorno {
+        public final String epoca;
+        public final String confirmada;
+        public final String marca;
+        public final boolean cerrada;
+        public final boolean bloqueo;
+
+        public Entorno(String epoca, String confirmada, String marca, boolean cerrada, boolean bloqueo) {
+            this.epoca = epoca == null ? "" : epoca;
+            this.confirmada = confirmada == null ? "" : confirmada;
+            this.marca = marca == null ? "" : marca;
+            this.cerrada = cerrada;
+            this.bloqueo = bloqueo;
+        }
+
+        public boolean permite() {
+            return !bloqueo && !cerrada && !epoca.isEmpty() && !marca.isEmpty() && confirmada.equals(marca);
         }
     }
 
@@ -148,10 +183,11 @@ public final class WidgetSnapshot {
         return true;
     }
 
-    public boolean visible(String expectedProduct, String currentGeneration, boolean locked, long now) {
-        if (locked || !active || version != 1 || product == null || !product.equals(expectedProduct)
+    public boolean visible(String expectedProduct, Entorno entorno, long now) {
+        if (entorno == null || !entorno.permite() || !active || version != VERSION || product == null
+                || !product.equals(expectedProduct)
                 || generation == null || generation.isEmpty() || generation.length() > 128
-                || !generation.equals(currentGeneration) || updatedAt <= 0 || updatedAt > now + 5
+                || !generation.equals(entorno.epoca) || updatedAt <= 0 || updatedAt > now + 5
                 || expiresAt <= now || expiresAt <= updatedAt || expiresAt - updatedAt > MAX_AGE
                 || counters.size() > 12 || items.size() > MAX_ITEMS) {
             return false;
@@ -208,5 +244,104 @@ public final class WidgetSnapshot {
             }
         }
         return true;
+    }
+
+    /** El lector dice de cuándo es el dato a partir de FRESCO (Snapshot.Rancio en Go). */
+    public boolean rancio(long now) {
+        return now - updatedAt >= FRESCO;
+    }
+
+    /**
+     * widgets.Vigentes: en Calendar, un evento con hora vale mientras no haya terminado (o
+     * no haya empezado); uno de día completo es FLOTANTE —medianoche UTC— y vale hasta la
+     * medianoche local que sigue a su último día, con el final exclusivo. Sin fechas, vale.
+     */
+    public static boolean vigente(Item item, long now, TimeZone zona) {
+        if (item.startAt == 0 && item.endAt == 0) {
+            return true;
+        }
+        if (!item.allDay) {
+            return item.endAt > now || item.startAt >= now;
+        }
+        return now < finDeDiaCompleto(item, zona);
+    }
+
+    /** La medianoche local que sigue al último día (UTC) de un evento de día completo. */
+    static long finDeDiaCompleto(Item item, TimeZone zona) {
+        long ultimo = item.endAt > item.startAt ? item.endAt - 1 : item.startAt;
+        Calendar utc = Calendar.getInstance(TimeZone.getTimeZone("UTC"), Locale.ROOT);
+        utc.setTimeInMillis(ultimo * 1000L);
+        Calendar local = Calendar.getInstance(zona, Locale.ROOT);
+        local.clear();
+        local.set(utc.get(Calendar.YEAR), utc.get(Calendar.MONTH), utc.get(Calendar.DAY_OF_MONTH));
+        local.add(Calendar.DAY_OF_MONTH, 1);
+        return local.getTimeInMillis() / 1000L;
+    }
+
+    /** El mismo snapshot con solo los elementos vigentes a `now` (solo cambia en Calendar). */
+    public WidgetSnapshot conVigentes(long now, TimeZone zona) {
+        if (!"calendar".equals(product)) {
+            return this;
+        }
+        List<Item> quedan = new ArrayList<>();
+        for (Item item : items) {
+            if (vigente(item, now, zona)) {
+                quedan.add(item);
+            }
+        }
+        return new WidgetSnapshot(version, product, generation, updatedAt, expiresAt, active, counters, quedan, calendar);
+    }
+
+    /**
+     * Cuándo hay que volver a pintar aunque nadie publique: la caducidad, el próximo evento
+     * que deja de valer y la medianoche local (la rejilla y el «hoy» cambian). Sin
+     * snapshot, solo la medianoche: la rejilla de Calendar se pinta igual. Los segundos
+     * después de la medianoche dan margen a un reloj que llega justo.
+     */
+    public static long proximoRepintado(WidgetSnapshot snapshot, long now, TimeZone zona) {
+        Calendar manana = Calendar.getInstance(zona, Locale.ROOT);
+        manana.setTimeInMillis(now * 1000L);
+        manana.set(Calendar.HOUR_OF_DAY, 0);
+        manana.set(Calendar.MINUTE, 0);
+        manana.set(Calendar.SECOND, 0);
+        manana.set(Calendar.MILLISECOND, 0);
+        manana.add(Calendar.DAY_OF_MONTH, 1);
+        long proximo = manana.getTimeInMillis() / 1000L + 5;
+        if (snapshot == null) {
+            return proximo;
+        }
+        if (snapshot.expiresAt > now) {
+            proximo = Math.min(proximo, snapshot.expiresAt);
+        }
+        if ("calendar".equals(snapshot.product)) {
+            for (Item item : snapshot.items) {
+                long cambio = item.allDay ? finDeDiaCompleto(item, zona)
+                        : item.endAt > now ? item.endAt : item.startAt >= now ? item.startAt + 1 : 0;
+                if (cambio > now) {
+                    proximo = Math.min(proximo, cambio);
+                }
+            }
+        }
+        return proximo;
+    }
+
+    /** Qué hacer con un widget ya puesto según el dispositivo y su anfitrión (Widgets.java). */
+    public enum Pintado { PINTAR, CONSERVAR, EN_BLANCO }
+
+    /** AppWidgetProviderInfo.WIDGET_CATEGORY_KEYGUARD, sin depender de Android. */
+    public static final int CATEGORIA_KEYGUARD = 2;
+
+    /**
+     * Con el dispositivo bloqueado el receptor no lee nada (los datos van tras el bloqueo
+     * del sistema). En la pantalla de inicio, que con el teléfono bloqueado no se ve, se
+     * CONSERVA la última imagen: borrarla dejaba el widget en blanco al desbloquear, porque
+     * nada garantiza repintar entonces. Un anfitrión de la pantalla de bloqueo
+     * (KEYGUARD), que sí se ve bloqueado, se pinta EN BLANCO.
+     */
+    public static Pintado pintado(boolean dispositivoBloqueado, int categoriaAnfitrion) {
+        if (!dispositivoBloqueado) {
+            return Pintado.PINTAR;
+        }
+        return (categoriaAnfitrion & CATEGORIA_KEYGUARD) != 0 ? Pintado.EN_BLANCO : Pintado.CONSERVAR;
     }
 }

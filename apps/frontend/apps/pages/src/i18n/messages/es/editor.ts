@@ -17,10 +17,10 @@ export const editor = {
   'editor.bases.desc': 'Los registros de una vista, tal como están ahora',
   'editor.bases.title': 'Tabla desde Sytue Bases',
   'editor.bases.prompt':
-    'Pega el token de una conexión de solo lectura concedida para Sytue Web. Los datos de esa vista pasarán a ser contenido del sitio y serán públicos al publicar.',
+    'Pega el token de una conexión de solo lectura concedida para Sytue Webs. Los datos de esa vista pasarán a ser contenido del sitio y serán públicos al publicar.',
   'editor.bases.confirm': 'Traer la vista',
   'editor.bases.invalid':
-    'Esa conexión no vale para Sytue Web: puede estar revocada, caducada o concedida a otro producto u organización.',
+    'Esa conexión no vale para Sytue Webs: puede estar revocada, caducada o concedida a otro producto u organización.',
   'editor.bases.large':
     'La vista no cabe en una tabla del sitio (50 filas y 8 columnas como mucho). Acótala en Sytue Bases.',
   'editor.bases.forbidden': 'Solo administración puede traer datos de Sytue Bases a un sitio.',

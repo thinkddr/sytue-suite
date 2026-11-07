@@ -3,7 +3,7 @@
  * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
  *
  * La vista previa de un enlace a OTRA NOTA: al pasar el ratón por él (o llegar
- * con el teclado), una ficha con su título y su principio, como la de Twos.
+ * con el teclado), una ficha con su título y su principio.
  *
  * Solo con lo que la suite ya resuelve: las notas del cuaderno abierto, y si no,
  * la lista de notas del cuaderno del enlace, con el token de quien mira. Nada se

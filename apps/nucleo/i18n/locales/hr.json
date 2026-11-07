@@ -101,6 +101,7 @@
   "linkedServices.changed": "Ova je stavka promijenjena kod vašeg pružatelja usluge. Osvježite je prije ponovnog uređivanja.",
   "linkedServices.choose": "Odaberite što želite povezati. Pružatelj će zatražiti dopuštenja za odabrane usluge.",
   "linkedServices.connected": "Povezane usluge",
+  "linkedServices.exists": "Ovaj je račun već bio povezan i sada je otvoren.",
   "linkedServices.keepAdmin": "Google Keep zahtijeva odobrenu konfiguraciju administracije Google Workspacea. Osobni Gmail računi ne mogu ga povezati.",
   "linkedServices.notGranted": "Pristup ovoj usluzi nije odobren. Ponovno povežite račun kako biste odabrali dopuštenja.",
   "linkedServices.notSupported": "Ovaj pružatelj ne nudi ovu uslugu.",
@@ -170,7 +171,7 @@
   "notifications.kind.pages.order.oversold": "Narudžba {number} na {site} plaćena je bez zaliha",
   "notifications.kind.pages.order.paid": "Nova narudžba {number} na {site}",
   "notifications.kind.pages.payment.duplicated": "Dvostruko plaćanje narudžbe {number} na {site}: drugo se vraća",
-  "notifications.kind.pages.settings.changed": "Promjena postavke u Sytue Web: {actor}",
+  "notifications.kind.pages.settings.changed": "Promjena postavke u Sytue Webs: {actor}",
   "notifications.kind.pages.store.busy": "Trgovina na {site} ima previše narudžbi koje čekaju plaćanje",
   "notifications.kind.pages.withdrawal.requested": "Zatraženo je odustajanje od narudžbe {number} na {site}",
   "notifications.kind.photos.album.added": "{actor} je dodao/la fotografije u „{name}“",
@@ -305,6 +306,8 @@
   "shell.update.failedBody": "Pokušajte ponovno kasnije ili je preuzmite s portala.",
   "shell.update.install": "Ažuriraj na verziju {version}",
   "shell.update.upToDate": "{app} je ažurna",
+  "shell.widgets.wake": "Ažuriraj widgete dok je aplikacija zatvorena",
+  "shell.widgets.wakeHelp": "Kad se nešto tvoje promijeni, Sytue budi aplikaciju praznom Appleovom obavijesti kako bi osvježila svoj widget. Apple vidi koju aplikaciju i kada, nikad ono što se promijenilo.",
   "ui.backToList": "Natrag na popis",
   "ui.bulk.clear": "Poništi odabir",
   "ui.bulk.region": "Radnje za odabir",
@@ -322,6 +325,8 @@
   "ui.review.edit": "Uredi",
   "ui.save": "Spremi",
   "ui.selectRow": "Odaberi redak",
+  "ui.suiteClose": "Natrag u aplikaciju",
+  "ui.suiteOpen": "Sytue: aplikacije, pretraživanje, obavijesti i račun",
   "ui.wizard.back": "Natrag",
   "ui.wizard.cancel": "Odustani",
   "ui.wizard.goToStep": "Natrag na korak {n}: ",
@@ -340,5 +345,7 @@
   "widgets.pending": "Na čekanju",
   "widgets.photos": "Fotografije",
   "widgets.rows": "Redci",
-  "widgets.storage": "Pohrana"
+  "widgets.storage": "Pohrana",
+  "widgets.updatedAgo": "Ažurirano {time}",
+  "widgets.updatedAt": "Ažurirano: {time}"
 }

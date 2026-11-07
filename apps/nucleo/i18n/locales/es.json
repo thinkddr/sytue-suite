@@ -101,6 +101,7 @@
   "linkedServices.changed": "Este elemento ha cambiado en tu proveedor. Actualiza antes de volver a editarlo.",
   "linkedServices.choose": "Elige qué conectar. Tu proveedor solicitará los permisos de los servicios elegidos.",
   "linkedServices.connected": "Servicios conectados",
+  "linkedServices.exists": "Esta cuenta ya estaba conectada y se ha abierto.",
   "linkedServices.keepAdmin": "Google Keep necesita una configuración aprobada por la administración de Google Workspace. Las cuentas personales de Gmail no pueden conectarlo.",
   "linkedServices.notGranted": "No se ha concedido acceso a este servicio. Vuelve a conectar la cuenta para elegir sus permisos.",
   "linkedServices.notSupported": "Este proveedor no ofrece este servicio.",
@@ -169,7 +170,7 @@
   "notifications.kind.pages.order.oversold": "El pedido {number} de {site} se ha pagado sin existencias",
   "notifications.kind.pages.order.paid": "Nuevo pedido {number} en {site}",
   "notifications.kind.pages.payment.duplicated": "Cobro duplicado en el pedido {number} de {site}: se devuelve el segundo",
-  "notifications.kind.pages.settings.changed": "{actor} ha cambiado un ajuste de Sytue Web",
+  "notifications.kind.pages.settings.changed": "{actor} ha cambiado un ajuste de Sytue Webs",
   "notifications.kind.pages.store.busy": "La tienda de {site} tiene demasiados pedidos pendientes de pago",
   "notifications.kind.pages.withdrawal.requested": "Desistimiento solicitado en el pedido {number} de {site}",
   "notifications.kind.photos.album.added": "{actor} ha añadido fotos a «{name}»",
@@ -301,6 +302,8 @@
   "shell.update.failedBody": "Vuelve a intentarlo más tarde o descárgala desde el portal.",
   "shell.update.install": "Actualizar a la versión {version}",
   "shell.update.upToDate": "{app} está al día",
+  "shell.widgets.wake": "Actualizar los widgets con la app cerrada",
+  "shell.widgets.wakeHelp": "Cuando cambia algo tuyo, Sytue despierta la app con un aviso vacío de Apple para que actualice su widget. Apple ve qué app y cuándo, nunca qué ha cambiado.",
   "ui.backToList": "Volver a la lista",
   "ui.bulk.clear": "Quitar la selección",
   "ui.bulk.region": "Acciones para la selección",
@@ -318,6 +321,8 @@
   "ui.review.edit": "Editar",
   "ui.save": "Guardar",
   "ui.selectRow": "Seleccionar fila",
+  "ui.suiteClose": "Volver a la aplicación",
+  "ui.suiteOpen": "Sytue: aplicaciones, búsqueda, avisos y cuenta",
   "ui.wizard.back": "Atrás",
   "ui.wizard.cancel": "Cancelar",
   "ui.wizard.goToStep": "Volver al paso {n}: ",
@@ -336,5 +341,7 @@
   "widgets.pending": "Pendientes",
   "widgets.photos": "Fotos",
   "widgets.rows": "Filas",
-  "widgets.storage": "Almacenamiento"
+  "widgets.storage": "Almacenamiento",
+  "widgets.updatedAgo": "Actualizado {time}",
+  "widgets.updatedAt": "Actualizado: {time}"
 }

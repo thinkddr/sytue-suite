@@ -57,6 +57,11 @@ type Config struct {
 	// CONTACTS_INTERNAL_SECRET en el chart de id; del Secret Manager, NUNCA en
 	// git. Vacía ⇒ la ruta no se monta (fail-closed).
 	InternalSecret string
+
+	// HubBaseURL y HubInternalSecret mandan la señal de cambios de cada escritura al
+	// Hub (/internal/events), para el widget nativo (hubnotify.TrasEscribir).
+	HubBaseURL        string
+	HubInternalSecret string
 }
 
 // Load construye la configuración leyendo el entorno. Devuelve todos los
@@ -85,6 +90,8 @@ func Load() (Config, error) {
 		OIDCAudience:          l.GetDefault("OIDC_AUDIENCE", "sytue-contacts"),
 		OIDCAcceptedAudiences: l.GetCSVDefault("OIDC_ACCEPTED_AUDIENCES", pcfg.FirstPartyAudiences()),
 		InternalSecret:        l.Get("INTERNAL_SECRET"),
+		HubBaseURL:            l.GetDefault("HUB_BASE_URL", "http://hub:8092"),
+		HubInternalSecret:     l.HubInternalSecret(base.Env),
 	}
 
 	// PORT (compose) tiene prioridad sobre HTTP_ADDR para fijar la escucha.

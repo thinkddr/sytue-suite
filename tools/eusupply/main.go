@@ -335,6 +335,10 @@ func runtimeProviderSource(path string) bool {
 	if strings.HasPrefix(path, "services/integrations/internal/http/external_chat_") && strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, "_test.go") {
 		return true
 	}
+	// El despertar de iOS (ADR 0039): el único envío del núcleo que sale de la UE.
+	if strings.HasPrefix(path, "platform/pkg/apns/") && strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, "_test.go") {
+		return true
+	}
 	switch path {
 	case "services/integrations/internal/mailbox/cloud.go",
 		"services/integrations/internal/http/handlers_external_mail.go",

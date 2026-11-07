@@ -151,17 +151,43 @@ func menuDe(disparador fyne.CanvasObject, rotulo string, elementos ...fyne.Canva
 	m.Mostrar(disparador)
 }
 
+// etiquetaSinMiembros dice si el correo y el .vcf del menú de la etiqueta van apagados:
+// como la web, según los contactos CARGADOS que la llevan, no según la lista MEMBER
+// del grupo, que puede nombrar a quien ya no está en la libreta (y entonces el menú
+// salía encendido y no hacía nada). Sin App que lo cuente, por la lista.
+func (p *Pantalla) etiquetaSinMiembros() bool {
+	if p.MiembrosEtiqueta != nil {
+		return p.MiembrosEtiqueta() == 0
+	}
+	for _, g := range p.Etiquetas {
+		if g.ID == p.EtiquetaActiva {
+			return len(g.Members) == 0
+		}
+	}
+	return true
+}
+
 // accionesEtiqueta es LabelActions: cambiar el nombre y eliminar la etiqueta por la que
 // se filtra. Solo con red y con una etiqueta activa.
 func (p *Pantalla) accionesEtiqueta() fyne.CanvasObject {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	rotulo := p.t("label.actions", nil)
-	b := botonAcciones(rotulo, Glifo(EtiquetaD, iconos.TallaMD, "text", v), iconos.Ninguno, iconos.TallaMD)
+	// `currentColor` del fantasma y a 16, como el de la libreta que va al lado.
+	b := botonAcciones(rotulo, Glifo(EtiquetaD, iconos.TallaSM, "primary-text", v), iconos.Ninguno, iconos.TallaSM)
 	b.AlPulsar = func() {
+		// Lo que se hace CON la etiqueta, antes de lo que se le hace a ella; apagado si
+		// nadie de la libreta la lleva.
+		vacia := p.etiquetaSinMiembros()
+		con := func(clave string, f func()) fyne.CanvasObject {
+			e := ui.NuevoElementoMenu(p.t(clave, nil), iconos.Ninguno, f)
+			e.Inerte = vacia || f == nil
+			return e
+		}
 		renombrar := ui.NuevoElementoMenu(p.t("label.rename", nil), iconos.Ninguno, p.AlRenombrarEtiqueta)
 		borrar := ui.NuevoElementoMenu(p.t("label.delete", nil), iconos.Ninguno, p.AlBorrarEtiqueta)
 		borrar.Peligro = true
-		menuDe(b, rotulo, renombrar, borrar)
+		menuDe(b, rotulo, con("batch.emailAll", p.AlCorreoEtiqueta), con("batch.exportVcf", p.AlExportarEtiqueta),
+			renombrar, borrar)
 	}
 	return b
 }

@@ -11,12 +11,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"mime"
 	"mime/multipart"
 	"net/http"
 	"net/mail"
 	"net/textproto"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -194,20 +196,97 @@ func (c *cloudClient) Folders(ctx context.Context) ([]Folder, error) {
 			if label.Type == "system" && roles[label.ID] == "" {
 				continue
 			}
-			folders = append(folders, Folder{ID: label.ID, Name: label.Name, Role: roles[label.ID]})
+			folder := Folder{ID: label.ID, Name: label.Name, Role: roles[label.ID]}
+			if label.ID == "INBOX" {
+				// labels.list never carries counters; only labels.get does. One
+				// extra request for the inbox is what the sidebar shows. A failure
+				// here must not hide the folders: the counter is best-effort.
+				folder.Total, folder.Unread = c.gmailCounters(ctx, label.ID)
+			}
+			folders = append(folders, folder)
 		}
 		return folders, nil
 	}
 	return c.graphFolders(ctx)
 }
 
+func (c *cloudClient) gmailCounters(ctx context.Context, id string) (total, unread int64) {
+	var label struct {
+		Total  int64 `json:"messagesTotal"`  //nolint:tagliatelle // Gmail wire format
+		Unread int64 `json:"messagesUnread"` //nolint:tagliatelle // Gmail wire format
+	}
+	if c.request(ctx, http.MethodGet, gmailBase+"/labels/"+url.PathEscape(id), nil, &label) != nil {
+		return 0, 0
+	}
+	return max(label.Total, 0), max(label.Unread, 0)
+}
+
+// graphWellKnown maps Graph's well-known folder names to Sytue roles. Graph
+// v1.0 does not return `wellKnownName` in the folder list, so the identifiers
+// are resolved by name, all in ONE $batch request: six requests per folder
+// listing would spend the gateway's per-instance egress burst.
+var graphWellKnown = []struct{ name, role string }{
+	{"inbox", "inbox"},
+	{"sentitems", "sent"},
+	{"drafts", "drafts"},
+	{"junkemail", "junk"},
+	{"deleteditems", "trash"},
+	{"archive", "archive"},
+}
+
+const graphBatch = "https://graph.microsoft.com/v1.0/$batch"
+
+func (c *cloudClient) graphRoles(ctx context.Context) (map[string]string, error) {
+	type request struct {
+		ID     string `json:"id"`
+		Method string `json:"method"`
+		URL    string `json:"url"`
+	}
+	body := struct {
+		Requests []request `json:"requests"`
+	}{}
+	requested := map[string]bool{}
+	for _, known := range graphWellKnown {
+		requested[known.role] = true
+		body.Requests = append(body.Requests, request{ID: known.role, Method: http.MethodGet, URL: "/me/mailFolders/" + known.name + "?$select=id"})
+	}
+	var response struct {
+		Responses []struct {
+			ID     string `json:"id"`
+			Status int    `json:"status"`
+			Body   struct {
+				ID string `json:"id"`
+			} `json:"body"`
+		} `json:"responses"`
+	}
+	if err := c.request(ctx, http.MethodPost, graphBatch, body, &response); err != nil {
+		return nil, err
+	}
+	roles := map[string]string{}
+	for _, item := range response.Responses {
+		switch {
+		case item.ID == "inbox" && (item.Status == http.StatusUnauthorized || item.Status == http.StatusForbidden):
+			return nil, ErrAuth
+		case item.Status != http.StatusOK || item.Body.ID == "":
+			// A mailbox without Archive (or a hidden one) answers 404: no role.
+			continue
+		}
+		if requested[item.ID] {
+			roles[item.Body.ID] = item.ID
+		}
+	}
+	if !slices.Contains(slices.Collect(maps.Values(roles)), "inbox") {
+		// Every Exchange mailbox has an inbox: without it the batch is not trustworthy.
+		return nil, ErrUnavailable
+	}
+	return roles, nil
+}
+
 func (c *cloudClient) graphFolders(ctx context.Context) ([]Folder, error) {
 	// Graph exposes child folders separately. Traverse the hierarchy with a fixed
 	// cap; never silently present only top-level folders as the complete mailbox.
-	var inbox struct {
-		ID string `json:"id"`
-	}
-	if err := c.request(ctx, http.MethodGet, graphBase+"/mailFolders/inbox?$select=id", nil, &inbox); err != nil {
+	roles, err := c.graphRoles(ctx)
+	if err != nil {
 		return nil, err
 	}
 	folders := []Folder{}
@@ -232,11 +311,7 @@ func (c *cloudClient) graphFolders(ctx context.Context) ([]Folder, error) {
 			return nil, err
 		}
 		for _, item := range response.Value {
-			role := ""
-			if item.ID == inbox.ID {
-				role = "inbox"
-			}
-			folders = append(folders, Folder{ID: item.ID, Name: item.Name, Total: item.Total, Unread: item.Unread, Role: role})
+			folders = append(folders, Folder{ID: item.ID, Name: item.Name, Total: item.Total, Unread: item.Unread, Role: roles[item.ID]})
 			if item.Child > 0 {
 				pending = append(pending, graphBase+"/mailFolders/"+url.PathEscape(item.ID)+"/childFolders?$top=100")
 			}

@@ -149,7 +149,8 @@ type Lista struct {
 	AlMarcar      func(id string)
 	AlMarcarTodas func()
 	AlDesmarcar   func()
-	// AlLote aplica «estado» (con su estado) o «borrar» a las marcadas.
+	// AlLote aplica «estado» (con su estado), «borrar» o —en la papelera— «restaurar» a
+	// las marcadas.
 	AlLote func(accion, estado string)
 	// AlVista cambia entre tabla y tarjetas.
 	AlVista func(tarjetas bool)
@@ -495,7 +496,10 @@ const (
 )
 
 // barraLote es la barra de «N seleccionados» que sale al marcar filas: deseleccionar,
-// cambiar el estado de todas, exportarlas y mandarlas a la papelera.
+// cambiar el estado de todas, exportarlas y mandarlas a la papelera. DENTRO de la
+// papelera ni se cambia el estado ni se tira: se devuelve («Restaurar», `restaurar`).
+// Tirar lo ya tirado no hacía nada, y el «Deshacer» de su aviso sacaba de la papelera
+// lo que ya estaba en ella (lib/papelera.ts `aplicarLote`).
 func (l *Lista) barraLote(v tema.Variante, ancho float32) (fyne.CanvasObject, float32) {
 	n := 0
 	for _, r := range l.registros() {
@@ -516,7 +520,7 @@ func (l *Lista) barraLote(v tema.Variante, ancho float32) (fyne.CanvasObject, fl
 	b.izq = append(b.izq, piezaDe(ui.NuevaInsignia(cuenta, ui.InsigniaInfo), ui.MedidaInsignia(cuenta)))
 	quitar := ui.NuevoBoton(l.t("list.deselect"), l.AlDesmarcar).Con(ui.Fantasma, ui.TallaXS)
 	b.izq = append(b.izq, piezaDe(quitar, quitar.MinSize()))
-	if len(l.Modelo.Estados) > 0 {
+	if len(l.Modelo.Estados) > 0 && !l.Papelera {
 		rot := l.t("list.batchState") + ":"
 		b.der = append(b.der, pieza{
 			ui.Texto(rot, tema.TextoXS, ui.Normal, tema.Color("text-subtle", v)),
@@ -553,11 +557,15 @@ func (l *Lista) barraLote(v tema.Variante, ancho float32) (fyne.CanvasObject, fl
 	exportar.MargenIcono = 1 * 0.25 * tema.Rem
 	exportar.Inerte = l.AlExportar == nil
 	b.der = append(b.der, piezaDe(exportar, exportar.MinSize()))
-	borrar := ui.NuevoBoton(l.t("list.batchDelete"), func() {
+	accion, rotulo, estilo := "borrar", "list.batchDelete", ui.Fantasma
+	if l.Papelera {
+		accion, rotulo, estilo = "restaurar", "action.restore", ui.Secundario
+	}
+	borrar := ui.NuevoBoton(l.t(rotulo), func() {
 		if l.AlLote != nil {
-			l.AlLote("borrar", "")
+			l.AlLote(accion, "")
 		}
-	}).Con(ui.Fantasma, ui.TallaXS)
+	}).Con(estilo, ui.TallaXS)
 	borrar.Inerte = l.EnLote
 	b.der = append(b.der, piezaDe(borrar, borrar.MinSize()))
 	for _, p := range append(slices.Clone(b.izq), b.der...) {
@@ -659,25 +667,51 @@ func (l *Lista) cuerpo(v tema.Variante, ancho float32) (fyne.CanvasObject, float
 	return l.tablaERP(v, ancho)
 }
 
-// vacio es `EmptyState` con el icono de edificio: «Aquí todavía no hay nada». Con un
-// filtro puesto, la acción es quitarlo; sin filtro, «Nuevo» si se puede escribir.
-func (l *Lista) vacio(v tema.Variante) *ui.Vacio {
-	x := ui.NuevoVacio(l.t("list.empty"), "")
-	// La papelera NO cuenta aquí, y es la web: vacía, la papelera dice lo mismo que una
-	// lista vacía («Crea el primero con Nuevo») porque su condición mira solo estado y
-	// búsqueda.
+// vacioLista es `VacioDeLista` de la web (vacio.ts): qué dice la lista sin filas.
+type vacioLista struct {
+	titulo, pista string
+	papelera      bool // el icono: la papelera o el edificio
+	limpiar       bool // la acción: «Restablecer vista» (true) o «Nuevo»
+}
+
+// vacioDeLista es `vacioDeLista`: la papelera tiene el SUYO —vacía decía «Crea el
+// primero con Nuevo», y en la papelera no se crea nada—; con un filtro puesto, la
+// acción es quitarlo (que también saca de la papelera).
+func vacioDeLista(papelera bool, estado, busqueda string) vacioLista {
+	filtrada := estado != "" || busqueda != ""
 	switch {
-	case l.Estado != "" || l.Busqueda != "":
+	case papelera && filtrada:
+		return vacioLista{titulo: "list.trashEmpty", papelera: true, limpiar: true}
+	case papelera:
+		return vacioLista{titulo: "list.trashEmpty", pista: "list.trashEmptyHint", papelera: true, limpiar: true}
+	case filtrada:
+		return vacioLista{titulo: "list.empty", limpiar: true}
+	}
+	return vacioLista{titulo: "list.empty", pista: "list.emptyHint"}
+}
+
+// vacio es `EmptyState`: «Aquí todavía no hay nada» con el edificio, o «La papelera
+// está vacía» con la papelera. Con un filtro puesto (o en la papelera), la acción es
+// quitarlo; sin filtro, «Nuevo» si se puede escribir.
+func (l *Lista) vacio(v tema.Variante) *ui.Vacio {
+	d := vacioDeLista(l.Papelera, l.Estado, l.Busqueda)
+	x := ui.NuevoVacio(l.t(d.titulo), "")
+	if d.pista != "" {
+		x.Descripcion = l.t(d.pista, i18n.Vars{"action": l.t("action.new")})
+	}
+	switch {
+	case d.limpiar:
 		if l.AlLimpiar != nil {
 			x.Accion = ui.NuevoBoton(l.t("action.resetView"), l.AlLimpiar).Con(ui.Secundario, ui.TallaSM)
 		}
-	default:
-		x.Descripcion = l.t("list.emptyHint", i18n.Vars{"action": l.t("action.new")})
-		if !l.SoloLectura && l.AlNueva != nil {
-			x.Accion = ui.NuevoBoton(l.t("action.new"), l.AlNueva).Con(ui.Primario, ui.TallaSM)
-		}
+	case !l.SoloLectura && l.AlNueva != nil:
+		x.Accion = ui.NuevoBoton(l.t("action.new"), l.AlNueva).Con(ui.Primario, ui.TallaSM)
 	}
-	x.Ilustracion = iconos.Trazo(iconos.Edificio, IlustracionVacio, "text-subtle", v).Objeto()
+	icono := iconos.Edificio
+	if d.papelera {
+		icono = iconos.Papelera
+	}
+	x.Ilustracion = iconos.Trazo(icono, IlustracionVacio, "text-subtle", v).Objeto()
 	return x
 }
 

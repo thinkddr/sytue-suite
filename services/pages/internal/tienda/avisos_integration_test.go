@@ -79,7 +79,7 @@ func TestLosAvisosDeLaTiendaSalen(t *testing.T) {
 	svc := Nuevo(store.New(super), nil, "https://web.example.test", "sites.example.test", hubnotify.New(hubSrv.URL, "secreto"), nil)
 	var correos []string
 	svc.enviarCorreo = func(_ context.Context, op correo.Opciones, para, asunto, _ string) error {
-		if op.NombreRemitente != "Panadería Aurora (vía Sytue Web)" || op.ResponderA != "hola@aurora.example" {
+		if op.NombreRemitente != "Panadería Aurora (vía Sytue Webs)" || op.ResponderA != "hola@aurora.example" {
 			t.Errorf("el correo a %s sale como %+v; quiero el nombre de la tienda y su respuesta", para, op)
 		}
 		correos = append(correos, para+":"+asunto)

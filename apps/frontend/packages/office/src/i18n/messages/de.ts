@@ -155,6 +155,12 @@ export const de: AppCatalog<typeof en> = {
   'share.password.removed': 'Passwort vom Link entfernt.',
   'share.password.failed':
     'Das Passwort konnte nicht gespeichert werden. Es muss zwischen 8 und 128 Zeichen lang sein.',
+  'copy.action': 'Kopie erstellen',
+  'copy.title': 'Kopie von {title}',
+  'copy.error': 'Die Kopie konnte nicht erstellt werden',
+  'tile.more': 'Weitere Aktionen',
+  'tile.more.label': 'Weitere Aktionen für „{title}“',
+  'tile.copy.label': 'Kopie von „{title}“ erstellen',
   'tile.delete': 'Löschen',
   'tile.delete.label': '„{title}“ löschen',
 
@@ -226,6 +232,7 @@ export const de: AppCatalog<typeof en> = {
   'header.save.saving': 'Wird gespeichert…',
   'header.save.dirty': 'Nicht gespeicherte Änderungen',
   'header.save.error': 'Fehler beim Speichern',
+  'header.save.retry': 'Erneut speichern',
   'header.save.offline': 'Auf diesem Gerät gespeichert',
   'header.save.agoSeconds': 'Vor {seconds} s gespeichert',
   'header.save.agoMinutes': 'Vor {minutes} Min. gespeichert',
@@ -250,6 +257,7 @@ export const de: AppCatalog<typeof en> = {
   'status.zoom': 'Zoom',
   'status.zoom.out': 'Verkleinern',
   'status.zoom.in': 'Vergrößern',
+  'status.zoom.reset': '{zoom} % · Zurück auf 100 %',
 
   'rail.search': 'Suchen',
   'rail.search.title': 'Suchen',

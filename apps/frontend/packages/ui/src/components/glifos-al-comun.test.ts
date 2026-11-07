@@ -50,9 +50,6 @@ const EXCEPCIONES: Record<string, [number, string]> = {
     1,
     'el anillo de progreso de un cuaderno: un medidor en su caja de 16, no un glifo',
   ],
-  // PENDIENTE, no excepción de verdad: el catálogo de Notepads está en manos de otra
-  // sesión. Cuando cierre pasa a `Glifo` y esta línea se borra.
-  'apps/notes/src/components/glyphs.tsx': [1, 'PENDIENTE: catálogo de Notepads, en otra sesión'],
 };
 
 /*

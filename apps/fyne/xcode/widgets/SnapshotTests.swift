@@ -16,11 +16,14 @@ struct SnapshotContractTests {
         try manager.createDirectory(at: root.appendingPathComponent("widgets"), withIntermediateDirectories: true)
         defer { try? manager.removeItem(at: root) }
         let marker = root.appendingPathComponent("sesion.marca")
+        let epochFile = root.appendingPathComponent("sesion.epoca")
         let preferences = root.appendingPathComponent("ajustes.json")
         let snapshot = root.appendingPathComponent("widgets/eu.sytue.rooms.json")
         let now: Int64 = 1_800_000_000
+        // Formato 2: `generation` es la época (sesion.epoca), confirmada con la marca.
+        let epoch = "0123456789abcdef0123456789abcdef"
         let valid: [String: Any] = [
-            "version": 1, "product": "rooms", "generation": "opaque-revision",
+            "version": 2, "product": "rooms", "generation": epoch,
             "updated_at": now - 10, "expires_at": now + 600, "active": true,
             "counters": [["kind": "unread", "value": 3]],
         ]
@@ -49,9 +52,14 @@ struct SnapshotContractTests {
         func write(_ value: [String: Any]) throws {
             try JSONSerialization.data(withJSONObject: value).write(to: snapshot, options: .atomic)
         }
+        func writeEpoch(_ value: String, confirmed: String) throws {
+            try Data((value + "\nhuella\nhuella-org\n" + confirmed + "\n").utf8).write(to: epochFile, options: .atomic)
+        }
         func reset() throws {
             try Data("opaque-revision".utf8).write(to: marker, options: .atomic)
+            try writeEpoch(epoch, confirmed: "opaque-revision")
             try Data("{}".utf8).write(to: preferences, options: .atomic)
+            try? manager.removeItem(at: root.appendingPathComponent("sesion-0123.cerrada"))
             try write(valid)
         }
         func load() -> SytueWidgetSnapshot? {
@@ -63,6 +71,55 @@ struct SnapshotContractTests {
             changed[key] = value
             try write(changed)
             require(load() == nil, "reject invalid " + key)
+        }
+
+        // Los casos comunes con Go y Java: apps/nucleo/widgets/testdata/contrato.tsv,
+        // primer argumento.
+        func contract() throws {
+            guard CommandLine.arguments.count == 2 else {
+                return require(false, "usage: snapshot apps/nucleo/widgets/testdata/contrato.tsv")
+            }
+            let text = try String(contentsOfFile: CommandLine.arguments[1], encoding: .utf8)
+            var counts = [String: Int]()
+            func field(_ value: String) -> String { value == "-" ? "" : value }
+            func int(_ value: String) -> Int64 { Int64(value) ?? -1 }
+            for line in text.components(separatedBy: "\n") where !line.isEmpty && !line.hasPrefix("#") {
+                let c = line.components(separatedBy: "\t")
+                counts[c[0], default: 0] += 1
+                switch c[0] {
+                case "visible":
+                    let entorno = SytueWidgetEntorno(epoca: field(c[2]), confirmada: field(c[3]), marca: field(c[4]),
+                                                     cerrada: c[5] == "1", bloqueo: c[6] == "1")
+                    let object: [String: Any] = [
+                        "version": int(c[7]), "product": "mail", "active": c[8] == "1", "generation": field(c[9]),
+                        "updated_at": int(c[10]), "expires_at": int(c[11]), "counters": [["kind": "unread", "value": 3]],
+                    ]
+                    let decoded = try JSONDecoder().decode(SytueWidgetSnapshot.self,
+                                                           from: JSONSerialization.data(withJSONObject: object))
+                    require(decoded.isVisible(product: "mail", entorno: entorno, now: int(c[12])) == (c[13] == "1"),
+                            "contract visible: " + c[1])
+                case "rancio":
+                    let object: [String: Any] = [
+                        "version": 2, "product": "mail", "active": true, "generation": "g",
+                        "updated_at": int(c[2]), "expires_at": int(c[2]) + 60, "counters": [[String: Any]](),
+                    ]
+                    let decoded = try JSONDecoder().decode(SytueWidgetSnapshot.self,
+                                                           from: JSONSerialization.data(withJSONObject: object))
+                    require(decoded.isStale(now: int(c[3])) == (c[4] == "1"), "contract stale: " + c[1])
+                case "vigente":
+                    var zone = Calendar(identifier: .gregorian)
+                    guard let tz = TimeZone(identifier: c[2]) else { return require(false, "known zone " + c[2]) }
+                    zone.timeZone = tz
+                    let item = SytueWidgetItem(title: "x", subtitle: nil, badge: nil, color: nil, start_at: int(c[3]),
+                                               end_at: int(c[4]), all_day: c[5] == "1", unread: nil, done: nil)
+                    require(SytueWidgetTimeline.isCurrent(item, now: int(c[6]), calendar: zone) == (c[7] == "1"),
+                            "contract current: " + c[1] + " in " + c[2])
+                default:
+                    require(false, "unknown contract case " + c[0])
+                }
+            }
+            require((counts["visible"] ?? 0) >= 15 && (counts["rancio"] ?? 0) >= 4 && (counts["vigente"] ?? 0) >= 10,
+                    "the contrato.tsv cases are all there")
         }
 
         try reset()
@@ -93,12 +150,19 @@ struct SnapshotContractTests {
         try manager.removeItem(at: preferences)
         require(load() != nil, "new settings profile can omit preferences")
         try reject("generation", "previous-account")
+        try reject("generation", "opaque-revision")
         try reject("product", "mail")
-        try reject("version", 2)
+        try reject("version", 1)
+        try reject("version", 3)
         try reject("active", false)
         try reject("updated_at", now + 6)
         try reject("expires_at", now)
-        try reject("expires_at", now + 1801)
+        try reject("expires_at", now - 10 + 86401)
+        try reset()
+        var day = valid
+        day["expires_at"] = now - 10 + 86400
+        try write(day)
+        require(load() != nil, "a snapshot lives up to 24 h")
         try reject("counters", [["kind": "message-body", "value": 3]])
         try reject("counters", [["kind": "unread", "value": -1]])
         try reject("counters", [["kind": "unread", "value": Int64(1_000_000_000_001)]])
@@ -140,7 +204,20 @@ struct SnapshotContractTests {
         try reject("calendar", ["year": 2026, "month": 11, "secret": "nope"])
         try reset()
         try Data("another-session".utf8).write(to: marker, options: .atomic)
-        require(load() == nil, "reject snapshot from another session")
+        require(load() == nil, "a session changed by a build that does not know the epoch stays private")
+        try writeEpoch(epoch, confirmed: "another-session")
+        require(load() != nil, "a renewal (same epoch, new confirmed marker) keeps the snapshot visible")
+        try writeEpoch("fedcba9876543210fedcba9876543210", confirmed: "another-session")
+        require(load() == nil, "reject snapshot from another identity epoch")
+        try reset()
+        try Data("1\n".utf8).write(to: root.appendingPathComponent("sesion-0123.cerrada"), options: .atomic)
+        require(load() == nil, "a closed session marker hides every snapshot")
+        try reset()
+        try manager.removeItem(at: epochFile)
+        require(load() == nil, "without an identity epoch nothing is shown")
+        try reset()
+        try Data("short\n".utf8).write(to: epochFile, options: .atomic)
+        require(load() == nil, "malformed epoch stays private")
         try reset()
         try Data("{\"bloqueo\":true}".utf8).write(to: preferences, options: .atomic)
         require(load() == nil, "OS unlock preference keeps widget private")
@@ -157,7 +234,63 @@ struct SnapshotContractTests {
         try reset()
         require(SytueWidgetSnapshots.load(directory: root, bundle: "../sesion.marca", product: "rooms", now: now) == nil,
                 "untrusted bundle cannot choose another path")
-        require(checked >= 22, "snapshot contract executes its cases")
+        // La línea de tiempo `.atEnd`: precalculada, sin la entrada vacía de 24 h cuando la
+        // lectura es protegida.
+        try reset()
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC")!
+        guard let current = load() else { return require(false, "fixture visible") }
+        let start = Date(timeIntervalSince1970: TimeInterval(now))
+        switch SytueWidgetTimeline.plan(for: .visible(current), now: start, calendar: utc) {
+        case .entries(let dates, let expiry):
+            // Caduca a los 10 min: ni la marca de los 15 min ni la medianoche caben.
+            require(dates == [start] && expiry == start.addingTimeInterval(600),
+                    "entries start now and never go past the expiry")
+        default:
+            require(false, "a visible snapshot gets precomputed entries")
+        }
+        var long = valid
+        long["expires_at"] = now - 10 + 86400
+        long["product"] = "calendar"
+        long["items"] = [["title": "Daily", "start_at": now + 60, "end_at": now + 1200]]
+        try write(long)
+        if let calendarSnapshot = SytueWidgetSnapshots.load(directory: root, bundle: "eu.sytue.rooms", product: "calendar", now: now),
+           case .entries(let dates, _) = SytueWidgetTimeline.plan(for: .visible(calendarSnapshot), now: start, calendar: utc) {
+            let updated = Date(timeIntervalSince1970: TimeInterval(now - 10))
+            require(dates.count <= SytueWidgetTimeline.maxEntries - 1, "at most 40 entries with the expiry")
+            require(dates.first == start && dates == dates.sorted() && Set(dates).count == dates.count, "sorted, unique, from now")
+            require([15, 30, 45, 60, 120].allSatisfy { dates.contains(updated.addingTimeInterval(TimeInterval($0 * 60))) },
+                    "the «updated X ago» marks: 15, 30, 45 min, then hourly")
+            require(dates.contains(Date(timeIntervalSince1970: TimeInterval(now + 1200))), "an entry when an event ends")
+            require(dates.contains(utc.startOfDay(for: start).addingTimeInterval(86400)), "an entry at midnight")
+            require(SytueWidgetTimeline.currentItems(calendarSnapshot, at: Date(timeIntervalSince1970: TimeInterval(now + 1200)),
+                                                     calendar: utc).isEmpty, "rows that ended are trimmed at their entry")
+            require(SytueWidgetTimeline.currentItems(calendarSnapshot, at: start, calendar: utc).count == 1, "current rows stay")
+        } else {
+            require(false, "the 24 h calendar snapshot is visible")
+        }
+        require(SytueWidgetTimeline.plan(for: .hidden, now: start, calendar: utc) == .empty, "nothing to show, no reloads")
+        require(SytueWidgetTimeline.plan(for: .protected, now: start, calendar: utc) == .protected(retry: start.addingTimeInterval(300)),
+                "a protected read retries in 5 min")
+        try reset()
+        if getuid() != 0 {
+            // Lo que ve la extensión con NSFileProtectionComplete y el teléfono bloqueado.
+            try manager.setAttributes([.posixPermissions: 0], ofItemAtPath: snapshot.path)
+            if case .protected = SytueWidgetSnapshots.reading(directory: root, bundle: "eu.sytue.rooms", product: "rooms", now: now) {
+                require(true, "an unreadable snapshot is protected, not missing")
+            } else {
+                require(false, "an unreadable snapshot is protected, not missing")
+            }
+            try manager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: snapshot.path)
+        }
+        try manager.removeItem(at: snapshot)
+        if case .hidden = SytueWidgetSnapshots.reading(directory: root, bundle: "eu.sytue.rooms", product: "rooms", now: now) {
+            require(true, "a missing snapshot is hidden")
+        } else {
+            require(false, "a missing snapshot is hidden")
+        }
+        try contract()
+        require(checked >= 40, "snapshot contract executes its cases")
         print("ok - \(checked) WidgetKit snapshot cases")
     }
 }

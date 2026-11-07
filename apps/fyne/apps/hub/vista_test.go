@@ -15,6 +15,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
 
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/auth"
 )
@@ -24,6 +25,13 @@ type hubDoble struct {
 	mu       sync.Mutex
 	origenes []string
 	apps     []string
+	// paginas son las respuestas de la búsqueda, una por `offset`; desdes, lo pedido.
+	paginas []api.HubBusqueda
+	desdes  []int
+	// colgada, si está, retiene la PRIMERA petición de «más» (`desde > 0`) hasta que se
+	// cierra, y entonces contesta `tardia`: un Hub lento.
+	colgada chan struct{}
+	tardia  api.HubBusqueda
 }
 
 func (h *hubDoble) RecentDe(_ context.Context, o []string, _ int) (api.HubBusqueda, error) {
@@ -33,7 +41,25 @@ func (h *hubDoble) RecentDe(_ context.Context, o []string, _ int) (api.HubBusque
 	return api.HubBusqueda{}, nil
 }
 
-func (h *hubDoble) Search(context.Context, string, int) (api.HubBusqueda, error) {
+func (h *hubDoble) Search(ctx context.Context, q string, limite int) (api.HubBusqueda, error) {
+	return h.SearchDesde(ctx, q, limite, 0)
+}
+
+// SearchDesde contesta con la página que toque de `paginas` y apunta cada desplazamiento.
+func (h *hubDoble) SearchDesde(_ context.Context, _ string, _, desde int) (api.HubBusqueda, error) {
+	h.mu.Lock()
+	if c := h.colgada; c != nil && desde > 0 {
+		h.colgada = nil
+		h.desdes = append(h.desdes, desde)
+		h.mu.Unlock()
+		<-c
+		return h.tardia, nil
+	}
+	defer h.mu.Unlock()
+	h.desdes = append(h.desdes, desde)
+	if i := desde / PorPaginaBusqueda; i < len(h.paginas) {
+		return h.paginas[i], nil
+	}
 	return api.HubBusqueda{}, nil
 }
 
@@ -94,21 +120,10 @@ func TestDestinoDeRuta(t *testing.T) {
 	}
 }
 
-// TestHoyEsLoQueDaElBFF: seis como mucho, por hora de inicio, y el correo de la bandeja
-// de entrada o, sin ella, la suma de todos los buzones.
-//
-// Visto en ROJO a mano el 2026-09-22 (en el frontal): recortando antes de ordenar, se
-// cuela el evento de las 23:00 y el test lo dice.
+// TestHoyEsLoQueDaElBFF: el correo de la bandeja de entrada o, sin ella, la suma de
+// todos los buzones. El corte de la agenda (seis, por hora de inicio) es de
+// api.RecortarHoy y se prueba allí (TestLaAgendaDeHoyEsLaDelBFF).
 func TestHoyEsLoQueDaElBFF(t *testing.T) {
-	horas := []int{23, 9, 10, 11, 12, 13, 14, 8}
-	eventos := make([]EventoDeHoy, 0, len(horas))
-	for _, h := range horas {
-		eventos = append(eventos, EventoDeHoy{ID: fmt.Sprint(h), Inicio: time.Date(2026, 9, 21, h, 0, 0, 0, time.UTC)})
-	}
-	got := RecortarHoy(eventos)
-	if len(got) != MaxEventosHoy || got[0].Inicio.Hour() != 8 || got[5].Inicio.Hour() != 13 {
-		t.Errorf("salen %d eventos, del %v al %v", len(got), got[0].Inicio, got[len(got)-1].Inicio)
-	}
 	if n := SinLeerDe([]api.Mailbox{{Role: "sent", UnreadEmails: 3}, {Role: "inbox", UnreadEmails: 17}}); n != 17 {
 		t.Errorf("con bandeja de entrada salen %d sin leer y son 17", n)
 	}
@@ -245,5 +260,250 @@ func TestSinOrganizacionSeVaAlAlta(t *testing.T) {
 		if c.tenant != "" && preguntado {
 			t.Errorf("%s: se pregunta por el alta a quien ya tiene organización", c.nombre)
 		}
+	}
+}
+
+// TestLaBusquedaCargaMas: con el Hub diciendo que quedan, sale «Cargar más resultados»;
+// pulsarlo pide la página siguiente por `offset`, la pega detrás sin repetir y, cuando
+// el Hub dice que no quedan, el botón se va.
+//
+// Visto en ROJO a mano el 2026-11-05: sin el `UnirBusqueda` (pegando la página tal
+// cual), el resultado que se repite entre las dos sale dos veces y el test lo dice.
+func TestLaBusquedaCargaMas(t *testing.T) {
+	ayer := time.Date(2026, 9, 20, 10, 0, 0, 0, time.UTC)
+	primera := hits(PorPaginaBusqueda, "mail", ayer)
+	segunda := append([]api.HubHit{primera[len(primera)-1]}, hits(3, "drive", ayer)...)
+	d := &hubDoble{paginas: []api.HubBusqueda{
+		{Hits: primera, Total: 23, HasMore: true},
+		{Hits: segunda, Total: 23, HasMore: false},
+	}}
+	v := NuevaVista(traductor(t), nil, time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC)).Con(d)
+	lee := func(f func(b *Buscar) bool) func() bool {
+		return func() bool {
+			v.mu.Lock()
+			defer v.mu.Unlock()
+			return f(v.buscar)
+		}
+	}
+	boton := func() *ui.Boton {
+		var out *ui.Boton
+		fyne.DoAndWait(func() {
+			for _, o := range test.WidgetRenderer(v.buscar).Objects() {
+				if b, ok := o.(*ui.Boton); ok && b.Texto == v.buscar.T.T("search.loadMore", nil) {
+					out = b
+				}
+			}
+		})
+		return out
+	}
+	v.buscar.AlBuscar("factura")
+	esperar(t, "la primera página", lee(func(b *Buscar) bool { return b.Estado == Listo && len(b.Items) == PorPaginaBusqueda }))
+	if !lee(func(b *Buscar) bool { return b.HayMas })() || boton() == nil {
+		t.Fatal("con el Hub diciendo que quedan, no hay «Cargar más resultados»")
+	}
+	boton().Tapped(&fyne.PointEvent{})
+	esperar(t, "la segunda página", lee(func(b *Buscar) bool { return len(b.Items) == 23 }))
+	d.mu.Lock()
+	desdes := slices.Clone(d.desdes)
+	d.mu.Unlock()
+	if !slices.Equal(desdes, []int{0, PorPaginaBusqueda}) {
+		t.Errorf("al Hub le llegaron los desplazamientos %v", desdes)
+	}
+	if lee(func(b *Buscar) bool { return b.HayMas })() || boton() != nil {
+		t.Error("sin más en el Hub, el botón sigue")
+	}
+	if lee(func(b *Buscar) bool { return b.Items[len(b.Items)-1].Source != "drive" })() {
+		t.Error("la página nueva no va al final")
+	}
+}
+
+// Visto en ROJO a mano el 2026-11-05: comparando el total con lo enseñado (como antes),
+// el caso de los repetidos sigue ofreciendo más y el test lo dice.
+func TestHayMasBusquedaTieneTope(t *testing.T) {
+	if HayMasBusqueda(api.HubBusqueda{HasMore: true}, MaxPaginasBusqueda) {
+		t.Error("pasado el tope de páginas sigue ofreciendo más")
+	}
+	if !HayMasBusqueda(api.HubBusqueda{Total: 40}, 1) {
+		t.Error("con un total mayor que lo pedido no ofrece más")
+	}
+	// Dos páginas pedidas (40) con un repetido entre ellas: se ven 39 de 40 y el Hub dice
+	// que no quedan. Con el total contra lo enseñado, el botón no se iba nunca.
+	if HayMasBusqueda(api.HubBusqueda{Total: 2 * PorPaginaBusqueda}, 2) {
+		t.Error("tras quitar un repetido sigue ofreciendo más sin que quede nada")
+	}
+}
+
+// TestCargarMasBusquedaDeOtraBusqueda: un «Cargar más» que se queda colgado no se pega a
+// la búsqueda siguiente cuando por fin llega, ni deja mudo el «Cargar más» de esta.
+//
+// Visto en ROJO a mano el 2026-11-05: sin soltar `cargandoMasBusqueda` al empezar la
+// búsqueda nueva, su «Cargar más» no hace nada y el test lo dice; y sin el descarte por
+// generación, la página tardía de la anterior acaba en la lista.
+func TestCargarMasBusquedaDeOtraBusqueda(t *testing.T) {
+	ayer := time.Date(2026, 9, 20, 10, 0, 0, 0, time.UTC)
+	colgada := make(chan struct{})
+	d := &hubDoble{
+		paginas: []api.HubBusqueda{
+			{Hits: hits(PorPaginaBusqueda, "mail", ayer), Total: 23, HasMore: true},
+			{Hits: hits(3, "drive", ayer), Total: 23},
+		},
+		colgada: colgada,
+		tardia:  api.HubBusqueda{Hits: hits(2, "rooms", ayer), Total: 23},
+	}
+	// Las de drive con ids propios: que no se confundan con las de mail.
+	for i := range d.paginas[1].Hits {
+		d.paginas[1].Hits[i].ID = fmt.Sprintf("drive-%d", i)
+	}
+	for i := range d.tardia.Hits {
+		d.tardia.Hits[i].ID = fmt.Sprintf("rooms-%d", i)
+	}
+	v := NuevaVista(traductor(t), nil, time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC)).Con(d)
+	lee := func(f func(b *Buscar) bool) func() bool {
+		return func() bool {
+			v.mu.Lock()
+			defer v.mu.Unlock()
+			return f(v.buscar)
+		}
+	}
+	v.buscar.AlBuscar("factura")
+	esperar(t, "la primera búsqueda", lee(func(b *Buscar) bool { return b.Estado == Listo && b.HayMas }))
+	acabada := make(chan struct{})
+	go func() { v.cargarMasBusqueda(); close(acabada) }()
+	esperar(t, "el «Cargar más» colgado", func() bool {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+		return len(d.desdes) == 2
+	})
+
+	v.buscar.AlBuscar("otra")
+	esperar(t, "la segunda búsqueda", lee(func(b *Buscar) bool {
+		return b.Termino == "otra" && b.Estado == Listo && b.Paginas == 1 && b.HayMas
+	}))
+	v.cargarMasBusqueda()
+	esperar(t, "su «Cargar más», con el otro aún colgado", lee(func(b *Buscar) bool { return len(b.Items) == 23 }))
+
+	close(colgada)
+	<-acabada
+	fyne.DoAndWait(func() {})
+	if lee(func(b *Buscar) bool {
+		return slices.ContainsFunc(b.Items, func(h api.HubHit) bool { return h.Source == "rooms" }) || b.Paginas != 2
+	})() {
+		t.Error("la página de la búsqueda anterior se ha pegado a la de ahora")
+	}
+}
+
+// buscarConMas monta la búsqueda en una ventana baja, con su desplazamiento, y con la
+// primera página de veinte puesta y «Cargar más» a la vista.
+func buscarConMas(t *testing.T, d *hubDoble) (*Vista, fyne.Canvas, *buscarRenderer) {
+	t.Helper()
+	v := NuevaVista(traductor(t), nil, time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC)).Con(d)
+	ven := test.NewWindow(v.Desplazable())
+	t.Cleanup(ven.Close)
+	ven.Resize(fyne.NewSize(1280, 400))
+	v.Ir(ABuscar)
+	v.buscar.AlBuscar("factura")
+	esperar(t, "la primera página", func() bool {
+		v.mu.Lock()
+		defer v.mu.Unlock()
+		return v.buscar.Estado == Listo && len(v.buscar.Items) == PorPaginaBusqueda && v.buscar.HayMas
+	})
+	var r *buscarRenderer
+	fyne.DoAndWait(func() { r = test.WidgetRenderer(v.buscar).(*buscarRenderer) })
+	return v, ven.Canvas(), r
+}
+
+// pulsarMasConTeclado es Tab hasta «Cargar más» y Enter.
+func pulsarMasConTeclado(t *testing.T, c fyne.Canvas, r *buscarRenderer) {
+	t.Helper()
+	fyne.DoAndWait(func() {
+		if r.mas == nil {
+			t.Fatal("no hay «Cargar más»")
+		}
+		c.Focus(r.mas)
+		r.mas.TypedKey(&fyne.KeyEvent{Name: fyne.KeyReturn})
+	})
+}
+
+// TestCargarMasConTecladoAterrizaEnElPrimeroNuevo: «Cargar más» pulsado con Enter rehace
+// el botón y los grupos; el foco va al primer resultado NUEVO —el `#r-<n>` de la web— y
+// queda a la vista, no en nada con el siguiente Tab empezando desde arriba.
+//
+// Visto en ROJO a mano el 2026-11-06: sin `devolverFoco`, el foco queda en nil; y sin
+// `AlRevelarFoco`, la fila enfocada queda por debajo de la ventana.
+func TestCargarMasConTecladoAterrizaEnElPrimeroNuevo(t *testing.T) {
+	ayer := time.Date(2026, 9, 20, 10, 0, 0, 0, time.UTC)
+	d := &hubDoble{paginas: []api.HubBusqueda{
+		{Hits: hits(PorPaginaBusqueda, "mail", ayer), Total: 23, HasMore: true},
+		{Hits: hits(3, "drive", ayer), Total: 23},
+	}}
+	v, c, r := buscarConMas(t, d)
+	pulsarMasConTeclado(t, c, r)
+	esperar(t, "el foco en el primero nuevo", func() bool {
+		var ok bool
+		fyne.DoAndWait(func() {
+			ok = len(r.porRango) == 23 && c.Focused() == fyne.Focusable(r.porRango[PorPaginaBusqueda])
+		})
+		return ok
+	})
+	var y, alto float32
+	fyne.DoAndWait(func() {
+		f := r.porRango[PorPaginaBusqueda]
+		y, alto = fyne.CurrentApp().Driver().AbsolutePositionForObject(f).Y, f.Size().Height
+	})
+	if y < 0 || y+alto > 400 {
+		t.Errorf("el resultado enfocado está en y=%v (alto %v), fuera de una ventana de 400", y, alto)
+	}
+	v.Ir(AInicio)
+}
+
+// TestCargarMasSinNovedadLoDice: si la página siguiente llega vacía aunque el Hub dijera
+// que quedan (o falla), la pantalla lo dice junto al botón —el aviso de la web— y el foco
+// pasa al botón nuevo.
+//
+// Visto en ROJO a mano el 2026-11-06: sin `SinNovedad` no sale el aviso; y sin el
+// respaldo al botón en `devolverFoco`, el foco queda en nil.
+func TestCargarMasSinNovedadLoDice(t *testing.T) {
+	ayer := time.Date(2026, 9, 20, 10, 0, 0, 0, time.UTC)
+	d := &hubDoble{paginas: []api.HubBusqueda{
+		{Hits: hits(PorPaginaBusqueda, "mail", ayer), Total: 40, HasMore: true},
+		{Total: 40, HasMore: true},
+	}}
+	v, c, r := buscarConMas(t, d)
+	aviso := v.buscar.T.T("search.loadMoreFailed", nil)
+	if aviso == "search.loadMoreFailed" {
+		t.Fatal("el aviso no está en el catálogo")
+	}
+	hayAviso := func() bool {
+		var ok bool
+		fyne.DoAndWait(func() {
+			for _, o := range r.Objects() {
+				if p, es := o.(*ui.Parrafo); es && p.Texto == aviso {
+					ok = true
+				}
+			}
+		})
+		return ok
+	}
+	if hayAviso() {
+		t.Fatal("el aviso sale antes de pedir nada")
+	}
+	pulsarMasConTeclado(t, c, r)
+	esperar(t, "el aviso", hayAviso)
+	esperar(t, "el foco en el botón nuevo", func() bool {
+		var ok bool
+		fyne.DoAndWait(func() { ok = r.mas != nil && c.Focused() == fyne.Focusable(r.mas) })
+		return ok
+	})
+	v.Ir(AInicio)
+}
+
+// Visto en ROJO a mano el 2026-11-06: devolviendo siempre `total`, el «39 de 40» sigue
+// sin botón para traer el 40, que no existe.
+func TestTotalAMostrarSinMasEsLoEnsenado(t *testing.T) {
+	if n := TotalAMostrar(api.HubBusqueda{Total: 40}, 2, 40, 39); n != 39 {
+		t.Errorf("sin más en el Hub dice %d de total y se ven 39", n)
+	}
+	if n := TotalAMostrar(api.HubBusqueda{Total: 143, HasMore: true}, 1, 143, 20); n != 143 {
+		t.Errorf("con más en el Hub dice %d de total y son 143", n)
 	}
 }

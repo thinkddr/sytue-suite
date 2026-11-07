@@ -101,6 +101,7 @@
   "linkedServices.changed": "Dit item is gewijzigd bij je aanbieder. Vernieuw voordat je het opnieuw bewerkt.",
   "linkedServices.choose": "Kies wat je wilt verbinden. Je aanbieder vraagt om machtigingen voor de geselecteerde diensten.",
   "linkedServices.connected": "Verbonden diensten",
+  "linkedServices.exists": "Dit account was al verbonden en is nu geopend.",
   "linkedServices.keepAdmin": "Google Keep vereist een goedgekeurde instelling door het Google Workspace-beheer. Persoonlijke Gmail-accounts kunnen het niet verbinden.",
   "linkedServices.notGranted": "Er is geen toegang tot deze dienst verleend. Verbind het account opnieuw om de machtigingen te kiezen.",
   "linkedServices.notSupported": "Deze aanbieder biedt deze dienst niet aan.",
@@ -169,7 +170,7 @@
   "notifications.kind.pages.order.oversold": "Bestelling {number} op {site} is betaald zonder voorraad",
   "notifications.kind.pages.order.paid": "Nieuwe bestelling {number} op {site}",
   "notifications.kind.pages.payment.duplicated": "Dubbele betaling op bestelling {number} op {site}: de tweede wordt terugbetaald",
-  "notifications.kind.pages.settings.changed": "{actor} heeft een instelling van Sytue Web gewijzigd",
+  "notifications.kind.pages.settings.changed": "{actor} heeft een instelling van Sytue Webs gewijzigd",
   "notifications.kind.pages.store.busy": "De webwinkel op {site} heeft te veel bestellingen die op betaling wachten",
   "notifications.kind.pages.withdrawal.requested": "Herroeping aangevraagd voor bestelling {number} op {site}",
   "notifications.kind.photos.album.added": "{actor} heeft foto’s toegevoegd aan ‘{name}’",
@@ -301,6 +302,8 @@
   "shell.update.failedBody": "Probeer het later opnieuw of download de app via het portaal.",
   "shell.update.install": "Bijwerken naar versie {version}",
   "shell.update.upToDate": "{app} is up-to-date",
+  "shell.widgets.wake": "Widgets bijwerken als de app gesloten is",
+  "shell.widgets.wakeHelp": "Als er iets van jou verandert, wekt Sytue de app met een lege melding via Apple zodat die zijn widget kan vernieuwen. Apple ziet welke app en wanneer, nooit wat er veranderd is.",
   "ui.backToList": "Terug naar de lijst",
   "ui.bulk.clear": "Selectie wissen",
   "ui.bulk.region": "Acties voor de selectie",
@@ -318,6 +321,8 @@
   "ui.review.edit": "Bewerken",
   "ui.save": "Opslaan",
   "ui.selectRow": "Rij selecteren",
+  "ui.suiteClose": "Terug naar de app",
+  "ui.suiteOpen": "Sytue: apps, zoeken, meldingen en account",
   "ui.wizard.back": "Vorige",
   "ui.wizard.cancel": "Annuleren",
   "ui.wizard.goToStep": "Terug naar stap {n}: ",
@@ -336,5 +341,7 @@
   "widgets.pending": "In behandeling",
   "widgets.photos": "Foto’s",
   "widgets.rows": "Rijen",
-  "widgets.storage": "Opslag"
+  "widgets.storage": "Opslag",
+  "widgets.updatedAgo": "Bijgewerkt {time}",
+  "widgets.updatedAt": "Bijgewerkt: {time}"
 }

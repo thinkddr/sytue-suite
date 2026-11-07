@@ -44,7 +44,7 @@ export {
   type OpcionesRutaMatrixStorageBootstrap,
 } from './almacenamiento-cifrado.js';
 export { consulta } from './consulta.js';
-export { crearDirectorio } from './directorio.js';
+export { crearDirectorio, respuestaAgenda } from './directorio.js';
 export { rutasDePeticiones } from './peticiones.js';
 export { rutasDeCompartir } from './compartir.js';
 export type { OpcionesCompartir, PersonaCompartida } from './compartir.js';

@@ -574,6 +574,9 @@ func (r *menuRenderer) Refresh() {
 type ElementoMenu struct {
 	widget.BaseWidget
 	Texto string
+	// Rotulo es el `aria-label`, YA traducido: el nombre accesible cuando el texto solo
+	// no dice qué hace (las duraciones de «Pausar avisos» de Rooms). Vacío: el Texto.
+	Rotulo string
 	// Icono es el glifo del catálogo. `iconos.Ninguno`, que es el cero: sin icono.
 	Icono iconos.Icono
 	// TamIcono en px de CSS. Cero: 16, que es el que pasan doce de los catorce
@@ -632,6 +635,7 @@ func (e *ElementoMenu) focoVisible() bool { return e.enfocado && !e.sinAro }
 
 var (
 	_ fyne.Widget       = (*ElementoMenu)(nil)
+	_ fyne.Accessible   = (*ElementoMenu)(nil)
 	_ fyne.Tappable     = (*ElementoMenu)(nil)
 	_ fyne.Focusable    = (*ElementoMenu)(nil)
 	_ fyne.Tabbable     = (*ElementoMenu)(nil)
@@ -655,6 +659,17 @@ func (e *ElementoMenu) AcceptsTab() bool {
 	}
 	return lista[len(lista)-1] == e
 }
+
+// AccessibilityLabel es el Rotulo si lo hay, y si no el texto escrito.
+func (e *ElementoMenu) AccessibilityLabel() string {
+	if e.Rotulo != "" {
+		return e.Rotulo
+	}
+	return e.Texto
+}
+
+// AccessibilityRole es «button»: Fyne no tiene «menuitem», y el ítem es un `<button>`.
+func (e *ElementoMenu) AccessibilityRole() fyne.AccessibleRole { return fyne.AccessibleRoleButton }
 
 // NuevoElementoMenu crea la acción.
 func NuevoElementoMenu(texto string, icono iconos.Icono, alPulsar func()) *ElementoMenu {

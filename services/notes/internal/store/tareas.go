@@ -100,7 +100,7 @@ func (s *Store) ListTasks(ctx context.Context, sub, estado string, desde, hasta 
 }
 
 // PostponeTask lleva una nota, con todo lo que cuelga de ella, al diario de `date`
-// (creándolo si hace falta). Es «Posponer» de Twos: mañana o el día que se elija.
+// (creándolo si hace falta). Es «Posponer»: mañana o el día que se elija.
 // Las reglas son las del traslado diario, así que una nota compartida o cifrada no
 // se mueve: contesta ErrNotFound, igual que una que no existe.
 func (s *Store) PostponeTask(ctx context.Context, id uuid.UUID, sub, date, title string) (domain.Notebook, error) {

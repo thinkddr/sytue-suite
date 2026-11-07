@@ -218,7 +218,10 @@ func run(esTranscoder bool) error {
 
 	if esTranscoder {
 		logger.Info("sytue-cast-transcoder iniciado", "env", string(cfg.Env), "threads", cfg.TranscoderThreads)
-		err := transcoder.Run(ctx, transcoder.Deps{Pool: pool, Objetos: objetos, Store: st, Servicio: svc, Cfg: cfg, Logger: logger})
+		err := transcoder.Run(ctx, transcoder.Deps{
+			Pool: pool, Objetos: objetos, Store: st, Servicio: svc, Cfg: cfg, Logger: logger,
+			Hub: hubnotify.New(cfg.HubBaseURL, cfg.HubInternalSecret),
+		})
 		if err != nil && !errors.Is(err, context.Canceled) {
 			return fmt.Errorf("transcodificador: %w", err)
 		}
@@ -285,6 +288,7 @@ func run(esTranscoder bool) error {
 		Altcha: altcha.New(secretoDenuncias, altcha.ConRepeticiones(altcha.EnTabla(pool, "altcha_used"))),
 		// La cola de denuncias del operador: quién lo es lo dice Sytue ID.
 		Operador: operador.SytueID(cfg.IDURL),
+		Hub:      hub,
 		ReadyCheckers: []httpx.Checker{
 			httpx.CheckerFunc{Label: "postgres", Fn: st.Healthz},
 			httpx.CheckerFunc{Label: "s3", Fn: objetos.Healthz},

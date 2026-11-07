@@ -4,6 +4,8 @@
   "action.classified": "Klasyfikacja · {name}",
   "action.classify": "Klasyfikuj",
   "action.copy": "Utwórz kopię",
+  "action.copyLink": "Kopiuj link",
+  "action.copyLinkFailed": "Nie udało się skopiować linku.",
   "action.delete": "Przenieś do kosza",
   "action.desktopBody": "Jeśli jeszcze jej nie masz, możesz ją pobrać.",
   "action.desktopCta": "Zobacz pliki do pobrania",
@@ -12,6 +14,7 @@
   "action.downloadName": "Pobierz {name}",
   "action.downloadZip": "Pobierz (ZIP)",
   "action.editorFailed": "Edytor nie mógł otworzyć tego pliku.",
+  "action.linkCopied": "Skopiowano link. Otworzy go tylko ktoś, kto już ma dostęp.",
   "action.mailFailed": "Nie udało się otworzyć edytora wiadomości",
   "action.menu": "Akcje dla: {name}",
   "action.more": "Więcej akcji",
@@ -87,6 +90,18 @@
     "few": "Przenieś {count} elementy",
     "many": "Przenieś {count} elementów",
     "other": "Przenieś {count} elementu"
+  },
+  "files.batch.restorePartial": {
+    "one": "Nie udało się przywrócić 1 elementu; nadal jest w koszu.",
+    "few": "Nie udało się przywrócić {count} elementów; nadal są w koszu.",
+    "many": "Nie udało się przywrócić {count} elementów; nadal są w koszu.",
+    "other": "Nie udało się przywrócić {count} elementu; nadal są w koszu."
+  },
+  "files.batch.restored": {
+    "one": "Przywrócono 1 element.",
+    "few": "Przywrócono {count} elementy.",
+    "many": "Przywrócono {count} elementów.",
+    "other": "Przywrócono {count} elementu."
   },
   "files.batch.trashBody": {
     "one": "1 element trafi do kosza. Możesz go stamtąd przywrócić.",
@@ -587,6 +602,21 @@
     "other": "Przesłano {count} pliku."
   },
   "team.upload.partial": "Przesłano {uploaded} z {count}.",
+  "trash.emptiedAll": "Kosz został opróżniony.",
+  "trash.emptyAll": "Opróżnij kosz",
+  "trash.emptyAllBody": {
+    "one": "Element z kosza zostanie wymazany na zawsze razem z historią wersji. Potem nie da się go odzyskać.",
+    "few": "{count} elementy z kosza zostaną wymazane na zawsze razem z historią wersji. Potem nie da się ich odzyskać.",
+    "many": "{count} elementów z kosza zostanie wymazanych na zawsze razem z historią wersji. Potem nie da się ich odzyskać.",
+    "other": "{count} elementu z kosza zostanie wymazane na zawsze razem z historią wersji. Potem nie da się ich odzyskać."
+  },
+  "trash.emptyAllPartial": {
+    "one": "Nie udało się usunąć 1 elementu; nadal jest w koszu.",
+    "few": "Nie udało się usunąć {count} elementów; nadal są w koszu.",
+    "many": "Nie udało się usunąć {count} elementów; nadal są w koszu.",
+    "other": "Nie udało się usunąć {count} elementu; nadal są w koszu."
+  },
+  "trash.emptyAllTitle": "Opróżnić kosz?",
   "trash.emptyBody": "Usunięte pliki i foldery pojawią się tutaj i będzie można je przywrócić.",
   "trash.emptyTitle": "Kosz jest pusty",
   "trash.errorTitle": "Nie udało się wczytać kosza",

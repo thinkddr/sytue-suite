@@ -60,7 +60,8 @@ func TestLaNavegacionMovilConservaElCajonYElRegresoAlArbol(t *testing.T) {
 		t.Fatal("volver al árbol no deja la lista visible con el cajón cerrado")
 	}
 	p.activo.Crudo.DailyDate = "2026-10-16"
-	if got := p.barraMovil(false, false).Titulo; got != p.tr.T("app.title", nil) {
+	// Sin título: la barra única dice el nombre del producto traducido (no la marca).
+	if got := p.barraMovil(false, false).Titulo; got != "" {
 		t.Errorf("un día repite el título del cuaderno en la navegación: %q", got)
 	}
 }

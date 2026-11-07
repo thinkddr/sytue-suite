@@ -223,7 +223,7 @@ func (v *VistaTarjeta) construir() *fyne.Container {
 			append(filas, ui.NuevoRotulo(pie, escalonMeta, ui.Normal, "text-subtle"))...)
 	}
 	caja := ui.NuevaCaja(tema.Color("surface-sunken", tm), tema.Color("border", tm), tema.RadioMD)
-	return container.NewStack(append(caja.Objetos(),
+	return container.New(enCaja{caja}, append(caja.Objetos(),
 		container.New(ui.Margen{Izq: RellenoCajaTarjeta, Arr: RellenoCajaTarjeta, Der: RellenoCajaTarjeta, Abj: RellenoCajaTarjeta}, dentro))...)
 }
 
@@ -316,8 +316,10 @@ func (r *opcionEncuestaRenderer) Layout(t fyne.Size) {
 	if o.Encima() && !o.Inerte {
 		fondo = tema.Color("bg-subtle", v)
 	}
-	caja := ui.NuevaCaja(fondo, tema.Color(borde, v), tema.RadioMD)
-	ui.MoverCaja(caja, fyne.Position{}, t)
+	// Sin hover el relleno es transparente: con ConTrazo se ve el borde y no un
+	// rectángulo macizo del color del borde.
+	caja := ui.NuevaCaja(fondo, tema.Color(borde, v), tema.RadioMD).ConTrazo()
+	caja.Redimensionar(t)
 	r.objs = append([]fyne.CanvasObject{}, caja.Objetos()...)
 	alfa := float32(1)
 	if o.Inerte {

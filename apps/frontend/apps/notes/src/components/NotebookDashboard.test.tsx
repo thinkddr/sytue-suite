@@ -3,7 +3,7 @@
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { afterEach, expect, test } from 'bun:test';
 import { render } from 'preact';
-import type { Notebook } from '@sytue/api-clients';
+import type { NoteInput, Notebook } from '@sytue/api-clients';
 import { NotebookDashboard } from './NotebookDashboard.js';
 if (typeof document === 'undefined') GlobalRegistrator.register();
 const t = ((key: string) => key) as never;
@@ -187,4 +187,113 @@ test('un día pasado con pendientes ofrece trasladarlas; uno sin pendientes, no'
   expect(pintar([pendiente], '2020-01-01')).toEqual({ hay: true, carries: 1 });
   expect(pintar([cancelada], '2020-01-01').hay).toBe(false);
   expect(pintar([pendiente], '2999-01-01').hay).toBe(false);
+});
+
+/** Un `paste` con texto plano, como el del navegador. */
+function pegarEn(el: HTMLElement, texto: string): Event {
+  const ev = new Event('paste', { bubbles: true, cancelable: true });
+  Object.defineProperty(ev, 'clipboardData', {
+    value: { getData: (tipo: string) => (tipo === 'text/plain' ? texto : '') },
+  });
+  el.dispatchEvent(ev);
+  return ev;
+}
+
+/** La captura con su borrador, y lo que llega al servicio. */
+function montarCaptura(
+  responder: (input: NoteInput, n: number) => Promise<boolean>,
+  initialDraft = '',
+  pegarRef?: { current: ((texto: string) => boolean) | null },
+) {
+  const enviadas: NoteInput[] = [];
+  const drafts: string[] = [];
+  host = document.createElement('div');
+  document.body.append(host);
+  render(
+    <NotebookDashboard
+      t={t}
+      locale="es"
+      notebook={{ id: 'nb', title: 'Ideas', layout: 'list' } as Notebook}
+      notes={[]}
+      disabled={false}
+      enfoque="all"
+      openingDay={false}
+      initialDraft={initialDraft}
+      onDraft={(s) => drafts.push(s)}
+      onEnfoque={() => {}}
+      hideFinished={false}
+      onHideFinished={() => {}}
+      onDay={() => {}}
+      onCarry={() => {}}
+      onCapture={(input) => {
+        enviadas.push(input);
+        return responder(input, enviadas.length);
+      }}
+      onTemplate={async () => false}
+      {...(pegarRef ? { pegarRef } : {})}
+    />,
+    host,
+  );
+  return { input: host.querySelector('input')!, enviadas, drafts };
+}
+
+const hasta = async (ok: () => boolean) => {
+  for (let i = 0; i < 50 && !ok(); i++) await tick();
+};
+
+test('pegar varias líneas crea una nota por línea, en orden y con la sintaxis de la captura', async () => {
+  const { input, enviadas } = montarCaptura(async () => true);
+  const ev = pegarEn(input, '- Comprar pan\n\n[x] Llamar a Ana\r\n---\nLa reunión es el jueves\n');
+  expect(ev.defaultPrevented).toBe(true);
+  await hasta(() => enviadas.length === 4 && input.value === '');
+  expect(enviadas).toEqual([
+    { kind: 'todo', title: 'Comprar pan', checked: false },
+    { kind: 'todo', title: 'Llamar a Ana', checked: true },
+    { kind: 'text', content: '<hr>' },
+    { kind: 'text', content: '<p>La reunión es el jueves</p>' },
+  ]);
+  expect(input.value).toBe('');
+});
+
+test('pegar UNA línea la deja en el campo, como siempre', async () => {
+  const { input, enviadas } = montarCaptura(async () => true);
+  expect(pegarEn(input, 'Una sola idea\n').defaultPrevented).toBe(false);
+  await tick();
+  expect(enviadas).toEqual([]);
+});
+
+test('un fallo para en esa línea y lo que no ha salido se queda en la captura', async () => {
+  const { input, enviadas, drafts } = montarCaptura(async (_i, n) => n !== 2);
+  pegarEn(input, 'uno\ndos\ntres');
+  await hasta(() => enviadas.length === 2 && input.value === 'dos tres');
+  await tick();
+  expect(enviadas).toHaveLength(2);
+  // El campo es de una línea: enseña espacios, pero el borrador guarda los saltos, e
+  // Intro sigue sacando una nota por línea.
+  expect(input.value).toBe('dos tres');
+  expect(drafts.at(-1)).toBe('dos\ntres');
+  host!
+    .querySelector('form')!
+    .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  await hasta(() => enviadas.length === 4);
+  expect(enviadas.slice(2).map((i) => i.content)).toEqual(['<p>dos</p>', '<p>tres</p>']);
+});
+
+test('como mucho cincuenta de una vez: el resto se queda en la captura', async () => {
+  const { input, enviadas } = montarCaptura(async () => true);
+  pegarEn(input, Array.from({ length: 53 }, (_, i) => `l${i + 1}`).join('\n'));
+  await hasta(() => enviadas.length === 50 && input.value === 'l51 l52 l53');
+  expect(enviadas).toHaveLength(50);
+  expect(input.value).toBe('l51 l52 l53');
+});
+
+test('lo pegado sobre el cuaderno sale por la captura sin mandar lo que estaba a medias', async () => {
+  const pegarRef: { current: ((texto: string) => boolean) | null } = { current: null };
+  const { input, enviadas } = montarCaptura(async () => true, 'a medias', pegarRef);
+  await hasta(() => pegarRef.current !== null);
+  expect(pegarRef.current?.('una sola')).toBe(false);
+  expect(pegarRef.current?.('uno\ndos')).toBe(true);
+  await hasta(() => enviadas.length === 2 && input.value === 'a medias');
+  expect(enviadas.map((i) => i.content)).toEqual(['<p>uno</p>', '<p>dos</p>']);
+  expect(input.value).toBe('a medias');
 });

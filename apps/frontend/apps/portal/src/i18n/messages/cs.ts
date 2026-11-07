@@ -66,6 +66,7 @@ export const cs: AppCatalog<typeof en> = {
   'inbox.markAll': 'Označit vše jako přečtené',
   'inbox.loading': 'Načítání oznámení…',
   'inbox.unreadDot': 'Nepřečteno',
+  'inbox.markRead': 'Označit jako přečtené',
   'inbox.errorTitle': 'Oznámení se nepodařilo načíst',
   'inbox.errorBody': 'Hub teď neodpovídá. Zkuste to znovu za několik sekund.',
   'inbox.retry': 'Zkusit znovu',
@@ -696,6 +697,8 @@ export const cs: AppCatalog<typeof en> = {
     'Bez odpovědi: {sources}. Některé výsledky proto mohou chybět. Zkuste to znovu za chvíli.',
   'search.partialJoin': ' a ',
   'search.showing': 'Zobrazeno {count} z {total} výsledků.',
+  'search.loadMore': 'Načíst další výsledky',
+  'search.loadMoreFailed': 'Další výsledky se nepodařilo načíst. Zkuste to znovu.',
   'privacy.notice':
     'Vaše údaje neprodáváme ani je nepředáváme třetím stranám. Nepoužíváme je k profilování, k reklamě ani k trénování či vylepšování našich služeb nebo služeb kohokoli jiného. Jsou šifrované při přenosu i v klidu a naši evropskou infrastrukturu opouštějí jen v nezbytně nutném rozsahu kvůli fakturaci a v integracích, které si zapnete — v nich vás třetí strana požádá o souhlas s údaji, které použije.',
 };

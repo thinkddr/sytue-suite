@@ -83,9 +83,11 @@ class API:
 
 
 class Perfiles(unittest.TestCase):
-    def validar_falso(self, item, requisito, plataforma):
+    def validar_falso(self, item, requisito, plataforma, motivos=None):
         self.assertEqual(requisito, REQUISITO)
         self.assertEqual(plataforma, "ios")
+        if not item["attributes"]["authorized"] and motivos is not None:
+            motivos.append("el perfil no autoriza el AppGroup")
         return b"perfil publico" if item["attributes"]["authorized"] else None
 
     def recibos(self, plataforma):
@@ -263,6 +265,16 @@ class Perfiles(unittest.TestCase):
                     p.comprobar_recibo(ruta, catalogo, plataforma, True)
                 self.assertEqual(salida.getvalue(), "")
 
+    def test_el_sustituto_de_un_perfil_de_hoy_no_repite_su_nombre(self):
+        # 2026-11-05: el perfil creado antes de asociar el App Group tenía la misma
+        # huella y el mismo día que su sustituto, y Apple contestó 409 a los 31.
+        asc = API()
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(p, "validar_perfil", side_effect=self.validar_falso):
+            p.preparar(asc, REQUISITO, "ios", "cert-importado", pathlib.Path(tmp))
+        nombre = asc.escritos[0][1]["name"]
+        # Fecha y hora hasta el segundo (UTC), no solo el día.
+        self.assertRegex(nombre, r" \d{14}$")
+
     def test_perfil_de_otro_certificado_no_se_reutiliza_y_siguiente_ejecucion_no_duplica(self):
         asc = API()
         asc.perfiles = [perfil("ajeno", "otra-clave")]
@@ -319,6 +331,19 @@ class Perfiles(unittest.TestCase):
         self.assertEqual(resultado["reason"], "app_group_capability_missing")
         self.assertFalse(asc.escritos)
 
+    def test_el_despertar_exige_la_capacidad_push_sin_crear_perfiles(self):
+        # SYTUE_DESPERTAR_APPLE: `aps-environment` en los derechos pide Push en el App ID.
+        # Visto en rojo sin la comprobación: se creaba un perfil sin los avisos.
+        asc = API()
+        requisito = {**REQUISITO, "entitlements": {**REQUISITO["entitlements"], "aps-environment": "production"}}
+        with tempfile.TemporaryDirectory() as tmp:
+            resultado = p.preparar(asc, requisito, "ios", "cert-importado", pathlib.Path(tmp))
+        self.assertEqual(resultado["reason"], "push_capability_missing")
+        self.assertFalse(asc.escritos)
+        asc.capacidades.append({"attributes": {"capabilityType": "PUSH_NOTIFICATIONS"}})
+        with mock.patch.object(p, "validar_perfil", return_value=b"perfil publico"), tempfile.TemporaryDirectory() as tmp:
+            self.assertTrue(p.preparar(asc, requisito, "ios", "cert-importado", pathlib.Path(tmp))["profile_ready"])
+
     def test_cms_que_no_autoriza_grupo_no_se_guarda(self):
         asc = API()
         def crear(*args, **kwargs):
@@ -330,6 +355,9 @@ class Perfiles(unittest.TestCase):
             resultado = p.preparar(asc, REQUISITO, "ios", "cert-importado", pathlib.Path(tmp))
             self.assertFalse(resultado["profile_ready"])
             self.assertFalse(list(pathlib.Path(tmp).iterdir()))
+            # El recibo dice QUÉ no autoriza: sin eso, 31 «no autoriza» no dicen qué
+            # cambiar en el portal de Apple (2026-11-05).
+            self.assertEqual(resultado["detail"], "el perfil no autoriza el AppGroup")
 
     def test_perfil_nuevo_exige_tipo_activo_vigente_y_certificado_importado(self):
         casos = (("profileType", "IOS_APP_DEVELOPMENT"), ("profileState", "INVALID"),

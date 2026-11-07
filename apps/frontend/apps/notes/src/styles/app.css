@@ -142,49 +142,61 @@
   pointer-events: none;
 }
 
-/* Notepads con la referencia de Twos: UNA columna de lectura para todo (el día, un
-   cuaderno en lista y las páginas de Tareas, Fijadas, Archivo, Buscar y Papelera), el
-   título de la página escrito una vez y en grande, filas sin caja ni raya entre ellas
-   y los controles en voz baja. Todo sale de los tokens: el oscuro y el translúcido
-   llegan solos. */
+/* Notepads es una LIBRETA, no un panel. Una columna de lectura
+   para todo (el día, un cuaderno en lista y las páginas de Tareas, Fijadas, Archivo,
+   Buscar y Papelera), sobre papel blanco (el cromo «papel» de appearance.css). Cada
+   nota es una línea con su marca en una columna fija —la raya de una cosa, la casilla
+   de una tarea—, sin caja, sin raya entre ellas y sin color: la tinta es para el texto
+   y el color de marca se queda en la acción y en «hoy». Los controles van en voz baja y
+   en gris, y solo se ven del todo al pasar por encima. Todo sale de los tokens: el
+   oscuro y el translúcido llegan solos.
+
+   Los velos (`--notes-velo-*`) son la tinta del texto con poco alfa: oscurecen el papel
+   en claro y lo aclaran en oscuro, como el lateral «papel». */
 @layer components {
   .notes-col {
-    @apply mx-auto w-full max-w-[46rem] px-4 sm:px-6;
+    --notes-velo-encima: color-mix(in srgb, var(--sytue-text) 4%, transparent);
+    --notes-velo-elegida: color-mix(in srgb, var(--sytue-text) 7%, transparent);
+    @apply mx-auto w-full max-w-[42rem] px-4 sm:px-6;
   }
   .notes-page {
-    @apply pt-6 pb-10;
+    @apply pt-8 pb-10 max-sm:pt-5;
   }
   .notes-page-head {
-    @apply mb-5 flex flex-wrap items-end justify-between gap-x-4 gap-y-2;
+    @apply mb-6 flex flex-wrap items-end justify-between gap-x-4 gap-y-2;
   }
+  /* El título de la página, escrito una vez: grande pero sin gritar (el 800 de la hoja de
+     Marco es para la cabecera de un panel, no para una libreta). */
   .notes-page-title {
-    @apply text-text text-2xl leading-tight font-semibold tracking-tight first-letter:uppercase sm:text-3xl;
+    @apply text-text text-[1.625rem] leading-[2rem] font-bold tracking-[-0.015em] first-letter:uppercase sm:text-[1.875rem] sm:leading-[2.375rem];
   }
-  /* Un rótulo de grupo dentro de una página: el día o el cuaderno de unas tareas. */
+  /* Un rótulo de grupo dentro de una página: el día o el cuaderno de unas tareas. En
+     minúsculas y en gris, como un margen escrito a lápiz; las versalitas espaciadas eran
+     un rótulo de formulario. */
   .notes-group {
-    @apply text-text-subtle mb-1 text-xs font-medium tracking-wide uppercase;
+    @apply text-text-subtle mb-1 text-sm font-medium first-letter:uppercase;
   }
   .notes-group-block + .notes-group-block {
-    @apply mt-6;
+    @apply mt-7;
   }
 
-  /* El segmentado: opciones de texto, y la elegida con un fondo suave. No es el
-     `Button` relleno: aquí no se ejecuta nada, se elige qué se mira. */
+  /* El segmentado: palabras que se eligen. La elegida es tinta y las demás, gris; sin
+     píldora, que convertía cada fila de opciones en una botonera. */
   .notes-seg {
-    @apply flex flex-wrap items-center gap-0.5;
+    @apply flex flex-wrap items-center gap-x-3 gap-y-0.5;
   }
   .notes-seg-item {
-    @apply text-text-muted hover:bg-bg-subtle hover:text-text inline-flex min-h-7 items-center gap-1.5 rounded-md px-2 text-sm whitespace-nowrap transition-colors duration-150 pointer-coarse:min-h-11 pointer-coarse:px-3;
+    @apply text-text-subtle hover:text-text inline-flex min-h-7 items-center gap-1 rounded-sm text-sm whitespace-nowrap transition-colors duration-150 pointer-coarse:min-h-11;
   }
   .notes-seg-item[aria-pressed='true'] {
-    @apply bg-bg-subtle text-text font-medium;
+    @apply text-text font-medium;
   }
   .notes-seg-count {
     @apply text-text-subtle text-xs font-normal tabular-nums;
   }
 
   .notes-day {
-    @apply pt-6 pb-1;
+    @apply pt-8 pb-1 max-sm:pt-5;
   }
   /* «Trasladada: 2». En el teléfono se cae: al lado de un recordatorio dejaba el título
      de la tarea en tres palabras, y el título es lo que se viene a leer. */
@@ -201,8 +213,11 @@
   .notes-pending-item {
     @apply flex min-h-6 items-center gap-2;
   }
+
+  /* La cabecera del día: el año y «hoy» encima en gris, el día en grande y la semana
+     debajo. La navegación son glifos grises a la derecha, no botones de color. */
   .notes-day-head {
-    @apply mb-4 grid gap-1;
+    @apply mb-5 grid gap-1.5;
   }
   .notes-day-row {
     @apply flex flex-wrap items-center justify-between gap-x-3 gap-y-1;
@@ -210,10 +225,15 @@
   .notes-day-sub {
     @apply text-text-subtle flex items-center gap-1.5 text-sm tabular-nums;
   }
-  .notes-day-nav {
-    @apply text-text-muted -mr-2 flex shrink-0 items-center gap-0.5;
+  /* «Hoy», cuando lo es: lo único de color en la cabecera. */
+  .notes-day-today {
+    @apply text-primary-text font-medium;
   }
-  /* El progreso del día: un aro de 14 px junto al año, no una barra con su rótulo. */
+  .notes-day-nav {
+    @apply -mr-2 flex shrink-0 items-center gap-0.5;
+    --sytue-glyph-fill: currentColor;
+  }
+  /* El progreso del día: un aro de 14 px, no una barra con su rótulo. */
   .notes-ring {
     @apply inline-flex items-center gap-1.5;
   }
@@ -224,32 +244,36 @@
     stroke: var(--sytue-border);
   }
   .notes-ring-value {
-    stroke: var(--sytue-primary);
+    stroke: var(--sytue-text-subtle);
     transition: stroke-dashoffset 200ms ease;
   }
+
+  /* La semana: una tira de siete, la inicial del día encima y el número debajo. El día
+     abierto va en un círculo de TINTA (no de marca: es dónde estás, no una acción) y hoy,
+     si no es el abierto, en el color de marca. Un punto bajo los días que tienen algo. */
   .notes-week {
-    @apply mb-3 grid grid-cols-7;
+    @apply -mx-1 mb-4 grid grid-cols-7;
   }
   .notes-week-day {
-    @apply text-text-muted hover:bg-bg-subtle flex min-w-0 flex-col items-center gap-0.5 rounded-lg py-1.5 transition-colors duration-150 disabled:opacity-50;
+    @apply text-text-muted flex min-w-0 flex-col items-center gap-1 rounded-lg py-1.5 transition-colors duration-150 hover:bg-[var(--notes-velo-encima)] disabled:opacity-50;
   }
   .notes-week-name {
-    @apply text-text-subtle text-xs;
+    @apply text-text-subtle text-xs leading-none font-medium uppercase;
   }
   .notes-week-num {
-    @apply grid h-8 w-8 place-items-center rounded-full text-base font-medium tabular-nums;
+    @apply grid h-8 w-8 place-items-center rounded-full text-[0.9375rem] font-medium tabular-nums;
   }
   .notes-week-day[aria-current='date'] .notes-week-num {
     @apply text-primary-text font-semibold;
   }
   .notes-week-day[aria-pressed='true'] .notes-week-num {
-    @apply bg-primary text-[var(--sytue-on-primary)];
+    @apply bg-text text-surface font-semibold;
   }
   .notes-week-dot {
     @apply h-1 w-1 rounded-full;
   }
   .notes-week-dot--on {
-    @apply bg-text-subtle;
+    @apply bg-border-strong;
   }
   /* Con algo pendiente, el punto va en `primary`. */
   .notes-week-dot--pending {
@@ -261,34 +285,49 @@
     @apply ring-primary/50 ring-2;
   }
 
-  /* La captura: una línea donde se escribe, sin caja. La pista de la sintaxis solo
+  /* La captura: la última línea de la libreta. Sin caja: la marca de lo que se va a
+     escribir —la raya de una cosa o la casilla vacía de una tarea— en la columna de las
+     marcas, y el texto donde empieza el de las notas. La pista de la sintaxis solo
      aparece al entrar en el campo y ocupa el hueco que ya hay debajo: no empuja nada. */
   .notes-capture-wrap {
-    @apply relative pt-2 pb-3;
+    @apply relative pt-1.5 pb-2;
   }
   .notes-capture {
-    @apply border-border bg-surface flex min-h-12 items-center gap-1 rounded-lg border px-2 py-1 transition-colors duration-150;
-  }
-  .notes-capture:focus-within {
-    @apply border-primary;
+    @apply flex min-h-11 items-center gap-1 rounded-md px-1;
   }
   .notes-capture-input {
-    @apply min-w-0 flex-1 border-0! bg-transparent! px-1! text-base shadow-none!;
+    @apply text-md! min-w-0 flex-1 border-0! bg-transparent! px-1! shadow-none!;
   }
   .notes-capture-input:focus-visible {
     box-shadow: none !important;
   }
+  .notes-capture-input::placeholder {
+    color: var(--sytue-text-subtle);
+  }
+  /* El conmutador de tipo es la marca de la fila que va a nacer. */
+  .notes-capture-kind {
+    @apply grid size-5 place-items-center;
+  }
+  .notes-capture-kind-dash {
+    @apply bg-border-strong h-[1.5px] w-2.5 rounded-full;
+  }
+  .notes-capture-kind-box {
+    @apply border-border-strong size-4 rounded-[4px] border-[1.5px];
+  }
+  .notes-capture:focus-within .notes-capture-kind-dash {
+    @apply bg-text-muted;
+  }
   .notes-capture-hint {
-    @apply text-text-muted pointer-events-none mt-1 min-h-4 px-1 text-xs opacity-0 transition-opacity duration-150;
+    @apply text-text-subtle pointer-events-none mt-0.5 min-h-4 pl-8 text-xs opacity-0 transition-opacity duration-150;
   }
   .notes-capture:focus-within + .notes-capture-hint {
     @apply opacity-100;
   }
   .notes-day-filters {
-    @apply -mx-2 mt-7 flex flex-wrap items-center justify-between gap-x-3 gap-y-1;
+    @apply mt-6 flex flex-wrap items-center justify-between gap-x-3 gap-y-1;
   }
   .notes-dashboard-docked .notes-day-filters {
-    @apply mt-3;
+    @apply mt-2;
   }
 
   /* La agenda del día: las mismas filas que las notas, con el glifo del calendario
@@ -297,55 +336,77 @@
     @apply border-border-subtle -mx-2 mt-3 flex flex-col border-b pb-2;
   }
   .notes-agenda-item {
-    @apply text-text-muted flex min-h-8 items-center gap-2 rounded-md px-2 text-base;
+    @apply text-text-muted text-md flex min-h-8 items-center gap-2.5 rounded-md px-2;
   }
   .notes-agenda-time {
     @apply text-text-subtle shrink-0 text-xs tabular-nums;
   }
 
-  /* Las notas en lista son filas, no tarjetas: un glifo por tipo en una columna
-     fija, sin raya entre ellas y con el menú solo al pasar por encima. La elegida
-     es un fondo, no un anillo. */
+  /* Las notas en lista son LÍNEAS, no tarjetas: una marca por tipo en una columna fija,
+     sin raya entre ellas y con el menú solo al pasar por encima. La elegida es un velo,
+     no un anillo ni el tinte de marca. */
   /* `grid-cols-1` es `minmax(0, 1fr)`: sin él la columna implícita crece hasta la fila
      más ancha (una con recordatorio y «Trasladada») y en el teléfono TODAS las filas
      se salían de la pantalla. */
   .notes-stream {
-    @apply relative grid grid-cols-1 gap-1 pb-10;
+    @apply relative grid grid-cols-1 gap-0 pb-10;
   }
   .notes-stream-note {
-    @apply rounded-md border-0 bg-transparent px-2 py-2 shadow-none!;
+    @apply rounded-md border-0 bg-transparent px-2 py-1 shadow-none!;
   }
   .notes-stream-note:hover,
   .notes-stream-note:focus-within {
-    @apply bg-bg-subtle;
+    background: var(--notes-velo-encima);
   }
-  .notes-stream-note--selected {
-    @apply bg-selected;
+  .notes-stream-note--selected,
+  .notes-stream-note--selected:hover {
+    background: var(--notes-velo-elegida);
   }
+  /* El texto de la línea, a 16 px y con su interlínea: lo que se viene a leer. */
+  /* Lo que una cosa lleva debajo —su texto, una lista, el enlace— va en gris y un punto
+     más pequeño, colgado de la columna del texto: es la nota de la cosa, no otra cosa. */
+  .notes-stream-body {
+    @apply text-text-muted -mt-0.5 pb-1 pl-[1.875rem] text-base;
+  }
+  /* La columna de las marcas: 20 px, centrada en la primera línea (24 px). */
   .notes-stream-glyph {
-    @apply text-text-subtle mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center;
+    @apply text-text-subtle flex h-6 w-5 shrink-0 items-center justify-center;
+    --sytue-glyph-fill: currentColor;
   }
+  /* La marca de una cosa: una raya corta, no un punto de lista. */
   .notes-stream-bullet {
-    @apply bg-text-subtle h-1.5 w-1.5 rounded-full;
+    @apply bg-border-strong h-[1.5px] w-2.5 rounded-full;
   }
-  /* Un separador (`---`) es solo su raya: ni viñeta ni menú a la vista. */
+  .notes-stream-note:is(:hover, :focus-within) .notes-stream-bullet {
+    @apply bg-text-subtle;
+  }
+  /* Un separador (`---`) es solo su raya, a todo lo ancho de la línea. */
   .notes-stream-rule {
-    @apply border-border my-1 h-px flex-1 self-center border-t;
+    @apply border-border my-0 h-px flex-1 self-center border-t;
+  }
+  .notes-stream-note:has(.notes-stream-rule) > header {
+    @apply py-2;
+  }
+  .notes-stream-note:has(.notes-stream-rule) .notes-stream-glyph {
+    @apply hidden;
   }
   /* La nota de un cuaderno en árbol llena el panel: es una página, no una tarjeta. */
   .notes-sheet {
-    @apply mx-auto w-full max-w-[64rem] rounded-none border-0 bg-transparent px-6 py-6 shadow-none! sm:px-10;
+    @apply mx-auto w-full max-w-[46rem] rounded-none border-0 bg-transparent px-6 py-8 shadow-none! sm:px-10;
   }
   .notes-sheet-title {
-    @apply text-2xl! leading-tight font-semibold! tracking-tight;
+    @apply text-[1.625rem]! leading-[2rem] font-bold! tracking-[-0.015em];
   }
 
   /* Filas de las páginas (tareas, resultados, archivo, papelera). */
   .notes-rows {
-    @apply -mx-2 grid grid-cols-1 gap-px;
+    @apply -mx-2 grid grid-cols-1 gap-0;
   }
   .notes-row {
-    @apply hover:bg-bg-subtle focus-within:bg-bg-subtle flex min-h-9 items-start gap-2 rounded-md px-2 py-1.5 transition-colors duration-150;
+    @apply text-md flex min-h-10 items-start gap-2.5 rounded-md px-2 py-2 transition-colors duration-150;
+  }
+  .notes-row:is(:hover, :focus-within) {
+    background: color-mix(in srgb, var(--sytue-text) 4%, transparent);
   }
   .notes-row-actions {
     @apply flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-150 pointer-coarse:opacity-100;
@@ -361,7 +422,7 @@
     @apply mx-4 mt-2 mb-8 grid grid-cols-1 sm:mx-6 md:grid-cols-7;
   }
   .notes-week-col {
-    @apply border-border-subtle flex min-w-0 flex-col gap-1.5 border-b px-2 py-3 last:border-b-0 md:min-h-64 md:border-r md:border-b-0 md:last:border-r-0;
+    @apply border-border-subtle flex min-w-0 flex-col gap-1 border-b px-2 py-3 last:border-b-0 md:min-h-64 md:border-r md:border-b-0 md:last:border-r-0;
   }
   /* La cabecera de un día en Semana, Días y «Este día»: texto que se pulsa, no un botón. */
   .notes-days-head {
@@ -374,30 +435,126 @@
     @apply text-text flex items-start gap-2 rounded-md px-1 py-1 text-sm break-words;
   }
   .notes-day-line:hover {
-    @apply bg-bg-subtle;
+    background: color-mix(in srgb, var(--sytue-text) 4%, transparent);
   }
   .notes-day-box {
-    @apply border-border-strong mt-0.5 size-3.5 shrink-0 rounded-sm border;
+    @apply border-border-strong mt-0.5 size-3.5 shrink-0 rounded-[3px] border-[1.5px];
   }
   .notes-day-box--done {
-    @apply bg-primary border-primary;
+    @apply bg-text-subtle border-transparent;
   }
+  /* La marca de una cosa en Semana y Días: la misma raya, a su escala. */
   .notes-day-dot {
-    @apply bg-text-subtle mx-[0.3125rem] mt-2 size-1 shrink-0 rounded-full;
+    @apply bg-border-strong mx-[0.1875rem] mt-[0.6875rem] h-[1.5px] w-2 shrink-0 rounded-full;
   }
   .notes-days-view {
-    @apply mt-6 flex flex-col gap-6 pb-10;
+    @apply mt-6 flex flex-col gap-7 pb-10;
   }
   .notes-days-entry {
-    @apply -mx-1 flex flex-col gap-1;
+    @apply -mx-1 flex flex-col gap-0.5;
   }
   .notes-this-day {
-    @apply border-border-subtle mt-2 flex flex-col gap-2 border-t pt-5 pb-10;
+    @apply border-border-subtle mt-4 flex flex-col gap-2 border-t pt-6 pb-10;
+  }
+}
+
+/* LO QUE TIENE QUE GANAR A LAS UTILIDADES, fuera de toda `@layer`: el gris de los
+   controles de la libreta, el tamaño del texto de las líneas y la casilla. Los
+   componentes de `@sytue/ui` traen su color en utilidades (`text-primary-text`…), y una
+   regla de componentes pierde contra ellas por la capa, no por el peso. */
+.notes-day-nav :is(button, a),
+.notes-capture button,
+.notes-day-filters button:not(.notes-seg-item) {
+  color: var(--sytue-text-subtle);
+}
+.notes-day-nav :is(button, a):is(:hover, [aria-expanded='true'], [aria-pressed='true']),
+.notes-capture button:hover,
+.notes-day-filters button:not(.notes-seg-item):is(:hover, [aria-pressed='true']) {
+  color: var(--sytue-text);
+}
+/* El texto de una línea, a 16 px con su interlínea de 24: lo que se viene a leer. Lo
+   mismo si es el título (una tarea) que si es el cuerpo en la línea (un texto suelto). */
+.notes-stream-note > header {
+  align-items: flex-start;
+  gap: 0.625rem;
+  min-height: 2rem;
+  padding-block: 0.25rem;
+}
+.notes-stream-note > header > h3,
+.notes-stream-text .sytue-prose {
+  font-size: var(--text-md);
+  line-height: 1.5rem;
+}
+/* Una línea larga PARTE, no se corta: el título de una tarea es un botón (pulsarlo lo
+   renombra) que fuera de la libreta va con `truncate`. */
+.notes-stream-note > header > h3 > button {
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+}
+/* Lo que una cosa lleva debajo, en gris y un punto más pequeño. */
+.notes-stream-body .sytue-prose {
+  color: var(--sytue-text-muted);
+  font-size: var(--text-base);
+  line-height: 1.375rem;
+}
+.notes-stream-body a:not(.notes-hashtag) {
+  color: var(--sytue-text-muted);
+}
+.notes-stream-body a:not(.notes-hashtag):hover {
+  color: var(--sytue-text);
+}
+/* La chincheta y los demás distintivos de la línea, en gris: están, no llaman. */
+.notes-stream-note > header > .text-primary-text {
+  color: var(--sytue-text-subtle);
+}
+/* La casilla de una tarea, a la medida de la columna: 16 px y esquinas de 4. Hecha, se
+   apaga con su texto: lo terminado se retira, no se celebra. */
+.notes-stream-glyph input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 4px;
+  accent-color: var(--sytue-text-subtle);
+}
+.notes-sheet .sytue-prose {
+  font-size: var(--text-md);
+  line-height: 1.625rem;
+}
+/* Con el dedo no hay «encima»: el asa y el «…» de cada línea eran dos controles por
+   renglón. El asa se queda a 24 px de ancho y en gris claro (se sigue cogiendo con el
+   dedo: mide 44 de alto) y el «…» solo se ve en la línea elegida o enfocada. */
+@media (pointer: coarse) {
+  .notes-stream-note > header > button.cursor-grab {
+    width: 1.5rem;
+    opacity: 0.35;
+  }
+  /* Lo que cuelga de la cosa sigue empezando donde su texto: el asa va en la línea. */
+  .notes-stream-note:has(> header > button.cursor-grab) > .notes-stream-body {
+    padding-left: 4rem;
+  }
+  .notes-stream-note:not(:focus-within, .notes-stream-note--selected)
+    > header
+    [aria-haspopup='menu'] {
+    opacity: 0;
+  }
+}
+/* En el teléfono el aro del progreso se cae: «Hechas 1» ya lo dice y los filtros caben
+   en una línea. */
+@media (max-width: 639px) {
+  .notes-day-filters .notes-ring {
+    display: none;
   }
 }
 
 .notes-tree-grip {
   -webkit-user-select: none;
+}
+/* Con ratón, el asa de un cuaderno solo aparece en la fila que se señala: una columna de
+   puntos delante de cada nombre se leía antes que los nombres. */
+@media (pointer: fine) {
+  .notes-notebook-row:not(:hover, :focus-within) .notes-tree-grip {
+    opacity: 0;
+  }
 }
 .notes-notebook-row[data-notebook-drop='inside'] {
   background: var(--sytue-sidebar-active);
@@ -469,7 +626,7 @@
   }
 }
 
-/* Una lista plegada (`<li class="plegada">`, como en Twos) esconde su sublista al LEERLA
+/* Una lista plegada (`<li class="plegada">`) esconde su sublista al LEERLA
    y deja tres puntos en su lugar; en el editor se sigue viendo entera para poder
    escribirla, con la viñeta en el color de marca como aviso. La sublista va dentro del `<li>` o justo
    detrás, que es como la anida `indent` en Chromium.
@@ -485,4 +642,37 @@
 }
 .sytue-prose[contenteditable] li.plegada::marker {
   color: var(--sytue-primary);
+}
+
+/* La raya de una cosa que se puede editar es un botón: pulsarla la hace tarea. Mide 24 px
+   para el dedo (en px: la raíz es de 14) y sobresale lo mismo por cada lado de la columna
+   de las marcas, que no se mueve. Al pasar por encima o con el foco, la raya se vuelve la
+   casilla vacía en la que se va a convertir, del tamaño de la de una tarea. */
+.notes-stream-bullet-btn {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-inline: calc((1.25rem - 24px) / 2);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.notes-stream-bullet-btn .notes-stream-bullet {
+  transition:
+    width 120ms,
+    height 120ms,
+    background-color 120ms;
+}
+.notes-stream-bullet-btn:is(:hover, :focus-visible) .notes-stream-bullet {
+  width: 1rem;
+  height: 1rem;
+  border: 1.5px solid var(--sytue-border-strong);
+  border-radius: 4px;
+  background: transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+  .notes-stream-bullet-btn .notes-stream-bullet {
+    transition: none;
+  }
 }

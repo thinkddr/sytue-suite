@@ -17,6 +17,9 @@ import (
 type Borrador struct {
 	// De es la dirección «De» elegida; vacía, la principal.
 	De string
+	// Cuenta es la instancia de la cuenta externa por la que sale (el «De» es su
+	// dirección), o vacía si sale por Sytue. El borrador se guarda en Sytue igual.
+	Cuenta string
 	// Para, Cc y Cco son lo que la persona escribe: direcciones separadas por comas,
 	// con o sin nombre (`Nombre <a@b>`).
 	Para, Cc, Cco string

@@ -26,6 +26,7 @@ const EsperaFlujo = 3 * time.Second
 func (v *Vista) ConBuzon(b Buzon) *Vista {
 	v.buzon = b
 	v.avisos.AlAbrir = v.abrirAviso
+	v.avisos.AlMarcarLeido = v.marcarLeido
 	v.avisos.AlMarcarTodas = v.marcarTodas
 	v.avisos.AlSilenciar = v.silenciar
 	v.avisos.AlCargarMas = v.cargarMas
@@ -151,14 +152,7 @@ func (v *Vista) llegaAviso(n api.HubNotification) {
 // abrirAviso lo marca como leído y, si lleva a algún sitio, lo abre EN SU APP: el aviso
 // es de otro producto de la suite, igual que en el panel de la campana.
 func (v *Vista) abrirAviso(n api.HubNotification) {
-	v.enUI(func() {
-		for i := range v.avisos.Items {
-			if v.avisos.Items[i].ID == n.ID {
-				v.avisos.Items[i].Read = true
-			}
-		}
-	})
-	v.segundoPlano(func(ctx context.Context) { _ = v.buzon.MarkRead(ctx, n.ID) })
+	v.marcarLeido(n)
 	if n.URL == "" || v.abrir == nil {
 		return
 	}
@@ -167,6 +161,19 @@ func (v *Vista) abrirAviso(n api.HubNotification) {
 		clave = p.Marca.Clave()
 	}
 	_ = api.AbrirURL(v.abrir, clave, n.URL)
+}
+
+// marcarLeido marca UN aviso como leído sin abrirlo: el punto azul de la fila, que es un
+// botón. Optimista, como en la web (`avisos.leer`).
+func (v *Vista) marcarLeido(n api.HubNotification) {
+	v.enUI(func() {
+		for i := range v.avisos.Items {
+			if v.avisos.Items[i].ID == n.ID {
+				v.avisos.Items[i].Read = true
+			}
+		}
+	})
+	v.segundoPlano(func(ctx context.Context) { _ = v.buzon.MarkRead(ctx, n.ID) })
 }
 
 func (v *Vista) marcarTodas() {

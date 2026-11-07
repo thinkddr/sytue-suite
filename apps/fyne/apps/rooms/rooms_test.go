@@ -171,6 +171,7 @@ func TestLosGlifosSonLosDeLaWeb(t *testing.T) {
 	web := webref.Read(t, fuente)
 	nuestros := map[string]string{
 		"MoreGlyph":     glifoMas,
+		"ArchiveGlyph":  glifoArchivo,
 		"PinGlyph":      glifoChincheta,
 		"BookmarkGlyph": glifoMarcador,
 		"VideoGlyph":    glifoVideo,

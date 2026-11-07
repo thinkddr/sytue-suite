@@ -98,3 +98,28 @@ test('dejar de compartir va por el sub de la lista', async () => {
     400,
   );
 });
+
+test('sin recurso y con agenda, GET es la gente de la organización: correo y nombre, sin el sub', async () => {
+  const vistas = servicio(() => Response.json({}));
+  const conAgenda = (conSesion: boolean) =>
+    rutasDeCompartir({
+      sesion: async () => (conSesion ? ({ accessToken: 'tok' } as ServerSession) : null),
+      servicio: () => 'http://svc/api/v1',
+      base: (q) => (q.get('album') ? `/albums/${q.get('album')}/people` : null),
+      directorio: {
+        resolverPersona: async () => null,
+        resolverPersonaPorId: async () => null,
+        resolverPersonas: async () => new Map(),
+      },
+      agenda: async () => [ana, { userId: 'sub-luis', email: 'luis@acme.test' }],
+    });
+  const res = await conAgenda(true).GET(ctx('/api/people'));
+  expect(res.status).toBe(200);
+  expect(await res.json()).toEqual({
+    people: [{ email: ana.email, name: 'Ana' }, { email: 'luis@acme.test' }],
+  });
+  expect((await conAgenda(false).GET(ctx('/api/people'))).status).toBe(401);
+  // Sin agenda, una petición sin recurso sigue siendo un error, y no llega al servicio.
+  expect((await rutas().GET(ctx('/api/people'))).status).toBe(400);
+  expect(vistas).toEqual([]);
+});

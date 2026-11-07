@@ -17,10 +17,10 @@ export const editor = {
   'editor.bases.desc': 'Înregistrările unei vizualizări, așa cum sunt acum',
   'editor.bases.title': 'Tabel din Sytue Bases',
   'editor.bases.prompt':
-    'Lipiți tokenul unei conexiuni doar pentru citire acordate pentru Sytue Web. Datele acelei vizualizări vor deveni conținut al site-ului și vor fi publice după publicare.',
+    'Lipiți tokenul unei conexiuni doar pentru citire acordate pentru Sytue Webs. Datele acelei vizualizări vor deveni conținut al site-ului și vor fi publice după publicare.',
   'editor.bases.confirm': 'Aduceți vizualizarea',
   'editor.bases.invalid':
-    'Această conexiune nu este valabilă pentru Sytue Web: poate fi revocată, expirată sau acordată altui produs ori altei organizații.',
+    'Această conexiune nu este valabilă pentru Sytue Webs: poate fi revocată, expirată sau acordată altui produs ori altei organizații.',
   'editor.bases.large':
     'Vizualizarea nu încape într-un tabel al site-ului (cel mult 50 de rânduri și 8 coloane). Restrângeți-o în Sytue Bases.',
   'editor.bases.forbidden':

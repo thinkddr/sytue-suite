@@ -18,6 +18,8 @@ export const hr: Catalog = {
   'ui.openNav': 'Otvori navigaciju',
   'ui.closeNav': 'Zatvori navigaciju',
   'ui.backToList': 'Natrag na popis',
+  'ui.suiteOpen': 'Sytue: aplikacije, pretraživanje, obavijesti i račun',
+  'ui.suiteClose': 'Natrag u aplikaciju',
   'ui.noResults': 'Nema rezultata.',
   'ui.meter.almostFull': 'gotovo puno',
   'ui.meter.full': 'puno',
@@ -60,6 +62,9 @@ export const hr: Catalog = {
   'shell.lock.reasonNotebook': 'otvoriti vašu šifriranu bilježnicu',
   'shell.lock.faceIdUsage':
     'Sytue koristi Face ID za otključavanje vaše sesije kada otvorite aplikaciju.',
+  'shell.widgets.wake': 'Ažuriraj widgete dok je aplikacija zatvorena',
+  'shell.widgets.wakeHelp':
+    'Kad se nešto tvoje promijeni, Sytue budi aplikaciju praznom Appleovom obavijesti kako bi osvježila svoj widget. Apple vidi koju aplikaciju i kada, nikad ono što se promijenilo.',
   'shell.call.microphoneUsage':
     'Sytue Rooms koristi mikrofon samo tijekom poziva i samo kada ga uključite.',
   'shell.call.cameraUsage':
@@ -182,7 +187,7 @@ export const hr: Catalog = {
   'notifications.kind.pages.domain.failed':
     'Domena {domain} na {site} ne radi: provjerite njezine postavke',
   'notifications.kind.pages.erp.failed': 'Narudžba {number} s {site} nije stigla u Sytue ERP',
-  'notifications.kind.pages.settings.changed': 'Promjena postavke u Sytue Web: {actor}',
+  'notifications.kind.pages.settings.changed': 'Promjena postavke u Sytue Webs: {actor}',
   'notifications.kind.pages.export.ready': 'Vaš izvoz za {site} je spreman',
   'notifications.kind.pages.store.busy':
     'Trgovina na {site} ima previše narudžbi koje čekaju plaćanje',
@@ -366,6 +371,8 @@ export const hr: Catalog = {
   'widgets.compose': 'Napiši',
   'widgets.storage': 'Pohrana',
   'widgets.create': 'Stvori događaj',
+  'widgets.updatedAgo': 'Ažurirano {time}',
+  'widgets.updatedAt': 'Ažurirano: {time}',
 
   'linkedServices.services': 'Usluge',
   'linkedServices.changed':
@@ -378,6 +385,7 @@ export const hr: Catalog = {
   'linkedServices.notGranted':
     'Pristup ovoj usluzi nije odobren. Ponovno povežite račun kako biste odabrali dopuštenja.',
   'linkedServices.connected': 'Povezane usluge',
+  'linkedServices.exists': 'Ovaj je račun već bio povezan i sada je otvoren.',
   'linkedServices.providerData': 'Promjene se spremaju kod vašeg pružatelja.',
   'linkedServices.writeUnknown':
     'Pružatelj nije potvrdio spremanje. Osvježite prikaz i provjerite prije ponovnog pokušaja.',

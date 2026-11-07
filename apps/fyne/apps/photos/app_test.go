@@ -22,6 +22,7 @@ import (
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/test"
 
+	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/auth"
@@ -149,6 +150,13 @@ func (s *servicioFalso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		escribir(map[string]any{"memories": []any{}})
 	case r.URL.Path == "/api/v1/albums":
 		escribir(map[string]any{"items": []any{}})
+	// «m1» es un álbum MÍO con las tres primeras fotos y la primera de portada.
+	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/albums/m1":
+		escribir(map[string]any{"id": "m1", "title": "Verano", "coverAssetId": s.fotos[0].ID, "count": 3})
+	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/albums/m1/assets":
+		escribir(map[string]any{"items": s.fotos[:3]})
+	case r.Method == http.MethodPatch && r.URL.Path == "/api/v1/albums/m1":
+		escribir(map[string]any{"id": "m1"})
 	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/settings":
 		escribir(map[string]bool{"excludeAiBatch": s.excluidaLoteIA, "canManageAiBatch": s.puedeGestionarIA})
 	case r.Method == http.MethodPut && r.URL.Path == "/api/v1/settings":
@@ -1006,5 +1014,327 @@ func TestExcluirOrganizacionDelLoteIA(t *testing.T) {
 	a.cambiarExclusionLote(true)
 	if !a.aj.ExcludeAIBatch || !contieneTextoApp(a.scroll.Content, a.v.Traduce("aiBatch.excludedHint")) {
 		t.Fatalf("tras excluir debe quedar activo y mostrar el aviso: %+v", a.aj)
+	}
+}
+
+// TestRenombrarElAlbumYElegirSuPortadaDesdeElVisor: la cabecera de un álbum mío ofrece
+// «Renombrar» y lo manda por PATCH; aceptar sin cambiar nada no pide nada. En el visor del
+// álbum, en la que ya es portada el mando lo dice y va apagado —no pulsado: no es un
+// conmutador—, y en otra manda el título de ahora con la foto (`ponerPortada` de
+// photosApi.ts). VISTO EN ROJO quitando el mando del visor, con tituloRenombrado
+// devolviendo lo escrito aunque no cambie y con el mando pulsado en vez de apagado.
+func TestRenombrarElAlbumYElegirSuPortadaDesdeElVisor(t *testing.T) {
+	s := &servicioFalso{fotos: fotosDelServicio(4), porPagina: 100}
+	a, _ := appDePrueba(t, s)
+	a.Arrancar()
+	a.AbrirAlbum("m1")
+	if !contieneTextoApp(a.scroll.Content, a.v.Traduce("album.rename")) {
+		t.Fatal("la cabecera del álbum no ofrece «Renombrar»")
+	}
+	antes := len(s.vistas())
+	a.renombrarAlbumA("  Verano  ")
+	if len(s.vistas()) != antes {
+		t.Errorf("renombrar con el mismo título pidió %v", s.vistas()[antes:])
+	}
+	a.renombrarAlbumA("Verano en Getaria")
+	if a.uno.album.Title != "Verano en Getaria" {
+		t.Errorf("renombrar deja %q", a.uno.album.Title)
+	}
+	if got := s.vistas()[len(s.vistas())-1]; got != `PATCH /api/v1/albums/m1? {"title":"Verano en Getaria"}` {
+		t.Errorf("renombrar pidió %q", got)
+	}
+
+	portadaDelVisor := func() *ui.BotonIcono {
+		t.Helper()
+		var b *ui.BotonIcono
+		var buscar func(o fyne.CanvasObject)
+		buscar = func(o fyne.CanvasObject) {
+			switch x := o.(type) {
+			case *ui.BotonIcono:
+				if x.Rotulo == a.v.Traduce("album.setCover") || x.Rotulo == a.v.Traduce("album.isCover") {
+					b = x
+				}
+			case *fyne.Container:
+				for _, h := range x.Objects {
+					buscar(h)
+				}
+			case *container.Scroll:
+				buscar(x.Content)
+			case *container.ThemeOverride:
+				buscar(x.Content)
+			}
+		}
+		buscar(a.vis.capa.dentro)
+		if b == nil {
+			t.Fatal("el visor del álbum no ofrece «Usar como portada del álbum»")
+		}
+		return b
+	}
+	a.datosAlbum().AlAbrir(a.uno.fotos[0])
+	// No es un conmutador: en la que ya es portada lo dice y va apagado, sin pulsar.
+	if b := portadaDelVisor(); b.Pulsado || !b.Apagado || b.Disabled() || b.Rotulo != a.v.Traduce("album.isCover") {
+		t.Errorf("en la que ya es portada el mando no dice que lo es apagado y en el tabulador: %q pulsado=%v apagado=%v", b.Rotulo, b.Pulsado, b.Apagado)
+	}
+	a.siguiente()
+	f, _ := a.vis.foto()
+	if b := portadaDelVisor(); b.Pulsado || b.Apagado || b.Rotulo != a.v.Traduce("album.setCover") {
+		t.Errorf("en otra foto el mando no ofrece «Usar como portada»: %q apagado=%v", b.Rotulo, b.Apagado)
+	}
+	a.ponerPortada(f)
+	if a.uno.album.CoverAssetID != f.ID || !portadaDelVisor().Apagado {
+		t.Errorf("la portada queda en %q y el mando sin apagar", a.uno.album.CoverAssetID)
+	}
+	want := `PATCH /api/v1/albums/m1? {"coverAssetId":"` + f.ID + `","title":"Verano en Getaria"}`
+	if got := s.vistas()[len(s.vistas())-1]; got != want {
+		t.Errorf("la portada se pidió con %q y quiero %q", got, want)
+	}
+}
+
+// botonDeLaPantalla busca un mando por su rótulo, se vea o vaya al lector (por debajo
+// de `xl` la barra de selección solo deja el icono).
+func botonDeLaPantalla(o fyne.CanvasObject, rotulo string) *ui.Boton {
+	switch x := o.(type) {
+	case *ui.Boton:
+		if x.Texto == rotulo || x.Rotulo == rotulo {
+			return x
+		}
+	case *fyne.Container:
+		for _, h := range x.Objects {
+			if b := botonDeLaPantalla(h, rotulo); b != nil {
+				return b
+			}
+		}
+	case *container.Scroll:
+		return botonDeLaPantalla(x.Content, rotulo)
+	case *container.ThemeOverride:
+		return botonDeLaPantalla(x.Content, rotulo)
+	}
+	return nil
+}
+
+// TestFavoritasDesdeLaBarraDeSeleccion: con alguna sin marcar, el corazón de la barra
+// dice «Añadir a favoritas» y pide SOLO las que faltan; con todas marcadas dice
+// «Quitar de favoritas», va lleno y las quita. En «Favoritas» quitar las saca de la
+// lista (`favoritasEnLote.ts`). VISTO EN ROJO pidiendo todas las marcadas y con el
+// corazón sin llenar.
+func TestFavoritasDesdeLaBarraDeSeleccion(t *testing.T) {
+	s := &servicioFalso{fotos: fotosDelServicio(4), porPagina: 100} // favoritas: 0 y 2
+	a, _ := appDePrueba(t, s)
+	a.Arrancar()
+	f := a.g.fotos
+	a.entrarEnSeleccion()
+	for _, x := range f[:3] {
+		a.alternar(x)
+	}
+	if b := botonDeLaPantalla(a.pantallaGaleria(), a.v.Traduce("gallery.favorite")); b == nil || b.Glifo != nil {
+		t.Fatalf("con una sin marcar la barra no ofrece «Añadir a favoritas» con el corazón vacío: %v", b)
+	}
+	antes := len(s.vistas())
+	a.favoritasDeLaSeleccion()
+	if got := s.vistas()[antes:]; len(got) != 1 || got[0] != "PUT /api/v1/assets/"+f[1].ID+"/favorite? {\"favorite\":true}" {
+		t.Errorf("marcar en lote pidió %v; tocaba solo la que faltaba", got)
+	}
+	if !a.g.fotos[1].Favorite || a.g.seleccion != nil {
+		t.Errorf("tras el lote la 1 sigue sin corazón (%v) o la selección sigue abierta", a.g.fotos[1].Favorite)
+	}
+	if quiero := a.v.T.T("gallery.favorited", i18n.Vars{"count": 1}); a.g.aviso != quiero {
+		t.Errorf("el aviso dice %q y quiero %q", a.g.aviso, quiero)
+	}
+
+	a.entrarEnSeleccion()
+	a.alternar(a.g.fotos[0])
+	a.alternar(a.g.fotos[1])
+	b := botonDeLaPantalla(a.pantallaGaleria(), a.v.Traduce("gallery.unfavorite"))
+	if b == nil || b.Glifo == nil {
+		t.Fatalf("con todas favoritas la barra no ofrece «Quitar de favoritas» con el corazón lleno: %v", b)
+	}
+	antes = len(s.vistas())
+	a.favoritasDeLaSeleccion()
+	if n := len(s.vistas()) - antes; n != 2 || a.g.fotos[0].Favorite || a.g.fotos[1].Favorite {
+		t.Errorf("quitar en lote hizo %d llamadas y deja %v, %v", n, a.g.fotos[0].Favorite, a.g.fotos[1].Favorite)
+	}
+
+	if got := conFavoritas(a.g.fotos, []string{f[2].ID}, false, true); len(got) != 3 || posicion(got, f[2].ID) >= 0 {
+		t.Errorf("en «Favoritas» quitar no saca la foto de la lista: %d fotos", len(got))
+	}
+}
+
+// TestElCorazonDeLaBarraNoSeLanzaDosVeces: mientras vuelven los PUT del lote, el
+// corazón va `loading` y otra pulsación (un doble clic) no calcula el plan otra vez
+// ni repite las llamadas; al volver, se suelta. VISTO EN ROJO sin la guarda: cuatro
+// PUT para dos fotos y el botón sin rueda.
+func TestElCorazonDeLaBarraNoSeLanzaDosVeces(t *testing.T) {
+	s := &servicioFalso{fotos: fotosDelServicio(4), porPagina: 100} // favoritas: 0 y 2
+	a, _ := appDePrueba(t, s)
+	a.Arrancar()
+	f := a.g.fotos
+	a.entrarEnSeleccion()
+	a.alternar(f[1])
+	a.alternar(f[3])
+	// Las llamadas se quedan en vuelo hasta que el test las suelte.
+	var enVuelo []func()
+	a.lanzar = func(g func()) { enVuelo = append(enVuelo, g) }
+	antes := len(s.vistas())
+	a.favoritasDeLaSeleccion()
+	a.favoritasDeLaSeleccion()
+	if b := botonDeLaPantalla(a.pantallaGaleria(), a.v.Traduce("gallery.favorite")); b == nil || !b.Cargando {
+		t.Errorf("con el lote en vuelo el corazón de la barra no va «cargando»: %v", b)
+	}
+	for _, g := range enVuelo {
+		g()
+	}
+	fyne.DoAndWait(func() {})
+	if n := len(s.vistas()) - antes; n != 2 {
+		t.Errorf("dos pulsaciones seguidas hicieron %d PUT; tocaban 2, una por foto", n)
+	}
+	if a.g.marcandoFavoritas || !a.g.fotos[1].Favorite || !a.g.fotos[3].Favorite {
+		t.Errorf("al volver el lote sigue en vuelo (%v) o no marcó las dos", a.g.marcandoFavoritas)
+	}
+}
+
+// TestPlanFavoritasMarcaLasQueNoEstanCargadas: una marcada que no está en la lista no
+// tiene corazón conocido, así que el lote marca y la incluye (`favoritasEnLote.ts`).
+// VISTO EN ROJO sin las de fuera (quitaba las cargadas e ignoraba la otra).
+func TestPlanFavoritasMarcaLasQueNoEstanCargadas(t *testing.T) {
+	fotos := []api.Photo{{ID: "a", Favorite: true}, {ID: "d", Favorite: true}}
+	valor, ids := planFavoritas(fotos, map[string]bool{"a": true, "x": true, "d": true})
+	if !valor || len(ids) != 1 || ids[0] != "x" {
+		t.Errorf("con una sin cargar el plan es %v %v; tocaba marcar solo x", valor, ids)
+	}
+	valor, ids = planFavoritas(nil, map[string]bool{"y": true, "x": true})
+	if !valor || len(ids) != 2 || ids[0] != "x" || ids[1] != "y" {
+		t.Errorf("sin ninguna cargada el plan es %v %v", valor, ids)
+	}
+}
+
+// vacioDeLaPantalla busca el estado vacío en el árbol de la pantalla.
+func vacioDeLaPantalla(o fyne.CanvasObject) *ui.Vacio {
+	switch x := o.(type) {
+	case *ui.Vacio:
+		return x
+	case *fyne.Container:
+		for _, h := range x.Objects {
+			if e := vacioDeLaPantalla(h); e != nil {
+				return e
+			}
+		}
+	case *container.Scroll:
+		return vacioDeLaPantalla(x.Content)
+	case *container.ThemeOverride:
+		return vacioDeLaPantalla(x.Content)
+	}
+	return nil
+}
+
+// TestUnaBusquedaSinAciertosEsUnEstadoVacio: «playa» no encuentra nada y la galería
+// dice qué se buscó, con «Borrar búsqueda» y ampliar; ya ampliada sigue el vacío sin
+// volver a ofrecer ampliar; y borrar vacía el buscador, vuelve a pedir la galería
+// entera y le devuelve el foco (`sinResultados.ts`). VISTO EN ROJO sin el vacío (la caja
+// de ampliar de antes) y con borrar sin devolver el foco.
+func TestUnaBusquedaSinAciertosEsUnEstadoVacio(t *testing.T) {
+	s := &servicioFalso{fotos: fotosDelServicio(3), porPagina: 100}
+	a, w := appDePrueba(t, s)
+	a.Arrancar()
+	a.buscador.PonerTexto("playa")
+	e := vacioDeLaPantalla(a.pantallaGaleria())
+	if e == nil || e.Titulo != a.v.T.T("gallery.noResults.title", i18n.Vars{"query": "playa"}) {
+		t.Fatalf("una búsqueda sin aciertos no dice qué se buscó: %+v", e)
+	}
+	if botonDeLaPantalla(e.Accion, a.v.Traduce("gallery.clearSearch")) == nil ||
+		botonDeLaPantalla(e.Accion, a.v.Traduce("gallery.searchWider")) == nil {
+		t.Error("el vacío de la búsqueda no ofrece «Borrar búsqueda» y ampliar")
+	}
+
+	a.ampliarBusqueda()
+	e = vacioDeLaPantalla(a.pantallaGaleria())
+	if e == nil || e.Descripcion != a.v.Traduce("gallery.noResults.description") ||
+		botonDeLaPantalla(e.Accion, a.v.Traduce("gallery.searchWider")) != nil {
+		t.Errorf("ya ampliada, el vacío sigue ofreciendo ampliar o no está: %+v", e)
+	}
+
+	botonDeLaPantalla(e.Accion, a.v.Traduce("gallery.clearSearch")).Tapped(nil)
+	if a.buscador.Texto() != "" || a.g.texto != "" || len(a.g.fotos) != 3 {
+		t.Errorf("borrar deja %q en el buscador, %q buscado y %d fotos", a.buscador.Texto(), a.g.texto, len(a.g.fotos))
+	}
+	if w.Canvas().Focused() != a.buscador {
+		t.Error("borrar la búsqueda no devuelve el foco al buscador")
+	}
+	if vacioDeLaPantalla(a.pantallaGaleria()) != nil {
+		t.Error("con la galería entera sigue el vacío de la búsqueda")
+	}
+}
+
+// TestMientrasSeTecleaNoHayVacioDeBusqueda: con el retardo de verdad, justo después de
+// teclear la búsqueda aún no se ha pedido, así que no puede decir «Ninguna foto coincide
+// con…»; en cuanto llega la respuesta vacía, sí. VISTO EN ROJO sin la marca `pendiente`
+// (el vacío salía tras cada tecla).
+func TestMientrasSeTecleaNoHayVacioDeBusqueda(t *testing.T) {
+	s := &servicioFalso{fotos: fotosDelServicio(3), porPagina: 100}
+	a, _ := appDePrueba(t, s)
+	a.Arrancar()
+	a.espera = time.Hour
+	t.Cleanup(func() {
+		if a.temporizado != nil {
+			a.temporizado.Stop()
+		}
+	})
+	a.buscador.PonerTexto("pla")
+	if e := vacioDeLaPantalla(a.pantallaGaleria()); e != nil {
+		t.Fatalf("con la búsqueda aún sin pedir ya dice que no hay nada: %q", e.Titulo)
+	}
+	a.cargarMas()
+	if e := vacioDeLaPantalla(a.pantallaGaleria()); e == nil {
+		t.Error("pedida la búsqueda y sin aciertos, no sale el vacío")
+	}
+}
+
+// TestElVisorDiceDondeVaYSaltaConInicioYFin: la cabecera dice «2 / 5»; Inicio lleva a la
+// primera y Fin a la última; con páginas por pedir, el total es lo cargado con un «+»
+// (`posicionVisor.ts`); y una foto sola no lleva «1 / 1». VISTO EN ROJO sin el contador
+// en la cabecera y con Fin sin saltar.
+func TestElVisorDiceDondeVaYSaltaConInicioYFin(t *testing.T) {
+	s := &servicioFalso{fotos: fotosDelServicio(5), porPagina: 100}
+	a, _ := appDePrueba(t, s)
+	a.Arrancar()
+	a.abrirEnGaleria(a.g.fotos[1].ID)
+	cabecera := cabeceraVisor(a.v, Visor{Foto: a.g.fotos[a.vis.i], Posicion: a.textoPosicion(a.vis)})
+	if quiero := a.v.T.T("viewer.counter", i18n.Vars{"index": 2, "total": 5}); !contieneTextoApp(cabecera, quiero) ||
+		!contieneTextoApp(a.vis.capa.dentro, quiero) {
+		t.Errorf("la cabecera del visor no dice %q", quiero)
+	}
+	a.teclaSuelta(&fyne.KeyEvent{Name: fyne.KeyEnd})
+	if a.vis.i != 4 || a.textoPosicion(a.vis) != a.v.T.T("viewer.counter", i18n.Vars{"index": 5, "total": 5}) {
+		t.Errorf("Fin deja la %d con %q", a.vis.i, a.textoPosicion(a.vis))
+	}
+	a.teclaSuelta(&fyne.KeyEvent{Name: fyne.KeyHome})
+	if a.vis.i != 0 {
+		t.Errorf("Inicio deja la %d", a.vis.i)
+	}
+
+	s2 := &servicioFalso{fotos: fotosDelServicio(30), porPagina: 10}
+	b, _ := appDePrueba(t, s2)
+	b.Arrancar()
+	b.abrirEnGaleria(b.g.fotos[0].ID)
+	mas := b.v.T.T("viewer.counterMore", i18n.Vars{"count": len(b.g.fotos)})
+	if got := b.textoPosicion(b.vis); b.g.fin || got != b.v.T.T("viewer.counter", i18n.Vars{"index": 1, "total": mas}) {
+		t.Errorf("con páginas por pedir el contador dice %q (fin=%v)", got, b.g.fin)
+	}
+
+	if _, ok := posicionVisor(0, 1, false); ok {
+		t.Error("una foto sola lleva contador")
+	}
+
+	// Por debajo de `lg` la cabecera va en dos filas: el contador sigue al nombre, en la
+	// fila de arriba, sin pisarlo ni meterse bajo «Cerrar».
+	estrecha := a.v
+	estrecha.Ventana = 390
+	f := api.Photo{ID: "x", Name: strings.Repeat("nombre-muy-largo-", 8) + ".jpg"}
+	c := cabeceraVisor(estrecha, Visor{Foto: f, Posicion: "12 / 240"}).(*fyne.Container)
+	c.Resize(fyne.NewSize(390, c.MinSize().Height))
+	nombre, contador := c.Objects[0].(*canvas.Text), c.Objects[5].(*canvas.Text)
+	finNombre := nombre.Position().X + ui.Medir(nombre.Text, tema.TextoSM, ui.Medio).Width
+	finContador := contador.Position().X + ui.Medir(contador.Text, tema.TextoXS, ui.Normal).Width
+	if contador.Text != "12 / 240" || contador.Position().X < finNombre || finContador > c.Objects[2].Position().X {
+		t.Errorf("en estrecho el contador %q va en x=%v (el nombre acaba en %v)", contador.Text, contador.Position().X, finNombre)
 	}
 }

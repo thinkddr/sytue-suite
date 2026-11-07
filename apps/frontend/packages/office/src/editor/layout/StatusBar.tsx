@@ -5,13 +5,14 @@
  * Barra de estado inferior de 28 px (BLUEPRINT.md §6.7): unidad actual
  * (página/hoja/diapositiva), palabras e idioma (solo kind document) y control
  * de zoom (botón −, deslizador MIN_ZOOM–MAX_ZOOM en pasos de 10, porcentaje, botón +).
+ * El porcentaje es un botón: un clic vuelve al 100 %, como Ctrl/⌘ 0 (atajosZoom.ts).
  */
 import type { JSX } from 'preact';
 import type { DocKind } from '@sytue/api-clients';
 import { intlTag } from '@sytue/i18n';
 import { IconButton } from '@sytue/ui';
 import { EditorIcon } from '../icons';
-import { MIN_ZOOM, MAX_ZOOM } from '../canvas/metrics';
+import { MIN_ZOOM, MAX_ZOOM, clampZoom } from '../canvas/metrics';
 import type { DocsKey } from '../../i18n';
 import type { EditorContext } from '../types';
 
@@ -28,7 +29,7 @@ export function StatusBar({ ctx }: { ctx: EditorContext }): JSX.Element {
   const { page, pages, words } = ctx.stats;
   const zoom = ctx.ui.zoom;
   const setZoom = (next: number): void => {
-    ctx.setUi({ zoom: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next)) });
+    ctx.setUi({ zoom: clampZoom(next) });
   };
 
   return (
@@ -84,7 +85,18 @@ export function StatusBar({ ctx }: { ctx: EditorContext }): JSX.Element {
           onInput={(e) => setZoom(Number(e.currentTarget.value))}
           class="sytue-zoom sytue-focus-ring w-24 min-w-[44px] shrink cursor-pointer rounded-full pointer-coarse:min-h-[max(44px,2.75rem)]"
         />
-        <span class="w-10 shrink-0 text-center whitespace-nowrap tabular-nums">{zoom} %</span>
+        {/* «Volver al 100 %» de un clic: con el deslizador en pasos de 10, desde el 130
+            eran tres pulsaciones de «−» o atinar con el dedo. El nombre accesible empieza
+            por lo que se lee («130 %»): quien manda por voz dice lo que ve. */}
+        <button
+          type="button"
+          onClick={() => setZoom(100)}
+          aria-label={t('status.zoom.reset', { zoom })}
+          title={t('status.zoom.reset', { zoom })}
+          class="hover:text-text sytue-focus-ring w-10 shrink-0 cursor-pointer rounded-sm text-center whitespace-nowrap tabular-nums pointer-coarse:min-h-[max(44px,2.75rem)]"
+        >
+          {zoom} %
+        </button>
         <IconButton
           size="sm"
           label={t('status.zoom.in')}

@@ -81,6 +81,7 @@ type Client struct {
 	baseURL string
 	secret  string
 	hc      *http.Client
+	cambios *agrupador // la ventana de AvisarCambio (cambios.go)
 }
 
 // New construye un cliente de notificaciones hacia el Hub.
@@ -90,11 +91,13 @@ func New(baseURL, secret string) *Client {
 	if base == "" {
 		return nil
 	}
-	return &Client{
+	c := &Client{
 		baseURL: base,
 		secret:  strings.TrimSpace(secret),
 		hc:      &http.Client{Timeout: 4 * time.Second},
 	}
+	c.cambios = nuevoAgrupador(c.enviarCambio)
+	return c
 }
 
 // Send entrega la notificación al Hub por el endpoint interno /internal/notifications.

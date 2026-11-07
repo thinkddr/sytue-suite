@@ -78,14 +78,16 @@ func TestWidgetUsesAdoptedIdentityBeforeDataFetch(t *testing.T) {
 	aparte(t)
 	app := test.NewApp()
 	defer app.Quit()
-	ajustes.MarcarSesion()
-	s := &Suite{
-		app: widgetApp{app}, Sesion: auth.NewSession(auth.Tokens{Subject: "first"}, nil, nil),
-		generacionSesion: ajustes.Leer().Sesion,
+	s := suiteConSesion(t, widgetApp{app}, "first")
+	captura := s.capturarWidget()
+	publicar := func(v VistaWidget, n int64) error {
+		p := widgets.NuevoPublicador(widgets.OpcionesPublicador{
+			Vista:  func() VistaWidget { return v },
+			Fuente: func(context.Context) (widgets.Detail, error) { return conDocumentos(n), nil },
+		})
+		return p.RefrescarYa(context.Background())
 	}
-	old := s.CapturarWidget()
-	ctx := context.Background()
-	if err := old.Publicar(ctx, widgets.Counter{Kind: "documents", Value: 2}); err != nil {
+	if err := publicar(captura, 2); err != nil {
 		t.Fatal(err)
 	}
 	snapshot, err := widgets.Read("eu.sytue.docus")
@@ -93,27 +95,25 @@ func TestWidgetUsesAdoptedIdentityBeforeDataFetch(t *testing.T) {
 		t.Fatalf("product must come from schema: %+v %v", snapshot, err)
 	}
 	// Another app connects a second account. This Suite hasn't adopted it yet:
-	// reading the new disk marker here would mislabel the first person's data.
-	ajustes.MarcarSesion()
-	if err := s.CapturarWidget().Publicar(ctx, widgets.Counter{Kind: "documents", Value: 99}); !errors.Is(err, widgets.ErrPrivate) {
-		t.Fatalf("unadopted account marker used: %v", err)
+	// reading the new disk epoch here would mislabel the first person's data.
+	guardar(t, "second", "r2")
+	if err := publicar(s.capturarWidget(), 99); !errors.Is(err, widgets.ErrPrivate) {
+		t.Fatalf("unadopted account epoch used: %v", err)
 	}
-	s.mu.Lock()
-	s.Sesion.Sincronizar(auth.Tokens{Subject: "second"})
-	s.generacionSesion = ajustes.Leer().Sesion
-	s.mu.Unlock()
-	if err := s.CapturarWidget().Publicar(ctx, widgets.Counter{Kind: "documents", Value: 3}); err != nil {
+	s.aplicar(ajustes.Leer())
+	if err := publicar(s.capturarWidget(), 3); err != nil {
 		t.Fatal(err)
 	}
-	if err := old.Publicar(ctx, widgets.Counter{Kind: "documents", Value: 99}); !errors.Is(err, widgets.ErrPrivate) {
+	if err := publicar(captura, 99); !errors.Is(err, widgets.ErrPrivate) {
 		t.Fatalf("late first account response used: %v", err)
 	}
 	snapshot, err = widgets.Read("eu.sytue.docus")
 	if err != nil || len(snapshot.Counters) != 1 || snapshot.Counters[0].Value != 3 {
 		t.Fatalf("second account snapshot changed: %+v %v", snapshot, err)
 	}
-	s.Sesion.Sincronizar(auth.Tokens{})
-	if err := s.CapturarWidget().Publicar(ctx); !errors.Is(err, widgets.ErrPrivate) {
-		t.Fatalf("closed session published: %v", err)
+	guardar(t, "", "")
+	s.aplicar(ajustes.Leer())
+	if v := s.capturarWidget(); v != (VistaWidget{}) {
+		t.Fatalf("closed session captured a view: %+v", v)
 	}
 }

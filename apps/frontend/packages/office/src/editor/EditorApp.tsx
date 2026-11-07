@@ -34,6 +34,7 @@ import { PageCanvas } from './canvas/PageCanvas';
 import { SheetCanvas } from './sheets/SheetCanvas';
 import { FranjaHojaProtegida } from './sheets/FranjaHojaProtegida';
 import { SlidesCanvas } from './slides/SlidesCanvas';
+import { useAtajosDelEditor } from './atajos';
 
 /** Throttle del reflejo de formato bajo el cursor (§4.4: 100 ms). */
 const FMT_THROTTLE_MS = 100;
@@ -175,43 +176,8 @@ function EditorShell({
     };
   }, [refreshFmt]);
 
-  /* Atajos de suite ofimática que el navegador se quedaba (§6.8 solo cubría los
-   * del folio). Ctrl/Cmd+S abría el «Guardar página como…» del navegador —que
-   * descarga el HTML de la aplicación— en un editor que ya guarda solo: aquí
-   * adelanta el autosave y el chip lo cuenta. Ctrl/Cmd+F abría el buscador del
-   * navegador, que no ve más que el folio visible y no sabe reemplazar, teniendo
-   * el panel Buscar del editor a un lado. Van en window y no en el folio para que
-   * respondan también con el foco en la cinta o en un panel.
-   *
-   * Se dejan pasar los del navegador que no compiten (Ctrl+P imprime, y aquí no
-   * hay nada mejor todavía) y los del folio (B/I/U, deshacer nativo). */
-  const { saveNow } = data;
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent): void => {
-      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
-      const key = event.key.toLowerCase();
-      if (key === 's') {
-        event.preventDefault();
-        saveNow();
-      } else if (key === 'f' && !event.shiftKey) {
-        event.preventDefault();
-        setUi({ panel: 'buscar' });
-        // Con el panel recién abierto lo enfoca su propio autofocus; con el panel
-        // YA abierto (y el cursor de vuelta en el folio) hay que traer el foco a
-        // mano, o el segundo Ctrl+F no haría nada visible. El tiempo 0 espera al
-        // render, mismo truco que el panel Esquema.
-        window.setTimeout(() => {
-          const field = document.getElementById('editor-find-input');
-          if (field instanceof HTMLInputElement) {
-            field.focus();
-            field.select(); // teclear sustituye la búsqueda anterior
-          }
-        }, 0);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [saveNow, setUi]);
+  /* Ctrl/⌘ S, F y los del zoom, en window (atajos.ts). */
+  useAtajosDelEditor(data.saveNow, setUiState);
 
   /* Autoría de las marcas de control de cambios: nombre + id (sub) de la sesión.
    * Best-effort (si falla, exec usa una reserva); no bloquea el arranque. */
@@ -344,6 +310,7 @@ function EditorShell({
     addComment: data.addComment,
     resolveComment: data.resolveComment,
     removeComment: data.removeComment,
+    saveNow: data.saveNow,
     versions: data.versions,
     loadVersions: data.loadVersions,
     createVersion: data.createVersion,
@@ -351,6 +318,7 @@ function EditorShell({
     applyTheme: data.applyTheme,
     previewTheme: data.previewTheme,
     exportAs: data.exportAs,
+    makeCopy: data.makeCopy,
     sourceRef: data.sourceRef,
     cursorDots: data.cursorDots,
     soloLectura: data.soloLectura,

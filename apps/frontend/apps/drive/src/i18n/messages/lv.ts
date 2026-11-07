@@ -277,6 +277,16 @@ export const lv: AppCatalog<typeof en> = {
     one: '{count} vienums pārvietots uz atkritni.',
     other: '{count} vienumi pārvietoti uz atkritni.',
   },
+  'files.batch.restored': {
+    zero: '{count} vienumi atjaunoti.',
+    one: '{count} vienums atjaunots.',
+    other: '{count} vienumi atjaunoti.',
+  },
+  'files.batch.restorePartial': {
+    zero: '{count} vienumus neizdevās atjaunot; tie joprojām ir atkritnē.',
+    one: '{count} vienumu neizdevās atjaunot; tas joprojām ir atkritnē.',
+    other: '{count} vienumus neizdevās atjaunot; tie joprojām ir atkritnē.',
+  },
   'files.batch.trashFailed': 'Atlasīto neizdevās pārvietot uz atkritni.',
   'files.batch.moveTitle': {
     zero: 'Pārvietot {count} vienumus',
@@ -299,6 +309,9 @@ export const lv: AppCatalog<typeof en> = {
   'action.rename': 'Pārdēvēt',
   'action.move': 'Pārvietot uz…',
   'action.copy': 'Izveidot kopiju',
+  'action.copyLink': 'Kopēt saiti',
+  'action.linkCopied': 'Saite nokopēta. Tā atveras tikai tiem, kam jau ir piekļuve.',
+  'action.copyLinkFailed': 'Saiti neizdevās nokopēt.',
   'action.shareLink': 'Kopīgot saiti',
   'action.openInApp': 'Atvērt lietotnē',
   'action.openInEditor': 'Atvērt redaktorā',
@@ -518,6 +531,20 @@ export const lv: AppCatalog<typeof en> = {
   'trash.purged': '“{name}” ir neatgriezeniski izdzēsts.',
   'trash.purgeDenied': '“{name}” nevar izdzēst',
   'trash.purgeFailed': 'Dzēšana neizdevās.',
+  'trash.emptyAll': 'Iztukšot atkritni',
+  'trash.emptyAllTitle': 'Iztukšot atkritni?',
+  'trash.emptyAllBody': {
+    zero: '{count} vienumi atkritnē tiks neatgriezeniski izdzēsti kopā ar versiju vēsturi. Pēc tam tos vairs nevarēs atgūt.',
+    one: '{count} vienums atkritnē tiks neatgriezeniski izdzēsts kopā ar versiju vēsturi. Pēc tam to vairs nevarēs atgūt.',
+    other:
+      '{count} vienumi atkritnē tiks neatgriezeniski izdzēsti kopā ar versiju vēsturi. Pēc tam tos vairs nevarēs atgūt.',
+  },
+  'trash.emptiedAll': 'Atkritne ir iztukšota.',
+  'trash.emptyAllPartial': {
+    zero: '{count} vienumus neizdevās izdzēst; tie joprojām ir atkritnē.',
+    one: '{count} vienumu neizdevās izdzēst; tas joprojām ir atkritnē.',
+    other: '{count} vienumus neizdevās izdzēst; tie joprojām ir atkritnē.',
+  },
   'trash.purgeTitle': 'Dzēst neatgriezeniski?',
   'trash.purgeBodyFolder':
     '“{name}” un visa tajā esošā saturs tiks izdzēsts no Sytue serveriem kopā ar versiju vēsturi. Pēc tam to vairs nevarēs atgūt ne šeit, ne ar atbalsta dienesta palīdzību. Toties atbrīvosiet tā aizņemto vietu.',

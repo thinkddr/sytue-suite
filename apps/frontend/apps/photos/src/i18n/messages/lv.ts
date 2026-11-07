@@ -140,6 +140,11 @@ export const lv: AppCatalog<typeof en> = {
   'gallery.downloadSelected': 'Lejupielādēt',
   'gallery.downloading':
     'Sāktie lejupielādes pieprasījumi: {count}. Pārbaudiet pārlūka lejupielādes.',
+  'gallery.downloadingNative': {
+    zero: 'Lejupielādē {count} fotoattēlus…',
+    one: 'Lejupielādē {count} fotoattēlu…',
+    other: 'Lejupielādē {count} fotoattēlus…',
+  },
   'gallery.downloadCapped': 'Šajā grupā neiekļautie fotoattēli: {count}.',
   'gallery.newAlbum': 'Jauns albums',
   'gallery.newAlbumTitle': 'Jauns albums',
@@ -272,4 +277,20 @@ export const lv: AppCatalog<typeof en> = {
   'aiBatch.excludeOrg': 'Izslēgt organizāciju no automātiskās Sytue AI apstrādes',
   'aiBatch.excludedHint':
     'Organizācija ir izslēgta no automātiskās Sytue AI apstrādes. Jauni fotoattēli fonā netiek apstrādāti ieteikumiem vai līdzībām.',
+  'album.rename': 'Pārdēvēt',
+  'album.renamePrompt': 'Albuma nosaukums',
+  'album.setCover': 'Izmantot kā albuma vāku',
+  'album.isCover': 'Šis ir albuma vāks',
+  'album.coverSet': 'Albuma vāks ir atjaunināts',
+  'gallery.favorited': 'Pievienoti izlasei: {count}',
+  'gallery.unfavorited': 'Noņemti no izlases: {count}',
+  'gallery.favoriteFailed': 'Fotoattēli, kurus neizdevās mainīt: {count}',
+  'gallery.noResults.title': 'Neviens fotoattēls neatbilst “{query}”',
+  'gallery.noResults.description':
+    'Mēģiniet citus vārdus vai notīriet meklēšanu, lai redzētu visus savus fotoattēlus.',
+  'gallery.clearSearch': 'Notīrīt meklēšanu',
+  'viewer.counter': '{index} / {total}',
+  'viewer.counterMore': '{count}+',
+  'viewer.counterLabel': 'Fotoattēls {index} no {total}',
+  'viewer.shortcutsJump': 'Home un End pāriet uz pirmo un pēdējo fotoattēlu.',
 };

@@ -206,9 +206,7 @@ export default function ConsoleShell({
       hubBaseUrl={hubBaseUrl}
       locale={locale}
     >
-      <AdminShell sidebar={sidebar} title={t('shell.brand')}>
-        {children}
-      </AdminShell>
+      <AdminShell sidebar={sidebar}>{children}</AdminShell>
     </SytueShell>
   );
 }

@@ -40,6 +40,15 @@ export const de: AppCatalog<typeof en> = {
 
   // --- Barra lateral ------------------------------------------------------
   'nav.compose': 'Verfassen',
+  'nav.mailboxes': 'Postfächer',
+  'nav.allInboxes': 'Alle Posteingänge',
+  'nav.allDrafts': 'Alle Entwürfe',
+  'nav.allSent': 'Alle Gesendeten',
+  'nav.allArchive': 'Gesamtes Archiv',
+  'nav.allJunk': 'Gesamter Spam',
+  'nav.allTrash': 'Gesamter Papierkorb',
+  'nav.sytueMailbox': 'Sytue-Postfach',
+  'nav.accountsIn': 'Konten: {mailbox}',
   'nav.folders': 'Ordner',
   'nav.refresh': 'Aktualisieren',
   'nav.manageFolders': 'Ordner verwalten',
@@ -64,6 +73,10 @@ export const de: AppCatalog<typeof en> = {
   'shortcuts.archive': 'Archivieren',
   'shortcuts.trash': 'In den Papierkorb',
   'shortcuts.star': 'Markieren',
+  'shortcuts.select': 'Unterhaltung auswählen',
+  'shortcuts.clearSelection': 'Auswahl aufheben',
+  'shortcuts.label': 'Label zuweisen',
+  'shortcuts.move': 'Verschieben nach…',
   'shortcuts.help': 'Diese Liste anzeigen',
   'nav.settings': 'Einstellungen',
   'nav.signature': 'Signatur',
@@ -177,6 +190,9 @@ export const de: AppCatalog<typeof en> = {
   'error.undoSend': 'Das Senden konnte nicht rückgängig gemacht werden',
   'error.undoSendGone': 'Zu spät zum Rückgängigmachen: Die Nachricht ist bereits raus',
   'undo.done': 'Senden rückgängig gemacht',
+  'triage.moved': 'In {folder} verschoben',
+  'triage.undone': 'An den ursprünglichen Ort zurückverschoben',
+  'error.undoMove': 'Zurückverschieben nicht möglich',
 
   // --- Lista de conversaciones --------------------------------------------
   'list.region': 'Konversationen in {folder}',
@@ -190,6 +206,14 @@ export const de: AppCatalog<typeof en> = {
   'list.searchHint':
     'Operatoren: from:, to:, subject:, has:attachment, is:unread, is:starred, after:2026-01-31, before:2026-03-01. Für mehrere Wörter Anführungszeichen verwenden.',
   'list.clearSearch': 'Suche löschen',
+  'filter.group': 'Schnellfilter',
+  'filter.unread': 'Ungelesen',
+  'filter.starred': 'Markiert',
+  'filter.attachments': 'Mit Anhängen',
+  'filter.emptyTitle': 'Nichts hier passt zu diesem Filter',
+  'filter.emptyDescription':
+    'Versuchen Sie einen anderen Filter oder zeigen Sie alle Unterhaltungen an.',
+  'filter.showAll': 'Alle anzeigen',
   'list.selectAll': 'Alle Konversationen auswählen',
   'list.loading': 'Konversationen werden geladen…',
   'list.errorTitle': 'Ihre Mail konnte nicht geladen werden',
@@ -227,6 +251,8 @@ export const de: AppCatalog<typeof en> = {
   'reader.createEvent': 'Termin erstellen',
   'reader.eventCreated': 'Termin in Sytue Calendar erstellt',
   'reader.eventFailed': 'Der Termin konnte nicht erstellt werden',
+  'reader.shareToRooms': 'In Rooms freigeben',
+  'reader.roomsFailed': 'Freigabe in Rooms nicht möglich.',
   'reader.unsubscribe': 'Abbestellen',
   'reader.unsubscribeFailed': 'Die Abbestellung konnte nicht abgeschlossen werden',
   'reader.unsubscribeSent': 'Abbestellung gesendet',
@@ -363,6 +389,10 @@ export const de: AppCatalog<typeof en> = {
   'editor.font': 'Schriftart',
   'editor.redo': 'Wiederholen',
   'editor.undo': 'Rückgängig',
+  'editor.cut': 'Ausschneiden',
+  'editor.copy': 'Kopieren',
+  'editor.paste': 'Einfügen',
+  'editor.selectAll': 'Alles auswählen',
   'editor.colorNone': 'Keine',
   'editor.colorYellow': 'Gelb',
   'editor.colorViolet': 'Violett',
@@ -761,6 +791,11 @@ export const de: AppCatalog<typeof en> = {
   'externalMail.port': 'Port',
   'externalMail.username': 'Benutzername (bei leerem Feld die E-Mail-Adresse)',
   'externalMail.password': 'Passwort oder App-Passwort',
+  'externalMail.icloudBody':
+    'iCloud Mail akzeptiert hier nicht das Passwort deines Apple Accounts. Erstelle unter account.apple.com (Anmeldung und Sicherheit › App-spezifische Passwörter) ein app-spezifisches Passwort und gib es unten ein.',
+  'externalMail.icloudLink': 'account.apple.com öffnen',
+  'externalMail.icloudAuthError':
+    'iCloud hat das Passwort nicht akzeptiert. Verwende ein app-spezifisches Passwort, nicht das Passwort deines Apple Accounts.',
   'externalMail.smtpPassword': 'SMTP-Passwort (bei leerem Feld das Passwort für den Posteingang)',
   'externalMail.advanced': 'Erweiterte Optionen',
   'externalMail.security': 'Sicherheit der SMTP-Verbindung',
@@ -769,6 +804,10 @@ export const de: AppCatalog<typeof en> = {
     'Vor dem Speichern prüfen wir die Anmeldung am Eingangs- und Ausgangsserver. Es wird keine Test-E-Mail gesendet.',
   'externalMail.connect': 'Konto verbinden',
   'externalMail.authorize': 'Weiter zum Anbieter',
+  'externalMail.reconnectNeeded': 'Erneut anmelden, um dieses Konto zu sehen',
+  'externalMail.accountUnavailable': 'Konto nicht erreichbar. Erneut versuchen',
+  'externalMail.someUnavailable':
+    'Einige Konten waren nicht erreichbar. Ihre E-Mails fehlen in dieser Liste.',
   'externalMail.add': 'E-Mail-Konto hinzufügen',
   'externalMail.empty': 'Keine externen E-Mail-Konten verbunden.',
   'externalMail.open': 'Postfach öffnen',
@@ -781,6 +820,13 @@ export const de: AppCatalog<typeof en> = {
     'Die sichere Verbindung konnte nicht geprüft werden. Kläre den Servernamen und das Zertifikat mit deinem E-Mail-Anbieter.',
   'externalMail.authError':
     'Die Anmeldung wurde abgelehnt. Verbinde das Konto erneut oder prüfe Benutzername und App-Passwort.',
+  'externalMail.cancelled': 'Die Anmeldung wurde abgebrochen. Es wurde nichts verbunden.',
+  'externalMail.scopeMissing':
+    'Der Zugriff auf E-Mails wurde nicht erlaubt. Versuche es erneut und lass die E-Mail-Berechtigung ausgewählt.',
+  'externalMail.timeout': 'Diese Anmeldung ist nicht mehr gültig. Versuche es erneut.',
+  'externalMail.exists': 'Dieses E-Mail-Konto ist bereits verbunden.',
+  'externalMail.connected': 'Das Konto {account} ist jetzt verbunden.',
+  'externalMail.accountsError': 'Externe E-Mail-Konten konnten nicht geladen werden.',
   'externalMail.sendUnknown':
     'Der Server hat diese E-Mail möglicherweise angenommen. Prüfe vor einem erneuten Versuch den Ordner „Gesendet“, um einen doppelten Versand zu vermeiden.',
   'externalMail.blockedError':
@@ -789,23 +835,9 @@ export const de: AppCatalog<typeof en> = {
     'Diese E-Mail oder ihre Anhänge überschreiten die Größenbegrenzung. Verkleinere die Anhänge und versuche es erneut.',
   'externalMail.pop3Note':
     'Mit POP3 kannst du den Posteingang lesen und über SMTP senden. Entfernte Ordner, Lesemarkierungen und das Verschieben von Nachrichten sind nicht verfügbar.',
-  'externalMail.refreshNote':
-    'Dieses Postfach wird alle 30 Sekunden aktualisiert, solange die Nachrichtenliste geöffnet ist. Die E-Mails bleiben bei deinem Anbieter.',
   'externalMail.sent': 'Dein Anbieter hat die E-Mail angenommen.',
   'externalMail.sentNoCopy':
     'Die E-Mail wurde angenommen, aber eine Kopie konnte nicht unter „Gesendet“ gespeichert werden. Sende sie nicht erneut.',
-  'externalMail.draftNote':
-    'Dieser Entwurf bleibt nur erhalten, solange dieses Fenster geöffnet ist. Beim Schließen wird er verworfen.',
-  'externalMail.attach': 'Dateien anhängen',
-  'externalMail.markUnread': 'Als ungelesen markieren',
-  'externalMail.markRead': 'Als gelesen markieren',
-  'externalMail.flag': 'Nachricht mit Stern markieren',
-  'externalMail.unflag': 'Stern entfernen',
-  'externalMail.trash': 'In den Papierkorb verschieben',
-  'externalMail.noMessages': 'Keine Nachrichten in diesem Ordner.',
-  'externalMail.discardDraft': 'Diesen Entwurf verwerfen?',
   'externalMail.invalidConfiguration':
     'Gib eine gültige E-Mail-Adresse, die Namen und Ports beider Server und ein Passwort ein.',
-  'externalMail.invalidRecipients':
-    'Prüfe die E-Mail-Adressen. Trenne mehrere Adressen durch Kommas.',
 };

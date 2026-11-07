@@ -113,10 +113,46 @@ public final class SesionCompartida {
         try {
             Bundle estado = llamar(ctx, "estado", null, new Bundle());
             return new JSONObject().put("generacion", estado.getString("generacion", ""))
+                    .put("marca_widgets", estado.getString("marca_widgets", ""))
                     .put("bloqueo", estado.getBoolean("bloqueo", true))
                     .put(DrivePreferencia.CLAVE, preferenciaDrive(ctx, estado)).toString();
         } catch (Exception fallo) {
-            return "{\"generacion\":\"\",\"bloqueo\":true,\"drive_sistema_desactivado\":true}";
+            return "{\"generacion\":\"\",\"marca_widgets\":\"\",\"bloqueo\":true,\"drive_sistema_desactivado\":true}";
+        }
+    }
+
+    /**
+     * La marca con que se comparan los snapshots de los widgets (formato 2): con el broker,
+     * su `marca_widgets`; sin él, la época de `sesion.epoca`. Vacía es ocultar. Nunca la
+     * generación: esa cambia en cada renovación del token.
+     */
+    public static String marcaWidgets(Context ctx) {
+        try {
+            if (habilitada()) {
+                return llamar(ctx, "estado", null, new Bundle()).getString("marca_widgets", "");
+            }
+            String[] epoca = leerLocal(ctx, "sesion.epoca").split("\n", -1);
+            return epoca.length == 5 && epoca[0].length() == 32 ? epoca[0] : "";
+        } catch (Exception fallo) {
+            return "";
+        }
+    }
+
+    /**
+     * Lo que el widget necesita del broker en UNA llamada: `generacion`, `marca_widgets` y
+     * `bloqueo`. Null sin broker (se lee de la carpeta propia). Ante cualquier fallo, un
+     * estado bloqueado y sin marca: el widget no enseña nada.
+     */
+    public static Bundle estadoWidgets(Context ctx) {
+        if (!habilitada()) {
+            return null;
+        }
+        try {
+            return llamar(ctx, "estado", null, new Bundle());
+        } catch (Exception fallo) {
+            Bundle cerrado = new Bundle();
+            cerrado.putBoolean("bloqueo", true);
+            return cerrado;
         }
     }
 

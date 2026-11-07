@@ -48,7 +48,9 @@ func casillaDespertar(c *cuentaBarra, s fyne.CanvasObject) *Eleccion {
 // `Marcada = true` de salida y sin devolverla tras el fallo.
 func TestLaCasillaDelDespertarSoloConElModoDeFondo(t *testing.T) {
 	antes := fyne.CurrentApp()
-	fyne.SetCurrentApp(appRooms{test.NewTempApp(t)})
+	// Envuelve la app de TestMain, con el tema de la suite: `test.NewTempApp` dejaría
+	// detrás una de serie y sin Figtree (ver TestNingunTestMontaUnaAppDeSerie).
+	fyne.SetCurrentApp(appRooms{antes})
 	t.Cleanup(func() { fyne.SetCurrentApp(antes) })
 	t.Cleanup(widgets.SimularLector(true))
 	t.Cleanup(widgets.SimularInstalados(1))

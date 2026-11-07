@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/test"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/sistema/escritorio"
@@ -18,7 +17,6 @@ import (
 // lo que cuentan los avisos del Hub; desde que lo dice (Rooms, sus no leídos), lleva
 // lo suyo, y un aviso nuevo del Hub ya no lo pisa.
 func TestLaInsigniaPropiaMandaSobreLaDelHub(t *testing.T) {
-	test.NewTempApp(t)
 	var puestos []int
 	antes := insigniaSistema
 	insigniaSistema = func(_ string, n int) error { puestos = append(puestos, n); return nil }
@@ -51,7 +49,9 @@ func (appRooms) Metadata() fyne.AppMetadata {
 // sin pausa, salen.
 func TestLaPausaCallaLosAvisosDeLaApp(t *testing.T) {
 	antes := fyne.CurrentApp()
-	fyne.SetCurrentApp(appRooms{test.NewTempApp(t)})
+	// Envuelve la app de TestMain, con el tema de la suite: `test.NewTempApp` dejaría
+	// detrás una de serie y sin Figtree (ver TestNingunTestMontaUnaAppDeSerie).
+	fyne.SetCurrentApp(appRooms{antes})
 	t.Cleanup(func() { fyne.SetCurrentApp(antes) })
 	var salidos []string
 	avisarAntes := avisarSistema

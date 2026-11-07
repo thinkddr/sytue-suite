@@ -165,9 +165,16 @@ async function gesto(page, cdp, punto, distancia = 180, preventFling = true) {
 }
 
 async function gestoUnificado(page, cdp, enlace) {
+  // Se mide la CABECERA del título, no el h1: con la barra única del teléfono (<768) el
+  // h1 de la ofimática es `sr-only` —la barra ya dice el producto—, y como va en
+  // posición absoluta no se mueve con el desplazamiento de la página aunque esta sí lo
+  // haga (accesibilidad-office de v3.19.1, a 360 en Docus, Calcus y Diapos).
   const punto = await puntoSobreRecientes(page, enlace);
   const antes = await page.evaluate(() => ({
-    titulo: document.querySelector("main h1").getBoundingClientRect().top,
+    titulo: document
+      .querySelector("main h1")
+      .closest("header")
+      .getBoundingClientRect().top,
     crear: document
       .querySelector(
         'section[aria-labelledby="new-heading"],section[aria-labelledby="pdf-new-heading"]',
@@ -178,7 +185,10 @@ async function gestoUnificado(page, cdp, enlace) {
   const movido = await page
     .waitForFunction(
       (antes) =>
-        document.querySelector("main h1").getBoundingClientRect().top <
+        document
+          .querySelector("main h1")
+          .closest("header")
+          .getBoundingClientRect().top <
           antes.titulo - 30 &&
         document
           .querySelector(
@@ -198,7 +208,10 @@ async function gestoUnificado(page, cdp, enlace) {
     return page
       .waitForFunction(
         (antes) =>
-          document.querySelector("main h1").getBoundingClientRect().top <
+          document
+            .querySelector("main h1")
+            .closest("header")
+            .getBoundingClientRect().top <
             antes.titulo - 30 &&
           document
             .querySelector(

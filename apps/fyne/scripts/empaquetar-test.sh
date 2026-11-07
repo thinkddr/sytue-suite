@@ -96,6 +96,12 @@ grep -qE '^FYNE_TOOLS_VERSION=[0-9]+\.[0-9]+\.[0-9]+$' "$RAIZ/deploy/sytue-git/v
 if mutable="$(grep -n 'fyne.io/tools/cmd/fyne@latest' "$GUION" "$RAIZ"/.github/workflows/*.yml)"; then
   mal "la CLI de Fyne se instala desde @latest: $mutable"
 fi
+# Y tampoco con `go install …@vX`: así Go ignora el go.mod de la app y la CLI sale con la
+# Fyne que pide fyne.io/tools (la 2.8.1), sin el fork. Se instala con fyne-cli.sh.
+if directa="$(grep -n 'go install "\{0,1\}fyne.io/tools/cmd/fyne@' "$RAIZ"/.github/workflows/*.yml \
+  "$RAIZ/apps/fyne/xcode/ci_scripts/ci_post_clone.sh")"; then
+  mal "la CLI de Fyne se instala sin el fork de la app (usa .github/actions/toolchain/fyne-cli.sh): $directa"
+fi
 
 # --- 5. Cada app empaquetable declara sus metadatos ---------------------------
 # `FyneApp.toml` es lo que hace que un directorio de `cmd/` entre en la cadena, y

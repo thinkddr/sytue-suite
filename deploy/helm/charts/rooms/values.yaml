@@ -157,6 +157,10 @@ webPush:
   # nuestras notificaciones dan problemas.
   subject: mailto:tls@sytue.eu
 
+# APNs (iOS) no tiene valores aqui: las cuatro piezas (`apns-key-p8`,
+# `apns-key-id`, `apns-team-id`, `apns-bundle-id`) van en `existingSecret`,
+# escritas por 02b-secretos.sh desde `rooms-apns` en Secret Manager.
+
 # PodDisruptionBudget: garantiza disponibilidad durante drains/upgrades del cluster.
 podDisruptionBudget:
   enabled: true

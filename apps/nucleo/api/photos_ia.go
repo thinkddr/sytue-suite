@@ -39,14 +39,31 @@ const (
 	maxMiniatura = 4 << 20
 )
 
-var instruccionDescribir = strings.Join([]string{
-	"Describe what is visible in this photo for use as alt text.",
-	`Answer ONLY with a JSON object: {"descripcion": string, "etiquetas": string[]}.`,
-	"The description must be one sentence, at most 200 characters, in the language of this request.",
-	"Use at most 8 short lowercase tags naming objects, places or scenes that appear.",
-	"Do not name or identify people. Do not guess who someone is.",
-	"Describe only what you can see; do not speculate about the context.",
-}, " ")
+// idiomasIA nombra en inglés cada idioma de producto, porque las instrucciones están en
+// inglés. Lo que no está aquí cae al inglés base: en la instrucción nunca entra texto
+// que no esté escrito aquí.
+var idiomasIA = map[string]string{
+	"en": "English", "de": "German", "es": "Spanish", "fr": "French", "it": "Italian",
+}
+
+// instruccionDescribir nombra el idioma, también el de las etiquetas: «en la lengua de
+// esta petición» no bastaba, porque la petición está en inglés y las etiquetas salían en
+// inglés. Son lo que luego se busca y lo que nombra un álbum.
+func instruccionDescribir(idioma string) string {
+	nombre, ok := idiomasIA[idioma]
+	if !ok {
+		nombre = idiomasIA["en"]
+	}
+	return strings.Join([]string{
+		"Describe what is visible in this photo for use as alt text.",
+		`Answer ONLY with a JSON object: {"descripcion": string, "etiquetas": string[]}.`,
+		"Write the description and every tag in " + nombre + "; keep the JSON keys as they are.",
+		"The description must be one sentence, at most 200 characters.",
+		"Use at most 8 short lowercase tags naming objects, places or scenes that appear.",
+		"Do not name or identify people. Do not guess who someone is.",
+		"Describe only what you can see; do not speculate about the context.",
+	}, " ")
+}
 
 var instruccionPreguntar = strings.Join([]string{
 	"Answer the question about this photo using ONLY what is visible in it.",
@@ -116,7 +133,7 @@ func (p *Photos) verLaFoto(ctx context.Context, ia *IA, id, accion, instruccion,
 // Describir le pide a Sytue AI la descripción y las etiquetas de una foto, en la lengua
 // de la sesión (acaban en su `alt`). NO las guarda: eso es SetDescription.
 func (p *Photos) Describir(ctx context.Context, ia *IA, id, idioma string) (descripcion string, etiquetas []string, err error) {
-	texto, err := p.verLaFoto(ctx, ia, id, "describir-foto", instruccionDescribir, "", idioma)
+	texto, err := p.verLaFoto(ctx, ia, id, "describir-foto", instruccionDescribir(idioma), "", idioma)
 	if err != nil {
 		return "", nil, err
 	}

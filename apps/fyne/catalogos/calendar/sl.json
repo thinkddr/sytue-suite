@@ -156,6 +156,8 @@
     "other": "{date}, {count} dogodkov"
   },
   "grid.daySelected": "{label}, izbrano",
+  "grid.handle": "Preklopi med mesecem, tednom in dnevnim redom",
+  "grid.handleState": "{view}. Preklopi med mesecem, tednom in dnevnim redom",
   "grid.loadError": "Koledarja ni bilo mogoče naložiti",
   "grid.loading": "Nalaganje koledarja",
   "grid.more": {
@@ -164,8 +166,6 @@
     "few": "+{count} več",
     "other": "+{count} več"
   },
-  "grid.showMonth": "Prikaži cel mesec",
-  "grid.showWeek": "Prikaži samo ta teden",
   "grid.snapAria": {
     "one": "Pripenjanje pri vlečenju: {count} minuta. Pritisnite za spremembo.",
     "two": "Pripenjanje pri vlečenju: {count} minuti. Pritisnite za spremembo.",

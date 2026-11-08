@@ -546,6 +546,10 @@ func (r *tarjetaRenderer) Refresh() {
 func (r *tarjetaRenderer) pintarCabecera(v tema.Variante) bool {
 	t, m := r.t, r.t.Mensaje
 	r.avatar.Nombre = NombreVisible(t.L.T, m.De)
+	r.avatar.Logo, r.avatar.Foto = true, nil
+	if t.L.Logo != nil && len(m.De) > 0 {
+		r.avatar.Foto = t.L.Logo(m.De[0].Correo)
+	}
 	peso := r.peso()
 	tinta, tintaFecha := tema.Color("text", v), tema.Color("text-subtle", v)
 	if !m.Leido {

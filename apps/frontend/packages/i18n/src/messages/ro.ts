@@ -258,6 +258,8 @@ export const ro: Catalog = {
   'app.pdf.description': 'PDF: citire și adnotare',
   'app.disabled': 'Dezactivată',
   'import.title': 'Aduceți-vă datele',
+  'import.collapse': 'Restrânge',
+  'import.expand': 'Extinde',
   'import.help':
     'Copiați în Sytue ce aveți deja la vechiul furnizor. Puteți continua să lucrați între timp.',
   'import.fromGoogle': 'Adu din Google',

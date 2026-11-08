@@ -156,6 +156,8 @@
     "other": "{date}, {count} udalostí"
   },
   "grid.daySelected": "{label}, vybraté",
+  "grid.handle": "Prepnúť medzi mesiacom, týždňom a agendou",
+  "grid.handleState": "{view}. Prepnúť medzi mesiacom, týždňom a agendou",
   "grid.loadError": "Kalendár sa nepodarilo načítať",
   "grid.loading": "Načítava sa kalendár",
   "grid.more": {
@@ -164,8 +166,6 @@
     "many": "+{count} ďalších",
     "other": "+{count} ďalších"
   },
-  "grid.showMonth": "Zobraziť celý mesiac",
-  "grid.showWeek": "Zobraziť iba tento týždeň",
   "grid.snapAria": {
     "one": "Prichytávanie pri presúvaní: {count} minúta. Stlačením zmeníte.",
     "few": "Prichytávanie pri presúvaní: {count} minúty. Stlačením zmeníte.",

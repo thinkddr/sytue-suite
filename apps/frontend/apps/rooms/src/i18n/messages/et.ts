@@ -976,6 +976,12 @@ export const et: AppCatalog<typeof en> = {
   'matrix.unsupported': 'See toiming pole krüptitud sõnumite puhul saadaval.',
   'matrix.auth': 'Kinnita oma isik',
   'matrix.authContinue': 'Olen sisse loginud',
+  'matrix.reset': 'Unustasin taastevõtme',
+  'matrix.resetAction': 'Lähtesta krüpteerimine',
+  'matrix.resetBody':
+    'Luuakse uus taastevõti. Varasemad krüpteeritud sõnumid jäävad loetavaks ainult seadmetes, kus need juba on, ning pead oma teised seadmed ja kontaktid uuesti kinnitama.',
+  'matrix.resetUnderstood':
+    'Saan aru, et võin kaotada juurdepääsu varasematele krüpteeritud sõnumitele',
   'matrix.tab': 'Rooms on avatud teisel vahekaardil. Selle seadme siin kasutamiseks sulge see.',
   'matrix.identityUnverified': 'Isik pole kinnitatud',
   'matrix.senderUnverified': 'Selles seadmes ei saa saatjat kinnitada',

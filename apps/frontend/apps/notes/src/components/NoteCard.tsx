@@ -310,6 +310,22 @@ export function NoteCard({
     [alCambiarRef, ultimoRef],
   );
 
+  const empezarAEditar = () => {
+    setBorrador(contenido);
+    sesionRef.current = `${note.id}:${Date.now()}`;
+    setEditando(true);
+  };
+
+  // En la hoja de un árbol, una nota VACÍA se abre ya escribiendo: es lo único que se
+  // puede hacer con ella, y enseñarla en lectura dejaba un panel en blanco sin decir
+  // dónde pulsar. Solo al llegar a la nota (su `id`), no cada vez que se queda vacía:
+  // quien borra todo y se va a otra parte no quiere que el editor le robe el foco.
+  const abrirVacia = llenar && !diario && editable && !contenido;
+  const abrirVaciaRef = useUltimo({ abrirVacia, empezarAEditar });
+  useEffect(() => {
+    if (abrirVaciaRef.current.abrirVacia) abrirVaciaRef.current.empezarAEditar();
+  }, [note.id, abrirVaciaRef]);
+
   const empezarARenombrar = () => {
     setTituloBorrador(titulo);
     setRenombrando(true);
@@ -496,11 +512,7 @@ export function NoteCard({
       {...(editable
         ? {
             onPlegar: (html: string) => onChange({ content: html }),
-            onEdit: () => {
-              setBorrador(contenido);
-              sesionRef.current = `${note.id}:${Date.now()}`;
-              setEditando(true);
-            },
+            onEdit: empezarAEditar,
           }
         : {})}
     />
@@ -957,14 +969,23 @@ function Cuerpo({
       // Nota vacía: se dice qué hacer, en vez de una caja en blanco que no invita.
       // Va ANTES de preparar el cuerpo: sin contenido no hay anclas que calcular
       // ni enlaces que interceptar.
+      //
+      // Con el lápiz delante y un fondo al pasar por encima, para que se lea como lo que
+      // es —un sitio donde pulsar— y no como un texto gris más. En la hoja de un árbol
+      // ocupa todo el alto: antes solo era pulsable la primera línea y el resto del
+      // panel, en blanco, no hacía nada.
       if (!contenido && onEdit) {
         return (
           <button
             type="button"
             onClick={onEdit}
-            class="text-text-subtle min-h-[24px] w-full cursor-text text-left text-base leading-relaxed"
+            class={cx(
+              'text-text-subtle hover:text-text hover:bg-bg-subtle sytue-focus-ring -mx-2 flex min-h-[24px] w-[calc(100%+1rem)] cursor-text items-start gap-2 rounded-md px-2 text-left text-base leading-relaxed transition-colors duration-150',
+              llenar && 'flex-1',
+            )}
           >
-            {t('note.placeholder')}
+            <Icon name="pen" size={16} class="mt-1 shrink-0" />
+            <span>{t('note.placeholder')}</span>
           </button>
         );
       }

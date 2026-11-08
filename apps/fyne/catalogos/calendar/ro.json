@@ -152,6 +152,8 @@
     "other": "{date}, {count} de evenimente"
   },
   "grid.daySelected": "{label}, selectat",
+  "grid.handle": "Comută între lună, săptămână și agendă",
+  "grid.handleState": "{view}. Comută între lună, săptămână și agendă",
   "grid.loadError": "Calendarul nu a putut fi încărcat",
   "grid.loading": "Se încarcă calendarul",
   "grid.more": {
@@ -159,8 +161,6 @@
     "few": "Încă {count}",
     "other": "Încă {count}"
   },
-  "grid.showMonth": "Afișează toată luna",
-  "grid.showWeek": "Afișează doar această săptămână",
   "grid.snapAria": {
     "one": "Aliniere la tragere: {count} minut. Apăsați pentru a schimba.",
     "few": "Aliniere la tragere: {count} minute. Apăsați pentru a schimba.",

@@ -54,20 +54,21 @@ func TestLaPildoraDelMesLlevaLaHoraDeInicio(t *testing.T) {
 }
 
 // TestEnElTelefonoLaBarraDeDiaCompletoSeLee es lo que se veía en iOS, en la franja de
-// día completo de la SEMANA (`nuevaBarraEvento`, vistahoraria.go), que es donde la barra
-// estrecha sigue viva por debajo de 640: la columna de un día mide ~50 y la barra de
-// escritorio dejaba solo «…». En estrecho baja a `px-0.5` y corta sin suspensivos.
+// día completo de la rejilla horaria (`nuevaBarraEvento`, vistahoraria.go): en estrecho
+// la barra baja a `px-0.5` y corta sin suspensivos.
 //
-// Antes vivía en el mes, junto a la píldora compacta; el mes por debajo de 640 es ahora
-// el mes del teléfono (vistamescompacta.go) y esa píldora se retiró. VISTO EN ROJO con
-// la rama estrecha de `barraRenderer.Layout` apagada: «Vac…».
+// Antes vivía en el mes, junto a la píldora compacta, y luego en la SEMANA a 390. Por
+// debajo de 640 el mes y la semana son ahora el mes del teléfono con su asa
+// (vistamescompacta.go), y la franja que queda viva ahí es la del DÍA: con un título que
+// no cabe en los 390. VISTO EN ROJO con la rama estrecha de `barraRenderer.Layout`
+// apagada: acababa en «…».
 func TestEnElTelefonoLaBarraDeDiaCompletoSeLee(t *testing.T) {
 	dia := time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC)
 	p := &Pantalla{
-		T: traductor(t), Vista: VistaSemana, Estado: agenda.Exito, Zona: time.UTC, Ventana: 390,
+		T: traductor(t), Vista: VistaDia, Estado: agenda.Exito, Zona: time.UTC, Ventana: 390,
 		Cursor: time.Date(2026, 9, 15, 12, 0, 0, 0, time.UTC),
 		Eventos: []Ocurrencia{{Instance: api.Instance{
-			Event: api.Event{ID: "e2", Summary: "Vacaciones en la playa", AllDay: true, DTStart: dia, DTEnd: dia.AddDate(0, 0, 1)},
+			Event: api.Event{ID: "e2", Summary: "Vacaciones en la playa de Cádiz con toda la familia, los abuelos y los perros", AllDay: true, DTStart: dia, DTEnd: dia.AddDate(0, 0, 1)},
 			Start: dia, End: dia.AddDate(0, 0, 1),
 		}}},
 	}
@@ -78,7 +79,7 @@ func TestEnElTelefonoLaBarraDeDiaCompletoSeLee(t *testing.T) {
 
 	b, _ := buscarObjeto(w.Content(), func(o fyne.CanvasObject) bool { _, ok := o.(*barraEvento); return ok }).(*barraEvento)
 	if b == nil {
-		t.Fatal("no hay barra de día completo en la semana")
+		t.Fatal("no hay barra de día completo en el día")
 	}
 	rb := test.WidgetRenderer(b).(*barraRenderer)
 	rb.Layout(b.Size())

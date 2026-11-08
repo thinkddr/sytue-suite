@@ -289,6 +289,7 @@ func (p *Pantalla) crearEn(in api.NoteInput, cuaderno string, despues func()) er
 			Rehacer:  func() error { return p.llamar(n.ID, p.svc.RestoreNote, func() { p.añadir(n) }) },
 		}, "")
 		p.Repintar()
+		p.escribirSiVacia(n.ID)
 	})
 	return err
 }

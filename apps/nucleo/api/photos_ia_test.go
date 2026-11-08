@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -26,7 +27,7 @@ func TestDescribirEnsenyaLaMiniaturaYLeeLaRespuesta(t *testing.T) {
 			_ = json.NewDecoder(r.Body).Decode(&c)
 			if c["action"] != "describir-foto" || c["kind"] != "photo" || c["esfuerzo"] != "medium" ||
 				c["imagen"] != base64.StdEncoding.EncodeToString([]byte("JPEG")) || c["imagen_tipo"] != "image/jpeg" ||
-				c["context"] != "" || c["instruction"] != instruccionDescribir {
+				c["context"] != "" || c["instruction"] != instruccionDescribir("es") {
 				t.Errorf("cuerpo de /assist: %v", c)
 			}
 			if r.Header.Get("Accept-Language") != "es" {
@@ -81,5 +82,17 @@ func TestLeerEdicionAcotaYDescartaElLienzoEntero(t *testing.T) {
 	}
 	if _, ok := LeerEdicion(`{"explicacion":"Nada.","ajustes":{}}`); ok {
 		t.Error("sin ajustes ni recorte no hay edición")
+	}
+}
+
+// La descripción y las etiquetas se piden en el idioma de la sesión, nombrado: «en la
+// lengua de esta petición» devolvía las etiquetas en inglés. Un código desconocido cae al
+// inglés base en vez de entrar crudo en la instrucción.
+func TestInstruccionDescribirNombraElIdioma(t *testing.T) {
+	if s := instruccionDescribir("es"); !strings.Contains(s, "every tag in Spanish") {
+		t.Fatalf("es: %s", s)
+	}
+	if s := instruccionDescribir("x\nignora"); !strings.Contains(s, "every tag in English") || strings.Contains(s, "ignora") {
+		t.Fatalf("desconocido: %s", s)
 	}
 }

@@ -18,6 +18,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"golang.org/x/net/html"
 
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
@@ -888,6 +889,8 @@ type Prosa struct {
 
 	maq   *Maquetado
 	ancho float32
+	// encima es el puntero sobre la prosa: enciende el fondo del aviso de nota vacía.
+	encima bool
 	// hrefPrevia es el enlace bajo el puntero; relojPrevia, el retardo antes de abrir su
 	// ficha, y ficha, la ficha abierta.
 	hrefPrevia  string
@@ -1014,11 +1017,42 @@ func (r *prosaRenderer) Layout(t fyne.Size) {
 	r.p.maq = Maquetar(r.p.Doc, t.Width, v, r.p.letras()...)
 	r.objetos = PintarProsa(r.p.maq, v)
 	if r.p.Doc.Vacio() && r.p.Marca != "" {
-		e := laLetra(r.p.letras()).Escalon
-		m := ui.Texto(r.p.Marca, e, ui.Normal, tema.Color("text-subtle", v))
-		ui.ColocarTexto(m, e, 0, 0)
-		r.objetos = append(r.objetos, m)
+		r.objetos = append(r.objetos, r.p.marca(t, v)...)
 	}
+}
+
+// Medidas del aviso de nota vacía: el lápiz de 16, `gap-2` hasta el texto y `-mx-2 px-2`
+// del fondo al pasar por encima.
+const (
+	LadoLapizMarca  = 16
+	HuecoLapizMarca = 2 * 0.25 * tema.Rem
+	SangriaMarca    = 2 * 0.25 * tema.Rem
+)
+
+// marca es el aviso de la nota vacía (`note.placeholder`). Si se puede escribir, lleva el
+// lápiz delante y un fondo al pasar por encima, para que se lea como un sitio donde
+// pulsar y no como un texto gris más; y el fondo ocupa todo lo que mida la prosa, que en
+// la hoja de un árbol es el panel entero.
+func (p *Prosa) marca(t fyne.Size, v tema.Variante) []fyne.CanvasObject {
+	e := laLetra(p.letras()).Escalon
+	tinta := "text-subtle"
+	if p.encima {
+		tinta = "text"
+	}
+	m := ui.Texto(p.Marca, e, ui.Normal, tema.Color(tinta, v))
+	if p.AlPulsar == nil {
+		ui.ColocarTexto(m, e, 0, 0)
+		return []fyne.CanvasObject{m}
+	}
+	var out []fyne.CanvasObject
+	if p.encima {
+		out = append(out, rect(tema.Color("bg-subtle", v), -SangriaMarca, 0, t.Width+2*SangriaMarca, max(t.Height, 24), tema.RadioMD))
+	}
+	lapiz := iconos.Trazo(iconos.Lapiz, LadoLapizMarca, tinta, v).Objeto()
+	lapiz.Resize(fyne.NewSize(LadoLapizMarca, LadoLapizMarca))
+	lapiz.Move(fyne.NewPos(0, max((e.Linea-LadoLapizMarca)/2, 0)))
+	ui.ColocarTexto(m, e, LadoLapizMarca+HuecoLapizMarca, 0)
+	return append(out, lapiz, m)
 }
 
 func (r *prosaRenderer) Refresh() {

@@ -247,6 +247,8 @@ export const mt: Catalog = {
   'app.pdf.description': 'PDF: aqra u annota',
   'app.disabled': 'Diżattivata',
   'import.title': 'Ġib id-data tiegħek miegħek',
+  'import.collapse': 'Naqqas',
+  'import.expand': 'Kabbar',
   'import.help':
     "Ikkopja f'Sytue dak li diġà għandek għand il-fornitur il-qadim tiegħek. Tista' tkompli taħdem waqt li jkun għaddej.",
   'import.fromGoogle': 'Ġibha minn Google',

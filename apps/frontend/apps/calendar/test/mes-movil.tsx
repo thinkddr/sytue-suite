@@ -3,13 +3,21 @@
 // test/e2e/compilar-mes-movil.mjs y lo fotografía test/e2e/mes-movil.mjs: AppShell real
 // con la barra móvil del mes, el cajón con su bloque de vista y el MesCompacto con los
 // mismos datos que el test de Fyne (la captura del dueño: noviembre de 2026, hoy el 6).
+// El asa y el selector del cajón van juntos, como en CalendarApp: la posición ES la vista.
 import { render } from 'preact';
 import { useState } from 'preact/hooks';
 import { I18nProvider } from '@sytue/i18n/preact';
 import { AppShell, Sidebar } from '@sytue/ui';
 import { useT } from '../src/i18n/index.js';
-import type { GridEvent } from '../src/components/CalendarGrid.js';
-import { addDays, addMonthsClamped, compactTitle, type ViewMode } from '../src/components/dates.js';
+import { CalendarGrid, type GridEvent } from '../src/components/CalendarGrid.js';
+import { posicionDeVista, vistaDePosicion } from '../src/components/asaMes.js';
+import {
+  addDays,
+  addMonthsClamped,
+  compactTitle,
+  startOfDay,
+  type ViewMode,
+} from '../src/components/dates.js';
 import {
   AccionesBarraCompacta,
   BloqueVistaMovil,
@@ -70,8 +78,14 @@ const RECORDATORIOS: EstadoRecordatorios = {
 function Banco() {
   const t = useT('es');
   const [cursor, setCursor] = useState(new Date(2026, 10, 6));
-  const [plegado, setPlegado] = useState(false);
   const [mode, setMode] = useState<ViewMode>('month');
+  const posicion = posicionDeVista(mode) ?? 'mes';
+  // La agenda pide al servicio [cursor, +30 días): aquí, lo de ese rango.
+  const desde = startOfDay(cursor).getTime();
+  const agenda = EVENTOS.filter((e) => {
+    const [y, m, d] = [e.start.slice(0, 4), e.start.slice(4, 6), e.start.slice(6, 8)].map(Number);
+    return new Date(y, m - 1, d).getTime() >= desde;
+  });
   const pendientes = RECORDATORIOS.lista.length + 1;
   return (
     <AppShell
@@ -114,12 +128,24 @@ function Banco() {
           cursor={cursor}
           hoy={HOY}
           events={EVENTOS}
-          plegado={plegado}
-          onPlegar={() => setPlegado((v) => !v)}
+          posicion={posicion}
+          onPosicion={(p) => setMode(vistaDePosicion(p))}
+          agenda={
+            <CalendarGrid
+              locale="es"
+              mode="agenda"
+              cursor={cursor}
+              events={agenda}
+              onSelectEvent={() => {}}
+              onCreateAt={() => {}}
+              onCreateRange={() => {}}
+              onMoveResize={() => {}}
+            />
+          }
           cargando={false}
           onElegir={setCursor}
           onMoverMes={(d) =>
-            setCursor((c) => (plegado ? addDays(c, 7 * d) : addMonthsClamped(c, d)))
+            setCursor((c) => (posicion === 'semana' ? addDays(c, 7 * d) : addMonthsClamped(c, d)))
           }
           onSelectEvent={() => {}}
         />

@@ -253,9 +253,10 @@ func TestLoQueNoCabeSeDesplazaYNoSeEsconde(t *testing.T) {
 	b.Acciones.NoSpam = nada
 	b.Refresh()
 	f := primeraFila(t, b)
-	// 300 px fija una columna donde seis acciones24 + cinco gaps2 desbordan.
-	// El panel20rem ahora mide320: el fixture anterior ya cabía y no ejercía scroll.
-	f.Resize(fyne.NewSize(300, f.Size().Height))
+	// 250 px fija una columna donde seis acciones24 + cinco gaps2 desbordan. Era 300
+	// mientras la fecha tuvo columna propia; desde que va en la línea del remitente,
+	// la columna de texto llega al margen y a 300 la tira ya cabía.
+	f.Resize(fyne.NewSize(250, f.Size().Height))
 	r := test.WidgetRenderer(f).(*filaRenderer)
 	f.MouseIn(nil)
 	if visibles(r.triaje) != 6 {

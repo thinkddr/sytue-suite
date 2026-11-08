@@ -148,14 +148,14 @@
     "other": "{date}, {count} events"
   },
   "grid.daySelected": "{label}, selected",
+  "grid.handle": "Switch between month, week and agenda",
+  "grid.handleState": "{view}. Switch between month, week and agenda",
   "grid.loadError": "The calendar could not be loaded",
   "grid.loading": "Loading the calendar",
   "grid.more": {
     "one": "+{count} more",
     "other": "+{count} more"
   },
-  "grid.showMonth": "Show the whole month",
-  "grid.showWeek": "Show this week only",
   "grid.snapAria": {
     "one": "Snap dragging to {count} minute. Press to change.",
     "other": "Snap dragging to {count} minutes. Press to change."

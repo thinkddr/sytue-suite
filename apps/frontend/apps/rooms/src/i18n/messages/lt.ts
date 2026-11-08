@@ -1091,6 +1091,11 @@ export const lt: AppCatalog<typeof en> = {
   'matrix.unsupported': 'Šis veiksmas negalimas su šifruotomis žinutėmis.',
   'matrix.auth': 'Patvirtink savo tapatybę',
   'matrix.authContinue': 'Prisijungiau',
+  'matrix.reset': 'Pamiršau atkūrimo raktą',
+  'matrix.resetAction': 'Iš naujo nustatyti šifravimą',
+  'matrix.resetBody':
+    'Bus sukurtas naujas atkūrimo raktas. Ankstesnės šifruotos žinutės liks perskaitomos tik įrenginiuose, kuriuose jos jau yra, o kitus savo įrenginius ir kontaktus turėsite patvirtinti iš naujo.',
+  'matrix.resetUnderstood': 'Suprantu, kad galiu prarasti prieigą prie ankstesnių šifruotų žinučių',
   'matrix.tab': 'Rooms atidaryta kitame skirtuke. Uždaryk jį, kad galėtum naudoti šį įrenginį čia.',
   'matrix.identityUnverified': 'Tapatybė nepatvirtinta',
   'matrix.senderUnverified': 'Šiame įrenginyje negalima patvirtinti, kas išsiuntė žinutę',

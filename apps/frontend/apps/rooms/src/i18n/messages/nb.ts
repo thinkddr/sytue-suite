@@ -982,6 +982,11 @@ export const nb: AppCatalog<typeof en> = {
   'matrix.unsupported': 'Denne handlingen er ikke tilgjengelig for krypterte meldinger.',
   'matrix.auth': 'Bekreft identiteten din',
   'matrix.authContinue': 'Jeg har logget inn',
+  'matrix.reset': 'Jeg har glemt gjenopprettingsnøkkelen',
+  'matrix.resetAction': 'Tilbakestill krypteringen',
+  'matrix.resetBody':
+    'Det opprettes en ny gjenopprettingsnøkkel. Eldre krypterte meldinger kan bare leses på enheter som allerede har dem, og du må bekrefte de andre enhetene dine og kontaktene dine på nytt.',
+  'matrix.resetUnderstood': 'Jeg forstår at jeg kan miste tilgangen til eldre krypterte meldinger',
   'matrix.tab': 'Rooms er åpent i en annen fane. Lukk den for å bruke denne enheten her.',
   'matrix.identityUnverified': 'Identitet ikke bekreftet',
   'matrix.senderUnverified': 'Avsenderen kan ikke bekreftes på denne enheten',

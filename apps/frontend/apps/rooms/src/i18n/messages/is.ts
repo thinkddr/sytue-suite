@@ -978,6 +978,11 @@ export const is: AppCatalog<typeof en> = {
   'matrix.unsupported': 'Þessi aðgerð er ekki í boði fyrir dulkóðuð skilaboð.',
   'matrix.auth': 'Staðfestu hver þú ert',
   'matrix.authContinue': 'Ég hef skráð mig inn',
+  'matrix.reset': 'Ég hef gleymt endurheimtarlyklinum',
+  'matrix.resetAction': 'Endurstilla dulkóðun',
+  'matrix.resetBody':
+    'Nýr endurheimtarlykill verður búinn til. Eldri dulkóðuð skilaboð verða aðeins læsileg á tækjum sem þegar eru með þau og þú þarft að staðfesta önnur tæki þín og tengiliði aftur.',
+  'matrix.resetUnderstood': 'Ég skil að ég gæti misst aðgang að eldri dulkóðuðum skilaboðum',
   'matrix.tab': 'Rooms er opið í öðrum flipa. Lokaðu honum til að nota þetta tæki hér.',
   'matrix.identityUnverified': 'Auðkenni ekki staðfest',
   'matrix.senderUnverified': 'Ekki er hægt að staðfesta hver sendi skilaboðin á þessu tæki',

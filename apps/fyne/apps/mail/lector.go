@@ -4,6 +4,7 @@
 package mail
 
 import (
+	"image"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -62,6 +63,8 @@ type Lector struct {
 	T      *i18n.Translator
 	Locale i18n.Locale
 	Ahora  func() time.Time
+	// Logo es el del remitente de una tarjeta, como en la bandeja (Buzon.LogoDe).
+	Logo func(correo string) image.Image
 
 	// Conversacion es el hilo abierto. Vacía (sin mensajes) es el estado «elige una».
 	Conversacion Conversacion

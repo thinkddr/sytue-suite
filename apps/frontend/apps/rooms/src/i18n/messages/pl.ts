@@ -1091,6 +1091,12 @@ export const pl: AppCatalog<typeof en> = {
   'matrix.unsupported': 'Ta czynność jest niedostępna dla zaszyfrowanych wiadomości.',
   'matrix.auth': 'Potwierdź swoją tożsamość',
   'matrix.authContinue': 'Logowanie zostało zakończone',
+  'matrix.reset': 'Nie pamiętam klucza odzyskiwania',
+  'matrix.resetAction': 'Zresetuj szyfrowanie',
+  'matrix.resetBody':
+    'Zostanie utworzony nowy klucz odzyskiwania. Wcześniejsze zaszyfrowane wiadomości będą czytelne tylko na urządzeniach, które już je mają, a Twoje pozostałe urządzenia i kontakty trzeba będzie ponownie zweryfikować.',
+  'matrix.resetUnderstood':
+    'Rozumiem, że mogę stracić dostęp do wcześniejszych zaszyfrowanych wiadomości',
   'matrix.tab': 'Rooms jest otwarty w innej karcie. Zamknij ją, aby używać tego urządzenia tutaj.',
   'matrix.identityUnverified': 'Tożsamość niezweryfikowana',
   'matrix.senderUnverified': 'Na tym urządzeniu nie można zweryfikować, kto wysłał wiadomość',

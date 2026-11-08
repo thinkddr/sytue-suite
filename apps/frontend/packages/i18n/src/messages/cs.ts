@@ -259,6 +259,8 @@ export const cs: Catalog = {
   'app.pdf.description': 'PDF: čtení a poznámky',
   'app.disabled': 'Vypnuto',
   'import.title': 'Přeneste si svá data',
+  'import.collapse': 'Sbalit',
+  'import.expand': 'Rozbalit',
   'import.help':
     'Zkopírujte do Sytue to, co už máte u starého poskytovatele. Mezitím můžete dál pracovat.',
   'import.fromGoogle': 'Přenést z Googlu',

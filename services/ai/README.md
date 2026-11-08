@@ -26,6 +26,14 @@ No hubo que tocar el BFF: el contrato ya coincidía.
 
 Sondas: `GET /healthz` (liveness), `GET /readyz` (readiness, sin dependencias).
 
+## Idioma de las respuestas
+
+El asistente escribe en el idioma que la persona eligió en su perfil de Sytue
+ID: el claim `locale` del access token (scope `profile`), y en un token sin él
+el que negocie `Accept-Language`. Sin ninguno, el prompt no lleva directiva.
+La excepción es transformar un texto existente (corregir, reescribir, acortar…):
+ahí se conserva el idioma de ese texto. Ver `provider.ConIdioma`.
+
 ## Seguridad
 
 - **API key server-only.** `AI_API_KEY` vive solo en el entorno del servidor.

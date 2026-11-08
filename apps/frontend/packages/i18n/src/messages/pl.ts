@@ -261,6 +261,8 @@ export const pl: Catalog = {
   'app.pdf.description': 'PDF: czytanie i adnotacje',
   'app.disabled': 'Wyłączona',
   'import.title': 'Przenieś swoje dane',
+  'import.collapse': 'Zwiń',
+  'import.expand': 'Rozwiń',
   'import.help':
     'Skopiuj do Sytue to, co masz u dotychczasowego dostawcy. W tym czasie możesz dalej pracować.',
   'import.fromGoogle': 'Przenieś z Google',

@@ -273,33 +273,13 @@ func claimsFromToken(tok jwt.Token) Claims {
 		Emitido:  tok.IssuedAt(),
 		Expira:   tok.Expiration(),
 	}
-	if v, ok := tok.Get("email"); ok {
-		if s, ok := v.(string); ok {
-			c.Email = s
-		}
-	}
-	if v, ok := tok.Get("name"); ok {
-		if s, ok := v.(string); ok {
-			c.Name = s
-		}
-	}
-	if v, ok := tok.Get("mailbox"); ok {
-		if s, ok := v.(string); ok {
-			c.Mailbox = s
-		}
-	}
+	c.Email = claimTexto(tok, "email")
+	c.Name = claimTexto(tok, "name")
+	c.Locale = claimTexto(tok, "locale")
+	c.Mailbox = claimTexto(tok, "mailbox")
 	// Tenant: claim "tenant" preferente, "org" como alternativa.
-	if v, ok := tok.Get("tenant"); ok {
-		if s, ok := v.(string); ok {
-			c.Tenant = s
-		}
-	}
-	if c.Tenant == "" {
-		if v, ok := tok.Get("org"); ok {
-			if s, ok := v.(string); ok {
-				c.Tenant = s
-			}
-		}
+	if c.Tenant = claimTexto(tok, "tenant"); c.Tenant == "" {
+		c.Tenant = claimTexto(tok, "org")
 	}
 	if v, ok := tok.Get("mail_domains"); ok {
 		c.MailDomains = toStringSlice(v)
@@ -330,20 +310,19 @@ func claimsFromToken(tok jwt.Token) Claims {
 	return c
 }
 
+// claimTexto es el claim si es una cadena, o "" si falta o es de otro tipo.
+func claimTexto(tok jwt.Token, nombre string) string {
+	v, _ := tok.Get(nombre)
+	s, _ := v.(string)
+	return s
+}
+
 // planClaimsFromToken lee la clase de la organización, su plan y las cuotas que
 // concede. Aparte de claimsFromToken porque son cuatro claims que llegan juntos
 // y un token sin ellos —anterior a la distinción— es perfectamente válido.
 func planClaimsFromToken(tok jwt.Token, c *Claims) {
-	if v, ok := tok.Get("org_kind"); ok {
-		if s, ok := v.(string); ok {
-			c.OrgKind = s
-		}
-	}
-	if v, ok := tok.Get("plan"); ok {
-		if s, ok := v.(string); ok {
-			c.Plan = s
-		}
-	}
+	c.OrgKind = claimTexto(tok, "org_kind")
+	c.Plan = claimTexto(tok, "plan")
 	if v, ok := tok.Get("storage_bytes"); ok {
 		c.StorageBytes = toInt64(v)
 	}

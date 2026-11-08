@@ -244,6 +244,8 @@ export const et: Catalog = {
   'app.pdf.description': 'PDF: lugemine ja märkused',
   'app.disabled': 'Keelatud',
   'import.title': 'Tooge oma andmed kaasa',
+  'import.collapse': 'Ahenda',
+  'import.expand': 'Laienda',
   'import.help':
     "Kopeerige Sytue'sse see, mis teil vana teenusepakkuja juures juba olemas on. Vahepeal saate edasi töötada.",
   'import.fromGoogle': "Too Google'ist",

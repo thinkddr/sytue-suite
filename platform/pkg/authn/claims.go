@@ -61,6 +61,10 @@ type Claims struct {
 	MailDomains []string
 	// Name es el nombre legible (claim "name"), si está presente.
 	Name string
+	// Locale es el idioma que la persona eligió en su perfil de Sytue ID (claim
+	// "locale", en|de|es|fr|it). Vacío en tokens anteriores al claim o sin scope
+	// profile: entonces quien genera texto negocia Accept-Language.
+	Locale string
 	// Roles son los roles del usuario en el tenant activo (owner|admin|member|billing).
 	Roles []string
 	// Groups son los NOMBRES de los grupos del usuario en el tenant activo (claim

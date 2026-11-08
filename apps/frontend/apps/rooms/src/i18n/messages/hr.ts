@@ -1021,6 +1021,11 @@ export const hr: AppCatalog<typeof en> = {
   'matrix.unsupported': 'Ova radnja nije dostupna za šifrirane poruke.',
   'matrix.auth': 'Potvrdi svoj identitet',
   'matrix.authContinue': 'Prijava je dovršena',
+  'matrix.reset': 'Zaboravio/la sam ključ za oporavak',
+  'matrix.resetAction': 'Poništi šifriranje',
+  'matrix.resetBody':
+    'Stvorit će se novi ključ za oporavak. Starije šifrirane poruke ostat će čitljive samo na uređajima koji ih već imaju, a svoje ostale uređaje i kontakte morat ćete ponovno potvrditi.',
+  'matrix.resetUnderstood': 'Razumijem da mogu izgubiti pristup starijim šifriranim porukama',
   'matrix.tab': 'Rooms je otvoren u drugoj kartici. Zatvori je da bi ovdje koristio ovaj uređaj.',
   'matrix.identityUnverified': 'Identitet nije potvrđen',
   'matrix.senderUnverified': 'Na ovom uređaju nije moguće potvrditi tko je poslao poruku',

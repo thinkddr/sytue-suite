@@ -471,6 +471,30 @@ func (m *Mail) Raw(ctx context.Context, id string) (io.ReadCloser, error) {
 	return resp.Body, nil
 }
 
+// ErrSinLogo: el dominio no tiene un logo aprovechable (o es un buzón personal).
+var ErrSinLogo = errors.New("api: el remitente no tiene logo")
+
+// SenderLogo es el logo de la web del dominio de un remitente, como PNG de 128 px
+// como mucho (`GET /api/v1/sender-logo`). El servicio normaliza el dominio
+// (`corp.vodafone.es` → `vodafone.es`) y lo busca él: la web del remitente no ve
+// quién lee. ErrSinLogo si no hay, que es la respuesta normal de la mayoría.
+func (m *Mail) SenderLogo(ctx context.Context, dominio string) ([]byte, error) {
+	resp, err := m.c.Do(ctx, Request{
+		Path:   "/sender-logo",
+		Query:  url.Values{"d": {dominio}},
+		Header: http.Header{"Accept": {"image/png"}},
+	})
+	var e *Error
+	if errors.As(err, &e) && e.Status == http.StatusNotFound {
+		return nil, ErrSinLogo
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	return io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+}
+
 // MaxMailBody es lo que el servicio admite en el cuerpo JSON de una petición: /send y
 // /drafts pasan por httpx.DecodeJSON, que corta en 1 MiB. Lo que no cabe se rechaza
 // AQUÍ, con un error que se puede explicar, y no con el «400 body_too_large» del

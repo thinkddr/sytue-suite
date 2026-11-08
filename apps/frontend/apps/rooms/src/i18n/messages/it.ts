@@ -1075,6 +1075,11 @@ export const it: AppCatalog<typeof en> = {
   'matrix.unsupported': 'Questa azione non è disponibile per i messaggi cifrati.',
   'matrix.auth': 'Conferma la tua identità',
   'matrix.authContinue': 'Ho effettuato l’accesso',
+  'matrix.reset': 'Ho dimenticato la chiave di recupero',
+  'matrix.resetAction': 'Reimposta la crittografia',
+  'matrix.resetBody':
+    'Verrà creata una nuova chiave di recupero. I messaggi cifrati precedenti resteranno leggibili solo sui dispositivi che li hanno già e dovrai verificare di nuovo gli altri dispositivi e i tuoi contatti.',
+  'matrix.resetUnderstood': 'Capisco che potrei perdere l’accesso ai messaggi cifrati precedenti',
   'matrix.tab': 'Rooms è aperto in un’altra scheda. Chiudila per usare questo dispositivo qui.',
   'matrix.identityUnverified': 'Identità non verificata',
   'matrix.senderUnverified': 'Non è possibile verificare il mittente su questo dispositivo',

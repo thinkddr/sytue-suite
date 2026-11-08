@@ -247,6 +247,8 @@ export const is: Catalog = {
   'app.pdf.description': 'PDF: lesa og skrifa athugasemdir',
   'app.disabled': 'Óvirkt',
   'import.title': 'Taktu gögnin þín með',
+  'import.collapse': 'Fella saman',
+  'import.expand': 'Fella út',
   'import.help':
     'Afritaðu það sem þú átt hjá fyrri þjónustuveitanda yfir í Sytue. Þú getur haldið áfram að vinna á meðan.',
   'import.fromGoogle': 'Sækja frá Google',

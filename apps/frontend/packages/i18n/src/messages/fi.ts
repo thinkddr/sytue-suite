@@ -249,6 +249,8 @@ export const fi: Catalog = {
   'app.pdf.description': 'PDF: lue ja merkitse',
   'app.disabled': 'Poistettu käytöstä',
   'import.title': 'Tuo tietosi mukanasi',
+  'import.collapse': 'Tiivistä',
+  'import.expand': 'Laajenna',
   'import.help':
     'Kopioi Sytueen se, mitä sinulla jo on vanhalla palveluntarjoajallasi. Voit jatkaa työskentelyä sillä välin.',
   'import.fromGoogle': 'Tuo Googlesta',

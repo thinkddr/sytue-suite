@@ -33,6 +33,8 @@ type chatService interface {
 
 	BootstrapMatrix(context.Context, string, string) (service.MatrixBootstrap, error)
 	BootstrapMatrixStorage(context.Context, string, string) (service.MatrixBootstrap, error)
+	MatrixRecoveryKey(context.Context, string) (string, error)
+	StoreMatrixRecoveryKey(context.Context, string, string) error
 	MatrixAccountAccess(context.Context, string, string, int64) error
 	MatrixTenantAccess(context.Context, string, string, string, int64) error
 	EditMatrixMessage(context.Context, uuid.UUID, string, string, domain.MatrixEventRef) (domain.Message, error)

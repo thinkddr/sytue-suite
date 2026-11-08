@@ -77,6 +77,9 @@ func avisoDelSistema(propio string, n api.HubNotification, yaAnunciado bool, abi
 // (`eu.sytue.one`) y no `eu.sytue.hub`.
 const productoHub = "one"
 
+// productoMail es la clave de Sytue Mail, la única app cuyo icono cuenta su buzón.
+const productoMail = "mail"
+
 // insigniaDe es el número que va sobre el icono de ESTA aplicación.
 //
 // Por la misma razón que la regla 3: con trece iconos en el Dock, el mismo total en todos
@@ -86,9 +89,17 @@ const productoHub = "one"
 // ponytail: lo suyo se cuenta sobre los últimos [MaxAvisos] que tiene cargados la barra,
 // no sobre todo el histórico: con más de treinta avisos sin leer de una sola app el
 // número se queda corto. El techo se levanta cuando el Hub dé la cuenta por origen.
-func insigniaDe(propio string, items []api.HubNotification, sinLeer int) int {
+//
+// Mail es la excepción: lo suyo no son los avisos, son los CORREOS sin leer del buzón
+// (`correo`, el `mail_unread` del Hub). El Hub agrupa los correos nuevos en un aviso, y
+// contando avisos el icono decía 1 con veinte correos esperando. Sin ese dato (Mail no
+// contestó al Hub) se cuentan los avisos, que es mejor que nada.
+func insigniaDe(propio string, items []api.HubNotification, sinLeer int, correo *int) int {
 	if propio == productoHub {
 		return sinLeer
+	}
+	if propio == productoMail && correo != nil {
+		return *correo
 	}
 	n := 0
 	for _, it := range items {

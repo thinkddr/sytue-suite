@@ -242,6 +242,8 @@ export const pt: Catalog = {
   'app.pdf.description': 'PDF: ler e anotar',
   'app.disabled': 'Desativado',
   'import.title': 'Traga os seus dados',
+  'import.collapse': 'Recolher',
+  'import.expand': 'Expandir',
   'import.help':
     'Copie o que já tem no seu antigo fornecedor para o Sytue. Pode continuar a trabalhar enquanto decorre.',
   'import.fromGoogle': 'Trazer do Google',

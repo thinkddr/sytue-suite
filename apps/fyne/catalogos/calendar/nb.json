@@ -148,14 +148,14 @@
     "other": "{date}, {count} hendelser"
   },
   "grid.daySelected": "{label}, valgt",
+  "grid.handle": "Bytt mellom måned, uke og agenda",
+  "grid.handleState": "{view}. Bytt mellom måned, uke og agenda",
   "grid.loadError": "Kalenderen kunne ikke lastes",
   "grid.loading": "Laster kalenderen",
   "grid.more": {
     "one": "+{count} til",
     "other": "+{count} til"
   },
-  "grid.showMonth": "Vis hele måneden",
-  "grid.showWeek": "Vis bare denne uken",
   "grid.snapAria": {
     "one": "Fest dra til {count} minutt. Trykk for å endre.",
     "other": "Fest dra til {count} minutter. Trykk for å endre."

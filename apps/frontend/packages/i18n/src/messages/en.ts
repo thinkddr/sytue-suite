@@ -279,6 +279,8 @@ export const en = {
 
   // Asistente de importacion: traerse uno sus propios datos (@sytue/shell ImportData).
   'import.title': 'Bring your data across',
+  'import.collapse': 'Collapse',
+  'import.expand': 'Expand',
   'import.help':
     'Copy what you already have in your old provider into Sytue. You can keep working while it runs.',
   'import.fromGoogle': 'Bring it from Google',

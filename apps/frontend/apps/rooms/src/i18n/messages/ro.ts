@@ -1050,6 +1050,11 @@ export const ro: AppCatalog<typeof en> = {
   'matrix.unsupported': 'Această acțiune nu este disponibilă pentru mesaje criptate.',
   'matrix.auth': 'Confirmă-ți identitatea',
   'matrix.authContinue': 'Am finalizat autentificarea',
+  'matrix.reset': 'Am uitat cheia de recuperare',
+  'matrix.resetAction': 'Resetează criptarea',
+  'matrix.resetBody':
+    'Va fi creată o cheie de recuperare nouă. Mesajele criptate anterioare vor rămâne lizibile doar pe dispozitivele care le au deja, iar celelalte dispozitive și contactele tale vor trebui verificate din nou.',
+  'matrix.resetUnderstood': 'Înțeleg că pot pierde accesul la mesajele criptate anterioare',
   'matrix.tab':
     'Rooms este deschis într-o altă filă. Închide-o pentru a folosi acest dispozitiv aici.',
   'matrix.identityUnverified': 'Identitate neverificată',

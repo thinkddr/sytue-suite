@@ -128,9 +128,13 @@ type Pantalla struct {
 	Ventana float32
 	// Ahora es el reloj de la pantalla: qué día es hoy. nil, `time.Now`.
 	Ahora func() time.Time
-	// mesPlegado es el asa del mes del teléfono: solo la semana elegida. Sobrevive a
-	// que la App reconstruya la pantalla, como `useState` en la web.
-	mesPlegado bool
+	// altoHoja es el alto de la hoja del mes del teléfono en el último pintado (o en el
+	// fotograma en curso, arrastrando o animando); hayAltoHoja, si ya hubo uno. La hoja
+	// nueva se anima DESDE él: cambiar de vista con el asa, el teclado o el selector del
+	// cajón reconstruye la pantalla, y así no salta. animHoja es esa animación.
+	altoHoja    float32
+	hayAltoHoja bool
+	animHoja    *fyne.Animation
 	// diaElegido y asaMes son el día elegido y el asa del último pintado del mes del
 	// teléfono: adonde vuelve el foco tras repintar si estaba en un día o en el asa.
 	diaElegido *diaCompacto
@@ -173,8 +177,6 @@ type Pantalla struct {
 	// AlRehacer pide reconstruir la pantalla FUERA del Layout: la ventana cruzó el corte
 	// del mes del teléfono.
 	AlRehacer func()
-	// AlPlegarMes repinta tras plegar o desplegar el mes del teléfono con el asa.
-	AlPlegarMes func()
 }
 
 // t es azúcar para no repetir el nil-check del traductor en cada rótulo.
@@ -286,13 +288,10 @@ func (p *Pantalla) cabecera() *CabeceraVista {
 }
 
 // navegar es «anterior/siguiente» (los botones de la cabecera y las teclas `p`/`n`). En
-// el mes del teléfono es el mismo paso que deslizar: un mes desplegado, una semana
-// plegado, que es lo que se ve (`navigate` en CalendarApp.tsx).
+// el mes del teléfono es el mismo paso que deslizar porque la vista ES la posición del
+// asa: un mes en el mes, una semana en la semana (el mes plegado), que es lo que se ve
+// (`navigate` en CalendarApp.tsx).
 func (p *Pantalla) navegar(d int) {
-	if p.compacta() {
-		p.moverCompacto(d)
-		return
-	}
 	if p.AlNavegar != nil {
 		p.AlNavegar(d)
 	}

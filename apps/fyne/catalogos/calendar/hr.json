@@ -152,6 +152,8 @@
     "other": "{date}, {count} događaja"
   },
   "grid.daySelected": "{label}, odabrano",
+  "grid.handle": "Prebaci između mjeseca, tjedna i rasporeda",
+  "grid.handleState": "{view}. Prebaci između mjeseca, tjedna i rasporeda",
   "grid.loadError": "Kalendar nije moguće učitati",
   "grid.loading": "Učitavanje kalendara",
   "grid.more": {
@@ -159,8 +161,6 @@
     "few": "+{count} više",
     "other": "+{count} više"
   },
-  "grid.showMonth": "Prikaži cijeli mjesec",
-  "grid.showWeek": "Prikaži samo ovaj tjedan",
   "grid.snapAria": {
     "one": "Poravnanje pri povlačenju: {count} minuta. Pritisnite za promjenu.",
     "few": "Poravnanje pri povlačenju: {count} minute. Pritisnite za promjenu.",

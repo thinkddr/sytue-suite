@@ -776,6 +776,13 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     // `GrupoVista.Rejilla`), el título de la barra usa el hueco y baja a text-sm antes de
     // truncar (`AppShell` / `ui.BarraMovil`), `n`/`p` dan el paso de lo que se ve y el
     // primer pintado ya es compacto (`max-sm:hidden` / `VentanaInicial`).
+    // 2026-11-08: el asa cambia entre mes, semana (el mes plegado) y agenda, y ES la vista:
+    // el selector del cajón y el asa dicen lo mismo, y por debajo de sm: la semana es el
+    // mes plegado (la rejilla horaria sigue desde sm:). Se arrastra con la hoja pegada al
+    // dedo y al soltar se ajusta por recorrido y velocidad (`asaMes.ts` / `asames.go`, con
+    // los mismos vectores A1–D3); toque, ↑/↓ e Inicio/Fin también. Web `slider` con
+    // `aria-valuetext`; Fyne con la vista en el nombre. Con esto la franja estrecha de
+    // día completo solo vive en el DÍA por debajo de sm:.
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,

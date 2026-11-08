@@ -16,6 +16,7 @@ import {
   EventShieldColour,
   EventShieldReason,
   type CryptoApi,
+  type GeneratedSecretStorageKey,
   type VerificationRequest,
 } from 'matrix-js-sdk/lib/crypto-api';
 import { decodeRecoveryKey } from 'matrix-js-sdk/lib/crypto-api/recovery-key';
@@ -310,20 +311,54 @@ export class SuiteMatrix {
     )
       throw new MatrixSecurityError('recovery');
     await this.crypto.bootstrapSecretStorage({
-      createSecretStorageKey: async () => {
-        const generated = await this.crypto.createRecoveryKeyFromPassphrase();
-        if (!generated.encodedPrivateKey) throw new MatrixSecurityError('recovery');
-        await this.ui.saveRecoveryKey(generated.encodedPrivateKey);
-        return generated;
-      },
+      createSecretStorageKey: () => this.newRecoveryKey(),
       setupNewKeyBackup: false,
     });
     await this.crypto.bootstrapCrossSigning({
       authUploadDeviceSigningKeys: (request) => this.interactiveAuth(request),
     });
     if ((await this.crypto.checkKeyBackupAndEnable()) === null) await this.crypto.resetKeyBackup();
-    if (!(await this.crypto.isSecretStorageReady()) || !(await this.trusted()))
-      throw new MatrixSecurityError('device');
+    if (!(await this.settledTrust())) throw new MatrixSecurityError('device');
+  }
+  /**
+   * Forgotten recovery key: a new cross-signing identity, secret storage and key
+   * backup for the account, with a new recovery key shown once. The old backup is
+   * deleted, so older messages stay readable only on devices that already hold
+   * their keys, and the person must verify their other devices and contacts again.
+   * Replacing cross-signing keys always goes through the homeserver's SSO re-auth.
+   */
+  async resetRecovery(): Promise<void> {
+    if (this.closed) throw new MatrixSecurityError('device');
+    // Private storage keeps its vault inside secret storage: a reset would orphan it.
+    if (this.bootstrap.storage_product) throw new MatrixSecurityError('unsupported');
+    await this.crypto.resetEncryption((request) => this.interactiveAuth(request));
+    for (const key of this.temporaryKeys.values()) key.fill(0);
+    this.temporaryKeys.clear();
+    // `setupNewKeyBackup: false` stores the backup that resetEncryption just made.
+    await this.crypto.bootstrapSecretStorage({
+      createSecretStorageKey: () => this.newRecoveryKey(),
+      setupNewSecretStorage: true,
+      setupNewKeyBackup: false,
+    });
+    if (!(await this.settledTrust())) throw new MatrixSecurityError('device');
+  }
+  /**
+   * Right after new cross-signing keys or a new backup, the device's own signature
+   * can take a moment to show up (seen once in six resets against Synapse 1.163):
+   * a single check reported a correct setup as failed. Waits up to ~5 s.
+   */
+  private async settledTrust(): Promise<boolean> {
+    for (let attempt = 0; ; attempt++) {
+      if ((await this.crypto.isSecretStorageReady()) && (await this.trusted())) return true;
+      if (attempt >= 10 || this.closed) return false;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+  private async newRecoveryKey(): Promise<GeneratedSecretStorageKey> {
+    const generated = await this.crypto.createRecoveryKeyFromPassphrase();
+    if (!generated.encodedPrivateKey) throw new MatrixSecurityError('recovery');
+    await this.ui.saveRecoveryKey(generated.encodedPrivateKey);
+    return generated;
   }
   async recover(): Promise<void> {
     if (!(await this.crypto.isSecretStorageReady())) throw new MatrixSecurityError('recovery');

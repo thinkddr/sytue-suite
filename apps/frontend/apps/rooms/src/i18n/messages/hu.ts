@@ -999,6 +999,12 @@ export const hu: AppCatalog<typeof en> = {
   'matrix.unsupported': 'Ez a művelet titkosított üzeneteknél nem érhető el.',
   'matrix.auth': 'Erősítsd meg a személyazonosságodat',
   'matrix.authContinue': 'Bejelentkeztem',
+  'matrix.reset': 'Elfelejtettem a helyreállítási kulcsot',
+  'matrix.resetAction': 'Titkosítás visszaállítása',
+  'matrix.resetBody':
+    'Új helyreállítási kulcs jön létre. A korábbi titkosított üzenetek csak azokon az eszközökön maradnak olvashatók, amelyeken már megvannak, és a többi eszközödet és a partnereidet újra ellenőrizned kell.',
+  'matrix.resetUnderstood':
+    'Tudomásul veszem, hogy elveszíthetem a hozzáférést a korábbi titkosított üzenetekhez',
   'matrix.tab':
     'A Rooms egy másik lapon van megnyitva. Zárd be, hogy itt használhasd ezt a készüléket.',
   'matrix.identityUnverified': 'Nem ellenőrzött személyazonosság',

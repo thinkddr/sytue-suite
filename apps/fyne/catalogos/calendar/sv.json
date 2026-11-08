@@ -148,14 +148,14 @@
     "other": "{date}, {count} händelser"
   },
   "grid.daySelected": "{label}, vald",
+  "grid.handle": "Växla mellan månad, vecka och agenda",
+  "grid.handleState": "{view}. Växla mellan månad, vecka och agenda",
   "grid.loadError": "Kalendern kunde inte läsas in",
   "grid.loading": "Läser in kalendern",
   "grid.more": {
     "one": "+{count} till",
     "other": "+{count} till"
   },
-  "grid.showMonth": "Visa hela månaden",
-  "grid.showWeek": "Visa bara den här veckan",
   "grid.snapAria": {
     "one": "Fäst dragning vid {count} minut. Tryck för att ändra.",
     "other": "Fäst dragning vid {count} minuter. Tryck för att ändra."

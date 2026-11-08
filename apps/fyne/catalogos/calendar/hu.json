@@ -148,14 +148,14 @@
     "other": "{date}, {count} esemény"
   },
   "grid.daySelected": "{label}, kijelölve",
+  "grid.handle": "Váltás hónap, hét és napirend között",
+  "grid.handleState": "{view}. Váltás hónap, hét és napirend között",
   "grid.loadError": "A naptárat nem sikerült betölteni",
   "grid.loading": "A naptár betöltése",
   "grid.more": {
     "one": "+{count} további",
     "other": "+{count} további"
   },
-  "grid.showMonth": "A teljes hónap megjelenítése",
-  "grid.showWeek": "Csak ennek a hétnek a megjelenítése",
   "grid.snapAria": {
     "one": "Húzás igazítása {count} percre. Nyomja meg a módosításhoz.",
     "other": "Húzás igazítása {count} percre. Nyomja meg a módosításhoz."

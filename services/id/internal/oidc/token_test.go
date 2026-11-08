@@ -341,3 +341,33 @@ func TestIssueAccessToken_MailboxesNoEnUnTokenDelegado(t *testing.T) {
 		t.Fatal("sin scope email lleva mailboxes")
 	}
 }
+
+// El idioma del perfil viaja en el ACCESS token con el scope profile: Sytue AI lo
+// lee del Bearer para responder en él. Sin profile no sale, como `name`.
+func TestIssueAccessToken_Locale(t *testing.T) {
+	priv, set := testKeys(t)
+	km := &KeyManager{keys: []keyEntry{{kid: "test-kid", private: priv}}}
+	km.active = &km.keys[0]
+	const issuer = "https://id.test"
+	iss := NewIssuer(km, issuer, issuer, time.Minute, time.Hour)
+
+	for _, tc := range []struct {
+		scope string
+		want  bool
+	}{{"openid profile", true}, {"openid", false}} {
+		raw, err := iss.IssueAccessToken(TokenClaims{
+			Subject: "u1", Audience: "sytue-one", Scope: tc.scope, Locale: "fr",
+		}, time.Now())
+		if err != nil {
+			t.Fatalf("IssueAccessToken(%q): %v", tc.scope, err)
+		}
+		tok, err := Verify(raw, issuer, issuer, set)
+		if err != nil {
+			t.Fatalf("Verify(%q): %v", tc.scope, err)
+		}
+		v, ok := tok.Get("locale")
+		if ok != tc.want || (tc.want && v != "fr") {
+			t.Fatalf("scope %q: locale = %v (presente=%v), quería presente=%v", tc.scope, v, ok, tc.want)
+		}
+	}
+}

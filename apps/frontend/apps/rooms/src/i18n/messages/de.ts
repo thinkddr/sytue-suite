@@ -1088,6 +1088,12 @@ export const de: AppCatalog<typeof en> = {
   'matrix.unsupported': 'Diese Aktion ist für verschlüsselte Nachrichten nicht verfügbar.',
   'matrix.auth': 'Bestätige deine Identität',
   'matrix.authContinue': 'Ich habe mich angemeldet',
+  'matrix.reset': 'Wiederherstellungsschlüssel vergessen',
+  'matrix.resetAction': 'Verschlüsselung zurücksetzen',
+  'matrix.resetBody':
+    'Es wird ein neuer Wiederherstellungsschlüssel erstellt. Ältere verschlüsselte Nachrichten bleiben nur auf Geräten lesbar, die sie bereits haben, und du musst deine anderen Geräte und deine Kontakte erneut verifizieren.',
+  'matrix.resetUnderstood':
+    'Mir ist klar, dass ich den Zugriff auf ältere verschlüsselte Nachrichten verlieren kann',
   'matrix.tab':
     'Rooms ist in einem anderen Tab geöffnet. Schließe ihn, um dieses Gerät hier zu verwenden.',
   'matrix.identityUnverified': 'Identität nicht verifiziert',

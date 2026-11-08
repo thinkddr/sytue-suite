@@ -261,6 +261,8 @@ export const sl: Catalog = {
   'app.pdf.description': 'PDF: branje in opombe',
   'app.disabled': 'Onemogočeno',
   'import.title': 'Prenesite svoje podatke',
+  'import.collapse': 'Strni',
+  'import.expand': 'Razširi',
   'import.help':
     'Kopirajte v Sytue, kar že imate pri starem ponudniku. Medtem lahko nadaljujete z delom.',
   'import.fromGoogle': 'Prenesi iz Googla',

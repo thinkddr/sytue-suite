@@ -243,6 +243,8 @@ export const da: Catalog = {
   'app.pdf.description': 'PDF: læs og kommentér',
   'app.disabled': 'Deaktiveret',
   'import.title': 'Tag dine data med',
+  'import.collapse': 'Fold sammen',
+  'import.expand': 'Fold ud',
   'import.help':
     'Kopiér det, du allerede har hos din gamle udbyder, til Sytue. Du kan arbejde videre imens.',
   'import.fromGoogle': 'Hent fra Google',

@@ -60,6 +60,7 @@ func TestIssueIDToken(t *testing.T) {
 		Email:         "user@acme.eu",
 		EmailVerified: true,
 		Name:          "User One",
+		Locale:        "de",
 	}, time.Now())
 	if err != nil {
 		t.Fatalf("IssueIDToken: %v", err)
@@ -87,6 +88,9 @@ func TestIssueIDToken(t *testing.T) {
 	}
 	if v, ok := tok.Get("org_forma"); !ok || v != "carril" {
 		t.Errorf("org_forma ausente: %v", v)
+	}
+	if v, ok := tok.Get("locale"); !ok || v != "de" {
+		t.Errorf("locale ausente: %v", v)
 	}
 }
 

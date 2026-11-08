@@ -15,6 +15,7 @@ import type { MailFilter, MailFilterInput } from '@sytue/api-clients/mail';
  * (packages/ui/src/basePath.ts) no llega hasta aquí porque esto no es un fetch.
  */
 import { withBase } from '@sytue/ui';
+import { dominioDeLogo } from '../lib/dominioRemitente.js';
 
 export type { Mailbox, EmailSummary, EmailAddress, MessageBody, MailFilter, MailFilterInput };
 
@@ -418,6 +419,17 @@ export function attachmentDownloadUrl(emailId: string, index: number, enLinea = 
     import.meta.env.BASE_URL,
     `/api/attachments?emailId=${encodeURIComponent(emailId)}&index=${index}${enLinea ? '&inline=1' : ''}`,
   );
+}
+
+/**
+ * URL del logo del remitente (el icono de la web de su dominio), o `undefined` si
+ * la fila se queda con las iniciales: buzón personal gratuito o dirección rara.
+ */
+export function senderLogoUrl(email: string | undefined): string | undefined {
+  const dominio = dominioDeLogo(email);
+  return dominio
+    ? withBase(import.meta.env.BASE_URL, `/api/sender-logo?d=${encodeURIComponent(dominio)}`)
+    : undefined;
 }
 
 /**

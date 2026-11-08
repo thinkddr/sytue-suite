@@ -48,8 +48,23 @@ var (
 
 var _ desktop.Hoverable = (*Prosa)(nil)
 
-// MouseIn no hace nada: la ficha la abre MouseMoved cuando llega a un enlace.
-func (p *Prosa) MouseIn(e *desktop.MouseEvent) { p.MouseMoved(e) }
+// MouseIn enciende el fondo del aviso de nota vacía; la ficha la abre MouseMoved cuando
+// llega a un enlace.
+func (p *Prosa) MouseIn(e *desktop.MouseEvent) {
+	p.ponerEncima(true)
+	p.MouseMoved(e)
+}
+
+// ponerEncima repinta solo si hay aviso de nota vacía, que es lo único que cambia.
+func (p *Prosa) ponerEncima(si bool) {
+	if p.encima == si {
+		return
+	}
+	p.encima = si
+	if p.Doc.Vacio() && p.Marca != "" {
+		p.Refresh()
+	}
+}
 
 // MouseMoved abre la ficha del enlace a otra nota que hay bajo el puntero, tras el
 // retardo, y la cierra al salir de él.
@@ -80,6 +95,7 @@ func (p *Prosa) MouseMoved(e *desktop.MouseEvent) {
 
 // MouseOut cierra la ficha.
 func (p *Prosa) MouseOut() {
+	p.ponerEncima(false)
 	p.cerrarPrevia()
 	p.hrefPrevia = ""
 }

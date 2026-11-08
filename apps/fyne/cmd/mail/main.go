@@ -66,6 +66,11 @@ func main() {
 	// publicar tras cada escritura de Mail y con lo que traiga el vivo del buzón.
 	s.PublicadorWidget(s.FuenteWidget(t))
 	b.AlCambiarDatos = s.AvisarWidget
+	// El icono lleva los no leídos de la Entrada, no los avisos de correo del Hub
+	// (que eran uno y salía siempre un «1»). Antes de `s.AlCambiar`: el primer árbol
+	// llega en cuanto hay sesión.
+	barra := ui.NuevaBarraSuite(t, s, iconos.Mail)
+	b.AlCambiarNoLeidos = barra.PonerInsignia
 	s.AlFondo(b.EnSegundoPlano)
 	s.AlVolver(b.EnPrimerPlano)
 	ctx := context.Background()
@@ -115,7 +120,7 @@ func main() {
 	}
 	w := a.NewWindow(nombre)
 	w.SetPadded(false)
-	w.SetContent(ui.NuevaBarraSuite(t, s, iconos.Mail).Montar(p.Objeto()))
+	w.SetContent(barra.Montar(p.Objeto()))
 	b.Atajos(w.Canvas())
 	// El texto o el enlace soltado sobre el redactor entra en el campo donde cae.
 	soltar.AlSoltar(w, func(x soltar.Soltado) { b.Soltar(x.ComoTexto(), x.Posicion) })

@@ -1064,6 +1064,12 @@ export const es: AppCatalog<typeof en> = {
   'matrix.unsupported': 'Esta acción no está disponible para mensajes cifrados.',
   'matrix.auth': 'Confirma tu identidad',
   'matrix.authContinue': 'Ya he iniciado sesión',
+  'matrix.reset': 'He olvidado la clave de recuperación',
+  'matrix.resetAction': 'Restablecer el cifrado',
+  'matrix.resetBody':
+    'Se creará una clave de recuperación nueva. Los mensajes cifrados anteriores solo se podrán leer en los dispositivos que ya los tengan, y tendrás que volver a verificar tus otros dispositivos y a tus contactos.',
+  'matrix.resetUnderstood':
+    'Entiendo que puedo perder el acceso a los mensajes cifrados anteriores',
   'matrix.tab': 'Rooms está abierto en otra pestaña. Ciérrala para usar este dispositivo aquí.',
   'matrix.identityUnverified': 'Identidad sin verificar',
   'matrix.senderUnverified': 'No se puede verificar el remitente en este dispositivo',

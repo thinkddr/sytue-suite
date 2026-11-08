@@ -260,6 +260,8 @@ export const sk: Catalog = {
   'app.pdf.description': 'PDF: čítanie a poznámky',
   'app.disabled': 'Vypnuté',
   'import.title': 'Preneste si svoje údaje',
+  'import.collapse': 'Zbaliť',
+  'import.expand': 'Rozbaliť',
   'import.help':
     'Skopírujte do Sytue to, čo už máte u starého poskytovateľa. Medzitým môžete ďalej pracovať.',
   'import.fromGoogle': 'Preniesť z Googlu',

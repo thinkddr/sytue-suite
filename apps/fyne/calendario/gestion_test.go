@@ -336,7 +336,9 @@ func TestEnElTelefonoLaCabeceraSeDesplazaYSaleElBotonFlotante(t *testing.T) {
 	// Como en la captura de producción: sin invitaciones pendientes, que meten su
 	// insignia dentro del botón y lo ensanchan.
 	a.P.Invitaciones = 0
-	a.P.Vista = VistaSemana
+	// El día: por debajo de 640 el mes, la semana y la agenda son el mes del teléfono, sin
+	// cabecera de vista (vistamescompacta.go).
+	a.P.Vista = VistaDia
 	a.pintar()
 	w.Resize(fyne.NewSize(390, 740))
 	var cab *CabeceraVista

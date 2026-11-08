@@ -113,6 +113,11 @@ type Buzon struct {
 	// sondeo o el flujo de eventos): lo que se ve en él lo lee su propia Fuente, que
 	// mira siempre Recibidos (ADR 0078, enmienda del 2026-11-06). nil: nadie escucha.
 	AlCambiarDatos func()
+	// AlCambiarNoLeidos recibe los no leídos de «Todos los buzones de entrada» (Sytue
+	// y las cuentas externas) cada vez que se rehace el árbol del lateral: es el número
+	// del icono de la app. Sin él, el icono contaba los AVISOS de correo del Hub, que
+	// suelen ser uno, y enseñaba un «1» tuviera los que tuviera. nil: nadie escucha.
+	AlCambiarNoLeidos func(int)
 	// Lanzar corre una llamada al servicio fuera del hilo de la interfaz. Los
 	// guardianes la hacen síncrona: así no dependen de cuándo acabe una goroutine.
 	Lanzar func(func())
@@ -188,10 +193,14 @@ type Buzon struct {
 	identidad   string
 	redacciones map[string]redaccionSuspendida
 
-	carpetas   []api.Mailbox
-	etiquetas  []api.MailLabel
-	carpetaID  string
-	etiquetaID string
+	carpetas []api.Mailbox
+	// logos son los del avatar de cada dominio remitente (logos.go), y
+	// pendienteLogos, que ya hay un repintado esperando a la tanda que llega.
+	logos          map[string]*estadoLogo
+	pendienteLogos bool
+	etiquetas      []api.MailLabel
+	carpetaID      string
+	etiquetaID     string
 	// compartidos son los buzones ajenos con acceso; compartido, el que se ve (nil,
 	// el propio) y carpetaComp, su Recibidos.
 	// peticion es la franja del buzón compartido abierto; buzonDelAviso, el del aviso
@@ -305,6 +314,7 @@ func NuevoBuzon(p *Pantalla, s Servicio) *Buzon {
 		b.P.Refrescar()
 	}
 	p.Bandeja.AlElegir = b.Abrir
+	p.Bandeja.Logo, p.Lector.Logo = b.LogoDe, b.LogoDe
 	p.Bandeja.AlBuscar = b.Buscar
 	p.Bandeja.AlFiltrar = b.ElegirFiltro
 	p.Bandeja.AlSeguirFiltro = b.seguirFiltrando
@@ -404,6 +414,9 @@ func (b *Buzon) Arrancar(ctx context.Context) {
 	b.ctx = ctx
 	ciclo := b.ciclo + 1
 	b.ciclo = ciclo
+	// Un ciclo nuevo descarta lo pedido en el anterior, logos incluidos: sin esto, un
+	// dominio que se pidió y no llegó a contestar se quedaba sin logo toda la sesión.
+	b.logos = nil
 	//nolint:contextcheck // Estas cargas toman el contexto de vida guardado en b.ctx.
 	b.cargarCarpetas()
 	//nolint:contextcheck // Estas cargas toman el contexto de vida guardado en b.ctx.

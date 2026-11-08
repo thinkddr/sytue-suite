@@ -148,14 +148,14 @@
     "other": "{date}, {count} événements"
   },
   "grid.daySelected": "{label}, sélectionné",
+  "grid.handle": "Basculer entre mois, semaine et planning",
+  "grid.handleState": "{view}. Basculer entre mois, semaine et planning",
   "grid.loadError": "Impossible de charger l’agenda",
   "grid.loading": "Chargement de l’agenda",
   "grid.more": {
     "one": "+{count} autre",
     "other": "+{count} autres"
   },
-  "grid.showMonth": "Afficher le mois entier",
-  "grid.showWeek": "Afficher seulement cette semaine",
   "grid.snapAria": {
     "one": "Aligner le déplacement sur {count} minute. Appuyez pour changer.",
     "other": "Aligner le déplacement sur {count} minutes. Appuyez pour changer."

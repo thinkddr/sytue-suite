@@ -32,6 +32,10 @@ type Bloque struct {
 	// preguntada sin él contesta con el de UNA columna, y la página saldría con el
 	// alto de una tesela por muchas filas que tenga.
 	Alto func(ancho float32) float32
+	// Llenar es el `flex-1` del bloque: se queda con el alto que sobre cuando la página
+	// es más baja que su caja. Sin él, una hoja que debe llegar hasta abajo (la nota de
+	// un árbol de Notepads) medía lo de su contenido y dejaba el resto muerto.
+	Llenar bool
 }
 
 // pila coloca los bloques en columna, cada uno a todo el ancho.
@@ -129,9 +133,23 @@ func (p pila) MinSize(objs []fyne.CanvasObject) fyne.Size {
 var _ conAlto = pila{}
 
 func (p pila) Layout(objs []fyne.CanvasObject, t fyne.Size) {
+	altos := make([]float32, len(objs))
+	sobra := t.Height
+	for i, o := range objs {
+		altos[i] = p.alto(i, o, t.Width)
+		sobra -= altos[i] + p.b[i].Margen
+	}
+	if sobra > 0 {
+		for i := range objs {
+			if p.b[i].Llenar {
+				altos[i] += sobra
+				break
+			}
+		}
+	}
 	y := float32(0)
 	for i, o := range objs {
-		h := p.alto(i, o, t.Width)
+		h := altos[i]
 		o.Move(fyne.NewPos(0, y))
 		o.Resize(fyne.NewSize(t.Width, h))
 		y += h + p.b[i].Margen

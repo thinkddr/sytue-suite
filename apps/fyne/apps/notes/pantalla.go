@@ -414,7 +414,9 @@ func (p *Pantalla) contenidoCuaderno(v tema.Variante) fyne.CanvasObject {
 	if d, err := time.ParseInLocation(time.DateOnly, p.activo.Crudo.DailyDate, time.Local); err == nil && p.vistaDiario() != VistaDia {
 		bloques = append(bloques, ui.Bloque{Obj: p.vistaDias(d, v)})
 	} else {
-		bloques = append(bloques, ui.Bloque{Obj: p.lienzo.Objeto(v)})
+		// En árbol la nota es una hoja que llena el panel hasta abajo: escribir se
+		// puede en todo el alto, no solo en las líneas que ya tiene.
+		bloques = append(bloques, ui.Bloque{Obj: p.lienzo.Objeto(v), Llenar: p.lienzo.Llenar})
 		if e := p.esteDia(v); err == nil && e != nil {
 			bloques = append(bloques, ui.Bloque{Obj: e})
 		}
@@ -1094,6 +1096,25 @@ func (p *Pantalla) irA(v Vista) {
 func (p *Pantalla) abrirNota(id string) {
 	p.lienzo.Seleccionada, p.cajon = id, false
 	p.Repintar()
+	p.escribirSiVacia(id)
+}
+
+// escribirSiVacia abre ya escribiendo la nota vacía de un árbol, que es lo único que se
+// puede hacer con ella: enseñarla en lectura dejaba una hoja en blanco sin decir dónde
+// pulsar. Es el `autoEditar` de NoteCard.tsx. Solo en árbol: en lista o en columnas,
+// elegir una tarjeta no la abre.
+func (p *Pantalla) escribirSiVacia(id string) {
+	if p.vista != VistaCuaderno || p.activo.Vista != VistaArbol {
+		return
+	}
+	if s := p.edicion; s != nil && s.nota == id {
+		return
+	}
+	n, ok := p.nota(id)
+	if !ok || (n.Tipo != "text" && n.Tipo != "todo") || !n.Doc.Vacio() || !n.Editable(!p.hayRed(), p.bloqueado) {
+		return
+	}
+	p.abrirEditor(n)
 }
 
 // abrirResultado salta a la nota de un resultado de búsqueda, cambiando de cuaderno si

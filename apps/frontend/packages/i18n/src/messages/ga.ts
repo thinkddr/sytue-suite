@@ -253,6 +253,8 @@ export const ga: Catalog = {
   'app.pdf.description': 'PDF: léigh agus anótáil',
   'app.disabled': 'Díchumasaithe',
   'import.title': 'Tabhair do chuid sonraí leat',
+  'import.collapse': 'Laghdaigh',
+  'import.expand': 'Leathnaigh',
   'import.help':
     'Cóipeáil isteach i Sytue a bhfuil agat cheana ag do sheansoláthraí. Is féidir leat leanúint ort ag obair fad is atá sé ar siúl.',
   'import.fromGoogle': 'Tabhair ó Google é',

@@ -20,6 +20,14 @@ func (*fakeService) BootstrapMatrixStorage(context.Context, string, string) (ser
 	return service.MatrixBootstrap{}, domain.ErrMatrixUnavailable
 }
 
+func (*fakeService) MatrixRecoveryKey(context.Context, string) (string, error) {
+	return "", domain.ErrMatrixUnavailable
+}
+
+func (*fakeService) StoreMatrixRecoveryKey(context.Context, string, string) error {
+	return domain.ErrMatrixUnavailable
+}
+
 func (*fakeService) MatrixAccountAccess(context.Context, string, string, int64) error {
 	return domain.ErrMatrixUnavailable
 }

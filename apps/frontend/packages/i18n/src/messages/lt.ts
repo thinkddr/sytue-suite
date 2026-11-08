@@ -264,6 +264,8 @@ export const lt: Catalog = {
   'app.pdf.description': 'PDF: skaitymas ir pastabos',
   'app.disabled': 'Išjungta',
   'import.title': 'Perkelkite savo duomenis',
+  'import.collapse': 'Sutraukti',
+  'import.expand': 'Išskleisti',
   'import.help':
     'Nukopijuokite į Sytue tai, ką jau turite pas senąjį tiekėją. Tuo metu galite toliau dirbti.',
   'import.fromGoogle': 'Perkelti iš „Google“',

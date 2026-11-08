@@ -1085,6 +1085,11 @@ export const fr: AppCatalog<typeof en> = {
   'matrix.unsupported': 'Cette action n’est pas disponible pour les messages chiffrés.',
   'matrix.auth': 'Confirme ton identité',
   'matrix.authContinue': 'Je me suis connecté',
+  'matrix.reset': 'J’ai oublié ma clé de récupération',
+  'matrix.resetAction': 'Réinitialiser le chiffrement',
+  'matrix.resetBody':
+    'Une nouvelle clé de récupération sera créée. Les anciens messages chiffrés ne resteront lisibles que sur les appareils qui les ont déjà, et vous devrez vérifier à nouveau vos autres appareils et vos contacts.',
+  'matrix.resetUnderstood': 'Je comprends que je peux perdre l’accès aux anciens messages chiffrés',
   'matrix.tab': 'Rooms est ouvert dans un autre onglet. Ferme-le pour utiliser cet appareil ici.',
   'matrix.identityUnverified': 'Identité non vérifiée',
   'matrix.senderUnverified': 'L’expéditeur ne peut pas être vérifié sur cet appareil',

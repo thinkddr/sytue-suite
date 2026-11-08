@@ -1034,6 +1034,12 @@ export const pt: AppCatalog<typeof en> = {
   'matrix.unsupported': 'Esta ação não está disponível para mensagens encriptadas.',
   'matrix.auth': 'Confirma a tua identidade',
   'matrix.authContinue': 'Já iniciei sessão',
+  'matrix.reset': 'Esqueci a chave de recuperação',
+  'matrix.resetAction': 'Repor a encriptação',
+  'matrix.resetBody':
+    'Será criada uma nova chave de recuperação. As mensagens encriptadas anteriores só continuarão legíveis nos dispositivos que já as têm e terá de voltar a verificar os seus outros dispositivos e os seus contactos.',
+  'matrix.resetUnderstood':
+    'Compreendo que posso perder o acesso às mensagens encriptadas anteriores',
   'matrix.tab': 'O Rooms está aberto noutro separador. Fecha-o para usares este dispositivo aqui.',
   'matrix.identityUnverified': 'Identidade não verificada',
   'matrix.senderUnverified': 'Não é possível verificar o remetente neste dispositivo',

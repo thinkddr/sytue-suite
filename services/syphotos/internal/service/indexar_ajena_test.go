@@ -32,7 +32,7 @@ func TestNoSeIndexaLaFotoDeOtraPersona(t *testing.T) {
 	defer srv.Close()
 	in := service.NuevaIngesta(nil, drive.Nuevo(srv.URL, 5*time.Second), nil, 0, nil)
 	ctx := tenancy.Into(context.Background(), tenancy.Tenant{Slug: "t1"})
-	if _, err := in.Indexar(ctx, "tok", "d-ajena", "u1"); err == nil {
+	if _, err := in.Indexar(ctx, "tok", "d-ajena", "u1", "es"); err == nil {
 		t.Fatal("la foto de otra persona se indexó")
 	}
 	if leidas.Load() != 0 {

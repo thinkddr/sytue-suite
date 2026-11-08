@@ -95,6 +95,7 @@ import { InvitationsModal } from './InvitationsModal.js';
 import { ScopeDialog } from './ScopeDialog.js';
 import { ReminderCenter, useRecordatorios } from './ReminderCenter.js';
 import { AccionesBarraCompacta, BloqueVistaMovil, MesCompacto } from './MesCompacto.js';
+import { posicionDeVista, vistaDePosicion } from './asaMes.js';
 import { SelectorVista } from './SelectorVista.js';
 import { SearchPanel } from './SearchPanel.js';
 import { fechaDelEnlace } from '../lib/search.js';
@@ -108,15 +109,19 @@ interface Props {
   hubBaseUrl: string;
 }
 
-/** Rango iCalendar que cubre la vista actual (para la consulta CalDAV). */
-function rangeFor(mode: ViewMode, cursor: Date): { start: string; end: string } {
+/**
+ * Rango iCalendar que cubre la vista actual (para la consulta CalDAV). En el teléfono
+ * (`compacto`) la semana es el mes plegado con el asa: pide el MES, que es lo que la hoja
+ * enseña al desplegarse con el dedo, y pasar de mes a semana no vuelve a la red.
+ */
+function rangeFor(mode: ViewMode, cursor: Date, compacto = false): { start: string; end: string } {
   // Agenda: [cursor, cursor+AGENDA_DAYS) local — ventana rodante de próximos días.
   if (mode === 'agenda') {
     const start = startOfDay(cursor);
     return { start: toIcalUtc(start), end: toIcalUtc(addDays(start, AGENDA_DAYS)) };
   }
   let days: Date[];
-  if (mode === 'month') days = monthGrid(cursor);
+  if (mode === 'month' || (mode === 'week' && compacto)) days = monthGrid(cursor);
   else if (mode === 'week') days = weekGrid(cursor);
   // Dia: [00:00, 24:00) local, como mes/semana (sus grids ya van a medianoche).
   else days = [startOfDay(cursor)];
@@ -234,12 +239,14 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
   const [seq, setSeq] = useState(0); // fuerza la recarga de eventos (guardar/reintentar)
   const [mode, setMode] = useState<ViewMode>('month');
   const [cursor, setCursor] = useState(new Date());
-  // El mes del teléfono: la vista de mes por debajo de `sm:` es el mes compacto, con su
-  // cabecera en la barra móvil y lo demás de la cabecera en el cajón. `plegado` es su
-  // asa (solo la semana elegida) y sobrevive a cambiar de mes y de vista.
+  // El mes del teléfono: por debajo de `sm:`, mes, semana y agenda son el mes compacto,
+  // con su cabecera en la barra móvil y lo demás de la cabecera en el cajón. Su asa ES la
+  // vista: mes, semana (la rejilla plegada) o agenda (sin rejilla). No hay otro estado,
+  // así que el asa y el selector del cajón dicen siempre lo mismo, y la posición
+  // sobrevive a cambiar de mes como la vista. El día sigue siendo el de siempre.
   const estrecha = useEstrecha();
-  const compacto = mode === 'month' && estrecha;
-  const [plegado, setPlegado] = useState(false);
+  const posicion = estrecha ? posicionDeVista(mode) : null;
+  const compacto = posicion !== null;
   const [loadingCals, setLoadingCals] = useState(true);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -392,7 +399,7 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const range = useMemo(() => rangeFor(mode, cursor), [mode, cursor]);
+  const range = useMemo(() => rangeFor(mode, cursor, compacto), [mode, cursor, compacto]);
   const rangeKey = `${range.start}..${range.end}`;
   const visibleKey = [...visible].sort().join(',');
 
@@ -497,14 +504,12 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
     });
   }
 
-  // En el mes del teléfono, el mismo paso que deslizar: plegado es una semana, que es lo
-  // que se ve (`Pantalla.navegar` en Fyne).
+  // En el mes del teléfono es el mismo paso que deslizar: en la semana (el mes plegado)
+  // una semana, que es lo que se ve (`Pantalla.navegar` en Fyne).
   function navigate(delta: number): void {
     setCursor((c) =>
       mode === 'month'
-        ? compacto && plegado
-          ? addDays(c, 7 * delta)
-          : addMonthsClamped(c, delta)
+        ? addMonthsClamped(c, delta)
         : mode === 'agenda'
           ? addDays(c, delta * AGENDA_DAYS)
           : addDays(c, mode === 'week' ? delta * 7 : delta),
@@ -541,15 +546,16 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
     return () => document.removeEventListener('keydown', onKey);
     // `navigate` y `openCreate` se redeclaran en cada render: el oyente se vuelve a
     // enlazar cuando cambia lo que leen del cierre (vista, cursor, conectividad y el
-    // mes del teléfono con su asa).
+    // mes del teléfono).
     // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, cursor, offline, compacto, plegado]);
+  }, [mode, cursor, offline, compacto]);
 
   function openCreate(day: Date): void {
     if (offline) return;
     const start = new Date(day);
-    // Mes/agenda no fijan hora al elegir día: por defecto a las 9:00.
-    if (mode === 'month' || mode === 'agenda') start.setHours(9, 0, 0, 0);
+    // Mes/agenda no fijan hora al elegir día: por defecto a las 9:00. Tampoco la semana
+    // del teléfono, que es el mes plegado y no la rejilla horaria.
+    if (mode === 'month' || mode === 'agenda' || compacto) start.setHours(9, 0, 0, 0);
     const end = new Date(start);
     end.setHours(start.getHours() + 1);
     setModal({ open: true, editing: { href: null, summary: '', start, end } });
@@ -1262,7 +1268,7 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
           ) : null}
 
           <div class="min-h-0 flex-1 overflow-auto">
-            {compacto ? (
+            {posicion ? (
               // La geometría no depende de los datos: cargando, la hoja es la misma sin
               // puntos y la lista enseña su esqueleto; el error va en el sitio de la lista.
               <MesCompacto
@@ -1271,8 +1277,20 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
                 cursor={cursor}
                 hoy={new Date()}
                 events={shownEvents}
-                plegado={plegado}
-                onPlegar={() => setPlegado((v) => !v)}
+                posicion={posicion}
+                onPosicion={(p) => setMode(vistaDePosicion(p))}
+                agenda={
+                  <CalendarGrid
+                    locale={locale}
+                    mode="agenda"
+                    cursor={cursor}
+                    events={shownEvents}
+                    onSelectEvent={openQuickView}
+                    onCreateAt={openCreate}
+                    onCreateRange={openCreateRange}
+                    onMoveResize={moveResizeEvent}
+                  />
+                }
                 cargando={loadingCals || (loadingEvents && shownEvents.length === 0)}
                 atenuado={loadingEvents && shownEvents.length > 0}
                 panel={
@@ -1297,7 +1315,9 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
                 }
                 onElegir={setCursor}
                 onMoverMes={(d) =>
-                  setCursor((c) => (plegado ? addDays(c, 7 * d) : addMonthsClamped(c, d)))
+                  setCursor((c) =>
+                    posicion === 'semana' ? addDays(c, 7 * d) : addMonthsClamped(c, d),
+                  )
                 }
                 onSelectEvent={openQuickView}
               />

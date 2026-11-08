@@ -34,6 +34,7 @@ import (
 	"git.sytue.eu/sytue/one/services/mail/internal/config"
 	"git.sytue.eu/sytue/one/services/mail/internal/delivery"
 	"git.sytue.eu/sytue/one/services/mail/internal/domain"
+	"git.sytue.eu/sytue/one/services/mail/internal/logo"
 	"git.sytue.eu/sytue/one/services/mail/internal/push"
 	"git.sytue.eu/sytue/one/services/mail/internal/smime"
 	"git.sytue.eu/sytue/one/services/mail/internal/store"
@@ -140,6 +141,8 @@ type API struct {
 	// peticiones y hub son «pedir acceso» de un buzón compartido (peticiones.go).
 	peticiones peticionesStore
 	hub        *hubnotify.Client
+	// logos es la caché por dominio de los logos de remitente (sender_logo.go).
+	logos *logo.Cache
 }
 
 // anclaSMIME es lo único que jmap necesita del servicio de firma.
@@ -153,7 +156,7 @@ func New(cfg config.Config, st *store.Store, blobs *objectstore.Client, out *del
 	// blobs/out pueden ser nil (dev sin S3); guardamos nil explícito en la
 	// interfaz para que las comprobaciones `== nil` de los handlers sigan siendo
 	// correctas (un puntero nil envuelto en interfaz no es == nil).
-	a := &API{cfg: cfg, store: st, compliance: st, outbound: out, logger: logger, peticiones: st}
+	a := &API{cfg: cfg, store: st, compliance: st, outbound: out, logger: logger, peticiones: st, logos: logo.NuevaCache()}
 	if blobs != nil {
 		a.blobs = blobs
 	}
@@ -279,6 +282,11 @@ func (a *API) Mount(r chi.Router, verifier *authn.Verifier) {
 			// del propio usuario. used_bytes es el contador agregado que el store mantiene
 			// (sin N+1, O(1)); solo lectura y owner-scoped. Ver quota.go.
 			ar.Get("/quota", a.getQuota)
+
+			// El logo de la web de un remitente, para su avatar en la bandeja de la
+			// web y de la app nativa. Por DOMINIO y buscado desde aquí: la web del
+			// remitente no sabe quién lee. Ver sender_logo.go.
+			ar.Get("/sender-logo", a.getSenderLogo)
 
 			ar.Get("/mailboxes/{mailboxID}/messages", a.listMessages)
 

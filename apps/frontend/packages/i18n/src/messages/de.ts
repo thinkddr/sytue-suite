@@ -265,6 +265,8 @@ export const de: Catalog = {
 
   // Asistente de importacion: traerse uno sus propios datos (@sytue/shell ImportData).
   'import.title': 'Deine Daten mitnehmen',
+  'import.collapse': 'Einklappen',
+  'import.expand': 'Ausklappen',
   'import.help':
     'Kopiere nach Sytue, was du bei deinem bisherigen Anbieter hast. Du kannst währenddessen weiterarbeiten.',
   'import.fromGoogle': 'Von Google holen',

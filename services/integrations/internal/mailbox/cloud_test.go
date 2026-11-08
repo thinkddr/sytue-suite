@@ -121,6 +121,39 @@ func TestGraphPagingAndInboxRole(t *testing.T) {
 	}
 }
 
+// Graph escribe el nextLink a su manera, no como se le pidió: con la clave entre
+// comillas (OData), con el `=` del id codificado y `$` como `%24`, o por
+// `/users/<id>/`. Con cualquiera de ellas la carpeta tiene que paginar
+// (2026-11-08: las carpetas de más de 50 mensajes daban 502 en la primera página).
+func TestGraphPaginatesWithGraphShapedNextLinks(t *testing.T) {
+	const folder = "AQMkADAwATNiZmYAZC1iN2NhLTNkNzUt_VaBNmJrgEAGIggNul5EEuWnx92WntMbAAAAgEMAAAA="
+	for _, nextLink := range []string{
+		"https://graph.microsoft.com/v1.0/me/mailFolders('AQMkADAwATNiZmYAZC1iN2NhLTNkNzUt_VaBNmJrgEAGIggNul5EEuWnx92WntMbAAAAgEMAAAA%3D')/messages?%24top=50&%24skip=50",
+		"https://graph.microsoft.com/v1.0/users/00000000-0000-0000-0000-000000000001/mailFolders/" + folder + "/messages?$skip=50",
+		"https://graph.microsoft.com/v1.0/me/mailFolders/" + folder + "/messages?$skiptoken=abc",
+	} {
+		pedidas := []string{}
+		client := NewCloudClient(Account{Provider: "microsoft"}, cloudHTTP(func(r *http.Request) (*http.Response, error) {
+			pedidas = append(pedidas, r.URL.Path)
+			if r.URL.Query().Get("$skip") != "" || r.URL.Query().Get("$skiptoken") != "" {
+				return cloudReply(200, `{"value":[]}`), nil
+			}
+			return cloudReply(200, `{"value":[{"id":"m1","subject":"s"}],"@odata.nextLink":"`+nextLink+`"}`), nil
+		}))
+		page, err := client.Messages(t.Context(), folder, "")
+		if err != nil || len(page.Items) != 1 || page.NextCursor == "" {
+			t.Fatalf("%s: primera página %#v: %v", nextLink, page, err)
+		}
+		if _, err := client.Messages(t.Context(), folder, page.NextCursor); err != nil {
+			t.Fatalf("%s: segunda página: %v", nextLink, err)
+		}
+		// La segunda petición va por la ruta PROPIA, no por la del nextLink.
+		if len(pedidas) != 2 || pedidas[1] != "/v1.0/me/mailFolders/"+folder+"/messages" {
+			t.Fatalf("%s: peticiones %v", nextLink, pedidas)
+		}
+	}
+}
+
 func TestGraphRejectsForeignPaginationOrigin(t *testing.T) {
 	client := NewCloudClient(Account{Provider: "microsoft"}, cloudHTTP(func(*http.Request) (*http.Response, error) {
 		return cloudReply(200, `{"value":[],"@odata.nextLink":"https://evil.example/me?$skip=1"}`), nil

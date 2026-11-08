@@ -224,6 +224,27 @@ describe('cabecerasCerradas', () => {
     }
   });
 
+  // El cifrado de Rooms es RustCrypto en wasm: sin `'wasm-unsafe-eval'` el navegador
+  // no lo compila y «Configurar este dispositivo» fallaba (piloto, 2026-11-08). Se
+  // concede SOLO a quien lo pide, y nunca el `'unsafe-eval'` entero.
+  it('wasm: añade solo wasm-unsafe-eval, y solo a quien lo pide', () => {
+    const script = (opciones: Parameters<typeof cabecerasCerradas>[1]) =>
+      (cabecerasCerradas(HUB, opciones)['content-security-policy'] ?? '')
+        .split('; ')
+        .find((d) => d.startsWith('script-src '));
+    expect(script({ wasm: true })).toBe("script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'");
+    expect(script({})).toBe("script-src 'self' 'unsafe-inline'");
+    expect(script({ wasm: true })).not.toContain("'unsafe-eval'");
+  });
+
+  it('Rooms abre su CSP al servidor de Matrix y a WebAssembly', async () => {
+    const fuente = await Bun.file(
+      new URL('../../../apps/rooms/src/middleware.ts', import.meta.url),
+    ).text();
+    expect(fuente).toContain('...matrixOrigen()');
+    expect(fuente).toContain('wasm: true');
+  });
+
   it('conserva las cuatro directivas de la suite', () => {
     const csp = cabecerasCerradas(HUB)['content-security-policy'] ?? '';
     expect(csp.startsWith(`${SYTUE_SECURITY_HEADERS['content-security-policy']}; `)).toBe(true);

@@ -26,6 +26,7 @@ import {
   suiteApps,
   nombreCorto,
   Glifo,
+  Icon,
 } from '@sytue/ui';
 import { permsFromAccessToken } from '@sytue/auth/client';
 import { sinAdminPorPlan, soloOrganizacion } from '@sytue/auth';
@@ -35,7 +36,12 @@ import { useShell } from './context.js';
 import { useProductMap } from './useProductMap.js';
 import { useAppsDesplegadas } from './useAppsDesplegadas.js';
 
-export function AppSwitcher(): JSX.Element {
+/**
+ * `compacto`: la variante de la barra del teléfono (cara de la app, junto a la
+ * entrada a la suite). Solo la cuadrícula, del tamaño de los botones de la barra, y
+ * el panel se abre hacia la izquierda porque el botón está en el lado derecho.
+ */
+export function AppSwitcher({ compacto = false }: { compacto?: boolean } = {}): JSX.Element {
   const { currentApp, accessToken, hubBaseUrl, user } = useShell();
   const t = useT();
   // El nombre del producto va junto a la marca (el <span> de abajo): en Mail,
@@ -131,30 +137,49 @@ export function AppSwitcher(): JSX.Element {
 
   return (
     <div ref={boxRef} class="relative inline-flex">
-      <button
-        type="button"
-        // El nombre accesible CONTIENE el texto visible (WCAG 2.5.3): «Mail · Aplicaciones».
-        aria-label={producto ? `${producto} · ${t('shell.appSwitcher')}` : t('shell.appSwitcher')}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        onClick={() => {
-          load();
-          cargarDesplegadas();
-          setOpen((v) => !v);
-        }}
-        // ALTURA FIJA `h-9`, la misma que el buscador, las notificaciones y la
-        // cuenta. Sin ella la caja la marcaba el texto del producto y salía a 35px
-        // mientras sus vecinos median 31,5: cuatro controles en una fila y el de
-        // la izquierda más alto que los otros tres. El relleno lateral se queda
-        // —es lo que separa el logo del velo del hover— y ahora cuadra con el aire
-        // que deja el avatar del otro extremo. `-ml-1` se come ese `pl-1`: la marca
-        // VISIBLE queda a un canalón del cristal, como el avatar (medido en drive, one
-        // y mail: 24,5 a la izquierda contra 21 a la derecha); el velo se sale.
-        class={`hover:bg-chrome-hover active:bg-chrome-active sytue-focus-ring-chrome rounded-control -ml-1 inline-flex h-9 items-center gap-1.5 pr-1.5 pl-1 transition-colors duration-150 focus-visible:outline-none pointer-coarse:min-h-[max(44px,2.75rem)] ${
-          open ? 'bg-chrome-hover' : ''
-        }`}
-      >
-        {/* El logo de la organización si lo ha subido, y si no la marca de la casa
+      {compacto ? (
+        <button
+          type="button"
+          aria-label={t('shell.appSwitcher')}
+          title={t('shell.appSwitcher')}
+          aria-expanded={open}
+          aria-haspopup="menu"
+          onClick={() => {
+            load();
+            cargarDesplegadas();
+            setOpen((v) => !v);
+          }}
+          class={`text-topbar-fg rounded-control hover:bg-chrome-hover active:bg-chrome-active sytue-focus-ring-chrome inline-flex h-9 w-9 items-center justify-center transition-colors duration-150 focus-visible:outline-none pointer-coarse:min-h-[max(44px,2.75rem)] pointer-coarse:min-w-[max(44px,2.75rem)] ${
+            open ? 'bg-chrome-hover' : ''
+          }`}
+        >
+          <Icon name="grid" size={20} />
+        </button>
+      ) : (
+        <button
+          type="button"
+          // El nombre accesible CONTIENE el texto visible (WCAG 2.5.3): «Mail · Aplicaciones».
+          aria-label={producto ? `${producto} · ${t('shell.appSwitcher')}` : t('shell.appSwitcher')}
+          aria-expanded={open}
+          aria-haspopup="menu"
+          onClick={() => {
+            load();
+            cargarDesplegadas();
+            setOpen((v) => !v);
+          }}
+          // ALTURA FIJA `h-9`, la misma que el buscador, las notificaciones y la
+          // cuenta. Sin ella la caja la marcaba el texto del producto y salía a 35px
+          // mientras sus vecinos median 31,5: cuatro controles en una fila y el de
+          // la izquierda más alto que los otros tres. El relleno lateral se queda
+          // —es lo que separa el logo del velo del hover— y ahora cuadra con el aire
+          // que deja el avatar del otro extremo. `-ml-1` se come ese `pl-1`: la marca
+          // VISIBLE queda a un canalón del cristal, como el avatar (medido en drive, one
+          // y mail: 24,5 a la izquierda contra 21 a la derecha); el velo se sale.
+          class={`hover:bg-chrome-hover active:bg-chrome-active sytue-focus-ring-chrome rounded-control -ml-1 inline-flex h-9 items-center gap-1.5 pr-1.5 pl-1 transition-colors duration-150 focus-visible:outline-none pointer-coarse:min-h-[max(44px,2.75rem)] ${
+            open ? 'bg-chrome-hover' : ''
+          }`}
+        >
+          {/* El logo de la organización si lo ha subido, y si no la marca de la casa
             teñida por su slug. Excluyentes: NUNCA se enmarca ni se tiñe el logo de
             un cliente con nuestro acento.
 
@@ -163,36 +188,37 @@ export function AppSwitcher(): JSX.Element {
             tope un wordmark apaisado empujaría el resto de la barra. Si la imagen
             no carga (logo recién borrado con el token todavía vivo), se cae a la
             marca de la casa en vez de dejar el hueco roto. */}
-        {user.orgLogo && user.tenant && !falloLogo ? (
-          <img
-            src={`${appDomains.id}/branding/${encodeURIComponent(user.tenant)}/logo.png?v=${user.orgLogo}`}
-            alt=""
-            height={28}
-            // Placa blanca redondeada, SIEMPRE, como la marca de la casa: el logo de un
-            // cliente está pensado para papel blanco y aquí va sobre el carril de color.
-            class="h-7 w-auto max-w-[160px] rounded-md bg-white object-contain p-0.5"
-            onError={() => setFalloLogo(true)}
+          {user.orgLogo && user.tenant && !falloLogo ? (
+            <img
+              src={`${appDomains.id}/branding/${encodeURIComponent(user.tenant)}/logo.png?v=${user.orgLogo}`}
+              alt=""
+              height={28}
+              // Placa blanca redondeada, SIEMPRE, como la marca de la casa: el logo de un
+              // cliente está pensado para papel blanco y aquí va sobre el carril de color.
+              class="h-7 w-auto max-w-[160px] rounded-md bg-white object-contain p-0.5"
+              onError={() => setFalloLogo(true)}
+            />
+          ) : (
+            <OrgMark slug={user.tenant} size={28} />
+          )}
+          {producto ? (
+            // Oculto en <640px: ahí la barra no tiene sitio y la app se lee en su
+            // propia barra móvil.
+            <span class="text-topbar-fg text-sm font-semibold max-sm:hidden">{producto}</span>
+          ) : null}
+          {/* Chevron discreto: sin él, nada delata que la marca es pulsable. */}
+          <Glifo
+            d="m6 9 6 6 6-6"
+            size={14}
+            class={`text-topbar-fg shrink-0 opacity-70 transition-transform duration-150 ${
+              open ? 'rotate-180' : ''
+            }`}
           />
-        ) : (
-          <OrgMark slug={user.tenant} size={28} />
-        )}
-        {producto ? (
-          // Oculto en <640px: ahí la barra no tiene sitio y la app se lee en su
-          // propia barra móvil.
-          <span class="text-topbar-fg text-sm font-semibold max-sm:hidden">{producto}</span>
-        ) : null}
-        {/* Chevron discreto: sin él, nada delata que la marca es pulsable. */}
-        <Glifo
-          d="m6 9 6 6 6-6"
-          size={14}
-          class={`text-topbar-fg shrink-0 opacity-70 transition-transform duration-150 ${
-            open ? 'rotate-180' : ''
-          }`}
-        />
-      </button>
+        </button>
+      )}
       {open ? (
         <div
-          class="sytue-pop-in absolute top-[calc(100%+6px)] left-0"
+          class={`sytue-pop-in absolute top-[calc(100%+6px)] ${compacto ? 'right-0' : 'left-0'}`}
           style={{ zIndex: 'var(--z-popover)' }}
         >
           <AppGrid apps={apps} current={currentApp} onClose={close} />

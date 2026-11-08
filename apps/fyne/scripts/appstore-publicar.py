@@ -465,6 +465,43 @@ def sondear(asc, app, ficha, plataformas, version=""):
     print(f"✓ {app} ({visto['bundleId']}, {id}): existe, «{visto['name']}», {visto['primaryLocale']} · " + " · ".join(partes))
 
 
+def caducar(asc, app, ficha, plataformas, version, build):
+    """Caduca en TestFlight la build `build` de `version`, y SOLO esa.
+
+    Para retirar una subida mala sin tocar las demás (v3.19.3: la build 95 salió con
+    la CLI de Fyne compilada contra la 2.8.1, la 97 con el fork). Nunca deja a los
+    probadores sin nada: si en esa plataforma no hay OTRA build más nueva de la misma
+    versión, válida y sin caducar, no toca la mala y lo dice.
+    """
+    id, _ = comprobar_app(asc, app, ficha)
+    hechas, fallidas = [], []
+    for p in plataformas:
+        builds = builds_de(asc, id, p, version)
+        mala = next((b for b in builds if b["attributes"].get("version") == build), None)
+        if mala is None:
+            hechas.append(f"{p}: sin build {build}")
+            continue
+        if mala["attributes"].get("expired"):
+            hechas.append(f"{p}: {build} ya estaba caducada")
+            continue
+        relevo = [
+            b["attributes"]["version"]
+            for b in builds
+            if b["attributes"].get("version", "").isdigit()
+            and int(b["attributes"]["version"]) > int(build)
+            and b["attributes"].get("processingState") == "VALID"
+            and not b["attributes"].get("expired")
+        ]
+        if not relevo:
+            fallidas.append(f"{p}: no hay una build de {version} más nueva que {build}, válida y sin caducar")
+            continue
+        asc.escribir("builds", {"expired": True}, id=mala["id"])
+        hechas.append(f"{p}: {build} caducada (queda {max(relevo, key=int)})")
+    if fallidas:
+        raise RuntimeError("; ".join(fallidas + hechas))
+    print(f"✓ {app} {version}: " + " · ".join(hechas))
+
+
 def revisiones_pendientes(asc, app_id, plataforma, versiones_app):
     """Sólo estados/refs de versión y build. Nunca actores, contacto ni feedback privado."""
     estados = ",".join(sorted(EN_REVISION | {"READY_FOR_REVIEW", "COMPLETING"}))
@@ -964,17 +1001,20 @@ def enviar_a_revision(asc, app, ficha, plataformas, version):
 
 
 def main(argv):
-    modo, version, plataformas, apps = "", "", ["IOS", "MAC_OS"], []
+    modo, version, build, plataformas, apps = "", "", "", ["IOS", "MAC_OS"], []
     i = 0
     while i < len(argv):
         a = argv[i]
-        if a in ("--seco", "--sondear", "--preparacion", "--ficha", "--paises", "--revision", "--cifrado-exento", "--notas"):
+        if a in ("--seco", "--sondear", "--preparacion", "--ficha", "--paises", "--revision", "--cifrado-exento", "--notas", "--caducar"):
             if modo:
                 sys.exit("appstore-publicar: un solo modo cada vez")
             modo = a[2:]
         elif a == "--version" and i + 1 < len(argv):
             i += 1
             version = argv[i]
+        elif a == "--build" and i + 1 < len(argv):
+            i += 1
+            build = argv[i]
         elif a == "--plataformas" and i + 1 < len(argv):
             i += 1
             plataformas = argv[i].split()
@@ -985,7 +1025,7 @@ def main(argv):
             apps.append(a)
         i += 1
     if not modo or not plataformas or set(plataformas) - {"IOS", "MAC_OS"}:
-        print(f"uso: {sys.argv[0]} --seco|--sondear|--preparacion|--ficha|--paises|--revision|--cifrado-exento|--notas [--version X.Y.Z] [--plataformas \"IOS MAC_OS\"] [app...]", file=sys.stderr)
+        print(f"uso: {sys.argv[0]} --seco|--sondear|--preparacion|--ficha|--paises|--revision|--cifrado-exento|--notas|--caducar [--version X.Y.Z] [--build N] [--plataformas \"IOS MAC_OS\"] [app...]", file=sys.stderr)
         return 2
     if version and not re.fullmatch(r"\d+\.\d+\.\d+", version):
         print(f"appstore-publicar: la versión tiene que ser X.Y.Z y es «{version}»", file=sys.stderr)
@@ -1030,9 +1070,20 @@ def main(argv):
             print("appstore-publicar: la revisión requiere --version X.Y.Z, la del build que se envía", file=sys.stderr)
             return 2
 
+    # Caducar deja la build fuera de TestFlight para siempre: la frase con el número de
+    # build, o nada. Se comprueba ANTES de leer una sola credencial.
+    if modo == "caducar":
+        if not version or not re.fullmatch(r"\d+", build):
+            print("appstore-publicar: caducar requiere --version X.Y.Z y --build N", file=sys.stderr)
+            return 2
+        frase = f"CADUCAR_BUILD_{build}"
+        if os.environ.get("APPSTORE_CONFIRMAR_CADUCAR", "") != frase:
+            print(f"appstore-publicar: caducar requiere APPSTORE_CONFIRMAR_CADUCAR={frase}", file=sys.stderr)
+            return 2
+
     with open(os.path.join(FICHAS, "ficha.json"), encoding="utf-8") as f:
         ficha = json.load(f)
-    if modo not in ("sondear", "preparacion", "cifrado-exento", "paises"):
+    if modo not in ("sondear", "preparacion", "cifrado-exento", "paises", "caducar"):
         validar_comun(ficha)
         for app in apps:
             validar(app, ficha)
@@ -1066,12 +1117,16 @@ def main(argv):
         return completar_exencion(asc, apps, ficha, plataformas, version)
     if modo == "notas":
         return actualizar_notas(asc, apps, ficha, plataformas, version)
+    def caducar_esta(asc, app, ficha, plataformas, version):
+        caducar(asc, app, ficha, plataformas, version, build)
+
     hacer = {
         "sondear": sondear,
         "preparacion": preparacion,
         "ficha": publicar_ficha,
         "paises": ajustar_paises,
         "revision": enviar_a_revision,
+        "caducar": caducar_esta,
     }[modo]
     malas = []
     for app in apps:

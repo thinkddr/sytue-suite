@@ -276,9 +276,10 @@ var literalesQueNoSonClaves = map[string]bool{
 	"erp.access.granted":      true,
 	"mail.access.granted":     true,
 	"notes.access.granted":    true,
-	// Clave de `fyne.Preferences` con la última versión anunciada en la campana
-	// (`sesion/actualizar.go`): se guarda, no se traduce.
+	// Claves de `fyne.Preferences` (`sesion/actualizar.go`, `ui/importar.go`): se
+	// guardan, no se traducen.
 	"actualizacion.enLaCampana": true,
+	"import.plegado":            true,
 	// Tipos de aviso del Hub (`sesion/actualizar.go`, `ui/barraavisos.go`): se mandan o
 	// se comparan con el `type`; el título sale de `notifications.kind.<tipo>`.
 	"one.update.available":  true,

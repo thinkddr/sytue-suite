@@ -262,6 +262,21 @@ test('pegar UNA línea la deja en el campo, como siempre', async () => {
   expect(enviadas).toEqual([]);
 });
 
+test('Safari: lo que solo trae HTML también se pega en la captura, como texto', async () => {
+  const { input, enviadas } = montarCaptura(async () => true, 'Idea: ');
+  await tick();
+  input.setSelectionRange(6, 6);
+  const ev = new Event('paste', { bubbles: true, cancelable: true });
+  Object.defineProperty(ev, 'clipboardData', {
+    value: { getData: (tipo: string) => (tipo === 'text/html' ? '<p>Hola <b>mundo</b></p>' : '') },
+  });
+  input.dispatchEvent(ev);
+  expect(ev.defaultPrevented).toBe(true);
+  await hasta(() => input.value === 'Idea: Hola mundo');
+  expect(input.value).toBe('Idea: Hola mundo');
+  expect(enviadas).toEqual([]);
+});
+
 test('un fallo para en esa línea y lo que no ha salido se queda en la captura', async () => {
   const { input, enviadas, drafts } = montarCaptura(async (_i, n) => n !== 2);
   pegarEn(input, 'uno\ndos\ntres');

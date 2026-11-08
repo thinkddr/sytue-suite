@@ -256,6 +256,32 @@ class InsercionTests(unittest.TestCase):
                     self.insertar()
                 self.assertFalse(self.comandos)
 
+    def test_host_ios_que_abre_el_puente_por_dlopen_no_necesita_enlazarlo(self):
+        # El host de `fyne package --target ios` no enlaza ningún framework: lo abre
+        # notify_apple.go con dlopen. release-desktop 42390120840 caía aquí con photos.
+        self.carga = "/System/Library/Frameworks/Foundation.framework/Foundation"
+        self.rpath = "otra"
+        (self.host / "main").write_bytes(b"\x00cabecera\x00@executable_path/Frameworks/SytueWidgetBridge.framework/SytueWidgetBridge\x00resto")
+        self.insertar()
+        self.assertFalse(any("otool" in c for c in self.lecturas))
+        self.assertTrue((self.host / "Frameworks/SytueWidgetBridge.framework").is_dir())
+
+    def test_una_ruta_dlopen_parecida_no_vale(self):
+        self.carga = "/System/Library/Frameworks/Foundation.framework/Foundation"
+        for ruta in (b"@executable_path/Frameworks/SytueWidgetBridge.framework/SytueWidgetBridgeOtro\x00",
+                     b"@executable_path/../Frameworks/SytueWidgetBridge.framework/SytueWidgetBridge\x00",
+                     b"@executable_path/Frameworks/SytueWidgetBridge.framework/SytueWidgetBridge"):
+            with self.subTest(ruta=ruta):
+                self.comandos.clear()
+                (self.host / "main").write_bytes(b"x" + ruta)
+                with self.assertRaisesRegex(ValueError, "no carga el puente"):
+                    self.insertar()
+                self.assertFalse(self.comandos)
+
+    def test_la_ruta_dlopen_es_la_de_notify_apple(self):
+        fuente = (pathlib.Path(__file__).resolve().parents[3] / "apps/nucleo/widgets/notify_apple.go").read_text()
+        self.assertIn('dlopen("@executable_path/Frameworks/SytueWidgetBridge.framework/SytueWidgetBridge"', fuente)
+
     def test_puente_versionado_en_bundle_es_valido(self):
         self.carga = "@rpath/SytueWidgetBridge.framework/Versions/A/SytueWidgetBridge"
         self.insertar()

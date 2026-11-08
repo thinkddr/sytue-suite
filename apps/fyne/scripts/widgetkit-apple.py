@@ -9,6 +9,7 @@ Sin --insertar no firma. Nunca publica ni modifica capacidades o perfiles.
 import argparse
 import importlib.util
 import json
+import mmap
 import os
 import pathlib
 import plistlib
@@ -84,6 +85,18 @@ def restringir_listado_publico(ruta):
     os.chmod(ruta, (permisos & ~lectura_escritura) | stat.S_IXOTH)
 
 
+def abre_puente(ejecutable, puente):
+    """En iOS el host de `fyne package` no enlaza el puente: lo abre con dlopen por su
+    ruta dentro del bundle (SYTUE_PUENTE_DLOPEN, apps/nucleo/widgets/notify_apple.go).
+    Se busca esa ruta exacta, con el NUL de la cadena C, en el ejecutable."""
+    ruta = ("@executable_path/Frameworks/" + puente + ".framework/" + puente + "\0").encode()
+    with open(ejecutable, "rb") as archivo:
+        if os.fstat(archivo.fileno()).st_size == 0:
+            return False
+        with mmap.mmap(archivo.fileno(), 0, access=mmap.ACCESS_READ) as datos:
+            return datos.find(ruta) != -1
+
+
 def insertar(productos, host, destino, identidad, app, generador, incluir_widgets=True):
     """Firma sólo el contenido anidado. File Provider no depende de WidgetKit."""
     plataforma = "ios" if destino == "ios" else "macos"
@@ -94,7 +107,7 @@ def insertar(productos, host, destino, identidad, app, generador, incluir_widget
         raise ValueError("el host iOS debe estar dentro del Payload real del IPA")
     raiz = host if plataforma == "ios" else host / "Contents"
     ejecutable = raiz / ("" if plataforma == "ios" else "MacOS") / info["CFBundleExecutable"]
-    if incluir_widgets:
+    if incluir_widgets and not (plataforma == "ios" and abre_puente(ejecutable, generador.PUENTE_WIDGETS)):
         enlace = capturar(["xcrun", "otool", "-L", ejecutable])
         puente_cargado = (r"^\s*@rpath/" + re.escape(generador.PUENTE_WIDGETS)
                           + r"\.framework/(?:Versions/A/)?" + re.escape(generador.PUENTE_WIDGETS) + r" \(")

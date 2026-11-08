@@ -119,14 +119,19 @@ export function Avatar({ name, src, size = 'md', presence, class: cls }: AvatarP
           class="h-full w-full rounded-full object-cover ring-1 ring-[var(--sytue-border)] ring-inset"
         />
       ) : (
+        // LAS INICIALES SE PINTAN CON CSS, no son texto del DOM. Dentro de un botón con
+        // nombre propio («Sytue: aplicaciones…», «Cuenta de Ana Díaz») un texto visible
+        // «AD» que no está en ese nombre es un fallo grave de axe
+        // (label-content-name-mismatch, WCAG 2.5.3): lo dio la entrada del teléfono en
+        // accesibilidad-office de v3.19.1, y el menú de cuenta solo pasaba por la «de» de
+        // «Cuenta de Demo». La persona se anuncia por el `role="img"` con su nombre.
         <span
-          class="flex h-full w-full items-center justify-center rounded-full font-semibold text-white"
+          class="flex h-full w-full items-center justify-center rounded-full font-semibold text-white before:content-[attr(data-iniciales)]"
           style={{ backgroundColor: bgFor(name), fontSize: Math.round(px * 0.4) }}
           aria-label={name}
           role="img"
-        >
-          {initials(name)}
-        </span>
+          data-iniciales={initials(name)}
+        />
       )}
       {presence ? (
         <span

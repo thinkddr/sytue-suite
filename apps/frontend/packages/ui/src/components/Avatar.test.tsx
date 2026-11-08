@@ -35,8 +35,23 @@ function mount(children: VNode): HTMLElement {
 /** Preact re-renderiza en el siguiente tick, no dentro del propio evento. */
 const tick = (): Promise<void> => new Promise((r) => setTimeout(r, 20));
 
+/** Las iniciales que se ven: van en `data-iniciales` y las pinta el `::before`. */
+const iniciales = (host: HTMLElement): string | null =>
+  host.querySelector('[data-iniciales]')?.getAttribute('data-iniciales') ?? null;
+
 test('sin foto pone las iniciales del nombre', () => {
-  expect(mount(<Avatar name="Daniel Delgado" size="sm" />).textContent).toBe('DD');
+  expect(iniciales(mount(<Avatar name="Daniel Delgado" size="sm" />))).toBe('DD');
+});
+
+// Las iniciales no son texto: dentro de un botón con nombre propio, un «DD» visible que
+// no está en ese nombre es label-content-name-mismatch de axe (accesibilidad-office de
+// v3.19.1). Quien las anuncia es el `role="img"` con el nombre de la persona.
+test('las iniciales no son texto del DOM y la persona se anuncia por su nombre', () => {
+  const host = mount(<Avatar name="Daniel Delgado" size="sm" />);
+  expect(host.textContent).toBe('');
+  const img = host.querySelector('[role="img"]')!;
+  expect(img.getAttribute('aria-label')).toBe('Daniel Delgado');
+  expect(img.className).toContain('before:content-[attr(data-iniciales)]');
 });
 
 test('una foto que no carga cae a las iniciales, no deja un cuadro vacío', async () => {
@@ -47,7 +62,7 @@ test('una foto que no carga cae a las iniciales, no deja un cuadro vacío', asyn
   await tick();
 
   expect(host.querySelector('img')).toBeNull();
-  expect(host.textContent).toBe('DD');
+  expect(iniciales(host)).toBe('DD');
 });
 
 // El caso de la barra de la suite: se pinta en el servidor, el `<img>` falla
@@ -60,7 +75,7 @@ test('una foto que ya falló antes de montar también cae a las iniciales', asyn
     const host = mount(<Avatar name="Daniel Delgado" src="https://x.invalido/g.jpg" size="sm" />);
     await tick();
     expect(host.querySelector('img')).toBeNull();
-    expect(host.textContent).toBe('DD');
+    expect(iniciales(host)).toBe('DD');
   } finally {
     yaFallo = false;
   }
@@ -70,7 +85,7 @@ test('cambiar de foto vuelve a intentarlo: el fallo es de UNA url, no del avatar
   const host = mount(<Avatar name="Ana Soto" src="https://x.invalido/1.jpg" size="sm" />);
   host.querySelector('img')!.dispatchEvent(new Event('error'));
   await tick();
-  expect(host.textContent).toBe('AS');
+  expect(iniciales(host)).toBe('AS');
 
   render(<Avatar name="Ana Soto" src="https://x.valido/2.jpg" size="sm" />, host);
   await tick();

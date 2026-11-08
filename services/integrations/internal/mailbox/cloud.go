@@ -390,8 +390,15 @@ func (c *cloudClient) graphMessages(ctx context.Context, folder, cursor string) 
 		page.Items = append(page.Items, item.message(folder))
 	}
 	if response.Next != "" {
+		// NO SE COMPARA LA RUTA. Graph no devuelve la que se le pidió: la escribe en
+		// forma OData (`mailFolders('AQMk…=')`) o con `/users/<id>/`, y exigir la
+		// literal tumbaba con 502 la PRIMERA página de toda carpeta de más de 50
+		// mensajes (2026-11-08: «Bandeja de entrada» de 327 no cargaba). Tampoco
+		// protegía nada: el nextLink nunca se pide tal cual, de él solo se toman
+		// `$skip`/`$skiptoken` y la petición se rehace con la ruta propia. Lo que sí
+		// se exige es su origen.
 		next, err := url.Parse(response.Next)
-		if err != nil || next.Scheme != "https" || next.Host != "graph.microsoft.com" || next.User != nil || next.Fragment != "" || next.Path != "/v1.0/me/mailFolders/"+folder+"/messages" {
+		if err != nil || next.Scheme != "https" || next.Host != "graph.microsoft.com" || next.User != nil || next.Fragment != "" {
 			return Page{}, ErrUnavailable
 		}
 		if next.Query().Get("$skiptoken") == "" && next.Query().Get("$skip") == "" {

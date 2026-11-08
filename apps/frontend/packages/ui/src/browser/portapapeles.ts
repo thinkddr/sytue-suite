@@ -4,12 +4,25 @@
  */
 
 /**
+ * Pre-filtro defensivo para HTML no confiable antes de parsearlo como documento.
+ * El objetivo es conservar texto legible y eliminar construcciones activas.
+ */
+function preFiltrarHtmlParaTexto(html: string): string {
+  return html
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<(script|style|template|noscript|iframe|object|embed|svg|math)\b[^>]*>[\s\S]*?<\/\1>/gi, '')
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/\s(?:href|src)\s*=\s*("javascript:[^"]*"|'javascript:[^']*'|javascript:[^\s>]+)/gi, ' ');
+}
+
+/**
  * HTML → texto plano: `<br>` y los cierres de bloque pasan a saltos de línea y el
  * marcado se descarta. Lo que no es texto que se lee (`<style>`, `<script>`, la
  * cabecera) no entra. `DOMParser` da un documento inerte: no ejecuta ni carga nada.
  */
 export function htmlATexto(html: string): string {
-  const conSaltos = html
+  const seguro = preFiltrarHtmlParaTexto(html);
+  const conSaltos = seguro
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(p|div|li|h[1-6]|blockquote|pre|tr)>/gi, '\n');
   const doc = new DOMParser().parseFromString(conSaltos, 'text/html');

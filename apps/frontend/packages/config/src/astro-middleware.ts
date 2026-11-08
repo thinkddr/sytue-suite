@@ -105,14 +105,20 @@ export function cabecerasCerradas(
     conectar?: readonly string[];
     /** Orígenes de imágenes además de la shell (`img-src`). */
     imagenes?: readonly string[];
+    /** La app ejecuta WebAssembly (el cifrado de Matrix de Rooms es Rust compilado
+     *  a wasm). Añade SOLO `'wasm-unsafe-eval'`, que permite compilar wasm y no
+     *  `eval()`: sin él el navegador lo rechaza y el cifrado no arranca. */
+    wasm?: boolean;
   } = {},
 ): Readonly<Record<string, string>> {
   const shell = origenesDeLaShell(hubBaseUrl);
-  const { marcos, conectar = [], imagenes = [] } = propios;
+  const { marcos, conectar = [], imagenes = [], wasm = false } = propios;
   return {
     'content-security-policy': [
       SYTUE_SECURITY_HEADERS['content-security-policy'],
-      "script-src 'self' 'unsafe-inline'",
+      wasm
+        ? "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'"
+        : "script-src 'self' 'unsafe-inline'",
       ["connect-src 'self'", ...shell.conectar, ...conectar].join(' '),
       ["img-src 'self' data: blob:", ...shell.imagenes, ...imagenes].join(' '),
       ...(marcos ? [["frame-src 'self'", ...marcos].join(' ')] : []),

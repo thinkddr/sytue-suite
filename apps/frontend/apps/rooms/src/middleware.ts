@@ -35,6 +35,16 @@ const sfuOrigen = (): string[] => {
   return URL.canParse(url) ? [new URL(url).origin] : [`wss://rooms-sfu.${suiteApex}`];
 };
 
+// El servidor de Matrix (Synapse), al que habla el cliente de Matrix del navegador:
+// sin él en `connect-src`, la CSP cerrada del 22/10 bloqueaba su primera petición y el
+// cifrado de extremo a extremo no se podía configurar («No se pudo configurar el
+// cifrado»). La URL buena la da el servicio en el bootstrap; esta es la misma, la del
+// despliegue, y se puede cambiar con SYTUE_MATRIX_URL.
+const matrixOrigen = (): string[] => {
+  const url = serverEnv(import.meta.env).SYTUE_MATRIX_URL ?? `https://matrix.${suiteApex}`;
+  return URL.canParse(url) ? [new URL(url).origin] : [`https://matrix.${suiteApex}`];
+};
+
 export const onRequest = sequence(
   middlewareDeOrganizacion({
     base: '/rooms',
@@ -43,7 +53,8 @@ export const onRequest = sequence(
   }),
   // Rooms es la única superficie con cámara, micrófono y captura de pantalla:
   // su Permissions-Policy las concede a su propio origen y apaga el resto, y su
-  // CSP cerrada añade la señalización del SFU (`wss://rooms-sfu.<dominio>`).
+  // CSP cerrada añade la señalización del SFU (`wss://rooms-sfu.<dominio>`), el
+  // servidor de Matrix y WebAssembly para su cifrado.
   middlewareDeIdioma(
     () => ({
       'permissions-policy': SYTUE_PERMISSIONS_POLICY_ROOMS,
@@ -51,7 +62,9 @@ export const onRequest = sequence(
     }),
     () =>
       cabecerasCerradas(serverEnv(import.meta.env).SYTUE_HUB_BASE_URL, {
-        conectar: sfuOrigen(),
+        conectar: [...sfuOrigen(), ...matrixOrigen()],
+        // El cifrado de Matrix es RustCrypto en WebAssembly.
+        wasm: true,
       }),
   ),
 );

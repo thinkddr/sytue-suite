@@ -66,15 +66,12 @@ interface LibretaCruda {
  * 409 si el nombre ya existe, en vez de fallar en silencio).
  */
 function slugify(displayName: string): string {
-  const base =
-    displayName
-      .trim()
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '') // acentos
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 96) || 'libreta';
+  const normalized = displayName
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, ''); // acentos
+  const base = (normalized.match(/[a-z0-9]+/g) ?? []).join('-').slice(0, 96) || 'libreta';
   return `${base}-${Math.random().toString(36).slice(2, 8)}`;
 }
 

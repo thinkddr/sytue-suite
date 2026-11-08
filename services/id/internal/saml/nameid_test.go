@@ -137,3 +137,20 @@ func TestAuthenticate_SinSubjectNoEntraEnPanico(t *testing.T) {
 		t.Fatal("una assertion sin Subject debería RECHAZARSE")
 	}
 }
+
+// Sin <saml:Issuer> en la assertion también se rechaza sin entrar en pánico.
+func TestAuthenticate_SinIssuerNoEntraEnPanico(t *testing.T) {
+	key, cert, pemStr := genKeyCert(t)
+	prov := samlProvider(pemStr)
+	sp, _ := BuildSP(prov, tACSURL, tSPEntityID)
+	resp := mintResponseMutada(t, key, cert, func(*csaml.Assertion) {}, func(el *etree.Element) {
+		for _, c := range el.ChildElements() {
+			if c.Tag == "Issuer" {
+				el.RemoveChild(c)
+			}
+		}
+	})
+	if _, err := sp.Authenticate(acsPost(t, resp), []string{tRequestID}, prov); err == nil {
+		t.Fatal("una assertion sin Issuer debería RECHAZARSE")
+	}
+}

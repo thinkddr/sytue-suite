@@ -9,6 +9,7 @@ package pg
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"time"
 
@@ -78,14 +79,7 @@ func Connect(ctx context.Context, cfg Config) (*Pool, error) {
 		return nil, fmt.Errorf("pg: DSN inválido: %w", err)
 	}
 
-	switch {
-	case cfg.MaxConns > 0 && cfg.MaxConns <= 4096:
-		poolCfg.MaxConns = int32(cfg.MaxConns) //nolint:gosec // G115: acotado a [1,4096] por el case.
-	case cfg.MaxConns > 4096:
-		poolCfg.MaxConns = 4096
-	default:
-		poolCfg.MaxConns = 10
-	}
+	poolCfg.MaxConns = clampMaxConns(cfg.MaxConns)
 	poolCfg.MinConns = cfg.MinConns
 	if cfg.MaxConnLifetime > 0 {
 		poolCfg.MaxConnLifetime = cfg.MaxConnLifetime
@@ -175,4 +169,17 @@ func (p *Pool) Healthz(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 	return p.Ping(ctx)
+}
+
+func clampMaxConns(maxConns int) int32 {
+	if maxConns <= 0 {
+		return 10
+	}
+	if maxConns > math.MaxInt32 {
+		return 4096
+	}
+	if maxConns > 4096 {
+		return 4096
+	}
+	return int32(maxConns) //nolint:gosec // G115: acotado a [1,4096] justo arriba.
 }

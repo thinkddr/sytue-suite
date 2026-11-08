@@ -69,6 +69,15 @@ test('listAddressBooks usa /address-books y desenvuelve el sobre', async () => {
   expect(libretas).toEqual([{ id: 'b1', name: 'personal', displayName: 'Personal' }]);
 });
 
+test('createAddressBook deriva un slug acotado y lineal ante repeticiones de guiones', async () => {
+  const { cliente, llamadas } = clienteQueApunta({
+    'POST /address-books': { id: 'b2', name: 'equipo-sur-abc123', display_name: 'Equipo Sur' },
+  });
+  await cliente.createAddressBook(`---Crème  Brûlée ${'-'.repeat(5000)} Sur---`);
+  const enviado = llamadas[0]!.body as Record<string, unknown>;
+  expect(String(enviado['name'])).toMatch(/^creme-brulee-sur-[a-z0-9]{6}$/);
+});
+
 test('sin filtro, listContacts pide el listado y no la búsqueda', async () => {
   const { cliente, llamadas } = clienteQueApunta({ '/contacts/all': { contacts: [CRUDO] } });
   const out = await cliente.listContacts();

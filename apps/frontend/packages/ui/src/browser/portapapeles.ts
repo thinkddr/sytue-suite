@@ -3,33 +3,67 @@
  * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
  */
 
-/**
- * Pre-filtro defensivo para HTML no confiable antes de parsearlo como documento.
- * El objetivo es conservar texto legible y eliminar construcciones activas.
- */
-function preFiltrarHtmlParaTexto(html: string): string {
-  return html
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<(script|style|template|noscript|iframe|object|embed|svg|math)\b[^>]*>[\s\S]*?<\/\1>/gi, '')
-    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-    .replace(/\s(?:href|src)\s*=\s*("javascript:[^"]*"|'javascript:[^']*'|javascript:[^\s>]+)/gi, ' ');
+import { parseFragment, type DefaultTreeAdapterMap } from 'parse5';
+
+type NodoHtml = DefaultTreeAdapterMap['childNode'];
+
+const NO_TEXTO = new Set(['head', 'title', 'style', 'script', 'template', 'noscript']);
+const FIN_DE_BLOQUE = new Set([
+  'p',
+  'div',
+  'li',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'blockquote',
+  'pre',
+  'tr',
+]);
+
+function quitarEspacioFinalDeLinea(linea: string): string {
+  let fin = linea.length;
+  while (fin > 0 && (linea[fin - 1] === ' ' || linea[fin - 1] === '\t')) fin--;
+  return fin === linea.length ? linea : linea.slice(0, fin);
 }
 
 /**
  * HTML → texto plano: `<br>` y los cierres de bloque pasan a saltos de línea y el
  * marcado se descarta. Lo que no es texto que se lee (`<style>`, `<script>`, la
- * cabecera) no entra. `DOMParser` da un documento inerte: no ejecuta ni carga nada.
+ * cabecera) no entra. Se parsea con `parse5` sin tocar el DOM ni usar regex de
+ * saneado.
  */
 export function htmlATexto(html: string): string {
-  const seguro = preFiltrarHtmlParaTexto(html);
-  const conSaltos = seguro
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(p|div|li|h[1-6]|blockquote|pre|tr)>/gi, '\n');
-  const doc = new DOMParser().parseFromString(conSaltos, 'text/html');
-  for (const n of doc.querySelectorAll('head, style, script, template, noscript')) n.remove();
-  return (doc.body?.textContent ?? '')
-    .replace(/ /g, ' ')
-    .replace(/[ \t]+\n/g, '\n')
+  const pendientes: (NodoHtml | string)[] = [...parseFragment(html).childNodes].reverse();
+  const partes: string[] = [];
+  while (pendientes.length) {
+    const nodo = pendientes.pop()!;
+    if (typeof nodo === 'string') {
+      partes.push(nodo);
+      continue;
+    }
+    if ('value' in nodo) {
+      partes.push(nodo.value);
+      continue;
+    }
+    if (!('tagName' in nodo)) continue;
+    const etiqueta = nodo.tagName.toLowerCase();
+    if (NO_TEXTO.has(etiqueta)) continue;
+    if (etiqueta === 'br') {
+      partes.push('\n');
+      continue;
+    }
+    if (FIN_DE_BLOQUE.has(etiqueta)) pendientes.push('\n');
+    for (let i = nodo.childNodes.length - 1; i >= 0; i--) pendientes.push(nodo.childNodes[i]!);
+  }
+  return partes
+    .join('')
+    .replaceAll('\u00a0', ' ')
+    .split('\n')
+    .map(quitarEspacioFinalDeLinea)
+    .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
@@ -125,23 +159,27 @@ function enlaceSeguro(href: string | null): string | null {
   }
 }
 
-function copiar(origen: Node, destino: Node, doc: Document): void {
-  for (const nodo of Array.from(origen.childNodes)) {
-    if (nodo.nodeType === 3) {
-      destino.appendChild(doc.createTextNode(nodo.textContent ?? ''));
+function atributo(nodo: DefaultTreeAdapterMap['element'], nombre: string): string | null {
+  return nodo.attrs.find((a) => a.name === nombre)?.value ?? null;
+}
+
+function copiar(nodos: readonly NodoHtml[], destino: Node, doc: Document): void {
+  for (const nodo of nodos) {
+    if ('value' in nodo) {
+      destino.appendChild(doc.createTextNode(nodo.value));
       continue;
     }
-    if (nodo.nodeType !== 1) continue;
-    const el = nodo as Element;
-    const etiqueta = el.tagName.toLowerCase();
+    if (!('tagName' in nodo)) continue;
+    const etiqueta = nodo.tagName.toLowerCase();
     if (FUERA.has(etiqueta)) continue;
     if (VACIAS.has(etiqueta)) {
       // El salto que Safari añade al final de lo copiado no es del texto.
-      if (!el.classList.contains('Apple-interchange-newline'))
+      const clases = (atributo(nodo, 'class') ?? '').split(/\s+/);
+      if (!clases.includes('Apple-interchange-newline'))
         destino.appendChild(doc.createElement(etiqueta));
       continue;
     }
-    const marcas = marcasDelEstilo(el.getAttribute('style') ?? '');
+    const marcas = marcasDelEstilo(atributo(nodo, 'style') ?? '');
     let base: string | undefined = ESTRUCTURA[etiqueta];
     // Google Docs envuelve TODO en `<b style="font-weight:normal">`.
     if (base === 'b' && marcas.negrita === false) base = undefined;
@@ -152,14 +190,14 @@ function copiar(origen: Node, destino: Node, doc: Document): void {
     for (const capa of capas) {
       const nuevo = doc.createElement(capa);
       if (capa === 'a') {
-        const href = enlaceSeguro(el.getAttribute('href'));
+        const href = enlaceSeguro(atributo(nodo, 'href'));
         if (!href) continue;
         nuevo.setAttribute('href', href);
       }
       dentro.appendChild(nuevo);
       dentro = nuevo;
     }
-    copiar(el, dentro, doc);
+    copiar(nodo.childNodes, dentro, doc);
   }
 }
 
@@ -168,10 +206,9 @@ function copiar(origen: Node, destino: Node, doc: Document): void {
  * origen, el estilo del destino. Vacío si no queda texto.
  */
 export function pegadoConFormato(html: string): string {
-  if (!html || typeof DOMParser === 'undefined') return '';
-  const origen = new DOMParser().parseFromString(html, 'text/html');
+  if (!html || typeof document === 'undefined') return '';
   const doc = document.implementation.createHTMLDocument('');
   const caja = doc.createElement('div');
-  copiar(origen.body, caja, doc);
+  copiar(parseFragment(html).childNodes, caja, doc);
   return caja.textContent?.trim() ? caja.innerHTML.trim() : '';
 }

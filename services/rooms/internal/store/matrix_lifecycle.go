@@ -139,6 +139,12 @@ func (s *Store) ApplyMatrixAccountAccess(ctx context.Context, subject, status st
 			return err
 		}
 		needsRevoke = status != "active"
+		// Con la cuenta borrada, su clave de recuperación custodiada no sirve a nadie.
+		if status == "deleted" {
+			if _, err := tx.Exec(ctx, `DELETE FROM matrix_recovery_keys WHERE subject=$1`, subject); err != nil {
+				return err
+			}
+		}
 		_, err := tx.Exec(ctx, `UPDATE matrix_identity_access SET status=$2,version=$3,applied=$4 WHERE subject=$1`, subject, status, version, !needsRevoke)
 		return err
 	})

@@ -24,25 +24,50 @@ import { json, miniaturaEnBase64, urlDeIA, verLaFoto } from '../../lib/visionIA.
 export const prerender = false;
 
 /**
+ * Nombre en inglés de cada idioma de producto, porque la instrucción está en
+ * inglés. Lo que no está aquí cae al inglés base, como el resto de la interfaz:
+ * así en la instrucción nunca entra texto que no esté escrito en este fichero.
+ */
+const IDIOMAS: Record<string, string> = {
+  en: 'English',
+  de: 'German',
+  es: 'Spanish',
+  fr: 'French',
+  it: 'Italian',
+};
+
+/**
  * Lo que se le pide al modelo.
  *
  * EN LA LENGUA DE LA SESIÓN, porque lo que devuelve acaba en el `alt` de la
  * foto y en su ficha: una descripción en inglés dentro de una cuenta en español
  * es tan inútil para un lector de pantalla como el nombre del fichero.
  *
+ * EL IDIOMA SE NOMBRA, y también para las etiquetas. «En la lengua de esta
+ * petición» no bastaba: la petición está escrita en inglés, y el modelo devolvía
+ * la descripción y sobre todo las etiquetas en inglés. Las etiquetas son lo que
+ * luego se busca y lo que nombra un álbum, así que tienen que estar en el idioma
+ * en que la persona escribe.
+ *
  * Se pide JSON y se pide corto. Lo de «no inventes nombres de personas» no es
  * remilgo: un modelo que reconoce a alguien y se equivoca deja escrito en la
  * foto de otra persona que ahí sale fulano, y eso no se puede deshacer sin que
  * alguien lo lea antes.
+ *
+ * Es la MISMA instrucción que `instruccionDescribir` de `apps/nucleo/api/photos_ia.go`.
  */
-const INSTRUCCION = [
-  'Describe what is visible in this photo for use as alt text.',
-  'Answer ONLY with a JSON object: {"descripcion": string, "etiquetas": string[]}.',
-  'The description must be one sentence, at most 200 characters, in the language of this request.',
-  'Use at most 8 short lowercase tags naming objects, places or scenes that appear.',
-  'Do not name or identify people. Do not guess who someone is.',
-  'Describe only what you can see; do not speculate about the context.',
-].join(' ');
+function instruccion(locale: string): string {
+  const idioma = IDIOMAS[locale] ?? 'English';
+  return [
+    'Describe what is visible in this photo for use as alt text.',
+    'Answer ONLY with a JSON object: {"descripcion": string, "etiquetas": string[]}.',
+    `Write the description and every tag in ${idioma}; keep the JSON keys as they are.`,
+    'The description must be one sentence, at most 200 characters.',
+    'Use at most 8 short lowercase tags naming objects, places or scenes that appear.',
+    'Do not name or identify people. Do not guess who someone is.',
+    'Describe only what you can see; do not speculate about the context.',
+  ].join(' ');
+}
 
 export const POST: APIRoute = async (ctx) => {
   const sesion = await bff.getSession(toBffContext(ctx));
@@ -62,7 +87,7 @@ export const POST: APIRoute = async (ctx) => {
     token: sesion.tokens.accessToken,
     locale: ctx.locals.locale,
     action: 'describir-foto',
-    instruction: INSTRUCCION,
+    instruction: instruccion(ctx.locals.locale),
     context: '',
     // `medium` y no `none`: en visión, razonar menos se traga la mitad de lo
     // que hay en la foto. Lo dice el propio contrato del servicio.

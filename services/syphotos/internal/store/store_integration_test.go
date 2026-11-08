@@ -1328,3 +1328,51 @@ func TestCercaDe_elMismoSitioYNoLaMismaCiudad(t *testing.T) {
 		t.Fatalf("otra persona no consulta: %v", err)
 	}
 }
+
+// El lote describe en el idioma de la dueña —el de su foto MÁS RECIENTE con idioma—
+// y nunca pisa una descripción que ya exista. Antes escribía sin organización en el
+// contexto y fallaba siempre en silencio.
+func TestVectores_loteIdiomaYSinPisar(t *testing.T) {
+	st, ctx := nuevoStore(t)
+	const modelo = "qwen3-embedding-8b"
+	vieja := foto("a.jpg", "d-a", nil)
+	vieja.IdiomaDuenyo = "de"
+	a, _ := st.Ingerir(ctx, vieja)
+	time.Sleep(10 * time.Millisecond)
+	nueva := foto("b.jpg", "d-b", nil)
+	nueva.IdiomaDuenyo = "fr"
+	b, _ := st.Ingerir(ctx, nueva)
+	// Reingerir con un token sin idioma no borra el que se sabía.
+	sinIdioma := foto("b.jpg", "d-b", nil)
+	if _, err := st.Ingerir(ctx, sinIdioma); err != nil {
+		t.Fatal(err)
+	}
+
+	pend, err := st.PendientesDeVector(context.Background(), modelo, 100)
+	if err != nil || len(pend) != 2 {
+		t.Fatalf("pendientes: %v %d", err, len(pend))
+	}
+	for _, p := range pend {
+		if p.Idioma != "fr" {
+			t.Fatalf("%s: idioma %q, quería el de la foto más reciente (fr)", p.ID, p.Idioma)
+		}
+	}
+
+	if err := st.GuardarDescripcion(ctx, a.ID, "u1", "Escrita a mano", nil); err != nil {
+		t.Fatal(err)
+	}
+	if escrita, err := st.GuardarDescripcionDelLote(ctx, a.ID, "u1", "Del lote", []string{"x"}); err != nil || escrita {
+		t.Fatalf("el lote no pisa lo escrito: escrita=%v err=%v", escrita, err)
+	}
+	if escrita, err := st.GuardarDescripcionDelLote(ctx, b.ID, "u1", "Une plage", []string{"plage", "mer"}); err != nil || !escrita {
+		t.Fatalf("sin descripción, el lote escribe: escrita=%v err=%v", escrita, err)
+	}
+	pend, _ = st.PendientesDeVector(context.Background(), modelo, 100)
+	got := map[uuid.UUID]string{}
+	for _, p := range pend {
+		got[p.ID] = p.Descripcion
+	}
+	if got[a.ID] != "Escrita a mano" || got[b.ID] != "Une plage" {
+		t.Fatalf("descripciones: %v", got)
+	}
+}

@@ -1088,6 +1088,11 @@ export const sk: AppCatalog<typeof en> = {
   'matrix.unsupported': 'Táto akcia nie je dostupná pre šifrované správy.',
   'matrix.auth': 'Potvrď svoju totožnosť',
   'matrix.authContinue': 'Prihlásenie je dokončené',
+  'matrix.reset': 'Zabudol(a) som kľúč na obnovenie',
+  'matrix.resetAction': 'Obnoviť šifrovanie od začiatku',
+  'matrix.resetBody':
+    'Vytvorí sa nový kľúč na obnovenie. Staršie šifrované správy zostanú čitateľné len na zariadeniach, ktoré ich už majú, a svoje ďalšie zariadenia aj kontakty budete musieť overiť znova.',
+  'matrix.resetUnderstood': 'Rozumiem, že môžem stratiť prístup k starším šifrovaným správam',
   'matrix.tab':
     'Rooms je otvorený na inej karte. Zatvor ju, aby si mohol toto zariadenie používať tu.',
   'matrix.identityUnverified': 'Totožnosť neoverená',

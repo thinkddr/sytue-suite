@@ -115,16 +115,25 @@ func (h *Handlers) admitCloudHuman(w http.ResponseWriter, r *http.Request) bool 
 	if fromMembership && role != "" {
 		return true
 	}
+	// Quien administra la organización entra SIEMPRE, tenga o no fila de
+	// colaborador en DevX (ver rolDeOrganizacion).
+	org := rolDeOrganizacion(claims)
 	if fromMembership {
 		accepted, acceptErr := h.svc.AcceptPendingMember(r.Context(), claims.Subject, claims.Email)
 		if acceptErr != nil {
 			httpx.Fail(w, r, toAPIError(acceptErr))
 			return false
 		}
-		if !accepted {
+		if !accepted && org == "" {
 			httpx.Fail(w, r, httpx.ErrForbidden.WithMessage("You do not have access to Sytue Cloud in this organisation."))
+			return false
 		}
-		return accepted
+		return true
+	}
+	if org == domain.RoleAdmin {
+		// Tenant vacío y entra antes un admin que el owner: pasa sin
+		// materializarse; la primera fila sigue siendo la del owner.
+		return true
 	}
 
 	// Tenant vacío: materializa al primer usuario autorizado por Sytue ID.
@@ -138,6 +147,44 @@ func (h *Handlers) admitCloudHuman(w http.ResponseWriter, r *http.Request) bool 
 		return false
 	}
 	return true
+}
+
+// rolDeOrganizacion es el rol que el JWT da a la persona en la organización
+// activa, SOLO si es owner o admin; vacío en otro caso.
+//
+// Es un SUELO del rol en DevX, no un valor por defecto: el owner y los admins de
+// la organización son, como mínimo, owner y admin aquí, aunque no tengan fila de
+// colaborador o la tengan con un rol menor. Antes, en un tenant ya poblado, un
+// admin de la organización sin fila explícita quedaba fuera con «You do not have
+// access» —y el que hubiera fijado a member o billing, recortado—, de modo que
+// la persona que administra la organización podía no poder entrar en su DevX.
+// Eso no debe ocurrir nunca: quien manda en la organización ya puede, desde
+// Sytue ID, darse a sí misma cualquier acceso, así que negárselo aquí no protegía
+// nada y solo la dejaba sin puerta.
+//
+// member y billing NO son suelo: para ellos sigue mandando la lista de
+// colaboradores de DevX, que es lo que impide que un miembro de la organización
+// herede acceso a producción solo por serlo.
+func rolDeOrganizacion(c authn.Claims) domain.Role {
+	switch {
+	case c.HasRole(string(domain.RoleOwner)):
+		return domain.RoleOwner
+	case c.HasRole(string(domain.RoleAdmin)):
+		return domain.RoleAdmin
+	}
+	return ""
+}
+
+// conSueloDeOrganizacion eleva el rol de membresía al de la organización cuando
+// este es mayor (owner > admin > el resto).
+func conSueloDeOrganizacion(membresia, org domain.Role) domain.Role {
+	switch {
+	case org == domain.RoleOwner:
+		return domain.RoleOwner
+	case org == domain.RoleAdmin && membresia != domain.RoleOwner:
+		return domain.RoleAdmin
+	}
+	return membresia
 }
 
 func roleFromClaims(c authn.Claims) domain.Role {
@@ -274,8 +321,9 @@ func (h *Handlers) requireRole(roles ...string) func(http.Handler) http.Handler 
 }
 
 // humanHasRole indica si el HUMANO autenticado tiene alguno de los roles: rol
-// EFECTIVO desde memberships y, si no hay membership explícito, fallback al claim
-// del JWT (para no romper al owner inicial). Falso para tokens. Un error de BD
+// EFECTIVO desde memberships, con el owner/admin de la organización como suelo
+// (rolDeOrganizacion) y, si no hay membership explícito, fallback al claim del
+// JWT (para no romper al owner inicial). Falso para tokens. Un error de BD
 // deniega (fail-closed). Reutilizado por requireRole y por la revelación del
 // secreto de webhook en GetProject.
 func (h *Handlers) humanHasRole(r *http.Request, roles ...string) bool {
@@ -289,6 +337,9 @@ func (h *Handlers) humanHasRole(r *http.Request, roles ...string) bool {
 	role, fromMembership, err := h.svc.EffectiveRole(r.Context(), claims.Subject)
 	if err != nil {
 		return false
+	}
+	if org := rolDeOrganizacion(claims); org != "" {
+		return roleIn(string(conSueloDeOrganizacion(role, org)), roles)
 	}
 	if fromMembership {
 		return roleIn(string(role), roles)

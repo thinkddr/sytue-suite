@@ -148,14 +148,14 @@
     "other": "{date}, {count} Termine"
   },
   "grid.daySelected": "{label}, ausgewählt",
+  "grid.handle": "Zwischen Monat, Woche und Übersicht wechseln",
+  "grid.handleState": "{view}. Zwischen Monat, Woche und Übersicht wechseln",
   "grid.loadError": "Der Kalender konnte nicht geladen werden",
   "grid.loading": "Kalender wird geladen",
   "grid.more": {
     "one": "+{count} weiterer",
     "other": "+{count} weitere"
   },
-  "grid.showMonth": "Ganzen Monat anzeigen",
-  "grid.showWeek": "Nur diese Woche anzeigen",
   "grid.snapAria": {
     "one": "Ziehen auf {count} Minute einrasten. Zum Ändern drücken.",
     "other": "Ziehen auf {count} Minuten einrasten. Zum Ändern drücken."

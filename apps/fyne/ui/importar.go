@@ -10,6 +10,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
@@ -43,6 +44,10 @@ type ImportarDatos struct {
 	// Sondeo es cada cuánto se vuelve a preguntar mientras hay trabajo: los 5 s de la web.
 	Sondeo time.Duration
 
+	// plegado deja el bloque en su línea de título: abierto, la ayuda, el `DataFlow` y
+	// los botones se comen media barra lateral. Se recuerda (`PreferenciaPlegado`).
+	plegado bool
+
 	origenes    []api.OrigenImportacion
 	trabajos    []api.TrabajoImportacion
 	cargada     bool
@@ -62,7 +67,28 @@ type ImportarDatos struct {
 // NuevoImportarDatos crea la pieza para el contenido de `dominios` («drive»,
 // «contacts», «mail», «calendar»).
 func NuevoImportarDatos(tr *i18n.Translator, svc *api.Integraciones, dominios ...string) *ImportarDatos {
-	return &ImportarDatos{tr: tr, svc: svc, dominios: dominios, Sondeo: 5 * time.Second}
+	d := &ImportarDatos{tr: tr, svc: svc, dominios: dominios, Sondeo: 5 * time.Second}
+	if a := fyne.CurrentApp(); a != nil {
+		d.plegado = a.Preferences().Bool(PreferenciaPlegado)
+	}
+	return d
+}
+
+// PreferenciaPlegado es la clave que recuerda el bloque plegado: la misma para todas
+// las apps, como `sytue.import.plegado` en la web. Quien ya decidió no traer nada no
+// quiere el bloque abierto en cada producto.
+const PreferenciaPlegado = "import.plegado"
+
+// Plegado dice si el bloque está en su línea de título.
+func (d *ImportarDatos) Plegado() bool { return d.plegado }
+
+// Alternar pliega o despliega el bloque, lo recuerda y lo repinta.
+func (d *ImportarDatos) Alternar() {
+	d.plegado = !d.plegado
+	if a := fyne.CurrentApp(); a != nil {
+		a.Preferences().SetBool(PreferenciaPlegado, d.plegado)
+	}
+	d.cambiar()
 }
 
 func (d *ImportarDatos) lanzar(f func()) {
@@ -259,19 +285,13 @@ func (d *ImportarDatos) Objeto(ancho float32, v tema.Variante) fyne.CanvasObject
 		x := NuevoParrafo(texto, e, p, tinta, v)
 		poner(x, AltoParrafo(x, col), antes)
 	}
-	parrafo(t("import.title"), tema.TextoSM, SemiNegrita, "text", 0)
+	trabajando, hechos, fallidos := repartirTrabajos(d.trabajos)
 
-	var trabajando, hechos []api.TrabajoImportacion
-	fallidos := false
-	for _, j := range d.trabajos {
-		switch {
-		case j.EnCurso():
-			trabajando = append(trabajando, j)
-		case j.Status == "done":
-			hechos = append(hechos, j)
-		case j.Status == "error":
-			fallidos = true
-		}
+	fila, altoFila := d.filaTitulo(col, len(trabajando) > 0, v)
+	poner(fila, altoFila, 0)
+
+	if d.plegado {
+		return d.caja(ancho, y+relleno, objs, v)
 	}
 	if len(trabajando) > 0 {
 		rueda := NuevaRueda(16, "text", v)
@@ -322,7 +342,62 @@ func (d *ImportarDatos) Objeto(ancho float32, v tema.Variante) fyne.CanvasObject
 	if d.fallo {
 		parrafo(t("import.failed"), tema.TextoXS, Normal, "danger-text", tema.Espacio(2))
 	}
-	alto := y + relleno
+	return d.caja(ancho, y+relleno, objs, v)
+}
+
+// filaTitulo es la línea de título: el rótulo y, a la derecha, el galón que pliega
+// (`flex items-center justify-between gap-2`). Plegado y trabajando, la rueda de 14
+// sigue diciendo que algo pasa.
+func (d *ImportarDatos) filaTitulo(col float32, trabajando bool, v tema.Variante) (fyne.CanvasObject, float32) {
+	clave := "import.collapse"
+	galon := iconos.ChevronAbajo
+	if d.plegado {
+		clave, galon = "import.expand", iconos.ChevronDerecha
+	}
+	b := NuevoBoton("", d.Alternar).Con(Fantasma, TallaXS)
+	b.Icono, b.TamIcono, b.SoloIcono = galon, 14, true
+	b.Rotulo = d.tr.T(clave, nil) + ": " + d.tr.T("import.title", nil)
+	mb := b.MinSize()
+	hueco := tema.Espacio(2)
+	rueda := float32(0)
+	if d.plegado && trabajando {
+		rueda = 14 + hueco
+	}
+	ancho := max(col-mb.Width-hueco-rueda, 0)
+	x := NuevoParrafo(d.tr.T("import.title", nil), tema.TextoSM, SemiNegrita, "text", v)
+	ax := AltoParrafo(x, ancho)
+	alto := max(ax, mb.Height)
+	objsFila := []fyne.CanvasObject{x, b}
+	x.Move(fyne.NewPos(0, (alto-ax)/2))
+	x.Resize(fyne.NewSize(ancho, ax))
+	if rueda > 0 {
+		r := NuevaRueda(14, "text", v)
+		r.Move(fyne.NewPos(min(Medir(d.tr.T("import.title", nil), tema.TextoSM, SemiNegrita).Width, ancho)+hueco, (alto-14)/2))
+		r.Resize(fyne.NewSize(14, 14))
+		objsFila = append(objsFila, r)
+	}
+	b.Move(fyne.NewPos(col-mb.Width, (alto-mb.Height)/2))
+	b.Resize(mb)
+	return container.NewWithoutLayout(objsFila...), alto
+}
+
+// repartirTrabajos separa los trabajos en curso, los terminados y si alguno falló.
+func repartirTrabajos(ts []api.TrabajoImportacion) (trabajando, hechos []api.TrabajoImportacion, fallidos bool) {
+	for _, j := range ts {
+		switch {
+		case j.EnCurso():
+			trabajando = append(trabajando, j)
+		case j.Status == "done":
+			hechos = append(hechos, j)
+		case j.Status == "error":
+			fallidos = true
+		}
+	}
+	return trabajando, hechos, fallidos
+}
+
+// caja envuelve lo pintado en el `border-border bg-surface rounded-md`.
+func (d *ImportarDatos) caja(ancho, alto float32, objs []fyne.CanvasObject, v tema.Variante) fyne.CanvasObject {
 	caja := NuevaCaja(tema.Color("surface", v), tema.Color("border", v), tema.RadioMD)
 	caja.Redimensionar(fyne.NewSize(ancho, alto))
 	return container.New(tamFijo{fyne.NewSize(ancho, alto)}, append(caja.Objetos(), objs...)...)

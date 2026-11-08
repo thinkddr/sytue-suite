@@ -4,6 +4,7 @@
 package mail
 
 import (
+	"image"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -80,6 +81,9 @@ type Bandeja struct {
 	// cambio.
 	Filtro    FiltroRapido
 	AlFiltrar func(FiltroRapido)
+	// Logo es el logo del remitente de una dirección si ya ha llegado (Buzon.LogoDe);
+	// nil, o un Logo nil, deja las iniciales.
+	Logo func(correo string) image.Image
 	// FiltroTope dice que el filtro ya pidió sus páginas automáticas sin encontrar
 	// nada y quedan más: el vacío ofrece «Cargar más» (AlSeguirFiltro).
 	FiltroTope     bool
@@ -299,6 +303,10 @@ func (b *Bandeja) rellenar(f *FilaConversacion, i int, c Conversacion) {
 		f.Acciones = b.Acciones
 	}
 	f.Chips = EtiquetasDe(c, b.Etiquetas)
+	f.Logo = nil
+	if b.Logo != nil && len(c.Ultimo.De) > 0 {
+		f.Logo = b.Logo(c.Ultimo.De[0].Correo)
+	}
 	f.AlAbrir = func() {
 		if b.AlElegir != nil {
 			b.AlElegir(c)
@@ -437,8 +445,7 @@ func (r *bandejaRenderer) ajustarAltos(ancho float32) {
 		if len(chips) == 0 {
 			continue
 		}
-		fecha := FechaCorta(b.Locale, c.Ultimo.Recibido, b.Ahora())
-		alto := AltoFilaCon(chips, AnchoTextoFila(ancho, fecha, c.ConAdjunto, c.SinLeer))
+		alto := AltoFilaCon(chips, AnchoTextoFila(ancho))
 		vistas[i] = true
 		if r.altos[i] != alto {
 			r.altos[i] = alto

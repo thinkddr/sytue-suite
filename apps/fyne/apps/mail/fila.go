@@ -4,6 +4,7 @@
 package mail
 
 import (
+	"image"
 	"image/color"
 
 	"fyne.io/fyne/v2"
@@ -36,7 +37,9 @@ import (
 //	              empieza en x = 260 + 2 + 12 + 72 + 12 = 358 (raíz actual 16)
 //	texto         19,25 (remitente) + 15,75 (asunto) + 1,75 (gap-0.5) + 24 (tira)
 //	              = 60,75, que ES el alto de contenido: 60,75 + 14 + 1 = 75,75
-//	meta          derecha en x = 528,5; fecha `text-xs` (14 de caja) centrada
+//	fecha         en la línea del remitente, a la derecha (`ml-auto pl-2`), y el
+//	              clip en la del asunto (`gap-2`): no hay columna de meta, como en
+//	              Proton o Apple Mail, y la columna de texto llega al margen
 const (
 	// MargenFila es `px-3` y RellenoFila es `py-2`.
 	MargenFila  float32 = 3 * 0.25 * tema.Rem
@@ -52,8 +55,10 @@ const (
 	TiraAcciones float32 = 24
 	// HuecoLineas es el `gap-0.5` entre el asunto y la tira.
 	HuecoLineas float32 = 0.5 * 0.25 * tema.Rem
-	// HuecoMeta es el `gap-1` entre la fecha y el clip.
-	HuecoMeta float32 = 1 * 0.25 * tema.Rem
+	// HuecoFecha es el `pl-2` que separa la fecha del remitente, y HuecoClip el
+	// `gap-2` entre el asunto y el clip.
+	HuecoFecha float32 = 2 * 0.25 * tema.Rem
+	HuecoClip  float32 = 2 * 0.25 * tema.Rem
 	// TallaClip es el `size={14}` del clip de adjunto, y TallaEstrella el `size={16}`
 	// de la estrella que acompaña al remitente.
 	TallaClip     float32 = 14
@@ -140,17 +145,13 @@ func AltoFilaCon(chips []Etiqueta, anchoTexto float32) float32 {
 	return AltoFilaConversacion() + altoTiraConChips + alto
 }
 
-// AnchoTextoFila es la columna `flex-1 min-w-0` de una fila de ese ancho: lo que dejan
-// el delantero, los dos `gap-3` y la meta, que es `shrink-0` y manda.
-func AnchoTextoFila(anchoFila float32, fecha string, conAdjunto, sinLeer bool) float32 {
-	peso := ui.Normal
-	if sinLeer {
-		peso = ui.Negrita
-	}
-	meta := max(ui.Medir(fecha, tema.TextoXS, peso).Width, adjuntoAncho(conAdjunto))
+// AnchoTextoFila es la columna `flex-1 min-w-0` de una fila de ese ancho: lo que deja
+// el delantero y su `gap-3`. La fecha y el clip van DENTRO de la columna, en sus
+// líneas, así que no le quitan nada.
+func AnchoTextoFila(anchoFila float32) float32 {
 	izquierda := ui.InicioFila() + ui.LadoEleccion + 2*HuecoDelantero + PuntoSinLeer +
 		ui.MedidaAvatar(ui.AvatarMD).Width + HuecoBloque
-	return max(anchoFila-MargenFila-meta-HuecoBloque-izquierda, 0)
+	return max(anchoFila-MargenFila-izquierda, 0)
 }
 
 // coloresEtiqueta es `LABEL_COLORS` de `components/utils.ts`: TOKEN → color del PUNTO.
@@ -207,6 +208,8 @@ type FilaConversacion struct {
 	Acciones *Acciones
 	// Chips son las etiquetas del registro que lleva el hilo (`conversationLabels`).
 	Chips []Etiqueta
+	// Logo es el de la web del remitente (Buzon.LogoDe); nil, las iniciales.
+	Logo image.Image
 
 	AlAbrir  func()
 	AlMarcar func()
@@ -438,7 +441,7 @@ func (r *filaRenderer) montar() {
 // etiquetas crece, y ese alto se lo pone la bandeja con `SetItemHeight`.
 func (r *filaRenderer) MinSize() fyne.Size {
 	ancho := ui.InicioFila() + MargenFila + ui.LadoEleccion + 2*HuecoDelantero +
-		PuntoSinLeer + ui.MedidaAvatar(ui.AvatarMD).Width + 2*HuecoBloque
+		PuntoSinLeer + ui.MedidaAvatar(ui.AvatarMD).Width + HuecoBloque
 	return fyne.NewSize(ancho, AltoFilaConversacion())
 }
 
@@ -473,24 +476,12 @@ func (r *filaRenderer) Layout(t fyne.Size) {
 	r.avatar.Move(fyne.NewPos(x, centro(lado.Height)))
 	x += lado.Width + HuecoBloque
 
-	// La meta es `shrink-0`: nunca encoge, encoge la columna de texto.
-	anchoFecha := ui.Medir(f.Fecha, tema.TextoXS, r.peso()).Width
-	altoMeta := tema.TextoXS.Linea
-	if f.Conv.ConAdjunto {
-		altoMeta += HuecoMeta + TallaClip
-	}
-	yMeta := centro(altoMeta)
+	// La columna de texto es `flex-1 min-w-0`: lo que queda hasta el margen, y con
+	// truncado. Va centrada como bloque (`items-center` del `li`), que solo se nota
+	// con chips. La fecha y el clip van dentro, cada uno en su línea.
 	derecha := t.Width - MargenFila
-	ui.ColocarTexto(r.fecha, tema.TextoXS, derecha-anchoFecha, yMeta)
-	if f.Conv.ConAdjunto {
-		// `items-end`: el clip se pega a la derecha, debajo de la fecha.
-		r.clip.Colocar(derecha-TallaClip, yMeta+tema.TextoXS.Linea+HuecoMeta, TallaClip)
-	}
-	derecha -= max(anchoFecha, adjuntoAncho(f.Conv.ConAdjunto)) + HuecoBloque
-
-	// La columna de texto es `flex-1 min-w-0`: lo que queda, y con truncado. Va
-	// centrada como bloque (`items-center` del `li`), que solo se nota con chips.
 	disponible := max(derecha-x, 0)
+	anchoFecha := ui.Medir(f.Fecha, tema.TextoXS, r.peso()).Width
 	_, _, altoChips := ColocarChips(f.Chips, disponible)
 	bloque := AltoTextoFila
 	if len(f.Chips) > 0 {
@@ -499,7 +490,8 @@ func (r *filaRenderer) Layout(t fyne.Size) {
 	y := centro(bloque)
 	// El remitente comparte línea con el contador de mensajes del hilo y la estrella,
 	// los dos `shrink-0`: se reservan a la derecha y el nombre se trunca con el resto.
-	reservado := float32(0)
+	// La fecha es `ml-auto shrink-0 pl-2`: se pega a la derecha de la línea.
+	reservado := anchoFecha + HuecoFecha
 	if f.Conv.Total > 1 {
 		reservado += tema.Espacio(1) + ui.Medir(r.cuantos.Text, tema.TextoXS, ui.Normal).Width
 	}
@@ -516,15 +508,22 @@ func (r *filaRenderer) Layout(t fyne.Size) {
 	if f.Conv.Destacada {
 		r.estrella.Colocar(nx, y+(tema.TextoBase.Linea-TallaEstrella)/2, TallaEstrella)
 	}
+	ui.ColocarTexto(r.fecha, tema.TextoXS, derecha-anchoFecha, y+(tema.TextoBase.Linea-tema.TextoXS.Linea)/2)
 	y += tema.TextoBase.Linea
 
-	ui.Truncar(r.asunto, f.Asunto, tema.TextoSM, r.peso(), disponible)
+	// El asunto es `flex-1 truncate` y el clip, `shrink-0` a su derecha.
+	anchoAsunto := disponible
+	if f.Conv.ConAdjunto {
+		anchoAsunto -= TallaClip + HuecoClip
+		r.clip.Colocar(derecha-TallaClip, y+(tema.TextoSM.Linea-TallaClip)/2, TallaClip)
+	}
+	ui.Truncar(r.asunto, f.Asunto, tema.TextoSM, r.peso(), max(anchoAsunto, 0))
 	ui.ColocarTexto(r.asunto, tema.TextoSM, x, y)
 	y += tema.TextoSM.Linea + HuecoLineas
 
 	// El extracto va CENTRADO en la tira de 24, que es donde se releva con los botones
 	// de triaje al pasar por encima.
-	ui.Truncar(r.extracto, f.Conv.Ultimo.Extracto, tema.TextoSM, r.peso(), disponible)
+	ui.Truncar(r.extracto, f.extracto(), tema.TextoSM, ui.Normal, disponible)
 	ui.ColocarTexto(r.extracto, tema.TextoSM, x, y+(TiraAcciones-tema.TextoSM.Linea)/2)
 	r.colocarTriaje(x, y, disponible)
 	y += TiraAcciones
@@ -562,12 +561,13 @@ func (r *filaRenderer) colocarChips(x, y, disponible float32) {
 	}
 }
 
-// adjuntoAncho es lo que la columna de meta reserva por el clip.
-func adjuntoAncho(hay bool) float32 {
-	if hay {
-		return TallaClip
+// extracto es el texto ENTERO de la tercera línea, antes de truncar: el del mensaje o
+// «Sin vista previa».
+func (f *FilaConversacion) extracto() string {
+	if e := f.Conv.Ultimo.Extracto; e != "" || f.T == nil {
+		return e
 	}
-	return 0
+	return f.T.T("list.noPreview", nil)
 }
 
 // peso es el 400 → 700 de la bandeja. NO es el 500 → 600 del `ListItem` genérico:
@@ -614,12 +614,10 @@ func (r *filaRenderer) Refresh() {
 	cara := r.peso().Cara()
 	r.nombre.Text, r.nombre.Color, r.nombre.FontSource = f.Remitente, tinta, cara
 	r.asunto.Text, r.asunto.Color, r.asunto.FontSource = f.Asunto, tintaSub, cara
-	// El extracto SIEMPRE va en `text-subtle`; lo que hereda del bloque es el PESO.
-	r.extracto.Text = f.Conv.Ultimo.Extracto
-	if r.extracto.Text == "" && f.T != nil {
-		r.extracto.Text = f.T.T("list.noPreview", nil)
-	}
-	r.extracto.Color, r.extracto.FontSource = tema.Color("text-subtle", v), cara
+	// El extracto va SIEMPRE en `text-subtle` y en 400 (`font-normal`), también en un
+	// no leído: lo que destaca es el asunto, no el resumen.
+	r.extracto.Text = f.extracto()
+	r.extracto.Color, r.extracto.FontSource = tema.Color("text-subtle", v), ui.Normal.Cara()
 	r.fecha.Text, r.fecha.Color, r.fecha.FontSource = f.Fecha, tintaFecha, cara
 	r.cuantos.Text = ""
 	if f.Conv.Total > 1 {
@@ -632,6 +630,7 @@ func (r *filaRenderer) Refresh() {
 		r.punto.FillColor = tema.Color("primary-600", v)
 	}
 	r.avatar.Nombre = f.Remitente
+	r.avatar.Foto, r.avatar.Logo = f.Logo, true
 	r.casilla.Marcada = f.Marcada
 	// La casilla es `opacity-0` en reposo: se ve marcada, con una selección en curso,
 	// al pasar por encima o con el dedo, que no tiene «encima» (`pointer-coarse`).

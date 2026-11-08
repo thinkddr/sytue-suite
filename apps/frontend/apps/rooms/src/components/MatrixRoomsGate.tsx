@@ -22,6 +22,8 @@ import {
 } from '../client/matrix/auth.js';
 import { RoomsMatrix, setRoomsMatrix, type MatrixDevice } from '../client/matrix/client.js';
 import { MatrixSecurityError, type MatrixBootstrap } from '../client/matrix/types.js';
+import { matrixFailureCode, type MatrixStep } from '../client/matrix/failure.js';
+import { escrowRecoveryKey, readEscrowedRecoveryKey } from '../client/matrix/recovery.js';
 import { roomsT } from '../i18n/index.js';
 
 export function MatrixRoomsGate({
@@ -39,6 +41,9 @@ export function MatrixRoomsGate({
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<'matrix.failed' | 'matrix.tab' | null>(null);
+  // El paso y el motivo del último fallo («setup:recovery»): sin él todos los
+  // fallos se veían igual y no había forma de saber cuál era.
+  const [detail, setDetail] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const [show, setShow] = useState(false);
   const [recipients, setRecipients] = useState<{ user: string; device: string; name: string }[]>(
@@ -49,6 +54,9 @@ export function MatrixRoomsGate({
   const [saved, setSaved] = useState(false);
   const [authentication, setAuthentication] = useState<string | null>(null);
   const [authOpened, setAuthOpened] = useState(false);
+  // «He olvidado la clave»: confirmación antes de restablecer el cifrado de la cuenta.
+  const [resetting, setResetting] = useState(false);
+  const [understood, setUnderstood] = useState(false);
   const [request, setRequest] = useState<VerificationRequest | null>(null);
   const [sas, setSas] = useState<ShowSasCallbacks | null>(null);
   const [phase, setPhase] = useState<VerificationPhase | null>(null);
@@ -60,16 +68,25 @@ export function MatrixRoomsGate({
     null,
   );
   const liveClientRef = useRef<RoomsMatrix | null>(null);
+  // La clave custodiada (ADR 0081) que el SDK pedirá UNA vez en la recuperación
+  // automática; si no vale, la siguiente petición abre el diálogo de siempre.
+  const escrowedRef = useRef<string | null>(null);
+  // La que la persona teclea a mano: si la recuperación sale bien, se custodia, y
+  // el siguiente dispositivo ya no la pide.
+  const typedRef = useRef<string | null>(null);
   const loadingRef = useRef<Promise<void> | null>(null);
 
-  const fail = useCallback((failure: unknown): void => {
+  const fail = useCallback((failure: unknown, step: MatrixStep = 'other'): void => {
+    const code = matrixFailureCode(step, failure);
+    console.error(`[rooms/matrix] ${code}`);
+    setDetail(code);
     setError(
       failure instanceof MatrixSecurityError && failure.reason === 'locked'
         ? 'matrix.tab'
         : 'matrix.failed',
     );
   }, []);
-  const refresh = useCallback(async (instance: RoomsMatrix): Promise<void> => {
+  const refresh = useCallback(async (instance: RoomsMatrix): Promise<boolean> => {
     const [verified, list, peers] = await Promise.all([
       instance.trusted(),
       instance.devices(),
@@ -82,7 +99,36 @@ export function MatrixRoomsGate({
       setRoomsMatrix(instance);
       window.dispatchEvent(new Event('sytue-matrix-verified'));
     }
+    return verified;
   }, []);
+  /**
+   * Sin pasos a mano (ADR 0081): con una clave custodiada, este dispositivo la usa;
+   * en una cuenta sin cifrado configurado, se crea y se custodia. Si la cuenta ya
+   * tiene cifrado pero el servicio no guarda su clave (se creó antes de esto), se
+   * quedan los botones de siempre. Un fallo aquí no cierra la pantalla: se ve el
+   * motivo y se puede seguir a mano.
+   */
+  const automaticRecovery = useCallback(
+    async (instance: RoomsMatrix, signal: AbortSignal, gone: () => boolean): Promise<void> => {
+      const escrowed = await readEscrowedRecoveryKey(signal);
+      let step: MatrixStep = 'recover';
+      try {
+        if (escrowed) {
+          escrowedRef.current = escrowed;
+          await instance.recover();
+        } else if (!(await instance.client.secretStorage.hasKey())) {
+          step = 'setup';
+          await instance.setupRecovery();
+        } else return;
+        if (!gone()) await refresh(instance);
+      } catch (failure) {
+        if (!gone()) fail(failure, step);
+      } finally {
+        escrowedRef.current = null;
+      }
+    },
+    [fail, refresh],
+  );
   useEffect(() => {
     let disposed = false;
     const controller = new AbortController();
@@ -92,6 +138,7 @@ export function MatrixRoomsGate({
       setReady(false);
       setClient(null);
       setError(null);
+      setDetail(null);
       try {
         const data = await matrixBootstrap(controller.signal);
         if (data.actor !== actor) throw new MatrixSecurityError('identity');
@@ -100,8 +147,11 @@ export function MatrixRoomsGate({
         const instance = await RoomsMatrix.open(
           data,
           {
-            saveRecoveryKey: (value) =>
-              new Promise<void>((resolve, reject) => {
+            saveRecoveryKey: async (value) => {
+              // Custodiada para la sesión OIDC: no hay nada que guardar a mano. Si el
+              // servicio no la acepta, se enseña como antes para no perderla.
+              if (!disposed && (await escrowRecoveryKey(value))) return;
+              return new Promise<void>((resolve, reject) => {
                 if (disposed) {
                   reject(new MatrixSecurityError('device'));
                   return;
@@ -109,16 +159,27 @@ export function MatrixRoomsGate({
                 pendingSecretRef.current = { resolve: () => resolve(), reject };
                 setSaved(false);
                 setSecret({ kind: 'save', value });
-              }),
-            readRecoveryKey: () =>
-              new Promise<string>((resolve, reject) => {
+              });
+            },
+            readRecoveryKey: () => {
+              const escrowed = escrowedRef.current;
+              escrowedRef.current = null;
+              if (escrowed) return Promise.resolve(escrowed);
+              return new Promise<string>((resolve, reject) => {
                 if (disposed) {
                   reject(new MatrixSecurityError('device'));
                   return;
                 }
-                pendingSecretRef.current = { resolve, reject };
+                pendingSecretRef.current = {
+                  resolve: (value) => {
+                    typedRef.current = value.trim();
+                    resolve(value);
+                  },
+                  reject,
+                };
                 setSecret({ kind: 'read', value: '' });
-              }),
+              });
+            },
             authenticate: (url) =>
               new Promise<void>((resolve, reject) => {
                 if (disposed || new URL(url).origin !== data.homeserver_url) {
@@ -151,10 +212,12 @@ export function MatrixRoomsGate({
           setRequest(incoming);
           setShow(true);
         });
-        await refresh(instance);
+        if (!(await refresh(instance)) && !disposed) {
+          await automaticRecovery(instance, controller.signal, () => disposed);
+        }
       } catch (failure) {
         if (!disposed && !(failure instanceof MatrixSecurityError && failure.reason === 'login'))
-          fail(failure);
+          fail(failure, 'open');
       } finally {
         if (!disposed) setBusy(false);
       }
@@ -175,7 +238,7 @@ export function MatrixRoomsGate({
       liveClientRef.current?.close();
       liveClientRef.current = null;
     };
-  }, [actor, tick, fail, refresh]);
+  }, [actor, tick, fail, refresh, automaticRecovery]);
   useEffect(() => {
     if (!client) return;
     const verify = (): void => {
@@ -235,15 +298,23 @@ export function MatrixRoomsGate({
       activeVerifier?.off(VerifierEvent.ShowSas, showSas);
     };
   }, [request, client, fail, refresh]);
-  async function operation(action: () => Promise<void>): Promise<void> {
+  /** Tras usar una clave tecleada, se custodia para los siguientes dispositivos. */
+  async function recoverByHand(instance: RoomsMatrix): Promise<void> {
+    await instance.recover();
+    const typed = typedRef.current;
+    typedRef.current = null;
+    if (typed) await escrowRecoveryKey(typed);
+  }
+  async function operation(step: MatrixStep, action: () => Promise<void>): Promise<void> {
     if (busy) return;
     setBusy(true);
     setError(null);
+    setDetail(null);
     try {
       await action();
       if (client) await refresh(client);
     } catch (failure) {
-      fail(failure);
+      fail(failure, step);
     } finally {
       setBusy(false);
     }
@@ -270,6 +341,7 @@ export function MatrixRoomsGate({
       {error ? (
         <p class="text-danger-text text-sm" role="alert">
           {t(error)}
+          {detail ? <span class="ms-1 font-mono text-xs">({detail})</span> : null}
         </p>
       ) : null}
       {busy ? (
@@ -279,7 +351,10 @@ export function MatrixRoomsGate({
         </p>
       ) : null}
       {!client && bootstrap ? (
-        <Button disabled={busy} onClick={() => void operation(() => beginMatrixSso(bootstrap))}>
+        <Button
+          disabled={busy}
+          onClick={() => void operation('connect', () => beginMatrixSso(bootstrap))}
+        >
           {t('matrix.connect')}
         </Button>
       ) : null}
@@ -288,13 +363,16 @@ export function MatrixRoomsGate({
           {ready ? <p class="text-success-text">{t('matrix.trusted')}</p> : null}
           {!ready ? (
             <div class="flex flex-wrap gap-2">
-              <Button disabled={busy} onClick={() => void operation(() => client.setupRecovery())}>
+              <Button
+                disabled={busy}
+                onClick={() => void operation('setup', () => client.setupRecovery())}
+              >
                 {t('matrix.setup')}
               </Button>
               <Button
                 variant="secondary"
                 disabled={busy}
-                onClick={() => void operation(() => client.recover())}
+                onClick={() => void operation('recover', () => recoverByHand(client))}
               >
                 {t('matrix.recover')}
               </Button>
@@ -302,10 +380,22 @@ export function MatrixRoomsGate({
                 variant="secondary"
                 disabled={busy}
                 onClick={() =>
-                  void operation(async () => setRequest(await client.requestVerification()))
+                  void operation('verify', async () =>
+                    setRequest(await client.requestVerification()),
+                  )
                 }
               >
                 {t('matrix.verify')}
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={busy}
+                onClick={() => {
+                  setUnderstood(false);
+                  setResetting(true);
+                }}
+              >
+                {t('matrix.reset')}
               </Button>
             </div>
           ) : null}
@@ -362,7 +452,7 @@ export function MatrixRoomsGate({
                 variant="secondary"
                 disabled={busy}
                 onClick={() =>
-                  void operation(async () =>
+                  void operation('verify', async () =>
                     setRequest(await client.verifyRecipient(peer.user, peer.device)),
                   )
                 }
@@ -384,7 +474,7 @@ export function MatrixRoomsGate({
                       size="sm"
                       variant="secondary"
                       disabled={busy}
-                      onClick={() => void operation(() => client.revokeDevice(device.id))}
+                      onClick={() => void operation('other', () => client.revokeDevice(device.id))}
                     >
                       {t('matrix.revoke')}
                     </Button>
@@ -465,6 +555,28 @@ export function MatrixRoomsGate({
             }}
           >
             {t('action.done')}
+          </Button>
+        </div>
+      </Modal>
+      <Modal open={resetting} onClose={() => setResetting(false)} title={t('matrix.resetAction')}>
+        <div class="flex flex-col gap-4">
+          <p class="text-text-muted text-sm">{t('matrix.resetBody')}</p>
+          <Checkbox
+            checked={understood}
+            onChange={(event) => setUnderstood(event.currentTarget.checked)}
+            label={t('matrix.resetUnderstood')}
+          />
+          <Button
+            variant="danger"
+            disabled={!understood || busy || !client}
+            onClick={() => {
+              // Se cierra antes: el restablecimiento abre sus propios diálogos
+              // (confirmar identidad, guardar la clave nueva).
+              setResetting(false);
+              if (client) void operation('reset', () => client.resetRecovery());
+            }}
+          >
+            {t('matrix.resetAction')}
           </Button>
         </div>
       </Modal>

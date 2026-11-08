@@ -160,6 +160,8 @@
     "other": "{date}, {count} imeacht"
   },
   "grid.daySelected": "{label}, roghnaithe",
+  "grid.handle": "Athraigh idir mí, seachtain agus clár",
+  "grid.handleState": "{view}. Athraigh idir mí, seachtain agus clár",
   "grid.loadError": "Níorbh fhéidir an féilire a lódáil",
   "grid.loading": "An féilire á lódáil",
   "grid.more": {
@@ -169,8 +171,6 @@
     "many": "+{count} eile",
     "other": "+{count} eile"
   },
-  "grid.showMonth": "Taispeáin an mhí ar fad",
-  "grid.showWeek": "Taispeáin an tseachtain seo amháin",
   "grid.snapAria": {
     "one": "Léim tharraingthe: {count} nóiméad. Brúigh chun é a athrú.",
     "two": "Léim tharraingthe: {count} nóiméad. Brúigh chun é a athrú.",

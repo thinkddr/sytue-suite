@@ -183,7 +183,8 @@ func (a *App) crearEn(dia time.Time) {
 		return
 	}
 	inicio := dia.In(p.zona())
-	if p.Vista == VistaMes || p.Vista == VistaAgenda {
+	// La semana del teléfono es el mes plegado, no la rejilla horaria: tampoco fija hora.
+	if p.Vista == VistaMes || p.Vista == VistaAgenda || p.compacta() {
 		inicio = time.Date(inicio.Year(), inicio.Month(), inicio.Day(), 9, 0, 0, 0, p.zona())
 	}
 	a.abrirFormulario(Edicion{Inicio: inicio, Fin: inicio.Add(time.Hour)})

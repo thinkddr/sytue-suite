@@ -259,6 +259,8 @@ export const lv: Catalog = {
   'app.pdf.description': 'PDF: lasīšana un anotēšana',
   'app.disabled': 'Atspējota',
   'import.title': 'Pārnesiet savus datus',
+  'import.collapse': 'Sakļaut',
+  'import.expand': 'Izvērst',
   'import.help':
     'Nokopējiet uz Sytue to, kas jums jau ir pie vecā pakalpojumu sniedzēja. Tikmēr varat turpināt strādāt.',
   'import.fromGoogle': 'Pārnest no Google',

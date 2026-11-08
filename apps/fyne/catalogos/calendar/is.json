@@ -148,14 +148,14 @@
     "other": "{date}, {count} viðburðir"
   },
   "grid.daySelected": "{label}, valið",
+  "grid.handle": "Skipta á milli mánaðar, viku og dagskrár",
+  "grid.handleState": "{view}. Skipta á milli mánaðar, viku og dagskrár",
   "grid.loadError": "Ekki tókst að hlaða dagatalinu",
   "grid.loading": "Hleður dagatalinu",
   "grid.more": {
     "one": "+{count} í viðbót",
     "other": "+{count} í viðbót"
   },
-  "grid.showMonth": "Sýna allan mánuðinn",
-  "grid.showWeek": "Sýna aðeins þessa viku",
   "grid.snapAria": {
     "one": "Dráttarskref {count} mínúta. Ýttu til að breyta.",
     "other": "Dráttarskref {count} mínútur. Ýttu til að breyta."

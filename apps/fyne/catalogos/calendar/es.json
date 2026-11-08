@@ -148,14 +148,14 @@
     "other": "{date}, {count} eventos"
   },
   "grid.daySelected": "{label}, seleccionado",
+  "grid.handle": "Cambiar entre mes, semana y agenda",
+  "grid.handleState": "{view}. Cambiar entre mes, semana y agenda",
   "grid.loadError": "No se pudo cargar el calendario",
   "grid.loading": "Cargando el calendario",
   "grid.more": {
     "one": "+{count} más",
     "other": "+{count} más"
   },
-  "grid.showMonth": "Mostrar el mes entero",
-  "grid.showWeek": "Mostrar solo esta semana",
   "grid.snapAria": {
     "one": "Imantar el arrastre a {count} minuto. Pulsa para cambiar.",
     "other": "Imantar el arrastre a {count} minutos. Pulsa para cambiar."

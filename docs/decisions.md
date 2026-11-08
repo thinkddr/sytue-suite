@@ -82,6 +82,7 @@ o reversibles sin coste no necesitan entrada.
 | 0078 | [Widgets nativos: contadores con caducidad en un App Group, Apple tras un interruptor y nada en Windows/Linux](#0078)                                        | accepted                                                                             |
 | 0079 | [Sytue Notepads sobre «papel»: un cromo neutro elegido por la app](#0079)                                                                                    | accepted                                                                             |
 | 0080 | [Toda la suite sobre «papel»: el cromo de Notepads pasa a las quince apps](#0080)                                                                            | accepted · amplía la [0079](#0079)                                                   |
+| 0081 | [La clave de recuperación de Matrix la custodia Rooms para la sesión OIDC](#0081)                                                                            | accepted                                                                             |
 
 <a id="el-pivote-sytue-native-2026-07-01"></a>
 
@@ -5955,3 +5956,41 @@ elección de cromo es global al proceso: hecha en `sesion.Abrir` se colaba en es
 quitar el atributo y la llamada. Las apps que pintan su contenido sobre `bg` dentro de la
 hoja lo enseñan gris dentro del filete blanco de la hoja: se irán pasando a `sheet-bg` al
 tocarlas.
+
+<a id="0081"></a>
+
+## 0081 — La clave de recuperación de Matrix la custodia Rooms para la sesión OIDC
+
+`accepted` · 2026-11-08 · rama `sytue-native`
+
+**Problema.** Para configurar el cifrado de extremo a extremo de Rooms, cada persona tenía
+que crear una clave de recuperación, guardarla por su cuenta y teclearla en cada dispositivo
+nuevo. Es el paso donde la gente se atasca o pierde la clave, y una clave perdida obliga a
+restablecer el cifrado y a perder el historial cifrado. El dueño pidió (2026-11-08) que la
+clave se guarde ligada al inicio de sesión de Sytue ID, sin que la persona la gestione.
+
+**Decisión.** El servicio de Rooms custodia la clave de recuperación de cada persona:
+
+- La tabla `matrix_recovery_keys` va por `subject` (la cuenta de Matrix `@sytue_<sub>` es una
+  sola en todas sus organizaciones). Se guarda cifrada con la KEK del servicio
+  (`SYTUE_ROOMS_KEY_ENCRYPTION_KEY`, `encv1:`) y solo se ve en transacciones de mantenimiento.
+  Sin KEK no se guarda nada.
+- `GET`/`POST /api/v1/matrix/recovery-key` sirven y guardan la clave de quien llama. La
+  identidad sale del token OIDC, y pasa la misma comprobación que el bootstrap de Matrix
+  (cuenta y organización activas). Nadie puede pedir la clave de otra persona.
+- El navegador, al abrir Rooms en un dispositivo sin verificar, actúa solo:
+  - Si hay clave custodiada, se recupera con ella.
+  - Si la cuenta no tiene cifrado, lo crea y custodia la clave nueva.
+  - Si la cuenta ya tenía cifrado con una clave que el servicio no conoce, se quedan los
+    botones de siempre. Cuando la persona teclea su clave y funciona, esa clave pasa a
+    custodia.
+  - Restablecer el cifrado sustituye la clave custodiada.
+- Al borrar la cuenta, su clave custodiada se borra en la misma transacción.
+
+**Consecuencias.** El cifrado deja de ser de extremo a extremo frente al operador. Quien
+controle a la vez la base de Rooms y la KEK, o pueda actuar como la persona ante Sytue ID,
+puede leer la clave y, con ella, la copia de seguridad de claves de sus salas. Ante terceros
+nada cambia: Synapse sigue guardando solo texto cifrado, y la clave nunca pasa por Synapse.
+Si un día se quiere volver al modelo anterior para una organización, basta con no llamar a la
+custodia. Las claves custodiadas se borran con `DELETE FROM matrix_recovery_keys`, y quien ya
+tenía la clave en un dispositivo la conserva.

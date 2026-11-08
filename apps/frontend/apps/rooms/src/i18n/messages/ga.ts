@@ -1129,6 +1129,12 @@ export const ga: AppCatalog<typeof en> = {
   'matrix.unsupported': 'Níl an gníomh seo ar fáil do theachtaireachtaí criptithe.',
   'matrix.auth': 'Deimhnigh d’aitheantas',
   'matrix.authContinue': 'Tá mé logáilte isteach',
+  'matrix.reset': 'Rinne mé dearmad ar m’eochair athshlánaithe',
+  'matrix.resetAction': 'Athshocraigh an criptiú',
+  'matrix.resetBody':
+    'Cruthófar eochair athshlánaithe nua. Ní bheidh teachtaireachtaí criptithe níos sine inléite ach ar ghléasanna a bhfuil siad orthu cheana, agus beidh ort do ghléasanna eile agus do theagmhálaithe a fhíorú arís.',
+  'matrix.resetUnderstood':
+    'Tuigim go bhféadfainn rochtain ar theachtaireachtaí criptithe níos sine a chailleadh',
   'matrix.tab': 'Tá Rooms oscailte i gcluaisín eile. Dún é chun an gléas seo a úsáid anseo.',
   'matrix.identityUnverified': 'Aitheantas gan fíorú',
   'matrix.senderUnverified': 'Ní féidir an seoltóir a fhíorú ar an ngléas seo',

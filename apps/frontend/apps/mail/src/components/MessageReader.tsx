@@ -41,6 +41,7 @@ import {
   getUnsubscribe,
   listAttachments,
   unsubscribe,
+  senderLogoUrl,
 } from '../client/mailApi.js';
 import type { Locale } from '@sytue/i18n';
 import type { ExternalMailAttachment } from '@sytue/api-clients';
@@ -134,6 +135,8 @@ interface Props {
   onSpam: ((conv: Conversation) => void) | null;
   /** «No es spam» (devuelve el hilo a Recibidos); null salvo en la carpeta Spam. */
   onNotSpam: ((conv: Conversation) => void) | null;
+  /** El hilo está en la carpeta de spam: sin logos de remitente, como en la lista. */
+  enSpam?: boolean;
   /** Borrado definitivo del hilo (solo en papelera/spam); la confirmación es del padre. */
   onPurge: ((conv: Conversation) => void) | null;
   onMove: (conv: Conversation, dest: Mailbox) => void;
@@ -165,6 +168,7 @@ export function MessageReader({
   onTrash,
   onSpam,
   onNotSpam,
+  enSpam = false,
   onPurge,
   onMove,
   moveTargets,
@@ -682,6 +686,7 @@ export function MessageReader({
               prefetchedBody={msg.id === latest.id ? latestBody : null}
               onReply={onReply}
               cuerpoExterno={cuerpoExterno}
+              enSpam={enSpam}
             />
           ))}
         </div>
@@ -703,6 +708,7 @@ function ThreadMessage({
   prefetchedBody,
   onReply,
   cuerpoExterno,
+  enSpam,
 }: {
   /** `t` y `locale` bajan por props desde el lector: nunca se detecta aquí. */
   t: T;
@@ -712,6 +718,7 @@ function ThreadMessage({
   prefetchedBody: CuerpoLeido | null;
   onReply: (email: EmailSummary, mode: ReplyMode, bodyText?: string) => void;
   cuerpoExterno?: ((origen: OrigenExterno) => Promise<CuerpoExterno>) | undefined;
+  enSpam: boolean;
 }): JSX.Element {
   const externo = origenExterno(email.id) !== null;
   const cuerpoExternoRef = useRef(cuerpoExterno);
@@ -814,7 +821,12 @@ function ThreadMessage({
         aria-expanded={expanded}
         onClick={() => setExpanded((v) => !v)}
       >
-        <Avatar name={displayName(t, email.from)} size={expanded ? 'lg' : 'md'} />
+        <Avatar
+          name={displayName(t, email.from)}
+          src={enSpam ? undefined : senderLogoUrl(email.from[0]?.email)}
+          logo
+          size={expanded ? 'lg' : 'md'}
+        />
         <span class="min-w-0 flex-1">
           <span class="flex items-baseline gap-3">
             {/* 400 y no 500 para el leído: contra el 600 del no leído, un escalón de

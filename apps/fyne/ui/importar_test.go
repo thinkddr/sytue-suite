@@ -248,3 +248,47 @@ func TestElFlujoDeDatosDeduceLaDireccion(t *testing.T) {
 		w.Close()
 	}
 }
+
+// TestImportarSePliegaYLoRecuerda: plegado queda en su línea de título —sin la ayuda ni
+// los botones— y la elección sobrevive a la pieza, porque es una preferencia.
+func TestImportarSePliegaYLoRecuerda(t *testing.T) {
+	tr := traductorPrueba(t)
+	prefs := fyne.CurrentApp().Preferences()
+	prefs.SetBool(PreferenciaPlegado, false)
+	t.Cleanup(func() { prefs.RemoveValue(PreferenciaPlegado) })
+	g := &pasarelaDoble{instancias: `{"instances":[{"id":"g","name":"G","template_key":"google","status":"active"}]}`, migraciones: `{"migrations":[]}`}
+	srv := g.servidor(t)
+	nuevo := func() *ImportarDatos {
+		d := NuevoImportarDatos(tr, api.NewIntegraciones(srv.URL, nil, nil), "drive")
+		d.aparte = func(f func()) { f() }
+		d.Sondeo = 0
+		d.Cargar()
+		return d
+	}
+	d := nuevo()
+	repintado := 0
+	d.AlCambiar = func() { repintado++ }
+	abierto := d.Objeto(231, tema.Claro)
+	ayuda := tr.T("import.help", nil)
+	if d.Plegado() || !strings.Contains(textosDeArbol(abierto), ayuda) {
+		t.Fatalf("arranca plegado o sin los botones: plegado=%v %q", d.Plegado(), textosDeArbol(abierto))
+	}
+	d.Alternar()
+	plegado := d.Objeto(231, tema.Claro)
+	if !d.Plegado() || repintado != 1 {
+		t.Fatal("plegar no cambia el estado o no repinta")
+	}
+	if strings.Contains(textosDeArbol(plegado), ayuda) || !strings.Contains(textosDeArbol(plegado), tr.T("import.title", nil)) {
+		t.Fatalf("plegado debe quedar solo el título: %q", textosDeArbol(plegado))
+	}
+	if plegado.MinSize().Height >= abierto.MinSize().Height/2 {
+		t.Fatalf("plegado no ahorra sitio: %v contra %v", plegado.MinSize().Height, abierto.MinSize().Height)
+	}
+	if !nuevo().Plegado() {
+		t.Fatal("la elección no se recuerda")
+	}
+	d.Alternar()
+	if d.Plegado() || nuevo().Plegado() {
+		t.Fatal("desplegar no se recuerda")
+	}
+}

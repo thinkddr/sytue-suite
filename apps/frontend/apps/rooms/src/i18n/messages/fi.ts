@@ -977,6 +977,11 @@ export const fi: AppCatalog<typeof en> = {
   'matrix.unsupported': 'Tämä toiminto ei ole käytettävissä salatuille viesteille.',
   'matrix.auth': 'Vahvista henkilöllisyytesi',
   'matrix.authContinue': 'Olen kirjautunut sisään',
+  'matrix.reset': 'Olen unohtanut palautusavaimen',
+  'matrix.resetAction': 'Nollaa salaus',
+  'matrix.resetBody':
+    'Uusi palautusavain luodaan. Aiemmat salatut viestit pysyvät luettavina vain laitteilla, joilla ne jo ovat, ja sinun on vahvistettava muut laitteesi ja yhteyshenkilösi uudelleen.',
+  'matrix.resetUnderstood': 'Ymmärrän, että voin menettää pääsyn aiempiin salattuihin viesteihin',
   'matrix.tab': 'Rooms on auki toisessa välilehdessä. Sulje se käyttääksesi tätä laitetta täällä.',
   'matrix.identityUnverified': 'Henkilöllisyyttä ei ole vahvistettu',
   'matrix.senderUnverified': 'Lähettäjää ei voida vahvistaa tällä laitteella',

@@ -1073,6 +1073,11 @@ export const en = {
   'matrix.unsupported': 'This action is not available for encrypted messages.',
   'matrix.auth': 'Confirm your identity',
   'matrix.authContinue': 'I’ve completed sign-in',
+  'matrix.reset': 'I’ve forgotten my recovery key',
+  'matrix.resetAction': 'Reset encryption',
+  'matrix.resetBody':
+    'A new recovery key will be created. Earlier encrypted messages will only stay readable on devices that already have them, and you will need to verify your other devices and your contacts again.',
+  'matrix.resetUnderstood': 'I understand I may lose access to earlier encrypted messages',
   'matrix.tab': 'Rooms is open in another tab. Close it to use this device here.',
   'matrix.identityUnverified': 'Identity not verified',
   'matrix.senderUnverified': 'The sender cannot be verified on this device',

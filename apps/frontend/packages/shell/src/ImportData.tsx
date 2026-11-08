@@ -17,7 +17,7 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { Button, DataFlow, Spinner } from '@sytue/ui';
+import { Button, DataFlow, Icon, Spinner } from '@sytue/ui';
 import type { DataCategory } from '@sytue/ui';
 import { useI18n } from '@sytue/i18n/preact';
 import type { ImportDomain, ImportJob, ImportOrigin } from '@sytue/api-clients';
@@ -52,6 +52,30 @@ const CATEGORIA: Record<ImportDomain, DataCategory> = {
 };
 
 /** ¿Sigue trabajando? Mientras lo haga se vuelve a preguntar. */
+/**
+ * Si la persona lo dejó plegado. Una preferencia de este navegador y para todas las apps:
+ * quien ya ha decidido no traer nada no quiere el bloque abierto en cada producto. Sin
+ * almacenamiento (ventana privada, bloqueado) arranca abierto, como siempre.
+ */
+const CLAVE_PLEGADO = 'sytue.import.plegado';
+
+function leerPlegado(): boolean {
+  try {
+    return localStorage.getItem(CLAVE_PLEGADO) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function guardarPlegado(plegado: boolean): void {
+  try {
+    if (plegado) localStorage.setItem(CLAVE_PLEGADO, '1');
+    else localStorage.removeItem(CLAVE_PLEGADO);
+  } catch {
+    // Sin almacenamiento solo se pierde el recuerdo; el pliegue funciona igual.
+  }
+}
+
 function enCurso(jobs: ImportJob[]): boolean {
   return jobs.some((j) => j.status === 'queued' || j.status === 'running');
 }
@@ -66,6 +90,9 @@ export function ImportData({
   const [cargando, setCargando] = useState(true);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState('');
+  // En el lateral el bloque entero (ayuda, DataFlow, botones) se come media barra, así
+  // que se puede plegar a su línea de título.
+  const [plegado, setPlegado] = useState(leerPlegado);
   // Cada importación lanzada vuelve a arrancar el sondeo: sin esto el bloque se quedaba
   // en «trayendo…» hasta recargar la página, porque solo se sondeaba lo que ya estaba en
   // curso al montar. Igual en la app nativa (`ui.ImportarDatos`).
@@ -142,55 +169,85 @@ export function ImportData({
   const hechos = estado.jobs.filter((j) => j.status === 'done');
   const fallidos = estado.jobs.filter((j) => j.status === 'error');
 
+  function alternar(): void {
+    const siguiente = !plegado;
+    setPlegado(siguiente);
+    guardarPlegado(siguiente);
+  }
+
   return (
     <section class="border-border bg-surface rounded-md border p-3" aria-label={t('import.title')}>
-      <h2 class="text-text text-sm font-semibold">{t('import.title')}</h2>
+      <div class="flex items-center justify-between gap-2">
+        <h2 class="text-text flex min-w-0 items-center gap-2 text-sm font-semibold">
+          <span class="truncate">{t('import.title')}</span>
+          {/* Plegado y trabajando: la rueda sigue diciendo que algo pasa. */}
+          {plegado && trabajando.length > 0 ? <Spinner size={14} /> : null}
+        </h2>
+        {/* `data-mantiene-nav`: en el teléfono el lateral es un cajón que se cierra al
+            pulsar cualquier botón de dentro; plegar no es elegir nada (ver SidebarSection). */}
+        <Button
+          size="xs"
+          variant="ghost"
+          iconOnly
+          data-mantiene-nav
+          aria-expanded={!plegado}
+          aria-label={`${t(plegado ? 'import.expand' : 'import.collapse')}: ${t('import.title')}`}
+          title={t(plegado ? 'import.expand' : 'import.collapse')}
+          onClick={alternar}
+        >
+          <Icon name={plegado ? 'chevronRight' : 'chevronDown'} size={14} />
+        </Button>
+      </div>
 
-      {trabajando.length > 0 ? (
-        <div class="mt-2 flex items-center gap-2" aria-live="polite">
-          <Spinner size={16} />
-          <p class="text-text-muted text-xs">
-            {t('import.running', { count: contar(trabajando) })}
-          </p>
-        </div>
-      ) : (
+      {plegado ? null : (
         <>
-          <p class="text-text-muted mt-0.5 text-xs">{t('import.help')}</p>
-          <DataFlow compact class="mt-2" incoming={domains.map((d) => CATEGORIA[d])} />
-          <div class="mt-2 flex flex-wrap gap-2">
-            {estado.origins.map((o) => (
-              <Button
-                key={o.instanceId}
-                size="sm"
-                variant="secondary"
-                disabled={enviando}
-                onClick={() => void traer(o)}
-              >
-                {t(o.source === 'google' ? 'import.fromGoogle' : 'import.fromMicrosoft')}
-              </Button>
-            ))}
-          </div>
-        </>
-      )}
+          {trabajando.length > 0 ? (
+            <div class="mt-2 flex items-center gap-2" aria-live="polite">
+              <Spinner size={16} />
+              <p class="text-text-muted text-xs">
+                {t('import.running', { count: contar(trabajando) })}
+              </p>
+            </div>
+          ) : (
+            <>
+              <p class="text-text-muted mt-0.5 text-xs">{t('import.help')}</p>
+              <DataFlow compact class="mt-2" incoming={domains.map((d) => CATEGORIA[d])} />
+              <div class="mt-2 flex flex-wrap gap-2">
+                {estado.origins.map((o) => (
+                  <Button
+                    key={o.instanceId}
+                    size="sm"
+                    variant="secondary"
+                    disabled={enviando}
+                    onClick={() => void traer(o)}
+                  >
+                    {t(o.source === 'google' ? 'import.fromGoogle' : 'import.fromMicrosoft')}
+                  </Button>
+                ))}
+              </div>
+            </>
+          )}
 
-      {/* El recuento va SIEMPRE, también cuando termina: «traído» a secas no dice si
+          {/* El recuento va SIEMPRE, también cuando termina: «traído» a secas no dice si
           llegó todo, y saber cuántos elementos se quedaron fuera es la mitad honesta
           del informe. */}
-      {hechos.length > 0 ? (
-        <p class="sytue-meta mt-2">
-          {t('import.done', { count: contar(hechos), skipped: contarOmitidos(hechos) })}
-        </p>
-      ) : null}
-      {fallidos.length > 0 ? (
-        <p class="text-danger-text mt-2 text-xs" role="alert">
-          {t('import.someFailed')}
-        </p>
-      ) : null}
-      {error ? (
-        <p class="text-danger-text mt-2 text-xs" role="alert">
-          {error}
-        </p>
-      ) : null}
+          {hechos.length > 0 ? (
+            <p class="sytue-meta mt-2">
+              {t('import.done', { count: contar(hechos), skipped: contarOmitidos(hechos) })}
+            </p>
+          ) : null}
+          {fallidos.length > 0 ? (
+            <p class="text-danger-text mt-2 text-xs" role="alert">
+              {t('import.someFailed')}
+            </p>
+          ) : null}
+          {error ? (
+            <p class="text-danger-text mt-2 text-xs" role="alert">
+              {error}
+            </p>
+          ) : null}
+        </>
+      )}
     </section>
   );
 }

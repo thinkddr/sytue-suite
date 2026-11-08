@@ -160,6 +160,10 @@ func TestLasCapturasDeLaApp(t *testing.T) {
 			p.abrirEditor(n)
 			p.lienzo.AlEnsanchar()
 		}},
+		// Una nota recién creada, sin título ni texto: lo que se ve tiene que decir
+		// dónde escribir, y la zona que lo dice llega hasta abajo.
+		{"escritorio-arbol-vacia", 1280, 800, "tree", conNotaVacia},
+		{"movil-arbol-vacia", 360, 740, "tree", conNotaVacia},
 		{"escritorio-arbol-editando", 1280, 800, "tree", func(p *Pantalla) {
 			n, _ := p.nota("n1")
 			p.abrirEditor(n)
@@ -189,6 +193,14 @@ func TestLasCapturasDeLaApp(t *testing.T) {
 	}
 }
 
+// conNotaVacia deja «Presupuesto» sin título ni texto y la elige en el árbol.
+func conNotaVacia(p *Pantalla) {
+	c := p.notas[0].Crudo
+	c.Title, c.Content, c.States = "", "", nil
+	p.notas[0] = DeNota(c)
+	p.lienzo.Seleccionada = "n1"
+}
+
 // conIconoPin le pone a «Direcciones» el icono de la chincheta.
 func conIconoPin(p *Pantalla) {
 	c := p.notas[3].Crudo
@@ -204,5 +216,45 @@ func conColaSinRed(p *Pantalla) {
 	p.cola = []capturaPendiente{
 		{ClientID: "a", Cuaderno: "c1", In: api.NoteInput{Kind: "text", Content: "<p>Llamar a Marta para la reunión del jueves</p>"}},
 		{ClientID: "b", Cuaderno: "c1", In: api.NoteInput{Kind: "todo", Title: "Comprar el regalo de Lucía"}, Rechazada: true},
+	}
+}
+
+// En árbol, elegir una nota VACÍA la abre ya escribiendo: enseñarla en lectura dejaba
+// la hoja en blanco sin decir dónde pulsar. Con texto, o fuera del árbol, elegir no
+// abre el editor.
+func TestLaNotaVaciaDeUnArbolSeAbreEscribiendo(t *testing.T) {
+	for _, c := range []struct {
+		nombre, vista string
+		vacia, abre   bool
+	}{
+		{"arbol-vacia", "tree", true, true},
+		{"arbol-con-texto", "tree", false, false},
+		{"columnas-vacia", "columns", true, false},
+	} {
+		t.Run(c.nombre, func(t *testing.T) {
+			p, _ := montarCaptura(t, 1280, 800, c.vista)
+			if c.vacia {
+				conNotaVacia(p)
+				p.lienzo.Seleccionada = ""
+			}
+			p.abrirNota("n1")
+			if abierta := p.edicion != nil && p.edicion.nota == "n1"; abierta != c.abre {
+				t.Fatalf("editor abierto = %v, se esperaba %v", abierta, c.abre)
+			}
+		})
+	}
+}
+
+// La hoja del árbol llega hasta abajo del panel, y el editor con ella: antes medía lo
+// de su contenido y el resto del panel no era pulsable.
+func TestLaHojaDelArbolLlenaElPanel(t *testing.T) {
+	p, w := montarCaptura(t, 1280, 800, "tree")
+	n, _ := p.nota("n1")
+	p.abrirEditor(n)
+	p.Repintar()
+	ed := p.edicion.editor
+	abajo := fyne.CurrentApp().Driver().AbsolutePositionForObject(ed).Y + ed.Size().Height
+	if alto := w.Canvas().Size().Height; abajo < alto-120 {
+		t.Fatalf("el editor acaba en %v y la ventana mide %v: no llena el panel", abajo, alto)
 	}
 }

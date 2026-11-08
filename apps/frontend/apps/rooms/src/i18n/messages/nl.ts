@@ -992,6 +992,12 @@ export const nl: AppCatalog<typeof en> = {
   'matrix.unsupported': 'Deze actie is niet beschikbaar voor versleutelde berichten.',
   'matrix.auth': 'Bevestig je identiteit',
   'matrix.authContinue': 'Ik ben ingelogd',
+  'matrix.reset': 'Ik ben mijn herstelsleutel vergeten',
+  'matrix.resetAction': 'Versleuteling opnieuw instellen',
+  'matrix.resetBody':
+    'Er wordt een nieuwe herstelsleutel aangemaakt. Eerdere versleutelde berichten blijven alleen leesbaar op apparaten die ze al hebben, en je moet je andere apparaten en je contacten opnieuw verifiëren.',
+  'matrix.resetUnderstood':
+    'Ik begrijp dat ik de toegang tot eerdere versleutelde berichten kan verliezen',
   'matrix.tab':
     'Rooms is geopend in een ander tabblad. Sluit het om dit apparaat hier te gebruiken.',
   'matrix.identityUnverified': 'Identiteit niet geverifieerd',

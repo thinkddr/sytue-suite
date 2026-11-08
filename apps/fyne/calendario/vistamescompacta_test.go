@@ -226,10 +226,6 @@ func TestElMesDelTelefonoSeParecaALaCaptura(t *testing.T) {
 			}
 		}
 		if modo == "oscuro" {
-			p.mesPlegado = true
-			a.pintar()
-			guardar(t, w.Canvas().Capture(), "calendario-mes-movil-plegado-oscuro")
-			p.mesPlegado = false
 			p.Recordatorios = []api.Reminder{{ID: "r1", Summary: "Tenis", DTStart: time.Date(2026, 11, 6, 13, 0, 0, 0, time.UTC)}}
 			p.Invitaciones = 1
 			a.recCargando = false
@@ -390,39 +386,255 @@ func TestDeslizarSobreLosDiasCambiaDeMes(t *testing.T) {
 		t.Errorf("a la izquierda llega al %s y es el 6 de diciembre", got)
 	}
 	deslizar(mesDe(t, w.Content()), 120, 120)
-	p.mesPlegado = true
-	a.pintar()
+	p.AlCambiarVista(VistaSemana)
 	deslizar(mesDe(t, w.Content()), 120, -120)
 	if got := p.Cursor.Format(time.DateOnly); got != "2026-11-13" {
-		t.Errorf("plegado, a la izquierda llega al %s y es la semana siguiente (13-nov)", got)
+		t.Errorf("en la semana, a la izquierda llega al %s y es la semana siguiente (13-nov)", got)
 	}
 }
 
-// TestElAsaPliegaALaSemanaYVuelve: plegado queda una fila con los días del mes vecino
-// (V14 pintado: desde el 1-nov se ven del 26 al 31 de octubre) y el asa cambia de nombre;
-// otra vez, el mes entero. VISTO EN ROJO sin conmutar `mesPlegado`.
-func TestElAsaPliegaALaSemanaYVuelve(t *testing.T) {
+// filasVisibles son los números de las semanas que se ven (las demás, escondidas).
+func filasVisibles(m *mesCompacto) []int {
+	var out []int
+	for i, w := range m.semanas {
+		if m.pastis[i].Visible() {
+			out = append(out, w.Numero)
+		}
+	}
+	return out
+}
+
+// TestUnToqueEnElAsaAlternaMesYSemana: un toque pliega a la semana del cursor, con los
+// días del mes vecino (V14 pintado: desde el 1-nov se ven del 26 al 31 de octubre), y el
+// nombre dice la vista; otro, el mes entero; desde la agenda, a la semana. La vista ES la
+// posición: el selector del cajón dice lo mismo. VISTO EN ROJO con `PosicionAlTocar`
+// devolviendo siempre la semana (el segundo toque no volvía al mes).
+func TestUnToqueEnElAsaAlternaMesYSemana(t *testing.T) {
 	a, w := appTelefono(t)
 	p := a.P
 	p.AlElegirDia(time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC))
 	m := mesDe(t, w.Content())
-	if m.asa.Nombre != "Mostrar solo esta semana" {
-		t.Errorf("desplegado, el asa se llama %q", m.asa.Nombre)
+	if m.asa.Nombre != "Mes. Cambiar entre mes, semana y agenda" {
+		t.Errorf("en el mes, el asa se llama %q", m.asa.Nombre)
 	}
 	test.Tap(m.asa)
 	m = mesDe(t, w.Content())
-	if len(m.semanas) != 1 || m.semanas[0].Numero != 44 || m.asa.Nombre != "Mostrar el mes entero" {
-		t.Fatalf("plegado: %d semanas (%v), asa %q", len(m.semanas), numeros(m.semanas), m.asa.Nombre)
+	if p.Vista != VistaSemana || m.asa.Nombre != "Semana. Cambiar entre mes, semana y agenda" {
+		t.Fatalf("tras un toque: vista %d, asa %q", p.Vista, m.asa.Nombre)
+	}
+	if got := filasVisibles(m); len(got) != 1 || got[0] != 44 || len(m.semanas) != 6 {
+		t.Fatalf("en la semana se ven %v de %d semanas", got, len(m.semanas))
 	}
 	if d := m.dias[0]; d == nil || d.d.Fecha.Day() != 26 || !d.d.OtroMes {
-		t.Errorf("plegado, el lunes es %+v y es el 26 de octubre", d)
+		t.Errorf("en la semana, el lunes es %+v y es el 26 de octubre", d)
 	}
 	if h := m.Size().Height; h != AltoDiasCompacta+AltoSemanaCompacta+AltoAsaMes {
-		t.Errorf("plegado, la hoja mide %v", h)
+		t.Errorf("en la semana, la hoja mide %v", h)
 	}
 	test.Tap(m.asa)
-	if m = mesDe(t, w.Content()); len(m.semanas) != 6 {
-		t.Errorf("desplegado otra vez: %d semanas", len(m.semanas))
+	if m = mesDe(t, w.Content()); p.Vista != VistaMes || len(filasVisibles(m)) != 6 {
+		t.Errorf("otro toque: vista %d, %v a la vista", p.Vista, filasVisibles(m))
+	}
+	p.AlCambiarVista(VistaAgenda)
+	test.Tap(mesDe(t, w.Content()).asa)
+	if p.Vista != VistaSemana {
+		t.Errorf("de la agenda, un toque lleva a la vista %d y es la semana", p.Vista)
+	}
+}
+
+// TestElAsaConElTeclado: ↑ un paso hacia la agenda, ↓ hacia el mes, Inicio al mes y Fin a
+// la agenda; Espacio es el toque. VISTO EN ROJO sin el `TypedKey` del asa (las flechas
+// no hacían nada: Pulsable solo atiende Intro y Espacio).
+func TestElAsaConElTeclado(t *testing.T) {
+	a, w := appTelefono(t)
+	p := a.P
+	tecla := func(k fyne.KeyName) { mesDe(t, w.Content()).asa.TypedKey(&fyne.KeyEvent{Name: k}) }
+	teclas := []fyne.KeyName{fyne.KeyUp, fyne.KeyUp, fyne.KeyUp, fyne.KeyHome, fyne.KeyEnd, fyne.KeyDown, fyne.KeyLeft}
+	vistas := make([]Vista, 0, len(teclas))
+	for _, k := range teclas {
+		tecla(k)
+		vistas = append(vistas, p.Vista)
+	}
+	quiero := []Vista{VistaSemana, VistaAgenda, VistaAgenda, VistaMes, VistaAgenda, VistaSemana, VistaMes}
+	for i := range quiero {
+		if vistas[i] != quiero[i] {
+			t.Fatalf("las vistas tras cada tecla son %v y son %v", vistas, quiero)
+		}
+	}
+	mesDe(t, w.Content()).asa.TypedRune(' ')
+	if p.Vista != VistaSemana {
+		t.Errorf("Espacio en el mes lleva a la vista %d", p.Vista)
+	}
+}
+
+// arrastrarAsa lleva el asa `dy` en cuatro pasos de `paso` y, si `soltar`, la suelta.
+func arrastrarAsa(t *testing.T, w fyne.Window, dy float32, paso time.Duration, soltar bool) *mesCompacto {
+	t.Helper()
+	antes := relojAsa
+	t.Cleanup(func() { relojAsa = antes })
+	ahora := time.Date(2026, 11, 6, 19, 36, 0, 0, time.UTC)
+	relojAsa = func() time.Time { return ahora }
+	m := mesDe(t, w.Content())
+	for range 4 {
+		ahora = ahora.Add(paso)
+		m.asa.Dragged(&fyne.DragEvent{PointEvent: fyne.PointEvent{Position: fyne.NewPos(195, 16)}, Dragged: fyne.NewDelta(0, dy/4)})
+	}
+	if soltar {
+		// Soltar QUIETO: 150 ms parado, y lo de antes sale de la ventana de velocidad.
+		ahora = ahora.Add(150 * time.Millisecond)
+		m.asa.Dragged(&fyne.DragEvent{PointEvent: fyne.PointEvent{Position: fyne.NewPos(195, 16)}})
+		m.asa.DragEnd()
+	}
+	return m
+}
+
+// TestArrastrarElAsaLlevaLaHoja: la hoja sigue al dedo (a medio camino entre el mes y la
+// semana mide lo que dice el modelo y la fila del cursor ha subido en proporción, con
+// todas las semanas a la vista), y al soltar se ajusta: pasada la mitad, a la semana; un
+// lanzamiento, a la siguiente; un temblor, nada. Con la animación, la hoja nueva sale del
+// alto en que la dejó el dedo. VISTOS EN ROJO sin `arrastrando` en `alto()` (la hoja no se
+// movía).
+func TestArrastrarElAsaLlevaLaHoja(t *testing.T) {
+	a, w := appTelefono(t)
+	p := a.P
+	// Noviembre de 2026: seis semanas, 264 en el mes; el 6 va en la fila 1.
+	m := arrastrarAsa(t, w, -100, 60*time.Millisecond, false)
+	if h := m.Size().Height; h != 164+AltoAsaMes {
+		t.Errorf("a medio camino la hoja mide %v y es 164 + el asa", h)
+	}
+	seis := diaN(t, m, 6)
+	if y := seis.Position().Y; y != AltoDiasCompacta+AltoSemanaCompacta-20 {
+		t.Errorf("a medio camino la fila del 6 está en y=%v (sube 20 de 40)", y)
+	}
+	if got := filasVisibles(m); len(got) != 6 {
+		t.Errorf("arrastrando se ven %v", got)
+	}
+	m.asa.Dragged(&fyne.DragEvent{Dragged: fyne.NewDelta(0, -20)})
+	m.asa.Dragged(&fyne.DragEvent{})
+	// relojAsa sigue quieto: la última muestra es del mismo instante, sin velocidad.
+	m.asa.DragEnd()
+	if p.Vista != VistaSemana || !p.hayAltoHoja {
+		t.Fatalf("soltar a 144 lleva a la vista %d", p.Vista)
+	}
+	// Lento y poco: se queda.
+	arrastrarAsa(t, w, 25, 60*time.Millisecond, true)
+	if p.Vista != VistaSemana {
+		t.Errorf("25 hacia abajo y lento lleva a la vista %d", p.Vista)
+	}
+	// Un lanzamiento corto hacia arriba: a la agenda.
+	arrastrarAsa(t, w, -20, 5*time.Millisecond, false).asa.DragEnd()
+	if p.Vista != VistaAgenda {
+		t.Errorf("un lanzamiento desde la semana lleva a la vista %d", p.Vista)
+	}
+	// Un temblor no es arrastre.
+	arrastrarAsa(t, w, -3, 30*time.Millisecond, true)
+	if p.Vista != VistaAgenda {
+		t.Errorf("un temblor cambió a la vista %d", p.Vista)
+	}
+	// Abajo del todo y lento: al mes.
+	arrastrarAsa(t, w, 300, 80*time.Millisecond, true)
+	if p.Vista != VistaMes {
+		t.Errorf("abajo del todo lleva a la vista %d", p.Vista)
+	}
+}
+
+// TestLaHojaSeAnimaDesdeDondeEstaba: cambiar de vista reconstruye la pantalla y la hoja
+// nueva arranca del alto de la vieja; a mitad de la animación mide lo de en medio, con
+// todo el mes a la vista, y al acabar, el de su posición. Con `SinMovimiento`, ya en su
+// sitio. VISTOS EN ROJO sin `arrancar` (la hoja nueva salía en su sitio: un salto de 200
+// px) y con `quieta()` siempre cierto (a medio camino solo se veía la semana).
+func TestLaHojaSeAnimaDesdeDondeEstaba(t *testing.T) {
+	a, w := appTelefono(t)
+	p := a.P
+	antes := empezarAnimacion
+	t.Cleanup(func() { empezarAnimacion = antes })
+	var anim *fyne.Animation
+	empezarAnimacion = func(x *fyne.Animation) { anim = x }
+	p.AlCambiarVista(VistaSemana)
+	m := mesDe(t, w.Content())
+	if anim == nil || !m.animando || m.alto() != 264 {
+		t.Fatalf("la hoja nueva no sale del alto de la vieja: %v (animando %v)", m.alto(), m.animando)
+	}
+	anim.Tick(0.5)
+	if m.alto() != 164 || len(filasVisibles(m)) != 6 {
+		t.Errorf("a mitad: %v y %v a la vista", m.alto(), filasVisibles(m))
+	}
+	anim.Tick(1)
+	if m.animando || m.alto() != 64 || len(filasVisibles(m)) != 1 {
+		t.Errorf("al final: %v, animando %v, %v a la vista", m.alto(), m.animando, filasVisibles(m))
+	}
+	quieto := ui.SinMovimiento
+	ui.SinMovimiento = true
+	t.Cleanup(func() { ui.SinMovimiento = quieto })
+	p.AlCambiarVista(VistaMes)
+	if m = mesDe(t, w.Content()); m.animando || p.animHoja != nil {
+		t.Error("con SinMovimiento la hoja se anima")
+	}
+}
+
+// TestLasTresPosicionesDelAsa: el mes, la semana y la agenda a 390, en oscuro y en claro.
+// En la agenda no hay rejilla (ni se ve ni se recorre), el asa queda arriba y debajo va
+// la agenda de siempre, con su buscador. El selector del cajón marca la misma vista.
+func TestLasTresPosicionesDelAsa(t *testing.T) {
+	t.Cleanup(func() { tema.Elegir("") })
+	for _, modo := range []string{"oscuro", "claro"} {
+		tema.Elegir(modo)
+		a, w := appTelefono(t)
+		p := a.P
+		guardar(t, w.Canvas().Capture(), "calendario-asa-mes-"+modo)
+		p.AlCambiarVista(VistaSemana)
+		m := mesDe(t, w.Content())
+		if got := filasVisibles(m); len(got) != 1 || got[0] != 45 {
+			t.Errorf("%s: en la semana se ve %v y es la 45", modo, got)
+		}
+		if tx := textos(w.Content()); !tx["viernes, 6 de noviembre de 2026"] || !tx["Tenis"] {
+			t.Errorf("%s: en la semana falta la lista del día", modo)
+		}
+		guardar(t, w.Canvas().Capture(), "calendario-asa-semana-"+modo)
+		// La agenda pide su rango: los treinta días desde el cursor. La caché del test es
+		// la del mes; se deja solo lo de ese rango, como lo daría el servicio.
+		todo, claveMes := a.porCal, a.clave
+		desde, hasta := Rango(VistaAgenda, p.Cursor, p.zona())
+		a.clave = desde.Format(time.RFC3339) + ".." + hasta.Format(time.RFC3339)
+		var enRango []api.Instance
+		for _, i := range a.porCal["c"] {
+			if !i.Start.Before(desde) {
+				enRango = append(enRango, i)
+			}
+		}
+		a.porCal = map[string][]api.Instance{"c": enRango}
+		p.AlCambiarVista(VistaAgenda)
+		m = mesDe(t, w.Content())
+		if h := m.Size().Height; h != AltoAsaMes || p.diaElegido != nil {
+			t.Errorf("%s: en la agenda la hoja mide %v (y el foco tiene día: %v)", modo, h, p.diaElegido != nil)
+		}
+		for _, d := range m.dias {
+			if d != nil && d.Visible() {
+				t.Fatalf("%s: en la agenda se ve el %d", modo, d.d.Fecha.Day())
+			}
+		}
+		if pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(m.asa); pos.Y > 60 {
+			t.Errorf("%s: en la agenda el asa está en y=%v y va arriba", modo, pos.Y)
+		}
+		if buscarObjeto(w.Content(), func(o fyne.CanvasObject) bool { _, es := o.(*ui.Entrada); return es }) == nil {
+			t.Errorf("%s: en la agenda falta su buscador", modo)
+		}
+		guardar(t, w.Canvas().Capture(), "calendario-asa-agenda-"+modo)
+		p.cajonAbierto = true
+		a.pintar()
+		if g := buscarObjeto(w.Content(), func(o fyne.CanvasObject) bool { _, es := o.(*GrupoVista); return es }); g == nil || g.(*GrupoVista).Activa != VistaAgenda {
+			t.Errorf("%s: el selector del cajón no marca la agenda", modo)
+		}
+		if modo == "oscuro" {
+			guardar(t, w.Canvas().Capture(), "calendario-asa-agenda-cajon-oscuro")
+		}
+		p.cajonAbierto = false
+		a.pintar()
+		// A medio arrastre, del mes hacia la semana (con la caché del mes de vuelta).
+		a.porCal, a.clave = todo, claveMes
+		p.AlCambiarVista(VistaMes)
+		arrastrarAsa(t, w, -100, 60*time.Millisecond, false)
+		guardar(t, w.Canvas().Capture(), "calendario-asa-arrastrando-"+modo)
 	}
 }
 
@@ -437,9 +649,15 @@ func TestElMesDelTelefonoSoloPorDebajoDe640(t *testing.T) {
 	if p.compacta() {
 		t.Error("a 640 no es compacto")
 	}
-	p.Ventana, p.Vista = 390, VistaSemana
+	// La semana y la agenda son posiciones del asa; el día no.
+	for _, v := range []Vista{VistaSemana, VistaAgenda} {
+		if p.Ventana, p.Vista = 390, v; !p.compacta() {
+			t.Errorf("a 390 la vista %d tiene que ser compacta", v)
+		}
+	}
+	p.Ventana, p.Vista = 390, VistaDia
 	if p.compacta() {
-		t.Error("en la semana no es compacto")
+		t.Error("en el día no es compacto")
 	}
 	p.Ventana, p.Vista = 0, VistaMes
 	if p.compacta() {
@@ -636,7 +854,7 @@ func TestSiguienteYAnteriorDanElPasoDeLoQueSeVe(t *testing.T) {
 	if !mismoDia(p.Cursor, time.Date(2027, 2, 28, 0, 0, 0, 0, time.UTC)) {
 		t.Errorf("desplegado, «n» desde el 31-ene lleva a %v", p.Cursor)
 	}
-	p.conmutarPlegado()
+	p.AlCambiarVista(VistaSemana)
 	a.Atajo('n')
 	if !mismoDia(p.Cursor, time.Date(2027, 3, 7, 0, 0, 0, 0, time.UTC)) {
 		t.Errorf("plegado, «n» desde el 28-feb lleva a %v", p.Cursor)
@@ -660,10 +878,10 @@ func TestElFocoVuelveTrasRepintar(t *testing.T) {
 	asa := mesDe(t, w.Content()).asa
 	c.Focus(asa)
 	asa.TypedRune(' ')
-	if !p.mesPlegado || c.Focused() != mesDe(t, w.Content()).asa || c.Focused() == asa {
+	if p.Vista != VistaSemana || c.Focused() != mesDe(t, w.Content()).asa || c.Focused() == asa {
 		t.Errorf("tras plegar con Espacio el foco está en %T (asa nueva %v)", c.Focused(), c.Focused() == mesDe(t, w.Content()).asa)
 	}
-	p.conmutarPlegado()
+	p.AlCambiarVista(VistaMes)
 
 	p.AlElegirDia(time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC))
 	c.Focus(p.diaElegido)

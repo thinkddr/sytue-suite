@@ -4,7 +4,9 @@
 package ui
 
 import (
+	"fmt"
 	"image/color"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -57,21 +59,54 @@ func TestElIdiomaDeCuentaPuedeVolverAlSistema(t *testing.T) {
 		if len(s.Opciones) != 1+len(i18n.Locales) || s.Opciones[0] != c.t.T("account.appearance.system", nil) {
 			t.Fatalf("falta la opción traducida de seguir al sistema: %+v", s.Opciones)
 		}
-		antes := ajustes.Leer()
-		s.elegir(i)
 		quiero := ""
 		if i > 0 {
 			quiero = string(i18n.Locales[i-1])
 		}
-		despues := ajustes.Leer()
-		if despues.Idioma != quiero || selector().Elegida != i {
-			t.Fatalf("elegir %d guarda %q y marca %d; quiero %q", i, despues.Idioma, selector().Elegida, quiero)
+		// Hasta tres medidas. Las rutinas en segundo plano de las suites de otros tests
+		// (presencia, bloqueo, cierre de sesión) escriben los ajustes del HOME que haya
+		// en ese momento, y una pudo colarse entre las dos lecturas (ci-desktop de
+		// v3.19.7, con -race -shuffle, sin reproducirse con la misma semilla). Si elegir
+		// idioma tocara otro ajuste DE VERDAD, saldría en las tres: cada intento parte
+		// del mismo estado, así que el efecto se repite entero.
+		var otros []string
+		partida := ajustes.Leer().Ajustes
+		for intento := range 3 {
+			if intento > 0 {
+				if err := ajustes.Cambiar(func(a *ajustes.Ajustes) { *a = partida }); err != nil {
+					t.Fatal(err)
+				}
+			}
+			antes := ajustes.Leer()
+			s = selector()
+			s.elegir(i)
+			despues := ajustes.Leer()
+			if despues.Idioma != quiero || selector().Elegida != i {
+				t.Fatalf("elegir %d guarda %q y marca %d; quiero %q", i, despues.Idioma, selector().Elegida, quiero)
+			}
+			if otros = otrosCambios(antes, despues); len(otros) == 0 {
+				break
+			}
 		}
-		despues.Idioma = antes.Idioma
-		if despues != antes {
-			t.Fatal("elegir idioma ha cambiado otro ajuste")
+		if len(otros) > 0 {
+			t.Fatalf("elegir idioma ha cambiado otro ajuste en las tres medidas: %v", otros)
 		}
 	}
+}
+
+// otrosCambios son los ajustes, salvo el idioma, que no coinciden; y la marca de sesión.
+func otrosCambios(antes, despues ajustes.Estado) []string {
+	a, d := reflect.ValueOf(antes.Ajustes), reflect.ValueOf(despues.Ajustes)
+	var campos []string
+	for i := range a.NumField() {
+		if nombre := a.Type().Field(i).Name; nombre != "Idioma" && !reflect.DeepEqual(a.Field(i).Interface(), d.Field(i).Interface()) {
+			campos = append(campos, fmt.Sprintf("%s: %v → %v", nombre, a.Field(i).Interface(), d.Field(i).Interface()))
+		}
+	}
+	if antes.Sesion != despues.Sesion || antes.Epoca != despues.Epoca || antes.EpocaConfirmada != despues.EpocaConfirmada {
+		campos = append(campos, "la marca de sesión o su época")
+	}
+	return campos
 }
 
 func TestLasAparienciasTraducidasCabenEnElMenuDeCuenta(t *testing.T) {

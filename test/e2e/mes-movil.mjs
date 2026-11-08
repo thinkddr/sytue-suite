@@ -139,13 +139,75 @@ for (const [tema, nombre] of [
   );
   await page.screenshot({ path: join(out, `calendar-mes-movil-${nombre}.png`) });
 
+  // El asa: un toque pliega a la semana, Fin la lleva a la agenda, y arrastrarla mueve la
+  // hoja con el dedo. Cada posición se mide (alto de la hoja, filas a la vista, lo de
+  // debajo) y se fotografía, y también a medio arrastre.
+  const asa = page.getByRole('slider', { name: 'Cambiar entre mes, semana y agenda' });
+  const hoja = () =>
+    page.evaluate(() => {
+      const s = document.querySelector('[role="slider"]');
+      const caja = s.previousElementSibling.getBoundingClientRect();
+      return {
+        alto: Math.round(caja.height),
+        asaY: Math.round(s.getBoundingClientRect().top),
+        valor: s.getAttribute('aria-valuetext'),
+        filas: document.querySelectorAll('[id^="sytue-mes-"] > div:not([inert])').length,
+        lista: document.querySelector('section h2')?.textContent ?? null,
+        buscador: document.querySelector('input[type="search"]') !== null,
+        cajon: [...document.querySelectorAll('[role="group"] [aria-pressed="true"]')]
+          .map((b) => b.textContent)
+          .find((x) => ['Mes', 'Semana', 'Día', 'Agenda'].includes(x)),
+      };
+    });
+  // La hoja se anima 200 ms al llegar a su sitio.
+  const asentar = () => page.waitForTimeout(300);
+  await asa.click();
+  await asentar();
+  const sem = await hoja();
+  exigir(
+    sem.valor === 'Semana' && sem.alto === 64 && sem.filas === 1 && sem.cajon === 'Semana',
+    `${nombre}: la semana (${JSON.stringify(sem)})`,
+  );
+  exigir(sem.lista === 'viernes, 6 de noviembre de 2026', `${nombre}: semana con la lista`);
+  await page.screenshot({ path: join(out, `calendar-asa-semana-${nombre}.png`) });
+  await asa.press('End');
+  await asentar();
+  const age = await hoja();
+  exigir(
+    age.valor === 'Agenda' && age.alto === 0 && age.buscador && age.lista === null,
+    `${nombre}: la agenda (${JSON.stringify(age)})`,
+  );
+  exigir(age.cajon === 'Agenda', `${nombre}: el selector del cajón marca la agenda`);
+  await page.screenshot({ path: join(out, `calendar-asa-agenda-${nombre}.png`) });
+  await asa.press('Home');
+  await asentar();
+  // A medio arrastre, del mes hacia la semana: 100 px hacia arriba, sin soltar.
+  const caja = await asa.boundingBox();
+  const cx = caja.x + caja.width / 2;
+  const cy = caja.y + caja.height / 2;
+  await page.mouse.move(cx, cy);
+  await page.mouse.down();
+  for (let i = 1; i <= 10; i++) {
+    await page.mouse.move(cx, cy - 10 * i);
+    await page.waitForTimeout(30);
+  }
+  const medio = await hoja();
+  exigir(
+    medio.alto === 164 && medio.filas === 6,
+    `${nombre}: a medio arrastre la hoja sigue al dedo (${JSON.stringify(medio)})`,
+  );
+  await page.screenshot({ path: join(out, `calendar-asa-arrastrando-${nombre}.png`) });
+  // Soltar quieto a 144: más cerca de la semana.
+  await page.mouse.move(cx, cy - 120);
+  await page.waitForTimeout(150);
+  await page.mouse.up();
+  await asentar();
+  const suelta = await hoja();
+  exigir(suelta.valor === 'Semana' && suelta.alto === 64, `${nombre}: soltar a 144 lleva a la semana`);
+  await asa.press('Home');
+  await asentar();
+
   if (tema === 'dark') {
-    // Plegado: una fila, con los días del mes vecino si la semana cruza.
-    await page.getByRole('button', { name: 'Mostrar solo esta semana' }).click();
-    const plegadas = await page.locator('[id^="sytue-mes-"] > div').count();
-    exigir(plegadas === 1, `plegado: una fila (${plegadas})`);
-    await page.screenshot({ path: join(out, `calendar-mes-movil-plegado-${nombre}.png`) });
-    await page.getByRole('button', { name: 'Mostrar el mes entero' }).click();
     // El cajón, con el bloque de vista y el aviso de pendientes en ☰.
     const menu = page.getByRole('button', { name: 'Abrir menú, 3 pendientes' });
     exigir((await menu.count()) === 1, 'el ☰ dice «Abrir menú, 3 pendientes»');
@@ -230,7 +292,13 @@ async function abrirApp({ l = 'es', w = 390, h = 844, tema = 'dark' } = {}) {
         ],
       });
     }
-    if (u.pathname === '/api/events') return json({ events: EVENTOS_API });
+    if (u.pathname === '/api/events') {
+      // Lo del rango pedido, como el servicio: la agenda pide [cursor, +30 días). Las
+      // horas del banco son flotantes y el rango va en UTC; para un banco, basta.
+      const desde = (u.searchParams.get('start') ?? '').slice(0, 15);
+      const hasta = (u.searchParams.get('end') ?? '99999999T999999').slice(0, 15);
+      return json({ events: EVENTOS_API.filter((e) => e.start >= desde && e.start < hasta) });
+    }
     if (u.pathname === '/api/invitations') {
       return json({ invitations: [{ id: 'i1', summary: 'X', status: 'NEEDS-ACTION' }] });
     }
@@ -304,11 +372,12 @@ const titulo = (page) =>
   t0Tam = t0.tam;
   exigir(t0.texto === 'noviembre' && t0.cabe, `app: el título (${JSON.stringify(t0)})`);
   await page.screenshot({ path: join(out, 'calendar-app-mes-movil-oscuro.png') });
-  // `n`/`p`: un mes, y con el asa plegada, una semana (el paso de deslizar).
+  // `n`/`p`: un mes, y con el asa en la semana, una semana (el paso de deslizar).
   await page.keyboard.press('n');
   exigir((await titulo(page)).texto === 'diciembre', 'app: «n» pasa a diciembre');
   await page.keyboard.press('p');
-  await page.getByRole('button', { name: 'Mostrar solo esta semana' }).click();
+  const asaApp = page.getByRole('slider', { name: 'Cambiar entre mes, semana y agenda' });
+  await asaApp.click();
   // El oyente de teclas se vuelve a enlazar en un efecto, que corre tras pintar.
   await page.waitForTimeout(200);
   await page.keyboard.press('n');
@@ -318,7 +387,7 @@ const titulo = (page) =>
         .querySelector('[id^="sytue-mes-"] [aria-pressed="true"]')
         ?.getAttribute('aria-label') ?? '',
   );
-  exigir(/13 de noviembre/.test(elegido), `app: plegado, «n» avanza una semana (${elegido})`);
+  exigir(/13 de noviembre/.test(elegido), `app: en la semana, «n» avanza una semana (${elegido})`);
   // Con un día ENFOCADO, los atajos siguen y el foco va con el elegido (cada día lleva
   // `key` de su fecha: sin seguirlo, `n` lo dejaba en <body> y las flechas no iban).
   const foco = () =>
@@ -333,9 +402,16 @@ const titulo = (page) =>
     exigir(quiero.test(f ?? ''), `app: ${donde}, «${tecla}» deja el foco en ${f}`);
   };
   await page.locator('[id^="sytue-mes-"] [aria-pressed="true"]').focus();
-  await pulsar('n', /20 de noviembre/, 'plegado y con foco');
-  await pulsar('ArrowRight', /21 de noviembre/, 'plegado y con foco');
-  await page.getByRole('button', { name: 'Mostrar el mes entero' }).click();
+  await pulsar('n', /20 de noviembre/, 'en la semana y con foco');
+  await pulsar('ArrowRight', /21 de noviembre/, 'en la semana y con foco');
+  // `w` y `a` mueven el asa (la vista ES su posición); `m` la devuelve al mes.
+  await page.keyboard.press('a');
+  await page.waitForTimeout(300);
+  const valor = await asaApp.getAttribute('aria-valuetext');
+  exigir(valor === 'Agenda', `app: «a» lleva el asa a la agenda (${valor})`);
+  await page.screenshot({ path: join(out, 'calendar-app-asa-agenda-oscuro.png') });
+  await page.keyboard.press('m');
+  await page.waitForTimeout(300);
   await page.locator('[id^="sytue-mes-"] [aria-pressed="true"]').focus();
   await page.waitForTimeout(200);
   await pulsar('n', /21 de diciembre/, 'con foco');

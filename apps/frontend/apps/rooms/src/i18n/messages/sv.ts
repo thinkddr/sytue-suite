@@ -984,6 +984,12 @@ export const sv: AppCatalog<typeof en> = {
   'matrix.unsupported': 'Den här åtgärden är inte tillgänglig för krypterade meddelanden.',
   'matrix.auth': 'Bekräfta din identitet',
   'matrix.authContinue': 'Jag har loggat in',
+  'matrix.reset': 'Jag har glömt min återställningsnyckel',
+  'matrix.resetAction': 'Återställ krypteringen',
+  'matrix.resetBody':
+    'En ny återställningsnyckel skapas. Äldre krypterade meddelanden går bara att läsa på enheter som redan har dem, och du behöver verifiera dina andra enheter och dina kontakter igen.',
+  'matrix.resetUnderstood':
+    'Jag förstår att jag kan förlora åtkomsten till äldre krypterade meddelanden',
   'matrix.tab': 'Rooms är öppet i en annan flik. Stäng den för att använda den här enheten här.',
   'matrix.identityUnverified': 'Identitet inte verifierad',
   'matrix.senderUnverified': 'Avsändaren kan inte verifieras på den här enheten',

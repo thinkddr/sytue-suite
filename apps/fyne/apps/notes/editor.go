@@ -949,7 +949,10 @@ func (e *EditorNota) armarBarra() *fyne.Container {
 	e.fondoBarra, e.fileteBarra = canvas.NewRectangle(color.NRGBA{}), canvas.NewRectangle(color.NRGBA{})
 	f := &barraFlex{
 		entera: -1, px: PXBarraEd, py: PYBarraEd, hueco: HuecoBarraEd,
-		filaUnica: func() bool { return anchoApp() < ui.CorteMD },
+		// El ancho de SU ventana, no el de la primera de la app: con otra abierta (la
+		// captura rápida, un diálogo) la barra se quedaba en una fila recortada en un
+		// escritorio de sobra ancho, sin los botones del final.
+		filaUnica: func() bool { return anchoVentana([]fyne.CanvasObject{e}) < ui.CorteMD },
 	}
 	return container.New(f, append([]fyne.CanvasObject{e.fondoBarra, e.fileteBarra}, items...)...)
 }

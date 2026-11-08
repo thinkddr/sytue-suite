@@ -426,3 +426,20 @@ func TestLeerEnElPanelBajaLosContadoresExternos(t *testing.T) {
 		t.Fatalf("después: %d resúmenes, «Buzones» %q, cuenta %d; quiero uno más, 2 y 0", s.resumenes, todas.Contador, b.P.Menu.Cuentas[0].NoLeidos)
 	}
 }
+
+// El icono de la app lleva los no leídos de «Todos los buzones de entrada» —Sytue y
+// cada cuenta—, no los avisos de correo del Hub. VISTO EN ROJO (2026-11-08): sin
+// AlCambiarNoLeidos el icono contaba un aviso y salía «1» con cualquier número.
+func TestElIconoLlevaLosNoLeidosDeLaEntrada(t *testing.T) {
+	s := &correoFalso{cuentas: api.ExternalMailAccounts{}, carpetas: map[string][]api.ExternalMailFolder{"nueva": carpetasDeGmail}}
+	b := correoDePrueba(t, s).b
+	var puestos []int
+	b.AlCambiarNoLeidos = func(n int) { puestos = append(puestos, n) }
+	b.ponerCarpetas([]api.Mailbox{{ID: "sytue-inbox", Name: "Inbox", Role: "inbox", UnreadEmails: 2}, {ID: "sytue-junk", Name: "Junk", Role: "junk", UnreadEmails: 9}})
+	s.cuentas = cuentaGmailNueva()
+	b.cargarExternas()
+	b.ponerCarpetas([]api.Mailbox{{ID: "sytue-inbox", Name: "Inbox", Role: "inbox", UnreadEmails: 0}})
+	if len(puestos) < 3 || puestos[0] != 2 || puestos[len(puestos)-2] != 6 || puestos[len(puestos)-1] != 4 {
+		t.Fatalf("el icono llevó %v; quiero 2, luego 6 con la cuenta y 4 al leer los de Sytue", puestos)
+	}
+}

@@ -203,6 +203,11 @@ func (s *Service) EffectiveRole(ctx context.Context, sub string) (role domain.Ro
 		// producción, emitir tokens de CI, re-añadirse, restore de servicios,
 		// spend-limit y el secreto HMAC del webhook git—. Los vocabularios de rol de
 		// Sytue ID y de Cloud son idénticos, así que el claim encajaba sin más.
+		//
+		// Ojo: esto vale para member y billing. El owner y los admins de la
+		// organización tienen su rol como SUELO en la capa HTTP
+		// (rolDeOrganizacion), así que para ellos «no ser colaborador» no cierra
+		// la puerta: quien administra la organización no se queda nunca sin DevX.
 		n, cErr := s.store.CountMemberships(ctx)
 		if cErr != nil {
 			return "", false, cErr

@@ -1039,6 +1039,11 @@ export const lv: AppCatalog<typeof en> = {
   'matrix.unsupported': 'Šī darbība nav pieejama šifrētiem ziņojumiem.',
   'matrix.auth': 'Apstiprini savu identitāti',
   'matrix.authContinue': 'Esmu pierakstījies',
+  'matrix.reset': 'Esmu aizmirsis atkopšanas atslēgu',
+  'matrix.resetAction': 'Atiestatīt šifrēšanu',
+  'matrix.resetBody':
+    'Tiks izveidota jauna atkopšanas atslēga. Iepriekšējās šifrētās ziņas būs lasāmas tikai ierīcēs, kurās tās jau ir, un jums būs no jauna jāverificē citas savas ierīces un kontakti.',
+  'matrix.resetUnderstood': 'Saprotu, ka varu zaudēt piekļuvi iepriekšējām šifrētajām ziņām',
   'matrix.tab': 'Rooms ir atvērts citā cilnē. Aizver to, lai šeit izmantotu šo ierīci.',
   'matrix.identityUnverified': 'Identitāte nav verificēta',
   'matrix.senderUnverified': 'Šajā ierīcē nevar verificēt, kas nosūtīja ziņojumu',

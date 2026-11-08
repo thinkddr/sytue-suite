@@ -1085,6 +1085,11 @@ export const cs: AppCatalog<typeof en> = {
   'matrix.unsupported': 'Tato akce není u šifrovaných zpráv dostupná.',
   'matrix.auth': 'Potvrď svou totožnost',
   'matrix.authContinue': 'Přihlášení je dokončeno',
+  'matrix.reset': 'Zapomněl(a) jsem klíč pro obnovení',
+  'matrix.resetAction': 'Obnovit šifrování od začátku',
+  'matrix.resetBody':
+    'Vytvoří se nový klíč pro obnovení. Starší šifrované zprávy zůstanou čitelné jen na zařízeních, která je už mají, a své další zařízení i kontakty budete muset ověřit znovu.',
+  'matrix.resetUnderstood': 'Rozumím, že mohu ztratit přístup ke starším šifrovaným zprávám',
   'matrix.tab': 'Rooms je otevřený na jiné kartě. Zavři ji, abys mohl toto zařízení používat tady.',
   'matrix.identityUnverified': 'Totožnost neověřena',
   'matrix.senderUnverified': 'Na tomto zařízení nelze ověřit, kdo zprávu odeslal',

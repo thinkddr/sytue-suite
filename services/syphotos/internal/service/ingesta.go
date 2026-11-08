@@ -62,7 +62,10 @@ func NuevaIngesta(st *store.Store, dr *drive.Cliente, obj *objectstore.Client, b
 // Es idempotente por el fichero de Drive (lo garantiza el store), así que
 // reindexar una carpeta entera no duplica nada y sí mejora lo que la primera
 // pasada no supo leer.
-func (i *Ingesta) Indexar(ctx context.Context, token, driveID, duenyo string) (domain.Activo, error) {
+//
+// `idioma` es el del perfil de quien la da de alta (claim `locale`), para que el
+// lote de IA la describa en él. Vacío = no se sabe, y no borra el que hubiera.
+func (i *Ingesta) Indexar(ctx context.Context, token, driveID, duenyo, idioma string) (domain.Activo, error) {
 	f, err := i.drive.Metadatos(ctx, token, driveID)
 	if err != nil {
 		return domain.Activo{}, err
@@ -92,6 +95,7 @@ func (i *Ingesta) Indexar(ctx context.Context, token, driveID, duenyo string) (d
 		Duenyo: duenyo, DriveID: driveID, Nombre: f.Nombre,
 		Tipo: f.ContentType, Bytes: f.Bytes,
 		Ancho: cfg.Width, Alto: cfg.Height,
+		IdiomaDuenyo: idioma,
 	}
 	// El EXIF es OPCIONAL: hay millones de imágenes sin él —capturas, PNG— y
 	// tratarlo como error impediría subirlas. Lo que no trae, se queda vacío.

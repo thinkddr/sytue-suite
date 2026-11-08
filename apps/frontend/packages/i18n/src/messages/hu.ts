@@ -249,6 +249,8 @@ export const hu: Catalog = {
   'app.pdf.description': 'PDF: olvasás és jegyzetelés',
   'app.disabled': 'Letiltva',
   'import.title': 'Hozza át az adatait',
+  'import.collapse': 'Összecsukás',
+  'import.expand': 'Kibontás',
   'import.help':
     'Másolja át a Sytue-ba, amije már megvan a régi szolgáltatónál. Közben tovább dolgozhat.',
   'import.fromGoogle': 'Áthozás a Google-ből',

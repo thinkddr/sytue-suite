@@ -251,6 +251,8 @@ export const nl: Catalog = {
   'app.pdf.description': 'PDF: lezen en annoteren',
   'app.disabled': 'Uitgeschakeld',
   'import.title': 'Neem je gegevens mee',
+  'import.collapse': 'Inklappen',
+  'import.expand': 'Uitklappen',
   'import.help':
     'Kopieer wat je al bij je oude provider hebt naar Sytue. Je kunt ondertussen gewoon doorwerken.',
   'import.fromGoogle': 'Overzetten vanuit Google',

@@ -173,6 +173,20 @@ export class ChatClient {
     });
   }
 
+  /** Recovery key held for the signed-in person (ADR 0081); 404 when there is none yet. */
+  matrixRecoveryKey(signal?: AbortSignal): Promise<{ recovery_key: string }> {
+    return this.http.json({
+      path: '/matrix/recovery-key',
+      maxResponseBytes: 4096,
+      ...(signal ? { signal } : {}),
+    });
+  }
+
+  /** Stores or replaces the signed-in person's recovery key (ADR 0081). */
+  storeMatrixRecoveryKey(recoveryKey: string): Promise<void> {
+    return this.http.postJson('/matrix/recovery-key', { recovery_key: recoveryKey });
+  }
+
   startMatrixNative(input: {
     code_challenge: string;
     code_challenge_method: 'S256';

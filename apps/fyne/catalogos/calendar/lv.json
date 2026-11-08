@@ -152,6 +152,8 @@
     "other": "{date}, {count} notikumi"
   },
   "grid.daySelected": "{label}, atlasīts",
+  "grid.handle": "Pārslēgties starp mēnesi, nedēļu un darba kārtību",
+  "grid.handleState": "{view}. Pārslēgties starp mēnesi, nedēļu un darba kārtību",
   "grid.loadError": "Kalendāru neizdevās ielādēt",
   "grid.loading": "Ielādē kalendāru",
   "grid.more": {
@@ -159,8 +161,6 @@
     "one": "+{count} vēl",
     "other": "+{count} vēl"
   },
-  "grid.showMonth": "Rādīt visu mēnesi",
-  "grid.showWeek": "Rādīt tikai šo nedēļu",
   "grid.snapAria": {
     "zero": "Vilkšanas solis: {count} minūtes. Nospiediet, lai mainītu.",
     "one": "Vilkšanas solis: {count} minūte. Nospiediet, lai mainītu.",

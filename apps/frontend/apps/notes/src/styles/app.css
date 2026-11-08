@@ -392,7 +392,7 @@
   }
   /* La nota de un cuaderno en árbol llena el panel: es una página, no una tarjeta. */
   .notes-sheet {
-    @apply mx-auto w-full max-w-[46rem] rounded-none border-0 bg-transparent px-6 py-8 shadow-none! sm:px-10;
+    @apply w-full rounded-none border-0 bg-transparent px-6 py-8 shadow-none! sm:px-10;
   }
   .notes-sheet-title {
     @apply text-[1.625rem]! leading-[2rem] font-bold! tracking-[-0.015em];

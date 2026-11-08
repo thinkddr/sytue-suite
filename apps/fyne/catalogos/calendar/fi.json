@@ -148,14 +148,14 @@
     "other": "{date}, {count} tapahtumaa"
   },
   "grid.daySelected": "{label}, valittu",
+  "grid.handle": "Vaihda kuukauden, viikon ja asialistan välillä",
+  "grid.handleState": "{view}. Vaihda kuukauden, viikon ja asialistan välillä",
   "grid.loadError": "Kalenteria ei voitu ladata",
   "grid.loading": "Ladataan kalenteria",
   "grid.more": {
     "one": "+{count} lisää",
     "other": "+{count} lisää"
   },
-  "grid.showMonth": "Näytä koko kuukausi",
-  "grid.showWeek": "Näytä vain tämä viikko",
   "grid.snapAria": {
     "one": "Vedon tarttuma {count} minuutti. Paina vaihtaaksesi.",
     "other": "Vedon tarttuma {count} minuuttia. Paina vaihtaaksesi."

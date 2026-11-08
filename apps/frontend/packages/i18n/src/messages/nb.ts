@@ -243,6 +243,8 @@ export const nb: Catalog = {
   'app.pdf.description': 'PDF: les og kommenter',
   'app.disabled': 'Deaktivert',
   'import.title': 'Ta med dataene dine',
+  'import.collapse': 'Skjul',
+  'import.expand': 'Vis',
   'import.help':
     'Kopier det du allerede har hos den gamle leverandøren din til Sytue. Du kan fortsette å jobbe mens det pågår.',
   'import.fromGoogle': 'Hent fra Google',

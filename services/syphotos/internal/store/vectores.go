@@ -32,6 +32,13 @@ type Pendiente struct {
 	Tenant string
 	Duenyo string
 	Huella string
+	// Descripcion es la que ya tiene, vacía si nadie la ha descrito. Con una, el
+	// lote la vectoriza tal cual: no paga otra llamada de visión ni pisa lo que
+	// escribió la persona o el botón «Describir».
+	Descripcion string
+	// Idioma es el de su dueña según su foto más reciente con idioma conocido
+	// (owner_locale), vacío si nunca se supo.
+	Idioma string
 }
 
 // ExcluidaDelLoteIA dice si la organización de la transacción ha pedido quedar
@@ -107,7 +114,11 @@ func (s *Store) PendientesDeVector(ctx context.Context, modelo string, limite in
 	var out []Pendiente
 	err := s.pool.InMaintenanceTx(ctx, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
-			SELECT a.id, a.tenant, a.owner_sub, coalesce(e.fingerprint, '')
+			SELECT a.id, a.tenant, a.owner_sub, coalesce(e.fingerprint, ''), a.description,
+			       coalesce((SELECT o.owner_locale FROM assets o
+			                  WHERE o.tenant = a.tenant AND o.owner_sub = a.owner_sub
+			                    AND o.owner_locale <> ''
+			                  ORDER BY o.uploaded_at DESC LIMIT 1), '')
 			  FROM assets a
 			  LEFT JOIN edits e
 			    ON e.tenant = a.tenant AND e.asset_id = a.id AND e.owner_sub = a.owner_sub
@@ -126,7 +137,7 @@ func (s *Store) PendientesDeVector(ctx context.Context, modelo string, limite in
 		out = out[:0]
 		for rows.Next() {
 			var p Pendiente
-			if err := rows.Scan(&p.ID, &p.Tenant, &p.Duenyo, &p.Huella); err != nil {
+			if err := rows.Scan(&p.ID, &p.Tenant, &p.Duenyo, &p.Huella, &p.Descripcion, &p.Idioma); err != nil {
 				return err
 			}
 			out = append(out, p)

@@ -161,15 +161,43 @@ func TestRequireCloudMembership(t *testing.T) {
 		}
 	})
 
-	t.Run("non owner cannot bootstrap an empty tenant", func(t *testing.T) {
-		h := newHandlers(&fakeSvc{effFromMember: false})
+	t.Run("org admin enters an empty tenant without materializing", func(t *testing.T) {
+		f := &fakeSvc{effFromMember: false}
+		h := newHandlers(f)
 		next, called := spyNext()
 		rr := httptest.NewRecorder()
 		h.requireCloudMembership()(next).ServeHTTP(rr, cloudHumanReq(http.MethodGet, "/api/v1/projects", "admin"))
-		if rr.Code != http.StatusForbidden || *called {
-			t.Fatalf("bootstrap no-owner: code=%d called=%v", rr.Code, *called)
+		if rr.Code != http.StatusOK || !*called {
+			t.Fatalf("admin de la org en tenant vacío: code=%d called=%v", rr.Code, *called)
+		}
+		if f.addMemberSub != "" {
+			t.Fatalf("la primera fila debe ser la del owner, no la de un admin: sub=%q", f.addMemberSub)
 		}
 	})
+
+	t.Run("plain member cannot bootstrap an empty tenant", func(t *testing.T) {
+		h := newHandlers(&fakeSvc{effFromMember: false})
+		next, called := spyNext()
+		rr := httptest.NewRecorder()
+		h.requireCloudMembership()(next).ServeHTTP(rr, cloudHumanReq(http.MethodGet, "/api/v1/projects", "member"))
+		if rr.Code != http.StatusForbidden || *called {
+			t.Fatalf("bootstrap member: code=%d called=%v", rr.Code, *called)
+		}
+	})
+
+	// Un owner o admin de la organización NUNCA se queda fuera de DevX, aunque el
+	// tenant ya tenga colaboradores y él no figure entre ellos.
+	for _, rol := range []string{"admin", "owner"} {
+		t.Run("org "+rol+" without membership in a populated tenant passes", func(t *testing.T) {
+			h := newHandlers(&fakeSvc{effFromMember: true})
+			next, called := spyNext()
+			rr := httptest.NewRecorder()
+			h.requireCloudMembership()(next).ServeHTTP(rr, cloudHumanReq(http.MethodGet, "/api/v1/projects", rol))
+			if rr.Code != http.StatusOK || !*called {
+				t.Fatalf("%s de la org sin fila: code=%d called=%v", rol, rr.Code, *called)
+			}
+		})
+	}
 }
 
 // --- confineProjectToken (token de API acotado a un proyecto) ---
@@ -264,13 +292,44 @@ func TestRequireRoleEffectiveMembership(t *testing.T) {
 		t.Fatalf("admin efectivo: code=%d called=%v", rr.Code, *called)
 	}
 
-	// Membership explícito member => 403 (aunque el claim dijera otra cosa).
+	// Membership explícito member, y member también en la org => 403.
 	h = newHandlers(&fakeSvc{effRole: domain.RoleMember, effFromMember: true})
 	next, called = spyNext()
 	rr = httptest.NewRecorder()
-	h.requireRole("admin", "owner")(next).ServeHTTP(rr, humanReq(http.MethodPatch, "/org", "owner"))
+	h.requireRole("admin", "owner")(next).ServeHTTP(rr, humanReq(http.MethodPatch, "/org", "member"))
 	if rr.Code != http.StatusForbidden || *called {
-		t.Fatalf("member efectivo debe denegar pese al claim: code=%d called=%v", rr.Code, *called)
+		t.Fatalf("member efectivo: code=%d called=%v", rr.Code, *called)
+	}
+}
+
+// El rol de la organización es un SUELO: un admin u owner de la org lo es en
+// DevX aunque su fila de colaborador diga menos o no exista.
+func TestRequireRoleSueloDeOrganizacion(t *testing.T) {
+	casos := []struct {
+		nombre     string
+		svc        *fakeSvc
+		claim      string
+		permitidos []string
+		quiere     int
+	}{
+		{"admin de la org fijado a member", &fakeSvc{effRole: domain.RoleMember, effFromMember: true}, "admin", []string{"admin", "owner"}, http.StatusOK},
+		{"admin de la org fijado a billing", &fakeSvc{effRole: domain.RoleBilling, effFromMember: true}, "admin", []string{"admin", "owner"}, http.StatusOK},
+		{"admin de la org sin fila en tenant poblado", &fakeSvc{effFromMember: true}, "admin", []string{"admin", "owner"}, http.StatusOK},
+		{"owner de la org fijado a member", &fakeSvc{effRole: domain.RoleMember, effFromMember: true}, "owner", []string{"owner"}, http.StatusOK},
+		{"admin de la org no es owner", &fakeSvc{effRole: domain.RoleMember, effFromMember: true}, "admin", []string{"owner"}, http.StatusForbidden},
+		{"owner en DevX no baja por ser admin en la org", &fakeSvc{effRole: domain.RoleOwner, effFromMember: true}, "admin", []string{"owner"}, http.StatusOK},
+		{"member de la org sin fila sigue fuera", &fakeSvc{effFromMember: true}, "member", []string{"owner", "admin", "member"}, http.StatusForbidden},
+	}
+	for _, c := range casos {
+		t.Run(c.nombre, func(t *testing.T) {
+			h := newHandlers(c.svc)
+			next, called := spyNext()
+			rr := httptest.NewRecorder()
+			h.requireRole(c.permitidos...)(next).ServeHTTP(rr, humanReq(http.MethodPatch, "/org", c.claim))
+			if rr.Code != c.quiere || *called != (c.quiere == http.StatusOK) {
+				t.Fatalf("code=%d called=%v, quería %d", rr.Code, *called, c.quiere)
+			}
+		})
 	}
 }
 

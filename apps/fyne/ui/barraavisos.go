@@ -608,7 +608,7 @@ func (a *avisosBarra) verTodas() fyne.CanvasObject {
 func (a *avisosBarra) ponerInsignia() {
 	id := fyne.CurrentApp().Metadata().ID
 	a.mu.Lock()
-	n := insigniaDe(productoDeID(id), a.items, a.sinLeer)
+	n := insigniaDe(productoDeID(id), a.items, a.sinLeer, a.correo)
 	if a.propia != nil {
 		n = *a.propia
 	}

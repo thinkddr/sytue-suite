@@ -156,6 +156,8 @@
     "other": "{date}, {count} avveniment"
   },
   "grid.daySelected": "{label}, magħżul",
+  "grid.handle": "Aqleb bejn xahar, ġimgħa u aġenda",
+  "grid.handleState": "{view}. Aqleb bejn xahar, ġimgħa u aġenda",
   "grid.loadError": "Il-kalendarju ma setax jitgħabba",
   "grid.loading": "Qed jitgħabba l-kalendarju",
   "grid.more": {
@@ -164,8 +166,6 @@
     "many": "+{count} oħra",
     "other": "+{count} oħra"
   },
-  "grid.showMonth": "Uri x-xahar kollu",
-  "grid.showWeek": "Uri din il-ġimgħa biss",
   "grid.snapAria": {
     "one": "Pass tat-tkaxkir: minuta {count}. Agħfas biex tibdel.",
     "few": "Pass tat-tkaxkir: {count} minuti. Agħfas biex tibdel.",

@@ -245,6 +245,8 @@ export const bg: Catalog = {
   'app.pdf.description': 'PDF: четене и анотиране',
   'app.disabled': 'Деактивирано',
   'import.title': 'Пренесете данните си',
+  'import.collapse': 'Свий',
+  'import.expand': 'Разгъни',
   'import.help':
     'Копирайте в Sytue това, което вече имате при стария си доставчик. Междувременно можете да продължите да работите.',
   'import.fromGoogle': 'Пренасяне от Google',

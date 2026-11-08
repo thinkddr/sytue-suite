@@ -200,6 +200,19 @@ func (b *Buzon) pintarExternas() {
 func (b *Buzon) ponerArbol() {
 	arbol := arbolDeBuzones(b.P.Locale, b.carpetas, b.resumenExternas)
 	b.P.Menu.Unificados, b.P.Menu.Cuentas, b.P.Menu.TituloSytue = arbol.Unificados, arbol.Cuentas, b.principal
+	if b.AlCambiarNoLeidos != nil {
+		b.AlCambiarNoLeidos(noLeidosDeEntrada(arbol))
+	}
+}
+
+// noLeidosDeEntrada son los no leídos del buzón unificado de entrada; cero sin él.
+func noLeidosDeEntrada(arbol ArbolDeBuzones) int {
+	for _, u := range arbol.Unificados {
+		if u.Rol == "inbox" {
+			return int(u.NoLeidos)
+		}
+	}
+	return 0
 }
 
 // plegarRama pliega o despliega una rama del árbol del lateral.

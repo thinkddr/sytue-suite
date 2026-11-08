@@ -42,6 +42,16 @@ func Rango(v Vista, cursor time.Time, loc *time.Location) (desde, hasta time.Tim
 	return d[0], d[len(d)-1].AddDate(0, 0, 1)
 }
 
+// rango es el de la vista en pantalla. En el teléfono la semana es el mes plegado con el
+// asa: pide el MES, que es lo que la hoja enseña al desplegarse con el dedo, y pasar de
+// mes a semana no vuelve a la red (`rangeFor(mode, cursor, compacto)` en la web).
+func (p *Pantalla) rango() (desde, hasta time.Time) {
+	if p.compacta() && p.Vista == VistaSemana {
+		return Rango(VistaMes, p.Cursor, p.zona())
+	}
+	return Rango(p.Vista, p.Cursor, p.zona())
+}
+
 // Desplazar es `navigate(delta)`: un mes, una semana, un día o una ventana de agenda.
 // El mes conserva el día recortado al último (MoverMes), como `addMonthsClamped`.
 func Desplazar(v Vista, cursor time.Time, delta int) time.Time {
@@ -196,10 +206,9 @@ func NuevaApp(p *Pantalla, cal *api.Calendars) *App {
 	p.AlVerRecordatorios = a.abrirRecordatorios
 	p.AlConmutarCajon = func() { p.cajonAbierto = !p.cajonAbierto; a.pintar() }
 	// El mes del teléfono: cruzar el corte de 640 reconstruye la pantalla, pero NO dentro
-	// del Layout del armazón que lo mide; el asa repinta; y la rama de recordatorios del
+	// del Layout del armazón que lo mide; y la rama de recordatorios del
 	// cajón salta y descarta como el panel de la campana.
 	p.AlRehacer = func() { a.lanzar(func() { a.enUI(a.pintar) }) }
-	p.AlPlegarMes = a.pintar
 	p.saltarRec, p.descartRec = a.saltarA, a.descartar
 	// En el teléfono, lo que se activa en el menú lo CIERRA (el `onClick` del `<aside>`
 	// de AppShell): elegir un día, cambiar de mes, crear… Conmutar un calendario no,
@@ -361,7 +370,7 @@ func (a *App) encender() {
 // y lo lee su propia Fuente (apps/nucleo/widgets/fuentes, ADR 0078 enmendado).
 func (a *App) cargarEventos() {
 	p := a.P
-	desde, hasta := Rango(p.Vista, p.Cursor, p.zona())
+	desde, hasta := p.rango()
 	clave := desde.Format(time.RFC3339) + ".." + hasta.Format(time.RFC3339)
 	if clave != a.clave {
 		a.porCal, a.clave = map[string][]api.Instance{}, clave

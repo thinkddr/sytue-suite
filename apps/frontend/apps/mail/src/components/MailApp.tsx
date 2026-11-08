@@ -1707,6 +1707,8 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
     : !readOnly && !inSearch && selectedMailbox?.role === 'junk' && inboxBox
       ? (c: Conversation) => handleMove(c, inboxBox)
       : null;
+  // En spam la fila no pinta logos: ahí abundan los remitentes suplantados.
+  const enSpam = vistaExterna ? rolExterno === 'junk' : selectedMailbox?.role === 'junk';
   // «Mover a…»: cualquier carpeta menos la actual y Borradores (un mensaje normal
   // movido a Borradores no sería editable como borrador). En un buzón compartido
   // (solo lectura) no hay destinos de movimiento.
@@ -2486,6 +2488,7 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
             onTrash={onTrash}
             onSpam={onSpam}
             onNotSpam={onNotSpam}
+            enSpam={enSpam}
             selected={selected}
             onToggleSelect={toggleSelect}
             onToggleSelectAll={toggleSelectAll}
@@ -2516,6 +2519,7 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
           onTrash={onTrash}
           onSpam={onSpam}
           onNotSpam={onNotSpam}
+          enSpam={enSpam}
           onPurge={onPurge}
           onMove={handleMove}
           moveTargets={moveTargets}

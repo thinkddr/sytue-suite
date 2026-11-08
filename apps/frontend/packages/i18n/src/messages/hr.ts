@@ -256,6 +256,8 @@ export const hr: Catalog = {
   'app.pdf.description': 'PDF: čitanje i bilješke',
   'app.disabled': 'Onemogućeno',
   'import.title': 'Prenesite svoje podatke',
+  'import.collapse': 'Sažmi',
+  'import.expand': 'Proširi',
   'import.help':
     'Kopirajte u Sytue ono što već imate kod starog pružatelja. U međuvremenu možete nastaviti raditi.',
   'import.fromGoogle': 'Prenesi iz Googlea',

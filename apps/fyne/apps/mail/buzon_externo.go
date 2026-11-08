@@ -584,6 +584,19 @@ func (b *Buzon) moverPorRol(cs []Conversacion, rol string) {
 	}
 }
 
+// rolExterno es el rol de la vista externa a la vista: el de su carpeta, o el del
+// buzón unificado («inbox», «junk»…).
+func (b *Buzon) rolExterno() string {
+	v := b.externa
+	rol := v.Unificado
+	if !v.Mezclada() {
+		if f, ok := b.carpetaExterna(v.Cuenta, func(f api.ExternalMailFolder) bool { return f.ID == v.Carpeta }); ok {
+			rol = f.Role
+		}
+	}
+	return rol
+}
+
 // ponerAccionesExternas es el triaje de una vista externa, en ponerAcciones. Una
 // carpeta de una cuenta: sus destinos son las carpetas de ESA cuenta, y una acción
 // sale si la cuenta tiene la carpeta de su rol y no se está ya en ella. En un buzón
@@ -593,12 +606,7 @@ func (b *Buzon) moverPorRol(cs []Conversacion, rol string) {
 func (b *Buzon) ponerAccionesExternas(a *Acciones) {
 	v := b.externa
 	a.Destacar, a.Leido = b.alternarDestacado, b.alternarLeido
-	rolActual := v.Unificado
-	if !v.Mezclada() {
-		if f, ok := b.carpetaExterna(v.Cuenta, func(f api.ExternalMailFolder) bool { return f.ID == v.Carpeta }); ok {
-			rolActual = f.Role
-		}
-	}
+	rolActual := b.rolExterno()
 	destino := func(rol string) func(Conversacion) {
 		if rolActual == rol {
 			return nil

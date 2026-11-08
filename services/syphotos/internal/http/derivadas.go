@@ -284,7 +284,7 @@ func (h *Handlers) Indexar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	a, err := h.ingesta.Indexar(r.Context(), token, cuerpo.DriveFileID, sub(r))
+	a, err := h.ingesta.Indexar(r.Context(), token, cuerpo.DriveFileID, sub(r), idiomaDe(r))
 	if err != nil {
 		httpx.Fail(w, r, traducir(err))
 		return

@@ -148,14 +148,14 @@
     "other": "{date}, {count} begivenheder"
   },
   "grid.daySelected": "{label}, valgt",
+  "grid.handle": "Skift mellem måned, uge og agenda",
+  "grid.handleState": "{view}. Skift mellem måned, uge og agenda",
   "grid.loadError": "Kalenderen kunne ikke indlæses",
   "grid.loading": "Indlæser kalenderen",
   "grid.more": {
     "one": "+{count} mere",
     "other": "+{count} mere"
   },
-  "grid.showMonth": "Vis hele måneden",
-  "grid.showWeek": "Vis kun denne uge",
   "grid.snapAria": {
     "one": "Fastgør trækning til {count} minut. Tryk for at ændre.",
     "other": "Fastgør trækning til {count} minutter. Tryk for at ændre."

@@ -148,14 +148,14 @@
     "other": "{date}, {count} eventi"
   },
   "grid.daySelected": "{label}, selezionato",
+  "grid.handle": "Passa tra mese, settimana e agenda",
+  "grid.handleState": "{view}. Passa tra mese, settimana e agenda",
   "grid.loadError": "Impossibile caricare il calendario",
   "grid.loading": "Caricamento del calendario",
   "grid.more": {
     "one": "+{count} altro",
     "other": "+{count} altri"
   },
-  "grid.showMonth": "Mostra tutto il mese",
-  "grid.showWeek": "Mostra solo questa settimana",
   "grid.snapAria": {
     "one": "Aggancia il trascinamento a {count} minuto. Premi per cambiare.",
     "other": "Aggancia il trascinamento a {count} minuti. Premi per cambiare."

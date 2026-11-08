@@ -91,3 +91,17 @@ func TestRequireOrgKind(t *testing.T) {
 		t.Fatalf("sin claims: %d", rr.Code)
 	}
 }
+
+// El idioma del perfil es el que usa Sytue AI para responder: leerlo mal haría
+// que el asistente hablase en otro idioma sin que nada fallase.
+func TestClaimLocaleSeLeeDelToken(t *testing.T) {
+	tok := jwt.New()
+	_ = tok.Set(jwt.SubjectKey, "u1")
+	_ = tok.Set("locale", "it")
+	if c := claimsFromToken(tok); c.Locale != "it" {
+		t.Fatalf("locale = %q", c.Locale)
+	}
+	if c := claimsFromToken(jwt.New()); c.Locale != "" {
+		t.Fatalf("sin claim no hay idioma: %q", c.Locale)
+	}
+}

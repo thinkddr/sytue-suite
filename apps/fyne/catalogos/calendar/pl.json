@@ -156,6 +156,8 @@
     "other": "{date}, {count} wydarzenia"
   },
   "grid.daySelected": "{label}, wybrany",
+  "grid.handle": "Przełączaj między miesiącem, tygodniem i agendą",
+  "grid.handleState": "{view}. Przełączaj między miesiącem, tygodniem i agendą",
   "grid.loadError": "Nie udało się wczytać kalendarza",
   "grid.loading": "Wczytywanie kalendarza",
   "grid.more": {
@@ -164,8 +166,6 @@
     "many": "+{count} więcej",
     "other": "+{count} więcej"
   },
-  "grid.showMonth": "Pokaż cały miesiąc",
-  "grid.showWeek": "Pokaż tylko ten tydzień",
   "grid.snapAria": {
     "one": "Przyciąganie przy przeciąganiu: {count} minuta. Naciśnij, aby zmienić.",
     "few": "Przyciąganie przy przeciąganiu: {count} minuty. Naciśnij, aby zmienić.",

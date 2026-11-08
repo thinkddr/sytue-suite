@@ -67,6 +67,11 @@ type TokenClaims struct {
 	Email         string
 	EmailVerified bool
 	Name          string
+	// Locale es el idioma que la persona eligió en su perfil (en|de|es|fr|it),
+	// claim estándar `locale` de OIDC Core §5.1. Va también en el ACCESS token
+	// porque quien GENERA texto para ella lo lee del Bearer: Sytue AI responde en
+	// ese idioma, y sin el claim tendría que adivinarlo del documento.
+	Locale string
 	// Mailbox es la dirección de correo del sujeto EN LA ORGANIZACIÓN ACTIVA
 	// (nombre.apellidos@dominio-de-la-org), que no tiene por qué coincidir con
 	// Email: el correo de registro es su login global en la suite y puede ser
@@ -217,15 +222,28 @@ func (i *Issuer) IssueAccessToken(c TokenClaims, now time.Time) (string, error) 
 	if len(c.MailDomains) > 0 && hasScope(c.Scope, "email") {
 		b = b.Claim("mail_domains", c.MailDomains)
 	}
-	if c.Name != "" && hasScope(c.Scope, "profile") {
-		b = b.Claim("name", c.Name)
-	}
+	b = withProfileClaims(b, c)
 	b = withPlanClaims(b, c)
 	tok, err := b.Build()
 	if err != nil {
 		return "", err
 	}
 	return i.sign(tok)
+}
+
+// withProfileClaims añade al ACCESS token el nombre y el idioma del perfil, solo
+// con el scope `profile` concedido: es lo que ese scope autoriza a leer.
+func withProfileClaims(b *jwt.Builder, c TokenClaims) *jwt.Builder {
+	if !hasScope(c.Scope, "profile") {
+		return b
+	}
+	if c.Name != "" {
+		b = b.Claim("name", c.Name)
+	}
+	if c.Locale != "" {
+		b = b.Claim("locale", c.Locale)
+	}
+	return b
 }
 
 // withPlanClaims añade la clase de la organización, su plan y sus cuotas. Solo
@@ -324,6 +342,9 @@ func (i *Issuer) IssueIDToken(c TokenClaims, now time.Time) (string, error) {
 	}
 	if c.Name != "" {
 		b = b.Claim("name", c.Name)
+	}
+	if c.Locale != "" {
+		b = b.Claim("locale", c.Locale)
 	}
 	// `picture` (OIDC Core §5.2.4): URL absoluta del avatar propio, versionada
 	// con su updated_at — al cambiar la foto cambia la URL y todas las apps la

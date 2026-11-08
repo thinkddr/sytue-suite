@@ -148,14 +148,14 @@
     "other": "{date}, {count} sündmust"
   },
   "grid.daySelected": "{label}, valitud",
+  "grid.handle": "Vaheta kuu, nädala ja päevakava vahel",
+  "grid.handleState": "{view}. Vaheta kuu, nädala ja päevakava vahel",
   "grid.loadError": "Kalendrit ei õnnestunud laadida",
   "grid.loading": "Kalendri laadimine",
   "grid.more": {
     "one": "+{count} veel",
     "other": "+{count} veel"
   },
-  "grid.showMonth": "Näita kogu kuud",
-  "grid.showWeek": "Näita ainult seda nädalat",
   "grid.snapAria": {
     "one": "Lohistamise samm {count} minut. Vajutage muutmiseks.",
     "other": "Lohistamise samm {count} minutit. Vajutage muutmiseks."

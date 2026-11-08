@@ -116,8 +116,25 @@ func TestCadaIconoCuentaLoSuyo(t *testing.T) {
 		{ID: "4", Source: "mail"},
 	}
 	for propio, quiero := range map[string]int{"mail": 2, "rooms": 1, "drive": 0, productoHub: 40} {
-		if got := insigniaDe(propio, items, 40); got != quiero {
+		if got := insigniaDe(propio, items, 40, nil); got != quiero {
 			t.Errorf("insigniaDe(%q) = %d; quiero %d", propio, got, quiero)
 		}
+	}
+}
+
+// TestElIconoDeMailCuentaSuBuzon: el Hub junta los correos nuevos en UN aviso, y el
+// icono de Mail decía 1 con veinte correos sin leer. Lleva lo que cuenta el buzón; las
+// demás apps no se enteran de ese número.
+func TestElIconoDeMailCuentaSuBuzon(t *testing.T) {
+	items := []api.HubNotification{{ID: "1", Source: "mail"}, {ID: "2", Source: "rooms"}}
+	veinte := 20
+	for propio, quiero := range map[string]int{"mail": 20, "rooms": 1, productoHub: 7} {
+		if got := insigniaDe(propio, items, 7, &veinte); got != quiero {
+			t.Errorf("insigniaDe(%q) = %d; quiero %d", propio, got, quiero)
+		}
+	}
+	cero := 0
+	if got := insigniaDe("mail", items, 7, &cero); got != 0 {
+		t.Errorf("con el buzón leído, insigniaDe(mail) = %d; quiero 0", got)
 	}
 }

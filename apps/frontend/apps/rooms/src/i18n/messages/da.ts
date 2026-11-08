@@ -983,6 +983,11 @@ export const da: AppCatalog<typeof en> = {
   'matrix.unsupported': 'Denne handling er ikke tilgængelig for krypterede beskeder.',
   'matrix.auth': 'Bekræft din identitet',
   'matrix.authContinue': 'Jeg har logget ind',
+  'matrix.reset': 'Jeg har glemt min gendannelsesnøgle',
+  'matrix.resetAction': 'Nulstil kryptering',
+  'matrix.resetBody':
+    'Der oprettes en ny gendannelsesnøgle. Ældre krypterede beskeder kan kun læses på enheder, der allerede har dem, og du skal verificere dine andre enheder og dine kontakter igen.',
+  'matrix.resetUnderstood': 'Jeg forstår, at jeg kan miste adgangen til ældre krypterede beskeder',
   'matrix.tab': 'Rooms er åbent i en anden fane. Luk den for at bruge denne enhed her.',
   'matrix.identityUnverified': 'Identitet ikke bekræftet',
   'matrix.senderUnverified': 'Afsenderen kan ikke bekræftes på denne enhed',

@@ -15,9 +15,12 @@ import "math"
 const (
 	recorridoMinDeslizar    = 56   // RECORRIDO_MIN: lo menos que recorre el dedo, en px
 	fraccionAnchoDeslizar   = 0.18 // FRACCION_ANCHO: o esta fracción del ancho, si es mayor
-	velocidadRapidaDeslizar = 0.5  // VELOCIDAD_RAPIDA: un golpe rápido, px por milisegundo
 	recorridoRapidoDeslizar = 24   // RECORRIDO_RAPIDO: y aun rápido, al menos esto
 )
+
+// VelocidadRapida es `VELOCIDAD_RAPIDA`: un golpe rápido, en px por milisegundo. Es
+// pública porque el asa del mes del teléfono (Calendar) llama «lanzamiento» a lo mismo.
+const VelocidadRapida = 0.5
 
 // DominioDeslizamiento es `DOMINIO_HORIZONTAL`: horizontal de verdad es |dx| > 1,4·|dy|.
 // Es pública porque quien sigue al dedo mientras arrastra (el visor de Photos) decide con
@@ -33,7 +36,7 @@ func DecidirDeslizamiento(dx, dy, ancho float32, ms float64) int {
 		return 0
 	}
 	lejos := ax >= math.Max(recorridoMinDeslizar, fraccionAnchoDeslizar*float64(ancho))
-	rapido := ax >= recorridoRapidoDeslizar && ax/math.Max(ms, 1) >= velocidadRapidaDeslizar
+	rapido := ax >= recorridoRapidoDeslizar && ax/math.Max(ms, 1) >= VelocidadRapida
 	if !lejos && !rapido {
 		return 0
 	}

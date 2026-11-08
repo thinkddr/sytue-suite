@@ -27,7 +27,7 @@ import {
 } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import { useT } from '../i18n/index.js';
-import type { Label } from '../client/mailApi.js';
+import { senderLogoUrl, type Label } from '../client/mailApi.js';
 import {
   FILTROS_RAPIDOS,
   displayName,
@@ -89,6 +89,8 @@ interface Props {
   /** «Marcar como spam» / «No es spam» (null oculta la acción según la carpeta). */
   onSpam: ((conv: Conversation) => void) | null;
   onNotSpam: ((conv: Conversation) => void) | null;
+  /** La carpeta es la de spam: sin logos de remitente (ver la fila). */
+  enSpam?: boolean;
   /** Registro de etiquetas de la cuenta, para pintar los chips de cada fila. */
   labels: Label[];
   // ---- Multiselección + acciones en lote ----
@@ -198,6 +200,7 @@ export function MessageList({
   onTrash,
   onSpam,
   onNotSpam,
+  enSpam = false,
   labels,
   selected,
   onToggleSelect,
@@ -404,11 +407,13 @@ export function MessageList({
                     <Skeleton circle width="40px" height="40px" />
                   </span>
                   <div class="min-w-0 flex-1">
-                    <Skeleton height="14px" width="45%" />
+                    <div class="flex items-center justify-between gap-3">
+                      <Skeleton height="14px" width="45%" />
+                      <Skeleton height="12px" width="36px" />
+                    </div>
                     <Skeleton height="12px" width="80%" class="mt-2" />
                     <Skeleton height="12px" width="65%" class="mt-2" />
                   </div>
-                  <Skeleton height="12px" width="36px" />
                 </li>
               ))}
             </ul>
@@ -554,7 +559,16 @@ export function MessageList({
                           class={`h-2 w-2 shrink-0 rounded-full ${unread ? 'bg-primary-600' : 'bg-transparent'}`}
                           aria-hidden="true"
                         />
-                        <Avatar name={sender} size="md" />
+                        {/* El logo de la web del remitente, si su dominio lo tiene
+                            (Proton, Apple Mail). En SPAM no: ahí abundan los
+                            remitentes suplantados, y el logo de un banco en un
+                            correo falso le presta una credibilidad que no tiene. */}
+                        <Avatar
+                          name={sender}
+                          src={enSpam ? undefined : senderLogoUrl(email.from[0]?.email)}
+                          logo
+                          size="md"
+                        />
                       </span>
                     }
                     title={
@@ -601,18 +615,48 @@ export function MessageList({
                             <Glyph name="star" filled size={16} />
                           </span>
                         ) : null}
+                        {/* La fecha va en la línea del remitente, a la derecha, como
+                            en cualquier cliente de móvil: antes era una columna
+                            propia que robaba ancho a las tres líneas de texto. */}
+                        <time
+                          class={cx(
+                            'sytue-meta ml-auto shrink-0 pl-2 whitespace-nowrap tabular-nums',
+                            unread ? 'text-primary-text font-bold' : 'text-text-subtle font-normal',
+                          )}
+                          dateTime={email.receivedAt}
+                          title={fullDate(locale, email.receivedAt)}
+                        >
+                          {shortDate(locale, email.receivedAt)}
+                        </time>
                       </span>
                     }
                     subtitle={
                       <span class="flex w-full min-w-0 flex-col gap-0.5">
-                        <span
-                          class={cx(
-                            'truncate',
-                            unread ? 'text-primary-text font-bold' : 'text-text-muted font-normal',
-                          )}
-                          title={subject}
-                        >
-                          {subject}
+                        <span class="flex w-full min-w-0 items-center gap-2">
+                          <span
+                            class={cx(
+                              'min-w-0 flex-1 truncate',
+                              unread
+                                ? 'text-primary-text font-bold'
+                                : 'text-text-muted font-normal',
+                            )}
+                            title={subject}
+                          >
+                            {subject}
+                          </span>
+                          {/* Un CLIP, no un Badge de texto: el Badge era el elemento
+                              de más peso de la fila, gastado en el dato menos
+                              importante. El nombre accesible sigue en `aria-label`. */}
+                          {conv.hasAttachment ? (
+                            <span
+                              class="text-text-subtle shrink-0"
+                              title={t('list.attachment')}
+                              role="img"
+                              aria-label={t('list.attachment')}
+                            >
+                              <Glyph name="paperclip" size={14} />
+                            </span>
+                          ) : null}
                         </span>
                         {/* Extracto y acciones de triaje se RELEVAN en el mismo
                             hueco. Las acciones colgaban de la fecha, se desbordaban
@@ -630,7 +674,7 @@ export function MessageList({
                             se recorre dentro (foco te lleva al botón, gesto en
                             táctil), sin scrollbar que ensucie el reveal. */}
                         <span class="relative flex h-6 min-h-[24px] w-full min-w-0 items-center">
-                          <span class="text-text-subtle min-w-0 flex-1 truncate transition-opacity duration-150 group-focus-within:opacity-0 group-hover:opacity-0">
+                          <span class="text-text-subtle min-w-0 flex-1 truncate font-normal transition-opacity duration-150 group-focus-within:opacity-0 group-hover:opacity-0">
                             {email.preview || t('list.noPreview')}
                           </span>
                           {!readOnly ? (
@@ -699,37 +743,6 @@ export function MessageList({
                                 <span class="truncate">{l.name}</span>
                               </span>
                             ))}
-                          </span>
-                        ) : null}
-                      </span>
-                    }
-                    meta={
-                      <span class="flex flex-col items-end gap-1">
-                        <time
-                          class={cx(
-                            'whitespace-nowrap tabular-nums',
-                            unread ? 'text-primary-text font-bold' : 'text-text-subtle font-normal',
-                          )}
-                          dateTime={email.receivedAt}
-                          title={fullDate(locale, email.receivedAt)}
-                        >
-                          {shortDate(locale, email.receivedAt)}
-                        </time>
-                        {/* Un CLIP, no un Badge de texto. El Badge es una píldora
-                            rellena en negrita: el elemento de más peso visual de la
-                            fila, gastado en el dato menos importante, y repetido en
-                            cada correo con adjunto. Además ocupaba ancho de meta
-                            —«Pièce jointe» tanto que hubo que ponerle `nowrap` para
-                            que no rompiera la altura de la fila—, y ese ancho se lo
-                            quitaba al asunto. El nombre accesible no se pierde: sigue
-                            siendo el mismo texto, en `sr-only` y en el `title`. */}
-                        {conv.hasAttachment ? (
-                          <span
-                            title={t('list.attachment')}
-                            role="img"
-                            aria-label={t('list.attachment')}
-                          >
-                            <Glyph name="paperclip" size={14} />
                           </span>
                         ) : null}
                       </span>

@@ -82,6 +82,8 @@ func NewRouter(d Deps) http.Handler {
 		api.Use(d.Service.Hub().TrasEscribir(sinSenalDeCambios, "rooms"))
 		api.Get("/matrix/bootstrap", h.MatrixBootstrap)
 		api.Get("/matrix/storage/bootstrap", h.MatrixStorageBootstrap)
+		api.Get("/matrix/recovery-key", h.MatrixRecoveryKey)
+		api.Post("/matrix/recovery-key", h.StoreMatrixRecoveryKey)
 		api.Post("/matrix/native/start", h.MatrixNativeStart)
 		api.Get("/matrix/native/preview", h.MatrixNativePreview)
 		api.Post("/matrix/native/accept", h.MatrixNativeAccept)

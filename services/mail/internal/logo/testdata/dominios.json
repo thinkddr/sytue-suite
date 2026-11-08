@@ -1,0 +1,23 @@
+{
+  "_": "De qué dominio sale el logo de un remitente. Lo recorren services/mail/internal/logo (TestDominiosCompartidos) y apps/frontend/apps/mail/src/lib/dominioRemitente.test.ts: la web y el servicio deciden lo mismo. null = iniciales.",
+  "casos": [
+    { "correo": "vodafone@corp.vodafone.es", "dominio": "vodafone.es" },
+    { "correo": "no-reply@email.skyshowtime.com", "dominio": "skyshowtime.com" },
+    { "correo": "news@mail.bbc.co.uk", "dominio": "bbc.co.uk" },
+    { "correo": "Talent@ROCHE.com", "dominio": "roche.com" },
+    { "correo": "info@ejemplo.com.", "dominio": "ejemplo.com" },
+    { "correo": "ana@gmail.com", "dominio": null },
+    { "correo": "luis@hotmail.es", "dominio": null },
+    { "correo": "x@icloud.com", "dominio": null },
+    { "correo": "y@proton.me", "dominio": null },
+    { "correo": "equipo@sytue.eu", "dominio": null },
+    { "correo": "equipo@acme.sytue.eu", "dominio": null },
+    { "correo": "sinarroba", "dominio": null },
+    { "correo": "@x.com", "dominio": null },
+    { "correo": "a@localhost", "dominio": null },
+    { "correo": "a@10.0.0.1", "dominio": null },
+    { "correo": "a@co.uk", "dominio": null },
+    { "correo": "a@-x.com", "dominio": null },
+    { "correo": "a@x_y.com", "dominio": null }
+  ]
+}

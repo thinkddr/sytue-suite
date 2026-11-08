@@ -64,6 +64,16 @@ func sub(r *http.Request) string {
 	return ""
 }
 
+// idiomaDe es el idioma del perfil de quien hace la petición (claim `locale`),
+// reducido a uno de producto. Vacío si su token no lo trae: entonces no se
+// adivina, porque el lote de IA escribiría en un idioma que nadie eligió.
+func idiomaDe(r *http.Request) string {
+	if c, ok := authn.FromContext(r.Context()); ok && strings.TrimSpace(c.Locale) != "" {
+		return httpx.NegotiateLanguage(c.Locale)
+	}
+	return ""
+}
+
 // traducir mapea los errores de dominio al sobre canónico de la API.
 //
 // «No existe» y «no autorizado» se contestan IGUAL (404): distinguirlos deja

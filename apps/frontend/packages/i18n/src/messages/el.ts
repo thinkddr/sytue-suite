@@ -251,6 +251,8 @@ export const el: Catalog = {
   'app.pdf.description': 'PDF: ανάγνωση και σχολιασμός',
   'app.disabled': 'Απενεργοποιημένη',
   'import.title': 'Μεταφέρετε τα δεδομένα σας',
+  'import.collapse': 'Σύμπτυξη',
+  'import.expand': 'Ανάπτυξη',
   'import.help':
     'Αντιγράψτε στο Sytue όσα έχετε ήδη στον παλιό σας πάροχο. Μπορείτε να συνεχίσετε να εργάζεστε όσο εκτελείται.',
   'import.fromGoogle': 'Μεταφορά από το Google',

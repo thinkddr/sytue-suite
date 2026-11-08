@@ -244,6 +244,8 @@ export const sv: Catalog = {
   'app.pdf.description': 'PDF: läs och kommentera',
   'app.disabled': 'Inaktiverad',
   'import.title': 'Ta med dina data',
+  'import.collapse': 'Fäll ihop',
+  'import.expand': 'Fäll ut',
   'import.help':
     'Kopiera det du redan har hos din gamla leverantör till Sytue. Du kan fortsätta arbeta under tiden.',
   'import.fromGoogle': 'Hämta från Google',

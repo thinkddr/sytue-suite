@@ -391,7 +391,7 @@ func (h *handlers) assist(w http.ResponseWriter, r *http.Request) {
 	}
 
 	start := time.Now()
-	res, err := prov.Complete(ctx, provider.SystemPrompt, user, opts)
+	res, err := prov.Complete(ctx, provider.ConIdioma(provider.SystemPrompt, idiomaDe(r)), user, opts)
 	elapsed := time.Since(start)
 
 	// SE COBRA AUNQUE LA PETICIÓN FALLE: los tokens ya se gastaron. Un truncado
@@ -425,6 +425,21 @@ func (h *handlers) assist(w http.ResponseWriter, r *http.Request) {
 		"modelo":    prov.Modelo(),
 		"degradado": degradado,
 	})
+}
+
+// idiomaDe es el idioma en que el asistente escribe para la persona: el que
+// eligió en su perfil de Sytue ID (claim `locale` del Bearer) y, en un token
+// sin él, el que negocie su Accept-Language. Sin ninguno de los dos devuelve ""
+// y el prompt no lleva directiva: forzar el inglés base a quien no ha dicho nada
+// cambiaría el idioma de respuestas que hoy salen bien.
+func idiomaDe(r *http.Request) string {
+	if c, ok := authn.FromContext(r.Context()); ok && strings.TrimSpace(c.Locale) != "" {
+		return httpx.NegotiateLanguage(c.Locale)
+	}
+	if strings.TrimSpace(r.Header.Get("Accept-Language")) != "" {
+		return httpx.LanguageFromRequest(r)
+	}
+	return ""
 }
 
 // modoDe normaliza el modo para el log: el vacío es el interactivo, y en una
@@ -799,7 +814,7 @@ func (h *handlers) assistPages(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	start := time.Now()
-	res, err := prov.Complete(ctx, systemPrompt, user, opts)
+	res, err := prov.Complete(ctx, provider.ConIdioma(systemPrompt, idiomaDe(r)), user, opts)
 	elapsed := time.Since(start)
 
 	var gastado float64

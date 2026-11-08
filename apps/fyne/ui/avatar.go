@@ -86,7 +86,20 @@ type Avatar struct {
 	// Foto es la imagen de la persona. nil: las iniciales. Se recorta al cuadrado
 	// del centro (`object-cover`) y al círculo aquí; quien la pone no hace nada.
 	Foto image.Image
+	// Logo dice que la Foto es el LOGO de una entidad (el icono de la web de un
+	// remitente de Mail), no la cara de una persona: va ENTERO (`object-contain`) con
+	// un 14 % de margen sobre una losa blanca de radio 22 % —la forma de las
+	// entidades, design.md §3.15—, como el `logo` de Avatar.tsx. Un favicon recortado
+	// en círculo pierde las esquinas, y uno transparente desaparece en tema oscuro.
+	// Sin Foto no cambia nada: las iniciales siguen en su círculo.
+	Logo bool
 }
+
+// Proporciones del modo Logo, las de Avatar.tsx (`rounded-[22%]` y `p-[14%]`).
+const (
+	radioLogo  float32 = 0.22
+	margenLogo float32 = 0.14
+)
 
 var _ fyne.Widget = (*Avatar)(nil)
 
@@ -158,7 +171,11 @@ func (a *Avatar) CreateRenderer() fyne.WidgetRenderer {
 	r.foto = canvas.NewImageFromImage(nil)
 	r.foto.FillMode = canvas.ImageFillStretch
 	r.foto.ScaleMode = canvas.ImageScaleSmooth
-	r.objetos = []fyne.CanvasObject{circulo, r.iniciales, r.foto, r.aro, r.punto, r.forma}
+	// La losa del logo: blanco FIJO, no `surface` —los logos están pensados sobre
+	// blanco—, con el `ring-1` de `border`.
+	r.losa = canvas.NewRectangle(color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff})
+	r.losa.StrokeWidth = tema.Borde
+	r.objetos = []fyne.CanvasObject{circulo, r.iniciales, r.losa, r.foto, r.aro, r.punto, r.forma}
 	r.verPunto(a.Presencia)
 	r.Refresh()
 	return r
@@ -219,6 +236,8 @@ type avatarRenderer struct {
 	iniciales  *canvas.Text
 	foto       *canvas.Image
 	fuente     image.Image // la Foto de la que sale `foto.Image`
+	logo       bool        // si `foto.Image` se hizo en modo Logo
+	losa       *canvas.Rectangle
 	aro, punto *canvas.Rectangle
 	// forma es la luna, la raya o el hueco del aro que distingue cada presencia.
 	forma   *canvas.Rectangle
@@ -263,7 +282,16 @@ func (r *avatarRenderer) Layout(t fyne.Size) {
 	p := pxAvatar[r.a.Talla]
 	r.circulo.Resize(fyne.NewSize(p, p))
 	r.circulo.CornerRadius = p / 2
-	r.foto.Resize(fyne.NewSize(p, p))
+	r.losa.Resize(fyne.NewSize(p, p))
+	r.losa.CornerRadius = radioLogo * p
+	if r.a.Logo {
+		m := redondear(margenLogo * p)
+		r.foto.Move(fyne.NewPos(m, m))
+		r.foto.Resize(fyne.NewSize(p-2*m, p-2*m))
+	} else {
+		r.foto.Move(fyne.NewPos(0, 0))
+		r.foto.Resize(fyne.NewSize(p, p))
+	}
 	ancho := Medir(r.iniciales.Text, r.escalon, SemiNegrita).Width
 	ColocarTexto(r.iniciales, r.escalon, (p-ancho)/2, (p-r.escalon.Linea)/2)
 	// `dot = Math.max(10, Math.round(px * 0.34))`, anclado a `-right-0.5 -bottom-0.5`,
@@ -309,13 +337,26 @@ func (r *avatarRenderer) Refresh() {
 	r.aro.FillColor = tema.Color("surface", v)
 	r.forma.FillColor = tema.Color("surface", v)
 	r.verPunto(r.a.Presencia)
-	if r.a.Foto != r.fuente {
-		r.fuente, r.foto.Image = r.a.Foto, nil
-		if r.a.Foto != nil {
+	r.losa.StrokeColor = tema.Color("border", v)
+	if r.a.Foto != r.fuente || r.a.Logo != r.logo {
+		r.fuente, r.logo, r.foto.Image = r.a.Foto, r.a.Logo, nil
+		switch {
+		case r.a.Foto == nil:
+		case r.a.Logo:
+			// Entero y sin recortar: `contain` dentro del hueco con margen.
+			r.foto.Image = r.a.Foto
+		default:
 			r.foto.Image = RecorteCircular(r.a.Foto)
 		}
 	}
+	r.foto.FillMode = canvas.ImageFillStretch
+	if r.a.Logo {
+		r.foto.FillMode = canvas.ImageFillContain
+	}
+	conLogo := r.a.Foto != nil && r.a.Logo
 	ver(r.foto, r.a.Foto != nil)
+	ver(r.losa, conLogo)
+	ver(r.circulo, !conLogo)
 	ver(r.iniciales, r.a.Foto == nil)
 	for _, o := range r.objetos {
 		o.Refresh()

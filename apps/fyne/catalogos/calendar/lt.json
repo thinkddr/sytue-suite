@@ -156,6 +156,8 @@
     "other": "{date}, {count} įvykių"
   },
   "grid.daySelected": "{label}, pasirinkta",
+  "grid.handle": "Perjungti mėnesį, savaitę ir darbotvarkę",
+  "grid.handleState": "{view}. Perjungti mėnesį, savaitę ir darbotvarkę",
   "grid.loadError": "Nepavyko įkelti kalendoriaus",
   "grid.loading": "Įkeliamas kalendorius",
   "grid.more": {
@@ -164,8 +166,6 @@
     "many": "Dar {count}",
     "other": "Dar {count}"
   },
-  "grid.showMonth": "Rodyti visą mėnesį",
-  "grid.showWeek": "Rodyti tik šią savaitę",
   "grid.snapAria": {
     "one": "Vilkimo žingsnis: {count} minutė. Paspauskite, kad pakeistumėte.",
     "few": "Vilkimo žingsnis: {count} minutės. Paspauskite, kad pakeistumėte.",

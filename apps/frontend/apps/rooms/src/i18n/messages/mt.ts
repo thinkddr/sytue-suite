@@ -1117,6 +1117,11 @@ export const mt: AppCatalog<typeof en> = {
   'matrix.unsupported': 'Din l-azzjoni mhix disponibbli għal messaġġi kriptati.',
   'matrix.auth': 'Ikkonferma l-identità tiegħek',
   'matrix.authContinue': 'Dħalt fil-kont',
+  'matrix.reset': 'Insejt iċ-ċavetta tal-irkupru',
+  'matrix.resetAction': 'Irrisettja l-kriptaġġ',
+  'matrix.resetBody':
+    'Se tinħoloq ċavetta tal-irkupru ġdida. Il-messaġġi kriptati ta’ qabel jibqgħu jinqraw biss fuq it-tagħmir li diġà għandu, u jkollok terġa’ tivverifika t-tagħmir l-ieħor tiegħek u l-kuntatti tiegħek.',
+  'matrix.resetUnderstood': 'Nifhem li nista’ nitlef l-aċċess għall-messaġġi kriptati ta’ qabel',
   'matrix.tab': 'Rooms huwa miftuħ f’tab oħra. Agħlaqha biex tuża dan it-tagħmir hawn.',
   'matrix.identityUnverified': 'Identità mhux ivverifikata',
   'matrix.senderUnverified': 'Ma jistax jiġi vverifikat min bagħat il-messaġġ fuq dan it-tagħmir',

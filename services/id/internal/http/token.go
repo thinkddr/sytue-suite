@@ -608,6 +608,7 @@ func (s *Server) userClaims(ctx context.Context, client domain.Client, user doma
 		Email:         user.Email,
 		EmailVerified: user.EmailVerified,
 		Name:          user.Name,
+		Locale:        user.Locale,
 		Mailbox:       mailbox,
 		Mailboxes:     mailboxes,
 		MailDomains:   mailDomains,

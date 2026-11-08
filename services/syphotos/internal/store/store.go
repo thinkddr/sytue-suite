@@ -98,8 +98,8 @@ func (s *Store) Ingerir(ctx context.Context, a domain.Activo) (domain.Activo, er
 		row := tx.QueryRow(ctx, `
 			INSERT INTO assets (tenant, owner_sub, drive_file_id, name, media_type,
 			                    bytes, width, height, orientation, taken_at, camera, lens,
-			                    latitude, longitude)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+			                    latitude, longitude, owner_locale)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
 			ON CONFLICT (tenant, drive_file_id) DO UPDATE SET
 			    name        = EXCLUDED.name,
 			    media_type  = EXCLUDED.media_type,
@@ -116,6 +116,8 @@ func (s *Store) Ingerir(ctx context.Context, a domain.Activo) (domain.Activo, er
 			    -- no supo leer el GPS no borra el que ya se leyó.
 			    latitude    = COALESCE(EXCLUDED.latitude, assets.latitude),
 			    longitude   = COALESCE(EXCLUDED.longitude, assets.longitude),
+			    -- Un token sin idioma no borra el que ya se sabía.
+			    owner_locale = COALESCE(NULLIF(EXCLUDED.owner_locale, ''), assets.owner_locale),
 			    deleted_at  = NULL,
 			    updated_at  = now()
 			-- Solo la PROPIA: un fichero que ya está en Photos a nombre de otra persona
@@ -124,7 +126,7 @@ func (s *Store) Ingerir(ctx context.Context, a domain.Activo) (domain.Activo, er
 			RETURNING `+colsBase,
 			tenant, a.Duenyo, a.DriveID, a.Nombre, a.Tipo, a.Bytes,
 			a.Ancho, a.Alto, int16(a.Orientacion), a.TomadaEn, a.Camara, a.Objetivo,
-			a.Lat, a.Lon)
+			a.Lat, a.Lon, a.IdiomaDuenyo)
 		// Sin fila (el fichero es de otra persona) scanActivo da ErrNotFound.
 		out, err = scanActivo(row, tenant)
 		return err
@@ -574,12 +576,39 @@ const (
 	MaxDescripcion = 500
 )
 
-// GuardarDescripcion fija qué sale en la foto.
+// GuardarDescripcionDelLote escribe la descripción y las etiquetas que sacó el
+// lote de IA, SOLO si la foto sigue sin ninguna de las dos. Entre que el lote la
+// listó y que el modelo contestó, su dueña pudo describirla o escribirla a mano,
+// y lo suyo manda. Devuelve si escribió.
 //
-// Recorta en vez de rechazar: quien pulsó «describir» quiere su descripción, y
-// que el modelo se haya pasado de largo no es un error suyo. Lo que no se
-// admite es una foto que no sea de esa persona.
-func (s *Store) GuardarDescripcion(ctx context.Context, id uuid.UUID, duenyo, descripcion string, etiquetas []string) error {
+// La organización va en el contexto, como en cualquier escritura: el lote la
+// fija con tenancy.Into porque no viene de ninguna petición.
+func (s *Store) GuardarDescripcionDelLote(ctx context.Context, id uuid.UUID, duenyo, descripcion string, etiquetas []string) (bool, error) {
+	descripcion, limpias := limpiarDescripcion(descripcion, etiquetas)
+	if descripcion == "" {
+		return false, nil
+	}
+	escrita := false
+	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		tenant, err := tenantDe(ctx)
+		if err != nil {
+			return err
+		}
+		tag, err := tx.Exec(ctx, `
+			UPDATE assets SET description = $4, tags = $5, updated_at = now()
+			WHERE tenant = $1 AND id = $2 AND owner_sub = $3 AND deleted_at IS NULL
+			  AND description = '' AND cardinality(tags) = 0`,
+			tenant, id, duenyo, descripcion, limpias)
+		escrita = err == nil && tag.RowsAffected() == 1
+		return err
+	})
+	return escrita, err
+}
+
+// limpiarDescripcion recorta la descripción y deja las etiquetas sin vacías,
+// largas ni repetidas. La comparten las dos escrituras: la de la persona y la
+// del lote.
+func limpiarDescripcion(descripcion string, etiquetas []string) (string, []string) {
 	descripcion = strings.TrimSpace(descripcion)
 	if len(descripcion) > MaxDescripcion {
 		descripcion = descripcion[:MaxDescripcion]
@@ -597,6 +626,16 @@ func (s *Store) GuardarDescripcion(ctx context.Context, id uuid.UUID, duenyo, de
 			break
 		}
 	}
+	return descripcion, limpias
+}
+
+// GuardarDescripcion fija qué sale en la foto.
+//
+// Recorta en vez de rechazar: quien pulsó «describir» quiere su descripción, y
+// que el modelo se haya pasado de largo no es un error suyo. Lo que no se
+// admite es una foto que no sea de esa persona.
+func (s *Store) GuardarDescripcion(ctx context.Context, id uuid.UUID, duenyo, descripcion string, etiquetas []string) error {
+	descripcion, limpias := limpiarDescripcion(descripcion, etiquetas)
 	return s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
 		tenant, err := tenantDe(ctx)
 		if err != nil {

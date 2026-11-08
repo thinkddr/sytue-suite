@@ -19,6 +19,14 @@ export interface AvatarProps {
   src?: string | undefined;
   size?: AvatarSize;
   presence?: PresenceStatus;
+  /**
+   * `src` es el LOGO de una entidad (el icono de la web de un remitente), no la
+   * foto de una persona: se pinta entero (`contain`) sobre una losa clara de radio
+   * `md` —la forma de las entidades, design.md §3.15—, porque un favicon recortado
+   * en círculo pierde sus esquinas y uno transparente desaparece sobre fondo oscuro.
+   * Si no carga, vuelven las iniciales de siempre, en círculo.
+   */
+  logo?: boolean;
   class?: string;
 }
 
@@ -68,7 +76,14 @@ function bgFor(name: string): string {
   return palette[hash % palette.length] ?? palette[0]!;
 }
 
-export function Avatar({ name, src, size = 'md', presence, class: cls }: AvatarProps): JSX.Element {
+export function Avatar({
+  name,
+  src,
+  size = 'md',
+  presence,
+  logo = false,
+  class: cls,
+}: AvatarProps): JSX.Element {
   const { t } = useI18n();
   const px = sizePx[size];
   // El punto lleva dentro su FORMA (ver FORMA), y a 8 px —con el aro de 2 dentro— el
@@ -116,7 +131,14 @@ export function Avatar({ name, src, size = 'md', presence, class: cls }: AvatarP
           loading="lazy"
           decoding="async"
           onError={() => setRota(src)}
-          class="h-full w-full rounded-full object-cover ring-1 ring-[var(--sytue-border)] ring-inset"
+          class={cx(
+            'h-full w-full ring-1 ring-[var(--sytue-border)] ring-inset',
+            logo
+              ? // Blanco fijo y no `surface`: los logos están pensados sobre blanco,
+                // y en tema oscuro uno negro sobre `surface` no se vería.
+                'rounded-[22%] bg-white object-contain p-[14%]'
+              : 'rounded-full object-cover',
+          )}
         />
       ) : (
         // LAS INICIALES SE PINTAN CON CSS, no son texto del DOM. Dentro de un botón con

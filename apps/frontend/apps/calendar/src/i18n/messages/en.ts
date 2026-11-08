@@ -87,8 +87,11 @@ export const en = {
   'grid.todayLabel': 'Today, {date}',
   // Solo Fyne: la web anuncia el día elegido con `aria-pressed`.
   'grid.daySelected': '{label}, selected',
-  'grid.showWeek': 'Show this week only',
-  'grid.showMonth': 'Show the whole month',
+  // El asa del mes del teléfono. La web la anuncia como `slider` con la vista en
+  // `aria-valuetext`; Fyne, que no tiene estado accesible, la dice en el nombre.
+  'grid.handle': 'Switch between month, week and agenda',
+  // Solo Fyne.
+  'grid.handleState': '{view}. Switch between month, week and agenda',
   'day.noEvents': 'No events on this day',
   'grid.continued': '{title} (continued from earlier)',
   'grid.blockAria': '{title}, {time}',

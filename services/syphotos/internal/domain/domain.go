@@ -169,6 +169,12 @@ type Activo struct {
 	// normalizarlo aquí perdería lo que puso el fichero.
 	Camara   string
 	Objetivo string
+
+	// IdiomaDuenyo es el idioma del perfil de su dueña al darla de alta (claim
+	// `locale` de su token). Solo se ESCRIBE al ingerir y no se lee de vuelta: lo
+	// usa el lote de IA, que va con token de servicio, para describir la foto en
+	// su idioma.
+	IdiomaDuenyo string
 }
 
 // Vistas devuelve las dimensiones ya orientadas, que son las que ve quien mira.

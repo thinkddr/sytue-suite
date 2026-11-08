@@ -221,6 +221,7 @@ function BarraDeLaSuite({
         titulo: producto,
         marca: <ProductIcon appKey={currentApp} size={24} />,
         entrada: <Avatar name={user.name} src={user.picture} size="xs" class="sytue-aro-carril" />,
+        selector: <AppSwitcher compacto />,
         ...(aviso ? { aviso } : {}),
         estado: <OfflineStatus compacto />,
         alDestinos,

@@ -15,7 +15,7 @@ import { Icon } from './Icon.js';
  * La barra ÚNICA del teléfono (<768px): la topbar acoge la barra de la app
  * (`BarraMovil`) y la suite queda tras una sola entrada. Dos caras de la misma barra:
  *
- *   app    [☰ / ‹]  título o centro  [acciones de la app] [entrada]
+ *   app    [☰ / ‹]  título o centro  [acciones de la app] [selector] [entrada]
  *   suite  [✕]  marca ▾  buscador  [sin conexión] [campana] [cuenta]
  *
  * La entrada es el avatar de la cuenta, en el sitio exacto del de la topbar de siempre:
@@ -32,6 +32,12 @@ export interface TopBarMovil {
   marca?: ComponentChildren;
   /** El contenido de la entrada a la suite (el avatar de la cuenta, `xs`). */
   entrada: ComponentChildren;
+  /**
+   * El selector de apps, A LA VISTA en la cara de la app (decisión del dueño,
+   * 2026-11-08): plegado tras la entrada, cambiar de app en el teléfono costaba dos
+   * toques y nadie lo encontraba. Va justo antes de la entrada.
+   */
+  selector?: ComponentChildren;
   /**
    * Avisos sin leer con la barra plegada (la campana no se ve): pinta el punto de la
    * entrada, el mismo de la campana, y se añade a su nombre.
@@ -265,6 +271,7 @@ export function TopBar({
           >
             <div ref={accionesRef} class="flex items-center gap-1 empty:hidden" />
             {movil.estado}
+            {movil.selector}
             <TopBarButton
               botonRef={entradaRef}
               label={nombreEntrada}

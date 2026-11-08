@@ -262,3 +262,33 @@ test('SectionHeader `repiteLaBarra`: con la barra única, el título solo para e
   expect(sin.host.querySelector('h1')!.parentElement!.className).not.toContain('sr-only');
   sin.quitar();
 });
+
+// El selector de apps A LA VISTA en la cara de la app del teléfono (2026-11-08): antes
+// solo estaba en la cara de la suite, tras la entrada, y no lo encontraba nadie.
+test('el selector de apps se ve en la cara de la app, justo antes de la entrada', () => {
+  const m = montar(
+    <TopBar
+      rail
+      brand={<b>marca</b>}
+      movil={{
+        titulo: 'Mail',
+        entrada: <span>AG</span>,
+        selector: (
+          <button type="button" data-selector>
+            apps
+          </button>
+        ),
+        alDestinos: () => {},
+      }}
+    />,
+  );
+  const selector = m.host.querySelector('[data-selector]');
+  expect(selector).not.toBeNull();
+  // En el grupo de la derecha de la cara de la app (que en ≥768 no existe)...
+  const grupo = selector!.parentElement!;
+  expect(grupo.className.split(' ')).toContain('col-start-3');
+  expect(grupo.className.split(' ')).toContain('md:hidden');
+  // ...y pegado a la entrada, que es el botón que sigue.
+  expect(selector!.nextElementSibling?.textContent).toBe('AG');
+  m.quitar();
+});

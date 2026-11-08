@@ -245,6 +245,18 @@ spec:
             # pueden dejar de aceptarlas.
             - name: SYTUE_VAPID_SUBJECT
               value: {{ .Values.webPush.subject | quote }}
+            # ----- APNs (despertar las apps de iOS) -----
+            # Las cuatro salen del mismo Secret, bundle ID incluido: Rooms exige
+            # todas o ninguna, y 02b-secretos.sh solo las escribe si hay clave.
+            # Sin ellas, iOS queda sin push y el pod arranca igual.
+            {{- range $env, $key := dict "SYTUE_APNS_KEY_P8" "apns-key-p8" "SYTUE_APNS_KEY_ID" "apns-key-id" "SYTUE_APNS_TEAM_ID" "apns-team-id" "SYTUE_APNS_BUNDLE_ID" "apns-bundle-id" }}
+            - name: {{ $env }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.existingSecret }}
+                  key: {{ $key }}
+                  optional: true
+            {{- end }}
             # ----- Postgres EXTERNO (Scaleway RDB; unica fuente de verdad) -----
             - name: DATABASE_URL
               valueFrom:

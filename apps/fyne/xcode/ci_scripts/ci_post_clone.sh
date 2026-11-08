@@ -153,7 +153,9 @@ export GOTOOLCHAIN=local GOPRIVATE='github.com/thinkddr/*'
 if [ -n "${SYTUE_GIT_FORKS_TOKEN:-}" ]; then
   bash .github/actions/toolchain/forks.sh
 fi
-go install "fyne.io/tools/cmd/fyne@v$(sed -n 's/^FYNE_TOOLS_VERSION=//p' deploy/sytue-git/versions.env)"
+# Con el guion y no `go install …@v`: la CLI lleva el fork de Fyne de la app.
+bash .github/actions/toolchain/fyne-cli.sh apps/fyne \
+  "$(sed -n 's/^FYNE_TOOLS_VERSION=//p' deploy/sytue-git/versions.env)" >/dev/null
 
 # 3. Los módulos que compila esta app en esta plataforma (los de macOS, con `tienda`).
 goos=ios

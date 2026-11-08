@@ -1582,7 +1582,8 @@ CLI="$(command -v fyne || true)"
 [ -z "$CLI" ] && [ -x "$HOME/go/bin/fyne" ] && CLI="$HOME/go/bin/fyne"
 [ -n "$CLI" ] || {
   echo "::error::falta la CLI de Fyne. Instálala con:" >&2
-  echo "  go install fyne.io/tools/cmd/fyne@v\$(sed -n 's/^FYNE_TOOLS_VERSION=//p' deploy/sytue-git/versions.env)" >&2
+  echo "  .github/actions/toolchain/fyne-cli.sh apps/fyne \$(sed -n 's/^FYNE_TOOLS_VERSION=//p' deploy/sytue-git/versions.env)" >&2
+  echo "  (no «go install …@v»: compilaría la CLI sin el fork de Fyne de la app)" >&2
   exit 1
 }
 

@@ -15,13 +15,14 @@
  * para que color y alineación salgan como `style` —que es lo que el saneador
  * del servicio conserva— y no como `<font>` o `align=`, que tiraría.
  *
- * EL PEGADO ENTRA COMO TEXTO PLANO, a propósito. Insertar el HTML del
- * portapapeles en el DOM lo EJECUTA aquí y ahora, antes de que ningún servidor
- * pueda opinar: pegar desde una página hostil sería XSS en tu propia sesión. El
- * formato que se escribe con esta barra se conserva entero; lo que se pierde es
- * el formato de lo que se pega de fuera.
- * ponytail: si algún día hace falta conservarlo, lo que toca es un saneador de
- * allowlist en `@sytue/ui` (compartido con Mail), no relajar esto.
+ * EL PEGADO CONSERVA LA ESTRUCTURA Y TOMA EL ESTILO DE LA NOTA. Insertar el HTML
+ * del portapapeles tal cual lo EJECUTARÍA aquí y ahora, antes de que ningún
+ * servidor pueda opinar: pegar desde una página hostil sería XSS en tu propia
+ * sesión. Por eso pasa por `pegadoConFormato` (`@sytue/ui/browser/portapapeles`),
+ * que reconstruye un árbol nuevo con lista blanca —títulos, negrita, cursiva,
+ * listas, enlaces…— sin copiar ningún atributo salvo un `href` seguro: ni
+ * manejadores, ni `style`, ni imágenes. Sin HTML, entra como texto; y si Safari
+ * solo trae HTML, también.
  */
 import { Fragment, type JSX } from 'preact';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
@@ -54,6 +55,7 @@ import {
   editingCommandValue,
   executeEditingCommand,
 } from '@sytue/ui/browser/editing';
+import { pegadoConFormato, textoPegado } from '@sytue/ui/browser/portapapeles';
 import {
   ESTILO_CELDA,
   celdaDe,
@@ -1323,11 +1325,13 @@ export function RichText({
             }
           }}
           onPaste={(e) => {
-            // Ver la cabecera: el portapapeles entra como texto, nunca como HTML.
+            // Ver la cabecera: la estructura del origen, sin su estilo ni sus atributos.
             e.preventDefault();
             e.stopPropagation();
-            const texto = e.clipboardData?.getData('text/plain') ?? '';
-            if (texto) executeEditingCommand('insertText', texto);
+            const rico = pegadoConFormato(e.clipboardData?.getData('text/html') ?? '');
+            const texto = rico ? '' : textoPegado(e.clipboardData);
+            if (rico) executeEditingCommand('insertHTML', rico);
+            else if (texto) executeEditingCommand('insertText', texto);
             emitir();
           }}
           onKeyDown={(e) => {

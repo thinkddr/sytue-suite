@@ -30,6 +30,7 @@ import {
   haySuperposicionAbierta,
 } from '@sytue/ui';
 import type { Note, Notebook, Reminder } from '@sytue/api-clients';
+import { textoPegado } from '@sytue/ui/browser/portapapeles';
 import type { T } from '../i18n/index.js';
 import { colocarNota, conSangria } from '../client/arbol.js';
 import { interpretarCaptura, type Captura } from '../client/captura.js';
@@ -505,7 +506,7 @@ export function NoteCanvas({
         )
           return;
       }
-      const texto = e.clipboardData?.getData('text/plain') ?? '';
+      const texto = textoPegado(e.clipboardData);
       const uris = e.clipboardData?.getData('text/uri-list') ?? '';
       // En una lista cada línea es una nota, como al pegar en la captura. En el lienzo
       // libre y en columnas, un texto pegado es UNA tarjeta, que es lo que se ve allí.

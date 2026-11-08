@@ -23,6 +23,7 @@ import {
 import { appUrl, orgActual } from '@sytue/config';
 import { intlTag, type Locale } from '@sytue/i18n';
 import type { DailyDay, Note, NoteInput, Notebook } from '@sytue/api-clients';
+import { textoPegado } from '@sytue/ui/browser/portapapeles';
 import type { T } from '../i18n/index.js';
 import {
   capturaRapida,
@@ -487,8 +488,24 @@ export function NotebookDashboard({
               onPaste={(e) => {
                 const campo = e.currentTarget;
                 const fin = campo.selectionEnd ?? campo.value.length;
-                const pegado = e.clipboardData?.getData('text/plain') ?? '';
-                if (pegar(pegado, campo.selectionStart ?? fin, fin)) e.preventDefault();
+                const inicio = campo.selectionStart ?? fin;
+                const pegado = textoPegado(e.clipboardData);
+                if (pegar(pegado, inicio, fin)) {
+                  e.preventDefault();
+                } else if (pegado && !e.clipboardData?.getData('text/plain')) {
+                  // Solo venía HTML (Safari): el navegador no pegaría nada en el campo,
+                  // así que lo ponemos nosotros, donde estaba el cursor.
+                  e.preventDefault();
+                  const valor = borradorActualRef.current;
+                  const libre = valor.length - (fin - inicio);
+                  const trozo =
+                    campo.maxLength >= 0
+                      ? pegado.slice(0, Math.max(0, campo.maxLength - libre))
+                      : pegado;
+                  changeDraft(valor.slice(0, inicio) + trozo + valor.slice(fin));
+                  const cursor = inicio + trozo.length;
+                  requestAnimationFrame(() => campo.setSelectionRange(cursor, cursor));
+                }
               }}
             />
             <Dropdown

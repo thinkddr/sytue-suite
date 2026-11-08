@@ -1,4 +1,5 @@
 import createDOMPurify from 'dompurify';
+import { htmlATexto } from '@sytue/ui/browser/portapapeles';
 
 /**
  * Utilidades de rich-text del compositor de Sytue Mail (solo navegador). El
@@ -336,23 +337,11 @@ export function textToHtml(text: string): string {
 }
 
 /**
- * HTML → texto plano aproximado (para guardar el borrador, que es text/plain).
- * Convierte <br> y cierres de bloque en saltos de línea antes de descartar el
- * marcado. ponytail: aproximación; el round-trip de formato del borrador queda
- * como texto (el envío sí va en rich-text).
+ * HTML → texto plano (para guardar el borrador, que es text/plain). Es la pieza
+ * compartida de `@sytue/ui`, la misma que usa Notepads al pegar desde Safari.
  */
-export function htmlToText(html: string): string {
-  const withBreaks = html
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(p|div|li|h[1-6]|blockquote|pre)>/gi, '\n');
-  const doc = new DOMParser().parseFromString(withBreaks, 'text/html');
-  return (doc.body.textContent ?? '')
-    .replace(/\n{3,}/g, '\n\n')
-    .replace(/[ \t]+\n/g, '\n')
-    .trim();
-}
-
+export { htmlATexto as htmlToText } from '@sytue/ui/browser/portapapeles';
 /** ¿El HTML compuesto está vacío (solo espacios/saltos)? */
 export function isHtmlEmpty(html: string): boolean {
-  return htmlToText(html).trim().length === 0;
+  return htmlATexto(html).trim().length === 0;
 }

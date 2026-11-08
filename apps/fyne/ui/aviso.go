@@ -94,6 +94,11 @@ var (
 	sepAccion       = tema.Espacio(1.5) // mt-1.5
 )
 
+// DuracionDeshacer es lo que dura un aviso con «Deshacer» (la papelera, una
+// importación): 10 s y no los 5 de serie, porque deshacer hay que leerlo, decidirlo y
+// alcanzarlo. Uno para toda la suite; espejo de `DURACION_DESHACER` de `@sytue/ui`.
+const DuracionDeshacer = 10 * time.Second
+
 // DuracionDe es la vida de un aviso: 5 s, salvo advertencia y peligro, que PERSISTEN
 // hasta que alguien los cierra.
 //

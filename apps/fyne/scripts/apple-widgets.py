@@ -3,6 +3,10 @@
 # Copyright (c) 2026 Daniel Delgado Ramos
 """Consulta o registra los IDs y capacidades de las extensiones WidgetKit.
 
+Con el despertar del widget en iOS encendido (SYTUE_DESPERTAR_APPLE), también la
+capacidad Push Notifications del App ID de cada host con widget; nunca la de la
+extensión, que no recibe avisos.
+
 No crea certificados, perfiles, grupos ni miembros. Apple exige asociar el App
 Group en Developer Portal; la firma debe comprobar después el perfil resultante.
 Por defecto sólo hace GET y falla si falta el registro o alguna capacidad. Esto
@@ -119,7 +123,39 @@ def diagnostico_proteccion(capacidades):
     return resultado
 
 
-def registrar(asc, app, escribir, grupo):
+def asegurar(asc, bundle, identificador, requeridas, escribir):
+    """Lee y, con escribir, completa las capacidades de un App ID. Idempotente.
+
+    Devuelve las capacidades persistidas (GET) y las requeridas que ya están bien.
+    """
+    capacidades = leer_capacidades(asc, bundle, identificador)
+    mutado = False
+    for tipo, settings in requeridas.items():
+        actual = capacidades.get(tipo)
+        if actual and (settings is None or completa(actual)):
+            continue
+        if escribir:
+            attrs = {"capabilityType": tipo}
+            if settings is not None:
+                attrs["settings"] = settings
+            if actual:
+                asc.escribir("bundleIdCapabilities", attrs, id=actual["id"])
+            else:
+                asc.escribir("bundleIdCapabilities", attrs,
+                             rels={"bundleId": {"type": "bundleIds", "id": bundle["id"]}})
+            mutado = True
+    if mutado:
+        # Apple puede omitir settings en el POST/PATCH. Sólo el GET acredita
+        # la configuración persistida, nunca el payload que hemos enviado.
+        capacidades = leer_capacidades(asc, bundle, identificador)
+    disponibles = [tipo for tipo, settings in requeridas.items()
+                   if capacidades.get(tipo) and (settings is None or completa(capacidades[tipo]))]
+    return capacidades, disponibles
+
+
+def registrar(asc, app, escribir, grupo, push=False):
+    """push: el despertar del widget en iOS (SYTUE_DESPERTAR_APPLE) pide Push Notifications
+    en el App ID del HOST, que es quien recibe el aviso; la extensión no recibe nada."""
     host = buscar(asc, app["id"])
     if not host:
         raise RuntimeError(app["clave"] + ": falta el App ID del host; no se crea automáticamente")
@@ -128,48 +164,33 @@ def registrar(asc, app, escribir, grupo):
         raise RuntimeError(app["clave"] + ": plataforma del host desconocida")
     identificador = app["id"] + ".widgets"
     extension = buscar(asc, identificador)
-    mutado = False
     if extension and extension["attributes"]["platform"] != plataforma:
         raise RuntimeError(identificador + ": plataforma distinta del host")
+    # El host primero: sin su Push el perfil de iOS no autoriza `aps-environment`.
+    # POST sólo con capabilityType (settings es opcional y Push no tiene ninguno).
+    requeridas_host = {"PUSH_NOTIFICATIONS": None} if push and plataforma in ("IOS", "UNIVERSAL") else {}
+    disponibles_host = []
+    if requeridas_host:
+        _, disponibles_host = asegurar(asc, host, app["id"], requeridas_host, escribir)
     if not extension and escribir:
         attrs = {"identifier": identificador, "name": app["nombre"] + " Widgets", "platform": plataforma}
         if host["attributes"].get("seedId"):
             attrs["seedId"] = host["attributes"]["seedId"]
         extension = asc.escribir("bundleIds", attrs)["data"]
-        mutado = True
     requeridas = {"APP_GROUPS": None}
     if plataforma in ("IOS", "UNIVERSAL"):
         requeridas["DATA_PROTECTION"] = PROTECCION
     capacidades = {}
-    if extension:
-        capacidades = leer_capacidades(asc, extension, identificador)
-        for tipo, settings in requeridas.items():
-            actual = capacidades.get(tipo)
-            if actual and (settings is None or completa(actual)):
-                continue
-            if escribir:
-                attrs = {"capabilityType": tipo}
-                if settings is not None:
-                    attrs["settings"] = settings
-                if actual:
-                    asc.escribir("bundleIdCapabilities", attrs, id=actual["id"])
-                else:
-                    asc.escribir("bundleIdCapabilities", attrs,
-                                 rels={"bundleId": {"type": "bundleIds", "id": extension["id"]}})
-                mutado = True
-        if mutado:
-            # Apple puede omitir settings en el POST/PATCH. Sólo el GET acredita
-            # la configuración persistida, nunca el payload que hemos enviado.
-            capacidades = leer_capacidades(asc, extension, identificador)
     disponibles = []
-    for tipo, settings in requeridas.items():
-        actual = capacidades.get(tipo)
-        if actual and (settings is None or completa(actual)):
-            disponibles.append(tipo)
+    if extension:
+        capacidades, disponibles = asegurar(asc, extension, identificador, requeridas, escribir)
     return {"app": app["clave"], "widget": identificador, "platform": plataforma,
             "registered": extension is not None, "capabilities": disponibles,
             "requiredCapabilities": list(requeridas), "group": grupo,
-            "registrationReady": extension is not None and len(disponibles) == len(requeridas),
+            "host": app["id"], "hostCapabilities": disponibles_host,
+            "hostRequiredCapabilities": list(requeridas_host),
+            "registrationReady": (extension is not None and len(disponibles) == len(requeridas)
+                                  and len(disponibles_host) == len(requeridas_host)),
             "dataProtectionDiagnostic": diagnostico_proteccion(capacidades),
             "groupAssociationVerified": False, "profileRequired": True}
 
@@ -188,8 +209,10 @@ def main():
     if len(set(seleccion)) != len(seleccion) or any(a not in catalogo for a in seleccion):
         parser.error("las apps deben pertenecer al catálogo WidgetKit y no repetirse")
     grupo = generador.grupo_widgets()
+    push = generador.despertar_apple()
     if opciones.seco:
-        print(json.dumps({"widgets": [catalogo[a]["id"] + ".widgets" for a in seleccion], "group": grupo}))
+        print(json.dumps({"widgets": [catalogo[a]["id"] + ".widgets" for a in seleccion], "group": grupo,
+                          "hostPush": push}))
         return
     cliente = importar("sytue_asc_widgets", AQUI / "appstore-publicar.py")
     asc = cliente.Apple()
@@ -197,7 +220,7 @@ def main():
     incompletas = []
     for nombre in seleccion:
         try:
-            resultado = registrar(asc, catalogo[nombre], opciones.registrar, grupo)
+            resultado = registrar(asc, catalogo[nombre], opciones.registrar, grupo, push)
             print(json.dumps(resultado))
             if not resultado["registrationReady"]:
                 incompletas.append(nombre)

@@ -9,8 +9,6 @@ import (
 	"errors"
 	"maps"
 	"net/http"
-	"path"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -21,7 +19,6 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	"git.sytue.eu/sytue/one/apps/nucleo/sistema/voz"
-	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
 /*
@@ -521,11 +518,6 @@ func (p *Pantalla) MostrarPortada(pdf *api.PDF, loc i18n.Locale) {
 	if pdf == nil {
 		return
 	}
-	view := p.Widget.View()
-	p.widgetMu.Lock()
-	p.widgetPending, p.widgetFiles = nil, nil
-	p.widgetFirmas, p.widgetReciente = nil, nil
-	p.widgetMu.Unlock()
 	go func() {
 		ctx, parar := context.WithTimeout(p.ctx, plazo)
 		defer parar()
@@ -533,16 +525,12 @@ func (p *Pantalla) MostrarPortada(pdf *api.PDF, loc i18n.Locale) {
 		if err != nil {
 			return // sin la lista no hay sección, y ya
 		}
-		p.publicarFirmasWidget(ctx, view, ps)
 		fyne.Do(func() { po.Peticiones = &ps; po.Recomponer() })
 	}()
 	go func() {
 		ctx, parar := context.WithTimeout(p.ctx, plazo)
 		defer parar()
 		lista, err := pdf.Lista(ctx)
-		if err == nil {
-			p.publicarListaWidget(ctx, view, lista)
-		}
 		fyne.Do(func() {
 			defer p.avisarRed()
 			if err != nil {
@@ -553,100 +541,6 @@ func (p *Pantalla) MostrarPortada(pdf *api.PDF, loc i18n.Locale) {
 			po.Recomponer()
 		})
 	}()
-}
-
-func (p *Pantalla) publicarFirmasWidget(ctx context.Context, view widgets.View, ps api.PDFPeticionesFirma) {
-	var pendientes int64
-	firmas := make([]widgets.Item, 0, widgets.MaxItems)
-	for _, r := range ps.Recibidas {
-		if r.Estado != "" && r.Estado != "pending" && r.Estado != "pendiente" {
-			continue
-		}
-		pendientes++
-		if len(firmas) >= widgets.MaxItems {
-			continue
-		}
-		titulo := strings.TrimSpace(path.Base(r.Ruta))
-		if titulo == "" || titulo == "." || titulo == "/" {
-			titulo = strings.TrimSpace(cmp.Or(r.NombrePide, r.Solicitante))
-		}
-		if titulo == "" {
-			continue
-		}
-		var startAt int64
-		if !r.Creada.IsZero() && r.Creada.Unix() > 0 {
-			startAt = r.Creada.Unix()
-		}
-		firmas = append(firmas, widgets.Item{
-			Title:    titulo,
-			Subtitle: r.NombrePide,
-			Badge:    "FIRMAR",
-			StartAt:  startAt,
-			Color:    "#d83b35",
-			Unread:   true,
-		})
-	}
-	p.widgetMu.Lock()
-	p.widgetPending = &pendientes
-	p.widgetFirmas = widgets.SanitizeItems(firmas)
-	detalle := p.detalleWidgetBloqueado()
-	p.widgetMu.Unlock()
-	_ = view.PublicarDetalle(ctx, detalle)
-}
-
-func (p *Pantalla) publicarListaWidget(ctx context.Context, view widgets.View, lista []api.File) {
-	items := make([]widgets.Item, 0, min(len(lista), widgets.MaxItems))
-	for _, f := range lista {
-		nombre := strings.TrimSpace(f.Name)
-		if nombre == "" {
-			continue
-		}
-		var startAt int64
-		if !f.UpdatedAt.IsZero() && f.UpdatedAt.Unix() > 0 {
-			startAt = f.UpdatedAt.Unix()
-		}
-		items = append(items, widgets.Item{
-			Title:   nombre,
-			Badge:   "PDF",
-			StartAt: startAt,
-		})
-		if len(items) >= widgets.MaxItems {
-			break
-		}
-	}
-	p.widgetMu.Lock()
-	if len(lista) < MaxRecientes {
-		total := int64(len(lista))
-		p.widgetFiles = &total
-	} else {
-		p.widgetFiles = nil
-	}
-	p.widgetReciente = widgets.SanitizeItems(items)
-	detalle := p.detalleWidgetBloqueado()
-	p.widgetMu.Unlock()
-	if len(detalle.Counters) > 0 || len(detalle.Items) > 0 {
-		_ = view.PublicarDetalle(ctx, detalle)
-	}
-}
-
-func (p *Pantalla) detalleWidgetBloqueado() widgets.Detail {
-	var d widgets.Detail
-	if p.widgetPending != nil {
-		d.Counters = append(d.Counters, widgets.Counter{Kind: "pending", Value: *p.widgetPending})
-	}
-	if p.widgetFiles != nil {
-		d.Counters = append(d.Counters, widgets.Counter{Kind: "files", Value: *p.widgetFiles})
-	}
-	combinados := make([]widgets.Item, 0, len(p.widgetFirmas)+len(p.widgetReciente))
-	combinados = append(combinados, p.widgetFirmas...)
-	combinados = append(combinados, p.widgetReciente...)
-	if len(combinados) > widgets.MaxItems {
-		combinados = combinados[:widgets.MaxItems]
-	}
-	if len(combinados) > 0 {
-		d.Items = slices.Clone(combinados)
-	}
-	return d
 }
 
 // desbloquear quita el bloqueo desde la portada y la vuelve a pintar sin esa persona.

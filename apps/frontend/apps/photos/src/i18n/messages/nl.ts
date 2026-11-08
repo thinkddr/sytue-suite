@@ -133,6 +133,7 @@ export const nl: AppCatalog<typeof en> = {
   'gallery.downloadSelected': 'Downloaden',
   'gallery.downloading':
     'Gestarte downloadverzoeken: {count}. Controleer de downloads in je browser.',
+  'gallery.downloadingNative': { one: '1 foto downloaden…', other: "{count} foto's downloaden…" },
   'gallery.downloadCapped': 'Foto’s buiten deze batch: {count}.',
   'gallery.newAlbum': 'Nieuw album',
   'gallery.newAlbumTitle': 'Nieuw album',
@@ -257,4 +258,20 @@ export const nl: AppCatalog<typeof en> = {
   'aiBatch.excludeOrg': 'Organisatie uitsluiten van de automatische Sytue AI-batch',
   'aiBatch.excludedHint':
     'De organisatie is uitgesloten van de automatische Sytue AI-batch. Nieuwe foto’s worden niet op de achtergrond verwerkt voor suggesties of gelijkenissen.',
+  'album.rename': 'Naam wijzigen',
+  'album.renamePrompt': 'Albumnaam',
+  'album.setCover': 'Gebruiken als albumomslag',
+  'album.isCover': 'Dit is de albumomslag',
+  'album.coverSet': 'Albumomslag bijgewerkt',
+  'gallery.favorited': 'Toegevoegd aan favorieten: {count}',
+  'gallery.unfavorited': 'Verwijderd uit favorieten: {count}',
+  'gallery.favoriteFailed': "Foto's die niet gewijzigd konden worden: {count}",
+  'gallery.noResults.title': "Geen foto's komen overeen met ‘{query}’",
+  'gallery.noResults.description':
+    "Probeer andere woorden of wis de zoekopdracht om al je foto's te zien.",
+  'gallery.clearSearch': 'Zoekopdracht wissen',
+  'viewer.counter': '{index} / {total}',
+  'viewer.counterMore': '{count}+',
+  'viewer.counterLabel': 'Foto {index} van {total}',
+  'viewer.shortcutsJump': 'Home en End gaan naar de eerste en de laatste foto.',
 };

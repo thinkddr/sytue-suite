@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
@@ -45,6 +46,9 @@ func (p *Pantalla) menu() fyne.CanvasObject {
 	mini.AlDesplazar = p.AlDesplazarMes
 
 	bloques := []fyne.CanvasObject{mini, p.seccionMisCalendarios()}
+	if p.compacta() {
+		bloques = append([]fyne.CanvasObject{p.seccionVistaMovil()}, bloques...)
+	}
 	if p.AlServiciosVinculados != nil {
 		bloques = append(bloques, ui.NuevaFilaLateral(p.t("linkedServices.connected", nil), iconos.Trazo(iconos.Globo, ui.GlifoMenu, "sidebar-fg", tema.De(fyne.CurrentApp().Settings().ThemeVariant())).Objeto(), func() { p.cajonAbierto = false; p.AlServiciosVinculados() }))
 	}
@@ -66,6 +70,59 @@ func (p *Pantalla) menu() fyne.CanvasObject {
 		}
 	}
 	return l
+}
+
+// seccionVistaMovil es el primer bloque del cajón en el mes del teléfono: lo que la
+// cabecera de la vista tenía y en la barra no cabe. La vista, buscar, recordatorios (una
+// rama que despliega el panel en el sitio) e invitaciones con su contador. Es
+// `BloqueVistaMovil` de la web.
+func (p *Pantalla) seccionVistaMovil() *ui.SeccionLateral {
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	s := ui.NuevaSeccionLateral(p.t("view.label", nil))
+	grupo := NuevoGrupoVista([4]string{
+		p.t("view.month", nil), p.t("view.week", nil), p.t("view.day", nil), p.t("view.agenda", nil),
+	}, p.Vista, func(vista Vista) { p.cajonAbierto = false; p.cambiarVista(vista) })
+	grupo.Rejilla = true
+	buscar := ui.NuevaFilaLateral(p.t("search.events", nil), iconos.Trazo(iconos.Buscar, ui.GlifoMenu, "sidebar-fg", v).Objeto(), func() {
+		p.cajonAbierto = false
+		if p.AlBuscar != nil {
+			p.AlBuscar()
+		}
+	})
+	rec := ui.NuevaFilaLateral(p.t("reminders.title", nil), iconos.Trazo(iconos.Campana, ui.GlifoMenu, "sidebar-fg", v).Objeto(), nil)
+	rec.Contador = contar(len(p.Recordatorios))
+	inv := ui.NuevaFilaLateral(p.t("header.invitations", nil), iconos.Trazo(iconos.Usuarios, ui.GlifoMenu, "sidebar-fg", v).Objeto(), func() {
+		p.cajonAbierto = false
+		if p.AlVerInvitaciones != nil {
+			p.AlVerInvitaciones()
+		}
+	})
+	inv.Contador = contar(p.Invitaciones)
+	// El `px-1 pb-1.5` del selector en el cajón; el grupo llena el ancho que queda.
+	s.Filas = append(s.Filas, container.New(ui.Margen{Izq: tema.Espacio(1), Der: tema.Espacio(1), Abj: tema.Espacio(1.5)}, grupo), buscar)
+	s.Filas = append(s.Filas, ui.RamaDesplegable(rec, p.recEnCajon, func() {
+		if p.AlVerRecordatorios != nil {
+			p.AlVerRecordatorios(nil)
+		}
+	}, v, p.recordatoriosEnCajon(v))...)
+	s.Filas = append(s.Filas, inv)
+	return s
+}
+
+// recordatoriosEnCajon es el panel de la campana dentro de la rama: la misma lista, en
+// una hoja de superficie con borde (el carril del menú es de color y el cuerpo usa los
+// tokens de superficie), sin la cabecera del panel flotante.
+func (p *Pantalla) recordatoriosEnCajon(v tema.Variante) fyne.CanvasObject {
+	saltar, descartar := p.saltarRec, p.descartRec
+	if saltar == nil {
+		saltar = func(api.Reminder) {}
+	}
+	if descartar == nil {
+		descartar = func(api.Reminder) {}
+	}
+	caja := ui.NuevaCaja(tema.Color("surface", v), tema.Color("border", v), tema.RadioMD)
+	lista := p.listaRecordatorios(p.recCargando, p.recFallo, saltar, descartar)
+	return container.NewStack(append(caja.Objetos(), container.New(ui.Margen{Arr: tema.Borde, Abj: tema.Borde}, lista))...)
 }
 
 // seccionMisCalendarios es el bloque «MIS CALENDARIOS» con sus acciones de cabecero.

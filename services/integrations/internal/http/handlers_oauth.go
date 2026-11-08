@@ -305,9 +305,12 @@ type oauthFinishReq struct {
 }
 
 // oauthFinishResp es el desenlace para la consola. `error` es un código corto y
-// estable (denied|provider|state|exchange); vacío ⇒ conectada.
+// estable (denied|provider|state|exchange|scope|exists); vacío ⇒ conectada.
+// `scope`: se inició sesión pero sin el permiso que pedía el origen. `exists`: esa
+// cuenta ya estaba conectada; `existing` es la que hay y el borrador se descarta.
 type oauthFinishResp struct {
 	Instance string `json:"instance,omitempty"`
+	Existing string `json:"existing,omitempty"`
 	Section  string `json:"section"`
 	Out      bool   `json:"out,omitempty"`
 	Error    string `json:"error,omitempty"`
@@ -380,11 +383,28 @@ func (h *Handlers) OAuthFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.redeemAndStore(r, rd); err != nil {
-		log.From(ctx).Error("integrations: canje del código de autorización falló",
-			"instance", logsafe.Text(rd.Instance), "error", logsafe.Text(err))
-		out.Error = "exchange"
+		out.Error, out.Existing = finishError(err)
+		if out.Error == "exchange" {
+			log.From(ctx).Error("integrations: canje del código de autorización falló",
+				"instance", logsafe.Text(rd.Instance), "error", logsafe.Text(err))
+		}
 	}
 	httpx.JSON(w, r, http.StatusOK, out)
+}
+
+// finishError traduce un canje fallido al código de oauthFinishResp. Solo
+// «exchange» es un fallo nuestro o del proveedor que merece el log de error; los
+// otros dos son decisiones de la persona y se le explican tal cual.
+func finishError(err error) (code, existing string) {
+	var exists *errMailAccountExists
+	switch {
+	case errors.As(err, &exists):
+		return "exists", exists.instance
+	case errors.Is(err, errMailScope):
+		return "scope", ""
+	default:
+		return "exchange", ""
+	}
 }
 
 // esDeQuienEmpezo dice si la sesión que termina el consentimiento es la que lo empezó:
@@ -488,10 +508,7 @@ func (h *Handlers) redeemAndStore(r *http.Request, rd consent.Redeem) error {
 	}
 	if externalMailOAuth(inst.TemplateKey) {
 		conn.Secrets[store.SecretKeyBearer] = tok.AccessToken
-		if err := applyMailServicesGrant(inst.TemplateKey, cfg, tok.Scope, rd.RequestedScopes, flow.Scopes, mailConsentService(rd.Section)); err != nil {
-			return err
-		}
-		if err := h.applyMailConsentMetadata(ctx, conn, cfg); err != nil {
+		if err := h.applyMailConsent(ctx, inst, conn, rd, tok.Scope, flow.Scopes, cfg); err != nil {
 			return err
 		}
 	}

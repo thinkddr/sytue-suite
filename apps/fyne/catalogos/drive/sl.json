@@ -4,6 +4,8 @@
   "action.classified": "Razvrstitev · {name}",
   "action.classify": "Razvrsti",
   "action.copy": "Ustvari kopijo",
+  "action.copyLink": "Kopiraj povezavo",
+  "action.copyLinkFailed": "Povezave ni bilo mogoče kopirati.",
   "action.delete": "Premakni v koš",
   "action.desktopBody": "Če je še nimate nameščene, jo lahko prenesete.",
   "action.desktopCta": "Oglejte si prenose",
@@ -12,6 +14,7 @@
   "action.downloadName": "Prenesi {name}",
   "action.downloadZip": "Prenesi (ZIP)",
   "action.editorFailed": "Urejevalnik te datoteke ni mogel odpreti.",
+  "action.linkCopied": "Povezava je kopirana. Odpre se le tistim, ki že imajo dostop.",
   "action.mailFailed": "Urejevalnika e-pošte ni bilo mogoče odpreti",
   "action.menu": "Dejanja za {name}",
   "action.more": "Več dejanj",
@@ -87,6 +90,18 @@
     "two": "Premakni {count} elementa",
     "few": "Premakni {count} elemente",
     "other": "Premakni {count} elementov"
+  },
+  "files.batch.restorePartial": {
+    "one": "{count} elementa ni bilo mogoče obnoviti; še vedno je v košu.",
+    "two": "{count} elementov ni bilo mogoče obnoviti; še vedno sta v košu.",
+    "few": "{count} elementov ni bilo mogoče obnoviti; še vedno so v košu.",
+    "other": "{count} elementov ni bilo mogoče obnoviti; še vedno so v košu."
+  },
+  "files.batch.restored": {
+    "one": "{count} element je obnovljen.",
+    "two": "{count} elementa sta obnovljena.",
+    "few": "{count} elementi so obnovljeni.",
+    "other": "{count} elementov je obnovljenih."
   },
   "files.batch.trashBody": {
     "one": "{count} element bo premaknjen v koš. Od tam ga lahko obnovite.",
@@ -587,6 +602,21 @@
     "other": "Naloženih je {count} datotek."
   },
   "team.upload.partial": "Naloženo: {uploaded} od {count}.",
+  "trash.emptiedAll": "Koš je izpraznjen.",
+  "trash.emptyAll": "Izprazni koš",
+  "trash.emptyAllBody": {
+    "one": "{count} element v košu bo trajno izbrisan skupaj z zgodovino različic. Pozneje ga ni več mogoče pridobiti nazaj.",
+    "two": "{count} elementa v košu bosta trajno izbrisana skupaj z zgodovino različic. Pozneje ju ni več mogoče pridobiti nazaj.",
+    "few": "{count} elementi v košu bodo trajno izbrisani skupaj z zgodovino različic. Pozneje jih ni več mogoče pridobiti nazaj.",
+    "other": "{count} elementov v košu bo trajno izbrisanih skupaj z zgodovino različic. Pozneje jih ni več mogoče pridobiti nazaj."
+  },
+  "trash.emptyAllPartial": {
+    "one": "{count} elementa ni bilo mogoče izbrisati; še vedno je v košu.",
+    "two": "{count} elementov ni bilo mogoče izbrisati; še vedno sta v košu.",
+    "few": "{count} elementov ni bilo mogoče izbrisati; še vedno so v košu.",
+    "other": "{count} elementov ni bilo mogoče izbrisati; še vedno so v košu."
+  },
+  "trash.emptyAllTitle": "Želite izprazniti koš?",
   "trash.emptyBody": "Izbrisane datoteke in mape se bodo prikazale tukaj in jih bo mogoče obnoviti.",
   "trash.emptyTitle": "Koš je prazen",
   "trash.errorTitle": "Koša ni bilo mogoče naložiti",

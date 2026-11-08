@@ -390,6 +390,11 @@ type Redactor struct {
 	B Borrador
 	// OpcionesDe son las direcciones «De»: con una sola no hay fila.
 	OpcionesDe []string
+	// Remitentes son esas mismas opciones con la cuenta externa de cada una, si la hay.
+	Remitentes []OpcionDe
+	// AlCambiarDe avisa de que se ha elegido otro «De» (el reloj de programar cuelga de
+	// aquí: desde una cuenta externa no se programa).
+	AlCambiarDe func()
 	// AlCambiar avisa de cada cambio (el autoguardado cuelga de aquí).
 	AlCambiar func()
 	// AlEnviar es ⌘/Ctrl + Intro dentro de cualquier campo.
@@ -462,7 +467,24 @@ func NuevoRedactor(t *i18n.Translator, l i18n.Locale, b Borrador, opcionesDe []s
 // NuevoRedactorEn es NuevoRedactor sabiendo el ancho de la VENTANA, que decide lo que la
 // web decide con `md:` y `max-[820px]:` (la barra en una fila y el alto del cuerpo).
 func NuevoRedactorEn(t *i18n.Translator, l i18n.Locale, b Borrador, opcionesDe []string, ancho, ventana float32) *Redactor {
-	r := &Redactor{T: t, Locale: l, B: b, OpcionesDe: opcionesDe, ancho: ancho, ventana: ventana, verCc: b.Cc != "" || b.Cco != ""}
+	return NuevoRedactorDe(t, l, b, remitentes(opcionesDe, nil), ancho, ventana)
+}
+
+// NuevoRedactorDe es NuevoRedactorEn con las cuentas externas en el «De»
+// (`remitentes`): el borrador sale por la elegida.
+//
+// Un borrador de una cuenta que la lista aún no trae (se recupera al volver a esta
+// identidad, antes de que lleguen las cuentas) conserva su «De»: es lo que hace la web al
+// pintarse otra vez cuando llegan. Si de verdad se desconectó, enviar lo dice.
+func NuevoRedactorDe(t *i18n.Translator, l i18n.Locale, b Borrador, rs []OpcionDe, ancho, ventana float32) *Redactor {
+	if b.Cuenta != "" && b.De != "" && !slices.ContainsFunc(rs, func(o OpcionDe) bool { return o.Cuenta == b.Cuenta }) {
+		rs = append(slices.Clip(rs), OpcionDe{Valor: valorDe(b), Direccion: b.De, Cuenta: b.Cuenta})
+	}
+	opcionesDe := make([]string, len(rs))
+	for i, x := range rs {
+		opcionesDe[i] = x.Direccion
+	}
+	r := &Redactor{T: t, Locale: l, B: b, OpcionesDe: opcionesDe, Remitentes: rs, ancho: ancho, ventana: ventana, verCc: b.Cc != "" || b.Cco != ""}
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	cambio := func() {
 		if r.AlCambiar != nil {
@@ -558,23 +580,36 @@ func NuevoRedactorEn(t *i18n.Translator, l i18n.Locale, b Borrador, opcionesDe [
 		f := par.f
 		par.c.AlEnfocar = func(si bool) { f.Enfocada = si; f.Refresh() }
 	}
-	if len(opcionesDe) > 1 {
-		i := 0
-		for j, o := range opcionesDe {
-			if o == b.De {
-				i = j
-			}
-		}
-		s := ui.NuevoSelector(opcionesDe, func(j int) { r.B.De = opcionesDe[j]; cambio() })
-		s.Elegida = i
-		r.B.De = opcionesDe[i]
-		r.filaDe = nuevaFilaCabecera(t.T("compose.from", nil), campoDe{s})
-	}
+	r.montarDe(cambio)
 	r.textoAdjuntos = ui.Texto("", tema.TextoXS, ui.Normal, tema.Color("text-subtle", v))
 	r.contenedor = container.New(&columnaRedactor{r: r})
 	r.montar()
 	r.ExtendBaseWidget(r)
 	return r
+}
+
+// montarDe arma la fila «De»: solo con más de una opción. Lo que enseña el selector es
+// lo que se usa: un valor que ya no está (la cuenta se desconectó) se queda en la primera.
+func (r *Redactor) montarDe(cambio func()) {
+	if i, ok := remitenteElegido(valorDe(r.B), r.Remitentes); ok && (len(r.Remitentes) > 1 || r.B.Cuenta != "") {
+		r.B.De, r.B.Cuenta = r.Remitentes[i].Direccion, r.Remitentes[i].Cuenta
+		if len(r.Remitentes) > 1 {
+			s := ui.NuevoSelector(r.OpcionesDe, func(j int) {
+				r.B.De, r.B.Cuenta = r.Remitentes[j].Direccion, r.Remitentes[j].Cuenta
+				if r.B.Cuenta != "" && r.verProgramar {
+					r.AlternarProgramar()
+				}
+				if r.AlCambiarDe != nil {
+					r.AlCambiarDe()
+				}
+				cambio()
+			})
+			s.Elegida = i
+			r.filaDe = nuevaFilaCabecera(r.T.T("compose.from", nil), campoDe{s})
+		}
+	} else if !ok {
+		r.B.Cuenta = "" // sin opciones no hay cuenta que elegir: sale por Sytue
+	}
 }
 
 // Foco es donde se empieza a escribir: el «Para» en un mensaje nuevo, y el cuerpo al
@@ -1244,6 +1279,9 @@ func (p *pieRedactor) MinSize([]fyne.CanvasObject) fyne.Size {
 func (p *pieRedactor) Layout(_ []fyne.CanvasObject, t fyne.Size) {
 	x := float32(0)
 	for _, o := range p.izquierda {
+		if !o.Visible() {
+			continue // el reloj, desde una cuenta externa
+		}
 		m := o.MinSize()
 		o.Move(fyne.NewPos(x, (t.Height-m.Height)/2))
 		o.Resize(m)

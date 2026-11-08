@@ -406,3 +406,119 @@ func TestIMAPOAuthUsesConsentTokenWithoutPasswordFallback(t *testing.T) {
 		t.Fatal("OAuth consent token was not used")
 	}
 }
+
+// imapFixture serves one memory user over TLS with these mailboxes.
+func imapFixture(t *testing.T, mailboxes ...string) *protocolClient {
+	t.Helper()
+	permitFixture(t)
+	config, roots := tlsFixture(t)
+	listener, err := tls.Listen("tcp", "127.0.0.1:0", config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	backend := imapmemserver.New()
+	user := imapmemserver.NewUser("test@example.org", "fixture")
+	for _, name := range mailboxes {
+		if err := user.Create(name, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	backend.AddUser(user)
+	server := imapserver.New(&imapserver.Options{NewSession: func(*imapserver.Conn) (imapserver.Session, *imapserver.GreetingData, error) {
+		return backend.NewSession(), nil, nil
+	}})
+	go func() { _ = server.Serve(listener) }()
+	t.Cleanup(func() { _ = server.Close() })
+	return &protocolClient{account: Account{Provider: "imap", Address: "test@example.org", Incoming: serverAddress(t, listener.Addr(), "tls"), Password: "fixture"}, roots: roots}
+}
+
+func folderRoles(t *testing.T, p *protocolClient) map[string]string {
+	t.Helper()
+	folders, err := p.Folders(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	roles := map[string]string{}
+	for _, f := range folders {
+		roles[f.ID] = f.Role
+	}
+	return roles
+}
+
+// iCloud names its folders «Sent Messages» and «Deleted Messages». Without a role
+// the client showed them raw, at the end of the list and in English, and «Move to
+// Trash» did not find the trash.
+func TestIMAPFolderRolesByICloudNames(t *testing.T) {
+	p := imapFixture(t, "INBOX", "Sent Messages", "Deleted Messages", "Junk", "Drafts", "Archive", "Notes")
+	want := map[string]string{"INBOX": "inbox", "Sent Messages": "sent", "Deleted Messages": "trash", "Junk": "junk", "Drafts": "drafts", "Archive": "archive", "Notes": ""}
+	if got := folderRoles(t, p); fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("roles = %v, quiero %v", got, want)
+	}
+}
+
+// Dovecot and Courier keep them under INBOX («INBOX.Sent»), and a role named
+// twice goes only to the first folder.
+func TestNamedRolesUnderInboxAndOnlyOnce(t *testing.T) {
+	folders := []Folder{{Name: "INBOX", Role: "inbox"}, {Name: "INBOX.Sent"}, {Name: "Sent Items"}, {Name: "inbox/Trash"}, {Name: "Projects.Sent"}}
+	namedRoles(folders)
+	got := make([]string, 0, len(folders))
+	for _, f := range folders {
+		got = append(got, f.Role)
+	}
+	if want := []string{"inbox", "sent", "", "trash", ""}; fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("roles = %q, quiero %q", got, want)
+	}
+}
+
+// specialUseScript is a server that offers SPECIAL-USE and, as RFC 6154 allows,
+// only marks its folders when LIST asks for them with RETURN (SPECIAL-USE).
+func specialUseScript(conn net.Conn) {
+	c := textproto.NewConn(conn)
+	_ = c.PrintfLine("* OK [CAPABILITY IMAP4rev1 SPECIAL-USE AUTH=PLAIN] fixture")
+	for {
+		line, err := c.ReadLine()
+		if err != nil {
+			return
+		}
+		tag, command, _ := strings.Cut(line, " ")
+		verb, rest, _ := strings.Cut(command, " ")
+		switch strings.ToUpper(verb) {
+		case "CAPABILITY":
+			_ = c.PrintfLine("* CAPABILITY IMAP4rev1 SPECIAL-USE\r\n%s OK capabilities", tag)
+		case "LOGIN":
+			_ = c.PrintfLine("%s OK [CAPABILITY IMAP4rev1 SPECIAL-USE] logged in", tag)
+		case "LIST":
+			sent, trash := "", ""
+			if strings.Contains(strings.ToUpper(rest), "RETURN (SPECIAL-USE)") {
+				sent, trash = ` \Sent`, ` \Trash`
+			}
+			_ = c.PrintfLine(`* LIST (\HasNoChildren) "/" INBOX`)
+			_ = c.PrintfLine(`* LIST (\HasNoChildren%s) "/" Enviados`, sent)
+			_ = c.PrintfLine(`* LIST (\HasNoChildren) "/" "Sent Messages"`)
+			_ = c.PrintfLine(`* LIST (\HasNoChildren%s) "/" Papelera`, trash)
+			_ = c.PrintfLine(`* LIST (\HasNoChildren) "/" Trash`)
+			_ = c.PrintfLine("%s OK list", tag)
+		case "STATUS":
+			name, _, _ := strings.Cut(rest, " (")
+			_ = c.PrintfLine("* STATUS %s (MESSAGES 0 UNSEEN 0)\r\n%s OK status", name, tag)
+		case "LOGOUT":
+			_ = c.PrintfLine("* BYE\r\n%s OK logout", tag)
+			return
+		default:
+			_ = c.PrintfLine("%s BAD unexpected", tag)
+		}
+	}
+}
+
+// SPECIAL-USE is asked for when the server offers it, and it wins over a name:
+// a server that marks «Enviados» as \Sent keeps a folder called «Sent Messages»
+// as an ordinary one, and no role is given twice.
+func TestIMAPFolderRolesPreferSpecialUse(t *testing.T) {
+	permitFixture(t)
+	s, roots := scriptServer(t, true, specialUseScript)
+	p := &protocolClient{account: Account{Provider: "imap", Address: "test@example.org", Incoming: s, Password: "fixture"}, roots: roots}
+	want := map[string]string{"INBOX": "inbox", "Enviados": "sent", "Sent Messages": "", "Papelera": "trash", "Trash": ""}
+	if got := folderRoles(t, p); fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("roles = %v, quiero %v", got, want)
+	}
+}

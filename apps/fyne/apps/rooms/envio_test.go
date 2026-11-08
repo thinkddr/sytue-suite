@@ -285,8 +285,15 @@ func (s *servicioFalso) UpdateChannel(_ context.Context, c string, cambio api.Ro
 	if cambio.Purpose != nil {
 		v = "proposito=" + *cambio.Purpose
 	}
+	nombre := ""
+	if cambio.Name != nil {
+		v, nombre = "nombre="+*cambio.Name, *cambio.Name
+	}
+	if cambio.Archived != nil {
+		v = map[bool]string{true: "archivado", false: "desarchivado"}[*cambio.Archived]
+	}
 	s.apuntar("UpdateChannel", c, v)
-	return api.RoomsChannel{ID: c}, s.errAccion
+	return api.RoomsChannel{ID: c, Name: nombre}, s.errAccion
 }
 
 func (s *servicioFalso) LeaveChannel(_ context.Context, c string) error {
@@ -316,6 +323,18 @@ func (s *servicioFalso) ExecuteCommand(_ context.Context, c, linea string) (api.
 
 func (s *servicioFalso) NotifyPrefs(context.Context) (api.RoomsNotifyPrefs, error) {
 	s.apuntar("NotifyPrefs")
+	return s.prefs, nil
+}
+
+func (s *servicioFalso) SetNotifyPause(_ context.Context, hasta time.Time) (api.RoomsNotifyPrefs, error) {
+	s.apuntar("SetNotifyPause", hasta.Format(time.RFC3339))
+	if s.errAccion != nil {
+		return api.RoomsNotifyPrefs{}, s.errAccion
+	}
+	s.prefs.PausedUntil = nil
+	if !hasta.IsZero() {
+		s.prefs.PausedUntil = &hasta
+	}
 	return s.prefs, nil
 }
 

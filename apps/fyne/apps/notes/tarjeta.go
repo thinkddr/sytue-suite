@@ -4,6 +4,7 @@
 package notes
 
 import (
+	"cmp"
 	"image"
 	"image/color"
 	"image/draw"
@@ -102,7 +103,10 @@ type Tarjeta struct {
 	portal        *portal
 	AlSeleccionar func()
 	AlMarcar      func(bool)
-	AlMenu        func(disparador fyne.CanvasObject)
+	// AlConvertir hace tarea una línea de texto al pulsar su raya (convertir.go); nil, la
+	// raya es solo dibujo.
+	AlConvertir func()
+	AlMenu      func(disparador fyne.CanvasObject)
 	// AlSoltar es el final de un arrastre en el lienzo libre, con la esquina de la
 	// tarjeta en coordenadas de su contenedor. Con él puesto, la tarjeta lleva el asa.
 	AlSoltar func(fyne.Position)
@@ -128,7 +132,10 @@ type Tarjeta struct {
 	AlTeclaEspecial func(*fyne.KeyEvent)
 
 	encima, enfocado bool
-	mas              *botonMas
+	// sobreRaya es el puntero en la raya pulsable: la fila sigue «encima» (su velo, su
+	// «…»), como el `:hover` de la web, que también vale sobre lo que hay dentro.
+	sobreRaya bool
+	mas       *botonMas
 	// arrastre es dónde iría la tarjeta sin el recorte a cero: el `clientX - dx` de la
 	// web, que sigue al puntero aunque salga por la izquierda.
 	arrastre    fyne.Position
@@ -161,7 +168,8 @@ const (
 	PuntoEstado = 2 * 0.25 * tema.Rem
 )
 
-// Las filas (`.notes-stream-note` de app.css): `px-2 py-2` sin borde; la cabecera en
+// Las filas (`.notes-stream-note` de app.css): `px-2 py-1` sin borde y otro `py-1` en su
+// cabecera, que son los 8 px de `RellenoFilaY`; la cabecera en
 // `gap-2`, el glifo en su columna de `w-5` y el cuerpo con el `pl-7` que lo alinea con el
 // título. La hoja de un árbol (`.notes-sheet`) es `px-6 py-6 sm:px-10`, también sin borde.
 const (
@@ -314,6 +322,8 @@ func (t *Tarjeta) altoCabecera(interior float32) float32 {
 		alto = max(alto, p.AltoPara(huecoTitulo(izq, der, interior, hueco)))
 	case *EditorNota:
 		alto = max(alto, p.AltoPara(huecoTitulo(izq, der, interior, hueco)))
+	case *BotonTitulo:
+		alto = max(alto, p.AltoPara(huecoTitulo(izq, der, interior, hueco)))
 	}
 	if !t.SinAcciones && !t.SinMenu {
 		alto = max(alto, ui.LadoIconoSM)
@@ -452,7 +462,12 @@ func (t *Tarjeta) cabecera(v tema.Variante) (izq []pieza, titulo fyne.CanvasObje
 		der = append(der, pieza{lineaTok(t.tr.T("task.carried", i18n.Vars{"count": t.nota.Traslados}), tema.TextoXS, ui.Normal, "text-subtle", v), bajaGlifoTarjeta})
 	}
 	if t.nota.Fijada {
-		der = append(der, pieza{Glifo(FijarD, GlifoFijada, "primary-text", v), 0})
+		// En una línea, en gris: la chincheta está, no llama.
+		tinta := "primary-text"
+		if t.Diario {
+			tinta = "text-subtle"
+		}
+		der = append(der, pieza{Glifo(FijarD, GlifoFijada, tinta, v), 0})
 	}
 	if t.Recordatorio != nil {
 		der = append(der, pieza{indicadorRecordatorio(t.tr, *t.Recordatorio, t.AlRecordatorio, v), 0})
@@ -485,6 +500,11 @@ func (t *Tarjeta) glifosCabecera(v tema.Variante) (izq []pieza) {
 	case t.nota.Tipo == "todo":
 		c := ui.NuevaCasilla("", func(marcada bool) { llamar1(t.AlMarcar, marcada) })
 		c.Marcada = t.nota.Marcada
+		if t.Diario {
+			// Hecha, se apaga con su texto: lo terminado se retira, no se celebra
+			// (`accent-color: var(--sytue-text-subtle)` en `.notes-stream-glyph`).
+			c.Acento = "text-subtle"
+		}
 		if t.SoloLectura || t.Bloqueada {
 			c.Disable()
 		}
@@ -495,19 +515,65 @@ func (t *Tarjeta) glifosCabecera(v tema.Variante) (izq []pieza) {
 		}
 	}
 	if t.Diario {
-		// La columna fija de Twos (`.notes-stream-glyph`, `h-5 w-5` centrada y `mt-0.5`):
-		// cada fila empieza por su glifo en el mismo sitio, y un texto lleva la viñeta.
-		dentro := punto(VinetaFila, tema.Color("text-subtle", v))
+		// La columna fija de las marcas (`.notes-stream-glyph`, `h-6 w-5` centrada): cada
+		// fila empieza por su marca en el mismo sitio, y un texto lleva la raya corta.
+		dentro := fyne.CanvasObject(raya(v))
 		switch {
 		case len(izq) > 0:
 			dentro = izq[0].o
 		case t.esSeparador():
 			// Un separador es solo su raya: la columna del glifo se queda vacía.
 			dentro = canvas.NewRectangle(color.NRGBA{})
+		case t.convertible():
+			// La raya de una cosa es su casilla por marcar: pulsarla la hace tarea.
+			dentro = t.rayaPulsable(v)
 		}
 		izq = []pieza{{container.New(&celdaGlifo{lado: ColumnaGlifoFila}, dentro), bajaGlifoTarjeta}}
 	}
 	return izq
+}
+
+// convertible dice si la raya de la fila se pulsa para hacerla tarea: una línea de
+// texto que se puede editar entera (`puedeConvertir` de NoteCard.tsx). Quien tiene una
+// nota solo por compartida cambia su texto y nada más (el servicio no le deja cambiar el
+// tipo), y un separador no es una cosa apuntada.
+func (t *Tarjeta) convertible() bool {
+	return t.AlConvertir != nil && t.nota.Tipo == "text" && !t.SoloLectura && !t.SinMenu && !t.Bloqueada &&
+		!soloRaya.MatchString(t.nota.Contenido)
+}
+
+// LadoRayaPulsable es el botón de la raya: 24 px para el dedo (`.notes-stream-bullet-btn`,
+// en px porque la raíz es de 14).
+const LadoRayaPulsable = 24
+
+// rayaPulsable es la raya de una línea de texto hecha botón. Mide 24 y sobresale lo mismo
+// por cada lado de la columna de las marcas, que no se mueve (`celdaGlifo` lo centra a su
+// medida, el `margin-inline` negativo de la web). Al pasar por encima o con el foco, la
+// raya se vuelve la casilla vacía en la que se va a convertir, del tamaño de la de una
+// tarea; sin la transición de 120 ms, que Fyne no anima.
+func (t *Tarjeta) rayaPulsable(v tema.Variante) fyne.CanvasObject {
+	r, c := raya(v), casillaVacia(v)
+	c.Hide()
+	rotulo := t.tr.T("note.toTodo", nil)
+	resumen := cmp.Or(resumenNota(t.nota.Titulo, t.nota.Contenido, 60), t.tr.T("note.new", nil))
+	// La raya y la casilla en el mismo cuadrado de la casilla: el botón no cambia de
+	// medida al pasar de una a otra.
+	o := NuevaOpcion(rotulo+": "+resumen, container.New(&celdaGlifo{lado: LadoCasilla}, r, c),
+		func() { llamar0(t.AlConvertir) })
+	o.SinFondo, o.Radio = true, RadioCasilla
+	o.PX, o.PY = (LadoRayaPulsable-LadoCasilla)/2, (LadoRayaPulsable-LadoCasilla)/2
+	o.AlCambiarEstado(func() {
+		if o.Encima() || o.Enfocado() {
+			r.Hide()
+			c.Show()
+		} else {
+			c.Hide()
+			r.Show()
+		}
+		t.sobreRaya = o.Encima()
+		t.Refresh()
+	})
+	return o
 }
 
 // titulo es lo que va en el `<h3>`, en uno de sus cuatro estados: el candado de un
@@ -549,6 +615,9 @@ func (t *Tarjeta) titulo(v tema.Variante) fyne.CanvasObject {
 	}
 	b := NuevoBotonTitulo(texto, tinta, t.tr.T("note.rename", nil), t.AlRenombrar).ConLetra(escalon, peso)
 	b.Tachada = t.nota.Terminada()
+	if t.Diario {
+		b.Partido() // la libreta parte la línea larga, no la corta
+	}
 	return b
 }
 
@@ -558,7 +627,7 @@ func (t *Tarjeta) titulo(v tema.Variante) fyne.CanvasObject {
 func (t *Tarjeta) letraTitulo() (tema.Escalon, ui.Peso) {
 	switch {
 	case t.Diario:
-		return tema.TextoBase, ui.Normal
+		return tema.TextoMD, ui.Normal
 	case t.hoja():
 		return tema.Texto2XL, ui.SemiNegrita
 	}
@@ -635,7 +704,7 @@ func (t *Tarjeta) verMas() bool {
 	if t.mas == nil {
 		return false
 	}
-	return t.encima || t.enfocado || t.mas.dentro || t.mas.enfoque ||
+	return t.encima || t.sobreRaya || t.enfocado || t.mas.dentro || t.mas.enfoque ||
 		fyne.CurrentApp().Driver().Device().IsMobile()
 }
 
@@ -699,7 +768,16 @@ func (t *Tarjeta) cuerpoContenido(v tema.Variante) fyne.CanvasObject {
 	}
 	// Texto y tarea. Sin contenido y editable, se dice qué hacer (`note.placeholder`),
 	// y pulsarlo abre el editor como pulsar el texto.
-	p := NuevaProsa(n.Doc)
+	// Los #hashtags, pulsables: solo al pintar, sobre una copia (hashtags.go).
+	p := NuevaProsa(conHashtags(n.Doc))
+	if t.Diario {
+		// La letra de la libreta: el texto de la línea a 16 px y lo que cuelga, en gris.
+		letra := LetraDebajo
+		if t.enLinea() {
+			letra = LetraLinea
+		}
+		p.Letra = &letra
+	}
 	if n.Doc.Vacio() && !t.SoloLectura {
 		p.Marca = t.tr.T("note.placeholder", nil)
 	}
@@ -722,9 +800,14 @@ func (t *Tarjeta) enlaceExterno(url, rotulo string, v tema.Variante) fyne.Canvas
 	if rotulo == "" {
 		rotulo = url
 	}
+	// En una línea de la libreta, en gris: es la nota de la cosa (`.notes-stream-body a`).
+	tinta := "primary-text"
+	if t.Diario {
+		tinta = "text-muted"
+	}
 	return container.New(ui.Fila{Hueco: 1 * 0.25 * tema.Rem},
-		Icono(iconos.FlechaArribaDerecha, GlifoFijada, "primary-text", v),
-		lineaTok(rotulo, tema.TextoBase, ui.Normal, "primary-text", v))
+		Icono(iconos.FlechaArribaDerecha, GlifoFijada, tinta, v),
+		lineaTok(rotulo, tema.TextoBase, ui.Normal, tinta, v))
 }
 
 // esWeb dice si una dirección es http(s): una fila antigua o un `data.url` de otra ruta
@@ -880,9 +963,8 @@ func (r *tarjetaRenderer) Layout(t fyne.Size) {
 
 // colocarTitulo pone el título en su hueco de la cabecera.
 //
-// ponytail: la web PARTE un título largo en líneas (`break-words`) y la cabecera crece;
-// aquí se recorta con elipsis en una. Partirlo es medir la cabecera con el ancho, que
-// `MedidaTarjetaNota` ya recibe.
+// En la libreta el botón del título PARTE en líneas, como la web, y la cabecera crece;
+// en las tarjetas se recorta con elipsis en una (`truncate`).
 func (r *tarjetaRenderer) colocarTitulo(x, y, cabe float32) {
 	switch o := r.titulo.(type) {
 	case *canvas.Text:
@@ -901,6 +983,10 @@ func (r *tarjetaRenderer) colocarTitulo(x, y, cabe float32) {
 	case *EditorNota:
 		o.Move(fyne.NewPos(x, y))
 		o.Resize(fyne.NewSize(cabe, o.AltoPara(cabe)))
+	case *BotonTitulo:
+		w := min(o.MinSize().Width, cabe)
+		o.Move(fyne.NewPos(x, y))
+		o.Resize(fyne.NewSize(w, o.AltoPara(w)))
 	default:
 		m := o.MinSize()
 		o.Move(fyne.NewPos(x, y))
@@ -938,7 +1024,7 @@ func (r *tarjetaRenderer) Refresh() {
 	if r.asa != nil {
 		// `opacity-0 group-hover:opacity-100 group-focus-within:opacity-100`, y en táctil
 		// siempre (al 60 %, que pinta `nuevaAsa`).
-		if t.encima || t.enfocado || r.asa.enfocada || t.arrastrando || t.Editor != nil || ui.EsTactil() {
+		if t.encima || t.sobreRaya || t.enfocado || r.asa.enfocada || t.arrastrando || t.Editor != nil || ui.EsTactil() {
 			r.asa.Show()
 		} else {
 			r.asa.Hide()
@@ -953,12 +1039,14 @@ func (r *tarjetaRenderer) pintarFondo(v tema.Variante) {
 	var fondo, borde color.NRGBA
 	switch {
 	case t.Diario:
-		// La elegida es un fondo, no un anillo; al pasar por encima, `bg-subtle`.
+		// La elegida es un velo, no un anillo ni el tinte de marca: la tinta del texto al
+		// 7 % y, al pasar por encima, al 4 % (`--notes-velo-*` de styles/app.css), sobre
+		// el papel de la hoja.
 		switch {
 		case t.Seleccionada && t.Editor == nil:
-			fondo = tema.Color("selected", v)
-		case t.encima || t.enfocado:
-			fondo = tema.Color("bg-subtle", v)
+			fondo = veloLibreta(0.07, v)
+		case t.encima || t.sobreRaya || t.enfocado:
+			fondo = veloLibreta(0.04, v)
 		}
 	case t.hoja():
 		// La hoja es lo único que hay en su panel: ni caja ni anillo.
@@ -976,6 +1064,12 @@ func (r *tarjetaRenderer) pintarFondo(v tema.Variante) {
 	if t.arrastrando {
 		r.caja.Pintar(tema.Color("selected", v), borde)
 	}
+}
+
+// veloLibreta es la tinta del texto con ese alfa, ya compuesta sobre la hoja: oscurece el
+// papel en claro y lo aclara en oscuro.
+func veloLibreta(alfa float64, v tema.Variante) color.NRGBA {
+	return tokens.SobreSRGB(tokens.ConAlfa(tema.Color("text", v), alfa), tema.Color(ui.FondoHoja(), v))
 }
 
 const GlifoAsa = 14

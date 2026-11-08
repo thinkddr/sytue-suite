@@ -46,12 +46,18 @@ func main() {
 	// La sesión, la apariencia y el idioma son TRANSVERSALES a las trece apps: esto lo
 	// lee de donde lo dejó la última que lo tocó. `Abrir` no habla con la red.
 	s := sesion.Abrir(a, "")
+	// El cromo «papel» de toda la suite (ADR 0080). Aquí y no en `sesion.Abrir`: las
+	// pruebas que abren sesión comprueban también el cromo de color.
+	tema.ElegirCromo(tema.CromoPapel)
 	w := a.NewWindow("Sytue Photos")
 	w.SetPadded(false)
 	w.Resize(fyne.NewSize(anchoInicial, altoInicial))
 
 	tr := traductor(s.Idioma())
-	cli := api.NewPhotos(s.URL("photos"), s.Sesion, nil)
+	cli := api.NewPhotos(s.URL("photos"), s.Sesion, s.ClienteConAviso(nil))
+	// El widget nativo lo lee su propia Fuente, sin depender de la pantalla, y se
+	// vuelve a publicar tras cada escritura del cliente de arriba (ClienteConAviso).
+	s.PublicadorWidget(s.FuenteWidget(tr))
 	teca, grande := photos.NuevaFototeca(), photos.NuevaFototeca()
 	grande.Variante = photos.VarianteGrande
 
@@ -60,7 +66,6 @@ func main() {
 		Variante: tema.De(a.Settings().ThemeVariant()),
 	}
 	p := photos.Nueva(cli, v, w)
-	p.Widget = s.CapturarWidget
 	p.Drive = api.NewDrive(s.URL("drive"), s.Sesion, nil)
 	p.IA = api.NewIA(s.URL("ai"), s.Sesion, nil)
 	// Compartir un álbum con alguien y decir quién me compartió uno: Sytue ID.
@@ -152,7 +157,8 @@ func main() {
 	s.AlFondo(p.AlFondo)
 	s.AlVolver(p.AlVolver)
 	w.SetOnClosed(p.AlFondo)
-	p.Arrancar()
+	// Con interfaz: lanzada por iOS solo para el widget no se pide la fototeca.
+	s.CuandoHayaEscena(p.Arrancar)
 	s.Arrancar(context.Background())
 	w.ShowAndRun()
 }

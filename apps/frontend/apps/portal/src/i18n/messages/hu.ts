@@ -56,6 +56,7 @@ export const hu: AppCatalog<typeof en> = {
   'inbox.markAll': 'Az összes megjelölése olvasottként',
   'inbox.loading': 'Értesítések betöltése…',
   'inbox.unreadDot': 'Olvasatlan',
+  'inbox.markRead': 'Megjelölés olvasottként',
   'inbox.errorTitle': 'Nem sikerült betölteni az értesítéseket',
   'inbox.errorBody': 'A Hub jelenleg nem válaszol. Próbálja újra néhány másodperc múlva.',
   'inbox.retry': 'Újra',
@@ -689,6 +690,8 @@ export const hu: AppCatalog<typeof en> = {
     '{sources} nem válaszolt, ezért egyes találatok hiányozhatnak. Próbálja újra egy kis idő múlva.',
   'search.partialJoin': ' és ',
   'search.showing': '{total} találatból {count} látható.',
+  'search.loadMore': 'További találatok betöltése',
+  'search.loadMoreFailed': 'Nem sikerült további találatokat betölteni. Próbáld újra.',
   'privacy.notice':
     'Nem adjuk el az adatait, és nem adjuk át harmadik feleknek. Nem használjuk profilalkotásra, hirdetésre, sem szolgáltatásaink vagy bárki máséinak betanítására vagy fejlesztésére. Átvitel közben és nyugalmi állapotban is titkosítva vannak, és csak a számlázáshoz feltétlenül szükséges mértékben, valamint az Ön által bekapcsolt integrációkban hagyják el európai infrastruktúránkat; ott a harmadik fél jóváhagyást kér az általa használt adatokra.',
 };

@@ -8,6 +8,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/widget"
 
@@ -441,10 +442,13 @@ func (f *FilaPlana) CreateRenderer() fyne.WidgetRenderer {
 	return r
 }
 
-// pildora es una insignia montada: su caja, su glifo y su texto.
+// pildora es una insignia montada: su caja, su glifo y su texto. La caja es solo el
+// filete (`border`, sin fondo) y va en su propio contenedor, `marco`: con el trazo,
+// Redimensionar la coloca respecto a su padre, y MoverCaja no lo sabe.
 type pildora struct {
 	i     *Insignia
 	caja  *ui.Caja
+	marco *fyne.Container
 	glifo *iconos.Dibujo
 	texto *canvas.Text
 }
@@ -452,9 +456,10 @@ type pildora struct {
 func nuevaPildora(i *Insignia, v tema.Variante) *pildora {
 	borde, tinta := i.tintas(v)
 	p := &pildora{
-		i: i, caja: ui.NuevaCaja(color.NRGBA{}, borde, tema.RadioPill),
+		i: i, caja: ui.NuevaCaja(color.NRGBA{}, borde, tema.RadioPill).ConTrazo(),
 		texto: ui.Texto(i.Texto, tema.TextoXS, ui.Medio, tinta),
 	}
+	p.marco = container.NewWithoutLayout(p.caja.Objetos()...)
 	if i.Glifo != "" {
 		p.glifo = glifoCon(i.Glifo, ladoLapizInsignia, tinta)
 	}
@@ -462,7 +467,7 @@ func nuevaPildora(i *Insignia, v tema.Variante) *pildora {
 }
 
 func (p *pildora) objetos() []fyne.CanvasObject {
-	out := append([]fyne.CanvasObject{}, p.caja.Objetos()...)
+	out := []fyne.CanvasObject{p.marco}
 	if p.glifo != nil {
 		out = append(out, p.glifo.Objeto())
 	}
@@ -471,7 +476,9 @@ func (p *pildora) objetos() []fyne.CanvasObject {
 
 func (p *pildora) colocar(o fyne.Position) {
 	m := MedidaInsignia(p.i)
-	ui.MoverCaja(p.caja, o, m)
+	p.marco.Move(o)
+	p.marco.Resize(m)
+	p.caja.Redimensionar(m)
 	x := o.X + tema.Borde + margenXInsignia
 	if p.glifo != nil {
 		p.glifo.Colocar(x, o.Y+(m.Height-ladoLapizInsignia)/2, ladoLapizInsignia)

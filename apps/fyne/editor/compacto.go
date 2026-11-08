@@ -147,8 +147,8 @@ func (m *Marco) opcionesCompactas() []fyne.CanvasObject {
 		}
 	})
 	formato := c.formato()
-	zoom := ui.NuevoElementoMenu(strconv.Itoa(c.Zoom)+" %", iconos.Ninguno, nil)
-	zoom.Inerte = true
+	// El porcentaje vuelve al 100, como el de la barra de estado que en compacto no se ve.
+	zoom := ui.NuevoElementoMenu(strconv.Itoa(c.Zoom)+" %", iconos.Ninguno, func() { c.PonerZoom(100) })
 	return []fyne.CanvasObject{
 		rotulo, compartir,
 		item("action.undo", c.SoloLectura || !formato.PuedeDeshacer, func() { c.Mandar(Deshacer, "") }),

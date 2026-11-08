@@ -274,6 +274,23 @@ func FormatMonthShort(l Locale, t time.Time) string {
 	return m[t.Month()-1]
 }
 
+// FormatMonth es el mes suelto y entero: «noviembre», «November», «listopad», «Νοέμβριος».
+// Es `monthLabel` de Calendar, el título del mes del teléfono. En minúscula donde la
+// lengua lo escribe así: la mayúscula, si toca, la pone quien lo pinta.
+//
+// Son MesesLargos, la parte `month` de `{ month: 'long', year: 'numeric' }`, y no `{
+// month: 'long' }` a secas: en griego esa da el GENITIVO («Νοεμβρίου», «de noviembre»),
+// mientras que con el año va en nominativo. En los otros 25 idiomas coinciden. Hasta el
+// 2026-11-07 era una tabla aparte, `meses_sueltos`, sacada del formato sin año, y el
+// título del teléfono en griego decía «Νοεμβρίου» junto al «Νοέμβριος 2026» del mini-mes.
+func FormatMonth(l Locale, t time.Time) string {
+	m := fechas[l].MesesLargos
+	if len(m) != 12 {
+		return ""
+	}
+	return m[t.Month()-1]
+}
+
 // FormatDateRange es `formatRange(a, b)` de `{ day: 'numeric', month: 'long', year:
 // 'numeric' }`: «1–7 de enero de 2026», «5 de enero – 3 de febrero de 2026». Es el título
 // de la vista de SEMANA de Sytue Calendar. Lo que los dos extremos comparten se escribe

@@ -68,6 +68,7 @@
   "common.remove": "Elimină",
   "common.retry": "Reîncearcă",
   "common.save": "Salvează",
+  "day.noEvents": "Niciun eveniment în această zi",
   "error.calendarsLoad": "Calendarele nu au putut fi încărcate.",
   "error.eventsLoad": "Evenimentele nu au putut fi încărcate.",
   "event.ai": "Descrieți evenimentul",
@@ -145,6 +146,12 @@
   "grid.blockAria": "{title}, {time}",
   "grid.continued": "{title} (continuare)",
   "grid.createOn": "Creează un eveniment pe {date}",
+  "grid.dayEvents": {
+    "one": "{date}, {count} eveniment",
+    "few": "{date}, {count} evenimente",
+    "other": "{date}, {count} de evenimente"
+  },
+  "grid.daySelected": "{label}, selectat",
   "grid.loadError": "Calendarul nu a putut fi încărcat",
   "grid.loading": "Se încarcă calendarul",
   "grid.more": {
@@ -152,6 +159,8 @@
     "few": "Încă {count}",
     "other": "Încă {count}"
   },
+  "grid.showMonth": "Afișează toată luna",
+  "grid.showWeek": "Afișează doar această săptămână",
   "grid.snapAria": {
     "one": "Aliniere la tragere: {count} minut. Apăsați pentru a schimba.",
     "few": "Aliniere la tragere: {count} minute. Apăsați pentru a schimba.",
@@ -167,6 +176,13 @@
     "few": "{count} min",
     "other": "{count} min"
   },
+  "grid.todayLabel": "Astăzi, {date}",
+  "grid.weekNumber": "Săptămâna {week}",
+  "guests.organizer": "Organizator",
+  "guests.status.accepted": "Participă",
+  "guests.status.declined": "Nu participă",
+  "guests.status.pending": "Așteaptă răspuns",
+  "guests.status.tentative": "Poate",
   "header.invitations": "Invitații",
   "header.next": "Următor",
   "header.pending": {
@@ -205,6 +221,11 @@
   "nav.createEventOn": "Creează eveniment pe {date}",
   "nav.deleteSubscription": "Elimină abonamentul",
   "nav.manageResources": "Gestionează săli și echipamente",
+  "nav.menuPending": {
+    "one": "Deschide meniul, {count} în așteptare",
+    "few": "Deschide meniul, {count} în așteptare",
+    "other": "Deschide meniul, {count} în așteptare"
+  },
   "nav.myCalendars": "Calendarele mele",
   "nav.next": "Următor",
   "nav.nextMonth": "Luna următoare",
@@ -355,6 +376,7 @@
   "scope.following": "Acestuia și următoarelor",
   "scope.legend": "Acest eveniment se repetă. Căror evenimente li se aplică modificarea?",
   "scope.this": "Doar acestui eveniment",
+  "search.allCalendars": "Toate calendarele",
   "search.error": "Căutarea nu a putut fi finalizată.",
   "search.events": "Caută evenimente",
   "search.loadMore": "Încarcă mai multe",
@@ -364,6 +386,12 @@
     "other": "Scrieți cel puțin {count} de caractere pentru a căuta în calendare."
   },
   "search.noResults": "Niciun rezultat pentru „{term}”.",
+  "search.period": "Perioadă",
+  "search.period.any": "Oricând",
+  "search.period.month": "Luna aceasta",
+  "search.period.past": "Trecute",
+  "search.period.upcoming": "Viitoare",
+  "search.period.year": "Anul acesta",
   "search.placeholder": "Titlu, descriere, locație sau persoană invitată…",
   "search.searching": "Se caută…",
   "search.series": "Serie",
@@ -405,6 +433,14 @@
   "share.whoSeesNow": "Cine îl vede acum",
   "share.writerHint": "Pe lângă că le vede, creează, modifică și șterge evenimente în acest calendar.",
   "share.writerLabel": "Să vadă și să editeze evenimentele mele",
+  "shortcuts.group.actions": "Acțiuni",
+  "shortcuts.group.navigate": "Navigare",
+  "shortcuts.group.views": "Vizualizări",
+  "shortcuts.help": "Afișează această listă",
+  "shortcuts.next": "Perioada următoare",
+  "shortcuts.prev": "Perioada anterioară",
+  "shortcuts.title": "Scurtături de la tastatură",
+  "shortcuts.today": "Mergi la astăzi",
   "subscribe.aria": "Abonare la un calendar prin URL",
   "subscribe.byUrl": "Abonare prin URL (.ics)",
   "subscribe.defaultName": "Calendar abonat",

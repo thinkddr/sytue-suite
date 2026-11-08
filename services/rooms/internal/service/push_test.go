@@ -110,7 +110,10 @@ type fakePushStore struct {
 	recipients  []domain.NotificationRecipient
 	recErr      error
 	pushTargets []domain.PushTarget
-	apnsTargets []domain.APNSTarget
+	// despertables son a quién despertar la app de iOS (DespertablesForMessage);
+	// conTodos, el mentionsAll con que se pidió.
+	despertables []string
+	conTodos     bool
 }
 
 func (f *fakePushStore) PushTargetsForMessage(context.Context, uuid.UUID, string, []string) ([]domain.PushTarget, error) {
@@ -119,11 +122,10 @@ func (f *fakePushStore) PushTargetsForMessage(context.Context, uuid.UUID, string
 
 func (f *fakePushStore) DeletePushSubscription(context.Context, string, string) error { return nil }
 
-func (f *fakePushStore) APNSTargetsForMessage(context.Context, uuid.UUID, string, []string) ([]domain.APNSTarget, error) {
-	return f.apnsTargets, nil
+func (f *fakePushStore) DespertablesForMessage(_ context.Context, _ uuid.UUID, _ string, _ []string, todos bool) ([]string, error) {
+	f.conTodos = todos
+	return f.despertables, nil
 }
-
-func (f *fakePushStore) DeleteAPNSDevice(context.Context, string, string) error { return nil }
 
 func (f *fakePushStore) NotificationRecipientsForMessage(context.Context, uuid.UUID, string, []string) ([]domain.NotificationRecipient, error) {
 	return f.recipients, f.recErr
@@ -133,7 +135,84 @@ func (f *fakePushStore) SavePushSubscription(context.Context, string, domain.Pus
 	return nil
 }
 
-func (f *fakePushStore) SaveAPNSDevice(context.Context, string, string) error { return nil }
+// Un mensaje que avisa a alguien despierta su app de iOS por la señal de cambios del
+// Hub (`datos` de rooms), que es quien guarda los aparatos: Rooms solo dice a quién, y
+// nada del mensaje. Visto en rojo quitando despertarIOS de deliverPushForEvent.
+func TestDeliverPushForEvent_DespiertaPorElHub(t *testing.T) {
+	recibidos := make(chan hubnotify.Evento, 4)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/internal/events" {
+			var e hubnotify.Evento
+			_ = json.NewDecoder(r.Body).Decode(&e)
+			recibidos <- e
+		}
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	defer srv.Close()
+	chID := uuid.New()
+	svc := &Service{cfg: config.Config{PublicURL: "https://rooms.sytue.eu"}}
+	svc.SetPushStoreForTest(&fakePushStore{despertables: []string{"bob-sub"}})
+	svc.SetHubNotifier(hubnotify.New(srv.URL, "test-secret"))
+	payload, _ := json.Marshal(map[string]any{
+		"channel_id": chID,
+		"data": map[string]any{
+			"id": uuid.New(), "channel_id": chID, "author_sub": "alice", "author_name": "Alice",
+			"body": "secreto", "type": domain.MessageTypeUser, "mentions": []string{"bob-sub"},
+		},
+	})
+	svc.deliverPushForEvent(context.Background(), events.Event{
+		Channel: EventChannel, Type: EventMessageCreated, Tenant: "acme", Payload: payload,
+	})
+	select {
+	case e := <-recibidos:
+		datos, _ := json.Marshal(e.Data)
+		if e.Tenant != "acme" || e.Subject != "bob-sub" || e.Event != hubnotify.EventoDatos || string(datos) != `{"producto":"rooms"}` {
+			t.Fatalf("evento = %+v %s, quiero datos de rooms para bob en acme", e, datos)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("no se despertó a nadie")
+	}
+}
+
+// Lo que escribe una integración, o una tarjeta de sistema, no avisa pero suma en el
+// contador del widget: despierta igual. Y un @channel llega al store como mención de
+// todos. Visto en rojo con el despertar detrás del filtro de bots.
+func TestDeliverPushForEvent_UnBotTambienDespierta(t *testing.T) {
+	recibidos := make(chan hubnotify.Evento, 4)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var e hubnotify.Evento
+		_ = json.NewDecoder(r.Body).Decode(&e)
+		recibidos <- e
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	defer srv.Close()
+	chID := uuid.New()
+	ps := &fakePushStore{despertables: []string{"bob-sub"}}
+	svc := &Service{cfg: config.Config{PublicURL: "https://rooms.sytue.eu"}}
+	svc.SetPushStoreForTest(ps)
+	svc.SetHubNotifier(hubnotify.New(srv.URL, "test-secret"))
+	payload, _ := json.Marshal(map[string]any{
+		"channel_id": chID,
+		"data": map[string]any{
+			"id": uuid.New(), "channel_id": chID, "author_sub": "bot:despliegues",
+			"body": "listo", "type": domain.MessageTypeUser, "mentions_all": true,
+		},
+	})
+	svc.deliverPushForEvent(context.Background(), events.Event{
+		Channel: EventChannel, Type: EventMessageCreated, Tenant: "acme", Payload: payload,
+	})
+	select {
+	case e := <-recibidos:
+		if e.Event != hubnotify.EventoDatos || e.Subject != "bob-sub" {
+			t.Fatalf("evento = %+v, quiero datos de rooms para bob", e)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("el mensaje de una integración no despertó a nadie")
+	}
+	if !ps.conTodos {
+		t.Fatal("el @channel no llegó al store como mención de todos")
+	}
+}
 
 func TestDeliverPushForEvent_HubNotification(t *testing.T) {
 	received := make(chan hubnotify.Notification, 2)

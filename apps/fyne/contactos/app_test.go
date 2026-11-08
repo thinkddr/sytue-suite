@@ -40,6 +40,9 @@ type servicioFalso struct {
 	escrituras []escritura
 	// papelera es lo que devuelve GET /trash.
 	papelera []api.TrashItem
+	// noVuelven es cuántos de los UID de un «Deshacer» (POST batch/restore) no vuelven:
+	// ya purgados, o chocan con un vivo.
+	noVuelven int
 	// fotos son los bytes de la foto de cada UID; sin entrada, 404. fotosVistas son
 	// los UID por los que se ha preguntado, en orden.
 	fotos       map[string][]byte
@@ -56,6 +59,9 @@ type servicioFalso struct {
 	// cola es el trabajo que las filas lanzan al pintarse (enFondoFila), para correrlo
 	// fuera del relleno de la lista.
 	cola []func()
+	// vcardsBorradas hace que el lote de vCard no traiga ninguna: las borraron desde
+	// otro dispositivo.
+	vcardsBorradas bool
 }
 
 // correrCola corre lo que las filas han pedido, y lo que eso pida a su vez.
@@ -74,11 +80,24 @@ func (s *servicioFalso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer s.mu.Unlock()
 	responder := func(v any) { _ = json.NewEncoder(w).Encode(v) }
 	ruta := r.Method + " " + r.URL.Path
+	var cuerpo []byte
 	if r.Method != http.MethodGet {
-		cuerpo, _ := io.ReadAll(r.Body)
+		cuerpo, _ = io.ReadAll(r.Body)
 		s.escrituras = append(s.escrituras, escritura{ruta, string(cuerpo)})
 	}
 	switch {
+	case ruta == "POST /api/v1/contacts/batch/vcard":
+		var pedido struct {
+			IDs []string `json:"ids"`
+		}
+		_ = json.Unmarshal(cuerpo, &pedido)
+		if s.vcardsBorradas {
+			return
+		}
+		for _, id := range pedido.IDs {
+			_, _ = io.WriteString(w, "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:"+id+"\r\nEND:VCARD\r\n")
+		}
+		return
 	case ruta == "GET /api/v1/contacts/photo":
 		s.fotosVistas = append(s.fotosVistas, r.URL.Query().Get("uid"))
 		if b, hay := s.fotos[r.URL.Query().Get("uid")]; hay {
@@ -117,6 +136,17 @@ func (s *servicioFalso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	case strings.HasPrefix(ruta, "DELETE /api/v1/contacts/"):
 		w.WriteHeader(http.StatusNoContent)
+		return
+	case ruta == "POST /api/v1/contacts/batch/trash", ruta == "POST /api/v1/contacts/batch/restore":
+		var lote struct {
+			UIDs []string `json:"uids"`
+		}
+		_ = json.Unmarshal([]byte(s.escrituras[len(s.escrituras)-1].cuerpo), &lote)
+		if strings.HasSuffix(ruta, "/trash") {
+			responder(map[string]int{"trashed": len(lote.UIDs)})
+		} else {
+			responder(map[string]int{"restored": max(len(lote.UIDs)-s.noVuelven, 0)})
+		}
 		return
 	}
 	switch ruta {

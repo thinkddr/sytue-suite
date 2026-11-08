@@ -6,6 +6,7 @@
 package hub
 
 import (
+	"slices"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -70,6 +71,68 @@ func PorOrigen(hits []api.HubHit) []GrupoOrigen {
 	return out
 }
 
+// «Cargar más» de la búsqueda: el `POR_PAGINA` y el `MAX_PAGINAS` de `lib/search.ts`. El
+// Hub acota `limit` a su máximo por petición, así que cada página va por su `offset`.
+const (
+	PorPaginaBusqueda  = 20
+	MaxPaginasBusqueda = 10
+)
+
+// HayMasBusqueda es el `hayMas` de la web: manda el `has_more` de la ÚLTIMA página, que
+// el Hub calcula sobre el agregado, y nunca pasado el tope de páginas. El respaldo por
+// total compara con lo PEDIDO (`paginas × PorPaginaBusqueda`), no con lo enseñado: tras
+// quitar repetidos lo enseñado queda por debajo del total aunque no quede nada, y el
+// botón no se iría nunca.
+func HayMasBusqueda(res api.HubBusqueda, paginas int) bool {
+	return paginas < MaxPaginasBusqueda && quedanEnElHub(res, paginas)
+}
+
+// quedanEnElHub: el Hub tiene más de lo pedido, por su `has_more` o por su total.
+func quedanEnElHub(res api.HubBusqueda, paginas int) bool {
+	return res.HasMore || res.Total > paginas*PorPaginaBusqueda
+}
+
+// TotalAMostrar es el `totalAMostrar` de la web: el total del «Se muestran 39 de 40». Si
+// el Hub ya no tiene nada más, lo enseñado ES todo: tras quitar un repetido, «39 de 40»
+// sin botón prometería un resultado que no existe. Con más en el Hub, vale su total.
+func TotalAMostrar(res api.HubBusqueda, paginas, total, mostrados int) int {
+	if quedanEnElHub(res, paginas) {
+		return total
+	}
+	return mostrados
+}
+
+// claveHit identifica un resultado entre páginas: el mismo id en dos productos son dos.
+func claveHit(h api.HubHit) string { return h.Source + "\x00" + h.ID }
+
+// UnirBusqueda es el `unirPaginas` de la web: pega la página nueva detrás de lo que ya
+// hay, sin repetir. Cada página es una búsqueda aparte y entre dos el ranking puede
+// moverse; un resultado repetido se queda en su primera posición.
+func UnirBusqueda(previos, nuevos []api.HubHit) []api.HubHit {
+	visto := make(map[string]bool, len(previos)+len(nuevos))
+	out := make([]api.HubHit, 0, len(previos)+len(nuevos))
+	for _, h := range append(append([]api.HubHit(nil), previos...), nuevos...) {
+		clave := claveHit(h)
+		if visto[clave] {
+			continue
+		}
+		visto[clave] = true
+		out = append(out, h)
+	}
+	return out
+}
+
+// UnirFallidos junta los orígenes caídos de dos páginas: cada uno se avisa una vez.
+func UnirFallidos(previos, nuevos []string) []string {
+	out := append([]string(nil), previos...)
+	for _, f := range nuevos {
+		if !slices.Contains(out, f) {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
 // Buscar es la pantalla `/buscar`.
 type Buscar struct {
 	pagina
@@ -85,6 +148,25 @@ type Buscar struct {
 	Fallidos []string
 	// Total es cuántos hay en el Hub, para el «se muestran 20 de 143».
 	Total int
+	// HayMas: el Hub dice que quedan resultados; AlCargarMas pide la página siguiente
+	// («Cargar más resultados»). Paginas es cuántas se han cargado ya.
+	HayMas      bool
+	Paginas     int
+	AlCargarMas func()
+	// SinNovedad: el último «Cargar más» no trajo nada (falló, o llegó vacío o todo
+	// repetido). Se dice junto al botón, como el aviso de la web.
+	SinNovedad bool
+	// AlRevelarFoco desplaza lo justo para que se vea lo enfocado; lo pone quien tiene
+	// el desplazamiento (Vista.Desplazable).
+	AlRevelarFoco func()
+
+	// focoEnMas: «Cargar más» se pulsó con el foco puesto. Al llegar la página, el foco
+	// va al primer resultado nuevo (enfocarRango, por su puesto en el ranking) o, si no
+	// hay ninguno, al botón nuevo: rehacer cambia el botón y, sin esto, el foco se
+	// quedaba en nada y el siguiente Tab empezaba desde arriba. Es el `#r-<n>` de la web.
+	focoEnMas        bool
+	enfocarPendiente bool
+	enfocarRango     int
 
 	AlBuscar     func(termino string)
 	AlAbrirURL   func(string)
@@ -140,9 +222,15 @@ type buscarRenderer struct {
 	// previo es lo que va antes de los grupos: la pista sin consulta, el «sin
 	// resultados», el aviso de los productos que no contestaron o el «se muestran 20
 	// de 143», en el orden de la web. Nil es que no hay nada.
-	previo  bloque
-	grupos  []grupoResultados
-	objetos []fyne.CanvasObject
+	previo bloque
+	grupos []grupoResultados
+	// mas es «Cargar más resultados», debajo de los grupos; nil si no quedan. sinNovedad
+	// es el aviso de que el último no trajo nada, encima del botón.
+	mas        *ui.Boton
+	sinNovedad bloque
+	// porRango es la fila de cada resultado por su puesto en el ranking (b.Items).
+	porRango []*FilaResultado
+	objetos  []fyne.CanvasObject
 }
 
 type grupoResultados struct {
@@ -173,7 +261,7 @@ func (r *buscarRenderer) rehacer() {
 			b.AlBuscar(recortarTermino(r.campo.Texto()))
 		}
 	})
-	r.previo, r.grupos, r.aviso = nil, nil, nil
+	r.previo, r.grupos, r.aviso, r.mas, r.sinNovedad, r.porRango = nil, nil, nil, nil, nil, nil
 	_ = ancho
 
 	switch {
@@ -205,8 +293,27 @@ func (r *buscarRenderer) rehacer() {
 		if len(previo.hijos) > 0 {
 			r.previo = previo
 		}
+		rango := make(map[string]int, len(b.Items))
+		for i, h := range b.Items {
+			rango[claveHit(h)] = i
+		}
+		r.porRango = make([]*FilaResultado, len(b.Items))
 		for _, g := range PorOrigen(b.Items) {
-			r.grupos = append(r.grupos, r.grupoDe(v, g))
+			r.grupos = append(r.grupos, r.grupoDe(v, g, rango))
+		}
+		// «Cargar más»: la misma consulta con una página más. El Hub es quien dice si
+		// quedan; el botón es el `Button variant="secondary" size="sm"` de la web.
+		if b.HayMas && b.AlCargarMas != nil {
+			r.mas = ui.NuevoBoton(t.T("search.loadMore", nil), func() {
+				if c := fyne.CurrentApp().Driver().CanvasForObject(b); c != nil && r.mas != nil &&
+					c.Focused() == fyne.Focusable(r.mas) {
+					b.focoEnMas = true
+				}
+				b.AlCargarMas()
+			}).Con(ui.Secundario, ui.TallaSM)
+			if b.SinNovedad {
+				r.sinNovedad = texto(t.T("search.loadMoreFailed", nil), tema.TextoSM)
+			}
 		}
 	}
 	r.recomponer()
@@ -241,6 +348,10 @@ func (r *buscarRenderer) avisoCaidos(v tema.Variante) bloque {
 
 // AnchoParrafo es el `max-w-xl` de la pista de la búsqueda: 36rem con el rem 14.
 const AnchoParrafo float32 = 36 * tema.Rem
+
+// HuecoSinNovedad es el `flex flex-col items-start gap-2` entre el aviso de que el
+// último «Cargar más» no trajo nada y el botón.
+const HuecoSinNovedad float32 = 2 * 0.25 * tema.Rem
 
 // HuecoVacioBuscar es el `gap-3` entre el «sin resultados» y el aviso.
 const HuecoVacioBuscar float32 = 3 * 0.25 * tema.Rem
@@ -292,7 +403,7 @@ func (a *avisoCaidosB) objetos() []fyne.CanvasObject {
 	return append(a.caja.Objetos(), a.icono.Objeto(), a.texto)
 }
 
-func (r *buscarRenderer) grupoDe(v tema.Variante, g GrupoOrigen) grupoResultados {
+func (r *buscarRenderer) grupoDe(v tema.Variante, g GrupoOrigen, rango map[string]int) grupoResultados {
 	p, ok := ProductoDe(g.Origen)
 	rotulo := g.Origen
 	if ok {
@@ -307,11 +418,15 @@ func (r *buscarRenderer) grupoDe(v tema.Variante, g GrupoOrigen) grupoResultados
 	}
 	for _, h := range g.Items {
 		url := h.URL
-		out.filas = append(out.filas, NuevaFilaResultado(h.Title, ui.DetalleHit(r.b.T.Locale(), h), func() {
+		fila := NuevaFilaResultado(h.Title, ui.DetalleHit(r.b.T.Locale(), h), func() {
 			if r.b.AlAbrirURL != nil {
 				r.b.AlAbrirURL(url)
 			}
-		}))
+		})
+		out.filas = append(out.filas, fila)
+		if i, ok := rango[claveHit(h)]; ok && i < len(r.porRango) {
+			r.porRango[i] = fila
+		}
 	}
 	out.filetes = Divisores(v, len(out.filas))
 	return out
@@ -340,6 +455,12 @@ func (r *buscarRenderer) recomponer() {
 			r.objetos = append(r.objetos, f)
 		}
 	}
+	if r.sinNovedad != nil {
+		r.objetos = append(r.objetos, r.sinNovedad.objetos()...)
+	}
+	if r.mas != nil {
+		r.objetos = append(r.objetos, r.mas)
+	}
 }
 
 func (r *buscarRenderer) MinSize() fyne.Size { return fyne.NewSize(0, r.alto(r.b.Ancho())) }
@@ -352,6 +473,34 @@ func (r *buscarRenderer) Refresh() {
 	r.rehacer()
 	r.Layout(r.b.Size())
 	canvas.Refresh(r.b)
+	r.devolverFoco()
+}
+
+// devolverFoco lleva el foco, tras un «Cargar más» pulsado con él, al primer resultado
+// nuevo o, si no llegó ninguno, al botón nuevo; y lo deja a la vista.
+func (r *buscarRenderer) devolverFoco() {
+	b := r.b
+	if !b.enfocarPendiente {
+		return
+	}
+	b.enfocarPendiente = false
+	c := fyne.CurrentApp().Driver().CanvasForObject(b)
+	if c == nil {
+		return
+	}
+	var o fyne.Focusable
+	switch {
+	case b.enfocarRango >= 0 && b.enfocarRango < len(r.porRango) && r.porRango[b.enfocarRango] != nil:
+		o = r.porRango[b.enfocarRango]
+	case r.mas != nil:
+		o = r.mas
+	default:
+		return
+	}
+	c.Focus(o)
+	if b.AlRevelarFoco != nil {
+		b.AlRevelarFoco()
+	}
 }
 
 // alto es lo que ocupa la pantalla entera.
@@ -370,6 +519,12 @@ func (r *buscarRenderer) alto(ventana float32) float32 {
 			y += HuecoResultados
 		}
 		y += r.altoGrupo(g)
+	}
+	if r.mas != nil {
+		y += HuecoResultados + r.mas.MinSize().Height // `flex-col gap-6` hasta el botón
+		if r.sinNovedad != nil {
+			y += r.sinNovedad.alto(ancho) + HuecoSinNovedad
+		}
 	}
 	return y + MargenY
 }
@@ -437,5 +592,14 @@ func (r *buscarRenderer) Layout(t fyne.Size) {
 			fy += h
 		}
 		y += alto
+	}
+	if r.mas != nil {
+		y += HuecoResultados
+		if r.sinNovedad != nil {
+			r.sinNovedad.poner(x, y, ancho)
+			y += r.sinNovedad.alto(ancho) + HuecoSinNovedad
+		}
+		r.mas.Move(fyne.NewPos(x, y))
+		r.mas.Resize(r.mas.MinSize())
 	}
 }

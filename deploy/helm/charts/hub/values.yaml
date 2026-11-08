@@ -121,6 +121,15 @@ descargas:
   region: fr-par
   secret: sytue-downloads
 
+# El despertar de las apps de iOS por su widget (ADR 0039 y 0078, enmiendas del
+# 2026-11-06): las credenciales de proveedor de Apple en el Secret `secret`, con las
+# claves `key-p8` (el fichero .p8 entero), `key-id` y `team-id`. Sin el Secret nadie se
+# despierta. `host` vacío es el servidor de producción de Apple; el de pruebas
+# (`apns.HostPruebas`) solo para compilaciones de desarrollo.
+apns:
+  secret: sytue-hub-apns
+  host: ""
+
 # PodDisruptionBudget: garantiza disponibilidad durante drains/upgrades del cluster.
 podDisruptionBudget:
   enabled: true

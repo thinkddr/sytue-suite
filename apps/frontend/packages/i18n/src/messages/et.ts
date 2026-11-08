@@ -18,6 +18,8 @@ export const et: Catalog = {
   'ui.openNav': 'Ava navigatsioon',
   'ui.closeNav': 'Sulge navigatsioon',
   'ui.backToList': 'Tagasi loendisse',
+  'ui.suiteOpen': 'Sytue: rakendused, otsing, teavitused ja konto',
+  'ui.suiteClose': 'Tagasi rakendusse',
   'ui.noResults': 'Tulemusi pole.',
   'ui.meter.almostFull': 'peaaegu täis',
   'ui.meter.full': 'täis',
@@ -59,6 +61,9 @@ export const et: Catalog = {
     'See rakendus vajab OpenGL 2.1-te, kuid selle arvuti graafikadraiver seda ei paku ({detalle}). Paigaldage või uuendage graafikakaardi draiverit. Ilma graafikakaardita (kaugtöölaud või virtuaalmasin) seda avada ei saa.',
   'shell.lock.reasonNotebook': 'avada oma krüpteeritud märkmik',
   'shell.lock.faceIdUsage': 'Sytue kasutab Face ID-d, et avada rakenduse käivitamisel teie seanss.',
+  'shell.widgets.wake': 'Värskenda vidinaid, kui rakendus on suletud',
+  'shell.widgets.wakeHelp':
+    "Kui midagi sinu omast muutub, äratab Sytue rakenduse Apple'i tühja teavitusega, et see värskendaks oma vidinat. Apple näeb, milline rakendus ja millal, mitte kunagi seda, mis muutus.",
   'shell.call.microphoneUsage':
     'Sytue Rooms kasutab mikrofoni ainult kõne ajal ja ainult siis, kui selle sisse lülitate.',
   'shell.call.cameraUsage':
@@ -171,7 +176,7 @@ export const et: Catalog = {
     'Domeen {domain} saidil {site} ei tööta: kontrolli selle seadeid',
   'notifications.kind.pages.erp.failed':
     'Tellimus {number} saidilt {site} ei jõudnud Sytue ERP-sse',
-  'notifications.kind.pages.settings.changed': '{actor} muutis Sytue Web seadet',
+  'notifications.kind.pages.settings.changed': '{actor} muutis Sytue Webs seadet',
   'notifications.kind.pages.export.ready': 'Sinu saidi {site} eksport on valmis',
   'notifications.kind.pages.store.busy':
     'Saidi {site} e-poes on liiga palju maksmist ootavaid tellimusi',
@@ -352,6 +357,8 @@ export const et: Catalog = {
   'widgets.compose': 'Koosta kiri',
   'widgets.storage': 'Salvestusruum',
   'widgets.create': 'Loo sündmus',
+  'widgets.updatedAgo': 'Uuendatud {time}',
+  'widgets.updatedAt': 'Uuendatud: {time}',
 
   'linkedServices.services': 'Teenused',
   'linkedServices.changed':
@@ -364,6 +371,7 @@ export const et: Catalog = {
   'linkedServices.notGranted':
     'Juurdepääsu sellele teenusele ei antud. Õiguste valimiseks ühenda konto uuesti.',
   'linkedServices.connected': 'Ühendatud teenused',
+  'linkedServices.exists': 'See konto oli juba ühendatud ja on nüüd avatud.',
   'linkedServices.providerData': 'Muudatused salvestatakse teenusepakkuja juures.',
   'linkedServices.writeUnknown':
     'Teenusepakkuja ei kinnitanud salvestamist. Enne uuesti proovimist värskenda vaadet ja kontrolli tulemust.',

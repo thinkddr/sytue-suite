@@ -4,6 +4,8 @@
   "action.classified": "Einstufung · {name}",
   "action.classify": "Einstufen",
   "action.copy": "Kopie anlegen",
+  "action.copyLink": "Link kopieren",
+  "action.copyLinkFailed": "Der Link konnte nicht kopiert werden.",
   "action.delete": "In den Papierkorb",
   "action.desktopBody": "Wenn du sie noch nicht installiert hast, kannst du sie herunterladen.",
   "action.desktopCta": "Downloads ansehen",
@@ -12,6 +14,7 @@
   "action.downloadName": "{name} herunterladen",
   "action.downloadZip": "Herunterladen (ZIP)",
   "action.editorFailed": "Der Editor konnte diese Datei nicht öffnen.",
+  "action.linkCopied": "Link kopiert. Er öffnet sich nur für Personen, die bereits Zugriff haben.",
   "action.mailFailed": "Der E-Mail-Editor ließ sich nicht öffnen",
   "action.menu": "Aktionen für {name}",
   "action.more": "Weitere Aktionen",
@@ -81,6 +84,14 @@
   "files.batch.moveTitle": {
     "one": "1 Element verschieben",
     "other": "{count} Elemente verschieben"
+  },
+  "files.batch.restorePartial": {
+    "one": "1 Element konnte nicht wiederhergestellt werden und bleibt im Papierkorb.",
+    "other": "{count} Elemente konnten nicht wiederhergestellt werden und bleiben im Papierkorb."
+  },
+  "files.batch.restored": {
+    "one": "1 Element wiederhergestellt.",
+    "other": "{count} Elemente wiederhergestellt."
   },
   "files.batch.trashBody": {
     "one": "1 Element wandert in den Papierkorb. Von dort kannst du es wiederherstellen.",
@@ -555,6 +566,17 @@
     "other": "{count} Dateien hochgeladen."
   },
   "team.upload.partial": "{uploaded} von {count} hochgeladen.",
+  "trash.emptiedAll": "Der Papierkorb wurde geleert.",
+  "trash.emptyAll": "Papierkorb leeren",
+  "trash.emptyAllBody": {
+    "one": "Das Element im Papierkorb wird samt Versionsverlauf endgültig gelöscht. Danach gibt es keine Möglichkeit mehr, es zurückzuholen.",
+    "other": "Die {count} Elemente im Papierkorb werden samt Versionsverlauf endgültig gelöscht. Danach gibt es keine Möglichkeit mehr, sie zurückzuholen."
+  },
+  "trash.emptyAllPartial": {
+    "one": "1 Element konnte nicht gelöscht werden und bleibt im Papierkorb.",
+    "other": "{count} Elemente konnten nicht gelöscht werden und bleiben im Papierkorb."
+  },
+  "trash.emptyAllTitle": "Papierkorb leeren?",
   "trash.emptyBody": "Gelöschte Dateien und Ordner erscheinen hier und lassen sich wiederherstellen.",
   "trash.emptyTitle": "Der Papierkorb ist leer",
   "trash.errorTitle": "Der Papierkorb konnte nicht geladen werden",

@@ -1,9 +1,14 @@
 {
   "aiBatch.excludeOrg": "Excluir a organização do lote automático do Sytue AI",
   "aiBatch.excludedHint": "A organização está excluída do lote automático do Sytue AI. As fotos novas não são processadas em segundo plano para sugestões nem semelhanças.",
+  "album.coverSet": "Capa do álbum atualizada",
+  "album.isCover": "Esta é a capa do álbum",
   "album.linkCopied": "Ligação copiada",
   "album.newLink": "Nova ligação",
   "album.newLinkConfirm": "Criar uma nova ligação? A ligação atual deixará de funcionar para quem já a tem.",
+  "album.rename": "Mudar o nome",
+  "album.renamePrompt": "Nome do álbum",
+  "album.setCover": "Usar como capa do álbum",
   "album.share": "Partilhar",
   "album.shared": "Partilhado",
   "album.unshare": "Deixar de partilhar",
@@ -98,6 +103,7 @@
     "other": "{count} pela data de carregamento"
   },
   "gallery.cancelSelection": "Sair da seleção",
+  "gallery.clearSearch": "Limpar pesquisa",
   "gallery.describeCapped": "Só se descrevem as primeiras {count} de cada vez; volte a executar para as restantes.",
   "gallery.describeNothing": "As fotos selecionadas já têm descrição",
   "gallery.describeSelected": "Descrever com o Sytue AI",
@@ -106,7 +112,8 @@
   "gallery.describing": "A descrever {done} de {total}…",
   "gallery.downloadCapped": "Fotografias fora deste lote: {count}.",
   "gallery.downloadSelected": "Transferir",
-  "gallery.downloading": {
+  "gallery.downloading": "Pedidos de transferência iniciados: {count}. Verifique as transferências do navegador.",
+  "gallery.downloadingNative": {
     "one": "A transferir {count} foto…",
     "other": "A transferir {count} fotos…"
   },
@@ -114,6 +121,8 @@
   "gallery.empty.description": "As fotos do seu Sytue Drive aparecerão aqui, ordenadas pela data em que foram tiradas.",
   "gallery.empty.title": "Ainda não há fotos",
   "gallery.favorite": "Adicionar às favoritas",
+  "gallery.favoriteFailed": "Fotos que não foi possível alterar: {count}",
+  "gallery.favorited": "Adicionadas às favoritas: {count}",
   "gallery.likeTheseResults": "E as que se parecem",
   "gallery.moreLikeThese": "Mais como estas",
   "gallery.newAlbum": "Novo álbum",
@@ -124,6 +133,8 @@
   },
   "gallery.newAlbumTitle": "Novo álbum",
   "gallery.noExifDate": "Sem data de captura: ordenadas pela data de envio",
+  "gallery.noResults.description": "Experimente outras palavras ou limpe a pesquisa para ver todas as suas fotos.",
+  "gallery.noResults.title": "Nenhuma foto corresponde a «{query}»",
   "gallery.onlyImages": "Só é possível adicionar imagens.",
   "gallery.open": "Abrir {name}",
   "gallery.openInEditor": "Editar {name}",
@@ -152,6 +163,7 @@
     "other": "{count} fotos movidas para o lixo"
   },
   "gallery.unfavorite": "Remover das favoritas",
+  "gallery.unfavorited": "Removidas das favoritas: {count}",
   "gallery.unselectMonth": "Desselecionar o mês",
   "gallery.uploadFailed": "Não foi possível enviar: {name}",
   "gallery.uploaded": {
@@ -198,6 +210,9 @@
   "viewer.askSend": "Perguntar",
   "viewer.canvasBackground": "Fundo da foto",
   "viewer.close": "Fechar",
+  "viewer.counter": "{index} / {total}",
+  "viewer.counterLabel": "Foto {index} de {total}",
+  "viewer.counterMore": "{count}+",
   "viewer.delete": "Mover para o lixo",
   "viewer.deleteConfirm": "Mover esta foto para o lixo? O ficheiro fica no Sytue Drive.",
   "viewer.describe": "Descrever com o Sytue AI",
@@ -237,6 +252,7 @@
   "viewer.saveDescription": "Guardar",
   "viewer.savingDescription": "A guardar…",
   "viewer.shortcuts": "Atalhos: setas para mudar de foto, espaço para a apresentação, I para info, Z para tamanho real, Delete para o lixo.",
+  "viewer.shortcutsJump": "Home e End vão para a primeira e a última foto.",
   "viewer.similar": "Fotos semelhantes",
   "viewer.slideshow": "Apresentação",
   "viewer.slideshowStop": "Parar a apresentação",

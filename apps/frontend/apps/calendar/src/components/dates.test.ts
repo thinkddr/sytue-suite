@@ -8,6 +8,11 @@
 import { describe, expect, test } from 'bun:test';
 import type { CalendarEvent } from '@sytue/api-clients';
 import {
+  addMonthsClamped,
+  compactTitle,
+  fullDateLabel,
+  isoWeek,
+  titleFor,
   overlapsDay,
   expandOccurrences,
   shiftEnd,
@@ -190,5 +195,72 @@ describe('los días de la semana, en sus tres anchos', () => {
     expect(weekdayNarrowLabels('en')[0]).toBe('M');
     expect(weekdayLabels('en')[0]).toBe('Mon');
     expect(weekdayLongLabels('en')[0]).toBe('Monday');
+  });
+});
+
+/**
+ * V12 mover-mes-recorta — vector espejo de `TestV12MoverMesRecorta` (Fyne, `MoverMes`).
+ * Cambiar de mes conserva el día, recortado al último del mes de destino: con `addMonths`
+ * el 31 de enero + 1 era el 3 de MARZO. Visto en ROJO volviendo `navigate` a `addMonths`
+ * (aquí, devolviendo `addMonths(d, n)` desde `addMonthsClamped`).
+ */
+describe('V12 mover-mes-recorta', () => {
+  const dia = (d: Date) => [d.getFullYear(), d.getMonth() + 1, d.getDate()];
+  test('el día se recorta al último del mes de destino', () => {
+    expect(dia(addMonthsClamped(new Date(2027, 0, 31), 1))).toEqual([2027, 2, 28]);
+    expect(dia(addMonthsClamped(new Date(2026, 2, 31), -1))).toEqual([2026, 2, 28]);
+    expect(dia(addMonthsClamped(new Date(2026, 11, 31), 2))).toEqual([2027, 2, 28]);
+    expect(dia(addMonthsClamped(new Date(2024, 0, 31), 1))).toEqual([2024, 2, 29]);
+  });
+  test('si el día cabe no cambia, y la hora se conserva', () => {
+    const x = addMonthsClamped(new Date(2026, 10, 6, 19, 36), 1);
+    expect(dia(x)).toEqual([2026, 12, 6]);
+    expect([x.getHours(), x.getMinutes()]).toEqual([19, 36]);
+  });
+});
+
+/**
+ * V13 titulo — vector espejo de `TestV13Titulo` (Fyne, `TituloCompacto`). El título del
+ * mes del teléfono: el mes suelto en el año en curso, con el año fuera de él, y sin
+ * capitalizar, como lo escribe el idioma. Visto en ROJO comparando con el año del CURSOR
+ * en vez del de hoy (siempre «noviembre» a secas), y con `{ month: 'long' }` sin año
+ * (en griego, «Νοεμβρίου»: el genitivo).
+ */
+describe('V13 titulo', () => {
+  const hoy = new Date(2026, 10, 6);
+  test('es y en', () => {
+    expect(compactTitle('es', new Date(2026, 10, 6), hoy)).toBe('noviembre');
+    expect(compactTitle('es', new Date(2027, 0, 15), hoy)).toBe('enero de 2027');
+    expect(compactTitle('en', new Date(2026, 10, 6), hoy)).toBe('November');
+    expect(compactTitle('en', new Date(2027, 0, 15), hoy)).toBe('January 2027');
+  });
+  test('el griego, en nominativo como el mini-mes y no en genitivo', () => {
+    expect(compactTitle('el', new Date(2026, 10, 6), hoy)).toBe('Νοέμβριος');
+    expect(compactTitle('el', new Date(2027, 0, 15), hoy)).toBe('Ιανουάριος 2027');
+  });
+  test('la fecha entera de la lista sale sin capitalizar; el título de la vista día, capitalizado', () => {
+    expect(fullDateLabel('es', hoy)).toBe('viernes, 6 de noviembre de 2026');
+    expect(titleFor('day', hoy, 'es')).toBe('Viernes, 6 de noviembre de 2026');
+    expect(titleFor('month', hoy, 'es')).toBe('Noviembre de 2026');
+  });
+});
+
+/**
+ * El número de semana ISO 8601: la de su jueves; la 1 es la del 4 de enero. Visto en ROJO
+ * contando la semana 1 desde el 1 de enero.
+ */
+describe('isoWeek', () => {
+  test('los bordes de año', () => {
+    expect(isoWeek(new Date(2024, 11, 30))).toBe(1); // lunes de la 1 de 2025
+    expect(isoWeek(new Date(2024, 11, 31))).toBe(1);
+    expect(isoWeek(new Date(2027, 0, 1))).toBe(53); // viernes de la 53 de 2026
+    expect(isoWeek(new Date(2027, 0, 3))).toBe(53);
+    expect(isoWeek(new Date(2027, 0, 4))).toBe(1);
+    expect(isoWeek(new Date(2021, 0, 3))).toBe(53);
+  });
+  test('dentro del año, lunes y domingo de la misma semana', () => {
+    expect(isoWeek(new Date(2026, 10, 2))).toBe(45);
+    expect(isoWeek(new Date(2026, 10, 8))).toBe(45);
+    expect(isoWeek(new Date(2026, 10, 9))).toBe(46);
   });
 });

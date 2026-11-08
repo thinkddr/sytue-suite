@@ -164,8 +164,9 @@ func TestDiaposDescargaYVersionaConLaPiezaComun(t *testing.T) {
 	test.NewTempWindow(t, a.Objeto()).Resize(fyne.NewSize(1280, 800))
 	a.AbrirID("d1", "Plan")
 	ctx := a.Contexto()
-	if ctx.Exportar == nil || ctx.GuardarVersion == nil || ctx.Versiones == nil || ctx.RestaurarVersion == nil {
-		t.Fatal("abierta con permiso, el menú descarga y versiona")
+	if ctx.Exportar == nil || ctx.GuardarVersion == nil || ctx.Versiones == nil || ctx.RestaurarVersion == nil ||
+		ctx.HacerCopia == nil || ctx.GuardarYa == nil {
+		t.Fatal("abierta con permiso, el menú descarga, versiona y hace copias, y el chip reintenta")
 	}
 	// «Compartir» también, como Docus y Calcus: sin él el botón estaba encendido y no
 	// hacía nada (visto en Windows).
@@ -201,4 +202,57 @@ func TestDiaposDescargaYVersionaConLaPiezaComun(t *testing.T) {
 func sinRelojDeCabecera(w fyne.Window) {
 	w.Close()
 	fyne.DoAndWait(func() {})
+}
+
+// «Hacer una copia» con el último guardado FALLIDO: vuelve a guardar antes y, si falla
+// otra vez, no copia y avisa con `copy.error`, como `makeCopy` de la web. Una copia sin
+// los últimos cambios parecería buena y no lo sería.
+//
+// VISTO EN ROJO (2026-11-06): con `guardarAntes` atento solo a `Sucio` y devolviendo
+// nil pasara lo que pasara, se pedía la copia y se abría.
+func TestDiaposNoCopiaTrasUnGuardadoFallido(t *testing.T) {
+	var copias, guardados int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		cuerpo, _ := io.ReadAll(r.Body)
+		switch {
+		case r.Method != http.MethodGet && strings.Contains(string(cuerpo), "copy_of"):
+			copias++
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"document":{"id":"c1","kind":"presentation","title":"Copia de Plan"},"role":"owner"}`))
+		case r.Method != http.MethodGet:
+			guardados++
+			w.WriteHeader(http.StatusInternalServerError)
+		case strings.HasSuffix(r.URL.Path, "/state"):
+			_, _ = w.Write([]byte(`{"seq":1,"state":{"lamport":1,"registers":{"doc:slides":` +
+				`{"value":"{\"slides\":[{\"id\":\"s\",\"boxes\":[]}]}","dot":{"a":"x","c":1},"lamport":1}}}}`))
+		default:
+			_, _ = w.Write([]byte(`{"document":{"id":"d1","kind":"presentation","title":"Plan"},"role":"editor"}`))
+		}
+	}))
+	defer srv.Close()
+	a := NuevaApp(traductor(t), "es", api.NewDocs(srv.URL, nil, srv.Client()), api.NewSlides(srv.URL, nil, srv.Client()))
+	a.lanzar = func(f func()) { f() }
+	w := test.NewTempWindow(t, a.Objeto())
+	w.Resize(fyne.NewSize(1280, 800))
+	a.AbrirID("d1", "Plan")
+	ctx := a.Contexto()
+	a.Editor().NuevaForma("rect")
+	ctx.GuardarYa()
+	fyne.DoAndWait(func() {})
+	if ctx.Guardado != editor.FalloAlGuardar || guardados == 0 {
+		t.Fatalf("con el servicio en 500 el chip dice %v (%d guardados)", ctx.Guardado, guardados)
+	}
+	antes := guardados
+	ctx.HacerCopia(nil)
+	fyne.DoAndWait(func() {})
+	if guardados == antes {
+		t.Error("tras un guardado fallido, la copia no vuelve a intentar guardar")
+	}
+	if copias != 0 {
+		t.Errorf("se ha pedido la copia sin lo último guardado (%d)", copias)
+	}
+	if a.abierta == nil || a.Contexto().Titulo != "Plan" {
+		t.Error("sin copia no se abre nada: sigue la presentación de antes")
+	}
 }

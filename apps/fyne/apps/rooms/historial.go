@@ -379,18 +379,63 @@ func (r *historialRenderer) Refresh() {
 
 // centrar trae la fila resaltada al medio de la vista.
 func (h *Historial) centrar(s *container.Scroll) {
+	h.centrarFila(s, func(f *FilaMensaje) bool { return f.Resaltada })
+}
+
+// centrarFila trae al medio de la vista la primera fila que cumple `es`, y la devuelve.
+func (h *Historial) centrarFila(s *container.Scroll, es func(*FilaMensaje) bool) *FilaMensaje {
 	c, ok := s.Content.(*fyne.Container)
 	if !ok {
-		return
+		return nil
 	}
 	for _, o := range c.Objects {
-		if f, es := o.(*FilaMensaje); es && f.Resaltada {
+		if f, fila := o.(*FilaMensaje); fila && es(f) {
 			y := f.Position().Y - (s.Size().Height-f.Size().Height)/2
 			s.Offset.Y = max(0, min(y, c.MinSize().Height-s.Size().Height))
 			s.Refresh()
-			return
+			return f
 		}
 	}
+	return nil
+}
+
+// EnfocarEdicion trae a la vista la fila que se está editando y pone el cursor en su
+// caja: es el `scrollToIndex` + `focus()` de la web al abrir la edición con ↑.
+func (h *Historial) EnfocarEdicion(lienzo fyne.Canvas) {
+	s, ok := h.cuerpo.(*container.Scroll)
+	if !ok {
+		return
+	}
+	f := h.centrarFila(s, func(f *FilaMensaje) bool { return f.Editando })
+	if f == nil {
+		return
+	}
+	if f.edicion == nil {
+		f.Refresh() // la caja nace con el renderizador de la fila
+	}
+	if lienzo != nil && f.edicion != nil && f.edicion.area != nil {
+		lienzo.Focus(f.edicion.area)
+	}
+}
+
+// EditandoYa es `editandoYa` de lib/editarUltimo.ts: ↑ sobre el mensaje que ya está en
+// edición solo devuelve el foco a su caja, sin reabrirla con el texto original.
+func EditandoYa(editando, pedido string) bool { return editando != "" && editando == pedido }
+
+// UltimoEditable es `ultimoEditable` de lib/editarUltimo.ts: el último mensaje PROPIO
+// del canal que de verdad se puede editar. Fuera quedan los que aún no existen en el
+// servidor (en vuelo o fallidos), las tarjetas de llamada y las encuestas y tareas.
+func UltimoEditable(ms []Mensaje, yo string) (Mensaje, bool) {
+	if yo == "" {
+		return Mensaje{}, false
+	}
+	for i := len(ms) - 1; i >= 0; i-- {
+		m := ms[i]
+		if m.Autor.ID == yo && m.ID != "" && !m.Enviando && !m.Fallido && m.Tipo != Llamada && m.Tarjeta == nil {
+			return m, true
+		}
+	}
+	return Mensaje{}, false
 }
 
 // QuitarResalte apaga el resalte sin rehacer la lista ni mover la vista, que es lo que

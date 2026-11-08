@@ -67,9 +67,9 @@ func (c *conMargen) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 // eventos de otro rango: la vista se queda en su sitio, atenuada, y no atiende al
 // puntero.
 //
-// Fyne no tiene opacidad de grupo. Pintar la vista al 60 % sobre `bg` —que es lo que
-// hay detrás en la web, el fondo del AppShell— da exactamente lo mismo que pintar encima
-// `bg` al 40 %: 0,6·vista + 0,4·bg. Y se traga el clic y el paso del ratón, que es la
+// Fyne no tiene opacidad de grupo. Pintar la vista al 60 % sobre lo que hay detrás en
+// la web —la hoja en Marco (`--sytue-sheet-bg`), el fondo del AppShell en Carril— da lo
+// mismo que pintar encima ese fondo al 40 %: 0,6·vista + 0,4·fondo. Y se traga el clic y el paso del ratón, que es la
 // otra mitad de la clase.
 type cortina struct {
 	widget.BaseWidget
@@ -109,7 +109,7 @@ func (r *cortinaRenderer) Destroy()                     {}
 func (r *cortinaRenderer) Layout(t fyne.Size)           { r.c.velo.Resize(t) }
 
 func (r *cortinaRenderer) Refresh() {
-	fondo := tema.Color("bg", tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
+	fondo := tema.Color(ui.FondoHoja(), tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
 	opaco := float32(255)
 	fondo.A = uint8(opaco*(1-OpacidadRecarga) + 0.5) // 102: el 40 % que deja ver el 60 %
 	r.c.velo.FillColor = fondo

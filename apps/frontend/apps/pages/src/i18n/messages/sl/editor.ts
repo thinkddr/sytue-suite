@@ -17,10 +17,10 @@ export const editor = {
   'editor.bases.desc': 'Zapisi pogleda takšni, kot so zdaj',
   'editor.bases.title': 'Tabela iz Sytue Bases',
   'editor.bases.prompt':
-    'Prilepite žeton povezave samo za branje, odobrene za Sytue Web. Podatki tega pogleda bodo postali vsebina spletnega mesta in bodo po objavi javni.',
+    'Prilepite žeton povezave samo za branje, odobrene za Sytue Webs. Podatki tega pogleda bodo postali vsebina spletnega mesta in bodo po objavi javni.',
   'editor.bases.confirm': 'Prenesi pogled',
   'editor.bases.invalid':
-    'Ta povezava ni veljavna za Sytue Web: morda je preklicana, potekla ali odobrena za drug izdelek ali organizacijo.',
+    'Ta povezava ni veljavna za Sytue Webs: morda je preklicana, potekla ali odobrena za drug izdelek ali organizacijo.',
   'editor.bases.large':
     'Pogled je prevelik za tabelo spletnega mesta (največ 50 vrstic in 8 stolpcev). Omejite ga v Sytue Bases.',
   'editor.bases.forbidden':

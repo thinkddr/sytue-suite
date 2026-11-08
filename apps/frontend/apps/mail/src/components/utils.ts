@@ -3,7 +3,8 @@
  * tamaños, nombres de carpeta— depende del idioma, así que estas funciones reciben
  * el `locale` ya negociado (o la `t` de la app) en vez de fijar un formato.
  */
-import { formatDate, formatDateTime, formatTime, type Locale } from '@sytue/i18n';
+import { formatDate, formatDateTime, formatTime, intlTag, type Locale } from '@sytue/i18n';
+import { appUrl } from '@sytue/config';
 import type { GlyphName } from './glyphs.js';
 import type { MailMessageKey, T } from '../i18n/index.js';
 import type { EmailAddress, EmailChange, EmailSummary } from '../client/mailApi.js';
@@ -180,6 +181,177 @@ export function conversacionAbierta(
   return groupByThread(recientesPrimero)[0] ?? null;
 }
 
+/**
+ * «Deshacer» un movimiento: los mensajes movidos agrupados por la carpeta de la que
+ * SALIERON, para devolver cada uno a la suya en una llamada por carpeta.
+ *
+ * Volver todos a la carpeta de la vista no vale: en una búsqueda o en una etiqueta
+ * la vista cruza carpetas, y una conversación tiene a la vez mensajes en Recibidos y
+ * en Enviados. Lo que manda es el `mailboxId` de cada mensaje; sin él (lecturas que
+ * no lo traen) se cae a la carpeta que se estaba mirando, que en una carpeta es
+ * exactamente de donde salió. Quedan fuera los que ya estaban en el destino —no se
+ * movieron— y los que no tienen origen conocido: devolverlos a ciegas es inventar.
+ */
+export function origenesDeMovimiento(
+  convs: Conversation[],
+  carpetaVista: string | null,
+  destino: string,
+): Map<string, string[]> {
+  const origenes = new Map<string, string[]>();
+  for (const c of convs) {
+    for (const m of c.messages) {
+      const origen = m.mailboxId || carpetaVista;
+      if (!origen || origen === destino) continue;
+      const ids = origenes.get(origen) ?? [];
+      ids.push(m.id);
+      origenes.set(origen, ids);
+    }
+  }
+  return origenes;
+}
+
+/** Filtros rápidos de la lista: todas, sin leer, destacadas o con adjuntos. */
+export const FILTROS_RAPIDOS = ['todas', 'noLeidas', 'destacadas', 'conAdjuntos'] as const;
+export type FiltroRapido = (typeof FILTROS_RAPIDOS)[number];
+
+/**
+ * Las conversaciones que deja ver un filtro rápido. Se filtra lo YA cargado —la
+ * lista sigue pidiendo páginas al bajar—, sin otra consulta al servicio.
+ *
+ * La conversación ABIERTA se queda aunque deje de cumplirlo: abrir una sin leer la
+ * marca leída, y que desaparezca de «No leídos» bajo el cursor —con j/k y la
+ * selección contando por posición— es perder el sitio. Sale al abrir otra.
+ */
+export function filtrarConversaciones(
+  convs: Conversation[],
+  filtro: FiltroRapido,
+  abierta: string | null,
+): Conversation[] {
+  if (filtro === 'todas') return convs;
+  const cumple = (c: Conversation): boolean =>
+    filtro === 'noLeidas' ? c.unread : filtro === 'destacadas' ? c.flagged : c.hasAttachment;
+  return convs.filter((c) => c.threadId === abierta || cumple(c));
+}
+
+/** Las páginas que un filtro sin coincidencias pide por su cuenta antes de parar. */
+export const TOPE_PAGINAS_FILTRO = 5;
+
+/**
+ * Qué hace la lista con un filtro rápido puesto, según lo que deja ver: `reiniciar`
+ * la cuenta si ya enseña algo (o no queda nada que pedir); `esperar` si hay una
+ * página en camino —no se pide otra ni se cuenta: contar repintados gastaría el
+ * tope sin pedir—; `pedir` la siguiente; o `tope` tras TOPE_PAGINAS_FILTRO
+ * seguidas, y el vacío ofrece «Cargar más». Es el final de `pintarLista` en Fyne.
+ */
+export function pasoDelFiltroVacio(ctx: {
+  filtroSinNada: boolean;
+  cargandoMas: boolean;
+  paginas: number;
+}): 'reiniciar' | 'esperar' | 'pedir' | 'tope' {
+  if (!ctx.filtroSinNada) return 'reiniciar';
+  if (ctx.cargandoMas) return 'esperar';
+  return ctx.paginas >= TOPE_PAGINAS_FILTRO ? 'tope' : 'pedir';
+}
+
+/** Lo que hace un atajo de la selección: marcar una fila o vaciarla. */
+export type AccionSeleccion =
+  { tipo: 'marcar'; threadId: string; indice: number } | { tipo: 'vaciar' } | null;
+
+/**
+ * «x» y Escape sobre la lista. «x» marca la conversación del cursor: la abierta —y
+ * si la abierta no está en la lista (abierta desde un aviso), nada— o la fila donde
+ * se quedó j/k. Escape vacía la selección, y SOLO si hay algo marcado: sin selección
+ * la tecla sigue siendo de quien la escuche. Es `marcarCursor`/`TeclaSuelta` de Fyne.
+ */
+export function atajoDeSeleccion(
+  tecla: string,
+  ctx: {
+    conversaciones: Conversation[];
+    abierta: string | null;
+    cursor: number;
+    soloLectura: boolean;
+    marcadas: number;
+  },
+): AccionSeleccion {
+  if (tecla === 'Escape') return ctx.marcadas > 0 ? { tipo: 'vaciar' } : null;
+  if (tecla !== 'x' || ctx.soloLectura || ctx.conversaciones.length === 0) return null;
+  const indice = ctx.abierta
+    ? ctx.conversaciones.findIndex((c) => c.threadId === ctx.abierta)
+    : Math.min(ctx.cursor, ctx.conversaciones.length - 1);
+  const fila = ctx.conversaciones[indice];
+  return fila ? { tipo: 'marcar', threadId: fila.threadId, indice } : null;
+}
+
+/**
+ * «Deshacer» del aviso de triaje: una llamada en lote por carpeta de origen
+ * (`origenesDeMovimiento`) y, salga bien o mal, se piden de nuevo la carpeta, la
+ * búsqueda y los contadores. Las dos listas perdieron los movidos de forma
+ * optimista; si solo se pidiera la carpeta, en una búsqueda lo devuelto no volvía
+ * hasta repetirla (la búsqueda vacía no consulta, así que pedirla siempre es gratis).
+ * Devuelve si todas las carpetas aceptaron el movimiento.
+ */
+export async function deshacerMovimiento(
+  origenes: Map<string, string[]>,
+  mover: (ids: string[], carpeta: string) => Promise<unknown>,
+  refrescar: { carpeta: () => void; busqueda: () => void; contadores: () => void },
+): Promise<boolean> {
+  try {
+    await Promise.all(Array.from(origenes, ([carpeta, ids]) => mover(ids, carpeta)));
+    return true;
+  } catch {
+    return false;
+  } finally {
+    refrescar.carpeta();
+    refrescar.busqueda();
+    refrescar.contadores();
+  }
+}
+
+/**
+ * Abre en otra pestaña una URL que solo se conoce tras una petición (el deep-link de
+ * un intent del Hub). La pestaña se abre YA, en el mismo clic, y se le da la URL al
+ * llegar: después del `await` el navegador puede haber retirado el permiso del clic,
+ * y Safari —o Firefox si el Hub tarda— bloquea la ventana sin avisar (con `noopener`
+ * `window.open` siempre devuelve null, así que el bloqueo ni se detectaba).
+ *
+ * Si aun así la bloquea, se navega en esta pestaña, como hace Drive: perder el
+ * correo es mejor que un botón que no hace nada. Sin URL o con error, la pestaña en
+ * blanco se cierra. Solo se navega a http(s): la pestaña vacía es de nuestro origen,
+ * y un `javascript:` en ella correría con él. Devuelve si se navegó.
+ */
+export async function abrirTrasPeticion(
+  pedir: () => Promise<string | null | undefined>,
+  win: Pick<Window, 'open' | 'location'> = window,
+): Promise<boolean> {
+  const pestana = win.open('', '_blank');
+  if (pestana) pestana.opener = null;
+  try {
+    const url = await pedir();
+    const destino = url ? new URL(url, win.location.href) : null;
+    if (!destino || (destino.protocol !== 'https:' && destino.protocol !== 'http:')) {
+      pestana?.close();
+      return false;
+    }
+    if (pestana) pestana.location.href = destino.href;
+    else win.location.assign(destino.href);
+    return true;
+  } catch (e) {
+    pestana?.close();
+    throw e;
+  }
+}
+
+/**
+ * El mensaje que se propone en Sytue Rooms al compartir una conversación: el asunto y
+ * el ENLACE canónico del correo (`/messages/{id}`, que abre su hilo), nunca el cuerpo
+ * —la sala puede tener gente que no debería leerlo, y quien pulse el enlace pasa por
+ * la autorización de Mail—. Con la organización de la ruta (ADR 0056) el enlace
+ * aterriza sin el salto del middleware.
+ */
+export function textoParaRooms(asunto: string, id: string, org: string | null): string {
+  return `${asunto}\n${appUrl('mail', `/messages/${encodeURIComponent(id)}`, org)}`;
+}
+
 export type ReplyMode = 'reply' | 'replyAll' | 'forward';
 
 const RE_PREFIX = /^\s*re:/i;
@@ -285,6 +457,37 @@ const ROLE_KEYS = {
 export function mailboxLabel(t: T, name: string, role?: string): string {
   const key = role ? ROLE_KEYS[role as keyof typeof ROLE_KEYS] : undefined;
   return key ? t(key) : name;
+}
+
+/**
+ * Orden de prioridad de carpetas por role JMAP (resto, alfabético). Es también el de
+ * los buzones unificados del lateral (`arbolDeBuzones`).
+ */
+export const ROLE_ORDER = ['inbox', 'drafts', 'sent', 'archive', 'junk', 'trash'] as const;
+
+/**
+ * Carpetas en el orden del lateral: las del sistema por su role y las demás por
+ * nombre. Vale igual para las de Sytue y para las de una cuenta externa, que llegan
+ * en el orden del proveedor —Gmail da la Papelera antes que Recibidos— y con el mismo
+ * vocabulario de roles (`services/integrations/internal/mailbox`). Los casos que
+ * comparte con Fyne (`ordenarCarpetas`) están en
+ * `apps/fyne/apps/mail/testdata/carpetas-externas.json`.
+ */
+export function sortMailboxes<M extends { name: string; role?: string | undefined }>(
+  locale: Locale,
+  boxes: readonly M[],
+): M[] {
+  const rank = (m: M): number => {
+    const i = m.role ? ROLE_ORDER.indexOf(m.role as (typeof ROLE_ORDER)[number]) : -1;
+    return i === -1 ? 99 : i;
+  };
+  return [...boxes].sort(
+    (a, b) =>
+      rank(a) - rank(b) ||
+      // Las carpetas propias se ordenan con el collator del idioma del usuario, no
+      // con uno fijo: la Ä alemana y la Ñ española no se colocan igual.
+      a.name.localeCompare(b.name, intlTag(locale)),
+  );
 }
 
 /**

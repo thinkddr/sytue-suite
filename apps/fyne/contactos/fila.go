@@ -28,6 +28,10 @@ import (
 //   - Entre el avatar y el nombre hay `gap-2.5` (8,75), no el `gap-3` (10,5) de
 //     `ListItem`: el avatar y el texto van dentro del `<button>`, que lleva el suyo.
 //   - Al final va la estrella de 14 en `warning-text` si el contacto está destacado.
+//     Con red es un BOTÓN (`FavoriteToggle row`, hermano del de abrir, `estrellaFila`):
+//     destaca sin abrir la ficha, se llega a él con el tabulador y se anuncia con su
+//     nombre, y sin destacar se ve en trazo al pasar el puntero por la fila, con el
+//     foco, o siempre en un teléfono, donde no hay «pasar por encima».
 //
 // La paridad manda sobre la reutilización (`docs/CONVENTIONS.md` §13.6): la misma
 // decisión que tomó Mail con su fila.
@@ -38,6 +42,9 @@ import (
 const (
 	// HuecoBotonFila es el `gap-2.5` de dentro del botón.
 	HuecoBotonFila = 2.5 * 0.25 * tema.Rem
+	// LadoBotonEstrellaFila es el `IconButton size="sm"` de la estrella: `h-6 w-6`, que
+	// con el dedo sube al suelo táctil (`ui.SueloTactil`).
+	LadoBotonEstrellaFila = 6 * 0.25 * tema.Rem
 	// ToqueCasilla es el `p-2.5` del `<label>`: la zona de toque se estira eso por
 	// cada lado sin mover nada, porque el `-m-2.5` lo devuelve.
 	ToqueCasilla = 2.5 * 0.25 * tema.Rem
@@ -60,9 +67,14 @@ type FilaContacto struct {
 	Marcada bool
 	// RotuloCasilla es el `aria-label` de la casilla («Seleccionar a …»).
 	RotuloCasilla string
+	// RotuloEstrella es el de la estrella («Destacar a …» o «Quitar a … de destacados»).
+	RotuloEstrella string
 
 	AlAbrir  func()
 	AlMarcar func()
+	// AlDestacar destaca o quita el destacado desde la fila; nil (sin red) deja solo la
+	// estrella de quien ya lo está, sin botón.
+	AlDestacar func()
 
 	encima bool
 }
@@ -97,7 +109,16 @@ func MedidaFilaContacto(conSubtitulo bool) float32 {
 func xCasilla() float32 { return ui.InicioFila() }
 func xBoton() float32   { return xCasilla() + ui.LadoEleccion + ui.HuecoFila }
 
-// Tapped abre la ficha, salvo que el toque caiga en la zona de la casilla.
+// zonaEstrella es el ancho del botón de la estrella al final de la fila; 0 si no hay.
+func (f *FilaContacto) zonaEstrella() float32 {
+	if f.AlDestacar == nil {
+		return 0
+	}
+	return ui.SueloTactil(LadoBotonEstrellaFila)
+}
+
+// Tapped abre la ficha, salvo que el toque caiga en la zona de la casilla o en la de
+// la estrella (el botón recibe su propio toque; esto cubre lo que llegue a la fila).
 //
 // La casilla dibuja 14 px, pero su `<label>` recoge el toque 8,75 px más allá por cada
 // lado: a 14 px, en un teléfono el dedo falla la casilla y lo que pasa entonces es que
@@ -109,6 +130,10 @@ func (f *FilaContacto) Tapped(e *fyne.PointEvent) {
 		if f.AlMarcar != nil {
 			f.AlMarcar()
 		}
+		return
+	}
+	if z := f.zonaEstrella(); z > 0 && e.Position.X >= f.Size().Width-ui.MargenFila-z {
+		f.AlDestacar()
 		return
 	}
 	if f.AlAbrir != nil {
@@ -155,7 +180,17 @@ func (f *FilaContacto) CreateRenderer() fyne.WidgetRenderer {
 		nombre:    ui.Texto(f.Nombre, tema.TextoBase, ui.Medio, tema.Color("text", v)),
 		subtitulo: ui.Texto(f.Subtitulo, tema.TextoSM, ui.Normal, tema.Color("text-muted", v)),
 		estrella:  GlifoRelleno(EstrellaD, LadoEstrellaFila, tema.Color("warning-text", v)),
+		boton:     nuevaEstrellaFila(),
 	}
+	r.boton.AlPulsar = func() {
+		if f.AlDestacar != nil {
+			f.AlDestacar()
+		}
+	}
+	// Fyne da el hover solo al Hoverable más hondo: al llegar a la estrella la fila
+	// recibe MouseOut. En la web el `hover:` es del div de la fila y sigue encima de
+	// la estrella, así que la fila se repinta cuando el puntero entra o sale de ella.
+	r.boton.AlCambiarEstado(f.Refresh)
 	r.casilla = ui.NuevaCasilla(f.RotuloCasilla, func(bool) {
 		if f.AlMarcar != nil {
 			f.AlMarcar()
@@ -163,7 +198,7 @@ func (f *FilaContacto) CreateRenderer() fyne.WidgetRenderer {
 	})
 	r.casilla.SinEtiqueta = true
 	r.objetos = []fyne.CanvasObject{
-		r.base, r.velo, r.galon, r.casilla, r.avatar, r.nombre, r.subtitulo, r.estrella.Objeto(),
+		r.base, r.velo, r.galon, r.casilla, r.avatar, r.nombre, r.subtitulo, r.estrella.Objeto(), r.boton,
 	}
 	r.Refresh()
 	return r
@@ -175,8 +210,10 @@ type filaContactoRenderer struct {
 	casilla           *ui.Eleccion
 	avatar            *ui.Avatar
 	nombre, subtitulo *canvas.Text
-	estrella          *iconos.Dibujo
-	objetos           []fyne.CanvasObject
+	// estrella es la que se ve sin red, sin botón; con red la pinta `boton`.
+	estrella *iconos.Dibujo
+	boton    *estrellaFila
+	objetos  []fyne.CanvasObject
 }
 
 func (r *filaContactoRenderer) MinSize() fyne.Size {
@@ -203,7 +240,13 @@ func (r *filaContactoRenderer) Layout(t fyne.Size) {
 	x += av.Width + HuecoBotonFila
 
 	derecha := t.Width - ui.MargenFila
-	if f.Destacado {
+	if z := f.zonaEstrella(); z > 0 {
+		// El botón ocupa su sitio esté o no a la vista (`opacity-0`): el nombre no
+		// salta de ancho al pasar el puntero. Va tras el `gap-3` de la fila.
+		r.boton.Move(fyne.NewPos(derecha-z, centro(z)))
+		r.boton.Resize(fyne.NewSize(z, z))
+		derecha -= z + ui.HuecoFila
+	} else if f.Destacado {
 		r.estrella.Colocar(derecha-LadoEstrellaFila, centro(LadoEstrellaFila), LadoEstrellaFila)
 		derecha -= LadoEstrellaFila + HuecoBotonFila
 	}
@@ -230,7 +273,7 @@ func (r *filaContactoRenderer) Refresh() {
 	case f.Abierta:
 		r.velo.FillColor = tema.Color("selected", v)
 		r.galon.FillColor = tema.Color("primary", v)
-	case f.encima:
+	case f.encima || (f.AlDestacar != nil && r.boton.Encima()):
 		r.velo.FillColor = tema.Color("bg-subtle", v)
 		r.galon.FillColor = color.NRGBA{}
 	default:
@@ -243,7 +286,10 @@ func (r *filaContactoRenderer) Refresh() {
 	r.subtitulo.Color = tema.Color("text-muted", v)
 	r.subtitulo.Hidden = f.Subtitulo == ""
 	r.estrella.TenirCon(tema.Color("warning-text", v))
-	r.estrella.Ver(f.Destacado)
+	r.estrella.Ver(f.AlDestacar == nil && f.Destacado)
+	// Oculto sin red: así tampoco es parada del tabulador.
+	r.boton.Hidden = f.AlDestacar == nil
+	r.boton.Nombre, r.boton.Activo, r.boton.FilaEncima = f.RotuloEstrella, f.Destacado, f.encima
 	for _, o := range r.objetos {
 		o.Refresh()
 	}

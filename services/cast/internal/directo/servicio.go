@@ -459,6 +459,9 @@ func (s *Servicio) arrancar(ctx context.Context, v domain.Video) error {
 		return err
 	}
 	s.logger.Info("cast: directo en emisión", "tenant", v2.Tenant, "video", v2.ID, "room", v2.LiveRoom, "source", string(v2.LiveSource))
+	// Empieza por una señal de LiveKit, no por una petición de quien emite: su widget
+	// de Cast se entera por aquí (ADR 0078).
+	s.hub.AvisarCambio(ctx, v2.Tenant, "cast", v2.OwnerSub)
 	if s.puedeGrabar() {
 		eg, err := s.lk.StartParticipantSegments(ctx, v2.LiveRoom, identidadEmisor(v2.OwnerSub), prefijoGrabacion(v2), s.cfg.SegundosSegmento, s.cfg.Grabacion)
 		if err != nil {
@@ -545,6 +548,7 @@ func (s *Servicio) terminar(ctx context.Context, v domain.Video) error {
 		// uno de los dos cierres siempre ve ambas condiciones para encolar.
 		v = actual
 		s.logger.Info("cast: directo terminado", "tenant", v.Tenant, "video", v.ID)
+		s.hub.AvisarCambio(ctx, v.Tenant, "cast", v.OwnerSub)
 	}
 	if v.LiveEgressID != "" {
 		if _, err := s.lk.StopEgress(ctx, v.LiveEgressID); err != nil {

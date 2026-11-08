@@ -209,6 +209,14 @@ export function batchTrash(uids: string[]): Promise<{ trashed: number }> {
   return sendJson('POST', '/api/batch', { action: 'trash', uids });
 }
 
+/**
+ * «Deshacer» de `batchTrash`: devuelve de la papelera, en UNA operación, lo último que
+ * se tiró de cada UID. `restored` se compara con el `trashed` del lote.
+ */
+export function batchRestore(uids: string[]): Promise<{ restored: number }> {
+  return sendJson('POST', '/api/batch', { action: 'restore', uids });
+}
+
 /** Destaca o quita el destacado de los contactos indicados (por UID) en lote. */
 export function batchFavorite(uids: string[], favorite: boolean): Promise<{ updated: number }> {
   return sendJson('POST', '/api/batch', { action: 'favorite', uids, favorite });

@@ -29,6 +29,15 @@ export const ga: AppCatalog<typeof en> = {
   'folder.junk': 'Turscar',
   'folder.archive': 'Cartlann',
   'nav.compose': 'Scríobh',
+  'nav.mailboxes': 'Boscaí poist',
+  'nav.allInboxes': 'Gach bosca isteach',
+  'nav.allDrafts': 'Gach dréacht',
+  'nav.allSent': 'Gach a seoladh',
+  'nav.allArchive': 'An chartlann ar fad',
+  'nav.allJunk': 'An turscar ar fad',
+  'nav.allTrash': 'An bruscar ar fad',
+  'nav.sytueMailbox': 'Bosca poist Sytue',
+  'nav.accountsIn': 'Cuntais: {mailbox}',
   'nav.folders': 'Fillteáin',
   'nav.refresh': 'Athnuaigh',
   'nav.manageFolders': 'Bainistigh fillteáin',
@@ -53,6 +62,10 @@ export const ga: AppCatalog<typeof en> = {
   'shortcuts.archive': 'Cartlannaigh',
   'shortcuts.trash': 'Bog go dtí an bruscar',
   'shortcuts.star': 'Cuir réalta air',
+  'shortcuts.select': 'Roghnaigh an comhrá',
+  'shortcuts.clearSelection': 'Glan an rogha',
+  'shortcuts.label': 'Cuir lipéad',
+  'shortcuts.move': 'Bog go…',
   'shortcuts.help': 'Taispeáin an liosta seo',
   'nav.settings': 'Socruithe',
   'nav.signature': 'Síniú',
@@ -170,6 +183,9 @@ export const ga: AppCatalog<typeof en> = {
   'error.undoSend': 'Níorbh fhéidir an seoladh a chealú',
   'error.undoSendGone': 'Tá sé ródhéanach é a chealú; tá an teachtaireacht imithe cheana',
   'undo.done': 'Cealaíodh an seoladh',
+  'triage.moved': 'Bogadh go {folder}',
+  'triage.undone': 'Bogadh ar ais é go dtí an áit a raibh sé',
+  'error.undoMove': 'Níorbh fhéidir é a bhogadh ar ais',
   'list.region': 'Comhráite in {folder}',
   'list.fallbackName': 'Ríomhphost',
   'list.searchResults': 'Torthaí cuardaigh',
@@ -199,6 +215,13 @@ export const ga: AppCatalog<typeof en> = {
   'list.searchHint':
     'Oibreoirí: from:, to:, subject:, has:attachment, is:unread, is:starred, after:2026-01-31, before:2026-03-01. Úsáid comharthaí athfhriotail do níos mó ná focal amháin.',
   'list.clearSearch': 'Glan an cuardach',
+  'filter.group': 'Scagairí tapa',
+  'filter.unread': 'Gan léamh',
+  'filter.starred': 'Réaltaithe',
+  'filter.attachments': 'Le ceangaltáin',
+  'filter.emptyTitle': 'Níl aon rud anseo a fhreagraíonn don scagaire seo',
+  'filter.emptyDescription': 'Bain triail as scagaire eile nó taispeáin gach comhrá.',
+  'filter.showAll': 'Taispeáin gach rud',
   'list.selectAll': 'Roghnaigh gach comhrá',
   'list.loading': 'Comhráite á lódáil…',
   'list.errorTitle': 'Níorbh fhéidir do ríomhphost a lódáil',
@@ -242,6 +265,8 @@ export const ga: AppCatalog<typeof en> = {
   'reader.createEvent': 'Cruthaigh imeacht',
   'reader.eventCreated': 'Cruthaíodh an t-imeacht in Sytue Calendar',
   'reader.eventFailed': 'Níorbh fhéidir an t-imeacht a chruthú',
+  'reader.shareToRooms': 'Comhroinn in Rooms',
+  'reader.roomsFailed': 'Níorbh fhéidir é a chomhroinnt in Rooms.',
   'reader.unsubscribe': 'Díliostáil',
   'reader.unsubscribeFailed': 'Níorbh fhéidir an díliostáil a chríochnú',
   'reader.unsubscribeSent': 'Seoladh an t-iarratas díliostála',
@@ -397,6 +422,10 @@ export const ga: AppCatalog<typeof en> = {
   'editor.font': 'Cló',
   'editor.redo': 'Athdhéan',
   'editor.undo': 'Cealaigh',
+  'editor.cut': 'Gearr',
+  'editor.copy': 'Cóipeáil',
+  'editor.paste': 'Greamaigh',
+  'editor.selectAll': 'Roghnaigh gach rud',
   'editor.colorNone': 'Dada',
   'editor.colorYellow': 'Buí',
   'editor.colorViolet': 'Corcra',
@@ -782,6 +811,11 @@ export const ga: AppCatalog<typeof en> = {
   'externalMail.port': 'Port',
   'externalMail.username': 'Ainm úsáideora (seoladh ríomhphoist má fhágtar folamh é)',
   'externalMail.password': 'Pasfhocal nó pasfhocal aipe',
+  'externalMail.icloudBody':
+    'Ní ghlacann iCloud Mail le pasfhocal do Chuntais Apple anseo. Cruthaigh pasfhocal a bhaineann go sonrach le haip ag account.apple.com (Síniú Isteach agus Slándáil › Pasfhocail a Bhaineann go Sonrach le hAip) agus cuir isteach thíos é.',
+  'externalMail.icloudLink': 'Oscail account.apple.com',
+  'externalMail.icloudAuthError':
+    'Níor ghlac iCloud leis an bpasfhocal. Úsáid pasfhocal a bhaineann go sonrach le haip, ní pasfhocal do Chuntais Apple.',
   'externalMail.smtpPassword':
     'Pasfhocal SMTP (mar an gcéanna leis an bpost isteach má fhágtar folamh é)',
   'externalMail.advanced': 'Ardroghanna',
@@ -791,6 +825,10 @@ export const ga: AppCatalog<typeof en> = {
     'Seiceálfaimid síniú isteach ar an dá fhreastalaí roimh shábháil. Ní sheolfar ríomhphost tástála.',
   'externalMail.connect': 'Nasc cuntas',
   'externalMail.authorize': 'Lean ar aghaidh chuig an soláthraí',
+  'externalMail.reconnectNeeded': 'Sínigh isteach arís chun an cuntas seo a fheiceáil',
+  'externalMail.accountUnavailable': 'Níorbh fhéidir teacht ar an gcuntas seo. Bain triail eile as',
+  'externalMail.someUnavailable':
+    'Níorbh fhéidir teacht ar roinnt cuntas. Níl a dteachtaireachtaí sa liosta seo.',
   'externalMail.add': 'Cuir cuntas ríomhphoist leis',
   'externalMail.empty': 'Níl aon chuntas ríomhphoist seachtrach nasctha.',
   'externalMail.open': 'Oscail an bosca poist',
@@ -803,6 +841,13 @@ export const ga: AppCatalog<typeof en> = {
     'Níorbh fhéidir an nasc slán a fhíorú. Seiceáil ainm an fhreastalaí agus an teastas le do sholáthraí ríomhphoist.',
   'externalMail.authError':
     'Diúltaíodh don síniú isteach. Nasc an cuntas arís nó seiceáil an t-ainm úsáideora agus pasfhocal na haipe.',
+  'externalMail.cancelled': 'Cuireadh an síniú isteach ar ceal. Níor nascadh aon rud.',
+  'externalMail.scopeMissing':
+    'Níor ceadaíodh rochtain ar an ríomhphost. Bain triail eile as agus fág cead an ríomhphoist roghnaithe.',
+  'externalMail.timeout': 'Níl an síniú isteach sin bailí a thuilleadh. Bain triail eile as.',
+  'externalMail.exists': 'Tá an cuntas ríomhphoist seo nasctha cheana féin.',
+  'externalMail.connected': 'Tá an cuntas {account} nasctha anois.',
+  'externalMail.accountsError': 'Níorbh fhéidir na cuntais ríomhphoist sheachtracha a lódáil.',
   'externalMail.sendUnknown':
     'Seans gur ghlac an freastalaí leis an ríomhphost seo. Seiceáil an fillteán Seolta roimh iarracht eile chun é a sheachaint a sheoladh faoi dhó.',
   'externalMail.blockedError':
@@ -811,23 +856,9 @@ export const ga: AppCatalog<typeof en> = {
     'Tá an ríomhphost seo nó a iatáin thar an teorainn méide. Laghdaigh na hiatáin agus bain triail eile as.',
   'externalMail.pop3Note':
     'Le POP3 is féidir leat an bosca isteach a léamh agus seoladh trí SMTP. Níl fillteáin chianda, marcanna léite ná bogadh teachtaireachtaí ar fáil.',
-  'externalMail.refreshNote':
-    'Athnuachan an bosca poist seo gach 30 soicind agus liosta na dteachtaireachtaí oscailte. Fanann an ríomhphost leis an soláthraí.',
   'externalMail.sent': 'Ghlac do sholáthraí leis an ríomhphost.',
   'externalMail.sentNoCopy':
     'Glacadh leis an ríomhphost, ach níorbh fhéidir cóip a shábháil in Seolta. Ná seol arís é.',
-  'externalMail.draftNote':
-    'Ní choinnítear an dréacht seo ach fad atá an fhuinneog oscailte. Má dhúnann tú í, caitear an dréacht amach.',
-  'externalMail.attach': 'Ceangail comhaid',
-  'externalMail.markUnread': 'Marcáil mar neamhléite',
-  'externalMail.markRead': 'Marcáil mar léite',
-  'externalMail.flag': 'Cuir réalta leis',
-  'externalMail.unflag': 'Bain an réalta',
-  'externalMail.trash': 'Bog go dtí an bruscar',
-  'externalMail.noMessages': 'Níl aon teachtaireacht san fhillteán seo.',
-  'externalMail.discardDraft': 'An bhfuil tú ag iarraidh an dréacht seo a chaitheamh amach?',
   'externalMail.invalidConfiguration':
     'Cuir isteach seoladh ríomhphoist bailí, ainmneacha agus poirt an dá fhreastalaí, agus pasfhocal.',
-  'externalMail.invalidRecipients':
-    'Seiceáil seoltaí ríomhphoist na bhfaighteoirí. Scar seoltaí iolracha le camóga.',
 };

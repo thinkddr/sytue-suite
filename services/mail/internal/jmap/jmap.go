@@ -20,6 +20,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -175,6 +176,24 @@ func (a *API) WithSMIME(s anclaSMIME) *API {
 	return a
 }
 
+// ajustesSinSenal son las rutas de /api/v1 cuyas escrituras no cambian lo que enseña
+// el widget de Mail (la Entrada y sus no leídos).
+var ajustesSinSenal = map[string]bool{
+	"drafts": true, "smime": true, "filters": true, "aliases": true,
+	"vacation": true, "signature": true, "delegation": true,
+}
+
+func sinSenalDeCambios(r *http.Request) bool {
+	_, resto, _ := strings.Cut(r.URL.Path, "/api/v1/")
+	primero, _, _ := strings.Cut(resto, "/")
+	return ajustesSinSenal[primero]
+}
+
+// jmapConSenal es POST /jmap con la señal de cambios del widget de Mail.
+func (a *API) jmapConSenal() http.Handler {
+	return a.hub.TrasEscribir(nil, "mail")(http.HandlerFunc(a.handleJMAP))
+}
+
 // Mount registra las rutas bajo /api y el endpoint JMAP, protegidas por authn.
 // El verifier valida los JWT de Sytue ID; RequireAuth inyecta claims + tenant.
 func (a *API) Mount(r chi.Router, verifier *authn.Verifier) {
@@ -231,8 +250,11 @@ func (a *API) Mount(r chi.Router, verifier *authn.Verifier) {
 		if a.push != nil {
 			pr.Get("/jmap/eventos", a.handleStream)
 		}
-		// Endpoint principal JMAP: sobre Request -> Response por lotes.
-		pr.Post("/jmap", a.handleJMAP)
+		// Endpoint principal JMAP: sobre Request -> Response por lotes. Lleva la señal
+		// de cambios como /api/v1: es por donde la web marca un correo como leído
+		// (Email/set con $seen). Todo va por POST, también lo que solo lee: handleJMAP
+		// la apaga si el lote no escribió nada (hubnotify.CambioEn sin productos).
+		pr.Method(http.MethodPost, "/jmap", a.jmapConSenal())
 
 		// Subida/descarga de blobs (RFC 8620 §6.1/§6.2): adjuntos y cuerpos MIME
 		// que el cliente sube antes de componer un Email/set, y la descarga de un
@@ -242,6 +264,12 @@ func (a *API) Mount(r chi.Router, verifier *authn.Verifier) {
 
 		// REST de conveniencia (mismo modelo) que usa @sytue/api-clients.
 		pr.Route("/api/v1", func(ar chi.Router) {
+			// La señal de cambios para el widget de Mail (hubnotify.TrasEscribir): mover,
+			// marcar, borrar, enviar… Los ajustes y los borradores, que se autoguardan
+			// cada pocos segundos, no cambian lo que enseña: van sin señal. Las otras
+			// puertas que cambian el buzón la llevan también: /jmap (arriba), el IMAP
+			// (imap.session.cambio) y la entrega de un correo nuevo (publishDelivered).
+			ar.Use(a.hub.TrasEscribir(sinSenalDeCambios, "mail"))
 			// «Exportar tus datos»: el buzón con sus .eml (platform/pkg/portabilidad).
 			ar.Get("/export", a.exportData)
 			ar.Get("/mailboxes", a.listMailboxes)

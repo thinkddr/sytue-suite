@@ -64,6 +64,7 @@ export const en = {
   'inbox.markAll': 'Mark all as read',
   'inbox.loading': 'Loading notifications…',
   'inbox.unreadDot': 'Unread',
+  'inbox.markRead': 'Mark as read',
   'inbox.errorTitle': 'Notifications could not be loaded',
   'inbox.errorBody': 'The Hub is not responding right now. Try again in a few seconds.',
   'inbox.retry': 'Try again',
@@ -725,6 +726,8 @@ export const en = {
     '{sources} did not respond, so some results may be missing. Try again in a moment.',
   'search.partialJoin': ' and ',
   'search.showing': 'Showing {count} of {total} results.',
+  'search.loadMore': 'Load more results',
+  'search.loadMoreFailed': 'More results could not be loaded. Try again.',
   'privacy.notice':
     'We do not sell your data or share it with third parties. We do not use it to profile you, for advertising, or to train or improve our services or anyone else’s. It is encrypted in transit and at rest, and only leaves our European infrastructure where strictly needed to bill you and in the integrations you enable, where the third party will ask your approval for the data it will use.',
 };

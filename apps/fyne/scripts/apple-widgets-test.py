@@ -6,7 +6,10 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
 import pathlib
+import plistlib
+import subprocess
 import types
 import unittest
 import urllib.parse
@@ -24,13 +27,14 @@ class Apple:
         self.host = {"id": "host", "attributes": {"identifier": APP["id"], "platform": "UNIVERSAL", "seedId": "TEAM"}}
         self.extension = {"id": "widget", "attributes": {"identifier": APP["id"] + ".widgets", "platform": "UNIVERSAL"}} if registrado else None
         self.capacidades = []
+        self.capacidades_host = []
         self.escrituras = []
         self.lecturas = []
 
     def lista(self, ruta):
         self.lecturas.append(ruta)
         if "bundleIdCapabilities" in ruta:
-            return copy.deepcopy(self.capacidades)
+            return copy.deepcopy(self.capacidades_host if ruta.startswith("/v1/bundleIds/host/") else self.capacidades)
         if "eu.sytue.rooms.widgets" in ruta:
             return [self.extension] if self.extension else []
         return [self.host] if self.host else []
@@ -41,8 +45,11 @@ class Apple:
             self.extension = {"id": "widget", "attributes": attrs}
             return {"data": self.extension}
         if tipo == "bundleIdCapabilities":
-            assert (rels and rels["bundleId"]["id"] == "widget") or id
+            assert (rels and rels["bundleId"]["id"] in ("widget", "host")) or id
             capacidad = {"id": id or attrs["capabilityType"], "attributes": copy.deepcopy(attrs)}
+            if rels and rels["bundleId"]["id"] == "host":
+                self.capacidades_host.append(capacidad)
+                return {"data": capacidad}
             self.capacidades = [c for c in self.capacidades if c["id"] != capacidad["id"]] + [capacidad]
             return {"data": capacidad}
         raise AssertionError("unexpected mutation " + tipo)
@@ -61,7 +68,7 @@ class RegistroTests(unittest.TestCase):
             with self.subTest(registrado=registrado):
                 asc = Apple(registrado)
                 gen = types.SimpleNamespace(apps=lambda: [{**APP, "widget_acciones": ["abrir"]}],
-                                            grupo_widgets=lambda: "group.eu.sytue.suite")
+                                            grupo_widgets=lambda: "group.eu.sytue.suite", despertar_apple=lambda: False)
                 def importar(nombre, ruta):
                     return gen if str(ruta).endswith("generar.py") else types.SimpleNamespace(Apple=lambda: asc)
                 with mock.patch.object(widgets, "importar", side_effect=importar), \
@@ -77,7 +84,7 @@ class RegistroTests(unittest.TestCase):
         widgets.registrar(asc, APP, True, "group.eu.sytue.suite")
         asc.escrituras.clear()
         gen = types.SimpleNamespace(apps=lambda: [{**APP, "widget_acciones": ["abrir"]}],
-                                    grupo_widgets=lambda: "group.eu.sytue.suite")
+                                    grupo_widgets=lambda: "group.eu.sytue.suite", despertar_apple=lambda: False)
         def importar(nombre, ruta):
             return gen if str(ruta).endswith("generar.py") else types.SimpleNamespace(Apple=lambda: asc)
         with mock.patch.object(widgets, "importar", side_effect=importar), \
@@ -301,6 +308,98 @@ class RegistroTests(unittest.TestCase):
         resultado = widgets.registrar(asc, APP, True, "group.eu.sytue.suite")
         self.assertEqual(resultado["capabilities"], ["APP_GROUPS"])
         self.assertTrue(resultado["profileRequired"])
+
+
+class PushHostTests(unittest.TestCase):
+    """SYTUE_DESPERTAR_APPLE: Push Notifications en el App ID del host, no en la extensión."""
+
+    def test_registrar_activa_push_solo_en_el_host_y_sin_settings(self):
+        asc = Apple()
+        resultado = widgets.registrar(asc, APP, True, "group.eu.sytue.suite", push=True)
+        push = [e for e in asc.escrituras if e[0] == "bundleIdCapabilities" and e[1]["capabilityType"] == "PUSH_NOTIFICATIONS"]
+        self.assertEqual(push, [("bundleIdCapabilities", {"capabilityType": "PUSH_NOTIFICATIONS"},
+                                 {"bundleId": {"type": "bundleIds", "id": "host"}}, None)])
+        self.assertNotIn("PUSH_NOTIFICATIONS", [c["attributes"]["capabilityType"] for c in asc.capacidades])
+        self.assertEqual(resultado["hostCapabilities"], ["PUSH_NOTIFICATIONS"])
+        self.assertEqual(resultado["hostRequiredCapabilities"], ["PUSH_NOTIFICATIONS"])
+        self.assertTrue(resultado["registrationReady"])
+
+    def test_push_ya_activo_no_se_toca(self):
+        asc = Apple()
+        widgets.registrar(asc, APP, True, "group.eu.sytue.suite", push=True)
+        asc.escrituras.clear()
+        for registrar in (False, True):
+            with self.subTest(registrar=registrar):
+                resultado = widgets.registrar(asc, APP, registrar, "group.eu.sytue.suite", push=True)
+                self.assertTrue(resultado["registrationReady"])
+                self.assertEqual(asc.escrituras, [])
+
+    def test_consulta_dice_que_falta_push_sin_escribir(self):
+        asc = Apple()
+        widgets.registrar(asc, APP, True, "group.eu.sytue.suite")
+        asc.escrituras.clear()
+        resultado = widgets.registrar(asc, APP, False, "group.eu.sytue.suite", push=True)
+        self.assertEqual(asc.escrituras, [])
+        self.assertEqual(resultado["capabilities"], ["APP_GROUPS", "DATA_PROTECTION"])
+        self.assertEqual(resultado["hostCapabilities"], [])
+        self.assertEqual(resultado["hostRequiredCapabilities"], ["PUSH_NOTIFICATIONS"])
+        self.assertFalse(resultado["registrationReady"], "sin Push en el host el despertar no firma")
+
+    def test_push_que_el_get_no_acredita_no_da_verde(self):
+        asc = Apple()
+        escribir = asc.escribir
+        def sin_persistir(tipo, attrs, rels=None, id=None):
+            respuesta = escribir(tipo, attrs, rels, id)
+            if rels and rels["bundleId"]["id"] == "host":
+                asc.capacidades_host.clear()
+            return respuesta
+        with mock.patch.object(asc, "escribir", side_effect=sin_persistir):
+            resultado = widgets.registrar(asc, APP, True, "group.eu.sytue.suite", push=True)
+        self.assertEqual(resultado["hostCapabilities"], [])
+        self.assertFalse(resultado["registrationReady"])
+
+    def test_host_solo_mac_no_pide_push(self):
+        asc = Apple()
+        asc.host["attributes"]["platform"] = "MAC_OS"
+        resultado = widgets.registrar(asc, APP, True, "group.eu.sytue.suite", push=True)
+        self.assertEqual(resultado["hostRequiredCapabilities"], [])
+        self.assertTrue(all(not r or r["bundleId"]["id"] == "widget" for _, _, r, _ in asc.escrituras))
+
+    def test_main_pasa_el_interruptor_del_despertar(self):
+        for despertar in (False, True):
+            with self.subTest(despertar=despertar):
+                asc = Apple()
+                gen = types.SimpleNamespace(apps=lambda: [{**APP, "widget_acciones": ["open"]}],
+                                            grupo_widgets=lambda: "group.eu.sytue.suite",
+                                            despertar_apple=lambda: despertar)
+                def importar(nombre, ruta):
+                    return gen if str(ruta).endswith("generar.py") else types.SimpleNamespace(Apple=lambda: asc)
+                with mock.patch.object(widgets, "importar", side_effect=importar), \
+                        mock.patch("sys.argv", ["apple-widgets.py", "--registrar"]), contextlib.redirect_stdout(io.StringIO()) as salida:
+                    self.assertEqual(widgets.main(), 0)
+                dato = json.loads(salida.getvalue())
+                self.assertEqual(dato["hostCapabilities"], ["PUSH_NOTIFICATIONS"] if despertar else [])
+                self.assertEqual(bool(asc.capacidades_host), despertar)
+
+    def test_el_interruptor_de_generar_es_el_de_empaquetar(self):
+        """generar.despertar_apple() y el `aps-environment` de empaquetar.sh no divergen."""
+        raiz = pathlib.Path(__file__).resolve().parent
+        gen_spec = importlib.util.spec_from_file_location("generar_push", raiz.parent / "xcode/generar.py")
+        generar = importlib.util.module_from_spec(gen_spec)
+        gen_spec.loader.exec_module(generar)
+        for w in ("0", "1"):
+            for d in ("0", "1"):
+                entorno = dict(os.environ, SYTUE_WIDGETS_APPLE=w, SYTUE_DESPERTAR_APPLE=d)
+                with self.subTest(widgets=w, despertar=d), mock.patch.dict(os.environ, entorno):
+                    derechos = plistlib.loads(subprocess.run(
+                        ["bash", str(raiz / "empaquetar.sh"), "derechos-sesion", str(raiz.parent / "cmd/calendar"),
+                         generar.EQUIPO, "ios"], env=entorno, check=True, capture_output=True).stdout)
+                    self.assertEqual(generar.despertar_apple(), "aps-environment" in derechos)
+
+    def test_el_workflow_trae_el_interruptor(self):
+        flujo = (pathlib.Path(__file__).resolve().parents[3] / ".github/workflows/appstore-publicar.yml").read_text()
+        checkout = flujo[flujo.index("git checkout -q FETCH_HEAD"):flujo.index("- name: Hablar con App Store Connect")]
+        self.assertIn("apps/fyne/xcode/Sytue.xcconfig", checkout)
 
 
 if __name__ == "__main__":

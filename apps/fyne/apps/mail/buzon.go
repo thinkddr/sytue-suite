@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -25,7 +24,6 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/htmltext"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	"git.sytue.eu/sytue/one/apps/nucleo/sistema/portapapeles"
-	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
 // Buzón es Sytue Mail CON DATOS: habla con el servicio y rellena la Pantalla. Es el
@@ -111,8 +109,10 @@ var ordenRoles = []string{"inbox", "drafts", "sent", "archive", "junk", "trash"}
 type Buzon struct {
 	P *Pantalla
 	S Servicio
-	// Widget captures the adopted identity before the existing mailbox fetch.
-	Widget widgets.Source
+	// AlCambiarDatos avisa al widget nativo de que el vivo ha traído cambios (el
+	// sondeo o el flujo de eventos): lo que se ve en él lo lee su propia Fuente, que
+	// mira siempre Recibidos (ADR 0078, enmienda del 2026-11-06). nil: nadie escucha.
+	AlCambiarDatos func()
 	// Lanzar corre una llamada al servicio fuera del hilo de la interfaz. Los
 	// guardianes la hacen síncrona: así no dependen de cuándo acabe una goroutine.
 	Lanzar func(func())
@@ -126,6 +126,10 @@ type Buzon struct {
 	// la app que toca. Sin cualquiera de los dos, el botón no se ofrece.
 	Hub     Intents
 	Abridor api.Abridor
+	// Apex es el dominio de la suite (vacío: producción) y Org la organización de la
+	// sesión: con ellos se escribe el enlace de un correo que se comparte en Rooms.
+	Apex string
+	Org  func() string
 	// Drive guarda un adjunto como fichero de Drive, por un acto explícito. Sin él, el
 	// botón «Guardar en Drive» no se ofrece.
 	Drive Guardador
@@ -156,6 +160,27 @@ type Buzon struct {
 	AutorizarCorreo     func(context.Context, string, string, ...string) (string, error)
 	cerrarCorreoExterno func()
 	correoAbierto       *correoExterno
+	// cuentasDialogo son las cuentas que listó el diálogo: una recién conectada se
+	// abre antes de que el resumen la traiga (cuentaExterna).
+	cuentasDialogo []api.ExternalMailAccount
+	// externa es la carpeta externa, o el buzón unificado, a la vista
+	// (buzon_externo.go); nil, una vista de Sytue. mezcla es lo pedido y no enseñado de
+	// cada carpeta del buzón unificado; mezclaCaida, que alguna no contestó; errorExterno, lo que dijo
+	// el proveedor al no dejar leer; masExternos, que se pidió más de una página (el
+	// refresco de 30 s ya no reemplaza la lista), y pararExterno, ese refresco.
+	externa      *VistaExterna
+	mezcla       []fuenteMezcla
+	mezclaCaida  bool
+	errorExterno string
+	masExternos  bool
+	pararExterno func()
+	// resumenExternas es el último `GET /external-mail/summary`: las cuentas con buzón,
+	// cada una con su estado y sus carpetas, de donde sale el lateral (arbolDeBuzones).
+	resumenExternas []api.ExternalMailAccountSummary
+	// cargandoExternas dice si hay un resumen en camino; externasPendientes es la
+	// última lista del diálogo que llegó mientras tanto (useExternalAccounts en la web).
+	cargandoExternas   bool
+	externasPendientes *api.ExternalMailAccounts
 
 	ctx         context.Context
 	cancelar    context.CancelFunc
@@ -197,6 +222,12 @@ type Buzon struct {
 	// cursorAtajo es la fila donde se quedó j/k: tras archivar, la siguiente ocupa su
 	// sitio y j/k sigue desde ahí.
 	cursorAtajo int
+	// paginasFiltro son las páginas pedidas seguidas por un filtro que no deja ver
+	// nada (tope TopePaginasFiltro).
+	paginasFiltro int
+	// listaCaducada dice que la carpeta de debajo de una búsqueda cambió (se deshizo un
+	// movimiento) y que al salir de la búsqueda hay que volver a pedirla.
+	listaCaducada bool
 	// ancla es la fila del último clic en una casilla: de ahí sale el rango de
 	// Mayúsculas + clic. -1 es ninguna.
 	ancla int
@@ -219,10 +250,6 @@ type Buzon struct {
 	// mientras tanto: al volver se pregunta otra vez sin esperar.
 	deltaEnCurso, otraVuelta bool
 	segundoPlano             bool
-
-	widgetMu     sync.Mutex
-	widgetUnread *int64
-	widgetItems  []widgets.Item
 }
 
 // Cuerpo es lo que se enseña de un mensaje abierto.
@@ -255,7 +282,20 @@ func NuevoBuzon(p *Pantalla, s Servicio) *Buzon {
 	p.Menu.AlElegirCarpeta = b.ElegirCarpeta
 	p.Menu.AlElegirEtiqueta = b.ElegirEtiqueta
 	p.Menu.AlElegirCompartido = b.ElegirCompartido
-	p.Menu.AlElegirExterna = func(c Compartido) { b.P.CerrarCajon(); b.abrirCorreoExternoEn(c.ID) }
+	// Una carpeta se abre en el panel principal; sin carpeta, la cuenta en el diálogo,
+	// para volver a iniciar sesión.
+	p.Menu.AlAbrirExterna = func(id, carpeta string) {
+		if carpeta != "" {
+			b.ElegirExterna(id, carpeta)
+			return
+		}
+		b.P.CerrarCajon()
+		b.abrirCorreoExternoEn(id)
+	}
+	p.Menu.AlAbrirUnificado = b.ElegirUnificado
+	p.Menu.AlPlegarRama = b.plegarRama
+	p.Menu.AlAnadirExterna = func() { b.P.CerrarCajon(); b.abrirCorreoExterno() }
+	p.Menu.AlReintentarExternas = b.cargarExternas
 	p.Menu.AlReintentarCarpetas = b.cargarCarpetas
 	p.Menu.AlRefrescar = b.Refrescar
 	p.Menu.AlGestionarEtiquetas = func() { b.P.CerrarCajon(); b.verEtiquetas() }
@@ -266,6 +306,8 @@ func NuevoBuzon(p *Pantalla, s Servicio) *Buzon {
 	}
 	p.Bandeja.AlElegir = b.Abrir
 	p.Bandeja.AlBuscar = b.Buscar
+	p.Bandeja.AlFiltrar = b.ElegirFiltro
+	p.Bandeja.AlSeguirFiltro = b.seguirFiltrando
 	p.Bandeja.AlReintentar = b.Reintentar
 	p.Bandeja.Refresco.Actualizar = b.Reintentar
 	p.Bandeja.Refresco.Puede = func() bool {
@@ -320,9 +362,12 @@ func (b *Buzon) ConImportar(i *api.Integraciones, alPolitica func()) *Buzon {
 // ConHub engancha el Hub y el abridor de apps: con ellos aparece «Crear evento».
 func (b *Buzon) ConHub(h Intents, a api.Abridor) *Buzon {
 	b.Hub, b.Abridor = h, a
-	b.P.Lector.AlCrearEvento = nil
+	b.P.Lector.AlCrearEvento, b.P.Lector.AlCompartirEnRooms = nil, nil
 	if h != nil && a != nil {
 		b.P.Lector.AlCrearEvento = b.crearEvento
+	}
+	if a != nil {
+		b.P.Lector.AlCompartirEnRooms = b.compartirEnRooms
 	}
 	return b
 }
@@ -394,19 +439,36 @@ func (b *Buzon) Arrancar(ctx context.Context) {
 // ordenarCarpetas es `sortMailboxes`: las del sistema por su rol y las de la persona
 // por nombre con el orden del idioma (la Ä alemana y la Ñ no se colocan igual).
 func ordenarCarpetas(l i18n.Locale, cs []api.Mailbox) []api.Mailbox {
-	pos := func(m api.Mailbox) int {
-		if i := slices.Index(ordenRoles, m.Role); i >= 0 && m.Role != "" {
-			return i
+	return ordenarPorRol(l, cs, func(m api.Mailbox) (string, string) { return m.Role, m.Name })
+}
+
+// ordenarCarpetasExternas es el mismo `sortMailboxes` sobre las carpetas de una cuenta
+// externa, que llegan en el orden del proveedor —Gmail da la Papelera antes que
+// Recibidos— y con el mismo vocabulario de roles. Los casos que comparte con la web
+// están en `testdata/carpetas-externas.json`.
+func ordenarCarpetasExternas(l i18n.Locale, cs []api.ExternalMailFolder) []api.ExternalMailFolder {
+	return ordenarPorRol(l, cs, func(f api.ExternalMailFolder) (string, string) { return f.Role, f.Name })
+}
+
+// ordenarPorRol ordena cualquier carpeta que sepa decir su rol y su nombre.
+func ordenarPorRol[C any](l i18n.Locale, cs []C, rolYNombre func(C) (string, string)) []C {
+	pos := func(c C) int {
+		if rol, _ := rolYNombre(c); rol != "" {
+			if i := slices.Index(ordenRoles, rol); i >= 0 {
+				return i
+			}
 		}
 		return 99
 	}
 	col := collate.New(l.Tag())
 	out := slices.Clone(cs)
-	slices.SortStableFunc(out, func(a, c api.Mailbox) int {
+	slices.SortStableFunc(out, func(a, c C) int {
 		if d := cmp.Compare(pos(a), pos(c)); d != 0 {
 			return d
 		}
-		return col.CompareString(a.Name, c.Name)
+		_, na := rolYNombre(a)
+		_, nc := rolYNombre(c)
+		return col.CompareString(na, nc)
 	})
 	return out
 }
@@ -414,7 +476,7 @@ func ordenarCarpetas(l i18n.Locale, cs []api.Mailbox) []api.Mailbox {
 func (b *Buzon) cargarCarpetas() {
 	b.P.Menu.EstadoCarpetas = Cargando
 	b.P.Refrescar()
-	pedir(b, b.carpetasParaWidget(), func(cs []api.Mailbox, err error) {
+	pedir(b, b.S.Mailboxes, func(cs []api.Mailbox, err error) {
 		if err != nil {
 			b.P.Menu.EstadoCarpetas = Error
 			// La lista TAMBIÉN lo dice: en un teléfono el menú es un cajón cerrado y
@@ -450,6 +512,7 @@ func (b *Buzon) ponerCarpetas(cs []api.Mailbox) {
 	if len(b.carpetas) == 0 {
 		b.P.Menu.EstadoCarpetas = Vacio
 	}
+	b.ponerArbol()    // los no leídos de Sytue cuentan en «Buzones»
 	b.ponerAcciones() // los destinos del triaje salen de las carpetas
 }
 
@@ -457,7 +520,7 @@ func (b *Buzon) ponerCarpetas(cs []api.Mailbox) {
 // que el número del lateral diga la verdad, sin tocar la selección ni la lista.
 // `luego` corre al volver, haya ido bien o no: el gestor de carpetas se repinta ahí.
 func (b *Buzon) refrescarContadores(luego ...func()) {
-	pedir(b, b.carpetasParaWidget(), func(cs []api.Mailbox, err error) {
+	pedir(b, b.S.Mailboxes, func(cs []api.Mailbox, err error) {
 		if err == nil {
 			b.ponerCarpetas(cs)
 			b.P.Refrescar()
@@ -466,27 +529,6 @@ func (b *Buzon) refrescarContadores(luego ...func()) {
 			f()
 		}
 	})
-}
-
-// carpetasParaWidget reuses the existing complete inventory and server counter;
-// it never infers unread messages from the current page or starts another fetch.
-func (b *Buzon) carpetasParaWidget() func(context.Context) ([]api.Mailbox, error) {
-	view := b.Widget.View()
-	return func(ctx context.Context) ([]api.Mailbox, error) {
-		mailboxes, err := b.S.Mailboxes(ctx)
-		if err == nil {
-			unread := int64(api.MailInboxUnread(mailboxes))
-			b.widgetMu.Lock()
-			b.widgetUnread = &unread
-			items := slices.Clone(b.widgetItems)
-			b.widgetMu.Unlock()
-			_ = view.PublicarDetalle(ctx, widgets.Detail{
-				Counters: []widgets.Counter{{Kind: "unread", Value: unread}},
-				Items:    items,
-			})
-		}
-		return mailboxes, err
-	}
 }
 
 func (b *Buzon) cargarEtiquetas() {
@@ -524,8 +566,10 @@ func (b *Buzon) cargarCuota() {
 // ElegirCarpeta abre una carpeta. Borra la búsqueda y la etiqueta, como el `onClick`
 // de un SidebarItem de carpeta.
 func (b *Buzon) ElegirCarpeta(c Carpeta) {
+	b.P.Bandeja.Filtro = FiltroTodas // otra vista empieza sin filtro
 	b.P.CerrarCajon()
 	b.dejarCompartido()
+	b.dejarExterna()
 	b.carpetaID, b.etiquetaID = c.ID, ""
 	b.P.Menu.CarpetaID, b.P.Menu.EtiquetaID = c.ID, ""
 	b.P.Bandeja.Titulo = RotuloCarpeta(b.P.T, c.Nombre, c.Rol)
@@ -539,8 +583,10 @@ func (b *Buzon) ElegirCarpeta(c Carpeta) {
 // no se está EN ninguna carpeta, así que el triaje ofrece todas y el hilo esconde lo
 // de Papelera y Spam.
 func (b *Buzon) ElegirEtiqueta(e Etiqueta) {
+	b.P.Bandeja.Filtro = FiltroTodas // otra vista empieza sin filtro
 	b.P.CerrarCajon()
 	b.dejarCompartido()
+	b.dejarExterna()
 	b.etiquetaID, b.carpetaID = e.ID, ""
 	b.P.Menu.EtiquetaID, b.P.Menu.CarpetaID = e.ID, ""
 	b.P.Bandeja.Titulo = e.Nombre
@@ -565,10 +611,15 @@ func (b *Buzon) cargarLista() {
 	b.mensajes, b.cursor, b.pidiendo = nil, "", false
 	b.P.Bandeja.Marcadas, b.ancla = map[string]bool{}, -1
 	b.cursorAtajo = 0 // otra lista: j empieza por arriba
+	b.paginasFiltro, b.listaCaducada = 0, false
 	b.P.Bandeja.Estado = Cargando
 	b.P.Bandeja.Conversaciones = nil
 	b.P.Refrescar()
 	b.estadoDelta = "" // otra vista, otro arranque del delta
+	if v := b.externa; v != nil {
+		b.cargarListaExterna(vista, *v)
+		return
+	}
 
 	carpeta, etiqueta, comp := b.carpetaID, b.etiquetaID, b.compartido
 	pedir(b, func(ctx context.Context) (pagina, error) {
@@ -658,6 +709,10 @@ func (b *Buzon) MasPagina() {
 		b.masResultados()
 		return
 	}
+	if v := b.externa; v != nil {
+		b.masExterna(*v)
+		return
+	}
 	if b.pidiendo || b.cursor == "" {
 		return
 	}
@@ -742,6 +797,10 @@ func (b *Buzon) Buscar(q string) {
 	if strings.TrimSpace(q) == "" {
 		b.consulta, b.resultados = "", nil
 		b.P.Bandeja.Buscando = false
+		if b.listaCaducada {
+			b.cargarLista()
+			return
+		}
 		b.vista++
 		b.pintarLista()
 		return
@@ -759,6 +818,7 @@ func (b *Buzon) buscarYa(q string) {
 	b.P.Bandeja.Estado = Cargando
 	b.P.Refrescar()
 	b.buscaMas, b.pidiendo = false, false
+	b.paginasFiltro = 0
 	pedir(b, func(ctx context.Context) ([]api.MailMessage, error) {
 		return b.S.Search(ctx, q, 0, PorPagina)
 	}, func(ms []api.MailMessage, err error) {
@@ -794,101 +854,68 @@ func (b *Buzon) pintarLista() {
 	for _, m := range vis {
 		mensajes = append(mensajes, MensajeDe(m))
 	}
-	b.P.Bandeja.Conversaciones = AgruparPorHilo(mensajes)
+	b.P.Bandeja.Conversaciones = FiltrarConversaciones(AgruparPorHilo(mensajes), b.P.Bandeja.Filtro, b.hiloID)
 	b.P.Bandeja.HayMas = b.cursor != ""
+	if v := b.externa; v != nil && v.Mezclada() {
+		b.P.Bandeja.HayMas = quedanEnMezcla(b.mezcla)
+	}
 	if b.consulta != "" {
 		b.P.Bandeja.HayMas = b.buscaMas
 	}
 	b.ponerAcciones()
 	b.P.Bandeja.Estado = Listo
-	if len(mensajes) == 0 {
+	if len(b.P.Bandeja.Conversaciones) == 0 {
 		b.P.Bandeja.Estado = Vacio
 	}
 	b.pintarHilo()
-	b.publicarHilosWidget()
 	b.P.Refrescar()
-}
-
-// publicarHilosWidget adjunta las cabeceras de Recibidos (remitente, asunto y
-// hora, nunca el cuerpo ni el extracto) al contador autoritativo ya cargado.
-func (b *Buzon) publicarHilosWidget() {
-	if b.Widget == nil || !widgets.Disponible() || b.P == nil || b.P.Bandeja == nil {
+	// Un filtro que no deja ver NADA de lo cargado no tiene filas que lleguen al final
+	// de la lista, así que nadie pediría la página siguiente: se pide aquí, hasta
+	// TopePaginasFiltro seguidas; después el vacío ofrece «Cargar más».
+	b.P.Bandeja.FiltroTope = false
+	if b.P.Bandeja.Filtro == FiltroTodas || b.P.Bandeja.Estado != Vacio || !b.P.Bandeja.HayMas {
+		b.paginasFiltro = 0
 		return
 	}
-	if b.compartido != nil || b.etiquetaID != "" || b.consulta != "" || b.rolVista() != "inbox" {
+	// Con una página ya en camino `MasPagina` no pediría nada, y contarla gastaría el
+	// tope sin pedir: repintar (abrir, un movimiento optimista, un refresco) no es
+	// pedir. Es la web, donde el efecto no cuenta mientras `cargandoMas`.
+	if b.pidiendo {
 		return
 	}
-	convs := b.P.Bandeja.Conversaciones
-	raw := make([]widgets.Item, 0, min(len(convs), widgets.MaxItems))
-	for _, c := range convs {
-		if len(raw) >= widgets.MaxItems {
-			break
-		}
-		remitente := ""
-		if len(c.Ultimo.De) > 0 {
-			remitente = strings.TrimSpace(c.Ultimo.De[0].Nombre)
-			if remitente == "" {
-				remitente = strings.TrimSpace(c.Ultimo.De[0].Correo)
-			}
-		}
-		asunto := strings.TrimSpace(c.Ultimo.Asunto)
-		titulo, subtitulo := remitente, asunto
-		if titulo == "" {
-			titulo, subtitulo = asunto, ""
-		}
-		if titulo == "" {
-			continue
-		}
-		var badge string
-		var startAt int64
-		if !c.Ultimo.Recibido.IsZero() && c.Ultimo.Recibido.Unix() > 0 {
-			startAt = c.Ultimo.Recibido.Unix()
-			badge = c.Ultimo.Recibido.Local().Format("15:04")
-		}
-		raw = append(raw, widgets.Item{
-			Title:    titulo,
-			Subtitle: subtitulo,
-			Badge:    badge,
-			StartAt:  startAt,
-			Unread:   c.SinLeer,
-		})
-	}
-	items := widgets.SanitizeItems(raw)
-	b.widgetMu.Lock()
-	b.widgetItems = items
-	var unreadPtr *int64
-	if b.widgetUnread != nil {
-		v := *b.widgetUnread
-		unreadPtr = &v
-	}
-	b.widgetMu.Unlock()
-	if unreadPtr == nil {
+	if b.paginasFiltro >= TopePaginasFiltro {
+		b.P.Bandeja.FiltroTope = true
+		b.P.Bandeja.Refresh()
 		return
 	}
-	view := b.Widget.View()
-	detail := widgets.Detail{
-		Counters: []widgets.Counter{{Kind: "unread", Value: *unreadPtr}},
-		Items:    items,
-	}
-	pedir(b, func(ctx context.Context) (struct{}, error) {
-		return struct{}{}, view.PublicarDetalle(ctx, detail)
-	}, func(struct{}, error) {})
+	b.paginasFiltro++
+	b.MasPagina()
 }
 
 // ---- La conversación abierta ----
 
 // Abrir es `handleSelectConversation`: abre el hilo, lo marca leído en UNA llamada y
 // pide la conversación completa y el cuerpo del último mensaje. En Borradores no abre
-// el lector: reabre el redactor para seguir escribiendo.
+// el lector: reabre el redactor para seguir escribiendo; en «Todos los borradores»,
+// también con uno de Sytue (abreRedactor), y el de una cuenta se lee. Un resultado de
+// búsqueda siempre se lee.
 func (b *Buzon) Abrir(c Conversacion) {
-	if b.rolVista() == "drafts" {
+	if abreRedactor(b.externa, b.rolVista(), c.Ultimo.ID, b.consulta != "") {
 		b.abrirBorrador(c.Ultimo)
 		return
 	}
 	b.hiloID = c.HiloID
 	b.hilo = nil
+	b.ponerLector(esExterno(c.Ultimo.ID))
+	// Uno de una cuenta POP3 mezclado en un buzón unificado se lee sin triaje.
+	b.P.Lector.SoloLectura = b.P.Bandeja.SoloLectura || b.sinAcciones(c.Ultimo.ID)
 	b.P.Bandeja.AbiertaID = c.HiloID
 	b.P.Lector.Estado = Listo
+	if b.P.Bandeja.Filtro != FiltroTodas {
+		// Con un filtro, la que estaba abierta sale si ya no lo cumple (el `useMemo`
+		// de la web sobre `selectedThreadId`), aunque la nueva ya estuviera leída.
+		b.pintarLista()
+	}
 	b.pintarHilo()
 	b.P.DetalleAbierto(true)
 	b.P.Refrescar()
@@ -899,10 +926,11 @@ func (b *Buzon) Abrir(c Conversacion) {
 			sinLeer = append(sinLeer, m.ID)
 		}
 	}
-	if len(sinLeer) > 0 && !b.P.Bandeja.SoloLectura {
+	if len(sinLeer) > 0 && !b.P.Lector.SoloLectura {
 		b.marcar(sinLeer, api.MailFlagSeen, true)
+		dirs := b.direccionesDeCuentas()
 		pedir(b, func(ctx context.Context) (struct{}, error) {
-			return struct{}{}, b.S.SetFlagMany(ctx, sinLeer, api.MailFlagSeen, true)
+			return struct{}{}, b.marcarEnServidor(ctx, sinLeer, api.MailFlagSeen, true, dirs)
 		}, func(_ struct{}, err error) {
 			if err != nil {
 				b.marcar(sinLeer, api.MailFlagSeen, false)
@@ -910,8 +938,9 @@ func (b *Buzon) Abrir(c Conversacion) {
 				return
 			}
 			// Y SE REFRESCAN LOS CONTADORES: el parche es optimista y el número del
-			// lateral sale de las carpetas. La web los pedía al mover y no al leer.
-			b.refrescarContadores()
+			// lateral sale de las carpetas (o del resumen, si es de una cuenta externa).
+			// La web los pedía al mover y no al leer.
+			b.refrescarContadoresDe(sinLeer)
 		})
 	}
 	// En un buzón compartido no se pide el hilo: sería de otra cuenta y el servicio,
@@ -1045,6 +1074,12 @@ func (b *Buzon) pedirCuerpo(id string) {
 	if _, ya := b.cuerpos[id]; ya || id == "" {
 		return
 	}
+	if o, ok := origenExterno(id); ok {
+		if b.CorreoExterno != nil {
+			b.pedirCuerpoExterno(id, o)
+		}
+		return
+	}
 	pedir(b, func(ctx context.Context) (eml.Mensaje, error) {
 		r, err := b.S.Raw(ctx, id)
 		if err != nil {
@@ -1152,6 +1187,9 @@ func (b *Buzon) vueltaDelta() {
 // aplicarDelta es el `apply` del sondeo: quita lo borrado, pone o quita lo cambiado
 // según pertenezca a la vista, y reordena del más nuevo al más viejo.
 func (b *Buzon) aplicarDelta(c api.MailCambios) {
+	if b.AlCambiarDatos != nil && (len(c.Changed) > 0 || len(c.Destroyed) > 0) {
+		b.AlCambiarDatos()
+	}
 	b.mensajes = AplicarDelta(b.mensajes, c, b.carpetaID, b.etiquetaID)
 	b.pintarLista()
 	b.refrescarContadores()
@@ -1208,6 +1246,7 @@ func (b *Buzon) Parar() {
 	if b.cerrarCorreoExterno != nil {
 		b.cerrarCorreoExterno()
 	}
+	b.pararRefrescoExterno()
 	for _, f := range []func(){b.pararBusca, b.pararSondeo} {
 		if f != nil {
 			f()

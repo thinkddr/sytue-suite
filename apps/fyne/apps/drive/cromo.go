@@ -207,9 +207,11 @@ func (c *ConmutadorVista) AccessibilityRole() fyne.AccessibleRole { return fyne.
 func (c *ConmutadorVista) CreateRenderer() fyne.WidgetRenderer {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	r := &conmutadorRenderer{
-		c:       c,
-		aro:     ui.NuevoAro(tema.RadioMD, ui.SinHueco, v),
-		marco:   ui.NuevaCaja(color.NRGBA{}, tema.Color("border-strong", v), tema.RadioMD),
+		c:   c,
+		aro: ui.NuevoAro(tema.RadioMD, ui.SinHueco, v),
+		// Con relleno: con el de `Caja` transparente, el rectángulo de fuera se veía entero
+		// —el segmento sin elegir, gris oscuro— y los velos tapaban el borde (2026-11-06).
+		marco:   ui.NuevaCaja(tema.Color("surface", v), tema.Color("border-strong", v), tema.RadioMD),
 		veloA:   canvas.NewRectangle(color.NRGBA{}),
 		veloB:   canvas.NewRectangle(color.NRGBA{}),
 		filete:  canvas.NewRectangle(tema.Color("border", v)),
@@ -217,6 +219,12 @@ func (c *ConmutadorVista) CreateRenderer() fyne.WidgetRenderer {
 		glifoB:  iconos.Trazo(iconos.Rejilla, GlifoSegmento, "text-muted", v),
 		trasero: canvas.NewRectangle(tema.Color("surface", v)),
 	}
+	// Los velos siguen la esquina de dentro del marco: cuadrados, tapaban el borde en
+	// las cuatro esquinas.
+	dentro := max(tema.RadioMD-tema.Borde, 0)
+	r.veloA.TopLeftCornerRadius, r.veloA.BottomLeftCornerRadius = dentro, dentro
+	r.veloB.TopRightCornerRadius, r.veloB.BottomRightCornerRadius = dentro, dentro
+	r.trasero.CornerRadius = tema.RadioMD
 	r.objetos = append(r.aro.Objetos(), r.trasero)
 	r.objetos = append(r.objetos, r.marco.Objetos()...)
 	r.objetos = append(r.objetos, r.veloA, r.veloB, r.filete, r.glifoA.Objeto(), r.glifoB.Objeto())
@@ -266,7 +274,7 @@ func (r *conmutadorRenderer) Refresh() {
 	c := r.c
 	r.trasero.FillColor = tema.Color("surface", v)
 	r.trasero.Refresh()
-	r.marco.Pintar(color.NRGBA{}, tema.Color("border-strong", v))
+	r.marco.Pintar(tema.Color("surface", v), tema.Color("border-strong", v))
 	r.filete.FillColor = tema.Color("border", v)
 
 	// El orden de la web: activo gana, y el hover solo existe en la otra rama.

@@ -1,9 +1,121 @@
 # El parche de URL entrantes, listo para enviar a Fyne
 
-`apps/fyne/go.mod` reemplaza Fyne por `github.com/thinkddr/fyne/v2 v2.8.2-sytue.3`
+`apps/fyne/go.mod` reemplaza Fyne por `github.com/thinkddr/fyne/v2 v2.8.2-sytue.5`
 (alojado en GitHub desde el 2026-09-27; antes en git.gay, con las mismas ramas y tags)
 (ADR «URL entrante» en `docs/decisions.md`). Un fork es deuda: esta carpeta tiene lo que
 hace falta para quitarlo, que es que el parche entre aguas arriba.
+
+## `v2.8.2-sytue.4` y `v2.8.2-sytue.5` (2026-11-07): refresco y avisos de fondo en iOS
+
+Las dos tags apuntan a la misma fuente,
+[`5438e4c86769e1f5936adacedb29c4436d15cbdc`](https://github.com/thinkddr/fyne/commit/5438e4c86769e1f5936adacedb29c4436d15cbdc):
+`.4` es la que trae `0016` funcionando y `.5` añade `0017`. Sus arreglos van ya dentro de
+`0016-ios-background-refresh.patch` y `0017-ios-remote-notifications.patch`, regenerados
+con `git format-patch` sobre `v2.8.2-sytue.3`. Aplicados con `git am`, dan el árbol de la
+fuente etiquetada salvo `.github/ios-geometry/run.sh`, que es CI del fork y no va aguas
+arriba. Las matrices de los parches tal y como estaban sacaron dos fallos:
+
+- **La app moría al arrancar en iOS** (`GeometryUITests`: el informe no aparecía; con el
+  diagnóstico nuevo de `run.sh`, `SIGSEGV` en `runApp`). cgo compila `darwin_ios.m`
+  **sin ARC**. Un arranque normal conecta la escena sin adjuntar y aplaza la conexión, y
+  `sceneWillEnterForeground` soltaba las opciones antes de usarlas. Ahora se sueltan
+  después, y `sceneDidBecomeActive` conecta también una escena pendiente.
+- **Windows**: el `.m` se extrae con CRLF y los contratos de fuente cortaban con -1. Ahora
+  leen con LF, fallan nombrando el marcador que falta y `.gitattributes` fija LF en
+  `*.m`, `*.h` y `*.c`.
+
+Además, `didReceiveRemoteNotification:fetchCompletionHandler:` solo se añade al delegado
+(en `runApp`) si el `Info.plist` declara `remote-notification`: antes UIKit avisaba en
+todas las apps. Y el `completionHandler` ya no se pierde (se retenía dos veces).
+
+Pasaron, sobre la fuente etiquetada:
+
+- [Web](https://github.com/thinkddr/fyne/actions/runs/42379644977)
+- [Static Analysis](https://github.com/thinkddr/fyne/actions/runs/42379645045)
+- [Mobile](https://github.com/thinkddr/fyne/actions/runs/42379645039)
+- [Platform](https://github.com/thinkddr/fyne/actions/runs/42379645027), con Windows
+- [CodeQL](https://github.com/thinkddr/fyne/actions/runs/42379644935)
+- [Fork conformance](https://github.com/thinkddr/fyne/actions/runs/42379645040): el driver
+  UIKit compilado y enlazado para dispositivo y simulador, y la app arrancada en el
+  simulador de iPhone y de iPad con sus 32 medidas y toques.
+
+No acreditan una tarea de refresco ni un aviso de APNs reales (el simulador no los lanza),
+ni un iPhone físico, ni App Review.
+
+## Refresco en segundo plano de iOS (2026-11-07, `v2.8.2-sytue.4`)
+
+`0016-ios-background-refresh.patch` añade la interfaz opcional
+`mobile.BackgroundDriver`, que el driver móvil implementa. Sirve al widget nativo con la
+app cerrada ([enmienda del ADR 0078](../../../docs/decisions.md#0078)):
+
+- `LaunchedInBackground`: UIKit lanzó el proceso sin escena (tarea de refresco o aviso
+  de fondo).
+- `OnFirstScene`: lo que necesita interfaz corre al conectar la primera escena, en el
+  hilo principal y antes de las URL de esa escena; fuera de iOS, en el acto. Si UIKit
+  conecta la escena fuera del primer plano (lo puede hacer durante un trabajo de fondo),
+  eso y sus URL esperan a `sceneWillEnterForeground`: sin nadie mirando, el Face ID del
+  bloqueo fallaría y la app saldría.
+- `ProtectedDataAvailable`: falso con el dispositivo bloqueado. Cada tarea se lo vuelve a
+  preguntar a UIKit (`isProtectedDataAvailable`, en el hilo principal) antes de correr el
+  manejador: los avisos del delegado pueden llegarle tarde a una app suspendida.
+- `OnBackgroundRefresh`: el manejador de la tarea que nombra la primera entrada de
+  `BGTaskSchedulerPermittedIdentifiers`. Se registra antes de acabar el lanzamiento, se
+  vuelve a pedir al pasar a segundo plano y al terminar, y se completa una sola vez: si
+  el sistema la corta, se cancela el contexto y falla en cuanto el manejador vuelve, o a
+  los 500 ms si no vuelve; y si la corta antes de que el manejador empiece (el hilo
+  principal ocupado), falla en el acto y el manejador no corre: Go la conoce desde que
+  iOS la entrega, antes de poner su `expirationHandler`. Ese margen es para que suelte el cerrojo de `ajustes` (un
+  `flock` en el App Group): iOS mata con 0xdead10cc a la app que se suspende con un
+  cerrojo de fichero tomado en un contenedor compartido.
+
+Una app sin esas claves en el `Info.plist` se comporta como antes. La parte portable
+tiene pruebas en todas las plataformas; el puente de Objective-C se fija con contratos
+de fuente, porque no compila fuera de Xcode. Se ha comprobado aquí: `go vet` y
+`go test` de `driver/mobile`, `internal/driver/mobile` e `internal/driver/mobile/app` en
+Linux, y que `apps/fyne/sesion` compila contra el fork parcheado con la interfaz idéntica
+a la suya. El `.m` lo compila y arranca en el simulador la matriz de UIKit (arriba); no se
+ha corrido en un iPhone.
+
+La suite lo usa por aserción sobre el driver (`sesion/fondo.go`). **Encendido** el
+2026-11-07: el `replace` de `apps/fyne/go.mod` usa `v2.8.2-sytue.5`, y en el mismo commit se
+subieron las referencias de `ci-desktop.yml`, `ci-mobile.yml`, `empaquetar-test.sh`,
+`BACKLOG-FYNE.md` y `docs/CONVENTIONS.md` y se puso `SYTUE_REFRESCO_APPLE = YES` en
+`apps/fyne/xcode/Sytue.xcconfig`. Ese es también el camino para un tag futuro.
+
+## Avisos silenciosos de iOS (2026-11-07, `v2.8.2-sytue.5`)
+
+`0017-ios-remote-notifications.patch` va **encima de `0016`** y añade la interfaz
+opcional `mobile.RemoteNotificationDriver`. Sirve al despertar del widget con la app
+cerrada: el Hub manda un aviso vacío de APNs cuando cambia algo del producto
+([enmiendas del ADR 0039 y 0078](../../../docs/decisions.md#0039)):
+
+- `RemoteNotificationsAvailable`: el `Info.plist` declara `remote-notification` en
+  `UIBackgroundModes`. Se puede leer desde `main`, antes de que UIKit arranque.
+- `RegisterForRemoteNotifications`: pide a UIKit el token del aparato, sin diálogo de
+  permiso (un aviso sin alerta no lo necesita), y lo entrega en hexadecimal en minúsculas a
+  todos los que lo esperan, o el error de UIKit. Las peticiones a la vez comparten una.
+- `OnRemoteNotification`: el manejador de
+  `application:didReceiveRemoteNotification:fetchCompletionHandler:`. El contenido no se
+  lee nunca. El manejador recibe un contexto que se cancela a los 25 s, y el
+  `completionHandler` se llama una sola vez: con datos nuevos, sin datos o fallo según
+  lo que devuelva, fallo si se canceló el contexto, o fallo a los 500 ms de gracia si el
+  manejador no vuelve (iOS mata la app que no lo llama). Antes de correr el manejador se
+  pregunta a UIKit, en el hilo principal, si los datos protegidos están disponibles. Sin
+  manejador, el aviso falla en el acto.
+
+Una app sin ese modo de fondo se comporta como antes. Como con `0016`, la máquina de
+estados portable tiene pruebas en todas las plataformas y el puente de Objective-C se fija
+con contratos de fuente. Se ha comprobado aquí: `go vet` y `go test` de `driver/mobile`,
+`internal/driver/mobile` e `internal/driver/mobile/app` en Linux sobre `0016` y que
+`apps/fyne/sesion` compila contra el fork con la interfaz idéntica a la suya
+(`conductorAvisos`, `sesion/despertar.go`). El `.m` lo compila la matriz de UIKit; no se
+ha recibido un aviso en un iPhone.
+
+La suite lo usa por aserción sobre el driver. El fork ya lo trae: `apps/fyne/go.mod` usa
+`v2.8.2-sytue.5` desde el 2026-11-07. `SYTUE_DESPERTAR_APPLE = YES` desde el mismo día (decisión del dueño); faltan los pasos
+del dueño del [runbook](../../../docs/operations.md#despertar-widgets-ios): la clave, la
+capacidad Push en los quince App ID, los perfiles regenerados y el Secret del Hub.
+`empaquetar-test.sh` no deja encenderlo con `.4` o anterior.
 
 ## Ciclo completo del toque móvil (2026-11-02)
 

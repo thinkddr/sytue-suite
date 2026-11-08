@@ -70,6 +70,7 @@
   "common.remove": "Neħħi",
   "common.retry": "Erġa' pprova",
   "common.save": "Issejvja",
+  "day.noEvents": "L-ebda avveniment f’dan il-jum",
   "error.calendarsLoad": "Il-kalendarji ma setgħux jitgħabbew.",
   "error.eventsLoad": "L-avvenimenti ma setgħux jitgħabbew.",
   "event.ai": "Iddeskrivi l-avveniment",
@@ -148,6 +149,13 @@
   "grid.blockAria": "{title}, {time}",
   "grid.continued": "{title} (tkompli)",
   "grid.createOn": "Oħloq avveniment fil-{date}",
+  "grid.dayEvents": {
+    "one": "{date}, {count} avveniment",
+    "few": "{date}, {count} avvenimenti",
+    "many": "{date}, {count} avveniment",
+    "other": "{date}, {count} avveniment"
+  },
+  "grid.daySelected": "{label}, magħżul",
   "grid.loadError": "Il-kalendarju ma setax jitgħabba",
   "grid.loading": "Qed jitgħabba l-kalendarju",
   "grid.more": {
@@ -156,6 +164,8 @@
     "many": "+{count} oħra",
     "other": "+{count} oħra"
   },
+  "grid.showMonth": "Uri x-xahar kollu",
+  "grid.showWeek": "Uri din il-ġimgħa biss",
   "grid.snapAria": {
     "one": "Pass tat-tkaxkir: minuta {count}. Agħfas biex tibdel.",
     "few": "Pass tat-tkaxkir: {count} minuti. Agħfas biex tibdel.",
@@ -174,6 +184,13 @@
     "many": "{count} min",
     "other": "{count} min"
   },
+  "grid.todayLabel": "Illum, {date}",
+  "grid.weekNumber": "Ġimgħa {week}",
+  "guests.organizer": "Organizzatur",
+  "guests.status.accepted": "Ġej",
+  "guests.status.declined": "Mhux ġej",
+  "guests.status.pending": "Qed tistenna tweġiba",
+  "guests.status.tentative": "Forsi",
   "header.invitations": "Stediniet",
   "header.next": "Li jmiss",
   "header.pending": {
@@ -213,6 +230,12 @@
   "nav.createEventOn": "Oħloq avveniment fil-{date}",
   "nav.deleteSubscription": "Neħħi l-abbonament",
   "nav.manageResources": "Immaniġġja kmamar u tagħmir",
+  "nav.menuPending": {
+    "one": "Iftaħ il-menu, {count} pendenti",
+    "few": "Iftaħ il-menu, {count} pendenti",
+    "many": "Iftaħ il-menu, {count} pendenti",
+    "other": "Iftaħ il-menu, {count} pendenti"
+  },
   "nav.myCalendars": "Il-kalendarji tiegħi",
   "nav.next": "Li jmiss",
   "nav.nextMonth": "Ix-xahar ta' wara",
@@ -369,6 +392,7 @@
   "scope.following": "Għal dan u għal ta' wara",
   "scope.legend": "Dan l-avveniment jirrepeti. Għal liema avvenimenti tapplika l-bidla?",
   "scope.this": "Għal dan l-avveniment biss",
+  "search.allCalendars": "Il-kalendarji kollha",
   "search.error": "It-tfittxija ma setgħetx titlesta.",
   "search.events": "Fittex avvenimenti",
   "search.loadMore": "Tella' aktar",
@@ -379,6 +403,12 @@
     "other": "Ittajpja mill-inqas {count} karattru biex tfittex fil-kalendarji tiegħek."
   },
   "search.noResults": "L-ebda riżultat għal “{term}”.",
+  "search.period": "Perjodu",
+  "search.period.any": "Kull meta",
+  "search.period.month": "Dan ix-xahar",
+  "search.period.past": "Li għaddew",
+  "search.period.upcoming": "Li ġejjin",
+  "search.period.year": "Din is-sena",
   "search.placeholder": "Titlu, deskrizzjoni, post jew persuna mistiedna…",
   "search.searching": "Qed ifittex…",
   "search.series": "Serje",
@@ -420,6 +450,14 @@
   "share.whoSeesNow": "Min jarah issa",
   "share.writerHint": "Minbarra li tarahom, toħloq, tibdel u tħassar avvenimenti f'dan il-kalendarju.",
   "share.writerLabel": "Tara u teditja l-avvenimenti tiegħi",
+  "shortcuts.group.actions": "Azzjonijiet",
+  "shortcuts.group.navigate": "Imxi",
+  "shortcuts.group.views": "Veduti",
+  "shortcuts.help": "Uri din il-lista",
+  "shortcuts.next": "Il-perjodu li jmiss",
+  "shortcuts.prev": "Il-perjodu ta' qabel",
+  "shortcuts.title": "Shortcuts tat-tastiera",
+  "shortcuts.today": "Mur għal-lum",
   "subscribe.aria": "Abbona f'kalendarju permezz ta' URL",
   "subscribe.byUrl": "Abbona permezz ta' URL (.ics)",
   "subscribe.defaultName": "Kalendarju abbonat",

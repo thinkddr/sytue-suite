@@ -44,6 +44,8 @@ const (
 // recuento y la lista virtualizada.
 func (p *Pantalla) lista() fyne.CanvasObject {
 	cabecera := ui.NuevaCabeceraApp(p.t("list.title", nil), p.accionesDeLista()...)
+	// «Contactos» ya lo dice la barra única del teléfono: ahí quedan las acciones.
+	cabecera.RepiteLaBarra = true
 	// La cabecera hace `flex-wrap`: en el panel de 279 las acciones bajan a una segunda
 	// línea y mide 76,25, como en producción. Su alto depende del ancho del panel.
 	cabecera.Ancho = p.anchoLista()
@@ -121,10 +123,20 @@ func (p *Pantalla) barraLote() *ui.BarraDeLote {
 		b.Inerte = p.LoteOcupado
 		return b
 	}
+	// Lo que se hace CON la selección y no le cambia nada: no espera a `LoteOcupado`.
+	var acciones []*ui.Boton
+	if p.AlCorreoATodos != nil {
+		correo := ui.NuevoBoton(p.t("batch.emailAll", nil), func() { p.AlCorreoATodos(sel) }).Con(ui.Secundario, ui.TallaSM)
+		acciones = append(acciones, correo)
+	}
+	if p.AlExportarSeleccion != nil {
+		exportar := ui.NuevoBoton(p.t("batch.exportVcf", nil), func() { p.AlExportarSeleccion(sel) }).Con(ui.Secundario, ui.TallaSM)
+		acciones = append(acciones, exportar)
+	}
 	destacar, quitar := boton("batch.star", ui.Secundario), boton("batch.unstar", ui.Secundario)
 	destacar.AlPulsar = func() { p.AlLote(LoteDestacar, sel, nil) }
 	quitar.AlPulsar = func() { p.AlLote(LoteQuitarDestacado, sel, nil) }
-	acciones := []*ui.Boton{destacar, quitar}
+	acciones = append(acciones, destacar, quitar)
 	if len(p.Etiquetas) > 0 {
 		for _, x := range []struct {
 			clave string
@@ -343,6 +355,12 @@ func (p *Pantalla) rellenarFila(f *FilaContacto, c api.Contact) {
 	f.Abierta = p.Seleccionado != nil && p.Seleccionado.ID == c.ID
 	f.Marcada = p.Marcados[c.ID]
 	f.RotuloCasilla = p.t("list.select", i18n.Vars{"name": f.Nombre})
+	// Con el nombre, como la casilla: «Destacar» a secas repetido cien veces no dice de
+	// quién.
+	f.RotuloEstrella = p.t("list.star", i18n.Vars{"name": f.Nombre})
+	if f.Destacado {
+		f.RotuloEstrella = p.t("list.unstar", i18n.Vars{"name": f.Nombre})
+	}
 	contacto := c
 	f.AlAbrir = func() {
 		if p.AlElegirContacto != nil {
@@ -353,6 +371,11 @@ func (p *Pantalla) rellenarFila(f *FilaContacto, c api.Contact) {
 		if p.AlMarcar != nil {
 			p.AlMarcar(contacto.ID)
 		}
+	}
+	// Destacar desde la fila, sin abrir la ficha: solo con red, como la de la ficha.
+	f.AlDestacar = nil
+	if p.AlDestacar != nil && !p.SinConexion {
+		f.AlDestacar = func() { p.AlDestacar(contacto) }
 	}
 	f.Refresh()
 }

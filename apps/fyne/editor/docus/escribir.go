@@ -1279,7 +1279,7 @@ func (p *pagina) TypedShortcut(s fyne.Shortcut) {
 //
 //nolint:gocyclo // una rama por atajo
 func (f *Folio) atajo(s *desktop.CustomShortcut) {
-	if f.ctx.AtajoImprimir(s) {
+	if f.ctx.AtajoDelEditor(s) {
 		return
 	}
 	mod := s.Modifier &^ fyne.KeyModifierShift

@@ -156,7 +156,8 @@ func (x *Lector) grupoTriaje(estrecha bool) *fyne.Container {
 	t, a, c := x.T, x.Acciones, x.Conversacion
 	var objs []fyne.CanvasObject
 	if a.Destacar != nil {
-		clave, token := "action.star", "text"
+		// Sin destacar, la tinta del fantasma (`token` vacío), como sus vecinos.
+		clave, token := "action.star", ""
 		if c.Destacada {
 			clave, token = "action.unstar", "warning-text"
 		}
@@ -179,19 +180,39 @@ func (x *Lector) grupoTriaje(estrecha bool) *fyne.Container {
 	mas.Rotulo, mas.SoloIcono, mas.Icono, mas.TamIcono = mas.Texto, true, iconos.Puntos, 16
 	mas.AlPulsar = func() { x.menuMas().Mostrar(mas) }
 	objs = append(objs, mas)
-	if a.Etiquetar != nil {
+	x.botonEtiquetar, x.botonMover = nil, nil
+	// Las etiquetas son de Sytue: uno de una cuenta externa no las lleva.
+	if a.Etiquetar != nil && !esExterno(c.Ultimo.ID) {
 		var etiquetar *ui.Boton
 		etiquetar = botonCabecera(t.T("action.label", nil), EtiquetaD, ui.Fantasma, "", false, estrecha,
 			iconos.ChevronAbajo, func() { x.menuEtiquetas().Mostrar(etiquetar) })
 		objs = append(objs, etiquetar)
+		x.botonEtiquetar = etiquetar
 	}
 	if a.Mover != nil && len(a.Destinos) > 0 {
 		var mover *ui.Boton
 		mover = botonCabecera(t.T("action.moveTo", nil), CarpetaD, ui.Fantasma, "", false, estrecha,
 			iconos.ChevronAbajo, func() { x.menuMover().Mostrar(mover) })
 		objs = append(objs, mover)
+		x.botonMover = mover
 	}
 	return container.New(flujo{hueco: HuecoTriajeLector}, objs...)
+}
+
+// AbrirEtiquetar y AbrirMover son los atajos «l» y «v»: pulsan el disparador del
+// menú, que se abre donde se abriría con el ratón. Devuelven si había menú que abrir
+// (sin hilo, en solo lectura o sin destinos, no lo hay).
+func (x *Lector) AbrirEtiquetar() bool { return pulsarSiHay(x.botonEtiquetar) }
+
+// AbrirMover es «v»; ver AbrirEtiquetar.
+func (x *Lector) AbrirMover() bool { return pulsarSiHay(x.botonMover) }
+
+func pulsarSiHay(b *ui.Boton) bool {
+	if b == nil || b.AlPulsar == nil || fyne.CurrentApp().Driver().CanvasForObject(b) == nil {
+		return false
+	}
+	b.AlPulsar()
+	return true
 }
 
 // elementoGlifo es un `MenuItem` con uno de los glifos de Mail en `icon`: el hueco del
@@ -221,7 +242,14 @@ func (x *Lector) menuMas() *ui.Menu {
 			}
 		}),
 	}
-	if a.CrearRegla != nil {
+	if x.AlCompartirEnRooms != nil {
+		els = append(els, elementoGlifo(t.T("reader.shareToRooms", nil), ReenviarD, false, func() {
+			if len(x.Conversacion.Mensajes) > 0 {
+				x.AlCompartirEnRooms(x.Conversacion.Mensajes[0])
+			}
+		}))
+	}
+	if a.CrearRegla != nil && !esExterno(x.Conversacion.Ultimo.ID) {
 		els = append(els, elementoGlifo(t.T("reader.createRule", nil), CarpetaD, false,
 			func() { a.CrearRegla(x.Conversacion) }))
 	}

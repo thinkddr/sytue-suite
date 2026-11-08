@@ -35,6 +35,71 @@ const (
 	EsperaBusqueda = 250 * time.Millisecond
 )
 
+// PeriodosBusqueda es `SEARCH_PERIODS` de lib/search.ts, en su orden.
+var PeriodosBusqueda = []string{"any", "upcoming", "past", "month", "year"}
+
+// rangoPeriodo es `periodRange`: el tramo [desde, hasta) de un periodo, con `ahora` en
+// la zona de quien mira (mes y año empiezan a SUS 00:00). Un extremo a cero no acota.
+func rangoPeriodo(periodo string, ahora time.Time) (desde, hasta time.Time) {
+	switch periodo {
+	case "upcoming":
+		return ahora, time.Time{}
+	case "past":
+		return time.Time{}, ahora
+	case "month":
+		ini := time.Date(ahora.Year(), ahora.Month(), 1, 0, 0, 0, 0, ahora.Location())
+		return ini, ini.AddDate(0, 1, 0)
+	case "year":
+		ini := time.Date(ahora.Year(), 1, 1, 0, 0, 0, 0, ahora.Location())
+		return ini, ini.AddDate(1, 0, 0)
+	}
+	return time.Time{}, time.Time{}
+}
+
+// propiosConID son los calendarios que se pueden filtrar: los PROPIOS con id del
+// servicio. La búsqueda aísla por dueño, así que un compartido nunca daría resultados.
+func (p *Pantalla) propiosConID() []api.Calendar {
+	var out []api.Calendar
+	for _, c := range p.Calendarios {
+		if c.ID != "" {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// filtrosBusqueda son los filtros de calendario y periodo que van bajo el campo (`grid
+// grid-cols-2 gap-2`, `<Select size="sm">`): la fila, y lo que piden en cada momento.
+// Cambiarlos llama a `alCambiar`, que relanza la búsqueda. `filtro` lee los selectores:
+// se llama en el hilo de la UI.
+func (p *Pantalla) filtrosBusqueda(alCambiar func()) (fila fyne.CanvasObject, filtro func() api.FiltroBusqueda) {
+	propios := p.propiosConID()
+	opcionesCal := make([]string, 0, len(propios)+1)
+	opcionesCal = append(opcionesCal, p.t("search.allCalendars", nil))
+	for _, c := range propios {
+		opcionesCal = append(opcionesCal, c.Title())
+	}
+	opcionesPer := make([]string, len(PeriodosBusqueda))
+	for i, x := range PeriodosBusqueda {
+		opcionesPer[i] = p.t("search.period."+x, nil)
+	}
+	calSel := ui.NuevoSelector(opcionesCal, func(int) { alCambiar() }).Con(ui.CampoSM)
+	calSel.Rotulo = p.t("event.calendar", nil)
+	perSel := ui.NuevoSelector(opcionesPer, func(int) { alCambiar() }).Con(ui.CampoSM)
+	perSel.Rotulo = p.t("search.period", nil)
+	filtro = func() api.FiltroBusqueda {
+		var f api.FiltroBusqueda
+		if i := calSel.Elegida - 1; i >= 0 && i < len(propios) {
+			f.Calendario = propios[i].ID
+		}
+		if i := perSel.Elegida; i >= 0 && i < len(PeriodosBusqueda) {
+			f.Desde, f.Hasta = rangoPeriodo(PeriodosBusqueda[i], time.Now().In(p.zona()))
+		}
+		return f
+	}
+	return container.New(&dosColumnas{Hueco: espacio2}, calSel, perSel), filtro
+}
+
 // abrirBusqueda abre el buscador. `alAbrir` lleva al día de un resultado.
 func (a *App) abrirBusqueda() {
 	lienzo := a.lienzo()
@@ -44,11 +109,17 @@ func (a *App) abrirBusqueda() {
 	p := a.P
 	campo := ui.NuevaEntrada(p.t("search.placeholder", nil))
 	campo.Icono = iconos.Buscar
+	var buscar func(string)
+	filtros, filtro := p.filtrosBusqueda(func() { buscar(strings.TrimSpace(campo.Texto())) })
 	zona := container.New(&minAlto{Alto: tema.Espacio(32)}) // `min-h-[8rem]`
 	var d *ui.Dialogo
 	var (
-		resultados   []api.Event
-		cursor       string
+		resultados []api.Event
+		cursor     string
+		// consulta son los filtros con los que se pidió la primera página, con su
+		// tramo ya fijado: «Cargar más» pide la siguiente de ESA consulta. Recalcular
+		// «Próximos» con la hora de ahora movería `from` bajo el mismo cursor.
+		consulta     api.FiltroBusqueda
 		secuencia    int
 		cargando     bool
 		fallo        bool
@@ -62,11 +133,12 @@ func (a *App) abrirBusqueda() {
 		}, func() {
 			// «Cargar más»: misma búsqueda; si el término cambia, se descarta.
 			sec := secuencia
-			q := strings.TrimSpace(campo.Texto())
+			// El cursor se copia en el hilo de la UI, que es quien lo escribe.
+			q, f, desde := strings.TrimSpace(campo.Texto()), consulta, cursor
 			a.lanzar(func() {
 				ctx, parar := context.WithTimeout(context.Background(), plazo)
 				defer parar()
-				b, err := a.Cal.SearchEventsPage(ctx, q, PaginaBusqueda, cursor)
+				b, err := a.Cal.SearchEventsFiltrada(ctx, q, f, PaginaBusqueda, desde)
 				a.enUI(func() {
 					if sec != secuencia {
 						return
@@ -85,7 +157,7 @@ func (a *App) abrirBusqueda() {
 			arriba.Refresh()
 		}
 	}
-	buscar := func(q string) {
+	buscar = func(q string) {
 		secuencia++
 		sec := secuencia
 		if temporizador != nil {
@@ -98,11 +170,13 @@ func (a *App) abrirBusqueda() {
 		}
 		cargando, fallo = true, false
 		pintar()
+		f := filtro() // en el hilo de la UI: los selectores son suyos
+		consulta = f
 		temporizador = time.AfterFunc(EsperaBusqueda, func() {
 			a.lanzar(func() {
 				ctx, parar := context.WithTimeout(context.Background(), plazo)
 				defer parar()
-				b, err := a.Cal.SearchEventsPage(ctx, q, PaginaBusqueda, "")
+				b, err := a.Cal.SearchEventsFiltrada(ctx, q, f, PaginaBusqueda, "")
 				a.enUI(func() {
 					if sec != secuencia {
 						return // llegó una búsqueda más nueva
@@ -117,7 +191,7 @@ func (a *App) abrirBusqueda() {
 	}
 	campo.AlCambiar(func(s string) { buscar(strings.TrimSpace(s)) })
 	pintar()
-	d = ui.NuevoDialogo(p.t("search.title", nil), container.New(ui.Columna{Hueco: espacio3}, campo, zona)).Con(ui.DialogoLG, nil)
+	d = ui.NuevoDialogo(p.t("search.title", nil), container.New(ui.Columna{Hueco: espacio3}, campo, filtros, zona)).Con(ui.DialogoLG, nil)
 	d.RotuloCerrar = p.t("common.close", nil)
 	d.Foco = campo
 	d.AlCerrar = func() {

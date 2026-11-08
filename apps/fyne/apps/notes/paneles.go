@@ -49,8 +49,10 @@ type ArbolNotas struct {
 	AlSeleccionar func(string)
 	AlPlegar      func(Nota, bool)
 	AlNueva       func()
-	AlMenuNota    func(Nota, fyne.CanvasObject)
-	AlRenombrar   func(Nota)
+	// AlQuitarFiltro: el filtro oculta todas las notas que hay (ver Lienzo).
+	AlQuitarFiltro func()
+	AlMenuNota     func(Nota, fyne.CanvasObject)
+	AlRenombrar    func(Nota)
 
 	// ultimo es el toque anterior, para reconocer el doble clic: la fila se rehace al
 	// seleccionar, así que el segundo clic cae en OTRA fila y no puede acordarse ella.
@@ -108,6 +110,14 @@ func (a *ArbolNotas) lista(v tema.Variante) fyne.CanvasObject {
 	case Vacia, Exito:
 	}
 	arbol := Arbol(a.Notas)
+	if len(arbol) == 0 && a.AlQuitarFiltro != nil {
+		// `grid justify-items-start gap-2 p-4`: la frase y, debajo, quitar el filtro.
+		quitar := ui.NuevoBoton(t("filter.clear", nil), a.AlQuitarFiltro).Con(ui.Secundario, ui.TallaSM)
+		return container.New(ui.Margen{Izq: MargenLienzo, Der: MargenLienzo, Arr: MargenLienzo, Abj: MargenLienzo},
+			container.New(ui.Columna{Hueco: tema.Espacio(2)},
+				ui.NuevoParrafo(t("filter.noMatches", nil), tema.TextoBase, ui.Normal, "text-muted", v),
+				container.New(ui.Fila{}, quitar)))
+	}
 	if len(arbol) == 0 {
 		return parrafo("empty.noNotes.title")
 	}
@@ -257,10 +267,10 @@ func (s *sangrado) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 // Busqueda es el panel de buscar en TODAS las notas indexables, que es la misma
 // búsqueda que federa el Hub.
 //
-// Donde la web pone los resultados o «No se ha encontrado nada», aquí va lo que diga la
-// fase. La web convierte un fallo en una lista vacía y dice «no se ha encontrado nada»
-// de algo que no ha podido buscar; aquí se dice lo que ha pasado, en el mismo sitio y con
-// las claves de la app.
+// Donde van los resultados va lo que diga la fase: «Buscando…», cuántos hay y la lista,
+// «No se ha encontrado nada» o el fallo con «Reintentar». Un fallo no es una lista
+// vacía: decir «no se ha encontrado nada» de algo que no se ha podido buscar es mentir
+// (lo mismo que `PanelBusqueda` en la web).
 type Busqueda struct {
 	tr *i18n.Translator
 
@@ -364,9 +374,14 @@ func (b *Busqueda) lista(v tema.Variante) fyne.CanvasObject {
 	}
 	switch b.Fase {
 	case Cargando:
-		return container.New(ui.Fila{}, ui.NuevaRueda(24, "text-muted", v))
+		// La rueda sola no dice qué espera: «Buscando…» al lado, como la web.
+		return container.New(ui.Fila{Hueco: tema.Espacio(2)}, ui.NuevaRueda(16, "text-muted", v),
+			aviso("search.searching", "text-muted"))
 	case Fallo:
-		return aviso("error.loadFailed", "danger-text")
+		// Un fallo NO es «no se ha encontrado nada»: se dice y se ofrece repetirla.
+		reintentar := ui.NuevoBoton(t("common.retry", nil), func() { llamar1(b.AlBuscar, b.Buscada) }).Con(ui.Secundario, ui.TallaSM)
+		return container.New(ui.Columna{Hueco: tema.Espacio(2)}, aviso("search.failed", "danger-text"),
+			container.New(ui.Fila{}, reintentar))
 	case SinConexion:
 		return aviso("offline.status", "text-muted")
 	case SinSesion:
@@ -382,7 +397,9 @@ func (b *Busqueda) lista(v tema.Variante) fyne.CanvasObject {
 	for _, h := range b.Resultados {
 		filas = append(filas, filaHit(h, b.Buscada, b.AlAbrir, v))
 	}
-	return filasDePagina(filas...)
+	// Cuántos, encima de la lista (`sytue-meta`): es lo primero que se mira.
+	cuantos := lineaTok(t("search.results", i18n.Vars{"count": len(b.Resultados)}), tema.TextoXS, ui.Normal, "text-subtle", v)
+	return container.New(ui.Columna{Hueco: tema.Espacio(2)}, cuantos, filasDePagina(filas...))
 }
 
 // filaHit es un resultado (`ListaDeHits` de Archivo.tsx, `.notes-row`): el glifo en su
@@ -407,8 +424,8 @@ func filaHit(h api.NoteHit, buscada string, alAbrir func(api.NoteHit), v tema.Va
 		piezas = append(piezas, lineaTok(h.Notebook, tema.TextoXS, ui.Normal, "text-subtle", v))
 	}
 	o := NuevaOpcion(titulo, container.New(&filaElastica{hueco: tema.Espacio(2), elastico: 1, arriba: true}, piezas...), func() { llamar1(alAbrir, h) })
-	o.PX, o.PY, o.Superficie = tema.Espacio(2), tema.Espacio(1.5), "bg"
-	return o
+	o.PX, o.PY = tema.Espacio(2), tema.Espacio(1.5)
+	return filaDePagina(o)
 }
 
 // filaElastica es `flex gap-N` con UN hijo en `flex-1` —el primero, salvo que se diga

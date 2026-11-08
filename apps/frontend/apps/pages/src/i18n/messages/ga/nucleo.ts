@@ -92,7 +92,7 @@ export const nucleo = {
   'new.progress': 'Céimeanna chun an suíomh a chruthú',
   'new.go_to_step': 'Téigh go céim {n}',
   'new.step_of': 'Céim {n} as {total}',
-  'app_settings.title': 'Socruithe Sytue Web',
+  'app_settings.title': 'Socruithe Sytue Webs',
   'new.search_title': 'Tosaigh le do chineál gnó',
   'new.search_help':
     'Clóscríobh cad a dhéanann tú nó roghnaigh grúpa. Tá foclaíocht do cheirde i ngach teimpléad cheana féin: ní athraíonn tú ach an t-ainm, an uimhir gutháin, na praghsanna agus na grianghraif.',
@@ -300,7 +300,7 @@ export const nucleo = {
   'domains.start_help':
     'Cuir isteach an fearann ba mhaith leat a úsáid. Teastóidh rochtain uait ar shocruithe DNS an tsoláthraí ar cheannaigh tú uaidh é.',
   'domains.progress': 'Dul chun cinn cheangal an fhearainn',
-  'domains.step.registered': 'Curtha le Sytue Web',
+  'domains.step.registered': 'Curtha le Sytue Webs',
   'domains.step.dns': 'DNS fíoraithe',
   'domains.step.https': 'HTTPS réidh',
   'domains.step.primary': 'Príomhsheoladh',

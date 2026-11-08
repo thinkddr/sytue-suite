@@ -298,6 +298,10 @@ def verificar(productos, plataforma, apps, puente, version=None, build=None, inc
             simbolos = capturar(["xcrun", "nm", "-gU", ejecutable])
             if not re.search(r"\b_sytue_widgets_reload\s*$", simbolos, re.M):
                 raise ValueError(nombre + ": falta el puente público de actualización")
+            # Sin él la app no sabe si hay un widget puesto y nunca se registra para que el
+            # Hub la despierte (apps/fyne/sesion/despertar.go): fallaría en silencio.
+            if not re.search(r"\b_sytue_widgets_instalados\s*$", simbolos, re.M):
+                raise ValueError(nombre + ": falta el puente público que cuenta los widgets puestos")
         print(json.dumps({"producto": nombre, "plataforma": plataforma,
                           "arquitecturas": arquitecturas, "minimos": minimos,
                           "firmado": False}, ensure_ascii=False))

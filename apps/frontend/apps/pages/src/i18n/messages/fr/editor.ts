@@ -18,10 +18,10 @@ export const editor = {
   'editor.bases.desc': 'Les enregistrements d’une vue, tels qu’ils sont maintenant',
   'editor.bases.title': 'Tableau de Sytue Bases',
   'editor.bases.prompt':
-    'Collez le jeton d’une connexion en lecture seule accordée à Sytue Web. Les données de cette vue deviendront du contenu du site et seront publiques une fois celui-ci publié.',
+    'Collez le jeton d’une connexion en lecture seule accordée à Sytue Webs. Les données de cette vue deviendront du contenu du site et seront publiques une fois celui-ci publié.',
   'editor.bases.confirm': 'Importer la vue',
   'editor.bases.invalid':
-    'Cette connexion n’est pas valable pour Sytue Web : elle a peut-être été révoquée, a expiré ou a été accordée à un autre produit ou à une autre organisation.',
+    'Cette connexion n’est pas valable pour Sytue Webs : elle a peut-être été révoquée, a expiré ou a été accordée à un autre produit ou à une autre organisation.',
   'editor.bases.large':
     'La vue ne tient pas dans un tableau de site (50 lignes et 8 colonnes au maximum). Réduisez-la dans Sytue Bases.',
   'editor.bases.forbidden':

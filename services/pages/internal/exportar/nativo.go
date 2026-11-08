@@ -17,14 +17,14 @@ func generarNativo(destino Destino, sitio *ir.Sitio) (map[string][]byte, error) 
 	baseURL := obtenerBaseURLSitio(sitio)
 	nombre := obtenerTextoIdioma(sitio.SEO.SiteName, sitio.Languages.Default)
 	if nombre == "" {
-		nombre = "Sytue Web"
+		nombre = "Sytue Webs"
 	}
 	archivos := map[string][]byte{
-		"README.md": []byte("# Sytue Web native export\n\nEl catálogo, los formularios y el checkout siguen en la web publicada de Sytue Web. No despubliques el sitio mientras este cliente esté activo.\n\nRegla de layout: fill vertical en una página desplazable es hug; fill en fila usa weight/Expanded/maxWidth; wrap usa el flujo de cada plataforma.\n"),
+		"README.md": []byte("# Sytue Webs native export\n\nEl catálogo, los formularios y el checkout siguen en la web publicada de Sytue Webs. No despubliques el sitio mientras este cliente esté activo.\n\nRegla de layout: fill vertical en una página desplazable es hug; fill en fila usa weight/Expanded/maxWidth; wrap usa el flujo de cada plataforma.\n"),
 	}
 	switch destino {
 	case DestinoFlutter:
-		archivos["pubspec.yaml"] = []byte("name: sytue_pages_export\ndescription: Sytue Web export\nenvironment:\n  sdk: '>=3.0.0 <4.0.0'\n")
+		archivos["pubspec.yaml"] = []byte("name: sytue_pages_export\ndescription: Sytue Webs export\nenvironment:\n  sdk: '>=3.0.0 <4.0.0'\n")
 		archivos["lib/pages_api.dart"] = apiweb.GenerarClienteDart(baseURL)
 		archivos["lib/main.dart"] = []byte(fmt.Sprintf("import 'package:flutter/material.dart';\n\nvoid main() => runApp(const PagesApp());\nclass PagesApp extends StatelessWidget { const PagesApp({super.key}); @override Widget build(BuildContext context) => const MaterialApp(home: Scaffold(body: Center(child: Text(%q)))); }\n", nombre))
 	case DestinoCompose:

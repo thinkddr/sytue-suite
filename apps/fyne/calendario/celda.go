@@ -187,18 +187,19 @@ func (r *celdaRenderer) Layout(t fyne.Size) {
 		RellenoCelda+(LadoNumeroDia-tema.TextoSM.Linea)/2)
 
 	// Las píldoras arrancan bajo el carril de barras, con `mt-0.5` y `gap-0.5`.
-	ancho := max(t.Width-2*RellenoCelda, 0)
+	x := RellenoCelda
+	ancho := max(t.Width-2*x, 0)
 	y := CarrilBarras + r.c.reserva + espacio0p5
 	for _, p := range r.pildoras {
 		h := p.MinSize().Height
-		p.Move(fyne.NewPos(RellenoCelda, y))
+		p.Move(fyne.NewPos(x, y))
 		p.Resize(fyne.NewSize(ancho, h))
 		y += h + espacio0p5
 	}
 	if r.mas != nil {
 		// `px-1.5 text-xs font-medium`, recortado con puntos suspensivos si no cabe.
 		ui.Truncar(r.mas, r.masTexto, tema.TextoXS, ui.Medio, ancho-2*espacio1p5)
-		ui.ColocarTexto(r.mas, tema.TextoXS, RellenoCelda+espacio1p5, y)
+		ui.ColocarTexto(r.mas, tema.TextoXS, x+espacio1p5, y)
 	}
 }
 

@@ -13,8 +13,20 @@ import { useT } from '../i18n/index.js';
 import { bff, toBffContext } from '../lib/auth';
 import { canonicaConOrg, returnToCanonico } from '@sytue/config';
 import { hubClient } from '../lib/hub';
-import { groupBySource } from '../lib/search';
-import { appForKey, Icon, ProductIcon } from '@sytue/ui';
+import {
+  cargaSinNovedad,
+  enlaceCargarMas,
+  groupBySource,
+  hayMas,
+  idResultado,
+  paginasHastaElFallo,
+  paginasPedidas,
+  POR_PAGINA,
+  totalAMostrar,
+  unirPaginas,
+} from '../lib/search';
+import { r } from '../lib/rutas.js';
+import { appForKey, Button, Icon, ProductIcon } from '@sytue/ui';
 import AvisoOrigenesCaidos from '../components/AvisoOrigenesCaidos.astro';
 import type { SearchResult } from '@sytue/api-clients';
 
@@ -50,17 +62,46 @@ let failed = false;
 // aplicado a los fallos PARCIALES: `failed` solo cubre que se caiga el Hub entero.
 let fallidos: { source: string; error: string }[] = [];
 let total = 0;
+// «Cargar más»: cuántas páginas se enseñan (`?paginas=`) y si quedan más en el Hub.
+const pedidas = paginasPedidas(Astro.url.searchParams.get('paginas'));
+// Las que se enseñan: si una del medio falla, se corta ahí (ver `paginasHastaElFallo`).
+let paginas = pedidas;
+let mas = false;
+// El último «Cargar más» no trajo nada nuevo: se dice junto al botón (ver abajo).
+let sinNovedad = false;
 if (q) {
   try {
-    const res = await hubClient(session.tokens.accessToken).search(q);
-    results = res.results;
-    fallidos = res.fallidos;
-    total = res.total;
+    const hub = hubClient(session.tokens.accessToken);
+    // Una petición por página, en paralelo: el Hub acota `limit` a su máximo, así que
+    // la única forma de llegar a la página N es su `offset`.
+    const hasta = paginasHastaElFallo(
+      await Promise.allSettled(
+        Array.from({ length: pedidas }, (_, i) =>
+          hub.search(q, undefined, { limit: POR_PAGINA, offset: i * POR_PAGINA }),
+        ),
+      ),
+    );
+    if (!hasta) {
+      // Degradación elegante: ni la primera página -> estado de error con reintento.
+      failed = true;
+    } else {
+      const res = unirPaginas(hasta.paginas);
+      paginas = hasta.paginas.length;
+      results = res.results;
+      fallidos = res.fallidos;
+      // Sin nada más en el Hub, lo enseñado es todo: nada de «39 de 40» sin botón.
+      total = totalAMostrar(res, paginas);
+      // Una página que falló deja «Cargar más» para pedirla otra vez.
+      mas = hasta.cortada || hayMas(res, paginas);
+      sinNovedad = mas && cargaSinNovedad(hasta);
+    }
   } catch {
-    // Degradación elegante: el Hub no responde -> estado de error con reintento.
     failed = true;
   }
 }
+// El ancla de cada resultado por su posición en el ranking (no en el grupo): «Cargar
+// más» aterriza en el primero nuevo.
+const posicion = new Map(results.map((item, i) => [item, i]));
 const groups = groupBySource(results);
 const shortName = (name: string) => name.replace('Sytue ', '');
 const t = useT(Astro.locals.locale);
@@ -73,7 +114,12 @@ const t = useT(Astro.locals.locale);
       <h1 class="sytue-h1 text-text mt-1.5">{t('search.heading')}</h1>
     </header>
 
-    <form method="get" action="/buscar" role="search" class="mb-8 flex gap-2">
+    <form
+      method="get"
+      action={r('/buscar', Astro.locals.org)}
+      role="search"
+      class="mb-8 flex gap-2"
+    >
       <div class="relative min-w-0 flex-1">
         <span class="text-text-subtle pointer-events-none absolute top-1/2 left-3 -translate-y-1/2">
           <Icon name="search" size={18} />
@@ -148,7 +194,11 @@ const t = useT(Astro.locals.locale);
               </h2>
               <ul class="divide-border border-border bg-surface divide-y overflow-hidden rounded-lg border">
                 {group.items.map((item) => (
-                  <li>
+                  <li
+                    id={idResultado(posicion.get(item) ?? -1)}
+                    tabindex="-1"
+                    class="focus:outline-none"
+                  >
                     <a
                       href={item.url}
                       class="hover:bg-bg-subtle focus-visible:bg-bg-subtle active:bg-surface-sunken flex flex-col gap-0.5 px-4 py-3 transition-colors focus-visible:outline-none"
@@ -168,6 +218,33 @@ const t = useT(Astro.locals.locale);
             </section>
           );
         })}
+        {/* «Cargar más»: la misma consulta con una página más. Sin JS, como el resto
+              de la pantalla; el Hub es quien dice si quedan. */}
+        {mas ? (
+          <div class="flex flex-col items-start gap-2">
+            {/* La página que se pidió falló o llegó vacía. Sin esto se recargaba igual y
+                arriba del todo: el ancla del enlace apunta al primer resultado nuevo, que
+                no existe. El aviso ocupa ESE sitio —lleva su id—, así que la navegación
+                aterriza aquí y el lector de pantalla lo anuncia. */}
+            {sinNovedad ? (
+              <p
+                id={idResultado(results.length)}
+                tabindex="-1"
+                role="alert"
+                class="text-text-muted text-sm focus:outline-none"
+              >
+                {t('search.loadMoreFailed')}
+              </p>
+            ) : null}
+            <Button
+              variant="secondary"
+              size="sm"
+              href={enlaceCargarMas((p) => r(p, Astro.locals.org), q, paginas, results.length)}
+            >
+              {t('search.loadMore')}
+            </Button>
+          </div>
+        ) : null}
       </div>
     )}
   </div>

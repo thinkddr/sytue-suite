@@ -3,6 +3,7 @@
 
 package eu.sytue.nativo;
 
+import android.app.AlarmManager;
 import android.app.KeyguardManager;
 import android.app.PendingIntent;
 import android.appwidget.AppWidgetManager;
@@ -22,6 +23,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextPaint;
 import android.text.TextUtils;
+import android.text.format.DateUtils;
 import android.util.DisplayMetrics;
 import android.view.View;
 import android.widget.RemoteViews;
@@ -47,6 +49,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TimeZone;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -65,25 +68,49 @@ public final class Widgets extends AppWidgetProvider {
     private static final Set<String> REQUIRED_CALENDAR_KEYS = keys("year", "month");
     private static final Set<String> ALLOWED_CALENDAR_KEYS = keys("year", "month", "busy_days", "day_colors");
     private static final int MAX_BITMAP_PIXELS = 135_000;
+    /**
+     * El repintado programado (AlarmManager RTC). El receptor no se exporta: solo esta app
+     * puede mandarlo, y no lleva nada más que la acción.
+     */
+    private static final String REPINTAR = "eu.sytue.nativo.widgets.REPINTAR";
+    /** Con el dispositivo bloqueado no se pinta: se vuelve a intentar a los 5 min. */
+    private static final long REINTENTO_BLOQUEADO = 5 * 60;
 
     @Override
     public void onUpdate(Context ctx, AppWidgetManager manager, int[] ignored) {
         // Un broadcast de otra app no puede elegir los IDs de widgets que actualizamos.
         actualizar(ctx);
+        // Con un widget puesto, su refresco en segundo plano (RefrescoWidgets) está
+        // encolado: también tras reiniciar el teléfono, que es cuando Android vuelve a
+        // llamar aquí, y tras una actualización que cambie su modo.
+        RefrescoWidgets.programar(ctx);
     }
 
     @Override
-    public void onAppWidgetOptionsChanged(Context ctx, AppWidgetManager manager, int id, Bundle options) {
-        actualizar(ctx);
-    }
-
-    /** La llama Go tras escribir/borrar el snapshot, con el cerrojo ya liberado. */
-    public static void actualizar(Context ctx) {
-        AppWidgetManager manager = AppWidgetManager.getInstance(ctx);
-        int[] ids = manager.getAppWidgetIds(new ComponentName(ctx, Widgets.class));
-        if (ids.length == 0) {
+    public void onReceive(Context ctx, Intent intent) {
+        if (intent != null && REPINTAR.equals(intent.getAction())) {
+            actualizar(ctx);
             return;
         }
+        super.onReceive(ctx, intent);
+    }
+
+    @Override
+    public void onDisabled(Context ctx) {
+        cancelarRepintado(ctx);
+        RefrescoWidgets.cancelar(ctx);
+    }
+
+    /** Los widgets de esta app que hay puestos. */
+    static int[] ids(Context ctx) {
+        return AppWidgetManager.getInstance(ctx).getAppWidgetIds(new ComponentName(ctx, Widgets.class));
+    }
+
+    /**
+     * El catálogo del widget de esta APK (assets/sytue-widget.json, de android-widgets.py)
+     * si es el suyo y está bien formado; si no, null y no se pinta ni se refresca nada.
+     */
+    static JSONObject configuracion(Context ctx) {
         try {
             JSONObject config;
             try (InputStream in = ctx.getAssets().open("sytue-widget.json")) {
@@ -95,8 +122,117 @@ public final class Widgets extends AppWidgetProvider {
             if (config.getInt("version") != 1 || !pkg.equals(config.getString("id"))
                     || !pkg.matches("eu\\.sytue\\.[a-z][a-z0-9]*")
                     || !scheme.equals("sytue-" + product) || !product.matches("[a-z][a-z0-9]*")) {
+                return null;
+            }
+            return config;
+        } catch (IOException | JSONException roto) {
+            return null;
+        }
+    }
+
+    private static void cancelarRepintado(Context ctx) {
+        AlarmManager alarmas = ctx.getSystemService(AlarmManager.class);
+        if (alarmas != null) {
+            alarmas.cancel(repintado(ctx));
+        }
+    }
+
+    private static PendingIntent repintado(Context ctx) {
+        Intent intent = new Intent(REPINTAR).setClass(ctx, Widgets.class);
+        return PendingIntent.getBroadcast(ctx, 0, intent, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+    }
+
+    /**
+     * Pide repintar en `cuando` (segundos) sin despertar el dispositivo ni pedir permiso:
+     * RTC inexacto, que llega en cuanto el teléfono está despierto. Es lo que hace que el
+     * widget quite un evento que ya terminó, cambie de día a medianoche y se oculte al
+     * caducar aunque la app no publique. Sustituye a la alarma anterior.
+     */
+    private static void programar(Context ctx, long cuando) {
+        AlarmManager alarmas = ctx.getSystemService(AlarmManager.class);
+        if (alarmas != null) {
+            alarmas.set(AlarmManager.RTC, cuando * 1000L, repintado(ctx));
+        }
+    }
+
+    /** El widget sin datos: sin contadores, sin insignia, sin imagen y sin rótulo. */
+    private static void enBlanco(Context ctx, AppWidgetManager manager, int id) {
+        int layout = resource(ctx, "layout", "sytue_widget");
+        int countsId = resource(ctx, "id", "sytue_widget_counts");
+        int badgeId = resource(ctx, "id", "sytue_widget_badge");
+        int visualId = resource(ctx, "id", "sytue_widget_visual");
+        int updatedId = resource(ctx, "id", "sytue_widget_updated");
+        RemoteViews blank = new RemoteViews(ctx.getPackageName(), layout);
+        blank.setViewVisibility(countsId, View.GONE);
+        if (badgeId != 0) {
+            blank.setTextViewText(badgeId, "");
+            blank.setViewVisibility(badgeId, View.GONE);
+        }
+        if (visualId != 0) {
+            blank.setImageViewBitmap(visualId, null);
+            blank.setViewVisibility(visualId, View.GONE);
+        }
+        if (updatedId != 0) {
+            blank.setTextViewText(updatedId, "");
+            blank.setViewVisibility(updatedId, View.GONE);
+        }
+        manager.updateAppWidget(id, blank);
+    }
+
+    /**
+     * «Actualizado: 14:05», o «Actualizado: jue 23:10» si no es de hoy. Hora ABSOLUTA, y no
+     * «hace 20 min»: la vista se queda con el texto con que se pintó, y con el teléfono
+     * bloqueado no se repinta (WidgetSnapshot.pintado) ni nada garantiza hacerlo al
+     * desbloquear, así que una antigüedad relativa mentiría. Por lo mismo se enseña
+     * siempre que hay datos, no solo cuando ya son rancios.
+     */
+    private static String rotuloActualizado(Context ctx, WidgetSnapshot snapshot, JSONObject labels)
+            throws JSONException {
+        long cuando = snapshot.updatedAt * 1000L;
+        int formato = DateUtils.FORMAT_SHOW_TIME;
+        if (!DateUtils.isToday(cuando)) {
+            formato |= DateUtils.FORMAT_SHOW_WEEKDAY | DateUtils.FORMAT_ABBREV_WEEKDAY;
+        }
+        return labels.getString("updated_at").replace("{time}", DateUtils.formatDateTime(ctx, cuando, formato));
+    }
+
+    @Override
+    public void onAppWidgetOptionsChanged(Context ctx, AppWidgetManager manager, int id, Bundle options) {
+        actualizar(ctx);
+    }
+
+    /** La llama Go tras escribir/borrar el snapshot, con el cerrojo ya liberado. */
+    public static void actualizar(Context ctx) {
+        AppWidgetManager manager = AppWidgetManager.getInstance(ctx);
+        int[] ids = ids(ctx);
+        if (ids.length == 0) {
+            cancelarRepintado(ctx);
+            return;
+        }
+        long now = System.currentTimeMillis() / 1000L;
+        KeyguardManager pantalla = ctx.getSystemService(KeyguardManager.class);
+        boolean bloqueado = pantalla == null || pantalla.isDeviceLocked();
+        if (bloqueado) {
+            // Ni se lee ni se repinta la pantalla de inicio (no se ve); la de bloqueo, en
+            // blanco. Y se vuelve a intentar: al desbloquear nadie avisa.
+            for (int id : ids) {
+                Bundle opts = manager.getAppWidgetOptions(id);
+                int categoria = opts != null ? opts.getInt(AppWidgetManager.OPTION_APPWIDGET_HOST_CATEGORY, 1) : 1;
+                if (WidgetSnapshot.pintado(true, categoria) == WidgetSnapshot.Pintado.EN_BLANCO) {
+                    enBlanco(ctx, manager, id);
+                }
+            }
+            programar(ctx, now + REINTENTO_BLOQUEADO);
+            return;
+        }
+        try {
+            JSONObject config = configuracion(ctx);
+            if (config == null) {
                 return;
             }
+            String pkg = ctx.getPackageName();
+            String product = config.getString("product");
+            String scheme = config.getString("scheme");
             Configuration sysCfg = ctx.getResources().getConfiguration();
             Locale locale = sysCfg.getLocales().get(0);
             boolean night = (sysCfg.uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
@@ -105,7 +241,13 @@ public final class Widgets extends AppWidgetProvider {
             if (labels == null) {
                 labels = translations.getJSONObject("en");
             }
+            TimeZone zona = TimeZone.getDefault();
             WidgetSnapshot snapshot = load(ctx, product);
+            if (snapshot != null) {
+                snapshot = snapshot.conVigentes(now, zona);
+            }
+            String actualizado = snapshot != null ? rotuloActualizado(ctx, snapshot, labels) : "";
+            int updatedId = resource(ctx, "id", "sytue_widget_updated");
             int layout = resource(ctx, "layout", "sytue_widget");
             int appIcon = ctx.getApplicationInfo().icon;
             int brandColor = brandColor(product, night);
@@ -126,6 +268,10 @@ public final class Widgets extends AppWidgetProvider {
 
                 int titleId = resource(ctx, "id", "sytue_widget_title");
                 views.setTextViewText(titleId, config.getString("name"));
+                if (updatedId != 0) {
+                    views.setTextViewText(updatedId, actualizado);
+                    views.setViewVisibility(updatedId, actualizado.isEmpty() ? View.GONE : View.VISIBLE);
+                }
                 clickDestination(ctx, views, "sytue_widget_background", scheme + ":/", id, 0);
 
                 // Badge de resumen rápido en cabecera
@@ -181,7 +327,7 @@ public final class Widgets extends AppWidgetProvider {
 
                 if (visualId != 0 && hasVisual) {
                     int canvasDpW = Math.max(96, minW - 24);
-                    int canvasDpH = Math.max(54, minH - (hideFooter ? 36 : 68));
+                    int canvasDpH = Math.max(54, minH - (hideFooter ? 36 : 68) - (actualizado.isEmpty() ? 0 : 14));
                     Bitmap bmp = renderVisualBitmap(product, snapshot, labels, locale, night,
                             canvasDpW, canvasDpH, metrics.density);
                     views.setImageViewBitmap(visualId, bmp);
@@ -202,25 +348,12 @@ public final class Widgets extends AppWidgetProvider {
 
                 manager.updateAppWidget(id, views);
             }
-        } catch (IOException | JSONException | RuntimeException ignored) {
+            programar(ctx, WidgetSnapshot.proximoRepintado(snapshot, now, zona));
+        } catch (JSONException | RuntimeException ignored) {
             // Datos ausentes/corruptos nunca se convierten en datos de otra cuenta.
             // Borrar la vista anterior evita conservar números o píxeles si el fichero deja de ser legible.
-            int layout = resource(ctx, "layout", "sytue_widget");
-            int countsId = resource(ctx, "id", "sytue_widget_counts");
-            int badgeId = resource(ctx, "id", "sytue_widget_badge");
-            int visualId = resource(ctx, "id", "sytue_widget_visual");
             for (int id : ids) {
-                RemoteViews blank = new RemoteViews(ctx.getPackageName(), layout);
-                blank.setViewVisibility(countsId, View.GONE);
-                if (badgeId != 0) {
-                    blank.setTextViewText(badgeId, "");
-                    blank.setViewVisibility(badgeId, View.GONE);
-                }
-                if (visualId != 0) {
-                    blank.setImageViewBitmap(visualId, null);
-                    blank.setViewVisibility(visualId, View.GONE);
-                }
-                manager.updateAppWidget(id, blank);
+                enBlanco(ctx, manager, id);
             }
         }
     }
@@ -883,6 +1016,52 @@ public final class Widgets extends AppWidgetProvider {
         return TextUtils.join("\n", lines);
     }
 
+    /**
+     * Lo que el lector comprueba fuera del snapshot (formato 2). Con el broker, su estado en
+     * una llamada: la marca de los widgets (de su época) y su generación, que es a la vez la
+     * marca y la confirmación. Sin él, `sesion.epoca` (época y confirmación), `sesion.marca`
+     * y el bloqueo de `ajustes.json`. En los dos, un `*.cerrada` en la carpeta lo oculta.
+     */
+    private static WidgetSnapshot.Entorno entorno(Context ctx, File dir) throws IOException, JSONException {
+        boolean cerrada = hayCierre(dir);
+        Bundle broker = SesionCompartida.estadoWidgets(ctx);
+        if (broker != null) {
+            String generacion = broker.getString("generacion", "");
+            return new WidgetSnapshot.Entorno(broker.getString("marca_widgets", ""), generacion, generacion,
+                    cerrada, broker.getBoolean("bloqueo", true));
+        }
+        String marca = file(new File(dir, "sesion.marca"), 256);
+        String[] epoca = file(new File(dir, "sesion.epoca"), 1024).split("\n", -1);
+        File settingsFile = new File(dir, "ajustes.json");
+        JSONObject settings = settingsFile.exists()
+                ? object(file(settingsFile, WidgetSnapshot.MAX_BYTES)) : new JSONObject();
+        Object locked = settings.opt("bloqueo");
+        boolean bloqueo = locked != null && !Boolean.FALSE.equals(locked);
+        if (epoca.length != 5 || epoca[0].length() != 32 || !epoca[4].isEmpty()) {
+            return new WidgetSnapshot.Entorno("", "", marca, cerrada, true);
+        }
+        return new WidgetSnapshot.Entorno(epoca[0], epoca[3], marca, cerrada, bloqueo);
+    }
+
+    /** Algún `*.cerrada` (AlmacenSesion: un cierre de sesión). Sin poder listar, como si lo hubiera. */
+    private static boolean hayCierre(File dir) {
+        File[] ficheros = dir.listFiles();
+        if (ficheros == null) {
+            return true;
+        }
+        for (File f : ficheros) {
+            if (f.isFile() && f.getName().endsWith(".cerrada")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean mismoEntorno(WidgetSnapshot.Entorno a, WidgetSnapshot.Entorno b) {
+        return a.epoca.equals(b.epoca) && a.confirmada.equals(b.confirmada) && a.marca.equals(b.marca)
+                && a.cerrada == b.cerrada && a.bloqueo == b.bloqueo;
+    }
+
     private static WidgetSnapshot load(Context ctx, String product) {
         try {
             KeyguardManager lock = ctx.getSystemService(KeyguardManager.class);
@@ -890,12 +1069,8 @@ public final class Widgets extends AppWidgetProvider {
                 return null;
             }
             File dir = new File(ctx.getFilesDir(), ".config/sytue");
-            String before = file(new File(dir, "sesion.marca"), 256);
-            File settingsFile = new File(dir, "ajustes.json");
-            JSONObject settings = settingsFile.exists()
-                    ? object(file(settingsFile, WidgetSnapshot.MAX_BYTES)) : new JSONObject();
-            Object locked = settings.opt("bloqueo");
-            if (locked != null && !(locked instanceof Boolean)) {
+            WidgetSnapshot.Entorno before = entorno(ctx, dir);
+            if (!before.permite()) {
                 return null;
             }
             JSONObject json = object(file(new File(dir, "widgets/" + ctx.getPackageName() + ".json"),
@@ -996,9 +1171,8 @@ public final class Widgets extends AppWidgetProvider {
             WidgetSnapshot snapshot = new WidgetSnapshot(integer(json, "version"), string(json, "product"),
                     string(json, "generation"), integer(json, "updated_at"), integer(json, "expires_at"),
                     (Boolean) active, values, parsedItems, parsedCalendar);
-            String after = file(new File(dir, "sesion.marca"), 256);
-            if (!before.equals(after) || !snapshot.visible(product, after, Boolean.TRUE.equals(locked),
-                    System.currentTimeMillis() / 1000)) {
+            WidgetSnapshot.Entorno after = entorno(ctx, dir);
+            if (!mismoEntorno(before, after) || !snapshot.visible(product, after, System.currentTimeMillis() / 1000)) {
                 return null;
             }
             return snapshot;

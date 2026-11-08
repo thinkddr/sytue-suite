@@ -18,10 +18,10 @@ export const editor = {
   'editor.bases.desc': 'De records van een weergave, zoals ze nu zijn',
   'editor.bases.title': 'Tabel uit Sytue Bases',
   'editor.bases.prompt':
-    'Plak het token van een alleen-lezenkoppeling die aan Sytue Web is verleend. De gegevens van die weergave worden inhoud van de site en zijn openbaar zodra je publiceert.',
+    'Plak het token van een alleen-lezenkoppeling die aan Sytue Webs is verleend. De gegevens van die weergave worden inhoud van de site en zijn openbaar zodra je publiceert.',
   'editor.bases.confirm': 'Weergave ophalen',
   'editor.bases.invalid':
-    'Die koppeling werkt niet voor Sytue Web: ze is mogelijk ingetrokken, verlopen of verleend aan een ander product of een andere organisatie.',
+    'Die koppeling werkt niet voor Sytue Webs: ze is mogelijk ingetrokken, verlopen of verleend aan een ander product of een andere organisatie.',
   'editor.bases.large':
     'De weergave past niet in een tabel van de site (maximaal 50 rijen en 8 kolommen). Beperk ze in Sytue Bases.',
   'editor.bases.forbidden':

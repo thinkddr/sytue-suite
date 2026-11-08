@@ -3,7 +3,13 @@
  * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
  */
 import { describe, expect, it } from 'bun:test';
-import { appQueAbre, subibleACast, urlDeApertura, urlDeSubirACast } from './abrir-con.js';
+import {
+  appQueAbre,
+  enlaceInterno,
+  subibleACast,
+  urlDeApertura,
+  urlDeSubirACast,
+} from './abrir-con.js';
 
 const todo = { conMiniatura: true, conEditor: true };
 const nada = { conMiniatura: false, conEditor: false };
@@ -128,5 +134,23 @@ describe('Subir a Cast', () => {
     const u = new URL(urlDeSubirACast('v-1', 'acme'));
     expect(u.pathname).toBe('/cast/acme/upload');
     expect(u.searchParams.get('drive')).toBe('v-1');
+  });
+});
+
+describe('enlaceInterno', () => {
+  it('un fichero va por su id, al canónico /files/{id} con el prefijo de Drive', () => {
+    const url = enlaceInterno({ id: 'f 1', isDirectory: false, path: '/Actas/acta.odt' });
+    expect(url).toEndWith('/drive/files/f%201');
+  });
+
+  it('una carpeta va por su ruta y con la organización, no por /files/{id}', () => {
+    // `/files/{id}` es de ficheros: con el id de una carpeta es un 404.
+    const url = enlaceInterno({ id: 'c1', isDirectory: true, path: '/Actas 2026' }, 'acme') ?? '';
+    expect(url).toEndWith('/drive/acme/?path=%2FActas%202026');
+    expect(url).not.toContain('/files/');
+  });
+
+  it('un fichero sin id no tiene enlace estable', () => {
+    expect(enlaceInterno({ isDirectory: false, path: '/x.txt' })).toBeNull();
   });
 });

@@ -65,6 +65,7 @@ export const lt: AppCatalog<typeof en> = {
   'inbox.markAll': 'Pažymėti visus kaip perskaitytus',
   'inbox.loading': 'Įkeliami pranešimai…',
   'inbox.unreadDot': 'Neperskaitytas',
+  'inbox.markRead': 'Pažymėti kaip skaitytą',
   'inbox.errorTitle': 'Nepavyko įkelti pranešimų',
   'inbox.errorBody': 'Hub šiuo metu neatsako. Bandykite dar kartą po kelių sekundžių.',
   'inbox.retry': 'Bandyti dar kartą',
@@ -718,6 +719,8 @@ export const lt: AppCatalog<typeof en> = {
     '{sources} neatsakė, todėl kai kurių rezultatų gali trūkti. Bandykite dar kartą po akimirkos.',
   'search.partialJoin': ' ir ',
   'search.showing': 'Rodoma {count} iš {total} rezultatų.',
+  'search.loadMore': 'Įkelti daugiau rezultatų',
+  'search.loadMoreFailed': 'Nepavyko įkelti daugiau rezultatų. Bandykite dar kartą.',
   'privacy.notice':
     'Jūsų duomenų neparduodame ir neperduodame tretiesiems asmenims. Nenaudojame jų profiliavimui, reklamai, taip pat mūsų ar kieno nors kito paslaugoms mokyti ar tobulinti. Jie šifruojami perduodant ir saugant, o mūsų Europos infrastruktūrą palieka tik tiek, kiek būtina sąskaitoms išrašyti, ir jūsų įjungtose integracijose, kuriose trečioji šalis paprašys jūsų sutikimo dėl naudojamų duomenų.',
 };

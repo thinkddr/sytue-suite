@@ -141,6 +141,9 @@ type Visor struct {
 	Fondo       FondoLienzo
 	// Aviso es el `role="status"` de la cabecera.
 	Aviso string
+	// Posicion es el «12 / 240» de la cabecera, ya escrito (`posicionVisor`); "", no se
+	// enseña.
+	Posicion string
 	// HayAnterior y HaySiguiente encienden las flechas.
 	HayAnterior, HaySiguiente bool
 	// Borrando enseña la banda de confirmación bajo la cabecera.
@@ -254,14 +257,19 @@ func movil(ventana float32) bool { return ventana < ui.CorteMD }
 func cabeceraVisor(v Vista, d Visor) fyne.CanvasObject {
 	nombre := ParrafoEn(d.Foto.Name, tema.TextoSM, ui.Medio, "text", v.Variante)
 	aviso := ParrafoEn(d.Aviso, tema.TextoXS, ui.Normal, "text-muted", v.Variante)
+	// El «12 / 240», `text-text-muted shrink-0 text-xs tabular-nums` tras el nombre.
+	contador := ParrafoEn(d.Posicion, tema.TextoXS, ui.Normal, "text-muted", v.Variante)
 	mandos := mandosVisor(v, d)
 	// Cerrar es el aspa de cualquier diálogo de la casa, en la talla de los demás mandos.
 	cerrar := mandoVisor(v, iconos.Cerrar, "viewer.close", d.AlCerrar)
 	if v.Ventana >= ui.CorteLG {
-		// `gap-2` entre el nombre, el aviso, el grupo de mandos y cerrar; dentro del
-		// grupo, `gap-1`.
+		// `gap-2` entre el nombre, el contador, el aviso, el grupo de mandos y cerrar;
+		// dentro del grupo, `gap-1`.
 		grupo := container.New(ui.FilaAuto{Hueco: HuecoMandos}, mandos...)
-		return container.New(ui.FilaAuto{Hueco: HuecoVisor, Derecha: 1}, nombre, aviso, grupo, cerrar)
+		if d.Posicion == "" {
+			return container.New(ui.FilaAuto{Hueco: HuecoVisor, Derecha: 1}, nombre, aviso, grupo, cerrar)
+		}
+		return container.New(ui.FilaAuto{Hueco: HuecoVisor, Derecha: 2}, nombre, contador, aviso, grupo, cerrar)
 	}
 	// Por debajo de `lg:` la barra NO cabe en una línea: el nombre y cerrar arriba, y los
 	// mandos en su propia fila,
@@ -271,18 +279,21 @@ func cabeceraVisor(v Vista, d Visor) fyne.CanvasObject {
 	// Sin barra (`[scrollbar-width:none]`): la máscara ya dice que hay más.
 	desliza := container.NewThemeOverride(container.NewHScroll(fila), tema.SinBarras{})
 	mascara := canvas.NewHorizontalGradient(conAlfa(tema.Color("bg", v.Variante), 0), tema.Color("bg", v.Variante))
-	return container.New(cabeceraPartida{nombre: nombre, aviso: aviso, textoNombre: d.Foto.Name, textoAviso: d.Aviso},
-		nombre, aviso, cerrar, desliza, mascara)
+	partida := cabeceraPartida{
+		nombre: nombre, aviso: aviso, contador: contador,
+		textoNombre: d.Foto.Name, textoAviso: d.Aviso, textoContador: d.Posicion,
+	}
+	return container.New(partida, nombre, aviso, cerrar, desliza, mascara, contador)
 }
 
 // cabeceraPartida es la cabecera del visor en dos filas. Arriba, el nombre en `min-w-0
 // flex-1 truncate`, el aviso en `ml-auto truncate` y «Cerrar»; abajo, los mandos a todo
 // el ancho con los últimos 28 px desvaneciéndose.
 type cabeceraPartida struct {
-	nombre, aviso *canvas.Text
+	nombre, aviso, contador *canvas.Text
 	// Los textos enteros: Truncar escribe en el `canvas.Text`, y recolocar partiendo de
 	// lo ya truncado iría comiéndose letras.
-	textoNombre, textoAviso string
+	textoNombre, textoAviso, textoContador string
 }
 
 func (cabeceraPartida) MinSize([]fyne.CanvasObject) fyne.Size {
@@ -297,9 +308,19 @@ func (c cabeceraPartida) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	cerrar.Move(fyne.NewPos(max(t.Width-mc.Width, 0), (lado-mc.Height)/2))
 	cerrar.Resize(mc)
 	libre := max(t.Width-mc.Width-2*HuecoVisor, 0)
+	// El contador no se encoge (`shrink-0`): lo que falte lo pone el nombre.
+	anchoContador := float32(0)
+	if c.textoContador != "" {
+		anchoContador = min(ui.Medir(c.textoContador, tema.TextoXS, ui.Normal).Width, libre)
+		libre = max(libre-anchoContador-HuecoVisor, 0)
+	}
 	anchoAviso := min(ui.Medir(c.textoAviso, tema.TextoXS, ui.Normal).Width, libre)
 	anchoNombre := ui.Truncar(nombre, c.textoNombre, tema.TextoSM, ui.Medio, libre-anchoAviso)
 	ui.ColocarTexto(nombre, tema.TextoSM, 0, (lado-tema.TextoSM.Linea)/2)
+	if c.textoContador != "" {
+		ui.ColocarTexto(c.contador, tema.TextoXS, anchoNombre+HuecoVisor, (lado-tema.TextoXS.Linea)/2)
+		anchoNombre += HuecoVisor + anchoContador
+	}
 	ui.Truncar(aviso, c.textoAviso, tema.TextoXS, ui.Normal, anchoAviso)
 	ui.ColocarTexto(aviso, tema.TextoXS, max(t.Width-mc.Width-HuecoVisor-anchoAviso, anchoNombre+HuecoVisor),
 		(lado-tema.TextoXS.Linea)/2)

@@ -55,6 +55,9 @@ func main() {
 	// La sesión, la apariencia y el idioma son TRANSVERSALES a las trece apps: esto lo
 	// lee de donde lo dejó la última que lo tocó. `Abrir` no habla con la red.
 	s := sesion.Abrir(a, "")
+	// El cromo «papel» de toda la suite (ADR 0080). Aquí y no en `sesion.Abrir`: las
+	// pruebas que abren sesión comprueban también el cromo de color.
+	tema.ElegirCromo(tema.CromoPapel)
 
 	tr, err := i18n.New(s.Idioma(), i18n.Common(), catalogos.Drive())
 	if err != nil {
@@ -72,8 +75,10 @@ func main() {
 	// lo que hace la web al redirigir al inicio de sesión.
 	// Sin conexión, solo lectura: la caché «red primero» y su monitor son de la sesión.
 	red, cliente := s.Conexion("drive", drive.SinGuardarSinConexion...)
-	p := drive.NuevaPantalla(tr, api.NewDrive(s.URL("drive"), s.Sesion, cliente), red, w)
-	p.Widget = s.CapturarWidget
+	p := drive.NuevaPantalla(tr, api.NewDrive(s.URL("drive"), s.Sesion, s.ClienteConAviso(cliente)), red, w)
+	// El widget nativo lo lee su propia Fuente (la raíz y la cuota), SIN la caché de
+	// trabajar sin conexión, y se vuelve a publicar tras cada escritura de Drive.
+	s.PublicadorWidget(s.FuenteWidget(tr))
 	p.Docs = api.NewDocs(s.URL("docs"), s.Sesion, cliente)
 	p.Directorio = api.NewDirectorio(s.URL("id"), s.Sesion, cliente)
 	p.Grupos = s.Sesion.Grupos
@@ -119,9 +124,14 @@ func main() {
 			p.IniciarImportador(vida)
 		}
 	}
+	// conEscena: hasta que corre lo de CuandoHayaEscena, el AlCambiar no toca la
+	// pantalla; la escena la arranca con la sesión de ese momento (sesion.CuandoHayaEscena).
+	conEscena := false
 	s.AlCambiar(func(e sesion.Estado) {
 		actualizarImportador(e)
-		p.Sesion(e.Dentro())
+		if conEscena {
+			p.Sesion(e.Dentro())
+		}
 	})
 
 	// Arrastrar ficheros del sistema a la ventana los sube a la carpeta abierta, como
@@ -137,14 +147,18 @@ func main() {
 
 	w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.Drive).Montar(p.Objeto()))
 	w.Resize(fyne.NewSize(anchoInicial, altoInicial))
-	actualizarImportador(s.Estado())
 	w.SetOnClosed(func() {
 		if pararImportador != nil {
 			pararImportador()
 		}
 		p.PararImportador()
 	})
-	p.Arrancar(s.Estado().Dentro())
+	// Con interfaz: lanzada por iOS solo para el widget, ni importador ni explorador.
+	s.CuandoHayaEscena(func() {
+		conEscena = true
+		actualizarImportador(s.Estado())
+		p.Arrancar(s.Estado().Dentro())
+	})
 	s.RutaPropia(func(u *url.URL) bool {
 		if u == nil {
 			return false
@@ -238,17 +252,20 @@ func main() {
 	// Con el cliente EN LÍNEA: lo que otra app guarda aquí tiene que llegar a Drive, no a
 	// la caché sin conexión.
 	// En iOS, la copia en «En mi iPhone» sobra donde está la extensión: serían dos Drive.
-	go func() {
-		if runtime.GOOS == "ios" && sistema.ArchivosDisponible() {
-			return
-		}
-		err := documentos.Servir(context.Background(), api.NewDrive(s.URL("drive"), s.Sesion, nil), documentos.Textos{
-			Titulo: a.Metadata().Name, SinApp: tr.T("shell.documentsProvider.openApp", nil),
-		})
-		if err != nil && !errors.Is(err, documentos.ErrNoDisponible) {
-			slog.Warn("drive: el proveedor de documentos de Android no arranca", "error", err)
-		}
-	}()
+	// Con interfaz: lanzada por iOS solo para el widget no se sincroniza nada.
+	s.CuandoHayaEscena(func() {
+		go func() {
+			if runtime.GOOS == "ios" && sistema.ArchivosDisponible() {
+				return
+			}
+			err := documentos.Servir(context.Background(), api.NewDrive(s.URL("drive"), s.Sesion, nil), documentos.Textos{
+				Titulo: a.Metadata().Name, SinApp: tr.T("shell.documentsProvider.openApp", nil),
+			})
+			if err != nil && !errors.Is(err, documentos.ErrNoDisponible) {
+				slog.Warn("drive: el proveedor de documentos de Android no arranca", "error", err)
+			}
+		}()
+	})
 	ejecutarDrive(a, w, s, tr)
 }
 

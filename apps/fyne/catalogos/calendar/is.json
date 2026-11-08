@@ -66,6 +66,7 @@
   "common.remove": "Fjarlægja",
   "common.retry": "Reyna aftur",
   "common.save": "Vista",
+  "day.noEvents": "Engir viðburðir þennan dag",
   "error.calendarsLoad": "Ekki tókst að hlaða dagatölunum.",
   "error.eventsLoad": "Ekki tókst að hlaða viðburðunum.",
   "event.ai": "Lýstu viðburðinum",
@@ -142,12 +143,19 @@
   "grid.blockAria": "{title}, {time}",
   "grid.continued": "{title} (framhald)",
   "grid.createOn": "Búa til viðburð {date}",
+  "grid.dayEvents": {
+    "one": "{date}, {count} viðburður",
+    "other": "{date}, {count} viðburðir"
+  },
+  "grid.daySelected": "{label}, valið",
   "grid.loadError": "Ekki tókst að hlaða dagatalinu",
   "grid.loading": "Hleður dagatalinu",
   "grid.more": {
     "one": "+{count} í viðbót",
     "other": "+{count} í viðbót"
   },
+  "grid.showMonth": "Sýna allan mánuðinn",
+  "grid.showWeek": "Sýna aðeins þessa viku",
   "grid.snapAria": {
     "one": "Dráttarskref {count} mínúta. Ýttu til að breyta.",
     "other": "Dráttarskref {count} mínútur. Ýttu til að breyta."
@@ -160,6 +168,13 @@
     "one": "{count} mín.",
     "other": "{count} mín."
   },
+  "grid.todayLabel": "Í dag, {date}",
+  "grid.weekNumber": "Vika {week}",
+  "guests.organizer": "Skipuleggjandi",
+  "guests.status.accepted": "Mætir",
+  "guests.status.declined": "Mætir ekki",
+  "guests.status.pending": "Bíður svars",
+  "guests.status.tentative": "Kannski",
   "header.invitations": "Boð",
   "header.next": "Næsta",
   "header.pending": {
@@ -197,6 +212,10 @@
   "nav.createEventOn": "Búa til viðburð {date}",
   "nav.deleteSubscription": "Fjarlægja áskrift",
   "nav.manageResources": "Stjórna herbergjum og búnaði",
+  "nav.menuPending": {
+    "one": "Opna valmynd, {count} í bið",
+    "other": "Opna valmynd, {count} í bið"
+  },
   "nav.myCalendars": "Dagatölin mín",
   "nav.next": "Næsta",
   "nav.nextMonth": "Næsti mánuður",
@@ -341,6 +360,7 @@
   "scope.following": "Þennan og þá sem á eftir koma",
   "scope.legend": "Þessi viðburður endurtekur sig. Á hvaða viðburði á breytingin við?",
   "scope.this": "Aðeins þennan viðburð",
+  "search.allCalendars": "Öll dagatöl",
   "search.error": "Ekki tókst að ljúka leitinni.",
   "search.events": "Leita að viðburðum",
   "search.loadMore": "Sækja fleiri",
@@ -349,6 +369,12 @@
     "other": "Sláðu inn að minnsta kosti {count} stafi til að leita í dagatölunum þínum."
   },
   "search.noResults": "Engar niðurstöður fyrir „{term}“.",
+  "search.period": "Tímabil",
+  "search.period.any": "Hvenær sem er",
+  "search.period.month": "Í þessum mánuði",
+  "search.period.past": "Liðnir",
+  "search.period.upcoming": "Væntanlegir",
+  "search.period.year": "Á þessu ári",
   "search.placeholder": "Titill, lýsing, staðsetning eða boðið fólk…",
   "search.searching": "Leitar…",
   "search.series": "Röð",
@@ -390,6 +416,14 @@
   "share.whoSeesNow": "Hverjir sjá það núna",
   "share.writerHint": "Auk þess að sjá þá býr til, breytir og eyðir viðburðum í þessu dagatali.",
   "share.writerLabel": "Sjá og breyta viðburðunum mínum",
+  "shortcuts.group.actions": "Aðgerðir",
+  "shortcuts.group.navigate": "Fara á milli",
+  "shortcuts.group.views": "Yfirlit",
+  "shortcuts.help": "Sýna þennan lista",
+  "shortcuts.next": "Næsta tímabil",
+  "shortcuts.prev": "Fyrra tímabil",
+  "shortcuts.title": "Flýtilyklar",
+  "shortcuts.today": "Fara á daginn í dag",
   "subscribe.aria": "Gerast áskrifandi að dagatali með vefslóð",
   "subscribe.byUrl": "Áskrift með vefslóð (.ics)",
   "subscribe.defaultName": "Áskriftardagatal",

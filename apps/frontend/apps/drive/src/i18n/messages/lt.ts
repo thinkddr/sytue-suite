@@ -285,6 +285,18 @@ export const lt: AppCatalog<typeof en> = {
     many: '{count} elemento perkelta į šiukšlinę.',
     other: '{count} elementų perkelta į šiukšlinę.',
   },
+  'files.batch.restored': {
+    one: '{count} elementas atkurtas.',
+    few: '{count} elementai atkurti.',
+    many: '{count} elemento atkurta.',
+    other: '{count} elementų atkurta.',
+  },
+  'files.batch.restorePartial': {
+    one: '{count} elemento nepavyko atkurti; jis vis dar šiukšlinėje.',
+    few: '{count} elementų nepavyko atkurti; jie vis dar šiukšlinėje.',
+    many: '{count} elemento nepavyko atkurti; jie vis dar šiukšlinėje.',
+    other: '{count} elementų nepavyko atkurti; jie vis dar šiukšlinėje.',
+  },
   'files.batch.trashFailed': 'Nepavyko perkelti pasirinktų elementų į šiukšlinę.',
   'files.batch.moveTitle': {
     one: 'Perkelti {count} elementą',
@@ -309,6 +321,9 @@ export const lt: AppCatalog<typeof en> = {
   'action.rename': 'Pervardyti',
   'action.move': 'Perkelti į…',
   'action.copy': 'Sukurti kopiją',
+  'action.copyLink': 'Kopijuoti nuorodą',
+  'action.linkCopied': 'Nuoroda nukopijuota. Ji atsidaro tik tiems, kurie jau turi prieigą.',
+  'action.copyLinkFailed': 'Nuorodos nukopijuoti nepavyko.',
   'action.shareLink': 'Bendrinti nuorodą',
   'action.openInApp': 'Atidaryti programoje',
   'action.openInEditor': 'Atidaryti redaktoriuje',
@@ -535,6 +550,22 @@ export const lt: AppCatalog<typeof en> = {
   'trash.purged': '„{name}“ ištrintas visam laikui.',
   'trash.purgeDenied': '„{name}“ negalima ištrinti',
   'trash.purgeFailed': 'Nepavyko ištrinti.',
+  'trash.emptyAll': 'Išvalyti šiukšlinę',
+  'trash.emptyAllTitle': 'Išvalyti šiukšlinę?',
+  'trash.emptyAllBody': {
+    one: '{count} elementas šiukšlinėje bus ištrintas visam laikui kartu su versijų istorija. Vėliau jo atkurti nebus galima.',
+    few: '{count} elementai šiukšlinėje bus ištrinti visam laikui kartu su versijų istorija. Vėliau jų atkurti nebus galima.',
+    many: '{count} elemento šiukšlinėje bus ištrinta visam laikui kartu su versijų istorija. Vėliau jų atkurti nebus galima.',
+    other:
+      '{count} elementų šiukšlinėje bus ištrinta visam laikui kartu su versijų istorija. Vėliau jų atkurti nebus galima.',
+  },
+  'trash.emptiedAll': 'Šiukšlinė išvalyta.',
+  'trash.emptyAllPartial': {
+    one: '{count} elemento nepavyko ištrinti; jis vis dar šiukšlinėje.',
+    few: '{count} elementų nepavyko ištrinti; jie vis dar šiukšlinėje.',
+    many: '{count} elemento nepavyko ištrinti; jie vis dar šiukšlinėje.',
+    other: '{count} elementų nepavyko ištrinti; jie vis dar šiukšlinėje.',
+  },
   'trash.purgeTitle': 'Ištrinti visam laikui?',
   'trash.purgeBodyFolder':
     '„{name}“ ir viso jame esančio turinio duomenys bus ištrinti iš Sytue serverių kartu su versijų istorija. Vėliau jų atkurti nebus galima nei čia, nei per pagalbos tarnybą. Mainais atlaisvinsite jų užimamą vietą.',

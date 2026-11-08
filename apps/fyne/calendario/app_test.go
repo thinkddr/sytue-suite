@@ -38,8 +38,9 @@ func TestElRangoEsElDeLaWeb(t *testing.T) {
 	}
 }
 
-// TestNavegarEsElDeLaWeb: `navigate(delta)`. El mes desborda como `setMonth` de JS, y la
-// agenda salta su ventana entera de treinta días.
+// TestNavegarEsElDeLaWeb: `navigate(delta)`. El mes conserva el día recortado al último
+// (`addMonthsClamped`: desde el 31 de enero, «siguiente» es el 28 de febrero y no el 3 de
+// marzo), y la agenda salta su ventana entera de treinta días.
 func TestNavegarEsElDeLaWeb(t *testing.T) {
 	enero31 := time.Date(2026, 1, 31, 9, 0, 0, 0, time.UTC)
 	for _, c := range []struct {
@@ -48,13 +49,34 @@ func TestNavegarEsElDeLaWeb(t *testing.T) {
 		desde time.Time
 		llega string
 	}{
-		{VistaMes, 1, enero31, "2026-03-03"},
+		{VistaMes, 1, enero31, "2026-02-28"},
 		{VistaSemana, -1, enero31, "2026-01-24"},
 		{VistaDia, 1, enero31, "2026-02-01"},
 		{VistaAgenda, 1, enero31, "2026-03-02"},
 	} {
 		if got := Desplazar(c.v, c.desde, c.delta).Format(time.DateOnly); got != c.llega {
 			t.Errorf("vista %d, %+d: llega al %s y la web al %s", c.v, c.delta, got, c.llega)
+		}
+	}
+}
+
+// TestV12MoverMesRecorta es el vector espejo V12 mover-mes-recorta (dates.test.ts): el día
+// se conserva recortado al último del mes de destino, y la hora también. VISTO EN ROJO
+// devolviendo `cursor.AddDate(0, delta, 0)`, que salta a marzo.
+func TestV12MoverMesRecorta(t *testing.T) {
+	for _, c := range []struct {
+		desde time.Time
+		delta int
+		llega string
+	}{
+		{time.Date(2027, 1, 31, 9, 30, 0, 0, time.UTC), 1, "2027-02-28 09:30"},
+		{time.Date(2026, 3, 31, 9, 30, 0, 0, time.UTC), -1, "2026-02-28 09:30"},
+		{time.Date(2026, 12, 31, 9, 30, 0, 0, time.UTC), 2, "2027-02-28 09:30"},
+		{time.Date(2024, 1, 31, 9, 30, 0, 0, time.UTC), 1, "2024-02-29 09:30"},
+		{time.Date(2026, 11, 6, 9, 30, 0, 0, time.UTC), -1, "2026-10-06 09:30"},
+	} {
+		if got := MoverMes(c.desde, c.delta).Format("2006-01-02 15:04"); got != c.llega {
+			t.Errorf("MoverMes(%s, %+d) = %s y la web da %s", c.desde.Format(time.DateOnly), c.delta, got, c.llega)
 		}
 	}
 }

@@ -4,6 +4,8 @@
   "action.classified": "Aicmiú · {name}",
   "action.classify": "Aicmigh",
   "action.copy": "Déan cóip",
+  "action.copyLink": "Cóipeáil an nasc",
+  "action.copyLinkFailed": "Níorbh fhéidir an nasc a chóipeáil.",
   "action.delete": "Bog go dtí an bruscar",
   "action.desktopBody": "Mura bhfuil sé suiteáilte agat fós, is féidir leat é a íoslódáil.",
   "action.desktopCta": "Féach ar na híoslódálacha",
@@ -12,6 +14,7 @@
   "action.downloadName": "Íoslódáil {name}",
   "action.downloadZip": "Íoslódáil (ZIP)",
   "action.editorFailed": "Níorbh fhéidir leis an eagarthóir an comhad seo a oscailt.",
+  "action.linkCopied": "Cóipeáladh an nasc. Ní osclaítear é ach do dhaoine a bhfuil rochtain acu cheana.",
   "action.mailFailed": "Níorbh fhéidir cumadóir an ríomhphoist a oscailt",
   "action.menu": "Gníomhartha do {name}",
   "action.more": "Tuilleadh gníomhartha",
@@ -90,6 +93,20 @@
     "few": "Bog míreanna ({count})",
     "many": "Bog míreanna ({count})",
     "other": "Bog míreanna ({count})"
+  },
+  "files.batch.restorePartial": {
+    "one": "Níorbh fhéidir mír amháin a athchóiriú; tá sí fós sa bhruscar.",
+    "two": "Míreanna nárbh fhéidir a athchóiriú: {count}. Tá siad fós sa bhruscar.",
+    "few": "Míreanna nárbh fhéidir a athchóiriú: {count}. Tá siad fós sa bhruscar.",
+    "many": "Míreanna nárbh fhéidir a athchóiriú: {count}. Tá siad fós sa bhruscar.",
+    "other": "Míreanna nárbh fhéidir a athchóiriú: {count}. Tá siad fós sa bhruscar."
+  },
+  "files.batch.restored": {
+    "one": "Athchóiríodh mír amháin.",
+    "two": "Míreanna athchóirithe: {count}.",
+    "few": "Míreanna athchóirithe: {count}.",
+    "many": "Míreanna athchóirithe: {count}.",
+    "other": "Míreanna athchóirithe: {count}."
   },
   "files.batch.trashBody": {
     "one": "Cuirfear mír amháin sa bhruscar. Is féidir leat í a athchóiriú as sin.",
@@ -603,6 +620,23 @@
     "other": "Comhaid uaslódáilte: {count}."
   },
   "team.upload.partial": "Uaslódáladh {uploaded} as {count}.",
+  "trash.emptiedAll": "Folmhaíodh an bruscar.",
+  "trash.emptyAll": "Folmhaigh an bruscar",
+  "trash.emptyAllBody": {
+    "one": "Scriosfar an mhír sa bhruscar go buan, mar aon lena stair leaganacha. Ní bheidh aon bhealach í a fháil ar ais ina dhiaidh sin.",
+    "two": "Scriosfar na míreanna sa bhruscar go buan ({count}), mar aon lena stair leaganacha. Ní bheidh aon bhealach iad a fháil ar ais ina dhiaidh sin.",
+    "few": "Scriosfar na míreanna sa bhruscar go buan ({count}), mar aon lena stair leaganacha. Ní bheidh aon bhealach iad a fháil ar ais ina dhiaidh sin.",
+    "many": "Scriosfar na míreanna sa bhruscar go buan ({count}), mar aon lena stair leaganacha. Ní bheidh aon bhealach iad a fháil ar ais ina dhiaidh sin.",
+    "other": "Scriosfar na míreanna sa bhruscar go buan ({count}), mar aon lena stair leaganacha. Ní bheidh aon bhealach iad a fháil ar ais ina dhiaidh sin."
+  },
+  "trash.emptyAllPartial": {
+    "one": "Níorbh fhéidir mír amháin a scriosadh; tá sí fós sa bhruscar.",
+    "two": "Míreanna nárbh fhéidir a scriosadh: {count}. Tá siad fós sa bhruscar.",
+    "few": "Míreanna nárbh fhéidir a scriosadh: {count}. Tá siad fós sa bhruscar.",
+    "many": "Míreanna nárbh fhéidir a scriosadh: {count}. Tá siad fós sa bhruscar.",
+    "other": "Míreanna nárbh fhéidir a scriosadh: {count}. Tá siad fós sa bhruscar."
+  },
+  "trash.emptyAllTitle": "An bruscar a fholmhú?",
   "trash.emptyBody": "Taispeánfar anseo na comhaid agus na fillteáin a scriosann tú, agus beidh tú in ann iad a athchóiriú.",
   "trash.emptyTitle": "Tá an bruscar folamh",
   "trash.errorTitle": "Níorbh fhéidir an bruscar a lódáil",

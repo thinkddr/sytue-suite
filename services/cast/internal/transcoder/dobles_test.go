@@ -203,6 +203,18 @@ func (c *colaFalsa) Fallar(_ context.Context, jobID uuid.UUID, motivo string) (b
 
 var errBaseCaida = errors.New("postgres: connection refused")
 
+// senalFalsa apunta la señal de cambios que mandaría el trabajador.
+type senalFalsa struct {
+	mu     sync.Mutex
+	vistas []string
+}
+
+func (s *senalFalsa) AvisarCambio(_ context.Context, tenant, producto string, subjects ...string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.vistas = append(s.vistas, tenant+" "+producto+" "+strings.Join(subjects, ","))
+}
+
 // trabajadorDePrueba monta el bucle con los dobles, SIN pasar por `nuevo` (que
 // exige ffmpeg en el PATH): lo que se prueba aquí no lo necesita.
 func trabajadorDePrueba(cola Cola, objetos Objetos, tmp string) *trabajador {

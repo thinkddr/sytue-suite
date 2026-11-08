@@ -17,10 +17,10 @@ export const editor = {
   'editor.bases.desc': 'I record di una vista, così come sono ora',
   'editor.bases.title': 'Tabella da Sytue Bases',
   'editor.bases.prompt':
-    'Incolla il token di una connessione in sola lettura concessa a Sytue Web. I dati di quella vista diventeranno contenuto del sito e saranno pubblici una volta pubblicato.',
+    'Incolla il token di una connessione in sola lettura concessa a Sytue Webs. I dati di quella vista diventeranno contenuto del sito e saranno pubblici una volta pubblicato.',
   'editor.bases.confirm': 'Importa la vista',
   'editor.bases.invalid':
-    'Questa connessione non è valida per Sytue Web: potrebbe essere stata revocata, essere scaduta o essere stata concessa a un altro prodotto o a un’altra organizzazione.',
+    'Questa connessione non è valida per Sytue Webs: potrebbe essere stata revocata, essere scaduta o essere stata concessa a un altro prodotto o a un’altra organizzazione.',
   'editor.bases.large':
     'La vista non entra in una tabella del sito (al massimo 50 righe e 8 colonne). Restringila in Sytue Bases.',
   'editor.bases.forbidden':

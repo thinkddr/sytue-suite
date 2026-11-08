@@ -88,9 +88,9 @@ func GenerarCompartidosWooCommerce(irSitio *ir.Sitio, productos []domain.Product
 	archivos["style.css"] = []byte(fmt.Sprintf(`/*
 Theme Name: %s
 Theme URI: https://sytue.eu/product/web
-Author: Sytue Web
+Author: Sytue Webs
 Author URI: https://sytue.eu
-Description: Tema de bloques FSE exportado automáticamente desde Sytue Web con soporte WooCommerce.
+Description: Tema de bloques FSE exportado automáticamente desde Sytue Webs con soporte WooCommerce.
 Version: %s
 Requires at least: %s
 Tested up to: %s
@@ -105,7 +105,7 @@ Tags: full-site-editing, e-commerce, block-patterns
 	// 3. functions.php
 	archivos["functions.php"] = []byte(`<?php
 /**
- * Funciones del tema exportado desde Sytue Web.
+ * Funciones del tema exportado desde Sytue Webs.
  */
 
 if (!defined('ABSPATH')) {
@@ -135,7 +135,7 @@ add_action('after_setup_theme', 'sytue_pages_setup');
 	archivos["parts/footer.html"] = []byte(`<!-- wp:group {"tagName":"footer","layout":{"type":"flex","justifyContent":"center"}} -->
 <footer class="wp-block-group">
   <!-- wp:paragraph -->
-  <p>© 2026 Sytue Web Store</p>
+  <p>© 2026 Sytue Webs Store</p>
   <!-- /wp:paragraph -->
 </footer>
 <!-- /wp:group -->
@@ -149,7 +149,7 @@ add_action('after_setup_theme', 'sytue_pages_setup');
   <h1>%s</h1>
   <!-- /wp:heading -->
   <!-- wp:paragraph -->
-  <p>Bienvenido a nuestra tienda WooCommerce exportada desde Sytue Web.</p>
+  <p>Bienvenido a nuestra tienda WooCommerce exportada desde Sytue Webs.</p>
   <!-- /wp:paragraph -->
 </main>
 <!-- /wp:group -->
@@ -175,7 +175,7 @@ add_action('after_setup_theme', 'sytue_pages_setup');
 	// 9. README.md
 	archivos["README.md"] = []byte(fmt.Sprintf(`# Tema WooCommerce: %s
 
-Tema de bloques FSE (Full Site Editing) exportado desde **Sytue Web**.
+Tema de bloques FSE (Full Site Editing) exportado desde **Sytue Webs**.
 
 - Versión del tema: %s
 - Compatible con WordPress: >= %s

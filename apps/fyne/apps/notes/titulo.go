@@ -183,6 +183,9 @@ type BotonTitulo struct {
 	// no un encabezado— y `text-2xl font-semibold` en la hoja de un árbol.
 	Peso    ui.Peso
 	Escalon tema.Escalon
+	// Partir reparte el título en líneas en vez de recortarlo: es la tarea de la
+	// libreta, donde la web le quita el `truncate` (`.notes-stream-note … > button`).
+	Partir bool
 }
 
 // letra es el escalón y el peso con sus valores por defecto.
@@ -213,6 +216,18 @@ func (b *BotonTitulo) ConLetra(e tema.Escalon, p ui.Peso) *BotonTitulo {
 	return b
 }
 
+// Partido lo reparte en líneas y devuelve el mismo botón, para encadenar.
+func (b *BotonTitulo) Partido() *BotonTitulo { b.Partir = true; return b }
+
+// AltoPara es lo que ocupa a ese ancho: una línea, o las del reparto si parte.
+func (b *BotonTitulo) AltoPara(ancho float32) float32 {
+	e, peso := b.letra()
+	if !b.Partir {
+		return e.Linea
+	}
+	return max(e.Linea, ui.AltoParrafo(&ui.Parrafo{Texto: b.Texto, Escalon: e, Peso: peso}, max(ancho, 1)))
+}
+
 // Cursor es la mano: es un botón.
 func (b *BotonTitulo) Cursor() desktop.Cursor { return desktop.PointerCursor }
 
@@ -227,6 +242,9 @@ func (b *BotonTitulo) CreateRenderer() fyne.WidgetRenderer {
 		texto: ui.Texto(b.Texto, e, peso, tema.Color(b.Tinta, v)),
 		raya:  canvas.NewRectangle(tema.Color(b.Tinta, v)),
 	}
+	if b.Partir {
+		r.parrafo = ui.NuevoParrafo(b.Texto, e, peso, b.Tinta, v)
+	}
 	r.fondo.CornerRadius = tema.RadioSM
 	r.Refresh()
 	return r
@@ -238,6 +256,8 @@ type botonTituloRenderer struct {
 	aro   *ui.Aro
 	texto *canvas.Text
 	raya  *canvas.Rectangle
+	// parrafo sustituye a texto y raya cuando el título parte en líneas.
+	parrafo *ui.Parrafo
 }
 
 // MinSize es el texto entero y la línea; quien lo coloca le da menos si no cabe.
@@ -247,6 +267,9 @@ func (r *botonTituloRenderer) MinSize() fyne.Size {
 }
 
 func (r *botonTituloRenderer) Objects() []fyne.CanvasObject {
+	if r.parrafo != nil {
+		return append(r.aro.Antes(r.fondo), r.parrafo)
+	}
 	return append(r.aro.Antes(r.fondo), r.texto, r.raya)
 }
 func (r *botonTituloRenderer) Destroy() {}
@@ -257,6 +280,11 @@ func (r *botonTituloRenderer) Layout(t fyne.Size) {
 	r.fondo.Move(pos)
 	r.fondo.Resize(tam)
 	r.aro.ColocarEn(pos, tam)
+	if r.parrafo != nil {
+		r.parrafo.Move(fyne.NewPos(0, 0))
+		r.parrafo.Resize(fyne.NewSize(t.Width, ui.AltoParrafo(r.parrafo, t.Width)))
+		return
+	}
 	e, peso := r.b.letra()
 	ui.Truncar(r.texto, r.b.Texto, e, peso, t.Width)
 	ui.ColocarTexto(r.texto, e, 0, (t.Height-e.Linea)/2)
@@ -282,6 +310,10 @@ func (r *botonTituloRenderer) Refresh() {
 		r.raya.Hide()
 	}
 	r.raya.Refresh()
+	if r.parrafo != nil {
+		r.parrafo.Tinta, r.parrafo.Tachado = tema.Color(r.b.Tinta, v), r.b.Tachada
+		r.parrafo.Refresh()
+	}
 	r.aro.Pintar(v)
 	r.aro.Ver(r.b.Enfocado())
 	r.fondo.Refresh()

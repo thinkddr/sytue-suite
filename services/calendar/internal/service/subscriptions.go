@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/calendar/internal/caldav"
@@ -74,6 +75,11 @@ func (s *Service) SubscribeICS(ctx context.Context, ownerSub, rawURL, displayNam
 	return c, nil
 }
 
+// feedFetcher es lo que el servicio necesita de subscriptions.Client.
+type feedFetcher interface {
+	Fetch(ctx context.Context, rawURL string, cond subscriptions.Conditional) (subscriptions.FetchResult, error)
+}
+
 // RefreshSubscription refresca AHORA la suscripción de un calendario (acción
 // «actualizar ahora» del usuario) y devuelve el calendario con su estado nuevo.
 // El tenant ya va en el contexto de la petición. Misma verja que el resto de la
@@ -114,6 +120,33 @@ func (s *Service) refreshJob(ctx context.Context, job store.SubJob) {
 	if err := s.store.MarkSubscriptionResult(ctx, job, res); err != nil {
 		log.From(ctx).Warn("calendar: marcar suscripción", "calendar_id", job.CalendarID, "error", err)
 	}
+	if res.Status == "ok" {
+		s.avisarRefresco(ctx, job.CalendarID)
+	}
+}
+
+// avisarRefresco manda la señal de cambios del widget de Calendar a quienes ven un
+// calendario suscrito cuyo feed acaba de cambiar (un 304 o un error no cambian nada).
+// El worker refresca fuera de cualquier petición, así que avisa él; desde «actualizar
+// ahora» ya va dentro de la escritura (TrasEscribir) y la señal sale con ella.
+func (s *Service) avisarRefresco(ctx context.Context, calendarID uuid.UUID) {
+	if s.hub == nil {
+		return
+	}
+	if hubnotify.EnEscritura(ctx) {
+		s.store.AvisarQuienesVen(ctx, calendarID)
+		return
+	}
+	t, err := tenancy.From(ctx)
+	if err != nil {
+		return
+	}
+	quienes, err := s.store.QuienesVen(ctx, calendarID)
+	if err != nil {
+		log.From(ctx).Warn("calendar: quiénes ven la suscripción", "calendar_id", calendarID, "error", err)
+		return
+	}
+	s.hub.AvisarCambio(ctx, t.Slug, "calendar", quienes...)
 }
 
 // fetchAndSync hace el GET condicional SSRF-safe, y si el feed cambió lo parsea

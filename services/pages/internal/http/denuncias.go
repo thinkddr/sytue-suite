@@ -151,7 +151,7 @@ func (h *Handlers) retoValido(ctx context.Context, payload string) bool {
 
 func (h *Handlers) enviarAvisoCorreo(ctx context.Context, host string, rep *domain.AbuseReport) {
 	if h.Cfg.Correo.Activo() && h.Cfg.AbusoCorreo != "" {
-		asunto := fmt.Sprintf("[Sytue Web] Denuncia de abuso: %s", host)
+		asunto := fmt.Sprintf("[Sytue Webs] Denuncia de abuso: %s", host)
 		cuerpo := fmt.Sprintf("Denuncia de abuso recibida:\n\nHost: %s\nRuta: %s\nMotivo: %s\nDetalles:\n%s\nInformante: %s\nFecha: %s\n\n"+
 			"Es el único aviso de este sitio en la próxima hora: si llegan más denuncias suyas, están en abuse_reports.\n",
 			host, rep.Path, rep.Reason, rep.Details, rep.ReporterEmail, rep.CreatedAt.Format(time.RFC3339))

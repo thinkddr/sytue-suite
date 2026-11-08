@@ -115,6 +115,16 @@ spec:
                   name: sytue-contacts-internal
                   key: token
                   optional: true
+            # La señal de cambios de lo que se escribe, para el widget nativo de
+            # Contacts (/internal/events del Hub, ADR 0078). El secreto es el MISMO en el
+            # Hub y en cada servicio que avisa; sin él, fuera de dev, no arranca.
+            - name: HUB_BASE_URL
+              value: {{ .Values.config.hubUrl | default (printf "http://%s-hub" .Release.Name) | quote }}
+            - name: HUB_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sytue-hub-internal
+                  key: secret
             # ----- Postgres EXTERNO (Scaleway RDB; unica fuente de verdad) -----
             - name: DATABASE_URL
               valueFrom:

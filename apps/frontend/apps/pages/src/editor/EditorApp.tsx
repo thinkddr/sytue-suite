@@ -764,7 +764,7 @@ export function EditorApp({ siteId, locale, administra }: EditorAppProps): JSX.E
     return (
       <div class="sytue-safe-fullscreen bg-bg-subtle text-text-muted flex h-[100dvh] w-full flex-col items-center justify-center">
         <Spinner size={28} class="text-primary-text mb-3" />
-        <p class="text-sm font-medium">Cargando editor de Sytue Web...</p>
+        <p class="text-sm font-medium">Cargando editor de Sytue Webs...</p>
       </div>
     );
   }

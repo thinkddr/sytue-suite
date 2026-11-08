@@ -18,10 +18,10 @@ export const editor = {
   'editor.bases.desc': 'Posterne i en visning, som de ser ud nu',
   'editor.bases.title': 'Tabel fra Sytue Bases',
   'editor.bases.prompt':
-    'Indsæt tokenet for en skrivebeskyttet forbindelse, der er givet til Sytue Web. Dataene fra visningen bliver en del af webstedets indhold og bliver offentlige ved udgivelse.',
+    'Indsæt tokenet for en skrivebeskyttet forbindelse, der er givet til Sytue Webs. Dataene fra visningen bliver en del af webstedets indhold og bliver offentlige ved udgivelse.',
   'editor.bases.confirm': 'Hent visningen',
   'editor.bases.invalid':
-    'Den forbindelse er ikke gyldig til Sytue Web: den kan være tilbagekaldt, udløbet eller givet til et andet produkt eller en anden organisation.',
+    'Den forbindelse er ikke gyldig til Sytue Webs: den kan være tilbagekaldt, udløbet eller givet til et andet produkt eller en anden organisation.',
   'editor.bases.large':
     'Visningen kan ikke være i en tabel på webstedet (højst 50 rækker og 8 kolonner). Begræns den i Sytue Bases.',
   'editor.bases.forbidden':

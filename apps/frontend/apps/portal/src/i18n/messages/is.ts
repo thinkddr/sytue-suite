@@ -55,6 +55,7 @@ export const is: AppCatalog<typeof en> = {
   'inbox.markAll': 'Merkja allar sem lesnar',
   'inbox.loading': 'Sæki tilkynningar…',
   'inbox.unreadDot': 'Ólesin',
+  'inbox.markRead': 'Merkja sem lesið',
   'inbox.errorTitle': 'Ekki tókst að sækja tilkynningarnar',
   'inbox.errorBody': 'Hub svarar ekki í augnablikinu. Reyndu aftur eftir nokkrar sekúndur.',
   'inbox.retry': 'Reyna aftur',
@@ -682,6 +683,8 @@ export const is: AppCatalog<typeof en> = {
     '{sources} svaraði ekki svo einhverjar niðurstöður gætu vantað. Reyndu aftur eftir smástund.',
   'search.partialJoin': ' og ',
   'search.showing': 'Sýni {count} af {total} niðurstöðum.',
+  'search.loadMore': 'Hlaða inn fleiri niðurstöðum',
+  'search.loadMoreFailed': 'Ekki tókst að hlaða inn fleiri niðurstöðum. Reyndu aftur.',
   'privacy.notice':
     'Við seljum ekki gögnin þín og látum þau ekki þriðju aðilum í té. Við notum þau hvorki til að búa til snið um þig, til auglýsinga né til að þjálfa eða bæta þjónustu okkar eða annarra. Þau eru dulkóðuð í flutningi og í geymslu og fara aðeins út fyrir evrópsku innviðina okkar að því marki sem nauðsynlegt er til að rukka þig og í þeim samþættingum sem þú kveikir á, þar sem þriðji aðilinn biður þig um samþykki fyrir þeim gögnum sem hann notar.',
 };

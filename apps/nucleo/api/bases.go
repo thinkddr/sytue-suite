@@ -468,3 +468,58 @@ func (b *Bases) Export(ctx context.Context, tabla, formato string) (io.ReadClose
 	}
 	return resp.Body, nil
 }
+
+// MaxBytesAdjuntoBases es lo más que pesa un adjunto (`MAX_BYTES_ADJUNTO` de la web):
+// el servicio rechaza uno mayor con un 413, y así se avisa antes de subirlo.
+const MaxBytesAdjuntoBases = 20 << 20
+
+// MaxBytesCSVBases es lo más que pesa un CSV que se importa (`MAX_BYTES_CSV`).
+const MaxBytesCSVBases = 5 << 20
+
+// UploadAttachment sube un fichero a un campo de adjuntos de un registro. El tipo lo
+// decide el servicio por el contenido, no por la extensión ni por quien sube.
+func (b *Bases) UploadAttachment(ctx context.Context, registro, campo, nombre string, datos []byte) (BasesAttachment, error) {
+	var out BasesAttachment
+	resp, err := b.c.Do(ctx, Request{
+		Method: http.MethodPost, Path: "/records/" + url.PathEscape(registro) + "/attachments",
+		Query:  url.Values{"field": {campo}, "name": {nombre}},
+		Header: http.Header{"Content-Type": {"application/octet-stream"}}, Body: datos,
+	})
+	if err != nil {
+		return out, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	err = json.NewDecoder(resp.Body).Decode(&out)
+	return out, err
+}
+
+// DownloadAttachment baja un adjunto. Cerrar el cuerpo es cosa de quien llama.
+func (b *Bases) DownloadAttachment(ctx context.Context, registro, adjunto string) (io.ReadCloser, error) {
+	resp, err := b.c.Do(ctx, Request{Path: "/records/" + url.PathEscape(registro) + "/attachments/" + url.PathEscape(adjunto)})
+	if err != nil {
+		return nil, err
+	}
+	return resp.Body, nil
+}
+
+// DeleteAttachment borra un adjunto de un registro.
+func (b *Bases) DeleteAttachment(ctx context.Context, registro, adjunto string) error {
+	return b.sinCuerpo(ctx, http.MethodDelete, "/records/"+url.PathEscape(registro)+"/attachments/"+url.PathEscape(adjunto), nil)
+}
+
+// ImportCSV crea una tabla nueva a partir de un CSV con fila de cabecera (solo el
+// propietario). Devuelve la tabla creada.
+func (b *Bases) ImportCSV(ctx context.Context, base, nombre string, csv []byte) (BasesTable, error) {
+	var out BasesTable
+	resp, err := b.c.Do(ctx, Request{
+		Method: http.MethodPost, Path: "/bases/" + url.PathEscape(base) + "/import",
+		Query:  url.Values{"name": {nombre}},
+		Header: http.Header{"Content-Type": {"text/csv"}}, Body: csv,
+	})
+	if err != nil {
+		return out, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	err = json.NewDecoder(resp.Body).Decode(&out)
+	return out, err
+}

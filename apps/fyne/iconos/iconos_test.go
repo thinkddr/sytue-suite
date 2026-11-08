@@ -257,3 +257,59 @@ func TestChatYMeetSonRooms(t *testing.T) {
 		t.Error("una clave que no existe ha salido con marca")
 	}
 }
+
+// TestElNombreDeCadaProductoEsElDeLaWebYElDeSuToml: la barra del teléfono dice el nombre
+// de MARCA del producto sin «Sytue» y sin traducir (dueño, 2026-11-07: «mantén los mismos
+// nombres originales»). Tres fuentes que tienen que decir lo mismo: el catálogo de la web
+// (`CATALOGO_ORDENADO` de @sytue/ui, el del selector de apps), esta tabla y el `Name` del
+// FyneApp.toml de cada app nativa.
+//
+// VISTO EN ROJO cambiando «Sytue CertiPDF» por «Sytue PDF» en esta tabla.
+func TestElNombreDeCadaProductoEsElDeLaWebYElDeSuToml(t *testing.T) {
+	web := webref.Read(t, "apps/frontend/packages/ui/src/lib/apps.ts")
+	entrada := regexp.MustCompile(`key:\s*'([a-z-]+)',\s*name:\s*'([^']+)'`)
+	nombreWeb := map[string]string{}
+	for _, m := range entrada.FindAllStringSubmatch(web, -1) {
+		nombreWeb[m[1]] = m[2]
+	}
+	if len(nombreWeb) < 15 {
+		t.Fatalf("solo %d productos leídos del catálogo de la web: la lectura no vale", len(nombreWeb))
+	}
+	for p := One; p <= Bases; p++ {
+		if w, hay := nombreWeb[p.Clave()]; hay && w != p.Nombre() {
+			t.Errorf("%s: la web dice %q y Fyne %q", p.Clave(), w, p.Nombre())
+		}
+	}
+	tomls, err := filepath.Glob("../cmd/*/FyneApp.toml")
+	if err != nil || len(tomls) == 0 {
+		t.Fatalf("sin los FyneApp.toml: %v", err)
+	}
+	nombre := regexp.MustCompile(`(?m)^\s*Name\s*=\s*"([^"]+)"`)
+	esquema := regexp.MustCompile(`(?m)^\s*esquema\s*=\s*"sytue-([a-z-]+)"`)
+	vistos := 0
+	for _, ruta := range tomls {
+		datos, err := os.ReadFile(ruta)
+		if err != nil {
+			t.Fatal(err)
+		}
+		n, e := nombre.FindSubmatch(datos), esquema.FindSubmatch(datos)
+		if n == nil || e == nil || string(e[1]) == "fyne-demo" {
+			continue
+		}
+		p, ok := ProductoDe(string(e[1]))
+		if !ok {
+			t.Errorf("%s: esquema sin producto (%s)", ruta, e[1])
+			continue
+		}
+		if string(n[1]) != p.Nombre() {
+			t.Errorf("%s: Name %q y la barra diría %q", ruta, n[1], p.Nombre())
+		}
+		if p.NombreCorto() != strings.TrimPrefix(string(n[1]), "Sytue ") {
+			t.Errorf("%s: el nombre corto %q no es el Name sin «Sytue »", ruta, p.NombreCorto())
+		}
+		vistos++
+	}
+	if vistos != 15 {
+		t.Fatalf("vistas %d apps nativas; son quince", vistos)
+	}
+}

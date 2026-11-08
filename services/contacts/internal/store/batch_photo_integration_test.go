@@ -302,3 +302,214 @@ func TestHasPhotoEnElListado(t *testing.T) {
 		}
 	}
 }
+
+// TestBatchRestoreUltimoDeCadaUID verifica el «Deshacer» del lote: UNA operación que
+// devuelve lo último que se tiró de cada UID (las dos copias de un UID que vive en dos
+// libretas, no una copia más vieja), sin ajenos, sin chocar con un vivo y con un
+// recuento comparable al de TrashContacts.
+func TestBatchRestoreUltimoDeCadaUID(t *testing.T) {
+	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
+	st := store.New(h.Pool)
+	ctx := tenantCtx("acme")
+
+	bookA, err := st.CreateAddressBook(ctx, store.NewAddressBook{OwnerSub: "owner", Name: "a"})
+	if err != nil {
+		t.Fatalf("CreateAddressBook a: %v", err)
+	}
+	bookB, err := st.CreateAddressBook(ctx, store.NewAddressBook{OwnerSub: "owner", Name: "b"})
+	if err != nil {
+		t.Fatalf("CreateAddressBook b: %v", err)
+	}
+	for _, c := range []struct {
+		book uuid.UUID
+		uid  string
+	}{{bookA.ID, "d1"}, {bookA.ID, "d2"}, {bookA.ID, "d3"}, {bookB.ID, "d1"}, {bookB.ID, "d3"}} {
+		if _, err := st.CreateContact(ctx, "owner", sampleContact(c.book, c.uid, "C "+c.uid)); err != nil {
+			t.Fatalf("CreateContact %s: %v", c.uid, err)
+		}
+	}
+	ajeno, err := st.CreateAddressBook(ctx, store.NewAddressBook{OwnerSub: "owner2", Name: "x"})
+	if err != nil {
+		t.Fatalf("CreateAddressBook owner2: %v", err)
+	}
+	if _, err := st.CreateContact(ctx, "owner2", sampleContact(ajeno.ID, "x1", "Ajeno")); err != nil {
+		t.Fatalf("CreateContact x1: %v", err)
+	}
+	if _, err := st.TrashContacts(ctx, "owner2", []string{"x1"}); err != nil {
+		t.Fatalf("TrashContacts owner2: %v", err)
+	}
+
+	// d1 vive en dos libretas: el lote tira tres filas y deshacer devuelve las tres.
+	trashed, err := st.TrashContacts(ctx, "owner", []string{"d1", "d2"})
+	if err != nil || trashed != 3 {
+		t.Fatalf("TrashContacts = %d, %v; want 3", trashed, err)
+	}
+	if n, _ := st.RestoreContacts(ctx, "intruso", []string{"d1", "d2"}); n != 0 {
+		t.Fatalf("un intruso restauró %d contactos ajenos", n)
+	}
+	n, err := st.RestoreContacts(ctx, "owner", []string{"d1", "urn:uuid:d2", "x1", "nope"})
+	if err != nil || n != trashed {
+		t.Fatalf("RestoreContacts = %d, %v; want %d (ni ajenos ni inexistentes)", n, err, trashed)
+	}
+	if items, _ := st.ListTrash(ctx, "owner", 0); len(items) != 0 {
+		t.Fatalf("papelera tras deshacer = %+v, want vacía", items)
+	}
+	if other, _ := st.ListTrash(ctx, "owner2", 0); len(other) != 1 {
+		t.Fatalf("el contacto ajeno salió de su papelera: %+v", other)
+	}
+
+	// d3: se tiran las dos copias, se recupera una a mano y se vuelve a tirar.
+	// Deshacer ese segundo borrado devuelve esa copia, no la otra (que es de antes).
+	if n, _ := st.TrashContacts(ctx, "owner", []string{"d3"}); n != 2 {
+		t.Fatalf("TrashContacts d3 = %d, want 2", n)
+	}
+	items, _ := st.ListTrash(ctx, "owner", 0)
+	if len(items) != 2 {
+		t.Fatalf("papelera con d3 = %+v, want 2", items)
+	}
+	if err := st.RestoreContact(ctx, "owner", items[0].ID); err != nil {
+		t.Fatalf("RestoreContact: %v", err)
+	}
+	vivoEn := map[uuid.UUID]bool{}
+	for _, b := range []uuid.UUID{bookA.ID, bookB.ID} {
+		live, _ := st.ListContacts(ctx, "owner", b, 0)
+		for _, c := range live {
+			if c.UID == "d3" {
+				vivoEn[b] = true
+			}
+		}
+	}
+	if len(vivoEn) != 1 {
+		t.Fatalf("d3 debía estar vivo en una sola libreta: %v", vivoEn)
+	}
+	if n, _ := st.TrashContacts(ctx, "owner", []string{"d3"}); n != 1 {
+		t.Fatalf("segundo TrashContacts d3 = %d, want 1", n)
+	}
+	if n, _ := st.RestoreContacts(ctx, "owner", []string{"d3"}); n != 1 {
+		t.Fatalf("RestoreContacts d3 = %d, want 1 (solo el último borrado)", n)
+	}
+	for b := range vivoEn {
+		live, _ := st.ListContacts(ctx, "owner", b, 0)
+		hay := false
+		for _, c := range live {
+			hay = hay || c.UID == "d3"
+		}
+		if !hay {
+			t.Fatalf("volvió la copia vieja de d3, no la del último borrado")
+		}
+	}
+	if items, _ := st.ListTrash(ctx, "owner", 0); len(items) != 1 {
+		t.Fatalf("la copia vieja de d3 debía seguir en la papelera: %+v", items)
+	}
+
+	// Un UID que ya tiene un vivo en su libreta no vuelve (chocaría) y no cuenta.
+	if n, _ := st.TrashContacts(ctx, "owner", []string{"d2"}); n != 1 {
+		t.Fatalf("TrashContacts d2 = %d, want 1", n)
+	}
+	if _, err := st.CreateContact(ctx, "owner", sampleContact(bookA.ID, "d2", "Otro d2")); err != nil {
+		t.Fatalf("CreateContact d2 nuevo: %v", err)
+	}
+	if n, err := st.RestoreContacts(ctx, "owner", []string{"d2"}); err != nil || n != 0 {
+		t.Fatalf("RestoreContacts con choque = %d, %v; want 0 sin error", n, err)
+	}
+}
+
+// TestBatchRestoreNoReviveLoYaRecuperado: si en los diez segundos del aviso la persona
+// recupera a mano desde la Papelera lo que acaba de tirar, «Deshacer» no puede revivir
+// en su lugar una copia más vieja del mismo UID que tiró otro día en otra libreta.
+func TestBatchRestoreNoReviveLoYaRecuperado(t *testing.T) {
+	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
+	st := store.New(h.Pool)
+	ctx := tenantCtx("acme")
+
+	bookA, err := st.CreateAddressBook(ctx, store.NewAddressBook{OwnerSub: "owner", Name: "a"})
+	if err != nil {
+		t.Fatalf("CreateAddressBook a: %v", err)
+	}
+	bookB, err := st.CreateAddressBook(ctx, store.NewAddressBook{OwnerSub: "owner", Name: "b"})
+	if err != nil {
+		t.Fatalf("CreateAddressBook b: %v", err)
+	}
+	// Ayer: d1 en B, a la papelera.
+	if _, err := st.CreateContact(ctx, "owner", sampleContact(bookB.ID, "d1", "Copia de ayer")); err != nil {
+		t.Fatalf("CreateContact d1 en B: %v", err)
+	}
+	if n, _ := st.TrashContacts(ctx, "owner", []string{"d1"}); n != 1 {
+		t.Fatalf("TrashContacts d1 (ayer) = %d, want 1", n)
+	}
+	// Hoy: d1 en A, a la papelera desde el lote, y recuperado a mano.
+	if _, err := st.CreateContact(ctx, "owner", sampleContact(bookA.ID, "d1", "Copia de hoy")); err != nil {
+		t.Fatalf("CreateContact d1 en A: %v", err)
+	}
+	if n, _ := st.TrashContacts(ctx, "owner", []string{"d1"}); n != 1 {
+		t.Fatalf("TrashContacts d1 (hoy) = %d, want 1", n)
+	}
+	items, _ := st.ListTrash(ctx, "owner", 0)
+	if len(items) != 2 || items[0].FormattedName != "Copia de hoy" {
+		t.Fatalf("papelera = %+v, want la de hoy primero", items)
+	}
+	if err := st.RestoreContact(ctx, "owner", items[0].ID); err != nil {
+		t.Fatalf("RestoreContact: %v", err)
+	}
+
+	// «Deshacer» del aviso: no hay nada suyo que deshacer.
+	if n, err := st.RestoreContacts(ctx, "owner", []string{"d1"}); err != nil || n != 0 {
+		t.Fatalf("RestoreContacts tras recuperar a mano = %d, %v; want 0", n, err)
+	}
+	if live, _ := st.ListContacts(ctx, "owner", bookB.ID, 0); len(live) != 0 {
+		t.Fatalf("volvió la copia de ayer de B, que nadie pidió: %+v", live)
+	}
+	if items, _ := st.ListTrash(ctx, "owner", 0); len(items) != 1 || items[0].FormattedName != "Copia de ayer" {
+		t.Fatalf("la copia de ayer debía seguir en la papelera: %+v", items)
+	}
+}
+
+// TestEachCardByIDSoloLasVivasDelDuenoEnOrden: la exportación de una selección trae, en
+// UNA consulta, la vCard guardada de cada contacto vivo del dueño, en el orden pedido;
+// ni ajenos, ni borrados.
+func TestEachCardByIDSoloLasVivasDelDuenoEnOrden(t *testing.T) {
+	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
+	st := store.New(h.Pool)
+	ctx := tenantCtx("acme")
+
+	book, err := st.CreateAddressBook(ctx, store.NewAddressBook{OwnerSub: "owner", Name: "a"})
+	if err != nil {
+		t.Fatalf("CreateAddressBook: %v", err)
+	}
+	ids := map[string]uuid.UUID{}
+	for _, u := range []string{"e1", "e2", "e3"} {
+		c, err := st.CreateContact(ctx, "owner", sampleContact(book.ID, u, "C "+u))
+		if err != nil {
+			t.Fatalf("CreateContact %s: %v", u, err)
+		}
+		ids[u] = c.ID
+	}
+	ajena, _ := st.CreateAddressBook(ctx, store.NewAddressBook{OwnerSub: "owner2", Name: "x"})
+	x, err := st.CreateContact(ctx, "owner2", sampleContact(ajena.ID, "x1", "Ajeno"))
+	if err != nil {
+		t.Fatalf("CreateContact x1: %v", err)
+	}
+	if _, err := st.TrashContacts(ctx, "owner", []string{"e2"}); err != nil {
+		t.Fatalf("TrashContacts: %v", err)
+	}
+
+	var cards []string
+	err = st.EachCardByID(ctx, "owner", []uuid.UUID{ids["e3"], x.ID, ids["e2"], ids["e1"], uuid.New()}, func(c string) error {
+		cards = append(cards, c)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("EachCardByID: %v", err)
+	}
+	if len(cards) != 2 || !strings.Contains(cards[0], "UID:e3") || !strings.Contains(cards[1], "UID:e1") {
+		t.Fatalf("EachCardByID = %q; want e3 y e1, en ese orden", cards)
+	}
+
+	// Un error de quien recibe para la lectura y se devuelve.
+	parar := errors.New("parar")
+	n := 0
+	err = st.EachCardByID(ctx, "owner", []uuid.UUID{ids["e3"], ids["e1"]}, func(string) error { n++; return parar })
+	if !errors.Is(err, parar) || n != 1 {
+		t.Fatalf("EachCardByID con fn que falla: err=%v tras %d tarjetas; want parar tras 1", err, n)
+	}
+}

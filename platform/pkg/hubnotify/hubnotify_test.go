@@ -87,3 +87,14 @@ func TestMencionados(t *testing.T) {
 		t.Fatalf("Mencionados = %v", got)
 	}
 }
+
+// TestMencionadosConEspacioDuro: el espacio duro (U+00A0, el `&nbsp;` que deja el editor
+// tras una mención al final de un párrafo) y los demás blancos de Unicode separan como
+// un espacio, igual que el `\s` de JavaScript con el que la web pinta la mención. Visto
+// en rojo con el `\s` de RE2: salía `ana@x.es\u00a0` y no se avisaba a nadie.
+func TestMencionadosConEspacioDuro(t *testing.T) {
+	got := hubnotify.Mencionados("hola @ana@x.es\u00a0\nsigue,\u00a0@luis@y.org\u202fy\u3000@eva@z.eu")
+	if len(got) != 3 || got[0] != "ana@x.es" || got[1] != "luis@y.org" || got[2] != "eva@z.eu" {
+		t.Fatalf("Mencionados = %q", got)
+	}
+}

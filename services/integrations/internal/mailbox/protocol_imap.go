@@ -57,7 +57,7 @@ func (p *protocolClient) imapFolders(ctx context.Context) ([]Folder, error) {
 		return nil, err
 	}
 	defer func() { _ = c.Close() }()
-	cmd := c.List("", "*", nil)
+	cmd := c.List("", "*", specialUseList(c))
 	defer func() { _ = cmd.Close() }()
 	var folders []Folder
 	for item := cmd.Next(); item != nil; item = cmd.Next() {
@@ -67,20 +67,16 @@ func (p *protocolClient) imapFolders(ctx context.Context) ([]Folder, error) {
 		if len(folders) >= 500 {
 			return nil, ErrTooLarge
 		}
-		f := Folder{ID: item.Mailbox, Name: item.Mailbox}
+		f := Folder{ID: item.Mailbox, Name: item.Mailbox, Role: specialUseRole(item.Attrs)}
 		if strings.EqualFold(item.Mailbox, "INBOX") {
 			f.Role = "inbox"
-		}
-		for _, role := range []string{"Sent", "Drafts", "Trash", "Junk", "Archive"} {
-			if slices.Contains(item.Attrs, imap.MailboxAttr("\\"+role)) {
-				f.Role = strings.ToLower(role)
-			}
 		}
 		folders = append(folders, f)
 	}
 	if err := cmd.Close(); err != nil {
 		return nil, protocolError(err)
 	}
+	namedRoles(folders)
 	// STATUS is issued after draining LIST: a streaming LIST must not deadlock
 	// its reader while another command waits for that same connection.
 	for i := range folders {
@@ -96,6 +92,77 @@ func (p *protocolClient) imapFolders(ctx context.Context) ([]Folder, error) {
 		}
 	}
 	return folders, nil
+}
+
+// specialUseList asks LIST for the SPECIAL-USE attributes (RFC 6154) when the
+// server offers them: without RETURN (SPECIAL-USE) a server may leave them out.
+func specialUseList(c *imapclient.Client) *imap.ListOptions {
+	return &imap.ListOptions{ReturnSpecialUse: c.Caps().Has(imap.CapSpecialUse)}
+}
+
+// specialUseRoles are the SPECIAL-USE attributes the client shows as a role.
+var specialUseRoles = []struct {
+	attr imap.MailboxAttr
+	role string
+}{
+	{imap.MailboxAttrSent, "sent"},
+	{imap.MailboxAttrDrafts, "drafts"},
+	{imap.MailboxAttrTrash, "trash"},
+	{imap.MailboxAttrJunk, "junk"},
+	{imap.MailboxAttrArchive, "archive"},
+}
+
+// specialUseRole is the role a mailbox's SPECIAL-USE attributes give it.
+func specialUseRole(attrs []imap.MailboxAttr) string {
+	for _, s := range specialUseRoles {
+		if slices.Contains(attrs, s.attr) {
+			return s.role
+		}
+	}
+	return ""
+}
+
+// mailboxNames are the names servers give their special folders when they do
+// not mark them: iCloud's «Sent Messages» and «Deleted Messages», Outlook's
+// «Sent Items» and «Deleted Items», Gmail's «Spam».
+var mailboxNames = map[string]string{
+	"sent":             "sent",
+	"sent messages":    "sent",
+	"sent items":       "sent",
+	"sent mail":        "sent",
+	"drafts":           "drafts",
+	"trash":            "trash",
+	"deleted messages": "trash",
+	"deleted items":    "trash",
+	"junk":             "junk",
+	"junk e-mail":      "junk",
+	"junk email":       "junk",
+	"spam":             "junk",
+	"archive":          "archive",
+}
+
+// namedRole is the role a mailbox's name gives it, at the top level or under
+// INBOX (Dovecot and Courier call them «INBOX.Sent»).
+func namedRole(name string) string {
+	name = strings.ToLower(name)
+	for _, prefix := range []string{"inbox.", "inbox/"} {
+		name = strings.TrimPrefix(name, prefix)
+	}
+	return mailboxNames[name]
+}
+
+// namedRoles gives a role by name only when no mailbox has it from SPECIAL-USE,
+// and only to the first one with that name: a role is never given twice.
+func namedRoles(folders []Folder) {
+	taken := map[string]bool{}
+	for _, f := range folders {
+		taken[f.Role] = true
+	}
+	for i, f := range folders {
+		if role := namedRole(f.Name); f.Role == "" && role != "" && !taken[role] {
+			folders[i].Role, taken[role] = role, true
+		}
+	}
 }
 
 func imapIdentity(validity uint32, uid imap.UID) string {
@@ -284,11 +351,7 @@ func (p *protocolClient) saveSent(ctx context.Context, raw []byte) bool {
 		return false
 	}
 	defer func() { _ = c.Close() }()
-	options := &imap.ListOptions{}
-	if c.Caps().Has(imap.CapSpecialUse) {
-		options.ReturnSpecialUse = true
-	}
-	cmd := c.List("", "*", options)
+	cmd := c.List("", "*", specialUseList(c))
 	sent, fallback := "", ""
 	for count, item := 0, cmd.Next(); item != nil; count, item = count+1, cmd.Next() {
 		if count >= 500 {
@@ -301,7 +364,7 @@ func (p *protocolClient) saveSent(ctx context.Context, raw []byte) bool {
 		if slices.Contains(item.Attrs, imap.MailboxAttrSent) {
 			sent = item.Mailbox
 		}
-		if strings.EqualFold(item.Mailbox, "Sent") || strings.EqualFold(item.Mailbox, "Sent Items") || strings.EqualFold(item.Mailbox, "Sent Messages") {
+		if fallback == "" && namedRole(item.Mailbox) == "sent" {
 			fallback = item.Mailbox
 		}
 	}

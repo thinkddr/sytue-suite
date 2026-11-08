@@ -131,3 +131,40 @@ func TestTodosLosJuegosDeLaHojaSeLeen(t *testing.T) {
 		}
 	}
 }
+
+// TestElCromoPapelEsUnEjeAparte: el cromo «papel» pone el marco, el menú y la hoja en
+// los colores de la página, con la tinta del texto, en las tres apariencias, sin tocar el
+// color de marca; y se quita igual que se pone. Visto en rojo sin `apilarBloque` (el menú
+// seguía en petróleo) y con la apertura del bloque mal escrita (ídem).
+func TestElCromoPapelEsUnEjeAparte(t *testing.T) {
+	t.Cleanup(func() { ElegirCromo(""); ElegirColor("") })
+	primario := Color("primary", Light)
+	if EsPapel() || !ElegirCromo(CromoPapel) || !EsPapel() {
+		t.Fatal("el cromo por defecto no es el de color, o elegir «papel» no cambia nada")
+	}
+	if ElegirCromo(CromoPapel) {
+		t.Error("elegir el cromo que ya está dice que ha cambiado: se repintaría sin motivo")
+	}
+	for v := range variantes {
+		va := Variant(v)
+		for nombre, quiero := range map[string]string{
+			"sidebar-bg": "bg", "frame-from": "bg", "frame-to": "bg", "sheet-bg": "surface",
+			"sidebar-fg": "text", "sidebar-fg-muted": "text-muted", "sidebar-indicator": "primary",
+		} {
+			if got := Color(nombre, va); got != Color(quiero, va) {
+				t.Errorf("papel, apariencia %d: %s = %v y %s = %v", v, nombre, got, quiero, Color(quiero, va))
+			}
+		}
+	}
+	if Color("primary", Light) != primario {
+		t.Error("el cromo ha tocado el color de marca")
+	}
+	// Con otro color de la suite el menú sigue en papel: el cromo pesa más que el carril.
+	ElegirColor("cobalto")
+	if Color("sidebar-bg", Light) != Color("bg", Light) {
+		t.Errorf("papel en cobalto: el menú pinta %v", Color("sidebar-bg", Light))
+	}
+	if !ElegirCromo("") || EsPapel() || Color("sidebar-bg", Light) != rgb(0x3355d6) {
+		t.Error("quitar el cromo no devuelve el carril del color elegido")
+	}
+}

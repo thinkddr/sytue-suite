@@ -16,9 +16,11 @@ import (
 	"testing"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/test"
 
+	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
@@ -183,7 +185,11 @@ func (f *falso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		di(pag)
 	case clave == "POST tables/3" && x[2] == "records":
-		reg := m{"id": fmt.Sprintf("n%d", f.n), "table_id": x[1], "rev": 1, "data": m{}, "links": m{}}
+		datos, _ := pedido["data"].(map[string]any)
+		if datos == nil {
+			datos = m{}
+		}
+		reg := m{"id": fmt.Sprintf("n%d", f.n), "table_id": x[1], "rev": 1, "data": datos, "links": m{}}
 		f.registros[x[1]] = append(f.registros[x[1]], reg)
 		di(reg)
 	case clave == "GET tables/3" && x[2] == "views":
@@ -255,6 +261,23 @@ func (f *falso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		nada()
+	case clave == "POST records/3" && x[2] == "attachments":
+		q := r.URL.Query()
+		if strings.HasSuffix(q.Get("name"), ".exe") {
+			falla(http.StatusUnprocessableEntity, "invalid")
+			return
+		}
+		di(m{"id": fmt.Sprintf("a%d", f.n), "record_id": x[1], "field_id": q.Get("field"), "name": q.Get("name"), "mime": "text/plain", "size": len(cuerpo)})
+	case clave == "GET records/4" && x[2] == "attachments":
+		_, _ = io.WriteString(w, "contenido del adjunto")
+	case clave == "DELETE records/4" && x[2] == "attachments":
+		nada()
+	case clave == "POST bases/3" && x[2] == "import":
+		campos := []m{campoDe(fmt.Sprintf("c%d", f.n), "", "Cliente", "text", nil)}
+		t := m{"id": fmt.Sprintf("t%d", f.n), "base_id": "b1", "name": r.URL.Query().Get("name"), "position": len(f.tablas), "fields": campos}
+		f.tablas = append(f.tablas, t)
+		w.WriteHeader(http.StatusCreated)
+		di(t)
 	case clave == "GET tables/3" && x[2] == "export":
 		_, _ = io.WriteString(w, "Nombre,Edad\nPersona 1,21\n")
 	default:
@@ -556,8 +579,9 @@ func TestEditarCeldasSegunSuTipo(t *testing.T) {
 	}
 }
 
-// TestAnadirYBorrarRegistros: «Añadir registro» lo pone al final; borrar pregunta, y si
-// otros registros enlazan con él, el propietario puede forzarlo con una segunda pregunta.
+// TestAnadirYBorrarRegistros: «Añadir registro» lo pone al final y abre su ficha; borrar
+// se hace desde la ficha y pregunta, y si otros registros enlazan con él, el propietario
+// puede forzarlo con una segunda pregunta.
 func TestAnadirYBorrarRegistros(t *testing.T) {
 	f := nuevoFalso(2)
 	p, w := abrir(t, f)
@@ -569,6 +593,14 @@ func TestAnadirYBorrarRegistros(t *testing.T) {
 	if len(g.Registros) != 3 || !f.vio(`POST /tables/t1/records {"data":{}}`) {
 		t.Fatalf("no se ha añadido el registro: %d", len(g.Registros))
 	}
+	if campoDeDialogo(t, w, "Nombre") == nil {
+		t.Fatal("añadir un registro no abre su ficha")
+	}
+	pulsar(t, w, "Guardar") // sin tocar nada, cierra sin escribir
+	if n := len(f.peticiones("PUT")); n != 0 || len(w.Canvas().Overlays().List()) != 0 {
+		t.Fatalf("guardar una ficha sin cambios escribe (%d) o no se cierra", n)
+	}
+	pulsar(t, w, "Fila 2")
 	pulsar(t, w, "Borrar la fila 2")
 	if got := textos(w); !strings.Contains(got, "¿Borrar este registro?") || f.vio("DELETE /records/r002") {
 		t.Fatalf("borrar un registro pregunta antes:\n%s", got)
@@ -581,6 +613,74 @@ func TestAnadirYBorrarRegistros(t *testing.T) {
 	pulsar(t, w, "Borrar")
 	if !f.vio("DELETE /records/r002?force=true") || len(g.Registros) != 2 || g.Registros[1].ID == "r002" {
 		t.Fatalf("no se ha forzado el borrado: %q", f.peticiones("DELETE"))
+	}
+}
+
+// TestLaFichaRellenaElRegistro: la ficha pide cada campo con su control, no envía un
+// valor que no encaja (y lo marca sin perder lo escrito), guarda solo lo cambiado y
+// «Añadir registro» guarda y abre la ficha de otro, para rellenar seguido.
+func TestLaFichaRellenaElRegistro(t *testing.T) {
+	f := nuevoFalso(1)
+	p, w := abrir(t, f)
+	pulsar(t, w, "Añadir registro")
+	capturar(t, w, "ficha-nueva")
+	campoDeDialogo(t, w, "Nombre").PonerTexto("Ana")
+	campoDeDialogo(t, w, "Edad").PonerTexto("treinta")
+	campoDeDialogo(t, w, "Alta").PonerTexto("05/10/2026")
+	pulsar(t, w, "Guardar")
+	if got := textos(w); !strings.Contains(got, "Ese valor no encaja en este campo.") || len(f.peticiones("PUT")) != 0 {
+		t.Fatalf("un número que no lo es se ha enviado o no se avisa:\n%s", got)
+	}
+	if campoDeDialogo(t, w, "Nombre").Texto() != "Ana" {
+		t.Fatal("avisar de un valor ha borrado lo escrito en otro campo")
+	}
+	campoDeDialogo(t, w, "Edad").PonerTexto("33,5")
+	elegir(t, w, "Nivel", "Oro")
+	enCapas(w, func(o fyne.CanvasObject) {
+		if c, ok := o.(*ui.Eleccion); ok && (c.Etiqueta == "Activa" || c.Etiqueta == "vip" || c.Etiqueta == "Acme") {
+			test.Tap(c)
+		}
+	})
+	pulsar(t, w, "Añadir registro")
+	id := p.abierta.rejilla.Registros[1].ID
+	for _, quiero := range []string{
+		"PUT /records/" + id + `/cells/nom?v=1 {"expected":null,"value":"Ana"}`,
+		"PUT /records/" + id + `/cells/eda?v=1 {"expected":null,"value":33.5}`,
+		"PUT /records/" + id + `/cells/alt?v=1 {"expected":null,"value":"2026-10-05"}`,
+		"PUT /records/" + id + `/cells/act?v=1 {"expected":null,"value":true}`,
+		"PUT /records/" + id + `/cells/niv?v=1 {"expected":null,"value":"Oro"}`,
+		"PUT /records/" + id + `/cells/eti?v=1 {"expected":null,"value":["vip"]}`,
+		"PUT /records/" + id + `/cells/emp?v=1 {"expected":[],"links":["e1"]}`,
+	} {
+		if !f.vio(quiero) {
+			t.Errorf("no se ha enviado %s; se envió:\n%s", quiero, strings.Join(f.peticiones("PUT"), "\n"))
+		}
+	}
+	if n := len(f.peticiones("PUT")); n != 7 {
+		t.Errorf("se han escrito %d celdas; la fórmula no se escribe", n)
+	}
+	if len(p.abierta.rejilla.Registros) != 3 || campoDeDialogo(t, w, "Nombre") == nil || campoDeDialogo(t, w, "Nombre").Texto() != "" {
+		t.Fatal("«Añadir registro» en la ficha no abre la de otro registro, vacía")
+	}
+}
+
+// TestEnUnTelefonoNoSeHablaDeTeclas: la ayuda de Intro, F2 y flechas no dice nada a
+// quien toca la pantalla; ahí se toca la celda que ya está marcada para editarla.
+func TestEnUnTelefonoNoSeHablaDeTeclas(t *testing.T) {
+	t.Cleanup(ui.TactilDePrueba(true))
+	f := nuevoFalso(1)
+	p, w := abrir(t, f)
+	if got := textos(w); strings.Contains(got, "Intro o F2") {
+		t.Errorf("en un teléfono se explica el teclado:\n%s", got)
+	}
+	g := p.abierta.rejilla
+	g.Tapped(&fyne.PointEvent{Position: fyne.NewPos(g.r.ancho0+1, altoCabeza+1)})
+	if g.editando {
+		t.Fatal("el primer toque ya edita: tiene que marcar la celda")
+	}
+	g.Tapped(&fyne.PointEvent{Position: fyne.NewPos(g.r.ancho0+1, altoCabeza+1)})
+	if !g.editando || g.editor.Texto() != "Persona 1" {
+		t.Fatal("tocar la celda marcada no la edita")
 	}
 }
 
@@ -603,10 +703,25 @@ func TestQuienSoloLeeNoEdita(t *testing.T) {
 	if !strings.Contains(got, "Puedes leer esta tabla pero no cambiarla.") {
 		t.Errorf("la rejilla no dice que es de solo lectura:\n%s", got)
 	}
-	for _, no := range []string{"[Añadir registro]", "[Añadir campo]", "[Añadir vista]", "[Añadir tabla]", "[Renombrar tabla]", "[Borrar la fila 1]"} {
+	for _, no := range []string{"[Añadir registro]", "[Añadir campo]", "(Más acciones · Personas)", "(Más acciones · Clientes)"} {
 		if strings.Contains(got, no) {
 			t.Errorf("un lector ve %s", no)
 		}
+	}
+	// La ficha se abre también para leer: sin campos que escribir ni botón de borrar.
+	pulsar(t, w, "Fila 1")
+	capturar(t, w, "ficha-lector")
+	if got := textos(w); !strings.Contains(got, "Persona 1") || strings.Contains(got, "[Borrar la fila 1]") || strings.Contains(got, "[Guardar]") {
+		t.Errorf("la ficha de un lector no es solo de lectura:\n%s", got)
+	}
+	var campos int
+	enCapas(w, func(o fyne.CanvasObject) {
+		if _, ok := o.(*ui.Entrada); ok {
+			campos++
+		}
+	})
+	if campos != 0 {
+		t.Errorf("la ficha de un lector trae %d campos que se escriben", campos)
 	}
 }
 
@@ -617,7 +732,7 @@ func TestLasVistasGuardadas(t *testing.T) {
 	f := nuevoFalso(3)
 	p, w := abrir(t, f)
 	b := p.abierta
-	pulsar(t, w, "Añadir vista")
+	pulsarEnMenu(t, w, "Personas", "Añadir vista")
 	if c := boton(w, "Crear vista"); c == nil || !c.Inerte {
 		t.Fatal("sin nombre, «Crear vista» tiene que estar apagado")
 	}
@@ -643,17 +758,17 @@ func TestLasVistasGuardadas(t *testing.T) {
 		t.Errorf("los registros no vienen en el orden de la vista: el primero es %s", b.rejilla.Registros[0].ID)
 	}
 	capturar(t, w, "rejilla-con-vista")
-	if got := textos(w); !strings.Contains(got, "[Mayores · Rejilla]") || !strings.Contains(got, "[Borrar vista]") {
+	if got := textos(w); !strings.Contains(got, "‹Vistas: Mayores · Rejilla›") || !slices.Contains(elementosDe(t, w, "Personas"), "Borrar vista") {
 		t.Errorf("la vista elegida no sale en la barra:\n%s", got)
 	}
-	pulsar(t, w, "Borrar vista")
+	pulsarEnMenu(t, w, "Personas", "Borrar vista")
 	pulsar(t, w, "Borrar")
 	if !f.vio("DELETE /views/"+vista) || b.VistaID != "" || len(b.Vistas) != 0 || b.rejilla.Registros[0].ID != "r001" {
 		t.Fatalf("al borrar la vista no se vuelve a todos los registros: vista %q, %d vistas", b.VistaID, len(b.Vistas))
 	}
 
 	// Una vista de formulario enseña los campos que pide, no la rejilla.
-	pulsar(t, w, "Añadir vista")
+	pulsarEnMenu(t, w, "Personas", "Añadir vista")
 	campoDeDialogo(t, w, "Nombre de la vista").PonerTexto("Alta de personas")
 	elegir(t, w, "Tipo", "Formulario")
 	enCapas(w, func(o fyne.CanvasObject) {
@@ -719,13 +834,13 @@ func TestElPropietarioCambiaElEsquema(t *testing.T) {
 		t.Fatalf("el enlace no apunta a la otra tabla: %q", f.peticiones("POST /tables/t1/fields"))
 	}
 
-	pulsar(t, w, "Renombrar tabla")
+	pulsarEnMenu(t, w, "Personas", "Renombrar tabla")
 	campoDeDialogo(t, w, "").PonerTexto("Gente")
 	pulsar(t, w, "Guardar")
 	if !f.vio(`PATCH /tables/t1 {"name":"Gente"}`) || !strings.Contains(textos(w), "<Gente>") {
 		t.Fatalf("la tabla no se ha renombrado:\n%s", textos(w))
 	}
-	pulsar(t, w, "Añadir tabla")
+	pulsarEnMenu(t, w, "Clientes", "Añadir tabla")
 	campoDeDialogo(t, w, "").PonerTexto("Pedidos")
 	pulsar(t, w, "Crear tabla")
 	if !f.vio(`POST /bases/b1/tables {"name":"Pedidos"}`) || b.tabla() == nil || b.tabla().Name != "Pedidos" {
@@ -735,7 +850,7 @@ func TestElPropietarioCambiaElEsquema(t *testing.T) {
 	if got := textos(w); !strings.Contains(got, "Esta tabla todavía no tiene campos.") {
 		t.Errorf("una tabla sin campos lo dice:\n%s", got)
 	}
-	pulsar(t, w, "Borrar tabla")
+	pulsarEnMenu(t, w, "Pedidos", "Borrar tabla")
 	pulsar(t, w, "Borrar")
 	if len(b.Tablas) != 2 || b.Activa != "t1" {
 		t.Fatalf("al borrar la tabla no se vuelve a la primera: %d tablas, activa %q", len(b.Tablas), b.Activa)
@@ -752,7 +867,7 @@ func TestElTableroMueveTarjetasConSuSelector(t *testing.T) {
 	}
 	f.vistas["t1"] = []m{{"id": "vk", "table_id": "t1", "name": "Por nivel", "kind": "kanban", "config": m{"group_by": "niv"}}}
 	p, w := abrir(t, f)
-	pulsar(t, w, "Por nivel · Tablero")
+	elegir(t, w, "Vistas", "Por nivel · Tablero")
 	capturar(t, w, "tablero")
 	if !f.vio("GET /tables/t1/records?limit=100&view=vk") {
 		t.Fatalf("el tablero no pide los registros de su vista: %q", f.peticiones("GET /tables/t1/records"))
@@ -803,9 +918,9 @@ func TestElTableroMueveTarjetasConSuSelector(t *testing.T) {
 	// Quien solo lee ve el tablero sin selectores.
 	f.rol = "viewer"
 	p.Abrir("b1")
-	pulsar(t, w, "Por nivel · Tablero")
+	elegir(t, w, "Vistas", "Por nivel · Tablero")
 	recorrer(w.Canvas().Content(), func(o fyne.CanvasObject) {
-		if _, ok := o.(*ui.Selector); ok {
+		if s, ok := o.(*ui.Selector); ok && s.Rotulo != "Vistas" { // el de las vistas, sí
 			t.Error("un lector puede mover tarjetas")
 		}
 		if _, ok := o.(*ui.AsaArrastre); ok {
@@ -814,5 +929,33 @@ func TestElTableroMueveTarjetasConSuSelector(t *testing.T) {
 	})
 	if !strings.Contains(textos(w), "Puedes leer esta tabla pero no cambiarla.") {
 		t.Error("el tablero de un lector no dice que es de solo lectura")
+	}
+}
+
+// Las columnas del tablero son `bg-bg-subtle/50`, como la web: el gris a medias, que
+// sobre la hoja de papel no se come las tarjetas.
+// VISTO EN ROJO (2026-11-06): pintaban `bg-subtle` entero.
+func TestLasColumnasDelTableroVanAMedioGris(t *testing.T) {
+	f := nuevoFalso(2)
+	f.registros["t1"][0]["data"].(m)["niv"] = "Oro"
+	f.vistas["t1"] = []m{{"id": "vk", "table_id": "t1", "name": "Por nivel", "kind": "kanban", "config": m{"group_by": "niv"}}}
+	_, w := abrir(t, f)
+	elegir(t, w, "Vistas", "Por nivel · Tablero")
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	quiero := tema.Color("bg-subtle", v)
+	quiero.A /= 2
+	columnas := 0
+	recorrer(w.Canvas().Content(), func(o fyne.CanvasObject) {
+		r, ok := o.(*canvas.Rectangle)
+		if !ok || r.CornerRadius != tema.RadioLG || r.StrokeWidth != tema.Borde || r.StrokeColor != tema.Color("border", v) {
+			return
+		}
+		columnas++
+		if r.FillColor != quiero {
+			t.Errorf("una columna pinta %v; quiero %v", r.FillColor, quiero)
+		}
+	})
+	if columnas == 0 {
+		t.Fatal("no se ve ninguna columna del tablero")
 	}
 }

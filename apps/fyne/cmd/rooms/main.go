@@ -45,6 +45,9 @@ func main() {
 	// La sesión, la apariencia y el idioma son TRANSVERSALES a las trece apps: esto lo
 	// lee de donde lo dejó la última que lo tocó. `Abrir` no habla con la red.
 	s := sesion.Abrir(a, "")
+	// El cromo «papel» de toda la suite (ADR 0080). Aquí y no en `sesion.Abrir`: las
+	// pruebas que abren sesión comprueban también el cromo de color.
+	tema.ElegirCromo(tema.CromoPapel)
 
 	// El idioma lo decide el SISTEMA, igual que en la web lo decide el middleware:
 	// nunca se detecta dentro de una vista. Uno que la suite no sirva cae al inglés.
@@ -58,11 +61,14 @@ func main() {
 	// Los datos: el mismo servicio que la web, con la sesión transversal. Se arranca
 	// en cuanto hay alguien dentro; sin sesión, se abre Sytue ID en el navegador del
 	// sistema, que es lo que hace la web al llegar sin cookie.
-	base := api.NewRooms(s.URL("rooms"), s.Sesion, nil)
+	base := api.NewRooms(s.URL("rooms"), s.Sesion, s.ClienteConAviso(nil))
+	// El widget nativo lo lee su propia Fuente (nunca descifra) y se vuelve a publicar
+	// tras cada escritura de Rooms y con lo que traiga el WebSocket.
+	s.PublicadorWidget(s.FuenteWidget(t))
 	var secure *rooms.Cifrado
 	content := mx.NewRoomsService(base, func(ctx context.Context) (*mx.Client, error) { return secure.Cliente(ctx) })
 	sala := rooms.NuevaSala(p, content, "")
-	sala.Widget = s.CapturarWidget
+	sala.AlCambiarDatos = s.AvisarWidget
 	store, storeErr := ajustes.Carpeta()
 	secure = &rooms.Cifrado{Sala: sala, API: base, Base: mx.Config{SytueApex: s.Apex(), StoreDir: filepath.Join(store, "rooms-matrix"), DeviceName: "Sytue Rooms · " + runtime.GOOS}, Abrir: func(target string) error { return api.AbrirFuera(a, target) }}
 	if storeErr != nil {
@@ -156,6 +162,18 @@ func main() {
 	ctx := context.Background()
 	arrancada := false
 	identidad := ""
+	// Al volver a la app se relee lo que pudo cambiar en otro dispositivo (la pausa).
+	s.AlVolver(func() {
+		if arrancada {
+			sala.EnPrimerPlano()
+		}
+	})
+	// Y al dejarla, lo que llegue al canal abierto suma al icono: nadie lo está leyendo.
+	s.AlFondo(func() {
+		if arrancada {
+			sala.EnSegundoPlano()
+		}
+	})
 	secure.AlLista = func(sessionCtx context.Context) {
 		if !arrancada {
 			arrancada = true
@@ -255,15 +273,25 @@ func main() {
 	}
 	w := a.NewWindow(nombre)
 	w.SetPadded(false)
-	w.SetContent(ui.NuevaBarraSuite(t, s, iconos.Rooms).Montar(p.Objeto()))
+	barra := ui.NuevaBarraSuite(t, s, iconos.Rooms)
+	// El icono lleva los no leídos de la sala —el «(3)» del título en la web—, no solo
+	// las menciones y directos que cuentan los avisos del Hub.
+	sala.AlCambiarNoLeidos = barra.PonerInsignia
+	// «Pausar avisos»: mientras dure, los de Rooms no salen al sistema.
+	barra.CallarAvisosSi(sala.AvisosEnPausa)
+	w.SetContent(barra.Montar(p.Objeto()))
 	sala.Atajos(w.Canvas())
 	w.Resize(fyne.NewSize(1280, 744))
 	s.Arrancar(ctx)
-	if e := s.Estado(); e.Dentro() {
-		arrancar(e)
-	} else {
-		go func() { _ = s.Entrar(ctx) }() // BLOQUEA hasta volver del navegador
-	}
+	// Con interfaz: lanzada por iOS solo para el widget, ni sala, ni Matrix, ni el
+	// navegador para entrar.
+	s.CuandoHayaEscena(func() {
+		if e := s.Estado(); e.Dentro() {
+			arrancar(e)
+		} else {
+			go func() { _ = s.Entrar(ctx) }() // BLOQUEA hasta volver del navegador
+		}
+	})
 	w.SetOnClosed(func() {
 		secure.Cerrar() //nolint:contextcheck // Closing invalidates the previous device lifecycle before a new session starts.
 		content.Forget()

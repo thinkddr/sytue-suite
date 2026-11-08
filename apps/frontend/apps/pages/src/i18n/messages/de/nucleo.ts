@@ -82,7 +82,7 @@ export const nucleo = {
   'new.progress': 'Schritte zum Erstellen der Website',
   'new.go_to_step': 'Zu Schritt {n}',
   'new.step_of': 'Schritt {n} von {total}',
-  'app_settings.title': 'Einstellungen von Sytue Web',
+  'app_settings.title': 'Einstellungen von Sytue Webs',
   'new.search_title': 'Beginnen Sie mit Ihrer Branche',
   'new.search_help':
     'Geben Sie ein, was Sie tun, oder wählen Sie eine Gruppe. Jede Vorlage enthält bereits die passenden Texte für Ihre Branche: Sie ändern nur Namen, Telefonnummer, Preise und Fotos.',
@@ -287,7 +287,7 @@ export const nucleo = {
   'domains.start_help':
     'Geben Sie die Domain ein, die Sie verwenden möchten. Sie benötigen Zugriff auf die DNS-Einstellungen bei dem Anbieter, bei dem Sie sie gekauft haben.',
   'domains.progress': 'Fortschritt der Domain-Verbindung',
-  'domains.step.registered': 'Zu Sytue Web hinzugefügt',
+  'domains.step.registered': 'Zu Sytue Webs hinzugefügt',
   'domains.step.dns': 'DNS bestätigt',
   'domains.step.https': 'HTTPS bereit',
   'domains.step.primary': 'Hauptadresse',

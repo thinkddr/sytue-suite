@@ -18,6 +18,8 @@ export const lv: Catalog = {
   'ui.openNav': 'Atvērt navigāciju',
   'ui.closeNav': 'Aizvērt navigāciju',
   'ui.backToList': 'Atpakaļ uz sarakstu',
+  'ui.suiteOpen': 'Sytue: lietotnes, meklēšana, paziņojumi un konts',
+  'ui.suiteClose': 'Atpakaļ uz lietotni',
   'ui.noResults': 'Nav rezultātu.',
   'ui.meter.almostFull': 'gandrīz pilns',
   'ui.meter.full': 'pilns',
@@ -60,6 +62,9 @@ export const lv: Catalog = {
   'shell.lock.reasonNotebook': 'atvērt jūsu šifrēto piezīmju grāmatiņu',
   'shell.lock.faceIdUsage':
     'Sytue izmanto Face ID, lai atbloķētu jūsu sesiju, kad atverat lietotni.',
+  'shell.widgets.wake': 'Atjaunināt logrīkus, kad lietotne ir aizvērta',
+  'shell.widgets.wakeHelp':
+    'Kad kaut kas jūsu mainās, Sytue pamodina lietotni ar tukšu Apple paziņojumu, lai tā atjauninātu savu logrīku. Apple redz, kura lietotne un kad, bet nekad – kas mainījās.',
   'shell.call.microphoneUsage':
     'Sytue Rooms izmanto mikrofonu tikai zvana laikā un tikai tad, ja to ieslēdzat.',
   'shell.call.cameraUsage':
@@ -185,7 +190,7 @@ export const lv: Catalog = {
     'Domēns {domain} vietnē {site} nedarbojas: pārbaudiet tā iestatījumus',
   'notifications.kind.pages.erp.failed':
     'Pasūtījums {number} no vietnes {site} nav nonācis Sytue ERP',
-  'notifications.kind.pages.settings.changed': '{actor} nomainīja Sytue Web iestatījumu',
+  'notifications.kind.pages.settings.changed': '{actor} nomainīja Sytue Webs iestatījumu',
   'notifications.kind.pages.export.ready': 'Jūsu vietnes {site} eksports ir gatavs',
   'notifications.kind.pages.store.busy':
     'Vietnes {site} veikalā ir pārāk daudz pasūtījumu, kas gaida apmaksu',
@@ -370,6 +375,8 @@ export const lv: Catalog = {
   'widgets.compose': 'Rakstīt',
   'widgets.storage': 'Krātuve',
   'widgets.create': 'Izveidot notikumu',
+  'widgets.updatedAgo': 'Atjaunināts {time}',
+  'widgets.updatedAt': 'Atjaunināts: {time}',
 
   'linkedServices.services': 'Pakalpojumi',
   'linkedServices.changed':
@@ -382,6 +389,7 @@ export const lv: Catalog = {
   'linkedServices.notGranted':
     'Piekļuve šim pakalpojumam netika piešķirta. Savienojiet kontu vēlreiz, lai izvēlētos atļaujas.',
   'linkedServices.connected': 'Savienotie pakalpojumi',
+  'linkedServices.exists': 'Šis konts jau bija savienots, un tagad tas ir atvērts.',
   'linkedServices.providerData': 'Izmaiņas tiek saglabātas pie pakalpojumu sniedzēja.',
   'linkedServices.writeUnknown':
     'Pakalpojumu sniedzējs neapstiprināja saglabāšanu. Pirms mēģināt vēlreiz, atsvaidziniet un pārbaudiet.',

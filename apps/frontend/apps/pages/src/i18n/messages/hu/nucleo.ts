@@ -77,7 +77,7 @@ export const nucleo = {
   'new.progress': 'A webhely létrehozásának lépései',
   'new.go_to_step': 'Ugrás a(z) {n}. lépésre',
   'new.step_of': '{n}. lépés, összesen: {total}',
-  'app_settings.title': 'A Sytue Web beállításai',
+  'app_settings.title': 'A Sytue Webs beállításai',
   'new.search_title': 'Kezdje a vállalkozása típusával',
   'new.search_help':
     'Írja be, mivel foglalkozik, vagy válasszon egy csoportot. Minden sablon tartalmazza a szakmájához illő szövegeket: csak a nevet, a telefonszámot, az árakat és a fotókat kell lecserélnie.',
@@ -276,7 +276,7 @@ export const nucleo = {
   'domains.start_help':
     'Adja meg a használni kívánt domaint. Szüksége lesz a DNS-beállítások elérésére annál a szolgáltatónál, ahol a domaint vásárolta.',
   'domains.progress': 'A domain csatlakoztatásának állapota',
-  'domains.step.registered': 'Hozzáadva a Sytue Webhez',
+  'domains.step.registered': 'Hozzáadva a Sytue Webshez',
   'domains.step.dns': 'DNS ellenőrizve',
   'domains.step.https': 'HTTPS kész',
   'domains.step.primary': 'Elsődleges cím',

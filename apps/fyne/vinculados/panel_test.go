@@ -150,6 +150,50 @@ func TestDeniedConsentRetriesTheSameDraft(t *testing.T) {
 	}
 }
 
+// La cuenta elegida en el proveedor ya estaba conectada para este servicio: el
+// servidor borró el borrador. Se abre la que hay con un aviso, y un reintento no
+// manda el borrador borrado (antes: «no se aceptó el inicio de sesión» en bucle).
+func TestAlreadyConnectedAccountOpensItInsteadOfRetryingTheDiscardedDraft(t *testing.T) {
+	calls := 0
+	p := panelPrueba(t, "calendar", func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/external-mail/accounts":
+			_, _ = w.Write([]byte(`{"items":[{"instance_id":"existing","provider":"gmail","address":"ana@example.eu","connected":true,"services":["mail","calendar"]}]}`))
+		case "/api/v1/linked-services/existing/calendar/collections":
+			_, _ = w.Write([]byte(`{"items":[{"id":"cal","name":"Ana"}]}`))
+		default:
+			t.Errorf("unexpected request %s", r.URL)
+			w.WriteHeader(http.StatusBadRequest)
+		}
+	})
+	p.cuenta = api.ExternalMailAccount{}
+	p.autorizar = func(_ context.Context, _, instance string, _ ...string) (string, error) {
+		calls++
+		if instance != "" {
+			t.Errorf("retried with the discarded draft %q", instance)
+		}
+		return "", &api.OAuthExistsError{Instance: "existing"}
+	}
+	p.conectar("gmail", "")
+	if p.cuenta.InstanceID != "existing" || p.paso != "colecciones" || len(p.colecciones) != 1 {
+		t.Fatalf("did not open the account already connected: %#v paso=%s", p.cuenta, p.paso)
+	}
+	if p.fallo != "" || p.aviso != p.t("linkedServices.exists") {
+		t.Fatalf("fallo=%q aviso=%q", p.fallo, p.aviso)
+	}
+	if !contieneTexto(p.dialogo.Cuerpo, p.t("linkedServices.exists")) {
+		t.Fatal("the notice is not painted")
+	}
+	p.conectar("gmail", "")
+	if calls != 2 {
+		t.Fatalf("calls=%d", calls)
+	}
+	test.Tap(botonConTexto(t, p.dialogo.Pie, p.t("ui.wizard.back")))
+	if p.aviso != "" {
+		t.Fatalf("the notice outlived the account it was about: %q", p.aviso)
+	}
+}
+
 func TestLinkedConsentPreservesExistingServicesAndReviewsBeforeBrowser(t *testing.T) {
 	p := panelPrueba(t, "contacts", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(`{"items":[]}`)) })
 	p.cuentas.Items = []api.ExternalMailAccount{{InstanceID: "owned", Provider: "microsoft", Services: []string{"mail", "calendar", "notes", "unknown", "calendar"}}}
@@ -704,4 +748,18 @@ func TestNativeLinkedProviderPickerPhoneLayout(t *testing.T) {
 			}
 		})
 	}
+}
+
+func contieneTexto(objeto fyne.CanvasObject, texto string) bool {
+	if p, ok := objeto.(*ui.Parrafo); ok && p.Texto == texto {
+		return true
+	}
+	if c, ok := objeto.(*fyne.Container); ok {
+		for _, hijo := range c.Objects {
+			if contieneTexto(hijo, texto) {
+				return true
+			}
+		}
+	}
+	return false
 }

@@ -38,6 +38,7 @@ import {
   Dropdown,
   MenuItem,
   MenuSeparator,
+  MobileFab,
   Skeleton,
   Spinner,
   VirtualList,
@@ -67,7 +68,7 @@ import type { DriveResource, ShareLink as ShareLinkSdk, TrashItem } from '@sytue
  */
 type ShareLink = ShareLinkSdk & { email?: string; name?: string };
 import { FranjaPeticion, openInApp, inNativeShell } from '@sytue/shell';
-import { appUrl, driveFileUrl, driveFolderUrl, orgActual } from '@sytue/config';
+import { appUrl, orgActual } from '@sytue/config';
 import { useConnectivity } from '@sytue/offline/preact';
 import { formatDate as formatDateI18n, intlTag, translate, type Locale } from '@sytue/i18n';
 import { useI18n } from '@sytue/i18n/preact';
@@ -75,9 +76,24 @@ import { useT, type T } from '../i18n';
 import { Glyph } from './glyphs';
 import { wopiExtensions, extensionOf, openInEditor, openableInDocs } from '../lib/wopi';
 import { idsDelRango, partirEnTeselas, posicionEnLista } from '../lib/teselas';
-import { appQueAbre, subibleACast, urlDeApertura, urlDeSubirACast } from '../lib/abrir-con';
+import {
+  appQueAbre,
+  enlaceInterno,
+  subibleACast,
+  urlDeApertura,
+  urlDeSubirACast,
+} from '../lib/abrir-con';
 import { MIME_ARRASTRE, movibles, rutaDestino } from '../lib/arrastrar';
-import { formatBytes } from '@sytue/ui';
+import {
+  alRestaurar,
+  avisarRestaurados,
+  conId,
+  enTandas,
+  recargarLaVista,
+  type PorId,
+  type VistaViva,
+} from '../lib/lote';
+import { DURACION_DESHACER, formatBytes } from '@sytue/ui';
 import { VersionsDialog } from './VersionsDialog';
 import { ResumenIA } from './ResumenIA.js';
 import { PdfPageOrder, expandirPaginas, type PaginaIndice } from './PdfPageOrder';
@@ -760,6 +776,16 @@ export function FileBrowser() {
   const { t } = useDriveT();
 
   const [path, setPath] = useState(() => urlParam('path') || '/');
+  // Lo que se ve ahora, para los «Deshacer» que llegan hasta 10 s después (`lote.ts`).
+  const vistaViva = useRef<VistaViva>({ montada: true, ruta: path });
+  vistaViva.current.ruta = path;
+  useEffect(() => {
+    const v = vistaViva.current;
+    v.montada = true;
+    return () => {
+      v.montada = false;
+    };
+  }, []);
   // La barra de vista, para el aviso de que queda contenido a la derecha en móvil.
   // Se lee en el primer render porque el efecto que sincroniza la URL borra `preview`
   // enseguida (es de un solo uso, no debe quedarse pegado a la sesión).
@@ -1342,7 +1368,8 @@ export function FileBrowser() {
     try {
       await drive.restore(id, item.isDirectory ? 'folder' : 'file');
       toast.notify({ tone: 'success', title: t('trash.restored', { name: item.name }) });
-      await load(path);
+      avisarRestaurados();
+      await recargarLaVista(vistaViva, load);
     } catch {
       toast.notify({ tone: 'danger', title: t('trash.restoreFailed') });
     }
@@ -1366,7 +1393,7 @@ export function FileBrowser() {
         title: t('files.delete.done', { name: item.name }),
         // 10 s y no los 5 de serie: deshacer hay que leerlo, decidirlo y alcanzarlo,
         // y un botón que se va antes de eso es como no tenerlo.
-        duration: 10_000,
+        duration: DURACION_DESHACER,
         // Sin id no hay a qué llamar para restaurar (la papelera trabaja por id, no
         // por ruta): se avisa igual, y la papelera sigue siendo el camino.
         ...(id
@@ -1651,14 +1678,46 @@ export function FileBrowser() {
     a.click();
   };
 
+  /**
+   * Devuelve a su sitio lo que acaba de ir a la papelera en lote. El servicio restaura
+   * por id, de uno en uno: se piden en tandas y lo que no vuelve se dice con su número,
+   * porque sigue en la papelera y ahí se puede reintentar.
+   */
+  const onUndoBatchTrash = async (items: PorId[]) => {
+    const { hechos, fallidos } = await enTandas(items, (x) => drive.restore(x.id, x.kind));
+    if (fallidos.length === 0) {
+      toast.notify({ tone: 'success', title: t('files.batch.restored', { count: hechos.length }) });
+    } else {
+      toast.notify({
+        tone: 'danger',
+        title: t('files.batch.restorePartial', { count: fallidos.length }),
+      });
+    }
+    if (hechos.length > 0) avisarRestaurados();
+    await recargarLaVista(vistaViva, load);
+  };
+
   const onBatchTrash = async () => {
     if (offline || selectionCount === 0 || busy) return;
     setBusy(true);
     try {
       await drive.batch('trash', { fileIds: selectedFileIds, folderIds: selectedFolderIds });
+      // El mismo «Deshacer» de 10 s que al tirar un solo elemento: confirmar antes no
+      // quita que se haya marcado uno de más, y sin él tocaba ir a buscarlos uno a uno
+      // a la papelera. Se guarda ya qué devolver: la selección se limpia ahora.
+      const devolver = conId(selectedItems);
       toast.notify({
         tone: 'success',
         title: t('files.batch.trashDone', { count: selectionCount }),
+        duration: DURACION_DESHACER,
+        ...(devolver.length > 0
+          ? {
+              action: {
+                label: t('files.delete.undo'),
+                onClick: () => void onUndoBatchTrash(devolver),
+              },
+            }
+          : {}),
       });
       setBatchTrashOpen(false);
       clearSelection();
@@ -1873,6 +1932,16 @@ export function FileBrowser() {
             aria-hidden="true"
             tabIndex={-1}
           />
+          {/* «Subir» al alcance del pulgar en el teléfono, como «Redactar» en Mail: el
+              botón de la cabecera queda arriba del todo. Es `fixed` y `md:hidden`, así
+              que da igual dónde se monte; sin red no se ofrece, que no se puede subir. */}
+          {!offline ? (
+            <MobileFab
+              label={t('files.upload')}
+              icon={<Icon name="upload" size={24} />}
+              onClick={onUploadClick}
+            />
+          ) : null}
           {/* Selector de vista, también en el idioma del header: los tokens de
               superficie clara (text-muted sobre el cromo grafito) quedaban en
               2,2:1. Activo = latón sobre cromo (5,1:1), el acento de la casa. */}
@@ -2681,7 +2750,7 @@ function ActionsMenu({
     try {
       // Con el prefijo: `drive.sytue.eu/files/…` es el 404 de Traefik. Una carpeta va
       // por su ruta, como en la app nativa (`enlaceDe`): `/files/{id}` es de ficheros.
-      const link = item.isDirectory ? driveFolderUrl(item.path) : driveFileUrl(item.id);
+      const link = enlaceInterno(item) ?? '';
       const res = await fetch('/api/intent', {
         method: 'POST',
         credentials: 'include',
@@ -2699,6 +2768,21 @@ function ActionsMenu({
     } catch {
       toast.notify({ tone: 'danger', title: t('action.roomsFailed') });
       setSharing(false);
+    }
+  }
+
+  // «Copiar enlace»: el enlace de siempre del fichero o la carpeta, para pegarlo en
+  // un correo o una nota a alguien que YA tiene acceso. No es «Compartir enlace»,
+  // que crea un enlace público con su permiso y su caducidad: este no abre nada a
+  // quien no podía entrar. No necesita red, así que sigue ahí sin conexión.
+  const enlace = enlaceInterno(item, orgActual(import.meta.env.BASE_URL));
+  async function copiarEnlace(): Promise<void> {
+    if (!enlace) return;
+    try {
+      await navigator.clipboard.writeText(enlace);
+      toast.notify({ tone: 'success', title: t('action.linkCopied') });
+    } catch {
+      toast.notify({ tone: 'danger', title: t('action.copyLinkFailed') });
     }
   }
 
@@ -2753,6 +2837,11 @@ function ActionsMenu({
         {!offline && onShare ? (
           <MenuItem icon={<Glyph name="link" size={16} />} onClick={() => onShare(item)}>
             {t('action.shareLink')}
+          </MenuItem>
+        ) : null}
+        {enlace ? (
+          <MenuItem icon={<Icon name="copies" size={16} />} onClick={() => void copiarEnlace()}>
+            {t('action.copyLink')}
           </MenuItem>
         ) : null}
         {/* Dentro de la app nativa sobra: ya estás en ella. */}
@@ -4393,10 +4482,11 @@ function FileList({
   const getKey = useMemo(() => (i: number) => items[i]?.path ?? i, [items]);
   return (
     <>
-      {/* bg-bg (no bg-surface): se funde con el lienzo en claro y oscuro. Los
+      {/* El fondo de la hoja (no bg-surface): se funde con ella en claro, en oscuro y
+          sobre papel, donde la hoja es blanca y el lienzo gris (ADR 0080). Los
           rótulos de columna son decorativos (aria-hidden); la casilla «seleccionar
           todo» es un control real (fuera del aria-hidden). */}
-      <div class="sytue-overline bg-bg text-text-subtle mx-3 flex shrink-0 items-center gap-3 px-3 py-2.5 font-semibold shadow-[inset_0_-1px_0_var(--sytue-border)]">
+      <div class="sytue-overline text-text-subtle mx-3 flex shrink-0 items-center gap-3 bg-[var(--sytue-sheet-bg)] px-3 py-2.5 font-semibold shadow-[inset_0_-1px_0_var(--sytue-border)]">
         {onToggleAll ? (
           <SelectAllCheckbox
             checked={!!allSelected}
@@ -4458,7 +4548,7 @@ function FileList({
       {loadingMore ? (
         <div
           role="status"
-          class="border-border/60 bg-bg sytue-meta flex shrink-0 items-center justify-center gap-2 border-t py-1.5"
+          class="border-border/60 sytue-meta flex shrink-0 items-center justify-center gap-2 border-t bg-[var(--sytue-sheet-bg)] py-1.5"
         >
           <Spinner size={14} />
           {t('files.loadingMore')}
@@ -4872,9 +4962,14 @@ export function TrashView() {
   const [busy, setBusy] = useState(false);
   // Confirmación previa a la purga (acción irreversible): elemento pendiente.
   const [pendingPurge, setPendingPurge] = useState<TrashItem | null>(null);
+  // Confirmación de «Vaciar papelera»: lo mismo, para todo lo que hay.
+  const [emptyAllOpen, setEmptyAllOpen] = useState(false);
 
   useEffect(() => {
-    if (offline) setPendingPurge(null);
+    if (offline) {
+      setPendingPurge(null);
+      setEmptyAllOpen(false);
+    }
   }, [offline]);
 
   const load = useCallback(async () => {
@@ -4890,6 +4985,10 @@ export function TrashView() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Un «Deshacer» del explorador que llega con la papelera delante: lo restaurado ya no
+  // está aquí, y dejarlo pintado lo hacía fallar después en «Vaciar papelera».
+  useEffect(() => alRestaurar(() => void load()), [load]);
 
   const onRestore = async (it: TrashItem) => {
     if (offline) return;
@@ -4933,15 +5032,52 @@ export function TrashView() {
     }
   };
 
+  /**
+   * «Vaciar papelera»: purga todo lo que hay, con UNA confirmación. El servicio purga
+   * por id, así que va en tandas, y cada purga pasa por su autorización: lo que se
+   * niega (hoy, la retención legal) se queda y se dice cuántos.
+   */
+  const onEmptyAll = async () => {
+    if (offline || !items || items.length === 0) return;
+    setBusy(true);
+    try {
+      const { fallidos } = await enTandas(conId(items), (x) => drive.purge(x.id, x.kind));
+      toast.notify(
+        fallidos.length === 0
+          ? { tone: 'success', title: t('trash.emptiedAll') }
+          : { tone: 'danger', title: t('trash.emptyAllPartial', { count: fallidos.length }) },
+      );
+      setEmptyAllOpen(false);
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div class="flex h-full flex-col">
       {/* Cabecera de la papelera: sólida con el acento del producto (a juego con
-          la topbar de la shell). Sin subir/crear: no aplican aquí. */}
+          la topbar de la shell). Sin subir/crear: no aplican aquí. Solo «Vaciar
+          papelera», y solo si hay algo que vaciar. */}
       <SectionHeader
         level={1}
         icon={<Glyph name="trash" size={18} />}
         title={t('trash.title')}
         subtitle={t('trash.subtitle')}
+        actions={
+          items && items.length > 0 ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              class="text-danger-text"
+              disabled={busy || offline}
+              leadingIcon={<Glyph name="trash" size={16} />}
+              onClick={() => setEmptyAllOpen(true)}
+            >
+              {t('trash.emptyAll')}
+            </Button>
+          ) : null
+        }
       />
 
       <div class="min-h-0 flex-1 overflow-y-auto">
@@ -5068,6 +5204,29 @@ export function TrashView() {
           {t(pendingPurge?.isDirectory ? 'trash.purgeBodyFolder' : 'trash.purgeBodyFile', {
             name: pendingPurge?.name ?? '',
           })}
+        </p>
+      </Modal>
+
+      {/* Confirmación de «Vaciar papelera»: irreversible y para todo, así que dice
+          cuántos elementos se pierden. */}
+      <Modal
+        open={emptyAllOpen}
+        onClose={() => setEmptyAllOpen(false)}
+        title={t('trash.emptyAllTitle')}
+        size="sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setEmptyAllOpen(false)} disabled={busy}>
+              {t('files.cancel')}
+            </Button>
+            <Button variant="danger" loading={busy} onClick={() => void onEmptyAll()}>
+              {t('trash.emptyAll')}
+            </Button>
+          </>
+        }
+      >
+        <p class="text-text-muted text-base leading-relaxed">
+          {t('trash.emptyAllBody', { count: items?.length ?? 0 })}
         </p>
       </Modal>
     </div>

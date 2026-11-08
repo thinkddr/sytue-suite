@@ -129,6 +129,7 @@ export const fi: AppCatalog<typeof en> = {
   'gallery.unselectMonth': 'Poista kuukauden valinta',
   'gallery.downloadSelected': 'Lataa',
   'gallery.downloading': 'Aloitettuja latauspyyntöjä: {count}. Tarkista selaimen lataukset.',
+  'gallery.downloadingNative': { one: 'Ladataan 1 kuvaa…', other: 'Ladataan {count} kuvaa…' },
   'gallery.downloadCapped': 'Tämän erän ulkopuolelle jääviä kuvia: {count}.',
   'gallery.newAlbum': 'Uusi albumi',
   'gallery.newAlbumTitle': 'Uusi albumi',
@@ -252,4 +253,20 @@ export const fi: AppCatalog<typeof en> = {
   'aiBatch.excludeOrg': 'Sulje organisaatio pois Sytue AI:n automaattierästä',
   'aiBatch.excludedHint':
     'Organisaatio on suljettu pois Sytue AI:n automaattierästä. Uusia kuvia ei käsitellä taustalla ehdotuksia tai samankaltaisuuksia varten.',
+  'album.rename': 'Nimeä uudelleen',
+  'album.renamePrompt': 'Albumin nimi',
+  'album.setCover': 'Käytä albumin kansikuvana',
+  'album.isCover': 'Tämä on albumin kansikuva',
+  'album.coverSet': 'Albumin kansikuva päivitetty',
+  'gallery.favorited': 'Lisätty suosikkeihin: {count}',
+  'gallery.unfavorited': 'Poistettu suosikeista: {count}',
+  'gallery.favoriteFailed': 'Kuvat, joita ei voitu muuttaa: {count}',
+  'gallery.noResults.title': 'Haulla ”{query}” ei löytynyt kuvia',
+  'gallery.noResults.description':
+    'Kokeile muita sanoja tai tyhjennä haku nähdäksesi kaikki kuvasi.',
+  'gallery.clearSearch': 'Tyhjennä haku',
+  'viewer.counter': '{index} / {total}',
+  'viewer.counterMore': '{count}+',
+  'viewer.counterLabel': 'Kuva {index}/{total}',
+  'viewer.shortcutsJump': 'Home ja End siirtyvät ensimmäiseen ja viimeiseen kuvaan.',
 };

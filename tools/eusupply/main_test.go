@@ -400,6 +400,18 @@ func TestAppleBundlePathIsNotAnExternalHost(t *testing.T) {
 	}
 }
 
+// El enviador de APNs habla con Apple en caliente: si no se escaneara, su host no
+// tendría fila y la única salida del núcleo fuera de la UE no constaría en ningún sitio
+// (hasta el 2026-11-07 vivía en Rooms y no lo miraba nadie).
+func TestElDespertarDeIOSSeInventaria(t *testing.T) {
+	if !runtimeProviderSource("platform/pkg/apns/apns.go") {
+		t.Fatal("platform/pkg/apns no se escanea")
+	}
+	if runtimeProviderSource("platform/pkg/apns/apns_test.go") {
+		t.Fatal("las pruebas no son hosts en caliente")
+	}
+}
+
 func TestMailRuntimeProvidersAreInventoried(t *testing.T) {
 	for _, path := range []string{"services/integrations/internal/linkedservices/client.go", "services/integrations/internal/linkedservices/dav.go"} {
 		if !runtimeProviderSource(path) {

@@ -4,6 +4,8 @@
   "action.classified": "Clasificación · {name}",
   "action.classify": "Clasificar",
   "action.copy": "Hacer una copia",
+  "action.copyLink": "Copiar enlace",
+  "action.copyLinkFailed": "No se pudo copiar el enlace.",
   "action.delete": "Enviar a la papelera",
   "action.desktopBody": "Si aún no la tienes instalada, puedes descargarla.",
   "action.desktopCta": "Ver descargas",
@@ -12,6 +14,7 @@
   "action.downloadName": "Descargar {name}",
   "action.downloadZip": "Descargar (ZIP)",
   "action.editorFailed": "El editor no ha podido abrir este fichero.",
+  "action.linkCopied": "Enlace copiado. Solo lo abre quien ya tiene acceso.",
   "action.mailFailed": "No se ha podido abrir el redactor de correo",
   "action.menu": "Acciones para {name}",
   "action.more": "Más acciones",
@@ -81,6 +84,14 @@
   "files.batch.moveTitle": {
     "one": "Mover 1 elemento",
     "other": "Mover {count} elementos"
+  },
+  "files.batch.restorePartial": {
+    "one": "No se pudo restaurar 1 elemento; sigue en la papelera.",
+    "other": "No se pudieron restaurar {count} elementos; siguen en la papelera."
+  },
+  "files.batch.restored": {
+    "one": "Se restauró 1 elemento.",
+    "other": "Se restauraron {count} elementos."
   },
   "files.batch.trashBody": {
     "one": "Se enviará 1 elemento a la papelera. Podrás restaurarlo desde ahí.",
@@ -555,6 +566,17 @@
     "other": "Se subieron {count} archivos."
   },
   "team.upload.partial": "Se subieron {uploaded} de {count}.",
+  "trash.emptiedAll": "Se vació la papelera.",
+  "trash.emptyAll": "Vaciar papelera",
+  "trash.emptyAllBody": {
+    "one": "Se borrará para siempre el elemento de la papelera, con su historial de versiones. No hay forma de recuperarlo después.",
+    "other": "Se borrarán para siempre los {count} elementos de la papelera, con su historial de versiones. No hay forma de recuperarlos después."
+  },
+  "trash.emptyAllPartial": {
+    "one": "No se pudo eliminar 1 elemento; sigue en la papelera.",
+    "other": "No se pudieron eliminar {count} elementos; siguen en la papelera."
+  },
+  "trash.emptyAllTitle": "¿Vaciar la papelera?",
   "trash.emptyBody": "Los archivos y carpetas que elimines aparecerán aquí y podrás restaurarlos.",
   "trash.emptyTitle": "La papelera está vacía",
   "trash.errorTitle": "No se pudo cargar la papelera",

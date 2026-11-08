@@ -336,6 +336,7 @@ func (a *App) cargar(ab *abierto) {
 		if !ctx.SoloLectura {
 			ab.folio.AlEditar = func() { a.programarGuardado(ab) }
 			ab.folio.AlGuardarYa = func() { a.guardarYa(ab) }
+			ctx.GuardarYa = ab.folio.AlGuardarYa // el chip de la cabecera, en error
 			ctx.AlternarRastreo = func() {
 				ab.folio.AlternarRastreo()
 				ab.marco.Recomponer()
@@ -356,6 +357,11 @@ func (a *App) cargar(ab *abierto) {
 			ctx.RestaurarVersion = func(v api.DocVersion) { a.restaurarVersion(ab, v) }
 		}
 		ctx.Versiones = func(listo func([]api.DocVersion)) { a.servicio().Versiones(ab.id, listo) }
+		// «Hacer una copia», con cualquier papel, como la web: guarda lo pendiente y la abre.
+		ctx.HacerCopia = func(listo func()) {
+			a.servicio().HacerCopia(api.Document{ID: ab.id, Kind: ctx.Tipo.Kind(), Title: ctx.Titulo}, a.guardarAntesDeCopiar(ab),
+				func(d api.Document) { a.AbrirID(d.ID, d.Title) }, listo)
+		}
 		if rol == "owner" {
 			ctx.Actividad = func(listo func([]api.DocActividad, error)) { a.servicio().Actividad(ab.id, listo) }
 		}
@@ -559,12 +565,10 @@ func (a *App) exportar(ab *abierto, formato string) {
 	a.exportarCon(ab, formato, false)
 }
 
-func (a *App) exportarCon(ab *abierto, formato string, plantilla bool) {
-	if a.Svc == nil || ab.ctx.Exportando != "" {
-		return
-	}
-	ab.ctx.Exportando = formato
-	ab.marco.Recomponer()
+// guardarAntes es el guardado de lo pendiente antes de que el servicio lea el documento
+// (exportar, hacer una copia). Se prepara en el hilo de la interfaz —cancela el
+// autoguardado en cola y serializa el folio— y guarda en la rutina de quien llame.
+func (a *App) guardarAntes(ab *abierto) func() error {
 	if ab.cancelar != nil {
 		ab.cancelar()
 		ab.cancelar = nil
@@ -577,7 +581,7 @@ func (a *App) exportarCon(ab *abierto, formato string, plantilla bool) {
 	}
 	ab.cuenta++
 	dot, base := api.DocDot{Actor: a.actor, Counter: ab.cuenta}, ab.base
-	antes := func() error {
+	return func() error {
 		if sinCambios || ab.ctx.SoloLectura {
 			return nil
 		}
@@ -590,6 +594,32 @@ func (a *App) exportarCon(ab *abierto, formato string, plantilla bool) {
 		fyne.Do(func() { a.guardadoHecho(ab, n, res, err) })
 		return err
 	}
+}
+
+// errCopiaSinGuardar: hay cambios en pantalla que no se pueden guardar (un conflicto
+// con otra persona), y una copia sin ellos parecería buena y no lo sería.
+var errCopiaSinGuardar = errors.New("docus: copia con cambios sin guardar")
+
+// guardarAntesDeCopiar es guardarAntes para «Hacer una copia»: con un conflicto, lo
+// escrito no llega al servicio y la copia saldría sin ello, así que no se copia y se
+// avisa (`makeCopy` de la web: «copia: cambios sin guardar»).
+func (a *App) guardarAntesDeCopiar(ab *abierto) func() error {
+	pendiente := ab.conflicto && !ab.ctx.SoloLectura && ab.folio.Documento().Editable() &&
+		ab.folio.Cambios() != ab.guardado
+	antes := a.guardarAntes(ab)
+	if pendiente {
+		return func() error { return errCopiaSinGuardar }
+	}
+	return antes
+}
+
+func (a *App) exportarCon(ab *abierto, formato string, plantilla bool) {
+	if a.Svc == nil || ab.ctx.Exportando != "" {
+		return
+	}
+	ab.ctx.Exportando = formato
+	ab.marco.Recomponer()
+	antes := a.guardarAntes(ab)
 	descargar := a.servicio().Descargar
 	if plantilla {
 		descargar = a.servicio().DescargarPlantilla

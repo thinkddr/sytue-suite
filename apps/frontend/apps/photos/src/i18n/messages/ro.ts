@@ -138,6 +138,11 @@ export const ro: AppCatalog<typeof en> = {
   'gallery.downloadSelected': 'Descarcă',
   'gallery.downloading':
     'Solicitări de descărcare inițiate: {count}. Verificați descărcările din browser.',
+  'gallery.downloadingNative': {
+    one: 'Se descarcă 1 fotografie…',
+    few: 'Se descarcă {count} fotografii…',
+    other: 'Se descarcă {count} de fotografii…',
+  },
   'gallery.downloadCapped': 'Fotografii din afara acestui lot: {count}.',
   'gallery.newAlbum': 'Album nou',
   'gallery.newAlbumTitle': 'Album nou',
@@ -270,4 +275,20 @@ export const ro: AppCatalog<typeof en> = {
   'aiBatch.excludeOrg': 'Exclude organizația din lotul automat Sytue AI',
   'aiBatch.excludedHint':
     'Organizația este exclusă din lotul automat Sytue AI. Fotografiile noi nu sunt procesate în fundal pentru sugestii sau asemănări.',
+  'album.rename': 'Redenumește',
+  'album.renamePrompt': 'Numele albumului',
+  'album.setCover': 'Folosește ca copertă a albumului',
+  'album.isCover': 'Aceasta este coperta albumului',
+  'album.coverSet': 'Coperta albumului a fost actualizată',
+  'gallery.favorited': 'Adăugate la favorite: {count}',
+  'gallery.unfavorited': 'Eliminate din favorite: {count}',
+  'gallery.favoriteFailed': 'Fotografii care nu au putut fi modificate: {count}',
+  'gallery.noResults.title': 'Nicio fotografie nu corespunde cu „{query}”',
+  'gallery.noResults.description':
+    'Încercați alte cuvinte sau ștergeți căutarea pentru a vedea toate fotografiile.',
+  'gallery.clearSearch': 'Șterge căutarea',
+  'viewer.counter': '{index} / {total}',
+  'viewer.counterMore': '{count}+',
+  'viewer.counterLabel': 'Fotografia {index} din {total}',
+  'viewer.shortcutsJump': 'Home și End duc la prima și la ultima fotografie.',
 };

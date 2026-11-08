@@ -104,7 +104,7 @@ func (s *Servicio) avisar(ctx context.Context, ev events.Event, a avisoTienda) e
 	if err != nil {
 		return err
 	}
-	op := correo.Opciones{NombreRemitente: sitio.Name + " (vía Sytue Web)", ResponderA: ajustes.ReplyTo}
+	op := correo.Opciones{NombreRemitente: sitio.Name + " (vía Sytue Webs)", ResponderA: ajustes.ReplyTo}
 	hub := func(tipo, titulo string, params map[string]string, ruta string) error {
 		params["site"] = sitio.Name
 		var errs []error

@@ -364,6 +364,8 @@ func (b *Backend) PutCalendarObject(ctx context.Context, urlPath string, calenda
 	if err != nil {
 		return nil, mapErr(err)
 	}
+	// Lo que el dueño guarda aquí lo ven también quienes lo tienen compartido.
+	b.store.AvisarQuienesVen(ctx, cal.ID)
 
 	data, err := encodeCalendar(calendar)
 	if err != nil {
@@ -433,6 +435,7 @@ func (b *Backend) DeleteCalendarObject(ctx context.Context, urlPath string) erro
 	if err != nil {
 		return mapErr(err)
 	}
+	b.store.AvisarQuienesVen(ctx, cal.ID)
 	obj, err := b.store.GetObjectByResource(ctx, cal.ID, resource)
 	if err != nil {
 		return mapErr(err)

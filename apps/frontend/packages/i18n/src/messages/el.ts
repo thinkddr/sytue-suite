@@ -18,6 +18,8 @@ export const el: Catalog = {
   'ui.openNav': 'Άνοιγμα πλοήγησης',
   'ui.closeNav': 'Κλείσιμο πλοήγησης',
   'ui.backToList': 'Επιστροφή στη λίστα',
+  'ui.suiteOpen': 'Sytue: εφαρμογές, αναζήτηση, ειδοποιήσεις και λογαριασμός',
+  'ui.suiteClose': 'Επιστροφή στην εφαρμογή',
   'ui.noResults': 'Δεν υπάρχουν αποτελέσματα.',
   'ui.meter.almostFull': 'σχεδόν γεμάτο',
   'ui.meter.full': 'γεμάτο',
@@ -61,6 +63,9 @@ export const el: Catalog = {
   'shell.lock.reasonNotebook': 'άνοιγμα του κρυπτογραφημένου σημειωματάριού σας',
   'shell.lock.faceIdUsage':
     'Το Sytue χρησιμοποιεί το Face ID για να ξεκλειδώνει τη συνεδρία σας όταν ανοίγετε την εφαρμογή.',
+  'shell.widgets.wake': 'Ενημέρωση των widget με την εφαρμογή κλειστή',
+  'shell.widgets.wakeHelp':
+    'Όταν αλλάζει κάτι δικό σας, το Sytue ξυπνά την εφαρμογή με μια κενή ειδοποίηση της Apple για να ανανεώσει το widget της. Η Apple βλέπει ποια εφαρμογή και πότε, ποτέ τι άλλαξε.',
   'shell.call.microphoneUsage':
     'Το Sytue Rooms χρησιμοποιεί το μικρόφωνο μόνο κατά τη διάρκεια μιας κλήσης και μόνο όταν το ενεργοποιήσετε.',
   'shell.call.cameraUsage':
@@ -177,7 +182,7 @@ export const el: Catalog = {
     'Ο τομέας {domain} του {site} δεν λειτουργεί: ελέγξτε τις ρυθμίσεις του',
   'notifications.kind.pages.erp.failed':
     'Η παραγγελία {number} του {site} δεν έφτασε στο Sytue ERP',
-  'notifications.kind.pages.settings.changed': '{actor} άλλαξε μια ρύθμιση του Sytue Web',
+  'notifications.kind.pages.settings.changed': '{actor} άλλαξε μια ρύθμιση του Sytue Webs',
   'notifications.kind.pages.export.ready': 'Η εξαγωγή σας από το {site} είναι έτοιμη',
   'notifications.kind.pages.store.busy':
     'Το κατάστημα του {site} έχει πάρα πολλές παραγγελίες που αναμένουν πληρωμή',
@@ -366,6 +371,8 @@ export const el: Catalog = {
   'widgets.compose': 'Σύνταξη',
   'widgets.storage': 'Αποθηκευτικός χώρος',
   'widgets.create': 'Δημιουργία συμβάντος',
+  'widgets.updatedAgo': 'Ενημερώθηκε {time}',
+  'widgets.updatedAt': 'Ενημέρωση: {time}',
 
   'linkedServices.services': 'Υπηρεσίες',
   'linkedServices.changed':
@@ -378,6 +385,7 @@ export const el: Catalog = {
   'linkedServices.notGranted':
     'Δεν παραχωρήθηκε πρόσβαση σε αυτή την υπηρεσία. Συνδέστε ξανά τον λογαριασμό για να επιλέξετε τα δικαιώματά του.',
   'linkedServices.connected': 'Συνδεδεμένες υπηρεσίες',
+  'linkedServices.exists': 'Αυτός ο λογαριασμός ήταν ήδη συνδεδεμένος και άνοιξε.',
   'linkedServices.providerData': 'Οι αλλαγές αποθηκεύονται στον πάροχό σας.',
   'linkedServices.writeUnknown':
     'Ο πάροχος δεν επιβεβαίωσε την αποθήκευση. Ανανεώστε και ελέγξτε πριν δοκιμάσετε ξανά.',

@@ -4,6 +4,7 @@
 package contactshttp
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -39,6 +40,113 @@ func TestBatchTrashEmptyRejected(t *testing.T) {
 	newHandlers(&fakeStore{}).BatchTrash(rec, req(http.MethodPost, "/", `{"uids":[]}`, nil))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("code = %d, want 400", rec.Code)
+	}
+}
+
+func TestBatchRestoreOK(t *testing.T) {
+	f := &fakeStore{batchN: 2}
+	rec := httptest.NewRecorder()
+	newHandlers(f).BatchRestore(rec, req(http.MethodPost, "/", `{"uids":["a","b","c"]}`, nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("code = %d, want 200 (%s)", rec.Code, rec.Body.String())
+	}
+	if decode(t, rec)["restored"].(float64) != 2 {
+		t.Errorf("restored != 2: %v", rec.Body.String())
+	}
+	if len(f.gotBatchUIDs) != 3 {
+		t.Errorf("uids no propagados: %v", f.gotBatchUIDs)
+	}
+}
+
+func TestBatchRestoreEmptyRejected(t *testing.T) {
+	rec := httptest.NewRecorder()
+	newHandlers(&fakeStore{}).BatchRestore(rec, req(http.MethodPost, "/", `{"uids":[]}`, nil))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("code = %d, want 400", rec.Code)
+	}
+}
+
+// TestBatchVCardUnaRespuestaConTodas: la exportación de una selección es UNA respuesta
+// `text/vcard` con las tarjetas guardadas, en el orden pedido y por id de contacto.
+func TestBatchVCardUnaRespuestaConTodas(t *testing.T) {
+	a, b := uuid.New(), uuid.New()
+	f := &fakeStore{batchCards: []string{"BEGIN:VCARD\r\nFN:Ana\r\nEND:VCARD\r\n", "BEGIN:VCARD\r\nFN:Luis\r\nEND:VCARD"}}
+	rec := httptest.NewRecorder()
+	newHandlers(f).BatchVCard(rec, req(http.MethodPost, "/", `{"ids":["`+a.String()+`"," `+b.String()+`"]}`, nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("code = %d, want 200 (%s)", rec.Code, rec.Body.String())
+	}
+	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/vcard") {
+		t.Errorf("Content-Type = %q, want text/vcard", ct)
+	}
+	quiero := "BEGIN:VCARD\r\nFN:Ana\r\nEND:VCARD\r\nBEGIN:VCARD\r\nFN:Luis\r\nEND:VCARD\r\n"
+	if rec.Body.String() != quiero {
+		t.Errorf("cuerpo = %q, want %q", rec.Body.String(), quiero)
+	}
+	if len(f.gotBatchIDs) != 2 || f.gotBatchIDs[0] != a || f.gotBatchIDs[1] != b {
+		t.Errorf("ids no propagados en orden: %v", f.gotBatchIDs)
+	}
+}
+
+// TestBatchVCardEscribeSegunLee: cada tarjeta sale a la respuesta antes de leer la
+// siguiente. Juntarlas todas para una sola escritura tiraba el pod por OOM al exportar
+// mil contactos con foto.
+func TestBatchVCardEscribeSegunLee(t *testing.T) {
+	rec := httptest.NewRecorder()
+	cards := []string{"BEGIN:VCARD\r\nFN:Ana\r\nEND:VCARD", "BEGIN:VCARD\r\nFN:Luis\r\nEND:VCARD", "BEGIN:VCARD\r\nFN:Eva\r\nEND:VCARD"}
+	f := &fakeStore{batchCards: cards}
+	f.antesDeCard = func(i int) {
+		var ya strings.Builder
+		for _, c := range cards[:i] {
+			ya.WriteString(c + "\r\n")
+		}
+		if rec.Body.String() != ya.String() {
+			t.Errorf("antes de leer la tarjeta %d el cuerpo es %q, want %q", i, rec.Body.String(), ya.String())
+		}
+	}
+	newHandlers(f).BatchVCard(rec, req(http.MethodPost, "/", `{"ids":["`+uuid.NewString()+`"]}`, nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("code = %d, want 200", rec.Code)
+	}
+}
+
+// TestBatchVCardFalloAMitadCortaLaDescarga: si la lectura falla con media exportación
+// ya enviada, se aborta la conexión (no se cierra bien un .vcf al que le faltan
+// tarjetas); si falla antes de la primera, es un error normal.
+func TestBatchVCardFalloAMitadCortaLaDescarga(t *testing.T) {
+	cuerpo := `{"ids":["` + uuid.NewString() + `"]}`
+	rec := httptest.NewRecorder()
+	newHandlers(&fakeStore{batchErr: domain.ErrConflict}).BatchVCard(rec, req(http.MethodPost, "/", cuerpo, nil))
+	if rec.Code == http.StatusOK {
+		t.Errorf("fallo antes de la primera tarjeta: code = 200, want un error")
+	}
+
+	defer func() {
+		if r, _ := recover().(error); !errors.Is(r, http.ErrAbortHandler) {
+			t.Errorf("fallo a mitad: recover() = %v, want http.ErrAbortHandler", r)
+		}
+	}()
+	f := &fakeStore{batchCards: []string{"BEGIN:VCARD\r\nFN:Ana\r\nEND:VCARD"}, batchErr: domain.ErrConflict}
+	newHandlers(f).BatchVCard(httptest.NewRecorder(), req(http.MethodPost, "/", cuerpo, nil))
+}
+
+// TestBatchVCardNingunaVivaEsUnVcfVacio: si ninguna sigue viva, 200 sin cuerpo (como el
+// resto de los lotes); el aviso lo da quien exporta.
+func TestBatchVCardNingunaVivaEsUnVcfVacio(t *testing.T) {
+	rec := httptest.NewRecorder()
+	newHandlers(&fakeStore{}).BatchVCard(rec, req(http.MethodPost, "/", `{"ids":["`+uuid.NewString()+`"]}`, nil))
+	if rec.Code != http.StatusOK || rec.Body.Len() != 0 {
+		t.Errorf("code = %d, cuerpo %q; want 200 vacío", rec.Code, rec.Body.String())
+	}
+}
+
+func TestBatchVCardRechazaVacioOIdMalo(t *testing.T) {
+	for _, cuerpo := range []string{`{"ids":[]}`, `{"ids":["no-es-un-id"]}`} {
+		rec := httptest.NewRecorder()
+		newHandlers(&fakeStore{}).BatchVCard(rec, req(http.MethodPost, "/", cuerpo, nil))
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: code = %d, want 400", cuerpo, rec.Code)
+		}
 	}
 }
 

@@ -364,9 +364,20 @@ func (c *Lienzo) abrirFiltro(col int) {
 		e.Denso, e.Glifo = true, iconos.TrazoEd(icono, iconos.TallaSM, "text-muted", v)
 		return e
 	}
-	menu := container.New(ui.Margen{Izq: tema.Espacio(1), Der: tema.Espacio(1)}, container.New(ui.Columna{},
-		ordenar(iconos.EdOrdenAsc, "data.sortAsc", "asc"), ordenar(iconos.EdOrdenDesc, "data.sortDesc", "desc")))
-	lista := container.New(ui.Columna{}, append([]fyne.CanvasObject{menu, ui.NuevoSeparadorMenu()}, filas...)...)
+	// «Filtrar por condición…», entre ordenar y los valores (SheetCanvas.tsx): abre el
+	// formulario en el mismo sitio (filtro_form.go).
+	porCond := ui.NuevoElementoMenu(c.t("filtro.byCondition", nil), iconos.Ninguno, func() {
+		emergente.Cerrar()
+		c.abrirFiltroCond(nuevoFormFiltro(col, c.Libro.CondicionFiltro(col)))
+	})
+	porCond.Denso, porCond.Glifo = true, iconos.TrazoEd(iconos.EdFiltro, iconos.TallaSM, "text-muted", v)
+	px1 := func(objs ...fyne.CanvasObject) fyne.CanvasObject {
+		return container.New(ui.Margen{Izq: tema.Espacio(1), Der: tema.Espacio(1)}, container.New(ui.Columna{}, objs...))
+	}
+	menu := px1(ordenar(iconos.EdOrdenAsc, "data.sortAsc", "asc"), ordenar(iconos.EdOrdenDesc, "data.sortDesc", "desc"))
+	lista := container.New(ui.Columna{}, append([]fyne.CanvasObject{
+		menu, ui.NuevoSeparadorMenu(), px1(porCond), ui.NuevoSeparadorMenu(),
+	}, filas...)...)
 	medida := lista.MinSize()
 	medida.Width = max(medida.Width, tema.Espacio(32))
 	medida.Height = min(medida.Height+2*tema.Espacio(1), tema.Espacio(56))

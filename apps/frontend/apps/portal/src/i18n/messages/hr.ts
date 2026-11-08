@@ -60,6 +60,7 @@ export const hr: AppCatalog<typeof en> = {
   'inbox.markAll': 'Označi sve kao pročitano',
   'inbox.loading': 'Učitavanje obavijesti…',
   'inbox.unreadDot': 'Nepročitano',
+  'inbox.markRead': 'Označi kao pročitano',
   'inbox.errorTitle': 'Obavijesti nije bilo moguće učitati',
   'inbox.errorBody': 'Hub trenutačno ne odgovara. Pokušajte ponovno za nekoliko sekundi.',
   'inbox.retry': 'Pokušaj ponovno',
@@ -691,6 +692,8 @@ export const hr: AppCatalog<typeof en> = {
     'Bez odgovora: {sources}. Neki rezultati možda nedostaju. Pokušajte ponovno za trenutak.',
   'search.partialJoin': ' i ',
   'search.showing': 'Prikazano {count} od {total} rezultata.',
+  'search.loadMore': 'Učitaj još rezultata',
+  'search.loadMoreFailed': 'Nije moguće učitati još rezultata. Pokušajte ponovno.',
   'privacy.notice':
     'Ne prodajemo vaše podatke niti ih ustupamo trećim stranama. Ne koristimo ih za profiliranje, za oglašavanje ni za treniranje ili poboljšavanje naših ili bilo čijih usluga. Šifrirani su u prijenosu i u mirovanju te napuštaju našu europsku infrastrukturu samo u mjeri nužnoj za naplatu i u integracijama koje uključite, u kojima će vas treća strana pitati za odobrenje podataka koje će upotrijebiti.',
 };

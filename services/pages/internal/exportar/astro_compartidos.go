@@ -20,7 +20,7 @@ func generarAstro(sitio *ir.Sitio) (map[string][]byte, error) {
 	}
 	nombre := obtenerTextoIdioma(sitio.SEO.SiteName, sitio.Languages.Default)
 	if nombre == "" {
-		nombre = "Sytue Web"
+		nombre = "Sytue Webs"
 	}
 	astro, err := ObtenerVersion("astro_version")
 	if err != nil {
@@ -47,6 +47,6 @@ import Form from '../islands/Form.tsx';
 `, nombre, nombre)),
 		"src/islands/Form.tsx": []byte(`import { useState } from 'preact/hooks'; import { pagesApi, resolverAltcha } from '../lib/pages-api'; export default function Form({ formId }: { formId: string }) { const [sent, setSent] = useState(false); return <form onSubmit={async (event) => { event.preventDefault(); const fields = Object.fromEntries(new FormData(event.currentTarget)); const altcha = await resolverAltcha(await pagesApi.getAltcha()); await pagesApi.submitForm(formId, { fields, consent: true, language: document.documentElement.lang || 'es', altcha }); setSent(true); }}><label>Nombre <input required name="name" /></label><button type="submit">Enviar</button>{sent && <p role="status">Enviado</p>}</form>; }` + "\n"),
 		"src/islands/Cart.tsx": []byte(`import { useState } from 'preact/hooks'; import { pagesApi, resolverAltcha } from '../lib/pages-api'; export default function Cart() { const [state, setState] = useState(''); return <button onClick={async () => { const altcha = await resolverAltcha(await pagesApi.getAltcha()); const result = await pagesApi.checkout({ checkout_token: crypto.randomUUID(), items: [], buyer: { email: '', name: '' }, shipping: { method_id: 'standard' }, payment: { gateway: 'mollie' }, terms_version: 1, language: document.documentElement.lang || 'es', altcha }); setState(result.order_id); }}>{state ? 'Pedido creado' : 'Finalizar compra'}</button>; }` + "\n"),
-		"README.md":            []byte("# Exportación Astro de Sytue Web\n\n`src/lib/pages-api.ts` se genera desde el catálogo público de rutas; no lo edites manualmente. Las islas Preact se hidratan solo donde hay formulario o carrito.\n"),
+		"README.md":            []byte("# Exportación Astro de Sytue Webs\n\n`src/lib/pages-api.ts` se genera desde el catálogo público de rutas; no lo edites manualmente. Las islas Preact se hidratan solo donde hay formulario o carrito.\n"),
 	}, nil
 }

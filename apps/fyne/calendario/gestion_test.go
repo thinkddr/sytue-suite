@@ -329,12 +329,14 @@ func TestLaBusquedaDiceQueFaltaUnaLetra(t *testing.T) {
 // TestEnElTelefonoLaCabeceraSeDesplazaYSaleElBotonFlotante: a 390 de ancho —el teléfono
 // medido el 2026-10-04— la cabecera conserva una fila de 53 y desplaza de lado,
 // el menú se va a un cajón que saca la hamburguesa, y abajo a la derecha está el botón
-// flotante de «Crear evento» en `primary`.
+// flotante de «Crear evento» en `primary`. En la SEMANA: el mes, por debajo de 640, es
+// el mes del teléfono, sin cabecera de vista ni botón flotante (vistamescompacta_test.go).
 func TestEnElTelefonoLaCabeceraSeDesplazaYSaleElBotonFlotante(t *testing.T) {
 	a, w := appConVentana(t, &escrituras{})
 	// Como en la captura de producción: sin invitaciones pendientes, que meten su
 	// insignia dentro del botón y lo ensanchan.
 	a.P.Invitaciones = 0
+	a.P.Vista = VistaSemana
 	a.pintar()
 	w.Resize(fyne.NewSize(390, 740))
 	var cab *CabeceraVista
@@ -398,8 +400,8 @@ func TestLaCabeceraNoRecortaHoyConControlesDe44(t *testing.T) {
 			p.AlIrHoy = func() { pulsado = true }
 			cab := p.cabecera()
 			for _, o := range append(append([]fyne.CanvasObject{}, cab.Izquierda...), cab.Derecha...) {
-				if b, ok := o.(*ui.Boton); ok {
-					b.Talla = ui.TallaLG
+				if b, ok := o.(*ui.BotonIcono); ok {
+					b.Lado = ui.SueloTactilBarra // el suelo táctil de 44
 				}
 			}
 			if got := cab.AltoPara(ancho); got != 65 {
@@ -444,7 +446,7 @@ func TestLaCabeceraNoRecortaHoyConControlesDe44(t *testing.T) {
 			// controles con las coordenadas de la tira que ya no está en el árbol.
 			cab.Resize(fyne.NewSize(1020, cab.AltoPara(1020)))
 			posHoy := hoy.Position()
-			buscar := cab.Derecha[0].(*ui.Boton)
+			buscar := cab.Derecha[0].(*ui.BotonIcono)
 			posBuscar := buscar.Position()
 			grupoVista.AlEnfocar()
 			hoy.FocusGained()

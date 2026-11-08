@@ -100,6 +100,32 @@ spec:
                 secretKeyRef:
                   name: sytue-hub-internal
                   key: secret
+            # El despertar de las apps de iOS por su widget (ADR 0039 y 0078): la clave
+            # `.p8` de Apple ENTERA, su identificador y el del equipo. Sin el Secret nadie
+            # se despierta y el registro de aparatos sigue; con las tres claves a medias,
+            # el Hub no arranca. Runbook: docs/operations.md#activar-widgets-apple.
+            - name: SYTUE_APNS_KEY_P8
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.apns.secret | default "sytue-hub-apns" }}
+                  key: key-p8
+                  optional: true
+            - name: SYTUE_APNS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.apns.secret | default "sytue-hub-apns" }}
+                  key: key-id
+                  optional: true
+            - name: SYTUE_APNS_TEAM_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.apns.secret | default "sytue-hub-apns" }}
+                  key: team-id
+                  optional: true
+            {{- with .Values.apns.host }}
+            - name: SYTUE_APNS_HOST
+              value: {{ . | quote }}
+            {{- end }}
             - name: HTTP_ADDR
               value: ":{{ .Values.service.targetPort }}"
             - name: LOG_LEVEL

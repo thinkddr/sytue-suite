@@ -18,6 +18,8 @@ export const nl: Catalog = {
   'ui.openNav': 'Navigatie openen',
   'ui.closeNav': 'Navigatie sluiten',
   'ui.backToList': 'Terug naar de lijst',
+  'ui.suiteOpen': 'Sytue: apps, zoeken, meldingen en account',
+  'ui.suiteClose': 'Terug naar de app',
   'ui.noResults': 'Geen resultaten.',
   'ui.meter.almostFull': 'bijna vol',
   'ui.meter.full': 'vol',
@@ -60,6 +62,9 @@ export const nl: Catalog = {
   'shell.lock.reasonNotebook': 'je versleutelde notitieboek openen',
   'shell.lock.faceIdUsage':
     'Sytue gebruikt Face ID om je sessie te ontgrendelen wanneer je de app opent.',
+  'shell.widgets.wake': 'Widgets bijwerken als de app gesloten is',
+  'shell.widgets.wakeHelp':
+    'Als er iets van jou verandert, wekt Sytue de app met een lege melding via Apple zodat die zijn widget kan vernieuwen. Apple ziet welke app en wanneer, nooit wat er veranderd is.',
   'shell.call.microphoneUsage':
     'Sytue Rooms gebruikt de microfoon alleen tijdens een gesprek, en alleen als je hem aanzet.',
   'shell.call.cameraUsage':
@@ -177,7 +182,7 @@ export const nl: Catalog = {
   'notifications.kind.pages.erp.failed':
     'Bestelling {number} op {site} is niet aangekomen bij Sytue ERP',
   'notifications.kind.pages.settings.changed':
-    '{actor} heeft een instelling van Sytue Web gewijzigd',
+    '{actor} heeft een instelling van Sytue Webs gewijzigd',
   'notifications.kind.pages.export.ready': 'Je export van {site} is klaar',
   'notifications.kind.pages.store.busy':
     'De webwinkel op {site} heeft te veel bestellingen die op betaling wachten',
@@ -365,6 +370,8 @@ export const nl: Catalog = {
   'widgets.compose': 'Opstellen',
   'widgets.storage': 'Opslag',
   'widgets.create': 'Afspraak maken',
+  'widgets.updatedAgo': 'Bijgewerkt {time}',
+  'widgets.updatedAt': 'Bijgewerkt: {time}',
 
   'linkedServices.services': 'Diensten',
   'linkedServices.changed':
@@ -377,6 +384,7 @@ export const nl: Catalog = {
   'linkedServices.notGranted':
     'Er is geen toegang tot deze dienst verleend. Verbind het account opnieuw om de machtigingen te kiezen.',
   'linkedServices.connected': 'Verbonden diensten',
+  'linkedServices.exists': 'Dit account was al verbonden en is nu geopend.',
   'linkedServices.providerData': 'Wijzigingen worden bij je aanbieder opgeslagen.',
   'linkedServices.writeUnknown':
     'De aanbieder heeft het opslaan niet bevestigd. Vernieuw en controleer voordat je het opnieuw probeert.',

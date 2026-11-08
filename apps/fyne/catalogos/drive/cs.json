@@ -4,6 +4,8 @@
   "action.classified": "Klasifikace · {name}",
   "action.classify": "Klasifikovat",
   "action.copy": "Vytvořit kopii",
+  "action.copyLink": "Kopírovat odkaz",
+  "action.copyLinkFailed": "Odkaz se nepodařilo zkopírovat.",
   "action.delete": "Přesunout do koše",
   "action.desktopBody": "Pokud ji ještě nemáte nainstalovanou, můžete si ji stáhnout.",
   "action.desktopCta": "Zobrazit soubory ke stažení",
@@ -12,6 +14,7 @@
   "action.downloadName": "Stáhnout {name}",
   "action.downloadZip": "Stáhnout (ZIP)",
   "action.editorFailed": "Editor nemohl tento soubor otevřít.",
+  "action.linkCopied": "Odkaz zkopírován. Otevře se jen osobám, které už mají přístup.",
   "action.mailFailed": "Editor e-mailu se nepodařilo otevřít",
   "action.menu": "Akce pro {name}",
   "action.more": "Další akce",
@@ -87,6 +90,18 @@
     "few": "Přesunout {count} položky",
     "many": "Přesunout {count} položky",
     "other": "Přesunout {count} položek"
+  },
+  "files.batch.restorePartial": {
+    "one": "1 položku se nepodařilo obnovit; zůstává v koši.",
+    "few": "{count} položky se nepodařilo obnovit; zůstávají v koši.",
+    "many": "{count} položky se nepodařilo obnovit; zůstávají v koši.",
+    "other": "{count} položek se nepodařilo obnovit; zůstávají v koši."
+  },
+  "files.batch.restored": {
+    "one": "1 položka byla obnovena.",
+    "few": "{count} položky byly obnoveny.",
+    "many": "{count} položky bylo obnoveno.",
+    "other": "{count} položek bylo obnoveno."
   },
   "files.batch.trashBody": {
     "one": "1 položka se přesune do koše. Odtud ji můžete obnovit.",
@@ -587,6 +602,21 @@
     "other": "Nahráno {count} souborů."
   },
   "team.upload.partial": "Nahráno {uploaded} z {count}.",
+  "trash.emptiedAll": "Koš byl vysypán.",
+  "trash.emptyAll": "Vysypat koš",
+  "trash.emptyAllBody": {
+    "one": "Položka v koši bude navždy vymazána i s historií verzí. Poté ji už nelze získat zpět.",
+    "few": "{count} položky v koši budou navždy vymazány i s historií verzí. Poté je už nelze získat zpět.",
+    "many": "{count} položky v koši bude navždy vymazáno i s historií verzí. Poté je už nelze získat zpět.",
+    "other": "{count} položek v koši bude navždy vymazáno i s historií verzí. Poté je už nelze získat zpět."
+  },
+  "trash.emptyAllPartial": {
+    "one": "1 položku se nepodařilo smazat; zůstává v koši.",
+    "few": "{count} položky se nepodařilo smazat; zůstávají v koši.",
+    "many": "{count} položky se nepodařilo smazat; zůstávají v koši.",
+    "other": "{count} položek se nepodařilo smazat; zůstávají v koši."
+  },
+  "trash.emptyAllTitle": "Vysypat koš?",
   "trash.emptyBody": "Smazané soubory a složky se zobrazí zde a bude možné je obnovit.",
   "trash.emptyTitle": "Koš je prázdný",
   "trash.errorTitle": "Koš se nepodařilo načíst",

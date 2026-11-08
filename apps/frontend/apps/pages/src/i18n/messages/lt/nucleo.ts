@@ -88,7 +88,7 @@ export const nucleo = {
   'new.progress': 'Svetainės kūrimo žingsniai',
   'new.go_to_step': 'Eiti į {n} žingsnį',
   'new.step_of': '{n} žingsnis iš {total}',
-  'app_settings.title': 'Sytue Web nustatymai',
+  'app_settings.title': 'Sytue Webs nustatymai',
   'new.search_title': 'Pradėkite nuo savo veiklos srities',
   'new.search_help':
     'Įrašykite, kuo užsiimate, arba pasirinkite grupę. Kiekviename šablone jau yra jūsų srities tekstai: pakeičiate tik pavadinimą, telefoną, kainas ir nuotraukas.',
@@ -291,7 +291,7 @@ export const nucleo = {
   'domains.start_help':
     'Įveskite norimą naudoti domeną. Jums reikės prieigos prie teikėjo, pas kurį jį įsigijote, DNS nustatymų.',
   'domains.progress': 'Domeno prijungimo eiga',
-  'domains.step.registered': 'Pridėta prie Sytue Web',
+  'domains.step.registered': 'Pridėta prie Sytue Webs',
   'domains.step.dns': 'DNS patvirtintas',
   'domains.step.https': 'HTTPS paruoštas',
   'domains.step.primary': 'Pagrindinis adresas',

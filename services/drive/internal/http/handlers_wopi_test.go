@@ -5,15 +5,19 @@ package drivehttp
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/platform/pkg/keycrypto"
 	"git.sytue.eu/sytue/one/services/drive/internal/config"
 	"git.sytue.eu/sytue/one/services/drive/internal/domain"
@@ -55,6 +59,13 @@ func (f *fakeLocks) ReleaseWopiLock(_ context.Context, _ uuid.UUID, lockID strin
 // wopiHarness monta el host con un fichero y devuelve el router, el id y un token válido.
 func wopiHarness(t *testing.T, write bool) (http.Handler, uuid.UUID, string, *fakeLocks) {
 	t.Helper()
+	return wopiHarnessConHub(t, write, nil)
+}
+
+// wopiHarnessConHub es wopiHarness con la señal de cambios hacia `hub`; el fichero es
+// de "u2" y lo edita "u1".
+func wopiHarnessConHub(t *testing.T, write bool, hub *hubnotify.Client) (http.Handler, uuid.UUID, string, *fakeLocks) {
+	t.Helper()
 	c, err := keycrypto.New([]byte("0123456789abcdef0123456789abcdef"))
 	if err != nil {
 		t.Fatalf("keycrypto: %v", err)
@@ -62,10 +73,13 @@ func wopiHarness(t *testing.T, write bool) (http.Handler, uuid.UUID, string, *fa
 	m := wopi.NewMinter(c, time.Hour)
 	id := uuid.New()
 	svc := &fakeSvc{file: domain.File{ID: id, Name: "informe.docx", SizeBytes: 12, Version: 3}}
+	if hub != nil {
+		svc.file.OwnerSub = "u2"
+	}
 	locks := &fakeLocks{}
 
 	r := chi.NewRouter()
-	mountWopi(r, &wopiHandlers{svc: svc, locks: locks, minter: m, maxUpload: 1 << 20})
+	mountWopi(r, &wopiHandlers{svc: svc, locks: locks, minter: m, maxUpload: 1 << 20, hub: hub})
 
 	tok, err := m.Mint(wopi.Claims{Tenant: "acme", Subject: "u1", FileID: id, Write: write})
 	if err != nil {
@@ -220,5 +234,57 @@ func TestWopiOverrideDesconocidoEs501(t *testing.T) {
 	r.ServeHTTP(rec, req)
 	if rec.Code != http.StatusNotImplemented {
 		t.Fatalf("override no soportado = %d, quiero 501", rec.Code)
+	}
+}
+
+// TestWopiGuardarMandaLaSenalDeCambios: lo que guarda un editor externo cambia los
+// recientes del widget de Drive de quien edita y del dueño. El host WOPI no pasa por
+// TrasEscribir (no lleva el Bearer), así que la manda putFile. Un guardado rechazado
+// no la manda. VISTO EN ROJO sin el AvisarCambio de putFile.
+func TestWopiGuardarMandaLaSenalDeCambios(t *testing.T) {
+	var mu sync.Mutex
+	var llegan []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var e struct {
+			Subject string `json:"subject"`
+			Data    struct {
+				Producto string `json:"producto"`
+			} `json:"data"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&e)
+		mu.Lock()
+		llegan = append(llegan, e.Data.Producto+" "+e.Subject)
+		mu.Unlock()
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	defer srv.Close()
+	recibido := func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		out := slices.Clone(llegan)
+		slices.Sort(out)
+		return out
+	}
+
+	r, id, tok, _ := wopiHarnessConHub(t, false, hubnotify.New(srv.URL, "s"))
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, wopiReq(http.MethodPost, "/wopi/files/"+id.String()+"/contents", tok))
+	time.Sleep(300 * time.Millisecond) // el envío es asíncrono
+	if got := recibido(); rec.Code == http.StatusOK || len(got) != 0 {
+		t.Fatalf("un guardado rechazado (%d) manda la señal: %v", rec.Code, got)
+	}
+
+	r, id, tok, _ = wopiHarnessConHub(t, true, hubnotify.New(srv.URL, "s"))
+	rec = httptest.NewRecorder()
+	r.ServeHTTP(rec, wopiReq(http.MethodPost, "/wopi/files/"+id.String()+"/contents", tok))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("guardar = %d, quiero 200", rec.Code)
+	}
+	quiero := []string{"drive u1", "drive u2"}
+	for limite := time.Now().Add(5 * time.Second); !slices.Equal(recibido(), quiero); {
+		if time.Now().After(limite) {
+			t.Fatalf("llega %v, quiero %v", recibido(), quiero)
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 }

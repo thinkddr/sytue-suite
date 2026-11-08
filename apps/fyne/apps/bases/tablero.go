@@ -28,8 +28,8 @@ var (
 )
 
 // caja es `border-border rounded-* border` con su fondo y margen interior.
-func caja(fondo string, radio, margen float32, v tema.Variante, contenido fyne.CanvasObject) fyne.CanvasObject {
-	r := canvas.NewRectangle(tema.Color(fondo, v))
+func caja(fondo color.NRGBA, radio, margen float32, v tema.Variante, contenido fyne.CanvasObject) fyne.CanvasObject {
+	r := canvas.NewRectangle(fondo)
 	r.CornerRadius, r.StrokeWidth, r.StrokeColor = radio, tema.Borde, tema.Color("border", v)
 	m := margen + tema.Borde
 	return container.NewStack(r, container.New(ui.Margen{Izq: m, Arr: m, Der: m, Abj: m}, contenido))
@@ -72,6 +72,9 @@ func (p *Pantalla) objetoTablero(v tema.Variante, agrupar api.BasesField, puedeE
 	arrastre := &arrastreTablero{p: p, campo: agrupar, columnas: columnas}
 	arrastre.valores = make([]string, len(cols))
 	arrastre.aros = make([]*canvas.Rectangle, len(cols))
+	// `bg-bg-subtle/50`: el gris a medias.
+	fondoColumna := tema.Color("bg-subtle", v)
+	fondoColumna.A /= 2
 	for i, col := range cols {
 		arrastre.valores[i] = col.valor
 		hijos := make([]fyne.CanvasObject, 0, 1+len(col.registros))
@@ -90,7 +93,7 @@ func (p *Pantalla) objetoTablero(v tema.Variante, agrupar api.BasesField, puedeE
 		aro.Hide()
 		arrastre.aros[i] = aro
 		columnas[i] = container.New(anchoFijo{Ancho: anchoColumna},
-			container.NewStack(caja("bg-subtle", tema.RadioLG, margenTablero, v, container.New(ui.Columna{Hueco: tema.Espacio(3)}, hijos...)), aro))
+			container.NewStack(caja(fondoColumna, tema.RadioLG, margenTablero, v, container.New(ui.Columna{Hueco: tema.Espacio(3)}, hijos...)), aro))
 	}
 	// `overflow-x-auto`: las columnas se desplazan de lado y la rueda sigue bajando la página.
 	fila := container.New(ui.Margen{Abj: tema.Espacio(2)}, container.New(ui.Fila{Hueco: tema.Espacio(3)}, columnas...))
@@ -165,7 +168,7 @@ func (p *Pantalla) tarjetaDeTablero(v tema.Variante, r api.BasesRecord, agrupar 
 		}
 		hijos = append(hijos, mover)
 	}
-	return caja("surface", tema.RadioMD, margenTablero, v, container.New(ui.Columna{Hueco: tema.Espacio(2)}, hijos...))
+	return caja(tema.Color("surface", v), tema.RadioMD, margenTablero, v, container.New(ui.Columna{Hueco: tema.Espacio(2)}, hijos...))
 }
 
 type arrastreTablero struct {

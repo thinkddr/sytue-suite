@@ -31,16 +31,16 @@ func TestRecorridoConSesion(t *testing.T) {
 	recorrido.Comprobar(t, base, 400)
 }
 
-// TestLaCabeceraDeLaBaseCabeEnUnTelefono: a 360 de ancho el nombre y los tres botones del
-// propietario no caben en una fila; tienen que partir, no pisarse ni salirse de la
-// ventana (así se vio en las capturas de teléfono del 2026-10-05).
+// TestLaCabeceraDeLaBaseCabeEnUnTelefono: a 360 de ancho el nombre, «Compartir» y el
+// menú «⋯» van en una línea sin pisarse ni salirse de la ventana (así se vio en las
+// capturas de teléfono del 2026-10-05, cuando eran tres botones sueltos).
 //
-// Verlo en rojo: quitar el `flujo` de la cabecera en objetoBase.
+// Verlo en rojo: quitar el `Truncar` del nombre en objetoBase, con un nombre largo.
 func TestLaCabeceraDeLaBaseCabeEnUnTelefono(t *testing.T) {
 	p, w := abrir(t, nuevoFalso(3))
 	w.Resize(fyne.NewSize(360, 640))
+	p.abierta.Datos.Name = "Clientes de la delegación de Castilla y León, 2026"
 	p.Repintar()
-	// El nombre de la base, entero y sin nada encima: el primer botón va después o debajo.
 	var nombre *ui.Rotulo
 	recorrer(w.Canvas().Content(), func(o fyne.CanvasObject) {
 		if r, ok := o.(*ui.Rotulo); ok && r.Texto == p.abierta.Datos.Name {
@@ -52,17 +52,20 @@ func TestLaCabeceraDeLaBaseCabeEnUnTelefono(t *testing.T) {
 	}
 	donde := fyne.CurrentApp().Driver().AbsolutePositionForObject
 	compartir := boton(w, p.t("share.open"))
-	if n, c := donde(nombre), donde(compartir); c.Y < n.Y+nombre.Size().Height && c.X < n.X+nombre.MinSize().Width {
-		t.Errorf("«%s» (en %v) pisa el nombre (en %v, %v de ancho)", p.t("share.open"), c, n, nombre.MinSize().Width)
+	if compartir == nil {
+		t.Fatalf("no se ve «%s»", p.t("share.open"))
 	}
-	for _, clave := range []string{"share.open", "base.rename", "base.delete"} {
-		b := boton(w, p.t(clave))
-		if b == nil {
-			t.Fatalf("no se ve «%s»", p.t(clave))
-		}
-		x := fyne.CurrentApp().Driver().AbsolutePositionForObject(b).X
-		if x < 0 || x+b.Size().Width > 360 {
-			t.Errorf("«%s» va de %.0f a %.0f en una ventana de 360", p.t(clave), x, x+b.Size().Width)
+	if n, c := donde(nombre), donde(compartir); c.Y < n.Y+nombre.Size().Height && c.X < n.X+nombre.Size().Width {
+		t.Errorf("«%s» (en %v) pisa el nombre (en %v, %v de ancho)", p.t("share.open"), c, n, nombre.Size().Width)
+	}
+	mas := menuMasDe(w, p.abierta.Datos.Name)
+	if mas == nil {
+		t.Fatal("no se ve el menú «⋯» de la base")
+	}
+	for _, o := range []fyne.CanvasObject{compartir, mas} {
+		x := donde(o).X
+		if x < 0 || x+o.Size().Width > 360 {
+			t.Errorf("%T va de %.0f a %.0f en una ventana de 360", o, x, x+o.Size().Width)
 		}
 	}
 }

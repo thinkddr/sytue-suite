@@ -315,6 +315,51 @@ paths:
         "204": { description: Offline }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
+  /api/v1/me/push/apns:
+    post:
+      tags: [push]
+      summary: Registrar un aparato de iOS al que despertar por su widget
+      description: >
+        Registro único de la suite (ADR 0039, enmienda del 2026-11-06). La app lo pide solo
+        con el interruptor «Actualizar los widgets con la app cerrada» encendido y un widget
+        puesto. El Hub le manda un aviso VACÍO de APNs, como mucho cada 5 min, cuando cambia
+        algo del producto de esa app. Un token delegado no registra (403).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bundle, token]
+              properties:
+                bundle: { type: string, description: "Bundle de una de las quince apps (eu.sytue.calendar…)" }
+                token: { type: string, pattern: "^[0-9A-Fa-f]{32,200}$" }
+      responses:
+        "204": { description: Registrado }
+        "400": { description: Bundle desconocido o token mal formado }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { description: Token delegado }
+  /api/v1/me/push/apns/forget:
+    post:
+      tags: [push]
+      summary: Olvidar aparatos de iOS
+      description: >
+        Con `{token}`, borra ese aparato de la persona; sin cuerpo, TODOS sus aparatos en
+        esta organización. 204 aunque no hubiera ninguno. Las rutas homónimas de Rooms
+        redirigen aquí (308).
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token: { type: string, pattern: "^[0-9A-Fa-f]{32,200}$" }
+      responses:
+        "204": { description: Olvidados }
+        "400": { description: Token mal formado }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
   /api/v1/intents:
     post:
       tags: [intents]

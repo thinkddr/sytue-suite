@@ -20,32 +20,12 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/webref"
 )
 
-// La mención que se escribe es la que el servicio reconoce para avisar: `@correo`.
-// Las mismas reglas que Menciones.test.ts de la web.
-func TestLasMenciones(t *testing.T) {
-	if q, ok := consultaMencion("Hola @an"); !ok || q != "an" {
-		t.Errorf("«Hola @an» = %q %v", q, ok)
-	}
-	for _, x := range []string{"escribe a ana@x.es", "Hola @ana@x.es ya"} {
-		if _, ok := consultaMencion(x); ok {
-			t.Errorf("%q no es una mención a medias", x)
-		}
-	}
-	if got := ponerMencion("Hola @an", "ana@x.es"); got != "Hola @ana@x.es " {
-		t.Errorf("ponerMencion = %q", got)
-	}
-	g := []api.Miembro{{Email: "ana@x.es", Nombre: "Ana Pérez"}, {Email: "luis@x.es"}}
-	if c := candidatosMencion(g, "pér"); len(c) != 1 || c[0].Email != "ana@x.es" {
-		t.Errorf("por nombre: %+v", c)
-	}
-}
-
 // Con la lista abierta, el teclado la recorre sin sacar el foco del área: flechas
 // (dando la vuelta), Intro escribe la activa y Escape la cierra hasta la siguiente tecla.
 func TestLasMencionesConElTeclado(t *testing.T) {
 	campo := ui.NuevaAreaTexto("")
 	m := nuevasMenciones(&App{}, campo)
-	m.gente = []api.Miembro{{Email: "ana@x.es"}, {Email: "luis@x.es"}, {Email: "eva@x.es"}}
+	m.agenda.Poner([]api.Miembro{{Email: "ana@x.es"}, {Email: "luis@x.es"}, {Email: "eva@x.es"}})
 	campo.PonerTexto("Hola @")
 	m.cambio(campo.Texto())
 	tecla := func(k fyne.KeyName) { campo.TypedKey(&fyne.KeyEvent{Name: k}) }
@@ -71,7 +51,7 @@ func TestLasMencionesConElTeclado(t *testing.T) {
 	if got := campo.Texto(); got != "Hola @luis@x.es " {
 		t.Errorf("Intro escribe %q", got)
 	}
-	if moverActiva(0, 0, fyne.KeyDown) != 0 {
+	if ui.MoverActiva(0, 0, fyne.KeyDown) != 0 {
 		t.Error("sin candidatos no hay activa que mover")
 	}
 }
@@ -124,7 +104,7 @@ func TestLaListaDeMencionesPintaComoLaWeb(t *testing.T) {
 	// Y la que se pinta activa es la que dice el teclado, con esos colores.
 	campo := ui.NuevaAreaTexto("")
 	m := nuevasMenciones(&App{}, campo)
-	m.gente = []api.Miembro{{Email: "ana@x.es", Nombre: "Ana"}, {Email: "luis@x.es"}}
+	m.agenda.Poner([]api.Miembro{{Email: "ana@x.es", Nombre: "Ana"}, {Email: "luis@x.es"}})
 	campo.PonerTexto("@")
 	m.cambio(campo.Texto())
 	campo.TypedKey(&fyne.KeyEvent{Name: fyne.KeyDown})

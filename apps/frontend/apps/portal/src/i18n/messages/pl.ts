@@ -66,6 +66,7 @@ export const pl: AppCatalog<typeof en> = {
   'inbox.markAll': 'Oznacz wszystkie jako przeczytane',
   'inbox.loading': 'Wczytywanie powiadomień…',
   'inbox.unreadDot': 'Nieprzeczytane',
+  'inbox.markRead': 'Oznacz jako przeczytane',
   'inbox.errorTitle': 'Nie udało się wczytać powiadomień',
   'inbox.errorBody': 'Hub w tej chwili nie odpowiada. Spróbuj ponownie za kilka sekund.',
   'inbox.retry': 'Spróbuj ponownie',
@@ -709,6 +710,8 @@ export const pl: AppCatalog<typeof en> = {
     '{sources} nie odpowiedziało, więc może brakować części wyników. Spróbuj ponownie za chwilę.',
   'search.partialJoin': ' i ',
   'search.showing': 'Wyświetlono {count} z {total} wyników.',
+  'search.loadMore': 'Wczytaj więcej wyników',
+  'search.loadMoreFailed': 'Nie udało się wczytać więcej wyników. Spróbuj ponownie.',
   'privacy.notice':
     'Nie sprzedajemy Twoich danych ani nie udostępniamy ich podmiotom trzecim. Nie używamy ich do profilowania, reklamy ani do trenowania czy ulepszania naszych usług lub cudzych. Są szyfrowane podczas przesyłania i przechowywania i opuszczają naszą europejską infrastrukturę tylko wtedy, gdy jest to absolutnie konieczne do wystawienia faktury, oraz w integracjach, które włączysz — wtedy podmiot trzeci poprosi o zgodę na dane, których użyje.',
 };

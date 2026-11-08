@@ -101,6 +101,7 @@
   "linkedServices.changed": "Dan l-element inbidel għand il-fornitur tiegħek. Aġġorna qabel terġa’ teditjah.",
   "linkedServices.choose": "Agħżel x’għandek tqabbad. Il-fornitur tiegħek jitlob il-permessi għas-servizzi magħżula.",
   "linkedServices.connected": "Servizzi mqabbda",
+  "linkedServices.exists": "Dan il-kont kien diġà mqabbad u issa huwa miftuħ.",
   "linkedServices.keepAdmin": "Google Keep jeħtieġ konfigurazzjoni approvata mill-amministrazzjoni ta’ Google Workspace. Kontijiet personali ta’ Gmail ma jistgħux iqabbduh.",
   "linkedServices.notGranted": "L-aċċess għal dan is-servizz ma ngħatax. Erġa’ qabbad il-kont biex tagħżel il-permessi tiegħu.",
   "linkedServices.notSupported": "Dan il-fornitur ma joffrix dan is-servizz.",
@@ -169,7 +170,7 @@
   "notifications.kind.pages.order.oversold": "L-ordni {number} fuq {site} tħallset mingħajr stokk",
   "notifications.kind.pages.order.paid": "Ordni ġdida {number} fuq {site}",
   "notifications.kind.pages.payment.duplicated": "Ħlas doppju fuq l-ordni {number} fuq {site}: it-tieni wieħed qed jiġi rimborsat",
-  "notifications.kind.pages.settings.changed": "{actor} biddel setting ta' Sytue Web",
+  "notifications.kind.pages.settings.changed": "{actor} biddel setting ta' Sytue Webs",
   "notifications.kind.pages.store.busy": "Il-ħanut fuq {site} għandu wisq ordnijiet li qed jistennew il-ħlas",
   "notifications.kind.pages.withdrawal.requested": "Intalab irtirar mill-ordni {number} fuq {site}",
   "notifications.kind.photos.album.added": "{actor} żied ritratti ma’ “{name}”",
@@ -303,6 +304,8 @@
   "shell.update.failedBody": "Erġa’ pprova aktar tard jew niżżilha mill-portal.",
   "shell.update.install": "Aġġorna għall-verżjoni {version}",
   "shell.update.upToDate": "{app} hija aġġornata",
+  "shell.widgets.wake": "Aġġorna l-widgets meta l-app tkun magħluqa",
+  "shell.widgets.wakeHelp": "Meta xi ħaġa tiegħek tinbidel, Sytue tqajjem l-app b’notifika vojta ta’ Apple biex taġġorna l-widget tagħha. Apple tara liema app u meta, qatt x’inbidel.",
   "ui.backToList": "Lura għal-lista",
   "ui.bulk.clear": "Neħħi l-għażla",
   "ui.bulk.region": "Azzjonijiet għall-għażla",
@@ -320,6 +323,8 @@
   "ui.review.edit": "Editja",
   "ui.save": "Issejvja",
   "ui.selectRow": "Agħżel ir-ringiela",
+  "ui.suiteClose": "Lura għall-app",
+  "ui.suiteOpen": "Sytue: apps, tfittxija, notifiki u kont",
   "ui.wizard.back": "Lura",
   "ui.wizard.cancel": "Ikkanċella",
   "ui.wizard.goToStep": "Lura għall-pass {n}: ",
@@ -338,5 +343,7 @@
   "widgets.pending": "Pendenti",
   "widgets.photos": "Ritratti",
   "widgets.rows": "Ringieli",
-  "widgets.storage": "Ħażna"
+  "widgets.storage": "Ħażna",
+  "widgets.updatedAgo": "Aġġornat {time}",
+  "widgets.updatedAt": "Aġġornat: {time}"
 }

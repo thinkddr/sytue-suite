@@ -31,7 +31,7 @@ func (p *Panel) cuerpoCuentas() []fyne.CanvasObject {
 		if c.Provider != "gmail" && c.Provider != "microsoft" && c.Provider != "yahoo" {
 			continue
 		}
-		f := func() { p.elegirCuenta(c) }
+		f := func() { p.aviso = ""; p.elegirCuenta(c) }
 		label := cmp.Or(c.Address, c.Name)
 		reconectar := !c.Connected || !slices.Contains(c.Services, p.servicio)
 		if reconectar {
@@ -45,7 +45,7 @@ func (p *Panel) cuerpoCuentas() []fyne.CanvasObject {
 		cuerpo = append(cuerpo, card)
 	}
 	return append(cuerpo, p.boton(p.t("externalMail.connect"), func() {
-		p.pendienteProvider, p.pendienteID, p.esperadaID = "", "", ""
+		p.pendienteProvider, p.pendienteID, p.esperadaID, p.aviso = "", "", "", ""
 		p.paso = "proveedores"
 		p.pintar()
 	}), p.boton(p.t("nav.refresh"), func() { p.cargarCuentas(p.esperadaID) }))
@@ -76,7 +76,7 @@ func (p *Panel) cuerpoProveedores() []fyne.CanvasObject {
 }
 
 func (p *Panel) prepararConsentimiento(provider, instance string) {
-	p.consentProvider, p.consentInstance, p.volverConsentimiento = provider, instance, p.paso
+	p.consentProvider, p.consentInstance, p.volverConsentimiento, p.aviso = provider, instance, p.paso, ""
 	p.consentServices = p.serviciosConsentir(provider, instance)
 	p.paso = "consentimiento"
 	p.pintar()

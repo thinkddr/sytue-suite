@@ -2,8 +2,9 @@
 // Copyright (c) 2026 Daniel Delgado Ramos
 import type { Note, NoteInput, Notebook } from '@sytue/api-clients';
 import { esMac } from '@sytue/ui';
-import { interpretarCaptura } from './captura.js';
+import { escapar, interpretarCaptura } from './captura.js';
 import { sinEtiquetas } from './enlaces.js';
+import { textoDeNota } from './extracto.js';
 
 export const ENFOQUES = ['all', 'pending', 'done', 'pinned'] as const;
 export type Enfoque = (typeof ENFOQUES)[number];
@@ -61,9 +62,9 @@ export function enfocarNotas(
 }
 
 /**
- * Los marcadores son explícitos, como en Twos: una frase normal nunca se
+ * Los marcadores son explícitos: una frase normal nunca se
  * reclasifica. `[ ] `, `[] `, `[x] ` o `- ` al principio hacen una tarea (el guion
- * es el de la viñeta de Twos: la línea que empieza por él es algo que hacer), y
+ * es el de una lista apuntada a mano: la línea que empieza por él es algo que hacer), y
  * `---` solo es un separador.
  */
 export function capturaRapida(texto: string, tipo: 'text' | 'todo'): NoteInput | null {
@@ -84,9 +85,141 @@ export function capturaRapida(texto: string, tipo: 'text' | 'todo'): NoteInput |
     : { kind: 'text', content: c.content };
 }
 
+/** Lo más que nace de UNA vez al pegar varias líneas; lo que sobra se queda en la captura. */
+export const MAX_LINEAS_PEGADAS = 50;
+
+/**
+ * Las líneas con algo de lo que hay en la captura, en orden: cada una es una nota, con
+ * la misma sintaxis que al teclearla (`capturaRapida`). Pegar una lista apuntada en otra
+ * parte da una fila por línea, que es lo que se ve en el papel. Las líneas en blanco no
+ * son nada, y el `\r` de un portapapeles de Windows tampoco.
+ */
+export function lineasDeCaptura(texto: string): string[] {
+  return texto
+    .split(/\r\n|\r|\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+}
+
+/** El título de una tarea, en runas: el tope de la captura y el `maxNoteTitle` del servicio. */
+export const MAX_TITULO_TAREA = 400;
+
+/** Los bloques que acaban una línea del cuerpo de una nota. */
+const BLOQUE = 'p,div,li,h1,h2,h3,h4,h5,h6,blockquote,pre,td,th';
+const FIN_DE_LINEA = `br,hr,ul,ol,table,${BLOQUE}`;
+
+/**
+ * La primera línea de un cuerpo HTML como texto, y el cuerpo sin ella con su formato.
+ * Una línea acaba en un salto (`<br>`) o donde acaba su bloque; lo que queda vacío al
+ * quitarla (el párrafo, la lista) se va con ella.
+ */
+export function primeraLinea(html: string): { linea: string; resto: string } {
+  // En una `<template>`: su contenido es inerte —ni se cargan imágenes ni corre nada—,
+  // como el de DOMParser, y admite rangos en cualquier DOM.
+  const plantilla = document.createElement('template');
+  plantilla.innerHTML = html;
+  const raiz = plantilla.content;
+  const textos = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT);
+  let primero: Node | null = null;
+  while (textos.nextNode()) {
+    if (textos.currentNode.nodeValue?.trim()) {
+      primero = textos.currentNode;
+      break;
+    }
+  }
+  if (!primero) return { linea: '', resto: html };
+  const bloque = primero.parentElement?.closest(BLOQUE);
+  const contenedor: Element | DocumentFragment = bloque && raiz.contains(bloque) ? bloque : raiz;
+  // Donde acaba la línea: el primer salto o bloque que viene DETRÁS de su primer texto.
+  let fin: Element | null = null;
+  for (const el of contenedor.querySelectorAll(FIN_DE_LINEA)) {
+    if (primero.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) {
+      fin = el;
+      break;
+    }
+  }
+  // Desde su primer texto con lo que lo envuelve (la negrita de la palabra), no desde
+  // el principio del bloque: una imagen que vaya delante no es parte de la línea.
+  let inicio: Node = primero;
+  while (
+    inicio.parentNode &&
+    inicio.parentNode !== contenedor &&
+    !(inicio.parentNode as Element).querySelector('img')
+  )
+    inicio = inicio.parentNode;
+  const rango = document.createRange();
+  rango.setStartBefore(inicio);
+  if (fin) rango.setEndBefore(fin);
+  else rango.setEnd(contenedor, contenedor.childNodes.length);
+  const linea = rango.toString().replace(/\s+/g, ' ').trim();
+  rango.deleteContents();
+  if (fin?.tagName === 'BR') fin.remove();
+  let vacio = contenedor instanceof Element ? contenedor : null;
+  while (vacio && !vacio.textContent?.trim() && !vacio.querySelector('img,hr,table')) {
+    const padre: Element | null = vacio.parentElement;
+    vacio.remove();
+    vacio = padre;
+  }
+  return { linea, resto: plantilla.innerHTML.trim() };
+}
+
+/** Un cuerpo sin nada que leer: vacío, o párrafos sin texto. */
+function sinTexto(html: string): boolean {
+  return textoDeNota(html) === '' && !/<(img|hr|table)\b/i.test(html);
+}
+
+/** Lo que cambia al convertir una línea: su tipo y, si hace falta, de dónde sale su texto. */
+export interface Conversion {
+  kind: 'text' | 'todo';
+  title: string;
+  content: string;
+  checked?: boolean;
+  cancelled?: boolean;
+}
+
+/**
+ * Una cosa apuntada pasa a ser una tarea, o al revés, sin perder nada de lo escrito.
+ *
+ * - De texto a tarea: sin título, la primera línea del texto lo es y el resto se queda
+ *   debajo, con su formato. Si esa línea no cabe en el título de una tarea, el título
+ *   lleva su principio y el texto se queda entero.
+ * - De tarea a texto: sin nada debajo, el título pasa a ser el texto; con algo, se
+ *   quedan los dos. Hecha o cancelada, deja de estarlo: un texto no tiene casilla, y
+ *   al volver a ser tarea sería una cosa por hacer que se vería tachada.
+ */
+export function convertirNota(n: {
+  kind: 'text' | 'todo';
+  title: string;
+  content: string;
+}): Conversion {
+  const title = n.title.trim();
+  if (n.kind === 'todo') {
+    return title && sinTexto(n.content)
+      ? {
+          kind: 'text',
+          title: '',
+          content: `<p>${escapar(title)}</p>`,
+          checked: false,
+          cancelled: false,
+        }
+      : { kind: 'text', title, content: n.content, checked: false, cancelled: false };
+  }
+  if (title) return { kind: 'todo', title, content: n.content };
+  const { linea, resto } = primeraLinea(n.content);
+  // Por puntos de código y no por grafemas: es como cuenta el servicio (`RuneCountInString`).
+  const runas = Array.from(linea);
+  return runas.length > MAX_TITULO_TAREA
+    ? {
+        kind: 'todo',
+        title: `${runas.slice(0, MAX_TITULO_TAREA - 1).join('')}…`,
+        content: n.content,
+      }
+    : { kind: 'todo', title: linea, content: resto };
+}
+
 /**
  * `dd` y `tt` seguidos de un espacio se cambian por la fecha y la hora, como en
- * Twos. Solo la palabra que se acaba de teclear (al final y suelta): `add ` o un
+ * un cuaderno de notas rápido. Solo la palabra que se acaba de teclear (al final y suelta): `add ` o un
  * `dd` en mitad de una frase ya escrita no se tocan. Fecha ISO y hora de 24 h,
  * las mismas en la web y en Fyne y en todos los idiomas.
  */
@@ -127,8 +260,8 @@ export function atajoDiario(
 }
 
 /**
- * Los diarios PROPIOS no van al árbol: uno por día lo entierra en un mes, y en Twos
- * los días tampoco son listas de la barra. A un día se llega por «Hoy», por la tira
+ * Los diarios PROPIOS no van al árbol: uno por día lo entierra en un mes, y un
+ * día no es una lista de la barra. A un día se llega por «Hoy», por la tira
  * de la semana y sus flechas, y a los viejos por la vista «Días», que enseña solo los
  * que tienen algo y los abre sin crear diarios vacíos por el camino. (Mientras esa
  * vista no existía, los diarios con notas se quedaban en el árbol: era la única forma

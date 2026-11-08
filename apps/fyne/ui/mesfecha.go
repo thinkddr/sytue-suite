@@ -6,6 +6,7 @@ package ui
 import (
 	"image/color"
 	"strconv"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -187,11 +188,14 @@ func nuevoDiaFecha(m *MesFecha, d time.Time) *diaFecha {
 	return c
 }
 
-// La celda de la semana (`.notes-week-day` de Notes): `py-1.5 gap-1`, el nombre en
-// `text-xs`, el número en un círculo de `h-8 w-8` y el punto de `h-1 w-1`.
+// La celda de la semana (`.notes-week-day` de Notes): `py-1.5 gap-1`, la INICIAL del día
+// en `text-xs` medio y en versal, el número a 15 px en un círculo de `h-8 w-8` y el punto
+// de `h-1 w-1`.
 var (
 	CirculoSemana = tema.Espacio(8)
 	PuntoSemana   = tema.Espacio(1)
+	// NumeroSemana es el `text-[0.9375rem]` del número, con la línea de `text-base`.
+	NumeroSemana = tema.Escalon{Tam: 0.9375 * tema.Rem, Linea: tema.TextoBase.Linea}
 )
 
 func (c *diaFecha) MinSize() fyne.Size {
@@ -239,13 +243,21 @@ func (c *diaFecha) CreateRenderer() fyne.WidgetRenderer {
 	r.peso = peso
 	r.escalon = tema.TextoSM
 	if c.semana {
-		r.escalon = tema.TextoBase
+		r.escalon = NumeroSemana
 		r.fondo.CornerRadius = tema.RadioLG
+		r.peso = Medio
+		if mismaFecha(c.dia, c.m.Elegida) || mismaFecha(c.dia, c.m.Hoy) {
+			r.peso = SemiNegrita
+		}
+		peso = r.peso
 	}
 	r.texto = Texto(strconv.Itoa(c.dia.Day()), r.escalon, peso, tema.Color("text", v))
 	fondos := []fyne.CanvasObject{r.fondo}
 	if c.semana {
-		r.subtitulo = Texto(i18n.WeekdaysShort(c.m.Locale)[(int(c.dia.Weekday())+6)%7], tema.TextoXS, Normal, tema.Color("text-subtle", v))
+		// La inicial, como en el margen de una agenda de papel: el nombre entero lo lee
+		// el lector de pantalla (`Nombre`).
+		inicial := strings.ToUpper(i18n.WeekdaysNarrow(c.m.Locale)[(int(c.dia.Weekday())+6)%7])
+		r.subtitulo = Texto(inicial, tema.TextoXS, Medio, tema.Color("text-subtle", v))
 		r.circulo = canvas.NewRectangle(color.NRGBA{})
 		r.circulo.CornerRadius = CirculoSemana / 2
 		r.punto = canvas.NewRectangle(color.NRGBA{})
@@ -279,7 +291,7 @@ func (r *diaFechaRenderer) Layout(t fyne.Size) {
 	r.fondo.Resize(t)
 	if r.circulo != nil {
 		y := tema.Espacio(1.5)
-		ancho := Medir(r.subtitulo.Text, tema.TextoXS, Normal).Width
+		ancho := Medir(r.subtitulo.Text, tema.TextoXS, Medio).Width
 		ColocarTexto(r.subtitulo, tema.TextoXS, (t.Width-ancho)/2, y)
 		y += tema.TextoXS.Linea + tema.Espacio(1)
 		r.circulo.Move(fyne.NewPos((t.Width-CirculoSemana)/2, y))
@@ -321,8 +333,9 @@ func (r *diaFechaRenderer) Refresh() {
 		r.texto.Color = tema.Color("text-subtle", v)
 	}
 	if r.circulo != nil {
-		// La semana: velo de celda al pasar, círculo `primary` en el elegido, hoy en
-		// `primary-text` y el resto en `text-muted`.
+		// La semana: velo de celda al pasar, círculo de TINTA en el elegido (es dónde se
+		// está, no una acción: `bg-text text-surface`), hoy en `primary-text` y el resto
+		// en `text-muted`. El punto de un día con notas, en `border-strong`.
 		r.fondo.FillColor, r.circulo.FillColor = color.NRGBA{}, color.NRGBA{}
 		if c.Encima() {
 			r.fondo.FillColor = tema.Color("bg-subtle", v)
@@ -330,7 +343,7 @@ func (r *diaFechaRenderer) Refresh() {
 		tinta := tema.Color("text-muted", v)
 		switch {
 		case mismaFecha(c.dia, c.m.Elegida):
-			r.circulo.FillColor, tinta = tema.Color("primary", v), tema.Color("on-primary", v)
+			r.circulo.FillColor, tinta = tema.Color("text", v), tema.Color("surface", v)
 		case mismaFecha(c.dia, c.m.Hoy):
 			tinta = tema.Color("primary-text", v)
 		}
@@ -341,7 +354,7 @@ func (r *diaFechaRenderer) Refresh() {
 		r.punto.FillColor = color.NRGBA{}
 		switch c.marca {
 		case 1:
-			r.punto.FillColor = tema.Color("text-subtle", v)
+			r.punto.FillColor = tema.Color("border-strong", v)
 		case 2:
 			r.punto.FillColor = tema.Color("primary", v)
 		}

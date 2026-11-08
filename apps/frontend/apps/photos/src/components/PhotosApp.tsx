@@ -66,6 +66,9 @@ import { Nav } from './Nav.js';
 import { Recuerdos } from './Recuerdos.js';
 import { porMes } from '../lib/agrupar.js';
 import { planDeDescarga, programarDescarga } from '../lib/descargaEnLote.js';
+import { conFavoritas, planFavoritas, unLoteALaVez } from '../lib/favoritasEnLote.js';
+import { sinResultados } from '../lib/sinResultados.js';
+import { posicionVisor, saltoVisor, type PosicionVisor } from '../lib/posicionVisor.js';
 import { estiloDeTesela } from '../lib/filas.js';
 import { CAMPO_TACTIL } from '../lib/tactil.js';
 import { RUTA } from '../lib/ruta.js';
@@ -99,6 +102,8 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
   const [fotos, setFotos] = useState<Foto[]>([]);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [cargando, setCargando] = useState(true);
+  // La búsqueda escrita que aún no se ha pedido (espera los 250 ms del temporizador).
+  const [pendiente, setPendiente] = useState(false);
   const [fin, setFin] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const centinela = useRef<HTMLDivElement>(null);
@@ -229,6 +234,31 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
       setError(String(e));
     }
   };
+
+  /**
+   * El corazón de la barra de selección: marca lo que falte o, si todas lo son ya,
+   * las quita. Una llamada por foto que cambia (el servicio no tiene lote), a la
+   * vez como la papelera, y la lista cambia con las que volvieron bien.
+   */
+  const favoritasEnVuelo = useRef(false);
+  const [marcandoFavoritas, setMarcandoFavoritas] = useState(false);
+  const favoritasDeLaSeleccion = () =>
+    unLoteALaVez(favoritasEnVuelo, async () => {
+      if (!seleccion || seleccion.size === 0) return;
+      const { valor, ids } = planFavoritas(fotos, seleccion);
+      setMarcandoFavoritas(true);
+      try {
+        const resultados = await Promise.allSettled(ids.map((id) => marcarFavorita(id, valor)));
+        const hechas = new Set(ids.filter((_, i) => resultados[i]?.status === 'fulfilled'));
+        setFotos((l) => conFavoritas(l, hechas, valor, soloFavoritas));
+        salirDeSeleccion();
+        setAviso(t(valor ? 'gallery.favorited' : 'gallery.unfavorited', { count: hechas.size }));
+        if (hechas.size < ids.length)
+          setError(t('gallery.favoriteFailed', { count: ids.length - hechas.size }));
+      } finally {
+        setMarcandoFavoritas(false);
+      }
+    });
 
   const cargarAlbumes = () => {
     if (albumesLista === null)
@@ -450,6 +480,7 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
   const posiciones = useMemo(() => new Map(fotos.map((f, i) => [f.id, i])), [fotos]);
 
   const cargarMas = useCallback(async () => {
+    setPendiente(false);
     if (fin) return;
     setCargando(true);
     const gen = generacion.current;
@@ -496,6 +527,7 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
         return;
       }
       generacion.current++;
+      setPendiente(true);
       setTambien(terminos);
       setFotos([]);
       setCursor(undefined);
@@ -515,6 +547,9 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
     // consulta anterior y arrastrarlos daría resultados que nadie pidió.
     setTambien([]);
     setAviso(null);
+    // Solo si cambia: con el mismo texto el efecto del temporizador no corre y la
+    // marca se quedaría puesta.
+    if (nuevo !== texto) setPendiente(true);
     setTexto(nuevo);
     setFotos([]);
     setCursor(undefined);
@@ -556,7 +591,7 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
     return () => obs.disconnect();
   }, [cargarMas, cargando, fin]);
 
-  if (!cargando && fotos.length === 0 && !error && !texto) {
+  if (!cargando && !pendiente && fotos.length === 0 && !error && !texto) {
     return (
       <Marco user={user} hubBaseUrl={hubBaseUrl} locale={locale} title={t('app.title')}>
         <div
@@ -590,6 +625,7 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
               envoltorio porque con icono el `class` de `Input` llega al <input>. */}
           <div class="mb-4 ml-auto min-w-0 flex-1 sm:w-64 sm:flex-none">
             <Input
+              id={ID_BUSCADOR}
               type="search"
               value={texto}
               onInput={(e) => buscar((e.target as HTMLInputElement).value)}
@@ -717,6 +753,27 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
                 </>
               )}
             </Dropdown>
+            {/* Dice lo que hará, como el corazón de una foto: si todas lo son ya,
+                quitarlas (y el corazón va lleno); si falta alguna, marcarlas. */}
+            {(() => {
+              const quitar = seleccion.size > 0 && !planFavoritas(fotos, seleccion).valor;
+              const rotulo = t(quitar ? 'gallery.unfavorite' : 'gallery.favorite');
+              return (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  leadingIcon={
+                    <Icon name="corazon" {...(quitar ? { fill: 'currentColor' } : {})} />
+                  }
+                  disabled={seleccion.size === 0}
+                  loading={marcandoFavoritas}
+                  title={rotulo}
+                  onClick={() => void favoritasDeLaSeleccion()}
+                >
+                  <span class={ROTULO_DE_LOTE}>{rotulo}</span>
+                </Button>
+              );
+            })()}
             <Button
               variant="ghost"
               size="sm"
@@ -813,31 +870,69 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
           />
         ) : null}
 
-        {/* Solo cuando la búsqueda literal no encuentra NADA: ampliar siempre
-            gastaría una llamada por búsqueda sin mejorar las que ya funcionan. */}
-        {texto.trim() && !cargando && fotos.length === 0 && tambien.length === 0 ? (
-          <div class="border-border mb-6 rounded-md border p-4">
-            <p class="text-text-muted mb-2 text-sm">{t('gallery.searchWiderHint')}</p>
-            <Button
-              variant="secondary"
-              size="sm"
-              leadingIcon={<Icon name="search" />}
-              disabled={ampliando}
-              onClick={() => void ampliarBusqueda()}
-            >
-              {t('gallery.searchWider')}
-            </Button>
-          </div>
-        ) : null}
+        {/* Una búsqueda sin aciertos es un estado vacío, no una galería en blanco:
+            dice qué se buscó y ofrece salir de ahí. «Borrar búsqueda» devuelve el foco
+            al buscador, que es donde se va a escribir otra cosa. Ampliar solo se
+            ofrece aquí: hacerlo siempre gastaría una llamada por búsqueda sin
+            mejorar las que ya funcionan. */}
+        {(() => {
+          const vacio = sinResultados({
+            texto,
+            cargando,
+            pendiente,
+            fotos: fotos.length,
+            error: error !== null,
+            tambien: tambien.length,
+          });
+          if (!vacio) return null;
+          return (
+            <EmptyState
+              class="mb-6"
+              illustration={<Illustration name="emptySearch" />}
+              title={t('gallery.noResults.title', { query: vacio.consulta })}
+              description={t(
+                vacio.ampliar ? 'gallery.searchWiderHint' : 'gallery.noResults.description',
+              )}
+              action={
+                <div class="flex flex-wrap items-center justify-center gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    leadingIcon={<Icon name="close" />}
+                    onClick={() => {
+                      buscar('');
+                      document.getElementById(ID_BUSCADOR)?.focus();
+                    }}
+                  >
+                    {t('gallery.clearSearch')}
+                  </Button>
+                  {vacio.ampliar ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      leadingIcon={<Icon name="search" />}
+                      disabled={ampliando}
+                      onClick={() => void ampliarBusqueda()}
+                    >
+                      {t('gallery.searchWider')}
+                    </Button>
+                  ) : null}
+                </div>
+              }
+            />
+          );
+        })()}
 
         {grupos.map((grupo) => (
           <section key={grupo.clave} class="mb-8">
             {/* `sticky`: el mes se queda arriba mientras se recorre, que es lo que
               permite saber dónde estás en una galería de miles. Opaca y del color
-              del fondo: pegada tapa las fotos, y suelta no pinta una banda blanca. */}
+              de la hoja: pegada tapa las fotos, y suelta no pinta una banda (con
+              `bg-bg`, sobre papel era gris dentro de la hoja blanca). En Carril no hay
+              hoja que pinte y el fondo es el lienzo: `bg-bg`, como `ui.FondoHoja`. */}
             <h2
               class={cx(
-                'bg-bg text-text sticky z-10 flex items-center gap-3 py-2 text-sm font-semibold',
+                'text-text in-data-[forma=carril]:bg-bg sticky z-10 flex items-center gap-3 bg-[var(--sytue-sheet-bg)] py-2 text-sm font-semibold',
                 // Bajo la barra de selección cuando está: si no, el mes se escondía detrás.
                 // Su alto: 12 de relleno, 2 de borde y los 32 de un mando —44 con el dedo—.
                 seleccion !== null ? 'top-[2.875rem] pointer-coarse:top-[3.625rem]' : 'top-0',
@@ -917,6 +1012,8 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
                 .catch((e) => setError(String(e)))
             }
             vecinas={[fotos[abierta - 1], fotos[abierta + 1]]}
+            posicion={posicionVisor(abierta, fotos.length, !fin)}
+            onIr={setAbierta}
             onPrev={abierta > 0 ? () => setAbierta(abierta - 1) : undefined}
             onNext={
               abierta < fotos.length - 1
@@ -942,6 +1039,8 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
  * que tenía. Sin rótulos cabe en un teléfono.
  */
 const ROTULO_DE_LOTE = 'max-xl:sr-only';
+/** El buscador de la galería: «Borrar búsqueda» le devuelve el foco. */
+const ID_BUSCADOR = 'photos-busqueda';
 
 /** El mando de «marcar el mes entero», que también dice si ya lo está. */
 function BotonDelMes({
@@ -1074,6 +1173,8 @@ export function Visor({
   onFavorite,
   onDescribe,
   vecinas = [],
+  posicion = null,
+  onIr,
 }: {
   foto: Foto;
   t: ReturnType<typeof useT>;
@@ -1081,13 +1182,21 @@ export function Visor({
   onClose: () => void;
   onPrev?: (() => void) | undefined;
   onNext?: (() => void) | undefined;
+  /** El «12 / 240» de la cabecera (`posicionVisor`); `null`, no se enseña. */
+  posicion?: PosicionVisor | null;
+  /** Ir a la foto `i` de la lista (desde 0): Inicio y Fin. Sin él, no saltan. */
+  onIr?: ((i: number) => void) | undefined;
   /**
    * La anterior y la siguiente, para pedirlas mientras se mira esta: pasar de foto es
    * entonces enseñar algo que ya está, no esperar a la red. Ver `precargar`.
    */
   vecinas?: (Foto | undefined)[];
-  /** Un mando extra en la cabecera (p. ej. «quitar del álbum»). */
-  accion?: JSX.Element | undefined;
+  /**
+   * Un mando extra en la cabecera (p. ej. «quitar del álbum»). Como función recibe
+   * `avisar`, que escribe en el `role=status` del visor: lo de fuera queda detrás del
+   * modal, inerte, y ni se ve ni se anuncia mientras está abierto.
+   */
+  accion?: JSX.Element | ((avisar: (texto: string) => void) => JSX.Element) | undefined;
   /** Mover a la papelera; si no se pasa, el visor no ofrece borrar. */
   onDelete?: ((foto: Foto) => void) | undefined;
   /** Marcar o desmarcar favorita; sin él, el visor no ofrece el corazón. */
@@ -1302,6 +1411,12 @@ export function Visor({
     [t('viewer.infoDimensions'), `${lados[0]} × ${lados[1]}`],
     [t('viewer.infoSize'), formatBytes(locale, foto.sizeBytes)],
   ];
+  // «240», o «100+» si quedan páginas por pedir: el total es lo cargado.
+  const totalVisor = posicion
+    ? posicion.hayMas
+      ? t('viewer.counterMore', { count: posicion.total })
+      : posicion.total
+    : 0;
   return (
     <dialog
       ref={ref}
@@ -1315,7 +1430,13 @@ export function Visor({
           e.target.closest('select, input, textarea, [role="menu"]')
         )
           return;
-        if (e.key === 'ArrowLeft') onPrev?.();
+        const salto =
+          posicion && onIr ? saltoVisor(e.key, posicion.indice - 1, posicion.total) : null;
+        if (salto !== null) {
+          // Sin esto, Inicio y Fin desplazan la ficha o el diálogo además de saltar.
+          e.preventDefault();
+          onIr?.(salto);
+        } else if (e.key === 'ArrowLeft') onPrev?.();
         else if (e.key === 'ArrowRight') onNext?.();
         else if (e.key === ' ') {
           e.preventDefault();
@@ -1344,6 +1465,18 @@ export function Visor({
             fotos; cerrar es el aspa de cualquier diálogo de la casa. */}
         <header class="border-border flex items-center gap-2 border-b px-3 py-2 max-lg:flex-wrap">
           <span class="truncate text-sm font-medium max-lg:min-w-0 max-lg:flex-1">{foto.name}</span>
+          {posicion ? (
+            // Dónde se está en la lista: «12 / 240», o «12 / 100+» si quedan páginas
+            // por pedir. Se ve corto y se lee entero («Foto 12 de 240»).
+            <span class="text-text-muted shrink-0 text-xs tabular-nums">
+              <span aria-hidden="true">
+                {t('viewer.counter', { index: posicion.indice, total: totalVisor })}
+              </span>
+              <span class="sr-only">
+                {t('viewer.counterLabel', { index: posicion.indice, total: totalVisor })}
+              </span>
+            </span>
+          ) : null}
           <span role="status" aria-live="polite" class="text-text-muted ml-auto truncate text-xs">
             {aviso}
           </span>
@@ -1363,7 +1496,7 @@ export function Visor({
             // sin culpable visible (v3.11.1).
             class="relative flex items-center gap-1 max-lg:order-last max-lg:w-full max-lg:overflow-x-auto max-lg:[mask-image:linear-gradient(to_right,black_calc(100%-28px),transparent)] max-lg:[&>*]:shrink-0"
           >
-            {accion}
+            {typeof accion === 'function' ? accion(setAviso) : accion}
             {accion ? <Filete /> : null}
             {onFavorite ? (
               <IconButton
@@ -1820,6 +1953,7 @@ export function Visor({
       </div>
       <p id={atajosId} class="sr-only">
         {t('viewer.shortcuts')}
+        {posicion && onIr ? ` ${t('viewer.shortcutsJump')}` : null}
       </p>
     </dialog>
   );

@@ -3,7 +3,7 @@
  * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
  *
  * «Ir a» (Ctrl/⌘+P, o Ctrl/⌘+O): escribir el nombre de un cuaderno o de una
- * nota, flechas e Intro, sin tocar el ratón. Es el «quick switcher» de Twos y de
+ * nota, flechas e Intro, sin tocar el ratón. Es el «quick switcher» de
  * cualquier editor. Los cuadernos y las notas del cuaderno abierto salen al
  * instante; las de los demás, de la búsqueda del servicio (solo las indexables,
  * las mismas que encuentra el buscador).

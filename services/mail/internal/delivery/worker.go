@@ -19,6 +19,7 @@ import (
 	"github.com/emersion/go-sasl"
 	gosmtp "github.com/emersion/go-smtp"
 
+	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/mail/internal/domain"
@@ -47,6 +48,7 @@ type QueueWorker struct {
 	maxAttempts  int
 	baseBackoff  time.Duration
 	pollInterval time.Duration
+	hubNotifier  *hubnotify.Client
 }
 
 // QueueConfig configura el worker de cola.
@@ -55,6 +57,9 @@ type QueueConfig struct {
 	MaxAttempts  int
 	BaseBackoff  time.Duration
 	PollInterval time.Duration
+	// HubNotifier manda la señal de cambios del widget de Mail cuando el aviso de no
+	// entrega entra en la Entrada de quien envió. Nil: sin señal.
+	HubNotifier *hubnotify.Client
 }
 
 // NewQueueWorker construye el worker de cola. Si sender es nil, usa SMTPSender.
@@ -74,6 +79,7 @@ func NewQueueWorker(st *store.Store, blobs *objectstore.Client, sender Sender, l
 		maxAttempts:  cfg.MaxAttempts,
 		baseBackoff:  cfg.BaseBackoff,
 		pollInterval: cfg.PollInterval,
+		hubNotifier:  cfg.HubNotifier,
 	}
 }
 

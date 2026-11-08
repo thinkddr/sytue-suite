@@ -18,6 +18,8 @@ export const sv: Catalog = {
   'ui.openNav': 'Öppna navigeringen',
   'ui.closeNav': 'Stäng navigeringen',
   'ui.backToList': 'Tillbaka till listan',
+  'ui.suiteOpen': 'Sytue: appar, sök, aviseringar och konto',
+  'ui.suiteClose': 'Tillbaka till appen',
   'ui.noResults': 'Inga resultat.',
   'ui.meter.almostFull': 'nästan fullt',
   'ui.meter.full': 'fullt',
@@ -60,6 +62,9 @@ export const sv: Catalog = {
   'shell.lock.reasonNotebook': 'öppna din krypterade anteckningsbok',
   'shell.lock.faceIdUsage':
     'Sytue använder Face ID för att låsa upp din session när du öppnar appen.',
+  'shell.widgets.wake': 'Uppdatera widgetar när appen är stängd',
+  'shell.widgets.wakeHelp':
+    'När något av ditt ändras väcker Sytue appen med en tom avisering från Apple så att den kan uppdatera sin widget. Apple ser vilken app och när, aldrig vad som har ändrats.',
   'shell.call.microphoneUsage':
     'Sytue Rooms använder mikrofonen bara under ett samtal, och bara när du slår på den.',
   'shell.call.cameraUsage':
@@ -171,7 +176,7 @@ export const sv: Catalog = {
   'notifications.kind.pages.domain.failed':
     'Domänen {domain} på {site} fungerar inte: kontrollera inställningarna',
   'notifications.kind.pages.erp.failed': 'Beställning {number} på {site} nådde inte Sytue ERP',
-  'notifications.kind.pages.settings.changed': '{actor} har ändrat en inställning i Sytue Web',
+  'notifications.kind.pages.settings.changed': '{actor} har ändrat en inställning i Sytue Webs',
   'notifications.kind.pages.export.ready': 'Din export av {site} är klar',
   'notifications.kind.pages.store.busy':
     'Webbutiken på {site} har för många beställningar som väntar på betalning',
@@ -353,6 +358,8 @@ export const sv: Catalog = {
   'widgets.compose': 'Skriv',
   'widgets.storage': 'Lagring',
   'widgets.create': 'Skapa händelse',
+  'widgets.updatedAgo': 'Uppdaterad {time}',
+  'widgets.updatedAt': 'Uppdaterad: {time}',
 
   'linkedServices.services': 'Tjänster',
   'linkedServices.changed':
@@ -365,6 +372,7 @@ export const sv: Catalog = {
   'linkedServices.notGranted':
     'Åtkomst till den här tjänsten beviljades inte. Anslut kontot igen för att välja behörigheter.',
   'linkedServices.connected': 'Anslutna tjänster',
+  'linkedServices.exists': 'Det här kontot var redan anslutet och är nu öppnat.',
   'linkedServices.providerData': 'Ändringar sparas hos din leverantör.',
   'linkedServices.writeUnknown':
     'Leverantören bekräftade inte om det sparades. Uppdatera och kontrollera innan du försöker igen.',

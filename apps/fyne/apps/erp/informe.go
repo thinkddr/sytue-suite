@@ -447,7 +447,7 @@ func (x *Tablero) Objeto(v tema.Variante) fyne.CanvasObject {
 	partes, altoPartes := x.Informe.Objeto(v, ancho)
 	p.add(partes, altoPartes, HuecoTablero)
 	o, alto := p.objeto()
-	return enPagina(o, alto, AnchoTablero, MargenLista)
+	return enPagina(o, alto, AnchoTablero)
 }
 
 // cabecera es el `<header class="flex flex-wrap items-center justify-between gap-3">`.

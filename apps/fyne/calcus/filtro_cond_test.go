@@ -89,6 +89,13 @@ func TestEvaluarFiltro(t *testing.T) {
 		{CondFiltro{Op: "gt", A: "b"}, cuerpoDe("a", "c", 5.0, ""), "0100"}, // texto con texto; el número y el vacío, no
 		{CondFiltro{Op: "eq", A: "ana"}, cuerpoDe("Ana", " ANA ", "Ana María"), "110"},
 		{CondFiltro{Op: "lt", A: "fila 10"}, cuerpoDe("fila 2", "fila 10", "fila 11"), "100"}, // orden numérico, como la web
+		// «Entre fechas»: el operando tecleado como fecha es su serial (46037 = 15/01/2026,
+		// 46068 = 15/02/2026), los mismos casos que la web y TestPasaCondicion del servicio.
+		// VISTO EN ROJO con `numeroEstricto` a secas.
+		{CondFiltro{Op: "between", A: "01/01/2026", B: "31/01/2026"}, cuerpoDe(46037.0, 46068.0, "enero", ""), "1000"},
+		{CondFiltro{Op: "gt", A: "2026-01-31"}, cuerpoDe(46037.0, 46068.0, "enero", ""), "0100"},
+		{CondFiltro{Op: "eq", A: "15/2/2026"}, cuerpoDe(46037.0, 46068.0, "enero", ""), "0100"},
+		{CondFiltro{Op: "eq", A: "31/02/2026"}, cuerpoDe(46037.0, 46068.0, "enero", ""), "0000"},
 	}
 	for _, c := range casos {
 		if got := pasan(evaluarFiltro(c.cond, c.cuerpo)); got != c.quiere {

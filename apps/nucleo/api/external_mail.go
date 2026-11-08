@@ -7,6 +7,8 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"slices"
+	"strings"
 )
 
 var (
@@ -51,6 +53,46 @@ type ExternalMailAccount struct {
 	Connected    bool                     `json:"connected"`
 	Capabilities ExternalMailCapabilities `json:"capabilities"`
 }
+
+// ICloudMail es iCloud Mail, que no ofrece inicio de sesión a otras apps: es IMAP
+// y SMTP con una contraseña de app. Sus servidores son fijos, así que Mail pide
+// solo la dirección y esa contraseña y guarda una conexión «imap» con estos. Es
+// el mismo preajuste que ICLOUD_MAIL en @sytue/api-clients.
+var ICloudMail = struct {
+	Name               string
+	Incoming, Outgoing ExternalMailServer
+	// AccountPage es donde se crea la contraseña de app: «Inicio de sesión y
+	// seguridad» de la cuenta de Apple.
+	AccountPage string
+}{
+	Name:        "iCloud Mail",
+	Incoming:    ExternalMailServer{Host: "imap.mail.me.com", Port: 993, Security: "tls"},
+	Outgoing:    ExternalMailServer{Host: "smtp.mail.me.com", Port: 587, Security: "starttls"},
+	AccountPage: "https://account.apple.com/",
+}
+
+// IsICloud dice si una conexión de la lista es un buzón de iCloud guardado con
+// ese preajuste.
+func (a ExternalMailAccount) IsICloud() bool {
+	return a.Provider == "imap" && a.Configuration != nil && strings.EqualFold(a.Configuration.Incoming.Host, ICloudMail.Incoming.Host)
+}
+
+// ProviderName es el nombre del proveedor de una conexión de la lista: «iCloud
+// Mail» para el preajuste (mailProviderName en @sytue/api-clients).
+func (a ExternalMailAccount) ProviderName() string {
+	if a.IsICloud() {
+		return ICloudMail.Name
+	}
+	return MailProviderNames[a.Provider]
+}
+
+// ServesMail says whether Mail opens this account: one connected only for
+// Calendar, Contacts or Notes is listed too, but has no mailbox. Without
+// services (accounts from before linked services) it is a mailbox.
+func (a ExternalMailAccount) ServesMail() bool {
+	return a.Services == nil || slices.Contains(a.Services, "mail")
+}
+
 type ExternalMailProvider struct {
 	Services      []LinkedServiceCapability `json:"services"`
 	Provider      string                    `json:"provider"`
@@ -68,6 +110,23 @@ type ExternalMailFolder struct {
 	Total  int64  `json:"total"`
 	Unread int64  `json:"unread"`
 }
+
+// Estados de una cuenta en el resumen: «reconnect» pide volver a iniciar sesión;
+// «unavailable» es del proveedor (no contestó a tiempo o falló).
+const (
+	ExternalMailOK          = "ok"
+	ExternalMailReconnect   = "reconnect"
+	ExternalMailUnavailable = "unavailable"
+)
+
+// ExternalMailAccountSummary es una cuenta como la da el resumen: con sus
+// carpetas, vacías salvo en «ok» (ExternalMailAccountSummary en @sytue/api-clients).
+type ExternalMailAccountSummary struct {
+	ExternalMailAccount
+	State   string               `json:"state"`
+	Folders []ExternalMailFolder `json:"folders"`
+}
+
 type ExternalMailAddress struct {
 	Name  string `json:"name,omitempty"`
 	Email string `json:"email"`
@@ -116,6 +175,16 @@ type ExternalMailSent struct {
 
 func (i *Integraciones) MailAccounts(ctx context.Context) (ExternalMailAccounts, error) {
 	return JSON[ExternalMailAccounts](ctx, i.c, Request{Path: "/external-mail/accounts"})
+}
+
+// MailSummary son los buzones que pinta el lateral de Mail, cada uno con sus
+// carpetas y no leídos, en una petición: solo las cuentas con buzón, y una que
+// falla no tumba las demás.
+func (i *Integraciones) MailSummary(ctx context.Context) ([]ExternalMailAccountSummary, error) {
+	result, err := JSON[struct {
+		Items []ExternalMailAccountSummary `json:"items"`
+	}](ctx, i.c, Request{Path: "/external-mail/summary"})
+	return result.Items, err
 }
 
 func (i *Integraciones) MailConnect(ctx context.Context, provider, instance string, services ...string) (OAuthAuthorization, error) {

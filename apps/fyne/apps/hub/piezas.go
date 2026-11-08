@@ -182,6 +182,7 @@ func nuevaTarjeta(v tema.Variante, titulo string, cuerpo fyne.CanvasObject, acci
 		cabecera: ui.NuevaCabeceraApp(titulo, acciones...),
 		cuerpo:   cuerpo,
 	}
+	t.cabecera.RadioArriba = max(RadioTarjeta()-tema.Borde, 0)
 	t.ExtendBaseWidget(t)
 	return t
 }

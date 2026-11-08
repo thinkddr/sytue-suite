@@ -216,7 +216,7 @@ export default function CloudShell({
     >
       {/* Sidebar responsive compartida (@sytue/ui): en ≥768px en flujo, en
           <768px drawer con overlay, foco gestionado y Esc — mismo main#contenido. */}
-      <AdminShell sidebar={sidebar} title={project ?? 'Sytue DevX'}>
+      <AdminShell sidebar={sidebar} {...(project ? { title: project } : {})}>
         {children}
       </AdminShell>
       <CommandPalette

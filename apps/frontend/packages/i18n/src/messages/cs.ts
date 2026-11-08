@@ -18,6 +18,8 @@ export const cs: Catalog = {
   'ui.openNav': 'Otevřít navigaci',
   'ui.closeNav': 'Zavřít navigaci',
   'ui.backToList': 'Zpět na seznam',
+  'ui.suiteOpen': 'Sytue: aplikace, hledání, oznámení a účet',
+  'ui.suiteClose': 'Zpět do aplikace',
   'ui.noResults': 'Žádné výsledky.',
   'ui.meter.almostFull': 'téměř plné',
   'ui.meter.full': 'plné',
@@ -59,6 +61,9 @@ export const cs: Catalog = {
     'Tato aplikace potřebuje OpenGL 2.1 a grafický ovladač tohoto počítače ho nenabízí ({detalle}). Nainstalujte nebo aktualizujte ovladač grafické karty. Bez grafické karty (vzdálená plocha nebo virtuální počítač) ji nelze otevřít.',
   'shell.lock.reasonNotebook': 'otevřít váš zašifrovaný sešit',
   'shell.lock.faceIdUsage': 'Sytue používá Face ID k odemčení vaší relace při otevření aplikace.',
+  'shell.widgets.wake': 'Aktualizovat widgety, i když je aplikace zavřená',
+  'shell.widgets.wakeHelp':
+    'Když se u vás něco změní, Sytue probudí aplikaci prázdným oznámením přes Apple, aby mohla obnovit svůj widget. Apple vidí, o kterou aplikaci jde a kdy, nikdy ne, co se změnilo.',
   'shell.call.microphoneUsage':
     'Sytue Rooms používá mikrofon jen během hovoru a jen když ho zapnete.',
   'shell.call.cameraUsage': 'Sytue Rooms používá kameru jen během hovoru a jen když ji zapnete.',
@@ -186,7 +191,7 @@ export const cs: Catalog = {
     'Doména {domain} na webu {site} nefunguje: zkontrolujte její nastavení',
   'notifications.kind.pages.erp.failed':
     'Objednávka {number} z webu {site} nedorazila do Sytue ERP',
-  'notifications.kind.pages.settings.changed': 'Změna nastavení v Sytue Web: {actor}',
+  'notifications.kind.pages.settings.changed': 'Změna nastavení v Sytue Webs: {actor}',
   'notifications.kind.pages.export.ready': 'Váš export webu {site} je hotový',
   'notifications.kind.pages.store.busy':
     'Obchod na webu {site} má příliš mnoho objednávek čekajících na platbu',
@@ -369,6 +374,8 @@ export const cs: Catalog = {
   'widgets.compose': 'Napsat',
   'widgets.storage': 'Úložiště',
   'widgets.create': 'Vytvořit událost',
+  'widgets.updatedAgo': 'Aktualizováno {time}',
+  'widgets.updatedAt': 'Aktualizováno: {time}',
 
   'linkedServices.services': 'Služby',
   'linkedServices.changed':
@@ -381,6 +388,7 @@ export const cs: Catalog = {
   'linkedServices.notGranted':
     'Přístup k této službě nebyl udělen. Připojte účet znovu a vyberte jeho oprávnění.',
   'linkedServices.connected': 'Připojené služby',
+  'linkedServices.exists': 'Tento účet už byl připojen a je otevřený.',
   'linkedServices.providerData': 'Změny se ukládají u poskytovatele.',
   'linkedServices.writeUnknown':
     'Poskytovatel nepotvrdil uložení. Před dalším pokusem obnovte zobrazení a ověřte stav.',

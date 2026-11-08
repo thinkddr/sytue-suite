@@ -477,7 +477,14 @@ export function getNotifyPrefs(): Promise<{ prefs: NotifyPrefs }> {
 /** Guarda mis preferencias de notificación (POST al BFF → PUT al servicio; el backend
  *  las sanea). Devuelve las resultantes. */
 export function putNotifyPrefs(prefs: NotifyPrefs): Promise<{ prefs: NotifyPrefs }> {
-  return postJson('/api/notify-prefs', prefs);
+  // Solo los tres campos: un `pausedUntil` leído convertiría esto en «Pausar avisos».
+  const { keywords, dndStart, dndEnd } = prefs;
+  return postJson('/api/notify-prefs', { keywords, dndStart, dndEnd });
+}
+
+/** «Pausar avisos» hasta `until` (ISO 8601), o la quita con null. */
+export function setNotifyPause(until: string | null): Promise<{ prefs: NotifyPrefs }> {
+  return postJson('/api/notify-prefs', { pausedUntil: until });
 }
 
 // ---- Ola 18: Web Push ----
@@ -553,6 +560,11 @@ export function createChannel(input: {
 export function browseChannels(query = ''): Promise<{ channels: Channel[] }> {
   const qs = query.trim() ? `?q=${encodeURIComponent(query.trim())}` : '';
   return getJson(`/api/browse${qs}`);
+}
+
+/** Canales archivados del usuario (pestaña «Archivados» de «Explorar canales»). */
+export function listArchivedChannels(): Promise<{ channels: Channel[] }> {
+  return getJson('/api/browse?archived=1');
 }
 
 /** Une al usuario a un canal público; devuelve el canal. */

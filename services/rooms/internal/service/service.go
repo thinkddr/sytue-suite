@@ -151,9 +151,6 @@ type Service struct {
 	// push es el enviador de Web Push (Ola 18): par VAPID + cliente SSRF-safe. nil =
 	// push deshabilitado (sin claves VAPID). Lo inyecta main.go vía SetPushSender.
 	push *PushSender
-	// apns despierta la app nativa de iOS con un aviso VACÍO (ver apns.go). nil =
-	// deshabilitado. Lo inyecta main.go vía SetAPNSSender.
-	apns *APNSSender
 	// directorio encuentra en Sytue ID a personas de otras organizaciones (ver
 	// externos.go). nil = no se puede añadir a nadie de fuera.
 	directorio Directorio
@@ -161,6 +158,15 @@ type Service struct {
 	hubNotifier *hubnotify.Client
 	nombresOrgs NombresOrgs
 	pushSt      pushStore
+}
+
+// Hub es el cliente del Hub del servicio (nil sin Hub): el de los avisos y el de la
+// señal de cambios del router.
+func (s *Service) Hub() *hubnotify.Client {
+	if s == nil {
+		return nil
+	}
+	return s.hubNotifier
 }
 
 // New construye el servicio.
@@ -585,6 +591,19 @@ func (s *Service) GetNotifyPrefs(ctx context.Context, sub string) (domain.Notify
 // persistir (dedupe/recorte de palabras clave, DND acotado a [0..1439]).
 func (s *Service) PutNotifyPrefs(ctx context.Context, sub string, p domain.NotifyPrefs) (domain.NotifyPrefs, error) {
 	return s.pstore.PutNotifyPrefs(ctx, sub, domain.NormalizeNotifyPrefs(p))
+}
+
+// SetNotifyPause es «Pausar avisos»: fija hasta cuándo (nil o pasado la quita; más de
+// domain.MaxNotifyPause es un 400).
+func (s *Service) SetNotifyPause(ctx context.Context, sub string, until *time.Time) (domain.NotifyPrefs, error) {
+	u, err := domain.NormalizeNotifyPause(until, time.Now())
+	if err != nil {
+		return domain.NotifyPrefs{}, err
+	}
+	if u.IsZero() {
+		return s.pstore.SetNotifyPause(ctx, sub, nil)
+	}
+	return s.pstore.SetNotifyPause(ctx, sub, &u)
 }
 
 // ListJoinableChannels lista canales públicos del team a los que el usuario no pertenece.

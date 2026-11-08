@@ -79,13 +79,19 @@ type Lienzo struct {
 
 	AlSeleccionar func(string)
 	AlMarcar      func(Nota, bool)
+	// AlConvertir hace tarea una línea de texto al pulsar su raya.
+	AlConvertir func(Nota)
 	// AlPlegarLista pliega el elemento de lista i de una nota (plegar.go) y Previa da la
 	// ficha de un enlace a otra nota (previa.go).
-	AlPlegarLista   func(Nota, int)
-	Previa          func(href string, listo func()) (VistaPrevia, bool)
-	portal          *portal
-	AlMenuNota      func(Nota, fyne.CanvasObject)
-	AlCrearPrimera  func()
+	AlPlegarLista  func(Nota, int)
+	Previa         func(href string, listo func()) (VistaPrevia, bool)
+	portal         *portal
+	AlMenuNota     func(Nota, fyne.CanvasObject)
+	AlCrearPrimera func()
+	// AlQuitarFiltro está puesto cuando HAY notas pero el filtro las oculta todas: el
+	// vacío dice «ninguna nota coincide» y ofrece quitarlo, en vez de fingir que el
+	// cuaderno está vacío (`onQuitarFiltro` de NoteCanvas).
+	AlQuitarFiltro  func()
 	AlReintentar    func()
 	AlTecla         func(rune)
 	AlTeclaEspecial func(*fyne.KeyEvent)
@@ -154,6 +160,9 @@ func (l *Lienzo) Objeto(v tema.Variante) fyne.CanvasObject {
 			"", nil, v), v)
 	case Exito:
 		// Las notas: se reparten debajo del switch.
+		if len(l.Notas) == 0 && l.AlQuitarFiltro != nil {
+			return centrar(l.sinCoincidencias(), v)
+		}
 	case Vacia:
 		if l.diario() {
 			// Un día vacío no es un hueco que adornar: la captura está justo encima
@@ -235,6 +244,16 @@ func (l *Lienzo) vacio(titulo, cuerpo, cta string, accion func(), v tema.Variant
 	if cta != "" && accion != nil {
 		x.Accion = ui.NuevoBoton(cta, accion)
 	}
+	return x
+}
+
+// sinCoincidencias es el vacío POR EL FILTRO: el `EmptyState` con solo el título y
+// «Quitar el filtro» (`Button size="sm" variant="secondary"`). Ofrecer «Nueva nota»
+// aquí mentiría: el cuaderno no está vacío.
+func (l *Lienzo) sinCoincidencias() *ui.Vacio {
+	t := l.tr.T
+	x := ui.NuevoVacio(t("filter.noMatches", nil), "")
+	x.Accion = ui.NuevoBoton(t("filter.clear", nil), l.AlQuitarFiltro).Con(ui.Secundario, ui.TallaSM)
 	return x
 }
 
@@ -373,7 +392,7 @@ func conSangria(notas []Nota) ([]Nota, map[string]int) {
 // corriente; la nota de un árbol, que llena su panel, es una hoja.
 func (l *Lienzo) filas() bool { return l.Cuaderno.Vista == Lista && !l.Llenar }
 
-// diario es la lista de un día: filas al estilo de Twos en vez de tarjetas.
+// diario es la lista de un día: líneas de libreta en vez de tarjetas.
 func (l *Lienzo) diario() bool { return l.Cuaderno.Crudo.DailyDate != "" && l.Cuaderno.Vista == Lista }
 
 // margenDiario es el `px-4 sm:px-6` de la columna del día.
@@ -402,6 +421,9 @@ func (l *Lienzo) tarjeta(n Nota) *Tarjeta {
 	t.SinMenu = l.SinMenu
 	t.AlSeleccionar = func() { llamar1(l.AlSeleccionar, n.ID) }
 	t.AlMarcar = func(m bool) { llamar2(l.AlMarcar, n, m) }
+	if l.AlConvertir != nil {
+		t.AlConvertir = func() { l.AlConvertir(n) }
+	}
 	t.AlMenu = func(d fyne.CanvasObject) { llamar2(l.AlMenuNota, n, d) }
 	if r, ok := l.Recordatorios[n.ID]; ok {
 		t.Recordatorio = &r

@@ -26,7 +26,8 @@ const keepAliveInterval = 25 * time.Second
 // Protocolo (WHATWG EventSource):
 //   - event: ready   -> handshake con el contador inicial de no leídas.
 //   - event: notification -> una notificación nueva (JSON en data).
-//   - event: avatar -> un evento de ESTADO (no se guarda; ver PublishEvent).
+//   - event: avatar | datos -> un evento de ESTADO (no se guarda; ver PublishEvent):
+//     la foto cambió, o algo de un producto cambió ({"producto"}, para los widgets).
 //   - ': keep-alive' -> comentario periódico de mantenimiento.
 func (h *Handlers) Stream(w http.ResponseWriter, r *http.Request) {
 	claims, ok := authn.FromContext(r.Context())

@@ -16,38 +16,15 @@ import (
 
 // La pareja en la web es apps/frontend/apps/photos/src/lib/gestos.ts.
 
-// Deslizar entre fotos con el dedo: la regla de `decidir` en gestos.ts, con los mismos
-// umbrales (TestDeslizarEsLaReglaDeLaWeb repite sus casos).
-const (
-	recorridoMin      = 56   // RECORRIDO_MIN
-	fraccionAncho     = 0.18 // FRACCION_ANCHO
-	velocidadRapida   = 0.5  // VELOCIDAD_RAPIDA, px por milisegundo
-	recorridoRapido   = 24   // RECORRIDO_RAPIDO
-	dominioHorizontal = 1.4  // DOMINIO_HORIZONTAL
-	resistencia       = 0.25 // RESISTENCIA: hacia un lado sin foto
-)
+// Deslizar entre fotos con el dedo: la regla común `ui.DecidirDeslizamiento` (subió de
+// aquí a `ui` cuando Calendar la necesitó para cambiar de mes en el teléfono), con
+// `ui.DominioDeslizamiento` para decidir si la foto sigue al dedo. Lo único del visor es
+// la resistencia hacia un lado sin foto.
+const resistencia = 0.25 // RESISTENCIA: hacia un lado sin foto
 
 // conDedo es `pointer: coarse`. Variable por los guardianes: el driver de pruebas es de
 // escritorio y aquí hay que medir también el teléfono.
 var conDedo = ui.EsTactil
-
-// decidirDeslizamiento es −1 (la anterior), 1 (la siguiente) o 0. Hacia la IZQUIERDA se
-// va a la siguiente, como al pasar una página.
-func decidirDeslizamiento(dx, dy, ancho float32, ms float64) int {
-	ax := math.Abs(float64(dx))
-	if ax < dominioHorizontal*math.Abs(float64(dy)) {
-		return 0
-	}
-	lejos := ax >= math.Max(recorridoMin, fraccionAncho*float64(ancho))
-	rapido := ax >= recorridoRapido && ax/math.Max(ms, 1) >= velocidadRapida
-	if !lejos && !rapido {
-		return 0
-	}
-	if dx < 0 {
-		return 1
-	}
-	return -1
-}
 
 // DeslizaFoto es la capa del escenario que recibe el dedo, encima de la foto y debajo de
 // las flechas (el `<div>` de `EscenarioVisor` en la web). Con el dedo, arrastrar de lado
@@ -141,7 +118,7 @@ func (d *DeslizaFoto) Dragged(e *fyne.DragEvent) {
 	}
 	d.dx += e.Dragged.DX
 	d.dy += e.Dragged.DY
-	if math.Abs(float64(d.dx)) < dominioHorizontal*math.Abs(float64(d.dy)) {
+	if math.Abs(float64(d.dx)) < ui.DominioDeslizamiento*math.Abs(float64(d.dy)) {
 		d.lienzo.Desplazar(0)
 		return
 	}
@@ -162,7 +139,7 @@ func (d *DeslizaFoto) DragEnd() {
 	if d.desde.IsZero() {
 		return
 	}
-	paso := decidirDeslizamiento(d.dx, d.dy, d.Size().Width, float64(time.Since(d.desde).Milliseconds()))
+	paso := ui.DecidirDeslizamiento(d.dx, d.dy, d.Size().Width, float64(time.Since(d.desde).Milliseconds()))
 	d.dx, d.dy, d.desde = 0, 0, time.Time{}
 	d.lienzo.Desplazar(0)
 	switch {

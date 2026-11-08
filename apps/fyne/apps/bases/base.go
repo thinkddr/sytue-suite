@@ -13,6 +13,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
@@ -199,6 +200,10 @@ func (p *Pantalla) borrarBase() {
 
 // objetoBase es BaseApp.tsx: la cabecera con el nombre y lo que el propietario puede
 // hacer con la base, y debajo sus tablas en pestañas.
+//
+// La cabecera son dos líneas: «Todas las bases» encima, y el nombre con «Compartir» y el
+// menú «⋯» a su derecha. Renombrar, añadir una tabla y borrar la base se hacen poco y
+// van en el menú: sueltos, en un teléfono, partían la cabecera en tres filas de botones.
 func (p *Pantalla) objetoBase(v tema.Variante) fyne.CanvasObject {
 	b := p.abierta
 	nombre := b.Datos.Name
@@ -206,26 +211,27 @@ func (p *Pantalla) objetoBase(v tema.Variante) fyne.CanvasObject {
 		nombre = p.t("nav.title")
 	}
 	volver := ui.NuevoEnlace(p.t("base.back"), tema.TextoSM, ui.Normal, "primary-text", p.volverALista)
-	volver.Subrayado = true
-	acciones := []fyne.CanvasObject{}
-	if puedeEsquema(b.Datos.Role) {
-		acciones = append(acciones,
-			ui.NuevoBoton(p.t("share.open"), p.dialogoCompartir).Con(ui.Secundario, ui.TallaSM),
-			ui.NuevoBoton(p.t("base.rename"), p.renombrarBase).Con(ui.Fantasma, ui.TallaSM),
-			ui.NuevoBoton(p.t("base.delete"), p.borrarBase).Con(ui.Fantasma, ui.TallaSM))
-	}
-	// ponytail: el nombre no se trunca (`truncate` en la web); uno más largo que la
-	// ventana pisa los botones. Si molesta, un rótulo que recorte con ui.Truncar.
 	titulo := ui.NuevoRotulo(nombre, tema.Texto2XL, ui.SemiNegrita, "text")
-	izquierda := container.New(alInicio{Hueco: tema.Espacio(3)}, volver, titulo)
-	derecha := container.New(ui.Fila{Hueco: tema.Espacio(2)}, acciones...)
-	cabecera := container.New(extremos{Hueco: tema.Espacio(2), Centro: true}, izquierda, derecha)
-	// Si no cabe en una línea (un teléfono, una ventana estrecha), parte como `flex-wrap`:
-	// el nombre arriba y cada botón donde quepa. En una sola fila se pisaban.
-	// (`izquierda` no cuenta el nombre en su mínimo —es `min-w-0`—, así que se suma aquí.)
-	if ancho := p.anchoContenido(); izquierda.MinSize().Width+titulo.MinSize().Width+tema.Espacio(2)+derecha.MinSize().Width > ancho {
-		cabecera = container.New(flujo{Hueco: tema.Espacio(2), Ancho: ancho}, append([]fyne.CanvasObject{volver, titulo}, acciones...)...)
+	titulo.Truncar = true
+	linea := []fyne.CanvasObject{titulo}
+	if puedeEsquema(b.Datos.Role) {
+		compartir := ui.NuevoBoton(p.t("share.open"), p.dialogoCompartir).Con(ui.Secundario, ui.TallaSM)
+		linea = append(linea, compartir, p.menuMas(p.t("actions.more")+" · "+nombre, func() []fyne.CanvasObject {
+			borrar := ui.NuevoElementoMenu(p.t("base.delete"), iconos.Papelera, p.borrarBase)
+			borrar.Peligro = true
+			menu := []fyne.CanvasObject{
+				ui.NuevoElementoMenu(p.t("base.rename"), iconos.Lapiz, p.renombrarBase),
+				ui.NuevoElementoMenu(p.t("table.add"), iconos.Mas, p.nuevaTabla),
+			}
+			if p.Elegir != nil {
+				menu = append(menu, ui.NuevoElementoMenu(p.t("import.open"), iconos.Subir, p.importarCSV))
+			}
+			return append(menu, ui.NuevoSeparadorMenu(), borrar)
+		}))
 	}
+	cabecera := container.New(ui.Columna{Hueco: tema.Espacio(1)},
+		container.New(ui.Fila{}, volver),
+		container.New(extremos{Hueco: tema.Espacio(2), Centro: true}, linea...))
 	hijos := []fyne.CanvasObject{cabecera}
 	if b.Fallo != "" {
 		hijos = append(hijos, alerta(b.Fallo, v))
@@ -242,11 +248,10 @@ func (p *Pantalla) objetoBase(v tema.Variante) fyne.CanvasObject {
 	default:
 		hijos = append(hijos, container.New(ui.Columna{Hueco: tema.Espacio(4)}, p.pestanasDeTablas(), p.objetoTabla(v)))
 	}
-	if !b.Cargando && puedeEsquema(b.Datos.Role) {
-		anadir := botonSM(p.t("table.add"), ui.Fantasma, p.nuevaTabla)
-		if len(b.Tablas) == 0 {
-			anadir = ui.NuevoBoton(p.t("table.add"), p.nuevaTabla)
-		}
+	// Sin tablas, añadir la primera es lo único que hay que hacer: va a la vista, y no
+	// solo en el menú.
+	if !b.Cargando && len(b.Tablas) == 0 && puedeEsquema(b.Datos.Role) {
+		anadir := ui.NuevoBoton(p.t("table.add"), p.nuevaTabla).ConIcono(iconos.Mas, 16)
 		hijos = append(hijos, container.New(ui.Fila{Hueco: tema.Espacio(2)}, anadir))
 	}
 	if b.Recalculando {
@@ -275,21 +280,15 @@ func (p *Pantalla) pestanasDeTablas() fyne.CanvasObject {
 	return pest
 }
 
-// alInicio es `flex min-w-0 items-center gap-*`: el primer hijo a su ancho y el segundo
-// con lo que quede, los dos centrados en la línea.
-type alInicio struct{ Hueco float32 }
-
-func (a alInicio) MinSize(objs []fyne.CanvasObject) fyne.Size {
-	m := objs[0].MinSize()
-	return fyne.NewSize(m.Width+a.Hueco, max(m.Height, objs[1].MinSize().Height))
-}
-
-func (a alInicio) Layout(objs []fyne.CanvasObject, t fyne.Size) {
-	m := objs[0].MinSize()
-	objs[0].Move(fyne.NewPos(0, (t.Height-m.Height)/2))
-	objs[0].Resize(m)
-	x := m.Width + a.Hueco
-	alto := objs[1].MinSize().Height
-	objs[1].Move(fyne.NewPos(x, (t.Height-alto)/2))
-	objs[1].Resize(fyne.NewSize(max(t.Width-x, 0), alto))
+// menuMas es el botón «⋯» que despliega un menú de acciones. Los elementos se arman al
+// abrirlo: cada uno lleva su menú, y un menú no se vuelve a mostrar.
+func (p *Pantalla) menuMas(rotulo string, elementos func() []fyne.CanvasObject) *ui.BotonIcono {
+	var b *ui.BotonIcono
+	b = ui.NuevoBotonIcono(iconos.Puntos, rotulo, func() {
+		m := ui.NuevoMenu(elementos()...)
+		m.Rotulo = rotulo
+		m.Mostrar(b)
+	})
+	b.Lado = ui.LadoIconoLG
+	return b
 }

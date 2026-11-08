@@ -64,11 +64,16 @@ type fakeStore struct {
 	created    []store.UpsertContact // acumula cada CreateContact (import)
 
 	// Lote / foto.
-	batchN        int
-	batchErr      error
-	gotBatchUIDs  []string
-	gotBatchOn    bool
-	gotBatchAdd   bool
+	batchN       int
+	batchErr     error
+	gotBatchUIDs []string
+	gotBatchOn   bool
+	gotBatchAdd  bool
+	gotBatchIDs  []uuid.UUID
+	batchCards   []string
+	// antesDeCard, si está, se llama antes de entregar la tarjeta i: deja ver qué había
+	// escrito ya el handler en ese momento.
+	antesDeCard   func(i int)
 	gotPhotoUID   string
 	gotPhotoData  string
 	photoDataURI  string
@@ -211,10 +216,28 @@ func (f *fakeStore) TrashContacts(_ context.Context, _ string, uids []string) (i
 	return f.batchN, f.batchErr
 }
 
+func (f *fakeStore) RestoreContacts(_ context.Context, _ string, uids []string) (int, error) {
+	f.gotBatchUIDs = uids
+	return f.batchN, f.batchErr
+}
+
 func (f *fakeStore) SetFavorites(_ context.Context, _ string, uids []string, on bool) (int, error) {
 	f.gotBatchUIDs = uids
 	f.gotBatchOn = on
 	return f.batchN, f.batchErr
+}
+
+func (f *fakeStore) EachCardByID(_ context.Context, _ string, ids []uuid.UUID, fn func(string) error) error {
+	f.gotBatchIDs = ids
+	for i, c := range f.batchCards {
+		if f.antesDeCard != nil {
+			f.antesDeCard(i)
+		}
+		if err := fn(c); err != nil {
+			return err
+		}
+	}
+	return f.batchErr
 }
 
 func (f *fakeStore) ModifyGroupMembers(_ context.Context, _ string, _ uuid.UUID, uids []string, add bool) (domain.Group, error) {

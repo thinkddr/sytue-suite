@@ -6,6 +6,7 @@ package integrationshttp
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"slices"
 	"time"
@@ -23,6 +24,11 @@ const (
 	mailServicesKey = "_mail_services"
 	mailScopesKey   = "_mail_service_scopes"
 )
+
+// errMailScope is a sign-in that succeeded without the permission its origin
+// needs (Google's granular screen lets the person untick it). It is still an
+// authentication failure, but the person must be told which one.
+var errMailScope = fmt.Errorf("%w: the required permission was not granted", mailbox.ErrAuth)
 
 func mailConsentReturn(section string) bool {
 	switch section {
@@ -112,7 +118,7 @@ func applyMailServicesGrant(key string, cfg map[string]string, raw json.RawMessa
 		required = origin[0]
 	}
 	if !slices.Contains(services, required) {
-		return mailbox.ErrAuth
+		return errMailScope
 	}
 	encoded, _ := json.Marshal(services)
 	cfg[mailServicesKey] = string(encoded)

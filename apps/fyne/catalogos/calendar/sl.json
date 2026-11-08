@@ -70,6 +70,7 @@
   "common.remove": "Odstrani",
   "common.retry": "Poskusi znova",
   "common.save": "Shrani",
+  "day.noEvents": "Ta dan ni dogodkov",
   "error.calendarsLoad": "Koledarjev ni bilo mogoče naložiti.",
   "error.eventsLoad": "Dogodkov ni bilo mogoče naložiti.",
   "event.ai": "Opišite dogodek",
@@ -148,6 +149,13 @@
   "grid.blockAria": "{title}, {time}",
   "grid.continued": "{title} (nadaljevanje)",
   "grid.createOn": "Ustvari dogodek za {date}",
+  "grid.dayEvents": {
+    "one": "{date}, {count} dogodek",
+    "two": "{date}, {count} dogodka",
+    "few": "{date}, {count} dogodki",
+    "other": "{date}, {count} dogodkov"
+  },
+  "grid.daySelected": "{label}, izbrano",
   "grid.loadError": "Koledarja ni bilo mogoče naložiti",
   "grid.loading": "Nalaganje koledarja",
   "grid.more": {
@@ -156,6 +164,8 @@
     "few": "+{count} več",
     "other": "+{count} več"
   },
+  "grid.showMonth": "Prikaži cel mesec",
+  "grid.showWeek": "Prikaži samo ta teden",
   "grid.snapAria": {
     "one": "Pripenjanje pri vlečenju: {count} minuta. Pritisnite za spremembo.",
     "two": "Pripenjanje pri vlečenju: {count} minuti. Pritisnite za spremembo.",
@@ -174,6 +184,13 @@
     "few": "{count} min",
     "other": "{count} min"
   },
+  "grid.todayLabel": "Danes, {date}",
+  "grid.weekNumber": "Teden {week}",
+  "guests.organizer": "Organizator",
+  "guests.status.accepted": "Pride",
+  "guests.status.declined": "Ne pride",
+  "guests.status.pending": "Čaka na odgovor",
+  "guests.status.tentative": "Morda",
   "header.invitations": "Povabila",
   "header.next": "Naslednje",
   "header.pending": {
@@ -213,6 +230,12 @@
   "nav.createEventOn": "Ustvari dogodek za {date}",
   "nav.deleteSubscription": "Odstrani naročnino",
   "nav.manageResources": "Upravljaj prostore in opremo",
+  "nav.menuPending": {
+    "one": "Odpri meni, {count} čaka",
+    "two": "Odpri meni, {count} čakata",
+    "few": "Odpri meni, {count} čakajo",
+    "other": "Odpri meni, {count} čaka"
+  },
   "nav.myCalendars": "Moji koledarji",
   "nav.next": "Naslednje",
   "nav.nextMonth": "Naslednji mesec",
@@ -369,6 +392,7 @@
   "scope.following": "Za tega in naslednje",
   "scope.legend": "Ta dogodek se ponavlja. Za katere dogodke velja sprememba?",
   "scope.this": "Samo za ta dogodek",
+  "search.allCalendars": "Vsi koledarji",
   "search.error": "Iskanja ni bilo mogoče dokončati.",
   "search.events": "Išči dogodke",
   "search.loadMore": "Naloži več",
@@ -379,6 +403,12 @@
     "other": "Za iskanje po koledarjih vnesite vsaj {count} znakov."
   },
   "search.noResults": "Ni zadetkov za »{term}«.",
+  "search.period": "Obdobje",
+  "search.period.any": "Kadar koli",
+  "search.period.month": "Ta mesec",
+  "search.period.past": "Pretekli",
+  "search.period.upcoming": "Prihajajoči",
+  "search.period.year": "To leto",
   "search.placeholder": "Naslov, opis, kraj ali povabljena oseba…",
   "search.searching": "Iskanje…",
   "search.series": "Niz",
@@ -420,6 +450,14 @@
   "share.whoSeesNow": "Kdo ga zdaj vidi",
   "share.writerHint": "Poleg ogleda tudi ustvarja, spreminja in briše dogodke v tem koledarju.",
   "share.writerLabel": "Videti in urejati moje dogodke",
+  "shortcuts.group.actions": "Dejanja",
+  "shortcuts.group.navigate": "Premikanje",
+  "shortcuts.group.views": "Pogledi",
+  "shortcuts.help": "Prikaži ta seznam",
+  "shortcuts.next": "Naslednje obdobje",
+  "shortcuts.prev": "Prejšnje obdobje",
+  "shortcuts.title": "Bližnjice na tipkovnici",
+  "shortcuts.today": "Pojdi na danes",
   "subscribe.aria": "Naroči se na koledar prek URL-ja",
   "subscribe.byUrl": "Naročnina prek URL-ja (.ics)",
   "subscribe.defaultName": "Naročeni koledar",

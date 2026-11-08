@@ -23,6 +23,7 @@ import (
 	"syscall"
 	"time"
 
+	"git.sytue.eu/sytue/one/platform/pkg/apns"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/cache"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
@@ -33,6 +34,7 @@ import (
 	hubdb "git.sytue.eu/sytue/one/services/hub/db"
 	"git.sytue.eu/sytue/one/services/hub/internal/config"
 	"git.sytue.eu/sytue/one/services/hub/internal/connectors"
+	"git.sytue.eu/sytue/one/services/hub/internal/despertar"
 	hubhttp "git.sytue.eu/sytue/one/services/hub/internal/http"
 	"git.sytue.eu/sytue/one/services/hub/internal/instaladores"
 	"git.sytue.eu/sytue/one/services/hub/internal/intents"
@@ -113,6 +115,21 @@ func run() error {
 
 	st := store.New(pool)
 
+	// El despertar de las apps de iOS por su widget (ADR 0039 y 0078). Sin las
+	// credenciales de Apple no hay despertador: el registro de aparatos sigue y nadie
+	// se despierta. A medias, el Hub no arranca.
+	enviadorApple, err := apns.Nuevo(cfg.APNs)
+	if err != nil {
+		return err
+	}
+	var despertador *despertar.Despertador
+	if enviadorApple != nil {
+		despertador = despertar.Nuevo(st, enviadorApple)
+		logger.Info("despertar de iOS habilitado (APNs, solo despertar)")
+	} else {
+		logger.Info("despertar de iOS deshabilitado (sin SYTUE_APNS_*)")
+	}
+
 	// Dragonfly (cache efímera): la presencia vive como claves con TTL en vez de
 	// UPSERTs por heartbeat en PostgreSQL. DEGRADACIÓN: sin DRAGONFLY_URL o sin
 	// conexión al arrancar => nil y la presencia sigue en PostgreSQL (el
@@ -189,6 +206,7 @@ func run() error {
 		Interprete:   interpretar.NewCliente(cfg.AIBaseURL, cfg.SearchTimeout/2),
 		Instaladores: catalogo,
 		Correo:       correo,
+		Despertador:  despertador,
 		ReadyCheckers: []httpx.Checker{
 			httpx.CheckerFunc{Label: "postgres", Fn: pool.Healthz},
 		},
@@ -210,11 +228,15 @@ func run() error {
 		}
 	}()
 	go runMaintenance(ctx, st, cfg)
+	go despertador.Correr(ctx)
 
 	logger.Info("Sytue Hub arrancando",
 		"addr", cfg.HTTPAddr, "env", string(cfg.Env), "public_url", cfg.PublicURL)
 	return srv.Run(ctx)
 }
+
+// OlvidoAparatos es cuánto se guarda un aparato de iOS que no se vuelve a registrar.
+const OlvidoAparatos = 30 * 24 * time.Hour
 
 // runMaintenance purga periódicamente notificaciones leídas antiguas y presencia
 // obsoleta (retención/limpieza). Se ejecuta hasta que se cancela el contexto.
@@ -234,6 +256,11 @@ func runMaintenance(ctx context.Context, st *store.Store, cfg config.Config) {
 			// Presencia: borra filas sin heartbeat en mucho tiempo (24x la TTL).
 			if _, err := st.PurgeStalePresence(ctx, time.Now().Add(-24*cfg.PresenceTTL)); err != nil {
 				log.From(ctx).Warn("purga de presencia falló", "error", err)
+			}
+			// Aparatos de iOS que no se han vuelto a registrar en un mes: la app lo hace
+			// cada vez que arranca con el interruptor encendido.
+			if _, err := st.PurgarAparatos(ctx, time.Now().Add(-OlvidoAparatos)); err != nil {
+				log.From(ctx).Warn("purga de aparatos falló", "error", err)
 			}
 		}
 	}

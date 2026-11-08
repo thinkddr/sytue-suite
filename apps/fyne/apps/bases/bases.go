@@ -25,7 +25,6 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
-	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
 // Traductor es el catálogo de Bases sobre el común de la suite.
@@ -35,7 +34,6 @@ func Traductor(l i18n.Locale) (*i18n.Translator, error) {
 
 // Pantalla es Sytue Bases entera: el carril, «Mis bases» y la base abierta.
 type Pantalla struct {
-	Widget  widgets.Source
 	tr      *i18n.Translator
 	svc     *api.Bases
 	ventana fyne.Window
@@ -62,6 +60,12 @@ type Pantalla struct {
 	// Guardar deja un fichero donde el sistema guarda las descargas y devuelve su ruta.
 	// Nil: no se ofrece exportar.
 	Guardar func(nombre string, contenido io.Reader) (string, error)
+	// Elegir abre el selector de ficheros del sistema y pasa lo elegido a `listo`, en el
+	// hilo de la interfaz (cancelar no llama a nada). Nil: no se ofrece subir adjuntos
+	// ni importar un CSV con el selector; soltarlos sobre la ventana sigue valiendo.
+	Elegir func(listo func(rutas []string))
+	// ficha es la ficha de registro abierta, si la hay: lo que se suelta va a ella.
+	ficha *fichaRegistro
 
 	// Plazo es cuánto se espera a una petición.
 	Plazo time.Duration

@@ -40,6 +40,15 @@ export const fr: AppCatalog<typeof en> = {
 
   // --- Barra lateral ------------------------------------------------------
   'nav.compose': 'Nouveau message',
+  'nav.mailboxes': 'Boîtes aux lettres',
+  'nav.allInboxes': 'Toutes les boîtes de réception',
+  'nav.allDrafts': 'Tous les brouillons',
+  'nav.allSent': 'Tous les envoyés',
+  'nav.allArchive': 'Toutes les archives',
+  'nav.allJunk': 'Tous les indésirables',
+  'nav.allTrash': 'Toute la corbeille',
+  'nav.sytueMailbox': 'Boîte Sytue',
+  'nav.accountsIn': 'Comptes de {mailbox}',
   'nav.folders': 'Dossiers',
   'nav.refresh': 'Actualiser',
   'nav.manageFolders': 'Gérer les dossiers',
@@ -64,6 +73,10 @@ export const fr: AppCatalog<typeof en> = {
   'shortcuts.archive': 'Archiver',
   'shortcuts.trash': 'Mettre à la corbeille',
   'shortcuts.star': 'Marquer',
+  'shortcuts.select': 'Sélectionner la conversation',
+  'shortcuts.clearSelection': 'Effacer la sélection',
+  'shortcuts.label': 'Libellé',
+  'shortcuts.move': 'Déplacer vers…',
   'shortcuts.help': 'Afficher cette liste',
   'nav.settings': 'Paramètres',
   'nav.signature': 'Signature',
@@ -175,6 +188,9 @@ export const fr: AppCatalog<typeof en> = {
   'error.undoSend': 'Impossible d’annuler l’envoi du message',
   'error.undoSendGone': 'Trop tard pour annuler : le message est déjà parti',
   'undo.done': 'Envoi annulé',
+  'triage.moved': 'Déplacé vers {folder}',
+  'triage.undone': 'Remis à sa place',
+  'error.undoMove': 'Impossible de le remettre à sa place',
 
   // --- Lista de conversaciones --------------------------------------------
   'list.region': 'Conversations dans {folder}',
@@ -188,6 +204,13 @@ export const fr: AppCatalog<typeof en> = {
   'list.searchHint':
     'Opérateurs : from:, to:, subject:, has:attachment, is:unread, is:starred, after:2026-01-31, before:2026-03-01. Utilisez des guillemets pour plusieurs mots.',
   'list.clearSearch': 'Effacer la recherche',
+  'filter.group': 'Filtres rapides',
+  'filter.unread': 'Non lus',
+  'filter.starred': 'Suivis',
+  'filter.attachments': 'Avec pièces jointes',
+  'filter.emptyTitle': 'Rien ici ne correspond à ce filtre',
+  'filter.emptyDescription': 'Essayez un autre filtre ou affichez toutes les conversations.',
+  'filter.showAll': 'Tout afficher',
   'list.selectAll': 'Sélectionner toutes les conversations',
   'list.loading': 'Chargement des conversations…',
   'list.errorTitle': 'Impossible de charger votre courrier',
@@ -224,6 +247,8 @@ export const fr: AppCatalog<typeof en> = {
   'reader.createEvent': 'Créer un événement',
   'reader.eventCreated': 'Événement créé dans Sytue Calendar',
   'reader.eventFailed': 'Impossible de créer l’événement',
+  'reader.shareToRooms': 'Partager dans Rooms',
+  'reader.roomsFailed': 'Impossible de partager dans Rooms.',
   'reader.unsubscribe': 'Se désabonner',
   'reader.unsubscribeFailed': 'Impossible d’aboutir à la demande de désabonnement',
   'reader.unsubscribeSent': 'Demande de désabonnement envoyée',
@@ -360,6 +385,10 @@ export const fr: AppCatalog<typeof en> = {
   'editor.font': 'Police',
   'editor.redo': 'Rétablir',
   'editor.undo': 'Annuler',
+  'editor.cut': 'Couper',
+  'editor.copy': 'Copier',
+  'editor.paste': 'Coller',
+  'editor.selectAll': 'Tout sélectionner',
   'editor.colorNone': 'Aucun',
   'editor.colorYellow': 'Jaune',
   'editor.colorViolet': 'Violet',
@@ -757,6 +786,11 @@ export const fr: AppCatalog<typeof en> = {
   'externalMail.port': 'Port',
   'externalMail.username': 'Identifiant (adresse e-mail si vide)',
   'externalMail.password': 'Mot de passe ou mot de passe d’application',
+  'externalMail.icloudBody':
+    'iCloud Mail n’accepte pas ici le mot de passe de votre compte Apple. Créez un mot de passe pour app sur account.apple.com (Connexion et sécurité › Mots de passe pour app) et saisissez-le ci-dessous.',
+  'externalMail.icloudLink': 'Ouvrir account.apple.com',
+  'externalMail.icloudAuthError':
+    'iCloud n’a pas accepté le mot de passe. Utilisez un mot de passe pour app, et non celui de votre compte Apple.',
   'externalMail.smtpPassword': 'Mot de passe SMTP (celui du courrier entrant si vide)',
   'externalMail.advanced': 'Options avancées',
   'externalMail.security': 'Sécurité de la connexion SMTP',
@@ -765,6 +799,10 @@ export const fr: AppCatalog<typeof en> = {
     'Nous vérifierons l’accès aux serveurs entrant et sortant avant d’enregistrer. Aucun e-mail de test ne sera envoyé.',
   'externalMail.connect': 'Connecter le compte',
   'externalMail.authorize': 'Continuer chez le fournisseur',
+  'externalMail.reconnectNeeded': 'Reconnectez-vous pour voir ce compte',
+  'externalMail.accountUnavailable': 'Compte injoignable. Réessayer',
+  'externalMail.someUnavailable':
+    'Certains comptes sont injoignables. Leurs messages ne figurent pas dans cette liste.',
   'externalMail.add': 'Ajouter un compte de messagerie',
   'externalMail.empty': 'Aucun compte de messagerie externe connecté.',
   'externalMail.open': 'Ouvrir la boîte',
@@ -777,6 +815,13 @@ export const fr: AppCatalog<typeof en> = {
     'Impossible de vérifier la connexion sécurisée. Vérifiez le nom du serveur et son certificat auprès de votre fournisseur.',
   'externalMail.authError':
     'La connexion a été refusée. Reconnectez le compte ou vérifiez l’identifiant et le mot de passe d’application.',
+  'externalMail.cancelled': 'La connexion a été annulée. Rien n’a été connecté.',
+  'externalMail.scopeMissing':
+    'L’accès aux e-mails n’a pas été autorisé. Réessayez en laissant l’autorisation e-mail cochée.',
+  'externalMail.timeout': 'Cette connexion n’est plus valide. Réessayez.',
+  'externalMail.exists': 'Ce compte e-mail est déjà connecté.',
+  'externalMail.connected': 'Le compte {account} est maintenant connecté.',
+  'externalMail.accountsError': 'Impossible de charger les comptes e-mail externes.',
   'externalMail.sendUnknown':
     'Le serveur a peut-être accepté cet e-mail. Vérifiez les messages envoyés avant de réessayer pour éviter un doublon.',
   'externalMail.blockedError':
@@ -785,23 +830,9 @@ export const fr: AppCatalog<typeof en> = {
     'Cet e-mail ou ses pièces jointes dépasse la taille limite. Réduisez les pièces jointes et réessayez.',
   'externalMail.pop3Note':
     'POP3 permet de consulter la boîte de réception et d’envoyer avec SMTP. Les dossiers distants, les indicateurs de lecture et le déplacement des messages ne sont pas disponibles.',
-  'externalMail.refreshNote':
-    'Cette boîte s’actualise toutes les 30 secondes lorsque sa liste de messages est ouverte. Les e-mails restent chez votre fournisseur.',
   'externalMail.sent': 'Votre fournisseur a accepté l’e-mail.',
   'externalMail.sentNoCopy':
     'L’e-mail a été accepté, mais sa copie n’a pas pu être enregistrée dans les messages envoyés. Ne l’envoyez pas à nouveau.',
-  'externalMail.draftNote':
-    'Ce brouillon est conservé uniquement tant que cette fenêtre reste ouverte. La fermer supprime le brouillon.',
-  'externalMail.attach': 'Joindre des fichiers',
-  'externalMail.markUnread': 'Marquer comme non lu',
-  'externalMail.markRead': 'Marquer comme lu',
-  'externalMail.flag': 'Ajouter une étoile',
-  'externalMail.unflag': 'Retirer l’étoile',
-  'externalMail.trash': 'Déplacer dans la corbeille',
-  'externalMail.noMessages': 'Aucun message dans ce dossier.',
-  'externalMail.discardDraft': 'Supprimer ce brouillon ?',
   'externalMail.invalidConfiguration':
     'Saisissez une adresse e-mail valide, les noms et ports des deux serveurs et un mot de passe.',
-  'externalMail.invalidRecipients':
-    'Vérifiez les adresses e-mail. Séparez les adresses par des virgules.',
 };

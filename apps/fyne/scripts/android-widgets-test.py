@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 import zipfile
 
 SPEC = importlib.util.spec_from_file_location("widgets", Path(__file__).with_name("android-widgets.py"))
@@ -66,7 +67,8 @@ class ResourceTests(unittest.TestCase):
         WIDGETS.prepare(self.args)
         dump = self.dump("AndroidManifest.xml")
         for value in ("eu.sytue.nativo.Widgets", "android.appwidget.provider", "sytue-mail",
-                      "Sytue_Mail", "ExistingService", "ExistingProvider", "eu.sytue.mail.existing"):
+                      "Sytue_Mail", "ExistingService", "ExistingProvider", "eu.sytue.mail.existing",
+                      "eu.sytue.nativo.RefrescoWidgets", "android.permission.BIND_JOB_SERVICE"):
             self.assertIn(value, dump)
         self.assertIn("versionCode(0x0101021b)=77", dump)
         self.assertIn("minSdkVersion(0x0101020c)=24", dump)
@@ -142,7 +144,56 @@ class ResourceTests(unittest.TestCase):
                 self.assertTrue(labels["search"])
                 self.assertTrue(labels["calendars"])
                 self.assertTrue(labels["address_books"])
+                self.assertEqual(labels["updated_at"].count("{time}"), 1)
         self.assertEqual(len(seen), 15)
+
+
+class FondoTests(unittest.TestCase):
+    """Los componentes del widget con la app cerrada, sin aapt2: corre en cualquier sitio."""
+
+    def manifest(self):
+        root = ET.fromstring('''<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+            package="eu.sytue.mail"><uses-permission android:name="android.permission.INTERNET" />
+            <application android:label="Sytue Mail" /></manifest>''')
+        return root, root.find("application")
+
+    def named(self, app, tag, name):
+        return app.find(tag + "[@" + WIDGETS.ATTR + "name='" + name + "']")
+
+    def test_without_go_only_the_repainting_job(self):
+        root, app = self.manifest()
+        WIDGETS.fondo(root, app, "eu.sytue.mail", go=False)
+        service = self.named(app, "service", "eu.sytue.nativo.RefrescoWidgets")
+        self.assertIsNotNone(service)
+        self.assertEqual(service.get(WIDGETS.ATTR + "permission"), "android.permission.BIND_JOB_SERVICE")
+        self.assertEqual(service.get(WIDGETS.ATTR + "exported"), "false")
+        meta = self.named(service, "meta-data", "eu.sytue.widgets.go")
+        self.assertEqual(meta.get(WIDGETS.ATTR + "value"), "false")
+        self.assertIsNone(self.named(app, "provider", "eu.sytue.nativo.RelevoWidgets"))
+        self.assertIsNone(self.named(root, "uses-permission", "android.permission.ACCESS_NETWORK_STATE"))
+
+    def test_with_go_the_relay_and_the_network_permission(self):
+        root, app = self.manifest()
+        WIDGETS.fondo(root, app, "eu.sytue.mail", go=True)
+        meta = self.named(self.named(app, "service", "eu.sytue.nativo.RefrescoWidgets"), "meta-data", "eu.sytue.widgets.go")
+        self.assertEqual(meta.get(WIDGETS.ATTR + "value"), "true")
+        relay = self.named(app, "provider", "eu.sytue.nativo.RelevoWidgets")
+        self.assertEqual(relay.get(WIDGETS.ATTR + "authorities"), "eu.sytue.mail.sytue.widgets")
+        self.assertEqual(relay.get(WIDGETS.ATTR + "exported"), "true")
+        permissions = [e.get(WIDGETS.ATTR + "name") for e in root.findall("uses-permission")]
+        self.assertEqual(permissions, ["android.permission.INTERNET", "android.permission.ACCESS_NETWORK_STATE"])
+        self.assertLess(list(root).index(root.findall("uses-permission")[-1]), list(root).index(app))
+
+    def test_components_are_not_declared_twice(self):
+        root, app = self.manifest()
+        WIDGETS.fondo(root, app, "eu.sytue.mail", go=True)
+        with self.assertRaisesRegex(ValueError, "duplicado"):
+            WIDGETS.fondo(root, app, "eu.sytue.mail", go=True)
+
+    def test_go_is_on_by_owner_decision(self):
+        # Encendido por decisión del dueño (2026-11-07), aún sin la prueba del runbook en un
+        # teléfono. Apagarlo es un commit revisado: este test cambia con él.
+        self.assertIs(WIDGETS.FONDO_GO, True)
 
 
 if __name__ == "__main__":

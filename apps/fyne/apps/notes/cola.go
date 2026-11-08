@@ -50,7 +50,15 @@ var (
 	vaciarCola   = notas.Vaciar
 	// capturaRapida la usan también los borradores que se suben al cerrar sesión.
 	capturaRapida = notas.CapturaRapida
+	// lineasDeCaptura parte la captura en las notas que nacen de ella (diario.go). Es la
+	// misma con la que «Subir» parte un borrador al cerrar sesión: uno de varias líneas
+	// sale como las notas que habría hecho Intro, y no como una con saltos.
+	lineasDeCaptura = notas.LineasDeCaptura
 )
+
+// MaxLineasPegadas es lo más que nace de una vez de varias líneas, el del núcleo
+// (`MAX_LINEAS_PEGADAS` de client/diario.ts).
+const MaxLineasPegadas = notas.MaxLineasPegadas
 
 // dueño es el `sub` de quien usa la app: el mismo en todas sus organizaciones, así que
 // vale para comparar con OwnerSub pero no para indexar el almacén (claveAlmacen).

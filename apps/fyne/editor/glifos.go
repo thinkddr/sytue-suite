@@ -22,6 +22,10 @@ const (
 
 	// GlifoLapiz es el `pencil` de «Renombrar».
 	GlifoLapiz = "M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"
+	// GlifoCopia es el `copy` de «Hacer una copia»: dos hojas, una delante de otra.
+	GlifoCopia = "M9 9h11v11H9zM5 15H4V4h11v1"
+	// GlifoMas es el `more` de «Más acciones», el menú de la tesela en la web.
+	GlifoMas = "M5 12h.01M12 12h.01M19 12h.01"
 	// GlifoPapelera es el `trash` de «Eliminar». NO es el `trash` de `Icon.tsx`: dibujan
 	// cosas distintas, y por eso está aquí y no allí.
 	GlifoPapelera = "M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14M10 11v6M14 11v6"
@@ -44,6 +48,7 @@ var (
 	GlifosPortada = map[string]string{
 		"pencil": GlifoLapiz, "trash": GlifoPapelera, "upload": GlifoSubir,
 		"download": GlifoDescargar, "share": GlifoCompartir, "star": GlifoEstrella,
+		"copy": GlifoCopia, "more": GlifoMas,
 	}
 	GlifosTipo = map[string]string{
 		"document": GlifoDocumento, "spreadsheet": GlifoHoja, "presentation": GlifoPresentacion,

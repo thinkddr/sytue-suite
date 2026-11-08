@@ -140,6 +140,12 @@ export const sk: AppCatalog<typeof en> = {
   'gallery.downloadSelected': 'Stiahnuť',
   'gallery.downloading':
     'Spustené požiadavky na stiahnutie: {count}. Skontrolujte sťahovanie v prehliadači.',
+  'gallery.downloadingNative': {
+    one: 'Sťahuje sa 1 fotka…',
+    few: 'Sťahujú sa {count} fotky…',
+    many: 'Sťahuje sa {count} fotky…',
+    other: 'Sťahuje sa {count} fotiek…',
+  },
   'gallery.downloadCapped': 'Fotografie mimo tejto dávky: {count}.',
   'gallery.newAlbum': 'Nový album',
   'gallery.newAlbumTitle': 'Nový album',
@@ -276,4 +282,20 @@ export const sk: AppCatalog<typeof en> = {
   'aiBatch.excludeOrg': 'Vylúčiť organizáciu z automatickej dávky Sytue AI',
   'aiBatch.excludedHint':
     'Organizácia je vylúčená z automatickej dávky Sytue AI. Nové fotografie sa na pozadí nespracovávajú pre návrhy ani podobnosti.',
+  'album.rename': 'Premenovať',
+  'album.renamePrompt': 'Názov albumu',
+  'album.setCover': 'Použiť ako obal albumu',
+  'album.isCover': 'Toto je obal albumu',
+  'album.coverSet': 'Obal albumu bol aktualizovaný',
+  'gallery.favorited': 'Pridané do obľúbených: {count}',
+  'gallery.unfavorited': 'Odstránené z obľúbených: {count}',
+  'gallery.favoriteFailed': 'Fotky, ktoré sa nepodarilo zmeniť: {count}',
+  'gallery.noResults.title': 'Hľadaniu „{query}“ nezodpovedá žiadna fotka',
+  'gallery.noResults.description':
+    'Skúste iné slová alebo vymažte hľadanie a uvidíte všetky svoje fotky.',
+  'gallery.clearSearch': 'Vymazať hľadanie',
+  'viewer.counter': '{index} / {total}',
+  'viewer.counterMore': '{count}+',
+  'viewer.counterLabel': 'Fotka {index} z {total}',
+  'viewer.shortcutsJump': 'Home a End prejdú na prvú a poslednú fotku.',
 };

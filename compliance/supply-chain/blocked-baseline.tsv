@@ -9,6 +9,10 @@
 # 2026-10-26: record the existing read-only Apple API in the CMS validator and
 # the tracked FYP-04 checksum manifest. Exact paths only; these channels remain
 # blocked observations, with no new runtime/service or host-policy permission.
+# 2026-11-07: the iOS wake-up sender moved from services/rooms to platform/pkg/apns
+# and is now scanned (it was not before). Same send ADR 0039 already accepted, no new
+# provider; the baseline grows by this decision, documented in the ADR 0039
+# amendment of 2026-11-06 and docs/security.md#apns-despertar.
 eur-lex.europa.eu	scripts/certipdf-compat/ue.py
 online-forms.e-justice.europa.eu	scripts/certipdf-compat/ue.py
 www.sede.fnmt.gob.es	scripts/certipdf-compat/ue.py
@@ -18,6 +22,8 @@ acme-v02.api.letsencrypt.org	deploy/helm/sytue-one/values-prod.yaml
 acme-v02.api.letsencrypt.org	deploy/helm/sytue-one/values.yaml
 androidpublisher.googleapis.com	apps/fyne/scripts/play-publicar.sh
 api.appstoreconnect.apple.com	apps/fyne/scripts/apple-cms-existing-validate.py
+api.push.apple.com	platform/pkg/apns/apns.go
+api.sandbox.push.apple.com	platform/pkg/apns/apns.go
 api.appstoreconnect.apple.com	apps/fyne/scripts/appstore-publicar.py
 appstoreconnect.apple.com	.github/workflows/imagenes-produccion.yml
 www.apple.com	apps/fyne/scripts/apple-firma.sh

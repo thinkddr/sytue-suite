@@ -43,7 +43,9 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/part-of: sytue-one
-    # Postgres EXTERNO (RDB) + Sytue ID/JWKS y Secret Manager via HTTPS (solo UE).
+    # Postgres EXTERNO (RDB) + Sytue ID/JWKS y Secret Manager via HTTPS (UE), y el
+    # despertar de iOS a api.push.apple.com:443 (Apple, EE. UU.: la única salida fuera
+    # de la UE, con cuerpo vacío; ADR 0039 y compliance/supply-chain).
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0

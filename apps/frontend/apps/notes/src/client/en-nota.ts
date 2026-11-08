@@ -47,8 +47,8 @@ export function liPlegable(nodo: Node | null): HTMLLIElement | null {
 
 /**
  * El HTML de una nota con el `n`-ésimo `<li>` plegado o desplegado. Es lo que
- * hace pulsar la viñeta en la lectura: el plegado se guarda con la nota, como en
- * Twos, y se ve igual en la web y en el escritorio.
+ * hace pulsar la viñeta en la lectura: el plegado se guarda con la nota
+ * y se ve igual en la web y en el escritorio.
  */
 export function alternarPlegado(html: string, n: number): string {
   // Un `<template>` y no un `div`: su contenido es inerte, no carga imágenes.

@@ -299,6 +299,14 @@ export const it: AppCatalog<typeof en> = {
     one: '1 elemento spostato nel cestino.',
     other: '{count} elementi spostati nel cestino.',
   },
+  'files.batch.restored': {
+    one: '1 elemento ripristinato.',
+    other: '{count} elementi ripristinati.',
+  },
+  'files.batch.restorePartial': {
+    one: 'Non è stato possibile ripristinare 1 elemento: è ancora nel cestino.',
+    other: 'Non è stato possibile ripristinare {count} elementi: sono ancora nel cestino.',
+  },
   'files.batch.trashFailed': 'Non è stato possibile spostare la selezione nel cestino.',
   'files.batch.moveTitle': { one: 'Sposta 1 elemento', other: 'Sposta {count} elementi' },
   'files.batch.moveDone': { one: '1 elemento spostato.', other: '{count} elementi spostati.' },
@@ -315,6 +323,9 @@ export const it: AppCatalog<typeof en> = {
   'action.rename': 'Rinomina',
   'action.move': 'Sposta in…',
   'action.copy': 'Crea una copia',
+  'action.copyLink': 'Copia link',
+  'action.linkCopied': 'Link copiato. Si apre solo per chi ha già accesso.',
+  'action.copyLinkFailed': 'Non è stato possibile copiare il link.',
   'action.shareLink': 'Condividi link',
   'action.openInApp': 'Apri nell’applicazione',
   'action.openInEditor': 'Apri nell’editor',
@@ -538,6 +549,18 @@ export const it: AppCatalog<typeof en> = {
   'trash.purged': '«{name}» è stato eliminato definitivamente.',
   'trash.purgeDenied': 'Non è possibile eliminare «{name}»',
   'trash.purgeFailed': 'Non è stato possibile eliminare.',
+  'trash.emptyAll': 'Svuota cestino',
+  'trash.emptyAllTitle': 'Svuotare il cestino?',
+  'trash.emptyAllBody': {
+    one: 'L’elemento nel cestino verrà cancellato per sempre, insieme alla cronologia delle versioni. Dopo non c’è modo di recuperarlo.',
+    other:
+      'I {count} elementi nel cestino verranno cancellati per sempre, insieme alla cronologia delle versioni. Dopo non c’è modo di recuperarli.',
+  },
+  'trash.emptiedAll': 'Il cestino è stato svuotato.',
+  'trash.emptyAllPartial': {
+    one: 'Non è stato possibile eliminare 1 elemento: è ancora nel cestino.',
+    other: 'Non è stato possibile eliminare {count} elementi: sono ancora nel cestino.',
+  },
   'trash.purgeTitle': 'Eliminare definitivamente?',
   'trash.purgeBodyFolder':
     'Il contenuto di «{name}» e di tutto ciò che contiene verrà cancellato dai server di Sytue, insieme alla cronologia delle versioni. Dopo non c’è modo di recuperarlo, né da qui né dall’assistenza. In cambio liberi lo spazio che occupava.',

@@ -45,6 +45,28 @@ func TestHub(t *testing.T) {
 	}
 }
 
+// TestLaBusquedaPaginaPorOffset: el «Cargar más» pide la página siguiente por `offset`,
+// y la primera no lo manda.
+func TestLaBusquedaPaginaPorOffset(t *testing.T) {
+	var pedidas []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pedidas = append(pedidas, r.URL.RawQuery)
+		_, _ = io.WriteString(w, `{"query":"x","hits":[],"total":45,"has_more":true}`)
+	}))
+	defer srv.Close()
+	h, ctx := NewHub(srv.URL, nil, nil), context.Background()
+	if _, err := h.Search(ctx, "x", 20); err != nil {
+		t.Fatal(err)
+	}
+	res, err := h.SearchDesde(ctx, "x", 20, 40)
+	if err != nil || !res.HasMore || res.Total != 45 {
+		t.Fatalf("la página: %+v, %v", res, err)
+	}
+	if len(pedidas) != 2 || strings.Contains(pedidas[0], "offset") || !strings.Contains(pedidas[1], "offset=40") {
+		t.Errorf("al Hub le llegó %q", pedidas)
+	}
+}
+
 func TestLosCamposDelHubSonLosDelServicio(t *testing.T) {
 	dominio := webref.Read(t, "services/hub/internal/domain/domain.go")
 	for _, campo := range []string{"`json:\"source\"`", "`json:\"title\"`", "`json:\"body,omitempty\"`", "`json:\"url,omitempty\"`", "`json:\"read\"`", "`json:\"created_at\"`"} {
@@ -56,6 +78,7 @@ func TestLosCamposDelHubSonLosDelServicio(t *testing.T) {
 	literales := []string{
 		`"notifications": items`, `"unread": count`, `Query().Get("limit")`,
 		`"prefs": prefs`, "Kind   string `json:\"kind\"`", `"apps": apps`, `p.Get("sources")`,
+		`atoiDefault(p.Get("offset"), 0)`,
 	}
 	for _, literal := range literales {
 		if !strings.Contains(manejadores, literal) {

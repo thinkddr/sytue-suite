@@ -125,7 +125,8 @@ func (a *AlmacenSesion) Guardar(t Tokens) (err error) {
 		if err != nil {
 			return err
 		}
-		return a.publicarAccesoDrive(t)
+		// Con el broker, la marca es su generación: la época se confirma con ella.
+		return errors.Join(a.publicarAccesoDrive(t), ajustes.MarcarIdentidad(a.IdentidadWidgets(t)))
 	}
 	var errMarca error
 	rutaCierre, errCierre := a.marcaCierre()
@@ -153,7 +154,16 @@ func (a *AlmacenSesion) Guardar(t Tokens) (err error) {
 		errMarca = errors.Join(errMarca, a.publicarAccesoDrive(t))
 	}
 	ajustes.MarcarSesion()
-	return errors.Join(err, errMarca, errCierre)
+	// Después de la marca y aún bajo CerrojoSesion: la época se confirma con la marca
+	// que se acaba de escribir y solo rota si ha cambiado quién (ajustes/epoca.go).
+	errEpoca := ajustes.MarcarIdentidad(a.IdentidadWidgets(t))
+	return errors.Join(err, errMarca, errCierre, errEpoca)
+}
+
+// IdentidadWidgets es IdentidadWidgets con el emisor y el cliente de este almacén, que
+// son los que se guardan con el refresh.
+func (a *AlmacenSesion) IdentidadWidgets(t Tokens) ajustes.Identidad {
+	return identidadWidgets(a.emisor, a.cliente, t)
 }
 
 // Migrar conserva la sesión anterior al actualizar, una sola vez y bajo exclusión.

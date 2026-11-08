@@ -238,3 +238,139 @@ test('el pie queda alcanzable cuando no cabe: tope y desplazamiento propio', () 
   expect(pie.className.split(' ')).toContain('overflow-y-auto');
   expect(pie.className.split(' ')).toContain('max-h-[60%]');
 });
+
+// La rama de Apple Mail («Todos los buzones de entrada» con la Entrada de cada cuenta,
+// una cuenta con sus carpetas). VISTO EN ROJO (2026-11-06): sin `aria-expanded` ni
+// `data-mantiene-nav` en el disparador, y con los hijos pintados estando cerrada.
+test('una rama dice si está abierta, no cierra el cajón y solo enseña sus hijos abierta', () => {
+  const rama = (expanded: boolean) =>
+    mount(
+      <ul>
+        <SidebarItem label="ana@gmail.com" expanded={expanded} onClick={() => {}}>
+          <SidebarItem label="Recibidos" />
+        </SidebarItem>
+      </ul>,
+    );
+  const abierta = rama(true);
+  const cerrada = rama(false);
+  try {
+    const boton = abierta.querySelector('button');
+    expect(boton?.getAttribute('aria-expanded')).toBe('true');
+    expect(boton?.hasAttribute('data-mantiene-nav')).toBe(true);
+    // Los hijos van en su propio grupo, fuera del disparador, y sí cierran el cajón.
+    const grupo = abierta.querySelector('ul[role="group"]');
+    expect(grupo?.textContent).toBe('Recibidos');
+    expect(boton?.contains(grupo ?? null)).toBe(false);
+    expect(grupo?.querySelector('[data-mantiene-nav]')).toBeNull();
+    expect(cerrada.querySelector('button')?.getAttribute('aria-expanded')).toBe('false');
+    expect(cerrada.querySelector('ul[role="group"]')).toBeNull();
+    expect(cerrada.textContent).not.toContain('Recibidos');
+  } finally {
+    for (const host of [abierta, cerrada]) {
+      render(null, host);
+      host.remove();
+    }
+  }
+});
+
+// «Todos los buzones de entrada» se abre al pulsar la fila y se despliega con su
+// triángulo, como en Apple Mail. VISTO EN ROJO (2026-11-06): con el chevron dentro de
+// la fila, pulsarla solo plegaba y no había forma de abrir la Entrada mezclada; con
+// `data-mantiene-nav` en la fila, abrirla dejaba el cajón del móvil tapando la lista.
+test('con `onToggle` la fila es un destino y el triángulo aparte pliega', () => {
+  const pulsado: string[] = [];
+  const rama = (expanded: boolean) =>
+    mount(
+      <ul>
+        <SidebarItem
+          label="Todos los buzones de entrada"
+          active
+          expanded={expanded}
+          onClick={() => pulsado.push('fila')}
+          onToggle={() => pulsado.push('triangulo')}
+          toggleLabel="Cuentas"
+        >
+          <SidebarItem label="ana@gmail.com" />
+        </SidebarItem>
+      </ul>,
+    );
+  const abierta = rama(true);
+  const cerrada = rama(false);
+  try {
+    const fila = abierta.querySelector<HTMLButtonElement>('li > button');
+    const triangulo = abierta.querySelector<HTMLButtonElement>('li > span > button');
+    expect(fila?.getAttribute('aria-current')).toBe('page');
+    expect(fila?.hasAttribute('aria-expanded')).toBe(false);
+    expect(fila?.hasAttribute('data-mantiene-nav')).toBe(false);
+    expect(fila?.querySelector('svg')).toBeNull();
+    expect(triangulo?.getAttribute('aria-expanded')).toBe('true');
+    expect(triangulo?.getAttribute('aria-label')).toBe('Cuentas');
+    expect(triangulo?.hasAttribute('data-mantiene-nav')).toBe(true);
+    expect(fila?.contains(triangulo ?? null)).toBe(false);
+    expect(abierta.querySelector('ul[role="group"]')?.textContent).toBe('ana@gmail.com');
+    fila?.click();
+    triangulo?.click();
+    expect(pulsado).toEqual(['fila', 'triangulo']);
+    expect(cerrada.querySelector('[aria-label="Cuentas"]')?.getAttribute('aria-expanded')).toBe(
+      'false',
+    );
+    expect(cerrada.querySelector('ul[role="group"]')).toBeNull();
+  } finally {
+    for (const host of [abierta, cerrada]) {
+      render(null, host);
+      host.remove();
+    }
+  }
+});
+
+// VISTO EN ROJO (2026-11-06): con `children` como condición, el `[]` de una cuenta sin
+// carpetas pintaba un grupo vacío con su margen.
+test('una rama abierta sin nada que colgar no pinta un grupo vacío', () => {
+  const host = mount(
+    <ul>
+      <SidebarItem label="ana@gmail.com" expanded onClick={() => {}}>
+        {[].map(() => null)}
+        {null}
+      </SidebarItem>
+    </ul>,
+  );
+  try {
+    expect(host.querySelector('button')?.getAttribute('aria-expanded')).toBe('true');
+    expect(host.querySelector('ul[role="group"]')).toBeNull();
+  } finally {
+    render(null, host);
+    host.remove();
+  }
+});
+
+// La fila que repite otra ya marcada se ve activa sin ser otra «página actual».
+// VISTO EN ROJO (2026-11-06) con `aria-current` atado solo a `active`.
+test('`ariaCurrent={false}` marca el item sin anunciarlo como página actual', () => {
+  const host = mount(
+    <ul>
+      <SidebarItem label="Recibidos" active />
+      <SidebarItem label="ana@sytue.eu" active ariaCurrent={false} />
+    </ul>,
+  );
+  try {
+    const [carpeta, fuente] = [...host.querySelectorAll('button')];
+    expect(carpeta?.getAttribute('aria-current')).toBe('page');
+    expect(fuente?.hasAttribute('aria-current')).toBe(false);
+    expect(fuente?.className).toContain('sytue-nav-current');
+  } finally {
+    render(null, host);
+    host.remove();
+  }
+});
+
+test('un item que no es rama no anuncia nada desplegable', () => {
+  const host = mount(<SidebarItem label="Recibidos" onClick={() => {}} />);
+  try {
+    const boton = host.querySelector('button');
+    expect(boton?.hasAttribute('aria-expanded')).toBe(false);
+    expect(boton?.hasAttribute('data-mantiene-nav')).toBe(false);
+  } finally {
+    render(null, host);
+    host.remove();
+  }
+});

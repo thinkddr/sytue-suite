@@ -323,13 +323,33 @@ func TestElTruncadoEsElMasLargoQueCabe(t *testing.T) {
 				}
 			}
 		}
-		if got, ancho := truncado(completo, tema.TextoSM, SemiNegrita.cara(), cabe); got != quiero || ancho != Medir(got, tema.TextoSM, SemiNegrita).Width {
+		if got, ancho := truncado(completo, tema.TextoSM, SemiNegrita.cara(), cabe, "…"); got != quiero || ancho != Medir(got, tema.TextoSM, SemiNegrita).Width {
 			t.Errorf("en %v cabe %q y recorta da %q (%v de ancho)", cabe, quiero, got, ancho)
 		}
 	}
 	for _, cabe := range []float32{0, -12} {
 		if got := recorta(completo, tema.TextoSM, SemiNegrita, cabe); got != "" {
 			t.Errorf("con %v de sitio recorta da %q, y sin sitio no se enseña nada", cabe, got)
+		}
+	}
+}
+
+// TestCortarNoPoneSuspensivos: el `clip` de la píldora del mes en el teléfono deja
+// las letras que caben, sin «…», y es el prefijo MÁS LARGO que cabe.
+func TestCortarNoPoneSuspensivos(t *testing.T) {
+	const completo = "Colaboración con la gestoría"
+	runas := []rune(completo)
+	c := Texto("", tema.TextoXS, Normal, color.NRGBA{})
+	for cabe := float32(4); cabe < Medir(completo, tema.TextoXS, Normal).Width+4; cabe += 3.5 {
+		quiero := ""
+		for i := len(runas); i > 0; i-- {
+			if p := string(runas[:i]); Medir(p, tema.TextoXS, Normal).Width <= cabe {
+				quiero = p
+				break
+			}
+		}
+		if ancho := Cortar(c, completo, tema.TextoXS, Normal, cabe); c.Text != quiero || ancho > cabe {
+			t.Errorf("en %v cabe %q y Cortar da %q (%v de ancho)", cabe, quiero, c.Text, ancho)
 		}
 	}
 }
@@ -407,6 +427,28 @@ func TestLaCabeceraDeDriveMide36(t *testing.T) {
 	c := NuevaCabeceraDrive("Nombre", "Tamaño", "Modificado")
 	if got := c.MinSize().Height; got != AltoCabeceraDrive {
 		t.Errorf("MinSize de la cabecera de Drive = %v y la declarada es %v", got, AltoCabeceraDrive)
+	}
+}
+
+// TestLaListaDeDrivePintaSobreLaHoja: sobre papel la cabecera de columnas y las filas
+// son la hoja blanca, como `bg-[var(--sytue-sheet-bg)]` en la web, y no una franja gris.
+//
+// VISTO EN ROJO (2026-11-06): las dos pintaban `bg`.
+func TestLaListaDeDrivePintaSobreLaHoja(t *testing.T) {
+	tema.ElegirForma("marco")
+	tema.ElegirCromo(tema.CromoPapel)
+	t.Cleanup(func() { tema.ElegirCromo(""); tema.FormaDeLosGuardianes() })
+	hoja := tema.Color("sheet-bg", tema.Claro)
+	if hoja == tema.Color("bg", tema.Claro) {
+		t.Fatal("sobre papel la hoja y el lienzo son del mismo color: la prueba no mira nada")
+	}
+	cab := NuevaCabeceraDrive("Nombre", "Tamaño", "Modificado")
+	if got := test.WidgetRenderer(cab).(*cabeceraDriveRenderer).base.FillColor; got != color.Color(hoja) {
+		t.Errorf("la cabecera de columnas pinta %v y la hoja es %v", got, hoja)
+	}
+	fila := NuevaFilaDrive("a.txt", "txt")
+	if got := test.WidgetRenderer(fila).(*filaDriveRenderer).base.FillColor; got != color.Color(hoja) {
+		t.Errorf("la fila pinta %v y la hoja es %v", got, hoja)
 	}
 }
 

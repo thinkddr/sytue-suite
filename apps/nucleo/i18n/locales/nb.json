@@ -101,6 +101,7 @@
   "linkedServices.changed": "Dette elementet er endret hos leverandøren din. Oppdater før du redigerer det igjen.",
   "linkedServices.choose": "Velg hva du vil koble til. Leverandøren ber om tillatelser for de valgte tjenestene.",
   "linkedServices.connected": "Tilkoblede tjenester",
+  "linkedServices.exists": "Denne kontoen var allerede tilkoblet og er nå åpnet.",
   "linkedServices.keepAdmin": "Google Keep krever et godkjent oppsett fra Google Workspace-administrasjonen. Personlige Gmail-kontoer kan ikke koble den til.",
   "linkedServices.notGranted": "Tilgang til denne tjenesten ble ikke gitt. Koble til kontoen på nytt for å velge tillatelser.",
   "linkedServices.notSupported": "Denne leverandøren tilbyr ikke denne tjenesten.",
@@ -169,7 +170,7 @@
   "notifications.kind.pages.order.oversold": "Bestilling {number} på {site} ble betalt uten lagerbeholdning",
   "notifications.kind.pages.order.paid": "Ny bestilling {number} på {site}",
   "notifications.kind.pages.payment.duplicated": "Dobbel betaling på bestilling {number} på {site}: den andre refunderes",
-  "notifications.kind.pages.settings.changed": "{actor} endret en innstilling i Sytue Web",
+  "notifications.kind.pages.settings.changed": "{actor} endret en innstilling i Sytue Webs",
   "notifications.kind.pages.store.busy": "Nettbutikken på {site} har for mange bestillinger som venter på betaling",
   "notifications.kind.pages.withdrawal.requested": "Bestilling {number} på {site}: angrerett er påberopt",
   "notifications.kind.photos.album.added": "{actor} har lagt til bilder i «{name}»",
@@ -301,6 +302,8 @@
   "shell.update.failedBody": "Prøv igjen senere, eller last den ned fra portalen.",
   "shell.update.install": "Oppdater til versjon {version}",
   "shell.update.upToDate": "{app} er oppdatert",
+  "shell.widgets.wake": "Oppdater moduler mens appen er lukket",
+  "shell.widgets.wakeHelp": "Når noe av ditt endres, vekker Sytue appen med et tomt varsel fra Apple, slik at den kan oppdatere modulen sin. Apple ser hvilken app og når, aldri hva som er endret.",
   "ui.backToList": "Tilbake til listen",
   "ui.bulk.clear": "Fjern utvalget",
   "ui.bulk.region": "Handlinger for utvalget",
@@ -318,6 +321,8 @@
   "ui.review.edit": "Rediger",
   "ui.save": "Lagre",
   "ui.selectRow": "Velg rad",
+  "ui.suiteClose": "Tilbake til appen",
+  "ui.suiteOpen": "Sytue: apper, søk, varsler og konto",
   "ui.wizard.back": "Tilbake",
   "ui.wizard.cancel": "Avbryt",
   "ui.wizard.goToStep": "Tilbake til trinn {n}: ",
@@ -336,5 +341,7 @@
   "widgets.pending": "Ventende",
   "widgets.photos": "Bilder",
   "widgets.rows": "Rader",
-  "widgets.storage": "Lagring"
+  "widgets.storage": "Lagring",
+  "widgets.updatedAgo": "Oppdatert {time}",
+  "widgets.updatedAt": "Oppdatert: {time}"
 }

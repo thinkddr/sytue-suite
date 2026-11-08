@@ -140,6 +140,12 @@ export const mt: AppCatalog<typeof en> = {
   'gallery.unselectMonth': 'Neħħi l-għażla tax-xahar',
   'gallery.downloadSelected': 'Niżżel',
   'gallery.downloading': 'Talbiet ta’ tniżżil mibdija: {count}. Iċċekkja t-tniżżil tal-browser.',
+  'gallery.downloadingNative': {
+    one: 'Qed jitniżżel ritratt wieħed…',
+    few: 'Qed jitniżżlu {count} ritratti…',
+    many: 'Qed jitniżżlu {count}-il ritratt…',
+    other: 'Qed jitniżżlu {count} ritratt…',
+  },
   'gallery.downloadCapped': 'Ritratti barra minn dan il-grupp: {count}.',
   'gallery.newAlbum': 'Album ġdid',
   'gallery.newAlbumTitle': 'Album ġdid',
@@ -278,4 +284,20 @@ export const mt: AppCatalog<typeof en> = {
   'aiBatch.excludeOrg': "Eskludi l-organizzazzjoni mill-lott awtomatiku ta' Sytue AI",
   'aiBatch.excludedHint':
     "L-organizzazzjoni hija eskluża mill-lott awtomatiku ta' Sytue AI. Ritratti ġodda ma jiġux ipproċessati fl-isfond għal suġġerimenti jew xebh.",
+  'album.rename': 'Semmi mill-ġdid',
+  'album.renamePrompt': 'Isem l-album',
+  'album.setCover': 'Uża bħala qoxra tal-album',
+  'album.isCover': 'Din hija l-qoxra tal-album',
+  'album.coverSet': 'Il-qoxra tal-album ġiet aġġornata',
+  'gallery.favorited': 'Miżjuda mal-favoriti: {count}',
+  'gallery.unfavorited': 'Imneħħija mill-favoriti: {count}',
+  'gallery.favoriteFailed': 'Ritratti li ma setgħux jinbidlu: {count}',
+  'gallery.noResults.title': 'L-ebda ritratt ma jaqbel ma’ “{query}”',
+  'gallery.noResults.description':
+    'Ipprova kliem ieħor, jew ħassar it-tfittxija biex tara r-ritratti kollha tiegħek.',
+  'gallery.clearSearch': 'Ħassar it-tfittxija',
+  'viewer.counter': '{index} / {total}',
+  'viewer.counterMore': '{count}+',
+  'viewer.counterLabel': 'Ritratt {index} minn {total}',
+  'viewer.shortcutsJump': 'Home u End imorru fl-ewwel u fl-aħħar ritratt.',
 };

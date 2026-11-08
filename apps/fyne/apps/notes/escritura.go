@@ -47,6 +47,15 @@ type sesionEdicion struct {
 	compartida bool
 }
 
+// agendaMenciones es la gente a la que se menciona con «@»: se pide UNA vez por sesión, a
+// la primera arroba (`genteDeLaOrganizacion` de la web, que la pide una vez por página).
+func (p *Pantalla) agendaMenciones() *ui.AgendaMenciones {
+	if p.agenda == nil {
+		p.agenda = &ui.AgendaMenciones{}
+	}
+	return p.agenda
+}
+
 // abrirEditor abre una nota para escribir, cerrando (y guardando) la que hubiera.
 func (p *Pantalla) abrirEditor(n Nota) {
 	if s := p.edicion; s != nil && s.nota == n.ID {
@@ -58,6 +67,7 @@ func (p *Pantalla) abrirEditor(n Nota) {
 		return
 	}
 	ed := NuevoEditorNota(p.tr, n.Doc, p.tr.T("note.placeholder", nil))
+	ed.Afuera = p.afuera
 	s := &sesionEdicion{
 		nota: n.ID, editor: ed, fusion: n.ID + ":" + strconv.FormatInt(time.Now().UnixNano(), 36),
 	}
@@ -67,6 +77,13 @@ func (p *Pantalla) abrirEditor(n Nota) {
 	ed.AlTerminar = p.cerrarEditor
 	ed.conservaEdicion = p.barra.conservaEdicion
 	ed.AlEnlazar = func(d fyne.CanvasObject) { p.herramientaEnlace(ed, d) }
+	// «[[» busca como la herramienta, sin Drive; «@», la gente de la organización, salvo
+	// en un cuaderno cifrado: el servicio no lee su texto y la mención no avisaría a nadie.
+	ed.enlaces = p.nuevaBusquedaEnlaces(false)
+	ed.enlaces.alLlegar = ed.refrescarMenu
+	if !p.activo.Cifrado && p.Directorio != nil {
+		ed.gente = func(listo func()) []api.Miembro { return p.agendaMenciones().Gente(p.Directorio, nil, listo) }
+	}
 	ed.AlCrecer = p.recolocarLienzo
 	ed.AlIrA = p.abrirIrA
 	ed.portal = p.portal
@@ -132,6 +149,9 @@ func (p *Pantalla) cerrarEditor() {
 	p.portal.poner(s.editor) // el menú y la burbuja se van con el editor
 	if s.reloj != nil {
 		s.reloj.Stop()
+	}
+	if b := s.editor.enlaces; b != nil {
+		b.parar() // lo que busque el `[[` ya no tiene dónde pintarse
 	}
 	p.edicion = nil
 	p.lienzo.Editando, p.lienzo.Editor, p.lienzo.Ancha = "", nil, false
@@ -286,17 +306,27 @@ func slugDe(texto string) string {
 	return s[:min(len(s), 80)]
 }
 
-// opcionesEnlace son las de este cuaderno para lo escrito, al instante y sin red: la URL
-// si lo es, y las notas y los títulos de dentro que lo contienen (hasta ocho).
+// opcionesEnlace son las de la herramienta para lo escrito, al instante y sin red: la URL
+// si lo es y, si no, lo de este cuaderno (opcionesLocales).
 func (p *Pantalla) opcionesEnlace(q string) []opcionEnlace {
 	q = strings.TrimSpace(q)
 	if q == "" {
 		return nil
 	}
-	if esWeb(q) || strings.HasPrefix(q, "mailto:") {
+	if esDireccion(q) {
 		return []opcionEnlace{{url: q, rotulo: q, nota: q, tipo: enlaceURL}}
 	}
-	nq := buscar.Plegar(q)
+	return p.opcionesLocales(q)
+}
+
+// esDireccion es lo que la herramienta enlaza tal cual: una URL web o un `mailto:`.
+func esDireccion(q string) bool { return esWeb(q) || strings.HasPrefix(q, "mailto:") }
+
+// opcionesLocales son las notas de este cuaderno y los títulos de dentro que contienen lo
+// escrito, hasta ocho (`opcionesLocales` de LinkTool.tsx). Sin consulta —el `[[` recién
+// escrito—, sus notas por su nombre, sin sus títulos.
+func (p *Pantalla) opcionesLocales(q string) []opcionEnlace {
+	nq := buscar.Plegar(strings.TrimSpace(q))
 	var out []opcionEnlace
 	for _, n := range p.notas {
 		t := strings.TrimSpace(n.Titulo)
@@ -305,7 +335,7 @@ func (p *Pantalla) opcionesEnlace(q string) []opcionEnlace {
 			out = append(out, opcionEnlace{url: p.urlDeNota(p.activo.ID, n.ID, ""), rotulo: t, nota: nombre, tipo: enlaceLocal})
 		}
 		for _, h := range titulosDe(n.Contenido) {
-			if buscar.Contiene(h.texto, nq) {
+			if nq != "" && buscar.Contiene(h.texto, nq) {
 				out = append(out, opcionEnlace{
 					url: p.urlDeNota(p.activo.ID, n.ID, h.slug), rotulo: h.texto,
 					nota: nombre, titulo: h.texto, tipo: enlaceLocal,
@@ -317,6 +347,73 @@ func (p *Pantalla) opcionesEnlace(q string) []opcionEnlace {
 		}
 	}
 	return out[:min(len(out), maxOpcionesEnlace)]
+}
+
+// busquedaEnlaces es LA búsqueda de enlaces (`useOpcionesDeEnlace` de LinkTool.tsx): lo de
+// este cuaderno al instante y, desde dos letras, lo de los demás —y, con `drive`, los
+// ficheros de Sytue Drive— tras su retardo. La usan la herramienta de enlaces y el `[[`
+// del editor: dos búsquedas de lo mismo acabarían encontrando cosas distintas. Solo se
+// toca desde el hilo de la interfaz.
+type busquedaEnlaces struct {
+	p     *Pantalla
+	drive bool
+	// alLlegar avisa, en el hilo de la interfaz, de que ha llegado lo de fuera.
+	alLlegar func()
+	// q es la consulta y hay, si se está buscando (el `null` de la web es no).
+	q                 string
+	hay               bool
+	remotas, archivos []opcionEnlace
+	buscando          bool
+	reloj             *time.Timer
+	// vuelta descarta lo que vuelva de una consulta que ya no es la de ahora.
+	vuelta int
+}
+
+func (p *Pantalla) nuevaBusquedaEnlaces(drive bool) *busquedaEnlaces {
+	return &busquedaEnlaces{p: p, drive: drive}
+}
+
+// buscar pone la consulta; `hay` false deja de buscar y para lo que hubiera en vuelo. La
+// misma consulta otra vez no vuelve a buscar.
+func (b *busquedaEnlaces) buscar(q string, hay bool) {
+	q = strings.TrimSpace(q)
+	if hay == b.hay && q == b.q {
+		return
+	}
+	b.q, b.hay = q, hay
+	b.remotas, b.archivos, b.buscando = nil, nil, false
+	if b.reloj != nil {
+		b.reloj.Stop()
+	}
+	b.vuelta++
+	p := b.p
+	if !hay || len([]rune(q)) < minimoBusquedaEnl || !p.hayRed() || p.svc == nil && (!b.drive || p.Suite == nil) {
+		return
+	}
+	b.buscando = true
+	mia, drive := b.vuelta, b.drive
+	b.reloj = time.AfterFunc(esperaEnlace, func() {
+		r, d := p.buscarFuera(q, drive)
+		fyne.Do(func() {
+			if mia != b.vuelta {
+				return
+			}
+			b.buscando, b.remotas, b.archivos = false, r, d
+			llamar0(b.alLlegar)
+		})
+	})
+}
+
+// parar deja de buscar.
+func (b *busquedaEnlaces) parar() { b.buscar("", false) }
+
+// opciones son las de ahora: lo de este cuaderno, que se lee cada vez porque las notas
+// cambian, y lo que haya llegado de fuera.
+func (b *busquedaEnlaces) opciones() []opcionEnlace {
+	if !b.hay {
+		return nil
+	}
+	return slices.Concat(b.p.opcionesLocales(b.q), b.remotas, b.archivos)
 }
 
 // opcionesRemotas son las de los demás cuadernos, de la búsqueda del servicio: la nota y
@@ -459,20 +556,20 @@ func (p *Pantalla) herramientaEnlace(ed *EditorNota, disparador fyne.CanvasObjec
 	campo.Ancho = min(AnchoHerramientaEnlace, p.anchoVentana()*0.92) - 2*PXOpcionEnlace
 	lista := container.NewStack()
 	cuerpo := container.New(ui.Columna{Hueco: 2 * 0.25 * tema.Rem}, campo, lista)
+	busqueda := p.nuevaBusquedaEnlaces(true)
 	var (
-		q                string
-		locales, remotas []opcionEnlace
-		drive            []opcionEnlace
-		activa, vuelta   int
-		buscando         bool
-		reloj            *time.Timer
+		q      string
+		activa int
 	)
-	opciones := func() []opcionEnlace { return append(append(slices.Clip(locales), remotas...), drive...) }
-	cerrar := func() {
-		if reloj != nil {
-			reloj.Stop()
+	// Una URL es UNA opción, la de enlazarla; si no, lo que encuentre la búsqueda.
+	opciones := func() []opcionEnlace {
+		if esDireccion(strings.TrimSpace(q)) {
+			return p.opcionesEnlace(q)
 		}
-		vuelta++ // lo que esté en vuelo ya no se pinta
+		return busqueda.opciones()
+	}
+	cerrar := func() {
+		busqueda.parar() // lo que esté en vuelo ya no se pinta
 		if em != nil {
 			em.Cerrar()
 		}
@@ -485,34 +582,16 @@ func (p *Pantalla) herramientaEnlace(ed *EditorNota, disparador fyne.CanvasObjec
 	pintar := func() {
 		lista.Objects = nil
 		if strings.TrimSpace(q) != "" {
-			lista.Objects = []fyne.CanvasObject{p.filasEnlace(opciones(), activa, buscando, elegir, v)}
+			lista.Objects = []fyne.CanvasObject{p.filasEnlace(opciones(), activa, busqueda.buscando, elegir, v)}
 		}
 		lista.Refresh()
 		recolocarEmergente(em)
 	}
+	busqueda.alLlegar = pintar
 	campo.AlCambiar(func(s string) {
 		q, activa = s, 0
 		consulta := strings.TrimSpace(s)
-		locales, remotas, drive, buscando = p.opcionesEnlace(consulta), nil, nil, false
-		if reloj != nil {
-			reloj.Stop()
-		}
-		vuelta++
-		if len([]rune(consulta)) >= minimoBusquedaEnl && (len(locales) == 0 || locales[0].tipo != enlaceURL) &&
-			(p.svc != nil || p.Suite != nil) && p.hayRed() {
-			buscando = true
-			mia := vuelta
-			reloj = time.AfterFunc(esperaEnlace, func() {
-				r, d := p.buscarFuera(consulta)
-				fyne.Do(func() {
-					if mia != vuelta {
-						return
-					}
-					buscando, remotas, drive = false, r, d
-					pintar()
-				})
-			})
-		}
+		busqueda.buscar(consulta, consulta != "" && !esDireccion(consulta))
 		pintar()
 	})
 	campo.AlTeclear = func(k *fyne.KeyEvent) bool {

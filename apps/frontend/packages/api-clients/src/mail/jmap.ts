@@ -83,6 +83,10 @@ export interface EmailSummary {
   /** Mensajes del hilo en TODA la cuenta, no solo en esta carpeta: es lo que abre
    *  el lector al pulsar la fila. Solo lo rellena el listado de bandeja. */
   threadCount?: number;
+  /** Carpeta en la que vive el mensaje (`mailbox_id` del servicio). Es lo que permite
+   *  DESHACER un movimiento desde una búsqueda o una etiqueta, que cruzan carpetas:
+   *  cada mensaje vuelve a la suya y no a la de la vista. */
+  mailboxId?: string;
 }
 
 /** Adjunto saliente: se codifica base64 inline en el MIME multipart/mixed. */
@@ -739,6 +743,7 @@ interface RawEmail {
   received_at?: string;
   keywords?: string[];
   has_attachment?: boolean;
+  mailbox_id?: string;
 }
 
 /** Flag IMAP (\Seen) → keyword JMAP ($seen). El resto se pasa en minúsculas. */
@@ -811,6 +816,7 @@ function mapEmail(e: RawEmail): EmailSummary {
     receivedAt: e.received_at ?? '',
     keywords: flagsToKeywords(e.keywords),
     hasAttachment: Boolean(e.has_attachment),
+    ...(e.mailbox_id ? { mailboxId: e.mailbox_id } : {}),
   };
 }
 

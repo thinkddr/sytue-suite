@@ -102,12 +102,19 @@ func TestTrabajoDeCalidadesQuitaYLibera(t *testing.T) {
 	}
 	v.BytesOriginal, v.BytesTotal = 1000, 99999
 	j := cola.encolar(v, domain.JobQualities, "")
+	senal := &senalFalsa{}
+	w.cambios = senal
 
 	if _, err := w.unaVuelta(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if m, ok := cola.fallos[j.ID]; ok {
 		t.Fatalf("el trabajo falló: %s", m)
+	}
+	// Acabar un trabajo le dice al widget de Cast de su dueña que vuelva a leer: la
+	// subida contestó hace rato. VISTO EN ROJO sin el avisarCambio tras Terminar.
+	if !slices.Equal(senal.vistas, []string{"acme cast ana"}) {
+		t.Errorf("señal de cambios al terminar: %v, quiero [acme cast ana]", senal.vistas)
 	}
 	est, ok := cola.terminados[j.ID]
 	if !ok {

@@ -137,9 +137,14 @@ func (a *App) saltarA(r api.Reminder) {
 		a.recPanel.Cerrar()
 		a.recPanel = nil
 	}
-	if !r.DTStart.IsZero() {
-		a.irAlDia(r.DTStart.In(a.P.zona()))
+	// Desde el cajón del teléfono, el enlace es un destino: cierra el cajón como
+	// cualquier otro (en la web, el enlace no lleva `data-mantiene-nav`).
+	a.P.cajonAbierto = false
+	if r.DTStart.IsZero() {
+		a.pintar()
+		return
 	}
+	a.irAlDia(r.DTStart.In(a.P.zona()))
 }
 
 // descartar es `dismiss`: fuera de la lista YA, y el servicio lo apunta.
@@ -164,6 +169,13 @@ func (a *App) descartar(r api.Reminder) {
 // abrirRecordatorios despliega el panel colgando de la campana, pegado a su borde
 // derecho y acotado a la ventana.
 func (a *App) abrirRecordatorios(campana fyne.CanvasObject) {
+	// En el mes del teléfono no hay campana: es la rama del cajón, que se despliega en el
+	// sitio sin cerrarlo.
+	if a.P.compacta() {
+		a.P.recEnCajon = !a.P.recEnCajon
+		a.pintar()
+		return
+	}
 	lienzo := a.lienzo()
 	if lienzo == nil {
 		return
@@ -216,6 +228,13 @@ func (p *Pantalla) cuerpoRecordatorios(cargando, fallo bool, cerrar func(), salt
 	aspa := botonAspa(p.t("common.close", nil), cerrar)
 	cabecera := container.New(&cabeceraPanel{}, canvas.NewRectangle(tema.Color("border", v)),
 		ui.Texto(p.t("reminders.title", nil), tema.TextoSM, ui.SemiNegrita, tema.Color("text", v)), aspa)
+	return container.New(ui.Columna{}, cabecera, p.listaRecordatorios(cargando, fallo, saltar, descartar))
+}
+
+// listaRecordatorios es lo de dentro del panel: la carga, el error, el vacío o la lista.
+// La comparten el panel de la campana y la rama del cajón del teléfono.
+func (p *Pantalla) listaRecordatorios(cargando, fallo bool, saltar, descartar func(api.Reminder)) fyne.CanvasObject {
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	var cuerpo fyne.CanvasObject
 	lista := p.Recordatorios
 	switch {
@@ -236,7 +255,7 @@ func (p *Pantalla) cuerpoRecordatorios(cargando, fallo bool, cerrar func(), salt
 		_, d := desplazable(col)
 		cuerpo = container.New(&altoMaximo{Alto: AltoMaxRecordatorios, Hijo: col}, d)
 	}
-	return container.New(ui.Columna{}, cabecera, cuerpo)
+	return cuerpo
 }
 
 // botonAspa es el `<Button variant="ghost" size="sm" iconOnly>` con el aspa de 16.

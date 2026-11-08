@@ -10,6 +10,17 @@ id = "GO-2026-5932"
 ignoreUntil = 2026-12-14
 reason = "openpgp no se importa ni se alcanza; confirmado por govulncheck en root y clientes nativos"
 
+# GO-2026-6909: `github.com/crewjam/saml` ≤ v0.5.1 —pánico con una assertion firmada
+# sin Subject/Issuer y NameID de otro espacio de nombres tomado por el bueno—. SÍ se
+# alcanza (services/id, el SP de SAML) y no hay versión corregida: la librería no se
+# toca desde mayo de 2025. Mitigado en services/id/internal/saml (recupera el pánico y
+# exige un único saml:NameID; nameid_test.go lo reproduce). La misma fecha en
+# compliance/supply-chain/govulncheck-excepciones.tsv, que es lo que lee govulncheck.
+[[IgnoredVulns]]
+id = "GO-2026-6909"
+ignoreUntil = 2026-12-14
+reason = "crewjam/saml sin arreglo: mitigado en services/id/internal/saml (pánico recuperado y saml:NameID único exigido)"
+
 # `extract-zip` 2.0.1 (GHSA-jmr9-qjv8-65gv y GHSA-7pqw-9j4j-h8q3) YA NO SE IGNORA:
 # no está en el lockfile. Llegaba por @lhci/cli → lighthouse 12 → puppeteer-core 24
 # → @puppeteer/browsers 2.x, sin versión corregida; @puppeteer/browsers 3 lo

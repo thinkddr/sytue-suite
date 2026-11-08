@@ -4,6 +4,7 @@
  * `/notes/{id}/people` del servicio. El correo se traduce aquí a su `sub` con Sytue
  * ID; el navegador nunca elige a quién se le da el permiso por su identificador.
  *
+ *   GET    /api/people                 la gente de la organización, para el «@» del editor
  *   GET    /api/people?notebook=<id> | ?note=<id>
  *   POST   /api/people?…  {email, permission: read|write}
  *   DELETE /api/people?…&sub=<sub>
@@ -14,6 +15,8 @@ import { notesApiUrl } from '../../lib/notes.js';
 
 export const prerender = false;
 
+const directorio = crearDirectorio(bff, import.meta.env);
+
 export const { GET, POST, DELETE } = rutasDeCompartir({
   sesion: getApiSession,
   servicio: () => `${notesApiUrl()}/api/v1`,
@@ -23,5 +26,6 @@ export const { GET, POST, DELETE } = rutasDeCompartir({
     const nota = q.get('note');
     return nota ? `/notes/${encodeURIComponent(nota)}/people` : null;
   },
-  directorio: crearDirectorio(bff, import.meta.env),
+  directorio,
+  agenda: directorio.agenda,
 });

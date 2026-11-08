@@ -4,6 +4,8 @@
   "action.classified": "Classificatie · {name}",
   "action.classify": "Classificeren",
   "action.copy": "Kopie maken",
+  "action.copyLink": "Link kopiëren",
+  "action.copyLinkFailed": "De link kon niet worden gekopieerd.",
   "action.delete": "Naar prullenbak",
   "action.desktopBody": "Als je die nog niet hebt geïnstalleerd, kun je hem downloaden.",
   "action.desktopCta": "Downloads bekijken",
@@ -12,6 +14,7 @@
   "action.downloadName": "{name} downloaden",
   "action.downloadZip": "Downloaden (ZIP)",
   "action.editorFailed": "De editor kon dit bestand niet openen.",
+  "action.linkCopied": "Link gekopieerd. Hij opent alleen voor wie al toegang heeft.",
   "action.mailFailed": "Het e-mailvenster kon niet worden geopend",
   "action.menu": "Acties voor {name}",
   "action.more": "Meer acties",
@@ -81,6 +84,14 @@
   "files.batch.moveTitle": {
     "one": "1 item verplaatsen",
     "other": "{count} items verplaatsen"
+  },
+  "files.batch.restorePartial": {
+    "one": "1 item kon niet worden teruggezet en staat nog in de prullenbak.",
+    "other": "{count} items konden niet worden teruggezet en staan nog in de prullenbak."
+  },
+  "files.batch.restored": {
+    "one": "1 item teruggezet.",
+    "other": "{count} items teruggezet."
   },
   "files.batch.trashBody": {
     "one": "1 item gaat naar de prullenbak. Je kunt het daar terugzetten.",
@@ -555,6 +566,17 @@
     "other": "{count} bestanden geüpload."
   },
   "team.upload.partial": "{uploaded} van {count} geüpload.",
+  "trash.emptiedAll": "De prullenbak is geleegd.",
+  "trash.emptyAll": "Prullenbak legen",
+  "trash.emptyAllBody": {
+    "one": "Het item in de prullenbak wordt definitief gewist, samen met de versiegeschiedenis. Daarna is er geen manier om het terug te halen.",
+    "other": "De {count} items in de prullenbak worden definitief gewist, samen met de versiegeschiedenis. Daarna is er geen manier om ze terug te halen."
+  },
+  "trash.emptyAllPartial": {
+    "one": "1 item kon niet worden verwijderd en staat nog in de prullenbak.",
+    "other": "{count} items konden niet worden verwijderd en staan nog in de prullenbak."
+  },
+  "trash.emptyAllTitle": "Prullenbak legen?",
   "trash.emptyBody": "Bestanden en mappen die je verwijdert, verschijnen hier en je kunt ze terugzetten.",
   "trash.emptyTitle": "De prullenbak is leeg",
   "trash.errorTitle": "De prullenbak kon niet worden geladen",

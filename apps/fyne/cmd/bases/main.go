@@ -23,8 +23,10 @@ import (
 	"fyne.io/fyne/v2/app"
 
 	"git.sytue.eu/sytue/one/apps/fyne/apps/bases"
+	"git.sytue.eu/sytue/one/apps/fyne/editor"
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/sesion"
+	"git.sytue.eu/sytue/one/apps/fyne/soltar"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
@@ -38,6 +40,9 @@ func main() {
 	// La sesión, la apariencia y el idioma son TRANSVERSALES a las apps de la suite: esto
 	// lo lee de donde lo dejó la última que lo tocó. `Abrir` no habla con la red.
 	s := sesion.Abrir(a, "")
+	// El cromo «papel» de toda la suite (ADR 0080). Aquí y no en `sesion.Abrir`: las
+	// pruebas que abren sesión comprueban también el cromo de color.
+	tema.ElegirCromo(tema.CromoPapel)
 	t, err := bases.Traductor(s.Idioma())
 	if err != nil {
 		panic(err) // el catálogo va embebido: si falla, es un error de compilación
@@ -53,8 +58,10 @@ func main() {
 	w.SetPadded(false)
 	w.Resize(fyne.NewSize(1280, 800))
 
-	p := bases.NuevaPantalla(t, api.NewBases(s.URL("bases"), s.Sesion, nil), w)
-	p.Widget = s.CapturarWidget
+	p := bases.NuevaPantalla(t, api.NewBases(s.URL("bases"), s.Sesion, s.ClienteConAviso(nil)), w)
+	// El widget nativo lo lee su propia Fuente, sin depender de la pantalla, y se
+	// vuelve a publicar tras cada escritura del cliente de arriba (ClienteConAviso).
+	s.PublicadorWidget(s.FuenteWidget(t))
 	// «Toda la organización» al compartir es la de la sesión.
 	p.Org = s.Sesion.Organizacion
 	// El enlace de un formulario público es de la WEB (lo abre quien no tiene cuenta):
@@ -68,12 +75,22 @@ func main() {
 		}
 		return ficheros.Guardar(carpeta, nombre, r)
 	}
+	// Adjuntos e importar un CSV: el selector del sistema (en el móvil, el que pone la
+	// sesión) o soltar los ficheros sobre la ventana. El texto soltado (un bloque copiado
+	// de una hoja de cálculo) se pega en la celda sobre la que cae.
+	p.Elegir = editor.ElegirDelSistema
+	w.SetOnDropped(p.Soltado)
+	soltar.AlArrastrar(w, p.Arrastrando)
+	soltar.AlSoltar(w, func(x soltar.Soltado) { p.SoltarTexto(x.Texto, x.Posicion) })
 
 	// Sin nadie dentro, la barra enseña «Iniciar sesión»; al entrar —aquí o en otra app
 	// de la suite— se pide la lista.
-	dentro := s.Estado().Dentro()
+	// conEscena: hasta que corre lo de CuandoHayaEscena, el AlCambiar solo apunta quién
+	// está. El cambio retenido sin escena llega justo antes, y cargar en los dos sitios
+	// pedía la lista dos veces (sesion.CuandoHayaEscena).
+	dentro, conEscena := s.Estado().Dentro(), false
 	s.AlCambiar(func(e sesion.Estado) {
-		if e.Dentro() && !dentro {
+		if e.Dentro() && !dentro && conEscena {
 			p.Arrancar()
 		}
 		dentro = e.Dentro()
@@ -92,9 +109,13 @@ func main() {
 	})
 
 	w.SetContent(ui.NuevaBarraSuite(t, s, iconos.Bases).Montar(p.Objeto()))
-	if dentro {
-		p.Arrancar()
-	}
+	// Con interfaz: lanzada por iOS solo para el widget no se pide la lista.
+	s.CuandoHayaEscena(func() {
+		conEscena = true
+		if dentro {
+			p.Arrancar()
+		}
+	})
 	s.Arrancar(context.Background())
 	w.ShowAndRun()
 }

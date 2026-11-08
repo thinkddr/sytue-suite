@@ -13,7 +13,13 @@ import type { Locale } from '@sytue/i18n';
 import { createTranslate, formatDate, formatTime, formatTimeAgo } from '@sytue/i18n';
 import { useT } from '../i18n/index.js';
 import { r } from '../lib/rutas.js';
-import { haTerminado, limitesDelDia, ordenarEventos, type EventoDeHoy } from '../lib/hoy.js';
+import {
+  haTerminado,
+  limitesDelDia,
+  ordenarEventos,
+  rutaDelEvento,
+  type EventoDeHoy,
+} from '../lib/hoy.js';
 import { recientesVisibles } from '../lib/reciente.js';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import {
@@ -728,20 +734,28 @@ export function Launcher({
                     <ul class="divide-border divide-y">
                       {hoy.eventos.map((e) => {
                         const pasado = haTerminado(e, ahora);
+                        // Cada evento abre ESE evento en Calendar: la vista de día en su
+                        // fecha. Con Calendar sustituido por otra aplicación, esa
+                        // aplicación, como «Ver el calendario».
+                        const href =
+                          productMap['calendar']?.href ??
+                          appUrl('calendar', rutaDelEvento(e), orgTeselas ?? undefined);
                         return (
-                          <li
-                            key={e.id}
-                            class={`marco:py-1 flex items-baseline gap-3 px-4 py-2 ${pasado ? 'opacity-60' : ''}`}
-                          >
-                            <span class="text-text-muted w-12 shrink-0 text-xs tabular-nums">
-                              {e.allDay ? t('today.allDay') : formatTime(locale, e.start)}
-                            </span>
-                            <span
-                              class="text-text min-w-0 flex-1 truncate text-sm"
-                              title={e.summary}
+                          <li key={e.id} class={pasado ? 'opacity-60' : undefined}>
+                            <a
+                              href={href}
+                              class="hover:bg-bg-subtle focus-visible:bg-bg-subtle marco:py-1 flex items-baseline gap-3 px-4 py-2 transition-colors duration-150 focus-visible:outline-none"
                             >
-                              {e.summary || t('today.untitled')}
-                            </span>
+                              <span class="text-text-muted w-12 shrink-0 text-xs tabular-nums">
+                                {e.allDay ? t('today.allDay') : formatTime(locale, e.start)}
+                              </span>
+                              <span
+                                class="text-text min-w-0 flex-1 truncate text-sm"
+                                title={e.summary}
+                              >
+                                {e.summary || t('today.untitled')}
+                              </span>
+                            </a>
                           </li>
                         );
                       })}

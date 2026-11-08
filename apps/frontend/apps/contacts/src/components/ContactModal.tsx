@@ -36,6 +36,7 @@ import {
 import { parseVcardDetails } from '../lib/vcard.js';
 import { hasEmbeddedPhoto } from '../client/vcard.js';
 import { AsistenteFicha } from './AsistenteFicha.js';
+import { avisarPapelera } from './avisoPapelera.js';
 import type { FichaPropuesta } from '../lib/ai.js';
 import type { ContactsMessageKey, T } from '../i18n/index.js';
 
@@ -352,12 +353,24 @@ export function ContactModal({
     try {
       await deleteContact(editing.href);
       // El borrado del servicio es SUAVE: decir solo «eliminado» hacía que la
-      // gente diera por perdido lo que está a un clic en la papelera.
-      toast.notify({
-        tone: 'success',
-        title: t('form.deleted'),
-        description: t('form.deletedHint'),
-      });
+      // gente diera por perdido lo que está a un clic en la papelera. Y el aviso
+      // lleva «Deshacer», que lo devuelve sin ir a buscarlo allí.
+      const uid = editing.uid;
+      if (uid)
+        avisarPapelera(
+          toast,
+          t,
+          { title: t('form.deleted'), description: t('form.deletedHint') },
+          [uid],
+          1,
+          onSaved,
+        );
+      else
+        toast.notify({
+          tone: 'success',
+          title: t('form.deleted'),
+          description: t('form.deletedHint'),
+        });
       onSaved();
       onClose();
     } catch {

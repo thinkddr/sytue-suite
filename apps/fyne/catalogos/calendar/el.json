@@ -66,6 +66,7 @@
   "common.remove": "Αφαίρεση",
   "common.retry": "Δοκιμή ξανά",
   "common.save": "Αποθήκευση",
+  "day.noEvents": "Δεν υπάρχουν συμβάντα αυτή την ημέρα",
   "error.calendarsLoad": "Δεν ήταν δυνατή η φόρτωση των ημερολογίων.",
   "error.eventsLoad": "Δεν ήταν δυνατή η φόρτωση των συμβάντων.",
   "event.ai": "Περιγράψτε το συμβάν",
@@ -142,12 +143,19 @@
   "grid.blockAria": "{title}, {time}",
   "grid.continued": "{title} (συνέχεια)",
   "grid.createOn": "Δημιουργία συμβάντος στις {date}",
+  "grid.dayEvents": {
+    "one": "{date}, {count} συμβάν",
+    "other": "{date}, {count} συμβάντα"
+  },
+  "grid.daySelected": "{label}, επιλεγμένη",
   "grid.loadError": "Δεν ήταν δυνατή η φόρτωση του ημερολογίου",
   "grid.loading": "Φόρτωση του ημερολογίου",
   "grid.more": {
     "one": "+{count} ακόμη",
     "other": "+{count} ακόμη"
   },
+  "grid.showMonth": "Εμφάνιση ολόκληρου του μήνα",
+  "grid.showWeek": "Εμφάνιση μόνο αυτής της εβδομάδας",
   "grid.snapAria": {
     "one": "Προσκόλληση μεταφοράς ανά {count} λεπτό. Πατήστε για αλλαγή.",
     "other": "Προσκόλληση μεταφοράς ανά {count} λεπτά. Πατήστε για αλλαγή."
@@ -160,6 +168,13 @@
     "one": "{count} λ.",
     "other": "{count} λ."
   },
+  "grid.todayLabel": "Σήμερα, {date}",
+  "grid.weekNumber": "Εβδομάδα {week}",
+  "guests.organizer": "Διοργανωτής",
+  "guests.status.accepted": "Θα έρθει",
+  "guests.status.declined": "Δεν θα έρθει",
+  "guests.status.pending": "Αναμένεται απάντηση",
+  "guests.status.tentative": "Ίσως",
   "header.invitations": "Προσκλήσεις",
   "header.next": "Επόμενο",
   "header.pending": {
@@ -197,6 +212,10 @@
   "nav.createEventOn": "Δημιουργία συμβάντος στις {date}",
   "nav.deleteSubscription": "Κατάργηση συνδρομής",
   "nav.manageResources": "Διαχείριση αιθουσών και εξοπλισμού",
+  "nav.menuPending": {
+    "one": "Άνοιγμα μενού, {count} σε αναμονή",
+    "other": "Άνοιγμα μενού, {count} σε αναμονή"
+  },
   "nav.myCalendars": "Τα ημερολόγιά μου",
   "nav.next": "Επόμενο",
   "nav.nextMonth": "Επόμενος μήνας",
@@ -341,6 +360,7 @@
   "scope.following": "Σε αυτό και στα επόμενα",
   "scope.legend": "Αυτό το συμβάν επαναλαμβάνεται. Σε ποια συμβάντα ισχύει η αλλαγή;",
   "scope.this": "Μόνο σε αυτό το συμβάν",
+  "search.allCalendars": "Όλα τα ημερολόγια",
   "search.error": "Δεν ήταν δυνατή η ολοκλήρωση της αναζήτησης.",
   "search.events": "Αναζήτηση συμβάντων",
   "search.loadMore": "Φόρτωση περισσότερων",
@@ -349,6 +369,12 @@
     "other": "Πληκτρολογήστε τουλάχιστον {count} χαρακτήρες για αναζήτηση στα ημερολόγιά σας."
   },
   "search.noResults": "Κανένα αποτέλεσμα για «{term}».",
+  "search.period": "Περίοδος",
+  "search.period.any": "Οποτεδήποτε",
+  "search.period.month": "Αυτόν τον μήνα",
+  "search.period.past": "Παρελθόντα",
+  "search.period.upcoming": "Επερχόμενα",
+  "search.period.year": "Φέτος",
   "search.placeholder": "Τίτλος, περιγραφή, τοποθεσία ή προσκεκλημένο άτομο…",
   "search.searching": "Αναζήτηση…",
   "search.series": "Σειρά",
@@ -390,6 +416,14 @@
   "share.whoSeesNow": "Ποιος το βλέπει τώρα",
   "share.writerHint": "Εκτός από το να τα βλέπει, δημιουργεί, αλλάζει και διαγράφει συμβάντα σε αυτό το ημερολόγιο.",
   "share.writerLabel": "Να βλέπει και να επεξεργάζεται τα συμβάντα μου",
+  "shortcuts.group.actions": "Ενέργειες",
+  "shortcuts.group.navigate": "Πλοήγηση",
+  "shortcuts.group.views": "Προβολές",
+  "shortcuts.help": "Εμφάνιση αυτής της λίστας",
+  "shortcuts.next": "Επόμενη περίοδος",
+  "shortcuts.prev": "Προηγούμενη περίοδος",
+  "shortcuts.title": "Συντομεύσεις πληκτρολογίου",
+  "shortcuts.today": "Μετάβαση στο σήμερα",
   "subscribe.aria": "Εγγραφή σε ημερολόγιο μέσω URL",
   "subscribe.byUrl": "Εγγραφή μέσω URL (.ics)",
   "subscribe.defaultName": "Ημερολόγιο συνδρομής",

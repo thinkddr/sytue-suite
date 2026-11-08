@@ -50,6 +50,9 @@ func main() {
 	// La sesión, la apariencia y el idioma son TRANSVERSALES a las trece apps: esto lo
 	// lee de donde lo dejó la última que lo tocó. `Abrir` no habla con la red.
 	s := sesion.Abrir(a, "")
+	// El cromo «papel» de toda la suite (ADR 0080). Aquí y no en `sesion.Abrir`: las
+	// pruebas que abren sesión comprueban también el cromo de color.
+	tema.ElegirCromo(tema.CromoPapel)
 
 	// El catálogo es el MISMO que el de Docus y el de Diapos: en la web montan el mismo
 	// paquete de la ofimática (`@sytue/office`).
@@ -65,7 +68,7 @@ func main() {
 	w.SetPadded(false)
 	// La portada y el editor hablan con el servicio con la sesión TRANSVERSAL: sin
 	// sesión, la portada lo dice y ofrece entrar; no se abre el navegador por sorpresa.
-	c := calcus.NuevaApp(tr.T, tr.Locale(), api.NewDocs(s.URL("docs"), s.Sesion, nil))
+	c := calcus.NuevaApp(tr.T, tr.Locale(), api.NewDocs(s.URL("docs"), s.Sesion, s.ClienteConAviso(nil)))
 	// Lo que copia «Compartir»: la página del documento en la web y la de un enlace
 	// público, `/s/<token>` bajo el prefijo de Docs (la vista de solo lectura de la web).
 	// La organización activa encabeza el enlace al editor (ADR 0056); el del enlace
@@ -88,7 +91,9 @@ func main() {
 	}
 	// La galería de plantillas de «Crear nuevo» y su selector de tema (editor/plantillas.go).
 	c.Portada().ConPlantillas = true
-	c.Portada().Widget = s.CapturarWidget
+	// El widget nativo lo lee su propia Fuente, sin depender de la pantalla, y se
+	// vuelve a publicar tras cada escritura del cliente de arriba (ClienteConAviso).
+	s.PublicadorWidget(s.FuenteWidget(tr))
 	c.Portada().AlEntrar = func() {
 		go func() {
 			if err := s.Entrar(context.Background()); err == nil {
@@ -106,7 +111,8 @@ func main() {
 	})
 	w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.Sheets).ConSinSesionPropia().Montar(c.Objeto()))
 	w.Resize(fyne.NewSize(1280, 800))
-	c.Arrancar()
+	// Con interfaz: lanzada por iOS solo para el widget no se pide la portada.
+	s.CuandoHayaEscena(c.Arrancar)
 
 	// `sytue-sheets:/edit?id=…` es el documento del servicio, el mismo que abre la web en
 	// `/calcus/edit?id=…` (el Hub lo emite desde lo reciente y la búsqueda): se lee y se

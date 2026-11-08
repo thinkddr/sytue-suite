@@ -32,6 +32,7 @@
   },
   "devDependencies": {
     "@astrojs/check": "catalog:",
+    "@happy-dom/global-registrator": "21.0.4",
     "@tailwindcss/vite": "4.3.3",
     "@types/node": "catalog:",
     "tailwindcss": "4.3.3",

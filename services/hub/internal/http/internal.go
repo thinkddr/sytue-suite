@@ -147,8 +147,19 @@ type internalEventRequest struct {
 // eventosDeEstado son los nombres que acepta /internal/events. Lista cerrada: el
 // nombre sale tal cual como `event:` del flujo, y `notification` o `ready` en
 // manos de un emisor se harían pasar por lo que no son.
-// ponytail: uno solo; se añade aquí el siguiente cuando haya otro estado que mover.
-var eventosDeEstado = map[string]bool{hubnotify.EventoAvatar: true}
+var eventosDeEstado = map[string]bool{hubnotify.EventoAvatar: true, hubnotify.EventoDatos: true}
+
+// datosDeCambio deja la señal de cambios (hubnotify.EventoDatos) en {"producto"} con
+// un producto de la lista cerrada, y nada más: lo que un emisor añadiera —un título,
+// un id— saldría por el flujo a todas las pantallas de la persona.
+func datosDeCambio(crudo json.RawMessage) (json.RawMessage, bool) {
+	var d hubnotify.DatosCambio
+	if json.Unmarshal(crudo, &d) != nil || !hubnotify.ProductoDeDatos(d.Producto) {
+		return nil, false
+	}
+	b, err := json.Marshal(hubnotify.DatosCambio{Producto: d.Producto})
+	return b, err == nil
+}
 
 // CreateInternalEvent atiende POST /internal/events: un evento de ESTADO para las
 // pantallas abiertas de una persona (hubnotify.Evento). No se guarda ni sale en la
@@ -168,9 +179,26 @@ func (h *Handlers) CreateInternalEvent(w http.ResponseWriter, r *http.Request) {
 	if len(req.Data) == 0 {
 		req.Data = json.RawMessage("{}")
 	}
+	producto := ""
+	if req.Event == hubnotify.EventoDatos {
+		datos, ok := datosDeCambio(req.Data)
+		if !ok {
+			httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("datos needs a known producto"))
+			return
+		}
+		req.Data = datos
+		var d hubnotify.DatosCambio
+		_ = json.Unmarshal(datos, &d)
+		producto = d.Producto
+	}
 	if err := h.notify.PublishEvent(r.Context(), t.Slug, req.Subject, req.Event, req.Data); err != nil {
 		httpx.Fail(w, r, toAPIError(err))
 		return
+	}
+	// Y con la app cerrada, el despertar de iOS (internal/despertar): la recibe UNA
+	// réplica, la que atiende esta petición, y no el relay de todas. No espera a Apple.
+	if producto != "" && h.despertar != nil {
+		h.despertar.Cambio(r.Context(), t.Slug, req.Subject, producto)
 	}
 	w.WriteHeader(http.StatusAccepted)
 }

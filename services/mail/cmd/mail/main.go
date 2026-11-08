@@ -245,6 +245,7 @@ func run() error {
 		MaxAttempts:  cfg.QueueMaxAttempts,
 		BaseBackoff:  cfg.QueueBaseBackoff,
 		PollInterval: cfg.QueuePollInterval,
+		HubNotifier:  hubNotifier,
 	})
 
 	// --- TLS para SMTPS/IMAPS (implícito). Vacío en dev (Traefik termina TLS) ---
@@ -357,6 +358,7 @@ func run() error {
 		Logger:      logger,
 
 		MaxAuthFailuresPerMinPerIP: cfg.MaxAuthFailuresPerMinPerIP,
+		Hub:                        hubNotifier,
 	})
 
 	// --- Arranque concurrente de todos los servidores + worker de cola ---

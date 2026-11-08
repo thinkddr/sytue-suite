@@ -66,6 +66,7 @@
   "common.remove": "Ta bort",
   "common.retry": "Försök igen",
   "common.save": "Spara",
+  "day.noEvents": "Inga händelser den här dagen",
   "error.calendarsLoad": "Kalendrarna kunde inte läsas in.",
   "error.eventsLoad": "Händelserna kunde inte läsas in.",
   "event.ai": "Beskriv händelsen",
@@ -142,12 +143,19 @@
   "grid.blockAria": "{title}, {time}",
   "grid.continued": "{title} (fortsättning)",
   "grid.createOn": "Skapa en händelse den {date}",
+  "grid.dayEvents": {
+    "one": "{date}, {count} händelse",
+    "other": "{date}, {count} händelser"
+  },
+  "grid.daySelected": "{label}, vald",
   "grid.loadError": "Kalendern kunde inte läsas in",
   "grid.loading": "Läser in kalendern",
   "grid.more": {
     "one": "+{count} till",
     "other": "+{count} till"
   },
+  "grid.showMonth": "Visa hela månaden",
+  "grid.showWeek": "Visa bara den här veckan",
   "grid.snapAria": {
     "one": "Fäst dragning vid {count} minut. Tryck för att ändra.",
     "other": "Fäst dragning vid {count} minuter. Tryck för att ändra."
@@ -160,6 +168,13 @@
     "one": "{count} min",
     "other": "{count} min"
   },
+  "grid.todayLabel": "Idag, {date}",
+  "grid.weekNumber": "Vecka {week}",
+  "guests.organizer": "Arrangör",
+  "guests.status.accepted": "Kommer",
+  "guests.status.declined": "Kommer inte",
+  "guests.status.pending": "Väntar på svar",
+  "guests.status.tentative": "Kanske",
   "header.invitations": "Inbjudningar",
   "header.next": "Nästa",
   "header.pending": {
@@ -197,6 +212,10 @@
   "nav.createEventOn": "Skapa händelse den {date}",
   "nav.deleteSubscription": "Ta bort prenumeration",
   "nav.manageResources": "Hantera rum och utrustning",
+  "nav.menuPending": {
+    "one": "Öppna menyn, {count} väntar",
+    "other": "Öppna menyn, {count} väntar"
+  },
   "nav.myCalendars": "Mina kalendrar",
   "nav.next": "Nästa",
   "nav.nextMonth": "Nästa månad",
@@ -341,6 +360,7 @@
   "scope.following": "Den här och kommande",
   "scope.legend": "Den här händelsen upprepas. Vilka händelser gäller ändringen?",
   "scope.this": "Bara den här händelsen",
+  "search.allCalendars": "Alla kalendrar",
   "search.error": "Sökningen kunde inte slutföras.",
   "search.events": "Sök händelser",
   "search.loadMore": "Läs in fler",
@@ -349,6 +369,12 @@
     "other": "Skriv minst {count} tecken för att söka i dina kalendrar."
   },
   "search.noResults": "Inga resultat för ”{term}”.",
+  "search.period": "Period",
+  "search.period.any": "När som helst",
+  "search.period.month": "Den här månaden",
+  "search.period.past": "Tidigare",
+  "search.period.upcoming": "Kommande",
+  "search.period.year": "I år",
   "search.placeholder": "Titel, beskrivning, plats eller gäst…",
   "search.searching": "Söker…",
   "search.series": "Serie",
@@ -390,6 +416,14 @@
   "share.whoSeesNow": "Vem som ser den nu",
   "share.writerHint": "Utöver att se dem skapar, ändrar och tar personen bort händelser i kalendern.",
   "share.writerLabel": "Se och redigera mina händelser",
+  "shortcuts.group.actions": "Åtgärder",
+  "shortcuts.group.navigate": "Navigera",
+  "shortcuts.group.views": "Vyer",
+  "shortcuts.help": "Visa den här listan",
+  "shortcuts.next": "Nästa period",
+  "shortcuts.prev": "Föregående period",
+  "shortcuts.title": "Kortkommandon",
+  "shortcuts.today": "Gå till i dag",
   "subscribe.aria": "Prenumerera på en kalender via URL",
   "subscribe.byUrl": "Prenumerera via URL (.ics)",
   "subscribe.defaultName": "Prenumererad kalender",

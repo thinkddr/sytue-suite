@@ -286,6 +286,18 @@ export const mt: AppCatalog<typeof en> = {
     many: '{count} element intbagħtu fil-barmil.',
     other: '{count} element intbagħtu fil-barmil.',
   },
+  'files.batch.restored': {
+    one: 'Element wieħed ġie rrestawrat.',
+    few: '{count} elementi ġew irrestawrati.',
+    many: '{count} element ġew irrestawrati.',
+    other: '{count} element ġew irrestawrati.',
+  },
+  'files.batch.restorePartial': {
+    one: 'Element wieħed ma setax jiġi rrestawrat; għadu fil-barmil.',
+    few: '{count} elementi ma setgħux jiġu rrestawrati; għadhom fil-barmil.',
+    many: '{count} element ma setgħux jiġu rrestawrati; għadhom fil-barmil.',
+    other: '{count} element ma setgħux jiġu rrestawrati; għadhom fil-barmil.',
+  },
   'files.batch.trashFailed': 'L-għażla ma setgħetx tintbagħat fil-barmil.',
   'files.batch.moveTitle': {
     one: 'Mexxi element wieħed',
@@ -310,6 +322,9 @@ export const mt: AppCatalog<typeof en> = {
   'action.rename': 'Semmi mill-ġdid',
   'action.move': 'Mexxi għal…',
   'action.copy': 'Agħmel kopja',
+  'action.copyLink': 'Ikkopja l-link',
+  'action.linkCopied': 'Il-link ġie kkupjat. Jinfetaħ biss għal min diġà għandu aċċess.',
+  'action.copyLinkFailed': 'Il-link ma setax jiġi kkupjat.',
   'action.shareLink': 'Aqsam link',
   'action.openInApp': 'Iftaħ fl-applikazzjoni',
   'action.openInEditor': 'Iftaħ fl-editur',
@@ -538,6 +553,22 @@ export const mt: AppCatalog<typeof en> = {
   'trash.purged': '“{name}” tħassar għal kollox.',
   'trash.purgeDenied': '“{name}” ma jistax jitħassar',
   'trash.purgeFailed': 'Ma setax jitħassar.',
+  'trash.emptyAll': 'Battal il-barmil',
+  'trash.emptyAllTitle': 'Tbattal il-barmil?',
+  'trash.emptyAllBody': {
+    one: "L-element fil-barmil jitħassar għal kollox, flimkien mal-istorja tal-verżjonijiet. Wara m'hemm l-ebda mod kif jinġieb lura.",
+    few: "Il-{count} elementi fil-barmil jitħassru għal kollox, flimkien mal-istorja tal-verżjonijiet. Wara m'hemm l-ebda mod kif jinġiebu lura.",
+    many: "Il-{count} element fil-barmil jitħassru għal kollox, flimkien mal-istorja tal-verżjonijiet. Wara m'hemm l-ebda mod kif jinġiebu lura.",
+    other:
+      "Il-{count} element fil-barmil jitħassru għal kollox, flimkien mal-istorja tal-verżjonijiet. Wara m'hemm l-ebda mod kif jinġiebu lura.",
+  },
+  'trash.emptiedAll': 'Il-barmil tbattal.',
+  'trash.emptyAllPartial': {
+    one: 'Element wieħed ma setax jitħassar; għadu fil-barmil.',
+    few: '{count} elementi ma setgħux jitħassru; għadhom fil-barmil.',
+    many: '{count} element ma setgħux jitħassru; għadhom fil-barmil.',
+    other: '{count} element ma setgħux jitħassru; għadhom fil-barmil.',
+  },
   'trash.purgeTitle': 'Tħassar għal kollox?',
   'trash.purgeBodyFolder':
     "Il-kontenut ta' “{name}” u ta' kull ma fih jitħassar mis-servers ta' Sytue, flimkien mal-istorja tal-verżjonijiet. Wara m'hemm l-ebda mod kif jinġieb lura, la minn hawn u lanqas permezz tal-appoġġ. Minflok, teħles l-ispazju li kien qed jieħu.",

@@ -226,7 +226,7 @@ func (r *botonTeselaRenderer) Refresh() {
 // ---- tesela de documento ----
 
 // TeselaDoc es la tarjeta de un documento de la portada: se pulsa para abrirlo, y
-// lleva la estrella arriba a la izquierda y renombrar/eliminar arriba a la derecha.
+// lleva la estrella arriba a la izquierda y renombrar/copiar/eliminar arriba a la derecha.
 //
 // Las acciones se esconden hasta que el puntero pasa por encima o el foco entra
 // (`opacity-0 group-hover:opacity-100 focus-within:opacity-100`); la estrella de un
@@ -251,7 +251,7 @@ type TeselaDoc struct {
 
 // Acciones de una tesela. Van juntas porque la portada las pasa todas a la vez.
 type AccionesTesela struct {
-	Abrir, Destacar, Renombrar, Eliminar func(api.Document)
+	Abrir, Destacar, Renombrar, Copiar, Eliminar func(api.Document)
 }
 
 // NuevaTeselaDoc monta la tesela. `t` traduce y `loc` es el idioma de la fecha.
@@ -278,12 +278,15 @@ func NuevaTeselaDoc(d api.Document, t func(string, i18n.Vars) string, loc i18n.L
 	s.estrella = NuevoBotonTesela(GlifoEstrella, t(clave+".label", i18n.Vars{"title": d.Title}), llamar(a.Destacar))
 	s.estrella.Pulsado = d.Starred
 	ren := NuevoBotonTesela(GlifoLapiz, t("tile.rename.label", i18n.Vars{"title": d.Title}), llamar(a.Renombrar))
+	// «Hacer una copia»: en la web va en el menú «Más acciones» con las descargas, porque
+	// allí son cinco botones; aquí, sin descargas aún en la tesela, cabe como botón.
+	cop := NuevoBotonTesela(GlifoCopia, t("tile.copy.label", i18n.Vars{"title": d.Title}), llamar(a.Copiar))
 	bor := NuevoBotonTesela(GlifoPapelera, t("tile.delete.label", i18n.Vars{"title": d.Title}), llamar(a.Eliminar))
 	bor.Peligro = true
 	// ponytail: faltan «Descargar» y «Compartir» entre los dos: el SDK no tiene aún las
 	// exportaciones ni los permisos del servicio (`/exports`, `/permissions`). Van en el
 	// mismo sitio, en el orden de la web: renombrar · descargar · compartir · eliminar.
-	s.acciones = []*BotonTesela{ren, bor}
+	s.acciones = []*BotonTesela{ren, cop, bor}
 	for _, b := range append([]*BotonTesela{s.estrella}, s.acciones...) {
 		b.AlEncima = func(si bool) { s.sobreHijo = si; s.Refresh() }
 	}

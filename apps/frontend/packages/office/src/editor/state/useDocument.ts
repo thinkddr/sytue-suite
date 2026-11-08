@@ -50,6 +50,7 @@ import { fijarPropietario, fijarYo, olvidarProteccion, sobreProteccion } from '.
 import { cabeEnUnLote, claveLww, CoEdicion } from './coedicion';
 import { CoedicionModelo, type Registro } from './fusion';
 import type { OpRGA } from './rga';
+import { hacerCopia } from '../../lib/copia';
 import {
   cacheLocalContent,
   cacheLocalTitle,
@@ -149,6 +150,8 @@ export interface UseDocumentResult {
   /** Diff de lo que cambiaría un tema, sin escribir; null si no se pudo calcular. */
   previewTheme: (themeId: string, brandVersion?: number) => Promise<TemaPrevia | null>;
   exportAs: (format: ExportFormat, plantilla?: boolean) => Promise<void>;
+  /** «Hacer una copia»: guarda lo que haya en cola y crea la copia; devuelve su id. */
+  makeCopy: (title: string) => Promise<string>;
 }
 
 export function useDocument(documentId: string, userId: string): UseDocumentResult {
@@ -622,8 +625,27 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
    */
   const saveNow = useCallback((): void => {
     clearTimeout(saveTimerRef.current);
+    // Tras un fallo, guardar ya ES el reintento: el programado sobraría.
+    clearTimeout(retryTimerRef.current);
     void doSave();
   }, [doSave]);
+
+  /**
+   * «Hacer una copia». La copia sale de lo que el SERVICIO tiene, así que primero se
+   * guarda lo que esté en cola —por el camino normal, para que el chip lo cuente— y si
+   * después sigue habiendo algo sin guardar se renuncia: una copia sin los últimos
+   * cambios parecería buena y no lo sería.
+   */
+  const makeCopy = useCallback(
+    async (copyTitle: string): Promise<string> => {
+      requireOnline();
+      clearTimeout(saveTimerRef.current);
+      await doSave();
+      if (pendingRef.current !== null) throw new Error('copia: cambios sin guardar');
+      return hacerCopia({ id: documentId, kind: kindRef.current, title }, copyTitle);
+    },
+    [doSave, documentId, title],
+  );
 
   const flush = useCallback((): void => {
     const value = pendingRef.current;
@@ -1193,6 +1215,7 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
     applyTheme,
     previewTheme,
     exportAs,
+    makeCopy,
     /** No vacío si el documento salió de un fichero de Sytue Drive. */
     sourceRef,
     cursorDots,

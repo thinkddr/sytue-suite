@@ -562,7 +562,7 @@ function AgendaRow({
   );
 }
 
-function EventChip({
+export function EventChip({
   locale,
   event,
   date,
@@ -609,11 +609,17 @@ function EventChip({
         style={{ backgroundColor: event.color ?? color }}
         aria-hidden="true"
       />
-      {expanded ? (
-        <span class="text-text-muted shrink-0 font-medium tabular-nums">
-          {timeLabel(locale, date)}
-        </span>
-      ) : null}
+      {/* La hora de inicio, delante del título: en el mes es lo que distingue la
+          reunión de las 9 de la de las 5 sin abrir ninguna. Solo desde `sm:`: en el
+          teléfono la celda mide ~50 px y la hora se comería el título entero. */}
+      <span
+        class={cx(
+          'text-text-muted shrink-0 font-medium tabular-nums',
+          expanded ? undefined : 'hidden sm:inline',
+        )}
+      >
+        {timeLabel(locale, date)}
+      </span>
       <span class="truncate">{event.summary}</span>
     </span>
   );

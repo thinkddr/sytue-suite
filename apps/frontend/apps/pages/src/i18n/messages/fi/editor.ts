@@ -17,10 +17,10 @@ export const editor = {
   'editor.bases.desc': 'Näkymän tietueet sellaisina kuin ne ovat nyt',
   'editor.bases.title': 'Taulukko Sytue Basesista',
   'editor.bases.prompt':
-    'Liitä Sytue Webille myönnetyn vain luku -yhteyden tunnus. Kyseisen näkymän tiedoista tulee sivuston sisältöä, ja ne ovat julkisia julkaisun jälkeen.',
+    'Liitä Sytue Websille myönnetyn vain luku -yhteyden tunnus. Kyseisen näkymän tiedoista tulee sivuston sisältöä, ja ne ovat julkisia julkaisun jälkeen.',
   'editor.bases.confirm': 'Tuo näkymä',
   'editor.bases.invalid':
-    'Yhteys ei kelpaa Sytue Webiin: se on ehkä peruttu, vanhentunut tai myönnetty toiselle tuotteelle tai organisaatiolle.',
+    'Yhteys ei kelpaa Sytue Websiin: se on ehkä peruttu, vanhentunut tai myönnetty toiselle tuotteelle tai organisaatiolle.',
   'editor.bases.large':
     'Näkymä ei mahdu sivuston taulukkoon (enintään 50 riviä ja 8 saraketta). Rajaa sitä Sytue Basesissa.',
   'editor.bases.forbidden': 'Vain ylläpito voi tuoda Sytue Basesin tietoja sivustolle.',

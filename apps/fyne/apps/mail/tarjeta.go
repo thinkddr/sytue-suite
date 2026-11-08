@@ -311,13 +311,14 @@ func (t *TarjetaMensaje) pie() *fyne.Container {
 			}
 		})
 	}
-	original := nuevoEnlaceOriginal(tr.T("reader.downloadOriginal", nil), tr.T("reader.downloadOriginalHint", nil), func() {
-		if t.L.AlOriginal != nil {
+	objs := []fyne.CanvasObject{accion("reader.reply", ResponderD, Responder), accion("reader.forward", ReenviarD, Reenviar)}
+	// El original es el .eml de Sytue: uno de una cuenta externa no lo tiene aquí.
+	if t.L.AlOriginal != nil {
+		objs = append(objs, nuevoEnlaceOriginal(tr.T("reader.downloadOriginal", nil), tr.T("reader.downloadOriginalHint", nil), func() {
 			t.L.AlOriginal(t.Mensaje)
-		}
-	})
-	return container.New(flujo{hueco: HuecoBarraLector},
-		accion("reader.reply", ResponderD, Responder), accion("reader.forward", ReenviarD, Reenviar), original)
+		}))
+	}
+	return container.New(flujo{hueco: HuecoBarraLector}, objs...)
 }
 
 type tarjetaRenderer struct {

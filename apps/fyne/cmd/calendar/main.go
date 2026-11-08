@@ -42,6 +42,9 @@ func main() {
 	// La sesión, la apariencia y el idioma son TRANSVERSALES a las trece apps: esto lo
 	// lee de donde lo dejó la última que lo tocó. `Abrir` no habla con la red.
 	s := sesion.Abrir(a, "")
+	// El cromo «papel» de toda la suite (ADR 0080). Aquí y no en `sesion.Abrir`: las
+	// pruebas que abren sesión comprueban también el cromo de color.
+	tema.ElegirCromo(tema.CromoPapel)
 
 	// El idioma sale del SISTEMA operativo, no de una cabecera HTTP: aquí no hay
 	// middleware que lo negocie. Lo que no esté traducido cae al inglés, que es lo
@@ -55,11 +58,18 @@ func main() {
 	}
 
 	p := &calendario.Pantalla{T: t, Cursor: time.Now(), Vista: calendario.VistaMes}
+	// El primer pintado de un teléfono ya es el mes compacto: la ventana aún no se ha
+	// medido y, sin esto, asomaba la rejilla de escritorio un fotograma.
+	dev := a.Driver().Device()
+	p.Ventana = calendario.VentanaInicial(dev.IsMobile(), fyne.IsVertical(dev.Orientation()))
 	// La App es quien habla con el servicio; la Pantalla solo pinta. El cliente va con
 	// la sesión compartida de las trece apps: sin sesión, las cargas fallan y la
 	// pantalla lo dice con su estado de error, y al entrar se vuelve a pedir todo.
-	c := calendario.NuevaApp(p, api.NewCalendars(s.URL("calendar"), s.Sesion, nil))
-	c.Widget = s.CapturarWidget
+	c := calendario.NuevaApp(p, api.NewCalendars(s.URL("calendar"), s.Sesion, s.ClienteConAviso(nil)))
+	// El widget nativo lo lee su propia Fuente: hoy y lo próximo de TODOS los
+	// calendarios, mire la pantalla el mes que mire, y se vuelve a publicar tras cada
+	// escritura del cliente de arriba (ClienteConAviso).
+	s.PublicadorWidget(s.FuenteWidget(t))
 	// La videollamada de un evento es una sala de Sytue Rooms ligada a su UID.
 	salas := api.NewRooms(s.URL("rooms"), s.Sesion, nil)
 	c.Salas = func(ctx context.Context, uid, titulo string) (string, error) {
@@ -149,14 +159,18 @@ func main() {
 		}
 	}
 	s.AlCambiar(cambiar)
-	cambiar(s.Estado())
 	w.SetOnClosed(func() {
 		if pararImportador != nil {
 			pararImportador()
 		}
 		c.PararImportador()
 	})
-	c.Reloj()
+	// Con interfaz: lanzada por iOS solo para el widget no se pide nada ni se sondean los
+	// recordatorios. El widget lo lee su Fuente.
+	s.CuandoHayaEscena(func() {
+		cambiar(s.Estado())
+		c.Reloj()
+	})
 	s.Arrancar(context.Background())
 	w.ShowAndRun()
 }

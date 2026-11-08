@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
@@ -200,7 +201,7 @@ func (a *App) pintarVisor() {
 		ConFicha: e.conFicha, AnchoFicha: a.medidaFicha(prefAnchoFicha, AnchoFicha, AnchoFichaMin, AnchoFichaMax),
 		AltoFicha: a.medidaFicha(prefAltoFicha, AltoFicha, AltoFichaMin, AltoFichaMax), Fondo: a.fondoLienzo(),
 		Pase: e.pase, TamanyoReal: e.tamanyoReal, Original: e.originalDe(f.ID, a.Huella(f.ID)), Aviso: e.aviso,
-		HayAnterior: e.i > 0, HaySiguiente: e.haySiguiente(),
+		HayAnterior: e.i > 0, HaySiguiente: e.haySiguiente(), Posicion: a.textoPosicion(e),
 		Borrando: e.borrando, Girando: e.girando, Describiendo: e.describiendo,
 		ConFavorita: e.origen == desdeGaleria, ConBorrar: e.origen == desdeGaleria,
 		ConDescribir: e.origen == desdeGaleria || e.origen == desdeAlbum,
@@ -246,7 +247,11 @@ func (a *App) pintarVisor() {
 		}
 	}
 	if e.origen == desdeAlbum {
-		d.Accion = botonQuitarDelAlbum(a.v, func() { a.quitarDelAlbum(f) })
+		// Los dos mandos del álbum, como el fragmento que AlbumView.tsx le pasa al visor:
+		// la portada y quitar.
+		d.Accion = container.New(ui.FilaAuto{Hueco: HuecoMandos},
+			botonPortada(a.v, esPortada(a.uno.album, f.ID), func() { a.ponerPortada(f) }),
+			botonQuitarDelAlbum(a.v, func() { a.quitarDelAlbum(f) }))
 	}
 	e.capa.poner(PantallaVisor(a.v, d))
 	if g := a.v.TecaGrande; g != nil {
@@ -287,6 +292,56 @@ func (a *App) siguiente() {
 	}
 }
 
+// posicionVisor es dónde va la foto abierta (`posicionVisor` en posicionVisor.ts): el
+// índice desde 1, el total y si quedan páginas por pedir. ok=false: una foto sola, y
+// nada más por cargar, no necesita «1 / 1».
+func posicionVisor(i, total int, hayMas bool) (indice int, ok bool) {
+	if i < 0 || i >= total || (total == 1 && !hayMas) {
+		return 0, false
+	}
+	return i + 1, true
+}
+
+// saltoVisor es a qué foto lleva Inicio o Fin (`saltoVisor` en posicionVisor.ts): la
+// primera, o la última CARGADA —pedir todas las páginas para llegar al final de miles
+// sería descargar la biblioteca entera—. ok=false: no salta, o ya está ahí.
+func saltoVisor(tecla fyne.KeyName, i, total int) (int, bool) {
+	switch {
+	case tecla == fyne.KeyHome && i > 0:
+		return 0, true
+	case tecla == fyne.KeyEnd && i < total-1:
+		return total - 1, true
+	}
+	return 0, false
+}
+
+// textoPosicion es el «12 / 240» del visor, o «12 / 100+» si quedan páginas.
+func (a *App) textoPosicion(e *estadoVisor) string {
+	total := len(e.lista())
+	hayMas := e.origen == desdeGaleria && !a.g.fin
+	indice, ok := posicionVisor(e.i, total, hayMas)
+	if !ok {
+		return ""
+	}
+	var cuantas any = total
+	if hayMas {
+		cuantas = a.v.T.T("viewer.counterMore", i18n.Vars{"count": total})
+	}
+	return a.v.T.T("viewer.counter", i18n.Vars{"index": indice, "total": cuantas})
+}
+
+// irAFoto es Inicio y Fin: la foto i de la lista, como si se hubiera llegado con las
+// flechas.
+func (a *App) irAFoto(i int) {
+	e := a.vis
+	if e == nil || i == e.i || i < 0 || i >= len(e.lista()) {
+		return
+	}
+	e.i = i
+	e.nuevaFoto()
+	a.pintarVisor()
+}
+
 // teclaVisor son los atajos del `onKeyDown` del `<dialog>`.
 func (a *App) teclaVisor(k *fyne.KeyEvent) {
 	e := a.vis
@@ -295,6 +350,10 @@ func (a *App) teclaVisor(k *fyne.KeyEvent) {
 		a.anterior()
 	case fyne.KeyRight:
 		a.siguiente()
+	case fyne.KeyHome, fyne.KeyEnd:
+		if i, ok := saltoVisor(k.Name, e.i, len(e.lista())); ok {
+			a.irAFoto(i)
+		}
 	case fyne.KeyEscape:
 		a.cerrarVisor()
 	case fyne.KeyDelete, fyne.KeyBackspace:
@@ -501,7 +560,7 @@ func (a *App) descargar(f api.Photo, formato string) {
 		return
 	}
 	gen := a.gen
-	a.avisarVisor(a.v.T.T("gallery.downloading", i18n.Vars{"count": 1}))
+	a.avisarVisor(a.v.T.T("gallery.downloadingNative", i18n.Vars{"count": 1}))
 	a.enSesion(func(vida context.Context) {
 		err := a.bajar(vida, f, formato)
 		if err != nil {

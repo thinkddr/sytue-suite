@@ -25,6 +25,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/platform/pkg/livekit"
 	"git.sytue.eu/sytue/one/platform/pkg/pgtest"
 	"git.sytue.eu/sytue/one/services/cast/db"
@@ -131,6 +132,44 @@ type banco struct {
 	st    *store.Store
 	falso *livekitFalso
 	firma *livekit.Signer
+	// senal recibe lo que llega a /internal/events del Hub: «sujeto producto».
+	senal chan string
+}
+
+// hubFalso es el /internal/events del Hub: apunta la señal de cambios que llega.
+func hubFalso(t *testing.T, senal chan<- string) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var e struct {
+			Subject string `json:"subject"`
+			Event   string `json:"event"`
+			Data    struct {
+				Producto string `json:"producto"`
+			} `json:"data"`
+		}
+		if r.URL.Path == "/internal/events" && json.NewDecoder(r.Body).Decode(&e) == nil && e.Event == "datos" {
+			select { // sin bloquear: los tests que no la miran no la leen
+			case senal <- e.Subject + " " + e.Data.Producto:
+			default:
+			}
+		}
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+// esperarSenal espera la señal de cambios `quiero` («sujeto producto»).
+func (b *banco) esperarSenal(t *testing.T, quiero string) {
+	t.Helper()
+	select {
+	case got := <-b.senal:
+		if got != quiero {
+			t.Fatalf("señal de cambios %q, quiero %q", got, quiero)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatalf("no llegó la señal de cambios %q", quiero)
+	}
 }
 
 func montar(t *testing.T) *banco {
@@ -143,15 +182,17 @@ func montar(t *testing.T) *banco {
 	falso := &livekitFalso{presentes: map[string][]livekit.ParticipantInfo{}}
 	srv := falso.servidor(t)
 	firma := livekit.NewSigner("api-key", "api-secret")
+	senal := make(chan string, 8)
 	s := New(Deps{
 		Pool: h.Pool, Store: st, Servicio: svc,
 		LiveKit: livekit.NewClient(srv.URL, firma), Firmante: firma,
+		Hub: hubnotify.New(hubFalso(t, senal).URL, "s"),
 		Cfg: Config{
 			LiveKitURL: "wss://sfu.sytue.test", IngestRTMPURL: "rtmp://cast-ingest.sytue.test/live", PublicURL: "https://cast.sytue.test",
 			Grabacion: livekit.DestinoS3{AccessKey: "ak", Secret: "sk", Bucket: "cast-medios", Endpoint: "https://s3.test"},
 		},
 	})
-	return &banco{ctx: ctx, s: s, st: st, falso: falso, firma: firma}
+	return &banco{ctx: ctx, s: s, st: st, falso: falso, firma: firma, senal: senal}
 }
 
 // aviso firma y entrega un webhook como haría LiveKit.
@@ -234,6 +275,9 @@ func TestCicloDelDirectoPorRTMP(t *testing.T) {
 	if v.LiveEgressID != "EG_y" {
 		t.Fatalf("la grabación no se anotó: %q", v.LiveEgressID)
 	}
+	// Empezar no lo pide nadie desde la app: el widget de Cast de Ana se entera por
+	// la señal de cambios. VISTO EN ROJO sin el AvisarCambio de arrancar.
+	b.esperarSenal(t, "ana cast")
 	eg := b.falso.ultima("StartParticipantEgress")
 	if eg["room_name"] != v.LiveRoom || eg["identity"] != "emisor-ana" {
 		t.Errorf("egress: %v", eg)

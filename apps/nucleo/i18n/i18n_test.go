@@ -40,6 +40,7 @@ type vectores struct {
 		FechaLargaHora []string `json:"fecha_larga_hora"`
 		FechaCompleta  []string `json:"fecha_completa"`
 		MesCorto       []string `json:"mes_corto"`
+		MesSuelto      []string `json:"mes_suelto"`
 		DiaCorto       []string `json:"dia_corto"`
 		RangoSemana    []string `json:"rango_semana"`
 		RangoLargo     []string `json:"rango_largo"`
@@ -221,6 +222,31 @@ func TestFormatMonthShortYearEsElDeIntl(t *testing.T) {
 		for i, inst := range v.Instantes {
 			if got, quiero := FormatMonthShortYear(l, inst.UTC()), v.IntlFechas[l].MesCortoAno[i]; got != quiero {
 				t.Errorf("FormatMonthShortYear(%s, %s) = %q, Intl dice %q", l, inst, got, quiero)
+			}
+		}
+	}
+}
+
+// TestFormatMonthEsElDeIntl: el mes suelto y entero, el título del mes del teléfono en
+// Calendar, contra la parte `month` de Intl con año (lo que hace `monthLabel`). VISTO EN
+// ROJO sirviendo el `{ month: 'long' }` sin año (la tabla `meses_sueltos` que había): en
+// griego sale el genitivo, «Νοεμβρίου» por «Νοέμβριος». Y el griego va escrito aquí
+// además, para que el vector no pueda cambiar de caso sin que nadie lo vea.
+func TestFormatMonthEsElDeIntl(t *testing.T) {
+	nov := time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC)
+	for l, quiero := range map[Locale]string{"el": "Νοέμβριος", "es": "noviembre", "cs": "listopad"} {
+		if got := FormatMonth(l, nov); got != quiero {
+			t.Errorf("FormatMonth(%s, nov) = %q y es %q", l, got, quiero)
+		}
+	}
+	v := leerVectores(t)
+	for _, l := range Locales {
+		if len(v.IntlFechas[l].MesSuelto) == 0 {
+			t.Fatalf("%s: sin vectores de mes suelto: regenerar testdata/intl.json EN LINUX", l)
+		}
+		for i, inst := range v.Instantes {
+			if got, quiero := FormatMonth(l, inst.UTC()), v.IntlFechas[l].MesSuelto[i]; got != quiero {
+				t.Errorf("FormatMonth(%s, %s) = %q, Intl dice %q", l, inst, got, quiero)
 			}
 		}
 	}

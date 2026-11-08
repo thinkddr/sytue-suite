@@ -259,6 +259,14 @@ export const pt: AppCatalog<typeof en> = {
     one: '{count} elemento enviado para o lixo.',
     other: '{count} elementos enviados para o lixo.',
   },
+  'files.batch.restored': {
+    one: '{count} elemento restaurado.',
+    other: '{count} elementos restaurados.',
+  },
+  'files.batch.restorePartial': {
+    one: 'Não foi possível restaurar {count} elemento; continua no lixo.',
+    other: 'Não foi possível restaurar {count} elementos; continuam no lixo.',
+  },
   'files.batch.trashFailed': 'Não foi possível enviar a seleção para o lixo.',
   'files.batch.moveTitle': { one: 'Mover {count} elemento', other: 'Mover {count} elementos' },
   'files.batch.moveDone': { one: '{count} elemento movido.', other: '{count} elementos movidos.' },
@@ -273,6 +281,9 @@ export const pt: AppCatalog<typeof en> = {
   'action.rename': 'Mudar o nome',
   'action.move': 'Mover para…',
   'action.copy': 'Fazer uma cópia',
+  'action.copyLink': 'Copiar ligação',
+  'action.linkCopied': 'Ligação copiada. Só abre para quem já tem acesso.',
+  'action.copyLinkFailed': 'Não foi possível copiar a ligação.',
   'action.shareLink': 'Partilhar ligação',
   'action.openInApp': 'Abrir na aplicação',
   'action.openInEditor': 'Abrir no editor',
@@ -486,6 +497,18 @@ export const pt: AppCatalog<typeof en> = {
   'trash.purged': '«{name}» foi eliminado definitivamente.',
   'trash.purgeDenied': '«{name}» não pode ser eliminado',
   'trash.purgeFailed': 'Não foi possível eliminar.',
+  'trash.emptyAll': 'Esvaziar lixo',
+  'trash.emptyAllTitle': 'Esvaziar o lixo?',
+  'trash.emptyAllBody': {
+    one: 'O {count} elemento do lixo será apagado para sempre, juntamente com o histórico de versões. Depois não há forma de o recuperar.',
+    other:
+      'Os {count} elementos do lixo serão apagados para sempre, juntamente com o histórico de versões. Depois não há forma de os recuperar.',
+  },
+  'trash.emptiedAll': 'O lixo foi esvaziado.',
+  'trash.emptyAllPartial': {
+    one: 'Não foi possível eliminar {count} elemento; continua no lixo.',
+    other: 'Não foi possível eliminar {count} elementos; continuam no lixo.',
+  },
   'trash.purgeTitle': 'Eliminar definitivamente?',
   'trash.purgeBodyFolder':
     'O conteúdo de «{name}» e de tudo o que está lá dentro será apagado dos servidores do Sytue, juntamente com o histórico de versões. Depois não há forma de o recuperar, nem daqui nem através do suporte. Em troca, liberta o espaço que ocupava.',

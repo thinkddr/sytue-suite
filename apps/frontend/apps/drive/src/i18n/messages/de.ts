@@ -307,6 +307,14 @@ export const de: AppCatalog<typeof en> = {
     one: '1 Element in den Papierkorb gelegt.',
     other: '{count} Elemente in den Papierkorb gelegt.',
   },
+  'files.batch.restored': {
+    one: '1 Element wiederhergestellt.',
+    other: '{count} Elemente wiederhergestellt.',
+  },
+  'files.batch.restorePartial': {
+    one: '1 Element konnte nicht wiederhergestellt werden und bleibt im Papierkorb.',
+    other: '{count} Elemente konnten nicht wiederhergestellt werden und bleiben im Papierkorb.',
+  },
   'files.batch.trashFailed': 'Die Auswahl konnte nicht in den Papierkorb gelegt werden.',
   'files.batch.moveTitle': {
     one: '1 Element verschieben',
@@ -328,6 +336,9 @@ export const de: AppCatalog<typeof en> = {
   'action.rename': 'Umbenennen',
   'action.move': 'Verschieben nach…',
   'action.copy': 'Kopie anlegen',
+  'action.copyLink': 'Link kopieren',
+  'action.linkCopied': 'Link kopiert. Er öffnet sich nur für Personen, die bereits Zugriff haben.',
+  'action.copyLinkFailed': 'Der Link konnte nicht kopiert werden.',
   'action.shareLink': 'Link freigeben',
   'action.openInApp': 'In der Anwendung öffnen',
   'action.openInEditor': 'Im Editor öffnen',
@@ -553,6 +564,18 @@ export const de: AppCatalog<typeof en> = {
   'trash.purged': '„{name}“ wurde endgültig gelöscht.',
   'trash.purgeDenied': '„{name}“ kann nicht gelöscht werden',
   'trash.purgeFailed': 'Löschen nicht möglich.',
+  'trash.emptyAll': 'Papierkorb leeren',
+  'trash.emptyAllTitle': 'Papierkorb leeren?',
+  'trash.emptyAllBody': {
+    one: 'Das Element im Papierkorb wird samt Versionsverlauf endgültig gelöscht. Danach gibt es keine Möglichkeit mehr, es zurückzuholen.',
+    other:
+      'Die {count} Elemente im Papierkorb werden samt Versionsverlauf endgültig gelöscht. Danach gibt es keine Möglichkeit mehr, sie zurückzuholen.',
+  },
+  'trash.emptiedAll': 'Der Papierkorb wurde geleert.',
+  'trash.emptyAllPartial': {
+    one: '1 Element konnte nicht gelöscht werden und bleibt im Papierkorb.',
+    other: '{count} Elemente konnten nicht gelöscht werden und bleiben im Papierkorb.',
+  },
   'trash.purgeTitle': 'Endgültig löschen?',
   'trash.purgeBodyFolder':
     'Der Inhalt von „{name}“ und von allem darin wird zusammen mit dem Versionsverlauf von den Servern von Sytue gelöscht. Danach gibt es keine Möglichkeit mehr, ihn zurückzuholen — weder hier noch über den Support. Dafür wird der belegte Speicherplatz frei.',

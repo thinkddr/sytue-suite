@@ -31,7 +31,7 @@ type RoomsFreeGifPage struct {
 
 // FreeGifs busca en el catálogo libre, sin enviar datos de la conversación.
 func (r *Rooms) FreeGifs(ctx context.Context, query, cursor string) (RoomsFreeGifPage, error) {
-	return PostJSON[RoomsFreeGifPage](ctx, r.c, "/gifs/search", map[string]string{"query": query, "cursor": cursor})
+	return PostJSONLectura[RoomsFreeGifPage](ctx, r.c, "/gifs/search", map[string]string{"query": query, "cursor": cursor})
 }
 
 // FreeGifContent abre solo el original elegido o una miniatura estática.

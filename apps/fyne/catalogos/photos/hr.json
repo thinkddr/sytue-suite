@@ -1,9 +1,14 @@
 {
   "aiBatch.excludeOrg": "Isključi organizaciju iz automatske obrade Sytue AI",
   "aiBatch.excludedHint": "Organizacija je isključena iz automatske obrade Sytue AI. Nove se fotografije ne obrađuju u pozadini za prijedloge ili sličnosti.",
+  "album.coverSet": "Naslovnica albuma je ažurirana",
+  "album.isCover": "Ovo je naslovnica albuma",
   "album.linkCopied": "Poveznica kopirana",
   "album.newLink": "Nova poveznica",
   "album.newLinkConfirm": "Stvoriti novu poveznicu? Trenutačna poveznica prestat će raditi svima koji je već imaju.",
+  "album.rename": "Preimenuj",
+  "album.renamePrompt": "Naziv albuma",
+  "album.setCover": "Postavi kao naslovnicu albuma",
   "album.share": "Podijeli",
   "album.shared": "Podijeljeno",
   "album.unshare": "Prestani dijeliti",
@@ -100,6 +105,7 @@
     "other": "{count} prema datumu prijenosa"
   },
   "gallery.cancelSelection": "Izađi iz odabira",
+  "gallery.clearSearch": "Očisti pretraživanje",
   "gallery.describeCapped": "Odjednom se opisuje samo prvih {count}; pokrenite ponovno za ostale.",
   "gallery.describeNothing": "Odabrane fotografije već imaju opis",
   "gallery.describeSelected": "Opiši sa Sytue AI",
@@ -108,7 +114,8 @@
   "gallery.describing": "Opisivanje {done} od {total}…",
   "gallery.downloadCapped": "Fotografije izvan ove serije: {count}.",
   "gallery.downloadSelected": "Preuzmi",
-  "gallery.downloading": {
+  "gallery.downloading": "Pokrenuti zahtjevi za preuzimanje: {count}. Provjerite preuzimanja u pregledniku.",
+  "gallery.downloadingNative": {
     "one": "Preuzimanje {count} fotografije…",
     "few": "Preuzimanje {count} fotografije…",
     "other": "Preuzimanje {count} fotografija…"
@@ -117,6 +124,8 @@
   "gallery.empty.description": "Fotografije iz vašeg Sytue Drivea pojavit će se ovdje, poredane prema datumu snimanja.",
   "gallery.empty.title": "Još nema fotografija",
   "gallery.favorite": "Dodaj u favorite",
+  "gallery.favoriteFailed": "Fotografije koje nije bilo moguće promijeniti: {count}",
+  "gallery.favorited": "Dodano u favorite: {count}",
   "gallery.likeTheseResults": "I one koje nalikuju",
   "gallery.moreLikeThese": "Više sličnih",
   "gallery.newAlbum": "Novi album",
@@ -128,6 +137,8 @@
   },
   "gallery.newAlbumTitle": "Novi album",
   "gallery.noExifDate": "Bez datuma snimanja: poredane prema datumu prijenosa",
+  "gallery.noResults.description": "Pokušajte s drugim riječima ili očistite pretraživanje da biste vidjeli sve svoje fotografije.",
+  "gallery.noResults.title": "Nijedna fotografija ne odgovara „{query}”",
   "gallery.onlyImages": "Mogu se dodati samo slike.",
   "gallery.open": "Otvori {name}",
   "gallery.openInEditor": "Uredi {name}",
@@ -160,6 +171,7 @@
     "other": "{count} fotografija premješteno u smeće"
   },
   "gallery.unfavorite": "Ukloni iz favorita",
+  "gallery.unfavorited": "Uklonjeno iz favorita: {count}",
   "gallery.unselectMonth": "Poništi odabir mjeseca",
   "gallery.uploadFailed": "Prijenos nije uspio: {name}",
   "gallery.uploaded": {
@@ -207,6 +219,9 @@
   "viewer.askSend": "Pitaj",
   "viewer.canvasBackground": "Pozadina fotografije",
   "viewer.close": "Zatvori",
+  "viewer.counter": "{index} / {total}",
+  "viewer.counterLabel": "Fotografija {index} od {total}",
+  "viewer.counterMore": "{count}+",
   "viewer.delete": "Premjesti u smeće",
   "viewer.deleteConfirm": "Premjestiti ovu fotografiju u smeće? Datoteka ostaje u Sytue Driveu.",
   "viewer.describe": "Opiši sa Sytue AI",
@@ -246,6 +261,7 @@
   "viewer.saveDescription": "Spremi",
   "viewer.savingDescription": "Spremanje…",
   "viewer.shortcuts": "Prečaci: strelice mijenjaju fotografiju, razmaknica pokreće prezentaciju, I za informacije, Z za punu veličinu, Delete za smeće.",
+  "viewer.shortcutsJump": "Home i End vode na prvu i posljednju fotografiju.",
   "viewer.similar": "Slične fotografije",
   "viewer.slideshow": "Prezentacija",
   "viewer.slideshowStop": "Zaustavi prezentaciju",

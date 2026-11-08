@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { haTerminado, limitesDelDia, ordenarEventos } from './hoy.js';
+import { haTerminado, limitesDelDia, ordenarEventos, rutaDelEvento } from './hoy.js';
 
 test('los límites del día van de medianoche local a la siguiente', () => {
   const { from, to } = limitesDelDia(new Date(2026, 8, 9, 15, 30));
@@ -39,4 +39,14 @@ test('un evento con fin pasado ha terminado; uno de todo el día, nunca', () => 
   expect(
     haTerminado({ id: 'z', summary: 'z', start: '2026-09-09T13:00:00Z', allDay: false }, ahora),
   ).toBe(false);
+});
+
+test('cada evento abre su día en Calendar, con la fecha de la instancia', () => {
+  expect(
+    rutaDelEvento({ id: 'x', summary: 'x', start: '2026-09-09T09:00:00Z', allDay: false }),
+  ).toBe('/?date=2026-09-09T09%3A00%3A00Z');
+  // Todo el día: `all_day=1`, y la fecha compacta de iCalendar, con guiones.
+  expect(rutaDelEvento({ id: 'y', summary: 'y', start: '20260909', allDay: true })).toBe(
+    '/?date=2026-09-09&all_day=1',
+  );
 });

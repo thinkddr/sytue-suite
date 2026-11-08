@@ -46,8 +46,9 @@ func (s *Store) DeletePushSubscription(ctx context.Context, subject, endpoint st
 // destinatariosCTE resuelve a quién hay que avisar de un mensaje nuevo: los @mencionados
 // y —si el canal es un DM— el otro miembro, excluyendo al autor, con el nivel de aviso del
 // canal (Ola 13) aplicado BARATO en SQL. Vive en una constante porque lo usan los DOS
-// caminos de aviso (Web Push y APNs) y deben decidir exactamente lo mismo: si uno se
-// quedara atrás, el mismo mensaje avisaría en el navegador y no en el móvil.
+// caminos de aviso (Web Push y la bandeja del Hub) y deben decidir exactamente lo
+// mismo. El despertar de iOS no lo usa: sigue al contador del widget
+// (DespertablesForMessage).
 // Parámetros: $1 tenant, $2 canal, $3 autor, $4 menciones.
 const destinatariosCTE = `WITH ch AS (
 			     SELECT kind FROM channels WHERE tenant = $1 AND id = $2
@@ -70,14 +71,26 @@ const destinatariosCTE = `WITH ch AS (
 
 // avisables filtra los destinatarios por su nivel de aviso: a un mencionado se le avisa
 // salvo que tenga el canal silenciado; a un miembro de DM solo con el nivel por defecto.
-const avisables = ` WHERE (r.mentioned AND r.notify_level <> 'none')
-			    OR (NOT r.mentioned AND r.notify_level = 'all')`
+// Va entre paréntesis para que lo que se le añada con AND valga para las dos ramas.
+const avisables = ` WHERE ((r.mentioned AND r.notify_level <> 'none')
+			    OR (NOT r.mentioned AND r.notify_level = 'all'))`
+
+// sinPausa deja fuera a quien tiene «Pausar avisos» en curso (mig. 0061). A diferencia
+// de la ventana «No molestar», `paused_until` es un instante absoluto y el servidor lo
+// compara sin conocer la zona horaria de nadie. Solo la llevan las alertas AL SISTEMA
+// (Web Push); el despertar de iOS no suena y no la mira. El del Hub no se filtra aquí:
+// es también la entrada de su bandeja, que no debe perderse por una pausa; callar su
+// notificación es cosa del Hub.
+const sinPausa = `
+			   AND NOT EXISTS (SELECT 1 FROM user_notify_prefs np
+			       WHERE np.tenant = $1 AND np.subject = r.subject AND np.paused_until > now())`
 
 // PushTargetsForMessage devuelve las suscripciones push a las que avisar de un mensaje
 // nuevo (Ola 18): los usuarios @mencionados y —si el canal es un DM— el otro miembro,
 // excluyendo al autor. Respeta el nivel de aviso del canal (Ola 13) BARATO en SQL: a un
 // mencionado se le avisa salvo notify_level='none' (silenciado); a un miembro de DM solo
-// con notify_level='all' (por defecto), igual que la política del cliente. Una sola
+// con notify_level='all' (por defecto), igual que la política del cliente; y a nadie
+// con «Pausar avisos» en curso (sinPausa). Una sola
 // consulta indexada (channel_members PK + push_subscriptions_subject_idx), sin N+1.
 func (s *Store) PushTargetsForMessage(ctx context.Context, channelID uuid.UUID, authorSub string, mentions []string) ([]domain.PushTarget, error) {
 	t := tenancy.MustFrom(ctx)
@@ -90,7 +103,7 @@ func (s *Store) PushTargetsForMessage(ctx context.Context, channelID uuid.UUID, 
 			destinatariosCTE+`
 			 SELECT r.subject, ps.endpoint, ps.p256dh, ps.auth_key
 			 FROM recipients r
-			 JOIN push_subscriptions ps ON ps.tenant = $1 AND ps.subject = r.subject`+avisables,
+			 JOIN push_subscriptions ps ON ps.tenant = $1 AND ps.subject = r.subject`+avisables+sinPausa,
 			t.Slug, channelID, authorSub, mentions)
 		if err != nil {
 			return err
@@ -111,67 +124,48 @@ func (s *Store) PushTargetsForMessage(ctx context.Context, channelID uuid.UUID, 
 	return sinQuienesBloquean(ctx, s, authorSub, out, func(x domain.PushTarget) string { return x.Subject })
 }
 
-// SaveAPNSDevice hace UPSERT del token de dispositivo de la app nativa de iOS. La clave es
-// (tenant, token): el mismo aparato puede cambiar de dueño al reinstalar, y entonces manda
-// el último que registró. Aislado por tenant vía RLS (mig. 0032).
-func (s *Store) SaveAPNSDevice(ctx context.Context, subject, token string) error {
-	t := tenancy.MustFrom(ctx)
-	return s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx,
-			`INSERT INTO push_apns (tenant, subject, token)
-			 VALUES ($1, $2, $3)
-			 ON CONFLICT (tenant, token) DO UPDATE SET subject = EXCLUDED.subject`,
-			t.Slug, subject, token)
-		return err
-	})
-}
+// maxDespertables acota lo que se lee por mensaje: es el pushMaxTargets del servicio,
+// que despierta como mucho a esos.
+const maxDespertables = 50
 
-// DeleteAPNSDevice borra un token por (subject, token). La usan el «olvidar este aparato»
-// del usuario y la limpieza del enviador cuando Apple reporta el token caduco (410).
-// Idempotente.
-func (s *Store) DeleteAPNSDevice(ctx context.Context, subject, token string) error {
-	t := tenancy.MustFrom(ctx)
-	return s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx,
-			`DELETE FROM push_apns WHERE tenant = $1 AND subject = $2 AND token = $3`,
-			t.Slug, subject, token)
-		return err
-	})
-}
-
-// APNSTargetsForMessage devuelve los dispositivos de iOS a los que despertar por un
-// mensaje nuevo. Usa EL MISMO CTE de destinatarios que el Web Push, así que los dos
-// caminos avisan a la misma gente.
-func (s *Store) APNSTargetsForMessage(ctx context.Context, channelID uuid.UUID, authorSub string, mentions []string) ([]domain.APNSTarget, error) {
+// DespertablesForMessage devuelve a quién despertar la app de iOS por un mensaje nuevo:
+// a quien le cambia el contador del widget de Rooms (api.PendientesRooms, la regla de
+// la lista): los miembros del canal salvo el autor con el nivel por defecto (`all`), y
+// con «menciones» solo los mencionados (todos con @channel, `mentionsAll`, que el
+// contador cuenta como mención de cada uno). Silenciado (`none`) no suma y no despierta.
+//
+// NO es el criterio del Web Push, y a propósito: aquél es una ALERTA y solo va a los
+// mencionados y al otro miembro de un DM; esto es un aviso VACÍO para que el contador
+// del widget no se quede atrás, y el contador cuenta todo lo no leído de un canal con
+// el nivel por defecto. Por lo mismo no mira «Pausar avisos» (sinPausa): la pausa calla
+// alertas, y aquí no suena nada; ni los bloqueos (sinQuienesBloquean), porque lo no
+// leído de un bloqueado también suma en el contador (Store.Unread no los mira) y el
+// despertar no enseña nada de él. Primero los mencionados, para que el tope del
+// servicio nunca deje fuera una mención; sin mirar si tienen aparato, que eso lo sabe
+// el Hub (ADR 0039).
+func (s *Store) DespertablesForMessage(ctx context.Context, channelID uuid.UUID, authorSub string, mentions []string, mentionsAll bool) ([]string, error) {
 	t := tenancy.MustFrom(ctx)
 	if mentions == nil {
 		mentions = []string{}
 	}
-	var out []domain.APNSTarget
+	var out []string
 	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx,
-			destinatariosCTE+`
-			 SELECT r.subject, pa.token
-			 FROM recipients r
-			 JOIN push_apns pa ON pa.tenant = $1 AND pa.subject = r.subject`+avisables,
-			t.Slug, channelID, authorSub, mentions)
+			`SELECT cm.subject
+			 FROM channel_members cm
+			 WHERE cm.tenant = $1 AND cm.channel_id = $2 AND cm.subject <> $3
+			   AND (cm.notify_level = 'all'
+			        OR (cm.notify_level = 'mentions' AND ($6 OR cm.subject = ANY($4))))
+			 ORDER BY (cm.subject = ANY($4)) DESC, cm.subject
+			 LIMIT $5`,
+			t.Slug, channelID, authorSub, mentions, maxDespertables, mentionsAll)
 		if err != nil {
 			return err
 		}
-		defer rows.Close()
-		for rows.Next() {
-			var at domain.APNSTarget
-			if err := rows.Scan(&at.Subject, &at.Token); err != nil {
-				return err
-			}
-			out = append(out, at)
-		}
-		return rows.Err()
+		out, err = pgx.CollectRows(rows, pgx.RowTo[string])
+		return err
 	})
-	if err != nil {
-		return nil, err
-	}
-	return sinQuienesBloquean(ctx, s, authorSub, out, func(x domain.APNSTarget) string { return x.Subject })
+	return out, err
 }
 
 // NotificationRecipientsForMessage devuelve los sujetos destinatarios a los que avisar de un mensaje

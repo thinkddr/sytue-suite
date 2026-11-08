@@ -56,6 +56,10 @@ interface Props {
   onSelectNota?: (id: string) => void;
   onMoveNoteToNotebook?: (noteId: string, targetNotebookId: string) => void;
   onReorderNotebook?: (draggedId: string, targetId: string, lado: ColocacionCuaderno) => void;
+  /** «Mover cuaderno a…»: lo mismo que arrastrar, sin arrastrar (teclado, lector, dedo). */
+  onMoveNotebook?: (nb: Notebook) => void;
+  /** Si a ESTE se le ofrece «Mover cuaderno a…»; sin él, a todo el que no sea de solo lectura. */
+  puedeMoverCuaderno?: (nb: Notebook) => boolean;
 }
 
 interface ArrastreArbol {
@@ -89,6 +93,8 @@ export function NotebookTree({
   onSelectNota,
   onMoveNoteToNotebook,
   onReorderNotebook,
+  onMoveNotebook,
+  puedeMoverCuaderno = (nb) => !nb.read_only,
 }: Props): JSX.Element {
   // Contraídos y no expandidos: un árbol recién abierto se ve entero, que es lo
   // que espera quien acaba de crear un cuaderno dentro de otro.
@@ -370,6 +376,9 @@ export function NotebookTree({
               )}
             >
               <MenuItem onClick={() => onNewChild(nb)}>{t('notebook.newChild')}</MenuItem>
+              {onMoveNotebook && puedeMoverCuaderno(nb) ? (
+                <MenuItem onClick={() => onMoveNotebook(nb)}>{t('notebook.moveTo')}</MenuItem>
+              ) : null}
               <MenuItem onClick={() => onSettings(nb)}>{t('notebook.settings')}</MenuItem>
             </Dropdown>
           </span>

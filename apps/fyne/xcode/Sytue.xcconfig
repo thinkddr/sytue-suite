@@ -45,6 +45,29 @@ STRIP_INSTALLED_PRODUCT = NO
 // Cambiarlo pide regenerar el proyecto (`python3 generar.py`) en el mismo commit.
 SYTUE_WIDGETS_APPLE = YES
 
+// EL REFRESCO DEL WIDGET CON LA APP CERRADA EN iOS (BGAppRefreshTask; enmienda del ADR
+// 0078): el modo de fondo `fetch` y `<App ID>.refresco` en el Info.plist de cada app
+// con widget. Exige SYTUE_WIDGETS_APPLE = YES. Va aparte porque quien registra la tarea es
+// el driver del fork (apps/fyne/upstream/0016-ios-background-refresh.patch), que trae
+// v2.8.2-sytue.4 y posteriores: encendido con un tag anterior, las quince apps pedirían un
+// modo de fondo que ningún código usa (App Review 2.5.4). Encendido el 2026-11-07, en el
+// commit que subió el `replace` de apps/fyne/go.mod a v2.8.2-sytue.5; lo lee empaquetar.sh
+// (`plist_refresco`) y empaquetar-test.sh falla si está encendido con un tag sin el parche.
+SYTUE_REFRESCO_APPLE = YES
+
+// EL DESPERTAR DEL WIDGET POR UN AVISO SILENCIOSO DEL HUB EN iOS (APNs; enmiendas del
+// 2026-11-06 de los ADR 0039 y 0078): el modo de fondo `remote-notification` y
+// `aps-environment` en los derechos de cada app con widget. Exige SYTUE_WIDGETS_APPLE = YES.
+// Va aparte porque el token y el aviso los entrega el driver del fork
+// (apps/fyne/upstream/0017-ios-remote-notifications.patch), que ya trae el tag
+// v2.8.2-sytue.5, y porque `aps-environment` pide la capacidad Push en los quince App ID y
+// perfiles regenerados: encendido antes de esos pasos del dueño, la firma fallaría. YES lo pone el dueño siguiendo
+// docs/operations.md#despertar-widgets-ios, en el mismo commit que sube el `replace` y
+// regenera el proyecto (`python3 generar.py`: escribe los ios.entitlements); lo leen
+// empaquetar.sh (`plist_refresco`, `derechos_sesion`) y empaquetar-test.sh falla si está
+// encendido con el tag de antes.
+SYTUE_DESPERTAR_APPLE = YES
+
 // La versión del tag y el número de build de Xcode Cloud los escribe
 // ci_scripts/ci_post_clone.sh en version.xcconfig (no versionado). Sin él, en un Mac de
 // desarrollo, queda esto.

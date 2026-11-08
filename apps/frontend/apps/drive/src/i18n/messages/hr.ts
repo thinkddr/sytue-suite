@@ -276,6 +276,16 @@ export const hr: AppCatalog<typeof en> = {
     few: '{count} stavke premještene su u otpad.',
     other: '{count} stavki premješteno je u otpad.',
   },
+  'files.batch.restored': {
+    one: '{count} stavka je vraćena.',
+    few: '{count} stavke su vraćene.',
+    other: '{count} stavki je vraćeno.',
+  },
+  'files.batch.restorePartial': {
+    one: '{count} stavku nije bilo moguće vratiti; i dalje je u otpadu.',
+    few: '{count} stavke nije bilo moguće vratiti; i dalje su u otpadu.',
+    other: '{count} stavki nije bilo moguće vratiti; i dalje su u otpadu.',
+  },
   'files.batch.trashFailed': 'Odabir nije moguće premjestiti u otpad.',
   'files.batch.moveTitle': {
     one: 'Premjesti {count} stavku',
@@ -298,6 +308,9 @@ export const hr: AppCatalog<typeof en> = {
   'action.rename': 'Preimenuj',
   'action.move': 'Premjesti u…',
   'action.copy': 'Izradi kopiju',
+  'action.copyLink': 'Kopiraj poveznicu',
+  'action.linkCopied': 'Poveznica je kopirana. Otvara se samo onima koji već imaju pristup.',
+  'action.copyLinkFailed': 'Poveznicu nije moguće kopirati.',
   'action.shareLink': 'Podijeli poveznicu',
   'action.openInApp': 'Otvori u aplikaciji',
   'action.openInEditor': 'Otvori u uređivaču',
@@ -521,6 +534,20 @@ export const hr: AppCatalog<typeof en> = {
   'trash.purged': '„{name}” je trajno izbrisano.',
   'trash.purgeDenied': '„{name}” nije moguće izbrisati',
   'trash.purgeFailed': 'Brisanje nije uspjelo.',
+  'trash.emptyAll': 'Isprazni otpad',
+  'trash.emptyAllTitle': 'Isprazniti otpad?',
+  'trash.emptyAllBody': {
+    one: '{count} stavka u otpadu bit će trajno obrisana zajedno s poviješću verzija. Poslije je više nije moguće vratiti.',
+    few: '{count} stavke u otpadu bit će trajno obrisane zajedno s poviješću verzija. Poslije ih više nije moguće vratiti.',
+    other:
+      '{count} stavki u otpadu bit će trajno obrisano zajedno s poviješću verzija. Poslije ih više nije moguće vratiti.',
+  },
+  'trash.emptiedAll': 'Otpad je ispražnjen.',
+  'trash.emptyAllPartial': {
+    one: '{count} stavku nije bilo moguće izbrisati; i dalje je u otpadu.',
+    few: '{count} stavke nije bilo moguće izbrisati; i dalje su u otpadu.',
+    other: '{count} stavki nije bilo moguće izbrisati; i dalje su u otpadu.',
+  },
   'trash.purgeTitle': 'Trajno izbrisati?',
   'trash.purgeBodyFolder':
     'Sadržaj „{name}” i svega što je u njoj bit će obrisan sa Sytueovih poslužitelja zajedno s poviješću verzija. Poslije ga više nije moguće vratiti, ni odavde ni putem podrške. Zauzvrat oslobađate prostor koji je zauzimao.',

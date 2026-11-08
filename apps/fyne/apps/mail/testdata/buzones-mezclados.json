@@ -1,0 +1,102 @@
+{
+  "_": "Los buzones unificados que se abren en el panel mezclados por fecha (fase B, punto 5) y qué abre una fila en ellos. Lo recorren vistaExterna.test.ts (esMezclado, fuentesDeUnificado, abreRedactor) y vista_externa_test.go (rolesMezclados, fuentesDeUnificado, abreRedactor). La Entrada, los Enviados y los Borradores se abren; Archivo, Spam y Papelera solo se despliegan: vaciar o borrar para siempre es de una carpeta, no de una mezcla. Un buzón unificado pide solo las carpetas de SU rol. Una fila reabre el redactor en Borradores de Sytue y, en «Todos los borradores», si el borrador es de Sytue; el de una cuenta se lee (vive en su proveedor, y el redactor guarda en Borradores de Sytue). Con una búsqueda, nunca: es de todo el buzón y un resultado puede ser un recibido, que guardado como borrador se borraría.",
+  "mezclados": ["inbox", "drafts", "sent"],
+  "noMezclados": ["archive", "junk", "trash"],
+  "unificados": [
+    {
+      "rol": "inbox",
+      "fuentes": [
+        { "cuenta": "", "carpeta": "sytue-inbox" },
+        { "cuenta": "gmail", "carpeta": "INBOX" }
+      ]
+    },
+    {
+      "rol": "drafts",
+      "fuentes": [
+        { "cuenta": "", "carpeta": "sytue-drafts" },
+        { "cuenta": "gmail", "carpeta": "DRAFT" }
+      ]
+    },
+    {
+      "rol": "sent",
+      "fuentes": [
+        { "cuenta": "gmail", "carpeta": "SENT" },
+        { "cuenta": "imap", "carpeta": "Sent" }
+      ]
+    }
+  ],
+  "fuentes": [
+    {
+      "rol": "sent",
+      "carpetas": ["gmail/SENT", "imap/Sent"]
+    },
+    {
+      "rol": "drafts",
+      "carpetas": ["/sytue-drafts", "gmail/DRAFT"]
+    },
+    {
+      "rol": "inbox",
+      "carpetas": ["/sytue-inbox", "gmail/INBOX"]
+    }
+  ],
+  "redactor": [
+    {
+      "nombre": "en Borradores de Sytue, un borrador",
+      "vista": null,
+      "rolSytue": "drafts",
+      "externo": false,
+      "abre": true
+    },
+    {
+      "nombre": "en Recibidos de Sytue, un mensaje",
+      "vista": null,
+      "rolSytue": "inbox",
+      "externo": false,
+      "abre": false
+    },
+    {
+      "nombre": "en «Todos los borradores», uno de Sytue",
+      "vista": { "tipo": "unificado", "rol": "drafts" },
+      "rolSytue": "",
+      "externo": false,
+      "abre": true
+    },
+    {
+      "nombre": "en «Todos los borradores», uno de una cuenta",
+      "vista": { "tipo": "unificado", "rol": "drafts" },
+      "rolSytue": "",
+      "externo": true,
+      "abre": false
+    },
+    {
+      "nombre": "en «Todos los enviados», uno de Sytue",
+      "vista": { "tipo": "unificado", "rol": "sent" },
+      "rolSytue": "",
+      "externo": false,
+      "abre": false
+    },
+    {
+      "nombre": "en los Borradores de una cuenta, uno suyo",
+      "vista": { "tipo": "carpeta", "cuenta": "gmail", "carpeta": "DRAFT" },
+      "rolSytue": "drafts",
+      "externo": true,
+      "abre": false
+    },
+    {
+      "nombre": "en «Todos los borradores», buscando, uno de Sytue",
+      "vista": { "tipo": "unificado", "rol": "drafts" },
+      "rolSytue": "",
+      "externo": false,
+      "enBusqueda": true,
+      "abre": false
+    },
+    {
+      "nombre": "en Borradores de Sytue, buscando, uno de Sytue",
+      "vista": null,
+      "rolSytue": "drafts",
+      "externo": false,
+      "enBusqueda": true,
+      "abre": false
+    }
+  ]
+}

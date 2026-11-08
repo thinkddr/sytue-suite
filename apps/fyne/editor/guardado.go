@@ -39,7 +39,7 @@ func (a *Autoguardado) Cambio() {
 	if a.reloj != nil {
 		a.reloj.Stop()
 	}
-	a.reloj = time.AfterFunc(a.Espera, a.disparar)
+	a.reloj = time.AfterFunc(a.Espera, func() { _ = a.disparar() })
 }
 
 // Parar desarma el reloj sin guardar: el documento se ha cerrado.
@@ -55,11 +55,18 @@ func (a *Autoguardado) Parar() {
 // por otro— antes de que venza no pierde el último cambio, y el reloj no repite luego
 // el mismo PUT. Guarda en la rutina de quien llama.
 func (a *Autoguardado) Ahora() {
-	a.Parar()
-	a.disparar()
+	_ = a.Volcar() // el error ya lo cuenta AlTerminar (el chip)
 }
 
-func (a *Autoguardado) disparar() {
+// Volcar es Ahora devolviendo el error del guardado, para quien no puede seguir sin
+// él: una copia o una descarga hechas tras un guardado fallido saldrían sin lo
+// último escrito y parecerían buenas.
+func (a *Autoguardado) Volcar() error {
+	a.Parar()
+	return a.disparar()
+}
+
+func (a *Autoguardado) disparar() error {
 	a.enVuelo.Lock()
 	defer a.enVuelo.Unlock()
 	if a.AlEmpezar != nil {
@@ -69,4 +76,5 @@ func (a *Autoguardado) disparar() {
 	if a.AlTerminar != nil {
 		a.AlTerminar(err)
 	}
+	return err
 }

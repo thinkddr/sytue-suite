@@ -4,6 +4,8 @@
   "action.classified": "Klassificering · {name}",
   "action.classify": "Klassificera",
   "action.copy": "Gör en kopia",
+  "action.copyLink": "Kopiera länk",
+  "action.copyLinkFailed": "Länken kunde inte kopieras.",
   "action.delete": "Flytta till papperskorgen",
   "action.desktopBody": "Om du inte har installerat det ännu kan du ladda ned det.",
   "action.desktopCta": "Se nedladdningar",
@@ -12,6 +14,7 @@
   "action.downloadName": "Ladda ned {name}",
   "action.downloadZip": "Ladda ned (ZIP)",
   "action.editorFailed": "Redigeraren kunde inte öppna den här filen.",
+  "action.linkCopied": "Länken har kopierats. Den öppnas bara för dem som redan har åtkomst.",
   "action.mailFailed": "Det gick inte att öppna e-postredigeraren",
   "action.menu": "Åtgärder för {name}",
   "action.more": "Fler åtgärder",
@@ -81,6 +84,14 @@
   "files.batch.moveTitle": {
     "one": "Flytta 1 objekt",
     "other": "Flytta {count} objekt"
+  },
+  "files.batch.restorePartial": {
+    "one": "1 objekt kunde inte återställas och ligger kvar i papperskorgen.",
+    "other": "{count} objekt kunde inte återställas och ligger kvar i papperskorgen."
+  },
+  "files.batch.restored": {
+    "one": "1 objekt har återställts.",
+    "other": "{count} objekt har återställts."
   },
   "files.batch.trashBody": {
     "one": "1 objekt skickas till papperskorgen. Du kan återställa det därifrån.",
@@ -555,6 +566,17 @@
     "other": "{count} filer har laddats upp."
   },
   "team.upload.partial": "{uploaded} av {count} har laddats upp.",
+  "trash.emptiedAll": "Papperskorgen har tömts.",
+  "trash.emptyAll": "Töm papperskorgen",
+  "trash.emptyAllBody": {
+    "one": "Objektet i papperskorgen raderas för gott, tillsammans med versionshistoriken. Det går inte att få tillbaka efteråt.",
+    "other": "De {count} objekten i papperskorgen raderas för gott, tillsammans med versionshistoriken. De går inte att få tillbaka efteråt."
+  },
+  "trash.emptyAllPartial": {
+    "one": "1 objekt kunde inte raderas och ligger kvar i papperskorgen.",
+    "other": "{count} objekt kunde inte raderas och ligger kvar i papperskorgen."
+  },
+  "trash.emptyAllTitle": "Tömma papperskorgen?",
   "trash.emptyBody": "Filer och mappar som du raderar visas här och du kan återställa dem.",
   "trash.emptyTitle": "Papperskorgen är tom",
   "trash.errorTitle": "Papperskorgen kunde inte läsas in",

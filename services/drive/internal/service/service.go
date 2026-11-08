@@ -187,6 +187,15 @@ func New(cfg config.Config, st *Store, blobs *objectstore.Client, pub EventPubli
 	return &Service{cfg: cfg, store: st, team: st, cipher: st, blobs: router, router: router, pub: pub, chat: chat, hubNotifier: notifier}
 }
 
+// Hub es el cliente del Hub del servicio (nil sin Hub): el de los avisos y el de la
+// señal de cambios del router.
+func (s *Service) Hub() *hubnotify.Client {
+	if s == nil {
+		return nil
+	}
+	return s.hubNotifier
+}
+
 // SetHubNotifier configura o reemplaza el cliente de notificaciones de Hub (útil en tests).
 func (s *Service) SetHubNotifier(notifier *hubnotify.Client) {
 	s.hubNotifier = notifier

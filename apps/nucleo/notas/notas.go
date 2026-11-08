@@ -22,6 +22,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"unicode"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
@@ -129,8 +130,10 @@ func Vaciar(ctx context.Context, st *offline.Store, dueño string, e Envio) map[
 }
 
 // Subir es lo que se hace al cerrar sesión con «Subir»: cada borrador pasa a la cola
-// como la captura que habría hecho pulsar Intro en su cuaderno, y la cola se envía.
-// Devuelve cuántas quedan sin subir de ese dueño (sin red, o rechazadas).
+// como las capturas que habría hecho pulsar Intro en su cuaderno —una por línea, como
+// mucho MaxLineasPegadas de una vez—, y la cola se envía. Lo que pasa de ese tope se
+// queda en el borrador, como en la captura. Devuelve cuántas quedan sin subir de ese
+// dueño (sin red, o rechazadas, y los borradores que aún tienen algo).
 func Subir(ctx context.Context, st *offline.Store, dueño string, e Envio, nuevoID func() string) int {
 	if bs, err := st.List(dueño, EspacioBorradores); err == nil {
 		for _, b := range bs {
@@ -138,21 +141,7 @@ func Subir(ctx context.Context, st *offline.Store, dueño string, e Envio, nuevo
 			if json.Unmarshal(b.Value, &texto) != nil {
 				continue
 			}
-			in, ok := CapturaRapida(texto, "")
-			if !ok {
-				_ = st.Delete(dueño, EspacioBorradores, b.ID)
-				continue
-			}
-			in = in.ConClientID(nuevoID())
-			c := Captura{ClientID: in.ClientID(), In: in, At: b.UpdatedAt.UnixMilli()}
-			if fecha, ok := strings.CutPrefix(b.ID, PrefijoDia); ok {
-				c.Fecha = fecha
-			} else {
-				c.Cuaderno = b.ID
-			}
-			if st.Write(dueño, EspacioCapturas, c.ClientID, c) == nil {
-				_ = st.Delete(dueño, EspacioBorradores, b.ID)
-			}
+			encolarBorrador(st, dueño, b.ID, texto, b.UpdatedAt.UnixMilli(), nuevoID)
 		}
 	}
 	Vaciar(ctx, st, dueño, e)
@@ -161,6 +150,57 @@ func Subir(ctx context.Context, st *offline.Store, dueño string, e Envio, nuevo
 		quedan += len(bs)
 	}
 	return quedan
+}
+
+// encolarBorrador pasa a la cola las líneas de un borrador, en su orden (cada una un
+// milisegundo después de la anterior: la cola se envía por `At`). Una línea que no es
+// una nota (`- ` sin nada detrás) no es nada, como en la captura. Lo que no ha llegado a
+// la cola —por el tope o porque no se ha podido escribir— se queda en el borrador.
+func encolarBorrador(st *offline.Store, dueño, id, texto string, at int64, nuevoID func() string) {
+	lineas := LineasDeCaptura(texto)
+	hechas := 0
+	for _, l := range lineas[:min(len(lineas), MaxLineasPegadas)] {
+		in, ok := CapturaRapida(l, "")
+		if ok {
+			in = in.ConClientID(nuevoID())
+			c := Captura{ClientID: in.ClientID(), In: in, At: at + int64(hechas)}
+			if fecha, esDia := strings.CutPrefix(id, PrefijoDia); esDia {
+				c.Fecha = fecha
+			} else {
+				c.Cuaderno = id
+			}
+			if st.Write(dueño, EspacioCapturas, c.ClientID, c) != nil {
+				break
+			}
+		}
+		hechas++
+	}
+	if resto := lineas[hechas:]; len(resto) > 0 {
+		_ = st.Write(dueño, EspacioBorradores, id, strings.Join(resto, "\n"))
+		return
+	}
+	_ = st.Delete(dueño, EspacioBorradores, id)
+}
+
+// MaxLineasPegadas es lo más que nace de UNA vez de varias líneas: lo que sobra se queda
+// en la captura (`MAX_LINEAS_PEGADAS` de client/diario.ts).
+const MaxLineasPegadas = 50
+
+var saltoDeLinea = regexp.MustCompile(`\r\n|\r|\n`)
+
+// LineasDeCaptura son las líneas con algo de lo que hay en una captura, en orden: cada una
+// es una nota, con la misma sintaxis que al teclearla (CapturaRapida). Las líneas en
+// blanco no son nada, y el `\r` de un portapapeles de Windows tampoco
+// (`lineasDeCaptura` de client/diario.ts).
+func LineasDeCaptura(texto string) []string {
+	var out []string
+	for _, l := range saltoDeLinea.Split(texto, -1) {
+		// El `trim` de JavaScript, que también se lleva la marca de orden de bytes.
+		if l = strings.TrimFunc(l, func(r rune) bool { return unicode.IsSpace(r) || r == '\ufeff' }); l != "" {
+			out = append(out, l)
+		}
+	}
+	return out
 }
 
 var (

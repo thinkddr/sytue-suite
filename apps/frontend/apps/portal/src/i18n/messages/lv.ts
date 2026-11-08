@@ -58,6 +58,7 @@ export const lv: AppCatalog<typeof en> = {
   'inbox.markAll': 'Atzīmēt visus kā lasītus',
   'inbox.loading': 'Ielādē paziņojumus…',
   'inbox.unreadDot': 'Nelasīts',
+  'inbox.markRead': 'Atzīmēt kā izlasītu',
   'inbox.errorTitle': 'Neizdevās ielādēt paziņojumus',
   'inbox.errorBody': 'Hub pašlaik neatbild. Mēģiniet vēlreiz pēc dažām sekundēm.',
   'inbox.retry': 'Mēģināt vēlreiz',
@@ -688,6 +689,8 @@ export const lv: AppCatalog<typeof en> = {
     'Nav atbildes: {sources}. Tāpēc daži rezultāti var trūkt. Mēģiniet vēlreiz pēc brīža.',
   'search.partialJoin': ' un ',
   'search.showing': 'Rāda {count} no {total} rezultātiem.',
+  'search.loadMore': 'Ielādēt vairāk rezultātu',
+  'search.loadMoreFailed': 'Neizdevās ielādēt vairāk rezultātu. Mēģiniet vēlreiz.',
   'privacy.notice':
     'Mēs nepārdodam jūsu datus un nenododam tos trešajām personām. Mēs tos neizmantojam profilēšanai, reklāmai vai savu vai citu pakalpojumu apmācībai vai uzlabošanai. Tie ir šifrēti pārsūtīšanas un glabāšanas laikā un atstāj mūsu Eiropas infrastruktūru tikai tad, ja tas ir noteikti nepieciešams rēķina izrakstīšanai, un jūsu ieslēgtajās integrācijās, kurās trešā persona lūgs jūsu piekrišanu datiem, ko tā izmantos.',
 };

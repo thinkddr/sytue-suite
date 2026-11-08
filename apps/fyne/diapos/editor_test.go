@@ -12,6 +12,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/test"
 
 	"git.sytue.eu/sytue/one/apps/fyne/editor"
@@ -55,6 +56,29 @@ func TestElEditorEnseñaLaPresentacionEntera(t *testing.T) {
 		t.Error("lo que se guardaría no reproduce lo que se enseña")
 	}
 	guarda(t, "editor.png", w.Canvas().Capture())
+}
+
+// TestLaMiniaturaDejaPasarLosAtajosDelEditor: con el foco en el carril, Ctrl/Cmd +, − y
+// 0 siguen moviendo el zoom (y Ctrl/Cmd+P imprimiendo): la miniatura los atiende con
+// `AlAtajo` antes que el reordenado, o se los quedaría sin hacer nada. VISTO EN ROJO sin
+// `t.AlAtajo` en `carrilDiapos.rehacer`.
+func TestLaMiniaturaDejaPasarLosAtajosDelEditor(t *testing.T) {
+	_, ctx, w := montar(t, `{"slides":[{"id":"a","boxes":[]}]}`)
+	ctx.Zoom = 100
+	var mini *Miniatura
+	for _, o := range test.LaidOutObjects(w.Content()) {
+		if m, ok := o.(*Miniatura); ok {
+			mini = m
+			break
+		}
+	}
+	if mini == nil {
+		t.Fatal("el carril no tiene miniaturas")
+	}
+	mini.TypedShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyMinus, Modifier: fyne.KeyModifierShortcutDefault})
+	if ctx.Zoom != 90 {
+		t.Errorf("Ctrl+− con el foco en una miniatura deja el zoom en %d", ctx.Zoom)
+	}
 }
 
 // TestElCarrilAñadeDuplicaYBorra: los tres botones del pie del carril, con el diálogo

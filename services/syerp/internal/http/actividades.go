@@ -21,6 +21,7 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
+	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
 	"git.sytue.eu/sytue/one/platform/pkg/peticiones"
 	"git.sytue.eu/sytue/one/platform/pkg/validation"
@@ -145,6 +146,9 @@ func (h *Handlers) CrearActividad(w http.ResponseWriter, r *http.Request) {
 	}
 	if creada.ResponsableSub != sub(r) {
 		h.avisarTarea(ctx, creada) // una tarea que te pone otro
+		// Y su widget («mis actividades pendientes»), aunque tenga el ERP silenciado:
+		// la señal de cambios no pasa por las preferencias de la campana.
+		hubnotify.AvisarTambien(ctx, creada.ResponsableSub)
 	}
 	httpx.JSON(w, r, http.StatusCreated, creada)
 }
@@ -167,6 +171,8 @@ func (h *Handlers) CerrarActividad(estado string) http.HandlerFunc {
 			httpx.Fail(w, r, errorDeEscritura(err))
 			return
 		}
+		// Sale de los pendientes de su responsable, que puede no ser quien la cierra.
+		hubnotify.AvisarTambien(ctx, a.ResponsableSub)
 		httpx.JSON(w, r, http.StatusOK, cerrada)
 	}
 }

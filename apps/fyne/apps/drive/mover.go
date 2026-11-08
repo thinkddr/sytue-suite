@@ -334,7 +334,6 @@ func (s *selectorCarpeta) pintar() {
 // caja es la lista con borde, o lo que haya en su lugar: la rueda, el fallo o «no hay
 // subcarpetas».
 func (s *selectorCarpeta) caja(v tema.Variante) fyne.CanvasObject {
-	borde := ui.NuevaCaja(color.NRGBA{}, tema.Color("border", v), tema.RadioMD)
 	var dentro fyne.CanvasObject
 	t := s.p.tr
 	switch {
@@ -356,26 +355,7 @@ func (s *selectorCarpeta) caja(v tema.Variante) fyne.CanvasObject {
 		}
 		dentro = container.NewVScroll(container.New(ui.Columna{}, filas...))
 	}
-	return container.New(&dentroDeCaja{}, append(borde.Objetos(), dentro)...)
-}
-
-// dentroDeCaja pone el borde a tamaño completo y el contenido un píxel hacia dentro.
-type dentroDeCaja struct{}
-
-var _ fyne.Layout = (*dentroDeCaja)(nil)
-
-func (*dentroDeCaja) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(0, AltoCajaMover) }
-
-func (*dentroDeCaja) Layout(objs []fyne.CanvasObject, t fyne.Size) {
-	for i, o := range objs {
-		if i == len(objs)-1 {
-			o.Move(fyne.NewPos(tema.Borde, tema.Borde))
-			o.Resize(fyne.NewSize(max(t.Width-2*tema.Borde, 0), max(t.Height-2*tema.Borde, 0)))
-			continue
-		}
-		o.Move(fyne.NewPos(0, 0))
-		o.Resize(t)
-	}
+	return dentroDeCaja(marcoLista(v, tema.RadioMD), tema.Borde, container.New(&altoFijo{alto: AltoCajaMover - 2*tema.Borde}, dentro))
 }
 
 // columnaMover apila la ruta, la caja y la línea de destino con sus `mb-2`/`mt-2`.

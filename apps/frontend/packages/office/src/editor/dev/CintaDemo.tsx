@@ -73,6 +73,7 @@ export function CintaDemo(props: {
     restoreVersion: nadaAsync,
     applyTheme: nadaAsync,
     exportAs: nadaAsync,
+    saveNow: nada,
     sourceRef: '',
     cursorDots: { aPuntos: () => null, aOffsets: () => null },
     soloLectura: props.soloLectura,

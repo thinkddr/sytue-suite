@@ -77,7 +77,7 @@ export const nucleo = {
   'new.progress': 'Steg för att skapa webbplatsen',
   'new.go_to_step': 'Gå till steg {n}',
   'new.step_of': 'Steg {n} av {total}',
-  'app_settings.title': 'Inställningar för Sytue Web',
+  'app_settings.title': 'Inställningar för Sytue Webs',
   'new.search_title': 'Utgå från din typ av verksamhet',
   'new.search_help':
     'Skriv vad du arbetar med eller välj en kategori. Varje mall har redan texter för din bransch: du byter bara namn, telefonnummer, priser och bilder.',
@@ -275,7 +275,7 @@ export const nucleo = {
   'domains.start_help':
     'Ange domänen du vill använda. Du behöver åtkomst till DNS-inställningarna hos leverantören där du köpte den.',
   'domains.progress': 'Förlopp för domänanslutning',
-  'domains.step.registered': 'Tillagd i Sytue Web',
+  'domains.step.registered': 'Tillagd i Sytue Webs',
   'domains.step.dns': 'DNS verifierad',
   'domains.step.https': 'HTTPS klar',
   'domains.step.primary': 'Huvudadress',

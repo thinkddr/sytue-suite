@@ -92,7 +92,7 @@ var nombres = [...]string{
 	Mail: "Sytue Mail", Calendar: "Sytue Calendar", Contacts: "Sytue Contacts",
 	Notes: "Sytue Notepads", Photos: "Sytue Photos", Rooms: "Sytue Rooms",
 	Cloud: "Sytue DevX", Console: "Sytue Admin", Hub: "Sytue Hub", ERP: "Sytue ERP",
-	Cast: "Sytue Cast", Pages: "Sytue Web", Bases: "Sytue Bases",
+	Cast: "Sytue Cast", Pages: "Sytue Webs", Bases: "Sytue Bases",
 }
 
 // ProductoDe es la marca cuya clave es esa, que es lo que hace falta para nombrar el

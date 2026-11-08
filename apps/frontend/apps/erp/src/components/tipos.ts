@@ -428,14 +428,6 @@ export interface CalculoObligacion {
   asentado: boolean;
 }
 
-export interface ResultadoImportacion {
-  filas: number;
-  creados: number;
-  actualizados: number;
-  ignoradas: string[];
-  fallos: { fila: number; error: string }[];
-}
-
 /** Un informe de Sytue AI: un tablero o un Excel. Espejo de internal/ia. */
 export interface Informe {
   titulo: string;

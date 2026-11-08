@@ -38,9 +38,11 @@ var DatosDeLaPersona = []struct {
 	Servicio string
 	Tablas   []string
 }{
-	{"hub", []string{"notifications", "notification_prefs", "presence"}},
+	// Los aparatos de iOS a los que despertar (mig. 0010 del Hub): el registro único
+	// de la suite desde el 2026-11-06, que sustituye a `push_apns` de Rooms.
+	{"hub", []string{"notifications", "notification_prefs", "presence", "aparatos_apns"}},
 	{"rooms", []string{
-		"push_apns", "push_subscriptions", "user_notify_prefs",
+		"push_subscriptions", "user_notify_prefs",
 		"message_drafts", "message_saves", "read_state", "thread_follows", "channel_categories",
 		// A quién ha bloqueado (ADR 0073). Sus DENUNCIAS no: son de la organización.
 		"user_blocks",

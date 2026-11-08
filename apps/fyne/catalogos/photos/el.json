@@ -1,9 +1,14 @@
 {
   "aiBatch.excludeOrg": "Εξαίρεση του οργανισμού από την αυτόματη παρτίδα Sytue AI",
   "aiBatch.excludedHint": "Ο οργανισμός έχει εξαιρεθεί από την αυτόματη παρτίδα Sytue AI. Οι φωτογραφίες δεν αναλύονται στο παρασκήνιο για προτάσεις ή παρόμοιες.",
+  "album.coverSet": "Το εξώφυλλο του άλμπουμ ενημερώθηκε",
+  "album.isCover": "Αυτό είναι το εξώφυλλο του άλμπουμ",
   "album.linkCopied": "Ο σύνδεσμος αντιγράφηκε",
   "album.newLink": "Νέος σύνδεσμος",
   "album.newLinkConfirm": "Δημιουργία νέου συνδέσμου; Ο τρέχων σύνδεσμος θα σταματήσει να λειτουργεί για όσους τον έχουν ήδη.",
+  "album.rename": "Μετονομασία",
+  "album.renamePrompt": "Όνομα άλμπουμ",
+  "album.setCover": "Χρήση ως εξώφυλλο άλμπουμ",
   "album.share": "Κοινοποίηση",
   "album.shared": "Κοινοποιημένο",
   "album.unshare": "Διακοπή κοινοποίησης",
@@ -98,6 +103,7 @@
     "other": "{count} κατά ημερομηνία μεταφόρτωσης"
   },
   "gallery.cancelSelection": "Έξοδος από την επιλογή",
+  "gallery.clearSearch": "Διαγραφή αναζήτησης",
   "gallery.describeCapped": "Περιγράφονται μόνο οι πρώτες {count} κάθε φορά· εκτελέστε ξανά για τις υπόλοιπες.",
   "gallery.describeNothing": "Οι επιλεγμένες φωτογραφίες έχουν ήδη περιγραφή",
   "gallery.describeSelected": "Περιγραφή με το Sytue AI",
@@ -106,7 +112,8 @@
   "gallery.describing": "Περιγραφή {done} από {total}…",
   "gallery.downloadCapped": "Φωτογραφίες εκτός αυτής της παρτίδας: {count}.",
   "gallery.downloadSelected": "Λήψη",
-  "gallery.downloading": {
+  "gallery.downloading": "Αιτήματα λήψης που ξεκίνησαν: {count}. Ελέγξτε τις λήψεις του προγράμματος περιήγησης.",
+  "gallery.downloadingNative": {
     "one": "Λήψη 1 φωτογραφίας…",
     "other": "Λήψη {count} φωτογραφιών…"
   },
@@ -114,6 +121,8 @@
   "gallery.empty.description": "Οι φωτογραφίες από το Sytue Drive σας θα εμφανιστούν εδώ, ταξινομημένες κατά την ημερομηνία λήψης.",
   "gallery.empty.title": "Δεν υπάρχουν φωτογραφίες ακόμη",
   "gallery.favorite": "Προσθήκη στα αγαπημένα",
+  "gallery.favoriteFailed": "Φωτογραφίες που δεν ήταν δυνατό να αλλάξουν: {count}",
+  "gallery.favorited": "Προστέθηκαν στα αγαπημένα: {count}",
   "gallery.likeTheseResults": "Και όσες τους μοιάζουν",
   "gallery.moreLikeThese": "Περισσότερες σαν αυτές",
   "gallery.newAlbum": "Νέο άλμπουμ",
@@ -124,6 +133,8 @@
   },
   "gallery.newAlbumTitle": "Νέο άλμπουμ",
   "gallery.noExifDate": "Χωρίς ημερομηνία λήψης: ταξινόμηση κατά ημερομηνία μεταφόρτωσης",
+  "gallery.noResults.description": "Δοκιμάστε άλλες λέξεις ή διαγράψτε την αναζήτηση για να δείτε όλες τις φωτογραφίες σας.",
+  "gallery.noResults.title": "Καμία φωτογραφία δεν ταιριάζει με «{query}»",
   "gallery.onlyImages": "Μόνο εικόνες μπορούν να προστεθούν.",
   "gallery.open": "Άνοιγμα {name}",
   "gallery.openInEditor": "Επεξεργασία {name}",
@@ -152,6 +163,7 @@
     "other": "{count} φωτογραφίες μετακινήθηκαν στον κάδο"
   },
   "gallery.unfavorite": "Αφαίρεση από τα αγαπημένα",
+  "gallery.unfavorited": "Αφαιρέθηκαν από τα αγαπημένα: {count}",
   "gallery.unselectMonth": "Αποεπιλογή μήνα",
   "gallery.uploadFailed": "Δεν ήταν δυνατή η μεταφόρτωση: {name}",
   "gallery.uploaded": {
@@ -198,6 +210,9 @@
   "viewer.askSend": "Ερώτηση",
   "viewer.canvasBackground": "Φόντο φωτογραφίας",
   "viewer.close": "Κλείσιμο",
+  "viewer.counter": "{index} / {total}",
+  "viewer.counterLabel": "Φωτογραφία {index} από {total}",
+  "viewer.counterMore": "{count}+",
   "viewer.delete": "Μετακίνηση στον κάδο",
   "viewer.deleteConfirm": "Μετακίνηση αυτής της φωτογραφίας στον κάδο; Το αρχείο παραμένει στο Sytue Drive.",
   "viewer.describe": "Περιγραφή με το Sytue AI",
@@ -237,6 +252,7 @@
   "viewer.saveDescription": "Αποθήκευση",
   "viewer.savingDescription": "Αποθήκευση…",
   "viewer.shortcuts": "Συντομεύσεις: βέλη για αλλαγή φωτογραφίας, διάστημα για παρουσίαση, I για πληροφορίες, Z για πλήρες μέγεθος, Delete για τον κάδο.",
+  "viewer.shortcutsJump": "Τα Home και End πηγαίνουν στην πρώτη και στην τελευταία φωτογραφία.",
   "viewer.similar": "Παρόμοιες φωτογραφίες",
   "viewer.slideshow": "Παρουσίαση",
   "viewer.slideshowStop": "Διακοπή παρουσίασης",

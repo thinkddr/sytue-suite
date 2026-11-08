@@ -88,7 +88,7 @@ export const nucleo = {
   'new.progress': 'Kroky na vytvorenie webu',
   'new.go_to_step': 'Prejsť na krok {n}',
   'new.step_of': 'Krok {n} z {total}',
-  'app_settings.title': 'Nastavenia Sytue Web',
+  'app_settings.title': 'Nastavenia Sytue Webs',
   'new.search_title': 'Začnite podľa zamerania svojho podnikania',
   'new.search_help':
     'Napíšte, čomu sa venujete, alebo vyberte odbor. Každá šablóna už obsahuje texty pre danú profesiu: stačí upraviť názov, telefón, ceny a fotky.',
@@ -290,7 +290,7 @@ export const nucleo = {
   'domains.start_help':
     'Zadajte doménu, ktorú chcete použiť. Budete potrebovať prístup k nastaveniam DNS u poskytovateľa, u ktorého ste ju zakúpili.',
   'domains.progress': 'Priebeh pripojenia domény',
-  'domains.step.registered': 'Pridané do Sytue Web',
+  'domains.step.registered': 'Pridané do Sytue Webs',
   'domains.step.dns': 'DNS overené',
   'domains.step.https': 'HTTPS pripravené',
   'domains.step.primary': 'Hlavná adresa',

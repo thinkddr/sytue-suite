@@ -47,6 +47,8 @@ type servicioFalso struct {
 	errCrear    error
 	explorables []api.RoomsChannel
 	errExplorar error
+	archivados  []api.RoomsChannel
+	errArchivad error
 	equipo      []api.RoomsMember
 	roster      []api.RoomsMember
 	seguidos    []api.RoomsThreadSummary
@@ -266,6 +268,11 @@ func (s *servicioFalso) CreateChannel(_ context.Context, e, nombre, asunto strin
 func (s *servicioFalso) Browse(_ context.Context, e, q string) ([]api.RoomsChannel, error) {
 	s.apuntar("Browse", e, q)
 	return s.explorables, s.errExplorar
+}
+
+func (s *servicioFalso) ArchivedChannels(_ context.Context, e string) ([]api.RoomsChannel, error) {
+	s.apuntar("ArchivedChannels", e)
+	return s.archivados, s.errArchivad
 }
 
 func (s *servicioFalso) Join(_ context.Context, c string) (api.RoomsChannel, error) {
@@ -957,6 +964,112 @@ func filaDe(t *testing.T, h *Historial, id string) *FilaMensaje {
 	}
 	t.Fatalf("no hay fila para %q", id)
 	return nil
+}
+
+// TestFlechaArribaEditaElUltimoPropio: ↑ con la caja vacía abre en edición el último
+// mensaje propio y le pasa el foco; con texto escrito la flecha es la de siempre.
+func TestFlechaArribaEditaElUltimoPropio(t *testing.T) {
+	s := servicioConDos()
+	s.mensajes["c1"] = append(s.mensajes["c1"], mensajeMio())
+	sa, _ := salaDePrueba(t, s)
+	sa.Arrancar(context.Background())
+	h, c := sa.P.Canal.Historial, sa.P.Canal.Compositor
+
+	c.PonerTexto("borrador")
+	c.area.TypedKey(&fyne.KeyEvent{Name: fyne.KeyUp})
+	if h.EditandoID != "" {
+		t.Fatalf("con texto en la caja ↑ abrió la edición de %q", h.EditandoID)
+	}
+	c.Vaciar()
+	c.area.TypedKey(&fyne.KeyEvent{Name: fyne.KeyUp})
+	if h.EditandoID != "mio" {
+		t.Fatalf("↑ en la caja vacía edita %q y debía editar «mio»", h.EditandoID)
+	}
+	f := filaDe(t, h, "mio")
+	lienzo := fyne.CurrentApp().Driver().CanvasForObject(sa.P.Objeto())
+	if f.edicion == nil || lienzo == nil || lienzo.Focused() != f.edicion.area {
+		t.Fatal("la caja de editar no se quedó con el foco")
+	}
+
+	// Con la edición abierta y a medias, volver al compositor y pulsar ↑ otra vez no
+	// la reabre con el texto original: solo le devuelve el foco.
+	f.edicion.area.PonerTexto("a medias")
+	lienzo.Focus(c.area)
+	c.area.TypedKey(&fyne.KeyEvent{Name: fyne.KeyUp})
+	f = filaDe(t, h, "mio")
+	if f.edicion == nil || f.edicion.Texto() != "a medias" {
+		t.Errorf("↑ otra vez dejó la caja en %q y debía conservar «a medias»", f.edicion.Texto())
+	}
+	if lienzo.Focused() != f.edicion.area {
+		t.Error("↑ otra vez no devolvió el foco a la caja de editar")
+	}
+}
+
+// TestCerrarLaEdicionDeFlechaVuelveAlCompositor: la edición abierta con ↑ se cierra con
+// Intro o con Esc y el foco vuelve al compositor, no se queda en la caja que desaparece
+// (design.md §2.6). Gemelo de editarVuelveElFoco.test.tsx. Abierta desde el menú del
+// mensaje, cerrarla no se lleva el foco al compositor.
+func TestCerrarLaEdicionDeFlechaVuelveAlCompositor(t *testing.T) {
+	for _, k := range []fyne.KeyName{fyne.KeyReturn, fyne.KeyEscape} {
+		t.Run(string(k), func(t *testing.T) {
+			s := servicioConDos()
+			s.mensajes["c1"] = append(s.mensajes["c1"], mensajeMio())
+			sa, _ := salaDePrueba(t, s)
+			sa.Arrancar(context.Background())
+			h, c := sa.P.Canal.Historial, sa.P.Canal.Compositor
+			lienzo := fyne.CurrentApp().Driver().CanvasForObject(sa.P.Objeto())
+			lienzo.Focus(c.area)
+			c.area.TypedKey(&fyne.KeyEvent{Name: fyne.KeyUp})
+			f := filaDe(t, h, "mio")
+			if f.edicion == nil || lienzo.Focused() != f.edicion.area {
+				t.Fatal("↑ no abrió la edición con el foco")
+			}
+			f.edicion.area.TypedKey(&fyne.KeyEvent{Name: k})
+			if h.EditandoID != "" {
+				t.Fatalf("%s no cerró la edición", k)
+			}
+			if lienzo.Focused() != c.area {
+				t.Errorf("tras %s el foco está en %T y debía volver al compositor", k, lienzo.Focused())
+			}
+		})
+	}
+
+	s := servicioConDos()
+	s.mensajes["c1"] = append(s.mensajes["c1"], mensajeMio())
+	sa, _ := salaDePrueba(t, s)
+	sa.Arrancar(context.Background())
+	h, c := sa.P.Canal.Historial, sa.P.Canal.Compositor
+	lienzo := fyne.CurrentApp().Driver().CanvasForObject(sa.P.Objeto())
+	lienzo.Focus(c.area)
+	c.area.TypedKey(&fyne.KeyEvent{Name: fyne.KeyUp}) // abierta con ↑…
+	lienzo.Unfocus()
+	sa.Editar(filaDe(t, h, "mio").Mensaje) // …y reabierta desde el menú
+	sa.CancelarEdicion()
+	if lienzo.Focused() == c.area {
+		t.Error("una edición abierta desde el menú mandó el foco al compositor al cerrarse")
+	}
+}
+
+// TestUltimoEditable es el gemelo de editarUltimo.test.ts.
+func TestUltimoEditable(t *testing.T) {
+	yo := Autor{ID: "yo"}
+	ms := []Mensaje{
+		{ID: "bueno", Autor: yo},
+		{ID: "ajeno", Autor: Autor{ID: "ana"}},
+		{ID: "llamada", Autor: yo, Tipo: Llamada},
+		{ID: "encuesta", Autor: yo, Tarjeta: &Tarjeta{}},
+		{ID: "fallido", Autor: yo, Fallido: true},
+		{ID: "enviando", Autor: yo, Enviando: true},
+	}
+	if m, ok := UltimoEditable(ms, "yo"); !ok || m.ID != "bueno" {
+		t.Errorf("el último editable es %q (%v)", m.ID, ok)
+	}
+	if _, ok := UltimoEditable(ms[1:], "yo"); ok {
+		t.Error("sin propios editables no hay nada que editar")
+	}
+	if _, ok := UltimoEditable(ms, ""); ok {
+		t.Error("sin saber quién mira no se edita nada")
+	}
 }
 
 // mensajeMio es un mensaje de quien mira, al final del canal.
@@ -2147,5 +2260,22 @@ func TestOwnChannelMembershipRemovalDropsDecryptedViewsAndLateReads(t *testing.T
 	}
 	if slices.ContainsFunc(sa.canales, func(c api.RoomsChannel) bool { return c.ID == "c1" }) {
 		t.Fatal("removed channel remained in sidebar")
+	}
+}
+
+// TestElVivoAvisaAlWidgetTambienAlReconectar: un mensaje y un cambio de canal avisan al
+// widget, y `ready` también: llega al reconectar, y lo que pasó durante el corte no
+// llegó como trama. «Escribiendo» no cambia nada del widget.
+func TestElVivoAvisaAlWidgetTambienAlReconectar(t *testing.T) {
+	sa, _ := salaDePrueba(t, servicioConDos())
+	avisos := 0
+	sa.AlCambiarDatos = func() { avisos++ }
+	sa.alLlegar(api.RoomsEvent{Type: api.RoomsReady})
+	if avisos != 1 {
+		t.Fatalf("al reconectar el vivo no avisa al widget (%d avisos)", avisos)
+	}
+	sa.alLlegar(api.RoomsEvent{Type: "typing", ChannelID: "otro"})
+	if avisos != 1 {
+		t.Fatalf("«escribiendo» avisa al widget (%d avisos)", avisos)
 	}
 }

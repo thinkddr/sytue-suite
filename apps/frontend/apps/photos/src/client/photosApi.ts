@@ -199,6 +199,13 @@ export const crearAlbum = (title: string) => mandar<Album>('POST', '/api/v1/albu
 export const album = (id: string) => pedir<Album>(`/api/v1/albums/${encodeURIComponent(id)}`);
 export const renombrarAlbum = (id: string, title: string, coverAssetId?: string) =>
   mandar<Album>('PATCH', `/api/v1/albums/${encodeURIComponent(id)}`, { title, coverAssetId });
+/**
+ * Elegir la portada es el mismo PATCH que renombrar: el servicio exige el título
+ * en cada cambio, así que va el de ahora. La foto tiene que estar en el álbum
+ * (el servicio contesta 400 si no) y devuelve el álbum con la portada nueva.
+ */
+export const ponerPortada = (id: string, tituloActual: string, foto: string) =>
+  renombrarAlbum(id, tituloActual, foto);
 export const borrarAlbum = (id: string) =>
   mandar<void>('DELETE', `/api/v1/albums/${encodeURIComponent(id)}`);
 export const fotosDelAlbum = (id: string) =>

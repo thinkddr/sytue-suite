@@ -24,6 +24,7 @@ import {
   hrefDe,
   puedeAdministrar,
   suiteApps,
+  nombreCorto,
   Glifo,
 } from '@sytue/ui';
 import { permsFromAccessToken } from '@sytue/auth/client';
@@ -41,7 +42,7 @@ export function AppSwitcher(): JSX.Element {
   // Calendar, Contacts y Notepads la barra lateral no lo lleva y nada en
   // pantalla decía en qué aplicación estabas. Sin «Sytue» delante, que ya lo
   // dice la marca de al lado.
-  const producto = suiteApps.find((a) => a.key === currentApp)?.name.replace('Sytue ', '');
+  const producto = nombreCorto(currentApp);
   const [open, setOpen] = useState(false);
   const [falloLogo, setFalloLogo] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);

@@ -31,6 +31,9 @@ type DesplazaLado struct {
 	// AlDesplazar avisa cuando cambia el desplazamiento o el alcance del contenido (por
 	// ejemplo, para encender o apagar `MASCARA_SCROLL_X`).
 	AlDesplazar func()
+	// Medir es el alto del contenido a un ancho, para el que envuelve en filas cuando
+	// cabe (la barra de formato de Notepads en el escritorio). Nil: su mínimo.
+	Medir func(ancho float32) float32
 
 	x float32
 }
@@ -117,6 +120,14 @@ func (d *DesplazaLado) Dragged(e *fyne.DragEvent) {
 func (d *DesplazaLado) DragEnd() {}
 
 // MinSize es el alto del contenido: el ancho lo pone la caja.
+// AltoPara es lo que ocupa a ese ancho: lo que diga Medir, o el mínimo del contenido.
+func (d *DesplazaLado) AltoPara(ancho float32) float32 {
+	if d.Medir != nil {
+		return d.Medir(max(ancho, d.ancho()))
+	}
+	return d.Contenido.MinSize().Height
+}
+
 func (d *DesplazaLado) MinSize() fyne.Size {
 	d.ExtendBaseWidget(d)
 	return fyne.NewSize(0, d.Contenido.MinSize().Height)

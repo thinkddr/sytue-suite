@@ -1,7 +1,15 @@
 // Las etiquetas se piden en un idioma CONCRETO: desde que las fechas salen de
 // Intl, «3 de julio» solo es la respuesta correcta si se pregunta en español.
 import { describe, expect, it } from 'bun:test';
-import { isRecurring, whenLabel, snippet, startDate, fechaDelEnlace } from './search.js';
+import {
+  isRecurring,
+  whenLabel,
+  snippet,
+  startDate,
+  fechaDelEnlace,
+  periodRange,
+  SEARCH_PERIODS,
+} from './search.js';
 import type { EventSearchResult } from '../client/calendarApi.js';
 
 function result(over: Partial<EventSearchResult>): EventSearchResult {
@@ -77,5 +85,40 @@ describe('fechaDelEnlace', () => {
     expect(fechaDelEnlace('?action=create')).toBeNull();
     expect(fechaDelEnlace('?date=ayer')).toBeNull();
     expect(fechaDelEnlace('?date=2026-99-99T00:00:00Z')).toBeNull();
+  });
+});
+
+describe('periodo del filtro de búsqueda', () => {
+  // 15 de marzo de 2026 a media mañana, hora LOCAL de quien mira.
+  const ahora = new Date(2026, 2, 15, 10, 30);
+
+  it('«Cualquier fecha» no acota nada', () => {
+    expect(periodRange('any', ahora)).toEqual({});
+  });
+
+  it('«Próximos» empieza ahora y «Pasados» acaba ahora', () => {
+    expect(periodRange('upcoming', ahora)).toEqual({ from: ahora.toISOString() });
+    expect(periodRange('past', ahora)).toEqual({ to: ahora.toISOString() });
+  });
+
+  it('mes y año son los del calendario local, de las 00:00 a las 00:00', () => {
+    expect(periodRange('month', ahora)).toEqual({
+      from: new Date(2026, 2, 1).toISOString(),
+      to: new Date(2026, 3, 1).toISOString(),
+    });
+    // Diciembre pasa al año siguiente.
+    expect(periodRange('month', new Date(2026, 11, 31, 23, 0))).toEqual({
+      from: new Date(2026, 11, 1).toISOString(),
+      to: new Date(2027, 0, 1).toISOString(),
+    });
+    expect(periodRange('year', ahora)).toEqual({
+      from: new Date(2026, 0, 1).toISOString(),
+      to: new Date(2027, 0, 1).toISOString(),
+    });
+  });
+
+  it('cada periodo tiene su rótulo en el catálogo', async () => {
+    const { en } = await import('../i18n/messages/en.js');
+    for (const p of SEARCH_PERIODS) expect(en).toHaveProperty([`search.period.${p}`]);
   });
 });

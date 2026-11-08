@@ -221,6 +221,23 @@ func TestPasaCondicion(t *testing.T) {
 			t.Errorf("%s: %v, quiero %v", c.nombre, got, c.quiero)
 		}
 	}
+	// «Entre fechas»: el operando tecleado como fecha es su serial, que es lo que guarda
+	// una celda de fecha (46037 = 15/01/2026, 46068 = 15/02/2026). VISTO EN ROJO con
+	// `parseNumES` a secas: «01/01/2026» no era un número y no pasaba nada.
+	fechas := col(46037.0, 46068.0, "enero", "")
+	for nombre, c := range map[string]struct {
+		cond   filterCond
+		quiero []bool
+	}{
+		"entre fechas":          {filterCond{Op: "between", A: "01/01/2026", B: "31/01/2026"}, []bool{true, false, false, false}},
+		"posterior a (ISO)":     {filterCond{Op: "gt", A: "2026-01-31"}, []bool{false, true, false, false}},
+		"igual a una fecha":     {filterCond{Op: "eq", A: "15/2/2026"}, []bool{false, true, false, false}},
+		"no es fecha: es texto": {filterCond{Op: "eq", A: "31/02/2026"}, []bool{false, false, false, false}},
+	} {
+		if got := pasaCondicion(c.cond, fechas); !reflect.DeepEqual(got, c.quiero) {
+			t.Errorf("%s: %v, quiero %v", nombre, got, c.quiero)
+		}
+	}
 	// «A1» no es un número: «igual a A1» compara texto y no se cuela con el 1.
 	if got := pasaCondicion(filterCond{Op: "eq", A: "A1"}, col(1.0, "a1")); !reflect.DeepEqual(got, []bool{false, true}) {
 		t.Errorf("A1 se leyó como número: %v", got)

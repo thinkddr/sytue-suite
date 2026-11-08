@@ -23,8 +23,6 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
-	"git.sytue.eu/sytue/one/apps/nucleo/offline"
-	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
 // # Lo que escribe: la ficha, el lote y lo que cuelga del registro
@@ -434,21 +432,28 @@ func (p *Pantalla) pedirBorrar(f *Ficha) {
 	d.Mostrar(p.lienzo)
 }
 
+// borrar lo manda a la papelera; el aviso lleva «Deshacer» (papelera.go), que lo
+// devuelve y repinta como `onGuardado`.
 func (p *Pantalla) borrar(f *Ficha) {
-	p.escribirRegistro(f, "toast.deleted", func(ctx context.Context) error {
-		return p.svc.Borrar(ctx, f.Modelo.Clave, f.Registro.ID)
+	m, id := f.Modelo, f.Registro.ID
+	p.escribirRegistro(f, func() {
+		// `recargarModelo` y no `escrito`: para cuando se pulsa «Deshacer» la ficha abierta
+		// puede ser otra (o un alta a medio escribir), y `escrito` la cerraría.
+		p.avisarPapelera(m, []string{id}, func() { p.recargarModelo(m) })
+	}, func(ctx context.Context) error {
+		return p.svc.Borrar(ctx, m.Clave, id)
 	})
 }
 
 func (p *Pantalla) restaurar(f *Ficha) {
-	p.escribirRegistro(f, "toast.restored", func(ctx context.Context) error {
+	p.escribirRegistro(f, func() { p.avisar(ui.AvisoExito, p.t("toast.restored")) }, func(ctx context.Context) error {
 		return p.svc.Restaurar(ctx, f.Modelo.Clave, f.Registro.ID)
 	})
 }
 
 // escribirRegistro es el esqueleto de borrar y restaurar: guardando, la llamada, el
 // aviso y, si fue bien, `onGuardado`.
-func (p *Pantalla) escribirRegistro(f *Ficha, aviso string, llamar func(context.Context) error) {
+func (p *Pantalla) escribirRegistro(f *Ficha, avisar func(), llamar func(context.Context) error) {
 	if p.svc == nil || f.Registro == nil {
 		return
 	}
@@ -466,7 +471,7 @@ func (p *Pantalla) escribirRegistro(f *Ficha, aviso string, llamar func(context.
 				p.Repintar()
 				return
 			}
-			p.avisar(ui.AvisoExito, p.t(aviso))
+			avisar()
 			if p.esta(f) {
 				p.escrito(m)
 			} else {
@@ -548,17 +553,30 @@ func (p *Pantalla) aplicarLote(accion, estado string, ids []string) {
 				p.Repintar()
 				return
 			}
-			titulo := p.t("toast.saved")
-			if accion == "borrar" {
-				titulo = p.t("toast.deleted")
+			// Lo tirado a la papelera vuelve con «Deshacer», todo el lote de una vez.
+			// Lo devuelto desde la papelera dice «Restaurado», sin «Deshacer».
+			switch accion {
+			case "borrar":
+				p.avisarPapelera(m, ids, func() { p.recargarModelo(m) })
+			case "restaurar":
+				p.avisar(ui.AvisoExito, p.t("toast.restored"))
+			default:
+				p.avisar(ui.AvisoExito, p.t("toast.saved"))
 			}
-			p.avisar(ui.AvisoExito, titulo)
 			l.Marcadas = map[string]bool{}
-			p.revision++
-			p.olvidar(m.Clave)
-			p.pedirLista()
+			p.recargarModelo(m)
 		})
 	})
+}
+
+// recargarModelo es el `onImportado` de la web: lo cacheado de ese modelo deja de
+// valer y, si es la lista abierta, se vuelve a pedir. No cierra la ficha.
+func (p *Pantalla) recargarModelo(m Modelo) {
+	p.revision++
+	p.olvidar(m.Clave)
+	if p.lista.Modelo.Clave == m.Clave {
+		p.pedirLista()
+	}
 }
 
 // descargar baja la factura como UBL, Facturae o para imprimir, la guarda y la abre.
@@ -927,8 +945,6 @@ func (p *Pantalla) contarTareas() {
 	if p.svc == nil {
 		return
 	}
-	view := p.Widget.View()
-	conRed := p.red == nil || p.red.State() != offline.Offline
 	p.fondo(func() {
 		ctx, cancelar := p.ctx()
 		defer cancelar()
@@ -937,46 +953,7 @@ func (p *Pantalla) contarTareas() {
 		if err != nil {
 			return
 		}
-		if conRed && (p.red == nil || p.red.State() != offline.Offline) {
-			publicarTareasERPWidget(ctx, view, as, hoy)
-		}
 		enHilo(func() { p.TareasHoy = len(as); p.Repintar() })
-	})
-}
-
-func publicarTareasERPWidget(ctx context.Context, view widgets.View, as []api.ERPActividad, hoy string) {
-	items := make([]widgets.Item, 0, min(len(as), widgets.MaxItems))
-	for _, a := range as {
-		titulo := strings.TrimSpace(a.Resumen)
-		if titulo == "" {
-			titulo = strings.TrimSpace(a.RegistroEtiqueta)
-		}
-		if titulo == "" {
-			continue
-		}
-		sub := strings.TrimSpace(a.RegistroEtiqueta)
-		if sub == "" {
-			sub = strings.TrimSpace(a.Modelo)
-		}
-		vencida := a.Vence != "" && a.Vence < hoy
-		color := ""
-		if vencida {
-			color = "#dc2626"
-		}
-		items = append(items, widgets.Item{
-			Title:    titulo,
-			Subtitle: sub,
-			Badge:    a.Vence,
-			Color:    color,
-			Unread:   vencida || a.Vence == hoy,
-		})
-		if len(items) >= widgets.MaxItems {
-			break
-		}
-	}
-	_ = view.PublicarDetalle(ctx, widgets.Detail{
-		Counters: []widgets.Counter{{Kind: "pending", Value: int64(len(as))}},
-		Items:    widgets.SanitizeItems(items),
 	})
 }
 
@@ -1053,17 +1030,20 @@ func (p *Pantalla) abrirRegistro(modelo, id string) {
 	})
 }
 
-// cargarLibro pide los últimos cincuenta asientos.
+// cargarLibro pide los últimos cincuenta asientos del período elegido.
 func (p *Pantalla) cargarLibro() {
 	if p.svc == nil {
 		return
 	}
+	periodo := p.libro.periodo()
+	desde, hasta := RangoDePeriodo(periodo, time.Now())
 	p.fondo(func() {
 		ctx, cancelar := p.ctx()
 		defer cancelar()
-		as, err := p.svc.Libro(ctx, LimitePagina)
+		as, err := p.svc.LibroEntre(ctx, LimitePagina, desde, hasta)
 		enHilo(func() {
-			if p.Vista != VistaLibro {
+			// Un período que contesta tarde no pisa al que se eligió después.
+			if p.Vista != VistaLibro || p.libro.periodo() != periodo {
 				return
 			}
 			if err != nil {
@@ -1076,17 +1056,20 @@ func (p *Pantalla) cargarLibro() {
 	})
 }
 
-// cargarBalance pide el sumas y saldos.
+// cargarBalance pide el sumas y saldos del período elegido.
 func (p *Pantalla) cargarBalance() {
 	if p.svc == nil {
 		return
 	}
+	periodo := p.libro.periodo()
+	desde, hasta := RangoDePeriodo(periodo, time.Now())
 	p.fondo(func() {
 		ctx, cancelar := p.ctx()
 		defer cancelar()
-		b, err := p.svc.Balance(ctx)
+		b, err := p.svc.BalanceEntre(ctx, desde, hasta)
 		enHilo(func() {
-			if p.Vista != VistaBalance {
+			// Un período que contesta tarde no pisa al que se eligió después.
+			if p.Vista != VistaBalance || p.libro.periodo() != periodo {
 				return
 			}
 			if err != nil {
@@ -1097,6 +1080,22 @@ func (p *Pantalla) cargarBalance() {
 			p.Repintar()
 		})
 	})
+}
+
+// cambiarPeriodo es el `onPeriodo` de la cabecera del libro y del balance: vuelve a
+// pedir la pantalla abierta con el corte nuevo, enseñando la rueda mientras tanto.
+func (p *Pantalla) cambiarPeriodo(periodo string) {
+	p.libro.Periodo, p.libro.Fallo = periodo, ""
+	switch p.Vista {
+	case VistaLibro:
+		p.libro.Asientos = nil
+		p.Repintar()
+		p.cargarLibro()
+	case VistaBalance:
+		p.libro.Balance = nil
+		p.Repintar()
+		p.cargarBalance()
+	}
 }
 
 // --- Obligaciones ---------------------------------------------------------------
@@ -1612,13 +1611,17 @@ func (p *Pantalla) importar() {
 		}
 		l.Importando = true
 		p.Repintar()
+		// Primero la VISTA PREVIA (importacion.go): se lee, se simula y se pregunta; si
+		// se acepta, se importa de verdad. Cancelar deja la lista como estaba.
 		p.fondo(func() {
-			r := p.importarRutas(m.Clave, elegidas)
+			leidos := leerFicheros(elegidas)
+			pr, err := p.simular(m.Clave, leidos)
 			enHilo(func() {
 				l.Importando = false
-				p.avisarImportacion(r)
-				if r.creados+r.actualizados > 0 && l.Modelo.Clave == m.Clave {
-					p.escrito(m)
+				if err != nil {
+					p.avisos.Notificar(ui.NuevoAviso(ui.AvisoPeligro, p.t("list.importPreviewFailed"), MensajeDeError(err, p.tr)))
+				} else {
+					p.preguntarImportacion(pr, func() { p.importarDeVerdad(m, leidos) })
 				}
 				p.Repintar()
 			})
@@ -1626,68 +1629,22 @@ func (p *Pantalla) importar() {
 	})
 }
 
-// importacion es lo que pasó con todos los ficheros de una importación.
-type importacion struct {
-	creados, actualizados int
-	ignoradas, fallos     []string
-}
-
-// importarRutas sube los ficheros uno tras otro y suma lo que pasó. Con varios, cada
-// fallo lleva delante el nombre de su fichero.
-func (p *Pantalla) importarRutas(modelo string, rutas []string) importacion {
-	var r importacion
-	for _, ruta := range rutas {
-		nombre := filepath.Base(ruta)
-		datos, err := os.ReadFile(ruta) //nolint:gosec // G304: la ruta la eligió quien usa la app en el selector del sistema
-		var res api.ERPResultadoImportacion
-		if err == nil {
-			ctx, cancelar := p.ctx()
-			res, err = p.svc.Importar(ctx, modelo, datos, strings.EqualFold(filepath.Ext(ruta), ".xml"))
-			cancelar()
-		}
-		if err != nil {
-			motivo := MensajeDeError(err, p.tr)
-			if len(rutas) > 1 {
-				motivo = nombre + ": " + motivo
+// importarDeVerdad sube los ficheros ya aceptados y cuenta el resultado.
+func (p *Pantalla) importarDeVerdad(m Modelo, leidos []ficheroLeido) {
+	l := p.lista
+	l.Importando = true
+	p.Repintar()
+	p.fondo(func() {
+		r := p.importarLeidos(m.Clave, leidos)
+		enHilo(func() {
+			l.Importando = false
+			p.avisarImportacion(m, r)
+			if r.creados+r.actualizados > 0 && l.Modelo.Clave == m.Clave {
+				p.escrito(m)
 			}
-			r.fallos = append(r.fallos, motivo)
-			continue
-		}
-		r.creados += res.Creados
-		r.actualizados += res.Actualizados
-		for _, c := range res.Ignoradas {
-			if !slices.Contains(r.ignoradas, c) {
-				r.ignoradas = append(r.ignoradas, c)
-			}
-		}
-		for _, f := range res.Fallos {
-			fila := p.t("list.importFailedRow", i18n.Vars{"row": f.Fila, "error": f.Error})
-			if len(rutas) > 1 {
-				fila = nombre + " · " + fila
-			}
-			r.fallos = append(r.fallos, fila)
-		}
-	}
-	return r
-}
-
-// avisarImportacion cuenta el resultado en un aviso y los fallos, fila a fila, en otros
-// (como mucho cinco): quien importa mil filas quiere saber cuáles no entraron.
-func (p *Pantalla) avisarImportacion(r importacion) {
-	tono := ui.AvisoExito
-	if len(r.fallos) > 0 {
-		tono = ui.AvisoInfo
-	}
-	desc := ""
-	if len(r.ignoradas) > 0 {
-		desc = p.t("list.importIgnored", i18n.Vars{"columns": strings.Join(r.ignoradas, ", ")})
-	}
-	p.avisos.Notificar(ui.NuevoAviso(tono, p.t("list.importResult", i18n.Vars{
-		"created": r.creados, "updated": r.actualizados, "failed": len(r.fallos),
-	}), desc))
-	for _, f := range r.fallos[:min(5, len(r.fallos))] {
-		p.avisar(ui.AvisoPeligro, f)
-	}
+			p.Repintar()
+		})
+	})
 }
 
 // conFicheros engancha subir e importar solo si hay selector de ficheros: sin él, los

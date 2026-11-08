@@ -238,6 +238,16 @@ type BarraSuite struct {
 	montado *fyne.Container
 	// pintada es la apariencia con la que se colocó el montaje por última vez.
 	pintada aparienciaVista
+	// LA BARRA ÚNICA DEL TELÉFONO (TopBar.tsx con `movil`). Por debajo de 768 la barra
+	// tiene dos caras: la de la app —[☰] título [acciones] [entrada]— y, al tocar la
+	// entrada (el avatar de la cuenta, en su sitio de siempre), la de la suite con un ✕
+	// delante. `suiteAbierta` es la segunda; `barraApp`, que la barra móvil del armazón
+	// va debajo y pone ella el ☰, el título y las acciones (la barra de la suite solo
+	// pinta la entrada encima). Sin armazón con barra, el título es el del producto.
+	suiteAbierta bool
+	barraApp     bool
+	cerrarSuite  *BotonIcono
+	tituloApp    *canvas.Text
 	// buscarPendiente espera a tener sesión y lienzo antes de mostrar el teclado.
 	buscarPendiente bool
 	busquedaSesion  sesion.Estado
@@ -289,6 +299,20 @@ func NuevaBarraSuite(t *i18n.Translator, s *sesion.Suite, p iconos.Producto) *Ba
 	// La foto cambia EN VIVO: el aviso llega por el flujo de la campana y la cuenta
 	// vuelve a pedir la ficha, que trae la versión nueva (o ninguna, si la quitó).
 	b.avisos.alFoto = func() { go b.cuenta.pedirFicha() }
+	// En la cara de la app el avatar es la ENTRADA a la suite: el primer toque la
+	// despliega y, desplegada, el mismo avatar abre la cuenta.
+	abrirCuenta := b.cuenta.boton.AlPulsar
+	b.cuenta.boton.AlPulsar = func() {
+		if b.plegada() {
+			b.desplegar(true)
+			return
+		}
+		abrirCuenta()
+	}
+	b.cerrarSuite = NuevoBotonIcono(iconos.Cerrar, t.T("ui.suiteClose", nil), func() { b.desplegar(false) })
+	b.cerrarSuite.TamIcono = TamGlifoBarra
+	b.cerrarSuite.Hide()
+	b.tituloApp = Texto(p.NombreCorto(), tema.TextoMD, SemiNegrita, color.NRGBA{})
 	b.ExtendBaseWidget(b)
 	b.engancharBusqueda()
 	return b
@@ -309,7 +333,13 @@ func NuevaBarraSuite(t *i18n.Translator, s *sesion.Suite, p iconos.Producto) *Ba
 // En la forma Marco, además, pinta el marco y la HOJA de lo que no trae armazón —el Hub,
 // los editores, la página «Iniciar sesión»—; con armazón, la hoja es suya (ver marco.go).
 func (b *BarraSuite) Montar(contenido fyne.CanvasObject) fyne.CanvasObject {
-	b.Arrancar()
+	// Los avisos, su SSE y la ficha, cuando haya interfaz: lanzada por iOS solo para el
+	// widget, la app no los pide (sesion.Suite.CuandoHayaEscena).
+	if b.s != nil {
+		b.s.CuandoHayaEscena(b.Arrancar)
+	} else {
+		b.Arrancar()
+	}
 	m := &montaje{
 		marco: nuevoMarco(), aSangre: b.hojaASangre, barra: b,
 		baseSegura:       canvas.NewRectangle(color.NRGBA{}),
@@ -398,6 +428,26 @@ func (b *BarraSuite) confirmarSubidaLocal(w fyne.Window, nombre string, aceptar 
 	d.Mostrar(lienzo)
 }
 
+// barraSuiteDe es la barra de la suite montada en ese lienzo, si la hay: la que acoge la
+// barra móvil del armazón en un teléfono. Lo pregunta el armazón al colocarse, y no se
+// lo dice el montaje, porque las apps REHACEN su armazón a menudo (Calendar en cada
+// pintado) sin que el montaje se vuelva a colocar.
+func barraSuiteDe(c fyne.Canvas) *BarraSuite {
+	if c == nil {
+		return nil
+	}
+	o := c.Content()
+	if g, es := o.(*raizGestos); es {
+		o = g.content
+	}
+	if cont, es := o.(*fyne.Container); es {
+		if m, es := cont.Layout.(*montaje); es {
+			return m.barra
+		}
+	}
+	return nil
+}
+
 // ContenidoMontado es lo que hay ahora mismo bajo la barra en lo que devolvió Montar: el
 // contenido de la app, o la página que Montar haya puesto en su lugar.
 func ContenidoMontado(montado fyne.CanvasObject) fyne.CanvasObject {
@@ -476,6 +526,30 @@ func (b *BarraSuite) Arrancar() {
 	b.cuenta.arrancar()
 }
 
+// PonerInsignia deja `n` sobre el icono de la app en lugar de lo que cuentan los avisos
+// del Hub. Es para la app que sabe contar lo suyo mejor que ellos: en Rooms, los
+// mensajes sin leer de todos sus canales, que es el «(3)» del título de la pestaña en
+// la web; los avisos del Hub solo cuentan menciones y directos. Desde la primera
+// llamada el número es siempre el de la app.
+func (b *BarraSuite) PonerInsignia(n int) {
+	a := b.avisos
+	a.mu.Lock()
+	a.propia = &n
+	a.mu.Unlock()
+	a.ponerInsignia()
+}
+
+// CallarAvisosSi deja que la app calle sus avisos al sistema mientras `f` diga que sí:
+// es «Pausar avisos» de Rooms. La campana los sigue mostrando; lo que no hacen es
+// interrumpir. Se llama desde la rutina del flujo del Hub, así que `f` ha de poder
+// correr fuera del hilo de la interfaz.
+func (b *BarraSuite) CallarAvisosSi(f func() bool) {
+	a := b.avisos
+	a.mu.Lock()
+	a.callar = f
+	a.mu.Unlock()
+}
+
 // CederAtajo le da ⌘K / Ctrl+K a la app: al pulsarlo se llama `f` en vez de llevar
 // el foco al buscador de la suite.
 //
@@ -497,6 +571,32 @@ func (b *BarraSuite) CederAtajoSi(f func() bool) { b.buscador.alAtajoSi = f }
 func (b *BarraSuite) Parar() {
 	b.avisos.parar()
 	b.buscador.parar()
+}
+
+// plegada es la cara de la app de la barra única: teléfono y suite sin desplegar.
+func (b *BarraSuite) plegada() bool {
+	return b.Size().Width > 0 && b.Size().Width < Estrecho && !b.suiteAbierta
+}
+
+// desplegar pone la cara de la suite (o la de la app) y lleva el foco a lo primero de
+// ella: el buscador al desplegar, la entrada al plegar.
+func (b *BarraSuite) desplegar(si bool) {
+	if b.suiteAbierta == si {
+		return
+	}
+	b.suiteAbierta = si
+	b.Refresh()
+	if c := lienzoDe(b); c != nil {
+		// Con el dedo no se mueve el foco: en el buscador sacaría el teclado sin pedirlo.
+		if EsTactil() {
+			return
+		}
+		var foco fyne.Focusable = b.cuenta.boton
+		if si {
+			foco = b.cerrarSuite
+		}
+		c.Focus(foco)
+	}
 }
 
 // AccessibilityLabel: es el `role="banner"` de la web.
@@ -533,7 +633,7 @@ func (b *BarraSuite) CreateRenderer() fyne.WidgetRenderer {
 	r.objetos = append([]fyne.CanvasObject{r.fondo}, r.marco.objetos()...)
 	// La pista del atajo va DESPUÉS del campo: se pinta encima de su borde derecho,
 	// que es donde la pone la hoja (`absolute right-3`).
-	r.objetos = append(r.objetos, r.filete, r.esquina, r.divisor, b.marca,
+	r.objetos = append(r.objetos, r.filete, r.esquina, r.divisor, b.tituloApp, b.cerrarSuite, b.marca,
 		b.buscador.campo, b.buscador.atajo, b.buscador.limpiar)
 	r.objetos = append(r.objetos, b.avisos.objetos()...)
 	// El panel de resultados va el ÚLTIMO: cuelga por debajo de la barra y se pinta
@@ -622,6 +722,13 @@ func (r *barraSuiteRenderer) pintar(v tema.Variante) {
 		c.Refresh()
 	}
 	r.b.buscador.enCarril(r.carril)
+	r.b.tituloApp.Color = tema.Color("sidebar-fg", v)
+	r.b.tituloApp.Refresh()
+	// El ✕ con los tonos de la campana, su vecina en la barra de color.
+	c := r.b.cerrarSuite
+	c.Trazo, c.TrazoEncima, c.FondoEncima, c.FondoActivo, c.FondoPulsado, c.TokenAro = "sidebar-fg", "sidebar-fg", "sidebar-hover-bg", "sidebar-active-bg", "sidebar-active-bg", "sidebar-focus"
+	c.Radio = tema.Forma("radius-control")
+	c.Refresh()
 }
 
 func (r *barraSuiteRenderer) MinSize() fyne.Size           { return MedidaBarraSuite() }
@@ -643,6 +750,148 @@ func (r *barraSuiteRenderer) Layout(t fyne.Size) {
 	}
 	lado := LadoControlBarra()
 	y := (AltoBarraSuite() - lado) / 2
+	if t.Width > 0 && t.Width < Estrecho {
+		r.layoutTelefono(t, lado, y)
+		return
+	}
+	r.verSuite(true)
+	esconder(r.b.cerrarSuite, true)
+	esconder(r.b.tituloApp, true)
+	r.reponerFondo()
+	r.b.cuenta.boton.Nombre = r.b.t.T("account.menu", nil)
+	r.layoutAncho(t, lado, y, 0, CanalonDeBarra(t.Width), 0)
+}
+
+// reponerFondo devuelve el fondo, el marco, la esquina y el filete que la cara de la
+// app del teléfono pudo esconder: lo mismo que deja `pintar`.
+func (r *barraSuiteRenderer) reponerFondo() {
+	r.fondo.Hidden = tema.EsMarco()
+	if tema.EsMarco() {
+		r.marco.pintar(tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
+	}
+	r.filete.Hidden = r.carril
+	r.esquina.Hidden = r.carril
+}
+
+// verSuite enseña o esconde lo de la suite: marca, buscador, campana y filete. El
+// buscador vuelve a decidir su pista y su aspa al colocarse.
+func (r *barraSuiteRenderer) verSuite(si bool) {
+	b := r.b
+	esconder(b.marca, !si)
+	esconder(b.buscador.campo, !si)
+	esconder(b.avisos.boton, !si)
+	if !si {
+		esconder(b.buscador.atajo, true)
+		esconder(b.buscador.limpiar, true)
+		esconder(r.divisor, true)
+	} else {
+		r.divisor.Hidden = tema.EsMarco()
+	}
+}
+
+// layoutTelefono es la barra única: la cara de la app o, desplegada, la de la suite
+// con el ✕ delante. Ver TopBar.tsx (`movil`).
+func (r *barraSuiteRenderer) layoutTelefono(t fyne.Size, lado, y float32) {
+	b := r.b
+	if !b.suiteAbierta {
+		r.verSuite(false)
+		esconder(b.cerrarSuite, true)
+		// Con la barra de la app debajo, esta no pinta fondo: la de la app ES la barra,
+		// del carril, y aquí solo va la entrada encima.
+		r.reponerFondo()
+		if b.barraApp {
+			r.fondo.Hidden = true
+			r.marco.esconder()
+		} else if tema.EsMarco() {
+			r.marco.colocar(fyne.NewPos(0, 0), t)
+		}
+		r.fondo.Resize(t)
+		r.esquina.Hide()
+		r.filete.Hide()
+		x := t.Width - canalonBarraUnica - lado
+		b.cuenta.boton.Move(fyne.NewPos(x, y))
+		b.cuenta.boton.Resize(fyne.NewSize(lado, lado))
+		// El punto de la campana, en la entrada (`indicator` de TopBarButton).
+		b.avisos.colocar(fyne.NewPos(x, y), lado)
+		b.avisos.boton.Hide()
+		b.cuenta.boton.Nombre = r.nombreEntrada()
+		// Sin ☰ —sin barra de app, o con una que no lo lleva—, la MARCA del producto en su
+		// sitio y de su tamaño (el lado de un botón): el título empieza en la misma x en
+		// todas las apps y a su izquierda está la identidad de la app, no un hueco.
+		conMarca := !b.barraApp || !b.barraAppConBoton()
+		esconder(b.marca, !conMarca)
+		if conMarca {
+			b.marca.conNombre = false
+			m := MedidaMarcaBarra(b.marca.producto, false)
+			caja := LadoBotonBarraMovil() // la del ☰ de la barra de la app
+			b.marca.Move(fyne.NewPos(canalonBarraUnica+(caja-m.Width)/2, y))
+			b.marca.Resize(fyne.NewSize(m.Width, lado))
+			b.marca.Refresh()
+		}
+		esconder(b.tituloApp, b.barraApp)
+		if !b.barraApp {
+			talla := tema.TextoMD
+			izq := canalonBarraUnica + LadoBotonBarraMovil() + huecoBarraUnica
+			b.tituloApp.Text = b.nombreProducto()
+			Truncar(b.tituloApp, b.nombreProducto(), talla, SemiNegrita, max(x-huecoBarraUnica-izq, 0))
+			ColocarTexto(b.tituloApp, talla, izq, (AltoBarraSuite()-talla.Linea)/2)
+		}
+		r.pintarTitulo()
+		return
+	}
+	// Desplegada: la barra de siempre, con el ✕ donde estaba el ☰.
+	r.verSuite(true)
+	esconder(b.tituloApp, true)
+	esconder(b.cerrarSuite, false)
+	r.reponerFondo()
+	b.cerrarSuite.Lado = lado
+	b.cerrarSuite.Move(fyne.NewPos(canalonBarraUnica, y))
+	b.cerrarSuite.Resize(fyne.NewSize(lado, lado))
+	b.cuenta.boton.Nombre = b.t.T("account.menu", nil)
+	// SIN MARCA: en Fyne no hay selector de aplicaciones (dueño: «el app switcher NO debe
+	// existir en las apps Fyne, solo en web»), y en la web lo que esta cara pone tras el ✕
+	// es justo eso, el selector. Aquí quedan buscador, campana y cuenta.
+	r.layoutAncho(t, lado, y, 0, canalonBarraUnica, canalonBarraUnica+lado)
+	esconder(b.marca, true)
+}
+
+// nombreProducto es el nombre de MARCA del producto sin «Sytue» («Mail», «CertiPDF»):
+// el `Name` de su FyneApp.toml, el mismo que la web enseña en el selector y en la barra
+// del teléfono, sin traducir en ningún idioma (decisión del dueño, 2026-11-07).
+func (b *BarraSuite) nombreProducto() string { return b.marca.producto.NombreCorto() }
+
+// barraAppConBoton dice si la barra móvil del armazón montado lleva ☰ o «volver».
+func (b *BarraSuite) barraAppConBoton() bool {
+	if b.montado == nil {
+		return false
+	}
+	a := armazonEn(ContenidoMontado(b.montado))
+	if a == nil {
+		return false
+	}
+	bm, es := a.barraMovil().(*BarraMovil)
+	return es && bm.conBoton()
+}
+
+// nombreEntrada es el de la entrada a la suite, con los avisos sin leer si los hay.
+func (r *barraSuiteRenderer) nombreEntrada() string {
+	a := r.b.avisos
+	a.mu.Lock()
+	n := a.sinLeer
+	a.mu.Unlock()
+	nombre := r.b.t.T("ui.suiteOpen", nil)
+	if n > 0 {
+		nombre += " · " + r.b.t.T("notifications.buttonLabel", i18n.Vars{"count": n})
+	}
+	return nombre
+}
+
+// layoutAncho es la barra de siempre (`flex items-center gap-3`), con la marca corrida
+// `desplaza` a la derecha (el ✕ de la cara de la suite) y el canalón derecho dado.
+//
+// `sinMarca` > 0 es la cara de la suite del teléfono: sin marca, y el buscador empieza
+// en esa x (tras el ✕).
+func (r *barraSuiteRenderer) layoutAncho(t fyne.Size, lado, y, desplaza, canalonDer, sinMarca float32) {
 	r.fondo.Resize(t)
 	r.marco.colocar(fyne.NewPos(0, 0), t)
 	// `shadow-[inset_0_-1px_0_var(--color-border)]`: la línea va DENTRO del alto y no
@@ -651,7 +900,7 @@ func (r *barraSuiteRenderer) Layout(t fyne.Size) {
 	r.filete.Move(fyne.NewPos(0, AltoBarraSuite()-tema.Borde))
 	r.filete.Resize(fyne.NewSize(t.Width, tema.Borde))
 
-	x := t.Width - CanalonDeBarra(t.Width)
+	x := t.Width - canalonDer
 
 	x -= lado
 	r.b.cuenta.boton.Move(fyne.NewPos(x, y))
@@ -670,14 +919,17 @@ func (r *barraSuiteRenderer) Layout(t fyne.Size) {
 	// `-ml-1`: la marca VISIBLE a un canalón del cristal; el `pl-1` del disparador se sale
 	// al canalón. El canalón es SIEMPRE el `px-4` del menú lateral y no el de la barra,
 	// que crece con la ventana: la marca cae sobre el botón de la cabecera del menú.
-	izquierda := canalonMenu - RellenoMarcaIzq
+	izquierda := canalonMenu - RellenoMarcaIzq + desplaza
 	r.b.marca.Move(fyne.NewPos(izquierda, y))
 	r.b.marca.Resize(fyne.NewSize(m.Width, lado))
 	r.b.marca.Refresh()
 	// La esquina RESERVA siempre lo mismo y, sin menú lateral debajo, PINTA solo lo que
 	// ocupa la marca: el buscador no se mueve al pasar de una app a otra (las dos cajas
 	// de TopBar.tsx).
-	reserva := AnchoEsquinaMarca(t.Width, m.Width)
+	reserva := AnchoEsquinaMarca(t.Width, m.Width) + desplaza
+	if sinMarca > 0 {
+		reserva = sinMarca
+	}
 	pintada := r.b.anchoEsquinaPintada(t.Width, m.Width)
 	r.esquina.Resize(fyne.NewSize(pintada, AltoBarraSuite()))
 
@@ -727,9 +979,26 @@ func (m *montaje) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	}
 	contenido, barra := objs[m.contenido], objs[len(objs)-1]
 	alto := barra.MinSize().Height
+	pos, tam := fyne.NewPos(0, alto), fyne.NewSize(t.Width, max(t.Height-alto, 0))
+	// LA BARRA ÚNICA: en un teléfono la barra móvil del armazón sube a la de la suite. El
+	// armazón empieza ARRIBA del todo, su barra mide lo que esta y la suite solo pinta
+	// encima la entrada (ver `layoutTelefono`). Sin armazón con barra, la de la suite
+	// lleva el nombre del producto.
+	unica := false
+	if a := armazonEn(contenido); a != nil {
+		a.suite = m.barra
+		_, conBarra := a.barraMovil().(*BarraMovil)
+		unica = t.Width < Estrecho && conBarra
+		if unica {
+			pos, tam = fyne.NewPos(0, 0), t
+		}
+	}
+	if m.barra.barraApp != unica {
+		m.barra.barraApp = unica
+		m.barra.Refresh()
+	}
 	barra.Move(fyne.NewPos(0, 0))
 	barra.Resize(fyne.NewSize(t.Width, alto))
-	pos, tam := fyne.NewPos(0, alto), fyne.NewSize(t.Width, max(t.Height-alto, 0))
 	// En Carril no hay marco. Con armazón la hoja es suya, pero el montaje sigue
 	// pintando el fondo exterior: iOS deja las áreas seguras fuera del contenido.
 	if !tema.EsMarco() || armazonEn(contenido) != nil {

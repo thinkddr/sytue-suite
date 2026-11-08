@@ -35,14 +35,10 @@ func (a *App) pedirCuota() {
 		return
 	}
 	gen := a.gen
-	view := a.Widget.View()
 	a.lanzar(func() {
 		c, fin := ctx()
 		defer fin()
 		q, err := a.cli.Quota(c)
-		if err == nil {
-			a.publicarCuotaWidget(c, view, gen, q)
-		}
 		a.hilo(gen, func() {
 			if err == nil {
 				a.sub.cuota, a.sub.errorCuota = &q, false

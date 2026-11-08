@@ -113,29 +113,32 @@ func TestElMenuDeUnElementoEsElDeLaWeb(t *testing.T) {
 		quiero   []string
 	}{
 		{"un fichero", fichero, false, false, k("action.download", "action.rename", "action.move",
-			"action.copy", "action.shareLink", "action.versions", "action.classify", "action.attachToMail",
+			"action.copy", "action.shareLink", "action.copyLink", "action.versions", "action.classify", "action.attachToMail",
 			"action.shareToRooms", "action.addFavorite", "action.delete")},
 		{"un PDF", pdf, false, true, k("action.download", "action.rename", "action.move",
-			"action.copy", "action.shareLink", "action.versions", "pdf.openInPdf", "action.classify",
+			"action.copy", "action.shareLink", "action.copyLink", "action.versions", "pdf.openInPdf", "action.classify",
 			"action.attachToMail", "action.shareToRooms", "action.removeFavorite", "action.delete")},
 		// Resumir solo donde hay texto que leer, y detrás de Clasificar.
 		{"un texto", notas, false, false, k("action.download", "action.rename", "action.move",
-			"action.copy", "action.shareLink", "action.versions", "action.classify", "ai.summarize",
+			"action.copy", "action.shareLink", "action.copyLink", "action.versions", "action.classify", "ai.summarize",
 			"action.attachToMail", "action.shareToRooms", "action.addFavorite", "action.delete")},
 		// Clasificado, el menú dice con qué.
 		{"un fichero clasificado", etiquetado, false, false, append(append(k("action.download", "action.rename", "action.move",
-			"action.copy", "action.shareLink", "action.versions"), clasificado),
+			"action.copy", "action.shareLink", "action.copyLink", "action.versions"), clasificado),
 			k("action.attachToMail", "action.shareToRooms", "action.addFavorite", "action.delete")...)},
 		// Un vídeo se puede llevar a Sytue Cast, detrás de Rooms como en la web.
 		{"un vídeo", video, false, false, k("action.download", "action.rename", "action.move",
-			"action.copy", "action.shareLink", "action.versions", "action.classify", "action.attachToMail",
+			"action.copy", "action.shareLink", "action.copyLink", "action.versions", "action.classify", "action.attachToMail",
 			"action.shareToRooms", "action.uploadToCast", "action.addFavorite", "action.delete")},
 		// Una carpeta no se adjunta a un correo, pero sí se comparte en una sala.
 		{"una carpeta", carpeta, false, false, k("action.downloadZip", "action.rename", "action.move",
-			"action.copy", "action.shareLink", "action.shareToRooms", "action.addFavorite", "action.delete")},
-		// Sin red quedan las dos de lectura de un fichero: bajarlo y su historial.
-		{"un fichero sin red", fichero, true, false, k("action.download", "action.versions")},
-		{"una carpeta sin red", carpeta, true, false, nil},
+			"action.copy", "action.shareLink", "action.copyLink", "action.shareToRooms", "action.addFavorite", "action.delete")},
+		// Sin red quedan las de lectura de un fichero: bajarlo, copiar su enlace y su
+		// historial. De una carpeta, su enlace.
+		{"un fichero sin red", fichero, true, false, k("action.download", "action.copyLink", "action.versions")},
+		{"una carpeta sin red", carpeta, true, false, k("action.copyLink")},
+		// Un fichero sin id no tiene enlace estable.
+		{"un fichero sin id", Elemento{Nombre: "suelto.txt"}, true, false, k("action.download")},
 	}
 	for _, c := range casos {
 		acciones := p.AccionesDe(c.el, c.sinRed, c.favorito)
@@ -232,7 +235,7 @@ func TestMoverALaMismaCarpetaNoHaceNada(t *testing.T) {
 // TestTirarALaPapeleraSeDeshace: el aviso dura los 10 s de la web y trae su «Deshacer»,
 // que devuelve el elemento a su carpeta. No pregunta antes: es reversible.
 //
-// VISTO EN ROJO (2026-09-22, en el frontal): sin `a.Duracion = DuracionDeshacer`, el aviso
+// VISTO EN ROJO (2026-09-22, en el frontal): sin `a.Duracion = ui.DuracionDeshacer`, el aviso
 // dura lo de serie y el test lo dice.
 func TestTirarALaPapeleraSeDeshace(t *testing.T) {
 	s := &servicioDoble{}
@@ -246,7 +249,7 @@ func TestTirarALaPapeleraSeDeshace(t *testing.T) {
 		t.Fatal("tirar a la papelera no avisa")
 	}
 	a := avisos[len(avisos)-1]
-	if a.Duracion != DuracionDeshacer || a.RotuloAccion != p.tr.T("files.delete.undo", nil) || a.AlPulsarAccion == nil {
+	if a.Duracion != ui.DuracionDeshacer || a.RotuloAccion != p.tr.T("files.delete.undo", nil) || a.AlPulsarAccion == nil {
 		t.Fatalf("el aviso no trae su «Deshacer» de 10 s: %+v", a)
 	}
 	a.AlPulsarAccion()
@@ -347,5 +350,68 @@ func TestElGlifoDeEliminarVaEnRojo(t *testing.T) {
 	}
 	if !pintado {
 		t.Fatal("el glifo de «Eliminar» no pinta ni un píxel opaco")
+	}
+}
+
+// TestCopiarEnlaceDejaElEnlaceDeSiempre: «Copiar enlace» deja en el portapapeles el
+// canónico de un fichero (`/files/{id}`) y una carpeta por su ruta, con la organización
+// de la sesión, y lo avisa.
+//
+// VISTO EN ROJO (2026-11-05): copiando `api.EnlaceFichero` también para una carpeta, el
+// test dice que la carpeta va a `/files/c1`, que es un 404.
+func TestCopiarEnlaceDejaElEnlaceDeSiempre(t *testing.T) {
+	p := NuevaPantalla(traductor(t), nil, nil, nil)
+	p.Org = func() string { return "acme" }
+	portapapeles := fyne.CurrentApp().Clipboard()
+
+	p.copiarEnlace(Elemento{ID: "f1", Nombre: "acta.odt"})
+	if got, quiero := portapapeles.Content(), api.EnlaceFichero(api.ApexProd, "acme", "f1"); got != quiero {
+		t.Errorf("el enlace de un fichero es %q y se esperaba %q", got, quiero)
+	}
+	p.copiarEnlace(Elemento{ID: "c1", Nombre: "Actas 2026", Carpeta: true, Ruta: "/Actas 2026"})
+	if got := portapapeles.Content(); strings.Contains(got, "/files/") || !strings.HasSuffix(got, "/acme/?path=%2FActas+2026") {
+		t.Errorf("el enlace de una carpeta es %q", got)
+	}
+	esperar()
+	avisos := p.avisos.Avisos()
+	if len(avisos) == 0 || avisos[len(avisos)-1].Titulo != p.tr.T("action.linkCopied", nil) {
+		t.Error("copiar el enlace no lo avisa")
+	}
+}
+
+// TestElMenuDeRecientesTraeCopiarEnlace: el «⋯» de «Recientes» y «Destacados» es el
+// `ActionsMenu` de la web con descargar y compartir, y como allí trae «Copiar enlace»
+// —también sin red, y no para un fichero sin id—.
+//
+// VISTO EN ROJO (2026-11-06): con `menuPlano` como estaba (solo descargar y compartir),
+// los tres primeros casos salen sin «Copiar enlace».
+func TestElMenuDeRecientesTraeCopiarEnlace(t *testing.T) {
+	p := NuevaPantalla(traductor(t), nil, nil, nil)
+	k := func(claves ...string) []string {
+		out := make([]string, 0, len(claves))
+		for _, c := range claves {
+			out = append(out, p.tr.T(c, nil))
+		}
+		return out
+	}
+	casos := []struct {
+		que    string
+		el     Elemento
+		sinRed bool
+		quiero []string
+	}{
+		{"un fichero", Elemento{ID: "f1", Nombre: "acta.odt"}, false, k("action.download", "action.shareLink", "action.copyLink")},
+		{"una carpeta", Elemento{ID: "c1", Nombre: "C", Carpeta: true}, false, k("action.shareLink", "action.copyLink")},
+		{"una carpeta sin red", Elemento{ID: "c1", Nombre: "C", Carpeta: true}, true, k("action.copyLink")},
+		{"un fichero sin id", Elemento{Nombre: "suelto.txt"}, false, k("action.download", "action.shareLink")},
+	}
+	for _, c := range casos {
+		got := []string{}
+		for _, a := range p.accionesPlano(c.el, c.sinRed) {
+			got = append(got, a.texto)
+		}
+		if !slices.Equal(got, c.quiero) {
+			t.Errorf("%s: el menú es %q y en la web %q", c.que, got, c.quiero)
+		}
 	}
 }

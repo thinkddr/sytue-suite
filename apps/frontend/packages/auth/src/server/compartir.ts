@@ -18,10 +18,14 @@
  *
  * La lista vuelve con el correo y el nombre de cada persona: el servicio solo guarda
  * identificadores, y una lista de identificadores no le sirve a nadie para decidir.
+ *
+ * Con `agenda`, `GET /api/<ruta>` SIN recurso es la gente de la organización: el
+ * selector de «@» (`genteDeLaOrganizacion` de @sytue/shell) pide la misma ruta en
+ * todas las apps.
  */
 import type { APIContext, APIRoute } from 'astro';
 import type { ServerSession } from './app-bff.js';
-import type { Directorio } from './directorio.js';
+import { respuestaAgenda, type Directorio } from './directorio.js';
 
 export interface OpcionesCompartir {
   /** La sesión de la app (`getApiSession` de `crearBffDeApp`). */
@@ -32,6 +36,8 @@ export interface OpcionesCompartir {
   base: (q: URLSearchParams) => string | null;
   /** El directorio de la app (`crearDirectorio(bff, import.meta.env)`). */
   directorio: Pick<Directorio, 'resolverPersona' | 'resolverPersonaPorId' | 'resolverPersonas'>;
+  /** La agenda del directorio: sin recurso en la query, GET la devuelve (el «@»). */
+  agenda?: Directorio['agenda'];
 }
 
 /** Una persona de la lista, ya con cara. */
@@ -88,6 +94,10 @@ export function rutasDeCompartir(o: OpcionesCompartir): {
 
   return {
     async GET(ctx) {
+      if (o.agenda && !o.base(new URL(ctx.request.url).searchParams)) {
+        if (!(await o.sesion(ctx))) return json({ error: 'unauthenticated' }, 401);
+        return respuestaAgenda(ctx, o.agenda);
+      }
       const res = await llamar(ctx, 'GET', '');
       if (!res.ok) return reenviar(res);
       const { people = [] } = (await res.json()) as { people?: PersonaCompartida[] };

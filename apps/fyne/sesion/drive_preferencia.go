@@ -32,7 +32,7 @@ func (s *Suite) PonerDriveEnSistema(habilitado bool) error {
 	}
 	// La sesión guardada tampoco permite saltarse el bloqueo de esta app ni
 	// volver a autorizar después de un cierre local que no pudo persistirse.
-	if s.almacen == nil || s.reidentificando.Load() || !s.Estado().Dentro() {
+	if s.almacen == nil || s.sinSesionPropia() || !s.Estado().Dentro() {
 		return ajustes.PonerAccesoDrive("", false)
 	}
 	return s.almacen.ActualizarAccesoDrive(context.Background())

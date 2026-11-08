@@ -305,6 +305,14 @@ export const fr: AppCatalog<typeof en> = {
     one: '{count} élément mis à la corbeille.',
     other: '{count} éléments mis à la corbeille.',
   },
+  'files.batch.restored': {
+    one: '{count} élément restauré.',
+    other: '{count} éléments restaurés.',
+  },
+  'files.batch.restorePartial': {
+    one: '{count} élément n’a pas pu être restauré et reste dans la corbeille.',
+    other: '{count} éléments n’ont pas pu être restaurés et restent dans la corbeille.',
+  },
   'files.batch.trashFailed': 'Impossible de mettre la sélection à la corbeille.',
   'files.batch.moveTitle': {
     one: 'Déplacer {count} élément',
@@ -327,6 +335,9 @@ export const fr: AppCatalog<typeof en> = {
   'action.rename': 'Renommer',
   'action.move': 'Déplacer vers…',
   'action.copy': 'Faire une copie',
+  'action.copyLink': 'Copier le lien',
+  'action.linkCopied': 'Lien copié. Il ne s’ouvre que pour les personnes qui ont déjà accès.',
+  'action.copyLinkFailed': 'Impossible de copier le lien.',
   'action.shareLink': 'Partager un lien',
   'action.openInApp': 'Ouvrir dans l’application',
   'action.openInEditor': 'Ouvrir dans l’éditeur',
@@ -552,6 +563,18 @@ export const fr: AppCatalog<typeof en> = {
   'trash.purged': '« {name} » a été supprimé définitivement.',
   'trash.purgeDenied': '« {name} » ne peut pas être supprimé',
   'trash.purgeFailed': 'Impossible de supprimer.',
+  'trash.emptyAll': 'Vider la corbeille',
+  'trash.emptyAllTitle': 'Vider la corbeille ?',
+  'trash.emptyAllBody': {
+    one: 'L’élément de la corbeille sera effacé définitivement, avec son historique de versions. Il n’y aura aucun moyen de le récupérer ensuite.',
+    other:
+      'Les {count} éléments de la corbeille seront effacés définitivement, avec leur historique de versions. Il n’y aura aucun moyen de les récupérer ensuite.',
+  },
+  'trash.emptiedAll': 'La corbeille a été vidée.',
+  'trash.emptyAllPartial': {
+    one: '{count} élément n’a pas pu être supprimé et reste dans la corbeille.',
+    other: '{count} éléments n’ont pas pu être supprimés et restent dans la corbeille.',
+  },
   'trash.purgeTitle': 'Supprimer définitivement ?',
   'trash.purgeBodyFolder':
     'Le contenu de « {name} » et de tout ce qu’il contient sera effacé des serveurs de Sytue, avec son historique de versions. Il n’y a aucun moyen de le récupérer ensuite, ni ici ni auprès du support. En échange, vous libérez l’espace qu’il occupait.',

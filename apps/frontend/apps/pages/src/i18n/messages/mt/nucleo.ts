@@ -89,7 +89,7 @@ export const nucleo = {
   'new.progress': 'Passi biex jinħoloq is-sit',
   'new.go_to_step': 'Mur fil-pass {n}',
   'new.step_of': 'Pass {n} minn {total}',
-  'app_settings.title': "Settings ta' Sytue Web",
+  'app_settings.title': "Settings ta' Sytue Webs",
   'new.search_title': "Ibda bit-tip ta' negozju tiegħek",
   'new.search_help':
     "Ikteb x'tagħmel jew agħżel grupp. Kull mudell diġà fih il-kliem għas-sengħa tiegħek: int tibdel biss l-isem, in-numru tat-telefon, il-prezzijiet u r-ritratti.",
@@ -295,7 +295,7 @@ export const nucleo = {
   'domains.start_help':
     'Daħħal id-dominju li trid tuża. Ikollok bżonn aċċess għas-settings tad-DNS għand il-fornitur fejn xtrajtu.',
   'domains.progress': 'Progress tal-konnessjoni tad-dominju',
-  'domains.step.registered': 'Miżjud ma’ Sytue Web',
+  'domains.step.registered': 'Miżjud ma’ Sytue Webs',
   'domains.step.dns': 'DNS ivverifikat',
   'domains.step.https': 'HTTPS lest',
   'domains.step.primary': 'Indirizz ewlieni',

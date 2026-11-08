@@ -146,6 +146,12 @@ export const es: AppCatalog<typeof en> = {
   'share.password.removed': 'Contraseña quitada del enlace.',
   'share.password.failed':
     'No se ha podido guardar la contraseña. Debe tener entre 8 y 128 caracteres.',
+  'copy.action': 'Hacer una copia',
+  'copy.title': 'Copia de {title}',
+  'copy.error': 'No se pudo hacer la copia',
+  'tile.more': 'Más acciones',
+  'tile.more.label': 'Más acciones para «{title}»',
+  'tile.copy.label': 'Hacer una copia de «{title}»',
   'tile.delete': 'Eliminar',
   'tile.delete.label': 'Eliminar «{title}»',
 
@@ -214,6 +220,7 @@ export const es: AppCatalog<typeof en> = {
   'header.save.saving': 'Guardando…',
   'header.save.dirty': 'Cambios sin guardar',
   'header.save.error': 'Error al guardar',
+  'header.save.retry': 'Reintentar el guardado',
   'header.save.offline': 'Guardado en este dispositivo',
   'header.save.agoSeconds': 'Guardado hace {seconds} s',
   'header.save.agoMinutes': 'Guardado hace {minutes} min',
@@ -238,6 +245,7 @@ export const es: AppCatalog<typeof en> = {
   'status.zoom': 'Zoom',
   'status.zoom.out': 'Reducir',
   'status.zoom.in': 'Ampliar',
+  'status.zoom.reset': '{zoom} % · Volver al 100 %',
 
   'rail.search': 'Buscar',
   'rail.search.title': 'Buscar',

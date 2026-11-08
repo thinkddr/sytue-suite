@@ -66,6 +66,7 @@
   "common.remove": "Entfernen",
   "common.retry": "Erneut versuchen",
   "common.save": "Speichern",
+  "day.noEvents": "Keine Termine an diesem Tag",
   "error.calendarsLoad": "Die Kalender konnten nicht geladen werden.",
   "error.eventsLoad": "Die Termine konnten nicht geladen werden.",
   "event.ai": "Beschreiben Sie den Termin",
@@ -142,12 +143,19 @@
   "grid.blockAria": "{title}, {time}",
   "grid.continued": "{title} (Fortsetzung)",
   "grid.createOn": "Termin am {date} erstellen",
+  "grid.dayEvents": {
+    "one": "{date}, {count} Termin",
+    "other": "{date}, {count} Termine"
+  },
+  "grid.daySelected": "{label}, ausgewählt",
   "grid.loadError": "Der Kalender konnte nicht geladen werden",
   "grid.loading": "Kalender wird geladen",
   "grid.more": {
     "one": "+{count} weiterer",
     "other": "+{count} weitere"
   },
+  "grid.showMonth": "Ganzen Monat anzeigen",
+  "grid.showWeek": "Nur diese Woche anzeigen",
   "grid.snapAria": {
     "one": "Ziehen auf {count} Minute einrasten. Zum Ändern drücken.",
     "other": "Ziehen auf {count} Minuten einrasten. Zum Ändern drücken."
@@ -160,6 +168,13 @@
     "one": "{count} Min.",
     "other": "{count} Min."
   },
+  "grid.todayLabel": "Heute, {date}",
+  "grid.weekNumber": "Woche {week}",
+  "guests.organizer": "Organisator",
+  "guests.status.accepted": "Nimmt teil",
+  "guests.status.declined": "Nimmt nicht teil",
+  "guests.status.pending": "Antwort ausstehend",
+  "guests.status.tentative": "Vielleicht",
   "header.invitations": "Einladungen",
   "header.next": "Weiter",
   "header.pending": {
@@ -197,6 +212,10 @@
   "nav.createEventOn": "Termin am {date} erstellen",
   "nav.deleteSubscription": "Abo entfernen",
   "nav.manageResources": "Räume und Ressourcen verwalten",
+  "nav.menuPending": {
+    "one": "Menü öffnen, {count} offen",
+    "other": "Menü öffnen, {count} offen"
+  },
   "nav.myCalendars": "Meine Kalender",
   "nav.next": "Weiter",
   "nav.nextMonth": "Nächster Monat",
@@ -341,6 +360,7 @@
   "scope.following": "Diesen und alle folgenden",
   "scope.legend": "Dieser Termin wiederholt sich. Für welche Termine gilt die Änderung?",
   "scope.this": "Nur diesen Termin",
+  "search.allCalendars": "Alle Kalender",
   "search.error": "Die Suche konnte nicht abgeschlossen werden.",
   "search.events": "Termine suchen",
   "search.loadMore": "Mehr laden",
@@ -349,6 +369,12 @@
     "other": "Gib mindestens {count} Zeichen ein, um deine Kalender zu durchsuchen."
   },
   "search.noResults": "Keine Treffer für „{term}“.",
+  "search.period": "Zeitraum",
+  "search.period.any": "Beliebiger Zeitraum",
+  "search.period.month": "Diesen Monat",
+  "search.period.past": "Vergangen",
+  "search.period.upcoming": "Bevorstehend",
+  "search.period.year": "Dieses Jahr",
   "search.placeholder": "Titel, Beschreibung, Ort oder eingeladene Person…",
   "search.searching": "Wird gesucht…",
   "search.series": "Serie",
@@ -390,6 +416,14 @@
   "share.whoSeesNow": "Wer es jetzt sieht",
   "share.writerHint": "Sieht sie nicht nur, sondern erstellt, ändert und löscht auch Termine in diesem Kalender.",
   "share.writerLabel": "Meine Termine sehen und bearbeiten",
+  "shortcuts.group.actions": "Aktionen",
+  "shortcuts.group.navigate": "Bewegen",
+  "shortcuts.group.views": "Ansichten",
+  "shortcuts.help": "Diese Liste anzeigen",
+  "shortcuts.next": "Nächster Zeitraum",
+  "shortcuts.prev": "Vorheriger Zeitraum",
+  "shortcuts.title": "Tastenkürzel",
+  "shortcuts.today": "Zu heute springen",
   "subscribe.aria": "Kalender per URL abonnieren",
   "subscribe.byUrl": "Per URL abonnieren (.ics)",
   "subscribe.defaultName": "Abonnierter Kalender",

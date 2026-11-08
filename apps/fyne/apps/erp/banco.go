@@ -191,7 +191,7 @@ func (b *Banco) Objeto(v tema.Variante) fyne.CanvasObject {
 		add(b.plegado(v, "hechas", b.t("bank.done"), ancho, b.hechas(v), HechasPB))
 	}
 	o, alto := p.objeto()
-	return enPagina(o, alto, AnchoObligaciones, MargenLista)
+	return enPagina(o, alto, AnchoObligaciones)
 }
 
 // cabecera es el título y la frase, y «Subir movimientos» a la derecha.
@@ -241,7 +241,7 @@ func (b *Banco) plegado(v tema.Variante, clave, titulo string, ancho float32, cu
 	ms := s.MinSize()
 	interior := ancho - 2*tema.Borde
 	l := &lienzo{}
-	caja := ui.NuevaCaja(tema.Color("bg", v), tema.Color("border", v), radioTarjeta())
+	caja := ui.NuevaCaja(tema.Color(ui.FondoHoja(), v), tema.Color("border", v), radioTarjeta())
 	l.caja(caja, 0, 0)
 	l.poner(s, tema.Borde, tema.Borde, interior, ms.Height)
 	alto := tema.Borde + ms.Height

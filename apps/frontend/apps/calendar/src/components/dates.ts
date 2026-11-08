@@ -107,6 +107,26 @@ export function addMonths(d: Date, n: number): Date {
   return x;
 }
 
+/**
+ * El mismo día `n` meses después, RECORTADO al último día del mes de destino: del 31 de
+ * enero, «mes siguiente» es el 28 (o 29) de febrero. `addMonths` deja que `Date` se
+ * desborde y salta a MARZO, que es lo que hacían las flechas del mes y del mini-mes.
+ * Conserva la hora. Pareja en Fyne: `calendario.MoverMes`.
+ *
+ * La pareja de NÚMERO DE SERIE es `shiftMonth` (el recorte de EDATE) en @sytue/formula;
+ * aquí se trabaja con `Date` local, y depender del motor de fórmulas para esto sería
+ * acoplar dos dominios.
+ */
+export function addMonthsClamped(d: Date, n: number): Date {
+  const x = new Date(d);
+  const dia = x.getDate();
+  x.setDate(1);
+  x.setMonth(x.getMonth() + n);
+  const ultimo = new Date(x.getFullYear(), x.getMonth() + 1, 0).getDate();
+  x.setDate(Math.min(dia, ultimo));
+  return x;
+}
+
 export function isSameDay(a: Date, b: Date): boolean {
   return (
     a.getFullYear() === b.getFullYear() &&
@@ -159,19 +179,8 @@ export function weekGrid(d: Date): Date[] {
  * interfaz y vive en el catálogo de la app, no aquí.
  */
 export function titleFor(mode: ViewMode, d: Date, locale: Locale): string {
-  if (mode === 'month') {
-    return capitalize(fmt(locale, 'monthYear', { month: 'long', year: 'numeric' }).format(d));
-  }
-  if (mode === 'day') {
-    return capitalize(
-      fmt(locale, 'dayLong', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      }).format(d),
-    );
-  }
+  if (mode === 'month') return capitalize(monthYearLabel(locale, d));
+  if (mode === 'day') return capitalize(fullDateLabel(locale, d));
   if (mode === 'agenda') return dayMonthLabel(locale, d);
   const days = weekGrid(d);
   return capitalize(
@@ -180,6 +189,75 @@ export function titleFor(mode: ViewMode, d: Date, locale: Locale): string {
       days[6]!,
     ),
   );
+}
+
+/**
+ * «noviembre» — el mes suelto, en minúscula si el idioma lo escribe así. Es la parte
+ * `month` de `{ month: 'long', year: 'numeric' }` y no `{ month: 'long' }` a secas: en
+ * griego esa da el GENITIVO («Νοεμβρίου», «de noviembre») y con el año va en nominativo
+ * («Νοέμβριος»), que es como lo escribe el mini-mes. En los otros 25 coinciden. Pareja en
+ * Fyne: `i18n.FormatMonth`, que lee la misma parte (`meses_largos`).
+ */
+export function monthLabel(locale: Locale, d: Date): string {
+  return (
+    fmt(locale, 'monthYear', { month: 'long', year: 'numeric' })
+      .formatToParts(d)
+      .find((p) => p.type === 'month')?.value ?? monthYearLabel(locale, d)
+  );
+}
+
+/** «noviembre de 2026», «November 2026» — sin capitalizar (`titleFor` lo capitaliza). */
+export function monthYearLabel(locale: Locale, d: Date): string {
+  return fmt(locale, 'monthYear', { month: 'long', year: 'numeric' }).format(d);
+}
+
+/** «viernes, 6 de noviembre de 2026» — la fecha entera, sin capitalizar. */
+export function fullDateLabel(locale: Locale, d: Date): string {
+  return fmt(locale, 'dayLong', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(d);
+}
+
+/** «viernes, 6 de noviembre» — el nombre accesible de un día del mes compacto. */
+export function weekdayDayMonthLabel(locale: Locale, d: Date): string {
+  return fmt(locale, 'weekdayDayMonth', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(d);
+}
+
+/**
+ * El título del mes compacto del teléfono: el mes suelto si es el año de `hoy`
+ * («noviembre», «November») y con el año si no («enero de 2027», «January 2027»). Sin
+ * capitalizar, como lo escribe el idioma. Pareja en Fyne: `calendario.TituloCompacto`.
+ */
+export function compactTitle(locale: Locale, cursor: Date, hoy: Date): string {
+  return cursor.getFullYear() === hoy.getFullYear()
+    ? monthLabel(locale, cursor)
+    : monthYearLabel(locale, cursor);
+}
+
+/**
+ * Número de semana ISO 8601 de la fecha (hora local): la semana es la de su jueves, y la
+ * 1 es la que contiene el 4 de enero. El 31-dic-2024 es la 1 de 2025 y el 1-ene-2027 la
+ * 53 de 2026. Pareja en Fyne: `time.ISOWeek`.
+ *
+ * La pareja de NÚMERO DE SERIE es `ISOWEEKNUM` en @sytue/formula; aquí se trabaja con
+ * `Date` local y depender del motor de fórmulas sería acoplar dos dominios.
+ */
+export function isoWeek(d: Date): number {
+  const jueves = startOfDay(d);
+  jueves.setDate(jueves.getDate() - ((jueves.getDay() + 6) % 7) + 3);
+  const cuatroDeEnero = new Date(jueves.getFullYear(), 0, 4);
+  const lunes1 = addDays(cuatroDeEnero, -((cuatroDeEnero.getDay() + 6) % 7));
+  // Días enteros en hora local: `round` absorbe la hora de más o de menos de un cambio
+  // de horario entre las dos fechas.
+  const dias = Math.round((jueves.getTime() - lunes1.getTime()) / 86_400_000);
+  return Math.floor(dias / 7) + 1;
 }
 
 /** «3 de julio» — para nombres accesibles y títulos cortos. */

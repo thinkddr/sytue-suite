@@ -87,7 +87,7 @@ export const nucleo = {
   'new.progress': 'Pași pentru crearea site-ului',
   'new.go_to_step': 'Mergeți la pasul {n}',
   'new.step_of': 'Pasul {n} din {total}',
-  'app_settings.title': 'Setări Sytue Web',
+  'app_settings.title': 'Setări Sytue Webs',
   'new.search_title': 'Începeți de la tipul afacerii dumneavoastră',
   'new.search_help':
     'Scrieți cu ce vă ocupați sau alegeți o categorie. Fiecare șablon conține deja textele potrivite domeniului: trebuie doar să schimbați numele, telefonul, prețurile și fotografiile.',
@@ -290,7 +290,7 @@ export const nucleo = {
   'domains.start_help':
     'Introduceți domeniul pe care doriți să îl folosiți. Veți avea nevoie de acces la panoul DNS al furnizorului de la care l-ați achiziționat.',
   'domains.progress': 'Progresul conectării domeniului',
-  'domains.step.registered': 'Adăugat în Sytue Web',
+  'domains.step.registered': 'Adăugat în Sytue Webs',
   'domains.step.dns': 'DNS verificat',
   'domains.step.https': 'HTTPS pregătit',
   'domains.step.primary': 'Adresă principală',

@@ -29,7 +29,7 @@ class Entrada(unittest.TestCase):
                                        capture_output=True, timeout=2, check=False)
             self.assertEqual(resultado.returncode, 1)
             self.assertEqual(resultado.stdout, b"")
-            self.assertEqual(resultado.stderr, b"::error::perfil CMS o derechos no v\xc3\xa1lidos\n")
+            self.assertEqual(resultado.stderr, b"::error::perfil CMS o derechos no v\xc3\xa1lidos: profile_input_invalid\n")
 
 
 class CMS(unittest.TestCase):
@@ -121,6 +121,55 @@ class CMS(unittest.TestCase):
         ruta.write_bytes(self.der)
         with mock.patch.object(p, "RAIZ_APPLE", ruta), self.assertRaisesRegex(p.PerfilInvalido, "pinned_apple_root"):
             p.decodificar(self.firmar(), "ios")
+
+
+
+class FyneAppSinTomllib(unittest.TestCase):
+    """El python3 del Mac propio no trae tomllib (3.11+): el lector de respaldo tiene
+    que dar exactamente lo mismo en cada FyneApp.toml real."""
+
+    def test_el_respaldo_lee_igual_que_tomllib_cada_fyneapp(self):
+        import tomllib as real
+        catalogo = sorted((pathlib.Path(__file__).resolve().parents[1] / "cmd").glob("*/FyneApp.toml"))
+        self.assertGreater(len(catalogo), 10)
+        with mock.patch.object(p, "tomllib", None):
+            for ruta in catalogo:
+                with self.subTest(app=ruta.parent.name):
+                    texto = ruta.read_text()
+                    self.assertEqual(p.leer_fyneapp(texto), real.loads(texto))
+            with self.assertRaises(ValueError):
+                p.leer_fyneapp("[Details]\n  Tags = [\"a\"]\n")
+
+
+class Despertar(unittest.TestCase):
+    """SYTUE_DESPERTAR_APPLE: `aps-environment` en los derechos del host solo se firma si
+    el perfil lo autoriza. Visto en rojo sin la guarda: se aceptaba un perfil sin Push."""
+
+    def perfil(self, **derechos):
+        return {"TeamIdentifier": ["VHC5QW7BZ3"], "Platform": ["iOS"], "ProvisionsAllDevices": False,
+                "ExpirationDate": datetime.datetime(2050, 1, 1),
+                "Entitlements": {"application-identifier": "VHC5QW7BZ3.eu.sytue.calendar",
+                                 "com.apple.security.application-groups": ["group.eu.sytue.suite"],
+                                 "keychain-access-groups": ["VHC5QW7BZ3.*"], **derechos}}
+
+    def validar(self, perfil, pedidos):
+        with tempfile.TemporaryDirectory() as tmp:
+            ruta = pathlib.Path(tmp, "derechos.plist")
+            ruta.write_bytes(plistlib.dumps({"com.apple.security.application-groups": ["group.eu.sytue.suite"],
+                                             "keychain-access-groups": ["VHC5QW7BZ3.eu.sytue.calendar",
+                                                                        "VHC5QW7BZ3.eu.sytue.suite"], **pedidos}))
+            p.validar_derechos(perfil, "eu.sytue.calendar", "ios", "group.eu.sytue.suite", "",
+                               "VHC5QW7BZ3.eu.sytue.suite", str(ruta))
+
+    def test_aps_environment_exige_el_perfil_con_push(self):
+        self.validar(self.perfil(), {})
+        self.validar(self.perfil(**{"aps-environment": "production"}), {"aps-environment": "production"})
+        for perfil, pedido in ((self.perfil(), "production"),
+                               (self.perfil(**{"aps-environment": "development"}), "production"),
+                               (self.perfil(**{"aps-environment": "development"}), "development")):
+            with self.subTest(perfil=perfil["Entitlements"].get("aps-environment"), pedido=pedido), \
+                    self.assertRaisesRegex(p.PerfilInvalido, "avisos"):
+                self.validar(perfil, {"aps-environment": pedido})
 
 
 if __name__ == "__main__":

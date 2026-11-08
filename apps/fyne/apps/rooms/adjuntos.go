@@ -216,9 +216,11 @@ func (v *VistaAdjuntos) fichero(a Adjunto) fyne.CanvasObject {
 	acciones = append(acciones, nube)
 	tm := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	caja := ui.NuevaCaja(tema.Color("surface", tm), tema.Color("border", tm), tema.RadioLG)
-	fila := container.NewBorder(nil, nil, nil,
-		container.New(ui.Margen{Der: tema.Espacio(1.5)}, container.New(ui.Fila{Hueco: tema.Espacio(1)}, acciones...)), enlace)
-	return container.NewStack(append(caja.Objetos(), fila)...)
+	// `flex items-center gap-1` con el enlace en `flex-1`: con ui.Fila los botones iban
+	// arriba, más altos que la flecha de descargar del enlace.
+	fila := container.New(ui.Margen{Der: tema.Espacio(1.5)},
+		container.New(filaFlexible{hueco: tema.Espacio(1)}, append([]fyne.CanvasObject{enlace}, acciones...)...))
+	return container.New(enCaja{caja}, append(caja.Objetos(), fila)...)
 }
 
 // anchoMax es un `max-w-*`: el hijo a su ancho pedido, como mucho ese.

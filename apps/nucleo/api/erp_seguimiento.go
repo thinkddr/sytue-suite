@@ -221,10 +221,28 @@ func (e *ERP) AsientosDe(ctx context.Context, modelo, id string) ([]ERPAsiento, 
 
 // Libro devuelve los últimos `limite` asientos del libro diario.
 func (e *ERP) Libro(ctx context.Context, limite int) ([]ERPAsiento, error) {
+	return e.LibroEntre(ctx, limite, "", "")
+}
+
+// LibroEntre es el libro de un período: `desde` y `hasta` en `YYYY-MM-DD`, incluidos;
+// vacíos, sin acotar (`rangoDePeriodo` de la web).
+func (e *ERP) LibroEntre(ctx context.Context, limite int, desde, hasta string) ([]ERPAsiento, error) {
+	q := url.Values{"limite": {strconv.Itoa(limite)}}
+	periodo(q, desde, hasta)
 	r, err := JSON[struct {
 		Asientos []ERPAsiento `json:"asientos"`
-	}](ctx, e.c, e.pedir("/libro", url.Values{"limite": {strconv.Itoa(limite)}}))
+	}](ctx, e.c, e.pedir("/libro", q))
 	return r.Asientos, err
+}
+
+// periodo pone `desde` y `hasta` en la consulta, si los hay.
+func periodo(q url.Values, desde, hasta string) {
+	if desde != "" {
+		q.Set("desde", desde)
+	}
+	if hasta != "" {
+		q.Set("hasta", hasta)
+	}
 }
 
 // AnularAsiento anula un asiento con su motivo. No borra nada: escribe el contrario, y
@@ -250,7 +268,15 @@ type ERPBalance struct {
 
 // Balance devuelve el sumas y saldos.
 func (e *ERP) Balance(ctx context.Context) (ERPBalance, error) {
-	return JSON[ERPBalance](ctx, e.c, e.pedir("/balance", nil))
+	return e.BalanceEntre(ctx, "", "")
+}
+
+// BalanceEntre es el sumas y saldos de un período (los movimientos entre `desde` y
+// `hasta`); sin `desde`, todo lo asentado hasta `hasta`.
+func (e *ERP) BalanceEntre(ctx context.Context, desde, hasta string) (ERPBalance, error) {
+	q := url.Values{}
+	periodo(q, desde, hasta)
+	return JSON[ERPBalance](ctx, e.c, e.pedir("/balance", q))
 }
 
 // ERPResumen son los indicadores de la portada.
@@ -430,6 +456,10 @@ func (e *ERP) enviar(ctx context.Context, ruta string, cuerpo any) error {
 // ERPResultadoImportacion es lo que pasó con un fichero importado: cuántas filas
 // entraron nuevas o actualizadas, qué columnas no se reconocieron y qué filas fallaron.
 type ERPResultadoImportacion struct {
+	// ID es el lote, con el que se deshace (RevertirImportacion). Vacío en una
+	// simulación y en una factura en XML, que no entra como lote.
+	ID           string   `json:"id,omitempty"`
+	Simulacion   bool     `json:"simulacion"`
 	Filas        int      `json:"filas"`
 	Creados      int      `json:"creados"`
 	Actualizados int      `json:"actualizados"`
@@ -443,7 +473,28 @@ type ERPResultadoImportacion struct {
 // Importar sube un CSV —o, en los modelos que reciben facturas, una factura
 // electrónica en XML— a `POST /api/v1/{modelo}/importar`.
 func (e *ERP) Importar(ctx context.Context, modelo string, datos []byte, xml bool) (ERPResultadoImportacion, error) {
-	r := e.pedir("/"+url.PathEscape(modelo)+"/importar", nil)
+	return e.ImportarCon(ctx, modelo, datos, xml, ERPOpcionesImportacion{})
+}
+
+// ERPOpcionesImportacion son los dos parámetros de la importación: el nombre del
+// fichero, con el que se reconoce el lote, y Simular, que hace la importación entera
+// contra la base y la DESHACE (`?simular=1`): el resultado es lo que pasaría.
+type ERPOpcionesImportacion struct {
+	Fichero string
+	Simular bool
+}
+
+// ImportarCon es Importar con sus opciones; es lo que hace la vista previa de la web
+// (`rutaImportar` de lib/importacion.ts).
+func (e *ERP) ImportarCon(ctx context.Context, modelo string, datos []byte, xml bool, op ERPOpcionesImportacion) (ERPResultadoImportacion, error) {
+	q := url.Values{}
+	if op.Fichero != "" {
+		q.Set("fichero", op.Fichero)
+	}
+	if op.Simular {
+		q.Set("simular", "1")
+	}
+	r := e.pedir("/"+url.PathEscape(modelo)+"/importar", q)
 	r.Method, r.Body = http.MethodPost, datos
 	tipo := "text/csv"
 	if xml {
@@ -451,4 +502,18 @@ func (e *ERP) Importar(ctx context.Context, modelo string, datos []byte, xml boo
 	}
 	r.Header.Set("Content-Type", tipo)
 	return JSON[ERPResultadoImportacion](ctx, e.c, r)
+}
+
+// ERPReversion es lo que pasó al deshacer un lote (`store.Reversion`). Intactos son los
+// registros que alguien tocó después de importar: no se pisan.
+type ERPReversion struct {
+	Borrados    int `json:"borrados"`
+	Restaurados int `json:"restaurados"`
+	Intactos    int `json:"intactos"`
+}
+
+// RevertirImportacion deshace un lote entero (`POST /api/v1/importaciones/{id}/revertir`).
+// Pide administrar la contabilidad: sin ese permiso, 403.
+func (e *ERP) RevertirImportacion(ctx context.Context, id string) (ERPReversion, error) {
+	return postJSON[ERPReversion](ctx, e, "/importaciones/"+url.PathEscape(id)+"/revertir", struct{}{})
 }

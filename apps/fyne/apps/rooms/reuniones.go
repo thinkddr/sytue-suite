@@ -582,14 +582,33 @@ func (c *columnaReuniones) Layout(_ []fyne.CanvasObject, t fyne.Size) {
 	c.colocar(t.Width, true)
 }
 
-// enCaja pone la caja debajo del último hijo, a su tamaño.
+// enCaja pone la caja debajo del último hijo, a su tamaño; sin hijo, es la caja sola.
+//
+// container.NewStack no vale para esto: lleva cada rectángulo de la caja a (0,0) y al
+// tamaño entero, así que con relleno opaco el de dentro tapa el borde, y con relleno
+// transparente el de fuera queda macizo. Caja.Redimensionar sabe dónde va cada uno.
 type enCaja struct{ caja *ui.Caja }
 
-func (e enCaja) MinSize(objs []fyne.CanvasObject) fyne.Size { return objs[len(objs)-1].MinSize() }
+// dentro es el hijo que va encima de la caja, o nil si no hay.
+func (e enCaja) dentro(objs []fyne.CanvasObject) fyne.CanvasObject {
+	if len(objs) <= len(e.caja.Objetos()) {
+		return nil
+	}
+	return objs[len(objs)-1]
+}
+
+func (e enCaja) MinSize(objs []fyne.CanvasObject) fyne.Size {
+	if d := e.dentro(objs); d != nil {
+		return d.MinSize()
+	}
+	return fyne.Size{}
+}
 
 func (e enCaja) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	e.caja.Redimensionar(t)
-	objs[len(objs)-1].Resize(t)
+	if d := e.dentro(objs); d != nil {
+		d.Resize(t)
+	}
 }
 
 // filaFlexible es `flex items-center gap-2` con el primer hijo en `flex-1`: los demás a

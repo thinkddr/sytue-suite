@@ -1,0 +1,52 @@
+# Contrato del snapshot de los widgets nativos (formato 2): los mismos casos los
+# corren Go (contrato_test.go), Java (WidgetSnapshotPrueba.java) y Swift
+# (SnapshotTests.swift). Columnas separadas por tabuladores; «-» es la cadena vacía.
+# visible  caso  epoca  confirmada  marca  cerrada  bloqueo  version  active  generation  updated_at  expires_at  now  esperado
+#   (producto «mail» y un contador «unread» de 3; el contenido lo prueba cada lector)
+# rancio   caso  updated_at  now  esperado
+# vigente  caso  zona  start_at  end_at  all_day  now  esperado
+#   (producto «calendar»; el día completo es flotante: medianoche UTC)
+visible	valido	e1	m1	m1	0	0	2	1	e1	1792500000	1792500120	1792500000	1
+visible	24h justas	e1	m1	m1	0	0	2	1	e1	1792500000	1792586400	1792500000	1
+visible	24h y 1 s	e1	m1	m1	0	0	2	1	e1	1792500000	1792586401	1792500000	0
+visible	visto al ultimo segundo	e1	m1	m1	0	0	2	1	e1	1792500000	1792586400	1792586399	1
+visible	visto a las 24h	e1	m1	m1	0	0	2	1	e1	1792500000	1792586400	1792586400	0
+visible	caducado	e1	m1	m1	0	0	2	1	e1	1792500000	1792500000	1792500000	0
+visible	formato v1	e1	m1	m1	0	0	1	1	e1	1792500000	1792500120	1792500000	0
+visible	formato v3	e1	m1	m1	0	0	3	1	e1	1792500000	1792500120	1792500000	0
+visible	inactivo	e1	m1	m1	0	0	2	0	e1	1792500000	1792500120	1792500000	0
+visible	otra epoca	e1	m1	m1	0	0	2	1	e0	1792500000	1792500120	1792500000	0
+visible	sin epoca	-	m1	m1	0	0	2	1	-	1792500000	1792500120	1792500000	0
+visible	renovado: otra marca confirmada	e1	m2	m2	0	0	2	1	e1	1792500000	1792500120	1792500000	1
+visible	sin confirmar	e1	m0	m1	0	0	2	1	e1	1792500000	1792500120	1792500000	0
+visible	sin marca	e1	-	-	0	0	2	1	e1	1792500000	1792500120	1792500000	0
+visible	cerrada	e1	m1	m1	1	0	2	1	e1	1792500000	1792500120	1792500000	0
+visible	bloqueo	e1	m1	m1	0	1	2	1	e1	1792500000	1792500120	1792500000	0
+visible	reloj 5 s por delante	e1	m1	m1	0	0	2	1	e1	1792500005	1792500120	1792500000	1
+visible	del futuro	e1	m1	m1	0	0	2	1	e1	1792500006	1792500120	1792500000	0
+visible	sin fecha	e1	m1	m1	0	0	2	1	e1	0	1792500120	1792500000	0
+visible	caduca antes de escribirse	e1	m1	m1	0	0	2	1	e1	1792500000	1792499999	1792499990	0
+rancio	recien	1792500000	1792500000	0
+rancio	14 min 59 s	1792500000	1792500899	0
+rancio	15 min	1792500000	1792500900	1
+rancio	casi un dia	1792500000	1792586399	1
+vigente	con hora, terminado	Europe/Madrid	1794045600	1794049199	0	1794049200	0
+vigente	con hora, termina ahora	Europe/Madrid	1794045600	1794049200	0	1794049200	0
+vigente	con hora, en curso	Europe/Madrid	1794045600	1794049201	0	1794049200	1
+vigente	con hora, empieza ahora sin fin	Europe/Madrid	1794049200	0	0	1794049200	1
+vigente	con hora, empezo sin fin	Europe/Madrid	1794049199	0	0	1794049200	0
+vigente	sin fechas	Europe/Madrid	0	0	0	1794049200	1
+vigente	dia completo, su ultimo segundo	Europe/Madrid	1794009600	1794096000	1	1794092399	1
+vigente	dia completo, al dia siguiente	Europe/Madrid	1794009600	1794096000	1	1794092400	0
+vigente	dia completo, a su primera hora	Europe/Madrid	1794009600	1794096000	1	1794006000	1
+vigente	dia completo sin fin	Europe/Madrid	1794009600	0	1	1794070800	1
+vigente	dia completo sin fin, al dia siguiente	Europe/Madrid	1794009600	0	1	1794092400	0
+vigente	dos dias, el segundo	Europe/Madrid	1794009600	1794182400	1	1794175200	1
+vigente	dos dias, el tercero	Europe/Madrid	1794009600	1794182400	1	1794178800	0
+vigente	dia completo, su ultimo segundo	America/New_York	1794009600	1794096000	1	1794113999	1
+vigente	dia completo, al dia siguiente	America/New_York	1794009600	1794096000	1	1794114000	0
+vigente	dia completo, a su primera hora	America/New_York	1794009600	1794096000	1	1794027600	1
+vigente	dia completo sin fin	America/New_York	1794009600	0	1	1794092400	1
+vigente	dia completo sin fin, al dia siguiente	America/New_York	1794009600	0	1	1794114000	0
+vigente	dos dias, el segundo	America/New_York	1794009600	1794182400	1	1794196800	1
+vigente	dos dias, el tercero	America/New_York	1794009600	1794182400	1	1794200400	0

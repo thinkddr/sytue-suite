@@ -102,10 +102,15 @@ export async function startAppConsent(
   return { instance_id: instance.id, authorize_url: url.href };
 }
 
+/**
+ * `error` is a short stable code (denied|provider|state|exchange|scope|exists).
+ * With `exists`, `existing` is the account already connected for that address
+ * and `instance` is a discarded draft.
+ */
 export function finishAppConsent(
   client: HttpClient,
   query: URLSearchParams,
-): Promise<{ section?: string; instance?: string; error?: string }> {
+): Promise<{ section?: string; instance?: string; existing?: string; error?: string }> {
   return client.postJson('/oauth/finish', {
     state: query.get('state') ?? '',
     code: query.get('code') ?? '',

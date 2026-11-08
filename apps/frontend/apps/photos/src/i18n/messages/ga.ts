@@ -145,6 +145,13 @@ export const ga: AppCatalog<typeof en> = {
   'gallery.downloadSelected': 'Íoslódáil',
   'gallery.downloading':
     'Iarratais íoslódála tosaithe: {count}. Seiceáil íoslódálacha do bhrabhsálaí.',
+  'gallery.downloadingNative': {
+    one: '1 ghrianghraf á íoslódáil…',
+    two: '{count} ghrianghraf á n-íoslódáil…',
+    few: '{count} ghrianghraf á n-íoslódáil…',
+    many: '{count} ngrianghraf á n-íoslódáil…',
+    other: '{count} grianghraf á n-íoslódáil…',
+  },
   'gallery.downloadCapped': 'Grianghraif lasmuigh den bhaisc seo: {count}.',
   'gallery.newAlbum': 'Albam nua',
   'gallery.newAlbumTitle': 'Albam nua',
@@ -290,4 +297,21 @@ export const ga: AppCatalog<typeof en> = {
   'aiBatch.excludeOrg': 'Fág an eagraíocht as baisc uathoibríoch Sytue AI',
   'aiBatch.excludedHint':
     'Tá an eagraíocht fágtha as baisc uathoibríoch Sytue AI. Ní phróiseáiltear grianghraif nua sa chúlra le haghaidh moltaí ná cosúlachtaí.',
+  'album.rename': 'Athainmnigh',
+  'album.renamePrompt': 'Ainm an albaim',
+  'album.setCover': 'Úsáid mar chlúdach an albaim',
+  'album.isCover': 'Seo clúdach an albaim',
+  'album.coverSet': 'Nuashonraíodh clúdach an albaim',
+  'gallery.favorited': 'Curtha leis na ceanáin: {count}',
+  'gallery.unfavorited': 'Bainte de na ceanáin: {count}',
+  'gallery.favoriteFailed': 'Grianghraif nárbh fhéidir a athrú: {count}',
+  'gallery.noResults.title': 'Níl aon ghrianghraf a mheaitseálann “{query}”',
+  'gallery.noResults.description':
+    'Bain triail as focail eile, nó glan an cuardach chun do ghrianghraif go léir a fheiceáil.',
+  'gallery.clearSearch': 'Glan an cuardach',
+  'viewer.counter': '{index} / {total}',
+  'viewer.counterMore': '{count}+',
+  'viewer.counterLabel': 'Grianghraf {index} as {total}',
+  'viewer.shortcutsJump':
+    'Téann Home agus End chuig an gcéad ghrianghraf agus an grianghraf deireanach.',
 };

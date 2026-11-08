@@ -1,0 +1,1044 @@
+From e0212741327166e49049d6deed6877688df7bd57 Mon Sep 17 00:00:00 2001
+From: Daniel Delgado <admin@sytue.eu>
+Date: Sat, 7 Nov 2026 03:29:45 +0000
+Subject: [PATCH 1/2] feat(mobile/ios): app refresh tasks and launches without
+ a scene
+
+iOS can launch an app with no scene, for an app refresh task (BGAppRefreshTask) or a
+background notification, and the whole main function runs then too. The mobile driver
+now implements the optional mobile.BackgroundDriver:
+
+- LaunchedInBackground: UIKit launched the process for background work and no scene has
+  connected yet.
+- OnFirstScene: run what needs a user interface when the first scene connects, on the
+  main thread and before that scene's URLs; at once elsewhere. A scene UIKit connects
+  outside the foreground waits, with its URLs, until it first enters the foreground.
+- ProtectedDataAvailable: false while the device is locked, followed through the
+  application delegate.
+- OnBackgroundRefresh: the handler of the task named by the first entry of
+  BGTaskSchedulerPermittedIdentifiers. It is registered before launching finishes,
+  requested again each time the app moves to the background and when the handler
+  returns, and completed exactly once: an expiring task cancels the handler's context
+  and fails as soon as the handler returns, or after a 500 ms grace; one that expires
+  before its handler starts (the main thread busy) fails at once and never runs it.
+  iOS suspends the app when the task completes, and kills one suspended holding a file
+  lock in a shared container (0xdead10cc): the grace lets the handler let go of it.
+  Each task asks UIKit for isProtectedDataAvailable on the main thread before the
+  handler runs, as the delegate notifications can reach a suspended app late.
+
+Apps without those Info.plist keys behave as before. The portable state machine is
+tested on every platform; the Objective-C bridge is pinned by source contracts, as it
+cannot be compiled outside Xcode.
+
+darwin_ios.m is compiled by cgo without ARC: a scene whose connection waits for its first
+foreground keeps the connection options in a property, released only after the
+connection used them (releasing them first crashed every launch, as a regular launch
+connects its scene unattached), and sceneDidBecomeActive connects it too should UIKit
+skip sceneWillEnterForeground. The source contracts read the native sources with LF line
+endings and fail, instead of panicking, when a marker is missing.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JNuJHCzQJGHE9egbBprScr
+---
+ .gitattributes                                |   4 +
+ driver/mobile/background.go                   |  53 +++
+ internal/driver/mobile/app/background.go      | 224 ++++++++++++
+ internal/driver/mobile/app/background_test.go | 327 ++++++++++++++++++
+ internal/driver/mobile/app/darwin_ios.go      |  35 +-
+ internal/driver/mobile/app/darwin_ios.m       | 110 ++++++
+ .../mobile/app/ios_geometry_source_test.go    |  25 +-
+ internal/driver/mobile/background.go          |  28 ++
+ internal/driver/mobile/background_test.go     |  23 ++
+ 9 files changed, 827 insertions(+), 2 deletions(-)
+ create mode 100644 driver/mobile/background.go
+ create mode 100644 internal/driver/mobile/app/background.go
+ create mode 100644 internal/driver/mobile/app/background_test.go
+ create mode 100644 internal/driver/mobile/background.go
+ create mode 100644 internal/driver/mobile/background_test.go
+
+diff --git a/.gitattributes b/.gitattributes
+index d207b18..676fb06 100644
+--- a/.gitattributes
++++ b/.gitattributes
+@@ -1 +1,5 @@
+ *.go text eol=lf
++# The native sources are read by the source contracts: keep them LF on every checkout.
++*.m text eol=lf
++*.h text eol=lf
++*.c text eol=lf
+diff --git a/driver/mobile/background.go b/driver/mobile/background.go
+new file mode 100644
+index 0000000..5329a7c
+--- /dev/null
++++ b/driver/mobile/background.go
+@@ -0,0 +1,53 @@
++// SPDX-License-Identifier: Apache-2.0
++// Copyright (c) 2026 Daniel Delgado Ramos
++
++package mobile
++
++import (
++	"context"
++	"time"
++)
++
++// BackgroundDriver is an optional API of the mobile driver for work that the system
++// starts without a user interface. Assert it on fyne.App.Driver().
++//
++// iOS can launch an app with no scene: for an app refresh task (BGAppRefreshTask) or
++// a background notification. The whole main function runs then too, before UIKit says
++// why it launched, so an app that wants to avoid user-facing work in that case defers
++// it with OnFirstScene. Other platforms have no such launch: OnFirstScene runs at once,
++// LaunchedInBackground is false, protected data is available and no refresh is ever
++// requested.
++type BackgroundDriver interface {
++	// LaunchedInBackground reports whether the system launched the process without a
++	// user interface and no scene has connected since. It is only meaningful once the
++	// application has finished launching; before that it is false.
++	LaunchedInBackground() bool
++
++	// OnFirstScene runs f when the first scene connects: synchronously, on the main
++	// thread, before the URLs or user activities of that scene are delivered, in the
++	// order the functions were registered. If a scene has already connected, or the
++	// platform has no scenes, f runs synchronously before OnFirstScene returns.
++	// f must not block or wait for the UI goroutine.
++	OnFirstScene(f func())
++
++	// ProtectedDataAvailable reports whether files with complete data protection can
++	// be read: on iOS, false while the device is locked
++	// (UIApplication.protectedDataAvailable). It is safe from any goroutine.
++	ProtectedDataAvailable() bool
++
++	// OnBackgroundRefresh sets the handler of the app refresh task. The first entry of
++	// BGTaskSchedulerPermittedIdentifiers in Info.plist names the task, and
++	// UIBackgroundModes must contain "fetch"; without them the handler never runs.
++	//
++	// A refresh is requested no earlier than every from now each time the app moves to
++	// the background, and again when the handler returns: after every, or after retry
++	// when it is positive. f runs on its own goroutine. ctx is cancelled when the
++	// system ends the task, and the task is then reported as failed as soon as f
++	// returns, or after a grace of half a second if it does not. f must return
++	// promptly once ctx is done, and must not hold a file lock in a shared container
++	// past that: iOS suspends the app when the task completes, and kills an app that
++	// is suspended holding one (0xdead10cc).
++	// ok is the success reported to the system. Set it before the first scene connects
++	// (in main) so that a refresh launch finds it.
++	OnBackgroundRefresh(every time.Duration, f func(ctx context.Context) (ok bool, retry time.Duration))
++}
+diff --git a/internal/driver/mobile/app/background.go b/internal/driver/mobile/app/background.go
+new file mode 100644
+index 0000000..33c4498
+--- /dev/null
++++ b/internal/driver/mobile/app/background.go
+@@ -0,0 +1,224 @@
++// SPDX-License-Identifier: Apache-2.0
++// Copyright (c) 2026 Daniel Delgado Ramos
++
++package app
++
++import (
++	"context"
++	"sync"
++	"time"
++)
++
++// BackgroundRefresh is the handler of the app refresh task (OnBackgroundRefresh).
++type BackgroundRefresh func(ctx context.Context) (ok bool, retry time.Duration)
++
++// backgroundState is what the platform tells about launches without a user
++// interface. Only iOS feeds it (darwin_ios.go); elsewhere the first scene is the
++// application itself and no refresh is ever requested.
++type backgroundState struct {
++	mu sync.Mutex
++	// waitsForScene: the platform can launch without a scene and connects one later.
++	waitsForScene        bool
++	sceneConnected       bool
++	launchedInBackground bool
++	firstScene           []func()
++	protectedUnavailable bool
++	every                time.Duration
++	refresh              BackgroundRefresh
++	running              map[uintptr]*refreshRun
++}
++
++// refreshRun is one refresh task the system handed to the app.
++type refreshRun struct {
++	// cancel is nil until the handler starts.
++	cancel   context.CancelFunc
++	complete func(ok bool, next time.Duration)
++	// returned is closed when the handler returns.
++	returned chan struct{}
++}
++
++// expireGrace is how long an expired task waits for its handler to return after the
++// handler's context is cancelled. iOS suspends the app as soon as the task completes,
++// and kills one suspended while holding a file lock in a shared container
++// (0xdead10cc): this gives the handler time to notice and let go.
++var expireGrace = 500 * time.Millisecond
++
++var background = &backgroundState{}
++
++// LaunchedInBackground reports whether the system launched the process without a
++// user interface and no scene has connected since.
++func LaunchedInBackground() bool { return background.launchedWithoutScene() }
++
++// OnFirstScene runs f when the first scene connects, or now if there is no scene to
++// wait for. See mobile.BackgroundDriver.
++func OnFirstScene(f func()) { background.onFirstScene(f) }
++
++// ProtectedDataAvailable reports whether files with complete data protection can be read.
++func ProtectedDataAvailable() bool { return background.protectedDataAvailable() }
++
++// OnBackgroundRefresh sets the handler of the app refresh task.
++func OnBackgroundRefresh(every time.Duration, f BackgroundRefresh) {
++	background.onBackgroundRefresh(every, f)
++}
++
++func (b *backgroundState) launchedWithoutScene() bool {
++	b.mu.Lock()
++	defer b.mu.Unlock()
++	return b.launchedInBackground && !b.sceneConnected
++}
++
++func (b *backgroundState) onFirstScene(f func()) {
++	if f == nil {
++		return
++	}
++	b.mu.Lock()
++	if b.waitsForScene && !b.sceneConnected {
++		b.firstScene = append(b.firstScene, f)
++		b.mu.Unlock()
++		return
++	}
++	b.mu.Unlock()
++	f()
++}
++
++func (b *backgroundState) protectedDataAvailable() bool {
++	b.mu.Lock()
++	defer b.mu.Unlock()
++	return !b.protectedUnavailable
++}
++
++func (b *backgroundState) onBackgroundRefresh(every time.Duration, f BackgroundRefresh) {
++	b.mu.Lock()
++	defer b.mu.Unlock()
++	if f == nil || every <= 0 {
++		b.every, b.refresh = 0, nil
++		return
++	}
++	b.every, b.refresh = every, f
++}
++
++// launchFinished records how the application finished launching.
++func (b *backgroundState) launchFinished(inBackground, protectedData bool) {
++	b.mu.Lock()
++	defer b.mu.Unlock()
++	b.launchedInBackground = inBackground
++	b.protectedUnavailable = !protectedData
++}
++
++func (b *backgroundState) setProtectedData(available bool) {
++	b.mu.Lock()
++	defer b.mu.Unlock()
++	b.protectedUnavailable = !available
++}
++
++// connectScene runs what waited for the first scene, in order. A function registered
++// by one of them runs at once: the scene is already there.
++func (b *backgroundState) connectScene() {
++	b.mu.Lock()
++	if b.sceneConnected {
++		b.mu.Unlock()
++		return
++	}
++	b.sceneConnected = true
++	waiting := b.firstScene
++	b.firstScene = nil
++	b.mu.Unlock()
++	for _, f := range waiting {
++		f()
++	}
++}
++
++// refreshInterval is how far ahead to request the next refresh when the app moves to
++// the background: zero without a handler.
++func (b *backgroundState) refreshInterval() time.Duration {
++	b.mu.Lock()
++	defer b.mu.Unlock()
++	return b.every
++}
++
++// receiveRefresh records the system task `task` as soon as the system hands it over,
++// before it can expire and before startRefresh. complete is called exactly once: when
++// the handler returns, or when the task expires first (at once if the handler had not
++// started). next is when to request the following refresh; zero requests none.
++func (b *backgroundState) receiveRefresh(task uintptr, complete func(ok bool, next time.Duration)) {
++	b.mu.Lock()
++	defer b.mu.Unlock()
++	if b.running == nil {
++		b.running = map[uintptr]*refreshRun{}
++	}
++	b.running[task] = &refreshRun{complete: complete, returned: make(chan struct{})}
++}
++
++// startRefresh runs the handler for the task receiveRefresh recorded. If the task
++// already expired, it was completed then and the handler does not run.
++func (b *backgroundState) startRefresh(task uintptr) {
++	b.mu.Lock()
++	run := b.running[task]
++	if run == nil || run.cancel != nil {
++		b.mu.Unlock()
++		return // expired before it started, or already running
++	}
++	f, every := b.refresh, b.every
++	if f == nil {
++		delete(b.running, task)
++		b.mu.Unlock()
++		run.complete(false, 0)
++		return
++	}
++	ctx, cancel := context.WithCancel(context.Background())
++	run.cancel = cancel
++	b.mu.Unlock()
++	go func() {
++		ok, retry := f(ctx)
++		close(run.returned)
++		next := every
++		if retry > 0 {
++			next = retry
++		}
++		b.finishRefresh(task, ok, next)
++	}()
++}
++
++// expireRefresh is the system ending the task: the handler's context is cancelled and
++// the task fails, with the regular interval for the next one, once the handler returns
++// or expireGrace passes. It does not block its caller.
++func (b *backgroundState) expireRefresh(task uintptr) {
++	b.mu.Lock()
++	run := b.running[task]
++	delete(b.running, task)
++	var cancel context.CancelFunc
++	if run != nil {
++		cancel = run.cancel
++	}
++	next := b.every
++	b.mu.Unlock()
++	if run == nil {
++		return // already completed
++	}
++	if cancel == nil {
++		run.complete(false, next) // the handler never started: nothing to wait for
++		return
++	}
++	cancel()
++	go func() {
++		grace := time.NewTimer(expireGrace)
++		defer grace.Stop()
++		select {
++		case <-run.returned:
++		case <-grace.C:
++		}
++		run.complete(false, next)
++	}()
++}
++
++func (b *backgroundState) finishRefresh(task uintptr, ok bool, next time.Duration) {
++	b.mu.Lock()
++	run := b.running[task]
++	delete(b.running, task)
++	b.mu.Unlock()
++	if run == nil {
++		return // already completed: expired before the handler returned
++	}
++	run.cancel()
++	run.complete(ok, next)
++}
+diff --git a/internal/driver/mobile/app/background_test.go b/internal/driver/mobile/app/background_test.go
+new file mode 100644
+index 0000000..3cf81ae
+--- /dev/null
++++ b/internal/driver/mobile/app/background_test.go
+@@ -0,0 +1,327 @@
++// SPDX-License-Identifier: Apache-2.0
++// Copyright (c) 2026 Daniel Delgado Ramos
++
++package app
++
++import (
++	"context"
++	"slices"
++	"strings"
++	"testing"
++	"time"
++)
++
++func TestFirstSceneRunsAtOnceWithoutScenes(t *testing.T) {
++	b := &backgroundState{}
++	ran := false
++	b.onFirstScene(func() { ran = true })
++	if !ran {
++		t.Fatal("a platform without scenes must run the function at once")
++	}
++	if b.launchedWithoutScene() {
++		t.Fatal("a platform without scenes is never launched without one")
++	}
++}
++
++func TestFirstSceneWaitsForTheSceneAndKeepsTheOrder(t *testing.T) {
++	b := &backgroundState{waitsForScene: true}
++	var order []string
++	b.onFirstScene(func() { order = append(order, "first") })
++	b.onFirstScene(func() {
++		order = append(order, "second")
++		// Registered while connecting: the scene is already there.
++		b.onFirstScene(func() { order = append(order, "nested") })
++	})
++	b.launchFinished(true, true)
++	if len(order) != 0 {
++		t.Fatalf("ran before any scene: %v", order)
++	}
++	if !b.launchedWithoutScene() {
++		t.Fatal("a background launch without a scene is not reported")
++	}
++	b.connectScene()
++	if want := []string{"first", "second", "nested"}; !slices.Equal(order, want) {
++		t.Fatalf("got %v, want %v", order, want)
++	}
++	if b.launchedWithoutScene() {
++		t.Fatal("still reported as without scene after one connected")
++	}
++	b.connectScene()
++	b.onFirstScene(func() { order = append(order, "late") })
++	if want := []string{"first", "second", "nested", "late"}; !slices.Equal(order, want) {
++		t.Fatalf("a second scene or a late registration: got %v, want %v", order, want)
++	}
++}
++
++func TestProtectedDataFollowsThePlatform(t *testing.T) {
++	b := &backgroundState{waitsForScene: true}
++	if !b.protectedDataAvailable() {
++		t.Fatal("protected data must be assumed available until the platform says otherwise")
++	}
++	b.launchFinished(true, false)
++	if b.protectedDataAvailable() {
++		t.Fatal("a launch with the device locked reports protected data")
++	}
++	b.setProtectedData(true)
++	if !b.protectedDataAvailable() {
++		t.Fatal("unlocking is not seen")
++	}
++}
++
++type completion struct {
++	ok   bool
++	next time.Duration
++}
++
++func TestRefreshWithoutHandlerFailsWithoutRescheduling(t *testing.T) {
++	b := &backgroundState{waitsForScene: true}
++	got := make(chan completion, 2)
++	b.receiveRefresh(1, func(ok bool, next time.Duration) { got <- completion{ok, next} })
++	b.startRefresh(1)
++	if c := <-got; c.ok || c.next != 0 {
++		t.Fatalf("got %+v, want a failure that requests nothing", c)
++	}
++	if b.refreshInterval() != 0 {
++		t.Fatal("an app without a handler must not request refreshes")
++	}
++}
++
++func TestRefreshCompletesWithTheHandlerResult(t *testing.T) {
++	b := &backgroundState{waitsForScene: true}
++	retry := time.Duration(0)
++	b.onBackgroundRefresh(30*time.Minute, func(context.Context) (bool, time.Duration) { return true, retry })
++	if b.refreshInterval() != 30*time.Minute {
++		t.Fatal("the interval is not the one registered")
++	}
++	got := make(chan completion, 2)
++	done := func(ok bool, next time.Duration) { got <- completion{ok, next} }
++	b.receiveRefresh(1, done)
++	b.startRefresh(1)
++	if c := <-got; !c.ok || c.next != 30*time.Minute {
++		t.Fatalf("got %+v, want success and the regular interval", c)
++	}
++	retry = 5 * time.Minute
++	b.receiveRefresh(2, done)
++	b.startRefresh(2)
++	if c := <-got; !c.ok || c.next != 5*time.Minute {
++		t.Fatalf("got %+v, want the handler's retry", c)
++	}
++}
++
++func TestExpiredRefreshCancelsAndCompletesOnce(t *testing.T) {
++	b := &backgroundState{waitsForScene: true}
++	started, released := make(chan struct{}), make(chan struct{})
++	b.onBackgroundRefresh(time.Hour, func(ctx context.Context) (bool, time.Duration) {
++		close(started)
++		<-ctx.Done()
++		<-released
++		return true, time.Minute
++	})
++	got := make(chan completion, 2)
++	b.receiveRefresh(7, func(ok bool, next time.Duration) { got <- completion{ok, next} })
++	b.startRefresh(7)
++	<-started
++	b.expireRefresh(7)
++	if c := <-got; c.ok || c.next != time.Hour {
++		t.Fatalf("got %+v, want a failure now, with the regular interval", c)
++	}
++	close(released) // the handler returns late: nothing else is reported
++	time.Sleep(20 * time.Millisecond)
++	select {
++	case c := <-got:
++		t.Fatalf("the task completed twice: %+v", c)
++	default:
++	}
++	b.expireRefresh(7) // an expiration after completion is ignored
++	select {
++	case c := <-got:
++		t.Fatalf("an expiration after completion was reported: %+v", c)
++	default:
++	}
++}
++
++func TestExpiredRefreshWaitsForTheHandlerToLetGo(t *testing.T) {
++	b := &backgroundState{waitsForScene: true}
++	started := make(chan struct{})
++	var letGo time.Time
++	b.onBackgroundRefresh(time.Hour, func(ctx context.Context) (bool, time.Duration) {
++		close(started)
++		<-ctx.Done()
++		time.Sleep(50 * time.Millisecond) // releasing a lock in the shared container
++		letGo = time.Now()
++		return true, time.Minute
++	})
++	got := make(chan time.Time, 2)
++	var c completion
++	b.receiveRefresh(8, func(ok bool, next time.Duration) {
++		c = completion{ok, next}
++		got <- time.Now()
++	})
++	b.startRefresh(8)
++	<-started
++	b.expireRefresh(8)
++	done := <-got
++	if done.Before(letGo) || letGo.IsZero() {
++		t.Fatal("the task completed before the handler let go")
++	}
++	if c.ok || c.next != time.Hour {
++		t.Fatalf("got %+v, want a failure with the regular interval, whatever the handler says", c)
++	}
++	select {
++	case <-got:
++		t.Fatal("the task completed twice")
++	case <-time.After(20 * time.Millisecond):
++	}
++}
++
++func TestExpiredRefreshDoesNotWaitForeverForTheHandler(t *testing.T) {
++	defer func(g time.Duration) { expireGrace = g }(expireGrace)
++	expireGrace = 30 * time.Millisecond
++	b := &backgroundState{waitsForScene: true}
++	stuck := make(chan struct{})
++	defer close(stuck)
++	b.onBackgroundRefresh(time.Hour, func(context.Context) (bool, time.Duration) {
++		<-stuck
++		return true, 0
++	})
++	got := make(chan completion, 1)
++	b.receiveRefresh(9, func(ok bool, next time.Duration) { got <- completion{ok, next} })
++	b.startRefresh(9)
++	b.expireRefresh(9)
++	select {
++	case c := <-got:
++		if c.ok {
++			t.Fatalf("got %+v, want a failure", c)
++		}
++	case <-time.After(2 * time.Second):
++		t.Fatal("an expired task waited for a handler that never returns")
++	}
++}
++
++// The expiration handler is set before the handler starts on the main thread: an
++// expiration that comes first completes the task at once, and the handler never runs.
++func TestRefreshExpiredBeforeItStarts(t *testing.T) {
++	b := &backgroundState{waitsForScene: true}
++	ran := false
++	b.onBackgroundRefresh(time.Hour, func(context.Context) (bool, time.Duration) {
++		ran = true
++		return true, 0
++	})
++	got := make(chan completion, 2)
++	b.receiveRefresh(10, func(ok bool, next time.Duration) { got <- completion{ok, next} })
++	b.expireRefresh(10)
++	select {
++	case c := <-got:
++		if c.ok || c.next != time.Hour {
++			t.Fatalf("got %+v, want a failure with the regular interval", c)
++		}
++	case <-time.After(time.Second):
++		t.Fatal("a task that expired before its handler started was not completed")
++	}
++	b.startRefresh(10)
++	time.Sleep(20 * time.Millisecond)
++	if ran {
++		t.Fatal("the handler ran for a task that had already expired")
++	}
++	select {
++	case c := <-got:
++		t.Fatalf("the task completed twice: %+v", c)
++	default:
++	}
++}
++
++func TestClearingTheRefreshHandler(t *testing.T) {
++	b := &backgroundState{}
++	b.onBackgroundRefresh(time.Hour, func(context.Context) (bool, time.Duration) { return true, 0 })
++	b.onBackgroundRefresh(time.Hour, nil)
++	if b.refreshInterval() != 0 {
++		t.Fatal("a nil handler must stop requesting refreshes")
++	}
++}
++
++// The native side cannot be compiled on Linux: these contracts pin what it must do.
++func TestIOSBackgroundRefreshBridge(t *testing.T) {
++	m := string(iosGeometrySource(t, "darwin_ios.m"))
++	for _, required := range []string{
++		"#import <BackgroundTasks/BackgroundTasks.h>",
++		"objectForInfoDictionaryKey:@\"BGTaskSchedulerPermittedIdentifiers\"",
++		"registerForTaskWithIdentifier:identifier usingQueue:nil launchHandler:",
++		"task.expirationHandler = ^{",
++		"backgroundRefreshReceived(handle);",
++		"backgroundRefreshStarted(handle)",
++		"backgroundRefreshExpired(handle)",
++		"[task setTaskCompleted:ok ? YES : NO]",
++		"BGAppRefreshTaskRequest alloc",
++		"submitTaskRequest:request error:&error",
++		"launchFinished(application.applicationState == UIApplicationStateBackground, application.isProtectedDataAvailable)",
++		"applicationProtectedDataWillBecomeUnavailable",
++		"applicationProtectedDataDidBecomeAvailable",
++		"scheduleBackgroundRefresh(backgroundRefreshInterval())",
++	} {
++		if !strings.Contains(m, required) {
++			t.Errorf("darwin_ios.m is missing %q", required)
++		}
++	}
++	// Each task asks UIKit whether protected data is available before the handler runs:
++	// the delegate notifications can reach a suspended app late.
++	handler := sourceSection(t, m, "launchHandler:", "}];")
++	if p, s := strings.Index(handler, "protectedDataChanged([UIApplication sharedApplication].isProtectedDataAvailable);"), strings.Index(handler, "backgroundRefreshStarted(handle);"); p < 0 || s < 0 || p > s {
++		t.Error("the launch handler must refresh protected data availability before starting the handler")
++	}
++	// Go knows the task before it can expire: an expiration that beats the main thread
++	// completes it instead of being lost.
++	if r, e := strings.Index(handler, "backgroundRefreshReceived(handle);"), strings.Index(handler, "task.expirationHandler = ^{"); r < 0 || e < 0 || r > e {
++		t.Error("the launch handler must record the task before setting its expiration handler")
++	}
++	// Registration must happen before launching finishes, or BGTaskScheduler throws.
++	launch := sourceSection(t, m, "didFinishLaunchingWithOptions", "return YES;")
++	if !strings.Contains(launch, "registerBackgroundRefresh();") {
++		t.Error("the refresh task is not registered during didFinishLaunching")
++	}
++	// The first-scene functions run before the scene's URLs reach the app.
++	connect := sourceSection(t, m, "willConnectToSession", "")
++	if s, u := strings.Index(connect, "sceneWillConnect();"), strings.Index(connect, "openURLContexts:connectionOptions.URLContexts"); s < 0 || u < 0 || s > u {
++		t.Error("sceneWillConnect must run before the connection URLs are delivered")
++	}
++	// A scene connected outside the foreground does not run them until it enters it.
++	will := sourceSection(t, connect, "willConnectToSession", "connectWithOptions:(UISceneConnectionOptions *)")
++	if !strings.Contains(will, "state != UISceneActivationStateForegroundActive && state != UISceneActivationStateForegroundInactive") ||
++		!strings.Contains(will, "self.pendingConnection = connectionOptions;") || strings.Contains(will, "sceneWillConnect();") {
++		t.Error("a scene connected outside the foreground must leave sceneWillConnect for its first foreground")
++	}
++	fg := sourceSection(t, m, "- (void)sceneWillEnterForeground:", "\n}\n")
++	if !strings.Contains(fg, "[self connectPendingScene:scene];") {
++		t.Error("sceneWillEnterForeground must connect a scene that connected in the background")
++	}
++	// A regular launch takes that path too (the scene connects unattached): should UIKit
++	// skip sceneWillEnterForeground, the scene still connects before it is used.
++	active := sourceSection(t, m, "- (void)sceneDidBecomeActive:", "\n}\n")
++	if c, f := strings.Index(active, "[self connectPendingScene:scene];"), strings.Index(active, "lifecycleFocused();"); c < 0 || f < 0 || c > f {
++		t.Error("sceneDidBecomeActive must connect a pending scene before the app is focused")
++	}
++	// Without ARC the pending options die with the property: releasing them before the
++	// connection used them crashed every launch (SIGSEGV in the geometry probe).
++	pending := sourceSection(t, m, "- (void)connectPendingScene:", "\n}\n")
++	if c, r := strings.Index(pending, "[self goScene:scene connectWithOptions:pending];"), strings.Index(pending, "self.pendingConnection = nil;"); c < 0 || r < 0 || c > r {
++		t.Error("the pending connection options must be released after the connection, not before")
++	}
++	if strings.Count(m, "scheduleBackgroundRefresh(backgroundRefreshInterval())") < 2 {
++		t.Error("both the scene and the application background transitions must request a refresh")
++	}
++	g := string(iosGeometrySource(t, "darwin_ios.go"))
++	// The bridge manages its references by hand (the scene options, the tasks, the
++	// requests): it is only right compiled the way cgo compiles it, without ARC.
++	if strings.Contains(g, "-fobjc-arc") {
++		t.Error("darwin_ios.m is written for manual reference counting")
++	}
++	for _, required := range []string{
++		"-framework BackgroundTasks", "background.waitsForScene = true",
++		"//export sceneWillConnect", "//export launchFinished", "//export protectedDataChanged",
++		"//export backgroundRefreshInterval", "//export backgroundRefreshReceived", "//export backgroundRefreshStarted", "//export backgroundRefreshExpired",
++		"C.completeBackgroundRefresh(task",
++	} {
++		if !strings.Contains(g, required) {
++			t.Errorf("darwin_ios.go is missing %q", required)
++		}
++	}
++}
+diff --git a/internal/driver/mobile/app/darwin_ios.go b/internal/driver/mobile/app/darwin_ios.go
+index 6af5e83..2aaee27 100644
+--- a/internal/driver/mobile/app/darwin_ios.go
++++ b/internal/driver/mobile/app/darwin_ios.go
+@@ -8,7 +8,7 @@ package app
+ 
+ /*
+ #cgo CFLAGS: -x objective-c -DGL_SILENCE_DEPRECATION
+-#cgo LDFLAGS: -framework Foundation -framework UIKit -framework CoreGraphics -framework MobileCoreServices -framework GLKit -framework OpenGLES -framework QuartzCore -framework UserNotifications
++#cgo LDFLAGS: -framework Foundation -framework UIKit -framework CoreGraphics -framework MobileCoreServices -framework GLKit -framework OpenGLES -framework QuartzCore -framework UserNotifications -framework BackgroundTasks
+ #include <sys/utsname.h>
+ #include <stdint.h>
+ #include <stdbool.h>
+@@ -30,6 +30,8 @@ void hideKeyboard();
+ void showFileOpenPicker(char* mimes, char *exts);
+ void showFileSavePicker(char* mimes, char *exts);
+ void closeFileResource(void* urlPtr);
++
++void completeBackgroundRefresh(uintptr_t task, bool ok, double next);
+ */
+ import "C"
+ 
+@@ -38,6 +40,7 @@ import (
+ 	"runtime"
+ 	"strings"
+ 	"sync/atomic"
++	"time"
+ 	"unsafe"
+ 
+ 	"fyne.io/fyne/v2/internal/driver/mobile/event/lifecycle"
+@@ -59,6 +62,9 @@ func init() {
+ 	// https://groups.google.com/forum/#!msg/golang-nuts/IiWZ2hUuLDA/SNKYYZBelsYJ
+ 	runtime.LockOSThread()
+ 	initThreadID = uint64(C.threadID())
++	// iOS can launch the app with no scene (an app refresh task, a background
++	// notification): what waits for the first scene waits for UIKit to connect one.
++	background.waitsForScene = true
+ }
+ 
+ func main(f func(App)) {
+@@ -355,3 +361,30 @@ func driverShowFileSavePicker(callback func(string, func()), filter *FileFilter,
+ 
+ 	C.showFileSavePicker(mimeStr, extStr)
+ }
++
++//export sceneWillConnect
++func sceneWillConnect() { background.connectScene() }
++
++//export launchFinished
++func launchFinished(inBackground, protectedData C.bool) {
++	background.launchFinished(bool(inBackground), bool(protectedData))
++}
++
++//export protectedDataChanged
++func protectedDataChanged(available C.bool) { background.setProtectedData(bool(available)) }
++
++//export backgroundRefreshInterval
++func backgroundRefreshInterval() C.double { return C.double(background.refreshInterval().Seconds()) }
++
++//export backgroundRefreshReceived
++func backgroundRefreshReceived(task C.uintptr_t) {
++	background.receiveRefresh(uintptr(task), func(ok bool, next time.Duration) {
++		C.completeBackgroundRefresh(task, C.bool(ok), C.double(next.Seconds()))
++	})
++}
++
++//export backgroundRefreshStarted
++func backgroundRefreshStarted(task C.uintptr_t) { background.startRefresh(uintptr(task)) }
++
++//export backgroundRefreshExpired
++func backgroundRefreshExpired(task C.uintptr_t) { background.expireRefresh(uintptr(task)) }
+diff --git a/internal/driver/mobile/app/darwin_ios.m b/internal/driver/mobile/app/darwin_ios.m
+index 3af3bef..79de9ca 100644
+--- a/internal/driver/mobile/app/darwin_ios.m
++++ b/internal/driver/mobile/app/darwin_ios.m
+@@ -14,6 +14,7 @@
+ #import <MobileCoreServices/MobileCoreServices.h>
+ #import <GLKit/GLKit.h>
+ #import <UserNotifications/UserNotifications.h>
++#import <BackgroundTasks/BackgroundTasks.h>
+ 
+ struct utsname sysInfo;
+ 
+@@ -31,8 +32,69 @@ struct utsname sysInfo;
+ 
+ @interface GoAppSceneDelegate : UIResponder<UIWindowSceneDelegate>
+ @property (strong, nonatomic) UIWindow *window;
++// The options of a scene that connected without being in the foreground: what waited
++// for a user interface, and the scene's URLs after it, wait for its first foreground.
++@property (strong, nonatomic) UISceneConnectionOptions *pendingConnection;
+ @end
+ 
++// The app refresh task is the first entry of BGTaskSchedulerPermittedIdentifiers; an
++// app that declares none never gets one. See mobile.BackgroundDriver.
++static NSString *backgroundRefreshIdentifier(void) {
++	NSArray *identifiers = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"BGTaskSchedulerPermittedIdentifiers"];
++	if (![identifiers isKindOfClass:[NSArray class]] || identifiers.count == 0 || ![identifiers[0] isKindOfClass:[NSString class]]) {
++		return nil;
++	}
++	return identifiers[0];
++}
++
++// Must run before launching finishes: BGTaskScheduler throws afterwards.
++static void registerBackgroundRefresh(void) {
++	NSString *identifier = backgroundRefreshIdentifier();
++	if (identifier == nil) {
++		return;
++	}
++	[[BGTaskScheduler sharedScheduler] registerForTaskWithIdentifier:identifier usingQueue:nil launchHandler:^(BGTask *task) {
++		// Retained until completeBackgroundRefresh, which Go calls exactly once.
++		uintptr_t handle = (uintptr_t)CFBridgingRetain(task);
++		// Known to Go before it can expire: a task that expires before its handler starts
++		// (the main thread busy) is completed at once and the handler never runs.
++		backgroundRefreshReceived(handle);
++		task.expirationHandler = ^{
++			backgroundRefreshExpired(handle);
++		};
++		// The launch handler runs on a background queue, and the delegate's protected
++		// data notifications can reach a suspended app late: ask UIKit now, on the main
++		// thread, before the handler reads anything.
++		dispatch_async(dispatch_get_main_queue(), ^{
++			protectedDataChanged([UIApplication sharedApplication].isProtectedDataAvailable);
++			backgroundRefreshStarted(handle);
++		});
++	}];
++}
++
++// A new request replaces the pending one. Zero or less requests nothing.
++static void scheduleBackgroundRefresh(double seconds) {
++	NSString *identifier = backgroundRefreshIdentifier();
++	if (seconds <= 0 || identifier == nil) {
++		return;
++	}
++	// No ARC in this file (cgo): the request is autoreleased, not leaked on each transition.
++	BGAppRefreshTaskRequest *request = [[[BGAppRefreshTaskRequest alloc] initWithIdentifier:identifier] autorelease];
++	request.earliestBeginDate = [NSDate dateWithTimeIntervalSinceNow:seconds];
++	NSError *error = nil;
++	if (![[BGTaskScheduler sharedScheduler] submitTaskRequest:request error:&error]) {
++		NSLog(@"fyne: the app refresh task was not scheduled: %@", error);
++	}
++}
++
++void completeBackgroundRefresh(uintptr_t handle, bool ok, double next) {
++	dispatch_async(dispatch_get_main_queue(), ^{
++		BGTask *task = (BGTask *)CFBridgingRelease((CFTypeRef)handle);
++		scheduleBackgroundRefresh(next);
++		[task setTaskCompleted:ok ? YES : NO];
++	});
++}
++
+ @implementation GoAppAppDelegate
+ - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
+     int scale = 1;
+@@ -55,9 +117,21 @@ struct utsname sysInfo;
+ 		urlOpened((char *)[[incoming absoluteString] UTF8String]);
+ 	}
+ 
++	registerBackgroundRefresh();
++	// Without a scene yet: UIKit launched the app for background work if the state is
++	// background now. Protected data is unavailable when it launched with the device locked.
++	launchFinished(application.applicationState == UIApplicationStateBackground, application.isProtectedDataAvailable);
+ 	return YES;
+ }
+ 
++- (void)applicationProtectedDataWillBecomeUnavailable:(UIApplication *)application {
++	protectedDataChanged(false);
++}
++
++- (void)applicationProtectedDataDidBecomeAvailable:(UIApplication *)application {
++	protectedDataChanged(true);
++}
++
+ - (UISceneConfiguration *)application:(UIApplication *)application configurationForConnectingSceneSession:(UISceneSession *)session options:(UISceneConnectionOptions *)options {
+ 	UISceneConfiguration *config = [[UISceneConfiguration alloc] initWithName:@"Default" sessionRole:session.role];
+ 	config.delegateClass = [GoAppSceneDelegate class];
+@@ -93,6 +167,7 @@ struct utsname sysInfo;
+ 
+ - (void)applicationDidEnterBackground:(UIApplication *)application {
+ 	lifecycleAlive();
++	scheduleBackgroundRefresh(backgroundRefreshInterval());
+ }
+ 
+ - (void)applicationWillTerminate:(UIApplication *)application {
+@@ -147,12 +222,45 @@ struct utsname sysInfo;
+ 	// update insets once key window is set
+ 	[app.controller updateGeometry];
+ 
++	// UIKit can connect a scene that is not in the foreground (a system request during
++	// background work): nobody is looking, so what waits for a user interface waits
++	// for the scene's first foreground, and its URLs after it.
++	// A regular launch connects the scene still unattached and brings it to the
++	// foreground right after, so it also goes through here.
++	UISceneActivationState state = scene.activationState;
++	if (state != UISceneActivationStateForegroundActive && state != UISceneActivationStateForegroundInactive) {
++		self.pendingConnection = connectionOptions;
++		return;
++	}
++	[self goScene:scene connectWithOptions:connectionOptions];
++}
++
++- (void)goScene:(UIScene *)scene connectWithOptions:(UISceneConnectionOptions *)connectionOptions {
++	// What the app deferred until it had a user interface, before this scene's URLs.
++	sceneWillConnect();
+ 	[self scene:scene openURLContexts:connectionOptions.URLContexts];
+ 	for (NSUserActivity *activity in connectionOptions.userActivities) {
+ 		[self scene:scene continueUserActivity:activity];
+ 	}
+ }
+ 
++// Connects a scene that connected outside the foreground. sceneWillEnterForeground is
++// where it happens; sceneDidBecomeActive only makes sure it does before the scene is used.
++- (void)connectPendingScene:(UIScene *)scene {
++	UISceneConnectionOptions *pending = self.pendingConnection;
++	if (pending == nil) {
++		return;
++	}
++	// cgo compiles this file without ARC, and the property holds the only reference
++	// to the options: they are let go after the connection, never before it.
++	[self goScene:scene connectWithOptions:pending];
++	self.pendingConnection = nil;
++}
++
++- (void)sceneWillEnterForeground:(UIScene *)scene {
++	[self connectPendingScene:scene];
++}
++
+ - (void)scene:(UIScene *)scene openURLContexts:(NSSet<UIOpenURLContext *> *)contexts {
+ 	for (UIOpenURLContext *c in contexts) {
+ 		if (c.URL != nil) {
+@@ -168,6 +276,7 @@ struct utsname sysInfo;
+ }
+ 
+ - (void)sceneDidBecomeActive:(UIScene *)scene {
++	[self connectPendingScene:scene];
+ 	lifecycleFocused();
+ }
+ 
+@@ -177,6 +286,7 @@ struct utsname sysInfo;
+ 
+ - (void)sceneDidEnterBackground:(UIScene *)scene {
+ 	lifecycleAlive();
++	scheduleBackgroundRefresh(backgroundRefreshInterval());
+ }
+ @end
+ 
+diff --git a/internal/driver/mobile/app/ios_geometry_source_test.go b/internal/driver/mobile/app/ios_geometry_source_test.go
+index f52facb..dcc39d8 100644
+--- a/internal/driver/mobile/app/ios_geometry_source_test.go
++++ b/internal/driver/mobile/app/ios_geometry_source_test.go
+@@ -4,6 +4,7 @@
+ package app
+ 
+ import (
++	"bytes"
+ 	"go/ast"
+ 	"go/parser"
+ 	"go/token"
+@@ -26,7 +27,29 @@ func iosGeometrySource(t *testing.T, name string) []byte {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	return source
++	// A checkout can turn the native sources into CRLF (Windows with autocrlf): the
++	// contracts are about the code, not its line endings.
++	return bytes.ReplaceAll(source, []byte("\r\n"), []byte("\n"))
++}
++
++// sourceSection is source from the first start to the first end after it (to the end
++// of source when end is empty). A missing marker fails the test instead of slicing
++// with -1.
++func sourceSection(t *testing.T, source, start, end string) string {
++	t.Helper()
++	i := strings.Index(source, start)
++	if i < 0 {
++		t.Fatalf("the native source has no %q", start)
++	}
++	section := source[i:]
++	if end == "" {
++		return section
++	}
++	j := strings.Index(section, end)
++	if j < 0 {
++		t.Fatalf("the native source has no %q after %q", end, start)
++	}
++	return section[:j]
+ }
+ 
+ func TestIOSGeometryUsesTheAttachedView(t *testing.T) {
+diff --git a/internal/driver/mobile/background.go b/internal/driver/mobile/background.go
+new file mode 100644
+index 0000000..2135ae4
+--- /dev/null
++++ b/internal/driver/mobile/background.go
+@@ -0,0 +1,28 @@
++// SPDX-License-Identifier: Apache-2.0
++// Copyright (c) 2026 Daniel Delgado Ramos
++
++package mobile
++
++import (
++	"context"
++	"time"
++
++	"fyne.io/fyne/v2/driver/mobile"
++	"fyne.io/fyne/v2/internal/driver/mobile/app"
++)
++
++var _ mobile.BackgroundDriver = (*driver)(nil)
++
++// LaunchedInBackground implements mobile.BackgroundDriver.
++func (*driver) LaunchedInBackground() bool { return app.LaunchedInBackground() }
++
++// OnFirstScene implements mobile.BackgroundDriver.
++func (*driver) OnFirstScene(f func()) { app.OnFirstScene(f) }
++
++// ProtectedDataAvailable implements mobile.BackgroundDriver.
++func (*driver) ProtectedDataAvailable() bool { return app.ProtectedDataAvailable() }
++
++// OnBackgroundRefresh implements mobile.BackgroundDriver.
++func (*driver) OnBackgroundRefresh(every time.Duration, f func(ctx context.Context) (ok bool, retry time.Duration)) {
++	app.OnBackgroundRefresh(every, f)
++}
+diff --git a/internal/driver/mobile/background_test.go b/internal/driver/mobile/background_test.go
+new file mode 100644
+index 0000000..4c0fa53
+--- /dev/null
++++ b/internal/driver/mobile/background_test.go
+@@ -0,0 +1,23 @@
++// SPDX-License-Identifier: Apache-2.0
++// Copyright (c) 2026 Daniel Delgado Ramos
++
++package mobile
++
++import (
++	"testing"
++
++	"fyne.io/fyne/v2/driver/mobile"
++)
++
++// Apps reach the background API by asserting the driver they were given.
++func TestTheDriverOffersTheBackgroundAPI(t *testing.T) {
++	d, ok := NewGoMobileDriver().(mobile.BackgroundDriver)
++	if !ok {
++		t.Fatal("the mobile driver does not implement mobile.BackgroundDriver")
++	}
++	ran := false
++	d.OnFirstScene(func() { ran = true })
++	if !ran || d.LaunchedInBackground() || !d.ProtectedDataAvailable() {
++		t.Fatal("without scenes the first scene is now, with protected data and no background launch")
++	}
++}
+-- 
+2.43.0
+

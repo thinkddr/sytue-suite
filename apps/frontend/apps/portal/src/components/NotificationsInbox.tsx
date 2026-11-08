@@ -20,6 +20,7 @@ import { getAccessToken } from '@sytue/auth/client';
 import {
   abrirAviso,
   conectarAvisos,
+  MarcarLeido,
   cuerpoAviso,
   destinoAviso,
   procedenciaAviso,
@@ -222,16 +223,12 @@ export function NotificationsInbox({ locale, hubBaseUrl }: Props): JSX.Element {
                     {formatTimeAgo(locale, new Date(n.created_at))}
                   </span>
                 </span>
-                {!n.read ? (
-                  <span
-                    class="bg-primary mt-2 h-2 w-2 shrink-0 rounded-full"
-                    aria-label={t('inbox.unreadDot')}
-                  />
-                ) : null}
+                {/* El punto se ve fuera, en su botón; aquí se dice para quien no lo ve. */}
+                {!n.read ? <span class="sr-only">{t('inbox.unreadDot')}</span> : null}
               </>
             );
             return (
-              <li key={n.id}>
+              <li key={n.id} class="flex items-start">
                 {destinoAviso(n) ? (
                   <a
                     href={destinoAviso(n) ?? undefined}
@@ -243,7 +240,7 @@ export function NotificationsInbox({ locale, hubBaseUrl }: Props): JSX.Element {
                         void abrirAviso(avisos, n, (u) => window.location.assign(u));
                       }
                     }}
-                    class="hover:bg-chrome-hover sytue-focus-ring flex items-start gap-3 rounded-md px-1 py-3 transition-colors"
+                    class="hover:bg-chrome-hover sytue-focus-ring flex min-w-0 flex-1 items-start gap-3 rounded-md px-1 py-3 transition-colors"
                   >
                     {contenido}
                   </a>
@@ -251,11 +248,20 @@ export function NotificationsInbox({ locale, hubBaseUrl }: Props): JSX.Element {
                   <button
                     type="button"
                     onClick={() => void avisos?.leer(n.id)}
-                    class="hover:bg-chrome-hover sytue-focus-ring flex w-full items-start gap-3 rounded-md px-1 py-3 text-left transition-colors"
+                    class="hover:bg-chrome-hover sytue-focus-ring flex min-w-0 flex-1 items-start gap-3 rounded-md px-1 py-3 text-left transition-colors"
                   >
                     {contenido}
                   </button>
                 )}
+                {/* El punto azul es un botón: marca ESTE aviso como leído sin abrirlo. Va
+                    fuera de la fila (un botón dentro de un enlace no es HTML válido). */}
+                {!n.read ? (
+                  <MarcarLeido
+                    class="mt-3"
+                    rotulo={t('inbox.markRead')}
+                    alMarcar={() => void avisos?.leer(n.id)}
+                  />
+                ) : null}
               </li>
             );
           })}

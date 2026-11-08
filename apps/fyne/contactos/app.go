@@ -5,8 +5,8 @@ package contactos
 
 import (
 	"bytes"
-	"cmp"
 	"context"
+	"errors"
 	"image"
 	"log/slog"
 	"net/url"
@@ -25,7 +25,6 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
-	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 
 	"git.sytue.eu/sytue/one/apps/fyne/agenda"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
@@ -47,8 +46,6 @@ type App struct {
 	cargaContactos      uint64
 
 	Pantalla *Pantalla
-	// Widget captura la sesión adoptada antes de consultar las libretas completas.
-	Widget widgets.Source
 
 	svc    *api.Contacts
 	avisos *ui.PilaAvisos
@@ -88,7 +85,9 @@ type App struct {
 	// libretaPedida, su libreta si el enlace llegó antes que las libretas.
 	pedido, libretaPedida string
 	favoritos             map[string]bool
-	marcados              map[string]bool
+	// destacando son los UID con su SetFavorite en vuelo (ver destacar).
+	destacando map[string]bool
+	marcados   map[string]bool
 	// Directorio es la agenda de Sytue ID, con la que se pone al día la libreta
 	// «Organización» al entrar; nil, no se toca. Yo es el `sub` de quien mira.
 	Directorio *api.Directorio
@@ -102,11 +101,6 @@ type App struct {
 	red               *offline.Monitor
 	escrituras        map[string]*ui.Dialogo
 	importadorCargado bool
-
-	widgetMu    sync.Mutex
-	widgetGen   uint64
-	widgetBooks *int64
-	widgetItems []widgets.Item
 }
 
 // NuevaApp monta Contacts. `svc` nil deja la pantalla sin datos, que es lo que se ve
@@ -120,6 +114,7 @@ func NuevaApp(t *i18n.Translator, svc *api.Contacts) *App {
 		enFondo:     func(f func()) { go f() },
 		enFondoFila: func(f func()) { go f() },
 		favoritos:   map[string]bool{},
+		destacando:  map[string]bool{},
 		marcados:    map[string]bool{},
 		escrituras:  map[string]*ui.Dialogo{},
 	}
@@ -237,7 +232,7 @@ func (a *App) enganchar() {
 	p.AlReintentarEtiquetas = func() { a.enFondo(a.cargarEtiquetas) }
 	p.AlEnviarCorreo = a.enviarCorreo
 	p.AlReunion = a.reunion
-	p.AlCopiarCorreo = a.copiarCorreo
+	p.AlCopiar = a.copiar
 	p.AlExportar = func(c api.Contact) { a.enFondo(func() { a.exportar(c) }) }
 	p.AlAbrirEnlace = a.abrirEnlace
 	p.AlEtiquetar = a.etiquetar
@@ -266,6 +261,20 @@ func (a *App) enganchar() {
 	p.AlExportarVcard = a.exportarLibreta
 	p.AlExportarCSV = a.exportarCSV
 	p.AlSoltarMarcados = func() { clear(a.marcados); a.repintar() }
+	p.AlCorreoATodos = a.correoATodos
+	p.AlExportarSeleccion = func(sel []api.Contact) { a.exportarContactos(p.t("io.exportFilename", nil), sel) }
+	p.AlCorreoEtiqueta = func() {
+		_, cs := a.miembrosEtiquetaActiva()
+		a.correoATodos(cs)
+	}
+	p.AlExportarEtiqueta = func() {
+		g, cs := a.miembrosEtiquetaActiva()
+		a.exportarContactos(NombreExportacion(g.Name), cs)
+	}
+	p.MiembrosEtiqueta = func() int {
+		_, cs := a.miembrosEtiquetaActiva()
+		return len(cs)
+	}
 	p.AlVerCumpleanos = func() { a.verCumples() }
 	p.AlVerPapelera = func() { a.verPapelera() }
 	a.engancharEtiquetasYLibretas()
@@ -474,8 +483,9 @@ func (a *App) borrarContacto(libreta api.AddressBook, c api.Contact, listo func(
 			a.avisar(ui.AvisoPeligro, "form.deleteFailed", "common.tryAgainSoon")
 		} else {
 			// El borrado es SUAVE: decir solo «eliminado» hacía que la gente diera por
-			// perdido lo que está a un clic en la papelera.
-			a.avisar(ui.AvisoExito, "form.deleted", "form.deletedHint")
+			// perdido lo que está a un clic en la papelera. Y lleva «Deshacer».
+			a.avisarPapelera(a.Pantalla.t("form.deleted", nil), a.Pantalla.t("form.deletedHint", nil),
+				[]string{api.CleanUID(c.UID)}, 1)
 		}
 		listo(err)
 		if err == nil {
@@ -503,8 +513,6 @@ func (a *App) Cargar() {
 	if !a.vigente(scope) {
 		return
 	}
-	widget := a.Widget.View()
-	conRed := !a.sinRed()
 	var sec uint64
 	fyne.DoAndWait(func() {
 		if !a.vigente(scope) {
@@ -530,9 +538,6 @@ func (a *App) Cargar() {
 	a.enFondo(func() { a.cargarFavoritosEn(scope) })
 	ctx, fin := context.WithTimeout(scope.ctx, a.Plazo)
 	libretas, err := a.svc.AddressBooks(ctx)
-	if err == nil && conRed && !a.sinRed() {
-		a.publicarLibretas(ctx, widget, scope.generacion, libretas)
-	}
 	fin()
 	var abrir, refrescar *api.AddressBook
 	adoptada := false
@@ -601,94 +606,6 @@ func (a *App) recibirLibretas(scope cargaContacts, sec uint64, libretas []api.Ad
 	return first
 }
 
-func (a *App) publicarLibretas(ctx context.Context, view widgets.View, gen uint64, libretas []api.AddressBook) {
-	ids := make(map[string]struct{}, len(libretas))
-	for _, book := range libretas {
-		ids[book.ID] = struct{}{}
-	}
-	total := int64(len(ids))
-	a.widgetMu.Lock()
-	if a.widgetGen != gen {
-		a.widgetGen = gen
-		a.widgetItems = nil
-	}
-	a.widgetBooks = &total
-	detalle := a.detalleWidgetBloqueado()
-	a.widgetMu.Unlock()
-	_ = view.PublicarDetalle(ctx, detalle)
-}
-
-func (a *App) publicarContactosWidget(ctx context.Context, view widgets.View, gen uint64, lista []api.Contact) {
-	items := itemsContactosParaWidget(lista)
-	a.widgetMu.Lock()
-	if a.widgetGen != gen {
-		a.widgetGen = gen
-		a.widgetBooks = nil
-	}
-	a.widgetItems = items
-	tieneDatos := a.widgetBooks != nil || len(a.widgetItems) > 0
-	detalle := a.detalleWidgetBloqueado()
-	a.widgetMu.Unlock()
-	if tieneDatos {
-		_ = view.PublicarDetalle(ctx, detalle)
-	}
-}
-
-func (a *App) detalleWidgetBloqueado() widgets.Detail {
-	var d widgets.Detail
-	if a.widgetBooks != nil {
-		d.Counters = []widgets.Counter{{Kind: "address_books", Value: *a.widgetBooks}}
-	}
-	if len(a.widgetItems) > 0 {
-		d.Items = slices.Clone(a.widgetItems)
-	}
-	return d
-}
-
-func itemsContactosParaWidget(lista []api.Contact) []widgets.Item {
-	items := make([]widgets.Item, 0, min(len(lista), widgets.MaxItems))
-	for _, c := range lista {
-		nombre := strings.TrimSpace(c.DisplayName())
-		if nombre == "" {
-			continue
-		}
-		subtitulo := strings.TrimSpace(cmp.Or(c.Organization, c.Title))
-		if subtitulo == "" && len(c.Emails) > 0 {
-			subtitulo = strings.TrimSpace(c.Emails[0].Email)
-		}
-		var startAt int64
-		if !c.UpdatedAt.IsZero() && c.UpdatedAt.Unix() > 0 {
-			startAt = c.UpdatedAt.Unix()
-		}
-		items = append(items, widgets.Item{
-			Title:    nombre,
-			Subtitle: subtitulo,
-			Badge:    monogramaWidget(nombre),
-			StartAt:  startAt,
-		})
-		if len(items) >= widgets.MaxItems {
-			break
-		}
-	}
-	return widgets.SanitizeItems(items)
-}
-
-func monogramaWidget(s string) string {
-	var r []rune
-	for _, p := range strings.Fields(s) {
-		for _, ch := range p {
-			if unicode.IsLetter(ch) || unicode.IsDigit(ch) {
-				r = append(r, unicode.ToUpper(ch))
-				break
-			}
-		}
-		if len(r) == 2 {
-			break
-		}
-	}
-	return string(r)
-}
-
 func (a *App) sincronizarOrganizacionEn(scope cargaContacts) {
 	if a.Directorio == nil || a.sinRed() || !a.vigente(scope) {
 		return
@@ -711,7 +628,6 @@ func (a *App) sincronizarOrganizacionEn(scope cargaContacts) {
 	if a.Yo != nil {
 		yo = a.Yo()
 	}
-	widget := a.Widget.View()
 	ctx, fin := context.WithTimeout(scope.ctx, 4*a.Plazo)
 	defer fin()
 	if _, err := sincronizarOrganizacion(ctx, a.svc, a.Directorio, yo, string(a.Pantalla.locale())); err != nil {
@@ -723,9 +639,6 @@ func (a *App) sincronizarOrganizacionEn(scope cargaContacts) {
 	libretas, err := a.svc.AddressBooks(ctx)
 	if err != nil {
 		return
-	}
-	if a.vigente(scope) && !a.sinRed() {
-		a.publicarLibretas(ctx, widget, scope.generacion, libretas)
 	}
 	var refrescar *api.AddressBook
 	fyne.DoAndWait(func() {
@@ -750,9 +663,6 @@ func (a *App) sincronizarOrganizacionEn(scope cargaContacts) {
 // quedarse en pantalla hasta la siguiente carga.
 func (a *App) Vaciar() {
 	a.invalidar(false)
-	a.widgetMu.Lock()
-	a.widgetBooks, a.widgetItems = nil, nil
-	a.widgetMu.Unlock()
 	a.pararImportador()
 	for key, d := range a.escrituras {
 		d.Cerrar()
@@ -812,8 +722,6 @@ func (a *App) abrirLibretaEn(scope cargaContacts, b api.AddressBook) {
 func (a *App) cargarContactos(b api.AddressBook) { a.cargarContactosEn(a.capturar(), b) }
 
 func (a *App) cargarContactosEn(scope cargaContacts, b api.AddressBook) {
-	widget := a.Widget.View()
-	conRed := !a.sinRed()
 	var sec uint64
 	fyne.DoAndWait(func() {
 		if a.vigente(scope) {
@@ -823,9 +731,6 @@ func (a *App) cargarContactosEn(scope cargaContacts, b api.AddressBook) {
 	})
 	ctx, fin := context.WithTimeout(scope.ctx, a.Plazo)
 	lista, err := a.svc.InBook(ctx, b.ID)
-	if err == nil && conRed && !a.sinRed() && a.vigente(scope) && len(lista) > 0 {
-		a.publicarContactosWidget(ctx, widget, scope.generacion, lista)
-	}
 	fin()
 	fyne.Do(func() {
 		p := a.Pantalla
@@ -1034,6 +939,14 @@ func (a *App) marcarTodo() {
 // pulsar y, si el servicio dice que no, vuelve atrás y se avisa.
 func (a *App) destacar(c api.Contact) {
 	uid := api.CleanUID(c.UID)
+	// Mientras va la petición de ESE contacto, otro toque no hace nada: es el `busy` de
+	// FavoriteToggle. Sin esto, un doble toque en la estrella de la fila lanzaba
+	// SetFavorite(true) y SetFavorite(false) a la vez, que podían llegar desordenados y
+	// dejar la pantalla y el servidor en desacuerdo hasta recargar.
+	if a.destacando[uid] {
+		return
+	}
+	a.destacando[uid] = true
 	nuevo := !a.favoritos[uid]
 	a.ponerFavorito(uid, nuevo)
 	a.repintar()
@@ -1041,11 +954,14 @@ func (a *App) destacar(c api.Contact) {
 		ctx, fin := a.ctx()
 		err := a.svc.SetFavorite(ctx, uid, nuevo)
 		fin()
-		if err == nil {
-			return
+		if err != nil {
+			slog.Warn("contactos: no se pudo destacar", "error", err)
 		}
-		slog.Warn("contactos: no se pudo destacar", "error", err)
 		fyne.Do(func() {
+			delete(a.destacando, uid)
+			if err == nil {
+				return
+			}
 			a.ponerFavorito(uid, !nuevo)
 			a.avisar(ui.AvisoPeligro, "detail.starFailed", "common.tryAgainSoon")
 			a.repintar()
@@ -1091,10 +1007,15 @@ func (a *App) reunion(c api.Contact, correo string) {
 	}
 }
 
-// copiarCorreo lo deja en el portapapeles del sistema y lo dice.
-func (a *App) copiarCorreo(correo string) {
-	fyne.CurrentApp().Clipboard().SetContent(correo)
-	a.avisar(ui.AvisoExito, "detail.emailCopied", "")
+// copiar lo deja en el portapapeles del sistema y lo dice; si no ha llegado
+// (`ui.Copiar` lo lee de vuelta), dice que no se ha podido, como el rechazo de
+// `navigator.clipboard.writeText` en la web.
+func (a *App) copiar(valor, aviso string) {
+	if !ui.Copiar(fyne.CurrentApp().Clipboard(), valor) {
+		a.avisar(ui.AvisoPeligro, "detail.copyFailed", "")
+		return
+	}
+	a.avisar(ui.AvisoExito, aviso, "")
 }
 
 // abrirEnlace abre un `mailto:` o un `tel:` con lo que el sistema tenga para eso, que
@@ -1129,23 +1050,31 @@ func (a *App) exportar(c api.Contact) {
 // la web. Son las del SERVICIO y no unas armadas aquí, así que un campo que esta app
 // no pinta —la foto, un X-* de otro cliente— viaja igual. Bloquea: en segundo plano.
 //
-// ponytail: una petición por contacto, en serie. La web ya tiene las tarjetas porque
-// lista por CardDAV; la API REST no las da en el listado. Con una libreta corporativa
-// de miles son miles de peticiones: se releva con un `?format=vcf` en el listado de la
-// libreta del servicio.
+// Van en UNA petición por tanda (`/contacts/batch/vcard`): la web ya tiene las tarjetas
+// porque lista por CardDAV, y la API REST no las da en el listado.
 func (a *App) guardarVCards(nombre string, cs []api.Contact) {
+	// Una petición por tanda de TandaVCard, no una por contacto: una etiqueta de
+	// trescientos eran trescientos GET seguidos, y uno que fallara cortaba los demás.
+	ids := make([]string, len(cs))
+	for i, c := range cs {
+		ids[i] = c.ID
+	}
 	var todo bytes.Buffer
 	var err error
-	for _, c := range cs {
+	for tanda := range slices.Chunk(ids, api.TandaVCard) {
 		ctx, fin := a.ctx()
-		var tarjeta []byte
-		tarjeta, err = a.svc.VCard(ctx, c.ID)
+		var tarjetas []byte
+		tarjetas, err = a.svc.BatchVCard(ctx, tanda)
 		fin()
 		if err != nil {
 			break
 		}
-		todo.Write(bytes.TrimSpace(tarjeta))
-		todo.WriteString("\r\n")
+		todo.Write(tarjetas)
+	}
+	if err == nil && todo.Len() == 0 && len(cs) > 0 {
+		// Ninguna sigue viva (borradas desde otro dispositivo entre la selección y la
+		// exportación): un .vcf vacío guardado en silencio parecería una exportación hecha.
+		err = errExportacionVacia
 	}
 	if err == nil {
 		err = a.guardarDescarga(nombre, todo.Bytes())
@@ -1155,6 +1084,9 @@ func (a *App) guardarVCards(nombre string, cs []api.Contact) {
 		fyne.Do(func() { a.avisar(ui.AvisoPeligro, "common.actionFailed", "common.tryAgainSoon") })
 	}
 }
+
+// errExportacionVacia: se pidió exportar contactos y el servicio no devolvió ninguno.
+var errExportacionVacia = errors.New("contactos: ninguno de los exportados sigue vivo")
 
 // guardarDescarga es lo que el navegador hace con una descarga: dejarla en la carpeta
 // de descargas del sistema.
@@ -1278,6 +1210,9 @@ func (a *App) lote(que AccionLote, sel []api.Contact, g *api.ContactGroup) {
 		uids[i] = api.CleanUID(c.UID)
 	}
 	n := len(sel)
+	// tirados es lo que el servicio dice que mandó a la papelera: «Deshacer» compara
+	// con eso, no con los marcados (un UID ajeno no se tira; uno en dos libretas, dos).
+	tirados := 0
 	var hacer func(context.Context) error
 	var exito string
 	switch que {
@@ -1299,7 +1234,10 @@ func (a *App) lote(que AccionLote, sel []api.Contact, g *api.ContactGroup) {
 			exito = p.t("batch.addedTo", i18n.Vars{"label": g.Name})
 		}
 	case LoteAPapelera:
-		hacer = func(ctx context.Context) error { return a.svc.BatchTrash(ctx, uids) }
+		hacer = func(ctx context.Context) (err error) {
+			tirados, err = a.svc.BatchTrash(ctx, uids)
+			return err
+		}
 		exito = p.t("batch.trashed", i18n.Vars{"count": n})
 	}
 	p.LoteOcupado = true
@@ -1316,7 +1254,12 @@ func (a *App) lote(que AccionLote, sel []api.Contact, g *api.ContactGroup) {
 				a.repintar()
 				return
 			}
-			a.avisos.Notificar(ui.NuevoAviso(ui.AvisoExito, exito, ""))
+			if que == LoteAPapelera {
+				// Con «Deshacer»: el lote es donde más fácil se tira de más.
+				a.avisarPapelera(exito, "", uids, tirados)
+			} else {
+				a.avisos.Notificar(ui.NuevoAviso(ui.AvisoExito, exito, ""))
+			}
 			a.recargarTodo()
 			a.enFondo(a.cargarEtiquetas)
 		})

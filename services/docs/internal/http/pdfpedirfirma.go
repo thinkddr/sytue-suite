@@ -386,6 +386,12 @@ func (h *Handler) cancelarPeticionFirma(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	h.revocarSiSobra(r.Context(), authn.Token(r), p)
+	// Sale de los pendientes de quien tenía que firmar.
+	if p.Destinatario != "" {
+		hubnotify.AvisarTambien(r.Context(), p.Destinatario)
+	} else if p.DestinatarioCorreo != "" {
+		hubnotify.AvisarTambien(r.Context(), hubnotify.PorCorreo(p.DestinatarioCorreo))
+	}
 	httpx.NoContent(w)
 }
 
@@ -491,6 +497,8 @@ func (h *Handler) enlacePDF(r *http.Request, ruta string) string {
 // con `cuerpo`, el correo desde avisos@.
 func (h *Handler) avisoDeFirma(r *http.Request, id, para, tipo, titulo, enlace string, params map[string]string, token, cuerpo string) {
 	t, _ := tenancy.From(r.Context())
+	// Lo pendiente de la otra parte ha cambiado: su widget de CertiPDF también.
+	hubnotify.AvisarTambien(r.Context(), para)
 	asunto := ""
 	if cuerpo != "" {
 		asunto = titulo

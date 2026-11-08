@@ -1,9 +1,14 @@
 {
   "aiBatch.excludeOrg": "Escludi l’organizzazione dal lotto automatico di Sytue AI",
   "aiBatch.excludedHint": "L’organizzazione è esclusa dal lotto automatico di Sytue AI. Le nuove foto non vengono elaborate in secondo piano per suggerimenti o somiglianze.",
+  "album.coverSet": "Copertina dell’album aggiornata",
+  "album.isCover": "Questa è la copertina dell’album",
   "album.linkCopied": "Link copiato",
   "album.newLink": "Nuovo link",
   "album.newLinkConfirm": "Creare un nuovo link? Il link attuale smetterà di funzionare per chi lo ha già.",
+  "album.rename": "Rinomina",
+  "album.renamePrompt": "Nome dell’album",
+  "album.setCover": "Usa come copertina dell’album",
   "album.share": "Condividi",
   "album.shared": "Condiviso",
   "album.unshare": "Smetti di condividere",
@@ -98,6 +103,7 @@
     "other": "{count} per data di caricamento"
   },
   "gallery.cancelSelection": "Esci dalla selezione",
+  "gallery.clearSearch": "Cancella ricerca",
   "gallery.describeCapped": "Se ne descrivono solo {count} alla volta; rilancia per le altre.",
   "gallery.describeNothing": "Le foto scelte hanno già una descrizione",
   "gallery.describeSelected": "Descrivi con Sytue AI",
@@ -106,7 +112,8 @@
   "gallery.describing": "Sto descrivendo {done} di {total}…",
   "gallery.downloadCapped": "Foto escluse da questo gruppo: {count}.",
   "gallery.downloadSelected": "Scarica",
-  "gallery.downloading": {
+  "gallery.downloading": "Richieste di download avviate: {count}. Controlla i download del browser.",
+  "gallery.downloadingNative": {
     "one": "Scaricamento di 1 foto…",
     "other": "Scaricamento di {count} foto…"
   },
@@ -114,6 +121,8 @@
   "gallery.empty.description": "Le foto del tuo Sytue Drive appariranno qui, ordinate per data di scatto.",
   "gallery.empty.title": "Ancora nessuna foto",
   "gallery.favorite": "Aggiungi alle preferite",
+  "gallery.favoriteFailed": "Foto che non è stato possibile modificare: {count}",
+  "gallery.favorited": "Aggiunte alle preferite: {count}",
   "gallery.likeTheseResults": "E quelle che si somigliano",
   "gallery.moreLikeThese": "Altre come queste",
   "gallery.newAlbum": "Nuovo album",
@@ -124,6 +133,8 @@
   },
   "gallery.newAlbumTitle": "Nuovo album",
   "gallery.noExifDate": "Senza data di scatto: ordinata per data di caricamento",
+  "gallery.noResults.description": "Prova con altre parole o cancella la ricerca per vedere tutte le tue foto.",
+  "gallery.noResults.title": "Nessuna foto corrisponde a «{query}»",
   "gallery.onlyImages": "Si possono aggiungere solo immagini.",
   "gallery.open": "Apri {name}",
   "gallery.openInEditor": "Modifica {name}",
@@ -152,6 +163,7 @@
     "other": "{count} foto spostate nel cestino"
   },
   "gallery.unfavorite": "Togli dalle preferite",
+  "gallery.unfavorited": "Tolte dalle preferite: {count}",
   "gallery.unselectMonth": "Deseleziona il mese",
   "gallery.uploadFailed": "Impossibile caricare: {name}",
   "gallery.uploaded": {
@@ -198,6 +210,9 @@
   "viewer.askSend": "Chiedi",
   "viewer.canvasBackground": "Sfondo della foto",
   "viewer.close": "Chiudi",
+  "viewer.counter": "{index} / {total}",
+  "viewer.counterLabel": "Foto {index} di {total}",
+  "viewer.counterMore": "{count}+",
   "viewer.delete": "Sposta nel cestino",
   "viewer.deleteConfirm": "Spostare questa foto nel cestino? Il file resta in Sytue Drive.",
   "viewer.describe": "Descrivi con Sytue AI",
@@ -237,6 +252,7 @@
   "viewer.saveDescription": "Salva",
   "viewer.savingDescription": "Salvataggio…",
   "viewer.shortcuts": "Scorciatoie: frecce per cambiare foto, spazio per la presentazione, I per le informazioni, Z per la dimensione reale, Canc per il cestino.",
+  "viewer.shortcutsJump": "Home e Fine vanno alla prima e all’ultima foto.",
   "viewer.similar": "Foto simili",
   "viewer.slideshow": "Presentazione",
   "viewer.slideshowStop": "Ferma la presentazione",

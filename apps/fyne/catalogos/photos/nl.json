@@ -1,9 +1,14 @@
 {
   "aiBatch.excludeOrg": "Organisatie uitsluiten van de automatische Sytue AI-batch",
   "aiBatch.excludedHint": "De organisatie is uitgesloten van de automatische Sytue AI-batch. Nieuwe foto’s worden niet op de achtergrond verwerkt voor suggesties of gelijkenissen.",
+  "album.coverSet": "Albumomslag bijgewerkt",
+  "album.isCover": "Dit is de albumomslag",
   "album.linkCopied": "Link gekopieerd",
   "album.newLink": "Nieuwe link",
   "album.newLinkConfirm": "Een nieuwe link maken? De huidige link werkt dan niet meer voor wie hem al heeft.",
+  "album.rename": "Naam wijzigen",
+  "album.renamePrompt": "Albumnaam",
+  "album.setCover": "Gebruiken als albumomslag",
   "album.share": "Delen",
   "album.shared": "Gedeeld",
   "album.unshare": "Stoppen met delen",
@@ -98,6 +103,7 @@
     "other": "{count} op uploaddatum"
   },
   "gallery.cancelSelection": "Selectie verlaten",
+  "gallery.clearSearch": "Zoekopdracht wissen",
   "gallery.describeCapped": "Er worden maar {count} foto's tegelijk beschreven; voer het opnieuw uit voor de rest.",
   "gallery.describeNothing": "De geselecteerde foto's hebben al een beschrijving",
   "gallery.describeSelected": "Beschrijven met Sytue AI",
@@ -106,7 +112,8 @@
   "gallery.describing": "{done} van {total} beschrijven…",
   "gallery.downloadCapped": "Foto’s buiten deze batch: {count}.",
   "gallery.downloadSelected": "Downloaden",
-  "gallery.downloading": {
+  "gallery.downloading": "Gestarte downloadverzoeken: {count}. Controleer de downloads in je browser.",
+  "gallery.downloadingNative": {
     "one": "1 foto downloaden…",
     "other": "{count} foto's downloaden…"
   },
@@ -114,6 +121,8 @@
   "gallery.empty.description": "Foto's uit je Sytue Drive verschijnen hier, gesorteerd op de datum waarop ze zijn gemaakt.",
   "gallery.empty.title": "Nog geen foto's",
   "gallery.favorite": "Toevoegen aan favorieten",
+  "gallery.favoriteFailed": "Foto's die niet gewijzigd konden worden: {count}",
+  "gallery.favorited": "Toegevoegd aan favorieten: {count}",
   "gallery.likeTheseResults": "En de foto's die erop lijken",
   "gallery.moreLikeThese": "Meer zoals deze",
   "gallery.newAlbum": "Nieuw album",
@@ -124,6 +133,8 @@
   },
   "gallery.newAlbumTitle": "Nieuw album",
   "gallery.noExifDate": "Geen opnamedatum: gesorteerd op uploaddatum",
+  "gallery.noResults.description": "Probeer andere woorden of wis de zoekopdracht om al je foto's te zien.",
+  "gallery.noResults.title": "Geen foto's komen overeen met ‘{query}’",
   "gallery.onlyImages": "Alleen afbeeldingen kunnen worden toegevoegd.",
   "gallery.open": "{name} openen",
   "gallery.openInEditor": "{name} bewerken",
@@ -152,6 +163,7 @@
     "other": "{count} foto's naar de prullenbak verplaatst"
   },
   "gallery.unfavorite": "Verwijderen uit favorieten",
+  "gallery.unfavorited": "Verwijderd uit favorieten: {count}",
   "gallery.unselectMonth": "Maand deselecteren",
   "gallery.uploadFailed": "Kon niet uploaden: {name}",
   "gallery.uploaded": {
@@ -198,6 +210,9 @@
   "viewer.askSend": "Vragen",
   "viewer.canvasBackground": "Achtergrond van de foto",
   "viewer.close": "Sluiten",
+  "viewer.counter": "{index} / {total}",
+  "viewer.counterLabel": "Foto {index} van {total}",
+  "viewer.counterMore": "{count}+",
   "viewer.delete": "Naar prullenbak",
   "viewer.deleteConfirm": "Deze foto naar de prullenbak verplaatsen? Het bestand blijft in Sytue Drive.",
   "viewer.describe": "Beschrijven met Sytue AI",
@@ -237,6 +252,7 @@
   "viewer.saveDescription": "Opslaan",
   "viewer.savingDescription": "Opslaan…",
   "viewer.shortcuts": "Sneltoetsen: pijltjes om van foto te wisselen, spatie voor de diavoorstelling, I voor info, Z voor ware grootte, Delete voor de prullenbak.",
+  "viewer.shortcutsJump": "Home en End gaan naar de eerste en de laatste foto.",
   "viewer.similar": "Vergelijkbare foto's",
   "viewer.slideshow": "Diavoorstelling",
   "viewer.slideshowStop": "Diavoorstelling stoppen",

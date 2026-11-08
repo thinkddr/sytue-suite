@@ -16,12 +16,30 @@
 // servidor empuje (PushKit de File Provider) o un `sync-collection` (RFC 6578) en /dav.
 // ponytail: sin If-Match al subir: si dos equipos guardan el mismo fichero, gana el último.
 //
+// Cada fallo queda en el registro del sistema (subsistema eu.sytue.drive.archivos): el
+// código HTTP, el método y el error que se le devuelve al sistema, sin rutas ni claves.
+// Se ve con `log show --predicate 'subsystem == "eu.sytue.drive.archivos"' --last 10m`.
+//
 // El proyecto lo genera apps/fyne/xcode/generar.py (target «archivos-drive»).
 
 import FileProvider
 import Foundation
+import os
 import Security
 import UniformTypeIdentifiers
+
+// MARK: - El registro
+
+/// Lo que se registra no lleva rutas, nombres de fichero, usuarios ni claves: solo el
+/// motivo, el método, el código HTTP y el dominio y código del error.
+enum Registro {
+    static let proveedor = Logger(subsystem: "eu.sytue.drive.archivos", category: "proveedor")
+
+    static func fallo(_ operacion: String, _ error: Error) {
+        let e = error as NSError
+        proveedor.error("\(operacion, privacy: .public): \(e.domain, privacy: .public) \(e.code, privacy: .public)")
+    }
+}
 
 // MARK: - La credencial
 
@@ -126,9 +144,16 @@ final class DAV {
 
     init(_ c: Credencial, contexto: ContextoDrive,
          acceso: @escaping (String, String?) -> AccesoDrive.Estado? = AccesoDrive.estado) throws {
-        guard let u = URL(string: c.url), u.scheme == "https", u.host != nil,
-              c.identidad == contexto.identidad,
-              acceso(contexto.identidad, contexto.revision) != nil else {
+        guard let u = URL(string: c.url), u.scheme == "https", u.host != nil else {
+            Registro.proveedor.error("sin acceso: la dirección WebDAV guardada no es https")
+            throw NSFileProviderError(.notAuthenticated)
+        }
+        guard c.identidad == contexto.identidad else {
+            Registro.proveedor.error("sin acceso: la credencial del llavero es de otra cuenta que el dominio")
+            throw NSFileProviderError(.notAuthenticated)
+        }
+        guard acceso(contexto.identidad, contexto.revision) != nil else {
+            Registro.proveedor.error("sin acceso: falta la marca drive-acceso.json del grupo de la suite, o es de otra sesión")
             throw NSFileProviderError(.notAuthenticated)
         }
         base = u.absoluteString.hasSuffix("/") ? String(u.absoluteString.dropLast()) : u.absoluteString
@@ -176,11 +201,20 @@ final class DAV {
         return r
     }
 
-    /// Lo que el sistema entiende de cada respuesta: 401 es «vuelve a entrar en la app».
-    static func comprobar(_ respuesta: URLResponse, admite: Set<Int> = []) throws {
-        guard let h = respuesta as? HTTPURLResponse else { throw URLError(.badServerResponse) }
+    /// Lo que el sistema entiende de cada respuesta: 401 es «vuelve a entrar en la app», y
+    /// lo pasajero del servidor (429, 502, 503 y 504; 503 es también Sytue ID sin contestar
+    /// al canjear la contraseña) es «servidor inalcanzable», que el sistema reintenta solo
+    /// en vez de dar la carpeta por rota. Un 500 sigue siendo un fallo: reintentarlo en
+    /// bucle escondería un error del servidor.
+    static func comprobar(_ respuesta: URLResponse, admite: Set<Int> = [], metodo: String = "") throws {
+        guard let h = respuesta as? HTTPURLResponse else {
+            Registro.proveedor.error("\(metodo, privacy: .public): respuesta sin HTTP")
+            throw URLError(.badServerResponse)
+        }
         if (200..<300).contains(h.statusCode) || admite.contains(h.statusCode) { return }
+        Registro.proveedor.error("\(metodo, privacy: .public): HTTP \(h.statusCode, privacy: .public)")
         switch h.statusCode {
+        case 429, 502, 503, 504: throw NSFileProviderError(.serverUnreachable)
         case 401: throw NSFileProviderError(.notAuthenticated)
         case 403: throw CocoaError(.fileWriteNoPermission)
         case 404: throw NSFileProviderError(.noSuchItem)
@@ -191,22 +225,32 @@ final class DAV {
     }
 
     /// Sin red el sistema reintenta solo si se lo dice así.
+    ///
+    /// El sistema solo acepta errores de los dominios NSFileProviderErrorDomain y
+    /// NSCocoaErrorDomain: cualquier otro (un URLError de un código HTTP que no está en
+    /// `comprobar`, un 405 por ejemplo) lo descarta como «no admitido» y el Finder se
+    /// queda en «Cargando…» con un aviso genérico. Lo que no sea de esos dos dominios sale
+    /// como fallo de lectura de Cocoa, con el original dentro.
     static func traducir(_ e: Error) -> Error {
-        guard let u = e as? URLError else { return e }
-        switch u.code {
-        case .notConnectedToInternet, .timedOut, .cannotConnectToHost, .cannotFindHost,
-             .networkConnectionLost, .dnsLookupFailed:
-            return NSFileProviderError(.serverUnreachable)
-        default:
-            return e
+        let ns = e as NSError
+        if ns.domain == NSFileProviderErrorDomain || ns.domain == NSCocoaErrorDomain { return e }
+        if let u = e as? URLError {
+            switch u.code {
+            case .notConnectedToInternet, .timedOut, .cannotConnectToHost, .cannotFindHost,
+                 .networkConnectionLost, .dnsLookupFailed:
+                return NSFileProviderError(.serverUnreachable)
+            default:
+                break
+            }
         }
+        return CocoaError(.fileReadUnknown, userInfo: [NSUnderlyingErrorKey: ns])
     }
 
     func hacer(_ r: URLRequest, admite: Set<Int> = []) async throws -> Data {
         try validar()
         let (datos, respuesta) = try await sesion.data(for: r)
         try validar()
-        try DAV.comprobar(respuesta, admite: admite)
+        try DAV.comprobar(respuesta, admite: admite, metodo: r.httpMethod ?? "")
         return datos
     }
 
@@ -226,7 +270,10 @@ final class DAV {
         let xml = XMLParser(data: datos)
         xml.shouldProcessNamespaces = true
         xml.delegate = lector
-        guard xml.parse() else { throw URLError(.cannotParseResponse) }
+        guard xml.parse() else {
+            Registro.proveedor.error("PROPFIND: la respuesta 207 no se pudo leer")
+            throw URLError(.cannotParseResponse)
+        }
         return lector.entradas
     }
 
@@ -244,7 +291,7 @@ final class DAV {
         let (temporal, respuesta) = try await sesion.download(for: peticion("GET", ruta))
         defer { try? FileManager.default.removeItem(at: temporal) }
         try validar()
-        try DAV.comprobar(respuesta)
+        try DAV.comprobar(respuesta, metodo: "GET")
         try? FileManager.default.removeItem(at: destino)
         try FileManager.default.moveItem(at: temporal, to: destino)
     }
@@ -260,7 +307,7 @@ final class DAV {
             (_, respuesta) = try await sesion.upload(for: r, from: Data())
         }
         try validar()
-        try DAV.comprobar(respuesta)
+        try DAV.comprobar(respuesta, metodo: "PUT")
     }
 
     func carpeta(_ ruta: String) async throws {
@@ -467,18 +514,28 @@ final class Proveedor: NSObject, NSFileProviderReplicatedExtension {
     /// Se relee la credencial para detectar su retirada, pero jamás se adopta la de
     /// otra cuenta o una sesión posterior del mismo usuario. El dominio fija ambas.
     func dav() throws -> DAV {
-        guard let contexto, let c = leerCredencial() else { throw NSFileProviderError(.notAuthenticated) }
+        guard let contexto else {
+            Registro.proveedor.error("sin acceso: el dominio no es sytue-drive.<identidad>.<revisión>")
+            throw NSFileProviderError(.notAuthenticated)
+        }
+        guard let c = leerCredencial() else {
+            Registro.proveedor.error("sin acceso: no hay credencial en el llavero compartido")
+            throw NSFileProviderError(.notAuthenticated)
+        }
         return try DAV(c, contexto: contexto, acceso: leerAcceso)
     }
 
     /// Corre `cuerpo` aparte y devuelve el Progress que pide el sistema. El fallo, traducido.
-    func trabajo(_ cuerpo: @escaping () async throws -> Void, fallo: @escaping (Error) -> Void) -> Progress {
+    func trabajo(_ operacion: String, _ cuerpo: @escaping () async throws -> Void,
+                 fallo: @escaping (Error) -> Void) -> Progress {
         let p = Progress(totalUnitCount: 1)
         let t = Task {
             do {
                 try await cuerpo()
             } catch {
-                fallo(DAV.traducir(error))
+                let traducido = DAV.traducir(error)
+                Registro.fallo(operacion, traducido)
+                fallo(traducido)
             }
             self.indice.guardar()
             p.completedUnitCount = 1
@@ -503,7 +560,7 @@ final class Proveedor: NSObject, NSFileProviderReplicatedExtension {
 
     func item(for identifier: NSFileProviderItemIdentifier, request: NSFileProviderRequest,
               completionHandler: @escaping (NSFileProviderItem?, Error?) -> Void) -> Progress {
-        trabajo({
+        trabajo("item", {
             let d = try self.dav()
             let item = try await self.elemento(d, self.ruta(identifier))
             try d.validar()
@@ -514,7 +571,7 @@ final class Proveedor: NSObject, NSFileProviderReplicatedExtension {
     func fetchContents(for itemIdentifier: NSFileProviderItemIdentifier, version requestedVersion: NSFileProviderItemVersion?,
                        request: NSFileProviderRequest,
                        completionHandler: @escaping (URL?, NSFileProviderItem?, Error?) -> Void) -> Progress {
-        trabajo({
+        trabajo("fetchContents", {
             let d = try self.dav()
             let ruta = try self.ruta(itemIdentifier)
             let item = try await self.elemento(d, ruta)
@@ -531,7 +588,7 @@ final class Proveedor: NSObject, NSFileProviderReplicatedExtension {
     func createItem(basedOn itemTemplate: NSFileProviderItem, fields: NSFileProviderItemFields, contents url: URL?,
                     options: NSFileProviderCreateItemOptions = [], request: NSFileProviderRequest,
                     completionHandler: @escaping (NSFileProviderItem?, NSFileProviderItemFields, Bool, Error?) -> Void) -> Progress {
-        trabajo({
+        trabajo("createItem", {
             let d = try self.dav()
             let ruta = Proveedor.unir(try self.ruta(itemTemplate.parentItemIdentifier), itemTemplate.filename)
             let carpeta = itemTemplate.contentType == .folder
@@ -560,7 +617,7 @@ final class Proveedor: NSObject, NSFileProviderReplicatedExtension {
                     changedFields: NSFileProviderItemFields, contents newContents: URL?,
                     options: NSFileProviderModifyItemOptions = [], request: NSFileProviderRequest,
                     completionHandler: @escaping (NSFileProviderItem?, NSFileProviderItemFields, Bool, Error?) -> Void) -> Progress {
-        trabajo({
+        trabajo("modifyItem", {
             let d = try self.dav()
             var ruta = try self.ruta(item.itemIdentifier)
             if changedFields.contains(.filename) || changedFields.contains(.parentItemIdentifier) {
@@ -584,7 +641,7 @@ final class Proveedor: NSObject, NSFileProviderReplicatedExtension {
     func deleteItem(identifier: NSFileProviderItemIdentifier, baseVersion version: NSFileProviderItemVersion,
                     options: NSFileProviderDeleteItemOptions = [], request: NSFileProviderRequest,
                     completionHandler: @escaping (Error?) -> Void) -> Progress {
-        trabajo({
+        trabajo("deleteItem", {
             let ruta = try self.ruta(identifier)
             // Una carpeta con barra final; sin saber qué es, se pregunta.
             let d = try self.dav()
@@ -630,7 +687,9 @@ final class Carpeta: NSObject, NSFileProviderEnumerator {
                 proveedor.indice.guardar()
                 observer.finishEnumerating(upTo: nil)
             } catch {
-                observer.finishEnumeratingWithError(DAV.traducir(error))
+                let traducido = DAV.traducir(error)
+                Registro.fallo("enumerateItems", traducido)
+                observer.finishEnumeratingWithError(traducido)
             }
         }
     }

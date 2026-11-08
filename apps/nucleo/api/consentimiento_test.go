@@ -211,3 +211,31 @@ func TestOAuthDraftCanRetryWithoutCreatingOrReplacingAnotherAccount(t *testing.T
 		t.Fatalf("el reintento crea otra cuenta: %+v err=%v creadas=%d", reintento, err, creadas)
 	}
 }
+
+// B7: cancelar, quitar el permiso de correo y repetir una cuenta se distinguen.
+func TestConsentErrorTellsDeniedScopeAndExistingAccountApart(t *testing.T) {
+	start := OAuthAuthorization{InstanceID: "borrador", Section: "native-mail"}
+	result := func(code, existing string) OAuthResult {
+		return OAuthResult{Section: "native-mail", Instance: "borrador", Error: code, Existing: existing}
+	}
+	if err := result("denied", "").ConsentError(start); !errors.Is(err, ErrOAuthDenied) {
+		t.Fatalf("denied = %v", err)
+	}
+	if err := result("scope", "").ConsentError(start); !errors.Is(err, ErrOAuthScope) {
+		t.Fatalf("scope = %v", err)
+	}
+	if err := result("state", "").ConsentError(start); !errors.Is(err, ErrOAuthState) {
+		t.Fatalf("state = %v", err)
+	}
+	var exists *OAuthExistsError
+	if err := result("exists", "la-de-antes").ConsentError(start); !errors.As(err, &exists) || exists.Instance != "la-de-antes" {
+		t.Fatalf("exists = %v; quiero la cuenta que ya estaba", err)
+	}
+	// Sin la cuenta existente no hay a dónde llevar a la persona: error genérico.
+	if err := result("exists", "").ConsentError(start); err == nil || errors.As(err, &exists) {
+		t.Fatalf("exists sin cuenta = %v", err)
+	}
+	if err := result("", "").ConsentError(start); err != nil {
+		t.Fatal(err)
+	}
+}

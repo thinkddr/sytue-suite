@@ -46,5 +46,10 @@ func (h *Handlers) completarMetadatos(r *http.Request) {
 			log.From(ctx).Info("tipo y tamaño de las fotos completados",
 				"arregladas", c.Arreglados, "sin_original", c.SinOriginal)
 		}
+		// Acaba DESPUÉS de contestar: la escritura ya mandó su señal, y esta es la de
+		// lo que ha cambiado desde entonces.
+		if c.Arreglados > 0 {
+			h.hub.AvisarCambio(ctx, tenancy.MustFrom(ctx).Slug, "photos", yo)
+		}
 	}()
 }

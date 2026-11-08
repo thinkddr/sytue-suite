@@ -129,6 +129,7 @@ export const da: AppCatalog<typeof en> = {
   'gallery.unselectMonth': 'Fravælg måned',
   'gallery.downloadSelected': 'Download',
   'gallery.downloading': 'Startede downloadanmodninger: {count}. Tjek browserens downloads.',
+  'gallery.downloadingNative': { one: 'Downloader 1 foto…', other: 'Downloader {count} fotos…' },
   'gallery.downloadCapped': 'Fotos uden for denne portion: {count}.',
   'gallery.newAlbum': 'Nyt album',
   'gallery.newAlbumTitle': 'Nyt album',
@@ -251,4 +252,20 @@ export const da: AppCatalog<typeof en> = {
   'aiBatch.excludeOrg': 'Udeluk organisationen fra den automatiske Sytue AI-kørsel',
   'aiBatch.excludedHint':
     'Organisationen er udelukket fra den automatiske Sytue AI-kørsel. Billeder behandles ikke i baggrunden til forslag eller lignende.',
+  'album.rename': 'Omdøb',
+  'album.renamePrompt': 'Albummets navn',
+  'album.setCover': 'Brug som albumcover',
+  'album.isCover': 'Dette er albummets cover',
+  'album.coverSet': 'Albumcoveret er opdateret',
+  'gallery.favorited': 'Føjet til favoritter: {count}',
+  'gallery.unfavorited': 'Fjernet fra favoritter: {count}',
+  'gallery.favoriteFailed': 'Billeder, der ikke kunne ændres: {count}',
+  'gallery.noResults.title': 'Ingen billeder matcher “{query}”',
+  'gallery.noResults.description':
+    'Prøv andre ord, eller ryd søgningen for at se alle dine billeder.',
+  'gallery.clearSearch': 'Ryd søgning',
+  'viewer.counter': '{index} / {total}',
+  'viewer.counterMore': '{count}+',
+  'viewer.counterLabel': 'Billede {index} af {total}',
+  'viewer.shortcutsJump': 'Home og End går til det første og sidste billede.',
 };

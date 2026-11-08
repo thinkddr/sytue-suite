@@ -207,6 +207,7 @@ func run() error {
 		Service:  svc,
 		Verifier: verifier,
 		CalDAV:   caldavBackend.Handler(),
+		Hub:      notifier,
 		ReadyCheckers: []httpx.Checker{
 			httpx.CheckerFunc{Label: "postgres", Fn: st.Healthz},
 		},

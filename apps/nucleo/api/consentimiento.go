@@ -81,9 +81,12 @@ type OAuthCallback struct {
 	Error string `json:"error"`
 }
 
+// OAuthResult is the gateway's outcome. With Error "exists", Existing is the
+// account already connected for that address and Instance a discarded draft.
 type OAuthResult struct {
 	Section  string `json:"section"`
 	Instance string `json:"instance"`
+	Existing string `json:"existing,omitempty"`
 	Error    string `json:"error"`
 }
 
@@ -91,7 +94,16 @@ var (
 	ErrOAuthState       = errors.New("oauth: consent does not match this app")
 	ErrOAuthDenied      = errors.New("oauth: access was not granted")
 	ErrOAuthUnavailable = errors.New("oauth: provider connection is not configured")
+	// ErrOAuthScope is a sign-in that did not grant the permission its app needs
+	// (Google's granular screen lets the person untick it).
+	ErrOAuthScope = errors.New("oauth: the required permission was not granted")
 )
+
+// OAuthExistsError says the person signed in to an account already connected;
+// Instance is that account, which the app opens instead of a second copy.
+type OAuthExistsError struct{ Instance string }
+
+func (e *OAuthExistsError) Error() string { return "oauth: account already connected" }
 
 var nativeConsentProducts = map[string]string{
 	"native-storage": "drive", "native-personal-storage": "drive", "native-rooms": "rooms", "native-mail": "mail", "native-apps": "one",
@@ -288,8 +300,18 @@ func (r OAuthResult) ConsentError(expected OAuthAuthorization) error {
 	if r.Section != expected.Section || r.Instance != expected.InstanceID {
 		return ErrOAuthState
 	}
-	if r.Error == "denied" {
+	switch r.Error {
+	case "denied":
 		return ErrOAuthDenied
+	case "scope":
+		return ErrOAuthScope
+	case "state":
+		// Caducado, ya usado o sustituido por un arranque posterior.
+		return ErrOAuthState
+	case "exists":
+		if r.Existing != "" {
+			return &OAuthExistsError{Instance: r.Existing}
+		}
 	}
 	if r.Error != "" {
 		return fmt.Errorf("oauth: %s", r.Error)

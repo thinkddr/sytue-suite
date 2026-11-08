@@ -187,3 +187,118 @@ func TestExternalMailStaleRefreshStopsOriginalOperation(t *testing.T) {
 		t.Fatal("non-expiring refresh did not clear expiry")
 	}
 }
+
+// B2 y B3 con el store de verdad: el borrador de un «Añadir» que no terminó no
+// sale en la lista, el siguiente intento lo reutiliza en vez de crear otro, y la
+// misma dirección no se conecta dos veces (y se rechaza antes de tocar la red).
+func TestExternalMailDraftsAreNotAccountsAndAddressesAreUnique(t *testing.T) {
+	var handlers *Handlers
+	a := montarAlmacen(t, func(h *Handlers, r chi.Router) {
+		handlers = h
+		h.oauthCipher, _ = keycrypto.New(make([]byte, 32))
+		r.Get("/external-mail/accounts", h.ExternalMailAccounts)
+		r.Post("/external-mail/accounts", h.ExternalMailConfigure)
+	})
+	ctx := tenancy.Into(authn.Into(context.Background(), authn.Claims{Subject: "ana", Tenant: "acme", Roles: []string{"member"}}), tenancy.Tenant{Slug: "acme"})
+	if err := a.st.UpsertTemplate(ctx, "mail-imap", json.RawMessage(`{"name":"IMAP","description":"Fixture","color":"#123456","icon":"<svg/>","identity":{"kind":"none"},"launch":{"kind":"none"},"provisioning":"none"}`), "tier2"); err != nil {
+		t.Fatal(err)
+	}
+	cuenta, err := a.st.CreateInstance(ctx, "mail-imap", "Buzón", json.RawMessage(`{"_mail_config":"{\"address\":\"ana@example.eu\"}"}`), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	borrador, err := a.st.CreateInstance(ctx, "mail-imap", "IMAP", json.RawMessage(`{}`), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{cuenta.ID, borrador.ID} {
+		if err := a.st.BindExternalChatActor(ctx, id, "ana"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := a.st.MergeSecrets(ctx, cuenta.ID, map[string]string{mailPasswordKey: "fixture-password"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.st.SetStatus(ctx, cuenta.ID, domain.StatusActive); err != nil {
+		t.Fatal(err)
+	}
+	status, raw := a.pedir(t, ana, http.MethodGet, "/external-mail/accounts", nil)
+	if status != http.StatusOK || !strings.Contains(string(raw), cuenta.ID) || strings.Contains(string(raw), borrador.ID) {
+		t.Fatalf("lista con borrador o sin la cuenta: %d %s", status, raw)
+	}
+	reuse, err := handlers.reuseMailDraft(ctx, "ana", "mail-imap")
+	if err != nil || reuse != borrador.ID {
+		t.Fatalf("reintento = %q (%v); quiero el borrador %s", reuse, err, borrador.ID)
+	}
+	// 127.0.0.1 falla con mail_blocked si llega a probar la red: el 409 va antes.
+	status, raw = a.pedir(t, ana, http.MethodPost, "/external-mail/accounts", map[string]any{"provider": "imap", "name": "Otra vez", "address": "Ana@example.eu", "password": "fixture", "incoming": map[string]any{"host": "127.0.0.1", "port": 993, "security": "tls"}, "outgoing": map[string]any{"host": "127.0.0.1", "port": 465, "security": "tls"}})
+	if status != http.StatusConflict || !strings.Contains(string(raw), "mail_account_exists") || !strings.Contains(string(raw), cuenta.ID) {
+		t.Fatalf("misma dirección dos veces: %d %s", status, raw)
+	}
+	// Reconfigurar la propia cuenta no es repetirla.
+	status, raw = a.pedir(t, ana, http.MethodPost, "/external-mail/accounts", map[string]any{"provider": "imap", "instance_id": cuenta.ID, "name": "Buzón", "address": "ana@example.eu", "password": "fixture", "incoming": map[string]any{"host": "127.0.0.1", "port": 993, "security": "tls"}, "outgoing": map[string]any{"host": "127.0.0.1", "port": 465, "security": "tls"}})
+	if status == http.StatusConflict {
+		t.Fatalf("reconfigurar la propia cuenta se tomó por repetida: %s", raw)
+	}
+}
+
+// El resumen con el store de verdad: cada persona ve solo sus buzones, sin el
+// borrador ni la cuenta conectada solo para Calendario, y un servidor que no se
+// puede usar sale «unavailable» sin tumbar la respuesta ni filtrar la contraseña.
+func TestExternalMailSummaryIsPersonalAndSurvivesFailures(t *testing.T) {
+	a := montarAlmacen(t, func(h *Handlers, r chi.Router) {
+		h.oauthCipher, _ = keycrypto.New(make([]byte, 32))
+		r.Get("/external-mail/summary", h.ExternalMailSummary)
+	})
+	ctx := tenancy.Into(authn.Into(context.Background(), authn.Claims{Subject: "ana", Tenant: "acme", Roles: []string{"member"}}), tenancy.Tenant{Slug: "acme"})
+	if err := a.st.UpsertTemplate(ctx, "mail-imap", json.RawMessage(`{"name":"IMAP","description":"Fixture","color":"#123456","icon":"<svg/>","identity":{"kind":"none"},"launch":{"kind":"none"},"provisioning":"none"}`), "tier2"); err != nil {
+		t.Fatal(err)
+	}
+	crear := func(name, config string, secrets bool) string {
+		inst, err := a.st.CreateInstance(ctx, "mail-imap", name, json.RawMessage(config), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := a.st.BindExternalChatActor(ctx, inst.ID, "ana"); err != nil {
+			t.Fatal(err)
+		}
+		if secrets {
+			if err := a.st.MergeSecrets(ctx, inst.ID, map[string]string{mailPasswordKey: "fixture-password"}); err != nil {
+				t.Fatal(err)
+			}
+			if err := a.st.SetStatus(ctx, inst.ID, domain.StatusActive); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return inst.ID
+	}
+	// 127.0.0.1: el transporte la bloquea (mail_blocked) sin salir a la red.
+	buzon := crear("Buzón", `{"_mail_config":"{\"address\":\"ana@example.eu\",\"incoming\":{\"host\":\"127.0.0.1\",\"port\":993,\"security\":\"tls\"}}"}`, true)
+	calendario := crear("Calendario", `{"_mail_config":"{\"address\":\"cal@example.eu\"}","_mail_services":"[\"calendar\"]"}`, true)
+	borrador := crear("IMAP", `{}`, false)
+	for _, person := range []quien{ana, bea} {
+		status, raw := a.pedir(t, person, http.MethodGet, "/external-mail/summary", nil)
+		if status != http.StatusOK || strings.Contains(string(raw), "fixture-password") {
+			t.Fatalf("summary %s: %d %s", person.sub, status, raw)
+		}
+		var body struct {
+			Items []struct {
+				InstanceID string `json:"instance_id"`
+				State      string `json:"state"`
+				Folders    []any  `json:"folders"`
+			} `json:"items"`
+		}
+		if err := json.Unmarshal(raw, &body); err != nil {
+			t.Fatal(err)
+		}
+		if person.sub != "ana" {
+			if len(body.Items) != 0 {
+				t.Fatalf("%s ve buzones de otra persona: %s", person.sub, raw)
+			}
+			continue
+		}
+		if len(body.Items) != 1 || body.Items[0].InstanceID != buzon || body.Items[0].State != "unavailable" || body.Items[0].Folders == nil {
+			t.Fatalf("resumen de ana = %s; quiero solo %s, «unavailable» y sin carpetas (no %s ni %s)", raw, buzon, calendario, borrador)
+		}
+	}
+}

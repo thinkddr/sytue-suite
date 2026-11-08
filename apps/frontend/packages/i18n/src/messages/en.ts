@@ -28,6 +28,8 @@ export const en = {
   'ui.openNav': 'Open navigation',
   'ui.closeNav': 'Close navigation',
   'ui.backToList': 'Back to the list',
+  'ui.suiteOpen': 'Sytue: apps, search, notifications and account',
+  'ui.suiteClose': 'Back to the app',
   'ui.noResults': 'No results.',
 
   // Medidor de uso (Meter). El aviso se dice TAMBIÉN con palabras: un umbral que
@@ -81,6 +83,9 @@ export const en = {
     'This app needs OpenGL 2.1 and this computer’s graphics driver does not offer it ({detalle}). Install or update the graphics card driver. Without a graphics card (remote desktop or virtual machine) it cannot open.',
   'shell.lock.reasonNotebook': 'open your encrypted notebook',
   'shell.lock.faceIdUsage': 'Sytue uses Face ID to unlock your session when you open the app.',
+  'shell.widgets.wake': 'Update widgets while the app is closed',
+  'shell.widgets.wakeHelp':
+    'When something of yours changes, Sytue wakes the app with an empty Apple notification so it can refresh its widget. Apple sees which app and when, never what changed.',
   'shell.call.microphoneUsage':
     'Sytue Rooms uses the microphone only during a call, and only when you turn it on.',
   'shell.call.cameraUsage':
@@ -201,7 +206,7 @@ export const en = {
   'notifications.kind.pages.domain.failed':
     'The domain {domain} on {site} is not working: check its settings',
   'notifications.kind.pages.erp.failed': 'Order {number} on {site} did not reach Sytue ERP',
-  'notifications.kind.pages.settings.changed': '{actor} changed a Sytue Web setting',
+  'notifications.kind.pages.settings.changed': '{actor} changed a Sytue Webs setting',
   'notifications.kind.pages.export.ready': 'Your export of {site} is ready',
   'notifications.kind.pages.store.busy': 'The shop on {site} has too many orders awaiting payment',
   'notifications.kind.one.update.available': '{app} {version} is available',
@@ -388,6 +393,8 @@ export const en = {
   'widgets.compose': 'Compose',
   'widgets.storage': 'Storage',
   'widgets.create': 'Create event',
+  'widgets.updatedAgo': 'Updated {time}',
+  'widgets.updatedAt': 'Updated: {time}',
 
   'linkedServices.services': 'Services',
   'linkedServices.changed': 'This item changed at your provider. Refresh before editing again.',
@@ -399,6 +406,7 @@ export const en = {
   'linkedServices.notGranted':
     'Access to this service was not granted. Connect the account again to choose its permissions.',
   'linkedServices.connected': 'Connected services',
+  'linkedServices.exists': 'This account was already connected and is now open.',
   'linkedServices.providerData': 'Changes are saved at your provider.',
   'linkedServices.writeUnknown':
     'The provider did not confirm whether this was saved. Refresh and check before trying again.',

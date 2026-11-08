@@ -13,7 +13,9 @@ export function ExternalMailDemo({ locale }: { locale: Locale }) {
       <main class="mx-auto max-w-xl p-6">
         <h1 class="sytue-h1 mb-6">Sytue Mail</h1>
         <Button onClick={() => setOpen(true)}>{t('externalMail.add')}</Button>
-        {open ? <ExternalMail t={t} onClose={() => setOpen(false)} /> : null}
+        {open ? (
+          <ExternalMail t={t} onOpenAccount={() => setOpen(false)} onClose={() => setOpen(false)} />
+        ) : null}
       </main>
     </I18nProvider>
   );

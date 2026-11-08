@@ -569,7 +569,7 @@ func (e *Explorador) textoProblema() (titulo, cuerpo, accion string) {
 // centrar es el `grid h-full place-items-center p-6` con el que la web centra los
 // estados vacíos en el hueco que queda.
 func centrar(x *ui.Vacio, v tema.Variante) fyne.CanvasObject {
-	fondo := canvas.NewRectangle(tema.Color("bg", v))
+	fondo := canvas.NewRectangle(tema.Color(ui.FondoHoja(), v))
 	return container.New(&centrado{hijo: x}, fondo, x)
 }
 
@@ -674,7 +674,7 @@ func (e *Explorador) lista(v tema.Variante) fyne.CanvasObject {
 		e.arriba = false
 	}
 
-	fondo := canvas.NewRectangle(tema.Color("bg", v))
+	fondo := canvas.NewRectangle(tema.Color(ui.FondoHoja(), v))
 	col := &columnaLista{cab: cab, filas: e.filasObj}
 	hijos := []fyne.CanvasObject{fondo, cab, e.filasObj}
 	e.tarjetas = e.tarjetas[:0]
@@ -744,12 +744,13 @@ func (e *Explorador) rellenarFila(i widget.ListItemID, o fyne.CanvasObject) {
 }
 
 // pieCargando es la franja de «Cargando más…» debajo de la lista: `border-t
-// border-border/60 bg-bg sytue-meta py-1.5`, con la rueda de 14 y `gap-2`.
+// border-border/60 bg-[var(--sytue-sheet-bg)] sytue-meta py-1.5`, con la rueda de 14 y
+// `gap-2`: sobre la hoja, no sobre el lienzo.
 func (e *Explorador) pieCargando(v tema.Variante) fyne.CanvasObject {
 	texto := ui.Texto(e.t("files.loadingMore"), tema.TextoXS, ui.Normal, tema.Color("text-subtle", v))
 	rueda := ui.NuevaRueda(LadoRuedaPie, "text-subtle", v)
 	return container.New(&pieLista{texto: texto, rueda: rueda},
-		canvas.NewRectangle(tema.Color("bg", v)), canvas.NewRectangle(conAlfaBorde(v)), rueda, texto)
+		canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)), canvas.NewRectangle(conAlfaBorde(v)), rueda, texto)
 }
 
 // LadoRuedaPie es el `<Spinner size={14} />` del pie de carga, y AltoPieCargando lo
@@ -992,7 +993,7 @@ const FilasEsqueleto = 9
 // cuanto haya una medida de la tarjeta de carga.
 func (e *Explorador) esqueletoCuerpo(v tema.Variante) fyne.CanvasObject {
 	hijos := make([]fyne.CanvasObject, 0, 4+4*FilasEsqueleto)
-	hijos = append(hijos, canvas.NewRectangle(tema.Color("bg", v)))
+	hijos = append(hijos, canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)))
 	s := &esqueletoLista{}
 	// La cabecera: tres rayas de `0.6rem` donde van los tres rótulos de columna.
 	for _, ancho := range []float32{56, 48, 72} {
@@ -1122,7 +1123,7 @@ func (e *Explorador) rejilla(v tema.Variante) fyne.CanvasObject {
 		e.desplazable.ScrollToTop()
 		e.arriba = false
 	}
-	fondo := canvas.NewRectangle(tema.Color("bg", v))
+	fondo := canvas.NewRectangle(tema.Color(ui.FondoHoja(), v))
 	refresco := e.Refresco
 	refresco.Arriba = func() bool { return e.desplazable.Offset.Y <= 0.5 }
 	cuerpo := ui.RefrescarAlTirar(e.desplazable, &refresco)

@@ -66,6 +66,7 @@ import {
 import { MAX_ATTACHMENTS } from '../lib/fileIds.js';
 import { loadDraft, saveDraft, clearDraft } from '../lib/drafts.js';
 import { mentionsWholeChannel } from '../lib/mentions.js';
+import { abreEdicionUltimo } from '../lib/editarUltimo.js';
 import { aplicarFormato, marcaDeAtajo, type MarcaFormato } from '../lib/formato.js';
 import { formatSchedule, schedulePresets, toLocalValue } from '../lib/schedule.js';
 import {
@@ -156,6 +157,12 @@ interface Props {
   onRemoteCommand?: (name: string, arg: string) => void;
   /** Notifica (el padre lo emite por WS) que el usuario está escribiendo. Throttled aquí. */
   onTyping?: () => void;
+  /**
+   * ↑ con la caja VACÍA: abre en edición el último mensaje propio del canal (Slack,
+   * Teams). Devuelve false si no hay ninguno editable, y entonces la flecha hace lo de
+   * siempre. Ausente = la flecha no hace nada especial (composer de hilo).
+   */
+  onEditLast?: () => boolean;
   /**
    * Ámbito del borrador (canal `<channelId>` o hilo `<channelId>:thread:<rootId>`).
    * Persiste el texto sin enviar en localStorage y lo restaura al remontar. El padre
@@ -397,6 +404,7 @@ export function Composer({
   remoteCommands,
   onRemoteCommand,
   onTyping,
+  onEditLast,
   onOpenIntegrations,
   draftId,
   channelId,
@@ -843,6 +851,10 @@ export function Composer({
         setTrigger(null);
         return;
       }
+    }
+    if (abreEdicionUltimo(e, value, pending.length) && onEditLast?.()) {
+      e.preventDefault();
+      return;
     }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();

@@ -66,6 +66,7 @@
   "common.remove": "Retirer",
   "common.retry": "Réessayer",
   "common.save": "Enregistrer",
+  "day.noEvents": "Aucun événement ce jour-là",
   "error.calendarsLoad": "Impossible de charger les agendas.",
   "error.eventsLoad": "Impossible de charger les événements.",
   "event.ai": "Décrivez l'événement",
@@ -142,12 +143,19 @@
   "grid.blockAria": "{title}, {time}",
   "grid.continued": "{title} (suite)",
   "grid.createOn": "Créer un événement le {date}",
+  "grid.dayEvents": {
+    "one": "{date}, {count} événement",
+    "other": "{date}, {count} événements"
+  },
+  "grid.daySelected": "{label}, sélectionné",
   "grid.loadError": "Impossible de charger l’agenda",
   "grid.loading": "Chargement de l’agenda",
   "grid.more": {
     "one": "+{count} autre",
     "other": "+{count} autres"
   },
+  "grid.showMonth": "Afficher le mois entier",
+  "grid.showWeek": "Afficher seulement cette semaine",
   "grid.snapAria": {
     "one": "Aligner le déplacement sur {count} minute. Appuyez pour changer.",
     "other": "Aligner le déplacement sur {count} minutes. Appuyez pour changer."
@@ -160,6 +168,13 @@
     "one": "{count} min",
     "other": "{count} min"
   },
+  "grid.todayLabel": "Aujourd’hui, {date}",
+  "grid.weekNumber": "Semaine {week}",
+  "guests.organizer": "Organisateur",
+  "guests.status.accepted": "Participe",
+  "guests.status.declined": "Ne participe pas",
+  "guests.status.pending": "En attente de réponse",
+  "guests.status.tentative": "Peut-être",
   "header.invitations": "Invitations",
   "header.next": "Suivant",
   "header.pending": {
@@ -197,6 +212,10 @@
   "nav.createEventOn": "Créer un événement le {date}",
   "nav.deleteSubscription": "Supprimer l’abonnement",
   "nav.manageResources": "Gérer les salles et les équipements",
+  "nav.menuPending": {
+    "one": "Ouvrir le menu, {count} en attente",
+    "other": "Ouvrir le menu, {count} en attente"
+  },
   "nav.myCalendars": "Mes agendas",
   "nav.next": "Suivant",
   "nav.nextMonth": "Mois suivant",
@@ -341,6 +360,7 @@
   "scope.following": "Cet événement et les suivants",
   "scope.legend": "Cet événement se répète. À quels événements la modification s’applique-t-elle ?",
   "scope.this": "Cet événement uniquement",
+  "search.allCalendars": "Tous les agendas",
   "search.error": "Impossible de terminer la recherche.",
   "search.events": "Rechercher des événements",
   "search.loadMore": "Charger plus",
@@ -349,6 +369,12 @@
     "other": "Saisissez au moins {count} caractères pour chercher dans vos agendas."
   },
   "search.noResults": "Aucun résultat pour « {term} ».",
+  "search.period": "Période",
+  "search.period.any": "À tout moment",
+  "search.period.month": "Ce mois-ci",
+  "search.period.past": "Passés",
+  "search.period.upcoming": "À venir",
+  "search.period.year": "Cette année",
   "search.placeholder": "Titre, description, lieu ou personne invitée…",
   "search.searching": "Recherche…",
   "search.series": "Série",
@@ -390,6 +416,14 @@
   "share.whoSeesNow": "Qui le voit actuellement",
   "share.writerHint": "En plus de les voir, crée, modifie et supprime des événements de cet agenda.",
   "share.writerLabel": "Voir et modifier mes événements",
+  "shortcuts.group.actions": "Actions",
+  "shortcuts.group.navigate": "Se déplacer",
+  "shortcuts.group.views": "Vues",
+  "shortcuts.help": "Afficher cette liste",
+  "shortcuts.next": "Période suivante",
+  "shortcuts.prev": "Période précédente",
+  "shortcuts.title": "Raccourcis clavier",
+  "shortcuts.today": "Aller à aujourd'hui",
   "subscribe.aria": "S'abonner à un calendrier par URL",
   "subscribe.byUrl": "S'abonner par URL (.ics)",
   "subscribe.defaultName": "Agenda abonné",

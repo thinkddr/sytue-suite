@@ -145,6 +145,29 @@ func TestLaEstrellaDeLaFichaNoTieneFondo(t *testing.T) {
 	}
 }
 
+// TestLaEstrellaSobrePapelEsBlancaComoLaHoja: sin fondo, dentro del borde se ve la hoja.
+// Sobre el cromo «papel» la hoja es `sheet-bg` (blanca) y `bg` es el gris del marco.
+// VISTO EN ROJO (2026-11-06): la estrella pintaba `bg` y salía un cuadro gris en la
+// ficha blanca.
+func TestLaEstrellaSobrePapelEsBlancaComoLaHoja(t *testing.T) {
+	tema.ElegirCromo(tema.CromoPapel)
+	tema.ElegirForma("marco")
+	t.Cleanup(func() { tema.ElegirCromo(""); tema.FormaDeLosGuardianes() })
+	b := nuevoBotonEstrella(false, "Destacar", nil)
+	img := pintarObjeto(t, b, fyne.NewSize(LadoEstrellaFicha, LadoEstrellaFicha))
+	hoja, marco := tema.Color("sheet-bg", tema.Claro), tema.Color("bg", tema.Claro)
+	if mismoColor(hoja, marco) {
+		t.Fatal("sobre papel la hoja y el marco deberían ser distintos")
+	}
+	mitad := int(LadoEstrellaFicha / 2)
+	if got := px(img, 4, mitad); !mismoColor(got, hoja) {
+		t.Errorf("dentro del borde se pinta %v y la hoja es %v", got, hoja)
+	}
+	if got, quiero := px(img, mitad, 0), ui.BordeSobre("border", "sheet-bg", tema.Claro); !mismoColor(got, quiero) {
+		t.Errorf("el borde de arriba es %v y es `border` sobre la hoja (%v)", got, quiero)
+	}
+}
+
 // TestElNombreDeExportacionEsElDeLaWeb es `exportFilename`: cualquier alfabeto, lo
 // demás a guiones, y «contacto» si no queda nada.
 func TestElNombreDeExportacionEsElDeLaWeb(t *testing.T) {

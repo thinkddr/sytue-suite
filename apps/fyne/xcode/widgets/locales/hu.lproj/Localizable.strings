@@ -31,3 +31,4 @@
 "dataflow.item.events" = "Naptár";
 "dataflow.item.documents" = "Dokumentumok";
 "dataflow.item.contacts" = "Névjegyek";
+"widgets.updatedAgo" = "Frissítve %@";

@@ -31,3 +31,4 @@
 "dataflow.item.events" = "Koledar";
 "dataflow.item.documents" = "Dokumenti";
 "dataflow.item.contacts" = "Stiki";
+"widgets.updatedAgo" = "Posodobljeno %@";

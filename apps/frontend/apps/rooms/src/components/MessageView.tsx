@@ -60,6 +60,7 @@ import { BlockedFold } from './Moderation.js';
 import { MessageBody, EmojiToken, extractLinks } from './MessageBody.js';
 import { LinkPreview, MeetingLinkCard } from './LinkPreview.js';
 import { proveedorDeReunion } from '../lib/enlacesExternos.js';
+import { editandoYa } from '../lib/editarUltimo.js';
 import { Attachments } from './Attachments.js';
 import { CardView } from './CardView.js';
 import { EmojiPickerButton } from './EmojiPicker.js';
@@ -92,6 +93,9 @@ interface Props {
   onEdit?: (messageId: string, body: string) => void;
   /** Borra un mensaje propio. */
   onDelete?: (messageId: string) => void;
+  /** Pide abrir la edición de un mensaje desde fuera (↑ en el compositor vacío).
+   *  `n` cambia en cada pulsación para que la misma petición dos veces vuelva a abrirla. */
+  editRequest?: { id: string; n: number } | null;
   /** IDs de mensajes fijados en el canal activo (para alternar Fijar/Desfijar). */
   pinnedIds?: Set<string>;
   /** IDs de mensajes guardados por el usuario (para alternar Guardar/Quitar). */
@@ -233,6 +237,7 @@ export function MessageView({
   onOpenThread,
   onEdit,
   onDelete,
+  editRequest,
   pinnedIds,
   savedIds,
   onTogglePin,
@@ -445,14 +450,78 @@ export function MessageView({
   // nada: en escritorio sigue mandando el hover de siempre.
   const ultimoPuntero = useRef('');
 
+  // Quién tenía el foco cuando ↑ pidió la edición (el compositor). Una edición abierta
+  // desde el menú del mensaje no lo apunta: ahí el foco sigue su camino de siempre.
+  const volverFocoRef = useRef<HTMLElement | null>(null);
   function startEdit(m: ChatMessage): void {
     setEditingId(m.id);
     setDraft(m.body);
+    volverFocoRef.current = null;
   }
   function cancelEdit(): void {
     setEditingId(null);
     setDraft('');
+    enfocadaParaRef.current = null;
+    // Retorno de foco al cerrar (design.md §2.6): una edición abierta con ↑ devuelve el
+    // foco al compositor desde el que se pidió; si no, el textarea se desmonta y el
+    // foco cae al <body>, y lo siguiente que se teclea no va a ninguna parte.
+    const volver = volverFocoRef.current;
+    volverFocoRef.current = null;
+    if (volver?.isConnected) volver.focus();
   }
+  // El `autofocus` del atributo solo cuenta al cargar la página: una caja que aparece
+  // después hay que enfocarla a mano, con el cursor al final como en el compositor. Va
+  // en la ref y no en un efecto porque la lista es virtual: si la fila estaba fuera de
+  // la ventana, la caja nace después, al llegar el scroll.
+  const enfocadaParaRef = useRef<string | null>(null);
+  const cajaRef = useRef<HTMLTextAreaElement | null>(null);
+  // ↑ sobre una edición ya abierta cuya fila estaba fuera de la ventana: la caja que
+  // nace al llegar el scroll se enfoca aunque esa edición ya constara enfocada.
+  const reenfocarRef = useRef(false);
+  function cajaDeEdicion(el: HTMLTextAreaElement | null): void {
+    cajaRef.current = el;
+    if (!el || !editingId) return;
+    if (enfocadaParaRef.current === editingId && !reenfocarRef.current) return;
+    enfocadaParaRef.current = editingId;
+    reenfocarRef.current = false;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }
+  // ↑ en el compositor vacío: abre la edición y trae la fila a la vista (la lista es
+  // virtual: si quedó fuera de la ventana pintada, la caja ni existiría). Cada petición
+  // se atiende UNA vez: que lleguen mensajes no reabre una edición ya cerrada. Una
+  // petición a null (ChatApp la olvida al cambiar de canal, y su cuenta vuelve a 1)
+  // olvida también la atendida: si no, la primera ↑ del canal siguiente se descartaba.
+  const atendidaRef = useRef(0);
+  useEffect(() => {
+    if (!editRequest) {
+      atendidaRef.current = 0;
+      return;
+    }
+    if (editRequest.n === atendidaRef.current) return;
+    const idx = messages.findIndex((m) => m.id === editRequest.id);
+    if (idx < 0) return;
+    atendidaRef.current = editRequest.n;
+    const origen = document.activeElement;
+    const desde = origen instanceof HTMLElement && origen !== cajaRef.current ? origen : null;
+    if (editandoYa(editingId, editRequest.id)) {
+      // Ya abierta: solo vuelve el foco, sin reponer el borrador con el texto original.
+      // Si la fila estaba fuera de la ventana, el scroll de abajo la trae y la ref la
+      // enfoca al nacer, aunque esa edición ya constara enfocada.
+      const el = cajaRef.current;
+      if (el) {
+        el.focus();
+        el.setSelectionRange(el.value.length, el.value.length);
+      } else {
+        reenfocarRef.current = true;
+      }
+    } else {
+      startEdit(messages[idx]!);
+    }
+    if (desde) volverFocoRef.current = desde;
+    const lista = listHandle.current;
+    requestAnimationFrame(() => lista?.scrollToIndex(idx, { align: 'center' }));
+  }, [editRequest, messages, listHandle, editingId]);
   function saveEdit(original: string): void {
     const body = draft.trim();
     if (body && body !== original) onEdit?.(editingId!, body);
@@ -801,6 +870,7 @@ export function MessageView({
             {editingId === m.id ? (
               <div class="mt-0.5">
                 <textarea
+                  ref={cajaDeEdicion}
                   aria-label={t('message.edit')}
                   value={draft}
                   autofocus

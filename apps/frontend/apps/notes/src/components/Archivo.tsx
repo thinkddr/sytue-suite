@@ -20,9 +20,16 @@ import { Resaltado } from './Resaltado.js';
 export function ListaDeHits({
   hits,
   consulta = '',
+  onAbrir,
 }: {
   hits: readonly NoteHit[];
   consulta?: string;
+  /**
+   * Abre la nota dentro de la app, sin recargar la página. Devuelve `false` si no
+   * puede (un cuaderno que no está en el árbol) y entonces se sigue el enlace. Con
+   * Ctrl, Mayús o la rueda el enlace se abre aparte, como cualquier enlace.
+   */
+  onAbrir?: (h: NoteHit) => boolean;
 }): JSX.Element {
   return (
     <ul class="notes-rows">
@@ -35,6 +42,11 @@ export function ListaDeHits({
             <a
               href={`?notebook=${encodeURIComponent(h.notebook_id)}&note=${encodeURIComponent(h.id)}`}
               class="notes-row sytue-focus-ring"
+              onClick={(e) => {
+                if (!onAbrir || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)
+                  return;
+                if (onAbrir(h)) e.preventDefault();
+              }}
             >
               <span class="notes-stream-glyph">
                 {h.kind === 'todo' || h.kind === 'link' ? (
@@ -79,7 +91,15 @@ function Vacia({ titulo, frase }: { titulo: string; frase: string }): JSX.Elemen
 }
 
 /** «Fijadas»: las notas fijadas de todos los cuadernos visibles. */
-export function PanelFijadas({ t, hits }: { t: T; hits: NoteHit[] | null }): JSX.Element | null {
+export function PanelFijadas({
+  t,
+  hits,
+  onAbrir,
+}: {
+  t: T;
+  hits: NoteHit[] | null;
+  onAbrir?: (h: NoteHit) => boolean;
+}): JSX.Element | null {
   if (hits === null) return null;
   if (hits.length === 0) return <Vacia titulo={t('focus.pinned')} frase={t('pinned.empty')} />;
   return (
@@ -87,7 +107,7 @@ export function PanelFijadas({ t, hits }: { t: T; hits: NoteHit[] | null }): JSX
       <div class="notes-page-head">
         <h2 class="notes-page-title">{t('focus.pinned')}</h2>
       </div>
-      <ListaDeHits hits={hits} />
+      <ListaDeHits hits={hits} {...(onAbrir ? { onAbrir } : {})} />
     </div>
   );
 }

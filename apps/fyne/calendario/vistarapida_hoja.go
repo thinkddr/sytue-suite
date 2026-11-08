@@ -65,6 +65,9 @@ func (a *App) abrirVistaRapidaHoja(c fyne.Canvas, o Ocurrencia) {
 		detalle = append(detalle, parrafo(o.Event.Description, "text"))
 	}
 	hijos := []fyne.CanvasObject{container.New(ui.Columna{Hueco: tema.Espacio(1.5)}, detalle...)}
+	if inv := p.seccionInvitados(o.Event, ancho, tema.TextoSM); inv != nil {
+		hijos = append(hijos, inv)
+	}
 	if o.Event.ConferenceURL != "" && a.AbrirEnlace != nil {
 		url := o.Event.ConferenceURL
 		unirse := ui.NuevoBoton(p.t("popover.join", nil), func() { a.AbrirEnlace(url) }).Con(ui.Primario, ui.TallaMD)

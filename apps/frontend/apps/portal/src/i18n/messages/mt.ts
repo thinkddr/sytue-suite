@@ -68,6 +68,7 @@ export const mt: AppCatalog<typeof en> = {
   'inbox.markAll': 'Immarka kollha bħala moqrija',
   'inbox.loading': 'Qed jitgħabbew in-notifiki…',
   'inbox.unreadDot': 'Mhux moqrija',
+  'inbox.markRead': 'Immarka bħala moqri',
   'inbox.errorTitle': 'In-notifiki ma setgħux jitgħabbew',
   'inbox.errorBody': "Il-Hub mhux qed iwieġeb bħalissa. Erġa' pprova fi ftit sekondi.",
   'inbox.retry': "Erġa' pprova",
@@ -717,6 +718,8 @@ export const mt: AppCatalog<typeof en> = {
     "L-ebda tweġiba minn: {sources}. Għalhekk jista' jkun li xi riżultati huma neqsin. Erġa' pprova fi ftit mumenti.",
   'search.partialJoin': ' u ',
   'search.showing': 'Qed jintwerew {count} minn {total} riżultat.',
+  'search.loadMore': 'Għabbi aktar riżultati',
+  'search.loadMoreFailed': 'Ma setgħux jitgħabbew aktar riżultati. Erġa’ pprova.',
   'privacy.notice':
     "Ma nbigħux id-data tiegħek u ma naqsmuhiex ma' terzi. Ma nużawhiex biex nagħmlulek profil, għar-reklamar, jew biex inħarrġu jew intejbu s-servizzi tagħna jew ta' ħaddieħor. Hija kriptata waqt it-trasmissjoni u fil-ħażna, u toħroġ mill-infrastruttura Ewropea tagħna biss fejn ikun strettament meħtieġ biex noħorġulek il-fattura u fl-integrazzjonijiet li tattiva int, fejn it-terza parti titolbok l-approvazzjoni għad-data li se tuża.",
 };

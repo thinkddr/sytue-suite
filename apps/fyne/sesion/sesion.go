@@ -66,6 +66,21 @@ import (
 // es lo que tarda alguien en mirar la otra ventana después de cambiar el tema.
 const cadaVistazo = 2 * time.Second
 
+// oidcDe es el cliente de Sytue ID de la suite en `apex`, sin navegador que abrir (lo
+// pone Abrir). El client_id va con el CAMINO DE VUELTA, no con el producto: el móvil
+// vuelve por el esquema propio de cada app (`sytue-mobile`, migración 0071) y el
+// escritorio a un servidor efímero del equipo (`sytue-desktop`, 0069). Se decide al
+// abrir y no en Entrar porque el refresco lo usa igual: renovar con el client_id del
+// escritorio un token emitido al móvil sale 401 cuando ya nadie está mirando. También lo
+// usa el refresco sin ventana de Android (fondo_sinventana.go), que solo renueva.
+func oidcDe(apex string, movil bool) *auth.OIDC {
+	o := &auth.OIDC{Issuer: api.ServiceURL(apex, "id")}
+	if movil {
+		o.Cliente = auth.ClientIDMovil
+	}
+	return o
+}
+
 // Suite es lo transversal de esta app. El cero no vale: se monta con Abrir.
 type Suite struct {
 	// Sesion entrega un access token vigente. Es lo que se le pasa a los clientes de
@@ -80,9 +95,17 @@ type Suite struct {
 	almacen         *auth.AlmacenSesion
 	reidentificando atomic.Bool
 
-	mu                sync.Mutex
-	visto             ajustes.Estado
-	generacionSesion  string
+	mu               sync.Mutex
+	visto            ajustes.Estado
+	generacionSesion string
+	// epocaSesion es la época de identidad adoptada con generacionSesion
+	// (ajustes.MarcarIdentidad): solo cambia cuando cambia quién, no al renovar.
+	epocaSesion string
+	// widgets es lo de los widgets nativos de esta app (widgets.go).
+	widgets widgetsSuite
+	// despertar es el registro de esta app en el Hub para el aviso silencioso de iOS
+	// (despertar.go).
+	despertar         despertarSuite
 	presencia         api.EstadoPresencia
 	mensaje           string
 	alCambiar         []func(Estado)
@@ -126,6 +149,41 @@ type Suite struct {
 	tareasAlmacenSeq uint64
 	tareasAlmacenWG  sync.WaitGroup
 	almacenCerrando  bool
+
+	// alCambiarSiempre son los AlCambiar de la propia suite que siguen a la sesión
+	// también sin escena (el widget); los de alCambiar esperan a la escena (fondo.go).
+	alCambiarSiempre []func(Estado)
+	// fondo es la API de fondo del driver (fondo.go); nil, la de siempre con escena.
+	fondo conductorFondo
+	// sinEscena: iOS lanzó la app sin interfaz y aún no hay escena. cambioRetenido: la
+	// sesión cambió mientras tanto y las apps no se han enterado.
+	sinEscena, cambioRetenido bool
+	// trasEscena es lo de CuandoHayaEscena que espera a la escena, en orden.
+	trasEscena []func()
+	// bloqueoPendiente: la plataforma puede lanzar sin escena (iOS) y el bloqueo de la
+	// suite aún no se ha comprobado en este proceso; se comprueba al conectar la escena
+	// (fondo.go). verificando: se está pidiendo ahora, y las URL que llegan esperan en
+	// urlsRetenidas.
+	bloqueoPendiente, verificando bool
+	urlsRetenidas                 []*url.URL
+	// retenida: con el bloqueo puesto y sin pasar, la sesión guardada no se adopta.
+	retenida atomic.Bool
+	// abierta se cierra al acabar Abrir; nil en las suites que las pruebas montan a mano.
+	abierta chan struct{}
+	// ilegibleAlAbrir: Abrir no pudo leer la sesión guardada (el llavero falló; en iOS,
+	// lanzada con el teléfono bloqueado). Estar «fuera» entonces no es saber que no hay
+	// nadie, y el primer aviso del widget no borra nada (iniciarWidgets).
+	ilegibleAlAbrir bool
+	// aplicando serializa aplicar: el vigilante y el refresco de fondo pueden llamarlo a
+	// la vez, y sin esto la lectura más vieja de la sesión podía ganar (fondo.go).
+	aplicando sync.Mutex
+	// pausaEnFondo: en esta plataforma lo que dice que hay alguien —la presencia, el SSE
+	// de la barra— se para al dejar el primer plano (iOS: la app suspendida puede volver
+	// a correr para su widget). enFondo lo lleva repartir, y vuelta despierta a latir al
+	// volver (primerplano.go).
+	pausaEnFondo bool
+	enFondo      atomic.Bool
+	vuelta       chan struct{}
 }
 
 // Estado es lo que el menú de cuenta enseña.
@@ -133,8 +191,11 @@ type Estado struct {
 	// Sujeto es el `sub` de quien ha entrado, o "" si no hay nadie.
 	Sujeto string
 	// GeneracionSesion identifica la sesión adoptada por esta app. No contiene
-	// tokens; los widgets la comparan con la marca compartida antes de publicar.
+	// tokens; cambia en cada renovación.
 	GeneracionSesion string
+	// EpocaSesion es la época de identidad adoptada: cambia solo cuando cambia quién.
+	// Es lo que captura el widget antes de leer (capturarWidget).
+	EpocaSesion string
 	// Tema es "claro", "oscuro", "traslucido" o "" (el del sistema).
 	Tema string
 	// Color es el color de la suite EN VIGOR: el que eligió la persona o, si no ha
@@ -174,24 +235,15 @@ func Abrir(a fyne.App, apex string) *Suite {
 	sinGraficos(a, estado)
 	tema.Elegir(estado.Tema)
 
-	s := &Suite{app: a, apex: apex, visto: estado}
+	s := &Suite{app: a, apex: apex, visto: estado, abierta: make(chan struct{})}
+	s.prepararFondo(conductorDe(a))
 	s.engancharVida(a)
-	s.oidc = &auth.OIDC{
-		Issuer: api.ServiceURL(apex, "id"),
-		Open: func(destino string) error {
-			s.mu.Lock()
-			s.autorizando = destino
-			s.mu.Unlock()
-			return abrir(a, destino)
-		},
-	}
-	// El client_id va con el CAMINO DE VUELTA, no con el producto: el móvil vuelve por
-	// el esquema propio de cada app (`sytue-mobile`, migración 0071) y el escritorio a
-	// un servidor efímero del equipo (`sytue-desktop`, 0069). Se decide aquí y no en
-	// Entrar porque el refresco lo usa igual: renovar con el client_id del escritorio un
-	// token emitido al móvil sale 401 cuando ya nadie está mirando.
-	if a.Driver().Device().IsMobile() {
-		s.oidc.Cliente = auth.ClientIDMovil
+	s.oidc = oidcDe(apex, a.Driver().Device().IsMobile())
+	s.oidc.Open = func(destino string) error {
+		s.mu.Lock()
+		s.autorizando = destino
+		s.mu.Unlock()
+		return abrir(a, destino)
 	}
 	if receptor, ok := a.(fyne.URLHandler); ok {
 		receptor.SetOnOpenURL(s.recibirURL)
@@ -228,7 +280,17 @@ func Abrir(a fyne.App, apex string) *Suite {
 	// es; si no lo dice, la app no abre (entrar otra vez por el navegador sería saltarse
 	// el bloqueo con la sesión que el navegador tenga con Sytue ID). Va después del
 	// reenvío: la copia que ya estaba abierta ya se desbloqueó.
-	pedirSytueID := pedirSytueIDAlAbrir(estado)
+	//
+	// Donde la app puede lanzarse sin escena (iOS) no se pregunta aquí: sin interfaz no
+	// hay Face ID que pedir, y con el teléfono bloqueado ni siquiera se lee si el bloqueo
+	// está puesto. Se pregunta al conectar la escena (fondo.go) y, hasta entonces, con el
+	// bloqueo puesto la sesión guardada no se adopta.
+	pedirSytueID := false
+	if s.bloqueoSinComprobar() {
+		s.retenerSiBloqueada(estado)
+	} else {
+		pedirSytueID = pedirSytueIDAlAbrir(estado)
+	}
 	// En un Linux sin llavero la sesión va a un fichero cifrado (apps/nucleo/auth): se
 	// dice una vez, al guardarla por primera vez, y con qué protegerla mejor.
 	auth.SinLlavero = func() {
@@ -243,8 +305,9 @@ func Abrir(a fyne.App, apex string) *Suite {
 	if err := s.almacen.Migrar(context.Background(), apex == api.ApexProd); err != nil {
 		slog.Warn("sesion: no se pudo migrar la sesión guardada", "error", err)
 	}
-	guardados, generacion, err := s.leerSesionCompartida(context.Background())
-	s.generacionSesion = generacion
+	guardados, marcas, err := s.leerSesion(context.Background())
+	s.generacionSesion, s.epocaSesion = marcas.generacion, marcas.epoca
+	s.ilegibleAlAbrir = err != nil
 	if err != nil {
 		// Sin llavero se puede trabajar: lo que no se puede es recordar la sesión.
 		slog.Warn("sesion: el almacén seguro no se deja leer; habrá que entrar", "error", err)
@@ -270,6 +333,7 @@ func Abrir(a fyne.App, apex string) *Suite {
 	}
 	// Y en el móvil, `ficheros.Elegir` abre el selector del toolkit (elegir.go).
 	s.ponerSelector()
+	close(s.abierta) // ya se puede pedir el bloqueo al conectar la escena (fondo.go)
 	return s
 }
 
@@ -353,6 +417,7 @@ func (s *Suite) estado() Estado {
 	return Estado{
 		Sujeto:           s.Sesion.Subject(),
 		GeneracionSesion: s.generacionSesion,
+		EpocaSesion:      s.epocaSesion,
 		Tema:             s.visto.Tema,
 		Color:            color,
 		Forma:            forma,
@@ -530,6 +595,14 @@ func (s *Suite) finArranque() bool {
 }
 
 func (s *Suite) recibirURL(u *url.URL) {
+	// Mientras se pide Face ID al conectar la escena, nada llega a nadie (fondo.go).
+	s.mu.Lock()
+	if s.verificando {
+		s.urlsRetenidas = append(s.urlsRetenidas, u)
+		s.mu.Unlock()
+		return
+	}
+	s.mu.Unlock()
 	// Ni la vuelta del login ni el clic de un aviso (Windows lo devuelve por enlace) son
 	// de ninguna pantalla.
 	if s.recibirMatrix(u) || s.recibirConsentimiento(u) || s.oidc.Vuelta(u) || escritorio.Pulsado(u) {
@@ -561,9 +634,25 @@ func (s *Suite) recibirURL(u *url.URL) {
 }
 
 // avisar llama a los apuntados en el hilo de la interfaz. Se llama SIN el cerrojo.
-func (s *Suite) avisar() {
+func (s *Suite) avisar() { s.avisarA(true) }
+
+// avisarApps avisa solo a los AlCambiar de las apps: los que esperaban a la escena.
+func (s *Suite) avisarApps() { s.avisarA(false) }
+
+// avisarA avisa con el estado de ahora. Sin escena, los de las apps quedan retenidos
+// hasta conectarEscena (fondo.go).
+func (s *Suite) avisarA(suite bool) {
 	s.mu.Lock()
-	e, quienes := s.estado(), append([]func(Estado){}, s.alCambiar...)
+	e := s.estado()
+	var quienes []func(Estado)
+	if suite {
+		quienes = append(quienes, s.alCambiarSiempre...)
+	}
+	if s.sinEscena {
+		s.cambioRetenido = true
+	} else {
+		quienes = append(quienes, s.alCambiar...)
+	}
 	s.mu.Unlock()
 	fyne.Do(func() {
 		for _, f := range quienes {
@@ -636,15 +725,15 @@ func (s *Suite) Entrar(ctx context.Context) error {
 	// Sólo un login completado desbloquea la renovación y las marcas de otras apps.
 	s.reidentificando.Store(false)
 	s.prepararAvisos()
-	guardados, generacion, errLectura := s.leerSesionCompartida(ctx)
+	guardados, marcas, errLectura := s.leerSesion(ctx)
 	s.mu.Lock()
 	if errLectura == nil {
 		s.Sesion.Sincronizar(guardados)
-		s.generacionSesion = generacion
+		s.generacionSesion, s.epocaSesion = marcas.generacion, marcas.epoca
 	}
 	s.visto = ajustes.Leer()
 	// La revisión corresponde a los tokens leídos, no a una marca posterior.
-	s.visto.Sesion = s.generacionSesion
+	s.visto.Sesion, s.visto.Epoca = s.generacionSesion, s.epocaSesion
 	visto := s.visto.Ajustes
 	s.mu.Unlock()
 	s.repintar(visto) // la organización de quien entra trae su color y su forma
@@ -654,30 +743,69 @@ func (s *Suite) Entrar(ctx context.Context) error {
 
 // leerSesionCompartida obtiene identidad y marca de la misma escritura. El
 // cerrojo se libera antes de tocar Suite/Session para mantener el orden de locks.
+func (s *Suite) leerSesionCompartida(ctx context.Context) (auth.Tokens, string, error) {
+	t, marcas, err := s.leerSesion(ctx)
+	return t, marcas.generacion, err
+}
+
+// marcasSesion son la marca de sesión y la época de identidad leídas con los tokens.
+type marcasSesion struct{ generacion, epoca string }
+
+// leerSesion es leerSesionCompartida con la época. Si la sesión la escribió una
+// compilación que no conoce la época (la época no está confirmada con la marca), la
+// confirma o la rota aquí mismo, bajo el mismo cerrojo y con la identidad de los
+// tokens leídos (ADR 0078, enmienda del 2026-11-06).
 //
 //nolint:contextcheck // El llavero usa callbacks sin contexto y un plazo propio para D-Bus.
-func (s *Suite) leerSesionCompartida(ctx context.Context) (auth.Tokens, string, error) {
+func (s *Suite) leerSesion(ctx context.Context) (auth.Tokens, marcasSesion, error) {
+	return leerSesionGuardada(ctx, s.cargarSesion, s.almacen, !s.sinSesionPropia())
+}
+
+// leerSesionGuardada es leerSesion sin Suite: lee con `cargar` bajo el cerrojo de la
+// sesión y, con `confirmar`, confirma o rota la época como ella. La usa también el
+// refresco sin ventana de Android (fondo_sinventana.go).
+//
+//nolint:contextcheck // El llavero usa callbacks sin contexto y un plazo propio para D-Bus.
+func leerSesionGuardada(
+	ctx context.Context, cargar func() (auth.Tokens, error), almacen *auth.AlmacenSesion, confirmar bool,
+) (auth.Tokens, marcasSesion, error) {
 	soltar, err := ajustes.CerrojoSesion(ctx)
 	if err != nil {
-		return auth.Tokens{}, "", err
+		return auth.Tokens{}, marcasSesion{}, err
 	}
 	defer soltar()
-	guardados, err := s.cargarSesion()
+	guardados, err := cargar()
 	if err != nil {
-		return auth.Tokens{}, "", err
+		return auth.Tokens{}, marcasSesion{}, err
 	}
-	return guardados, ajustes.Leer().Sesion, nil
+	e := ajustes.Leer()
+	if e.EpocaConfirmada != e.Sesion && confirmar {
+		identidad := auth.IdentidadWidgets(guardados)
+		if almacen != nil {
+			identidad = almacen.IdentidadWidgets(guardados)
+		}
+		if err := ajustes.MarcarIdentidad(identidad); err != nil {
+			slog.Warn("sesion: no se ha podido confirmar la época de los widgets", "error", err)
+		}
+		e = ajustes.Leer()
+	}
+	return guardados, marcasSesion{generacion: e.Sesion, epoca: e.Epoca}, nil
 }
 
 func (s *Suite) cargarSesion() (auth.Tokens, error) {
-	if s.reidentificando.Load() {
+	if s.sinSesionPropia() {
 		return auth.Tokens{}, nil
 	}
 	if s.almacen != nil {
-		return s.almacen.Cargar()
+		return cargarAlmacen(s.almacen)
 	}
 	return auth.Load()
 }
+
+// cargarAlmacen es AlmacenSesion.Cargar. Las pruebas lo hacen fallar como falla el
+// llavero de iOS con el teléfono bloqueado: en Linux, sin bus de sesión, auth cae al
+// fichero cifrado y nunca da ese error.
+var cargarAlmacen = (*auth.AlmacenSesion).Cargar
 
 // Salir cierra la sesión en LAS TRECE apps: borra la entrada compartida del llavero y
 // deja la marca que hace que las otras doce lo vean en menos de dos segundos.
@@ -694,6 +822,16 @@ func (s *Suite) Salir() {
 // SalirConError permite avisar y reintentar si el dispositivo no dejó retirar
 // la sesión compartida. El estado local nunca readopta los tokens no borrados.
 func (s *Suite) SalirConError() error {
+	// Los aparatos de iOS de las quince apps de aquí, que el Hub despertaba para su
+	// widget: con la sesión que aún vale, antes de revocarla (despertar.go).
+	s.olvidarDespertares(context.Background(), false)
+	// Y el interruptor, que es el consentimiento de quien lo encendió y no del aparato:
+	// quien entre después lo encuentra apagado, y nadie lo registra sin que lo pida.
+	if a := ajustes.Leer(); a.DespertarWidgets || a.DespertarDe != "" {
+		if err := ajustes.Cambiar(func(a *ajustes.Ajustes) { a.DespertarWidgets, a.DespertarDe = false, "" }); err != nil {
+			slog.Warn("sesion: no se ha podido apagar el despertar de los widgets", "error", err)
+		}
+	}
 	// La contraseña del proveedor de archivos de Drive, que sigue valiendo sin sesión. La
 	// primera: su token puede necesitar el refresh que se revoca justo debajo.
 	s.revocarArchivos()
@@ -723,14 +861,14 @@ func (s *Suite) SalirConError() error {
 	if err := errors.Join(auth.OlvidarSecretos("notes-"), auth.OlvidarSecretos("rooms-matrix-")); err != nil {
 		slog.Warn("sesion: no se han podido olvidar las claves privadas", "error", err)
 	}
-	guardados, generacion, errLectura := s.leerSesionCompartida(context.Background())
+	guardados, marcas, errLectura := s.leerSesion(context.Background())
 	s.mu.Lock()
 	if errLectura == nil {
 		s.Sesion.Sincronizar(guardados)
-		s.generacionSesion = generacion
+		s.generacionSesion, s.epocaSesion = marcas.generacion, marcas.epoca
 	}
 	s.visto, s.presencia, s.mensaje = ajustes.Leer(), "", ""
-	s.visto.Sesion = s.generacionSesion
+	s.visto.Sesion, s.visto.Epoca = s.generacionSesion, s.epocaSesion
 	visto := s.visto.Ajustes
 	s.mu.Unlock()
 	s.repintar(visto) // sin sesión no hay organización que diga color ni forma
@@ -808,9 +946,16 @@ func (s *Suite) PonerPresencia(ctx context.Context, e api.EstadoPresencia, mensa
 }
 
 // Arrancar lanza las dos goroutines de fondo y vuelve enseguida: la que mira si otra app
-// ha cambiado algo, y la que mantiene viva la presencia. Mueren con ctx.
+// ha cambiado algo, y la que mantiene viva la presencia. Mueren con ctx. La presencia,
+// los avisos y el enchufe de URL esperan a que haya escena (CuandoHayaEscena): con la
+// app lanzada por iOS solo para el widget, solo corren el widget y el vigilante.
 func (s *Suite) Arrancar(ctx context.Context) {
+	// Desde aquí, un refresco sin ventana en este proceso (Android) se lo deja a esta
+	// suite, que ya sigue al servidor (fondo_sinventana.go).
+	suiteViva.Store(s)
 	s.iniciarWidgets(ctx)
+	s.iniciarRefrescoEnFondo()
+	s.iniciarDespertar() //nolint:contextcheck // vive lo que el proceso, no lo que el arranque; cada petición lleva su plazo
 	s.iniciarDriveSistemaNoApple(ctx)
 	s.mu.Lock()
 	desde := s.visto
@@ -822,20 +967,24 @@ func (s *Suite) Arrancar(ctx context.Context) {
 		registrarAtras()
 	}
 	go ajustes.Vigilar(ctx, cadaVistazo, desde, s.aplicar)
-	go s.latir(ctx)
-	if s.Sesion.Subject() != "" {
-		s.prepararAvisos()
-	}
-	// El enchufe se abre AQUÍ y no en Abrir: para entonces cada app ya ha registrado
-	// sus receptores, así que lo que llegue tiene a quién ir.
-	if id := s.app.Metadata().ID; id != "" && !s.app.Driver().Device().IsMobile() {
-		go escuchar(ctx, id, func(u *url.URL) {
-			fyne.Do(func() {
-				s.recibirURL(u)
-				aparecer(s.app)
+	// Lanzada solo para el widget (iOS, sin escena), la app no está «En línea», no pide
+	// permisos ni escucha enlaces: todo eso espera a que haya interfaz (fondo.go).
+	s.CuandoHayaEscena(func() {
+		go s.latir(ctx)
+		if s.Sesion.Subject() != "" {
+			s.prepararAvisos()
+		}
+		// El enchufe se abre AQUÍ y no en Abrir: para entonces cada app ya ha registrado
+		// sus receptores, así que lo que llegue tiene a quién ir.
+		if id := s.app.Metadata().ID; id != "" && !s.app.Driver().Device().IsMobile() {
+			go escuchar(ctx, id, func(u *url.URL) {
+				fyne.Do(func() {
+					s.recibirURL(u)
+					aparecer(s.app)
+				})
 			})
-		})
-	}
+		}
+	})
 }
 
 // prepararAvisos pide en Android el permiso de avisos en cuanto hay alguien dentro, que
@@ -853,29 +1002,51 @@ func (s *Suite) prepararAvisos() {
 }
 
 // aplicar es lo que hay que hacer cuando lo compartido cambia, venga de esta app o de
-// otra. Corre en la goroutine del vigilante.
+// otra. Corre en la goroutine del vigilante, y también en la del refresco de fondo y en
+// Poner: de uno en uno (aplicando), y la sesión se vuelve a leer del almacén dentro,
+// así que la que se adopta es la de ahora y no la de quien leyó `e` antes.
 func (s *Suite) aplicar(e ajustes.Estado) {
+	s.aplicando.Lock()
+	defer s.aplicando.Unlock()
+	s.aplicarYa(e)
+}
+
+// trasLeerAlAplicar no hace nada: las pruebas paran aquí a aplicar, entre leer la sesión y
+// adoptarla (TestElVigilanteNoVaciaLaSesionTrasFaceID).
+var trasLeerAlAplicar = func() {}
+
+// aplicarYa es aplicar con `aplicando` ya tomado.
+func (s *Suite) aplicarYa(e ajustes.Estado) {
 	s.mu.Lock()
-	cambioSesion := e.Sesion != s.visto.Sesion
+	// También cuando solo cambia la época: es otra app confirmando o rotando la
+	// identidad de una sesión que escribió una compilación anterior.
+	cambioSesion := e.Sesion != s.visto.Sesion || e.Epoca != s.visto.Epoca
+	pendiente := s.bloqueoPendiente
 	s.mu.Unlock()
+	// Sin haber pasado el bloqueo (iOS, lanzada sin escena): si ahora se lee puesto, la
+	// sesión no se adopta y la que hubiera se suelta; si ahora se lee quitado, se adopta.
+	if pendiente && s.retenerSiBloqueada(e) {
+		cambioSesion = true
+	}
 	var guardados auth.Tokens
-	var generacion string
+	var marcas marcasSesion
 	var err error
 	if cambioSesion {
-		guardados, generacion, err = s.leerSesionCompartida(context.Background())
+		guardados, marcas, err = s.leerSesion(context.Background())
+		trasLeerAlAplicar()
 	}
 	s.mu.Lock()
 	anterior := s.generacionSesion
 	s.visto = e
 	if cambioSesion && err == nil {
 		s.Sesion.Sincronizar(guardados)
-		s.generacionSesion = generacion
-		s.visto.Sesion = generacion
+		s.generacionSesion, s.epocaSesion = marcas.generacion, marcas.epoca
+		s.visto.Sesion, s.visto.Epoca = marcas.generacion, marcas.epoca
 	}
 	if cambioSesion && errors.Is(err, auth.ErrSesionNoDisponible) {
 		s.Sesion.Sincronizar(auth.Tokens{})
-		s.generacionSesion = ""
-		s.visto.Sesion = ""
+		s.generacionSesion, s.epocaSesion = "", ""
+		s.visto.Sesion, s.visto.Epoca = "", ""
 	}
 	cambioGeneracion := cambioSesion && s.generacionSesion != anterior
 	s.mu.Unlock()
@@ -928,45 +1099,67 @@ func (s *Suite) repintar(a ajustes.Ajustes) {
 // cuando el Hub empuje la presencia por su SSE (hoy solo manda `ready` y
 // `notification`); mientras tanto, un sondeo más corto solo gastaría más peticiones.
 func (s *Suite) latir(ctx context.Context) {
+	vuelta := s.senalVuelta()
 	for {
+		// En segundo plano en iOS no se late: la app suspendida vuelve a correr cuando el
+		// sistema la despierta para su widget, y el latido vencido publicaría «En línea»
+		// sin que nadie la mire (ADR 0078, enmienda del refresco). Se espera a volver.
+		if s.latidoEnPausa() {
+			select {
+			case <-ctx.Done():
+				return
+			case <-vuelta:
+			}
+			continue
+		}
 		s.mu.Lock()
-		cada, estado, mensaje := s.haciaDonde, s.presencia, s.mensaje
+		cada := s.haciaDonde
 		s.mu.Unlock()
 		if cada <= 0 {
 			cada = 20 * time.Second // hasta que el Hub diga el suyo
 		}
-
 		if s.Sesion.Subject() != "" {
-			// «Desconectada» es también lo que dice el Hub de quien no ha latido en un rato:
-			// solo se adopta si alguien de este equipo lo eligió (ajustes.Invisible). Si
-			// no, abrir una ventana es estar en línea y se publica eso.
-			if quien, err := s.Hub.Presencias(ctx); err == nil && len(quien) == 1 &&
-				(quien[0].Estado != api.Desconectado || ajustes.Leer().Invisible) {
-				if quien[0].Estado != estado || quien[0].Mensaje != mensaje {
-					s.mu.Lock()
-					s.presencia, s.mensaje = quien[0].Estado, quien[0].Mensaje
-					s.mu.Unlock()
-					estado, mensaje = quien[0].Estado, quien[0].Mensaje
-					s.avisar()
-				}
-			}
-			if estado == "" {
-				estado = api.EnLinea // abrir una ventana es estar en línea
-			}
-			if nueva, err := s.Hub.PonerPresencia(ctx, estado, mensaje); err == nil {
-				s.mu.Lock()
-				s.presencia, s.haciaDonde = estado, nueva
-				s.mu.Unlock()
-			} else if !errors.Is(err, context.Canceled) {
-				slog.Debug("sesion: no se ha podido latir la presencia", "error", err)
-			}
+			s.latido(ctx)
 		}
-
 		select {
 		case <-ctx.Done():
 			return
 		case <-time.After(cada):
+		case <-vuelta: // de vuelta al primer plano, se late ya
 		}
+	}
+}
+
+// latido es una vuelta al Hub: se entera de la presencia que tiene y la vuelve a poner.
+func (s *Suite) latido(ctx context.Context) {
+	s.mu.Lock()
+	estado, mensaje := s.presencia, s.mensaje
+	s.mu.Unlock()
+	// «Desconectada» es también lo que dice el Hub de quien no ha latido en un rato: solo
+	// se adopta si alguien de este equipo lo eligió (ajustes.Invisible). Si no, abrir una
+	// ventana es estar en línea y se publica eso.
+	if quien, err := s.Hub.Presencias(ctx); err == nil && len(quien) == 1 &&
+		(quien[0].Estado != api.Desconectado || ajustes.Leer().Invisible) {
+		if quien[0].Estado != estado || quien[0].Mensaje != mensaje {
+			s.mu.Lock()
+			s.presencia, s.mensaje = quien[0].Estado, quien[0].Mensaje
+			s.mu.Unlock()
+			estado, mensaje = quien[0].Estado, quien[0].Mensaje
+			s.avisar()
+		}
+	}
+	if estado == "" {
+		estado = api.EnLinea // abrir una ventana es estar en línea
+	}
+	if s.latidoEnPausa() {
+		return // pasó al fondo mientras se preguntaba: no se publica
+	}
+	if nueva, err := s.Hub.PonerPresencia(ctx, estado, mensaje); err == nil {
+		s.mu.Lock()
+		s.presencia, s.haciaDonde = estado, nueva
+		s.mu.Unlock()
+	} else if !errors.Is(err, context.Canceled) {
+		slog.Debug("sesion: no se ha podido latir la presencia", "error", err)
 	}
 }
 

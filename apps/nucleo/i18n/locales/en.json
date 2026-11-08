@@ -101,6 +101,7 @@
   "linkedServices.changed": "This item changed at your provider. Refresh before editing again.",
   "linkedServices.choose": "Choose what to connect. Your provider will ask for the permissions of the selected services.",
   "linkedServices.connected": "Connected services",
+  "linkedServices.exists": "This account was already connected and is now open.",
   "linkedServices.keepAdmin": "Google Keep needs an approved Google Workspace administrator setup. Personal Gmail accounts cannot connect it.",
   "linkedServices.notGranted": "Access to this service was not granted. Connect the account again to choose its permissions.",
   "linkedServices.notSupported": "This provider does not offer this service.",
@@ -169,7 +170,7 @@
   "notifications.kind.pages.order.oversold": "Order {number} on {site} was paid without stock",
   "notifications.kind.pages.order.paid": "New order {number} on {site}",
   "notifications.kind.pages.payment.duplicated": "Duplicate payment on order {number} on {site}: the second one is being refunded",
-  "notifications.kind.pages.settings.changed": "{actor} changed a Sytue Web setting",
+  "notifications.kind.pages.settings.changed": "{actor} changed a Sytue Webs setting",
   "notifications.kind.pages.store.busy": "The shop on {site} has too many orders awaiting payment",
   "notifications.kind.pages.withdrawal.requested": "Withdrawal requested for order {number} on {site}",
   "notifications.kind.photos.album.added": "{actor} added photos to “{name}”",
@@ -301,6 +302,8 @@
   "shell.update.failedBody": "Try again later or download it from the portal.",
   "shell.update.install": "Update to version {version}",
   "shell.update.upToDate": "{app} is up to date",
+  "shell.widgets.wake": "Update widgets while the app is closed",
+  "shell.widgets.wakeHelp": "When something of yours changes, Sytue wakes the app with an empty Apple notification so it can refresh its widget. Apple sees which app and when, never what changed.",
   "ui.backToList": "Back to the list",
   "ui.bulk.clear": "Clear selection",
   "ui.bulk.region": "Actions for the selection",
@@ -318,6 +321,8 @@
   "ui.review.edit": "Edit",
   "ui.save": "Save",
   "ui.selectRow": "Select row",
+  "ui.suiteClose": "Back to the app",
+  "ui.suiteOpen": "Sytue: apps, search, notifications and account",
   "ui.wizard.back": "Back",
   "ui.wizard.cancel": "Cancel",
   "ui.wizard.goToStep": "Back to step {n}: ",
@@ -336,5 +341,7 @@
   "widgets.pending": "Pending",
   "widgets.photos": "Photos",
   "widgets.rows": "Rows",
-  "widgets.storage": "Storage"
+  "widgets.storage": "Storage",
+  "widgets.updatedAgo": "Updated {time}",
+  "widgets.updatedAt": "Updated: {time}"
 }

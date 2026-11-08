@@ -155,12 +155,12 @@ func (a *App) devolver(p *ventanaPiP, sonando bool) {
 // rehacer arma la barra: reproducir o pausa a la izquierda; volver y cerrar a la derecha.
 func (p *ventanaPiP) rehacer() {
 	v := p.a.v
-	glifo, rotulo := glifoPausa, "player.pause"
+	glifo, rotulo := iconos.Pausa, "player.pause"
 	if p.r.Pausado() {
-		glifo, rotulo = glifoPlay, "player.play"
+		glifo, rotulo = iconos.Reproducir, "player.play"
 	}
 	p.barra.Objects = []fyne.CanvasObject{
-		botonVisor(v, glifo, v.Traduce(rotulo), p.alternar, true),
+		botonVisor(glifo, v.Traduce(rotulo), p.alternar, true),
 		botonIconoVisor(iconos.ImagenEnImagen, v.Traduce("player.pipBack"), func() { p.a.cerrarPiP(true) }),
 		botonIconoVisor(iconos.Cerrar, v.Traduce("player.pipClose"), func() { p.a.cerrarPiP(false) }),
 	}

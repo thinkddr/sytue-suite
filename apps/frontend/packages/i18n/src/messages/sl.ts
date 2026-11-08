@@ -18,6 +18,8 @@ export const sl: Catalog = {
   'ui.openNav': 'Odpri navigacijo',
   'ui.closeNav': 'Zapri navigacijo',
   'ui.backToList': 'Nazaj na seznam',
+  'ui.suiteOpen': 'Sytue: aplikacije, iskanje, obvestila in račun',
+  'ui.suiteClose': 'Nazaj v aplikacijo',
   'ui.noResults': 'Ni rezultatov.',
   'ui.meter.almostFull': 'skoraj polno',
   'ui.meter.full': 'polno',
@@ -60,6 +62,9 @@ export const sl: Catalog = {
   'shell.lock.reasonNotebook': 'odpreti vaš šifrirani zvezek',
   'shell.lock.faceIdUsage':
     'Sytue uporablja Face ID za odklepanje vaše seje, ko odprete aplikacijo.',
+  'shell.widgets.wake': 'Posodabljaj pripomočke, ko je aplikacija zaprta',
+  'shell.widgets.wakeHelp':
+    'Ko se kaj tvojega spremeni, Sytue zbudi aplikacijo s praznim Applovim obvestilom, da osveži svoj pripomoček. Apple vidi, katera aplikacija in kdaj, nikoli pa, kaj se je spremenilo.',
   'shell.call.microphoneUsage':
     'Sytue Rooms uporablja mikrofon samo med klicem in samo, ko ga vklopite.',
   'shell.call.cameraUsage': 'Sytue Rooms uporablja kamero samo med klicem in samo, ko jo vklopite.',
@@ -187,7 +192,7 @@ export const sl: Catalog = {
   'notifications.kind.pages.domain.failed':
     'Domena {domain} na {site} ne deluje: preverite njene nastavitve',
   'notifications.kind.pages.erp.failed': 'Naročilo {number} s {site} ni prispelo v Sytue ERP',
-  'notifications.kind.pages.settings.changed': 'Sprememba nastavitve v Sytue Web: {actor}',
+  'notifications.kind.pages.settings.changed': 'Sprememba nastavitve v Sytue Webs: {actor}',
   'notifications.kind.pages.export.ready': 'Vaš izvoz za {site} je pripravljen',
   'notifications.kind.pages.store.busy':
     'Trgovina na {site} ima preveč naročil, ki čakajo na plačilo',
@@ -371,6 +376,8 @@ export const sl: Catalog = {
   'widgets.compose': 'Napiši',
   'widgets.storage': 'Shramba',
   'widgets.create': 'Ustvari dogodek',
+  'widgets.updatedAgo': 'Posodobljeno {time}',
+  'widgets.updatedAt': 'Posodobljeno: {time}',
 
   'linkedServices.services': 'Storitve',
   'linkedServices.changed':
@@ -383,6 +390,7 @@ export const sl: Catalog = {
   'linkedServices.notGranted':
     'Dostop do te storitve ni bil odobren. Znova povežite račun in izberite dovoljenja.',
   'linkedServices.connected': 'Povezane storitve',
+  'linkedServices.exists': 'Ta račun je bil že povezan in je zdaj odprt.',
   'linkedServices.providerData': 'Spremembe se shranijo pri ponudniku.',
   'linkedServices.writeUnknown':
     'Ponudnik ni potrdil shranjevanja. Pred ponovnim poskusom osvežite prikaz in preverite stanje.',

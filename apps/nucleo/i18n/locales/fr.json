@@ -101,6 +101,7 @@
   "linkedServices.changed": "Cet élément a été modifié chez votre fournisseur. Actualisez avant de le modifier à nouveau.",
   "linkedServices.choose": "Choisissez les services à connecter. Votre fournisseur demandera les autorisations des services sélectionnés.",
   "linkedServices.connected": "Services connectés",
+  "linkedServices.exists": "Ce compte était déjà connecté et il est maintenant ouvert.",
   "linkedServices.keepAdmin": "Google Keep nécessite une configuration approuvée par l’administration Google Workspace. Les comptes Gmail personnels ne peuvent pas le connecter.",
   "linkedServices.notGranted": "L’accès à ce service n’a pas été accordé. Reconnectez le compte pour choisir ses autorisations.",
   "linkedServices.notSupported": "Ce fournisseur ne propose pas ce service.",
@@ -169,7 +170,7 @@
   "notifications.kind.pages.order.oversold": "La commande {number} sur {site} a été payée sans stock",
   "notifications.kind.pages.order.paid": "Nouvelle commande {number} sur {site}",
   "notifications.kind.pages.payment.duplicated": "Double paiement sur la commande {number} de {site} : le second est remboursé",
-  "notifications.kind.pages.settings.changed": "{actor} a modifié un réglage de Sytue Web",
+  "notifications.kind.pages.settings.changed": "{actor} a modifié un réglage de Sytue Webs",
   "notifications.kind.pages.store.busy": "La boutique de {site} a trop de commandes en attente de paiement",
   "notifications.kind.pages.withdrawal.requested": "Rétractation demandée sur la commande {number} de {site}",
   "notifications.kind.photos.album.added": "{actor} a ajouté des photos à « {name} »",
@@ -301,6 +302,8 @@
   "shell.update.failedBody": "Réessayez plus tard ou téléchargez-la depuis le portail.",
   "shell.update.install": "Mettre à jour vers la version {version}",
   "shell.update.upToDate": "{app} est à jour",
+  "shell.widgets.wake": "Mettre à jour les widgets quand l’app est fermée",
+  "shell.widgets.wakeHelp": "Quand quelque chose change chez vous, Sytue réveille l’app avec une notification Apple vide pour qu’elle actualise son widget. Apple voit quelle app et quand, jamais ce qui a changé.",
   "ui.backToList": "Revenir à la liste",
   "ui.bulk.clear": "Effacer la sélection",
   "ui.bulk.region": "Actions sur la sélection",
@@ -318,6 +321,8 @@
   "ui.review.edit": "Modifier",
   "ui.save": "Enregistrer",
   "ui.selectRow": "Sélectionner la ligne",
+  "ui.suiteClose": "Revenir à l’application",
+  "ui.suiteOpen": "Sytue : applications, recherche, notifications et compte",
   "ui.wizard.back": "Retour",
   "ui.wizard.cancel": "Annuler",
   "ui.wizard.goToStep": "Revenir à l’étape {n} : ",
@@ -336,5 +341,7 @@
   "widgets.pending": "En attente",
   "widgets.photos": "Photos",
   "widgets.rows": "Lignes",
-  "widgets.storage": "Stockage"
+  "widgets.storage": "Stockage",
+  "widgets.updatedAgo": "Mis à jour {time}",
+  "widgets.updatedAt": "Mis à jour : {time}"
 }

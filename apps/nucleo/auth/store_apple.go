@@ -7,7 +7,6 @@ package auth
 
 import (
 	"log/slog"
-	"strings"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
 )
@@ -71,7 +70,7 @@ func borrarSecreto(cuenta string) error {
 }
 
 func grupoCuenta(cuenta string) string {
-	if strings.HasPrefix(cuenta, "sesion-") || cuenta == CuentaBloqueo {
+	if enGrupoSuite(cuenta) {
 		return ajustes.GrupoSuite
 	}
 	return ""

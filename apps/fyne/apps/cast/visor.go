@@ -133,11 +133,11 @@ func (x *Visor) Rehacer() {
 	v := x.v
 	var hijos []fyne.CanvasObject
 	if x.Mando != nil && !x.Directo {
-		glifo, rotulo := glifoPausa, "player.pause"
+		glifo, rotulo := iconos.Pausa, "player.pause"
 		if x.Mando.Pausado() {
-			glifo, rotulo = glifoPlay, "player.play"
+			glifo, rotulo = iconos.Reproducir, "player.play"
 		}
-		x.boton = botonVisor(v, glifo, v.Traduce(rotulo), x.Mando.Alternar, true)
+		x.boton = botonVisor(glifo, v.Traduce(rotulo), x.Mando.Alternar, true)
 		d := x.Mando.Duracion()
 		x.progreso = ui.NuevoDeslizador(0, max(d.Seconds(), 0.001), x.Mando.Posicion().Seconds(), func(s float64) {
 			x.Mando.Buscar(time.Duration(s * float64(time.Second)))
@@ -150,11 +150,11 @@ func (x *Visor) Rehacer() {
 			ui.Texto(v.Traduce("live.viewers", i18n.Vars{"count": x.Viendo}), tema.TextoXS, ui.Medio, tema.Color("text-muted", v.Variante)))
 	}
 	silencio := x.Mando != nil && x.Mando.Silenciado()
-	glifo, rotulo := glifoVolumen, "player.mute"
+	glifo, rotulo := iconos.Voz, "player.mute"
 	if silencio {
-		glifo, rotulo = glifoSilencio, "player.unmute"
+		glifo, rotulo = iconos.VozApagada, "player.unmute"
 	}
-	derecha := []fyne.CanvasObject{botonVisor(v, glifo, v.Traduce(rotulo), x.AlSilencio, x.AlSilencio != nil)}
+	derecha := []fyne.CanvasObject{botonVisor(glifo, v.Traduce(rotulo), x.AlSilencio, x.AlSilencio != nil)}
 	var volumen fyne.CanvasObject
 	if x.Mando != nil {
 		vol := ui.NuevoDeslizador(0, 1, x.volumen, func(f float64) {
@@ -173,7 +173,7 @@ func (x *Visor) Rehacer() {
 	if x.AlPiP != nil {
 		derecha = append(derecha, botonIconoVisor(iconos.ImagenEnImagen, v.Traduce("player.pip"), x.AlPiP))
 	}
-	derecha = append(derecha, botonVisor(v, glifoAmpliar, v.Traduce("player.fullscreen"), x.AlAmpliar, x.AlAmpliar != nil))
+	derecha = append(derecha, botonVisor(iconos.Maximizar, v.Traduce("player.fullscreen"), x.AlAmpliar, x.AlAmpliar != nil))
 	hijos = append(hijos, derecha...)
 	x.barra.Objects = hijos
 	x.barra.Layout = &barraVisor{directo: x.Directo || x.Mando == nil, derecha: len(derecha), volumen: volumen}
@@ -223,22 +223,16 @@ func (x *Visor) textoTiempo() string {
 	return Duracion(x.Mando.Posicion()) + " / " + Duracion(x.Mando.Duracion())
 }
 
-// botonVisor es un mando cuadrado de la barra (el IconButton de la web, talla LG).
-func botonVisor(v Vista, glifo, rotulo string, al func(), activo bool) *ui.BotonIcono {
-	b := ui.NuevoBotonIcono(iconos.Ninguno, rotulo, al)
-	lleno := glifo == glifoPlay || glifo == glifoPausa
-	tinta := tema.Color("text", v.Variante)
-	if lleno {
-		b.Glifo = iconos.RellenoDeRuta(glifo, iconos.TallaMD, tinta)
-	} else {
-		b.Glifo = iconos.TrazoDeRuta(glifo, iconos.TallaMD, tinta)
-	}
-	b.Lado, b.TamIcono = ui.LadoIconoLG, iconos.TallaMD
+// botonVisor es un mando cuadrado de la barra (el IconButton de la web, talla LG), con
+// los glifos de Player.tsx: todos del catálogo y de trazo, como la web. Eran propios, y
+// reproducir y pausa iban rellenos junto a los de trazo del catálogo.
+func botonVisor(icono iconos.Icono, rotulo string, al func(), activo bool) *ui.BotonIcono {
+	b := botonIconoVisor(icono, rotulo, al)
 	b.Inerte = !activo
 	return b
 }
 
-// botonIconoVisor es un mando de la barra con un icono del catálogo compartido.
+// botonIconoVisor es un mando de la barra que siempre responde.
 func botonIconoVisor(icono iconos.Icono, rotulo string, al func()) *ui.BotonIcono {
 	b := ui.NuevoBotonIcono(icono, rotulo, al)
 	b.Lado, b.TamIcono = ui.LadoIconoLG, iconos.TallaMD

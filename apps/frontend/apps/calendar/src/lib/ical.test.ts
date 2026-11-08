@@ -8,10 +8,15 @@ import { describe, expect, test } from 'bun:test';
 import {
   buildAlarm,
   buildVevent,
+  guestPartstats,
+  guestStatus,
   newUid,
   parseAlarms,
+  parseAttendees,
   parseColor,
   parseExdates,
+  parseGuests,
+  parseOrganizer,
   parseReminders,
 } from './ical.js';
 
@@ -148,5 +153,118 @@ describe('parseExdates', () => {
       'EXDATE;VALUE=DATE:20260722\r\n' +
       'END:VEVENT';
     expect(parseExdates(ical)).toEqual(['20260708T090000Z', '20260715T090000Z', '20260722']);
+  });
+});
+
+describe('invitados y su respuesta', () => {
+  // Un VEVENT como lo devuelve el servicio: líneas plegadas a 75 octetos (RFC 5545
+  // §3.1), CN entre comillas con «:» dentro y PARTSTAT en cualquier caja.
+  const REUNION = [
+    'BEGIN:VCALENDAR',
+    'BEGIN:VEVENT',
+    'UID:r-1@sytue.eu',
+    'DTSTART:20261110T090000Z',
+    'ORGANIZER;CN="Ada: equipo":mailto:ada@sytue.eu',
+    'ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED;RSVP=TRUE:mailto:bob@examp',
+    ' le.com',
+    'ATTENDEE;CN=Carla;PARTSTAT=tentative:mailto:carla@sytue.eu',
+    'ATTENDEE;PARTSTAT=DECLINED:mailto:dani@sytue.eu',
+    'ATTENDEE;RSVP=TRUE:mailto:eva@sytue.eu',
+    'ATTENDEE;PARTSTAT=DELEGATED:mailto:fede@sytue.eu',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+
+  test('lee cada invitado con su respuesta, también si la línea viene plegada', () => {
+    expect(parseGuests(REUNION)).toEqual([
+      { email: 'bob@example.com', name: undefined, status: 'accepted' },
+      { email: 'carla@sytue.eu', name: 'Carla', status: 'tentative' },
+      { email: 'dani@sytue.eu', name: undefined, status: 'declined' },
+      { email: 'eva@sytue.eu', name: undefined, status: 'pending' },
+      { email: 'fede@sytue.eu', name: undefined, status: 'pending' },
+    ]);
+  });
+
+  test('el organizador, con el CN aunque lleve «:» entre comillas', () => {
+    expect(parseOrganizer(REUNION)).toEqual({ email: 'ada@sytue.eu', name: 'Ada: equipo' });
+    expect(parseOrganizer('BEGIN:VEVENT\r\nUID:x\r\nEND:VEVENT')).toBeNull();
+  });
+
+  test('guestStatus: lo que no es sí, quizá o no es «a la espera»', () => {
+    expect(guestStatus('Accepted')).toBe('accepted');
+    expect(guestStatus('NEEDS-ACTION')).toBe('pending');
+    expect(guestStatus(undefined)).toBe('pending');
+  });
+
+  test('guardar conserva la respuesta de quien ya contestó', () => {
+    const partstats = guestPartstats(REUNION);
+    expect(partstats).toEqual({
+      'bob@example.com': 'ACCEPTED',
+      'carla@sytue.eu': 'TENTATIVE',
+      'dani@sytue.eu': 'DECLINED',
+    });
+    const ics = buildVevent({
+      uid: 'r-1@sytue.eu',
+      summary: 'Revisión',
+      start: '2026-11-10T09:00:00Z',
+      organizer: 'ada@sytue.eu',
+      attendees: ['Bob@Example.com', 'nuevo@sytue.eu'],
+      partstats,
+    });
+    expect(ics).toContain('PARTSTAT=ACCEPTED;RSVP=TRUE:mailto:Bob@Example.com');
+    // El recién añadido entra a la espera, como siempre.
+    expect(ics).toContain('PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:nuevo@sytue.eu');
+  });
+
+  test('el destinatario de un recordatorio por correo no es un invitado', () => {
+    // Thunderbird y Apple guardan así un aviso por email: el ATTENDEE va DENTRO del
+    // VALARM. El servicio no lo cuenta, y la web tampoco debe pintarlo ni, al mover
+    // el evento, convertirlo en invitado.
+    const personal = [
+      'BEGIN:VCALENDAR',
+      'BEGIN:VEVENT',
+      'UID:p-1@example.com',
+      'DTSTART:20261110T090000Z',
+      'SUMMARY:Dentista',
+      'BEGIN:VALARM',
+      'ACTION:EMAIL',
+      'TRIGGER:-PT1H',
+      'SUMMARY:Aviso',
+      'ATTENDEE:mailto:yo@sytue.eu',
+      'END:VALARM',
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n');
+    expect(parseGuests(personal)).toEqual([]);
+    expect(parseAttendees(personal)).toEqual([]);
+    // Con invitados de verdad, salen ellos y no el del aviso.
+    const conInvitado = personal.replace(
+      'SUMMARY:Dentista',
+      'SUMMARY:Dentista\r\nATTENDEE;PARTSTAT=ACCEPTED:mailto:bob@sytue.eu',
+    );
+    expect(parseAttendees(conInvitado)).toEqual(['bob@sytue.eu']);
+  });
+
+  test('una línea con muchos parámetros entrecomillados y sin valor no se atasca', () => {
+    // Sin la clase excluyente, cada «"a"» podía leerse entrecomillado o letra a
+    // letra, y una línea que no casa probaba todas las combinaciones: con 18
+    // segmentos JSC tardaba más de un segundo y luego abandonaba.
+    const linea = `ATTENDEE;CN=${'"a"'.repeat(40)}:`;
+    const ics = `BEGIN:VEVENT\r\n${linea}\r\nEND:VEVENT`;
+    const t0 = performance.now();
+    expect(parseGuests(ics)).toEqual([]);
+    expect(performance.now() - t0).toBeLessThan(200);
+  });
+
+  test('un PARTSTAT que no es un token no se cuela en el .ics', () => {
+    const ics = buildVevent({
+      uid: 'r-2@sytue.eu',
+      summary: 'x',
+      start: '2026-11-10T09:00:00Z',
+      attendees: ['bob@example.com'],
+      partstats: { 'bob@example.com': 'ACCEPTED\r\nX-MAL:1' },
+    });
+    expect(ics).toContain('PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:bob@example.com');
+    expect(ics).not.toContain('X-MAL');
   });
 });

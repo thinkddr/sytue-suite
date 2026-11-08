@@ -5,6 +5,7 @@ package hub
 
 import (
 	"image/color"
+	"net/url"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -61,7 +62,24 @@ func MedidaEvento(lineasHora int) float32 {
 	return 2*altoEvento() + max(tema.TextoSM.Linea, sangriaHora()+float32(lineasHora)*tema.TextoXS.Linea)
 }
 
-// FilaEvento es un evento del día. No es pulsable: en la web es un `<li>` sin enlace.
+// RutaDelEvento es el `rutaDelEvento` de `lib/hoy.ts`: la ruta, dentro de Calendar, que
+// abre ESE evento —la vista de día en su fecha, `?date=<inicio>` y `all_day=1` si es de
+// todo el día—, que es el enlace que Calendar atiende (`calendario.FechaDelEnlace`). Va
+// con el inicio de la INSTANCIA y no con `/events/{id}`, que resuelve el maestro y
+// llevaría una repetición al día de la primera de la serie.
+func RutaDelEvento(e EventoDeHoy) string {
+	q := url.Values{}
+	if e.TodoElDia {
+		q.Set("date", e.Inicio.Format(time.DateOnly))
+		q.Set("all_day", "1")
+	} else {
+		q.Set("date", e.Inicio.Format(time.RFC3339))
+	}
+	return "/?" + q.Encode()
+}
+
+// FilaEvento es un evento del día. Pulsarla abre ese evento en Calendar: en la web es un
+// `<a>` con `hover:bg-bg-subtle`, como el pie de correo.
 type FilaEvento struct {
 	ui.Pulsable
 
@@ -79,7 +97,7 @@ func (f *FilaEvento) lineasHora() []string {
 }
 
 // nuevaFilaEvento construye la fila a partir del evento y de la hora actual.
-func nuevaFilaEvento(v tema.Variante, t *i18n.Translator, e EventoDeHoy, ahora time.Time) *FilaEvento {
+func nuevaFilaEvento(v tema.Variante, t *i18n.Translator, e EventoDeHoy, ahora time.Time, alPulsar func()) *FilaEvento {
 	hora := i18n.FormatTime(t.Locale(), e.Inicio)
 	if e.TodoElDia {
 		hora = t.T("today.allDay", nil)
@@ -88,28 +106,43 @@ func nuevaFilaEvento(v tema.Variante, t *i18n.Translator, e EventoDeHoy, ahora t
 	if resumen == "" {
 		resumen = t.T("today.untitled", nil)
 	}
-	f := &FilaEvento{Hora: hora, Resumen: resumen, Pasado: HaTerminado(e, ahora)}
+	f := &FilaEvento{Hora: hora, Resumen: resumen, Pasado: e.HaTerminado(ahora)}
 	f.Nombre = hora + " " + resumen
-	f.Inerte = true
+	f.AlPulsar = alPulsar
 	f.ExtendBaseWidget(f)
 	_ = v
 	return f
 }
 
-// AccessibilityRole: es texto, no un control.
-func (f *FilaEvento) AccessibilityRole() fyne.AccessibleRole { return fyne.AccessibleRoleText }
+// AccessibilityRole: es un enlace a Calendar.
+func (f *FilaEvento) AccessibilityRole() fyne.AccessibleRole { return fyne.AccessibleRoleLink }
 
-// CreateRenderer compone hora y resumen.
+// CreateRenderer compone el fondo del puntero, hora y resumen.
 func (f *FilaEvento) CreateRenderer() fyne.WidgetRenderer {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	r := &eventoRenderer{f: f, resumen: ui.Texto(f.Resumen, tema.TextoSM, ui.Normal, f.tinta(v, "text"))}
-	r.objetos = []fyne.CanvasObject{r.resumen}
+	r := &eventoRenderer{
+		f:       f,
+		fondo:   canvas.NewRectangle(f.fondo(v)),
+		aro:     ui.NuevoAro(0, ui.SinHueco, v).Abierto(),
+		resumen: ui.Texto(f.Resumen, tema.TextoSM, ui.Normal, f.tinta(v, "text")),
+	}
+	r.objetos = append(r.aro.Objetos(), r.fondo, r.resumen)
 	for _, l := range f.lineasHora() {
 		h := ui.Texto(l, tema.TextoXS, ui.Normal, f.tinta(v, "text-muted"))
 		r.hora = append(r.hora, h)
 		r.objetos = append(r.objetos, h)
 	}
 	return r
+}
+
+// fondo es el `hover:bg-bg-subtle focus-visible:bg-bg-subtle` del enlace. El
+// `opacity-60` de un evento pasado va en el `<li>` y también lo apaga, así que se aplana
+// igual que la tinta.
+func (f *FilaEvento) fondo(v tema.Variante) color.NRGBA {
+	if !f.Encima() && !f.Enfocado() {
+		return color.NRGBA{}
+	}
+	return f.tinta(v, "bg-subtle")
 }
 
 func (f *FilaEvento) tinta(v tema.Variante, token string) color.NRGBA {
@@ -122,6 +155,8 @@ func (f *FilaEvento) tinta(v tema.Variante, token string) color.NRGBA {
 
 type eventoRenderer struct {
 	f       *FilaEvento
+	fondo   *canvas.Rectangle
+	aro     *ui.Aro
 	hora    []*canvas.Text // una por línea
 	resumen *canvas.Text
 	objetos []fyne.CanvasObject
@@ -140,6 +175,8 @@ func (r *eventoRenderer) Destroy()                     {}
 // de base de verdad pide la métrica de la fuente, que Fyne no expone por fuera de
 // `canvas.Text`; con 10,5 y 11,375 px de tamaño la diferencia es de medio píxel.
 func (r *eventoRenderer) Layout(t fyne.Size) {
+	r.aro.Colocar(t)
+	r.fondo.Resize(t)
 	y := altoEvento()
 	for i, h := range r.hora {
 		ui.ColocarTexto(h, tema.TextoXS, MargenEvento, y+sangriaHora()+float32(i)*tema.TextoXS.Linea)
@@ -149,9 +186,13 @@ func (r *eventoRenderer) Layout(t fyne.Size) {
 	ui.ColocarTexto(r.resumen, tema.TextoSM, x, y)
 }
 
-// Refresh repinta con los tokens del tema actual.
+// Refresh repinta con los tokens del tema actual y el estado del puntero y del foco.
 func (r *eventoRenderer) Refresh() {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	r.fondo.FillColor = r.f.fondo(v)
+	r.fondo.Refresh()
+	r.aro.Pintar(v)
+	r.aro.Ver(r.f.Enfocado())
 	for _, h := range r.hora {
 		h.Color = r.f.tinta(v, "text-muted")
 		h.Refresh()

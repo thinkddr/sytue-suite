@@ -21,12 +21,24 @@ export {
   procedenciaAviso,
   tituloAviso,
 } from './avisos.js';
+// El punto azul de un aviso sin leer, como botón «Marcar como leído».
+export { MarcarLeido } from './MarcarLeido.js';
+export type { MarcarLeidoProps } from './MarcarLeido.js';
 // La franja de solo lectura con su «Pedir acceso de edición» (platform/pkg/peticiones).
 export { FranjaPeticion } from './FranjaPeticion.js';
 export type { FranjaPeticionProps } from './FranjaPeticion.js';
 // «Compartir con una persona» (el BFF es `rutasDeCompartir` de @sytue/auth/server).
 export { CompartirConPersonas } from './CompartirConPersonas.js';
 export type { CompartirConPersonasProps, NivelCompartido } from './CompartirConPersonas.js';
+// Mencionar a alguien con «@» (la gente la da `respuestaAgenda` de @sytue/auth/server).
+export {
+  candidatos,
+  consultaMencion,
+  genteDeLaOrganizacion,
+  moverActiva,
+  ponerMencion,
+} from './menciones.js';
+export type { Persona } from './menciones.js';
 export type { Avisos, EstadoAvisos, FlujoAvisos, FuenteAvisos } from './avisos.js';
 export { AccountMenu } from './AccountMenu.js';
 export { ShellContext, useShell } from './context.js';

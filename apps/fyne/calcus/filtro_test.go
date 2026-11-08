@@ -137,7 +137,8 @@ func TestElDesplegableDelAutofiltroFiltra(t *testing.T) {
 			ordenar = append(ordenar, e)
 		}
 	}
-	if len(ordenar) != 2 || ordenar[1].Texto != lz.t("data.sortDesc", nil) {
+	// Y tras ordenar, «Filtrar por condición…».
+	if len(ordenar) != 3 || ordenar[1].Texto != lz.t("data.sortDesc", nil) || ordenar[2].Texto != lz.t("filtro.byCondition", nil) {
 		t.Fatalf("el desplegable no empieza por ordenar: %d elementos", len(ordenar))
 	}
 	ordenar[1].Tapped(nil)

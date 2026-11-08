@@ -3,7 +3,11 @@
 
 package notes
 
-import "sync"
+import (
+	"slices"
+	"sync"
+	"sync/atomic"
+)
 
 // Paridad web: apps/frontend/apps/notes/src/client/historial.ts.
 
@@ -21,6 +25,8 @@ type Accion struct {
 	Rehacer  func() error
 
 	fusion string
+	// id es el que devuelve Registrar, para deshacer ESTA y no la última.
+	id uint64
 }
 
 // Historial es la pila de deshacer y la de rehacer. El cerrojo existe porque se registra
@@ -33,6 +39,12 @@ type Historial struct {
 	Limite int
 }
 
+// ultimoID numera las acciones registradas, de TODOS los historiales del proceso. No
+// vive en el struct: `p.hist = Historial{}` (al cerrar sesión) lo pondría a 0, y un
+// aviso viejo aún en pantalla desharía la primera acción nueva, que llevaría su número.
+// En la web la identidad es el objeto, y no se repite.
+var ultimoID atomic.Uint64
+
 // limiteHistorial es el `limite = 50` del constructor de la web.
 const limiteHistorial = 50
 
@@ -41,15 +53,17 @@ const limiteHistorial = 50
 // Con `fusion`, una acción que llega con la MISMA marca que la de arriba no apila otra:
 // se queda con la inversa de la primera y el «rehacer» de la última. Es lo que hace que
 // los guardados de una misma edición —uno por pausa al teclear— se deshagan de una vez.
-func (h *Historial) Registrar(a Accion, fusion string) {
+//
+// Devuelve con qué número quedó apuntada, para DeshacerEsta.
+func (h *Historial) Registrar(a Accion, fusion string) uint64 {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if n := len(h.pasado); fusion != "" && n > 0 && h.pasado[n-1].fusion == fusion {
 		h.pasado[n-1].Rehacer = a.Rehacer
 		h.futuro = nil
-		return
+		return h.pasado[n-1].id
 	}
-	a.fusion = fusion
+	a.fusion, a.id = fusion, ultimoID.Add(1)
 	h.pasado = append(h.pasado, a)
 	tope := h.Limite
 	if tope <= 0 {
@@ -60,6 +74,40 @@ func (h *Historial) Registrar(a Accion, fusion string) {
 	}
 	// Lo que se podía rehacer deja de tener sentido: la rama cambió.
 	h.futuro = nil
+	return a.id
+}
+
+// DeshacerEsta deshace UNA acción concreta, la del número que dio Registrar: es el
+// «Deshacer» del aviso tras eliminar o mover una nota (`deshacerEsta` de la web). Si
+// desde entonces se hizo otra cosa, Deshacer desharía la que no es.
+//
+// Devuelve "" sin error si ya no está (se deshizo con Ctrl+Z o salió por el límite). Si
+// era la de arriba pasa a rehacer; si no, se descarta. Si falla, vuelve a su sitio.
+func (h *Historial) DeshacerEsta(id uint64) (string, error) {
+	h.mu.Lock()
+	i := slices.IndexFunc(h.pasado, func(a Accion) bool { return a.id == id })
+	if i < 0 {
+		h.mu.Unlock()
+		return "", nil
+	}
+	a, cima := h.pasado[i], i == len(h.pasado)-1
+	h.pasado = slices.Delete(h.pasado, i, i+1)
+	h.mu.Unlock()
+
+	var err error
+	if a.Deshacer != nil {
+		err = a.Deshacer()
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if err != nil {
+		h.pasado = slices.Insert(h.pasado, min(i, len(h.pasado)), a)
+		return "", err
+	}
+	if cima {
+		h.futuro = append(h.futuro, a)
+	}
+	return a.Etiqueta, nil
 }
 
 // SiguienteDeshacer y SiguienteRehacer son la etiqueta de lo que toca, o "" si nada.

@@ -51,6 +51,7 @@ export const en = {
   'common.actionFailed': 'The action could not be completed',
   'common.tryAgain': 'Try again.',
   'common.tryAgainSoon': 'Try again in a few seconds.',
+  'common.undo': 'Undo',
 
   // --- Lista de contactos -------------------------------------------------
   'list.region': 'Contact list',
@@ -58,6 +59,8 @@ export const en = {
   'list.search': 'Search contacts',
   'list.selectAll': 'Select all visible contacts',
   'list.select': 'Select {name}',
+  'list.star': 'Star {name}',
+  'list.unstar': 'Remove {name} from starred',
   'list.starredTitle': 'Starred',
   'list.reviewDuplicates': 'Review duplicates ({count})',
   'list.count': { one: '{count} contact', other: '{count} contacts' },
@@ -179,6 +182,11 @@ export const en = {
   'trash.restoreFailed': 'Could not restore',
   'trash.purged': 'Contact permanently deleted',
   'trash.purgeFailed': 'Could not delete',
+  'trash.undone': 'Restored from the trash',
+  'trash.undoFailed': 'Some contacts could not be restored',
+  'trash.undoFailedHint': 'They are still in Trash.',
+  'trash.undoFailedOne': 'The contact could not be restored',
+  'trash.undoFailedOneHint': 'If it is not in Trash, it was deleted permanently.',
 
   // --- Acciones en lote ---------------------------------------------------
   'batch.region': 'Actions for the selection',
@@ -196,6 +204,10 @@ export const en = {
     one: '{count} contact moved to the trash',
     other: '{count} contacts moved to the trash',
   },
+  'batch.emailAll': 'Email all',
+  'batch.exportVcf': 'Export (.vcf)',
+  'batch.noEmail': 'None of them has an email address',
+  'batch.emailCapped': 'Only the first {count} addresses were included',
 
   // --- Ficha del contacto -------------------------------------------------
   'detail.emptyTitle': 'Select a contact',
@@ -206,6 +218,9 @@ export const en = {
   'detail.copyEmail': 'Copy the email',
   'detail.emailCopied': 'Email copied',
   'detail.copyFailed': 'Could not copy',
+  'detail.copyValue': 'Copy {value}',
+  'detail.phoneCopied': 'Phone number copied',
+  'detail.addressCopied': 'Address copied',
   'detail.export': 'Export',
   'detail.merge': 'Merge with…',
   'detail.moreActions': 'More actions',

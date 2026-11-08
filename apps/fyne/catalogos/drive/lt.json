@@ -4,6 +4,8 @@
   "action.classified": "Klasifikacija · {name}",
   "action.classify": "Klasifikuoti",
   "action.copy": "Sukurti kopiją",
+  "action.copyLink": "Kopijuoti nuorodą",
+  "action.copyLinkFailed": "Nuorodos nukopijuoti nepavyko.",
   "action.delete": "Perkelti į šiukšlinę",
   "action.desktopBody": "Jei jos dar neįdiegėte, galite ją atsisiųsti.",
   "action.desktopCta": "Peržiūrėti atsisiuntimus",
@@ -12,6 +14,7 @@
   "action.downloadName": "Atsisiųsti {name}",
   "action.downloadZip": "Atsisiųsti (ZIP)",
   "action.editorFailed": "Redaktorius negalėjo atidaryti šio failo.",
+  "action.linkCopied": "Nuoroda nukopijuota. Ji atsidaro tik tiems, kurie jau turi prieigą.",
   "action.mailFailed": "Nepavyko atidaryti el. laiško rašymo lango",
   "action.menu": "Veiksmai: {name}",
   "action.more": "Daugiau veiksmų",
@@ -87,6 +90,18 @@
     "few": "Perkelti {count} elementus",
     "many": "Perkelti {count} elemento",
     "other": "Perkelti {count} elementų"
+  },
+  "files.batch.restorePartial": {
+    "one": "{count} elemento nepavyko atkurti; jis vis dar šiukšlinėje.",
+    "few": "{count} elementų nepavyko atkurti; jie vis dar šiukšlinėje.",
+    "many": "{count} elemento nepavyko atkurti; jie vis dar šiukšlinėje.",
+    "other": "{count} elementų nepavyko atkurti; jie vis dar šiukšlinėje."
+  },
+  "files.batch.restored": {
+    "one": "{count} elementas atkurtas.",
+    "few": "{count} elementai atkurti.",
+    "many": "{count} elemento atkurta.",
+    "other": "{count} elementų atkurta."
   },
   "files.batch.trashBody": {
     "one": "{count} elementas bus perkeltas į šiukšlinę. Iš ten jį galėsite atkurti.",
@@ -587,6 +602,21 @@
     "other": "Įkelta {count} failų."
   },
   "team.upload.partial": "Įkelta {uploaded} iš {count}.",
+  "trash.emptiedAll": "Šiukšlinė išvalyta.",
+  "trash.emptyAll": "Išvalyti šiukšlinę",
+  "trash.emptyAllBody": {
+    "one": "{count} elementas šiukšlinėje bus ištrintas visam laikui kartu su versijų istorija. Vėliau jo atkurti nebus galima.",
+    "few": "{count} elementai šiukšlinėje bus ištrinti visam laikui kartu su versijų istorija. Vėliau jų atkurti nebus galima.",
+    "many": "{count} elemento šiukšlinėje bus ištrinta visam laikui kartu su versijų istorija. Vėliau jų atkurti nebus galima.",
+    "other": "{count} elementų šiukšlinėje bus ištrinta visam laikui kartu su versijų istorija. Vėliau jų atkurti nebus galima."
+  },
+  "trash.emptyAllPartial": {
+    "one": "{count} elemento nepavyko ištrinti; jis vis dar šiukšlinėje.",
+    "few": "{count} elementų nepavyko ištrinti; jie vis dar šiukšlinėje.",
+    "many": "{count} elemento nepavyko ištrinti; jie vis dar šiukšlinėje.",
+    "other": "{count} elementų nepavyko ištrinti; jie vis dar šiukšlinėje."
+  },
+  "trash.emptyAllTitle": "Išvalyti šiukšlinę?",
   "trash.emptyBody": "Ištrinti failai ir aplankai bus rodomi čia, ir juos bus galima atkurti.",
   "trash.emptyTitle": "Šiukšlinė tuščia",
   "trash.errorTitle": "Nepavyko įkelti šiukšlinės",

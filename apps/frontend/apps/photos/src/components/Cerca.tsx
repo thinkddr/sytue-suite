@@ -17,6 +17,7 @@ import type { SytueUser } from '@sytue/auth';
 import type { Locale } from '@sytue/i18n';
 import { cerca as pedirCerca, foto as pedirFoto, type Foto } from '../client/photosApi.js';
 import { useT } from '../i18n/index.js';
+import { posicionVisor } from '../lib/posicionVisor.js';
 import { RUTA } from '../lib/ruta.js';
 import { Marco } from './Marco.js';
 import { Miniatura, Visor } from './PhotosApp.js';
@@ -102,6 +103,8 @@ export function Cerca({
             locale={locale}
             onClose={() => setAbierta(null)}
             vecinas={[fotos[abierta - 1], fotos[abierta + 1]]}
+            posicion={posicionVisor(abierta, fotos.length)}
+            onIr={setAbierta}
             onPrev={abierta > 0 ? () => setAbierta(abierta - 1) : undefined}
             onNext={abierta < fotos.length - 1 ? () => setAbierta(abierta + 1) : undefined}
           />

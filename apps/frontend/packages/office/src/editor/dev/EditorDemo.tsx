@@ -233,6 +233,7 @@ export function EditorDemo(props: {
     createVersion: nadaAsync,
     restoreVersion: nadaAsync,
     exportAs: nadaAsync,
+    saveNow: nada,
     sourceRef: '',
     soloLectura: props.soloLectura,
     savingToDrive: false,

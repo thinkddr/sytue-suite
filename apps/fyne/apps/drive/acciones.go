@@ -7,7 +7,6 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -36,14 +35,10 @@ import (
 //
 // ponytail: falta «Organizar páginas», que es un diálogo propio y entra con él: un
 // elemento de menú que no abre nada es peor que no tenerlo. (Las versiones van en la web
-// detrás de «Compartir enlace» y delante de lo de PDF; aquí también.) Detrás de lo de PDF
+// detrás de «Compartir enlace» y delante de lo de PDF; aquí también, con «Copiar enlace»
+// en medio.) Detrás de lo de PDF
 // van «Clasificar» y «Resumir», y luego «Adjuntar a un correo» y «Compartir en Rooms»,
 // que llaman a la otra app por su esquema (entreapps.go), juntas, como en la web.
-
-// DuracionDeshacer es cuánto dura el aviso de «enviado a la papelera» con su «Deshacer»:
-// los 10 s de la web y no los 5 de serie, porque deshacer hay que leerlo, decidirlo y
-// alcanzarlo.
-const DuracionDeshacer = 10 * time.Second
 
 // accionMenu es una fila del menú: su rótulo, su glifo y qué hace.
 type accionMenu struct {
@@ -74,6 +69,10 @@ func (p *Pantalla) AccionesDe(el Elemento, sinRed, favorito bool) []accionMenu {
 	add(!sinRed, accionMenu{texto: t("action.move"), cuerpo: glifoMover, hacer: func() { p.pedirMover(el) }})
 	add(!sinRed, accionMenu{texto: t("action.copy"), cuerpo: glifoCopia, hacer: func() { go p.copiar(el) }})
 	add(!sinRed, accionMenu{texto: t("action.shareLink"), cuerpo: glifoEnlace, hacer: func() { p.pedirCompartir(el) }})
+	// «Copiar enlace» es el enlace de siempre, para quien YA tiene acceso: no abre nada a
+	// nadie más, así que no es «Compartir enlace». No necesita red. Un fichero sin id no
+	// tiene enlace estable.
+	add(el.Carpeta || el.ID != "", accionMenu{texto: t("action.copyLink"), icono: iconos.Copias, hacer: func() { p.copiarEnlace(el) }})
 	// El historial es LECTURA: la web lo ofrece también sin red.
 	add(fichero && el.ID != "", accionMenu{texto: t("action.versions"), cuerpo: glifoReloj, hacer: func() { p.pedirVersiones(el) }})
 	// «Abrir en Sytue PDF» va con el verbo del producto: ahí se ve, se anota, se rellena
@@ -372,7 +371,7 @@ func (p *Pantalla) aLaPapelera(el Elemento) {
 	}
 	enHilo(func() {
 		a := ui.NuevoAviso(ui.AvisoExito, p.tr.T("files.delete.done", i18n.Vars{"name": el.Nombre}), "")
-		a.Duracion = DuracionDeshacer
+		a.Duracion = ui.DuracionDeshacer
 		// Sin id no hay a qué llamar para restaurar: la papelera trabaja por id.
 		if el.ID != "" {
 			a.RotuloAccion = p.tr.T("files.delete.undo", nil)
@@ -394,6 +393,13 @@ func (p *Pantalla) deshacerPapelera(el Elemento) {
 	}
 	p.avisar(ui.AvisoExito, p.tr.T("trash.restored", i18n.Vars{"name": el.Nombre}), "")
 	p.recargarVista()
+}
+
+// copiarEnlace deja en el portapapeles el enlace del elemento (`enlaceDe`, el mismo que se
+// publica en Rooms) y lo dice. Va en la rutina de la interfaz.
+func (p *Pantalla) copiarEnlace(el Elemento) {
+	fyne.CurrentApp().Clipboard().SetContent(p.enlaceDe(el))
+	p.avisar(ui.AvisoExito, p.tr.T("action.linkCopied", nil), "")
 }
 
 // alternarFavorito pone o quita la estrella al momento y la devuelve si el servicio no
@@ -468,12 +474,22 @@ func (p *Pantalla) org() string {
 
 // recargarVista vuelve a pedir lo que se está viendo tras una mutación: la búsqueda si
 // es lo que hay delante, la carpeta si no. Corre en su propia rutina.
+//
+// Con la Papelera delante —el «Deshacer» de un aviso llega hasta 10 s después y en ese
+// rato se puede haber ido a ella— lo que se pide es la papelera: dejarla como estaba
+// enseñaba como borrado lo ya restaurado, y «Vaciar papelera» fallaba después con ello.
+// La carpeta se vuelve a pedir igualmente al volver a Mi unidad (`cargadorDe`).
 func (p *Pantalla) recargarVista() {
-	var busqueda bool
+	var busqueda, enPapelera bool
 	var consulta, carpeta string
 	fyne.DoAndWait(func() {
 		busqueda, consulta, carpeta = p.explor.EnBusqueda, strings.TrimSpace(p.explor.Consulta), p.carpetaActual()
+		enPapelera = p.seccion == Papelera
 	})
+	if enPapelera {
+		p.cargarPapelera()
+		return
+	}
 	if busqueda {
 		p.ejecutarBusqueda(consulta)
 		return

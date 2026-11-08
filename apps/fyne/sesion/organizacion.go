@@ -50,8 +50,17 @@ func (s *Suite) Organizaciones(ctx context.Context) ([]api.Organizacion, error) 
 // vuelta, el servicio ya ha revocado los refresh tokens —es a propósito, para que el
 // tenant viejo no sobreviva días— y la sesión se acaba al caducar el token: es lo mismo
 // que le pasa a la web si se cierra la pestaña a mitad de la redirección.
+//
+// Antes del cambio se olvidan, en el Hub y con la sesión de la organización de antes, los
+// aparatos de iOS de las quince apps (despertar.go): las filas son de cada organización,
+// y después ya no habría sesión con que borrarlas. Al volver a entrar, la vuelta del
+// despertar los registra en la nueva si el interruptor sigue encendido.
 func (s *Suite) CambiarOrganizacion(ctx context.Context, id string) error {
+	s.olvidarDespertares(ctx, true)
 	if err := s.cuenta().CambiarOrganizacion(ctx, id); err != nil {
+		// Se sigue en la de antes: se vuelve a registrar ahí, en una vuelta aparte con sus
+		// propios plazos y no con los de esta petición.
+		s.levantarVetoDespertar() //nolint:contextcheck // la vuelta va aparte, con sus plazos
 		return err
 	}
 	if s.reentrar != nil {

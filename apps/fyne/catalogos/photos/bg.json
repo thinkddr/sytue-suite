@@ -1,9 +1,14 @@
 {
   "aiBatch.excludeOrg": "Изключи организацията от автоматичния пакет на Sytue AI",
   "aiBatch.excludedHint": "Организацията е изключена от автоматичния пакет на Sytue AI. Снимките не се обработват във фонов режим за предложения или подобни.",
+  "album.coverSet": "Корицата на албума е обновена",
+  "album.isCover": "Това е корицата на албума",
   "album.linkCopied": "Връзката е копирана",
   "album.newLink": "Нова връзка",
   "album.newLinkConfirm": "Да се създаде ли нова връзка? Текущата връзка ще спре да работи за всички, които вече я имат.",
+  "album.rename": "Преименуване",
+  "album.renamePrompt": "Име на албума",
+  "album.setCover": "Използване като корица на албума",
   "album.share": "Споделяне",
   "album.shared": "Споделен",
   "album.unshare": "Спиране на споделянето",
@@ -98,6 +103,7 @@
     "other": "{count} по дата на качване"
   },
   "gallery.cancelSelection": "Изход от избора",
+  "gallery.clearSearch": "Изчистване на търсенето",
   "gallery.describeCapped": "Наведнъж се описват само първите {count}; стартирайте отново за останалите.",
   "gallery.describeNothing": "Избраните снимки вече имат описание",
   "gallery.describeSelected": "Описание със Sytue AI",
@@ -106,7 +112,8 @@
   "gallery.describing": "Описване на {done} от {total}…",
   "gallery.downloadCapped": "Снимки извън тази партида: {count}.",
   "gallery.downloadSelected": "Изтегляне",
-  "gallery.downloading": {
+  "gallery.downloading": "Започнати заявки за изтегляне: {count}. Проверете изтеглянията в браузъра.",
+  "gallery.downloadingNative": {
     "one": "Изтегляне на 1 снимка…",
     "other": "Изтегляне на {count} снимки…"
   },
@@ -114,6 +121,8 @@
   "gallery.empty.description": "Снимките от вашия Sytue Drive ще се появят тук, подредени по датата на заснемане.",
   "gallery.empty.title": "Още няма снимки",
   "gallery.favorite": "Добавяне в любими",
+  "gallery.favoriteFailed": "Снимки, които не можаха да бъдат променени: {count}",
+  "gallery.favorited": "Добавени в любими: {count}",
   "gallery.likeTheseResults": "И тези, които приличат на тях",
   "gallery.moreLikeThese": "Още като тези",
   "gallery.newAlbum": "Нов албум",
@@ -124,6 +133,8 @@
   },
   "gallery.newAlbumTitle": "Нов албум",
   "gallery.noExifDate": "Без дата на заснемане: подредени по дата на качване",
+  "gallery.noResults.description": "Опитайте с други думи или изчистете търсенето, за да видите всичките си снимки.",
+  "gallery.noResults.title": "Няма снимки, отговарящи на „{query}“",
   "gallery.onlyImages": "Могат да се добавят само изображения.",
   "gallery.open": "Отваряне на {name}",
   "gallery.openInEditor": "Редактиране на {name}",
@@ -152,6 +163,7 @@
     "other": "{count} снимки са преместени в кошчето"
   },
   "gallery.unfavorite": "Премахване от любими",
+  "gallery.unfavorited": "Премахнати от любими: {count}",
   "gallery.unselectMonth": "Отмяна на избора на месец",
   "gallery.uploadFailed": "Неуспешно качване: {name}",
   "gallery.uploaded": {
@@ -198,6 +210,9 @@
   "viewer.askSend": "Питане",
   "viewer.canvasBackground": "Фон на снимката",
   "viewer.close": "Затваряне",
+  "viewer.counter": "{index} / {total}",
+  "viewer.counterLabel": "Снимка {index} от {total}",
+  "viewer.counterMore": "{count}+",
   "viewer.delete": "Преместване в кошчето",
   "viewer.deleteConfirm": "Да се премести ли тази снимка в кошчето? Файлът остава в Sytue Drive.",
   "viewer.describe": "Описание със Sytue AI",
@@ -237,6 +252,7 @@
   "viewer.saveDescription": "Запазване",
   "viewer.savingDescription": "Запазване…",
   "viewer.shortcuts": "Клавишни комбинации: стрелки за смяна на снимката, интервал за слайдшоу, I за информация, Z за пълен размер, Delete за кошчето.",
+  "viewer.shortcutsJump": "Home и End отиват на първата и последната снимка.",
   "viewer.similar": "Подобни снимки",
   "viewer.slideshow": "Слайдшоу",
   "viewer.slideshowStop": "Спиране на слайдшоуто",

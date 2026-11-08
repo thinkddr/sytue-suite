@@ -65,6 +65,7 @@ export const sk: AppCatalog<typeof en> = {
   'inbox.markAll': 'Označiť všetko ako prečítané',
   'inbox.loading': 'Načítavajú sa oznámenia…',
   'inbox.unreadDot': 'Neprečítané',
+  'inbox.markRead': 'Označiť ako prečítané',
   'inbox.errorTitle': 'Oznámenia sa nepodarilo načítať',
   'inbox.errorBody': 'Hub práve neodpovedá. Skúste to znova o pár sekúnd.',
   'inbox.retry': 'Skúsiť znova',
@@ -696,6 +697,8 @@ export const sk: AppCatalog<typeof en> = {
     '{sources} neodpovedali, takže niektoré výsledky môžu chýbať. Skúste to znova o chvíľu.',
   'search.partialJoin': ' a ',
   'search.showing': 'Zobrazuje sa {count} z {total} výsledkov.',
+  'search.loadMore': 'Načítať ďalšie výsledky',
+  'search.loadMoreFailed': 'Ďalšie výsledky sa nepodarilo načítať. Skúste to znova.',
   'privacy.notice':
     'Vaše údaje nepredávame ani ich neposkytujeme tretím stranám. Nepoužívame ich na profilovanie, reklamu ani na trénovanie či zlepšovanie našich služieb alebo služieb iných. Sú šifrované pri prenose aj uložení a našu európsku infraštruktúru opúšťajú len vtedy, keď je to nevyhnutné na fakturáciu, a v integráciách, ktoré zapnete, kde vás tretia strana požiada o súhlas s údajmi, ktoré použije.',
 };

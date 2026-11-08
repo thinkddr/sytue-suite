@@ -7,6 +7,7 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { expect, test } from 'bun:test';
 import { render } from 'preact';
 import { useRef } from 'preact/hooks';
+import { act } from 'preact/test-utils';
 import {
   IndicadorRefrescoTactil,
   UMBRAL_ACTUALIZAR,
@@ -49,8 +50,9 @@ test('arrastrar hacia abajo desde arriba muestra el disco y dispara la actualiza
   }
 
   try {
-    render(<Superficie />, host);
-    await turno();
+    // `act` ejecuta ya el efecto que engancha los escuchadores: sin él, Preact lo deja
+    // para el siguiente fotograma y el primer toque podía llegar antes que ellos.
+    act(() => render(<Superficie />, host));
     const lista = host.querySelector('#lista-interna') as HTMLElement;
     expect(host.querySelector('[data-sytue-pull-indicator]')).toBeNull();
 
@@ -130,8 +132,7 @@ test('no intercepta listas ya desplazadas, cintas horizontales, campos ni modale
   };
 
   try {
-    render(<Superficie />, host);
-    await turno();
+    act(() => render(<Superficie />, host));
     const sublista = host.querySelector('#sublista') as HTMLElement;
     const fila = host.querySelector('#fila') as HTMLElement;
     const cinta = host.querySelector('#boton-cinta') as HTMLElement;

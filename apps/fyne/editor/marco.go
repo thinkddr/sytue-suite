@@ -42,7 +42,7 @@ type Marco struct {
 	// zoomLienzo es el último zoom pintado: recomponer el marco a la misma medida no
 	// vuelve a colocar su lienzo, y solo un cambio de zoom debe invalidarlo.
 	zoomLienzo int
-	// lienzoAtajo es la ventana donde ya está puesto Ctrl/Cmd+P.
+	// lienzoAtajo es la ventana donde ya están puestos Ctrl/Cmd+P y el zoom.
 	lienzoAtajo fyne.Canvas
 	// buscarAbierto es si el panel «Buscar» estaba abierto en la última recomposición.
 	buscarAbierto bool
@@ -222,7 +222,7 @@ func (r *marcoRenderer) Objects() []fyne.CanvasObject {
 
 func (r *marcoRenderer) Destroy() {}
 
-// atajoImprimir es Ctrl/Cmd+P en la ventana del marco, para cuando el foco no lo tiene
+// atajoImprimir es Ctrl/Cmd+P (y el zoom) en la ventana del marco, para cuando el foco no lo tiene
 // el lienzo (la cinta, un panel): se pone al colocarlo, que es cuando ya tiene ventana.
 func (m *Marco) atajoImprimir() {
 	c := fyne.CurrentApp().Driver().CanvasForObject(m)
@@ -230,11 +230,14 @@ func (m *Marco) atajoImprimir() {
 		return
 	}
 	m.lienzoAtajo = c
-	c.AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyP, Modifier: fyne.KeyModifierShortcutDefault}, func(fyne.Shortcut) {
-		if m.ctx.Imprimir != nil {
-			m.ctx.Imprimir()
-		}
-	})
+	// Y Ctrl/Cmd +, − y 0 sobre el zoom (`AtajoZoom`), que en la web escucha `window`.
+	for _, a := range AtajosDelEditor() {
+		c.AddShortcut(a, func(s fyne.Shortcut) {
+			if cs, ok := s.(*desktop.CustomShortcut); ok {
+				m.ctx.AtajoDelEditor(cs)
+			}
+		})
+	}
 }
 
 func (r *marcoRenderer) Layout(t fyne.Size) {

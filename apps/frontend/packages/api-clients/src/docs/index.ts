@@ -61,6 +61,9 @@ export interface CreateDocumentInput {
    *  crear; `brandVersion` elige una versión de la marca (sin ella, la vigente). */
   theme?: string;
   brandVersion?: number;
+  /** «Hacer una copia»: el documento nace con el contenido de ahora de este otro (su
+   *  id). Su tipo manda sobre `kind`; con `title` vacío, se llama como el original. */
+  copyOf?: string;
   // Aquí había un `drivePath?: string` documentado como «carpeta de Sytue Drive donde
   // anclar el documento». El servicio Go solo acepta `kind` y `title`: se enviaba y se
   // descartaba en silencio, así que el tipo prometía un anclaje que nunca ocurrió. Un
@@ -250,6 +253,7 @@ export class DocsClient {
         ...(input.templateVersion ? { template_version: input.templateVersion } : {}),
         ...(input.theme ? { theme: input.theme } : {}),
         ...(input.brandVersion ? { brand_version: input.brandVersion } : {}),
+        ...(input.copyOf ? { copy_of: input.copyOf } : {}),
       }),
     });
     const body = (await res.json()) as { document: RawDocument };

@@ -1,9 +1,14 @@
 {
   "aiBatch.excludeOrg": "Szervezet kizárása az automatikus Sytue AI-feldolgozásból",
   "aiBatch.excludedHint": "A szervezet ki van zárva az automatikus Sytue AI-feldolgozásból. Az új fényképeket nem dolgozzuk fel a háttérben javaslatokhoz vagy hasonlóságokhoz.",
+  "album.coverSet": "Az albumborító frissült",
+  "album.isCover": "Ez az album borítója",
   "album.linkCopied": "Hivatkozás másolva",
   "album.newLink": "Új hivatkozás",
   "album.newLinkConfirm": "Új hivatkozást hoz létre? A jelenlegi hivatkozás megszűnik működni mindenkinek, akinek már megvan.",
+  "album.rename": "Átnevezés",
+  "album.renamePrompt": "Az album neve",
+  "album.setCover": "Beállítás albumborítóként",
   "album.share": "Megosztás",
   "album.shared": "Megosztva",
   "album.unshare": "Megosztás leállítása",
@@ -98,6 +103,7 @@
     "other": "{count} a feltöltés dátuma szerint"
   },
   "gallery.cancelSelection": "Kilépés a kijelölésből",
+  "gallery.clearSearch": "Keresés törlése",
   "gallery.describeCapped": "Egyszerre csak az első {count} kap leírást; a többihez futtassa újra.",
   "gallery.describeNothing": "A kijelölt fotóknak már van leírásuk",
   "gallery.describeSelected": "Leírás a Sytue AI-jal",
@@ -106,7 +112,8 @@
   "gallery.describing": "Leírás: {done}/{total}…",
   "gallery.downloadCapped": "Ebből a kötegből kimaradó fényképek: {count}.",
   "gallery.downloadSelected": "Letöltés",
-  "gallery.downloading": {
+  "gallery.downloading": "Elindított letöltési kérések: {count}. Ellenőrizze a böngésző letöltéseit.",
+  "gallery.downloadingNative": {
     "one": "1 fotó letöltése…",
     "other": "{count} fotó letöltése…"
   },
@@ -114,6 +121,8 @@
   "gallery.empty.description": "A Sytue Drive-ban lévő fotók itt jelennek meg, a készítés dátuma szerint rendezve.",
   "gallery.empty.title": "Még nincsenek fotók",
   "gallery.favorite": "Hozzáadás a kedvencekhez",
+  "gallery.favoriteFailed": "Nem módosítható fotók: {count}",
+  "gallery.favorited": "Kedvencekhez adva: {count}",
   "gallery.likeTheseResults": "És a hozzájuk hasonlók",
   "gallery.moreLikeThese": "Több ilyen",
   "gallery.newAlbum": "Új album",
@@ -124,6 +133,8 @@
   },
   "gallery.newAlbumTitle": "Új album",
   "gallery.noExifDate": "Nincs felvételi dátum: feltöltési dátum szerint rendezve",
+  "gallery.noResults.description": "Próbáljon más szavakat, vagy törölje a keresést az összes fotó megtekintéséhez.",
+  "gallery.noResults.title": "Egy fotó sem felel meg ennek: „{query}”",
   "gallery.onlyImages": "Csak képeket lehet hozzáadni.",
   "gallery.open": "{name} megnyitása",
   "gallery.openInEditor": "{name} szerkesztése",
@@ -152,6 +163,7 @@
     "other": "{count} fotó a kukába helyezve"
   },
   "gallery.unfavorite": "Eltávolítás a kedvencekből",
+  "gallery.unfavorited": "Kedvencek közül eltávolítva: {count}",
   "gallery.unselectMonth": "Hónap kijelölésének megszüntetése",
   "gallery.uploadFailed": "Nem sikerült feltölteni: {name}",
   "gallery.uploaded": {
@@ -198,6 +210,9 @@
   "viewer.askSend": "Kérdés",
   "viewer.canvasBackground": "Fotó háttere",
   "viewer.close": "Bezárás",
+  "viewer.counter": "{index} / {total}",
+  "viewer.counterLabel": "Fotó: {index} / {total}",
+  "viewer.counterMore": "{count}+",
   "viewer.delete": "Áthelyezés a kukába",
   "viewer.deleteConfirm": "Áthelyezi ezt a fotót a kukába? A fájl a Sytue Drive-ban marad.",
   "viewer.describe": "Leírás a Sytue AI-jal",
@@ -237,6 +252,7 @@
   "viewer.saveDescription": "Mentés",
   "viewer.savingDescription": "Mentés…",
   "viewer.shortcuts": "Gyorsbillentyűk: nyilak a fotóváltáshoz, szóköz a diavetítéshez, I az információkhoz, Z a teljes mérethez, Delete a kukához.",
+  "viewer.shortcutsJump": "A Home és az End az első és az utolsó fotóra ugrik.",
   "viewer.similar": "Hasonló fotók",
   "viewer.slideshow": "Diavetítés",
   "viewer.slideshowStop": "Diavetítés leállítása",

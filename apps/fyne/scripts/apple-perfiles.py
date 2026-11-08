@@ -188,7 +188,7 @@ def certificado_de_identidad(asc, plataforma, identidad):
     return candidatos[0]
 
 
-def validar_perfil(perfil, requisito, plataforma):
+def validar_perfil(perfil, requisito, plataforma, motivos=None):
     try:
         datos = base64.b64decode(perfil["attributes"]["profileContent"], validate=True)
         if not datos or len(datos) > 2 * 1024 * 1024:
@@ -203,6 +203,17 @@ def validar_perfil(perfil, requisito, plataforma):
                    requisito["id"], plataforma, requisito["group"], requisito["protection"],
                    requisito["keychain"], derechos]
         r = subprocess.run([str(a) for a in llamada], capture_output=True, check=False)
+        if r.returncode != 0 and motivos is not None:
+            # Solo la línea ::error:: de apple_perfil.py, que es un texto fijo nuestro.
+            errores = [linea.split("::error::", 1)[1] for linea in r.stderr.decode(errors="replace").splitlines()
+                       if "::error::" in linea]
+            if errores:
+                motivos.append(errores[-1][:200])
+            else:
+                # Sin línea ::error:: cayó antes de validar (el intérprete, el shell,
+                # OpenSSL): su código y la cola de lo que dijo, recortada.
+                cola = [l.strip()[:160] for l in r.stderr.decode(errors="replace").splitlines() if l.strip()][-3:]
+                motivos.append("código " + str(r.returncode) + ": " + " | ".join(cola) if cola else "código " + str(r.returncode) + " sin salida")
         return datos if r.returncode == 0 else None
 
 
@@ -266,6 +277,10 @@ def preparar(asc, requisito, plataforma, certificado="", salida=None, solo_exist
         return {**resultado, "reason": "app_group_capability_missing"}
     if requisito["protection"] and not REGISTRO["completa"](por_tipo.get("DATA_PROTECTION", {})):
         return {**resultado, "reason": "data_protection_complete_missing"}
+    # El despertar del widget por aviso silencioso (SYTUE_DESPERTAR_APPLE): un perfil creado
+    # sin la capacidad no llevaría `aps-environment` y la firma no lo aceptaría.
+    if "aps-environment" in requisito["entitlements"] and "PUSH_NOTIFICATIONS" not in por_tipo:
+        return {**resultado, "reason": "push_capability_missing"}
     perfil, datos = perfiles_validos(asc, bundle, requisito, plataforma, certificado)
     if perfil is None and solo_existentes:
         return {**resultado, "reason": "existing_profile_missing_or_invalid"}
@@ -273,7 +288,10 @@ def preparar(asc, requisito, plataforma, certificado="", salida=None, solo_exist
         if not certificado:
             raise ValueError("preparar un perfil exige verificar antes la identidad importada")
         sello = hashlib.sha256(plistlib.dumps(requisito["entitlements"]) + certificado.encode()).hexdigest()[:12]
-        fecha = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d")
+        # Hasta el segundo, no el día: Apple rechaza (409) un nombre que ya existe, y un
+        # perfil creado hoy que no autorizaba los derechos —el App Group se asoció
+        # después— tiene la misma huella y el mismo día que su sustituto (2026-11-05).
+        fecha = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d%H%M%S")
         nombre = "Sytue suite " + identificador + " " + TIPOS[plataforma] + " " + sello + " " + fecha
         creado = asc.escribir("profiles", {"name": nombre, "profileType": TIPOS[plataforma]},
                               rels={"bundleId": {"type": "bundleIds", "id": bundle["id"]},
@@ -284,7 +302,10 @@ def preparar(asc, requisito, plataforma, certificado="", salida=None, solo_exist
         resultado["created"] = True
         if not perfil_compatible(asc, perfil, plataforma, certificado):
             return {**resultado, "reason": "created_profile_invalid_or_wrong_certificate"}
-        datos = validar_perfil(perfil, requisito, plataforma)
+        motivos = []
+        datos = validar_perfil(perfil, requisito, plataforma, motivos)
+        if motivos:
+            resultado["detail"] = motivos[-1]
     if datos is None:
         return {**resultado, "reason": "profile_does_not_authorize_requested_rights"}
     resultado["profile_ready"] = True

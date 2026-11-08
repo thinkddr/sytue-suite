@@ -5,58 +5,21 @@
  *
  * Se elige con el ratón o con el teclado sin salir del campo (flechas, Intro, Escape);
  * la lista son como mucho seis personas, filtradas por lo que va tras la arroba.
+ *
+ * La regla —cuándo se menciona, a quién se ofrece, de dónde sale la gente— es la de
+ * `@sytue/shell` (menciones.ts), la misma que el editor de notas de Notepads; aquí solo
+ * queda la lista de un `<textarea>`.
  */
 import type { HTMLAttributes, JSX } from 'preact';
 import { useEffect, useId, useState } from 'preact/hooks';
-import { contiene } from '@sytue/i18n';
-
-export interface Persona {
-  email: string;
-  name?: string;
-}
-
-/** Lo que se lleva escrito tras la última «@» suelta, o null si no se está mencionando. */
-export function consultaMencion(texto: string): string | null {
-  const m = /(?:^|\s)@([^\s@]*)$/.exec(texto);
-  return m ? (m[1] ?? '').toLowerCase() : null;
-}
-
-/** El texto con la mención a medias sustituida por la dirección elegida. */
-export function ponerMencion(texto: string, email: string): string {
-  return texto.replace(/@[^\s@]*$/, `@${email} `);
-}
-
-/** Quién casa con lo escrito: por nombre o por dirección, seis como mucho. */
-export function candidatos(gente: readonly Persona[], q: string): Persona[] {
-  return gente.filter((p) => contiene(p.email, q) || contiene(p.name ?? '', q)).slice(0, 6);
-}
-
-// La gente se pide UNA vez por página, al primer «@».
-let pedida: Promise<Persona[]> | null = null;
-function gente(): Promise<Persona[]> {
-  pedida ??= fetch('/api/people', {
-    credentials: 'include',
-    headers: { accept: 'application/json' },
-  })
-    .then((r) => (r.ok ? (r.json() as Promise<{ people?: Persona[] }>) : { people: [] }))
-    .then((d) => d.people ?? [])
-    .catch(() => {
-      pedida = null; // un fallo de red se reintenta en la siguiente arroba
-      return [];
-    });
-  return pedida;
-}
-
-/**
- * Adónde va la opción activa con una flecha: da la vuelta en los dos extremos, como
- * cualquier lista de sugerencias. Otra tecla la deja donde estaba.
- */
-export function moverActiva(activa: number, total: number, tecla: string): number {
-  if (total === 0) return 0;
-  if (tecla === 'ArrowDown') return (activa + 1) % total;
-  if (tecla === 'ArrowUp') return (activa - 1 + total) % total;
-  return activa;
-}
+import {
+  candidatos,
+  consultaMencion,
+  genteDeLaOrganizacion,
+  moverActiva,
+  ponerMencion,
+  type Persona,
+} from '@sytue/shell';
 
 /**
  * El selector de menciones de un campo de texto. El foco se queda en el campo (el
@@ -88,7 +51,7 @@ export function useMenciones(
   const [cerradaEn, setCerradaEn] = useState<string | null>(null);
   const mencionando = q !== null;
   useEffect(() => {
-    if (mencionando) void gente().then(setTodos);
+    if (mencionando) void genteDeLaOrganizacion().then(setTodos);
   }, [mencionando]);
   useEffect(() => setActiva(0), [q]);
   const lista = q === null || cerradaEn === texto ? [] : candidatos(todos, q);

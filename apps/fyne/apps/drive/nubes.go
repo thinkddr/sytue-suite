@@ -120,7 +120,7 @@ func (q *VistaNube) cabecera(v tema.Variante) fyne.CanvasObject {
 func (q *VistaNube) cuerpo(v tema.Variante) fyne.CanvasObject {
 	switch q.Fase {
 	case Cargando:
-		return container.NewStack(canvas.NewRectangle(tema.Color("bg", v)), container.NewVScroll(esqueletoFilas()))
+		return container.NewStack(canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)), container.NewVScroll(esqueletoFilas()))
 	case Vacia:
 		x := ui.NuevoVacio(q.t("team.folder.emptyTitle"), "")
 		x.Ilustracion = ilustracion(iconos.VacioDrive, v)
@@ -149,7 +149,7 @@ func (q *VistaNube) cuerpo(v tema.Variante) fyne.CanvasObject {
 		q.desplazable.Content = contenido
 		q.desplazable.Refresh()
 	}
-	return container.NewStack(canvas.NewRectangle(tema.Color("bg", v)), q.desplazable)
+	return container.NewStack(canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)), q.desplazable)
 }
 
 // fila es un elemento: la carpeta en `primary-text` entra, el fichero en `text-muted`

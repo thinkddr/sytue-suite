@@ -42,6 +42,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	"git.sytue.eu/sytue/one/apps/nucleo/sistema"
 	"git.sytue.eu/sytue/one/apps/nucleo/sistema/escritorio"
+	"git.sytue.eu/sytue/one/apps/nucleo/widgets/fuentes"
 )
 
 // Ventana inicial: la misma con la que se midió la web (1280×800), para que lo que se
@@ -63,6 +64,9 @@ func main() {
 	// La sesión, la apariencia y el idioma son TRANSVERSALES a las trece apps: esto lo
 	// lee de donde lo dejó la última que lo tocó. `Abrir` no habla con la red.
 	s := sesion.Abrir(a, "")
+	// El cromo «papel» de toda la suite (ADR 0080). Aquí y no en `sesion.Abrir`: las
+	// pruebas que abren sesión comprueban también el cromo de color.
+	tema.ElegirCromo(tema.CromoPapel)
 
 	// El idioma lo decide el SISTEMA, con la misma pieza que el móvil y el resto de
 	// la suite: `sistema.Idioma()` pregunta al sistema operativo y cae al entorno
@@ -90,7 +94,10 @@ func main() {
 			Calendario: api.NewCalendars(s.URL("calendar"), s.Sesion, nil),
 			Correo:     api.NewMail(s.URL("mail"), s.Sesion, nil),
 		})
-	v.Widget = s.CapturarWidget
+	// El widget de One junta lo de hoy de la suite con su propia Fuente; además de
+	// sus disparadores, se entera de los avisos del Hub de los productos que enseña
+	// (fuentes.ProductosDeHub: el correo, la agenda y la actividad reciente).
+	s.PublicadorWidget(s.FuenteWidget(t), fuentes.ProductosDeHub...)
 	v.ConDriveEnSistema(s.DriveEnSistema, s.PonerDriveEnSistema, s.AbrirDriveEnSistema)
 	s.AlCambiar(func(sesion.Estado) {
 		fyne.Do(func() { v.RefrescarDriveEnSistema(s.DriveEnSistema()); v.RefrescarSesionClientesExternos() })
@@ -200,20 +207,26 @@ func main() {
 	})
 	// Quien entra DESPUÉS de abrir la ventana —desde el menú de cuenta o desde otra de
 	// las apps— tiene que ver su portada, no el fallo de antes de entrar.
-	dentro := s.Estado().Dentro()
+	// conEscena: hasta que corre lo de CuandoHayaEscena, el AlCambiar solo apunta quién
+	// está (sesion.CuandoHayaEscena).
+	dentro, conEscena := s.Estado().Dentro(), false
 	s.AlCambiar(func(e sesion.Estado) {
-		if e.Dentro() && !dentro {
+		if e.Dentro() && !dentro && conEscena {
 			v.Arrancar()
 		}
-		if e.Dentro() != dentro {
+		if e.Dentro() != dentro && conEscena {
 			avisosEnSegundoPlano(a, t, e.Dentro())
 		}
 		dentro = e.Dentro()
 	})
-	v.Arrancar()
-	if dentro {
-		avisosEnSegundoPlano(a, t, true)
-	}
+	// Con interfaz: lanzada por iOS solo para el widget no se pide la portada.
+	s.CuandoHayaEscena(func() {
+		conEscena = true
+		v.Arrancar()
+		if dentro {
+			avisosEnSegundoPlano(a, t, true)
+		}
+	})
 	s.Arrancar(context.Background())
 	if enBandeja && slices.Contains(os.Args[1:], escritorio.ArgBandeja) {
 		a.Run() // arrancado al iniciar sesión: en la bandeja, sin ventana

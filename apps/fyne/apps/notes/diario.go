@@ -166,27 +166,144 @@ func (p *Pantalla) abrirDia(date string) {
 	}()
 }
 
-func (p *Pantalla) enviarCaptura() {
+// enUnaLinea es la captura como la enseña su campo, que es de UNA línea: cada salto, un
+// espacio, como pega el navegador un texto de varias líneas en un `<input>`. Cada salto
+// es una runa y cada espacio otra, así que las posiciones valen en los dos.
+func enUnaLinea(s string) string { return strings.ReplaceAll(s, "\n", " ") }
+
+// ponerCaptura cambia lo que lleva la captura del cuaderno abierto: lo guarda como su
+// borrador y lo enseña en el campo (`changeDraft` de NotebookDashboard.tsx).
+func (p *Pantalla) ponerCaptura(texto string) {
+	p.capturaTexto = texto
+	p.guardarBorrador(p.activo.ID, texto)
+	if c := p.campoCaptura; c != nil && c.Texto() != enUnaLinea(texto) {
+		c.PonerTexto(enUnaLinea(texto))
+	}
+}
+
+// enviarCaptura es Intro (o el «+») en la captura: lo que haya, una nota por línea.
+func (p *Pantalla) enviarCaptura() { p.enviar(p.capturaTexto, MaxLineasPegadas) }
+
+// enviar guarda lo que hay en la captura: una nota por línea, de una en una y en orden
+// (`enviar` de NotebookDashboard.tsx). La captura se vacía según salen, y para en el
+// primer fallo o a las cincuenta: lo que no ha salido se queda escrito. Si mientras tanto
+// se escribe otra cosa en ella, se para también y lo escrito no se toca. `cuantas`: las
+// primeras líneas y no más (lo pegado sobre el cuaderno, que va delante de lo que ya
+// hubiera en la captura).
+func (p *Pantalla) enviar(texto string, cuantas int) {
 	if p.campoCaptura == nil || p.guardandoCaptura || p.creando || !p.puedeCapturar() || p.bloqueado {
 		return
 	}
-	in, ok := capturaRapida(p.campoCaptura.Texto(), p.tipoCaptura)
-	if !ok {
+	lineas := lineasDeCaptura(texto)
+	if len(lineas) == 0 {
 		return
 	}
-	campo, id := p.campoCaptura, p.activo.ID
+	campo, id, tipo := p.campoCaptura, p.activo.ID, p.tipoCaptura
 	p.guardandoCaptura = true
 	p.Repintar()
 	go func() {
-		_ = p.crearEn(in, id, func() {
-			p.guardarBorrador(id, "")
-			if p.activo.ID == id {
-				campo.PonerTexto("")
+		hechas := 0
+		for i, linea := range lineas[:min(len(lineas), cuantas, MaxLineasPegadas)] {
+			in, ok := capturaRapida(linea, tipo)
+			// `despues` es que ha salido —o que se ha quedado en la cola, sin red—, y corre
+			// en el hilo de la interfaz, como lo de abajo: `fyne.Do` va en orden.
+			salio, seguir := false, false
+			if ok {
+				_ = p.crearEn(in, id, func() { salio = true })
+			}
+			fyne.DoAndWait(func() {
+				if salio {
+					hechas++
+					seguir = p.quedanEnCaptura(campo, id, texto, lineas, i)
+				}
+			})
+			if !seguir {
+				break
+			}
+		}
+		enHilo(func() {
+			p.guardandoCaptura = false
+			if hechas > 0 && p.activo.ID == id {
 				p.enfoque = "all"
 			}
+			p.Repintar()
 		})
-		enHilo(func() { p.guardandoCaptura = false; p.Repintar() })
 	}()
+}
+
+// quedanEnCaptura deja en la captura las líneas que siguen a la `i`, que acaba de salir,
+// y dice si se sigue. Si mientras tanto se ha escrito otra cosa, lo escrito no se toca y
+// se para. Si se ha cambiado de cuaderno, su borrador pierde lo que ya ha salido y el
+// resto espera a que se vuelva (crearEn ya no escribiría allí). En el hilo de la
+// interfaz.
+func (p *Pantalla) quedanEnCaptura(campo *ui.Entrada, id, texto string, lineas []string, i int) bool {
+	// Lo que había antes de esta línea: lo enviado al principio, o las que quedaban.
+	enCampo := texto
+	if i > 0 {
+		enCampo = strings.Join(lineas[i:], "\n")
+	}
+	abierto := p.campoCaptura == campo && p.activo.ID == id
+	actual := p.capturaTexto
+	if !abierto {
+		actual = p.borradorGuardado(id)
+	}
+	if actual != enCampo {
+		return false
+	}
+	resto := strings.Join(lineas[i+1:], "\n")
+	if !abierto {
+		p.guardarBorrador(id, resto)
+		return false
+	}
+	p.ponerCaptura(resto)
+	return true
+}
+
+// pegarEnCaptura es pegar varias líneas en la captura: una nota por línea. Una sola se
+// pega como siempre, en el campo (devuelve false). Lo pegado va donde iría —en lugar de
+// lo seleccionado— con sus saltos, que el campo enseña como espacios, y sale enseguida.
+func (p *Pantalla) pegarEnCaptura(campo *ui.Entrada, pegado string) bool {
+	if p.capturaDeshabilitada() || len(lineasDeCaptura(pegado)) < 2 {
+		return false
+	}
+	antes, enCampo := []rune(p.capturaTexto), []rune(campo.Texto())
+	if len(antes) != len(enCampo) {
+		antes = enCampo // no debería pasar: el campo enseña la captura runa a runa
+	}
+	pegado = strings.ReplaceAll(strings.ReplaceAll(pegado, "\r\n", "\n"), "\r", "\n")
+	inicio, fin := campo.Pegar(pegado)
+	// Lo que había seleccionado es lo que el campo tiene de menos, contando lo pegado.
+	quitado := len(enCampo) - (utf8.RuneCountInString(campo.Texto()) - (fin - inicio))
+	inicio = min(max(inicio, 0), len(antes))
+	nuevo := string(antes[:inicio]) + pegado + string(antes[min(inicio+max(quitado, 0), len(antes)):])
+	p.ponerCaptura(nuevo)
+	p.enviar(nuevo, MaxLineasPegadas)
+	return true
+}
+
+// pegarLineas es lo que se pega con varias líneas sobre una lista con nada enfocado
+// (`pegarFuera` de NotebookDashboard.tsx): va DELANTE de lo que estuviera a medio
+// escribir en la captura, y solo salen sus líneas, porque lo que la persona tenía en la
+// captura no lo ha mandado nadie. Una sola línea no es esto (devuelve false).
+func (p *Pantalla) pegarLineas(texto string) bool {
+	lineas := lineasDeCaptura(texto)
+	if p.campoCaptura == nil || p.capturaDeshabilitada() || len(lineas) < 2 {
+		return false
+	}
+	nuevo := strings.Join(lineas, "\n")
+	if strings.TrimSpace(p.capturaTexto) != "" {
+		nuevo += "\n" + p.capturaTexto
+	}
+	p.ponerCaptura(nuevo)
+	p.enviar(nuevo, len(lineas))
+	return true
+}
+
+// capturaDeshabilitada es el `disabled` de la captura: sin escritura, cerrado o con las
+// notas sin cargar. Guardar NO la deshabilita aquí —la web deja pegar mientras tanto y
+// lo pegado espera en el campo—; el campo sí se apaga mientras guarda (capturaFija).
+func (p *Pantalla) capturaDeshabilitada() bool {
+	return !p.puedeCapturar() || p.bloqueado || (p.lienzo.Fase != Exito && p.lienzo.Fase != Vacia)
 }
 
 // anchoContenido usa los cortes del armazón, sin inventar una segunda rejilla.
@@ -242,7 +359,7 @@ func (p *Pantalla) dashboard(v tema.Variante) fyne.CanvasObject {
 	} else if len(acciones) > 0 {
 		// Un cuaderno en lista es una página como la de un día: su título en grande y
 		// sus acciones al lado.
-		derecha := container.New(filaCentro{hueco: tema.Espacio(0.5)}, acciones...)
+		derecha := container.New(filaCentro{hueco: tema.Espacio(0.5)}, enVozBajaTodos(acciones)...)
 		bloques = append(bloques, ui.Bloque{Obj: p.cabeceraPagina(p.activo.Titulo, derecha, interior, v), Margen: tema.Espacio(5)})
 	}
 	if pend := p.pendientesAqui(); len(pend) > 0 {
@@ -261,7 +378,7 @@ func (p *Pantalla) dashboard(v tema.Variante) fyne.CanvasObject {
 // La misma captura permanece al pie mientras se recorren las notas. El campo no se
 // recrea: conserva borrador, selección y foco al guardar o cambiar de disposición.
 func (p *Pantalla) capturaFija(v tema.Variante) fyne.CanvasObject {
-	inhabilitada := !p.puedeCapturar() || p.bloqueado || p.guardandoCaptura || p.creando || (p.lienzo.Fase != Exito && p.lienzo.Fase != Vacia)
+	inhabilitada := p.capturaDeshabilitada() || p.guardandoCaptura || p.creando
 	pista := ui.NuevoParrafo(p.tr.T("capture.submitHint", nil), tema.TextoXS, ui.Normal, "text-subtle", v)
 	if !p.capturaEnfocada {
 		pista.Hide()
@@ -280,10 +397,11 @@ func (p *Pantalla) capturaFija(v tema.Variante) fyne.CanvasObject {
 	return ui.PilaBloques(ui.Bloque{Obj: linea}, ui.Bloque{Obj: centrado})
 }
 
-// botonDiario es un botón fantasma de la página: poco cromo, como en la web.
+// botonDiario es un botón fantasma de la página, en gris (`Atenuado`): poco cromo, como
+// en la web.
 func botonDiario(s string, talla ui.Talla, inerte bool, accion func()) *ui.Boton {
 	b := ui.NuevoBoton(s, accion)
-	b.Variante, b.Talla, b.Inerte = ui.Fantasma, talla, inerte
+	b.Variante, b.Talla, b.Inerte, b.Atenuado = ui.Fantasma, talla, inerte, true
 	return b
 }
 
@@ -299,29 +417,32 @@ func conMayuscula(s string) string {
 func (p *Pantalla) cabeceraDiaria(v tema.Variante, interior float32, acciones []fyne.CanvasObject) (fyne.CanvasObject, time.Time, bool) {
 	t := p.tr.T
 	dia, _ := time.ParseInLocation(time.DateOnly, p.activo.Crudo.DailyDate, time.Local)
-	sub := strconv.Itoa(dia.Year())
+	// El año en gris y, si lo es, «Hoy» en el color de marca: lo único de color en la
+	// cabecera (`.notes-day-sub` y `.notes-day-today`).
+	piezasSub := []fyne.CanvasObject{lineaTok(strconv.Itoa(dia.Year()), tema.TextoSM, ui.Normal, "text-subtle", v)}
 	if p.activo.Crudo.DailyDate == time.Now().Format(time.DateOnly) {
-		sub += " · " + t("daily.today", nil)
+		piezasSub = append(piezasSub, lineaTok("·", tema.TextoSM, ui.Normal, "text-subtle", v),
+			lineaTok(t("daily.today", nil), tema.TextoSM, ui.Medio, "primary-text", v))
 	}
 	inerte := p.abriendoDia || p.svc == nil || !p.hayRed() && p.Almacen == nil
 	anterior := ui.NuevoBotonIcono(iconos.ChevronIzquierda, t("daily.previous", nil), func() { llamar1(p.lateral.AlDia, dia.AddDate(0, 0, -1).Format(time.DateOnly)) })
 	hoy := botonDiario(t("daily.today", nil), ui.TallaSM, inerte, p.lateral.AlHoy)
 	siguiente := ui.NuevoBotonIcono(iconos.ChevronDerecha, t("daily.next", nil), func() { llamar1(p.lateral.AlDia, dia.AddDate(0, 0, 1).Format(time.DateOnly)) })
 	anterior.Inerte, siguiente.Inerte = inerte, inerte
-	dias := []fyne.CanvasObject{anterior, hoy, siguiente}
+	dias := []fyne.CanvasObject{enVozBaja(anterior), hoy, enVozBaja(siguiente)}
 	if p.AbrirCalendar != nil {
 		fecha := dia.Format(time.DateOnly)
-		dias = append(dias, ui.NuevoBotonIcono(iconos.Calendario, "Sytue Calendar", func() { p.AbrirCalendar("/?date=" + fecha + "&all_day=1") }))
+		dias = append(dias, enVozBaja(ui.NuevoBotonIcono(iconos.Calendario, "Sytue Calendar", func() { p.AbrirCalendar("/?date=" + fecha + "&all_day=1") })))
 	}
-	dias = append(dias, acciones...)
+	dias = append(dias, enVozBajaTodos(acciones)...)
 	navegacion := container.New(filaCentro{hueco: tema.Espacio(0.5)}, dias...)
 	titulo := p.cabeceraPagina(conMayuscula(i18n.FormatWeekdayDayMonth(p.loc, dia)), navegacion, interior, v)
 	selector := p.selectorVista(v)
 	// `min-w-0` del año: lo que deja el segmentado.
 	resto := max(interior-selector.MinSize().Width-tema.Espacio(3), 1)
 	segunda := container.New(ui.FilaAuto{Hueco: tema.Espacio(3), Derecha: 1, Elastico: 1},
-		ui.AlAnchoFluido(resto, ui.NuevoParrafo(sub, tema.TextoSM, ui.Normal, "text-subtle", v)), selector)
-	return ui.PilaBloques(ui.Bloque{Obj: titulo, Margen: tema.Espacio(1)}, ui.Bloque{Obj: segunda}), dia, inerte
+		ui.AlAnchoFluido(resto, container.New(filaCentro{hueco: tema.Espacio(1.5)}, piezasSub...)), selector)
+	return ui.PilaBloques(ui.Bloque{Obj: titulo, Margen: tema.Espacio(1.5)}, ui.Bloque{Obj: segunda}), dia, inerte
 }
 
 // capturaDiaria es la captura en UNA fila subrayada (`.notes-capture`): el conmutador de
@@ -332,7 +453,21 @@ func (p *Pantalla) capturaDiaria(v tema.Variante, desactivado bool) fyne.CanvasO
 		p.campoCaptura = p.nuevoCampoCaptura()
 	}
 	p.campoCaptura.Inerte(desactivado)
-	tarea := nuevoBotonBarra(TareaD, iconos.Ninguno, t("note.newTodo", nil), func() {
+	// El conmutador de tarea ES la marca de la línea que va a nacer —la raya de una cosa o
+	// la casilla vacía de una tarea—, en la columna de las marcas de las filas
+	// (`.notes-capture-kind`).
+	var marca fyne.CanvasObject
+	p.lineaCaptura = nil
+	if p.tipoCaptura == "todo" {
+		marca = casillaVacia(v)
+	} else {
+		r := raya(v)
+		if p.capturaEnfocada {
+			r.FillColor = tema.Color("text-muted", v)
+		}
+		marca, p.lineaCaptura = r, r
+	}
+	tarea := NuevaOpcion(t("note.newTodo", nil), container.NewCenter(marca), func() {
 		if p.tipoCaptura == "todo" {
 			p.tipoCaptura = "text"
 		} else {
@@ -340,24 +475,38 @@ func (p *Pantalla) capturaDiaria(v tema.Variante, desactivado bool) fyne.CanvasO
 		}
 		p.Repintar()
 	})
-	tarea.ConEstado, tarea.Activo, tarea.Inerte = true, p.tipoCaptura == "todo", desactivado
+	tarea.PX, tarea.PY = (ui.LadoIconoMD-LadoCasilla)/2, (ui.LadoIconoMD-LadoCasilla)/2
+	filaDePagina(tarea)
+	tarea.Activa, tarea.FondoActivo = p.tipoCaptura == "todo", color.NRGBA{}
+	tarea.Inerte = desactivado
 	var plantillas *ui.BotonIcono
-	plantillas = ui.NuevoBotonIcono(iconos.Puntos, t("template.label", nil), func() { p.abrirMenu(plantillas, p.menuPlantillas()) })
+	plantillas = enVozBaja(ui.NuevoBotonIcono(iconos.Puntos, t("template.label", nil), func() { p.abrirMenu(plantillas, p.menuPlantillas()) }))
 	plantillas.Inerte = desactivado
 	rotulo := t("capture.add", nil)
 	if p.guardandoCaptura {
 		rotulo = t("note.saving", nil)
 	}
-	añadir := ui.NuevoBotonIcono(iconos.Mas, rotulo, p.enviarCaptura)
+	añadir := enVozBaja(ui.NuevoBotonIcono(iconos.Mas, rotulo, p.enviarCaptura))
 	añadir.Inerte = desactivado || strings.TrimSpace(p.campoCaptura.Texto()) == ""
 	p.añadirCaptura, p.capturaInerte = añadir, desactivado
 	fila := container.New(ui.FilaAuto{Hueco: tema.Espacio(1), Derecha: 2, Elastico: 2, Partir: true}, tarea, p.campoCaptura, plantillas, añadir)
-	tinta := "border-subtle"
-	if p.capturaEnfocada {
-		tinta = "primary"
-	}
-	p.lineaCaptura = canvas.NewRectangle(tema.Color(tinta, v))
-	return container.New(&subrayado{py: tema.Espacio(1)}, p.lineaCaptura, fila)
+	// Sin caja ni subrayado: la última línea de la libreta (`min-h-11 px-1`).
+	return container.New(ui.Margen{Izq: tema.Espacio(1), Der: tema.Espacio(1)}, container.New(&alturaMinima{alto: tema.Espacio(11)}, fila))
+}
+
+// alturaMinima centra a su hijo en una caja de al menos `alto` (`min-h-*` con
+// `items-center`).
+type alturaMinima struct{ alto float32 }
+
+func (a *alturaMinima) MinSize(objs []fyne.CanvasObject) fyne.Size {
+	m := objs[0].MinSize()
+	return fyne.NewSize(m.Width, max(m.Height, a.alto))
+}
+
+func (a *alturaMinima) Layout(objs []fyne.CanvasObject, t fyne.Size) {
+	m := objs[0].MinSize()
+	objs[0].Move(fyne.NewPos(0, (t.Height-m.Height)/2))
+	objs[0].Resize(fyne.NewSize(t.Width, m.Height))
 }
 
 // subrayado es la fila con su `border-b` y su `py-*`: el primer objeto es la línea.
@@ -431,11 +580,17 @@ func (p *Pantalla) enfoquesDiarios(v tema.Variante, interior float32) []ui.Bloqu
 		if p.ocultarTerminadas {
 			ocultar.Icono, ocultar.Pulsado = iconos.OjoTachado, true
 		}
-		items = append(items, aroProgreso(hechas, total, v), ocultar)
+		enVozBaja(ocultar)
+		// En el teléfono el aro se cae: «Hechas 1» ya lo dice y los filtros caben en una
+		// línea.
+		if p.anchoVentana() >= ui.CorteSM {
+			items = append(items, aroProgreso(hechas, total, v))
+		}
+		items = append(items, ocultar)
 	}
-	fila := container.New(ui.FilaAuto{Hueco: tema.Espacio(0.5), Derecha: derecha, Partir: true, SaltoFila: tema.Espacio(0.5)}, items...)
-	// `-mx-2`: el texto del primer segmento cae en el borde de la columna, bajo el título.
-	return append(bloques, ui.Bloque{Obj: container.New(ui.Margen{Izq: -tema.Espacio(2), Der: -tema.Espacio(2)}, ui.AlAnchoFluido(interior+2*tema.Espacio(2), fila))})
+	fila := container.New(ui.FilaAuto{Hueco: HuecoSegmento, Derecha: derecha, Partir: true, SaltoFila: tema.Espacio(1)}, items...)
+	// Sin `-mx-2`: las palabras ya no llevan relleno y la primera cae bajo el título.
+	return append(bloques, ui.Bloque{Obj: ui.AlAnchoFluido(interior, fila)})
 }
 
 // atajoDiario es lo que hace cada atajo del diario: «today» abre hoy desde cualquier
@@ -476,16 +631,19 @@ func (p *Pantalla) atajoDiario(a string) bool {
 func (p *Pantalla) EnfocarCaptura() bool { return p.atajoDiario("capture") }
 
 // nuevoCampoCaptura es el campo sin caja de la captura: Intro guarda, `dd`/`tt` se
-// expanden al teclearlos y la línea de debajo sigue al foco.
+// expanden al teclearlos, pegar varias líneas hace una nota por línea y la línea de
+// debajo sigue al foco.
 func (p *Pantalla) nuevoCampoCaptura() *ui.Entrada {
 	t := p.tr.T
+	// El texto de la captura, a 16 px como el de las líneas (`.notes-capture-input`).
 	campo := ui.NuevaEntrada(t("capture.placeholder", nil)).ConPropia(ui.CampoPropio{
-		MargenX: tema.Espacio(1), MargenY: (tema.Espacio(9) - 2*tema.Borde - tema.TextoBase.Linea) / 2,
-		Texto: tema.TextoBase, Plano: true,
+		MargenX: tema.Espacio(1), MargenY: (tema.Espacio(9) - 2*tema.Borde - tema.TextoMD.Linea) / 2,
+		Texto: tema.TextoMD, Plano: true,
 	})
 	campo.Rotulo = t("capture.label", nil)
-	campo.PonerTexto(p.borradorGuardado(p.activo.ID))
 	id := p.activo.ID
+	p.capturaTexto = p.borradorGuardado(id)
+	campo.PonerTexto(enUnaLinea(p.capturaTexto))
 	campo.AlTeclear = func(e *fyne.KeyEvent) bool {
 		if e.Name == fyne.KeyReturn || e.Name == fyne.KeyEnter {
 			p.enviarCaptura()
@@ -493,14 +651,24 @@ func (p *Pantalla) nuevoCampoCaptura() *ui.Entrada {
 		}
 		return false
 	}
-	previo := campo.Texto()
+	// Pegando, el campo cambia a medias (con espacios donde iban los saltos): eso no es
+	// lo que lleva la captura, y `pegarEnCaptura` lo pone enseguida.
+	pegando := false
+	campo.AlPegar = func(s string) bool {
+		pegando = true
+		defer func() { pegando = false }()
+		return p.pegarEnCaptura(campo, s)
+	}
 	campo.AlCambiar(func(s string) {
-		x := expandirCaptura(previo, s, time.Now())
-		previo = x
-		p.guardarBorrador(id, x)
-		if x != s {
-			campo.PonerTextoAlFinal(x)
-			return
+		// Lo que el campo enseña de la captura no es un cambio: es ponerCaptura.
+		if !pegando && s != enUnaLinea(p.capturaTexto) {
+			x := expandirCaptura(p.capturaTexto, s, time.Now())
+			p.capturaTexto = x
+			p.guardarBorrador(id, x)
+			if x != s {
+				campo.PonerTextoAlFinal(x)
+				return
+			}
 		}
 		// El «+» se enciende y se apaga con lo escrito, sin repintar la pantalla.
 		if b := p.añadirCaptura; b != nil {
@@ -510,8 +678,9 @@ func (p *Pantalla) nuevoCampoCaptura() *ui.Entrada {
 	})
 	campo.AlEnfocar = func(f bool) {
 		p.capturaEnfocada = f
+		// Con el campo enfocado, la raya de la marca sube a `text-muted`.
 		if p.lineaCaptura != nil {
-			p.lineaCaptura.FillColor = tema.Color(map[bool]string{true: "primary", false: "border-subtle"}[f], p.variante())
+			p.lineaCaptura.FillColor = tema.Color(map[bool]string{true: "text-muted", false: "border-strong"}[f], p.variante())
 			p.lineaCaptura.Refresh()
 		}
 		// La pista de la sintaxis aparece al entrar y se va al salir, sin repintar.

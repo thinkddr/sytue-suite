@@ -233,11 +233,11 @@ func (desliza) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 
 // recuadro es un `<div class="border rounded-* p-*">` con tokens: la caja de borde de
 // `ui` (regla 4: el borde no es un trazo) y el hijo con su relleno. Un borde vacío es
-// «sin borde»; un fondo vacío es el de la página (`bg`), porque la caja de `ui` pinta el
-// borde DEBAJO del relleno y con un relleno transparente se vería entero.
+// «sin borde»; un fondo vacío es el de la página (`ui.FondoHoja`), porque la caja de
+// `ui` pinta el borde DEBAJO del relleno y con un relleno transparente se vería entero.
 func recuadro(v Vista, fondo, borde string, radio float32, m ui.Margen, hijo fyne.CanvasObject) *fyne.Container {
 	if fondo == "" {
-		fondo = "bg"
+		fondo = ui.FondoHoja()
 	}
 	var b color.NRGBA
 	if borde != "" {
@@ -297,10 +297,17 @@ func Pagina(v Vista, activa Seccion, alIr func(Seccion), galeria bool, bloques .
 	return Envolver(v, galeria, ui.PilaBloques(todos...))
 }
 
-// Envolver pone el fondo de la ventana y centra una caja de contenido. Lo usa Pagina y
-// también `/p/{token}`, que no lleva nav.
+// Envolver pone el fondo de la ventana y centra una caja de contenido. Es lo que en la
+// web va dentro de la hoja del AppShell (Marco.tsx), así que el fondo es el de la hoja:
+// con `bg`, sobre papel la página salía gris donde la web es blanca.
 func Envolver(v Vista, galeria bool, dentro *fyne.Container) *fyne.Container {
-	fondo := canvas.NewRectangle(tema.Color("bg", v.Variante))
+	return envolverSobre(v, ui.FondoHoja(), galeria, dentro)
+}
+
+// envolverSobre es Envolver con otro fondo: `/p/{token}` no lleva AppShell ni hoja y
+// pinta el `bg-bg` del `<body>`.
+func envolverSobre(v Vista, token string, galeria bool, dentro *fyne.Container) *fyne.Container {
+	fondo := canvas.NewRectangle(tema.Color(token, v.Variante))
 	ventana := v.Ventana
 	if ventana <= 0 {
 		ventana = AnchoMaximoGaleria
@@ -347,4 +354,39 @@ func (m *marco) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	x, ancho := m.caja(t.Width)
 	objs[1].Move(fyne.NewPos(x, MargenPaginaY))
 	objs[1].Resize(fyne.NewSize(ancho, m.altoDentro(ancho)))
+}
+
+// ---- La fila que se desplaza de lado ----
+
+// filaDeLado es `max-md:flex-nowrap max-md:overflow-x-auto` con el MASCARA_SCROLL_X de
+// la web: los últimos 24 px se funden con `fondo` mientras queda algo por la derecha.
+func filaDeLado(fila fyne.CanvasObject, fondo string, v tema.Variante, afuera func() fyne.Scrollable) fyne.CanvasObject {
+	c := tema.Color(fondo, v)
+	lado := ui.NuevoDesplazaLado(fila, 0, afuera)
+	mascara := canvas.NewHorizontalGradient(conAlfa(c, 0), c)
+	l := &filaDeLadoLayout{lado: lado, mascara: mascara}
+	caja := container.New(l, lado, mascara)
+	lado.AlDesplazar = func() { l.Layout(caja.Objects, caja.Size()) }
+	return caja
+}
+
+// AnchoMascaraLado es el `calc(100%-24px)` de MASCARA_SCROLL_X.
+const AnchoMascaraLado float32 = 24
+
+type filaDeLadoLayout struct {
+	lado    *ui.DesplazaLado
+	mascara *canvas.LinearGradient
+}
+
+func (l *filaDeLadoLayout) MinSize([]fyne.CanvasObject) fyne.Size { return l.lado.MinSize() }
+
+func (l *filaDeLadoLayout) Layout(_ []fyne.CanvasObject, t fyne.Size) {
+	l.lado.Move(fyne.NewPos(0, 0))
+	l.lado.Resize(t)
+	// `barraSeleccion.queda`: hay más a la derecha de lo que se ve.
+	queda := l.lado.AnchoContenido()-l.lado.X() > t.Width+0.5
+	l.mascara.Hidden = !queda
+	l.mascara.Move(fyne.NewPos(t.Width-AnchoMascaraLado, 0))
+	l.mascara.Resize(fyne.NewSize(AnchoMascaraLado, t.Height))
+	l.mascara.Refresh()
 }

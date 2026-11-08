@@ -31,3 +31,4 @@
 "dataflow.item.events" = "Kalender";
 "dataflow.item.documents" = "Dokumendid";
 "dataflow.item.contacts" = "Kontaktid";
+"widgets.updatedAgo" = "Uuendatud %@";

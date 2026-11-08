@@ -11,13 +11,11 @@
  */
 import type { ComponentChildren, JSX } from 'preact';
 import { useId, useRef, useState } from 'preact/hooks';
-import { useT } from '@sytue/i18n/preact';
 import { cx } from '../lib/cx.js';
 import { useNavDrawer } from '../lib/useNavDrawer.js';
 import { useMobileBack } from '../lib/useMobileBack.js';
 import { IndicadorRefrescoTactil, usePullToRefresh } from '../lib/usePullToRefresh.js';
-import { Button } from './Button.js';
-import { Icon } from './Icon.js';
+import { BarraMovil } from './BarraMovil.js';
 import { ResizablePanel } from './ResizablePanel.js';
 
 export interface AppShellProps {
@@ -40,6 +38,24 @@ export interface AppShellProps {
   onBack?: () => void;
   /** Título de la barra móvil, junto al botón de menú. */
   title?: string;
+  /**
+   * Lo que va CENTRADO en la barra móvil, en vez de `title` (el mes del calendario del
+   * teléfono). Centrado en el ancho entero de la barra, no en el hueco que dejan los
+   * botones: así no baila según cuántas acciones haya a cada lado. Si así no cabe, se
+   * acerca al centro todo lo que deja el lado más ocupado y usa el hueco REAL entre los
+   * botones; si ni ahí cabe, baja a `text-sm` antes de truncar (a 320, «Σεπτέμβριος
+   * 2027» perdía el año con 96 px de los 140 que había). `BarraMovil.TituloCentrado` en
+   * Fyne.
+   */
+  mobileBarCenter?: ComponentChildren;
+  /** Acciones a la derecha de la barra móvil (Hoy y «+» en el mes del teléfono). */
+  mobileBarActions?: ComponentChildren;
+  /**
+   * Hay algo pendiente dentro del cajón (recordatorios, invitaciones): es el nombre
+   * accesible, ya traducido, del botón de menú cerrado, y pinta un punto (el color de
+   * señal, `indicator`) en la esquina de la hamburguesa. Abierto, el nombre sigue siendo «Cerrar navegación».
+   */
+  mobileNavNotice?: string;
   class?: string;
 }
 
@@ -73,9 +89,11 @@ export function AppShell({
   detailOpen = false,
   onBack,
   title,
+  mobileBarCenter,
+  mobileBarActions,
+  mobileNavNotice,
   class: cls,
 }: AppShellProps): JSX.Element {
-  const t = useT();
   const [open, setOpen] = useState(false);
   const hojaRef = useRef<HTMLDivElement>(null);
   const refresco = usePullToRefresh(hojaRef);
@@ -176,46 +194,30 @@ export function AppShell({
           </>
         ) : null}
         <div class="sytue-sheet-column flex min-h-0 min-w-0 flex-1 flex-col">
-          {/* Barra móvil: única vía de abrir la nav —y de volver a la lista— en <768px. */}
+          {/* Barra móvil: única vía de abrir la nav —y de volver a la lista— en <768px.
+              Con la Sytue Shell va DENTRO de su topbar (una sola barra en el teléfono);
+              sin ella, es la barra de 44 de siempre. Ver BarraMovil.tsx. */}
           {sidebar || secondaryPanel ? (
-            // `px-4`, EL MISMO CANALÓN QUE LA TOPBAR, y por eso y no por otra
-            // cosa: esta barra va justo debajo, así que el botón de menú cae en
-            // la misma línea vertical que la marca de arriba. Con `px-2` eran 7px
-            // reales —la raíz de la suite está en 14px— y el cromo se leía
-            // escalonado: marca a 14, hamburguesa a 7. Salió 28 veces en el
-            // barrido, en mail, notes y platform.
-            <div class="sytue-mobilebar border-border bg-surface flex h-11 shrink-0 items-center gap-1.5 border-b px-4 md:hidden">
-              {secondaryPanel && detailOpen && onBack ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  aria-label={t('ui.backToList')}
-                  onClick={onBack}
-                >
-                  <Icon name="chevronLeft" size={18} />
-                </Button>
-              ) : sidebar ? (
-                <Button
-                  id={toggleId}
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  aria-label={open ? t('ui.closeNav') : t('ui.openNav')}
-                  aria-expanded={open}
-                  aria-controls={drawerId}
-                  onClick={() => setOpen((v) => !v)}
-                >
-                  <Icon name="menu" size={18} />
-                </Button>
-              ) : null}
-              {/* Con panel secundario visible, el título sobra: la lista trae el suyo
-                  justo debajo («Recibidos · 3 conversaciones») y se leía dos veces.
-                  En el detalle sí hace falta: ahí es lo único que dice dónde estás. */}
-              {title && (!secondaryPanel || detailOpen) ? (
-                <span class="truncate text-sm font-semibold">{title}</span>
-              ) : null}
-            </div>
+            <BarraMovil
+              volver={secondaryPanel && detailOpen && onBack ? onBack : undefined}
+              menu={
+                sidebar
+                  ? {
+                      id: toggleId,
+                      controla: drawerId,
+                      abierto: open,
+                      alPulsar: () => setOpen((v) => !v),
+                      aviso: mobileNavNotice,
+                    }
+                  : undefined
+              }
+              centro={mobileBarCenter}
+              // Con panel secundario visible, el título sobra: la lista trae el suyo
+              // justo debajo («Recibidos · 3 conversaciones») y se leía dos veces. En el
+              // detalle sí hace falta: ahí es lo único que dice dónde estás.
+              titulo={title && (!secondaryPanel || detailOpen) ? title : undefined}
+              acciones={mobileBarActions}
+            />
           ) : null}
           {/* La barra móvil pertenece al marco de color; la hoja empieza DEBAJO. Sus
               esquinas las redondea lo de dentro (`sytue-sheet-corners`). En escritorio

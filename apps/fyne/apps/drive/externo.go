@@ -759,7 +759,7 @@ func (de *dialogoExterno) comandoNas(v tema.Variante, ancho float32) fyne.Canvas
 	}
 	pila := container.New(&pilaSeparada{separas: []float32{0, tema.Espacio(1), tema.Espacio(2), tema.Espacio(2), tema.Espacio(2)}}, hijos...)
 	caja := ui.NuevaCaja(tema.Color("surface-sunken", v), tema.Color("border", v), tema.RadioMD)
-	return container.New(&conMargen{m: tema.Borde + tema.Espacio(3)}, append(caja.Objetos(), pila)...)
+	return dentroDeCaja(caja, tema.Borde+tema.Espacio(3), pila)
 }
 
 // casilla es una casilla con su texto al lado (`flex items-start gap-3`), sin caja.
@@ -782,7 +782,7 @@ func (de *dialogoExterno) avisoResponsabilidad(v tema.Variante, ancho float32) f
 	x := ui.NuevoParrafo(texto, tema.Escalon{Tam: tema.TextoXS.Tam, Linea: 1.625 * tema.TextoXS.Tam}, ui.Normal, "text", v).A(dentro)
 	fila := container.New(&dosAlLado{hueco: tema.Espacio(2), izq: m.Width}, casilla, x)
 	caja := ui.NuevaCaja(tema.Color("surface-sunken", v), tema.Color("border", v), tema.RadioMD)
-	return container.New(&conMargen{m: tema.Borde + tema.Espacio(3)}, append(caja.Objetos(), fila)...)
+	return dentroDeCaja(caja, tema.Borde+tema.Espacio(3), fila)
 }
 
 // dosAlLado pone dos objetos en una fila, cada uno a su alto y arriba (`items-start`): con

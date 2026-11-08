@@ -18,10 +18,10 @@ export const editor = {
   'editor.bases.desc': 'Skata ieraksti tādi, kādi tie ir pašlaik',
   'editor.bases.title': 'Tabula no Sytue Bases',
   'editor.bases.prompt':
-    'Ielīmējiet Sytue Web piešķirta tikai lasāma savienojuma pilnvaru. Šī skata dati kļūs par vietnes saturu un pēc publicēšanas būs publiski.',
+    'Ielīmējiet Sytue Webs piešķirta tikai lasāma savienojuma pilnvaru. Šī skata dati kļūs par vietnes saturu un pēc publicēšanas būs publiski.',
   'editor.bases.confirm': 'Ielādēt skatu',
   'editor.bases.invalid':
-    'Šis savienojums nav derīgs Sytue Web: tas var būt atsaukts, beidzies vai piešķirts citam produktam vai organizācijai.',
+    'Šis savienojums nav derīgs Sytue Webs: tas var būt atsaukts, beidzies vai piešķirts citam produktam vai organizācijai.',
   'editor.bases.large':
     'Skats neietilpst vietnes tabulā (augstākais 50 rindas un 8 kolonnas). Sašauriniet to Sytue Bases.',
   'editor.bases.forbidden':

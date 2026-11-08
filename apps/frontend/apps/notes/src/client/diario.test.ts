@@ -1,22 +1,29 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Daniel Delgado Ramos
+import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { expect, test } from 'bun:test';
 import type { Note, Notebook } from '@sytue/api-clients';
 import {
   atajoDiario,
   capturaRapida,
+  convertirNota,
   cuadernosDelArbol,
   diaLocal,
   desplazarDia,
   enfocarNotas,
   expandirAtajos,
   expandirCaptura,
+  lineasDeCaptura,
+  primeraLinea,
   resumenNota,
   semanaDe,
   terminada,
   vecesTrasladada,
 } from './diario.js';
 import { eventoDeDiaCompleto, eventoDelDia } from './agenda.js';
+
+// `primeraLinea` lee el HTML con DOMParser, como en el navegador.
+if (typeof document === 'undefined') GlobalRegistrator.register();
 
 test('captura tareas solo por elección o marcador explícito y escapa HTML', () => {
   expect(capturaRapida(' - [X] Comprar pan ', 'text')).toEqual({
@@ -76,7 +83,7 @@ test('filtra sin perder los antepasados, respeta orden y termina ante ciclos', (
   expect(enfocarNotas(notes, 'all')).toEqual(notes);
 });
 
-test('la sintaxis de Twos: guion y casilla vacía son tareas, --- un separador', () => {
+test('la sintaxis de captura: guion y casilla vacía son tareas, --- un separador', () => {
   expect(capturaRapida('- Comprar pan', 'text')).toEqual({
     kind: 'todo',
     title: 'Comprar pan',
@@ -208,4 +215,93 @@ test('la agenda: los de día completo por su fecha UTC y el evento nace de día 
   });
   expect(eventoDeDiaCompleto('31-12-2026', 'Fin')).toBeNull();
   expect(eventoDeDiaCompleto('2026-12-31', '')).toBeNull();
+});
+
+test('pegar varias líneas: una captura por línea, con la sintaxis de teclearlas', () => {
+  const lineas = lineasDeCaptura(
+    '- Comprar pan\r\n\n  [x] Llamar  \r---\nhttps://sytue.eu\nIdea suelta\n   \n',
+  );
+  expect(lineas).toEqual(['- Comprar pan', '[x] Llamar', '---', 'https://sytue.eu', 'Idea suelta']);
+  expect(lineas.map((l) => capturaRapida(l, 'text'))).toEqual([
+    { kind: 'todo', title: 'Comprar pan', checked: false },
+    { kind: 'todo', title: 'Llamar', checked: true },
+    { kind: 'text', content: '<hr>' },
+    { kind: 'link', title: 'sytue.eu', data: { url: 'https://sytue.eu' } },
+    { kind: 'text', content: '<p>Idea suelta</p>' },
+  ]);
+  // Con el conmutador en «tarea», también las líneas sin marca son tareas.
+  expect(capturaRapida(lineas[4]!, 'todo')).toEqual({
+    kind: 'todo',
+    title: 'Idea suelta',
+    checked: false,
+  });
+  expect(lineasDeCaptura(' \n\r\n ')).toEqual([]);
+  expect(lineasDeCaptura('una sola')).toEqual(['una sola']);
+});
+
+test('la primera línea sale del cuerpo y el resto conserva su formato', () => {
+  expect(primeraLinea('<p>Comprar pan</p>')).toEqual({ linea: 'Comprar pan', resto: '' });
+  expect(primeraLinea('<p><b>Hola</b> mundo<br>segunda</p><p>Más</p>')).toEqual({
+    linea: 'Hola mundo',
+    resto: '<p>segunda</p><p>Más</p>',
+  });
+  expect(primeraLinea('<h2>Plan</h2><ul><li><i>a</i></li></ul>')).toEqual({
+    linea: 'Plan',
+    resto: '<ul><li><i>a</i></li></ul>',
+  });
+  expect(primeraLinea('<ul><li>uno</li><li>dos</li></ul>')).toEqual({
+    linea: 'uno',
+    resto: '<ul><li>dos</li></ul>',
+  });
+  expect(primeraLinea('<p><b>Hola<br>sigue</b></p>')).toEqual({
+    linea: 'Hola',
+    resto: '<p><b>sigue</b></p>',
+  });
+  expect(primeraLinea('<p><br></p>')).toEqual({ linea: '', resto: '<p><br></p>' });
+});
+
+test('convertir: texto a tarea con su primera línea, y tarea a texto sin perder nada', () => {
+  expect(
+    convertirNota({ kind: 'text', title: '', content: '<p>Llamar a Ana<br>al móvil</p>' }),
+  ).toEqual({
+    kind: 'todo',
+    title: 'Llamar a Ana',
+    content: '<p>al móvil</p>',
+  });
+  // Con título, el título manda y el texto se queda entero.
+  expect(convertirNota({ kind: 'text', title: ' Plan ', content: '<p>x</p>' })).toEqual({
+    kind: 'todo',
+    title: 'Plan',
+    content: '<p>x</p>',
+  });
+  // Una línea que no cabe en el título: su principio, y el texto entero debajo.
+  const larga = `<p>${'a'.repeat(450)}</p>`;
+  const c = convertirNota({ kind: 'text', title: '', content: larga });
+  expect([...c.title]).toHaveLength(400);
+  expect(c.title.endsWith('…')).toBe(true);
+  expect(c.content).toBe(larga);
+  // De vuelta: sin cuerpo, el título es el texto (escapado) y la marca se va.
+  expect(convertirNota({ kind: 'todo', title: 'Pan <y> "leche"', content: '<p><br></p>' })).toEqual(
+    {
+      kind: 'text',
+      title: '',
+      content: '<p>Pan &lt;y&gt; &quot;leche&quot;</p>',
+      checked: false,
+      cancelled: false,
+    },
+  );
+  expect(convertirNota({ kind: 'todo', title: 'Viaje', content: '<p>Lisboa</p>' })).toEqual({
+    kind: 'text',
+    title: 'Viaje',
+    content: '<p>Lisboa</p>',
+    checked: false,
+    cancelled: false,
+  });
+  // Ida y vuelta de una línea suelta: queda como estaba.
+  const ida = convertirNota({ kind: 'text', title: '', content: '<p>Comprar pan</p>' });
+  expect(convertirNota({ ...ida, kind: 'todo' })).toMatchObject({
+    kind: 'text',
+    title: '',
+    content: '<p>Comprar pan</p>',
+  });
 });

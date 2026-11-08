@@ -569,3 +569,35 @@ test('cambiar de un campo de texto a otro con el teclado ya abierto desplaza el 
     expect(cuerpo.scrollTop).toBe(90);
   });
 });
+
+test('un campo con data-escape-local se queda su Escape; fuera de él, Escape cierra', () => {
+  enHost((host) => {
+    let cierres = 0;
+    let locales = 0;
+    render(
+      <Modal open onClose={() => cierres++} title="Archivados">
+        <Input
+          id="renombrar"
+          data-escape-local
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') locales++;
+          }}
+        />
+        <button id="otro">Otro</button>
+      </Modal>,
+      host,
+    );
+    const campo = document.getElementById('renombrar') as HTMLInputElement;
+    campo.focus();
+    campo.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+    );
+    expect(locales).toBe(1);
+    expect(cierres).toBe(0);
+    document.getElementById('otro')!.focus();
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+    );
+    expect(cierres).toBe(1);
+  });
+});

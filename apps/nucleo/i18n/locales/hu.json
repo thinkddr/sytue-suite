@@ -101,6 +101,7 @@
   "linkedServices.changed": "Ez az elem megváltozott a szolgáltatónál. Frissítsd, mielőtt újra szerkeszted.",
   "linkedServices.choose": "Válaszd ki, mit szeretnél csatlakoztatni. A szolgáltató a kiválasztott szolgáltatásokhoz kér engedélyeket.",
   "linkedServices.connected": "Csatlakoztatott szolgáltatások",
+  "linkedServices.exists": "Ez a fiók már csatlakoztatva volt, és most meg van nyitva.",
   "linkedServices.keepAdmin": "A Google Keep a Google Workspace adminisztrációja által jóváhagyott beállítást igényel. Személyes Gmail-fiókokkal nem csatlakoztatható.",
   "linkedServices.notGranted": "Ehhez a szolgáltatáshoz nem kaptál hozzáférést. Csatlakoztasd újra a fiókot az engedélyek kiválasztásához.",
   "linkedServices.notSupported": "Ez a szolgáltató nem kínálja ezt a szolgáltatást.",
@@ -169,7 +170,7 @@
   "notifications.kind.pages.order.oversold": "A(z) {site} webhelyen a(z) {number} rendelést készlet nélkül fizették ki",
   "notifications.kind.pages.order.paid": "Új rendelés érkezett: {number} ({site})",
   "notifications.kind.pages.payment.duplicated": "Dupla fizetés a(z) {site} webhely {number} rendelésénél: a második összeget visszatérítjük",
-  "notifications.kind.pages.settings.changed": "{actor} módosította a Sytue Web egyik beállítását",
+  "notifications.kind.pages.settings.changed": "{actor} módosította a Sytue Webs egyik beállítását",
   "notifications.kind.pages.store.busy": "A(z) {site} webáruházában túl sok a fizetésre váró rendelés",
   "notifications.kind.pages.withdrawal.requested": "Elállást kértek a(z) {site} webhely {number} rendelésére",
   "notifications.kind.photos.album.added": "{actor} fotókat adott ehhez: „{name}”",
@@ -301,6 +302,8 @@
   "shell.update.failedBody": "Próbálja újra később, vagy töltse le a portálról.",
   "shell.update.install": "Frissítés a(z) {version} verzióra",
   "shell.update.upToDate": "A(z) {app} naprakész",
+  "shell.widgets.wake": "Widgetek frissítése bezárt alkalmazás mellett",
+  "shell.widgets.wakeHelp": "Ha valami megváltozik nálad, a Sytue egy üres Apple-értesítéssel felébreszti az alkalmazást, hogy frissítse a widgetjét. Az Apple azt látja, melyik alkalmazásról van szó és mikor, azt soha, hogy mi változott.",
   "ui.backToList": "Vissza a listához",
   "ui.bulk.clear": "Kijelölés törlése",
   "ui.bulk.region": "Műveletek a kijelöléshez",
@@ -318,6 +321,8 @@
   "ui.review.edit": "Szerkesztés",
   "ui.save": "Mentés",
   "ui.selectRow": "Sor kijelölése",
+  "ui.suiteClose": "Vissza az alkalmazáshoz",
+  "ui.suiteOpen": "Sytue: alkalmazások, keresés, értesítések és fiók",
   "ui.wizard.back": "Vissza",
   "ui.wizard.cancel": "Mégse",
   "ui.wizard.goToStep": "Vissza a(z) {n}. lépéshez: ",
@@ -336,5 +341,7 @@
   "widgets.pending": "Függőben",
   "widgets.photos": "Fotók",
   "widgets.rows": "Sorok",
-  "widgets.storage": "Tárhely"
+  "widgets.storage": "Tárhely",
+  "widgets.updatedAgo": "Frissítve {time}",
+  "widgets.updatedAt": "Frissítve: {time}"
 }

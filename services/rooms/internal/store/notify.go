@@ -6,6 +6,7 @@ package store
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -21,9 +22,9 @@ func (s *Store) GetNotifyPrefs(ctx context.Context, subject string) (domain.Noti
 	p := domain.NotifyPrefs{Keywords: []string{}}
 	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
 		err := tx.QueryRow(ctx,
-			`SELECT keywords, dnd_start, dnd_end FROM user_notify_prefs
+			`SELECT keywords, dnd_start, dnd_end, paused_until FROM user_notify_prefs
 			 WHERE tenant=$1 AND subject=$2`,
-			t.Slug, subject).Scan(&p.Keywords, &p.DNDStart, &p.DNDEnd)
+			t.Slug, subject).Scan(&p.Keywords, &p.DNDStart, &p.DNDEnd, &p.PausedUntil)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
@@ -44,18 +45,39 @@ func (s *Store) PutNotifyPrefs(ctx context.Context, subject string, p domain.Not
 	if kws == nil {
 		kws = []string{}
 	}
+	// La pausa no se toca aquí (SetNotifyPause), pero se devuelve la vigente para que
+	// quien guarda las palabras clave no la pierda de vista.
 	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx,
+		return tx.QueryRow(ctx,
 			`INSERT INTO user_notify_prefs (tenant, subject, keywords, dnd_start, dnd_end)
 			 VALUES ($1, $2, $3, $4, $5)
 			 ON CONFLICT (tenant, subject)
-			 DO UPDATE SET keywords=EXCLUDED.keywords, dnd_start=EXCLUDED.dnd_start, dnd_end=EXCLUDED.dnd_end`,
-			t.Slug, subject, kws, p.DNDStart, p.DNDEnd)
-		return err
+			 DO UPDATE SET keywords=EXCLUDED.keywords, dnd_start=EXCLUDED.dnd_start, dnd_end=EXCLUDED.dnd_end
+			 RETURNING paused_until`,
+			t.Slug, subject, kws, p.DNDStart, p.DNDEnd).Scan(&p.PausedUntil)
 	})
 	if err != nil {
 		return domain.NotifyPrefs{}, err
 	}
 	p.Keywords = kws
 	return p, nil
+}
+
+// SetNotifyPause fija (o quita, con nil) la pausa de avisos del usuario y devuelve sus
+// preferencias completas. El servicio ya la ha saneado (NormalizeNotifyPause).
+func (s *Store) SetNotifyPause(ctx context.Context, subject string, until *time.Time) (domain.NotifyPrefs, error) {
+	t := tenancy.MustFrom(ctx)
+	p := domain.NotifyPrefs{}
+	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx,
+			`INSERT INTO user_notify_prefs (tenant, subject, paused_until)
+			 VALUES ($1, $2, $3)
+			 ON CONFLICT (tenant, subject) DO UPDATE SET paused_until=EXCLUDED.paused_until
+			 RETURNING keywords, dnd_start, dnd_end, paused_until`,
+			t.Slug, subject, until).Scan(&p.Keywords, &p.DNDStart, &p.DNDEnd, &p.PausedUntil)
+	})
+	if p.Keywords == nil {
+		p.Keywords = []string{}
+	}
+	return p, err
 }

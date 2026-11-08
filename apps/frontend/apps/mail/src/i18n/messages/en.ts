@@ -39,6 +39,11 @@ export const en = {
   'externalMail.port': 'Port',
   'externalMail.username': 'Username (email address if blank)',
   'externalMail.password': 'Password or app password',
+  'externalMail.icloudBody':
+    'iCloud Mail doesn’t accept your Apple Account password here. Create an app-specific password at account.apple.com (Sign-In and Security › App-Specific Passwords) and enter it below.',
+  'externalMail.icloudLink': 'Open account.apple.com',
+  'externalMail.icloudAuthError':
+    'iCloud didn’t accept the password. Use an app-specific password, not your Apple Account password.',
   'externalMail.smtpPassword': 'SMTP password (same as incoming if blank)',
   'externalMail.advanced': 'Advanced options',
   'externalMail.security': 'SMTP connection security',
@@ -47,6 +52,10 @@ export const en = {
     'We will verify incoming and outgoing sign-in before saving. No test email will be sent.',
   'externalMail.connect': 'Connect account',
   'externalMail.authorize': 'Continue to provider',
+  'externalMail.reconnectNeeded': 'Sign in again to see this account',
+  'externalMail.accountUnavailable': 'Couldn’t reach this account. Retry',
+  'externalMail.someUnavailable':
+    'Some accounts couldn’t be reached. Their messages aren’t in this list.',
   'externalMail.add': 'Add email account',
   'externalMail.empty': 'No external email accounts connected.',
   'externalMail.open': 'Open mailbox',
@@ -59,6 +68,13 @@ export const en = {
     'The server’s secure connection could not be verified. Check its hostname and certificate with your email provider.',
   'externalMail.authError':
     'Sign-in was not accepted. Reconnect the account or check the username and app password.',
+  'externalMail.cancelled': 'Sign-in was cancelled. Nothing was connected.',
+  'externalMail.scopeMissing':
+    'Access to email was not allowed. Try again and keep the email permission selected.',
+  'externalMail.timeout': 'That sign-in is no longer valid. Try again.',
+  'externalMail.exists': 'This email account is already connected.',
+  'externalMail.connected': 'The account {account} is now connected.',
+  'externalMail.accountsError': 'External email accounts could not be loaded.',
   'externalMail.sendUnknown':
     'The server may have accepted this email. Check Sent before trying again to avoid sending it twice.',
   'externalMail.blockedError':
@@ -67,25 +83,11 @@ export const en = {
     'This email or its attachments exceed the size limit. Reduce the attachments and try again.',
   'externalMail.pop3Note':
     'POP3 lets you read the inbox and send with SMTP. Remote folders, read flags and moving messages are unavailable.',
-  'externalMail.refreshNote':
-    'This mailbox refreshes every 30 seconds while its message list is open. Email stays at your provider.',
   'externalMail.sent': 'Email accepted by your provider.',
   'externalMail.sentNoCopy':
     'Email accepted, but a copy could not be saved in Sent. Do not send it again.',
-  'externalMail.draftNote':
-    'This draft is kept only while this window is open. Closing it discards the draft.',
-  'externalMail.attach': 'Attach files',
-  'externalMail.markUnread': 'Mark as unread',
-  'externalMail.markRead': 'Mark as read',
-  'externalMail.flag': 'Star message',
-  'externalMail.unflag': 'Remove star',
-  'externalMail.trash': 'Move to Trash',
-  'externalMail.noMessages': 'No messages in this folder.',
-  'externalMail.discardDraft': 'Discard this draft?',
   'externalMail.invalidConfiguration':
     'Enter a valid email address, both server hostnames and ports, and a password.',
-  'externalMail.invalidRecipients':
-    'Check the recipient email addresses. Separate multiple addresses with commas.',
 
   // --- Comunes ------------------------------------------------------------
   'common.retry': 'Retry',
@@ -115,6 +117,15 @@ export const en = {
 
   // --- Barra lateral ------------------------------------------------------
   'nav.compose': 'Compose',
+  'nav.mailboxes': 'Mailboxes',
+  'nav.allInboxes': 'All Inboxes',
+  'nav.allDrafts': 'All Drafts',
+  'nav.allSent': 'All Sent',
+  'nav.allArchive': 'All Archive',
+  'nav.allJunk': 'All Spam',
+  'nav.allTrash': 'All Trash',
+  'nav.sytueMailbox': 'Sytue mailbox',
+  'nav.accountsIn': 'Accounts in {mailbox}',
   'nav.folders': 'Folders',
   'nav.refresh': 'Refresh',
   'nav.manageFolders': 'Manage folders',
@@ -139,6 +150,10 @@ export const en = {
   'shortcuts.archive': 'Archive',
   'shortcuts.trash': 'Move to the trash',
   'shortcuts.star': 'Star',
+  'shortcuts.select': 'Select the conversation',
+  'shortcuts.clearSelection': 'Clear the selection',
+  'shortcuts.label': 'Label',
+  'shortcuts.move': 'Move to…',
   'shortcuts.help': 'Show this list',
   'nav.settings': 'Settings',
   'nav.signature': 'Signature',
@@ -249,6 +264,9 @@ export const en = {
   'error.undoSend': 'The message could not be unsent',
   'error.undoSendGone': 'It is too late to undo; the message has already gone out',
   'undo.done': 'Sending undone',
+  'triage.moved': 'Moved to {folder}',
+  'triage.undone': 'Moved back to where it was',
+  'error.undoMove': 'Could not move it back',
 
   // --- Lista de conversaciones --------------------------------------------
   'list.region': 'Conversations in {folder}',
@@ -262,6 +280,13 @@ export const en = {
   'list.searchHint':
     'Operators: from:, to:, subject:, has:attachment, is:unread, is:starred, after:2026-01-31, before:2026-03-01. Use quotes for several words.',
   'list.clearSearch': 'Clear search',
+  'filter.group': 'Quick filters',
+  'filter.unread': 'Unread',
+  'filter.starred': 'Starred',
+  'filter.attachments': 'With attachments',
+  'filter.emptyTitle': 'Nothing here matches this filter',
+  'filter.emptyDescription': 'Try another filter or show every conversation.',
+  'filter.showAll': 'Show all',
   'list.selectAll': 'Select all conversations',
   'list.loading': 'Loading conversations…',
   'list.errorTitle': 'Your mail could not be loaded',
@@ -296,6 +321,8 @@ export const en = {
   'reader.createEvent': 'Create event',
   'reader.eventCreated': 'Event created in Sytue Calendar',
   'reader.eventFailed': 'The event could not be created',
+  'reader.shareToRooms': 'Share to Rooms',
+  'reader.roomsFailed': 'It could not be shared to Rooms.',
   'reader.unsubscribe': 'Unsubscribe',
   'reader.unsubscribeFailed': 'The unsubscribe request could not be completed',
   'reader.unsubscribeSent': 'Unsubscribe request sent',
@@ -428,6 +455,11 @@ export const en = {
   'editor.font': 'Font',
   'editor.redo': 'Redo',
   'editor.undo': 'Undo',
+  // The context menu of the native app's editor (on the web the browser provides it).
+  'editor.cut': 'Cut',
+  'editor.copy': 'Copy',
+  'editor.paste': 'Paste',
+  'editor.selectAll': 'Select all',
   'editor.colorNone': 'None',
   'editor.colorYellow': 'Yellow',
   'editor.colorViolet': 'Violet',

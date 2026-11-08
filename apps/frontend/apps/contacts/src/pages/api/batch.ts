@@ -4,6 +4,7 @@
  *
  * POST /api/batch { action, uids, ... }
  *   action = 'trash'    -> POST /api/v1/contacts/batch/trash      { uids }
+ *   action = 'restore'  -> POST /api/v1/contacts/batch/restore    { uids }  (deshacer)
  *   action = 'favorite' -> POST /api/v1/contacts/batch/favorite   { uids, favorite }
  *   action = 'group'    -> POST /api/v1/groups/{groupId}/members  { uids, add }
  *
@@ -41,6 +42,10 @@ export const POST: APIRoute = async (ctx) => {
       case 'trash':
         return json(
           await restJson(session.accessToken, 'POST', '/api/v1/contacts/batch/trash', { uids }),
+        );
+      case 'restore':
+        return json(
+          await restJson(session.accessToken, 'POST', '/api/v1/contacts/batch/restore', { uids }),
         );
       case 'favorite':
         return json(

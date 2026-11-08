@@ -1510,6 +1510,10 @@ export interface EditorContext {
   resolveComment: (id: string, resolved: boolean) => Promise<void>;
   removeComment: (id: string) => Promise<void>;
 
+  /** Guarda YA lo que haya en cola (Ctrl/⌘+S y el chip de la cabecera en error, que
+   *  reintenta sin esperar al reintento programado). Sin nada pendiente, no hace nada. */
+  saveNow: () => void;
+
   versions: VersionItem[];
   loadVersions: () => Promise<void>;
   createVersion: (label?: string) => Promise<void>;
@@ -1524,6 +1528,9 @@ export interface EditorContext {
 
   /** POST /api/export → el BFF proxea el blob (attachment) y dispara la descarga. Errores → toast. */
   exportAs: (format: ExportFormat, plantilla?: boolean) => Promise<void>;
+  /** «Hacer una copia» (menú Archivo): guarda lo pendiente, crea la copia con ese título y
+   *  devuelve su id. Ausente en las demos, que no tienen servicio. */
+  makeCopy?: (title: string) => Promise<string>;
   /** Fichero de Drive del que salió el documento, o '' si nació aquí. */
   sourceRef: string;
   /** Cursores anclados a la identidad de los caracteres (state/coedicion.ts). Solo en documentos

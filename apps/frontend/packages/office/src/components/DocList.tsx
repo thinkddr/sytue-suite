@@ -37,9 +37,11 @@ import {
   cx,
   Dropdown,
   MenuItem,
+  MenuSeparator,
   Illustration,
   esAtajoDeApp,
   grosorDeGlifo,
+  useBarraUnica,
 } from '@sytue/ui';
 import type {
   DocKind,
@@ -60,6 +62,7 @@ import { CONTENT_KEY } from '../editor/types';
 import { listOfflineDocuments } from '../editor/state/offline';
 import { crearPdfEnBlanco } from '../pdf/crear';
 import { descargarExport } from '../editor/exportName';
+import { hacerCopia } from '../lib/copia';
 import { EXPORT_FORMATS, type ExportFormat } from '../editor/types';
 
 /*
@@ -218,6 +221,10 @@ const GLYPHS = {
   // Compartir: dos nodos unidos a un tercero. El servicio tenía el modelo de permisos
   // desde el principio y no había ningún sitio desde donde usarlo.
   download: 'M12 3v11m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2',
+  // «Más acciones»: tres puntos, el menú de la tesela (hacer una copia y descargar).
+  more: 'M5 12h.01M12 12h.01M19 12h.01',
+  // «Hacer una copia»: dos hojas, una delante de otra.
+  copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
   share:
     'M18 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm12 7a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM8.6 13.5l6.8 3.9M15.4 6.6 8.6 10.5',
   // Mismo trazado que la estrella de Sytue Drive: es la misma función y no puede
@@ -249,6 +256,7 @@ interface DocTileProps {
   t: DocsT;
   onRename: (doc: DocumentMeta) => void;
   onDownload: (doc: DocumentMeta, format: ExportFormat) => void;
+  onCopy: (doc: DocumentMeta) => void;
   onShare: (doc: DocumentMeta) => void;
   onDelete: (doc: DocumentMeta) => void;
   onStar: (doc: DocumentMeta) => void;
@@ -261,6 +269,7 @@ function DocTile({
   t,
   onRename,
   onDownload,
+  onCopy,
   onShare,
   onDelete,
   onStar,
@@ -339,10 +348,11 @@ function DocTile({
           >
             <Glyph name="pencil" />
           </button>
-          {/* Descargar sin abrir el documento: los cinco formatos que exporta el
-              editor, en el menú de la casa. */}
+          {/* «Más acciones»: hacer una copia y descargar sin abrir el documento (los
+              cinco formatos que exporta el editor). En un menú y no en dos botones más:
+              con cinco, a 180 px —el mínimo de la rejilla— la fila pisaba la estrella. */}
           <Dropdown
-            label={t('tile.download.label', { title: doc.title })}
+            label={t('tile.more.label', { title: doc.title })}
             align="end"
             trigger={({ onClick, ...aria }) => (
               <button
@@ -350,26 +360,43 @@ function DocTile({
                 type="button"
                 onClick={onClick}
                 class={tileActionBtn}
-                aria-label={t('tile.download.label', { title: doc.title })}
-                title={t('tile.download')}
+                aria-label={t('tile.more.label', { title: doc.title })}
+                title={t('tile.more')}
               >
-                <Glyph name="download" />
+                <Glyph name="more" />
               </button>
             )}
           >
             {(close) => (
               <>
-                {EXPORT_FORMATS.map((f) => (
-                  <MenuItem
-                    key={f}
-                    onClick={() => {
-                      close();
-                      onDownload(doc, f);
-                    }}
-                  >
-                    {t(`export.format.${f}`)}
-                  </MenuItem>
-                ))}
+                <MenuItem
+                  icon={<Glyph name="copy" />}
+                  onClick={() => {
+                    close();
+                    onCopy(doc);
+                  }}
+                >
+                  {t('copy.action')}
+                </MenuItem>
+                <MenuSeparator />
+                {/* Los formatos, en un grupo con nombre: dentro de un menú el lector de
+                    pantalla solo lee los elementos, y «PDF» a secas no dice que descarga. */}
+                <div role="group" aria-labelledby={`descargar-${doc.id}`}>
+                  <p id={`descargar-${doc.id}`} class="text-text-muted px-2.5 pt-1 pb-0.5 text-xs">
+                    {t('tile.download')}
+                  </p>
+                  {EXPORT_FORMATS.map((f) => (
+                    <MenuItem
+                      key={f}
+                      onClick={() => {
+                        close();
+                        onDownload(doc, f);
+                      }}
+                    >
+                      {t(`export.format.${f}`)}
+                    </MenuItem>
+                  ))}
+                </div>
               </>
             )}
           </Dropdown>
@@ -417,6 +444,8 @@ export interface DocListProps {
 export function DocList({ locale, userId, kind: kindDeProps }: DocListProps) {
   const t = docsT(locale);
   const toast = useToast();
+  // Con la barra única del teléfono, el encabezado repite el producto: ver el `header`.
+  const unica = useBarraUnica();
   const connectivity = useConnectivity();
   const [cachedMode, setCachedMode] = useState(false);
   const offline = connectivity === 'offline' || cachedMode;
@@ -578,6 +607,21 @@ export function DocList({ locale, userId, kind: kindDeProps }: DocListProps) {
     void descargarExport(doc.id, doc.title, doc.kind, format).catch(() =>
       toast.notify({ tone: 'danger', title: t('doc.msg.exportFailed') }),
     );
+  };
+
+  /** «Hacer una copia» desde la tesela: el servicio copia el contenido y se abre la copia,
+   *  como al crear un documento. */
+  const [copiando, setCopiando] = useState(false);
+  const copiar = async (doc: DocumentMeta): Promise<void> => {
+    if (offline || copiando) return;
+    setCopiando(true);
+    try {
+      const id = await hacerCopia(doc, t('copy.title', { title: doc.title }));
+      window.location.href = r(`/edit?id=${encodeURIComponent(id)}`);
+    } catch {
+      toast.notify({ tone: 'danger', title: t('copy.error') });
+      setCopiando(false);
+    }
   };
 
   // Con plantilla, el SERVICIO pone tipo, título y contenido (GaleriaPlantillas).
@@ -915,11 +959,22 @@ export function DocList({ locale, userId, kind: kindDeProps }: DocListProps) {
       class="sytue-sheet-corners mx-auto h-[calc(100dvh-var(--spacing-topbar)-var(--sytue-sheet-gap,0px)-var(--sytue-safe-bottom,0px))] w-full max-w-[var(--container-content,1280px)] overflow-y-auto px-6 pt-8"
     >
       <div class="min-w-0">
-        <header class="mb-8 flex shrink-0 items-start gap-3">
+        <header
+          class={cx(
+            'mb-8 flex shrink-0 items-start gap-3',
+            unica && 'max-md:mb-4 max-md:justify-end',
+          )}
+        >
           <div class="min-w-0 flex-1">
             {/* Encabeza lo que hay («Tus hojas de cálculo»), no la marca: el selector de
             apps de la barra superior ya dice Docus/Calcus/Diapos (2026-09-09). */}
-            <h1 id="docs-page-heading" class="sytue-h2 text-text">
+            <h1
+              id="docs-page-heading"
+              // En el teléfono la barra ya dice el producto («Hojas de cálculo»): el
+              // encabezado y su lema quedan para el lector de pantalla, y arriba solo la
+              // papelera. Ver SectionHeader `repiteLaBarra`.
+              class={cx('sytue-h2 text-text', unica && 'max-md:sr-only')}
+            >
               {t(
                 fixedKind.current === 'document'
                   ? 'list.heading.document'
@@ -930,7 +985,7 @@ export function DocList({ locale, userId, kind: kindDeProps }: DocListProps) {
                       : 'list.heading.all',
               )}
             </h1>
-            <p class="text-text-muted mt-1 max-w-2xl text-base">
+            <p class={cx('text-text-muted mt-1 max-w-2xl text-base', unica && 'max-md:hidden')}>
               {t(
                 fixedKind.current === 'document'
                   ? 'list.tagline.document'
@@ -1228,6 +1283,7 @@ export function DocList({ locale, userId, kind: kindDeProps }: DocListProps) {
                       t={t}
                       onRename={openRename}
                       onDownload={descargar}
+                      onCopy={(doc) => void copiar(doc)}
                       onShare={setSharing}
                       onDelete={setPendingDelete}
                       onStar={(doc) => void toggleStar(doc)}

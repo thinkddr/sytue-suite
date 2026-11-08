@@ -57,6 +57,11 @@ type Deps struct {
 	ReadyCheckers []httpx.Checker
 }
 
+// Los verbos WebDAV en chi ANTES de montar /dav, como Calendar y Contacts: sin esto
+// PROPFIND, MKCOL, MOVE… caen en 405 en el router y Drive no se monta en el Finder,
+// Archivos ni ningún cliente WebDAV (dav_verbos_test.go). Idempotente.
+func init() { httpx.EnableWebDAVMethods() }
+
 // NewRouter construye el router completo de Sytue Drive.
 func NewRouter(d Deps) http.Handler {
 	// EL TOPE DEL ROUTER TIENE QUE DAR PARA LO QUE ESTE SERVICIO RECIBE.
@@ -102,6 +107,9 @@ func NewRouter(d Deps) http.Handler {
 		h.bases = d.Service
 		h.cipher = d.Service
 	}
+	// La señal de cambios (hubnotify.TrasEscribir) de lo que se escribe por la API y
+	// por WebDAV: el widget de Drive y el de CertiPDF, que lista los PDF de su carpeta.
+	cambios := d.Service.Hub().TrasEscribir(nil, "drive", "pdf")
 	tenantAuth := func(next http.Handler) http.Handler {
 		return d.Verifier.RequireAuth(d.Verifier.RequireTenant(next))
 	}
@@ -121,6 +129,7 @@ func NewRouter(d Deps) http.Handler {
 		// El tope es alto a propósito —ninguna sesión legítima se acerca—: lo que
 		// corta es el bucle desbocado y el barrido que se lleva la unidad entera.
 		api.Use(httpx.RateLimit(httpx.RateLimitConfig{Limiter: apiLimiter, KeyFunc: authn.RateKey}))
+		api.Use(cambios)
 
 		// Carpetas.
 		// «Exportar tus datos»: los archivos con sus bytes (platform/pkg/portabilidad).
@@ -312,9 +321,11 @@ func NewRouter(d Deps) http.Handler {
 	// /compat/graph, para integraciones de terceros con «base URL» configurable.
 	// Mismo Bearer de Sytue ID y MISMO servicio que /api/v1 ⇒ mismo aislamiento
 	// (tenant/RLS, unidades de equipo, permisos). Ver handlers_compat.go.
+	// Lo que una integración crea, sube o borra por aquí también cambia el widget:
+	// lleva la señal, igual que en Calendar y Contacts.
 	mountCompat(r, &compatHandlers{svc: d.Service, cfg: d.Cfg}, func(next http.Handler) http.Handler {
-		return d.Verifier.RequireGoogleAPIs(googleScopesLectura, googleScopesEscritura)(d.Verifier.RequireTenant(next))
-	}, tenantAuth)
+		return d.Verifier.RequireGoogleAPIs(googleScopesLectura, googleScopesEscritura)(d.Verifier.RequireTenant(cambios(next)))
+	}, func(next http.Handler) http.Handler { return tenantAuth(cambios(next)) })
 
 	// Host WOPI (lado ENTRANTE): Office Online / Collabora / OnlyOffice abriendo un
 	// fichero que vive aquí, como hacen contra Nextcloud u ownCloud. NO lleva el
@@ -327,6 +338,7 @@ func NewRouter(d Deps) http.Handler {
 			locks:     d.Locks,
 			minter:    wopiMinter,
 			maxUpload: d.Cfg.MaxUploadBytes,
+			hub:       d.Service.Hub(),
 		})
 	}
 
@@ -361,7 +373,7 @@ func NewRouter(d Deps) http.Handler {
 	// WebDAV (RFC 4918) bajo /dav, autenticado con el mismo JWT o, para los clientes
 	// del sistema, con Basic y una contraseña de aplicación canjeada por él.
 	if d.WebDAV != nil {
-		r.Mount("/dav", d.AppPasswords.Basic(tenantAuth(webdav.WithTenant(d.WebDAV))))
+		r.Mount("/dav", d.AppPasswords.Basic(tenantAuth(cambios(webdav.WithTenant(d.WebDAV)))))
 	}
 
 	return r

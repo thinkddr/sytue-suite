@@ -48,6 +48,9 @@ import {
   withBase,
   Checkbox,
   useAtajo,
+  DURACION_DESHACER,
+  BarraMovil,
+  SinBarraUnica,
 } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import { contiene, formatDate, translate } from '@sytue/i18n';
@@ -69,7 +72,6 @@ import type {
   RequisitosFactura,
   RespuestaActivarModulo,
   RespuestaObligaciones,
-  ResultadoImportacion,
   ResumenOperativo,
   Tablero,
 } from './tipos.js';
@@ -84,6 +86,24 @@ import {
 } from './formato.js';
 import { api, baseDeLaApp, consulta, ErrorApi, mensajeDeError, esSinPermiso } from '../lib/api.js';
 import { claveDeFicha } from '../lib/ficha';
+import {
+  importarLeidos,
+  leerFicheros,
+  merecePreguntar,
+  ofrecerDeshacer,
+  revertirImportaciones,
+  SimulacionFallida,
+  simularLeidos,
+} from '../lib/importacion.js';
+import {
+  accionesDeLote,
+  aplicarLote,
+  avisarPapelera,
+  marcadasVisibles,
+  type AccionDeLote,
+} from '../lib/papelera.js';
+import { invalidarModelo, type ListaAbierta } from '../lib/invalidar.js';
+import { vacioDeLista } from './vacio.js';
 import { SelectorRelacion } from './SelectorRelacion.js';
 import { AsientoCompacto, Balance, LibroDiario } from './Libro.js';
 import { Onboarding } from './Onboarding.js';
@@ -354,6 +374,27 @@ function ErpAppInterna({
       }
     },
     [t],
+  );
+
+  // La lista abierta AHORA, para los «Deshacer» que se pulsan segundos después de
+  // crear su aviso (lib/invalidar.ts): leerla del render del borrado recargaba otro
+  // modelo con los filtros de entonces.
+  const abiertaRef = useRef<ListaAbierta<Modelo>>({
+    modelo,
+    busqueda,
+    estado,
+    orden,
+    papelera,
+  });
+  abiertaRef.current = { modelo, busqueda, estado, orden, papelera };
+  const invalidar = useCallback(
+    (clave: string) => {
+      setRevision((r) => r + 1);
+      invalidarModelo(clave, cache.current, abiertaRef.current, (l) => {
+        void cargarLista(l.modelo, l.busqueda, l.estado, l.orden, l.papelera);
+      });
+    },
+    [cargarLista],
   );
 
   /**
@@ -794,23 +835,39 @@ function ErpAppInterna({
                   locale={locale}
                 />
               ) : null}
-              {/* El único mando de navegación que hay por debajo de 768 px. Va aquí y
-              no dentro de cada pantalla para que exista también en el libro, en
-              el balance y en la bienvenida. */}
-              <button
-                id="erp-cajon-boton"
-                type="button"
-                onClick={() => {
-                  cajonBoton.current = 'erp-cajon-boton';
-                  setCajon(true);
+              {/* El único mando de navegación que hay por debajo de 768 px. Con la Sytue
+              Shell va en la topbar (BarraMovil), como el ☰ de todas las apps; sin ella
+              (app nativa), aquí, para que exista también en el libro, en el balance y
+              en la bienvenida. */}
+              <BarraMovil
+                soloEnLaTopbar
+                menu={{
+                  id: 'erp-cajon-boton',
+                  controla: 'erp-cajon',
+                  abierto: cajon,
+                  alPulsar: () => {
+                    cajonBoton.current = 'erp-cajon-boton';
+                    setCajon(true);
+                  },
+                  rotulo: t('nav.menu'),
                 }}
-                aria-label={t('nav.menu')}
-                aria-expanded={cajon}
-                aria-controls="erp-cajon"
-                class="sytue-focus-ring border-border text-text-muted hover:text-text rounded-control mt-4 ml-6 inline-grid min-h-[44px] min-w-[44px] place-items-center border text-lg md:hidden"
-              >
-                <span aria-hidden="true">☰</span>
-              </button>
+              />
+              <SinBarraUnica>
+                <button
+                  id="erp-cajon-boton"
+                  type="button"
+                  onClick={() => {
+                    cajonBoton.current = 'erp-cajon-boton';
+                    setCajon(true);
+                  }}
+                  aria-label={t('nav.menu')}
+                  aria-expanded={cajon}
+                  aria-controls="erp-cajon"
+                  class="sytue-focus-ring border-border text-text-muted hover:text-text rounded-control mt-4 ml-6 inline-grid min-h-[44px] min-w-[44px] place-items-center border text-lg md:hidden"
+                >
+                  <span aria-hidden="true">☰</span>
+                </button>
+              </SinBarraUnica>
               {error ? (
                 <p class="bg-danger-bg text-danger-text mx-6 mt-4 rounded-md px-4 py-3 text-sm">
                   {error}
@@ -983,13 +1040,8 @@ function ErpAppInterna({
                     onMas={() => void cargarMas()}
                     soloLectura={!puedeEscribir(modelo.modulo)}
                     revision={revision}
-                    onImportado={() => {
-                      setRevision((r) => r + 1);
-                      for (const clave of cache.current.keys()) {
-                        if (clave.startsWith(`${modelo.clave}|`)) cache.current.delete(clave);
-                      }
-                      void cargarLista(modelo, busqueda, estado, orden, papelera);
-                    }}
+                    onInvalidar={invalidar}
+                    puedeAccion={puedeAccion}
                     t={t}
                   />
                 </>
@@ -1041,18 +1093,13 @@ function ErpAppInterna({
                   setFicha('nueva');
                 }}
                 onGuardado={() => {
-                  setRevision((r) => r + 1);
                   setFicha(null);
                   // Lo escrito invalida lo cacheado de ESE modelo —todas sus
                   // búsquedas—: servir una lista vieja justo después de crear algo es
                   // la forma más rápida de que alguien crea que no se ha guardado.
-                  // Sin copiar las claves: borrar durante la iteración de un `Map` es
-                  // seguro —la entrada retirada simplemente no se visita—.
-                  for (const clave of cache.current.keys()) {
-                    if (clave.startsWith(`${modelo.clave}|`)) cache.current.delete(clave);
-                  }
-                  void cargarLista(modelo, busqueda, estado, orden, papelera);
+                  invalidar(modelo.clave);
                 }}
+                onInvalidar={invalidar}
                 t={t}
               />
             ) : null}
@@ -1455,7 +1502,8 @@ function Lista({
   onDuplicar,
   onNueva,
   onMas,
-  onImportado,
+  onInvalidar,
+  puedeAccion,
   soloLectura,
   revision,
   t,
@@ -1481,8 +1529,13 @@ function Lista({
   /** Sin permiso de escritura en su módulo: ni «Nuevo» ni importar. */
   soloLectura: boolean;
   onMas: () => void;
-  /** Tras una importación: lo cacheado de este modelo ya no vale. */
-  onImportado: () => void;
+  /**
+   * Tras una importación o un deshacer: lo cacheado de ese modelo ya no vale. Recarga
+   * la lista solo si sigue abierta (lib/invalidar.ts).
+   */
+  onInvalidar: (clave: string) => void;
+  /** Los verbos concedidos: «Deshacer» una importación pide uno de contabilidad. */
+  puedeAccion: (modulo: string, verbo: string) => boolean;
   /** Sube con cada escritura: es lo que hace que el recuento no se quede viejo. */
   revision: number;
   t: Traducir;
@@ -1520,9 +1573,16 @@ function Lista({
   }, [colDinero, registros]);
 
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
+  // El lote actúa sobre lo marcado QUE SE VE (lib/papelera.ts): la selección sobrevive
+  // a cambiar de filtro, y contarla entera ofrecía tirar o devolver filas que no están.
+  const marcadas = useMemo(
+    () => marcadasVisibles(seleccionados, registros),
+    [seleccionados, registros],
+  );
+  const loteOfrece = accionesDeLote(papelera, (modelo.estados?.length ?? 0) > 0);
   // La barra de lote solo existe con selección marcada: su hook depende de ello.
   const { ref: barraLoteRef, queda: barraLoteQueda } = useScrollRestante<HTMLDivElement>(
-    seleccionados.size > 0,
+    marcadas.length > 0,
   );
   const [ejecutandoLote, setEjecutandoLote] = useState(false);
   const aviso = useToast();
@@ -1532,52 +1592,105 @@ function Lista({
   // sus facturas electrónicas, varias de una vez. El resultado se cuenta en un
   // aviso y los fallos, fila a fila, en otro: quien importa mil filas quiere
   // saber cuáles no entraron, no que «algo falló».
+  //
+  // ANTES DE ESCRIBIR, LA VISTA PREVIA: los CSV se mandan primero con
+  // `simular=1` —el servicio hace la importación entera contra la base y la
+  // deshace— y se pregunta con lo que pasaría. Y DESPUÉS, «Deshacer» en el aviso:
+  // revierte los lotes que acaban de entrar (lib/importacion.ts).
   const selectorCSV = useRef<HTMLInputElement>(null);
   const [importando, setImportando] = useState(false);
+  const { confirmar: confirmarImportacion, dialogo: dialogoImportacion } = useConfirm();
   async function importarFicheros(ficheros: File[]): Promise<void> {
     setImportando(true);
-    const total = { creados: 0, actualizados: 0, ignoradas: new Set<string>() };
-    const fallos: string[] = [];
-    for (const fichero of ficheros) {
-      const xml = /\.xml$/i.test(fichero.name) || fichero.type.includes('xml');
+    try {
+      const fila = (n: number, error: string): string =>
+        t('list.importFailedRow', { row: n, error });
+      // Cada fichero se lee por su lado: uno ilegible es un fallo más, no un
+      // rechazo que tumba la importación entera sin decir nada.
+      const leidos = await leerFicheros(ficheros);
+      let previa;
       try {
-        const res = await api<ResultadoImportacion>(`${modelo.clave}/importar`, {
-          method: 'POST',
-          headers: { 'content-type': xml ? 'application/xml' : 'text/csv' },
-          body: await fichero.text(),
-        });
-        total.creados += res.creados;
-        total.actualizados += res.actualizados;
-        for (const c of res.ignoradas) total.ignoradas.add(c);
-        for (const f of res.fallos ?? []) {
-          const fila = t('list.importFailedRow', { row: f.fila, error: f.error });
-          fallos.push(ficheros.length > 1 ? `${fichero.name} · ${fila}` : fila);
-        }
+        previa = await simularLeidos(modelo.clave, leidos, fila);
       } catch (err) {
-        const motivo = mensajeDeError(err, t);
-        fallos.push(ficheros.length > 1 ? `${fichero.name}: ${motivo}` : motivo);
+        // Sin vista previa por un corte o un 5xx no se importa a ciegas: se dice
+        // y se deja todo como estaba.
+        aviso.notify({
+          tone: 'danger',
+          title: t('list.importPreviewFailed'),
+          description: mensajeDeError(err instanceof SimulacionFallida ? err.causa : err, t),
+        });
+        return;
       }
+      if (merecePreguntar(previa)) {
+        const mensaje = [
+          t('list.importPreview', {
+            created: previa.creados,
+            updated: previa.actualizados,
+            failed: previa.fallos.length,
+          }),
+          ...previa.fallos.slice(0, 3),
+        ].join(' · ');
+        const si = await confirmarImportacion({
+          titulo: t('list.importPreviewTitle'),
+          mensaje,
+          confirmLabel: t('list.importConfirm'),
+        });
+        if (!si) return;
+      }
+
+      const total = await importarLeidos(modelo.clave, leidos, fila, (err) =>
+        mensajeDeError(err, t),
+      );
+      const lotes = total.lotes;
+      aviso.notify({
+        tone: total.fallos.length > 0 ? 'info' : 'success',
+        title: t('list.importResult', {
+          created: total.creados,
+          updated: total.actualizados,
+          failed: total.fallos.length,
+        }),
+        ...(total.ignoradas.length > 0
+          ? { description: t('list.importIgnored', { columns: total.ignoradas.join(', ') }) }
+          : {}),
+        ...(ofrecerDeshacer(lotes, puedeAccion)
+          ? {
+              duration: DURACION_DESHACER,
+              action: { label: t('action.undo'), onClick: () => void deshacerImportacion(lotes) },
+            }
+          : {}),
+      });
+      for (const f of total.fallos.slice(0, 5)) aviso.notify({ tone: 'danger', title: f });
+      if (total.creados + total.actualizados > 0) onInvalidar(modelo.clave);
+    } finally {
+      setImportando(false);
     }
-    aviso.notify({
-      tone: fallos.length > 0 ? 'info' : 'success',
-      title: t('list.importResult', {
-        created: total.creados,
-        updated: total.actualizados,
-        failed: fallos.length,
-      }),
-      ...(total.ignoradas.size > 0
-        ? { description: t('list.importIgnored', { columns: [...total.ignoradas].join(', ') }) }
-        : {}),
-    });
-    for (const f of fallos.slice(0, 5)) aviso.notify({ tone: 'danger', title: f });
-    if (total.creados + total.actualizados > 0) onImportado();
-    setImportando(false);
   }
 
-  const todosSeleccionados = registros.length > 0 && seleccionados.size === registros.length;
+  async function deshacerImportacion(lotes: string[]): Promise<void> {
+    try {
+      const r = await revertirImportaciones(lotes);
+      aviso.notify({
+        tone: 'success',
+        title: t('list.importUndone', { deleted: r.borrados, restored: r.restaurados }),
+        ...(r.intactos > 0 ? { description: t('list.importUndoKept', { n: r.intactos }) } : {}),
+      });
+    } catch (err) {
+      aviso.notify({
+        tone: 'danger',
+        title: t('list.importUndoFailed'),
+        description: mensajeDeError(err, t),
+      });
+    } finally {
+      onInvalidar(modelo.clave);
+    }
+  }
+
+  const todosSeleccionados = registros.length > 0 && marcadas.length === registros.length;
+  // La papelera vacía tiene su propio estado (vacio.ts).
+  const vacio = vacioDeLista({ papelera, estado, busqueda });
 
   function toggleTodos(): void {
-    if (seleccionados.size === registros.length) {
+    if (marcadas.length === registros.length) {
       setSeleccionados(new Set());
     } else {
       setSeleccionados(new Set(registros.map((r) => r.id)));
@@ -1600,27 +1713,22 @@ function Lista({
   const { cancelar: cancelarSeleccionRegistro } = mantenerRegistro;
   useEffect(() => cancelarSeleccionRegistro(), [registros, cancelarSeleccionRegistro]);
 
-  async function ejecutarLote(
-    accion: 'estado' | 'borrar' | 'restaurar',
-    nuevoEstado?: string,
-  ): Promise<void> {
-    if (seleccionados.size === 0) return;
+  async function ejecutarLote(accion: AccionDeLote, nuevoEstado?: string): Promise<void> {
+    if (marcadas.length === 0) return;
     setEjecutandoLote(true);
     try {
-      await api<{ afectados: number }>(`${modelo.clave}/lote`, {
-        method: 'POST',
-        body: JSON.stringify({
-          accion,
-          ids: Array.from(seleccionados),
-          estado: nuevoEstado,
-        }),
-      });
-      aviso.notify({
-        tone: 'success',
-        title: accion === 'borrar' ? t('toast.deleted') : t('toast.saved'),
-      });
+      await aplicarLote(
+        aviso,
+        t,
+        modelo.clave,
+        accion,
+        marcadas,
+        // Olvida la caché del modelo y vuelve a pedir la lista abierta: lo devuelto o
+        // tirado deja de verse (en Fyne, `recargarModelo`).
+        () => onInvalidar(modelo.clave),
+        nuevoEstado,
+      );
       setSeleccionados(new Set());
-      onEstado(estado);
     } catch (err) {
       aviso.notify({
         tone: 'danger',
@@ -1740,6 +1848,7 @@ function Lista({
                   if (ficheros.length > 0) void importarFicheros(ficheros);
                 }}
               />
+              {dialogoImportacion}
               <Button
                 variant="secondary"
                 size="sm"
@@ -1763,7 +1872,7 @@ function Lista({
 
       {/* Barra de Acciones en Lote (Estilo Odoo). En móvil, UNA fila que se
           desplaza de lado (ver scrollX.ts): envolver robaba dos filas al listado. */}
-      {seleccionados.size > 0 ? (
+      {marcadas.length > 0 ? (
         <div
           data-scroll-x
           ref={barraLoteRef}
@@ -1774,14 +1883,15 @@ function Lista({
           )}
         >
           <div class="flex items-center gap-2">
-            <Badge tone="info">{t('list.selectedCount', { n: String(seleccionados.size) })}</Badge>
+            <Badge tone="info">{t('list.selectedCount', { n: String(marcadas.length) })}</Badge>
             <Button variant="ghost" size="xs" onClick={() => setSeleccionados(new Set())}>
               {t('list.deselect')}
             </Button>
           </div>
 
           <div class="flex flex-wrap items-center gap-2">
-            {modelo.estados && modelo.estados.length > 0 ? (
+            {/* En la papelera no se cambia el estado (el lote no toca lo borrado): se devuelve. */}
+            {loteOfrece.cambiarEstado && modelo.estados ? (
               <div class="flex items-center gap-1">
                 <span class="text-text-subtle text-xs">{t('list.batchState')}:</span>
                 <select
@@ -1810,33 +1920,46 @@ function Lista({
               size="xs"
               href={withBase(
                 baseDeLaApp(),
-                `/api/${modelo.clave}/export?ids=${Array.from(seleccionados).join(',')}`,
+                `/api/${modelo.clave}/export?ids=${marcadas.join(',')}`,
               )}
             >
               <Icon name="download" size={12} class="mr-1" />
               {t('list.exportCsv')}
             </Button>
 
-            <Button
-              variant="ghost"
-              size="xs"
-              // El diálogo de la suite, de peligro, y no `window.confirm`: el nativo salía
-              // con el título del navegador, sin tono y sin foco atrapado (Fyne ya lo hacía).
-              onClick={() => {
-                void confirmarLote({
-                  titulo: t('list.batchDelete'),
-                  mensaje: t('list.batchDeleteConfirm', { n: String(seleccionados.size) }),
-                  confirmLabel: t('list.batchDelete'),
-                  tone: 'danger',
-                }).then((si) => {
-                  if (si) void ejecutarLote('borrar');
-                });
-              }}
-              disabled={ejecutandoLote}
-              class="text-danger hover:bg-danger-bg"
-            >
-              {t('list.batchDelete')}
-            </Button>
+            {loteOfrece.accion === 'restaurar' ? (
+              // Dentro de la papelera, la acción es DEVOLVER (lib/papelera.ts): tirar lo ya
+              // tirado no hacía nada y su «Deshacer» sacaba de aquí lo que ya estaba.
+              <Button
+                variant="secondary"
+                size="xs"
+                onClick={() => void ejecutarLote('restaurar')}
+                disabled={ejecutandoLote}
+              >
+                {t('action.restore')}
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="xs"
+                // El diálogo de la suite, de peligro, y no `window.confirm`: el nativo salía
+                // con el título del navegador, sin tono y sin foco atrapado (Fyne ya lo hacía).
+                onClick={() => {
+                  void confirmarLote({
+                    titulo: t('list.batchDelete'),
+                    mensaje: t('list.batchDeleteConfirm', { n: String(marcadas.length) }),
+                    confirmLabel: t('list.batchDelete'),
+                    tone: 'danger',
+                  }).then((si) => {
+                    if (si) void ejecutarLote('borrar');
+                  });
+                }}
+                disabled={ejecutandoLote}
+                class="text-danger hover:bg-danger-bg"
+              >
+                {t('list.batchDelete')}
+              </Button>
+            )}
             {dialogoLote}
           </div>
         </div>
@@ -1904,13 +2027,11 @@ function Lista({
         />
       ) : registros.length === 0 ? (
         <EmptyState
-          title={t('list.empty')}
-          {...(!estado && !busqueda
-            ? { description: t('list.emptyHint', { action: t('action.new') }) }
-            : {})}
-          illustration={<Icon name="building" size={32} class="text-text-subtle" />}
+          title={t(vacio.titulo)}
+          {...(vacio.pista ? { description: t(vacio.pista, { action: t('action.new') }) } : {})}
+          illustration={<Icon name={vacio.icono} size={32} class="text-text-subtle" />}
           action={
-            estado || busqueda ? (
+            vacio.accion === 'limpiar' ? (
               <Button
                 variant="secondary"
                 size="sm"
@@ -2274,6 +2395,7 @@ function Ficha({
   onDuplicar,
   onConvertido,
   onGuardado,
+  onInvalidar,
   enPapelera,
   facturae,
   requisitos,
@@ -2300,6 +2422,8 @@ function Ficha({
   /** Algo cambió en las tareas (el contador de la barra lateral). */
   onTareas: () => void;
   onGuardado: () => void;
+  /** El «Deshacer» del borrado: refresca el modelo sin cerrar la ficha que haya. */
+  onInvalidar: (clave: string) => void;
   t: Traducir;
 }): JSX.Element {
   const altas = useContext(AltasContext);
@@ -2529,9 +2653,8 @@ function Ficha({
     if (!registro) return;
     // PREGUNTAR ANTES. Borrar estaba a un clic y sin vuelta atrás visible: el
     // botón vive al lado de «Duplicar», y confundirlos se paga con un documento
-    // que desaparece de todas las listas. Va a la papelera y no se destruye, pero
-    // desde la interfaz no hay forma de sacarlo de ahí, así que para quien lo
-    // pulsa es definitivo — y se le pregunta como tal.
+    // que desaparece de todas las listas. Va a la papelera y no se destruye, y el
+    // aviso lleva «Deshacer» (lib/papelera.ts); aun así se pregunta antes.
     const seguro = await confirmar({
       titulo: t('action.delete'),
       mensaje: t('confirm.delete', { nombre: nombreDe(registro) }),
@@ -2542,7 +2665,9 @@ function Ficha({
     setGuardando(true);
     try {
       await api(`${modelo.clave}/${registro.id}`, { method: 'DELETE' });
-      aviso2.notify({ tone: 'success', title: t('toast.deleted') });
+      // «Deshacer» no cierra nada: para entonces la ficha puede ser otra (o un alta a
+      // medio escribir); solo refresca la lista si sigue siendo la de este modelo.
+      avisarPapelera(aviso2, t, modelo.clave, [registro.id], () => onInvalidar(modelo.clave));
       onGuardado();
     } catch (err) {
       setFallo(mensajeDeError(err, t));
@@ -2593,9 +2718,11 @@ function Ficha({
               UBL
             </Button>
           ) : null}
+          {/* Tinta y velo del fantasma de al lado: con `text-text` era el único glifo
+              negro de la fila. */}
           {registro && modelo.clave === 'factura_venta' ? (
             <a
-              class="sytue-focus-ring text-text hover:bg-bg-subtle rounded-control inline-flex items-center px-2 py-1.5"
+              class="sytue-focus-ring text-primary-text hover:bg-selected rounded-control inline-flex items-center px-2 py-1.5"
               title={t('form.print')}
               aria-label={t('form.print')}
               href={withBase(baseDeLaApp(), `/api/${modelo.clave}/${registro.id}/imprimir`)}

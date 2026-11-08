@@ -16,6 +16,7 @@ import type { DocKind } from '@sytue/api-clients';
 import { Button, Dropdown, MenuItem, ProductIcon, useToast } from '@sytue/ui';
 import { openInApp, inNativeShell } from '@sytue/shell';
 import { ShareDialog } from '../dialogs/ShareDialog';
+import { MenuHistorial } from '../HistorialVersiones';
 import { EditorIcon } from '../icons';
 import { cambioDePresencia, peerColor, peerName, quienCambia } from '../state/cursors';
 import { SIN_LLAMADA, enLlamada, nombreDe, parseLlamada } from '../state/llamada';
@@ -27,6 +28,13 @@ const ICON_BTN =
   'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-sm text-text-muted ' +
   'hover:bg-bg-subtle hover:text-text ' +
   'sytue-focus-ring';
+
+/** El chip de guardado: texto apagado como siempre, y ahora botón (historial o
+ *  reintento) con su hover, su foco y su diana táctil. */
+const CHIP_GUARDADO =
+  'text-text-muted inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-sm px-1.5 text-xs ' +
+  'hover:bg-bg-subtle hover:text-text aria-expanded:bg-selected sytue-focus-ring ' +
+  'max-md:min-w-0 max-md:shrink pointer-coarse:min-h-[max(44px,2.75rem)]';
 
 const SAVE_CHIP: Record<SaveState, { dot: string; labelKey: DocsKey }> = {
   saved: { dot: 'bg-success', labelKey: 'header.save.saved' },
@@ -270,13 +278,43 @@ export function EditorHeader({ ctx }: { ctx: EditorContext }): JSX.Element {
       {/* En móvil cede ancho antes que el título: con «Guardado hace 10 s»
           entero, al nombre del documento le quedaban 72px y se leía «Prue». El
           anuncio a lectores de pantalla (aria-live) va con el texto completo. */}
-      <span
-        class="text-text-muted inline-flex shrink-0 items-center gap-1.5 text-xs max-md:min-w-0 max-md:shrink max-md:truncate"
-        aria-live="polite"
-      >
-        <span class={`h-1.5 w-1.5 rounded-full ${chipDot}`} aria-hidden="true" />
+      {/* El chip SE PULSA (2026-11-05): con el guardado en error reintenta ya, sin
+          esperar al reintento programado; si no, abre el historial de versiones, que es
+          a donde va quien mira cuándo se guardó. Sin red no hace nada —ni el historial
+          ni el guardado llegan al servicio— y se queda en texto. Lo que hace lo dice el
+          `title`. El anuncio a lectores NO va dentro de las ramas: cada una monta su nodo, y
+          una región viva que se inserta ya con texto no se anuncia en NVDA, JAWS ni
+          VoiceOver —justo al pasar a «Error al guardar» o a sin red—. Va en una sola
+          región, siempre montada, debajo. */}
+      <span class="sr-only" aria-live="polite">
         {chipLabel}
       </span>
+      {ctx.connection === 'offline' ? (
+        <span class={`${CHIP_GUARDADO} cursor-default`}>
+          <span class={`h-1.5 w-1.5 rounded-full ${chipDot}`} aria-hidden="true" />
+          {chipLabel}
+        </span>
+      ) : ctx.save === 'error' ? (
+        <button
+          type="button"
+          class={CHIP_GUARDADO}
+          title={t('header.save.retry')}
+          onClick={() => ctx.saveNow()}
+        >
+          <span class={`h-1.5 w-1.5 shrink-0 rounded-full ${chipDot}`} aria-hidden="true" />
+          <span class="truncate">{chipLabel}</span>
+        </button>
+      ) : (
+        <MenuHistorial
+          ctx={ctx}
+          trigger={(trigger) => (
+            <button type="button" class={CHIP_GUARDADO} title={t('versions.history')} {...trigger}>
+              <span class={`h-1.5 w-1.5 shrink-0 rounded-full ${chipDot}`} aria-hidden="true" />
+              <span class="truncate">{chipLabel}</span>
+            </button>
+          )}
+        />
+      )}
 
       <div class="flex-1 max-md:hidden" />
 

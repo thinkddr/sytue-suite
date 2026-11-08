@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"git.sytue.eu/sytue/one/platform/pkg/apns"
 	pcfg "git.sytue.eu/sytue/one/platform/pkg/config"
 )
 
@@ -144,6 +145,13 @@ type Config struct {
 	// campana enseña su identificador.
 	IDNombresOrgsSecret string
 
+	// APNs son las credenciales de proveedor de Apple para despertar las apps de iOS
+	// por su widget (internal/despertar, ADR 0039 y 0078): la clave `.p8` ENTERA, su
+	// identificador y el del equipo. Las tres vacías ⇒ nadie se despierta y el registro
+	// de aparatos sigue; a medias, el Hub no arranca. Host vacío es el de producción
+	// (el de pruebas, api.sandbox.push.apple.com, para compilaciones de desarrollo).
+	APNs apns.Config
+
 	// Descargas es el bucket de los instaladores nativos, el MISMO que sirve el portal
 	// (`apps/frontend/apps/portal/src/lib/descargas.ts`) y con la misma credencial de
 	// solo lectura. Lo pide el actualizador de las apps de escritorio, que hablan con el
@@ -241,6 +249,12 @@ func Load() (Config, error) {
 		CORSAllowedOrigins:  l.GetCSVDefault("CORS_ALLOWED_ORIGINS", pcfg.FirstPartyCORSOrigins(base.Env)),
 		InternalSecret:      l.HubInternalSecret(base.Env),
 		IDNombresOrgsSecret: l.Get("ID_NOMBRES_ORGS_SECRET"),
+		APNs: apns.Config{
+			KeyP8:  l.Get("SYTUE_APNS_KEY_P8"),
+			KeyID:  l.Get("SYTUE_APNS_KEY_ID"),
+			TeamID: l.Get("SYTUE_APNS_TEAM_ID"),
+			Host:   l.Get("SYTUE_APNS_HOST"),
+		},
 
 		Descargas: Descargas{
 			Endpoint:        strings.TrimSpace(l.Get("DOWNLOADS_ENDPOINT")),

@@ -21,6 +21,8 @@ export const fr: Catalog = {
   'ui.openNav': 'Ouvrir la navigation',
   'ui.closeNav': 'Fermer la navigation',
   'ui.backToList': 'Revenir à la liste',
+  'ui.suiteOpen': 'Sytue : applications, recherche, notifications et compte',
+  'ui.suiteClose': 'Revenir à l’application',
   'ui.noResults': 'Aucun résultat.',
 
   'ui.meter.almostFull': 'presque plein',
@@ -67,6 +69,9 @@ export const fr: Catalog = {
   'shell.lock.reasonNotebook': 'ouvrir votre carnet chiffré',
   'shell.lock.faceIdUsage':
     'Sytue utilise Face ID pour déverrouiller votre session à l’ouverture de l’app.',
+  'shell.widgets.wake': 'Mettre à jour les widgets quand l’app est fermée',
+  'shell.widgets.wakeHelp':
+    'Quand quelque chose change chez vous, Sytue réveille l’app avec une notification Apple vide pour qu’elle actualise son widget. Apple voit quelle app et quand, jamais ce qui a changé.',
   'shell.call.microphoneUsage':
     'Sytue Rooms n’utilise le micro que pendant un appel, et seulement si vous l’activez.',
   'shell.call.cameraUsage':
@@ -188,7 +193,7 @@ export const fr: Catalog = {
     'Le domaine {domain} de {site} ne fonctionne pas : vérifiez sa configuration',
   'notifications.kind.pages.erp.failed':
     'La commande {number} de {site} n’est pas arrivée dans Sytue ERP',
-  'notifications.kind.pages.settings.changed': '{actor} a modifié un réglage de Sytue Web',
+  'notifications.kind.pages.settings.changed': '{actor} a modifié un réglage de Sytue Webs',
   'notifications.kind.pages.export.ready': 'Votre export de {site} est prêt',
   'notifications.kind.pages.store.busy':
     'La boutique de {site} a trop de commandes en attente de paiement',
@@ -380,6 +385,8 @@ export const fr: Catalog = {
   'widgets.compose': 'Rédiger',
   'widgets.storage': 'Stockage',
   'widgets.create': 'Créer un événement',
+  'widgets.updatedAgo': 'Mis à jour {time}',
+  'widgets.updatedAt': 'Mis à jour : {time}',
 
   'linkedServices.services': 'Services',
   'linkedServices.changed':
@@ -392,6 +399,7 @@ export const fr: Catalog = {
   'linkedServices.notGranted':
     'L’accès à ce service n’a pas été accordé. Reconnectez le compte pour choisir ses autorisations.',
   'linkedServices.connected': 'Services connectés',
+  'linkedServices.exists': 'Ce compte était déjà connecté et il est maintenant ouvert.',
   'linkedServices.providerData': 'Les modifications sont enregistrées chez votre fournisseur.',
   'linkedServices.writeUnknown':
     'Le fournisseur n’a pas confirmé l’enregistrement. Actualisez et vérifiez avant de réessayer.',

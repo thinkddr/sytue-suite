@@ -160,3 +160,23 @@ func TestSelectorYMenuMovilEnHojaYDesplazablesConElDedo(t *testing.T) {
 		t.Fatalf("arrastrar el menú con el dedo no desplazó sus elementos: desplazado=%v", m.desplazado)
 	}
 }
+
+// TestElSelectorSinAnchoMideSuOpcionMasLarga: un `<select>` sin ancho mide su opción más
+// larga, y no recorta «Gestión» en «G…».
+//
+// VISTO EN ROJO (2026-11-06): el mínimo dejaba un rem para el texto.
+func TestElSelectorSinAnchoMideSuOpcionMasLarga(t *testing.T) {
+	for _, talla := range []TallaCampo{CampoMD, CampoSM} {
+		s := NuevoSelector([]string{"Lectura", "Gestión de permisos"}, nil)
+		s.Talla = talla
+		m, sel := medidasCampo[talla], medidasSelector[talla]
+		quiero := Medir("Gestión de permisos", m.texto, Normal).Width + 2*tema.Borde + m.margen + sel.derecha
+		if got := s.MinSize().Width; got < quiero {
+			t.Errorf("talla %v: el selector mide %v y su opción más larga pide %v", talla, got, quiero)
+		}
+		s.Ancho = 50
+		if got := s.MinSize().Width; got != 50 {
+			t.Errorf("talla %v: con Ancho 50 mide %v", talla, got)
+		}
+	}
+}

@@ -260,6 +260,11 @@ export const hu: AppCatalog<typeof en> = {
     one: '1 elem a kukába került.',
     other: '{count} elem a kukába került.',
   },
+  'files.batch.restored': { one: '1 elem visszaállítva.', other: '{count} elem visszaállítva.' },
+  'files.batch.restorePartial': {
+    one: '1 elemet nem sikerült visszaállítani, továbbra is a kukában van.',
+    other: '{count} elemet nem sikerült visszaállítani, továbbra is a kukában vannak.',
+  },
   'files.batch.trashFailed': 'A kijelölést nem sikerült a kukába helyezni.',
   'files.batch.moveTitle': { one: '1 elem áthelyezése', other: '{count} elem áthelyezése' },
   'files.batch.moveDone': { one: '1 elem áthelyezve.', other: '{count} elem áthelyezve.' },
@@ -274,6 +279,10 @@ export const hu: AppCatalog<typeof en> = {
   'action.rename': 'Átnevezés',
   'action.move': 'Áthelyezés ide…',
   'action.copy': 'Másolat készítése',
+  'action.copyLink': 'Hivatkozás másolása',
+  'action.linkCopied':
+    'A hivatkozás kimásolva. Csak azoknak nyílik meg, akiknek már van hozzáférésük.',
+  'action.copyLinkFailed': 'A hivatkozást nem sikerült kimásolni.',
   'action.shareLink': 'Hivatkozás megosztása',
   'action.openInApp': 'Megnyitás az alkalmazásban',
   'action.openInEditor': 'Megnyitás a szerkesztőben',
@@ -486,6 +495,18 @@ export const hu: AppCatalog<typeof en> = {
   'trash.purged': '„{name}” véglegesen törölve.',
   'trash.purgeDenied': '„{name}” nem törölhető',
   'trash.purgeFailed': 'A törlés nem sikerült.',
+  'trash.emptyAll': 'Kuka ürítése',
+  'trash.emptyAllTitle': 'Kiüríti a kukát?',
+  'trash.emptyAllBody': {
+    one: 'A kukában lévő elem a verzióelőzményekkel együtt véglegesen törlődik. Utána nincs mód a visszaszerzésére.',
+    other:
+      'A kukában lévő {count} elem a verzióelőzményekkel együtt véglegesen törlődik. Utána nincs mód a visszaszerzésükre.',
+  },
+  'trash.emptiedAll': 'A kuka kiürítve.',
+  'trash.emptyAllPartial': {
+    one: '1 elemet nem sikerült törölni, továbbra is a kukában van.',
+    other: '{count} elemet nem sikerült törölni, továbbra is a kukában vannak.',
+  },
   'trash.purgeTitle': 'Véglegesen törli?',
   'trash.purgeBodyFolder':
     '„{name}” és a benne lévő összes elem tartalma a verzióelőzményekkel együtt törlődik a Sytue szervereiről. Utána nincs mód a visszaszerzésére, sem innen, sem az ügyfélszolgálaton keresztül. Cserébe felszabadul az általa foglalt hely.',

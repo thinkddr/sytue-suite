@@ -4,6 +4,8 @@
   "action.classified": "Klassifikazzjoni · {name}",
   "action.classify": "Ikklassifika",
   "action.copy": "Agħmel kopja",
+  "action.copyLink": "Ikkopja l-link",
+  "action.copyLinkFailed": "Il-link ma setax jiġi kkupjat.",
   "action.delete": "Mexxi għall-barmil",
   "action.desktopBody": "Jekk għadha mhix installata, tista' tniżżilha.",
   "action.desktopCta": "Ara t-tniżżil",
@@ -12,6 +14,7 @@
   "action.downloadName": "Niżżel {name}",
   "action.downloadZip": "Niżżel (ZIP)",
   "action.editorFailed": "L-editur ma setax jiftaħ dan il-fajl.",
+  "action.linkCopied": "Il-link ġie kkupjat. Jinfetaħ biss għal min diġà għandu aċċess.",
   "action.mailFailed": "Il-kompożitur tal-email ma setax jinfetaħ",
   "action.menu": "Azzjonijiet għal {name}",
   "action.more": "Aktar azzjonijiet",
@@ -87,6 +90,18 @@
     "few": "Mexxi {count} elementi",
     "many": "Mexxi {count} element",
     "other": "Mexxi {count} element"
+  },
+  "files.batch.restorePartial": {
+    "one": "Element wieħed ma setax jiġi rrestawrat; għadu fil-barmil.",
+    "few": "{count} elementi ma setgħux jiġu rrestawrati; għadhom fil-barmil.",
+    "many": "{count} element ma setgħux jiġu rrestawrati; għadhom fil-barmil.",
+    "other": "{count} element ma setgħux jiġu rrestawrati; għadhom fil-barmil."
+  },
+  "files.batch.restored": {
+    "one": "Element wieħed ġie rrestawrat.",
+    "few": "{count} elementi ġew irrestawrati.",
+    "many": "{count} element ġew irrestawrati.",
+    "other": "{count} element ġew irrestawrati."
   },
   "files.batch.trashBody": {
     "one": "Element wieħed se jintbagħat fil-barmil. Tista' tirrestawrah minn hemm.",
@@ -587,6 +602,21 @@
     "other": "Ittellgħu {count} fajl."
   },
   "team.upload.partial": "Ittellgħu {uploaded} minn {count}.",
+  "trash.emptiedAll": "Il-barmil tbattal.",
+  "trash.emptyAll": "Battal il-barmil",
+  "trash.emptyAllBody": {
+    "one": "L-element fil-barmil jitħassar għal kollox, flimkien mal-istorja tal-verżjonijiet. Wara m'hemm l-ebda mod kif jinġieb lura.",
+    "few": "Il-{count} elementi fil-barmil jitħassru għal kollox, flimkien mal-istorja tal-verżjonijiet. Wara m'hemm l-ebda mod kif jinġiebu lura.",
+    "many": "Il-{count} element fil-barmil jitħassru għal kollox, flimkien mal-istorja tal-verżjonijiet. Wara m'hemm l-ebda mod kif jinġiebu lura.",
+    "other": "Il-{count} element fil-barmil jitħassru għal kollox, flimkien mal-istorja tal-verżjonijiet. Wara m'hemm l-ebda mod kif jinġiebu lura."
+  },
+  "trash.emptyAllPartial": {
+    "one": "Element wieħed ma setax jitħassar; għadu fil-barmil.",
+    "few": "{count} elementi ma setgħux jitħassru; għadhom fil-barmil.",
+    "many": "{count} element ma setgħux jitħassru; għadhom fil-barmil.",
+    "other": "{count} element ma setgħux jitħassru; għadhom fil-barmil."
+  },
+  "trash.emptyAllTitle": "Tbattal il-barmil?",
   "trash.emptyBody": "Il-fajls u l-folders li tħassar jidhru hawn u tkun tista' tirrestawrahom.",
   "trash.emptyTitle": "Il-barmil huwa vojt",
   "trash.errorTitle": "Il-barmil ma setax jiġi llowdjat",

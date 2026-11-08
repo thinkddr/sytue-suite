@@ -44,7 +44,7 @@ type Celda struct{ C, F int }
 type Rejilla struct {
 	widget.BaseWidget
 
-	// Contexto es el del editor, para Ctrl/Cmd+P con el foco en la rejilla; nil, nada.
+	// Contexto es el del editor, para Ctrl/Cmd+P y el zoom con el foco en la rejilla; nil, nada.
 	Contexto *editor.Contexto
 
 	L *Libro
@@ -1017,7 +1017,7 @@ func (r *Rejilla) TypedShortcut(s fyne.Shortcut) {
 // rehace, Ctrl+Mayús+V pega solo valores, Ctrl+B y Ctrl+I son negrita y cursiva, y
 // Ctrl+Inicio y Ctrl+Fin van a A1 y a la última celda con algo de la hoja.
 func (r *Rejilla) atajo(a *desktop.CustomShortcut) {
-	if r.Contexto.AtajoImprimir(a) {
+	if r.Contexto.AtajoDelEditor(a) {
 		return
 	}
 	ctrl := fyne.KeyModifierShortcutDefault

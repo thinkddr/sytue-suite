@@ -8,8 +8,11 @@ package ui
 import (
 	"image/color"
 	"slices"
+	"strings"
+	"unicode/utf8"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/driver/desktop"
 	temafyne "fyne.io/fyne/v2/theme"
@@ -247,12 +250,59 @@ type editor struct {
 	alEnfocar func(bool)
 	// alTecla es el TypedKey de la Entrada que lo envuelve (ver editor.TypedKey).
 	alTecla func(*fyne.KeyEvent)
+	// alPegar es el AlPegar de la Entrada (ver editor.TypedShortcut).
+	alPegar func(string) bool
 }
 
 func nuevoEditor(alEnfocar func(bool)) *editor {
 	e := &editor{alEnfocar: alEnfocar}
 	e.ExtendBaseWidget(e)
 	return e
+}
+
+// AnchoCursor es el grosor del cursor de texto: el `caret` de un `<input>`, 1 px de CSS.
+const AnchoCursor float32 = 1
+
+// CreateRenderer es el de `widget.Entry` sin su rectángulo de borde. El tema del editor
+// da a InputBorder el ancho del cursor (ver temaEditor.Size), y Fyne usa esa misma
+// medida para trazar un borde que, al enfocar, pinta del color primario y, deshabilitado,
+// del de la marca de agua: la caja y el aro son NUESTROS, así que ese borde sobra.
+func (e *editor) CreateRenderer() fyne.WidgetRenderer {
+	return sinBordeDeFyne(e.Entry.CreateRenderer())
+}
+
+// sinBordeDeFyne envuelve el renderer de `widget.Entry` y deja fuera de lo que se pinta
+// su borde: el único rectángulo HIJO DIRECTO con trazo (el relleno del fondo no lo
+// lleva). El resto —colocar, medir, repintar— es el de Fyne tal cual. Fyne no pide el
+// renderer de un Entry por su tipo concreto (solo el de su contenido interno), así que
+// envolverlo no rompe nada; si algún día lo hiciera, `TestElCursorDeTextoSeVe` y los
+// tests del campo se pondrían rojos.
+func sinBordeDeFyne(r fyne.WidgetRenderer) fyne.WidgetRenderer {
+	return &rendererSinBorde{WidgetRenderer: r}
+}
+
+type rendererSinBorde struct {
+	fyne.WidgetRenderer
+	visto   []fyne.CanvasObject
+	objetos []fyne.CanvasObject
+}
+
+func (r *rendererSinBorde) Objects() []fyne.CanvasObject {
+	// Se pide en cada fotograma: se recalcula solo si la lista de Fyne ha cambiado
+	// (le añade el icono de validación o el de acción después de crearse).
+	todos := r.WidgetRenderer.Objects()
+	if slices.Equal(todos, r.visto) && r.objetos != nil {
+		return r.objetos
+	}
+	r.visto = slices.Clone(todos)
+	r.objetos = make([]fyne.CanvasObject, 0, len(todos))
+	for _, o := range todos {
+		if rect, es := o.(*canvas.Rectangle); es && rect.StrokeWidth > 0 {
+			continue
+		}
+		r.objetos = append(r.objetos, o)
+	}
+	return r.objetos
 }
 
 func (e *editor) FocusGained() {
@@ -288,6 +338,11 @@ func (e *editor) TypedKey(k *fyne.KeyEvent) {
 // lo conoce, y se perdía. Los que son del campo —copiar, pegar, deshacer, y moverse o
 // borrar por palabras con las flechas y el retroceso— se quedan en él.
 func (e *editor) TypedShortcut(s fyne.Shortcut) {
+	// Pegar pasa antes por `AlPegar`: aquí llegan el ⌘V del teclado (vía la Entrada) y
+	// el «Pegar» del menú contextual de `widget.Entry`, que llama a este mismo método.
+	if p, es := s.(*fyne.ShortcutPaste); es && e.alPegar != nil && p.Clipboard != nil && e.alPegar(p.Clipboard.Content()) {
+		return
+	}
 	if subeAlLienzo(s) {
 		if c := atajosDelLienzo(e); c != nil {
 			c.TypedShortcut(s)
@@ -419,8 +474,15 @@ func (t temaEditor) Size(n fyne.ThemeSizeName) float32 {
 	switch n {
 	case temafyne.SizeNameText:
 		return t.escalon.Tam
-	case temafyne.SizeNameInputBorder, temafyne.SizeNameInnerPadding,
-		temafyne.SizeNamePadding, temafyne.SizeNameInputRadius:
+	// InputBorder NO es cero aunque el borde de Fyne no se vea: `widget.Entry` dibuja el
+	// CURSOR con ese mismo ancho (`moveCursor`: `Resize(inputBorder, lineHeight)`), y
+	// con 0 el cursor de texto desaparecía en todos los campos de la suite. Fyne lo
+	// compensa en la colocación —el texto se mete `inset` hacia dentro y el contenido
+	// se baja lo mismo—, así que el texto cae en el mismo píxel; el rectángulo del
+	// borde, que sí se pintaría al enfocar, lo quita `sinBordeDeFyne`.
+	case temafyne.SizeNameInputBorder:
+		return AnchoCursor
+	case temafyne.SizeNameInnerPadding, temafyne.SizeNamePadding, temafyne.SizeNameInputRadius:
 		return 0
 	// El interlineado es la diferencia entre la caja de línea de CSS y la de la fuente.
 	// Con esto, en un área de texto la SEGUNDA línea cae donde la pone el navegador; sin
@@ -494,6 +556,10 @@ type Entrada struct {
 	// entonces no se puede seguir escribiendo — que es la mitad de lo que hace útil a
 	// un buscador.
 	AlTeclear func(*fyne.KeyEvent) bool
+	// AlPegar ve lo que se pega ANTES que el campo y devuelve `true` cuando se lo queda.
+	// Un campo de una línea junta las líneas pegadas en una; la captura de Notepads
+	// prefiere hacer una nota por línea.
+	AlPegar func(texto string) bool
 	// Busqueda es `type="search"`: Escape vacía lo escrito, como en el navegador. Con el
 	// campo vacío, Escape sigue su camino (el diálogo o el menú de encima).
 	Busqueda bool
@@ -650,6 +716,7 @@ func (e *Entrada) montar(multilinea bool) {
 		}
 	})
 	e.editor.alTecla = e.TypedKey
+	e.editor.alPegar = func(s string) bool { return e.AlPegar != nil && e.AlPegar(s) }
 	e.editor.MultiLine = multilinea
 	e.editor.OnChanged = func(s string) {
 		e.recentrar()
@@ -709,6 +776,33 @@ func (e *Entrada) PonerMarcaDeAgua(s string) {
 
 // AlCambiar se llama con el texto nuevo en cada pulsación.
 func (e *Entrada) AlCambiar(f func(string)) { e.alCambiar = f }
+
+// Pegar pega `texto` como lo pegaría el campo —en lugar de lo seleccionado, o donde
+// está el cursor— sin pasar por AlPegar, y dice entre qué runas del texto ha quedado.
+// En un campo de una línea cada salto es un espacio, como al pegar siempre.
+//
+// Es para quien se queda lo pegado en `AlPegar` y necesita saber DÓNDE iba: la captura
+// de Notepads guarda los saltos aparte y el campo solo los enseña. La selección de
+// `widget.Entry` no se puede leer desde fuera, así que el sitio lo decide el motor del
+// campo, que es quien sabe hacia dónde se seleccionó.
+func (e *Entrada) Pegar(texto string) (inicio, fin int) {
+	if e.soloLectura || e.inerte {
+		fin = e.editor.CursorTextOffset()
+		return fin, fin
+	}
+	if !e.editor.MultiLine {
+		texto = strings.ReplaceAll(texto, "\n", " ")
+	}
+	e.editor.Entry.TypedShortcut(&fyne.ShortcutPaste{Clipboard: textoAPegar(texto)})
+	fin = e.editor.CursorTextOffset()
+	return fin - utf8.RuneCountInString(texto), fin
+}
+
+// textoAPegar es un portapapeles que solo tiene ese texto: el de `Pegar`.
+type textoAPegar string
+
+func (t textoAPegar) Content() string { return string(t) }
+func (textoAPegar) SetContent(string) {}
 
 // PonerTextoAlFinal escribe en el campo y deja el cursor detrás de lo escrito: es lo
 // que hace falta para reescribir lo que se está tecleando (los atajos `dd`/`tt` de

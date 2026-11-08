@@ -415,7 +415,7 @@ func TestLaPortadaDeMarcoEsBienvenidaYTablero(t *testing.T) {
 		{web, `'marco:flex-row marco:items-center marco:px-3 marco:py-2.5 marco:[&>span:first-child]:scale-105',`, "la tesela compacta"},
 		{web, `marco:line-clamp-1 line-clamp-2 text-sm leading-snug`, "la descripción, a una línea"},
 		{web, `'marco:gap-2.5 marco:lg:grid-cols-1 grid items-start gap-6 lg:grid-cols-3',`, "«Hoy» y «Reciente», apiladas a 10"},
-		{web, "class={`marco:py-1 flex items-baseline gap-3 px-4 py-2 ${pasado ? 'opacity-60' : ''}`}", "el evento, a 4"},
+		{web, `hover:bg-bg-subtle focus-visible:bg-bg-subtle marco:py-1 flex items-baseline gap-3 px-4 py-2 transition-colors duration-150`, "el evento, a 4"},
 		{web, `marco:py-2 flex items-center gap-3 border-t px-4 py-2.5 text-sm`, "el pie de correo, a 8"},
 		{web, `{recientesVisibles(recent!, forma).map((item) => {`, "«Reciente» pinta solo las que tocan"},
 		{reciente, `export const RECIENTES_EN_MARCO = 3;`, "«Reciente» enseña tres"},
@@ -561,7 +561,8 @@ func TestTodoElDiaOcupaDosLineas(t *testing.T) {
 	for _, trozo := range []string{
 		`<span class="text-text-muted w-12 shrink-0 text-xs tabular-nums">`,
 		`{e.allDay ? t('today.allDay') : formatTime(locale, e.start)}`,
-		"class={`marco:py-1 flex items-baseline gap-3 px-4 py-2 ${pasado ? 'opacity-60' : ''}`}",
+		"<li key={e.id} class={pasado ? 'opacity-60' : undefined}>",
+		`hover:bg-bg-subtle focus-visible:bg-bg-subtle marco:py-1 flex items-baseline gap-3 px-4 py-2 transition-colors duration-150`,
 	} {
 		if !strings.Contains(web, trozo) {
 			t.Errorf("la web ya no dice %q: la fila de evento de aquí ha dejado de ser la suya", trozo)
@@ -821,6 +822,25 @@ func TestLasTarjetasMovilesPintanPapelBajoTodoSuContenido(t *testing.T) {
 				t.Errorf("%s a %g: bajo la última fila hay%v en vez de surface", forma, ancho, pixel)
 			}
 			guardar(t, img, fmt.Sprintf("hub-papel-%s-%g", forma, ancho))
+		}
+	}
+}
+
+// TestLaCabeceraDeLaTarjetaSigueSuCurva: la cabecera no tapa las esquinas de arriba de
+// la tarjeta. En la web las recorta el `overflow-hidden` de `Card`.
+//
+// VISTO EN ROJO (2026-11-06): el fondo `surface` de la cabecera tenía las esquinas
+// rectas y en la de arriba a la izquierda salía blanco en vez del fondo de la página.
+func TestLaCabeceraDeLaTarjetaSigueSuCurva(t *testing.T) {
+	l := lanzadorDePrueba(t)
+	img, r := pinta(t, l, ventana)
+	for _, card := range []*tarjeta{r.hoy, r.recientes} {
+		x := int(card.Position().X + tema.Borde + 1)
+		y := int(card.Position().Y + tema.Borde + 1)
+		cr, cg, cb, ca := img.At(x, y).RGBA()
+		got := color.NRGBA{R: uint8(cr >> 8), G: uint8(cg >> 8), B: uint8(cb >> 8), A: uint8(ca >> 8)}
+		if quiero := tema.Color("bg", tema.Claro); !parecido(got, quiero) {
+			t.Errorf("la esquina de «%s» pinta %v y fuera de la curva es el fondo %v", card.cabecera.Titulo, got, quiero)
 		}
 	}
 }

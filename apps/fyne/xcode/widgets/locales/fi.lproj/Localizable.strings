@@ -31,3 +31,4 @@
 "dataflow.item.events" = "Kalenteri";
 "dataflow.item.documents" = "Asiakirjat";
 "dataflow.item.contacts" = "Yhteystiedot";
+"widgets.updatedAgo" = "Päivitetty %@";

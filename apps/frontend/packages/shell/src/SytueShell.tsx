@@ -13,7 +13,17 @@
  */
 import type { ComponentChildren, JSX } from 'preact';
 import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
-import { ThemeProvider, ToastProvider, TopBar, SkipLink } from '@sytue/ui';
+import {
+  Avatar,
+  BarraUnicaContext,
+  ThemeProvider,
+  ToastProvider,
+  TopBar,
+  SkipLink,
+  ProductIcon,
+  nombreCorto,
+  type DestinosBarra,
+} from '@sytue/ui';
 import { HubClient, bearer } from '@sytue/api-clients';
 import { activateNativeOffline } from '@sytue/offline';
 import { useConnectivity } from '@sytue/offline/preact';
@@ -111,16 +121,48 @@ function SinOrganizacion(): JSX.Element | null {
   );
 }
 
-function OfflineStatus(): JSX.Element | null {
+function OfflineStatus({
+  compacto = false,
+  class: cls,
+}: {
+  compacto?: boolean;
+  class?: string;
+}): JSX.Element | null {
   const connectivity = useConnectivity();
   const t = useT();
   if (connectivity === 'online') return null;
+  if (compacto) {
+    // Con la barra del teléfono plegada: el punto ámbar en una pastilla del alto de los
+    // botones, y el rótulo para el lector de pantalla (y al pasar por encima). Cabe a 320
+    // junto al mes, «Hoy» y «+», que el rótulo entero no.
+    return (
+      <span
+        class={[
+          'border-chrome-border bg-chrome-hover inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border',
+          cls,
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        role="status"
+        aria-live="polite"
+        title={t('offline.description')}
+      >
+        <span class="bg-warning h-2 w-2 rounded-full" aria-hidden="true" />
+        <span class="sr-only">{t('offline.status')}</span>
+      </span>
+    );
+  }
   return (
     <span
       // Más apretado en <640px: con el aviso puesto, la fila de acciones de la
       // topbar se salía 3px de un iPhone SE. Se recorta el aire, no el rótulo:
       // «sin conexión» es justo lo que hay que poder leer yendo por la calle.
-      class="border-chrome-border bg-chrome-hover text-header-fg inline-flex h-8 items-center gap-2 rounded-md border px-2.5 text-sm font-semibold max-sm:gap-1.5 max-sm:px-1.5"
+      class={[
+        'border-chrome-border bg-chrome-hover text-header-fg inline-flex h-8 items-center gap-2 rounded-md border px-2.5 text-sm font-semibold max-sm:gap-1.5 max-sm:px-1.5',
+        cls,
+      ]
+        .filter(Boolean)
+        .join(' ')}
       role="status"
       aria-live="polite"
       title={t('offline.description')}
@@ -135,6 +177,57 @@ function OfflineStatus(): JSX.Element | null {
 // del selector de aplicaciones y vive en AppSwitcher.tsx, que la topbar monta
 // como `brand`, sobre la cabecera del carril (`rail`): la barra es clara y el
 // color de marca vive en esa esquina y en el menú lateral. marker-a1
+
+/**
+ * La topbar de la suite. En el teléfono es la barra ÚNICA: acoge la barra de la app
+ * (`BarraMovil` de @sytue/ui, que la porta aquí) y pliega la suite tras la entrada de la
+ * derecha, el avatar de la cuenta. Ver TopBar.tsx.
+ */
+function BarraDeLaSuite({
+  showSearch,
+  alDestinos,
+}: {
+  showSearch: boolean;
+  alDestinos: (d: DestinosBarra | null) => void;
+}): JSX.Element {
+  const { currentApp, user } = useShell();
+  const t = useT();
+  const [sinLeer, setSinLeer] = useState(0);
+  // El nombre de MARCA del producto («Mail», «CertiPDF»), el mismo del selector de apps
+  // y de Fyne, sin traducir en ningún idioma (decisión del dueño): es lo que se lee en la
+  // barra del teléfono cuando la app no pone título.
+  const producto = nombreCorto(currentApp) ?? 'Sytue';
+  // Los avisos sin leer, en el punto de la entrada (el de la campana, que plegada no se
+  // ve). Sin conexión NO lleva punto: ya se lee en su pastilla, junto a la entrada.
+  const aviso =
+    sinLeer > 0 ? { texto: t('notifications.buttonLabel', { count: sinLeer }) } : undefined;
+  return (
+    <TopBar
+      rail
+      brand={<AppSwitcher />}
+      center={showSearch ? <GlobalSearch /> : undefined}
+      actions={
+        <>
+          {/* En el teléfono, también desplegada, la pastilla en pequeño: con el ✕ delante
+              el rótulo entero no cabe a 320 en la mitad de los idiomas. */}
+          <OfflineStatus class="max-md:hidden" />
+          <OfflineStatus compacto class="md:hidden" />
+          <NotificationCenter alCambiarSinLeer={setSinLeer} />
+          <span class="bg-chrome-divider marco:invisible mx-1 h-6 w-px" aria-hidden="true" />
+          <AccountMenu />
+        </>
+      }
+      movil={{
+        titulo: producto,
+        marca: <ProductIcon appKey={currentApp} size={24} />,
+        entrada: <Avatar name={user.name} src={user.picture} size="xs" class="sytue-aro-carril" />,
+        ...(aviso ? { aviso } : {}),
+        estado: <OfflineStatus compacto />,
+        alDestinos,
+      }}
+    />
+  );
+}
 
 export function SytueShell({
   currentApp,
@@ -221,6 +314,10 @@ export function SytueShell({
   // (la suite en Gio) esta shell ni se carga; la detección cubre el bridge y a las
   // futuras ventanas web que vuelvan a inyectarlo.
   const nativo = inNativeShell();
+  // Los huecos de la topbar donde las apps portan su barra móvil (`BarraMovil`). Sin
+  // topbar (nativo) no hay contexto, y cada app pinta su barra de siempre.
+  const [destinos, setDestinos] = useState<DestinosBarra | null>(null);
+  const barraUnica = useMemo(() => (nativo ? null : { destinos }), [nativo, destinos]);
 
   return (
     <I18nProvider locale={locale}>
@@ -240,24 +337,9 @@ export function SytueShell({
               {nativo ? (
                 <div class="sytue-native-safe-top sytue-topbar-carril" aria-hidden="true" />
               ) : (
-                <TopBar
-                  rail
-                  brand={<AppSwitcher />}
-                  center={showSearch ? <GlobalSearch /> : undefined}
-                  actions={
-                    <>
-                      <OfflineStatus />
-                      <NotificationCenter />
-                      <span
-                        class="bg-chrome-divider marco:invisible mx-1 h-6 w-px"
-                        aria-hidden="true"
-                      />
-                      <AccountMenu />
-                    </>
-                  }
-                />
+                <BarraDeLaSuite showSearch={showSearch} alDestinos={setDestinos} />
               )}
-              {children}
+              <BarraUnicaContext.Provider value={barraUnica}>{children}</BarraUnicaContext.Provider>
             </div>
           </ShellContext.Provider>
         </ToastProvider>

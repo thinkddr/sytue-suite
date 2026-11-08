@@ -126,17 +126,11 @@ type Config struct {
 	VAPIDPublic  string
 	VAPIDPrivate string
 	VAPIDSubject string
-	// APNs (aviso «solo despertar» de la app nativa de iOS, ver service/apns.go).
-	// APNSKeyP8 es el fichero .p8 ENTERO que descarga Apple (PEM, PKCS#8); los otros
-	// tres los da el portal de desarrollador. Los cuatro vacíos => iOS sin push; a
-	// medias => error de arranque. APNSHost apunta al servidor de pruebas
-	// (api.sandbox.push.apple.com) cuando la app es una compilación de desarrollo.
-	// La clave es un SECRETO: fuera de git y nunca en logs.
-	APNSKeyP8    string
-	APNSKeyID    string
-	APNSTeamID   string
-	APNSBundleID string
-	APNSHost     string
+	// HubPublicURL es la URL pública del Hub (https://hub.sytue.eu). Las rutas de
+	// aparatos de iOS que tuvo Rooms (`/me/push/apns` y su `forget`) redirigen ahí: el
+	// registro de aparatos es único y vive en el Hub (ADR 0039, enmienda del
+	// 2026-11-06).
+	HubPublicURL string
 	// KeyEncryptionKey es la KEK AES-256 (32 bytes ya decodificados) con la que se
 	// cifran en reposo los secretos de FIRMA de las integraciones salientes
 	// (outgoing_webhooks y slash_commands). Vacía = sin cifrado: se admite en
@@ -230,11 +224,7 @@ func Load() (Config, error) {
 		VAPIDPrivate: l.Get("SYTUE_VAPID_PRIVATE"),
 		VAPIDSubject: l.GetDefault("SYTUE_VAPID_SUBJECT", "mailto:ops@sytue.eu"),
 		// APNs: iOS no se puede despertar de otra forma. Vacío => deshabilitado.
-		APNSKeyP8:    l.Get("SYTUE_APNS_KEY_P8"),
-		APNSKeyID:    l.Get("SYTUE_APNS_KEY_ID"),
-		APNSTeamID:   l.Get("SYTUE_APNS_TEAM_ID"),
-		APNSBundleID: l.Get("SYTUE_APNS_BUNDLE_ID"),
-		APNSHost:     l.Get("SYTUE_APNS_HOST"),
+		HubPublicURL: l.GetDefault("HUB_PUBLIC_URL", "https://hub.sytue.localhost"),
 
 		HubBaseURL:        l.GetDefault("HUB_BASE_URL", "http://hub:8092"),
 		HubInternalSecret: l.HubInternalSecret(base.Env),

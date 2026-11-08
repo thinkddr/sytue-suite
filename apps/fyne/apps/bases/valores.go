@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
 
@@ -69,6 +70,34 @@ func valorDeTexto(campo api.BasesField, texto string) (valor any, ok bool) {
 		return t, slices.Contains(campo.Choices, t)
 	}
 	return nil, false
+}
+
+// valorEscrito es lo tecleado en un campo de texto, número o fecha → el valor a enviar.
+// La fecha se teclea como se escribe (05/10/2026) y viaja en ISO. Es la cuenta de la
+// celda de la rejilla y de la ficha del registro: las dos aceptan lo mismo.
+func valorEscrito(campo api.BasesField, texto string) (valor any, ok bool) {
+	if campo.Kind == api.BasesKindDate {
+		if f, vacia, vale := ui.LeerFecha(texto, time.UTC); vale && !vacia {
+			texto = f.Format("2006-01-02")
+		} else if vacia {
+			texto = ""
+		} else {
+			texto = "?"
+		}
+	}
+	return valorDeTexto(campo, texto)
+}
+
+// textoParaEditar es lo que se pone en el campo al empezar a editar un valor: la fecha,
+// como se escribe.
+func textoParaEditar(campo api.BasesField, valor any) string {
+	texto := textoDeValor(valor)
+	if campo.Kind == api.BasesKindDate {
+		if f, err := time.Parse("2006-01-02", texto); err == nil {
+			texto = ui.EscribirFecha(f)
+		}
+	}
+	return texto
 }
 
 // etiquetaDeRegistro es cómo se llama un registro en una lista de enlaces: su primer

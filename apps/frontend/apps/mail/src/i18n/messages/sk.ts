@@ -29,6 +29,15 @@ export const sk: AppCatalog<typeof en> = {
   'folder.junk': 'Spam',
   'folder.archive': 'Archív',
   'nav.compose': 'Napísať',
+  'nav.mailboxes': 'Schránky',
+  'nav.allInboxes': 'Všetka doručená pošta',
+  'nav.allDrafts': 'Všetky koncepty',
+  'nav.allSent': 'Všetka odoslaná pošta',
+  'nav.allArchive': 'Celý archív',
+  'nav.allJunk': 'Všetok spam',
+  'nav.allTrash': 'Celý kôš',
+  'nav.sytueMailbox': 'Schránka Sytue',
+  'nav.accountsIn': 'Účty: {mailbox}',
   'nav.folders': 'Priečinky',
   'nav.refresh': 'Obnoviť',
   'nav.manageFolders': 'Spravovať priečinky',
@@ -53,6 +62,10 @@ export const sk: AppCatalog<typeof en> = {
   'shortcuts.archive': 'Archivovať',
   'shortcuts.trash': 'Presunúť do koša',
   'shortcuts.star': 'Označiť hviezdičkou',
+  'shortcuts.select': 'Označiť konverzáciu',
+  'shortcuts.clearSelection': 'Zrušiť výber',
+  'shortcuts.label': 'Pridať štítok',
+  'shortcuts.move': 'Presunúť do…',
   'shortcuts.help': 'Zobraziť tento zoznam',
   'nav.settings': 'Nastavenia',
   'nav.signature': 'Podpis',
@@ -164,6 +177,9 @@ export const sk: AppCatalog<typeof en> = {
   'error.undoSend': 'Odoslanie správy sa nepodarilo vrátiť',
   'error.undoSendGone': 'Na vrátenie je neskoro; správa už bola odoslaná',
   'undo.done': 'Odoslanie vrátené',
+  'triage.moved': 'Presunuté do {folder}',
+  'triage.undone': 'Vrátené tam, kde bolo',
+  'error.undoMove': 'Nepodarilo sa to vrátiť späť',
   'list.region': 'Konverzácie: {folder}',
   'list.fallbackName': 'Pošta',
   'list.searchResults': 'Výsledky hľadania',
@@ -190,6 +206,13 @@ export const sk: AppCatalog<typeof en> = {
   'list.searchHint':
     'Operátory: from:, to:, subject:, has:attachment, is:unread, is:starred, after:2026-01-31, before:2026-03-01. Viac slov dajte do úvodzoviek.',
   'list.clearSearch': 'Vymazať hľadanie',
+  'filter.group': 'Rýchle filtre',
+  'filter.unread': 'Neprečítané',
+  'filter.starred': 'S hviezdičkou',
+  'filter.attachments': 'S prílohami',
+  'filter.emptyTitle': 'Tomuto filtru tu nič nezodpovedá',
+  'filter.emptyDescription': 'Skúste iný filter alebo zobrazte všetky konverzácie.',
+  'filter.showAll': 'Zobraziť všetko',
   'list.selectAll': 'Vybrať všetky konverzácie',
   'list.loading': 'Načítavajú sa konverzácie…',
   'list.errorTitle': 'Vašu poštu sa nepodarilo načítať',
@@ -228,6 +251,8 @@ export const sk: AppCatalog<typeof en> = {
   'reader.createEvent': 'Vytvoriť udalosť',
   'reader.eventCreated': 'Udalosť vytvorená v Sytue Calendar',
   'reader.eventFailed': 'Udalosť sa nepodarilo vytvoriť',
+  'reader.shareToRooms': 'Zdieľať v Rooms',
+  'reader.roomsFailed': 'Zdieľanie v Rooms sa nepodarilo.',
   'reader.unsubscribe': 'Zrušiť odber',
   'reader.unsubscribeFailed': 'Zrušenie odberu sa nepodarilo dokončiť',
   'reader.unsubscribeSent': 'Žiadosť o zrušenie odberu odoslaná',
@@ -374,6 +399,10 @@ export const sk: AppCatalog<typeof en> = {
   'editor.font': 'Písmo',
   'editor.redo': 'Znova',
   'editor.undo': 'Späť',
+  'editor.cut': 'Vystrihnúť',
+  'editor.copy': 'Kopírovať',
+  'editor.paste': 'Prilepiť',
+  'editor.selectAll': 'Vybrať všetko',
   'editor.colorNone': 'Žiadna',
   'editor.colorYellow': 'Žltá',
   'editor.colorViolet': 'Fialová',
@@ -739,6 +768,11 @@ export const sk: AppCatalog<typeof en> = {
   'externalMail.port': 'Port',
   'externalMail.username': 'Používateľské meno (ak je pole prázdne, e-mailová adresa)',
   'externalMail.password': 'Heslo alebo heslo aplikácie',
+  'externalMail.icloudBody':
+    'iCloud Mail tu neprijme heslo k vášmu účtu Apple. Vytvorte si heslo pre konkrétnu aplikáciu na account.apple.com (Prihlásenie a zabezpečenie › Heslá pre konkrétne aplikácie) a zadajte ho nižšie.',
+  'externalMail.icloudLink': 'Otvoriť account.apple.com',
+  'externalMail.icloudAuthError':
+    'iCloud heslo neprijal. Použite heslo pre konkrétnu aplikáciu, nie heslo k účtu Apple.',
   'externalMail.smtpPassword':
     'Heslo SMTP (ak je pole prázdne, rovnaké ako pre prichádzajúcu poštu)',
   'externalMail.advanced': 'Rozšírené možnosti',
@@ -748,6 +782,10 @@ export const sk: AppCatalog<typeof en> = {
     'Pred uložením overíme prihlásenie na oba servery. Žiadny skúšobný e-mail neodošleme.',
   'externalMail.connect': 'Pripojiť účet',
   'externalMail.authorize': 'Pokračovať k poskytovateľovi',
+  'externalMail.reconnectNeeded': 'Ak chcete vidieť tento účet, znova sa prihláste',
+  'externalMail.accountUnavailable': 'Účet sa nepodarilo zastihnúť. Skúsiť znova',
+  'externalMail.someUnavailable':
+    'Niektoré účty sa nepodarilo zastihnúť. Ich správy v tomto zozname nie sú.',
   'externalMail.add': 'Pridať e-mailový účet',
   'externalMail.empty': 'Nie sú pripojené žiadne externé e-mailové účty.',
   'externalMail.open': 'Otvoriť schránku',
@@ -760,6 +798,13 @@ export const sk: AppCatalog<typeof en> = {
     'Zabezpečené pripojenie sa nedá overiť. Overte názov servera a certifikát u poskytovateľa pošty.',
   'externalMail.authError':
     'Prihlásenie bolo odmietnuté. Znova pripojte účet alebo skontrolujte používateľské meno a heslo aplikácie.',
+  'externalMail.cancelled': 'Prihlásenie bolo zrušené. Nič nebolo pripojené.',
+  'externalMail.scopeMissing':
+    'Prístup k e-mailu nebol povolený. Skúste to znova a nechajte povolenie pre e-mail označené.',
+  'externalMail.timeout': 'Toto prihlásenie už neplatí. Skúste to znova.',
+  'externalMail.exists': 'Tento e-mailový účet je už pripojený.',
+  'externalMail.connected': 'Účet {account} bol pripojený.',
+  'externalMail.accountsError': 'Externé e-mailové účty sa nepodarilo načítať.',
   'externalMail.sendUnknown':
     'Server už mohol e-mail prijať. Pred ďalším pokusom skontrolujte priečinok Odoslané, aby sa neodoslal dvakrát.',
   'externalMail.blockedError':
@@ -768,23 +813,9 @@ export const sk: AppCatalog<typeof en> = {
     'Tento e-mail alebo jeho prílohy prekračujú limit veľkosti. Zmenšite prílohy a skúste to znova.',
   'externalMail.pop3Note':
     'POP3 umožňuje čítať doručenú poštu a odosielať cez SMTP. Vzdialené priečinky, príznaky prečítania a presúvanie správ nie sú dostupné.',
-  'externalMail.refreshNote':
-    'Táto schránka sa obnovuje každých 30 sekúnd, kým je zoznam správ otvorený. Pošta zostáva u poskytovateľa.',
   'externalMail.sent': 'Poskytovateľ e-mail prijal.',
   'externalMail.sentNoCopy':
     'E-mail bol prijatý, ale kópiu sa nepodarilo uložiť do Odoslaných. Neodosielajte ho znova.',
-  'externalMail.draftNote':
-    'Tento koncept sa uchováva len počas otvorenia okna. Zatvorením okna sa zahodí.',
-  'externalMail.attach': 'Priložiť súbory',
-  'externalMail.markUnread': 'Označiť ako neprečítané',
-  'externalMail.markRead': 'Označiť ako prečítané',
-  'externalMail.flag': 'Pridať hviezdičku',
-  'externalMail.unflag': 'Odobrať hviezdičku',
-  'externalMail.trash': 'Presunúť do koša',
-  'externalMail.noMessages': 'V tomto priečinku nie sú žiadne správy.',
-  'externalMail.discardDraft': 'Zahodiť tento koncept?',
   'externalMail.invalidConfiguration':
     'Zadajte platnú e-mailovú adresu, názvy a porty oboch serverov a heslo.',
-  'externalMail.invalidRecipients':
-    'Skontrolujte e-mailové adresy. Viaceré adresy oddeľte čiarkami.',
 };

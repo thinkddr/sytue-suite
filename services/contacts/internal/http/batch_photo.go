@@ -5,15 +5,18 @@ package contactshttp
 
 import (
 	"errors"
+	"io"
 	"net/http"
 	"strings"
+
+	"github.com/google/uuid"
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/services/contacts/internal/domain"
 )
 
 // ---------------------------------------------------------------------------
-// Acciones EN LOTE (multiseleccion): papelera / favorito / grupo.
+// Acciones EN LOTE (multiseleccion): papelera (y su deshacer) / favorito / grupo.
 //
 // Mutaciones por POST con cuerpo JSON (CSRF-safe: el navegador no puede enviarlas
 // cross-origin sin preflight; el BFF Astro ademas rechaza DELETE/PUT). El store
@@ -47,6 +50,88 @@ func (h *Handlers) BatchTrash(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, r, http.StatusOK, map[string]any{"trashed": n})
+}
+
+// BatchRestore es el «Deshacer» de BatchTrash: devuelve de la papelera, en una sola
+// operacion, lo ultimo que se tiro de cada UID. Responde cuantos volvieron, para que
+// el cliente lo compare con el `trashed` del lote en vez de con la lista de UID.
+func (h *Handlers) BatchRestore(w http.ResponseWriter, r *http.Request) {
+	var req batchRequest
+	if err := httpx.DecodeJSON(w, r, &req); err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
+	if !req.valid() {
+		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("Select between 1 and 1000 contacts."))
+		return
+	}
+	n, err := h.store.RestoreContacts(r.Context(), subFromCtx(r), req.UIDs)
+	if err != nil {
+		httpx.Fail(w, r, toAPIError(err))
+		return
+	}
+	httpx.JSON(w, r, http.StatusOK, map[string]any{"restored": n})
+}
+
+type batchVCardRequest struct {
+	IDs []string `json:"ids"`
+}
+
+// BatchVCard exporta la seleccion: las vCard guardadas de esos contactos (por id de
+// contacto, no por UID: un UID que vive en dos libretas es dos filas, y se exporta la
+// que se marco), en UNA respuesta `text/vcard`. Es el «Exportar (.vcf)» de la barra de
+// seleccion y del menu de una etiqueta en la app nativa.
+func (h *Handlers) BatchVCard(w http.ResponseWriter, r *http.Request) {
+	var req batchVCardRequest
+	if err := httpx.DecodeJSON(w, r, &req); err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
+	if len(req.IDs) == 0 || len(req.IDs) > maxBatchUIDs {
+		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("Select between 1 and 1000 contacts."))
+		return
+	}
+	ids := make([]uuid.UUID, 0, len(req.IDs))
+	for _, s := range req.IDs {
+		id, err := uuid.Parse(strings.TrimSpace(s))
+		if err != nil {
+			httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("Invalid contact id."))
+			return
+		}
+		ids = append(ids, id)
+	}
+	// En streaming: cada tarjeta sale al cliente según se lee, sin juntarlas. Mil vCard
+	// guardadas con foto son decenas de MB, y el pod de contacts tiene 192 MiB: juntarlas
+	// (y copiarlas) para una sola respuesta lo tiraba por OOM a mitad de una exportación,
+	// y con él la API y CardDAV de todos. Así el pico es una tarjeta.
+	escritas := 0
+	err := h.store.EachCardByID(r.Context(), subFromCtx(r), ids, func(card string) error {
+		if escritas == 0 {
+			w.Header().Set("Content-Type", "text/vcard; charset=utf-8")
+			w.WriteHeader(http.StatusOK)
+		}
+		escritas++
+		if _, err := io.WriteString(w, strings.TrimSpace(card)); err != nil {
+			return err
+		}
+		_, err := io.WriteString(w, "\r\n")
+		return err
+	})
+	if err != nil {
+		if escritas == 0 {
+			httpx.Fail(w, r, toAPIError(err))
+			return
+		}
+		// Ya hay media exportación enviada: se corta la conexión para que la descarga
+		// FALLE, en vez de cerrar bien un .vcf al que le faltan tarjetas.
+		panic(http.ErrAbortHandler)
+	}
+	if escritas == 0 {
+		// Ninguna sigue viva (borradas desde otro dispositivo): 200 vacío, como el resto
+		// de los lotes, que omiten en silencio lo que ya no está. Quien exporta decide.
+		w.Header().Set("Content-Type", "text/vcard; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+	}
 }
 
 type batchFavoriteRequest struct {

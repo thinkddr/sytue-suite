@@ -111,12 +111,13 @@ func (s *Store) Album(ctx context.Context, id uuid.UUID, duenyo string) (domain.
 // RenombrarAlbum cambia el título y, si se pasa, la portada (que tiene que
 // ser una foto del álbum: una portada de fuera es un enlace roto en potencia).
 // `quien` es su dueña o alguien con edición (0010), comprobado en la MISMA transacción.
-func (s *Store) RenombrarAlbum(ctx context.Context, id uuid.UUID, quien, titulo string, portada *uuid.UUID) (domain.Album, error) {
-	titulo, err := domain.TituloDeAlbum(titulo)
+// `renombrado` dice si el título cambió de verdad: elegir la portada es este mismo
+// cambio con el título de siempre, y no es un renombrado del que avisar a la dueña.
+func (s *Store) RenombrarAlbum(ctx context.Context, id uuid.UUID, quien, titulo string, portada *uuid.UUID) (al domain.Album, renombrado bool, err error) {
+	titulo, err = domain.TituloDeAlbum(titulo)
 	if err != nil {
-		return domain.Album{}, err
+		return domain.Album{}, false, err
 	}
-	var al domain.Album
 	err = s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
 		tenant, err := tenantDe(ctx)
 		if err != nil {
@@ -136,15 +137,20 @@ func (s *Store) RenombrarAlbum(ctx context.Context, id uuid.UUID, quien, titulo 
 				return fmt.Errorf("%w: la portada tiene que ser una foto del álbum", domain.ErrInvalidInput)
 			}
 		}
+		// `antes` lee la fila con la instantánea de la sentencia, previa al UPDATE.
 		row := tx.QueryRow(ctx, `
-			WITH tocado AS (
+			WITH antes AS (
+				SELECT title FROM albums WHERE tenant = $1 AND id = $2 AND owner_sub = $3
+			), tocado AS (
 				UPDATE albums SET title = $4, cover_asset_id = COALESCE($5, cover_asset_id), updated_at = now()
 				WHERE tenant = $1 AND id = $2 AND owner_sub = $3 RETURNING *
-			) SELECT `+colsAlbum+` FROM tocado al`, tenant, id, duenyo, titulo, portada)
-		al, err = scanAlbum(row)
+			) SELECT `+colsAlbum+`, (SELECT title FROM antes) FROM tocado al`, tenant, id, duenyo, titulo, portada)
+		var anterior string
+		al, err = scanAlbum(row, &anterior)
+		renombrado = err == nil && anterior != al.Titulo
 		return err
 	})
-	return al, err
+	return al, renombrado, err
 }
 
 // BorrarAlbum borra el álbum y sus pertenencias (CASCADE). Las fotos no se tocan.

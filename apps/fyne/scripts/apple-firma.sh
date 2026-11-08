@@ -208,15 +208,29 @@ preparar() {
         mal "no se pudo preguntar a Apple por el App ID $id"
       grep -q "\"$id\"" <<<"$registrados" ||
         mal "el App ID $id no está registrado en la cuenta de Apple (Certificates, Identifiers & Profiles → Identifiers): aquí no se da de alta."
+      # Con crear_perfiles el perfil lo crea el paso siguiente (apple-perfiles.py), y
+      # aquí solo hace falta el certificado: exigir el perfil existente paraba la
+      # preparación justo cuando hay que rehacerlos —activar Push en los hosts
+      # (34b6e790) invalidó los de las quince apps, run 42387082514—.
+      [ "${SYTUE_CREAR_PERFILES:-false}" != true ] || continue
       # El perfil de tienda de ESTE App ID y el Apple Distribution de nuestra clave:
       # sólo se reutilizan: sin --create ni --delete-stale-profiles, falta = error.
       llavero_operacion cli fetch-signing-files "$id" --platform "$plataforma" --type "$tipo" \
         --strict-match-identifier --certificates-dir "$CERTS" --certificate-key @env:CERTIFICATE_PRIVATE_KEY >&2 ||
         mal "no se pudo traer el perfil de tienda ($tipo) de $id"
       # Y que el de Mac está donde `empaquetar.sh` lo va a buscar: aquí, en el primer
-      # minuto, y no después de compilar.
-      [ "$destino" != macappstore ] || perfil "$id" mac >/dev/null
+      # minuto, y no después de compilar. Con crear_perfiles se comprueba en el paso
+      # siguiente, que es el que lo crea (apple-perfiles.py, con todos sus derechos).
+      [ "$destino" != macappstore ] || [ "${SYTUE_CREAR_PERFILES:-false}" = true ] ||
+        perfil "$id" mac >/dev/null
     done
+    if [ "${SYTUE_CREAR_PERFILES:-false}" = true ]; then
+      # Solo el Apple Distribution existente de NUESTRA clave, sin perfil: `list` no
+      # crea nada (lo vigila apple_llavero.py), igual que el Developer ID de macOS.
+      llavero_operacion cli certificates list --type DISTRIBUTION \
+        --certificates-dir "$CERTS" --certificate-key @env:CERTIFICATE_PRIVATE_KEY --save >&2 ||
+        mal 'no se pudo consultar el Apple Distribution existente de la clave fija'
+    fi
     if [ "$destino" = macappstore ]; then
       # El instalador debe existir, ser válido y corresponder a la clave fija.
       llavero_operacion cli certificates list --type MAC_INSTALLER_DISTRIBUTION \

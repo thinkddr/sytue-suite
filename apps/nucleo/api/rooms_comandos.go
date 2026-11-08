@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // Lo que piden los comandos «/» del compositor (`runCommand` y `runRemoteCommand` de
@@ -20,6 +21,9 @@ type RoomsChannelPatch struct {
 	Name    *string `json:"name,omitempty"`
 	Topic   *string `json:"topic,omitempty"`
 	Purpose *string `json:"purpose,omitempty"`
+	// Archived archiva (true) o desarchiva (false) el canal: el puntero distingue
+	// «no tocar» de «desarchivar», que con un bool a secas se perdería en el omitempty.
+	Archived *bool `json:"archived,omitempty"`
 }
 
 // UpdateChannel renombra un canal o le cambia el tema o el propósito, y lo devuelve ya
@@ -88,6 +92,22 @@ type RoomsNotifyPrefs struct {
 	Keywords []string `json:"keywords"`
 	DNDStart int      `json:"dnd_start"`
 	DNDEnd   int      `json:"dnd_end"`
+	// PausedUntil es «Pausar avisos»: hasta cuándo no se avisa; nil, sin pausa. Solo
+	// se lee aquí: se fija con SetNotifyPause, y omitempty la deja fuera del PUT.
+	PausedUntil *time.Time `json:"paused_until,omitempty"`
+}
+
+// SetNotifyPause pone en pausa los avisos hasta `hasta`, o la quita con el cero, y
+// devuelve las preferencias con la pausa ya saneada por el servicio.
+func (r *Rooms) SetNotifyPause(ctx context.Context, hasta time.Time) (RoomsNotifyPrefs, error) {
+	var cuerpo struct {
+		Until *time.Time `json:"until"`
+	}
+	if !hasta.IsZero() {
+		u := hasta.UTC()
+		cuerpo.Until = &u
+	}
+	return conJSON[RoomsNotifyPrefs](ctx, r.c, http.MethodPut, "/me/notify-pause", cuerpo)
 }
 
 // NotifyPrefs son las preferencias de aviso de quien mira.

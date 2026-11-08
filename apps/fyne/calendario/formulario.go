@@ -4,6 +4,7 @@
 package calendario
 
 import (
+	"cmp"
 	"regexp"
 	"strconv"
 	"strings"
@@ -629,15 +630,30 @@ func (f *formulario) bloqueInvitados() fyne.CanvasObject {
 	if len(f.e.Invitados) == 0 {
 		return ui.GrupoCampo(rotulo, false, f.correo, "", f.errCorreo)
 	}
+	// Al editar, la respuesta que ya dio cada uno y quién organiza (GuestList.tsx).
+	respuestas := map[string]string{}
+	organizador := ""
+	if f.e.O != nil {
+		for _, a := range f.e.O.Event.Attendees {
+			// Un ATTENDEE sin PARTSTAT (llega así por CalDAV de otros clientes) ya
+			// estaba invitado: la web lo enseña «Sin responder», no sin insignia.
+			respuestas[strings.ToLower(a.Email)] = cmp.Or(a.PartStat, "NEEDS-ACTION")
+		}
+		organizador = api.SinMailto(f.e.O.Event.Organizer)
+	}
 	var pildoras []fyne.CanvasObject
 	for _, correo := range f.e.Invitados {
-		pildoras = append(pildoras, nuevaPildoraInvitado(f.p, correo, func() {
+		pildoras = append(pildoras, nuevaPildoraInvitado(f.p, correo, respuestas[strings.ToLower(correo)], func() {
 			f.e.Invitados = quitar(f.e.Invitados, correo)
 			f.rehacer()
 		}))
 	}
 	lista := container.New(ui.FilaAuto{Hueco: espacio1p5, SaltoFila: espacio1p5, Derecha: len(pildoras), Partir: true}, pildoras...)
-	return ui.GrupoCampo(rotulo, false, container.New(ui.Columna{Hueco: espacio2}, lista, f.correo), "", f.errCorreo)
+	filas := []fyne.CanvasObject{lista, f.correo}
+	if organizador != "" {
+		filas = append([]fyne.CanvasObject{f.p.filaOrganizador(organizador, f.util(), tema.TextoSM)}, filas...)
+	}
+	return ui.GrupoCampo(rotulo, false, container.New(ui.Columna{Hueco: espacio2}, filas...), "", f.errCorreo)
 }
 
 func quitar(l []string, s string) []string {

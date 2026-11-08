@@ -27,23 +27,6 @@ const (
 	HuecoFila    = 2 * 0.25 * tema.Rem
 )
 
-// Los glifos propios de Cast: lo que el catálogo compartido no tiene porque ninguna
-// otra app lo necesitaba (reproducir, pausa, volumen, pantalla completa, el directo).
-// Son de la familia del catálogo —trazo de 2 sobre la rejilla de 24—, y el de
-// reproducir y pausa van rellenos, como en cualquier reproductor.
-const (
-	glifoInicio   = "M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"
-	glifoVideo    = "M16 13l5.2 3.5a.5.5 0 0 0 .8-.4V7.9a.5.5 0 0 0-.8-.4L16 10.5M4 6h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"
-	glifoDirecto  = "M4.9 19.1C1 15.2 1 8.8 4.9 4.9M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5M19.1 4.9C23 8.8 23 15.1 19.1 19M14 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"
-	glifoPlay     = "M7 4.5v15l12.5-7.5z"
-	glifoPausa    = "M6 4h4v16H6zM14 4h4v16h-4z"
-	glifoVolumen  = "M11 4.7a.7.7 0 0 0-1.2-.5L6.4 7.6A1.4 1.4 0 0 1 5.4 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.4a1.4 1.4 0 0 1 1 .4l3.4 3.4a.7.7 0 0 0 1.2-.5zM16 9a5 5 0 0 1 0 6M19.4 18.4a9 9 0 0 0 0-12.8"
-	glifoSilencio = "M11 4.7a.7.7 0 0 0-1.2-.5L6.4 7.6A1.4 1.4 0 0 1 5.4 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.4a1.4 1.4 0 0 1 1 .4l3.4 3.4a.7.7 0 0 0 1.2-.5zM22 9l-6 6M16 9l6 6"
-	glifoAmpliar  = "M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"
-	glifoOjo      = "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"
-	glifoOjoNo    = "M10.7 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a13 13 0 0 1-1.7 2.7M6.6 6.6A13.5 13.5 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2M2 2l20 20"
-)
-
 // ---- El marco de una página ----
 
 // Pagina es el fondo de la ventana con la caja de contenido centrada y los bloques
@@ -168,12 +151,11 @@ func (r *recuadroLayout) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 
 // ---- Los estados ----
 
-// Vacio es el `EmptyState` de la web con un glifo de Cast en el sitio de la
-// ilustración (la suite no tiene ilustración de vídeo, y dibujar una nueva no es
-// cosa de esta app).
-func Vacio(v Vista, glifo, titulo, descripcion string, accion fyne.CanvasObject) *ui.Vacio {
+// Vacio es el `EmptyState` de la web con un glifo en el sitio de la ilustración (la
+// suite no tiene ilustración de vídeo, y dibujar una nueva no es cosa de esta app).
+func Vacio(v Vista, glifo iconos.Icono, titulo, descripcion string, accion fyne.CanvasObject) *ui.Vacio {
 	e := ui.NuevoVacio(titulo, descripcion)
-	e.Glifo = iconos.TrazoDeRuta(glifo, 40, tema.Color("text-subtle", v.Variante))
+	e.Glifo = iconos.Trazo(glifo, 40, "text-subtle", v.Variante)
 	e.Accion = accion
 	return e
 }
@@ -202,14 +184,14 @@ func CuerpoDeEstado(v Vista, vacio *ui.Vacio) fyne.CanvasObject {
 		if detalle == "" {
 			detalle = v.Traduce("errors.description")
 		}
-		return Vacio(v, glifoVideo, v.Traduce("errors.title"), detalle, reintentar())
+		return Vacio(v, iconos.Video, v.Traduce("errors.title"), detalle, reintentar())
 	case SinConexion:
-		return Vacio(v, glifoVideo, v.Traduce("errors.offline.title"), v.Traduce("errors.offline.description"), reintentar())
+		return Vacio(v, iconos.Video, v.Traduce("errors.offline.title"), v.Traduce("errors.offline.description"), reintentar())
 	case SinPermiso:
-		return Vacio(v, glifoVideo, v.Traduce("errors.forbidden.title"), v.Traduce("errors.forbidden.description"), nil)
+		return Vacio(v, iconos.Video, v.Traduce("errors.forbidden.title"), v.Traduce("errors.forbidden.description"), nil)
 	case SinSesion:
 		entrar := ui.NuevoBoton(v.Traduce("account.signIn"), v.AlEntrar).Con(ui.Primario, ui.TallaSM)
-		return Vacio(v, glifoVideo, v.Traduce("account.signedOutTitle"), v.Traduce("account.signedOutDescription"), entrar)
+		return Vacio(v, iconos.Video, v.Traduce("account.signedOutTitle"), v.Traduce("account.signedOutDescription"), entrar)
 	}
 	return nil
 }

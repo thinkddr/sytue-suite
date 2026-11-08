@@ -5,27 +5,17 @@ package bases
 
 import (
 	"io"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/test"
+	"fyne.io/fyne/v2/canvas"
 
-	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
-
-// enlaceDe busca un enlace de texto de la pantalla por su rótulo.
-func enlaceDe(w fyne.Window, texto string) *ui.Enlace {
-	var hallado *ui.Enlace
-	recorrer(w.Canvas().Content(), func(o fyne.CanvasObject) {
-		if e, ok := o.(*ui.Enlace); ok && e.Texto == texto {
-			hallado = e
-		}
-	})
-	return hallado
-}
 
 // TestCompartirLaBase: el propietario concede a toda la organización, a una persona por
 // su correo, a un grupo y a alguien de otra organización; retira un acceso, y transfiere
@@ -123,7 +113,7 @@ func TestLosEnlacesPublicosDeUnFormulario(t *testing.T) {
 	f.vistas["t1"] = []m{{"id": "vf", "table_id": "t1", "name": "Alta", "kind": "form", "config": m{"fields": []string{"nom"}}}}
 	p, w := abrir(t, f)
 	p.URLPublica = func(ruta string) string { return api.AppURL(api.ApexProd, "bases", "", ruta) }
-	pulsar(t, w, "Alta · Formulario")
+	elegir(t, w, "Vistas", "Alta · Formulario")
 	capturar(t, w, "formulario-sin-enlaces")
 	if got := textos(w); !strings.Contains(got, "Enlaces públicos") || !strings.Contains(got, "Todavía no hay enlaces.") {
 		t.Fatalf("la vista de formulario no enseña sus enlaces públicos:\n%s", got)
@@ -165,9 +155,33 @@ func TestLosEnlacesPublicosDeUnFormulario(t *testing.T) {
 	// Quien no es propietario ve los campos del formulario, no sus enlaces.
 	f.rol = "editor"
 	p.Abrir("b1")
-	pulsar(t, w, "Alta · Formulario")
+	elegir(t, w, "Vistas", "Alta · Formulario")
 	if got := textos(w); strings.Contains(got, "Enlaces públicos") || !strings.Contains(got, "•  Nombre (Texto)") {
 		t.Errorf("un editor no gestiona los enlaces públicos:\n%s", got)
+	}
+}
+
+// La caja de los enlaces públicos no tiene fondo en la web (`border rounded-lg`): en
+// Marco es la hoja, no el gris de la página.
+// VISTO EN ROJO (2026-11-06): pintaba "bg" y salía gris dentro de la hoja blanca.
+func TestLosEnlacesPublicosVanSobreLaHoja(t *testing.T) {
+	forma, cromo := "carril", ""
+	if tema.EsMarco() {
+		forma = "marco"
+	}
+	if tema.EsPapel() {
+		cromo = tema.CromoPapel
+	}
+	tema.ElegirForma("marco")
+	tema.ElegirCromo(tema.CromoPapel)
+	t.Cleanup(func() { tema.ElegirForma(forma); tema.ElegirCromo(cromo) })
+	f := nuevoFalso(1)
+	f.vistas["t1"] = []m{{"id": "vf", "table_id": "t1", "name": "Alta", "kind": "form", "config": m{"fields": []string{"nom"}}}}
+	p, w := abrir(t, f)
+	elegir(t, w, "Vistas", "Alta · Formulario")
+	fondo := p.panelFormulario(tema.Claro).(*fyne.Container).Objects[0].(*canvas.Rectangle)
+	if quiero := tema.Color("sheet-bg", tema.Claro); fondo.FillColor != quiero {
+		t.Errorf("la caja de enlaces pinta %v; quiero la hoja, %v", fondo.FillColor, quiero)
 	}
 }
 
@@ -197,7 +211,7 @@ func TestElEstadoDeUnEnlacePublico(t *testing.T) {
 func TestExportarGuardaLaTabla(t *testing.T) {
 	f := nuevoFalso(1)
 	p, w := abrir(t, f)
-	if enlaceDe(w, "Exportar CSV") != nil {
+	if slices.Contains(elementosDe(t, w, "Personas"), "Exportar CSV") {
 		t.Fatal("sin dónde guardar no se ofrece exportar")
 	}
 	var nombre, contenido string
@@ -208,11 +222,10 @@ func TestExportarGuardaLaTabla(t *testing.T) {
 	}
 	p.Repintar()
 	capturar(t, w, "rejilla-con-exportar")
-	csv := enlaceDe(w, "Exportar CSV")
-	if csv == nil || enlaceDe(w, "Exportar JSON") == nil {
-		t.Fatal("no se ofrece exportar en CSV y en JSON")
+	if got := elementosDe(t, w, "Personas"); !slices.Contains(got, "Exportar CSV") || !slices.Contains(got, "Exportar JSON") {
+		t.Fatalf("no se ofrece exportar en CSV y en JSON: %q", got)
 	}
-	test.Tap(csv)
+	pulsarEnMenu(t, w, "Personas", "Exportar CSV")
 	capturar(t, w, "exportar-aviso")
 	if !f.vio("GET /tables/t1/export?format=csv") || nombre != "Personas.csv" || contenido != "Nombre,Edad\nPersona 1,21\n" {
 		t.Fatalf("la exportación no se ha guardado: %q, %q", nombre, contenido)

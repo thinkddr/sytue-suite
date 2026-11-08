@@ -101,6 +101,7 @@
   "linkedServices.changed": "Tato položka se u vašeho poskytovatele změnila. Před další úpravou ji obnovte.",
   "linkedServices.choose": "Vyberte, co chcete připojit. Poskytovatel požádá o oprávnění pro vybrané služby.",
   "linkedServices.connected": "Připojené služby",
+  "linkedServices.exists": "Tento účet už byl připojen a je otevřený.",
   "linkedServices.keepAdmin": "Google Keep vyžaduje schválené nastavení správy Google Workspace. Osobní účty Gmail jej připojit nemohou.",
   "linkedServices.notGranted": "Přístup k této službě nebyl udělen. Připojte účet znovu a vyberte jeho oprávnění.",
   "linkedServices.notSupported": "Tento poskytovatel tuto službu nenabízí.",
@@ -171,7 +172,7 @@
   "notifications.kind.pages.order.oversold": "Objednávka {number} na webu {site} byla zaplacena, ale zboží není skladem",
   "notifications.kind.pages.order.paid": "Nová objednávka {number} na webu {site}",
   "notifications.kind.pages.payment.duplicated": "Dvojí platba u objednávky {number} na webu {site}: druhá se vrací",
-  "notifications.kind.pages.settings.changed": "Změna nastavení v Sytue Web: {actor}",
+  "notifications.kind.pages.settings.changed": "Změna nastavení v Sytue Webs: {actor}",
   "notifications.kind.pages.store.busy": "Obchod na webu {site} má příliš mnoho objednávek čekajících na platbu",
   "notifications.kind.pages.withdrawal.requested": "Žádost o odstoupení od smlouvy u objednávky {number} na webu {site}",
   "notifications.kind.photos.album.added": "{actor} přidal(a) fotky do „{name}“",
@@ -309,6 +310,8 @@
   "shell.update.failedBody": "Zkuste to později znovu nebo si ji stáhněte z portálu.",
   "shell.update.install": "Aktualizovat na verzi {version}",
   "shell.update.upToDate": "{app} je aktuální",
+  "shell.widgets.wake": "Aktualizovat widgety, i když je aplikace zavřená",
+  "shell.widgets.wakeHelp": "Když se u vás něco změní, Sytue probudí aplikaci prázdným oznámením přes Apple, aby mohla obnovit svůj widget. Apple vidí, o kterou aplikaci jde a kdy, nikdy ne, co se změnilo.",
   "ui.backToList": "Zpět na seznam",
   "ui.bulk.clear": "Zrušit výběr",
   "ui.bulk.region": "Akce pro výběr",
@@ -326,6 +329,8 @@
   "ui.review.edit": "Upravit",
   "ui.save": "Uložit",
   "ui.selectRow": "Vybrat řádek",
+  "ui.suiteClose": "Zpět do aplikace",
+  "ui.suiteOpen": "Sytue: aplikace, hledání, oznámení a účet",
   "ui.wizard.back": "Zpět",
   "ui.wizard.cancel": "Zrušit",
   "ui.wizard.goToStep": "Zpět na krok {n}: ",
@@ -344,5 +349,7 @@
   "widgets.pending": "Čekající",
   "widgets.photos": "Fotky",
   "widgets.rows": "Řádky",
-  "widgets.storage": "Úložiště"
+  "widgets.storage": "Úložiště",
+  "widgets.updatedAgo": "Aktualizováno {time}",
+  "widgets.updatedAt": "Aktualizováno: {time}"
 }

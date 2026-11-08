@@ -581,9 +581,39 @@ describe('un identificador que no es un UUID no forma una ruta', () => {
     }
     expect(llamadas).toHaveLength(0);
   });
+  // «Hacer una copia»: el id del original es un segmento que el servicio resuelve.
+  // VISTO EN ROJO (2026-11-05): sin el `esUuid` de create.ts, `..` llegaba al servicio.
+  test('POST /api/create con copy_of', async () => {
+    for (const malo of hostiles) {
+      const cuerpo = JSON.stringify({ kind: 'document', title: 'Copia', copy_of: malo });
+      const res = await create.POST!(ctxDe('POST', '/api/create', cuerpo));
+      expect([malo, res.status]).toEqual([malo, 400]);
+    }
+    expect(llamadas).toHaveLength(0);
+  });
 });
 
 describe('lo que viaja y lo que vuelve, verbatim', () => {
+  test('POST /api/create con copy_of lo pasa al servicio, sin título por defecto', async () => {
+    respuesta = () =>
+      new Response(
+        JSON.stringify({ document: { id: OTRO, title: 'Copia', kind: 'spreadsheet' } }),
+        {
+          status: 201,
+          headers: { 'content-type': 'application/json' },
+        },
+      );
+    const res = await create.POST!(
+      ctxDe('POST', '/api/create', JSON.stringify({ kind: 'spreadsheet', copy_of: ID })),
+    );
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({ id: OTRO, title: 'Copia', kind: 'spreadsheet' });
+    expect(JSON.parse(String(llamadas[0]!.body))).toEqual({
+      title: '',
+      kind: 'spreadsheet',
+      copy_of: ID,
+    });
+  });
   test('POST /api/ops reenvía el cuerpo tal cual, con el sobre de la contraseña', async () => {
     await ops.POST!(ctxDe('POST', `/api/ops?id=${ID}`, OPS_BODY));
     expect(llamadas[0]!.body).toBe(OPS_BODY);

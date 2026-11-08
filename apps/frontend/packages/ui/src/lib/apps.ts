@@ -188,7 +188,7 @@ const CATALOGO_ORDENADO: readonly EntradaCatalogo[] = [
   // (`PRODUCTOS_SOLO_ORGANIZACION` de @sytue/config).
   {
     key: 'pages',
-    name: 'Sytue Web',
+    name: 'Sytue Webs',
     suite: 'autonomo',
     // La puerta es «Mis sitios», también sin org durante SSR.
     ruta: '',
@@ -341,6 +341,16 @@ const SOURCE_ALIAS: Record<string, ProductKey> = { chat: 'rooms', meet: 'rooms',
  *  (aplicando el alias Chat/Meet -> Rooms). undefined si no es de la suite. */
 export function appForKey(key: string): SuiteApp | undefined {
   return byKey.get((SOURCE_ALIAS[key] ?? key) as ProductKey);
+}
+
+/**
+ * El nombre de MARCA del producto sin «Sytue» delante («Mail», «Notepads», «CertiPDF»):
+ * el que enseña el selector de aplicaciones junto a la marca y la barra del teléfono, en
+ * cualquier idioma —es marca, no se traduce—. En Fyne es el `Name` de su FyneApp.toml
+ * sin el prefijo (`iconos.Producto.NombreCorto`).
+ */
+export function nombreCorto(key: string): string | undefined {
+  return appForKey(key)?.name.replace('Sytue ', '');
 }
 
 /**

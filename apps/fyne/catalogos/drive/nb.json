@@ -4,6 +4,8 @@
   "action.classified": "Klassifisering · {name}",
   "action.classify": "Klassifiser",
   "action.copy": "Lag en kopi",
+  "action.copyLink": "Kopier lenke",
+  "action.copyLinkFailed": "Lenken kunne ikke kopieres.",
   "action.delete": "Flytt til papirkurven",
   "action.desktopBody": "Hvis du ikke har installert den ennå, kan du laste den ned.",
   "action.desktopCta": "Se nedlastinger",
@@ -12,6 +14,7 @@
   "action.downloadName": "Last ned {name}",
   "action.downloadZip": "Last ned (ZIP)",
   "action.editorFailed": "Redigeringsprogrammet kunne ikke åpne denne filen.",
+  "action.linkCopied": "Lenken er kopiert. Den åpnes bare for dem som allerede har tilgang.",
   "action.mailFailed": "E-postskriveren kunne ikke åpnes",
   "action.menu": "Handlinger for {name}",
   "action.more": "Flere handlinger",
@@ -81,6 +84,14 @@
   "files.batch.moveTitle": {
     "one": "Flytt 1 element",
     "other": "Flytt {count} elementer"
+  },
+  "files.batch.restorePartial": {
+    "one": "1 element kunne ikke gjenopprettes og ligger fortsatt i papirkurven.",
+    "other": "{count} elementer kunne ikke gjenopprettes og ligger fortsatt i papirkurven."
+  },
+  "files.batch.restored": {
+    "one": "1 element er gjenopprettet.",
+    "other": "{count} elementer er gjenopprettet."
   },
   "files.batch.trashBody": {
     "one": "1 element sendes til papirkurven. Du kan gjenopprette det derfra.",
@@ -555,6 +566,17 @@
     "other": "{count} filer lastet opp."
   },
   "team.upload.partial": "{uploaded} av {count} lastet opp.",
+  "trash.emptiedAll": "Papirkurven er tømt.",
+  "trash.emptyAll": "Tøm papirkurven",
+  "trash.emptyAllBody": {
+    "one": "Elementet i papirkurven slettes for godt sammen med versjonsloggen. Det kan ikke hentes tilbake senere.",
+    "other": "De {count} elementene i papirkurven slettes for godt sammen med versjonsloggen. De kan ikke hentes tilbake senere."
+  },
+  "trash.emptyAllPartial": {
+    "one": "1 element kunne ikke slettes og ligger fortsatt i papirkurven.",
+    "other": "{count} elementer kunne ikke slettes og ligger fortsatt i papirkurven."
+  },
+  "trash.emptyAllTitle": "Tømme papirkurven?",
   "trash.emptyBody": "Filene og mappene du sletter, vises her, og du kan gjenopprette dem.",
   "trash.emptyTitle": "Papirkurven er tom",
   "trash.errorTitle": "Papirkurven kunne ikke lastes inn",

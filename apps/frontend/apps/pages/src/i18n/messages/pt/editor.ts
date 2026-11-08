@@ -18,10 +18,10 @@ export const editor = {
   'editor.bases.desc': 'Os registos de uma vista, tal como estão agora',
   'editor.bases.title': 'Tabela do Sytue Bases',
   'editor.bases.prompt':
-    'Cole o token de uma ligação só de leitura concedida ao Sytue Web. Os dados dessa vista passam a ser conteúdo do site e ficam públicos quando o publicar.',
+    'Cole o token de uma ligação só de leitura concedida ao Sytue Webs. Os dados dessa vista passam a ser conteúdo do site e ficam públicos quando o publicar.',
   'editor.bases.confirm': 'Trazer a vista',
   'editor.bases.invalid':
-    'Essa ligação não serve para o Sytue Web: pode ter sido revogada, ter expirado ou ter sido concedida a outro produto ou organização.',
+    'Essa ligação não serve para o Sytue Webs: pode ter sido revogada, ter expirado ou ter sido concedida a outro produto ou organização.',
   'editor.bases.large':
     'A vista não cabe numa tabela do site (no máximo 50 linhas e 8 colunas). Restrinja-a no Sytue Bases.',
   'editor.bases.forbidden':

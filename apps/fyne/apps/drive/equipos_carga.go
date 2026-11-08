@@ -5,7 +5,6 @@ package drive
 
 import (
 	"context"
-	"image/color"
 	"io"
 	"net/http"
 	"strings"
@@ -303,7 +302,7 @@ func (p *Pantalla) pedirBorrarDeEquipo(el Elemento) {
 		titulo = "team.delete.folderTitle"
 	}
 	id := q.Abierta.ID
-	cuerpo := parrafo(p.variante(), p.tr.T("team.delete.body", i18n.Vars{"name": el.Nombre}), 0)
+	cuerpo := parrafo(p.variante(), p.tr.T("team.delete.body", i18n.Vars{"name": el.Nombre}))
 	var d *ui.Dialogo
 	d = ui.Confirmacion(p.tr.T(titulo, nil), p.tr.T("team.create.cancel", nil), p.tr.T("team.delete.cta", nil), true, cuerpo,
 		func() { d.Cerrar() },
@@ -581,12 +580,12 @@ func (dm *dialogoMiembros) pintar() {
 	pista := ui.NuevaPistaCampo(dm.t(clavePodra[rol]))
 	dentro := container.New(&pilaSeparada{separas: []float32{0, tema.Espacio(2)}}, fila, pista)
 	caja := ui.NuevaCaja(tema.Color("bg-subtle", v), tema.Color("border", v), tema.RadioLG)
-	anadir := container.New(&conMargen{m: tema.Espacio(3) + tema.Borde}, append(caja.Objetos(), dentro)...)
+	anadir := dentroDeCaja(caja, tema.Espacio(3)+tema.Borde, dentro)
 
 	bloques := []fyne.CanvasObject{anadir, dm.lista(v)}
 	separas := []float32{0, tema.Espacio(4)}
 	if len(dm.miembros) > 0 {
-		bloques = append(bloques, lineaTexto(ui.Texto(dm.t("team.member.note"), tema.TextoXS, ui.Normal, tema.Color("text-subtle", v)), tema.TextoXS))
+		bloques = append(bloques, notaMeta(dm.t("team.member.note"), v))
 		separas = append(separas, tema.Espacio(4))
 	}
 	dm.cuerpo.Objects = []fyne.CanvasObject{container.New(&pilaSeparada{separas: separas, ancho: &dm.ancho}, bloques...)}
@@ -618,8 +617,7 @@ func (dm *dialogoMiembros) lista(v tema.Variante) fyne.CanvasObject {
 	for i, m := range dm.miembros {
 		filas = append(filas, dm.fila(m, i > 0, v))
 	}
-	borde := ui.NuevaCaja(color.NRGBA{}, tema.Color("border", v), tema.RadioLG)
-	return container.New(&conMargen{m: tema.Borde}, append(borde.Objetos(), container.New(ui.Columna{}, filas...))...)
+	return dentroDeCaja(marcoLista(v, tema.RadioLG), tema.Borde, container.New(ui.Columna{}, filas...))
 }
 
 // fila es un miembro: `px-3 py-2 gap-3`, el sujeto en `text-sm font-medium`, el selector
@@ -645,6 +643,7 @@ func (dm *dialogoMiembros) fila(m api.MiembroEquipo, filete bool, v tema.Variant
 		})
 	})
 	sel.Elegida = elegido
+	sel.Ancho = anchoSelectorOpciones(nombres)
 	sel.Inerte(dm.ocupado)
 	quitar := nuevoBotonTexto("", tema.TextoSM, ui.Normal, func() { dm.quitar(miembro) })
 	quitar.cuerpo, quitar.ladoIcono = glifoPapelera, 16

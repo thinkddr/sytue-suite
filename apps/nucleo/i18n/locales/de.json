@@ -101,6 +101,7 @@
   "linkedServices.changed": "Dieses Element wurde bei deinem Anbieter geändert. Aktualisiere es, bevor du es erneut bearbeitest.",
   "linkedServices.choose": "Wähle aus, was du verbinden möchtest. Dein Anbieter fragt nach den Berechtigungen für die ausgewählten Dienste.",
   "linkedServices.connected": "Verbundene Dienste",
+  "linkedServices.exists": "Dieses Konto war bereits verbunden und ist jetzt geöffnet.",
   "linkedServices.keepAdmin": "Google Keep erfordert eine genehmigte Einrichtung durch die Google Workspace-Verwaltung. Private Gmail-Konten können es nicht verbinden.",
   "linkedServices.notGranted": "Der Zugriff auf diesen Dienst wurde nicht gewährt. Verbinde das Konto erneut, um seine Berechtigungen auszuwählen.",
   "linkedServices.notSupported": "Dieser Anbieter bietet diesen Dienst nicht an.",
@@ -169,7 +170,7 @@
   "notifications.kind.pages.order.oversold": "Bestellung {number} auf {site} wurde ohne Lagerbestand bezahlt",
   "notifications.kind.pages.order.paid": "Neue Bestellung {number} auf {site}",
   "notifications.kind.pages.payment.duplicated": "Doppelte Zahlung bei Bestellung {number} auf {site}: Die zweite wird erstattet",
-  "notifications.kind.pages.settings.changed": "{actor} hat eine Einstellung von Sytue Web geändert",
+  "notifications.kind.pages.settings.changed": "{actor} hat eine Einstellung von Sytue Webs geändert",
   "notifications.kind.pages.store.busy": "Der Shop auf {site} hat zu viele Bestellungen, die auf Zahlung warten",
   "notifications.kind.pages.withdrawal.requested": "Widerruf der Bestellung {number} auf {site} beantragt",
   "notifications.kind.photos.album.added": "{actor} hat Fotos zu „{name}“ hinzugefügt",
@@ -301,6 +302,8 @@
   "shell.update.failedBody": "Versuchen Sie es später erneut oder laden Sie sie im Portal herunter.",
   "shell.update.install": "Auf Version {version} aktualisieren",
   "shell.update.upToDate": "{app} ist auf dem neuesten Stand",
+  "shell.widgets.wake": "Widgets bei geschlossener App aktualisieren",
+  "shell.widgets.wakeHelp": "Wenn sich bei dir etwas ändert, weckt Sytue die App mit einer leeren Mitteilung über Apple, damit sie ihr Widget aktualisiert. Apple sieht, welche App und wann, aber nie, was sich geändert hat.",
   "ui.backToList": "Zurück zur Liste",
   "ui.bulk.clear": "Auswahl aufheben",
   "ui.bulk.region": "Aktionen für die Auswahl",
@@ -318,6 +321,8 @@
   "ui.review.edit": "Bearbeiten",
   "ui.save": "Speichern",
   "ui.selectRow": "Zeile auswählen",
+  "ui.suiteClose": "Zurück zur App",
+  "ui.suiteOpen": "Sytue: Apps, Suche, Benachrichtigungen und Konto",
   "ui.wizard.back": "Zurück",
   "ui.wizard.cancel": "Abbrechen",
   "ui.wizard.goToStep": "Zurück zu Schritt {n}: ",
@@ -336,5 +341,7 @@
   "widgets.pending": "Ausstehend",
   "widgets.photos": "Fotos",
   "widgets.rows": "Zeilen",
-  "widgets.storage": "Speicher"
+  "widgets.storage": "Speicher",
+  "widgets.updatedAgo": "Aktualisiert {time}",
+  "widgets.updatedAt": "Aktualisiert: {time}"
 }

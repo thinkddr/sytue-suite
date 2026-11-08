@@ -31,6 +31,8 @@ const (
 	// glifoMas es el «…» del menú de acciones de un mensaje. No es el `ellipsis` del
 	// catálogo compartido: aquel son tres puntos de camino y este tres círculos.
 	glifoMas = `<circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" />`
+	// glifoArchivo es «Archivar» y la marca de las filas de «Archivados».
+	glifoArchivo = `<path d="M3 5h18v4H3z" /><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9" /><path d="M10 13h4" />`
 	// glifoChincheta es «Fijar».
 	glifoChincheta = `<path d="M9 4h6l-1 6 3 3v2H7v-2l3-3-1-6Z" /><path d="M12 15v5" />`
 	// glifoMarcador es «Guardado».

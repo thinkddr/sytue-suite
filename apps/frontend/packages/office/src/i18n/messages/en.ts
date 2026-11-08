@@ -157,6 +157,12 @@ export const en = {
   'share.password.removed': 'Password removed from the link.',
   'share.password.failed':
     'The password could not be saved. It must be between 8 and 128 characters.',
+  'copy.action': 'Make a copy',
+  'copy.title': 'Copy of {title}',
+  'copy.error': 'Couldn’t make the copy',
+  'tile.more': 'More actions',
+  'tile.more.label': 'More actions for “{title}”',
+  'tile.copy.label': 'Make a copy of “{title}”',
   'tile.delete': 'Delete',
   'tile.delete.label': 'Delete “{title}”',
 
@@ -229,6 +235,7 @@ export const en = {
   'header.save.saving': 'Saving…',
   'header.save.dirty': 'Unsaved changes',
   'header.save.error': 'Save failed',
+  'header.save.retry': 'Try saving again',
   'header.save.offline': 'Saved on this device',
   'header.save.agoSeconds': 'Saved {seconds} s ago',
   'header.save.agoMinutes': 'Saved {minutes} min ago',
@@ -256,6 +263,7 @@ export const en = {
   'status.zoom': 'Zoom',
   'status.zoom.out': 'Zoom out',
   'status.zoom.in': 'Zoom in',
+  'status.zoom.reset': '{zoom} % · Reset to 100 %',
 
   // ---------------------------------------------------------------------------
   // Franja izquierda y paneles

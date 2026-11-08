@@ -58,6 +58,7 @@ export const nl: AppCatalog<typeof en> = {
   'inbox.markAll': 'Alles als gelezen markeren',
   'inbox.loading': 'Meldingen laden…',
   'inbox.unreadDot': 'Ongelezen',
+  'inbox.markRead': 'Markeren als gelezen',
   'inbox.errorTitle': 'De meldingen konden niet worden geladen',
   'inbox.errorBody':
     'De Hub reageert op dit moment niet. Probeer het over een paar seconden opnieuw.',
@@ -687,6 +688,8 @@ export const nl: AppCatalog<typeof en> = {
     '{sources} reageerde niet, dus er kunnen resultaten ontbreken. Probeer het zo meteen opnieuw.',
   'search.partialJoin': ' en ',
   'search.showing': '{count} van {total} resultaten weergegeven.',
+  'search.loadMore': 'Meer resultaten laden',
+  'search.loadMoreFailed': 'Er konden geen extra resultaten worden geladen. Probeer het opnieuw.',
   'privacy.notice':
     'We verkopen je gegevens niet en delen ze niet met derden. We gebruiken ze niet om je te profileren, voor advertenties of om onze diensten of die van anderen te trainen of te verbeteren. Ze worden versleuteld tijdens verzending en opslag, en verlaten onze Europese infrastructuur alleen waar dat strikt nodig is om je te factureren en in de integraties die je inschakelt, waarbij de derde partij je om toestemming vraagt voor de gegevens die ze gebruikt.',
 };

@@ -1,9 +1,14 @@
 {
   "aiBatch.excludeOrg": "Utelukk organisasjonen fra den automatiske Sytue AI-kjøringen",
   "aiBatch.excludedHint": "Organisasjonen er utelukket fra den automatiske Sytue AI-kjøringen. Nye bilder behandles ikke i bakgrunnen for forslag eller likhet.",
+  "album.coverSet": "Albumomslaget er oppdatert",
+  "album.isCover": "Dette er albumomslaget",
   "album.linkCopied": "Lenke kopiert",
   "album.newLink": "Ny lenke",
   "album.newLinkConfirm": "Vil du lage en ny lenke? Den nåværende lenken slutter å virke for alle som allerede har den.",
+  "album.rename": "Gi nytt navn",
+  "album.renamePrompt": "Albumnavn",
+  "album.setCover": "Bruk som albumomslag",
   "album.share": "Del",
   "album.shared": "Delt",
   "album.unshare": "Slutt å dele",
@@ -98,6 +103,7 @@
     "other": "{count} etter opplastingsdato"
   },
   "gallery.cancelSelection": "Avslutt valg",
+  "gallery.clearSearch": "Tøm søk",
   "gallery.describeCapped": "Bare de første {count} beskrives om gangen; kjør på nytt for resten.",
   "gallery.describeNothing": "De valgte bildene har allerede en beskrivelse",
   "gallery.describeSelected": "Beskriv med Sytue AI",
@@ -106,7 +112,8 @@
   "gallery.describing": "Beskriver {done} av {total}…",
   "gallery.downloadCapped": "Bilder utenfor denne puljen: {count}.",
   "gallery.downloadSelected": "Last ned",
-  "gallery.downloading": {
+  "gallery.downloading": "Startede nedlastingsforespørsler: {count}. Sjekk nedlastingene i nettleseren.",
+  "gallery.downloadingNative": {
     "one": "Laster ned 1 bilde…",
     "other": "Laster ned {count} bilder…"
   },
@@ -114,6 +121,8 @@
   "gallery.empty.description": "Bilder fra Sytue Drive vises her, sortert etter datoen de ble tatt.",
   "gallery.empty.title": "Ingen bilder ennå",
   "gallery.favorite": "Legg til i favoritter",
+  "gallery.favoriteFailed": "Bilder som ikke kunne endres: {count}",
+  "gallery.favorited": "Lagt til i favoritter: {count}",
   "gallery.likeTheseResults": "Og de som ligner",
   "gallery.moreLikeThese": "Flere som disse",
   "gallery.newAlbum": "Nytt album",
@@ -124,6 +133,8 @@
   },
   "gallery.newAlbumTitle": "Nytt album",
   "gallery.noExifDate": "Ingen opptaksdato: sortert etter opplastingsdato",
+  "gallery.noResults.description": "Prøv andre ord, eller tøm søket for å se alle bildene dine.",
+  "gallery.noResults.title": "Ingen bilder samsvarer med «{query}»",
   "gallery.onlyImages": "Bare bilder kan legges til.",
   "gallery.open": "Åpne {name}",
   "gallery.openInEditor": "Rediger {name}",
@@ -152,6 +163,7 @@
     "other": "{count} bilder flyttet til papirkurven"
   },
   "gallery.unfavorite": "Fjern fra favoritter",
+  "gallery.unfavorited": "Fjernet fra favoritter: {count}",
   "gallery.unselectMonth": "Fjern valg av måned",
   "gallery.uploadFailed": "Kunne ikke laste opp: {name}",
   "gallery.uploaded": {
@@ -198,6 +210,9 @@
   "viewer.askSend": "Spør",
   "viewer.canvasBackground": "Bildebakgrunn",
   "viewer.close": "Lukk",
+  "viewer.counter": "{index} / {total}",
+  "viewer.counterLabel": "Bilde {index} av {total}",
+  "viewer.counterMore": "{count}+",
   "viewer.delete": "Flytt til papirkurven",
   "viewer.deleteConfirm": "Flytte dette bildet til papirkurven? Filen blir i Sytue Drive.",
   "viewer.describe": "Beskriv med Sytue AI",
@@ -237,6 +252,7 @@
   "viewer.saveDescription": "Lagre",
   "viewer.savingDescription": "Lagrer…",
   "viewer.shortcuts": "Snarveier: piltaster bytter bilde, mellomrom starter fremvisningen, I for info, Z for full størrelse, Delete for papirkurven.",
+  "viewer.shortcutsJump": "Home og End går til det første og siste bildet.",
   "viewer.similar": "Lignende bilder",
   "viewer.slideshow": "Lysbildefremvisning",
   "viewer.slideshowStop": "Stopp fremvisningen",

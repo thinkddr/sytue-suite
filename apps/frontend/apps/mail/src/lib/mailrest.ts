@@ -103,6 +103,7 @@ interface RawMessage {
   keywords?: string[];
   has_attachment?: boolean;
   thread_count?: number;
+  mailbox_id?: string;
 }
 
 /** Flag IMAP (\Seen) → keyword JMAP ($seen); el resto en minúsculas. */
@@ -137,5 +138,6 @@ export function toEmailSummary(m: RawMessage): EmailSummary {
     keywords: flagsToKeywords(m.keywords),
     hasAttachment: Boolean(m.has_attachment),
     ...(m.thread_count ? { threadCount: m.thread_count } : {}),
+    ...(m.mailbox_id ? { mailboxId: m.mailbox_id } : {}),
   };
 }

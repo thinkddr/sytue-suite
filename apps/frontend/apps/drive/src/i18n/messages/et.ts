@@ -261,6 +261,11 @@ export const et: AppCatalog<typeof en> = {
     one: '1 üksus on teisaldatud prügikasti.',
     other: '{count} üksust on teisaldatud prügikasti.',
   },
+  'files.batch.restored': { one: '1 üksus on taastatud.', other: '{count} üksust on taastatud.' },
+  'files.batch.restorePartial': {
+    one: '1 üksust ei õnnestunud taastada, see on endiselt prügikastis.',
+    other: '{count} üksust ei õnnestunud taastada, need on endiselt prügikastis.',
+  },
   'files.batch.trashFailed': 'Valikut ei õnnestunud prügikasti teisaldada.',
   'files.batch.moveTitle': { one: 'Teisalda 1 üksus', other: 'Teisalda {count} üksust' },
   'files.batch.moveDone': {
@@ -278,6 +283,9 @@ export const et: AppCatalog<typeof en> = {
   'action.rename': 'Nimeta ümber',
   'action.move': 'Teisalda…',
   'action.copy': 'Tee koopia',
+  'action.copyLink': 'Kopeeri link',
+  'action.linkCopied': 'Link on kopeeritud. See avaneb ainult neile, kellel juba on juurdepääs.',
+  'action.copyLinkFailed': 'Linki ei õnnestunud kopeerida.',
   'action.shareLink': 'Jaga linki',
   'action.openInApp': 'Ava rakenduses',
   'action.openInEditor': 'Ava redaktoris',
@@ -491,6 +499,18 @@ export const et: AppCatalog<typeof en> = {
   'trash.purged': '„{name}“ on jäädavalt kustutatud.',
   'trash.purgeDenied': '„{name}“ ei saa kustutada',
   'trash.purgeFailed': 'Kustutamine ebaõnnestus.',
+  'trash.emptyAll': 'Tühjenda prügikast',
+  'trash.emptyAllTitle': 'Kas tühjendada prügikast?',
+  'trash.emptyAllBody': {
+    one: 'Prügikastis olev üksus kustutatakse jäädavalt koos versiooniajalooga. Hiljem pole seda võimalik taastada.',
+    other:
+      'Prügikastis olevad {count} üksust kustutatakse jäädavalt koos versiooniajalooga. Hiljem pole neid võimalik taastada.',
+  },
+  'trash.emptiedAll': 'Prügikast on tühjendatud.',
+  'trash.emptyAllPartial': {
+    one: '1 üksust ei õnnestunud kustutada, see on endiselt prügikastis.',
+    other: '{count} üksust ei õnnestunud kustutada, need on endiselt prügikastis.',
+  },
   'trash.purgeTitle': 'Kas kustutada jäädavalt?',
   'trash.purgeBodyFolder':
     'Kausta „{name}“ ja kogu selle sisu andmed kustutatakse Sytue serveritest koos versiooniajalooga. Hiljem pole neid võimalik taastada, ei siit ega toe kaudu. Vastutasuks vabastate nende kasutatud ruumi.',

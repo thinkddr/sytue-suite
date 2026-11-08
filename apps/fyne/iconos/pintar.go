@@ -727,15 +727,29 @@ func (d *Dibujo) acentoDeAhora() color.NRGBA {
 	// construye el icono (`EnCarril`, o el token `sidebar-*` de `Trazo`); la tinta
 	// atenuada del carril, que no coincide con ninguna otra de la hoja, se reconoce sola.
 	if d.carril || d.tinta == tema.Color("sidebar-fg-muted", v) {
+		if tema.EsPapel() {
+			return color.NRGBA{} // sobre papel, de una sola tinta (abajo)
+		}
 		return tema.Color("sidebar-indicator", v)
 	}
 	if d.tinta == (color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}) || d.tinta == tema.Color("on-primary", v) {
 		return d.tinta
 	}
+	// Sobre papel la tinta de MARCA va hueca: `text-primary-text` no está en la lista
+	// de styles.css que pasa el relleno a currentColor, así que allí queda transparente.
+	if tema.EsPapel() && (d.tinta == tema.Color("primary-text", v) || d.tinta == tema.Color("primary", v)) {
+		return color.NRGBA{}
+	}
 	// Y la otra mitad de la regla de `styles.css`: con la tinta YA de color —rojo de
 	// peligro, verde de éxito, el color de un producto— el relleno sigue a la tinta.
 	if tintaDeColor(d.tinta) {
 		return d.tinta
+	}
+	// SOBRE EL CROMO «PAPEL» (Sytue Notepads) el glifo es de una sola tinta: es el
+	// `--sytue-glyph-fill: transparent` de appearance.css. Lo de arriba —un acento
+	// pedido, un icono sobre un relleno de color, una tinta de estado— sigue igual.
+	if tema.EsPapel() {
+		return color.NRGBA{}
 	}
 	return tema.Color("primary", v)
 }
@@ -750,8 +764,9 @@ const cromaDeColor = 40
 //
 // Medido sobre la hoja: las tintas neutras de los tres temas (`text`, `text-muted`,
 // `text-subtle`, `sidebar-fg*`, `header-fg`) quedan entre 0 y 17; las de estado y las de
-// producto, de 80 para arriba. `primary-text` también es «de color», y da lo mismo: su
-// relleno es el de marca en los dos casos.
+// producto, de 80 para arriba. `primary-text` también es «de color», y en el cromo de
+// color da lo mismo: su relleno es el de marca en los dos casos. Sobre papel no, y por
+// eso acentoDeAhora la mira antes.
 //
 // ponytail: un umbral y no la lista de tokens, porque la tinta puede venir mezclada o
 // atenuada y ya no ser igual a ningún token. Si un tema nuevo trae una tinta neutra muy

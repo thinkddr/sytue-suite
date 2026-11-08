@@ -20,6 +20,7 @@ import (
 
 	imapserver "github.com/emersion/go-imap/v2/imapserver"
 
+	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
 	"git.sytue.eu/sytue/one/services/mail/internal/store"
 )
@@ -52,13 +53,16 @@ type Deps struct {
 	// se desactiva. El 993 está expuesto a internet y hasta ahora aceptaba
 	// intentos ilimitados sin dejar rastro en el log.
 	MaxAuthFailuresPerMinPerIP int
+	// Hub recibe la señal de cambios del widget de Mail (hubnotify.AvisarCambio) de lo
+	// que se marca, mueve o borra por IMAP. nil = sin señal.
+	Hub *hubnotify.Client
 }
 
 // New construye el servidor IMAP con el backend de Sytue Mail.
 func New(d Deps) *Server {
 	be := &backend{
 		store: d.Store, blobs: d.Blobs, auth: d.Auth, hostname: d.Hostname, logger: d.Logger,
-		maxAuthFailPerMin: d.MaxAuthFailuresPerMinPerIP,
+		maxAuthFailPerMin: d.MaxAuthFailuresPerMinPerIP, hub: d.Hub,
 	}
 	srv := imapserver.New(&imapserver.Options{
 		NewSession:   be.newSession,

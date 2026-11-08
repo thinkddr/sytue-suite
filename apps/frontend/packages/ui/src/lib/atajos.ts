@@ -26,11 +26,21 @@ import { useEffect, useState } from 'preact/hooks';
 
 const SUPERPOSICIONES = '[role="dialog"], [role="menu"]';
 
+/**
+ * Los `<input>` donde NO se escribe: se marcan o se pulsan. Chrome y Firefox les dan
+ * el foco al hacer clic, así que contarlos como campo apagaba los atajos después de
+ * marcar una casilla con el ratón (Escape ya no vaciaba la selección de Mail).
+ */
+const INPUT_SIN_TEXTO = /^(checkbox|radio|button|submit|reset)$/i;
+
 /** El foco está en algo donde se escribe (campo o `contenteditable`). */
 export function enCampoDeTexto(destino: EventTarget | null): boolean {
   const el = destino as HTMLElement | null;
   if (!el) return false;
-  return el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/i.test(el.tagName ?? '');
+  if (el.isContentEditable) return true;
+  const tag = el.tagName ?? '';
+  if (/^INPUT$/i.test(tag)) return !INPUT_SIN_TEXTO.test((el as HTMLInputElement).type ?? '');
+  return /^(TEXTAREA|SELECT)$/i.test(tag);
 }
 
 /**

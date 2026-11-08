@@ -137,6 +137,11 @@ func (h *Handlers) concederPermiso(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, errorAPI(err))
 		return
 	}
+	// A una persona, la base le aparece en su widget. A un grupo o a toda la
+	// organización no se avisa uno a uno: lo ven al abrir la app o en el latido.
+	if p.PrincipalKind == domain.PrincipalUsuario {
+		hubnotify.AvisarTambien(r.Context(), p.PrincipalID)
+	}
 	httpx.JSON(w, r, http.StatusCreated, p)
 }
 

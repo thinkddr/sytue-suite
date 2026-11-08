@@ -8,6 +8,9 @@
  * asiento no es un registro con campos declarados, es una estructura con reglas
  * propias —se asienta, no se edita— y sus tablas viven aparte precisamente por
  * eso. Aquí solo se LEEN: corregir contabilidad se hace con otro asiento.
+ *
+ * Las dos se acotan por PERÍODO (periodo.ts) desde un selector junto al título: el
+ * libro de un mes y el sumas y saldos de un trimestre son lo que se mira de verdad.
  */
 import { useEffect, useState } from 'preact/hooks';
 import type { JSX } from 'preact';
@@ -16,6 +19,7 @@ import { api, consulta, mensajeDeError } from '../lib/api.js';
 import type { Asiento, RespuestaBalance } from './tipos.js';
 import { formatearDinero, formatearFecha } from './formato.js';
 import type { T } from '../i18n/index.js';
+import { PERIODOS, ROTULO_PERIODO, rangoDePeriodo, type Periodo } from './periodo.js';
 
 /** Importe en céntimos, o un guion si es cero: una columna de ceros no informa. */
 function importe(centimos: number, locale: string): string {
@@ -77,13 +81,81 @@ export function AsientoCompacto({
   );
 }
 
+/**
+ * El título de la pantalla con el selector de período a la derecha. El `<select>`
+ * es el de la barra de lote (`text-xs`): más bajo que el título, no cambia el alto
+ * de la fila.
+ */
+function CabeceraPeriodo({
+  titulo,
+  periodo,
+  onPeriodo,
+  t,
+}: {
+  titulo: string;
+  periodo: Periodo;
+  onPeriodo: (p: Periodo) => void;
+  t: T;
+}): JSX.Element {
+  return (
+    <header class="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <h1 class="text-text text-2xl font-semibold">{titulo}</h1>
+      <select
+        aria-label={t('ledger.period')}
+        class="sytue-focus-ring border-border bg-surface text-text rounded px-2 py-1 text-xs"
+        value={periodo}
+        onChange={(e) => onPeriodo((e.target as HTMLSelectElement).value as Periodo)}
+      >
+        {PERIODOS.map((p) => (
+          <option key={p} value={p}>
+            {t(ROTULO_PERIODO[p])}
+          </option>
+        ))}
+      </select>
+    </header>
+  );
+}
+
+/*
+ * La cabecera con el selector se pinta SIEMPRE, también mientras carga y con un
+ * error: devolver solo la rueda o solo el error desmontaba el `<select>` a cada
+ * cambio de período —el foco caía al `body` y, con la flecha sobre el select
+ * cerrado (que dispara `change` en cada paso), había que volver con Tab cada vez—
+ * y, si un período fallaba, no quedaba forma de volver a «Todo».
+ */
+function Cargando(): JSX.Element {
+  return (
+    <div class="flex justify-center py-16">
+      <Spinner size={22} />
+    </div>
+  );
+}
+
+function Fallo({ texto }: { texto: string }): JSX.Element {
+  return (
+    <p role="alert" class="bg-danger-bg text-danger-text rounded-md px-4 py-3 text-sm">
+      {texto}
+    </p>
+  );
+}
+
+/** «Todavía no hay nada asentado», o «Nada asentado en este período» con un corte puesto. */
+function textoVacio(periodo: Periodo, t: T): string {
+  return periodo === 'todo' ? t('ledger.empty') : t('ledger.emptyPeriod');
+}
+
 export function LibroDiario({ locale, t }: { locale: string; t: T }): JSX.Element {
   const [asientos, setAsientos] = useState<Asiento[] | null>(null);
   const [error, setError] = useState('');
+  const [periodo, setPeriodo] = useState<Periodo>('todo');
 
   useEffect(() => {
     let vivo = true;
-    api<{ asientos: Asiento[] | null }>(`libro${consulta({ limite: 50 })}`)
+    setAsientos(null);
+    setError('');
+    api<{ asientos: Asiento[] | null }>(
+      `libro${consulta({ limite: 50, ...rangoDePeriodo(periodo) })}`,
+    )
       .then((r) => vivo && setAsientos(r.asientos ?? []))
       .catch((err: unknown) => {
         if (vivo) setError(mensajeDeError(err, t));
@@ -91,24 +163,17 @@ export function LibroDiario({ locale, t }: { locale: string; t: T }): JSX.Elemen
     return () => {
       vivo = false;
     };
-  }, [t]);
-
-  if (error) {
-    return <p class="bg-danger-bg text-danger-text m-6 rounded-md px-4 py-3 text-sm">{error}</p>;
-  }
-  if (!asientos) {
-    return (
-      <div class="flex justify-center py-16">
-        <Spinner size={22} />
-      </div>
-    );
-  }
+  }, [t, periodo]);
 
   return (
     <div class="mx-auto max-w-5xl px-6 py-6">
-      <h1 class="text-text mb-5 text-2xl font-semibold">{t('nav.ledger')}</h1>
-      {asientos.length === 0 ? (
-        <p class="text-text-muted py-16 text-center text-sm">{t('ledger.empty')}</p>
+      <CabeceraPeriodo titulo={t('nav.ledger')} periodo={periodo} onPeriodo={setPeriodo} t={t} />
+      {error ? (
+        <Fallo texto={error} />
+      ) : !asientos ? (
+        <Cargando />
+      ) : asientos.length === 0 ? (
+        <p class="text-text-muted py-16 text-center text-sm">{textoVacio(periodo, t)}</p>
       ) : (
         <ul class="space-y-3">
           {asientos.map((a) => (
@@ -125,10 +190,13 @@ export function LibroDiario({ locale, t }: { locale: string; t: T }): JSX.Elemen
 export function Balance({ locale, t }: { locale: string; t: T }): JSX.Element {
   const [datos, setDatos] = useState<RespuestaBalance | null>(null);
   const [error, setError] = useState('');
+  const [periodo, setPeriodo] = useState<Periodo>('todo');
 
   useEffect(() => {
     let vivo = true;
-    api<RespuestaBalance>('balance')
+    setDatos(null);
+    setError('');
+    api<RespuestaBalance>(`balance${consulta(rangoDePeriodo(periodo))}`)
       .then((r) => vivo && setDatos(r))
       .catch((err: unknown) => {
         if (vivo) setError(mensajeDeError(err, t));
@@ -136,29 +204,22 @@ export function Balance({ locale, t }: { locale: string; t: T }): JSX.Element {
     return () => {
       vivo = false;
     };
-  }, [t]);
+  }, [t, periodo]);
 
-  if (error) {
-    return <p class="bg-danger-bg text-danger-text m-6 rounded-md px-4 py-3 text-sm">{error}</p>;
-  }
-  if (!datos) {
-    return (
-      <div class="flex justify-center py-16">
-        <Spinner size={22} />
-      </div>
-    );
-  }
-
-  const cuentas = datos.cuentas ?? [];
+  const cuentas = datos?.cuentas ?? [];
   // Que los dos lados coincidan es LO PRIMERO que mira quien abre esta pantalla.
   // Si no coinciden, algo va muy mal y hay que decirlo aquí y no en un registro.
-  const cuadra = datos.total_debe === datos.total_haber;
+  const cuadra = datos !== null && datos.total_debe === datos.total_haber;
 
   return (
     <div class="mx-auto max-w-4xl px-6 py-6">
-      <h1 class="text-text mb-5 text-2xl font-semibold">{t('nav.balance')}</h1>
-      {cuentas.length === 0 ? (
-        <p class="text-text-muted py-16 text-center text-sm">{t('ledger.empty')}</p>
+      <CabeceraPeriodo titulo={t('nav.balance')} periodo={periodo} onPeriodo={setPeriodo} t={t} />
+      {error ? (
+        <Fallo texto={error} />
+      ) : !datos ? (
+        <Cargando />
+      ) : cuentas.length === 0 ? (
+        <p class="text-text-muted py-16 text-center text-sm">{textoVacio(periodo, t)}</p>
       ) : (
         <table class="w-full text-sm">
           <thead>

@@ -21,6 +21,8 @@ export const en = {
   'task.postponeFailed': 'This task could not be postponed',
   'task.cancel': 'Cancel task',
   'task.reopen': 'Reopen task',
+  'note.toTodo': 'Convert to task',
+  'note.toText': 'Convert to text',
   'task.carried': 'Carried over: {count}',
   'task.carriedFrom': 'First planned for {date}',
   'daily.pendingLeft': 'Still pending: {count}',
@@ -121,6 +123,9 @@ export const en = {
   'notebook.emoji': 'Icon',
   'notebook.color': 'Colour',
   'notebook.move': 'Move notebook',
+  'notebook.moveTo': 'Move notebook to…',
+  'notebook.toRoot': 'Top level (no parent)',
+  'notebook.noTarget': 'There is nowhere else to move this notebook.',
   'notebook.title': 'Name',
 
   // --- Disposición ---
@@ -194,6 +199,7 @@ export const en = {
   'note.fromRooms': 'Rooms channel',
   'note.fromNotes': 'Reference to another note',
   'note.delete': 'Delete note',
+  'note.trashed': 'Note moved to the trash',
   'note.export': 'Export…',
   'note.moveTo': 'Move to another notebook…',
   'move.title': 'Move to a notebook',
@@ -281,6 +287,11 @@ export const en = {
   'editor.highlight': 'Highlight',
   'editor.undo': 'Undo',
   'editor.redo': 'Redo',
+  // The context menu of the native app's editor (on the web the browser provides it).
+  'editor.cut': 'Cut',
+  'editor.copy': 'Copy',
+  'editor.paste': 'Paste',
+  'editor.selectAll': 'Select all',
   'editor.block': 'Text style',
   'editor.paragraph': 'Paragraph',
   'editor.h1': 'Heading 1',
@@ -315,6 +326,8 @@ export const en = {
   'editor.linkSearching': 'Searching in other notebooks…',
   'editor.linkThisNotebook': 'This notebook',
   'editor.linkOtherNotebooks': 'Other notebooks',
+  'editor.linkNote': 'Link a note',
+  'editor.mention': 'Mention someone',
   'editor.shortcut': '{label} ({keys})',
 
   // --- Etiquetas con estado ---
@@ -344,6 +357,8 @@ export const en = {
   'search.placeholder': 'Search all your notes',
   'search.results': { one: '{count} result', other: '{count} results' },
   'search.empty': 'Nothing found',
+  'search.searching': 'Searching…',
+  'search.failed': 'The search could not be completed. That does not mean there is nothing.',
   'search.hint': 'Notes left out of the index do not appear here.',
   'search.hashtags': 'Hashtags',
 

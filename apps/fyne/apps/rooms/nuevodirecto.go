@@ -428,6 +428,8 @@ type FilaPersona struct {
 
 	fondo   *canvas.Rectangle
 	casilla *ui.Caja
+	// cuadro lleva la casilla: ui.MoverCaja pierde el medio píxel del trazo.
+	cuadro  *fyne.Container
 	tic     *iconos.Dibujo
 	avatar  *ui.Avatar
 	nombre  *canvas.Text
@@ -457,12 +459,14 @@ func (f *FilaPersona) CreateRenderer() fyne.WidgetRenderer {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	f.fondo = canvas.NewRectangle(color.NRGBA{})
 	f.fondo.CornerRadius = tema.RadioMD
-	f.casilla = ui.NuevaCaja(color.NRGBA{}, tema.Color("border", v), tema.RadioSM)
+	// Sin marcar es `border` sobre transparente: con ConTrazo, y no un cuadrado macizo
+	// del color del borde.
+	f.casilla = ui.NuevaCaja(color.NRGBA{}, tema.Color("border", v), tema.RadioSM).ConTrazo()
+	f.cuadro = container.New(enCaja{f.casilla}, f.casilla.Objetos()...)
 	f.tic = iconos.Trazo(iconos.Tic, iconos.TallaXXS, "on-primary", v)
 	f.avatar = ui.NuevoAvatar(f.Persona.Nombre).Con(ui.AvatarSM)
 	f.nombre = ui.Texto(f.Persona.Nombre, tema.TextoBase, ui.Medio, tema.Color("text", v))
-	f.objetos = append([]fyne.CanvasObject{f.fondo}, f.casilla.Objetos()...)
-	f.objetos = append(f.objetos, f.tic.Objeto(), f.avatar, f.nombre)
+	f.objetos = []fyne.CanvasObject{f.fondo, f.cuadro, f.tic.Objeto(), f.avatar, f.nombre}
 	r := &filaPersonaRenderer{f: f}
 	r.Refresh()
 	return r
@@ -479,7 +483,8 @@ func (r *filaPersonaRenderer) Layout(t fyne.Size) {
 	f.fondo.Resize(t)
 	x := tema.Espacio(2)
 	lado := tema.Espacio(4)
-	ui.MoverCaja(f.casilla, fyne.NewPos(x, (t.Height-lado)/2), fyne.NewSize(lado, lado))
+	f.cuadro.Move(fyne.NewPos(x, (t.Height-lado)/2))
+	f.cuadro.Resize(fyne.NewSize(lado, lado))
 	f.tic.Colocar(x+(lado-iconos.TallaXXS)/2, (t.Height-iconos.TallaXXS)/2, iconos.TallaXXS)
 	x += lado + tema.Espacio(3)
 	m := ui.MedidaAvatar(ui.AvatarSM)

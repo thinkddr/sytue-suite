@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/url"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -23,7 +22,6 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/fyne/video"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
-	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
 // # La app viva
@@ -71,8 +69,6 @@ type App struct {
 	cli *api.Cast
 	w   fyne.Window
 	v   Vista
-	// Widget publica la cuota ya pedida para subir, sin otra lectura de la red.
-	Widget widgets.Source
 
 	// ConSesion dice si hay alguien dentro. nil: nadie.
 	ConSesion func() bool
@@ -186,13 +182,6 @@ type App struct {
 	ges        estadoGestionar
 	dri        estadoDrive
 	emi        estadoEmitir
-
-	widgetMu         sync.Mutex
-	widgetGen        int
-	widgetCuota      *widgets.Counter
-	widgetCuotaLeida bool
-	widgetEpisodes   *int64
-	widgetItems      []widgets.Item
 }
 
 // estadoCarga es lo común a las pantallas que piden algo al entrar.
@@ -576,7 +565,7 @@ func (a *App) pintar() {
 	})
 	arm := ui.NuevoArmazon(container.New(&medirVentana{a: a}, refresco))
 	arm.Menu = Lateral(a.v, activa, a.irSeccion)
-	arm.Titulo = a.v.Traduce("app.title")
+	// Sin título: la barra única dice el nombre de marca del producto, como la web.
 	a.raiz.Objects = []fyne.CanvasObject{arm}
 	if a.ruta == RutaInicio && a.dentro() {
 		// «Subir» al alcance del pulgar (MobileFab de la web, `fab` en Inicio): solo se
@@ -644,7 +633,6 @@ func (a *App) pedirInicio() {
 	}
 	a.ini.cargando, a.ini.fallo = true, nil
 	gen, q := a.gen, strings.TrimSpace(a.buscaInicio.Texto())
-	view := a.Widget.View()
 	a.lanzar(func() {
 		c, fin := ctx()
 		defer fin()
@@ -657,9 +645,6 @@ func (a *App) pedirInicio() {
 		if err == nil {
 			vivos, _ = a.cli.Videos(c, api.CastOrgScope, api.CastStatusLive, "", "", 8)
 			comp, _ = a.cli.Shared(c, "")
-			if q == "" {
-				a.publicarInicioWidget(c, view, gen, mios, vivos.Videos, org.Videos)
-			}
 		}
 		a.hilo(gen, func() {
 			a.ini.cargando, a.ini.fallo, a.ini.pedidos = false, err, a.ini.pedidos || err == nil
@@ -710,121 +695,6 @@ func (a *App) hayVivoEnInicio() bool {
 		}
 	}
 	return len(a.ini.d.EnDirecto) > 0
-}
-
-func (a *App) publicarCuotaWidget(ctx context.Context, view widgets.View, gen int, q api.CastQuota) {
-	a.widgetMu.Lock()
-	if a.widgetGen != gen {
-		a.widgetGen = gen
-		a.widgetEpisodes, a.widgetItems = nil, nil
-	}
-	a.widgetCuotaLeida = true
-	if counter, valid := widgets.StoragePercent(q.UsedBytes, q.LimitBytes); valid && q.ExternalStorage != nil && !*q.ExternalStorage {
-		c := counter
-		a.widgetCuota = &c
-	} else {
-		// An older backend cannot distinguish plan usage from an external
-		// store. Unknown/unlimited capacity also retires the previous percent.
-		a.widgetCuota = nil
-	}
-	detalle := a.detalleWidgetBloqueado()
-	a.widgetMu.Unlock()
-	_ = view.PublicarDetalle(ctx, detalle)
-}
-
-func (a *App) publicarInicioWidget(ctx context.Context, view widgets.View, gen int, mios api.CastPage, vivos, org []api.CastVideo) {
-	items := itemsCastParaWidget(vivos, mios.Videos, quitarDe(org, mios.Videos, vivos))
-	a.widgetMu.Lock()
-	if a.widgetGen != gen {
-		a.widgetGen = gen
-		a.widgetCuota, a.widgetCuotaLeida = nil, false
-	}
-	if mios.NextCursor == "" {
-		ep := int64(len(mios.Videos))
-		a.widgetEpisodes = &ep
-	} else {
-		a.widgetEpisodes = nil
-	}
-	a.widgetItems = items
-	tieneDatos := a.widgetCuotaLeida || a.widgetEpisodes != nil || len(a.widgetItems) > 0
-	detalle := a.detalleWidgetBloqueado()
-	a.widgetMu.Unlock()
-	if tieneDatos {
-		_ = view.PublicarDetalle(ctx, detalle)
-	}
-}
-
-func (a *App) detalleWidgetBloqueado() widgets.Detail {
-	var d widgets.Detail
-	if a.widgetCuota != nil {
-		d.Counters = append(d.Counters, *a.widgetCuota)
-	}
-	if a.widgetEpisodes != nil {
-		d.Counters = append(d.Counters, widgets.Counter{Kind: "episodes", Value: *a.widgetEpisodes})
-	}
-	if len(a.widgetItems) > 0 {
-		d.Items = slices.Clone(a.widgetItems)
-	}
-	return d
-}
-
-func itemsCastParaWidget(vivos, mios, org []api.CastVideo) []widgets.Item {
-	items := make([]widgets.Item, 0, widgets.MaxItems)
-	anadir := func(lista []api.CastVideo, directo bool) {
-		for _, v := range lista {
-			if len(items) >= widgets.MaxItems {
-				return
-			}
-			titulo := strings.TrimSpace(v.Title)
-			if titulo == "" {
-				continue
-			}
-			badge := duracionCastWidget(v.DurationMS)
-			color := ""
-			if directo || v.Status == api.CastStatusLive {
-				badge = "LIVE"
-				color = "#dc2626"
-			}
-			var startAt int64
-			if !v.CreatedAt.IsZero() && v.CreatedAt.Unix() > 0 {
-				startAt = v.CreatedAt.Unix()
-			}
-			items = append(items, widgets.Item{
-				Title:    titulo,
-				Subtitle: v.Owner.Name,
-				Badge:    badge,
-				StartAt:  startAt,
-				Color:    color,
-				Unread:   directo || v.Status == api.CastStatusLive,
-			})
-		}
-	}
-	anadir(vivos, true)
-	anadir(mios, false)
-	anadir(org, false)
-	return widgets.SanitizeItems(items)
-}
-
-func duracionCastWidget(ms int64) string {
-	if ms <= 0 {
-		return ""
-	}
-	seg := ms / 1000
-	minutos := seg / 60
-	rem := seg % 60
-	if minutos >= 60 {
-		h := minutos / 60
-		minutos %= 60
-		return strconv.FormatInt(h, 10) + ":" + dosCifras(minutos) + ":" + dosCifras(rem)
-	}
-	return strconv.FormatInt(minutos, 10) + ":" + dosCifras(rem)
-}
-
-func dosCifras(v int64) string {
-	if v < 10 {
-		return "0" + strconv.FormatInt(v, 10)
-	}
-	return strconv.FormatInt(v, 10)
 }
 
 // sondear repite `f` cada `cada` mientras se siga en la misma pantalla y `hace`

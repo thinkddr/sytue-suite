@@ -60,7 +60,15 @@ function notificarEnSO(title: string, body: string | undefined): void {
   });
 }
 
-export function NotificationCenter(): JSX.Element {
+export interface NotificationCenterProps {
+  /** Avisa de los sin leer: con la barra plegada del teléfono, la campana no se ve y el
+   *  punto lo lleva la entrada a la suite (ver `TopBarMovil.aviso`). */
+  alCambiarSinLeer?: (n: number) => void;
+}
+
+export function NotificationCenter({
+  alCambiarSinLeer,
+}: NotificationCenterProps = {}): JSX.Element {
   const { hub, cambiarFoto } = useShell();
   const { locale, t } = useI18n();
   // La carga, el contador (el de la base, no los `!read` de la página), el flujo con
@@ -91,6 +99,7 @@ export function NotificationCenter(): JSX.Element {
   // El correo sin leer lo cuenta el Hub (`mail_unread`), así que la fila sale en las
   // trece apps y no solo en Mail, que era la única que podía preguntar a su BFF.
   const { items, sinLeer: unread, correoSinLeer, cargando: loading, fallo: error } = estado;
+  useEffect(() => alCambiarSinLeer?.(unread), [unread, alCambiarSinLeer]);
   const cuerpo = (n: Notification) => {
     const c = cuerpoAviso(locale, n);
     return c ? <span title={c}>{c}</span> : undefined;

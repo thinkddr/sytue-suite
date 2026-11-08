@@ -81,6 +81,51 @@ func (c *Contexto) AtajoImprimir(s *desktop.CustomShortcut) bool {
 	return true
 }
 
+// AtajoZoom es Ctrl/Cmd +, − y 0 sobre el zoom del documento (`atajosZoom.ts` de la web):
+// + (o =, que es el + sin Mayús) y − de 10 en 10, y 0 vuelve al 100. Dice si era uno de
+// ellos. Se admite la Mayús porque en muchos teclados el + es Mayús+=.
+func (c *Contexto) AtajoZoom(s *desktop.CustomShortcut) bool {
+	if s == nil || s.Modifier&^fyne.KeyModifierShift != fyne.KeyModifierShortcutDefault {
+		return false
+	}
+	var hacer func()
+	switch s.KeyName {
+	case fyne.KeyPlus, fyne.KeyEqual:
+		hacer = func() { c.AjustarZoom(+ZoomPaso) }
+	case fyne.KeyMinus:
+		hacer = func() { c.AjustarZoom(-ZoomPaso) }
+	case fyne.Key0:
+		hacer = func() { c.PonerZoom(100) }
+	default:
+		return false
+	}
+	if c != nil {
+		hacer()
+	}
+	return true
+}
+
+// AtajoDelEditor son los atajos del marco que también tiene que oír el lienzo con el
+// foco (Ctrl/Cmd+P y el zoom): dice si era uno de ellos, y si lo era lo hace.
+func (c *Contexto) AtajoDelEditor(s *desktop.CustomShortcut) bool {
+	return c.AtajoImprimir(s) || c.AtajoZoom(s)
+}
+
+// AtajosDelEditor son las combinaciones que [Contexto.AtajoDelEditor] atiende, para
+// engancharlas a la ventana: así responden también con el foco en la cinta o un panel.
+func AtajosDelEditor() []*desktop.CustomShortcut {
+	ctrl := fyne.KeyModifierShortcutDefault
+	return []*desktop.CustomShortcut{
+		{KeyName: fyne.KeyP, Modifier: ctrl},
+		{KeyName: fyne.KeyPlus, Modifier: ctrl},
+		{KeyName: fyne.KeyPlus, Modifier: ctrl | fyne.KeyModifierShift},
+		{KeyName: fyne.KeyEqual, Modifier: ctrl},
+		{KeyName: fyne.KeyEqual, Modifier: ctrl | fyne.KeyModifierShift},
+		{KeyName: fyne.KeyMinus, Modifier: ctrl},
+		{KeyName: fyne.Key0, Modifier: ctrl},
+	}
+}
+
 // PDFSimple es «PDF accesible» APAGADO en el menú Archivo: la descarga en PDF pide el simple
 // en vez del etiquetado (PDF/UA-1). El valor cero es el de la web: accesible.
 // ponytail: vive lo que el proceso; la web lo guarda en localStorage. Llevarlo a las
@@ -218,6 +263,44 @@ func (s Servicio) RestaurarVersion(id string, v api.DocVersion, luego func()) {
 			s.avisar(ui.AvisoExito, "versions.restored")
 			if luego != nil {
 				luego()
+			}
+		})
+	})
+}
+
+// HacerCopia es «Hacer una copia» (`hacerCopia` de la web): `antes` guarda lo pendiente
+// —la copia sale de lo que el servicio tiene, y sin eso le faltaría lo último escrito—,
+// luego el servicio copia el original con el título traducido («Copia de …») y `abrir`
+// recibe la copia en el hilo de la interfaz. Si algo falla se avisa y no se abre nada.
+// `listo`, si no es nil, se llama en el hilo de la interfaz al acabar, haya salido o no:
+// es lo que suelta la guarda contra la doble pulsación de quien llama.
+func (s Servicio) HacerCopia(original api.Document, antes func() error, abrir func(api.Document), listo func()) {
+	// Sin traductor, la clave, como en `avisar`: nada de un literal en un idioma.
+	titulo := original.Title
+	if s.T != nil {
+		titulo = s.T("copy.title", i18n.Vars{"title": original.Title})
+	}
+	s.lanzar(func() {
+		var err error
+		if antes != nil {
+			err = antes()
+		}
+		var copia api.Document
+		if err == nil {
+			c, cancelar := s.ctx()
+			defer cancelar()
+			copia, err = s.Svc.CreateCopy(c, original, titulo)
+		}
+		fyne.Do(func() {
+			if listo != nil {
+				listo()
+			}
+			if err != nil || copia.ID == "" {
+				s.avisar(ui.AvisoPeligro, "copy.error")
+				return
+			}
+			if abrir != nil {
+				abrir(copia)
 			}
 		})
 	})

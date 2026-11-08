@@ -5,6 +5,7 @@ package notes
 
 import (
 	"image/color"
+	"math"
 	"slices"
 
 	"fyne.io/fyne/v2"
@@ -82,10 +83,13 @@ type Barra struct {
 	AlRehacer      func()
 	AlAjustes      func()
 	// AlCompartir es «Compartir con personas» del cuaderno: solo su dueño. Nil: no sale.
-	AlCompartir   func()
-	AlNuevaNota   func()
-	AlDesbloquear func()
-	AlBloquear    func()
+	AlCompartir func()
+	// AlMoverCuaderno es «Mover cuaderno a…» del abierto. Nil: no sale (sin red, de
+	// lectura, un día del diario o sin permiso para cambiarlo de padre).
+	AlMoverCuaderno func()
+	AlNuevaNota     func()
+	AlDesbloquear   func()
+	AlBloquear      func()
 	// AlMenu abre un menú superpuesto. Lo pone la pantalla, que es quien tiene el
 	// lienzo donde la capa se dibuja.
 	AlMenu func(disparador fyne.CanvasObject, m *ui.Menu)
@@ -186,6 +190,14 @@ func (b *Barra) campoFiltro() *ui.Entrada {
 	return b.filtro
 }
 
+// VaciarFiltro deja el filtro de texto en blanco, también en el campo si ya existe.
+func (b *Barra) VaciarFiltro() {
+	b.Filtro, b.Filtrando = "", false
+	if b.filtro != nil {
+		b.filtro.PonerTexto("")
+	}
+}
+
 // conservaEdicion reconoce las herramientas de la barra, incluido el editor interno
 // del filtro. El foco puede quedarse en el control: no se devuelve al cuerpo mientras
 // la persona lo esté usando.
@@ -265,6 +277,9 @@ func (b *Barra) menuMas() *ui.Menu {
 	es = append(es, ui.NuevoSeparadorMenu())
 	if b.AlCompartir != nil {
 		es = append(es, ui.NuevoElementoMenu(t("sharePeople.open", nil), iconos.Ninguno, func() { llamar0(b.AlCompartir) }))
+	}
+	if b.AlMoverCuaderno != nil {
+		es = append(es, ui.NuevoElementoMenu(t("notebook.moveTo", nil), iconos.Ninguno, func() { llamar0(b.AlMoverCuaderno) }))
 	}
 	es = append(es, ui.NuevoElementoMenu(t("notebook.settings", nil), iconos.Ninguno, func() { llamar0(b.AlAjustes) }))
 	return ui.NuevoMenu(es...)
@@ -359,7 +374,13 @@ type barraFlex struct {
 	px, py, hueco float32
 	minAlto       float32
 	auto          bool
+	// filaUnica pone todo en una fila, que se desplaza de lado en vez de envolver: la
+	// barra de formato en el teléfono (`FILA_UNICA_EN_MOVIL` de la web, hasta `md`).
+	filaUnica func() bool
 }
+
+// unaFila dice si la barra va en una fila.
+func (f *barraFlex) unaFila() bool { return f.filaUnica != nil && f.filaUnica() }
 
 // Los dos primeros hijos son el fondo y el filete; los demás, lo que va en la fila.
 func (f *barraFlex) items(objs []fyne.CanvasObject) []fyne.CanvasObject {
@@ -374,6 +395,9 @@ func (f *barraFlex) lineas(items []fyne.CanvasObject, cabe float32) [][]int {
 	var out [][]int
 	var fila []int
 	var x float32
+	if f.unaFila() {
+		cabe = float32(math.Inf(1))
+	}
 	for i, o := range items {
 		w := o.MinSize().Width
 		if i == f.entera {
@@ -424,7 +448,14 @@ func (f *barraFlex) AltoPara(objs []fyne.CanvasObject, ancho float32) float32 {
 
 func (f *barraFlex) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	var ancho float32
-	for _, o := range f.items(objs) {
+	for i, o := range f.items(objs) {
+		if f.unaFila() {
+			if i > 0 {
+				ancho += f.hueco
+			}
+			ancho += o.MinSize().Width
+			continue
+		}
 		ancho = max(ancho, o.MinSize().Width)
 	}
 	return fyne.NewSize(ancho+2*f.px, f.AltoPara(objs, 1280))

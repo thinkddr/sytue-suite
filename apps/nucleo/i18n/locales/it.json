@@ -101,6 +101,7 @@
   "linkedServices.changed": "Questo elemento è stato modificato presso il tuo provider. Aggiorna prima di modificarlo di nuovo.",
   "linkedServices.choose": "Scegli cosa collegare. Il fornitore richiederà le autorizzazioni per i servizi selezionati.",
   "linkedServices.connected": "Servizi collegati",
+  "linkedServices.exists": "Questo account era già collegato e ora è aperto.",
   "linkedServices.keepAdmin": "Google Keep richiede una configurazione approvata dall’amministrazione di Google Workspace. Gli account Gmail personali non possono collegarlo.",
   "linkedServices.notGranted": "L’accesso a questo servizio non è stato concesso. Collega di nuovo l’account per scegliere le autorizzazioni.",
   "linkedServices.notSupported": "Questo fornitore non offre questo servizio.",
@@ -169,7 +170,7 @@
   "notifications.kind.pages.order.oversold": "L’ordine {number} su {site} è stato pagato senza scorte",
   "notifications.kind.pages.order.paid": "Nuovo ordine {number} su {site}",
   "notifications.kind.pages.payment.duplicated": "Doppio pagamento sull’ordine {number} su {site}: il secondo viene rimborsato",
-  "notifications.kind.pages.settings.changed": "{actor} ha modificato un’impostazione di Sytue Web",
+  "notifications.kind.pages.settings.changed": "{actor} ha modificato un’impostazione di Sytue Webs",
   "notifications.kind.pages.store.busy": "Il negozio di {site} ha troppi ordini in attesa di pagamento",
   "notifications.kind.pages.withdrawal.requested": "Recesso richiesto per l’ordine {number} su {site}",
   "notifications.kind.photos.album.added": "{actor} ha aggiunto foto a «{name}»",
@@ -301,6 +302,8 @@
   "shell.update.failedBody": "Riprova più tardi o scaricala dal portale.",
   "shell.update.install": "Aggiorna alla versione {version}",
   "shell.update.upToDate": "{app} è aggiornata",
+  "shell.widgets.wake": "Aggiorna i widget con l’app chiusa",
+  "shell.widgets.wakeHelp": "Quando cambia qualcosa di tuo, Sytue sveglia l’app con una notifica Apple vuota perché aggiorni il suo widget. Apple vede quale app e quando, mai che cosa è cambiato.",
   "ui.backToList": "Torna all’elenco",
   "ui.bulk.clear": "Annulla selezione",
   "ui.bulk.region": "Azioni sulla selezione",
@@ -318,6 +321,8 @@
   "ui.review.edit": "Modifica",
   "ui.save": "Salva",
   "ui.selectRow": "Seleziona riga",
+  "ui.suiteClose": "Torna all’app",
+  "ui.suiteOpen": "Sytue: app, ricerca, notifiche e account",
   "ui.wizard.back": "Indietro",
   "ui.wizard.cancel": "Annulla",
   "ui.wizard.goToStep": "Torna al passaggio {n}: ",
@@ -336,5 +341,7 @@
   "widgets.pending": "In sospeso",
   "widgets.photos": "Foto",
   "widgets.rows": "Righe",
-  "widgets.storage": "Spazio di archiviazione"
+  "widgets.storage": "Spazio di archiviazione",
+  "widgets.updatedAgo": "Aggiornato {time}",
+  "widgets.updatedAt": "Aggiornato: {time}"
 }

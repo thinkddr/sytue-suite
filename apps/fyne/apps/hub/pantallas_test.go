@@ -274,16 +274,3 @@ func TestLaAgendaNoSeQuedaCargandoParaSiempre(t *testing.T) {
 		t.Error("sin fuente conectada la agenda se queda cargando para siempre")
 	}
 }
-
-// TestLosLimitesDelDiaSonLocales: de la medianoche local a la siguiente, que es lo
-// que hace `limitesDelDia` en la web. En UTC daría «ayer» a las 00:30 de Madrid.
-func TestLosLimitesDelDiaSonLocales(t *testing.T) {
-	madrid := time.FixedZone("CEST", 2*60*60)
-	desde, hasta := LimitesDelDia(time.Date(2026, 9, 21, 0, 30, 0, 0, madrid))
-	if desde.Day() != 21 || desde.Hour() != 0 || desde.Location() != madrid {
-		t.Errorf("el día empieza en %v", desde)
-	}
-	if hasta.Sub(desde) != 24*time.Hour {
-		t.Errorf("el día dura %v", hasta.Sub(desde))
-	}
-}

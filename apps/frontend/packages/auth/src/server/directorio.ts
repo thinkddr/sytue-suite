@@ -169,3 +169,24 @@ export function crearDirectorio(bff: Pick<Bff, 'getSession'>, buildEnv: EnvLike)
     },
   };
 }
+
+/**
+ * La respuesta de `GET /api/people` sin recurso: la gente de la organización para el
+ * selector de «@» (`genteDeLaOrganizacion` de @sytue/shell). Solo correo y nombre, que
+ * es lo que se escribe y lo que se enseña: el `sub` no le hace falta a la página.
+ */
+export async function respuestaAgenda(
+  ctx: APIContext,
+  agenda: Directorio['agenda'],
+): Promise<Response> {
+  const personas = await agenda(ctx);
+  return new Response(
+    JSON.stringify({
+      people: personas.map(({ email, name }) => ({ email, ...(name ? { name } : {}) })),
+    }),
+    {
+      status: 200,
+      headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+    },
+  );
+}

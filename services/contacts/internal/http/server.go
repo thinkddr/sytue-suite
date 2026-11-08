@@ -17,6 +17,7 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
+	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
 	carddavsrv "git.sytue.eu/sytue/one/services/contacts/internal/carddav"
 	"git.sytue.eu/sytue/one/services/contacts/internal/config"
 	"git.sytue.eu/sytue/one/services/contacts/internal/store"
@@ -29,6 +30,9 @@ type Deps struct {
 	Verifier      *authn.Verifier
 	CardDAV       http.Handler
 	ReadyCheckers []httpx.Checker
+	// Hub recibe la señal de cambios de cada escritura (hubnotify.TrasEscribir), para
+	// el widget nativo. nil: sin señal.
+	Hub *hubnotify.Client
 }
 
 // Registrar los verbos WebDAV en chi ANTES de montar el router CardDAV
@@ -41,8 +45,11 @@ func NewRouter(d Deps) http.Handler {
 	httpx.MountHealth(r, d.Cfg.Version, 3*time.Second, d.ReadyCheckers...)
 
 	h := &Handlers{store: d.Store, cfg: d.Cfg}
+	// La señal de cambios por la REST y por CardDAV, que es por donde escriben los
+	// teléfonos y las libretas de escritorio.
+	cambios := d.Hub.TrasEscribir(nil, "contacts")
 	tenantAuth := func(next http.Handler) http.Handler {
-		return d.Verifier.RequireAuth(d.Verifier.RequireTenant(next))
+		return d.Verifier.RequireAuth(d.Verifier.RequireTenant(cambios(next)))
 	}
 	// ponytail: cubo en memoria, o sea POR RÉPLICA (el tope real se multiplica por
 	// el número de instancias). Si hiciera falta que fuera del servicio entero,
@@ -58,6 +65,7 @@ func NewRouter(d Deps) http.Handler {
 		// la misma, así que un cubo por IP sería un cubo para todos los clientes.
 		// Alto a propósito: corta el barrido del directorio entero, no el uso normal.
 		api.Use(httpx.RateLimit(httpx.RateLimitConfig{Limiter: apiLimiter, KeyFunc: authn.RateKey}))
+		api.Use(cambios)
 
 		// «Exportar tus datos»: la entrega de la agenda (platform/pkg/portabilidad).
 		api.Get("/export", h.Export)
@@ -79,7 +87,9 @@ func NewRouter(d Deps) http.Handler {
 		// Acciones EN LOTE (multiseleccion), por UID, owner-scoped. Antes de
 		// /contacts/{id} para que "batch"/"photo" no se tomen por un {id}.
 		api.Post("/contacts/batch/trash", h.BatchTrash)
+		api.Post("/contacts/batch/restore", h.BatchRestore)
 		api.Post("/contacts/batch/favorite", h.BatchFavorite)
+		api.Post("/contacts/batch/vcard", h.BatchVCard)
 
 		// Listado paginado de TODOS los contactos del usuario (?limit=&offset=).
 		// Existe para poder LLEVARSE los contactos: la búsqueda exige `q` y el
@@ -128,7 +138,7 @@ func NewRouter(d Deps) http.Handler {
 	// MISMO store owner-scoped y el MISMO middleware de auth que /api/v1 (ver
 	// handlers_compat.go). Prefijos /compat/google y /compat/graph.
 	mountCompat(r, &compatHandlers{store: d.Store, cfg: d.Cfg}, func(next http.Handler) http.Handler {
-		return d.Verifier.RequireGoogleAPIs(googleScopesLectura, googleScopesEscritura)(d.Verifier.RequireTenant(next))
+		return d.Verifier.RequireGoogleAPIs(googleScopesLectura, googleScopesEscritura)(d.Verifier.RequireTenant(cambios(next)))
 	}, tenantAuth)
 
 	// Endpoint INTERNO service-to-service (ver internal.go): Sytue ID refleja

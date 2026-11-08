@@ -147,6 +147,19 @@ func (d *Docs) CreateDesde(ctx context.Context, kind DocKind, titulo, fuente str
 	return out.Document, resp.StatusCode == http.StatusCreated, nil
 }
 
+// CreateCopy es «Hacer una copia»: un documento NUEVO con el contenido de ahora de
+// `original`, que el servicio copia en la misma petición (`copy_of`). El tipo lo pone el
+// original; `titulo` es el ya traducido («Copia de …»). Lo que el original tenga sin
+// guardar no viaja: quien llama guarda antes.
+func (d *Docs) CreateCopy(ctx context.Context, original Document, titulo string) (Document, error) {
+	out, err := PostJSON[docResp](ctx, d.c, "/documents", struct {
+		Kind   DocKind `json:"kind"`
+		Title  string  `json:"title"`
+		CopyOf string  `json:"copy_of"` //nolint:tagliatelle // el cable del servicio
+	}{original.Kind, titulo, original.ID})
+	return out.Document, err
+}
+
 // BySource es el documento nacido de ese fichero (`drive:<uuid>`), o ok=false si nunca se
 // ha abierto. Ahorra descargar y convertir el fichero para descubrirlo.
 func (d *Docs) BySource(ctx context.Context, fuente string) (doc Document, ok bool, err error) {
@@ -440,6 +453,9 @@ func (d *Docs) Presencia(ctx context.Context, id, conn string) ([]DocMiembro, er
 	}](ctx, d.c, Request{
 		Method: http.MethodPut, Path: "/documents/" + url.PathEscape(id) + "/presence",
 		Header: http.Header{"Content-Type": {"application/json"}}, Body: cuerpo,
+		// Es el latido de coedición (cada pocos segundos con un documento abierto): no
+		// cambia nada de lo que enseña el widget y no debe dispararle rondas.
+		SinAviso: true,
 	})
 	return out.Members, err
 }
@@ -566,7 +582,8 @@ func (d *Docs) export(ctx context.Context, id, formato string, plantilla bool) (
 }
 
 func (d *Docs) exportCon(ctx context.Context, id, formato string, plantilla bool, accesible *bool) ([]byte, error) {
-	blob, err := PostJSON[struct {
+	// Pedir una exportación es una consulta, aunque vaya por POST: no avisa al widget.
+	blob, err := PostJSONLectura[struct {
 		Export struct {
 			ID string `json:"id"`
 		} `json:"export"`

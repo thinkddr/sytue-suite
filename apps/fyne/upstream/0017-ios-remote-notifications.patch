@@ -1,0 +1,672 @@
+From 1c33c69c27045e19b139969ef7949a56855a3888 Mon Sep 17 00:00:00 2001
+From: Daniel Delgado <admin@sytue.eu>
+Date: Sat, 7 Nov 2026 06:06:16 +0000
+Subject: [PATCH 2/2] feat(mobile/ios): background remote notifications
+
+A background remote notification (content-available, no alert) wakes the app so it can
+fetch what changed from its own servers. The mobile driver now implements the optional
+mobile.RemoteNotificationDriver:
+
+- RemoteNotificationsAvailable: the app lists "remote-notification" in
+  UIBackgroundModes. Readable from main, before UIKit launches.
+- RegisterForRemoteNotifications: asks UIKit for the device token, with no permission
+  prompt, and hands it to every caller waiting for it in lowercase hexadecimal (or the
+  error UIKit gave). Concurrent callers share one request.
+- OnRemoteNotification: the handler of application:didReceiveRemoteNotification:
+  fetchCompletionHandler:. The payload is never read. The handler gets a context that is
+  cancelled after 25 seconds, and the completion handler is called exactly once: with
+  new data, no data or failed as the handler returned, failed when its context was
+  cancelled, or failed after a 500 ms grace if the handler does not return, as iOS kills
+  an app that never calls it. Protected data availability is asked for on the main
+  thread before the handler runs. With no handler the notification fails at once.
+
+Apps without the background mode behave as before. The portable state machine is
+tested on every platform; the Objective-C bridge is pinned by source contracts, as it
+cannot be compiled outside Xcode.
+
+The delegate has application:didReceiveRemoteNotification:fetchCompletionHandler: only in
+an app that declares the mode: runApp adds it, from goApplication:didReceiveRemoteNotification:
+fetchCompletionHandler:, before UIApplicationMain. Elsewhere UIKit would warn that the mode
+is missing and wake the app for nothing. Without ARC, the copy of the completion handler
+is its one reference, released once the handler is called.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JNuJHCzQJGHE9egbBprScr
+---
+ driver/mobile/remote.go                   |  37 ++++
+ internal/driver/mobile/app/darwin_ios.go  |  25 +++
+ internal/driver/mobile/app/darwin_ios.m   |  64 +++++++
+ internal/driver/mobile/app/remote.go      | 142 +++++++++++++++
+ internal/driver/mobile/app/remote_test.go | 205 ++++++++++++++++++++++
+ internal/driver/mobile/remote.go          |  26 +++
+ internal/driver/mobile/remote_test.go     |  33 ++++
+ 7 files changed, 532 insertions(+)
+ create mode 100644 driver/mobile/remote.go
+ create mode 100644 internal/driver/mobile/app/remote.go
+ create mode 100644 internal/driver/mobile/app/remote_test.go
+ create mode 100644 internal/driver/mobile/remote.go
+ create mode 100644 internal/driver/mobile/remote_test.go
+
+diff --git a/driver/mobile/remote.go b/driver/mobile/remote.go
+new file mode 100644
+index 0000000..6bf83a9
+--- /dev/null
++++ b/driver/mobile/remote.go
+@@ -0,0 +1,37 @@
++// SPDX-License-Identifier: Apache-2.0
++// Copyright (c) 2026 Daniel Delgado Ramos
++
++package mobile
++
++import "context"
++
++// RemoteNotificationDriver is an optional API of the mobile driver for background
++// remote notifications: pushes with content-available and no alert, that wake the app so
++// it can fetch what changed. Assert it on fyne.App.Driver().
++//
++// Only iOS has them, and only for an app whose Info.plist lists "remote-notification" in
++// UIBackgroundModes and that is signed with the aps-environment entitlement. Elsewhere
++// they are not available: registering fails at once and the handler never runs.
++type RemoteNotificationDriver interface {
++	// RemoteNotificationsAvailable reports whether the app declares the
++	// remote-notification background mode. It is safe from any goroutine and before
++	// the application has finished launching.
++	RemoteNotificationsAvailable() bool
++
++	// RegisterForRemoteNotifications asks the system for the device token of this app,
++	// and calls f once, on its own goroutine, with the token in lowercase hexadecimal or
++	// with the error the system gave. It shows no permission prompt: background
++	// notifications need none. Calling it again is cheap and may return the same token;
++	// the system can change it, so register on every launch.
++	RegisterForRemoteNotifications(f func(token string, err error))
++
++	// OnRemoteNotification sets the handler of background remote notifications. f runs
++	// on its own goroutine with the payload left out: it should fetch what it needs from
++	// its own servers. ctx is cancelled after RemoteNotificationTime, and the
++	// notification is then reported as failed as soon as f returns, or after a grace of
++	// half a second if it does not: iOS gives the app about 30 seconds in all.
++	// newData is whether the app fetched something new; ok, whether it worked. Set it
++	// before the first scene connects (in main) so that a launch for a notification
++	// finds it; one that arrives with no handler fails at once.
++	OnRemoteNotification(f func(ctx context.Context) (newData, ok bool))
++}
+diff --git a/internal/driver/mobile/app/darwin_ios.go b/internal/driver/mobile/app/darwin_ios.go
+index 2aaee27..1365c14 100644
+--- a/internal/driver/mobile/app/darwin_ios.go
++++ b/internal/driver/mobile/app/darwin_ios.go
+@@ -32,10 +32,15 @@ void showFileSavePicker(char* mimes, char *exts);
+ void closeFileResource(void* urlPtr);
+ 
+ void completeBackgroundRefresh(uintptr_t task, bool ok, double next);
++
++bool remoteNotificationsDeclared(void);
++void registerForRemoteNotifications(void);
++void completeRemoteNotification(uintptr_t handler, int result);
+ */
+ import "C"
+ 
+ import (
++	"errors"
+ 	"log"
+ 	"runtime"
+ 	"strings"
+@@ -65,6 +70,10 @@ func init() {
+ 	// iOS can launch the app with no scene (an app refresh task, a background
+ 	// notification): what waits for the first scene waits for UIKit to connect one.
+ 	background.waitsForScene = true
++	// Background remote notifications (remote.go): the background mode is read from
++	// Info.plist, which is there before UIKit launches.
++	remote.declared = func() bool { return bool(C.remoteNotificationsDeclared()) }
++	remote.register = func() { C.registerForRemoteNotifications() }
+ }
+ 
+ func main(f func(App)) {
+@@ -388,3 +397,19 @@ func backgroundRefreshStarted(task C.uintptr_t) { background.startRefresh(uintpt
+ 
+ //export backgroundRefreshExpired
+ func backgroundRefreshExpired(task C.uintptr_t) { background.expireRefresh(uintptr(task)) }
++
++//export remoteTokenReceived
++func remoteTokenReceived(token, failure *C.char) {
++	if failure != nil {
++		remote.tokenReceived("", errors.New(C.GoString(failure)))
++		return
++	}
++	remote.tokenReceived(C.GoString(token), nil)
++}
++
++//export remoteNotificationReceived
++func remoteNotificationReceived(handler C.uintptr_t) {
++	remote.receiveNotification(func(r RemoteResult) {
++		C.completeRemoteNotification(handler, C.int(r))
++	})
++}
+diff --git a/internal/driver/mobile/app/darwin_ios.m b/internal/driver/mobile/app/darwin_ios.m
+index 79de9ca..4f551c9 100644
+--- a/internal/driver/mobile/app/darwin_ios.m
++++ b/internal/driver/mobile/app/darwin_ios.m
+@@ -15,6 +15,7 @@
+ #import <GLKit/GLKit.h>
+ #import <UserNotifications/UserNotifications.h>
+ #import <BackgroundTasks/BackgroundTasks.h>
++#import <objc/runtime.h>
+ 
+ struct utsname sysInfo;
+ 
+@@ -87,6 +88,38 @@ static void scheduleBackgroundRefresh(double seconds) {
+ 	}
+ }
+ 
++// Background remote notifications (mobile.RemoteNotificationDriver): the app declares
++// the mode in UIBackgroundModes, and the bundle is readable before UIKit launches.
++bool remoteNotificationsDeclared(void) {
++	NSArray *modes = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"UIBackgroundModes"];
++	return [modes isKindOfClass:[NSArray class]] && [modes containsObject:@"remote-notification"];
++}
++
++// No permission prompt: a background notification shows nothing. The token arrives in
++// the delegate, as remoteTokenReceived.
++void registerForRemoteNotifications(void) {
++	dispatch_async(dispatch_get_main_queue(), ^{
++		[[UIApplication sharedApplication] registerForRemoteNotifications];
++	});
++}
++
++// Called exactly once per notification by Go (remote.go), with RemoteNewData, RemoteNoData
++// or RemoteFailed; it releases the copy of the completion handler made when it arrived
++// (no ARC in this file: cgo compiles it without).
++void completeRemoteNotification(uintptr_t handle, int result) {
++	dispatch_async(dispatch_get_main_queue(), ^{
++		void (^completion)(UIBackgroundFetchResult) = (void (^)(UIBackgroundFetchResult))(void *)handle;
++		UIBackgroundFetchResult r = UIBackgroundFetchResultFailed;
++		if (result == 0) {
++			r = UIBackgroundFetchResultNewData;
++		} else if (result == 1) {
++			r = UIBackgroundFetchResultNoData;
++		}
++		completion(r);
++		[completion release];
++	});
++}
++
+ void completeBackgroundRefresh(uintptr_t handle, bool ok, double next) {
+ 	dispatch_async(dispatch_get_main_queue(), ^{
+ 		BGTask *task = (BGTask *)CFBridgingRelease((CFTypeRef)handle);
+@@ -124,6 +157,31 @@ void completeBackgroundRefresh(uintptr_t handle, bool ok, double next) {
+ 	return YES;
+ }
+ 
++- (void)application:(UIApplication *)application didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)deviceToken {
++	const unsigned char *bytes = deviceToken.bytes;
++	NSMutableString *hex = [NSMutableString stringWithCapacity:deviceToken.length * 2];
++	for (NSUInteger i = 0; i < deviceToken.length; i++) {
++		[hex appendFormat:@"%02x", bytes[i]];
++	}
++	remoteTokenReceived((char *)[hex UTF8String], NULL);
++}
++
++- (void)application:(UIApplication *)application didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
++	remoteTokenReceived(NULL, (char *)[[error localizedDescription] UTF8String]);
++}
++
++// A background notification: the payload is never read (the app fetches what changed from
++// its own servers). Protected data is asked for here, on the main thread, as the delegate's
++// notifications can reach a suspended app late.
++// It is application:didReceiveRemoteNotification:fetchCompletionHandler: only in an app
++// that declares the background mode (runApp adds it then): elsewhere UIKit would see the
++// method, warn that the mode is missing and wake the app for nothing.
++- (void)goApplication:(UIApplication *)application didReceiveRemoteNotification:(NSDictionary *)userInfo fetchCompletionHandler:(void (^)(UIBackgroundFetchResult))completionHandler {
++	protectedDataChanged(application.isProtectedDataAvailable);
++	// The copy is the one reference completeRemoteNotification releases.
++	remoteNotificationReceived((uintptr_t)(void *)[completionHandler copy]);
++}
++
+ - (void)applicationProtectedDataWillBecomeUnavailable:(UIApplication *)application {
+ 	protectedDataChanged(false);
+ }
+@@ -484,6 +542,12 @@ static void sendTouches(int change, NSSet* touches, UIView *view) {
+ void runApp(void) {
+ 	char * argv[] = {};
+ 	@autoreleasepool {
++		// Before UIKit looks at the delegate: see goApplication:didReceiveRemoteNotification:.
++		if (remoteNotificationsDeclared()) {
++			Method m = class_getInstanceMethod([GoAppAppDelegate class], @selector(goApplication:didReceiveRemoteNotification:fetchCompletionHandler:));
++			class_addMethod([GoAppAppDelegate class], @selector(application:didReceiveRemoteNotification:fetchCompletionHandler:),
++				method_getImplementation(m), method_getTypeEncoding(m));
++		}
+ 		UIApplicationMain(0, argv, nil, NSStringFromClass([GoAppAppDelegate class]));
+ 	}
+ }
+diff --git a/internal/driver/mobile/app/remote.go b/internal/driver/mobile/app/remote.go
+new file mode 100644
+index 0000000..f93b8d7
+--- /dev/null
++++ b/internal/driver/mobile/app/remote.go
+@@ -0,0 +1,142 @@
++// SPDX-License-Identifier: Apache-2.0
++// Copyright (c) 2026 Daniel Delgado Ramos
++
++package app
++
++import (
++	"context"
++	"errors"
++	"sync"
++	"time"
++)
++
++// RemoteNotification is the handler of background remote notifications
++// (OnRemoteNotification).
++type RemoteNotification func(ctx context.Context) (newData, ok bool)
++
++// RemoteResult is what a background remote notification reports to the system.
++type RemoteResult int
++
++const (
++	// RemoteNewData: the handler fetched something new.
++	RemoteNewData RemoteResult = iota
++	// RemoteNoData: it worked and there was nothing new.
++	RemoteNoData
++	// RemoteFailed: it failed, timed out or there was no handler.
++	RemoteFailed
++)
++
++// RemoteNotificationTime is how long a handler has before its context is cancelled. iOS
++// gives the app about 30 seconds to call the completion handler; this leaves room for
++// the grace and for the main thread.
++var RemoteNotificationTime = 25 * time.Second
++
++// ErrRemoteNotificationsUnavailable is the registration error where the app cannot
++// receive background remote notifications.
++var ErrRemoteNotificationsUnavailable = errors.New("remote notifications are not available")
++
++// remoteState is what the platform tells about background remote notifications. Only
++// iOS feeds it (darwin_ios.go); elsewhere declared and register stay nil.
++type remoteState struct {
++	mu sync.Mutex
++	// declared reports whether the app declares the background mode; register asks the
++	// system for a token, which arrives later through tokenReceived.
++	declared func() bool
++	register func()
++	waiting  []func(string, error)
++	handler  RemoteNotification
++}
++
++var remote = &remoteState{}
++
++// RemoteNotificationsAvailable reports whether the app declares the remote-notification
++// background mode.
++func RemoteNotificationsAvailable() bool { return remote.available() }
++
++// RegisterForRemoteNotifications asks the system for the device token.
++func RegisterForRemoteNotifications(f func(token string, err error)) { remote.registerToken(f) }
++
++// OnRemoteNotification sets the handler of background remote notifications.
++func OnRemoteNotification(f RemoteNotification) { remote.onNotification(f) }
++
++func (r *remoteState) available() bool {
++	r.mu.Lock()
++	declared := r.declared
++	r.mu.Unlock()
++	return declared != nil && declared()
++}
++
++func (r *remoteState) registerToken(f func(string, error)) {
++	if f == nil {
++		return
++	}
++	if !r.available() {
++		go f("", ErrRemoteNotificationsUnavailable)
++		return
++	}
++	r.mu.Lock()
++	r.waiting = append(r.waiting, f)
++	first, register := len(r.waiting) == 1, r.register
++	r.mu.Unlock()
++	if first && register != nil {
++		register() // one request answers every caller waiting for it
++	}
++}
++
++func (r *remoteState) onNotification(f RemoteNotification) {
++	r.mu.Lock()
++	defer r.mu.Unlock()
++	r.handler = f
++}
++
++// tokenReceived is the system's answer to the registration: a token or an error.
++func (r *remoteState) tokenReceived(token string, err error) {
++	r.mu.Lock()
++	waiting := r.waiting
++	r.waiting = nil
++	r.mu.Unlock()
++	for _, f := range waiting {
++		go f(token, err)
++	}
++}
++
++// receiveNotification runs the handler for one notification and calls complete exactly
++// once: with what the handler returned, or failed when it times out (after the grace) or
++// when there is no handler. It does not block its caller.
++func (r *remoteState) receiveNotification(complete func(RemoteResult)) {
++	r.mu.Lock()
++	f := r.handler
++	r.mu.Unlock()
++	if f == nil {
++		complete(RemoteFailed)
++		return
++	}
++	ctx, cancel := context.WithTimeout(context.Background(), RemoteNotificationTime)
++	graceAfter := expireGrace
++	var once sync.Once
++	finish := func(res RemoteResult) { once.Do(func() { complete(res) }) }
++	returned := make(chan struct{})
++	go func() {
++		defer cancel()
++		newData, ok := f(ctx)
++		close(returned)
++		switch {
++		case !ok || ctx.Err() != nil:
++			finish(RemoteFailed)
++		case newData:
++			finish(RemoteNewData)
++		default:
++			finish(RemoteNoData)
++		}
++	}()
++	go func() {
++		<-ctx.Done()
++		grace := time.NewTimer(graceAfter)
++		defer grace.Stop()
++		select {
++		case <-returned:
++		case <-grace.C:
++			finish(RemoteFailed)
++		}
++	}()
++}
+diff --git a/internal/driver/mobile/app/remote_test.go b/internal/driver/mobile/app/remote_test.go
+new file mode 100644
+index 0000000..50e9e5d
+--- /dev/null
++++ b/internal/driver/mobile/app/remote_test.go
+@@ -0,0 +1,205 @@
++// SPDX-License-Identifier: Apache-2.0
++// Copyright (c) 2026 Daniel Delgado Ramos
++
++package app
++
++import (
++	"context"
++	"errors"
++	"strings"
++	"sync"
++	"testing"
++	"time"
++)
++
++func withRemoteTime(t *testing.T, d, grace time.Duration) {
++	t.Helper()
++	old, oldGrace := RemoteNotificationTime, expireGrace
++	RemoteNotificationTime, expireGrace = d, grace
++	t.Cleanup(func() { RemoteNotificationTime, expireGrace = old, oldGrace })
++}
++
++type completions struct {
++	mu   sync.Mutex
++	got  []RemoteResult
++	done chan struct{}
++}
++
++func newCompletions() *completions { return &completions{done: make(chan struct{}, 4)} }
++
++func (c *completions) complete(r RemoteResult) {
++	c.mu.Lock()
++	c.got = append(c.got, r)
++	c.mu.Unlock()
++	c.done <- struct{}{}
++}
++
++func (c *completions) wait(t *testing.T) []RemoteResult {
++	t.Helper()
++	select {
++	case <-c.done:
++	case <-time.After(2 * time.Second):
++		t.Fatal("the notification was never completed")
++	}
++	time.Sleep(50 * time.Millisecond) // a second completion would land here
++	c.mu.Lock()
++	defer c.mu.Unlock()
++	return append([]RemoteResult(nil), c.got...)
++}
++
++func TestRemoteNotificationReportsWhatTheHandlerReturned(t *testing.T) {
++	for _, tc := range []struct {
++		newData, ok bool
++		want        RemoteResult
++	}{{true, true, RemoteNewData}, {false, true, RemoteNoData}, {true, false, RemoteFailed}} {
++		r := &remoteState{handler: func(context.Context) (bool, bool) { return tc.newData, tc.ok }}
++		c := newCompletions()
++		r.receiveNotification(c.complete)
++		if got := c.wait(t); len(got) != 1 || got[0] != tc.want {
++			t.Fatalf("(%v, %v) completed %v, want once %v", tc.newData, tc.ok, got, tc.want)
++		}
++	}
++}
++
++func TestRemoteNotificationWithoutHandlerFailsAtOnce(t *testing.T) {
++	c := newCompletions()
++	(&remoteState{}).receiveNotification(c.complete)
++	if got := c.wait(t); len(got) != 1 || got[0] != RemoteFailed {
++		t.Fatalf("completed %v, want once failed", got)
++	}
++}
++
++// A handler that ignores its context still lets the notification complete, after the
++// grace: iOS kills an app that never calls the completion handler.
++func TestRemoteNotificationThatOverrunsCompletesOnceAsFailed(t *testing.T) {
++	withRemoteTime(t, 20*time.Millisecond, 20*time.Millisecond)
++	release := make(chan struct{})
++	r := &remoteState{handler: func(context.Context) (bool, bool) { <-release; return true, true }}
++	c := newCompletions()
++	r.receiveNotification(c.complete)
++	select {
++	case <-c.done:
++	case <-time.After(2 * time.Second):
++		t.Fatal("the notification was never completed")
++	}
++	close(release) // the handler returns late: it must not complete a second time
++	c.done <- struct{}{}
++	if got := c.wait(t); len(got) != 1 || got[0] != RemoteFailed {
++		t.Fatalf("completed %v, want once failed", got)
++	}
++}
++
++// One that notices the cancellation and returns in time is failed too, but only once.
++func TestRemoteNotificationCancelledReturnsFailedOnce(t *testing.T) {
++	withRemoteTime(t, 20*time.Millisecond, time.Second)
++	r := &remoteState{handler: func(ctx context.Context) (bool, bool) { <-ctx.Done(); return true, true }}
++	c := newCompletions()
++	r.receiveNotification(c.complete)
++	if got := c.wait(t); len(got) != 1 || got[0] != RemoteFailed {
++		t.Fatalf("completed %v, want once failed", got)
++	}
++}
++
++func TestRemoteTokenGoesToEveryoneWaitingAndAsksOnce(t *testing.T) {
++	asked := 0
++	r := &remoteState{declared: func() bool { return true }, register: func() { asked++ }}
++	got := make(chan string, 2)
++	for range 2 {
++		r.registerToken(func(token string, err error) { got <- token })
++	}
++	if asked != 1 {
++		t.Fatalf("asked the system %d times, want once", asked)
++	}
++	r.tokenReceived("ab01", nil)
++	for range 2 {
++		select {
++		case tok := <-got:
++			if tok != "ab01" {
++				t.Fatalf("token %q", tok)
++			}
++		case <-time.After(time.Second):
++			t.Fatal("a caller never got the token")
++		}
++	}
++	r.registerToken(func(string, error) {})
++	if asked != 2 {
++		t.Fatal("a later registration asks again: the token can change")
++	}
++}
++
++func TestRemoteNotificationsUnavailableFailRegistration(t *testing.T) {
++	for _, r := range []*remoteState{{}, {declared: func() bool { return false }}} {
++		errs := make(chan error, 1)
++		r.registerToken(func(_ string, err error) { errs <- err })
++		select {
++		case err := <-errs:
++			if !errors.Is(err, ErrRemoteNotificationsUnavailable) {
++				t.Fatalf("err = %v", err)
++			}
++		case <-time.After(time.Second):
++			t.Fatal("registration never answered")
++		}
++	}
++}
++
++// The native side cannot be compiled on Linux: these contracts pin what it must do.
++func TestIOSRemoteNotificationBridge(t *testing.T) {
++	m := string(iosGeometrySource(t, "darwin_ios.m"))
++	for _, required := range []string{
++		`objectForInfoDictionaryKey:@"UIBackgroundModes"`,
++		`containsObject:@"remote-notification"`,
++		"[[UIApplication sharedApplication] registerForRemoteNotifications];",
++		"didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)deviceToken",
++		`[hex appendFormat:@"%02x", bytes[i]];`,
++		"remoteTokenReceived((char *)[hex UTF8String], NULL);",
++		"didFailToRegisterForRemoteNotificationsWithError:(NSError *)error",
++		"remoteTokenReceived(NULL, (char *)[[error localizedDescription] UTF8String]);",
++		"didReceiveRemoteNotification:(NSDictionary *)userInfo fetchCompletionHandler:(void (^)(UIBackgroundFetchResult))completionHandler",
++		"remoteNotificationReceived((uintptr_t)(void *)[completionHandler copy]);",
++		"completion(r);\n\t\t[completion release];",
++		"UIBackgroundFetchResultNewData", "UIBackgroundFetchResultNoData", "UIBackgroundFetchResultFailed",
++	} {
++		if !strings.Contains(m, required) {
++			t.Errorf("darwin_ios.m is missing %q", required)
++		}
++	}
++	// The payload is never handed to the app, and protected data is asked for before
++	// the handler runs.
++	recv := sourceSection(t, m, "didReceiveRemoteNotification:(NSDictionary *)userInfo", "\n}\n")
++	if strings.Contains(recv, "userInfo[") || strings.Contains(recv, "objectForKey") {
++		t.Error("the notification payload must not be read")
++	}
++	if p, r := strings.Index(recv, "protectedDataChanged(application.isProtectedDataAvailable);"), strings.Index(recv, "remoteNotificationReceived("); p < 0 || r < 0 || p > r {
++		t.Error("protected data availability must be refreshed before the handler starts")
++	}
++	// Only an app that declares the mode has the delegate method: UIKit warns about one
++	// that does not and would wake it for nothing. runApp adds it before UIKit starts.
++	if strings.Contains(m, "- (void)application:(UIApplication *)application didReceiveRemoteNotification:") {
++		t.Error("the delegate must not implement didReceiveRemoteNotification for every app")
++	}
++	run := sourceSection(t, m, "void runApp(void) {", "\n}\n")
++	if d, a, u := strings.Index(run, "if (remoteNotificationsDeclared()) {"),
++		strings.Index(run, "class_addMethod([GoAppAppDelegate class], @selector(application:didReceiveRemoteNotification:fetchCompletionHandler:),"),
++		strings.Index(run, "UIApplicationMain("); d < 0 || a < d || u < a {
++		t.Error("runApp must add didReceiveRemoteNotification, only with the background mode, before UIApplicationMain")
++	}
++	if !strings.Contains(m, "@selector(goApplication:didReceiveRemoteNotification:fetchCompletionHandler:)") ||
++		!strings.Contains(m, "- (void)goApplication:(UIApplication *)application didReceiveRemoteNotification:(NSDictionary *)userInfo") {
++		t.Error("the method runApp adds must be the delegate's goApplication:didReceiveRemoteNotification:fetchCompletionHandler:")
++	}
++	// The results Go sends are the order of RemoteResult.
++	if RemoteNewData != 0 || RemoteNoData != 1 || RemoteFailed != 2 {
++		t.Fatal("RemoteResult changed: completeRemoteNotification maps 0, 1 and 2")
++	}
++	g := string(iosGeometrySource(t, "darwin_ios.go"))
++	for _, required := range []string{
++		"//export remoteTokenReceived", "//export remoteNotificationReceived",
++		"remote.declared = func() bool { return bool(C.remoteNotificationsDeclared()) }",
++		"remote.register = func() { C.registerForRemoteNotifications() }",
++		"C.completeRemoteNotification(handler, C.int(r))",
++	} {
++		if !strings.Contains(g, required) {
++			t.Errorf("darwin_ios.go is missing %q", required)
++		}
++	}
++}
+diff --git a/internal/driver/mobile/remote.go b/internal/driver/mobile/remote.go
+new file mode 100644
+index 0000000..404125a
+--- /dev/null
++++ b/internal/driver/mobile/remote.go
+@@ -0,0 +1,26 @@
++// SPDX-License-Identifier: Apache-2.0
++// Copyright (c) 2026 Daniel Delgado Ramos
++
++package mobile
++
++import (
++	"context"
++
++	"fyne.io/fyne/v2/driver/mobile"
++	"fyne.io/fyne/v2/internal/driver/mobile/app"
++)
++
++var _ mobile.RemoteNotificationDriver = (*driver)(nil)
++
++// RemoteNotificationsAvailable implements mobile.RemoteNotificationDriver.
++func (*driver) RemoteNotificationsAvailable() bool { return app.RemoteNotificationsAvailable() }
++
++// RegisterForRemoteNotifications implements mobile.RemoteNotificationDriver.
++func (*driver) RegisterForRemoteNotifications(f func(token string, err error)) {
++	app.RegisterForRemoteNotifications(f)
++}
++
++// OnRemoteNotification implements mobile.RemoteNotificationDriver.
++func (*driver) OnRemoteNotification(f func(ctx context.Context) (newData, ok bool)) {
++	app.OnRemoteNotification(f)
++}
+diff --git a/internal/driver/mobile/remote_test.go b/internal/driver/mobile/remote_test.go
+new file mode 100644
+index 0000000..8342db6
+--- /dev/null
++++ b/internal/driver/mobile/remote_test.go
+@@ -0,0 +1,33 @@
++// SPDX-License-Identifier: Apache-2.0
++// Copyright (c) 2026 Daniel Delgado Ramos
++
++package mobile
++
++import (
++	"testing"
++	"time"
++
++	"fyne.io/fyne/v2/driver/mobile"
++)
++
++// Apps reach the remote notification API by asserting the driver they were given, and
++// without the background mode it is not available.
++func TestTheDriverOffersRemoteNotifications(t *testing.T) {
++	d, ok := NewGoMobileDriver().(mobile.RemoteNotificationDriver)
++	if !ok {
++		t.Fatal("the mobile driver does not implement mobile.RemoteNotificationDriver")
++	}
++	if d.RemoteNotificationsAvailable() {
++		t.Fatal("remote notifications available without the background mode")
++	}
++	errs := make(chan error, 1)
++	d.RegisterForRemoteNotifications(func(_ string, err error) { errs <- err })
++	select {
++	case err := <-errs:
++		if err == nil {
++			t.Fatal("registering without the background mode must fail")
++		}
++	case <-time.After(time.Second):
++		t.Fatal("registration never answered")
++	}
++}
+-- 
+2.43.0
+

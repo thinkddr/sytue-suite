@@ -45,6 +45,7 @@ export const es: AppCatalog<typeof en> = {
   'common.actionFailed': 'No se pudo completar la acción',
   'common.tryAgain': 'Inténtalo de nuevo.',
   'common.tryAgainSoon': 'Inténtalo de nuevo en unos segundos.',
+  'common.undo': 'Deshacer',
 
   // --- Lista de contactos -------------------------------------------------
   'list.region': 'Lista de contactos',
@@ -52,6 +53,8 @@ export const es: AppCatalog<typeof en> = {
   'list.search': 'Buscar contactos',
   'list.selectAll': 'Seleccionar todos los contactos visibles',
   'list.select': 'Seleccionar {name}',
+  'list.star': 'Destacar a {name}',
+  'list.unstar': 'Quitar a {name} de destacados',
   'list.starredTitle': 'Destacado',
   'list.reviewDuplicates': 'Revisar duplicados ({count})',
   'list.count': { one: '{count} contacto', other: '{count} contactos' },
@@ -173,6 +176,11 @@ export const es: AppCatalog<typeof en> = {
   'trash.restoreFailed': 'No se pudo restaurar',
   'trash.purged': 'Contacto eliminado definitivamente',
   'trash.purgeFailed': 'No se pudo eliminar',
+  'trash.undone': 'Recuperado de la papelera',
+  'trash.undoFailed': 'No se pudieron recuperar todos',
+  'trash.undoFailedHint': 'Los que faltan siguen en la Papelera.',
+  'trash.undoFailedOne': 'No se pudo recuperar el contacto',
+  'trash.undoFailedOneHint': 'Si no está en la Papelera, se eliminó para siempre.',
 
   // --- Acciones en lote ---------------------------------------------------
   'batch.region': 'Acciones para la selección',
@@ -193,6 +201,10 @@ export const es: AppCatalog<typeof en> = {
     one: '{count} contacto en la papelera',
     other: '{count} contactos en la papelera',
   },
+  'batch.emailAll': 'Enviar correo a todos',
+  'batch.exportVcf': 'Exportar (.vcf)',
+  'batch.noEmail': 'Ninguno tiene correo electrónico',
+  'batch.emailCapped': 'Solo se incluyen las {count} primeras direcciones',
 
   // --- Ficha del contacto -------------------------------------------------
   'detail.emptyTitle': 'Selecciona un contacto',
@@ -203,6 +215,9 @@ export const es: AppCatalog<typeof en> = {
   'detail.copyEmail': 'Copiar el correo',
   'detail.emailCopied': 'Correo copiado',
   'detail.copyFailed': 'No se pudo copiar',
+  'detail.copyValue': 'Copiar {value}',
+  'detail.phoneCopied': 'Teléfono copiado',
+  'detail.addressCopied': 'Dirección copiada',
   'detail.export': 'Exportar',
   'detail.merge': 'Combinar con…',
   'detail.moreActions': 'Más acciones',

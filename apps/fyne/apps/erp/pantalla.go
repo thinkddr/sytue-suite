@@ -18,7 +18,6 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
-	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
 // Pantalla es Sytue ERP entero: el menú y lo que ocupe el panel principal.
@@ -30,10 +29,9 @@ import (
 // La TOPBAR no está, y no es un olvido: es una de las dos exclusiones de paridad
 // escritas en `docs/CONVENTIONS.md` §13.6.
 type Pantalla struct {
-	Widget widgets.Source
-	svc    *api.ERP
-	tr     *i18n.Translator
-	red    *offline.Monitor
+	svc *api.ERP
+	tr  *i18n.Translator
+	red *offline.Monitor
 
 	// Catalogo es lo que publica el servicio y Permisos lo que esta persona alcanza.
 	Catalogo Catalogo
@@ -470,10 +468,13 @@ func (p *Pantalla) IrA(vista string) {
 		p.tareas.Lista = nil
 		p.cargarTareas()
 	case VistaLibro:
-		p.libro.Asientos, p.libro.Fallo = nil, ""
+		// Cada pantalla abre sin corte, como en la web, que la monta de nuevo.
+		p.libro.Asientos, p.libro.Fallo, p.libro.Periodo = nil, "", ""
+		p.libro.AlPeriodo = p.cambiarPeriodo
 		p.cargarLibro()
 	case VistaBalance:
-		p.libro.Balance, p.libro.Fallo = nil, ""
+		p.libro.Balance, p.libro.Fallo, p.libro.Periodo = nil, "", ""
+		p.libro.AlPeriodo = p.cambiarPeriodo
 		p.cargarBalance()
 	case VistaObligaciones:
 		if p.SabeOrg && p.Organizacion == nil {

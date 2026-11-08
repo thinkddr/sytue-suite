@@ -13,6 +13,7 @@ package store_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -116,4 +117,32 @@ func mustList(t *testing.T, st *store.Store, ctx context.Context, teamID uuid.UU
 		t.Fatalf("ListChannels: %v", err)
 	}
 	return list
+}
+
+// TestNotifyPauseRoundTrip: «Pausar avisos» se guarda aparte de las palabras clave
+// —guardarlas no la borra y la devuelve— y nil la quita.
+func TestNotifyPauseRoundTrip(t *testing.T) {
+	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
+	st := store.New(h.Pool, nil)
+	ctx := tenantCtx("acme")
+
+	hasta := time.Date(2026, 11, 5, 18, 30, 0, 0, time.UTC)
+	p, err := st.SetNotifyPause(ctx, "alice", &hasta)
+	if err != nil || p.PausedUntil == nil || !p.PausedUntil.Equal(hasta) || len(p.Keywords) != 0 {
+		t.Fatalf("pausar sin fila: %+v err=%v", p, err)
+	}
+	p, err = st.PutNotifyPrefs(ctx, "alice", domain.NotifyPrefs{Keywords: []string{"deploy"}})
+	if err != nil || p.PausedUntil == nil || !p.PausedUntil.Equal(hasta) {
+		t.Fatalf("guardar palabras devolvió la pausa %v err=%v", p.PausedUntil, err)
+	}
+	if got, _ := st.GetNotifyPrefs(ctx, "alice"); got.PausedUntil == nil || !got.PausedUntil.Equal(hasta) || len(got.Keywords) != 1 {
+		t.Fatalf("releer: %+v", got)
+	}
+	p, err = st.SetNotifyPause(ctx, "alice", nil)
+	if err != nil || p.PausedUntil != nil || len(p.Keywords) != 1 || p.Keywords[0] != "deploy" {
+		t.Fatalf("quitar la pausa: %+v err=%v", p, err)
+	}
+	if got, _ := st.GetNotifyPrefs(tenantCtx("other"), "alice"); got.PausedUntil != nil {
+		t.Fatalf("aislamiento tenant: %+v", got)
+	}
 }

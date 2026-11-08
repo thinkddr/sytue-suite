@@ -64,6 +64,24 @@ type CabeceraApp struct {
 	// ancho. Con 0, el último que le dieron. Quien la pone en una columna de ancho
 	// conocido —el panel de lista— lo dice aquí, como con `Parrafo.A`.
 	Ancho float32
+	// RadioArriba redondea las dos esquinas de arriba del fondo: dentro de una tarjeta
+	// redondeada es el `overflow-hidden` de `Card` que la recorta en la web.
+	RadioArriba float32
+	// RepiteLaBarra: el título dice lo mismo que la barra del teléfono («Contactos» bajo
+	// «Contactos»). En la barra única (estrecho, con la barra de la suite) no se pinta y
+	// quedan las acciones; el nombre accesible sigue siendo el título. Es el
+	// `repiteLaBarra` de SectionHeader.
+	RepiteLaBarra bool
+}
+
+// tituloVisible es el título que se pinta: ninguno si lo dice ya la barra única.
+func (c *CabeceraApp) tituloVisible() string {
+	if c.RepiteLaBarra {
+		if l := lienzoDe(c); l != nil && l.Size().Width < Estrecho && barraSuiteDe(l) != nil {
+			return ""
+		}
+	}
+	return c.Titulo
 }
 
 var _ fyne.Widget = (*CabeceraApp)(nil)
@@ -132,7 +150,7 @@ func repartir(c *CabeceraApp, ancho float32) repartoCabecera {
 	if c.Subtitulo != "" {
 		r.linea1 += tema.TextoSM.Linea
 	}
-	natural := Medir(c.Titulo, EscalonTitulo(4), PesoTitulo(4)).Width
+	natural := Medir(c.tituloVisible(), EscalonTitulo(4), PesoTitulo(4)).Width
 	if c.Subtitulo != "" {
 		natural = max(natural, Medir(c.Subtitulo, tema.TextoSM, Normal).Width)
 	}
@@ -273,6 +291,7 @@ func (r *cabeceraRenderer) prepararTira(rep repartoCabecera) {
 func (r *cabeceraRenderer) Layout(t fyne.Size) {
 	c := r.c
 	r.fondo.Resize(t)
+	r.fondo.TopLeftCornerRadius, r.fondo.TopRightCornerRadius = c.RadioArriba, c.RadioArriba
 	r.filete.Move(fyne.NewPos(0, t.Height-tema.Borde))
 	r.filete.Resize(fyne.NewSize(t.Width, tema.Borde))
 
@@ -331,7 +350,7 @@ func (r *cabeceraRenderer) Layout(t fyne.Size) {
 		bloque += tema.TextoSM.Linea
 	}
 	y := y1 + (rep.linea1-bloque)/2
-	r.titulo.Text = recorta(c.Titulo, EscalonTitulo(4), PesoTitulo(4), der-x)
+	r.titulo.Text = recorta(c.tituloVisible(), EscalonTitulo(4), PesoTitulo(4), der-x)
 	ColocarTexto(r.titulo, EscalonTitulo(4), x, y)
 	r.subtitulo.Hidden = c.Subtitulo == ""
 	r.subtitulo.Text = recorta(c.Subtitulo, tema.TextoSM, Normal, der-x)

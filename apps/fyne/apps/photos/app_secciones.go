@@ -78,14 +78,8 @@ func (a *App) datosAlbumes() Albumes {
 }
 
 func (a *App) pedirAlbumes() {
-	gen := a.gen
-	view := a.Widget.View()
 	pedir(a, func(x context.Context, c *api.Photos) ([]api.Album, error) {
-		l, err := c.Albums(x)
-		if err == nil {
-			a.publicarAlbumesWidget(x, view, gen, l)
-		}
-		return l, err
+		return c.Albums(x)
 	}, func(l []api.Album, err error) {
 		a.alb.cargando, a.alb.fallo = false, err
 		if err != nil {
@@ -224,6 +218,7 @@ func (a *App) datosAlbum() AlbumAbierto {
 		AlCompartir:        a.compartirAlbum,
 		AlDejarDeCompartir: a.dejarDeCompartir,
 		AlBorrar:           a.borrarAlbum,
+		AlRenombrar:        a.renombrarAlbum,
 		AlAbrir: func(f api.Photo) {
 			if i := posicion(a.uno.fotos, f.ID); i >= 0 {
 				a.abrirVisor(desdeAlbum, i)
@@ -231,6 +226,77 @@ func (a *App) datosAlbum() AlbumAbierto {
 		},
 		AlIr: a.irSeccion,
 	}
+}
+
+// tituloRenombrado es el título que hay que mandar al renombrar, o "" si no hay nada
+// que guardar: vacío o igual al de ahora (`tituloRenombrado` en edicionAlbum.ts).
+func tituloRenombrado(antes, escrito string) string {
+	if nuevo := strings.TrimSpace(escrito); nuevo != antes {
+		return nuevo
+	}
+	return ""
+}
+
+// esPortada dice si esa foto es ya la portada del álbum. El servicio devuelve la
+// portada resuelta —la elegida o, si nadie eligió, la primera—, así que basta comparar.
+func esPortada(al api.Album, foto string) bool {
+	return al.CoverAssetID != "" && al.CoverAssetID == foto
+}
+
+// renombrarAlbum es «Renombrar» de la cabecera: el diálogo con el título de ahora escrito.
+func (a *App) renombrarAlbum() {
+	if a.uno.album.ID == "" {
+		return
+	}
+	a.preguntar(a.v.Traduce("album.rename"), a.v.Traduce("album.renamePrompt"), a.v.Traduce("ui.save"),
+		a.uno.album.Title, a.renombrarAlbumA)
+}
+
+// renombrarAlbumA le pone al álbum abierto lo escrito, si cambia algo.
+func (a *App) renombrarAlbumA(escrito string) {
+	id := a.uno.id
+	nuevo := tituloRenombrado(a.uno.album.Title, escrito)
+	if id == "" || nuevo == "" {
+		return
+	}
+	pedir(a, func(x context.Context, c *api.Photos) (struct{}, error) {
+		return struct{}{}, c.RenameAlbum(x, id, nuevo)
+	}, func(_ struct{}, err error) {
+		if err != nil {
+			a.uno.error = a.textoDeFallo(err)
+			return
+		}
+		a.uno.album.Title = nuevo
+		a.albumes = nil // la lista de «Añadir a un álbum…» lleva el título viejo
+	})
+}
+
+// ponerPortada es «Usar como portada del álbum» del visor de un álbum: la foto que se
+// está mirando pasa a ser la que representa al álbum en «Álbumes».
+func (a *App) ponerPortada(f api.Photo) {
+	id, titulo := a.uno.id, a.uno.album.Title
+	if id == "" || esPortada(a.uno.album, f.ID) {
+		return
+	}
+	pedir(a, func(x context.Context, c *api.Photos) (struct{}, error) {
+		return struct{}{}, c.PonerPortada(x, id, titulo, f.ID)
+	}, func(_ struct{}, err error) {
+		if a.vis != nil {
+			defer a.pintarVisor()
+		}
+		if err != nil {
+			a.uno.error = a.textoDeFallo(err)
+			if a.vis != nil {
+				a.vis.aviso = a.uno.error
+			}
+			return
+		}
+		a.uno.album.CoverAssetID = f.ID
+		a.uno.aviso = a.v.Traduce("album.coverSet")
+		if a.vis != nil {
+			a.vis.aviso = a.uno.aviso
+		}
+	})
 }
 
 // compartirAlbum crea el enlace y lo copia. El servicio solo guarda su huella:

@@ -1,9 +1,14 @@
 {
   "aiBatch.excludeOrg": "Izslēgt organizāciju no automātiskās Sytue AI apstrādes",
   "aiBatch.excludedHint": "Organizācija ir izslēgta no automātiskās Sytue AI apstrādes. Jauni fotoattēli fonā netiek apstrādāti ieteikumiem vai līdzībām.",
+  "album.coverSet": "Albuma vāks ir atjaunināts",
+  "album.isCover": "Šis ir albuma vāks",
   "album.linkCopied": "Saite nokopēta",
   "album.newLink": "Jauna saite",
   "album.newLinkConfirm": "Vai izveidot jaunu saiti? Pašreizējā saite pārstās darboties visiem, kuriem tā jau ir.",
+  "album.rename": "Pārdēvēt",
+  "album.renamePrompt": "Albuma nosaukums",
+  "album.setCover": "Izmantot kā albuma vāku",
   "album.share": "Kopīgot",
   "album.shared": "Kopīgots",
   "album.unshare": "Pārtraukt kopīgošanu",
@@ -100,6 +105,7 @@
     "other": "{count} pēc augšupielādes datuma"
   },
   "gallery.cancelSelection": "Iziet no atlases",
+  "gallery.clearSearch": "Notīrīt meklēšanu",
   "gallery.describeCapped": "Vienā reizē tiek aprakstīti tikai pirmie {count}; pārējiem palaidiet vēlreiz.",
   "gallery.describeNothing": "Atlasītajiem fotoattēliem jau ir apraksts",
   "gallery.describeSelected": "Aprakstīt ar Sytue AI",
@@ -108,7 +114,8 @@
   "gallery.describing": "Apraksta {done} no {total}…",
   "gallery.downloadCapped": "Šajā grupā neiekļautie fotoattēli: {count}.",
   "gallery.downloadSelected": "Lejupielādēt",
-  "gallery.downloading": {
+  "gallery.downloading": "Sāktie lejupielādes pieprasījumi: {count}. Pārbaudiet pārlūka lejupielādes.",
+  "gallery.downloadingNative": {
     "zero": "Lejupielādē {count} fotoattēlus…",
     "one": "Lejupielādē {count} fotoattēlu…",
     "other": "Lejupielādē {count} fotoattēlus…"
@@ -117,6 +124,8 @@
   "gallery.empty.description": "Fotoattēli no jūsu Sytue Drive parādīsies šeit, sakārtoti pēc uzņemšanas datuma.",
   "gallery.empty.title": "Vēl nav fotoattēlu",
   "gallery.favorite": "Pievienot izlasei",
+  "gallery.favoriteFailed": "Fotoattēli, kurus neizdevās mainīt: {count}",
+  "gallery.favorited": "Pievienoti izlasei: {count}",
   "gallery.likeTheseResults": "Un tie, kas izskatās līdzīgi",
   "gallery.moreLikeThese": "Vairāk līdzīgu",
   "gallery.newAlbum": "Jauns albums",
@@ -128,6 +137,8 @@
   },
   "gallery.newAlbumTitle": "Jauns albums",
   "gallery.noExifDate": "Nav uzņemšanas datuma: sakārtots pēc augšupielādes datuma",
+  "gallery.noResults.description": "Mēģiniet citus vārdus vai notīriet meklēšanu, lai redzētu visus savus fotoattēlus.",
+  "gallery.noResults.title": "Neviens fotoattēls neatbilst “{query}”",
   "gallery.onlyImages": "Var pievienot tikai attēlus.",
   "gallery.open": "Atvērt {name}",
   "gallery.openInEditor": "Rediģēt {name}",
@@ -160,6 +171,7 @@
     "other": "{count} fotoattēli pārvietoti uz atkritni"
   },
   "gallery.unfavorite": "Noņemt no izlases",
+  "gallery.unfavorited": "Noņemti no izlases: {count}",
   "gallery.unselectMonth": "Noņemt mēneša atlasi",
   "gallery.uploadFailed": "Neizdevās augšupielādēt: {name}",
   "gallery.uploaded": {
@@ -207,6 +219,9 @@
   "viewer.askSend": "Jautāt",
   "viewer.canvasBackground": "Fotoattēla fons",
   "viewer.close": "Aizvērt",
+  "viewer.counter": "{index} / {total}",
+  "viewer.counterLabel": "Fotoattēls {index} no {total}",
+  "viewer.counterMore": "{count}+",
   "viewer.delete": "Pārvietot uz atkritni",
   "viewer.deleteConfirm": "Pārvietot šo fotoattēlu uz atkritni? Fails paliek Sytue Drive.",
   "viewer.describe": "Aprakstīt ar Sytue AI",
@@ -246,6 +261,7 @@
   "viewer.saveDescription": "Saglabāt",
   "viewer.savingDescription": "Saglabā…",
   "viewer.shortcuts": "Īsinājumtaustiņi: bultiņas maina fotoattēlu, atstarpe – slaidrāde, I – informācija, Z – pilns izmērs, Delete – atkritne.",
+  "viewer.shortcutsJump": "Home un End pāriet uz pirmo un pēdējo fotoattēlu.",
   "viewer.similar": "Līdzīgi fotoattēli",
   "viewer.slideshow": "Slaidrāde",
   "viewer.slideshowStop": "Apturēt slaidrādi",

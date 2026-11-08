@@ -18,10 +18,10 @@ export const editor = {
   'editor.bases.desc': 'Færslur í yfirliti eins og þær eru núna',
   'editor.bases.title': 'Tafla úr Sytue Bases',
   'editor.bases.prompt':
-    'Límdu tóka skrifvarinnar tengingar sem veitt var Sytue Web. Gögn þess yfirlits verða hluti af efni vefsvæðisins og verða opinber þegar það er birt.',
+    'Límdu tóka skrifvarinnar tengingar sem veitt var Sytue Webs. Gögn þess yfirlits verða hluti af efni vefsvæðisins og verða opinber þegar það er birt.',
   'editor.bases.confirm': 'Sækja yfirlitið',
   'editor.bases.invalid':
-    'Sú tenging gildir ekki fyrir Sytue Web: hún kann að hafa verið afturkölluð, runnið út eða verið veitt annarri vöru eða fyrirtæki.',
+    'Sú tenging gildir ekki fyrir Sytue Webs: hún kann að hafa verið afturkölluð, runnið út eða verið veitt annarri vöru eða fyrirtæki.',
   'editor.bases.large':
     'Yfirlitið rúmast ekki í töflu á vefsvæðinu (hámark 50 raðir og 8 dálkar). Þrengdu það í Sytue Bases.',
   'editor.bases.forbidden': 'Aðeins stjórnendur geta sótt gögn úr Sytue Bases inn á vefsvæði.',

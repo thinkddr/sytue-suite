@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -164,7 +165,7 @@ func claveLote(l *Lote) string {
 func botonLote(rotulo, d string, alPulsar func()) *ui.Boton {
 	b := ui.NuevoBoton(rotulo, alPulsar).Con(ui.Fantasma, ui.TallaSM)
 	b.Rotulo, b.SoloIcono, b.TamIcono = rotulo, true, TallaGlifoLector
-	b.Glifo = Glifo(d, TallaGlifoLector, "text", tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
+	b.Glifo = Glifo(d, TallaGlifoLector, "primary-text", tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
 	return b
 }
 
@@ -333,6 +334,10 @@ func (b *Buzon) ponerLote() {
 		if h == nil {
 			return nil
 		}
+		// En una vista externa, cada hilo a la carpeta de ese rol de su cuenta.
+		if b.externa != nil && b.consulta == "" {
+			return func() { b.moverPorRol(b.seleccionadas(), rol) }
+		}
 		c, _ := b.carpetaDeRol(rol)
 		return func() { b.moverConvs(b.seleccionadas(), c) }
 	}
@@ -342,14 +347,18 @@ func (b *Buzon) ponerLote() {
 	if a.Purgar != nil {
 		l.Purgar = func() { b.pedirPurga(b.seleccionadas()) }
 	}
-	l.Etiquetar = b.etiquetarSeleccion
+	// Las etiquetas son de Sytue: una carpeta externa no las lleva.
+	if b.externa == nil || b.consulta != "" || b.externa.Mezclada() {
+		l.Etiquetar = b.etiquetarSeleccion
+	}
 }
 
 // etiquetarSeleccion es `onBatchLabel`: añade la etiqueta a toda la selección, suelta
 // la selección y refresca los contadores. Si el servidor dice que no, se avisa.
 func (b *Buzon) etiquetarSeleccion(etiqueta string) {
 	cs := b.seleccionadas()
-	ids := idsDe(cs)
+	// Lo de una cuenta externa se queda como está: las etiquetas son de Sytue.
+	ids := slices.DeleteFunc(idsDe(cs), esExterno)
 	if len(ids) == 0 {
 		return
 	}

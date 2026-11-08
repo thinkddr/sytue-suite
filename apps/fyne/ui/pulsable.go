@@ -173,6 +173,28 @@ func SubirTecla(c fyne.Canvas, e *fyne.KeyEvent) {
 	}
 }
 
+// SubirRuna es la pareja de SubirTecla para las letras: entrega a la ranura de runas
+// sueltas de la ventana (`OnTypedRune`) la que el control enfocado no usa. En la web un
+// atajo de una letra llega al documento con un botón enfocado (`esAtajoDeApp` solo se
+// la queda a un campo); en Fyne la ventana solo la recibe sin foco, así que el control
+// que quiera dejar pasar los atajos de su app la sube con esto. La ranura sigue
+// decidiendo (por ejemplo, ignorarla con un diálogo abierto).
+//
+// No la usa `pulsable` por defecto: subir TODAS las letras de todos los botones cambia
+// lo que hace cada pantalla, y quien la quiera la pide.
+func SubirRuna(c fyne.Canvas, r rune) {
+	if c == nil {
+		return
+	}
+	if f := c.OnTypedRune(); f != nil {
+		f(r)
+	}
+}
+
+// Lienzo es el lienzo cuyo foco tiene este control, o nil. Es lo que necesita quien
+// embebe `Pulsable` para llamar a SubirTecla o SubirRuna.
+func (p *pulsable) Lienzo() fyne.Canvas { return p.lienzo() }
+
 // lienzo es el lienzo que tiene este control enfocado. Se busca así porque un widget que
 // embebe `pulsable` es, para Fyne, el de FUERA, y desde aquí dentro no se le conoce:
 // `CanvasForObject(p)` no lo encuentra.

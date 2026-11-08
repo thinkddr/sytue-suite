@@ -101,6 +101,7 @@
   "linkedServices.changed": "Acest element s-a modificat la furnizorul tău. Reîmprospătează înainte de a-l edita din nou.",
   "linkedServices.choose": "Alege ce dorești să conectezi. Furnizorul va solicita permisiuni pentru serviciile selectate.",
   "linkedServices.connected": "Servicii conectate",
+  "linkedServices.exists": "Acest cont era deja conectat și acum este deschis.",
   "linkedServices.keepAdmin": "Google Keep necesită o configurare aprobată de administrația Google Workspace. Conturile Gmail personale nu îl pot conecta.",
   "linkedServices.notGranted": "Nu s-a acordat acces la acest serviciu. Conectează din nou contul pentru a alege permisiunile.",
   "linkedServices.notSupported": "Acest furnizor nu oferă acest serviciu.",
@@ -170,7 +171,7 @@
   "notifications.kind.pages.order.oversold": "Comanda {number} de pe {site} a fost plătită fără stoc",
   "notifications.kind.pages.order.paid": "Comandă nouă {number} pe {site}",
   "notifications.kind.pages.payment.duplicated": "Plată dublă la comanda {number} de pe {site}: a doua se rambursează",
-  "notifications.kind.pages.settings.changed": "{actor} a modificat o setare din Sytue Web",
+  "notifications.kind.pages.settings.changed": "{actor} a modificat o setare din Sytue Webs",
   "notifications.kind.pages.store.busy": "Magazinul de pe {site} are prea multe comenzi care așteaptă plata",
   "notifications.kind.pages.withdrawal.requested": "S-a solicitat retragerea pentru comanda {number} de pe {site}",
   "notifications.kind.photos.album.added": "{actor} a adăugat fotografii în „{name}”",
@@ -305,6 +306,8 @@
   "shell.update.failedBody": "Încercați din nou mai târziu sau descărcați-o de pe portal.",
   "shell.update.install": "Actualizează la versiunea {version}",
   "shell.update.upToDate": "{app} este la zi",
+  "shell.widgets.wake": "Actualizează widgeturile când aplicația e închisă",
+  "shell.widgets.wakeHelp": "Când se schimbă ceva al tău, Sytue trezește aplicația cu o notificare Apple goală, ca să-și actualizeze widgetul. Apple vede ce aplicație și când, niciodată ce s-a schimbat.",
   "ui.backToList": "Înapoi la listă",
   "ui.bulk.clear": "Golește selecția",
   "ui.bulk.region": "Acțiuni pentru selecție",
@@ -322,6 +325,8 @@
   "ui.review.edit": "Editează",
   "ui.save": "Salvează",
   "ui.selectRow": "Selectează rândul",
+  "ui.suiteClose": "Înapoi la aplicație",
+  "ui.suiteOpen": "Sytue: aplicații, căutare, notificări și cont",
   "ui.wizard.back": "Înapoi",
   "ui.wizard.cancel": "Anulează",
   "ui.wizard.goToStep": "Înapoi la pasul {n}: ",
@@ -340,5 +345,7 @@
   "widgets.pending": "În așteptare",
   "widgets.photos": "Fotografii",
   "widgets.rows": "Rânduri",
-  "widgets.storage": "Stocare"
+  "widgets.storage": "Stocare",
+  "widgets.updatedAgo": "Actualizat {time}",
+  "widgets.updatedAt": "Actualizat: {time}"
 }

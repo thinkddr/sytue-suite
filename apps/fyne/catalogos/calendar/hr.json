@@ -68,6 +68,7 @@
   "common.remove": "Ukloni",
   "common.retry": "Pokušaj ponovno",
   "common.save": "Spremi",
+  "day.noEvents": "Nema događaja ovog dana",
   "error.calendarsLoad": "Kalendare nije moguće učitati.",
   "error.eventsLoad": "Događaje nije moguće učitati.",
   "event.ai": "Opišite događaj",
@@ -145,6 +146,12 @@
   "grid.blockAria": "{title}, {time}",
   "grid.continued": "{title} (nastavak)",
   "grid.createOn": "Stvori događaj za {date}",
+  "grid.dayEvents": {
+    "one": "{date}, {count} događaj",
+    "few": "{date}, {count} događaja",
+    "other": "{date}, {count} događaja"
+  },
+  "grid.daySelected": "{label}, odabrano",
   "grid.loadError": "Kalendar nije moguće učitati",
   "grid.loading": "Učitavanje kalendara",
   "grid.more": {
@@ -152,6 +159,8 @@
     "few": "+{count} više",
     "other": "+{count} više"
   },
+  "grid.showMonth": "Prikaži cijeli mjesec",
+  "grid.showWeek": "Prikaži samo ovaj tjedan",
   "grid.snapAria": {
     "one": "Poravnanje pri povlačenju: {count} minuta. Pritisnite za promjenu.",
     "few": "Poravnanje pri povlačenju: {count} minute. Pritisnite za promjenu.",
@@ -167,6 +176,13 @@
     "few": "{count} min",
     "other": "{count} min"
   },
+  "grid.todayLabel": "Danas, {date}",
+  "grid.weekNumber": "Tjedan {week}",
+  "guests.organizer": "Organizator",
+  "guests.status.accepted": "Dolazi",
+  "guests.status.declined": "Ne dolazi",
+  "guests.status.pending": "Čeka se odgovor",
+  "guests.status.tentative": "Možda",
   "header.invitations": "Pozivnice",
   "header.next": "Sljedeće",
   "header.pending": {
@@ -205,6 +221,11 @@
   "nav.createEventOn": "Stvori događaj za {date}",
   "nav.deleteSubscription": "Ukloni pretplatu",
   "nav.manageResources": "Upravljaj prostorijama i opremom",
+  "nav.menuPending": {
+    "one": "Otvori izbornik, {count} na čekanju",
+    "few": "Otvori izbornik, {count} na čekanju",
+    "other": "Otvori izbornik, {count} na čekanju"
+  },
   "nav.myCalendars": "Moji kalendari",
   "nav.next": "Sljedeće",
   "nav.nextMonth": "Sljedeći mjesec",
@@ -355,6 +376,7 @@
   "scope.following": "Na ovaj i sljedeće",
   "scope.legend": "Ovaj se događaj ponavlja. Na koje se događaje odnosi promjena?",
   "scope.this": "Samo na ovaj događaj",
+  "search.allCalendars": "Svi kalendari",
   "search.error": "Pretraživanje nije moguće dovršiti.",
   "search.events": "Traži događaje",
   "search.loadMore": "Učitaj još",
@@ -364,6 +386,12 @@
     "other": "Upišite barem {count} znakova za pretraživanje kalendara."
   },
   "search.noResults": "Nema rezultata za „{term}”.",
+  "search.period": "Razdoblje",
+  "search.period.any": "Bilo kada",
+  "search.period.month": "Ovaj mjesec",
+  "search.period.past": "Prošli",
+  "search.period.upcoming": "Nadolazeći",
+  "search.period.year": "Ova godina",
   "search.placeholder": "Naslov, opis, mjesto ili pozvana osoba…",
   "search.searching": "Pretraživanje…",
   "search.series": "Niz",
@@ -405,6 +433,14 @@
   "share.whoSeesNow": "Tko ga sada vidi",
   "share.writerHint": "Osim što ih vidi, stvara, mijenja i briše događaje u ovom kalendaru.",
   "share.writerLabel": "Vidjeti i uređivati moje događaje",
+  "shortcuts.group.actions": "Radnje",
+  "shortcuts.group.navigate": "Kretanje",
+  "shortcuts.group.views": "Prikazi",
+  "shortcuts.help": "Prikaži ovaj popis",
+  "shortcuts.next": "Sljedeće razdoblje",
+  "shortcuts.prev": "Prethodno razdoblje",
+  "shortcuts.title": "Tipkovnički prečaci",
+  "shortcuts.today": "Idi na danas",
   "subscribe.aria": "Pretplati se na kalendar putem URL-a",
   "subscribe.byUrl": "Pretplata putem URL-a (.ics)",
   "subscribe.defaultName": "Pretplaćeni kalendar",

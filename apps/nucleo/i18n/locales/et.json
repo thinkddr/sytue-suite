@@ -101,6 +101,7 @@
   "linkedServices.changed": "See üksus on teie teenusepakkuja juures muutunud. Enne uuesti muutmist värskendage seda.",
   "linkedServices.choose": "Vali, mida ühendada. Teenusepakkuja küsib valitud teenuste jaoks õigusi.",
   "linkedServices.connected": "Ühendatud teenused",
+  "linkedServices.exists": "See konto oli juba ühendatud ja on nüüd avatud.",
   "linkedServices.keepAdmin": "Google Keep nõuab Google Workspace’i halduse kinnitatud seadistust. Isiklike Gmaili kontodega ei saa seda ühendada.",
   "linkedServices.notGranted": "Juurdepääsu sellele teenusele ei antud. Õiguste valimiseks ühenda konto uuesti.",
   "linkedServices.notSupported": "See teenusepakkuja ei paku seda teenust.",
@@ -169,7 +170,7 @@
   "notifications.kind.pages.order.oversold": "Tellimus {number} saidil {site} on makstud, kuid laos pole kaupa",
   "notifications.kind.pages.order.paid": "Uus tellimus {number} saidil {site}",
   "notifications.kind.pages.payment.duplicated": "Topeltmakse tellimusel {number} saidil {site}: teine makse tagastatakse",
-  "notifications.kind.pages.settings.changed": "{actor} muutis Sytue Web seadet",
+  "notifications.kind.pages.settings.changed": "{actor} muutis Sytue Webs seadet",
   "notifications.kind.pages.store.busy": "Saidi {site} e-poes on liiga palju maksmist ootavaid tellimusi",
   "notifications.kind.pages.withdrawal.requested": "Tellimusele {number} saidil {site} on esitatud taganemisavaldus",
   "notifications.kind.photos.album.added": "{actor} lisas fotosid albumisse „{name}“",
@@ -301,6 +302,8 @@
   "shell.update.failedBody": "Proovi hiljem uuesti või laadi see portaalist alla.",
   "shell.update.install": "Värskenda versioonile {version}",
   "shell.update.upToDate": "{app} on ajakohane",
+  "shell.widgets.wake": "Värskenda vidinaid, kui rakendus on suletud",
+  "shell.widgets.wakeHelp": "Kui midagi sinu omast muutub, äratab Sytue rakenduse Apple'i tühja teavitusega, et see värskendaks oma vidinat. Apple näeb, milline rakendus ja millal, mitte kunagi seda, mis muutus.",
   "ui.backToList": "Tagasi loendisse",
   "ui.bulk.clear": "Tühista valik",
   "ui.bulk.region": "Toimingud valikuga",
@@ -318,6 +321,8 @@
   "ui.review.edit": "Muuda",
   "ui.save": "Salvesta",
   "ui.selectRow": "Vali rida",
+  "ui.suiteClose": "Tagasi rakendusse",
+  "ui.suiteOpen": "Sytue: rakendused, otsing, teavitused ja konto",
   "ui.wizard.back": "Tagasi",
   "ui.wizard.cancel": "Loobu",
   "ui.wizard.goToStep": "Tagasi sammule {n}: ",
@@ -336,5 +341,7 @@
   "widgets.pending": "Ootel",
   "widgets.photos": "Fotod",
   "widgets.rows": "Read",
-  "widgets.storage": "Salvestusruum"
+  "widgets.storage": "Salvestusruum",
+  "widgets.updatedAgo": "Uuendatud {time}",
+  "widgets.updatedAt": "Uuendatud: {time}"
 }

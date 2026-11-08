@@ -129,12 +129,15 @@ type Pantalla struct {
 	AlEditar         func(api.Contact)
 	// AlEnviarCorreo abre Sytue Mail con ese destinatario.
 	AlEnviarCorreo func(correo string)
-	// Lo del menú «⋯» de la ficha: crear una reunión en Sytue Calendar, copiar el
-	// correo, exportar la vCard y combinar con otro contacto.
-	AlReunion      func(c api.Contact, correo string)
-	AlCopiarCorreo func(correo string)
-	AlExportar     func(api.Contact)
-	AlCombinar     func(api.Contact)
+	// Lo del menú «⋯» de la ficha: crear una reunión en Sytue Calendar, exportar la
+	// vCard y combinar con otro contacto.
+	AlReunion  func(c api.Contact, correo string)
+	AlExportar func(api.Contact)
+	AlCombinar func(api.Contact)
+	// AlCopiar deja un valor de la ficha en el portapapeles y avisa con la clave de lo
+	// copiado (`detail.emailCopied`, `detail.phoneCopied`, `detail.addressCopied`): el
+	// «Copiar el correo» del menú «⋯» y el botón de copiar de cada valor.
+	AlCopiar func(valor, aviso string)
 	// AlAbrirEnlace abre un `mailto:` o un `tel:` con el sistema.
 	AlAbrirEnlace func(destino string)
 	// AlEtiquetar pone o quita una etiqueta a un contacto.
@@ -162,6 +165,14 @@ type Pantalla struct {
 	// «Añadir a» y «Quitar de». AlSoltarMarcados vacía la selección (el aspa).
 	AlLote           func(que AccionLote, sel []api.Contact, g *api.ContactGroup)
 	AlSoltarMarcados func()
+	// «Enviar correo a todos» y «Exportar (.vcf)», de la barra de lote sobre los
+	// marcados y del menú de la etiqueta activa sobre los que la llevan.
+	AlCorreoATodos                       func(sel []api.Contact)
+	AlExportarSeleccion                  func(sel []api.Contact)
+	AlCorreoEtiqueta, AlExportarEtiqueta func()
+	// MiembrosEtiqueta cuenta los contactos cargados que llevan la etiqueta activa: con
+	// cero, el correo y el .vcf de su menú van apagados.
+	MiembrosEtiqueta func() int
 	// LoteOcupado apaga los botones de la barra mientras su petición va.
 	LoteOcupado bool
 	// Duplicados son los grupos de posibles duplicados de la libreta: con alguno sale

@@ -91,7 +91,8 @@ func conectarArchivos(s *sesion.Suite) *archivos {
 	}
 	// Fuera del hilo de la interfaz: el alta espera a NSFileProviderManager y a la red.
 	s.AlCambiar(func(e sesion.Estado) { go func() { _ = a.seguir(e.Dentro()) }() })
-	go func() { _ = a.seguir(s.Estado().Dentro()) }()
+	// Con interfaz: lanzada por iOS solo para el widget no se da de alta el proveedor.
+	s.CuandoHayaEscena(func() { go func() { _ = a.seguir(s.Estado().Dentro()) }() })
 	return a
 }
 

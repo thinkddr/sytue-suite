@@ -101,7 +101,18 @@ func Truncar(t *canvas.Text, completo string, e tema.Escalon, p Peso, cabe float
 // con la que se pinta, por lo mismo que Medir.
 func TruncarCara(t *canvas.Text, completo string, e tema.Escalon, cara fyne.Resource, cabe float32) float32 {
 	var ancho float32
-	t.Text, ancho = truncado(completo, e, cara, cabe)
+	t.Text, ancho = truncado(completo, e, cara, cabe, "…")
+	return ancho
+}
+
+// Cortar es `text-overflow: clip`: deja las letras que quepan en `cabe`, SIN puntos
+// suspensivos. Es para cajas tan estrechas que el «…» se come la mitad de lo que se
+// ve —una píldora del mes en el teléfono, donde caben seis u ocho letras—: ahí se lee
+// mejor el arranque de la palabra que el aviso de que hay más. Como Truncar, se le
+// pasa siempre el texto `completo`.
+func Cortar(t *canvas.Text, completo string, e tema.Escalon, p Peso, cabe float32) float32 {
+	var ancho float32
+	t.Text, ancho = truncado(completo, e, p.cara(), cabe, "")
 	return ancho
 }
 
@@ -113,12 +124,13 @@ func TruncarCara(t *canvas.Text, completo string, e tema.Escalon, cara fyne.Reso
 // cero devolvía el texto ENTERO, que se salía de su caja porque Fyne no recorta, donde
 // el navegador no enseña nada.
 func recorta(s string, e tema.Escalon, p Peso, ancho float32) string {
-	r, _ := truncado(s, e, p.cara(), ancho)
+	r, _ := truncado(s, e, p.cara(), ancho, "…")
 	return r
 }
 
-// truncado es la búsqueda de los tres: el texto que cabe y lo que ocupa.
-func truncado(completo string, e tema.Escalon, cara fyne.Resource, cabe float32) (string, float32) {
+// truncado es la búsqueda de todos: el texto que cabe, con `fin` detrás si ha habido
+// que cortar, y lo que ocupa.
+func truncado(completo string, e tema.Escalon, cara fyne.Resource, cabe float32, fin string) (string, float32) {
 	medir := func(s string) float32 {
 		tam, _ := fyne.CurrentApp().Driver().RenderedTextSize(s, e.Tam, fyne.TextStyle{}, cara)
 		return tam.Width
@@ -135,14 +147,14 @@ func truncado(completo string, e tema.Escalon, cara fyne.Resource, cabe float32)
 	ancho := float32(0)
 	for bajo < alto {
 		medio := (bajo + alto + 1) / 2
-		cand := string(runas[:medio]) + "…"
+		cand := string(runas[:medio]) + fin
 		if w := medir(cand); w <= cabe {
 			bajo, ancho = medio, w
 			continue
 		}
 		alto = medio - 1
 	}
-	r := string(runas[:bajo]) + "…"
+	r := string(runas[:bajo]) + fin
 	if bajo == 0 {
 		ancho = medir(r)
 	}
@@ -160,12 +172,17 @@ func truncado(completo string, e tema.Escalon, cara fyne.Resource, cabe float32)
 // `ui.CabeceraApp`, por ejemplo— esos 4,55 de diferencia mueven el texto medio píxel
 // arriba respecto a la web. Con el rótulo, «17 sin leer» cae en y = 69,5, que es lo
 // medido en producción.
+//
+// Con `Truncar` es un renglón que se ADAPTA al ancho que le dan (`truncate` de la web):
+// no pide ancho propio y recorta con «…» lo que no cabe. Es el título y el vacío de la
+// lista del día en el mes del teléfono de Calendar, dentro de un `Margen`.
 type Rotulo struct {
 	widget.BaseWidget
 	Texto   string
 	Escalon tema.Escalon
 	Peso    Peso
 	Token   string
+	Truncar bool
 }
 
 var _ fyne.Widget = (*Rotulo)(nil)
@@ -200,11 +217,21 @@ type rotuloRenderer struct {
 	t *canvas.Text
 }
 
-func (x *rotuloRenderer) MinSize() fyne.Size           { return MedidaRotulo(x.r) }
 func (x *rotuloRenderer) Objects() []fyne.CanvasObject { return []fyne.CanvasObject{x.t} }
 func (x *rotuloRenderer) Destroy()                     {}
 
-func (x *rotuloRenderer) Layout(fyne.Size) {
+// MinSize es la caja de línea; truncado, sin ancho propio (lo pone quien lo coloca).
+func (x *rotuloRenderer) MinSize() fyne.Size {
+	if x.r.Truncar {
+		return fyne.NewSize(0, x.r.Escalon.Linea)
+	}
+	return MedidaRotulo(x.r)
+}
+
+func (x *rotuloRenderer) Layout(s fyne.Size) {
+	if x.r.Truncar {
+		Truncar(x.t, x.r.Texto, x.r.Escalon, x.r.Peso, s.Width)
+	}
 	ColocarTexto(x.t, x.r.Escalon, 0, 0)
 }
 
@@ -213,8 +240,8 @@ func (x *rotuloRenderer) Refresh() {
 	x.t.Text = x.r.Texto
 	x.t.Color = tema.Color(x.r.Token, v)
 	x.t.FontSource = x.r.Peso.Cara()
+	x.Layout(x.r.Size()) // antes de pintar: truncado, el Layout cambia el texto
 	x.t.Refresh()
-	x.Layout(x.r.Size())
 }
 
 // Lineas reparte el texto del bloque en las líneas que caben en `cabe`, respetando los

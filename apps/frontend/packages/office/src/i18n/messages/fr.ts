@@ -153,6 +153,12 @@ export const fr: AppCatalog<typeof en> = {
   'share.password.removed': 'Mot de passe supprimé du lien.',
   'share.password.failed':
     'Le mot de passe n’a pas pu être enregistré. Il doit comporter entre 8 et 128 caractères.',
+  'copy.action': 'Créer une copie',
+  'copy.title': 'Copie de {title}',
+  'copy.error': 'Impossible de créer la copie',
+  'tile.more': 'Plus d’actions',
+  'tile.more.label': 'Plus d’actions pour « {title} »',
+  'tile.copy.label': 'Créer une copie de « {title} »',
   'tile.delete': 'Supprimer',
   'tile.delete.label': 'Supprimer « {title} »',
 
@@ -224,6 +230,7 @@ export const fr: AppCatalog<typeof en> = {
   'header.save.saving': 'Enregistrement…',
   'header.save.dirty': 'Modifications non enregistrées',
   'header.save.error': 'Échec de l’enregistrement',
+  'header.save.retry': 'Réessayer l’enregistrement',
   'header.save.offline': 'Enregistré sur cet appareil',
   'header.save.agoSeconds': 'Enregistré il y a {seconds} s',
   'header.save.agoMinutes': 'Enregistré il y a {minutes} min',
@@ -248,6 +255,7 @@ export const fr: AppCatalog<typeof en> = {
   'status.zoom': 'Zoom',
   'status.zoom.out': 'Zoom arrière',
   'status.zoom.in': 'Zoom avant',
+  'status.zoom.reset': '{zoom} % · Revenir à 100 %',
 
   'rail.search': 'Rechercher',
   'rail.search.title': 'Rechercher',

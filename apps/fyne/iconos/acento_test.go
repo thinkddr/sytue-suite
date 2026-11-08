@@ -305,3 +305,34 @@ func TestDentroDelCarrilElRellenoEsSuAmbar(t *testing.T) {
 	}
 	tema.Elegir("")
 }
+
+// TestSobrePapelElGlifoEsDeUnaTinta: con el cromo «papel» (Sytue Notepads) el escudo no
+// lleva el acento por dentro, ni en el menú; un acento pedido y una tinta de estado sí lo
+// siguen llevando. Visto en rojo sin la salida de `EsPapel` al final de acentoDeAhora.
+func TestSobrePapelElGlifoEsDeUnaTinta(t *testing.T) {
+	const lado = 24
+	blanco := color.NRGBA{R: 255, G: 255, B: 255, A: 255}
+	centro := func(d *Dibujo) color.NRGBA { return px(pinta(t, lado, d), int(12*escala), int(12*escala)) }
+	tema.ElegirCromo("papel")
+	t.Cleanup(func() { tema.ElegirCromo("") })
+	for _, d := range []*Dibujo{
+		Trazo(Escudo, lado, "text", tema.Claro),
+		Trazo(Escudo, lado, "text-muted", tema.Claro),
+		Trazo(Escudo, lado, "sidebar-fg", tema.Claro),
+		// La tinta de marca tampoco: en styles.css `text-primary-text` no pasa a
+		// currentColor. VISTO EN ROJO (2026-11-06): salía rellena de su verde.
+		Trazo(Escudo, lado, "primary-text", tema.Claro),
+		Trazo(Escudo, lado, "primary", tema.Claro),
+	} {
+		if got := centro(d); !cerca(got, blanco) {
+			t.Errorf("sobre papel el escudo pinta %v por dentro: debería ir hueco", got)
+		}
+	}
+	if got, quiero := centro(Trazo(Escudo, lado, "danger", tema.Claro)), sobreBlanco(tema.Color("danger", tema.Claro), opacidadAcento); !cerca(got, quiero) {
+		t.Errorf("una tinta de estado sobre papel pinta %v y debería seguir llevando su relleno %v", got, quiero)
+	}
+	ambar := color.NRGBA{R: 0xff, G: 0xd4, B: 0x5e, A: 0xff}
+	if got, quiero := centro(Trazo(Escudo, lado, "text", tema.Claro).Acento(ambar)), sobreBlanco(ambar, opacidadAcento); !cerca(got, quiero) {
+		t.Errorf("un acento pedido sobre papel pinta %v y es %v", got, quiero)
+	}
+}

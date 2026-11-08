@@ -27,10 +27,8 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
-	"git.sytue.eu/sytue/one/apps/nucleo/htmltext"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
-	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
 // Pantalla es la aplicación entera: el armazón con su menú, el panel del árbol de
@@ -42,8 +40,6 @@ import (
 // se rellenan esos campos y se vuelve a pintar. Es lo que hace que los guardianes de
 // píxel no necesiten ni red ni servicio.
 type Pantalla struct {
-	// Widget captura la sesión adoptada antes de consultar el árbol completo.
-	Widget widgets.Source
 	// peticion es la franja de «Pedir acceso de edición» del cuaderno abierto, y
 	// cuadernoDelAviso el del aviso de una petición que atiende su dueño (peticiones.go).
 	peticion         pet.Estado
@@ -87,7 +83,10 @@ type Pantalla struct {
 	abriendoDia      bool
 	guardandoCaptura bool
 	campoCaptura     *ui.Entrada
-	tipoCaptura      string
+	// capturaTexto es lo que lleva la captura, con los saltos de lo pegado que aún no ha
+	// salido: el `draft` de la web. El campo es de UNA línea y los enseña como espacios.
+	capturaTexto string
+	tipoCaptura  string
 	// capturaEnfocada y lineaCaptura son el `focus-within` de la fila de captura: la
 	// línea de debajo pasa a `primary`.
 	capturaEnfocada bool
@@ -101,8 +100,10 @@ type Pantalla struct {
 	dia estadoDiario
 	// cola es lo capturado que aún no ha llegado al servicio (cola.go); vaciando corta
 	// dos envíos a la vez y vigilando arranca la vigilancia una sola vez.
-	cola      []capturaPendiente
-	vaciando  atomic.Bool
+	cola     []capturaPendiente
+	vaciando atomic.Bool
+	// busquedas numera las búsquedas: la respuesta de una vieja no pisa la de la última.
+	busquedas atomic.Uint64
 	vigilando sync.Once
 	// Almacen es donde se guardan la cola y los borradores (`sesion.Almacen`). Nil: sin
 	// red no se captura, como antes.
@@ -168,6 +169,8 @@ type Pantalla struct {
 	// vuelta para decir quién me compartió algo (compartidas.go). Nil: no se ofrece
 	// compartir con personas.
 	Directorio *api.Directorio
+	// agenda es la gente de la organización para el «@» del editor (agendaMenciones).
+	agenda *ui.AgendaMenciones
 	// Yo es el `sub` de quien usa la app: solo el dueño comparte un cuaderno, y solo quien
 	// la escribió, una nota.
 	Yo func() string
@@ -186,11 +189,6 @@ type Pantalla struct {
 	// Asistir es Sytue AI (`api.IA.Asistir`): con él, el editor lleva el asistente al
 	// final de la barra (asistente.go). Nil: no sale.
 	Asistir func(context.Context, api.PeticionIA) (string, error)
-
-	widgetMu    sync.Mutex
-	widgetGen   string
-	widgetTotal *int64
-	widgetItems []widgets.Item
 }
 
 // ConServiciosVinculados añade el acceso a las páginas del proveedor sin copiarlas
@@ -215,6 +213,10 @@ const clavePrefOcultarTerminadas = "sytue-notes-ocultar-terminadas"
 // NuevaPantalla monta la aplicación. `svc` puede ser nil: la pantalla se pinta igual y
 // se queda en la fase que se le ponga, que es lo que hace el guardián.
 func NuevaPantalla(tr *i18n.Translator, l i18n.Locale, svc *api.Notes, red *offline.Monitor, win fyne.Window) *Pantalla {
+	// Notepads es una libreta: marco, menú y barra en el fondo de la página, la hoja en
+	// blanco con su filete y los glifos de una sola tinta (el `data-cromo="papel"` de la
+	// web, ADR 0079). Antes de construir nada: los colores se leen al pintar.
+	tema.ElegirCromo(tema.CromoPapel)
 	p := &Pantalla{
 		svc: svc, tr: tr, loc: l, red: red, win: win,
 		Plazo: 30 * time.Second, avisos: ui.NuevaPilaAvisos(), orden: OrdenManual,
@@ -337,9 +339,10 @@ func (p *Pantalla) barraMovil(conPanel, detalle bool) *ui.BarraMovil {
 		p.Repintar()
 	}
 	b.Titulo = p.activo.Titulo
-	// En un día, el título ya lo escribe la página: aquí, el de la app.
-	if b.Titulo == "" || p.activo.Crudo.DailyDate != "" {
-		b.Titulo = t("app.title", nil)
+	// En un día, el título ya lo escribe la página: aquí, ninguno, y la barra única dice
+	// el nombre de marca del producto («Notepads»), como la web.
+	if p.activo.Crudo.DailyDate != "" {
+		b.Titulo = ""
 	}
 	return b
 }
@@ -541,7 +544,8 @@ func (p *Pantalla) sincronizar() {
 	if p.activo.Crudo.DailyDate == "" {
 		p.dia.semana, p.dia.marcasDestino = nil, nil
 	}
-	visibles := Ordenar(Filtrar(enfocarNotas(p.notas, p.enfoque, p.ocultarTerminadas), p.filtro, p.filtroEstado), p.orden, p.loc)
+	enfocadas := enfocarNotas(p.notas, p.enfoque, p.ocultarTerminadas)
+	visibles := Ordenar(Filtrar(enfocadas, p.filtro, p.filtroEstado), p.orden, p.loc)
 
 	p.lateral.Cuadernos, p.lateral.Activo, p.lateral.EsMio = enArbol(p.cuadernos), p.activo.ID, p.esMio
 	// Las del cuaderno abierto cuelgan de su fila TAL COMO LLEGARON: la web le pasa
@@ -559,6 +563,10 @@ func (p *Pantalla) sincronizar() {
 	if p.Directorio != nil && p.svc != nil && p.hayRed() && p.esMio(p.activo.Crudo.OwnerSub) {
 		p.barra.AlCompartir = p.compartirCuaderno
 	}
+	p.barra.AlMoverCuaderno = nil
+	if p.puedeMoverCuaderno(p.activo) {
+		p.barra.AlMoverCuaderno = func() { p.dialogoMoverCuaderno(p.activo) }
+	}
 
 	p.lienzo.Cuaderno, p.lienzo.Bloqueado = p.activo, p.bloqueado
 	// Un cuaderno público de otra persona se lee y no se escribe: su franja ofrece pedir
@@ -567,6 +575,16 @@ func (p *Pantalla) sincronizar() {
 	p.arbol.Notas, p.arbol.Bloqueado = visibles, p.bloqueado
 	p.arbol.SoloLectura, p.arbol.Seleccionada = p.lienzo.SoloLectura, p.lienzo.Seleccionada
 	p.arbol.Fase = p.lienzo.Fase
+	// Hay notas y el filtro las oculta todas: los dos vacíos lo dicen y ofrecen quitarlo.
+	// Las notas que cuentan son las que deja el enfoque (y «ocultar completadas»): si
+	// esas ya son cero, quitar el filtro volvería al mismo vacío.
+	p.lienzo.AlQuitarFiltro, p.arbol.AlQuitarFiltro = nil, nil
+	if len(enfocadas) > 0 && len(visibles) == 0 && (strings.TrimSpace(p.filtro) != "" || p.filtroEstado != "") {
+		p.arbol.AlQuitarFiltro = p.quitarFiltro
+		if p.activo.Vista != VistaArbol {
+			p.lienzo.AlQuitarFiltro = p.quitarFiltro
+		}
+	}
 
 	// En árbol el panel principal es UNA nota a todo el ancho. Se reutiliza la
 	// disposición de LISTA con una sola nota: es exactamente eso, y así no hay una
@@ -580,6 +598,14 @@ func (p *Pantalla) sincronizar() {
 		return
 	}
 	p.lienzo.Llenar, p.lienzo.Notas = false, visibles
+}
+
+// quitarFiltro vacía el filtro de texto y el de estado, y también el campo de la barra,
+// que conserva lo escrito mientras no se le diga otra cosa.
+func (p *Pantalla) quitarFiltro() {
+	p.filtro, p.filtroEstado = "", ""
+	p.barra.VaciarFiltro()
+	p.Repintar()
 }
 
 // enHilo ejecuta algo en la rutina de la interfaz. `fyne.Do` es obligatorio desde Fyne
@@ -598,6 +624,15 @@ func (p *Pantalla) hayRed() bool {
 }
 
 // Arrancar hace la primera carga.
+// afuera es el desplazador de la página, para lo vertical que cae sobre algo que se
+// desplaza de lado (la barra del editor en el teléfono).
+func (p *Pantalla) afuera() fyne.Scrollable {
+	if p.desplazador == nil {
+		return nil
+	}
+	return p.desplazador
+}
+
 func (p *Pantalla) Arrancar() {
 	go p.cargarCuadernos()
 	go p.cargarEtiquetas()
@@ -609,8 +644,6 @@ func (p *Pantalla) Arrancar() {
 }
 
 func (p *Pantalla) cargarCuadernos() {
-	widget := p.Widget.View()
-	conRed := p.hayRed()
 	var generacion string
 	fyne.DoAndWait(func() { generacion = p.generacionCrypto() })
 	enHilo(func() { p.lateral.Fase = Cargando; p.Repintar() })
@@ -622,13 +655,6 @@ func (p *Pantalla) cargarCuadernos() {
 	ctx, cancelar := p.ctx()
 	defer cancelar()
 	lista, err := p.svc.ListNotebooks(ctx)
-	if err == nil && conRed && p.hayRed() {
-		// NoteCount ya aplica los permisos del lector. El árbol no se pagina y
-		// cada nota pertenece a un cuaderno; no se cuentan las páginas de notas.
-		if total, valido := notasParaWidget(lista); valido {
-			p.publicarTotalWidget(ctx, widget, generacion, total)
-		}
-	}
 	cuadernos := DeCuadernos(lista)
 	enHilo(func() {
 		if p.generacionCrypto() != generacion {
@@ -668,125 +694,6 @@ func (p *Pantalla) cargarCuadernos() {
 	})
 }
 
-func notasParaWidget(lista []api.Notebook) (int64, bool) {
-	ids := make(map[string]struct{}, len(lista))
-	var total int64
-	for _, c := range lista {
-		if c.ArchivedAt != nil {
-			continue
-		}
-		if _, repetido := ids[c.ID]; repetido {
-			continue
-		}
-		if c.NoteCount < 0 || int64(c.NoteCount) > 1_000_000_000_000-total {
-			return 0, false
-		}
-		ids[c.ID] = struct{}{}
-		total += int64(c.NoteCount)
-	}
-	return total, true
-}
-
-func (p *Pantalla) publicarTotalWidget(ctx context.Context, view widgets.View, gen string, total int64) {
-	p.widgetMu.Lock()
-	if p.widgetGen != gen {
-		p.widgetGen = gen
-		p.widgetItems = nil
-	}
-	v := total
-	p.widgetTotal = &v
-	detalle := p.detalleWidgetBloqueado()
-	p.widgetMu.Unlock()
-	_ = view.PublicarDetalle(ctx, detalle)
-}
-
-func (p *Pantalla) publicarNotasWidget(ctx context.Context, view widgets.View, gen string, c Cuaderno, lista []api.Note) {
-	var items []widgets.Item
-	if !c.Cifrado {
-		items = itemsNotasParaWidget(c, lista)
-	}
-	p.widgetMu.Lock()
-	if p.widgetGen != gen {
-		p.widgetGen = gen
-		p.widgetTotal = nil
-	}
-	p.widgetItems = items
-	tieneDatos := p.widgetTotal != nil || len(p.widgetItems) > 0
-	detalle := p.detalleWidgetBloqueado()
-	p.widgetMu.Unlock()
-	if tieneDatos {
-		_ = view.PublicarDetalle(ctx, detalle)
-	}
-}
-
-func (p *Pantalla) detalleWidgetBloqueado() widgets.Detail {
-	var d widgets.Detail
-	if p.widgetTotal != nil {
-		d.Counters = []widgets.Counter{{Kind: "notes", Value: *p.widgetTotal}}
-	}
-	if len(p.widgetItems) > 0 {
-		d.Items = slices.Clone(p.widgetItems)
-	}
-	return d
-}
-
-func itemsNotasParaWidget(c Cuaderno, lista []api.Note) []widgets.Item {
-	if c.Cifrado {
-		return nil
-	}
-	candidatas := make([]api.Note, 0, len(lista))
-	for _, n := range lista {
-		if n.ContentCipher != "" || n.CancelledAt != nil {
-			continue
-		}
-		candidatas = append(candidatas, n)
-	}
-	slices.SortStableFunc(candidatas, func(a, b api.Note) int {
-		if a.Pinned != b.Pinned {
-			if a.Pinned {
-				return -1
-			}
-			return 1
-		}
-		return b.UpdatedAt.Compare(a.UpdatedAt)
-	})
-	items := make([]widgets.Item, 0, min(len(candidatas), widgets.MaxItems))
-	for _, n := range candidatas {
-		titulo := strings.TrimSpace(n.Title)
-		if titulo == "" && n.Kind == "task" {
-			titulo = strings.TrimSpace(htmltext.Text(n.Content))
-		}
-		if titulo == "" {
-			continue
-		}
-		badge := ""
-		switch {
-		case n.Kind == "task" && n.Checked:
-			badge = "✓"
-		case n.Kind == "task":
-			badge = "○"
-		case n.Pinned:
-			badge = "★"
-		}
-		var startAt int64
-		if !n.UpdatedAt.IsZero() && n.UpdatedAt.Unix() > 0 {
-			startAt = n.UpdatedAt.Unix()
-		}
-		items = append(items, widgets.Item{
-			Title:    titulo,
-			Subtitle: c.Titulo,
-			Badge:    badge,
-			StartAt:  startAt,
-			Color:    c.Color,
-			Unread:   n.Kind == "task" && !n.Checked,
-		})
-		if len(items) >= widgets.MaxItems {
-			break
-		}
-	}
-	return widgets.SanitizeItems(items)
-}
-
 func (p *Pantalla) cargarEtiquetas() {
 	if p.svc == nil || !p.hayRed() {
 		return
@@ -808,9 +715,9 @@ func (p *Pantalla) cargarEtiquetas() {
 func (p *Pantalla) abrirCuaderno(c Cuaderno) {
 	p.cerrarEditor()
 	if p.campoCaptura != nil && p.activo.ID != "" {
-		p.guardarBorrador(p.activo.ID, p.campoCaptura.Texto())
+		p.guardarBorrador(p.activo.ID, p.capturaTexto)
 	}
-	p.campoCaptura = nil
+	p.campoCaptura, p.capturaTexto = nil, ""
 	p.enfoque = "all"
 	p.activo, p.vista, p.cajon = c, VistaCuaderno, false
 	// AL CAMBIAR DE CUADERNO SE OLVIDA LA CLAVE, y con ella todo lo descifrado.
@@ -828,8 +735,6 @@ func (p *Pantalla) abrirCuaderno(c Cuaderno) {
 }
 
 func (p *Pantalla) cargarNotas(c Cuaderno) {
-	widget := p.Widget.View()
-	conRed := p.hayRed()
 	var generacion string
 	var epoch uint64
 	fyne.DoAndWait(func() { generacion, epoch = p.generacionCrypto(), p.cryptoEpoch })
@@ -846,9 +751,6 @@ func (p *Pantalla) cargarNotas(c Cuaderno) {
 	ctx, cancelar := p.ctx()
 	defer cancelar()
 	lista, err := p.svc.ListNotes(ctx, c.ID)
-	if err == nil && conRed && p.hayRed() {
-		p.publicarNotasWidget(ctx, widget, generacion, c, lista)
-	}
 	enHilo(func() {
 		if p.activo.ID != c.ID || p.generacionCrypto() != generacion || p.cryptoEpoch != epoch {
 			return // se ha cambiado de cuaderno mientras llegaba: esto ya no vale
@@ -882,6 +784,7 @@ func (p *Pantalla) cargarPapelera() {
 }
 
 func (p *Pantalla) buscar(q string, archivados bool) {
+	esta := p.busquedas.Add(1)
 	enHilo(func() { p.busqueda.Fase = Cargando; p.busqueda.Consulta = q; p.Repintar() })
 	if !p.hayRed() || p.svc == nil {
 		enHilo(func() { p.busqueda.Fase = SinConexion; p.Repintar() })
@@ -891,6 +794,9 @@ func (p *Pantalla) buscar(q string, archivados bool) {
 	defer cancelar()
 	res, err := p.svc.Search(ctx, q, limiteBusqueda, archivados)
 	enHilo(func() {
+		if p.busquedas.Load() != esta {
+			return
+		}
 		p.busqueda.Resultados, p.busqueda.Buscada = res, q
 		p.busqueda.Fase = FaseDe(err, p.hayRed(), len(res))
 		p.Repintar()
@@ -969,6 +875,7 @@ func (p *Pantalla) enganchar() {
 	p.lienzo.AlMarcar = func(n Nota, m bool) {
 		lanzar(func() error { return p.editar(n.ID, Parche{Marcada: &m}, true) })
 	}
+	p.lienzo.AlConvertir = func(n Nota) { p.convertir(n.ID) }
 	p.lienzo.AlRecordatorio = p.dialogoRecordatorio
 	p.lienzo.AlReintentar = func() { go p.cargarNotas(p.activo) }
 	p.lienzo.AlCrearPrimera = p.nuevaNota
@@ -1246,12 +1153,28 @@ func (p *Pantalla) purgarYa(n Nota) {
 // dentro, sin salir (`destinoInterno` de la web); cualquier otro lo abre el sistema, que
 // es el `target="_blank"` que el servicio pone a todos.
 func (p *Pantalla) seguirEnlace(href string) {
+	if tag, ok := hashtagDe(href); ok {
+		p.buscarHashtag("#" + tag)
+		return
+	}
 	if cuaderno, nota, ancla, ok := destinoInterno(href, p.AppURL); ok {
 		p.ancla = ancla
 		p.abrirResultado(api.NoteHit{ID: nota, NotebookID: cuaderno})
 		return
 	}
 	_ = api.AbrirFuera(fyne.CurrentApp(), href)
+}
+
+// buscarHashtag abre «Buscar notas» con `#palabra` escrito y buscado: es pulsar un
+// hashtag pintado en una nota, y lo mismo que pulsarlo en la tira de la búsqueda.
+func (p *Pantalla) buscarHashtag(q string) {
+	p.cerrarEditor()
+	p.vista, p.cajon = VistaBusqueda, false
+	p.busqueda.Campo().PonerTexto(q)
+	p.busqueda.Consulta = q
+	p.Repintar()
+	go p.buscar(q, p.busqueda.Archivados)
+	go p.cargarHashtags()
 }
 
 // destinoInterno reconoce un enlace a una nota de Notepads: mismo origen que la app y

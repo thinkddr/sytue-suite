@@ -109,3 +109,26 @@ func de(app string) fs.FS {
 	}
 	return sub
 }
+
+// deProducto es, por producto (el esquema de la app sin «sytue-»), qué catálogos de app
+// carga su `cmd` además del común, y en ese orden. Lo pide quien traduce sin el `main`
+// de la app: el refresco sin ventana del widget en Android (apps/fyne/sesion,
+// fondo_sinventana.go). TestDeProductoEsLoQueCargaCadaCmd la ata a la tabla `catalogo`
+// de las pruebas, que es la composición real de cada `cmd`.
+var deProducto = map[string][]string{
+	"bases": {"bases"}, "calendar": {"calendar"}, "cast": {"cast"}, "contacts": {"contacts"},
+	"docs": {"office"}, "sheets": {"office"}, "slides": {"office"}, "pdf": {"office"},
+	"drive": {"drive"}, "erp": {"erp"}, "mail": {"mail"}, "notes": {"notes"},
+	"one": {"console", "portal"}, "photos": {"photos"}, "rooms": {"rooms"},
+}
+
+// DeProducto son los catálogos de la app de `producto`, sin el común, listos para
+// `i18n.New(l, i18n.Common(), DeProducto(p)...)`. Un producto sin app, ninguno.
+func DeProducto(producto string) []fs.FS {
+	apps := deProducto[producto]
+	out := make([]fs.FS, 0, len(apps))
+	for _, app := range apps {
+		out = append(out, de(app))
+	}
+	return out
+}

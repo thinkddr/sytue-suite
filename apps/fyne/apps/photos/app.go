@@ -17,8 +17,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -31,7 +29,6 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/auth"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
-	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
 // # La app viva
@@ -90,13 +87,6 @@ const (
 
 // App es Sytue Photos en marcha. El cero no vale: se crea con Nueva.
 type App struct {
-	Widget        widgets.Source
-	widgetMu      sync.Mutex
-	widgetGen     int
-	widgetCount   *int64
-	widgetAlbumes []widgets.Item
-	widgetFotos   []widgets.Item
-
 	cli *api.Photos
 	w   fyne.Window
 	v   Vista
@@ -192,6 +182,12 @@ type estadoGaleria struct {
 	lote      *[2]int // describiendo: hechas, total
 	parar     bool
 	ampliando bool
+	// marcandoFavoritas es el corazón de la barra en vuelo: mientras vuelven los PUT
+	// otra pulsación no lanza el mismo plan otra vez (`marcandoFavoritas` en la web).
+	marcandoFavoritas bool
+	// pendiente es la búsqueda que espera al temporizador: aún no se ha pedido, así que
+	// cuenta como cargando y no dice «Ninguna foto coincide con…» mientras se teclea.
+	pendiente bool
 	// siguienteAlLlegar abre la foto siguiente en el visor en cuanto llegue la página:
 	// es el `cargarMas().then(() => setAbierta(abierta + 1))` de la web.
 	siguienteAlLlegar bool
@@ -519,11 +515,13 @@ func (a *App) soloFavoritas() bool { return a.ruta == RutaFavoritas }
 
 func (a *App) pantallaGaleria() fyne.CanvasObject {
 	g := a.g
-	v := a.vistaDe(g.estadoCarga, len(g.fotos) == 0, !g.cargando && len(g.fotos) == 0 && g.fallo == nil && g.texto == "")
+	esperando := g.cargando || g.pendiente
+	v := a.vistaDe(g.estadoCarga, len(g.fotos) == 0, !esperando && len(g.fotos) == 0 && g.fallo == nil && g.texto == "")
 	aviso := g.aviso
 	if g.subida != nil {
 		aviso = a.v.T.T("gallery.uploading", i18n.Vars{"done": g.subida[0], "total": g.subida[1]})
 	}
+	consulta, ampliar := sinResultados(g.texto, esperando, len(g.fotos), g.fallo != nil, len(g.tambien))
 	d := Galeria{
 		Grupos:        PorMes(g.fotos, a.v.T),
 		Buscador:      a.buscador,
@@ -538,18 +536,21 @@ func (a *App) pantallaGaleria() fyne.CanvasObject {
 		Subiendo:      g.subida != nil,
 		// Solo cuando la búsqueda literal no encuentra NADA: ampliar siempre gastaría una
 		// llamada por búsqueda sin mejorar las que ya funcionan.
-		Ampliar:       strings.TrimSpace(g.texto) != "" && !g.cargando && len(g.fotos) == 0 && len(g.tambien) == 0 && g.fallo == nil,
-		Ampliando:     g.ampliando,
-		AlAmpliar:     a.ampliarBusqueda,
-		AlAbrir:       func(f api.Photo) { a.abrirEnGaleria(f.ID) },
-		AlAlternar:    a.alternar,
-		AlFavorita:    func(f api.Photo) { a.cambiarFavorita(f, !f.Favorite) },
-		AlIr:          a.irSeccion,
-		AlAnyadir:     a.elegirFicheros,
-		AlComoEstas:   a.parecidasALosResultados,
-		AlSeleccionar: a.entrarEnSeleccion,
-		AlSalir:       a.salirDeSeleccion,
-		AlAlternarMes: a.alternarMes,
+		Ampliar:          ampliar,
+		SinResultados:    consulta,
+		AlBorrarBusqueda: a.borrarBusqueda,
+		Ampliando:        g.ampliando,
+		AlAmpliar:        a.ampliarBusqueda,
+		AlAbrir:          func(f api.Photo) { a.abrirEnGaleria(f.ID) },
+		AlAlternar:       a.alternar,
+		AlFavorita:       func(f api.Photo) { a.cambiarFavorita(f, !f.Favorite) },
+		AlIr:             a.irSeccion,
+		AlAnyadir:        a.elegirFicheros,
+		AlComoEstas:      a.parecidasALosResultados,
+		AlSeleccionar:    a.entrarEnSeleccion,
+		AlSalir:          a.salirDeSeleccion,
+		AlAlternarMes:    a.alternarMes,
+		Afuera:           func() fyne.Scrollable { return a.scroll },
 		Lote: Lote{
 			Albumes:      a.albumes,
 			AlNuevoAlbum: a.albumDeLaSeleccion,
@@ -559,8 +560,14 @@ func (a *App) pantallaGaleria() fyne.CanvasObject {
 			AlParecidas:  a.parecidasALaSeleccion,
 			AlDescargar:  a.descargarSeleccion,
 			AlTirar:      a.confirmarTirarSeleccion,
+			AlFavoritas:  a.favoritasDeLaSeleccion,
 		},
 	}
+	if len(g.seleccion) > 0 {
+		valor, _ := planFavoritas(g.fotos, g.seleccion)
+		d.Lote.QuitarFavoritas = !valor
+	}
+	d.Lote.MarcandoFavoritas = g.marcandoFavoritas
 	if g.lote != nil {
 		d.Lote.Describiendo = a.v.T.T("gallery.describing", i18n.Vars{"done": g.lote[0], "total": g.lote[1]})
 	}
@@ -582,20 +589,17 @@ func (a *App) pantallaGaleria() fyne.CanvasObject {
 
 // cargarMas pide la página siguiente de la línea de tiempo.
 func (a *App) cargarMas() {
+	a.g.pendiente = false
 	if a.cli == nil || a.g.fin || a.g.cargando {
 		return
 	}
 	a.g.cargando = true
 	a.pintar()
 	gen, cursor, texto, solo, tambien := a.gen, a.g.cursor, a.g.texto, a.soloFavoritas(), a.g.tambien
-	view := a.Widget.View()
 	a.enSesion(func(vida context.Context) {
 		c, fin := ctx(vida)
 		defer fin()
 		fotos, siguiente, err := a.cli.Timeline(c, cursor, PaginaLinea, solo, texto, tambien...)
-		if err == nil && cursor == "" && !solo && strings.TrimSpace(texto) == "" && len(tambien) == 0 {
-			a.publicarTimelineWidget(c, view, gen, fotos, siguiente)
-		}
 		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 		a.hilo(gen, func() {
 			a.g.cargando = false
@@ -618,102 +622,6 @@ func (a *App) cargarMas() {
 	})
 }
 
-func (a *App) publicarTimelineWidget(ctx context.Context, view widgets.View, gen int, fotos []api.Photo, siguiente string) {
-	items := make([]widgets.Item, 0, min(len(fotos), widgets.MaxItems))
-	for _, f := range fotos {
-		titulo := strings.TrimSpace(f.Description)
-		if titulo == "" {
-			titulo = strings.TrimSpace(f.Name)
-		}
-		if titulo == "" {
-			continue
-		}
-		badge := ""
-		var startAt int64
-		if !f.TakenAt.IsZero() && f.TakenAt.Unix() > 0 {
-			startAt = f.TakenAt.Unix()
-			badge = f.TakenAt.Format("02/01")
-		}
-		if f.Favorite {
-			badge = "★ " + badge
-		}
-		items = append(items, widgets.Item{
-			Title:    titulo,
-			Subtitle: f.Camera,
-			Badge:    strings.TrimSpace(badge),
-			StartAt:  startAt,
-			Unread:   f.Favorite,
-		})
-		if len(items) >= widgets.MaxItems {
-			break
-		}
-	}
-	a.widgetMu.Lock()
-	if a.widgetGen != gen {
-		a.widgetGen = gen
-		a.widgetAlbumes = nil
-	}
-	if siguiente == "" {
-		total := int64(len(fotos))
-		a.widgetCount = &total
-	} else {
-		a.widgetCount = nil
-	}
-	a.widgetFotos = widgets.SanitizeItems(items)
-	tieneDatos := a.widgetCount != nil || len(a.widgetAlbumes) > 0 || len(a.widgetFotos) > 0
-	detalle := a.detalleWidgetBloqueado()
-	a.widgetMu.Unlock()
-	if tieneDatos {
-		_ = view.PublicarDetalle(ctx, detalle)
-	}
-}
-
-func (a *App) publicarAlbumesWidget(ctx context.Context, view widgets.View, gen int, lista []api.Album) {
-	items := make([]widgets.Item, 0, min(len(lista), widgets.MaxItems))
-	for _, al := range lista {
-		titulo := strings.TrimSpace(al.Title)
-		if titulo == "" {
-			continue
-		}
-		items = append(items, widgets.Item{
-			Title: titulo,
-			Badge: strconv.Itoa(al.Count),
-		})
-		if len(items) >= widgets.MaxItems {
-			break
-		}
-	}
-	a.widgetMu.Lock()
-	if a.widgetGen != gen {
-		a.widgetGen = gen
-		a.widgetCount, a.widgetFotos = nil, nil
-	}
-	a.widgetAlbumes = widgets.SanitizeItems(items)
-	tieneDatos := a.widgetCount != nil || len(a.widgetAlbumes) > 0 || len(a.widgetFotos) > 0
-	detalle := a.detalleWidgetBloqueado()
-	a.widgetMu.Unlock()
-	if tieneDatos {
-		_ = view.PublicarDetalle(ctx, detalle)
-	}
-}
-
-func (a *App) detalleWidgetBloqueado() widgets.Detail {
-	var d widgets.Detail
-	if a.widgetCount != nil {
-		d.Counters = []widgets.Counter{{Kind: "photos", Value: *a.widgetCount}}
-	}
-	combinados := make([]widgets.Item, 0, len(a.widgetAlbumes)+len(a.widgetFotos))
-	combinados = append(combinados, a.widgetAlbumes...)
-	combinados = append(combinados, a.widgetFotos...)
-	if len(combinados) > widgets.MaxItems {
-		combinados = combinados[:widgets.MaxItems]
-	}
-	if len(combinados) > 0 {
-		d.Items = slices.Clone(combinados)
-	}
-	return d
-}
-
 // quizaMas pide otra página si el final ya está a menos de una pantalla: es lo que hace
 // el IntersectionObserver del centinela, también cuando la primera página no llena la
 // ventana y no hay nada que desplazar.
@@ -730,6 +638,26 @@ func (a *App) quizaMas() {
 	}
 }
 
+// sinResultados es cuándo la galería dice «Ninguna foto coincide con…» y si ofrece
+// ampliar (`sinResultados.ts`): una búsqueda hecha, ya cargada, sin fotos y sin fallo.
+// Con los términos ya ampliados, ampliar no se vuelve a ofrecer. "" es que no toca.
+func sinResultados(texto string, cargando bool, fotos int, fallo bool, tambien int) (consulta string, ampliar bool) {
+	consulta = strings.TrimSpace(texto)
+	if consulta == "" || cargando || fotos > 0 || fallo {
+		return "", false
+	}
+	return consulta, tambien == 0
+}
+
+// borrarBusqueda es «Borrar búsqueda» del vacío de una búsqueda: vacía el buscador —que
+// vuelve a pedir la galería entera— y le devuelve el foco, que es donde se va a escribir.
+func (a *App) borrarBusqueda() {
+	a.buscador.PonerTexto("")
+	if a.w != nil {
+		a.w.Canvas().Focus(a.buscador)
+	}
+}
+
 // buscar es el `onInput` del buscador: se empieza otra línea, vacía y sin cursor, y se
 // pide al cabo de un cuarto de segundo sin teclear.
 func (a *App) buscar(texto string) {
@@ -739,7 +667,7 @@ func (a *App) buscar(texto string) {
 	a.cancelarFotos()
 	a.gen++
 	gen := a.gen
-	a.g = estadoGaleria{texto: texto}
+	a.g = estadoGaleria{texto: texto, pendiente: a.espera > 0}
 	a.pintar()
 	if a.temporizado != nil {
 		a.temporizado.Stop()

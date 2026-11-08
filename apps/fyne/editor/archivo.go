@@ -135,7 +135,11 @@ func (b *BotonArchivo) Menu() *ui.Menu {
 	}
 	elems = append(elems, ui.NuevoSeparadorMenu(),
 		item("file.saveVersion", c.SinRed, c.preguntarVersion(b)),
-		item("file.rename", b.antes != nil && c.AlRenombrar == nil, c.EnfocarTitulo),
+		item("file.rename", b.antes != nil && c.AlRenombrar == nil, c.EnfocarTitulo))
+	if c.HacerCopia != nil { // Ribbon.tsx: «Hacer una copia» tras «Renombrar»
+		elems = append(elems, item("copy.action", c.SinRed || c.Copiando, c.copiar))
+	}
+	elems = append(elems,
 		ui.NuevoSeparadorMenu(),
 		// En nativo «volver» es a la portada de la app, como la flecha de la cabecera:
 		// al Hub se va cambiando de aplicación (`docs/CONVENTIONS.md` §13.6).
@@ -227,4 +231,14 @@ func (r *archivoRenderer) Refresh() {
 	r.rotulo.Refresh()
 	r.aro.Pintar(v)
 	r.aro.Ver(r.b.Enfocado())
+}
+
+// copiar es la entrada «Hacer una copia»: una sola copia a la vez. Mientras vuelve, la
+// entrada sale inerte y una segunda pulsación no hace nada.
+func (c *Contexto) copiar() {
+	if c.HacerCopia == nil || c.Copiando {
+		return
+	}
+	c.Copiando = true
+	c.HacerCopia(func() { c.Copiando = false })
 }

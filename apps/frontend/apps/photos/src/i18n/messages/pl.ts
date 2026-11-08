@@ -140,6 +140,12 @@ export const pl: AppCatalog<typeof en> = {
   'gallery.downloadSelected': 'Pobierz',
   'gallery.downloading':
     'Rozpoczęte żądania pobrania: {count}. Sprawdź pobrane pliki w przeglądarce.',
+  'gallery.downloadingNative': {
+    one: 'Pobieranie 1 zdjęcia…',
+    few: 'Pobieranie {count} zdjęć…',
+    many: 'Pobieranie {count} zdjęć…',
+    other: 'Pobieranie {count} zdjęcia…',
+  },
   'gallery.downloadCapped': 'Zdjęcia poza tą partią: {count}.',
   'gallery.newAlbum': 'Nowy album',
   'gallery.newAlbumTitle': 'Nowy album',
@@ -277,4 +283,20 @@ export const pl: AppCatalog<typeof en> = {
   'aiBatch.excludeOrg': 'Wyklucz organizację z automatycznej partii Sytue AI',
   'aiBatch.excludedHint':
     'Organizacja jest wykluczona z automatycznej partii Sytue AI. Nowe zdjęcia nie są przetwarzane w tle pod kątem propozycji ani podobieństw.',
+  'album.rename': 'Zmień nazwę',
+  'album.renamePrompt': 'Nazwa albumu',
+  'album.setCover': 'Ustaw jako okładkę albumu',
+  'album.isCover': 'To jest okładka albumu',
+  'album.coverSet': 'Zaktualizowano okładkę albumu',
+  'gallery.favorited': 'Dodano do ulubionych: {count}',
+  'gallery.unfavorited': 'Usunięto z ulubionych: {count}',
+  'gallery.favoriteFailed': 'Zdjęcia, których nie udało się zmienić: {count}',
+  'gallery.noResults.title': 'Żadne zdjęcie nie pasuje do „{query}”',
+  'gallery.noResults.description':
+    'Spróbuj innych słów lub wyczyść wyszukiwanie, aby zobaczyć wszystkie zdjęcia.',
+  'gallery.clearSearch': 'Wyczyść wyszukiwanie',
+  'viewer.counter': '{index} / {total}',
+  'viewer.counterMore': '{count}+',
+  'viewer.counterLabel': 'Zdjęcie {index} z {total}',
+  'viewer.shortcutsJump': 'Home i End przechodzą do pierwszego i ostatniego zdjęcia.',
 };

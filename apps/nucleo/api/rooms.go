@@ -136,6 +136,22 @@ type RoomsUnread struct {
 	Mentions  int    `json:"mentions"`
 }
 
+// PendientesRooms es `unreadOf` de la web: lo que un canal suma a un contador de
+// pendientes según su nivel de aviso ("all", "mentions" o "none"). Silenciado o con
+// «nada» no suma; con «menciones», solo las menciones. Es la regla ÚNICA que comparten
+// la lista de Rooms (las secciones plegadas) y su widget nativo: un contador que suma
+// lo silenciado convierte el plegado en una alarma permanente.
+func PendientesRooms(silenciado bool, nivel string, sinLeer, menciones int) int {
+	switch {
+	case silenciado || nivel == "none":
+		return 0
+	case nivel == "mentions":
+		return max(menciones, 0)
+	default:
+		return max(sinLeer, 0)
+	}
+}
+
 // Teams lista los equipos de la persona; el servicio crea el de su organización si no tiene.
 func (r *Rooms) Teams(ctx context.Context) ([]RoomsTeam, error) {
 	out, err := JSON[struct {
@@ -306,7 +322,8 @@ func (r *Rooms) PutDraft(ctx context.Context, canal, raiz, texto string) error {
 	if raiz != "" {
 		d.ParentID = &raiz
 	}
-	return r.conCuerpo(ctx, http.MethodPut, "/me/drafts", struct {
+	// Se autoguarda a ritmo de tecla y no cambia nada de lo que enseña el widget.
+	return r.enviar(ctx, Request{Method: http.MethodPut, Path: "/me/drafts", SinAviso: true}, struct {
 		ChannelID string  `json:"channel_id"`
 		ParentID  *string `json:"parent_id,omitempty"`
 		Body      string  `json:"body"`
@@ -320,13 +337,18 @@ func (r *Rooms) parchear(ctx context.Context, ruta string, cuerpo any) error {
 
 // conCuerpo es una petición con cuerpo JSON cuya respuesta no hace falta.
 func (r *Rooms) conCuerpo(ctx context.Context, metodo, ruta string, cuerpo any) error {
+	return r.enviar(ctx, Request{Method: metodo, Path: ruta}, cuerpo)
+}
+
+// enviar es conCuerpo con la petición entera (SinAviso, por ejemplo): le pone el
+// cuerpo JSON y su cabecera.
+func (r *Rooms) enviar(ctx context.Context, pedido Request, cuerpo any) error {
 	datos, err := json.Marshal(cuerpo)
 	if err != nil {
 		return err
 	}
-	resp, err := r.c.Do(ctx, Request{
-		Method: metodo, Path: ruta, Body: datos, Header: http.Header{"Content-Type": {"application/json"}},
-	})
+	pedido.Body, pedido.Header = datos, http.Header{"Content-Type": {"application/json"}}
+	resp, err := r.c.Do(ctx, pedido)
 	if err != nil {
 		return err
 	}
@@ -502,6 +524,21 @@ func (r *Rooms) CreateChannel(ctx context.Context, equipo, nombre, tema string, 
 	}{nombre, kind, tema})
 }
 
+// ArchivedChannels son los canales ARCHIVADOS del equipo a los que se pertenece:
+// `?archived=1` trae también los activos y aquí se quedan solo los archivados.
+func (r *Rooms) ArchivedChannels(ctx context.Context, equipo string) ([]RoomsChannel, error) {
+	out, err := JSON[struct {
+		Channels []RoomsChannel `json:"channels"`
+	}](ctx, r.c, Request{Path: "/teams/" + url.PathEscape(equipo) + "/channels", Query: url.Values{"archived": {"1"}}})
+	archivados := out.Channels[:0]
+	for _, c := range out.Channels {
+		if c.Archived {
+			archivados = append(archivados, c)
+		}
+	}
+	return archivados, err
+}
+
 // Browse son los canales públicos del equipo a los que aún no se pertenece.
 func (r *Rooms) Browse(ctx context.Context, equipo, q string) ([]RoomsChannel, error) {
 	out, err := JSON[struct {
@@ -584,7 +621,7 @@ func (r *Rooms) SetChannelMemberRole(ctx context.Context, canal, persona, rol st
 // ResolvePerson busca a alguien por su @usuario o su correo. Un 404 es que no existe,
 // un 429 que se ha preguntado demasiado y un 400 que lo escrito no vale.
 func (r *Rooms) ResolvePerson(ctx context.Context, consulta string) (RoomsPerson, error) {
-	return PostJSON[RoomsPerson](ctx, r.c, "/people:resolve", map[string]string{"query": consulta})
+	return PostJSONLectura[RoomsPerson](ctx, r.c, "/people:resolve", map[string]string{"query": consulta})
 }
 
 // Unread devuelve lo pendiente de cada canal del equipo.

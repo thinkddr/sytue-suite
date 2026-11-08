@@ -283,6 +283,18 @@ export const sl: AppCatalog<typeof en> = {
     few: '{count} elementi so premaknjeni v koš.',
     other: '{count} elementov je premaknjenih v koš.',
   },
+  'files.batch.restored': {
+    one: '{count} element je obnovljen.',
+    two: '{count} elementa sta obnovljena.',
+    few: '{count} elementi so obnovljeni.',
+    other: '{count} elementov je obnovljenih.',
+  },
+  'files.batch.restorePartial': {
+    one: '{count} elementa ni bilo mogoče obnoviti; še vedno je v košu.',
+    two: '{count} elementov ni bilo mogoče obnoviti; še vedno sta v košu.',
+    few: '{count} elementov ni bilo mogoče obnoviti; še vedno so v košu.',
+    other: '{count} elementov ni bilo mogoče obnoviti; še vedno so v košu.',
+  },
   'files.batch.trashFailed': 'Izbora ni bilo mogoče premakniti v koš.',
   'files.batch.moveTitle': {
     one: 'Premakni {count} element',
@@ -307,6 +319,9 @@ export const sl: AppCatalog<typeof en> = {
   'action.rename': 'Preimenuj',
   'action.move': 'Premakni v…',
   'action.copy': 'Ustvari kopijo',
+  'action.copyLink': 'Kopiraj povezavo',
+  'action.linkCopied': 'Povezava je kopirana. Odpre se le tistim, ki že imajo dostop.',
+  'action.copyLinkFailed': 'Povezave ni bilo mogoče kopirati.',
   'action.shareLink': 'Deli povezavo',
   'action.openInApp': 'Odpri v aplikaciji',
   'action.openInEditor': 'Odpri v urejevalniku',
@@ -535,6 +550,22 @@ export const sl: AppCatalog<typeof en> = {
   'trash.purged': '»{name}« je trajno izbrisano.',
   'trash.purgeDenied': '»{name}« ni mogoče izbrisati',
   'trash.purgeFailed': 'Brisanje ni uspelo.',
+  'trash.emptyAll': 'Izprazni koš',
+  'trash.emptyAllTitle': 'Želite izprazniti koš?',
+  'trash.emptyAllBody': {
+    one: '{count} element v košu bo trajno izbrisan skupaj z zgodovino različic. Pozneje ga ni več mogoče pridobiti nazaj.',
+    two: '{count} elementa v košu bosta trajno izbrisana skupaj z zgodovino različic. Pozneje ju ni več mogoče pridobiti nazaj.',
+    few: '{count} elementi v košu bodo trajno izbrisani skupaj z zgodovino različic. Pozneje jih ni več mogoče pridobiti nazaj.',
+    other:
+      '{count} elementov v košu bo trajno izbrisanih skupaj z zgodovino različic. Pozneje jih ni več mogoče pridobiti nazaj.',
+  },
+  'trash.emptiedAll': 'Koš je izpraznjen.',
+  'trash.emptyAllPartial': {
+    one: '{count} elementa ni bilo mogoče izbrisati; še vedno je v košu.',
+    two: '{count} elementov ni bilo mogoče izbrisati; še vedno sta v košu.',
+    few: '{count} elementov ni bilo mogoče izbrisati; še vedno so v košu.',
+    other: '{count} elementov ni bilo mogoče izbrisati; še vedno so v košu.',
+  },
   'trash.purgeTitle': 'Želite trajno izbrisati?',
   'trash.purgeBodyFolder':
     'Vsebina »{name}« in vsega, kar je v njej, bo izbrisana s strežnikov Sytue skupaj z zgodovino različic. Pozneje je ni več mogoče pridobiti nazaj, ne od tu ne prek podpore. V zameno sprostite prostor, ki ga je zasedala.',

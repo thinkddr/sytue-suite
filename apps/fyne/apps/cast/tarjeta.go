@@ -110,11 +110,11 @@ func (t *Tarjeta) CreateRenderer() fyne.WidgetRenderer {
 	r := &tarjetaRenderer{t: t}
 	r.aro = ui.NuevoAro(radioTarjeta(), ui.SinHueco, v)
 	r.fondo = ui.NuevaCaja(tema.Color("surface-sunken", v), color.NRGBA{}, radioTarjeta())
-	glifo := glifoVideo
+	glifo := iconos.Video
 	if t.Video.Kind == "live" {
-		glifo = glifoDirecto
+		glifo = iconos.Emitir
 	}
-	r.glifo = iconos.TrazoDeRuta(glifo, 32, tema.Color("text-subtle", v))
+	r.glifo = iconos.Trazo(glifo, 32, "text-subtle", v)
 	r.poster = canvas.NewRaster(r.generar)
 	r.poster.ScaleMode = canvas.ImageScaleSmooth
 	r.titulo = ui.NuevoParrafo(t.Video.Title, escalonTituloTarjeta(), ui.PesoTitulo(4), "text", v).Recortado(2)

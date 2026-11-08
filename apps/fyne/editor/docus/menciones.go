@@ -5,11 +5,7 @@ package docus
 
 import (
 	"cmp"
-	"context"
 	"image/color"
-	"regexp"
-	"strings"
-	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -20,7 +16,6 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
-	"git.sytue.eu/sytue/one/apps/nucleo/buscar"
 )
 
 // El selector de menciones de los comentarios, `Menciones.tsx` de la web: al escribir
@@ -34,59 +29,17 @@ import (
 // `rounded-sm px-2 py-1`, la activa en `bg-bg-subtle` (el `menu-hover` del menú), el nombre en `text-sm
 // font-medium text-text` y el correo debajo en `text-xs text-text-muted`. Lo vigila
 // TestLaListaDeMencionesPintaComoLaWeb, que lee esas clases del fuente.
-
-var reMencion = regexp.MustCompile(`(?:^|\s)@([^\s@]*)$`)
-
-// consultaMencion es lo que se lleva escrito tras la última «@» suelta.
-func consultaMencion(texto string) (string, bool) {
-	m := reMencion.FindStringSubmatch(texto)
-	if m == nil {
-		return "", false
-	}
-	return strings.ToLower(m[1]), true
-}
-
-// ponerMencion sustituye la mención a medias por la dirección elegida.
-func ponerMencion(texto, email string) string {
-	i := strings.LastIndex(texto, "@")
-	return texto[:i] + "@" + email + " "
-}
-
-// candidatosMencion son quienes casan por nombre o dirección, seis como mucho.
-func candidatosMencion(gente []api.Miembro, q string) []api.Miembro {
-	var out []api.Miembro
-	for _, p := range gente {
-		if len(out) == 6 {
-			break
-		}
-		if buscar.Contiene(p.Email, q) || buscar.Contiene(p.Nombre, q) {
-			out = append(out, p)
-		}
-	}
-	return out
-}
-
-// moverActiva es adónde va la opción activa con una flecha: da la vuelta en los dos
-// extremos. Otra tecla la deja donde estaba. La misma regla que `moverActiva` de la web.
-func moverActiva(activa, total int, tecla fyne.KeyName) int {
-	switch {
-	case total == 0:
-		return 0
-	case tecla == fyne.KeyDown:
-		return (activa + 1) % total
-	case tecla == fyne.KeyUp:
-		return (activa - 1 + total) % total
-	}
-	return activa
-}
+//
+// Las reglas —cuándo se menciona, a quién se ofrece y de dónde sale la gente— son las
+// de `ui` (menciones.go, el `menciones.ts` de @sytue/shell), las mismas que el «@» del
+// editor de notas de Notepads; aquí solo queda la lista de un área de texto.
 
 // menciones cuelga de un área de texto y se repinta con lo que se escribe.
 type menciones struct {
 	a      *App
 	campo  *ui.AreaTexto
 	caja   *fyne.Container
-	gente  []api.Miembro
-	pedida bool
+	agenda ui.AgendaMenciones
 	// lista son los candidatos a la vista y activa, el que se escribe con Intro.
 	lista  []api.Miembro
 	activa int
@@ -109,7 +62,7 @@ func (m *menciones) teclear(k *fyne.KeyEvent) bool {
 	}
 	switch k.Name {
 	case fyne.KeyDown, fyne.KeyUp:
-		m.activa = moverActiva(m.activa, len(m.lista), k.Name)
+		m.activa = ui.MoverActiva(m.activa, len(m.lista), k.Name)
 		m.pintar()
 	case fyne.KeyReturn, fyne.KeyEnter:
 		m.elegir(m.lista[m.activa])
@@ -125,26 +78,15 @@ func (m *menciones) teclear(k *fyne.KeyEvent) bool {
 }
 
 func (m *menciones) elegir(p api.Miembro) {
-	m.campo.PonerTexto(ponerMencion(m.campo.Texto(), p.Email))
+	m.campo.PonerTexto(ui.PonerMencion(m.campo.Texto(), p.Email))
 }
 
 // cambio se llama con cada tecla; la gente se pide UNA vez, al primer «@».
 func (m *menciones) cambio(texto string) {
-	q, ok := consultaMencion(texto)
-	if ok && !m.pedida && m.a.Directorio != nil {
-		m.pedida = true
-		m.a.lanzar(func() {
-			ctx, cancelar := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancelar()
-			gente, err := m.a.Directorio.Agenda(ctx, 500)
-			fyne.Do(func() {
-				if err != nil {
-					m.pedida = false // se reintenta en la siguiente arroba
-				}
-				m.gente = gente
-				m.cambio(m.campo.Texto())
-			})
-		})
+	q, ok := ui.ConsultaMencion(texto)
+	var gente []api.Miembro
+	if ok {
+		gente = m.agenda.Gente(m.a.Directorio, m.a.lanzar, func() { m.cambio(m.campo.Texto()) })
 	}
 	if m.cerradaEn != nil && *m.cerradaEn != texto {
 		m.cerradaEn = nil
@@ -154,7 +96,7 @@ func (m *menciones) cambio(texto string) {
 	}
 	m.lista = nil
 	if ok && m.cerradaEn == nil {
-		m.lista = candidatosMencion(m.gente, q)
+		m.lista = ui.CandidatosMencion(gente, q)
 	}
 	m.activa = min(m.activa, max(len(m.lista)-1, 0))
 	m.pintar()

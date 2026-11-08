@@ -56,6 +56,7 @@ export const fi: AppCatalog<typeof en> = {
   'inbox.markAll': 'Merkitse kaikki luetuiksi',
   'inbox.loading': 'Ladataan ilmoituksia…',
   'inbox.unreadDot': 'Lukematon',
+  'inbox.markRead': 'Merkitse luetuksi',
   'inbox.errorTitle': 'Ilmoituksia ei voitu ladata',
   'inbox.errorBody': 'Hub ei vastaa juuri nyt. Yritä uudelleen muutaman sekunnin kuluttua.',
   'inbox.retry': 'Yritä uudelleen',
@@ -682,6 +683,8 @@ export const fi: AppCatalog<typeof en> = {
     '{sources} ei vastannut, joten osa tuloksista voi puuttua. Yritä hetken kuluttua uudelleen.',
   'search.partialJoin': ' ja ',
   'search.showing': 'Näytetään {count}/{total} tulosta.',
+  'search.loadMore': 'Lataa lisää tuloksia',
+  'search.loadMoreFailed': 'Lisää tuloksia ei voitu ladata. Yritä uudelleen.',
   'privacy.notice':
     'Emme myy tietojasi emmekä luovuta niitä kolmansille osapuolille. Emme käytä niitä profilointiin, mainontaan emmekä palveluidemme tai kenenkään muun palveluiden kouluttamiseen tai parantamiseen. Ne on salattu siirron aikana ja levossa, ja ne poistuvat eurooppalaisesta infrastruktuuristamme vain siltä osin kuin laskutus välttämättä vaatii sekä käyttöön ottamissasi integraatioissa, joissa kolmas osapuoli pyytää hyväksyntäsi käyttämilleen tiedoille.',
 };

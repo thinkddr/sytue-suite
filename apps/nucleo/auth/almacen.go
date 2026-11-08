@@ -40,7 +40,24 @@ func Load() (Tokens, error) { return cargar() }
 func Save(t Tokens) error {
 	err := guardar(t)
 	ajustes.MarcarSesion()
-	return err
+	return errors.Join(err, ajustes.MarcarIdentidad(IdentidadWidgets(t)))
+}
+
+// IdentidadWidgets es a quién pertenecen unos tokens para la época de los widgets
+// (ajustes.MarcarIdentidad): sin refresh o sin sujeto, nadie. Lo usa también la suite
+// al adoptar una sesión guardada por otra app.
+func IdentidadWidgets(t Tokens) ajustes.Identidad {
+	return identidadWidgets(t.Issuer, t.Cliente, t)
+}
+
+func identidadWidgets(emisor, cliente string, t Tokens) ajustes.Identidad {
+	if t.Refresh == "" || t.Subject == "" {
+		return ajustes.Identidad{}
+	}
+	return ajustes.Identidad{
+		Emisor: strings.TrimRight(emisor, "/"), Cliente: cliente,
+		Sujeto: t.Subject, Organizacion: organizacionDe(t),
+	}
 }
 
 // # Otros secretos en el mismo almacén
@@ -56,6 +73,20 @@ func Save(t Tokens) error {
 // CuentaBloqueo es el testigo seguro de la política de desbloqueo de la suite.
 // También se comparte entre las variantes firmadas Developer ID y Mac App Store.
 const CuentaBloqueo = "bloqueo-sesion"
+
+// PrefijoDespertar es el de las cuentas con el token APNs de cada app
+// (`despertar-<bundle>`, apps/fyne/sesion/despertar.go).
+const PrefijoDespertar = "despertar-"
+
+// enGrupoSuite dice qué cuentas van, en Apple, al grupo del llavero de TODA la suite
+// (ajustes.GrupoSuite) y no al privado de cada app, que es el primero de sus
+// `keychain-access-groups` y donde cae lo que se guarda sin grupo: la sesión, el
+// bloqueo y los tokens del despertar, porque la app que sale olvida en el Hub los de
+// las quince. La extensión de widgets no tiene llavero: no gana nada. Va aquí, sin
+// plataforma, para que una prueba en Linux lo vigile.
+func enGrupoSuite(cuenta string) bool {
+	return strings.HasPrefix(cuenta, "sesion-") || cuenta == CuentaBloqueo || strings.HasPrefix(cuenta, PrefijoDespertar)
+}
 
 var errCuenta = errors.New("auth: cuenta de secreto no válida")
 

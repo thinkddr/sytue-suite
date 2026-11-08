@@ -1,0 +1,20 @@
+# Lo que deja `go build ./cmd/<app>` lanzado aquí sin `-o`: un ejecutable con el nombre
+# de la app. Uno de 114 MB llegó a colarse en un commit (GitHub rechaza >100 MB).
+# `!/*/` vuelve a admitir los directorios que se llaman igual (calcus, diapos, rooms…).
+/bases
+/calcus
+/calendar
+/cast
+/certipdf
+/contacts
+/demo
+/diapos
+/docus
+/drive
+/erp
+/hub
+/mail
+/notes
+/photos
+/rooms
+!/*/

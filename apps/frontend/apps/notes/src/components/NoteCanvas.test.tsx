@@ -112,3 +112,49 @@ test('lista y columnas también ofrecen el asa; un cuaderno de lectura no', () =
   }
   expect(mount('free', [], true)).toBeNull();
 });
+
+function vacio(props: { onQuitarFiltro?: () => void; onCreateFirst?: () => void }) {
+  host = document.createElement('div');
+  document.body.append(host);
+  render(
+    <NoteCanvas
+      t={((key: string) => key) as never}
+      notebook={{ id: 'nb', layout: 'columns' } as Notebook}
+      notes={[]}
+      cargando={false}
+      claro={{}}
+      bloqueado={false}
+      seleccionada={null}
+      onSelect={noop}
+      onChange={noop}
+      onMove={noop}
+      onDelete={noop}
+      onDuplicate={noop}
+      onTogglePin={noop}
+      onShare={noop}
+      onTags={noop}
+      onBacklinks={noop}
+      {...props}
+    />,
+    host,
+  );
+  return host;
+}
+
+test('un filtro sin coincidencias lo dice y ofrece quitarlo, no «cuaderno vacío»', () => {
+  let quitado = 0;
+  const el = vacio({ onQuitarFiltro: () => quitado++, onCreateFirst: noop });
+  expect(el.textContent).toContain('filter.noMatches');
+  expect(el.textContent).not.toContain('empty.noNotes.title');
+  expect(el.textContent).not.toContain('note.new');
+  const boton = [...el.querySelectorAll('button')].find((b) => b.textContent === 'filter.clear');
+  expect(boton).toBeDefined();
+  boton!.click();
+  expect(quitado).toBe(1);
+});
+
+test('sin filtro, el cuaderno vacío sigue siendo el de siempre', () => {
+  const el = vacio({ onCreateFirst: noop });
+  expect(el.textContent).toContain('empty.noNotes.title');
+  expect(el.textContent).not.toContain('filter.noMatches');
+});

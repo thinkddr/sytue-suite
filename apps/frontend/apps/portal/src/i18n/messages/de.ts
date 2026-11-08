@@ -71,6 +71,7 @@ export const de: AppCatalog<typeof en> = {
   'inbox.markAll': 'Alle als gelesen markieren',
   'inbox.loading': 'Benachrichtigungen werden geladen…',
   'inbox.unreadDot': 'Ungelesen',
+  'inbox.markRead': 'Als gelesen markieren',
   'inbox.errorTitle': 'Benachrichtigungen konnten nicht geladen werden',
   'inbox.errorBody':
     'Der Hub antwortet gerade nicht. Versuchen Sie es in ein paar Sekunden erneut.',
@@ -753,6 +754,8 @@ export const de: AppCatalog<typeof en> = {
     '{sources} hat nicht geantwortet, daher können Ergebnisse fehlen. Versuchen Sie es gleich noch einmal.',
   'search.partialJoin': ' und ',
   'search.showing': '{count} von {total} Ergebnissen werden angezeigt.',
+  'search.loadMore': 'Weitere Ergebnisse laden',
+  'search.loadMoreFailed': 'Weitere Ergebnisse konnten nicht geladen werden. Versuche es erneut.',
   'privacy.notice':
     'Wir verkaufen Ihre Daten nicht und geben sie nicht an Dritte weiter. Wir nutzen sie weder für Profilbildung noch für Werbung, noch um unsere Dienste oder die anderer zu trainieren oder zu verbessern. Sie sind bei der Übertragung und im Ruhezustand verschlüsselt und verlassen unsere europäische Infrastruktur nur, soweit es für die Abrechnung unbedingt nötig ist, und in den Integrationen, die Sie aktivieren – dort bittet Sie der Drittanbieter um Zustimmung zu den verwendeten Daten.',
 };

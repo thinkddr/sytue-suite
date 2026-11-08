@@ -209,6 +209,7 @@ func (sa *Sala) AbrirEstado(disparador fyne.CanvasObject) {
 			sa.AlternarAvisosDirectos()
 		}))
 	}
+	elementos = append(elementos, sa.entradasPausa(t, sa.P.Locale, func() { m.Cerrar() })...)
 	elementos = append(elementos,
 		ui.NuevoElementoMenu(t.T("notify.openSettings", nil), iconos.Ajustes, func() {
 			m.Cerrar()

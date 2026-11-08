@@ -28,6 +28,8 @@ export function DmNotificationsDemo({ locale }: { locale: Locale }) {
           onDiscardLegacyDmNotify={preference.discardLegacy}
           onToggleDmNotify={preference.toggle}
           onOpenNotifySettings={() => {}}
+          pausedUntilLabel={null}
+          onPause={() => {}}
           onOpenIntegrations={() => {}}
           onMarkAllRead={() => {}}
           canManageIntegrations={false}

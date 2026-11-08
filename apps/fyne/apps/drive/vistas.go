@@ -143,7 +143,7 @@ func (p *VistaPlana) lista(v tema.Variante, filas []fyne.CanvasObject) fyne.Canv
 		p.desplazable.Content = contenido
 		p.desplazable.Refresh()
 	}
-	return container.NewStack(canvas.NewRectangle(tema.Color("bg", v)), p.desplazable)
+	return container.NewStack(canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)), p.desplazable)
 }
 
 // MargenCargarMas es el `rootMargin: '200px'` del observador de «Recientes».
@@ -486,14 +486,14 @@ func (d *VistaDocumentos) cuerpo(v tema.Variante) fyne.CanvasObject {
 		d.desplazable.Content = contenido
 		d.desplazable.Refresh()
 	}
-	return container.NewStack(canvas.NewRectangle(tema.Color("bg", v)), d.desplazable)
+	return container.NewStack(canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)), d.desplazable)
 }
 
 // esqueleto son las cinco filas de carga: la caja de `h-9 w-9` (31,5) y una raya de
 // `h-4 w-1/3`, dentro del `px-3` de la lista y del `px-3 py-2 gap-3` de cada fila.
 func (d *VistaDocumentos) esqueleto(v tema.Variante) fyne.CanvasObject {
 	hijos := make([]fyne.CanvasObject, 0, 1+2*FilasEsqueletoDocs)
-	hijos = append(hijos, canvas.NewRectangle(tema.Color("bg", v)))
+	hijos = append(hijos, canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)))
 	filas := make([][2]*ui.Esqueleto, 0, FilasEsqueletoDocs)
 	for range FilasEsqueletoDocs {
 		caja, raya := ui.NuevoEsqueleto(LadoCajaEsqueletoDocs, LadoCajaEsqueletoDocs), ui.NuevoEsqueleto(0, tema.Espacio(4))

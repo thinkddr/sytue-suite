@@ -27,7 +27,6 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
-	"git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
 
 // La portada de documentos: `DocList.tsx` bajo un producto (`?kind=`), que es lo que
@@ -83,10 +82,9 @@ var (
 // Portada es la pantalla y su estado. Se construye con NuevaPortada y se arranca con
 // Cargar.
 type Portada struct {
-	Tipo   Tipo
-	Widget widgets.Source
-	T      func(string, i18n.Vars) string
-	Loc    i18n.Locale
+	Tipo Tipo
+	T    func(string, i18n.Vars) string
+	Loc  i18n.Locale
 	// Svc es el cliente del servicio. nil: la portada se pinta y no pide nada.
 	Svc *api.Docs
 	// Red es el monitor de conectividad. nil: se asume que hay red.
@@ -140,6 +138,9 @@ type Portada struct {
 	Destacados  bool
 	Creando     bool
 	CargandoMas bool
+
+	// copiando: hay una copia en curso (Copiar); solo la toca el hilo de la interfaz.
+	copiando bool
 
 	vista *vistaPortada
 }
@@ -271,15 +272,10 @@ func (p *Portada) Cargar() {
 		p.CargarPlantillas()
 	}
 	f := p.filtro("")
-	view := p.Widget.View()
-	conRed := p.hayRed()
 	p.lanzar(func() {
 		ctx, cancelar := p.ctx()
 		defer cancelar()
 		docs, cursor, err := p.Svc.List(ctx, f)
-		if err == nil && conRed && p.hayRed() && f.Query == "" && !f.Starred {
-			publicarPortadaWidget(ctx, view, docs, cursor)
-		}
 		fyne.Do(func() {
 			if !p.vigente(seq) {
 				return // llegó tarde: ya se pidió otro listado
@@ -295,41 +291,6 @@ func (p *Portada) vigente(seq int) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return seq == p.seq
-}
-
-func publicarPortadaWidget(ctx context.Context, view widgets.View, docs []api.Document, cursor string) {
-	var detalle widgets.Detail
-	if cursor == "" {
-		detalle.Counters = []widgets.Counter{{Kind: "documents", Value: int64(len(docs))}}
-	}
-	items := make([]widgets.Item, 0, min(len(docs), widgets.MaxItems))
-	for _, d := range docs {
-		titulo := strings.TrimSpace(d.Title)
-		if titulo == "" {
-			continue
-		}
-		badge := ""
-		if d.Starred {
-			badge = "★"
-		}
-		var startAt int64
-		if !d.UpdatedAt.IsZero() && d.UpdatedAt.Unix() > 0 {
-			startAt = d.UpdatedAt.Unix()
-		}
-		items = append(items, widgets.Item{
-			Title:   titulo,
-			Badge:   badge,
-			StartAt: startAt,
-			Unread:  d.Starred,
-		})
-		if len(items) >= widgets.MaxItems {
-			break
-		}
-	}
-	detalle.Items = widgets.SanitizeItems(items)
-	if len(detalle.Counters) > 0 || len(detalle.Items) > 0 {
-		_ = view.PublicarDetalle(ctx, detalle)
-	}
 }
 
 // Mas pide la página siguiente, si la hay. Tiene candado propio: el desplazamiento
@@ -557,6 +518,30 @@ func (p *Portada) renombrar(id, titulo string, listo func(bool)) {
 	})
 }
 
+// Copiar es «Hacer una copia» desde la tesela: el servicio copia el contenido de ahora
+// del documento y la copia se abre, como al crear uno (`copiar` de DocList.tsx). Desde la
+// portada no hay nada pendiente de guardar. Una sola copia a la vez: el botón de la
+// tesela no es una entrada de menú que se cierra, y un doble clic pediría dos
+// (`copiando` de DocList.tsx).
+func (p *Portada) Copiar(d api.Document) {
+	if p.Svc == nil || !p.hayRed() || p.copiando {
+		return
+	}
+	p.copiando = true
+	Servicio{
+		Svc: p.Svc, Plazo: p.Plazo, T: p.T, Lanzar: p.Lanzar,
+		Avisar: func(_ ui.TonoAviso, titulo string) {
+			if p.Avisos != nil {
+				p.Avisos.Notificar(ui.NuevoAviso(ui.AvisoPeligro, titulo, ""))
+			}
+		},
+	}.HacerCopia(d, nil, func(copia api.Document) {
+		if p.AlAbrir != nil {
+			p.AlAbrir(copia)
+		}
+	}, func() { p.copiando = false })
+}
+
 // PedirBorrado confirma antes de borrar: es una acción destructiva y nunca va directa.
 func (p *Portada) PedirBorrado(d api.Document) {
 	lienzo := p.lienzo()
@@ -672,7 +657,7 @@ func (w *vistaPortada) rehacerCuerpo() {
 		w.cuerpo = container.New(w.rejilla, esqueletos...)
 	case Listo:
 		teselas := make([]fyne.CanvasObject, len(p.Docs))
-		acc := AccionesTesela{Abrir: p.AlAbrir, Destacar: p.Destacar, Renombrar: p.PedirNombre, Eliminar: p.PedirBorrado}
+		acc := AccionesTesela{Abrir: p.AlAbrir, Destacar: p.Destacar, Renombrar: p.PedirNombre, Copiar: p.Copiar, Eliminar: p.PedirBorrado}
 		for i, d := range p.Docs {
 			s := NuevaTeselaDoc(d, p.t2(), p.Loc, acc)
 			s.SinRed = !p.hayRed()

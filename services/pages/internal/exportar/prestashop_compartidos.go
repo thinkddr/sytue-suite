@@ -41,7 +41,7 @@ func GenerarCompartidosPrestaShop(irSitio *ir.Sitio, productos []domain.Product)
 display_name: '%s'
 version: '%s'
 author:
-  name: 'Sytue Web'
+  name: 'Sytue Webs'
   email: 'soporte@sytue.eu'
   url: 'https://sytue.eu'
 meta:
@@ -72,7 +72,7 @@ assets:
   <section id="content" class="page-home">
     <div class="container my-4">
       <h1 class="h1 text-center">%s</h1>
-      <p class="text-center lead">Tema exportado desde Sytue Web basado en Hummingbird.</p>
+      <p class="text-center lead">Tema exportado desde Sytue Webs basado en Hummingbird.</p>
     </div>
   </section>
 {/block}
@@ -104,7 +104,7 @@ assets:
 	// 7. README.md
 	archivos["README.md"] = []byte(fmt.Sprintf(`# Tema PrestaShop: %s
 
-Tema hijo basado en el tema oficial **Hummingbird** exportado desde **Sytue Web**.
+Tema hijo basado en el tema oficial **Hummingbird** exportado desde **Sytue Webs**.
 
 - Versión: %s
 - Compatible con PrestaShop: >= 8.0.0 (hasta %s)

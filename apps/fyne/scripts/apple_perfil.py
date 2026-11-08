@@ -7,6 +7,7 @@ import fnmatch
 import hashlib
 import os
 import pathlib
+import json
 import plistlib
 import re
 import shutil
@@ -16,9 +17,38 @@ import subprocess
 import sys
 import tempfile
 import time
-import tomllib
+
+try:  # Python 3.11+. El python3 del Mac propio es anterior (2026-11-05: la validación
+    import tomllib  # moría aquí sin ::error:: y los 31 perfiles salían inválidos).
+except ModuleNotFoundError:  # pragma: no cover - depende del intérprete
+    tomllib = None
 
 AQUI = pathlib.Path(__file__).resolve().parent
+
+
+def leer_fyneapp(texto):
+    """FyneApp.toml como diccionario: tomllib si existe y, si no, el subconjunto que
+    usan esos ficheros (secciones, `clave = "cadena"`, números y booleanos, comentarios).
+    Lo que no sepa leer es un error, no un valor inventado."""
+    if tomllib is not None:
+        return tomllib.loads(texto)
+    datos, seccion = {}, None
+    for numero, linea in enumerate(texto.splitlines(), 1):
+        linea = linea.strip()
+        if not linea or linea.startswith('#'):
+            continue
+        m = re.fullmatch(r'\[([A-Za-z0-9_.-]+)\]', linea)
+        if m:
+            seccion = datos.setdefault(m.group(1), {})
+            continue
+        m = re.fullmatch(r'([A-Za-z0-9_-]+)\s*=\s*("(?:[^"\\]|\\.)*"|-?\d+|true|false)\s*(?:#.*)?', linea)
+        if not m:
+            raise ValueError('FyneApp.toml: línea ' + str(numero) + ' fuera del subconjunto admitido')
+        crudo = m.group(2)
+        valor = (json.loads(crudo) if crudo.startswith('"') else crudo == 'true' if crudo in ('true', 'false')
+                 else int(crudo))
+        (datos if seccion is None else seccion)[m.group(1)] = valor
+    return datos
 RAIZ_APPLE = AQUI.parents[2] / ".github/actions/apple/AppleRootCA.cer"
 HUELLA_RAIZ = "b0b1730ecbc7ff4505142c49f1295e6eda6bcaed7e2c68c5be91b5a11001f024"
 LIMITE = 2 * 1024 * 1024
@@ -204,7 +234,7 @@ def validar_derechos(perfil, appid, modo, grupo, proteccion="", llavero="", soli
         if appid.endswith('.archivos'):
             host = appid.removesuffix('.archivos')
             catalogo = pathlib.Path(fuente).resolve().parents[2] / 'fyne/cmd'
-            declarados = [tomllib.loads(p.read_text()) for p in catalogo.glob('*/FyneApp.toml')]
+            declarados = [leer_fyneapp(p.read_text()) for p in catalogo.glob('*/FyneApp.toml')]
             if not any(a.get('Details', {}).get('ID') == host and a.get('Development', {}).get('archivos') == 'si' for a in declarados):
                 mal('el catálogo no declara este proveedor de archivos')
             llavero_proveedor = equipo + '.' + host + '.shared'
@@ -253,6 +283,12 @@ def validar_derechos(perfil, appid, modo, grupo, proteccion="", llavero="", soli
                 mal('los widgets no pueden solicitar acceso al Keychain')
             if llavero_proveedor and claves_pedidas != [llavero_proveedor]:
                 mal('File Provider no puede leer el Keychain de la sesión ni de otra app')
+            # El despertar del widget por aviso silencioso (SYTUE_DESPERTAR_APPLE): solo
+            # `production`, y solo si el perfil lo autoriza; si no, la app se instalaría sin
+            # recibir nada, o no se instalaría.
+            aps = peticion.get('aps-environment')
+            if aps is not None and (aps != 'production' or derechos.get('aps-environment') != aps):
+                mal('el perfil no autoriza los avisos: activar Push Notifications en el App ID y regenerar el perfil')
             for pedido in grupos_pedidos:
                 # macOS autoriza también grupos <TeamID>.* mediante la firma del
                 # mismo equipo. El grupo legado se conserva sólo para migrar MAS.
@@ -287,7 +323,11 @@ def main(argv=None):
             raise PerfilInvalido("profile_command_invalid")
         return 0
     except PerfilInvalido as error:
-        mensaje = "se requiere OpenSSL 3 existente" if str(error) == "openssl3_required" else "perfil CMS o derechos no válidos"
+        # El motivo es siempre un texto fijo de este fichero (exigir/mal), nunca datos
+        # del perfil: decir QUÉ derecho falta no publica nada de terceros, y sin él un
+        # «no autoriza» de 31 perfiles no dice qué hay que cambiar en Apple (2026-11-05).
+        mensaje = ("se requiere OpenSSL 3 existente" if str(error) == "openssl3_required"
+                   else "perfil CMS o derechos no válidos: " + str(error))
         print("::error::" + mensaje, file=sys.stderr)
         return 1
     except Exception:

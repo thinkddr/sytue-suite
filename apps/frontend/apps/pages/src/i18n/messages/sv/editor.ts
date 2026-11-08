@@ -18,10 +18,10 @@ export const editor = {
   'editor.bases.desc': 'Posterna i en vy, precis som de är nu',
   'editor.bases.title': 'Tabell från Sytue Bases',
   'editor.bases.prompt':
-    'Klistra in token för en skrivskyddad anslutning som beviljats till Sytue Web. Data i den vyn blir innehåll på webbplatsen och blir offentliga när den publiceras.',
+    'Klistra in token för en skrivskyddad anslutning som beviljats till Sytue Webs. Data i den vyn blir innehåll på webbplatsen och blir offentliga när den publiceras.',
   'editor.bases.confirm': 'Hämta vyn',
   'editor.bases.invalid':
-    'Den anslutningen är inte giltig för Sytue Web: den kan vara återkallad, utgången eller beviljad till en annan produkt eller organisation.',
+    'Den anslutningen är inte giltig för Sytue Webs: den kan vara återkallad, utgången eller beviljad till en annan produkt eller organisation.',
   'editor.bases.large':
     'Vyn får inte plats i en tabell på webbplatsen (högst 50 rader och 8 kolumner). Begränsa den i Sytue Bases.',
   'editor.bases.forbidden':

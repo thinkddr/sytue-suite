@@ -73,19 +73,33 @@ type avisosBarra struct {
 	correo *int
 	// insignia es el último número puesto sobre el icono, para no repetirlo.
 	enIcono int
-	estado  estadoBarra
-	parada  context.CancelFunc
+	// propia es el número que la app cuenta por su cuenta ([BarraSuite.PonerInsignia]);
+	// nil, el icono lleva lo que dicen los avisos del Hub ([insigniaDe]).
+	propia *int
+	// callar dice si los avisos de la app están en pausa ([BarraSuite.CallarAvisosSi]).
+	callar func() bool
+	estado estadoBarra
+	parada context.CancelFunc
+	// dormida: en iOS, con la app fuera del primer plano el flujo está cerrado y se abre
+	// al volver (sesion.Suite.PausaEnFondo; ver dormir).
+	dormida bool
 	// irA lleva al destino de un aviso: su app nativa si está instalada y, si no, la
 	// web (`api.AbrirURL`). Los guardianes la sustituyen para ver a dónde va.
 	irA func(producto, url string)
 	// alFoto es lo que hace la barra cuando Sytue ID avisa, por el mismo flujo, de que
 	// la persona cambió o quitó su foto: volver a pedir la ficha (lo pone BarraSuite).
 	alFoto func()
+	// alDatos es lo que hace con la señal de cambios del Hub (`datos`): pasársela al
+	// widget nativo de esta app, que decide si el producto es suyo (Suite.AvisoDelHub).
+	alDatos func(producto string)
 }
 
 func nuevoAvisosBarra(t *i18n.Translator, s *sesion.Suite) *avisosBarra {
 	a := &avisosBarra{t: t, s: s, estado: enReposo, anunciados: map[string]bool{}}
 	a.irA = func(producto, u string) { _ = api.AbrirURL(fyne.CurrentApp(), producto, u) }
+	if s != nil {
+		a.alDatos = s.AvisoDelHub
+	}
 	a.boton = NuevoBotonIcono(iconos.Campana, t.T("notifications.title", nil), a.abrir).SobreBanda()
 	a.boton.Trazo = "topbar-fg" // `text-topbar-fg` de TopBarButton, no el blanco entero de la banda
 	a.boton.Lado = LadoControlBarra()
@@ -198,7 +212,38 @@ func (a *avisosBarra) arrancar() {
 		return
 	}
 	a.s.AlCambiar(a.sesionCambio) // siempre en el hilo de la interfaz
+	if a.s.PausaEnFondo() {
+		a.s.AlFondo(a.dormir)
+		a.s.AlVolver(a.despertar)
+	}
 	a.sesionCambio(a.s.Estado())
+}
+
+// dormir cierra el flujo y lo que estuviera cargando al dejar el primer plano en iOS.
+// Allí la app suspendida vuelve a correr cuando el sistema la despierta para su widget,
+// y el flujo se reconectaba en segundo plano, sin nadie mirando: la barra hacía de app
+// en cada refresco. Lo que se tenía se queda; al volver, despertar lo repesca.
+func (a *avisosBarra) dormir() {
+	a.mu.Lock()
+	a.dormida = true
+	a.mu.Unlock()
+	a.parar()
+}
+
+// despertar vuelve a abrir el flujo al volver al primer plano, si hay sesión, y vuelve a
+// pedir la lista: lo que llegó con el flujo cerrado se anuncia como tras un corte.
+func (a *avisosBarra) despertar() {
+	a.mu.Lock()
+	if !a.dormida {
+		a.mu.Unlock()
+		return
+	}
+	a.dormida = false
+	abrir, repesca := a.hub != nil, a.estado == listo
+	a.mu.Unlock()
+	if abrir {
+		a.abrirFlujo(repesca)
+	}
 }
 
 // sesionCambio enciende o apaga la campana según haya sesión.
@@ -217,11 +262,22 @@ func (a *avisosBarra) sesionCambio(e sesion.Estado) {
 		a.refrescar()
 		return
 	}
+	a.mu.Lock()
+	a.hub, a.estado = a.s.Hub, cargando
+	dormida := a.dormida
+	a.mu.Unlock()
+	if !dormida { // dormida, lo abre despertar al volver
+		a.abrirFlujo(false)
+	}
+}
+
+// abrirFlujo pide la lista y abre el flujo, hasta el siguiente parar.
+func (a *avisosBarra) abrirFlujo(repesca bool) {
 	ctx, cancelar := context.WithCancel(context.Background())
 	a.mu.Lock()
-	a.hub, a.estado, a.parada = a.s.Hub, cargando, cancelar
+	a.parada = cancelar
 	a.mu.Unlock()
-	go a.cargar(ctx, false)
+	go a.cargar(ctx, repesca)
 	go a.escuchar(ctx)
 }
 
@@ -308,10 +364,16 @@ func (a *avisosBarra) escuchar(ctx context.Context) {
 }
 
 // alEstado atiende un evento de ESTADO del flujo, que no es un aviso ni entra en la
-// campana. Hoy solo hay uno: «cambió la foto».
-func (a *avisosBarra) alEstado(evento, _ string) {
-	if evento == api.EventoAvatar && a.alFoto != nil {
+// campana: «cambió la foto» y la señal de cambios de un producto, que va al widget
+// nativo de esta app si es suyo (ADR 0078, enmienda del 2026-11-06).
+func (a *avisosBarra) alEstado(evento, datos string) {
+	switch {
+	case evento == api.EventoAvatar && a.alFoto != nil:
 		a.alFoto()
+	case evento == api.EventoDatos && a.alDatos != nil:
+		if p := api.ProductoDeDatos(datos); p != "" {
+			a.alDatos(p)
+		}
 	}
 }
 
@@ -340,6 +402,11 @@ func (a *avisosBarra) llega(n api.HubNotification) {
 	a.estado = listo
 	a.mu.Unlock()
 	avisarOyentes(n)
+	// Un aviso de su producto (un correo, una invitación) es un cambio que el widget
+	// nativo tiene que enseñar (ADR 0078, enmienda del 2026-11-06).
+	if a.s != nil {
+		a.s.AvisoDelHub(n.Source)
+	}
 	a.refrescar()
 	// Y, si es de esta aplicación y no se ha leído, se dice al SISTEMA: la ventana
 	// puede estar detrás de otras o minimizada, que es cuando un aviso sirve de algo.
@@ -542,13 +609,19 @@ func (a *avisosBarra) ponerInsignia() {
 	id := fyne.CurrentApp().Metadata().ID
 	a.mu.Lock()
 	n := insigniaDe(productoDeID(id), a.items, a.sinLeer)
+	if a.propia != nil {
+		n = *a.propia
+	}
 	cambia := n != a.enIcono
 	a.enIcono = n
 	a.mu.Unlock()
 	if cambia {
-		_ = escritorio.Insignia(id, n)
+		_ = insigniaSistema(id, n)
 	}
 }
+
+// insigniaSistema es quien pone el número de verdad; los guardianes lo sustituyen.
+var insigniaSistema = escritorio.Insignia
 
 // ProcedenciaAviso es lo que va delante de cuándo llegó un aviso, con su « · »: la
 // organización que lo mandó si no es la de la sesión (ADR 0053) y, si se reconstruyó

@@ -12,6 +12,7 @@ import (
 
 	"fyne.io/fyne/v2"
 
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/peticion"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
@@ -242,9 +243,22 @@ func (p *Pantalla) estrellaPlana(el Elemento, quiere bool) {
 }
 
 // menuPlano es el «⋯» de «Recientes» y «Destacados»: `ActionsMenu` solo con descargar
-// —un fichero; una carpeta no se descarga desde aquí— y compartir. Sin red, a una
-// carpeta no le queda nada y el menú no se abre, en vez de abrirse vacío.
+// —un fichero; una carpeta no se descarga desde aquí—, compartir y copiar el enlace. Sin
+// nada que ofrecer el menú no se abre, en vez de abrirse vacío.
 func (p *Pantalla) menuPlano(el Elemento, disparador fyne.CanvasObject) {
+	acciones := p.accionesPlano(el, p.sec.recientes.SinRed())
+	if len(acciones) == 0 {
+		return
+	}
+	m := ui.NuevoMenu(elementosMenu(acciones)...)
+	m.Rotulo = p.tr.T("action.menu", i18n.Vars{"name": el.Nombre})
+	m.Mostrar(disparador)
+}
+
+// accionesPlano son las acciones de `menuPlano`, puras para que el guardián las compare
+// sin abrir ningún menú. «Copiar enlace» sale con las mismas condiciones que en «Mi
+// unidad» (`AccionesDe`): no necesita red, y un fichero sin id no tiene enlace estable.
+func (p *Pantalla) accionesPlano(el Elemento, sinRed bool) []accionMenu {
 	var acciones []accionMenu
 	if !el.Carpeta {
 		acciones = append(acciones, accionMenu{
@@ -252,18 +266,19 @@ func (p *Pantalla) menuPlano(el Elemento, disparador fyne.CanvasObject) {
 			hacer: func() { go p.descargar(el) },
 		})
 	}
-	if !p.sec.recientes.SinRed() {
+	if !sinRed {
 		acciones = append(acciones, accionMenu{
 			texto: p.tr.T("action.shareLink", nil), cuerpo: glifoEnlace,
 			hacer: func() { p.pedirCompartir(el) },
 		})
 	}
-	if len(acciones) == 0 {
-		return
+	if el.Carpeta || el.ID != "" {
+		acciones = append(acciones, accionMenu{
+			texto: p.tr.T("action.copyLink", nil), icono: iconos.Copias,
+			hacer: func() { p.copiarEnlace(el) },
+		})
 	}
-	m := ui.NuevoMenu(elementosMenu(acciones)...)
-	m.Rotulo = p.tr.T("action.menu", i18n.Vars{"name": el.Nombre})
-	m.Mostrar(disparador)
+	return acciones
 }
 
 // ---- «Compartido conmigo» ----

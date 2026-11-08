@@ -1,9 +1,14 @@
 {
   "aiBatch.excludeOrg": "Exclude organization from the automatic Sytue AI batch",
   "aiBatch.excludedHint": "This organization is excluded from the automatic Sytue AI batch. New photos are not processed in the background for suggestions or similarity.",
+  "album.coverSet": "Album cover updated",
+  "album.isCover": "This is the album cover",
   "album.linkCopied": "Link copied",
   "album.newLink": "New link",
   "album.newLinkConfirm": "Create a new link? The current link will stop working for anyone who already has it.",
+  "album.rename": "Rename",
+  "album.renamePrompt": "Album name",
+  "album.setCover": "Use as album cover",
   "album.share": "Share",
   "album.shared": "Shared",
   "album.unshare": "Stop sharing",
@@ -98,6 +103,7 @@
     "other": "{count} by upload date"
   },
   "gallery.cancelSelection": "Exit selection",
+  "gallery.clearSearch": "Clear search",
   "gallery.describeCapped": "Only the first {count} are described at a time; run it again for the rest.",
   "gallery.describeNothing": "The selected photos already have a description",
   "gallery.describeSelected": "Describe with Sytue AI",
@@ -106,7 +112,8 @@
   "gallery.describing": "Describing {done} of {total}…",
   "gallery.downloadCapped": "Photos outside this batch: {count}.",
   "gallery.downloadSelected": "Download",
-  "gallery.downloading": {
+  "gallery.downloading": "Download requests started: {count}. Check your browser's downloads.",
+  "gallery.downloadingNative": {
     "one": "Downloading 1 photo…",
     "other": "Downloading {count} photos…"
   },
@@ -114,6 +121,8 @@
   "gallery.empty.description": "Photos from your Sytue Drive will appear here, ordered by the date they were taken.",
   "gallery.empty.title": "No photos yet",
   "gallery.favorite": "Add to favourites",
+  "gallery.favoriteFailed": "Photos that could not be changed: {count}",
+  "gallery.favorited": "Added to favourites: {count}",
   "gallery.likeTheseResults": "And the ones that look alike",
   "gallery.moreLikeThese": "More like these",
   "gallery.newAlbum": "New album",
@@ -124,6 +133,8 @@
   },
   "gallery.newAlbumTitle": "New album",
   "gallery.noExifDate": "No capture date: ordered by upload date",
+  "gallery.noResults.description": "Try other words, or clear the search to see all your photos.",
+  "gallery.noResults.title": "No photos match “{query}”",
   "gallery.onlyImages": "Only images can be added.",
   "gallery.open": "Open {name}",
   "gallery.openInEditor": "Edit {name}",
@@ -152,6 +163,7 @@
     "other": "{count} photos moved to the trash"
   },
   "gallery.unfavorite": "Remove from favourites",
+  "gallery.unfavorited": "Removed from favourites: {count}",
   "gallery.unselectMonth": "Unselect month",
   "gallery.uploadFailed": "Could not upload: {name}",
   "gallery.uploaded": {
@@ -198,6 +210,9 @@
   "viewer.askSend": "Ask",
   "viewer.canvasBackground": "Photo background",
   "viewer.close": "Close",
+  "viewer.counter": "{index} / {total}",
+  "viewer.counterLabel": "Photo {index} of {total}",
+  "viewer.counterMore": "{count}+",
   "viewer.delete": "Move to trash",
   "viewer.deleteConfirm": "Move this photo to the trash? The file stays in Sytue Drive.",
   "viewer.describe": "Describe with Sytue AI",
@@ -237,6 +252,7 @@
   "viewer.saveDescription": "Save",
   "viewer.savingDescription": "Saving…",
   "viewer.shortcuts": "Shortcuts: arrows to change photo, space for the slideshow, I for info, Z for full size, Delete for the trash.",
+  "viewer.shortcutsJump": "Home and End go to the first and last photo.",
   "viewer.similar": "Similar photos",
   "viewer.slideshow": "Slideshow",
   "viewer.slideshowStop": "Stop slideshow",

@@ -81,8 +81,10 @@ func main() {
 	// Las exportaciones no se guardan: la de toda la cuenta, por prefijo; la de un
 	// cuaderno, con `Cache-Control: no-store` desde el SDK (ExportNotebook).
 	red, cliente := s.Conexion("notes", "/api/v1/export")
-	p := notes.NuevaPantalla(tr, l, api.NewNotes(s.URL("notes"), s.Sesion, cliente), red, w)
-	p.Widget = s.CapturarWidget
+	p := notes.NuevaPantalla(tr, l, api.NewNotes(s.URL("notes"), s.Sesion, s.ClienteConAviso(cliente)), red, w)
+	// El widget nativo lo lee su propia Fuente, SIN la caché de trabajar sin conexión,
+	// y se vuelve a publicar tras cada escritura de Notepads.
+	s.PublicadorWidget(s.FuenteWidget(tr))
 	if almacen, err := sesion.Almacen(); err == nil {
 		p.Almacen = almacen
 	} else {
@@ -183,7 +185,8 @@ func main() {
 		generacion, sujeto, organizacion, dentro = e.GeneracionSesion, e.Sujeto, orgActual, e.Dentro()
 	}
 	s.AlCambiar(arrancar)
-	arrancar(s.Estado())
+	// Con interfaz: lanzada por iOS solo para el widget no se pide nada.
+	s.CuandoHayaEscena(func() { arrancar(s.Estado()) })
 	s.Arrancar(context.Background())
 	w.ShowAndRun()
 }

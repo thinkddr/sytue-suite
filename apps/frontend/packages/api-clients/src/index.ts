@@ -299,7 +299,16 @@ export type {
   ExternalChatMessages,
 } from './core/externalConversations.js';
 export type { PhotosOptions, Foto, PaginaFotos } from './photos/index.js';
-export { ExternalMailClient, MAIL_PROVIDERS } from './core/externalMail.js';
+export {
+  ExternalMailClient,
+  ICLOUD_MAIL,
+  MAIL_PROVIDERS,
+  forgetMailConsent,
+  isICloudMail,
+  mailProviderName,
+  pendingMailConsent,
+  servesMail,
+} from './core/externalMail.js';
 export { LinkedServicesClient } from './core/linkedServices.js';
 export type {
   LinkedService,
@@ -320,9 +329,13 @@ export type {
   ExternalMailConfiguration,
   ExternalMailAccount,
   ExternalMailAccounts,
+  ExternalMailAccountSummary,
+  ExternalMailSummary,
+  ExternalMailSummaryState,
   ExternalMailFolder,
   ExternalMailAttachment,
   ExternalMailMessage,
   ExternalMailOutgoing,
   ExternalMailPage,
+  PendingMailConsent,
 } from './core/externalMail.js';

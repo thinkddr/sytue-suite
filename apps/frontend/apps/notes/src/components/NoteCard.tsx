@@ -38,7 +38,7 @@ import { conAnclas, destinoInterno, type DestinoInterno } from '../client/enlace
 import { conHashtags, conMenciones } from '../client/hashtags.js';
 import type { FuentesDeEnlace } from './LinkTool.js';
 import { RichText } from './RichText.js';
-import { terminada, vecesTrasladada } from '../client/diario.js';
+import { convertirNota, resumenNota, terminada, vecesTrasladada } from '../client/diario.js';
 import { rotuloRecordatorio, yaPaso } from '../client/recordatorios.js';
 import { textoDeNota } from '../client/extracto.js';
 import { useVistaPreviaEnlaces, type VistaPrevia } from './VistaPreviaEnlace.js';
@@ -98,6 +98,8 @@ interface Props {
   onSelect: () => void;
   onChange: (
     patch: {
+      /** Convertir en tarea o en texto (`convertirNota`). */
+      kind?: 'text' | 'todo';
       title?: string;
       content?: string;
       checked?: boolean;
@@ -421,6 +423,27 @@ export function NoteCard({
     };
   }, [editando, guardarRef]);
 
+  /**
+   * Una línea de texto pasa a ser tarea y una tarea, texto (`convertirNota`). Solo en
+   * lo que se puede editar entero: quien tiene una nota solo por compartida cambia su
+   * texto y nada más (el servicio no le deja cambiar el tipo), y un separador no es una
+   * cosa apuntada. Si se está escribiendo en ella, lo escrito es lo que se convierte.
+   */
+  const puedeConvertir = editable && !sinMenu && !/^\s*<hr\s*\/?>\s*$/i.test(contenido);
+  const convertir = () => {
+    const html = editando ? borrador : contenido;
+    if (editando) {
+      if (temporizadorRef.current) clearTimeout(temporizadorRef.current);
+      temporizadorRef.current = null;
+      setEditando(false);
+      setAncha(false);
+    }
+    onChange(
+      convertirNota({ kind: note.kind === 'todo' ? 'todo' : 'text', title: titulo, content: html }),
+    );
+  };
+  const raya = <span class="notes-stream-bullet" aria-hidden="true" />;
+
   const glifo =
     note.data?.icon && typeof note.data.icon === 'string' ? (
       <Glyph
@@ -544,17 +567,35 @@ export function NoteCard({
           </button>
         ) : null}
         {diario ? (
-          // La columna fija de Twos: cada fila empieza por su glifo en el mismo
+          // La columna fija de las marcas: cada fila empieza por su glifo en el mismo
           // sitio, y un texto suelto lleva la viñeta.
           <span class="notes-stream-glyph">
-            {separador ? null : (glifo ?? <span class="notes-stream-bullet" aria-hidden="true" />)}
+            {separador
+              ? null
+              : (glifo ??
+                (puedeConvertir && note.kind === 'text' ? (
+                  // La raya de una cosa es su casilla por marcar: pulsarla la hace tarea.
+                  <button
+                    type="button"
+                    class="notes-stream-bullet-btn sytue-focus-ring"
+                    title={t('note.toTodo')}
+                    aria-label={`${t('note.toTodo')}: ${resumenNota({ title: titulo, content: contenido }, 60) || t('note.new')}`}
+                    onClick={convertir}
+                  >
+                    {raya}
+                  </button>
+                ) : (
+                  raya
+                )))}
           </span>
         ) : (
           glifo
         )}
 
         {enLinea ? (
-          <div class={cx('min-w-0 flex-1', separador && 'flex min-h-5')}>{cuerpo}</div>
+          <div class={cx('notes-stream-text min-w-0 flex-1', separador && 'flex min-h-[24px]')}>
+            {cuerpo}
+          </div>
         ) : (
           <h3
             class={cx(
@@ -689,6 +730,11 @@ export function NoteCard({
                 {t(note.cancelled_at ? 'task.reopen' : 'task.cancel')}
               </MenuItem>
             ) : null}
+            {puedeConvertir ? (
+              <MenuItem onClick={convertir}>
+                {t(note.kind === 'todo' ? 'note.toText' : 'note.toTodo')}
+              </MenuItem>
+            ) : null}
             <MenuItem onClick={onTags}>{t('tags.apply')}</MenuItem>
             <MenuSeparator />
             <MenuItem onClick={empezarARenombrar}>{t('note.rename')}</MenuItem>
@@ -721,7 +767,7 @@ export function NoteCard({
       </header>
 
       {/* CUERPO — lo único que cambia entre tipos. */}
-      {enLinea ? null : diario && cuerpo ? <div class="pl-7">{cuerpo}</div> : cuerpo}
+      {enLinea ? null : diario && cuerpo ? <div class="notes-stream-body">{cuerpo}</div> : cuerpo}
       <input
         type="file"
         multiple

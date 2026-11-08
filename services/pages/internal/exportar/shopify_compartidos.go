@@ -133,7 +133,7 @@ func generarThemeLiquid(sitio *ir.Sitio) string {
 }
 
 func generarSettingsSchema(sitio *ir.Sitio, version string) string {
-	themeName := "Sytue Web Theme"
+	themeName := "Sytue Webs Theme"
 	if sitio != nil && len(sitio.SEO.SiteName) > 0 {
 		for _, name := range sitio.SEO.SiteName {
 			if name != "" {
@@ -148,7 +148,7 @@ func generarSettingsSchema(sitio *ir.Sitio, version string) string {
 			"name":                    "theme_info",
 			"theme_name":              themeName,
 			"theme_version":           version,
-			"theme_author":            "Sytue Web",
+			"theme_author":            "Sytue Webs",
 			"theme_documentation_url": "https://sytue.eu/docs",
 			"theme_support_url":       "https://sytue.eu/support",
 		},
@@ -542,7 +542,7 @@ func generarSeccion404Liquid() string {
 
 func generarThemeCSS(sitio *ir.Sitio) string {
 	return `
-/* Sytue Web - Shopify Theme CSS */
+/* Sytue Webs - Shopify Theme CSS */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -626,7 +626,7 @@ body {
 }
 
 func generarReadmeShopify(sitio *ir.Sitio, version string) string {
-	siteName := "Sytue Web"
+	siteName := "Sytue Webs"
 	if sitio != nil && len(sitio.SEO.SiteName) > 0 {
 		for _, name := range sitio.SEO.SiteName {
 			if name != "" {
@@ -645,7 +645,7 @@ Versión del tema: %s
 1. Accede a tu panel de administración de Shopify.
 2. Ve a **Tienda online** > **Temas**.
 3. En la sección **Biblioteca de temas**, pulsa en **Agregar tema** > **Subir archivo zip**.
-4. Selecciona el archivo zip descargado desde Sytue Web y confirma la subida.
+4. Selecciona el archivo zip descargado desde Sytue Webs y confirma la subida.
 5. Una vez cargado, pulsa **Publicar** o **Personalizar** para ajustar colores, tipografía y secciones.
 
 ## Cómo importar el catálogo de productos
@@ -657,7 +657,7 @@ Versión del tema: %s
 
 ## Traducciones e Idiomas (§20.8)
 
-El contenido principal de este tema está preparado en el idioma por defecto configurado en Sytue Web. Para añadir traducciones a otros idiomas:
+El contenido principal de este tema está preparado en el idioma por defecto configurado en Sytue Webs. Para añadir traducciones a otros idiomas:
 - Instala la aplicación oficial **Shopify Translate & Adapt** desde la Shopify App Store.
 - Los textos del sistema del tema se encuentran en `+"`locales/en.default.json`"+`.
 - Podrás traducir cada sección y producto directamente desde la herramienta de traducción de Shopify.

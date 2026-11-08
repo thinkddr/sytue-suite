@@ -26,9 +26,21 @@ type flotante struct {
 	widget.BaseWidget
 	contenido fyne.CanvasObject
 	relleno   float32
+	// rotulo es el nombre de la lista (el `aria-label` del `listbox`): «Comandos»,
+	// «Enlazar una nota», «Mencionar a alguien».
+	rotulo string
 }
 
-var _ fyne.Tappable = (*flotante)(nil)
+var (
+	_ fyne.Tappable   = (*flotante)(nil)
+	_ fyne.Accessible = (*flotante)(nil)
+)
+
+// AccessibilityLabel es el nombre de la lista, si lo tiene.
+func (f *flotante) AccessibilityLabel() string { return f.rotulo }
+
+// AccessibilityRole: un panel con filas dentro.
+func (f *flotante) AccessibilityRole() fyne.AccessibleRole { return fyne.AccessibleRoleContainer }
 
 func nuevoFlotante(contenido fyne.CanvasObject, relleno float32) *flotante {
 	f := &flotante{contenido: contenido, relleno: relleno}

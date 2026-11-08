@@ -44,6 +44,8 @@ type Cabecera struct {
 	compartir *ui.Boton
 	descargar *ui.Boton
 	menu      *ui.Menu
+	// chip es el «Guardado hace 2 min»: abre el historial o, en error, reintenta.
+	chip *ChipGuardado
 
 	// guardadoEn es cuándo pasó el chip a «Guardado», para «hace N s»; ultimo, el
 	// estado anterior, y reloj si el tic de 5 s está en marcha.
@@ -88,8 +90,40 @@ func NuevaCabecera(ctx *Contexto, alVolver func()) *Cabecera {
 	// (`text-primary-text` del fantasma).
 	c.descargar.Glifo = iconos.TrazoEd(iconos.EdDescargar, IconoBotonCinta, "primary-text", v)
 	c.descargar.TamIcono = IconoBotonCinta
+	c.chip = &ChipGuardado{}
+	c.chip.AlPulsar = c.pulsarChip
+	c.chip.ExtendBaseWidget(c.chip)
 	c.Sincronizar()
 	return c
+}
+
+// pulsarChip es el clic en el chip de guardado (EditorHeader.tsx): en error reintenta el
+// guardado ya, sin esperar al reintento programado; si no, abre el historial de
+// versiones, que es a donde va quien mira cuándo se guardó. Sin red no hace nada.
+func (c *Cabecera) pulsarChip() {
+	switch {
+	case c.ctx.SinRed:
+	case c.ctx.Guardado == FalloAlGuardar:
+		if c.ctx.GuardarYa != nil {
+			c.ctx.GuardarYa()
+		}
+	default:
+		c.ctx.abrirHistorialEn(c.chip, c.chip.mostrarMenu)
+	}
+}
+
+// ponerChip lleva al chip su texto, su punto, su nombre y si se puede pulsar.
+func (c *Cabecera) ponerChip(ahora time.Time) {
+	texto, token := c.textoChip(ahora)
+	c.chip.Texto, c.chip.Token = texto, token
+	c.chip.Rotulo = texto
+	if c.ctx.Guardado == FalloAlGuardar {
+		c.chip.Rotulo = texto + " · " + c.ctx.Traducir("header.save.retry")
+		c.chip.Inerte = c.ctx.SinRed || c.ctx.GuardarYa == nil
+	} else {
+		c.chip.Rotulo = texto + " · " + c.ctx.Traducir("versions.history")
+		c.chip.Inerte = c.ctx.SinRed || c.ctx.Versiones == nil
+	}
 }
 
 // EnfocarTitulo lleva el foco al título: «Renombrar» del menú «Archivo»
@@ -271,13 +305,11 @@ func (c *Cabecera) marcarGuardado() {
 // CreateRenderer compone el fondo, la línea, el chip y los controles.
 func (c *Cabecera) CreateRenderer() fyne.WidgetRenderer {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	clave, token := c.textoChip(time.Now())
+	c.ponerChip(time.Now())
 	r := &cabeceraRenderer{
-		c:      c,
-		fondo:  canvas.NewRectangle(tema.Color("surface", v)),
-		linea:  canvas.NewRectangle(tema.Color("border", v)),
-		punto:  canvas.NewCircle(tema.Color(token, v)),
-		estado: ui.Texto(clave, tema.TextoXS, ui.Normal, tema.Color("text-muted", v)),
+		c:     c,
+		fondo: canvas.NewRectangle(tema.Color("surface", v)),
+		linea: canvas.NewRectangle(tema.Color("border", v)),
 	}
 	return r
 }
@@ -289,18 +321,16 @@ var LadoPuntoGuardado = tema.Espacio(1.5)
 var HuecoChip = tema.Espacio(1.5)
 
 type cabeceraRenderer struct {
-	c      *Cabecera
-	fondo  *canvas.Rectangle
-	linea  *canvas.Rectangle
-	punto  *canvas.Circle
-	estado *canvas.Text
+	c     *Cabecera
+	fondo *canvas.Rectangle
+	linea *canvas.Rectangle
 }
 
 func (r *cabeceraRenderer) MinSize() fyne.Size { return r.c.MinSize() }
 
 func (r *cabeceraRenderer) Objects() []fyne.CanvasObject {
 	return []fyne.CanvasObject{
-		r.fondo, r.linea, r.c.volver, r.c.marca.Objeto(), r.c.filete, r.c.titulo, r.punto, r.estado,
+		r.fondo, r.linea, r.c.volver, r.c.marca.Objeto(), r.c.filete, r.c.titulo, r.c.chip,
 		r.c.compartir, r.c.descargar,
 	}
 }
@@ -336,8 +366,8 @@ func (r *cabeceraRenderer) Layout(t fyne.Size) {
 	} else {
 		r.c.filete.Hide()
 	}
-	chipTexto, _ := r.c.textoChip(time.Now())
-	chip := LadoPuntoGuardado + HuecoChip + ui.Medir(chipTexto, tema.TextoXS, ui.Normal).Width
+	r.c.ponerChip(time.Now())
+	chip := MedidaChipGuardado(r.c.chip.Texto).Width
 	if ancha {
 		// El título se ciñe a lo que pide su texto, con el `max-w-[360px]` como tope: en
 		// producción mide 217,5, no 360. El suelo es el ancho de la marca de agua, que si
@@ -361,14 +391,9 @@ func (r *cabeceraRenderer) Layout(t fyne.Size) {
 	}
 	x = centrar(r.c.titulo, x)
 
-	r.punto.Move(fyne.NewPos(x, (t.Height-tema.Borde-LadoPuntoGuardado)/2))
-	r.punto.Resize(fyne.NewSize(LadoPuntoGuardado, LadoPuntoGuardado))
-	r.estado.Text = chipTexto
-	if cabe := chip - LadoPuntoGuardado - HuecoChip; cabe > 0 {
-		ui.Truncar(r.estado, chipTexto, tema.TextoXS, ui.Normal, cabe)
-	}
-	ui.ColocarTexto(r.estado, tema.TextoXS, x+LadoPuntoGuardado+HuecoChip,
-		(t.Height-tema.Borde-tema.TextoXS.Linea)/2)
+	altoChip := r.c.chip.MinSize().Height
+	r.c.chip.Move(fyne.NewPos(x, (t.Height-tema.Borde-altoChip)/2))
+	r.c.chip.Resize(fyne.NewSize(chip, altoChip))
 
 	// `flex-1` y luego los dos botones pegados a la derecha; en un móvil, «Compartir»
 	// detrás del chip, y «Descargar» fuera.
@@ -392,17 +417,14 @@ func (r *cabeceraRenderer) Layout(t fyne.Size) {
 
 func (r *cabeceraRenderer) Refresh() {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	texto, token := r.c.textoChip(time.Now())
+	r.c.ponerChip(time.Now())
 	r.fondo.FillColor = tema.Color("surface", v)
 	r.linea.FillColor = tema.Color("border", v)
-	r.punto.FillColor = tema.Color(token, v)
-	r.estado.Text = texto
-	r.estado.Color = tema.Color("text-muted", v)
 	r.c.filete.FillColor = tema.Color("border", v)
 	if s := r.c.Size(); s.Width > 0 {
 		r.Layout(s) // el chip cambia de texto con el reloj, y en un móvil se recorta
 	}
-	for _, o := range []fyne.CanvasObject{r.fondo, r.linea, r.punto, r.estado, r.c.filete} {
+	for _, o := range []fyne.CanvasObject{r.fondo, r.linea, r.c.chip, r.c.filete} {
 		o.Refresh()
 	}
 }

@@ -393,6 +393,29 @@ type NotifyPrefs struct {
 	Keywords []string `json:"keywords"`
 	DNDStart int      `json:"dnd_start"`
 	DNDEnd   int      `json:"dnd_end"`
+	// PausedUntil es «Pausar avisos»: hasta cuándo no se avisa de nada. nil, sin pausa.
+	// Se fija aparte (SetNotifyPause) para que guardar las palabras clave no la borre.
+	PausedUntil *time.Time `json:"paused_until,omitempty"`
+}
+
+// MaxNotifyPause es la pausa más larga que se admite. La opción más lejana del menú es
+// «hasta el lunes» a las 9:00, que desde un lunes por la mañana son casi siete días; el
+// margen cubre los husos horarios.
+const MaxNotifyPause = 8 * 24 * time.Hour
+
+// ErrInvalidPause es una pausa más larga que MaxNotifyPause; es un ErrInvalidInput (400).
+var ErrInvalidPause = fmt.Errorf("%w: notification pause too long", ErrInvalidInput)
+
+// NormalizeNotifyPause sanea el «hasta» de una pausa: nil o ya pasado es quitarla (el
+// instante cero), y más allá de MaxNotifyPause es un error. Pura y testeable.
+func NormalizeNotifyPause(until *time.Time, now time.Time) (time.Time, error) {
+	if until == nil || !until.After(now) {
+		return time.Time{}, nil
+	}
+	if until.Sub(now) > MaxNotifyPause {
+		return time.Time{}, ErrInvalidPause
+	}
+	return until.UTC().Truncate(time.Second), nil
 }
 
 // Topes de las preferencias de notificación (evitan abuso a escala).

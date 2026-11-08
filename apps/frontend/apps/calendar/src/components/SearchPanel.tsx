@@ -7,6 +7,10 @@
  * Paginación keyset («Cargar más»). Al pulsar un resultado, el calendario navega
  * a su día (donde el evento es visible y editable con su popover).
  *
+ * Bajo el campo, dos filtros que el servicio ya entendía y nadie le pedía: el
+ * calendario (solo los propios: la búsqueda no entra en los compartidos) y el
+ * periodo (`periodRange`). Cambiarlos relanza la búsqueda.
+ *
  * Estados carga/vacío/error/inicial. Solo @sytue/ui + tokens --sytue-*; el Modal
  * aporta foco atrapado, Escape y backdrop. Accesible: campo etiquetado (FieldGroup),
  * resultados como lista de botones navegables por teclado. Anti AI-slop: hairlines,
@@ -19,9 +23,17 @@
 import type { JSX } from 'preact';
 import type { Locale } from '@sytue/i18n';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { Badge, Button, Icon, Input, Modal, Spinner, cx } from '@sytue/ui';
+import { Badge, Button, Icon, Input, Modal, Select, Spinner, cx } from '@sytue/ui';
 import { searchEvents, type Calendar, type EventSearchResult } from '../client/calendarApi.js';
-import { isRecurring, whenLabel, snippet, startDate } from '../lib/search.js';
+import {
+  isRecurring,
+  whenLabel,
+  snippet,
+  startDate,
+  periodRange,
+  SEARCH_PERIODS,
+  type SearchPeriod,
+} from '../lib/search.js';
 import type { T } from '../i18n/index.js';
 
 interface Props {
@@ -49,6 +61,9 @@ export function SearchPanel({
   onOpenResult,
 }: Props): JSX.Element {
   const [query, setQuery] = useState('');
+  // Filtros: '' es «todos los calendarios»; 'any', «cualquier fecha».
+  const [calendar, setCalendar] = useState('');
+  const [period, setPeriod] = useState<SearchPeriod>('any');
   const [results, setResults] = useState<EventSearchResult[]>([]);
   const [cursor, setCursor] = useState('');
   const [loading, setLoading] = useState(false);
@@ -56,6 +71,10 @@ export function SearchPanel({
   const [error, setError] = useState(false);
   // Secuencia: descarta respuestas fuera de orden (una consulta más nueva gana).
   const seqRef = useRef(0);
+  // La consulta de la búsqueda en curso, con su tramo ya fijado: «Cargar más» pide la
+  // página siguiente de ESA consulta. Recalcular «Próximos» con la hora de ahora
+  // movería el `from` bajo el mismo cursor y saltaría o repetiría un resultado.
+  const consultaRef = useRef<Parameters<typeof searchEvents>[0] | null>(null);
 
   // color/nombre por id de calendario (para el punto y el pie de cada resultado).
   const calById = useMemo(() => {
@@ -63,6 +82,20 @@ export function SearchPanel({
     for (const c of calendars) if (c.id) m.set(c.id, c);
     return m;
   }, [calendars]);
+
+  // Los calendarios que se pueden filtrar: los PROPIOS con id del servicio. La
+  // búsqueda aísla por dueño, así que un compartido nunca daría resultados.
+  const ownCalendars = useMemo(() => calendars.filter((c) => c.id && !c.shared), [calendars]);
+
+  /** La consulta con sus filtros; el tramo del periodo se fija al lanzarla. */
+  function params(term: string): Parameters<typeof searchEvents>[0] {
+    return {
+      q: term,
+      limit: PAGE,
+      ...periodRange(period, new Date()),
+      ...(calendar ? { calendar } : {}),
+    };
+  }
 
   // Búsqueda con debounce al teclear (solo con el panel abierto). Términos por
   // debajo del mínimo limpian los resultados sin llamar al servidor.
@@ -80,7 +113,9 @@ export function SearchPanel({
     setLoading(true);
     setError(false);
     const timer = setTimeout(() => {
-      void searchEvents({ q: term, limit: PAGE })
+      const consulta = params(term);
+      consultaRef.current = consulta;
+      void searchEvents(consulta)
         .then((res) => {
           if (id !== seqRef.current) return;
           setResults(res.events);
@@ -94,12 +129,16 @@ export function SearchPanel({
         });
     }, DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [query, open]);
+    // `params` se redeclara en cada render; lo que lee son los filtros.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, open, calendar, period]);
 
   // Al cerrar, reinicia el estado (una nueva apertura empieza limpia).
   useEffect(() => {
     if (open) return;
     setQuery('');
+    setCalendar('');
+    setPeriod('any');
     setResults([]);
     setCursor('');
     setError(false);
@@ -107,10 +146,11 @@ export function SearchPanel({
   }, [open]);
 
   function loadMore(): void {
-    if (!cursor) return;
+    const consulta = consultaRef.current;
+    if (!cursor || !consulta) return;
     const id = seqRef.current; // misma búsqueda: si el término cambia, se descarta
     setLoadingMore(true);
-    void searchEvents({ q: query.trim(), limit: PAGE, cursor })
+    void searchEvents({ ...consulta, cursor })
       .then((res) => {
         if (id !== seqRef.current) return;
         setResults((prev) => [...prev, ...res.events]);
@@ -148,6 +188,36 @@ export function SearchPanel({
           leadingIcon={<Icon name="search" size={16} />}
           onInput={(e) => setQuery(e.currentTarget.value)}
         />
+
+        <div class="grid grid-cols-2 gap-2">
+          <Select
+            id="cal-search-calendar"
+            size="sm"
+            value={calendar}
+            aria-label={t('event.calendar')}
+            onChange={(e) => setCalendar(e.currentTarget.value)}
+          >
+            <option value="">{t('search.allCalendars')}</option>
+            {ownCalendars.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.displayName}
+              </option>
+            ))}
+          </Select>
+          <Select
+            id="cal-search-period"
+            size="sm"
+            value={period}
+            aria-label={t('search.period')}
+            onChange={(e) => setPeriod(e.currentTarget.value as SearchPeriod)}
+          >
+            {SEARCH_PERIODS.map((p) => (
+              <option key={p} value={p}>
+                {t(`search.period.${p}`)}
+              </option>
+            ))}
+          </Select>
+        </div>
 
         {/* Región viva: anuncia carga/resultados a lectores de pantalla. */}
         <div class="min-h-[8rem]" aria-live="polite" aria-busy={loading || undefined}>

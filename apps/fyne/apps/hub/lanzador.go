@@ -128,15 +128,9 @@ var (
 	cortesTarjetas = ui.Cortes{1, 0, 0, 3, 0, 0} // grid gap-6 lg:grid-cols-3
 )
 
-// EventoDeHoy es lo que la tarjeta «Hoy» enseña de un evento: lo mismo que `resumir`
-// deja en el BFF de la web (`/api/hoy`).
-type EventoDeHoy struct {
-	ID        string
-	Resumen   string
-	Inicio    time.Time
-	Fin       time.Time
-	TodoElDia bool
-}
+// EventoDeHoy es lo que la tarjeta «Hoy» enseña de un evento. Es api.EventoDeHoy: el
+// widget del Hub lee la misma agenda y no puede decir otra cosa.
+type EventoDeHoy = api.EventoDeHoy
 
 // OrdenarEventos es el `ordenarEventos` de `lib/hoy.ts`: todo el día delante y el
 // resto por hora de inicio. No muta la lista que recibe.
@@ -155,21 +149,6 @@ func antes(a, b EventoDeHoy) bool {
 		return a.TodoElDia
 	}
 	return a.Inicio.Before(b.Inicio)
-}
-
-// LimitesDelDia es el `limitesDelDia` de `lib/hoy.ts`: de la medianoche local a la
-// siguiente. Los pone el CLIENTE y no el servidor, porque es quien sabe en qué zona
-// horaria vive la persona.
-func LimitesDelDia(ahora time.Time) (desde, hasta time.Time) {
-	a, m, d := ahora.Date()
-	desde = time.Date(a, m, d, 0, 0, 0, 0, ahora.Location())
-	return desde, desde.AddDate(0, 0, 1)
-}
-
-// HaTerminado es el `haTerminado` de la web: un evento ya pasado se apaga en la
-// lista, pero no desaparece.
-func HaTerminado(e EventoDeHoy, ahora time.Time) bool {
-	return !e.TodoElDia && !e.Fin.IsZero() && e.Fin.Before(ahora)
 }
 
 // Agenda es la mitad izquierda de la tarjeta «Hoy». Las dos fuentes fallan por su
@@ -597,7 +576,11 @@ func (r *lanzadorRenderer) hacerHoy(v tema.Variante) {
 			tema.Color("text-muted", v))
 	case Listo:
 		for _, e := range OrdenarEventos(l.Agenda.Eventos) {
-			r.filasHoy = append(r.filasHoy, nuevaFilaEvento(v, t, e, l.Ahora))
+			// Cada evento abre ESE evento en Calendar (su día); con Calendar sustituido,
+			// la aplicación elegida, como «Ver el calendario».
+			ruta := RutaDelEvento(e)
+			r.filasHoy = append(r.filasHoy, nuevaFilaEvento(v, t, e, l.Ahora,
+				func() { l.abrirProducto("calendar", ruta) }))
 		}
 	}
 	if l.Agenda.HayCorreo && l.Agenda.Estado != Cargando {

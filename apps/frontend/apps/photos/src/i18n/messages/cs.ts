@@ -140,6 +140,12 @@ export const cs: AppCatalog<typeof en> = {
   'gallery.downloadSelected': 'Stáhnout',
   'gallery.downloading':
     'Zahájené požadavky na stažení: {count}. Zkontrolujte stahování v prohlížeči.',
+  'gallery.downloadingNative': {
+    one: 'Stahování 1 fotky…',
+    few: 'Stahování {count} fotek…',
+    many: 'Stahování {count} fotky…',
+    other: 'Stahování {count} fotek…',
+  },
   'gallery.downloadCapped': 'Fotografie mimo tuto dávku: {count}.',
   'gallery.newAlbum': 'Nové album',
   'gallery.newAlbumTitle': 'Nové album',
@@ -276,4 +282,20 @@ export const cs: AppCatalog<typeof en> = {
   'aiBatch.excludeOrg': 'Vyloučit organizaci z automatické dávky Sytue AI',
   'aiBatch.excludedHint':
     'Organizace je vyloučena z automatické dávky Sytue AI. Fotografie se na pozadí nezpracovávají pro návrhy ani podobné snímky.',
+  'album.rename': 'Přejmenovat',
+  'album.renamePrompt': 'Název alba',
+  'album.setCover': 'Použít jako obálku alba',
+  'album.isCover': 'Toto je obálka alba',
+  'album.coverSet': 'Obálka alba aktualizována',
+  'gallery.favorited': 'Přidáno do oblíbených: {count}',
+  'gallery.unfavorited': 'Odebráno z oblíbených: {count}',
+  'gallery.favoriteFailed': 'Fotky, které se nepodařilo změnit: {count}',
+  'gallery.noResults.title': 'Hledání „{query}“ neodpovídá žádná fotka',
+  'gallery.noResults.description':
+    'Zkuste jiná slova nebo vymažte hledání a uvidíte všechny své fotky.',
+  'gallery.clearSearch': 'Vymazat hledání',
+  'viewer.counter': '{index} / {total}',
+  'viewer.counterMore': '{count}+',
+  'viewer.counterLabel': 'Fotka {index} z {total}',
+  'viewer.shortcutsJump': 'Home a End přejdou na první a poslední fotku.',
 };

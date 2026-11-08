@@ -3,7 +3,7 @@
  * fecha; uno que no se abre es un comando que no existe. Los negativos importan.
  */
 import { expect, test } from 'bun:test';
-import { COMANDOS, consultaDeBarra, filtrarComandos } from './comandos.js';
+import { COMANDOS, consultaDeBarra, consultaDeEnlace, filtrarComandos } from './comandos.js';
 import { en } from '../i18n/messages/en.js';
 import { es } from '../i18n/messages/es.js';
 
@@ -40,4 +40,16 @@ test('los alias valen en cualquier idioma', () => {
   expect(filtrarComandos('todo', (c) => String(es[c.clave])).map((c) => c.id)).toEqual(['tarea']);
   expect(filtrarComandos('---', (c) => String(es[c.clave])).map((c) => c.id)).toEqual(['regla']);
   expect(filtrarComandos('zzz', (c) => String(es[c.clave]))).toEqual([]);
+});
+
+test('[[ abre la lista de notas en cualquier sitio de la línea, y un corchete la cierra', () => {
+  expect(consultaDeEnlace('[[')).toBe('');
+  expect(consultaDeEnlace('ver [[Presupuesto de oc')).toBe('Presupuesto de oc');
+  expect(consultaDeEnlace('a[[b')).toBe('b');
+  // El espacio que pone el navegador al final de una línea editable es un no separable.
+  expect(consultaDeEnlace('[[Plan ')).toBe('Plan ');
+  expect(consultaDeEnlace('[[x]] y sigue')).toBeNull();
+  expect(consultaDeEnlace('[[x] y')).toBeNull();
+  expect(consultaDeEnlace('[ [x')).toBeNull();
+  expect(consultaDeEnlace(`[[${'a'.repeat(61)}`)).toBeNull();
 });

@@ -17,10 +17,10 @@ export const editor = {
   'editor.bases.desc': 'Vaate kirjed praegusel kujul',
   'editor.bases.title': 'Tabel Sytue Basesist',
   'editor.bases.prompt':
-    'Kleepige Sytue Webile antud kirjutuskaitstud ühenduse tunnus. Selle vaate andmed muutuvad saidi sisuks ja on pärast avaldamist avalikud.',
+    'Kleepige Sytue Websile antud kirjutuskaitstud ühenduse tunnus. Selle vaate andmed muutuvad saidi sisuks ja on pärast avaldamist avalikud.',
   'editor.bases.confirm': 'Too vaade',
   'editor.bases.invalid':
-    'See ühendus ei kehti Sytue Webi jaoks: see võib olla tühistatud, aegunud või antud teisele tootele või organisatsioonile.',
+    'See ühendus ei kehti Sytue Websi jaoks: see võib olla tühistatud, aegunud või antud teisele tootele või organisatsioonile.',
   'editor.bases.large':
     'Vaade ei mahu saidi tabelisse (kuni 50 rida ja 8 veergu). Kitsendage seda Sytue Basesis.',
   'editor.bases.forbidden': 'Sytue Basesi andmeid saab saidile tuua ainult haldus.',

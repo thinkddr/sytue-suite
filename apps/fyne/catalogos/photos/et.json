@@ -1,9 +1,14 @@
 {
   "aiBatch.excludeOrg": "Välista organisatsioon Sytue AI automaatsest pakktöötlusest",
   "aiBatch.excludedHint": "Organisatsioon on Sytue AI automaatsest pakktöötlusest välistatud. Uusi fotosid ei töödelda taustal soovituste ega sarnasuste leidmiseks.",
+  "album.coverSet": "Albumi kaas on uuendatud",
+  "album.isCover": "See on albumi kaas",
   "album.linkCopied": "Link kopeeritud",
   "album.newLink": "Uus link",
   "album.newLinkConfirm": "Kas luua uus link? Praegune link lakkab töötamast kõigil, kellel see juba on.",
+  "album.rename": "Nimeta ümber",
+  "album.renamePrompt": "Albumi nimi",
+  "album.setCover": "Kasuta albumi kaanena",
   "album.share": "Jaga",
   "album.shared": "Jagatud",
   "album.unshare": "Lõpeta jagamine",
@@ -98,6 +103,7 @@
     "other": "{count} üleslaadimise kuupäeva järgi"
   },
   "gallery.cancelSelection": "Välju valikust",
+  "gallery.clearSearch": "Tühjenda otsing",
   "gallery.describeCapped": "Korraga kirjeldatakse ainult esimesed {count}; ülejäänute jaoks käivitage uuesti.",
   "gallery.describeNothing": "Valitud fotodel on juba kirjeldus",
   "gallery.describeSelected": "Kirjelda Sytue AI-ga",
@@ -106,7 +112,8 @@
   "gallery.describing": "Kirjeldamine: {done}/{total}…",
   "gallery.downloadCapped": "Sellest partiist välja jäänud fotod: {count}.",
   "gallery.downloadSelected": "Laadi alla",
-  "gallery.downloading": {
+  "gallery.downloading": "Alustatud allalaadimistaotlused: {count}. Kontrollige brauseri allalaadimisi.",
+  "gallery.downloadingNative": {
     "one": "1 foto allalaadimine…",
     "other": "{count} foto allalaadimine…"
   },
@@ -114,6 +121,8 @@
   "gallery.empty.description": "Teie Sytue Drive'i fotod ilmuvad siia, järjestatuna pildistamise kuupäeva järgi.",
   "gallery.empty.title": "Fotosid pole veel",
   "gallery.favorite": "Lisa lemmikutesse",
+  "gallery.favoriteFailed": "Fotod, mida ei õnnestunud muuta: {count}",
+  "gallery.favorited": "Lemmikutesse lisatud: {count}",
   "gallery.likeTheseResults": "Ja need, mis sarnanevad",
   "gallery.moreLikeThese": "Rohkem selliseid",
   "gallery.newAlbum": "Uus album",
@@ -124,6 +133,8 @@
   },
   "gallery.newAlbumTitle": "Uus album",
   "gallery.noExifDate": "Pildistamise kuupäev puudub: järjestatud üleslaadimise kuupäeva järgi",
+  "gallery.noResults.description": "Proovige teisi sõnu või tühjendage otsing, et näha kõiki oma fotosid.",
+  "gallery.noResults.title": "Otsingule „{query}” ei vasta ükski foto",
   "gallery.onlyImages": "Lisada saab ainult pilte.",
   "gallery.open": "Ava {name}",
   "gallery.openInEditor": "Muuda: {name}",
@@ -152,6 +163,7 @@
     "other": "{count} fotot teisaldatud prügikasti"
   },
   "gallery.unfavorite": "Eemalda lemmikutest",
+  "gallery.unfavorited": "Lemmikutest eemaldatud: {count}",
   "gallery.unselectMonth": "Tühista kuu valik",
   "gallery.uploadFailed": "Üleslaadimine ebaõnnestus: {name}",
   "gallery.uploaded": {
@@ -198,6 +210,9 @@
   "viewer.askSend": "Küsi",
   "viewer.canvasBackground": "Foto taust",
   "viewer.close": "Sulge",
+  "viewer.counter": "{index} / {total}",
+  "viewer.counterLabel": "Foto {index}/{total}",
+  "viewer.counterMore": "{count}+",
   "viewer.delete": "Teisalda prügikasti",
   "viewer.deleteConfirm": "Kas teisaldada see foto prügikasti? Fail jääb Sytue Drive'i.",
   "viewer.describe": "Kirjelda Sytue AI-ga",
@@ -237,6 +252,7 @@
   "viewer.saveDescription": "Salvesta",
   "viewer.savingDescription": "Salvestamine…",
   "viewer.shortcuts": "Kiirklahvid: nooled vahetavad fotot, tühik käivitab slaidiseansi, I näitab teavet, Z täissuurust, Delete viib prügikasti.",
+  "viewer.shortcutsJump": "Home ja End viivad esimese ja viimase foto juurde.",
   "viewer.similar": "Sarnased fotod",
   "viewer.slideshow": "Slaidiseanss",
   "viewer.slideshowStop": "Peata slaidiseanss",

@@ -58,11 +58,10 @@ type chatService interface {
 	SetChannelPref(ctx context.Context, id uuid.UUID, sub, name string, favorite, muted *bool, notifyLevel *string) (domain.Channel, error)
 	GetNotifyPrefs(ctx context.Context, sub string) (domain.NotifyPrefs, error)
 	PutNotifyPrefs(ctx context.Context, sub string, p domain.NotifyPrefs) (domain.NotifyPrefs, error)
+	SetNotifyPause(ctx context.Context, sub string, until *time.Time) (domain.NotifyPrefs, error)
 	VAPIDPublicKey() string
 	SubscribePush(ctx context.Context, subject string, sub domain.PushSubscription) error
 	UnsubscribePush(ctx context.Context, subject, endpoint string) error
-	RegisterAPNSDevice(ctx context.Context, subject, token string) error
-	ForgetAPNSDevice(ctx context.Context, subject, token string) error
 	ListJoinableChannels(ctx context.Context, teamID uuid.UUID, sub, query string, limit int) ([]domain.Channel, error)
 	LeaveChannel(ctx context.Context, id uuid.UUID, sub string) error
 	DeleteChannel(ctx context.Context, id uuid.UUID, actor string) error
@@ -786,6 +785,28 @@ func (h *Handlers) PutNotifyPrefs(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, r, http.StatusOK, prefs)
 }
 
+type notifyPauseRequest struct {
+	// Until es hasta cuándo; null (o ya pasado) quita la pausa.
+	Until *time.Time `json:"until"`
+}
+
+// PutNotifyPause es «Pausar avisos»: PUT /me/notify-pause {until}. Devuelve las
+// preferencias completas, con la pausa ya saneada.
+func (h *Handlers) PutNotifyPause(w http.ResponseWriter, r *http.Request) {
+	var req notifyPauseRequest
+	if err := httpx.DecodeJSON(w, r, &req); err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
+	sub, _ := caller(r)
+	prefs, err := h.svc.SetNotifyPause(r.Context(), sub, req.Until)
+	if err != nil {
+		httpx.Fail(w, r, toAPIError(err))
+		return
+	}
+	httpx.JSON(w, r, http.StatusOK, prefs)
+}
+
 // ---------------------------------------------------------------------------
 // Web Push (Ola 18)
 // ---------------------------------------------------------------------------
@@ -824,40 +845,21 @@ func (h *Handlers) SubscribePush(w http.ResponseWriter, r *http.Request) {
 	httpx.NoContent(w)
 }
 
-type apnsDeviceRequest struct {
-	// Token es el token de dispositivo que da APNs a la app nativa (hex).
-	Token string `json:"token"`
-}
-
-// RegisterAPNSDevice registra el aparato de iOS al que mandar el aviso «solo despertar»
-// (ver service/apns.go: a Apple no le llega ni el texto ni el autor).
-func (h *Handlers) RegisterAPNSDevice(w http.ResponseWriter, r *http.Request) {
-	var req apnsDeviceRequest
-	if err := httpx.DecodeJSON(w, r, &req); err != nil {
-		httpx.Fail(w, r, err)
-		return
+// AparatosEnElHub atiende las rutas de aparatos de iOS que tuvo Rooms
+// (`POST /api/v1/me/push/apns` y `…/forget`) con un 308 a las MISMAS rutas del Hub,
+// que guarda desde el 2026-11-06 el registro único de aparatos de la suite (ADR 0039,
+// enmienda). 308 y no 301 o 302: conserva el método y el cuerpo. Pero solo dice dónde
+// está ahora: el Hub es otro host, y net/http y fetch quitan `Authorization` al seguir
+// una redirección a otro host, así que el cliente tiene que repetir la llamada al Hub
+// con su token (lo seguido sin él recibe un 401 y no borra nada). Las apps llaman al Hub
+// directamente; no hay clientes de estas rutas. Se queda hasta su baja.
+func (h *Handlers) AparatosEnElHub(w http.ResponseWriter, r *http.Request) {
+	base := strings.TrimRight(h.cfg.HubPublicURL, "/")
+	ruta := "/api/v1/me/push/apns"
+	if strings.HasSuffix(r.URL.Path, "/forget") {
+		ruta += "/forget"
 	}
-	sub, _ := caller(r)
-	if err := h.svc.RegisterAPNSDevice(r.Context(), sub, strings.TrimSpace(req.Token)); err != nil {
-		httpx.Fail(w, r, toAPIError(err))
-		return
-	}
-	httpx.NoContent(w)
-}
-
-// ForgetAPNSDevice borra el aparato: al cerrar sesión o al apagar los avisos.
-func (h *Handlers) ForgetAPNSDevice(w http.ResponseWriter, r *http.Request) {
-	var req apnsDeviceRequest
-	if err := httpx.DecodeJSON(w, r, &req); err != nil {
-		httpx.Fail(w, r, err)
-		return
-	}
-	sub, _ := caller(r)
-	if err := h.svc.ForgetAPNSDevice(r.Context(), sub, strings.TrimSpace(req.Token)); err != nil {
-		httpx.Fail(w, r, toAPIError(err))
-		return
-	}
-	httpx.NoContent(w)
+	http.Redirect(w, r, base+ruta, http.StatusPermanentRedirect)
 }
 
 type pushUnsubscribeRequest struct {

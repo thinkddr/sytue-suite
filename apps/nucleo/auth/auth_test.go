@@ -577,6 +577,23 @@ func TestUnSecretoSeGuardaSeLeeYSeBorra(t *testing.T) {
 	}
 }
 
+// TestLosTokensDelDespertarVanAlGrupoDeLaSuite: en Apple, lo que se guarda sin grupo
+// cae en el privado de cada app, y la que sale solo veía su propio token del despertar:
+// las otras catorce seguían registradas en el Hub. VISTO EN ROJO sin `despertar-` en
+// enGrupoSuite. Las claves de Notepads y el índice siguen siendo de cada app.
+func TestLosTokensDelDespertarVanAlGrupoDeLaSuite(t *testing.T) {
+	for _, c := range []string{PrefijoDespertar + "eu.sytue.mail", PrefijoDespertar + "eu.sytue.one", "sesion-x", CuentaBloqueo} {
+		if !enGrupoSuite(c) {
+			t.Errorf("%q no va al grupo de la suite", c)
+		}
+	}
+	for _, c := range []string{"notes-x", "rooms-matrix-y", cuentaIndice, "drive-archivos"} {
+		if enGrupoSuite(c) {
+			t.Errorf("%q va al grupo de la suite y es de cada app", c)
+		}
+	}
+}
+
 // TestLaAparienciaDeLaOrganizacionVieneEnElIDToken: el color y la forma por defecto de
 // la organización (reclamos `org_color` y `org_forma`) solo viajan en el ID token. Se
 // leen al entrar, se guardan con la sesión para pintar bien sin red, y una renovación

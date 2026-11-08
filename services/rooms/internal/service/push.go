@@ -32,7 +32,7 @@ import (
 // No BLOQUEA el post: corre en el consumidor exactly-once del outbox (main.go), como los
 // webhooks salientes (Ola 15). Best-effort: los fallos de envío se registran/limpian pero
 // nunca reintentan el evento (no re-disparar webhooks). Respeta silenciado/no-molestar del
-// canal en la consulta (store.PushTargetsForMessage); el filtrado FINO por ventana horaria
+// canal y «Pausar avisos» en la consulta (store.PushTargetsForMessage); el filtrado FINO por ventana horaria
 // «No molestar» queda en el cliente (el servidor no conoce la zona horaria del usuario).
 
 const (
@@ -48,11 +48,9 @@ const (
 type pushStore interface {
 	PushTargetsForMessage(ctx context.Context, channelID uuid.UUID, authorSub string, mentions []string) ([]domain.PushTarget, error)
 	DeletePushSubscription(ctx context.Context, subject, endpoint string) error
-	APNSTargetsForMessage(ctx context.Context, channelID uuid.UUID, authorSub string, mentions []string) ([]domain.APNSTarget, error)
-	DeleteAPNSDevice(ctx context.Context, subject, token string) error
+	DespertablesForMessage(ctx context.Context, channelID uuid.UUID, authorSub string, mentions []string, mentionsAll bool) ([]string, error)
 	NotificationRecipientsForMessage(ctx context.Context, channelID uuid.UUID, authorSub string, mentions []string) ([]domain.NotificationRecipient, error)
 	SavePushSubscription(ctx context.Context, subject string, sub domain.PushSubscription) error
-	SaveAPNSDevice(ctx context.Context, subject, token string) error
 }
 
 func (s *Service) pushStore() pushStore {
@@ -177,12 +175,15 @@ type pushPayload struct {
 	Body       string    `json:"body"`
 	Type       string    `json:"type"`
 	Mentions   []string  `json:"mentions"`
+	// MentionsAll es @channel/@here/@all: cuenta como mención para cada miembro en el
+	// contador del widget (despertarIOS).
+	MentionsAll bool `json:"mentions_all"`
 }
 
 // deliverPushForEvent envía Web Push / APNs / Hub notifications por un mensaje recién creado a sus @mencionados y (si
 // DM) al otro miembro. Best-effort: nunca devuelve error.
 func (s *Service) deliverPushForEvent(ctx context.Context, ev events.Event) {
-	if s.push == nil && s.apns == nil && s.hubNotifier == nil {
+	if s.push == nil && s.hubNotifier == nil {
 		return
 	}
 	if ev.Channel != EventChannel || ev.Type != EventMessageCreated || ev.Tenant == "" {
@@ -202,16 +203,18 @@ func (s *Service) deliverPushForEvent(ctx context.Context, ev events.Event) {
 	if msg.ChannelID == uuid.Nil {
 		return
 	}
+	tctx := tenancy.Into(ctx, tenancy.Tenant{Slug: ev.Tenant})
+	// El despertar va antes del filtro de abajo: lo de una integración o una tarjeta de
+	// sistema también suma en el contador del widget, aunque no avise.
+	if s.hubNotifier != nil {
+		s.despertarIOS(tctx, ev.Tenant, msg)
+	}
 	// Ni integraciones (hook:/bot:) ni tarjetas de sistema disparan push.
 	if domain.IsBotAuthor(msg.AuthorSub) || (msg.Type != "" && msg.Type != domain.MessageTypeUser) {
 		return
 	}
-	tctx := tenancy.Into(ctx, tenancy.Tenant{Slug: ev.Tenant})
 	if s.push != nil {
 		s.entregarWebPush(tctx, msg)
-	}
-	if s.apns != nil {
-		s.despertarIOS(tctx, msg)
 	}
 	if s.hubNotifier != nil {
 		s.entregarHubNotification(tctx, ev.Tenant, msg)
@@ -288,33 +291,32 @@ func (s *Service) entregarWebPush(ctx context.Context, msg pushPayload) {
 	}
 }
 
-// despertarIOS manda el aviso VACÍO a los aparatos de iOS de los mismos destinatarios
-// (ver apns.go: a Apple no le llega ni el texto ni el autor). Best-effort, como el Web
-// Push: un fallo aquí nunca tumba el evento del outbox.
-func (s *Service) despertarIOS(tctx context.Context, msg pushPayload) {
+// despertarIOS despierta la app de Rooms de quien ve moverse su contador de pendientes
+// (store.DespertablesForMessage: la regla del widget, api.PendientesRooms), para que
+// con la app cerrada su widget enseñe lo no leído. No es el criterio del Web Push, que
+// es una alerta: un canal con el nivel por defecto suma todo lo no leído aunque no
+// mencione a nadie, y una pausa de avisos no calla un aviso que no suena. Va por la
+// señal de cambios del Hub: el Hub reparte `datos` a sus apps abiertas y despierta, con
+// el aviso VACÍO de platform/pkg/apns, los aparatos de iOS que tengan registrada la app
+// de Rooms (ADR 0039 y 0078, enmiendas del 2026-11-06), como mucho uno cada cinco
+// minutos. A Apple no le llega ni el texto ni el autor ni el canal. Como mucho
+// pushMaxTargets por mensaje, los mencionados primero: en un canal más grande, el resto
+// espera al refresco periódico. Best-effort: un fallo aquí nunca tumba el evento del
+// outbox.
+func (s *Service) despertarIOS(tctx context.Context, tenant string, msg pushPayload) {
 	ps := s.pushStore()
 	if ps == nil {
 		return
 	}
-	targets, err := ps.APNSTargetsForMessage(tctx, msg.ChannelID, msg.AuthorSub, msg.Mentions)
+	quienes, err := ps.DespertablesForMessage(tctx, msg.ChannelID, msg.AuthorSub, msg.Mentions, msg.MentionsAll)
 	if err != nil {
-		log.From(tctx).Warn("apns: no se pudieron leer los aparatos", "error", err)
+		log.From(tctx).Warn("despertar: no se pudieron resolver los destinatarios", "error", err)
 		return
 	}
-	if len(targets) > apnsMaxTargets {
-		targets = targets[:apnsMaxTargets]
+	if len(quienes) > pushMaxTargets {
+		quienes = quienes[:pushMaxTargets]
 	}
-	for _, t := range targets {
-		if err := s.sendOneAPNS(tctx, t); err != nil {
-			if errors.Is(err, errPushGone) {
-				if derr := ps.DeleteAPNSDevice(tctx, t.Subject, t.Token); derr != nil {
-					log.From(tctx).Warn("apns: no se pudo limpiar el token caduco", "error", derr)
-				}
-				continue
-			}
-			log.From(tctx).Warn("apns: no se pudo despertar el aparato", "error", err)
-		}
-	}
+	s.hubNotifier.AvisarCambio(tctx, tenant, "rooms", quienes...)
 }
 
 // pushMessageJSON never exposes authors, excerpts or encrypted payloads to the

@@ -50,6 +50,9 @@ func main() {
 
 	// La sesión, la apariencia y el idioma son TRANSVERSALES a las apps de la suite.
 	s := sesion.Abrir(a, "")
+	// El cromo «papel» de toda la suite (ADR 0080). Aquí y no en `sesion.Abrir`: las
+	// pruebas que abren sesión comprueban también el cromo de color.
+	tema.ElegirCromo(tema.CromoPapel)
 	w := a.NewWindow("Sytue Cast")
 	w.SetPadded(false)
 	w.Resize(fyne.NewSize(anchoInicial, altoInicial))
@@ -58,12 +61,14 @@ func main() {
 	if err != nil {
 		panic(err) // el catálogo va embebido: si falla, es un error de compilación
 	}
-	cli := api.NewCast(s.URL("cast"), s.Sesion, nil)
+	cli := api.NewCast(s.URL("cast"), s.Sesion, s.ClienteConAviso(nil))
+	// El widget nativo lo lee su propia Fuente, sin depender de la pantalla, y se
+	// vuelve a publicar tras cada escritura del cliente de arriba (ClienteConAviso).
+	s.PublicadorWidget(s.FuenteWidget(tr))
 	teca := photos.NuevaFototeca()
 	movil := a.Driver().Device().IsMobile()
 	v := cast.Vista{T: tr, Ventana: anchoInicial, Variante: tema.De(a.Settings().ThemeVariant()), Teca: teca, Movil: movil}
 	p := cast.Nueva(cli, v, w)
-	p.Widget = s.CapturarWidget
 	p.Movil = movil
 	p.SoltarCopia = sesion.SoltarElegido
 	teca.Pedir = p.PedirPoster
@@ -174,7 +179,8 @@ func main() {
 	// «Iniciar sesión», que dejaba Explorar inalcanzable sin entrar.
 	w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.Cast).ConSinSesionPropia().Montar(p.Objeto()))
 	w.SetOnClosed(p.Cerrar)
-	p.Arrancar()
+	// Con interfaz: lanzada por iOS solo para el widget no se pide la portada.
+	s.CuandoHayaEscena(p.Arrancar)
 	s.Arrancar(context.Background())
 	w.ShowAndRun()
 }

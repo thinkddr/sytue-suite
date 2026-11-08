@@ -125,6 +125,12 @@ func (p *Pantalla) nuevaVistaRapida(o Ocurrencia, invitado bool, a AccionesVista
 		hijos = append(hijos, container.New(&sangria{Izq: SangriaDetalle, Arr: espacio2, Hueco: tema.Espacio(1.5)}, detalle...))
 	}
 
+	// Quién organiza y qué ha contestado cada uno, bajo el detalle (`mt-2.5 pl-[18px]`):
+	// es lo que se mira para saber si la reunión sigue en pie.
+	if inv := p.seccionInvitados(o.Event, util-SangriaDetalle, tema.TextoXS); inv != nil {
+		hijos = append(hijos, container.New(&sangria{Izq: SangriaDetalle, Arr: tema.Espacio(2.5)}, inv))
+	}
+
 	// Las notas de Notepads llegan después: su hueco se rellena cuando contesta.
 	if a.Notas != nil {
 		hueco := container.New(ui.Columna{})

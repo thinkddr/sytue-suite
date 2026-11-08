@@ -1,0 +1,767 @@
+{
+  "_": "Árbol de buzones de Mail al estilo de Apple Mail: los buzones unificados de cada rol (las carpetas del sistema de Sytue y de cada cuenta externa) y, por cuenta externa, su título, su estado, sus no leídos de la Entrada y sus carpetas en orden. Es el contrato de la web (arbolDeBuzones de apps/frontend/apps/mail/src/components/buzones.ts) y de Fyne (arbolDeBuzones de apps/fyne/apps/mail/buzones.go). 'sytue' son las carpetas de la cuenta de Sytue (id, name, role, unread); 'externas' son los elementos de GET /external-mail/summary. En 'fuentes', la cuenta vacía es Sytue; 'carpetas' son los ids de arriba abajo.",
+  "casos": [
+    {
+      "nombre": "Solo Sytue: los buzones unificados son sus carpetas del sistema, en el orden del lateral y sin las propias",
+      "locale": "es",
+      "sytue": [
+        {
+          "id": "s-trash",
+          "name": "Trash",
+          "role": "trash"
+        },
+        {
+          "id": "s-inbox",
+          "name": "Inbox",
+          "role": "inbox",
+          "unread": 2
+        },
+        {
+          "id": "s-facturas",
+          "name": "Facturas"
+        },
+        {
+          "id": "s-sent",
+          "name": "Sent",
+          "role": "sent"
+        },
+        {
+          "id": "s-drafts",
+          "name": "Drafts",
+          "role": "drafts"
+        },
+        {
+          "id": "s-junk",
+          "name": "Junk",
+          "role": "junk",
+          "unread": 1
+        },
+        {
+          "id": "s-archive",
+          "name": "Archive",
+          "role": "archive"
+        }
+      ],
+      "externas": [],
+      "esperado": {
+        "unificados": [
+          {
+            "rol": "inbox",
+            "fuentes": [
+              {
+                "cuenta": "",
+                "carpeta": "s-inbox"
+              }
+            ],
+            "noLeidos": 2
+          },
+          {
+            "rol": "drafts",
+            "fuentes": [
+              {
+                "cuenta": "",
+                "carpeta": "s-drafts"
+              }
+            ],
+            "noLeidos": 0
+          },
+          {
+            "rol": "sent",
+            "fuentes": [
+              {
+                "cuenta": "",
+                "carpeta": "s-sent"
+              }
+            ],
+            "noLeidos": 0
+          },
+          {
+            "rol": "archive",
+            "fuentes": [
+              {
+                "cuenta": "",
+                "carpeta": "s-archive"
+              }
+            ],
+            "noLeidos": 0
+          },
+          {
+            "rol": "junk",
+            "fuentes": [
+              {
+                "cuenta": "",
+                "carpeta": "s-junk"
+              }
+            ],
+            "noLeidos": 1
+          },
+          {
+            "rol": "trash",
+            "fuentes": [
+              {
+                "cuenta": "",
+                "carpeta": "s-trash"
+              }
+            ],
+            "noLeidos": 0
+          }
+        ],
+        "cuentas": []
+      }
+    },
+    {
+      "nombre": "Gmail e iCloud: cada rol junta la carpeta de Sytue y la de cada cuenta, la Entrada suma sus no leídos y las carpetas de la cuenta van en su orden, con la Ñ detrás de la N",
+      "locale": "es",
+      "sytue": [
+        {
+          "id": "s-trash",
+          "name": "Trash",
+          "role": "trash"
+        },
+        {
+          "id": "s-inbox",
+          "name": "Inbox",
+          "role": "inbox",
+          "unread": 2
+        },
+        {
+          "id": "s-facturas",
+          "name": "Facturas"
+        },
+        {
+          "id": "s-sent",
+          "name": "Sent",
+          "role": "sent"
+        },
+        {
+          "id": "s-drafts",
+          "name": "Drafts",
+          "role": "drafts"
+        },
+        {
+          "id": "s-junk",
+          "name": "Junk",
+          "role": "junk",
+          "unread": 1
+        },
+        {
+          "id": "s-archive",
+          "name": "Archive",
+          "role": "archive"
+        }
+      ],
+      "externas": [
+        {
+          "instance_id": "gmail",
+          "provider": "gmail",
+          "name": "ana@gmail.com",
+          "address": "ana@gmail.com",
+          "connected": true,
+          "capabilities": {
+            "read": true,
+            "send": true,
+            "actions": true,
+            "attachments": true,
+            "continuous_sync": false
+          },
+          "state": "ok",
+          "folders": [
+            {
+              "id": "Label_3",
+              "name": "Zeta"
+            },
+            {
+              "id": "TRASH",
+              "name": "TRASH",
+              "role": "trash"
+            },
+            {
+              "id": "SENT",
+              "name": "SENT",
+              "role": "sent"
+            },
+            {
+              "id": "Label_1",
+              "name": "Ñandú"
+            },
+            {
+              "id": "INBOX",
+              "name": "INBOX",
+              "role": "inbox",
+              "unread": 3
+            },
+            {
+              "id": "SPAM",
+              "name": "SPAM",
+              "role": "junk",
+              "unread": 4
+            },
+            {
+              "id": "DRAFT",
+              "name": "DRAFT",
+              "role": "drafts"
+            },
+            {
+              "id": "Label_2",
+              "name": "Nube"
+            }
+          ],
+          "services": [
+            "mail",
+            "calendar"
+          ]
+        },
+        {
+          "instance_id": "icloud",
+          "provider": "imap",
+          "name": "iCloud",
+          "address": "ana@icloud.com",
+          "connected": true,
+          "capabilities": {
+            "read": true,
+            "send": true,
+            "actions": true,
+            "attachments": true,
+            "continuous_sync": false
+          },
+          "state": "ok",
+          "folders": [
+            {
+              "id": "INBOX",
+              "name": "INBOX",
+              "role": "inbox",
+              "unread": 1
+            },
+            {
+              "id": "Sent Messages",
+              "name": "Sent Messages",
+              "role": "sent"
+            },
+            {
+              "id": "Deleted Messages",
+              "name": "Deleted Messages",
+              "role": "trash"
+            },
+            {
+              "id": "Drafts",
+              "name": "Drafts",
+              "role": "drafts"
+            },
+            {
+              "id": "Archive",
+              "name": "Archive",
+              "role": "archive"
+            }
+          ],
+          "configuration": {
+            "address": "ana@icloud.com",
+            "incoming": {
+              "host": "imap.mail.me.com",
+              "port": 993,
+              "username": "",
+              "security": "tls"
+            },
+            "outgoing": {
+              "host": "smtp.mail.me.com",
+              "port": 587,
+              "username": "",
+              "security": "starttls"
+            }
+          }
+        }
+      ],
+      "esperado": {
+        "unificados": [
+          {
+            "rol": "inbox",
+            "fuentes": [
+              {
+                "cuenta": "",
+                "carpeta": "s-inbox"
+              },
+              {
+                "cuenta": "gmail",
+                "carpeta": "INBOX"
+              },
+              {
+                "cuenta": "icloud",
+                "carpeta": "INBOX"
+              }
+            ],
+            "noLeidos": 6
+          },
+          {
+            "rol": "drafts",
+            "fuentes": [
+              {
+                "cuenta": "",
+                "carpeta": "s-drafts"
+              },
+              {
+                "cuenta": "gmail",
+                "carpeta": "DRAFT"
+              },
+              {
+                "cuenta": "icloud",
+                "carpeta": "Drafts"
+              }
+            ],
+            "noLeidos": 0
+          },
+          {
+            "rol": "sent",
+            "fuentes": [
+              {
+                "cuenta": "",
+                "carpeta": "s-sent"
+              },
+              {
+                "cuenta": "gmail",
+                "carpeta": "SENT"
+              },
+              {
+                "cuenta": "icloud",
+                "carpeta": "Sent Messages"
+              }
+            ],
+            "noLeidos": 0
+          },
+          {
+            "rol": "archive",
+            "fuentes": [
+              {
+                "cuenta": "",
+                "carpeta": "s-archive"
+              },
+              {
+                "cuenta": "icloud",
+                "carpeta": "Archive"
+              }
+            ],
+            "noLeidos": 0
+          },
+          {
+            "rol": "junk",
+            "fuentes": [
+              {
+                "cuenta": "",
+                "carpeta": "s-junk"
+              },
+              {
+                "cuenta": "gmail",
+                "carpeta": "SPAM"
+              }
+            ],
+            "noLeidos": 5
+          },
+          {
+            "rol": "trash",
+            "fuentes": [
+              {
+                "cuenta": "",
+                "carpeta": "s-trash"
+              },
+              {
+                "cuenta": "gmail",
+                "carpeta": "TRASH"
+              },
+              {
+                "cuenta": "icloud",
+                "carpeta": "Deleted Messages"
+              }
+            ],
+            "noLeidos": 0
+          }
+        ],
+        "cuentas": [
+          {
+            "id": "gmail",
+            "titulo": "ana@gmail.com",
+            "icloud": false,
+            "estado": "ok",
+            "noLeidos": 3,
+            "carpetas": [
+              "INBOX",
+              "DRAFT",
+              "SENT",
+              "SPAM",
+              "TRASH",
+              "Label_2",
+              "Label_1",
+              "Label_3"
+            ]
+          },
+          {
+            "id": "icloud",
+            "titulo": "ana@icloud.com",
+            "icloud": true,
+            "estado": "ok",
+            "noLeidos": 1,
+            "carpetas": [
+              "INBOX",
+              "Drafts",
+              "Sent Messages",
+              "Archive",
+              "Deleted Messages"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "nombre": "Una cuenta que pide volver a iniciar sesión o que no contesta sale con su estado y sin carpetas, y no entra en los unificados",
+      "locale": "en",
+      "sytue": [
+        {
+          "id": "s-inbox",
+          "name": "Inbox",
+          "role": "inbox",
+          "unread": 2
+        }
+      ],
+      "externas": [
+        {
+          "instance_id": "caducada",
+          "provider": "microsoft",
+          "name": "ana@outlook.com",
+          "address": "ana@outlook.com",
+          "connected": true,
+          "capabilities": {
+            "read": true,
+            "send": true,
+            "actions": true,
+            "attachments": true,
+            "continuous_sync": false
+          },
+          "state": "reconnect",
+          "folders": []
+        },
+        {
+          "instance_id": "desconectada",
+          "provider": "gmail",
+          "name": "bea@gmail.com",
+          "address": "bea@gmail.com",
+          "connected": false,
+          "capabilities": {
+            "read": true,
+            "send": true,
+            "actions": true,
+            "attachments": true,
+            "continuous_sync": false
+          },
+          "state": "reconnect",
+          "folders": []
+        },
+        {
+          "instance_id": "lenta",
+          "provider": "imap",
+          "name": "ana@work.eu",
+          "address": "ana@work.eu",
+          "connected": true,
+          "capabilities": {
+            "read": true,
+            "send": true,
+            "actions": true,
+            "attachments": true,
+            "continuous_sync": false
+          },
+          "state": "unavailable",
+          "folders": []
+        },
+        {
+          "instance_id": "viva",
+          "provider": "yahoo",
+          "name": "ana@yahoo.com",
+          "address": "ana@yahoo.com",
+          "connected": true,
+          "capabilities": {
+            "read": true,
+            "send": true,
+            "actions": true,
+            "attachments": true,
+            "continuous_sync": false
+          },
+          "state": "ok",
+          "folders": [
+            {
+              "id": "Inbox",
+              "name": "Inbox",
+              "role": "inbox",
+              "unread": 7
+            }
+          ]
+        }
+      ],
+      "esperado": {
+        "unificados": [
+          {
+            "rol": "inbox",
+            "fuentes": [
+              {
+                "cuenta": "",
+                "carpeta": "s-inbox"
+              },
+              {
+                "cuenta": "viva",
+                "carpeta": "Inbox"
+              }
+            ],
+            "noLeidos": 9
+          }
+        ],
+        "cuentas": [
+          {
+            "id": "caducada",
+            "titulo": "ana@outlook.com",
+            "icloud": false,
+            "estado": "reconnect",
+            "noLeidos": 0,
+            "carpetas": []
+          },
+          {
+            "id": "desconectada",
+            "titulo": "bea@gmail.com",
+            "icloud": false,
+            "estado": "reconnect",
+            "noLeidos": 0,
+            "carpetas": []
+          },
+          {
+            "id": "lenta",
+            "titulo": "ana@work.eu",
+            "icloud": false,
+            "estado": "unavailable",
+            "noLeidos": 0,
+            "carpetas": []
+          },
+          {
+            "id": "viva",
+            "titulo": "ana@yahoo.com",
+            "icloud": false,
+            "estado": "ok",
+            "noLeidos": 7,
+            "carpetas": [
+              "Inbox"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "nombre": "Una cuenta desconectada pide volver a iniciar sesión aunque traiga carpetas, las cuentas solo de Calendario no salen y, sin dirección, el título es el nombre",
+      "locale": "en",
+      "sytue": [
+        {
+          "id": "s-inbox",
+          "name": "Inbox",
+          "role": "inbox"
+        }
+      ],
+      "externas": [
+        {
+          "instance_id": "calendario",
+          "provider": "gmail",
+          "name": "cal@gmail.com",
+          "address": "cal@gmail.com",
+          "connected": true,
+          "capabilities": {
+            "read": true,
+            "send": true,
+            "actions": true,
+            "attachments": true,
+            "continuous_sync": false
+          },
+          "state": "ok",
+          "folders": [
+            {
+              "id": "INBOX",
+              "name": "INBOX",
+              "role": "inbox",
+              "unread": 9
+            }
+          ],
+          "services": [
+            "calendar"
+          ]
+        },
+        {
+          "instance_id": "sinDireccion",
+          "provider": "pop3",
+          "name": "Old POP",
+          "address": "",
+          "connected": true,
+          "capabilities": {
+            "read": true,
+            "send": true,
+            "actions": false,
+            "attachments": true,
+            "continuous_sync": false
+          },
+          "state": "ok",
+          "folders": [
+            {
+              "id": "INBOX",
+              "name": "INBOX",
+              "role": "inbox"
+            }
+          ]
+        },
+        {
+          "instance_id": "raro",
+          "provider": "gmail",
+          "name": "raro@gmail.com",
+          "address": "raro@gmail.com",
+          "connected": false,
+          "capabilities": {
+            "read": true,
+            "send": true,
+            "actions": true,
+            "attachments": true,
+            "continuous_sync": false
+          },
+          "state": "ok",
+          "folders": [
+            {
+              "id": "INBOX",
+              "name": "INBOX",
+              "role": "inbox",
+              "unread": 5
+            }
+          ]
+        }
+      ],
+      "esperado": {
+        "unificados": [
+          {
+            "rol": "inbox",
+            "fuentes": [
+              {
+                "cuenta": "",
+                "carpeta": "s-inbox"
+              },
+              {
+                "cuenta": "sinDireccion",
+                "carpeta": "INBOX"
+              }
+            ],
+            "noLeidos": 0
+          }
+        ],
+        "cuentas": [
+          {
+            "id": "sinDireccion",
+            "titulo": "Old POP",
+            "icloud": false,
+            "estado": "ok",
+            "noLeidos": 0,
+            "carpetas": [
+              "INBOX"
+            ]
+          },
+          {
+            "id": "raro",
+            "titulo": "raro@gmail.com",
+            "icloud": false,
+            "estado": "reconnect",
+            "noLeidos": 0,
+            "carpetas": []
+          }
+        ]
+      }
+    },
+    {
+      "nombre": "Un rol que Sytue no tiene sale igual si lo tiene una cuenta, y una cuenta sin Entrada no suma",
+      "locale": "en",
+      "sytue": [
+        {
+          "id": "s-inbox",
+          "name": "Inbox",
+          "role": "inbox",
+          "unread": 1
+        }
+      ],
+      "externas": [
+        {
+          "instance_id": "outlook",
+          "provider": "microsoft",
+          "name": "ana@outlook.com",
+          "address": "ana@outlook.com",
+          "connected": true,
+          "capabilities": {
+            "read": true,
+            "send": true,
+            "actions": true,
+            "attachments": true,
+            "continuous_sync": false
+          },
+          "state": "ok",
+          "folders": [
+            {
+              "id": "arch",
+              "name": "Archive",
+              "role": "archive"
+            },
+            {
+              "id": "own",
+              "name": "Projects"
+            },
+            {
+              "id": "del",
+              "name": "Deleted Items",
+              "role": "trash",
+              "unread": 2
+            }
+          ]
+        }
+      ],
+      "esperado": {
+        "unificados": [
+          {
+            "rol": "inbox",
+            "fuentes": [
+              {
+                "cuenta": "",
+                "carpeta": "s-inbox"
+              }
+            ],
+            "noLeidos": 1
+          },
+          {
+            "rol": "archive",
+            "fuentes": [
+              {
+                "cuenta": "outlook",
+                "carpeta": "arch"
+              }
+            ],
+            "noLeidos": 0
+          },
+          {
+            "rol": "trash",
+            "fuentes": [
+              {
+                "cuenta": "outlook",
+                "carpeta": "del"
+              }
+            ],
+            "noLeidos": 2
+          }
+        ],
+        "cuentas": [
+          {
+            "id": "outlook",
+            "titulo": "ana@outlook.com",
+            "icloud": false,
+            "estado": "ok",
+            "noLeidos": 0,
+            "carpetas": [
+              "arch",
+              "del",
+              "own"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

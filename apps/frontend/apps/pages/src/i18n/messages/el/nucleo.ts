@@ -80,7 +80,7 @@ export const nucleo = {
   'new.progress': 'Βήματα δημιουργίας ιστοτόπου',
   'new.go_to_step': 'Μετάβαση στο βήμα {n}',
   'new.step_of': 'Βήμα {n} από {total}',
-  'app_settings.title': 'Ρυθμίσεις Sytue Web',
+  'app_settings.title': 'Ρυθμίσεις Sytue Webs',
   'new.search_title': 'Ξεκινήστε με το είδος της επιχείρησής σας',
   'new.search_help':
     'Πληκτρολογήστε το αντικείμενό σας ή επιλέξτε μια κατηγορία. Κάθε πρότυπο περιλαμβάνει ήδη κείμενα για τον κλάδο σας: αλλάζετε μόνο το όνομα, το τηλέφωνο, τις τιμές και τις φωτογραφίες.',
@@ -283,7 +283,7 @@ export const nucleo = {
   'domains.start_help':
     'Εισαγάγετε τον τομέα που θέλετε να χρησιμοποιήσετε. Θα χρειαστείτε πρόσβαση στις ρυθμίσεις DNS του παρόχου από όπου τον αγοράσατε.',
   'domains.progress': 'Πρόοδος σύνδεσης τομέα',
-  'domains.step.registered': 'Προστέθηκε στο Sytue Web',
+  'domains.step.registered': 'Προστέθηκε στο Sytue Webs',
   'domains.step.dns': 'Το DNS επαληθεύτηκε',
   'domains.step.https': 'Το HTTPS είναι έτοιμο',
   'domains.step.primary': 'Κύρια διεύθυνση',

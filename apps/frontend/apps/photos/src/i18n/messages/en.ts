@@ -128,6 +128,11 @@ export const en = {
   'gallery.unselectMonth': 'Unselect month',
   'gallery.downloadSelected': 'Download',
   'gallery.downloading': "Download requests started: {count}. Check your browser's downloads.",
+  // Fyne: guarda en la carpeta de descargas del sistema, sin navegador al que remitir.
+  'gallery.downloadingNative': {
+    one: 'Downloading 1 photo…',
+    other: 'Downloading {count} photos…',
+  },
   'gallery.downloadCapped': 'Photos outside this batch: {count}.',
   'gallery.newAlbum': 'New album',
   'gallery.newAlbumTitle': 'New album',
@@ -250,4 +255,19 @@ export const en = {
   'aiBatch.excludeOrg': 'Exclude organization from the automatic Sytue AI batch',
   'aiBatch.excludedHint':
     'This organization is excluded from the automatic Sytue AI batch. New photos are not processed in the background for suggestions or similarity.',
+  'album.rename': 'Rename',
+  'album.renamePrompt': 'Album name',
+  'album.setCover': 'Use as album cover',
+  'album.isCover': 'This is the album cover',
+  'album.coverSet': 'Album cover updated',
+  'gallery.favorited': 'Added to favourites: {count}',
+  'gallery.unfavorited': 'Removed from favourites: {count}',
+  'gallery.favoriteFailed': 'Photos that could not be changed: {count}',
+  'gallery.noResults.title': 'No photos match “{query}”',
+  'gallery.noResults.description': 'Try other words, or clear the search to see all your photos.',
+  'gallery.clearSearch': 'Clear search',
+  'viewer.counter': '{index} / {total}',
+  'viewer.counterMore': '{count}+',
+  'viewer.counterLabel': 'Photo {index} of {total}',
+  'viewer.shortcutsJump': 'Home and End go to the first and last photo.',
 } as const;

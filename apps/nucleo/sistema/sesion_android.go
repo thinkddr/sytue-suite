@@ -46,7 +46,8 @@ func sesionAndroidTexto(metodo, firma string, textos ...string) (string, error) 
 	return resultado, err
 }
 
-// EstadoSesionAndroid devuelve sólo generación y bloqueo, nunca una identidad o token.
+// EstadoSesionAndroid devuelve sólo generación, marca de los widgets y bloqueo, nunca una
+// identidad o token.
 func EstadoSesionAndroid() (string, error) {
 	return sesionAndroidTexto("estado", "(Landroid/content/Context;)Ljava/lang/String;")
 }

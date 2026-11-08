@@ -30,9 +30,10 @@ function hubInternalUrl(): string {
   return env.SYTUE_HUB_INTERNAL_URL ?? env.SYTUE_HUB_BASE_URL ?? 'https://hub.sytue.eu';
 }
 
-/** Intents que Mail INICIA (el Hub revalida). Adjuntar desde Drive no pasa por
- *  aquí: el compositor lista Drive y adjunta el enlace directamente (/api/drive-files). */
-const ALLOWED = new Set(['create-event-from-mail']);
+/** Intents que Mail INICIA (el Hub revalida): crear un evento desde un correo y
+ *  compartir una conversación en Rooms. Adjuntar desde Drive no pasa por aquí: el
+ *  compositor lista Drive y adjunta el enlace directamente (/api/drive-files). */
+const ALLOWED = new Set(['create-event-from-mail', 'share-to-chat']);
 
 interface IntentRequest {
   type?: unknown;

@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Sytue Web Web API
+  title: Sytue Webs Web API
   description: Contrato público versionado v1 de las rutas bajo /_pages/* para webs de clientes y código exportado (§9.5, §6.4).
   version: 1.0.0
 servers:

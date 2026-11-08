@@ -53,6 +53,34 @@ import (
 // Línea del cuerpo: `leading-relaxed`.
 var escalonCuerpo = tema.Escalon{Tam: tema.TextoBase.Tam, Linea: tema.TextoBase.Tam * 1.625}
 
+// Letra es la del cuerpo cuando no es la de siempre: el tamaño y la tinta del texto
+// corrido (párrafos, listas y tareas; los títulos y el código conservan la suya). Es lo
+// que la web cambia con CSS en las líneas de una libreta (`.notes-stream-text` a 16 px
+// con interlínea de 24, `.notes-stream-body` a 14 en gris).
+type Letra struct {
+	Escalon tema.Escalon
+	Tinta   string
+}
+
+// letraCuerpo es la de siempre: `text-base leading-relaxed` en tinta.
+var letraCuerpo = Letra{Escalon: escalonCuerpo, Tinta: "text"}
+
+// Las letras de las líneas de una libreta (styles/app.css).
+var (
+	// LetraLinea es el texto de una línea: `text-md leading-6`.
+	LetraLinea = Letra{Escalon: tema.TextoMD, Tinta: "text"}
+	// LetraDebajo es lo que una cosa lleva debajo: `text-base leading-[1.375rem]` en gris.
+	LetraDebajo = Letra{Escalon: tema.TextoBase, Tinta: "text-muted"}
+)
+
+// laLetra es la pedida o, sin pedir, la de siempre.
+func laLetra(l []Letra) Letra {
+	if len(l) > 0 {
+		return l[0]
+	}
+	return letraCuerpo
+}
+
 // Medidas de la prosa.
 const (
 	margenParrafo  = 2 * 0.25 * tema.Rem
@@ -191,8 +219,8 @@ type estiloBloque struct {
 	pyFondo float32
 }
 
-func estiloBloqueDe(b Bloque, primero bool) estiloBloque {
-	e := estiloBloque{escalon: escalonCuerpo, tinta: "text", alinear: b.Alineacion}
+func estiloBloqueDe(b Bloque, primero bool, l Letra) estiloBloque {
+	e := estiloBloque{escalon: l.Escalon, tinta: l.Tinta, alinear: b.Alineacion}
 	switch b.Tipo {
 	case Parrafo:
 		if b.Etiqueta == "p" {
@@ -231,10 +259,12 @@ func estiloBloqueDe(b Bloque, primero bool) estiloBloque {
 // del `ul` colapsa con el `my-0.5` de su primer y su último `li`.
 func esLista(t TipoBloque) bool { return t == Vineta || t == Numerada }
 
-// Maquetar pone el documento a ese ancho. `v` decide los colores.
+// Maquetar pone el documento a ese ancho. `v` decide los colores y `letra`, si se da, la
+// del cuerpo (ver Letra).
 //
 //nolint:gocognit,gocyclo // El flujo lineal reproduce las reglas de maquetación del documento.
-func Maquetar(d *Documento, ancho float32, v tema.Variante) *Maquetado {
+func Maquetar(d *Documento, ancho float32, v tema.Variante, letra ...Letra) *Maquetado {
+	l := laLetra(letra)
 	m := &Maquetado{}
 	if d == nil {
 		return m
@@ -275,7 +305,7 @@ func Maquetar(d *Documento, ancho float32, v tema.Variante) *Maquetado {
 			i = j - 1
 			continue
 		}
-		e := estiloBloqueDe(b, i == 0)
+		e := estiloBloqueDe(b, i == 0, l)
 		mt := e.mt
 		if esLista(b.Tipo) && !sigueLista(i, i-1) {
 			mt = max(mt, margenLista)
@@ -657,6 +687,11 @@ func estiloTramo(t Tramo, e estiloBloque, v tema.Variante) estiloTrozo {
 	if t.Enlace != "" {
 		s.enlace, s.subrayado, s.href = true, true, t.Enlace
 		s.tinta = tema.Color("primary-text", v)
+		if _, es := hashtagDe(t.Enlace); es {
+			// Un #hashtag se lee como etiqueta, no como enlace (`a.notes-hashtag`):
+			// medio y sin subrayar.
+			s.subrayado, s.peso = false, max(s.peso, ui.Medio)
+		}
 	}
 	if c, ok := tokens.ParseColor(t.Color); ok && t.Color != "" {
 		s.tinta = c
@@ -838,6 +873,8 @@ type Prosa struct {
 	Llenar bool
 	// Marca es lo que se pinta con el documento vacío (`note.placeholder`).
 	Marca string
+	// Letra es la del cuerpo; nil, la de siempre (ver Letra).
+	Letra *Letra
 
 	AlPulsar func()
 	AlEnlace func(href string)
@@ -880,7 +917,15 @@ func (p *Prosa) AltoPara(ancho float32) float32 {
 	if ancho <= 0 {
 		ancho = 1e6
 	}
-	return max(Maquetar(p.Doc, ancho, tema.Claro).Alto, 24)
+	return max(Maquetar(p.Doc, ancho, tema.Claro, p.letras()...).Alto, 24)
+}
+
+// letras es la Letra pedida, como argumento de Maquetar.
+func (p *Prosa) letras() []Letra {
+	if p.Letra == nil {
+		return nil
+	}
+	return []Letra{*p.Letra}
 }
 
 // AccessibilityLabel es el texto entero de la nota.
@@ -966,11 +1011,12 @@ func (r *prosaRenderer) Destroy() {}
 func (r *prosaRenderer) Layout(t fyne.Size) {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	r.p.ancho = t.Width
-	r.p.maq = Maquetar(r.p.Doc, t.Width, v)
+	r.p.maq = Maquetar(r.p.Doc, t.Width, v, r.p.letras()...)
 	r.objetos = PintarProsa(r.p.maq, v)
 	if r.p.Doc.Vacio() && r.p.Marca != "" {
-		m := ui.Texto(r.p.Marca, escalonCuerpo, ui.Normal, tema.Color("text-subtle", v))
-		ui.ColocarTexto(m, escalonCuerpo, 0, 0)
+		e := laLetra(r.p.letras()).Escalon
+		m := ui.Texto(r.p.Marca, e, ui.Normal, tema.Color("text-subtle", v))
+		ui.ColocarTexto(m, e, 0, 0)
 		r.objetos = append(r.objetos, m)
 	}
 }

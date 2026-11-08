@@ -28,8 +28,16 @@ import {
 import type { Locale } from '@sytue/i18n';
 import { useT } from '../i18n/index.js';
 import type { Label } from '../client/mailApi.js';
-import type { Conversation } from './utils.js';
-import { displayName, fullDate, shortDate, conversationLabels, labelDot } from './utils.js';
+import {
+  FILTROS_RAPIDOS,
+  displayName,
+  fullDate,
+  shortDate,
+  conversationLabels,
+  labelDot,
+  type Conversation,
+  type FiltroRapido,
+} from './utils.js';
 import { Glyph } from './glyphs.js';
 import { BatchActionBar } from './BatchActionBar.js';
 
@@ -41,6 +49,15 @@ interface Props {
   /** Idioma ya negociado en el servidor; llega por props desde la isla raíz. */
   locale: Locale;
   conversations: Conversation[];
+  /** Filtro rápido activo (la lista ya llega filtrada) y su cambio. */
+  filtro: FiltroRapido;
+  onFiltro: (filtro: FiltroRapido) => void;
+  /**
+   * El filtro ya pidió sus páginas automáticas sin encontrar nada y quedan más: el
+   * vacío ofrece «Cargar más» (otra tanda) en lugar de «Ver todas», que sigue a mano
+   * pulsando el filtro activo de la franja.
+   */
+  onMasFiltro?: (() => void) | null;
   loading: boolean;
   /** Fallo al cargar la carpeta: estado de error con reintento. */
   error: boolean;
@@ -101,6 +118,14 @@ interface Props {
  * marcado obligue a mirar el atajo.
  */
 export const SEARCH_INPUT_ID = 'mail-search';
+
+/** Rótulo de cada filtro rápido (el de «todas» no se pinta: es pulsar el activo). */
+const ROTULO_FILTRO = {
+  todas: 'filter.showAll',
+  noLeidas: 'filter.unread',
+  destacadas: 'filter.starred',
+  conAdjuntos: 'filter.attachments',
+} as const satisfies Record<FiltroRapido, string>;
 export const CONVERSATION_LIST_ID = 'mail-conversations';
 
 /**
@@ -150,6 +175,9 @@ export function MessageList({
   franja = null,
   locale,
   conversations,
+  filtro,
+  onFiltro,
+  onMasFiltro,
   loading,
   error,
   selectedThreadId,
@@ -291,6 +319,29 @@ export function MessageList({
             </Button>
           ) : null}
         </form>
+        {/* Filtros rápidos: conmutadores (`aria-pressed`), uno a la vez; pulsar el
+            activo vuelve a «todas». Filtran lo ya cargado, sin otra consulta. */}
+        <div
+          role="group"
+          aria-label={t('filter.group')}
+          class="border-border flex items-center gap-1 border-b px-4 py-1.5"
+        >
+          {FILTROS_RAPIDOS.filter((f) => f !== 'todas').map((f) => {
+            const activo = filtro === f;
+            return (
+              <Button
+                key={f}
+                type="button"
+                size="xs"
+                variant={activo ? 'secondary' : 'ghost'}
+                aria-pressed={activo}
+                onClick={() => onFiltro(activo ? 'todas' : f)}
+              >
+                {t(ROTULO_FILTRO[f])}
+              </Button>
+            );
+          })}
+        </div>
         {/* Barra de acciones en lote: aparece al seleccionar (no ocupa espacio en
             reposo). Trae «seleccionar todo» (indeterminate) + las acciones. */}
         {selectionActive ? (
@@ -375,7 +426,25 @@ export function MessageList({
             }
           />
         ) : count === 0 ? (
-          searchMode ? (
+          filtro !== 'todas' ? (
+            <EmptyState
+              class="h-full"
+              title={t('filter.emptyTitle')}
+              description={t('filter.emptyDescription')}
+              illustration={<Illustration name="emptyMail" />}
+              action={
+                onMasFiltro ? (
+                  <Button variant="secondary" size="sm" onClick={onMasFiltro}>
+                    {t('common.loadMore')}
+                  </Button>
+                ) : (
+                  <Button variant="secondary" size="sm" onClick={() => onFiltro('todas')}>
+                    {t('filter.showAll')}
+                  </Button>
+                )
+              }
+            />
+          ) : searchMode ? (
             <EmptyState
               class="h-full"
               title={t('list.emptySearchTitle', { query: query.trim() })}

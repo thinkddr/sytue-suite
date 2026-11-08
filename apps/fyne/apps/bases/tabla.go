@@ -13,6 +13,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
@@ -33,7 +34,10 @@ func (p *Pantalla) elegirTabla(id string) {
 		p.cambiar(r, map[string]any{campo.ID: valor}, nil)
 	}
 	b.rejilla.AlElegirVarios = p.dialogoVarios
-	b.rejilla.AlBorrar = p.borrarRegistro
+	b.rejilla.AlAbrir = func(r api.BasesRecord) { p.abrirRegistro(r, false) }
+	// Intro sobre una celda de adjuntos abre la ficha, que es donde se ven y se suben.
+	b.rejilla.AlPegar = p.pegar
+	b.rejilla.AlAdjuntos = func(r api.BasesRecord, _ api.BasesField) { p.abrirRegistro(r, false) }
 	b.rejilla.AlMover = p.dejarALaVista
 	// `overflow-auto`: la rejilla se desplaza de lado y la rueda sigue bajando la página.
 	b.lado = ui.NuevoDesplazaLado(b.rejilla, 0, func() fyne.Scrollable {
@@ -324,6 +328,8 @@ func (p *Pantalla) nuevoRegistro() {
 		b.Estado = p.t("grid.added")
 		p.ponerRejilla()
 		p.Repintar()
+		// Añadir es rellenar: la ficha del registro nuevo se abre sola.
+		p.abrirRegistro(r, true)
 	})
 }
 
@@ -441,52 +447,87 @@ func botonSM(texto string, v ui.Variante, alPulsar func()) *ui.Boton {
 	return ui.NuevoBoton(texto, alPulsar).Con(v, ui.TallaSM)
 }
 
-// objetoTabla es el contenido de la pestaña activa: lo que el propietario puede hacer
-// con la tabla, las vistas guardadas y la rejilla (o lo que pinte la vista elegida).
-func (p *Pantalla) objetoTabla(v tema.Variante) fyne.CanvasObject {
+// accionesDeTabla es el menú «⋯» de la tabla: lo que el propietario hace con ella, las
+// vistas para quien escribe y, para cualquiera que la lea, exportarla. Lo que borra va al
+// final, en rojo y tras una raya. Se arma en cada apertura: un elemento recuerda el menú
+// en el que va.
+func (p *Pantalla) accionesDeTabla() []fyne.CanvasObject {
 	b := p.abierta
-	ancho := p.anchoContenido()
-	puedeEditar := puedeEscribir(b.rol())
-	hijos := []fyne.CanvasObject{}
-
-	// Lo que el propietario hace con la tabla y, para cualquiera que la lea, exportarla.
-	barra := []fyne.CanvasObject{}
-	if puedeEsquema(b.Datos.Role) {
-		barra = append(barra,
-			botonSM(p.t("field.add"), ui.Secundario, p.dialogoCampo),
-			botonSM(p.t("table.rename"), ui.Fantasma, p.renombrarTabla),
-			botonSM(p.t("table.delete"), ui.Fantasma, p.borrarTabla))
+	puedeEditar, esquema := puedeEscribir(b.rol()), puedeEsquema(b.Datos.Role)
+	var acciones, peligro []fyne.CanvasObject
+	if esquema {
+		acciones = append(acciones, ui.NuevoElementoMenu(p.t("table.rename"), iconos.Lapiz, p.renombrarTabla))
+	}
+	if puedeEditar {
+		acciones = append(acciones, ui.NuevoElementoMenu(p.t("view.add"), iconos.Mas, p.dialogoVista))
 	}
 	if p.Guardar != nil {
-		for _, formato := range []string{"csv", "json"} {
-			enlace := ui.NuevoEnlace(p.t("export."+formato), tema.TextoSM, ui.Normal, "primary-text", func() { p.exportar(formato) })
-			enlace.Subrayado = true
-			barra = append(barra, container.New(ui.Margen{Izq: tema.Espacio(2), Der: tema.Espacio(2)}, enlace))
+		acciones = append(acciones,
+			ui.NuevoElementoMenu(p.t("export.csv"), iconos.Descargar, func() { p.exportar("csv") }),
+			ui.NuevoElementoMenu(p.t("export.json"), iconos.Descargar, func() { p.exportar("json") }))
+	}
+	if puedeEditar && b.vista() != nil {
+		x := ui.NuevoElementoMenu(p.t("view.delete"), iconos.Papelera, p.borrarVista)
+		x.Peligro = true
+		peligro = append(peligro, x)
+	}
+	if esquema {
+		x := ui.NuevoElementoMenu(p.t("table.delete"), iconos.Papelera, p.borrarTabla)
+		x.Peligro = true
+		peligro = append(peligro, x)
+	}
+	if len(acciones) > 0 && len(peligro) > 0 {
+		acciones = append(acciones, ui.NuevoSeparadorMenu())
+	}
+	return append(acciones, peligro...)
+}
+
+// objetoTabla es el contenido de la pestaña activa: una barra con la vista que se mira
+// y lo que se puede hacer con la tabla, y debajo la rejilla (o lo que pinte la vista).
+//
+// La barra es UNA línea: el selector de vista a la izquierda, que se lleva lo que sobra,
+// y a la derecha «Añadir campo» y el menú «⋯» con lo demás (renombrar, exportar, las
+// vistas, borrar). Antes eran tres filas de botones y enlaces sueltos.
+func (p *Pantalla) objetoTabla(v tema.Variante) fyne.CanvasObject {
+	b := p.abierta
+	puedeEditar := puedeEscribir(b.rol())
+	vista := b.vista()
+
+	// Las vistas: «Todos los registros» y las guardadas, en un selector.
+	rotulos := make([]string, 0, 1+len(b.Vistas))
+	rotulos = append(rotulos, p.t("view.all"))
+	elegida := 0
+	for i, x := range b.Vistas {
+		rotulos = append(rotulos, x.Name+" · "+p.t("view.kind."+x.Kind))
+		if x.ID == b.VistaID {
+			elegida = i + 1
 		}
 	}
-	if len(barra) > 0 {
-		hijos = append(hijos, container.New(flujo{Hueco: tema.Espacio(2), Ancho: ancho}, barra...))
+	vistas := b.Vistas
+	selector := ui.NuevoSelector(rotulos, func(i int) {
+		if i == 0 {
+			p.elegirVista("")
+			return
+		}
+		p.elegirVista(vistas[i-1].ID)
+	})
+	campo := botonSM(p.t("field.add"), ui.Secundario, p.dialogoCampo).ConIcono(iconos.Mas, 14)
+	// `h-8`: el selector, a la altura de los botones de la barra.
+	selector.Rotulo, selector.Elegida, selector.Talla = p.t("view.list"), elegida, ui.CampoSM
+	selector.Alto = ui.MedidaBotonDe(campo).Height
+	barra := []fyne.CanvasObject{container.New(tope{Max: 18 * tema.Rem}, selector)}
+	if puedeEsquema(b.Datos.Role) {
+		barra = append(barra, campo)
 	}
 
-	// Las vistas: «Todos los registros» y las guardadas; la elegida va marcada.
-	variante := func(id string) ui.Variante {
-		if b.VistaID == id {
-			return ui.Secundario
+	if len(p.accionesDeTabla()) > 0 {
+		nombre := ""
+		if t := b.tabla(); t != nil {
+			nombre = t.Name
 		}
-		return ui.Fantasma
+		barra = append(barra, p.menuMas(p.t("actions.more")+" · "+nombre, p.accionesDeTabla))
 	}
-	vistas := []fyne.CanvasObject{botonSM(p.t("view.all"), variante(""), func() { p.elegirVista("") })}
-	for _, x := range b.Vistas {
-		vistas = append(vistas, botonSM(x.Name+" · "+p.t("view.kind."+x.Kind), variante(x.ID), func() { p.elegirVista(x.ID) }))
-	}
-	vista := b.vista()
-	if puedeEditar {
-		vistas = append(vistas, botonSM(p.t("view.add"), ui.Fantasma, p.dialogoVista))
-		if vista != nil {
-			vistas = append(vistas, botonSM(p.t("view.delete"), ui.Fantasma, p.borrarVista))
-		}
-	}
-	hijos = append(hijos, container.New(flujo{Hueco: tema.Espacio(2), Ancho: ancho}, vistas...))
+	hijos := []fyne.CanvasObject{container.New(extremos{Hueco: tema.Espacio(2), Centro: true}, barra...)}
 
 	switch campo, hay := b.campoDelTablero(); {
 	case vista != nil && vista.Kind == api.BasesForm:
@@ -533,11 +574,21 @@ func (p *Pantalla) objetoRejilla(puedeEditar bool) fyne.CanvasObject {
 	if len(b.Campos) == 0 {
 		return ui.NuevoRotulo(p.t("grid.noFields"), tema.TextoSM, ui.Normal, "text-muted")
 	}
-	ayuda := p.t("grid.readOnly")
-	if puedeEditar {
-		ayuda = p.t("grid.help")
+	// La ayuda de teclado no dice nada en una pantalla táctil: ahí se toca la celda o se
+	// abre la ficha de la fila. Que no se pueda cambiar, en cambio, se dice siempre.
+	// Es un párrafo y no un rótulo: en una ventana estrecha parte en líneas en vez de
+	// ensanchar la página entera y sacar de la vista lo que va a la derecha.
+	var hijos []fyne.CanvasObject
+	ayuda := func(clave string) fyne.CanvasObject {
+		v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+		return ui.NuevoParrafo(p.t(clave), tema.TextoXS, ui.Normal, "text-muted", v).A(p.anchoContenido())
 	}
-	hijos := []fyne.CanvasObject{ui.NuevoRotulo(ayuda, tema.TextoXS, ui.Normal, "text-muted")}
+	switch {
+	case !puedeEditar:
+		hijos = append(hijos, ayuda("grid.readOnly"))
+	case !ui.EsTactil():
+		hijos = append(hijos, ayuda("grid.help"))
+	}
 	if b.vent.primera > 0 {
 		hijos = append(hijos, container.New(ui.Fila{},
 			botonSM(p.t("grid.loadPrevious"), ui.Fantasma, func() { p.cargarRegistros("antes") })))
@@ -548,11 +599,23 @@ func (p *Pantalla) objetoRejilla(puedeEditar bool) fyne.CanvasObject {
 	}
 	pie := []fyne.CanvasObject{}
 	if puedeEditar {
-		pie = append(pie, botonSM(p.t("grid.addRecord"), ui.Secundario, p.nuevoRegistro))
+		pie = append(pie, botonSM(p.t("grid.addRecord"), ui.Secundario, p.nuevoRegistro).ConIcono(iconos.Mas, 14))
 	}
 	if b.vent.siguiente != "" {
 		pie = append(pie, botonSM(p.t("grid.loadMore"), ui.Fantasma, func() { p.cargarRegistros("mas") }))
 	}
 	hijos = append(hijos, container.New(ui.Fila{Hueco: tema.Espacio(2)}, pie...))
 	return container.New(ui.Columna{Hueco: tema.Espacio(2)}, hijos...)
+}
+
+// tope pone su hijo al principio de la línea con el ancho que haya, pero no más de Max
+// (`w-full max-w-*`): el selector de vistas no cruza una ventana de escritorio entera.
+type tope struct{ Max float32 }
+
+func (t tope) MinSize(objs []fyne.CanvasObject) fyne.Size { return objs[0].MinSize() }
+
+func (t tope) Layout(objs []fyne.CanvasObject, tam fyne.Size) {
+	m := objs[0].MinSize()
+	objs[0].Move(fyne.NewPos(0, (tam.Height-m.Height)/2))
+	objs[0].Resize(fyne.NewSize(max(min(tam.Width, t.Max), 0), m.Height))
 }

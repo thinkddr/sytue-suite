@@ -4151,9 +4151,12 @@ Sin tabla, porque no son capacidades: son bloqueos concretos con nombre.
   que un `content-available` no despertaría a la app aunque llegara. Los _entitlements_ sí
   saldrían del perfil de aprovisionamiento (gogio los saca de ahí con `PlistBuddy`), o sea que
   `aps-environment` no es problema. El cuerpo del envío ya está decidido y cerrado por el lado
-  del servidor: la constante `{"aps":{"content-available":1}}` de `services/rooms`, que
-  `TestAPNSNoMandaNadaMasQueElDespertar` impide ampliar. **Camino escrito y NO EJECUTADO**: no
-  se ha construido un `.ipa`, ni enviado un push, ni probado en un iPhone.
+  del servidor: la constante `{"aps":{"content-available":1}}`, hoy en `platform/pkg/apns`
+  (movida desde `services/rooms` el 2026-11-07, con un único registro de aparatos en el Hub),
+  que `TestAPNSNoMandaNadaMasQueElDespertar` impide ampliar. Con Fyne, el modo de fondo
+  `remote-notification` y `aps-environment` los escribe `empaquetar.sh` tras
+  `SYTUE_DESPERTAR_APPLE` ([runbook](operations.md#despertar-widgets-ios)). **Camino escrito y
+  NO EJECUTADO**: no se ha construido un `.ipa`, ni enviado un push, ni probado en un iPhone.
 - **Drive en el sistema de ficheros.** El montaje FUSE existe como binario suelto
   (`apps/desktop/cmd/sytue-drive-fuse`) y **no hay nada en la interfaz que lo lance** desde que
   se fue la shell de Fyne. El proveedor de ficheros de macOS y el SAF de Android, ni empezados.
@@ -4197,6 +4200,12 @@ Sin tabla, porque no son capacidades: son bloqueos concretos con nombre.
 <a id="pages-arquitectura"></a>
 
 ## Sytue Web: publicación separada y contrato de exportación
+
+> **Desde el 2026-11-07 el producto se llama «Sytue Webs»** (en la barra, «Webs»): cambia
+> todo lo que ve una persona —catálogo del selector, marcas, textos, exportaciones y
+> correos—. La clave `pages`, los hosts y rutas (`web.*`, `/web`), DNS, charts, compose,
+> las migraciones y el client OIDC de Sytue ID (`Sytue Web`, migración 0104) no cambian;
+> abajo, «Sytue Web» es el nombre histórico.
 
 Sytue Web tiene dos superficies: el BFF autenticado en `web.<dominio>/web` y las webs de clientes.
 El BFF convierte el IR validado con `@sytue/pages-render`; `pages sitios` solo lee la publicación
@@ -4280,6 +4289,10 @@ ni sus versiones.
   contenido de la versión elegida (`State.Diff` desde un estado vacío, sin la contraseña de
   protección) a un documento NUEVO de quien la usa. No se copian permisos, comentarios ni
   versiones. La galería (`GET /templates`) devuelve las de la organización en `org_templates`.
+- **Hacer una copia** es el mismo camino con `copy_of: <id>` en vez de plantilla: el estado de
+  ahora del original (papel de lector, que ya basta para leerlo entero), `State.Diff` a nombre
+  de un actor nuevo; tipo y, sin `title`, título del original. No se combina con `template`
+  ni con `source_ref` (`creacion.go`).
 
 **Temas comunes y marca.** `domain.CatalogoTemas()` reutiliza los presets de Diapos
 (`slideThemePresets`: mismos ids y colores) y les añade un acento, la tinta sobre él y las
@@ -5543,12 +5556,28 @@ render y una imagen PNG de respaldo oculta (`img[data-dibujo-respaldo]`). La fue
 
 El porqué está en el [ADR 0078](decisions.md#0078); aquí, las piezas y quién llama a quién.
 
-- **Quién escribe.** `apps/nucleo/widgets` es el único escritor. Cada app se apunta con
-  `X.Widget = s.CapturarWidget` (`apps/fyne/sesion/widgets.go`), que captura la generación de
-  sesión adoptada **antes** de pedir los datos; al volver, `View.Publicar` o
-  `View.PublicarDetalle` escribe los contadores, las filas visuales saneadas (`items`, máx. 8,
-  sin `enc:v1:` ni cuerpos) y, en Calendar, la cuadrícula mensual (`calendar`: `busy_days` y
-  `day_colors`) bajo el cerrojo de la suite (`ajustes.Cerrojo`) y avisa al sistema
+- **Quién escribe (desde el 2026-11-06).** Solo el `widgets.Publicador`
+  (`apps/nucleo/widgets/publicador.go`); las pantallas ya no publican
+  (`TestNadiePublicaWidgetsDesdeLaVista`). Cada `cmd/<app>` le da su Fuente con
+  `s.PublicadorWidget(fuentes.<Producto>(s.ComunesWidget(t), cliente))`: una lectura propia,
+  sin Fyne y sin depender de la pantalla (`apps/nucleo/widgets/fuentes`), con un cliente sin
+  la caché de trabajar sin conexión. El cliente de la pantalla va envuelto en
+  `s.ClienteConAviso`, que avisa tras cada escritura con éxito del producto
+  (`api.ConAvisoDeEscritura`; `Request.Lectura`, `Request.SinAviso` y `api.SinAviso(ctx)` lo
+  excluyen). `Suite.iniciarWidgets` lo engancha a entrar/salir, bloqueo, renovación
+  (`Republicar`, sin red), `AlVolver`, el `offline.Monitor` de `Suite.Conexion`, los avisos
+  del Hub y su **señal de cambios** `datos` (`AvisoDelHub`, desde la barra; desde el
+  2026-11-07: cada servicio la emite tras sus escrituras con `hubnotify.TrasEscribir`, a quien
+  escribe y a quienes ven lo escrito con `hubnotify.AvisarTambien`, y al acabar sus trabajos
+  asíncronos con `AvisarCambio`; `{"producto"}` y nada más, agrupada en 3 s); `AlFondo` publica ya lo aplazado
+  (`PublicarPendiente`); Mail y Rooms avisan desde su vivo (`AlCambiarDatos`; Rooms también
+  con `ready`, al reconectar). Las reglas que el widget comparte con una pantalla se importan
+  de `api`, no se copian: la agenda de hoy del Hub (`api.Calendars.Hoy`, `RecortarHoy`,
+  `EventoDeHoy.HaTerminado`) y lo que suma un canal de Rooms (`api.PendientesRooms`). En cada ronda captura la **época de identidad** adoptada
+  (`ajustes.MarcarIdentidad`, `sesion.epoca`), lee, y escribe con `PublishDetail` los
+  contadores, las filas visuales saneadas (`items`, máx. 8, sin `enc:v1:` ni cuerpos) y, en
+  Calendar, la cuadrícula del mes en curso, bajo el cerrojo de la suite, con la **época** en
+  `generation` (formato 2, desde el 2026-11-07) y 24 h de vida, y avisa al sistema
   (`widgets.Notify`). Publican las **quince apps**: Calendar (cuadrícula mensual, próximos
   eventos no cifrados y `calendars`/`events`), Mail (`unread` y cabeceras de Entrada sin
   cuerpo), Rooms (`channels`, `unread` y canales públicos internos), Notes (`notes` y
@@ -5557,12 +5586,47 @@ El porqué está en el [ADR 0078](decisions.md#0078); aquí, las piezas y quién
   actividad reciente), Cast (`storage_percent`, `episodes` y directos/vídeos), Docus/Calcus/Diapos
   (`documents` y documentos recientes), CertiPDF (`pending` firmas, `files` y PDFs recientes),
   Bases (`documents` y bases con rol), ERP (`pending` y actividades con vencimiento) y Photos
-  (`photos` y álbumes/fotos). No se añaden consultas de red para alimentar widgets.
-  Las respuestas idénticas agrupan la escritura y la recarga sin alargar una caducidad
-  más corta que solicite el consumidor.
+  (`photos` y álbumes/fotos). Un contenido idéntico con la misma época no se reescribe
+  durante `RenovarTras` (10 min, el latido) si aún sobrevive al siguiente latido
+  (`vidaParaReusar`: latido + espera + plazo de la ronda); pasado ese tiempo, sí, para que
+  `updated_at` diga cuándo se comprobó. Una renovación del token no cambia la época y no
+  reescribe nada.
+- **Con la app cerrada, en iOS (desde el 2026-11-07, encendido con el fork `v2.8.2-sytue.5`).** La
+  tarea `BGAppRefreshTask` `<App ID>.refresco` (`plist_refresco` en `empaquetar.sh`, tras
+  `SYTUE_WIDGETS_APPLE`) la lanza el driver del fork (`mobile.BackgroundDriver`, parche
+  `0016`) y la atiende `Suite.RefrescarWidgetEnFondo` (`sesion/fondo.go`) con el mismo
+  Publicador (`RefrescarEnFondo`: si el arranque ya dejó una ronda apuntada, esa). Lanzada
+  sin escena, la suite solo corre el widget y `ajustes.Vigilar`: la presencia, los avisos,
+  la barra y las cargas de cada `cmd` esperan a `Suite.CuandoHayaEscena`, y los `AlCambiar`
+  de las apps se retienen hasta entonces. Con los datos protegidos fuera de alcance
+  (teléfono bloqueado) no lee y contesta `Aplazado` (otra tarea a los 5 min).
+- **Despertada por el Hub, en iOS (desde el 2026-11-07; el fork ya está, se enciende con
+  `SYTUE_DESPERTAR_APPLE` tras los pasos del dueño).** El aviso vacío de APNs (`mobile.RemoteNotificationDriver`,
+  parche `0017`) entra por la misma `RefrescarWidgetEnFondo`. `sesion/despertar.go` decide el
+  registro: con «Actualizar los widgets con la app cerrada» encendido
+  (`ajustes.DespertarWidgets`, apagado por defecto), un widget puesto (`widgets.Instalados`,
+  que pregunta a WidgetKit por `sytue_widgets_instalados` de `Puente.swift`), sesión y sin
+  bloqueo, registra el token en el Hub (`api.Hub.RegistrarAparatoApple`) y lo guarda en el
+  almacén seguro (`despertar-<bundle>`); salir, poner el bloqueo o apagar el interruptor
+  olvida en el Hub los tokens de las quince apps del aparato, con la sesión aún válida. En el
+  Hub, `aparatos_apns` y `internal/despertar` (un despertar cada 5 min por aparato, reservado
+  en la base de datos); ver la [enmienda del ADR 0039](decisions.md#0039).
+- **Con la app cerrada, en Android (desde el 2026-11-07, encendido por decisión del dueño
+  y aún sin probar en un teléfono: `FONDO_GO` en `android-widgets.py`).** `eu.sytue.nativo.RefrescoWidgets` (`JobService`,
+  cada hora; lo encola `Widgets.onUpdate`) carga la biblioteca con `System.loadLibrary`
+  —los `init`, no el `main`— y llama a la entrada JNI de `sesion/fondo_android.go`, que da
+  `RefrescarSinVentana` (`sesion/fondo_sinventana.go`): la sesión guardada
+  (`leerSesionGuardada`), la Fuente de `fuentes.Registrada` (la misma que monta cada `cmd`
+  con `Suite.FuenteWidget`) y una ronda de un Publicador que se para al acabar, sin Suite
+  ni `fyne.App`. One releva la señal de cambios a la app del producto
+  (`sesion/relevo.go` → `RelevoWidgets.avisar`, una llamada sin datos al proveedor
+  `<paquete>.sytue.widgets`, que solo acepta a One con su firma fijada y encola un trabajo
+  suelto). Ver la [enmienda del ADR 0078](decisions.md#0078) y el
+  [runbook](operations.md#widgets-android-fondo).
 - **Quién borra.** `Suite.iniciarWidgets` escucha los cambios de sesión y de bloqueo:
-  fuera de sesión o bloqueada, `widgets.ClearIf` borra los snapshots de esa generación (una
-  llamada tardía no borra los de la cuenta nueva).
+  fuera de sesión o bloqueada, pausa el publicador y `widgets.ClearIf` borra los snapshots
+  de esa época (una llamada tardía no borra los de la cuenta nueva). Si el servidor rechaza
+  la sesión de una app, su publicador borra solo el de esa app (`ClearBundleIf`).
 - **Quién lee.** En Android, `eu.sytue.nativo.Widgets` (`AppWidgetProvider`, uno por APK)
   renderiza un lienzo `Canvas` adaptado al tamaño del widget y al modo oscuro (cuadrícula
   mensual gráfica con el día actual resaltado, puntos de eventos y agenda en Calendar; barra
@@ -5572,7 +5636,22 @@ El porqué está en el [ADR 0078](decisions.md#0078); aquí, las piezas y quién
   `eu.sytue.<app>.widgets`) generada por `apps/fyne/xcode/generar.py` desde el
   `widget_acciones` de su `FyneApp.toml`, más el framework `SytueWidgetBridge`, que da al
   ejecutable de Go `sytue_widgets_reload` (WidgetCenter). Las dos implementan las mismas
-  comprobaciones que `Snapshot.Visible` en Go.
+  comprobaciones que `Snapshot.Visible` en Go, con los casos de
+  `apps/nucleo/widgets/testdata/contrato.tsv`: formato 2; la época de `sesion.epoca` (en
+  Android con el broker, su `marca_widgets`), confirmada con la `sesion.marca` actual;
+  ningún `*.cerrada`; sin bloqueo; como mucho 24 h. Las filas de Calendar se recortan al
+  leer (`widgets.Vigentes`: lo terminado se va; el día completo es flotante).
+- **Cómo cambia sin que nadie publique.** En Apple, la línea de tiempo `.atEnd` se
+  precalcula (`SytueWidgetTimeline.plan`): ahora, +15/30/45 min y cada hora desde la
+  comprobación, cada medianoche, el fin de cada evento y la caducidad sin datos, ≤ 40
+  entradas; a partir de 15 min cada entrada dice «Actualizado hace X» (`widgets.updatedAgo`,
+  `RelativeDateTimeFormatter`). Una lectura que falla por la protección de datos da el marco
+  con el marcador y otra petición a los 5 min, nunca la entrada vacía. En Android,
+  `Widgets.java` rotula siempre la hora absoluta de la comprobación (`widgets.updatedAt`) y
+  programa con `AlarmManager.RTC` el próximo repintado (`WidgetSnapshot.proximoRepintado`:
+  fin de un evento, medianoche, caducidad); con el dispositivo bloqueado no lee ni repinta
+  la pantalla de inicio (`WidgetSnapshot.pintado`; un anfitrión `KEYGUARD`, en blanco) y
+  vuelve a intentarlo a los 5 min.
 - **Galería de Apple (iOS, iPadOS y escritorio de macOS).** Cada extensión declara un
   `WidgetBundle`: conserva el identificador del resumen y añade Buscar; Mail añade Redactar
   y Calendar Crear evento. El resumen soporta `systemSmall`, `systemMedium`, `systemLarge`
@@ -5599,9 +5678,11 @@ El porqué está en el [ADR 0078](decisions.md#0078); aquí, las piezas y quién
   requerido.
 - **Windows y Linux**: no hay lector y no se escribe nada (ADR 0078).
 - **Quién lo vigila.** `widgets_test.go` (formato, caducidad, bloqueo, respuestas tardías,
-  sin lector no se escribe), los `widgets_test.go` de cada app, `ProjectTests.swift` y
-  `SnapshotTests.swift` (en el job `widgets-apple` de `ci-desktop`, en el Mac), y
-  `empaquetar-test.sh` (los derechos con el interruptor en las dos posiciones).
+  sin lector no se escribe), `contrato_test.go` (el contrato común y que Swift y Java dicen
+  `86400`, `900` y la versión 2), los `widgets_test.go` de cada app, `ProjectTests.swift` y
+  `SnapshotTests.swift` (en el job `widgets-apple` de `ci-desktop`, en el Mac),
+  `WidgetSnapshotPrueba.java` y `WidgetsBloqueoPrueba.java` (en `empaquetar.sh`, en la JVM),
+  y `empaquetar-test.sh` (los derechos con el interruptor en las dos posiciones).
 
 <a id="gestos-moviles-fyne"></a>
 

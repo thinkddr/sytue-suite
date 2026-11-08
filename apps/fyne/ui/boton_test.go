@@ -246,6 +246,36 @@ func TestElFantasmaAtenuadoTieneLaTintaDeLaWeb(t *testing.T) {
 	}
 }
 
+// TestElGlifoDeUnBotonDeColorVaEnLaTintaDelRotulo: sobre el relleno del primario y del
+// de peligro el glifo es `currentColor`, como el rótulo, y se apaga con él. El secundario
+// no: allí un glifo puede ir en su color (la estrella en `warning-text`).
+//
+// VISTO EN ROJO (2026-11-06): el glifo puesto a mano seguía en `text`, casi negro sobre
+// el primario («Emitir ahora» de Cast).
+func TestElGlifoDeUnBotonDeColorVaEnLaTintaDelRotulo(t *testing.T) {
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	for _, variante := range []Variante{Primario, Peligro} {
+		for _, inerte := range []bool{false, true} {
+			b := NuevoBoton("Emitir", nil).Con(variante, TallaSM)
+			b.Glifo, b.TamIcono, b.Inerte = iconos.TrazoConTinta(iconos.Mas, 16, tema.Color("text", v)), 16, inerte
+			r := test.WidgetRenderer(b).(*botonRenderer)
+			r.Refresh()
+			_, texto, _ := b.colores(v)
+			if g, quiero := tintaDe(r.delante.Objeto().(*canvas.Raster)), b.pintura(texto, v); g != quiero {
+				t.Errorf("variante %v, inerte %v: el glifo pinta %v y el rótulo %v", variante, inerte, g, quiero)
+			}
+		}
+	}
+	estrella := tema.Color("warning-text", v)
+	b := NuevoBoton("Destacar", nil).Con(Secundario, TallaSM)
+	b.Glifo, b.TamIcono = iconos.TrazoConTinta(iconos.Mas, 16, estrella), 16
+	r := test.WidgetRenderer(b).(*botonRenderer)
+	r.Refresh()
+	if g := tintaDe(r.delante.Objeto().(*canvas.Raster)); g != estrella {
+		t.Errorf("en el secundario el glifo a mano pinta %v y es %v", g, estrella)
+	}
+}
+
 // tintaDe es el color del píxel más opaco de un glifo: el trazo sin el antialias.
 func tintaDe(r *canvas.Raster) color.NRGBA {
 	img := r.Generator(28, 28)
@@ -279,5 +309,34 @@ func TestLaTallaDeTextoEsElBotonQueLaWebEscribeAMano(t *testing.T) {
 	}
 	if radioTalla(TallaTexto) != 4 || radioTalla(TallaXS) != 4 {
 		t.Error("las dos tallas comparten la esquina de 4 px")
+	}
+}
+
+// TestAlInicioElBotonArrancaEnSuRelleno es `justify-start`: en una columna de botones
+// `w-full` —las carpetas de una cuenta externa en Mail— el glifo y el rótulo empiezan
+// en el `px-4` de la izquierda y no en el centro, y el rótulo sigue a un `gap-2` del
+// glifo. Sin AlInicio, el bloque va centrado como siempre.
+//
+// VISTO EN ROJO (2026-11-06): sin la rama de AlInicio en el Layout, el glifo cae en 105,76
+// y no en el `px-4`.
+func TestAlInicioElBotonArrancaEnSuRelleno(t *testing.T) {
+	px4, gap2, lado := tema.Espacio(4), tema.Espacio(2), float32(18)
+	pintar := func(alInicio bool) *botonRenderer {
+		b := NuevoBoton("Recibidos", nil).Con(Fantasma, TallaMD)
+		b.Glifo, b.TamIcono = iconos.TrazoConTinta(iconos.Mas, lado, tema.Color("primary-text", tema.Claro)), lado
+		b.AlInicio = alInicio
+		r := test.WidgetRenderer(b).(*botonRenderer)
+		r.Layout(fyne.NewSize(300, b.MinSize().Height))
+		return r
+	}
+	r := pintar(true)
+	if x := r.delante.Objeto().Position().X; x != px4 {
+		t.Errorf("el glifo empieza en %v y `justify-start px-4` lo pone en %v", x, px4)
+	}
+	if x := r.texto.Position().X; x != px4+lado+gap2 {
+		t.Errorf("el rótulo empieza en %v y va a un `gap-2` del glifo: %v", x, px4+lado+gap2)
+	}
+	if x := pintar(false).delante.Objeto().Position().X; x <= px4 {
+		t.Errorf("sin AlInicio el glifo empieza en %v: el bloque tenía que ir centrado", x)
 	}
 }

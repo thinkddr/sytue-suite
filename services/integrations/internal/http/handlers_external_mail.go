@@ -82,6 +82,150 @@ func connectedMailCapabilities(provider string, cfg map[string]string) map[strin
 	return caps
 }
 
+// mailDraft is the instance «Add account» creates before the provider returns:
+// no secrets and still a draft. It is not an account, and listing it painted a
+// nameless «Gmail» row for every abandoned or cancelled sign-in.
+func mailDraft(inst domain.AppInstance) bool {
+	return inst.Status == domain.StatusDraft && !inst.HasSecrets
+}
+
+// staleMailDraft is how long an abandoned draft is kept. The sealed consent
+// state lives minutes, so after a day no sign-in can still be in flight.
+const staleMailDraft = 24 * time.Hour
+
+// mailDrafts picks, among the caller's instances, the newest draft for
+// `template` to reuse, so that retrying a cancelled «Add account» does not create
+// one draft per attempt, and the abandoned mail drafts to remove.
+//
+// Accepted trade-off: two «Add» of the same provider at once (two tabs, web and
+// Fyne, Mail and Calendar) share that draft, and the second start replaces the
+// first one's pending consent, which then ends as «state». Reusing only drafts
+// without a pending consent does not work: a cancelled sign-in («denied») keeps
+// its consent pending, and the clients cannot name the draft on the retry
+// because drafts are not listed. Finishing the newer sign-in is enough.
+func mailDrafts(instances []domain.AppInstance, template string, now time.Time) (reuse string, stale []string) {
+	var newest time.Time
+	for _, inst := range instances {
+		if inst.TemplateKey == template && mailDraft(inst) && (reuse == "" || inst.CreatedAt.After(newest)) {
+			reuse, newest = inst.ID, inst.CreatedAt
+		}
+	}
+	for _, inst := range instances {
+		if inst.ID != reuse && externalMailTemplate(inst.TemplateKey) && mailDraft(inst) && now.Sub(inst.CreatedAt) >= staleMailDraft {
+			stale = append(stale, inst.ID)
+		}
+	}
+	return reuse, stale
+}
+
+// reuseMailDraft returns the draft to reuse and removes the abandoned ones.
+// Removal is best-effort: a failure is logged and never blocks the new sign-in.
+func (h *Handlers) reuseMailDraft(ctx context.Context, actor, template string) (string, error) {
+	instances, err := h.store.ListExternalChatInstances(ctx, actor)
+	if err != nil {
+		return "", err
+	}
+	reuse, stale := mailDrafts(instances, template, time.Now())
+	for _, id := range stale {
+		if err := h.store.DeleteInstance(ctx, id); err != nil {
+			log.From(ctx).Warn("integrations: borrador de correo abandonado sin borrar", "instance", id, "error", err)
+		}
+	}
+	return reuse, nil
+}
+
+// errMailAccountExists says the provider account is already connected by the
+// same person, for the same service. A second instance would show the mailbox
+// twice and refresh two token sets for one account.
+type errMailAccountExists struct{ instance string }
+
+func (e *errMailAccountExists) Error() string { return "mail account already connected" }
+
+// duplicateMailAccount finds, among the caller's instances, another connection
+// of the same provider and address that already serves `service`. A
+// Calendar-only connection of the same address is not a duplicate of a Mail
+// one: it cannot open the mailbox.
+//
+// Reconnecting `except` when it already served that address and service is a
+// repair, not a new copy: the other one is a duplicate from before this check
+// existed (B3), and refusing it left the expired copy impossible to fix.
+func duplicateMailAccount(instances []domain.AppInstance, template, address, except, service string) string {
+	if address == "" {
+		return ""
+	}
+	found := ""
+	for _, inst := range instances {
+		if inst.TemplateKey != template || !inst.HasSecrets || !mailServes(inst, address, service) {
+			continue
+		}
+		if inst.ID == except {
+			return ""
+		}
+		if found == "" {
+			found = inst.ID
+		}
+	}
+	return found
+}
+
+// mailServes says whether a connection is for `address` and serves `service`.
+func mailServes(inst domain.AppInstance, address, service string) bool {
+	var cfg map[string]string
+	_ = json.Unmarshal(inst.Config, &cfg)
+	configuration, err := mailConfig(cfg)
+	return err == nil && strings.EqualFold(configuration.Address, address) && slices.Contains(connectedMailServices(cfg), service)
+}
+
+func (h *Handlers) existingMailAccount(ctx context.Context, actor, template, address, except, service string) (string, error) {
+	if address == "" {
+		return "", nil
+	}
+	instances, err := h.store.ListExternalChatInstances(ctx, actor)
+	if err != nil {
+		return "", err
+	}
+	return duplicateMailAccount(instances, template, address, except, service), nil
+}
+
+func mailAccountExists(instance string) *httpx.Error {
+	return httpx.ErrConflict.WithCode("mail_account_exists").
+		WithMessage("This email account is already connected.").
+		WithParams(map[string]any{"instance_id": instance})
+}
+
+// externalMailAccounts are the caller's mail connections, oldest first: a new
+// account is added at the end and the list does not reorder. Drafts are left
+// out: they are sign-ins that never finished, not accounts.
+func externalMailAccounts(instances []domain.AppInstance) []domain.AppInstance {
+	instances = slices.Clone(instances)
+	slices.SortStableFunc(instances, func(a, b domain.AppInstance) int { return a.CreatedAt.Compare(b.CreatedAt) })
+	return slices.DeleteFunc(instances, func(inst domain.AppInstance) bool {
+		return externalMailProvider(inst.TemplateKey) == "" || mailDraft(inst)
+	})
+}
+
+// externalMailItem is how a connection is listed: metadata, never a secret.
+func externalMailItem(inst domain.AppInstance) map[string]any {
+	provider := externalMailProvider(inst.TemplateKey)
+	var cfg map[string]string
+	_ = json.Unmarshal(inst.Config, &cfg)
+	configuration, _ := mailConfig(cfg)
+	return map[string]any{"instance_id": inst.ID, "provider": provider, "name": inst.Name, "address": configuration.Address, "connected": mailConnected(inst), "configuration": configuration, "capabilities": connectedMailCapabilities(provider, cfg), "services": connectedMailServices(cfg)}
+}
+
+func mailConnected(inst domain.AppInstance) bool {
+	return inst.Status == domain.StatusActive && inst.HasSecrets
+}
+
+func externalMailItems(instances []domain.AppInstance) []map[string]any {
+	accounts := externalMailAccounts(instances)
+	items := make([]map[string]any, 0, len(accounts))
+	for _, inst := range accounts {
+		items = append(items, externalMailItem(inst))
+	}
+	return items
+}
+
 // ExternalMailAccounts lists only the caller's connections. Provider readiness
 // reflects real configured credentials, never the mere existence of a template.
 func (h *Handlers) ExternalMailAccounts(w http.ResponseWriter, r *http.Request) {
@@ -91,17 +235,7 @@ func (h *Handlers) ExternalMailAccounts(w http.ResponseWriter, r *http.Request) 
 		httpx.Fail(w, r, toAPIError(err))
 		return
 	}
-	items := []map[string]any{}
-	for _, inst := range instances {
-		provider := externalMailProvider(inst.TemplateKey)
-		if provider == "" {
-			continue
-		}
-		var cfg map[string]string
-		_ = json.Unmarshal(inst.Config, &cfg)
-		configuration, _ := mailConfig(cfg)
-		items = append(items, map[string]any{"instance_id": inst.ID, "provider": provider, "name": inst.Name, "address": configuration.Address, "connected": inst.Status == domain.StatusActive && inst.HasSecrets, "configuration": configuration, "capabilities": connectedMailCapabilities(provider, cfg), "services": connectedMailServices(cfg)})
-	}
+	items := externalMailItems(instances)
 	providers := []map[string]any{}
 	for _, provider := range []string{"gmail", "microsoft", "yahoo", "imap", "pop3"} {
 		available := h.oauthCipher.Enabled()
@@ -159,6 +293,12 @@ func (h *Handlers) ExternalMailConnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	actor, _ := authn.FromContext(r.Context())
+	if req.Instance == "" {
+		if req.Instance, err = h.reuseMailDraft(r.Context(), actor.Subject, key); err != nil {
+			httpx.Fail(w, r, toAPIError(err))
+			return
+		}
+	}
 	inst, err := h.externalChatInstance(r.Context(), key, name, req.Instance, actor.Subject)
 	if err != nil {
 		httpx.Fail(w, r, toAPIError(err))
@@ -254,6 +394,16 @@ func (h *Handlers) ExternalMailConfigure(w http.ResponseWriter, r *http.Request)
 		httpx.Fail(w, r, httpx.ErrUnavailable.WithCode("external_provider_unavailable"))
 		return
 	}
+	// Before testing the remote servers: a duplicate needs no network round trip.
+	existing, err := h.existingMailAccount(r.Context(), actor.Subject, mailProviderTemplates[req.Provider], req.Address, req.Instance, linkedservices.Mail)
+	if err != nil {
+		httpx.Fail(w, r, toAPIError(err))
+		return
+	}
+	if existing != "" {
+		httpx.Fail(w, r, mailAccountExists(existing))
+		return
+	}
 	if req.Incoming.Username == "" {
 		req.Incoming.Username = req.Address
 	}
@@ -300,10 +450,15 @@ func (h *Handlers) mailClient(r *http.Request, expected ...string) (mailbox.Clie
 	if err != nil {
 		return nil, err
 	}
+	return h.mailboxOf(r.Context(), connected)
+}
+
+// mailboxOf is the mailbox of a connection, if it was granted for Mail.
+func (h *Handlers) mailboxOf(ctx context.Context, connected *connectedMailAccount) (mailbox.Client, error) {
 	if !slices.Contains(connectedMailServices(connected.conn.Config), linkedservices.Mail) {
 		return nil, mailbox.ErrAuth
 	}
-	return h.mailClientFor(r.Context(), connected.conn, connected.account), nil
+	return h.mailClientFor(ctx, connected.conn, connected.account), nil
 }
 
 func (h *Handlers) mailAccount(r *http.Request, expected ...string) (*connectedMailAccount, error) {
@@ -319,20 +474,33 @@ func (h *Handlers) mailAccount(r *http.Request, expected ...string) (*connectedM
 	if err != nil {
 		return nil, toAPIError(err)
 	}
+	expectedAddress := r.URL.Query().Get("expected_address")
+	if len(expected) > 0 {
+		expectedAddress = expected[0]
+	}
+	return h.mailAccountFor(r.Context(), *inst, expectedAddress)
+}
+
+// mailAccountFor opens a connection whose owner was already checked: by
+// mailAccount for the instance in the path, or by the summary, that only walks
+// the caller's own list.
+func (h *Handlers) mailAccountFor(ctx context.Context, inst domain.AppInstance, expectedAddress string) (*connectedMailAccount, error) {
+	id := inst.ID
 	if !externalMailTemplate(inst.TemplateKey) || inst.Status != domain.StatusActive {
 		return nil, httpx.ErrNotFound
 	}
-	if err := h.integracionEncendida(r.Context(), externalMailProvider(inst.TemplateKey)); err != nil {
+	if err := h.integracionEncendida(ctx, externalMailProvider(inst.TemplateKey)); err != nil {
 		return nil, err
 	}
 	var conn connector.Instance
+	var err error
 	if externalMailOAuth(inst.TemplateKey) {
-		conn, _, err = h.oauthConnection(r.Context(), id, externalMailOAuth)
+		conn, _, err = h.oauthConnection(ctx, id, externalMailOAuth)
 		if err != nil && httpx.AsError(err).Status == http.StatusConflict {
 			return nil, httpx.ErrConflict.WithCode("external_reconnect_required").WithMessage("Refresh or reconnect this mailbox before trying again.")
 		}
 	} else {
-		conn, err = h.store.LoadInstanceWithSecrets(r.Context(), id)
+		conn, err = h.store.LoadInstanceWithSecrets(ctx, id)
 	}
 	if err != nil {
 		return nil, toAPIError(err)
@@ -340,10 +508,6 @@ func (h *Handlers) mailAccount(r *http.Request, expected ...string) (*connectedM
 	cfg, err := mailConfig(conn.Config)
 	if err != nil {
 		return nil, err
-	}
-	expectedAddress := r.URL.Query().Get("expected_address")
-	if len(expected) > 0 {
-		expectedAddress = expected[0]
 	}
 	if expectedAddress != "" && !strings.EqualFold(expectedAddress, cfg.Address) {
 		return nil, httpx.ErrConflict.WithCode("external_reconnect_required").WithMessage("The connected account changed. Refresh the mailbox before trying again.")
@@ -393,6 +557,39 @@ func (h *Handlers) applyMailConsentMetadata(ctx context.Context, conn connector.
 	encoded, _ := json.Marshal(mailConfiguration{Address: profile.Address, Incoming: account.Incoming, Outgoing: account.Outgoing})
 	cfg["_mail_config"] = string(encoded)
 	return nil
+}
+
+// applyMailConsent checks a mail consent before it is stored: the permission its
+// origin needs, the account's address, and that it is not already connected.
+func (h *Handlers) applyMailConsent(ctx context.Context, inst *domain.AppInstance, conn connector.Instance, rd consent.Redeem, granted json.RawMessage, legacyScopes []string, cfg map[string]string) error {
+	if err := applyMailServicesGrant(inst.TemplateKey, cfg, granted, rd.RequestedScopes, legacyScopes, mailConsentService(rd.Section)); err != nil {
+		return err
+	}
+	if err := h.applyMailConsentMetadata(ctx, conn, cfg); err != nil {
+		return err
+	}
+	return h.rejectDuplicateMail(ctx, inst, rd, cfg)
+}
+
+// rejectDuplicateMail stops a consent that signed in to an account the person
+// already has connected for the same service. The fresh token is dropped, not
+// revoked: at Google and Microsoft revoking it would also revoke the existing
+// connection's grant. A draft created for this attempt is removed with it.
+func (h *Handlers) rejectDuplicateMail(ctx context.Context, inst *domain.AppInstance, rd consent.Redeem, cfg map[string]string) error {
+	configuration, err := mailConfig(cfg)
+	if err != nil {
+		return err
+	}
+	existing, err := h.existingMailAccount(ctx, rd.Sub, inst.TemplateKey, configuration.Address, inst.ID, mailConsentService(rd.Section))
+	if err != nil || existing == "" {
+		return err
+	}
+	if mailDraft(*inst) {
+		if err := h.store.DeleteInstance(ctx, inst.ID); err != nil {
+			log.From(ctx).Warn("integrations: borrador de cuenta repetida sin borrar", "instance", inst.ID, "error", err)
+		}
+	}
+	return &errMailAccountExists{instance: existing}
 }
 
 func (h *Handlers) ExternalMailFolders(w http.ResponseWriter, r *http.Request) {
@@ -533,7 +730,7 @@ func (h *Handlers) ExternalMailDisconnect(w http.ResponseWriter, r *http.Request
 		httpx.Fail(w, r, httpx.ErrNotFound)
 		return
 	}
-	if externalMailOAuth(inst.TemplateKey) {
+	if externalMailOAuth(inst.TemplateKey) && !h.mailGrantShared(r.Context(), actor.Subject, *inst) {
 		h.revokeAtProvider(r.Context(), id, inst.TemplateKey, m, cfg)
 	}
 	if err := h.store.DeleteInstance(r.Context(), id); err != nil {
@@ -541,6 +738,46 @@ func (h *Handlers) ExternalMailDisconnect(w http.ResponseWriter, r *http.Request
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// sharedMailGrant says whether another connection of the caller uses the same
+// provider account as `inst`. Google and Microsoft revoke the whole grant of
+// the app for that account, not one token: revoking while disconnecting one of
+// them (Mail) would silently break the other (Calendar).
+func sharedMailGrant(instances []domain.AppInstance, inst domain.AppInstance) bool {
+	var cfg map[string]string
+	_ = json.Unmarshal(inst.Config, &cfg)
+	configuration, err := mailConfig(cfg)
+	if err != nil || configuration.Address == "" {
+		return false
+	}
+	for _, other := range instances {
+		if other.ID == inst.ID || other.TemplateKey != inst.TemplateKey || !other.HasSecrets {
+			continue
+		}
+		var otherCfg map[string]string
+		_ = json.Unmarshal(other.Config, &otherCfg)
+		if theirs, err := mailConfig(otherCfg); err == nil && strings.EqualFold(theirs.Address, configuration.Address) {
+			return true
+		}
+	}
+	return false
+}
+
+// mailGrantShared reads the caller's connections for sharedMailGrant. If they
+// cannot be read, the token is revoked as before: the safe default for a
+// disconnect is that the provider stops honouring it.
+func (h *Handlers) mailGrantShared(ctx context.Context, actor string, inst domain.AppInstance) bool {
+	instances, err := h.store.ListExternalChatInstances(ctx, actor)
+	if err != nil {
+		log.From(ctx).Warn("integrations: sin lista de conexiones; se revoca el token", "instance", inst.ID, "error", err)
+		return false
+	}
+	if sharedMailGrant(instances, inst) {
+		log.From(ctx).Info("integrations: otra conexión usa la misma cuenta; no se revoca en el proveedor", "instance", inst.ID)
+		return true
+	}
+	return false
 }
 
 func failExternalMail(w http.ResponseWriter, r *http.Request, err error) {

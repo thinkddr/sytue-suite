@@ -214,8 +214,7 @@ func (dv *dialogoVersiones) lista(v tema.Variante) fyne.CanvasObject {
 	for i, ver := range dv.versiones {
 		filas = append(filas, dv.fila(ver, i > 0, v))
 	}
-	borde := ui.NuevaCaja(color.NRGBA{}, tema.Color("border", v), tema.RadioMD)
-	marco := container.New(&conMargen{m: tema.Borde}, append(borde.Objetos(), container.New(ui.Columna{}, filas...))...)
+	marco := dentroDeCaja(marcoLista(v, tema.RadioMD), tema.Borde, container.New(ui.Columna{}, filas...))
 	bloques, separas = append(bloques, marco), append(separas, tema.Espacio(3))
 	if dv.cursor != "" {
 		mas := ui.NuevoBoton(dv.t("versions.loadMore"), func() {
@@ -315,7 +314,7 @@ func (dv *dialogoVersiones) confirmacion(ver api.DriveVersion, v tema.Variante) 
 	botones := container.New(ui.Fila{Hueco: tema.Espacio(2)}, si, no)
 	dentro := container.New(&pilaSeparada{separas: []float32{0, tema.Espacio(1), tema.Espacio(3)}, ancho: &dv.anchoPanel}, uno, dos, botones)
 	caja := ui.NuevaCaja(tema.Color("bg-subtle", v), tema.Color("border", v), tema.RadioMD)
-	return container.New(&conMargen{m: tema.Espacio(3) + tema.Borde}, append(caja.Objetos(), dentro)...)
+	return dentroDeCaja(caja, tema.Espacio(3)+tema.Borde, dentro)
 }
 
 // filaVersion coloca una versión: `px-3 py-2.5 gap-3`, y la confirmación debajo.

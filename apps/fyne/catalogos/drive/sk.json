@@ -4,6 +4,8 @@
   "action.classified": "Klasifikácia · {name}",
   "action.classify": "Klasifikovať",
   "action.copy": "Vytvoriť kópiu",
+  "action.copyLink": "Kopírovať odkaz",
+  "action.copyLinkFailed": "Odkaz sa nepodarilo skopírovať.",
   "action.delete": "Presunúť do koša",
   "action.desktopBody": "Ak ju ešte nemáte nainštalovanú, môžete si ju stiahnuť.",
   "action.desktopCta": "Zobraziť súbory na stiahnutie",
@@ -12,6 +14,7 @@
   "action.downloadName": "Stiahnuť {name}",
   "action.downloadZip": "Stiahnuť (ZIP)",
   "action.editorFailed": "Editor nedokázal otvoriť tento súbor.",
+  "action.linkCopied": "Odkaz bol skopírovaný. Otvorí sa len osobám, ktoré už majú prístup.",
   "action.mailFailed": "Editor e-mailu sa nepodarilo otvoriť",
   "action.menu": "Akcie pre {name}",
   "action.more": "Ďalšie akcie",
@@ -87,6 +90,18 @@
     "few": "Presunúť {count} položky",
     "many": "Presunúť {count} položky",
     "other": "Presunúť {count} položiek"
+  },
+  "files.batch.restorePartial": {
+    "one": "1 položku sa nepodarilo obnoviť; zostáva v koši.",
+    "few": "{count} položky sa nepodarilo obnoviť; zostávajú v koši.",
+    "many": "{count} položky sa nepodarilo obnoviť; zostávajú v koši.",
+    "other": "{count} položiek sa nepodarilo obnoviť; zostávajú v koši."
+  },
+  "files.batch.restored": {
+    "one": "1 položka bola obnovená.",
+    "few": "{count} položky boli obnovené.",
+    "many": "{count} položky bolo obnovených.",
+    "other": "{count} položiek bolo obnovených."
   },
   "files.batch.trashBody": {
     "one": "1 položka sa presunie do koša. Odtiaľ ju môžete obnoviť.",
@@ -587,6 +602,21 @@
     "other": "Nahraných {count} súborov."
   },
   "team.upload.partial": "Nahrané: {uploaded} z {count}.",
+  "trash.emptiedAll": "Kôš bol vyprázdnený.",
+  "trash.emptyAll": "Vyprázdniť kôš",
+  "trash.emptyAllBody": {
+    "one": "Položka v koši sa natrvalo vymaže vrátane histórie verzií. Potom ju už nemožno získať späť.",
+    "few": "{count} položky v koši sa natrvalo vymažú vrátane histórie verzií. Potom ich už nemožno získať späť.",
+    "many": "{count} položky v koši sa natrvalo vymaže vrátane histórie verzií. Potom ich už nemožno získať späť.",
+    "other": "{count} položiek v koši sa natrvalo vymaže vrátane histórie verzií. Potom ich už nemožno získať späť."
+  },
+  "trash.emptyAllPartial": {
+    "one": "1 položku sa nepodarilo odstrániť; zostáva v koši.",
+    "few": "{count} položky sa nepodarilo odstrániť; zostávajú v koši.",
+    "many": "{count} položky sa nepodarilo odstrániť; zostávajú v koši.",
+    "other": "{count} položiek sa nepodarilo odstrániť; zostávajú v koši."
+  },
+  "trash.emptyAllTitle": "Vyprázdniť kôš?",
   "trash.emptyBody": "Odstránené súbory a priečinky sa zobrazia tu a bude možné ich obnoviť.",
   "trash.emptyTitle": "Kôš je prázdny",
   "trash.errorTitle": "Kôš sa nepodarilo načítať",

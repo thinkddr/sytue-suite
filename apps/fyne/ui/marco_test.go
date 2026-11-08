@@ -155,7 +155,9 @@ func TestElMarcoMovilProlongaLaBarraHastaLaHoja(t *testing.T) {
 			montado.Resize(fyne.NewSize(390, 360))
 			r := test.WidgetRenderer(a).(*armazonRenderer)
 			nav := test.WidgetRenderer(a.barra).(*barraMovilRenderer)
-			if r.marco.hoja.Position() != fyne.NewPos(0, AltoBarraMovil) || nav.fondo.Visible() {
+			// La barra única: la de navegación ES la de la suite (mide lo que ella) y la hoja
+			// empieza justo debajo.
+			if r.marco.hoja.Position() != fyne.NewPos(0, AltoBarraSuite()) || nav.fondo.Visible() {
 				t.Fatalf("%s/%s: la hoja empieza en %v y el fondo opaco de navegación es visible=%v",
 					variante, colorSuite, r.marco.hoja.Position(), nav.fondo.Visible())
 			}
@@ -169,16 +171,18 @@ func TestElMarcoMovilProlongaLaBarraHastaLaHoja(t *testing.T) {
 				img := pintaA(t, esc, 390, 360, montado)
 				for _, x := range []float32{2, 195, 388} {
 					quiero := r.marco.fondo.colorEn(x, 390)
-					for _, y := range []float32{AltoBarraSuite() - 1, AltoBarraSuite(), AltoBarraSuite() + 1, AltoBarraSuite() + AltoBarraMovil - 1} {
+					// Una sola barra (la de navegación sube a la de la suite): marco de arriba
+					// abajo de ella, sin costura en la fila donde antes se unían las dos.
+					for _, y := range []float32{1, AltoBarraSuite()/2 - 20, AltoBarraSuite() - 2, AltoBarraSuite() - 1} {
 						got := px(img, int(x*esc), int(y*esc))
 						if !cercaDe(got, quiero, 3) {
 							t.Errorf("%s/%s ×%g: unión en (%g,%g): %v, quiero marco %v", variante, colorSuite, esc, x, y, got, quiero)
 						}
 					}
 				}
-				// La hoja empieza a sangre bajo la barra móvil con sus esquinas superiores redondeadas.
+				// La hoja empieza a sangre bajo la barra con sus esquinas superiores redondeadas.
 				for _, x := range []float32{1, 388} {
-					y := AltoBarraSuite() + AltoBarraMovil + 1
+					y := AltoBarraSuite() + 1
 					if got := px(img, int(x*esc), int(y*esc)); !cercaDe(got, r.marco.fondo.colorEn(x, 390), 3) {
 						t.Errorf("la esquina superior de la hoja en x=%g no deja ver el marco: %v", x, got)
 					}

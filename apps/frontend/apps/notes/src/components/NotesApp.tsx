@@ -25,6 +25,7 @@ import {
   FranjaPeticion,
   LinkedServices,
   SytueShell,
+  genteDeLaOrganizacion,
   type NivelCompartido,
 } from '@sytue/shell';
 import { useConnectivity } from '@sytue/offline/preact';
@@ -44,6 +45,7 @@ import {
   SidebarItem,
   SidebarSection,
   SidebarAction,
+  Spinner,
   SIDEBAR_ACTION_CLASS,
   cx,
   useConfirm,
@@ -95,7 +97,7 @@ import { NoteTree } from './NoteTree.js';
 import { PanelCompartidas } from './Compartidas.js';
 import type { Captura } from '../client/captura.js';
 import { sincronizarEnlaces, type DestinoInterno } from '../client/enlaces.js';
-import { Historial } from '../client/historial.js';
+import { Historial, type Accion } from '../client/historial.js';
 import type { FuentesDeEnlace } from './LinkTool.js';
 import { principioDe, type VistaPrevia } from './VistaPreviaEnlace.js';
 import { AbrirRapido } from './AbrirRapido.js';
@@ -137,7 +139,13 @@ import { contenidoPlantilla } from '../client/plantillas.js';
 import { intlTag } from '@sytue/i18n';
 import { ListaDeHits, PanelArchivo, PanelFijadas } from './Archivo.js';
 import { enArbol as cuadernosEnArbol, raicesArchivadas } from '../client/archivo.js';
-import { colocarCuaderno, type ColocacionCuaderno } from '../client/cuadernos.js';
+import {
+  colocarCuaderno,
+  destinosDeCuaderno,
+  moverCuadernoA,
+  type CambioCuaderno,
+  type ColocacionCuaderno,
+} from '../client/cuadernos.js';
 import { reponerFamilia } from '../client/arbol.js';
 
 interface Props {
@@ -202,8 +210,12 @@ const TIPO_POR_DESTINO: Record<string, NoteKind> = {
 };
 
 type Vista = 'notebook' | 'search' | 'trash' | 'shared' | 'tasks' | 'pinned' | 'archive';
+/** Dónde está la búsqueda: la que se pinta depende de esto, no de si hay resultados. */
+type EstadoBusqueda = 'buscando' | 'listo' | 'fallo';
 
 interface ParcheDeNota {
+  /** Convertir una línea de texto en tarea o al revés (`convertirNota`, client/diario.ts). */
+  kind?: 'text' | 'todo' | undefined;
   title?: string | undefined;
   content?: string | undefined;
   checked?: boolean | undefined;
@@ -268,6 +280,8 @@ function NotesView({
   const [reordenandoCuadernos, setReordenandoCuadernos] = useState(false);
   const [reordenandoNotas, setReordenandoNotas] = useState(false);
   const [capturaHost, setCapturaHost] = useState<HTMLDivElement | null>(null);
+  // Lo que se pega con varias líneas sobre una lista entra por la captura (una nota por línea).
+  const pegarEnCaptura = useRef<((texto: string) => boolean) | null>(null);
   const [cargandoNotas, setCargandoNotas] = useState(false);
   const [errorArbol, setErrorArbol] = useState(false);
   const [seleccionada, setSeleccionada] = useState<string | null>(notaInicial ?? null);
@@ -297,6 +311,11 @@ function NotesView({
   activeId.current = activo?.id;
   const [filtroEstado, setFiltroEstado] = useState<string | null>(null);
   const [resultados, setResultados] = useState<api.NoteHit[]>([]);
+  // Lo que se está enseñando: buscando, los resultados o un fallo. Un fallo NO es
+  // «no se ha encontrado nada»: decirlo así es afirmar algo que no se ha mirado.
+  const [estadoBusqueda, setEstadoBusqueda] = useState<EstadoBusqueda>('listo');
+  // La respuesta de una búsqueda vieja no pisa la de la última.
+  const ultimaBusqueda = useRef(0);
   const [papelera, setPapelera] = useState<Note[]>([]);
   const [fijadas, setFijadas] = useState<api.NoteHit[] | null>(null);
   // Los #hashtags de las notas, y la consulta con la que se abre «Buscar notas»
@@ -746,7 +765,7 @@ function NotesView({
       try {
         cuerpo = await conCifrado(
           {
-            kind: note.kind,
+            kind: patch.kind ?? note.kind,
             data: patch.data ?? enClaro?.data ?? note.data ?? {},
             checked,
             ...(cancelled === undefined ? {} : { cancelled }),
@@ -787,6 +806,7 @@ function NotesView({
       // Cancelar quita la marca de hecha (el servicio rechaza las dos a la vez).
       const enEstado = activo.encrypted
         ? {
+            kind: patch.kind,
             pinned: patch.pinned,
             collapsed: patch.collapsed,
             content_cipher: input.content_cipher,
@@ -835,6 +855,7 @@ function NotesView({
             // Lo que había ANTES, para volver: título y contenido en claro (que en
             // un cuaderno cifrado viven en `claro`) y las tres marcas.
             const previo: ParcheDeNota = {
+              ...(patch.kind === undefined ? {} : { kind: note.kind as 'text' | 'todo' }),
               title: enClaro?.title ?? note.title ?? '',
               content: enClaro?.content ?? note.content ?? '',
               checked: note.checked,
@@ -857,25 +878,32 @@ function NotesView({
           edicionesRef.current.delete(id);
         } catch (error) {
           if (!current()) return;
-          // Keep the unsaved text and attachments in memory; only saved metadata rolls back.
-          setNotes((prev) =>
-            prev.map((n) => {
-              if (n.id !== id) return n;
-              const draft = activo.encrypted
-                ? {
-                    ...note,
-                    ...limpiar({ content_cipher: input.content_cipher, data: input.data }),
-                  }
-                : {
-                    ...note,
-                    title: titulo,
-                    content: contenido,
-                    ...limpiar({ data: patch.data ?? note.data }),
-                  };
-              if (activo.encrypted || patch.data !== undefined) delete draft.data_json;
-              return draft;
-            }),
-          );
+          // Una conversión que no llega se deshace entera: su título y su texto salen del
+          // tipo nuevo, y en el de antes no se leerían como lo que eran.
+          if (patch.kind !== undefined) {
+            setNotes((prev) => prev.map((n) => (n.id === id ? note : n)));
+            if (activo.encrypted && enClaro) setClaro((prev) => ({ ...prev, [id]: enClaro }));
+          } else {
+            // Keep the unsaved text and attachments in memory; only saved metadata rolls back.
+            setNotes((prev) =>
+              prev.map((n) => {
+                if (n.id !== id) return n;
+                const draft = activo.encrypted
+                  ? {
+                      ...note,
+                      ...limpiar({ content_cipher: input.content_cipher, data: input.data }),
+                    }
+                  : {
+                      ...note,
+                      title: titulo,
+                      content: contenido,
+                      ...limpiar({ data: patch.data ?? note.data }),
+                    };
+                if (activo.encrypted || patch.data !== undefined) delete draft.data_json;
+                return draft;
+              }),
+            );
+          }
           if (intento.notice) toast.dismiss(intento.notice);
           intento.notice = toast.notify({
             tone: 'danger',
@@ -1026,35 +1054,79 @@ function NotesView({
     [notes, activo, reordenandoNotas, offline, bloqueado, migrando, toast, t],
   );
 
+  // El «Deshacer» del aviso de eliminar o mover: deshace ESE paso, no el último,
+  // porque entre el aviso y la pulsación puede haber pasado otra cosa. Y en ESE
+  // historial: al cambiar de cuaderno se estrena otro, y el aviso, que sigue a la
+  // vista, tiene que seguir deshaciendo lo que anuncia (Fyne hace lo mismo).
+  // Quien registra el paso antes de que conteste el servidor pasa el historial
+  // en el que lo registró: al volver la respuesta puede que ya sea otro.
+  const avisarConDeshacer = useCallback(
+    (titulo: string, paso: Accion, h: Historial = historial.current) => {
+      toast.notify({
+        tone: 'success',
+        title: titulo,
+        action: {
+          label: t('history.undo'),
+          onClick: () => {
+            void h
+              .deshacerEsta(paso)
+              .then((hecho) => {
+                if (hecho)
+                  toast.notify({
+                    tone: 'success',
+                    title: t('history.undone', { action: paso.etiqueta }),
+                  });
+              })
+              .catch(() => toast.notify({ tone: 'danger', title: t('note.saveFailed') }))
+              .finally(tocarHistorial);
+          },
+        },
+      });
+    },
+    [toast, t],
+  );
+
   const borrarNota = useCallback(
     (id: string, opts: OpcionesDeAccion = {}) => {
       const antes = notes;
       const borrada = notes.find((n) => n.id === id);
       setNotes((prev) => prev.filter((n) => n.id !== id));
-      void api.deleteNote(id).catch(() => {
-        setNotes(antes);
-        toast.notify({ tone: 'danger', title: t('note.saveFailed') });
-      });
+      const origen = activeId.current;
+      let paso: Accion | null = null;
+      const hist = historial.current;
       if (opts.historial !== false && borrada) {
         // Deshacer un borrado es sacar la nota de la papelera: vuelve con el
         // mismo id y en el mismo sitio, sin pasar por la pantalla de papelera.
-        historial.current.registrar({
+        paso = hist.registrar({
           etiqueta: t('history.delete'),
           deshacer: async () => {
             await api.restoreNote(id);
+            // Si ya se mira otro cuaderno, la nota vuelve al suyo, no a este.
+            if (activeId.current !== origen) return;
             setNotes((prev) => (prev.some((n) => n.id === id) ? prev : [...prev, borrada]));
           },
           rehacer: () => ultimas.current?.borrar(id, { historial: false }),
         });
         tocarHistorial();
       }
+      void api
+        .deleteNote(id)
+        .then(() => {
+          // Que se vea adónde ha ido y que tiene vuelta, sin ir a buscar el botón.
+          if (paso) avisarConDeshacer(t('note.trashed'), paso, hist);
+        })
+        .catch(() => {
+          setNotes(antes);
+          toast.notify({ tone: 'danger', title: t('note.saveFailed') });
+        });
     },
-    [notes, toast, t],
+    [notes, toast, t, avisarConDeshacer],
   );
 
   // Mover a otro cuaderno: la nota (y sus agrupadas) desaparece de aquí en el
   // acto y el servidor la coloca al final del destino. Deshacer la trae de vuelta.
   const [notaAMover, setNotaAMover] = useState<Note | null>(null);
+  const [cuadernoAMover, setCuadernoAMover] = useState<Notebook | null>(null);
   // «Exportar…» de una nota: el mismo endpoint del cuaderno con `?note=`, así
   // que hereda formatos, saneado y nombre de fichero sin código nuevo.
   const [notaAExportar, setNotaAExportar] = useState<Note | null>(null);
@@ -1093,9 +1165,11 @@ function NotesView({
       void api
         .moveNoteToNotebook(note.id, destino.id)
         .then(() => {
-          toast.notify({ tone: 'success', title: t('move.done', { name: destino.title }) });
-          if (opts.historial !== false && activeId.current === origen.id) {
-            historial.current.registrar({
+          const hecho = t('move.done', { name: destino.title });
+          if (opts.historial === false || activeId.current !== origen.id) {
+            toast.notify({ tone: 'success', title: hecho });
+          } else {
+            const paso = historial.current.registrar({
               etiqueta: t('history.move'),
               deshacer: async () => {
                 await api.moveNoteToNotebook(note.id, origen.id);
@@ -1105,6 +1179,7 @@ function NotesView({
               rehacer: () => ultimas.current?.moverACuaderno(note, destino, { historial: false }),
             });
             tocarHistorial();
+            avisarConDeshacer(hecho, paso);
           }
         })
         .catch(() => {
@@ -1113,7 +1188,7 @@ function NotesView({
           toast.notify({ tone: 'danger', title: t('move.failed') });
         });
     },
-    [activo, notes, toast, t],
+    [activo, notes, toast, t, avisarConDeshacer],
   );
 
   const duplicarNota = useCallback(
@@ -1340,7 +1415,7 @@ function NotesView({
   }, [activo, bloqueado, offline, crearNota]);
 
   // Ctrl/⌘+P o Ctrl/⌘+O abren «Ir a», también desde dentro de una nota: es el
-  // atajo que espera quien viene de Twos o de un editor de código. Ganarle al
+  // atajo que espera quien viene de otra app de notas o de un editor de código. Ganarle al
   // «imprimir» y al «abrir» del navegador es lo que hacen las apps de notas.
   const [irA, setIrA] = useState(false);
   useEffect(() => {
@@ -1515,9 +1590,14 @@ function NotesView({
     [notes, claro, bloqueado],
   );
 
+  // Lo que deja el enfoque (y «ocultar completadas»), antes del filtro de texto y estado.
+  const enfocadas = useMemo(
+    () => enfocarNotas(notes, enfoque, ocultarTerminadas),
+    [notes, enfoque, ocultarTerminadas],
+  );
   const notasVisibles = useMemo(() => {
     const q = filtro.trim().toLowerCase();
-    const filtradas = enfocarNotas(notes, enfoque, ocultarTerminadas).filter((n) => {
+    const filtradas = enfocadas.filter((n) => {
       if (filtroEstado && !n.states?.some((s) => s.state_id === filtroEstado)) return false;
       if (!q) return true;
       const enClaro = claro[n.id];
@@ -1527,14 +1607,32 @@ function NotesView({
       return contiene(texto, q);
     });
     return ordenarNotas(filtradas, orden, locale);
-  }, [notes, filtro, filtroEstado, claro, orden, locale, enfoque, ocultarTerminadas, bloqueado]);
+  }, [enfocadas, filtro, filtroEstado, claro, orden, locale, bloqueado]);
+
+  // El filtro deja sin nada un cuaderno que SÍ tiene notas: el vacío tiene que
+  // decirlo y ofrecer quitarlo, no fingir que el cuaderno está vacío. Cuentan las
+  // que deja el enfoque: si esas ya son cero, quitarlo volvería al mismo vacío.
+  const quitarFiltro =
+    enfocadas.length > 0 && notasVisibles.length === 0 && (filtro.trim() !== '' || filtroEstado)
+      ? () => {
+          setFiltro('');
+          setFiltroEstado(null);
+        }
+      : undefined;
 
   const buscar = useCallback(async (q: string, archivados = false) => {
     setVista('search');
+    const esta = ++ultimaBusqueda.current;
+    setEstadoBusqueda('buscando');
     try {
-      setResultados(await api.search(q, archivados));
+      const hits = await api.search(q, archivados);
+      if (esta !== ultimaBusqueda.current) return;
+      setResultados(hits);
+      setEstadoBusqueda('listo');
     } catch {
+      if (esta !== ultimaBusqueda.current) return;
       setResultados([]);
+      setEstadoBusqueda('fallo');
     }
   }, []);
 
@@ -1748,7 +1846,7 @@ function NotesView({
   abrirDiaRef.current = abrirDia;
   const diaActivo = vista === 'notebook' ? activo?.daily_date : undefined;
 
-  // Los atajos del diario (Twos): ⌘D hoy, ⌘⇧←/→ el día de al lado y ⌘K la captura.
+  // Los atajos del diario: ⌘D hoy, ⌘⇧←/→ el día de al lado y ⌘K la captura.
   // En fase de CAPTURA para adelantarse al ⌘K del buscador global, que cede si este
   // ya lo atendió (`defaultPrevented`). Dentro de un campo no se roba nada: ahí ⌘⇧←
   // selecciona y ⌘K es el enlace del editor; con la captura enfocada, el segundo ⌘K
@@ -1809,6 +1907,11 @@ function NotesView({
       !esCuentaPersonal(user) &&
       (user.roles.includes('owner') || user.roles.includes('admin')));
 
+  // «Mover cuaderno a…»: lo mismo en el «…» de la página y en el de la fila del
+  // árbol (y en Fyne, `puedeMoverCuaderno`). Un día del diario no se mueve.
+  const puedeMoverCuaderno = (nb: Notebook) =>
+    !nb.read_only && !nb.daily_date && puedeAdministrarCuaderno(nb);
+
   vaciarRef.current = async () => {
     if (offline) return;
     const tocados = await vaciar(almacen, {
@@ -1867,9 +1970,13 @@ function NotesView({
     moverACuaderno(note, target);
   };
 
-  const colocarUnCuaderno = (id: string, destino: string, lado: ColocacionCuaderno): void => {
+  const colocarUnCuaderno = (id: string, destino: string, lado: ColocacionCuaderno): void =>
+    aplicarPlanDeCuadernos(colocarCuaderno(notebooks, id, destino, lado));
+  // «Mover cuaderno a…»: el mismo plan que arrastrar, al final del padre elegido.
+  const moverUnCuadernoA = (id: string, padre: string | null): void =>
+    aplicarPlanDeCuadernos(moverCuadernoA(notebooks, id, padre));
+  const aplicarPlanDeCuadernos = (plan: CambioCuaderno[] | null): void => {
     if (offline || reordenandoCuadernos) return;
-    const plan = colocarCuaderno(notebooks, id, destino, lado);
     if (!plan?.length) return;
     if (
       plan.some(
@@ -2030,7 +2137,11 @@ function NotesView({
                 ? { onMoveNoteToNotebook: moverNotaACuaderno }
                 : {})}
               {...(!offline && !reordenandoCuadernos
-                ? { onReorderNotebook: colocarUnCuaderno }
+                ? {
+                    onReorderNotebook: colocarUnCuaderno,
+                    onMoveNotebook: setCuadernoAMover,
+                    puedeMoverCuaderno,
+                  }
                 : {})}
             />
           )}
@@ -2157,10 +2268,20 @@ function NotesView({
     [notes, activo, claro],
   );
 
-  // Lo que la herramienta de enlaces del editor puede ofrecer: las notas de este
-  // cuaderno con su contenido (para los títulos), y la búsqueda para el resto.
+  // Lo que la herramienta de enlaces del editor (y su `[[`) puede ofrecer: las notas de
+  // este cuaderno con su contenido (para los títulos), y la búsqueda para el resto. Y la
+  // gente para el «@», salvo en un cuaderno cifrado: el servicio no lee su texto y la
+  // mención no avisaría a nadie.
   const fuentesDeEnlace: FuentesDeEnlace | undefined = activo
-    ? { notas: notes, notebookId: activo.id, publicBase, buscar: api.search, claro, previa }
+    ? {
+        notas: notes,
+        notebookId: activo.id,
+        publicBase,
+        buscar: api.search,
+        claro,
+        previa,
+        ...(activo.encrypted ? {} : { personas: genteDeLaOrganizacion }),
+      }
     : undefined;
 
   // Seguir un enlace a otra nota sin recargar: mismo cuaderno o cambio de
@@ -2177,6 +2298,19 @@ function NotesView({
       setAncla(d.h ?? null);
     },
     [activo, notebooks],
+  );
+
+  // Abrir un resultado (búsqueda, fijadas) sin recargar la página: el cuaderno y la
+  // nota, como un enlace interno. Un cuaderno que no está en el árbol (archivado,
+  // compartido) sigue el enlace de verdad, que sabe abrirlo.
+  const abrirHit = useCallback(
+    (h: api.NoteHit): boolean => {
+      if (!notebooks.some((n) => n.id === h.notebook_id)) return false;
+      navegarA({ notebook: h.notebook_id, note: h.id });
+      setVista('notebook');
+      return true;
+    },
+    [notebooks, navegarA],
   );
 
   useEffect(() => {
@@ -2217,6 +2351,9 @@ function NotesView({
         onOrden={cambiarOrden}
         onNueva={() => void crearNota('text')}
         onAjustes={() => setAjustes({ nb: activo })}
+        {...(!offline && !reordenandoCuadernos && puedeMoverCuaderno(activo)
+          ? { onMoverCuaderno: () => setCuadernoAMover(activo) }
+          : {})}
         {...(activo.owner_sub === user.id && !offline
           ? {
               compartir: {
@@ -2263,10 +2400,10 @@ function NotesView({
         topbar={null}
         class="h-[calc(100dvh-var(--spacing-topbar))]!"
         sidebar={sidebar}
-        // El título lo escribe la página una sola vez, como en Twos: en un día, en un
+        // El título lo escribe la página una sola vez: en un día, en un
         // cuaderno en lista y en Tareas, Fijadas, Buscar, Archivo y Papelera. Aquí solo
         // va el del cuaderno que tiene barra (columnas, lienzo libre, árbol, cifrado).
-        title={vista === 'notebook' && activo && !enDia ? activo.title : t('app.title')}
+        {...(vista === 'notebook' && activo && !enDia ? { title: activo.title } : {})}
         {...(enArbol && activo
           ? {
               secondaryPanelResize: { label: activo.title, storageKey: 'sytue.notes.panel-width' },
@@ -2281,6 +2418,7 @@ function NotesView({
                   seleccionada={seleccionada}
                   onSelect={setSeleccionada}
                   onNueva={() => void crearNota('text')}
+                  onQuitarFiltro={quitarFiltro}
                   onNuevaDentro={(padre) => void crearNota('text', { group_id: padre.id })}
                   onSacar={(n) =>
                     moverNota(n.id, {
@@ -2352,6 +2490,7 @@ function NotesView({
                   <NotebookDashboard
                     key={`${cryptoScope}:${bloqueado}`}
                     captureContainer={capturaHost}
+                    pegarRef={pegarEnCaptura}
                     acciones={enDia ? barraDe('dia') : undefined}
                     t={t}
                     locale={locale}
@@ -2446,10 +2585,12 @@ function NotesView({
                       reordenarNotas(cambios);
                     }}
                     cargando={cargandoNotas}
+                    onQuitarFiltro={enArbol ? undefined : quitarFiltro}
                     claro={claro}
                     bloqueado={bloqueado}
                     soloLectura={offline || activo?.read_only === true || migrando}
                     onCaptura={(c, pos) => void capturar(c, pos)}
+                    onPegarLineas={(texto) => pegarEnCaptura.current?.(texto) ?? false}
                     seleccionada={seleccionada}
                     onSelect={setSeleccionada}
                     onChange={(id, patch, opts) => void editarNota(id, patch, opts)}
@@ -2513,7 +2654,7 @@ function NotesView({
               {enArbol ? null : (
                 <div
                   ref={setCapturaHost}
-                  class="notes-capture-dock border-border-subtle bg-bg shrink-0 border-t empty:hidden"
+                  class="notes-capture-dock border-border-subtle bg-surface shrink-0 border-t empty:hidden"
                 />
               )}
             </>
@@ -2525,10 +2666,12 @@ function NotesView({
               inicial={consulta}
               hashtags={hashtags}
               resultados={resultados}
+              estado={estadoBusqueda}
               onBuscar={(q, archivados) => void buscar(q, archivados)}
+              onAbrir={abrirHit}
             />
           ) : vista === 'pinned' ? (
-            <PanelFijadas t={t} hits={fijadas} />
+            <PanelFijadas t={t} hits={fijadas} onAbrir={abrirHit} />
           ) : vista === 'archive' ? (
             <PanelArchivo
               t={t}
@@ -2745,8 +2888,29 @@ function NotesView({
         cuadernos={cuadernosEnArbol(notebooks).filter((nb) => nb.id !== activo?.id)}
         onClose={() => setNotaAMover(null)}
         onPick={(destino) => {
-          if (notaAMover) moverACuaderno(notaAMover, destino);
+          if (notaAMover && destino) moverACuaderno(notaAMover, destino);
           setNotaAMover(null);
+        }}
+        t={t}
+      />
+      <MoverNotaModal
+        abierto={cuadernoAMover !== null}
+        titulo={t('notebook.moveTo')}
+        vacio={t('notebook.noTarget')}
+        {...(cuadernoAMover?.parent_id ? { raiz: t('notebook.toRoot') } : {})}
+        cifradosApagados={false}
+        cuadernos={
+          cuadernoAMover
+            ? destinosDeCuaderno(
+                cuadernosDelArbol(cuadernosEnArbol(notebooks), user.id),
+                cuadernoAMover.id,
+              )
+            : []
+        }
+        onClose={() => setCuadernoAMover(null)}
+        onPick={(destino) => {
+          if (cuadernoAMover) moverUnCuadernoA(cuadernoAMover.id, destino?.id ?? null);
+          setCuadernoAMover(null);
         }}
         t={t}
       />
@@ -2894,6 +3058,7 @@ function BarraDeCuaderno({
   onOrden,
   onNueva,
   onAjustes,
+  onMoverCuaderno,
   compartir,
   onExportar,
   deshacer,
@@ -2917,6 +3082,8 @@ function BarraDeCuaderno({
   onOrden: (v: Orden) => void;
   onNueva: () => void;
   onAjustes: () => void;
+  /** «Mover cuaderno a…»; sin él (solo lectura, sin red) no se ofrece. */
+  onMoverCuaderno?: () => void;
   /** «Compartir con personas»: solo su dueño. Con su rótulo, del catálogo común. */
   compartir?: { rotulo: string; onClick: () => void };
   /** Etiqueta de lo siguiente que se puede deshacer o rehacer; null si nada. */
@@ -3054,6 +3221,16 @@ function BarraDeCuaderno({
           {compartir.rotulo}
         </MenuItem>
       ) : null}
+      {onMoverCuaderno ? (
+        <MenuItem
+          onClick={() => {
+            cerrar();
+            onMoverCuaderno();
+          }}
+        >
+          {t('notebook.moveTo')}
+        </MenuItem>
+      ) : null}
       <MenuItem
         onClick={() => {
           cerrar();
@@ -3166,18 +3343,29 @@ function PanelBusqueda({
   inicial,
   hashtags,
   resultados,
+  estado,
   onBuscar,
+  onAbrir,
 }: {
   t: ReturnType<typeof useT>;
   inicial: string;
   hashtags: api.Hashtag[];
   resultados: api.NoteHit[];
+  estado: EstadoBusqueda;
   onBuscar: (q: string, archivados: boolean) => void;
+  onAbrir: (h: api.NoteHit) => boolean;
 }): JSX.Element {
   const [q, setQ] = useState(inicial);
   const [archivados, setArchivados] = useState(false);
-  // Lo que se buscó, no lo que hay escrito: es lo que se resalta en los resultados.
-  const [buscada, setBuscada] = useState(inicial);
+  // La última búsqueda lanzada, con su casilla: lo que se buscó, no lo que hay
+  // escrito. Es lo que se resalta en los resultados y lo que repite «Reintentar»
+  // (`b.Buscada` en Fyne).
+  const [lanzada, setLanzada] = useState({ q: inicial, archivados: false });
+  const buscada = lanzada.q;
+  const lanzar = (consulta: string, conArchivados: boolean) => {
+    setLanzada({ q: consulta, archivados: conArchivados });
+    onBuscar(consulta, conArchivados);
+  };
   return (
     <div class="notes-col notes-page">
       <div class="notes-page-head">
@@ -3187,8 +3375,7 @@ function PanelBusqueda({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          setBuscada(q);
-          onBuscar(q, archivados);
+          lanzar(q, archivados);
         }}
         class="notes-capture"
       >
@@ -3215,7 +3402,7 @@ function PanelBusqueda({
           onChange={(e) => {
             const si = (e.target as HTMLInputElement).checked;
             setArchivados(si);
-            onBuscar(q, si);
+            lanzar(q, si);
           }}
         />
         <p class="sytue-meta">{t('search.hint')}</p>
@@ -3231,8 +3418,7 @@ function PanelBusqueda({
               aria-pressed={buscada === `#${h.tag}`}
               onClick={() => {
                 setQ(`#${h.tag}`);
-                setBuscada(`#${h.tag}`);
-                onBuscar(`#${h.tag}`, archivados);
+                lanzar(`#${h.tag}`, archivados);
               }}
             >
               #{h.tag}
@@ -3241,11 +3427,33 @@ function PanelBusqueda({
           ))}
         </div>
       )}
-      {resultados.length === 0 ? (
-        <p class="text-text-subtle text-base">{t('search.empty')}</p>
-      ) : (
-        <ListaDeHits hits={resultados} consulta={buscada} />
-      )}
+      {/* Lo que dice la búsqueda se anuncia: buscando, cuántos o el fallo. */}
+      <div role="status" aria-live="polite" class="mb-2">
+        {estado === 'buscando' ? (
+          <p class="text-text-muted flex items-center gap-2 text-base">
+            <Spinner size={16} />
+            {t('search.searching')}
+          </p>
+        ) : estado === 'fallo' ? null : resultados.length === 0 ? (
+          <p class="text-text-subtle text-base">{t('search.empty')}</p>
+        ) : (
+          <p class="sytue-meta">{t('search.results', { count: resultados.length })}</p>
+        )}
+      </div>
+      {estado === 'fallo' ? (
+        <div role="alert" class="grid justify-items-start gap-2">
+          <p class="text-danger-text text-base">{t('search.failed')}</p>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => lanzar(lanzada.q, lanzada.archivados)}
+          >
+            {t('common.retry')}
+          </Button>
+        </div>
+      ) : estado === 'listo' && resultados.length > 0 ? (
+        <ListaDeHits hits={resultados} consulta={buscada} onAbrir={onAbrir} />
+      ) : null}
     </div>
   );
 }

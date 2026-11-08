@@ -20,7 +20,7 @@ export function rutaDeRetornoDeApp(options: {
   finish: (
     accessToken: string,
     query: URLSearchParams,
-  ) => Promise<{ section?: string; instance?: string; error?: string }>;
+  ) => Promise<{ section?: string; instance?: string; existing?: string; error?: string }>;
 }): APIRoute {
   return async (ctx) => {
     // The gateway checks actor + tenant against sealed state when exchanging the code.
@@ -47,7 +47,9 @@ export function rutaDeRetornoDeApp(options: {
         options.section === 'external-chat' && result.section === 'external-chat-meeting';
       if (result.section !== options.section && !meeting) query.set('oauth_error', 'state');
       else {
-        if (result.instance) query.set('instance', result.instance);
+        // «exists»: the draft was discarded; the app opens the account already there.
+        const instance = result.error === 'exists' ? result.existing : result.instance;
+        if (instance) query.set('instance', instance);
         if (meeting) query.set('meeting', '1');
         if (result.error) query.set('oauth_error', result.error);
       }

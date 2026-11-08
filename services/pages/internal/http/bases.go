@@ -32,7 +32,7 @@ import (
 // token sellado por sitio y decidir qué hace una publicación cuando la conexión ya no vale.
 
 var errConexionBases = httpx.NewError(http.StatusUnprocessableEntity, "bases_connection_invalid",
-	"That Sytue Bases connection is not valid for Sytue Web: it may be revoked, expired, granted to another product or to another organisation.")
+	"That Sytue Bases connection is not valid for Sytue Webs: it may be revoked, expired, granted to another product or to another organisation.")
 
 // clienteBases habla con Sytue Bases por dentro del clúster.
 var clienteBases = &http.Client{Timeout: 15 * time.Second}

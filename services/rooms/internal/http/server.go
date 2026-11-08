@@ -74,6 +74,12 @@ func NewRouter(d Deps) http.Handler {
 		api.Use(d.Verifier.RequireAuth)
 		api.Use(d.Verifier.RequireTenant)
 		api.Use(withBearer)
+		// La señal de cambios para el widget de Rooms (hubnotify.TrasEscribir) de lo
+		// que hace quien escribe: crear, unirse, salir, leer. Lo que reciben los demás
+		// miembros les llega por su WebSocket con la app abierta; con ella cerrada, es
+		// el despertar de la pieza del push (ADR 0078). Lo que no cambia el widget va
+		// sin señal: sinSenalDeCambios.
+		api.Use(d.Service.Hub().TrasEscribir(sinSenalDeCambios, "rooms"))
 		api.Get("/matrix/bootstrap", h.MatrixBootstrap)
 		api.Get("/matrix/storage/bootstrap", h.MatrixStorageBootstrap)
 		api.Post("/matrix/native/start", h.MatrixNativeStart)
@@ -178,15 +184,17 @@ func NewRouter(d Deps) http.Handler {
 		// molestar». PUT server-to-server (sin CSRF de navegador); el BFF lo hace POST.
 		api.Get("/me/notify-prefs", h.GetNotifyPrefs)
 		api.Put("/me/notify-prefs", h.PutNotifyPrefs)
+		api.Put("/me/notify-pause", h.PutNotifyPause)
 
 		// Web Push (Ola 18): clave pública VAPID + alta/baja de suscripción del navegador.
 		// Mutaciones por POST (sin CSRF de navegador vía el BFF).
 		api.Get("/me/push/key", h.PushKey)
 		api.Post("/me/push/subscribe", h.SubscribePush)
 		api.Post("/me/push/unsubscribe", h.UnsubscribePush)
-		// iOS nativo: registrar/olvidar el aparato al que mandar el aviso vacío.
-		api.Post("/me/push/apns", h.RegisterAPNSDevice)
-		api.Post("/me/push/apns/forget", h.ForgetAPNSDevice)
+		// iOS nativo: el registro de aparatos es único y vive en el Hub; estas dos
+		// redirigen allí (308) hasta su baja.
+		api.Post("/me/push/apns", h.AparatosEnElHub)
+		api.Post("/me/push/apns/forget", h.AparatosEnElHub)
 
 		// Mensajes / hilos.
 		porCanal.Get("/channels/{channelID}/messages", h.ListMessages)
@@ -386,4 +394,15 @@ func NewRouter(d Deps) http.Handler {
 	}
 
 	return r
+}
+
+// sinSenalDeCambios: las escrituras de Rooms que no mandan la señal del widget.
+// Buscar GIF y resolver una persona solo leen; el borrador del compositor se
+// autoguarda a ritmo de tecla y no cambia nada de lo que enseña el widget (no leídos,
+// canales). Con señal, cada aparato de quien escribe releería el widget cada ventana
+// del agrupador mientras teclea (ADR 0078: lo que va a ritmo de tecla, sin señal).
+func sinSenalDeCambios(r *http.Request) bool {
+	p := r.URL.Path
+	return strings.HasSuffix(p, "/gifs/search") || strings.HasSuffix(p, "/people:resolve") ||
+		strings.HasSuffix(p, "/me/drafts")
 }

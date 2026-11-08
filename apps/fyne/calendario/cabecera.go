@@ -232,12 +232,12 @@ func (r *cabeceraVistaRenderer) crearTiraMovil() {
 			}
 		}
 		switch o := objeto.(type) {
-		case *ui.Boton:
+		case *ui.BotonIcono:
 			o.AlEnfocar = mostrar
 		case *fyne.Container:
 			for _, hijo := range o.Objects {
 				switch b := hijo.(type) {
-				case *ui.Boton:
+				case *ui.BotonIcono:
 					b.AlEnfocar = mostrar
 				case *botonInvitaciones:
 					b.alEnfocar = mostrar
@@ -365,6 +365,11 @@ type GrupoVista struct {
 	AlElegir func(Vista)
 	// AlEnfocar enseña el grupo cuando sus botones ganan foco en una tira móvil.
 	AlEnfocar func()
+	// Rejilla lo pinta en 2×2 a todo el ancho que le den, y no en una fila a su ancho
+	// natural: es el cajón del teléfono (`<SelectorVista rejilla>`). En una fila el
+	// grupo llega a 294 en finés y a 290 en búlgaro, y el cajón deja 244: la última
+	// vista salía cortada. Cada botón trunca antes que desbordar.
+	Rejilla bool
 }
 
 var _ fyne.Widget = (*GrupoVista)(nil)
@@ -413,12 +418,28 @@ type grupoVistaRenderer struct {
 	objetos []fyne.CanvasObject
 }
 
-func (r *grupoVistaRenderer) MinSize() fyne.Size           { return MedidaGrupoVista(r.g.Rotulos) }
+func (r *grupoVistaRenderer) MinSize() fyne.Size {
+	if r.g.Rejilla {
+		// Como `min-w-0` en la web: el ancho lo pone quien lo coloca, no los rótulos.
+		return fyne.NewSize(3*RellenoGrupoVista, 2*AltoGrupoVista+3*RellenoGrupoVista)
+	}
+	return MedidaGrupoVista(r.g.Rotulos)
+}
 func (r *grupoVistaRenderer) Objects() []fyne.CanvasObject { return r.objetos }
 func (r *grupoVistaRenderer) Destroy()                     {}
 
 func (r *grupoVistaRenderer) Layout(t fyne.Size) {
 	r.fondo.Resize(t)
+	if r.g.Rejilla {
+		// `grid grid-cols-2 gap-0.5 p-0.5`: dos columnas iguales, dos filas de `h-7`.
+		ancho := max((t.Width-3*RellenoGrupoVista)/2, 0)
+		for i, b := range r.botones {
+			col, fila := float32(i%2), float32(i/2)
+			b.Move(fyne.NewPos(RellenoGrupoVista+col*(ancho+RellenoGrupoVista), RellenoGrupoVista+fila*(AltoGrupoVista+RellenoGrupoVista)))
+			b.Resize(fyne.NewSize(ancho, AltoGrupoVista))
+		}
+		return
+	}
 	x := RellenoGrupoVista
 	for i, b := range r.botones {
 		m := b.MinSize()
@@ -474,8 +495,22 @@ func (b *botonVista) FocusGained() {
 }
 
 func (b *botonVista) MinSize() fyne.Size {
+	if b.g.Rejilla {
+		return fyne.NewSize(2*espacio1p5, AltoGrupoVista)
+	}
 	ancho := ui.Medir(b.g.Rotulos[b.v], tema.TextoSM, ui.SemiNegrita).Width + 2*espacio2p5
 	return fyne.NewSize(ancho, AltoGrupoVista)
+}
+
+// CabeRotulo dice si el rótulo entra entero en el botón tal como está colocado: con el
+// `px-1.5` de la rejilla o el `px-2.5` de la fila. Es el `scrollWidth <= clientWidth`
+// que el banco e2e afirma en la web.
+func (b *botonVista) CabeRotulo() bool {
+	relleno := espacio2p5
+	if b.g.Rejilla {
+		relleno = espacio1p5
+	}
+	return ui.Medir(b.g.Rotulos[b.v], tema.TextoSM, ui.SemiNegrita).Width <= b.Size().Width-2*relleno
 }
 
 func (b *botonVista) CreateRenderer() fyne.WidgetRenderer {
@@ -507,7 +542,14 @@ func (r *botonVistaRenderer) Destroy()                     {}
 
 func (r *botonVistaRenderer) Layout(t fyne.Size) {
 	r.caja.Redimensionar(t)
-	ancho := ui.Medir(r.texto.Text, tema.TextoSM, ui.SemiNegrita).Width
+	completo := r.b.g.Rotulos[r.b.v]
+	var ancho float32
+	if r.b.g.Rejilla {
+		ancho = ui.Truncar(r.texto, completo, tema.TextoSM, ui.SemiNegrita, max(t.Width-2*espacio1p5, 0))
+	} else {
+		r.texto.Text = completo
+		ancho = ui.Medir(completo, tema.TextoSM, ui.SemiNegrita).Width
+	}
 	ui.ColocarTexto(r.texto, tema.TextoSM, (t.Width-ancho)/2, (t.Height-tema.TextoSM.Linea)/2)
 	r.aro.Colocar(t)
 }
@@ -531,24 +573,21 @@ func (r *botonVistaRenderer) Refresh() {
 
 // BotonIconoCabecera es el `HEADER_ICON_BTN` de CalendarApp.tsx:
 //
-//	grid h-8 w-8 place-items-center rounded-md text-text
-//	hover:bg-surface-sunken active:bg-surface-sunken
+//	grid h-8 w-8 place-items-center rounded-control text-text
+//	hover:bg-surface-sunken active:bg-surface-sunken sytue-focus-ring
 //
-// En la web no es `Button.tsx` sino una clase escrita a mano dentro de esta app, pero
-// la GEOMETRÍA es exactamente la de un `<Button variant="ghost" size="sm" iconOnly>`
-// —28×28, radio 6, sin relleno—, así que se importa del catálogo en vez de escribir
-// aquí noventa líneas de widget que solo cambian en un token.
+// En la web es una clase escrita a mano y no `Button.tsx`: un cuadrado sin relleno con
+// la tinta del texto. Es `ui.BotonIcono` con esos tokens. Con el fantasma de `ui.Boton`
+// el glifo salía en `primary-text` y, sobre papel, la lupa se rellenaba de azul; y el
+// hover era `bg-subtle` y no `surface-sunken`.
 //
-// ponytail: ese token es el HOVER, y solo se separa en OSCURO. La clase de la web usa
-// `surface-sunken` (neutral-950 en oscuro) y el botón fantasma usa `bg-subtle`
-// (neutral-900): en claro los dos son neutral-100 y no hay diferencia; en oscuro, al
-// pasar el ratón, este botón queda un escalón más claro que la web. Se cierra el día
-// que `ui.Boton` admita un token de hover propio, que es de la familia de los botones.
-func BotonIconoCabecera(i iconos.Icono, nombre string, alPulsar func()) *ui.Boton {
-	b := ui.NuevoBoton(nombre, alPulsar).Con(ui.Fantasma, ui.TallaSM)
-	b.SoloIcono = true
-	b.Icono = i
+// Con el dedo conserva el suelo de 44 que ya tenía como botón.
+func BotonIconoCabecera(i iconos.Icono, nombre string, alPulsar func()) *ui.BotonIcono {
+	b := ui.NuevoBotonIcono(i, nombre, alPulsar)
+	b.Lado = ui.SueloTactil(LadoBotonIcono)
 	b.TamIcono = TamGlifoCabecera
+	b.Trazo, b.TrazoEncima = "text", ""
+	b.FondoEncima, b.FondoActivo, b.FondoPulsado = "surface-sunken", "surface-sunken", ""
 	return b
 }
 

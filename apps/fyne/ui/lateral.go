@@ -1528,6 +1528,24 @@ func nuevoPlegador(s *SeccionLateral) *Plegador {
 // LadoGalon es el `size={14}` del chevron del rótulo plegable.
 const LadoGalon float32 = 14
 
+// RamaDesplegable convierte una fila del menú en una RAMA que se despliega en el sitio:
+// el `SidebarItem` con `expanded`/`children` de la web (688cdc3cc). Lleva el galón
+// derecha/abajo de LadoGalon en la Cola, NO cierra el cajón al pulsarla (es un
+// conmutador, `data-mantiene-nav`), y abierta pone sus hijos debajo con `ml-7` y el
+// `gap-0.5` de la lista. Devuelve lo que se añade a las filas de la sección: la fila sola
+// o la fila con sus hijos. Nació como `(*Menu).rama` de Mail; Calendar la necesitaba
+// igual (los recordatorios del cajón del teléfono) y habría sido la segunda copia.
+func RamaDesplegable(f *FilaLateral, abierta bool, alPlegar func(), v tema.Variante, hijos ...fyne.CanvasObject) []fyne.CanvasObject {
+	f.Cola = iconos.Trazo(galonDe(abierta), LadoGalon, "sidebar-fg-muted", v).Objeto()
+	f.MantieneCajon = true
+	f.AlPulsar = alPlegar
+	if !abierta || len(hijos) == 0 {
+		return []fyne.CanvasObject{f}
+	}
+	return []fyne.CanvasObject{f, container.New(Margen{Izq: tema.Espacio(7)},
+		container.New(Columna{Hueco: tema.Espacio(0.5)}, hijos...))}
+}
+
 // galonDe es qué chevron toca. NO es una rotación: el `-rotate-90` que la web aplica al
 // plegar es, punto por punto, el `chevronRight` del mismo juego de iconos.
 func galonDe(abierta bool) iconos.Icono {

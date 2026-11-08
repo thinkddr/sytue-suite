@@ -35,7 +35,7 @@ export function Marco({ user, hubBaseUrl, locale, activa, children }: MarcoProps
         topbar={null}
         class="h-[calc(100dvh-var(--spacing-topbar))]!"
         sidebar={<Nav t={t} activa={activa} />}
-        title={t('nav.title')}
+        // Sin título: la barra del teléfono dice el nombre de marca del producto.
       >
         {/* `relative`: el que desplaza es este panel, no el `main` del AppShell; lo que
             lleva dentro (el título oculto de la lista) se ancla a él y no un piso más arriba. */}

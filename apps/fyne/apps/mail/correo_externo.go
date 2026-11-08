@@ -4,10 +4,7 @@
 package mail
 
 import (
-	"bytes"
-	"cmp"
 	"context"
-	"encoding/base64"
 	"errors"
 	"net/mail"
 	"slices"
@@ -22,13 +19,14 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
-	"git.sytue.eu/sytue/one/apps/nucleo/htmltext"
+	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
 // CorreoExterno is a person's remote mailbox, distinct from the one-off importer.
 // Implemented by the shared API client on desktop, iOS and Android.
 type CorreoExterno interface {
 	MailAccounts(context.Context) (api.ExternalMailAccounts, error)
+	MailSummary(context.Context) ([]api.ExternalMailAccountSummary, error)
 	MailConfigure(context.Context, api.ExternalMailConfiguration) (string, error)
 	MailFolders(context.Context, string, string) ([]api.ExternalMailFolder, error)
 	MailMessages(context.Context, string, string, string, string) (api.ExternalMailPage, error)
@@ -42,62 +40,183 @@ func (b *Buzon) ConCorreoExterno(g CorreoExterno, autorizar func(context.Context
 	b.CorreoExterno, b.AutorizarCorreo = g, autorizar
 }
 
+// correoExterno es el diálogo de las cuentas externas: la lista y el asistente de
+// alta. Ya no lleva buzón dentro: «Abrir buzón» y la cuenta recién conectada se abren
+// en el panel principal (vista_externa.go), con la Bandeja y el Lector de siempre.
 type correoExterno struct {
-	b                                                   *Buzon
-	ctx                                                 context.Context
-	cancelar                                            context.CancelFunc
-	d                                                   *ui.Dialogo
-	cuerpo, pie                                         *fyne.Container
-	cuentas                                             api.ExternalMailAccounts
-	cuenta                                              *api.ExternalMailAccount
-	carpetas                                            []api.ExternalMailFolder
-	mensajes                                            []api.ExternalMailMessage
-	mensaje                                             *api.ExternalMailMessage
-	proveedor, instancia, carpeta, cursor, smtpSecurity string
-	errorClave, aviso                                   string
-	paso                                                int
-	asistente, ocupado, cerrado, redactando, masLeidos  bool
-	version                                             uint64
-	parar                                               func()
-	campos                                              map[string]*ui.Entrada
-	texto                                               *ui.AreaTexto
-	adjuntos                                            []api.ExternalMailAttachment
-	servicios                                           []string
-	avanzado                                            bool
+	b                                  *Buzon
+	ctx                                context.Context
+	cancelar                           context.CancelFunc
+	d                                  *ui.Dialogo
+	cuerpo, pie                        *fyne.Container
+	cuentas                            api.ExternalMailAccounts
+	proveedor, instancia, smtpSecurity string
+	errorClave, aviso                  string
+	paso                               int
+	asistente, ocupado, cerrado        bool
+	campos                             map[string]*ui.Entrada
+	servicios                          []string
+	avanzado                           bool
+	// icloud es el preajuste de iCloud sobre «imap»: servidores fijos y solo la
+	// dirección y la contraseña de app a la vista.
+	icloud bool
+	// foco es la cuenta cuyo botón recibe el foco al pintar la lista: la que ya
+	// estaba tras un «ya conectada», para que el teclado no quede en el botón
+	// «Conectar» que desaparece (en la web, focusAfterList). Se olvida al usar la lista.
+	foco string
+	// autorizando corta el inicio de sesión en el proveedor que está en curso: con
+	// diez minutos de plazo, «Cancelar» y el aspa no pueden quedarse inertes.
+	autorizando context.CancelFunc
 }
 
-var proveedoresCorreo = []string{"gmail", "microsoft", "yahoo", "imap", "pop3"}
+var (
+	// plazoCorreo es lo que espera cada llamada al buzón remoto.
+	plazoCorreo = 45 * time.Second
+	// plazoAutorizar es el del inicio de sesión en el proveedor: la persona está en
+	// el navegador con su contraseña o su segundo factor, y los 45 s de una llamada
+	// cortaban el OAuth a medias y descartaban la vuelta (B1). Es el mismo de
+	// vinculados y de sesion.autorizarCuenta, que cuelga de este contexto.
+	plazoAutorizar = 10 * time.Minute
+)
 
-// cargarExternas llena la sección del lateral con las cuentas conectadas. Best-effort.
+// eleccionesCorreo son las tarjetas del asistente: los proveedores, con iCloud
+// como preajuste de IMAP (lo mismo que CHOICES en la web).
+var eleccionesCorreo = []string{"gmail", "microsoft", "yahoo", "icloud", "imap", "pop3"}
+
+func nombreEleccion(e string) string {
+	if e == "icloud" {
+		return api.ICloudMail.Name
+	}
+	return api.MailProviderNames[e]
+}
+
+// ponerICloud rellena los servidores fijos de iCloud, con la dirección como
+// usuario de los dos.
+func (c *correoExterno) ponerICloud() {
+	c.campos["host"].PonerTexto(api.ICloudMail.Incoming.Host)
+	c.campos["port"].PonerTexto(strconv.Itoa(api.ICloudMail.Incoming.Port))
+	c.campos["smtpHost"].PonerTexto(api.ICloudMail.Outgoing.Host)
+	c.campos["smtpPort"].PonerTexto(strconv.Itoa(api.ICloudMail.Outgoing.Port))
+	c.campos["username"].PonerTexto("")
+	c.campos["smtpUser"].PonerTexto("")
+	c.smtpSecurity = api.ICloudMail.Outgoing.Security
+	c.avanzado = false
+}
+
+// cargarExternas pide el resumen de las cuentas externas (`GET /external-mail/summary`):
+// cada cuenta con su estado y sus carpetas, que es lo que pinta el lateral al estilo de
+// Apple Mail. Si no carga, la sección lo dice y deja reintentar: antes el fallo se
+// tragaba y la sección se quedaba vacía sin decir por qué (B4).
 func (b *Buzon) cargarExternas() {
 	if b.CorreoExterno == nil {
 		return
 	}
-	pedir(b, b.CorreoExterno.MailAccounts, func(v api.ExternalMailAccounts, err error) {
-		if err == nil {
-			b.fijarExternas(v)
+	if b.P.Menu.EstadoExternas == Error {
+		b.P.Menu.EstadoExternas = Cargando
+		b.P.Refrescar()
+	}
+	b.cargandoExternas = true
+	pedir(b, b.CorreoExterno.MailSummary, func(v []api.ExternalMailAccountSummary, err error) {
+		b.cargandoExternas = false
+		pendiente := b.externasPendientes
+		b.externasPendientes = nil
+		if err != nil {
+			b.P.Menu.EstadoExternas = Error
+			b.P.Refrescar()
+			return
+		}
+		if pendiente != nil {
+			// Una cuenta que el diálogo quitó mientras este resumen iba de camino no vuelve.
+			v = slices.DeleteFunc(slices.Clone(v), func(c api.ExternalMailAccountSummary) bool { return !listada(pendiente.Items, c.InstanceID) })
+		}
+		b.resumenExternas = v
+		b.P.Menu.EstadoExternas = Listo
+		b.pintarExternas()
+		if pendiente != nil && resumenCaducado(v, pendiente.Items) {
+			b.cargarExternas()
 		}
 	})
 }
 
-func (b *Buzon) fijarExternas(v api.ExternalMailAccounts) {
-	b.P.Menu.Externas = b.P.Menu.Externas[:0]
-	for _, a := range v.Items {
-		if a.Connected && (a.Services == nil || slices.Contains(a.Services, "mail")) {
-			b.P.Menu.Externas = append(b.P.Menu.Externas, Compartido{ID: a.InstanceID, Direccion: cmp.Or(a.Address, a.Name)})
+// soloBuzones deja las cuentas que Mail abre: el endpoint es compartido y lista
+// también las conectadas solo para Calendario, Contactos o Notas (B12).
+func soloBuzones(v api.ExternalMailAccounts) api.ExternalMailAccounts {
+	v.Items = slices.DeleteFunc(slices.Clone(v.Items), func(a api.ExternalMailAccount) bool { return !a.ServesMail() })
+	return v
+}
+
+func listada(items []api.ExternalMailAccount, id string) bool {
+	return slices.ContainsFunc(items, func(a api.ExternalMailAccount) bool { return a.InstanceID == id })
+}
+
+// resumenCaducado dice si la lista del diálogo trae una cuenta con buzón que el
+// resumen no tiene, o que se reconectó o se reconfiguró (otra conexión u otra
+// dirección): entonces hay que volver a pedirlo (`staleIn` en la web).
+func resumenCaducado(resumen []api.ExternalMailAccountSummary, items []api.ExternalMailAccount) bool {
+	for _, a := range items {
+		if !a.ServesMail() {
+			continue
+		}
+		if !slices.ContainsFunc(resumen, func(c api.ExternalMailAccountSummary) bool {
+			return c.InstanceID == a.InstanceID && c.Connected == a.Connected && c.Address == a.Address
+		}) {
+			return true
 		}
 	}
+	return false
+}
+
+// fijarExternas recibe la lista que acaba de cargar el diálogo: al volver del
+// proveedor y al conectar o desconectar, el lateral cambia sin esperar a que se
+// cierre. Lo que se fue sale ya; lo nuevo o cambiado vuelve a pedir el resumen, salvo
+// que el que está en camino ya lo traiga (la vuelta del proveedor).
+func (b *Buzon) fijarExternas(v api.ExternalMailAccounts) {
+	b.cuentasDialogo = slices.Clone(v.Items)
+	b.resumenExternas = slices.DeleteFunc(slices.Clone(b.resumenExternas), func(c api.ExternalMailAccountSummary) bool { return !listada(v.Items, c.InstanceID) })
+	// La cuenta a la vista se desconectó: se vuelve a la Entrada de Sytue.
+	if e := b.externa; e != nil && !e.Mezclada() && !listada(v.Items, e.Cuenta) {
+		if c, hay := b.carpetaDeRol("inbox"); hay {
+			b.ElegirCarpeta(c)
+		}
+	}
+	b.pintarExternas()
+	switch {
+	case b.cargandoExternas:
+		b.externasPendientes = &v
+	case resumenCaducado(b.resumenExternas, v.Items):
+		b.cargarExternas()
+	}
+}
+
+// pintarExternas pone en el lateral el árbol de buzones y lo repinta.
+func (b *Buzon) pintarExternas() {
+	b.ponerArbol()
 	b.P.Refrescar()
 }
 
-func (b *Buzon) abrirCorreoExternoEn(id string) {
-	b.abrirCorreoExterno()
-	if b.correoAbierto != nil {
-		b.correoAbierto.cargarCuentas(id)
-	}
+// ponerArbol arma el árbol de buzones del lateral (`arbolDeBuzones`) con las carpetas
+// de Sytue y el resumen de las cuentas externas, también las que piden volver a iniciar
+// sesión. No repinta: lo llaman también las carpetas de Sytue, que repintan ellas.
+func (b *Buzon) ponerArbol() {
+	arbol := arbolDeBuzones(b.P.Locale, b.carpetas, b.resumenExternas)
+	b.P.Menu.Unificados, b.P.Menu.Cuentas, b.P.Menu.TituloSytue = arbol.Unificados, arbol.Cuentas, b.principal
 }
 
-func (b *Buzon) abrirCorreoExterno() {
+// plegarRama pliega o despliega una rama del árbol del lateral.
+func (b *Buzon) plegarRama(clave string) {
+	if b.P.Menu.Ramas == nil {
+		b.P.Menu.Ramas = map[string]bool{}
+	}
+	b.P.Menu.Ramas[clave] = !b.P.Menu.Ramas[clave]
+	b.P.Refrescar()
+}
+
+func (b *Buzon) abrirCorreoExterno() { b.abrirCorreoExternoEn("") }
+
+// abrirCorreoExternoEn abre el diálogo y, si id no está vacío, el inicio de sesión de
+// esa cuenta («Requiere volver a iniciar sesión» del lateral, o la franja de una
+// carpeta que el proveedor ya no deja leer). Pide las cuentas una sola vez (B9).
+func (b *Buzon) abrirCorreoExternoEn(id string) {
 	if b.CorreoExterno == nil || b.P.Lienzo() == nil {
 		return
 	}
@@ -110,14 +229,12 @@ func (b *Buzon) abrirCorreoExterno() {
 	}
 	ctx, cancelar := context.WithCancel(ctx)
 	c := &correoExterno{b: b, ctx: ctx, cancelar: cancelar, proveedor: "gmail", smtpSecurity: "tls", campos: map[string]*ui.Entrada{}}
-	for _, key := range []string{"name", "address", "host", "port", "username", "password", "smtpHost", "smtpPort", "smtpUser", "smtpPassword", "to", "cc", "bcc", "subject"} {
+	for _, key := range []string{"name", "address", "host", "port", "username", "password", "smtpHost", "smtpPort", "smtpUser", "smtpPassword"} {
 		c.campos[key] = ui.NuevaEntrada("")
 	}
 	c.campos["password"].Contrasena(true)
 	c.campos["smtpPassword"].Contrasena(true)
 	c.limpiarConfiguracion()
-	c.texto = ui.NuevaAreaTexto("")
-	c.texto.Filas = 8
 	c.cuerpo = container.New(ui.Columna{Hueco: tema.Espacio(3)})
 	c.pie = container.New(ui.Fila{Hueco: tema.Espacio(2)})
 	c.d = ui.NuevoDialogo(c.t("externalMail.title"), c.cuerpo).Con(ui.DialogoLG, c.pie)
@@ -126,7 +243,7 @@ func (b *Buzon) abrirCorreoExterno() {
 	b.cerrarCorreoExterno = c.cerrar
 	b.correoAbierto = c
 	c.d.Mostrar(b.P.Lienzo())
-	c.cargarCuentas("")
+	c.cargarCuentas("", id)
 }
 
 func (c *correoExterno) t(key string) string { return c.b.P.T.T(key, nil) }
@@ -166,45 +283,24 @@ func (c *correoExterno) limpiarConfiguracion() {
 	c.avanzado = false
 }
 
-func (c *correoExterno) limpiarBorrador() {
-	for _, key := range []string{"to", "cc", "bcc", "subject"} {
-		c.campos[key].PonerTexto("")
-	}
-	c.texto.PonerTexto("")
-	clear(c.adjuntos)
-	c.adjuntos = nil
-	c.redactando = false
-}
-
-func (c *correoExterno) hayBorrador() bool {
-	return c.texto.Texto() != "" || c.campos["to"].Texto() != "" || c.campos["cc"].Texto() != "" || c.campos["bcc"].Texto() != "" || c.campos["subject"].Texto() != "" || len(c.adjuntos) > 0
-}
-
-func (c *correoExterno) salir(f func()) {
-	if c.ocupado {
+// pedirCerrar es el aspa, Escape o «Cerrar»; mientras se espera al navegador también
+// vale, y corta esa espera. No vuelve a pedir el resumen: el diálogo ya no lee correo,
+// y lo que conecta o desconecta ya se lo cuenta al lateral (fijarExternas).
+func (c *correoExterno) pedirCerrar() {
+	if c.ocupado && c.autorizando == nil {
 		return
 	}
-	if !c.hayBorrador() {
-		f()
-		return
-	}
-	d := ui.Confirmacion(c.t("externalMail.discardDraft"), c.t("common.cancel"), c.t("common.discard"), false, c.parrafo(c.t("externalMail.draftNote")), nil, func() { c.limpiarBorrador(); f() })
-	d.Mostrar(c.b.P.Lienzo())
+	c.cerrar()
 }
-func (c *correoExterno) pedirCerrar() { c.salir(c.cerrar) }
+
 func (c *correoExterno) cerrar() {
 	if c.cerrado {
 		return
 	}
 	c.cerrado = true
 	c.cancelar()
-	if c.parar != nil {
-		c.parar()
-	}
+	c.autorizando = nil
 	c.limpiarClaves()
-	c.limpiarBorrador()
-	clear(c.mensajes)
-	c.mensaje = nil
 	c.b.cerrarCorreoExterno = nil
 	if c.b.correoAbierto == c {
 		c.b.correoAbierto = nil
@@ -214,7 +310,7 @@ func (c *correoExterno) cerrar() {
 }
 
 func pedirCorreo[T any](c *correoExterno, llamada func(context.Context) (T, error), luego func(T, error)) {
-	pedirCorreoConPlazo(c, 45*time.Second, llamada, luego)
+	pedirCorreoConPlazo(c, plazoCorreo, llamada, luego)
 }
 
 func pedirCorreoConPlazo[T any](c *correoExterno, plazo time.Duration, llamada func(context.Context) (T, error), luego func(T, error)) {
@@ -234,20 +330,28 @@ func pedirCorreoConPlazo[T any](c *correoExterno, plazo time.Duration, llamada f
 		}
 		c.ocupado = false
 		if err != nil {
-			c.errorClave = errorCorreo(err)
+			c.errorClave = errorCorreo(err, c.enICloud())
 		}
 		luego(v, err)
 		c.pintar()
 	})
 }
 
-func errorCorreo(err error) string {
+// errorCorreo es el aviso de una llamada al buzón remoto, por el `code` de la API.
+// iCloud no acepta la contraseña del Apple ID: su LOGIN rechazado pide la
+// contraseña específica de app, como errorKey(err, icloud) en la web.
+func errorCorreo(err error, icloud bool) string {
 	var e *api.Error
 	if errors.As(err, &e) {
 		switch e.Code() {
 		case "mail_tls":
 			return "externalMail.tlsError"
-		case "mail_auth", "external_reconnect_required":
+		case "mail_auth":
+			if icloud {
+				return "externalMail.icloudAuthError"
+			}
+			return "externalMail.authError"
+		case "external_reconnect_required":
 			return "externalMail.authError"
 		case "mail_blocked":
 			return "externalMail.blockedError"
@@ -255,9 +359,38 @@ func errorCorreo(err error) string {
 			return "externalMail.sendUnknown"
 		case "mail_too_large":
 			return "externalMail.tooLarge"
+		case "mail_account_exists":
+			return "externalMail.exists"
 		}
 	}
 	return "externalMail.error"
+}
+
+// errorAutorizacion distingue lo que la persona puede arreglar al volver del
+// proveedor: cancelar, desmarcar el permiso de correo o dejar caducar el inicio
+// de sesión. Antes todo salía como el genérico «no se pudo acceder al buzón».
+func errorAutorizacion(err error) string {
+	switch {
+	case errors.Is(err, api.ErrOAuthDenied), errors.Is(err, context.Canceled):
+		return "externalMail.cancelled"
+	case errors.Is(err, api.ErrOAuthScope):
+		return "externalMail.scopeMissing"
+	case errors.Is(err, api.ErrOAuthState), errors.Is(err, context.DeadlineExceeded):
+		return "externalMail.timeout"
+	}
+	return errorCorreo(err, false)
+}
+
+// enICloud dice si lo que está a la vista es el formulario de iCloud del asistente.
+func (c *correoExterno) enICloud() bool { return c.asistente && c.icloud }
+
+// yaConectada lleva a la lista, con su aviso, cuando la cuenta ya estaba: no es un
+// fallo que reintentar sino una cuenta que ya se puede abrir.
+func (c *correoExterno) yaConectada(instancia string) {
+	c.instancia, c.errorClave, c.aviso, c.asistente = "", "", "externalMail.exists", false
+	c.foco = instancia
+	c.limpiarClaves()
+	c.cargarCuentas("", "")
 }
 
 func (c *correoExterno) disponible() bool {
@@ -269,49 +402,63 @@ func (c *correoExterno) disponible() bool {
 	return false
 }
 
-func (c *correoExterno) cargarCuentas(instancia string) {
+// cargarCuentas pide la lista. Con `abrir`, la cuenta que acaba de conectarse se
+// abre en el panel principal si ya está conectada, y se avisa (fase B, punto 7: el
+// diálogo se ha ido y la persona tiene que saber qué pasó); con `reconectar`, el
+// asistente arranca en el inicio de sesión de esa cuenta.
+func (c *correoExterno) cargarCuentas(abrir, reconectar string) {
 	pedirCorreo(c, c.b.CorreoExterno.MailAccounts, func(v api.ExternalMailAccounts, err error) {
 		if err != nil {
 			return
 		}
-		c.cuentas = v
-		c.b.fijarExternas(v)
-		if instancia != "" {
-			for _, a := range v.Items {
-				if a.InstanceID == instancia && a.Connected && (a.Services == nil || slices.Contains(a.Services, "mail")) {
+		c.cuentas = soloBuzones(v)
+		c.b.fijarExternas(c.cuentas)
+		for _, a := range c.cuentas.Items {
+			switch a.InstanceID {
+			case abrir:
+				if a.Connected {
+					p := c.b.P
 					c.abrirCuenta(a)
-					break
+					cuenta := a.Address
+					if cuenta == "" {
+						cuenta = a.Name
+					}
+					p.Avisar(ui.AvisoExito, p.T.T("externalMail.connected", i18n.Vars{"account": cuenta}), "")
+					return
 				}
+			case reconectar:
+				c.reconectar(a)
+				return
 			}
 		}
 	})
 }
 
+// abrirCuenta es «Abrir buzón»: su Entrada en el panel principal, y el diálogo se
+// cierra. Una cuenta conectada solo para Calendario o Contactos no tiene buzón.
 func (c *correoExterno) abrirCuenta(a api.ExternalMailAccount) {
-	if a.Services != nil && !slices.Contains(a.Services, "mail") {
+	if !a.ServesMail() {
 		return
 	}
-	c.cuenta = &a
-	c.asistente = false
-	c.instancia = a.InstanceID
-	c.carpeta = ""
-	c.mensaje = nil
-	c.mensajes = nil
-	c.masLeidos = false
-	c.cargarCarpetas()
+	// El aviso («ya conectada») era de la lista: abrir el buzón lo responde.
+	c.aviso = ""
+	b := c.b
+	c.cerrar()
+	// Su rama se despliega, aunque se hubiera plegado: la Entrada que se va a elegir
+	// tiene que verse elegida (`reveal` de ExternalAccountsSection).
+	delete(b.P.Menu.Ramas, claveCuenta(a.InstanceID))
+	b.ElegirExterna(a.InstanceID, "")
 }
 
 func (c *correoExterno) reconectar(a api.ExternalMailAccount) {
 	c.proveedor, c.instancia, c.asistente, c.paso = a.Provider, a.InstanceID, true, 1
+	c.icloud = a.IsICloud()
 	c.limpiarConfiguracion()
 	c.servicios = append([]string(nil), a.Services...)
 	if !slices.Contains(c.servicios, "mail") {
 		c.servicios = append([]string{"mail"}, c.servicios...)
 	}
-	c.cuenta = nil
-	c.mensaje = nil
-	c.mensajes = nil
-	c.errorClave = ""
+	c.errorClave, c.aviso = "", ""
 	c.campos["name"].PonerTexto(a.Name)
 	c.campos["address"].PonerTexto(a.Address)
 	if cfg := a.Configuration; cfg != nil {
@@ -322,123 +469,17 @@ func (c *correoExterno) reconectar(a api.ExternalMailAccount) {
 		c.campos["smtpPort"].PonerTexto(strconv.Itoa(cfg.Outgoing.Port))
 		c.campos["smtpUser"].PonerTexto(cfg.Outgoing.Username)
 		c.smtpSecurity = cfg.Outgoing.Security
+		if c.icloud {
+			// En iCloud el usuario solo se guarda si no es la dirección: si no, sigue a
+			// la dirección, también si se edita ahora.
+			if strings.EqualFold(cfg.Incoming.Username, a.Address) {
+				c.campos["username"].PonerTexto("")
+			}
+			c.campos["smtpUser"].PonerTexto("")
+			c.avanzado = c.campos["username"].Texto() != ""
+		}
 	}
 	c.pintar()
-}
-
-func (c *correoExterno) cargarCarpetas() {
-	id := c.instancia
-	pedirCorreo(c, func(ctx context.Context) ([]api.ExternalMailFolder, error) {
-		return c.b.CorreoExterno.MailFolders(ctx, id, c.cuenta.Address)
-	}, func(v []api.ExternalMailFolder, err error) {
-		if err != nil || c.instancia != id {
-			return
-		}
-		c.carpetas = v
-		if len(v) == 0 {
-			return
-		}
-		c.carpeta = v[0].ID
-		for _, f := range v {
-			if f.Role == "inbox" {
-				c.carpeta = f.ID
-				break
-			}
-		}
-		c.cargarMensajes(false)
-	})
-}
-
-func (c *correoExterno) cargarMensajes(mas bool) {
-	if c.carpeta == "" {
-		c.cargarCarpetas()
-		return
-	}
-	c.version++
-	version := c.version
-	id, carpeta, cursor := c.instancia, c.carpeta, ""
-	if mas {
-		cursor = c.cursor
-	}
-	pedirCorreo(c, func(ctx context.Context) (api.ExternalMailPage, error) {
-		return c.b.CorreoExterno.MailMessages(ctx, id, carpeta, cursor, c.cuenta.Address)
-	}, func(v api.ExternalMailPage, err error) {
-		if err != nil || c.version != version {
-			return
-		}
-		if !mas {
-			c.mensajes = v.Items
-			c.masLeidos = false
-		} else {
-			known := map[string]bool{}
-			for _, m := range c.mensajes {
-				known[m.ID] = true
-			}
-			for _, m := range v.Items {
-				if !known[m.ID] {
-					c.mensajes = append(c.mensajes, m)
-					known[m.ID] = true
-				}
-			}
-			c.masLeidos = true
-		}
-		c.cursor = v.NextCursor
-		c.programar()
-	})
-}
-
-func (c *correoExterno) programar() {
-	c.pausarLista()
-	if c.cerrado || c.b.segundoPlano || c.ctx.Err() != nil {
-		return
-	}
-	c.parar = c.b.Esperar(30*time.Second, func() {
-		if c.cerrado || c.b.segundoPlano || c.ctx.Err() != nil {
-			return
-		}
-		if c.puedeActualizarLista() {
-			c.cargarMensajes(false)
-		} else {
-			c.programar()
-		}
-	})
-}
-
-func (c *correoExterno) pausarLista() {
-	if c.parar != nil {
-		c.parar()
-		c.parar = nil
-	}
-}
-
-func (c *correoExterno) puedeActualizarLista() bool {
-	return !c.ocupado && !c.redactando && c.mensaje == nil && !c.masLeidos && c.cuenta != nil
-}
-
-func (c *correoExterno) leer(m api.ExternalMailMessage) {
-	id, carpeta, version := c.instancia, c.carpeta, c.version
-	pedirCorreo(c, func(ctx context.Context) (api.ExternalMailMessage, error) {
-		return c.b.CorreoExterno.MailMessage(ctx, id, carpeta, m.ID, c.cuenta.Address)
-	}, func(v api.ExternalMailMessage, err error) {
-		if err == nil && c.version == version {
-			c.mensaje = &v
-		}
-	})
-}
-
-func (c *correoExterno) accion(action string) {
-	if c.mensaje == nil {
-		return
-	}
-	id, folder, message := c.instancia, c.carpeta, c.mensaje.ID
-	pedirCorreo(c, func(ctx context.Context) (struct{}, error) {
-		return struct{}{}, c.b.CorreoExterno.MailAction(ctx, id, folder, message, action, "", c.cuenta.Address)
-	}, func(_ struct{}, err error) {
-		if err == nil {
-			c.mensaje = nil
-			c.cargarMensajes(false)
-		}
-	})
 }
 
 func (c *correoExterno) autorizar() {
@@ -450,14 +491,31 @@ func (c *correoExterno) autorizar() {
 	if len(services) == 0 {
 		services = []string{"mail"}
 	}
-	pedirCorreo(c, func(ctx context.Context) (string, error) {
+	espera, cortar := context.WithCancel(c.ctx)
+	c.autorizando = cortar
+	pedirCorreoConPlazo(c, plazoAutorizar, func(ctx context.Context) (string, error) {
+		ctx, cancelar := context.WithCancel(ctx)
+		defer cancelar()
+		stop := context.AfterFunc(espera, cancelar)
+		defer stop()
 		return c.b.AutorizarCorreo(ctx, provider, instance, services...)
 	}, func(id string, err error) {
+		cortar()
+		c.autorizando = nil
+		var exists *api.OAuthExistsError
+		switch {
+		case errors.As(err, &exists):
+			// El borrador se descartó en el servidor: no se reintenta con él.
+			c.yaConectada(exists.Instance)
+			return
+		case err != nil:
+			c.errorClave = errorAutorizacion(err)
+		}
 		if id != "" {
 			c.instancia = id
 		}
 		if err == nil {
-			c.cargarCuentas(id)
+			c.cargarCuentas(id, "")
 		}
 	})
 }
@@ -482,7 +540,8 @@ func (c *correoExterno) configuracion() (api.ExternalMailConfiguration, error) {
 		username = address
 	}
 	smtpUser := value("smtpUser")
-	if smtpUser == "" {
+	if smtpUser == "" || c.icloud {
+		// iCloud entra en los dos servidores con la misma cuenta.
 		smtpUser = username
 	}
 	security := c.smtpSecurity
@@ -497,104 +556,18 @@ func (c *correoExterno) conectar() {
 		return
 	}
 	pedirCorreo(c, func(ctx context.Context) (string, error) { return c.b.CorreoExterno.MailConfigure(ctx, config) }, func(id string, err error) {
-		if err == nil {
-			c.limpiarClaves()
-			c.cargarCuentas(id)
-		}
-	})
-}
-
-func direccionesExternas(text string) ([]api.ExternalMailAddress, error) {
-	if strings.TrimSpace(text) == "" {
-		return nil, nil
-	}
-	addresses, err := mail.ParseAddressList(strings.ReplaceAll(text, ";", ","))
-	if err != nil {
-		return nil, err
-	}
-	out := make([]api.ExternalMailAddress, len(addresses))
-	for i, a := range addresses {
-		out[i] = api.ExternalMailAddress{Name: a.Name, Email: a.Address}
-	}
-	return out, nil
-}
-
-func (c *correoExterno) enviar() {
-	to, err := direccionesExternas(c.campos["to"].Texto())
-	if err != nil || len(to) == 0 {
-		c.errorClave = "externalMail.invalidRecipients"
-		c.pintar()
-		return
-	}
-	cc, err := direccionesExternas(c.campos["cc"].Texto())
-	if err != nil {
-		c.errorClave = "externalMail.invalidRecipients"
-		c.pintar()
-		return
-	}
-	bcc, err := direccionesExternas(c.campos["bcc"].Texto())
-	if err != nil {
-		c.errorClave = "externalMail.invalidRecipients"
-		c.pintar()
-		return
-	}
-	out := api.ExternalMailOutgoing{ExpectedAddress: c.cuenta.Address, To: to, Cc: cc, Bcc: bcc, Subject: c.campos["subject"].Texto(), Text: c.texto.Texto(), Attachments: c.adjuntos}
-	id := c.instancia
-	pedirCorreo(c, func(ctx context.Context) (api.ExternalMailSent, error) {
-		return c.b.CorreoExterno.MailSend(ctx, id, out)
-	}, func(v api.ExternalMailSent, err error) {
-		if err != nil {
+		if c.errorClave == "externalMail.exists" {
 			var e *api.Error
-			if !errors.As(err, &e) || e.Status == 0 || e.Status >= 500 {
-				c.errorClave = "externalMail.sendUnknown"
+			instancia := ""
+			if errors.As(err, &e) {
+				instancia = e.Param("instance_id")
 			}
+			c.yaConectada(instancia)
 			return
 		}
-		c.limpiarBorrador()
-		c.aviso = "externalMail.sent"
-		if v.SentCopySaved != nil && !*v.SentCopySaved {
-			c.aviso = "externalMail.sentNoCopy"
-		}
-		c.mensaje = nil
-		c.cargarMensajes(false)
-	})
-}
-
-func (c *correoExterno) adjuntar() {
-	if c.b.ElegirFicheros == nil {
-		return
-	}
-	pedirCorreo(c, func(context.Context) ([]api.ExternalMailAttachment, error) {
-		paths, err := c.b.ElegirFicheros()
-		if err != nil {
-			return nil, err
-		}
-		total := int64(0)
-		for _, a := range c.adjuntos {
-			total += a.Size
-		}
-		if total >= 18<<20 {
-			return nil, errors.New("size")
-		}
-		as, err := leerAdjuntosConLimite(paths, (18<<20)-total)
-		if err != nil {
-			return nil, err
-		}
-
-		var out []api.ExternalMailAttachment
-		for _, a := range as {
-			total += int64(len(a.Datos))
-			if total > 18<<20 {
-				return nil, errors.New("size")
-			}
-			out = append(out, api.ExternalMailAttachment{Name: a.Nombre, Type: a.Tipo, Size: int64(len(a.Datos)), ContentBase64: base64.StdEncoding.EncodeToString(a.Datos)})
-		}
-		return out, nil
-	}, func(as []api.ExternalMailAttachment, err error) {
 		if err == nil {
-			c.adjuntos = append(c.adjuntos, as...)
-		} else {
-			c.errorClave = "externalMail.tooLarge"
+			c.limpiarClaves()
+			c.cargarCuentas(id, "")
 		}
 	})
 }
@@ -605,7 +578,7 @@ func (c *correoExterno) desconectar(a api.ExternalMailAccount) {
 			return struct{}{}, c.b.CorreoExterno.MailDisconnect(ctx, a.InstanceID)
 		}, func(_ struct{}, err error) {
 			if err == nil {
-				c.cargarCuentas("")
+				c.cargarCuentas("", "")
 			}
 		})
 	})
@@ -617,13 +590,6 @@ func (c *correoExterno) pintar() {
 		return
 	}
 	c.d.NoDescartable = c.ocupado
-	if c.cuenta != nil {
-		c.d.Talla = ui.DialogoXL
-		c.d.Titulo = cmp.Or(c.cuenta.Address, c.cuenta.Name)
-	} else {
-		c.d.Talla = ui.DialogoLG
-		c.d.Titulo = c.t("externalMail.title")
-	}
 	c.cuerpo.RemoveAll()
 	c.pie.RemoveAll()
 	if c.ocupado {
@@ -635,48 +601,74 @@ func (c *correoExterno) pintar() {
 	if c.aviso != "" {
 		c.cuerpo.Add(ui.NuevaAyudaEnLinea(c.t(c.aviso)).ConTono(ui.AyudaInfo))
 	}
-	switch {
-	case c.cuenta != nil:
-		c.pintarBuzon()
-	case c.asistente:
+	var objetivo fyne.Focusable
+	if c.asistente {
+		c.foco = ""
 		c.pintarAsistente()
-	default:
-		c.cuerpo.Add(c.parrafo(c.t("externalMail.body")))
-		if len(c.cuentas.Items) == 0 {
-			c.cuerpo.Add(c.parrafo(c.t("externalMail.empty")))
-		}
-		for _, a := range c.cuentas.Items {
-			c.cuerpo.Add(c.parrafo(a.Name + " · " + a.Address))
-			if a.Connected && len(a.Services) > 0 {
-				names := make([]string, 0, len(a.Services))
-				for _, service := range a.Services {
-					names = append(names, c.t("app."+service+".description"))
-				}
-				c.cuerpo.Add(c.parrafo(c.t("linkedServices.connected") + ": " + strings.Join(names, " · ")))
-			}
-			if a.Connected && (a.Services == nil || slices.Contains(a.Services, "mail")) {
-				c.cuerpo.Add(c.boton("externalMail.open", func() { c.abrirCuenta(a) }))
-			}
-			c.cuerpo.Add(c.boton("externalMail.connect", func() { c.reconectar(a) }))
-			c.cuerpo.Add(c.boton("externalMail.disconnect", func() { c.desconectar(a) }))
-		}
-		c.pie.Add(c.boton("externalMail.add", func() {
-			c.limpiarConfiguracion()
-			c.proveedor = "gmail"
-			c.instancia = ""
-			c.servicios = []string{"mail"}
-			c.avanzado = false
-			c.asistente = true
-			c.paso = 0
-			c.errorClave = ""
-			c.pintar()
-		}))
-		c.pie.Add(c.boton("nav.refresh", func() { c.cargarCuentas("") }).Con(ui.Fantasma, ui.TallaMD))
+	} else {
+		objetivo = c.pintarCuentas()
 	}
 	c.cuerpo.Refresh()
 	c.pie.Refresh()
 	c.d.Refresh()
 	c.d.Recolocar()
+	// Cada repintado crea botones nuevos: mientras haya foco pendiente se le vuelve a dar.
+	if objetivo != nil && !c.ocupado {
+		if lienzo := c.b.P.Lienzo(); lienzo != nil {
+			lienzo.Focus(objetivo)
+		}
+	}
+}
+
+// pintarCuentas pinta la lista de cuentas y devuelve el botón que debe llevarse el
+// foco pendiente (c.foco), o nil.
+func (c *correoExterno) pintarCuentas() fyne.Focusable {
+	var objetivo fyne.Focusable
+	// usar es la acción de un botón de la lista: tocarla responde al foco pendiente.
+	usar := func(f func()) func() {
+		return func() { c.foco = ""; f() }
+	}
+	c.cuerpo.Add(c.parrafo(c.t("externalMail.body")))
+	if len(c.cuentas.Items) == 0 {
+		c.cuerpo.Add(c.parrafo(c.t("externalMail.empty")))
+	}
+	for _, a := range c.cuentas.Items {
+		c.cuerpo.Add(c.parrafo(a.Name))
+		c.cuerpo.Add(c.parrafo(strings.Join(slices.DeleteFunc([]string{a.Address, a.ProviderName()}, func(s string) bool { return s == "" }), " · ")))
+		if a.Connected && len(a.Services) > 0 {
+			names := make([]string, 0, len(a.Services))
+			for _, service := range a.Services {
+				names = append(names, c.t("app."+service+".description"))
+			}
+			c.cuerpo.Add(c.parrafo(c.t("linkedServices.connected") + ": " + strings.Join(names, " · ")))
+		}
+		conectar := c.boton("externalMail.connect", usar(func() { c.reconectar(a) }))
+		if a.Connected {
+			abrir := c.boton("externalMail.open", usar(func() { c.abrirCuenta(a) }))
+			c.cuerpo.Add(abrir)
+			if a.InstanceID == c.foco {
+				objetivo = abrir
+			}
+		} else if a.InstanceID == c.foco {
+			objetivo = conectar
+		}
+		c.cuerpo.Add(conectar)
+		c.cuerpo.Add(c.boton("externalMail.disconnect", usar(func() { c.desconectar(a) })))
+	}
+	c.pie.Add(c.boton("externalMail.add", usar(func() {
+		c.limpiarConfiguracion()
+		c.proveedor = "gmail"
+		c.icloud = false
+		c.instancia = ""
+		c.servicios = []string{"mail"}
+		c.avanzado = false
+		c.asistente = true
+		c.paso = 0
+		c.errorClave, c.aviso = "", ""
+		c.pintar()
+	})))
+	c.pie.Add(c.boton("nav.refresh", usar(func() { c.cargarCuentas("", "") })).Con(ui.Fantasma, ui.TallaMD))
+	return objetivo
 }
 
 func (c *correoExterno) pintarAsistente() {
@@ -700,45 +692,82 @@ func (c *correoExterno) pintarAsistente() {
 }
 
 func (c *correoExterno) pintarProveedor() {
-	names := make([]string, len(proveedoresCorreo))
-	for i, p := range proveedoresCorreo {
-		names[i] = api.MailProviderNames[p]
+	names := make([]string, len(eleccionesCorreo))
+	for i, e := range eleccionesCorreo {
+		names[i] = nombreEleccion(e)
 	}
 	selector := ui.NuevoSelector(names, func(index int) {
-		if index < 0 || index >= len(proveedoresCorreo) {
+		if index < 0 || index >= len(eleccionesCorreo) {
 			return
 		}
-		c.proveedor = proveedoresCorreo[index]
-		c.avanzado = false
-		c.instancia = ""
-		c.servicios = []string{"mail"}
-		c.limpiarClaves()
-		port := "993"
-		if c.proveedor == "pop3" {
-			port = "995"
-		}
-		c.campos["port"].PonerTexto(port)
+		c.elegirProveedor(eleccionesCorreo[index])
 		c.pintar()
 	})
-	for i, p := range proveedoresCorreo {
-		if p == c.proveedor {
-			selector.Elegida = i
-		}
+	actual := c.proveedor
+	if c.icloud {
+		actual = "icloud"
 	}
+	selector.Elegida = slices.Index(eleccionesCorreo, actual)
 	selector.Rotulo = c.t("externalMail.provider")
 	selector.Inerte(c.ocupado)
 	c.cuerpo.Add(selector)
 	c.cuerpo.Add(c.parrafo(c.t("externalMail.body")))
 }
 
+// elegirProveedor cambia de tarjeta en el asistente. Salir de iCloud no deja sus
+// servidores en el formulario genérico.
+func (c *correoExterno) elegirProveedor(e string) {
+	antes := c.icloud
+	c.icloud = e == "icloud"
+	c.proveedor = e
+	if c.icloud {
+		c.proveedor = "imap"
+	}
+	c.avanzado = false
+	c.instancia = ""
+	c.servicios = []string{"mail"}
+	c.limpiarClaves()
+	switch {
+	case c.icloud:
+		c.ponerICloud()
+		return
+	case antes:
+		for _, key := range []string{"host", "username", "smtpHost", "smtpUser"} {
+			c.campos[key].PonerTexto("")
+		}
+		c.campos["smtpPort"].PonerTexto("465")
+		c.smtpSecurity = "tls"
+	}
+	port := "993"
+	if c.proveedor == "pop3" {
+		port = "995"
+	}
+	c.campos["port"].PonerTexto(port)
+}
+
 func (c *correoExterno) pintarConfiguracion(oauth bool) {
 	if !c.disponible() {
 		c.cuerpo.Add(ui.NuevaAyudaEnLinea(c.t("externalMail.unavailable")).ConTono(ui.AyudaAviso))
 	}
-	if oauth {
+	switch {
+	case oauth:
 		c.cuerpo.Add(c.parrafo(c.t("externalMail.oauthBody")))
 		c.pintarServicios()
-	} else {
+	case c.icloud:
+		c.cuerpo.Add(c.parrafo(c.t("externalMail.icloudBody")))
+		c.cuerpo.Add(c.campo("name", "common.name", false))
+		c.cuerpo.Add(c.campo("address", "common.address", true))
+		c.cuerpo.Add(c.campo("password", "externalMail.password", true))
+		// Donde se crea la contraseña de app: el mismo enlace que la web.
+		c.cuerpo.Add(ui.NuevoEnlace(c.t("externalMail.icloudLink"), tema.TextoSM, ui.Medio, "primary-text", func() {
+			if c.b.Abridor != nil {
+				_ = api.AbrirFuera(c.b.Abridor, api.ICloudMail.AccountPage)
+			}
+		}))
+		// Un dominio propio de iCloud+ o un alias entra con la dirección principal de
+		// iCloud: vacío, el usuario es la dirección de arriba.
+		c.plegable(container.New(ui.Columna{Hueco: tema.Espacio(3)}, c.campo("username", "externalMail.username", false)))
+	default:
 		c.cuerpo.Add(c.parrafo(c.t("externalMail.tlsBody")))
 		for _, f := range []struct {
 			k, label string
@@ -771,30 +800,35 @@ func (c *correoExterno) pintarConfiguracion(oauth bool) {
 		selector.Rotulo = c.t("externalMail.security")
 		selector.Inerte(c.ocupado)
 		detalles.Add(selector)
-		var opciones *ui.Boton
-		opciones = c.boton("externalMail.advanced", func() {
-			c.avanzado = !c.avanzado
-			opciones.Icono = iconos.ChevronDerecha
-			if c.avanzado {
-				detalles.Show()
-				opciones.Icono = iconos.ChevronAbajo
-			} else {
-				detalles.Hide()
-			}
-			opciones.Refresh()
-			c.cuerpo.Refresh()
-			c.d.Refresh()
-			c.d.Recolocar()
-		}).Con(ui.Fantasma, ui.TallaMD)
+		c.plegable(detalles)
+	}
+}
+
+// plegable añade «Avanzado» y, debajo, lo que despliega.
+func (c *correoExterno) plegable(detalles *fyne.Container) {
+	var opciones *ui.Boton
+	opciones = c.boton("externalMail.advanced", func() {
+		c.avanzado = !c.avanzado
 		opciones.Icono = iconos.ChevronDerecha
 		if c.avanzado {
+			detalles.Show()
 			opciones.Icono = iconos.ChevronAbajo
 		} else {
 			detalles.Hide()
 		}
-		c.cuerpo.Add(opciones)
-		c.cuerpo.Add(detalles)
+		opciones.Refresh()
+		c.cuerpo.Refresh()
+		c.d.Refresh()
+		c.d.Recolocar()
+	}).Con(ui.Fantasma, ui.TallaMD)
+	opciones.Icono = iconos.ChevronDerecha
+	if c.avanzado {
+		opciones.Icono = iconos.ChevronAbajo
+	} else {
+		detalles.Hide()
 	}
+	c.cuerpo.Add(opciones)
+	c.cuerpo.Add(detalles)
 }
 
 func (c *correoExterno) pintarServicios() {
@@ -843,7 +877,20 @@ func (c *correoExterno) pintarRevision() {
 }
 
 func (c *correoExterno) pintarPieAsistente(oauth bool) {
-	c.pie.Add(c.boton("common.cancel", func() { c.limpiarClaves(); c.asistente = false; c.errorClave = ""; c.pintar() }).Con(ui.Fantasma, ui.TallaMD))
+	cancelar := c.boton("common.cancel", func() {
+		if c.autorizando != nil {
+			// Deja de esperar al navegador y se queda en el paso: «Autorizar» lo reintenta
+			// con el mismo borrador.
+			c.autorizando()
+			return
+		}
+		c.limpiarClaves()
+		c.asistente = false
+		c.errorClave = ""
+		c.pintar()
+	}).Con(ui.Fantasma, ui.TallaMD)
+	cancelar.Inerte = c.ocupado && c.autorizando == nil
+	c.pie.Add(cancelar)
 	if c.paso > 0 {
 		c.pie.Add(c.boton("common.back", func() { c.paso--; c.pintar() }))
 	}
@@ -883,145 +930,5 @@ func (c *correoExterno) avanzarAsistente(oauth bool) {
 		c.pintar()
 	default:
 		c.conectar()
-	}
-}
-
-func (c *correoExterno) pintarBuzon() {
-	note := "externalMail.refreshNote"
-	if c.cuenta.Provider == "pop3" {
-		note = "externalMail.pop3Note"
-	}
-	c.cuerpo.Add(c.parrafo(c.t(note)))
-	if c.errorClave == "externalMail.authError" {
-		c.cuerpo.Add(c.boton("externalMail.connect", func() { c.salir(func() { c.reconectar(*c.cuenta) }) }))
-	}
-	c.pie.Add(c.boton("common.back", func() {
-		c.salir(func() {
-			c.version++
-			c.cuenta = nil
-			c.mensaje = nil
-			c.mensajes = nil
-			c.aviso = ""
-			c.pintar()
-		})
-	}).Con(ui.Fantasma, ui.TallaMD))
-	c.pie.Add(c.boton("nav.compose", func() { c.redactando = !c.redactando; c.aviso = ""; c.pintar() }))
-	c.pie.Add(c.boton("nav.refresh", func() { c.cargarMensajes(false) }).Con(ui.Fantasma, ui.TallaMD))
-	switch {
-	case c.redactando:
-		c.pintarRedactor()
-	case c.mensaje != nil:
-		c.pintarMensaje()
-	default:
-		c.pintarLista()
-	}
-}
-
-func (c *correoExterno) pintarRedactor() {
-	c.cuerpo.Add(c.parrafo(c.t("externalMail.draftNote")))
-	for _, f := range []struct{ k, label string }{{"to", "compose.to"}, {"cc", "compose.cc"}, {"bcc", "compose.bcc"}, {"subject", "common.subject"}} {
-		c.cuerpo.Add(c.campo(f.k, f.label, f.k == "to"))
-	}
-	c.texto.Rotulo = c.t("compose.bodyLabel")
-	c.texto.Inerte(c.ocupado)
-	c.cuerpo.Add(c.texto)
-	c.cuerpo.Add(c.boton("externalMail.attach", c.adjuntar))
-	for i, a := range c.adjuntos {
-		c.cuerpo.Add(c.parrafo(a.Name))
-		c.cuerpo.Add(c.boton("common.discard", func() { c.adjuntos = append(c.adjuntos[:i], c.adjuntos[i+1:]...); c.pintar() }))
-	}
-	c.pie.Add(c.boton("compose.send", c.enviar).Con(ui.Primario, ui.TallaMD))
-}
-
-func (c *correoExterno) pintarMensaje() {
-	m := c.mensaje
-	c.cuerpo.Add(c.boton("common.back", func() { c.mensaje = nil; c.pintar() }))
-	c.cuerpo.Add(c.parrafo(m.Subject))
-	for _, from := range m.From {
-		c.cuerpo.Add(c.parrafo(from.Email))
-	}
-	text := m.Text
-	if text == "" {
-		text = htmltext.Text(m.HTML)
-	}
-	c.cuerpo.Add(c.parrafo(text))
-	for _, a := range m.Attachments {
-		button := ui.NuevoBoton(a.Name, func() {
-			data, err := base64.StdEncoding.DecodeString(a.ContentBase64)
-			if err != nil {
-				c.errorClave = "externalMail.error"
-				c.pintar()
-				return
-			}
-			c.b.Lanzar(func() { c.b.descargar(a.Name, bytes.NewReader(data)) })
-		}).Con(ui.Secundario, ui.TallaMD)
-		button.Inerte = c.ocupado || a.ContentBase64 == ""
-		c.cuerpo.Add(button)
-	}
-	c.cuerpo.Add(c.boton("compose.replyTitle", func() {
-		c.salir(func() {
-			if len(m.From) > 0 {
-				c.campos["to"].PonerTexto(m.From[0].Email)
-			}
-			subject := m.Subject
-			if !strings.HasPrefix(strings.ToLower(subject), "re:") {
-				subject = "Re: " + subject
-			}
-			c.campos["subject"].PonerTexto(subject)
-			c.redactando = true
-			c.pintar()
-		})
-	}))
-	if c.cuenta.Capabilities.Actions {
-		read, key := "read", "externalMail.markRead"
-		if m.Seen {
-			read, key = "unread", "externalMail.markUnread"
-		}
-		c.cuerpo.Add(c.boton(key, func() { c.accion(read) }))
-		flag, key := "flag", "externalMail.flag"
-		if m.Flagged {
-			flag, key = "unflag", "externalMail.unflag"
-		}
-		c.cuerpo.Add(c.boton(key, func() { c.accion(flag) }))
-		c.cuerpo.Add(c.boton("externalMail.trash", func() { c.accion("trash") }))
-	}
-}
-
-func (c *correoExterno) pintarLista() {
-	names := make([]string, len(c.carpetas))
-	for i, f := range c.carpetas {
-		names[i] = f.Name
-	}
-	selector := ui.NuevoSelector(names, func(index int) {
-		if index < 0 || index >= len(c.carpetas) {
-			return
-		}
-		c.carpeta = c.carpetas[index].ID
-		c.mensaje = nil
-		c.cargarMensajes(false)
-	})
-	for i, f := range c.carpetas {
-		if f.ID == c.carpeta {
-			selector.Elegida = i
-		}
-	}
-	selector.Rotulo = c.t("nav.folders")
-	selector.Inerte(c.ocupado)
-	c.cuerpo.Add(selector)
-	if len(c.mensajes) == 0 {
-		c.cuerpo.Add(c.parrafo(c.t("externalMail.noMessages")))
-	}
-	for _, m := range c.mensajes {
-		subject := m.Subject
-		if subject == "" {
-			subject = c.t("common.noSubject")
-		}
-		button := ui.NuevoBoton(subject, func() { c.leer(m) }).Con(ui.Fantasma, ui.TallaMD)
-		button.Inerte = c.ocupado
-		c.cuerpo.Add(button)
-		c.cuerpo.Add(c.parrafo(m.Snippet))
-	}
-	if c.cursor != "" {
-		c.cuerpo.Add(c.boton("common.loadMore", func() { c.cargarMensajes(true) }))
 	}
 }

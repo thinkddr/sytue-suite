@@ -97,6 +97,8 @@ func NewRouter(d Deps) http.Handler {
 		api.Use(d.Verifier.RequireOrgKind("org"))
 		api.Use(httpx.RateLimit(httpx.RateLimitConfig{Limiter: limitador, KeyFunc: authn.RateKey}))
 		api.Use(conPermisos)
+		// La señal de cambios para el widget del ERP (hubnotify.TrasEscribir).
+		api.Use(h.hub.TrasEscribir(nil, "erp"))
 
 		largas := api.With(middleware.Timeout(plazoPropuesta))
 		largas.Post("/ia/informe", h.ProponerInforme)

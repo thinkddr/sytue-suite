@@ -41,6 +41,9 @@ func main() {
 	// La sesión, la apariencia y el idioma son TRANSVERSALES a las trece apps: esto lo
 	// lee de donde lo dejó la última que lo tocó. `Abrir` no habla con la red.
 	s := sesion.Abrir(a, "")
+	// El cromo «papel» de toda la suite (ADR 0080). Aquí y no en `sesion.Abrir`: las
+	// pruebas que abren sesión comprueban también el cromo de color.
+	tema.ElegirCromo(tema.CromoPapel)
 
 	// El idioma lo decide el SISTEMA, igual que en la web lo decide el middleware:
 	// nunca se detecta dentro de una vista. Uno que la suite no sirva cae al inglés.
@@ -54,8 +57,10 @@ func main() {
 	// apps, el token está en el llavero y la primera carga ya trae datos. Sin nadie
 	// dentro, la carga falla y se pinta el estado de error —con su «Reintentar»—, que
 	// es lo honesto; en cuanto se entra desde el menú de cuenta, se vuelve a pedir todo.
-	p := erp.NuevaPantalla(t, api.NewERP(s.URL("erp"), s.Sesion, nil, string(l)), nil)
-	p.Widget = s.CapturarWidget
+	p := erp.NuevaPantalla(t, api.NewERP(s.URL("erp"), s.Sesion, s.ClienteConAviso(nil), string(l)), nil)
+	// El widget nativo lo lee su propia Fuente, sin depender de la pantalla, y se
+	// vuelve a publicar tras cada escritura del cliente de arriba (ClienteConAviso).
+	s.PublicadorWidget(s.FuenteWidget(t))
 	// Subir documentos e importar CSV usan el selector de ficheros DEL SISTEMA, como el
 	// `<input type="file">` de la web.
 	switch runtime.GOOS {
@@ -81,9 +86,11 @@ func main() {
 			}
 		}()
 	}
-	dentro := s.Estado().Dentro()
+	// conEscena: hasta que corre lo de CuandoHayaEscena, el AlCambiar solo apunta quién
+	// está (sesion.CuandoHayaEscena).
+	dentro, conEscena := s.Estado().Dentro(), false
 	s.AlCambiar(func(e sesion.Estado) {
-		if e.Dentro() && !dentro {
+		if e.Dentro() && !dentro && conEscena {
 			p.Arrancar()
 			saludar()
 		}
@@ -102,10 +109,14 @@ func main() {
 	w.SetContent(barra.Montar(p.Objeto()))
 	p.Atajos(w.Canvas(), barra)
 	w.Resize(fyne.NewSize(1280, 744))
-	p.Arrancar()
-	if dentro {
-		saludar()
-	}
+	// Con interfaz: lanzada por iOS solo para el widget no se pide nada.
+	s.CuandoHayaEscena(func() {
+		conEscena = true
+		p.Arrancar()
+		if dentro {
+			saludar()
+		}
+	})
 	// El aviso de una tarea asignada abre la vista de tareas (`?vista=tareas`), como la
 	// web.
 	s.AlAbrirURL(func(u *url.URL) {

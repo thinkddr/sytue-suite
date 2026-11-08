@@ -26,12 +26,14 @@ type rejillaRenderer struct {
 	version int
 
 	marco, cabeza, anillo, ancla *canvas.Rectangle
+	// resalte es el recuadro de «suelta aquí», encima de todo: las filas tapaban el borde.
+	resalte *canvas.Rectangle
 	// fondos[fila] es el fondo de la fila: alterno, bajo el puntero o con el foco.
 	fondos           []*canvas.Rectangle
 	lineas           []*canvas.Rectangle
 	glifos           []fyne.CanvasObject
 	titulos, numeros []*canvas.Text
-	borrar           []*ui.Boton
+	abrir            []*ui.Boton
 	// textos[fila][col] es el texto de la celda; nil donde va una casilla o chips.
 	textos   [][]*canvas.Text
 	casillas map[celda]fyne.CanvasObject
@@ -67,13 +69,16 @@ func (r *rejillaRenderer) armar() {
 	r.marco = canvas.NewRectangle(tema.Color("surface", v))
 	r.marco.CornerRadius, r.marco.StrokeWidth, r.marco.StrokeColor = tema.RadioLG, tema.Borde, tema.Color("border", v)
 	r.cabeza = canvas.NewRectangle(tema.Color("bg-subtle", v))
-	r.cabeza.CornerRadius = tema.RadioLG
+	// Solo arriba, con la esquina de dentro del marco: entera dejaba una muesca abajo.
+	r.cabeza.TopLeftCornerRadius, r.cabeza.TopRightCornerRadius = esquinaDentro, esquinaDentro
 	r.anillo = canvas.NewRectangle(color.Transparent)
 	r.anillo.StrokeWidth, r.anillo.StrokeColor = tema.AnilloFoco, tema.Color("focus-ring", v)
 	r.ancla = canvas.NewRectangle(color.Transparent)
+	r.resalte = canvas.NewRectangle(color.Transparent)
+	r.resalte.CornerRadius, r.resalte.StrokeWidth, r.resalte.StrokeColor = tema.RadioLG, tema.AnilloFoco, tema.Color("focus-ring", v)
 	r.objetos = []fyne.CanvasObject{r.marco, r.cabeza}
 
-	muestra := ui.NuevoBoton("", nil).Con(ui.Fantasma, ui.TallaSM).ConIcono(iconos.Papelera, 14)
+	muestra := ui.NuevoBoton("", nil).Con(ui.Fantasma, ui.TallaSM).ConIcono(iconos.Maximizar, 14)
 	muestra.SoloIcono = true
 	r.ladoBoton = ui.MedidaBotonDe(muestra).Height
 	r.alto = 2*tema.Espacio(1.5) + r.ladoBoton
@@ -88,7 +93,7 @@ func (r *rejillaRenderer) armar() {
 		r.anchos[i] = ladoIconoCabeza + huecoCabeza + ui.Medir(c.Name, tema.TextoSM, ui.SemiNegrita).Width
 	}
 
-	r.fondos, r.lineas, r.numeros, r.borrar, r.textos = r.fondos[:0], r.lineas[:0], r.numeros[:0], r.borrar[:0], r.textos[:0]
+	r.fondos, r.lineas, r.numeros, r.abrir, r.textos = r.fondos[:0], r.lineas[:0], r.numeros[:0], r.abrir[:0], r.textos[:0]
 	r.casillas = map[celda]fyne.CanvasObject{}
 	r.chips = map[celda][]*ui.Insignia{}
 	r.masChips = map[celda]*ui.Insignia{}
@@ -97,11 +102,11 @@ func (r *rejillaRenderer) armar() {
 		r.anchos[i] = min(max(r.anchos[i]+2*margenCelda, minCelda), maxCelda)
 	}
 	r.ancho0 = 2*margenFila0 + anchoNumero
-	if g.PuedeEditar {
+	if g.AlAbrir != nil {
 		r.ancho0 += tema.Espacio(1) + r.ladoBoton
 	}
 	r.ancho0 = max(r.ancho0, tema.Espacio(12))
-	r.objetos = append(r.objetos, r.ancla, r.anillo)
+	r.objetos = append(r.objetos, r.ancla, r.anillo, r.resalte)
 	r.conEditor = nil
 	if g.editando && g.editor != nil {
 		r.conEditor = g.editor
@@ -117,6 +122,10 @@ func (r *rejillaRenderer) armarFilas(tinta, apagada color.NRGBA) float32 {
 	var anchoNumero float32
 	for fila, reg := range g.Registros {
 		fondo := canvas.NewRectangle(color.Transparent)
+		if fila == len(g.Registros)-1 {
+			// La última fila no sale por las esquinas de abajo del marco.
+			fondo.BottomLeftCornerRadius, fondo.BottomRightCornerRadius = esquinaDentro, esquinaDentro
+		}
 		linea := canvas.NewRectangle(tema.Color("border", v))
 		n := strconv.Itoa(g.Desde + fila + 1)
 		numero := ui.Texto(n, tema.TextoXS, ui.Normal, apagada)
@@ -124,14 +133,11 @@ func (r *rejillaRenderer) armarFilas(tinta, apagada color.NRGBA) float32 {
 		r.fondos, r.lineas, r.numeros = append(r.fondos, fondo), append(r.lineas, linea), append(r.numeros, numero)
 		// Los fondos van debajo de todo lo de la fila.
 		r.objetos = append(r.objetos, fondo, linea, numero)
-		if g.PuedeEditar {
-			b := ui.NuevoBoton(g.t("grid.deleteRecord", i18n.Vars{"n": g.Desde + fila + 1}), func() {
-				if g.AlBorrar != nil {
-					g.AlBorrar(reg)
-				}
-			}).Con(ui.Fantasma, ui.TallaSM).ConIcono(iconos.Papelera, 14)
+		if g.AlAbrir != nil {
+			b := ui.NuevoBoton(g.t("grid.row", i18n.Vars{"n": g.Desde + fila + 1}), func() { g.AlAbrir(reg) }).
+				Con(ui.Fantasma, ui.TallaSM).ConIcono(iconos.Maximizar, 14)
 			b.SoloIcono = true
-			r.borrar = append(r.borrar, b)
+			r.abrir = append(r.abrir, b)
 			r.objetos = append(r.objetos, b)
 		}
 		textos := make([]*canvas.Text, len(g.Campos))
@@ -261,16 +267,22 @@ func (r *rejillaRenderer) Layout(t fyne.Size) {
 	}
 	interior := max(t.Width-2*tema.Borde, 0)
 	r.marco.Resize(t)
+	r.resalte.Resize(t)
+	r.resalte.Hidden = !g.resaltada
 	r.cabeza.Move(fyne.NewPos(tema.Borde, tema.Borde))
 	r.cabeza.Resize(fyne.NewSize(interior, altoCabeza-tema.Borde))
 	yGlifo := (altoCabeza - ladoIconoCabeza) / 2
 	for i := range g.Campos {
 		x, ancho := r.columna(i)
-		r.glifos[i].Move(fyne.NewPos(x+margenCelda, yGlifo))
+		xg := x + margenCelda
+		medido := ui.Truncar(r.titulos[i], g.Campos[i].Name, tema.TextoSM, ui.SemiNegrita, max(ancho-2*margenCelda-ladoIconoCabeza-huecoCabeza, 0))
+		if alineaALaDerecha(g.Campos[i]) {
+			// `justify-end`: la cabecera de un número va sobre sus cifras.
+			xg = x + ancho - margenCelda - medido - huecoCabeza - ladoIconoCabeza
+		}
+		r.glifos[i].Move(fyne.NewPos(xg, yGlifo))
 		r.glifos[i].Resize(fyne.NewSquareSize(ladoIconoCabeza))
-		xt := x + margenCelda + ladoIconoCabeza + huecoCabeza
-		ui.Truncar(r.titulos[i], g.Campos[i].Name, tema.TextoSM, ui.SemiNegrita, max(x+ancho-margenCelda-xt, 0))
-		ui.ColocarTexto(r.titulos[i], tema.TextoSM, xt, tema.Espacio(2))
+		ui.ColocarTexto(r.titulos[i], tema.TextoSM, xg+ladoIconoCabeza+huecoCabeza, tema.Espacio(2))
 	}
 	yTexto := (r.alto - tema.TextoSM.Linea) / 2
 	for fila := range g.Registros {
@@ -280,8 +292,8 @@ func (r *rejillaRenderer) Layout(t fyne.Size) {
 		r.lineas[fila].Move(fyne.NewPos(tema.Borde, y))
 		r.lineas[fila].Resize(fyne.NewSize(interior, tema.Borde))
 		ui.ColocarTexto(r.numeros[fila], tema.TextoXS, margenFila0, y+(r.alto-tema.TextoXS.Linea)/2)
-		if fila < len(r.borrar) {
-			b := r.borrar[fila]
+		if fila < len(r.abrir) {
+			b := r.abrir[fila]
 			b.Move(fyne.NewPos(r.ancho0-margenFila0-r.ladoBoton, y+(r.alto-r.ladoBoton)/2))
 			b.Resize(fyne.NewSquareSize(r.ladoBoton))
 		}

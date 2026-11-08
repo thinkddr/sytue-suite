@@ -47,6 +47,9 @@ type Miniatura struct {
 	// AlMover recibe el índice de destino con Ctrl/⌘+Mayús+↑/↓: reordenar sin ratón.
 	// nil = el carril no se deja reordenar (solo lectura).
 	AlMover func(hasta int)
+	// AlAtajo recibe antes que nada los atajos con modificador y dice si eran suyos: los
+	// del marco (Ctrl/⌘+P y el zoom), que con el foco aquí no le llegarían a la ventana.
+	AlAtajo func(*desktop.CustomShortcut) bool
 	// Rotulo traduce una clave del catálogo (para el nombre accesible).
 	Rotulo   func(clave string, n, total int) string
 	Variante tema.Variante
@@ -112,6 +115,9 @@ func (t *Miniatura) TypedKey(e *fyne.KeyEvent) {
 // quien navega con teclado, y el orden de las diapositivas no es un adorno».
 func (t *Miniatura) TypedShortcut(s fyne.Shortcut) {
 	c, ok := s.(*desktop.CustomShortcut)
+	if ok && t.AlAtajo != nil && t.AlAtajo(c) {
+		return
+	}
 	if !ok || t.AlMover == nil || c.Modifier&fyne.KeyModifierShift == 0 ||
 		c.Modifier&(fyne.KeyModifierControl|fyne.KeyModifierSuper) == 0 {
 		return

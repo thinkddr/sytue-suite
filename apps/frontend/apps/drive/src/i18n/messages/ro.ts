@@ -278,6 +278,16 @@ export const ro: AppCatalog<typeof en> = {
     few: '{count} elemente mutate în coșul de gunoi.',
     other: '{count} de elemente mutate în coșul de gunoi.',
   },
+  'files.batch.restored': {
+    one: '1 element restaurat.',
+    few: '{count} elemente restaurate.',
+    other: '{count} de elemente restaurate.',
+  },
+  'files.batch.restorePartial': {
+    one: '1 element nu a putut fi restaurat și rămâne în coșul de gunoi.',
+    few: '{count} elemente nu au putut fi restaurate și rămân în coșul de gunoi.',
+    other: '{count} de elemente nu au putut fi restaurate și rămân în coșul de gunoi.',
+  },
   'files.batch.trashFailed': 'Selecția nu a putut fi mutată în coșul de gunoi.',
   'files.batch.moveTitle': {
     one: 'Mutați 1 element',
@@ -300,6 +310,9 @@ export const ro: AppCatalog<typeof en> = {
   'action.rename': 'Redenumiți',
   'action.move': 'Mutați în…',
   'action.copy': 'Faceți o copie',
+  'action.copyLink': 'Copiați linkul',
+  'action.linkCopied': 'Linkul a fost copiat. Se deschide doar pentru cei care au deja acces.',
+  'action.copyLinkFailed': 'Linkul nu a putut fi copiat.',
   'action.shareLink': 'Partajați linkul',
   'action.openInApp': 'Deschideți în aplicație',
   'action.openInEditor': 'Deschideți în editor',
@@ -524,6 +537,20 @@ export const ro: AppCatalog<typeof en> = {
   'trash.purged': '„{name}” a fost șters definitiv.',
   'trash.purgeDenied': '„{name}” nu poate fi șters',
   'trash.purgeFailed': 'Ștergerea nu a reușit.',
+  'trash.emptyAll': 'Goliți coșul de gunoi',
+  'trash.emptyAllTitle': 'Goliți coșul de gunoi?',
+  'trash.emptyAllBody': {
+    one: 'Elementul din coșul de gunoi va fi șters definitiv, împreună cu istoricul versiunilor. Nu va mai putea fi recuperat.',
+    few: 'Cele {count} elemente din coșul de gunoi vor fi șterse definitiv, împreună cu istoricul versiunilor. Nu vor mai putea fi recuperate.',
+    other:
+      'Cele {count} de elemente din coșul de gunoi vor fi șterse definitiv, împreună cu istoricul versiunilor. Nu vor mai putea fi recuperate.',
+  },
+  'trash.emptiedAll': 'Coșul de gunoi a fost golit.',
+  'trash.emptyAllPartial': {
+    one: '1 element nu a putut fi șters și rămâne în coșul de gunoi.',
+    few: '{count} elemente nu au putut fi șterse și rămân în coșul de gunoi.',
+    other: '{count} de elemente nu au putut fi șterse și rămân în coșul de gunoi.',
+  },
   'trash.purgeTitle': 'Ștergeți definitiv?',
   'trash.purgeBodyFolder':
     'Conținutul „{name}” și al tuturor elementelor din interior va fi eliminat de pe serverele Sytue, împreună cu istoricul versiunilor. Nu va mai putea fi recuperat, nici de aici, nici prin asistență. În schimb, eliberați spațiul pe care îl ocupa.',

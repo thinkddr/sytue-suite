@@ -54,7 +54,9 @@ func TestLaCasillaDelDespertarSoloConElModoDeFondo(t *testing.T) {
 	t.Cleanup(func() { fyne.SetCurrentApp(antes) })
 	t.Cleanup(widgets.SimularLector(true))
 	t.Cleanup(widgets.SimularInstalados(1))
-	s := suiteConSesion(t)
+	// Contra un dominio que no existe: encender el despertar intenta registrar el
+	// aparato en el Hub, y este test no lo necesita ni debe salir a producción.
+	s := suiteConSesionEn(t, "sytue.invalid")
 	s.PublicadorWidget(func(context.Context) (widgets.Detail, error) { return widgets.Detail{}, nil })
 	escena := s.ProbarSinEscena()
 	escena.Conectar()
@@ -78,8 +80,12 @@ func TestLaCasillaDelDespertarSoloConElModoDeFondo(t *testing.T) {
 		t.Fatal("la casilla tiene que empezar apagada")
 	}
 
-	// Que no se pueda guardar: una carpeta de ajustes relativa la rechaza el sistema.
+	// Que no se pueda guardar, en CUALQUIER sistema. En Linux la carpeta de ajustes
+	// sale de XDG_CONFIG_HOME, y relativa la rechaza; en macOS sale de $HOME e ignora
+	// XDG, así que solo con lo primero el guardado funcionaba y la casilla se quedaba
+	// marcada (fallaba en el Mac, no en el CI). Sin HOME, os.UserConfigDir da error.
 	t.Setenv("XDG_CONFIG_HOME", "relativa")
+	t.Setenv("HOME", "")
 	test.NewTempWindow(t, casilla)
 	var pedido atomic.Bool
 	if alCambiar := casilla.AlCambiar; alCambiar != nil {

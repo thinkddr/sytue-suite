@@ -348,7 +348,7 @@ func Load(defaultPort string) (Config, error) {
 		// Pinneadas por tag (no :latest); en prod, re-pinnear por digest tras
 		// verificar con un build vivo (como KANIKO_IMAGE).
 		CNBBuilderImage: l.GetDefault("CNB_BUILDER_IMAGE", "paketobuildpacks/builder-jammy-base:0.4.681@sha256:7192795369e3c5bed59f5f63ed2542dee9efdfd016404d417bcda36f47c602d8"),
-		CNBGitImage:     l.GetDefault("CNB_GIT_IMAGE", "alpine/git:2.54.0@sha256:ac6c828f15d82775d204d3d75112e1d34af8945da80ccf922713c9891ba68e7a"),
+		CNBGitImage:     l.GetDefault("CNB_GIT_IMAGE", "alpine/git:2.54.0@sha256:6a1fdb962814ca11508ca8d1bab94375b5b7ac4e4a9a40981c29fc32c02f095d"),
 		CNBRunImage:     l.Get("CNB_RUN_IMAGE"),
 
 		BuildNamespace:      l.GetDefault("BUILD_NAMESPACE", "sytue-builds"),

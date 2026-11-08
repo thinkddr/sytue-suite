@@ -98,13 +98,18 @@ func (sesionDePrueba) Invalidate(string)                           {}
 
 // suiteConSesion es una `sesion.Suite` de verdad con alguien dentro, aislada del
 // llavero y de los ajustes de quien ejecuta las pruebas.
-func suiteConSesion(t *testing.T) *sesion.Suite {
+func suiteConSesion(t *testing.T) *sesion.Suite { t.Helper(); return suiteConSesionEn(t, "sytue.eu") }
+
+// suiteConSesionEn la abre contra `dominio`. `sytue.invalid` (RFC 2606) nunca resuelve:
+// para el test que dispara llamadas al Hub sin necesitarlas, que con "sytue.eu" salían a
+// producción con un token de mentira (401 en cada ejecución, también desde el CI).
+func suiteConSesionEn(t *testing.T, dominio string) *sesion.Suite {
 	t.Helper()
 	casa := t.TempDir()
 	t.Setenv("HOME", casa)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(casa, ".config"))
 	keyring.MockInit()
-	s := sesion.Abrir(fyne.CurrentApp(), "sytue.eu")
+	s := sesion.Abrir(fyne.CurrentApp(), dominio)
 	s.Sesion.Adoptar(auth.Tokens{Access: "tok", Refresh: "r", Subject: "ada", Expiry: time.Now().Add(time.Hour)})
 	return s
 }

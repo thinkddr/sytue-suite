@@ -109,6 +109,12 @@ func TestElAvisoConDeshacerDuraDiezSegundos(t *testing.T) {
 // `-race` tumba a ese otro (run 2593, `TestCargandoRelevaAlIconoYAtenuaMenos`).
 func pilaQueSeVacia(t *testing.T) *PilaAvisos {
 	p := NuevaPilaAvisos()
+	// EN SU PROPIA VENTANA. Suelta, la pila pregunta al driver de pruebas por «su»
+	// lienzo y este responde con el de cualquier ventana abierta: si un test anterior
+	// dejó ahí una capa de la suite, la pila le cede los avisos y no los coloca
+	// (ci-desktop de v3.19.7: el aviso en {0 56} midiendo 60). Con ventana propia no
+	// hereda nada.
+	test.NewTempWindow(t, p)
 	t.Cleanup(func() {
 		for _, a := range p.Avisos() {
 			p.Descartar(a)

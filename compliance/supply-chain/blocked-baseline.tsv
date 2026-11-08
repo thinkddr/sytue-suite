@@ -25,7 +25,6 @@ api.appstoreconnect.apple.com	apps/fyne/scripts/apple-cms-existing-validate.py
 api.push.apple.com	platform/pkg/apns/apns.go
 api.sandbox.push.apple.com	platform/pkg/apns/apns.go
 api.appstoreconnect.apple.com	apps/fyne/scripts/appstore-publicar.py
-appstoreconnect.apple.com	.github/workflows/imagenes-produccion.yml
 www.apple.com	apps/fyne/scripts/apple-firma.sh
 charts.jetstack.io	deploy/hybrid-production/bin/deploy-cloud.sh
 charts.jetstack.io	deploy/hybrid-production/bin/deploy-core.sh

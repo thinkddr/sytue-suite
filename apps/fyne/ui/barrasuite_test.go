@@ -705,9 +705,13 @@ func TestElBuscadorSeAbreYSeCierraSinRobarElFoco(t *testing.T) {
 // los `fyne.Do` que llegan de otras rutinas (el reloj del buscador, la respuesta de la
 // red) y los ejecuta en la del test en su siguiente punto de sincronía. Sin él, lo que la
 // espera tiene que ver no llega a pasar nunca mientras se espera.
+// esperar da hasta 10 s de RELOJ, no un número de vueltas: 60 vueltas de 20 ms eran
+// 1,2 s y en un runner cargado el cierre de sesión tardaba más («el cierre compartido no
+// terminó», ci-desktop de v3.19.7). Si llega antes, vuelve en cuanto está listo.
 func esperar(t *testing.T, listo func() bool) {
 	t.Helper()
-	for range 60 {
+	limite := time.Now().Add(10 * time.Second)
+	for time.Now().Before(limite) {
 		fyne.DoAndWait(func() {})
 		if listo() {
 			return

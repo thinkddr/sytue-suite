@@ -29,6 +29,14 @@ paths = [
   # Los dos productores de almacenamiento generan aquí únicamente claves desechables
   # y exigen artificial=true al consumir el vector del otro SDK.
   '''test/fixtures/storage-matrix-(go|js)\.json$''',
+  # Vectores de prueba del envoltorio de la clave de recuperación (ADR 0082): claves de
+  # envoltorio sintéticas y deterministas para que Go y JS comprueben el mismo AAD.
+  '''apps/nucleo/recoverywrap/testdata/vectors\.json$''',
+  # Certificados PKCS#12 de PRUEBA (clásico y moderno) de los tests de firma y Verifactu:
+  # generados para los tests, sin valor fuera de ellos.
+  '''(platform/pkg/pkcs12|services/syerp/internal/verifactu)/testdata/(clasico|moderno)\.p12$''',
+  # El test del contexto de trabajo Android compara HASHES de ficheros del SDK, no claves.
+  '''apps/fyne/scripts/android-work-context-test\.py$''',
 ]
 # REFERENCIAS a variables de Terraform, no valores. `secret_key = var.hetzner_s3_secret_key`
 # es un puntero a un TF_VAR_* que se inyecta en tiempo de ejecución; el secreto NUNCA está

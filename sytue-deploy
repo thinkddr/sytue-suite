@@ -567,7 +567,7 @@ requisitos_compose() {
     # Desktop vive dentro de su máquina virtual.
     local raiz libre
     raiz="$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || true)"
-    if [ -n "$raiz" ] && [ -d "$raiz" ]; then
+    if [ "$NO_BUILD" -eq 0 ] && [ -n "$raiz" ] && [ -d "$raiz" ]; then
       libre=$(( $(df -Pk "$raiz" | awk 'NR==2 {print $4}') / 1024 / 1024 ))
       if [ "$libre" -lt 25 ]; then
         warn "Quedan ${libre} GB libres en ${raiz}; la primera construcción necesita unos 25 GB (libera con «docker system prune»)."

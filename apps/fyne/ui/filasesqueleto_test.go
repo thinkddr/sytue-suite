@@ -245,11 +245,16 @@ func TestLasFilasConRecetaSiguenSuGeometria(t *testing.T) {
 // FilasEsqueleto con su receta, no un layout propio con un `Esqueleto` por bloque, que
 // late cada uno a su aire y anuncia la carga por su cuenta (o no la anuncia).
 //
+// Mira todas las apps del módulo, no solo las que ya se habían pasado.
+//
 // VISTO EN ROJO con las recetas de Mail, Contactos, Rooms, Notes y Calendar.
 func TestNingunaAppMontaSusFilasDeCarga(t *testing.T) {
 	receta := regexp.MustCompile(`(?m)^type (filaEsqueleto|filaCarga|EsqueletoMensajes|EsqueletoCanales|Esqueleto)\b`)
-	for _, dir := range []string{"../apps", "../contactos", "../calendario"} {
+	for _, dir := range []string{".."} {
 		err := filepath.WalkDir(dir, func(ruta string, d fs.DirEntry, err error) error {
+			if err == nil && d.IsDir() && fueraDelGuardian[filepath.ToSlash(ruta)] {
+				return filepath.SkipDir
+			}
 			if err != nil || d.IsDir() || !strings.HasSuffix(ruta, ".go") || strings.HasSuffix(ruta, "_test.go") {
 				return err
 			}

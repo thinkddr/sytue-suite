@@ -87,22 +87,25 @@ func TestLosEsqueletosMidenLoDeLaWeb(t *testing.T) {
 	cerca(t, "la caja de línea de la cifra (h-7.5)", tema.TextoXL.Linea, 1.875*rem)
 	cerca(t, "la de la pista (h-4)", tema.TextoXS.Linea, rem)
 	cerca(t, "la tarjeta del resumen", AltoKPI, 2*tema.Borde+2*rem+1.25*rem+0.25*rem+1.875*rem+0.25*rem+rem)
-	_, alto := tarjetaKPIEsqueleto(tema.Claro, 280)
+	_, alto := tarjetaKPIEsqueleto(tema.Claro, ui.NuevosBloquesEsqueleto(), 280)
 	cerca(t, "la tarjeta del resumen sin datos", alto, AltoKPI)
 }
 
-// esqueletosDe cuenta los bloques de carga y las ruedas de un objeto.
-func esqueletosDe(o fyne.CanvasObject) (esqueletos, ruedas int, barras []*ui.Esqueleto) {
+// esqueletosDe cuenta las barras de carga —sueltas o de un `ui.BloquesEsqueleto`— y las
+// ruedas de un objeto, y devuelve los grupos.
+func esqueletosDe(o fyne.CanvasObject) (esqueletos, ruedas int, grupos []*ui.BloquesEsqueleto) {
 	recorrer(o, func(x fyne.CanvasObject) {
 		switch e := x.(type) {
 		case *ui.Esqueleto:
 			esqueletos++
-			barras = append(barras, e)
+		case *ui.BloquesEsqueleto:
+			esqueletos += len(e.Bloques())
+			grupos = append(grupos, e)
 		case *ui.Rueda:
 			ruedas++
 		}
 	})
-	return esqueletos, ruedas, barras
+	return esqueletos, ruedas, grupos
 }
 
 // TestLaListaQueCargaPintaLaFormaDeLaTabla: seis filas con una barra por columna de
@@ -121,17 +124,25 @@ func TestLaListaQueCargaPintaLaFormaDeLaTabla(t *testing.T) {
 	w.Resize(fyne.NewSize(900, alto+20))
 	guardarPNG(t, w.Canvas().Capture(), "erp-lista-cargando.png")
 	w.Close()
-	n, ruedas, barras := esqueletosDe(o)
+	n, ruedas, grupos := esqueletosDe(o)
 	if ruedas != 0 {
 		t.Errorf("la lista que carga pinta %d ruedas", ruedas)
 	}
-	if n != FilasEsqueletoLista*cols {
-		t.Errorf("la lista que carga pinta %d barras y deberían ser %d×%d", n, FilasEsqueletoLista, cols)
+	// Todas las barras en UN grupo, que late a una. VISTO EN ROJO con una
+	// `ui.Esqueleto` por barra: «0 grupos».
+	if n != FilasEsqueletoLista*cols || len(grupos) != 1 {
+		t.Fatalf("la lista que carga pinta %d barras en %d grupos y deberían ser %d×%d en uno", n, len(grupos), FilasEsqueletoLista, cols)
 	}
-	for _, b := range barras {
-		if b.Fraccion <= 0 || b.Fraccion >= 1 {
-			t.Errorf("una barra ocupa %g de su celda: todas iguales parecen ladrillos", b.Fraccion)
+	celda := (900 - 2*tema.Borde - 2*EsqueletoPX - float32(cols-1)*EsqueletoHueco) / float32(cols)
+	anchos := map[float32]bool{}
+	for _, b := range grupos[0].Bloques() {
+		anchos[b.Size().Width] = true
+		if w := b.Size().Width; w <= 0 || w >= celda {
+			t.Errorf("una barra mide %g de una celda de %g: todas enteras parecen ladrillos", w, celda)
 		}
+	}
+	if len(anchos) < 3 {
+		t.Errorf("las barras solo tienen %d anchos distintos", len(anchos))
 	}
 	// Con filas ya pintadas, recargar no las cambia por el esqueleto.
 	l.Pagina = paginaEjemplo()
@@ -158,9 +169,9 @@ func TestLaPortadaQueCargaPintaLosIndicadores(t *testing.T) {
 	w.Resize(fyne.NewSize(1000, 240))
 	guardarPNG(t, w.Canvas().Capture(), "erp-portada-cargando.png")
 	w.Close()
-	n, ruedas, _ := esqueletosDe(portada)
-	if ruedas != 0 || n != 3*3 {
-		t.Errorf("la portada que carga pinta %d barras y %d ruedas; deberían ser 9 y 0", n, ruedas)
+	n, ruedas, grupos := esqueletosDe(portada)
+	if ruedas != 0 || n != 3*3 || len(grupos) != 1 {
+		t.Errorf("la portada que carga pinta %d barras en %d grupos y %d ruedas; deberían ser 9 en uno y 0", n, len(grupos), ruedas)
 	}
 
 	b = portadaArnes(t, 1280)

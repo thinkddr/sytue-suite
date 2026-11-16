@@ -191,11 +191,13 @@ func (p *Portada) recomponer() {
 		m.insignia = ui.NuevaInsignia(i18n.FormatNumber(p.loc, float64(len(p.Lista))), ui.InsigniaNeutra)
 	}
 	m.peticiones = p.seccionPeticiones()
-	m.cuerpo, m.tarjetas, m.esqueletos = p.cuerpoRecientes(), nil, nil
+	m.cuerpo, m.tarjetas, m.esqueletos, m.carga = p.cuerpoRecientes(), nil, nil, nil
 	if p.Lista == nil && !p.Fallo {
+		m.carga = ui.NuevosBloquesEsqueleto()
 		for range esqueletosRecientes {
-			m.esqueletos = append(m.esqueletos, nuevoMoldeTarjeta(v))
+			m.esqueletos = append(m.esqueletos, nuevoMoldeTarjeta(v, m.carga))
 		}
+		m.carga.AMano(m.esqueletos...)
 	}
 	if len(p.Lista) > 0 {
 		for _, f := range Filtrados(p.Lista, p.consulta) {
@@ -217,7 +219,9 @@ func (p *Portada) recomponer() {
 	for _, c := range m.tarjetas {
 		objs = append(objs, c)
 	}
-	objs = append(objs, m.esqueletos...)
+	if m.carga != nil {
+		objs = append(objs, m.carga)
+	}
 	p.vista.Objects = objs
 }
 
@@ -403,7 +407,10 @@ type marcoPortada struct {
 	peticiones      *fyne.Container
 	tarjetas        []*tarjetaPDF
 	esqueletos      []fyne.CanvasObject
-	ventana, alto   float32
+	// carga es el grupo de los moldes de `esqueletos`: laten a una y dicen «Cargando»
+	// una vez. Los coloca este layout, como a las tarjetas (ui.BloquesEsqueleto.AMano).
+	carga         *ui.BloquesEsqueleto
+	ventana, alto float32
 }
 
 // rejillaPDF es `grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4`.
@@ -523,6 +530,7 @@ func (m *marcoPortada) Layout(_ []fyne.CanvasObject, t fyne.Size) {
 	if m.ventana != t.Width {
 		m.ventana = t.Width
 	}
+	m.carga.Cubrir(t)
 	alto := m.colocar(t, true)
 	if math.Abs(float64(alto-m.alto)) > 0.01 {
 		m.alto = alto
@@ -651,19 +659,23 @@ func (r *accesoPDFRenderer) Refresh() {
 // entera de esqueleto y, en `p-3 gap-0.5`, una línea de nombre (`1em` en su `1lh`, al
 // 70 %) y otra `text-sm` (`0.75em`, al 45 %). Mide lo que [tarjetaPDF]: al llegar la
 // lista, cada tarjeta ocupa el sitio de su molde.
+//
+// Sus tres bloques son del grupo `g`, el de todos los moldes de la portada.
 type moldeTarjeta struct {
 	caja                *ui.Caja
-	banda, nombre, meta *ui.Esqueleto
+	banda, nombre, meta *canvas.Rectangle
 }
 
-func nuevoMoldeTarjeta(v tema.Variante) *fyne.Container {
+func nuevoMoldeTarjeta(v tema.Variante, g *ui.BloquesEsqueleto) *fyne.Container {
 	m := &moldeTarjeta{
 		caja:   ui.NuevaCaja(tema.Color("surface", v), tema.Color("border", v), tema.RadioLG),
-		banda:  ui.NuevoEsqueleto(0, editor.AltoBandaTesela),
-		nombre: ui.NuevoEsqueleto(0, tema.TextoRaiz.Tam),
-		meta:   ui.NuevoEsqueleto(0, 0.75*tema.TextoSM.Tam),
+		banda:  g.Bloque(0, editor.AltoBandaTesela),
+		nombre: g.Bloque(0, tema.TextoRaiz.Tam),
+		meta:   g.Bloque(0, 0.75*tema.TextoSM.Tam),
 	}
-	m.banda.Radio, m.banda.SoloArriba = tema.RadioLG-tema.Borde, true
+	// La banda solo redondea arriba: abajo la recorta la tarjeta.
+	radio := tema.RadioLG - tema.Borde
+	m.banda.CornerRadius, m.banda.TopLeftCornerRadius, m.banda.TopRightCornerRadius = 0, radio, radio
 	return container.New(m, append(m.caja.Objetos(), m.banda, m.nombre, m.meta)...)
 }
 
@@ -679,8 +691,8 @@ func (m *moldeTarjeta) Layout(_ []fyne.CanvasObject, t fyne.Size) {
 	x := b + editor.RellenoTesela
 	y := b + editor.AltoBandaTesela + editor.RellenoTesela
 	cabe := max(t.Width-2*x, 0)
-	linea := func(e *ui.Esqueleto, esc tema.Escalon, y, parte float32) {
-		alto := ui.MedidaEsqueleto(e).Height
+	linea := func(e *canvas.Rectangle, esc tema.Escalon, y, parte float32) {
+		alto := e.MinSize().Height
 		e.Move(fyne.NewPos(x, y+(esc.Linea-alto)/2))
 		e.Resize(fyne.NewSize(cabe*parte, alto))
 	}

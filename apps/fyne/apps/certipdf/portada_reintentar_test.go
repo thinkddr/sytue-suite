@@ -120,6 +120,11 @@ func TestLaPortadaCargaConEsqueletosDeTarjeta(t *testing.T) {
 	if len(m.esqueletos) != esqueletosRecientes {
 		t.Fatalf("cargando hay %d esqueletos; la web pinta %d", len(m.esqueletos), esqueletosRecientes)
 	}
+	// Los tres bloques de cada molde son de UN grupo de carga, que late a una. VISTO EN
+	// ROJO con un `ui.Esqueleto` por bloque: no había grupo.
+	if m.carga == nil || len(m.carga.Bloques()) != 3*esqueletosRecientes {
+		t.Errorf("los moldes no son un grupo de %d bloques", 3*esqueletosRecientes)
+	}
 	primero, segundo := m.esqueletos[0], m.esqueletos[1]
 	if h := primero.Size().Height; h != editor.MedidaTesela() {
 		t.Errorf("el molde mide %g de alto; la tarjeta, %g", h, editor.MedidaTesela())

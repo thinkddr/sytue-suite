@@ -58,19 +58,22 @@ func (l *Lienzo) forma() FormaEsqueleto {
 	}
 }
 
-// esqueleto es el lienzo mientras carga, con la forma del cuaderno.
+// esqueleto es el lienzo mientras carga, con la forma del cuaderno. La hoja y las
+// tarjetas son UN `ui.BloquesEsqueleto`: laten a una y se anuncian una vez, como el
+// `role="status"` de la web; las filas, un `ui.FilasEsqueleto`.
 func (l *Lienzo) esqueleto() fyne.CanvasObject {
 	switch l.forma() {
 	case EsqueletoHoja:
 		// `notes-sheet grid content-start gap-6`: el título y, debajo, el párrafo.
+		b := ui.NuevosBloquesEsqueleto()
 		lineas := make([]fyne.CanvasObject, 0, len(anchosParrafoEsqueleto))
 		for _, f := range anchosParrafoEsqueleto {
-			lineas = append(lineas, ui.NuevoEsqueletoFraccion(f, 0))
+			lineas = append(lineas, b.BloqueFraccion(f, 0))
 		}
-		return container.New(ui.Margen{Izq: tema.Espacio(6), Der: tema.Espacio(6), Arr: tema.Espacio(8), Abj: tema.Espacio(8)},
+		return b.Con(container.New(ui.Margen{Izq: tema.Espacio(6), Der: tema.Espacio(6), Arr: tema.Espacio(8), Abj: tema.Espacio(8)},
 			ui.EnColumna(tema.Espacio(6),
-				ui.NuevoEsqueletoFraccion(0.45, 1.75*tema.Rem),
-				ui.EnColumna(tema.Espacio(3), lineas...)))
+				b.BloqueFraccion(0.45, 1.75*tema.Rem),
+				ui.EnColumna(tema.Espacio(3), lineas...))))
 	case EsqueletoFilas:
 		// La misma columna y el mismo sangrado que `reparto` en filas: la marca cae en
 		// el borde de la columna y la línea empieza donde empezará el título.
@@ -81,17 +84,18 @@ func (l *Lienzo) esqueleto() fyne.CanvasObject {
 	case EsqueletoTarjetas:
 	}
 	// La rejilla de columnas tal cual: en el teléfono es una, y en escritorio, tres.
+	b := ui.NuevosBloquesEsqueleto()
 	cols := make([]fyne.CanvasObject, len(altosTarjetaEsqueleto))
 	for i, altos := range altosTarjetaEsqueleto {
 		tarjetas := make([]fyne.CanvasObject, 0, len(altos))
 		for _, alto := range altos {
-			e := ui.NuevoEsqueleto(0, alto*tema.Rem)
-			e.Radio = tema.RadioLG
+			e := b.Bloque(0, alto*tema.Rem)
+			e.CornerRadius = tema.RadioLG
 			tarjetas = append(tarjetas, e)
 		}
 		cols[i] = ui.EnColumna(HuecoLista, tarjetas...)
 	}
-	return conMargen(container.New(&rejillaVentana{hueco: HuecoColumnas, cortes: ui.Cortes{1, 0, 2, 3, 0, 0}}, cols...))
+	return b.Con(conMargen(container.New(&rejillaVentana{hueco: HuecoColumnas, cortes: ui.Cortes{1, 0, 2, 3, 0, 0}}, cols...)))
 }
 
 // esqueletoRamas son las filas del panel de notas del árbol mientras carga: a la altura

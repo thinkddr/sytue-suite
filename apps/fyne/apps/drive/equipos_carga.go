@@ -597,13 +597,14 @@ func (dm *dialogoMiembros) pintar() {
 func (dm *dialogoMiembros) lista(v tema.Variante) fyne.CanvasObject {
 	switch {
 	case dm.miembros == nil && !dm.fallo:
-		// `space-y-2 py-2` con tres barras de `2.25rem`.
+		// `space-y-2 py-2` con tres barras de `2.25rem`, en UN grupo de carga.
+		carga := ui.NuevosBloquesEsqueleto()
 		barras := make([]fyne.CanvasObject, 3)
 		for i := range barras {
-			barras[i] = ui.NuevoEsqueleto(0, 2.25*tema.Rem)
+			barras[i] = carga.Bloque(0, 2.25*tema.Rem)
 		}
-		return container.New(ui.Margen{Arr: tema.Espacio(2), Abj: tema.Espacio(2)},
-			container.New(ui.Columna{Hueco: tema.Espacio(2)}, barras...))
+		return carga.Con(container.New(ui.Margen{Arr: tema.Espacio(2), Abj: tema.Espacio(2)},
+			container.New(ui.Columna{Hueco: tema.Espacio(2)}, barras...)))
 	case dm.fallo:
 		texto := lineaTexto(ui.Texto(dm.t("team.member.loadFailed"), tema.TextoSM, ui.Normal, tema.Color("text-muted", v)), tema.TextoSM)
 		reintentar := ui.NuevoBoton(dm.t("team.retry"), func() {

@@ -329,13 +329,15 @@ func (p *PapeleraDocs) cuerpo(v tema.Variante) fyne.CanvasObject {
 	var e *ui.Vacio
 	switch p.Estado {
 	case Cargando:
+		// Las filas son UN grupo de carga: laten a una y dicen «Cargando» una vez.
+		g := ui.NuevosBloquesEsqueleto()
 		esqueletos := make([]fyne.CanvasObject, EsqueletosPapelera)
 		for i := range esqueletos {
-			s := ui.NuevoEsqueleto(0, AltoEsqueletoPapelera)
-			s.Radio = tema.RadioLG
+			s := g.Bloque(0, AltoEsqueletoPapelera)
+			s.CornerRadius = tema.RadioLG
 			esqueletos[i] = s
 		}
-		return container.New(ui.Columna{Hueco: tema.Espacio(2)}, esqueletos...)
+		return g.Con(container.New(ui.Columna{Hueco: tema.Espacio(2)}, esqueletos...))
 	case Listo:
 		return p.listado(v)
 	case Vacio:

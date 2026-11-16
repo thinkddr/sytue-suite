@@ -298,6 +298,7 @@ type lanzadorRenderer struct {
 	avisoHoy    *canvas.Text
 	fileteAviso *canvas.Rectangle
 	esqueleto   []fyne.CanvasObject
+	cargaHoy    *ui.BloquesEsqueleto // el grupo de `esqueleto`
 
 	recientes  *tarjeta
 	filas      []*FilaReciente
@@ -305,6 +306,10 @@ type lanzadorRenderer struct {
 	filetesHoy []*canvas.Rectangle
 	avisoRec   *ui.Vacio
 	esqRec     []fyne.CanvasObject
+	cargaRec   *ui.BloquesEsqueleto // el grupo de `esqRec`
+	// fraccRec son las dos fracciones de cada fila de carga: las de la web, de la
+	// columna de texto.
+	fraccRec   []float32
 	privacidad []*canvas.Text
 	// pasos es la tarjeta «Primeros pasos», encima de las apps; nil si no queda nada.
 	pasos *TarjetaPasos
@@ -395,7 +400,7 @@ func (r *lanzadorRenderer) rehacer() {
 		r.tAccesos = nuevaTarjeta(v, t.T("launcher.quickActions", nil), nil)
 	}
 	r.hacerHoy(v)
-	r.hacerReciente(v, ancho)
+	r.hacerReciente(v)
 	r.privacidad = nil
 	for _, linea := range ui.Repartir(t.T("privacy.notice", nil), tema.TextoXS, ui.Normal,
 		min(ancho-2*MargenX, AnchoAviso-2*MargenX)) {
@@ -425,7 +430,7 @@ func (r *lanzadorRenderer) rehacer() {
 		r.objetos = append(r.objetos, x)
 	}
 	r.objetos = append(r.objetos, r.hoy.objetos()...)
-	r.objetos = append(r.objetos, r.esqueleto...)
+	r.objetos = conCarga(r.objetos, r.cargaHoy)
 	if r.avisoHoy != nil {
 		r.objetos = append(r.objetos, r.fileteAviso, r.avisoHoy)
 	}
@@ -443,7 +448,7 @@ func (r *lanzadorRenderer) rehacer() {
 		r.objetos = append(r.objetos, a)
 	}
 	r.objetos = append(r.objetos, r.recientes.objetos()...)
-	r.objetos = append(r.objetos, r.esqRec...)
+	r.objetos = conCarga(r.objetos, r.cargaRec)
 	if r.avisoRec != nil {
 		r.objetos = append(r.objetos, r.avisoRec)
 	}
@@ -678,12 +683,21 @@ func (r *lanzadorRenderer) abrirWeb() func() {
 	}
 }
 
+// conCarga añade el grupo de carga, si lo hay: un `*ui.BloquesEsqueleto` nil dentro de
+// la lista sería un objeto que no es nil y que Fyne intentaría pintar.
+func conCarga(objs []fyne.CanvasObject, g *ui.BloquesEsqueleto) []fyne.CanvasObject {
+	if g == nil {
+		return objs
+	}
+	return append(objs, g)
+}
+
 // hacerHoy monta la tarjeta «Hoy» con el estado en el que esté la agenda.
 func (r *lanzadorRenderer) hacerHoy(v tema.Variante) {
 	l, t := r.l, r.l.T
 	abrir := enlace(t.T("today.openCalendar", nil), ui.Medio, func() { l.abrirProducto("calendar", "") })
 	r.hoy = nuevaTarjeta(v, t.T("today.title", nil), nil, abrir)
-	r.filasHoy, r.textoHoy, r.esqueleto = nil, nil, nil
+	r.filasHoy, r.textoHoy, r.esqueleto, r.cargaHoy = nil, nil, nil, nil
 	r.avisoHoy, r.fileteAviso = nil, nil
 	if l.Agenda.Parcial && (l.Agenda.Estado == Listo || l.Agenda.Estado == SinNada) {
 		// Un calendario que no contestó deja la agenda a medias: se dice en una línea,
@@ -696,10 +710,10 @@ func (r *lanzadorRenderer) hacerHoy(v tema.Variante) {
 	switch l.Agenda.Estado {
 	case Cargando:
 		// «filas Skeleton con la geometría real de la lista»: dos rótulos de
-		// `0.875rem` al 70 % y al 55 %, en un `flex-col gap-2 p-4`.
-		r.esqueleto = []fyne.CanvasObject{
-			ui.NuevoEsqueleto(0, tema.TextoRaiz.Tam), ui.NuevoEsqueleto(0, tema.TextoRaiz.Tam),
-		}
+		// `0.875rem` al 70 % y al 55 %, en un `flex-col gap-2 p-4`, de un solo grupo.
+		g := ui.NuevosBloquesEsqueleto()
+		r.esqueleto = []fyne.CanvasObject{g.Bloque(0, tema.TextoRaiz.Tam), g.Bloque(0, tema.TextoRaiz.Tam)}
+		r.cargaHoy = g.AMano()
 	case SinNada:
 		r.textoHoy = ui.Texto(t.T("today.noEvents", nil), tema.TextoSM, ui.Normal,
 			tema.Color("text-muted", v))
@@ -744,7 +758,7 @@ func (r *lanzadorRenderer) pieCorreo(v tema.Variante) fyne.CanvasObject {
 }
 
 // hacerReciente monta la tarjeta «Reciente en toda la suite».
-func (r *lanzadorRenderer) hacerReciente(v tema.Variante, ancho float32) {
+func (r *lanzadorRenderer) hacerReciente(v tema.Variante) {
 	l, t := r.l, r.l.T
 	verTodo := enlace(t.T("recent.viewAll", nil)+" →", ui.SemiNegrita, func() {
 		if l.AlIr != nil {
@@ -752,22 +766,28 @@ func (r *lanzadorRenderer) hacerReciente(v tema.Variante, ancho float32) {
 		}
 	})
 	r.recientes = nuevaTarjeta(v, t.T("launcher.recentAll", nil), nil, verTodo)
-	r.filas, r.avisoRec, r.esqRec = nil, nil, nil
+	r.filas, r.avisoRec, r.esqRec, r.cargaRec, r.fraccRec = nil, nil, nil, nil, nil
 
 	switch l.Reciente.Estado {
 	case Cargando:
+		// Las cuatro filas son UN grupo, que se anuncia con `recent.loading` como el
+		// `role="status"` de la web.
+		g := ui.NuevosBloquesEsqueleto()
 		for i := range 4 {
 			ancho1, ancho2 := float32(0.6), float32(0.35)
 			if i%2 == 1 {
 				ancho1, ancho2 = 0.45, 0.7
 			}
-			interior := AnchoInterior(ancho)
+			punto := g.Bloque(10, 10)
+			punto.CornerRadius = 5 // `circle`
 			r.esqRec = append(r.esqRec,
-				ui.NuevoEsqueletoRedondo(10),
-				ui.NuevoEsqueleto(interior*ancho1, tema.TextoRaiz.Tam),
-				ui.NuevoEsqueleto(interior*ancho2, tema.TextoXS.Tam),
-				ui.NuevoEsqueleto(3*tema.Rem, tema.TextoXS.Tam))
+				punto,
+				g.Bloque(0, tema.TextoRaiz.Tam),
+				g.Bloque(0, tema.TextoXS.Tam),
+				g.Bloque(3*tema.Rem, tema.TextoXS.Tam))
+			r.fraccRec = append(r.fraccRec, ancho1, ancho2)
 		}
+		r.cargaRec = g.AMano().ConRotulo(t.T("recent.loading", nil))
 	case SinNada:
 		r.avisoRec = Aviso(t, v, SinNada, textosReciente, func() { l.abrirProducto("drive", "") })
 	case Fallo, SinConexion, Prohibido:
@@ -1009,6 +1029,8 @@ func (r *lanzadorRenderer) Layout(t fyne.Size) {
 		return
 	}
 	r.fondo.Resize(fyne.NewSize(t.Width, max(t.Height, r.alto(t.Width))))
+	r.cargaHoy.Cubrir(r.fondo.Size())
+	r.cargaRec.Cubrir(r.fondo.Size())
 	x, ancho := CajaContenido(t.Width)
 	r.medirCabecerasTarjetas(t.Width, ancho)
 	if tema.EsMarco() {
@@ -1311,6 +1333,15 @@ func (r *lanzadorRenderer) colocarReciente(x, y, ancho float32) float32 {
 		r.esqRec[i+1].Move(fyne.NewPos(cx, fy+altoReciente()))
 		r.esqRec[i+2].Move(fyne.NewPos(cx, fy+altoReciente()+tema.TextoRaiz.Linea))
 		r.esqRec[i+3].Move(fyne.NewPos(ix+iw-MargenReciente-3*tema.Rem, fy+altoReciente()))
+		// Las barras, a su fracción de la columna de texto (`flex-1` entre el punto y
+		// la meta de `3rem`, con `gap-3`). Hasta el 2026-11-16 eran `ui.Esqueleto` que
+		// nadie redimensionaba: se quedaban en 0 × 0 y la fila de carga era solo el
+		// punto.
+		columna := max(iw-2*MargenReciente-10-2*HuecoReciente-3*tema.Rem, 0)
+		f := r.fraccRec[i/2 : i/2+2]
+		r.esqRec[i+1].Resize(fyne.NewSize(columna*f[0], tema.TextoRaiz.Tam))
+		r.esqRec[i+2].Resize(fyne.NewSize(columna*f[1], tema.TextoXS.Tam))
+		r.esqRec[i+3].Resize(fyne.NewSize(3*tema.Rem, tema.TextoXS.Tam))
 	}
 	for i, f := range r.filas {
 		if i > 0 {

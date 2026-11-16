@@ -106,8 +106,10 @@ func (p *Pantalla) objetoLista(v tema.Variante) fyne.CanvasObject {
 	}
 	switch {
 	case p.Cargando:
-		hijos = append(hijos, container.New(ui.Columna{Hueco: tema.Espacio(2)},
-			ui.NuevoEsqueleto(0, altoEsqueleto), ui.NuevoEsqueleto(0, altoEsqueleto)))
+		// Las dos barras son UN grupo de carga: laten a una y dicen «Cargando» una vez.
+		b := ui.NuevosBloquesEsqueleto()
+		hijos = append(hijos, b.Con(container.New(ui.Columna{Hueco: tema.Espacio(2)},
+			b.Bloque(0, altoEsqueleto), b.Bloque(0, altoEsqueleto))))
 	case len(p.Lista) == 0 && p.Fallo == "":
 		hijos = append(hijos, ui.NuevoVacio(p.t("bases.empty.title"), p.t("bases.empty.body")))
 	default:

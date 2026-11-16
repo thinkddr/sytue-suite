@@ -16,16 +16,16 @@ import (
 )
 
 // buscarCarga recorre lo que pinta una pantalla y dice qué indicador de carga lleva:
-// los esqueletos (Ocupado) y las ruedas sueltas.
-func buscarCarga(o fyne.CanvasObject) (ocupados []*Ocupado, ruedas int) {
+// los grupos de carga (ui.BloquesEsqueleto) y las ruedas sueltas.
+func buscarCarga(o fyne.CanvasObject) (ocupados []*ui.BloquesEsqueleto, ruedas int) {
 	var andar func(fyne.CanvasObject)
 	andar = func(o fyne.CanvasObject) {
 		switch x := o.(type) {
 		case nil:
 			return
-		case *Ocupado:
+		case *ui.BloquesEsqueleto:
 			ocupados = append(ocupados, x)
-			andar(x.Contenido)
+			andar(x.Contenido())
 		case *ui.Rueda:
 			ruedas++
 		case *fyne.Container:
@@ -61,7 +61,7 @@ func TestLaPrimeraCargaEnseñaElEsqueletoYNoLaRueda(t *testing.T) {
 		"parecidas", "cerca", "publica", "compartidos", "compartido",
 	} {
 		t.Run(nombre, func(t *testing.T) {
-			var ocupados []*Ocupado
+			var ocupados []*ui.BloquesEsqueleto
 			var ruedas int
 			fyne.DoAndWait(func() {
 				o := pantallas[nombre](base)
@@ -86,7 +86,7 @@ func TestLaPrimeraCargaEnseñaElEsqueletoYNoLaRueda(t *testing.T) {
 func TestLaRuedaQuedaParaLasPaginasSiguientes(t *testing.T) {
 	fotos := fotosDePrueba(6)
 	v := vistaDePrueba(t, nil)
-	var ocupados []*Ocupado
+	var ocupados []*ui.BloquesEsqueleto
 	var ruedas int
 	fyne.DoAndWait(func() {
 		ocupados, ruedas = buscarCarga(PantallaGaleria(v, Galeria{Grupos: PorMes(fotos, v.T), Cargando: true}))
@@ -104,9 +104,9 @@ func TestElEsqueletoDeLaGaleriaTieneSuAltoDeFila(t *testing.T) {
 	_, ancho := CajaGaleria(ventanaAncho)
 	fyne.DoAndWait(func() {
 		o := EsqueletoFilas(v, TeselasEsqueletoGaleria, true)
-		pila, ok := o.Contenido.(*fyne.Container)
+		pila, ok := o.Contenido().(*fyne.Container)
 		if !ok || len(pila.Objects) != 2 {
-			t.Fatalf("con `mes` tiene que ser la cabecera y las filas; es %T", o.Contenido)
+			t.Fatalf("con `mes` tiene que ser la cabecera y las filas; es %T", o.Contenido())
 		}
 		filas := pila.Objects[1].(*fyne.Container)
 		l, ok := filas.Layout.(Filas)
@@ -131,9 +131,15 @@ func TestElEsqueletoDeLaGaleriaTieneSuAltoDeFila(t *testing.T) {
 		filas.Resize(fyne.NewSize(ancho, ui.AltoA(filas, ancho)))
 		fila := AltoFila(ventanaAncho, ancho)
 		primera := filas.Objects[0]
+		// Las teselas son bloques del grupo: laten a una. VISTO EN ROJO con un
+		// `ui.Esqueleto` por tesela, cada uno con su latido.
+		delGrupo := map[fyne.CanvasObject]bool{}
+		for _, b := range o.Bloques() {
+			delGrupo[b] = true
+		}
 		for _, h := range filas.Objects {
-			if _, es := h.(*ui.Esqueleto); !es {
-				t.Fatalf("una tesela es %T y no un esqueleto", h)
+			if !delGrupo[h] {
+				t.Fatalf("una tesela es %T y no un bloque del grupo de carga", h)
 			}
 			if h.Size().Height+0.5 < fila {
 				t.Errorf("una tesela mide %v de alto, menos que el alto de fila %v", h.Size().Height, fila)
@@ -152,9 +158,9 @@ func TestLasTarjetasDelEsqueletoSonLasDeLosAlbumes(t *testing.T) {
 	album := api.Album{ID: "a1", Title: "Verano", Count: 3}
 	fyne.DoAndWait(func() {
 		esq := EsqueletoAlbumes(v, 4, tema.Espacio(6))
-		rej, ok := esq.Contenido.(*fyne.Container)
+		rej, ok := esq.Contenido().(*fyne.Container)
 		if !ok {
-			t.Fatalf("el contenido es %T", esq.Contenido)
+			t.Fatalf("el contenido es %T", esq.Contenido())
 		}
 		r, ok := rej.Layout.(ui.Rejilla)
 		if !ok || r.Hueco != tema.Espacio(6) || r.Min != ui.RejillaAlbumes().Min {

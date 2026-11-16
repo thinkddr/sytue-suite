@@ -4,6 +4,7 @@
 package notas
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -68,6 +69,94 @@ func TestSubirLlevaLosBorradoresYLaCola(t *testing.T) {
 	slices.Sort(enviadas)
 	if want := []string{"dia-2026-10-17:text", "nb-1:todo", "nb-3:text"}; !slices.Equal(enviadas, want) {
 		t.Fatalf("enviadas %v; quiero %v", enviadas, want)
+	}
+}
+
+func TestVaciarConservaYMarcaCapturaCifradaConEnlacesEnClaro(t *testing.T) {
+	st, err := offline.OpenWithSecrets(t.TempDir(), new(authtest.Secrets))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const owner = "ada/acme"
+	c := Captura{ClientID: "legacy", Fecha: "2026-10-17", In: api.NoteInput{ContentCipher: "encv1:synthetic", CipherVersion: 2, Links: []api.NoteLink{{TargetKind: "docs_document", TargetID: "secret", Label: "private"}}}}
+	if err := st.Write(owner, EspacioCapturas, c.ClientID, c); err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	e := Envio{Crear: func(context.Context, string, api.NoteInput) (api.Note, error) { calls++; return api.Note{}, nil }, Diario: func(context.Context, string, string, bool) (api.Notebook, error) { calls++; return api.Notebook{}, nil }}
+	Vaciar(t.Context(), st, owner, e)
+	got := Pendientes(st, owner)
+	var stored Captura
+	found, err := st.Read(owner, EspacioCapturas, c.ClientID, &stored)
+	if calls != 0 || len(got) != 1 || !got[0].Rechazada || err != nil || !found || len(stored.In.Links) != 1 || stored.In.Links[0] != c.In.Links[0] || stored.In.ContentCipher != c.In.ContentCipher || stored.Rechazada {
+		t.Fatal("unsafe capture was sent, erased or altered", calls, got)
+	}
+}
+
+func TestVaciarRetieneBytesLegadosAmbiguosSinRed(t *testing.T) {
+	st, err := offline.OpenWithSecrets(t.TempDir(), new(authtest.Secrets))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const owner = "ada/acme"
+	inputs := []string{
+		`{"client_id":"x","notebook_id":"book","input":{"cipher_version":2,"content_cipher":"encv1:x","Links":[{"target_kind":"note","target_id":"secret"}]}}`,
+		`{"client_id":"x","notebook_id":"book","input":{"cipher_version":2,"content_cipher":"encv1:x","links":[],"links":[{"target_kind":"note","target_id":"secret"}]}}`,
+		`{"client_id":"x","notebook_id":"book","input":{"cipher_version":2,"content_cipher":"encv1:x","links":{"label":"secret"}}}`,
+		`{"client_id":"x","notebook_id":"book","input":{"cipher_version":2,"content_cipher":"encv1:x","data":{"attachment":"secret"}}}`,
+		`{"client_id":"x","notebook_id":"book","input":{"cipher_version":2,"content_cipher":"encv1:x","expected_crypto":{"secret":"private"}}}`,
+		`{"client_id":"x","notebook_id":"book","input":{"cipher_version":2,"content_cipher":"encv1:x","title":"secret"}}`,
+		`{"client_id":"x","notebook_id":"book","input":{"cipher_version":2,"content_cipher":"encv1:x","unknown":"secret"}}`,
+		`{"client_id":"x","notebook_id":"book","input":{"cipher_version":2,"content_cipher":"encv1:x","title":"\ud800"}}`,
+	}
+	for _, raw := range inputs {
+		if err := st.Write(owner, EspacioCapturas, "x", json.RawMessage(raw)); err != nil {
+			t.Fatal(err)
+		}
+		var before json.RawMessage
+		if found, err := st.Read(owner, EspacioCapturas, "x", &before); err != nil || !found {
+			t.Fatal(found, err)
+		}
+		calls := 0
+		e := Envio{Crear: func(context.Context, string, api.NoteInput) (api.Note, error) { calls++; return api.Note{}, nil }, Diario: func(context.Context, string, string, bool) (api.Notebook, error) { calls++; return api.Notebook{}, nil }}
+		Vaciar(t.Context(), st, owner, e)
+		var after json.RawMessage
+		found, err := st.Read(owner, EspacioCapturas, "x", &after)
+		pending := Pendientes(st, owner)
+		if err != nil || !found || calls != 0 || !bytes.Equal(before, after) || len(pending) != 1 || !pending[0].Rechazada {
+			t.Fatal("ambiguous source was sent, altered or hidden", found, calls, err)
+		}
+	}
+}
+
+func TestCapturaExigeIdentidadIgualEnRegistroYEntrada(t *testing.T) {
+	st, err := offline.OpenWithSecrets(t.TempDir(), new(authtest.Secrets))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const owner = "ada/acme"
+	for _, raw := range []string{
+		`{"client_id":"other","notebook_id":"book","input":{"data":{"client_id":"x"}}}`,
+		`{"client_id":"x","notebook_id":"book","input":{"data":{"client_id":"other"}}}`,
+		`{"client_id":"x","notebook_id":"book","input":{"data":{}}}`,
+		`{"client_id":"x","notebook_id":"book","input":{"data":{"client_id":"x","Client_ID":"other"}}}`,
+	} {
+		if err := st.Write(owner, EspacioCapturas, "x", json.RawMessage(raw)); err != nil {
+			t.Fatal(err)
+		}
+		var before json.RawMessage
+		if found, err := st.Read(owner, EspacioCapturas, "x", &before); err != nil || !found {
+			t.Fatal(found, err)
+		}
+		calls := 0
+		e := Envio{Crear: func(context.Context, string, api.NoteInput) (api.Note, error) { calls++; return api.Note{}, nil }, Diario: func(context.Context, string, string, bool) (api.Notebook, error) { calls++; return api.Notebook{}, nil }}
+		Vaciar(t.Context(), st, owner, e)
+		var after json.RawMessage
+		found, err := st.Read(owner, EspacioCapturas, "x", &after)
+		pending := Pendientes(st, owner)
+		if err != nil || !found || calls != 0 || !bytes.Equal(before, after) || len(pending) != 1 || !pending[0].Insegura {
+			t.Fatal("mismatched identity was sent or altered", found, calls, err)
+		}
 	}
 }
 

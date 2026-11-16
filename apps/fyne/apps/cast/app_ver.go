@@ -150,6 +150,7 @@ func (a *App) pedirVideo() {
 			} else if vid.CommentsEnabled {
 				a.pedirComentarios(false)
 			}
+			a.empezarDiapositivas()
 		})
 	})
 }
@@ -179,11 +180,10 @@ func (a *App) prepararVisor(errPlay error) {
 		a.verDirecto()
 		return
 	}
-	// El menú de calidad si hay más de una, e imagen dentro de imagen (solo bajo
-	// demanda, como en la web).
-	if len(a.ver.play.Calidades()) > 1 {
-		x.AlCalidad = a.menuCalidad
-	}
+	// El menú de ajustes (calidad si hay más de una, y velocidad), e imagen dentro de
+	// imagen (solo bajo demanda, como en la web).
+	x.AlCalidad = a.menuCalidad
+	x.ConCalidad = len(a.ver.play.Calidades()) > 1
 	switch {
 	case !a.Movil:
 		x.AlPiP = a.alternarPiP
@@ -254,8 +254,13 @@ func (a *App) abrirReproductor(ruta string) {
 		go a.reloj(gen, a.pararReloj)
 		return
 	}
+	desde := a.prepararReanudo()
 	a.lanzar(func() {
 		f, r, err := a.abrirWebM(ruta)
+		if err == nil && desde > 0 {
+			// Antes de arrancar: el primer fotograma ya es el de donde se dejó.
+			r.Buscar(desde)
+		}
 		a.hilo(gen, func() {
 			if err != nil {
 				a.visor.Aviso(a.v.Traduce("player.error"), false)
@@ -263,6 +268,9 @@ func (a *App) abrirReproductor(ruta string) {
 			}
 			a.fuente, a.reproductor, a.ver.medida = f, r, f
 			a.enchufar(r)
+			if desde > 0 {
+				a.ofrecerInicio(r)
+			}
 			r.Arrancar()
 			a.pararReloj = make(chan struct{})
 			go a.reloj(gen, a.pararReloj)
@@ -311,6 +319,7 @@ func (a *App) reloj(gen int, parar <-chan struct{}) {
 				if a.visor != nil {
 					a.visor.Avanzar()
 				}
+				a.anotarPosicion(false)
 				if r := a.deVer(); r != nil && !r.Pausado() {
 					a.reevaluarAuto()
 				}
@@ -418,6 +427,9 @@ func (a *App) salirDeVer() {
 		close(a.pararReloj)
 		a.pararReloj = nil
 	}
+	// Antes de cerrar el reproductor, que es quien sabe dónde iba.
+	a.anotarPosicion(true)
+	a.reanudo = ""
 	if a.reproductor != nil {
 		a.reproductor.Cerrar()
 		a.reproductor = nil
@@ -446,6 +458,76 @@ func (a *App) salirDeVer() {
 	a.prepararPiPMovil() // sin vídeo, la app ya no entra sola en la esquina
 }
 
+// ---- Diapositivas ----
+
+// empezarDiapositivas pide la presentación de un directo o de su grabación: en directo
+// se sondea cada 3 s (la posición es una fila pequeña y no necesita sesión, y el chat,
+// que podría empujarla, solo está abierto con el chat encendido); la grabación se pide
+// una vez. Un vídeo subido no lleva presentación y no se pregunta.
+func (a *App) empezarDiapositivas() {
+	vid := a.ver.video
+	if vid.Kind != "live" || !reproducible(vid.Status) {
+		return
+	}
+	a.pedirDiapositivas()
+	if vid.EnDirecto() {
+		a.sondear(3*time.Second, a.hayQueSondearDiapositivas, a.pedirDiapositivas)
+	}
+}
+
+// hayQueSondearDiapositivas: mientras siga en directo y no haya otra petición en vuelo.
+func (a *App) hayQueSondearDiapositivas() bool {
+	return a.ver.video.EnDirecto() && !a.ver.pidiendoDiapos
+}
+
+// pedirDiapositivas trae la posición. Si falla (sin presentación todavía, sin red) se
+// queda lo que hubiera: un corte de un sondeo no borra la diapositiva de la pantalla.
+func (a *App) pedirDiapositivas() {
+	if a.cli == nil {
+		return
+	}
+	gen, id, dentro := a.gen, a.ver.id, a.dentro()
+	a.ver.pidiendoDiapos = true
+	a.lanzar(func() {
+		c, fin := ctx()
+		defer fin()
+		var p *api.CastPresentacion
+		var err error
+		if dentro {
+			p, err = a.cli.Diapositivas(c, id)
+		} else {
+			p, err = a.cli.PublicDiapositivas(c, id)
+		}
+		a.hilo(gen, func() {
+			a.ver.pidiendoDiapos = false
+			if err != nil || mismaPresentacion(a.ver.diapositivas, p) {
+				return // sin cambios no se repinta la página cada 3 s
+			}
+			a.ver.diapositivas = p
+			a.pintar()
+		})
+	})
+}
+
+// mismaPresentacion dice si lo que se ve no cambia: la misma diapositiva y las mismas
+// marcas (las marcas solo crecen, así que basta con contarlas).
+func mismaPresentacion(x, y *api.CastPresentacion) bool {
+	if x == nil || y == nil {
+		return x == y
+	}
+	return x.Index == y.Index && x.Total == y.Total && x.Title == y.Title && len(x.Marks) == len(y.Marks)
+}
+
+// irACapitulo lleva el vídeo al instante de un capítulo, con el mando que tenga el
+// visor (el de la página o el de la ventana de imagen dentro de imagen).
+func (a *App) irACapitulo(ms int64) {
+	if a.visor == nil || a.visor.Mando == nil {
+		return
+	}
+	a.visor.Mando.Buscar(time.Duration(ms) * time.Millisecond)
+	a.visor.Avanzar()
+}
+
 func (a *App) pantallaVer() fyne.CanvasObject {
 	e := a.ver
 	v := a.vistaDe(e.estadoCarga, e.video.ID == "", false, a.pedirVideo)
@@ -460,11 +542,11 @@ func (a *App) pantallaVer() fyne.CanvasObject {
 		Video:              vid,
 		Descargar:          e.play != nil && e.play.DownloadURL != "" && a.Guardar != nil,
 		DescripcionAbierta: e.descAbierta,
+		AlCapitulo:         a.irACapitulo,
 		AlAlternarDescripcion: func() {
 			a.ver.descAbierta = !a.ver.descAbierta
 			a.pintar()
 		},
-		AlCompartir: a.abrirCompartir,
 		AlDescargar: a.descargar,
 		AlGestionar: func() { a.AbrirGestionar(vid.ID) },
 		AlTerminar:  func() { a.confirmarTerminar(vid) },
@@ -491,6 +573,9 @@ func (a *App) pantallaVer() fyne.CanvasObject {
 			AlBloquear: func(k api.CastComment) { a.confirmarBloqueo(k.Author.Sub, k.Author.Name) },
 		},
 	}
+	if a.puedeCompartir() {
+		d.AlCompartir = a.abrirCompartir
+	}
 	if vid.Owner.Sub != yo || yo == "" {
 		d.AlDenunciar = func() { a.AbrirDenuncia(api.CastNewReport{Kind: api.CastReportVideo, VideoID: vid.ID}, "") }
 		d.AlDenunciarAutor = func() {
@@ -509,6 +594,10 @@ func (a *App) pantallaVer() fyne.CanvasObject {
 			// dos sitios, y la página de debajo no se ve.
 			d.Visor = canvas.NewRectangle(color.NRGBA{A: 255})
 		}
+	}
+	if reproducible(vid.Status) {
+		// Un directo que acaba de terminar no tiene aún grabación a la que saltar.
+		d.Diapositivas = e.diapositivas
 	}
 	if vid.Visibility == api.CastPublic {
 		d.AlCanal = func() { a.AbrirCanal(vid.Tenant) }
@@ -538,7 +627,12 @@ func (a *App) enfocar(o fyne.Focusable) {
 
 // ---- Compartir ----
 
+func (a *App) puedeCompartir() bool { return a.cli != nil && !a.cli.UsesPrivateData() }
+
 func (a *App) enlace() string {
+	if !a.puedeCompartir() {
+		return ""
+	}
 	ruta := "/watch/" + a.ver.video.ID
 	if a.WebDe != nil {
 		return a.WebDe(ruta)
@@ -557,6 +651,9 @@ func CodigoInsercion(web, id, titulo string) string {
 // datosCompartir son los del diálogo, con lo último copiado.
 func (a *App) datosCompartir() Compartir {
 	vid := a.ver.video
+	if !a.puedeCompartir() {
+		return Compartir{Video: vid}
+	}
 	d := Compartir{
 		Video: vid, Enlace: a.enlace(), Copiado: a.ver.copiado,
 		AlCopiarEnlace: a.copiarEnlace, AlCopiarInsercion: a.copiarInsercion,
@@ -570,6 +667,9 @@ func (a *App) datosCompartir() Compartir {
 // abrirCompartir abre el ShareDialog: el enlace y, si el vídeo es abierto, el código
 // de inserción, cada uno con su botón de copiar.
 func (a *App) abrirCompartir() {
+	if !a.puedeCompartir() {
+		return
+	}
 	a.ver.copiado = ""
 	if a.w == nil {
 		return
@@ -602,11 +702,17 @@ func (a *App) copiar(texto string) {
 }
 
 func (a *App) copiarEnlace() {
+	if !a.puedeCompartir() {
+		return
+	}
 	a.ultimoEnlace = a.enlace()
 	a.copiar(a.ultimoEnlace)
 }
 
 func (a *App) copiarInsercion() {
+	if !a.puedeCompartir() {
+		return
+	}
 	a.ultimaInsercion = CodigoInsercion(a.enlace(), a.ver.video.ID, a.ver.video.Title)
 	a.copiar(a.ultimaInsercion)
 }

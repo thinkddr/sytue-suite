@@ -10,6 +10,8 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
+
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 )
 
 func TestDispositivosUsaSistemaYConsentimiento(t *testing.T) {
@@ -27,8 +29,8 @@ func TestDispositivosUsaSistemaYConsentimiento(t *testing.T) {
 	for _, ancho := range []float32{360, 390, 1280} {
 		w.Resize(fyne.NewSize(ancho, 800))
 		d.Resize(fyne.NewSize(ancho, r.alto(ancho)))
-		for _, o := range r.Objects() {
-			if _, ok := o.(*FilaCopia); ok {
+		for _, o := range aplanar(r.Objects()) {
+			if _, ok := o.(*ui.FilaCopia); ok {
 				t.Fatal("la pantalla nativa no debe copiar claves ni direcciones de servidores")
 			}
 		}

@@ -120,7 +120,7 @@ func (q *VistaNube) cabecera(v tema.Variante) fyne.CanvasObject {
 func (q *VistaNube) cuerpo(v tema.Variante) fyne.CanvasObject {
 	switch q.Fase {
 	case Cargando:
-		return container.NewStack(canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)), container.NewVScroll(esqueletoFilas()))
+		return container.NewStack(canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)), container.NewVScroll(esqueletoFilas(q.t("team.loading"))))
 	case Vacia:
 		x := ui.NuevoVacio(q.t("team.folder.emptyTitle"), "")
 		x.Ilustracion = ilustracion(iconos.VacioDrive, v)

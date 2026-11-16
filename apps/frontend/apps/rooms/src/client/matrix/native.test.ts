@@ -49,3 +49,18 @@ test('native storage return follows the product fixed before authorization', () 
     ).toThrow();
   }
 });
+
+test('Drive data consent returns to its fixed native consumer', () => {
+  const redirect_url = `sytue-pdf://matrix/callback?state=${state}&ticket=${ticket}`;
+  const response = { product: 'drive', native_consumer: 'pdf', ticket, redirect_url };
+  expect(matrixNativeReturn(response, state)).toBe(redirect_url);
+  for (const changed of [
+    { ...response, native_consumer: 'docs' },
+    { ...response, native_consumer: 'drive' },
+    { ...response, native_consumer: 'unregistered' },
+    { ...response, native_consumer: 123 },
+    { ...response, product: 'mail' },
+    { ...response, redirect_url: redirect_url.replace('sytue-pdf:', 'sytue-drive:') },
+  ])
+    expect(() => matrixNativeReturn(changed, state)).toThrow();
+});

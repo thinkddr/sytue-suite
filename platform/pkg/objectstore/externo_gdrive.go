@@ -171,6 +171,33 @@ func (g *GoogleDrive) Get(ctx context.Context, t tenancy.Tenant, key string) (io
 	return res.Body, nil
 }
 
+func (g *GoogleDrive) GetRaw(ctx context.Context, t tenancy.Tenant, key string) (io.ReadCloser, error) {
+	id, err := g.id(ctx, t, key)
+	if err != nil {
+		return nil, err
+	}
+	if !rawHTTPClient(g.http) {
+		return nil, ErrRawUnsupported
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	res, err := conProveedor(ctx, g.http, g.tok, http.MethodGet, gdriveAPI+"/files/"+url.PathEscape(id)+"?alt=media", http.NoBody, 0, map[string]string{"Accept-Encoding": "identity"})
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	if res.StatusCode == http.StatusNotFound {
+		cancel()
+		_ = res.Body.Close()
+		return nil, ErrNotFound
+	}
+	if res.StatusCode != http.StatusOK {
+		defer cancel()
+		defer res.Body.Close()
+		return nil, errorDe(res, "google drive: descargar")
+	}
+	return acceptRawHTTP(res, cancel)
+}
+
 func (g *GoogleDrive) Delete(ctx context.Context, t tenancy.Tenant, key string) error {
 	id, err := g.id(ctx, t, key)
 	if errors.Is(err, ErrNotFound) {

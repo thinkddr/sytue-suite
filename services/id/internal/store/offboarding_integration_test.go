@@ -39,7 +39,7 @@ func TestRemoveMembershipRevokesOrgCredentials(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateOrg(otra): %v", err)
 	}
-	ada := seedUser(t, ctx, st, "ada@acme.example")
+	ada := seedUser(ctx, t, st, "ada@acme.example")
 
 	for _, org := range []domain.Organization{acme, otra} {
 		if err := st.UpsertMembership(ctx, nil, domain.Membership{

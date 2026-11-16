@@ -4,9 +4,13 @@
 package editor
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"sync"
+	"time"
 
 	"fyne.io/fyne/v2"
 
@@ -25,10 +29,12 @@ import (
 // que la web, sujeta por una tabla de casos compartida) y, si un solo paso falla, no
 // despacha ninguno.
 //
-// ponytail: las macros viven en la memoria del proceso. En la web se guardan por usuario
-// (`localStorage`, una clave por `sub`) y sin sesión no se guardan; en nativo esta pieza no
-// conoce al usuario, y escribirlas a disco sin él sería la clave «anon» que la web acaba de
-// quitar. Se persistirán cuando el producto pase el `sub` (hoy no llega al cromo).
+// Las macros guardadas son de la PERSONA, como en la web (`localStorage`, una clave por
+// `sub`): van al almacén por persona de la sesión ([Personal]), con el mismo JSON que la
+// web, y quien entra con otra cuenta no ve las de la anterior. Sin nadie dentro no se
+// guarda nada —la clave «anon» que la web quitó mezclaba a las personas— y la macro vive
+// lo que dure el proceso. Lo leído se vuelve a depurar contra el registro: lo guardado
+// pudo escribirlo otra versión.
 
 // macro es una macro guardada: nombre y secuencia. Nunca vacía.
 type macro struct {
@@ -46,10 +52,163 @@ type macros struct {
 	pasos     []office.Paso
 	pasados   int // pasos que no cupieron al llegar a [office.MaxPasos]
 	guardadas []macro
-	n         int
+	de        string // la persona de quien son las guardadas; "" sin nadie dentro
 }
 
 var grabadora = &macros{}
+
+// AlmacenPersonal es donde se guardan las macros; lo cumple `sesion.PorPersona`, que pone
+// a la persona en la clave y no guarda nada sin nadie dentro.
+type AlmacenPersonal interface {
+	Leer(clave string) string
+	Poner(clave, valor string)
+	Persona() string // el `sub` de quien ha entrado, o ""
+}
+
+// Personal es el almacén de la persona que ha entrado, si la app lo da (lo pone el `main`
+// de cada editor con la sesión). Sin él, las macros viven lo que dure el proceso.
+var Personal AlmacenPersonal
+
+// ClaveMacros es el prefijo de la clave de la web (`sytue:docs:macros:<sub>`): la persona
+// la pone el almacén.
+const ClaveMacros = "sytue:docs:macros"
+
+// sincronizar, con el candado tomado, carga las guardadas de quien está dentro si no son
+// las suyas: al entrar, al cambiar de cuenta o al salir (sin nadie, ninguna).
+func (m *macros) sincronizar() {
+	persona := ""
+	if Personal != nil {
+		persona = Personal.Persona()
+	}
+	if persona == m.de {
+		return
+	}
+	m.de, m.guardadas = persona, nil
+	if persona != "" {
+		m.guardadas = leerMacros(Personal.Leer(ClaveMacros))
+	}
+}
+
+// persistir, con el candado tomado, guarda las de quien está dentro. Sin nadie, nada.
+func (m *macros) persistir() {
+	if Personal == nil || m.de == "" {
+		return
+	}
+	if len(m.guardadas) == 0 {
+		Personal.Poner(ClaveMacros, "")
+		return
+	}
+	Personal.Poner(ClaveMacros, escribirMacros(m.guardadas))
+}
+
+// pasoJSON y macroJSON son la forma de `MacroStep` y `Macro` de la web.
+type pasoJSON struct {
+	Editor string  `json:"editor"`
+	Cmd    string  `json:"cmd"`
+	Valor  *string `json:"value,omitempty"`
+}
+
+type macroJSON struct {
+	ID     string     `json:"id"`
+	Nombre string     `json:"name"`
+	Pasos  []pasoJSON `json:"steps"`
+}
+
+// macroLeida es [macroJSON] al leer: cada paso por separado, para que uno mal formado
+// tire solo ese paso y no la macro entera, como `coerceStep`.
+type macroLeida struct {
+	ID     string            `json:"id"`
+	Nombre string            `json:"name"`
+	Pasos  []json.RawMessage `json:"steps"`
+}
+
+// pasoLeido es [pasoJSON] al leer: un `value` que no es texto se ignora, como en la web,
+// en vez de tirar el paso.
+type pasoLeido struct {
+	Editor string          `json:"editor"`
+	Cmd    string          `json:"cmd"`
+	Valor  json.RawMessage `json:"value"`
+}
+
+func esKind(k string) bool {
+	return k == office.Documento || k == office.Hoja || k == office.Presentacion
+}
+
+// leerMacros es `parseMacros`: tolerante, nunca falla y deja fuera lo mal formado, lo que
+// el registro no conoce o no se reproduce y lo que pasa de los techos. Una macro sin un
+// paso válido no se carga.
+func leerMacros(crudo string) []macro {
+	var datos []json.RawMessage
+	if crudo == "" || json.Unmarshal([]byte(crudo), &datos) != nil {
+		return nil
+	}
+	var out []macro
+	for _, d := range datos {
+		if len(out) >= office.MaxMacros {
+			break
+		}
+		var mj macroLeida
+		if json.Unmarshal(d, &mj) != nil || mj.ID == "" || mj.Pasos == nil {
+			continue
+		}
+		var pasos []office.Paso
+		for _, crudoPaso := range mj.Pasos[:min(len(mj.Pasos), office.MaxPasos)] {
+			var p pasoLeido
+			if json.Unmarshal(crudoPaso, &p) != nil || !esKind(p.Editor) || office.NoReproducibles[p.Cmd] {
+				continue
+			}
+			if _, ok := office.BuscarComando(p.Cmd); !ok {
+				continue
+			}
+			paso := office.Paso{Editor: p.Editor, Cmd: p.Cmd}
+			var valor string
+			if len(p.Valor) > 0 && json.Unmarshal(p.Valor, &valor) == nil {
+				if len([]rune(valor)) > office.MaxValor {
+					continue
+				}
+				paso.Valor, paso.ConValor = valor, true
+			}
+			pasos = append(pasos, paso)
+		}
+		if len(pasos) == 0 {
+			continue
+		}
+		out = append(out, macro{id: mj.ID, nombre: recortar(mj.Nombre, office.MaxNombre), tipo: pasos[0].Editor, pasos: pasos})
+	}
+	return out
+}
+
+// escribirMacros es `serializeMacros`.
+func escribirMacros(ms []macro) string {
+	out := make([]macroJSON, 0, len(ms))
+	for _, m := range ms {
+		mj := macroJSON{ID: m.id, Nombre: m.nombre, Pasos: make([]pasoJSON, 0, len(m.pasos))}
+		for _, p := range m.pasos {
+			pj := pasoJSON{Editor: p.Editor, Cmd: p.Cmd}
+			if p.ConValor {
+				v := p.Valor
+				pj.Valor = &v
+			}
+			mj.Pasos = append(mj.Pasos, pj)
+		}
+		out = append(out, mj)
+	}
+	b, err := json.Marshal(out)
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
+// idMacro es un id nuevo, al azar como el `crypto.randomUUID` de la web: un contador
+// chocaría con los ids que ya trae lo guardado.
+func idMacro() string {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "m" + strconv.FormatInt(time.Now().UnixNano(), 36)
+	}
+	return hex.EncodeToString(b[:])
+}
 
 // kindDe es el `DocKind` de la web de este tipo.
 func (t Tipo) kindDe() string {
@@ -113,26 +272,30 @@ func (m *macros) terminar() (pasos []office.Paso, descartados int) {
 func (m *macros) guardar(nombre, tipo string, pasos []office.Paso) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.sincronizar()
 	if len(m.guardadas) >= office.MaxMacros {
 		return false
 	}
-	m.n++
-	m.guardadas = append(m.guardadas, macro{id: "m" + strconv.Itoa(m.n), nombre: nombre, tipo: tipo, pasos: pasos})
+	m.guardadas = append(m.guardadas, macro{id: idMacro(), nombre: nombre, tipo: tipo, pasos: pasos})
+	m.persistir()
 	return true
 }
 
 func (m *macros) lista() []macro {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.sincronizar()
 	return append([]macro(nil), m.guardadas...)
 }
 
 func (m *macros) borrar(id string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.sincronizar()
 	for i, x := range m.guardadas {
 		if x.id == id {
 			m.guardadas = append(m.guardadas[:i], m.guardadas[i+1:]...)
+			m.persistir()
 			return
 		}
 	}

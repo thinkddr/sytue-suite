@@ -58,7 +58,11 @@ async function pedirOrganizaciones(
     return await bffDePrueba().organizations({
       request: new Request(url, init),
       url,
-      cookies: { get: () => ({ value: cookie }), set: () => {}, delete: () => {} },
+      cookies: {
+        get: (name: string) => (name === '__Host-sytue_session' ? { value: cookie } : undefined),
+        set: () => {},
+        delete: () => {},
+      },
     });
   } finally {
     globalThis.fetch = real;

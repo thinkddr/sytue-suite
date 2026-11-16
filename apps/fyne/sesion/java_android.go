@@ -66,5 +66,11 @@ func prepararCasa() {
 	_ = os.Setenv("XDG_CONFIG_HOME", filepath.Join(ficheros, ".config"))
 	if cache != "" {
 		_ = os.Setenv("XDG_CACHE_HOME", cache)
+		// Sin actividad nadie pone TMPDIR (lo hace GoNativeActivity), y os.TempDir sería
+		// /data/local/tmp, donde la app no puede escribir: la copia de seguridad deja ahí
+		// las fotos que lee de la galería.
+		if os.Getenv("TMPDIR") == "" {
+			_ = os.Setenv("TMPDIR", cache)
+		}
 	}
 }

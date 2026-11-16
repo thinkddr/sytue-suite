@@ -552,16 +552,15 @@ export default function MigrateWizard({
             ))}
           </ul>
         </section>
-        <section class="border-warning bg-warning-bg rounded-lg border p-4">
-          <h3 class="text-warning-text text-sm font-semibold">{t('wizard.migrate.limits.no')}</h3>
-          <ul class="mt-2 flex flex-col gap-1.5">
+        <InlineHelp tone="warning" live="off" title={t('wizard.migrate.limits.no')} titleAs="h3">
+          <ul class="flex flex-col gap-1.5">
             {gets.no.map((l) => (
-              <li key={l} class="text-text-muted text-sm leading-snug">
+              <li key={l} class="leading-snug">
                 {l}
               </li>
             ))}
           </ul>
-        </section>
+        </InlineHelp>
         <InlineHelp tone="info" title={t('wizard.migrate.limits.safeTitle')}>
           {t(self ? 'wizard.migrate.self.safeBody' : 'wizard.migrate.limits.safeBody')}
         </InlineHelp>
@@ -661,7 +660,7 @@ export default function MigrateWizard({
       <EmptyState
         title={t('wizard.migrate.empty.title')}
         description={t('wizard.migrate.empty.description')}
-        illustration={<Icon name="globe" size={28} />}
+        icon="globe"
         action={
           <Button variant="primary" onClick={() => window.location.assign(r('/apps'))}>
             {t('wizard.migrate.goToApps')}

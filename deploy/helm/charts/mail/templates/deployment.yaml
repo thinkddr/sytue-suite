@@ -59,6 +59,7 @@ spec:
               containerPort: {{ .Values.mailService.ports.imaps }}
             {{- end }}
           env:
+            {{- include "sytue.storageIngressEnv" . | nindent 12 }}
             {{- if (.Values.global).otlp }}
             {{- if (.Values.global).otlp.endpoint }}
             # Telemetria: metricas OTLP directas a Cockpit, sin agente intermedio.
@@ -322,13 +323,11 @@ spec:
             {{- with .Values.config.channelMailDomain }}
             # ----- CORREO A CANAL de Sytue Rooms -----
             # El correo a `<token-del-webhook>@<este dominio>` se publica en su canal
-            # en vez de entregarse a un buzon. Las dos variables se apagan juntas: sin
-            # dominio esas direcciones no existen para el MX, y sin Rooms no habria a
-            # quien entregar. El MISMO dominio va en el chart de Rooms, que lo publica.
+            # en vez de entregarse a un buzon. Sin dominio esas direcciones no existen
+            # para el MX. La autoridad de almacenamiento también usa ROOMS_URL,
+            # que llega siempre por el helper común. Rooms publica el mismo dominio.
             - name: CHANNEL_MAIL_DOMAIN
               value: {{ . | quote }}
-            - name: ROOMS_URL
-              value: {{ $.Values.config.roomsUrl | default (printf "http://%s-rooms" $.Release.Name) | quote }}
             {{- end }}
             - name: S3_ACCESS_KEY
               valueFrom:

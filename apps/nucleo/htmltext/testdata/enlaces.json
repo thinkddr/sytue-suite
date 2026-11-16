@@ -1,0 +1,168 @@
+{
+  "_": "Vectores COMPARTIDOS de enlazarTexto (apps/frontend/apps/mail/src/lib/enlaces.ts) y htmltext.Enlaces: el mismo texto de correo enlaza lo mismo en la web y en Fyne. Cada caso es el texto y los tramos que salen; un tramo sin destino es texto.",
+  "casos": [
+    { "nombre": "sin enlaces", "texto": "Hola, ¿qué tal?", "tramos": [{ "texto": "Hola, ¿qué tal?" }] },
+    { "nombre": "vacío", "texto": "", "tramos": [] },
+    {
+      "nombre": "https en medio",
+      "texto": "Mira https://sytue.eu/precios y dime",
+      "tramos": [
+        { "texto": "Mira " },
+        { "texto": "https://sytue.eu/precios", "destino": "https://sytue.eu/precios" },
+        { "texto": " y dime" }
+      ]
+    },
+    {
+      "nombre": "punto final de frase",
+      "texto": "Visita http://ejemplo.com.",
+      "tramos": [
+        { "texto": "Visita " },
+        { "texto": "http://ejemplo.com", "destino": "http://ejemplo.com" },
+        { "texto": "." }
+      ]
+    },
+    {
+      "nombre": "puntuación final varia",
+      "texto": "¿Has visto https://a.es/x?! Sí: https://b.es/y, https://c.es/z;",
+      "tramos": [
+        { "texto": "¿Has visto " },
+        { "texto": "https://a.es/x", "destino": "https://a.es/x" },
+        { "texto": "?! Sí: " },
+        { "texto": "https://b.es/y", "destino": "https://b.es/y" },
+        { "texto": ", " },
+        { "texto": "https://c.es/z", "destino": "https://c.es/z" },
+        { "texto": ";" }
+      ]
+    },
+    {
+      "nombre": "entre paréntesis",
+      "texto": "(ver https://sytue.eu/ayuda)",
+      "tramos": [
+        { "texto": "(ver " },
+        { "texto": "https://sytue.eu/ayuda", "destino": "https://sytue.eu/ayuda" },
+        { "texto": ")" }
+      ]
+    },
+    {
+      "nombre": "paréntesis que son de la dirección",
+      "texto": "(https://es.wikipedia.org/wiki/Gato_(desambiguación))",
+      "tramos": [
+        { "texto": "(" },
+        {
+          "texto": "https://es.wikipedia.org/wiki/Gato_(desambiguación)",
+          "destino": "https://es.wikipedia.org/wiki/Gato_(desambiguación)"
+        },
+        { "texto": ")" }
+      ]
+    },
+    {
+      "nombre": "entre ángulos, como se citan en texto plano",
+      "texto": "Restablece tu contraseña <https://id.sytue.eu/reset?t=1&u=2>",
+      "tramos": [
+        { "texto": "Restablece tu contraseña <" },
+        { "texto": "https://id.sytue.eu/reset?t=1&u=2", "destino": "https://id.sytue.eu/reset?t=1&u=2" },
+        { "texto": ">" }
+      ]
+    },
+    {
+      "nombre": "www sin esquema",
+      "texto": "en www.sytue.eu/blog hay más",
+      "tramos": [
+        { "texto": "en " },
+        { "texto": "www.sytue.eu/blog", "destino": "https://www.sytue.eu/blog" },
+        { "texto": " hay más" }
+      ]
+    },
+    {
+      "nombre": "www sin dominio no es una web",
+      "texto": "la carpeta www.antigua y www. sola",
+      "tramos": [{ "texto": "la carpeta www.antigua y www. sola" }]
+    },
+    {
+      "nombre": "esquema en mayúsculas",
+      "texto": "HTTPS://SYTUE.EU",
+      "tramos": [{ "texto": "HTTPS://SYTUE.EU", "destino": "HTTPS://SYTUE.EU" }]
+    },
+    {
+      "nombre": "esquema suelto",
+      "texto": "escribe https:// delante",
+      "tramos": [{ "texto": "escribe https:// delante" }]
+    },
+    {
+      "nombre": "pegado a una palabra no empieza",
+      "texto": "xhttps://malo.es y nowww.malo.es",
+      "tramos": [{ "texto": "xhttps://malo.es y nowww.malo.es" }]
+    },
+    {
+      "nombre": "otros esquemas no se enlazan",
+      "texto": "javascript:alert(1) ftp://viejo.es file:///etc/passwd",
+      "tramos": [{ "texto": "javascript:alert(1) ftp://viejo.es file:///etc/passwd" }]
+    },
+    {
+      "nombre": "dirección de correo",
+      "texto": "Escribe a ana.garcia+facturas@sytue.eu.",
+      "tramos": [
+        { "texto": "Escribe a " },
+        { "texto": "ana.garcia+facturas@sytue.eu", "destino": "mailto:ana.garcia+facturas@sytue.eu" },
+        { "texto": "." }
+      ]
+    },
+    {
+      "nombre": "mailto escrito",
+      "texto": "mailto:soporte@sytue.eu",
+      "tramos": [{ "texto": "mailto:soporte@sytue.eu", "destino": "mailto:soporte@sytue.eu" }]
+    },
+    {
+      "nombre": "correo que no acaba en el dominio",
+      "texto": "ana@sytue.eu2 no",
+      "tramos": [{ "texto": "ana@sytue.eu2 no" }]
+    },
+    {
+      "nombre": "arroba sin dominio",
+      "texto": "@ana y ana@local",
+      "tramos": [{ "texto": "@ana y ana@local" }]
+    },
+    {
+      "nombre": "correo dentro de una web es de la web",
+      "texto": "https://sytue.eu/u/ana@sytue.eu ok",
+      "tramos": [
+        { "texto": "https://sytue.eu/u/ana@sytue.eu", "destino": "https://sytue.eu/u/ana@sytue.eu" },
+        { "texto": " ok" }
+      ]
+    },
+    {
+      "nombre": "www tras una arroba es correo",
+      "texto": "info@www.sytue.eu",
+      "tramos": [{ "texto": "info@www.sytue.eu", "destino": "mailto:info@www.sytue.eu" }]
+    },
+    {
+      "nombre": "varias líneas y blancos de Unicode",
+      "texto": "Uno:\nhttps://a.es dos　https://b.es/ñ",
+      "tramos": [
+        { "texto": "Uno:\n" },
+        { "texto": "https://a.es", "destino": "https://a.es" },
+        { "texto": " dos　" },
+        { "texto": "https://b.es/ñ", "destino": "https://b.es/ñ" }
+      ]
+    },
+    {
+      "nombre": "entre comillas",
+      "texto": "\"https://a.es\" y 'https://b.es'",
+      "tramos": [
+        { "texto": "\"" },
+        { "texto": "https://a.es", "destino": "https://a.es" },
+        { "texto": "\" y '" },
+        { "texto": "https://b.es", "destino": "https://b.es" },
+        { "texto": "'" }
+      ]
+    },
+    {
+      "nombre": "letras que solo se parecen a las ASCII no abren otro esquema",
+      "texto": "httpſ://x.es ana@ſytue.eu \u212aa@b.es",
+      "tramos": [
+        { "texto": "httpſ://x.es ana@ſytue.eu \u212a" },
+        { "texto": "a@b.es", "destino": "mailto:a@b.es" }
+      ]
+    }
+  ]
+}

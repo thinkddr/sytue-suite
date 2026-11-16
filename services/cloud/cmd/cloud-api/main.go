@@ -35,6 +35,7 @@ import (
 
 	clouddb "git.sytue.eu/sytue/one/services/cloud/db"
 	"git.sytue.eu/sytue/one/services/cloud/internal/config"
+	"git.sytue.eu/sytue/one/services/cloud/internal/controller"
 	"git.sytue.eu/sytue/one/services/cloud/internal/crypto"
 	"git.sytue.eu/sytue/one/services/cloud/internal/domain"
 	"git.sytue.eu/sytue/one/services/cloud/internal/forge"
@@ -274,6 +275,8 @@ func run() error {
 	// Cloud conserva aquí solo su contabilidad local de consumo y límites.
 	logger.Info("Facturación Cloud local; suscripción de suite verificada por Sytue ID")
 
+	svc.SetDomainVerifier(verificadorDeDominios(cfg))
+
 	logStreamer, _ := runtime.NewLogStreamer(cfg)
 	svc.SetLogStreamer(logStreamer)
 	execSession, _ := runtime.NewExecSession(cfg)
@@ -312,6 +315,17 @@ func run() error {
 	logger.Info("Sytue Cloud API arrancando",
 		"addr", cfg.HTTPAddr, "env", string(cfg.Env), "public_url", cfg.PublicURL)
 	return srv.Run(ctx)
+}
+
+// verificadorDeDominios elige el verificador del «Comprobar ahora» de los
+// dominios propios: la misma comprobación DNS que el bucle del controller, sin
+// clúster. En dev (sin Kapsule) autoverifica, igual que el controller en modo
+// stub, para que el flujo se pueda recorrer entero en local.
+func verificadorDeDominios(cfg config.Config) service.DomainVerifier {
+	if cfg.UseKubeRunner() {
+		return controller.NewDNSDomainVerifier()
+	}
+	return controller.NewStubPlatform()
 }
 
 // purgeLoop ejecuta periódicamente la purga/rollup de retención sobre una

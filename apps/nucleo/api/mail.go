@@ -14,13 +14,16 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"git.sytue.eu/sytue/one/apps/nucleo/mail/model"
 )
 
 // Mail es el cliente de Sytue Mail sobre su API REST (services/mail/internal/jmap,
 // `/api/v1`). El servicio guarda el mensaje CRUDO y nada más: el cuerpo y los adjuntos se
 // sacan de Raw con internal/eml, y para enviar se le manda un mensaje ya compuesto.
 type Mail struct {
-	c *Client
+	data MailData
+	c    *Client
 	// jmap va a la raíz del servicio: lo poco que solo existe en JMAP (renombrar y
 	// borrar carpetas) se pide en `POST /jmap`.
 	jmap *Client
@@ -35,6 +38,9 @@ func NewMail(servicio string, s Session, h *http.Client) *Mail {
 const (
 	MailFlagSeen    = `\Seen`
 	MailFlagFlagged = `\Flagged`
+	// MailFlagAnswered es «respondido»: la que leen Thunderbird o el iPhone para
+	// pintar su flecha.
+	MailFlagAnswered = `\Answered`
 )
 
 // Mailbox es una carpeta de correo. Role dice si es especial: "inbox", "sent", "drafts",
@@ -83,6 +89,20 @@ type MailMessage struct {
 	HasAttachment bool      `json:"has_attachment"`
 	ReceivedAt    time.Time `json:"received_at"`
 	Date          time.Time `json:"date"`
+	// UnsnoozedAt es cuándo volvió de «Pospuestos» al vencer la fecha: el servicio
+	// ordena las listas por ella (lo devuelto sube arriba, como en Gmail) y la fila la
+	// enseña en lugar de la llegada. Nil si no se pospuso o se trajo a mano.
+	UnsnoozedAt *time.Time `json:"unsnoozed_at,omitempty"`
+}
+
+// FechaDeOrden es por lo que el servicio ordena las listas: la vuelta de
+// «Pospuestos» si la hubo, si no la llegada. Quien reordena en local (el delta de
+// cambios) ha de usar esta y no ReceivedAt, o lo vuelto bajaría a su sitio de antes.
+func (m MailMessage) FechaDeOrden() time.Time {
+	if m.UnsnoozedAt != nil {
+		return *m.UnsnoozedAt
+	}
+	return m.ReceivedAt
 }
 
 // Has dice si el mensaje lleva una marca; como el servicio, sin distinguir mayúsculas.
@@ -101,6 +121,10 @@ func (m MailMessage) Sender() string {
 // Address es la dirección principal de la cuenta: el «De» de lo que se envía. No es el
 // correo con el que se entra en Sytue ID, que puede ser otro.
 func (m *Mail) Address(ctx context.Context) (string, error) {
+	if m.data != nil {
+		primary, _, err := m.data.Aliases(ctx)
+		return primary, err
+	}
 	r, err := JSON[struct {
 		Primary string `json:"primary"`
 	}](ctx, m.c, Request{Path: "/aliases"})
@@ -117,6 +141,9 @@ type MailAlias struct {
 // Aliases es la dirección principal y los alias de la cuenta: las direcciones «De» que
 // ofrece el redactor, además de los buzones compartidos con permiso de envío.
 func (m *Mail) Aliases(ctx context.Context) (principal string, alias []MailAlias, err error) {
+	if m.data != nil {
+		return m.data.Aliases(ctx)
+	}
 	r, err := JSON[struct {
 		Primary string      `json:"primary"`
 		Aliases []MailAlias `json:"aliases"`
@@ -128,6 +155,12 @@ func (m *Mail) Aliases(ctx context.Context) (principal string, alias []MailAlias
 // dirección está reservada (400 `alias_reserved`) o si ya hay uno (409 `alias_limit`):
 // se leen con Error.Code().
 func (m *Mail) CreateAlias(ctx context.Context, direccion string) (MailAlias, error) {
+	if m.data != nil {
+		if data, ok := m.data.(MailRoutingData); ok {
+			return data.CreateRoutingAlias(ctx, direccion)
+		}
+		return MailAlias{}, ErrPrivateMailOperation
+	}
 	r, err := m.peticion(http.MethodPost, "/aliases", map[string]string{"address": direccion})
 	if err != nil {
 		return MailAlias{}, err
@@ -137,6 +170,12 @@ func (m *Mail) CreateAlias(ctx context.Context, direccion string) (MailAlias, er
 
 // DeleteAlias quita un alias.
 func (m *Mail) DeleteAlias(ctx context.Context, id string) error {
+	if m.data != nil {
+		if data, ok := m.data.(MailRoutingData); ok {
+			return data.DeleteRoutingAlias(ctx, id)
+		}
+		return ErrPrivateMailOperation
+	}
 	return m.sinCuerpo(ctx, http.MethodDelete, "/aliases/"+url.PathEscape(id), nil)
 }
 
@@ -144,6 +183,9 @@ func (m *Mail) DeleteAlias(ctx context.Context, id string) error {
 // (409) y el que no vale (400); renombrar y borrar NO están en REST y van por JMAP
 // (RenameMailbox, DeleteMailbox).
 func (m *Mail) CreateMailbox(ctx context.Context, nombre string) (Mailbox, error) {
+	if m.data != nil {
+		return m.data.CreateMailbox(ctx, nombre)
+	}
 	r, err := m.peticion(http.MethodPost, "/mailboxes", map[string]any{"name": nombre})
 	if err != nil {
 		return Mailbox{}, err
@@ -160,12 +202,18 @@ type MailboxSetError string
 // RenameMailbox renombra una carpeta de la persona (`Mailbox/set` update). Devuelve ""
 // si se aplicó.
 func (m *Mail) RenameMailbox(ctx context.Context, id, nombre string) (MailboxSetError, error) {
+	if m.data != nil {
+		return m.data.RenameMailbox(ctx, id, nombre)
+	}
 	return m.mailboxSet(ctx, map[string]any{"update": map[string]any{id: map[string]string{"name": nombre}}}, "notUpdated", id)
 }
 
 // DeleteMailbox borra una carpeta de la persona que esté VACÍA (`Mailbox/set` destroy):
 // con correo dentro, el servicio la niega con "mailboxHasEmail".
 func (m *Mail) DeleteMailbox(ctx context.Context, id string) (MailboxSetError, error) {
+	if m.data != nil {
+		return m.data.DeleteMailbox(ctx, id)
+	}
 	return m.mailboxSet(ctx, map[string]any{"destroy": []string{id}}, "notDestroyed", id)
 }
 
@@ -223,12 +271,13 @@ func (m *Mail) mailboxSet(ctx context.Context, args map[string]any, cubo, id str
 // MailFilter es una regla de servidor: condiciones AND de subcadena (remitente,
 // asunto) y acciones (mover, leído, destacado). La aplica la entrega entrante.
 type MailFilter struct {
-	ID           string `json:"id,omitempty"`
-	Name         string `json:"name"`
-	Enabled      bool   `json:"enabled"`
-	Priority     int    `json:"priority"`
-	MatchFrom    string `json:"match_from"`
-	MatchSubject string `json:"match_subject"`
+	PrivateRevision string `json:"-"`
+	ID              string `json:"id,omitempty"`
+	Name            string `json:"name"`
+	Enabled         bool   `json:"enabled"`
+	Priority        int    `json:"priority"`
+	MatchFrom       string `json:"match_from"`
+	MatchSubject    string `json:"match_subject"`
 	// MoveTo es la carpeta de destino; vacía, no mueve.
 	MoveTo      string `json:"move_to,omitempty"`
 	MarkRead    bool   `json:"mark_read"`
@@ -250,6 +299,10 @@ func cuerpoFiltro(f MailFilter) map[string]any {
 
 // Filters lista las reglas, en su orden de evaluación.
 func (m *Mail) Filters(ctx context.Context) ([]MailFilter, error) {
+	if m.data != nil {
+		return m.data.Filters(ctx)
+	}
+
 	r, err := JSON[struct {
 		Filters []MailFilter `json:"filters"`
 	}](ctx, m.c, Request{Path: "/filters"})
@@ -258,6 +311,10 @@ func (m *Mail) Filters(ctx context.Context) ([]MailFilter, error) {
 
 // CreateFilter crea una regla; el servicio exige al menos una condición.
 func (m *Mail) CreateFilter(ctx context.Context, f MailFilter) (MailFilter, error) {
+	if m.data != nil {
+		return m.data.CreateFilter(ctx, f)
+	}
+
 	r, err := m.peticion(http.MethodPost, "/filters", cuerpoFiltro(f))
 	if err != nil {
 		return MailFilter{}, err
@@ -268,11 +325,19 @@ func (m *Mail) CreateFilter(ctx context.Context, f MailFilter) (MailFilter, erro
 // UpdateFilter SUSTITUYE la regla entera: para activarla o desactivarla se manda con
 // todos sus campos.
 func (m *Mail) UpdateFilter(ctx context.Context, f MailFilter) error {
+	if m.data != nil {
+		return m.data.UpdateFilter(ctx, f)
+	}
+
 	return m.sinCuerpo(ctx, http.MethodPut, "/filters/"+url.PathEscape(f.ID), cuerpoFiltro(f))
 }
 
 // DeleteFilter borra una regla.
 func (m *Mail) DeleteFilter(ctx context.Context, id string) error {
+	if m.data != nil {
+		return m.data.DeleteFilter(ctx, id)
+	}
+
 	return m.sinCuerpo(ctx, http.MethodDelete, "/filters/"+url.PathEscape(id), nil)
 }
 
@@ -405,6 +470,9 @@ func (m *Mail) accesos(ctx context.Context, ruta string) ([]MailGrant, error) {
 
 // Mailboxes lista las carpetas.
 func (m *Mail) Mailboxes(ctx context.Context) ([]Mailbox, error) {
+	if m.data != nil {
+		return m.data.Mailboxes(ctx)
+	}
 	r, err := JSON[struct {
 		Mailboxes []Mailbox `json:"mailboxes"`
 	}](ctx, m.c, Request{Path: "/mailboxes"})
@@ -414,6 +482,9 @@ func (m *Mail) Mailboxes(ctx context.Context) ([]Mailbox, error) {
 // Messages devuelve una página de una carpeta, de más nuevo a más viejo. cursor vacío es
 // la primera; siguiente vacío, la última.
 func (m *Mail) Messages(ctx context.Context, carpeta, cursor string, limite int) (mensajes []MailMessage, siguiente string, err error) {
+	if m.data != nil {
+		return m.data.Messages(ctx, carpeta, cursor, limite)
+	}
 	return m.pagina(ctx, "/mailboxes/"+url.PathEscape(carpeta)+"/messages", cursor, limite)
 }
 
@@ -434,6 +505,9 @@ func (m *Mail) pagina(ctx context.Context, ruta, cursor string, limite int) (men
 // resultados saltar, así que la página siguiente pide `desde` + los ya recibidos, y
 // una página más corta que `limite` es la última. El servicio no da más de 50 de golpe.
 func (m *Mail) Search(ctx context.Context, q string, desde, limite int) ([]MailMessage, error) {
+	if m.data != nil {
+		return m.data.Search(ctx, q, desde, limite)
+	}
 	query := url.Values{"q": {q}, "limit": {strconv.Itoa(limite)}}
 	if desde > 0 {
 		query.Set("position", strconv.Itoa(desde))
@@ -464,6 +538,9 @@ func (m *Mail) Llegadas(ctx context.Context, alLlegar func()) error {
 
 // Raw es el .eml del mensaje. Cerrarlo es cosa de quien llama.
 func (m *Mail) Raw(ctx context.Context, id string) (io.ReadCloser, error) {
+	if m.data != nil {
+		return m.data.Raw(ctx, id)
+	}
 	resp, err := m.c.Do(ctx, Request{Path: "/messages/" + url.PathEscape(id) + "/raw", Header: http.Header{"Accept": {"message/rfc822"}}})
 	if err != nil {
 		return nil, err
@@ -562,16 +639,25 @@ func (m *Mail) sinCuerpo(ctx context.Context, metodo, ruta string, cuerpo any) e
 
 // SetFlag pone o quita una marca (MailFlagSeen, MailFlagFlagged).
 func (m *Mail) SetFlag(ctx context.Context, id, marca string, poner bool) error {
+	if m.data != nil {
+		return m.data.SetFlagMany(ctx, []string{id}, marca, poner)
+	}
 	return m.sinCuerpo(ctx, http.MethodPost, "/messages/"+url.PathEscape(id)+"/flags", map[string]any{"flag": marca, "add": poner})
 }
 
 // Move lleva un mensaje a otra carpeta.
 func (m *Mail) Move(ctx context.Context, id, carpeta string) error {
+	if m.data != nil {
+		return m.data.MoveMany(ctx, []string{id}, carpeta)
+	}
 	return m.sinCuerpo(ctx, http.MethodPost, "/messages/"+url.PathEscape(id)+"/move", map[string]string{"mailbox_id": carpeta})
 }
 
 // Delete borra un mensaje PARA SIEMPRE. «Eliminar» en la interfaz es Move a la papelera.
 func (m *Mail) Delete(ctx context.Context, id string) error {
+	if m.data != nil {
+		return m.data.Delete(ctx, id)
+	}
 	return m.sinCuerpo(ctx, http.MethodDelete, "/messages/"+url.PathEscape(id), nil)
 }
 
@@ -627,6 +713,12 @@ var ErrDemasiadoTarde = errors.New("api: el correo ya ha salido")
 // CancelOutbound deshace un envío retenido (deshacer o programado). Es idempotente-
 // consciente: si ya salió devuelve ErrDemasiadoTarde, nunca un doble efecto.
 func (m *Mail) CancelOutbound(ctx context.Context, id string) error {
+	if m.data != nil {
+		if port, ok := m.data.(PrivateMailOutbound); ok {
+			return port.CancelOutbound(ctx, id)
+		}
+		return ErrPrivateMailOperation
+	}
 	err := m.sinCuerpo(ctx, http.MethodPost, "/outbound/"+url.PathEscape(id)+"/cancel", nil)
 	var deAPI *Error
 	if errors.As(err, &deAPI) && deAPI.Status == http.StatusConflict {
@@ -671,8 +763,12 @@ func (m *Mail) DoUnsubscribe(ctx context.Context, id string) (string, error) {
 
 // SaveDraft guarda un borrador ya compuesto (eml.Componer con Borrador) en la carpeta de
 // borradores, sin enviar nada. Con `id`, SUSTITUYE a ese borrador y el id CAMBIA: hay que
-// quedarse con el del mensaje devuelto. Descartarlo es Delete.
+// quedarse con el del mensaje devuelto. El repositorio privado conserva el id y
+// publica una revisión nueva. Descartarlo es Delete.
 func (m *Mail) SaveDraft(ctx context.Context, id, de string, crudo []byte) (MailMessage, error) {
+	if m.data != nil {
+		return m.data.SaveDraft(ctx, id, de, crudo)
+	}
 	metodo, ruta := http.MethodPost, "/drafts"
 	if id != "" {
 		metodo, ruta = http.MethodPut, "/drafts/"+url.PathEscape(id)
@@ -689,6 +785,9 @@ func (m *Mail) SaveDraft(ctx context.Context, id, de string, crudo []byte) (Mail
 // Thread es la conversación ENTERA, de más nuevo a más viejo y atravesando carpetas: lo
 // que tú contestaste vive en Enviados y la lista de una carpeta no lo trae.
 func (m *Mail) Thread(ctx context.Context, hilo string) ([]MailMessage, error) {
+	if m.data != nil {
+		return m.data.Thread(ctx, hilo)
+	}
 	r, err := JSON[struct {
 		Messages []MailMessage `json:"messages"`
 	}](ctx, m.c, Request{Path: "/threads/" + url.PathEscape(hilo) + "/messages"})
@@ -712,6 +811,9 @@ type MailCambios struct {
 // servidor contesta su estado actual sin cambios, y a partir de ahí cada vuelta trae
 // solo el delta. Así se refresca la bandeja abierta sin volver a pedirla entera.
 func (m *Mail) Changes(ctx context.Context, desde string) (MailCambios, error) {
+	if m.data != nil {
+		return m.data.Changes(ctx, desde)
+	}
 	q := url.Values{}
 	if desde != "" {
 		q.Set("since", desde)
@@ -721,11 +823,17 @@ func (m *Mail) Changes(ctx context.Context, desde string) (MailCambios, error) {
 
 // MoveMany lleva varios mensajes —una conversación— a otra carpeta en UNA operación.
 func (m *Mail) MoveMany(ctx context.Context, ids []string, carpeta string) error {
+	if m.data != nil {
+		return m.data.MoveMany(ctx, ids, carpeta)
+	}
 	return m.sinCuerpo(ctx, http.MethodPost, "/messages/batch/move", map[string]any{"ids": ids, "mailbox_id": carpeta})
 }
 
 // SetFlagMany pone o quita una marca a varios mensajes en UNA operación.
 func (m *Mail) SetFlagMany(ctx context.Context, ids []string, marca string, poner bool) error {
+	if m.data != nil {
+		return m.data.SetFlagMany(ctx, ids, marca, poner)
+	}
 	return m.sinCuerpo(ctx, http.MethodPost, "/messages/batch/flags", map[string]any{"ids": ids, "flag": marca, "add": poner})
 }
 
@@ -743,6 +851,12 @@ type MailScheduled struct {
 // Scheduled lista los envíos programados pendientes, del que sale antes al que sale
 // después. Se cancelan con CancelOutbound, que es la misma cola.
 func (m *Mail) Scheduled(ctx context.Context) ([]MailScheduled, error) {
+	if m.data != nil {
+		if port, ok := m.data.(PrivateMailOutbound); ok {
+			return port.Scheduled(ctx)
+		}
+		return nil, ErrPrivateMailOperation
+	}
 	r, err := JSON[struct {
 		Scheduled []MailScheduled `json:"scheduled"`
 	}](ctx, m.c, Request{Path: "/scheduled"})
@@ -752,6 +866,12 @@ func (m *Mail) Scheduled(ctx context.Context) ([]MailScheduled, error) {
 // Reschedule cambia la hora de un programado. El instante tiene que estar en el futuro:
 // el servicio rechaza lo demás.
 func (m *Mail) Reschedule(ctx context.Context, id string, cuando time.Time) error {
+	if m.data != nil {
+		if port, ok := m.data.(PrivateMailOutbound); ok {
+			return port.Reschedule(ctx, id, cuando)
+		}
+		return ErrPrivateMailOperation
+	}
 	return m.sinCuerpo(ctx, http.MethodPost, "/scheduled/"+url.PathEscape(id)+"/reschedule",
 		map[string]any{"send_at": cuando.UTC().Format(time.RFC3339)})
 }
@@ -759,13 +879,22 @@ func (m *Mail) Reschedule(ctx context.Context, id string, cuando time.Time) erro
 // MailQuota es el espacio del buzón: cuánto se ha gastado y cuánto hay. Un límite a
 // cero es «sin cuota configurada», y entonces no hay nada que medir.
 type MailQuota struct {
-	UsedBytes  int64 `json:"used_bytes"`
-	QuotaBytes int64 `json:"quota_bytes"`
+	UsedBytes          int64 `json:"used_bytes"`
+	QuotaBytes         int64 `json:"quota_bytes"`
+	ExternalUsedBytes  int64 `json:"external_used_bytes,omitempty"`
+	PendingDeleteBytes int64 `json:"pending_delete_bytes,omitempty"`
+	CiphertextBytes    int64 `json:"ciphertext_bytes,omitempty"`
 }
 
 // Quota lee el espacio del buzón (el medidor del pie del menú). El uso es el contador
 // agregado que el servicio mantiene, no una suma por mensaje.
 func (m *Mail) Quota(ctx context.Context) (MailQuota, error) {
+	if m.data != nil {
+		if data, ok := m.data.(MailQuotaData); ok {
+			return data.Quota(ctx)
+		}
+		return MailQuota{}, ErrPrivateMailOperation
+	}
 	return JSON[MailQuota](ctx, m.c, Request{Path: "/quota"})
 }
 
@@ -780,6 +909,9 @@ type MailLabel struct {
 
 // Labels lista las etiquetas.
 func (m *Mail) Labels(ctx context.Context) ([]MailLabel, error) {
+	if m.data != nil {
+		return m.data.Labels(ctx)
+	}
 	r, err := JSON[struct {
 		Labels []MailLabel `json:"labels"`
 	}](ctx, m.c, Request{Path: "/labels"})
@@ -789,6 +921,9 @@ func (m *Mail) Labels(ctx context.Context) ([]MailLabel, error) {
 // CreateLabel crea una etiqueta. `color` es un token de la paleta cerrada
 // (theme.EtiquetasColores), no un hex: es lo que el servicio valida.
 func (m *Mail) CreateLabel(ctx context.Context, nombre, color string) (MailLabel, error) {
+	if m.data != nil {
+		return m.data.CreateLabel(ctx, nombre, color)
+	}
 	r, err := m.peticion(http.MethodPost, "/labels", map[string]any{"name": nombre, "color": color})
 	if err != nil {
 		return MailLabel{}, err
@@ -799,27 +934,42 @@ func (m *Mail) CreateLabel(ctx context.Context, nombre, color string) (MailLabel
 // UpdateLabel cambia el nombre y el color de una etiqueta. Los dos a la vez: el servicio
 // SUSTITUYE, así que mandar solo uno borraría el otro.
 func (m *Mail) UpdateLabel(ctx context.Context, id, nombre, color string) error {
+	if m.data != nil {
+		return m.data.UpdateLabel(ctx, id, nombre, color)
+	}
 	return m.sinCuerpo(ctx, http.MethodPut, "/labels/"+url.PathEscape(id), map[string]any{"name": nombre, "color": color})
 }
 
 // DeleteLabel borra una etiqueta. Los mensajes que la llevaban se quedan donde estaban:
 // una etiqueta no es una carpeta.
 func (m *Mail) DeleteLabel(ctx context.Context, id string) error {
+	if m.data != nil {
+		return m.data.DeleteLabel(ctx, id)
+	}
 	return m.sinCuerpo(ctx, http.MethodDelete, "/labels/"+url.PathEscape(id), nil)
 }
 
 // ApplyLabel pone o quita una etiqueta a varios mensajes.
 func (m *Mail) ApplyLabel(ctx context.Context, etiqueta string, ids []string, poner bool) error {
+	if m.data != nil {
+		return m.data.ApplyLabel(ctx, etiqueta, ids, poner)
+	}
 	return m.sinCuerpo(ctx, http.MethodPost, "/labels/"+url.PathEscape(etiqueta)+"/apply", map[string]any{"message_ids": ids, "add": poner})
 }
 
 // LabelMessages pagina los mensajes de una etiqueta, con el contrato de Messages.
 func (m *Mail) LabelMessages(ctx context.Context, etiqueta, cursor string, limite int) (mensajes []MailMessage, siguiente string, err error) {
+	if m.data != nil {
+		return m.data.LabelMessages(ctx, etiqueta, cursor, limite)
+	}
 	return m.pagina(ctx, "/labels/"+url.PathEscape(etiqueta)+"/messages", cursor, limite)
 }
 
 // Signature es la firma de la cuenta: texto plano, va al final de lo que se escribe.
 func (m *Mail) Signature(ctx context.Context) (string, error) {
+	if m.data != nil {
+		return m.data.Signature(ctx)
+	}
 	r, err := JSON[struct {
 		Signature string `json:"signature"`
 	}](ctx, m.c, Request{Path: "/signature"})
@@ -828,26 +978,31 @@ func (m *Mail) Signature(ctx context.Context) (string, error) {
 
 // SetSignature guarda la firma (el servicio rechaza más de 8 KiB, sin truncar).
 func (m *Mail) SetSignature(ctx context.Context, firma string) error {
+	if m.data != nil {
+		return m.data.SetSignature(ctx, firma)
+	}
 	return m.sinCuerpo(ctx, http.MethodPut, "/signature", map[string]string{"signature": firma})
 }
 
 // MailVacation es la respuesta automática. Sin StartsAt empieza ya; sin EndsAt, no acaba.
-type MailVacation struct {
-	Enabled  bool       `json:"enabled"`
-	Subject  string     `json:"subject"`
-	Body     string     `json:"body"`
-	StartsAt *time.Time `json:"starts_at,omitempty"`
-	EndsAt   *time.Time `json:"ends_at,omitempty"`
-}
+type MailVacation = model.Vacation
 
 // Vacation lee la respuesta automática.
 func (m *Mail) Vacation(ctx context.Context) (MailVacation, error) {
+	if m.data != nil {
+		return m.data.Vacation(ctx)
+	}
+
 	return JSON[MailVacation](ctx, m.c, Request{Path: "/vacation"})
 }
 
 // SetVacation la SUSTITUYE entera. El PUT quiere las fechas como texto RFC 3339 —vacío:
 // sin límite— y no admite campos de más, así que no vale mandar lo mismo que se leyó.
 func (m *Mail) SetVacation(ctx context.Context, v MailVacation) error {
+	if m.data != nil {
+		return m.data.SetVacation(ctx, v)
+	}
+
 	fecha := func(t *time.Time) string {
 		if t == nil {
 			return ""

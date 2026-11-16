@@ -244,7 +244,7 @@ func (e *Editor) grupoFuente(c *editor.Contexto, fuentes, tallas []editor.Opcion
 // Presentar abre el modo presentación desde la diapositiva activa, que es lo que hace
 // el botón de la cinta de la web.
 func (e *Editor) Presentar(moderador bool) {
-	Presentar(e.m, e.activa, moderador, e.Idioma, e.ctx.T)
+	Presentar(e.m, e.activa, moderador, e.Idioma, e.ctx.T, e.Almacen)
 }
 
 // ---- Organizar objetos ----

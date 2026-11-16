@@ -108,7 +108,7 @@ func nuevoS3EnMemoria(t *testing.T, bucket string) *s3EnMemoria {
 			s.objetos[key] = objS3Mem{datos: body, meta: meta}
 			s.mu.Unlock()
 			sum := sha256.Sum256(body)
-			w.Header().Set("ETag", fmt.Sprintf(`"%x"`, sum[:16]) )
+			w.Header().Set("ETag", fmt.Sprintf(`"%x"`, sum[:16]))
 			w.WriteHeader(http.StatusOK)
 		case http.MethodHead:
 			s.mu.RLock()

@@ -7,6 +7,7 @@
   "block.short": "Imblokka",
   "card.untitledOwner": "Isem mhux magħruf",
   "card.watch": "Ara {title}",
+  "card.watched": "Imħares {percent}%",
   "channel.count": {
     "other": "Vidjows pubbliċi: {count}"
   },
@@ -150,7 +151,12 @@
   "player.qualityAuto": "Awtomatika",
   "player.qualityAutoNow": "Awtomatika ({quality})",
   "player.region": "Plejer tal-vidjow",
+  "player.restart": "Ibda mill-bidu",
+  "player.resumedAt": "Ikompli minn {time}",
   "player.seek": "Pożizzjoni",
+  "player.speed": "Veloċità",
+  "player.speedNormal": "Normali",
+  "player.speedNow": "Veloċità {rate}",
   "player.unmute": "Ixgħel il-ħoss",
   "player.volume": "Volum",
   "quality.approximate": "Stima approssimattiva: it-tul tal-vidjo għadu mhux magħruf.",

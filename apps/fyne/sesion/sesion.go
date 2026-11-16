@@ -94,6 +94,7 @@ type Suite struct {
 	oidc            *auth.OIDC
 	almacen         *auth.AlmacenSesion
 	reidentificando atomic.Bool
+	cacheAlmacen    atomic.Pointer[almacenCache]
 
 	mu               sync.Mutex
 	visto            ajustes.Estado
@@ -141,8 +142,22 @@ type Suite struct {
 	// entrando dice que hay un Entrar esperando al navegador, y autorizando es la URL
 	// que le abrió: pulsar «Iniciar sesión» otra vez la vuelve a abrir en vez de pedir
 	// un segundo login, que no podría escuchar en el mismo puerto de vuelta.
-	entrando    bool
-	autorizando string
+	privateRevoke           func(context.Context, auth.TestigoTrabajo, auth.IdentitySnapshot) error
+	privateWorkMu           sync.Mutex
+	privateWorkNext         uint64
+	privateWork             map[uint64]privateWorkRegistration
+	privateTransitionActive bool
+	// privateTransitionUnresolved fences this process after a login whose token
+	// exchange succeeded but whose durable adoption failed: the stored login may
+	// be partially replaced, so nothing private starts again until a restart
+	// re-reads the store. It is never cleared in this process.
+	privateTransitionUnresolved bool
+	privateTransitionNext       uint64
+	privateTransitionCycle      uint64
+	privateTransitionLatest     EventoTransicionPrivada
+	privateTransitions          map[uint64]privateTransitionParticipant
+	entrando                    bool
+	autorizando                 string
 
 	tareasAlmacenMu  sync.Mutex
 	tareasAlmacen    map[uint64]context.CancelCauseFunc
@@ -674,30 +689,52 @@ var ErrYaEntrando = errors.New("sesion: ya hay un inicio de sesión abierto en e
 // contraseña se escribe en una ventana cuyo dominio y cuyo candado se ven, y si ya hay
 // sesión con Sytue ID —porque otra app entró hace un rato— se reutiliza sin volver a
 // pedirla.
-func (s *Suite) Entrar(ctx context.Context) error {
+func (s *Suite) Entrar(ctx context.Context) error { return s.entrar(ctx, nil) }
+
+func (s *Suite) entrar(ctx context.Context, transition *privateTransition) error {
 	var (
 		nuevos auth.Tokens
 		err    error
 	)
-	s.mu.Lock()
-	if s.entrando {
-		destino := s.autorizando
-		s.mu.Unlock()
-		if destino == "" {
+	if transition == nil {
+		s.mu.Lock()
+		if s.entrando {
+			destino := s.autorizando
+			s.mu.Unlock()
+			if destino == "" {
+				return ErrYaEntrando
+			}
+			if err := s.oidc.Open(destino); err != nil {
+				return err
+			}
 			return ErrYaEntrando
 		}
-		if err := s.oidc.Open(destino); err != nil {
+		s.entrando = true
+		s.mu.Unlock()
+		defer func() {
+			s.mu.Lock()
+			s.entrando, s.autorizando = false, ""
+			s.mu.Unlock()
+		}()
+	}
+	var committed, remoteConfirmed bool
+	if transition == nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 3*time.Minute)
+		defer cancel()
+		var err error
+		transition, err = s.prepararTransicionPrivada(ctx, cancel, nil)
+		if err != nil {
 			return err
 		}
-		return ErrYaEntrando
+		defer func() {
+			if committed {
+				transition.completada()
+			} else {
+				transition.fallo(remoteConfirmed)
+			}
+		}()
 	}
-	s.entrando = true
-	s.mu.Unlock()
-	defer func() {
-		s.mu.Lock()
-		s.entrando, s.autorizando = false, ""
-		s.mu.Unlock()
-	}()
 	if s.app.Driver().Device().IsMobile() {
 		esquema := s.app.Metadata().Custom["esquema"]
 		if esquema == "" {
@@ -718,10 +755,23 @@ func (s *Suite) Entrar(ctx context.Context) error {
 		slog.Warn("sesion: no se ha podido entrar", "error", err)
 		return err
 	}
-	// Adoptar, no sustituir: los clientes de `api` ya tienen este puntero.
-	if err := s.Sesion.AdoptarCon(ctx, nuevos); err != nil {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
+	if err := s.Sesion.AdoptarCon(ctx, nuevos); err != nil {
+		// The IdP has already issued the new login, but it is not durable (or
+		// only partially). Never confirm the transition, and fence any further
+		// private transition or login in this process until the store is
+		// re-read on restart.
+		remoteConfirmed = true
+		s.privateWorkMu.Lock()
+		s.privateTransitionUnresolved = true
+		s.privateWorkMu.Unlock()
+		slog.Warn("sesion: el inicio de sesión no se ha podido guardar", "error", err)
+		return err
+	}
+	committed = true
+	// Adoptar, no sustituir: los clientes de `api` ya tienen este puntero.
 	// Sólo un login completado desbloquea la renovación y las marcas de otras apps.
 	s.reidentificando.Store(false)
 	s.prepararAvisos()
@@ -741,11 +791,11 @@ func (s *Suite) Entrar(ctx context.Context) error {
 	return nil
 }
 
-// leerSesionCompartida obtiene identidad y marca de la misma escritura. El
-// cerrojo se libera antes de tocar Suite/Session para mantener el orden de locks.
-func (s *Suite) leerSesionCompartida(ctx context.Context) (auth.Tokens, string, error) {
-	t, marcas, err := s.leerSesion(ctx)
-	return t, marcas.generacion, err
+// leerSesionCompartida obtiene la identidad guardada. El cerrojo se libera antes
+// de tocar Suite/Session para mantener el orden de locks.
+func (s *Suite) leerSesionCompartida(ctx context.Context, guards ...func() error) (auth.Tokens, error) {
+	t, _, err := s.leerSesion(ctx, guards...)
+	return t, err
 }
 
 // marcasSesion son la marca de sesión y la época de identidad leídas con los tokens.
@@ -757,8 +807,8 @@ type marcasSesion struct{ generacion, epoca string }
 // tokens leídos (ADR 0078, enmienda del 2026-11-06).
 //
 //nolint:contextcheck // El llavero usa callbacks sin contexto y un plazo propio para D-Bus.
-func (s *Suite) leerSesion(ctx context.Context) (auth.Tokens, marcasSesion, error) {
-	return leerSesionGuardada(ctx, s.cargarSesion, s.almacen, !s.sinSesionPropia())
+func (s *Suite) leerSesion(ctx context.Context, guards ...func() error) (auth.Tokens, marcasSesion, error) {
+	return leerSesionGuardada(ctx, s.cargarSesion, s.almacen, !s.sinSesionPropia(), guards...)
 }
 
 // leerSesionGuardada es leerSesion sin Suite: lee con `cargar` bajo el cerrojo de la
@@ -767,13 +817,18 @@ func (s *Suite) leerSesion(ctx context.Context) (auth.Tokens, marcasSesion, erro
 //
 //nolint:contextcheck // El llavero usa callbacks sin contexto y un plazo propio para D-Bus.
 func leerSesionGuardada(
-	ctx context.Context, cargar func() (auth.Tokens, error), almacen *auth.AlmacenSesion, confirmar bool,
+	ctx context.Context, cargar func() (auth.Tokens, error), almacen *auth.AlmacenSesion, confirmar bool, guards ...func() error,
 ) (auth.Tokens, marcasSesion, error) {
 	soltar, err := ajustes.CerrojoSesion(ctx)
 	if err != nil {
 		return auth.Tokens{}, marcasSesion{}, err
 	}
 	defer soltar()
+	for _, guard := range guards {
+		if err := guard(); err != nil {
+			return auth.Tokens{}, marcasSesion{}, err
+		}
+	}
 	guardados, err := cargar()
 	if err != nil {
 		return auth.Tokens{}, marcasSesion{}, err
@@ -821,65 +876,88 @@ func (s *Suite) Salir() {
 
 // SalirConError permite avisar y reintentar si el dispositivo no dejó retirar
 // la sesión compartida. El estado local nunca readopta los tokens no borrados.
-func (s *Suite) SalirConError() error {
+func (s *Suite) salirClasico(ctx context.Context) error { return s.salirClasicoConGuardia(ctx, nil) }
+
+func (s *Suite) salirClasicoConGuardia(ctx context.Context, guard func() error) error {
+	// The legacy cleanup removes secrets without the private-work shutdown
+	// protocol. Never run it while a private presenter is registered.
+	s.privateWorkMu.Lock()
+	if s.privateTransitionBusyLocked() || len(s.privateTransitions) != 0 || len(s.privateWork) != 0 {
+		s.privateWorkMu.Unlock()
+		return ErrTransicionPrivada
+	}
+	s.privateTransitionActive = true
+	s.privateWorkMu.Unlock()
+	defer func() {
+		s.privateWorkMu.Lock()
+		s.privateTransitionActive = false
+		s.privateWorkMu.Unlock()
+	}()
+	if guard != nil {
+		if err := guard(); err != nil {
+			return err
+		}
+		ctx = s.Sesion.WithAuthorizationIntent(ctx)
+		if err := guard(); err != nil {
+			return err
+		}
+	}
 	// Los aparatos de iOS de las quince apps de aquí, que el Hub despertaba para su
 	// widget: con la sesión que aún vale, antes de revocarla (despertar.go).
-	s.olvidarDespertares(context.Background(), false)
+	s.olvidarDespertares(context.Background(), false) //nolint:contextcheck // se avisa a los aparatos aunque se cancele la salida: no puede quedar uno despertando a una cuenta cerrada.
 	// Y el interruptor, que es el consentimiento de quien lo encendió y no del aparato:
 	// quien entre después lo encuentra apagado, y nadie lo registra sin que lo pida.
 	if a := ajustes.Leer(); a.DespertarWidgets || a.DespertarDe != "" {
+		//nolint:contextcheck // apagarlo no puede abandonarse a medias porque se cancele la salida: quien entre después lo encontraría encendido.
 		if err := ajustes.Cambiar(func(a *ajustes.Ajustes) { a.DespertarWidgets, a.DespertarDe = false, "" }); err != nil {
 			slog.Warn("sesion: no se ha podido apagar el despertar de los widgets", "error", err)
 		}
 	}
 	// La contraseña del proveedor de archivos de Drive, que sigue valiendo sin sesión. La
 	// primera: su token puede necesitar el refresh que se revoca justo debajo.
-	s.revocarArchivos()
+	s.revocarArchivos(ctx)
 	// Lo guardado y no lo que haya en memoria: es el token que vale para las trece, y
 	// otra app puede haberlo rotado. Se lee ANTES de olvidarlo.
-	if guardados, err := s.cargarSesion(); err == nil && guardados.Refresh != "" && s.oidc != nil {
+	guards := []func() error{}
+	if guard != nil {
+		guards = append(guards, guard)
+	}
+	if guardados, err := s.leerSesionCompartida(ctx, guards...); err == nil && guardados.Refresh != "" && s.oidc != nil {
 		// Aparte y con plazo: sin red se sale igual, y el token caduca solo.
 		go func() {
-			ctx, parar := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, parar := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 			defer parar()
 			if err := s.oidc.Revocar(ctx, guardados.Refresh); err != nil {
 				slog.Warn("sesion: el token no se ha podido revocar en Sytue ID; caducará solo", "error", err)
 			}
 		}()
 	}
-	s.retirarDriveDelSistema()
+	s.retirarDriveDelSistema(ctx)
+	// Las tareas de almacenamiento se paran ANTES del logout y se reabren al
+	// volver: una subida en curso no puede recrear diarios con las claves ya
+	// olvidadas (composición con sytue-native, IniciarTareaAlmacenamiento).
 	reabrirAlmacen := s.detenerTareasAlmacenamiento()
 	defer reabrirAlmacen()
-	errCierre := s.Sesion.Logout()
+	errCierre := s.Sesion.LogoutConGuardia(ctx, guard, func() error {
+		if err := s.vaciarAlmacenCon(ctx); err != nil {
+			return err
+		}
+		return errors.Join(auth.OlvidarSecretos("notes-"), auth.OlvidarSecretos("rooms-matrix-"))
+	})
 	if errCierre != nil {
-		// Hasta un login completado, ni la vigilancia ni un cambio de ajustes
-		// pueden readoptar una copia que el almacén no dejó retirar.
+		if guard != nil {
+			return errCierre
+		}
 		s.reidentificando.Store(true)
 	}
-	s.vaciarAlmacen()
-	// Las claves recordadas de los cuadernos cifrados son de esta sesión (FYS-09).
-	if err := errors.Join(auth.OlvidarSecretos("notes-"), auth.OlvidarSecretos("rooms-matrix-")); err != nil {
-		slog.Warn("sesion: no se han podido olvidar las claves privadas", "error", err)
-	}
-	guardados, marcas, errLectura := s.leerSesion(context.Background())
-	s.mu.Lock()
-	if errLectura == nil {
-		s.Sesion.Sincronizar(guardados)
-		s.generacionSesion, s.epocaSesion = marcas.generacion, marcas.epoca
-	}
-	s.visto, s.presencia, s.mensaje = ajustes.Leer(), "", ""
-	s.visto.Sesion, s.visto.Epoca = s.generacionSesion, s.epocaSesion
-	visto := s.visto.Ajustes
-	s.mu.Unlock()
-	s.repintar(visto) // sin sesión no hay organización que diga color ni forma
-	s.avisar()
+	s.aplicarSesionCerrada(ctx)
 	return errCierre
 }
 
 // retirarDriveDelSistema quita Drive del gestor de ficheros y de «Archivos» y revoca su
 // contraseña de aplicación (documentos.Retirar). Revocarla pide el token, que se coge
 // AQUÍ, antes de olvidar la sesión; la revocación sigue aparte, con plazo.
-func (s *Suite) retirarDriveDelSistema() {
+func (s *Suite) retirarDriveDelSistema(parent context.Context) {
 	if !documentos.Guardada() {
 		return
 	}
@@ -888,7 +966,7 @@ func (s *Suite) retirarDriveDelSistema() {
 		cuentaSesion = s.almacen.Identificador()
 	}
 	identidad := identidadDocumentos(s.Sesion.SnapshotIdentity(), cuentaSesion)
-	ctx, parar := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, parar := context.WithTimeout(parent, 2*time.Second)
 	tok, err := s.Sesion.AccessToken(ctx)
 	parar()
 	if err != nil {
@@ -896,7 +974,7 @@ func (s *Suite) retirarDriveDelSistema() {
 	}
 	cuenta := api.NewAccount(s.URL("id"), tokenFijo(tok), nil)
 	go func() {
-		ctx, parar := context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, parar := context.WithTimeout(context.WithoutCancel(parent), 10*time.Second)
 		defer parar()
 		if err := documentos.RetirarIdentidad(ctx, cuenta, identidad); err != nil {
 			slog.Warn("sesion: la contraseña de Drive en el sistema no se ha podido revocar; se revocará al volver a entrar", "error", err)
@@ -1074,12 +1152,15 @@ func (s *Suite) apariencia(a ajustes.Ajustes) (colorSuite, forma string) {
 	return cmp.Or(colorSuite, tokens.ColorDeCadaApp), forma
 }
 
-// elegirApariencia pone el tema, el color y la forma en vigor y dice si ha cambiado algo.
+// elegirApariencia pone el tema, el color y la forma en vigor —y el «más contraste» que
+// pida el sistema, como hace el navegador con `prefers-contrast`— y dice si ha cambiado
+// algo.
 func (s *Suite) elegirApariencia(a ajustes.Ajustes) bool {
 	colorSuite, forma := s.apariencia(a)
-	// Los tres, siempre: con `||` un cambio de tema se saltaría los otros dos.
+	// Todos, siempre: con `||` un cambio de tema se saltaría los demás.
 	cambiaTema, cambiaColor, cambiaForma := tema.Elegir(a.Tema), tema.ElegirColor(colorSuite), tema.ElegirForma(forma)
-	return cambiaTema || cambiaColor || cambiaForma
+	cambiaContraste := tema.ElegirMasContraste(sistema.MasContraste())
+	return cambiaTema || cambiaColor || cambiaForma || cambiaContraste
 }
 
 // repintar aplica la apariencia y, si ha cambiado, refresca todos los lienzos.
@@ -1210,4 +1291,19 @@ func sinGraficos(a fyne.App, e ajustes.Estado) {
 	// Salir aquí y no en `main`: lo comparten las trece apps y, sin ventana, seguir
 	// viva es quedarse invisible con el icono en la bandeja (medido en Windows).
 	os.Exit(1) //nolint:revive // deep-exit: ver arriba
+}
+
+func (s *Suite) aplicarSesionCerrada(ctx context.Context) {
+	guardados, marcas, errLectura := s.leerSesion(ctx)
+	s.mu.Lock()
+	if errLectura == nil {
+		s.Sesion.Sincronizar(guardados)
+		s.generacionSesion, s.epocaSesion = marcas.generacion, marcas.epoca
+	}
+	s.visto, s.presencia, s.mensaje = ajustes.Leer(), "", ""
+	s.visto.Sesion, s.visto.Epoca = s.generacionSesion, s.epocaSesion
+	visto := s.visto.Ajustes
+	s.mu.Unlock()
+	s.repintar(visto) // sin sesión no hay organización que diga color ni forma
+	s.avisar()
 }

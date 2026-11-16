@@ -129,6 +129,10 @@ func (s *Store) GetInvitation(ctx context.Context, id uuid.UUID) (domain.Invitat
 // sub (recipient_sub) del JWT del llamante; una identidad vacia nunca casa
 // (deny-by-default). Sin coincidencia → ErrNotFound, sin distinguir «no
 // existe» de «no es tuya» (anti-enumeracion).
+//
+// Una invitación (REQUEST) ya contestada se puede volver a contestar: cambiar de
+// opinión es lo normal en un calendario, y el organizador debe enterarse. Lo que
+// no se contesta es una cancelada, ni otra vez un REPLY o un CANCEL de la bandeja.
 func (s *Store) RespondInvitation(ctx context.Context, id uuid.UUID, status domain.InvitationStatus, callerEmails []string, callerSub string) (domain.Invitation, error) {
 	t := tenancy.MustFrom(ctx)
 	switch status {
@@ -146,7 +150,8 @@ func (s *Store) RespondInvitation(ctx context.Context, id uuid.UUID, status doma
 	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
 		row := tx.QueryRow(ctx,
 			`UPDATE invitations SET status=$3, responded_at=now()
-			 WHERE tenant=$1 AND id=$2 AND status='pending'
+			 WHERE tenant=$1 AND id=$2
+			   AND (status='pending' OR (method='REQUEST' AND status IN ('accepted','declined','tentative')))
 			   AND (lower(recipient) = ANY($4) OR (recipient_sub <> '' AND recipient_sub = $5))
 			 RETURNING `+invitationCols,
 			t.Slug, id, string(status), direcciones, callerSub)
@@ -209,21 +214,35 @@ func (s *Store) EsInvitadoDeEvento(ctx context.Context, uid, sub string, direcci
 	return si, err
 }
 
-// InvitacionPendiente es la invitación (REQUEST) aún sin contestar de ese evento a esa
-// dirección: la que un REPLY por correo (iMIP) contesta. La más reciente si hay varias.
-func (s *Store) InvitacionPendiente(ctx context.Context, uid, email string) (uuid.UUID, error) {
+// InvitacionDeEvento es la invitación (REQUEST) de ese evento a alguna de esas
+// direcciones o a ese sub que aún se puede contestar: sin contestar o ya contestada
+// (cambiar de respuesta), nunca cancelada. Es la que contesta un REPLY por correo
+// (iMIP) y la que se marca al responder desde el propio evento. La más reciente si
+// hay varias: cada cambio del organizador manda un REQUEST nuevo. Una identidad
+// vacía no casa con nada (ErrNotFound).
+func (s *Store) InvitacionDeEvento(ctx context.Context, uid string, direcciones []string, sub string) (domain.Invitation, error) {
 	t := tenancy.MustFrom(ctx)
-	var id uuid.UUID
+	limpias := make([]string, 0, len(direcciones))
+	for _, d := range direcciones {
+		if d = domain.NormalizeEmail(d); d != "" {
+			limpias = append(limpias, d)
+		}
+	}
+	var inv domain.Invitation
 	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
-		return tx.QueryRow(ctx,
-			`SELECT id FROM invitations
-			 WHERE tenant=$1 AND uid=$2 AND lower(recipient)=lower($3)
-			   AND method='REQUEST' AND status='pending'
+		row := tx.QueryRow(ctx,
+			`SELECT `+invitationCols+` FROM invitations
+			 WHERE tenant=$1 AND uid=$2 AND method='REQUEST'
+			   AND status IN ('pending','accepted','declined','tentative')
+			   AND (lower(recipient) = ANY($3) OR ($4 <> '' AND recipient_sub = $4))
 			 ORDER BY created_at DESC LIMIT 1`,
-			t.Slug, uid, strings.TrimSpace(email)).Scan(&id)
+			t.Slug, uid, limpias, sub)
+		var e error
+		inv, e = scanInvitation(row, t.Slug)
+		return e
 	})
 	if isNoRows(err) {
-		return uuid.Nil, domain.ErrNotFound
+		return domain.Invitation{}, domain.ErrNotFound
 	}
-	return id, err
+	return inv, err
 }

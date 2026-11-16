@@ -92,7 +92,8 @@ func TestCapturasDeLasPantallas(t *testing.T) {
 
 	// La ficha a 1280, con su AvatarPicker y el menú de la cámara abierto.
 	c = a.Pantalla.Contactos[1]
-	c.Organization, c.Phones = "Analytical Engines", []api.ContactPhone{{Phone: "+34 600 11 22 33", Type: "cell"}}
+	c.Organization, c.Title, c.Nickname = "Analytical Engines", "Condesa", "Ada"
+	c.Phones = []api.ContactPhone{{Phone: "+34 600 11 22 33", Type: "cell"}}
 	a.todos[1] = c
 	a.elegir(c)
 	guardar(t, a.lienzo().Capture(), "contactos-ficha")

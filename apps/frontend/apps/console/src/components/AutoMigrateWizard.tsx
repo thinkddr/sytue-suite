@@ -537,16 +537,15 @@ export default function AutoMigrateWizard({
           </InlineHelp>
         ) : null}
 
-        <section class="border-warning bg-warning-bg rounded-lg border p-4">
-          <h3 class="text-warning-text text-sm font-semibold">{t('wizard.auto.limits.title')}</h3>
-          <ul class="mt-2 flex flex-col gap-1.5">
+        <InlineHelp tone="warning" live="off" title={t('wizard.auto.limits.title')} titleAs="h3">
+          <ul class="flex flex-col gap-1.5">
             {limits.map((k) => (
-              <li key={k} class="text-text-muted text-sm leading-snug">
+              <li key={k} class="leading-snug">
                 {t(k)}
               </li>
             ))}
           </ul>
-        </section>
+        </InlineHelp>
 
         <InlineHelp tone="info" title={t('wizard.auto.safe.title')}>
           {t('wizard.auto.safe.body')}

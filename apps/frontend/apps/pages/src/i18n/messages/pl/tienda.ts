@@ -177,14 +177,9 @@ export const tienda = {
   'store.mode_test_help':
     'Symulowane płatności przy użyciu kluczy testowych dostawcy. Nikt nie jest obciążany.',
   'store.mode_live_help': 'Rzeczywiste płatności od klientów przy użyciu kluczy produkcyjnych.',
-  'store.webhook_title': 'Krok 1: adres webhooka',
   'store.webhook_help': 'Wklej ten adres w panelu {nombre}.',
   'store.webhook_label': 'Adres webhooka',
   'store.webhook_error': 'Nie udało się pobrać adresu webhooka. Zamknij okno i spróbuj ponownie.',
-  'store.copy': 'Kopiuj',
-  'store.copied': 'Skopiowano adres.',
-  'store.credentials_title': 'Dane uwierzytelniające',
-  'store.credentials_step': 'Krok 2: dane uwierzytelniające',
   'store.f_api_key': 'Klucz API',
   'store.f_api_key_mode': 'Klucz API ({modo})',
   'store.f_profile_id': 'Identyfikator profilu (opcjonalnie)',
@@ -203,6 +198,48 @@ export const tienda = {
   'store.gateway_save': 'Zapisz i przetestuj',
   'store.gateway_saved': 'Bramka {nombre} przetestowana i zapisana.',
   'store.gateway_save_error': 'Nie udało się zweryfikować danych uwierzytelniających bramki.',
+  'store.wz_progress': 'Kroki podłączania bramki płatności',
+  'store.wz_step_mode': 'Tryb',
+  'store.wz_step_webhook': 'Webhook',
+  'store.wz_step_keys': 'Klucze',
+  'store.wz_step_check': 'Sprawdź',
+  'store.wz_step_done': 'Gotowe',
+  'store.wz_mode_heading': 'Płatności testowe czy prawdziwe?',
+  'store.wz_mode_desc':
+    'Zacznij w trybie testowym; gdy wszystko zadziała, otwórz ponownie tego kreatora i wybierz tryb produkcyjny.',
+  'store.wz_webhook_heading': 'Wskaż {nombre}, dokąd wysyłać powiadomienia o płatnościach',
+  'store.wz_keys_heading': 'Twoje klucze {nombre}',
+  'store.wz_keys_desc':
+    'Klucze tajne są przechowywane w postaci zapieczętowanej i nigdy więcej nie są pokazywane: aby zmienić klucz, wpisz go ponownie.',
+  'store.wz_keys_rejected': '{nombre} nie zaakceptował tych kluczy',
+  'store.wz_check_heading': 'Sprawdź i zapisz',
+  'store.wz_check_desc':
+    'Sytue Web testuje klucze w {nombre} przed włączeniem bramki. Nic nie zostanie zapisane, dopóki test się nie powiedzie.',
+  'store.wz_secret_hidden': 'Wpisany (ukryty)',
+  'store.wz_empty_value': 'Nie podano',
+  'store.wz_done_heading': '{nombre} jest gotowy',
+  'store.wz_finish': 'Zakończ',
+  'store.hint_mollie_api_key':
+    'W Mollie: Developers › API keys. Klucze testowe zaczynają się od test_, a produkcyjne od live_.',
+  'store.hint_mollie_profile':
+    'W Mollie: Settings › Website profiles. Zaczyna się od pfl_; zostaw puste, aby użyć profilu domyślnego.',
+  'store.hint_adyen_api_key':
+    'W Adyen Customer Area: Developers › API credentials › Twoje poświadczenie › API key.',
+  'store.hint_adyen_merchant':
+    'W Adyen Customer Area, w selektorze konta u góry: konto akceptanta, nie konto firmy.',
+  'store.hint_adyen_hmac': 'W Adyen: Developers › Webhooks › Twój webhook › Security › HMAC key.',
+  'store.hint_adyen_live_prefix':
+    'W Adyen (produkcja): Developers › API URLs. To część adresu przed -checkout-live.',
+  'store.hint_redsys_merchant':
+    'Otrzymasz go od banku wraz z umową na wirtualny terminal; widać go też w portalu administracyjnym Redsys.',
+  'store.hint_redsys_terminal':
+    'W portalu administracyjnym Redsys, obok kodu akceptanta. Zwykle to 1.',
+  'store.hint_redsys_secret':
+    'W portalu administracyjnym Redsys: dane akceptanta › klucz SHA-256. Klucz testowy i produkcyjny są różne.',
+  'store.hint_stripe_secret':
+    'W Stripe: Developers › API keys › Secret key. Zaczyna się od sk_test_ lub sk_live_.',
+  'store.hint_stripe_webhook':
+    'W Stripe: Developers › Webhooks › Twój endpoint › Signing secret. Zaczyna się od whsec_.',
   'orders.subtitle': 'Zamówienia i zakupy złożone w Twojej witrynie.',
   'orders.count': {
     one: '{count} zamówienie',

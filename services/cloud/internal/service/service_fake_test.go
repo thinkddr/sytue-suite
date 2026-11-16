@@ -64,6 +64,9 @@ type fakeStore struct {
 	domToken string
 	doms     []domain.Domain
 	rmDomErr error
+	// Estados que se pidieron para un dominio (SetDomainStatus), en orden.
+	domStatuses  []domain.DomainStatus
+	domStatusErr error
 
 	env       domain.EnvVar
 	envErr    error
@@ -239,6 +242,18 @@ func (f *fakeStore) RemoveDomain(_ context.Context, _ uuid.UUID) (domain.Domain,
 
 func (f *fakeStore) SetDomainPrimary(_ context.Context, _ uuid.UUID) (domain.Domain, error) {
 	return f.dom, nil
+}
+
+func (f *fakeStore) GetDomain(context.Context, uuid.UUID) (domain.Domain, error) {
+	return f.dom, f.domErr
+}
+
+func (f *fakeStore) SetDomainStatus(_ context.Context, _ string, _ uuid.UUID, st domain.DomainStatus) error {
+	f.domStatuses = append(f.domStatuses, st)
+	if f.domStatusErr != nil && st == domain.DomainVerified {
+		return f.domStatusErr
+	}
+	return nil
 }
 
 // canceledBuild recuerda QUÉ compilación se mandó parar: sin esto no se puede afirmar

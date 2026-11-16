@@ -38,19 +38,17 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 
-	"git.sytue.eu/sytue/one/apps/nucleo/api"
-	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
-	"git.sytue.eu/sytue/one/apps/nucleo/sistema"
-
-	"git.sytue.eu/sytue/one/apps/fyne/agenda"
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/peticion"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/sistema"
 )
 
 // Estado es el estado de carga de la pantalla, con los seis del encargo.
-type Estado = agenda.Estado
+type Estado = ui.Estado
 
 // Pantalla es Sytue Calendar entero: menú, cabecera de vista y la vista activa.
 //
@@ -66,7 +64,7 @@ type Pantalla struct {
 	Zona *time.Location
 	// Vista es cuál de las cuatro se enseña.
 	Vista Vista
-	// Estado son los seis del encargo. `agenda.Exito` pinta los datos.
+	// Estado son los seis del encargo. `ui.EstadoExito` pinta los datos.
 	Estado Estado
 	// Fallo es la clave del mensaje de error («no se pudieron cargar los calendarios» o
 	// «los eventos»), el `error` de la web. Vacía: el de los eventos.
@@ -122,6 +120,8 @@ type Pantalla struct {
 	cuerpoHorario *cuerpoHorario
 	// cajonAbierto es el menú sacado como cajón en ventana estrecha.
 	cajonAbierto bool
+	// controlesAjustes son los de la página de ajustes montada, para las pruebas.
+	controlesAjustes *controlesAjustes
 
 	// Ventana es el ancho de la ventana, que decide el mes del teléfono (< `ui.CorteSM`).
 	// Lo pone el armazón al medirse (`AlMedir`); 0 es «aún no se sabe» y no es compacto.
@@ -135,6 +135,9 @@ type Pantalla struct {
 	altoHoja    float32
 	hayAltoHoja bool
 	animHoja    *fyne.Animation
+	// hojaEnGesto es el asa con el dedo: mientras, ninguna lista refresca (un segundo
+	// dedo no lo convierte en un tirón). Es el `data-gesto-en-curso` de la web.
+	hojaEnGesto bool
 	// diaElegido y asaMes son el día elegido y el asa del último pintado del mes del
 	// teléfono: adonde vuelve el foco tras repintar si estaba en un día o en el asa.
 	diaElegido *diaCompacto
@@ -174,6 +177,15 @@ type Pantalla struct {
 	Refresco            ui.RefrescoLista
 	// AlConmutarCajon abre o cierra el menú en ventana estrecha.
 	AlConmutarCajon func()
+
+	// Ajustes son los de la persona (ajustes.go); EnAjustes, que su página ocupa el
+	// sitio de la vista. AlCambiarAjustes guarda unos nuevos; AlAbrirAjustes y
+	// AlCerrarAjustes entran y salen de la página.
+	Ajustes          Ajustes
+	EnAjustes        bool
+	AlCambiarAjustes func(Ajustes)
+	AlAbrirAjustes   func()
+	AlCerrarAjustes  func()
 	// AlRehacer pide reconstruir la pantalla FUERA del Layout: la ventana cruzó el corte
 	// del mes del teléfono.
 	AlRehacer func()
@@ -280,7 +292,7 @@ func (p *Pantalla) cabecera() *CabeceraVista {
 	invitaciones := nuevoBotonInvitaciones(p.t("header.invitations", nil), p.Invitaciones,
 		p.t("header.pending", i18n.Vars{"count": p.Invitaciones}), p.AlVerInvitaciones)
 
-	derecha := []fyne.CanvasObject{buscar, p.nuevaCampana(), invitaciones, NuevoGrupoVista([4]string{
+	derecha := []fyne.CanvasObject{buscar, p.nuevaCampana(), invitaciones, NuevoGrupoVista(p.t("view.label", nil), [4]string{
 		p.t("view.month", nil), p.t("view.week", nil),
 		p.t("view.day", nil), p.t("view.agenda", nil),
 	}, p.Vista, p.cambiarVista)}
@@ -319,6 +331,9 @@ func contar(n int) string {
 // contenido es la cabecera y, debajo, la vista o el estado que toque. En el mes del
 // teléfono no hay cabecera de vista: lo suyo va en la barra móvil y en el cajón.
 func (p *Pantalla) contenido() fyne.CanvasObject {
+	if p.EnAjustes {
+		return p.paginaAjustes()
+	}
 	if p.compacta() {
 		return p.conFranjas(p.vistaMesCompacta())
 	}
@@ -329,7 +344,7 @@ func (p *Pantalla) contenido() fyne.CanvasObject {
 
 // cuerpo es la vista activa, o el panel del estado cuando no hay datos que enseñar.
 func (p *Pantalla) cuerpo() fyne.CanvasObject {
-	if panel := agenda.Panel(p.Estado, p.textosDeEstado(), p.esqueleto()); panel != nil {
+	if panel := ui.PanelEstado(p.Estado, p.textosDeEstado(), p.esqueleto()); panel != nil {
 		return panel
 	}
 	vista := p.vista()
@@ -361,8 +376,14 @@ func (p *Pantalla) vista() fyne.CanvasObject {
 		return p.t("nav.createEventOn", i18n.Vars{"date": i18n.FormatDayMonthLong(p.locale(), d)})
 	}
 	m.DesdeAntes = p.t("cal.fromEarlier", nil)
+	if p.ajustes().NumeroSemana {
+		m.NumeroSemana = func(n int) string { return p.t("grid.weekNumber", i18n.Vars{"week": n}) }
+	}
 	m.AlCrear = p.AlCrearEvento
 	m.AlAbrir = p.AlAbrirEvento
+	m.AlMas = func(d time.Time, ancla fyne.CanvasObject) { p.mostrarDiaMes(d, ancla) }
+	// Arrastrar a otro día guarda por el mismo camino que la rejilla horaria.
+	m.AlMover = p.AlMoverEvento
 	// El mes conserva seis semanas legibles en horizontal: si no cabe su mínimo,
 	// se recorre entero en vez de apretar los números y eventos unos sobre otros.
 	desplazar, vista := desplazable(m)
@@ -373,41 +394,41 @@ func (p *Pantalla) vista() fyne.CanvasObject {
 
 // textosDeEstado es la copia de cada uno de los seis, con las claves del catálogo de
 // la app. No se inventa ninguna: son las que la web ya tiene.
-func (p *Pantalla) textosDeEstado() agenda.Textos {
+func (p *Pantalla) textosDeEstado() ui.TextosEstado {
 	switch p.Estado {
-	case agenda.Error:
+	case ui.EstadoError:
 		// `illustration={<Illustration name="errorRetry" />}`.
-		return agenda.Textos{
+		return ui.TextosEstado{
 			Titulo:       p.t("load.error", nil),
 			Descripcion:  p.t(p.claveFallo(), nil),
 			RotuloAccion: p.t("common.retry", nil),
 			Accion:       p.AlReintentar,
 			Ilustracion:  iconos.Pintar(iconos.ErrorReintentar, tema.De(fyne.CurrentApp().Settings().ThemeVariant())).Objeto(),
 		}
-	case agenda.SinConexion:
+	case ui.EstadoSinConexion:
 		// Sin red Calendar pasa a consulta: el reintento existe pero no se puede
 		// pulsar, que es lo que hace `disabled={offline}` en la web.
-		return agenda.Textos{
+		return ui.TextosEstado{
 			Titulo:       p.t("load.error", nil),
 			Descripcion:  p.t("cal.error.loadEvents", nil),
 			RotuloAccion: p.t("common.retry", nil),
 		}
-	case agenda.SinPermiso:
+	case ui.EstadoSinPermiso:
 		// Un 403 no se arregla reintentando, así que no lleva botón.
-		return agenda.Textos{
+		return ui.TextosEstado{
 			Titulo:      p.t("load.error", nil),
 			Descripcion: p.t(p.claveFallo(), nil),
 		}
-	case agenda.Vacia:
-		return agenda.Textos{
+	case ui.EstadoVacia:
+		return ui.TextosEstado{
 			Titulo:       p.t("cal.noUpcoming", nil),
 			Descripcion:  p.t("agenda.empty", nil),
 			RotuloAccion: p.t("nav.createEvent", nil),
 			Accion:       p.crearHoy,
 		}
-	case agenda.Exito, agenda.Cargando:
+	case ui.EstadoExito, ui.EstadoCargando:
 	}
-	return agenda.Textos{}
+	return ui.TextosEstado{}
 }
 
 // claveFallo es la clave del mensaje de error: la que dejó la carga que falló o, sin
@@ -432,14 +453,14 @@ func (p *Pantalla) esqueleto() fyne.CanvasObject {
 	cabecera := make([]fyne.CanvasObject, 0, 7)
 	for range 7 {
 		cabecera = append(cabecera, conMargenSimple(espacio2p5,
-			agenda.Bloque(2*tema.Rem, 0.75*tema.Rem, false)))
+			ui.NuevoEsqueleto(2*tema.Rem, 0.75*tema.Rem)))
 	}
 	// Y 42 celdas con su círculo de `1.5rem` y su `p-1.5`, que es lo que hace que el
 	// esqueleto tenga la GEOMETRÍA de la rejilla y no haya salto de layout al cargar.
 	celdas := make([]fyne.CanvasObject, 0, 42)
 	for range 42 {
 		celdas = append(celdas, conMargenSimple(espacio1p5,
-			agenda.Bloque(1.5*tema.Rem, 1.5*tema.Rem, false)))
+			ui.NuevoEsqueleto(1.5*tema.Rem, 1.5*tema.Rem)))
 	}
 	return container.New(&arriba{Alto: AltoDiasSemana + tema.Borde},
 		container.New(Cuadricula, cabecera...),

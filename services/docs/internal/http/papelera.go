@@ -44,6 +44,7 @@ import (
 
 // papeleraStore es lo que la papelera necesita de la persistencia.
 type papeleraStore interface {
+	WithLegacyDocumentEffect(context.Context, string, func() error) error
 	ListarPapelera(ctx context.Context, ownerSub string, kind domain.Kind, despues *store.CursorPapelera, limit int) ([]domain.Document, error)
 	DocumentoEnPapelera(ctx context.Context, id, ownerSub string) (*domain.Document, error)
 	RestaurarDocumento(ctx context.Context, id string) error
@@ -179,29 +180,36 @@ func (h *Handler) restaurarDePapelera(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := h.ficheroDelDocumento(r.Context(), doc, drive.AccionRestaurar); err != nil {
-		errorDePapelera(w, r, err)
-		return
-	}
-	if err := h.papelera.RestaurarDocumento(r.Context(), doc.ID); err != nil {
+	if err := h.restaurar(r.Context(), doc); err != nil {
 		errorDePapelera(w, r, err)
 		return
 	}
 	httpx.NoContent(w)
 }
 
+func (h *Handler) restaurar(ctx context.Context, doc *domain.Document) error {
+	return h.papelera.WithLegacyDocumentEffect(ctx, doc.ID, func() error {
+		if err := h.ficheroDelDocumento(ctx, doc, drive.AccionRestaurar); err != nil {
+			return err
+		}
+		return h.papelera.RestaurarDocumento(ctx, doc.ID)
+	})
+}
+
 // purgar borra para siempre un documento de la papelera: primero su fichero (si
 // ya está en la papelera de Drive; uno vivo no se toca, y una retención legal lo
 // impide todo), después la fila y por último sus ficheros de S3.
 func (h *Handler) purgar(ctx context.Context, doc *domain.Document) error {
-	if err := h.ficheroDelDocumento(ctx, doc, drive.AccionPurgar); err != nil {
-		return err
-	}
-	if err := h.papelera.PurgarDocumento(ctx, doc.ID); err != nil {
-		return err
-	}
-	h.borrarDeS3(ctx, doc.ID)
-	return nil
+	return h.papelera.WithLegacyDocumentEffect(ctx, doc.ID, func() error {
+		if err := h.ficheroDelDocumento(ctx, doc, drive.AccionPurgar); err != nil {
+			return err
+		}
+		if err := h.papelera.PurgarDocumento(ctx, doc.ID); err != nil {
+			return err
+		}
+		h.borrarDeS3(ctx, doc.ID)
+		return nil
+	})
 }
 
 // borrarDeS3 quita los snapshots y exports del documento. Sin la fila ya no los
@@ -431,6 +439,14 @@ func (h *Handler) PurgarPapeleraCaducada(ctx context.Context) (Caducidad, error)
 }
 
 func (h *Handler) purgarCaducado(ctx context.Context, cad store.Caducado, antes time.Time, c *Caducidad) {
+	tctx := tenancy.Into(ctx, tenancy.Tenant{Slug: cad.Tenant})
+	if err := h.papelera.WithLegacyDocumentEffect(tctx, cad.Doc.ID, func() error { h.purgarCaducadoLegacy(tctx, cad, antes, c); return nil }); err != nil {
+		c.Errores++
+		log.From(ctx).Warn("papelera caducada: private write fence", "doc", cad.Doc.ID, "error", err.Error())
+	}
+}
+
+func (h *Handler) purgarCaducadoLegacy(ctx context.Context, cad store.Caducado, antes time.Time, c *Caducidad) {
 	tctx := tenancy.Into(ctx, tenancy.Tenant{Slug: cad.Tenant})
 	doc := cad.Doc
 	// Se vuelve a mirar JUSTO antes de ir a Drive: si lo restauraron desde que se

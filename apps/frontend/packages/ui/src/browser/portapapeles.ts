@@ -112,7 +112,24 @@ function enlaceSeguro(href: string | null): string | null {
   }
 }
 
-function copiar(origen: Node, destino: Node, doc: Document): void {
+/** Lo que quien pega admite además de la lista blanca común. */
+export interface OpcionesDePegado {
+  /**
+   * Las tareas de Sytue Notes: `<div class="task-row">` con su casilla. Solo para el
+   * editor que las sabe pintar; de la casilla se copia el `checked` y nada más.
+   */
+  tareas?: boolean;
+}
+
+/** La casilla de una tarea, rehecha: tipo y marcada, ningún otro atributo. */
+function casilla(el: Element, doc: Document): Element {
+  const nueva = doc.createElement('input');
+  nueva.setAttribute('type', 'checkbox');
+  if (el.hasAttribute('checked')) nueva.setAttribute('checked', '');
+  return nueva;
+}
+
+function copiar(origen: Node, destino: Node, doc: Document, opciones: OpcionesDePegado): void {
   for (const nodo of Array.from(origen.childNodes)) {
     if (nodo.nodeType === 3) {
       destino.appendChild(doc.createTextNode(nodo.textContent ?? ''));
@@ -121,6 +138,22 @@ function copiar(origen: Node, destino: Node, doc: Document): void {
     if (nodo.nodeType !== 1) continue;
     const el = nodo as Element;
     const etiqueta = el.tagName.toLowerCase();
+    if (opciones.tareas && etiqueta === 'div' && el.classList.contains('task-row')) {
+      const fila = doc.createElement('div');
+      fila.setAttribute('class', 'task-row');
+      const caja = el.querySelector('input[type="checkbox" i]');
+      if (caja) fila.appendChild(casilla(caja, doc));
+      // La forma del editor: casilla, espacio y el texto en su `<span>`, que es de donde
+      // lo lee al marcarla. Si el origen no lo traía, el texto es el resto de la fila.
+      fila.appendChild(doc.createTextNode(' '));
+      const texto = doc.createElement('span');
+      copiar(el.querySelector(':scope > span') ?? el, texto, doc, opciones);
+      if (texto.firstChild?.nodeType === 3)
+        texto.firstChild.textContent = (texto.firstChild.textContent ?? '').trimStart();
+      fila.appendChild(texto);
+      destino.appendChild(fila);
+      continue;
+    }
     if (FUERA.has(etiqueta)) continue;
     if (VACIAS.has(etiqueta)) {
       // El salto que Safari añade al final de lo copiado no es del texto.
@@ -146,7 +179,7 @@ function copiar(origen: Node, destino: Node, doc: Document): void {
       dentro.appendChild(nuevo);
       dentro = nuevo;
     }
-    copiar(el, dentro, doc);
+    copiar(el, dentro, doc, opciones);
   }
 }
 
@@ -154,11 +187,11 @@ function copiar(origen: Node, destino: Node, doc: Document): void {
  * El HTML de un pegado, listo para `insertHTML` en un editor: la estructura del
  * origen, el estilo del destino. Vacío si no queda texto.
  */
-export function pegadoConFormato(html: string): string {
+export function pegadoConFormato(html: string, opciones: OpcionesDePegado = {}): string {
   if (!html || typeof DOMParser === 'undefined') return '';
   const origen = new DOMParser().parseFromString(html, 'text/html');
   const doc = document.implementation.createHTMLDocument('');
   const caja = doc.createElement('div');
-  copiar(origen.body, caja, doc);
+  copiar(origen.body, caja, doc, opciones);
   return caja.textContent?.trim() ? caja.innerHTML.trim() : '';
 }

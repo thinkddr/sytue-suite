@@ -182,7 +182,7 @@ func (s *Server) handleDirectoryList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	page, more, err := s.store.ListOrgUsersPage(r.Context(), org.ID, q, after, limit)
+	page, more, err := s.store.ListOrgUsersPage(r.Context(), org.ID, q, "", after, limit)
 	if err != nil {
 		httpx.Fail(w, r, mapDomainErr(err))
 		return

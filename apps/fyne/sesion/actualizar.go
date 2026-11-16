@@ -310,6 +310,13 @@ func (s *Suite) avisarEnLaCampana(nombre, version string) {
 	p.SetString(clave, version)
 }
 
+// AvisarSistema es avisarSistema para las apps que avisan de algo suyo que no pasa por
+// el Hub (la llamada entrante de Rooms). Puede tardar —en Linux es una llamada por
+// D-Bus—: mejor fuera del hilo de la interfaz.
+func (s *Suite) AvisarSistema(titulo, cuerpo string, alPulsar func()) {
+	s.avisarSistema(titulo, cuerpo, alPulsar)
+}
+
 // avisarSistema enseña un aviso de la app en el sistema; pulsarlo llama a `alPulsar`.
 // Donde el sistema no sabe avisar del clic sale el de Fyne, sin él.
 func (s *Suite) avisarSistema(titulo, cuerpo string, alPulsar func()) {

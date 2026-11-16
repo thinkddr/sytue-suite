@@ -16,17 +16,18 @@
 import type { JSX, ComponentChildren } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import {
-  Modal,
-  Input,
-  Button,
   Badge,
-  Spinner,
-  Select,
-  Tabs,
-  FieldHint,
-  DataFlow,
-  useToast,
+  Button,
   cx,
+  DataFlow,
+  FieldHint,
+  InlineHelp,
+  Input,
+  Modal,
+  Select,
+  Spinner,
+  Tabs,
+  useToast,
 } from '@sytue/ui';
 import type { InputProps, TabItem } from '@sytue/ui';
 import {
@@ -631,9 +632,9 @@ export function IntegrationsModal({
         <div class="flex flex-col gap-4">
           {/* Secreto recién creado: se muestra una vez. */}
           {secret ? (
-            <div class="border-warning bg-warning-bg rounded-md border p-3" role="alert">
-              <p class="text-warning-text text-sm font-semibold">{secret.title}</p>
-              <p class="text-text-muted mt-0.5 text-xs">{t('integrations.secretOnce')}</p>
+            // Se anuncia al aparecer: es lo único que hay que hacer ahora (copiarlo).
+            <InlineHelp tone="warning" live="alert" title={secret.title}>
+              <p>{t('integrations.secretOnce')}</p>
               <div class="mt-2 flex items-center gap-2">
                 <code class="border-border bg-surface text-text min-w-0 flex-1 truncate rounded border px-2 py-1 text-xs">
                   {secret.value}
@@ -677,7 +678,7 @@ export function IntegrationsModal({
                   </ul>
                 </div>
               ) : null}
-            </div>
+            </InlineHelp>
           ) : null}
 
           {error ? (

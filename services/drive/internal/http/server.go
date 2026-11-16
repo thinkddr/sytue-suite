@@ -106,6 +106,9 @@ func NewRouter(d Deps) http.Handler {
 	if d.Service != nil {
 		h.bases = d.Service
 		h.cipher = d.Service
+		if d.Service.PrivateStorageAvailable() {
+			h.migration = d.Service
+		}
 	}
 	// La señal de cambios (hubnotify.TrasEscribir) de lo que se escribe por la API y
 	// por WebDAV: el widget de Drive y el de CertiPDF, que lista los PDF de su carpeta.
@@ -130,12 +133,18 @@ func NewRouter(d Deps) http.Handler {
 		// corta es el bucle desbocado y el barrido que se lleva la unidad entera.
 		api.Use(httpx.RateLimit(httpx.RateLimitConfig{Limiter: apiLimiter, KeyFunc: authn.RateKey}))
 		api.Use(cambios)
+		api.Use(h.guardLegacyStorageWrites)
+		api.Get("/private-storage/migration", h.PrivateStorageState)
+		api.Post("/private-storage/migration", h.BeginPrivateStorageMigration)
+		api.Get("/private-storage/migration/{epoch}/rows", h.PrivateStorageSourcePage)
+		api.Get("/private-storage/migration/{epoch}/blobs/{kind}/{source}", h.PrivateStorageSourceBlob)
 
 		// Carpetas.
 		// «Exportar tus datos»: los archivos con sus bytes (platform/pkg/portabilidad).
 		api.Get("/export", h.Export)
 		api.With(httpx.MaxBodyBytes(storage.MaxCipherBlockBytes)).Put("/cipher/blobs/{product}/{id}", h.PutCipherBlob)
 		api.Get("/cipher/blobs/{product}/{id}", h.GetCipherBlob)
+		api.Get("/cipher/usage/{product}", h.CipherUsage)
 		api.Get("/cipher/blobs/{product}/{id}/content", h.DownloadCipherBlob)
 		api.Delete("/cipher/blobs/{product}/{id}", h.DeleteCipherBlob)
 		api.Get("/folders/root", h.GetRoot)

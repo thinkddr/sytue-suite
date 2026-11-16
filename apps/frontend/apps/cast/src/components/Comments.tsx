@@ -14,7 +14,7 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useId, useState } from 'preact/hooks';
-import { Avatar, Button, Textarea, useConfirm, useToast } from '@sytue/ui';
+import { Avatar, Button, Textarea, useConfirm, useToast, EmptyState } from '@sytue/ui';
 import { formatTimeAgo, translate, type Locale } from '@sytue/i18n';
 import type { T } from '../i18n/index.js';
 import { borrarComentario, comentar, comentarios } from '../client/castApi.js';
@@ -166,7 +166,7 @@ export function Comments({
           </Button>
         </div>
       ) : filas === null ? null : hilos.length === 0 && activos ? (
-        <p class="text-text-subtle text-sm">{t('comments.empty')}</p>
+        <EmptyState compact title={t('comments.empty')} />
       ) : (
         <ol class="flex flex-col gap-5">
           {hilos.map((h) => (

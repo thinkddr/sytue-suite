@@ -19,8 +19,9 @@ import (
 // todos sus modelos —contactos, facturas, asientos…— y se describe a sí mismo: el catálogo
 // dice qué modelos hay, con qué campos y de qué tipo, YA TRADUCIDO al idioma que se pida.
 type ERP struct {
-	c      *Client
-	idioma string
+	c       *Client
+	idioma  string
+	private ERPData
 }
 
 // NewERP crea el cliente sobre la raíz del servicio (ServiceURL(apex, "erp")). `idioma` va
@@ -121,12 +122,18 @@ func (e *ERP) pedir(ruta string, q url.Values) Request {
 
 // Catalogo devuelve los módulos y modelos, con los rótulos en el idioma del cliente.
 func (e *ERP) Catalogo(ctx context.Context) (ERPCatalogo, error) {
+	if e.private != nil {
+		return e.private.Catalogo(ctx)
+	}
 	return JSON[ERPCatalogo](ctx, e.c, e.pedir("/catalogo", nil))
 }
 
 // Listar devuelve una página de registros de un modelo. q filtra por texto; cursor vacío
 // es la primera página.
 func (e *ERP) Listar(ctx context.Context, modelo, q, cursor string, limite int) (ERPPagina, error) {
+	if e.private != nil {
+		return e.private.Listar(ctx, modelo, q, cursor, limite)
+	}
 	return e.ListarCon(ctx, modelo, ERPFiltro{Q: q, Cursor: cursor, Limite: limite})
 }
 
@@ -148,6 +155,9 @@ type ERPFiltro struct {
 
 // ListarCon devuelve una página de registros de un modelo con esos filtros.
 func (e *ERP) ListarCon(ctx context.Context, modelo string, f ERPFiltro) (ERPPagina, error) {
+	if e.private != nil {
+		return e.private.ListarCon(ctx, modelo, f)
+	}
 	// «limite», en español: es el nombre que lee el servicio. El escritorio de Fyne mandaba
 	// `limit` y el servicio lo ignoraba sin decir nada.
 	consulta := url.Values{"limite": {strconv.Itoa(f.Limite)}}
@@ -177,6 +187,9 @@ type ERPEstadisticas struct {
 
 // Estadisticas pide el recuento de un modelo (`GET /api/v1/{modelo}/estadisticas`).
 func (e *ERP) Estadisticas(ctx context.Context, modelo string) (ERPEstadisticas, error) {
+	if e.private != nil {
+		return e.private.Estadisticas(ctx, modelo)
+	}
 	return JSON[ERPEstadisticas](ctx, e.c, e.pedir("/"+url.PathEscape(modelo)+"/estadisticas", nil))
 }
 
@@ -224,13 +237,34 @@ func (p ERPPermisos) PuedeAccion(modulo, verbo string) bool {
 
 // MisPermisos pregunta qué puede hacer quien ha entrado, módulo a módulo.
 func (e *ERP) MisPermisos(ctx context.Context) (ERPPermisos, error) {
+	if e.private != nil {
+		return e.private.MisPermisos(ctx)
+	}
 	return JSON[ERPPermisos](ctx, e.c, e.pedir("/mis-permisos", nil))
 }
 
 // Obtener devuelve UN registro entero. La lista trae los campos, pero una ficha que se
 // va a editar se relee: entre que se listó y se abre pudo cambiar.
 func (e *ERP) Obtener(ctx context.Context, modelo, id string) (ERPRegistro, error) {
+	if e.private != nil {
+		return e.private.Obtener(ctx, modelo, id)
+	}
 	return JSON[ERPRegistro](ctx, e.c, e.pedir("/"+url.PathEscape(modelo)+"/"+url.PathEscape(id), nil))
+}
+
+// Buscar busca registros en TODOS los modelos por nombre o referencia («Acme»,
+// «FV-2026-0012»): es lo que ofrece la paleta (⌘K) bajo «Registros». El servicio solo
+// devuelve los de las áreas que quien pregunta puede leer, así que lo que llega se
+// puede ofrecer tal cual. `limite` cero deja el del servicio (veinte).
+func (e *ERP) Buscar(ctx context.Context, q string, limite int) ([]ERPRegistro, error) {
+	v := url.Values{"q": {q}}
+	if limite > 0 {
+		v.Set("limit", strconv.Itoa(limite))
+	}
+	r, err := JSON[struct {
+		Items []ERPRegistro `json:"items"`
+	}](ctx, e.c, e.pedir("/search", v))
+	return r.Items, err
 }
 
 // cuerpoDatos es lo que esperan Crear y Actualizar: `{"data": {...}}`.
@@ -242,18 +276,27 @@ type cuerpoDatos struct {
 // valida: el dinero en céntimos enteros, los decimales como cadena canónica, las fechas
 // en AAAA-MM-DD y las fechas con hora en RFC3339 (services/syerp/internal/domain).
 func (e *ERP) Crear(ctx context.Context, modelo string, data map[string]any) (ERPRegistro, error) {
+	if e.private != nil {
+		return e.private.Crear(ctx, modelo, data)
+	}
 	return e.escribir(ctx, http.MethodPost, "/"+url.PathEscape(modelo)+"/", cuerpoDatos{Data: data})
 }
 
 // Actualizar REEMPLAZA los datos del registro: el servicio valida el cuerpo entero
 // contra el modelo, así que `data` lleva todos los campos, no solo los que cambian.
 func (e *ERP) Actualizar(ctx context.Context, modelo, id string, data map[string]any) (ERPRegistro, error) {
+	if e.private != nil {
+		return e.private.Actualizar(ctx, modelo, id, data)
+	}
 	return e.escribir(ctx, http.MethodPut, "/"+url.PathEscape(modelo)+"/"+url.PathEscape(id), cuerpoDatos{Data: data})
 }
 
 // CambiarEstado mueve el documento dentro del flujo que declara su modelo. El servicio
 // rechaza un estado que no esté declarado: el cliente propone, no decide.
 func (e *ERP) CambiarEstado(ctx context.Context, modelo, id, estado string) (ERPRegistro, error) {
+	if e.private != nil {
+		return e.private.CambiarEstado(ctx, modelo, id, estado)
+	}
 	return e.escribir(ctx, http.MethodPost, "/"+url.PathEscape(modelo)+"/"+url.PathEscape(id)+"/estado",
 		struct {
 			Estado string `json:"estado"`
@@ -264,18 +307,35 @@ func (e *ERP) CambiarEstado(ctx context.Context, modelo, id, estado string) (ERP
 // devuelve. Aun así, desde fuera de la papelera parece definitivo, así que quien llame
 // tiene que haber preguntado antes.
 func (e *ERP) Borrar(ctx context.Context, modelo, id string) error {
+	if e.private != nil {
+		return e.private.Borrar(ctx, modelo, id)
+	}
 	return e.sinCuerpo(ctx, http.MethodDelete, "/"+url.PathEscape(modelo)+"/"+url.PathEscape(id), nil)
 }
 
 // Restaurar saca el registro de la papelera.
 func (e *ERP) Restaurar(ctx context.Context, modelo, id string) error {
+	if e.private != nil {
+		return e.private.Restaurar(ctx, modelo, id)
+	}
 	return e.sinCuerpo(ctx, http.MethodPost, "/"+url.PathEscape(modelo)+"/"+url.PathEscape(id)+"/restaurar", []byte("{}"))
 }
 
 // Duplicar clona el registro como BORRADOR con referencia nueva, en el servidor: la
 // factura de este mes es la del anterior con otra fecha. Devuelve la copia.
 func (e *ERP) Duplicar(ctx context.Context, modelo, id string) (ERPRegistro, error) {
+	if e.private != nil {
+		return e.private.Duplicar(ctx, modelo, id)
+	}
 	return e.escribir(ctx, http.MethodPost, "/"+url.PathEscape(modelo)+"/"+url.PathEscape(id)+"/duplicar", struct{}{})
+}
+
+// Convertir lleva el documento de venta al paso siguiente en el servidor: el presupuesto
+// aceptado a pedido y el pedido confirmado o entregado a factura
+// (`POST /api/v1/{modelo}/{id}/convertir`). Devuelve el documento NUEVO, que es lo que
+// hay que abrir; el servicio decide qué estados se convierten y contesta 422 a los demás.
+func (e *ERP) Convertir(ctx context.Context, modelo, id string) (ERPRegistro, error) {
+	return e.escribir(ctx, http.MethodPost, "/"+url.PathEscape(modelo)+"/"+url.PathEscape(id)+"/convertir", struct{}{})
 }
 
 func (e *ERP) sinCuerpo(ctx context.Context, metodo, ruta string, cuerpo []byte) error {
@@ -295,6 +355,9 @@ func (e *ERP) sinCuerpo(ctx context.Context, metodo, ruta string, cuerpo []byte)
 // asiento. Es de IDA SOLA: el asiento es inmutable y solo se deshace con otro que lo
 // anule. La web no pregunta antes (el botón dice «Llevar al libro»), y aquí tampoco.
 func (e *ERP) Asentar(ctx context.Context, modelo, id string) (string, error) {
+	if e.private != nil {
+		return e.private.Asentar(ctx, modelo, id)
+	}
 	r := e.pedir("/"+url.PathEscape(modelo)+"/"+url.PathEscape(id)+"/asentar", nil)
 	r.Method, r.Body = http.MethodPost, []byte("{}")
 	r.Header.Set("Content-Type", "application/json")
@@ -309,6 +372,9 @@ func (e *ERP) Asentar(ctx context.Context, modelo, id string) (string, error) {
 //
 // Quien llama cierra el lector.
 func (e *ERP) Exportar(ctx context.Context, modelo, q, estado string, ids []string) (io.ReadCloser, string, error) {
+	if e.private != nil {
+		return e.private.Exportar(ctx, modelo, q, estado, ids)
+	}
 	consulta := url.Values{}
 	if len(ids) > 0 {
 		consulta.Set("ids", strings.Join(ids, ","))
@@ -345,6 +411,10 @@ func (e *ERP) escribir(ctx context.Context, metodo, ruta string, cuerpo any) (ER
 // registra en la Agencia Tributaria.
 const ERPFacturaVenta = "factura_venta"
 
+// ERPFacturaCompra es la de las facturas recibidas de un proveedor: la única que se
+// prepara leyendo su factura electrónica en XML (`asistencia_facturas.go`).
+const ERPFacturaCompra = "factura_compra"
+
 // Imprimir devuelve la factura para el cliente: una página lista para imprimir, con su
 // QR tributario y la leyenda de su régimen de IVA
 // (`GET /api/v1/{modelo}/{id}/imprimir`). El servicio la sirve como HTML —no como PDF—,
@@ -352,18 +422,27 @@ const ERPFacturaVenta = "factura_venta"
 //
 // Quien llama cierra el lector.
 func (e *ERP) Imprimir(ctx context.Context, modelo, id string) (io.ReadCloser, error) {
+	if e.private != nil {
+		return e.private.Imprimir(ctx, modelo, id)
+	}
 	return e.documento(ctx, modelo, id, "/imprimir")
 }
 
 // Facturae devuelve la factura emitida como Facturae 3.2.2 SIN FIRMAR
 // (`GET /api/v1/{modelo}/{id}/facturae`), y el nombre con que la nombra el servicio.
 func (e *ERP) Facturae(ctx context.Context, modelo, id string) (io.ReadCloser, string, error) {
+	if e.private != nil {
+		return e.private.Facturae(ctx, modelo, id)
+	}
 	return e.documentoConNombre(ctx, modelo, id, "/facturae", "facturae.xml")
 }
 
 // UBL devuelve la factura emitida como XML UBL 2.1 —lo que entiende cualquier otro ERP—
 // (`GET /api/v1/{modelo}/{id}/ubl`), y el nombre con que la nombra el servicio.
 func (e *ERP) UBL(ctx context.Context, modelo, id string) (io.ReadCloser, string, error) {
+	if e.private != nil {
+		return e.private.UBL(ctx, modelo, id)
+	}
 	return e.documentoConNombre(ctx, modelo, id, "/ubl", "factura.xml")
 }
 
@@ -435,6 +514,9 @@ func (f ERPFacturaVerifactu) Ultimo() (ERPRegistroVerifactu, bool) {
 // RegistrosVerifactu devuelve lo que la Agencia Tributaria sabe de esta factura
 // (`GET /api/v1/{modelo}/{id}/verifactu`).
 func (e *ERP) RegistrosVerifactu(ctx context.Context, modelo, id string) (ERPFacturaVerifactu, error) {
+	if e.private != nil {
+		return e.private.RegistrosVerifactu(ctx, modelo, id)
+	}
 	return JSON[ERPFacturaVerifactu](ctx, e.c, e.pedir("/"+url.PathEscape(modelo)+"/"+url.PathEscape(id)+"/verifactu", nil))
 }
 
@@ -442,6 +524,9 @@ func (e *ERP) RegistrosVerifactu(ctx context.Context, modelo, id string) (ERPFac
 // una aceptación con errores (`POST /api/v1/{modelo}/{id}/verifactu/subsanar`). Devuelve
 // los registros ya con el nuevo, como hace el servicio.
 func (e *ERP) SubsanarVerifactu(ctx context.Context, modelo, id string) (ERPFacturaVerifactu, error) {
+	if e.private != nil {
+		return e.private.SubsanarVerifactu(ctx, modelo, id)
+	}
 	r := e.pedir("/"+url.PathEscape(modelo)+"/"+url.PathEscape(id)+"/verifactu/subsanar", nil)
 	r.Method = http.MethodPost
 	return JSON[ERPFacturaVerifactu](ctx, e.c, r)

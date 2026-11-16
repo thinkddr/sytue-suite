@@ -19,6 +19,8 @@
  * fuera de ese iframe, habría que sanear ANTES.
  */
 import type { SheetModel, SlidesModel, SlideBox } from '../editor/types';
+import { normalizarGiro } from '../editor/slides/girar';
+import { altDe } from '../editor/slides/textoAlt';
 
 /**
  * Tope de lo que se pinta de una hoja.
@@ -180,13 +182,19 @@ export function hojaAHtml(modelo: SheetModel, avisoCortado: string): string {
 
 /** Cuerpo de una caja de diapositiva. */
 function cajaAHtml(caja: SlideBox): string {
-  const pos = `left:${caja.x}%;top:${caja.y}%;width:${caja.w}%;height:${caja.h}%`;
+  // Girada se pinta girada: el giro ya es un número saneado (normalizarGiro).
+  const giro = normalizarGiro(caja.rot);
+  const pos =
+    `left:${caja.x}%;top:${caja.y}%;width:${caja.w}%;height:${caja.h}%` +
+    (giro === undefined ? '' : `;rotate:${giro}deg`);
   if ((caja.kind === 'image' || caja.kind === 'media') && caja.src) {
     // El `poster` de un vídeo es lo que se ve parado, que es justo lo que hay que
     // enseñar en una foto: aquí no se reproduce nada.
     const src = caja.kind === 'media' ? (caja.poster ?? '') : caja.src;
     if (!src) return `<div class="caja forma" style="${pos}"></div>`;
-    return `<div class="caja" style="${pos}"><img src="${esc(src)}" alt=""></div>`;
+    // La foto del vídeo es su portada, decorativa; la imagen lleva su texto alternativo.
+    const alt = caja.kind === 'image' ? altDe(caja) : '';
+    return `<div class="caja" style="${pos}"><img src="${esc(src)}" alt="${esc(alt)}"></div>`;
   }
   if (caja.kind && caja.kind !== 'text') {
     // Formas, gráficos y SmartArt: se marca el hueco que ocupan en vez de

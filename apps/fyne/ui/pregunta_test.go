@@ -235,3 +235,68 @@ func TestLaPreguntaSinDosPuntos(t *testing.T) {
 		}
 	}
 }
+
+// TestLaPreguntaConTituloYSecreto es `titulo` y `secreto` de usePrompt.tsx: el diálogo
+// lleva su título y no la frase, el campo pinta puntos, y una etiqueta que no cabe en
+// una línea se parte dentro del cuerpo con el asterisco detrás de la última palabra.
+func TestLaPreguntaConTituloYSecreto(t *testing.T) {
+	w := test.NewTempWindow(t, fcanvas.NewRectangle(tema.Color("bg", tema.Claro)))
+	lienzo := fyne.NewSize(1280, 800)
+	w.Resize(lienzo)
+	mensaje := "Pega el token de una conexión de solo lectura concedida a Sytue Drive. " +
+		"La vista se guardará en esta carpeta como un fichero CSV."
+
+	var aceptado string
+	d := PreguntaCon(mensaje, "", "Cancelar", "Exportar aquí", "(obligatorio)",
+		OpcionesPregunta{Titulo: "Vista de Sytue Bases", Secreto: true, Lienzo: lienzo},
+		func(s string) { aceptado = s })
+	d.Mostrar(w.Canvas())
+
+	if d.Titulo != "Vista de Sytue Bases" {
+		t.Errorf("el título es %q y tenía que ser el propio, no la frase", d.Titulo)
+	}
+	campo, ok := w.Canvas().Focused().(*Entrada)
+	if !ok {
+		t.Fatalf("el foco ha caído en %T y tiene que caer en el campo", w.Canvas().Focused())
+	}
+	if !campo.EsContrasena() {
+		t.Error("el campo de un secreto enseña lo que se escribe")
+	}
+
+	cuerpo := d.Cuerpo.(*fyne.Container)
+	etiqueta := cuerpo.Objects[0].(*fyne.Container)
+	ancho := AnchoCuerpoTalla(DialogoSM, lienzo)
+	if m := etiqueta.MinSize(); m.Width > ancho || m.Height < 2*tema.TextoSM.Linea {
+		t.Errorf("la etiqueta larga mide %v y tenía que partirse dentro de %v", m, ancho)
+	}
+	etiqueta.Resize(etiqueta.MinSize())
+	texto, asterisco := etiqueta.Objects[0].(*Parrafo), etiqueta.Objects[1]
+	lineas := LineasDe(texto, ancho)
+	if len(lineas) < 2 {
+		t.Fatalf("la etiqueta no se ha partido: %q", lineas)
+	}
+	ultima := Medir(lineas[len(lineas)-1], tema.TextoSM, SemiNegrita).Width
+	if p := asterisco.Position(); p.Y != float32(len(lineas)-1)*tema.TextoSM.Linea || p.X != ultima+tema.Espacio(0.5) {
+		t.Errorf("el asterisco cae en %v y va detrás de la última palabra", p)
+	}
+
+	campo.PonerTexto("sbc_123")
+	campo.TypedKey(&fyne.KeyEvent{Name: fyne.KeyReturn})
+	if aceptado != "sbc_123" {
+		t.Errorf("Intro ha aceptado %q", aceptado)
+	}
+}
+
+// TestLaPreguntaCortaNoSeParte: con lienzo pero con un rótulo que cabe, la etiqueta es
+// la de siempre, en una línea.
+func TestLaPreguntaCortaNoSeParte(t *testing.T) {
+	d := PreguntaCon("Nombre de la hoja:", "", "Cancelar", "Guardar", "(obligatorio)",
+		OpcionesPregunta{Lienzo: fyne.NewSize(1280, 800)}, func(string) {})
+	etiqueta := d.Cuerpo.(*fyne.Container).Objects[0].(*fyne.Container)
+	if _, ok := etiqueta.Layout.(Fila); !ok {
+		t.Errorf("una etiqueta que cabe va en su Fila de siempre, y va en %T", etiqueta.Layout)
+	}
+	if d.Titulo != "Nombre de la hoja" {
+		t.Errorf("sin título propio, el título es el mensaje sin dos puntos, y es %q", d.Titulo)
+	}
+}

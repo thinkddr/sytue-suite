@@ -19,6 +19,8 @@ describe('atajos de Calendar', () => {
     expect(accionDeTecla('k')).toBe('prev');
     expect(accionDeTecla('c')).toBe('create');
     expect(accionDeTecla('/')).toBe('search');
+    expect(accionDeTecla('g')).toBe('goto');
+    expect(accionDeTecla('G')).toBe('goto');
     expect(accionDeTecla('x')).toBeNull();
     expect(accionDeTecla('Enter')).toBeNull();
   });
@@ -32,5 +34,7 @@ describe('atajos de Calendar', () => {
     expect(teclas).toContain('?');
     const ayuda = grupos.flatMap((g) => g.atajos).find((a) => a.teclas.includes('?'));
     expect(ayuda?.descripcion).toBe('Ver esta lista');
+    const ir = grupos[0]?.atajos.find((a) => a.teclas.includes('g'));
+    expect(ir?.descripcion).toBe('Ir a una fecha');
   });
 });

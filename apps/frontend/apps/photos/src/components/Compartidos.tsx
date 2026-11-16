@@ -8,23 +8,14 @@
  * es que el álbum esté compartido con quien mira y la foto esté en él.
  */
 import type { JSX } from 'preact';
-import { useEffect, useRef, useState } from 'preact/hooks';
-import {
-  Badge,
-  EmptyState,
-  Icon,
-  IconButton,
-  Illustration,
-  Spinner,
-  Button,
-  usePrompt,
-  useMobileBack,
-} from '@sytue/ui';
+import { useEffect, useState } from 'preact/hooks';
+import { Badge, EmptyState, Icon, Button, usePrompt } from '@sytue/ui';
 import { translate, type Locale } from '@sytue/i18n';
 import type { SytueUser } from '@sytue/auth';
 import {
   albumCompartido,
   albumesCompartidos,
+  ErrorDeFotos,
   quitarDelAlbum,
   renombrarAlbum,
   urlDeVarianteCompartida,
@@ -33,12 +24,21 @@ import {
 } from '../client/photosApi.js';
 import { useT } from '../i18n/index.js';
 import { estiloDeTesela } from '../lib/filas.js';
+import { posicionVisor } from '../lib/posicionVisor.js';
 import { RUTA } from '../lib/ruta.js';
+import { conAvisos, FalloDeCarga, useAvisoDeFallo } from './Fallo.js';
 import { Marco } from './Marco.js';
 import { Nav } from './Nav.js';
-import { EscenarioVisor } from './EscenarioVisor.js';
+import { EsqueletoAlbumes, EsqueletoFilas } from './Esqueletos.js';
+import { VisorCompartido } from './VisorCompartido.js';
 
-export function Compartidos({
+// El visor vive en su fichero para que la página pública del álbum lo hidrate sin
+// cargar con la vista de compartidos entera; aquí se reexporta como siempre.
+export { VisorCompartido };
+
+export const Compartidos = conAvisos(CompartidoConmigo);
+
+function CompartidoConmigo({
   locale,
   album,
   user,
@@ -59,23 +59,24 @@ export function Compartidos({
     items: FotoCompartida[];
   } | null>(null);
   const [foto, setFoto] = useState<number | null>(null);
-  const [error, setError] = useState(false);
-  const [fallo, setFallo] = useState('');
+  const [fallo, setFallo] = useState<unknown>(null);
+  // Reintentar vuelve a lanzar la misma carga: el efecto depende de esta vuelta.
+  const [vuelta, setVuelta] = useState(0);
+  const avisarFallo = useAvisoDeFallo(locale);
   const { preguntar, dialogo: dialogoPreguntar } = usePrompt();
   const editable = abierto?.album.permission === 'write';
 
   useEffect(() => {
-    setError(false);
+    setFallo(null);
     if (album) {
-      albumCompartido(album)
-        .then(setAbierto)
-        .catch(() => setError(true));
+      albumCompartido(album).then(setAbierto).catch(setFallo);
     } else {
-      albumesCompartidos()
-        .then(setLista)
-        .catch(() => setError(true));
+      albumesCompartidos().then(setLista).catch(setFallo);
     }
-  }, [album]);
+  }, [album, vuelta]);
+  // Un 404 no es una avería: el álbum ya no está compartido con quien mira (o
+  // nunca lo estuvo), y lo honesto es la lista vacía, no «Reintentar».
+  const yaNoCompartido = fallo instanceof ErrorDeFotos && fallo.status === 404;
 
   const titulo = abierto?.album.title ?? tc('sharedWithMe.title');
   const quien = (a: AlbumCompartido) =>
@@ -91,7 +92,7 @@ export function Compartidos({
       await renombrarAlbum(album, nuevo);
       setAbierto((a) => (a ? { ...a, album: { ...a.album, title: nuevo } } : a));
     } catch (e) {
-      setFallo(String(e));
+      avisarFallo(e);
     }
   };
 
@@ -102,7 +103,7 @@ export function Compartidos({
       setAbierto((a) => (a ? { ...a, items: a.items.filter((x) => x.id !== f.id) } : a));
       setFoto(null);
     } catch (e) {
-      setFallo(String(e));
+      avisarFallo(e);
     }
   };
 
@@ -154,19 +155,17 @@ export function Compartidos({
             })}
           </p>
         ) : null}
-        {fallo ? (
-          <p class="text-danger-text mb-4 text-sm" role="alert">
-            {fallo}
-          </p>
-        ) : null}
-        {error ? (
-          <EmptyState
-            title={tc('sharedWithMe.empty')}
-            illustration={<Illustration name="emptyPhotos" />}
+        {fallo !== null && !yaNoCompartido ? (
+          <FalloDeCarga
+            locale={locale}
+            fallo={fallo}
+            alReintentar={() => setVuelta((v) => v + 1)}
           />
+        ) : yaNoCompartido ? (
+          <EmptyState title={tc('sharedWithMe.empty')} spot="emptyPhotos" />
         ) : album ? (
           abierto === null ? (
-            <Spinner />
+            <EsqueletoFilas />
           ) : (
             // Las mismas filas justificadas que la galería, y la misma tesela por
             // dentro: el recorte va en el botón para que su aro de foco se vea.
@@ -196,13 +195,9 @@ export function Compartidos({
             </ul>
           )
         ) : lista === null ? (
-          <Spinner />
+          <EsqueletoAlbumes cuadradas />
         ) : lista.length === 0 ? (
-          <EmptyState
-            class="flex-1"
-            title={tc('sharedWithMe.empty')}
-            illustration={<Illustration name="emptyPhotos" />}
-          />
+          <EmptyState class="flex-1" title={tc('sharedWithMe.empty')} spot="emptyPhotos" />
         ) : (
           <ul class="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3">
             {lista.map((al) => (
@@ -233,10 +228,13 @@ export function Compartidos({
         )}
         {album && abierto && foto !== null && abierto.items[foto] ? (
           <VisorCompartido
-            album={album}
+            src={urlDeVarianteCompartida(album, abierto.items[foto].id, 'grande')}
             foto={abierto.items[foto]}
             t={t}
             onClose={() => setFoto(null)}
+            // El álbum llega entero, sin páginas por pedir: nunca lleva el «+».
+            posicion={posicionVisor(foto, abierto.items.length)}
+            onIr={setFoto}
             onPrev={foto > 0 ? () => setFoto(foto - 1) : undefined}
             onNext={foto < abierto.items.length - 1 ? () => setFoto(foto + 1) : undefined}
             {...(editable ? { onQuitar: (f: FotoCompartida) => void quitar(f) } : {})}
@@ -245,88 +243,5 @@ export function Compartidos({
         {dialogoPreguntar}
       </div>
     </Marco>
-  );
-}
-
-/**
- * La foto sola, sobre negro, como la del enlace en la app nativa: anterior, siguiente
- * y cerrar, con las flechas y Escape. Sin ficha: no es de quien la mira. Con edición,
- * «Quitar del álbum».
- */
-function VisorCompartido({
-  album,
-  foto,
-  t,
-  onClose,
-  onPrev,
-  onNext,
-  onQuitar,
-}: {
-  album: string;
-  foto: FotoCompartida;
-  t: ReturnType<typeof useT>;
-  onClose: () => void;
-  onPrev?: (() => void) | undefined;
-  onNext?: (() => void) | undefined;
-  /** «Quitar del álbum»: solo con edición. */
-  onQuitar?: ((f: FotoCompartida) => void) | undefined;
-}): JSX.Element {
-  const ref = useRef<HTMLDialogElement>(null);
-  useMobileBack(true, onClose);
-  const imagen = useRef<HTMLImageElement>(null);
-  useEffect(() => {
-    const d = ref.current;
-    if (d && !d.open) d.showModal();
-  }, []);
-  return (
-    <dialog
-      ref={ref}
-      onClose={onClose}
-      onKeyDown={(e) => {
-        if (e.key === 'ArrowLeft') onPrev?.();
-        else if (e.key === 'ArrowRight') onNext?.();
-      }}
-      class="sytue-safe-fullscreen bg-bg text-text h-dvh max-h-none w-screen max-w-none p-0 backdrop:bg-black/80"
-    >
-      <div class="flex h-full flex-col">
-        <header class="border-border flex items-center gap-2 border-b px-3 py-2">
-          <span class="min-w-0 flex-1 truncate text-sm font-medium">{foto.name}</span>
-          {onQuitar ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              leadingIcon={<Icon name="minus" />}
-              title={t('albums.remove')}
-              onClick={() => onQuitar(foto)}
-            >
-              <span class="max-md:sr-only">{t('albums.remove')}</span>
-            </Button>
-          ) : null}
-          <IconButton label={t('viewer.close')} size="lg" onClick={onClose}>
-            <Icon name="close" />
-          </IconButton>
-        </header>
-        {/* Las flechas, sobre la foto y no en la cabecera: son las del visor de la galería
-            (`EscenarioVisor`), con su talla, su filete y el deslizamiento con el dedo. */}
-        <EscenarioVisor
-          prev={t('viewer.prev')}
-          next={t('viewer.next')}
-          onPrev={onPrev}
-          onNext={onNext}
-          foto={imagen}
-          clave={foto.id}
-          class="items-center justify-center overflow-hidden bg-[#0e0e0e] p-2"
-        >
-          <img
-            ref={imagen}
-            src={urlDeVarianteCompartida(album, foto.id, 'grande')}
-            alt={foto.name}
-            width={foto.width}
-            height={foto.height}
-            class="h-auto max-h-full w-auto max-w-full object-contain"
-          />
-        </EscenarioVisor>
-      </div>
-    </dialog>
   );
 }

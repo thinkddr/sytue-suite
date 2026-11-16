@@ -34,6 +34,7 @@ import (
 //     chat en `/ws/…`.
 type Cast struct {
 	c, pub, raiz *Client
+	data         CastData
 }
 
 // NewCast crea el cliente sobre la raíz del servicio (ServiceURL(apex, "cast")).
@@ -301,6 +302,9 @@ const (
 // Videos es una página de la biblioteca: `scope` "mine" (los míos) u "org" (los de la
 // organización que puedo ver). `status` y `q` filtran; vacíos, no.
 func (c *Cast) Videos(ctx context.Context, scope, status, q, cursor string, limite int) (CastPage, error) {
+	if c.data != nil {
+		return c.data.Videos(ctx, scope, status, q, cursor, limite)
+	}
 	v := url.Values{}
 	poner(v, "scope", scope)
 	poner(v, "status", status)
@@ -321,6 +325,9 @@ func (c *Cast) Shared(ctx context.Context, cursor string) (CastPage, error) {
 
 // Video es la ficha de un vídeo, con la ACL de quien pregunta.
 func (c *Cast) Video(ctx context.Context, id string) (CastVideo, error) {
+	if c.data != nil {
+		return c.data.Video(ctx, id)
+	}
 	return JSON[CastVideo](ctx, c.c, Request{Path: "/videos/" + url.PathEscape(id)})
 }
 
@@ -403,6 +410,9 @@ func (c *Cast) RemovePerson(ctx context.Context, id, userID string) error {
 // Play es lo que hace falta para reproducir con sesión: el WebM de la app, o la
 // conexión al directo.
 func (c *Cast) Play(ctx context.Context, id string) (CastPlay, error) {
+	if c.data != nil {
+		return c.data.Play(ctx, id)
+	}
 	return JSON[CastPlay](ctx, c.c, Request{Path: "/videos/" + url.PathEscape(id) + "/play"})
 }
 
@@ -723,6 +733,9 @@ func (c *Cast) PublicPlay(ctx context.Context, id string) (CastPlay, error) {
 // MediaURL es la dirección absoluta de una ruta de `/media/…` (la de poster_url o
 // webm_url). Una dirección que ya es absoluta se devuelve tal cual.
 func (c *Cast) MediaURL(ruta string) string {
+	if c.data != nil {
+		return ""
+	}
 	if strings.HasPrefix(ruta, "http://") || strings.HasPrefix(ruta, "https://") {
 		return ruta
 	}
@@ -732,6 +745,17 @@ func (c *Cast) MediaURL(ruta string) string {
 // Poster trae entero un póster (unos cientos de KB). El token firmado de la ruta es la
 // credencial: la petición va sin sesión.
 func (c *Cast) Poster(ctx context.Context, ruta string) ([]byte, error) {
+	if c.data != nil {
+		media, err := c.Media(ctx, ruta)
+		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = media.Close() }()
+		if media.Size() < 0 || media.Size() > 16<<20 {
+			return nil, ErrPrivateCastOperation
+		}
+		return io.ReadAll(media)
+	}
 	resp, err := c.media(ctx, http.MethodGet, ruta, "")
 	if err != nil {
 		return nil, err
@@ -764,6 +788,24 @@ func (c *Cast) media(ctx context.Context, metodo, ruta, rango string) (*http.Res
 // por Range solo lo que se lee, así el reproductor busca en un WebM de cientos de MB
 // sin bajarlo entero. El tamaño lo da un HEAD al abrir.
 func (c *Cast) Media(ctx context.Context, ruta string) (*CastMedia, error) {
+	if c.data != nil {
+		data, ok := c.data.(CastMediaData)
+		if !ok {
+			return nil, ErrPrivateCastOperation
+		}
+		body, err := data.OpenMedia(ctx, ruta)
+		if err != nil {
+			return nil, err
+		}
+		if body == nil {
+			return nil, ErrPrivateCastOperation
+		}
+		if body.Size() < 0 {
+			_ = body.Close()
+			return nil, ErrPrivateCastOperation
+		}
+		return &CastMedia{private: body, tamano: body.Size()}, nil
+	}
 	resp, err := c.media(ctx, http.MethodHead, ruta, "")
 	if err != nil {
 		return nil, err
@@ -777,11 +819,12 @@ func (c *Cast) Media(ctx context.Context, ruta string) (*CastMedia, error) {
 
 // CastMedia es un fichero remoto leído por rangos. No es seguro para varias rutinas.
 type CastMedia struct {
-	c      *Cast
-	ctx    context.Context //nolint:containedctx // vive lo que vive la reproducción
-	ruta   string
-	tamano int64
-	pos    int64
+	private CastPrivateMedia
+	c       *Cast
+	ctx     context.Context //nolint:containedctx // vive lo que vive la reproducción
+	ruta    string
+	tamano  int64
+	pos     int64
 	// El cuerpo abierto y dónde acaba: mientras se lee seguido se sigue del mismo; un
 	// salto lo cierra y pide otro rango.
 	cuerpo io.ReadCloser
@@ -797,6 +840,9 @@ func (m *CastMedia) Size() int64 { return m.tamano }
 
 // Read lee de donde esté.
 func (m *CastMedia) Read(p []byte) (int, error) {
+	if m.private != nil {
+		return m.private.Read(p)
+	}
 	if m.pos >= m.tamano {
 		return 0, io.EOF
 	}
@@ -830,6 +876,9 @@ func (m *CastMedia) Read(p []byte) (int, error) {
 
 // Seek mueve la posición; el siguiente Read pide el rango nuevo si hace falta.
 func (m *CastMedia) Seek(desplazamiento int64, desde int) (int64, error) {
+	if m.private != nil {
+		return m.private.Seek(desplazamiento, desde)
+	}
 	var nueva int64
 	switch desde {
 	case io.SeekStart:
@@ -853,6 +902,9 @@ func (m *CastMedia) Seek(desplazamiento int64, desde int) (int64, error) {
 
 // Close suelta la conexión abierta, si la hay.
 func (m *CastMedia) Close() error {
+	if m.private != nil {
+		return m.private.Close()
+	}
 	m.cerrar()
 	return nil
 }

@@ -38,6 +38,15 @@ func TestCheck(t *testing.T) {
 		{"cambio de tipo sin COLUMN", `ALTER TABLE t ALTER c SET DATA TYPE bigint;`, []string{"ALTER COLUMN TYPE"}},
 		{"not null nuevo", `ALTER TABLE t ALTER COLUMN c SET NOT NULL;`, []string{"SET NOT NULL"}},
 		{"truncate", `TRUNCATE outbox;`, []string{"TRUNCATE"}},
+		{"truncate tras otra sentencia", `SELECT 1; TRUNCATE t;`, []string{"TRUNCATE"}},
+		{"truncate dentro de DO", "DO $$ BEGIN\n  TRUNCATE t;\nEND $$;", []string{"TRUNCATE"}},
+
+		// Un disparador que VIGILA el TRUNCATE no trunca nada: su evento
+		// («BEFORE TRUNCATE ON …») no es una sentencia. Con el patrón suelto
+		// el gate daba por destructivo el cerrojo de 0013_private_storage,
+		// que PROHIBE truncar la fuente retenida de cast.
+		{"disparador que vigila truncate", "CREATE TRIGGER t BEFORE TRUNCATE ON states FOR EACH STATEMENT EXECUTE FUNCTION f();", nil},
+		{"disparador after truncate", "CREATE TRIGGER t AFTER TRUNCATE ON states FOR EACH STATEMENT EXECUTE FUNCTION f();", nil},
 
 		// ALTER TYPE ... ADD VALUE solo amplía un enum: compatible con el binario N-1.
 		{"ampliar enum", `ALTER TYPE estado ADD VALUE 'pausado';`, nil},
@@ -149,6 +158,9 @@ func TestTenantTablesYMergePolicyTables(t *testing.T) {
 		tablas    []string // las que estrenan `tenant`
 		politicas []string // las que reciben política de fusión
 	}{
+		{"bloqueo Scope explícito", "SELECT sytue_scope_merge_register('bound_rows'::regclass);", nil, []string{"bound_rows"}},
+		{"bloqueo comentado no cuenta", "/*\nSELECT sytue_scope_merge_register('bound_rows'::regclass);\n*/", nil, nil},
+		{"bloqueo en literal no cuenta", "SELECT 'SELECT sytue_scope_merge_register(''bound_rows''::regclass);';", nil, nil},
 		{"tabla sin tenant", `CREATE TABLE t (id uuid PRIMARY KEY);`, nil, nil},
 		{"tabla con tenant", `CREATE TABLE t (tenant text NOT NULL, id uuid);`, []string{"t"}, nil},
 		{
@@ -285,7 +297,7 @@ func TestMigracionesNuevasTraenPoliticaDeFusion(t *testing.T) {
 				continue
 			}
 			t.Errorf("%s:%d: la tabla %s tiene columna `tenant` y ninguna migración de este "+
-				"servicio le da política de fusión.\n\t"+
+				"servicio declara cómo participa en una fusión (movible o Scope inmutable).\n\t"+
 				"La fusión de organizaciones abortará en el preflight, y hasta que alguien la "+
 				"lance esta tabla se quedaría atrás sin que nada falle.\n\t"+
 				"Añade una migración con:\n\t"+

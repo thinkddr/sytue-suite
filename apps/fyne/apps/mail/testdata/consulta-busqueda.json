@@ -1,0 +1,151 @@
+{
+  "_": "El panel «Opciones de búsqueda» de Mail (MAIL-07): componerConsulta()/desmontarConsulta() en apps/frontend/apps/mail/src/components/utils.ts y ComponerConsulta()/DesmontarConsulta() en apps/fyne/apps/mail/consulta.go. La consulta es la que entiende ParseSearchQuery (services/mail/internal/domain/searchquery.go), que también recorre estos casos. Las fechas del panel son AAAA-MM-DD e inclusivas: «Hasta» el 28 de febrero se escribe before:2026-03-01, porque before excluye su día. Los valores con espacios van entre comillas; las comillas de dentro se quitan, porque el servicio no tiene forma de escaparlas.",
+  "componer": [
+    {
+      "nombre": "panel vacío",
+      "opciones": {},
+      "consulta": ""
+    },
+    {
+      "nombre": "solo el remitente",
+      "opciones": { "de": "ana@example.eu" },
+      "consulta": "from:ana@example.eu"
+    },
+    {
+      "nombre": "asunto con espacios, entre comillas",
+      "opciones": { "asunto": "informe anual" },
+      "consulta": "subject:\"informe anual\""
+    },
+    {
+      "nombre": "las comillas de dentro de un valor se quitan",
+      "opciones": { "asunto": "el \"plan\" B" },
+      "consulta": "subject:\"el plan B\""
+    },
+    {
+      "nombre": "espacios de más alrededor y dentro",
+      "opciones": { "de": "  Ana   Ruiz ", "contiene": "  factura   marzo  " },
+      "consulta": "from:\"Ana Ruiz\" factura marzo"
+    },
+    {
+      "nombre": "un campo con solo espacios y comillas no cuenta",
+      "opciones": { "para": "  ", "asunto": "\" \"" },
+      "consulta": ""
+    },
+    {
+      "nombre": "con adjuntos y sin leer",
+      "opciones": { "conAdjuntos": true, "sinLeer": true },
+      "consulta": "has:attachment is:unread"
+    },
+    {
+      "nombre": "Hasta es inclusivo: el servicio recibe el día siguiente",
+      "opciones": { "desde": "2026-01-31", "hasta": "2026-02-28" },
+      "consulta": "after:2026-01-31 before:2026-03-01"
+    },
+    {
+      "nombre": "Hasta el último día del año pasa al año siguiente",
+      "opciones": { "hasta": "2026-12-31" },
+      "consulta": "before:2027-01-01"
+    },
+    {
+      "nombre": "Hasta en un año bisiesto",
+      "opciones": { "hasta": "2028-02-28" },
+      "consulta": "before:2028-02-29"
+    },
+    {
+      "nombre": "fechas que no son AAAA-MM-DD válidas se ignoran",
+      "opciones": { "desde": "31/01/2026", "hasta": "2026-02-30" },
+      "consulta": ""
+    },
+    {
+      "nombre": "todos los campos a la vez",
+      "opciones": {
+        "de": "ana@example.eu",
+        "para": "equipo@example.eu",
+        "asunto": "cierre trimestral",
+        "contiene": "presupuesto 2027",
+        "conAdjuntos": true,
+        "sinLeer": true,
+        "desde": "2026-01-01",
+        "hasta": "2026-03-31"
+      },
+      "consulta": "from:ana@example.eu to:equipo@example.eu subject:\"cierre trimestral\" has:attachment is:unread after:2026-01-01 before:2026-04-01 presupuesto 2027"
+    }
+  ],
+  "desmontar": [
+    {
+      "nombre": "consulta vacía",
+      "consulta": "",
+      "opciones": {}
+    },
+    {
+      "nombre": "solo texto libre",
+      "consulta": "factura marzo",
+      "opciones": { "contiene": "factura marzo" }
+    },
+    {
+      "nombre": "la consulta que compone el panel completo vuelve a sus campos",
+      "consulta": "from:ana@example.eu to:equipo@example.eu subject:\"cierre trimestral\" has:attachment is:unread after:2026-01-01 before:2026-04-01 presupuesto 2027",
+      "opciones": {
+        "de": "ana@example.eu",
+        "para": "equipo@example.eu",
+        "asunto": "cierre trimestral",
+        "contiene": "presupuesto 2027",
+        "conAdjuntos": true,
+        "sinLeer": true,
+        "desde": "2026-01-01",
+        "hasta": "2026-03-31"
+      }
+    },
+    {
+      "nombre": "operadores en mayúsculas y sus sinónimos",
+      "consulta": "From:ana HAS:attachments is:unseen since:2026-01-01 until:2026-02-01",
+      "opciones": {
+        "de": "ana",
+        "conAdjuntos": true,
+        "sinLeer": true,
+        "desde": "2026-01-01",
+        "hasta": "2026-01-31"
+      }
+    },
+    {
+      "nombre": "lo que el panel no tiene se queda en Contiene",
+      "consulta": "is:starred factura is:read",
+      "opciones": { "contiene": "is:starred factura is:read" }
+    },
+    {
+      "nombre": "operador desconocido, valor vacío y has: de otra cosa son texto",
+      "consulta": "nota:reunión from: ana has:foto",
+      "opciones": { "contiene": "nota:reunión from: ana has:foto" }
+    },
+    {
+      "nombre": "una fecha mal escrita vuelve al texto",
+      "consulta": "after:31/01/2026 before:2026-02-30",
+      "opciones": { "contiene": "after:31/01/2026 before:2026-02-30" }
+    },
+    {
+      "nombre": "una frase entera entre comillas es texto aunque lleve dos puntos",
+      "consulta": "\"from: ana\" subject:\"informe anual\"",
+      "opciones": { "asunto": "informe anual", "contiene": "\"from: ana\"" }
+    },
+    {
+      "nombre": "una comilla sin cerrar llega hasta el final",
+      "consulta": "subject:\"informe anual",
+      "opciones": { "asunto": "informe anual" }
+    },
+    {
+      "nombre": "un operador repetido: gana el último, como en el servicio",
+      "consulta": "from:ana from:luis",
+      "opciones": { "de": "luis" }
+    },
+    {
+      "nombre": "before excluye su día: Hasta es el anterior",
+      "consulta": "before:2026-03-01",
+      "opciones": { "hasta": "2026-02-28" }
+    },
+    {
+      "nombre": "tabuladores y saltos separan como espacios",
+      "consulta": "to:luis\tsubject:acta\nfactura",
+      "opciones": { "para": "luis", "asunto": "acta", "contiene": "factura" }
+    }
+  ]
+}

@@ -27,14 +27,56 @@
  * - §7.1 no menciona el zoom en la hoja: se aplica con CSS `zoom` (mantiene
  *   las cabeceras pegajosas, cosa que `transform` rompería).
  */
-import { cloneElement, toChildArray } from 'preact';
-import type { JSX, TargetedEvent, VNode, ComponentChildren } from 'preact';
+import { Fragment, cloneElement, toChildArray } from 'preact';
+import type { JSX, RefObject, TargetedEvent, VNode, ComponentChildren } from 'preact';
 import { celdasARellenar } from './aifill.js';
 import { conIdsDeHoja, nuevoIdHoja } from './idhoja.js';
+import {
+  anclaDeCelda,
+  autorDe,
+  celdaDeAncla,
+  marcasDeComentarios,
+  type AnclaCelda,
+  type MarcaComentario,
+} from './anclaCelda.js';
+import {
+  accionDeTeclaEnPestana,
+  conColorDePestana,
+  esTeclaDeMenu,
+  opcionesDePestana,
+} from './pestana.js';
+import {
+  ROTULO_MENU,
+  conservaSeleccion,
+  opcionesContextuales,
+  zonaDeSeleccion,
+  type OpcionCtx,
+  type ZonaMenu,
+} from './menuContextual.js';
+import { MenuPestana } from './MenuPestana.js';
+import { ResumenSeleccion } from './ResumenSeleccion.js';
+import {
+  alternarMedida,
+  fxDesplegadaRecordada,
+  medidasRecordadas,
+  recordarFxDesplegada,
+  recordarMedidas,
+} from './resumenBarra.js';
+import {
+  RADIO_TIRADOR,
+  ZONA_TIRADOR,
+  celdaEnElementos,
+  destinoTirador,
+  puntoDeTirador,
+  type Tirador,
+} from './tiradores.js';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import {
+  Dropdown,
   MenuItem,
   MenuSeparator,
+  useLongPress,
+  type PuntoDeMenu,
   useToast,
   Icon,
   useListReorder,
@@ -43,7 +85,14 @@ import {
   useMobileBack,
   saneaHtmlDeDocumento,
 } from '@sytue/ui';
-import { confirmarEnEditor, preguntarEnEditor } from '@sytue/ui';
+import {
+  BOTON_DE_BARRA,
+  Button,
+  confirmarEnEditor,
+  preguntarEnEditor,
+  useDedo,
+  usePointerDrag,
+} from '@sytue/ui';
 import { FormulaError, nombresDeFunciones, numToCol, type Engine } from '@sytue/formula';
 import type { CellValue } from '@sytue/formula';
 import type {
@@ -53,7 +102,6 @@ import type {
   CondRule,
   DataValidation,
   DefinedName,
-  EditorCommand,
   EditorContext,
   ExternalTable,
   NumFmt,
@@ -62,7 +110,9 @@ import type {
   SheetAutoFilter,
   SheetData,
   SheetGroup,
+  SheetSpan,
   SheetModel,
+  SheetProtection,
   SheetTable,
   Slicer,
   Sparkline,
@@ -185,12 +235,18 @@ import {
   VISTA_PASO_COLS,
   VISTA_PASO_FILAS,
   ALTO_MAX,
+  ANCHO_MAX,
   acumulado,
   cuantiza,
+  altoAjustado,
+  anchoAjustado,
+  conMedidas,
   extension,
   indiceEn,
+  leerMedida,
   indiceVisible,
   medidaDe,
+  MEDIDA_MIN,
   primeroDesde,
   saltoADatos,
   tramo,
@@ -198,7 +254,15 @@ import {
   type Vista,
 } from './rejilla';
 import { conEstructura } from './anclas';
-import { fusionEn, fusionesEnVentana, moverPorFusiones, parseFusiones } from './fusiones';
+import {
+  combinarHoja,
+  combinarPierdeDatos,
+  fusionEn,
+  fusionesEnVentana,
+  moverPorFusiones,
+  parseFusiones,
+  separar,
+} from './fusiones';
 import {
   anotar,
   deshacer as deshacerHistorial,
@@ -247,6 +311,14 @@ import {
   toggleGroup,
 } from './outline';
 import {
+  extentPastHidden,
+  hideSpan,
+  isSpanHidden,
+  sanitizeSpans,
+  showSpan,
+  spanUnits,
+} from './ocultas';
+import {
   argHintAt,
   cycleRefAt,
   expectsRef,
@@ -275,13 +347,24 @@ import {
   sanitizeScenario,
 } from './scenario';
 import { colocarBloque } from './bloque';
+import { abrirEnlace, enlaceDeCelda, rotuloDeEnlace } from './enlaces';
 import { computeDataTable, planDataTable } from './datatable';
 import type { DataTableError, DataTableSubs } from './datatable';
 import type { SolverEvaluate } from './solver';
 import { useT } from '../context';
+import { CuadroNombres } from './CuadroNombres';
+import { irA, nombresParaIrA, type LibroIrA } from './irA';
 import { editorT } from '../../i18n';
-import type { DocsKey } from '../../i18n';
+import type { DocsKey, DocsT } from '../../i18n';
 import { comandoDelAtajo } from '../comandos';
+import { MARCAS_DE_CELDA, atenderAtajoDeTexto } from '../canvas/atajos';
+import {
+  atajoDeHoja,
+  rellenoDeAtajo,
+  seleccionEntera,
+  serialDeHoy,
+  type AtajoHoja,
+} from './atajosHoja';
 import '../canvas/superficies.css';
 import './superficie-hoja.css';
 
@@ -301,7 +384,7 @@ export type SheetCommand =
   | 'condmove' // value: 'i,dir' — reordena la regla i (prioridad); dir -1 sube, +1 baja
   | 'validadd' // value: JSON.stringify(DataValidation) (rango = selección actual)
   | 'validdel' // value: índice de la validación
-  | 'merge'
+  | 'merge' // value: 'center' (o ausente) combina y centra; 'merge' combina; 'unmerge' separa; 'content' une el texto en la primera celda (la combinación de contenido de antes)
   | 'copy' // portapapeles: value 'cut' corta (mover); ausente = copiar
   | 'paste' // value 'values' = pegado especial (solo valores)
   /* --- Fase Datos --- */
@@ -346,6 +429,9 @@ export type SheetCommand =
   /* --- Datos externos (conector Power Query): materializar/refrescar --- */
   | 'extdata' // value: JSON { connectionId, spec, anchor, columns, rows, style?, name? } — vuelca el resultado como SheetTable + guarda la definición (name presente = refrescar la existente)
   /* --- Protección de hoja y celda --- */
+  /* --- Medidas de columna y fila (sheets/rejilla.ts) --- */
+  | 'colwidth' // value: «{px}» o «auto» — ancho de las columnas de la selección
+  | 'rowheight' // value: «{px}» o «auto» — alto de las filas de la selección
   | 'protect' // value: JSON.stringify({ password?, selectCells?, formatCells? })
   | 'unprotect' // value: contraseña tecleada (cotejo client-side, no cripto)
   /* --- Protección de estructura del LIBRO --- */
@@ -354,6 +440,7 @@ export type SheetCommand =
   /* --- Esquema (agrupar/outline) y subtotales --- */
   | 'outline' // value: JSON { axis:'row'|'col', op:'group'|'ungroup'|'toggle'|'level'|'clear', start?, end?, level? }
   | 'subtotal' // value: JSON { range, groupCol, fn } — inserta subtotales por grupo + total general
+  | 'hide' // value: JSON { axis:'row'|'col', op:'hide'|'show' } — oculta o muestra las de la selección
   /* --- Nombres definidos (Administrador de nombres, sheets/nombres.ts) --- */
   | 'nameset' // value: JSON NameRequest — crea o edita (renombrar reescribe las fórmulas que lo usan)
   | 'namedel'; // value: JSON { name, sheet? } — borra el nombre de ese ámbito
@@ -367,6 +454,23 @@ export function dispatchSheetCommand(cmd: SheetCommand, value?: string): void {
   if (!sheetCommandHandler) return;
   recordStep('spreadsheet', cmd, value);
   sheetCommandHandler(cmd, value);
+}
+
+/**
+ * Pide el ancho de columna o el alto de fila (px, o «auto» para ajustar a lo escrito) y lo
+ * aplica a la selección. Lo usan la cinta y el menú contextual de las cabeceras.
+ */
+export async function pedirMedidaDeHoja(
+  cmd: 'colwidth' | 'rowheight',
+  actual: number | undefined,
+): Promise<void> {
+  const t = editorT();
+  const v = await preguntarEnEditor({
+    mensaje: t(cmd === 'colwidth' ? 'sheet.colWidth.prompt' : 'sheet.rowHeight.prompt'),
+    valor: actual === undefined ? '' : String(actual),
+  });
+  if (v === null || v.trim() === '') return;
+  dispatchSheetCommand(cmd, v);
 }
 
 /** Comandos que EDITAN contenido/estructura de celdas: vetados con la hoja
@@ -405,6 +509,9 @@ export const PROTECT_CONTENT_CMDS: ReadonlySet<SheetCommand> = new Set<SheetComm
 ]);
 /** Comandos de FORMATO de celda: con la hoja protegida solo si `formatCells`. */
 export const PROTECT_FORMAT_CMDS: ReadonlySet<SheetCommand> = new Set<SheetCommand>([
+  // Ocultar filas o columnas es «Formato de filas/columnas» en el cuadro de Excel: aquí va
+  // con el permiso de formato, que es el más cercano que hay.
+  'hide',
   'numfmt',
   'decimals',
   'style',
@@ -413,6 +520,9 @@ export const PROTECT_FORMAT_CMDS: ReadonlySet<SheetCommand> = new Set<SheetComma
   'bold',
   'italic',
   'align',
+  // Ancho y alto: el permiso «Formato de columnas/filas» de Excel va con el de celdas aquí.
+  'colwidth',
+  'rowheight',
 ]);
 /** Comando → permiso granular del cuadro «Proteger hoja» de Excel: con la hoja
  *  protegida solo pasa si ese permiso está CONCEDIDO (ausente = false). Los que
@@ -445,6 +555,24 @@ export const PROTECT_PERMISSION_CMDS: ReadonlyMap<SheetCommand, SheetPermission>
   ['scendel', 'scenarios'],
 ]);
 
+/**
+ * ¿La protección de la hoja veta este comando? Contenido y estructura, siempre; el formato,
+ * sin `formatCells`; y lo que tiene permiso propio, sin ese permiso. Es lo que mira el lienzo
+ * antes de ejecutar un comando y lo que apaga el menú contextual: una sola regla para los dos.
+ */
+export function comandoVetadoPorProteccion(
+  protect: SheetProtection | undefined,
+  cmd: SheetCommand,
+): boolean {
+  if (!protect) return false;
+  const perm = PROTECT_PERMISSION_CMDS.get(cmd);
+  return (
+    PROTECT_CONTENT_CMDS.has(cmd) ||
+    (PROTECT_FORMAT_CMDS.has(cmd) && protect.formatCells !== true) ||
+    (perm !== undefined && !isPermissionGranted(protect, perm))
+  );
+}
+
 /* ---------- Canal de LECTURA hoja→ribbon (dispatch es solo escritura) ---------- */
 
 /** Tabla de datos externos + el rango ACTUAL de su SheetTable enlazada (para
@@ -461,6 +589,10 @@ export interface SheetRibbonState {
   style: CellStyle;
   /** Paneles congelados de la hoja activa (0,0 = sin congelar). */
   freeze: { cols: number; rows: number };
+  /** Ancho de la columna y alto de la fila del ancla (px de maqueta): prellenan los cuadros
+   *  «Ancho de columna…» y «Alto de fila…». */
+  colWidth: number;
+  rowHeight: number;
   /** Reglas de formato condicional de la hoja activa. */
   condRules: readonly CondRule[];
   /** Validaciones de datos de la hoja activa (la pestaña Datos las lista y elimina). */
@@ -551,6 +683,10 @@ let sheetStateReader: (() => SheetRibbonState) | null = null;
 let sheetGridReader: ((range: string) => string[][] | null) | null = null;
 let sheetValueReader: ((range: string, sheet?: string) => CellValue[][] | null) | null = null;
 let sheetNameReader: (() => string | null) | null = null;
+let sheetCellAnchorReader: (() => AnclaCelda | null) | null = null;
+let sheetCellRevealer: ((a: AnclaCelda) => boolean) | null = null;
+let sheetCellRefReader: ((a: AnclaCelda) => string | null) | null = null;
+let sheetCellHighlighter: ((a: AnclaCelda | null) => void) | null = null;
 let sheetProbeReader: ((targetRef: string, varRef: string) => GoalSeekProbeResult) | null = null;
 let sheetSolverReader:
   | ((targetRef: string, varRefs: string[], cons: SolverConstraintRef[]) => SolverProbeResult)
@@ -577,6 +713,32 @@ export function readSheetValues(range: string, sheet?: string): CellValue[][] | 
 /** Nombre de la hoja activa; null sin lienzo. Lo usan los scripts para acotar por ámbito. */
 export function readSheetName(): string | null {
   return sheetNameReader ? sheetNameReader() : null;
+}
+
+/** El ancla de la celda activa (anclaCelda.ts), para colgarle un comentario: «Nuevo
+ *  comentario» de la cinta. null sin lienzo de hoja. */
+export function readSheetCellAnchor(): AnclaCelda | null {
+  return sheetCellAnchorReader ? sheetCellAnchorReader() : null;
+}
+
+/** Lleva a la celda de un comentario: cambia de hoja si hace falta, la selecciona y la trae
+ *  a la vista. false si no hay lienzo de hoja o la celda ya no existe. */
+export function revealCommentCell(a: AnclaCelda): boolean {
+  return sheetCellRevealer ? sheetCellRevealer(a) : false;
+}
+
+/** Dónde está HOY la celda de un comentario («B5», o «Hoja2!B5» si es de otra hoja): tras
+ *  insertar una fila encima ya no es la que se citó al comentar. null sin lienzo o si ya no
+ *  existe. */
+export function readCommentCellRef(a: AnclaCelda): string | null {
+  return sheetCellRefReader ? sheetCellRefReader(a) : null;
+}
+
+/** Enmarca en violeta la celda de un comentario mientras el puntero (o el foco) está en su
+ *  hilo del panel; null lo apaga. Solo se ve en la hoja activa: no cambia de hoja ni mueve
+ *  la selección, que es lo que hace el botón «Celda B5». */
+export function highlightCommentCell(a: AnclaCelda | null): void {
+  sheetCellHighlighter?.(a);
 }
 
 /** Prepara la sonda de Buscar objetivo para la celda objetivo y la variable (A1
@@ -639,6 +801,8 @@ function isTruthy(v: CellValue): boolean {
  *  número de aquí, hay que cambiar su clase `w-[…px]`/`h-[…px]` a la vez. */
 const HEAD_W = 40;
 const CELL_W = 96;
+/** Lienzo fuera de pantalla para `measureText` (autoajuste de columnas): uno para todo. */
+let lienzoMedida: HTMLCanvasElement | null = null;
 const CELL_H = 24;
 
 /** Grosor de un carril del canalón de esquema (un carril por nivel de outline). */
@@ -654,6 +818,60 @@ const INK = CONTENT_PALETTE[0];
 const DANGER = CONTENT_PALETTE[5];
 
 const SEL_STYLE = { boxShadow: `inset 0 0 0 2px ${ACCENT}` };
+
+/** Id de una fila o columna (anclas.ts), con el mismo patrón que el servicio (`reIDAncla`). */
+const ID_ANCLA = /^[A-Za-z0-9_-]{1,64}$/;
+/** Tope de la lista de anclas de un eje (el de `materializar` en anclas.ts). */
+const MAX_ANCLAS_HOJA = 20_000;
+
+/** Violeta de marca (CONTENT_PALETTE, §5): el triángulo de una celda comentada, como el de los
+ *  comentarios de Excel. Va sobre papel blanco en los dos temas. */
+const MARCA_COMENTARIO = CONTENT_PALETTE[9];
+/** El triángulo de la esquina superior derecha, por encima de la barra de datos si la hay. */
+const TRIANGULO_COMENTARIO = `linear-gradient(225deg, ${MARCA_COMENTARIO} 50%, transparent 50%)`;
+
+/** El marco de la celda de un hilo con el puntero encima en el panel (el violeta de la marca). */
+const RESALTE_COMENTARIO = `inset 0 0 0 2px ${MARCA_COMENTARIO}`;
+
+/** El estilo de una celda con su marca de comentario. */
+function conMarcaDeComentario(style: Record<string, string> | undefined): Record<string, string> {
+  const barra = style?.backgroundImage;
+  return {
+    ...style,
+    backgroundImage: barra ? `${TRIANGULO_COMENTARIO}, ${barra}` : TRIANGULO_COMENTARIO,
+    backgroundSize: barra ? '7px 7px, auto' : '7px 7px',
+    backgroundPosition: barra ? 'right top, left top' : 'right top',
+    backgroundRepeat: 'no-repeat',
+  };
+}
+
+/** Lo que dice la marca: el primer comentario con su autor y, si hay más hilos, cuántos. */
+function textoDeMarca(m: MarcaComentario, t: DocsT): string {
+  const primero = t('sheet.comment.mark', { author: autorDe(m.primero), text: m.primero.body });
+  return m.hilos > 1 ? `${primero} ${t('sheet.comment.more', { n: m.hilos - 1 })}` : primero;
+}
+
+/** El `title` de una celda: el aviso de su enlace y el de su comentario, si los tiene. */
+function tituloDeCelda(
+  enlace: string | null,
+  marca: MarcaComentario | undefined,
+  t: DocsT,
+): string | undefined {
+  const partes = [enlace, marca ? textoDeMarca(marca, t) : null].filter((x) => x !== null);
+  return partes.length > 0 ? partes.join('\n') : undefined;
+}
+
+/** Lo mínimo que tiene que llevar una celda para poder ser un enlace (ver ./enlaces). */
+const PISTA_ENLACE = /hyperlink|https?:|mailto:/i;
+
+/** Enlace que abre la celda (c,r) de una hoja: el destino de su HYPERLINK o la URL escrita
+ *  en ella (solo http/https/mailto; ver ./enlaces). */
+function enlaceEnHoja(s: SheetData | undefined, eng: Engine, c: number, r: number): string | null {
+  const raw = s?.cells[refOf({ c, r })] ?? '';
+  // Corte barato antes de parsear: el render pasa por aquí con cada celda visible.
+  if (!s || !PISTA_ENLACE.test(raw)) return null;
+  return enlaceDeCelda(raw, (f) => eng.evaluate(s.name, f, c, r));
+}
 
 /** Estilo de una celda FUSIONANDO el fill condicional, la barra de datos y la
  *  selección: el ancla marca con boxShadow (compatible con fondo), el rango tiñe
@@ -684,6 +902,9 @@ function cellStyle(
 // El anillo canónico vive en `@sytue/ui/styles.css` (.sytue-focus-ring): una sola
 // definición para toda la suite, en vez de la copia que cada fichero perdía a su manera.
 const FOCUS_RING = 'sytue-focus-ring';
+/** `id` del campo de la barra fx, al que apunta el botón de desplegarla. Uno por página
+ *  basta: la hoja de cálculo es el único editor montado. */
+const FX_CAMPO_ID = 'sytue-hoja-fx';
 
 /** `id` DOM de una celda, para que la rejilla pueda apuntarla con aria-activedescendant.
  *  Con prefijo porque «A1» a secas es un identificador demasiado goloso para colisionar. */
@@ -841,6 +1062,39 @@ function buildEngine(model: SheetModel): Engine {
 /** Hoja persistida → saneada: conserva los campos opcionales (formats,
  *  condFormats, freeze, charts) descartando basura; los docs viejos
  *  (solo name+cells) cargan exactamente igual que antes. */
+/** Las listas de anclas de una hoja (anclas.ts) tal como vienen del contenido guardado:
+ *  ids válidos y únicos, con el mismo tope que al materializarlas, y bases enteras. */
+function sanitizeAnclas(
+  s: SheetData,
+): Pick<SheetData, 'rowIds' | 'rowBase' | 'colIds' | 'colBase'> {
+  const out: Pick<SheetData, 'rowIds' | 'rowBase' | 'colIds' | 'colBase'> = {};
+  const lista = (raw: unknown): { id: string }[] | null => {
+    if (!Array.isArray(raw) || raw.length > MAX_ANCLAS_HOJA) return null;
+    const vistos = new Set<string>();
+    for (const x of raw) {
+      const id = (x as { id?: unknown } | null)?.id;
+      if (typeof id !== 'string' || !ID_ANCLA.test(id) || vistos.has(id)) return null;
+      vistos.add(id);
+    }
+    return (raw as { id: string }[]).map((x) => ({ id: x.id }));
+  };
+  const base = (raw: unknown): number | null =>
+    Number.isSafeInteger(raw) && (raw as number) >= 0 ? (raw as number) : null;
+  const filas = lista(s.rowIds);
+  if (filas) {
+    out.rowIds = filas;
+    const b = base(s.rowBase);
+    if (b !== null) out.rowBase = b;
+  }
+  const cols = lista(s.colIds);
+  if (cols) {
+    out.colIds = cols;
+    const b = base(s.colBase);
+    if (b !== null) out.colBase = b;
+  }
+  return out;
+}
+
 function sanitizeSheet(s: SheetData, i: number): SheetData {
   const out: SheetData = {
     ...(typeof s.id === 'string' && s.id !== '' ? { id: s.id } : {}),
@@ -964,10 +1218,17 @@ function sanitizeSheet(s: SheetData, i: number): SheetData {
     }
     if (pivots.length > 0) out.pivots = pivots;
   }
+  // La identidad de filas y columnas (anclas.ts): sin ella, al volver a abrir el libro
+  // las anclas de los cursores y de los comentarios de celda caerían en otra fila.
+  Object.assign(out, sanitizeAnclas(s));
   const rowGroups = sanitizeGroups(s.rowGroups, MAX_ROWS);
   if (rowGroups.length > 0) out.rowGroups = rowGroups;
   const colGroups = sanitizeGroups(s.colGroups, MAX_COLS);
   if (colGroups.length > 0) out.colGroups = colGroups;
+  const hiddenRows = sanitizeSpans(s.hiddenRows, MAX_ROWS);
+  if (hiddenRows.length > 0) out.hiddenRows = hiddenRows;
+  const hiddenCols = sanitizeSpans(s.hiddenCols, MAX_COLS);
+  if (hiddenCols.length > 0) out.hiddenCols = hiddenCols;
   if (Array.isArray(s.scenarios)) {
     const scenarios: Scenario[] = [];
     const names = new Set<string>();
@@ -1158,7 +1419,15 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
   const [fx, setFx] = useState('');
   /** Rango destino del autorelleno mientras se arrastra el asa (previsualización). */
   const [fillRect, setFillRect] = useState<Rect | null>(null);
+  /** Qué enseña el resumen de la selección y si la barra fx está desplegada: preferencias
+   *  del dispositivo, no del libro (`resumenBarra.ts`). */
+  const [medidasResumen, setMedidasResumen] = useState(medidasRecordadas);
+  const [fxDesplegada, setFxDesplegada] = useState(fxDesplegadaRecordada);
   const fillDragRef = useRef<{ src: Rect; rect: Rect | null } | null>(null);
+  /** Con el dedo (`pointer: coarse`) arrastrar la rejilla la desplaza: el rango se marca con
+   *  los tiradores de sus esquinas (`tiradores.ts`) y no hay asa de autorrelleno, que bajo el
+   *  dedo se confundiría con el tirador de abajo. */
+  const dedo = useDedo();
   /** Desplegable de validación de datos (lista) abierto sobre la celda activa. */
   const [validOpen, setValidOpen] = useState(false);
   useMobileBack(validOpen, () => setValidOpen(false));
@@ -1190,15 +1459,24 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
   const composingRef = useRef(false);
   /** Cursor pendiente que colocar en la barra fx tras un cambio programático. */
   const pendingBarCaretRef = useRef<number | null>(null);
-  const fxInputRef = useRef<HTMLInputElement>(null);
+  /** El campo de la barra fx: `<input>` de una línea o, desplegada, `<textarea>`. */
+  const fxInputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
   const fxBackdropRef = useRef<HTMLDivElement>(null);
 
-  const sheet = useMemo<SheetData>(
-    () =>
-      model.sheets[model.active] ??
-      model.sheets[0] ?? { name: t('sheet.defaultName', { n: 1 }), cells: {} },
-    [model.active, model.sheets, t],
+  /** Medida que se está arrastrando en una cabecera: se pinta sin tocar el modelo (ni el
+   *  historial ni la coedición) hasta soltar. */
+  const [previaMedida, setPreviaMedida] = useState<{ col: boolean; i: number; px: number } | null>(
+    null,
   );
+  const sheet = useMemo<SheetData>(() => {
+    const base = model.sheets[model.active] ??
+      model.sheets[0] ?? { name: t('sheet.defaultName', { n: 1 }), cells: {} };
+    if (!previaMedida) return base;
+    const { col, i, px } = previaMedida;
+    return col
+      ? { ...base, colWidths: { ...base.colWidths, [String(i)]: px } }
+      : { ...base, rowHeights: { ...base.rowHeights, [String(i)]: px } };
+  }, [model.active, model.sheets, t, previaMedida]);
   const rect = rectOf(sel, ext);
 
   /* Vistas de filtro PERSONALES (sheets/filtro.ts): la vista activa de cada hoja manda sobre
@@ -1257,7 +1535,7 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
    * del render: los manejadores registrados una sola vez la leen de stateRef
    * (cols/rows), y lo que acota una escritura usa los límites MAX_COLS/MAX_ROWS. */
   const usado = engine.usedRange(sheet.name);
-  const { cols: nCols, rows: nRows } = extension(
+  const extensionVista = extension(
     usado.maxCol,
     usado.maxRow,
     Math.max(sel.c, ext?.c ?? 0) + 1,
@@ -1266,6 +1544,9 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     CELL_W,
     CELL_H,
   );
+  // Lo oculto a mano no ocupa sitio: la extensión se estira para llegar a lo de detrás.
+  const nCols = extentPastHidden(extensionVista.cols, sheet.hiddenCols, MAX_COLS);
+  const nRows = extentPastHidden(extensionVista.rows, sheet.hiddenRows, MAX_ROWS);
 
   /* Paneles congelados y filas visibles tras el autofiltro. */
   const freeze = sheet.freeze ?? { cols: 0, rows: 0 };
@@ -1282,7 +1563,7 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
   const colGroups = sheet.colGroups ?? [];
   // Memorizado: el filtro lee una celda por fila y la hoja puede tener cien mil. Antes,
   // con cien filas fijas, se recalculaba en cada render (cada clic) sin que se notara.
-  const hidden = useMemo(() => {
+  const ocultasEsquemaFiltro = useMemo(() => {
     const totals = new Set<number>();
     for (const ct of compileTables(sheet.tables ?? [])) if (ct.totals) totals.add(ct.rect.r2);
     const h = filteredRows(afVisto, engine, sheet.name, totals, sheet.styles);
@@ -1293,12 +1574,25 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     // incluso de OTRA hoja, es el modelo.
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [engine, model, sheet, afVisto]);
+  // Las ocultas a mano se unen aparte: dependen de la extensión (un tramo puede llegar al
+  // final de la hoja y solo se recorre lo que se pinta), y la extensión cambia al
+  // desplazarse, cosa que no debe volver a evaluar el filtro.
+  const hidden = useMemo(() => {
+    if (!sheet.hiddenRows) return ocultasEsquemaFiltro;
+    const h = new Set(ocultasEsquemaFiltro);
+    for (const r of spanUnits(sheet.hiddenRows, nRows)) h.add(r);
+    return h;
+  }, [ocultasEsquemaFiltro, sheet.hiddenRows, nRows]);
   const visRows = useMemo(() => {
     const out: number[] = [];
     for (let r = 0; r < nRows; r++) if (!hidden.has(r)) out.push(r);
     return out;
   }, [hidden, nRows]);
-  const hiddenCols = useMemo(() => hiddenUnits(sheet.colGroups ?? []), [sheet]);
+  const hiddenCols = useMemo(() => {
+    const h = hiddenUnits(sheet.colGroups ?? []);
+    for (const c of spanUnits(sheet.hiddenCols, nCols)) h.add(c);
+    return h;
+  }, [sheet, nCols]);
   const visCols: number[] = [];
   for (let c = 0; c < nCols; c++) if (!hiddenCols.has(c)) visCols.push(c);
   /** Índice visible de una fila (-1 si está oculta o fuera de la extensión). */
@@ -1333,6 +1627,12 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
   }
   /* Celdas combinadas (sheets/fusiones.ts): válidas y sin solaparse, memorizadas por la lista. */
   const fusiones = useMemo(() => parseFusiones(sheet.merges), [sheet.merges]);
+  /** Celdas de la hoja activa con hilos de comentario abiertos (anclaCelda.ts): llevan el
+   *  triángulo en la esquina y el primer comentario en su `title`, como en Excel. */
+  const marcas = useMemo(
+    () => marcasDeComentarios(model, model.active, ctx.comments),
+    [model, ctx.comments],
+  );
   /** Borde superior de cada fila visible (+ el final de la última); null sin altos propios. */
   const rowTop = useMemo(
     () =>
@@ -1422,12 +1722,16 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
    *  navega con el teclado. Se resuelve por geometría y DESPUÉS de pintar, porque la
    *  celda de destino puede no existir aún en el DOM (fuera de la ventana) ni caber en
    *  la extensión de antes; scrollIntoView sobre ella no haría nada. */
-  const revelarRef = useRef(false);
+  const revelarRef = useRef<boolean | 'ancla'>(false);
+  /** El cuadro de nombres, al que llevan Ctrl+G y F5. */
+  const cuadroNombresRef = useRef<HTMLInputElement>(null);
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!revelarRef.current || !el) return;
+    // «Ir a» trae a la vista la esquina de ARRIBA del rango, que es por donde se lee;
+    // el teclado, el extremo que se mueve.
+    const p = revelarRef.current === 'ancla' ? sel : (ext ?? sel);
     revelarRef.current = false;
-    const p = ext ?? sel;
     const z = ctx.ui.zoom / 100;
     const top = el.scrollTop / z;
     const left = el.scrollLeft / z;
@@ -1564,6 +1868,190 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
   };
 
   const applyCells = (cells: Record<string, string>): void => applySheet({ cells });
+
+  /* ----- Medidas de columna y fila: valor exacto o autoajuste a lo usado ----- */
+
+  /** Lo que mide `texto` en px de maqueta con la letra de la celda (`measureText`). La letra
+   *  base sale de una celda pintada (la del tema y el tamaño reales); sin DOM, una aproximada. */
+  const medirTexto = (texto: string, cs: CellStyle | undefined, negrita: boolean): number => {
+    lienzoMedida ??= document.createElement('canvas');
+    const g = lienzoMedida.getContext?.('2d');
+    if (!g) return texto.length * 7;
+    const base = gridRef.current?.querySelector<HTMLElement>('[data-ref]');
+    const cb = base ? getComputedStyle(base) : null;
+    const css = cs ? cellStyleCss(cs) : {};
+    const tam = css['fontSize'] ?? cb?.fontSize ?? '12px';
+    const familia = css['fontFamily'] ?? cb?.fontFamily ?? 'sans-serif';
+    g.font = `${negrita ? '700 ' : ''}${tam} ${familia}`;
+    return g.measureText(texto).width;
+  };
+
+  /** Lo que usan las celdas de esas columnas (anchos de texto) o filas (tamaños de letra en
+   *  pt). Las combinadas que abarcan varias unidades no cuentan, como en Excel. */
+  const usadoEn = (
+    s: SheetData,
+    col: boolean,
+    indices: ReadonlySet<number>,
+  ): Map<number, number[]> => {
+    const out = new Map<number, number[]>();
+    const fs = parseFusiones(s.merges);
+    const eng = motorRef.current?.engine ?? engine;
+    for (const ref of Object.keys(s.cells)) {
+      const p = parseRangeRef(ref);
+      if (!p) continue;
+      const i = col ? p.c1 : p.r1;
+      if (!indices.has(i)) continue;
+      const f = fusionEn(fs, p.c1, p.r1);
+      if (f && (col ? f.c1 !== f.c2 : f.r1 !== f.r2)) continue;
+      const cs = s.styles?.[ref];
+      const raw = s.cells[ref] ?? '';
+      let m: number;
+      if (col) {
+        const texto = clipDisplay(s, eng, p.c1, p.r1);
+        if (texto === '') continue;
+        m = medirTexto(texto, cs, /<(b|strong)\b/i.test(raw));
+      } else {
+        if (raw === '' || typeof cs?.size !== 'number') continue;
+        m = cs.size;
+      }
+      const lista = out.get(i) ?? [];
+      lista.push(m);
+      out.set(i, lista);
+    }
+    return out;
+  };
+
+  /** Parche de `colWidths`/`rowHeights` con `indices` a `pedida` (px o autoajuste). */
+  const medidasPedidas = (
+    s: SheetData,
+    col: boolean,
+    indices: readonly number[],
+    pedida: number | 'auto',
+  ): SheetData => {
+    const serie = col ? CELL_W : CELL_H;
+    const tope = col ? ANCHO_MAX : ALTO_MAX;
+    let medidas = col ? s.colWidths : s.rowHeights;
+    if (pedida === 'auto') {
+      const usado = usadoEn(s, col, new Set(indices));
+      for (const i of indices) {
+        const lo = usado.get(i) ?? [];
+        const px = col ? anchoAjustado(lo, serie) : altoAjustado(lo, serie);
+        medidas = conMedidas(medidas, [i], px, serie, tope);
+      }
+    } else medidas = conMedidas(medidas, indices, pedida, serie, tope);
+    const next: SheetData = { ...s };
+    const clave = col ? 'colWidths' : 'rowHeights';
+    if (medidas) next[clave] = medidas;
+    else delete next[clave]; // sin medidas propias, sin clave (la de serie no se guarda)
+    return next;
+  };
+
+  /** Sustituye la hoja activa entera (aquí hace falta poder QUITAR claves). */
+  const ponHojaActiva = (next: SheetData): void => {
+    const m = stateRef.current.model;
+    apply({ ...m, sheets: m.sheets.map((x, i) => (i === m.active ? next : x)) });
+  };
+
+  /** Unidades a las que va un gesto sobre la cabecera `i`: toda la selección si `i` está en
+   *  ella y cubre columnas (o filas) ENTERAS —el gesto de Excel—; si no, solo esa. */
+  const unidadesDelGesto = (col: boolean, i: number): number[] => {
+    const cur = stateRef.current;
+    const r = rectOf(cur.sel, cur.ext);
+    const enteras = col ? r.r1 === 0 && r.r2 >= nRows - 1 : r.c1 === 0 && r.c2 >= nCols - 1;
+    const [a, b] = col ? [r.c1, r.c2] : [r.r1, r.r2];
+    if (!enteras || i < a || i > b) return [i];
+    const out: number[] = [];
+    for (let k = a; k <= b; k++) out.push(k);
+    return out;
+  };
+
+  /** Redimensiona desde la cabecera (arrastre o doble clic). Con la hoja protegida, solo si
+   *  se concedió el formato, como los comandos `colwidth`/`rowheight`. */
+  const redimensionar = (col: boolean, i: number, pedida: number | 'auto'): void => {
+    const m = stateRef.current.model;
+    const s = m.sheets[m.active];
+    if (!s) return;
+    if (s.protect && s.protect.formatCells !== true) {
+      notifyProtected(refOf(stateRef.current.sel));
+      return;
+    }
+    const next = medidasPedidas(s, col, unidadesDelGesto(col, i), pedida);
+    const antes = col ? s.colWidths : s.rowHeights;
+    const despues = col ? next.colWidths : next.rowHeights;
+    if (JSON.stringify(antes ?? {}) === JSON.stringify(despues ?? {})) return; // sin cambio: sin paso de deshacer
+    ponHojaActiva(next);
+  };
+
+  /** Arrastre del asa de 4 px del borde de una cabecera: el delta llega ya dividido por el
+   *  zoom (`escala`), así que es px de maqueta. */
+  const medidaArrastradaRef = useRef<number | null>(null);
+  const gestoMedida = usePointerDrag<{ col: boolean; i: number; base: number }>({
+    escala: () => stateRef.current.ctx.ui.zoom / 100,
+    onMove: ({ data, dxRaw, dyRaw }) => {
+      const tope = data.col ? ANCHO_MAX : ALTO_MAX;
+      const px = Math.round(
+        Math.min(tope, Math.max(MEDIDA_MIN, data.base + (data.col ? dxRaw : dyRaw))),
+      );
+      medidaArrastradaRef.current = px;
+      setPreviaMedida({ col: data.col, i: data.i, px });
+    },
+    onEnd: (data) => {
+      const px = medidaArrastradaRef.current;
+      medidaArrastradaRef.current = null;
+      setPreviaMedida(null);
+      if (px !== null && px !== data.base) redimensionar(data.col, data.i, px);
+    },
+    onCancel: () => {
+      medidaArrastradaRef.current = null;
+      setPreviaMedida(null);
+    },
+  });
+
+  /* ----- tiradores de rango (con el dedo) ----- */
+
+  /** La celda bajo un punto de pantalla: la que pinta el navegador ahí (`[data-ref]`) y, si
+   *  no hay ninguna (el dedo sobre una cabecera o fuera de la rejilla), la de la geometría. */
+  const celdaBajoPunto = (x: number, y: number): Pos | null =>
+    (typeof document.elementsFromPoint === 'function'
+      ? celdaEnElementos(document.elementsFromPoint(x, y))
+      : null) ?? posFromPoint(x, y);
+
+  /** Arrastre de un tirador: la esquina contraria se queda quieta (`destinoTirador`) y el
+   *  borde del panel lo desplaza solo (`scrollContainer`), como el arrastre del ratón. */
+  const gestoTirador = usePointerDrag<{
+    rect: Rect;
+    tirador: Tirador;
+    agarre: { x: number; y: number };
+  }>({
+    scrollContainer: () => scrollRef.current,
+    onMove: ({ data, clientX, clientY }) => {
+      const p = puntoDeTirador(data.tirador, { x: clientX, y: clientY }, data.agarre);
+      const hasta = celdaBajoPunto(p.x, p.y);
+      if (!hasta || !canSelectAt(hasta)) return;
+      const cur = stateRef.current;
+      const d = destinoTirador(data.rect, data.tirador, hasta, (c, r) =>
+        fusionEn(cur.fusiones, c, r),
+      );
+      if (cur.sel.c !== d.sel.c || cur.sel.r !== d.sel.r) setSel(d.sel);
+      if (cur.ext?.c !== d.ext?.c || cur.ext?.r !== d.ext?.r) setExt(d.ext);
+    },
+  });
+
+  const onTiradorDown = (e: PointerEvent, tirador: Tirador): void => {
+    const el = e.currentTarget as HTMLElement;
+    const caja = el.getBoundingClientRect();
+    const cur = stateRef.current;
+    // El centro del tirador es la esquina; el agarre es lo que el dedo queda de ella.
+    const agarre = {
+      x: caja.left + caja.width / 2 - e.clientX,
+      y: caja.top + caja.height / 2 - e.clientY,
+    };
+    // Lo que se ve seleccionado, como lo pintan los tiradores: con una combinada sola, la
+    // combinada entera (y no solo su ancla, que dejaría mal la esquina quieta del de arriba).
+    const fu = cur.ext ? null : fusionEn(cur.fusiones, cur.sel.c, cur.sel.r);
+    const rect = fu ? { c1: fu.c1, c2: fu.c2, r1: fu.r1, r2: fu.r2 } : rectOf(cur.sel, cur.ext);
+    gestoTirador.iniciarArrastre(e, { rect, tirador, agarre });
+  };
 
   /* ----- gráficos flotantes (fase Visual): mover al soltar y borrar ----- */
 
@@ -1771,6 +2259,13 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     c: Number(el.dataset['c'] ?? 0),
     r: Number(el.dataset['r'] ?? 0),
   });
+
+  /** Enlace de la celda (c,r) de la hoja activa leyendo el estado VIVO (gestores de ratón
+   *  y de teclado; el render usa `enlaceEnHoja` con lo que pinta). */
+  const enlaceEn = (c: number, r: number): string | null => {
+    const cur = stateRef.current;
+    return enlaceEnHoja(cur.model.sheets[cur.model.active], cur.engine, c, r);
+  };
 
   /** Validación de datos que cubre una celda de la hoja (null si ninguna). */
   const validationOf = (s: SheetData, c: number, r: number): DataValidation | null =>
@@ -2472,9 +2967,9 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
             : { eje: 'columna', desde: rc.c1, cantidad: -(rc.c2 - rc.c1 + 1), tope: MAX_COLS };
     const celdas = remap(s.cells);
     for (const ref in celdas) celdas[ref] = reescribirCelda(celdas[ref]!, desplazamiento);
-    // Los objetos de la hoja —tablas, minigráficos, gráficos, segmentaciones y el
-    // autofiltro— siguen a sus celdas con las mismas reglas (refshift.ts).
-    // ponytail: los grupos de esquema conservan su rango aunque las filas se desplacen.
+    // Los objetos de la hoja —tablas, minigráficos, gráficos, segmentaciones, el
+    // autofiltro, el formato condicional, las validaciones, el esquema, las combinadas
+    // y los anchos y altos— siguen a sus celdas con las mismas reglas (refshift.ts).
     const next: SheetData = {
       ...moverObjetos(s, desplazamiento),
       cells: celdas,
@@ -2895,6 +3390,8 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     notifyProtected,
     notifyPivotFailed,
     runTableCommand,
+    medidasPedidas,
+    ponHojaActiva,
   });
 
   useEffect(() => {
@@ -2910,6 +3407,8 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
         notifyProtected,
         notifyPivotFailed,
         runTableCommand,
+        medidasPedidas,
+        ponHojaActiva,
       } = commandActionsRef.current;
       const cur = stateRef.current;
       // Con el caret dentro de la celda, negrita/cursiva son formato en línea (§3 vía exec).
@@ -3019,13 +3518,7 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
       // Hoja protegida: veta contenido/estructura; el formato solo si `formatCells`;
       // y las acciones con permiso propio (insertar/borrar filas-columnas, ordenar,
       // autofiltro, objetos, escenarios) solo si ese permiso está concedido.
-      const perm = PROTECT_PERMISSION_CMDS.get(cmd);
-      if (
-        s.protect &&
-        (PROTECT_CONTENT_CMDS.has(cmd) ||
-          (PROTECT_FORMAT_CMDS.has(cmd) && s.protect.formatCells !== true) ||
-          (perm !== undefined && !isPermissionGranted(s.protect, perm)))
-      ) {
+      if (comandoVetadoPorProteccion(s.protect, cmd)) {
         notifyProtected(refOf(cur.sel));
         return;
       }
@@ -3036,6 +3529,21 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
           for (let c = range.c1; c <= range.c2; c++) fn(refOf({ c, r }));
         }
       };
+
+      /* --- Ancho de columna y alto de fila: para TODA la selección, como Excel. --- */
+      if (cmd === 'colwidth' || cmd === 'rowheight') {
+        const pedida = leerMedida(value);
+        if (pedida === null) {
+          notify({ tone: 'warning', title: t('sheet.resize.invalid') });
+          return;
+        }
+        const col = cmd === 'colwidth';
+        const indices: number[] = [];
+        if (col) for (let c = range.c1; c <= range.c2; c++) indices.push(c);
+        else for (let r = range.r1; r <= range.r2; r++) indices.push(r);
+        ponHojaActiva(medidasPedidas(s, col, indices, pedida));
+        return;
+      }
 
       /* --- Formato de número y reglas condicionales: campos aparte del modelo
        *     (nunca reescriben cells: el texto crudo es la fuente de verdad). --- */
@@ -4180,6 +4688,48 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
         return;
       }
 
+      /* --- Ocultar y mostrar filas o columnas sueltas (sheets/ocultas.ts): sobre la
+       *     selección, sin grupo de esquema. La selección se queda donde estaba, así
+       *     «Mostrar» justo después deshace lo que se acaba de ocultar. --- */
+      if (cmd === 'hide') {
+        let req: { axis?: unknown; op?: unknown } = {};
+        try {
+          req = JSON.parse(value ?? '{}') as typeof req;
+        } catch {
+          return;
+        }
+        if (req.op !== 'hide' && req.op !== 'show') return;
+        const axis = req.axis === 'col' ? 'col' : 'row';
+        const spans = (axis === 'col' ? s.hiddenCols : s.hiddenRows) ?? [];
+        const rc = rectOf(cur.sel, cur.ext);
+        const a = axis === 'col' ? rc.c1 : rc.r1;
+        const b = axis === 'col' ? rc.c2 : rc.r2;
+        let next: SheetSpan[];
+        if (req.op === 'hide') {
+          const h = hideSpan(spans, a, b, axis === 'col' ? MAX_COLS : MAX_ROWS);
+          if (!h) {
+            notify({
+              tone: 'info',
+              title: t(axis === 'col' ? 'sheet.msg.hideAll.cols' : 'sheet.msg.hideAll.rows'),
+            });
+            return;
+          }
+          next = h;
+        } else {
+          next = showSpan(spans, a, b);
+        }
+        if (JSON.stringify(next) === JSON.stringify(spans)) return;
+        const patch: SheetData = { ...s };
+        const campo = axis === 'col' ? 'hiddenCols' : 'hiddenRows';
+        if (next.length > 0) patch[campo] = next;
+        else delete patch[campo];
+        apply({
+          ...cur.model,
+          sheets: cur.model.sheets.map((x, i) => (i === cur.model.active ? patch : x)),
+        });
+        return;
+      }
+
       /* --- Subtotales: el asistente entero lo decide `applySubtotals` (outline.ts),
        *     que es el mismo que usa la app nativa con los mismos vectores. Aquí solo
        *     se aplica: mover cada fila a donde dice `from` (con su formato), escribir
@@ -4314,6 +4864,57 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
         return;
       }
 
+      /* --- Combinar y separar celdas (sheets/fusiones.ts). `center` (el botón, y lo que
+       *     reciben sin valor los scripts y las macros), `merge` o `unmerge` tocan
+       *     `merges`; `content` es la combinación de contenido de antes, más abajo. --- */
+      if (cmd === 'merge' && value === 'unmerge') {
+        const merges = separar(s.merges, range);
+        if (!merges) return;
+        const next: SheetData = { ...s, merges };
+        if (merges.length === 0) delete next.merges; // no ensuciar el JSON persistido
+        const m = cur.model;
+        apply({ ...m, sheets: m.sheets.map((x, i) => (i === m.active ? next : x)) });
+        return;
+      }
+      if (cmd === 'merge' && value !== 'content') {
+        const centrar = value !== 'merge';
+        const plan = combinarHoja(s, range, centrar);
+        if (!plan) return;
+        const f = plan.fusion;
+        const hoja = cur.model.active;
+        const nombre = s.name;
+        // Se rehace sobre el estado de ESE momento: entre la pregunta y la respuesta la
+        // hoja ha podido cambiar (otra persona, un script), y lo que se combina es lo de ahora.
+        const hacer = (): void => {
+          const now = stateRef.current;
+          const sh = now.model.sheets[now.model.active];
+          if (!sh || now.model.active !== hoja || sh.name !== nombre) return;
+          if (sh.protect) {
+            notifyProtected(refOf({ c: f.c1, r: f.r1 }));
+            return;
+          }
+          const hecho = combinarHoja(sh, f, centrar);
+          if (!hecho) return;
+          // Un solo applySheet: celdas y combinada van en el MISMO paso de deshacer.
+          applySheet({ cells: hecho.cells, merges: hecho.merges });
+          setSel({ c: hecho.fusion.c1, r: hecho.fusion.r1 });
+          setExt(null);
+        };
+        if (!combinarPierdeDatos(s.cells, f)) {
+          hacer();
+          return;
+        }
+        // Como Excel y Sheets: avisar ANTES de perder datos, y decir cómo no perderlos.
+        void confirmarEnEditor({
+          mensaje: t('dialog.sheet.mergeLoses', { ref: refOf({ c: f.c1, r: f.r1 }) }),
+          confirmLabel: t('sheet.merge'),
+          tone: 'danger',
+        }).then((ok) => {
+          if (ok) hacer();
+        });
+        return;
+      }
+
       const cells = { ...s.cells };
       let changed = false;
 
@@ -4338,9 +4939,9 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
           changed = true;
         });
       } else {
-        // merge: concatena el texto del rango en la celda superior-izquierda.
-        // ponytail: combinación de CONTENIDO, sin celda visual extendida
-        // (colspan); el modelo del §2 no contempla fusiones y es de A1.
+        // merge con «content»: COMBINAR CONTENIDO, la de siempre —el texto del rango, unido
+        // con espacios, en la celda de arriba a la izquierda, y las demás vacías—, sin
+        // celda extendida. Se queda como alternativa para quien no quiere perder nada.
         if (range.c1 === range.c2 && range.r1 === range.r2) return;
         const topRef = refOf({ c: range.c1, r: range.r1 });
         const texts: string[] = [];
@@ -4392,6 +4993,8 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
         numFmt: s?.formats?.[refOf(cur.sel)] ?? { id: 'general' },
         style: s?.styles?.[refOf(cur.sel)] ?? {},
         freeze: s?.freeze ?? { cols: 0, rows: 0 },
+        colWidth: medidaDe(s?.colWidths, cur.sel.c, CELL_W),
+        rowHeight: medidaDe(s?.rowHeights, cur.sel.r, CELL_H, ALTO_MAX),
         condRules: s?.condFormats ?? [],
         validations: s?.validations ?? [],
         sparklines: s?.sparklines ?? [],
@@ -4757,11 +5360,24 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     else setFx(stripHtml(raw));
   }, [sel, sheet]);
 
-  /** Ajusta el fondo tintado al desplazamiento horizontal del input. */
+  /** Ajusta el fondo tintado al desplazamiento del campo: horizontal en el `<input>`,
+   *  vertical en el `<textarea>` de la barra desplegada. */
   const syncBackdropScroll = (): void => {
     if (fxBackdropRef.current && fxInputRef.current) {
       fxBackdropRef.current.scrollLeft = fxInputRef.current.scrollLeft;
+      fxBackdropRef.current.scrollTop = fxInputRef.current.scrollTop;
     }
+  };
+
+  /** Despliega o recoge la barra fx. El campo cambia de elemento (`<input>` ↔
+   *  `<textarea>`): si se estaba escribiendo en él, el foco y el cursor pasan al nuevo
+   *  por el mismo camino que tras aceptar el autocompletado. */
+  const alternarFxDesplegada = (): void => {
+    const el = fxInputRef.current;
+    if (el && document.activeElement === el) pendingBarCaretRef.current = el.selectionStart;
+    const v = !fxDesplegada;
+    setFxDesplegada(v);
+    recordarFxDesplegada(v);
   };
 
   /* Coloca el cursor de la barra fx tras un cambio programático (aceptar
@@ -4776,9 +5392,18 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     }
   });
 
-  const onFxInput = (e: TargetedEvent<HTMLInputElement>): void => {
+  const onFxInput = (e: TargetedEvent<HTMLInputElement | HTMLTextAreaElement>): void => {
     const el = e.currentTarget;
-    const v = el.value;
+    let v = el.value;
+    // El `<textarea>` de la barra desplegada deja pegar saltos de línea, y una celda no
+    // los tiene: se quitan como hace el `<input>` de una línea al pegar, con el cursor
+    // en su sitio, para que desplegar no cambie lo que se escribe.
+    if (/[\r\n]/.test(v)) {
+      const antes = v.slice(0, el.selectionStart ?? v.length).replace(/[\r\n]/g, '').length;
+      v = v.replace(/[\r\n]/g, '');
+      el.value = v;
+      el.setSelectionRange(antes, antes);
+    }
     setFx(v);
     setAcDismissed(false);
     setAcIndex(0);
@@ -4791,7 +5416,7 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
 
   /** Foco o movimiento del cursor en la barra: arranca/actualiza la UX de fórmula.
    *  Solo si el input sigue enfocado (evita reabrirla tras confirmar y saltar). */
-  const onFxCaret = (e: TargetedEvent<HTMLInputElement>): void => {
+  const onFxCaret = (e: TargetedEvent<HTMLInputElement | HTMLTextAreaElement>): void => {
     const el = e.currentTarget;
     if (document.activeElement !== el || !el.value.startsWith('=')) return;
     // Celda bloqueada (hoja protegida): la barra es de solo lectura; no arranca la
@@ -4868,11 +5493,17 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
   /* ----- eventos delegados de la rejilla (2600 celdas sin closures por celda) ----- */
 
   const onGridMouseDown = (e: MouseEvent): void => {
+    // El botón secundario no selecciona, ni señala referencias de una fórmula, ni arrastra:
+    // lo suyo es el menú contextual (`onGridContextMenu`), que decide qué seleccionar.
+    if (e.button === 2) return;
     const target = e.target as HTMLElement;
     // Los botones que viven DENTRO de la rejilla (esquema, filtro, validación) no
     // son superficie de selección: sin este corte, pulsar el filtro de una columna
     // seleccionaría además la columna entera que hay debajo del desplegable.
-    if (target.closest('button')) return;
+    // Lo mismo el chip de un enlace: es un <a> que abre su destino, no una celda.
+    if (target.closest('button, a[href]')) return;
+    // El asa de medida de una cabecera tiene su propio gesto (arrastrar/doble clic).
+    if (target.closest('[data-asa-medida]')) return;
     const el = target.closest<HTMLElement>('[data-ref]');
     const cur = stateRef.current;
     const fe = fxEditRef.current;
@@ -4947,6 +5578,19 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
       return;
     }
     if (editing && refOf(pos) === refOf(sel)) return; // caret libre en la celda en edición
+    // Ctrl/⌘+clic sobre un enlace lo abre (como en Excel y Sheets); el clic solo, selecciona,
+    // para poder seguir editando la celda sin salir disparado a otra pestaña.
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+      const href = enlaceEn(pos.c, pos.r);
+      if (href) {
+        e.preventDefault();
+        commitOpenEdit();
+        if (canSelectAt(pos)) select(pos, false);
+        gridRef.current?.focus(); // las flechas siguen en la rejilla al volver de la pestaña
+        abrirEnlace(href);
+        return;
+      }
+    }
     e.preventDefault(); // clic = seleccionar; el foco (y el caret) llegan con doble clic
     commitOpenEdit();
     if (!canSelectAt(pos)) {
@@ -5167,12 +5811,9 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
         e.preventDefault();
         cancelEdit(target);
       } else {
-        // Dentro de la celda se edita texto: sus atajos son los de `exec` (registro).
-        const deTexto = comandoDelAtajo(e, 'document');
-        if (deTexto) {
-          e.preventDefault();
-          ctx.exec(deTexto.id as EditorCommand, deTexto.value);
-        }
+        // Dentro de la celda se edita texto: sus atajos son los de `exec` (registro),
+        // pero solo las marcas; alinear, titular o enlazar una celda no es de su texto.
+        atenderAtajoDeTexto(e, ctx, MARCAS_DE_CELDA);
       }
       return;
     }
@@ -5180,6 +5821,7 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     // Navegación con la rejilla enfocada (§7.1): flechas mueven; Mayús extiende el rango.
     const extend = e.shiftKey;
     const atajo = comandoDelAtajo(e, 'spreadsheet');
+    const deHoja = atajoDeHoja(e);
     const arrow =
       e.key === 'ArrowUp'
         ? [0, -1]
@@ -5190,7 +5832,16 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
             : e.key === 'ArrowRight'
               ? [1, 0]
               : null;
-    if (arrow) {
+    if (esTeclaDeMenu(e)) {
+      e.preventDefault();
+      abrirMenuTeclado();
+    } else if (deHoja) {
+      // Rellenar, la fecha de hoy, filas y columnas enteras y la hoja de atajos: van
+      // primero porque Mayús+Espacio también es «una tecla de un carácter» y empezaría
+      // a editar, y Ctrl+D y Ctrl+R son el marcador y recargar del navegador.
+      e.preventDefault();
+      atenderAtajoDeHoja(deHoja);
+    } else if (arrow) {
       e.preventDefault();
       // Ctrl (Cmd en Mac) salta al borde de los datos; sin él, una celda.
       if (e.ctrlKey || e.metaKey) moveToData(arrow[0]!, arrow[1]!, extend);
@@ -5210,6 +5861,17 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
       // Sin esto, recorrer una hoja larga con el teclado iba fila a fila.
       e.preventDefault();
       move(0, e.key === 'PageDown' ? pageRows() : -pageRows(), extend);
+    } else if (
+      e.key === 'Enter' &&
+      e.altKey &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      enlaceEn(sel.c, sel.r)
+    ) {
+      // Alt+Intro abre el enlace de la celda activa (atajo de Sheets): el teclado llega a
+      // lo mismo que Ctrl/⌘+clic sin tener que ir a buscar el chip.
+      e.preventDefault();
+      abrirEnlace(enlaceEn(sel.c, sel.r) ?? '');
     } else if (e.key === 'Enter' || e.key === 'F2') {
       e.preventDefault();
       startEdit(sel);
@@ -5254,6 +5916,73 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     }
   };
 
+  /** Los atajos de `atajosHoja.ts` con la rejilla enfocada. */
+  const atenderAtajoDeHoja = (a: AtajoHoja): void => {
+    const cur = stateRef.current;
+    if (a === 'ayuda') {
+      // La hoja del editor entero (`atajosAyuda.ts`), que en Calcus lleva también los de
+      // la rejilla: la misma que abren Vista y Ctrl+/ con el foco fuera de la hoja.
+      ctx.setUi({ atajos: true });
+      return;
+    }
+    if (a === 'irA') {
+      cuadroNombresRef.current?.focus();
+      return;
+    }
+    if (a === 'fila' || a === 'columna') {
+      const { sel: ancla, ext: hasta } = seleccionEntera(rectOf(cur.sel, cur.ext), a, nCols, nRows);
+      setSel(ancla);
+      setExt(hasta);
+      return;
+    }
+    if (ctx.soloLectura) return;
+    if (a === 'hoy') {
+      escribirHoy(cur.sel);
+      return;
+    }
+    const relleno = rellenoDeAtajo(
+      rectOf(cur.sel, cur.ext),
+      a === 'rellenarAbajo' ? 'abajo' : 'derecha',
+    );
+    if (!relleno) return;
+    applyFill(relleno.origen, relleno.destino);
+    // Ctrl+D no mueve la selección: con una sola fila, `applyFill` la ampliaría a la de
+    // encima, que es de donde se copió y no lo que la persona había marcado.
+    setSel(cur.sel);
+    setExt(cur.ext);
+  };
+
+  /** Ctrl+;: la fecha de hoy como VALOR en la celda activa, con formato de fecha si la
+   *  celda no lo tenía (si no, saldría el número de serie). Conserva negrita, cursiva y
+   *  alineación, y respeta la protección y la validación como teclearla. */
+  const escribirHoy = (pos: Pos): void => {
+    const m = stateRef.current.model;
+    const s = m.sheets[m.active];
+    if (!s) return;
+    const ref = refOf(pos);
+    if (!canEditAt(pos)) {
+      notifyProtected(ref);
+      return;
+    }
+    const valor = String(serialDeHoy(new Date()));
+    const dv = validationOf(s, pos.c, pos.r);
+    if (dv?.strict && !validateValue(dv, valor, () => dvFormulaOk(dv, pos.c, pos.r, valor))) {
+      notify({
+        tone: 'warning',
+        title: t('sheet.msg.badValue'),
+        description: validationMessage(dv, ref),
+      });
+      return;
+    }
+    const partes = parseCell(s.cells[ref] ?? '');
+    partes.inner = valor;
+    const cells = { ...s.cells, [ref]: renderCellHtml(partes) };
+    anotarCambio(cells, s.cells, [ref]);
+    const formats = { ...s.formats };
+    if (formats[ref]?.id !== 'date') formats[ref] = { id: 'date' };
+    applySheet({ cells, formats });
+  };
+
   /* ----- pestañas de hoja (§7.1) ----- */
 
   /** Backstop de la protección de LIBRO: veta las mutaciones de ESTRUCTURA
@@ -5279,6 +6008,88 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     setFilterCol(null);
   };
 
+  /** El libro como lo lee «Ir a» (`irA.ts`). */
+  const libroIrA = (): LibroIrA => {
+    const m = stateRef.current.model;
+    return { hojas: m.sheets.map((h) => h.name), activa: m.active, nombres: m.names };
+  };
+
+  /** Intro en el cuadro de nombres: salta a lo escrito o avisa sin moverse. */
+  const irAlDestino = (texto: string): boolean => {
+    const d = irA(texto, libroIrA());
+    if ('error' in d) {
+      if (d.error === 'vacio') {
+        gridRef.current?.focus();
+        return true;
+      }
+      notify({
+        tone: 'warning',
+        title: t('sheet.goTo.error'),
+        description: t(`sheet.goTo.${d.error}`, { texto: texto.trim() }),
+      });
+      return false;
+    }
+    switchSheet(d.hoja);
+    const unaCelda = d.c1 === d.c2 && d.r1 === d.r2;
+    // Una celda cubierta por una combinada es su ancla, también en otra hoja.
+    const fu = unaCelda
+      ? fusionEn(parseFusiones(stateRef.current.model.sheets[d.hoja]?.merges), d.c1, d.r1)
+      : null;
+    setSel(fu ? { c: fu.c1, r: fu.r1 } : { c: d.c1, r: d.r1 });
+    setExt(unaCelda ? null : { c: d.c2, r: d.r2 });
+    revelarRef.current = 'ancla';
+    gridRef.current?.focus();
+    return true;
+  };
+
+  /* ----- comentarios anclados a una celda (anclaCelda.ts): la cinta y el panel ----- */
+  const accionesCeldaRef = useUltimo({ switchSheet, select });
+  useEffect(() => {
+    sheetCellAnchorReader = (): AnclaCelda | null => {
+      const cur = stateRef.current;
+      const s = cur.model.sheets[cur.model.active];
+      if (!s) return null;
+      // De una combinada, su ancla: es la celda que se ve.
+      const fu = fusionEn(cur.fusiones, cur.sel.c, cur.sel.r);
+      return fu ? anclaDeCelda(s, fu.c1, fu.r1) : anclaDeCelda(s, cur.sel.c, cur.sel.r);
+    };
+    sheetCellRevealer = (a: AnclaCelda): boolean => {
+      const cur = stateRef.current;
+      const celda = celdaDeAncla(cur.model, a);
+      if (!celda) return false;
+      const { switchSheet: cambiar, select: seleccionar } = accionesCeldaRef.current;
+      cambiar(celda.hoja);
+      seleccionar({ c: celda.c, r: celda.r }, false);
+      revelarRef.current = true;
+      return true;
+    };
+    sheetCellRefReader = (a: AnclaCelda): string | null => {
+      const cur = stateRef.current;
+      const celda = celdaDeAncla(cur.model, a);
+      if (!celda) return null;
+      if (celda.hoja === cur.model.active) return celda.ref;
+      return `${cur.model.sheets[celda.hoja]?.name ?? ''}!${celda.ref}`;
+    };
+    return () => {
+      sheetCellAnchorReader = null;
+      sheetCellRevealer = null;
+      sheetCellRefReader = null;
+    };
+  }, [stateRef, accionesCeldaRef]);
+  /** El ancla del hilo con el puntero encima en el panel de comentarios (null: ninguno). */
+  const [resalteComentario, setResalteComentario] = useState<AnclaCelda | null>(null);
+  useEffect(() => {
+    sheetCellHighlighter = setResalteComentario;
+    return () => {
+      sheetCellHighlighter = null;
+    };
+  }, []);
+  /** La celda de ese hilo, si es de la hoja activa: la que se enmarca. */
+  const refResalte = useMemo(() => {
+    const celda = resalteComentario ? celdaDeAncla(model, resalteComentario) : null;
+    return celda && celda.hoja === model.active ? celda.ref : null;
+  }, [model, resalteComentario]);
+
   const addSheet = (): void => {
     if (!guardStructure()) return;
     apply({
@@ -5299,7 +6110,9 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
   };
 
   const renameSheet = async (i: number): Promise<void> => {
-    if (!guardStructure()) return;
+    // En solo lectura no se renombra: F2 y el doble clic llegan aquí sin pasar por el
+    // menú (que ya lo apaga), como `PedirRenombrarHoja` de Fyne.
+    if (ctx.soloLectura || !guardStructure()) return;
     const current = model.sheets[i];
     if (!current) return;
     const name = (
@@ -5396,11 +6209,169 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     });
   };
 
+  /** Color de la pestaña (`tabColor`, el de Excel); `null` lo quita. Es estructura del
+   *  libro: con el libro protegido Excel también lo apaga. */
+  const setTabColor = (i: number, color: string | null): void => {
+    if (ctx.soloLectura || !guardStructure()) return;
+    const next = conColorDePestana(model, i, color);
+    if (next !== model) apply(next);
+  };
+
+  /* ----- menú contextual de la rejilla (menuContextual.ts): clic derecho, Mayús+F10 o la
+   * tecla Menú, y mantener pulsado con el dedo ----- */
+  const [menuCtx, setMenuCtx] = useState<{ zona: ZonaMenu; punto: PuntoDeMenu } | null>(null);
+
+  /** Lo que hay bajo el puntero, para el menú: la zona y la celda, o null si no tiene menú. */
+  const objetivoDeMenu = (
+    target: EventTarget | null,
+  ): { zona: ZonaMenu; pos: Pos; esquina: boolean } | null => {
+    if (!(target instanceof Element)) return null;
+    // Los controles de dentro de la rejilla (el ▾ del filtro, el chip de un enlace, el asa
+    // de medida) tienen su gesto; el del navegador se queda para ellos.
+    if (target.closest('button, a[href], [data-asa-medida]')) return null;
+    const cel = target.closest<HTMLElement>('[data-ref]');
+    if (cel) return { zona: 'celdas', pos: posOf(cel), esquina: false };
+    const ch = target.closest<HTMLElement>('[data-colhead]');
+    if (ch)
+      return { zona: 'columnas', pos: { c: Number(ch.dataset['colhead']), r: 0 }, esquina: false };
+    const rh = target.closest<HTMLElement>('[data-rowhead]');
+    if (rh)
+      return { zona: 'filas', pos: { c: 0, r: Number(rh.dataset['rowhead']) }, esquina: false };
+    if (target.closest('[data-selectall]'))
+      return { zona: 'celdas', pos: { c: 0, r: 0 }, esquina: true };
+    return null;
+  };
+
+  /**
+   * Abre el menú donde se pulsó. Como en Excel, pulsar DENTRO de la selección la conserva
+   * (para copiar o borrar un rango entero desde su menú) y pulsar fuera selecciona lo
+   * pulsado: la celda, la columna o la fila. La esquina, la hoja entera.
+   */
+  const abrirMenuEn = (
+    obj: { zona: ZonaMenu; pos: Pos; esquina: boolean },
+    punto: PuntoDeMenu,
+  ): void => {
+    commitOpenEdit();
+    const cur = stateRef.current;
+    const rc = rectOf(cur.sel, cur.ext);
+    if (obj.esquina) {
+      setSel({ c: 0, r: 0 });
+      setExt({ c: nCols - 1, r: nRows - 1 });
+    } else if (!conservaSeleccion(obj.zona, obj.pos, rc, nCols, nRows)) {
+      if (obj.zona === 'columnas') {
+        setSel({ c: obj.pos.c, r: 0 });
+        setExt({ c: obj.pos.c, r: nRows - 1 });
+      } else if (obj.zona === 'filas') {
+        setSel({ c: 0, r: obj.pos.r });
+        setExt({ c: nCols - 1, r: obj.pos.r });
+      } else if (canSelectAt(obj.pos)) {
+        select(obj.pos, false);
+      }
+    }
+    // El foco a la rejilla ANTES de abrir: es adonde vuelve al cerrar el menú.
+    gridRef.current?.focus({ preventScroll: true });
+    setMenuCtx({ zona: obj.zona, punto });
+  };
+
+  const onGridContextMenu = (e: MouseEvent): void => {
+    // Editando una celda, el menú del navegador es el del texto (corregir, pegar).
+    if (editing && e.target instanceof Node && e.target !== gridRef.current) {
+      const enEdicion = document.getElementById(cellDomId(refOf(sel)));
+      if (enEdicion?.contains(e.target)) return;
+    }
+    // Sobre la propia rejilla (no una celda) es el teclado: la tecla Menú o Mayús+F10
+    // del navegador, con el foco en la rejilla. Va a la celda activa.
+    if (e.target === gridRef.current) {
+      e.preventDefault();
+      abrirMenuTeclado();
+      return;
+    }
+    const obj = objetivoDeMenu(e.target);
+    if (!obj) return;
+    e.preventDefault();
+    abrirMenuEn(obj, { x: e.clientX, y: e.clientY });
+  };
+
+  /**
+   * Mayús+F10 y la tecla Menú (WCAG 2.1.1): el menú de la selección, colgando de la celda
+   * activa. Con columnas o filas enteras, el de su cabecera, como si se hubiera pulsado ahí.
+   */
+  const abrirMenuTeclado = (): void => {
+    if (editing) return;
+    const zona = zonaDeSeleccion(rect, nCols, nRows);
+    const caja =
+      document.getElementById(cellDomId(refOf(sel)))?.getBoundingClientRect() ??
+      gridRef.current?.getBoundingClientRect();
+    if (!caja) return;
+    setMenuCtx({
+      zona,
+      punto: { x: caja.left, y: caja.top, ancho: caja.width, alto: caja.height },
+    });
+  };
+
+  // Mantener pulsado con el dedo: el clic derecho del teléfono. (Android además manda su
+  // `contextmenu`, que abre lo mismo en el mismo sitio.)
+  const pulsacionLarga = useLongPress<{
+    obj: { zona: ZonaMenu; pos: Pos; esquina: boolean };
+    punto: PuntoDeMenu;
+  }>((d) => abrirMenuEn(d.obj, d.punto));
+  const onGridPointerDown = (e: PointerEvent): void => {
+    const obj = objetivoDeMenu(e.target);
+    if (obj) pulsacionLarga.iniciar(e, { obj, punto: { x: e.clientX, y: e.clientY } });
+  };
+
+  /** Lo que hace una opción del menú. */
+  const hacerOpcionCtx = (o: OpcionCtx): void => {
+    const a = o.accion;
+    if ('borrar' in a) clearRange();
+    else if ('medida' in a) {
+      const s = stateRef.current.model.sheets[stateRef.current.model.active];
+      void pedirMedidaDeHoja(
+        a.medida,
+        a.medida === 'colwidth'
+          ? medidaDe(s?.colWidths, sel.c, CELL_W)
+          : medidaDe(s?.rowHeights, sel.r, CELL_H, ALTO_MAX),
+      );
+    } else dispatchSheetCommand(a.cmd, a.value);
+  };
+
+  /* Menú de la pestaña activa (el ▾ de su derecha). Mayús+F10, la tecla de menú o el
+   * clic derecho lo abren desde cualquier pestaña: primero se activa esa hoja —el menú
+   * actúa sobre la activa, como duplicar y eliminar— y, ya pintado su ▾, se despliega. */
+  const tabMenuTrigger = useRef<HTMLButtonElement>(null);
+  const [tabMenuPending, setTabMenuPending] = useState(false);
+  const openTabMenu = (): void => {
+    const b = tabMenuTrigger.current;
+    if (b && b.getAttribute('aria-expanded') !== 'true') b.click();
+  };
+  const requestTabMenu = (i: number): void => {
+    if (i === model.active) {
+      openTabMenu();
+      return;
+    }
+    switchSheet(i);
+    setTabMenuPending(true);
+  };
+  useEffect(() => {
+    if (!tabMenuPending) return;
+    setTabMenuPending(false);
+    openTabMenu();
+  }, [tabMenuPending, model.active]);
+
   /* ----- render ----- */
 
   const refLabel = ext
     ? `${refOf({ c: rect.c1, r: rect.r1 })}:${refOf({ c: rect.c2, r: rect.r2 })}`
     : refOf(sel);
+  const nombresIrA = useMemo(
+    () =>
+      nombresParaIrA({
+        hojas: model.sheets.map((h) => h.name),
+        activa: model.active,
+        nombres: model.names,
+      }),
+    [model.sheets, model.active, model.names],
+  );
 
   /* Resumen de la selección (recuento · suma · promedio), como la barra de estado
    * de Excel y de Numbers: saber cuánto suma lo que acabas de marcar no debería
@@ -5446,6 +6417,41 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     estiloParaMi(sheet.protect, selRef, sheet.styles?.[selRef], yo()),
     sheet.cells[selRef] ?? '',
   );
+
+  /** Asa de 4 px en el borde final de una cabecera: arrastrar cambia la medida, doble clic
+   *  la autoajusta. Es un separador ARIA con su valor; el teclado tiene los comandos
+   *  `colwidth`/`rowheight` de la cinta (Inicio › Formato). */
+  const asaMedida = (col: boolean, i: number, medida: number): JSX.Element => {
+    const nombre = col ? colName(i) : String(i + 1);
+    return (
+      <span
+        data-asa-medida={col ? 'col' : 'row'}
+        // Solo para el puntero: el teclado y el lector de pantalla tienen los comandos
+        // «Ancho de columna…»/«Alto de fila…» de la cinta (y un separador ARIA tendría que
+        // ser enfocable y moverse con flechas en cada una de las cabeceras pintadas).
+        aria-hidden="true"
+        title={`${t(col ? 'sheet.resize.col' : 'sheet.resize.row', { name: nombre })}. ${t('sheet.resize.hint')}`}
+        class={`hover:bg-primary absolute z-10 ${
+          col
+            ? 'top-0 -right-0.5 h-full w-1 cursor-col-resize pointer-coarse:w-3'
+            : '-bottom-0.5 left-0 h-1 w-full cursor-row-resize pointer-coarse:h-3'
+        }`}
+        onPointerDown={(e) => {
+          if (ctx.soloLectura) return;
+          gestoMedida.iniciarArrastre(e, { col, i, base: medida });
+        }}
+        onPointerMove={gestoMedida.onPointerMove}
+        onPointerUp={gestoMedida.onPointerUp}
+        onPointerCancel={gestoMedida.onPointerCancel}
+        onLostPointerCapture={gestoMedida.onLostPointerCapture}
+        onDblClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!ctx.soloLectura) redimensionar(col, i, 'auto');
+        }}
+      />
+    );
+  };
 
   const headCls =
     // px y NO `h-6`/`leading-6`: las clases de Tailwind son rem y la geometría
@@ -5633,18 +6639,22 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     const c = visCols[ci]!;
     const hl = c >= rect.c1 && c <= rect.c2;
     const fzCol = c < freeze.cols; // columna congelada: pegajosa también en horizontal
+    // Hay columnas ocultas a mano justo antes: la marca del borde dice dónde mostrarlas.
+    const trasOcultas = c > 0 && isSpanHidden(sheet.hiddenCols, c - 1);
     headerCells.push(
       <div
         key={colName(c)}
         role="columnheader"
         aria-colindex={c + 2}
         data-colhead={c}
+        title={trasOcultas ? t('sheet.hidden.colsBefore') : undefined}
         class={`${headCls} w-[96px] cursor-cell ${hl ? 'sytue-grid-head-hl' : 'bg-bg-subtle text-text-muted'} ${
           fzCol ? 'sticky z-10' : 'absolute top-0'
-        } ${c === freeze.cols - 1 ? 'border-r-border-strong' : ''}`}
+        } ${c === freeze.cols - 1 ? 'border-r-border-strong' : ''} ${trasOcultas ? 'sytue-grid-head-tras-ocultas' : ''}`}
         style={{ left: `${colX[c]}px`, ...(hayAnchos ? { width: `${colW(c)}px` } : {}) }}
       >
         {colName(c)}
+        {asaMedida(true, c, colW(c))}
       </div>,
     );
   }
@@ -5669,6 +6679,7 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     const rowHl = r >= rect.r1 && r <= rect.r2;
     const fzRow = r < freeze.rows;
     const rowEdge = r === freeze.rows - 1 ? ' border-b-border-strong' : '';
+    const trasOcultas = r > 0 && isSpanHidden(sheet.hiddenRows, r - 1);
     const cells: JSX.Element[] = [];
     const rg = rowGutterCell(r);
     if (rg) cells.push(rg);
@@ -5678,10 +6689,12 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
         role="rowheader"
         aria-colindex={1}
         data-rowhead={r}
-        class={`${headCls} sticky z-10 w-[40px] cursor-cell ${rowHl ? 'sytue-grid-head-hl' : 'bg-bg-subtle text-text-muted'}${rowEdge}`}
+        title={trasOcultas ? t('sheet.hidden.rowsAbove') : undefined}
+        class={`${headCls} sticky z-10 w-[40px] cursor-cell ${rowHl ? 'sytue-grid-head-hl' : 'bg-bg-subtle text-text-muted'}${rowEdge} ${trasOcultas ? 'sytue-grid-head-tras-ocultas' : ''}`}
         style={{ left: `${RGUT}px`, ...(hayAltos ? { height: `${altoDe(vi)}px` } : {}) }}
       >
         {r + 1}
+        {asaMedida(false, r, altoDe(vi))}
       </div>,
     );
     for (const ci of pintaCols) {
@@ -5724,6 +6737,23 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
       // relleno; no al de «Buscar», que tiene que leerse sobre el amarillo.
       if (decor?.textColor && !searchHits.has(`${c},${r}`))
         style = { ...style, color: decor.textColor };
+      // Enlace: subrayado siempre y el azul de marca salvo que la celda ya tenga su color
+      // (el del usuario, el condicional o el de «Buscar», que mandan sobre el de enlace).
+      const href = enlaceEnHoja(sheet, engine, c, r);
+      const marca = marcas.size > 0 ? marcas.get(ref) : undefined;
+      if (href) {
+        const conColor = !!cs?.color || !!decor?.textColor || searchHits.has(`${c},${r}`);
+        const linea = style?.['textDecorationLine'];
+        style = {
+          ...style,
+          ...(conColor ? {} : { color: ACCENT }),
+          textDecorationLine: !linea
+            ? 'underline'
+            : linea.includes('underline')
+              ? linea
+              : `${linea} underline`,
+        };
+      }
       // Validación no estricta: marca en rojo el valor que no cumple (avisar, no bloquear).
       // ponytail: se coteja el TEXTO crudo; las celdas con FÓRMULA no se marcan (evaluar
       // su resultado —o una validación tipo `formula`— pediría el motor en el render).
@@ -5756,6 +6786,8 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
         ...(hayAnchos ? { width: `${colW(c)}px` } : {}),
         ...(hayAltos ? { height: `${altoDe(vi)}px` } : {}),
       };
+      if (marca) style = conMarcaDeComentario(style);
+      if (ref === refResalte) style = { ...style, boxShadow: RESALTE_COMENTARIO };
       // Combinada: el ancla ocupa todo el rango (encima de las cubiertas) y las cubiertas no se ven.
       const fu = fusVis.length > 0 ? fusionEn(fusVis, c, r) : null;
       if (fu && fu.c1 === c && fu.r1 === r) {
@@ -5794,6 +6826,11 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
           // celda de hoja protegida); la tabla de oxlint aún no lo recoge.
           // oxlint-disable-next-line jsx-a11y/role-supports-aria-props
           aria-readonly={protectedSheet && !cellEditable ? true : undefined}
+          title={tituloDeCelda(href ? t('sheet.link.cellHint', { url: href }) : null, marca, t)}
+          // `aria-description` es global en ARIA 1.3 (el lector lee el comentario tras el
+          // valor); la tabla de oxlint aún no lo recoge.
+          // oxlint-disable-next-line jsx-a11y/role-supports-aria-props
+          aria-description={marca ? textoDeMarca(marca, t) : undefined}
           contentEditable={cellEditable}
           spellcheck={false}
           // `--editor-grid-line` y NO `border-border`: la celda se pinta sobre
@@ -5877,7 +6914,35 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
       </div>
     ) : null;
 
-  const fillHandleVi = editing ? -1 : viOf(rect.r2);
+  /* Chip del enlace de la celda activa (Sheets lo enseña igual, debajo de la celda): el
+   * `Button` con `href` de la suite, que es un <a> de verdad —clic central, «copiar
+   * dirección» y lector de pantalla como en cualquier enlace— con el aspecto de botón (el
+   * mismo `ui.Boton` secundario de la app nativa). Sin `noopener` la página abierta podría
+   * mover la nuestra. */
+  // Escribiendo en la celda no hay chip (como en la app nativa): taparía la fila de abajo
+  // y el desplegable de funciones mientras el destino aún no es el definitivo.
+  const selHref = selVi >= 0 && !editing ? enlaceEnHoja(sheet, engine, sel.c, sel.r) : null;
+  const linkChip = selHref ? (
+    <Button
+      href={selHref}
+      target="_blank"
+      rel="noopener noreferrer"
+      variant="secondary"
+      size="xs"
+      leadingIcon={<EditorIcon name="link" size="md" />}
+      data-enlace-celda
+      class="absolute z-10 max-w-64"
+      style={{ left: `${colX[sel.c]}px`, top: `${topDe(selVi + 1) + 4}px` }}
+      aria-label={t('sheet.link.open', { url: selHref })}
+      title={selHref}
+      // Sin robar el foco a la rejilla: tras abrir, las flechas siguen moviendo la selección.
+      onMouseDown={(e) => e.preventDefault()}
+    >
+      <span class="truncate">{rotuloDeEnlace(selHref)}</span>
+    </Button>
+  ) : null;
+
+  const fillHandleVi = editing || dedo ? -1 : viOf(rect.r2);
   const fillHandle =
     fillHandleVi < 0 ? null : (
       <div
@@ -5895,6 +6960,52 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
         onPointerCancel={onFillCancel}
       />
     );
+
+  /* Los dos tiradores del rango, con el dedo: un círculo en `ACCENT` con borde de papel,
+   * centrado en cada esquina, dentro de una caja de 44 px que es lo que coge el dedo. Con una
+   * celda sola también están: es como se empieza un rango sin ratón. Una celda combinada los
+   * lleva en las esquinas de lo que se ve. */
+  const tiradores = (() => {
+    if (!dedo || editing || rect.c1 >= nCols) return null;
+    let { c1, c2, r1, r2 } = rect;
+    const fu = !ext ? fusionEn(fusiones, sel.c, sel.r) : null;
+    if (fu) ({ c1, c2, r1, r2 } = fu);
+    const viIni = viOf(r1);
+    const viFin = viOf(r2);
+    if (viIni < 0 || viFin < 0) return null;
+    const esquinas: [Tirador, number, number][] = [
+      ['inicio', colX[c1]!, topDe(viIni)],
+      ['fin', colX[Math.min(c2, nCols - 1) + 1]!, topDe(viFin + 1)],
+    ];
+    return esquinas.map(([tirador, x, y]) => (
+      <div
+        key={`tirador-${tirador}`}
+        aria-hidden="true"
+        data-tirador={tirador}
+        class="absolute z-10 grid touch-none place-items-center select-none"
+        style={{
+          left: `${x - ZONA_TIRADOR}px`,
+          top: `${y - ZONA_TIRADOR}px`,
+          width: `${2 * ZONA_TIRADOR}px`,
+          height: `${2 * ZONA_TIRADOR}px`,
+        }}
+        onPointerDown={(e) => onTiradorDown(e, tirador)}
+        onPointerMove={gestoTirador.onPointerMove}
+        onPointerUp={gestoTirador.onPointerUp}
+        onPointerCancel={gestoTirador.onPointerCancel}
+        onLostPointerCapture={gestoTirador.onLostPointerCapture}
+      >
+        <span
+          class="block rounded-full border-[1.5px] border-[var(--editor-page-bg)]"
+          style={{
+            background: ACCENT,
+            width: `${2 * RADIO_TIRADOR}px`,
+            height: `${2 * RADIO_TIRADOR}px`,
+          }}
+        />
+      </div>
+    ));
+  })();
 
   /* Autofiltro persistente: flechas en la fila de encabezados; al abrir una,
    * lista de valores distintos con casillas (excluir = ocultar filas). Valores
@@ -6287,7 +7398,7 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
           class="sytue-peer-label text-2xs absolute -top-[15px] left-0 max-w-[160px] truncate rounded-sm px-1 py-px leading-tight font-medium text-white"
           style={{ background: pc.color }}
         >
-          {peerName(pc.name)}
+          {peerName(pc.name, t('header.peerUnnamed'))}
         </span>
       </div>
     );
@@ -6357,31 +7468,66 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     );
 
   const fxIsFormula = fx.startsWith('=');
+  /* Lo que comparten el `<input>` y el `<textarea>` de la barra fx. Con el texto de una
+   * fórmula transparente: lo que se lee es el fondo tintado. */
+  const campoFx = {
+    style: fxIsFormula ? { color: 'transparent', caretColor: 'var(--sytue-text)' } : undefined,
+    'aria-label': t('sheet.formulaBar'),
+    spellcheck: false,
+    readOnly: !canEditSel,
+    value: fx,
+    onInput: onFxInput,
+    onKeyDown: onFxKeyDown,
+    onKeyUp: onFxCaret,
+    onClick: onFxCaret,
+    onFocus: onFxCaret,
+    onBlur: onFxBlur,
+    onScroll: syncBackdropScroll,
+  };
 
   return (
     <div class="flex h-full min-h-0 flex-1 flex-col">
-      {/* Barra de fórmulas (§7.1): referencia + fx; Enter escribe y baja una fila. */}
-      <div class="border-border bg-surface flex h-8 shrink-0 items-center gap-2 border-b px-2 pointer-coarse:h-auto pointer-coarse:min-h-[max(44px,2.75rem)]">
-        <div
-          class="border-border bg-bg-subtle text-text flex h-6 w-16 shrink-0 items-center justify-center rounded-sm border text-xs font-medium tabular-nums"
-          title={t('sheet.activeCell')}
-        >
-          {refLabel}
-        </div>
-        <span class="sytue-meta italic" aria-hidden="true">
+      {/* Barra de fórmulas (§7.1): referencia + fx; Enter escribe y baja una fila.
+       *  Desplegada, el campo es un `<textarea>` de tres líneas que reparte la fórmula
+       *  larga en vez de correrla de lado; Enter sigue escribiendo (no hay saltos de
+       *  línea en una celda), así que lo único que cambia es cuánto se ve. */}
+      <div
+        class={
+          fxDesplegada
+            ? 'border-border bg-surface flex shrink-0 items-start gap-2 border-b px-2 py-1'
+            : 'border-border bg-surface flex h-8 shrink-0 items-center gap-2 border-b px-2 pointer-coarse:h-auto pointer-coarse:min-h-[max(44px,2.75rem)]'
+        }
+      >
+        <CuadroNombres
+          rotulo={refLabel}
+          nombres={nombresIrA}
+          onIr={irAlDestino}
+          onVolver={() => gridRef.current?.focus()}
+          campoRef={cuadroNombresRef}
+        />
+        <span class="sytue-meta leading-6 italic" aria-hidden="true">
           fx
         </span>
-        {/* Editor fx: input transparente sobre un fondo tintado por referencia
+        {/* Editor fx: campo transparente sobre un fondo tintado por referencia
          *  (los <span> no caben dentro de un <input>). El desplegable de
          *  autocompletado y el hint cuelgan bajo la barra.
          *  El texto va con la tinta de TEMA (--sytue-text), no con la de contenido
          *  (INK): esta barra vive en el cromo, así que INK la dejaba invisible en
-         *  tema oscuro. INK se reserva para lo que se pinta sobre el papel. */}
-        <div class="relative flex min-w-0 flex-1 items-center">
+         *  tema oscuro. INK se reserva para lo que se pinta sobre el papel.
+         *  Desplegada, el fondo y el `<textarea>` reparten igual —mismo `px-1`, mismo
+         *  `break-all` y el mismo hueco reservado para la barra de desplazamiento—, que
+         *  si no el tinte se despegaría de las letras a partir de la segunda línea. */}
+        <div
+          class={`relative flex min-w-0 flex-1 ${fxDesplegada ? 'mt-0.5 items-start' : 'items-center'}`}
+        >
           <div
             ref={fxBackdropRef}
             aria-hidden="true"
-            class="pointer-events-none absolute inset-0 overflow-hidden px-1 text-sm leading-5 whitespace-pre"
+            class={`pointer-events-none absolute inset-0 overflow-hidden px-1 text-sm leading-5 ${
+              fxDesplegada
+                ? '[scrollbar-gutter:stable] break-all whitespace-pre-wrap'
+                : 'whitespace-pre'
+            }`}
             style={{ color: 'var(--sytue-text)' }}
           >
             {fxIsFormula ? (
@@ -6392,30 +7538,43 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
               />
             ) : null}
           </div>
-          <input
-            ref={fxInputRef}
-            class={`text-text relative z-[1] h-5 w-full min-w-0 rounded-sm bg-transparent px-1 text-sm ${FOCUS_RING}`}
-            style={
-              fxIsFormula ? { color: 'transparent', caretColor: 'var(--sytue-text)' } : undefined
-            }
-            aria-label={t('sheet.formulaBar')}
-            spellcheck={false}
-            readOnly={!canEditSel}
-            value={fx}
-            onInput={onFxInput}
-            onKeyDown={onFxKeyDown}
-            onKeyUp={onFxCaret}
-            onClick={onFxCaret}
-            onFocus={onFxCaret}
-            onBlur={onFxBlur}
-            onScroll={syncBackdropScroll}
-          />
+          {fxDesplegada ? (
+            <textarea
+              id={FX_CAMPO_ID}
+              ref={fxInputRef as RefObject<HTMLTextAreaElement>}
+              rows={3}
+              class={`text-text relative z-[1] block h-15 w-full min-w-0 resize-none [scrollbar-gutter:stable] overflow-y-auto rounded-sm bg-transparent px-1 text-sm leading-5 break-all ${FOCUS_RING}`}
+              {...campoFx}
+            />
+          ) : (
+            <input
+              id={FX_CAMPO_ID}
+              ref={fxInputRef as RefObject<HTMLInputElement>}
+              class={`text-text relative z-[1] h-5 w-full min-w-0 rounded-sm bg-transparent px-1 text-sm ${FOCUS_RING}`}
+              {...campoFx}
+            />
+          )}
           {fxEdit?.surface === 'bar' && (acOpen || hintContent) ? (
             <div class="absolute top-full left-0 z-[var(--z-popover)] mt-1">
               {acOpen ? autoList('bar') : hintContent}
             </div>
           ) : null}
         </div>
+        {/* El botón de la cinta (`BOTON_DE_BARRA`, 28×28), pero con `aria-expanded` y no
+         *  `aria-pressed`: lo que hace es enseñar más del campo al que apunta. */}
+        <button
+          type="button"
+          class={`${BOTON_DE_BARRA} shrink-0`}
+          aria-label={t(fxDesplegada ? 'sheet.formulaBar.collapse' : 'sheet.formulaBar.expand')}
+          title={t(fxDesplegada ? 'sheet.formulaBar.collapse' : 'sheet.formulaBar.expand')}
+          aria-expanded={fxDesplegada}
+          aria-controls={FX_CAMPO_ID}
+          // Sin robar el foco: si se estaba escribiendo la fórmula, se sigue escribiendo.
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={alternarFxDesplegada}
+        >
+          <EditorIcon name={fxDesplegada ? 'chevronUp' : 'chevronDown'} />
+        </button>
       </div>
 
       {/* Rejilla con scroll; zoom por CSS zoom para no romper las cabeceras pegajosas. */}
@@ -6448,6 +7607,11 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
             class="sytue-focus-ring-inner relative w-max outline-none"
             style={{ width: `${gridW}px`, height: `${gridH}px` }}
             onMouseDown={onGridMouseDown}
+            onContextMenu={onGridContextMenu}
+            onPointerDown={onGridPointerDown}
+            onClickCapture={pulsacionLarga.onClickCapture}
+            onContextMenuCapture={pulsacionLarga.onContextMenuCapture}
+            aria-keyshortcuts="Shift+F10"
             onMouseMove={onGridMouseMove}
             onMouseUp={onGridMouseUp}
             onDblClick={onGridDblClick}
@@ -6474,7 +7638,9 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
             {rangeOverlays}
             {peerCursorOverlay}
             {fillHandle}
+            {tiradores}
             {validDropdown}
+            {linkChip}
             {cellFxPopover}
             {filtroEnFila ? null : filterOverlay}
           </div>
@@ -6536,6 +7702,68 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
         </div>
       </div>
 
+      {/* Menú contextual de la rejilla: sin disparador, en el punto pulsado o en la celda
+       * activa. Lo vetado sale inerte, con el motivo arriba y en el nombre de cada opción. */}
+      <Dropdown
+        label={t(ROTULO_MENU[menuCtx?.zona ?? 'celdas'])}
+        abiertoEn={menuCtx ? menuCtx.punto : null}
+        onCerrar={() => setMenuCtx(null)}
+      >
+        {(close) => {
+          if (!menuCtx) return null;
+          const grupos = opcionesContextuales(menuCtx.zona, {
+            soloLectura: ctx.soloLectura,
+            vetado: (cmd) => comandoVetadoPorProteccion(sheet.protect, cmd),
+            rangoBloqueado: rangeLocked(rect),
+            c1: rect.c1,
+            r1: rect.r1,
+            congelada: freeze.cols > 0 || freeze.rows > 0,
+          });
+          const motivos = [...new Set(grupos.flat().flatMap((o) => (o.motivo ? [o.motivo] : [])))];
+          return (
+            <>
+              {motivos.length > 0 && (
+                // Visible para quien mira; el lector de pantalla lo oye en cada opción.
+                <p
+                  aria-hidden="true"
+                  class="text-text-muted flex items-center gap-1.5 px-2.5 py-1.5 text-xs"
+                >
+                  <EditorIcon name="lock" size="sm" />
+                  {motivos.map((m) => t(m)).join(' · ')}
+                </p>
+              )}
+              {grupos.map((grupo, i) => (
+                <Fragment key={i}>
+                  {i > 0 && <MenuSeparator />}
+                  {grupo.map((o) => {
+                    const texto = t(o.clave);
+                    return (
+                      <MenuItem
+                        key={o.clave}
+                        size="sm"
+                        disabled={!o.vivo}
+                        aria-label={
+                          o.motivo
+                            ? t('sheet.ctx.unavailable', { action: texto, reason: t(o.motivo) })
+                            : undefined
+                        }
+                        aria-keyshortcuts={o.atajo}
+                        onClick={() => {
+                          close();
+                          hacerOpcionCtx(o);
+                        }}
+                      >
+                        {texto}
+                      </MenuItem>
+                    );
+                  })}
+                </Fragment>
+              ))}
+            </>
+          );
+        }}
+      </Dropdown>
+
       {/* Pestañas de hoja (§7.1): activa con subrayado del acento del producto;
        * doble clic renombra y el asa compartida reordena con dedo, ratón o teclado. */}
       <div class="border-border bg-surface flex h-8 shrink-0 items-center gap-1 border-t px-2 text-xs pointer-coarse:h-auto pointer-coarse:min-h-[max(44px,2.75rem)]">
@@ -6579,8 +7807,22 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
                     ? t('sheet.tab.locked', { name: s.name })
                     : t('sheet.tab.hint', { name: s.name })
                 }
+                // F2 renombra y Mayús+F10 abre el menú: el doble clic no lo alcanzan
+                // ni el teclado (WCAG 2.1.1) ni el dedo.
+                aria-keyshortcuts="F2 Shift+F10"
                 onClick={() => switchSheet(i)}
                 onDblClick={() => void renameSheet(i)}
+                onKeyDown={(e) => {
+                  const accion = accionDeTeclaEnPestana(e);
+                  if (!accion) return;
+                  e.preventDefault();
+                  if (accion === 'renombrar') void renameSheet(i);
+                  else requestTabMenu(i);
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  requestTabMenu(i);
+                }}
               >
                 {s.name}
                 {s.tabColor && (
@@ -6598,6 +7840,19 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
                   />
                 )}
               </button>
+              {i === model.active && (
+                <MenuPestana
+                  name={s.name}
+                  tabColor={s.tabColor}
+                  options={opcionesDePestana(model, i, ctx.soloLectura)}
+                  triggerRef={tabMenuTrigger}
+                  onRename={() => void renameSheet(i)}
+                  onDuplicate={duplicateSheet}
+                  onMove={(d) => moveSheetTo(i, i + d)}
+                  onColor={(c) => setTabColor(i, c)}
+                  onDelete={() => void deleteSheet()}
+                />
+              )}
             </span>
           ))}
         </div>
@@ -6619,14 +7874,22 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
           disabled={protectedWorkbook || model.sheets.length <= 1}
           onAction={() => void deleteSheet()}
         />
+        <RibbonButton
+          icon="keyboard"
+          label={t('sheet.shortcuts.title')}
+          keys="Ctrl+/"
+          onAction={() => ctx.setUi({ atajos: true })}
+        />
         {selStats && (
-          // <output> ya es role=status: el resumen se anuncia solo al cambiar la
-          // selección sin añadirle ARIA a mano.
-          <output class="text-text-muted shrink-0 truncate tabular-nums">
-            {t('sheet.stats.count', { count: selStats.count })} ·{' '}
-            {t('sheet.stats.sum', { value: formatCellValue(selStats.sum) })} ·{' '}
-            {t('sheet.stats.average', { value: formatCellValue(selStats.avg) })}
-          </output>
+          <ResumenSeleccion
+            stats={selStats}
+            medidas={medidasResumen}
+            onAlternar={(m) => {
+              const v = alternarMedida(medidasResumen, m);
+              setMedidasResumen(v);
+              recordarMedidas(v);
+            }}
+          />
         )}
       </div>
     </div>

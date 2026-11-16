@@ -32,6 +32,11 @@ func Carpeta() (string, error) {
 	return filepath.Join(casa, "Downloads"), nil
 }
 
+// CarpetaImagenes no existe fuera del escritorio: en el móvil la galería es la del
+// sistema (MediaStore, PhotoKit), a la que se llega con `apps/nucleo/carrete`, y en el
+// navegador no hay ninguna.
+func CarpetaImagenes() (string, error) { return "", ErrNoDisponible }
+
 func Revelar(ruta string) error {
 	abs, err := local(ruta)
 	if err != nil {

@@ -370,6 +370,18 @@ func (c *Caja) Objetos() []fyne.CanvasObject {
 	return []fyne.CanvasObject{c.fuera, c.dentro}
 }
 
+// Ver la muestra u oculta sin sacarla de los objetos del renderer: una caja que solo
+// aparece en un estado (el fondo bajo el puntero de un segmento) se crea una vez.
+func (c *Caja) Ver(visible bool) {
+	for _, o := range c.Objetos() {
+		if visible {
+			o.Show()
+		} else {
+			o.Hide()
+		}
+	}
+}
+
 // Redimensionar coloca la caja en (0,0) con el tamaño pedido. Un tamaño negativo —un
 // padre que aún no ha repartido, un hueco que resta más de lo que hay— se queda en cero:
 // el rasterizador de las esquinas entra en pánico con un lado negativo (visto en Docus

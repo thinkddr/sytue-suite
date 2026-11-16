@@ -540,3 +540,7 @@ func subirACompartidaUno(ctx context.Context, svc *api.Drive, raiz, subcamino st
 	_, err = svc.SharedUpload(ctx, raiz, subcamino, nombre, TipoDe(nombre), r, tamano)
 	return err
 }
+
+// abrirConElSistema entrega un fichero bajado a la app que el sistema tenga para él.
+// Vive aquí y no en pantalla.go porque allí `ficheros` es nombre de variable.
+func abrirConElSistema(ruta string) error { return ficheros.Abrir(ruta) }

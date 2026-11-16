@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"mime"
 	"net/http"
@@ -20,6 +21,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
@@ -48,7 +51,7 @@ type driveService interface {
 	Root(ctx context.Context) (domain.Folder, error)
 	GetFolder(ctx context.Context, id uuid.UUID) (domain.Folder, error)
 	ListSubfolders(ctx context.Context, id uuid.UUID) ([]domain.Folder, error)
-	ListFilesPage(ctx context.Context, folderID uuid.UUID, cursor string, limit int) (service.FilePage, error)
+	ListFilesPage(ctx context.Context, folderID uuid.UUID, orden store.OrdenFicheros, cursor string, limit int) (service.FilePage, error)
 	CreateFolder(ctx context.Context, parentID uuid.UUID, name, ownerSub string, isGroup bool) (domain.Folder, error)
 	RenameFolder(ctx context.Context, id uuid.UUID, name string) (domain.Folder, error)
 	MoveFolder(ctx context.Context, id, newParent uuid.UUID) (domain.Folder, error)
@@ -111,7 +114,7 @@ type driveService interface {
 	ListTeamDriveMembers(ctx context.Context, driveID uuid.UUID, subject string) ([]domain.TeamMember, error)
 	PutTeamDriveMember(ctx context.Context, driveID uuid.UUID, actorSub, subject string, role domain.TeamRole) (domain.TeamMember, error)
 	RemoveTeamDriveMember(ctx context.Context, driveID uuid.UUID, actorSub, subject string) error
-	TeamListChildren(ctx context.Context, driveID uuid.UUID, subject string, folderID uuid.UUID, cursor string, limit int) (service.TeamListing, error)
+	TeamListChildren(ctx context.Context, driveID uuid.UUID, subject string, folderID uuid.UUID, orden store.OrdenFicheros, cursor string, limit int) (service.TeamListing, error)
 	TeamCreateFolder(ctx context.Context, driveID uuid.UUID, subject string, parentID uuid.UUID, name string) (domain.Folder, error)
 	TeamUploadFile(ctx context.Context, driveID uuid.UUID, subject string, folderID uuid.UUID, name, contentType string, body io.Reader) (domain.File, error)
 	TeamOpenFileContent(ctx context.Context, driveID uuid.UUID, subject string, fileID uuid.UUID) (domain.File, io.ReadCloser, error)
@@ -131,9 +134,10 @@ type driveService interface {
 
 // Handlers agrupa los manejadores de la API REST de Drive.
 type Handlers struct {
-	svc    driveService
-	cipher cipherBlobService
-	cfg    config.Config
+	svc       driveService
+	cipher    cipherBlobService
+	migration privateStorageService
+	cfg       config.Config
 	// wopi acuña los tokens de acceso del host WOPI. Nil ⇒ el endpoint de acuñación
 	// responde 404, igual que si el protocolo no existiera (sin WOPI_KEY no se monta).
 	wopi *wopi.Minter
@@ -158,9 +162,19 @@ var _ driveService = (*service.Service)(nil)
 
 // toAPIError traduce errores de dominio a *httpx.Error canónicos.
 func toAPIError(err error) error {
-	switch {
-	case err == nil:
+	if err == nil {
 		return nil
+	}
+	if translated := privateStorageAPIError(err); translated != nil {
+		return translated
+	}
+	if translated := cipherBlobAPIError(err); translated != nil {
+		return translated
+	}
+	if translated := shareAndGovernanceAPIError(err); translated != nil {
+		return translated
+	}
+	switch {
 	case errors.Is(err, domain.ErrNotFound):
 		return httpx.ErrNotFound
 	case errors.Is(err, domain.ErrConflict):
@@ -186,6 +200,13 @@ func toAPIError(err error) error {
 		return httpx.ErrBadRequest.WithMessage("The selection is too large. Make it smaller and try again.")
 	case errors.Is(err, domain.ErrUnsupportedMedia):
 		return httpx.NewError(http.StatusUnsupportedMediaType, "unsupported_media", "A thumbnail cannot be generated for this file.")
+	default:
+		return httpx.ErrInternal.Wrap(err)
+	}
+}
+
+func shareAndGovernanceAPIError(err error) error {
+	switch {
 	case errors.Is(err, domain.ErrShareExpired):
 		return httpx.ErrNotFound.WithMessage("This link does not exist or has expired.")
 	case errors.Is(err, domain.ErrPasswordRequired), errors.Is(err, domain.ErrWrongPassword):
@@ -205,7 +226,20 @@ func toAPIError(err error) error {
 	case errors.Is(err, domain.ErrLegalHold):
 		return httpx.ErrConflict.WithMessage("This file is under legal hold and cannot be permanently deleted.")
 	default:
-		return httpx.ErrInternal.Wrap(err)
+		return nil
+	}
+}
+
+func cipherBlobAPIError(err error) error {
+	switch {
+	case errors.Is(err, service.ErrCipherBlobMissing):
+		return httpx.ErrUnavailable.WithCode("cipher_blob_missing").WithMessage("The stored encrypted block is missing.")
+	case errors.Is(err, service.ErrCipherBlobCorrupt):
+		return httpx.ErrUnavailable.WithCode("cipher_blob_corrupt").WithMessage("The stored encrypted block failed verification.")
+	case errors.Is(err, service.ErrCipherBlobProvider):
+		return httpx.ErrUnavailable.WithCode("cipher_blob_unavailable").WithMessage("The stored encrypted block could not be verified.")
+	default:
+		return nil
 	}
 }
 
@@ -322,12 +356,31 @@ type listResponse struct {
 	NextCursor string          `json:"next_cursor,omitempty"`
 }
 
+// ordenDeLaPeticion lee `?orden=nombre|modificado|tamano&sentido=asc|desc`
+// (por defecto nombre y ascendente). Un valor desconocido es un 400 y no un orden
+// por defecto: el cliente creería que ve lo que pidió.
+func ordenDeLaPeticion(r *http.Request) (store.OrdenFicheros, error) {
+	q := r.URL.Query()
+	o, err := store.ParseOrdenFicheros(strings.TrimSpace(q.Get("orden")), strings.TrimSpace(q.Get("sentido")))
+	if err != nil {
+		return store.OrdenFicheros{}, httpx.ErrBadRequest.WithMessage("Invalid orden or sentido: orden is nombre, modificado or tamano; sentido is asc or desc.")
+	}
+	return o, nil
+}
+
 // ListChildren lista subcarpetas y ficheros de una carpeta. Los ficheros van
-// con paginación keyset por (lower(name), id) — ?cursor=<opaco>&limit=N y
-// next_cursor en la respuesta cuando hay más (CONVENTIONS §0.8: sin OFFSET ni
-// listados sin LIMIT). Las subcarpetas solo viajan en la primera página.
+// con paginación keyset en el orden pedido (?orden=&sentido=, por defecto
+// (lower(name), id) ascendente) — ?cursor=<opaco>&limit=N y next_cursor en la
+// respuesta cuando hay más (CONVENTIONS §0.8: sin OFFSET ni listados sin LIMIT).
+// Las subcarpetas solo viajan en la primera página, en el mismo orden (por
+// nombre cuando se ordena por tamaño).
 func (h *Handlers) ListChildren(w http.ResponseWriter, r *http.Request) {
 	id, err := parseID(r)
+	if err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
+	orden, err := ordenDeLaPeticion(r)
 	if err != nil {
 		httpx.Fail(w, r, err)
 		return
@@ -349,8 +402,9 @@ func (h *Handlers) ListChildren(w http.ResponseWriter, r *http.Request) {
 		if folders == nil {
 			folders = []domain.Folder{}
 		}
+		service.OrdenarCarpetas(folders, orden)
 	}
-	page, err := h.svc.ListFilesPage(r.Context(), id, cursor, limit)
+	page, err := h.svc.ListFilesPage(r.Context(), id, orden, cursor, limit)
 	if err != nil {
 		httpx.Fail(w, r, toAPIError(err))
 		return
@@ -363,18 +417,24 @@ func (h *Handlers) ListChildren(w http.ResponseWriter, r *http.Request) {
 }
 
 // ListFolderFiles lista los ficheros de una carpeta con paginación keyset
-// (?cursor=<opaco>&limit=N). Devuelve `next_cursor` cuando hay más resultados;
-// un cursor vacío o ausente pide la primera página. Pensado para carpetas con
-// muchos ficheros (CONVENTIONS §0.8: keyset, sin OFFSET).
+// (?cursor=<opaco>&limit=N, y ?orden=&sentido= como ListChildren). Devuelve
+// `next_cursor` cuando hay más resultados; un cursor vacío o ausente pide la
+// primera página. Pensado para carpetas con muchos ficheros (CONVENTIONS §0.8:
+// keyset, sin OFFSET).
 func (h *Handlers) ListFolderFiles(w http.ResponseWriter, r *http.Request) {
 	id, err := parseID(r)
 	if err != nil {
 		httpx.Fail(w, r, err)
 		return
 	}
+	orden, err := ordenDeLaPeticion(r)
+	if err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
 	cursor := strings.TrimSpace(r.URL.Query().Get("cursor"))
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	page, err := h.svc.ListFilesPage(r.Context(), id, cursor, limit)
+	page, err := h.svc.ListFilesPage(r.Context(), id, orden, cursor, limit)
 	if err != nil {
 		httpx.Fail(w, r, toAPIError(err))
 		return
@@ -498,7 +558,20 @@ func (h *Handlers) UploadFile(w http.ResponseWriter, r *http.Request) {
 	body := http.MaxBytesReader(w, r.Body, h.cfg.MaxUploadBytes+1)
 	defer body.Close()
 
-	f, err := h.svc.UploadFile(r.Context(), folderID, name, contentType, subFromCtx(r), body)
+	// `on_conflict=keep_both`: con un fichero del mismo nombre en la carpeta, guardar
+	// este como «nombre (2).ext» en vez de sustituirlo (store.ConservarAmbos). Es lo que
+	// pide quien sube FOTOS: «IMG_0001.jpg» se repite en cada teléfono. Sin el parámetro,
+	// lo de siempre: una versión nueva del mismo fichero.
+	ctx := r.Context()
+	switch r.URL.Query().Get("on_conflict") {
+	case "", "replace":
+	case "keep_both":
+		ctx = store.ConservarAmbos(ctx)
+	default:
+		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("on_conflict must be replace or keep_both."))
+		return
+	}
+	f, err := h.svc.UploadFile(ctx, folderID, name, contentType, subFromCtx(r), body)
 	if err != nil {
 		var maxErr *http.MaxBytesError
 		if errors.As(err, &maxErr) {
@@ -695,11 +768,94 @@ func (h *Handlers) DownloadFile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Length", strconv.FormatInt(f.SizeBytes, 10))
 	w.Header().Set("Content-Disposition", "attachment; filename*=UTF-8''"+escapeFilename(f.Name))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	etag := ""
 	if f.Checksum != "" {
-		w.Header().Set("ETag", `"`+f.Checksum+`"`)
+		etag = `"` + f.Checksum + `"`
+		w.Header().Set("ETag", etag)
+	}
+	serveRanged(w, r, rc, f.SizeBytes, etag)
+}
+
+// serveRanged contesta un GET de contenido respetando una cabecera Range de UN
+// tramo (RFC 9110 §14). Hace falta para reproducir vídeo y audio: el navegador pide
+// `bytes=N-` al saltar a otro minuto, y con un 200 de cuerpo entero no deja buscar
+// (Safari ni siquiera arranca la reproducción sin un 206).
+//
+// El blob llega como stream sin Seek (S3 o WebDAV), así que el principio del tramo
+// se alcanza leyendo y descartando: cuesta ancho de banda interno, pero no memoria.
+// Cualquier cosa que no se sepa servir con exactitud —varios tramos, sintaxis rara,
+// If-Range que ya no coincide— cae al 200 completo, que siempre es correcto.
+func serveRanged(w http.ResponseWriter, r *http.Request, rc io.Reader, size int64, etag string) {
+	w.Header().Set("Accept-Ranges", "bytes")
+	start, end, status := parseByteRange(r.Header.Get("Range"), size)
+	if ir := r.Header.Get("If-Range"); ir != "" && (etag == "" || ir != etag) {
+		status = http.StatusOK
+	}
+	switch status {
+	case http.StatusRequestedRangeNotSatisfiable:
+		w.Header().Del("Content-Length")
+		w.Header().Set("Content-Range", "bytes */"+strconv.FormatInt(size, 10))
+		w.WriteHeader(status)
+		return
+	case http.StatusPartialContent:
+		if _, err := io.CopyN(io.Discard, rc, start); err != nil {
+			httpx.Fail(w, r, toAPIError(err))
+			return
+		}
+		n := end - start + 1
+		w.Header().Set("Content-Length", strconv.FormatInt(n, 10))
+		w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, size))
+		w.WriteHeader(status)
+		_, _ = io.CopyN(w, rc, n)
+		return
 	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = io.Copy(w, rc)
+}
+
+// parseByteRange interpreta `bytes=a-b`, `bytes=a-` y `bytes=-n` contra un tamaño.
+// Devuelve 206 con el tramo inclusivo, 416 si no cabe en el fichero, o 200 si no hay
+// Range o no es uno que se sepa servir (en ese caso se ignora, como permite la RFC).
+func parseByteRange(h string, size int64) (start, end int64, status int) {
+	spec, ok := strings.CutPrefix(strings.TrimSpace(h), "bytes=")
+	if !ok || strings.Contains(spec, ",") {
+		return 0, 0, http.StatusOK
+	}
+	a, b, ok := strings.Cut(strings.TrimSpace(spec), "-")
+	if !ok {
+		return 0, 0, http.StatusOK
+	}
+	if a == "" {
+		n, err := strconv.ParseInt(b, 10, 64)
+		if err != nil || n < 0 {
+			return 0, 0, http.StatusOK
+		}
+		if n == 0 || size == 0 {
+			return 0, 0, http.StatusRequestedRangeNotSatisfiable
+		}
+		if n > size {
+			n = size
+		}
+		return size - n, size - 1, http.StatusPartialContent
+	}
+	s, err := strconv.ParseInt(a, 10, 64)
+	if err != nil || s < 0 {
+		return 0, 0, http.StatusOK
+	}
+	e := size - 1
+	if b != "" {
+		e, err = strconv.ParseInt(b, 10, 64)
+		if err != nil || e < s {
+			return 0, 0, http.StatusOK
+		}
+		if e > size-1 {
+			e = size - 1
+		}
+	}
+	if s >= size {
+		return 0, 0, http.StatusRequestedRangeNotSatisfiable
+	}
+	return s, e, http.StatusPartialContent
 }
 
 // Thumbnail sirve una miniatura pequeña (JPEG/PNG) de un fichero de imagen ráster,
@@ -883,7 +1039,7 @@ func (h *Handlers) CopyFolder(w http.ResponseWriter, r *http.Request) {
 
 // maxBatchItems acota el nº de identificadores aceptados en una operación en lote
 // (defensa contra peticiones abusivas; el árbol del ZIP tiene su propia cota).
-const maxBatchItems = 1000
+const maxBatchItems = storage.MaxDriveSelectionItems
 
 // batchRequest son los objetivos de una operación en lote: ficheros y carpetas por
 // ID, más (solo en «mover») la carpeta destino (vacía = raíz «Mi unidad»).

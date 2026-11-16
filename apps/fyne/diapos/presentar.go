@@ -12,6 +12,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/widget"
 
@@ -33,17 +34,41 @@ const SinDestino = -1
 // TeclaPresentando es `presentKeyTarget`: a qué diapositiva ENTERA lleva una tecla.
 // `ultima` es el índice de la última (0-based).
 //
-// Las flechas arriba y abajo NO están, y es a propósito: la web no las atiende, y una
-// presentación que avanza con ↓ aquí y no allí es otra presentación.
+// Es la tabla de PowerPoint y Keynote, la misma que la web: ↓ e Intro avanzan como →, y
+// ↑ y Retroceso retroceden como ←, porque un mando de presentaciones manda unas u otras
+// según la marca.
 func TeclaPresentando(tecla fyne.KeyName, i, ultima int) int {
+	return TeclaPresentandoEn(tecla, i, ultima, nil)
+}
+
+// TeclaPresentandoEn es `presentKeyTarget` con las ocultas (`Saltables`): las cuatro
+// direcciones las saltan, también Inicio y Fin, que van a la primera y la última que se
+// enseñan. Sin ocultas (nil) es la tabla de siempre.
+func TeclaPresentandoEn(tecla fyne.KeyName, i, ultima int, ocultas []bool) int {
+	// Sin máscara no hay nada que saltar: el vecino de siempre.
+	vecino := func(dir int) int {
+		if n := SiguienteVisible(ocultas, i, dir); n != SinDestino {
+			return n
+		}
+		if len(ocultas) > 0 {
+			return i // no queda ninguna que se enseñe en ese sentido
+		}
+		return i + dir
+	}
 	switch tecla {
-	case fyne.KeyRight, fyne.KeySpace, fyne.KeyPageDown:
-		return min(ultima, i+1)
-	case fyne.KeyLeft, fyne.KeyPageUp:
-		return max(0, i-1)
+	case fyne.KeyRight, fyne.KeyDown, fyne.KeySpace, fyne.KeyReturn, fyne.KeyEnter, fyne.KeyPageDown:
+		return min(ultima, vecino(1))
+	case fyne.KeyLeft, fyne.KeyUp, fyne.KeyBackspace, fyne.KeyPageUp:
+		return max(0, vecino(-1))
 	case fyne.KeyHome:
+		if n := SiguienteVisible(ocultas, -1, 1); n != SinDestino {
+			return n
+		}
 		return 0
 	case fyne.KeyEnd:
+		if n := SiguienteVisible(ocultas, len(ocultas), -1); n != SinDestino {
+			return min(ultima, n)
+		}
 		return ultima
 	case fyne.KeyEscape:
 		return Salir
@@ -52,9 +77,72 @@ func TeclaPresentando(tecla fyne.KeyName, i, ultima int) int {
 	}
 }
 
+// maxCifras es `PRESENT_DIGITS_MAX`: con cuatro caben 9999 diapositivas, y una cifra de
+// más (un dedo que repite) no deja el número inservible para siempre.
+const maxCifras = 4
+
+// DiapoDeCifras es `slideFromDigits`: la diapositiva (0-based) que nombran las cifras
+// tecleadas para «número + Intro» (1-based, como las cuenta quien presenta), con tope en
+// la última. Sin cifras o con un 0, SinDestino: no hay diapositiva cero.
+func DiapoDeCifras(cifras string, ultima int) int {
+	if cifras == "" {
+		return SinDestino
+	}
+	n := 0
+	for _, r := range cifras {
+		if r < '0' || r > '9' {
+			return SinDestino
+		}
+		n = n*10 + int(r-'0')
+	}
+	if n < 1 {
+		return SinDestino
+	}
+	return min(ultima, n-1)
+}
+
+// Apagado es la pantalla negra o blanca de PowerPoint: tapa la diapositiva para que el
+// público mire a quien habla.
+type Apagado int
+
+const (
+	// Encendida es la presentación a la vista.
+	Encendida Apagado = iota
+	// Negra es la pantalla en negro (B o «.»).
+	Negra
+	// Blanca es la pantalla en blanco (W o «,»).
+	Blanca
+)
+
+// esModificador es `PRESENT_MODIFIERS`: «?» llega con Mayúsculas, y pulsar Mayúsculas no
+// puede devolver la pantalla ni borrar el número a medio teclear.
+func esModificador(k fyne.KeyName) bool {
+	switch k {
+	case desktop.KeyShiftLeft, desktop.KeyShiftRight, desktop.KeyControlLeft, desktop.KeyControlRight,
+		desktop.KeyAltLeft, desktop.KeyAltRight, desktop.KeySuperLeft, desktop.KeySuperRight,
+		desktop.KeyCapsLock, desktop.KeyMenu:
+		return true
+	default:
+		return false
+	}
+}
+
+// llegaPorRuna dice si la tecla es de las que Fyne entrega ADEMÁS como carácter: las
+// letras, las cifras, la puntuación y el espacio. Esas las atiende `Runa`, que sabe si
+// es «?» o «/» según el teclado; atenderlas también en `Tecla` las haría dos veces (la
+// B que devuelve la pantalla la volvería a apagar).
+func llegaPorRuna(k fyne.KeyName) bool { return len(k) == 1 || k == fyne.KeySpace }
+
 // DestinoAccion es `actionTarget`: a qué diapositiva lleva el enlace de una caja.
 // Devuelve SinDestino si el enlace no apunta a ninguna válida.
 func DestinoAccion(accion json.RawMessage, i, ultima int) int {
+	return DestinoAccionEn(accion, i, ultima, nil)
+}
+
+// DestinoAccionEn es `actionTarget` con las ocultas: los destinos relativos las saltan
+// como las teclas; el que nombra un número va a ella aunque esté oculta, como «número +
+// Intro».
+func DestinoAccionEn(accion json.RawMessage, i, ultima int, ocultas []bool) int {
 	if len(accion) == 0 {
 		return SinDestino
 	}
@@ -62,13 +150,13 @@ func DestinoAccion(accion json.RawMessage, i, ultima int) int {
 	if json.Unmarshal(accion, &s) == nil {
 		switch s {
 		case "first":
-			return 0
+			return TeclaPresentandoEn(fyne.KeyHome, i, ultima, ocultas)
 		case "last":
-			return ultima
+			return TeclaPresentandoEn(fyne.KeyEnd, i, ultima, ocultas)
 		case "next":
-			return min(ultima, i+1)
+			return TeclaPresentandoEn(fyne.KeyRight, i, ultima, ocultas)
 		case "prev":
-			return max(0, i-1)
+			return TeclaPresentandoEn(fyne.KeyLeft, i, ultima, ocultas)
 		}
 		return SinDestino
 	}
@@ -96,8 +184,8 @@ type i18nVars = i18n.Vars
 
 // Medidas del visor (`Presentation` y `PresentButton` de SlidesCanvas.tsx).
 var (
-	// LadoBotonVisor es `h-11 w-11`: la zona de toque mínima de un dedo, 38,5 con el
-	// rem de 14 (el comentario de la web dice 44 porque se escribió con rem 16).
+	// LadoBotonVisor es `h-11 w-11`: la zona de toque mínima de un dedo, 44 con el
+	// rem de 16.
 	LadoBotonVisor = tema.Espacio(11)
 	// HuecoBotonesVisor es el `gap-1.5` entre ellos; y van en `right-3 bottom-3`.
 	HuecoBotonesVisor  = tema.Espacio(1.5)
@@ -143,6 +231,8 @@ type Presentacion struct {
 	Notas bool
 	// Moderador dice si la vista del moderador está abierta (tecla P).
 	Moderador bool
+	// Pantalla es la pantalla negra o blanca (B o W; cualquier tecla vuelve).
+	Pantalla Apagado
 	// AlSalir cierra la presentación.
 	AlSalir func()
 	// AlCambiarModerador abre o cierra la vista del moderador.
@@ -159,12 +249,24 @@ type Presentacion struct {
 	// el reproductor del SISTEMA (ver `AbrirMedioDelSistema`), no dentro de la
 	// diapositiva, y el `autoplay` no lo abre solo.
 	AbrirMedio func(Caja)
+	// Almacen recuerda, por persona, el tamaño de las notas de la vista del moderador;
+	// nil, dura lo que la presentación.
+	Almacen Almacen
+	// tamNotas es el tamaño de las notas del moderador elegido en esta presentación,
+	// más uno (0: sin elegir). Vive aquí y no en el Moderador, que se rehace cada vez
+	// que se abre: así cerrar y abrir la vista con P no lo pierde aunque no haya
+	// Almacen (el `useState` de `Presentation` en la web).
+	tamNotas int
 
 	rotulo  func(clave string, v i18nVars) string
 	lienzo  *Lienzo
 	mandos  []*botonVisor
 	vivos   bool // los mandos a plena opacidad: el puntero o el foco está en ellos
 	enlaces []*enlaceCaja
+	// cifras son las de «número + Intro» a medio teclear.
+	cifras string
+	// ayuda es la lista de teclas («?» o H) mientras está abierta.
+	ayuda *ui.Dialogo
 
 	// velo y corre son el fotograma de la transición en curso: la opacidad de la tinta
 	// que tapa la diapositiva y su desplazamiento, en fracción de su ancho.
@@ -447,20 +549,42 @@ func conAlfa(c color.NRGBA, a float32) color.NRGBA { return tokens.ConAlfa(c, fl
 // Avanzar es `advance`: revela el paso siguiente o salta de diapositiva.
 func (p *Presentacion) Avanzar(dir int) { p.Ir(Avanzar(p.M.Diapos, p.Diapo, p.Paso, dir)) }
 
-// Tecla es el `onKeyDown` del visor.
+// Tecla es el `onKeyDown` del visor (`presentCommand` de la web, repartido con `Runa`).
 func (p *Presentacion) Tecla(k fyne.KeyName) {
-	switch k {
-	case fyne.KeyRight:
-		p.Avanzar(1)
+	if esModificador(k) {
 		return
-	case fyne.KeyLeft:
+	}
+	if llegaPorRuna(k) {
+		return // llega por Runa: atenderla aquí también la haría dos veces
+	}
+	if p.ayudaAbierta() {
+		// Solo llega aquí desde la ventana del moderador: en la del visor el teclado es
+		// del diálogo. Cualquier tecla lo cierra, o no se podría quitar desde allí.
+		p.ayuda.Cerrar()
+		return
+	}
+	if p.Pantalla != Encendida {
+		p.encender() // cualquier tecla vuelve, y no hace nada más
+		return
+	}
+	cifras := p.cifras
+	p.cifras = ""
+	if (k == fyne.KeyReturn || k == fyne.KeyEnter) && cifras != "" {
+		if d := DiapoDeCifras(cifras, p.ultima()); d != SinDestino {
+			p.Ir(d, 0)
+		}
+		return
+	}
+	switch k {
+	case fyne.KeyRight, fyne.KeyDown, fyne.KeyReturn, fyne.KeyEnter:
+		p.Avanzar(1) // paso a paso: revela las animaciones una a una
+		return
+	case fyne.KeyLeft, fyne.KeyUp, fyne.KeyBackspace:
 		p.Avanzar(-1)
 		return
-	case fyne.KeySpace:
-		return // llega por Runa: atenderla aquí también avanzaría dos pasos
 	default:
 	}
-	switch d := TeclaPresentando(k, p.Diapo, p.ultima()); d {
+	switch d := TeclaPresentandoEn(k, p.Diapo, p.ultima(), Saltables(p.M.Diapos)); d {
 	case SinDestino:
 	case Salir:
 		p.salir()
@@ -469,23 +593,116 @@ func (p *Presentacion) Tecla(k fyne.KeyName) {
 	}
 }
 
-// Runa atiende lo que Fyne entrega como carácter: el espacio avanza, N alterna las
-// notas y P la vista del moderador.
+// Runa atiende lo que Fyne entrega como carácter: el espacio avanza, las cifras se
+// apuntan para «número + Intro», N alterna las notas, P la vista del moderador, B y «.»
+// apagan en negro, W y «,» en blanco, y «?» y H abren la lista de teclas.
 func (p *Presentacion) Runa(r rune) {
+	if p.ayudaAbierta() {
+		p.ayuda.Cerrar()
+		return
+	}
+	if p.Pantalla != Encendida {
+		p.encender()
+		return
+	}
+	if r >= '0' && r <= '9' {
+		p.cifras += string(r)
+		if len(p.cifras) > maxCifras {
+			p.cifras = p.cifras[len(p.cifras)-maxCifras:]
+		}
+		return
+	}
+	p.cifras = ""
 	switch r {
 	case ' ':
 		p.Avanzar(1)
 	case 'n', 'N':
-		p.Notas = !p.Notas
-		p.Refresh()
+		p.alternarNotas()
 	case 'p', 'P':
-		// Sin quien abra la vista, P no hace nada, en vez de decir «abierta» sin abrir nada.
-		if p.AlCambiarModerador == nil {
-			return
-		}
-		p.Moderador = !p.Moderador
-		p.AlCambiarModerador(p.Moderador)
-		p.Refresh()
+		p.alternarModerador()
+	case 'b', 'B', '.':
+		p.apagar(Negra)
+	case 'w', 'W', ',':
+		p.apagar(Blanca)
+	case '?', 'h', 'H':
+		p.verAyuda()
+	}
+}
+
+// alternarNotas muestra u oculta las notas del ponente (N o su botón).
+func (p *Presentacion) alternarNotas() {
+	p.Notas = !p.Notas
+	p.Refresh()
+}
+
+// alternarModerador abre o cierra la vista del moderador (P, su «Volver» o Atrás). Los
+// botones van aquí y no por `Runa`: con la pantalla apagada, `Runa('p')` solo la
+// devolvería, y el «Volver» del moderador en el teléfono se quedaría sin hacer nada.
+func (p *Presentacion) alternarModerador() {
+	// Sin quien abra la vista, P no hace nada, en vez de decir «abierta» sin abrir nada.
+	if p.AlCambiarModerador == nil {
+		return
+	}
+	p.Moderador = !p.Moderador
+	p.AlCambiarModerador(p.Moderador)
+	p.Refresh()
+}
+
+// apagar tapa la diapositiva. Sin animar: se apaga para que el público deje de mirar, y
+// un fundido llamaría la atención.
+func (p *Presentacion) apagar(a Apagado) {
+	p.Pantalla = a
+	p.Refresh()
+	p.anunciar()
+}
+
+// encender devuelve la presentación donde estaba.
+func (p *Presentacion) encender() {
+	p.Pantalla = Encendida
+	p.Refresh()
+	p.anunciar()
+}
+
+// anunciar repinta el moderador, que sigue al visor, y avisa al lector de pantalla del
+// cambio de `AccessibilityLabel` (la región viva de la web).
+func (p *Presentacion) anunciar() {
+	if p.AlMover != nil {
+		p.AlMover()
+	}
+}
+
+func (p *Presentacion) ayudaAbierta() bool { return p.ayuda != nil && p.ayuda.Abierto() }
+
+// verAyuda abre la hoja de teclas de la suite sobre el visor (`ShortcutsModal`).
+func (p *Presentacion) verAyuda() {
+	c := fyne.CurrentApp().Driver().CanvasForObject(p)
+	if c == nil {
+		return
+	}
+	p.ayuda = ui.MostrarHojaAtajos(c, p.t("slides.present.help.title", nil), p.t("ui.close", nil),
+		GruposDeTeclasPresentando(p.t))
+}
+
+// GruposDeTeclasPresentando es `presentShortcuts`: la lista de «?», con los nombres de
+// las teclas en el idioma de quien presenta («Intro», «AvPág») y el orden de la web.
+func GruposDeTeclasPresentando(t func(string, i18nVars) string) []ui.GrupoDeAtajos {
+	k := func(c string) string { return t(c, nil) }
+	return []ui.GrupoDeAtajos{
+		{Titulo: k("slides.present.help.navigate"), Atajos: []ui.AtajoDeTeclado{
+			{Teclas: []string{"→", "↓", k("slides.present.key.space"), k("slides.present.key.enter")}, Descripcion: k("slides.present.help.next")},
+			{Teclas: []string{"←", "↑", k("slides.present.key.backspace")}, Descripcion: k("slides.present.help.prev")},
+			{Teclas: []string{k("slides.present.key.pageDown"), k("slides.present.key.pageUp")}, Descripcion: k("slides.present.help.jump")},
+			{Teclas: []string{k("slides.present.key.home"), k("slides.present.key.end")}, Descripcion: k("slides.present.help.ends")},
+			{Teclas: []string{k("slides.present.key.number"), k("slides.present.key.enter")}, Descripcion: k("slides.present.help.goTo")},
+		}},
+		{Titulo: k("slides.present.help.screen"), Atajos: []ui.AtajoDeTeclado{
+			{Teclas: []string{"B", "."}, Descripcion: k("slides.present.help.black")},
+			{Teclas: []string{"W", ","}, Descripcion: k("slides.present.help.white")},
+			{Teclas: []string{"N"}, Descripcion: k("slides.present.help.notes")},
+			{Teclas: []string{"P"}, Descripcion: k("slides.present.help.presenter")},
+			{Teclas: []string{"?", "H"}, Descripcion: k("slides.present.help.keys")},
+			{Teclas: []string{k("slides.present.key.esc")}, Descripcion: k("slides.present.exit")},
+		}},
 	}
 }
 
@@ -495,11 +712,31 @@ func (p *Presentacion) salir() {
 	}
 }
 
-// Tapped es el clic en cualquier sitio del visor: avanza.
-func (p *Presentacion) Tapped(*fyne.PointEvent) { p.Avanzar(1) }
+// Tapped es el clic en cualquier sitio del visor: avanza. Con la pantalla apagada, la
+// devuelve sin pasar de página.
+func (p *Presentacion) Tapped(e *fyne.PointEvent) {
+	if p.Pantalla != Encendida {
+		p.encender()
+		return
+	}
+	// Leer las notas (o desplazarlas con el dedo) no pasa de diapositiva: el
+	// `stopPropagation` de su capa en la web.
+	if r := p.r; r != nil && r.verNotas() && e != nil && e.Position.Y >= r.papelNotas.Position().Y {
+		return
+	}
+	p.Avanzar(1)
+}
 
-// AccessibilityLabel es el `aria-live` del visor: «Diapositiva n de m, paso k de j».
+// AccessibilityLabel es el `aria-live` del visor: «Diapositiva n de m, paso k de j», o
+// la pantalla negra o blanca mientras lo está.
 func (p *Presentacion) AccessibilityLabel() string {
+	switch p.Pantalla {
+	case Negra:
+		return p.t("slides.present.blackScreen", nil)
+	case Blanca:
+		return p.t("slides.present.whiteScreen", nil)
+	default:
+	}
 	s := p.t("slides.aria.slideOf", i18nVars{"n": p.Diapo + 1, "total": p.ultima() + 1})
 	if pasos := Pasos(p.M.Diapos[p.Diapo]); pasos > 0 {
 		s += ", " + p.t("slides.present.step", i18nVars{"n": p.Paso, "total": pasos})
@@ -528,10 +765,13 @@ func (p *Presentacion) CreateRenderer() fyne.WidgetRenderer {
 		fondo:      canvas.NewRectangle(tinta),
 		velo:       canvas.NewRectangle(color.Transparent),
 		papelNotas: canvas.NewRectangle(papel),
+		desplaza:   container.NewVScroll(ui.Colocados(fyne.Size{})),
+		notasDe:    -1,
 		pista:      ui.Texto("", tema.TextoXS, ui.Normal, color.NRGBA{R: 255, G: 255, B: 255, A: 115}),
+		apagon:     canvas.NewRectangle(color.Black),
 	}
 	p.mandos = []*botonVisor{
-		nuevoBotonVisor(p, iconos.EdComentario, p.t("slides.notes", nil), func() { p.Runa('n') }),
+		nuevoBotonVisor(p, iconos.EdComentario, p.t("slides.notes", nil), p.alternarNotas),
 		nuevoBotonVisor(p, iconos.EdChevronIzq, p.t("nav.previous", nil), func() { p.Avanzar(-1) }),
 		nuevoBotonVisor(p, iconos.EdChevronDer, p.t("nav.nextItem", nil), func() { p.Avanzar(1) }),
 		nuevoBotonVisor(p, iconos.EdCerrar, p.t("slides.present.exit", nil), p.salir),
@@ -548,7 +788,15 @@ type presentacionRenderer struct {
 	velo       *canvas.Rectangle
 	papelNotas *canvas.Rectangle
 	notas      []*canvas.Text
-	pista      *canvas.Text
+	// desplaza lleva las líneas de las notas (`overflow-auto`); solo se rehacen si
+	// cambian la diapositiva o el ancho, para no perder por dónde se iba leyendo.
+	desplaza  *container.Scroll
+	notasDe   int
+	notasPara float32
+	pista     *canvas.Text
+	// apagon es la pantalla negra o blanca: encima de todo, mandos y notas incluidos,
+	// que lo que se quiere es que no se vea nada.
+	apagon *canvas.Rectangle
 }
 
 func (r *presentacionRenderer) MinSize() fyne.Size { return fyne.NewSize(1, 1) }
@@ -561,14 +809,14 @@ func (r *presentacionRenderer) Objects() []fyne.CanvasObject {
 	}
 	objs = append(objs, r.velo)
 	if r.verNotas() {
-		objs = append(objs, r.papelNotas)
-		for _, t := range r.notas {
-			objs = append(objs, t)
-		}
+		objs = append(objs, r.papelNotas, r.desplaza)
 	}
 	objs = append(objs, r.pista)
 	for _, b := range r.botones() {
 		objs = append(objs, b)
+	}
+	if r.p.Pantalla != Encendida {
+		objs = append(objs, r.apagon)
 	}
 	return objs
 }
@@ -586,6 +834,7 @@ func (r *presentacionRenderer) botones() []*botonVisor {
 func (r *presentacionRenderer) Layout(t fyne.Size) {
 	p := r.p
 	ui.FondoHastaElBorde(p, r.fondo, t)
+	ui.FondoHastaElBorde(p, r.apagon, t)
 	r.velo.Resize(t)
 	esc := p.lienzo.MedidaEscenario(t)
 	dx := p.corre * esc.Width
@@ -618,25 +867,38 @@ func (r *presentacionRenderer) Layout(t fyne.Size) {
 
 // colocarNotas es la capa de notas: `fixed inset-x-0 bottom-0 max-h-[32%] px-8 pt-4
 // pb-16` sobre el papel, con el texto `mx-auto max-w-4xl text-base leading-relaxed
-// whitespace-pre-wrap`.
-//
-// ponytail: `overflow-auto` no está; unas notas que pasen del 32 % de la pantalla se
-// cortan. Se releva metiendo las líneas en un desplazador.
+// whitespace-pre-wrap`, y `overflow-auto`: lo que pasa del 32 % se desplaza. Los
+// rellenos van DENTRO de lo que se desplaza, como en la web, para que la última línea
+// pueda subir por encima de los mandos.
 func (r *presentacionRenderer) colocarNotas(t fyne.Size) {
+	p := r.p
 	e := tema.Escalon{Tam: tema.TextoBase.Tam, Linea: tema.TextoBase.Tam * 1.625}
 	ancho := min(t.Width-2*tema.Espacio(8), 56*tema.Rem) // max-w-4xl = 56rem
-	lineas := ui.Lineas(r.p.M.Diapos[r.p.Diapo].Notas, e, ui.Normal, ancho)
-	alto := min(tema.Espacio(4)+float32(len(lineas))*e.Linea+tema.Espacio(16), t.Height*0.32)
+	arriba, abajo := tema.Espacio(4), tema.Espacio(16)
+	if p.Diapo != r.notasDe || t.Width != r.notasPara {
+		if p.Diapo != r.notasDe {
+			r.desplaza.Offset = fyne.Position{}
+		}
+		r.notasDe, r.notasPara = p.Diapo, t.Width
+		lineas := ui.Lineas(p.M.Diapos[p.Diapo].Notas, e, ui.Normal, ancho)
+		r.notas = r.notas[:0]
+		objs := make([]fyne.CanvasObject, 0, len(lineas))
+		x, y := (t.Width-ancho)/2, arriba
+		for _, l := range lineas {
+			txt := ui.Texto(l, e, ui.Normal, tinta)
+			ui.ColocarTexto(txt, e, x, y)
+			r.notas = append(r.notas, txt)
+			objs = append(objs, txt)
+			y += e.Linea
+		}
+		r.desplaza.Content = ui.Colocados(fyne.NewSize(t.Width, y+abajo), objs...)
+		r.desplaza.Refresh()
+	}
+	alto := min(r.desplaza.Content.MinSize().Height, t.Height*0.32)
 	r.papelNotas.Resize(fyne.NewSize(t.Width, alto))
 	r.papelNotas.Move(fyne.NewPos(0, t.Height-alto))
-	x, y := (t.Width-ancho)/2, t.Height-alto+tema.Espacio(4)
-	r.notas = r.notas[:0]
-	for _, l := range lineas {
-		txt := ui.Texto(l, e, ui.Normal, tinta)
-		ui.ColocarTexto(txt, e, x, y)
-		r.notas = append(r.notas, txt)
-		y += e.Linea
-	}
+	r.desplaza.Resize(fyne.NewSize(t.Width, alto))
+	r.desplaza.Move(fyne.NewPos(0, t.Height-alto))
 }
 
 func (r *presentacionRenderer) Refresh() {
@@ -663,10 +925,24 @@ func (r *presentacionRenderer) Refresh() {
 	r.pista.Text = p.t(clave, nil)
 	r.pista.Refresh()
 
-	ultimo := p.Diapo == p.ultima() && p.Paso == Pasos(d)
+	// `background: black` o `white` de la web: el negro y el blanco puros, no la tinta ni
+	// el papel del tema, que es lo que hace PowerPoint.
+	if p.Pantalla == Blanca {
+		r.apagon.FillColor = color.White
+	} else {
+		r.apagon.FillColor = color.Black
+	}
+	r.apagon.Refresh()
+
+	// Inerte si no lleva a ningún sitio: con ocultas al final (o al principio), el tope
+	// no es la última diapositiva sino la última que se enseña.
+	quieto := func(dir int) bool {
+		d, s := Avanzar(p.M.Diapos, p.Diapo, p.Paso, dir)
+		return d == p.Diapo && s == p.Paso
+	}
 	p.mandos[0].Activo = p.Notas
-	p.mandos[1].Inerte = p.Diapo == 0 && p.Paso == 0
-	p.mandos[2].Inerte = ultimo
+	p.mandos[1].Inerte = quieto(-1)
+	p.mandos[2].Inerte = quieto(1)
 	for _, b := range p.mandos {
 		b.Refresh()
 	}
@@ -716,14 +992,20 @@ func (b *botonVisor) MouseMoved(*desktop.MouseEvent) {}
 func (b *botonVisor) MouseOut()                      { b.encima = false; b.p.avivar() }
 func (b *botonVisor) FocusGained()                   { b.enfocado = true; b.p.avivar() }
 func (b *botonVisor) FocusLost()                     { b.enfocado = false; b.p.avivar() }
+
+// TypedRune: el espacio pulsa el botón; el resto de caracteres siguen siendo del visor
+// (N, P, B…), como en la web, donde la tecla sube del botón al visor. Con la pantalla
+// apagada, también el espacio la devuelve y nada más.
 func (b *botonVisor) TypedRune(r rune) {
-	if r == ' ' {
+	if r == ' ' && b.p.Pantalla == Encendida && !b.p.ayudaAbierta() {
 		b.Tapped(nil)
+		return
 	}
+	b.p.Runa(r)
 }
 
 func (b *botonVisor) TypedKey(e *fyne.KeyEvent) {
-	if e.Name == fyne.KeyReturn || e.Name == fyne.KeyEnter {
+	if (e.Name == fyne.KeyReturn || e.Name == fyne.KeyEnter) && b.p.Pantalla == Encendida {
 		b.Tapped(nil)
 		return
 	}
@@ -833,7 +1115,7 @@ func (e *enlaceCaja) Tapped(*fyne.PointEvent) {
 		e.p.AbrirMedio(e.caja)
 		return
 	}
-	if d := DestinoAccion(e.caja.Accion, e.p.Diapo, e.p.ultima()); d != SinDestino {
+	if d := DestinoAccionEn(e.caja.Accion, e.p.Diapo, e.p.ultima(), Saltables(e.p.M.Diapos)); d != SinDestino {
 		e.p.Ir(d, 0)
 	}
 }
@@ -877,12 +1159,13 @@ func (e *enlaceCaja) CreateRenderer() fyne.WidgetRenderer {
 // web la pone encima porque en un navegador no hay otra; aquí, cerrarla devuelve el
 // foco a la ventana del editor, que sigue donde estaba.
 func Presentar(m *Modelo, desde int, moderador bool, idioma i18n.Locale,
-	rotulo func(string, i18nVars) string,
+	rotulo func(string, i18nVars) string, almacen Almacen,
 ) *Presentacion {
 	a := fyne.CurrentApp()
 	w := a.NewWindow(rotulo("slides.present", nil))
 	w.SetPadded(false)
 	p := NuevaPresentacion(m, desde, rotulo)
+	p.Almacen = almacen
 	p.AlSalir = func() { w.Close() }
 	p.AbrirMedio = AbrirMedioDelSistema
 	teclado(w, p)
@@ -900,7 +1183,7 @@ func Presentar(m *Modelo, desde int, moderador bool, idioma i18n.Locale,
 	}
 	w.Show()
 	if moderador {
-		p.Runa('p')
+		p.alternarModerador()
 	}
 	return p
 }
@@ -931,7 +1214,7 @@ func ModeradorEnLaMisma(w fyne.Window, p *Presentacion, idioma i18n.Locale) func
 			return
 		}
 		mod := NuevoModerador(p, idioma)
-		mod.AlVolver = func() { p.Runa('p') }
+		mod.AlVolver = p.alternarModerador
 		mover = p.AlMover
 		p.AlMover = func() {
 			mod.Refresh()
@@ -949,7 +1232,7 @@ func teclado(w fyne.Window, p *Presentacion) {
 	w.Canvas().SetOnTypedRune(p.Runa)
 	ui.AlAtras(w.Canvas(), func() bool {
 		if p.Moderador {
-			p.Runa('p')
+			p.alternarModerador()
 		} else {
 			p.Tecla(fyne.KeyEscape)
 		}

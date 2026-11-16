@@ -14,6 +14,7 @@ import (
 	"image/png"
 	"io"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -286,7 +287,8 @@ func TestThumbOutputType(t *testing.T) {
 		"image/gif":                 {"image/png", true},
 		"IMAGE/PNG":                 {"image/png", true},  // case-insensitive
 		"image/jpeg; charset=utf-8": {"image/jpeg", true}, // ignora parámetros
-		"image/webp":                {"", false},          // stdlib no decodifica webp
+		"image/webp":                {"image/png", true},  // x/image/webp; PNG por el alfa
+		"image/avif":                {"", false},          // sin decodificador en el módulo
 		"image/svg+xml":             {"", false},
 		"application/pdf":           {"", false},
 		"":                          {"", false},
@@ -325,5 +327,29 @@ func TestThumbVersionIncluyeLaDimension(t *testing.T) {
 	sinSuma := domain.File{ID: uuid.New(), Version: 3}
 	if v2 := thumbVersion(sinSuma); !strings.Contains(v2, "v3") || !strings.Contains(v2, strconv.Itoa(thumbMaxDim)) {
 		t.Fatalf("thumbVersion sin checksum = %q, quiero v3 + dimensión", v2)
+	}
+}
+
+// Un WebP subido a Drive tiene miniatura (PNG, por si trae alfa), en vez del 415
+// de antes (D-DRIVE-03).
+func TestThumbnailDeWebP(t *testing.T) {
+	datos, err := os.ReadFile("../../../../platform/pkg/miniatura/testdata/rosa-con-alfa.webp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := uuid.New()
+	fs := &fakeStore{file: domain.File{ID: id, StorageKey: "src-webp", ContentType: "image/webp", Checksum: "w1"}}
+	blobs := newMapBlobs()
+	blobs.data["src-webp"] = datos
+	rc, ct, _, err := newSvc(fs, blobs, nil).Thumbnail(tenantCtx(t), id)
+	if err != nil {
+		t.Fatalf("Thumbnail(webp): %v", err)
+	}
+	defer rc.Close()
+	if ct != "image/png" {
+		t.Fatalf("content-type = %q, quiero image/png", ct)
+	}
+	if _, err := png.Decode(rc); err != nil {
+		t.Fatalf("la miniatura no decodifica como PNG: %v", err)
 	}
 }

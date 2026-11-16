@@ -35,6 +35,18 @@ func TestCipherBlobsOwnerTenantProductQuotaAndRetryableDeletion(t *testing.T) {
 	if _, err := st.CreateCipherBlob(ctx, blob); err != nil {
 		t.Fatal(err)
 	}
+	if err := h.Pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		var reservations int
+		if err := tx.QueryRow(ctx, `SELECT count(*) FROM subidas_pendientes WHERE tenant=$1 AND storage_key=$2`, "acme", blob.StorageKey).Scan(&reservations); err != nil {
+			return err
+		}
+		if reservations != 0 {
+			return fmt.Errorf("committed ciphertext retained %d upload reservations", reservations)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
 	for _, other := range []struct{ tenant, actor, product string }{{"other", "alice", "mail"}, {"acme", "bob", "mail"}, {"acme", "alice", "drive"}} {
 		if _, err := st.CipherBlob(store.WithOwner(tenantCtx(other.tenant), other.actor), other.product, id); !errors.Is(err, domain.ErrNotFound) {
 			t.Fatal("ciphertext metadata crossed identity/product", other, err)
@@ -74,6 +86,28 @@ func TestCipherBlobsOwnerTenantProductQuotaAndRetryableDeletion(t *testing.T) {
 	}
 	if _, err := st.CreateCipherBlob(ctx, second); !errors.Is(err, domain.ErrQuotaExceeded) {
 		t.Fatal("ciphertext bypassed suite quota", err)
+	}
+	if err := h.Pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		var reservations int
+		if err := tx.QueryRow(ctx, `SELECT count(*) FROM subidas_pendientes WHERE tenant=$1 AND storage_key=$2`, "acme", second.StorageKey).Scan(&reservations); err != nil {
+			return err
+		}
+		if reservations != 1 {
+			return fmt.Errorf("rolled-back ciphertext lost its upload reservation: %d", reservations)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.CipherBlob(ctx, "mail", second.ID); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatal("rolled-back ciphertext became visible", err)
+	}
+	expired, err := st.ReclamarSubidasCaducadas(ctx, time.Now().Add(2*time.Minute), 20)
+	if err != nil || len(expired) != 1 || expired[0].StorageKey != second.StorageKey {
+		t.Fatal("collector did not claim only the uncommitted upload", expired, err)
+	}
+	if found, err := st.BlobReferenciado(ctx, "acme", blob.StorageKey); err != nil || !found {
+		t.Fatal("committed ciphertext was not protected from collection", err)
 	}
 	if _, err := st.CreateCipherBlob(ctx, blob); !errors.Is(err, domain.ErrConflict) {
 		t.Fatal("immutable ID overwritten", err)

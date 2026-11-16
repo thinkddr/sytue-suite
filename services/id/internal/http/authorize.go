@@ -26,6 +26,9 @@ type authzRequest struct {
 	Nonce               string
 	CodeChallenge       string
 	CodeChallengeMethod string
+	StorageTenant       string
+	StorageSubject      string
+	StorageHintInvalid  bool
 	// MaxAge es `max_age` (OIDC Core §3.1.2.1): cuántos segundos vale como
 	// mucho la última identificación de la persona. Nil = no se pidió.
 	//
@@ -55,6 +58,9 @@ func parseAuthz(r *http.Request) authzRequest {
 		}
 	}
 	return authzRequest{
+		StorageTenant:       q.Get("sytue_tenant"),
+		StorageSubject:      q.Get("sytue_subject"),
+		StorageHintInvalid:  (q.Has("sytue_tenant") || q.Has("sytue_subject")) && (len(q["sytue_tenant"]) != 1 || len(q["sytue_subject"]) != 1 || q.Get("sytue_tenant") == "" || q.Get("sytue_subject") == ""),
 		MaxAge:              maxAge,
 		ClientID:            q.Get("client_id"),
 		RedirectURI:         q.Get("redirect_uri"),
@@ -109,6 +115,9 @@ func (s *Server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		loginURL := "/login/?" + url.Values{"return_to": {r.URL.RequestURI()}}.Encode()
 		http.Redirect(w, r, loginURL, http.StatusFound)
+		return
+	}
+	if sess, ok = s.storageAuthorizationContext(w, r, req, sess, client.ID, redirectErr); !ok {
 		return
 	}
 
@@ -208,6 +217,9 @@ func (s *Server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 // lo que decide de verdad es el orden de sesión → max_age → segundo factor, y
 // con estas cuatro validaciones en medio ese orden no se veía.
 func validarAuthz(req authzRequest, client domain.Client) (code, desc string, ok bool) {
+	if !validStorageAuthorizationHint(req, client) {
+		return "invalid_request", "invalid storage authorization context", false
+	}
 	if req.ResponseType != "code" {
 		return "unsupported_response_type", "solo se soporta response_type=code", false
 	}

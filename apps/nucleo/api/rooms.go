@@ -53,7 +53,11 @@ type RoomsChannel struct {
 	Purpose  string `json:"purpose,omitempty"`
 	Kind     string `json:"kind"`
 	Archived bool   `json:"archived"`
-	Muted    bool   `json:"muted,omitempty"`
+	// CreatedBy y CreatedAt son quién creó el canal y cuándo: los dice el inicio del
+	// historial («Ana creó este canal el…»).
+	CreatedBy string    `json:"created_by,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	Muted     bool      `json:"muted,omitempty"`
 	// Peers son los nombres de los OTROS miembros de una conversación directa.
 	Peers []string `json:"peers,omitempty"`
 	// PeerSubs son sus identificadores, en el mismo orden que Peers.
@@ -80,23 +84,36 @@ func (c RoomsChannel) Title() string {
 	return c.Name
 }
 
+// RoomsThreadParticipant es una persona que respondió en un hilo (sus avatares).
+type RoomsThreadParticipant struct {
+	Sub  string `json:"sub"`
+	Name string `json:"name,omitempty"`
+}
+
 // RoomsMessage es un mensaje de un canal.
 type RoomsMessage struct {
-	MatrixEvent          *RoomsMatrixEventRef `json:"matrix_event,omitempty"`
-	EncryptionError      bool                 `json:"-"`
-	Encryption           string               `json:"encryption,omitempty"`
-	IdentityVerified     bool                 `json:"-"`
-	AuthenticityVerified bool                 `json:"-"`
-	ID                   string               `json:"id"`
-	ChannelID            string               `json:"channel_id"`
-	ParentID             *string              `json:"parent_id,omitempty"`
-	AuthorSub            string               `json:"author_sub"`
-	AuthorName           string               `json:"author_name,omitempty"`
-	Body                 string               `json:"body"`
-	Type                 string               `json:"type,omitempty"`
-	ReplyCount           int                  `json:"reply_count,omitempty"`
-	EditedAt             *time.Time           `json:"edited_at,omitempty"`
-	CreatedAt            time.Time            `json:"created_at"`
+	MatrixEvent            *RoomsMatrixEventRef `json:"matrix_event,omitempty"`
+	EncryptionError        bool                 `json:"-"`
+	RequiresOriginalDevice bool                 `json:"-"`
+	Encryption             string               `json:"encryption,omitempty"`
+	IdentityVerified       bool                 `json:"-"`
+	AuthenticityVerified   bool                 `json:"-"`
+	ID                     string               `json:"id"`
+	ChannelID              string               `json:"channel_id"`
+	ParentID               *string              `json:"parent_id,omitempty"`
+	AuthorSub              string               `json:"author_sub"`
+	AuthorName             string               `json:"author_name,omitempty"`
+	Body                   string               `json:"body"`
+	Type                   string               `json:"type,omitempty"`
+	ReplyCount             int                  `json:"reply_count,omitempty"`
+	// LastReplyAt y ThreadParticipants son el indicador de hilo de una raíz: cuándo
+	// fue la última respuesta y quiénes respondieron más recientemente (hasta tres).
+	LastReplyAt        *time.Time               `json:"last_reply_at,omitempty"`
+	ThreadParticipants []RoomsThreadParticipant `json:"thread_participants,omitempty"`
+	// AlsoInChannel es una respuesta de hilo mandada también al canal: va en el feed.
+	AlsoInChannel bool       `json:"also_in_channel,omitempty"`
+	EditedAt      *time.Time `json:"edited_at,omitempty"`
+	CreatedAt     time.Time  `json:"created_at"`
 	// Mentions son los `sub` de las personas @mencionadas.
 	Mentions []string `json:"mentions,omitempty"`
 	// Priority es "", "important" o "urgent"; IsBot, un webhook o una integración.
@@ -284,6 +301,8 @@ type RoomsScheduled struct {
 	Body       string    `json:"body"`
 	FileIDs    []string  `json:"file_ids,omitempty"`
 	SendAt     time.Time `json:"send_at"`
+	// AlsoInChannel es «También enviar al canal» de una respuesta programada.
+	AlsoInChannel bool `json:"also_in_channel,omitempty"`
 }
 
 // Scheduled son los mensajes programados de quien mira, de todos sus canales.

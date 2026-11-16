@@ -44,6 +44,10 @@ func dropboxPath(t tenancy.Tenant, key string) string {
 // content transmite los argumentos en la cabecera que exige la API de contenido;
 // el JSON escapado también conserva rutas Unicode sin cabeceras no ASCII.
 func (d *Dropbox) content(ctx context.Context, route string, args any, body io.Reader, size int64) (*http.Response, error) {
+	return d.contentHeaders(ctx, route, args, body, size, nil)
+}
+
+func (d *Dropbox) contentHeaders(ctx context.Context, route string, args any, body io.Reader, size int64, extra map[string]string) (*http.Response, error) {
 	arg, err := json.Marshal(args)
 	if err != nil {
 		return nil, err
@@ -63,9 +67,13 @@ func (d *Dropbox) content(ctx context.Context, route string, args any, body io.R
 			_, _ = escaped.WriteRune(r)
 		}
 	}
-	return conProveedor(ctx, d.http, d.tok, http.MethodPost, dropboxContent+route, body, size, map[string]string{
+	headers := map[string]string{
 		"Content-Type": "application/octet-stream", "Dropbox-API-Arg": escaped.String(),
-	})
+	}
+	for key, value := range extra {
+		headers[key] = value
+	}
+	return conProveedor(ctx, d.http, d.tok, http.MethodPost, dropboxContent+route, body, size, headers)
 }
 
 func (d *Dropbox) rpc(ctx context.Context, route string, args any) (*http.Response, error) {
@@ -148,7 +156,7 @@ func dropboxError(res *http.Response, op string) error {
 }
 
 func (d *Dropbox) Get(ctx context.Context, t tenancy.Tenant, key string) (io.ReadCloser, error) {
-	res, err := d.content(ctx, "/files/download", map[string]string{"path": dropboxPath(t, key)}, http.NoBody, 0)
+	res, err := d.contentHeaders(ctx, "/files/download", map[string]string{"path": dropboxPath(t, key)}, http.NoBody, 0, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -157,6 +165,24 @@ func (d *Dropbox) Get(ctx context.Context, t tenancy.Tenant, key string) (io.Rea
 		return nil, dropboxError(res, "descargar")
 	}
 	return res.Body, nil
+}
+
+func (d *Dropbox) GetRaw(ctx context.Context, t tenancy.Tenant, key string) (io.ReadCloser, error) {
+	if !rawHTTPClient(d.http) {
+		return nil, ErrRawUnsupported
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	res, err := d.contentHeaders(ctx, "/files/download", map[string]string{"path": dropboxPath(t, key)}, http.NoBody, 0, map[string]string{"Accept-Encoding": "identity"})
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	if res.StatusCode != http.StatusOK {
+		defer cancel()
+		defer res.Body.Close()
+		return nil, dropboxError(res, "descargar")
+	}
+	return acceptRawHTTP(res, cancel)
 }
 
 func (d *Dropbox) Delete(ctx context.Context, t tenancy.Tenant, key string) error {

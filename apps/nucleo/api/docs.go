@@ -17,9 +17,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/coedicion"
-	"git.sytue.eu/sytue/one/apps/nucleo/office"
 )
 
 // Docs es el cliente de Sytue Docs (services/docs, `/api/v1`). Docus, Calcus y Diapos
@@ -27,7 +27,11 @@ import (
 // es UNA cadena en un registro LWW propio (DocContentKey). Este fichero trae lo común
 // —listado por tipo, alta, renombrar, borrar, destacar, leer y guardar ese registro—;
 // lo que solo entiende un producto va en su fichero.
-type Docs struct{ c *Client }
+type Docs struct {
+	c           *Client
+	private     DocsData
+	privateMode bool
+}
 
 // NewDocs crea el cliente sobre la raíz del servicio (ServiceURL(apex, "docs")).
 func NewDocs(servicio string, s Session, h *http.Client) *Docs {
@@ -78,13 +82,36 @@ type DocsFilter struct {
 	Kind    DocKind
 	Query   string // filtra por título
 	Starred bool   // solo los destacados por quien pregunta
+	// Scope es «Míos» (DocsMine) o «Compartidos conmigo» (DocsShared); vacío = todos.
+	Scope DocsScope
+	// ByTitle ordena A→Z por título (sin mayúsculas ni acentos) en vez de por fecha.
+	// El cursor de la página siguiente es entonces de título: no se mezclan.
+	ByTitle bool
 	Cursor  string // el `next_cursor` de la página anterior
 	Limit   int    // el servicio acota a 1..200; 0 deja su defecto (50)
 }
 
-// List devuelve una página, lo modificado más recientemente primero, y el cursor de la
+// DocsScope es el alcance por propiedad del listado (`?scope=` del servicio).
+type DocsScope string
+
+const (
+	DocsAll    DocsScope = ""
+	DocsMine   DocsScope = "mine"
+	DocsShared DocsScope = "shared"
+)
+
+// List devuelve una página, lo modificado más recientemente primero (o por título), y el cursor de la
 // siguiente ("" si no hay más).
 func (d *Docs) List(ctx context.Context, f DocsFilter) ([]Document, string, error) {
+	if d == nil {
+		return nil, "", ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.ListDocuments(ctx, f)
+	}
+	if d.privateMode || d.c == nil {
+		return nil, "", ErrPrivateDataOnly
+	}
 	q := url.Values{}
 	if f.Kind != "" {
 		q.Set("kind", string(f.Kind))
@@ -94,6 +121,12 @@ func (d *Docs) List(ctx context.Context, f DocsFilter) ([]Document, string, erro
 	}
 	if f.Starred {
 		q.Set("starred", "1")
+	}
+	if f.Scope != DocsAll {
+		q.Set("scope", string(f.Scope))
+	}
+	if f.ByTitle {
+		q.Set("sort", "title")
 	}
 	if f.Cursor != "" {
 		q.Set("cursor", f.Cursor)
@@ -124,6 +157,15 @@ func (d *Docs) Create(ctx context.Context, kind DocKind, titulo string) (Documen
 // creado=false es que ya existía, y sembrarlo pisaría lo que su dueño lleve escrito. Con
 // `fuente` vacía es Create, y creado siempre true.
 func (d *Docs) CreateDesde(ctx context.Context, kind DocKind, titulo, fuente string) (doc Document, creado bool, err error) {
+	if d == nil {
+		return Document{}, false, ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.CreateDocumentFromSource(ctx, kind, titulo, fuente)
+	}
+	if d.privateMode || d.c == nil {
+		return Document{}, false, ErrPrivateDataOnly
+	}
 	cuerpo := map[string]string{"kind": string(kind), "title": titulo}
 	if fuente != "" {
 		cuerpo["source_ref"] = fuente
@@ -163,6 +205,15 @@ func (d *Docs) CreateCopy(ctx context.Context, original Document, titulo string)
 // BySource es el documento nacido de ese fichero (`drive:<uuid>`), o ok=false si nunca se
 // ha abierto. Ahorra descargar y convertir el fichero para descubrirlo.
 func (d *Docs) BySource(ctx context.Context, fuente string) (doc Document, ok bool, err error) {
+	if d == nil {
+		return Document{}, false, ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.DocumentBySource(ctx, fuente)
+	}
+	if d.privateMode || d.c == nil {
+		return Document{}, false, ErrPrivateDataOnly
+	}
 	out, err := JSON[struct {
 		Documents []Document `json:"documents"`
 	}](ctx, d.c, Request{Path: "/documents", Query: url.Values{"source_ref": {fuente}, "limit": {"1"}}})
@@ -174,6 +225,15 @@ func (d *Docs) BySource(ctx context.Context, fuente string) (doc Document, ok bo
 
 // Get devuelve el documento y el papel de quien pregunta: viewer, commenter, editor u owner.
 func (d *Docs) Get(ctx context.Context, id string) (Document, string, error) {
+	if d == nil {
+		return Document{}, "", ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.GetDocument(ctx, id)
+	}
+	if d.privateMode || d.c == nil {
+		return Document{}, "", ErrPrivateDataOnly
+	}
 	out, err := JSON[docResp](ctx, d.c, Request{Path: "/documents/" + url.PathEscape(id)})
 	return out.Document, out.Role, err
 }
@@ -203,6 +263,17 @@ type ImportadoComentario struct {
 	Quote    string `json:"quote,omitempty"`
 	Anchored bool   `json:"anchored"`
 	Resolved bool   `json:"resolved,omitempty"`
+	// Cell es la celda de un comentario de una hoja (.xlsx/.ods): su ancla.
+	Cell *ImportadoCelda `json:"cell,omitempty"`
+}
+
+// ImportadoCelda es el ancla de un comentario importado de una celda: la hoja (su id) y la
+// identidad de su fila y de su columna, más la referencia que se ve («B4»).
+type ImportadoCelda struct {
+	Hoja string `json:"hoja"`
+	Fila string `json:"fila"`
+	Col  string `json:"col"`
+	Text string `json:"text"`
 }
 
 // MaxImportar es lo más grande que convierte el servicio (`domain.MaxImportBytes`).
@@ -227,6 +298,15 @@ func (d *Docs) ImportarConComentarios(ctx context.Context, nombre string, datos 
 }
 
 func (d *Docs) importar(ctx context.Context, nombre string, datos []byte, comentarios bool) (Importado, error) {
+	if d == nil {
+		return Importado{}, ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.ImportDocument(ctx, nombre, datos, comentarios)
+	}
+	if d.privateMode || d.c == nil {
+		return Importado{}, ErrPrivateDataOnly
+	}
 	r, err := formularioPDF("/import", nil, PDFFichero{Nombre: nombre, Datos: datos})
 	if err != nil {
 		return Importado{}, err
@@ -241,6 +321,15 @@ func (d *Docs) importar(ctx context.Context, nombre string, datos []byte, coment
 // importado, de parte de quien importa, y devuelve los ids de los anclados que quedaron
 // guardados.
 func (d *Docs) ImportComments(ctx context.Context, id string, comentarios []ImportadoComentario) ([]string, error) {
+	if d == nil {
+		return nil, ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.ImportComments(ctx, id, comentarios)
+	}
+	if d.privateMode || d.c == nil {
+		return nil, ErrPrivateDataOnly
+	}
 	out, err := PostJSON[struct {
 		Anchored []string `json:"anchored"`
 	}](ctx, d.c, "/documents/"+url.PathEscape(id)+"/comments/import", map[string]any{"comments": comentarios})
@@ -271,6 +360,9 @@ func (i Importado) ContenidoConMarks(guardados []string) string {
 func CanWrite(role string) bool { return role == "editor" || role == "owner" }
 
 func (d *Docs) sinCuerpo(ctx context.Context, metodo, ruta string, cuerpo any) error {
+	if d == nil || d.privateMode || d.c == nil {
+		return ErrPrivateDataOnly
+	}
 	r := Request{Method: metodo, Path: ruta}
 	if cuerpo != nil {
 		datos, err := json.Marshal(cuerpo)
@@ -288,16 +380,43 @@ func (d *Docs) sinCuerpo(ctx context.Context, metodo, ruta string, cuerpo any) e
 
 // Rename cambia el título.
 func (d *Docs) Rename(ctx context.Context, id, titulo string) error {
+	if d == nil {
+		return ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.RenameDocument(ctx, id, titulo)
+	}
+	if d.privateMode || d.c == nil {
+		return ErrPrivateDataOnly
+	}
 	return d.sinCuerpo(ctx, http.MethodPatch, "/documents/"+url.PathEscape(id), map[string]string{"title": titulo})
 }
 
 // Delete manda el documento a la papelera (y su fichero de Drive a la de Drive).
 func (d *Docs) Delete(ctx context.Context, id string) error {
+	if d == nil {
+		return ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.DeleteDocument(ctx, id)
+	}
+	if d.privateMode || d.c == nil {
+		return ErrPrivateDataOnly
+	}
 	return d.sinCuerpo(ctx, http.MethodDelete, "/documents/"+url.PathEscape(id), nil)
 }
 
 // Star lo marca o desmarca como destacado para quien pregunta.
 func (d *Docs) Star(ctx context.Context, id string, destacado bool) error {
+	if d == nil {
+		return ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.StarDocument(ctx, id, destacado)
+	}
+	if d.privateMode || d.c == nil {
+		return ErrPrivateDataOnly
+	}
 	return d.sinCuerpo(ctx, http.MethodPut, "/documents/"+url.PathEscape(id)+"/star", map[string]bool{"starred": destacado})
 }
 
@@ -327,6 +446,15 @@ type DocContent struct {
 // Content lee el registro `clave` del estado consolidado (GET …/state). Un documento
 // recién creado no lo tiene: devuelve el cero, con el reloj del documento.
 func (d *Docs) Content(ctx context.Context, id, clave string) (DocContent, error) {
+	if d == nil {
+		return DocContent{}, ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.DocumentContent(ctx, id, clave)
+	}
+	if d.privateMode || d.c == nil {
+		return DocContent{}, ErrPrivateDataOnly
+	}
 	out, err := JSON[struct {
 		Seq   int64 `json:"seq"`
 		State struct {
@@ -372,6 +500,15 @@ func (d *Docs) SaveContent(ctx context.Context, id, clave, valor string, dot Doc
 // sin escribir nada, si otro escribió la clave después de esa seq. Es la comprobación que la
 // web hace con su base y que aquí cierra la ventana entre mirar el registro y escribirlo.
 func (d *Docs) saveContentBase(ctx context.Context, id, clave, valor string, dot DocDot, lamport uint64, autoritativo bool, baseSeq int64) (int64, error) {
+	if d == nil {
+		return 0, ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.SaveDocumentContent(ctx, id, clave, valor, dot, lamport, autoritativo, baseSeq)
+	}
+	if d.privateMode || d.c == nil {
+		return 0, ErrPrivateDataOnly
+	}
 	ops := []docOp{{Kind: "set", Dot: dot, Key: clave, Value: valor, Lamport: lamport}}
 	if autoritativo {
 		ops = append([]docOp{{Kind: "set", Dot: dot, Key: clave + ":lww", Value: lamport, Lamport: lamport}}, ops...)
@@ -394,6 +531,15 @@ var ErrLoteGrande = errors.New("docs: el cambio no cabe en un lote de ops")
 // secuencia hasta `valor` y, SIEMPRE, el `set` del registro, que es lo que lee el
 // servicio; con `autoritativo`, también la marca `<clave>:lww`. Da la seq del lote.
 func (d *Docs) SaveCoedicion(ctx context.Context, id, clave, valor string, dot DocDot, lamport uint64, autoritativo bool, chars []coedicion.Op) (int64, error) {
+	if d == nil {
+		return 0, ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.SaveDocumentCoedition(ctx, id, clave, valor, dot, lamport, autoritativo, chars)
+	}
+	if d.privateMode || d.c == nil {
+		return 0, ErrPrivateDataOnly
+	}
 	ops := make([]any, 0, len(chars)+2)
 	for _, c := range chars {
 		ops = append(ops, c)
@@ -429,6 +575,15 @@ type DocOpSecuenciada struct {
 // OpsDesde son las ops posteriores a `desde` (GET …/ops?since=): el sondeo con el que la
 // web se entera de lo que escriben los demás cuando no tiene el WebSocket.
 func (d *Docs) OpsDesde(ctx context.Context, id string, desde int64) ([]DocOpSecuenciada, error) {
+	if d == nil {
+		return nil, ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.DocumentOpsSince(ctx, id, desde)
+	}
+	if d.privateMode || d.c == nil {
+		return nil, ErrPrivateDataOnly
+	}
 	out, err := JSON[struct {
 		Ops []DocOpSecuenciada `json:"ops"`
 	}](ctx, d.c, Request{Path: "/documents/" + url.PathEscape(id) + "/ops", Query: url.Values{"since": {strconv.FormatInt(desde, 10)}}})
@@ -444,6 +599,15 @@ type DocMiembro struct {
 // Presencia renueva la de esta conexión (PUT …/presence, TTL de 30 s en el servicio) y
 // da las presentes, ella incluida.
 func (d *Docs) Presencia(ctx context.Context, id, conn string) ([]DocMiembro, error) {
+	if d == nil {
+		return nil, ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.DocumentPresence(ctx, id, conn)
+	}
+	if d.privateMode || d.c == nil {
+		return nil, ErrPrivateDataOnly
+	}
 	cuerpo, err := json.Marshal(map[string]string{"conn": conn})
 	if err != nil {
 		return nil, err
@@ -475,6 +639,15 @@ var ErrDocConflicto = errors.New("docs: otro ha guardado este documento entretan
 // La escritura va con `base_seq` (la seq que se leyó): si otro escribió entre la lectura de
 // aquí y el POST, el servicio contesta 409 y es también ErrDocConflicto, sin ventana.
 func (d *Docs) SaveChecked(ctx context.Context, id, clave, valor string, base DocContent, dot DocDot, autoritativo bool) (DocContent, error) {
+	if d == nil {
+		return base, ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.SaveDocumentChecked(ctx, id, clave, valor, base, dot, autoritativo)
+	}
+	if d.privateMode || d.c == nil {
+		return base, ErrPrivateDataOnly
+	}
 	// Hojas y presentaciones: solo lo que cambió, como parche (docs_parche.go). El servicio lo
 	// aplica sobre lo último que tiene, así que lo que otra persona haya escrito en OTRAS
 	// celdas se conserva y no hay conflicto. Si no se deja decir así, abajo va el registro entero.
@@ -524,6 +697,15 @@ type DocVersion struct {
 
 // Versions lista el historial, la más reciente primero.
 func (d *Docs) Versions(ctx context.Context, id string) ([]DocVersion, error) {
+	if d == nil {
+		return nil, ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.DocumentVersions(ctx, id)
+	}
+	if d.privateMode || d.c == nil {
+		return nil, ErrPrivateDataOnly
+	}
 	out, err := JSON[struct {
 		Versions []DocVersion `json:"versions"`
 	}](ctx, d.c, Request{Path: "/documents/" + url.PathEscape(id) + "/versions"})
@@ -533,12 +715,30 @@ func (d *Docs) Versions(ctx context.Context, id string) ([]DocVersion, error) {
 // RestoreVersion devuelve el documento a esa versión. No destruye nada: el servicio añade
 // las operaciones que llevan hasta ella, así que restaurar también se puede deshacer.
 func (d *Docs) RestoreVersion(ctx context.Context, id, version string) error {
+	if d == nil {
+		return ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.RestoreDocumentVersion(ctx, id, version)
+	}
+	if d.privateMode || d.c == nil {
+		return ErrPrivateDataOnly
+	}
 	return d.sinCuerpo(ctx, http.MethodPost, "/documents/"+url.PathEscape(id)+"/versions/"+url.PathEscape(version)+"/restore", struct{}{})
 }
 
 // CreateVersion guarda una versión con nombre del estado de ahora (`label` puede ir
 // vacío: el servicio la guarda sin nombre, como la web cuando no se escribe ninguno).
 func (d *Docs) CreateVersion(ctx context.Context, id, label string) (DocVersion, error) {
+	if d == nil {
+		return DocVersion{}, ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.CreateDocumentVersion(ctx, id, label)
+	}
+	if d.privateMode || d.c == nil {
+		return DocVersion{}, ErrPrivateDataOnly
+	}
 	peticion := map[string]string{}
 	if label = strings.TrimSpace(label); label != "" {
 		peticion["label"] = label
@@ -551,7 +751,7 @@ func (d *Docs) CreateVersion(ctx context.Context, id, label string) (DocVersion,
 
 // ExportFormats son los formatos que el menú «Archivo» ofrece, en su orden
 // (`EXPORT_FORMATS` de packages/office/src/editor/types.ts).
-var ExportFormats = office.Formats()
+var ExportFormats = []string{"pdf", "ooxml", "odf", "html", "markdown"}
 
 // maxExport acota lo que se lee de una exportación: un documento no pesa esto.
 const maxExport = 256 << 20
@@ -582,6 +782,15 @@ func (d *Docs) export(ctx context.Context, id, formato string, plantilla bool) (
 }
 
 func (d *Docs) exportCon(ctx context.Context, id, formato string, plantilla bool, accesible *bool) ([]byte, error) {
+	if d == nil {
+		return nil, ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.ExportDocument(ctx, id, formato, plantilla, accesible)
+	}
+	if d.privateMode || d.c == nil {
+		return nil, ErrPrivateDataOnly
+	}
 	// Pedir una exportación es una consulta, aunque vaya por POST: no avisa al widget.
 	blob, err := PostJSONLectura[struct {
 		Export struct {
@@ -689,6 +898,15 @@ type DocShare struct {
 // servicio les dice 403, y se devuelve tal cual —un diálogo vacío parecería «no hay
 // nadie con acceso»—. Los enlaces son informativos: si fallan, lista vacía.
 func (d *Docs) Sharing(ctx context.Context, id string) ([]DocPermission, []DocShare, error) {
+	if d == nil {
+		return nil, nil, ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.DocumentSharing(ctx, id)
+	}
+	if d.privateMode || d.c == nil {
+		return nil, nil, ErrPrivateDataOnly
+	}
 	base := "/documents/" + url.PathEscape(id)
 	perms, err := JSON[struct {
 		Permissions []DocPermission `json:"permissions"`
@@ -705,12 +923,30 @@ func (d *Docs) Sharing(ctx context.Context, id string) ([]DocPermission, []DocSh
 // Grant da (o cambia) el acceso de alguien: `kind` «user» con su dirección, o «tenant»
 // con el id vacío para toda la organización.
 func (d *Docs) Grant(ctx context.Context, id, kind, principal, role string) error {
+	if d == nil {
+		return ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.GrantDocumentPermission(ctx, id, kind, principal, role)
+	}
+	if d.privateMode || d.c == nil {
+		return ErrPrivateDataOnly
+	}
 	return d.sinCuerpo(ctx, http.MethodPut, "/documents/"+url.PathEscape(id)+"/permissions",
 		map[string]string{"principal_kind": kind, "principal_id": principal, "role": role})
 }
 
 // Revoke quita el acceso de ese principal.
 func (d *Docs) Revoke(ctx context.Context, id, kind, principal string) error {
+	if d == nil {
+		return ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.RevokeDocumentPermission(ctx, id, kind, principal)
+	}
+	if d.privateMode || d.c == nil {
+		return ErrPrivateDataOnly
+	}
 	resp, err := d.c.Do(ctx, Request{
 		Method: http.MethodDelete, Path: "/documents/" + url.PathEscape(id) + "/permissions",
 		Query: url.Values{"principal_kind": {kind}, "principal_id": {principal}},
@@ -724,6 +960,15 @@ func (d *Docs) Revoke(ctx context.Context, id, kind, principal string) error {
 // CreateShare crea un enlace público con ese papel y lo devuelve CON su token, que es la
 // única vez que se ve.
 func (d *Docs) CreateShare(ctx context.Context, id, role string) (DocShare, error) {
+	if d == nil {
+		return DocShare{}, ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.CreateDocumentShare(ctx, id, role)
+	}
+	if d.privateMode || d.c == nil {
+		return DocShare{}, ErrPrivateDataOnly
+	}
 	out, err := PostJSON[struct {
 		Share DocShare `json:"share"`
 	}](ctx, d.c, "/documents/"+url.PathEscape(id)+"/shares", map[string]string{"role": role})
@@ -732,6 +977,15 @@ func (d *Docs) CreateShare(ctx context.Context, id, role string) (DocShare, erro
 
 // RevokeShare anula un enlace público.
 func (d *Docs) RevokeShare(ctx context.Context, id, enlace string) error {
+	if d == nil {
+		return ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.RevokeDocumentShare(ctx, id, enlace)
+	}
+	if d.privateMode || d.c == nil {
+		return ErrPrivateDataOnly
+	}
 	return d.sinCuerpo(ctx, http.MethodDelete, "/documents/"+url.PathEscape(id)+"/shares/"+url.PathEscape(enlace), nil)
 }
 
@@ -785,6 +1039,15 @@ func CanComment(role string) bool { return role == "commenter" || CanWrite(role)
 
 // Comments lista los comentarios. Con conResueltos también los cerrados (`?resolved=true`).
 func (d *Docs) Comments(ctx context.Context, id string, conResueltos bool) ([]DocComment, error) {
+	if d == nil {
+		return nil, ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.DocumentComments(ctx, id, conResueltos)
+	}
+	if d.privateMode || d.c == nil {
+		return nil, ErrPrivateDataOnly
+	}
 	q := url.Values{}
 	if conResueltos {
 		q.Set("resolved", "true")
@@ -801,6 +1064,15 @@ func (d *Docs) CreateComment(ctx context.Context, id, padre, cuerpo string) (Doc
 	cuerpo = strings.TrimSpace(cuerpo)
 	if cuerpo == "" {
 		return DocComment{}, ErrComentarioVacio
+	}
+	if d == nil {
+		return DocComment{}, ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.CreateDocumentComment(ctx, id, padre, cuerpo)
+	}
+	if d.privateMode || d.c == nil {
+		return DocComment{}, ErrPrivateDataOnly
 	}
 	peticion := map[string]any{"body": cuerpo}
 	if padre != "" {
@@ -820,10 +1092,84 @@ func (d *Docs) CreateAnchoredComment(ctx context.Context, id, cuerpo, marca, tex
 	if cuerpo == "" {
 		return DocComment{}, ErrComentarioVacio
 	}
+	if d == nil {
+		return DocComment{}, ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.CreateAnchoredDocumentComment(ctx, id, cuerpo, marca, texto)
+	}
+	if d.privateMode || d.c == nil {
+		return DocComment{}, ErrPrivateDataOnly
+	}
 	peticion := map[string]any{"body": cuerpo, "anchor": map[string]string{"mark": marca, "text": texto}}
 	out, err := PostJSON[struct {
 		Comment DocComment `json:"comment"`
 	}](ctx, d.c, "/documents/"+url.PathEscape(id)+"/comments", peticion)
+	return out.Comment, err
+}
+
+// AnclaCelda es el ancla de un comentario de una hoja de Calcus (`sheets/anclaCelda.ts`):
+// el id de la hoja y la identidad de su fila y de su columna (`sheets/anclas.ts`), que siguen
+// a la celda aunque se inserten filas encima, más la referencia que se citó al comentar
+// («B4»). Es la forma que valida `validarAncla` en el servicio y la que guarda al importar
+// las notas de un .xlsx o un .ods.
+type AnclaCelda struct {
+	Hoja string `json:"hoja"`
+	Fila string `json:"fila"`
+	Col  string `json:"col"`
+	Text string `json:"text"`
+}
+
+// reIDEje es lo que admite el servicio en el id de una fila o una columna (`reIDAncla`).
+var reIDEje = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+
+// maxTextoAncla es el tope del id de hoja y de la referencia citada (`validarAncla`).
+const maxTextoAncla = 300
+
+// AnclaCelda es el ancla de celda del comentario (`leerAnclaCelda` de la web), o false si no
+// lo es —un texto del folio, un dibujo— o está mal formada.
+func (c DocComment) AnclaCelda() (AnclaCelda, bool) {
+	var o struct {
+		Hoja *string `json:"hoja"`
+		Fila *string `json:"fila"`
+		Col  *string `json:"col"`
+		Text any     `json:"text"`
+	}
+	if len(c.Anchor) == 0 || json.Unmarshal(c.Anchor, &o) != nil || o.Hoja == nil || o.Fila == nil || o.Col == nil {
+		return AnclaCelda{}, false
+	}
+	if *o.Hoja == "" || utf8.RuneCountInString(*o.Hoja) > maxTextoAncla || !reIDEje.MatchString(*o.Fila) || !reIDEje.MatchString(*o.Col) {
+		return AnclaCelda{}, false
+	}
+	a := AnclaCelda{Hoja: *o.Hoja, Fila: *o.Fila, Col: *o.Col}
+	if t, ok := o.Text.(string); ok {
+		if r := []rune(t); len(r) > maxTextoAncla {
+			t = string(r[:maxTextoAncla])
+		}
+		a.Text = t
+	}
+	return a, true
+}
+
+// CreateCellComment abre un hilo anclado a una celda de una hoja (AnclaCelda), como
+// «Nuevo comentario» de la cinta de Calcus en la web.
+func (d *Docs) CreateCellComment(ctx context.Context, id, cuerpo string, a AnclaCelda) (DocComment, error) {
+	cuerpo = strings.TrimSpace(cuerpo)
+	if cuerpo == "" {
+		return DocComment{}, ErrComentarioVacio
+	}
+	if d == nil {
+		return DocComment{}, ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.CreateCellDocumentComment(ctx, id, cuerpo, a)
+	}
+	if d.privateMode || d.c == nil {
+		return DocComment{}, ErrPrivateDataOnly
+	}
+	out, err := PostJSON[struct {
+		Comment DocComment `json:"comment"`
+	}](ctx, d.c, "/documents/"+url.PathEscape(id)+"/comments", map[string]any{"body": cuerpo, "anchor": a})
 	return out.Comment, err
 }
 
@@ -842,8 +1188,21 @@ func (c DocComment) AnchorMark() string {
 // ErrComentarioVacio: un comentario en blanco no se manda (el servicio lo rechazaría).
 var ErrComentarioVacio = errors.New("docs: el comentario está vacío")
 
+// ErrAnclaNoValida: el ancla de un comentario no tiene la forma que el servicio acepta
+// (office/ancla); el modo privado la rechaza igual.
+var ErrAnclaNoValida = errors.New("docs: el ancla del comentario no es válida")
+
 // ResolveComment marca el hilo como resuelto, o lo reabre.
 func (d *Docs) ResolveComment(ctx context.Context, id, comentario string, resuelto bool) error {
+	if d == nil {
+		return ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.ResolveDocumentComment(ctx, id, comentario, resuelto)
+	}
+	if d.privateMode || d.c == nil {
+		return ErrPrivateDataOnly
+	}
 	return d.sinCuerpo(ctx, http.MethodPut,
 		"/documents/"+url.PathEscape(id)+"/comments/"+url.PathEscape(comentario)+"/resolve",
 		map[string]bool{"resolved": resuelto})
@@ -851,6 +1210,15 @@ func (d *Docs) ResolveComment(ctx context.Context, id, comentario string, resuel
 
 // DeleteComment borra un comentario o una respuesta.
 func (d *Docs) DeleteComment(ctx context.Context, id, comentario string) error {
+	if d == nil {
+		return ErrPrivateDataOnly
+	}
+	if d.private != nil {
+		return d.private.DeleteDocumentComment(ctx, id, comentario)
+	}
+	if d.privateMode || d.c == nil {
+		return ErrPrivateDataOnly
+	}
 	return d.sinCuerpo(ctx, http.MethodDelete,
 		"/documents/"+url.PathEscape(id)+"/comments/"+url.PathEscape(comentario), nil)
 }

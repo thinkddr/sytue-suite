@@ -263,6 +263,8 @@ func TestLaPaletaSeRecorreConElTeclado(t *testing.T) {
 	p.Objeto()
 	p.AbrirPaleta()
 	pa := p.paleta
+	// «cli» deja solo las dos áreas: sin escribir nada van antes las pantallas.
+	pa.Escribir("cli")
 	pa.Teclear(&fyne.KeyEvent{Name: fyne.KeyDown})
 	if pa.Cursor != 1 {
 		t.Fatalf("la flecha abajo deja el cursor en %d", pa.Cursor)

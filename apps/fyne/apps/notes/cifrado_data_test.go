@@ -58,6 +58,86 @@ func TestDatosDeNotaCifradaSeRestauranYSeVuelvenACifrar(t *testing.T) {
 	}
 }
 
+func TestEntradaNoRebajaSobreConEnlaces(t *testing.T) {
+	key := bytes.Repeat([]byte{3}, 32)
+	for _, links := range []json.RawMessage{json.RawMessage(`[]`), json.RawMessage(`[{"target_kind":"doc","target_id":"s1","future":9007199254740993}]`)} {
+		cipher, err := api.EmpaquetarNota(key, api.NotaEnClaro{Title: "original", LinksJSON: links})
+		if err != nil {
+			t.Fatal(err)
+		}
+		n := api.Note{ID: "n1", NotebookID: "c1", Kind: "text", ContentCipher: cipher, Data: json.RawMessage(`{}`)}
+		p, _ := pantallaConServicio(t, nil, n)
+		p.activo.Cifrado, p.clave = true, key
+		view := p.deNota(n)
+		title := "changed"
+		if _, err := p.entradaEditada(view, Parche{Titulo: &title}); err == nil {
+			t.Fatal("v2 edit accepted a v3 link envelope")
+		}
+		original, err := api.DesempaquetarNota(key, n.ContentCipher)
+		if err != nil || !bytes.Equal(original.LinksJSON, links) {
+			t.Fatal("rejected edit lost original links", err)
+		}
+	}
+}
+
+func TestEnlacesEnClaroCifradoNoSalenYSeNotifica(t *testing.T) {
+	key := bytes.Repeat([]byte{3}, 32)
+	input := api.NoteInput{Title: "secret"}
+	if err := api.CifrarContenidoNota(key, &input); err != nil {
+		t.Fatal(err)
+	}
+	links := []api.NoteLink{{TargetKind: "docs_document", TargetID: "private-id", Label: "secret"}}
+	n := api.Note{ID: "n1", NotebookID: "c1", Kind: "text", ContentCipher: input.ContentCipher, Data: input.Data, Links: links}
+	p, server := pantallaConServicio(t, nil, n)
+	p.activo.Cifrado, p.clave = true, key
+	p.notas[0] = p.deNota(n)
+	if err := p.crear(api.NoteInput{Kind: "text", Links: links}); err == nil {
+		t.Fatal("created an encrypted note with clear links")
+	}
+	title := "changed"
+	if err := p.editar(n.ID, Parche{Titulo: &title}, true); err == nil {
+		t.Fatal("rewrote an encrypted note with clear links")
+	}
+	if got := server.rutas(); len(got) != 0 {
+		t.Fatal("clear links reached the service", got)
+	}
+	if len(p.avisos.Avisos()) < 2 || p.notas[0].Crudo.ContentCipher != n.ContentCipher {
+		t.Fatal("failure was hidden or original content changed")
+	}
+	p.clave = nil
+	locked := p.deNota(n)
+	pin := true
+	if _, err := p.entradaEditada(locked, Parche{Fijada: &pin}); err == nil {
+		t.Fatal("locked note allowed a metadata write carrying clear links")
+	}
+	if _, err := p.entradaEditada(locked, Parche{Enlaces: []api.NoteLink{}}); err == nil {
+		t.Fatal("locked note allowed an empty patch to erase legacy links")
+	}
+}
+
+func TestNotaBloqueadaRechazaEnlacesDelParcheAntesDeRed(t *testing.T) {
+	key := bytes.Repeat([]byte{3}, 32)
+	input := api.NoteInput{Title: "secret"}
+	if err := api.CifrarContenidoNota(key, &input); err != nil {
+		t.Fatal(err)
+	}
+	n := api.Note{ID: "n1", NotebookID: "c1", Kind: "text", ContentCipher: input.ContentCipher, Data: input.Data}
+	p, server := pantallaConServicio(t, nil, n)
+	p.activo.Cifrado = true
+	p.clave = nil
+	p.notas[0] = p.deNota(n)
+	links := []api.NoteLink{{TargetKind: "docs_document", TargetID: "private-id", Label: "secret"}}
+	if err := p.editar(n.ID, Parche{Enlaces: links}, true); err == nil {
+		t.Fatal("locked note accepted clear links from a patch")
+	}
+	if got := server.rutas(); len(got) != 0 {
+		t.Fatal("clear links reached the service", got)
+	}
+	if p.notas[0].Crudo.ContentCipher != n.ContentCipher || len(p.avisos.Avisos()) == 0 {
+		t.Fatal("rejection lost the original or was not shown")
+	}
+}
+
 func TestMigracionNotasEsCASYNoRepiteResultadoIncierto(t *testing.T) {
 	for _, fallar := range []bool{false, true} {
 		t.Run(map[bool]string{false: "confirmed", true: "uncertain"}[fallar], func(t *testing.T) {

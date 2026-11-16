@@ -157,11 +157,8 @@ func (f *Folio) PanelBuscar(t func(string, i18n.Vars) string) fyne.CanvasObject 
 	return f.buscador.Objeto()
 }
 
-// botonPequeno y alDerecha viven en `editor` desde que Calcus busca con el mismo panel.
-type (
-	botonPequeno = editor.BotonPequeno
-	alDerecha    = editor.AlDerecha
-)
+// botonPequeno vive en `editor` desde que Calcus busca con el mismo panel.
+type botonPequeno = editor.BotonPequeno
 
 // nuevoBotonAccion es ACTION_CLASS de Bibliografia.tsx: `h-6 w-full` con el texto en
 // medio (el botón pequeño lo centra siempre, como un `<button>`).

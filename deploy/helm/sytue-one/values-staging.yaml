@@ -126,7 +126,7 @@ pgbouncer:
   replicaCount: 1
   image:
     # Del espejo del proyecto, NO de Docker Hub. Sin esto el chart renderiza
-    # `edoburu/pgbouncer:...` y el despliegue se traería la imagen de un registro
+    # `ghcr.io/cloudnative-pg/pgbouncer:...` y el despliegue se traería la imagen de un registro
     # fuera de la UE, que es justo lo que la política de cadena de suministro
     # persigue. Producción ya lo hace así.
     repository: pgbouncer

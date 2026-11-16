@@ -99,6 +99,35 @@ func TestCarpetaMiraLaConfiguracion(t *testing.T) {
 	}
 }
 
+// TestCarpetaImagenesMiraLaConfiguracion: la galería del escritorio es la de imágenes
+// que tenga configurada xdg-user-dirs, con la misma regla que la de descargas, y una
+// clave no se confunde con la otra.
+func TestCarpetaImagenesMiraLaConfiguracion(t *testing.T) {
+	casa := t.TempDir()
+	t.Setenv("HOME", casa)
+	config := filepath.Join(casa, ".config")
+	if err := os.MkdirAll(config, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(config, "user-dirs.dirs"),
+		[]byte("XDG_DOWNLOAD_DIR=\"$HOME/Descargas\"\nXDG_PICTURES_DIR=\"$HOME/Imágenes\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("XDG_CONFIG_HOME", config)
+	t.Setenv("XDG_DOWNLOAD_DIR", "")
+	t.Setenv("XDG_PICTURES_DIR", "")
+	if hay, err := CarpetaImagenes(); err != nil || hay != filepath.Join(casa, "Imágenes") {
+		t.Errorf("con user-dirs.dirs: %q (%v), quiero ~/Imágenes", hay, err)
+	}
+	if hay, _ := Carpeta(); hay != filepath.Join(casa, "Descargas") {
+		t.Errorf("las descargas se han confundido con las imágenes: %q", hay)
+	}
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(casa, "sin-configurar"))
+	if hay, _ := CarpetaImagenes(); hay != filepath.Join(casa, "Pictures") {
+		t.Errorf("sin configuración quiero ~/Pictures, no %q", hay)
+	}
+}
+
 // TestNoDisponibleSeDistingueDeUnFallo: sin xdg-open, Abrir e Imprimir tienen que decir
 // «esta plataforma no lo tiene» y no un error cualquiera, porque quien llama usa eso para
 // NO ofrecer el botón en vez de enseñar un fallo encima de una descarga que ha ido bien.

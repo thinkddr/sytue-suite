@@ -27,6 +27,7 @@
     "aiPanel",
     "aifill",
     "copy",
+    "merge",
     "paste",
     "scenadd",
     "scendel",
@@ -43,7 +44,6 @@
   ],
   "presentation": [
     "aiPanel",
-    "grafico",
     "iafill"
   ]
 }

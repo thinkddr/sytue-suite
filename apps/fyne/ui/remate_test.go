@@ -354,6 +354,34 @@ func TestNingunWidgetNaceInvisible(t *testing.T) {
 		{"FilaSelector", func() fyne.CanvasObject {
 			return filaDePrueba(api.Elegible{ID: "c1", Nombre: "General", Meta: "Anuncios", URL: "u"})
 		}},
+		// La configuración guiada (§2.8): son contenedores, y lo que se mira es que la
+		// tarjeta, los títulos y la barra de acciones salgan ya en el primer pintado.
+		{"MarcoAjustes", func() fyne.CanvasObject {
+			m := NuevoMarcoAjustes("Tus datos", "Descarga o borra lo que guardamos.",
+				NuevaSeccionAjustes("Exportar", "", NuevoBoton("Descargar", nil)))
+			m.Resize(MedidaMarcoAjustes(m, 420))
+			return m
+		}},
+		{"SeccionAjustes", func() fyne.CanvasObject {
+			s := NuevaSeccionAjustes("Notificaciones", "Qué te avisamos.", NuevoBoton("Probar", nil))
+			s.Acciones = []fyne.CanvasObject{NuevoBoton("Guardar", nil)}
+			s.Resize(MedidaSeccionAjustes(s, 360))
+			return s
+		}},
+		{"Resumen", func() fyne.CanvasObject {
+			r := NuevoResumen(nil, FilaResumen{Clave: "Dominio", Valor: "acme.example", AlEditar: func() {}})
+			r.RotuloEditar = "Editar"
+			r.Resize(MedidaResumen(r, 320))
+			return r
+		}},
+		{"Asistente", func() fyne.CanvasObject {
+			a := NuevoAsistente(nil,
+				PasoAsistente{Titulo: "Elegir", Cuerpo: NuevoBoton("Slack", nil)},
+				PasoAsistente{Titulo: "Listo", Terminal: true})
+			a.Rotulos.Siguiente = "Continuar"
+			a.Resize(MedidaAsistente(a, 360))
+			return a
+		}},
 	}
 	for _, c := range casos {
 		crudo, refrescado := c.monta(), c.monta()

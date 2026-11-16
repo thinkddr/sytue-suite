@@ -177,6 +177,7 @@ func (s *Store) PurgeDeleted(ctx context.Context, olderThan time.Time) (int64, [
 			  AND m.tenant = $2 AND a.tenant = $2
 			  AND m.deleted_at IS NOT NULL
 			  AND m.deleted_at < $1
+              AND NOT mail_private_storage_frozen_account(m.tenant,m.account_id)
 			  AND NOT EXISTS (
 			      SELECT 1 FROM legal_holds h
 			      WHERE h.tenant = a.tenant AND h.released_at IS NULL
@@ -272,6 +273,13 @@ func (s *Store) EDiscoverySearch(ctx context.Context, accountID uuid.UUID, f EDi
 
 	var out []domain.EDiscoveryHit
 	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		var frozen bool
+		if err := tx.QueryRow(ctx, `SELECT mail_private_storage_frozen_account($1,$2)`, tenantOf(ctx), accountID).Scan(&frozen); err != nil {
+			return err
+		}
+		if frozen {
+			return ErrPrivateStorageFrozen
+		}
 		rows, err := tx.Query(ctx, query, args...)
 		if err != nil {
 			return fmt.Errorf("store: ediscovery search: %w", err)

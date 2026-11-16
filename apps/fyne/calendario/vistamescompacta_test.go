@@ -4,6 +4,7 @@
 package calendario
 
 import (
+	"context"
 	"image"
 	"image/color"
 	"testing"
@@ -13,13 +14,12 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/test"
 
-	"git.sytue.eu/sytue/one/apps/nucleo/api"
-	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
-
-	"git.sytue.eu/sytue/one/apps/fyne/agenda"
 	"git.sytue.eu/sytue/one/apps/fyne/catalogos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/sistema"
 )
 
 // Los guardianes del mes del teléfono (vistamescompacta.go), con los datos de la
@@ -53,7 +53,7 @@ func eventosCaptura() []Ocurrencia {
 func pantallaCaptura(t *testing.T) *Pantalla {
 	t.Helper()
 	return &Pantalla{
-		T: traductor(t), Vista: VistaMes, Estado: agenda.Exito, Ventana: 390,
+		T: traductor(t), Vista: VistaMes, Estado: ui.EstadoExito, Ventana: 390,
 		Ahora: func() time.Time { return ahoraCaptura }, Cursor: ahoraCaptura, Zona: time.UTC,
 		Eventos: eventosCaptura(),
 	}
@@ -76,7 +76,7 @@ func appTelefono(t *testing.T) (*App, fyne.Window) {
 	p := pantallaCaptura(t)
 	p.Eventos = nil
 	a := NuevaApp(p, nil)
-	a.lanzar = func(f func()) { f() }
+	a.lanzar = func(f func(context.Context)) bool { f(a.vida); return true }
 	a.enUI = func(f func()) { f() }
 	a.cargandoCal = false
 	p.Calendarios = []api.Calendar{{ID: "c", DisplayName: "Personal"}}
@@ -240,10 +240,10 @@ func TestElMesDelTelefonoSeParecaALaCaptura(t *testing.T) {
 // TestCargandoElMesDelTelefonoNoCambiaDeForma: mientras carga, la hoja es la del mes (5
 // semanas en diciembre de 2026) sin puntos, y la lista su esqueleto: NO las 42 celdas
 // del esqueleto de escritorio. VISTO EN ROJO dejando que la carga pinte `cuerpo()`
-// (`if p.compacta() && p.Estado != agenda.Cargando` en `contenido`).
+// (`if p.compacta() && p.Estado != ui.EstadoCargando` en `contenido`).
 func TestCargandoElMesDelTelefonoNoCambiaDeForma(t *testing.T) {
 	p := pantallaCaptura(t)
-	p.Cursor, p.Estado, p.Eventos = time.Date(2026, 12, 6, 12, 0, 0, 0, time.UTC), agenda.Cargando, nil
+	p.Cursor, p.Estado, p.Eventos = time.Date(2026, 12, 6, 12, 0, 0, 0, time.UTC), ui.EstadoCargando, nil
 	w, _ := telefono(t, p)
 	m := mesDe(t, w.Content())
 	if got := numeros(m.semanas); len(got) != 5 || got[0] != 49 || got[4] != 53 {
@@ -540,8 +540,8 @@ func TestArrastrarElAsaLlevaLaHoja(t *testing.T) {
 
 // TestLaHojaSeAnimaDesdeDondeEstaba: cambiar de vista reconstruye la pantalla y la hoja
 // nueva arranca del alto de la vieja; a mitad de la animación mide lo de en medio, con
-// todo el mes a la vista, y al acabar, el de su posición. Con `SinMovimiento`, ya en su
-// sitio. VISTOS EN ROJO sin `arrancar` (la hoja nueva salía en su sitio: un salto de 200
+// todo el mes a la vista, y al acabar, el de su posición. Con `SinMovimiento` o con
+// «Reducir movimiento» en el sistema, ya en su sitio. VISTOS EN ROJO sin `arrancar` (la hoja nueva salía en su sitio: un salto de 200
 // px) y con `quieta()` siempre cierto (a medio camino solo se veía la semana).
 func TestLaHojaSeAnimaDesdeDondeEstaba(t *testing.T) {
 	a, w := appTelefono(t)
@@ -569,6 +569,13 @@ func TestLaHojaSeAnimaDesdeDondeEstaba(t *testing.T) {
 	p.AlCambiarVista(VistaMes)
 	if m = mesDe(t, w.Content()); m.animando || p.animHoja != nil {
 		t.Error("con SinMovimiento la hoja se anima")
+	}
+	// Y con «Reducir movimiento» en el sistema, aunque la app no ponga SinMovimiento.
+	ui.SinMovimiento = false
+	t.Cleanup(sistema.FijarMenosMovimiento(true))
+	p.AlCambiarVista(VistaSemana)
+	if m = mesDe(t, w.Content()); m.animando || p.animHoja != nil {
+		t.Error("con «Reducir movimiento» en el sistema la hoja se anima")
 	}
 }
 
@@ -622,7 +629,7 @@ func TestLasTresPosicionesDelAsa(t *testing.T) {
 		guardar(t, w.Canvas().Capture(), "calendario-asa-agenda-"+modo)
 		p.cajonAbierto = true
 		a.pintar()
-		if g := buscarObjeto(w.Content(), func(o fyne.CanvasObject) bool { _, es := o.(*GrupoVista); return es }); g == nil || g.(*GrupoVista).Activa != VistaAgenda {
+		if g := buscarObjeto(w.Content(), func(o fyne.CanvasObject) bool { _, es := o.(*ui.Segmentado); return es }); g == nil || Vista(g.(*ui.Segmentado).Elegida) != VistaAgenda {
 			t.Errorf("%s: el selector del cajón no marca la agenda", modo)
 		}
 		if modo == "oscuro" {
@@ -695,7 +702,7 @@ func TestElCajonDelTelefonoLlevaLoDeLaCabecera(t *testing.T) {
 	p.cajonAbierto = true
 	a.pintar()
 	raiz := w.Content()
-	if buscarObjeto(raiz, func(o fyne.CanvasObject) bool { _, es := o.(*GrupoVista); return es }) == nil {
+	if buscarObjeto(raiz, func(o fyne.CanvasObject) bool { _, es := o.(*ui.Segmentado); return es }) == nil {
 		t.Error("el cajón no lleva el selector de vista")
 	}
 	fila := func(rotulo string) *ui.FilaLateral {
@@ -799,7 +806,7 @@ func TestElSelectorDelCajonCabeEnTodosLosIdiomas(t *testing.T) {
 			if idioma == "el" || idioma == "lt" || idioma == "fi" {
 				guardar(t, w.Canvas().Capture(), "calendario-mes-movil-cajon-"+string(idioma)+"-oscuro")
 			}
-			g, _ := buscarObjeto(w.Content(), func(o fyne.CanvasObject) bool { _, es := o.(*GrupoVista); return es }).(*GrupoVista)
+			g, _ := buscarObjeto(w.Content(), func(o fyne.CanvasObject) bool { _, es := o.(*ui.Segmentado); return es }).(*ui.Segmentado)
 			if g == nil {
 				t.Fatal("el cajón no lleva el selector de vista")
 			}
@@ -821,23 +828,13 @@ func TestElSelectorDelCajonCabeEnTodosLosIdiomas(t *testing.T) {
 			if gx > fx || g.Size().Width < fx-2*tema.Espacio(1)-1 {
 				t.Errorf("el grupo mide %v y acaba en %v; la fila mide %v", g.Size().Width, gx, fx)
 			}
-			n := 0
-			buscarObjeto(g, func(o fyne.CanvasObject) bool {
-				b, es := o.(*botonVista)
-				if !es {
-					return false
+			if g.Rejilla != 2 || len(g.Opciones) != 4 {
+				t.Fatalf("el selector del cajón va en %d columnas con %d vistas; quiero el 2×2", g.Rejilla, len(g.Opciones))
+			}
+			for i, o := range g.Opciones {
+				if !g.CabeRotulo(i) {
+					t.Errorf("%q no cabe en su celda del grupo de %v", o, g.Size().Width)
 				}
-				n++
-				if b.Position().X+b.Size().Width > g.Size().Width {
-					t.Errorf("%q se sale del grupo", b.AccessibilityLabel())
-				}
-				if !b.CabeRotulo() {
-					t.Errorf("%q no cabe en su botón de %v", b.AccessibilityLabel(), b.Size().Width)
-				}
-				return false
-			})
-			if n != 4 {
-				t.Errorf("%d botones de vista", n)
 			}
 		})
 	}
@@ -1042,5 +1039,64 @@ func TestLaCabeceraYLaListaVanEnLaZonaDeLaPantalla(t *testing.T) {
 func TestUnDiaNoEsShortcutable(t *testing.T) {
 	if _, es := any(&diaCompacto{}).(fyne.Shortcutable); es {
 		t.Error("diaCompacto implementa Shortcutable: revisa qué hace con las teclas con modificador")
+	}
+}
+
+// TestElAsaYTirarParaRefrescarNoSePisan pasa toques por el filtro del teléfono (el
+// mismo que reparte el dedo en un móvil). Un tirón que EMPIEZA en el asa o en la rejilla
+// es del asa o del deslizar: el filtro no lo toma y nunca refresca; desde la lista de
+// debajo, en lo alto, refresca sin mover el asa, también en la agenda. En el mes, tirar
+// del asa hacia abajo estira la hoja con resistencia y vuelve; y con el asa agarrada, un
+// segundo dedo en la lista no refresca. VISTOS EN ROJO sin `ZonaSinRefresco` en la hoja
+// (el filtro se quedaba el tirón del asa y refrescaba: el conflicto del teléfono del
+// dueño), con `AlturaArrastre` en `alto()` (el asa no cedía) y sin `hojaEnGesto`.
+func TestElAsaYTirarParaRefrescarNoSePisan(t *testing.T) {
+	defer ui.MovilDePrueba(true)()
+	a, w := appTelefono(t)
+	p := a.P
+	refrescos := 0
+	p.Refresco.Actualizar = func() { refrescos++ }
+	p.Refresco.Puede = func() bool { return !p.hojaEnGesto } // sin red: lo que añade la hoja
+	a.pintar()
+	c := w.Canvas()
+	abs := fyne.CurrentApp().Driver().AbsolutePositionForObject
+	centro := func(o fyne.CanvasObject) fyne.Position {
+		return abs(o).Add(fyne.NewPos(o.Size().Width/2, o.Size().Height/2))
+	}
+	m := mesDe(t, w.Content())
+	bajoLaHoja := func(m *mesCompacto, y float32) fyne.Position {
+		return abs(m).Add(fyne.NewPos(195, m.Size().Height+y))
+	}
+
+	if ui.TirarDePrueba(c, centro(m.asa), 150) || ui.TirarDePrueba(c, centro(diaN(t, m, 13)), 150) ||
+		ui.TirarDePrueba(c, centro(m.pastis[2]), 150) || refrescos != 0 {
+		t.Fatalf("un tirón desde la hoja lo tomó el refresco (%d refrescos)", refrescos)
+	}
+	if !ui.TirarDePrueba(c, bajoLaHoja(m, 30), 150) || refrescos != 1 {
+		t.Fatalf("desde la lista en lo alto no refresca (%d)", refrescos)
+	}
+	if m = mesDe(t, w.Content()); p.Vista != VistaMes || m.Size().Height != 264+AltoAsaMes {
+		t.Errorf("el refresco movió la hoja: vista %d, %v", p.Vista, m.Size().Height)
+	}
+
+	// En el mes, el asa hacia abajo estira (264 + 24) y, mientras, la lista no refresca.
+	m = arrastrarAsa(t, w, 48, 60*time.Millisecond, false)
+	if h := m.Size().Height; h != 288+AltoAsaMes {
+		t.Errorf("tirando del asa en el mes la hoja mide %v y es 288 + el asa", h)
+	}
+	guardar(t, w.Canvas().Capture(), "calendario-asa-estiron-claro")
+	if ui.TirarDePrueba(c, bajoLaHoja(m, 30), 150) || refrescos != 1 {
+		t.Errorf("con el asa agarrada, un segundo dedo en la lista refrescó")
+	}
+	m.asa.DragEnd()
+	if m = mesDe(t, w.Content()); p.Vista != VistaMes || m.Size().Height != 264+AltoAsaMes || p.hojaEnGesto {
+		t.Errorf("al soltar: vista %d, %v, en gesto %v", p.Vista, m.Size().Height, p.hojaEnGesto)
+	}
+
+	// En la agenda: desde su lista refresca; desde el asa, no (el asa baja a la semana).
+	p.AlCambiarVista(VistaAgenda)
+	m = mesDe(t, w.Content())
+	if ui.TirarDePrueba(c, centro(m.asa), 150) || !ui.TirarDePrueba(c, bajoLaHoja(m, 140), 150) || refrescos != 2 {
+		t.Errorf("en la agenda: %d refrescos y son 2 (uno desde la lista)", refrescos)
 	}
 }

@@ -65,3 +65,28 @@ func TestElAnclaDeUnDibujoNoSaltaElPermiso(t *testing.T) {
 		t.Fatalf("un usuario sin acceso comentó (%d)", got)
 	}
 }
+
+// El ancla de un comentario de una celda de Calcus es `{hoja, fila, col, text}`
+// (`sheets/anclaCelda.ts`): se acepta bien formada y se rechaza lo demás antes de guardarla.
+func TestElAnclaDeUnaCeldaSeValida(t *testing.T) {
+	casos := []struct {
+		nombre, ancla string
+		quiero        int
+	}{
+		{"a B4", `{"hoja":"9b2f-hoja","fila":"t3","col":"t1","text":"B4"}`, http.StatusCreated},
+		{"fila insertada", `{"hoja":"h:Hoja 1","fila":"n1a2b3c4d","col":"t0","text":"A5"}`, http.StatusCreated},
+		{"sin texto", `{"hoja":"h1","fila":"t0","col":"t0"}`, http.StatusCreated},
+		{"hoja vacía", `{"hoja":"","fila":"t0","col":"t0"}`, http.StatusBadRequest},
+		{"hoja no es texto", `{"hoja":3,"fila":"t0","col":"t0"}`, http.StatusBadRequest},
+		{"sin fila", `{"hoja":"h1","col":"t0"}`, http.StatusBadRequest},
+		{"columna con markup", `{"hoja":"h1","fila":"t0","col":"<b>"}`, http.StatusBadRequest},
+		{"con marca a la vez", `{"hoja":"h1","fila":"t0","col":"t0","mark":"m1"}`, http.StatusBadRequest},
+		{"texto largo", `{"hoja":"h1","fila":"t0","col":"t0","text":"` + strings.Repeat("ñ", 301) + `"}`, http.StatusBadRequest},
+		{"hoja larga", `{"hoja":"` + strings.Repeat("h", 301) + `","fila":"t0","col":"t0"}`, http.StatusBadRequest},
+	}
+	for _, c := range casos {
+		if got := comentar(t, ownerClaims(), c.ancla); got != c.quiero {
+			t.Errorf("%s: %d, quería %d", c.nombre, got, c.quiero)
+		}
+	}
+}

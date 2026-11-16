@@ -10,6 +10,7 @@ import (
 	"fyne.io/fyne/v2"
 
 	"git.sytue.eu/sytue/one/apps/fyne/editor"
+	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
@@ -26,15 +27,15 @@ const (
 	CmdEstilo        editor.Comando = "style"      // JSON de un Partial<CellStyle>; null quita
 	CmdBordes        editor.Comando = "border"     // "all", "outer", "bottom" o "none"
 	CmdQuitarEstil   editor.Comando = "clearstyle" // el formato visual fuera
-	CmdCombinar      editor.Comando = "merge"
-	CmdFijar         editor.Comando = "freeze"    // "cols,filas"; "0,0" descongela
-	CmdCopiar        editor.Comando = "copy"      // "cut" corta
-	CmdPegar         editor.Comando = "paste"     // "values" pega solo valores
-	CmdOrdenar       editor.Comando = "sort"      // "asc" o "desc"
-	CmdDuplicados    editor.Comando = "dedupe"    // quita las filas repetidas del rango
-	CmdTextoCols     editor.Comando = "text2cols" // el valor es el separador
-	CmdInsFila       editor.Comando = "insrow"    // "above" o "below"
-	CmdInsCol        editor.Comando = "inscol"    // "left" o "right"
+	CmdCombinar      editor.Comando = "merge"      // "center" (o vacío), "merge", "unmerge" o "content"
+	CmdFijar         editor.Comando = "freeze"     // "cols,filas"; "0,0" descongela
+	CmdCopiar        editor.Comando = "copy"       // "cut" corta
+	CmdPegar         editor.Comando = "paste"      // "values" pega solo valores
+	CmdOrdenar       editor.Comando = "sort"       // "asc" o "desc"
+	CmdDuplicados    editor.Comando = "dedupe"     // quita las filas repetidas del rango
+	CmdTextoCols     editor.Comando = "text2cols"  // el valor es el separador
+	CmdInsFila       editor.Comando = "insrow"     // "above" o "below"
+	CmdInsCol        editor.Comando = "inscol"     // "left" o "right"
 	CmdBorrarFilas   editor.Comando = "delrow"
 	CmdBorrarCols    editor.Comando = "delcol"
 	CmdCondAnadir    editor.Comando = "condadd"    // JSON de una CondRule
@@ -81,7 +82,8 @@ func (c *Lienzo) Mandar(cmd editor.Comando, valor string) {
 	c1, f1, c2, f2 := r.Rango()
 	if c.mandarFormato(cmd, valor, c1, f1, c2, f2) || c.mandarDatos(cmd, valor, c1, f1, c2, f2) ||
 		c.mandarEsquema(cmd, valor, c1, f1, c2, f2) || c.mandarDinamica(cmd, valor) ||
-		c.mandarHipotesis(cmd, valor) || c.mandarRelleno(cmd, valor) {
+		c.mandarHipotesis(cmd, valor) || c.mandarRelleno(cmd, valor) ||
+		c.mandarMedida(cmd, valor, c1, f1, c2, f2) {
 		c.trasCambio()
 	}
 }
@@ -126,15 +128,80 @@ func (c *Lienzo) mandarFormato(cmd editor.Comando, valor string, c1, f1, c2, f2 
 	case CmdQuitarEstil, editor.SinFormato:
 		l.QuitarEstilo(c1, f1, c2, f2)
 	case CmdCombinar:
-		if l.Combinar(c1, f1, c2, f2) {
-			r.sel, r.ext = Celda{C: c1, F: f1}, nil
-		}
+		return c.combinar(valor, c1, f1, c2, f2)
 	case CmdFijar:
 		cols, filas, _ := strings.Cut(valor, ",")
 		l.Fijar(enteroJS(cols), enteroJS(filas))
 	default:
 		return false // un comando que este lienzo no conoce: el contrato es ignorarlo
 	}
+	return true
+}
+
+// combinar es `merge`: `center` (el botón, y lo que reciben sin valor los scripts y las
+// macros) combina y centra, `merge` combina, `unmerge` separa y `content` es la
+// combinación de contenido de antes. Si combinar vaciaría celdas escritas, se pregunta
+// ANTES, como Excel y Sheets, y lo que se combina es lo que haya al confirmar.
+func (c *Lienzo) combinar(valor string, c1, f1, c2, f2 int) bool {
+	r, l := c.Rejilla, c.Libro
+	switch valor {
+	case "unmerge":
+		return l.Separar(c1, f1, c2, f2)
+	case "content":
+		if !l.CombinarContenido(c1, f1, c2, f2) {
+			return false
+		}
+		r.sel, r.ext = Celda{C: c1, F: f1}, nil
+		return true
+	}
+	centrar := valor != "merge"
+	u, pierde := l.CombinarPierdeDatos(c1, f1, c2, f2)
+	if !pierde {
+		return c.hacerCombinar(c1, f1, c2, f2, centrar)
+	}
+	hoja, nombre := l.Activa(), l.Hoja()
+	var d *ui.Dialogo
+	c.combinarPendiente = func() {
+		c.combinarPendiente = nil
+		if d != nil {
+			d.Cerrar()
+		}
+		// Entre la pregunta y la respuesta la hoja ha podido cambiar (otra persona, un
+		// script, la pestaña): si ya no es la misma, no se combina nada a ciegas.
+		if r.SoloLectura || l.Activa() != hoja || l.Hoja() != nombre {
+			return
+		}
+		if l.vetado(CmdCombinar) {
+			c.avisarProtegida(u.ancla())
+			return
+		}
+		if c.hacerCombinar(c1, f1, c2, f2, centrar) {
+			c.trasCambio()
+		}
+	}
+	lienzo := fyne.CurrentApp().Driver().CanvasForObject(c)
+	if lienzo == nil {
+		return false // sin ventana no hay a quién preguntar; `combinarPendiente` espera
+	}
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	relajado := tema.Escalon{Tam: tema.TextoSM.Tam, Linea: 1.625 * tema.TextoSM.Tam}
+	cuerpo := ui.NuevoParrafo(c.t("dialog.sheet.mergeLoses", i18n.Vars{"ref": Ref(u.C1, u.F1)}),
+		relajado, ui.Normal, "text", v)
+	confirmar := c.combinarPendiente
+	d = ui.Confirmacion(c.t("sheet.merge", nil), c.t("ui.cancel", nil), c.t("sheet.merge", nil), true, cuerpo,
+		func() { c.combinarPendiente = nil; d.Cerrar() }, confirmar)
+	d.RotuloCerrar = c.t("ui.close", nil)
+	d.Mostrar(lienzo)
+	return false
+}
+
+// hacerCombinar combina de verdad y deja la selección en el ancla, sin rango.
+func (c *Lienzo) hacerCombinar(c1, f1, c2, f2 int, centrar bool) bool {
+	u, ok := c.Libro.Combinar(c1, f1, c2, f2, centrar)
+	if !ok {
+		return false
+	}
+	c.Rejilla.sel, c.Rejilla.ext = u.ancla(), nil
 	return true
 }
 

@@ -2,53 +2,42 @@
  * SPDX-License-Identifier: Apache-2.0
  * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
  *
- * Glyph — iconos semánticos propios de Sytue Drive (carpeta, reloj, estrella,
- * papelera…) que aún no existen en el set de cromo de @sytue/ui. Mismo lenguaje
- * visual, porque el envoltorio es el mismo (`Glifo`): aquí solo vive el DIBUJO.
- * Decorativos siempre (aria-hidden); la etiqueta accesible la aporta el control
- * que los usa.
+ * Glyph — iconos semánticos propios de Sytue Drive (carpeta, fichero, estrella,
+ * los tres tipos de Docs…) que no existen en el set de cromo de @sytue/ui. Mismo
+ * lenguaje visual, porque el envoltorio es el mismo (`Glifo`): aquí solo vive el
+ * DIBUJO. Decorativos siempre (aria-hidden); la etiqueta accesible la aporta el
+ * control que los usa.
+ *
+ * UN DIBUJO POR CONCEPTO. La papelera, la descarga, el enlace, el candado o las
+ * personas se dibujaban aquí con OTRO trazado que el común (varios con la geometría
+ * de Feather), así que la misma acción se veía distinta en Drive que en el resto de
+ * la suite. Esos nombres se piden igual (`<Glyph name="trash" />`) pero los pinta
+ * `Icon`, y el guardián `glifos-al-comun.test.ts` de @sytue/ui impide que vuelvan.
  */
 import type { JSX } from 'preact';
-import { Glifo } from '@sytue/ui';
+import { Glifo, Icon, type IconName } from '@sytue/ui';
 
 const GLYPHS = {
-  folder: <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />,
-  file: <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6" />,
+  folder: (
+    <path d="M3.5 6.5A1.5 1.5 0 0 1 5 5h4.4l2 2.5H19a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 19.5H5a1.5 1.5 0 0 1-1.5-1.5ZM3.5 10.5h17" />
+  ),
+  file: (
+    <path d="M13.5 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8.5ZM13.5 3.5V8.5h5" />
+  ),
   // Los TRES tipos de Sytue Docs. Mismos trazados que usa el propio Docs
   // (`packages/office/src/components/DocList.tsx` → KIND_PATH): el mismo concepto debe
   // llevar el mismo signo en las dos apps. Antes los tres se pintaban con `file`,
   // así que el menú «Nuevo» mostraba tres entradas con el icono idéntico y la
   // columna de tipo de «Documentos» no distinguía nada.
   document: (
-    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h4" />
+    <path d="M13.5 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8.5ZM13.5 3.5V8.5h5M8.5 13h7M8.5 16.5h4.5" />
   ),
   // La tabla se reconoce por sus divisiones, no por su marco.
   spreadsheet: <path d="M4 5h16v14H4zM4 10h16M4 15h16M10 5v14" />,
   // Lienzo apaisado sobre pie, como una diapositiva proyectada.
   presentation: <path d="M4 4h16v11H4zM12 15v4M9 21h6" />,
-  clock: <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 7v5l3 2" />,
-  users: (
-    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm7-7.87a4 4 0 0 1 0 7.74M22 21v-2a4 4 0 0 0-3-3.87" />
-  ),
-  star: <path d="m12 3 2.9 5.9 6.5.9-4.7 4.6 1.1 6.4L12 17.8l-5.8 3 1.1-6.4-4.7-4.6 6.5-.9Z" />,
-  // Sobre, para «Adjuntar a un correo». Se dibuja aquí y no se reaprovecha `link`
-  // porque en el mismo menú ya hay «Copiar enlace»: dos entradas distintas con el
-  // mismo icono se leen como la misma acción.
-  mail: (
-    <path d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm-1 1.5 9 6 9-6" />
-  ),
-  trash: (
-    <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6" />
-  ),
-  download: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />,
-  // Subir: el mismo cajón que `download` con la flecha invertida (misma caja
-  // óptica y mismo eje) — «Subir» no es «Nuevo», así que no lleva el signo +.
-  upload: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />,
-  // Persona: el destinatario de una compartición con alguien de la casa, frente
-  // al eslabón del enlace público.
-  user: <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1" />,
-  link: (
-    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+  star: (
+    <path d="M12 3.6L14.4 9.3L20.6 9.8L15.9 13.9L17.3 19.9L12 16.7L6.7 19.9L8.1 13.9L3.4 9.8L9.6 9.3Z" />
   ),
   more: (
     <>
@@ -66,29 +55,34 @@ const GLYPHS = {
   ),
   folderMove: (
     <>
-      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-      <path d="M9 14h6m-2.5-2.5L15 14l-2.5 2.5" />
-    </>
-  ),
-  lock: (
-    <>
-      <rect x="3" y="11" width="18" height="11" rx="2" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-    </>
-  ),
-  // Unidad de equipo (edificio/organización): la propiedad es de la ORG, no de un
-  // usuario. Se distingue de «Compartido conmigo» (users), que es entre personas.
-  building: (
-    <>
-      <path d="M3 21h18" />
-      <path d="M5 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16" />
-      <path d="M15 21V9h2a2 2 0 0 1 2 2v10" />
-      <path d="M8.5 7h1.5M8.5 11h1.5M8.5 15h1.5" />
+      <path d="M3.5 6.5A1.5 1.5 0 0 1 5 5h4.4l2 2.5H19a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 19.5H5a1.5 1.5 0 0 1-1.5-1.5ZM3.5 10.5h17" />
+      <path d="M9 15h6M12.5 12.5 15 15l-2.5 2.5" />
     </>
   ),
 } as const;
 
-export type GlyphName = keyof typeof GLYPHS;
+/** Los nombres de Drive que dibuja el catálogo común. El sobre de «Adjuntar a un
+ *  correo» sigue sin confundirse con «Copiar enlace»: son `mail` y `link`, dos
+ *  dibujos distintos también en el común. */
+const DEL_COMUN = [
+  'clock',
+  'users',
+  'user',
+  'mail',
+  'trash',
+  'download',
+  'upload',
+  'link',
+  'lock',
+  'building',
+] as const satisfies readonly IconName[];
+
+type Propio = keyof typeof GLYPHS;
+export type GlyphName = Propio | (typeof DEL_COMUN)[number];
+
+function esPropio(name: GlyphName): name is Propio {
+  return Object.hasOwn(GLYPHS, name);
+}
 
 export interface GlyphProps {
   name: GlyphName;
@@ -98,9 +92,11 @@ export interface GlyphProps {
 }
 
 export function Glyph({ name, size = 20, class: cls }: GlyphProps): JSX.Element {
-  return (
+  return esPropio(name) ? (
     <Glifo size={size} class={cls}>
       {GLYPHS[name]}
     </Glifo>
+  ) : (
+    <Icon name={name} size={size} class={cls} />
   );
 }

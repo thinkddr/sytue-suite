@@ -28,8 +28,8 @@ func TestBlobCompartidoEntreOrganizaciones(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	acme, globex := tenantCtx("acme"), tenantCtx("globex")
-	cuentaAcme := seedAccount(t, acme, st, "ana@acme.eu")
-	cuentaGlobex := seedAccount(t, globex, st, "bob@globex.eu")
+	cuentaAcme := seedAccount(acme, t, st, "ana@acme.eu")
+	cuentaGlobex := seedAccount(globex, t, st, "bob@globex.eu")
 	inboxAcme, _ := st.MailboxByRole(acme, cuentaAcme.ID, domain.RoleInbox)
 	inboxGlobex, _ := st.MailboxByRole(globex, cuentaGlobex.ID, domain.RoleInbox)
 
@@ -94,7 +94,7 @@ func TestBlobPropioConCopia(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
-	cuenta := seedAccount(t, ctx, st, "ana@acme.eu")
+	cuenta := seedAccount(ctx, t, st, "ana@acme.eu")
 	inbox, _ := st.MailboxByRole(ctx, cuenta.ID, domain.RoleInbox)
 	key := "messages/" + cuenta.ID.String() + "/" + uuid.NewString() + ".eml"
 	m1, m2 := mensaje(cuenta, inbox.ID, key), mensaje(cuenta, inbox.ID, key)

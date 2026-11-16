@@ -6,7 +6,9 @@
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./matrix": "./src/matrix/index.ts",
+    "./matrix/fixture": "./src/matrix/MatrixStorageFixture.tsx"
   },
   "files": [
     "src"
@@ -23,7 +25,8 @@
     "@sytue/ui": "workspace:*",
     "@sytue/auth": "workspace:*",
     "@sytue/api-clients": "workspace:*",
-    "preact": "10.29.8"
+    "preact": "10.29.8",
+    "matrix-js-sdk": "45.0.0"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "21.0.4",

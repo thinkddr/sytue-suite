@@ -18,6 +18,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/resource"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	pcfg "git.sytue.eu/sytue/one/platform/pkg/config"
 	"git.sytue.eu/sytue/one/platform/pkg/correo"
@@ -84,6 +85,9 @@ type Deps struct {
 	// SecretoInterno es el de la suite: abre /internal/drive/files, por donde
 	// Drive trae lo que le pasa en su papelera al fichero de un documento.
 	SecretoInterno string
+	// Dedicated credential for public resource metadata; never a user/SDK token.
+	ResourceSourceSecret   string
+	ResourceSourceSessions *resource.SessionProvider
 	// Env decide qué orígenes admite el handshake del WebSocket de colaboración:
 	// en producción, sin los hosts `.localhost` de desarrollo.
 	Env pcfg.Environment
@@ -145,8 +149,10 @@ type Handler struct {
 	ficheros        ficherosDrive
 	// papelera y secretoInterno: la papelera de Docs y su puerta desde Drive
 	// (papelera.go).
-	papelera       papeleraStore
-	secretoInterno string
+	papelera               papeleraStore
+	secretoInterno         string
+	resourceSourceSecret   string
+	resourceSourceSessions *resource.SessionProvider
 	// plantillasOrg es la biblioteca de plantillas de la organización (plantillas_org.go).
 	plantillasOrg plantillasOrgStore
 	// marcaOrg es la marca de la organización, versionada (temas.go).
@@ -156,6 +162,9 @@ type Handler struct {
 	logos *logoorg.Cliente
 	// scripts es el almacén de scripts de usuario (scripts.go).
 	scripts scriptsStore
+	// miniaturas dibuja y sirve la miniatura de la portada (miniaturas.go). nil = sin
+	// Object Storage: la portada enseña el glifo del tipo.
+	miniaturas *miniaturas
 }
 
 // selloDeTiempo devuelve la función que pide el sello, o nil si no hay autoridad.
@@ -189,38 +198,44 @@ func New(d Deps) *Handler {
 		// 2 req/s sostenidas, ráfaga 10, por tenant.
 		// ponytail: por réplica; migrar a pg.RateLimiter si hace falta presupuesto
 		// compartido cross-réplica.
-		execLimiter:     httpx.NewTokenBucket(2, 10),
-		publicURL:       d.PublicURL,
-		hubNotifier:     d.HubNotifier,
-		idBaseURL:       d.IDBaseURL,
-		idSecreto:       d.IDOrgsSecret,
-		correo:          d.Correo,
-		peticiones:      d.Store,
-		vistasFiltro:    d.Store,
-		auditoria:       d.Store,
-		plantillasOrg:   d.Store,
-		marcaOrg:        d.Store,
-		logos:           logoorg.Nuevo(d.IDBaseURL),
-		scripts:         d.Store,
-		canje:           d.Store,
-		politicaEnlaces: d.Store,
-		claveEnlaces:    d.Store,
-		limitesClave:    nuevosLimitesClave(),
-		wopiHosts:       hostsWopi(d),
-		env:             d.Env,
-		ocr:             d.OCR,
-		drive:           d.Drive,
-		sello:           d.Sello,
-		firmaAnclas:     d.FirmaAnclas,
-		firmas:          d.Store,
-		ficheros:        ficherosDe(d.Drive),
-		peticionesFirma: d.Store,
-		papelera:        papeleraDe(d.Store),
-		secretoInterno:  d.SecretoInterno,
+		execLimiter:            httpx.NewTokenBucket(2, 10),
+		publicURL:              d.PublicURL,
+		hubNotifier:            d.HubNotifier,
+		idBaseURL:              d.IDBaseURL,
+		idSecreto:              d.IDOrgsSecret,
+		correo:                 d.Correo,
+		peticiones:             d.Store,
+		vistasFiltro:           d.Store,
+		auditoria:              d.Store,
+		plantillasOrg:          d.Store,
+		marcaOrg:               d.Store,
+		logos:                  logoorg.Nuevo(d.IDBaseURL),
+		scripts:                d.Store,
+		canje:                  d.Store,
+		politicaEnlaces:        d.Store,
+		claveEnlaces:           d.Store,
+		limitesClave:           nuevosLimitesClave(),
+		wopiHosts:              hostsWopi(d),
+		env:                    d.Env,
+		ocr:                    d.OCR,
+		drive:                  d.Drive,
+		sello:                  d.Sello,
+		firmaAnclas:            d.FirmaAnclas,
+		firmas:                 d.Store,
+		ficheros:               ficherosDe(d.Drive),
+		peticionesFirma:        d.Store,
+		papelera:               papeleraDe(d.Store),
+		secretoInterno:         d.SecretoInterno,
+		resourceSourceSecret:   d.ResourceSourceSecret,
+		resourceSourceSessions: d.ResourceSourceSessions,
 	}
 	if d.Service != nil && d.Objects != nil {
 		// La protección de hojas lee el modelo vigente de documentos con la base en S3.
 		d.Service.Hidratar = h.hydrateFromS3
+		if d.Store != nil {
+			h.miniaturas = nuevasMiniaturas(d.Service, d.Store, d.Objects)
+			d.Service.AlGuardar = h.miniaturas.programar
+		}
 	}
 	return h
 }
@@ -270,10 +285,13 @@ func (h *Handler) Mount(r chi.Router) {
 	// documento (papelera.go). De servicio a servicio: desde fuera es 404, y sin el
 	// secreto de la suite, 401.
 	r.With(httpx.SoloDesdeDentro(h.secretoInterno)).Post("/internal/drive/files", h.desdeDrive)
+	h.mountResourceSource(r)
 
 	r.Group(func(pr chi.Router) {
 		pr.Use(h.verifier.RequireAuth)
 		pr.Use(h.verifier.RequireTenant)
+
+		h.mountPrivateSource(pr)
 
 		// «Exportar tus datos»: los documentos propios en OOXML (platform/pkg/portabilidad).
 		pr.Get("/api/v1/export", h.exportData)
@@ -408,6 +426,7 @@ func (h *Handler) Mount(r chi.Router) {
 				idr.Delete("/", h.deleteDocument)
 				idr.Put("/star", h.starDocument)
 				idr.Post("/theme", h.aplicarTema)
+				idr.Get("/thumbnail", h.getMiniatura) // la de la portada (miniaturas.go)
 
 				// Estado y colaboración.
 				idr.Get("/state", h.getState)
@@ -506,6 +525,8 @@ func docID(r *http.Request) string { return chi.URLParam(r, "id") }
 // fail mapea un error de dominio al error HTTP canónico correspondiente.
 func fail(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
+	case privateOfficeWriteBlocked(err):
+		httpx.Fail(w, r, httpx.ErrConflict.WithCode("private_storage_frozen"))
 	case errors.Is(err, domain.ErrNotFound), errors.Is(err, domain.ErrSnapshotMissing):
 		httpx.Fail(w, r, httpx.ErrNotFound)
 	case errors.Is(err, domain.ErrForbidden):

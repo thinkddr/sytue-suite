@@ -27,9 +27,9 @@ func TestSharedMailboxDeliveryAndACL(t *testing.T) {
 	ctx := tenantCtx("acme")
 
 	// Personas del tenant y el buzón compartido de la ORG (Ada lo crea ⇒ manage).
-	ada := seedAccount(t, ctx, st, "ada@sytue.eu")
-	ben := seedAccount(t, ctx, st, "ben@sytue.eu") // grantee
-	seedAccount(t, ctx, st, "eve@sytue.eu")        // NO grantee
+	ada := seedAccount(ctx, t, st, "ada@sytue.eu")
+	ben := seedAccount(ctx, t, st, "ben@sytue.eu") // grantee
+	seedAccount(ctx, t, st, "eve@sytue.eu")        // NO grantee
 	shared, err := st.EnsureSharedMailbox(ctx, "soporte@sytue.eu", "Soporte", 1<<30, ada.Subject)
 	if err != nil {
 		t.Fatalf("EnsureSharedMailbox: %v", err)
@@ -49,7 +49,7 @@ func TestSharedMailboxDeliveryAndACL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MailboxByRole(shared inbox): %v", err)
 	}
-	msg := seedMessage(t, ctx, st, shared, inbox.ID, "Ticket #1", "cliente@x.com", nil)
+	msg := seedMessage(ctx, t, st, shared, inbox.ID, "Ticket #1", "cliente@x.com", nil)
 
 	// Conceder a Ben acceso de lectura al buzón compartido.
 	if err := st.GrantAccess(ctx, shared.ID, "ben@sytue.eu", domain.PermRead); err != nil {
@@ -98,8 +98,8 @@ func TestSharedSendIdentityAndRevoke(t *testing.T) {
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
 
-	ada := seedAccount(t, ctx, st, "ada@sytue.eu")
-	ben := seedAccount(t, ctx, st, "ben@sytue.eu")
+	ada := seedAccount(ctx, t, st, "ada@sytue.eu")
+	ben := seedAccount(ctx, t, st, "ben@sytue.eu")
 	shared, err := st.EnsureSharedMailbox(ctx, "ventas@sytue.eu", "Ventas", 1<<30, ada.Subject)
 	if err != nil {
 		t.Fatalf("EnsureSharedMailbox: %v", err)
@@ -135,8 +135,8 @@ func TestDelegationOfPersonalMailbox(t *testing.T) {
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
 
-	director := seedAccount(t, ctx, st, "director@sytue.eu")
-	asst := seedAccount(t, ctx, st, "asst@sytue.eu")
+	director := seedAccount(ctx, t, st, "director@sytue.eu")
+	asst := seedAccount(ctx, t, st, "asst@sytue.eu")
 
 	// El directivo delega su buzón PERSONAL en el asistente (enviar-en-nombre-de).
 	if err := st.GrantAccess(ctx, director.ID, "asst@sytue.eu", domain.PermSend); err != nil {
@@ -161,8 +161,8 @@ func TestSharedACLTenantIsolation(t *testing.T) {
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
 
-	ada := seedAccount(t, ctx, st, "ada@sytue.eu")
-	ben := seedAccount(t, ctx, st, "ben@sytue.eu")
+	ada := seedAccount(ctx, t, st, "ada@sytue.eu")
+	ben := seedAccount(ctx, t, st, "ben@sytue.eu")
 	shared, err := st.EnsureSharedMailbox(ctx, "soporte@sytue.eu", "Soporte", 1<<30, ada.Subject)
 	if err != nil {
 		t.Fatalf("EnsureSharedMailbox: %v", err)

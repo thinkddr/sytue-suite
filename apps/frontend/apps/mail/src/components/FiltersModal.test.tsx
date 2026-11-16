@@ -11,23 +11,32 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { expect, test } from 'bun:test';
 import { render } from 'preact';
 import { act } from 'preact/test-utils';
+import type { Mailbox } from '../client/mailApi.js';
 
 if (typeof document === 'undefined') GlobalRegistrator.register();
 
+/** Las reglas que devuelve el servidor simulado (cada prueba pone las suyas). */
+let reglas: unknown[] = [];
+
 globalThis.fetch = (async () =>
-  new Response(JSON.stringify({ filters: [] }), {
+  new Response(JSON.stringify({ filters: reglas }), {
     status: 200,
     headers: { 'content-type': 'application/json' },
   })) as unknown as typeof fetch;
 
 const { FiltersModal } = await import('./FiltersModal.js');
+const { reglaDeBloqueo } = await import('../lib/bloqueoRemitente.js');
+const { useT } = await import('../i18n/index.js');
 
-async function montar(initial?: { matchFrom: string }): Promise<HTMLElement> {
+async function montar(
+  initial?: { matchFrom: string },
+  mailboxes: Mailbox[] = [],
+): Promise<HTMLElement> {
   const host = document.createElement('div');
   document.body.appendChild(host);
   await act(async () => {
     render(
-      <FiltersModal locale="es" open mailboxes={[]} onClose={() => {}} initial={initial} />,
+      <FiltersModal locale="es" open mailboxes={mailboxes} onClose={() => {}} initial={initial} />,
       host,
     );
   });
@@ -52,5 +61,22 @@ test('sin remitente, se abre la lista', async () => {
   await montar();
   expect(remitente()).toBeUndefined();
   expect(document.body.textContent).toContain('Crear regla');
+  document.body.innerHTML = '';
+});
+
+test('la regla de «Bloquear a …» se lee en «Reglas»: su nombre y «→ Spam»', async () => {
+  const t = useT('es');
+  const regla = reglaDeBloqueo(
+    'ana@example.org',
+    'junk',
+    t('reader.block', { sender: 'ana@example.org' }),
+  );
+  reglas = [{ id: 'r1', priority: 0, markRead: false, markFlagged: false, ...regla }];
+  const spam: Mailbox = { id: 'junk', name: 'Junk', role: 'junk', totalEmails: 0, unreadEmails: 0 };
+  await montar(undefined, [spam]);
+  const texto = document.body.textContent ?? '';
+  expect(texto).toContain('Bloquear a ana@example.org');
+  expect(texto).toContain('Spam');
+  reglas = [];
   document.body.innerHTML = '';
 });

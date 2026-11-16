@@ -61,7 +61,7 @@ func (f storageFileIO) readRange(ctx context.Context, ref EventRef, object, revi
 	for cursor := offset; cursor < end; {
 		index := int(cursor / storage.MaxCipherBlockBytes)
 		descriptor, err := f.leafAt(ctx, file, index, cache)
-		block := descriptor.at(f.scope, object, revision, index)
+		block := descriptor.At(f.scope, object, revision, index)
 		if err != nil {
 			clear(out)
 			return nil, err

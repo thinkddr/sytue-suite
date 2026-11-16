@@ -134,13 +134,13 @@ export function EditorHeader({ ctx }: { ctx: EditorContext }): JSX.Element {
     let cambia = false;
     for (const pc of ctx.peerCursors) {
       if (!pc.name.trim()) continue;
-      const nombre = peerName(pc.name);
+      const nombre = peerName(pc.name, t('header.peerUnnamed'));
       if (nombresRef.current.get(pc.id) === nombre) continue;
       nombresRef.current.set(pc.id, nombre);
       cambia = true;
     }
     if (cambia) setNombres(new Map(nombresRef.current));
-  }, [ctx.peerCursors]);
+  }, [ctx.peerCursors, t]);
   const [abiertoEn] = useState(() => Date.now());
   const [anuncio, setAnuncio] = useState({ texto: '', n: 0 });
   useEffect(() => {

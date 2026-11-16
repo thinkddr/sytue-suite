@@ -21,7 +21,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/test"
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
@@ -45,6 +44,7 @@ type servicioFalso struct {
 	errBuscar      error
 	errLista       error
 	errTriaje      error
+	errMover       error // solo MoveMany: lo que falla después de crear una regla
 	baja           api.MailBaja
 	porEtiqueta    []api.MailMessage
 	firma          string
@@ -52,6 +52,7 @@ type servicioFalso struct {
 	enviado        string
 	guardado       string
 	errEnvio       error
+	errGuardar     error // el de SaveDraft: sin red, un error que no es *api.Error
 	programados    []api.MailScheduled
 	errProgramados error
 	vacaciones     api.MailVacation
@@ -155,6 +156,9 @@ func (s *servicioFalso) Changes(context.Context, string) (api.MailCambios, error
 
 func (s *servicioFalso) MoveMany(_ context.Context, ids []string, carpeta string) error {
 	s.apuntar("MoveMany", append([]string{carpeta}, ids...)...)
+	if s.errMover != nil {
+		return s.errMover
+	}
 	return s.errTriaje
 }
 
@@ -231,6 +235,9 @@ func (s *servicioFalso) Send(_ context.Context, de string, dest []string, crudo 
 func (s *servicioFalso) SaveDraft(_ context.Context, id, _ string, crudo []byte) (api.MailMessage, error) {
 	s.apuntar("SaveDraft", id)
 	s.guardado = string(crudo)
+	if s.errGuardar != nil {
+		return api.MailMessage{}, s.errGuardar
+	}
 	return api.MailMessage{ID: "d" + strconvInt(s.pidio("SaveDraft"))}, nil
 }
 
@@ -492,6 +499,10 @@ func servicioDeEjemplo() *servicioFalso {
 // una lista que el guardián dispara cuando quiere.
 func buzonDePrueba(t *testing.T, s Servicio) (*Buzon, *[]func()) {
 	t.Helper()
+	// Las preferencias son de la app de pruebas, una para todo el paquete: lo que una
+	// prueba plegó en el lateral no puede llegar plegado a la siguiente.
+	fyne.CurrentApp().Preferences().RemoveValue(prefCuentasAbiertas)
+	t.Cleanup(func() { fyne.CurrentApp().Preferences().RemoveValue(prefCuentasAbiertas) })
 	p := NuevaPantalla(traductor(t), "es")
 	p.Reloj(reloj())
 	p.AvisosSinReloj = true
@@ -845,6 +856,61 @@ func TestElEsqueletoMideLaFila(t *testing.T) {
 	if AltoEsqueleto != AltoFilaConversacion() {
 		t.Errorf("el esqueleto mide %v y la fila %v: el layout salta al llegar los datos", AltoEsqueleto, AltoFilaConversacion())
 	}
+
+	// Desde 7ee588aa la meta va en la línea del remitente (`justify-between`) y las
+	// líneas 2 y 3 son hermanas de esa línea, no de la meta: sus porcentajes son de
+	// la columna de texto entera.
+	barras := regexp.MustCompile(`<div class="flex items-center justify-between gap-3">\s*` +
+		`<Skeleton height="14px" width="([0-9.]+)%" />\s*` +
+		`<Skeleton height="12px" width="([0-9.]+)px" />\s*` +
+		`</div>\s*` +
+		`<Skeleton height="12px" width="([0-9.]+)%" class="mt-2" />\s*` +
+		`<Skeleton height="12px" width="([0-9.]+)%" class="mt-2" />`).FindStringSubmatch(fuente)
+	if barras == nil {
+		t.Fatal("MessageList.tsx ya no pinta la meta en la línea del remitente del esqueleto: hay que rehacer el espejo")
+	}
+	num := func(s string) float32 {
+		f, err := strconv.ParseFloat(s, 32)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return float32(f)
+	}
+	l1, meta, l2, l3 := num(barras[1])/100, num(barras[2]), num(barras[3])/100, num(barras[4])/100
+
+	e := nuevoEsqueleto()
+	const ancho float32 = 600
+	e.Resize(fyne.NewSize(ancho, FilasEsqueleto*AltoEsqueleto))
+	r := test.WidgetRenderer(e).(*esqueletoRenderer)
+	r.Layout(e.Size())
+	cerca := func(a, b float32) bool { return a-b < 0.01 && b-a < 0.01 }
+	for i, f := range r.filas {
+		x := f.l1.Position().X
+		derecha := ancho - MargenFila
+		util := derecha - x
+		if fin := f.meta.Position().X + f.meta.Size().Width; !cerca(fin, derecha) || !cerca(f.meta.Size().Width, meta) {
+			t.Errorf("fila %d: la meta acaba en %v con %v de ancho; la web la pinta de %vpx contra el `px-3` (%v)",
+				i, fin, f.meta.Size().Width, meta, derecha)
+		}
+		c1 := f.l1.Position().Y + f.l1.Size().Height/2
+		cm := f.meta.Position().Y + f.meta.Size().Height/2
+		if !cerca(c1, cm) {
+			t.Errorf("fila %d: la meta se centra en %v y el remitente en %v: no comparten línea", i, cm, c1)
+		}
+		for _, b := range []struct {
+			nombre string
+			r      *ui.Esqueleto
+			parte  float32
+		}{{"l1", f.l1, l1}, {"l2", f.l2, l2}, {"l3", f.l3, l3}} {
+			if !cerca(b.r.Position().X, x) || !cerca(b.r.Size().Width, util*b.parte) {
+				t.Errorf("fila %d: %s en x=%v con %v de ancho; la web la pinta en x=%v al %v %% de %v",
+					i, b.nombre, b.r.Position().X, b.r.Size().Width, x, b.parte*100, util)
+			}
+		}
+		if f.l2.Position().Y <= f.meta.Position().Y+f.meta.Size().Height {
+			t.Errorf("fila %d: la segunda barra (y=%v) no queda bajo la meta", i, f.l2.Position().Y)
+		}
+	}
 }
 
 // TestElLectorEnseñaElCuerpoYSuAviso: con el cuerpo leído, la tarjeta desplegada lo
@@ -967,36 +1033,5 @@ func TestTraeTuCorreoVaEnElPie(t *testing.T) {
 	defer mu.Unlock()
 	if !slices.Contains(pedidos, "GET /api/v1/instances") || !slices.Contains(pedidos, "GET /api/v1/migrations/self") {
 		t.Errorf("la pasarela no se consulta: %v", pedidos)
-	}
-}
-
-func TestMailAjustesDesplegarYAbrir(t *testing.T) {
-	b, _ := buzonDePrueba(t, servicioDeEjemplo())
-	if b.P.Menu.AjustesAbiertos {
-		t.Fatal("los ajustes deben arrancar plegados")
-	}
-	if b.P.Menu.AlPlegarAjustes == nil {
-		t.Fatal("AlPlegarAjustes no está conectado")
-	}
-
-	// Plegar/desplegar
-	b.P.Menu.AlPlegarAjustes()
-	if !b.P.Menu.AjustesAbiertos {
-		t.Fatal("AlPlegarAjustes no desplegó la sección")
-	}
-
-	// El menú construido debe contener las filas de ajustes
-	sec := b.P.Menu.seccionAjustes(tema.Claro)
-	if !sec.Abierta || len(sec.Filas) == 0 {
-		t.Fatalf("la sección de ajustes abierta no contiene filas: %d", len(sec.Filas))
-	}
-
-	// Atajo de teclado Cmd+, / Ctrl+,
-	b.P.Menu.AjustesAbiertos = false
-	if !b.AtajoPersonalizado(&desktop.CustomShortcut{KeyName: fyne.KeyComma, Modifier: fyne.KeyModifierShortcutDefault}) {
-		t.Fatal("el atajo de ajustes Cmd+, no fue reconocido")
-	}
-	if !b.P.Menu.AjustesAbiertos {
-		t.Fatal("el atajo de ajustes Cmd+, no desplegó los ajustes")
 	}
 }

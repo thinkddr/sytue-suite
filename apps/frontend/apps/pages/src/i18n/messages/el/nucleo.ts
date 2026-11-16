@@ -162,7 +162,6 @@ export const nucleo = {
   'legal.phone': 'Τηλέφωνο',
   'legal.registry': 'Στοιχεία μητρώου (ΓΕΜΗ / Εμπορικό Μητρώο)',
   'legal.privacy_contact': 'Υπεύθυνος επικοινωνίας απορρήτου (DPO)',
-  'legal.save': 'Αποθήκευση νομικών στοιχείων',
   'legal.saved': 'Τα νομικά στοιχεία αποθηκεύτηκαν',
 
   'settings.title': 'Ρυθμίσεις ιστοτόπου',
@@ -364,6 +363,17 @@ export const nucleo = {
   'legal.ph_privacy': 'dpo@paradeigma.gr',
   'legal.ph_registry': 'Αρ. ΓΕΜΗ 123456789000',
   'legal.err_generic': 'Δεν ήταν δυνατή η αποθήκευση των νομικών στοιχείων. Δοκιμάστε ξανά.',
+  'legal.section_holder': 'Κάτοχος',
+  'legal.section_holder_desc': 'Ποιος είναι ο κάτοχος του ιστότοπου και πώς είναι καταχωρισμένος.',
+  'legal.section_address': 'Έδρα',
+  'legal.section_address_desc': 'Η ταχυδρομική διεύθυνση που εμφανίζεται στη νομική σημείωση.',
+  'legal.section_contact': 'Επικοινωνία',
+  'legal.section_contact_desc':
+    'Πώς μπορούν να επικοινωνήσουν μαζί σας οι επισκέπτες και οι αρχές.',
+  'legal.save_section': 'Αποθήκευση',
+  'legal.unsaved': 'Μη αποθηκευμένες αλλαγές',
+  'legal.section_complete': 'Πλήρες',
+  'legal.section_incomplete': 'Ελλιπές',
 
   'settings.tab': 'Ρυθμίσεις',
   'settings.intro': 'Όνομα, διεύθυνση και γενικές επιλογές του ιστοτόπου.',

@@ -293,6 +293,18 @@ func filasDePagina(filas ...fyne.CanvasObject) fyne.CanvasObject {
 	return container.New(ui.Margen{Izq: -tema.Espacio(2), Der: -tema.Espacio(2)}, container.New(ui.Columna{Hueco: 1}, filas...))
 }
 
+// Las filas de carga de «Tareas» y «Compartidas conmigo» (`rows` de su `SkeletonRows`).
+const (
+	FilasEsqueletoTareas      = 5
+	FilasEsqueletoCompartidas = 4
+)
+
+// filasDeCarga son las filas comunes de carga (`<SkeletonRows class="-mx-2">`) de una
+// página: sangradas 8 px hacia fuera como las filas de verdad (`filasDePagina`).
+func filasDeCarga(n, lineas int) fyne.CanvasObject {
+	return container.New(ui.Margen{Izq: -tema.Espacio(2), Der: -tema.Espacio(2)}, ui.NuevasFilasEsqueleto(n, ui.SinDelantero, lineas))
+}
+
 // celdaFila es la columna fija del glifo de una fila (`.notes-stream-glyph`, `w-5`).
 func celdaFila(dentro fyne.CanvasObject) fyne.CanvasObject {
 	return container.New(&celdaGlifo{lado: ColumnaGlifoFila}, dentro)

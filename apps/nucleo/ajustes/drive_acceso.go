@@ -5,13 +5,9 @@ package ajustes
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
-	"regexp"
 	"time"
 )
 
@@ -20,17 +16,7 @@ import (
 const FicheroAccesoDrive = "drive-acceso.json"
 
 // AccesoDrive autoriza una identidad opaca y una revisión estable de su sesión.
-type AccesoDrive struct {
-	Version   int    `json:"version"`
-	Identidad string `json:"identity_hash"`
-	Revision  string `json:"revision"`
-	Activo    bool   `json:"active"`
-}
-
-var (
-	hashDrive     = regexp.MustCompile(`^[0-9a-f]{64}$`)
-	revisionDrive = regexp.MustCompile(`^[0-9a-f]{32}$`)
-)
+type AccesoDrive = AccesoSesion
 
 // LeerAccesoDrive falla cerrado: no se autoriza con una marca ausente o ilegible.
 func LeerAccesoDrive() (AccesoDrive, error) {
@@ -41,17 +27,7 @@ func LeerAccesoDrive() (AccesoDrive, error) {
 	return leerAccesoDrive(filepath.Join(dir, FicheroAccesoDrive))
 }
 
-func leerAccesoDrive(ruta string) (AccesoDrive, error) {
-	b, err := os.ReadFile(ruta)
-	if err != nil {
-		return AccesoDrive{}, err
-	}
-	var a AccesoDrive
-	if len(b) > 1024 || json.Unmarshal(b, &a) != nil || a.Version != 1 || !revisionDrive.MatchString(a.Revision) || (a.Activo && !hashDrive.MatchString(a.Identidad)) {
-		return AccesoDrive{}, errors.New("ajustes: marca de acceso a Drive inválida")
-	}
-	return a, nil
-}
+func leerAccesoDrive(ruta string) (AccesoDrive, error) { return leerAcceso(ruta) }
 
 // PonerAccesoDrive conserva la revisión al renovar la misma identidad. Cerrar,
 // cambiar de cuenta y volver a entrar la cambian, incluso A→B→A. La extensión
@@ -88,31 +64,7 @@ func PonerAccesoDriveCon(ctx context.Context, identidad string, activo bool) (er
 }
 
 func escribirAccesoDrive(ruta, identidad string, activo bool, escribir func(string, []byte) error, quitar func(string) error) error {
-	if activo && !hashDrive.MatchString(identidad) {
-		return errors.New("ajustes: identidad de Drive inválida")
-	}
-	previo, _ := leerAccesoDrive(ruta)
-	if previo.Version == 1 && previo.Activo == activo && previo.Identidad == identidad {
-		return nil
-	}
-	nonce := make([]byte, 16)
-	if _, err := rand.Read(nonce); err != nil {
-		return err
-	}
-	actual := AccesoDrive{1, identidad, hex.EncodeToString(nonce), activo}
-	b, err := json.Marshal(actual)
-	if err != nil {
-		return err
-	}
-	if err = escribir(ruta, b); err != nil {
-		// Nunca se conserva una autorización anterior si no se pudo sustituirla.
-		borrar := quitar(ruta)
-		if errors.Is(borrar, os.ErrNotExist) {
-			borrar = nil
-		}
-		return errors.Join(err, borrar)
-	}
-	return nil
+	return escribirAcceso(ruta, identidad, activo, escribir, quitar)
 }
 
 // Los escritores activos mantienen CerrojoSesion durante su publicación. Un

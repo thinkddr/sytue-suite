@@ -199,15 +199,28 @@ func TestElTituloSeMandaTrasLaPausa(t *testing.T) {
 }
 
 // TestUnFalloCedeLaPantallaEntera: como en la web, si el documento no se puede abrir el
-// editor desaparece y queda el aviso con «Reintentar» y «Volver».
+// editor desaparece y queda el aviso con «Reintentar» —que vuelve a pedirlo— y «Volver».
 func TestUnFalloCedeLaPantallaEntera(t *testing.T) {
-	a := appDePrueba(t, &servicioDocs{fallo: http.StatusInternalServerError})
+	servicio := &servicioDocs{rol: "owner", html: "<p>Hola</p>", fallo: http.StatusInternalServerError}
+	a := appDePrueba(t, servicio)
 	a.AbrirID("d1", "")
 	if a.abierto.ctx.Estado != editor.Error {
 		t.Errorf("con un 500 el editor queda en %v", a.abierto.ctx.Estado)
 	}
 	if a.raiz.Objects[0] == fyne.CanvasObject(a.abierto.marco) {
 		t.Error("con el documento sin abrir sigue enseñándose el editor vacío")
+	}
+	// «Reintentar» vuelve a pedir el documento: con el servicio ya bien, se abre.
+	ctx := a.abierto.ctx
+	if ctx.Reintentar == nil {
+		t.Fatal("el error no ofrece «Reintentar»")
+	}
+	servicio.mu.Lock()
+	servicio.fallo = 0
+	servicio.mu.Unlock()
+	ctx.Reintentar()
+	if a.abierto.ctx.Estado != editor.Listo || a.raiz.Objects[0] != fyne.CanvasObject(a.abierto.marco) {
+		t.Errorf("tras «Reintentar» el editor queda en %v", a.abierto.ctx.Estado)
 	}
 	a.Volver()
 	if a.raiz.Objects[0] != a.portada.Objeto() {
@@ -465,16 +478,15 @@ func TestLosComentariosSonHilos(t *testing.T) {
 	a, _ := abrirParaEscribir(t, s)
 	a.panelComentarios(a.abierto)
 	c := a.abierto.comentarios
-	raices, resp := hilos(c.lista)
+	raices, resp := editor.Hilos(c.Lista())
 	if len(raices) != 1 || raices[0].ID != "c1" || len(resp["c1"]) != 1 || raices[0].AnchorText() != "Alcance" {
 		t.Fatalf("los hilos: %+v %+v", raices, resp)
 	}
-	if !c.enviar.Inerte {
+	if !c.Enviar.Inerte {
 		t.Error("con el campo vacío, «Comentar» tiene que estar apagado")
 	}
-	c.nuevo.PonerTexto("  Mira esto  ")
-	c.pintarEnviar()
-	c.enviar.Tapped(nil)
+	c.Nuevo.PonerTexto("  Mira esto  ")
+	c.Enviar.Tapped(nil)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if len(s.comentados) != 1 || s.comentados[0] != `{"body":"Mira esto"}` {

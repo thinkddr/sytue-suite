@@ -166,6 +166,9 @@ func TestAdminOIDCClient_CreateAndCodeFlow(t *testing.T) {
 		t.Fatalf("borrado: código=%d body=%s", rr.Code, rr.Body)
 	}
 	rr, list = l.do(t, http.MethodGet, "/api/v1/admin/apps/oidc-clients", adminTok, nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("listado OIDC: código=%d", rr.Code)
+	}
 	if items, _ := list["items"].([]any); len(items) != 0 {
 		t.Fatalf("tras borrar, el listado debería quedar vacío: %v", list)
 	}
@@ -206,6 +209,9 @@ func TestAdminOIDCClient_OrgIsolation(t *testing.T) {
 	}
 	// El client sigue vivo para su dueña.
 	rr, list = l.do(t, http.MethodGet, "/api/v1/admin/apps/oidc-clients", tokA, nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("listado OIDC: código=%d", rr.Code)
+	}
 	if items, _ := list["items"].([]any); len(items) != 1 {
 		t.Fatalf("acme debería conservar su client: %v", list)
 	}

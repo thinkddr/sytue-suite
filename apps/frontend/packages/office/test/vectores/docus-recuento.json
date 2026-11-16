@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "nota": "Recuento detallado de Docus: un texto (párrafos separados por saltos de línea) y sus cifras. «Blanco» es exactamente el `\\s` de JavaScript, no el `unicode.IsSpace` de Go (que también toma U+0085 y no U+FEFF). Los caracteres son puntos de código sin los saltos de línea. La web los recorre en docs-recuento.test.tsx y Go en editor/recuento_test.go.",
+  "casos": [
+    {
+      "nombre": "vacío",
+      "texto": "",
+      "esperado": { "palabras": 0, "caracteres": 0, "caracteresSinEspacios": 0, "parrafos": 0 }
+    },
+    {
+      "nombre": "una frase",
+      "texto": "Hola mundo",
+      "esperado": { "palabras": 2, "caracteres": 10, "caracteresSinEspacios": 9, "parrafos": 1 }
+    },
+    {
+      "nombre": "dos párrafos: el salto no es un carácter",
+      "texto": "Uno dos\nTres",
+      "esperado": { "palabras": 3, "caracteres": 11, "caracteresSinEspacios": 10, "parrafos": 2 }
+    },
+    {
+      "nombre": "las líneas en blanco no son párrafos, pero sus espacios sí son caracteres",
+      "texto": "A\n\n  \nB",
+      "esperado": { "palabras": 2, "caracteres": 4, "caracteresSinEspacios": 2, "parrafos": 2 }
+    },
+    {
+      "nombre": "el fin de línea de Windows cuenta como un solo salto",
+      "texto": "uno\r\ndos",
+      "esperado": { "palabras": 2, "caracteres": 6, "caracteresSinEspacios": 6, "parrafos": 2 }
+    },
+    {
+      "nombre": "el espacio duro separa palabras",
+      "texto": "uno dos",
+      "esperado": { "palabras": 2, "caracteres": 7, "caracteresSinEspacios": 6, "parrafos": 1 }
+    },
+    {
+      "nombre": "espacio estrecho e ideográfico",
+      "texto": "a b　c",
+      "esperado": { "palabras": 3, "caracteres": 5, "caracteresSinEspacios": 3, "parrafos": 1 }
+    },
+    {
+      "nombre": "el tabulador es un blanco",
+      "texto": "a\tb",
+      "esperado": { "palabras": 2, "caracteres": 3, "caracteresSinEspacios": 2, "parrafos": 1 }
+    },
+    {
+      "nombre": "la marca de orden de bytes es blanco, como en JavaScript",
+      "texto": "﻿hola",
+      "esperado": { "palabras": 1, "caracteres": 5, "caracteresSinEspacios": 4, "parrafos": 1 }
+    },
+    {
+      "nombre": "U+0085 no es blanco, aunque Go diga que sí",
+      "texto": "a\u0085b",
+      "esperado": { "palabras": 1, "caracteres": 3, "caracteresSinEspacios": 3, "parrafos": 1 }
+    },
+    {
+      "nombre": "el espacio de anchura cero no separa",
+      "texto": "a​b",
+      "esperado": { "palabras": 1, "caracteres": 3, "caracteresSinEspacios": 3, "parrafos": 1 }
+    },
+    {
+      "nombre": "un emoji es un carácter y no dos unidades UTF-16",
+      "texto": "café 🙂 ñ",
+      "esperado": { "palabras": 3, "caracteres": 8, "caracteresSinEspacios": 6, "parrafos": 1 }
+    },
+    {
+      "nombre": "la puntuación suelta cuenta como palabra, como en la barra",
+      "texto": "dos , sin",
+      "esperado": { "palabras": 3, "caracteres": 9, "caracteresSinEspacios": 7, "parrafos": 1 }
+    },
+    {
+      "nombre": "el separador de línea Unicode separa palabras pero no párrafos",
+      "texto": "uno dos",
+      "esperado": { "palabras": 2, "caracteres": 7, "caracteresSinEspacios": 6, "parrafos": 1 }
+    }
+  ]
+}

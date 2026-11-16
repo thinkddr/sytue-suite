@@ -9,10 +9,9 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
-
-	"git.sytue.eu/sytue/one/apps/fyne/agenda"
 )
 
 // TestSinRedSeQuedaEnSoloLectura es el efecto de `offline` en ContactsApp.tsx: al irse
@@ -33,7 +32,7 @@ func TestSinRedSeQuedaEnSoloLectura(t *testing.T) {
 		t.Fatalf("sin red: solo lectura %v, encima %v, marcados %v",
 			a.Pantalla.SinConexion, a.lienzo().Overlays().Top(), a.marcados)
 	}
-	if a.Pantalla.Estado != agenda.Exito || len(a.Pantalla.Contactos) != 2 {
+	if a.Pantalla.Estado != ui.EstadoExito || len(a.Pantalla.Contactos) != 2 {
 		t.Errorf("lo ya cargado tiene que seguir viéndose: %v, %d", a.Pantalla.Estado, len(a.Pantalla.Contactos))
 	}
 	red.Report(offline.Online)
@@ -57,12 +56,12 @@ func TestSinRedYSinCopiaDiceSinConexionYVuelveSolo(t *testing.T) {
 	a.Conexion(red)
 	red.Report(offline.Offline)
 	a.Cargar()
-	if a.Pantalla.Estado != agenda.SinConexion {
+	if a.Pantalla.Estado != ui.EstadoSinConexion {
 		t.Fatalf("sin red y sin copia: estado %v", a.Pantalla.Estado)
 	}
 	antes := pedidas.Load()
 	red.Report(offline.Online)
-	if pedidas.Load() == antes || a.Pantalla.Estado != agenda.Error {
+	if pedidas.Load() == antes || a.Pantalla.Estado != ui.EstadoError {
 		t.Errorf("al volver la red no se ha vuelto a pedir (%d → %d, estado %v)", antes, pedidas.Load(), a.Pantalla.Estado)
 	}
 }

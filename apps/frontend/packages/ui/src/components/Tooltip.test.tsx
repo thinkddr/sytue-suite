@@ -2,16 +2,17 @@
  * Tests de Tooltip. Lo que se guarda aquí es que la ayuda LLEGUE a quien no la ve: un
  * tooltip que se pinta pero no se anuncia es decoración.
  *
- * Se abre por PUNTERO y no por foco a propósito: happy-dom no propaga `focus` en fase de
- * captura, que es como lo escucha el componente, así que un test de teclado aquí daría un
- * falso fallo. El camino de foco se comprueba en los e2e, con navegador de verdad.
+ * La v2 no envuelve el control: los manejadores van en él mismo (sin fase de captura,
+ * que happy-dom no propaga), así que el camino de TECLADO sí se prueba aquí con `focus()`.
+ * El panel vive en un portal: se busca en `document`, no dentro del host.
  *
  * Ejecutar: `bun test`.
  */
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { expect, test } from 'bun:test';
 import { render } from 'preact';
-import { Tooltip } from './Tooltip.js';
+import { IconButton } from './IconButton.js';
+import { colocarTooltip, Tooltip } from './Tooltip.js';
 
 if (typeof document === 'undefined') GlobalRegistrator.register();
 
@@ -22,7 +23,6 @@ function montar(ui: preact.JSX.Element): HTMLElement {
   return host;
 }
 
-/** Entra el puntero en el envoltorio y espera a que venza el retardo. */
 /**
  * Espera a que se cumpla la condición, cediendo el turno.
  *
@@ -47,72 +47,61 @@ async function hasta(cond: () => boolean, que: string, limite = 4000): Promise<v
   if (!cond()) throw new Error(`no se cumplió en ${limite} ms: ${que}`);
 }
 
-/**
- * Abre la ayuda por los DOS caminos que la abren.
- *
- * El foco la abre al instante y el puntero espera 300 ms. Depender solo del
- * temporizador dejaba este test rojo cuando el CI corre todo el workspace a la
- * vez —agotaba los 5 s enteros esperando a que el plazo venciera—, y no es
- * lentitud del componente: sin ese plazo de por medio no hay nada que esperar.
- * Se despachan los dos porque cada uno cubre al otro: si happy-dom propaga el
- * `focus` en captura, el tooltip está en el DOM sin temporizador ninguno; si no
- * lo propaga —que es por lo que este fichero abre por puntero—, queda el camino
- * de siempre. El camino de teclado con navegador de verdad se cubre en los e2e.
- */
-async function apuntar(host: HTMLElement): Promise<void> {
-  const envoltorio = host.querySelector('span')!;
-  envoltorio.dispatchEvent(new FocusEvent('focus'));
-  envoltorio.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
-  await hasta(() => host.querySelector('[role="tooltip"]') !== null, 'la ayuda se abre');
-}
+const ayuda = (): HTMLElement | null => document.querySelector('[role="tooltip"]');
 
-test('la descripción cuelga del CONTROL, no del envoltorio', async () => {
-  const host = montar(
-    <Tooltip label="Negrita (Ctrl+B)">
-      <button type="button">B</button>
-    </Tooltip>,
-  );
-  await apuntar(host);
-
-  const btn = host.querySelector('button')!;
-  // Si el atributo se queda en el <span> que envuelve, el lector de pantalla que enfoca
-  // el BOTÓN no lee nada: el tooltip se ve y no se anuncia.
-  const descrito = btn.getAttribute('aria-describedby');
-  expect(descrito).toBeTruthy();
-  // Y el id debe existir de verdad: apuntar a la nada no anuncia nada, y no hay forma
-  // de notarlo mirando la pantalla.
-  expect(host.querySelector(`#${descrito}`)?.textContent).toContain('Negrita');
-  render(null, host);
-});
-
-test('Escape lo cierra: es ayuda, no un diálogo que atrape al usuario', async () => {
+test('no añade nodos: el control es el mismo hijo directo, sin envoltorio', () => {
   const host = montar(
     <Tooltip label="Guardar">
       <button type="button">S</button>
     </Tooltip>,
   );
-  await apuntar(host);
-  expect(host.querySelector('[role="tooltip"]')).not.toBeNull();
+  // El <span> de la v1 es lo que impedía adoptarlo en la cinta: cambiaba la maquetación.
+  expect(host.childElementCount).toBe(1);
+  expect(host.firstElementChild?.tagName).toBe('BUTTON');
+  render(null, host);
+});
 
-  // La tecla se REENVÍA mientras se espera, no se despacha una sola vez.
-  //
-  // El componente engancha su listener de Escape en un `useEffect`, que Preact
-  // ejecuta DESPUÉS de pintar. Entre que la ayuda está en el DOM —que es lo que
-  // ve `apuntar`— y que el listener existe hay una ventana, y bajo carga (el CI
-  // corre el workspace entero a la vez) esa ventana se abre lo bastante para que
-  // el único Escape del test caiga antes: nadie lo escucha, la ayuda no se
-  // cierra y el test agota sus 4 s. Salía como un rojo intermitente del CI
-  // —2026-09-05, ci-frontend/quality— que aquí nunca se reproducía.
-  //
-  // Reenviarla no debilita nada: si el componente no cerrara con Escape, esto
-  // seguiría agotando el plazo igual.
+test('el foco del teclado la abre al instante y la descripción cuelga del CONTROL', async () => {
+  const host = montar(
+    <Tooltip label="Negrita (Ctrl+B)">
+      <button type="button">B</button>
+    </Tooltip>,
+  );
+  const btn = host.querySelector('button')!;
+  btn.focus();
+  await hasta(() => ayuda() !== null, 'el foco abre la ayuda');
+  // Si el atributo se queda en un envoltorio, el lector de pantalla que enfoca el BOTÓN
+  // no lee nada: el tooltip se ve y no se anuncia.
+  const descrito = btn.getAttribute('aria-describedby');
+  expect(descrito).toBeTruthy();
+  expect(document.getElementById(descrito!)?.textContent).toContain('Negrita');
+  // En un portal: un `overflow` de los antepasados del control ya no la recorta.
+  expect(host.contains(ayuda())).toBe(false);
+  // Y el DOM del control sigue sin ganar nodos con la ayuda abierta.
+  expect(host.childElementCount).toBe(1);
+  btn.blur();
+  await hasta(() => ayuda() === null, 'perder el foco la cierra');
+  expect(btn.hasAttribute('aria-describedby')).toBe(false);
+  render(null, host);
+});
+
+test('Escape la cierra: es ayuda, no un diálogo que atrape al usuario', async () => {
+  const host = montar(
+    <Tooltip label="Guardar">
+      <button type="button">S</button>
+    </Tooltip>,
+  );
+  host.querySelector('button')!.focus();
+  await hasta(() => ayuda() !== null, 'la ayuda se abre');
+  // La tecla se REENVÍA mientras se espera: el listener se engancha en un `useEffect`,
+  // que corre después de pintar, y bajo carga un único Escape podía caer antes.
   await hasta(() => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    return host.querySelector('[role="tooltip"]') === null;
+    return ayuda() === null;
   }, 'Escape la cierra');
-  expect(host.querySelector('[role="tooltip"]')).toBeNull();
   // El control sigue ahí: Escape descarta la ayuda, no la acción.
   expect(host.querySelector('button')).not.toBeNull();
+  host.querySelector('button')!.blur();
   render(null, host);
 });
 
@@ -122,19 +111,110 @@ test('sin puntero ni foco no hay nada que anunciar', () => {
       <button type="button">S</button>
     </Tooltip>,
   );
-  expect(host.querySelector('[role="tooltip"]')).toBeNull();
+  expect(ayuda()).toBeNull();
   expect(host.querySelector('button')!.hasAttribute('aria-describedby')).toBe(false);
   render(null, host);
 });
 
-test('el retardo existe: el tooltip no salta con solo rozar el control', () => {
+test('el retardo existe y es de GRUPO: la siguiente ayuda abre sin esperar', async () => {
+  const host = montar(
+    <div>
+      <Tooltip label="Uno">
+        <button type="button">1</button>
+      </Tooltip>
+      <Tooltip label="Dos">
+        <button type="button">2</button>
+      </Tooltip>
+    </div>,
+  );
+  const [uno, dos] = Array.from(host.querySelectorAll('button'));
+  uno!.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
+  // Rozar el control no basta: todavía no hay nada.
+  expect(ayuda()).toBeNull();
+  await hasta(() => ayuda()?.textContent === 'Uno', 'vence el retardo');
+  uno!.dispatchEvent(new MouseEvent('mouseleave', { bubbles: false }));
+  await hasta(() => ayuda() === null, 'salir la cierra');
+  dos!.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
+  // Recién cerrada la anterior, la vecina abre en el mismo turno, sin los 300 ms.
+  await hasta(() => ayuda()?.textContent === 'Dos', 'abre sin retardo', 50);
+  dos!.dispatchEvent(new MouseEvent('mouseleave', { bubbles: false }));
+  render(null, host);
+});
+
+test('conserva los manejadores propios del control', async () => {
+  let enfocado = 0;
   const host = montar(
     <Tooltip label="Guardar">
-      <button type="button">S</button>
+      <button type="button" onFocus={() => enfocado++}>
+        S
+      </button>
     </Tooltip>,
   );
-  host.querySelector('span')!.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
-  // Inmediatamente después de entrar el puntero todavía no hay nada.
-  expect(host.querySelector('[role="tooltip"]')).toBeNull();
+  host.querySelector('button')!.focus();
+  await hasta(() => ayuda() !== null, 'la ayuda se abre');
+  expect(enfocado).toBe(1);
+  host.querySelector('button')!.blur();
+  render(null, host);
+});
+
+test('queda dentro de una ventana de 320 px y se voltea si arriba no cabe', () => {
+  const antes = window.innerWidth;
+  Object.defineProperty(window, 'innerWidth', { value: 320, configurable: true });
+  Object.defineProperty(document.documentElement, 'clientWidth', {
+    value: 320,
+    configurable: true,
+  });
+  try {
+    // Un botón pegado al borde derecho y arriba del todo, como la campana de la barra.
+    const ancla = new DOMRect(300, 4, 24, 24);
+    const p = colocarTooltip(ancla, { width: 200, height: 24 }, 'top');
+    expect(p.left).toBeGreaterThanOrEqual(8);
+    expect(p.left + 200).toBeLessThanOrEqual(312);
+    expect(p.lado).toBe('bottom');
+    expect(p.top).toBeGreaterThanOrEqual(ancla.bottom);
+    // La flecha se corre hacia el control, hasta la esquina del panel.
+    expect(p.flecha).toBe(194);
+    // Pegado al borde izquierdo, igual.
+    const izq = colocarTooltip(new DOMRect(0, 200, 24, 24), { width: 200, height: 24 }, 'top');
+    expect(izq.left).toBe(8);
+    expect(izq.lado).toBe('top');
+    // El carril plegado: a la derecha, y a la izquierda si no cabe.
+    const der = colocarTooltip(new DOMRect(290, 100, 24, 24), { width: 120, height: 24 }, 'right');
+    expect(der.lado).toBe('left');
+    expect(der.left + 120).toBeLessThanOrEqual(312);
+  } finally {
+    Object.defineProperty(window, 'innerWidth', { value: antes, configurable: true });
+    delete (document.documentElement as unknown as Record<string, unknown>).clientWidth;
+  }
+});
+
+test('IconButton ya no emite `title`: su ayuda es visible con teclado', async () => {
+  const host = montar(
+    <IconButton label="Cerrar el panel">
+      <svg />
+    </IconButton>,
+  );
+  const btn = host.querySelector('button')!;
+  expect(btn.hasAttribute('title')).toBe(false);
+  expect(btn.getAttribute('aria-label')).toBe('Cerrar el panel');
+  expect(host.childElementCount).toBe(1);
+  btn.focus();
+  await hasta(() => ayuda()?.textContent === 'Cerrar el panel', 'el foco muestra la ayuda');
+  // La ayuda repite el nombre accesible: enlazarla haría que el lector lo leyera dos veces.
+  expect(btn.hasAttribute('aria-describedby')).toBe(false);
+  btn.blur();
+  render(null, host);
+});
+
+test('IconButton con showTitle={false} no muestra ayuda', async () => {
+  const host = montar(
+    <IconButton label="Cerrar" showTitle={false}>
+      <svg />
+    </IconButton>,
+  );
+  host.querySelector('button')!.focus();
+  await new Promise((r) => setTimeout(r, 20));
+  expect(ayuda()).toBeNull();
+  host.querySelector('button')!.blur();
   render(null, host);
 });

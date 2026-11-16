@@ -8,7 +8,8 @@
  * Ejecutar: cd apps/frontend && bun test packages/office/test/slides-protect.test.ts
  * (Fuera de src/ a propósito: astro check no typechequea este fichero.)
  */
-import { expect, test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
 import {
   alternarId,
   cambioProtegido,
@@ -95,6 +96,30 @@ test('lo que la protección fija', () => {
   };
   for (const [nombre, m] of Object.entries(cambios))
     expect([nombre, cambioProtegido(base, m)]).toEqual([nombre, true]);
+});
+
+/*
+ * Los VECTORES COMPARTIDOS con la app nativa (`vectores/diapos-proteccion.json`): los mismos
+ * casos los exige `apps/fyne/diapos/proteger_test.go` a `CambioProtegido`. Si uno se cambia,
+ * se cambia en los dos lados: son una sola regla escrita dos veces.
+ */
+describe('vectores compartidos con la app nativa', () => {
+  const vectores = JSON.parse(
+    readFileSync(new URL('./vectores/diapos-proteccion.json', import.meta.url), 'utf8'),
+  ) as {
+    base: SlidesModel;
+    casos: { nombre: string; antes?: SlidesModel; despues: SlidesModel; protegido: boolean }[];
+  };
+
+  test('hay casos que comprobar', () => {
+    expect(vectores.casos.length).toBeGreaterThan(20);
+  });
+
+  for (const caso of vectores.casos) {
+    test(caso.nombre, () => {
+      expect(cambioProtegido(caso.antes ?? vectores.base, caso.despues)).toBe(caso.protegido);
+    });
+  }
 });
 
 test('proteger es de cualquiera; sin protección nada se veta', () => {

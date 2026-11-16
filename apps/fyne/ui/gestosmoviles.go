@@ -404,12 +404,50 @@ func esControlDeEscritura(o fyne.CanvasObject) bool {
 	return false
 }
 
+// ZonaSinRefresco la implementa un widget con su propio gesto vertical: un toque que
+// EMPIEZA encima nunca es tirar para refrescar, aunque la lista que lo contiene esté
+// arriba del todo. Es el `data-sin-refresco` de `usePullToRefresh` en la web. La usa la
+// hoja del mes del teléfono de Calendar (su asa y su rejilla).
+type ZonaSinRefresco interface {
+	fyne.CanvasObject
+	ZonaSinRefresco()
+}
+
 func bloqueaRefrescoMovil(o fyne.CanvasObject) bool {
 	switch o.(type) {
-	case *BotonFlotante, *Aviso, *AsaArrastre:
+	case *BotonFlotante, *Aviso, *AsaArrastre, ZonaSinRefresco:
 		return true
 	}
 	return false
+}
+
+// MovilDePrueba hace que RefrescarAlTirar y la raíz de gestos se monten como en un
+// teléfono en los guardianes de OTROS paquetes (el driver de pruebas es de escritorio);
+// devuelve con qué volver a como estaba. Solo pruebas, como TactilDePrueba.
+func MovilDePrueba(si bool) (restaurar func()) {
+	antes := esMovil
+	esMovil = func() bool { return si }
+	return func() { esMovil = antes }
+}
+
+// TirarDePrueba pasa por el filtro de toques del teléfono un dedo que se apoya en `desde`
+// (coordenadas del lienzo) y baja `dy`, y dice si el filtro lo tomó por tirar para
+// refrescar; si pasó del umbral, ya llamó a `Actualizar`. Si no lo toma, el toque sigue
+// hasta el control de debajo, que es lo que haría el driver. Solo pruebas, para los
+// guardianes de OTROS paquetes, que no llegan a `gestosMoviles`.
+func TirarDePrueba(c fyne.Canvas, desde fyne.Position, dy float32) bool {
+	g := &gestosMoviles{canvas: c}
+	t0 := time.Unix(100, 0)
+	ev := func(f mobile.FilterPhase, y float32, ms int) mobile.FilterEvent {
+		return mobile.FilterEvent{Phase: f, ID: 1, Position: fyne.NewPos(desde.X, desde.Y+y), Time: t0.Add(time.Duration(ms) * time.Millisecond)}
+	}
+	if g.filtrar(ev(mobile.FilterBegin, 0, 0)) == mobile.FilterPass {
+		return false
+	}
+	g.filtrar(ev(mobile.FilterMove, dy/2, 50))
+	tomado := g.clase == gestoActualizar
+	g.filtrar(ev(mobile.FilterEnd, dy, 100))
+	return tomado
 }
 
 func puntoEnObjeto(d fyne.Driver, o fyne.CanvasObject, punto, rMin, rMax fyne.Position) bool {

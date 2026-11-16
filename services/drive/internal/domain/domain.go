@@ -11,21 +11,24 @@ package domain
 import (
 	"errors"
 	"math"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
+
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 )
 
 // Errores de dominio. La capa HTTP los traduce a *httpx.Error.
 var (
-	ErrNotFound      = errors.New("drive: recurso no encontrado")
-	ErrConflict      = errors.New("drive: conflicto de nombres")
-	ErrInvalidName   = errors.New("drive: nombre inválido")
-	ErrQuotaExceeded = errors.New("drive: cuota de almacenamiento superada")
-	ErrInvalidParent = errors.New("drive: carpeta destino inválida")
-	ErrShareExpired  = errors.New("drive: enlace de compartición expirado o revocado")
-	ErrPermission    = errors.New("drive: permiso insuficiente")
+	ErrPrivateStorageFrozen = errors.New("drive: el almacenamiento privado está migrándose; usa un cliente compatible con E2E")
+	ErrPrivateStorageEpoch  = errors.New("drive: la migración no corresponde a esta instantánea")
+	ErrNotFound             = errors.New("drive: recurso no encontrado")
+	ErrConflict             = errors.New("drive: conflicto de nombres")
+	ErrInvalidName          = errors.New("drive: nombre inválido")
+	ErrQuotaExceeded        = errors.New("drive: cuota de almacenamiento superada")
+	ErrInvalidParent        = errors.New("drive: carpeta destino inválida")
+	ErrShareExpired         = errors.New("drive: enlace de compartición expirado o revocado")
+	ErrPermission           = errors.New("drive: permiso insuficiente")
 	// ErrPasswordRequired indica que el enlace está protegido y falta (o no
 	// coincide) la prueba de contraseña: la ruta pública debe mostrar el prompt.
 	ErrPasswordRequired = errors.New("drive: el enlace requiere contraseña")
@@ -269,22 +272,7 @@ func (q Quota) DriveBytes() int64 {
 // ValidName valida un nombre de fichero/carpeta: no vacío, sin separadores de
 // ruta ni control, longitud razonable. (RFC 4918 §5.2 trata segmentos de ruta.)
 func ValidName(name string) bool {
-	name = strings.TrimSpace(name)
-	if name == "" || len(name) > 255 {
-		return false
-	}
-	if name == "." || name == ".." {
-		return false
-	}
-	if strings.ContainsAny(name, "/\\\x00") {
-		return false
-	}
-	for _, r := range name {
-		if r < 0x20 { // caracteres de control
-			return false
-		}
-	}
-	return true
+	return storage.ValidDriveName(name)
 }
 
 // ValidPermission valida un valor de permiso.

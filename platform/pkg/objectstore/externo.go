@@ -5,12 +5,24 @@ package objectstore
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/url"
 	"time"
 
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 )
+
+// ErrRawUnsupported means this provider cannot guarantee an untransformed read.
+// Callers verifying ciphertext must fail closed rather than falling back to Get.
+var ErrRawUnsupported = errors.New("objectstore: raw object reads unavailable")
+
+// RawBlobReader returns the representation delivered by the provider API,
+// without application or HTTP transparent decompression. This is not evidence
+// about physical storage or future availability. Close must cancel pending I/O.
+type RawBlobReader interface {
+	GetRaw(ctx context.Context, t tenancy.Tenant, key string) (io.ReadCloser, error)
+}
 
 // BlobStore es la superficie de blobs que comparten S3 y los almacenes conectados.
 // No cifra ni descifra contenido. Las claves, permisos y el cifrado de extremo

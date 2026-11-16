@@ -57,6 +57,78 @@ export function legalFaltante(legal: DatosLegales | undefined): CampoLegal[] {
   return faltan;
 }
 
+/**
+ * La ficha legal se edita y se guarda por bloques: quien corrige el teléfono no tiene por qué
+ * reenviar (ni pisar) el titular. Cada sección agrupa los campos que se rellenan juntos.
+ */
+export type SeccionLegal = 'titular' | 'direccion' | 'contacto';
+
+type CampoRaiz = Exclude<keyof DatosLegales, 'address'>;
+type CampoDireccion = keyof NonNullable<DatosLegales['address']>;
+export type CampoFicha = CampoRaiz | CampoDireccion;
+
+const DE_DIRECCION: ReadonlySet<string> = new Set(['street', 'postal_code', 'city', 'region']);
+
+export const SECCIONES_LEGAL: readonly SeccionLegal[] = ['titular', 'direccion', 'contacto'];
+
+export const CAMPOS_SECCION_LEGAL: Record<SeccionLegal, readonly CampoFicha[]> = {
+  titular: ['holder_name', 'tax_id', 'registry'],
+  direccion: ['country', 'street', 'postal_code', 'city', 'region'],
+  contacto: ['email', 'phone', 'privacy_contact'],
+};
+
+/** Valor de un campo de la ficha, esté en la raíz o en la dirección. */
+export function leerCampoLegal(legal: DatosLegales | undefined, k: CampoFicha): string {
+  if (DE_DIRECCION.has(k)) return legal?.address?.[k as CampoDireccion] ?? '';
+  return legal?.[k as CampoRaiz] ?? '';
+}
+
+/** Copia de `legal` con un campo cambiado (la dirección se copia también, no se comparte). */
+export function conCampoLegal(legal: DatosLegales, k: CampoFicha, v: string): DatosLegales {
+  if (DE_DIRECCION.has(k)) return { ...legal, address: { ...legal.address, [k]: v } };
+  return { ...legal, [k]: v };
+}
+
+/**
+ * Lo que se envía al guardar una sección: lo guardado en el servidor con solo los campos de esa
+ * sección tomados del borrador. Lo que se esté editando en otra sección no viaja.
+ */
+export function fusionarSeccionLegal(
+  guardado: DatosLegales | undefined,
+  borrador: DatosLegales,
+  seccion: SeccionLegal,
+): DatosLegales {
+  let resultado: DatosLegales = { ...guardado, address: { ...guardado?.address } };
+  for (const k of CAMPOS_SECCION_LEGAL[seccion]) {
+    resultado = conCampoLegal(resultado, k, leerCampoLegal(borrador, k));
+  }
+  return resultado;
+}
+
+/**
+ * Si la sección tiene cambios sin guardar. El país vacío cuenta como «ES», que es lo que enseña
+ * el formulario: si no, la dirección saldría siempre como pendiente en una ficha nueva.
+ */
+export function seccionLegalCambiada(
+  guardado: DatosLegales | undefined,
+  borrador: DatosLegales,
+  seccion: SeccionLegal,
+): boolean {
+  const base: DatosLegales = { ...guardado, country: guardado?.country || 'ES' };
+  return CAMPOS_SECCION_LEGAL[seccion].some(
+    (k) => leerCampoLegal(base, k).trim() !== leerCampoLegal(borrador, k).trim(),
+  );
+}
+
+/** Campos obligatorios que faltan, de entre los de una sección. */
+export function faltanEnSeccion(
+  faltan: readonly CampoLegal[],
+  seccion: SeccionLegal,
+): CampoLegal[] {
+  const campos: readonly string[] = CAMPOS_SECCION_LEGAL[seccion];
+  return faltan.filter((c) => campos.includes(c));
+}
+
 /** Cómo contesta el servicio cuando algo falla: `{ error: { code, message } }`. */
 export interface FalloApi {
   status: number;

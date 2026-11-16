@@ -759,8 +759,8 @@ func TestTuEstadoMide68x24(t *testing.T) {
 }
 
 // TestIrACanalLlevaSuTecla: el `kbd` de «Ctrl+G» va pegado al `px-2.5` de la derecha y
-// el rótulo se corta antes de él, con el `gap-2` de por medio. Su filete es el
-// `sidebar-fg-muted/40` compuesto sobre el carril.
+// el rótulo se corta antes de él, con el `gap-2` de por medio. Es la tecla del cromo
+// (`<Kbd tone="chrome">`): su filete es `chrome-border` compuesto sobre el carril.
 //
 // VISTO EN ROJO (2026-09-22, en el frontal): sin el `Fondo` de la tecla y sin restar el
 // borde en su x, la tecla acaba en 204,75 y por dentro sale del color del filete
@@ -782,7 +782,7 @@ func TestIrACanalLlevaSuTecla(t *testing.T) {
 	// A ×2 el filete de 1 px son dos columnas de dispositivo: se mira la de dentro, que
 	// no depende de hacia dónde redondee el borde de la caja.
 	x, y := int(k.Position().X*escala)+1, int((k.Position().Y+k.Size().Height/2)*escala)
-	if got, quiero := px(img, x, y), filetesIrACanal(v); !cerca(got, quiero) {
+	if got, quiero := px(img, x, y), tokens.SobreSRGB(tema.Color("chrome-border", v), ui.FondoCarril(v)); !cerca(got, quiero) {
 		t.Errorf("en el filete izquierdo de la tecla hay %v y la web pinta %v", got, quiero)
 	}
 	if got, quiero := px(img, x+2*int(escala), y-int(escala)*3), tema.Color("sidebar-bg", v); !cerca(got, quiero) {
@@ -989,5 +989,49 @@ func TestElMenuDeLaFilaSaleAlPasar(t *testing.T) {
 	test.Tap(f.menu)
 	if abierto != f.menu {
 		t.Error("el «…» no abre el menú colgando de él")
+	}
+}
+
+// TestRotuloDiaDiceElAnoSiNoEsElActual: con el reloj congelado, una fecha de este año
+// sale sin año y una del año pasado lo lleva, en español, alemán e inglés. Hoy y ayer no
+// cambian, ni siquiera cuando ayer cae en el año anterior.
+func TestRotuloDiaDiceElAnoSiNoEsElActual(t *testing.T) {
+	tr := traductor(t)
+	ahora := reloj()()
+	esteAno := time.Date(2026, 3, 6, 10, 0, 0, 0, time.UTC)
+	otroAno := time.Date(2025, 11, 7, 10, 0, 0, 0, time.UTC)
+	for _, l := range []i18n.Locale{"es", "de", "en"} {
+		if got := RotuloDia(tr, l, esteAno, ahora); strings.Contains(got, "2026") {
+			t.Errorf("[%s] una fecha de este año lleva el año: %q", l, got)
+		}
+		got := RotuloDia(tr, l, otroAno, ahora)
+		if !strings.Contains(got, "2025") {
+			t.Errorf("[%s] una fecha del año pasado sale sin año: %q", l, got)
+		}
+		if got != i18n.FormatFullDate(l, otroAno) {
+			t.Errorf("[%s] la fecha de otro año sale %q y tenía que ser la completa", l, got)
+		}
+	}
+	if got := RotuloDia(tr, "es", otroAno, ahora); got != "viernes, 7 de noviembre de 2025" {
+		t.Errorf("en español sale %q", got)
+	}
+	enero := time.Date(2027, 1, 1, 9, 0, 0, 0, time.UTC)
+	nochevieja := time.Date(2026, 12, 31, 22, 0, 0, 0, time.UTC)
+	if got := RotuloDia(tr, "es", nochevieja, enero); got != tr.T("day.yesterday", nil) {
+		t.Errorf("la nochevieja vista el 1 de enero sale %q y tenía que ser «ayer»", got)
+	}
+}
+
+// TestRotuloCuandoDiceElAnoSiNoEsElActual: las filas de los paneles siguen la misma
+// regla que el separador de día.
+func TestRotuloCuandoDiceElAnoSiNoEsElActual(t *testing.T) {
+	ahora := reloj()()
+	for _, l := range []i18n.Locale{"es", "de", "en"} {
+		if got := RotuloCuando(l, time.Date(2026, 9, 24, 9, 5, 0, 0, time.UTC), ahora); strings.Contains(got, "2026") || !strings.HasSuffix(got, "09:05") {
+			t.Errorf("[%s] la fila de este año dice %q", l, got)
+		}
+		if got := RotuloCuando(l, time.Date(2024, 9, 24, 9, 5, 0, 0, time.UTC), ahora); !strings.Contains(got, "2024") || !strings.HasSuffix(got, "09:05") {
+			t.Errorf("[%s] la fila de otro año dice %q", l, got)
+		}
 	}
 }

@@ -8,7 +8,7 @@
  * de su dueña (el servicio tampoco lo deja)—.
  */
 import type { JSX } from 'preact';
-import { Badge, Button, Icon, Spinner } from '@sytue/ui';
+import { Badge, Button, Icon, SkeletonRows } from '@sytue/ui';
 import { translate, type Locale } from '@sytue/i18n';
 import { resumenNota } from '../client/diario.js';
 import type { SharedNote } from '../client/notesApi.js';
@@ -45,9 +45,14 @@ export function PanelCompartidas({
     tc(n.permission === 'write' ? 'sharePeople.write' : 'sharePeople.read');
 
   if (notas === null) {
+    // La página ya tiene su título mientras llegan las notas: filas de carga con las dos
+    // líneas de cada fila (título y quién la compartió), no una rueda en medio de la nada.
     return (
-      <div class="grid h-full place-items-center p-6">
-        <Spinner />
+      <div class="notes-col notes-page">
+        <div class="notes-page-head">
+          <h2 class="notes-page-title">{tc('sharedWithMe.title')}</h2>
+        </div>
+        <SkeletonRows class="-mx-2" rows={4} lines={2} />
       </div>
     );
   }

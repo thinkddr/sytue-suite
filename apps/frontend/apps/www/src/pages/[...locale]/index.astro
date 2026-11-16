@@ -13,6 +13,7 @@ import { Glifo } from '@sytue/ui';
 import { appDomains } from '@sytue/config';
 import MarketingLayout from '../../layouts/MarketingLayout.astro';
 import ProductGrid from '../../components/ProductGrid';
+import PricingPlans from '../../components/PricingPlans.astro';
 import { localeFromParam, localeParams, localePath, useT } from '../../i18n';
 import { organizationJsonLd, webSiteJsonLd, softwareApplicationJsonLd } from '../../lib/seo';
 import { APPS_CON_IDENTIDAD } from '../../lib/product-content';
@@ -78,16 +79,6 @@ const integration = [
     body: t('home.integration.cross.body'),
     d: GLIFOS.cruce,
   },
-];
-
-// Las cuatro cosas que hay que saber del precio, y ninguna en letra pequeña: la
-// revalorización pactada, qué entra, qué se cobra aparte y cómo funciona el
-// almacenamiento compartido.
-const pricing = [
-  { title: t('home.pricing.commitment.title'), body: t('home.pricing.commitment.body') },
-  { title: t('home.pricing.included.title'), body: t('home.pricing.included.body') },
-  { title: t('home.pricing.metered.title'), body: t('home.pricing.metered.body') },
-  { title: t('home.pricing.storage.title'), body: t('home.pricing.storage.body') },
 ];
 
 const sovereignty = [
@@ -305,86 +296,19 @@ const sovereignty = [
       <h2 class="sytue-h2 text-text text-balance">{t('home.pricing.title')}</h2>
       <p class="text-text-muted mt-3 max-w-2xl text-base text-pretty">{t('home.pricing.body')}</p>
 
-      <div class="mt-8 grid gap-6 lg:grid-cols-3">
-        {/* Tres planes y los mismos productos en los tres (ADR 0038, precios del
-             2026-09-13): lo que cambia es el espacio por usuario. GRATIS va el
-             primero porque es la puerta que no pide hablar con nadie: el botón
-             lleva al alta, no a ventas. Los de pago valen para una organización
-             (por usuario) y para una persona sola. */}
-        <div class="border-border bg-surface flex flex-col rounded-lg border p-6">
-          <p class="text-text-muted text-sm">{t('home.pricing.personal.title')}</p>
-          <p class="text-text mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span class="sytue-h1">0 €</span>
-            <span class="text-text-muted text-base">{t('home.pricing.personal.freeStorage')}</span>
-          </p>
-          <p class="text-text-muted mt-3 text-base text-pretty">
-            {t('home.pricing.personal.freeBody')}
-          </p>
-          <p class="text-text-muted mt-3 text-sm text-pretty">{t('home.pricing.personal.note')}</p>
-          <div class="mt-auto flex justify-center pt-6">
-            <a
-              href={`${appDomains.id}/signup`}
-              class="bg-primary sytue-focus-ring-inset inline-flex h-11 items-center justify-center rounded-control px-6 font-semibold text-[var(--sytue-on-primary)] hover:bg-[var(--sytue-primary-hover)] pointer-coarse:min-h-[max(44px,2.75rem)]"
-            >
-              {t('home.pricing.personal.cta')}
-            </a>
-          </div>
-        </div>
-        {[
-          {
-            title: t('home.pricing.pro.title'),
-            amount: t('home.pricing.amount'),
-            storage: t('home.pricing.pro.storage'),
-            extra: t('home.pricing.education'),
-          },
-          {
-            title: t('home.pricing.enterprise.title'),
-            amount: t('home.pricing.enterprise.amount'),
-            storage: t('home.pricing.enterprise.storage'),
-            extra: t('home.pricing.enterprise.support'),
-          },
-        ].map((plan) => (
-          <div class="border-border bg-surface flex flex-col rounded-lg border p-6">
-            <p class="text-text-muted text-sm">
-              {plan.title}
-              {/* Los planes de pago aún no se pueden contratar (commerce.PersonalUpgradeAvailable
-                    y Mollie sin configurar): se dice al lado del nombre, no en la letra pequeña. */}
-              <span class="text-text-muted"> · {t('home.pricing.soon')}</span>
-            </p>
-            <p class="text-text mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <span class="sytue-h1 tabular-nums">{plan.amount}</span>
-              <span class="text-text-muted text-base">{t('home.pricing.per')}</span>
-            </p>
-            <p class="text-text mt-2 text-base font-semibold">{plan.storage}</p>
-            <p class="text-text-muted mt-1 text-sm">{plan.extra}</p>
-            {/* El impuesto, junto al precio y no en la letra pequeña: quien compara
-                  suites suma mal, y se entera al recibir la primera factura. */}
-            <p class="text-text-muted mt-1 text-sm">{t('home.pricing.tax')}</p>
-            <p class="text-text-muted mt-3 text-base text-pretty">{t('home.pricing.paidBody')}</p>
-            <div class="mt-auto flex justify-center pt-6">
-              <a
-                href="mailto:ventas@sytue.eu"
-                class="bg-primary sytue-focus-ring-inset inline-flex h-11 items-center justify-center rounded-control px-6 font-semibold text-[var(--sytue-on-primary)] hover:bg-[var(--sytue-primary-hover)] pointer-coarse:min-h-[max(44px,2.75rem)]"
-              >
-                {t('home.pricing.cta')}
-              </a>
-            </div>
-          </div>
-        ))}
-      </div>
-      <p class="text-text-muted mt-6 max-w-3xl text-sm text-pretty">
-        {t('home.pricing.thirdParty')}
-      </p>
       <div class="mt-8">
-        <ul class="grid gap-4 sm:grid-cols-2">
-          {pricing.map((x) => (
-            <li class="border-border bg-surface rounded-lg border p-5">
-              <h3 class="text-text font-semibold text-balance">{x.title}</h3>
-              <p class="text-text-muted mt-1.5 text-base text-pretty">{x.body}</p>
-            </li>
-          ))}
-        </ul>
+        <PricingPlans locale={locale} />
       </div>
+      {/* El detalle y la calculadora viven en /pricing; la portada resume y enlaza. */}
+      <p class="mt-8">
+        <a
+          href={localePath(locale, '/pricing')}
+          class="text-primary-text sytue-focus-ring inline-flex items-center gap-1.5 rounded-control font-semibold hover:underline pointer-coarse:min-h-[max(44px,2.75rem)]"
+        >
+          {t('home.pricing.more')}
+          <span aria-hidden="true">→</span>
+        </a>
+      </p>
     </div>
   </section>
 

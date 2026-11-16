@@ -7,6 +7,22 @@ import type { en } from './en.js';
 
 export const ro: AppCatalog<typeof en> = {
   'app.title': 'Contul meu',
+  'app.description': 'Contul meu — profilul, securitatea și accesele contului tău Sytue.',
+  'app.lead': 'Profilul tău, cum te conectezi și îți protejezi contul și unde este deschis.',
+
+  // --- Revisión de seguridad ---
+  'checkup.title': 'Verificare de securitate',
+  'checkup.all_good': 'Totul este în regulă: contul dvs. este bine protejat.',
+  'checkup.dos_pasos': 'Verificarea în doi pași este dezactivată: doar parola deschide contul.',
+  'checkup.recuperacion':
+    'Fără e-mail sau telefon de recuperare: dacă pierdeți accesul, nu mai există cale de întoarcere.',
+  'checkup.sesiones': 'Sesiuni deschise pe alte dispozitive: {count}',
+  'checkup.contrasenas_app': 'Parole de aplicație nefolosite de 90 de zile: {count}',
+  'checkup.dispositivos': 'Dispozitive de încredere nevăzute de 90 de zile: {count}',
+  'checkup.turn_on': 'Activați',
+  'checkup.add': 'Adăugați',
+  'checkup.review': 'Verificați',
+
   'profile.title': 'Profil',
   'profile.name': 'Nume afișat',
   'profile.name.hint': 'Cum apăreți în toată suita.',
@@ -30,25 +46,56 @@ export const ro: AppCatalog<typeof en> = {
   'photo.errorRead': 'Imaginea nu a putut fi citită.',
   'sessions.title': 'Sesiuni deschise',
   'sessions.current': 'Acest dispozitiv',
+  'sessions.signed_in': 'Autentificat {time}',
   'sessions.close_one': 'Închide această sesiune',
+  'sessions.close_named': 'Închide sesiunea de pe {device}',
+  'sessions.close_one_confirm':
+    '{device} va fi deconectat și va trebui să se autentifice din nou pentru a folosi contul tău.',
   'sessions.close_others': 'Închide toate sesiunile',
   'sessions.close_others_note': 'Inclusiv aceasta: va trebui să te autentifici din nou.',
+  'sessions.close_all_confirm':
+    'Vor fi închise toate sesiunile, inclusiv aceasta. Va trebui să te autentifici din nou pe fiecare dispozitiv.',
   'sessions.empty': 'Nu sunt alte sesiuni deschise.',
   'sessions.failed': 'Sesiunile nu au putut fi încărcate.',
   'common.loading': 'Se încarcă…',
+  'common.retry': 'Încearcă din nou',
   'devices.title': 'Dispozitive',
   'devices.current': 'Acest dispozitiv',
   'devices.trusted': 'De încredere',
   'devices.trust': 'Marchează ca de încredere',
   'devices.forget': 'Uită acest dispozitiv',
+  'devices.forget_named': 'Uită {device}',
+  'devices.forget_confirm':
+    '{device} nu va mai fi recunoscut și își va pierde statutul de dispozitiv de încredere. O nouă autentificare de pe el va conta ca un dispozitiv nou.',
   'devices.empty': 'Niciun dispozitiv recunoscut încă.',
   'devices.failed': 'Dispozitivele nu au putut fi încărcate.',
+  'signature.title': 'Semnătură salvată',
+  'signature.help':
+    'Semnătura pe care ai cerut CertiPDF să o țină minte când ai semnat de mână. Este stocată criptată în contul tău.',
+  'signature.empty':
+    'Nu ai nicio semnătură salvată. Când semnezi de mână în CertiPDF, bifează «Ține minte semnătura mea».',
+  'signature.failed': 'Semnătura salvată nu a putut fi încărcată.',
+  'signature.preview': 'Semnătura ta salvată',
+  'signature.saved_on': 'Salvată pe {date}',
+  'signature.delete': 'Șterge semnătura salvată',
+  'signature.delete_confirm':
+    'Semnătura ta salvată va fi ștearsă. Documentele deja semnate o păstrează; data viitoare când semnezi de mână va trebui s-o desenezi din nou.',
   'security.title': 'Securitate',
   'security.failed': 'Ceva nu a mers bine. Încercați din nou.',
   'security.password.title': 'Parolă',
   'security.password.warning': 'Schimbarea ei vă deconectează de peste tot, inclusiv de aici.',
   'security.password.current': 'Parola curentă',
   'security.password.new': 'Parolă nouă',
+  'security.password.requirements': 'Cerințe pentru parola nouă:',
+  'security.password.req_length': {
+    one: 'Cel puțin {count} caracter',
+    few: 'Cel puțin {count} caractere',
+    other: 'Cel puțin {count} de caractere',
+  },
+  'security.password.req_complexity': 'Litere și cel puțin o cifră',
+  'security.password.req_different': 'Diferită de parola curentă',
+  'security.password.req_met': 'Îndeplinit',
+  'security.password.req_pending': 'Încă nu',
   'security.password.submit': 'Schimbă parola',
   'security.password.done':
     'Parola a fost schimbată. Toate sesiunile au fost închise, inclusiv aceasta.',
@@ -72,6 +119,45 @@ export const ro: AppCatalog<typeof en> = {
   'security.codes.once':
     'Afișate o singură dată. Păstrați-le într-un loc sigur: fiecare funcționează o singură dată.',
   'security.codes.saved': 'Le-am salvat',
+  'security.codes.regenerate_confirm':
+    'Codurile de recuperare actuale nu vor mai funcționa imediat, inclusiv cele tipărite sau salvate.',
+  'security.mfa.step.need': 'Înainte să începi',
+  'security.mfa.step.need.heading': 'De ce ai nevoie',
+  'security.mfa.step.need.desc':
+    'O aplicație de autentificare pe telefon. Afișează un cod nou din șase cifre la fiecare 30 de secunde.',
+  'security.mfa.step.need.apps_title': 'Merge orice aplicație de autentificare',
+  'security.mfa.step.need.apps':
+    'De exemplu: Aegis, FreeOTP, Microsoft Authenticator, Google Authenticator, 1Password, Bitwarden. Dacă nu ai una, instaleaz-o înainte să continui.',
+  'security.mfa.step.need.next': 'Începe',
+  'security.mfa.step.scan': 'Scanează',
+  'security.mfa.step.scan.heading': 'Adaugă contul în aplicație',
+  'security.mfa.key_label': 'Cheie de configurare',
+  'security.mfa.step.code': 'Cod',
+  'security.mfa.step.code.heading': 'Scrie codul din aplicație',
+  'security.mfa.step.code.desc':
+    'Astfel se verifică, înainte de activare, că aplicația și contul se potrivesc.',
+  'security.mfa.code.hint': 'Șase cifre. Dacă se schimbă cât scrii, folosește-l pe cel nou.',
+  'security.mfa.step.codes.heading': 'Salvează codurile de recuperare',
+  'security.codes.copy': 'Copiază tot',
+  'security.codes.copied': 'Coduri copiate.',
+  'security.codes.copy_failed': 'Copierea nu a reușit. Selectează codurile și copiază-le manual.',
+  'security.codes.download': 'Descarcă .txt',
+  'security.codes.file_title': 'Coduri de recuperare Sytue',
+  'security.codes.file_account': 'Cont: {account}',
+  'security.codes.file_date': 'Create: {date}',
+  'security.codes.file_note':
+    'Fiecare cod funcționează o singură dată. Păstrează fișierul într-un loc sigur, departe de telefon.',
+  'security.mfa.step.done': 'Gata',
+  'security.mfa.step.done.heading': 'Verificarea în doi pași este activată',
+  'security.mfa.step.done.desc':
+    'Data viitoare când te conectezi, ți se va cere un cod din aplicație.',
+  'security.mfa.passkey_tip.title': 'Adaugă și o cheie de acces',
+  'security.mfa.passkey_tip':
+    'Cu o cheie de acces te conectezi cu amprenta, fața sau blocarea ecranului, fără să scrii coduri.',
+  'security.mfa.passkey_tip.action': 'Adaugă o cheie de acces',
+  'security.mfa.close': 'Închide',
+  'security.mfa.disable_title': 'Dezactivezi verificarea în doi pași?',
+  'security.mfa.disable_warning': 'Parola singură va deschide din nou contul.',
   'common.cancel': 'Anulează',
   'profile.given_name': 'Prenume',
   'profile.family_name': 'Nume de familie',
@@ -82,6 +168,8 @@ export const ro: AppCatalog<typeof en> = {
   'profile.locale.hint': 'Folosită în tot Sytue și în mesajele pe care vi le trimitem.',
   'security.passkeys.title': 'Chei de acces',
   'security.passkeys.remove': 'Elimină',
+  'security.passkeys.remove_named': 'Elimină {name}',
+  'security.passkeys.remove_confirm': 'Nu te vei mai putea autentifica cu {name}.',
   'security.passkeys.unnamed': 'Cheie fără nume',
   'app_passwords.title': 'Parole de aplicație',
   'app_passwords.hint':
@@ -90,6 +178,9 @@ export const ro: AppCatalog<typeof en> = {
   'app_passwords.label.hint': 'De exemplu: e-mail laptop, telefon.',
   'app_passwords.create': 'Creează parola',
   'app_passwords.revoke': 'Revocă',
+  'app_passwords.revoke_named': 'Revocă {label}',
+  'app_passwords.revoke_confirm':
+    'Aplicațiile care folosesc {label} nu se vor mai putea autentifica. Acțiunea nu poate fi anulată.',
   'app_passwords.empty': 'Nicio parolă de aplicație încă.',
   'app_passwords.failed': 'Parolele de aplicație nu au putut fi încărcate.',
   'app_passwords.unnamed': 'Fără nume',

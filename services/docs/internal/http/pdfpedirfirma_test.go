@@ -63,16 +63,81 @@ func (m *peticionesFirmaEnMemoria) CrearPeticionFirma(_ context.Context, p store
 		p.Silenciada = true // lo que hace el INSERT con docs_firma_bloqueado
 	}
 	p.ID = "00000000-0000-4000-8000-" + strconv.FormatInt(int64(200000000000+len(m.filas)), 10)
-	p.Estado, p.Creada = store.FirmaPendiente, time.Now()
+	p.Estado, p.Creada, p.Avisada = store.FirmaPendiente, time.Now(), time.Now()
 	m.filas = append(m.filas, p)
 	return p, nil
+}
+
+// CrearCadenaFirma es la de la 0034: la primera pendiente, las demás esperando turno.
+func (m *peticionesFirmaEnMemoria) CrearCadenaFirma(_ context.Context, filas []store.PeticionFirma) ([]store.PeticionFirma, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(m.filas)+len(filas) > store.MaxPeticionesFirmaPorHora {
+		return nil, store.ErrDemasiadasPeticionesFirma
+	}
+	circuito := "cadena-" + strconv.Itoa(len(m.filas))
+	out := make([]store.PeticionFirma, 0, len(filas))
+	for i, p := range filas {
+		p.ID = "00000000-0000-4000-8000-" + strconv.FormatInt(int64(200000000000+len(m.filas)), 10)
+		p.Circuito, p.Orden, p.Creada, p.Avisada = circuito, i, time.Now(), time.Now()
+		p.Estado = store.FirmaEnEspera
+		if i == 0 {
+			p.Estado = store.FirmaPendiente
+		}
+		m.filas = append(m.filas, p)
+		out = append(out, p)
+	}
+	return out, nil
+}
+
+// abierta es la condición de la 0034: no ha pasado su fecha.
+func abierta(p store.PeticionFirma) bool { return p.Caduca == nil || p.Caduca.After(time.Now()) }
+
+func (m *peticionesFirmaEnMemoria) PeticionesFirmaPorBarrer(context.Context) (v, r []store.PorBarrer, _ error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, x := range m.filas {
+		if (x.Estado == store.FirmaPendiente || x.Estado == store.FirmaEnEspera) && !abierta(x) {
+			v = append(v, store.PorBarrer{Tenant: "acme", Estado: x.Estado, Peticion: x})
+		}
+		if x.Estado == store.FirmaPendiente && x.RecordarDias > 0 && !x.Silenciada && abierta(x) &&
+			!x.Avisada.After(time.Now().Add(-time.Duration(x.RecordarDias)*24*time.Hour)) {
+			r = append(r, store.PorBarrer{Tenant: "acme", Estado: x.Estado, Peticion: x})
+		}
+	}
+	return v, r, nil
+}
+
+func (m *peticionesFirmaEnMemoria) CaducarPeticionFirma(_ context.Context, id string) (store.PeticionFirma, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i, x := range m.filas {
+		if x.ID == id && (x.Estado == store.FirmaPendiente || x.Estado == store.FirmaEnEspera) && !abierta(x) {
+			m.filas[i].Estado, m.filas[i].Enlace = store.FirmaCaducada, nil
+			return m.filas[i], nil
+		}
+	}
+	return store.PeticionFirma{}, store.ErrPeticionFirmaNoEsta
+}
+
+func (m *peticionesFirmaEnMemoria) RecordarPeticionFirma(_ context.Context, id string) (store.PeticionFirma, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i, x := range m.filas {
+		if x.ID == id && x.Estado == store.FirmaPendiente && x.RecordarDias > 0 && abierta(x) &&
+			!x.Avisada.After(time.Now().Add(-time.Duration(x.RecordarDias)*24*time.Hour)) {
+			m.filas[i].Avisada = time.Now()
+			return m.filas[i], nil
+		}
+	}
+	return store.PeticionFirma{}, store.ErrPeticionFirmaNoEsta
 }
 
 func (m *peticionesFirmaEnMemoria) PeticionesFirma(_ context.Context, sub string) (r, s []store.PeticionFirma, _ error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, x := range m.filas {
-		if x.Destinatario == sub && !x.Silenciada {
+		if x.Destinatario == sub && !x.Silenciada && x.Estado != store.FirmaEnEspera {
 			r = append(r, x)
 		}
 		if x.Solicitante == sub {
@@ -86,7 +151,7 @@ func (m *peticionesFirmaEnMemoria) PeticionFirmaPendiente(_ context.Context, id,
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, x := range m.filas {
-		if x.ID == id && x.Destinatario == dest && x.Estado == store.FirmaPendiente && !x.Silenciada {
+		if x.ID == id && x.Destinatario == dest && x.Estado == store.FirmaPendiente && !x.Silenciada && abierta(x) {
 			return x, nil
 		}
 	}
@@ -189,10 +254,27 @@ func (m *peticionesFirmaEnMemoria) ResolverPeticionFirma(_ context.Context, id, 
 		if estado == store.FirmaCancelada {
 			dueño = x.Solicitante
 		}
-		if x.ID == id && dueño == quien && x.Estado == store.FirmaPendiente {
+		if x.ID == id && dueño == quien && x.Estado == store.FirmaPendiente && (estado == store.FirmaCancelada || abierta(x)) {
 			f := &m.filas[i]
 			f.Estado, f.Firmado, f.FirmadoRuta, f.Enlace, f.FirmadoHuella = estado, firmado, ruta, enlace, huella
-			return *f, nil
+			out := *f
+			// seguirCadena: firmada, el turno pasa a la siguiente con el firmado; si no,
+			// las que esperaban se cancelan.
+			for j, y := range m.filas {
+				if out.Circuito == "" || y.Circuito != out.Circuito || y.Estado != store.FirmaEnEspera {
+					continue
+				}
+				switch {
+				case estado != store.FirmaFirmada:
+					m.filas[j].Estado = store.FirmaCancelada
+				case y.Orden == out.Orden+1:
+					g := &m.filas[j]
+					g.Estado, g.Fichero, g.Ruta, g.Avisada = store.FirmaPendiente, firmado, ruta, time.Now()
+					sig := *g
+					out.Siguiente = &sig
+				}
+			}
+			return out, nil
 		}
 	}
 	return store.PeticionFirma{}, store.ErrPeticionFirmaNoEsta
@@ -330,7 +412,10 @@ func (d driveDePrueba) GuardarPDF(_ context.Context, _, nombre string, datos []b
 // directorioDePrueba es el directory:resolve de Sytue ID con dos personas de acme.
 func directorioDePrueba(t *testing.T) *httptest.Server {
 	t.Helper()
-	personas := map[string]string{"ana@acme.eu": "11111111-1111-4111-8111-111111111111", "irati@acme.eu": "22222222-2222-4222-8222-222222222222"}
+	personas := map[string]string{
+		"ana@acme.eu": "11111111-1111-4111-8111-111111111111", "irati@acme.eu": "22222222-2222-4222-8222-222222222222",
+		"jon@acme.eu": jonAcme,
+	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var q map[string]string
 		_ = json.NewDecoder(r.Body).Decode(&q)

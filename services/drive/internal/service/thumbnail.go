@@ -10,10 +10,10 @@ import (
 	"fmt"
 	"io"
 	"strconv"
-	"strings"
 
 	"github.com/google/uuid"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
 	"git.sytue.eu/sytue/one/platform/pkg/miniatura"
 	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
@@ -21,12 +21,13 @@ import (
 	"git.sytue.eu/sytue/one/services/drive/internal/domain"
 )
 
-// Miniaturas server-side de imágenes ráster. Solo formatos que decodifica la
-// STDLIB (JPEG, PNG, GIF): sin dependencias nuevas. PDF y vídeo quedan FUERA de
-// alcance (requieren decodificadores pesados). WebP/AVIF/SVG tampoco: la stdlib no
-// los decodifica y no añadimos deps. La derivada se cachea en el mismo object store
-// (keyed por checksum del fichero) para no regenerarla; el gating por permiso lo
-// impone GetFile (RLS: un fichero ajeno/inexistente → ErrNotFound, nunca se genera).
+// Miniaturas server-side de imágenes ráster: JPEG, PNG y GIF (stdlib) y WebP (el
+// decodificador de golang.org/x/image, que ya estaba en el módulo: sin dependencias
+// nuevas). PDF y vídeo quedan FUERA de alcance (requieren decodificadores pesados).
+// AVIF y SVG tampoco: no hay decodificador en el módulo y no añadimos deps. La
+// derivada se cachea en el mismo object store (keyed por checksum del fichero) para
+// no regenerarla; el gating por permiso lo impone GetFile (RLS: un fichero
+// ajeno/inexistente → ErrNotFound, nunca se genera).
 const (
 	// thumbMaxDim es el lado máximo (px) de la miniatura, manteniendo el aspecto.
 	//
@@ -38,10 +39,10 @@ const (
 	//
 	// Cambiar este número INVALIDA las miniaturas cacheadas por sí solo: forma parte de
 	// thumbVersion, así que la clave del object store y el ETag cambian con él.
-	thumbMaxDim = 512
+	thumbMaxDim = storage.DriveThumbnailSide
 	// thumbMaxInputBytes acota el tamaño del blob de ORIGEN que leemos en memoria: la
 	// segunda barrera (un fichero enorme aunque sus dimensiones sean plausibles).
-	thumbMaxInputBytes = 40 << 20 // 40 MiB
+	thumbMaxInputBytes = storage.MaxDriveThumbnailBytes // 40 MiB
 )
 
 // turnoMiniaturas: cuántas miniaturas se generan a la vez en el proceso.
@@ -53,7 +54,7 @@ var turnoMiniaturas = make(chan struct{}, 2)
 //   - GATING: GetFile aplica la verja de acceso (RLS + aislamiento por tenant). Un
 //     fichero inaccesible/ajeno/inexistente → ErrNotFound; NUNCA se genera de un
 //     fichero que el usuario no puede ver (deny-by-default, como «Compartido conmigo»).
-//   - TIPO: solo JPEG/PNG/GIF (validado por content-type); otro → ErrUnsupportedMedia.
+//   - TIPO: solo JPEG/PNG/GIF/WebP (validado por content-type); otro → ErrUnsupportedMedia.
 //   - CACHÉ: la derivada se guarda en el object store bajo una clave por-fichero+checksum
 //     (thumbKey). La primera llamada decodifica+redimensiona+cachea; las siguientes la
 //     sirven directa del object store sin regenerar (la clave cambia si el contenido —y
@@ -141,26 +142,14 @@ func (s *Service) thumbnailOf(ctx context.Context, f domain.File) (io.ReadCloser
 	return io.NopCloser(bytes.NewReader(out)), outType, etag, nil
 }
 
-// thumbOutputType valida el content-type de ORIGEN (solo imágenes ráster de la
-// stdlib) y devuelve el content-type de SALIDA de la miniatura, o ok=false si no se
-// soporta. GIF→PNG y PNG→PNG (preservan transparencia/primer frame); JPEG→JPEG
-// (foto opaca, más pequeña). El tipo de salida es una función determinista del de
-// origen: no hace falta persistirlo para el cache-hit, se recalcula igual.
+// thumbOutputType valida el content-type de ORIGEN (solo imágenes ráster que sabe
+// decodificar platform/pkg/miniatura) y devuelve el content-type de SALIDA de la
+// miniatura, o ok=false si no se soporta. GIF→PNG, WebP→PNG y PNG→PNG (preservan
+// transparencia/primer frame); JPEG→JPEG (foto opaca, más pequeña). El tipo de
+// salida es una función determinista del de origen: no hace falta persistirlo para
+// el cache-hit, se recalcula igual.
 func thumbOutputType(contentType string) (string, bool) {
-	ct := contentType
-	if i := strings.IndexByte(ct, ';'); i >= 0 {
-		ct = ct[:i] // descarta parámetros (charset, etc.)
-	}
-	switch strings.ToLower(strings.TrimSpace(ct)) {
-	case "image/jpeg", "image/jpg":
-		return "image/jpeg", true
-	case "image/png":
-		return "image/png", true
-	case "image/gif":
-		return "image/png", true
-	default:
-		return "", false
-	}
+	return miniatura.TipoSalida(contentType)
 }
 
 // thumbVersion es la parte de la clave/ETag que INVALIDA la caché: el checksum del

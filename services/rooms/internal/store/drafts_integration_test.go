@@ -30,7 +30,7 @@ func TestDraftsUpsertByScope(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
 
-	_, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	_, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 	root, err := st.CreateMessage(ctx, store.NewMessageRecord{
 		ChannelID: ch.ID, AuthorSub: "alice", AuthorName: "Alice", Body: "raíz",
 	})
@@ -101,7 +101,7 @@ func TestDraftRequiresChannelAccess(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
 
-	_, priv := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPrivate)
+	_, priv := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPrivate)
 	if _, err := st.PutDraft(ctx, "mallory", priv.ID, nil, "texto"); err == nil {
 		t.Fatal("escribir un borrador en un canal privado ajeno debe denegarse")
 	} else if !errors.Is(err, domain.ErrForbidden) && !errors.Is(err, domain.ErrNotFound) {
@@ -115,7 +115,7 @@ func TestDraftsTenantIsolation(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctxA, ctxB := tenantCtx("acme"), tenantCtx("otra")
 
-	_, ch := seedTeamChannel(t, ctxA, st, "alice", domain.ChannelPublic)
+	_, ch := seedTeamChannel(ctxA, t, st, "alice", domain.ChannelPublic)
 	if _, err := st.PutDraft(ctxA, "alice", ch.ID, nil, "secreto de acme"); err != nil {
 		t.Fatalf("PutDraft: %v", err)
 	}

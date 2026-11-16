@@ -192,7 +192,7 @@ var ignorables = map[string]bool{
 	"width": true, "padding": true, "padding-top": true, "padding-right": true, "padding-bottom": true,
 	"padding-left": true, "border": true, "border-top": true, "border-right": true, "border-bottom": true,
 	"border-left": true, "letter-spacing": true, "font-variant": true, "text-transform": true,
-	"vertical-align": true, "display": true, "margin-left": true, "margin-right": true, "float": true,
+	"vertical-align": true, "display": true, "table-layout": true, "margin-left": true, "margin-right": true, "float": true,
 }
 
 // Guardable dice si lo que hay ahora se puede mandar al servidor: tras editar, lo que se
@@ -304,6 +304,8 @@ var (
 	atributosEntendidos = map[atom.Atom][]string{
 		atom.A: {"href", "target", "rel", "data-xref"}, atom.Font: {"color"},
 		atom.Td: {"colspan", "rowspan"}, atom.Th: {"colspan", "rowspan"},
+		// La marca con la que el panel «Ajustes» relee «Cabecera alternada» (SettingsPanel.tsx).
+		atom.Table: {"data-cabecera-alternada"},
 		// El ancla de un comentario (`wrapSelectionForComment`). Un <mark> suelto, sin
 		// ella, es el amarillo del navegador, que no se pinta: no se entiende.
 		atom.Mark: {"data-comment-id"},
@@ -313,7 +315,9 @@ var (
 		// Lo que escribe «Referencias»: los ids de los títulos que enlaza el índice, sus
 		// entradas con su nivel, el marcador de una nota al pie y la nota.
 		atom.H1: {"id"}, atom.H2: {"id"}, atom.H3: {"id"}, atom.Nav: {"data-toc"},
-		atom.Li: {"data-level", "id", "value", "data-index-term", "data-index-sub"}, atom.Sup: {"data-footnote-ref", "data-endnote-ref", "data-note-class", "id"},
+		// La lista de casillas (canvas/casillas.ts): la marca de la lista y el estado de cada elemento.
+		atom.Ul: {"data-checklist"},
+		atom.Li: {"data-level", "id", "value", "data-index-term", "data-index-sub", "data-checked"}, atom.Sup: {"data-footnote-ref", "data-endnote-ref", "data-note-class", "id"},
 		atom.Section: {"data-footnotes", "data-endnotes", "data-index", "data-bibliography"},
 		// Los de `trackAttrs`; el `style` solo con el color del autor (ver `entenderAtributo`).
 		atom.Ins: {"data-track", "data-author", "data-author-id", "data-ts"},
@@ -440,6 +444,12 @@ var atributosFijos = []struct {
 	{esLeyenda, []string{"data-caption", "id"}},
 	{esCita, []string{"data-citation", "contenteditable"}},
 	{esCampoCombinacion, []string{"data-mergefield", "contenteditable"}},
+	// Los de `buildFormFieldHtml`, más la semántica que la web pone en el DOM vivo mientras se
+	// rellena (`role`, `aria-*`, `tabindex`), por si un guardado la arrastra: no se pinta.
+	{esCampoFormulario, []string{
+		"data-formfield", "data-name", "data-checked", "data-options", "data-value", "data-placeholder",
+		"contenteditable", "tabindex", "role", "aria-checked", "aria-haspopup", "aria-label",
+	}},
 	{esEntradaBib, []string{"data-bib-entry"}},
 	{esEtiquetaLeyenda, []string{"data-caption-label"}},
 }

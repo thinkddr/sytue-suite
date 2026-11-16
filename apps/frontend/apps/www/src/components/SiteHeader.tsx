@@ -137,7 +137,7 @@ function HeaderInner({ locale, path, labels }: HeaderProps) {
     { href: `${home}#products`, label: labels.products },
     { href: `${home}#sovereignty`, label: labels.sovereignty },
     { href: `${home}#standards`, label: labels.standards },
-    { href: `${home}#pricing`, label: labels.pricing },
+    { href: localePath(locale, '/pricing'), label: labels.pricing },
     { href: localePath(locale, '/downloads'), label: labels.downloads },
   ];
 

@@ -165,6 +165,7 @@ export function Pedidos({ siteId, locale: localeProp }: PedidosProps): JSX.Eleme
       ) : errorCarga ? (
         <div class="border-border bg-surface rounded-xl border">
           <EmptyState
+            tone="error"
             title={t('orders.load_error')}
             description={t('store.load_error_help')}
             action={

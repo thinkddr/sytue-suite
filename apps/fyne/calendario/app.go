@@ -8,16 +8,17 @@ import (
 	"errors"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
+	"weak"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
-
-	"git.sytue.eu/sytue/one/apps/fyne/agenda"
-	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 )
 
 // AgendaDias es `AGENDA_DAYS` de dates.ts: la ventana rodante de la vista agenda.
@@ -119,6 +120,13 @@ type App struct {
 	// Cal es el cliente del servicio. nil: sin servicio (la pantalla se queda en carga).
 	Cal          *api.Calendars
 	importarVida context.Context
+	vida         context.Context
+	cancelarVida context.CancelFunc
+	trabajos     *offline.WorkGate
+	reloj        sync.Once
+	epocaUI      atomic.Uint64
+	cerrada      bool // solo se consulta y modifica en el hilo de interfaz
+	dialogos     []weak.Pointer[ui.Dialogo]
 
 	// Correo es el de quien ha entrado: decide si un evento es una invitación que
 	// contestar (`meHanInvitado`). Vacío, nunca lo es.
@@ -139,11 +147,15 @@ type App struct {
 	// Notepads, la vista rápida no enseña la sección.
 	Notas      func(ctx context.Context, uid string) ([]api.Note, error)
 	AbrirNotas func(ruta string)
+	// Almacen guarda lo que la web deja en `localStorage` por persona: la vista y los
+	// calendarios ocultos (preferencias.go). nil: viven lo que dure la ventana.
+	Almacen Almacen
 
 	// lanzar y enUI son `go f()` y `fyne.Do(f)`. Las pruebas los cambian por llamadas
 	// directas para no depender de gorutinas.
-	lanzar func(func())
-	enUI   func(func())
+	lanzar    func(func(context.Context)) bool
+	enUI      func(func())
+	despachar func(func())
 
 	raiz   *fyne.Container
 	avisos *ui.PilaAvisos
@@ -157,23 +169,37 @@ type App struct {
 	recError       bool
 	recDescartados map[string]bool
 
-	conocidos     map[string]bool           // `knownUrls`: los calendarios ya vistos
-	porCal        map[string][]api.Instance // la caché de eventos, válida para `clave`
-	clave         string                    // el rango de la caché
-	secCal, secEv int                       // secuencias de carga
-	cargandoCal   bool                      // `loadingCals`
-	cargandoEv    bool                      // `loadingEvents`
-	fallo         string                    // clave del error, o ""
-	prohibido     bool                      // el error fue un 403
+	conocidos      map[string]bool           // `knownUrls`: los calendarios ya vistos
+	ocultos        map[string]bool           // los que la persona dejó ocultos (Almacen)
+	vistaDelEnlace bool                      // un enlace profundo puso la vista: manda
+	porCal         map[string][]api.Instance // la caché de eventos, válida para `clave`
+	clave          string                    // el rango de la caché
+	secCal, secEv  int                       // secuencias de carga
+	cargandoCal    bool                      // `loadingCals`
+	cargandoEv     bool                      // `loadingEvents`
+	fallo          string                    // clave del error, o ""
+	prohibido      bool                      // el error fue un 403
 }
 
 // NuevaApp conecta la pantalla con el servicio. Arranca en carga: hasta que no
 // contesta el servicio no hay calendarios que enseñar.
 func NuevaApp(p *Pantalla, cal *api.Calendars) *App {
+	return NuevaAppConVida(context.Background(), p, cal)
+}
+
+// NuevaAppConVida binds one presenter to its original session lifetime. The
+// presenter never closes the repository or grants another session access.
+func NuevaAppConVida(parent context.Context, p *Pantalla, cal *api.Calendars) *App {
+	if parent == nil {
+		panic("calendar: missing presenter lifetime")
+	}
+	vida, cancelar := context.WithCancel(parent)
 	a := &App{
 		P: p, Cal: cal,
-		lanzar:         func(f func()) { go f() },
-		enUI:           fyne.Do,
+		vida:           vida,
+		cancelarVida:   cancelar,
+		trabajos:       offline.NewWorkGate(vida),
+		despachar:      fyne.Do,
 		conocidos:      map[string]bool{},
 		porCal:         map[string][]api.Instance{},
 		cargandoCal:    true,
@@ -181,16 +207,25 @@ func NuevaApp(p *Pantalla, cal *api.Calendars) *App {
 		recCargando:    true,
 		recDescartados: map[string]bool{},
 	}
+	a.lanzar = a.iniciarTrabajo
+	a.enUI = a.encolarUI
 	p.AlIrHoy = func() { a.cambiar(func() { p.Cursor = p.ahora() }) }
 	p.AlNavegar = func(d int) { a.cambiar(func() { p.Cursor = Desplazar(p.Vista, p.Cursor, d) }) }
 	p.AlDesplazarMes = func(d int) { a.cambiar(func() { p.Cursor = MoverMes(p.Cursor, d) }) }
 	p.AlElegirDia = func(d time.Time) { a.cambiar(func() { p.Cursor = d }) }
-	p.AlCambiarVista = func(v Vista) { a.cambiar(func() { p.Vista = v }) }
+	p.AlCambiarVista = func(v Vista) {
+		// Lo que elige la persona deja de ser la vista del enlace: si luego entra otra,
+		// recupera la suya.
+		a.vistaDelEnlace = false
+		a.guardarVista(v)
+		a.cambiar(func() { p.Vista = v })
+	}
 	p.AlConmutarCalendario = a.conmutar
 	p.AlReintentar = a.reintentar
 	p.Refresco.Actualizar = a.Recargar
 	p.Refresco.Puede = func() bool {
-		return a.Cal != nil && !p.SinConexion && !a.cargandoCal && !a.cargandoEv && (p.Vista == VistaAgenda || p.compacta())
+		return a.Cal != nil && !p.SinConexion && !a.cargandoCal && !a.cargandoEv && !p.hojaEnGesto &&
+			(p.Vista == VistaAgenda || p.compacta())
 	}
 	p.Refresco.Revision = func() uint64 { return ui.RevisionLista(a.secEv) }
 	p.AlAbrirEvento = a.abrirVistaRapida
@@ -205,10 +240,13 @@ func NuevaApp(p *Pantalla, cal *api.Calendars) *App {
 	p.AlBuscar = a.abrirBusqueda
 	p.AlVerRecordatorios = a.abrirRecordatorios
 	p.AlConmutarCajon = func() { p.cajonAbierto = !p.cajonAbierto; a.pintar() }
+	p.AlCambiarAjustes = a.cambiarAjustes
+	p.AlAbrirAjustes = func() { p.EnAjustes = true; a.pintar() }
+	p.AlCerrarAjustes = func() { p.EnAjustes = false; a.pintar() }
 	// El mes del teléfono: cruzar el corte de 640 reconstruye la pantalla, pero NO dentro
 	// del Layout del armazón que lo mide; y la rama de recordatorios del
 	// cajón salta y descarta como el panel de la campana.
-	p.AlRehacer = func() { a.lanzar(func() { a.enUI(a.pintar) }) }
+	p.AlRehacer = func() { a.lanzar(func(context.Context) { a.enUI(a.pintar) }) }
 	p.saltarRec, p.descartRec = a.saltarA, a.descartar
 	// En el teléfono, lo que se activa en el menú lo CIERRA (el `onClick` del `<aside>`
 	// de AppShell): elegir un día, cambiar de mes, crear… Conmutar un calendario no,
@@ -228,6 +266,9 @@ func NuevaApp(p *Pantalla, cal *api.Calendars) *App {
 // PonerGestorRecursos dice si quien ha entrado es `admin` u `owner`: solo entonces sale
 // el botón de salas y recursos del menú.
 func (a *App) PonerGestorRecursos(si bool) {
+	if a.vida.Err() != nil {
+		return
+	}
 	if a.P.PuedeGestionarRecursos != si {
 		a.P.PuedeGestionarRecursos = si
 		a.pintar()
@@ -237,8 +278,14 @@ func (a *App) PonerGestorRecursos(si bool) {
 // Objeto es lo que la ventana enseña.
 func (a *App) Objeto() fyne.CanvasObject { return a.raiz }
 
-// Arrancar pide los calendarios y el número de invitaciones pendientes.
+// Arrancar lee lo que recuerda quien ha entrado y pide los calendarios y el número de
+// invitaciones pendientes.
 func (a *App) Arrancar() {
+	if a.vida.Err() != nil {
+		return
+	}
+	a.restaurarPreferencias()
+	a.restaurarAjustes()
 	if d := a.P.Importar; d != nil && a.importarVida != nil && a.importarVida.Err() == nil {
 		d.Cargar()
 	}
@@ -249,6 +296,9 @@ func (a *App) Arrancar() {
 // IniciarImportador liga sólo el importador a la identidad que adoptó el binario.
 // Las operaciones de eventos y los formularios conservan su ciclo actual.
 func (a *App) IniciarImportador(ctx context.Context) {
+	if a.vida.Err() != nil {
+		return
+	}
 	a.importarVida = ctx
 	if d := a.P.Importar; d != nil {
 		d.CargarCon(ctx)
@@ -265,17 +315,26 @@ func (a *App) PararImportador() {
 
 // cambiar aplica un cambio de cursor o de vista y pide lo que falte del rango nuevo.
 func (a *App) cambiar(f func()) {
+	if a.vida.Err() != nil {
+		return
+	}
+	// Moverse por el calendario es volver a él: los ajustes no tapan lo pedido.
+	a.P.EnAjustes = false
 	f()
 	a.cargarEventos()
 }
 
 // conmutar es `toggleVisible`: un calendario ya cargado se enciende sin ir a la red.
 func (a *App) conmutar(id string) {
+	if a.vida.Err() != nil {
+		return
+	}
 	p := a.P
 	if p.Visibles == nil {
 		p.Visibles = map[string]bool{}
 	}
 	p.Visibles[id] = !p.Visibles[id]
+	a.guardarOcultos()
 	a.cargarEventos()
 }
 
@@ -292,6 +351,9 @@ func (a *App) reintentar() {
 // Recargar invalida la caché y vuelve a pedir los eventos: es `reload()` de la web,
 // lo que se hace tras guardar o borrar.
 func (a *App) Recargar() {
+	if a.vida.Err() != nil {
+		return
+	}
 	a.porCal, a.clave = map[string][]api.Instance{}, ""
 	a.cargarEventos()
 }
@@ -309,15 +371,15 @@ func (a *App) todos() []api.Calendar {
 // Las dos lecturas independientes arrancan juntas, como en la web. Cada una conserva
 // su error; no se comparte un primer fallo que cancele el resultado de la otra.
 func (a *App) cargarCalendarios() {
-	if a.Cal == nil {
+	if a.vida.Err() != nil || a.Cal == nil {
 		return
 	}
 	a.secCal++
 	sec := a.secCal
 	a.cargandoCal = true
 	a.pintar()
-	a.lanzar(func() {
-		ctx, parar := context.WithTimeout(context.Background(), 20*time.Second)
+	a.lanzar(func(vida context.Context) {
+		ctx, parar := context.WithTimeout(vida, 20*time.Second)
 		defer parar()
 		var compartidos []api.Calendar
 		var errC error
@@ -346,8 +408,9 @@ func (a *App) cargarCalendarios() {
 	})
 }
 
-// encender es la regla de visibilidad de la web: en la primera carga, todos; después se
-// respeta lo que la persona apagó y se encienden solo los recién llegados.
+// encender es la regla de visibilidad de la web: en la primera carga, todos menos los
+// que la persona dejó ocultos; después se respeta lo que apagó y se encienden solo los
+// recién llegados.
 func (a *App) encender() {
 	p := a.P
 	primera := len(a.conocidos) == 0
@@ -355,7 +418,7 @@ func (a *App) encender() {
 	ahora := map[string]bool{}
 	conocidos := map[string]bool{}
 	for _, c := range a.todos() {
-		if primera || antes[c.ID] || !a.conocidos[c.ID] {
+		if (primera && !a.ocultos[c.ID]) || (!primera && (antes[c.ID] || !a.conocidos[c.ID])) {
 			ahora[c.ID] = true
 		}
 		conocidos[c.ID] = true
@@ -369,6 +432,9 @@ func (a *App) encender() {
 // No publica el widget: lo que enseña el widget no depende de lo que se esté mirando,
 // y lo lee su propia Fuente (apps/nucleo/widgets/fuentes, ADR 0078 enmendado).
 func (a *App) cargarEventos() {
+	if a.vida.Err() != nil {
+		return
+	}
 	p := a.P
 	desde, hasta := p.rango()
 	clave := desde.Format(time.RFC3339) + ".." + hasta.Format(time.RFC3339)
@@ -392,8 +458,8 @@ func (a *App) cargarEventos() {
 	}
 	a.cargandoEv = true
 	a.pintar()
-	a.lanzar(func() {
-		ctx, parar := context.WithTimeout(context.Background(), 20*time.Second)
+	a.lanzar(func(vida context.Context) {
+		ctx, parar := context.WithTimeout(vida, 20*time.Second)
 		defer parar()
 		type par struct {
 			id   string
@@ -486,8 +552,8 @@ func (a *App) contarInvitaciones() {
 	if a.Cal == nil {
 		return
 	}
-	a.lanzar(func() {
-		ctx, parar := context.WithTimeout(context.Background(), 20*time.Second)
+	a.lanzar(func(vida context.Context) {
+		ctx, parar := context.WithTimeout(vida, 20*time.Second)
 		defer parar()
 		inv, err := a.Cal.Invitations(ctx, true)
 		if err != nil {
@@ -505,6 +571,9 @@ func (a *App) contarInvitaciones() {
 // cargan eventos sin ninguno que enseñar; error si lo hay; y si no, la rejilla,
 // atenuada mientras llega lo que falta.
 func (a *App) pintar() {
+	if a.vida.Err() != nil {
+		return
+	}
 	p := a.P
 	p.Eventos = Fundir(a.todos(), p.Visibles, a.porCal, p.SinConexion)
 	ordenar(p.Eventos)
@@ -513,13 +582,13 @@ func (a *App) pintar() {
 	p.Fallo = ""
 	switch {
 	case a.cargandoCal || (a.cargandoEv && len(p.Eventos) == 0):
-		p.Estado = agenda.Cargando
+		p.Estado = ui.EstadoCargando
 	case a.fallo != "" && a.prohibido:
-		p.Estado, p.Fallo = agenda.SinPermiso, a.fallo
+		p.Estado, p.Fallo = ui.EstadoSinPermiso, a.fallo
 	case a.fallo != "":
-		p.Estado, p.Fallo = agenda.Error, a.fallo
+		p.Estado, p.Fallo = ui.EstadoError, a.fallo
 	default:
-		p.Estado, p.Recargando = agenda.Exito, a.cargandoEv
+		p.Estado, p.Recargando = ui.EstadoExito, a.cargandoEv
 	}
 	p.recCargando, p.recFallo = a.recCargando, a.recError
 	if a.raiz == nil {
@@ -572,7 +641,14 @@ func (a *App) ConImportar(i *api.Integraciones) {
 func (a *App) ConServiciosVinculados(abrir func()) {
 	a.P.AlServiciosVinculados = nil
 	if abrir != nil {
-		a.P.AlServiciosVinculados = func() { a.P.cajonAbierto = false; a.pintar(); abrir() }
+		a.P.AlServiciosVinculados = func() {
+			if a.vida.Err() != nil {
+				return
+			}
+			a.P.cajonAbierto = false
+			a.pintar()
+			abrir()
+		}
 	}
 	a.pintar()
 }

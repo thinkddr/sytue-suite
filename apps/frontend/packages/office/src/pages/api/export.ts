@@ -15,7 +15,7 @@
  * Formatos: 'pdf' | 'html' | 'markdown' | 'odf' | 'ooxml'.
  *
  * PDF estaba fuera por un comentario que decía que el backend no lo serializa, y sí
- * lo hace: `services/docs/internal/domain/export_pdf.go` es un motor propio con solo
+ * lo hace: `apps/nucleo/office/model/export_pdf.go` es un motor propio con solo
  * la stdlib y `Export()` lo despacha para los tres tipos de documento. El menú del
  * editor ya ofrecía «PDF»; esta lista lo rechazaba con `bad_format`, así que la
  * entrada más buscada del menú devolvía un error.

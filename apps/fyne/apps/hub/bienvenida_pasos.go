@@ -67,8 +67,10 @@ type controlesAlta struct {
 	casillasRol map[string]*ui.Eleccion
 	sustituir   map[string]*ui.Eleccion
 	permisos    map[string]*ui.Enlace
-	editar      map[string]*ui.Enlace
-	siguientes  []*enlaceSiguiente
+	// resumen es el `ReviewSummary` del último paso. Sobrevive a los repintados: sus
+	// «Editar» no pierden el foco al refrescar.
+	resumen    *ui.Resumen
+	siguientes []*enlaceSiguiente
 }
 
 // valoresRol son los del selector de la invitación; su nombre sale del catálogo.
@@ -202,7 +204,7 @@ func (r *bienvenidaRenderer) montar() {
 	c.direccion.AlCambiar(func(s string) { cambia(func() { b.facturacion.Address = s }) })
 
 	c.casillasRol, c.sustituir = map[string]*ui.Eleccion{}, map[string]*ui.Eleccion{}
-	c.permisos, c.editar = map[string]*ui.Enlace{}, map[string]*ui.Enlace{}
+	c.permisos = map[string]*ui.Enlace{}
 	ir := func(d Destino) func() {
 		return func() {
 			if b.Ir != nil {
@@ -484,8 +486,8 @@ func (r *bienvenidaRenderer) panelDominio(v tema.Variante) bloque {
 		c.comprobar.Texto, c.comprobar.Variante = tt("ob.dnsRec.save"), ui.Primario
 	} else {
 		fila := func(rotulo, valor, clave string) bloque {
-			f := nuevaFilaCopia(t, tt(rotulo), valor, func(s string) { r.copiar(s, clave) })
-			f.Ventana, f.RotuloSM = b.Ancho(), RotuloCopiaAlta
+			f := nuevaFilaCopia(tt(rotulo), valor, func(s string) { r.copiar(s, clave) })
+			f.Ventana, f.RotuloSM = b.Ancho(), ui.RotuloCopiaCorto
 			return f
 		}
 		partes = append(partes,
@@ -958,19 +960,13 @@ func (r *bienvenidaRenderer) cuerpoListo(v tema.Variante) bloque {
 	tt := func(k string) string { return t.T(k, nil) }
 	ids := pasosDe(b.modoEfectivo())
 	org, dom, esOrg := b.org(), b.estado.Domain, b.esOrg()
-	editar := func(paso string) *ui.Enlace {
-		e, ok := c.editar[paso]
-		if !ok {
-			e = ui.NuevoEnlace(tt("ob.sum.edit"), tema.TextoSM, ui.SemiNegrita, "primary-text", func() {
-				b.mu.Lock()
-				b.paso = slices.Index(pasosDe(b.modoEfectivo()), paso)
-				b.mu.Unlock()
-				b.Refresh()
-			})
-			e.Boton = true
-			c.editar[paso] = e
+	editar := func(paso string) func() {
+		return func() {
+			b.mu.Lock()
+			b.paso = slices.Index(pasosDe(b.modoEfectivo()), paso)
+			b.mu.Unlock()
+			b.Refresh()
 		}
-		return e
 	}
 	raya := "—"
 	cuenta, direccion := raya, raya
@@ -993,17 +989,17 @@ func (r *bienvenidaRenderer) cuerpoListo(v tema.Variante) bloque {
 	if esOrg {
 		etiqueta = tt("ob.sum.org")
 	}
-	filas := []filaResumenAlta{
-		{etiqueta, cuenta, false, editar(api.AltaPasoIdentidad)},
-		{tt("ob.sum.address"), direccion, true, nil},
-		{tt("ob.sum.ownDomain"), propio, false, editar(api.AltaPasoIdentidad)},
+	filas := []ui.FilaResumen{
+		{Clave: etiqueta, Valor: cuenta, AlEditar: editar(api.AltaPasoIdentidad)},
+		{Clave: tt("ob.sum.address"), Valor: direccion, Mono: true},
+		{Clave: tt("ob.sum.ownDomain"), Valor: propio, AlEditar: editar(api.AltaPasoIdentidad)},
 	}
 	if esOrg {
 		inv := tt("ob.sum.noInvitations")
 		if n := len(b.estado.Invitations); n > 0 {
 			inv = t.T("ob.sum.invitationsPending", i18n.Vars{"count": n})
 		}
-		filas = append(filas, filaResumenAlta{tt("ob.sum.invitations"), inv, false, editar(api.AltaPasoPersonas)})
+		filas = append(filas, ui.FilaResumen{Clave: tt("ob.sum.invitations"), Valor: inv, AlEditar: editar(api.AltaPasoPersonas)})
 	}
 	fact := tt("ob.sum.billingEmpty")
 	if f := b.estado.Billing; f != nil && (f.LegalName != "" || f.BillingEmail != "") {
@@ -1012,7 +1008,7 @@ func (r *bienvenidaRenderer) cuerpoListo(v tema.Variante) bloque {
 			fact = f.BillingEmail
 		}
 	}
-	filas = append(filas, filaResumenAlta{tt("ob.sum.billing"), fact, false, editar(api.AltaPasoFacturacion)})
+	filas = append(filas, ui.FilaResumen{Clave: tt("ob.sum.billing"), Valor: fact, AlEditar: editar(api.AltaPasoFacturacion)})
 	if esOrg {
 		roles := tt("ob.sum.noRoles")
 		if len(b.estado.Roles) > 0 {
@@ -1022,10 +1018,16 @@ func (r *bienvenidaRenderer) cuerpoListo(v tema.Variante) bloque {
 			}
 			roles = strings.Join(nombres, ", ")
 		}
-		filas = append(filas, filaResumenAlta{tt("ob.sum.roles"), roles, false, editar(api.AltaPasoRoles)})
+		filas = append(filas, ui.FilaResumen{Clave: tt("ob.sum.roles"), Valor: roles, AlEditar: editar(api.AltaPasoRoles)})
 	}
 	_ = ids
-	partes := []bloque{nuevoResumenAlta(b.Ancho(), filas)}
+	if c.resumen == nil {
+		c.resumen = ui.NuevoResumen(nil)
+	}
+	c.resumen.RotuloEditar, c.resumen.Ventana = tt("ob.sum.edit"), b.Ancho()
+	c.resumen.Filas = filas
+	c.resumen.Refresh()
+	partes := []bloque{objetoB{c.resumen}}
 	if dom != nil && !dom.Verified {
 		sub := ""
 		if org != nil {
@@ -1076,9 +1078,6 @@ type campoB struct {
 	caja              *ui.Caja
 	suf               *canvas.Text
 }
-
-// RotuloCopiaAlta es el `sm:w-24` del rótulo de las filas de copiar del alta.
-const RotuloCopiaAlta float32 = 24 * 0.25 * tema.Rem
 
 // MargenSufijo es el `px-3` de la caja del sufijo.
 const MargenSufijo float32 = 3 * 0.25 * tema.Rem
@@ -1192,33 +1191,63 @@ func (o opcionesB) objetos() []fyne.CanvasObject {
 	return out
 }
 
-// filaB es `flex items-center gap-*`: cada hijo a su medida, centrados en la fila.
-//
-// ponytail: sin `flex-wrap`; en estrecho una fila que no cabe se sale por la derecha.
-// Las de este asistente son dos botones o un botón y una nota corta.
+// filaB es `flex flex-wrap items-center gap-*`: cada hijo a su medida, centrados en
+// su línea, y lo que no cabe baja a otra con el mismo hueco entre líneas. En el teléfono
+// «Buscar» y «Usar este dominio» no caben juntos a 360: sin el reparto el segundo se
+// salía por la derecha.
 type filaB struct {
 	hueco float32
 	hijos []fyne.CanvasObject
 }
 
-func (f filaB) alto(float32) float32 {
+// lineas son los índices de los hijos de cada línea a `ancho`. Con ancho 0 (aún sin
+// medir) todo va en una, que es lo que pinta el navegador antes de saber el ancho.
+func (f filaB) lineas(ancho float32) [][]int {
+	anchos := make([]float32, len(f.hijos))
+	for i, o := range f.hijos {
+		anchos[i] = medidaDe(o).Width
+	}
+	cabe := ancho
+	if ancho <= 0 {
+		cabe = float32(math.Inf(1))
+	}
+	return ui.RepartirEnLineas(anchos, cabe, func(int) float32 { return f.hueco })
+}
+
+// altoLinea es el del hijo más alto de la línea: el `items-center` centra en ella.
+func (f filaB) altoLinea(l []int) float32 {
 	var h float32
-	for _, o := range f.hijos {
-		h = max(h, medidaDe(o).Height)
+	for _, i := range l {
+		h = max(h, medidaDe(f.hijos[i]).Height)
 	}
 	return h
 }
 
-func (f filaB) poner(x, y, _ float32) {
-	h := f.alto(0)
-	for _, o := range f.hijos {
-		m := medidaDe(o)
-		if t, ok := o.(*canvas.Text); ok {
-			ui.ColocarTexto(t, tema.TextoXS, x, y+(h-m.Height)/2)
-		} else {
-			ponerObjeto(o, x, y+(h-m.Height)/2, m, true)
+func (f filaB) alto(ancho float32) float32 {
+	var h float32
+	for n, l := range f.lineas(ancho) {
+		if n > 0 {
+			h += f.hueco
 		}
-		x += m.Width + f.hueco
+		h += f.altoLinea(l)
+	}
+	return h
+}
+
+func (f filaB) poner(x0, y, ancho float32) {
+	for _, l := range f.lineas(ancho) {
+		h, x := f.altoLinea(l), x0
+		for _, i := range l {
+			o := f.hijos[i]
+			m := medidaDe(o)
+			if t, ok := o.(*canvas.Text); ok {
+				ui.ColocarTexto(t, tema.TextoXS, x, y+(h-m.Height)/2)
+			} else {
+				ponerObjeto(o, x, y+(h-m.Height)/2, m, true)
+			}
+			x += m.Width + f.hueco
+		}
+		y += h + f.hueco
 	}
 }
 
@@ -1403,65 +1432,6 @@ func nuevaFicha(texto string) fyne.CanvasObject {
 	i := ui.NuevaInsignia(texto, ui.InsigniaNeutra)
 	i.Cuadrada = true
 	return i
-}
-
-// ---- El resumen del último paso, con «Editar» ----
-
-type filaResumenAlta struct {
-	clave, valor string
-	mono         bool
-	editar       *ui.Enlace
-}
-
-// resumenAlta es `ReviewSummary` con su «Editar» a la derecha de cada fila que lo lleva.
-type resumenAlta struct {
-	*resumen
-	editar []*ui.Enlace
-}
-
-func nuevoResumenAlta(ventana float32, filas []filaResumenAlta) *resumenAlta {
-	pares := make([][2]string, len(filas))
-	r := &resumenAlta{}
-	for i, f := range filas {
-		pares[i] = [2]string{f.clave, f.valor}
-		r.editar = append(r.editar, f.editar)
-	}
-	r.resumen = nuevoResumen(ventana, pares)
-	for i, f := range filas {
-		if f.mono {
-			r.valores[i].Escalon = tema.TextoXS
-		}
-		// La tercera columna (`auto`) mide lo que el «Editar» más ancho.
-		if f.editar != nil {
-			r.derecha = max(r.derecha, ui.MedidaEnlace(f.editar).Width+HuecoResumen)
-		}
-	}
-	return r
-}
-
-func (r *resumenAlta) poner(x, y, ancho float32) {
-	r.resumen.poner(x, y, ancho)
-	fy := y + tema.Borde
-	for i, e := range r.editar {
-		if i > 0 {
-			fy += tema.Borde
-		}
-		if e != nil {
-			m := ui.MedidaEnlace(e)
-			ponerObjeto(e, x+ancho-tema.Borde-MargenResumenX-m.Width, fy+MargenResumenY, m, true)
-		}
-		fy += r.altoFila(i, ancho)
-	}
-}
-
-func (r *resumenAlta) objetos() []fyne.CanvasObject {
-	out := r.resumen.objetos()
-	for _, e := range r.editar {
-		if e != nil {
-			out = append(out, e)
-		}
-	}
-	return out
 }
 
 // enlaceSiguiente es `NextLink`: una fila pulsable con su icono, título y frase.

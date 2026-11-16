@@ -34,7 +34,34 @@ import {
 import { chartView } from '../../src/editor/sheets/Chart';
 import type { ChartSpec, SheetData, Sparkline, SheetTable } from '../../src/editor/types';
 import { moverObjetos } from '../../src/editor/sheets/refshift';
+import {
+  AIRE_AJUSTE,
+  ALTO_MAX,
+  ANCHO_MAX,
+  MEDIDA_MIN,
+  acumulado,
+  altoAjustado,
+  anchoAjustado,
+  conMedidas,
+  indiceEn,
+  leerMedida,
+  medidaDe,
+} from '../../src/editor/sheets/rejilla';
 import type { Desplazamiento } from '../../src/editor/sheets/refshift';
+import {
+  celdasCubiertas,
+  combinar,
+  combinarHoja,
+  combinarPierdeDatos,
+  fusionARango,
+  fusionEn,
+  fusionesEnVentana,
+  moverPorFusiones,
+  parseFusiones,
+  separar,
+} from '../../src/editor/sheets/fusiones';
+import type { Fusion } from '../../src/editor/sheets/fusiones';
+import { irA, nombresParaIrA, type LibroIrA } from '../../src/editor/sheets/irA';
 
 /** Un valor de celda en JSON: los errores como `{ error: '#DIV/0!' }`. */
 type ValorJSON = number | string | boolean | { error: string };
@@ -341,6 +368,369 @@ const SANEAR_MINIS: unknown[] = [
   null,
 ];
 
+/* ---------- Medidas propias de filas y columnas (sheets/rejilla.ts) ---------- */
+
+/** La rejilla de serie de SheetCanvas (`HEAD_W`, `CELL_W`, `CELL_H`), que no exporta: el
+ *  lado de Go ya comprueba que sus constantes son estas. */
+const HEAD_W = 40;
+const CELL_W = 96;
+const CELL_H = 24;
+
+const MEDIDA_DE: {
+  medidas: Record<string, number> | undefined;
+  i: number;
+  serie: number;
+  tope?: number;
+}[] = [
+  { medidas: undefined, i: 0, serie: CELL_W },
+  { medidas: { '0': 150 }, i: 0, serie: CELL_W },
+  { medidas: { '0': 150 }, i: 1, serie: CELL_W },
+  { medidas: { '2': 3.9 }, i: 2, serie: CELL_W },
+  { medidas: { '2': 4 }, i: 2, serie: CELL_W },
+  { medidas: { '3': 5000 }, i: 3, serie: CELL_W },
+  { medidas: { '3': 5000 }, i: 3, serie: CELL_H, tope: ALTO_MAX },
+  { medidas: { '1': 64.5 }, i: 1, serie: CELL_W },
+  { medidas: { '1': -3 }, i: 1, serie: CELL_H, tope: ALTO_MAX },
+];
+
+/** Hojas con medidas importadas (y alguna rota), con filas y columnas ocultas: la
+ *  geometría que pinta SheetCanvas y qué unidad cae bajo cada coordenada. */
+const GEOMETRIAS: {
+  colWidths?: Record<string, number>;
+  rowHeights?: Record<string, number>;
+  ocultasCols: number[];
+  ocultasFilas: number[];
+  nCols: number;
+  nRows: number;
+  xs: number[];
+  ys: number[];
+}[] = [
+  {
+    colWidths: { '0': 150, '2': 64.5, '4': 30, '7': 5000, '9': 2, x: 80 },
+    rowHeights: { '0': 32, '3': 60, '5': 12, '8': 900 },
+    ocultasCols: [],
+    ocultasFilas: [],
+    nCols: 12,
+    nRows: 14,
+    xs: [0, 39.9, 40, 189.9, 190, 286, 350.5, 351, 2500, 99999],
+    ys: [24, 55.9, 56, 128, 200, 260, 1500, 99999],
+  },
+  {
+    colWidths: { '1': 200, '3': 50 },
+    rowHeights: { '1': 40, '2': 48 },
+    ocultasCols: [1, 5],
+    ocultasFilas: [2, 3],
+    nCols: 8,
+    nRows: 10,
+    xs: [40, 136, 231.9, 232, 282, 400, 700],
+    ys: [24, 48, 88, 100, 200],
+  },
+  {
+    ocultasCols: [],
+    ocultasFilas: [0],
+    nCols: 4,
+    nRows: 4,
+    xs: [40, 136, 200],
+    ys: [24, 48, 60],
+  },
+];
+
+const LEER_MEDIDA: string[] = [
+  '120',
+  '120px',
+  '120,5',
+  ' 64.25 PX ',
+  'auto',
+  'AUTO',
+  '',
+  'x',
+  '-3',
+  '12px3',
+  '1e3',
+];
+
+const CON_MEDIDAS: {
+  medidas: Record<string, number> | undefined;
+  indices: number[];
+  px: number | null;
+  serie: number;
+  tope?: number;
+}[] = [
+  { medidas: undefined, indices: [0], px: 150, serie: CELL_W },
+  { medidas: { '0': 150 }, indices: [0, 1], px: 96, serie: CELL_W },
+  { medidas: { '0': 150, '3': 20 }, indices: [3], px: null, serie: CELL_W },
+  { medidas: { '0': 150 }, indices: [0], px: null, serie: CELL_W },
+  { medidas: undefined, indices: [2], px: 1, serie: CELL_W },
+  { medidas: undefined, indices: [2], px: 99999, serie: CELL_H, tope: ALTO_MAX },
+  { medidas: undefined, indices: [5, 6], px: 30.5, serie: CELL_H, tope: ALTO_MAX },
+  { medidas: undefined, indices: [5], px: 30.49, serie: CELL_H, tope: ALTO_MAX },
+];
+
+const ANCHO_AJUSTADO: number[][] = [[], [0], [12.3], [12.3, 80, 41], [5000], [-4, Number.NaN]];
+const ALTO_AJUSTADO: number[][] = [[], [0], [8], [11, 18], [24, 10], [400]];
+
+/** Lo que pinta SheetCanvas: `colX` (el borde izquierdo de cada columna, también de las
+ *  ocultas, que miden cero) y `rowTop` sobre las filas visibles, y qué unidad cae bajo
+ *  cada coordenada (`indiceEn`). */
+function geometria(g: (typeof GEOMETRIAS)[number]): unknown {
+  const ocC = new Set(g.ocultasCols);
+  const ocF = new Set(g.ocultasFilas);
+  const colW = (c: number): number => medidaDe(g.colWidths, c, CELL_W);
+  const colX: number[] = [];
+  let n = 0;
+  for (let c = 0; c <= g.nCols; c++) {
+    colX[c] = HEAD_W + n;
+    if (c < g.nCols && !ocC.has(c)) n += colW(c);
+  }
+  const visCols = Array.from({ length: g.nCols }, (_, c) => c).filter((c) => !ocC.has(c));
+  const visRows = Array.from({ length: g.nRows }, (_, r) => r).filter((r) => !ocF.has(r));
+  const colPos = acumulado(HEAD_W, visCols, colW);
+  const rowTop = acumulado(CELL_H, visRows, (r) => medidaDe(g.rowHeights, r, CELL_H, ALTO_MAX));
+  return {
+    ...g,
+    colX,
+    rowTop,
+    colEn: g.xs.map((x) => visCols[indiceEn(colPos, x)]),
+    filaEn: g.ys.map((y) => visRows[indiceEn(rowTop, y)]),
+  };
+}
+
+/* ---------- Celdas combinadas (sheets/fusiones.ts) ---------- */
+
+/** Listas de `merges` tal como llegan (de un .xlsx, de la web, rotas): `null` es la hoja
+ *  sin combinadas (`undefined` en la web, que el JSON no escribe). */
+const PARSE_FUSIONES: (string[] | null)[] = [
+  ['A1:D1', 'F3:G4'],
+  ['A1', 'B2'],
+  ['B2:C3', 'C3:D4', 'E1:E2'],
+  ['D4:B2', ' $a$1:$a$3 '],
+  ['basura', 'A1:', 'A0:B2', 'ZZZZ1:A2', 'A2:B2'],
+  null,
+];
+
+const FUSIONES_BASE = ['A1:D1', 'F3:G4', 'B10:C12'];
+const PUNTOS_FUSION: [number, number][] = [
+  [0, 0],
+  [3, 0],
+  [4, 0],
+  [5, 2],
+  [6, 3],
+  [7, 3],
+  [0, 1],
+  [2, 11],
+];
+const VENTANAS: { c1: number; r1: number; c2: number; r2: number; tope?: number }[] = [
+  { c1: 2, r1: 0, c2: 5, r2: 5 },
+  { c1: 0, r1: 4, c2: 10, r2: 8 },
+  { c1: 0, r1: 0, c2: 10, r2: 20, tope: 2 },
+  { c1: 1, r1: 11, c2: 1, r2: 11 },
+  { c1: 7, r1: 0, c2: 9, r2: 30 },
+];
+
+/** Movimientos de teclado sobre B2:D3 y F2:F5, con los topes de la rejilla de prueba. */
+const MOVER_FUSIONES = ['B2:D3', 'F2:F5'];
+const MOVIMIENTOS: { base: { c: number; r: number }; dc: number; dr: number }[] = [
+  { base: { c: 1, r: 1 }, dc: 1, dr: 0 },
+  { base: { c: 1, r: 1 }, dc: 0, dr: 1 },
+  { base: { c: 1, r: 1 }, dc: -1, dr: 0 },
+  { base: { c: 1, r: 1 }, dc: 0, dr: -1 },
+  { base: { c: 4, r: 1 }, dc: 1, dr: 0 },
+  { base: { c: 4, r: 3 }, dc: -1, dr: 0 },
+  { base: { c: 5, r: 1 }, dc: 0, dr: 1 },
+  { base: { c: 5, r: 1 }, dc: 0, dr: -1 },
+  { base: { c: 0, r: 2 }, dc: 1, dr: 0 },
+  { base: { c: 3, r: 0 }, dc: 0, dr: 1 },
+  { base: { c: 1, r: 1 }, dc: 0, dr: 30 },
+  { base: { c: 24, r: 98 }, dc: 5, dr: 5 },
+  { base: { c: 1, r: 1 }, dc: -1, dr: 0 },
+  { base: { c: 2, r: 2 }, dc: 0, dr: 0 },
+];
+
+const COMBINAR: { merges: string[] | null; rect: Fusion }[] = [
+  { merges: [], rect: { c1: 0, r1: 0, c2: 1, r2: 1 } },
+  { merges: null, rect: { c1: 0, r1: 0, c2: 0, r2: 0 } },
+  { merges: ['B2:C3'], rect: { c1: 0, r1: 0, c2: 1, r2: 1 } },
+  { merges: ['B2:C3', 'D3:E4'], rect: { c1: 0, r1: 0, c2: 2, r2: 1 } },
+  { merges: ['B2:C3', 'D3:E4'], rect: { c1: 0, r1: 0, c2: 3, r2: 1 } },
+  { merges: ['A1:B1', 'x', 'H8:H9'], rect: { c1: 0, r1: 0, c2: 2, r2: 0 } },
+  { merges: ['B2:C3'], rect: { c1: 1, r1: 1, c2: 1, r2: 1 } },
+];
+
+const SEPARAR: { merges: string[] | null; rect: Fusion }[] = [
+  { merges: ['A1:B2', 'D1:E1'], rect: { c1: 0, r1: 0, c2: 0, r2: 0 } },
+  { merges: ['A1:B2'], rect: { c1: 3, r1: 3, c2: 3, r2: 3 } },
+  { merges: null, rect: { c1: 0, r1: 0, c2: 5, r2: 5 } },
+  { merges: ['A1:B2', 'D1:E1', 'raro'], rect: { c1: 0, r1: 0, c2: 4, r2: 0 } },
+  { merges: ['A1:B2'], rect: { c1: 1, r1: 1, c2: 1, r2: 1 } },
+];
+
+const HOJAS_COMBINAR: {
+  cells: Record<string, string>;
+  merges: string[] | null;
+  rect: Fusion;
+  centrar: boolean;
+}[] = [
+  {
+    cells: { A1: 'Título', B1: '', C1: '<b>x</b>', A2: 'y', D1: 'fuera' },
+    merges: ['A2:A3'],
+    rect: { c1: 0, r1: 0, c2: 2, r2: 0 },
+    centrar: true,
+  },
+  {
+    cells: { A1: 'Título', C1: '<b>x</b>' },
+    merges: null,
+    rect: { c1: 0, r1: 0, c2: 2, r2: 0 },
+    centrar: false,
+  },
+  {
+    cells: { A1: '<div style="text-align: right;"><b>5</b></div>', B2: '<i> </i>' },
+    merges: null,
+    rect: { c1: 0, r1: 0, c2: 1, r2: 1 },
+    centrar: true,
+  },
+  {
+    cells: { B1: 'z' },
+    merges: null,
+    rect: { c1: 0, r1: 0, c2: 1, r2: 0 },
+    centrar: true,
+  },
+  {
+    cells: { A1: 'a', B1: '<b></b>', A9: 'lejos' },
+    merges: ['B1:B3'],
+    rect: { c1: 0, r1: 0, c2: 0, r2: 1 },
+    centrar: true,
+  },
+  {
+    cells: { A1: 'a' },
+    merges: null,
+    rect: { c1: 0, r1: 0, c2: 0, r2: 0 },
+    centrar: true,
+  },
+];
+
+/* ---------- «Ir a» y el cuadro de nombres (sheets/irA.ts) ---------- */
+
+const LIBRO_IR_A: LibroIrA = {
+  hojas: ['Hoja1', 'Ventas 2026', "D'Ana", 'Resumen', 'Año'],
+  activa: 0,
+  nombres: [
+    { name: 'Total', ref: 'Hoja1!$B$20' },
+    { name: 'Datos', ref: "'Ventas 2026'!$A$1:$D$50" },
+    { name: 'IVA', ref: '0.21' },
+    { name: 'Suma', ref: 'SUM(Hoja1!A1:A3)' },
+    { name: 'Zona', ref: '$C$3:$E$4' },
+    { name: 'Total', ref: 'Resumen!$Z$9', sheet: 'Resumen' },
+    { name: 'Local', ref: '$F$6', sheet: 'Hoja1' },
+    { name: 'Lejos', ref: '$A$1', sheet: 'Ventas 2026' },
+    { name: 'Columnas', ref: 'Hoja1!$C:$D' },
+    { name: 'Rota', ref: 'NoHay!$A$1' },
+    { name: 'Cierre', ref: "'Año'!$B$2:$B$13" },
+  ],
+};
+
+const IR_A: string[] = [
+  'B12',
+  ' b12 ',
+  '=C3',
+  '$A$1',
+  'A1:C5',
+  'C5:A1',
+  'AA1000:AB1200',
+  "'Ventas 2026'!A1:C5",
+  'resumen!B2',
+  "'D''Ana'!H8",
+  'NoHay!A1',
+  'Año!B2',
+  'año!b2:c3',
+  "'Año'!A1",
+  'Cierre',
+  'A:C',
+  '3:5',
+  'XFD1048576',
+  'XFE1',
+  'A1048577',
+  'Total',
+  'total',
+  'Datos',
+  'Zona',
+  'Local',
+  'Lejos',
+  "'Ventas 2026'!Lejos",
+  'Resumen!Total',
+  'Resumen!Datos',
+  'Columnas',
+  'IVA',
+  'Suma',
+  'Rota',
+  'NoExiste',
+  '',
+  '   ',
+  'A1 B2',
+  '1+1',
+  'Hoja1!',
+  '#REF!',
+];
+
+/** El mismo libro visto desde «Resumen»: su «Total» tapa al del libro. */
+const DESDE_RESUMEN: LibroIrA = { ...LIBRO_IR_A, activa: 3 };
+
+function vectoresIrA(): unknown {
+  return {
+    libro: LIBRO_IR_A,
+    casos: IR_A.map((texto) => ({ texto, sale: irA(texto, LIBRO_IR_A) })),
+    desdeResumen: ['Total', 'Zona', 'Local', 'B2'].map((texto) => ({
+      texto,
+      sale: irA(texto, DESDE_RESUMEN),
+    })),
+    nombres: [
+      { activa: 0, sale: nombresParaIrA(LIBRO_IR_A) },
+      { activa: 3, sale: nombresParaIrA(DESDE_RESUMEN) },
+    ],
+  };
+}
+
+/** Lo que dice la web de cada caso de combinadas. */
+function vectoresFusiones(): unknown {
+  const m = (x: string[] | null): string[] | undefined => x ?? undefined;
+  const base = parseFusiones(FUSIONES_BASE);
+  const mover = parseFusiones(MOVER_FUSIONES);
+  return {
+    parse: PARSE_FUSIONES.map((merges) => ({ merges, sale: parseFusiones(m(merges)) })),
+    fusionEn: {
+      merges: FUSIONES_BASE,
+      casos: PUNTOS_FUSION.map(([c, r]) => ({ c, r, sale: fusionEn(base, c, r) })),
+    },
+    ventana: {
+      merges: FUSIONES_BASE,
+      casos: VENTANAS.map((v) => ({
+        ...v,
+        sale: fusionesEnVentana(base, v.c1, v.r1, v.c2, v.r2, v.tope),
+      })),
+    },
+    mover: {
+      merges: MOVER_FUSIONES,
+      maxC: 25,
+      maxR: 99,
+      casos: MOVIMIENTOS.map((x) => ({
+        ...x,
+        sale: moverPorFusiones(mover, x.base, x.dc, x.dr, 25, 99),
+      })),
+    },
+    rango: base.map((f) => ({ f, sale: fusionARango(f) })),
+    combinar: COMBINAR.map((x) => ({ ...x, sale: combinar(m(x.merges), x.rect) })),
+    separar: SEPARAR.map((x) => ({ ...x, sale: separar(m(x.merges), x.rect) })),
+    hojas: HOJAS_COMBINAR.map((x) => {
+      const hoja = { cells: x.cells, merges: m(x.merges) };
+      return {
+        ...x,
+        cubiertas: celdasCubiertas(x.cells, x.rect).sort(),
+        pierde: combinarPierdeDatos(x.cells, x.rect),
+        sale: combinarHoja(hoja, x.rect, x.centrar),
+      };
+    }),
+  };
+}
+
 /* ---------- Gráficos ---------- */
 
 // La hoja de los gráficos: A1:E7 con cabecera, rótulos de mes, un negativo, un texto
@@ -450,6 +840,25 @@ const HOJA_OBJETOS: SheetData = {
     { id: 's3', col: 1, pivot: 'TablaDinámica1' },
   ],
   autofilter: { row: 1, c1: 1, c2: 3, excl: { '1': ['Norte'], '3': ['0'] } },
+  // Su fórmula mira a la celda de arriba a la izquierda: se mueve con el rango y, si lo
+  // borrado se la lleva, pasa a ser la de la nueva primera celda.
+  condFormats: [
+    { range: 'B2:B10', kind: 'formula', formula: '=B2>$E$1', fill: '#FFEB9C' },
+    { range: 'D3', op: 'gt', value: '5', fill: '#FFC7CE' },
+    { range: 'C4:D5', kind: 'dataBar', color: '#638EC6' },
+  ],
+  validations: [
+    { range: 'B2:B10', values: ['Norte', 'Sur'] },
+    { range: 'C3:C6', type: 'formula', formula: '=C3<=SUMA($D$3:D3)', strict: true },
+  ],
+  rowGroups: [
+    { start: 2, end: 8, level: 1 },
+    { start: 3, end: 4, level: 2, collapsed: true },
+  ],
+  colGroups: [{ start: 2, end: 3, level: 1 }],
+  merges: ['A1:D1', 'F3:G4'],
+  colWidths: { '1': 120, '3': 60 },
+  rowHeights: { '0': 32, '9': 20 },
 };
 const DESPLAZAMIENTOS: Desplazamiento[] = [
   { eje: 'fila', desde: 3, cantidad: 1, tope: 100 },
@@ -538,8 +947,26 @@ export function calcularVectores(): unknown {
     moverObjetos: {
       hoja: HOJA_OBJETOS,
       casos: DESPLAZAMIENTOS.map((d) => {
-        const { tables, sparklines, charts, slicers, autofilter } = moverObjetos(HOJA_OBJETOS, d);
-        return { d, sale: { tables, sparklines, charts, slicers, autofilter } };
+        const m = moverObjetos(HOJA_OBJETOS, d);
+        const { tables, sparklines, charts, slicers, autofilter, condFormats, validations } = m;
+        const { rowGroups, colGroups, merges, colWidths, rowHeights } = m;
+        return {
+          d,
+          sale: {
+            tables,
+            sparklines,
+            charts,
+            slicers,
+            autofilter,
+            condFormats,
+            validations,
+            rowGroups,
+            colGroups,
+            merges,
+            colWidths,
+            rowHeights,
+          },
+        };
       }),
     },
     funciones: { datos: DATOS_FUNCIONES, casos: evaluarFunciones() },
@@ -550,6 +977,26 @@ export function calcularVectores(): unknown {
         sale: sparklineGeom(valores, tipo),
       })),
       sanear: SANEAR_MINIS.map((entrada) => ({ entrada, sale: sanitizeSparkline(entrada) })),
+    },
+    fusiones: vectoresFusiones(),
+    irA: vectoresIrA(),
+    medidas: {
+      limites: { min: MEDIDA_MIN, anchoMax: ANCHO_MAX, altoMax: ALTO_MAX, aire: AIRE_AJUSTE },
+      medidaDe: MEDIDA_DE.map((m) => ({ ...m, sale: medidaDe(m.medidas, m.i, m.serie, m.tope) })),
+      geometrias: GEOMETRIAS.map(geometria),
+      leer: LEER_MEDIDA.map((valor) => ({ valor, sale: leerMedida(valor) })),
+      conMedidas: CON_MEDIDAS.map((m) => ({
+        ...m,
+        sale: conMedidas(m.medidas, m.indices, m.px, m.serie, m.tope) ?? null,
+      })),
+      anchoAjustado: ANCHO_AJUSTADO.map((anchos) => ({
+        anchos: anchos.map((a) => (Number.isFinite(a) ? a : null)),
+        sale: anchoAjustado(anchos, CELL_W),
+      })),
+      altoAjustado: ALTO_AJUSTADO.map((tamanos) => ({
+        tamanos,
+        sale: altoAjustado(tamanos, CELL_H),
+      })),
     },
   };
 }

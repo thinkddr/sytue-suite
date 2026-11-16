@@ -8,19 +8,20 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { VNode } from 'preact';
 import {
-  Card,
-  CardBody,
   Badge,
   Button,
-  Input,
+  Card,
+  CardBody,
   Icon,
-  Select,
+  InlineHelp,
+  Input,
   SectionHeader,
+  Select,
   Spinner,
   Tabs,
+  useUltimo,
   VirtualList,
   withBase,
-  useUltimo,
 } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import type { LogLevel, LogLine, UsageMetric } from '../lib/types.js';
@@ -85,8 +86,11 @@ function DarkButton({ children, onClick }: { children: string; onClick: () => vo
   );
 }
 
-/** Visor virtualizado compartido por las dos pestañas (build y runtime). */
-function LogViewer({
+/**
+ * Visor virtualizado compartido por las dos pestañas (build y runtime) y por el
+ * log del primer build en el asistente de nuevo proyecto.
+ */
+export function LogViewer({
   lines,
   query,
   empty,
@@ -313,12 +317,9 @@ function LiveLogs({
       </div>
 
       {status === 'error' ? (
-        <div
-          class="border-danger bg-danger-bg text-danger-text mb-3 rounded-md border px-3 py-2 text-sm"
-          role="alert"
-        >
+        <InlineHelp tone="danger" class="mb-3">
           {failure ? failureText(t, failure) : t('logs.connectionLost')}
-        </div>
+        </InlineHelp>
       ) : null}
 
       <LogViewer

@@ -82,7 +82,8 @@ o reversibles sin coste no necesitan entrada.
 | 0078 | [Widgets nativos: contadores con caducidad en un App Group, Apple tras un interruptor y nada en Windows/Linux](#0078)                                        | accepted                                                                             |
 | 0079 | [Sytue Notepads sobre «papel»: un cromo neutro elegido por la app](#0079)                                                                                    | accepted                                                                             |
 | 0080 | [Toda la suite sobre «papel»: el cromo de Notepads pasa a las quince apps](#0080)                                                                            | accepted · amplía la [0079](#0079)                                                   |
-| 0081 | [La clave de recuperación de Matrix la custodia Rooms para la sesión OIDC](#0081)                                                                            | accepted                                                                             |
+| 0081 | [La clave de recuperación de Matrix la custodia Rooms para la sesión OIDC](#0081)                                                                            | superseded → 0082                                                                    |
+| 0082 | [La clave de recuperación de Matrix, envuelta en el dispositivo con la contraseña o la passkey](#0082)                                                       | accepted · sustituye a la [0081](#0081)                                              |
 
 <a id="el-pivote-sytue-native-2026-07-01"></a>
 
@@ -5959,9 +5960,9 @@ tocarlas.
 
 <a id="0081"></a>
 
-## 0081 — La clave de recuperación de Matrix la custodia Rooms para la sesión OIDC
+## 0081 — La clave de recuperación de Matrix la custodia Rooms para la sesión OIDC · superseded por [0082](#0082)
 
-`accepted` · 2026-11-08 · rama `sytue-native`
+`superseded` · 2026-11-08 · rama `sytue-native`
 
 **Problema.** Para configurar el cifrado de extremo a extremo de Rooms, cada persona tenía
 que crear una clave de recuperación, guardarla por su cuenta y teclearla en cada dispositivo
@@ -5994,3 +5995,72 @@ nada cambia: Synapse sigue guardando solo texto cifrado, y la clave nunca pasa p
 Si un día se quiere volver al modelo anterior para una organización, basta con no llamar a la
 custodia. Las claves custodiadas se borran con `DELETE FROM matrix_recovery_keys`, y quien ya
 tenía la clave en un dispositivo la conserva.
+
+<a id="0082"></a>
+
+## 0082 — La clave de recuperación de Matrix, envuelta en el dispositivo con la contraseña o la passkey
+
+`accepted` · 2026-11-12 · rama `sytue-native` · sustituye a la [0081](#0081)
+
+**Problema.** La [0081](#0081) quitó a la persona el paso de crear, guardar y teclear la clave
+de recuperación, pero lo hizo guardándola en Rooms cifrada con la KEK del servicio: quien
+controle la base y la KEK, o pueda actuar como la persona ante Sytue ID, la lee. El dueño
+(2026-11-12) fijó dos reglas a la vez: «ni crear ni usar clave de recuperación», y «solo el
+usuario debe poder acceder a los datos con su OIDC, nadie más». Además la 0081 iba por
+persona y no por cuenta de Matrix: los productos de almacenamiento con identidad aislada
+(`@sytue_storage_<product>_<tenant>_<sub>`) tienen otra clave, y guardarla en la misma fila
+habría sobrescrito la de Rooms.
+
+**Decisión.** La clave se sigue generando en el dispositivo y nunca se enseña, pero lo que
+guarda Rooms es un **envoltorio**: la clave cifrada con una clave que se deriva en el
+dispositivo y que el servicio nunca ve.
+
+- **Por cuenta de Matrix.** Tabla `matrix_recovery_wrappers` (migración 0077 de Rooms): la
+  cuenta de Rooms y el almacenamiento heredado comparten fila (`tenant`/`product` vacíos);
+  cada cuenta aislada tiene la suya (`tenant` + `product`). Varios envoltorios por cuenta:
+  uno de contraseña y uno por passkey, hasta 16. Solo se ve en mantenimiento.
+- **API.** `GET`/`PUT /api/v1/matrix/recovery-wrappers`, con `product` e
+  `identity_version=2` para elegir la cuenta aislada. Misma comprobación que el bootstrap de
+  Matrix y el de almacenamiento: nadie lee los de otra persona ni los de una organización que
+  no es suya, y aunque los leyera no los podría abrir. Guardar un envoltorio de otra
+  `key_id` retira los de la clave anterior (restablecer) en la misma transacción.
+- **Contraseña.** Argon2id (64 MiB, 3 pasadas, 1 hilo, sal de 16 bytes por envoltorio) y HKDF
+  con la etiqueta `sytue-matrix-recovery-wrap-v1/password`. Se pide dos veces al crear (un
+  error al teclearla dejaría la clave sin abrir en los demás dispositivos) y una al abrir.
+- **Passkey.** La extensión PRF de WebAuthn de la passkey de Sytue ID (RP ID de
+  `WEBAUTHN_RP_ID`), con HKDF y la etiqueta `…/passkey`. Es la opción recomendada. En la web
+  la implementa el cliente del navegador; en Fyne no hay todavía una vía de WebAuthn de
+  plataforma en el repositorio, así que el escritorio usa la contraseña y la passkey queda
+  pendiente.
+- **Formato.** AES-256-GCM con el AAD atado a la cuenta de Matrix, al tipo, a la clave de
+  almacenamiento y a la passkey. La especificación está en
+  [architecture.md](architecture.md#custodia-envuelta-de-la-clave-de-recuperacion) y la fijan
+  los vectores de `apps/nucleo/recoverywrap/testdata/vectors.json`, que comprueban Go y la web.
+- **Flujos, sin clave a la vista.** Al crear el cifrado, la clave se envuelve y se guarda
+  **antes** de publicarla; si el servicio no la acepta, no se publica nada y el reintento usa
+  la misma clave (la configuración a medias vive en el llavero del sistema). Un dispositivo
+  nuevo pide la contraseña una vez por cuenta y la abre. Una cuenta con una clave que el
+  servicio no conoce solo ofrece verificar el dispositivo desde otro; ya verificado, si el
+  dispositivo tiene la clave (las cuentas de almacenamiento la guardan), pide la contraseña
+  para envolverla. Restablecer (solo Rooms; el almacenamiento sigue con
+  `ErrResetUnsupported`) envuelve la clave nueva antes de publicar la identidad nueva.
+- **Cambio de contraseña en Sytue ID.** El envoltorio viejo sigue abriendo con la contraseña
+  anterior. Si la persona falla y luego acierta (lo normal tras un cambio), se le pide la
+  actual para envolver otra vez; el envoltorio nuevo sustituye al de contraseña.
+- **Transición desde la 0081.** `POST /matrix/recovery-key` responde 410: ninguna clave nueva
+  entra en claro. `GET` sigue sirviendo la copia con KEK que exista, solo para esto: el
+  cliente la usa una vez para recuperar el dispositivo sin pedir nada y pide la contraseña
+  para envolverla; al guardar el primer envoltorio de la cuenta de Rooms, la copia con KEK se
+  borra en la misma transacción. Las copias que nadie haya envuelto **no** se borran solas,
+  porque esa persona perdería sus datos. Se retirarán con una migración posterior cuando
+  `SELECT count(*) FROM matrix_recovery_keys` llegue a cero o tras un aviso con fecha; hasta
+  entonces la 0081 sigue valiendo para esas filas, y solo para ellas.
+
+**Consecuencias.** El operador ya no puede leer las claves nuevas: la base solo tiene texto
+cifrado y parámetros públicos, y ni la KEK ni Sytue ID abren un envoltorio. La contraseña
+tiene una salvedad honesta: es la misma que se teclea al iniciar sesión en Sytue ID, así que
+un operador malicioso que capture inicios de sesión podría derivarla. La passkey no tiene
+ese punto débil, y por eso es la recomendada. Un envoltorio se puede atacar sin conexión con
+la contraseña: Argon2id a 64 MiB lo encarece, pero una contraseña débil sigue siendo débil.
+Quien olvide la contraseña y no tenga otro dispositivo verificado ni passkey solo puede
+restablecer (Rooms) y pierde el historial cifrado, como antes de la 0081.

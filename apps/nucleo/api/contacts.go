@@ -19,7 +19,10 @@ import (
 // Contacts es el cliente de Sytue Contacts, escrito CONTRA EL SERVICIO
 // (services/contacts/internal/http) y no contra el SDK de la web, que llegó a pedir
 // rutas que el servicio no tiene.
-type Contacts struct{ c *Client }
+type Contacts struct {
+	c    *Client
+	data ContactsData
+}
 
 // NewContacts crea el cliente sobre la raíz del servicio (ServiceURL(apex, "contacts")).
 func NewContacts(servicio string, s Session, h *http.Client) *Contacts {
@@ -61,6 +64,19 @@ type ContactAddress struct {
 	IsPrimary  bool   `json:"is_primary,omitempty"`
 }
 
+// ContactURL es un sitio web del contacto. Type es «home», «work» u «other».
+type ContactURL struct {
+	URL  string `json:"url"`
+	Type string `json:"type,omitempty"`
+}
+
+// ContactRelated es una persona relacionada, por su nombre. Type es un tipo de relación
+// de RFC 6350 («spouse», «child», «parent»…) o vacío.
+type ContactRelated struct {
+	Name string `json:"name"`
+	Type string `json:"type,omitempty"`
+}
+
 // Line es la dirección en una línea, con lo que tenga.
 func (a ContactAddress) Line() string {
 	partes := make([]string, 0, 5)
@@ -85,11 +101,15 @@ type ContactInput struct {
 	Title           string           `json:"title,omitempty"`
 	Nickname        string           `json:"nickname,omitempty"`
 	Note            string           `json:"note,omitempty"`
-	Birthday        string           `json:"birthday,omitempty"` // YYYY-MM-DD
+	Birthday        string           `json:"birthday,omitempty"`         // YYYY-MM-DD
+	BirthdayNoYear  string           `json:"birthday_no_year,omitempty"` // --MM-DD, si no hay Birthday
 	PhotoURL        string           `json:"photo_url,omitempty"`
 	Emails          []ContactEmail   `json:"emails,omitempty"`
 	Phones          []ContactPhone   `json:"phones,omitempty"`
 	Addresses       []ContactAddress `json:"addresses,omitempty"`
+	URLs            []ContactURL     `json:"urls,omitempty"`
+	Related         []ContactRelated `json:"related,omitempty"`
+	Anniversary     string           `json:"anniversary,omitempty"` // YYYY-MM-DD
 }
 
 // Contact es un contacto tal y como lo devuelve el servicio.
@@ -108,11 +128,15 @@ type Contact struct {
 	Nickname        string           `json:"nickname,omitempty"`
 	Note            string           `json:"note,omitempty"`
 	Birthday        *time.Time       `json:"birthday,omitempty"`
+	BirthdayNoYear  string           `json:"birthday_no_year,omitempty"` // SIN año, «--MM-DD» («--0215» o el año de relleno de Apple); con Birthday, vacío
 	PhotoURL        string           `json:"photo_url,omitempty"`
 	HasPhoto        bool             `json:"has_photo"` // lleva foto embebida: la que da Photo
 	Emails          []ContactEmail   `json:"emails,omitempty"`
 	Phones          []ContactPhone   `json:"phones,omitempty"`
 	Addresses       []ContactAddress `json:"addresses,omitempty"`
+	URLs            []ContactURL     `json:"urls,omitempty"`
+	Related         []ContactRelated `json:"related,omitempty"`
+	Anniversary     *time.Time       `json:"anniversary,omitempty"`
 	ETag            string           `json:"etag"`
 	UpdatedAt       time.Time        `json:"updated_at"`
 }
@@ -135,16 +159,23 @@ func (c Contact) Input() ContactInput {
 		FormattedName: c.FormattedName, FamilyName: c.FamilyName, GivenName: c.GivenName,
 		AdditionalName: c.AdditionalName, HonorificPrefix: c.HonorificPrefix, HonorificSuffix: c.HonorificSuffix,
 		Organization: c.Organization, Title: c.Title, Nickname: c.Nickname, Note: c.Note, PhotoURL: c.PhotoURL,
-		Emails: c.Emails, Phones: c.Phones, Addresses: c.Addresses,
+		BirthdayNoYear: c.BirthdayNoYear, Emails: c.Emails, Phones: c.Phones, Addresses: c.Addresses,
+		URLs: c.URLs, Related: c.Related,
 	}
 	if c.Birthday != nil {
 		in.Birthday = c.Birthday.Format(time.DateOnly)
+	}
+	if c.Anniversary != nil {
+		in.Anniversary = c.Anniversary.Format(time.DateOnly)
 	}
 	return in
 }
 
 // AddressBooks lista las libretas; el servicio crea la predeterminada si no hay ninguna.
 func (c *Contacts) AddressBooks(ctx context.Context) ([]AddressBook, error) {
+	if c.data != nil {
+		return c.data.AddressBooks(ctx)
+	}
 	r, err := JSON[struct {
 		AddressBooks []AddressBook `json:"address_books"`
 	}](ctx, c.c, Request{Path: "/address-books"})
@@ -154,6 +185,9 @@ func (c *Contacts) AddressBooks(ctx context.Context) ([]AddressBook, error) {
 // All devuelve una página de TODOS los contactos de la persona. siguiente es el offset
 // de la página que viene, o 0 si esta era la última.
 func (c *Contacts) All(ctx context.Context, limite, offset int) (contactos []Contact, siguiente int, err error) {
+	if c.data != nil {
+		return c.data.All(ctx, limite, offset)
+	}
 	r, err := JSON[struct {
 		Contacts   []Contact `json:"contacts"`
 		NextOffset int       `json:"next_offset"`
@@ -166,6 +200,9 @@ func (c *Contacts) All(ctx context.Context, limite, offset int) (contactos []Con
 // Search busca por nombre, correo u organización. q no puede ir vacío: el servicio
 // contesta 400.
 func (c *Contacts) Search(ctx context.Context, q string, limite int) ([]Contact, error) {
+	if c.data != nil {
+		return c.data.Search(ctx, q, limite)
+	}
 	r, err := JSON[struct {
 		Contacts []Contact `json:"contacts"`
 	}](ctx, c.c, Request{Path: "/contacts", Query: url.Values{"q": {q}, "limit": {strconv.Itoa(limite)}}})
@@ -174,6 +211,9 @@ func (c *Contacts) Search(ctx context.Context, q string, limite int) ([]Contact,
 
 // Create da de alta un contacto en una libreta.
 func (c *Contacts) Create(ctx context.Context, libreta string, in ContactInput) (Contact, error) {
+	if c.data != nil {
+		return c.data.Create(ctx, libreta, in)
+	}
 	return PostJSON[Contact](ctx, c.c, "/address-books/"+url.PathEscape(libreta)+"/contacts", in)
 }
 
@@ -181,6 +221,9 @@ func (c *Contacts) Create(ctx context.Context, libreta string, in ContactInput) 
 // lo que la ficha no enseña —la foto, los X-* de otros clientes— y le da un UID nuevo.
 // Es lo que hace la web mandando la tarjeta como `baseVcard` a su BFF.
 func (c *Contacts) ImportCard(ctx context.Context, libreta, tarjeta string) (Contact, error) {
+	if c.data != nil {
+		return c.data.ImportCard(ctx, libreta, tarjeta)
+	}
 	return JSON[Contact](ctx, c.c, Request{
 		Method: http.MethodPost, Path: "/address-books/" + url.PathEscape(libreta) + "/contacts",
 		Header: http.Header{"Content-Type": {"text/vcard; charset=utf-8"}}, Body: []byte(tarjeta),
@@ -190,6 +233,9 @@ func (c *Contacts) ImportCard(ctx context.Context, libreta, tarjeta string) (Con
 // Update sustituye un contacto. Con etag, el servicio rechaza (412) si alguien lo ha
 // cambiado entretanto —otro dispositivo, una sincronización CardDAV— en vez de pisarlo.
 func (c *Contacts) Update(ctx context.Context, id string, in ContactInput, etag string) (Contact, error) {
+	if c.data != nil {
+		return c.data.Update(ctx, id, in, etag)
+	}
 	cuerpo, err := json.Marshal(in)
 	if err != nil {
 		return Contact{}, err
@@ -204,11 +250,17 @@ func (c *Contacts) Update(ctx context.Context, id string, in ContactInput, etag 
 // Contact es un contacto por su id, de cualquier libreta: lo que resuelve el enlace
 // canónico `/contacts/{id}` del buscador de la suite.
 func (c *Contacts) Contact(ctx context.Context, id string) (Contact, error) {
+	if c.data != nil {
+		return c.data.Contact(ctx, id)
+	}
 	return JSON[Contact](ctx, c.c, Request{Path: "/contacts/" + url.PathEscape(id)})
 }
 
 // Delete manda un contacto a la papelera.
 func (c *Contacts) Delete(ctx context.Context, id string) error {
+	if c.data != nil {
+		return c.data.Delete(ctx, id)
+	}
 	return c.borrar(ctx, "/contacts/"+url.PathEscape(id))
 }
 
@@ -229,6 +281,9 @@ type ContactPage struct {
 
 // InBookPage reads a single page; it never substitutes an owner's other books.
 func (c *Contacts) InBookPage(ctx context.Context, libreta, cursor string) (ContactPage, error) {
+	if c.data != nil {
+		return c.data.InBookPage(ctx, libreta, cursor)
+	}
 	q := url.Values{"limit": {"100"}}
 	if cursor != "" {
 		q.Set("cursor", cursor)
@@ -247,7 +302,7 @@ func (c *Contacts) InBook(ctx context.Context, libreta string) ([]Contact, error
 		page, err := c.InBookPage(ctx, libreta, cursor)
 		if err != nil {
 			var response *Error
-			if cursor == "" && errors.As(err, &response) && response.Status == http.StatusNotFound {
+			if c.data == nil && cursor == "" && errors.As(err, &response) && response.Status == http.StatusNotFound {
 				legacy, legacyErr := JSON[ContactPage](ctx, c.c, Request{Path: "/address-books/" + url.PathEscape(libreta) + "/contacts", Query: url.Values{"limit": {"500"}}})
 				if legacyErr != nil {
 					return nil, legacyErr
@@ -284,6 +339,9 @@ func (c *Contacts) InBook(ctx context.Context, libreta string) ([]Contact, error
 // descargas. Es la canónica del servicio y no una armada aquí, así que un campo que
 // esta app no pinta —la foto, un X-* de otro cliente— viaja igual.
 func (c *Contacts) VCard(ctx context.Context, id string) ([]byte, error) {
+	if c.data != nil {
+		return c.data.VCard(ctx, id)
+	}
 	resp, err := c.c.Do(ctx, Request{
 		Path:   "/contacts/" + url.PathEscape(id) + "/vcard",
 		Header: http.Header{"Accept": {"text/vcard"}},
@@ -337,6 +395,9 @@ func CleanUID(uid string) string {
 // UID. Sin foto, el servicio contesta 404 y aquí sale `nil, nil`: el avatar se queda
 // con las iniciales, que es lo que hace la web cuando su `<img>` no carga.
 func (c *Contacts) Photo(ctx context.Context, uid string) ([]byte, error) {
+	if c.data != nil {
+		return c.data.Photo(ctx, uid)
+	}
 	resp, err := c.c.Do(ctx, Request{Path: "/contacts/photo", Query: url.Values{"uid": {CleanUID(uid)}}})
 	if err != nil {
 		var e *Error
@@ -352,6 +413,9 @@ func (c *Contacts) Photo(ctx context.Context, uid string) ([]byte, error) {
 // SetPhoto pone la foto de un contacto: un data URI raster (JPEG, PNG, WebP o GIF de
 // hasta 256 KiB), que el servicio valida e incrusta en la PHOTO de su vCard.
 func (c *Contacts) SetPhoto(ctx context.Context, uid, dataURI string) error {
+	if c.data != nil {
+		return c.data.SetPhoto(ctx, uid, dataURI)
+	}
 	cuerpo, err := json.Marshal(map[string]string{"uid": CleanUID(uid), "data": dataURI})
 	if err != nil {
 		return err
@@ -368,6 +432,9 @@ func (c *Contacts) SetPhoto(ctx context.Context, uid, dataURI string) error {
 
 // RemovePhoto quita la foto de un contacto.
 func (c *Contacts) RemovePhoto(ctx context.Context, uid string) error {
+	if c.data != nil {
+		return c.data.RemovePhoto(ctx, uid)
+	}
 	resp, err := c.c.Do(ctx, Request{
 		Method: http.MethodDelete, Path: "/contacts/photo", Query: url.Values{"uid": {CleanUID(uid)}},
 	})
@@ -380,6 +447,9 @@ func (c *Contacts) RemovePhoto(ctx context.Context, uid string) error {
 // Favorites son los UID de los contactos destacados de la persona. Son SUYOS, no de la
 // libreta: la lista los cruza por UID para pintar la estrella y para filtrar.
 func (c *Contacts) Favorites(ctx context.Context) ([]string, error) {
+	if c.data != nil {
+		return c.data.Favorites(ctx)
+	}
 	r, err := JSON[struct {
 		UIDs []string `json:"uids"`
 	}](ctx, c.c, Request{Path: "/favorites"})
@@ -388,12 +458,18 @@ func (c *Contacts) Favorites(ctx context.Context) ([]string, error) {
 
 // SetFavorite destaca un contacto, o le quita el destacado.
 func (c *Contacts) SetFavorite(ctx context.Context, uid string, destacado bool) error {
+	if c.data != nil {
+		return c.data.SetFavorite(ctx, uid, destacado)
+	}
 	_, err := PostJSON[struct{}](ctx, c.c, "/favorites", map[string]any{"uid": uid, "favorite": destacado})
 	return err
 }
 
 // BatchFavorite destaca o desdestaca varios de una vez (hasta MaxLoteContactos).
 func (c *Contacts) BatchFavorite(ctx context.Context, uids []string, destacado bool) error {
+	if c.data != nil {
+		return c.data.BatchFavorite(ctx, uids, destacado)
+	}
 	_, err := PostJSON[struct{}](ctx, c.c, "/contacts/batch/favorite", map[string]any{"uids": uids, "favorite": destacado})
 	return err
 }
@@ -401,6 +477,12 @@ func (c *Contacts) BatchFavorite(ctx context.Context, uids []string, destacado b
 // BatchTrash manda varios a la papelera de una vez y dice cuántos se tiraron (un UID
 // que vive en dos libretas cuenta dos; los ajenos o ya borrados, ninguno).
 func (c *Contacts) BatchTrash(ctx context.Context, uids []string) (int, error) {
+	if c.data != nil {
+		if err := c.data.BatchTrash(ctx, uids); err != nil {
+			return 0, err
+		}
+		return len(uids), nil
+	}
 	r, err := PostJSON[struct {
 		Trashed int `json:"trashed"`
 	}](ctx, c.c, "/contacts/batch/trash", map[string]any{"uids": uids})
@@ -429,6 +511,9 @@ type TrashItem struct {
 
 // Trash lista los contactos de la papelera, el más reciente primero.
 func (c *Contacts) Trash(ctx context.Context, limite int) ([]TrashItem, error) {
+	if c.data != nil {
+		return c.data.Trash(ctx, limite)
+	}
 	r, err := JSON[struct {
 		Items []TrashItem `json:"items"`
 	}](ctx, c.c, Request{Path: "/trash", Query: url.Values{"limit": {strconv.Itoa(limite)}}})
@@ -437,12 +522,18 @@ func (c *Contacts) Trash(ctx context.Context, limite int) ([]TrashItem, error) {
 
 // Restore saca un contacto de la papelera.
 func (c *Contacts) Restore(ctx context.Context, id string) error {
+	if c.data != nil {
+		return c.data.Restore(ctx, id)
+	}
 	_, err := PostJSON[struct{}](ctx, c.c, "/contacts/"+url.PathEscape(id)+"/restore", struct{}{})
 	return err
 }
 
 // Purge elimina un contacto de la papelera para siempre.
 func (c *Contacts) Purge(ctx context.Context, id string) error {
+	if c.data != nil {
+		return c.data.Purge(ctx, id)
+	}
 	return c.borrar(ctx, "/trash/"+url.PathEscape(id))
 }
 
@@ -457,6 +548,9 @@ type ContactGroup struct {
 
 // Groups lista las etiquetas de una libreta.
 func (c *Contacts) Groups(ctx context.Context, libreta string) ([]ContactGroup, error) {
+	if c.data != nil {
+		return c.data.Groups(ctx, libreta)
+	}
 	r, err := JSON[struct {
 		Groups []ContactGroup `json:"groups"`
 	}](ctx, c.c, Request{Path: "/address-books/" + url.PathEscape(libreta) + "/groups"})
@@ -465,6 +559,9 @@ func (c *Contacts) Groups(ctx context.Context, libreta string) ([]ContactGroup, 
 
 // CreateGroup crea una etiqueta vacía en una libreta.
 func (c *Contacts) CreateGroup(ctx context.Context, libreta, nombre string) (ContactGroup, error) {
+	if c.data != nil {
+		return c.data.CreateGroup(ctx, libreta, nombre)
+	}
 	return PostJSON[ContactGroup](ctx, c.c, "/address-books/"+url.PathEscape(libreta)+"/groups",
 		map[string]any{"name": nombre})
 }
@@ -472,6 +569,9 @@ func (c *Contacts) CreateGroup(ctx context.Context, libreta, nombre string) (Con
 // RenameGroup cambia el nombre de una etiqueta. El PUT sustituye también la pertenencia,
 // así que hay que reenviar SUS miembros: mandar una lista vacía la dejaría sin nadie.
 func (c *Contacts) RenameGroup(ctx context.Context, id, nombre string, miembros []string) (ContactGroup, error) {
+	if c.data != nil {
+		return c.data.RenameGroup(ctx, id, nombre, miembros)
+	}
 	cuerpo, err := json.Marshal(map[string]any{"name": nombre, "members": miembros})
 	if err != nil {
 		return ContactGroup{}, err
@@ -484,11 +584,17 @@ func (c *Contacts) RenameGroup(ctx context.Context, id, nombre string, miembros 
 
 // DeleteGroup elimina una etiqueta. Los contactos no se tocan: solo desaparece ella.
 func (c *Contacts) DeleteGroup(ctx context.Context, id string) error {
+	if c.data != nil {
+		return c.data.DeleteGroup(ctx, id)
+	}
 	return c.borrar(ctx, "/groups/"+url.PathEscape(id))
 }
 
 // BatchGroupMembers añade (o quita) varios contactos, por UID, a una etiqueta de una vez.
 func (c *Contacts) BatchGroupMembers(ctx context.Context, id string, uids []string, anadir bool) error {
+	if c.data != nil {
+		return c.data.BatchGroupMembers(ctx, id, uids, anadir)
+	}
 	_, err := PostJSON[struct{}](ctx, c.c, "/groups/"+url.PathEscape(id)+"/members",
 		map[string]any{"uids": uids, "add": anadir})
 	return err
@@ -497,6 +603,9 @@ func (c *Contacts) BatchGroupMembers(ctx context.Context, id string, uids []stri
 // DeleteAddressBook elimina una libreta y sus contactos. La predeterminada no se puede:
 // el servicio la protege.
 func (c *Contacts) DeleteAddressBook(ctx context.Context, id string) error {
+	if c.data != nil {
+		return c.data.DeleteAddressBook(ctx, id)
+	}
 	return c.borrar(ctx, "/address-books/"+url.PathEscape(id))
 }
 
@@ -504,6 +613,9 @@ func (c *Contacts) DeleteAddressBook(ctx context.Context, id string) error {
 // petición: el servicio detecta el dialecto, se salta las filas inválidas y no repite
 // correos que ya estén. Devuelve cuántos entraron y cuántos se omitieron.
 func (c *Contacts) ImportCSV(ctx context.Context, libreta string, csv []byte) (importados, omitidos int, err error) {
+	if c.data != nil {
+		return c.data.ImportCSV(ctx, libreta, csv)
+	}
 	r, err := JSON[struct {
 		Imported int `json:"imported"`
 		Skipped  int `json:"skipped"`
@@ -518,6 +630,9 @@ func (c *Contacts) ImportCSV(ctx context.Context, libreta string, csv []byte) (i
 // la libreta que se ve: es lo que baja «Exportar CSV» en la web. `nombre` es el que da
 // el servicio en `Content-Disposition`, que es el que pone el navegador al descargarlo.
 func (c *Contacts) ExportCSV(ctx context.Context) (nombre string, csv []byte, err error) {
+	if c.data != nil {
+		return c.data.ExportCSV(ctx)
+	}
 	resp, err := c.c.Do(ctx, Request{Path: "/export-csv", Header: http.Header{"Accept": {"text/csv"}}})
 	if err != nil {
 		return "", nil, err
@@ -533,6 +648,9 @@ func (c *Contacts) ExportCSV(ctx context.Context) (nombre string, csv []byte, er
 // CreateAddressBook crea una libreta. El servicio usa `name` como segmento de ruta
 // CardDAV y `display_name` como rótulo; con uno solo, el rótulo hace de los dos.
 func (c *Contacts) CreateAddressBook(ctx context.Context, nombre string) (AddressBook, error) {
+	if c.data != nil {
+		return c.data.CreateAddressBook(ctx, nombre)
+	}
 	return PostJSON[AddressBook](ctx, c.c, "/address-books",
 		map[string]any{"name": RutaDeLibreta(nombre), "display_name": nombre})
 }
@@ -540,6 +658,9 @@ func (c *Contacts) CreateAddressBook(ctx context.Context, nombre string) (Addres
 // CreateAddressBookAt crea una libreta en una ruta CardDAV fija —la de «Organización»
 // es `organizacion` en cualquier idioma—, con su rótulo y su color.
 func (c *Contacts) CreateAddressBookAt(ctx context.Context, ruta, rotulo, color string) (AddressBook, error) {
+	if c.data != nil {
+		return c.data.CreateAddressBookAt(ctx, ruta, rotulo, color)
+	}
 	return PostJSON[AddressBook](ctx, c.c, "/address-books",
 		map[string]any{"name": ruta, "display_name": rotulo, "color": color})
 }
@@ -547,6 +668,9 @@ func (c *Contacts) CreateAddressBookAt(ctx context.Context, ruta, rotulo, color 
 // RenameAddressBook cambia el rótulo de una libreta; su ruta CardDAV no se toca, que es
 // por donde la tienen enganchada los teléfonos ya sincronizados.
 func (c *Contacts) RenameAddressBook(ctx context.Context, id, nombre string) (AddressBook, error) {
+	if c.data != nil {
+		return c.data.RenameAddressBook(ctx, id, nombre)
+	}
 	cuerpo, err := json.Marshal(map[string]any{"display_name": nombre})
 	if err != nil {
 		return AddressBook{}, err

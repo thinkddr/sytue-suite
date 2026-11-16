@@ -175,15 +175,10 @@ export const tienda = {
   'store.mode_test_help':
     'Ħlasijiet simulati biċ-ċwievet tat-test tal-fornitur. Ħadd ma jiġi ċċarġjat.',
   'store.mode_live_help': 'Ħlasijiet reali mill-klijenti tiegħek biċ-ċwievet tal-produzzjoni.',
-  'store.webhook_title': 'Pass 1: indirizz tal-webhook',
   'store.webhook_help': 'Waħħal dan l-indirizz fid-dashboard ta’ {nombre}.',
   'store.webhook_label': 'Indirizz tal-webhook',
   'store.webhook_error':
     'L-indirizz tal-webhook ma setax jinġieb. Agħlaq id-djalogu u erġa’ pprova.',
-  'store.copy': 'Ikkopja',
-  'store.copied': 'L-indirizz ġie kkupjat.',
-  'store.credentials_title': 'Kredenzjali',
-  'store.credentials_step': 'Pass 2: kredenzjali',
   'store.f_api_key': 'Ċavetta tal-API',
   'store.f_api_key_mode': 'Ċavetta tal-API ({modo})',
   'store.f_profile_id': 'ID tal-profil (fakultattiv)',
@@ -201,6 +196,49 @@ export const tienda = {
   'store.gateway_save': 'Issejvja u ttestja',
   'store.gateway_saved': 'Il-gateway {nombre} ġie ttestjat u ssejvjat.',
   'store.gateway_save_error': 'Il-kredenzjali tal-gateway ma setgħux jiġu vvalidati.',
+  'store.wz_progress': 'Passi biex tikkollega l-gateway tal-ħlas',
+  'store.wz_step_mode': 'Mod',
+  'store.wz_step_webhook': 'Webhook',
+  'store.wz_step_keys': 'Ċwievet',
+  'store.wz_step_check': 'Iċċekkja',
+  'store.wz_step_done': 'Lest',
+  'store.wz_mode_heading': 'Ħlasijiet tal-prova jew ħlasijiet veri?',
+  'store.wz_mode_desc':
+    'Ibda fil-mod tal-prova; meta kollox jaħdem, erġa’ iftaħ dan l-assistent u agħżel il-mod veru.',
+  'store.wz_webhook_heading': 'Għid lil {nombre} fejn jibgħat l-avviżi tal-ħlas',
+  'store.wz_keys_heading': 'Iċ-ċwievet tiegħek ta’ {nombre}',
+  'store.wz_keys_desc':
+    'Iċ-ċwievet sigrieti jinħażnu ssiġillati u qatt ma jerġgħu jintwerew: biex tibdel waħda, erġa’ ikteb.',
+  'store.wz_keys_rejected': '{nombre} ma aċċettax dawn iċ-ċwievet',
+  'store.wz_check_heading': 'Iċċekkja u ssejvja',
+  'store.wz_check_desc':
+    'Sytue Web jittestja ċ-ċwievet ma’ {nombre} qabel ma jixgħel il-gateway. Xejn ma jiġi ssejvjat sakemm it-test jirnexxi.',
+  'store.wz_secret_hidden': 'Miktuba (moħbija)',
+  'store.wz_empty_value': 'Mhux indikat',
+  'store.wz_done_heading': '{nombre} lest',
+  'store.wz_finish': 'Agħlaq',
+  'store.hint_mollie_api_key':
+    'F’Mollie: Developers › API keys. Iċ-ċwievet tal-prova jibdew b’test_ u dawk veri b’live_.',
+  'store.hint_mollie_profile':
+    'F’Mollie: Settings › Website profiles. Jibda b’pfl_; ħallih vojt biex tuża l-profil awtomatiku.',
+  'store.hint_adyen_api_key':
+    'Fl-Adyen Customer Area: Developers › API credentials › il-kredenzjal tiegħek › API key.',
+  'store.hint_adyen_merchant':
+    'Fl-Adyen Customer Area, fl-għażla tal-kont fuq nett: il-kont tan-negozjant, mhux il-kont tal-kumpanija.',
+  'store.hint_adyen_hmac':
+    'F’Adyen: Developers › Webhooks › il-webhook tiegħek › Security › HMAC key.',
+  'store.hint_adyen_live_prefix':
+    'F’Adyen (veru): Developers › API URLs. Hija l-parti tal-indirizz qabel -checkout-live.',
+  'store.hint_redsys_merchant':
+    'Jagħtihulek il-bank tiegħek mal-kuntratt tal-POS virtwali; jidher ukoll fil-portal tal-amministrazzjoni ta’ Redsys.',
+  'store.hint_redsys_terminal':
+    'Fil-portal tal-amministrazzjoni ta’ Redsys, ħdejn il-kodiċi tan-negozjant. Normalment huwa 1.',
+  'store.hint_redsys_secret':
+    'Fil-portal tal-amministrazzjoni ta’ Redsys: dettalji tan-negozjant › ċavetta SHA-256. Iċ-ċavetta tal-prova u dik vera huma differenti.',
+  'store.hint_stripe_secret':
+    'F’Stripe: Developers › API keys › Secret key. Tibda b’sk_test_ jew sk_live_.',
+  'store.hint_stripe_webhook':
+    'F’Stripe: Developers › Webhooks › l-endpoint tiegħek › Signing secret. Jibda b’whsec_.',
   'orders.subtitle': 'Ordnijiet u xiri magħmula fuq il-websajt tiegħek.',
   'orders.count': {
     one: '{count} ordni',

@@ -8,7 +8,7 @@
 import type { ComponentChildren, JSX } from 'preact';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'preact/hooks';
 import { lazy, Suspense } from 'preact/compat';
-import { nombreDeOrganizacion, SytueShell } from '@sytue/shell';
+import { nombreDeOrganizacion, SytueShell, useAtajosDeApp } from '@sytue/shell';
 import { useConnectivity } from '@sytue/offline/preact';
 import {
   Sidebar,
@@ -29,20 +29,20 @@ import {
   ConfirmDialog,
   useConfirm,
   usePrompt,
-  Illustration,
-  ShortcutsModal,
   useUltimo,
   useAtajo,
   Glifo,
   BarraMovil,
   useBarraUnica,
+  Kbd,
 } from '@sytue/ui';
 import type { BarraMovilProps, VirtualListHandle } from '@sytue/ui';
 import type { SytueUser } from '@sytue/auth';
-import { MARCA_ORG, orgActual, RE_SLUG_ORG, rutaConOrg } from '@sytue/config';
+import { appUrl, MARCA_ORG, orgActual, RE_SLUG_ORG, rutaConOrg } from '@sytue/config';
 import { formatDateTime, type Locale } from '@sytue/i18n';
 import { roomsT } from '../i18n/index.js';
 import { ultimoEditable } from '../lib/editarUltimo.js';
+import { anotarRespuesta, deshacerRespuesta, esDifundida } from '../lib/hilos.js';
 import { sumaNoVisto, tituloConNoLeidos, totalNoLeidos } from '../lib/totalNoLeidos.js';
 import { pausaActiva } from '../lib/pausa.js';
 import { usePreferenciasAviso } from '../lib/usePreferenciasAviso.js';
@@ -95,6 +95,7 @@ import {
   postCallMessage,
   connectRealtime,
   messageLink,
+  channelLink,
   listCategories,
   createCategory,
   updateCategory,
@@ -127,6 +128,7 @@ import {
   DEFAULT_DMS,
   type SidebarGroup,
 } from '../lib/categories.js';
+import { canalVecino, ordenVisible, pasoDeNavegacion } from '../lib/navegarCanales.js';
 import {
   mentionsUser,
   mentionNotificationBody,
@@ -137,13 +139,26 @@ import {
 } from '../lib/mentions.js';
 import { unreadDividerIndex } from '../lib/unread.js';
 import { applyCardVotes, toggleMyCardVote } from '../lib/cards.js';
+import {
+  applyReactionDelta,
+  destinosDeReaccion,
+  mergeEdit,
+  toggleMyReaction,
+} from '../lib/hilo.js';
 import type { RemoteCommand } from '../lib/commands.js';
 import type { PreJoinChoice } from './PreJoin.js';
 import { TextoDelAsistente } from './TextoDelAsistente.js';
 import { IncomingCall } from './IncomingCall.js';
 import { sonarTimbre } from '../lib/timbre.js';
+import {
+  conSeparacion,
+  debeSonar,
+  leerPreferenciasSonido,
+  sonarAviso,
+} from '../lib/sonidoAviso.js';
 import { avisoDeLlamada } from '../lib/llamadaEntrante.js';
 import { upsertMember } from '../lib/roster.js';
+import { abrirEnCalendar, participantesDeReunion } from '../lib/reunion.js';
 import { forwardedBody } from '../lib/forward.js';
 import { getAccessToken } from '@sytue/auth/client';
 import {
@@ -186,6 +201,7 @@ import {
 } from '../lib/drafts.js';
 import { loadCustomStatus, saveCustomStatus, storedExpiry } from '../lib/status.js';
 import { useDmNotifications } from '../lib/useDmNotifications.js';
+import { CIFRADO_DE_EXTREMO_A_EXTREMO, disponibleConCifrado } from '../lib/cifrado.js';
 import { MessageView } from './MessageView.js';
 import { Composer, type ComposeOptions } from './Composer.js';
 import { ThreadPanel } from './ThreadPanel.js';
@@ -194,7 +210,13 @@ import { MessageListPanel } from './MessageListPanel.js';
 import { ScheduledPanel } from './ScheduledPanel.js';
 import { DraftsPanel } from './DraftsPanel.js';
 import { SearchPanel } from './SearchPanel.js';
+import {
+  cargarHistoriaDelCanal,
+  cargarHistoriaLocal,
+  MAX_ARCHIVOS_CANAL,
+} from '../lib/busquedaLocal.js';
 import { MembersPanel } from './MembersPanel.js';
+import type { TarjetaContexto } from './PersonCard.js';
 import { ChannelRow } from './ChannelRow.js';
 import { CategorySection } from './CategorySection.js';
 import { BrowseChannelsModal } from './BrowseChannelsModal.js';
@@ -208,6 +230,7 @@ import { IntegrationsModal } from './IntegrationsModal.js';
 import { ForwardMessageModal } from './ForwardMessageModal.js';
 import { StatusMenu } from './StatusMenu.js';
 import { QuickSwitcher } from './QuickSwitcher.js';
+import { InicioDelCanal } from './InicioDelCanal.js';
 import { MessageMenu, type MenuEntry } from './MessageMenu.js';
 import {
   PinGlyph,
@@ -335,63 +358,6 @@ function readCollapsedDefaults(): Set<string> {
   }
 }
 
-/** Añade/quita un sub de la lista de reactores de un chip, SOLO si el chip ya la
- *  trae: si el servicio no envió `subs`, no se fabrica una lista parcial (el chip
- *  cae a la etiqueta de solo conteo en vez de mentir sobre quién reaccionó). */
-function withSub(r: { subs?: string[] }, sub: string, added: boolean): { subs?: string[] } {
-  if (!r.subs) return {};
-  return { subs: added ? [...r.subs, sub] : r.subs.filter((s) => s !== sub) };
-}
-
-/** Alterna la reaccion del usuario de la sesion sobre un mensaje (optimista). */
-function toggleMyReaction(m: ChatMessage, emoji: string, mySub: string): ChatMessage {
-  const reactions = [...(m.reactions ?? [])];
-  const idx = reactions.findIndex((r) => r.emoji === emoji);
-  if (idx === -1) {
-    reactions.push({ emoji, count: 1, mine: true, subs: [mySub] });
-  } else {
-    const r = reactions[idx]!;
-    if (r.mine) {
-      const next = { ...r, count: r.count - 1, mine: false, ...withSub(r, mySub, false) };
-      if (next.count <= 0) reactions.splice(idx, 1);
-      else reactions[idx] = next;
-    } else {
-      reactions[idx] = { ...r, count: r.count + 1, mine: true, ...withSub(r, mySub, true) };
-    }
-  }
-  return { ...m, reactions };
-}
-
-/** Aplica el delta de una reaccion AJENA (added/removed); no toca `mine`. */
-function applyReactionDelta(
-  m: ChatMessage,
-  emoji: string,
-  added: boolean,
-  subject: string,
-): ChatMessage {
-  const reactions = [...(m.reactions ?? [])];
-  const idx = reactions.findIndex((r) => r.emoji === emoji);
-  if (added) {
-    if (idx === -1) reactions.push({ emoji, count: 1, mine: false, subs: [subject] });
-    else {
-      const r = reactions[idx]!;
-      reactions[idx] = { ...r, count: r.count + 1, ...withSub(r, subject, true) };
-    }
-  } else if (idx !== -1) {
-    const r = reactions[idx]!;
-    const next = { ...r, count: r.count - 1, ...withSub(r, subject, false) };
-    if (next.count <= 0) reactions.splice(idx, 1);
-    else reactions[idx] = next;
-  }
-  return { ...m, reactions };
-}
-
-/** Aplica una edicion a un mensaje: solo cuerpo + marca editedAt (conserva reacciones,
- *  replyCount, etc., que el frame/respuesta de edicion no incluye). */
-function mergeEdit(m: ChatMessage, edited: ChatMessage): ChatMessage {
-  return { ...m, body: edited.body, ...(edited.editedAt ? { editedAt: edited.editedAt } : {}) };
-}
-
 export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
   const offline = useConnectivity() === 'offline';
   // `t` atada al idioma que llega por props. Memoizada porque viaja por props a las
@@ -487,6 +453,9 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
 
   // Paginación hacia atrás: ¿quedan mensajes más antiguos? + página en vuelo.
   const [hasOlder, setHasOlder] = useState(false);
+  // Veces que se pidió «Añadir personas» desde el inicio del canal (0 = el panel de
+  // personas se abre en la lista, como siempre).
+  const [anadirPersonas, setAnadirPersonas] = useState(0);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const loadingOlderRef = useRef(false);
   // Handle de la lista virtualizada (isAtBottom para el cap del histórico).
@@ -524,6 +493,28 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
   const channelNames = useMemo(
     () => Object.fromEntries(channels.map((c) => [c.id, c.name])),
     [channels],
+  );
+
+  // Con cifrado el servidor no busca: el panel busca en la última página de cada canal,
+  // descifrada aquí y guardada solo en su memoria (D-ROOM-01, lib/busquedaLocal).
+  const cargarHistoriaParaBuscar = useCallback(
+    () =>
+      cargarHistoriaLocal(
+        channels.map((c) => c.id),
+        (id) => listMessages(id),
+      ),
+    [channels],
+  );
+  // «Archivos del canal» con cifrado (D-ROOM-03): la última página de cada canal se queda
+  // corta para una lista de archivos, así que se recorre hacia atrás SOLO el canal abierto,
+  // hasta los últimos mil mensajes descifrados. null = el panel es la búsqueda normal.
+  const [archivosDeCanal, setArchivosDeCanal] = useState<string | null>(null);
+  const cargarArchivosDelCanal = useCallback(
+    () =>
+      archivosDeCanal
+        ? cargarHistoriaDelCanal(archivosDeCanal, (id, before) => listMessages(id, before))
+        : Promise.resolve([]),
+    [archivosDeCanal],
   );
 
   // Panel de hilo: mensaje raíz abierto (null = cerrado) + respuestas y estado.
@@ -695,6 +686,13 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
   // Ref al hilo abierto: el handler de WebSocket enruta las respuestas en vivo.
   const threadRootRef = useRef<ChatMessage | null>(null);
   threadRootRef.current = threadRoot;
+  // Respuestas del hilo abierto, para saber de qué raíz era una respuesta que se
+  // borra (la trama `message.deleted` solo trae su id).
+  const threadRepliesRef = useRef<ChatMessage[]>([]);
+  threadRepliesRef.current = threadReplies;
+  // Respuestas cuyo borrado ya bajó el contador de su raíz: el borrado propio y su
+  // eco por WebSocket llegan en cualquier orden y solo uno de los dos debe restar.
+  const borradosRef = useRef(new Set<string>());
   // Ref a los canales: el handler de WebSocket (creado una sola vez) resuelve el
   // nombre del canal de una mención sin recrearse cada vez que cambia la lista.
   const channelsRef = useRef<Channel[]>([]);
@@ -892,10 +890,29 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
     }
   }
 
+  // Sonido de aviso (D-ROOM-07): uno por ráfaga, no uno por mensaje.
+  const [tocarAviso] = useState(() => conSeparacion(sonarAviso));
+
+  /** Suena si toca, con independencia del aviso de escritorio: suena aunque el
+   *  navegador no haya dado permiso de notificaciones. El ajuste se lee en cada
+   *  mensaje para que valga al momento lo guardado en el modal (o en otra pestaña). */
+  function sonarSiToca(msg: ChatMessage, personal: boolean): void {
+    const channel = channelsRef.current.find((c) => c.id === msg.channelId);
+    const sonar = debeSonar(msg, channel, {
+      personal,
+      canalActivo: msg.channelId === activeRef.current,
+      ventanaConFoco: typeof document !== 'undefined' ? document.hasFocus() : true,
+      bloqueado: blockedRef.current.has(msg.author.id),
+      silencio: inQuietHours(),
+      prefs: leerPreferenciasSonido(),
+    });
+    if (sonar) tocarAviso();
+  }
+
   // El WebSocket se conecta una sola vez; las notificaciones deben leer las
   // preferencias, el idioma y los canales de la renderización más reciente.
-  const notificationHandlersRef = useRef({ notifyMention, notifyDirectMessage });
-  notificationHandlersRef.current = { notifyMention, notifyDirectMessage };
+  const notificationHandlersRef = useRef({ notifyMention, notifyDirectMessage, sonarSiToca });
+  notificationHandlersRef.current = { notifyMention, notifyDirectMessage, sonarSiToca };
 
   // Miembros del team (una vez): alimentan el selector de menciones. El nombre del
   // propio usuario lo rellena el BFF desde la sesión (el backend puede no tenerlo).
@@ -1193,25 +1210,37 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
           } else if (!isPersonal) {
             notificationHandlersRef.current.notifyDirectMessage(msg);
           }
-          // Respuesta en hilo: NO va al histórico del canal; sube el contador del
-          // padre y, si su hilo está abierto, se anexa. El eco propio ya se
-          // gestionó de forma optimista (+ REST), así que se ignora (dedupe).
+          notificationHandlersRef.current.sonarSiToca(msg, isPersonal);
+          // Respuesta en hilo: sube el contador del padre (y su indicador: avatares y
+          // última respuesta) y, si su hilo está abierto, se anexa. Solo va al
+          // histórico del canal si se mandó «también al canal». El eco propio ya se
+          // gestionó de forma optimista (+ REST), así que se ignora (dedupe); la
+          // difundida desde OTRO dispositivo mío sí entra en el feed, por id.
           if (msg.parentId) {
-            if (msg.mine) return;
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === msg.parentId ? { ...m, replyCount: (m.replyCount ?? 0) + 1 } : m,
-              ),
-            );
+            const alFeed =
+              esDifundida(msg) && msg.channelId === activeRef.current && !viewingHistoryRef.current;
+            if (msg.mine) {
+              if (alFeed)
+                setMessages((prev) =>
+                  prev.some((m) => m.id === msg.id) ? prev : capAtBottom([...prev, msg]),
+                );
+              return;
+            }
+            setMessages((prev) => {
+              const anotados = prev.map((m) =>
+                m.id === msg.parentId ? anotarRespuesta(m, msg) : m,
+              );
+              return alFeed && !prev.some((m) => m.id === msg.id)
+                ? capAtBottom([...anotados, msg])
+                : anotados;
+            });
             const openThreadId = threadRootRef.current?.id;
             if (openThreadId === msg.parentId) {
               setThreadReplies((prev) =>
                 prev.some((r) => r.id === msg.id) ? prev : [...prev, msg],
               );
               setThreadRoot((prev) =>
-                prev && prev.id === msg.parentId
-                  ? { ...prev, replyCount: (prev.replyCount ?? 0) + 1 }
-                  : prev,
+                prev && prev.id === msg.parentId ? anotarRespuesta(prev, msg) : prev,
               );
             }
             // Vista global «Hilos» en vivo: si sigo el hilo (está en la lista cargada),
@@ -1260,13 +1289,20 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
           }
         } else if (ev.type === 'reaction') {
           // La reaccion propia ya se pinto optimista al hacer clic (evita doble
-          // conteo); aplica solo las de OTROS usuarios sobre el canal abierto.
-          if (ev.subject === user.id || ev.channelId !== activeRef.current) return;
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === ev.messageId ? applyReactionDelta(m, ev.emoji, ev.added, ev.subject) : m,
-            ),
-          );
+          // conteo); aplica solo las de OTROS usuarios, sobre el canal abierto y
+          // sobre el hilo abierto (sus respuestas no están en el histórico).
+          const destinos = destinosDeReaccion(ev, {
+            yo: user.id,
+            canalActivo: activeRef.current,
+            canalDelHilo: threadRootRef.current?.channelId ?? null,
+          });
+          const aplica = (m: ChatMessage): ChatMessage =>
+            m.id === ev.messageId ? applyReactionDelta(m, ev.emoji, ev.added, ev.subject) : m;
+          if (destinos.canal) setMessages((prev) => prev.map(aplica));
+          if (destinos.hilo) {
+            setThreadReplies((prev) => prev.map(aplica));
+            setThreadRoot((prev) => (prev ? aplica(prev) : prev));
+          }
         } else if (ev.type === 'card') {
           // Voto de encuesta o tarea marcada: el frame trae el recuento COMPLETO, así
           // que aplicarlo es idempotente (también para el eco del propio voto, que ya
@@ -1288,11 +1324,13 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
             prev && prev.id === ev.message.id ? mergeEdit(prev, ev.message) : prev,
           );
         } else if (ev.type === 'message.deleted') {
-          // Idempotente para el eco propio (ya retirado). Cierra el hilo si borran su raíz.
-          setMessages((prev) => prev.filter((m) => m.id !== ev.messageId));
-          setThreadReplies((prev) => prev.filter((m) => m.id !== ev.messageId));
-          setThreadRoot((prev) => (prev && prev.id === ev.messageId ? null : prev));
-          setPins((prev) => prev.filter((m) => m.id !== ev.messageId));
+          // Idempotente para el eco propio (ya retirado). Cierra el hilo si borran su raíz,
+          // y con la raíz se van del feed sus respuestas «también al canal» (el servicio
+          // tampoco las devuelve ya: su «Ver el hilo» no llevaría a nada).
+          retirarMensaje(
+            ev.messageId,
+            threadRepliesRef.current.find((r) => r.id === ev.messageId)?.parentId,
+          );
         } else if (ev.type === 'pin') {
           // Fijado/desfijado en el canal abierto: mantiene el panel/contador en vivo.
           // Idempotente para el eco propio (ya aplicado de forma optimista).
@@ -1722,7 +1760,8 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
    *  sube el conteo en el feed y en el hilo) y reconcilia con el total del servidor;
    *  revierte si falla. Idempotente en el backend. */
   function handleAck(message: ChatMessage): void {
-    if (message.acked) return;
+    if (message.acked || !disponibleConCifrado('confirmarAcuse', CIFRADO_DE_EXTREMO_A_EXTREMO))
+      return;
     const apply = (patch: (m: ChatMessage) => ChatMessage): void => {
       setMessages((prev) => prev.map((m) => (m.id === message.id ? patch(m) : m)));
       setThreadReplies((prev) => prev.map((m) => (m.id === message.id ? patch(m) : m)));
@@ -1809,8 +1848,22 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
   }
 
   /** Abre el panel de hilo de un mensaje raíz y carga raíz + respuestas. */
-  function openThread(message: ChatMessage): void {
-    if (message.pending || message.failed) return; // solo mensajes persistidos
+  function openThread(clicked: ChatMessage): void {
+    if (clicked.pending || clicked.failed) return; // solo mensajes persistidos
+    // Una respuesta mandada «también al canal» abre el hilo de su RAÍZ. Mientras carga
+    // se enseña la raíz si está en el feed; si no, la propia respuesta con el id de la
+    // raíz, para que el borrador y una respuesta rápida vayan al hilo correcto.
+    let message = clicked;
+    if (clicked.parentId) {
+      const rootId = clicked.parentId;
+      const enFeed = messages.find((m) => m.id === rootId);
+      if (enFeed) message = enFeed;
+      else {
+        message = { ...clicked, id: rootId };
+        delete message.parentId;
+        delete message.alsoInChannel;
+      }
+    }
     setRhsView(null); // el hilo y los paneles auxiliares son excluyentes
     setThreadRoot(message);
     setThreadReplies([]);
@@ -1881,14 +1934,19 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
     if (threadRoot) toggleFollow(threadRoot.id, threadFollowing);
   }
 
-  /** Publica una respuesta en el hilo abierto (optimista + reconciliación). */
+  /** Publica una respuesta en el hilo abierto (optimista + reconciliación). Con
+   *  `alsoToChannel` la respuesta entra también en el feed del canal en cuanto el
+   *  servidor la confirma. */
   function handleSendReply(
     body: string,
     mentions: string[] = [],
     attachments: Attachment[] = [],
+    alsoToChannel = false,
   ): void {
     const root = threadRoot;
     if (!root) return;
+    // Foto del indicador ANTES de la respuesta, para deshacerlo tal cual si falla.
+    const antes = messages.find((m) => m.id === root.id) ?? root;
     const clientId = newClientId();
     const optimistic: ChatMessage = {
       id: `pending-${clientId}`,
@@ -1901,14 +1959,13 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
       pending: true,
       ...(mentions.length ? { mentions } : {}),
       ...(attachments.length ? { attachments } : {}),
+      ...(alsoToChannel ? { alsoInChannel: true } : {}),
     };
     setThreadReplies((prev) => [...prev, optimistic]);
-    // Sube el contador de forma optimista (histórico + raíz del panel).
-    setMessages((prev) =>
-      prev.map((m) => (m.id === root.id ? { ...m, replyCount: (m.replyCount ?? 0) + 1 } : m)),
-    );
+    // Sube el contador y el indicador de forma optimista (histórico + raíz del panel).
+    setMessages((prev) => prev.map((m) => (m.id === root.id ? anotarRespuesta(m, optimistic) : m)));
     setThreadRoot((prev) =>
-      prev && prev.id === root.id ? { ...prev, replyCount: (prev.replyCount ?? 0) + 1 } : prev,
+      prev && prev.id === root.id ? anotarRespuesta(prev, optimistic) : prev,
     );
 
     postReply({
@@ -1916,9 +1973,20 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
       body,
       ...(mentions.length ? { mentions } : {}),
       ...(attachments.length ? { fileIds: attachments.map((a) => a.fileId) } : {}),
+      ...(alsoToChannel ? { alsoToChannel: true } : {}),
     })
       .then(({ message }) => {
         setThreadReplies((prev) => prev.map((m) => (m.id === optimistic.id ? message : m)));
+        // «También al canal»: entra en el feed si sigue siendo el canal abierto y no
+        // se está mirando el pasado (ahí el final del feed no es «ahora»).
+        if (
+          esDifundida(message) &&
+          message.channelId === activeRef.current &&
+          !viewingHistoryRef.current
+        )
+          setMessages((prev) =>
+            prev.some((m) => m.id === message.id) ? prev : capAtBottom([...prev, message]),
+          );
         // Responder auto-sigue el hilo en el backend (Ola 9): refleja «Siguiendo».
         setThreadFollowing(true);
       })
@@ -1928,14 +1996,10 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
           prev.map((m) => (m.id === optimistic.id ? { ...m, pending: false, failed: true } : m)),
         );
         setMessages((prev) =>
-          prev.map((m) =>
-            m.id === root.id ? { ...m, replyCount: Math.max(0, (m.replyCount ?? 1) - 1) } : m,
-          ),
+          prev.map((m) => (m.id === root.id ? deshacerRespuesta(m, antes) : m)),
         );
         setThreadRoot((prev) =>
-          prev && prev.id === root.id
-            ? { ...prev, replyCount: Math.max(0, (prev.replyCount ?? 1) - 1) }
-            : prev,
+          prev && prev.id === root.id ? deshacerRespuesta(prev, antes) : prev,
         );
       });
   }
@@ -1946,20 +2010,49 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
    * El resto de clientes lo recibe por WebSocket (evento `reaction`).
    */
   function handleToggleReaction(messageId: string, emoji: string): void {
-    const msg = messages.find((m) => m.id === messageId);
+    const msg = buscarMensaje(messageId);
     if (!msg || msg.pending || msg.failed) return; // no reaccionar a optimistas/fallidos
     const mine = msg.reactions?.find((r) => r.emoji === emoji)?.mine ?? false;
 
-    setMessages((prev) =>
-      prev.map((m) => (m.id === messageId ? toggleMyReaction(m, emoji, user.id) : m)),
-    );
+    const alternar = (m: ChatMessage): ChatMessage => toggleMyReaction(m, emoji, user.id);
+    aplicarAlMensaje(messageId, alternar);
 
+    // Fallo de la mutacion: deshaz el toggle (es su propio inverso).
     reactMessage({ messageId, emoji, add: !mine }).catch(() =>
-      // Fallo de la mutacion: deshaz el toggle (es su propio inverso).
-      setMessages((prev) =>
-        prev.map((m) => (m.id === messageId ? toggleMyReaction(m, emoji, user.id) : m)),
-      ),
+      aplicarAlMensaje(messageId, alternar),
     );
+  }
+
+  /** Un mensaje del canal abierto o del hilo abierto (raíz o respuesta). */
+  function buscarMensaje(messageId: string): ChatMessage | undefined {
+    return [...messages, ...threadReplies, threadRoot].find(
+      (m): m is ChatMessage => Boolean(m) && m!.id === messageId,
+    );
+  }
+
+  /** Aplica un cambio a un mensaje allí donde se vea: histórico del canal y panel de
+   *  hilo (una raíz está en ambos; una respuesta, solo en el hilo). */
+  function aplicarAlMensaje(messageId: string, patch: (m: ChatMessage) => ChatMessage): void {
+    const aplica = (m: ChatMessage): ChatMessage => (m.id === messageId ? patch(m) : m);
+    setMessages((prev) => prev.map(aplica));
+    setThreadReplies((prev) => prev.map(aplica));
+    setThreadRoot((prev) => (prev ? aplica(prev) : prev));
+  }
+
+  /** Retira un mensaje borrado de todas las vistas y, si era una respuesta, baja el
+   *  contador de su raíz UNA sola vez (ver `borradosRef`). Borrar la raíz cierra el hilo. */
+  function retirarMensaje(messageId: string, parentId?: string): void {
+    // Con la raíz se van del feed sus respuestas «también al canal».
+    setMessages((prev) => prev.filter((m) => m.id !== messageId && m.parentId !== messageId));
+    setThreadReplies((prev) => prev.filter((m) => m.id !== messageId));
+    setThreadRoot((prev) => (prev && prev.id === messageId ? null : prev));
+    setPins((prev) => prev.filter((m) => m.id !== messageId));
+    if (!parentId || borradosRef.current.has(messageId)) return;
+    borradosRef.current.add(messageId);
+    const baja = (m: ChatMessage): ChatMessage =>
+      m.id === parentId ? { ...m, replyCount: Math.max(0, (m.replyCount ?? 1) - 1) } : m;
+    setMessages((prev) => prev.map(baja));
+    setThreadRoot((prev) => (prev ? baja(prev) : prev));
   }
 
   /**
@@ -1971,10 +2064,11 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
   function handleCardVote(messageId: string, value: string, add: boolean): void {
     // La tarjeta puede estar en el feed o en el hilo abierto (una encuesta se responde
     // igual de bien desde el panel de hilo).
-    const before = [...messages, ...threadReplies, threadRoot].find(
-      (m): m is ChatMessage => Boolean(m) && m!.id === messageId,
-    );
+    const before = buscarMensaje(messageId);
     if (!before?.card || before.pending || before.failed) return;
+    // Sin esto, el voto optimista se pintaba y se deshacía al instante: el servicio no
+    // cuenta votos de un mensaje que no puede leer (`lib/cifrado.ts`).
+    if (!disponibleConCifrado('votar', CIFRADO_DE_EXTREMO_A_EXTREMO)) return;
     const optimistic = toggleMyCardVote(before.card, value, add, user.id);
     const apply = (votes: CardVote[]): void => {
       setMessages((prev) => prev.map((m) => applyCardVotes(m, messageId, votes)));
@@ -1993,18 +2087,25 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
    * de clientes lo recibe por WebSocket (evento `message.edited`).
    */
   function handleEdit(messageId: string, body: string): void {
-    const prev = messages.find((m) => m.id === messageId);
+    // Vale igual para un mensaje del canal que para una respuesta del hilo.
+    const prev = buscarMensaje(messageId);
     if (!prev || prev.pending || prev.failed || body === prev.body) return;
-    const optimistic: ChatMessage = { ...prev, body, editedAt: new Date().toISOString() };
-    setMessages((ms) => ms.map((m) => (m.id === messageId ? optimistic : m)));
+    const editedAt = new Date().toISOString();
+    aplicarAlMensaje(messageId, (m) => ({ ...m, body, editedAt }));
 
     editMessage({ messageId, body })
-      .then(({ message }) =>
-        setMessages((ms) => ms.map((m) => (m.id === messageId ? mergeEdit(m, message) : m))),
-      )
+      .then(({ message }) => aplicarAlMensaje(messageId, (m) => mergeEdit(m, message)))
       .catch(() =>
-        // Fallo: restaura el mensaje previo (cuerpo y marca de edición originales).
-        setMessages((ms) => ms.map((m) => (m.id === messageId ? prev : m))),
+        // Fallo: restaura el cuerpo y la marca de edición originales (conservando lo
+        // que haya cambiado entretanto, p. ej. reacciones).
+        aplicarAlMensaje(messageId, (m) => {
+          const { editedAt: _, ...sinMarca } = m;
+          return {
+            ...sinMarca,
+            body: prev.body,
+            ...(prev.editedAt ? { editedAt: prev.editedAt } : {}),
+          };
+        }),
       );
   }
 
@@ -2013,9 +2114,18 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
    * histórico. El resto de clientes lo recibe por WebSocket (`message.deleted`).
    */
   function handleDelete(messageId: string): void {
+    // Una respuesta del hilo también baja el contador «N respuestas» de su raíz.
+    const parentId = buscarMensaje(messageId)?.parentId;
     deleteMessage({ messageId })
-      .then(() => setMessages((prev) => prev.filter((m) => m.id !== messageId)))
+      .then(() => retirarMensaje(messageId, parentId))
       .catch(() => undefined);
+  }
+
+  /** Reintenta una respuesta de hilo fallida: la retira y la vuelve a enviar con sus
+   *  adjuntos (ya subidos), como «Reintentar» en el canal. */
+  function handleResendReply(message: ChatMessage): void {
+    setThreadReplies((prev) => prev.filter((m) => m.id !== message.id));
+    handleSendReply(message.body, message.mentions ?? [], message.attachments ?? []);
   }
 
   /** Alterna el fijado de un mensaje (optimista; revierte si la mutación falla).
@@ -2461,11 +2571,21 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
   }
 
   /** Añade al sidebar el canal recién creado, cierra el modal y ENTRA en él. */
-  function handleChannelCreated(channel: Channel): void {
+  function handleChannelCreated(channel: Channel, missing: ChannelMember[]): void {
     setChannels((prev) => (prev.some((c) => c.id === channel.id) ? prev : [...prev, channel]));
     setActiveId(channel.id);
     setCreateOpen(false);
     realtimeRef.current?.subscribe(channel.id);
+    // El canal ya existe: quien no entró se dice con nombre (aviso persistente), y se
+    // puede volver a intentar desde el panel de Miembros.
+    if (missing.length > 0) {
+      toast.notify({
+        tone: 'warning',
+        title: t('createChannel.membersMissing', {
+          names: missing.map((m) => m.name).join(', '),
+        }),
+      });
+    }
   }
 
   /** Abre/crea un DM desde «Nuevo mensaje» y lo selecciona en la vista. */
@@ -2560,6 +2680,7 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
       case 'search':
         setThreadRoot(null);
         setSearchSeed(arg);
+        setArchivosDeCanal(null);
         setRhsView('search');
         break;
       case 'leave': {
@@ -2651,6 +2772,25 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
   }
 
   /**
+   * «Programar reunión» (D-ROOM-06): Calendar en otra pestaña con el evento relleno
+   * —título con la conversación, enlace de vuelta y su gente invitada—. El roster solo
+   * está cargado para el canal activo, que es el único con este menú a mano.
+   */
+  function programarReunion(c: Channel): void {
+    void abrirEnCalendar(
+      appUrl('calendar', '', orgActual(import.meta.env.BASE_URL)),
+      {
+        titulo:
+          c.kind === 'direct'
+            ? t('dm.meetingTitle', { name: c.name })
+            : t('channel.meetingTitle', { name: c.name }),
+        descripcion: t('channel.meetingDescription', { link: channelLink(c.id) }),
+      },
+      participantesDeReunion(c, c.id === activeId ? roster : [], user.id),
+    );
+  }
+
+  /**
    * Acciones del canal ACTIVO para el menú de su cabecera. Las que ya vivían en el «…»
    * de la fila del sidebar siguen ahí; esto añade las que no tenían puerta en ninguna
    * parte —miembros, fijados, integraciones, tema— al sitio donde Slack, Teams y
@@ -2658,8 +2798,16 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
    * <h1> inerte, así que funciones ya construidas parecían no existir.
    */
   function channelHeaderMenuItems(c: Channel): MenuEntry[] {
+    const reunion: MenuEntry = {
+      key: 'meeting',
+      label: t('channel.scheduleMeeting'),
+      icon: <Icon name="calendar" size={16} />,
+      onSelect: () => programarReunion(c),
+    };
     if (c.kind === 'direct') {
       return [
+        reunion,
+        'separator',
         {
           key: 'delete-dm',
           label: t('dm.delete'),
@@ -2676,6 +2824,7 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
         icon: <Icon name="users" size={16} />,
         onSelect: toggleMembersPanel,
       },
+      reunion,
       {
         key: 'pinned',
         label: t('panel.pinned'),
@@ -2905,6 +3054,7 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
     setThreadRoot(null);
     // `in:` casa contra el NOMBRE del canal, que es lo que el parser entiende.
     setSearchSeed(`in:#${canal.name} has:file `);
+    setArchivosDeCanal(canal.id);
     setRhsView('search');
   }
 
@@ -2917,7 +3067,17 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
    *  cargado por el canal activo: abrir no vuelve a pedirlo. */
   function toggleMembersPanel(): void {
     setThreadRoot(null);
+    setAnadirPersonas(0);
     setRhsView((v) => (v === 'members' ? null : 'members'));
+  }
+
+  /** «Añadir personas» del inicio del canal (ROOM-13): abre el panel ya en la vista
+   *  de añadir. La cuenta va de clave del panel para que, si ya estaba abierto en la
+   *  lista, se vuelva a montar en «añadir» en vez de quedarse como estaba. */
+  function abrirAnadirPersonas(): void {
+    setThreadRoot(null);
+    setAnadirPersonas((n) => n + 1);
+    setRhsView('members');
   }
 
   // Acciones del roster. Aplican la respuesta del servicio (que trae el miembro
@@ -2952,6 +3112,7 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
   function toggleSearchPanel(): void {
     setThreadRoot(null);
     setSearchSeed('');
+    setArchivosDeCanal(null);
     setRhsView((v) => (v === 'search' ? null : 'search'));
   }
 
@@ -3065,17 +3226,26 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
 
   /** «Enviar ahora»: cancela el programado y publica el mensaje al momento
    *  (reusa el envío normal). Si el canal está abierto llega por WS; si no, estará
-   *  allí al visitarlo. */
+   *  allí al visitarlo. Una respuesta programada sale en su hilo, y también en el canal
+   *  si se pidió: igual que al vencer. */
   function sendScheduledNow(m: ScheduledMessage): void {
     setScheduledList((prev) => prev.filter((s) => s.id !== m.id));
+    const fileIds = m.fileIds?.length ? { fileIds: m.fileIds } : {};
     cancelScheduled(m.id)
       .then(() =>
-        sendMessage({
-          channelId: m.channelId,
-          body: m.body,
-          clientId: newClientId(),
-          ...(m.fileIds?.length ? { fileIds: m.fileIds } : {}),
-        }),
+        m.parentId
+          ? postReply({
+              messageId: m.parentId,
+              body: m.body,
+              ...fileIds,
+              ...(m.alsoInChannel ? { alsoToChannel: true } : {}),
+            })
+          : sendMessage({
+              channelId: m.channelId,
+              body: m.body,
+              clientId: newClientId(),
+              ...fileIds,
+            }),
       )
       .then(() => toast.notify({ tone: 'success', title: t('message.sent') }))
       .catch(() => {
@@ -3227,6 +3397,28 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
     setRhsView('meetings');
     loadMeetings();
   }
+
+  /** La tarjeta de persona (D-ROOM-04): «Mensaje» abre su directo y «Llamar» abre
+   *  el directo y llama en él, igual que «/msg» y que convocar con invitados. */
+  const tarjeta: TarjetaContexto = {
+    presences,
+    selfSub: user.id,
+    locale,
+    t,
+    onMessage: (sub) => {
+      openDirect([sub])
+        .then(({ channel }) => handleDmOpened(channel))
+        .catch(() => toast.notify({ tone: 'danger', title: t('command.dmFailed') }));
+    },
+    onCall: (sub) => {
+      openDirect([sub])
+        .then(({ channel }) => {
+          handleDmOpened(channel);
+          startCallFor(channel);
+        })
+        .catch(() => toast.notify({ tone: 'danger', title: t('command.dmFailed') }));
+    },
+  };
 
   /** Convoca y entra: una sola acción, como «Nueva reunión» de Meet. Con invitados
    *  —también de otras organizaciones, ADR 0040— se llama en la conversación con ellos. */
@@ -3646,34 +3838,72 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
   // Conmutador rápido de canales (Ctrl+G; Ctrl+K es la búsqueda de la suite).
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const atajoIrACanal = useAtajo('Ctrl+G');
-  // Hoja de atajos («?»): lo que el compositor solo contaba al lector de pantalla.
-  const [atajosOpen, setAtajosOpen] = useState(false);
+  // Hoja de atajos («?»): lo que el compositor solo contaba al lector de pantalla. La
+  // abre la shell, que escucha «?» en toda la suite (y calla mientras se escribe en el
+  // compositor); Rooms solo declara sus filas.
+  useAtajosDeApp([
+    {
+      titulo: t('shortcuts.group.move'),
+      atajos: [
+        { teclas: ['Ctrl', 'G'], descripcion: t('shortcuts.switcher') },
+        { teclas: ['Alt', '↑/↓'], descripcion: t('shortcuts.nextChannel') },
+        {
+          teclas: ['Alt', t('key.shift'), '↑/↓'],
+          descripcion: t('shortcuts.nextUnread'),
+        },
+        { teclas: ['Esc'], descripcion: t('shortcuts.close') },
+      ],
+    },
+    {
+      titulo: t('shortcuts.group.write'),
+      atajos: [
+        { teclas: [t('key.enter')], descripcion: t('composer.hintSend') },
+        { teclas: ['↑'], descripcion: t('shortcuts.editLast') },
+        { teclas: ['@'], descripcion: t('composer.hintMention') },
+        { teclas: [':'], descripcion: t('composer.hintEmoji') },
+        { teclas: ['/'], descripcion: t('composer.hintCommands') },
+      ],
+    },
+  ]);
   useEffect(() => {
     const alPulsar = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() === 'g' && (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey) {
         e.preventDefault();
         setSwitcherOpen(true);
-        return;
       }
-      // «?» abre la hoja de atajos, salvo mientras se escribe: en el compositor
-      // el signo es texto, no un mando.
-      if (e.key !== '?' || e.metaKey || e.ctrlKey || e.altKey) return;
-      const donde = document.activeElement;
-      if (
-        donde instanceof HTMLElement &&
-        (donde.isContentEditable ||
-          donde.tagName === 'INPUT' ||
-          donde.tagName === 'TEXTAREA' ||
-          donde.closest('[role="dialog"]'))
-      ) {
-        return;
-      }
-      e.preventDefault();
-      setAtajosOpen(true);
     };
     document.addEventListener('keydown', alPulsar);
     return () => document.removeEventListener('keydown', alPulsar);
   }, []);
+
+  // Alt+↑/↓ cambia de canal y Alt+Mayús+↑/↓ salta al siguiente con algo pendiente, en
+  // el orden que se ve en el carril (las secciones plegadas no cuentan). Va por un ref
+  // para escuchar una sola vez y leer siempre el carril de ahora. Ver lib/navegarCanales.
+  const navegarRef = useUltimo((e: KeyboardEvent): void => {
+    const nav = pasoDeNavegacion(e);
+    if (!nav) return;
+    e.preventDefault();
+    const destino = canalVecino(
+      ordenVisible(groups, isGroupCollapsed),
+      activeId,
+      nav.paso,
+      nav.soloPendientes,
+    );
+    if (!destino) return;
+    setActiveId(destino.id);
+    // La fila puede quedar fuera del carril visible: que se vea adónde se ha ido.
+    requestAnimationFrame(() =>
+      document
+        .getElementById(sidebarGestoId)
+        ?.querySelector('[aria-current="page"]')
+        ?.scrollIntoView({ block: 'nearest' }),
+    );
+  });
+  useEffect(() => {
+    const alPulsar = (e: KeyboardEvent): void => navegarRef.current(e);
+    document.addEventListener('keydown', alPulsar);
+    return () => document.removeEventListener('keydown', alPulsar);
+  }, [navegarRef]);
 
   const sidebar = (
     <Sidebar
@@ -3740,9 +3970,7 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
       >
         <Icon name="search" size={14} />
         <span class="min-w-0 flex-1 truncate text-left">{t('switcher.open')}</span>
-        <kbd class="text-2xs border-sidebar-fg-muted/40 rounded border px-1 font-mono">
-          {atajoIrACanal}
-        </kbd>
+        <Kbd tone="chrome">{atajoIrACanal}</Kbd>
       </button>
       {/* «Hilos» (Ola 9): vista global de hilos seguidos, con el nº de hilos con no
           leídos. Toggle de panel RHS (aria-pressed, como los toggles de la cabecera). */}
@@ -4209,8 +4437,8 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
                     items={channelHeaderMenuItems(active)}
                     // `min-h-[24px]`: con `py-0.5` el disparador medía 21px de
                     // alto, por debajo del mínimo de WCAG 2.5.8 (AA) para lo que
-                    // se toca. Y `min-h-6` no lo arreglaba: son 1,5 rem, que con la
-                    // raíz a 14 vuelven a ser 21 (medido en producción, 2026-09-21). Es el nombre del canal, que en un teléfono es el
+                    // se toca. Y `min-h-6` no lo arreglaba: son 1,5 rem, que con 1
+                    // rem en 14 px volvían a ser 21 (medido en producción, 2026-09-21). Es el nombre del canal, que en un teléfono es el
                     // camino a ajustes, miembros y salir del canal.
                     triggerClass="text-md text-header-fg hover:bg-chrome-hover active:bg-chrome-active inline-flex min-h-[24px] max-w-full items-center gap-1 truncate rounded-control px-1.5 py-0.5 leading-tight font-semibold transition-colors duration-150 sytue-focus-ring"
                     trigger={
@@ -4454,6 +4682,7 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
       ) : null}
 
       <MessageView
+        tarjeta={tarjeta}
         messages={messages}
         loading={loadingMessages}
         error={messagesError}
@@ -4481,12 +4710,49 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
         onForward={openForward}
         onAck={handleAck}
         onCardVote={handleCardVote}
+        cifrado={CIFRADO_DE_EXTREMO_A_EXTREMO}
         unreadDividerId={unreadDividerId}
         highlightId={highlightId}
         seen={seenReceipt}
         onJoinCall={startChannelCall}
         onLoadOlder={loadOlder}
         loadingOlder={loadingOlder}
+        inicio={
+          // Solo al agotar el historial: mientras quede una página anterior, lo de
+          // arriba del todo no es el principio. Un salto a un mensaje antiguo deja
+          // hasOlder en true, así que tampoco sale ahí.
+          hasOlder ? undefined : (
+            <InicioDelCanal
+              canal={active}
+              yo={user.id}
+              nombreCreador={
+                active.createdBy
+                  ? (roster.find((m) => m.sub === active.createdBy)?.name ??
+                    memberNames[active.createdBy])
+                  : undefined
+              }
+              presencia={
+                active.kind === 'direct'
+                  ? t(STATE_KEY[activePeerPresence?.state ?? 'offline']) +
+                    (activePeerPresence?.status ? ` · ${activePeerPresence.status}` : '')
+                  : undefined
+              }
+              onAnadirPersonas={
+                activeIsChannel && canManageMembers && !active.archived
+                  ? abrirAnadirPersonas
+                  : undefined
+              }
+              onEditarTema={
+                activeIsChannel && isTeamAdmin && !active.external && !active.archived
+                  ? startEditTopic
+                  : undefined
+              }
+              sinMensajes={messages.length === 0}
+              locale={locale}
+              t={t}
+            />
+          )
+        }
         handleRef={listRef}
         locale={locale}
         t={t}
@@ -4531,6 +4797,7 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
         draftId={`${user.id}:${active.id}`}
         channelId={active.id}
         advanced
+        cifrado={CIFRADO_DE_EXTREMO_A_EXTREMO}
         onSend={handleSend}
         onEditLast={() => {
           const m = ultimoEditable(messages);
@@ -4556,7 +4823,7 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
       class="h-full flex-1"
       title={t('empty.channelsError')}
       description={t('error.checkConnection')}
-      illustration={<Icon name="danger" size={32} class="text-danger-text" />}
+      tone="error"
       action={
         <Button size="sm" variant="secondary" onClick={() => setChannelsTick((n) => n + 1)}>
           {t('action.retry')}
@@ -4573,7 +4840,7 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
   ) : channels.length === 0 ? (
     // Un tenant recién creado empieza aquí, con 0 canales: sin este CTA no hay salida.
     <EmptyState
-      illustration={<Illustration name="emptyChat" />}
+      spot="emptyChat"
       class="h-full flex-1"
       title={t('empty.noChannels')}
       description={t('empty.noChannelsHelp')}
@@ -4590,7 +4857,7 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
     />
   ) : (
     <EmptyState
-      illustration={<Illustration name="emptyChat" />}
+      spot="emptyChat"
       class="h-full flex-1"
       title={t('empty.pickChannel')}
       description={t('empty.pickChannelHelp')}
@@ -4688,6 +4955,20 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
               onRetry={() => openThread(threadRoot)}
               onSendReply={handleSendReply}
               onCardVote={handleCardVote}
+              onReact={handleToggleReaction}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onResend={handleResendReply}
+              pinnedIds={pinnedIds}
+              savedIds={savedIds}
+              onTogglePin={togglePin}
+              onToggleSave={toggleSave}
+              onForward={openForward}
+              onReport={(m) => setReporting({ target: { messageId: m.id }, name: m.author.name })}
+              onToggleBlock={(m, blocked) =>
+                void toggleBlock(m.channelId, m.author.id, m.author.name, blocked)
+              }
+              cifrado={CIFRADO_DE_EXTREMO_A_EXTREMO}
               ownerId={user.id}
               offline={offline}
               locale={locale}
@@ -4752,9 +5033,13 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
             />
           ) : rhsView === 'search' ? (
             <SearchPanel
+              // Remonta al pasar de búsqueda a archivos (o de canal): otra semilla y otra historia.
+              key={archivosDeCanal ?? 'buscar'}
               channelNames={channelNames}
               memberNames={memberNames}
               initialQuery={searchSeed}
+              cargarLocal={archivosDeCanal ? cargarArchivosDelCanal : cargarHistoriaParaBuscar}
+              maxLocal={archivosDeCanal ? MAX_ARCHIVOS_CANAL : undefined}
               onSelect={(channelId, messageId) => goToMessage(channelId, messageId)}
               onClose={() => setRhsView(null)}
               locale={locale}
@@ -4778,6 +5063,8 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
             />
           ) : rhsView === 'members' && active ? (
             <MembersPanel
+              key={anadirPersonas}
+              initialMode={anadirPersonas > 0 ? 'add' : 'list'}
               channelName={active.name}
               members={roster}
               teamMembers={members}
@@ -4796,6 +5083,7 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
               onRetry={() => setRosterTick((n) => n + 1)}
               onClose={() => setRhsView(null)}
               presences={presences}
+              tarjeta={tarjeta}
               t={t}
             />
           ) : rhsView === 'drafts' ? (
@@ -4920,37 +5208,14 @@ export function ChatApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
       <CreateChannelModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
+        members={members}
+        selfId={user.id}
         onCreated={handleChannelCreated}
         t={t}
       />
       <Modal open={resumen !== null} onClose={() => setResumen(null)} title={t('channel.summary')}>
         <TextoDelAsistente texto={resumen ?? ''} />
       </Modal>
-      <ShortcutsModal
-        open={atajosOpen}
-        title={t('shortcuts.title')}
-        groups={[
-          {
-            titulo: t('shortcuts.group.move'),
-            atajos: [
-              { teclas: ['Ctrl', 'G'], descripcion: t('shortcuts.switcher') },
-              { teclas: ['Esc'], descripcion: t('shortcuts.close') },
-              { teclas: ['?'], descripcion: t('shortcuts.help') },
-            ],
-          },
-          {
-            titulo: t('shortcuts.group.write'),
-            atajos: [
-              { teclas: [t('key.enter')], descripcion: t('composer.hintSend') },
-              { teclas: ['↑'], descripcion: t('shortcuts.editLast') },
-              { teclas: ['@'], descripcion: t('composer.hintMention') },
-              { teclas: [':'], descripcion: t('composer.hintEmoji') },
-              { teclas: ['/'], descripcion: t('composer.hintCommands') },
-            ],
-          },
-        ]}
-        onClose={() => setAtajosOpen(false)}
-      />
 
       <QuickSwitcher
         open={switcherOpen}

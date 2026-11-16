@@ -697,7 +697,7 @@ function HoldsTab({
           <EmptyState
             title={t(includeReleased ? 'comp.holds.emptyEver' : 'comp.holds.emptyActive')}
             description={t('comp.holds.emptyDescription')}
-            illustration={<Icon name="lock" size={28} />}
+            icon="lock"
             action={
               <Button
                 variant="primary"
@@ -1074,13 +1074,13 @@ function SearchTab({
           <EmptyState
             title={t('comp.search.emptyTitle')}
             description={t('comp.search.emptyDescription')}
-            illustration={<Icon name="search" size={28} />}
+            icon="search"
           />
         ) : results.length === 0 ? (
           <EmptyState
             title={t('comp.search.noResultsTitle')}
             description={t('comp.search.noResultsDescription')}
-            illustration={<Icon name="search" size={28} />}
+            icon="search"
           />
         ) : (
           <>

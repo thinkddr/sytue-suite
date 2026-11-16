@@ -10,6 +10,7 @@ package ui
 // `piezas.go`, que llegó con el cromo de navegación. Se importa.
 
 import (
+	"math"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -126,6 +127,29 @@ func Cortar(t *canvas.Text, completo string, e tema.Escalon, p Peso, cabe float3
 func recorta(s string, e tema.Escalon, p Peso, ancho float32) string {
 	r, _ := truncado(s, e, p.cara(), ancho, "…")
 	return r
+}
+
+// recortaEnMedio es recorta con los puntos suspensivos EN MEDIO: conserva entero el
+// final desde la última «@» —el dominio de una dirección— y recorta lo de antes, así que
+// «daniel.delgador@outlook.com» se queda en «daniel.del…@outlook.com» y no en
+// «daniel.delgador@outlook.co…», que no dice de qué proveedor es. Sin «@», o si el
+// dominio solo ya no cabe con una letra delante, recorta por el final como siempre. Es
+// la pareja de `labelEnd` de `SidebarItem` en la web.
+func recortaEnMedio(s string, e tema.Escalon, p Peso, ancho float32) string {
+	r, _ := truncado(s, e, p.cara(), ancho, "…")
+	i := strings.LastIndex(s, "@")
+	if r == s || i <= 0 {
+		return r
+	}
+	cola := s[i:]
+	_, wCola := truncado(cola, e, p.cara(), math.MaxFloat32, "")
+	cabeza, _ := truncado(s[:i], e, p.cara(), ancho-wCola, "…")
+	// Un punto o un guion pegado a los puntos suspensivos se lee «daniel.…»: fuera.
+	cabeza = strings.TrimRight(strings.TrimSuffix(cabeza, "…"), ".-_+")
+	if cabeza == "" {
+		return r
+	}
+	return cabeza + "…" + cola
 }
 
 // truncado es la búsqueda de todos: el texto que cabe, con `fin` detrás si ha habido

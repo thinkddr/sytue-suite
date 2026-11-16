@@ -24,9 +24,17 @@ import (
 // visibilidad en dos radios con su explicación, el tema y el pie de cancelar y crear.
 // Los errores del nombre —ya existe, no vale, sin permiso— van JUNTO al campo y no en
 // un aviso flotante.
+//
+// Debajo, el campo «Personas» (el selector de «Nuevo mensaje»): quien se elija se
+// añade al canal ya creado, una a una, por el mismo camino que el panel de Miembros,
+// que comprueba que sea del equipo e invita a quien es de fuera. No se usa la lista
+// de miembros de la creación: el servicio la siembra sin validar ni avisar.
 
 // MaxNombreCanal es `MAX_NAME`.
 const MaxNombreCanal = 100
+
+// MaxPersonasCanal es `MAX_INITIAL_MEMBERS`: cada persona es una petición tras crear.
+const MaxPersonasCanal = 50
 
 // SlugCanal es `channelSlug`: minúsculas, letras y cifras ASCII, y un guion por cada
 // tramo de espacios, guiones bajos, guiones o puntos; sin guiones en las puntas y a lo
@@ -71,8 +79,10 @@ type CrearCanal struct {
 	// ErrorNombre va junto al campo; Fallo es el error genérico de debajo.
 	ErrorNombre string
 	Fallo       bool
-	// AlCrear recibe el nombre, el tema y si es privado.
-	AlCrear func(nombre, asunto string, privado bool)
+	// Personas es el selector de quién entra al nacer.
+	Personas *NuevoDirecto
+	// AlCrear recibe el nombre, el tema, si es privado y las personas elegidas.
+	AlCrear func(nombre, asunto string, privado bool, personas []Persona)
 
 	nombre, temaCanal *ui.Entrada
 	publico, privado  *ui.Eleccion
@@ -106,6 +116,8 @@ func NuevoCrearCanal(t *i18n.Translator) *CrearCanal {
 	c.publico = ui.NuevoRadio(t.T("createChannel.public", nil), func(bool) { c.Privado = false; c.Refresh() })
 	c.privado = ui.NuevoRadio(t.T("createChannel.private", nil), func(bool) { c.Privado = true; c.Refresh() })
 	c.crear = ui.NuevoBoton(t.T("createChannel.title", nil), c.Enviar).Con(ui.Primario, ui.TallaMD)
+	c.Personas = NuevoNuevoDirecto(t, nil)
+	c.Personas.Max, c.Personas.VacioEnTexto = MaxPersonasCanal, true
 	return c
 }
 
@@ -122,7 +134,8 @@ func (c *CrearCanal) Enviar() {
 	}
 	c.Ocupado, c.ErrorNombre, c.Fallo = true, "", false
 	c.Refresh()
-	c.AlCrear(strings.TrimSpace(c.nombre.Texto()), strings.TrimSpace(c.temaCanal.Texto()), c.Privado)
+	c.AlCrear(strings.TrimSpace(c.nombre.Texto()), strings.TrimSpace(c.temaCanal.Texto()), c.Privado,
+		append([]Persona(nil), c.Personas.Elegidas...))
 }
 
 // construir rehace la columna con la ayuda o el error de ahora.
@@ -147,6 +160,7 @@ func (c *CrearCanal) construir() {
 		ui.GrupoCampo(t.T("createChannel.name", nil), true, c.nombre, ayuda, c.ErrorNombre),
 		visibilidad,
 		ui.GrupoCampo(t.T("channel.topic", nil), false, c.temaCanal, t.T("createChannel.topicHelp", nil), ""),
+		ui.GrupoCampo(t.T("createChannel.people", nil), false, c.Personas, t.T("createChannel.peopleHelp", nil), ""),
 	}
 	if c.Fallo {
 		hijos = append(hijos, ui.NuevoRotulo(t.T("createChannel.failed", nil), tema.TextoSM, ui.Normal, "danger-text"))
@@ -155,6 +169,10 @@ func (c *CrearCanal) construir() {
 	c.crear.Inerte = SlugCanal(c.nombre.Texto()) == ""
 	c.crear.Cargando = c.Ocupado
 	c.crear.Refresh()
+	if c.Personas.Ocupado != c.Ocupado {
+		c.Personas.Ocupado = c.Ocupado // `disabled={busy}` del selector
+		c.Personas.Refresh()
+	}
 }
 
 // CreateRenderer monta la columna.

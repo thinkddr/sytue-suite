@@ -274,7 +274,7 @@ async function herramientasDelEditor(page, leerNotas) {
     const colores = page.getByRole('dialog', { name: es['editor.textColor'], exact: true });
     await colores.waitFor();
     await sigueEditando();
-    await colores.getByRole('button', { name: '#b91c1c', exact: true }).click();
+    await colores.getByRole('button', { name: es['colour.red'], exact: true }).click();
     await colores.waitFor({ state: 'hidden' });
     await sigueEditando();
     assert.equal(await estilo('seleccionado', 'color'), 'rgb(185, 28, 28)');

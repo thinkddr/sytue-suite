@@ -7,6 +7,11 @@
 export { SytueShell } from './SytueShell.js';
 export type { SytueShellProps } from './SytueShell.js';
 export { GlobalSearch, detalleDe } from './GlobalSearch.js';
+// ⌘K: la paleta de la suite; cada app registra su capa (pantallas, acciones, registros).
+export { ProveedorDePaleta, usePaletaDeLaSuite, useCapaDePaleta } from './PaletaDeLaSuite.js';
+export type { EstadoDePaleta } from './PaletaDeLaSuite.js';
+export { abrirPaleta, comandosQueCasan, esAtajoDePaleta } from './paleta.js';
+export type { CapaDePaleta, ComandoDeApp } from './paleta.js';
 export { AppSwitcher } from './AppSwitcher.js';
 export { NotificationCenter } from './NotificationCenter.js';
 // Los avisos del Hub sin Preact: la campana y la bandeja de One los comparten.
@@ -18,7 +23,10 @@ export {
   destinoAviso,
   EVENTO_AVISO,
   nombreDeOrganizacion,
+  ORIGENES_DE_AVISOS,
   procedenciaAviso,
+  TIPOS_CRITICOS,
+  TIPOS_DE_AVISOS,
   tituloAviso,
 } from './avisos.js';
 // El punto azul de un aviso sin leer, como botón «Marcar como leído».
@@ -39,8 +47,18 @@ export {
   ponerMencion,
 } from './menciones.js';
 export type { Persona } from './menciones.js';
-export type { Avisos, EstadoAvisos, FlujoAvisos, FuenteAvisos } from './avisos.js';
+export type {
+  Avisos,
+  EstadoAvisos,
+  FlujoAvisos,
+  FuenteAvisos,
+  GrupoDeAvisos,
+  IdTipoDeAviso,
+  TipoDeAviso,
+} from './avisos.js';
 export { AccountMenu } from './AccountMenu.js';
+// La hoja de «?» de la suite: cada app declara sus atajos y la shell la abre.
+export { useAtajosDeApp, abrirHojaDeAtajos, componerHoja } from './HojaDeAtajos.js';
 export { ShellContext, useShell } from './context.js';
 export { useAppsDesplegadas, appsRecordadas, recordarApps } from './useAppsDesplegadas.js';
 export type { ShellConfig } from './context.js';
@@ -63,3 +81,9 @@ export type {
   SelectorDeFicherosTextos,
   PickerItem,
 } from './SelectorDeFicheros.js';
+// La revisión de seguridad de una cuenta, pura: Mi cuenta, el portal y el Hub.
+export { ANCLAS, DIAS_SIN_USO, revisionDeCuenta } from './revisionCuenta.js';
+export type { ClaveRevision, DatosRevision, PuntoRevision } from './revisionCuenta.js';
+// …y los primeros pasos de la portada, que reutilizan sus dos primeros puntos.
+export { primerosPasos } from './revisionCuenta.js';
+export type { ClavePaso, DatosPrimerosPasos, PasoPendiente } from './revisionCuenta.js';

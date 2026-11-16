@@ -308,12 +308,12 @@ func (c *Controller) reconcileDomains(ctx context.Context) error {
 		l := log.From(ctx).With("domain_id", d.ID, "hostname", d.Hostname, "tenant", d.Tenant)
 		switch d.Status { //nolint:exhaustive // Active/Failed son estados terminales: no se reconcilian.
 		case domain.DomainPending:
-			ok, err := c.platform.VerifyDomain(ctx, d.Hostname, d.VerifyToken, c.cfg.IngressTarget)
+			check, err := c.platform.VerifyDomain(ctx, d.Hostname, d.VerifyToken, c.cfg.IngressTarget)
 			if err != nil {
 				l.Warn("verificar dominio", "error", err)
 				continue
 			}
-			if !ok {
+			if !check.Verified {
 				continue // sigue pendiente hasta que el cliente configure DNS
 			}
 			if err := c.store.SetDomainStatus(ctx, d.Tenant, d.ID, domain.DomainVerified); err != nil {

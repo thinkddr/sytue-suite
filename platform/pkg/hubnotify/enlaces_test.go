@@ -49,6 +49,7 @@ func ejemplos() []EjemploEnlace {
 		{"docs.comment", "docs", EnlaceDocumento(pub, org, uid, "document")},
 		{"docs.signature.requested", "pdf", EnlacePDF(pub, org, "/PDF/Contrato de servicios.pdf")},
 		{"erp.task.assigned", "erp", EnlaceTareas(pub, org)},
+		{"erp.approval.requested", "erp", EnlaceAprobacionesERP(pub, org)},
 		{"erp.access.requested", "erp", EnlacePeticionesERP(pub, org, "clientes")},
 		{"notes.access.requested", "notes", EnlaceCuaderno(pub, org, uid)},
 		{"notes.shared", "notes", EnlaceCuaderno(pub, org, uid)},

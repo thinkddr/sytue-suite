@@ -68,14 +68,6 @@ export const es: AppCatalog<typeof en> = {
   'palette.group.navigation': 'Navegación',
   'palette.group.actions': 'Acciones',
   'palette.group.projects': 'Proyectos',
-  'palette.dialog': 'Paleta de comandos',
-  'palette.inputLabel': 'Buscar comandos, proyectos y acciones',
-  'palette.placeholder': 'Buscar o saltar a…',
-  'palette.results': 'Resultados',
-  'palette.noResults': 'Sin resultados para «{query}».',
-  'palette.hint.move': 'moverse',
-  'palette.hint.open': 'abrir',
-  'palette.hint.close': 'cerrar',
   'palette.createProject': 'Crear proyecto',
   'palette.createProject.keywords': 'nuevo repositorio conectar deploy git',
   'palette.redeploy': 'Volver a desplegar',
@@ -323,6 +315,24 @@ export const es: AppCatalog<typeof en> = {
   'domains.dns.txtValue': 'TXT · valor',
   'domains.dns.after':
     'Lo comprobamos cada pocos minutos. En cuanto tu DNS se propague, el dominio pasa a verificado y el certificado se emite solo.',
+  'domains.check': 'Comprobar ahora',
+  'domains.check.ok.title': 'Dominio verificado',
+  'domains.check.ok.desc':
+    'El registro TXT está bien y {host} apunta a Sytue. El certificado se está emitiendo ya.',
+  'domains.check.txtMissing.title': 'No encontramos el registro TXT',
+  'domains.check.txtMissing.desc':
+    'No encontramos {record}. Créalo con el valor de arriba; si acabas de hacerlo, el DNS puede tardar unos minutos en propagarse.',
+  'domains.check.txtMismatch.title': 'El registro TXT tiene otro valor',
+  'domains.check.txtMismatch.desc':
+    '{record} existe, pero su valor no es el token de este dominio. Cámbialo por el valor de arriba.',
+  'domains.check.cname.title': 'Verificado, pero el tráfico va a otro sitio',
+  'domains.check.cname.desc':
+    '{host} apunta a {found}. Apunta su CNAME a {expected}: el certificado no se emitirá hasta entonces.',
+  'domains.check.cname.descNone':
+    '{host} todavía no resuelve. Apunta su CNAME a {expected}: el certificado no se emitirá hasta entonces.',
+  'domains.check.tooSoon': 'Espera unos segundos antes de volver a comprobar.',
+  'domains.check.fail': 'No se pudo comprobar el dominio. Inténtalo de nuevo.',
+  'domains.check.demo': 'En modo demostración no hay DNS que comprobar.',
   'domains.deleted': 'Dominio eliminado',
   'domains.deleted.desc': '{host} ya no sirve tráfico en este proyecto.',
   'domains.delete.fail': 'No se pudo eliminar el dominio',
@@ -647,15 +657,9 @@ export const es: AppCatalog<typeof en> = {
   'tasks.confirm.body':
     '{name} deja de ejecutarse a partir de ahora. Lo ya ejecutado no se deshace.',
 
-  'copy.secret': 'secreto',
   'copy.manage': 'Gestionar',
   'copy.manageLabel': 'Gestionar {label} en Variables y secretos',
   'copy.copy': 'Copiar',
-  'copy.copyLabel': 'Copiar {label}',
-  'copy.copied': 'Copiado',
-  'copy.copied.desc': '{label} copiado al portapapeles.',
-  'copy.fail': 'No se pudo copiar',
-  'copy.fail.desc': 'Copia el valor manualmente.',
 
   'billing.subtitle':
     'Tu plan, el gasto del período y tus facturas. Precios sencillos por unidad, sin sorpresas.',
@@ -853,6 +857,54 @@ export const es: AppCatalog<typeof en> = {
   'tplw.create.fail': 'No se ha podido crear el proyecto',
   'tplw.demo': 'No hay control-plane conectado',
   'tplw.demo.desc': 'No se ha creado nada. Inténtalo otra vez cuando el backend esté disponible.',
+  'npw.subtitle': 'De tu repositorio a una dirección en línea, paso a paso.',
+  'npw.step.origin': 'Origen',
+  'npw.step.origin.heading': '¿Dónde está tu código?',
+  'npw.step.origin.desc':
+    'Pega la dirección de tu repositorio Git. Miramos dentro para rellenar el resto por ti.',
+  'npw.step.configure': 'Configurar',
+  'npw.step.configure.heading': 'Ponle nombre y revisa cómo se construye',
+  'npw.step.configure.desc':
+    'El nombre será su dirección web. Los ajustes de compilación salen de tu repositorio: cámbialos solo si no son correctos.',
+  'npw.step.variables': 'Variables',
+  'npw.step.variables.heading': '¿Necesita variables tu aplicación?',
+  'npw.step.variables.desc':
+    'Claves de API, direcciones de base de datos… Añádelas ahora y el primer despliegue ya las tendrá. También puedes añadirlas después.',
+  'npw.vars.add': 'Añadir variable',
+  'npw.vars.skip': 'Seguir sin variables',
+  'npw.vars.empty': 'Aún no hay variables. No pasa nada si tu aplicación no las necesita.',
+  'npw.vars.keyLabel': 'Clave de la variable {n}',
+  'npw.vars.valueLabel': 'Valor de la variable {n}',
+  'npw.vars.remove': 'Quitar la variable {n}',
+  'npw.vars.duplicate': 'Esta clave está repetida: deja solo una.',
+  'npw.vars.scope':
+    'Valen para producción y para las previsualizaciones. Luego puedes acotar cada una en Variables.',
+  'npw.review.vars': 'Variables',
+  'npw.review.vars.none': 'Ninguna por ahora',
+  'npw.review.deploy.value': 'Empieza en cuanto se cree el proyecto, y puedes seguirlo aquí.',
+  'npw.review.order': 'En este orden',
+  'npw.review.order.desc':
+    'Creamos el proyecto, guardamos sus variables y lanzamos el primer despliegue. Si un paso falla, paramos ahí y te decimos por qué; no se pierde nada de lo ya hecho.',
+  'npw.step.deploy': 'Desplegar',
+  'npw.task.project': 'Crear el proyecto',
+  'npw.task.vars': 'Guardar las variables ({done} de {total})',
+  'npw.task.deploy': 'Lanzar el primer despliegue',
+  'npw.task.build': 'Compilar y publicar',
+  'npw.task.build.status': 'Compilar y publicar: {status}',
+  'npw.task.state.pending': 'pendiente',
+  'npw.task.state.running': 'en curso',
+  'npw.task.state.done': 'hecho',
+  'npw.task.state.failed': 'ha fallado',
+  'npw.fail.vars': 'No se ha podido guardar {key}',
+  'npw.fail.deploy': 'No se ha podido lanzar el primer despliegue',
+  'npw.fail.keep': 'El proyecto ya existe: al reintentar se sigue desde aquí.',
+  'npw.logs.title': 'Log de compilación',
+  'npw.logs.waiting': 'Esperando a que empiece la compilación…',
+  'npw.result.ready': 'Tu aplicación está en línea',
+  'npw.result.ready.desc': 'Responde en {url}.',
+  'npw.result.error': 'La compilación ha fallado',
+  'npw.result.error.desc':
+    'Las últimas líneas del log suelen decir qué falta. Corrígelo y sube un commit, o vuelve a desplegar desde el proyecto.',
 
   'monitoring.subtitle':
     'Sondas de disponibilidad de tus URLs y alertas por evento a Slack, Discord o un webhook.',

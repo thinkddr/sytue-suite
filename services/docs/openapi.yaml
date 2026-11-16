@@ -37,6 +37,8 @@ paths:
         - { name: kind, in: query, schema: { $ref: '#/components/schemas/Kind' } }
         - { name: owner, in: query, schema: { type: string } }
         - { name: q, in: query, schema: { type: string }, description: Búsqueda por título }
+        - { name: scope, in: query, schema: { type: string, enum: [mine, shared] }, description: «Míos» (los que posee) o «Compartidos conmigo» (los ajenos que ve); sin él, todos }
+        - { name: sort, in: query, schema: { type: string, enum: [updated, title] }, description: Orden; title = A→Z sin mayúsculas ni acentos (el cursor pasa a ser de título) }
         - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
         - { name: offset, in: query, schema: { type: integer, default: 0 } }
       responses:
@@ -171,6 +173,26 @@ paths:
           application/json:
             schema: { type: object, properties: { starred: { type: boolean } } }
       responses: { '204': { description: Sin contenido } }
+
+  /v1/documents/{id}/thumbnail:
+    parameters: [ { $ref: '#/components/parameters/DocId' } ]
+    get:
+      tags: [documents]
+      summary: Miniatura de la portada (PNG de la primera página, hoja o diapositiva)
+      description: >
+        Se dibuja al guardar, cuando el documento lleva unos segundos sin cambios. Con
+        `v` igual al `thumbnail_seq` de la lista, la respuesta es inmutable; sin él, se
+        revalida. 404 mientras el documento no tiene miniatura.
+      parameters:
+        - { name: v, in: query, required: false, schema: { type: integer, format: int64 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            image/png:
+              schema: { type: string, format: binary }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
 
   /v1/documents/{id}/state:
     parameters: [ { $ref: '#/components/parameters/DocId' } ]
@@ -763,6 +785,10 @@ components:
         starred: { type: boolean }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+        thumbnail_seq:
+          type: integer
+          format: int64
+          description: Secuencia con la que se dibujó la miniatura (solo en la lista; ausente = sin miniatura).
     Op:
       type: object
       description: Operación CRDT de bajo nivel (RGA + LWW).

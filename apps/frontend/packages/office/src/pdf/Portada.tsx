@@ -8,8 +8,8 @@
  * porque un PDF casi siempre viene de fuera. Los recientes salen de /PDF del
  * Drive (api/pdf-recientes.ts): un PDF no es un documento de Docs.
  */
-import { useEffect, useMemo, useState } from 'preact/hooks';
-import { Badge, EmptyState, Input, Spinner, cx } from '@sytue/ui';
+import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
+import { Badge, Button, EmptyState, Input, Skeleton, Spinner, cx } from '@sytue/ui';
 import { contiene, formatDate, type Locale } from '@sytue/i18n';
 import { productColor } from '@sytue/config';
 import { docsT } from '../i18n';
@@ -202,12 +202,18 @@ export function PortadaPdf({ locale }: { locale: Locale }) {
   const [creando, setCreando] = useState(false);
   const [errorCrear, setErrorCrear] = useState(false);
 
-  useEffect(() => {
+  // Un fallo de red no puede dejar la portada sin salida: «Reintentar» vuelve a
+  // pedir la lista sin recargar la página (y sin perder el filtro escrito).
+  const cargar = useCallback(() => {
+    setFallo(false);
+    setLista(null);
     fetch('/api/pdf-recientes', { credentials: 'include' })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
       .then((d: { items: PdfReciente[] }) => setLista(d.items))
       .catch(() => setFallo(true));
   }, []);
+
+  useEffect(cargar, [cargar]);
 
   const filtrados = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -298,13 +304,42 @@ export function PortadaPdf({ locale }: { locale: Locale }) {
           </div>
         </div>
         {fallo ? (
-          <p class="text-danger-text text-sm" role="alert">
-            {t('pdf.list.loadFailed')}
-          </p>
-        ) : lista === null ? (
-          <div class="flex justify-center py-10" aria-busy="true">
-            <Spinner size={22} />
+          <div class="flex flex-wrap items-center gap-3" data-recientes-fallo>
+            <p class="text-danger-text text-sm" role="alert">
+              {t('pdf.list.loadFailed')}
+            </p>
+            <Button variant="secondary" size="sm" onClick={cargar}>
+              {t('pdf.retry')}
+            </Button>
           </div>
+        ) : lista === null ? (
+          // El esqueleto tiene la forma de las tarjetas —la banda `h-24` y, en `p-3
+          // gap-0.5`, una línea de nombre y otra `text-sm`, cada una de su `1lh`—: al
+          // llegar la lista no salta nada, solo se rellena.
+          <ul
+            class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4"
+            aria-busy="true"
+            data-recientes-cargando
+          >
+            <li class="sr-only">{t('list.loading')}</li>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <li
+                key={i}
+                aria-hidden="true"
+                class="border-border bg-surface flex flex-col overflow-hidden rounded-lg border"
+              >
+                <Skeleton height="6rem" style={{ borderRadius: 0 }} />
+                <span class="flex flex-col gap-0.5 p-3">
+                  <span class="flex h-[1lh] items-center">
+                    <Skeleton height="1em" width="70%" />
+                  </span>
+                  <span class="flex h-[1lh] items-center text-sm">
+                    <Skeleton height="0.75em" width="45%" />
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
         ) : lista.length === 0 ? (
           <EmptyState title={t('pdf.list.heading')} description={t('pdf.list.empty')} />
         ) : filtrados.length === 0 ? (

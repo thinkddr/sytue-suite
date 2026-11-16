@@ -7,7 +7,16 @@ import DashboardLayout from '../layouts/DashboardLayout.astro';
 import DemoBanner from '../components/DemoBanner';
 import UsageCostTable from '../components/UsageCostTable';
 import UsageByProjectTable from '../components/UsageByProjectTable';
-import { Card, CardBody, CardHeader, CardTitle, Badge, Icon, SectionHeader } from '@sytue/ui';
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  CardTitle,
+  Badge,
+  Icon,
+  SectionHeader,
+  EmptyState,
+} from '@sytue/ui';
 import { requireSession } from '@sytue/auth/server';
 import { canonicaConOrg } from '@sytue/config';
 import { getBff, toBffContext } from '../server/bff.js';
@@ -161,7 +170,7 @@ const planMeta = {
       </CardHeader>
       <CardBody>
         {usageByProject.length === 0 ? (
-          <p class="text-text-muted text-sm">{t('usage.byProject.none')}</p>
+          <EmptyState compact title={t('usage.byProject.none')} />
         ) : (
           <>
             <UsageByProjectTable usage={usageByProject} locale={locale} />

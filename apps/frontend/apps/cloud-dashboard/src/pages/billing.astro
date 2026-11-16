@@ -213,7 +213,7 @@ const currentPlanLabel = planLabel[account.plan] ?? account.plan;
       <CardBody>
         {invoiceId && !invoice ? (
           <EmptyState
-            illustration={<Icon name="receipt" size={24} />}
+            icon="receipt"
             title={t('billing.notFound.title')}
             description={t('billing.notFound.desc')}
           />
@@ -221,7 +221,7 @@ const currentPlanLabel = planLabel[account.plan] ?? account.plan;
           <InvoiceLinesTable lines={invoice.lines} total={invoice.totalEur} locale={locale} />
         ) : invoices.length === 0 ? (
           <EmptyState
-            illustration={<Icon name="receipt" size={24} />}
+            icon="receipt"
             title={t('billing.empty.title')}
             description={t('billing.empty.desc')}
           />

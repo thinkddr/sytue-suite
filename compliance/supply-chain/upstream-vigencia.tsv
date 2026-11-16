@@ -4,7 +4,7 @@
 # mantenimiento no se rompe el día que lo archivan, sino el día que aparece una
 # CVE que ya no va a arreglar nadie.
 traefik	activo	MIT	traefik/traefik	2026-11-02
-pgbouncer	activo	MIT	edoburu/docker-pgbouncer	2026-11-02
+pgbouncer	activo	Apache-2.0	cloudnative-pg/pgbouncer-containers	2026-11-16
 livekit	activo	Apache-2.0	livekit/livekit	2026-11-02
 livekit-egress	activo	Apache-2.0	livekit/egress	2026-11-02
 cert-manager-controller	activo	Apache-2.0	cert-manager/cert-manager	2026-11-02

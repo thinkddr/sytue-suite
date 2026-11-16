@@ -118,12 +118,18 @@ function fallidosDe(sources: HubSearchWire['sources']): { source: ProductKey; er
 }
 
 /**
+ * Origen que puede dejar un aviso (`domain.NotificationSources` del Hub): los
+ * productos y, ademas, las integraciones, que avisan sin ser un producto propio.
+ */
+export type NotificationSource = ProductKey | 'integrations';
+
+/**
  * Regla de silencio de avisos. `kind` vacio u omitido silencia el ORIGEN
  * entero; con `kind`, solo ese tipo dentro del origen. La regla mas especifica
  * gana (domain.Muted del Hub).
  */
 export interface NotificationPref {
-  source: ProductKey;
+  source: NotificationSource;
   kind?: string;
   muted: boolean;
 }

@@ -11,6 +11,7 @@ import (
 
 	"fyne.io/fyne/v2/test"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/correo"
 	"git.sytue.eu/sytue/one/apps/nucleo/notas"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 )
@@ -39,6 +40,40 @@ func TestPendientesAlmacenamientoCuentaDiariosCifradosYNotepads(t *testing.T) {
 		t.Fatalf("PendientesAlmacenamiento = %d; quiero 2", got)
 	}
 
+	// El diseño de la rama cierra a la defensiva: con trabajo privado en disco,
+	// SalirConError RECHAZA (ErrTrabajoPendiente) sin borrar nada. El borrado
+	// explícito del propio ámbito es SalirDescartando, que trabajo_privado_test.go
+	// cubre con sesión y testigo (TestExplicitPrivateDiscardKeepsOtherAccounts…).
+	if err := s.SalirConError(); !errors.Is(err, ErrTrabajoPendiente) {
+		t.Fatalf("SalirConError no rechazó la salida con 2 pendientes: %v", err)
+	}
+	if got := PendientesAlmacenamiento(); got != 2 {
+		t.Fatalf("el rechazo alteró los pendientes en disco: %d; quiero 2", got)
+	}
+}
+
+// TestPendientesAlmacenamientoCuentaLaCopiaDelRedactorDeMail: lo escrito en Mail sin
+// red también se borra al salir, así que también se avisa; y «Subir» sin sesión (o sin
+// red) no lo da por subido.
+func TestPendientesAlmacenamientoCuentaLaCopiaDelRedactorDeMail(t *testing.T) {
+	aparte(t)
+	a := test.NewApp()
+	defer a.Quit()
+
+	s := Abrir(a, "sytue.eu")
+	alm, err := Almacen()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := correo.Guardar(alm, "ada/acme", "r1", correo.Copia{De: "ada@acme.eu", Crudo: []byte("Subject: Sin red\r\n\r\nHola")}); err != nil {
+		t.Fatal(err)
+	}
+	if got := PendientesAlmacenamiento(); got != 1 {
+		t.Fatalf("PendientesAlmacenamiento = %d; quiero 1 (la copia del redactor)", got)
+	}
+	if got := new(Suite).SubirPendientes(t.Context()); got != 1 {
+		t.Fatalf("SubirPendientes sin sesión deja %d; la copia sigue en el equipo", got)
+	}
 	if err := s.SalirConError(); err != nil {
 		t.Fatal(err)
 	}
@@ -70,9 +105,12 @@ func TestSalirCancelaYEsperaTareasAlmacenamientoAntesDeVaciarCache(t *testing.T)
 		close(cancelada)
 		<-soltarLimpieza
 		// Simula un último volcado del ejecutor antes de devolver el control a `fin()`:
-		// como SalirConError espera a `fin()` ANTES de vaciarAlmacen, este rastro tiene
-		// que desaparecer cuando SalirConError termine.
-		_ = alm.Write("ada/", storage.PendingUploadsNamespace, "job-en-vuelo", map[string]string{"id": "job-en-vuelo"})
+		// como SalirConError espera a `fin()` ANTES de vaciar la caché, este rastro
+		// tiene que desaparecer cuando SalirConError termine. Se usa un BORRADOR
+		// desechable, no un diario de subidas: el diseño de la rama protege los
+		// diarios durable frente al vaciado (solo el descarte explícito los borra),
+		// y el borrador es justamente lo que el vaciado sí se lleva.
+		_ = alm.Write("ada/", notas.EspacioBorradores, "job-en-vuelo", map[string]string{"id": "job-en-vuelo"})
 	}()
 
 	<-enCurso

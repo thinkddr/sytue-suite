@@ -83,6 +83,13 @@ type fakeService struct {
 	attendee   domain.Attendee
 	partErr    error
 	gotPartEml string
+	// Lo que llegó a ImportarInvitacion («PARTSTAT|ics») y el error que devuelve.
+	gotImport string
+	importErr error
+	// Lo que llegó a ResponderEvento (el RSVP por UID): vacío si no se llamó.
+	gotRespUID   string
+	gotRespEmail string
+	gotRespPS    domain.ParticipationStatus
 
 	periods []domain.FreeBusyPeriod
 	fbErr   error
@@ -292,6 +299,11 @@ func (f *fakeService) SetAttendeePartStat(_ context.Context, _ uuid.UUID, email 
 	return f.attendee, f.partErr
 }
 
+func (f *fakeService) ResponderEvento(_ context.Context, uid, email string, ps domain.ParticipationStatus) (domain.Attendee, error) {
+	f.gotRespUID, f.gotRespEmail, f.gotRespPS = uid, email, ps
+	return domain.Attendee{Email: email, PartStat: ps}, f.partErr
+}
+
 func (f *fakeService) FreeBusy(_ context.Context, user string, _, _ time.Time) ([]domain.FreeBusyPeriod, error) {
 	f.fbUser = user
 	return f.periods, f.fbErr
@@ -324,6 +336,11 @@ func (f *fakeService) ListInbox(_ context.Context, _ string, onlyPending bool, _
 func (f *fakeService) RespondInvitation(_ context.Context, _ uuid.UUID, status domain.InvitationStatus) (domain.Invitation, error) {
 	f.gotStatus = status
 	return f.inv, f.respErr
+}
+
+func (f *fakeService) ImportarInvitacion(_ context.Context, ics string, ps domain.ParticipationStatus) (service.InvitacionImportada, error) {
+	f.gotImport = string(ps) + "|" + ics
+	return service.InvitacionImportada{UID: "u-1", PartStat: ps}, f.importErr
 }
 
 func (f *fakeService) RecibirRespuesta(ctx context.Context, remitente, ics string) error {
@@ -823,10 +840,83 @@ func TestSetPartStatIgnoresBodyEmail(t *testing.T) {
 }
 
 func TestSetPartStatBadID(t *testing.T) {
+	// Un id que no es UUID se toma por UID; uno con saltos de línea no es un UID,
+	// es una inyección en el .ics.
+	for _, id := range []string{"", "a%0D%0AX-MAL:1", strings.Repeat("u", maxUIDLen+1)} {
+		f := &fakeService{}
+		rec := httptest.NewRecorder()
+		newHandlers(f).SetPartStat(rec, req(http.MethodPut, "/", `{}`, authClaims(), map[string]string{"id": id}))
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("id %q: code = %d, want 400", id, rec.Code)
+		}
+		if f.gotRespUID != "" || f.gotPartEml != "" {
+			t.Errorf("id %q: no debía llegar al servicio", id)
+		}
+	}
+}
+
+// TestSetPartStatPorUID: la web solo conoce el UID del .ics («…@calendar.sytue.eu»).
+// Antes se exigía un UUID y la respuesta desde la vista rápida daba siempre 400.
+func TestSetPartStatPorUID(t *testing.T) {
+	f := &fakeService{}
 	rec := httptest.NewRecorder()
-	newHandlers(&fakeService{}).SetPartStat(rec, req(http.MethodPut, "/", `{}`, authClaims(), map[string]string{"id": "x"}))
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("code = %d, want 400", rec.Code)
+	newHandlers(f).SetPartStat(rec, req(http.MethodPut, "/",
+		`{"partstat":"tentative"}`, authClaims(), map[string]string{"id": "reunion-1%40calendar.sytue.eu"}))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("code = %d, want 200: %s", rec.Code, rec.Body)
+	}
+	if f.gotRespUID != "reunion-1@calendar.sytue.eu" {
+		t.Errorf("uid = %q, want el de la ruta sin escapar", f.gotRespUID)
+	}
+	if f.gotRespPS != domain.PartTentative {
+		t.Errorf("partstat = %q, want TENTATIVE", f.gotRespPS)
+	}
+	if f.gotPartEml != "" {
+		t.Error("por UID no se usa el camino del id interno")
+	}
+}
+
+// TestSetPartStatUIDDelCuerpoMandaSobreLaRuta: un UID con forma de UUID (los generan
+// así muchos clientes) viaja en el cuerpo para no tomarse por el id interno.
+func TestSetPartStatUIDDelCuerpoMandaSobreLaRuta(t *testing.T) {
+	f := &fakeService{}
+	uid := uuid.NewString()
+	rec := httptest.NewRecorder()
+	newHandlers(f).SetPartStat(rec, req(http.MethodPut, "/",
+		`{"uid":"`+uid+`","partstat":"DECLINED"}`, authClaims(), map[string]string{"id": uid}))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("code = %d, want 200", rec.Code)
+	}
+	if f.gotRespUID != uid || f.gotPartEml != "" {
+		t.Errorf("uid = %q (id interno usado: %v), want por UID", f.gotRespUID, f.gotPartEml != "")
+	}
+}
+
+// TestSetPartStatPorUIDIgnoraElEmailDelCuerpo: nadie toca el PARTSTAT de otro,
+// tampoco por el camino del UID.
+func TestSetPartStatPorUIDIgnoraElEmailDelCuerpo(t *testing.T) {
+	f := &fakeService{}
+	rec := httptest.NewRecorder()
+	newHandlers(f).SetPartStat(rec, req(http.MethodPut, "/",
+		`{"uid":"reunion-1@calendar.sytue.eu","email":"victima@ex.com","partstat":"DECLINED"}`,
+		authClaims(), map[string]string{"id": "x"}))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("code = %d, want 200", rec.Code)
+	}
+	if f.gotRespEmail != "u@ex.com" {
+		t.Errorf("email = %q, want u@ex.com (el del JWT, nunca el del cuerpo)", f.gotRespEmail)
+	}
+}
+
+// TestSetPartStatPorUIDSinSerInvitado: el servicio dice «no figuras» (ErrNotFound)
+// y eso es un 404, no un éxito.
+func TestSetPartStatPorUIDSinSerInvitado(t *testing.T) {
+	f := &fakeService{partErr: domain.ErrNotFound}
+	rec := httptest.NewRecorder()
+	newHandlers(f).SetPartStat(rec, req(http.MethodPut, "/",
+		`{"uid":"ajeno@calendar.sytue.eu","partstat":"ACCEPTED"}`, authClaims(), map[string]string{"id": "x"}))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("code = %d, want 404", rec.Code)
 	}
 }
 
@@ -955,6 +1045,37 @@ func TestRespondInvitationConflict(t *testing.T) {
 	newHandlers(f).RespondInvitation(rec, req(http.MethodPost, "/", `{"status":"declined"}`, authClaims(), map[string]string{"id": uuid.NewString()}))
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("code = %d, want 409", rec.Code)
+	}
+}
+
+// D-MAIL-04: el lector de Mail contesta la invitación de un organizador de fuera.
+func TestImportInvitationPasaElICSYLaRespuesta(t *testing.T) {
+	f := &fakeService{}
+	rec := httptest.NewRecorder()
+	newHandlers(f).ImportInvitation(rec, req(http.MethodPost, "/", `{"ics":"BEGIN:VCALENDAR","partstat":"TENTATIVE"}`, authClaims(), nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("code = %d, want 200, body=%s", rec.Code, rec.Body.String())
+	}
+	if f.gotImport != "TENTATIVE|BEGIN:VCALENDAR" {
+		t.Errorf("llegó %q", f.gotImport)
+	}
+}
+
+func TestImportInvitationSinICSEs400(t *testing.T) {
+	f := &fakeService{}
+	rec := httptest.NewRecorder()
+	newHandlers(f).ImportInvitation(rec, req(http.MethodPost, "/", `{"ics":"  ","partstat":"ACCEPTED"}`, authClaims(), nil))
+	if rec.Code != http.StatusBadRequest || f.gotImport != "" {
+		t.Fatalf("code = %d, import = %q; want 400 sin llamar al servicio", rec.Code, f.gotImport)
+	}
+}
+
+func TestImportInvitationDeQuienNoEstaInvitadoEs404(t *testing.T) {
+	f := &fakeService{importErr: service.ErrNoInvitado}
+	rec := httptest.NewRecorder()
+	newHandlers(f).ImportInvitation(rec, req(http.MethodPost, "/", `{"ics":"BEGIN:VCALENDAR","partstat":"ACCEPTED"}`, authClaims(), nil))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("code = %d, want 404", rec.Code)
 	}
 }
 

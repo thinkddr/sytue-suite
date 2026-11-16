@@ -19,6 +19,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/auth"
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
@@ -114,7 +115,6 @@ func ptr[T any](v T) *T { return &v }
 
 // lanzar corre una escritura en su rutina. El error ya lo ha avisado ella misma
 // (`fallo`); aquí solo se descarta, que es lo que el `void` hace en la web.
-func lanzar(f func() error) { go func() { _ = f() }() }
 
 // errSinRed es el fallo de crear sin intentarlo: no hay red, o el cuaderno es un día
 // que aún no existe. Con almacén, la nota va a la cola.
@@ -182,7 +182,7 @@ func (p *Pantalla) fallo(clave string, err error) {
 
 // puedeEscribir son las condiciones de TODA escritura: servicio, red y cuaderno abierto.
 func (p *Pantalla) puedeEscribir() bool {
-	return !p.migrando && p.svc != nil && p.hayRed() && p.activo.ID != "" && !p.activo.Crudo.ReadOnly
+	return p.vigente() && !p.migrando && p.svc != nil && p.hayRed() && p.activo.ID != "" && !p.activo.Crudo.ReadOnly
 }
 
 // baseNueva completa una nota nueva como la web: en la siguiente columna y, en el lienzo
@@ -214,12 +214,16 @@ func (p *Pantalla) crearCon(in api.NoteInput, despues func()) error {
 }
 
 func (p *Pantalla) crearEn(in api.NoteInput, cuaderno string, despues func()) error {
+	return p.crearEnConOriginal(in, cuaderno, despues, "")
+}
+
+func (p *Pantalla) crearEnConOriginal(in api.NoteInput, cuaderno string, despues func(), original string) error {
 	var c Cuaderno
 	var fallo error
 	var epoch uint64
 	var generacion string
 	listo := false
-	fyne.DoAndWait(func() {
+	p.enHiloEsperar(func() {
 		// `creando` corta el doble clic: dos «Nueva nota» seguidos eran dos notas.
 		if p.bloqueado && p.puedeEscribir() {
 			// Escribir en un cuaderno cerrado pide antes su contraseña, como la web.
@@ -232,8 +236,9 @@ func (p *Pantalla) crearEn(in api.NoteInput, cuaderno string, despues func()) er
 		p.creando, c, listo = true, p.activo, true
 		epoch, generacion = p.cryptoEpoch, p.generacionCrypto()
 		in = baseNueva(in, len(p.notas))
-		if fallo = p.cifrar(&in); fallo != nil {
+		if fallo = p.cifrarConOriginal(&in, original); fallo != nil {
 			p.creando, listo = false, false
+			p.fallo("note.saveFailed", fallo)
 		}
 	})
 	if !listo {
@@ -253,7 +258,7 @@ func (p *Pantalla) crearEn(in api.NoteInput, cuaderno string, despues func()) er
 		defer cancelar()
 		nueva, err = p.svc.CreateNote(ctx, c.ID, in)
 	}
-	enHilo(func() {
+	p.enHilo(func() {
 		if !p.cryptoVigente(epoch, generacion) {
 			return
 		}
@@ -302,7 +307,7 @@ func (p *Pantalla) llamar(id string, f func(context.Context, string) error, desp
 	if err := f(ctx, id); err != nil {
 		return err
 	}
-	enHilo(func() { despues(); p.Repintar() })
+	p.enHilo(func() { despues(); p.Repintar() })
 	return nil
 }
 
@@ -315,6 +320,18 @@ func (p *Pantalla) editar(id string, pa Parche, conHistorial bool) error {
 // del editor son UN paso de deshacer, y deshacerlo devuelve la nota a como estaba antes
 // de abrirla.
 func (p *Pantalla) editarCon(id string, pa Parche, conHistorial bool, fusion string) error {
+	ctx, cancel := p.ctx()
+	defer cancel()
+	_, err := p.editarConEntrada(ctx, id, pa, conHistorial, fusion, nil)
+	return err
+}
+
+func (p *Pantalla) editarConEntrada(ctx context.Context, id string, pa Parche, conHistorial bool, fusion string, preparada *api.NoteInput) (api.Note, error) {
+	return p.editarConEntradaConfirmada(ctx, id, pa, conHistorial, fusion, preparada, nil)
+}
+
+//nolint:gocognit,gocyclo // prepara, pinta, guarda sobre versión y confirma en un solo paso; partirlo separa la comprobación de época de lo que protege.
+func (p *Pantalla) editarConEntradaConfirmada(ctx context.Context, id string, pa Parche, conHistorial bool, fusion string, preparada *api.NoteInput, acknowledge func(context.Context, api.Note) error) (api.Note, error) {
 	var epoch uint64
 	var generacion string
 	var (
@@ -323,21 +340,33 @@ func (p *Pantalla) editarCon(id string, pa Parche, conHistorial bool, fusion str
 		c     string
 		listo bool
 		in    api.NoteInput
+		mia   api.Note
 		fallo error
 	)
-	fyne.DoAndWait(func() {
+	//nolint:contextcheck // Rendering installs future actions that use the retained presenter lifetime.
+	p.enHiloEsperar(func() {
+		if ctx.Err() != nil || (auth.RequestAuthorizationIntent(ctx) != nil && !p.suiteSigueVigente(ctx)) {
+			fallo = auth.ErrAuthorizationChanged
+			return
+		}
 		var ok bool
 		if n, ok = p.nota(id); !ok || !p.puedeEscribir() {
 			return
 		}
-		in, fallo = p.entradaEditada(n, pa)
+		if preparada != nil {
+			in = *preparada
+		} else {
+			in, fallo = p.entradaEditada(n, pa)
+		}
 		if fallo != nil {
+			p.fallo("note.saveFailed", fallo)
 			return
 		}
 		antes, c, listo = p.notas, p.activo.ID, true
 		epoch, generacion = p.cryptoEpoch, p.generacionCrypto()
 		// Se pinta ya lo que se va a guardar, EN CLARO: el criptograma es para el viaje.
-		vista := DeNota(pa.sobre(baseEnClaro(n)))
+		mia = pa.sobre(baseEnClaro(n))
+		vista := DeNota(mia)
 		vista.Crudo = n.Crudo
 		if pa.Tipo != nil {
 			vista.Crudo.Kind = *pa.Tipo
@@ -346,16 +375,22 @@ func (p *Pantalla) editarCon(id string, pa Parche, conHistorial bool, fusion str
 		p.Repintar()
 	})
 	if fallo != nil {
-		return fallo
+		return api.Note{}, fallo
 	}
 	if !listo {
-		return nil
+		return api.Note{}, nil
 	}
-	ctx, cancelar := p.ctx()
-	defer cancelar()
-	actualizada, err := p.svc.UpdateNote(ctx, id, n.Cuaderno, in)
-	enHilo(func() {
-		if p.activo.ID != c || !p.cryptoVigente(epoch, generacion) {
+	// Con la versión sobre la que se editó: si otro dispositivo ha guardado entretanto,
+	// no se le pisa y se pregunta (conflicto.go).
+	actualizada, otra, err := p.guardarSobreVersionConfirmada(ctx, n, in, acknowledge)
+	//nolint:contextcheck // Rendering installs future actions that use the retained presenter lifetime.
+	p.enHilo(func() {
+		if (auth.RequestAuthorizationIntent(ctx) != nil && !p.suiteVidaVigente(ctx)) || p.activo.ID != c || !p.cryptoVigente(epoch, generacion) {
+			return
+		}
+		if otra != nil {
+			// Lo escrito se queda en pantalla hasta que se decida.
+			p.abrirConflicto(&conflictoAbierto{id: id, cuaderno: c, vista: n.Crudo, in: in, mia: mia, otra: *otra})
 			return
 		}
 		if err != nil {
@@ -383,11 +418,11 @@ func (p *Pantalla) editarCon(id string, pa Parche, conHistorial bool, fusion str
 	// Una tarea que repite, recién hecha (o deshecha): el servicio ha creado (o retirado)
 	// la siguiente y le ha mudado los recordatorios, sean de quien sean. Se traen las dos
 	// cosas, como la web.
-	if err == nil && actualizada.RepeatedInto != nil {
+	if err == nil && otra == nil && actualizada.RepeatedInto != nil {
 		p.releerNotas(ctx)
-		p.cargarRecordatorios()
+		p.cargarRecordatoriosConContexto(ctx)
 	}
-	return err
+	return actualizada, err
 }
 
 // baseEnClaro es la nota de la que parte una escritura: la del servicio, con el título y
@@ -410,6 +445,10 @@ func (p *Pantalla) entradaEditada(n Nota, pa Parche) (api.NoteInput, error) {
 			return api.NoteInput{}, errBloqueado
 		}
 		in := pa.sobre(n.Crudo).Input()
+		// Do not send new clear links or erase legacy links with an empty patch.
+		if len(n.Crudo.Links) != 0 || len(in.Links) != 0 {
+			return api.NoteInput{}, api.ErrDatosCifradosNotas
+		}
 		in.ExpectedCrypto = p.activo.Crudo.Crypto
 		in.Cancelled = pa.Cancelada
 		return in, nil
@@ -417,7 +456,7 @@ func (p *Pantalla) entradaEditada(n Nota, pa Parche) (api.NoteInput, error) {
 	in := pa.sobre(baseEnClaro(n)).Input()
 	// `Input()` no lleva la cancelación (nil = «como está»): solo viaja si se cambia.
 	in.Cancelled = pa.Cancelada
-	if err := p.cifrar(&in); err != nil {
+	if err := p.cifrarConOriginal(&in, n.Crudo.ContentCipher); err != nil {
 		return api.NoteInput{}, err
 	}
 	return in, nil
@@ -459,7 +498,7 @@ func (p *Pantalla) colocarVarias(destinos []posicionNota, conHistorial bool) err
 		listo    bool
 		epoch    uint64
 	)
-	fyne.DoAndWait(func() {
+	p.enHiloEsperar(func() {
 		if !p.puedeEscribir() || len(destinos) == 0 {
 			return
 		}
@@ -486,7 +525,7 @@ func (p *Pantalla) colocarVarias(destinos []posicionNota, conHistorial bool) err
 			break
 		}
 	}
-	enHilo(func() {
+	p.enHilo(func() {
 		if p.activo.ID != c || p.cryptoEpoch != epoch {
 			return
 		}
@@ -539,7 +578,7 @@ func (p *Pantalla) borrar(id string, conHistorial bool) error {
 		c     string
 		listo bool
 	)
-	fyne.DoAndWait(func() {
+	p.enHiloEsperar(func() {
 		var ok bool
 		if n, ok = p.nota(id); !ok || !p.puedeEscribir() {
 			return
@@ -554,7 +593,7 @@ func (p *Pantalla) borrar(id string, conHistorial bool) error {
 	ctx, cancelar := p.ctx()
 	defer cancelar()
 	err := p.svc.DeleteNote(ctx, id)
-	enHilo(func() {
+	p.enHilo(func() {
 		if p.activo.ID != c {
 			return
 		}
@@ -601,7 +640,7 @@ func (p *Pantalla) moverACuaderno(id string, destino Cuaderno, conHistorial bool
 		fam    map[string]bool
 		listo  bool
 	)
-	fyne.DoAndWait(func() {
+	p.enHiloEsperar(func() {
 		if _, ok := p.nota(id); !ok || !p.puedeEscribir() {
 			return
 		}
@@ -618,7 +657,7 @@ func (p *Pantalla) moverACuaderno(id string, destino Cuaderno, conHistorial bool
 	ctx, cancelar := p.ctx()
 	defer cancelar()
 	err := p.svc.MoveNoteToNotebook(ctx, id, destino.ID)
-	enHilo(func() {
+	p.enHilo(func() {
 		if err != nil {
 			if p.activo.ID == origen.ID {
 				p.ponerNotas(antes)
@@ -671,10 +710,10 @@ func (p *Pantalla) contar(id string, delta int) {
 // duplicar es el `duplicarNota` de la web: una copia al lado, con sus datos y enlaces.
 func (p *Pantalla) duplicar(n Nota) error {
 	c := baseEnClaro(n)
-	return p.crear(api.NoteInput{
+	return p.crearEnConOriginal(api.NoteInput{
 		Kind: c.Kind, Title: c.Title, Content: c.Content, Data: c.Data, Links: c.Links,
 		Col: ptr(c.Col), X: ptr(c.X + 20), Y: ptr(c.Y + 20),
-	})
+	}, "", nil, n.Crudo.ContentCipher)
 }
 
 // nuevaDentro crea una nota agrupada bajo otra (`tree.newInside`).
@@ -693,8 +732,9 @@ func (p *Pantalla) sacar(n Nota) error {
 // `enArbol`, el de la fila de NoteTree.tsx, que es el mismo con «Renombrar» en su clave
 // del árbol.
 //
-// «Compartir en Rooms» va entre «Exportar» y «Qué apunta aquí», como en NoteCard.tsx y
-// NoteTree.tsx, si hay con qué (suite.go).
+// «Compartir en Rooms» va entre «Exportar» e «Información», como en NoteCard.tsx y
+// NoteTree.tsx, si hay con qué (suite.go); «Información» va justo antes de «Qué apunta
+// aquí», como en las dos de la web.
 func (p *Pantalla) menuNota(n Nota, enArbol bool) *ui.Menu {
 	t := p.tr.T
 	var el []fyne.CanvasObject
@@ -712,7 +752,7 @@ func (p *Pantalla) menuNota(n Nota, enArbol bool) *ui.Menu {
 	if n.Fijada {
 		fijar = "note.unpin"
 	}
-	entrada(fijar, func() { lanzar(func() error { return p.editar(n.ID, Parche{Fijada: ptr(!n.Fijada)}, true) }) })
+	entrada(fijar, func() { p.lanzar(func() error { return p.editar(n.ID, Parche{Fijada: ptr(!n.Fijada)}, true) }) })
 	if enArbol {
 		entrada("tree.rename", func() { p.renombrarEnArbol(n) })
 	} else {
@@ -720,10 +760,10 @@ func (p *Pantalla) menuNota(n Nota, enArbol bool) *ui.Menu {
 	}
 	// Duplicar y crear dentro escriben TEXTO, y en un cuaderno cifrado y cerrado no
 	// hay con qué cifrarlo: la web pide la contraseña, y aquí no se puede abrir.
-	entrada("note.duplicate", func() { lanzar(func() error { return p.duplicar(n) }) }).Inerte = p.bloqueado
-	entrada("tree.newInside", func() { lanzar(func() error { return p.nuevaDentro(n) }) }).Inerte = p.bloqueado
+	entrada("note.duplicate", func() { p.lanzar(func() error { return p.duplicar(n) }) }).Inerte = p.bloqueado
+	entrada("tree.newInside", func() { p.lanzar(func() error { return p.nuevaDentro(n) }) }).Inerte = p.bloqueado
 	if n.Grupo != "" {
-		entrada("tree.unnest", func() { lanzar(func() error { return p.sacar(n) }) })
+		entrada("tree.unnest", func() { p.lanzar(func() error { return p.sacar(n) }) })
 	}
 	// Mover y exportar no se ofrecen en un cuaderno cifrado —la clave no viaja al
 	// destino ni al fichero— ni, mover, si no hay otro cuaderno al que ir.
@@ -732,7 +772,7 @@ func (p *Pantalla) menuNota(n Nota, enArbol bool) *ui.Menu {
 	}
 	// «Añadir al calendario», como NoteCard.tsx: fuera de un cifrado, con escritura y
 	// con Calendar a mano.
-	if !p.activo.Cifrado && p.puedeEscribir() && p.Suite != nil && p.Suite.Calendar != nil {
+	if p.permiteEnviarContenidoExterno(p.activo.ID, n) && p.puedeEscribir() && p.Suite != nil && p.Suite.Calendar != nil {
 		entrada("event.create", func() { p.crearEvento(n) })
 	}
 	if !p.activo.Cifrado {
@@ -742,15 +782,16 @@ func (p *Pantalla) menuNota(n Nota, enArbol bool) *ui.Menu {
 	if p.puedeCompartirNota(n) {
 		entrada("sharePeople.open", func() { p.compartirNota(n) })
 	}
-	if p.ofreceCompartir() {
+	if p.permiteEnviarContenidoExterno(p.activo.ID, n) && p.ofreceCompartir() {
 		entrada("share.toRoom", func() { p.compartirEnSala(n) })
 	}
+	entrada("note.info", func() { p.dialogoInformacion(n) })
 	entrada("backlinks.title", func() { p.dialogoRetroenlaces(n) })
 	if !enArbol {
 		entrada("note.attach", func() { p.adjuntar(n) })
 	}
 	el = append(el, ui.NuevoSeparadorMenu())
-	entrada("note.delete", func() { lanzar(func() error { return p.borrar(n.ID, true) }) }).Peligro = true
+	entrada("note.delete", func() { p.lanzar(func() error { return p.borrar(n.ID, true) }) }).Peligro = true
 
 	m := ui.NuevoMenu(el...)
 	m.Rotulo = t("common.more", nil)
@@ -770,7 +811,7 @@ func (p *Pantalla) entradasDeTarea(n Nota, enArbol bool, entrada func(clave stri
 			cancelar = "task.reopen"
 		}
 		entrada(cancelar, func() {
-			lanzar(func() error { return p.editar(n.ID, Parche{Cancelada: ptr(!n.Cancelada)}, true) })
+			p.lanzar(func() error { return p.editar(n.ID, Parche{Cancelada: ptr(!n.Cancelada)}, true) })
 		})
 	}
 	if !enArbol && p.puedeConvertir(n) {
@@ -794,7 +835,7 @@ func (p *Pantalla) renombrar(n Nota) {
 		nuevo := strings.TrimSpace(s)
 		cerrar()
 		if nuevo != n.Titulo {
-			lanzar(func() error { return p.editar(n.ID, Parche{Titulo: &nuevo}, true) })
+			p.lanzar(func() error { return p.editar(n.ID, Parche{Titulo: &nuevo}, true) })
 		}
 	}
 	c.AlCancelar = cerrar
@@ -820,7 +861,7 @@ func (p *Pantalla) renombrarEnArbol(n Nota) {
 		nuevo := strings.TrimSpace(s)
 		cerrar()
 		if nuevo != "" && nuevo != actual {
-			lanzar(func() error { return p.editar(n.ID, Parche{Titulo: &nuevo}, true) })
+			p.lanzar(func() error { return p.editar(n.ID, Parche{Titulo: &nuevo}, true) })
 		}
 	}
 	c.AlCancelar = cerrar
@@ -895,12 +936,16 @@ func (p *Pantalla) descargar(nombre string, cuerpo io.Reader) {
 // guardarCuaderno es el `guardarCuaderno` de la web: crea (`id` vacío) o cambia, vuelve
 // a cargar el árbol y abre el cuaderno guardado.
 func (p *Pantalla) guardarCuaderno(id string, in api.NotebookInput) error {
-	return p.guardarCuadernoCon(id, in, "note.saveFailed")
+	return p.guardarCuadernoCon(id, in, "note.saveFailed", true)
 }
 
 // guardarCuadernoCon es guardarCuaderno con la clave del aviso si falla: «Mover
 // cuaderno a…» dice `move.failed`, como en la web, y no «no se ha podido guardar».
-func (p *Pantalla) guardarCuadernoCon(id string, in api.NotebookInput, fallo string) error {
+//
+// `abrir` es si el guardado, cuando NO es el abierto, pasa a serlo. Mover no abre: desde
+// el «…» del árbol se mueve uno que no está abierto, y la web (`aplicarPlanDeCuadernos`)
+// solo recoloca el árbol y deja abierto el que estaba.
+func (p *Pantalla) guardarCuadernoCon(id string, in api.NotebookInput, fallo string, abrir bool) error {
 	if p.svc == nil || !p.hayRed() {
 		return nil
 	}
@@ -920,7 +965,7 @@ func (p *Pantalla) guardarCuadernoCon(id string, in api.NotebookInput, fallo str
 		return err
 	}
 	c := DeCuaderno(nb)
-	enHilo(func() {
+	p.enHilo(func() {
 		if c.ID == p.activo.ID {
 			// El MISMO cuaderno: se cambian sus ajustes sin volver a cargar sus notas,
 			// que es lo que hace la web (su efecto de carga mira `activo.id`).
@@ -928,7 +973,9 @@ func (p *Pantalla) guardarCuadernoCon(id string, in api.NotebookInput, fallo str
 			p.Repintar()
 			return
 		}
-		p.abrirCuaderno(c)
+		if abrir {
+			p.abrirCuaderno(c)
+		}
 	})
 	p.cargarCuadernos()
 	return nil
@@ -946,7 +993,7 @@ func (p *Pantalla) borrarCuaderno(c Cuaderno) {
 		return
 	}
 	p.olvidarClave(c.ID) // su clave recordada ya no abre nada
-	enHilo(func() {
+	p.enHilo(func() {
 		if p.activo.ID == c.ID {
 			p.activo, p.notas, p.lienzo.Seleccionada = Cuaderno{}, nil, ""
 		}
@@ -972,7 +1019,7 @@ func (p *Pantalla) avisarConDeshacer(titulo string, paso uint64) {
 
 func (p *Pantalla) historia(f func() (string, error), hecho string) {
 	etiqueta, err := f()
-	enHilo(func() {
+	p.enHilo(func() {
 		switch {
 		case err != nil:
 			p.fallo("note.saveFailed", err)

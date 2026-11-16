@@ -23,6 +23,8 @@ import {
   EmptyState,
   Input,
   useSondeo,
+  Stat,
+  type StatTone,
 } from '@sytue/ui';
 import { formatDateTime, type Locale } from '@sytue/i18n';
 import type { T } from '../i18n/index.js';
@@ -53,33 +55,12 @@ async function call(path: string): Promise<Response> {
   return res;
 }
 
-/** Cifra de cabecera. El tono avisa sin gritar: solo se enciende si hay algo. */
-function Kpi({
-  label,
-  value,
-  tone = 'neutral',
-  hint,
-}: {
-  label: string;
-  value: number | string;
-  tone?: 'neutral' | 'danger' | 'warning';
-  hint?: string;
-}) {
-  const color =
-    tone === 'danger' && value !== 0
-      ? 'text-danger-text'
-      : tone === 'warning' && value !== 0
-        ? 'text-warning-text'
-        : 'text-text';
-  return (
-    <Card raised={false}>
-      <CardBody>
-        <p class="text-text-muted truncate text-sm">{label}</p>
-        <p class={`sytue-h3 mt-1 tabular-nums ${color}`}>{value}</p>
-        {hint ? <p class="sytue-meta mt-0.5">{hint}</p> : null}
-      </CardBody>
-    </Card>
-  );
+/**
+ * El tono de una cifra de cabecera: avisa sin gritar, solo se enciende si hay algo.
+ * Sin datos todavía (la raya) tampoco: un «—» en rojo parece un error.
+ */
+function encender(valor: number | undefined, tono: StatTone): StatTone {
+  return valor !== undefined && valor > 0 ? tono : 'neutral';
 }
 
 /**
@@ -259,18 +240,26 @@ export default function LogsPanel({ locale, t }: { locale: Locale; t: T }) {
   return (
     <div class="flex flex-col gap-4">
       <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Kpi
+        <Stat
           label={t('logs.kpi.errors1h')}
           value={stats?.errors_1h ?? '—'}
-          tone="danger"
+          tone={encender(stats?.errors_1h, 'danger')}
           hint={t('logs.kpi.errors1hHint')}
         />
-        <Kpi label={t('logs.kpi.errors24h')} value={stats?.errors_24h ?? '—'} tone="danger" />
-        <Kpi label={t('logs.kpi.warns24h')} value={stats?.warns_24h ?? '—'} tone="warning" />
-        <Kpi
+        <Stat
+          label={t('logs.kpi.errors24h')}
+          value={stats?.errors_24h ?? '—'}
+          tone={encender(stats?.errors_24h, 'danger')}
+        />
+        <Stat
+          label={t('logs.kpi.warns24h')}
+          value={stats?.warns_24h ?? '—'}
+          tone={encender(stats?.warns_24h, 'warning')}
+        />
+        <Stat
           label={t('logs.kpi.services')}
           value={stats?.services_affected ?? '—'}
-          tone="danger"
+          tone={encender(stats?.services_affected, 'danger')}
           hint={t('logs.kpi.servicesHint')}
         />
       </div>

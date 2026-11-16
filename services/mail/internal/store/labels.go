@@ -168,10 +168,10 @@ func (s *Store) ApplyLabel(ctx context.Context, accountID, id uuid.UUID, message
 // ListMessagesByLabel pagina por KEYSET los mensajes con una etiqueta (across
 // carpetas, como la vista de etiqueta de Gmail), más recientes primero. Filtra
 // por account_id (owner) + membresía del keyword en flags (índice GIN). El cursor
-// (before, beforeID) es el (received_at, id) del último visto; cero = primera
+// (before, beforeID) es la (fecha de orden, id) del último visto; cero = primera
 // página. Mismo contrato que ListMessages.
 //
-// ponytail: el orden received_at DESC lo resuelve un sort sobre las filas que casa
+// ponytail: el orden por fecha de orden DESC lo resuelve un sort sobre las filas que casa
 // el GIN (no un índice ordenado), coste ~proporcional al tamaño de la etiqueta por
 // página, no O(1) como el listado de carpeta. Suficiente a escala de etiqueta
 // (subconjunto del buzón); si una sola etiqueta debe keyset sobre millones,
@@ -183,13 +183,13 @@ func (s *Store) ListMessagesByLabel(ctx context.Context, accountID, id uuid.UUID
 	kw := id.String()
 	q := selectMessageCols + `
 		  AND account_id = $1 AND flags @> ARRAY[$2] AND deleted_at IS NULL
-		ORDER BY received_at DESC, id DESC LIMIT $3`
+		ORDER BY ` + ordenLista + ` DESC, id DESC LIMIT $3`
 	args := []any{accountID, kw, limit}
 	if !before.IsZero() {
 		q = selectMessageCols + `
 			  AND account_id = $1 AND flags @> ARRAY[$2] AND deleted_at IS NULL
-			  AND received_at <= $4 AND (received_at, id) < ($4, $5)
-			ORDER BY received_at DESC, id DESC LIMIT $3`
+			  AND ` + ordenLista + ` <= $4 AND (` + ordenLista + `, id) < ($4, $5)
+			ORDER BY ` + ordenLista + ` DESC, id DESC LIMIT $3`
 		args = append(args, before, beforeID)
 	}
 	var out []domain.Message

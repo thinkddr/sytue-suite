@@ -7,11 +7,13 @@ import (
 	"strings"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/widget"
 
 	"git.sytue.eu/sytue/one/apps/fyne/editor"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/formula"
 )
 
@@ -48,14 +50,20 @@ type Rejilla struct {
 	Contexto *editor.Contexto
 
 	L *Libro
-	// Cols y Fils son el tamaño de la rejilla. Nacen en los 26×100 de la web
-	// (`COLS`/`ROWS`) y son campos, no constantes, por una razón concreta: para poder
-	// MEDIR que el coste de pintar no depende de ellos, que es lo único que significa
-	// virtualizar. Ver `BenchmarkRejilla`.
+	// Cols y Fils son la EXTENSIÓN de la rejilla (`extension()` de la web): lo usado, la
+	// selección y lo que se ve, con la rejilla mínima de 26×100 de holgura por delante,
+	// hasta los límites de Excel. Los recalcula `crecer` al desplazarse, al seleccionar
+	// y al pintar; lo que se pinta son solo las visibles, sea cual sea su tamaño (ver
+	// `BenchmarkRejilla`).
 	Cols, Fils int
 	// resaltes son las celdas con alguna coincidencia de «Buscar», que se pintan de
 	// amarillo como en la web; las pone la búsqueda.
 	resaltes map[Celda]bool
+	// comentarios son los hilos del libro, que marcan sus celdas con un triángulo, y
+	// resalteComentario, el ancla del hilo con el puntero encima en el panel (nil: ninguno).
+	// Ver comentarios.go.
+	comentarios       []api.DocComment
+	resalteComentario *api.AnclaCelda
 	// SoloLectura es la hoja protegida de la web (`sheet.protect`): se ve, se recorre
 	// y se copia, pero no se escribe. Es el estado de «permiso denegado» del lienzo.
 	SoloLectura bool
@@ -66,6 +74,13 @@ type Rejilla struct {
 	// AlDeshacer es Ctrl+Z (false) y Ctrl+Y o Ctrl+Mayús+Z (true). Lo atiende el lienzo,
 	// porque deshacer puede cambiar de hoja o quitar una, y eso toca las tres piezas.
 	AlDeshacer func(rehacer bool)
+	// AlAtajos es Ctrl+/: abre la hoja de atajos, que es del lienzo (necesita el traductor).
+	AlAtajos func()
+	// AlIrA es Ctrl+G o F5, «Ir a»: lleva el foco al cuadro de nombres de la barra.
+	AlIrA func()
+	// AlAbrirEnlace sustituye al sistema al abrir el enlace de una celda (pruebas). Sin
+	// él, el enlace va al navegador o al correo por las puertas de `api` (`enlaces.go`).
+	AlAbrirEnlace func(href string)
 	// Zoom es el `zoom` de CSS con el que la web escala la rejilla entera, cabeceras
 	// incluidas: 1 es el 100 %. Cero cuenta como 1.
 	Zoom float32
@@ -96,6 +111,10 @@ type Rejilla struct {
 	// AlPulsarFuera cierra lo que cuelgue de la rejilla (la lista de valores) al pulsar
 	// en otra parte o con Escape; devuelve si había algo que cerrar.
 	AlPulsarFuera func() bool
+	// AlMenu abre el menú contextual de una variante (`menuCeldas`, `menuColumnas` o
+	// `menuFilas`) colgando de `ancla`; lo pone el lienzo, que es quien sabe los comandos.
+	// Sin él, el clic derecho y Mayús+F10 no hacen nada.
+	AlMenu func(variante int, ancla fyne.CanvasObject)
 
 	sel          Celda
 	ext          *Celda // extremo del rango; nil si solo hay celda ancla
@@ -105,9 +124,18 @@ type Rejilla struct {
 	arrastre     int // la zona donde empezó el arrastre, o zonaFuera
 	señalando    bool
 	mayRaton     bool // Mayús en la última pulsación del ratón
+	ctrlRaton    bool // Ctrl (⌘ en el Mac) en la última pulsación: abre el enlace de la celda
 	autoArrastre ui.AutoScrollArrastre
 	cancelado    bool // ignora movimientos tardíos hasta DragEnd
 	arrastrando  bool
+	// tirador es lo que lleva el dedo en un arrastre táctil, y agarre, lo que el dedo queda
+	// de la esquina del tirador (`tactil.go`).
+	tirador int
+	agarre  fyne.Position
+	// medida es el arrastre del asa del borde de una cabecera (`redimensionar.go`), y
+	// puntero, dónde está el ratón (nil fuera): de él sale el cursor de redimensionar.
+	medida  *gestoMedida
+	puntero *fyne.Position
 	// El autorrelleno: arrastrando el asa, el rango de origen y el que se va a rellenar.
 	rellenando bool
 	origenRell [4]int
@@ -123,27 +151,30 @@ type Rejilla struct {
 	ed      *ui.EditorPlano
 	r       *rejillaRenderer
 	copiado *copia
+	// anclaMenu es el punto transparente del que cuelga el menú contextual.
+	anclaMenu *canvas.Rectangle
 }
 
 var (
-	_ fyne.Widget         = (*Rejilla)(nil)
-	_ fyne.Tappable       = (*Rejilla)(nil)
-	_ fyne.DoubleTappable = (*Rejilla)(nil)
-	_ fyne.Focusable      = (*Rejilla)(nil)
-	_ fyne.Scrollable     = (*Rejilla)(nil)
-	_ fyne.Draggable      = (*Rejilla)(nil)
-	_ fyne.Accessible     = (*Rejilla)(nil)
-	_ fyne.Shortcutable   = (*Rejilla)(nil)
-	_ fyne.Tabbable       = (*Rejilla)(nil)
-	_ desktop.Keyable     = (*Rejilla)(nil)
-	_ desktop.Cursorable  = (*Rejilla)(nil)
-	_ desktop.Mouseable   = (*Rejilla)(nil)
-	_ desktop.Hoverable   = (*Rejilla)(nil)
+	_ fyne.Widget            = (*Rejilla)(nil)
+	_ fyne.Tappable          = (*Rejilla)(nil)
+	_ fyne.DoubleTappable    = (*Rejilla)(nil)
+	_ fyne.SecondaryTappable = (*Rejilla)(nil)
+	_ fyne.Focusable         = (*Rejilla)(nil)
+	_ fyne.Scrollable        = (*Rejilla)(nil)
+	_ fyne.Draggable         = (*Rejilla)(nil)
+	_ fyne.Accessible        = (*Rejilla)(nil)
+	_ fyne.Shortcutable      = (*Rejilla)(nil)
+	_ fyne.Tabbable          = (*Rejilla)(nil)
+	_ desktop.Keyable        = (*Rejilla)(nil)
+	_ desktop.Cursorable     = (*Rejilla)(nil)
+	_ desktop.Mouseable      = (*Rejilla)(nil)
+	_ desktop.Hoverable      = (*Rejilla)(nil)
 )
 
 // NuevaRejilla crea la cuadrícula de ese libro.
 func NuevaRejilla(l *Libro) *Rejilla {
-	r := &Rejilla{L: l, Cols: Columnas, Fils: Filas}
+	r := &Rejilla{L: l, Cols: MinColumnas, Fils: MinFilas, anclaMenu: nuevaAnclaMenu()}
 	r.ExtendBaseWidget(r)
 	r.ed = ui.NuevoEditorPlano(EscalonCelda, nil)
 	r.ed.Tecla = r.teclaEnEdicion
@@ -170,12 +201,17 @@ func (r *Rejilla) Editando() bool { return r.editando }
 // Seleccionar mueve la celda ancla (o extiende el rango hasta ahí) y la trae a la
 // vista.
 func (r *Rejilla) Seleccionar(c, f int, extender bool) {
-	c, f = clamp(c, r.Cols-1), clamp(f, r.Fils-1)
+	c, f = clamp(c, MaxColumnas-1), clamp(f, MaxFilas-1)
 	if extender {
 		r.ext = &Celda{C: c, F: f}
 	} else {
+		// Una celda cubierta por una combinada es su ancla: no se selecciona ni se escribe.
+		if u, ok := r.L.FusionEn(c, f); ok {
+			c, f = u.C1, u.F1
+		}
 		r.sel, r.ext = Celda{C: c, F: f}, nil
 	}
+	r.crecer(r.desX, r.desY) // la selección empuja la extensión: la celda tiene que existir
 	r.aLaVista(c, f)
 	if r.AlMoverse != nil {
 		r.AlMoverse()
@@ -252,7 +288,9 @@ func (r *Rejilla) Confirmar(dc, df int) {
 		return
 	}
 	r.recuperarFoco()
-	r.Seleccionar(r.sel.C+dc, r.sel.F+df, false)
+	// Intro y Tab desde una combinada salen de ella entera, como las flechas.
+	d := moverPorFusiones(r.L.Fusiones(), r.sel, dc, df, MaxColumnas-1, MaxFilas-1)
+	r.Seleccionar(d.C, d.F, false)
 }
 
 // guardarEdicion cierra la celda abierta guardando lo escrito, sin mover la selección ni
@@ -347,9 +385,29 @@ func (r *Rejilla) Scrolled(e *fyne.ScrollEvent) {
 // cambia al hacer zoom.
 func (r *Rejilla) Desplazar(dx, dy float32) {
 	z := r.z()
+	// Primero la extensión hasta donde se quiere llegar, y luego los topes: así la rueda
+	// sigue bajando pasada la fila 100, como en la web, en vez de chocar con la rejilla.
+	r.crecer(max(r.desX+dx/z, 0), max(r.desY+dy/z, 0))
 	r.desX = clampF(r.desX+dx/z, 0, r.maxDesX())
 	r.desY = clampF(r.desY+dy/z, 0, r.maxDesY())
 	r.Refresh()
+}
+
+// crecer recalcula la extensión (Cols, Fils) con la vista desplazada a (desX, desY).
+// La vista va en filas y columnas DE LA HOJA, no en puestos de pantalla: con filas
+// ocultas por el filtro o el esquema, lo que se ve llega más abajo de lo que mide.
+func (r *Rejilla) crecer(desX, desY float32) {
+	uc, uf := r.L.Usado()
+	pc, pf := r.sel.C+1, r.sel.F+1
+	if r.ext != nil {
+		pc, pf = max(pc, r.ext.C+1), max(pf, r.ext.F+1)
+	}
+	t, z := r.Size(), r.z()
+	mc, m := r.mapaCols(), r.mapa()
+	der := mc.fila(mc.puestosHasta(desX + t.Width/z))
+	abajo := m.fila(m.puestosHasta(desY + t.Height/z))
+	vista := Vista{W: float32(der) * AnchoCelda, H: float32(abajo) * AltoCelda}
+	r.Cols, r.Fils = extension(uc, uf, pc, pf, vista, AnchoCelda, AltoCelda)
 }
 
 // maxDesX y maxDesY son los topes: la hoja entera cabe justo en la ventana. Las
@@ -357,20 +415,27 @@ func (r *Rejilla) Desplazar(dx, dy float32) {
 // alteran lo que mide el contenido—.
 func (r *Rejilla) maxDesX() float32 {
 	cx, _ := r.canal()
-	return max(float32(r.mapaCols().puesto(r.Cols))*AnchoCelda+AnchoCabecera+cx-r.Size().Width/r.z(), 0)
+	return max(r.mapaCols().borde(r.Cols)+AnchoCabecera+cx-r.Size().Width/r.z(), 0)
 }
 
 func (r *Rejilla) maxDesY() float32 {
 	_, cy := r.canal()
-	return max(float32(r.mapa().puesto(r.Fils))*AltoCelda+AltoCelda+cy-r.Size().Height/r.z(), 0)
+	return max(r.mapa().borde(r.Fils)+AltoCelda+cy-r.Size().Height/r.z(), 0)
 }
 
-// mapa son las filas que se ven en la hoja activa: sin las que esconden el autofiltro y
-// el esquema.
-func (r *Rejilla) mapa() mapaFilas { return nuevoMapaFilas(r.L.FilasOcultas()) }
+// mapa son las filas que se ven en la hoja activa —sin las que esconden el autofiltro y
+// el esquema— con sus altos propios.
+func (r *Rejilla) mapa() eje {
+	_, altos := r.L.Medidas()
+	return nuevoEje(nuevoMapaFilas(r.L.FilasOcultas()), r.conPrevia(false, altos), AltoCelda, AltoMax)
+}
 
-// mapaCols son las columnas que se ven: sin las de un grupo contraído.
-func (r *Rejilla) mapaCols() mapaFilas { return nuevoMapaFilas(r.L.ColumnasOcultas()) }
+// mapaCols son las columnas que se ven —sin las de un grupo contraído— con sus anchos
+// propios.
+func (r *Rejilla) mapaCols() eje {
+	anchos, _ := r.L.Medidas()
+	return nuevoEje(nuevoMapaFilas(r.L.ColumnasOcultas()), r.conPrevia(true, anchos), AnchoCelda, AnchoMax)
+}
 
 // z es el zoom, con el cero tapado.
 func (r *Rejilla) z() float32 {
@@ -400,13 +465,13 @@ func (r *Rejilla) aLaVista(c, f int) {
 	cx, cy := r.canal()
 	if c >= fc {
 		mc := r.mapaCols()
-		x := float32(mc.puesto(c)) * AnchoCelda
-		r.desX = clampF(r.desX, x+AnchoCelda+AnchoCabecera+cx-t.Width/z, x-float32(mc.puesto(fc))*AnchoCelda)
+		x := mc.borde(c)
+		r.desX = clampF(r.desX, x+mc.medida(c)+AnchoCabecera+cx-t.Width/z, x-mc.borde(fc))
 	}
 	if f >= ff {
 		m := r.mapa()
-		y := float32(m.puesto(f)) * AltoCelda
-		r.desY = clampF(r.desY, y+AltoCelda+AltoCelda+cy-t.Height/z, y-float32(m.puesto(ff))*AltoCelda)
+		y := m.borde(f)
+		r.desY = clampF(r.desY, y+m.medida(f)+AltoCelda+cy-t.Height/z, y-m.borde(ff))
 	}
 	r.desX, r.desY = clampF(r.desX, 0, r.maxDesX()), clampF(r.desY, 0, r.maxDesY())
 }
@@ -425,9 +490,9 @@ func (r *Rejilla) colEn(x float32) int {
 	fc, _ := r.fijas()
 	cx, _ := r.canal()
 	m := r.mapaCols()
-	i := int((x - AnchoCabecera - cx) / AnchoCelda)
+	i := m.puestoEn(x - AnchoCabecera - cx)
 	if i >= m.puesto(fc) {
-		i = int((x - AnchoCabecera - cx + r.desX) / AnchoCelda)
+		i = m.puestoEn(x - AnchoCabecera - cx + r.desX)
 	}
 	return m.fila(i)
 }
@@ -437,9 +502,9 @@ func (r *Rejilla) filaEn(y float32) int {
 	_, ff := r.fijas()
 	_, cy := r.canal()
 	m := r.mapa()
-	i := int((y - AltoCelda - cy) / AltoCelda)
+	i := m.puestoEn(y - AltoCelda - cy)
 	if i >= m.puesto(ff) {
-		i = int((y - AltoCelda - cy + r.desY) / AltoCelda)
+		i = m.puestoEn(y - AltoCelda - cy + r.desY)
 	}
 	return m.fila(i)
 }
@@ -515,8 +580,20 @@ func (r *Rejilla) celdaEn(p fyne.Position) (Celda, bool) {
 // foco al editor, que es justo después.
 func (r *Rejilla) MouseDown(e *desktop.MouseEvent) {
 	r.mayRaton = e.Modifier&fyne.KeyModifierShift != 0
+	// Solo Ctrl/⌘ a secas, como la web: Ctrl+Mayús o Ctrl+Alt+clic no abren el enlace.
+	r.ctrlRaton = e.Modifier&(fyne.KeyModifierControl|fyne.KeyModifierSuper) != 0 &&
+		e.Modifier&(fyne.KeyModifierShift|fyne.KeyModifierAlt) == 0
 	r.señalando, r.rellenando, r.destRell = false, false, nil
+	// El botón secundario abre el menú (TappedSecondary): ni señala una referencia para
+	// la fórmula ni empieza a arrastrar el asa.
+	if e.Button == desktop.MouseButtonSecondary {
+		return
+	}
 	if zona, _ := r.zonaEn(e.Position); zona == zonaValores || zona == zonaFiltro || zona == zonaEsquema {
+		return
+	}
+	// El borde de una cabecera es su asa de medida: arrastrar redimensiona, no selecciona.
+	if r.empezarMedida(e.Position) {
 		return
 	}
 	if !r.editando && !r.SoloLectura && r.enAsa(e.Position) {
@@ -554,13 +631,22 @@ func (r *Rejilla) señalado() bool {
 // extiende el rango); la cabecera de una columna o de una fila, la columna o la fila
 // ENTERA; y la esquina, la hoja completa.
 func (r *Rejilla) Tapped(e *fyne.PointEvent) {
-	defer func() { r.mayRaton = false }()
+	ctrl := r.ctrlRaton
+	defer func() { r.mayRaton, r.ctrlRaton = false, false }()
 	if r.señalado() {
+		return
+	}
+	if r.medida != nil { // pulsar el borde sin arrastrar no selecciona nada, como en Excel
+		r.medida = nil
 		return
 	}
 	if r.rellenando { // pulsar el asa sin arrastrar no hace nada
 		r.rellenando, r.destRell = false, nil
 		r.Refresh()
+		return
+	}
+	// Tocar un tirador sin arrastrarlo no deshace el rango que lleva.
+	if esMovil() && r.tiradorEn(e.Position) != tiradorNinguno {
 		return
 	}
 	zona, c := r.zonaEn(e.Position)
@@ -589,6 +675,15 @@ func (r *Rejilla) Tapped(e *fyne.PointEvent) {
 		r.Confirmar(0, 0)
 	}
 	r.recuperarFoco()
+	// Ctrl/⌘+clic sobre un enlace lo abre (Excel, Sheets y la web); el clic solo selecciona,
+	// para poder seguir editando la celda sin salir disparado al navegador.
+	if zona == zonaCelda && ctrl && r.L.Enlace(c.C, c.F) != "" {
+		if r.L.Seleccionable(c.C, c.F) {
+			r.Seleccionar(c.C, c.F, false)
+		}
+		r.AbrirEnlace(c.C, c.F)
+		return
+	}
 	r.pulsar(zona, c)
 }
 
@@ -612,8 +707,8 @@ func (r *Rejilla) botonValores() (fyne.Position, fyne.Size, bool) {
 		return fyne.Position{}, fyne.Size{}, false
 	}
 	vw := r.vista()
-	return fyne.NewPos(vw.x(r.sel.C)+vw.ancho()-AnchoBotonValores*vw.z, vw.y(r.sel.F)),
-		fyne.NewSize(AnchoBotonValores*vw.z, vw.alto()), true
+	return fyne.NewPos(vw.x(r.sel.C)+vw.ancho(r.sel.C)-AnchoBotonValores*vw.z, vw.y(r.sel.F)),
+		fyne.NewSize(AnchoBotonValores*vw.z, vw.alto(r.sel.F)), true
 }
 
 // pulsar es lo que hace un clic en cada zona. El ancla de una columna entera baja a la
@@ -652,7 +747,16 @@ func (r *Rejilla) pulsar(zona int, c Celda) {
 }
 
 // DoubleTapped abre la celda para escribir, igual que el doble clic de la web.
+//
+// Sobre el borde de una cabecera, ajusta esa columna o esa fila a lo escrito.
 func (r *Rejilla) DoubleTapped(e *fyne.PointEvent) {
+	r.medida = nil
+	if col, i, ok := r.asaMedidaEn(e.Position); ok {
+		if !r.SoloLectura {
+			r.redimensionar(col, i, medidaPedida{auto: true})
+		}
+		return
+	}
 	if c, ok := r.celdaEn(e.Position); ok {
 		r.Seleccionar(c.C, c.F, false)
 		r.Editar("")
@@ -665,6 +769,17 @@ func (r *Rejilla) DoubleTapped(e *fyne.PointEvent) {
 func (r *Rejilla) Dragged(e *fyne.DragEvent) {
 	if r.cancelado {
 		return
+	}
+	if r.medida != nil {
+		r.arrastrando = true
+		r.arrastrarMedida(e.Position)
+		return
+	}
+	// Con el dedo, arrastrar desplaza la hoja y el rango se marca con sus tiradores.
+	if esMovil() && !r.rellenando && !r.señalando {
+		if e = r.arrastrarTactil(e); e == nil {
+			return
+		}
 	}
 	r.arrastrarRango(e)
 	if r.arrastre == zonaFuera && !r.rellenando && !r.señalando {
@@ -724,6 +839,9 @@ func (r *Rejilla) arrastrarRango(e *fyne.DragEvent) {
 	} else {
 		r.ext = &hasta
 	}
+	if r.tirador == tiradorInicio {
+		r.recogerEnFusion()
+	}
 	if r.AlMoverse != nil {
 		r.AlMoverse()
 	}
@@ -733,9 +851,13 @@ func (r *Rejilla) arrastrarRango(e *fyne.DragEvent) {
 // DragEnd suelta el arrastre: el rango ya está puesto.
 func (r *Rejilla) DragEnd() {
 	r.autoArrastre.Parar()
-	r.arrastrando = false
+	r.arrastrando, r.tirador = false, tiradorSinDecidir
 	if r.cancelado {
 		r.cancelado = false
+		return
+	}
+	if r.medida != nil {
+		r.soltarMedida()
 		return
 	}
 	r.arrastre, r.mayRaton = zonaFuera, false
@@ -749,6 +871,14 @@ func (r *Rejilla) DragEnd() {
 // cerrar una celda que se estuviera editando.
 func (r *Rejilla) CancelarArrastre() {
 	r.autoArrastre.Parar()
+	r.tirador = tiradorSinDecidir
+	if r.medida != nil { // la medida vuelve a la de antes: no se guardó nada
+		r.medida = nil
+		r.cancelado = r.cancelado || r.arrastrando
+		r.arrastrando = false
+		r.Refresh()
+		return
+	}
 	if r.arrastre == zonaFuera && !r.rellenando && !r.señalando {
 		return
 	}
@@ -765,7 +895,7 @@ func (r *Rejilla) vista() vista {
 	cx, cy := r.canal()
 	return vista{
 		z: r.z(), fc: fc, ff: ff, desX: r.desX * r.z(), desY: r.desY * r.z(), filas: r.mapa(),
-		cols: r.mapaCols(), cx: cx, cy: cy,
+		cols: r.mapaCols(), cx: cx, cy: cy, fus: r.L.Fusiones(),
 	}
 }
 
@@ -780,7 +910,10 @@ const (
 func (r *Rejilla) asa() (fyne.Position, float32) {
 	vw := r.vista()
 	_, _, c2, f2 := r.Rango()
-	return fyne.NewPos(vw.x(c2+1)-RetiroAsa*vw.z, vw.y(f2)+vw.alto()-RetiroAsa*vw.z), LadoAsa * vw.z
+	if u, ok := r.L.FusionEn(r.sel.C, r.sel.F); ok && r.ext == nil {
+		c2, f2 = u.C2, u.F2 // el asa va en la esquina de la combinada, que es lo que se ve
+	}
+	return fyne.NewPos(vw.x(c2+1)-RetiroAsa*vw.z, vw.y(f2)+vw.alto(f2)-RetiroAsa*vw.z), LadoAsa * vw.z
 }
 
 func (r *Rejilla) enAsa(p fyne.Position) bool {
@@ -830,8 +963,14 @@ func (r *Rejilla) soltarAsa() {
 	r.Refresh()
 }
 
-// Cursor es la cruz de una hoja de cálculo (`cursor-cell`).
-func (r *Rejilla) Cursor() desktop.Cursor { return desktop.CrosshairCursor }
+// Cursor es la cruz de una hoja de cálculo (`cursor-cell`), salvo sobre el borde de una
+// cabecera, que es el de redimensionar (`cursor-col-resize`, `cursor-row-resize`).
+func (r *Rejilla) Cursor() desktop.Cursor {
+	if c, ok := r.cursorMedida(); ok {
+		return c
+	}
+	return desktop.CrosshairCursor
+}
 
 // ---- teclado ----
 
@@ -869,6 +1008,11 @@ func (r *Rejilla) KeyUp(k *fyne.KeyEvent) {
 
 // TypedRune empieza a editar con lo tecleado, como en Excel y en la web.
 func (r *Rejilla) TypedRune(ru rune) {
+	// Mayús+Espacio marca las filas enteras (Excel): sin esto empezaba a escribir un espacio.
+	if ru == ' ' && r.mayus() {
+		r.SeleccionarEnteras(true)
+		return
+	}
 	if ru >= ' ' {
 		r.Editar(string(ru))
 	}
@@ -894,6 +1038,9 @@ func (r *Rejilla) mayus() bool {
 func (r *Rejilla) TypedKey(k *fyne.KeyEvent) {
 	if k.Name == fyne.KeyEscape {
 		r.CancelarArrastre()
+	}
+	if r.teclaMenu(k) {
+		return
 	}
 	ext := r.mayus()
 	base := r.sel
@@ -930,6 +1077,8 @@ func (r *Rejilla) TypedKey(k *fyne.KeyEvent) {
 		}
 	case fyne.KeyReturn, fyne.KeyEnter, fyne.KeyF2:
 		r.Editar("")
+	case fyne.KeyF5:
+		r.enfocarCuadro()
 	case fyne.KeyDelete, fyne.KeyBackspace:
 		r.BorrarRango()
 	case fyne.KeyEscape:
@@ -942,11 +1091,13 @@ func (r *Rejilla) TypedKey(k *fyne.KeyEvent) {
 // protegida sin «Seleccionar celdas»—, sigue en esa dirección hasta la primera que sí,
 // como Excel; si no hay ninguna antes del borde, no se mueve.
 func (r *Rejilla) mover(base Celda, dc, df int, ext bool) {
-	c, f := clamp(base.C+dc, r.Cols-1), clamp(base.F+df, r.Fils-1)
+	// Salir de una combinada la salta entera, y caer en una lleva a su ancla (Excel).
+	d := moverPorFusiones(r.L.Fusiones(), base, dc, df, MaxColumnas-1, MaxFilas-1)
+	c, f := d.C, d.F
 	pc, pf := signo(dc), signo(df)
 	for !r.L.Seleccionable(c, f) {
 		c, f = c+pc, f+pf
-		if (pc == 0 && pf == 0) || c < 0 || c >= r.Cols || f < 0 || f >= r.Fils {
+		if (pc == 0 && pf == 0) || c < 0 || c >= MaxColumnas || f < 0 || f >= MaxFilas {
 			return
 		}
 	}
@@ -1009,15 +1160,27 @@ func (r *Rejilla) TypedShortcut(s fyne.Shortcut) {
 	case *fyne.ShortcutRedo:
 		r.deshacer(true)
 	case *desktop.CustomShortcut:
-		r.atajo(a)
+		if !r.atajoEnlace(a) {
+			r.atajo(a)
+		}
 	}
+}
+
+// atajoEnlace es Alt+Intro: abre el enlace de la celda activa (el atajo de Sheets, como en
+// la web). Sin enlace, la tecla sigue su camino.
+func (r *Rejilla) atajoEnlace(a *desktop.CustomShortcut) bool {
+	if a.Modifier != fyne.KeyModifierAlt || (a.KeyName != fyne.KeyReturn && a.KeyName != fyne.KeyEnter) {
+		return false
+	}
+	return r.AbrirEnlace(r.sel.C, r.sel.F)
 }
 
 // atajo son los atajos con Ctrl (⌘ en el Mac) que Fyne no trae con nombre: Ctrl+Mayús+Z
 // rehace, Ctrl+Mayús+V pega solo valores, Ctrl+B y Ctrl+I son negrita y cursiva, y
-// Ctrl+Inicio y Ctrl+Fin van a A1 y a la última celda con algo de la hoja.
+// Ctrl+Inicio y Ctrl+Fin van a A1 y a la última celda con algo de la hoja, y
+// Ctrl+flecha salta al borde del bloque de datos (con Mayús, extiende).
 func (r *Rejilla) atajo(a *desktop.CustomShortcut) {
-	if r.Contexto.AtajoDelEditor(a) {
+	if r.Contexto.AtajoDelEditor(a) || r.atajoDeHoja(a.KeyName, a.Modifier) {
 		return
 	}
 	ctrl := fyne.KeyModifierShortcutDefault
@@ -1028,6 +1191,8 @@ func (r *Rejilla) atajo(a *desktop.CustomShortcut) {
 		r.Pegar(fyne.CurrentApp().Clipboard().Content(), true)
 	case a.Modifier == ctrl && (a.KeyName == fyne.KeyB || a.KeyName == fyne.KeyI):
 		r.NegritaOCursiva(a.KeyName == fyne.KeyB)
+	case a.Modifier&^fyne.KeyModifierShift == ctrl && esFlecha(a.KeyName):
+		r.saltarADatos(a.KeyName, a.Modifier&fyne.KeyModifierShift != 0)
 	case a.Modifier&ctrl != 0 && (a.KeyName == fyne.KeyHome || a.KeyName == fyne.KeyEnd):
 		ext := a.Modifier&fyne.KeyModifierShift != 0
 		if a.KeyName == fyne.KeyHome {
@@ -1042,6 +1207,34 @@ func (r *Rejilla) atajo(a *desktop.CustomShortcut) {
 			}
 		}
 		r.Seleccionar(fin.C, fin.F, ext)
+	}
+}
+
+func esFlecha(k fyne.KeyName) bool {
+	return k == fyne.KeyUp || k == fyne.KeyDown || k == fyne.KeyLeft || k == fyne.KeyRight
+}
+
+// saltarADatos es `moveToData`: Ctrl+flecha con el criterio de Excel (`saltoADatos`)
+// sobre las celdas con algo de la fila o la columna de la celda activa. Pasa por
+// `mover`, así que en una hoja protegida respeta lo que no se puede seleccionar.
+func (r *Rejilla) saltarADatos(k fyne.KeyName, ext bool) {
+	base := r.sel
+	if ext && r.ext != nil {
+		base = *r.ext
+	}
+	switch k {
+	case fyne.KeyUp, fyne.KeyDown:
+		paso := 1
+		if k == fyne.KeyUp {
+			paso = -1
+		}
+		r.mover(base, 0, saltoADatos(r.L.llenasEn(base.C, 0, true), base.F, paso, MaxFilas)-base.F, ext)
+	default:
+		paso := 1
+		if k == fyne.KeyLeft {
+			paso = -1
+		}
+		r.mover(base, saltoADatos(r.L.llenasEn(0, base.F, false), base.C, paso, MaxColumnas)-base.C, 0, ext)
 	}
 }
 
@@ -1150,6 +1343,11 @@ func (r *Rejilla) MouseMoved(e *desktop.MouseEvent) { r.seguirPuntero(e.Position
 func (r *Rejilla) MouseOut() { r.seguirPuntero(fyne.NewPos(-1, -1)) }
 
 func (r *Rejilla) seguirPuntero(p fyne.Position) {
+	if p.X < 0 && p.Y < 0 {
+		r.puntero = nil
+	} else {
+		r.puntero = &p
+	}
 	boton := 0
 	if pos, tam, ok := r.botonValores(); ok && dentro(p, pos, tam) {
 		boton = -1

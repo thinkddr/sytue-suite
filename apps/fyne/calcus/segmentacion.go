@@ -65,7 +65,7 @@ func (l *Libro) Segmentaciones() []Segmentacion { return l.h().segs }
 // `repetida` si ya hay una de esa columna.
 func (l *Libro) AnadirSegmentacion(rango string, col int) (ok, repetida bool) {
 	r, valido := celdasDeRango(rango)
-	if !valido || col < 0 || col >= Columnas {
+	if !valido || col < 0 || col >= MaxColumnas {
 		return false, false
 	}
 	h := l.h()
@@ -77,7 +77,7 @@ func (l *Libro) AnadirSegmentacion(rango string, col int) (ok, repetida bool) {
 	if af != nil {
 		nuevo.Row, nuevo.C1, nuevo.C2, nuevo.Excl, nuevo.Cond = af.Row, min(af.C1, col), max(af.C2, col), af.Excl, af.Cond
 	}
-	nuevo.C1, nuevo.C2 = clamp(nuevo.C1, Columnas-1), clamp(nuevo.C2, Columnas-1)
+	nuevo.C1, nuevo.C2 = clamp(nuevo.C1, MaxColumnas-1), clamp(nuevo.C2, MaxColumnas-1)
 	n := len(h.segs)
 	x, y := float64(96+(n%8)*24), float64(48+(n%8)*24)
 	l.anotar()

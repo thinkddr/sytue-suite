@@ -9,7 +9,7 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { Button, EmptyState, Icon, Illustration, Skeleton } from '@sytue/ui';
+import { Button, EmptyState, Skeleton } from '@sytue/ui';
 import type { T } from '../i18n/index.js';
 import type { TipoDeFallo } from '../lib/fallo.js';
 
@@ -49,7 +49,7 @@ export function Fallo({
   if (tipo === 'offline') {
     return (
       <EmptyState
-        illustration={<Icon name="cloud" size={48} />}
+        icon="cloud"
         title={t('errors.offline.title')}
         description={t('errors.offline.description')}
         {...(reintentar
@@ -67,7 +67,7 @@ export function Fallo({
   if (tipo === 'sinPermiso') {
     return (
       <EmptyState
-        illustration={<Icon name="lock" size={48} />}
+        icon="lock"
         title={t('errors.forbidden.title')}
         description={t('errors.forbidden.description')}
       />
@@ -75,7 +75,8 @@ export function Fallo({
   }
   return (
     <EmptyState
-      illustration={<Illustration name="errorRetry" size={160} />}
+      tone="error"
+      spot="errorRetry"
       title={t('errors.title')}
       description={t('errors.description')}
       {...(reintentar

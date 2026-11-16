@@ -50,12 +50,15 @@ func (a *App) etiquetaActiva() *api.ContactGroup {
 // peticion lanza `hacer` en segundo plano con su plazo y trae el resultado al hilo de
 // la interfaz: avisa del éxito o del fallo con esas claves (el fallo, con la frase de
 // `pista`) y llama a `listo`.
-func (a *App) peticion(hacer func(context.Context) error, exito, fallo, pista string, listo func(error)) {
-	a.enFondo(func() {
-		ctx, fin := a.ctx()
+func (a *App) peticion(scope cargaContacts, hacer func(context.Context) error, exito, fallo, pista string, listo func(error)) {
+	a.programarEn(scope, func(scope cargaContacts) {
+		ctx, fin := context.WithTimeout(scope.ctx, a.Plazo)
 		err := hacer(ctx)
 		fin()
 		fyne.Do(func() {
+			if !a.vigente(scope) {
+				return
+			}
 			if err != nil {
 				slog.Warn("contactos: "+fallo, "error", err)
 				a.avisar(ui.AvisoPeligro, fallo, pista)
@@ -76,6 +79,7 @@ func (a *App) dialogoEtiqueta(g *api.ContactGroup) *ui.Dialogo {
 	if lienzo == nil || a.svc == nil || p.Activa == nil {
 		return nil
 	}
+	scope := a.capturar()
 	libreta := p.Activa.ID
 	titulo, inicial := "label.newTitle", ""
 	if g != nil {
@@ -95,10 +99,10 @@ func (a *App) dialogoEtiqueta(g *api.ContactGroup) *ui.Dialogo {
 					return err
 				}
 			}
-			a.peticion(hacer, exito, fallo, "common.tryAgainSoon", func(err error) {
+			a.peticion(scope, hacer, exito, fallo, "common.tryAgainSoon", func(err error) {
 				listo(err)
 				if err == nil {
-					a.enFondo(a.cargarEtiquetas)
+					a.programarEn(scope, a.cargarEtiquetasEn)
 				}
 			})
 		})
@@ -112,15 +116,16 @@ func (a *App) borrarEtiqueta() {
 	if lienzo == nil || a.svc == nil || g == nil {
 		return
 	}
+	scope := a.capturar()
 	id := g.ID
 	p.confirmar(lienzo, p.t("label.delete", nil), p.t("label.deleteConfirm", i18n.Vars{"label": g.Name}),
 		p.t("label.delete", nil), func() {
-			a.peticion(func(ctx context.Context) error { return a.svc.DeleteGroup(ctx, id) },
+			a.peticion(scope, func(ctx context.Context) error { return a.svc.DeleteGroup(ctx, id) },
 				"label.deleted", "label.deleteFailed", "common.tryAgainSoon", func(err error) {
 					if err == nil {
 						p.EtiquetaActiva = ""
 						a.repintar()
-						a.enFondo(a.cargarEtiquetas)
+						a.programarEn(scope, a.cargarEtiquetasEn)
 					}
 				})
 		})
@@ -133,6 +138,7 @@ func (a *App) dialogoLibreta(b *api.AddressBook) {
 	if lienzo == nil || a.svc == nil {
 		return
 	}
+	scope := a.capturar()
 	titulo, inicial := "book.newTitle", ""
 	if b != nil {
 		titulo, inicial = "book.renameTitle", nombreLibreta(*b)
@@ -151,10 +157,10 @@ func (a *App) dialogoLibreta(b *api.AddressBook) {
 					return err
 				}
 			}
-			a.peticion(hacer, exito, fallo, "common.tryAgainSoon", func(err error) {
+			a.peticion(scope, hacer, exito, fallo, "common.tryAgainSoon", func(err error) {
 				listo(err)
 				if err == nil {
-					a.enFondo(a.Cargar)
+					a.programarEn(scope, a.cargarEn)
 				}
 			})
 		})
@@ -167,13 +173,14 @@ func (a *App) borrarLibreta() {
 	if lienzo == nil || a.svc == nil || p.Activa == nil || p.Activa.IsDefault {
 		return
 	}
+	scope := a.capturar()
 	b := *p.Activa
 	p.confirmar(lienzo, p.t("book.delete", nil), p.t("book.deleteConfirm", i18n.Vars{"book": nombreLibreta(b)}),
 		p.t("book.delete", nil), func() {
-			a.peticion(func(ctx context.Context) error { return a.svc.DeleteAddressBook(ctx, b.ID) },
+			a.peticion(scope, func(ctx context.Context) error { return a.svc.DeleteAddressBook(ctx, b.ID) },
 				"book.deleted", "book.deleteFailed", "common.tryAgainSoon", func(err error) {
 					if err == nil {
-						a.enFondo(a.Cargar)
+						a.programarEn(scope, a.cargarEn)
 					}
 				})
 		})

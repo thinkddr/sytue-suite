@@ -3,12 +3,13 @@
  * Banco de pruebas de las PANTALLAS ENTERAS de Sytue Bases (marco, lista de bases y una
  * base abierta con sus diálogos), para la auditoría de accesibilidad
  * (test/e2e/accesibilidad-bases.mjs). Monta las islas REALES; no hay sesión ni servicio
- * detrás: la auditoría contesta a `/bases/api/*` con `page.route`.
+ * detrás: la auditoría contesta a `/bases/api/*` con `page.route`, y la puerta de
+ * almacenamiento privado de la lista recibe un dispositivo sintético ya verificado.
  * SOLO en desarrollo: en producción es un 404 y nada lo enlaza.
  */
 import '../../styles/app.css';
 import { basePathScript, themeInitScript } from '@sytue/ui';
-import { BasesApp } from '../../islands/BasesApp.js';
+import { BasesAppBanco } from '../../islands/dev/BasesAppBanco.js';
 import { BaseApp } from '../../islands/BaseApp.js';
 
 export const prerender = false;
@@ -50,7 +51,7 @@ const hub = 'http://127.0.0.1:9';
         hubBaseUrl={hub}
       />
     ) : (
-      <BasesApp client:only="preact" locale={lang} user={usuario} hubBaseUrl={hub} />
+      <BasesAppBanco client:only="preact" locale={lang} user={usuario} hubBaseUrl={hub} />
     )}
   </body>
 </html>

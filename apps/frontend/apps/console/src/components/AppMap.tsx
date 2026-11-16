@@ -245,7 +245,7 @@ export default function AppMap({ t, choices, live, canEdit, onChanged }: AppMapP
       <EmptyState
         title={t('appmap.offline.title')}
         description={t('appmap.offline.description')}
-        illustration={<Icon name="warning" size={28} class="text-danger-text" />}
+        tone="error"
       />
     );
   }
@@ -254,7 +254,7 @@ export default function AppMap({ t, choices, live, canEdit, onChanged }: AppMapP
       <EmptyState
         title={t('appmap.empty.title')}
         description={t('appmap.empty.description')}
-        illustration={<Icon name="grid" size={28} />}
+        icon="grid"
       />
     );
   }

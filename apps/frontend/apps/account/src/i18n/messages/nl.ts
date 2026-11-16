@@ -7,6 +7,23 @@ import type { en } from './en.js';
 
 export const nl: AppCatalog<typeof en> = {
   'app.title': 'Mijn account',
+  'app.description': 'Mijn account — profiel, beveiliging en toegang van je Sytue-account.',
+  'app.lead': 'Je profiel, hoe je inlogt en het account beschermt, en waar het open staat.',
+
+  // --- Revisión de seguridad ---
+  'checkup.title': 'Beveiligingscheck',
+  'checkup.all_good': 'Alles in orde: je account is goed beschermd.',
+  'checkup.dos_pasos':
+    'Verificatie in twee stappen staat uit: alleen je wachtwoord opent het account.',
+  'checkup.recuperacion':
+    'Geen herstel-e-mail of telefoon: als je de toegang kwijtraakt, kom je er niet meer in.',
+  'checkup.sesiones': 'Open sessies op andere apparaten: {count}',
+  'checkup.contrasenas_app': 'App-wachtwoorden 90 dagen ongebruikt: {count}',
+  'checkup.dispositivos': 'Vertrouwde apparaten 90 dagen niet gezien: {count}',
+  'checkup.turn_on': 'Inschakelen',
+  'checkup.add': 'Toevoegen',
+  'checkup.review': 'Bekijken',
+
   'profile.title': 'Profiel',
   'profile.name': 'Weergavenaam',
   'profile.name.hint': 'Hoe je in de hele suite verschijnt.',
@@ -30,25 +47,55 @@ export const nl: AppCatalog<typeof en> = {
   'photo.errorRead': 'De afbeelding kon niet worden gelezen.',
   'sessions.title': 'Open sessies',
   'sessions.current': 'Dit apparaat',
+  'sessions.signed_in': 'Ingelogd {time}',
   'sessions.close_one': 'Deze sessie sluiten',
+  'sessions.close_named': 'Sessie op {device} sluiten',
+  'sessions.close_one_confirm':
+    '{device} wordt afgemeld en moet opnieuw inloggen om je account te gebruiken.',
   'sessions.close_others': 'Alle sessies sluiten',
   'sessions.close_others_note': 'Deze ook: je moet opnieuw inloggen.',
+  'sessions.close_all_confirm':
+    'Alle sessies worden gesloten, ook deze. Je moet op elk apparaat opnieuw inloggen.',
   'sessions.empty': 'Er zijn geen andere sessies open.',
   'sessions.failed': 'Je sessies konden niet worden geladen.',
   'common.loading': 'Laden…',
+  'common.retry': 'Opnieuw proberen',
   'devices.title': 'Apparaten',
   'devices.current': 'Dit apparaat',
   'devices.trusted': 'Vertrouwd',
   'devices.trust': 'Als vertrouwd markeren',
   'devices.forget': 'Dit apparaat vergeten',
+  'devices.forget_named': '{device} vergeten',
+  'devices.forget_confirm':
+    '{device} wordt niet meer herkend en is niet langer vertrouwd. Opnieuw inloggen vanaf dit apparaat telt als een nieuw apparaat.',
   'devices.empty': 'Nog geen apparaten herkend.',
   'devices.failed': 'Je apparaten konden niet worden geladen.',
+  'signature.title': 'Bewaarde handtekening',
+  'signature.help':
+    'De handtekening die je CertiPDF liet onthouden bij het ondertekenen met de hand. Hij wordt versleuteld in je account bewaard.',
+  'signature.empty':
+    'Je hebt geen bewaarde handtekening. Vink bij het met de hand ondertekenen in CertiPDF «Mijn handtekening onthouden» aan.',
+  'signature.failed': 'Je bewaarde handtekening kon niet worden geladen.',
+  'signature.preview': 'Je bewaarde handtekening',
+  'signature.saved_on': 'Bewaard op {date}',
+  'signature.delete': 'Bewaarde handtekening verwijderen',
+  'signature.delete_confirm':
+    'Je bewaarde handtekening wordt verwijderd. Documenten die je al hebt ondertekend behouden hem; de volgende keer dat je met de hand ondertekent, moet je hem opnieuw tekenen.',
   'security.title': 'Beveiliging',
   'security.failed': 'Er is iets misgegaan. Probeer het opnieuw.',
   'security.password.title': 'Wachtwoord',
   'security.password.warning': 'Als je het wijzigt, word je overal afgemeld, ook hier.',
   'security.password.current': 'Huidig wachtwoord',
   'security.password.new': 'Nieuw wachtwoord',
+  'security.password.requirements': 'Eisen voor het nieuwe wachtwoord:',
+  'security.password.req_length': {
+    one: 'Minstens {count} teken',
+    other: 'Minstens {count} tekens',
+  },
+  'security.password.req_complexity': 'Letters en minstens één cijfer',
+  'security.password.req_different': 'Anders dan het huidige wachtwoord',
+  'security.password.req_met': 'Voldaan',
+  'security.password.req_pending': 'Nog niet',
   'security.password.submit': 'Wachtwoord wijzigen',
   'security.password.done': 'Wachtwoord gewijzigd. Alle sessies zijn gesloten, ook deze.',
   'security.password.signin_again': 'Opnieuw aanmelden',
@@ -72,6 +119,46 @@ export const nl: AppCatalog<typeof en> = {
   'security.codes.once':
     'Eenmalig getoond. Bewaar ze op een veilige plek: elke code werkt één keer.',
   'security.codes.saved': 'Ik heb ze bewaard',
+  'security.codes.regenerate_confirm':
+    'Je huidige herstelcodes werken meteen niet meer, ook de codes die je hebt afgedrukt of bewaard.',
+  'security.mfa.step.need': 'Voordat je begint',
+  'security.mfa.step.need.heading': 'Wat je nodig hebt',
+  'security.mfa.step.need.desc':
+    'Een authenticatie-app op je telefoon. Die toont elke 30 seconden een nieuwe code van zes cijfers.',
+  'security.mfa.step.need.apps_title': 'Elke authenticatie-app werkt',
+  'security.mfa.step.need.apps':
+    'Bijvoorbeeld: Aegis, FreeOTP, Microsoft Authenticator, Google Authenticator, 1Password, Bitwarden. Heb je er geen, installeer er dan eerst een.',
+  'security.mfa.step.need.next': 'Beginnen',
+  'security.mfa.step.scan': 'Scannen',
+  'security.mfa.step.scan.heading': 'Voeg je account toe aan de app',
+  'security.mfa.key_label': 'Instelsleutel',
+  'security.mfa.step.code': 'Code',
+  'security.mfa.step.code.heading': 'Typ de code uit de app',
+  'security.mfa.step.code.desc':
+    'Zo wordt gecontroleerd dat app en account overeenkomen voordat het aangaat.',
+  'security.mfa.code.hint': 'Zes cijfers. Verandert hij tijdens het typen, gebruik dan de nieuwe.',
+  'security.mfa.step.codes.heading': 'Bewaar je herstelcodes',
+  'security.codes.copy': 'Alles kopiëren',
+  'security.codes.copied': 'Codes gekopieerd.',
+  'security.codes.copy_failed':
+    'Kopiëren lukte niet. Selecteer de codes en kopieer ze met de hand.',
+  'security.codes.download': '.txt downloaden',
+  'security.codes.file_title': 'Sytue-herstelcodes',
+  'security.codes.file_account': 'Account: {account}',
+  'security.codes.file_date': 'Aangemaakt: {date}',
+  'security.codes.file_note':
+    'Elke code werkt één keer. Bewaar dit bestand op een veilige plek, niet bij je telefoon.',
+  'security.mfa.step.done': 'Klaar',
+  'security.mfa.step.done.heading': 'Verificatie in twee stappen staat aan',
+  'security.mfa.step.done.desc':
+    'De volgende keer dat je inlogt, wordt om een code uit de app gevraagd.',
+  'security.mfa.passkey_tip.title': 'Voeg ook een passkey toe',
+  'security.mfa.passkey_tip':
+    'Met een passkey log je in met je vingerafdruk, gezicht of schermvergrendeling, zonder codes te typen.',
+  'security.mfa.passkey_tip.action': 'Passkey toevoegen',
+  'security.mfa.close': 'Sluiten',
+  'security.mfa.disable_title': 'Verificatie in twee stappen uitschakelen?',
+  'security.mfa.disable_warning': 'Dan opent je wachtwoord alleen het account weer.',
   'common.cancel': 'Annuleren',
   'profile.given_name': 'Voornaam',
   'profile.family_name': 'Achternaam',
@@ -82,6 +169,8 @@ export const nl: AppCatalog<typeof en> = {
   'profile.locale.hint': 'Gebruikt in heel Sytue en in de berichten die we je sturen.',
   'security.passkeys.title': 'Passkeys',
   'security.passkeys.remove': 'Verwijderen',
+  'security.passkeys.remove_named': '{name} verwijderen',
+  'security.passkeys.remove_confirm': 'Je kunt niet meer inloggen met {name}.',
   'security.passkeys.unnamed': 'Naamloze sleutel',
   'app_passwords.title': 'App-wachtwoorden',
   'app_passwords.hint':
@@ -90,6 +179,9 @@ export const nl: AppCatalog<typeof en> = {
   'app_passwords.label.hint': 'Bijvoorbeeld: mail op de laptop, telefoon.',
   'app_passwords.create': 'Wachtwoord aanmaken',
   'app_passwords.revoke': 'Intrekken',
+  'app_passwords.revoke_named': '{label} intrekken',
+  'app_passwords.revoke_confirm':
+    'Apps die {label} gebruiken, kunnen niet meer inloggen. Dit kan niet ongedaan worden gemaakt.',
   'app_passwords.empty': 'Nog geen app-wachtwoorden.',
   'app_passwords.failed': 'Je app-wachtwoorden konden niet worden geladen.',
   'app_passwords.unnamed': 'Zonder naam',

@@ -325,9 +325,11 @@ func (p *Pantalla) destinosTableros() []Destino {
 	for _, tb := range p.Tableros {
 		t := tb
 		out = append(out, Destino{
-			Rotulo:   t.Titulo,
-			Activa:   p.Vista == VistaTablero && p.tablero != nil && p.tablero.Tablero.ID == t.ID,
-			AlPulsar: func() { p.AbrirTablero(t) },
+			Rotulo: t.Titulo,
+			Activa: p.Vista == VistaTablero && p.tablero != nil && p.tablero.Tablero.ID == t.ID,
+			// Ir a un tablero saca de la ficha, como cualquier otra vista del menú: si
+			// tiene cambios sin guardar, pregunta antes (la web pasa por `irAVista`).
+			AlPulsar: func() { p.dejarFicha(func() { p.AbrirTablero(t) }) },
 		})
 	}
 	return out

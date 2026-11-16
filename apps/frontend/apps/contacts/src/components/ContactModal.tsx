@@ -33,7 +33,7 @@ import {
   type TypedValue,
   type PostalAddress,
 } from '../client/contactsApi.js';
-import { parseVcardDetails } from '../lib/vcard.js';
+import { normalizeWebsite, parseVcardDetails, roleLine, structuredNameFor } from '../lib/vcard.js';
 import { hasEmbeddedPhoto } from '../client/vcard.js';
 import { AsistenteFicha } from './AsistenteFicha.js';
 import { avisarPapelera } from './avisoPapelera.js';
@@ -130,6 +130,24 @@ const ADDRESS_TYPES: TypeOption[] = [
   { value: 'other', key: 'type.otherAddress' },
 ];
 
+const WEBSITE_TYPES: TypeOption[] = [
+  { value: 'home', key: 'type.home' },
+  { value: 'work', key: 'type.work' },
+  { value: 'other', key: 'type.other' },
+];
+
+// RELATED (RFC 6350 §6.6.6): los tipos que la gente usa. «Otra» no lleva TYPE ('').
+const RELATED_TYPES: TypeOption[] = [
+  { value: 'spouse', key: 'relation.spouse' },
+  { value: 'child', key: 'relation.child' },
+  { value: 'parent', key: 'relation.parent' },
+  { value: 'sibling', key: 'relation.sibling' },
+  { value: 'friend', key: 'relation.friend' },
+  { value: 'co-worker', key: 'relation.coworker' },
+  { value: 'emergency', key: 'relation.emergency' },
+  { value: '', key: 'relation.other' },
+];
+
 /** Ajusta una etiqueta leída de la vCard al conjunto de opciones (o al fallback). */
 function normalizeType(type: string, options: TypeOption[], fallback: string): string {
   return options.some((o) => o.value === type) ? type : fallback;
@@ -175,7 +193,19 @@ export function ContactModal({
   // representa, birthdayManaged=false: se conserva verbatim salvo que el
   // usuario elija una fecha nueva (que pasa a gestionarlo el editor).
   const [birthdayManaged, setBirthdayManaged] = useState(true);
+  const [websites, setWebsites] = useState<ValueRow[]>([]);
+  const [websiteErrorIdx, setWebsiteErrorIdx] = useState<number | null>(null);
+  const [related, setRelated] = useState<ValueRow[]>([]);
+  const [anniversary, setAnniversary] = useState('');
+  // Como el cumpleaños: un ANNIVERSARY parcial no cabe en el campo y se conserva.
+  const [anniversaryManaged, setAnniversaryManaged] = useState(true);
   const [organization, setOrganization] = useState('');
+  // Cargo y apodo, y lo que traía la vCard: solo se mandan si cambian, para que
+  // buildVcard conserve verbatim las líneas que nadie tocó (con sus parámetros,
+  // p. ej. `NICKNAME;LANGUAGE=es`).
+  const [jobTitle, setJobTitle] = useState('');
+  const [nickname, setNickname] = useState('');
+  const [original, setOriginal] = useState({ title: '', nickname: '' });
   const [note, setNote] = useState('');
   // Avatar elegido en esta sesión del formulario (predefinido o subido), pendiente
   // de aplicarse hasta guardar: al crear, el contacto no tiene UID todavía, así
@@ -255,7 +285,25 @@ export function ContactModal({
     );
     setBirthday(details?.birthday ?? '');
     setBirthdayManaged(details?.birthdayManaged ?? true);
+    setWebsites(
+      (details?.urls ?? []).map((u) => ({
+        value: u.value,
+        type: normalizeType(u.type, WEBSITE_TYPES, 'other'),
+      })),
+    );
+    setWebsiteErrorIdx(null);
+    setRelated(
+      (details?.related ?? []).map((r) => ({
+        value: r.value,
+        type: normalizeType(r.type, RELATED_TYPES, ''),
+      })),
+    );
+    setAnniversary(details?.anniversary ?? '');
+    setAnniversaryManaged(details?.anniversaryManaged ?? true);
     setOrganization(editing?.organization ?? '');
+    setJobTitle(details?.title ?? '');
+    setNickname(details?.nickname ?? '');
+    setOriginal({ title: details?.title ?? '', nickname: details?.nickname ?? '' });
     setNote(details?.note ?? '');
     setNameError(undefined);
     setEmailErrorIdx(null);
@@ -280,9 +328,11 @@ export function ContactModal({
       const v = e.value.trim();
       if (v && !/^\S+@\S+\.\S+$/.test(v) && badEmail === null) badEmail = i;
     });
+    const badWebsite = websites.findIndex((w) => w.value.trim() && !normalizeWebsite(w.value));
     setNameError(nameErr);
     setEmailErrorIdx(badEmail);
-    if (nameErr || badEmail !== null) return;
+    setWebsiteErrorIdx(badWebsite >= 0 ? badWebsite : null);
+    if (nameErr || badEmail !== null || badWebsite >= 0) return;
 
     const emailsDetailed = toDetailed(emails, primaryEmail);
     const phonesDetailed = toDetailed(phones, primaryPhone);
@@ -306,8 +356,25 @@ export function ContactModal({
       phonesDetailed,
       addresses: addressesOut,
       ...(birthdayManaged ? { birthday } : {}),
+      ...(anniversaryManaged ? { anniversary } : {}),
+      urls: websites
+        .map((w) => ({ value: normalizeWebsite(w.value) ?? '', type: w.type }))
+        .filter((w) => w.value),
+      related: related.map((r) => ({ value: r.value.trim(), type: r.type })).filter((r) => r.value),
       ...(editing?.uid ? { uid: editing.uid } : {}),
-      ...(organization.trim() ? { organization: organization.trim() } : {}),
+      // ORG y N solo se mandan si cambiaron respecto a lo que enseñaba el
+      // formulario: si no, buildVcard conserva las líneas originales (con sus
+      // componentes, aunque el SDK no las sepa proyectar: agrupadas, plegadas o
+      // con escapes). Vaciar la organización sí manda '' y borra el ORG. Lo
+      // mismo el cargo (TITLE) y el apodo (NICKNAME).
+      ...(organization.trim() !== (editing?.organization ?? '').trim()
+        ? { organization: organization.trim() }
+        : {}),
+      ...(jobTitle.trim() !== original.title ? { title: jobTitle.trim() } : {}),
+      ...(nickname.trim() !== original.nickname ? { nickname: nickname.trim() } : {}),
+      ...(editing && name !== editing.fullName.trim()
+        ? structuredNameFor(name, editing.vcard)
+        : {}),
       ...(note.trim() ? { note } : {}),
       // Al editar, conserva PHOTO/X-*… (y ADR/BDAY que el editor no gestione).
       ...(editing?.vcard ? { baseVcard: editing.vcard } : {}),
@@ -422,7 +489,7 @@ export function ContactModal({
       }
     >
       <div class="flex flex-col gap-4">
-        {/* Vista previa en vivo: refleja el nombre/organización mientras se escribe. */}
+        {/* Vista previa en vivo: refleja el nombre y «Cargo · Empresa» mientras se escribe. */}
         <div class="border-border flex items-center gap-3 border-b pb-4">
           <AvatarPicker
             name={fullName.trim() || t('form.newTitle')}
@@ -463,9 +530,9 @@ export function ContactModal({
             >
               {fullName.trim() || t('form.newTitle')}
             </p>
-            {organization.trim() ? (
-              <p class="text-text-muted truncate text-sm" title={organization.trim()}>
-                {organization.trim()}
+            {roleLine(jobTitle, organization) ? (
+              <p class="text-text-muted truncate text-sm" title={roleLine(jobTitle, organization)}>
+                {roleLine(jobTitle, organization)}
               </p>
             ) : (
               <p class="text-text-subtle text-sm">{t('form.preview')}</p>
@@ -536,6 +603,24 @@ export function ContactModal({
 
         <AddressList t={t} addresses={addresses} setAddresses={setAddresses} />
 
+        <ValueList
+          t={t}
+          legend={t('field.website')}
+          idPrefix="c-website"
+          rows={websites}
+          setRows={setWebsites}
+          typeOptions={WEBSITE_TYPES}
+          inputType="url"
+          placeholder={t('form.websitePlaceholder')}
+          addLabel={t('form.addWebsite')}
+          typeLabelKey="form.websiteTypeLabel"
+          valueLabelKey="form.websiteLabel"
+          removeLabelKey="form.removeWebsite"
+          errorIndex={websiteErrorIdx}
+          error={websiteErrorIdx !== null ? t('form.websiteInvalid') : undefined}
+          onEditRow={() => setWebsiteErrorIdx(null)}
+        />
+
         <FieldGroup
           label={t('field.birthday')}
           htmlFor="c-bday"
@@ -553,6 +638,38 @@ export function ContactModal({
           />
         </FieldGroup>
 
+        <FieldGroup
+          label={t('field.anniversary')}
+          htmlFor="c-anniversary"
+          {...(!anniversaryManaged ? { help: t('form.anniversaryPartial') } : {})}
+        >
+          <Input
+            id="c-anniversary"
+            type="date"
+            value={anniversary}
+            aria-describedby={anniversaryManaged ? undefined : 'c-anniversary-help'}
+            onInput={(e) => {
+              setAnniversary(e.currentTarget.value);
+              setAnniversaryManaged(true);
+            }}
+          />
+        </FieldGroup>
+
+        <ValueList
+          t={t}
+          legend={t('field.related')}
+          idPrefix="c-related"
+          rows={related}
+          setRows={setRelated}
+          typeOptions={RELATED_TYPES}
+          inputType="text"
+          placeholder={t('form.relatedPlaceholder')}
+          addLabel={t('form.addRelated')}
+          typeLabelKey="form.relatedTypeLabel"
+          valueLabelKey="form.relatedLabel"
+          removeLabelKey="form.removeRelated"
+        />
+
         <FieldGroup label={t('field.organization')} htmlFor="c-org">
           <Input
             id="c-org"
@@ -560,6 +677,26 @@ export function ContactModal({
             placeholder={t('form.organizationPlaceholder')}
             autocomplete="off"
             onInput={(e) => setOrganization(e.currentTarget.value)}
+          />
+        </FieldGroup>
+
+        <FieldGroup label={t('field.title')} htmlFor="c-title">
+          <Input
+            id="c-title"
+            value={jobTitle}
+            placeholder={t('form.titlePlaceholder')}
+            autocomplete="off"
+            onInput={(e) => setJobTitle(e.currentTarget.value)}
+          />
+        </FieldGroup>
+
+        <FieldGroup label={t('field.nickname')} htmlFor="c-nickname">
+          <Input
+            id="c-nickname"
+            value={nickname}
+            placeholder={t('form.nicknamePlaceholder')}
+            autocomplete="off"
+            onInput={(e) => setNickname(e.currentTarget.value)}
           />
         </FieldGroup>
 
@@ -578,7 +715,7 @@ export function ContactModal({
 }
 
 /**
- * Lista editable de valores con etiqueta y principal (correos o teléfonos):
+ * Lista editable de valores con etiqueta y principal (correos, teléfonos, sitios web o personas relacionadas):
  * filas con selector de etiqueta + valor, radio «Principal» (cuando hay más de
  * una) y botón de quitar; botón para añadir filas. fieldset+legend para el
  * grupo (accesible), aria-label por control.
@@ -607,10 +744,11 @@ function ValueList({
   idPrefix: string;
   rows: ValueRow[];
   setRows: (rows: ValueRow[]) => void;
-  primary: number;
-  setPrimary: (i: number) => void;
+  /** Sin `primary` (sitios web, personas) no hay «Principal». */
+  primary?: number;
+  setPrimary?: (i: number) => void;
   typeOptions: TypeOption[];
-  inputType: 'email' | 'tel';
+  inputType: 'email' | 'tel' | 'url' | 'text';
   placeholder: string;
   addLabel: string;
   /* Etiquetas de lector de pantalla como CLAVES y no derivadas de `legend` con
@@ -630,8 +768,10 @@ function ValueList({
   function remove(i: number): void {
     setRows(rows.filter((_, idx) => idx !== i));
     // Reajusta el índice principal tras eliminar.
-    if (primary === i) setPrimary(0);
-    else if (primary > i) setPrimary(primary - 1);
+    if (primary !== undefined && setPrimary) {
+      if (primary === i) setPrimary(0);
+      else if (primary > i) setPrimary(primary - 1);
+    }
     onEditRow?.();
   }
   function add(): void {
@@ -669,7 +809,7 @@ function ValueList({
               onInput={(e) => update(i, { value: e.currentTarget.value })}
             />
           </div>
-          {rows.length > 1 ? (
+          {primary !== undefined && setPrimary && rows.length > 1 ? (
             <Radio
               class="shrink-0 whitespace-nowrap"
               name={`primary-${idPrefix}`}

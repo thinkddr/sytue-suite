@@ -39,7 +39,11 @@ func (p *Pantalla) imagenDe(url string) imagenRemota {
 		p.imagenes = map[string]imagenRemota{}
 	}
 	p.imagenes[url] = imagenRemota{}
-	go p.cargarImagen(url)
+	{
+		notaFuncion := p.cargarImagen
+		notaArgumento0 := url
+		p.iniciar(func() { notaFuncion(notaArgumento0) })
+	}
 	return imagenRemota{}
 }
 
@@ -48,7 +52,7 @@ func (p *Pantalla) cargarImagen(url string) {
 	ctx, cancelar := p.ctx()
 	defer cancelar()
 	img, err := externo.Imagen(ctx, url)
-	enHilo(func() {
+	p.enHilo(func() {
 		if p.imagenes == nil {
 			p.imagenes = map[string]imagenRemota{}
 		}

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	pcfg "git.sytue.eu/sytue/one/platform/pkg/config"
+	"git.sytue.eu/sytue/one/platform/pkg/resourcepg"
 )
 
 // ServiceName es el nombre lógico del servicio (atributo de logs/telemetría).
@@ -61,8 +62,14 @@ type Config struct {
 	MatrixRequired             bool
 	MatrixLifecycleSecret      string
 	MatrixIdentitySecret       string
-	DocumentCallAccessSecret   string
-	EncryptedDocumentCalls     bool
+	MatrixPublicationSecret    string
+	// ResourceSessionDocsSecret exposes only current public enrollment evidence to Docs.
+	ResourceSessionDocsSecret      string
+	ResourceSourceDocsURL          string
+	ResourceSourceDocsSecret       string
+	MatrixPublicationRequireMarker bool
+	DocumentCallAccessSecret       string
+	EncryptedDocumentCalls         bool
 
 	// IDURL es la base INTERNA de Sytue ID: de ahí sale a quién se le escribe
 	// cuando se teclea el correo o el @usuario de alguien de otra organización
@@ -181,22 +188,27 @@ func Load() (Config, error) {
 		OIDCAudience:          l.GetDefault("OIDC_AUDIENCE", "sytue-chat"),
 		OIDCAcceptedAudiences: l.GetCSVDefault("OIDC_ACCEPTED_AUDIENCES", pcfg.FirstPartyAudiences()),
 
-		DriveURL:                   l.GetDefault("DRIVE_URL", "http://drive:8082"),
-		IntegrationsURL:            l.GetDefault("INTEGRATIONS_URL", "http://integrations:8093"),
-		IntegrationsInternalSecret: l.Get("INTEGRATIONS_INTERNAL_SECRET"),
-		MatrixInternalURL:          l.Get("SYTUE_ROOMS_MATRIX_INTERNAL_URL"),
-		MatrixSourceURL:            l.Get("MATRIX_SOURCE_URL"),
-		MatrixHomeserverURL:        l.Get("SYTUE_ROOMS_MATRIX_HOMESERVER_URL"),
-		MatrixServerName:           l.GetDefault("SYTUE_ROOMS_MATRIX_SERVER_NAME", "matrix.sytue.eu"),
-		MatrixSSOProviderID:        l.GetDefault("SYTUE_ROOMS_MATRIX_SSO_PROVIDER_ID", "oidc-sytue"),
-		MatrixAdminToken:           l.Get("SYTUE_ROOMS_MATRIX_ADMIN_TOKEN"),
-		MatrixRequired:             l.GetBoolDefault("SYTUE_ROOMS_MATRIX_REQUIRED", true),
-		MatrixLifecycleSecret:      l.Get("SYTUE_ROOMS_MATRIX_LIFECYCLE_SECRET"),
-		MatrixIdentitySecret:       l.Get("SYTUE_ROOMS_MATRIX_IDENTITY_SECRET"),
-		DocumentCallAccessSecret:   l.Get("SYTUE_ROOMS_DOCUMENT_CALL_ACCESS_SECRET"),
-		EncryptedDocumentCalls:     l.GetBoolDefault("SYTUE_ROOMS_ENCRYPTED_DOCUMENT_CALLS", false),
-		IDURL:                      l.GetDefault("ID_URL", "http://id:8081"),
-		IDNombresOrgsSecret:        l.Get("ID_NOMBRES_ORGS_SECRET"),
+		DriveURL:                       l.GetDefault("DRIVE_URL", "http://drive:8082"),
+		IntegrationsURL:                l.GetDefault("INTEGRATIONS_URL", "http://integrations:8093"),
+		IntegrationsInternalSecret:     l.Get("INTEGRATIONS_INTERNAL_SECRET"),
+		MatrixInternalURL:              l.Get("SYTUE_ROOMS_MATRIX_INTERNAL_URL"),
+		MatrixSourceURL:                l.Get("MATRIX_SOURCE_URL"),
+		MatrixHomeserverURL:            l.Get("SYTUE_ROOMS_MATRIX_HOMESERVER_URL"),
+		MatrixServerName:               l.GetDefault("SYTUE_ROOMS_MATRIX_SERVER_NAME", "matrix.sytue.eu"),
+		MatrixSSOProviderID:            l.GetDefault("SYTUE_ROOMS_MATRIX_SSO_PROVIDER_ID", "oidc-sytue"),
+		MatrixAdminToken:               l.Get("SYTUE_ROOMS_MATRIX_ADMIN_TOKEN"),
+		MatrixRequired:                 l.GetBoolDefault("SYTUE_ROOMS_MATRIX_REQUIRED", true),
+		MatrixLifecycleSecret:          l.Get("SYTUE_ROOMS_MATRIX_LIFECYCLE_SECRET"),
+		MatrixIdentitySecret:           l.Get("SYTUE_ROOMS_MATRIX_IDENTITY_SECRET"),
+		MatrixPublicationSecret:        l.Get("SYTUE_ROOMS_MATRIX_PUBLICATION_SECRET"),
+		ResourceSessionDocsSecret:      l.Get("SYTUE_ROOMS_RESOURCE_SESSION_DOCS_SECRET"),
+		ResourceSourceDocsURL:          l.Get("SYTUE_ROOMS_RESOURCE_SOURCE_DOCS_URL"),
+		ResourceSourceDocsSecret:       l.Get("SYTUE_ROOMS_RESOURCE_SOURCE_DOCS_SECRET"),
+		MatrixPublicationRequireMarker: l.GetBoolDefault("SYTUE_ROOMS_MATRIX_PUBLICATION_REQUIRE_MARKER", false),
+		DocumentCallAccessSecret:       l.Get("SYTUE_ROOMS_DOCUMENT_CALL_ACCESS_SECRET"),
+		EncryptedDocumentCalls:         l.GetBoolDefault("SYTUE_ROOMS_ENCRYPTED_DOCUMENT_CALLS", false),
+		IDURL:                          l.GetDefault("ID_URL", "http://id:8081"),
+		IDNombresOrgsSecret:            l.Get("ID_NOMBRES_ORGS_SECRET"),
 
 		WhatsAppGraphURL: strings.TrimRight(l.GetDefault("WHATSAPP_GRAPH_URL", "https://graph.facebook.com/v23.0"), "/"),
 
@@ -267,6 +279,20 @@ func Load() (Config, error) {
 }
 
 func (c Config) validate() error {
+	if (c.ResourceSourceDocsURL == "") != (c.ResourceSourceDocsSecret == "") {
+		return fmt.Errorf("resource source requires both fixed Docs URL and internal credential")
+	}
+	if c.ResourceSourceDocsSecret != "" && c.ResourceSessionDocsSecret == "" {
+		return fmt.Errorf("docs source requires the fixed public session authority credential")
+	}
+	if c.ResourceSourceDocsSecret != "" {
+		if _, err := resourcepg.NewOriginSourceEndpoint("docs", c.ResourceSourceDocsURL, c.ResourceSourceDocsSecret, nil); err != nil {
+			return fmt.Errorf("invalid fixed Docs resource source configuration")
+		}
+	}
+	if c.ResourceSessionDocsSecret != "" && !resourcepg.ValidSessionServiceSecret(c.ResourceSessionDocsSecret) {
+		return fmt.Errorf("SYTUE_ROOMS_RESOURCE_SESSION_DOCS_SECRET must be canonical 32-byte hexadecimal")
+	}
 	if c.EncryptedDocumentCalls && c.DocumentCallAccessSecret == "" {
 		return fmt.Errorf("encrypted document calls require SYTUE_ROOMS_DOCUMENT_CALL_ACCESS_SECRET")
 	}

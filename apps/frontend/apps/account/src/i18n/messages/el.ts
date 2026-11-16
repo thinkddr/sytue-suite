@@ -7,6 +7,25 @@ import type { en } from './en.js';
 
 export const el: AppCatalog<typeof en> = {
   'app.title': 'Ο λογαριασμός μου',
+  'app.description':
+    'Ο λογαριασμός μου — προφίλ, ασφάλεια και πρόσβαση του λογαριασμού σας στο Sytue.',
+  'app.lead':
+    'Το προφίλ σας, πώς συνδέεστε και προστατεύετε τον λογαριασμό και πού είναι ανοιχτός.',
+
+  // --- Revisión de seguridad ---
+  'checkup.title': 'Έλεγχος ασφαλείας',
+  'checkup.all_good': 'Όλα καλά: ο λογαριασμός σας είναι καλά προστατευμένος.',
+  'checkup.dos_pasos':
+    'Η επαλήθευση σε δύο βήματα είναι ανενεργή: μόνο ο κωδικός ανοίγει τον λογαριασμό.',
+  'checkup.recuperacion':
+    'Χωρίς email ή τηλέφωνο ανάκτησης: αν χάσετε την πρόσβαση, δεν υπάρχει επιστροφή.',
+  'checkup.sesiones': 'Ανοιχτές συνεδρίες σε άλλες συσκευές: {count}',
+  'checkup.contrasenas_app': 'Κωδικοί εφαρμογών αχρησιμοποίητοι 90 ημέρες: {count}',
+  'checkup.dispositivos': 'Αξιόπιστες συσκευές που δεν εμφανίστηκαν 90 ημέρες: {count}',
+  'checkup.turn_on': 'Ενεργοποίηση',
+  'checkup.add': 'Προσθήκη',
+  'checkup.review': 'Έλεγχος',
+
   'profile.title': 'Προφίλ',
   'profile.name': 'Εμφανιζόμενο όνομα',
   'profile.name.hint': 'Πώς εμφανίζεστε σε όλη τη σουίτα.',
@@ -30,25 +49,55 @@ export const el: AppCatalog<typeof en> = {
   'photo.errorRead': 'Δεν ήταν δυνατή η ανάγνωση της εικόνας.',
   'sessions.title': 'Ανοιχτές συνεδρίες',
   'sessions.current': 'Αυτή η συσκευή',
+  'sessions.signed_in': 'Σύνδεση {time}',
   'sessions.close_one': 'Κλείσιμο αυτής της συνεδρίας',
+  'sessions.close_named': 'Κλείσιμο της συνεδρίας στη συσκευή {device}',
+  'sessions.close_one_confirm':
+    'Η συσκευή {device} θα αποσυνδεθεί και θα πρέπει να συνδεθεί ξανά για να χρησιμοποιήσει τον λογαριασμό σας.',
   'sessions.close_others': 'Κλείσιμο όλων των συνεδριών',
   'sessions.close_others_note': 'Και αυτής: θα χρειαστεί να συνδεθείτε ξανά.',
+  'sessions.close_all_confirm':
+    'Θα κλείσουν όλες οι συνεδρίες, μαζί και αυτή. Θα πρέπει να συνδεθείτε ξανά σε κάθε συσκευή.',
   'sessions.empty': 'Δεν υπάρχουν άλλες ανοιχτές συνεδρίες.',
   'sessions.failed': 'Δεν ήταν δυνατή η φόρτωση των συνεδριών σας.',
   'common.loading': 'Φόρτωση…',
+  'common.retry': 'Δοκιμάστε ξανά',
   'devices.title': 'Συσκευές',
   'devices.current': 'Αυτή η συσκευή',
   'devices.trusted': 'Αξιόπιστη',
   'devices.trust': 'Σήμανση ως αξιόπιστης',
   'devices.forget': 'Διαγραφή αυτής της συσκευής',
+  'devices.forget_named': 'Διαγραφή της συσκευής {device}',
+  'devices.forget_confirm':
+    'Η συσκευή {device} δεν θα αναγνωρίζεται πλέον και θα χάσει την ιδιότητα της αξιόπιστης. Μια νέα σύνδεση από αυτήν θα μετρά ως νέα συσκευή.',
   'devices.empty': 'Δεν έχουν αναγνωριστεί συσκευές ακόμη.',
   'devices.failed': 'Δεν ήταν δυνατή η φόρτωση των συσκευών σας.',
+  'signature.title': 'Αποθηκευμένη υπογραφή',
+  'signature.help':
+    'Η υπογραφή που ζητήσατε από το CertiPDF να θυμάται όταν υπογράφετε με το χέρι. Αποθηκεύεται κρυπτογραφημένη στον λογαριασμό σας.',
+  'signature.empty':
+    'Δεν έχετε αποθηκευμένη υπογραφή. Όταν υπογράφετε με το χέρι στο CertiPDF, επιλέξτε «Απομνημόνευση της υπογραφής μου».',
+  'signature.failed': 'Δεν ήταν δυνατή η φόρτωση της αποθηκευμένης υπογραφής σας.',
+  'signature.preview': 'Η αποθηκευμένη υπογραφή σας',
+  'signature.saved_on': 'Αποθηκεύτηκε στις {date}',
+  'signature.delete': 'Διαγραφή αποθηκευμένης υπογραφής',
+  'signature.delete_confirm':
+    'Η αποθηκευμένη υπογραφή σας θα διαγραφεί. Τα έγγραφα που έχετε ήδη υπογράψει τη διατηρούν· την επόμενη φορά που θα υπογράψετε με το χέρι θα πρέπει να τη σχεδιάσετε ξανά.',
   'security.title': 'Ασφάλεια',
   'security.failed': 'Κάτι πήγε στραβά. Δοκιμάστε ξανά.',
   'security.password.title': 'Κωδικός πρόσβασης',
   'security.password.warning': 'Η αλλαγή του σας αποσυνδέει παντού, και εδώ.',
   'security.password.current': 'Τρέχων κωδικός',
   'security.password.new': 'Νέος κωδικός',
+  'security.password.requirements': 'Απαιτήσεις για τον νέο κωδικό:',
+  'security.password.req_length': {
+    one: 'Τουλάχιστον {count} χαρακτήρας',
+    other: 'Τουλάχιστον {count} χαρακτήρες',
+  },
+  'security.password.req_complexity': 'Γράμματα και τουλάχιστον ένας αριθμός',
+  'security.password.req_different': 'Διαφορετικός από τον τρέχοντα κωδικό',
+  'security.password.req_met': 'Ικανοποιείται',
+  'security.password.req_pending': 'Όχι ακόμη',
   'security.password.submit': 'Αλλαγή κωδικού',
   'security.password.done': 'Ο κωδικός άλλαξε. Όλες οι συνεδρίες έκλεισαν, και αυτή.',
   'security.password.signin_again': 'Συνδεθείτε ξανά',
@@ -72,6 +121,46 @@ export const el: AppCatalog<typeof en> = {
   'security.codes.once':
     'Εμφανίζονται μία φορά. Φυλάξτε τους σε ασφαλές μέρος: καθένας λειτουργεί μόνο μία φορά.',
   'security.codes.saved': 'Τους αποθήκευσα',
+  'security.codes.regenerate_confirm':
+    'Οι τρέχοντες κωδικοί ανάκτησης θα πάψουν να ισχύουν αμέσως, ακόμη και όσοι έχετε εκτυπώσει ή αποθηκεύσει.',
+  'security.mfa.step.need': 'Πριν ξεκινήσετε',
+  'security.mfa.step.need.heading': 'Τι χρειάζεστε',
+  'security.mfa.step.need.desc':
+    'Μια εφαρμογή επαλήθευσης στο κινητό σας. Δείχνει νέο εξαψήφιο κωδικό κάθε 30 δευτερόλεπτα.',
+  'security.mfa.step.need.apps_title': 'Κάνει οποιαδήποτε εφαρμογή επαλήθευσης',
+  'security.mfa.step.need.apps':
+    'Για παράδειγμα: Aegis, FreeOTP, Microsoft Authenticator, Google Authenticator, 1Password, Bitwarden. Αν δεν έχετε, εγκαταστήστε μία πριν συνεχίσετε.',
+  'security.mfa.step.need.next': 'Έναρξη',
+  'security.mfa.step.scan': 'Σάρωση',
+  'security.mfa.step.scan.heading': 'Προσθέστε τον λογαριασμό σας στην εφαρμογή',
+  'security.mfa.key_label': 'Κλειδί ρύθμισης',
+  'security.mfa.step.code': 'Κωδικός',
+  'security.mfa.step.code.heading': 'Πληκτρολογήστε τον κωδικό της εφαρμογής',
+  'security.mfa.step.code.desc':
+    'Έτσι ελέγχεται ότι η εφαρμογή και ο λογαριασμός συμφωνούν πριν από την ενεργοποίηση.',
+  'security.mfa.code.hint': 'Έξι ψηφία. Αν αλλάξει ενώ γράφετε, χρησιμοποιήστε τον νέο.',
+  'security.mfa.step.codes.heading': 'Αποθηκεύστε τους κωδικούς ανάκτησης',
+  'security.codes.copy': 'Αντιγραφή όλων',
+  'security.codes.copied': 'Οι κωδικοί αντιγράφηκαν.',
+  'security.codes.copy_failed':
+    'Η αντιγραφή απέτυχε. Επιλέξτε τους κωδικούς και αντιγράψτε τους με το χέρι.',
+  'security.codes.download': 'Λήψη .txt',
+  'security.codes.file_title': 'Κωδικοί ανάκτησης Sytue',
+  'security.codes.file_account': 'Λογαριασμός: {account}',
+  'security.codes.file_date': 'Δημιουργήθηκαν: {date}',
+  'security.codes.file_note':
+    'Κάθε κωδικός ισχύει μία φορά. Φυλάξτε αυτό το αρχείο σε ασφαλές μέρος, μακριά από το κινητό.',
+  'security.mfa.step.done': 'Τέλος',
+  'security.mfa.step.done.heading': 'Η επαλήθευση σε δύο βήματα είναι ενεργή',
+  'security.mfa.step.done.desc':
+    'Την επόμενη φορά που θα συνδεθείτε, θα σας ζητηθεί κωδικός από την εφαρμογή.',
+  'security.mfa.passkey_tip.title': 'Προσθέστε και κλειδί πρόσβασης',
+  'security.mfa.passkey_tip':
+    'Με κλειδί πρόσβασης συνδέεστε με δακτυλικό αποτύπωμα, πρόσωπο ή κλείδωμα οθόνης, χωρίς κωδικούς.',
+  'security.mfa.passkey_tip.action': 'Προσθήκη κλειδιού πρόσβασης',
+  'security.mfa.close': 'Κλείσιμο',
+  'security.mfa.disable_title': 'Απενεργοποίηση της επαλήθευσης σε δύο βήματα;',
+  'security.mfa.disable_warning': 'Ο κωδικός πρόσβασης μόνος του θα ανοίγει ξανά τον λογαριασμό.',
   'common.cancel': 'Ακύρωση',
   'profile.given_name': 'Όνομα',
   'profile.family_name': 'Επώνυμο',
@@ -82,6 +171,8 @@ export const el: AppCatalog<typeof en> = {
   'profile.locale.hint': 'Χρησιμοποιείται σε όλο το Sytue και στα μηνύματα που σας στέλνουμε.',
   'security.passkeys.title': 'Κλειδιά πρόσβασης',
   'security.passkeys.remove': 'Αφαίρεση',
+  'security.passkeys.remove_named': 'Αφαίρεση του {name}',
+  'security.passkeys.remove_confirm': 'Δεν θα μπορείτε πλέον να συνδέεστε με το {name}.',
   'security.passkeys.unnamed': 'Κλειδί χωρίς όνομα',
   'app_passwords.title': 'Κωδικοί εφαρμογών',
   'app_passwords.hint':
@@ -90,6 +181,9 @@ export const el: AppCatalog<typeof en> = {
   'app_passwords.label.hint': 'Για παράδειγμα: αλληλογραφία φορητού, τηλέφωνο.',
   'app_passwords.create': 'Δημιουργία κωδικού',
   'app_passwords.revoke': 'Ανάκληση',
+  'app_passwords.revoke_named': 'Ανάκληση του {label}',
+  'app_passwords.revoke_confirm':
+    'Οι εφαρμογές που χρησιμοποιούν το {label} δεν θα μπορούν πλέον να συνδεθούν. Η ενέργεια δεν αναιρείται.',
   'app_passwords.empty': 'Δεν υπάρχουν κωδικοί εφαρμογών ακόμη.',
   'app_passwords.failed': 'Δεν ήταν δυνατή η φόρτωση των κωδικών εφαρμογών σας.',
   'app_passwords.unnamed': 'Χωρίς όνομα',

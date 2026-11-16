@@ -26,6 +26,7 @@ import (
 	"git.sytue.eu/sytue/one/services/drive/internal/config"
 	"git.sytue.eu/sytue/one/services/drive/internal/domain"
 	"git.sytue.eu/sytue/one/services/drive/internal/service"
+	"git.sytue.eu/sytue/one/services/drive/internal/store"
 )
 
 func newTeamService(t *testing.T) (*service.Service, context.Context) {
@@ -61,7 +62,7 @@ func TestTeamDriveIsolationAndRoles(t *testing.T) {
 	if drives, _ := svc.ListTeamDrives(ctx, bob); len(drives) != 0 {
 		t.Fatalf("no-miembro ve %d unidades, quiero 0", len(drives))
 	}
-	if _, err := svc.TeamListChildren(ctx, d.ID, bob, uuid.Nil, "", 0); !errors.Is(err, domain.ErrNotFound) {
+	if _, err := svc.TeamListChildren(ctx, d.ID, bob, uuid.Nil, store.OrdenFicheros{}, "", 0); !errors.Is(err, domain.ErrNotFound) {
 		t.Fatalf("no-miembro lista contenido => %v, quiero ErrNotFound", err)
 	}
 	if _, err := svc.TeamCreateFolder(ctx, d.ID, bob, uuid.Nil, "x"); !errors.Is(err, domain.ErrNotFound) {
@@ -78,7 +79,7 @@ func TestTeamDriveIsolationAndRoles(t *testing.T) {
 	if _, err := svc.PutTeamDriveMember(ctx, d.ID, alice, carol, domain.TeamViewer); err != nil {
 		t.Fatalf("añadir viewer: %v", err)
 	}
-	if _, err := svc.TeamListChildren(ctx, d.ID, carol, uuid.Nil, "", 0); err != nil {
+	if _, err := svc.TeamListChildren(ctx, d.ID, carol, uuid.Nil, store.OrdenFicheros{}, "", 0); err != nil {
 		t.Fatalf("viewer lee => %v, quiero ok", err)
 	}
 	if _, err := svc.TeamCreateFolder(ctx, d.ID, carol, uuid.Nil, "docs"); !errors.Is(err, domain.ErrPermission) {
@@ -128,11 +129,11 @@ func TestTeamDriveContentScoping(t *testing.T) {
 	if _, err := svc.TeamCreateFolder(ctx, a.ID, "alice", uuid.Nil, "solo-A"); err != nil {
 		t.Fatalf("crear carpeta en A: %v", err)
 	}
-	la, err := svc.TeamListChildren(ctx, a.ID, "alice", uuid.Nil, "", 0)
+	la, err := svc.TeamListChildren(ctx, a.ID, "alice", uuid.Nil, store.OrdenFicheros{}, "", 0)
 	if err != nil || len(la.Subfolders) != 1 {
 		t.Fatalf("A debería ver 1 subcarpeta: %+v, %v", la.Subfolders, err)
 	}
-	lb, err := svc.TeamListChildren(ctx, b.ID, "alice", uuid.Nil, "", 0)
+	lb, err := svc.TeamListChildren(ctx, b.ID, "alice", uuid.Nil, store.OrdenFicheros{}, "", 0)
 	if err != nil || len(lb.Subfolders) != 0 {
 		t.Fatalf("B NO debería ver el contenido de A: %+v, %v", lb.Subfolders, err)
 	}

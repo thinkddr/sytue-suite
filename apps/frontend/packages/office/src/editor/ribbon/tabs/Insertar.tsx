@@ -412,6 +412,24 @@ function ConectoresGroup(): JSX.Element {
   );
 }
 
+/* ---------- Gráfico (solo presentación): caja 'chart' vía dispatchSlidesCommand ----------
+ * El mismo `addChartBox` que el botón de la mini-barra del lienzo: aquí está donde
+ * se busca (en Docus el gráfico vive en Insertar), y la mini-barra lo conserva a mano. */
+
+export function GraficoSlidesGroup(): JSX.Element {
+  const t = useT();
+  return (
+    <RibbonGroup label={t('blocks.chart')}>
+      <RibbonButton
+        commandId="grafico"
+        icon="chart"
+        label={t('data.chart.insert')}
+        onAction={() => dispatchSlidesCommand('grafico')}
+      />
+    </RibbonGroup>
+  );
+}
+
 /* ---------- SmartArt (solo presentación): diagrama vía dispatchSlidesCommand ---------- */
 
 function SmartArtGroup(): JSX.Element {
@@ -1399,6 +1417,8 @@ export function InsertarTab({ ctx }: { ctx: EditorContext }): JSX.Element {
           <FormasGroup />
           <RibbonSeparator />
           <ConectoresGroup />
+          <RibbonSeparator />
+          <GraficoSlidesGroup />
           <RibbonSeparator />
           <SmartArtGroup />
           <RibbonSeparator />

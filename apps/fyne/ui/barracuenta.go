@@ -659,7 +659,17 @@ func (c *cuentaBarra) entrarOSalir(e sesion.Estado) fyne.CanvasObject {
 	}
 	salir := NuevoElementoMenu(c.t.T("account.signOut", nil), iconos.Salir, func() {
 		if c.s != nil {
-			c.salir(sesion.PendientesAlmacenamiento())
+			captured, err := c.s.AutorizarSalida()
+			if err != nil {
+				c.mostrarFalloCierre()
+				return
+			}
+			pending, err := c.s.PendientesSalida()
+			if err != nil {
+				c.mostrarFalloCierre(intentoCierre{autorizacion: captured})
+				return
+			}
+			c.salirAutorizado(pending, captured)
 		}
 	})
 	salir.Peligro = true
@@ -674,29 +684,45 @@ func (c *cuentaBarra) entrarOSalir(e sesion.Estado) fyne.CanvasObject {
 // descartarlo o no salir. Si al subir queda algo (sin red, rechazado, diario sin origen
 // o de otra organización), se vuelve a preguntar con lo que quede.
 func (c *cuentaBarra) salir(pendientes int) {
+	captured, err := c.s.AutorizarSalida()
+	if err != nil {
+		c.mostrarFalloCierre()
+		return
+	}
+	c.salirAutorizado(pendientes, captured)
+}
+
+// salirAutorizado avisa, antes de cerrar sesión, de lo que hay sin subir en
+// este equipo —capturas y borradores de Notepads más diarios de subidas cifradas—,
+// porque Salir lo borra del disco (NAT-08, «avisar y luego borrar», 2026-10-16). Se
+// elige subirlo, descartarlo o no salir. Si al subir queda algo (sin red, rechazado,
+// diario sin origen o de otra organización), se vuelve a preguntar con lo que quede.
+func (c *cuentaBarra) salirAutorizado(pendientes int, captured sesion.AutorizacionSalida) {
+	if captured.Vigente() != nil {
+		return
+	}
 	if pendientes == 0 {
-		c.cerrarSesion()
+		c.cerrarSesionAutorizada(&captured, false)
 		return
 	}
 	lienzo := fyne.CurrentApp().Driver().CanvasForObject(c.boton)
 	if lienzo == nil {
-		c.cerrarSesion() // sin ventana no hay a quién avisar; la web tampoco pregunta
-		return
+		return // pending work cannot be discarded without a visible explicit choice
 	}
 	var d *Dialogo
 	descartar := NuevoBoton(c.t.T("account.signOutPending.discard", nil), func() {
 		d.Cerrar()
-		c.cerrarSesion()
+		c.cerrarSesionAutorizada(&captured, true)
 	}).Con(Peligro, TallaMD)
 	subir := NuevoBoton(c.t.T("account.signOutPending.upload", nil), func() {
 		d.Ocupado(true)
 		go func() {
 			ctx, parar := context.WithTimeout(context.Background(), 30*time.Second)
-			quedan := c.s.SubirPendientes(ctx)
+			quedan := c.s.SubirNotepadsAutorizado(ctx, captured)
 			parar()
 			fyne.Do(func() {
 				d.Cerrar()
-				c.salir(quedan)
+				c.salirAutorizado(quedan, captured)
 			})
 		}()
 	}).Con(Primario, TallaMD)
@@ -714,7 +740,16 @@ func (c *cuentaBarra) salir(pendientes int) {
 
 // cerrarSesion conserva el aviso hasta que la persona lo cierre o reintente. No
 // muestra rutas ni errores del llavero: el motivo operativo queda en el registro.
-func (c *cuentaBarra) cerrarSesion() {
+type intentoCierre struct {
+	autorizacion sesion.AutorizacionSalida
+	descartar    bool
+}
+
+func (c *cuentaBarra) cerrarSesion(descartar ...bool) {
+	c.cerrarSesionAutorizada(nil, len(descartar) > 0 && descartar[0])
+}
+
+func (c *cuentaBarra) cerrarSesionAutorizada(captured *sesion.AutorizacionSalida, discard bool) {
 	c.mu.Lock()
 	if c.cerrando {
 		c.mu.Unlock()
@@ -722,28 +757,48 @@ func (c *cuentaBarra) cerrarSesion() {
 	}
 	c.cerrando = true
 	c.mu.Unlock()
+	var authorization sesion.AutorizacionSalida
+	var captureErr error
+	if captured != nil {
+		authorization = *captured
+	} else {
+		authorization, captureErr = c.s.AutorizarSalida()
+	}
 	go func() {
-		err := c.s.SalirConError()
+		err := captureErr
+		if err == nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			err = authorization.Cerrar(ctx, discard)
+			cancel()
+		}
 		if err != nil {
 			slog.Warn("ui: cierre de sesión compartida incompleto", "error", err)
 		}
 		fyne.Do(func() {
 			defer func() { c.mu.Lock(); c.cerrando = false; c.mu.Unlock() }()
 			if err != nil {
-				c.mostrarFalloCierre()
+				c.mostrarFalloCierre(intentoCierre{authorization, discard})
 			}
 		})
 	}()
 }
 
-func (c *cuentaBarra) mostrarFalloCierre() {
+func (c *cuentaBarra) mostrarFalloCierre(previous ...intentoCierre) {
 	lienzo := fyne.CurrentApp().Driver().CanvasForObject(c.boton)
 	if lienzo == nil {
 		return
 	}
 	var d *Dialogo
 	cerrar := NuevoBoton(c.t.T("ui.close", nil), func() { d.Cerrar() }).Con(Fantasma, TallaMD)
-	reintentar := NuevoBoton(c.t.T("action.retry", nil), func() { d.Cerrar(); c.cerrarSesion() }).Con(Primario, TallaMD)
+	reintentar := NuevoBoton(c.t.T("action.retry", nil), func() {
+		d.Cerrar()
+		if len(previous) > 0 {
+			old := previous[0]
+			c.cerrarSesionAutorizada(&old.autorizacion, old.descartar)
+		} else {
+			c.cerrarSesion()
+		}
+	}).Con(Primario, TallaMD)
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	escalon := tema.Escalon{Tam: tema.TextoSM.Tam, Linea: 1.625 * tema.TextoSM.Tam}
 	cuerpo := NuevoParrafo(c.t.T("account.signOutFailed", nil), escalon, Normal, "text", v)

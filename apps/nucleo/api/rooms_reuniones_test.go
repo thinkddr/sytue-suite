@@ -256,3 +256,53 @@ func TestLaClaveDelEnlaceViajaAlEntrarYAlLlamar(t *testing.T) {
 		t.Fatalf("enlace %q: id %q, clave %q", enlace, id, ClaveDeReunion(u))
 	}
 }
+
+// «Llamada en curso · N» del carril sale de las dos lecturas de `activeCall` de la web:
+// la sala del canal por su origen, sin crearla, y sus presentes. Sin sala es 0, no un
+// error: es lo normal en un canal sin llamada.
+//
+// VISTO EN ROJO (2026-11-09): tratando el 404 como error, el canal sin sala devuelve
+// error y el segundo caso falla; buscando con `POST /rooms/from-source`, mirar crearía
+// la sala y la lista de pedidas no cuadra.
+func TestRoomsLlamadaActivaDeUnCanal(t *testing.T) {
+	var pedidas []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pedidas = append(pedidas, r.Method+" "+r.URL.RequestURI())
+		switch r.Method + " " + r.URL.Path {
+		case "GET /api/v1/rooms/by-source":
+			switch r.URL.Query().Get("ref_id") {
+			case "c1":
+				_, _ = io.WriteString(w, `{"id":"rc","name":"sala-c"}`)
+			case "roto":
+				w.WriteHeader(http.StatusBadGateway)
+			default:
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = io.WriteString(w, `{"error":{"code":"not_found","message":"no room"}}`)
+			}
+		case "GET /api/v1/rooms/rc/participants":
+			_, _ = io.WriteString(w, `{"participants":[{"id":"p1","identity":"u1"},{"id":"p2","identity":"u2"}]}`)
+		default:
+			w.WriteHeader(http.StatusTeapot)
+		}
+	}))
+	defer srv.Close()
+	r, ctx := NewRooms(srv.URL, nil, nil), context.Background()
+	if n, err := r.LlamadaActiva(ctx, "c1"); err != nil || n != 2 {
+		t.Errorf("con llamada: %d, %v", n, err)
+	}
+	if n, err := r.LlamadaActiva(ctx, "c2"); err != nil || n != 0 {
+		t.Errorf("sin sala: %d, %v", n, err)
+	}
+	if _, err := r.LlamadaActiva(ctx, "roto"); err == nil {
+		t.Error("una avería del servicio no puede pasar por «sin llamada»")
+	}
+	quiero := []string{
+		"GET /api/v1/rooms/by-source?kind=chat&ref_id=c1",
+		"GET /api/v1/rooms/rc/participants?present=1",
+		"GET /api/v1/rooms/by-source?kind=chat&ref_id=c2",
+		"GET /api/v1/rooms/by-source?kind=chat&ref_id=roto",
+	}
+	if strings.Join(pedidas, "\n") != strings.Join(quiero, "\n") {
+		t.Errorf("pedidas:\n%s", strings.Join(pedidas, "\n"))
+	}
+}

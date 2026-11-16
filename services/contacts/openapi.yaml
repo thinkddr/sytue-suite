@@ -400,6 +400,10 @@ components:
         nickname: { type: string }
         note: { type: string }
         birthday: { type: string, format: date }
+        birthday_no_year:
+          type: string
+          pattern: "^--(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"
+          description: Cumpleaños SIN año («--MM-DD»), de un BDAY «--0215» o del año de relleno de Apple (X-APPLE-OMIT-YEAR). Vacío si hay `birthday`.
         photo_url: { type: string }
         has_photo:
           type: boolean
@@ -411,6 +415,15 @@ components:
         phones:
           type: array
           items: { $ref: "#/components/schemas/Phone" }
+        urls:
+          type: array
+          description: Sitios web (URL http/https; los demás URL se conservan en la tarjeta sin proyectar).
+          items: { $ref: "#/components/schemas/ContactURL" }
+        related:
+          type: array
+          description: Personas relacionadas, por su nombre (RELATED de texto).
+          items: { $ref: "#/components/schemas/ContactRelated" }
+        anniversary: { type: string, format: date, description: "ANNIVERSARY, solo si es una fecha completa." }
         etag: { type: string, format: uuid }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
@@ -430,6 +443,9 @@ components:
         nickname: { type: string }
         note: { type: string }
         birthday: { type: string, description: "YYYY-MM-DD o RFC3339" }
+        birthday_no_year:
+          type: string
+          description: Cumpleaños SIN año, «--MM-DD» o «--MMDD». Se ignora si va `birthday`; sin ninguno de los dos, el contacto se queda sin cumpleaños.
         photo_url: { type: string }
         emails:
           type: array
@@ -437,6 +453,31 @@ components:
         phones:
           type: array
           items: { $ref: "#/components/schemas/Phone" }
+        urls:
+          type: array
+          description: Sustituye a los sitios web proyectados. Sin esquema se completa con «https://»; solo http y https (400 si no).
+          items: { $ref: "#/components/schemas/ContactURL" }
+        related:
+          type: array
+          description: Sustituye a las personas relacionadas proyectadas.
+          items: { $ref: "#/components/schemas/ContactRelated" }
+        anniversary: { type: string, description: "YYYY-MM-DD o RFC3339; sin él, el contacto se queda sin aniversario." }
+
+    ContactURL:
+      type: object
+      required: [url]
+      properties:
+        url: { type: string, maxLength: 2048 }
+        type: { type: string, enum: [home, work, other] }
+
+    ContactRelated:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 256 }
+        type:
+          type: string
+          description: Tipo de relación del registro de la IANA (RFC 6350 §6.6.6), p. ej. spouse, child, parent, sibling, friend, co-worker, emergency. Otro valor se descarta.
 
     Group:
       type: object

@@ -21,7 +21,7 @@
  * —eso desajustaria la hidratacion— y los tamaños y fechas se formatean con ese
  * locale (docs/CONVENTIONS.md §13.1).
  */
-import { createContext } from 'preact';
+import { createContext, type RefObject } from 'preact';
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import {
   Button,
@@ -38,10 +38,13 @@ import {
   Dropdown,
   MenuItem,
   MenuSeparator,
+  SegmentedControl,
   MobileFab,
   Skeleton,
+  SkeletonRows,
   Spinner,
   VirtualList,
+  type VirtualListHandle,
   usePrompt,
   useToast,
   useAhora,
@@ -52,12 +55,16 @@ import {
   useTheme,
   BulkActionBar,
   withBase,
-  Illustration,
-  esAtajoDeApp,
+  ShortcutsModal,
+  useUltimo,
   Checkbox,
   Radio,
   usePointerDrag,
+  Migas,
+  moverFocoEnListaVirtual,
+  moverFocoEnRejilla,
 } from '@sytue/ui';
+import { thumbable } from '../lib/miniaturas';
 import type { DriveResource, ShareLink as ShareLinkSdk, TrashItem } from '@sytue/api-clients';
 
 /**
@@ -75,7 +82,19 @@ import { useI18n } from '@sytue/i18n/preact';
 import { useT, type T } from '../i18n';
 import { Glyph } from './glyphs';
 import { wopiExtensions, extensionOf, openInEditor, openableInDocs } from '../lib/wopi';
-import { idsDelRango, partirEnTeselas, posicionEnLista } from '../lib/teselas';
+import { partirEnTeselas, posicionEnLista } from '../lib/teselas';
+import {
+  guardarVista,
+  leerVista,
+  ordenarRecursos,
+  type CampoOrden,
+  type Orden,
+} from '../lib/orden';
+import { SelectorOrden, useOrdenRecordado } from './SelectorOrden';
+import { abrirMenuDeFila } from '../lib/menu-contextual';
+import { accionDeEvento, gruposDeAtajos } from '../lib/atajos';
+import { agruparPorFecha, type GrupoFecha } from '../lib/grupos-fecha';
+import { tipoMultimedia } from '../lib/multimedia';
 import {
   appQueAbre,
   enlaceInterno,
@@ -84,6 +103,15 @@ import {
   urlDeSubirACast,
 } from '../lib/abrir-con';
 import { MIME_ARRASTRE, movibles, rutaDestino } from '../lib/arrastrar';
+import { admiteSubirCarpeta, entradasDeCarpeta } from '../lib/subir-carpeta';
+import {
+  aMarcar,
+  carpetaEnCache,
+  carpetaPadre,
+  pendienteDeLaUrl,
+  urlDeListado,
+  type Pendiente,
+} from '../lib/ubicacion';
 import {
   alRestaurar,
   avisarRestaurados,
@@ -93,10 +121,12 @@ import {
   type PorId,
   type VistaViva,
 } from '../lib/lote';
-import { DURACION_DESHACER, formatBytes } from '@sytue/ui';
+import { DURACION_DESHACER, formatBytes, idsDelRango } from '@sytue/ui';
 import { VersionsDialog } from './VersionsDialog';
+import { DetailsDialog } from './DetailsDialog';
 import { ResumenIA } from './ResumenIA.js';
 import { PdfPageOrder, expandirPaginas, type PaginaIndice } from './PdfPageOrder';
+import { useOptionalPrivateDrive } from '../client/private-browser.js';
 
 /** `t` + locale de la isla, en una linea (el proveedor lo pone <SytueShell>). */
 function useDriveT(): { t: T; locale: Locale } {
@@ -133,9 +163,6 @@ async function bffReason(res: Response): Promise<string> {
     return '';
   }
 }
-
-/** Tamaño de página del listado (keyset en el servicio Go, que acota a ≤500). */
-const PAGE_SIZE = 200;
 
 /** Umbral para preferir la subida directa a S3 (presigned): por debajo, el PUT por
  *  el BFF (/api/content) es más simple y evita dos round-trips. La vía presigned
@@ -213,13 +240,12 @@ async function presignedUpload(
 const drive = {
   /**
    * Página de una carpeta: carpetas completas + primera tanda de ficheros ya
-   * ordenados por el servicio (carpetas primero, luego nombre); con `cursor`
-   * llegan los ficheros siguientes. `nextCursor` presente cuando hay más.
+   * ordenados por el servicio (carpetas primero, luego `orden`; por defecto el
+   * nombre); con `cursor` llegan los ficheros siguientes. `nextCursor` presente
+   * cuando hay más.
    */
-  list: (path: string, cursor?: string) =>
-    bffJson<{ items: DriveResource[]; nextCursor?: string }>(
-      `/api/files?path=${encodeURIComponent(path)}&limit=${PAGE_SIZE}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
-    ),
+  list: (path: string, cursor?: string, orden?: Orden) =>
+    bffJson<{ items: DriveResource[]; nextCursor?: string }>(urlDeListado(path, cursor, orden)),
   createFolder: (path: string) =>
     bffJson<{ resource: DriveResource }>('/api/folders', {
       method: 'POST',
@@ -431,6 +457,8 @@ const drive = {
     ),
 };
 
+export type DriveBrowserAPI = typeof drive;
+
 /** Permiso de un share dirigido al usuario (vocabulario de la UI de compartición). */
 type SharedPermission = 'view' | 'edit';
 
@@ -505,12 +533,16 @@ const TEXT_EXTS = new Set([
  * si solo cabe descargarlo. Decide por content-type real (lo guarda el servicio
  * al subir) con la extension como respaldo.
  */
-export function previewKind(item: DriveResource): 'image' | 'pdf' | 'text' | 'office' | null {
+export function previewKind(
+  item: DriveResource,
+): 'image' | 'pdf' | 'text' | 'office' | 'video' | 'audio' | null {
   if (item.isDirectory) return null;
   const ct = item.contentType ?? '';
   const ext = fileExt(item.name);
   if (ct.startsWith('image/') || IMAGE_EXTS.has(ext)) return 'image';
   if (ct === 'application/pdf' || ext === 'pdf') return 'pdf';
+  const medio = tipoMultimedia(ct, ext);
+  if (medio) return medio;
   if (ct.startsWith('text/') || ct === 'application/json' || TEXT_EXTS.has(ext)) return 'text';
   // Lo último, aposta: `openableInDocs` incluye también pdf, csv o md, que ya
   // tienen visor propio unas líneas más arriba. Aquí solo quedan los formatos
@@ -564,24 +596,6 @@ async function abrirEnLaSuite(
   // siempre en vez de dejar la pantalla como estaba sin decir nada.
   if (app === 'editor' && item.id) return openInEditor(item.id, 'edit', '_self');
   return false;
-}
-
-/** Content-types ráster con miniatura server-side (el backend usa la stdlib de Go). */
-const THUMB_CTS = new Set(['image/jpeg', 'image/png', 'image/gif']);
-/** Respaldo por extensión cuando el fichero no trae content-type. */
-const THUMB_EXTS = new Set(['jpg', 'jpeg', 'png', 'gif']);
-
-/**
- * ¿Tiene el fichero miniatura server-side? Solo ráster JPEG/PNG/GIF (lo que el
- * servicio Go genera con la stdlib). WebP/AVIF/SVG caen al icono (el backend no los
- * miniaturiza); un desajuste residual lo cubre el onError del <img>. Necesita id (la
- * miniatura se pide por id, no por ruta).
- */
-function thumbable(item: DriveResource): boolean {
-  if (item.isDirectory || !item.id) return false;
-  const ct = item.contentType ?? '';
-  if (ct) return THUMB_CTS.has(ct);
-  return THUMB_EXTS.has(fileExt(item.name));
 }
 
 /**
@@ -639,7 +653,7 @@ function segments(path: string): { name: string; path: string }[] {
 const UPLOAD_CONCURRENCY = 3;
 
 /** Un fichero a subir con su subruta relativa ('' = carpeta actual; 'a/b' = drop de carpeta). */
-interface UploadEntry {
+export interface UploadEntry {
   file: File;
   dir: string;
 }
@@ -684,7 +698,7 @@ async function walkEntry(
  * Las entradas raíz se capturan de forma SÍNCRONA (la lista solo es válida durante
  * el evento drop) antes de cualquier lectura asíncrona.
  */
-async function collectDropEntries(dt: DataTransfer): Promise<UploadEntry[]> {
+export async function collectDropEntries(dt: DataTransfer): Promise<UploadEntry[]> {
   const roots: FileSystemEntry[] = [];
   for (let i = 0; i < dt.items.length; i++) {
     const entry = dt.items[i]?.webkitGetAsEntry?.();
@@ -790,6 +804,14 @@ export function FileBrowser() {
   // Se lee en el primer render porque el efecto que sincroniza la URL borra `preview`
   // enseguida (es de un solo uso, no debe quedarse pegado a la sesión).
   const wantPreview = useRef(urlParam('preview'));
+  // «Mostrar en su carpeta»: lo que marcar y poner a la vista cuando llegue su carpeta.
+  // Llega por `?select=` (desde Recientes o Destacados, que montan esto de nuevo) o lo
+  // pone el menú de un resultado de búsqueda. Mismo motivo que `wantPreview` para leerlo
+  // aquí: el efecto de la URL lo borra en el primer pintado.
+  const wantSelect = useRef<Pendiente | null>(
+    typeof window === 'undefined' ? null : pendienteDeLaUrl(window.location.search),
+  );
+  const listaRef = useRef<VirtualListHandle>(null);
   // Búsqueda dentro de Drive. El servicio la sabía hacer desde el principio (y el Hub la
   // federa en la topbar), pero el explorador no tenía caja: encontrar un fichero obligaba
   // a navegar carpeta por carpeta. Con término, la lista pasa a ser la de resultados.
@@ -806,7 +828,17 @@ export function FileBrowser() {
   // 'session' (401: la sesión caducó, la salida es volver a entrar) o 'network'
   // (cualquier otro fallo, reintentable). El copy y la acción se derivan al pintar.
   const [error, setError] = useState<'session' | 'network' | null>(null);
-  const [view, setView] = useState<ViewMode>('list');
+  // Vista y orden se recuerdan por navegador. Se leen tras montar y no en el estado
+  // inicial: la isla se pinta también en el servidor, y leerlos antes desajustaría la
+  // hidratación. La carpeta no se pide hasta tener el orden: pedirla en el de siempre
+  // para tirarla al instante sería una petición de más en cada visita.
+  const [view, setVistaEstado] = useState<ViewMode>('list');
+  useEffect(() => setVistaEstado(leerVista()), []);
+  const setView = (v: ViewMode) => {
+    setVistaEstado(v);
+    guardarVista(v);
+  };
+  const { orden, ordenarPor, leido: prefsLeidas } = useOrdenRecordado();
   const [busy, setBusy] = useState(false);
 
   // Estado propio de la subida: el spinner de «Subir» solo debe girar al subir,
@@ -831,6 +863,8 @@ export function FileBrowser() {
   const [previewItem, setPreviewItem] = useState<DriveResource | null>(null);
   // Historial de versiones: fichero cuyo panel de versiones está abierto.
   const [versionsItem, setVersionsItem] = useState<DriveResource | null>(null);
+  // «Detalles»: elemento cuyo panel de información está abierto.
+  const [detailsItem, setDetailsItem] = useState<DriveResource | null>(null);
   const [organizePdfItem, setOrganizePdfItem] = useState<DriveResource | null>(null);
   // Clasificación: el fichero en curso y la taxonomía de la organización. La taxonomía
   // se pide al ABRIR el diálogo, no al montar el explorador: la mayoría de sesiones no
@@ -860,6 +894,14 @@ export function FileBrowser() {
   const [batchTrashOpen, setBatchTrashOpen] = useState(false);
 
   const fileInput = useRef<HTMLInputElement>(null);
+  const buscador = useRef<HTMLInputElement>(null);
+  const [atajosOpen, setAtajosOpen] = useState(false);
+  // «Subir carpeta»: el segundo input, con `webkitdirectory`. Se decide tras montar
+  // (en el servidor no hay navegador que mirar) y no se ofrece donde no hay selector
+  // de carpetas, como Safari para iOS.
+  const folderInput = useRef<HTMLInputElement>(null);
+  const [conCarpeta, setConCarpeta] = useState(false);
+  useEffect(() => setConCarpeta(admiteSubirCarpeta()), []);
 
   // Arrastrar-soltar: `dragging` pinta el overlay; `dragDepth` cuenta enter/leave
   // (los hijos disparan leave al entrar en ellos) para no parpadear al arrastrar.
@@ -874,6 +916,8 @@ export function FileBrowser() {
     setNewFolderOpen(false);
     setShareItem(null);
     setLabelItem(null);
+    // «Detalles» se pide a la red y sus atajos (compartir) también: sin ella no sirve.
+    setDetailsItem(null);
     setPendingRename(null);
     setPendingMove(null);
     setBatchMoveOpen(false);
@@ -888,26 +932,30 @@ export function FileBrowser() {
   // `loadingMore` llega un render tarde y dispararía peticiones duplicadas).
   const fetchingMore = useRef(false);
 
-  const load = useCallback(async (target: string) => {
-    const e = ++epoch.current;
-    setItems(null);
-    setNextCursor(null);
-    setError(null);
-    setSelected(new Set());
-    anchorRef.current = -1;
-    try {
-      // El orden llega del servicio (carpetas primero, luego ficheros por
-      // nombre, keyset): reordenar en cliente rompería la continuidad al
-      // encadenar páginas.
-      const page = await drive.list(target);
-      if (epoch.current !== e) return;
-      setItems(page.items);
-      setNextCursor(page.nextCursor ?? null);
-    } catch (err) {
-      if (epoch.current !== e) return;
-      setError(err instanceof BffError && err.status === 401 ? 'session' : 'network');
-    }
-  }, []);
+  const load = useCallback(
+    async (target: string) => {
+      const e = ++epoch.current;
+      setItems(null);
+      setNextCursor(null);
+      setError(null);
+      setSelected(new Set());
+      anchorRef.current = -1;
+      try {
+        // El orden llega del servicio (carpetas primero, luego ficheros por el
+        // campo elegido, keyset): reordenar en cliente rompería la continuidad al
+        // encadenar páginas. Cambiar de orden cambia `load` y vuelve a pedir la
+        // carpeta desde el principio.
+        const page = await drive.list(target, undefined, orden);
+        if (epoch.current !== e) return;
+        setItems(page.items);
+        setNextCursor(page.nextCursor ?? null);
+      } catch (err) {
+        if (epoch.current !== e) return;
+        setError(err instanceof BffError && err.status === 401 ? 'session' : 'network');
+      }
+    },
+    [orden],
+  );
 
   /** Página siguiente (scroll en lista, «Cargar más» en rejilla): añade al final. */
   const loadMore = useCallback(async () => {
@@ -916,7 +964,8 @@ export function FileBrowser() {
     const e = epoch.current;
     setLoadingMore(true);
     try {
-      const page = await drive.list(path, nextCursor);
+      // El cursor lleva su orden: seguirlo con otro es un 400 del servicio.
+      const page = await drive.list(path, nextCursor, orden);
       if (epoch.current !== e) return;
       setItems((prev) => [...(prev ?? []), ...page.items]);
       setNextCursor(page.nextCursor ?? null);
@@ -927,11 +976,11 @@ export function FileBrowser() {
       fetchingMore.current = false;
       setLoadingMore(false);
     }
-  }, [path, nextCursor, toast, t]);
+  }, [path, nextCursor, orden, toast, t]);
 
   useEffect(() => {
-    void load(path);
-  }, [path, load]);
+    if (prefsLeidas) void load(path);
+  }, [path, load, prefsLeidas]);
 
   // Carga el conjunto de favoritos una vez; el explorador funciona sin él.
   useEffect(() => {
@@ -980,6 +1029,8 @@ export function FileBrowser() {
   // `results === null` mientras aún no ha vuelto la primera respuesta, que es lo que hace
   // que el esqueleto aparezca igual que al cambiar de carpeta.
   const searchMode = query.trim() !== '';
+  // La carpeta llega ya en el orden elegido (lo aplica el servicio); los resultados de
+  // búsqueda conservan su orden de relevancia.
   const shown = searchMode ? results : items;
 
   // Invalida búsquedas en vuelo: con el rebote es raro, pero una respuesta lenta de
@@ -1036,6 +1087,7 @@ export function FileBrowser() {
     if (path === '/') u.searchParams.delete('path');
     else u.searchParams.set('path', path);
     u.searchParams.delete('preview');
+    u.searchParams.delete('select');
     window.history.replaceState(null, '', u.toString());
   }, [path]);
 
@@ -1058,23 +1110,6 @@ export function FileBrowser() {
   const onUploadClick = () => {
     if (!offline) fileInput.current?.click();
   };
-
-  // «u» sube y «n» crea una carpeta: los atajos que pulsa el menú nativo de la
-  // app de escritorio («Archivos → Subir… ⌘U / Nueva carpeta ⌘N»).
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (!esAtajoDeApp(e) || offline) return;
-      if (e.key === 'u') {
-        e.preventDefault();
-        fileInput.current?.click();
-      } else if (e.key === 'n') {
-        e.preventDefault();
-        setNewFolderOpen(true);
-      }
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [offline]);
 
   // Subida COMPARTIDA por el botón «Subir» y el arrastrar-soltar. Reusa el endpoint
   // de subida existente (drive.upload → PUT /api/content). En PARALELO ACOTADO
@@ -1171,6 +1206,15 @@ export function FileBrowser() {
     const files = Array.from(input.files ?? []);
     input.value = '';
     await uploadEntries(files.map((file) => ({ file, dir: '' })));
+  };
+
+  // La carpeta elegida va por el MISMO camino que una soltada: sus subcarpetas se crean
+  // antes de subir, con la misma barra y el mismo resumen.
+  const onFolderSelected = async (e: Event) => {
+    const input = e.currentTarget as HTMLInputElement;
+    const entries = entradasDeCarpeta(input.files ?? []);
+    input.value = '';
+    await uploadEntries(entries);
   };
 
   // --- Arrastrar-soltar (solo activa con ficheros del SO; ignora drags ajenos) ---
@@ -1476,6 +1520,48 @@ export function FileBrowser() {
   const franja = forma === 'marco' && view === 'list' && !searchMode;
   const partes = useMemo(() => partirEnTeselas(shown, franja), [shown, franja]);
 
+  // «Mostrar en su carpeta»: al llegar la carpeta, el elemento queda marcado —selección
+  // de uno, con el ancla en él para que Mayús + clic siga desde ahí— y a la vista. Va
+  // DESPUÉS del efecto de la búsqueda, que vacía la selección al salir de ella: en el
+  // mismo pintado, el último que escribe es este.
+  useEffect(() => {
+    const want = wantSelect.current;
+    if (!want || searchMode) return;
+    const r = aMarcar(partes.enOrden, want, path);
+    if (r === 'esperar') return;
+    // No está en lo cargado: se pide la página siguiente, como al bajar con la rueda, y
+    // al llegar se vuelve a mirar. Sin más páginas, ya no existe y no se marca nada.
+    // Sin esto, se marcaba de golpe —y la lista saltaba a él— cuando quien mira bajaba
+    // hasta esa página por su cuenta, mucho después.
+    if (r === 'falta' && nextCursor !== null) {
+      void loadMore();
+      return;
+    }
+    wantSelect.current = null;
+    if (r === 'olvidar' || r === 'falta') return;
+    const { item, indice } = r;
+    if (item.id) {
+      setSelected(new Set([item.id]));
+      anchorRef.current = indice;
+    }
+    const enLista = view === 'list' ? partes.resto.indexOf(item) : -1;
+    requestAnimationFrame(() => {
+      if (enLista >= 0) listaRef.current?.scrollToIndex(enLista, { align: 'center' });
+      else
+        document
+          .querySelector(`[data-drive-item="${CSS.escape(item.path)}"]`)
+          ?.scrollIntoView({ block: 'nearest' });
+    });
+  }, [partes, searchMode, path, view, nextCursor, loadMore]);
+
+  // Desde un resultado de búsqueda: se sale de ella y se abre la carpeta del elemento.
+  const onShowInFolder = (item: DriveResource) => {
+    const carpeta = carpetaPadre(item.path);
+    wantSelect.current = { carpeta, ruta: item.path };
+    setQuery('');
+    goTo(carpeta);
+  };
+
   const toggleSelect = useCallback(
     (item: DriveResource, index: number, shift: boolean) => {
       if (!item.id) return;
@@ -1729,6 +1815,50 @@ export function FileBrowser() {
     }
   };
 
+  // --- Atajos de teclado ---------------------------------------------------
+
+  // La tabla de `lib/atajos.ts` decide qué tecla es qué —y cuándo no es nada: en un
+  // campo, con un diálogo o un menú delante, o sin red si escribe—, y es también la
+  // de la hoja de «?». «u» y «n» son los que pulsa el menú nativo de la app de
+  // escritorio («Archivos → Subir… ⌘U / Nueva carpeta ⌘N»). El oyente se enlaza una
+  // vez y lee lo último por `useUltimo`: lo que hace cada tecla depende de media
+  // pantalla de estado (selección, vista, conectividad).
+  const alPulsarAtajo = useUltimo((e: KeyboardEvent) => {
+    const accion = accionDeEvento(e, { offline });
+    if (accion === null) return;
+    if (accion === 'search') buscador.current?.focus();
+    else if (accion === 'upload') fileInput.current?.click();
+    else if (accion === 'newFolder') setNewFolderOpen(true);
+    else if (accion === 'trash') {
+      if (selectionCount === 0 || busy) return;
+      // Uno solo va directo, como «Eliminar» en su menú (con «Deshacer» en el aviso);
+      // varios pasan por la misma confirmación que el botón de la barra, porque una
+      // tecla que tira cincuenta archivos sin preguntar es un accidente esperando.
+      if (selectionCount === 1) void onBatchTrash();
+      else setBatchTrashOpen(true);
+    } else if (accion === 'rename') {
+      const [unico] = selectedItems;
+      if (selectedItems.length !== 1 || !unico) return;
+      setPendingRename(unico);
+      setRenameName(unico.name);
+    } else if (accion === 'selectAll') {
+      if (selectableIds.length === 0) return;
+      setSelected(new Set(selectableIds));
+      anchorRef.current = -1;
+    } else if (accion === 'clearSelection') {
+      // Con algo marcado lo atiende ya `BulkActionBar` (su Escape); aquí no se
+      // vacía dos veces ni se le quita Escape a nadie cuando no hay nada que vaciar.
+      return;
+    } else if (accion === 'toggleView') setView(view === 'list' ? 'grid' : 'list');
+    else if (accion === 'help') setAtajosOpen(true);
+    e.preventDefault();
+  });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => alPulsarAtajo.current(e);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [alPulsarAtajo]);
+
   const crumbs = segments(path);
 
   // La cuadrícula de recursos: la vista de cuadrícula entera y, en la forma «Marco», la
@@ -1741,6 +1871,7 @@ export function FileBrowser() {
       onDownload={onDownload}
       folderDownload
       showLocation={searchMode}
+      onShowInFolder={searchMode ? onShowInFolder : undefined}
       onShare={onShare}
       onRename={
         offline
@@ -1754,6 +1885,7 @@ export function FileBrowser() {
       onCopy={offline ? undefined : (it) => void onCopy(it)}
       onDelete={offline ? undefined : (it) => void onDelete(it)}
       onVersions={setVersionsItem}
+      onDetails={offline ? undefined : setDetailsItem}
       onOrganizePdf={setOrganizePdfItem}
       onLabel={offline ? undefined : openLabel}
       onResumen={offline ? undefined : setResumenItem}
@@ -1793,43 +1925,15 @@ export function FileBrowser() {
         <h1 class="sr-only">{crumbs.at(-1)?.name ?? t('nav.myDrive')}</h1>
         {/* grow (basis auto), no flex-1 (basis 0): con basis 0 el breadcrumb se
             encoge a cero y nunca se produce el salto de línea en móvil. */}
-        <nav
-          aria-label={t('files.breadcrumb')}
-          class="flex min-w-0 grow items-center gap-0.5 text-base max-md:col-span-2"
-        >
-          <button
-            type="button"
-            onClick={() => goTo('/')}
-            aria-current={path === '/' ? 'page' : undefined}
-            class={cx(
-              'hover:bg-surface-sunken active:bg-surface-sunken sytue-focus-ring rounded-control px-2 py-1 whitespace-nowrap transition-colors duration-150',
-              path === '/'
-                ? 'text-text font-semibold'
-                : 'text-text-muted hover:text-text font-medium',
-            )}
-          >
-            {t('nav.myDrive')}
-          </button>
-          {crumbs.map((c) => (
-            <span key={c.path} class="flex min-w-0 items-center gap-0.5">
-              <Icon name="chevronRight" size={14} class="text-text/50 shrink-0" />
-              <button
-                type="button"
-                onClick={() => goTo(c.path)}
-                aria-current={c.path === path ? 'page' : undefined}
-                title={c.name}
-                class={cx(
-                  'hover:bg-surface-sunken active:bg-surface-sunken sytue-focus-ring rounded-control truncate px-2 py-1 transition-colors duration-150',
-                  c.path === path
-                    ? 'text-text font-semibold'
-                    : 'text-text-muted hover:text-text font-medium',
-                )}
-              >
-                {c.name}
-              </button>
-            </span>
-          ))}
-        </nav>
+        <Migas
+          label={t('files.breadcrumb')}
+          migas={[
+            { clave: '/', nombre: t('nav.myDrive'), onIr: () => goTo('/') },
+            ...crumbs.map((c) => ({ clave: c.path, nombre: c.name, onIr: () => goTo(c.path) })),
+          ]}
+          // En móvil cede la segunda columna al selector «Ordenar» cuando lo hay.
+          class={cx('grow', searchMode && 'min-w-0 max-md:col-span-2')}
+        />
 
         {/* En móvil no pinta caja (`contents`): sus hijos son celdas de la rejilla de
             arriba. Desde 768 px, el grupo de siempre, a la derecha. */}
@@ -1849,6 +1953,7 @@ export function FileBrowser() {
               class="text-text-muted pointer-events-none absolute left-2.5"
             />
             <input
+              ref={buscador}
               type="search"
               value={query}
               onInput={(e) => setQuery(e.currentTarget.value)}
@@ -1886,6 +1991,16 @@ export function FileBrowser() {
             >
               {t('files.new.folder')}
             </MenuItem>
+            {conCarpeta ? (
+              <MenuItem
+                icon={<Glyph name="upload" size={16} />}
+                onClick={() => {
+                  if (!offline) folderInput.current?.click();
+                }}
+              >
+                {t('files.upload.folder')}
+              </MenuItem>
+            ) : null}
             <MenuSeparator />
             <MenuItem
               icon={<Glyph name="document" size={16} />}
@@ -1932,6 +2047,18 @@ export function FileBrowser() {
             aria-hidden="true"
             tabIndex={-1}
           />
+          {conCarpeta ? (
+            <input
+              ref={folderInput}
+              type="file"
+              // Preact no tipa `webkitdirectory`; como propiedad del elemento, sí la pone.
+              {...{ webkitdirectory: true }}
+              class="hidden"
+              onChange={(e) => void onFolderSelected(e)}
+              aria-hidden="true"
+              tabIndex={-1}
+            />
+          ) : null}
           {/* «Subir» al alcance del pulgar en el teléfono, como «Redactar» en Mail: el
               botón de la cabecera queda arriba del todo. Es `fixed` y `md:hidden`, así
               que da igual dónde se monte; sin red no se ofrece, que no se puede subir. */}
@@ -1942,42 +2069,35 @@ export function FileBrowser() {
               onClick={onUploadClick}
             />
           ) : null}
-          {/* Selector de vista, también en el idioma del header: los tokens de
-              superficie clara (text-muted sobre el cromo grafito) quedaban en
-              2,2:1. Activo = latón sobre cromo (5,1:1), el acento de la casa. */}
-          {/* En móvil sube a la primera fila, a la derecha de las migas. */}
-          <div class="divide-border border-border-strong flex items-center divide-x overflow-hidden rounded-md border max-md:col-start-3 max-md:row-start-1 max-md:justify-self-end md:ml-1">
-            <button
-              type="button"
-              aria-label={t('files.viewList')}
-              title={t('files.viewList')}
-              aria-pressed={view === 'list'}
-              onClick={() => setView('list')}
+          {/* La cuadrícula no tiene cabeceras de columna: el orden se elige aquí. En la
+              lista también por debajo de 768 px, donde «Tamaño» y «Modificado» no se
+              pintan y solo quedaría ordenar por nombre. En móvil sube a la primera
+              fila, entre las migas y el selector de vista. */}
+          {!searchMode ? (
+            <div
               class={cx(
-                'sytue-focus-ring flex h-8 w-8 items-center justify-center transition-colors duration-150',
-                view === 'list'
-                  ? 'bg-surface-sunken text-primary-text'
-                  : 'text-text-muted hover:bg-surface-sunken hover:text-text',
+                'max-md:col-start-2 max-md:row-start-1 max-md:justify-self-end',
+                view === 'list' && 'md:hidden',
               )}
             >
-              <Icon name="menu" size={16} />
-            </button>
-            <button
-              type="button"
-              aria-label={t('files.viewGrid')}
-              title={t('files.viewGrid')}
-              aria-pressed={view === 'grid'}
-              onClick={() => setView('grid')}
-              class={cx(
-                'sytue-focus-ring flex h-8 w-8 items-center justify-center transition-colors duration-150',
-                view === 'grid'
-                  ? 'bg-surface-sunken text-primary-text'
-                  : 'text-text-muted hover:bg-surface-sunken hover:text-text',
-              )}
-            >
-              <Icon name="grid" size={16} />
-            </button>
-          </div>
+              <SelectorOrden orden={orden} onOrdenar={ordenarPor} t={t} />
+            </div>
+          ) : null}
+          {/* Selector de vista: el `SegmentedControl` de la suite con iconos solos, la
+              misma píldora clara que el de Calendar en su cabecera (la elegida en
+              `primary-text`, que invierte en oscuro). En móvil sube a la primera fila,
+              a la derecha de las migas. */}
+          <SegmentedControl
+            soloIcono
+            aria-label={t('files.viewLabel')}
+            opciones={[
+              { valor: 'list', rotulo: t('files.viewList'), icono: 'menu' },
+              { valor: 'grid', rotulo: t('files.viewGrid'), icono: 'grid' },
+            ]}
+            valor={view}
+            onChange={setView}
+            class="max-md:col-start-3 max-md:row-start-1 max-md:justify-self-end md:ml-1"
+          />
         </div>
       </div>
 
@@ -2114,7 +2234,7 @@ export function FileBrowser() {
               )}
               // Icono inline (no <img>): las ilustraciones SVG usan var(--sytue-*),
               // que no se resuelve dentro de un documento <img> externo.
-              illustration={<Icon name="warning" size={40} class="text-danger-text" />}
+              tone="error"
               action={
                 error === 'session' ? (
                   // Recargar basta: el SSR sin sesión redirige a /auth/login.
@@ -2136,7 +2256,7 @@ export function FileBrowser() {
                 <EmptyState
                   title={t('files.search.errorTitle')}
                   description={t('files.error.network')}
-                  illustration={<Icon name="warning" size={40} class="text-danger-text" />}
+                  tone="error"
                   action={
                     <Button
                       variant="secondary"
@@ -2151,14 +2271,14 @@ export function FileBrowser() {
                 <EmptyState
                   title={t('files.search.emptyTitle', { query: query.trim() })}
                   description={t('files.search.emptyBody')}
-                  illustration={<Illustration name="emptySearch" />}
+                  spot="emptySearch"
                 />
               )
             ) : (
               <EmptyState
                 title={t('files.empty.title')}
                 description={t('files.empty.body')}
-                illustration={<Illustration name="emptyDrive" />}
+                spot="emptyDrive"
                 action={
                   <Button
                     size="sm"
@@ -2186,12 +2306,16 @@ export function FileBrowser() {
               // Los resultados de búsqueda no paginan: el servicio acota a 200 y la lista
               // completa llega de una vez.
               hasMore={!searchMode && nextCursor !== null}
+              // En búsqueda manda la relevancia: las cabeceras no ordenan.
+              {...(searchMode ? {} : { orden, onOrdenar: ordenarPor })}
               loadingMore={loadingMore}
               onLoadMore={() => void loadMore()}
               onOpen={(it) => void handleOpen(it)}
               onDownload={onDownload}
               folderDownload
               showLocation={searchMode}
+              onShowInFolder={searchMode ? onShowInFolder : undefined}
+              listaRef={listaRef}
               onShare={onShare}
               onRename={
                 offline
@@ -2205,6 +2329,7 @@ export function FileBrowser() {
               onCopy={offline ? undefined : (it) => void onCopy(it)}
               onDelete={offline ? undefined : (it) => void onDelete(it)}
               onVersions={setVersionsItem}
+              onDetails={offline ? undefined : setDetailsItem}
               onOrganizePdf={setOrganizePdfItem}
               onLabel={offline ? undefined : openLabel}
               onResumen={offline ? undefined : setResumenItem}
@@ -2349,6 +2474,13 @@ export function FileBrowser() {
         />
       ) : null}
 
+      <ShortcutsModal
+        open={atajosOpen}
+        title={t('shortcuts.title')}
+        groups={gruposDeAtajos(t)}
+        onClose={() => setAtajosOpen(false)}
+      />
+
       {/* Confirmación de «Enviar selección a la papelera» (acción reversible desde
           la papelera, pero masiva: se confirma). */}
       <Modal
@@ -2410,7 +2542,7 @@ export function FileBrowser() {
             <EmptyState
               title={t('label.emptyTitle')}
               description={t('label.emptyBody')}
-              illustration={<Icon name="lock" size={28} />}
+              icon="lock"
             />
           ) : (
             <div class="flex flex-col gap-1">
@@ -2464,6 +2596,28 @@ export function FileBrowser() {
             setVersionsItem(null);
             void load(path);
           }}
+        />
+      ) : null}
+
+      {/* «Detalles»: propietario, fechas, versión, clasificación y acceso. Sus atajos
+          cierran el panel y abren el diálogo de siempre, que ya sabe hacerlo. */}
+      {detailsItem ? (
+        <DetailsDialog
+          key={detailsItem.id ?? detailsItem.path}
+          item={detailsItem}
+          onClose={() => setDetailsItem(null)}
+          onVersions={(it) => {
+            setDetailsItem(null);
+            setVersionsItem(it);
+          }}
+          onShare={
+            offline
+              ? undefined
+              : (it) => {
+                  setDetailsItem(null);
+                  onShare(it);
+                }
+          }
         />
       ) : null}
 
@@ -2529,6 +2683,8 @@ interface RowActions {
   // Historial de versiones (opcional): solo ficheros con id. `| undefined` explícito
   // por exactOptionalPropertyTypes al reenviar el prop por los componentes intermedios.
   onVersions?: ((item: DriveResource) => void) | undefined;
+  /** «Detalles» del elemento; sin él, el menú no lo ofrece. */
+  onDetails?: ((item: DriveResource) => void) | undefined;
   onOrganizePdf?: ((item: DriveResource) => void) | undefined;
   onLabel?: ((item: DriveResource) => void) | undefined;
   /** Abrir el resumen del fichero; sin él, el menú no lo ofrece. */
@@ -2545,6 +2701,9 @@ interface RowActions {
   // búsqueda, que cruzan todo el árbol: sin esto, dos «informe.pdf» de carpetas
   // distintas son la misma fila y hay que abrirlos para saber cuál es cuál.
   showLocation?: boolean | undefined;
+  // «Mostrar en su carpeta» (opcional): en las vistas que cruzan el árbol, la búsqueda y
+  // Recientes/Destacados. Ausente = sin la acción.
+  onShowInFolder?: ((item: DriveResource) => void) | undefined;
   // Multiselección (opcional): estado por-id + toggle con índice (para rangos con
   // shift) + si hay selección activa (para revelar las casillas). Ausente = sin casillas.
   selectedIds?: ReadonlySet<string> | undefined;
@@ -2635,12 +2794,14 @@ function ActionsMenu({
   onCopy,
   onDelete,
   onVersions,
+  onDetails,
   onOrganizePdf,
   onLabel,
   onResumen,
   favoriteIds,
   onToggleFavorite,
   folderDownload,
+  onShowInFolder,
 }: {
   item: DriveResource;
   onDownload: (item: DriveResource) => void;
@@ -2653,6 +2814,8 @@ function ActionsMenu({
   onCopy?: ((item: DriveResource) => void) | undefined;
   onDelete?: ((item: DriveResource) => void) | undefined;
   onVersions?: ((item: DriveResource) => void) | undefined;
+  /** «Detalles» del elemento; sin él, el menú no lo ofrece. */
+  onDetails?: ((item: DriveResource) => void) | undefined;
   onOrganizePdf?: ((item: DriveResource) => void) | undefined;
   onLabel?: ((item: DriveResource) => void) | undefined;
   /** Abrir el resumen del fichero; sin él, el menú no lo ofrece. */
@@ -2660,18 +2823,36 @@ function ActionsMenu({
   favoriteIds?: ReadonlySet<string> | undefined;
   onToggleFavorite?: ((item: DriveResource) => void) | undefined;
   folderDownload?: boolean | undefined;
+  /** «Mostrar en su carpeta»; sin él, el menú no lo ofrece. */
+  onShowInFolder?: ((item: DriveResource) => void) | undefined;
 }) {
+  const privateScope = useOptionalPrivateDrive();
   const toast = useToast();
   const { t } = useDriveT();
   const offline = useConnectivity() === 'offline';
   const [sharing, setSharing] = useState(false);
+
+  // Sin red, «Mostrar en su carpeta» solo si esa carpeta se puede pintar: si su listado
+  // está guardado para verlo sin conexión. Con red siempre.
+  const conUbicacion = !!onShowInFolder;
+  const [carpetaGuardada, setCarpetaGuardada] = useState(false);
+  useEffect(() => {
+    if (!conUbicacion || !offline) return;
+    let vivo = true;
+    void carpetaEnCache(carpetaPadre(item.path)).then((si) => {
+      if (vivo) setCarpetaGuardada(si);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [conUbicacion, offline, item.path]);
 
   // «Abrir en el editor» (WOPI): solo si el editor configurado declara saber abrir ESTA
   // extensión. Ofrecerlo siempre llevaría a una pestaña en blanco, que es peor que no
   // ofrecerlo: parece que ha funcionado.
   const [editable, setEditable] = useState(false);
   useEffect(() => {
-    if (item.isDirectory || !item.id) return;
+    if (privateScope || item.isDirectory || !item.id) return;
     const ext = extensionOf(item.name);
     if (!ext) return;
     let vivo = true;
@@ -2681,7 +2862,7 @@ function ActionsMenu({
     return () => {
       vivo = false;
     };
-  }, [item.id, item.name, item.isDirectory]);
+  }, [privateScope, item.id, item.name, item.isDirectory]);
 
   async function abrirEnEditor(): Promise<void> {
     if (!item.id) return;
@@ -2803,6 +2984,7 @@ function ActionsMenu({
             onClick={onClick}
             aria-label={t('action.menu', { name: item.name })}
             title={t('action.more')}
+            data-menu-trigger=""
             class="text-text-muted hover:bg-bg-subtle hover:text-text active:bg-surface-sunken sytue-focus-ring rounded-control flex h-8 w-8 items-center justify-center transition-colors duration-150"
             {...aria}
           >
@@ -2817,6 +2999,13 @@ function ActionsMenu({
         ) : folderDownload && item.id && !offline ? (
           <MenuItem icon={<Glyph name="download" size={16} />} onClick={() => onDownload(item)}>
             {t('action.downloadZip')}
+          </MenuItem>
+        ) : null}
+        {/* Ir a donde vive: lo primero que se echa de menos en una lista que cruza
+            todo el árbol. Va junto a descargar porque es lectura, como ella. */}
+        {onShowInFolder && (!offline || carpetaGuardada) ? (
+          <MenuItem icon={<Glyph name="folder" size={16} />} onClick={() => onShowInFolder(item)}>
+            {t('action.showInFolder')}
           </MenuItem>
         ) : null}
         {!offline && onRename ? (
@@ -2845,19 +3034,19 @@ function ActionsMenu({
           </MenuItem>
         ) : null}
         {/* Dentro de la app nativa sobra: ya estás en ella. */}
-        {!inNativeShell() ? (
+        {!privateScope && !inNativeShell() ? (
           <MenuItem icon={<Icon name="device" size={16} />} onClick={() => void abrirEnApp()}>
             {t('action.openInApp')}
           </MenuItem>
         ) : null}
         {/* Drive habla WOPI como host desde la migración 0016, pero no había desde dónde
             usarlo: el protocolo estaba entero y sin puerta. */}
-        {!offline && editable ? (
+        {!privateScope && !offline && editable ? (
           <MenuItem icon={<Glyph name="pencil" size={16} />} onClick={() => void abrirEnEditor()}>
             {t('action.openInEditor')}
           </MenuItem>
         ) : null}
-        {!offline && !item.isDirectory && previewKind(item) === 'office' ? (
+        {!privateScope && !offline && !item.isDirectory && previewKind(item) === 'office' ? (
           <MenuItem
             icon={<Glyph name="pencil" size={16} />}
             onClick={() => void abrirEnLaSuite(item, 'office')}
@@ -2876,6 +3065,13 @@ function ActionsMenu({
             {t('action.versions')}
           </MenuItem>
         ) : null}
+        {/* El panel lo reúne el BFF a partir del id: sin id no hay a quién preguntar, y
+            la unidad cifrada no comparte su metadato con el servidor. */}
+        {!privateScope && !offline && item.id && onDetails ? (
+          <MenuItem icon={<Icon name="info" size={16} />} onClick={() => onDetails(item)}>
+            {t('details.action')}
+          </MenuItem>
+        ) : null}
         {/* Organizar páginas: SOLO en PDF. Ofrecerlo en cualquier fichero llevaría
             a un error del servicio tras rellenar el formulario, que es peor que
             no ofrecerlo — parece que se podía y no se podía. */}
@@ -2891,7 +3087,7 @@ function ActionsMenu({
             El enlace lo compone el servidor (/api/abrir-pdf): la URL pública de
             Docs es configuración del despliegue y no tiene por qué bajar al
             navegador. */}
-        {!offline && !item.isDirectory && previewKind(item) === 'pdf' ? (
+        {!privateScope && !offline && !item.isDirectory && previewKind(item) === 'pdf' ? (
           <MenuItem
             icon={<Glyph name="pencil" size={16} />}
             onClick={() =>
@@ -2928,7 +3124,7 @@ function ActionsMenu({
         {/* Abrir en otro producto de la suite. Van juntas y seguidas porque son la
             misma idea —llevarse este fichero a otro sitio— y separarlas obligaría
             a buscar cada una en un tramo distinto del menú. */}
-        {!offline && item.id && !item.isDirectory ? (
+        {!privateScope && !offline && item.id && !item.isDirectory ? (
           <MenuItem
             icon={<Glyph name="mail" size={16} />}
             disabled={sharing}
@@ -2937,7 +3133,7 @@ function ActionsMenu({
             {t('action.attachToMail')}
           </MenuItem>
         ) : null}
-        {!offline && item.id ? (
+        {!privateScope && !offline && item.id ? (
           <MenuItem
             icon={<Glyph name="users" size={16} />}
             disabled={sharing}
@@ -2948,7 +3144,7 @@ function ActionsMenu({
         ) : null}
         {/* «Subir a Cast»: una COPIA en Sytue Cast (el fichero se queda aquí), solo
             para vídeos. La pantalla de Cast enseña el fichero y pide confirmar. */}
-        {!offline && item.id && subibleACast(item) ? (
+        {!privateScope && !offline && item.id && subibleACast(item) ? (
           <MenuItem
             icon={<Icon name="video" size={16} />}
             onClick={() =>
@@ -2985,7 +3181,7 @@ function ActionsMenu({
  * breadcrumb para subir. Excluye la propia carpeta que se mueve (no puede ser
  * su propio destino) y deshabilita «Mover aquí» en la carpeta actual (no-op).
  */
-function MoveDialog({
+export function MoveDialog({
   item,
   onClose,
   onMoved,
@@ -2994,6 +3190,8 @@ function MoveDialog({
   onClose: () => void;
   onMoved: () => void;
 }) {
+  const privateData = useOptionalPrivateDrive();
+  const service = privateData?.api ?? drive;
   const toast = useToast();
   const { t, locale } = useDriveT();
   const [dest, setDest] = useState('/');
@@ -3008,7 +3206,7 @@ function MoveDialog({
       try {
         // Las carpetas van completas en la primera página (solo los ficheros
         // se paginan), así que el picker no necesita seguir nextCursor.
-        const res = await drive.list(target);
+        const res = await service.list(target);
         setFolders(
           res.items
             .filter((it) => it.isDirectory && it.path !== item.path)
@@ -3020,7 +3218,7 @@ function MoveDialog({
         setLoadError(true);
       }
     },
-    [item.path, locale],
+    [service, item.path, locale],
   );
 
   useEffect(() => {
@@ -3035,7 +3233,10 @@ function MoveDialog({
     if (noop || moving) return;
     setMoving(true);
     try {
-      await drive.move(item.path, dest);
+      await service.move(
+        item.path,
+        privateData ? (dest === '/' ? '/' + item.name : dest + '/' + item.name) : dest,
+      );
       toast.notify({ tone: 'success', title: t('move.done', { name: item.name }) });
       onMoved();
     } catch (e) {
@@ -3968,8 +4169,7 @@ function ShareDialog({ item, onClose }: { item: DriveResource; onClose: () => vo
       </div>
 
       {createdUrl && createdWith ? (
-        <div class="border-success bg-success-bg mt-4 rounded-md border p-3">
-          <p class="text-success-text text-sm font-semibold">{t('share.readyTitle')}</p>
+        <InlineHelp tone="success" class="mt-4" title={t('share.readyTitle')}>
           {/* En el teléfono, el enlace a todo el ancho y «Copiar» debajo: al lado le
               quedaban 229 px para 394 de enlace. */}
           <div class="mt-2 flex items-center gap-2 max-md:flex-col max-md:items-stretch">
@@ -3999,7 +4199,7 @@ function ShareDialog({ item, onClose }: { item: DriveResource; onClose: () => vo
             {t(createdWith.hasPassword ? 'share.summaryPassword' : 'share.summaryNoPassword')}
           </p>
           <p class="sytue-meta mt-1.5">{t('share.copyNow')}</p>
-        </div>
+        </InlineHelp>
       ) : null}
 
       {/* Enlaces vivos del recurso. */}
@@ -4268,6 +4468,10 @@ export function PreviewDialog({
   const kind = previewKind(item);
   const src =
     inlineSrc ?? `/api/content?path=${encodeURIComponent(item.path)}&disposition=inline&offline=1`;
+  // El medio va SIN `offline=1`: el service worker guarda respuestas enteras y un
+  // vídeo llega a trozos 206, que la Cache API ni admite.
+  const mediaSrc =
+    inlineSrc ?? `/api/content?path=${encodeURIComponent(item.path)}&disposition=inline`;
   const [text, setText] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   // Páginas dibujadas por Sytue PDF, en SVG. `null` mientras se piden; `[]` si el
@@ -4388,6 +4592,37 @@ export function PreviewDialog({
           class="mx-auto max-h-[65dvh] max-w-full rounded-md object-contain"
           onError={() => setFailed(true)}
         />
+      ) : kind === 'video' ? (
+        // `preload="metadata"`: solo la cabecera del fichero hasta que se pulsa play;
+        // el resto llega por tramos (Range) según avanza o se busca. Sin autoplay: la
+        // vista previa no debe ponerse a sonar sola.
+        <>
+          {/* oxlint-disable-next-line jsx-a11y/media-has-caption -- fichero de la persona, que no trae subtítulos aparte */}
+          <video
+            src={mediaSrc}
+            controls
+            preload="metadata"
+            playsInline
+            aria-label={item.name}
+            class="bg-surface-sunken mx-auto max-h-[65dvh] w-full rounded-md"
+            onError={() => setFailed(true)}
+          />
+        </>
+      ) : kind === 'audio' ? (
+        <div class="grid place-items-center gap-3 py-8">
+          <span class="text-text-muted" aria-hidden="true">
+            <Icon name="voz" size={32} />
+          </span>
+          {/* oxlint-disable-next-line jsx-a11y/media-has-caption -- fichero de la persona, que no trae subtítulos aparte */}
+          <audio
+            src={mediaSrc}
+            controls
+            preload="metadata"
+            aria-label={item.name}
+            class="w-full max-w-md"
+            onError={() => setFailed(true)}
+          />
+        </div>
       ) : kind === 'pdf' && inlineSrc && !share && !drive ? (
         // «Compartido conmigo» va por otro endpoint y aún no tiene puente de
         // render, así que aquí sigue el visor del navegador. Sandbox vacío (sin
@@ -4434,13 +4669,76 @@ export function PreviewDialog({
 }
 
 /**
+ * Rótulo de una columna de la lista. Sin `onOrdenar` es decorativo, como antes; con él,
+ * un botón que ordena por esa columna, y la columna activa anuncia su sentido con
+ * `aria-sort` y lo pinta con una flecha.
+ */
+function Cabecera({
+  campo,
+  class: cls,
+  orden,
+  onOrdenar,
+  t,
+}: {
+  campo: CampoOrden;
+  class: string;
+  orden?: Orden | undefined;
+  onOrdenar?: ((campo: CampoOrden) => void) | undefined;
+  t: T;
+}) {
+  const rotulo = t(`files.col.${campo}`);
+  if (!onOrdenar || !orden) {
+    return (
+      <span aria-hidden="true" class={cx(cls, 'truncate')}>
+        {rotulo}
+      </span>
+    );
+  }
+  const activa = orden.campo === campo;
+  return (
+    <span
+      role="columnheader"
+      aria-sort={activa ? (orden.sentido === 'asc' ? 'ascending' : 'descending') : 'none'}
+      class={cx(cls, 'items-center')}
+    >
+      <button
+        type="button"
+        onClick={() => onOrdenar(campo)}
+        title={t('files.sort.by', { column: rotulo })}
+        class={cx(
+          'sytue-focus-ring sytue-overline inline-flex max-w-full items-center gap-1 rounded-sm font-semibold transition-colors duration-150 pointer-coarse:min-h-[max(44px,2.75rem)]',
+          activa ? 'text-text' : 'hover:text-text',
+        )}
+      >
+        <span class="truncate">{rotulo}</span>
+        {/* `aria-sort` fuera de una tabla/grid no lo anuncian todos los lectores: el
+            sentido va también en el nombre accesible del botón. */}
+        {activa ? (
+          <span class="sr-only">
+            {' · '}
+            {t(orden.sentido === 'asc' ? 'files.sort.asc' : 'files.sort.desc')}
+          </span>
+        ) : null}
+        {activa ? (
+          <Icon
+            name={orden.sentido === 'asc' ? 'chevronUp' : 'chevronDown'}
+            size={12}
+            aria-hidden="true"
+          />
+        ) : null}
+      </button>
+    </span>
+  );
+}
+
+/**
  * FileList — vista lista VIRTUALIZADA (VirtualList de @sytue/ui): con decenas
  * de miles de ficheros solo se pintan las filas visibles + overscan. Cabecera
  * de columnas fija fuera del área de scroll (mismo efecto que la antigua
  * cabecera pegajosa) y filas flex con la misma retícula. Al acercarse al final
  * se encadena la página siguiente (keyset del servicio Go).
  */
-function FileList({
+export function FileList({
   items,
   hasMore,
   loadingMore,
@@ -4449,12 +4747,15 @@ function FileList({
   onDownload,
   folderDownload,
   showLocation,
+  onShowInFolder,
+  listaRef,
   onShare,
   onRename,
   onMove,
   onCopy,
   onDelete,
   onVersions,
+  onDetails,
   onOrganizePdf,
   onLabel,
   onResumen,
@@ -4468,10 +4769,17 @@ function FileList({
   allSelected,
   someSelected,
   onToggleAll,
+  orden,
+  onOrdenar,
 }: RowActions & {
+  /** Con `onOrdenar`, las cabeceras son botones que ordenan y anuncian `aria-sort`. */
+  orden?: Orden | undefined;
+  onOrdenar?: ((campo: CampoOrden) => void) | undefined;
   hasMore: boolean;
   loadingMore: boolean;
   onLoadMore: () => void;
+  /** El handle de la lista virtual: «Mostrar en su carpeta» lleva la fila a la vista. */
+  listaRef?: RefObject<VirtualListHandle> | undefined;
   allSelected?: boolean | undefined;
   someSelected?: boolean | undefined;
   onToggleAll?: (() => void) | undefined;
@@ -4480,11 +4788,26 @@ function FileList({
   // Clave estable por fila (la ruta): la caché de medición del virtualizador
   // sobrevive a inserciones/borrados sin saltos de scroll.
   const getKey = useMemo(() => (i: number) => items[i]?.path ?? i, [items]);
+  // Las flechas necesitan el handle aunque quien pinta la lista no lo pida.
+  const handlePropio = useRef<VirtualListHandle>(null);
+  const handle = listaRef ?? handlePropio;
+  // ↑ ↓ Inicio y Fin de fila en fila. La lista es VIRTUAL: la de destino puede no estar
+  // en el DOM, así que primero se lleva a la vista y se enfoca cuando se pinta.
+  const moverFoco = (e: KeyboardEvent, index: number) => {
+    const lista = (e.currentTarget as HTMLElement).closest('[data-drive-scroll]');
+    moverFocoEnListaVirtual(
+      e,
+      index,
+      items.length,
+      (i) => handle.current?.scrollToIndex(i, { align: 'auto' }),
+      (i) => lista?.querySelector<HTMLElement>(`[data-drive-fila="${i}"]`) ?? null,
+    );
+  };
   return (
     <>
       {/* El fondo de la hoja (no bg-surface): se funde con ella en claro, en oscuro y
           sobre papel, donde la hoja es blanca y el lienzo gris (ADR 0080). Los
-          rótulos de columna son decorativos (aria-hidden); la casilla «seleccionar
+          rótulos de columna ordenan (botones con aria-sort) salvo en búsqueda; la casilla «seleccionar
           todo» es un control real (fuera del aria-hidden). */}
       <div class="sytue-overline text-text-subtle mx-3 flex shrink-0 items-center gap-3 bg-[var(--sytue-sheet-bg)] px-3 py-2.5 font-semibold shadow-[inset_0_-1px_0_var(--sytue-border)]">
         {onToggleAll ? (
@@ -4495,16 +4818,22 @@ function FileList({
             t={t}
           />
         ) : null}
-        <span aria-hidden="true" class="min-w-0 flex-1 truncate">
-          {t('files.col.name')}
-        </span>
+        <Cabecera campo="name" class="min-w-0 flex-1" orden={orden} onOrdenar={onOrdenar} t={t} />
         {/* w-24 y no w-20: «Größe»/«Modificado» son más largos que «Tamaño». */}
-        <span aria-hidden="true" class="hidden w-24 truncate text-right sm:block">
-          {t('files.col.size')}
-        </span>
-        <span aria-hidden="true" class="hidden w-28 truncate md:block">
-          {t('files.col.modified')}
-        </span>
+        <Cabecera
+          campo="size"
+          class="hidden w-24 justify-end sm:flex"
+          orden={orden}
+          onOrdenar={onOrdenar}
+          t={t}
+        />
+        <Cabecera
+          campo="modified"
+          class="hidden w-28 md:flex"
+          orden={orden}
+          onOrdenar={onOrdenar}
+          t={t}
+        />
         <span aria-hidden="true" class="w-8 shrink-0" />
       </div>
       <VirtualList
@@ -4512,6 +4841,7 @@ function FileList({
         estimateSize={53} /* py-2 (16) + icono 36 + hairline 1; la real se mide */
         data-drive-scroll
         getItemKey={getKey}
+        handleRef={handle}
         aria-label={t('files.list.aria')}
         class="min-h-0 flex-1 px-3 pb-6 text-base"
         onScroll={(e) => {
@@ -4526,12 +4856,14 @@ function FileList({
             onDownload={onDownload}
             folderDownload={folderDownload}
             showLocation={showLocation}
+            onShowInFolder={onShowInFolder}
             onShare={onShare}
             onRename={onRename}
             onMove={onMove}
             onCopy={onCopy}
             onDelete={onDelete}
             onVersions={onVersions}
+            onDetails={onDetails}
             onOrganizePdf={onOrganizePdf}
             onLabel={onLabel}
             onResumen={onResumen}
@@ -4542,6 +4874,7 @@ function FileList({
             onToggleSelect={onToggleSelect}
             onDragItem={onDragItem}
             onDropOnFolder={onDropOnFolder}
+            onMoverFoco={moverFoco}
           />
         )}
       />
@@ -4566,12 +4899,14 @@ function FileRow({
   onDownload,
   folderDownload,
   showLocation,
+  onShowInFolder,
   onShare,
   onRename,
   onMove,
   onCopy,
   onDelete,
   onVersions,
+  onDetails,
   onOrganizePdf,
   onLabel,
   onResumen,
@@ -4582,8 +4917,15 @@ function FileRow({
   onToggleSelect,
   onDragItem,
   onDropOnFolder,
-}: { item: DriveResource; index: number } & Omit<RowActions, 'items'>) {
+  onMoverFoco,
+}: {
+  item: DriveResource;
+  index: number;
+  /** Las flechas, Inicio y Fin sobre la fila: las resuelve la lista, que sabe cuántas hay. */
+  onMoverFoco?: ((e: KeyboardEvent, index: number) => void) | undefined;
+} & Omit<RowActions, 'items'>) {
   const { t, locale } = useDriveT();
+  const privateScope = useOptionalPrivateDrive() !== null;
   const movimiento = useContext(MovimientoDrive);
   const checked = !!(item.id && selectedIds?.has(item.id));
   const openLabel = t(item.isDirectory ? 'files.openFolder' : 'files.open', { name: item.name });
@@ -4597,6 +4939,7 @@ function FileRow({
       role="button"
       tabIndex={0}
       aria-label={openLabel}
+      data-drive-fila={index}
       data-drive-folder={puedeRecibir ? item.path : undefined}
       draggable={!!onDragItem}
       onDragStart={(e: DragEvent) => onDragItem?.(e, item)}
@@ -4622,6 +4965,7 @@ function FileRow({
             }
           : undefined
       }
+      onContextMenu={abrirMenuDeFila}
       class={cx(
         'group border-border/60 hover:bg-bg-subtle focus-within:bg-bg-subtle sytue-focus-ring flex cursor-pointer items-center gap-3 border-b px-3 py-2 transition-colors duration-150',
         checked && 'bg-selected hover:bg-selected',
@@ -4633,7 +4977,7 @@ function FileRow({
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           onOpen(item);
-        }
+        } else onMoverFoco?.(e, index);
       }}
     >
       {onToggleSelect && item.id ? (
@@ -4658,7 +5002,7 @@ function FileRow({
         {showLocation ? (
           <span class="sytue-meta mt-0.5 flex min-w-0 items-center gap-1">
             <Glyph name="folder" size={12} class="shrink-0" />
-            <span class="truncate">{locationOf(t, item.path)}</span>
+            <span class="truncate">{locationOf(t, item.path, privateScope)}</span>
           </span>
         ) : null}
         {/* En pantallas estrechas (columnas ocultas) el tamaño/fecha van bajo el nombre. */}
@@ -4682,12 +5026,14 @@ function FileRow({
           item={item}
           onDownload={onDownload}
           folderDownload={folderDownload}
+          onShowInFolder={onShowInFolder}
           onShare={onShare}
           onRename={onRename}
           onMove={onMove}
           onCopy={onCopy}
           onDelete={onDelete}
           onVersions={onVersions}
+          onDetails={onDetails}
           onOrganizePdf={onOrganizePdf}
           onLabel={onLabel}
           onResumen={onResumen}
@@ -4728,35 +5074,28 @@ function FileGridSkeleton() {
 function FileListSkeleton() {
   const { t } = useDriveT();
   return (
-    <div class="px-3" aria-busy="true">
-      <span class="sr-only" role="status">
-        {t('files.loading')}
-      </span>
-      {/* Réplica de la fila de cabecera (Nombre / Tamaño / Modificado). */}
-      <div class="border-border flex items-center border-b px-3 py-2.5">
-        <Skeleton width="56px" height="0.6rem" />
-        <span class="ml-auto hidden sm:block">
-          <Skeleton width="48px" height="0.6rem" />
-        </span>
-        <span class="ml-8 hidden w-24 md:block">
-          <Skeleton width="72px" height="0.6rem" />
-        </span>
-      </div>
-      <ul class="flex flex-col">
-        {Array.from({ length: 9 }).map((_, i) => (
-          <li key={i} class="flex items-center gap-3 px-3 py-2">
-            <Skeleton width="36px" height="36px" />
-            <Skeleton width={`${38 + ((i * 11) % 42)}%`} height="0.85rem" />
-            <span class="ml-auto hidden sm:block">
-              <Skeleton width="44px" height="0.7rem" />
-            </span>
-            <span class="ml-8 hidden w-24 md:block">
-              <Skeleton width="76px" height="0.7rem" />
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <SkeletonRows
+      class="px-3"
+      rows={9}
+      lead="tile"
+      label={t('files.loading')}
+      meta={[
+        { width: '44px', class: 'hidden sm:block' },
+        { width: '76px', class: 'hidden w-24 md:block' },
+      ]}
+      header={
+        // Réplica de la fila de cabecera (Nombre / Tamaño / Modificado).
+        <div class="border-border flex items-center border-b px-3 py-2.5">
+          <Skeleton width="56px" height="0.6rem" />
+          <span class="ml-auto hidden sm:block">
+            <Skeleton width="48px" height="0.6rem" />
+          </span>
+          <span class="ml-8 hidden w-24 md:block">
+            <Skeleton width="72px" height="0.6rem" />
+          </span>
+        </div>
+      }
+    />
   );
 }
 
@@ -4766,12 +5105,14 @@ function FileGrid({
   onDownload,
   folderDownload,
   showLocation,
+  onShowInFolder,
   onShare,
   onRename,
   onMove,
   onCopy,
   onDelete,
   onVersions,
+  onDetails,
   onOrganizePdf,
   onLabel,
   onResumen,
@@ -4793,11 +5134,19 @@ function FileGrid({
   const [encima, setEncima] = useState<string | null>(null);
   const movimiento = useContext(MovimientoDrive);
   return (
+    // Las flechas recorren las teselas por su sitio en pantalla: las columnas cambian
+    // con el ancho, así que se miden en vez de contarse.
+    // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- las teselas son los botones y las paradas de Tab; la lista solo recoge sus flechas
     <ul
       class={cx(
         'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5',
         franja ? 'gap-2.5' : 'gap-4',
       )}
+      onKeyDown={(e) =>
+        moverFocoEnRejilla(e, [
+          ...e.currentTarget.querySelectorAll<HTMLElement>(':scope > li > [data-drive-item]'),
+        ])
+      }
     >
       {items.map((item, index) => {
         const checked = !!(item.id && selectedIds?.has(item.id));
@@ -4814,6 +5163,7 @@ function FileGrid({
                 name: item.name,
               })}
               draggable={!!onDragItem}
+              data-drive-item={item.path}
               data-drive-folder={puedeRecibir ? item.path : undefined}
               onDragStart={(e: DragEvent) => onDragItem?.(e, item)}
               onDragOver={
@@ -4845,6 +5195,7 @@ function FileGrid({
                   onOpen(item);
                 }
               }}
+              onContextMenu={abrirMenuDeFila}
               style={tono?.style}
               class={cx(
                 'group border-border bg-surface hover:border-border-strong sytue-focus-ring relative flex cursor-pointer flex-col overflow-hidden rounded-lg border transition duration-150 hover:shadow-[var(--shadow-sm)]',
@@ -4885,12 +5236,14 @@ function FileGrid({
                   item={item}
                   onDownload={onDownload}
                   folderDownload={folderDownload}
+                  onShowInFolder={onShowInFolder}
                   onShare={onShare}
                   onRename={onRename}
                   onMove={onMove}
                   onCopy={onCopy}
                   onDelete={onDelete}
                   onVersions={onVersions}
+                  onDetails={onDetails}
                   onOrganizePdf={onOrganizePdf}
                   onLabel={onLabel}
                   onResumen={onResumen}
@@ -4950,10 +5303,13 @@ function trashAsResource(it: TrashItem): DriveResource {
  * TrashView — vista «Papelera» de Sytue Drive. Lista los elementos borrados
  * (recuperables) y permite «Restaurar» (vuelven a su carpeta) o «Eliminar
  * definitivamente» (purga: borra el blob, irreversible). Habla SOLO con el BFF
- * (/api/trash) por cookie de sesión httpOnly. La renderiza Shell cuando la
+ * (/api/trash) por cookie de sesión httpOnly fuera del contexto privado. El
+ * explorador privado reutiliza esta vista con su repositorio y sin purga. La renderiza Shell cuando la
  * sección activa es «Papelera».
  */
 export function TrashView() {
+  const privateData = useOptionalPrivateDrive();
+  const service = privateData?.api ?? drive;
   const toast = useToast();
   const { t, locale } = useDriveT();
   const offline = useConnectivity() === 'offline';
@@ -4972,18 +5328,25 @@ export function TrashView() {
     }
   }, [offline]);
 
-  const load = useCallback(async () => {
-    setItems(null);
-    setError(null);
-    try {
-      setItems(await drive.listTrash());
-    } catch (e) {
-      setError(e instanceof BffError && e.status === 401 ? 'session' : 'network');
-    }
-  }, []);
+  const load = useCallback(
+    async (signal?: AbortSignal) => {
+      setItems(null);
+      setError(null);
+      try {
+        const next = await (privateData ? privateData.trash(signal) : service.listTrash());
+        if (!signal?.aborted) setItems(next);
+      } catch (e) {
+        if (signal?.aborted) return;
+        setError(e instanceof BffError && e.status === 401 ? 'session' : 'network');
+      }
+    },
+    [privateData, service],
+  );
 
   useEffect(() => {
-    void load();
+    const controller = new AbortController();
+    void load(controller.signal);
+    return () => controller.abort();
   }, [load]);
 
   // Un «Deshacer» del explorador que llega con la papelera delante: lo restaurado ya no
@@ -4994,7 +5357,7 @@ export function TrashView() {
     if (offline) return;
     setBusy(true);
     try {
-      await drive.restore(it.id, it.isDirectory ? 'folder' : 'file');
+      await service.restore(it.id, it.isDirectory ? 'folder' : 'file');
       toast.notify({ tone: 'success', title: t('trash.restored', { name: it.name }) });
       await load();
     } catch (e) {
@@ -5002,7 +5365,7 @@ export function TrashView() {
       toast.notify({
         tone: 'danger',
         title:
-          e instanceof BffError && e.status === 409
+          (e instanceof BffError && e.status === 409) || privateData?.isConflict(e)
             ? t('trash.restoreConflict', { name: it.name })
             : t('trash.restoreFailed'),
       });
@@ -5015,7 +5378,7 @@ export function TrashView() {
     if (offline) return;
     setBusy(true);
     try {
-      await drive.purge(it.id, it.isDirectory ? 'folder' : 'file');
+      await service.purge(it.id, it.isDirectory ? 'folder' : 'file');
       toast.notify({ tone: 'success', title: t('trash.purged', { name: it.name }) });
       await load();
     } catch (e) {
@@ -5090,7 +5453,7 @@ export function TrashView() {
               description={t(
                 error === 'session' ? 'files.error.sessionBody' : 'files.error.network',
               )}
-              illustration={<Icon name="warning" size={40} class="text-danger-text" />}
+              tone="error"
               action={
                 error === 'session' ? (
                   <Button size="sm" onClick={() => location.reload()}>
@@ -5109,7 +5472,7 @@ export function TrashView() {
             <EmptyState
               title={t('trash.emptyTitle')}
               description={t('trash.emptyBody')}
-              illustration={<Illustration name="emptyDrive" />}
+              spot="emptyDrive"
             />
           </div>
         ) : (
@@ -5117,16 +5480,18 @@ export function TrashView() {
             {/* Lo único que Drive puede AFIRMAR hoy sobre la permanencia: mientras
                 estén aquí siguen ocupando almacenamiento (el servicio conserva los
                 blobs y la cuota hasta la purga). */}
-            <li class="px-3 pt-3 pb-1">
-              {/* Dos frases independientes del catálogo (la segunda solo si hay
+            {!privateData ? (
+              <li class="px-3 pt-3 pb-1">
+                {/* Dos frases independientes del catálogo (la segunda solo si hay
                   cuenta atrás): cada una se traduce entera, sin componerlas. */}
-              <InlineHelp tone="neutral">
-                {t('trash.help')}
-                {items!.some((i) => i.purgesAt) ? ` ${t('trash.helpCountdown')}` : ''}
-              </InlineHelp>
-            </li>
+                <InlineHelp tone="neutral">
+                  {t('trash.help')}
+                  {items!.some((i) => i.purgesAt) ? ` ${t('trash.helpCountdown')}` : ''}
+                </InlineHelp>
+              </li>
+            ) : null}
             {items!.map((item) => {
-              const purge = purgePhrase(t, locale, item);
+              const purge = privateData ? null : purgePhrase(t, locale, item);
               return (
                 <li
                   key={item.id}
@@ -5159,15 +5524,17 @@ export function TrashView() {
                     >
                       {t('trash.restore')}
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={busy || offline}
-                      class="text-danger-text"
-                      onClick={() => setPendingPurge(item)}
-                    >
-                      {t('trash.purge')}
-                    </Button>
+                    {!privateData ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={busy || offline}
+                        class="text-danger-text"
+                        onClick={() => setPendingPurge(item)}
+                      >
+                        {t('trash.purge')}
+                      </Button>
+                    ) : null}
                   </span>
                 </li>
               );
@@ -5178,7 +5545,7 @@ export function TrashView() {
 
       {/* Confirmación de purga (irreversible: borra el contenido de verdad). */}
       <Modal
-        open={pendingPurge !== null}
+        open={!privateData && pendingPurge !== null}
         onClose={() => setPendingPurge(null)}
         title={t('trash.purgeTitle')}
         size="sm"
@@ -5234,10 +5601,11 @@ export function TrashView() {
 }
 
 /** Carpeta contenedora de una ruta, como etiqueta de ubicación (Mi unidad / nombre). */
-function locationOf(t: T, path: string): string {
+function locationOf(t: T, path: string, literal = false): string {
   const parts = path.split('/').filter(Boolean);
   if (parts.length <= 1) return t('nav.myDrive');
-  return decodeURIComponent(parts[parts.length - 2]!);
+  const parent = parts[parts.length - 2]!;
+  return literal ? parent : decodeURIComponent(parent);
 }
 
 /** Glifo y CLAVES de catálogo de cada sección plana; el texto lo resuelve `t`. */
@@ -5260,18 +5628,36 @@ const SECTION_META = {
   },
 } as const;
 
+/** CLAVE de catálogo del rótulo de cada tramo de «Recientes». */
+const RECENT_GROUP_TITLE = {
+  today: 'recent.group.today',
+  yesterday: 'recent.group.yesterday',
+  thisWeek: 'recent.group.thisWeek',
+  earlier: 'recent.group.earlier',
+} as const satisfies Record<GrupoFecha, string>;
+
 /**
  * ResourceListView — vista plana de «Recientes» o «Favoritos» de Sytue Drive.
  * Lista los recursos (con su ruta ya resuelta por el servicio) y permite abrir/
  * previsualizar/descargar, compartir y marcar/desmarcar favorito. Habla SOLO con
  * el BFF (/api/recent, /api/favorites) por cookie de sesión httpOnly. Las
  * acciones de gestión (renombrar/mover/eliminar) viven en «Mi unidad».
- * ponytail: abrir una carpeta favorita aún no salta a «Mi unidad» en su ruta
- * (haría falta elevar la navegación de sección); se listan y se gestionan sus
- * favoritos. «Recientes» pagina por keyset (cursor opaco del backend) con scroll
- * infinito; «Favoritos» llega entero en una tanda y no lleva sentinel.
+ * Una carpeta se abre en «Mi unidad» (`onOpenFolder`) y cualquier elemento se puede
+ * mostrar en la suya (`onShowInFolder`): los dos los resuelve Shell, que es quien
+ * cambia de sección. «Recientes» pagina por keyset (cursor opaco del backend) con
+ * scroll infinito; «Favoritos» llega entero en una tanda y no lleva sentinel.
  */
-export function ResourceListView({ mode }: { mode: 'recent' | 'favorites' }) {
+export function ResourceListView({
+  mode,
+  onOpenFolder,
+  onShowInFolder,
+}: {
+  mode: 'recent' | 'favorites';
+  /** Abrir una carpeta de la lista en «Mi unidad», por su ruta. */
+  onOpenFolder?: ((path: string) => void) | undefined;
+  /** Abrir la carpeta de un elemento con él marcado. */
+  onShowInFolder?: ((item: DriveResource) => void) | undefined;
+}) {
   const toast = useToast();
   const { t, locale } = useDriveT();
   const offline = useConnectivity() === 'offline';
@@ -5333,7 +5719,7 @@ export function ResourceListView({ mode }: { mode: 'recent' | 'favorites' }) {
   }, [loadingMore, nextCursor, t, toast]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const sentinelRef = useRef<HTMLLIElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const root = scrollRef.current;
     const target = sentinelRef.current;
@@ -5398,6 +5784,68 @@ export function ResourceListView({ mode }: { mode: 'recent' | 'favorites' }) {
     }
   };
 
+  const renderRow = (item: DriveResource) => {
+    const starred = item.id ? favIds.has(item.id) : false;
+    return (
+      // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- el clic derecho solo pulsa el «⋯» de la fila, que ya se alcanza con Tab
+      <li
+        key={`${item.path}·${item.id ?? ''}`}
+        onContextMenu={abrirMenuDeFila}
+        class="group border-border/60 hover:bg-bg-subtle flex items-center gap-3 border-b px-3 py-2 transition-colors duration-150"
+      >
+        <FileIcon resource={item} size={36} />
+        <span class="min-w-0 flex-1">
+          {item.isDirectory && !onOpenFolder ? (
+            <span class="text-text block truncate font-medium" title={item.name}>
+              {item.name}
+            </span>
+          ) : (
+            // Una carpeta era texto muerto: se veía y no llevaba a ningún sitio.
+            <button
+              type="button"
+              onClick={() => (item.isDirectory ? onOpenFolder?.(item.path) : void handleOpen(item))}
+              title={t(item.isDirectory ? 'files.openFolder' : 'files.open', {
+                name: item.name,
+              })}
+              class="text-text sytue-focus-ring block max-w-full truncate rounded text-left font-medium hover:underline"
+            >
+              {item.name}
+            </button>
+          )}
+          <span class="sytue-meta mt-0.5 block truncate tabular-nums">
+            {item.isDirectory ? t('files.folder') : formatSize(locale, item.size)}
+            {item.modifiedAt ? ` · ${formatDate(locale, item.modifiedAt)}` : ''}
+            {` · ${locationOf(t, item.path)}`}
+          </span>
+        </span>
+        <button
+          type="button"
+          onClick={() => void onToggleFavorite(item)}
+          disabled={offline}
+          aria-pressed={starred}
+          aria-label={t(starred ? 'files.star.remove' : 'files.star.add', {
+            name: item.name,
+          })}
+          title={t(starred ? 'action.removeFavorite' : 'action.addFavorite')}
+          class="hover:bg-bg-subtle sytue-focus-ring rounded-control flex h-8 w-8 shrink-0 items-center justify-center transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50"
+        >
+          {/* Favorito = estado seleccionado → latón (el acento de acción
+              de la casa), no `warning`: el amarillo semántico significa
+              aviso, y aquí no hay nada que avisar. */}
+          <Glyph name="star" size={16} class={starred ? 'text-primary-text' : 'text-text-subtle'} />
+        </button>
+        <span class="shrink-0">
+          <ActionsMenu
+            item={item}
+            onDownload={onDownload}
+            onShare={setShareItem}
+            onShowInFolder={onShowInFolder}
+          />
+        </span>
+      </li>
+    );
+  };
+
   return (
     <div class="flex h-full flex-col">
       <SectionHeader
@@ -5417,7 +5865,7 @@ export function ResourceListView({ mode }: { mode: 'recent' | 'favorites' }) {
               description={t(
                 error === 'session' ? 'files.error.sessionBody' : 'files.error.network',
               )}
-              illustration={<Icon name="warning" size={40} class="text-danger-text" />}
+              tone="error"
               action={
                 error === 'session' ? (
                   <Button size="sm" onClick={() => location.reload()}>
@@ -5436,71 +5884,35 @@ export function ResourceListView({ mode }: { mode: 'recent' | 'favorites' }) {
             <EmptyState
               title={t(meta.emptyTitle)}
               description={t(meta.emptyDescription)}
-              illustration={<Illustration name="emptyDrive" />}
+              spot="emptyDrive"
             />
           </div>
         ) : (
-          <ul class="px-3 pb-6">
-            {items!.map((item) => {
-              const starred = item.id ? favIds.has(item.id) : false;
-              return (
-                <li
-                  key={`${item.path}·${item.id ?? ''}`}
-                  class="group border-border/60 hover:bg-bg-subtle flex items-center gap-3 border-b px-3 py-2 transition-colors duration-150"
-                >
-                  <FileIcon resource={item} size={36} />
-                  <span class="min-w-0 flex-1">
-                    {item.isDirectory ? (
-                      <span class="text-text block truncate font-medium" title={item.name}>
-                        {item.name}
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => void handleOpen(item)}
-                        title={t('files.open', { name: item.name })}
-                        class="text-text sytue-focus-ring block max-w-full truncate rounded text-left font-medium hover:underline"
-                      >
-                        {item.name}
-                      </button>
-                    )}
-                    <span class="sytue-meta mt-0.5 block truncate tabular-nums">
-                      {item.isDirectory ? t('files.folder') : formatSize(locale, item.size)}
-                      {item.modifiedAt ? ` · ${formatDate(locale, item.modifiedAt)}` : ''}
-                      {` · ${locationOf(t, item.path)}`}
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => void onToggleFavorite(item)}
-                    disabled={offline}
-                    aria-pressed={starred}
-                    aria-label={t(starred ? 'files.star.remove' : 'files.star.add', {
-                      name: item.name,
-                    })}
-                    title={t(starred ? 'action.removeFavorite' : 'action.addFavorite')}
-                    class="hover:bg-bg-subtle sytue-focus-ring rounded-control flex h-8 w-8 shrink-0 items-center justify-center transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50"
-                  >
-                    {/* Favorito = estado seleccionado → latón (el acento de acción
-                        de la casa), no `warning`: el amarillo semántico significa
-                        aviso, y aquí no hay nada que avisar. */}
-                    <Glyph
-                      name="star"
-                      size={16}
-                      class={starred ? 'text-primary-text' : 'text-text-subtle'}
-                    />
-                  </button>
-                  <span class="shrink-0">
-                    <ActionsMenu item={item} onDownload={onDownload} onShare={setShareItem} />
-                  </span>
-                </li>
-              );
-            })}
+          <div class="px-3 pb-6">
+            {/* «Recientes» va en tramos («Hoy», «Ayer», «Esta semana», «Antes»), cada
+                uno con su rótulo de nivel 2 bajo la cabecera de la sección; «Favoritos»
+                no tiene orden de fecha que partir y va en una sola lista sin rótulo. */}
+            {(mode === 'recent' ? agruparPorFecha(items!) : [{ grupo: null, items: items! }]).map(
+              ({ grupo, items: tramo }) =>
+                grupo ? (
+                  <section key={grupo} aria-labelledby={`recent-group-${grupo}`}>
+                    <h2
+                      id={`recent-group-${grupo}`}
+                      class="sytue-overline text-text-subtle px-3 pt-4 pb-1.5"
+                    >
+                      {t(RECENT_GROUP_TITLE[grupo])}
+                    </h2>
+                    <ul>{tramo.map(renderRow)}</ul>
+                  </section>
+                ) : (
+                  <ul key="all">{tramo.map(renderRow)}</ul>
+                ),
+            )}
             {/* Sentinel de scroll infinito con botón de respaldo: el observador
                 no dispara con teclado ni con `prefers-reduced-motion` en algunos
                 navegadores, así que la acción tiene que existir de verdad. */}
             {nextCursor ? (
-              <li ref={sentinelRef} class="flex items-center justify-center px-4 py-4">
+              <div ref={sentinelRef} class="flex items-center justify-center px-4 py-4">
                 {loadingMore ? (
                   <span class="text-text-subtle flex items-center gap-2 text-sm">
                     <Spinner size={16} label={t('files.loadingMore')} />
@@ -5511,9 +5923,9 @@ export function ResourceListView({ mode }: { mode: 'recent' | 'favorites' }) {
                     {t('files.loadMore')}
                   </Button>
                 )}
-              </li>
+              </div>
             ) : null}
-          </ul>
+          </div>
         )}
       </div>
 
@@ -5706,6 +6118,13 @@ export function SharedWithMeView() {
   const crumbs = subpath ? subpath.split('/').filter(Boolean) : [];
   const permission = folder?.permission ?? current?.permission ?? 'view';
   const canEdit = permission === 'edit' && !offline;
+  // El listado de una carpeta compartida llega entero (no pagina): aquí sí se ordena en
+  // el cliente, con el mismo orden recordado que «Mi unidad».
+  const { orden, ordenarPor } = useOrdenRecordado();
+  const visibles = useMemo(
+    () => (folder ? ordenarRecursos(folder.items, orden, locale) : []),
+    [folder, orden, locale],
+  );
 
   return (
     <div class="flex h-full flex-col">
@@ -5775,6 +6194,7 @@ export function SharedWithMeView() {
             })}
           </nav>
           <div class="ml-auto flex shrink-0 items-center gap-2">
+            <SelectorOrden orden={orden} onOrdenar={ordenarPor} t={t} />
             <PermBadge permission={permission} t={t} />
             {canEdit ? (
               <>
@@ -5834,7 +6254,7 @@ export function SharedWithMeView() {
               description={t(
                 rootsError === 'session' ? 'files.error.sessionBody' : 'files.error.network',
               )}
-              illustration={<Icon name="warning" size={40} class="text-danger-text" />}
+              tone="error"
               action={
                 rootsError === 'session' ? (
                   <Button size="sm" onClick={() => location.reload()}>
@@ -5853,7 +6273,7 @@ export function SharedWithMeView() {
             <EmptyState
               title={t('shared.emptyTitle')}
               description={t('shared.emptyBody')}
-              illustration={<Illustration name="emptyDrive" />}
+              spot="emptyDrive"
             />
           </div>
         ) : (
@@ -5923,7 +6343,7 @@ export function SharedWithMeView() {
           <EmptyState
             title={t(folderError === 'denied' ? 'shared.deniedTitle' : 'shared.folderErrorTitle')}
             description={t(folderError === 'denied' ? 'shared.deniedBody' : 'files.error.network')}
-            illustration={<Icon name="warning" size={40} class="text-danger-text" />}
+            tone="error"
             action={
               folderError === 'denied' ? (
                 <Button
@@ -5964,7 +6384,7 @@ export function SharedWithMeView() {
     }
     return (
       <ul class="px-3 pb-6">
-        {folder!.items.map((item) => (
+        {visibles.map((item) => (
           <li
             key={item.path}
             class="group border-border/60 hover:bg-bg-subtle flex items-center gap-3 border-b px-3 py-2 transition-colors duration-150"

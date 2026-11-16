@@ -18,7 +18,7 @@ import { MessageMenu, type MenuEntry } from './MessageMenu.js';
 
 /**
  * Disparador «…» de la cabecera: la acción del carril de `@sytue/ui`. Era una copia
- * de sus clases con `h-5 w-5`, 17,5 px con la raíz a 14.
+ * de sus clases con `h-5 w-5`, que medían 17,5 px cuando 1 rem eran 14.
  */
 const HEADER_TRIGGER = SIDEBAR_ACTION_CLASS;
 

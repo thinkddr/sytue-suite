@@ -92,6 +92,7 @@ const APPS = {
       "/",
       "/audit",
       "/billing",
+      "/new",
       "/settings",
       "/team",
       "/templates",
@@ -239,6 +240,17 @@ const DENEGACIONES_ESPERADAS = new Set([
   "/erp/api/obligaciones",
 ]);
 
+// 404 que el producto da a propósito: sin logo aprovechable para el dominio del
+// remitente, el `<img>` falla y la fila vuelve a las iniciales (mail/api/sender-logo.ts).
+const AUSENCIAS_ESPERADAS = new Set(["/mail/api/sender-logo"]);
+const esAusenciaEsperada = (url) => {
+  try {
+    return AUSENCIAS_ESPERADAS.has(new URL(url).pathname);
+  } catch {
+    return false;
+  }
+};
+
 const resultados = [];
 const apps = process.argv.slice(2).length
   ? process.argv.slice(2)
@@ -291,6 +303,7 @@ for (const app of apps) {
     const onConsole = (m) => {
       if (m.type() !== "error" || esRuido(m.text())) return;
       if (sonda && /status of 404/.test(m.text())) return;
+      if (/status of 404/.test(m.text()) && esAusenciaEsperada(m.location()?.url ?? "")) return;
       // La respuesta conserva la URL y decide si el 403 es esperado. Chromium solo
       // escribe aquí el mensaje genérico, sin ella; duplicarlo no añade señal.
       if (/Failed to load resource: the server responded with a status of 403/.test(m.text())) return;
@@ -301,6 +314,7 @@ for (const app of apps) {
       if (r.status() < 400 || esRuido(r.url())) return;
       const camino = new URL(r.url()).pathname;
       if (sonda && r.status() === 404 && camino === rutaPedida) return;
+      if (r.status() === 404 && AUSENCIAS_ESPERADAS.has(camino)) return;
       if (r.status() === 403 && app === "admin") {
         sinPermiso = true;
         return;

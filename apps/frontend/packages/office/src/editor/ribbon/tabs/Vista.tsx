@@ -6,7 +6,7 @@
  * 50–200 % y «Ajustar al ancho», conmutadores de regla y panel de ajustes
  * (icon-buttons con aria-pressed, §6.3), pantalla completa (Fullscreen API) y
  * tema del lienzo (claro/sepia sutil — SOLO el fondo del área de trabajo; el
- * folio sigue siendo papel blanco).
+ * folio sigue siendo papel blanco). Y la hoja «Atajos de teclado» (atajosAyuda.ts).
  *
  * Decisiones fuera del blueprint (la tarea manda; documentadas aquí):
  * - EditorUi (§2) no contempla «tema del lienzo» y types.ts/editor.css
@@ -23,6 +23,7 @@ import { RibbonButton, RibbonGroup, RibbonSelect, RibbonSeparator } from '../pri
 import { MacrosGroup } from '../MacrosGroup';
 import { ScriptsGroup } from '../ScriptsGroup';
 import { MIN_ZOOM, MAX_ZOOM, clampZoom } from '../../canvas/metrics';
+import { ATAJO_AYUDA } from '../../atajosAyuda';
 
 /* ---------- Zoom (§6.3: presets; el rango lo fija canvas/metrics) ---------- */
 
@@ -174,6 +175,13 @@ export function VistaTab({ ctx }: { ctx: EditorContext }): JSX.Element {
           icon="panelRight"
           active={ctx.ui.settingsOpen}
           onAction={() => ctx.setUi({ settingsOpen: !ctx.ui.settingsOpen })}
+        />
+        {/* La hoja de atajos: lo mismo que Ctrl+/, para quien no sabe que existe. */}
+        <RibbonButton
+          commandId="shortcutsHelp"
+          icon="keyboard"
+          keys={ATAJO_AYUDA}
+          onAction={() => ctx.setUi({ atajos: true })}
         />
       </RibbonGroup>
 

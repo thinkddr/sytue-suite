@@ -106,10 +106,16 @@ var (
 	// Papel es `--editor-page-bg`.
 	Papel = color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}
 	// Tinta es el `color: #0a0a0a` de `.sytue-page`.
-	Tinta       = color.NRGBA{R: 0x0a, G: 0x0a, B: 0x0a, A: 0xff}
-	tintaCita   = color.NRGBA{R: 0x47, G: 0x55, B: 0x69, A: 0xff} // blockquote: #475569
-	TintaLinea  = color.NRGBA{R: 15, G: 23, B: 42, A: 41}         // --page-rule: rgba(15,23,42,.16)
-	tintaEnlace = tokens.Color("primary-700", tokens.Light)       // el enlace sobre papel, en los dos temas
+	Tinta     = color.NRGBA{R: 0x0a, G: 0x0a, B: 0x0a, A: 0xff}
+	tintaCita = color.NRGBA{R: 0x47, G: 0x55, B: 0x69, A: 0xff} // blockquote: #475569
+	// tintaHecha es la de una casilla hecha: `color: #6e7379` (y tachada).
+	tintaHecha = color.NRGBA{R: 0x6e, G: 0x73, B: 0x79, A: 0xff}
+	// TintaCasilla y RellenoCasilla son las de la casilla de una lista de casillas: el borde
+	// pizarra (#475569) y, hecha, el latón de `--sytue-primary-700`.
+	TintaCasilla   = tintaCita
+	RellenoCasilla = tintaEnlace
+	TintaLinea     = color.NRGBA{R: 15, G: 23, B: 42, A: 41}   // --page-rule: rgba(15,23,42,.16)
+	tintaEnlace    = tokens.Color("primary-700", tokens.Light) // el enlace sobre papel, en los dos temas
 	// FondoAncla es el de lo comentado: `color-mix(in srgb, var(--sytue-primary) 16%,
 	// transparent)` de `mark[data-comment-id]`, el primario del papel (el claro).
 	FondoAncla = conAlfa(tokens.Color("primary", tokens.Light), 0.16)
@@ -181,6 +187,10 @@ func aplicar(e Estilo, n *html.Node) Estilo {
 	case atom.Div:
 		if regionDe(n) != "" {
 			e.Color = tintaRegion // el `font-size:12px` sale de su `style`, abajo
+		}
+	case atom.Li:
+		if e.hoja == nil && esCasilla(n) && atributo(n, "data-checked") == "1" {
+			e.Color, e.Tachado = tintaHecha, true
 		}
 	case atom.Mark:
 		if tieneAtributo(n, "data-comment-id") {

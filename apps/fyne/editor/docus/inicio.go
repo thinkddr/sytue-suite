@@ -12,6 +12,7 @@ import (
 	"fyne.io/fyne/v2/container"
 
 	"git.sytue.eu/sytue/one/apps/fyne/editor"
+	"git.sytue.eu/sytue/one/apps/fyne/editor/docus/rico"
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
@@ -22,10 +23,6 @@ import (
 // La pestaña «Inicio» de Docus (`ribbon/tabs/Inicio.tsx`): Historial · Fuente · Párrafo ·
 // Estilos. Vive aquí y no en el cromo porque Calcus y Diapos tienen la suya
 // (`InicioSheets.tsx`, `InicioSlides.tsx`), como en la web.
-//
-// ponytail: falta el grupo «Asistente» (IA). En la web solo sale si el servidor tiene
-// servicio de IA detrás; en nativo no hay todavía cliente del asistente, y un botón que
-// siempre falla es peor que no tenerlo —lo dice la propia web—.
 
 // Fuentes son las seis de la web, en su orden; «Times» se declara «Times New Roman».
 var Fuentes = []string{"Inter", "Arial", "Georgia", "Times New Roman", "Courier New", "JetBrains Mono"}
@@ -150,6 +147,7 @@ func (in *inicio) cuerpo(c *editor.Contexto) fyne.CanvasObject {
 			boton(iconos.EdSubindice, "format.subscript", false, editor.Subindice),
 			colorTexto, resalte,
 			boton(iconos.EdSinFormato, "format.clear", false, editor.SinFormato),
+			botonBrocha(c, f.Brocha), botonMayusculas(c),
 		),
 		editor.SeparadorGrupos(),
 		editor.NuevoGrupo(c.Traducir("group.paragraph"),
@@ -178,6 +176,47 @@ func (in *inicio) cuerpo(c *editor.Contexto) fyne.CanvasObject {
 		grupos = append(grupos, editor.SeparadorGrupos(), editor.NuevoGrupo(c.Traducir("group.assistant"), ia))
 	}
 	return editor.Grupos(grupos...)
+}
+
+// botonBrocha es «Copiar formato» (`brocha.go`): pulsado mientras está armada, con el
+// rótulo que dice qué hacer, como el `BrochaButton` de la web.
+func botonBrocha(c *editor.Contexto, armada bool) *editor.BotonCinta {
+	b := c.Boton(iconos.EdBrocha, "format.painter", armada, editor.CopiarFormato)
+	if armada {
+		b.Rotulo = c.Traducir("format.painterOn")
+	}
+	return b
+}
+
+// rotulosMayusculas son las opciones de «Cambiar mayúsculas y minúsculas», cada una
+// escrita como queda («MAYÚSCULAS», «minúsculas»…): el rótulo ES la muestra.
+var rotulosMayusculas = map[rico.ModoMayusculas]string{
+	rico.TipoOracion: "format.case.sentence", rico.Minusculas: "format.case.lower",
+	rico.Mayusculas: "format.case.upper", rico.CadaPalabra: "format.case.title",
+}
+
+// botonMayusculas es el botón «Aa» con su menú de cuatro transformaciones
+// (`CambiarMayusculasMenu` de la web).
+func botonMayusculas(c *editor.Contexto) *editor.BotonCinta {
+	b := c.Boton(iconos.EdMayusculas, "format.changeCase", false, editor.Mayusculas)
+	var menu *ui.Menu
+	b.AlPulsar = func() {
+		if menu != nil && menu.Abierto() {
+			menu.Cerrar()
+			return
+		}
+		elems := make([]fyne.CanvasObject, 0, len(rico.ModosMayusculas))
+		for _, m := range rico.ModosMayusculas {
+			e := ui.NuevoElementoMenu(c.Traducir(rotulosMayusculas[m]), iconos.Ninguno,
+				func() { c.Mandar(editor.Mayusculas, string(m)) })
+			e.Denso = true
+			elems = append(elems, e)
+		}
+		menu = ui.NuevoMenu(elems...)
+		menu.Rotulo = b.Rotulo
+		menu.Mostrar(b)
+	}
+	return b
 }
 
 func contiene(s []string, x string) bool {

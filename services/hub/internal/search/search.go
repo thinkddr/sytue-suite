@@ -45,7 +45,7 @@ func (s *Service) Search(ctx context.Context, token string, q domain.SearchQuery
 	if text == "" {
 		return domain.SearchResponse{}, domain.ErrInvalidInput
 	}
-	limit := s.clampLimit(q.Limit)
+	limit := s.clampPagina(q.Limit)
 	// Con paginación hay que pedir a cada origen lo suficiente para poder SALTAR: si
 	// se piden solo `limit` por origen, la página 2 del agregado no existe. El tope
 	// evita que un offset grande dispare la carga sobre los servicios.
@@ -131,6 +131,24 @@ func (s *Service) Recent(ctx context.Context, token string, sources []domain.Sou
 		})
 	rankByRecency(resp.Hits)
 	return resp
+}
+
+// paginaPorOrigenes es cuántas veces el máximo por origen cabe en UNA página del
+// agregado. Con SEARCH_LIMIT=20 son 200, las diez páginas que la web enseña como mucho
+// (`MAX_PAGINAS`; con todos los orígenes el agregado puede pasar de ahí): así la web
+// pide en una sola petición las N páginas que enseña (su «Cargar más» es SSR y sin JS)
+// en vez de N búsquedas federadas en paralelo. Lo que se pide a cada servicio sigue
+// acotado por clampLimit: el tope de página no encarece el fan-out, solo deja de
+// recortar lo que ya se ha traído.
+const paginaPorOrigenes = 10
+
+// clampPagina acota el tamaño de página del AGREGADO (0/negativo = el máximo por
+// origen, como siempre; por encima del tope, el tope).
+func (s *Service) clampPagina(n int) int {
+	if n <= 0 {
+		return s.limit
+	}
+	return min(n, s.limit*paginaPorOrigenes)
 }
 
 // clampLimit acota el límite por origen al máximo configurado (0/negativo = máx).

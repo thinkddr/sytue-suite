@@ -13,14 +13,12 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 
 	"git.sytue.eu/sytue/one/apps/fyne/editor"
-	"git.sytue.eu/sytue/one/apps/fyne/iconos"
-	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 )
@@ -69,6 +67,8 @@ type abierto struct {
 	lz    *Lienzo
 	marco *editor.Marco
 	auto  *editor.Autoguardado
+	// comentarios es el panel, una vez abierto.
+	comentarios *editor.Comentarios
 
 	mu       sync.Mutex
 	base     api.DocContent
@@ -93,6 +93,12 @@ func NuevaApp(t func(string, i18n.Vars) string, loc i18n.Locale, svc *api.Docs) 
 	a.portada = editor.NuevaPortada(editor.Hoja, t, loc, svc)
 	a.portada.Avisos = a.avisos
 	a.portada.AlAbrir = func(d api.Document) { a.AbrirID(d.ID, d.Title) }
+	a.portada.Carpeta = func() (string, error) {
+		if a.carpeta == nil {
+			return ficheros.Carpeta()
+		}
+		return a.carpeta()
+	}
 	a.raiz = container.NewStack(a.portada.Objeto(), a.avisos)
 	return a
 }
@@ -115,6 +121,14 @@ func (a *App) Abierto() *Lienzo {
 // Arrancar pide la primera página de la portada.
 func (a *App) Arrancar() {
 	editor.EngancharAtras(a.raiz, a.portada, func() bool { return a.abierto != nil }, a.Volver)
+	// La tesela comparte con el mismo panel que la cabecera; los enlaces los pone quien
+	// monta la app después de NuevaApp, así que se engancha aquí y no allí.
+	a.portada.Compartir = nil
+	if a.EnlaceDoc != nil {
+		a.portada.Compartir = func(d api.Document, desde fyne.CanvasObject) {
+			a.panelCompartir(d.ID, d.Title).Mostrar(desde)
+		}
+	}
 	a.portada.Cargar()
 }
 
@@ -170,7 +184,7 @@ func (a *App) editorDe(id, titulo string) *abierto {
 	lz.T, lz.IA = a.T, a.IA
 	lz.AlAviso = func(tono ui.TonoAviso, t, d string) { a.avisos.Notificar(ui.NuevoAviso(tono, t, d)) }
 	ctx.Lienzo = lz
-	ctx.Paneles = panelesDe(lz, a.T) // «Buscar» en las celdas de la hoja
+	delLienzo := panelesDe(lz, a.T) // «Buscar» en las celdas de la hoja
 	// «Nuevo hoja de cálculo» es el alta en blanco de la portada, y «Abrir un archivo»,
 	// el del binario: los dos del menú Archivo, también con una hoja convertida delante.
 	if a.Svc != nil {
@@ -192,10 +206,67 @@ func (a *App) editorDe(id, titulo string) *abierto {
 		}
 	}
 	lz.Rejilla.Contexto = ctx
+	// La hoja de atajos del editor acaba con los de la rejilla (`propiosDe` de la web).
+	ctx.AtajosPropios = func() []ui.GrupoDeAtajos {
+		return AtajosPropios(func(k string) string { return ctx.Traducir(k) })
+	}
 	lz.AlSeleccionar = marco.Recomponer
 	lz.AlCambiar = marco.Recomponer // lo que no se guarda también cambia la barra de estado
 	ctx.BloqueoPropio = func() (string, func()) { return lz.bloqueoPropio(ctx) }
-	return &abierto{id: id, ctx: ctx, lz: lz, marco: marco, actor: actorNuevo()}
+	ab := &abierto{id: id, ctx: ctx, lz: lz, marco: marco, actor: actorNuevo()}
+	// «Comentarios» es el panel de Docus (`CommentsPanel` en los dos editores de la web).
+	ctx.Paneles = func(p editor.Panel) fyne.CanvasObject {
+		if p == editor.PanelComentarios && a.Svc != nil {
+			return a.panelComentarios(ab)
+		}
+		return delLienzo(p)
+	}
+	return ab
+}
+
+// panelComentarios monta, la primera vez, los hilos del libro. El de una celda dice dónde
+// está hoy y lleva a ella (CALC-11 de la web), y al pasar por él se enmarca su celda.
+func (a *App) panelComentarios(ab *abierto) fyne.CanvasObject {
+	if ab.comentarios == nil {
+		lz := ab.lz
+		ab.comentarios = editor.NuevosComentarios(editor.FuenteComentarios{
+			T: a.t, Loc: a.portada.Loc, Svc: a.Svc, ID: ab.id, Lanzar: a.lanzar, Plazo: a.Plazo,
+			Avisos: a.avisos, SinRed: func() bool { return ab.ctx.SinRed },
+			Celda: func(x api.AnclaCelda) string {
+				ref := lz.Libro.RefDeAncla(x)
+				if ref == "" || a.T == nil {
+					return ref
+				}
+				return a.T("comments.cell", i18n.Vars{"ref": ref})
+			},
+			IrACelda:      lz.IrAComentario,
+			ResaltarCelda: lz.Rejilla.ResaltarComentario,
+			AlCargar:      lz.Rejilla.PonerComentarios,
+		})
+	}
+	return ab.comentarios.Objeto()
+}
+
+// comentar crea un hilo nuevo con ese cuerpo, pegado a la celda del ancla, y abre el panel
+// para verlo.
+func (a *App) comentar(ab *abierto, cuerpo string, celda api.AnclaCelda) {
+	a.lanzar(func() {
+		c, cancelar := context.WithTimeout(context.Background(), a.Plazo)
+		defer cancelar()
+		_, err := a.Svc.CreateCellComment(c, ab.id, cuerpo, celda)
+		fyne.Do(func() {
+			if err != nil {
+				a.avisos.Notificar(ui.NuevoAviso(ui.AvisoPeligro, a.t("comments.addError"), ""))
+				return
+			}
+			a.avisos.Notificar(ui.NuevoAviso(ui.AvisoExito, a.t("comments.added"), ""))
+			ab.ctx.Panel = editor.PanelComentarios
+			ab.marco.Recomponer()
+			if ab.comentarios != nil {
+				ab.comentarios.Recargar() // y con la lista, la marca de la celda
+			}
+		})
+	})
 }
 
 // PonerAbrir engancha «Abrir un archivo» —el del menú Archivo y el de la portada— con lo
@@ -255,13 +326,17 @@ func (a *App) archivo(ab *abierto, escribe bool) {
 		}
 	}
 	if a.EnlaceDoc != nil {
-		ctx.Compartir = func(desde fyne.CanvasObject) {
-			(&editor.Compartir{
-				T: a.T, Svc: a.Svc, ID: ab.id, Titulo: ctx.Titulo,
-				Enlace: a.EnlaceDoc(ab.id), EnlacePublico: a.EnlacePublico,
-				Avisos: a.avisos, Lanzar: a.lanzar, Plazo: a.Plazo, Dir: a.Directorio,
-			}).Mostrar(desde)
-		}
+		ctx.Compartir = func(desde fyne.CanvasObject) { a.panelCompartir(ab.id, ctx.Titulo).Mostrar(desde) }
+	}
+}
+
+// panelCompartir es el panel de «Compartir» de un documento, el de la cabecera y el de
+// la tesela de la portada.
+func (a *App) panelCompartir(id, titulo string) *editor.Compartir {
+	return &editor.Compartir{
+		T: a.T, Svc: a.Svc, ID: id, Titulo: titulo,
+		Enlace: a.EnlaceDoc(id), EnlacePublico: a.EnlacePublico,
+		Avisos: a.avisos, Lanzar: a.lanzar, Plazo: a.Plazo, Dir: a.Directorio,
 	}
 }
 
@@ -334,6 +409,8 @@ func (a *App) T0(clave string, v i18n.Vars) string {
 func (a *App) AbrirID(id, titulo string) {
 	ab := a.editorDe(id, titulo)
 	a.abierto = ab
+	// «Reintentar» del error vuelve a pedir el mismo documento, con el título que ya se sepa.
+	ab.ctx.Reintentar = func() { a.AbrirID(id, ab.ctx.Titulo) }
 	a.mostrar(ab.marco)
 	a.titulo(titulo)
 	if a.Svc == nil {
@@ -369,6 +446,12 @@ func (a *App) cargar(ab *abierto) {
 	if err == nil {
 		cont, err = a.Svc.Content(c, ab.id, ab.ctx.Tipo.ClaveContenido())
 	}
+	// Los hilos abiertos marcan sus celdas desde el principio, con el panel cerrado, como en
+	// la web (`ctx.comments`). Sin ellos el libro se abre igual, sin marcas.
+	var hilos []api.DocComment
+	if err == nil {
+		hilos, _ = a.Svc.Comments(c, ab.id, false)
+	}
 	hayRed := a.Red == nil || a.Red.State() != offline.Offline
 	fyne.Do(func() {
 		if a.abierto != ab {
@@ -376,11 +459,16 @@ func (a *App) cargar(ab *abierto) {
 		}
 		if err != nil {
 			ab.ctx.Estado = editor.EstadoDe(err, hayRed, 1)
-			a.mostrar(a.pantallaFallo(ab))
+			// Como en la web (`status === 'error'`), un fallo al abrir cede la
+			// pantalla entera al error con «Reintentar» y «Volver». Antes se recompone el
+			// marco, que así quita el esqueleto de carga y para su pulso.
+			ab.ctx.Refrescar()
+			a.mostrar(editor.PantallaFallo(ab.ctx))
 			return
 		}
 		ab.ctx.SinRed = !hayRed
 		a.poner(ab, doc.Title, rol, cont)
+		ab.lz.Rejilla.PonerComentarios(hilos)
 	})
 }
 
@@ -402,6 +490,19 @@ func (a *App) poner(ab *abierto, titulo, rol string, cont api.DocContent) {
 			a.lanzar(func() { a.cargar(ab) })
 		}
 	})
+	if api.CanComment(rol) && a.Svc != nil {
+		// Como en Docus, el texto se pregunta en un diálogo; y como en Excel y en la web, el
+		// comentario va pegado a la celda activa, que se toma ANTES de preguntar.
+		ctx.NuevoComentario = func() {
+			lienzo := fyne.CurrentApp().Driver().CanvasForObject(ab.marco)
+			if lienzo == nil {
+				return
+			}
+			celda := ab.lz.AnclaActiva()
+			ui.Pregunta(a.t("comments.newPrompt"), "", a.t("ui.cancel"), a.t("ui.save"), a.t("ui.required"),
+				func(cuerpo string) { a.comentar(ab, cuerpo, celda) }).Mostrar(lienzo)
+		}
+	}
 	if escribe {
 		ctx.AlRenombrar = func(s string) { a.renombrar(ab, s) }
 	}
@@ -522,20 +623,6 @@ func (a *App) renombrar(ab *abierto, titulo string) {
 			a.titulo(titulo)
 		})
 	})
-}
-
-// pantallaFallo es lo que la web pinta cuando el documento no se puede abrir: el editor
-// entero cede el sitio a un EmptyState con el aviso en `danger`, «Reintentar» y
-// «Volver» (`status === 'error'`).
-func (a *App) pantallaFallo(ab *abierto) fyne.CanvasObject {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	e := ui.NuevoVacio(a.t("editor.error.title"), a.t("editor.error.description"))
-	e.Ilustracion = iconos.Trazo(iconos.Aviso, 40, "danger", v).Objeto()
-	reintentar := ui.NuevoBoton(a.t("editor.error.retry"), func() { a.AbrirID(ab.id, ab.ctx.Titulo) }).
-		Con(ui.Primario, ui.TallaSM)
-	volver := ui.NuevoBoton(a.t("editor.error.back"), a.Volver).Con(ui.Secundario, ui.TallaSM)
-	e.Accion = container.New(ui.Fila{Hueco: tema.Espacio(2)}, reintentar, volver)
-	return container.NewStack(canvas.NewRectangle(tema.Color("surface", v)), e)
 }
 
 // IDDeEnlace saca el identificador de un enlace de edición de una hoja: el esquema

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/nucleo/webref"
 )
 
@@ -35,9 +36,41 @@ func TestLosGlifosSonLosDeLaWeb(t *testing.T) {
 			t.Errorf("el glifo %q tiene otra ruta en la web:\n  web:  %s\n  aquí: %s", clave, suya, nuestra)
 		}
 	}
-	// 33 y los nueve de la tabla y la imagen de la barra del redactor.
-	if len(glifosPropios) != 42 {
-		t.Errorf("hay %d glifos propios y eran 42: si se porta uno más, dilo aquí", len(glifosPropios))
+	// Los doce del triaje, los diez de la barra del redactor que el común no tiene, los
+	// siete de la tabla, el embudo de «Opciones de búsqueda» y la campana tachada de
+	// «Silenciar conversación». Los catorce que repetían un nombre del común ya no
+	// cuentan.
+	if len(glifosPropios) != 31 {
+		t.Errorf("hay %d glifos propios y eran 31: si se porta uno más, dilo aquí", len(glifosPropios))
+	}
+}
+
+// TestNingunGlifoPropioRepiteUnNombreDelComun es el espejo del guardián de la web
+// (`glifos-al-comun.test.ts`): un nombre que también está en `Icon.tsx` es el MISMO
+// concepto, y se pinta con la ruta del catálogo compartido, no con una copia de aquí.
+// Y los que la pantalla pide por esos nombres tienen que ser, ruta a ruta, los del
+// común.
+//
+// VISTO EN ROJO (2026-11-13): con `"trash": PapeleraD` de vuelta en `glifosPropios`, el
+// test nombra «trash»; y con la papelera vieja de Mail en `PapeleraD`, dice que no es
+// la del catálogo.
+func TestNingunGlifoPropioRepiteUnNombreDelComun(t *testing.T) {
+	for clave := range glifosPropios {
+		if _, es := iconos.Comun(clave); es {
+			t.Errorf("%q es un icono del catálogo compartido: se pinta con su ruta, no con una propia", clave)
+		}
+	}
+	delComun := map[string]string{
+		"trash": PapeleraD, "clock": RelojD, "tag": EtiquetaD, "download": DescargaD,
+		"bold": NegritaD, "italic": CursivaD, "underline": SubrayadoD, "strikethrough": TachadoD,
+		"quote": CitaD, "link": EnlaceD, "undo": DeshacerD, "redo": RehacerD,
+		"table": TablaD, "image": ImagenD,
+	}
+	for clave, d := range delComun {
+		i, es := iconos.Comun(clave)
+		if !es || i.Ruta() != d {
+			t.Errorf("%q no es la ruta del catálogo compartido:\n  común: %s\n  aquí:  %s", clave, i.Ruta(), d)
+		}
 	}
 }
 
@@ -59,4 +92,16 @@ func rutasDeLaWeb(t *testing.T) map[string]string {
 		t.Fatalf("solo se han leído %d rutas de %s: el patrón ya no vale", len(out), FuenteGlifos)
 	}
 	return out
+}
+
+// glifoPorNombre es la ruta de un `GlyphName` de la web, como lo resuelve allí `Glyph`:
+// los propios de esta tabla y, si no, el del catálogo compartido. Vacío si no está.
+func glifoPorNombre(nombre string) string {
+	if d, ok := glifosPropios[nombre]; ok {
+		return d
+	}
+	if i, ok := iconos.Comun(nombre); ok {
+		return i.Ruta()
+	}
+	return ""
 }

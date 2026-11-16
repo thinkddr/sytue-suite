@@ -25,11 +25,15 @@ import (
 	"git.sytue.eu/sytue/one/services/notes/internal/store"
 )
 
-func beforeWriteContract(t *testing.T) fs.FS {
+func notesMigrationPrefix(t *testing.T, firstExcluded string) fs.FS {
 	t.Helper()
 	files := fstest.MapFS{}
 	if err := fs.WalkDir(notesdb.Migrations, notesdb.MigrationsDir, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil || entry.IsDir() || strings.Contains(path, "/0017_") {
+		// Migration names have a fixed-width numeric prefix. Keep the entire
+		// contiguous history before this boundary: omitting only 0017 while
+		// retaining newer files advances the ledger past the fence without
+		// installing it, which is not a schema an ordinary upgrade produces.
+		if err != nil || entry.IsDir() || entry.Name() >= firstExcluded {
 			return err
 		}
 		data, err := fs.ReadFile(notesdb.Migrations, path)
@@ -57,7 +61,7 @@ func assertWriteFence(t *testing.T, err error) {
 }
 
 func TestAlreadyConnectedOldWriterCannotMutateAfterMigration(t *testing.T) {
-	h := pgtest.New(t, beforeWriteContract(t), notesdb.MigrationsDir)
+	h := pgtest.New(t, notesMigrationPrefix(t, "0017_"), notesdb.MigrationsDir)
 	ctx := writerContext(t)
 	old, err := h.Pool.Acquire(ctx)
 	if err != nil {
@@ -83,8 +87,17 @@ func TestAlreadyConnectedOldWriterCannotMutateAfterMigration(t *testing.T) {
 	if err := tx.Commit(ctx); err != nil {
 		t.Fatal(err)
 	}
-	// Keep the same physical connection open while the new schema is installed.
-	if err := pg.MigrateUp(notesdb.Migrations, notesdb.MigrationsDir, h.DSN); err != nil {
+	// Keep the same physical connection open while the complete current schema
+	// is installed, starting at the real schema immediately before the fence.
+	migrator, err := pg.NewMigrator(notesdb.Migrations, notesdb.MigrationsDir, h.DSN)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = migrator.Close() }()
+	if version, dirty, err := migrator.Version(); err != nil || dirty || version != 16 {
+		t.Fatalf("pre-contract fixture is not clean version 16: version=%d dirty=%t err=%v", version, dirty, err)
+	}
+	if err := migrator.Up(); err != nil {
 		t.Fatal(err)
 	}
 	for _, test := range []struct{ name, sql string }{
@@ -236,12 +249,17 @@ func TestWriteFloorIsMonotonicAndMalformedMarkersFailClosed(t *testing.T) {
 }
 
 func TestWriteContractCannotBeRemovedByOrdinaryDownMigration(t *testing.T) {
-	h := pgtest.New(t, notesdb.Migrations, notesdb.MigrationsDir)
+	// Exercise 0017's irreversible transition itself, rather than assuming
+	// that the newest migration in every future schema is the write fence.
+	h := pgtest.New(t, notesMigrationPrefix(t, "0018_"), notesdb.MigrationsDir)
 	migrator, err := pg.NewMigrator(notesdb.Migrations, notesdb.MigrationsDir, h.DSN)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = migrator.Close() }()
+	if version, dirty, err := migrator.Version(); err != nil || dirty || version != 17 {
+		t.Fatalf("write-contract fixture is not clean version 17: version=%d dirty=%t err=%v", version, dirty, err)
+	}
 	if err := migrator.Steps(-1); err == nil || !strings.Contains(err.Error(), "cannot be rolled back safely") {
 		t.Fatalf("a schema rollback could remove the fence: %v", err)
 	}

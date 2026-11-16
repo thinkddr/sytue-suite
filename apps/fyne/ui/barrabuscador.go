@@ -59,17 +59,12 @@ const (
 	SeparacionPanel float32 = 6
 	// MargenPanel es el `p-1` del panel.
 	MargenPanel = 1 * 0.25 * tema.Rem
-	// MargenAtajo y AltoAtajo son el `px-1.5 py-0.5` de la pista del atajo, con
-	// `leading-none`; RaizAtajo es su `right-3`.
-	MargenAtajo = 1.5 * 0.25 * tema.Rem
-	RaizAtajo   = 3 * 0.25 * tema.Rem
+	// RaizAtajo es el `right-3` de la tecla del atajo.
+	RaizAtajo = 3 * 0.25 * tema.Rem
 	// CorteAtajo es el `hidden md:inline-flex` de la pista: `md:` son 768 px de VENTANA
 	// (rem de 16). Por debajo, y siempre en un teléfono, no hay teclado que anunciar.
 	CorteAtajo float32 = 768
 )
-
-// EscalonAtajo es el `text-[11px] leading-none` de la pista `⌘K`.
-var EscalonAtajo = tema.Escalon{Tam: 11, Linea: 11}
 
 // estadoBarra es en qué punto está una de las piezas que piden datos.
 type estadoBarra uint8
@@ -89,7 +84,7 @@ type buscadorBarra struct {
 
 	campo   *Entrada
 	panel   *panelBarra
-	atajo   *pistaAtajo
+	atajo   *Tecla
 	limpiar *BotonIcono
 
 	ultimoX, ultimoAncho float32
@@ -218,7 +213,7 @@ func (b *buscadorBarra) colocarPanel() {
 func (b *buscadorBarra) verAtajo() {
 	conTexto := b.campo.Texto() != ""
 	mostrarLimpiar := conTexto && b.ultimoAncho >= 2*LadoLimpiarBuscador
-	b.atajo.Visible2(!b.estrecho && !b.campo.enfocado && !conTexto)
+	esconder(b.atajo, b.estrecho || b.campo.enfocado || conTexto)
 	esconder(b.limpiar, !mostrarLimpiar)
 	margenDer := float32(0)
 	if mostrarLimpiar {
@@ -853,80 +848,22 @@ func (r *panelBarraRenderer) Refresh() {
 	}
 }
 
-// dentroDelCampo es el relleno del buscador, que es lo que se ve detrás de la pista del
-// atajo (`bg-transparent`): la superficie, como pinta la web (ver colorCampoCromo).
+// tokenDentroDelCampo es el relleno del buscador, que es lo que se ve detrás de la
+// tecla del atajo (la `Kbd` del cromo no lleva fondo): la superficie, como pinta la web
+// (ver colorCampoCromo).
 //
 // Tiene que ser OPACO porque `ui.Caja` pinta el borde como un rectángulo RELLENO con la
-// caja encima: con un relleno transparente el borde se vería ENTERO y la píldora
-// saldría maciza.
-func dentroDelCampo(v tema.Variante) color.NRGBA { return tema.Color("surface", v) }
+// caja encima: con un relleno transparente el borde se vería ENTERO y la tecla saldría
+// maciza.
+const tokenDentroDelCampo = "surface"
 
-// ---- la pista del atajo ----
-
-// pistaAtajo es el `<kbd>⌘K</kbd>` del borde derecho del campo: una píldora perfilada
+// nuevaPistaAtajo es el `<Kbd tone="chrome">⌘K</Kbd>` del borde derecho del campo,
 // que se ve mientras el campo está en reposo y vacío.
 //
 // Es decorativa —`aria-hidden`— porque el atajo de verdad lo escucha el lienzo; está
 // por lo mismo que en Spotlight: quien lo ve una vez ya no lo busca en ningún manual.
-type pistaAtajo struct {
-	widget.BaseWidget
-	Texto string
-}
-
-var _ fyne.Widget = (*pistaAtajo)(nil)
-
-func nuevaPistaAtajo(texto string) *pistaAtajo {
-	p := &pistaAtajo{Texto: texto}
-	p.ExtendBaseWidget(p)
-	return p
-}
-
-// Visible2 enseña u oculta la pista. (`Visible` ya es de `BaseWidget`.)
-func (p *pistaAtajo) Visible2(si bool) {
-	if si {
-		p.Show()
-		return
-	}
-	p.Hide()
-}
-
-func (p *pistaAtajo) MinSize() fyne.Size {
-	p.ExtendBaseWidget(p)
-	return fyne.NewSize(
-		Medir(p.Texto, EscalonAtajo, Medio).Width+2*(MargenAtajo+tema.Borde),
-		EscalonAtajo.Linea+2*(0.5*0.25*tema.Rem+tema.Borde))
-}
-
-func (p *pistaAtajo) CreateRenderer() fyne.WidgetRenderer {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	r := &pistaAtajoRenderer{
-		p:      p,
-		caja:   NuevaCaja(dentroDelCampo(v), tema.Color("chrome-border", v), tema.RadioPill),
-		rotulo: Texto(p.Texto, EscalonAtajo, Medio, tema.Color("on-chrome-muted", v)),
-	}
-	r.objetos = append(r.caja.Objetos(), r.rotulo)
-	return r
-}
-
-type pistaAtajoRenderer struct {
-	p       *pistaAtajo
-	caja    *Caja
-	rotulo  *canvas.Text
-	objetos []fyne.CanvasObject
-}
-
-func (r *pistaAtajoRenderer) MinSize() fyne.Size           { return r.p.MinSize() }
-func (r *pistaAtajoRenderer) Objects() []fyne.CanvasObject { return r.objetos }
-func (r *pistaAtajoRenderer) Destroy()                     {}
-
-func (r *pistaAtajoRenderer) Layout(t fyne.Size) {
-	r.caja.Redimensionar(t)
-	ColocarTexto(r.rotulo, EscalonAtajo, MargenAtajo+tema.Borde, (t.Height-EscalonAtajo.Linea)/2)
-}
-
-func (r *pistaAtajoRenderer) Refresh() {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	r.caja.Pintar(dentroDelCampo(v), tema.Color("chrome-border", v))
-	r.rotulo.Color = tema.Color("on-chrome-muted", v)
-	r.rotulo.Refresh()
+func nuevaPistaAtajo(texto string) *Tecla {
+	t := TeclaCromo(texto)
+	t.Fondo = tokenDentroDelCampo
+	return t
 }

@@ -13,13 +13,13 @@
  */
 import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
-import { Button, EmptyState, Icon, Illustration, Input } from '@sytue/ui';
+import { Button, EmptyState, Icon, Input } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import type { SytueUser } from '@sytue/auth';
 import { useT } from '../i18n/index.js';
 import { Marco } from '../components/Marco.js';
 import { Fallo, REJILLA, useEnLinea } from '../components/Estados.js';
-import { VideoCard } from '../components/VideoCard.js';
+import { VideoCard, useVistos } from '../components/VideoCard.js';
 import { portada } from '../client/castApi.js';
 import type { TipoDeFallo } from '../lib/fallo.js';
 import type { Portada, Video } from '../lib/tipos.js';
@@ -48,6 +48,7 @@ export function ExploreApp({
 }: Props): JSX.Element {
   const t = useT(locale);
   const enLinea = useEnLinea();
+  const visto = useVistos(user?.id);
   const [datos, setDatos] = useState<Portada | null>(inicial);
   const [fallo, setFallo] = useState<TipoDeFallo | null>(falloInicial);
   const [q, setQ] = useState('');
@@ -108,7 +109,7 @@ export function ExploreApp({
           />
         ) : nada ? (
           <EmptyState
-            illustration={<Icon name="explorar" size={48} />}
+            icon="explorar"
             title={t('explore.empty.title')}
             description={t('explore.empty.description')}
           />
@@ -122,7 +123,7 @@ export function ExploreApp({
                 </h2>
                 <div class={REJILLA}>
                   {directos.map((v) => (
-                    <VideoCard key={v.id} t={t} locale={locale} video={v} />
+                    <VideoCard key={v.id} t={t} locale={locale} video={v} visto={visto(v.id)} />
                   ))}
                 </div>
               </section>
@@ -132,14 +133,11 @@ export function ExploreApp({
               {videos.length ? (
                 <div class={REJILLA}>
                   {videos.map((v) => (
-                    <VideoCard key={v.id} t={t} locale={locale} video={v} />
+                    <VideoCard key={v.id} t={t} locale={locale} video={v} visto={visto(v.id)} />
                   ))}
                 </div>
               ) : q ? (
-                <EmptyState
-                  illustration={<Illustration name="emptySearch" size={140} />}
-                  title={t('explore.noMatch', { query: q })}
-                />
+                <EmptyState spot="emptySearch" title={t('explore.noMatch', { query: q })} />
               ) : null}
               {datos.next_cursor ? (
                 <Button

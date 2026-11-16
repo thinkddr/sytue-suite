@@ -17,6 +17,8 @@ import {
   groupBoxes,
   reorderZ,
   ungroupBoxes,
+  moverConGuias,
+  redimensionarConGuias,
 } from '../src/editor/slides/organize';
 import type { SlideBox } from '../src/editor/types';
 
@@ -156,4 +158,53 @@ test('ungroupBoxes quita el groupId de todo el grupo tocado', () => {
 test('agrupar y luego expandir: seleccionar un miembro trae a todos', () => {
   const g = groupBoxes(abcd(), ['a', 'c'], 'G');
   expect(new Set(expandGroups(g, ['a']))).toEqual(new Set(['a', 'c']));
+});
+
+/* ---------- Guías inteligentes al mover y redimensionar ---------- */
+
+const ctxGuias = (otros: { x: number; y: number; w: number; h: number }[], sinAjuste = false) => ({
+  otros,
+  tolerancia: { x: 1, y: 1 },
+  sinAjuste,
+});
+
+test('moverConGuias: se pega al borde de otra caja y devuelve la guía aparte', () => {
+  const origs = [{ id: 'a', x: 10, y: 60, w: 10, h: 10, text: 'hola' }];
+  const r = moverConGuias(
+    origs,
+    9.6,
+    0,
+    { x: -10, y: -60 },
+    { x: 80, y: 30 },
+    ctxGuias([{ x: 30, y: 10, w: 20, h: 10 }]),
+  );
+  expect(r.nuevasPosiciones[0]).toEqual({ id: 'a', x: 20, y: 60, w: 10, h: 10, text: 'hola' });
+  // La guía no viaja en la caja (no se guarda en el modelo).
+  expect(r.nuevasPosiciones[0]).not.toHaveProperty('guias');
+  expect(r.guias).toEqual([{ eje: 'x', pos: 30, desde: 10, hasta: 70 }]);
+});
+
+test('moverConGuias: con Alt no ajusta ni pinta guías', () => {
+  const origs = [{ id: 'a', x: 10, y: 60, w: 10, h: 10 }];
+  const r = moverConGuias(
+    origs,
+    9.6,
+    0,
+    { x: -10, y: -60 },
+    { x: 80, y: 30 },
+    ctxGuias([{ x: 30, y: 10, w: 20, h: 10 }], true),
+  );
+  expect(r.nuevasPosiciones[0]!.x).toBeCloseTo(19.6, 6);
+  expect(r.guias).toEqual([]);
+});
+
+test('redimensionarConGuias: el borde derecho se pega; el izquierdo no se mueve', () => {
+  const r = redimensionarConGuias(
+    { x: 10, y: 10, w: 20, h: 20 },
+    9.4,
+    3,
+    ctxGuias([{ x: 40, y: 70, w: 5, h: 5 }]),
+  );
+  expect(r.rect).toEqual({ x: 10, y: 10, w: 30, h: 23 });
+  expect(r.guias).toEqual([{ eje: 'x', pos: 40, desde: 10, hasta: 75 }]);
 });

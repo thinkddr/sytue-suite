@@ -59,7 +59,7 @@ describe('listEventsOf', () => {
   const retirado = cal('/dav/calendars/duena/personal/', 'Equipo');
 
   test('un 403 de un calendario lo aparta sin tumbar los demás', async () => {
-    const r = await listEventsOf([propio, retirado], undefined, (url) =>
+    const r = await listEventsOf([propio, retirado], undefined, ({ url }) =>
       url === retirado.url
         ? Promise.reject(new HttpError(403, 'Forbidden', url))
         : Promise.resolve({ events: [{ href: 'e1' } as never] }),
@@ -69,14 +69,14 @@ describe('listEventsOf', () => {
   });
 
   test('un 404 también: el calendario lo borraron en otro sitio', async () => {
-    const r = await listEventsOf([retirado], undefined, (url) =>
+    const r = await listEventsOf([retirado], undefined, ({ url }) =>
       Promise.reject(new HttpError(404, 'Not Found', url)),
     );
     expect(r.sinAcceso).toEqual([retirado]);
   });
 
   test('lo demás sigue siendo un error de la vista', async () => {
-    const promesa = listEventsOf([propio], undefined, (url) =>
+    const promesa = listEventsOf([propio], undefined, ({ url }) =>
       Promise.reject(new HttpError(502, 'Bad Gateway', url)),
     );
     await expect(promesa).rejects.toBeInstanceOf(HttpError);

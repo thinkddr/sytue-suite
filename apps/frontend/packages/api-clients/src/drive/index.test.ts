@@ -96,6 +96,15 @@ function clienteEspia(): {
     // Como el servicio Go: pedir un fichero por id trae su RUTA resuelta, que él
     // añade aditivamente (los listados de carpeta no la llevan). Por el final
     // para no cazar /files/file-1/content ni /files/file-1/copy.
+    // El historial, como lo emite el servicio Go: snake_case y la actual primero.
+    if (url.includes('/versions?') || url.endsWith('/versions'))
+      return json({
+        versions: [
+          { version: 3, size_bytes: 30, author_sub: 'ana', is_current: true, created_at: 'c' },
+          { version: 2, size_bytes: 20, created_at: 'b' },
+        ],
+        next_cursor: 'sig',
+      });
     if (url.endsWith('/files/file-1')) return json({ ...fichero, path: '/Documentos/origen.bin' });
     // El contenido, como lo emite el servicio Go: cuerpo en streaming y el tamaño
     // exacto en Content-Length (sacado del metadato, no de bufferizar).
@@ -169,6 +178,33 @@ test('openDownload entrega el cuerpo SIN LEER, para poder transmitirlo', async (
   expect(cuerpoLeido()).toBe(true);
 });
 
+test('openDownload reenvía Range e If-Range para que un <video> pueda buscar', async () => {
+  let cabeceras: Headers | undefined;
+  const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input.toString();
+    const json = (b: unknown) =>
+      new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } });
+    if (url.includes('/children'))
+      return json({ folders: [], files: [{ id: 'v1', name: 'clip.mp4' }] });
+    if (url.includes('/folders/root')) return json({ id: 'raiz', name: '', is_root: true });
+    cabeceras = new Headers(init?.headers);
+    return new Response('23', {
+      status: 206,
+      headers: { 'content-range': 'bytes 2-3/10', 'content-length': '2' },
+    });
+  }) as unknown as typeof fetch;
+  const client = new DriveClient({
+    baseUrl: 'https://drive.test',
+    auth: { getAccessToken: () => 'tok' },
+    fetchImpl,
+  });
+  const res = await client.openDownload('/clip.mp4', { range: 'bytes=2-3', ifRange: '"abc"' });
+  expect(cabeceras?.get('range')).toBe('bytes=2-3');
+  expect(cabeceras?.get('if-range')).toBe('"abc"');
+  expect(res.status).toBe(206);
+  expect(res.headers.get('content-range')).toBe('bytes 2-3/10');
+});
+
 test('download() sigue dando los bytes enteros (manipular un PDF los necesita)', async () => {
   const { client } = clienteEspia();
   const blob = await client.download('/origen.bin');
@@ -199,4 +235,39 @@ test('el enlace público es el que devuelve el servicio, no el host por el que s
   const { client } = clienteEspia();
   const share = await client.createShare({ path: '/origen.bin' });
   expect(share.url).toBe('https://drive.publico/public/tk');
+});
+
+test('versions traduce el historial del servicio y conserva el cursor', async () => {
+  const { client, llamadas } = clienteEspia();
+  const pagina = await client.versions('file-1', { cursor: 'abc' });
+
+  expect(llamadas[0]?.url).toEndWith('/files/file-1/versions?cursor=abc');
+  expect(pagina.nextCursor).toBe('sig');
+  expect(pagina.versions).toEqual([
+    { version: 3, sizeBytes: 30, isCurrent: true, author: 'ana', createdAt: 'c' },
+    { version: 2, sizeBytes: 20, isCurrent: false, createdAt: 'b' },
+  ]);
+});
+
+test('restoreVersion manda un POST a la versión, y rechaza un número que no lo es', async () => {
+  const { client, llamadas } = clienteEspia();
+  await client.restoreVersion('file-1', 2);
+  expect(llamadas.at(-1)).toMatchObject({
+    method: 'POST',
+    url: expect.stringMatching(/\/files\/file-1\/versions\/2\/restore$/),
+  });
+
+  // Un «2/../../otra» en la ruta no debe llegar nunca al servicio.
+  const antes = llamadas.length;
+  await expect(client.restoreVersion('file-1', 0)).rejects.toThrow();
+  await expect(client.restoreVersion('file-1', 1.5)).rejects.toThrow();
+  expect(llamadas.length).toBe(antes);
+});
+
+test('openVersionDownload entrega el cuerpo de la versión SIN LEER', async () => {
+  const { client, llamadas, cuerpoLeido } = clienteEspia();
+  const res = await client.openVersionDownload('file-1', 2);
+  expect(llamadas.at(-1)?.url).toEndWith('/files/file-1/versions/2/content');
+  expect(cuerpoLeido()).toBe(false);
+  expect(new Uint8Array(await res.arrayBuffer())).toEqual(CONTENIDO);
 });

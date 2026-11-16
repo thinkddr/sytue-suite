@@ -86,7 +86,7 @@ func (s *Store) AppendOps(ctx context.Context, docID string, author domain.Subje
 		if err != nil {
 			return err
 		}
-		// El HTML del contenido se sanea aquí (domain/saneado_html.go): con los parches ya
+		// El HTML del contenido se sanea aquí (apps/nucleo/saneado): con los parches ya
 		// convertidos en el contenido que dejan, y ANTES de la protección, que compara y
 		// guarda lo que de verdad se va a escribir.
 		domain.SanearOps(lote)

@@ -27,7 +27,14 @@ import {
   type TrackAuthor,
 } from '../trackchanges';
 import { getSelectedImage } from './imageDom';
+import { cambioDeMayusculas, esModoMayusculas, type ModoMayusculas } from '../mayusculas';
 import { editorT } from '../../i18n';
+import {
+  dejarSeleccionEnCasillas,
+  elementoDeCasilla,
+  marcarComoCasillas,
+  quitarCasillas,
+} from './casillas';
 
 // ponytail: execCommand está deprecado pero es interoperable y sin dependencias;
 // migrar a un modelo propio de Range solo si un navegador soportado lo retira.
@@ -74,6 +81,16 @@ export function setEditorRoot(el: HTMLElement | null): void {
 
 export function getEditorRoot(): HTMLElement | null {
   return root;
+}
+
+/** Reemplaza (o quita, con html vacío) una capa del folio —la página, la marca de agua, el
+ *  borde— y emite `input` para el autosave. La capa va como PRIMER hijo (fuera del flujo,
+ *  no molesta al caret). La usan la cinta (Disposición) y la barra de estado (el idioma). */
+export function ponerCapaDelFolio(selector: string, html: string): void {
+  if (!root) return;
+  root.querySelector(selector)?.remove();
+  if (html) root.insertAdjacentHTML('afterbegin', html);
+  dispatchInput();
 }
 
 /* ---------- utilidades internas ---------- */
@@ -588,6 +605,13 @@ const VALUE_COMMANDS: Partial<Record<EditorCommand, string>> = {
 export function exec(command: EditorCommand, value?: string): void {
   if (!root) return;
   recordStep('document', command, value); // no-op salvo grabación de macro activa
+  ejecutar(command, value);
+}
+
+/** exec sin grabar: los pasos internos de un comando compuesto («Copiar formato») no son
+ *  pasos de la macro. */
+function ejecutar(command: EditorCommand, value?: string): void {
+  if (!root) return;
   restoreSelection();
 
   // Modo de markup del comando (ver SEMANTIC_INLINE): se deja puesto a propósito.
@@ -664,9 +688,253 @@ export function exec(command: EditorCommand, value?: string): void {
     case 'tableCellValign':
       setCellProp('vertical-align', value ?? '');
       break;
+    case 'changeCase':
+      if (esModoMayusculas(value)) cambiarMayusculas(value);
+      break;
+    case 'listCheck':
+      listaDeCasillas();
+      break;
     default:
       break; // el resto de EditorCommand lo cubren los mapas de arriba
   }
+}
+
+/* ---------- Lista de casillas (Inicio › Párrafo) ---------- */
+
+/**
+ * Pone o quita la lista de casillas, como los botones de viñetas y numerada: en una lista
+ * de casillas la deshace en párrafos; en una de viñetas la pasa entera a casillas; en lo
+ * demás (párrafos, una numerada) hace la lista y la marca. Los atributos no pasan por
+ * execCommand: el `input` se emite a mano.
+ */
+function listaDeCasillas(): void {
+  const rootEl = root;
+  const range = selectionRange();
+  if (!rootEl || !range) return;
+  const li = closestInRoot(range.startContainer, 'li');
+  const lista = li?.parentElement;
+  if (li && lista && elementoDeCasilla(rootEl, li)) {
+    quitarCasillas(lista);
+    cmd('insertUnorderedList'); // de viñetas a párrafos
+  } else if (lista?.tagName === 'UL') {
+    marcarComoCasillas(lista, null, false);
+  } else {
+    cmd('insertUnorderedList');
+    // Con varios párrafos seleccionados, todos sus elementos (no solo el del cursor).
+    dejarSeleccionEnCasillas(rootEl, selectionRange());
+  }
+  dispatchInput();
+}
+
+/* ---------- Cambiar mayúsculas y minúsculas (Inicio › Fuente) ---------- */
+
+/** Los bloques que abren párrafo para el cambio de mayúsculas: frase y palabra nuevas. */
+const PARRAFO_SELECTOR = `${BLOCK_SELECTOR},h4,h5,h6,div`;
+
+/** Un trozo de la selección: [desde, hasta) del texto de un nodo. */
+interface TramoDeTexto {
+  nodo: Text;
+  desde: number;
+  hasta: number;
+}
+
+/**
+ * Transforma las mayúsculas del texto seleccionado sin tocar el marcado: cada nodo de
+ * texto conserva su largo (`mayusculas.ts`), así que el formato de cada letra sigue en su
+ * sitio y la selección sigue abarcando lo mismo. Lo no editable (citas, campos de
+ * combinación) no se toca: su texto lo genera el editor.
+ *
+ * Con la selección dentro de UN nodo —una palabra, una frase sin cambios de formato, el
+ * caso de casi siempre— va por `insertText`, que entra en el deshacer del navegador. Si
+ * cruza nodos, cada uno se reescribe a mano, como el interlineado o las tablas: un
+ * `insertText` por nodo serían tantos pasos de deshacer como trozos.
+ */
+function cambiarMayusculas(modo: ModoMayusculas): void {
+  const rootEl = root;
+  const range = selectionRange();
+  if (!rootEl || !range || range.collapsed) return;
+  const cambio = cambioDeMayusculas(modo);
+  // El párrafo de donde arranca la selección, y su texto hasta ella (ver `previo`).
+  const primerParrafo = closestInRoot(range.startContainer, PARRAFO_SELECTOR);
+  const antes = document.createRange();
+  antes.setStart(primerParrafo ?? rootEl, 0);
+  antes.setEnd(range.startContainer, range.startOffset);
+  const tramos: TramoDeTexto[] = [];
+  const nuevos: string[] = [];
+  let parrafo: HTMLElement | null | undefined;
+  const comun = range.commonAncestorContainer;
+  const walker = document.createTreeWalker(
+    comun.nodeType === Node.TEXT_NODE ? (comun.parentNode ?? comun) : comun,
+    NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+  );
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (!range.intersectsNode(n)) continue;
+    const otro = closestInRoot(n, PARRAFO_SELECTOR);
+    if (otro !== parrafo) {
+      cambio.parrafo();
+      if (parrafo === undefined && otro === primerParrafo) cambio.previo(antes.toString());
+      parrafo = otro;
+    }
+    if (!(n instanceof Text)) {
+      // Un salto de línea o una imagen separan palabras (y un salto, frases), como el
+      // '\n' y el objeto de las runas de la app nativa.
+      if (n.nodeName === 'BR') cambio.tramo('\n');
+      else if (n.nodeName === 'IMG') cambio.tramo('￼');
+      continue;
+    }
+    if (closestInRoot(n, '[contenteditable="false"]')) continue;
+    const desde = n === range.startContainer ? range.startOffset : 0;
+    const hasta = n === range.endContainer ? range.endOffset : n.length;
+    if (desde >= hasta) continue;
+    tramos.push({ nodo: n, desde, hasta });
+    nuevos.push(cambio.tramo(n.data.slice(desde, hasta)));
+  }
+  const primero = tramos[0];
+  const ultimo = tramos[tramos.length - 1];
+  if (!primero || !ultimo) return;
+  if (tramos.length === 1 && insertarEnTramo(primero, nuevos[0]!)) return;
+  tramos.forEach((t, i) => {
+    const nuevo = nuevos[i]!;
+    if (nuevo !== t.nodo.data.slice(t.desde, t.hasta))
+      t.nodo.replaceData(t.desde, t.hasta - t.desde, nuevo);
+  });
+  // replaceData encoge los rangos vivos que acababan dentro de lo sustituido: se repone la
+  // selección entera, que mide lo mismo que antes.
+  const sel = document.getSelection();
+  if (sel) {
+    const r = document.createRange();
+    r.setStart(primero.nodo, primero.desde);
+    r.setEnd(ultimo.nodo, ultimo.hasta);
+    sel.removeAllRanges();
+    sel.addRange(r);
+    savedRange = r.cloneRange();
+  }
+  dispatchInput();
+}
+
+/** El camino con deshacer: selecciona el tramo y lo sustituye con `insertText`. */
+function insertarEnTramo(t: TramoDeTexto, nuevo: string): boolean {
+  const sel = document.getSelection();
+  if (!sel) return false;
+  const r = document.createRange();
+  r.setStart(t.nodo, t.desde);
+  r.setEnd(t.nodo, t.hasta);
+  sel.removeAllRanges();
+  sel.addRange(r);
+  if (!cmd('insertText', nuevo)) return false;
+  // El cursor queda tras lo escrito: se vuelve a seleccionar, como un procesador de textos.
+  const fin = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+  if (fin && fin.startContainer instanceof Text && fin.startOffset >= nuevo.length) {
+    sel.setBaseAndExtent(
+      fin.startContainer,
+      fin.startOffset - nuevo.length,
+      fin.startContainer,
+      fin.startOffset,
+    );
+  }
+  return true;
+}
+
+/* ---------- Copiar formato (la brocha de Inicio) ---------- */
+
+/** El formato de carácter que «Copiar formato» se lleva: lo que se VE, no las etiquetas. */
+export interface FormatoDeCaracter {
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  strike: boolean;
+  superscript: boolean;
+  subscript: boolean;
+  /** `fontName` tal cual lo da el navegador; '' si no lo sabe. */
+  font: string;
+  /** Peldaño '1'..'7' de `fontSize`; '' si no es ninguno. */
+  size: string;
+  /** Color del texto como `rgb(r, g, b)`; '' si no lo sabe. */
+  color: string;
+  /** Resaltado como `rgb(r, g, b)`; '' sin resaltado. */
+  highlight: string;
+}
+
+type Marca = 'bold' | 'italic' | 'underline' | 'strike' | 'superscript' | 'subscript';
+const MARCAS_DE_CARACTER: readonly Marca[] = [
+  'bold',
+  'italic',
+  'underline',
+  'strike',
+  'superscript',
+  'subscript',
+];
+
+/** Un color de queryCommandValue sin espacios; '' si es transparente (sin resaltado). */
+export function normalizarColor(v: string): string {
+  const c = v.replace(/\s+/g, '').toLowerCase();
+  if (c === '' || c === 'transparent' || /^rgba\(.*,0(\.0*)?\)$/.test(c)) return '';
+  return c.replace(/,/g, ', ');
+}
+
+/**
+ * Los comandos que dejan `destino` (lo que hay tras «Borrar formato») como `fuente`.
+ * Solo lo que difiere: un párrafo de un título ya es negrita y no hay que ponérsela, y
+ * el color del folio no se escribe como un `<span>` de más. Las marcas son conmutadores:
+ * primero se apagan las que sobran y luego se encienden las que faltan, para que el
+ * superíndice no vuelva a encender el subíndice que acaba de apagar. Puro: lo prueba
+ * docs-brocha.test.ts sin navegador.
+ */
+export function pasosDeFormato(
+  fuente: FormatoDeCaracter,
+  destino: FormatoDeCaracter,
+): [EditorCommand, string?][] {
+  const pasos: [EditorCommand, string?][] = [];
+  for (const m of MARCAS_DE_CARACTER) if (destino[m] && !fuente[m]) pasos.push([m]);
+  for (const m of MARCAS_DE_CARACTER) if (fuente[m] && !destino[m]) pasos.push([m]);
+  const familia = (f: string): string => f.replace(/["']/g, '').trim().toLowerCase();
+  if (fuente.font && familia(fuente.font) !== familia(destino.font))
+    pasos.push(['font', fuente.font]);
+  if (fuente.size && fuente.size !== destino.size) pasos.push(['size', fuente.size]);
+  if (fuente.color && fuente.color !== destino.color) pasos.push(['color', fuente.color]);
+  if (fuente.highlight !== destino.highlight)
+    pasos.push(['highlight', fuente.highlight || 'transparent']);
+  return pasos;
+}
+
+function leerFormatoDeCaracter(): FormatoDeCaracter {
+  return {
+    bold: editingCommandState('bold'),
+    italic: editingCommandState('italic'),
+    underline: editingCommandState('underline'),
+    strike: editingCommandState('strikeThrough'),
+    superscript: editingCommandState('superscript'),
+    subscript: editingCommandState('subscript'),
+    font: editingCommandValue('fontName'),
+    size: editingCommandValue('fontSize'),
+    color: normalizarColor(editingCommandValue('foreColor')),
+    highlight: normalizarColor(
+      editingCommandValue('hiliteColor') || editingCommandValue('backColor'),
+    ),
+  };
+}
+
+/** El formato de carácter al principio de la selección del lienzo; null sin lienzo. */
+export function copiarFormato(): FormatoDeCaracter | null {
+  if (!root || !(selectionRange() ?? savedRange)) return null;
+  restoreSelection();
+  return leerFormatoDeCaracter();
+}
+
+/**
+ * Pone `formato` en la selección: «Borrar formato» y luego lo que falte para igualarlo.
+ * Todo por execCommand, así que cada paso entra en el deshacer del navegador. Devuelve
+ * false si no hay texto seleccionado (no hay dónde pintar).
+ */
+export function pegarFormato(formato: FormatoDeCaracter): boolean {
+  if (!root) return false;
+  restoreSelection();
+  const range = selectionRange();
+  if (!range || range.collapsed) return false;
+  // Sin grabar: la macro no sabría reproducir «el formato de lo que se copió entonces».
+  ejecutar('clearFormat');
+  for (const [c, v] of pasosDeFormato(formato, leerFormatoDeCaracter())) ejecutar(c, v);
+  return true;
 }
 
 /* ---------- Reemplazo de una coincidencia (Buscar y reemplazar, §6.4) ---------- */
@@ -816,6 +1084,7 @@ export function getFormatState(): FormatState {
     return { ...EMPTY_FORMAT, imageSelected };
   }
   const block = qcv('formatBlock').toLowerCase();
+  const casillas = elementoDeCasilla(rootEl, sel.anchorNode) !== null;
   const align: FormatState['align'] = qcs('justifyCenter')
     ? 'center'
     : qcs('justifyRight')
@@ -831,8 +1100,9 @@ export function getFormatState(): FormatState {
     font: qcv('fontName').replace(/["']/g, ''),
     size: qcv('fontSize'),
     align,
-    bullet: qcs('insertUnorderedList'),
+    bullet: qcs('insertUnorderedList') && !casillas,
     number: qcs('insertOrderedList'),
+    checklist: casillas,
     heading:
       block === 'h1' || block === 'h2' || block === 'h3' || block === 'blockquote' ? block : 'p',
     inTable: closestInRoot(sel.anchorNode, 'table') !== null,

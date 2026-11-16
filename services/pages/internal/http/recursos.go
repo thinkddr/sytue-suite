@@ -95,6 +95,13 @@ func esPNG(b []byte) bool {
 	return len(b) >= 8 && string(b[:8]) == "\x89PNG\r\n\x1a\n"
 }
 
+// opaca dice si la imagen no tiene ningún píxel transparente. Los tipos de la
+// stdlib lo saben (Opaque); uno que no lo diga se trata como si tuviera alfa.
+func opaca(img image.Image) bool {
+	o, ok := img.(interface{ Opaque() bool })
+	return ok && o.Opaque()
+}
+
 func (h *Handlers) procesarPDF(w http.ResponseWriter, r *http.Request, siteID uuid.UUID, datos []byte, nombre string) {
 	if _, err := h.Store.SitioCompleto(r.Context(), siteID); err != nil {
 		httpx.Fail(w, r, errorAPI(err))
@@ -142,7 +149,7 @@ func (h *Handlers) procesarPDF(w http.ResponseWriter, r *http.Request, siteID uu
 func (h *Handlers) procesarImagen(w http.ResponseWriter, r *http.Request, siteID uuid.UUID, datos []byte, nombre string) {
 	// Guarda anti bomba de descompresión: por la memoria que pide, no solo por
 	// los píxeles (miniatura.Cabe, FILE-07).
-	cfg, _, err := image.DecodeConfig(bytes.NewReader(datos))
+	cfg, _, err := miniatura.Cabecera(datos)
 	if err != nil || !miniatura.Cabe(cfg) {
 		httpx.Fail(w, r, httpx.ErrUnprocessable.WithCode("invalid_image").WithMessage("Dimensiones o formato de imagen no soportados"))
 		return
@@ -161,7 +168,10 @@ func (h *Handlers) procesarImagen(w http.ResponseWriter, r *http.Request, siteID
 
 	ext := "jpg"
 	mimeType := "image/jpeg"
-	if formato == "png" || esPNG(datos) {
+	// Un WebP con transparencia (logos, recortes) se guarda en PNG: en JPEG lo
+	// transparente saldría negro. El WebP opaco, que suele ser una foto, en JPEG.
+	conAlfa := formato == "webp" && !opaca(img)
+	if formato == "png" || conAlfa || esPNG(datos) {
 		ext = "png"
 		mimeType = "image/png"
 	}

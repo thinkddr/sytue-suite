@@ -29,12 +29,19 @@
  * (un cristal sobre el marco, en el traslúcido). Se mide el texto sobre el marco, la
  * píldora, el buscador de la barra y, otra vez, todo el contenido con la HOJA de lienzo.
  *
+ * Y MÁS CONTRASTE (`prefers-contrast: more`, al final de colors.css y tras la forma en
+ * appearance.css): cada apariencia se mide otra vez con ese bloque encima («· más
+ * contraste»), y ahí los bordes y divisores, que en el modo normal se quedan por debajo
+ * de 3:1 a propósito, tienen que llegar a 3:1. Visto en ROJO sin el bloque: caen «Borde
+ * sobre superficie» y «Borde sutil sobre el lienzo» en todas, muy por debajo de 3:1.
+ *
  * Visto en ROJO: el buscador nació con el velo claro del ítem activo
  * (`background-color: var(--sytue-sidebar-active-bg)`) y cayó «Marco: marca de agua del
  * buscador» en claro (3,92) y en traslúcido (4,07): por eso el velo es oscuro, el mismo
  * `--sytue-sidebar-field` de la barra-carril del móvil.
  */
 import { expect, test } from 'bun:test';
+import { PALETA_DE_USUARIO } from './paleta-usuario.js';
 
 /** Una hoja de tokens, sin comentarios. */
 const hoja = async (nombre: string): Promise<string> =>
@@ -137,7 +144,7 @@ function razon(a: Color, b: Color): number {
 const TARJETAS = ['blue', 'violet', 'mint', 'rose', 'amber', 'cyan', 'coral', 'lime', 'slate'];
 
 /** Rótulo, mínimo exigido y razón, con las capas YA aplanadas sobre `lienzo`. */
-function medidas(t: Paleta, lienzo: Color): [string, number, number][] {
+function medidas(t: Paleta, lienzo: Color, masContraste = false): [string, number, number][] {
   const sup = sobre(t('surface'), lienzo);
   const lado = sobre(t('sidebar-bg'), lienzo);
   const barra = sobre(t('topbar-bg'), lienzo);
@@ -211,6 +218,16 @@ function medidas(t: Paleta, lienzo: Color): [string, number, number][] {
     ['Contorno de control', 3, razon(sobre(t('border-strong'), sup), sup)],
     ['Anillo de foco', 3, razon(t('focus-ring'), sup)],
     ['Indicador «estás aquí» fuera del carril', 3, razon(t('indicator'), sup)],
+    // Con más contraste, TODO borde es un contorno que se ve (WCAG 1.4.11): los divisores
+    // y los filetes de tarjeta dejan de ser decoración por debajo de 3:1.
+    ...(masContraste
+      ? ([
+          ['Borde sobre superficie', 3, razon(sobre(t('border'), sup), sup)],
+          ['Borde sutil sobre superficie', 3, razon(sobre(t('border-subtle'), sup), sup)],
+          ['Borde sobre el lienzo', 3, razon(sobre(t('border'), lienzo), lienzo)],
+          ['Borde sutil sobre el lienzo', 3, razon(sobre(t('border-subtle'), lienzo), lienzo)],
+        ] as [string, number, number][])
+      : []),
   ];
 }
 
@@ -248,12 +265,32 @@ const APPS = [...hojas[0]!.matchAll(/^\[data-color='app'\]\[data-app='([a-z]+)'\
 );
 // El color es un eje aparte del modo: cada medida, en cada color por los cuatro modos. Y
 // en «color de cada app», en cada app y en la superficie sin rampa propia (la casa).
-const APARIENCIAS: [string, string[]][] = MODOS.flatMap(([nombre, modo]) => [
+const NORMALES: [string, string[]][] = MODOS.flatMap(([nombre, modo]) => [
   [`petróleo · ${nombre}`, modo ? [modo] : []] as [string, string[]],
   [`cobalto · ${nombre}`, capas(modo, 'cobalto')] as [string, string[]],
   [`app (la casa) · ${nombre}`, capas(modo, 'app')] as [string, string[]],
   ...APPS.map((app) => [`app ${app} · ${nombre}`, capas(modo, 'app', app)] as [string, string[]]),
 ]);
+// Y MÁS CONTRASTE, el quinto eje: los bloques de `@media (prefers-contrast: more)`
+// encima de cada una de las anteriores. Pesan tres atributos y van al final de su hoja,
+// así que en la cascada se aplican los últimos (el traslúcido, solo en el traslúcido).
+const MAS_CONTRASTE =
+  ':root:is([data-theme], :not([data-theme])):is([data-color], :not([data-color])) {';
+const MAS_CONTRASTE_TRASLUCIDO =
+  ":root[data-theme='translucent']:is([data-color], :not([data-color])) {";
+const MAS_CONTRASTE_MARCO = ":root[data-theme='translucent']:not([data-forma='carril']) {";
+const CONTRASTE = ' · más contraste';
+const APARIENCIAS: [string, string[]][] = [
+  ...NORMALES,
+  ...NORMALES.map(([nombre, bloques]): [string, string[]] => [
+    nombre + CONTRASTE,
+    [
+      ...bloques,
+      MAS_CONTRASTE,
+      ...(nombre.includes('traslúcido') ? [MAS_CONTRASTE_TRASLUCIDO] : []),
+    ],
+  ]),
+];
 
 /**
  * Lo que «color de cada app» promete por encima del mínimo común: el carril de cada
@@ -272,7 +309,9 @@ function minimoDeApp(nombre: string, rotulo: string, minimo: number): number {
 /** La peor razón de cada medida entre los fondos de la apariencia. */
 function peores(nombre: string, bloques: string[]): [string, number, number][] {
   const t = paleta(bloques);
-  const porLienzo = lienzos(t, nombre.includes('traslúcido')).map((l) => medidas(t, l));
+  const porLienzo = lienzos(t, nombre.includes('traslúcido')).map((l) =>
+    medidas(t, l, nombre.endsWith(CONTRASTE)),
+  );
   return porLienzo[0]!.map(([rotulo, minimo], i) => [
     rotulo,
     minimo,
@@ -343,7 +382,13 @@ const esContenido = (rotulo: string) => !/^(Carril|Barra superior)/.test(rotulo)
 for (const [nombre, bloques] of APARIENCIAS) {
   test(`la forma Marco cumple el contraste en ${nombre}`, () => {
     const traslucido = nombre.includes('traslúcido');
-    const t = paleta([...bloques, MARCO, ...(traslucido ? [MARCO_TRASLUCIDO] : [])]);
+    const contraste = nombre.endsWith(CONTRASTE);
+    const t = paleta([
+      ...bloques,
+      MARCO,
+      ...(traslucido ? [MARCO_TRASLUCIDO] : []),
+      ...(traslucido && contraste ? [MAS_CONTRASTE_MARCO] : []),
+    ]);
     for (const token of ['frame-from', 'frame-to', 'sheet-bg', 'nav-active-bg', 'sidebar-field']) {
       expect(() => t(token), `appearance.css no declara --sytue-${token} en Marco`).not.toThrow();
     }
@@ -351,7 +396,7 @@ for (const [nombre, bloques] of APARIENCIAS) {
     const puntos = [t('frame-from'), t('frame-to')].map((c) => sobre(c, t('bg')));
     const porPunto = puntos.map((marco) => [
       ...medidasMarco(t, marco),
-      ...medidas(t, sobre(t('sheet-bg'), marco))
+      ...medidas(t, sobre(t('sheet-bg'), marco), contraste)
         .filter(([rotulo]) => esContenido(rotulo))
         .map(([rotulo, minimo, valor]): [string, number, number] => [
           `Marco, sobre la hoja: ${rotulo}`,
@@ -373,6 +418,39 @@ for (const [nombre, bloques] of APARIENCIAS) {
     const cortas = filas
       .filter(([, minimo, valor]) => valor < minimo)
       .map(([rotulo, minimo, valor]) => `${rotulo}: ${valor.toFixed(2)} < ${minimo}`);
+    expect(cortas).toEqual([]);
+  });
+}
+
+// ---- La paleta de colores de usuario (paleta-usuario.ts) ----
+// Los colores que la gente elige para lo suyo son FIJOS (se guardan en hex), así que cada
+// tono tiene que valer a la vez en todos los modos: el punto de una etiqueta o la casilla
+// de un calendario, 3:1 contra todo fondo de contenido donde se pintan; la barra de un
+// evento o la píldora de un estado, rótulo blanco a 4,5:1. Visto en ROJO con la paleta de
+// Calendar de antes: el `slate` (#334155) se queda en 1,49 sobre la hoja elevada del
+// oscuro en cobalto; con la de Mail, el `brass` (#9a7b3f) lleva el blanco a 3,98, y el
+// fucsia de los cuadernos de Notes (#86198f) no pasa de 1,88 en ese mismo oscuro.
+for (const [nombre, bloques] of APARIENCIAS) {
+  test(`cada color de usuario se lee en ${nombre}`, () => {
+    const t = paleta(bloques);
+    // Contra la hoja y la hoja elevada, y contra el lienzo cuando es liso. El degradado
+    // del traslúcido no lleva contenido suelto: todo va sobre su cristal.
+    const traslucido = nombre.includes('traslúcido');
+    const fondos = lienzos(t, traslucido).flatMap((l) => [
+      ...(traslucido ? [] : [l]),
+      sobre(t('surface'), l),
+      sobre(t('surface-raised'), l),
+    ]);
+    const blanco: Color = [255, 255, 255, 1];
+    const cortas = PALETA_DE_USUARIO.flatMap(({ id, valor }) => {
+      const c = color(valor);
+      const fondo = Math.min(...fondos.map((f) => razon(c, f)));
+      const rotulo = razon(blanco, c);
+      return [
+        ...(fondo < 3 ? [`${id} contra el fondo: ${fondo.toFixed(2)} < 3`] : []),
+        ...(rotulo < 4.5 ? [`${id} con rótulo blanco: ${rotulo.toFixed(2)} < 4.5`] : []),
+      ];
+    });
     expect(cortas).toEqual([]);
   });
 }

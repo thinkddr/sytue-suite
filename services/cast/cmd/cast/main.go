@@ -209,7 +209,7 @@ func run(esTranscoder bool) error {
 	svc := service.New(service.Deps{
 		Store:      st,
 		Directorio: directorioDe(cfg),
-		Objetos:    almacen.New(objetos),
+		Objetos:    almacen.New(objetos, st),
 		Cuota:      cuotaSvc,
 		Drive:      driveSvc,
 		Firmante:   media.New(cfg.MediaSigningKey),
@@ -274,12 +274,17 @@ func run(esTranscoder bool) error {
 		go dir.BucleDeSondeo(ctx)
 	}
 
+	privateSource, err := store.NewPrivateSource(st, objetos)
+	if err != nil {
+		return err
+	}
 	router := casthttp.NewRouter(casthttp.Deps{
-		Cfg:      cfg,
-		Store:    st,
-		Servicio: svc,
-		Social:   soc,
-		Directo:  casthttp.NuevoDirecto(dir),
+		PrivateSource: privateSource,
+		Cfg:           cfg,
+		Store:         st,
+		Servicio:      svc,
+		Social:        soc,
+		Directo:       casthttp.NuevoDirecto(dir),
 		// «Presentar con Cast»: la posición de la presentación de un directo.
 		Diapositivas: diapositivas.New(pool, svc, logger),
 		Verifier:     verifier,

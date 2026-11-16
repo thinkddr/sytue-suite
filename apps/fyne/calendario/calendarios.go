@@ -111,7 +111,7 @@ func (a *App) formularioCalendario(c *api.Calendar) {
 	p := a.P
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	editar := c != nil && c.ID != ""
-	color := PaletaCalendario[0].Hex
+	color := ColorNuevo
 	nombre := ui.NuevaEntrada(p.t("calendar.namePlaceholder", nil))
 	if editar {
 		nombre.PonerTexto(c.Title())
@@ -197,7 +197,7 @@ func (a *App) formularioCalendario(c *api.Calendar) {
 		Con(ui.DialogoSM, container.New(ui.Fila{Hueco: ui.HuecoPieDialogo}, cancelar, guardar))
 	d.RotuloCerrar = p.t("common.close", nil)
 	d.Foco = nombre
-	d.Mostrar(lienzo)
+	a.mostrarDialogo(d, lienzo)
 }
 
 // intro es el `onKeyDown` de Intro que envía el formulario.
@@ -242,7 +242,7 @@ func (a *App) confirmarBorrarCalendario(c api.Calendar) {
 	d = ui.NuevoDialogo(p.t("calendar.deleteTitle", nil), cuerpo).
 		Con(ui.DialogoSM, container.New(ui.Fila{Hueco: ui.HuecoPieDialogo}, cancelar, borrar))
 	d.RotuloCerrar = p.t("common.close", nil)
-	d.Mostrar(lienzo)
+	a.mostrarDialogo(d, lienzo)
 }
 
 // pareceURL es `looksLikeUrl`: http(s) con host. El servicio valida de verdad.
@@ -259,7 +259,7 @@ func (a *App) formularioSuscripcion() {
 	}
 	p := a.P
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	color := PaletaCalendario[7].Hex
+	color := ColorSuscripcion
 	enlace := ui.NuevaEntrada(p.t("subscribe.urlPlaceholder", nil))
 	gEnlace := nuevoGrupoVivo(p.t("subscribe.url", nil), true, enlace, "")
 	nombre := ui.NuevaEntrada(p.t("subscribe.namePlaceholder", nil))
@@ -314,7 +314,7 @@ func (a *App) formularioSuscripcion() {
 		Con(ui.DialogoSM, container.New(ui.Fila{Hueco: ui.HuecoPieDialogo}, cancelar, enviarB))
 	d.RotuloCerrar = p.t("common.close", nil)
 	d.Foco = enlace
-	d.Mostrar(lienzo)
+	a.mostrarDialogo(d, lienzo)
 }
 
 // grupoVivo es un `ui.GrupoCampo` que se rehace al cambiarle el error: la pieza del

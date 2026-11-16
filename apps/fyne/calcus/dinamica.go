@@ -130,7 +130,7 @@ func (l *Libro) EscribirDinamica(d analisis.Dinamica, t func(string, i18n.Vars) 
 	if !ok1 || !ok2 {
 		return "source"
 	}
-	c2, f2 := min(rr.C2, Columnas-1), min(rr.R2, Filas-1)
+	c2, f2 := min(rr.C2, MaxColumnas-1), min(rr.R2, MaxFilas-1)
 	ancho := 0
 	if len(rejilla) > 0 {
 		ancho = len(rejilla[0])
@@ -141,7 +141,7 @@ func (l *Libro) EscribirDinamica(d analisis.Dinamica, t func(string, i18n.Vars) 
 	for _, fila := range out {
 		w = max(w, len(fila))
 	}
-	if at.C1+w > Columnas || at.R1+alto > Filas {
+	if at.C1+w > MaxColumnas || at.R1+alto > MaxFilas {
 		return "room"
 	}
 	fin := Celda{C: at.C1 + w - 1, F: at.R1 + alto - 1}
@@ -171,7 +171,7 @@ func (l *Libro) origenDinamica(d analisis.Dinamica) (rejilla [][]formula.Value, 
 	if fuente == nil || !ok {
 		return nil, nil, false
 	}
-	f2 := min(rr.R2, Filas-1)
+	f2 := min(rr.R2, MaxFilas-1)
 	formatoCampo = func(campo int) *FormatoNum {
 		for f := rr.R1 + 1; f <= f2; f++ {
 			if x, ok := fuente.formatos[Celda{C: rr.C1 + campo, F: f}]; ok {
@@ -430,9 +430,9 @@ func (l *Libro) valoresRango(texto, hoja string) [][]formula.Value {
 	}
 	l.sincronizarOcultas()
 	var out [][]formula.Value
-	for f := r.R1; f <= min(r.R2, Filas-1); f++ {
+	for f := r.R1; f <= min(r.R2, MaxFilas-1); f++ {
 		var fila []formula.Value
-		for c := r.C1; c <= min(r.C2, Columnas-1); c++ {
+		for c := r.C1; c <= min(r.C2, MaxColumnas-1); c++ {
 			fila = append(fila, l.motor.ValueAt(nombre, c, f))
 		}
 		out = append(out, fila)

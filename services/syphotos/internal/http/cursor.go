@@ -54,3 +54,41 @@ func descifrarCursor(s string) (*store.Cursor, error) {
 	}
 	return &store.Cursor{Fecha: t, ID: id}, nil
 }
+
+// cursorDeFecha convierte `desde=` —un año, un mes o un día: `2019`,
+// `2019-07`, `2019-07-14`— en la posición desde la que sigue la línea de
+// tiempo: justo ANTES del primer instante del periodo siguiente. Así la página
+// empieza por la foto más reciente de ese periodo y, al seguir bajando, entra
+// en los anteriores con la paginación de siempre.
+//
+// Es un cursor como cualquier otro, y por eso el resto de páginas usan el
+// opaco: el servidor sigue siendo el único que compone posiciones intermedias.
+// `uuid.Nil` como id hace la comparación estricta —`(fecha, id) < (límite,
+// Nil)` equivale a `fecha < límite`—, de modo que una foto hecha justo a las
+// 00:00 del uno de enero siguiente no se cuela en el año pedido.
+//
+// En UTC, como la fecha guardada: la galería no conoce la zona de quien mira.
+func cursorDeFecha(s string) (*store.Cursor, error) {
+	s = strings.TrimSpace(s)
+	var (
+		t   time.Time
+		err error
+	)
+	switch len(s) {
+	case 4:
+		t, err = time.Parse("2006", s)
+		t = t.AddDate(1, 0, 0)
+	case 7:
+		t, err = time.Parse("2006-01", s)
+		t = t.AddDate(0, 1, 0)
+	case 10:
+		t, err = time.Parse("2006-01-02", s)
+		t = t.AddDate(0, 0, 1)
+	default:
+		return nil, fmt.Errorf("fecha %q: se espera AAAA, AAAA-MM o AAAA-MM-DD", s)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("fecha %q ilegible: %w", s, err)
+	}
+	return &store.Cursor{Fecha: t, ID: uuid.Nil}, nil
+}

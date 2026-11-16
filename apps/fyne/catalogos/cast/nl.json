@@ -7,6 +7,7 @@
   "block.short": "Blokkeren",
   "card.untitledOwner": "Onbekende naam",
   "card.watch": "{title} bekijken",
+  "card.watched": "{percent}% bekeken",
   "channel.count": {
     "one": "{count} openbare video",
     "other": "{count} openbare video’s"
@@ -153,7 +154,12 @@
   "player.qualityAuto": "Automatisch",
   "player.qualityAutoNow": "Automatisch ({quality})",
   "player.region": "Videospeler",
+  "player.restart": "Vanaf het begin starten",
+  "player.resumedAt": "Verder vanaf {time}",
   "player.seek": "Positie",
+  "player.speed": "Snelheid",
+  "player.speedNormal": "Normaal",
+  "player.speedNow": "Snelheid {rate}",
   "player.unmute": "Geluid aan",
   "player.volume": "Volume",
   "quality.approximate": "Ruwe schatting: de duur van de video is nog niet bekend.",

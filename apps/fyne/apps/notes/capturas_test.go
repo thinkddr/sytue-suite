@@ -123,9 +123,26 @@ func TestLasCapturasDeLaApp(t *testing.T) {
 		{"escritorio-icono", 1280, 800, "columns", func(p *Pantalla) { conIconoPin(p); p.dialogoIcono(p.notas[3]) }},
 		{"movil-icono", 360, 740, "columns", func(p *Pantalla) { conIconoPin(p); p.dialogoIcono(p.notas[3]) }},
 		{"escritorio-vacio", 1280, 800, "list", func(p *Pantalla) { p.notas, p.lienzo.Fase = nil, Vacia }},
+		// Mientras llegan las notas (NOTA-03): la forma del cuaderno en gris, y en el menú
+		// los cuadernos también, tintados para el cromo.
+		{"escritorio-cargando-lista", 1280, 800, "list", func(p *Pantalla) {
+			p.notas, p.lienzo.Fase, p.lateral.Fase = nil, Cargando, Cargando
+		}},
+		{"escritorio-cargando-columnas", 1280, 800, "columns", func(p *Pantalla) { p.notas, p.lienzo.Fase = nil, Cargando }},
+		{"escritorio-cargando-arbol", 1280, 800, "tree", func(p *Pantalla) {
+			p.notas, p.lienzo.Fase, p.lienzo.Seleccionada = nil, Cargando, "n1"
+		}},
+		{"movil-cargando-lista", 360, 740, "list", func(p *Pantalla) { p.notas, p.lienzo.Fase = nil, Cargando }},
 		{"escritorio-papelera", 1280, 800, "list", func(p *Pantalla) {
 			p.vista, p.papelera.Fase = VistaPapelera, Exito
-			p.papelera.Notas = DeNotas([]api.Note{{ID: "x1", Title: "Borrador viejo"}, {ID: "x2"}})
+			hoy := time.Date(2026, 11, 12, 10, 0, 0, 0, time.UTC)
+			en30, en2 := hoy.Add(30*24*time.Hour), hoy.Add(2*24*time.Hour)
+			p.papelera.Ahora = func() time.Time { return hoy }
+			p.papelera.Notas = DeNotasPapelera([]api.TrashedNote{
+				{Note: api.Note{ID: "x1", Title: "Borrador viejo"}, NotebookTitle: "Trabajo", PurgeAt: &en30},
+				{Note: api.Note{ID: "x2"}, NotebookTitle: "Casa", PurgeAt: &en2},
+				{Note: api.Note{ID: "x3", Title: "Contrato"}, NotebookTitle: "Legal"},
+			})
 		}},
 		{"escritorio-busqueda", 1280, 800, "list", func(p *Pantalla) {
 			p.vista, p.busqueda.Fase = VistaBusqueda, Exito

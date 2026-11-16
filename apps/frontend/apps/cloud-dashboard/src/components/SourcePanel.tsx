@@ -31,13 +31,13 @@ import {
   InlineHelp,
   ToastProvider,
   useToast,
+  CopyField,
 } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import type { PushDeployInfo } from '../lib/cloud.js';
 import type { T } from '../i18n/index.js';
 import { useT } from '../i18n/index.js';
 import { postBff, notifyDemoIfNeeded, demoDesc } from '../lib/bff-client.js';
-import { CopyField } from './CopyField.js';
 
 /** Nombre de rama/etiqueta: mismo criterio que el BFF (REF_RE). */
 const REF_RE = /^(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9._\-/]{0,254}$/;
@@ -280,8 +280,16 @@ function Inner({
               leer, así que se enseña hasta que alguien recargue la página. */}
           {creds ? (
             <div class="mb-3 grid gap-4 sm:grid-cols-2">
-              <CopyField t={t} label={t('source.preview.user')} value={creds.username} />
-              <CopyField t={t} label={t('source.preview.password')} value={creds.password} />
+              <CopyField
+                labelWidth="stacked"
+                label={t('source.preview.user')}
+                value={creds.username}
+              />
+              <CopyField
+                labelWidth="stacked"
+                label={t('source.preview.password')}
+                value={creds.password}
+              />
             </div>
           ) : null}
           {creds ? (
@@ -328,12 +336,16 @@ function Inner({
             <>
               <p class="text-text-muted mb-3 text-sm">{t('source.push.desc')}</p>
               <div class="grid gap-4 sm:grid-cols-2">
-                <CopyField t={t} label={t('source.push.url')} value={push.webhookUrl} />
+                <CopyField
+                  labelWidth="stacked"
+                  label={t('source.push.url')}
+                  value={push.webhookUrl}
+                />
                 {/* Copiable a propósito, y por eso NO va con `secret`: ese modo
                     enseña un preview truncado y enlaza a «Variables y secretos»,
                     donde este valor no vive. La única razón de existir del
                     secreto del webhook es pegarlo en el proveedor git. */}
-                <CopyField t={t} label={t('source.push.secret')} value={secret} />
+                <CopyField labelWidth="stacked" label={t('source.push.secret')} value={secret} />
               </div>
               <InlineHelp class="mt-4" title={t('source.push.how')}>
                 {t('source.push.steps')}
@@ -450,7 +462,7 @@ function DeployHookCard({
           <>
             {/* Copiable, no enmascarada: su única razón de existir es pegarla en
                 otro sitio, y no se vuelve a poder leer. */}
-            <CopyField t={t} label={t('source.hook.url')} value={url} />
+            <CopyField labelWidth="stacked" label={t('source.hook.url')} value={url} />
             <InlineHelp tone="warning" class="mt-3">
               {t('source.hook.once')}
             </InlineHelp>

@@ -25,6 +25,7 @@ import {
   ConfirmDialog,
 } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
+import { colorDeUsuario } from '@sytue/config';
 import SensitivityLabelWizard from './SensitivityLabelWizard.js';
 import { useT } from '../i18n/index.js';
 import type { SensitivityLabel } from '../lib/types.js';
@@ -130,7 +131,7 @@ function Inner({ locale, labels, live }: SensitivityLabelsPanelProps) {
             <EmptyState
               title={t('labels.empty.title')}
               description={t('labels.empty.description')}
-              illustration={<Icon name="lock" size={28} />}
+              icon="lock"
               action={
                 <Button
                   variant="primary"
@@ -155,7 +156,9 @@ function Inner({ locale, labels, live }: SensitivityLabelsPanelProps) {
                 <span
                   aria-hidden="true"
                   class="border-border-subtle h-3 w-3 shrink-0 rounded-full border"
-                  style={l.color ? { backgroundColor: l.color } : undefined}
+                  style={
+                    l.color ? { backgroundColor: colorDeUsuario(l.color) ?? l.color } : undefined
+                  }
                 />
                 <span class="min-w-0 flex-1 basis-64">
                   <span class="text-text block truncate font-medium">{l.name}</span>

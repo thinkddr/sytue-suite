@@ -306,9 +306,10 @@ func (a *App) abrirFusion(superviviente api.Contact, candidatos []api.Contact) *
 	if lienzo == nil || a.svc == nil {
 		return nil
 	}
+	scope := a.capturar()
 	f := a.Pantalla.nuevaFusion(lienzo, superviviente, candidatos)
 	f.alCombinar = func(perdedor api.Contact, np, op bool, listo func(error)) {
-		a.enFondo(func() { a.combinar(superviviente, perdedor, np, op, listo) })
+		a.programarEn(scope, func(scope cargaContacts) { a.combinar(scope, superviviente, perdedor, np, op, listo) })
 	}
 	a.mostrarEscritura("combinar", f.d, lienzo)
 	return f
@@ -326,27 +327,33 @@ func (a *App) abrirFusion(superviviente api.Contact, candidatos []api.Contact) *
 // Si falla 2 o 3, el perdedor queda duplicado —estado seguro, sin perder nada— y se
 // avisa de fusión incompleta. Si falla 1 no se ha tocado nada. Pase lo que pase, la
 // libreta y las etiquetas se vuelven a cargar. Bloquea: en segundo plano.
-func (a *App) combinar(s, l api.Contact, nombrePerdedor, orgPerdedor bool, listo func(error)) {
+func (a *App) combinar(scope cargaContacts, s, l api.Contact, nombrePerdedor, orgPerdedor bool, listo func(error)) {
+	if !a.vigente(scope) {
+		return
+	}
 	var libreta api.AddressBook
 	var etiquetas []api.ContactGroup
 	fyne.DoAndWait(func() {
+		if !a.vigente(scope) {
+			return
+		}
 		if a.Pantalla.Activa != nil {
 			libreta = *a.Pantalla.Activa
 		}
 		etiquetas = a.Pantalla.Etiquetas
 	})
-	ctx, fin := context.WithTimeout(context.Background(), 3*a.Plazo)
+	ctx, fin := context.WithTimeout(scope.ctx, 3*a.Plazo)
 	defer fin()
 	in := Fusion(s, l, nombrePerdedor, orgPerdedor)
 	if _, err := a.svc.Update(ctx, s.ID, in, s.ETag); err != nil {
 		in, err = a.reintentarFusion(ctx, libreta.ID, s, l, in, nombrePerdedor, orgPerdedor)
 		if err != nil {
-			a.finFusion(libreta, s, l, in, err, false, listo)
+			a.finFusion(scope, libreta, s, l, in, err, false, listo)
 			return
 		}
 	}
 	parcial := a.repuntar(ctx, etiquetas, s, l) != nil || a.svc.Delete(ctx, l.ID) != nil
-	a.finFusion(libreta, s, l, in, nil, parcial, listo)
+	a.finFusion(scope, libreta, s, l, in, nil, parcial, listo)
 }
 
 // reintentarFusion es el segundo intento de `performMerge`: la libreta otra vez, y la
@@ -374,10 +381,13 @@ func (a *App) reintentarFusion(ctx context.Context, libreta string, s, l api.Con
 }
 
 // finFusion avisa del resultado en el hilo de la interfaz y vuelve a cargar.
-func (a *App) finFusion(libreta api.AddressBook, _, l api.Contact, in api.ContactInput, err error, parcial bool,
+func (a *App) finFusion(scope cargaContacts, libreta api.AddressBook, _, l api.Contact, in api.ContactInput, err error, parcial bool,
 	listo func(error),
 ) {
 	fyne.Do(func() {
+		if !a.vigente(scope) {
+			return
+		}
 		p := a.Pantalla
 		vars := i18n.Vars{"loser": l.DisplayName(), "survivor": in.FormattedName}
 		switch {
@@ -390,8 +400,8 @@ func (a *App) finFusion(libreta api.AddressBook, _, l api.Contact, in api.Contac
 			a.avisos.Notificar(ui.NuevoAviso(ui.AvisoExito, p.t("merge.done", nil), p.t("merge.doneDescription", vars)))
 		}
 		listo(err)
-		a.recargar(libreta)
-		a.enFondo(a.cargarEtiquetas)
+		a.recargarEn(scope, libreta)
+		a.programarEn(scope, a.cargarEtiquetasEn)
 	})
 }
 

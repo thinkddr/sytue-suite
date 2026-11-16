@@ -176,15 +176,10 @@ export const tienda = {
   'store.mode_test_help':
     'Εικονικές πληρωμές με τα δοκιμαστικά κλειδιά του παρόχου. Δεν χρεώνεται κανείς.',
   'store.mode_live_help': 'Πραγματικές πληρωμές από τις αγορές πελατών με τα κλειδιά παραγωγής.',
-  'store.webhook_title': 'Βήμα 1: διεύθυνση webhook',
   'store.webhook_help': 'Επικολλήστε αυτή τη διεύθυνση στον πίνακα ελέγχου του {nombre}.',
   'store.webhook_label': 'Διεύθυνση webhook',
   'store.webhook_error':
     'Δεν ήταν δυνατή η ανάκτηση της διεύθυνσης webhook. Κλείστε το παράθυρο και δοκιμάστε ξανά.',
-  'store.copy': 'Αντιγραφή',
-  'store.copied': 'Η διεύθυνση αντιγράφηκε.',
-  'store.credentials_title': 'Διαπιστευτήρια',
-  'store.credentials_step': 'Βήμα 2: διαπιστευτήρια',
   'store.f_api_key': 'Κλειδί API',
   'store.f_api_key_mode': 'Κλειδί API ({modo})',
   'store.f_profile_id': 'Αναγνωριστικό προφίλ (προαιρετικό)',
@@ -203,6 +198,49 @@ export const tienda = {
   'store.gateway_save': 'Αποθήκευση και δοκιμή',
   'store.gateway_saved': 'Η πύλη {nombre} δοκιμάστηκε και αποθηκεύτηκε.',
   'store.gateway_save_error': 'Δεν ήταν δυνατή η επαλήθευση των διαπιστευτηρίων της πύλης.',
+  'store.wz_progress': 'Βήματα σύνδεσης της πύλης πληρωμών',
+  'store.wz_step_mode': 'Λειτουργία',
+  'store.wz_step_webhook': 'Webhook',
+  'store.wz_step_keys': 'Κλειδιά',
+  'store.wz_step_check': 'Έλεγχος',
+  'store.wz_step_done': 'Ολοκληρώθηκε',
+  'store.wz_mode_heading': 'Δοκιμαστικές ή πραγματικές πληρωμές;',
+  'store.wz_mode_desc':
+    'Ξεκινήστε σε δοκιμαστική λειτουργία· όταν όλα λειτουργούν, ανοίξτε ξανά αυτόν τον οδηγό και επιλέξτε πραγματική λειτουργία.',
+  'store.wz_webhook_heading': 'Πείτε στο {nombre} πού να στέλνει τις ειδοποιήσεις πληρωμών',
+  'store.wz_keys_heading': 'Τα κλειδιά σας για το {nombre}',
+  'store.wz_keys_desc':
+    'Τα μυστικά κλειδιά αποθηκεύονται σφραγισμένα και δεν εμφανίζονται ξανά: για να αλλάξετε ένα, πληκτρολογήστε το ξανά.',
+  'store.wz_keys_rejected': 'Το {nombre} δεν δέχτηκε αυτά τα κλειδιά',
+  'store.wz_check_heading': 'Έλεγχος και αποθήκευση',
+  'store.wz_check_desc':
+    'Το Sytue Web δοκιμάζει τα κλειδιά στο {nombre} πριν ενεργοποιήσει την πύλη. Τίποτα δεν αποθηκεύεται μέχρι να πετύχει η δοκιμή.',
+  'store.wz_secret_hidden': 'Πληκτρολογήθηκε (κρυφό)',
+  'store.wz_empty_value': 'Δεν δόθηκε',
+  'store.wz_done_heading': 'Το {nombre} είναι έτοιμο',
+  'store.wz_finish': 'Τέλος',
+  'store.hint_mollie_api_key':
+    'Στο Mollie: Developers › API keys. Τα δοκιμαστικά κλειδιά αρχίζουν με test_ και τα πραγματικά με live_.',
+  'store.hint_mollie_profile':
+    'Στο Mollie: Settings › Website profiles. Αρχίζει με pfl_· αφήστε το κενό για το προεπιλεγμένο προφίλ.',
+  'store.hint_adyen_api_key':
+    'Στο Adyen Customer Area: Developers › API credentials › το διαπιστευτήριό σας › API key.',
+  'store.hint_adyen_merchant':
+    'Στο Adyen Customer Area, στην επιλογή λογαριασμού πάνω: ο λογαριασμός εμπόρου, όχι ο εταιρικός.',
+  'store.hint_adyen_hmac':
+    'Στο Adyen: Developers › Webhooks › το webhook σας › Security › HMAC key.',
+  'store.hint_adyen_live_prefix':
+    'Στο Adyen (πραγματική λειτουργία): Developers › API URLs. Είναι το μέρος της διεύθυνσης πριν από το -checkout-live.',
+  'store.hint_redsys_merchant':
+    'Σας τον δίνει η τράπεζά σας με τη σύμβαση εικονικού POS· εμφανίζεται και στην πύλη διαχείρισης της Redsys.',
+  'store.hint_redsys_terminal':
+    'Στην πύλη διαχείρισης της Redsys, δίπλα στον κωδικό εμπόρου. Συνήθως είναι 1.',
+  'store.hint_redsys_secret':
+    'Στην πύλη διαχείρισης της Redsys: στοιχεία εμπόρου › κλειδί SHA-256. Το δοκιμαστικό και το πραγματικό κλειδί διαφέρουν.',
+  'store.hint_stripe_secret':
+    'Στο Stripe: Developers › API keys › Secret key. Αρχίζει με sk_test_ ή sk_live_.',
+  'store.hint_stripe_webhook':
+    'Στο Stripe: Developers › Webhooks › το endpoint σας › Signing secret. Αρχίζει με whsec_.',
   'orders.subtitle': 'Παραγγελίες και αγορές που πραγματοποιήθηκαν στον ιστότοπό σας.',
   'orders.count': { one: '{count} παραγγελία', other: '{count} παραγγελίες' },
   'orders.loading': 'Φόρτωση παραγγελιών',

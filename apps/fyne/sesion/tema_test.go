@@ -11,6 +11,7 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
+	"git.sytue.eu/sytue/one/apps/nucleo/sistema"
 )
 
 func TestElTraslucidoSeComparteYSeRecuperaAlAbrir(t *testing.T) {
@@ -151,5 +152,31 @@ func TestElColorDeCadaAppEsElPredeterminadoSinGuardarEleccion(t *testing.T) {
 	s.aplicar(ajustes.Leer())
 	if e := s.Estado(); e.Color != "petroleo" || e.ColorPropio != "" || tema.Color("primary", tema.Claro) != deLaCasa {
 		t.Fatalf("el petróleo explícito de la organización se ha perdido: %+v", e)
+	}
+}
+
+// TestElMasContrasteDelSistemaSeAplicaAlAbrir: quien tiene «Aumentar contraste» en el
+// sistema ve las apps con el bloque `prefers-contrast: more` de la hoja, como en el
+// navegador: los bordes son el contorno de control y el texto sutil, el atenuado. Quien
+// no lo tiene, la paleta de siempre.
+//
+// VISTO EN ROJO sin `tema.ElegirMasContraste` en `elegirApariencia`.
+func TestElMasContrasteDelSistemaSeAplicaAlAbrir(t *testing.T) {
+	aparte(t)
+	a := test.NewApp()
+	defer a.Quit()
+	Abrir(a, "sytue.eu")
+	if tema.Color("border", tema.Claro) == tema.Color("border-strong", tema.Claro) {
+		t.Fatal("sin pedir más contraste, el borde ya es el contorno de control")
+	}
+	sistema.FijarMasContraste(true)
+	Abrir(a, "sytue.eu")
+	for _, v := range []tema.Variante{tema.Claro, tema.Oscuro, tema.Translucido} {
+		if tema.Color("border", v) != tema.Color("border-strong", v) {
+			t.Errorf("tema %d: con más contraste el borde no es el contorno de control", v)
+		}
+		if tema.Color("text-subtle", v) != tema.Color("text-muted", v) {
+			t.Errorf("tema %d: con más contraste el texto sutil no es el atenuado", v)
+		}
 	}
 }

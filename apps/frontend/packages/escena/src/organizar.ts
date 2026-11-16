@@ -176,3 +176,108 @@ export function distributeBoxes<T extends Item>(
     return axis === 'h' ? { ...b, x: p } : { ...b, y: p };
   });
 }
+
+/* ---------- Guías inteligentes (ajuste magnético al arrastrar) ---------- */
+
+/** Ancla de una caja en un eje: borde inicial, centro o borde final. */
+export type AnclaGuia = 'ini' | 'centro' | 'fin';
+
+/** Línea guía que se pinta mientras se arrastra: vertical (`eje: 'x'`, en la
+ *  abscisa `pos`, de `desde` a `hasta` en y) u horizontal (`eje: 'y'`). */
+export interface Guia {
+  eje: 'x' | 'y';
+  pos: number;
+  desde: number;
+  hasta: number;
+}
+
+/** Resultado del ajuste: corrección a sumar al delta del arrastre y guías visibles. */
+export interface AjusteGuias {
+  dx: number;
+  dy: number;
+  lineas: Guia[];
+}
+
+const ANCLAS: readonly AnclaGuia[] = ['ini', 'centro', 'fin'];
+const EPS = 1e-6;
+
+const enAncla = (ini: number, lado: number, a: AnclaGuia): number =>
+  a === 'ini' ? ini : a === 'centro' ? ini + lado / 2 : ini + lado;
+
+/**
+ * Ajuste magnético de la caja `mov` (ya desplazada por el puntero) a los bordes y
+ * centros de `otros` y del `lienzo`, como las guías de Slides/Keynote. Por cada eje
+ * gana el objetivo más cercano dentro de `tolerancia` (empate: el lienzo y luego
+ * `otros` en su orden, y la primera ancla de `mov`), y se devuelven todas las guías
+ * que coinciden tras corregir, fundidas por posición. `anclas` limita qué anclas de
+ * `mov` se ajustan (al redimensionar desde la esquina inferior derecha solo se
+ * mueven los bordes finales). La tolerancia admite un valor por eje porque Diapos
+ * trabaja en % y un píxel no vale lo mismo en x que en y. Las guías son solo de
+ * vista: el llamante no las guarda en el modelo. Pura; el espejo Go
+ * (apps/fyne/diapos) debe dar la misma salida para los vectores de guias.vectores.json.
+ */
+export function guiasDeAjuste(
+  mov: Rect,
+  otros: readonly Rect[],
+  lienzo: Rect,
+  tolerancia: number | { x: number; y: number },
+  anclas: { x?: readonly AnclaGuia[]; y?: readonly AnclaGuia[] } = {},
+): AjusteGuias {
+  const tol = typeof tolerancia === 'number' ? { x: tolerancia, y: tolerancia } : tolerancia;
+  const objetivos = [lienzo, ...otros];
+  const ejes = (e: 'x' | 'y') =>
+    e === 'x' ? (['x', 'w', 'y', 'h'] as const) : (['y', 'h', 'x', 'w'] as const);
+  const mejorEn = (e: 'x' | 'y'): number => {
+    const [p, lado] = ejes(e);
+    const propias = anclas[e] ?? ANCLAS;
+    let mejor = Infinity;
+    for (const o of objetivos)
+      for (const ao of ANCLAS) {
+        const t = enAncla(o[p], o[lado], ao);
+        for (const am of propias) {
+          const d = t - enAncla(mov[p], mov[lado], am);
+          if (Math.abs(d) <= tol[e] + EPS && Math.abs(d) < Math.abs(mejor) - EPS) mejor = d;
+        }
+      }
+    return mejor;
+  };
+  const mx = mejorEn('x');
+  const my = mejorEn('y');
+  // Las guías se miden sobre `mov` ya corregido en los DOS ejes: si no, la línea
+  // vertical acabaría donde estaba la caja antes del ajuste en y (y viceversa).
+  const fin: Rect = {
+    ...mov,
+    x: mov.x + (mx === Infinity ? 0 : mx),
+    y: mov.y + (my === Infinity ? 0 : my),
+  };
+  const lineasEn = (e: 'x' | 'y', mejor: number): Guia[] => {
+    if (mejor === Infinity) return [];
+    const [p, lado, q, ladoQ] = ejes(e);
+    const propias = anclas[e] ?? ANCLAS;
+    // Guías: cada objetivo que coincide con alguna ancla de `mov` ya corregida.
+    const porPos = new Map<number, Guia>();
+    for (const o of objetivos)
+      for (const ao of ANCLAS) {
+        const t = r3(enAncla(o[p], o[lado], ao));
+        const coincide = propias.some(
+          (am) => Math.abs(t - enAncla(fin[p], fin[lado], am)) <= EPS * 1000,
+        );
+        if (!coincide) continue;
+        const desde = r3(Math.min(o[q], fin[q]));
+        const hasta = r3(Math.max(o[q] + o[ladoQ], fin[q] + fin[ladoQ]));
+        const ya = porPos.get(t);
+        porPos.set(
+          t,
+          ya
+            ? { ...ya, desde: Math.min(ya.desde, desde), hasta: Math.max(ya.hasta, hasta) }
+            : { eje: e, pos: t, desde, hasta },
+        );
+      }
+    return [...porPos.values()].sort((a, b) => a.pos - b.pos);
+  };
+  return {
+    dx: mx === Infinity ? 0 : r3(mx),
+    dy: my === Infinity ? 0 : r3(my),
+    lineas: [...lineasEn('x', mx), ...lineasEn('y', my)],
+  };
+}

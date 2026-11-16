@@ -49,7 +49,7 @@ func TestSubirLlevaSuFlechaYCaeDondeProduccion(t *testing.T) {
 		t.Fatal("«Subir» no lleva su glifo de Drive")
 	}
 	cercaDe(t, "el ancho de «Subir»", subir.Size().Width, 78.9375, 0.75)
-	cercaDe(t, "«Subir» empieza en x=1119,5", tema.AnchoLateral+subir.Position().X, 1099.0625, 0.75)
+	cercaDe(t, "«Subir» empieza en x=1119,5", tema.AnchoLateral+subir.Position().X, 1103.0625, 0.75)
 	casi(t, "el glifo de «Subir» es el `size={16}`", subir.TamIcono, iconos.TallaSM)
 }
 
@@ -238,7 +238,10 @@ func TestPorDebajoDe768LaCabeceraVaEnDosFilas(t *testing.T) {
 	for _, c := range []struct{ trozo, porque string }{
 		{`'bg-surface text-text border-border flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2.5 sm:px-6',`, "la cabecera y sus huecos"},
 		{`'max-md:grid max-md:grid-cols-[minmax(0,1fr)_auto_auto] max-md:gap-x-2',`, "por debajo de 768, tres columnas: la primera crece"},
-		{`class="flex min-w-0 grow items-center gap-0.5 text-base max-md:col-span-2"`, "las migas, en las dos primeras"},
+		// Las migas ceden la segunda columna a «Ordenar» cuando lo hay; sin él (un
+		// explorador que no ordena, o en búsqueda) ocupan las dos primeras.
+		// Las migas son la pieza común (Migas.tsx): crecen en la primera columna.
+		{`class={cx('grow', searchMode && 'min-w-0 max-md:col-span-2')}`, "las migas crecen en la primera y, sin «Ordenar» al lado, ocupan las dos primeras"},
 		{`class="ml-auto flex flex-wrap items-center justify-end gap-2 max-md:contents"`, "el grupo de acciones no pinta caja: sus hijos son celdas"},
 		{`max-md:col-start-3 max-md:row-start-1 max-md:justify-self-end md:ml-1`, "el conmutador sube a la primera fila, al final"},
 	} {
@@ -246,13 +249,16 @@ func TestPorDebajoDe768LaCabeceraVaEnDosFilas(t *testing.T) {
 			t.Errorf("FileBrowser.tsx ya no dice %q (%s): la cabecera de aquí ha dejado de ser la suya", c.trozo, c.porque)
 		}
 	}
+	if migas := webref.Read(t, "apps/frontend/packages/ui/src/components/Migas.tsx"); !strings.Contains(migas, `'flex min-w-0 items-center gap-0.5 text-base'`) {
+		t.Error("Migas.tsx ya no es `flex min-w-0 items-center gap-0.5 text-base`: la ruta de aquí ha dejado de ser la suya")
+	}
 
 	e := NuevoExplorador(traductor(t))
 	e.Ventana = 360
 	cab := e.cabecera(tema.Claro)
 	lay := cab.(*fyne.Container).Layout.(*CabeceraVista)
 	cab.Resize(fyne.NewSize(360, cab.MinSize().Height))
-	casi(t, "el alto de la cabecera en dos filas", cab.MinSize().Height, 95)
+	casi(t, "el alto de la cabecera en dos filas", cab.MinSize().Height, 93)
 	canalon := CanalonCabecera(360)
 	if x := lay.Ruta.Position().X; x != canalon || lay.Ruta.Size().Width < lay.Ruta.MinSize().Width {
 		t.Errorf("la ruta está en x=%g con %g de ancho; quiero x=%g y entera", x, lay.Ruta.Size().Width, canalon)
@@ -263,10 +269,10 @@ func TestPorDebajoDe768LaCabeceraVaEnDosFilas(t *testing.T) {
 		o              fyne.CanvasObject
 		x0, x1, y, alt float32
 	}{
-		{"el conmutador de vista", lay.Conmutador, 278, 344, 10, 34},
-		{"el buscador", buscador, 16, 164, 52, 32},
-		{"«Nuevo»", nuevo, 172, 257, 52, 32},
-		{"«Subir»", subir, 265, 344, 52, 32},
+		{"el conmutador de vista", lay.Conmutador, 282, 344, 10, 32},
+		{"el buscador", buscador, 16, 164, 50, 32},
+		{"«Nuevo»", nuevo, 172, 257, 50, 32},
+		{"«Subir»", subir, 265, 344, 50, 32},
 	} {
 		p, s := m.o.Position(), m.o.Size()
 		cercaDe(t, m.que+", donde empieza", p.X, m.x0, 1.5)
@@ -280,7 +286,7 @@ func TestPorDebajoDe768LaCabeceraVaEnDosFilas(t *testing.T) {
 	cab = e.cabecera(tema.Claro)
 	cab.Resize(fyne.NewSize(700, cab.MinSize().Height))
 	lay = cab.(*fyne.Container).Layout.(*CabeceraVista)
-	casi(t, "el alto de la cabecera a 700", cab.MinSize().Height, 95)
+	casi(t, "el alto de la cabecera a 700", cab.MinSize().Height, 93)
 	casi(t, "el buscador a 700, desde el canalón", lay.Acciones[0].Position().X, 24)
 	casi(t, "«Subir» a 700, hasta el canalón", lay.Acciones[2].Position().X+lay.Acciones[2].Size().Width, 700-24)
 	e.Ventana = 1280

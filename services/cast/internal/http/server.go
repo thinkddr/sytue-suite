@@ -51,6 +51,7 @@ type Deps struct {
 	// esa cola contesta 403.
 	Operador      operador.Autorizar
 	ReadyCheckers []httpx.Checker
+	PrivateSource httpx.PrivateSourcePort
 	// Hub recibe la señal de cambios de cada escritura (hubnotify.TrasEscribir), para
 	// el widget nativo. nil: sin señal.
 	Hub *hubnotify.Client
@@ -112,6 +113,9 @@ func NewRouter(d Deps) http.Handler {
 			// La señal de cambios para el widget de Cast. Lo que acaba después —la
 			// transcodificación, el comienzo de un directo— avisa por su cuenta.
 			auth.Use(d.Hub.TrasEscribir(nil, "cast"))
+			// Retained media can be large; the shared stream handler owns limits
+			// and cancellation, outside the legacy REST timeout.
+			mountCastPrivateSource(auth, d.PrivateSource)
 
 			// La subida del original va SIN el timeout de 30 s: dura lo que dure el fichero.
 			auth.Put("/videos/{id}/original", h.SubirOriginal)

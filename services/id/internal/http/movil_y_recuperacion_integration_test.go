@@ -49,7 +49,7 @@ func (f *smsDePrueba) Send(_ context.Context, to, text string) error {
 	return nil
 }
 
-var reCodigoSMS = regexp.MustCompile(`#([0-9]{6})$`)
+var reCodigoSMS = regexp.MustCompile(`#(\d{6})$`)
 
 // codigo es el código del último SMS a ese número (va en la línea de WebOTP).
 func (f *smsDePrueba) codigo(t *testing.T, to string) string {

@@ -12,15 +12,16 @@
  */
 import { useEffect, useState } from 'preact/hooks';
 import {
-  Button,
-  Modal,
-  Icon,
   Badge,
+  Button,
   EmptyState,
-  Input,
-  useToast,
   formatBytes,
+  Icon,
+  InlineHelp,
+  Input,
+  Modal,
   Radio,
+  useToast,
 } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import { postBff, notifyDemoIfNeeded, demoDesc } from '../../lib/bff-client.js';
@@ -227,7 +228,7 @@ export default function RestorePanel({
             <p class="text-text-muted py-8 text-center text-base">{t('db.restore.loading')}</p>
           ) : backups.length === 0 ? (
             <EmptyState
-              illustration={<Icon name="database" size={24} />}
+              icon="database"
               title={t('db.restore.empty.title')}
               description={t('db.restore.empty.desc')}
             />
@@ -278,15 +279,9 @@ export default function RestorePanel({
           )
         ) : (
           <div class="space-y-4">
-            <div
-              class="border-danger bg-danger-bg text-danger-text flex gap-3 rounded-md border p-3"
-              role="alert"
-            >
-              <Icon name="warning" size={18} class="mt-0.5 shrink-0" />
-              {/* El aviso entero es UNA clave: partirlo para poner la mitad en
-                  negrita obliga a concatenar, y el orden cambia entre idiomas. */}
-              <p class="text-sm font-medium">{t('db.restore.warning')}</p>
-            </div>
+            {/* El aviso entero es UNA clave, de titular: partirlo para poner la mitad
+                en negrita obliga a concatenar, y el orden cambia entre idiomas. */}
+            <InlineHelp tone="danger" title={t('db.restore.warning')} />
             <p class="text-text-muted text-sm break-words">
               {t('db.restore.from', { backup: selected ?? '' })}
             </p>

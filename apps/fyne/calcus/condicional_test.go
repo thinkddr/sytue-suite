@@ -34,36 +34,36 @@ func valor(s string) *string { return &s }
 
 func TestElFormatoCondicionalEsElDeLaWeb(t *testing.T) {
 	g := celdas(map[string]float64{"A1": 10, "A2": 3, "A3": 20})
-	m := decorar([]ReglaCond{{Rango: "A1:A3", Op: "gt", Valor: valor("5"), Relleno: "#FEF08A"}}, g, nunca)
+	m := decorar([]ReglaCond{{Rango: "A1:A3", Op: "gt", Valor: valor("5"), Relleno: "#FEF08A"}}, g, nunca, MaxColumnas, MaxFilas)
 	if m[Celda{0, 0}].relleno != "#FEF08A" || m[Celda{0, 1}] != nil || m[Celda{0, 2}].relleno != "#FEF08A" {
 		t.Error("la regla de celda no rellena solo las que cumplen")
 	}
 	verde := ReglaCond{Rango: "A1", Op: "gt", Valor: valor("0"), Relleno: "#BBF7D0"}
 	amarillo := ReglaCond{Rango: "A1", Op: "gt", Valor: valor("0"), Relleno: "#FEF08A"}
-	if decorar([]ReglaCond{verde, amarillo}, g, nunca)[Celda{}].relleno != "#BBF7D0" {
+	if decorar([]ReglaCond{verde, amarillo}, g, nunca, MaxColumnas, MaxFilas)[Celda{}].relleno != "#BBF7D0" {
 		t.Error("no gana la PRIMERA regla de relleno")
 	}
 
 	g = celdas(map[string]float64{"A1": 10, "A2": 20, "A3": 10, "A4": 5})
-	m = decorar([]ReglaCond{{Rango: "A1:A4", Clase: "top", Puesto: 2, Relleno: "#FED7AA"}}, g, nunca)
+	m = decorar([]ReglaCond{{Rango: "A1:A4", Clase: "top", Puesto: 2, Relleno: "#FED7AA"}}, g, nunca, MaxColumnas, MaxFilas)
 	if m[Celda{0, 0}] == nil || m[Celda{0, 1}] == nil || m[Celda{0, 2}] == nil || m[Celda{0, 3}] != nil {
 		t.Error("los dos superiores no incluyen los empates del umbral")
 	}
-	m = decorar([]ReglaCond{{Rango: "A1:A4", Clase: "dup", Relleno: "#FBCFE8"}}, g, nunca)
+	m = decorar([]ReglaCond{{Rango: "A1:A4", Clase: "dup", Relleno: "#FBCFE8"}}, g, nunca, MaxColumnas, MaxFilas)
 	if m[Celda{0, 0}] == nil || m[Celda{0, 1}] != nil {
 		t.Error("los duplicados no se marcan bien")
 	}
-	m = decorar([]ReglaCond{{Rango: "A1:A4", Clase: "unique", Relleno: "#BFDBFE"}}, g, nunca)
+	m = decorar([]ReglaCond{{Rango: "A1:A4", Clase: "unique", Relleno: "#BFDBFE"}}, g, nunca, MaxColumnas, MaxFilas)
 	if m[Celda{0, 1}] == nil || m[Celda{0, 0}] != nil {
 		t.Error("los únicos no se marcan bien")
 	}
 
 	g = celdas(map[string]float64{"A1": 5, "A2": 20, "A3": 12.5})
-	m = decorar([]ReglaCond{{Rango: "A1:A3", Clase: "colorScale", Escala: []string{"#000000", "#ffffff"}}}, g, nunca)
+	m = decorar([]ReglaCond{{Rango: "A1:A3", Clase: "colorScale", Escala: []string{"#000000", "#ffffff"}}}, g, nunca, MaxColumnas, MaxFilas)
 	if m[Celda{0, 0}].relleno != "#000000" || m[Celda{0, 1}].relleno != "#ffffff" || m[Celda{0, 2}].relleno != "#808080" {
 		t.Errorf("la escala de colores da %q %q %q", m[Celda{0, 0}].relleno, m[Celda{0, 1}].relleno, m[Celda{0, 2}].relleno)
 	}
-	m = decorar([]ReglaCond{{Rango: "A1:A3", Clase: "iconSet", Iconos: "arrows"}}, g, nunca)
+	m = decorar([]ReglaCond{{Rango: "A1:A3", Clase: "iconSet", Iconos: "arrows"}}, g, nunca, MaxColumnas, MaxFilas)
 	if m[Celda{0, 0}].icono != "arrows:0" || m[Celda{0, 1}].icono != "arrows:2" || m[Celda{0, 2}].icono != "arrows:1" {
 		t.Error("los iconos no van por tercios")
 	}
@@ -72,7 +72,7 @@ func TestElFormatoCondicionalEsElDeLaWeb(t *testing.T) {
 	}
 
 	g = celdas(map[string]float64{"A1": 10, "A2": 20, "A3": -20})
-	m = decorar([]ReglaCond{{Rango: "A1:A3", Clase: "dataBar", Color: "#2563EB"}}, g, nunca)
+	m = decorar([]ReglaCond{{Rango: "A1:A3", Clase: "dataBar", Color: "#2563EB"}}, g, nunca, MaxColumnas, MaxFilas)
 	if b := m[Celda{0, 1}].barra; b.frac != 1 || b.neg {
 		t.Errorf("la barra de 20 es %+v", b)
 	}
@@ -84,7 +84,7 @@ func TestElFormatoCondicionalEsElDeLaWeb(t *testing.T) {
 	}
 
 	m = decorar([]ReglaCond{{Rango: "A1:A2", Clase: "formula", Formula: "=X", Relleno: "#E9D5FF"}}, g,
-		func(_ string, _, df int) bool { return df == 0 })
+		func(_ string, _, df int) bool { return df == 0 }, MaxColumnas, MaxFilas)
 	if m[Celda{0, 0}] == nil || m[Celda{0, 1}] != nil {
 		t.Error("la regla de fórmula no usa el evaluador con la fila relativa")
 	}
@@ -181,13 +181,13 @@ func TestLasEtiquetasDeLasReglasSeTraducenComoEnLaWeb(t *testing.T) {
 }
 
 // TestUnaReglaDeRangoEnormeNoRecorreFueraDeLaRejilla (FYE-03): A1:A9999999 se
-// queda en las filas de la hoja.
+// queda en la extensión de la hoja, no en el millón de filas de Excel.
 func TestUnaReglaDeRangoEnormeNoRecorreFueraDeLaRejilla(t *testing.T) {
 	leidas := 0
 	g := func(c, f int) formula.Value { leidas++; return float64(1) }
-	m := decorar([]ReglaCond{{Rango: "A1:A9999999", Op: "gt", Valor: valor("0"), Relleno: "#FEF08A"}}, g, nunca)
-	if leidas > Filas || len(m) > Filas {
-		t.Fatalf("leídas %d celdas y decoradas %d con una hoja de %d filas", leidas, len(m), Filas)
+	m := decorar([]ReglaCond{{Rango: "A1:A9999999", Op: "gt", Valor: valor("0"), Relleno: "#FEF08A"}}, g, nunca, MinColumnas, MinFilas)
+	if leidas > MinFilas || len(m) > MinFilas {
+		t.Fatalf("leídas %d celdas y decoradas %d con una hoja de %d filas", leidas, len(m), MinFilas)
 	}
 }
 
@@ -205,7 +205,7 @@ func TestLaReglaPuedePintarSoloLaLetra(t *testing.T) {
 	}
 	g := celdas(map[string]float64{"A1": -1, "A2": 2})
 	ambos := ReglaCond{Rango: "A1:A2", Op: "gt", Valor: valor("-5"), Relleno: "#FEF08A", Tinta: "#1D4ED8"}
-	m := decorar([]ReglaCond{r, ambos}, g, nunca)
+	m := decorar([]ReglaCond{r, ambos}, g, nunca, MaxColumnas, MaxFilas)
 	if a1 := m[Celda{0, 0}]; a1 == nil || a1.tinta != "#C00000" || a1.relleno != "#FEF08A" {
 		t.Errorf("A1 = %+v: la letra de la primera y el relleno de la segunda", a1)
 	}

@@ -16,11 +16,33 @@ interface CallEncryptionUI {
   ready: () => Promise<void>;
   failed: () => void;
 }
+
+// An epoch is immutable: the server rotates it when any member or lease changes.
+function sameCallEpoch(left: MatrixCallScope, right: MatrixCallScope): boolean {
+  const members = new Map(right.members.map((member) => [member.subject, member.device_id]));
+  return (
+    left.call_id === right.call_id &&
+    left.generation === right.generation &&
+    left.matrix_room_id === right.matrix_room_id &&
+    left.livekit_room === right.livekit_room &&
+    left.expires_at_ms === right.expires_at_ms &&
+    left.leader_subject === right.leader_subject &&
+    left.leader_device_id === right.leader_device_id &&
+    left.members.length === right.members.length &&
+    left.members.every((member) => members.get(member.subject) === member.device_id)
+  );
+}
 /** Keys are ephemeral. The server supplies ACL/leases and receives no key material. */
 export class CallEncryption {
   private readonly matrix = roomsMatrix();
   private scope: MatrixCallScope | null = null;
   private key: MatrixCallKeyContent | null = null;
+  private installing: {
+    scope: MatrixCallScope;
+    content: MatrixCallKeyContent;
+    done: Promise<void>;
+  } | null = null;
+  private installQueue: Promise<void> = Promise.resolve();
   private unsubscribe: (() => void)[] = [];
   private timer: ReturnType<typeof setTimeout> | undefined;
   private waitForKey: { resolve: () => void; reject: (error: Error) => void } | null = null;
@@ -28,6 +50,7 @@ export class CallEncryption {
   private connected = false;
   private stopped = false;
   private acknowledged = false;
+  private authorizationVersion = 0;
   private expiryTimer: ReturnType<typeof setTimeout> | undefined;
   private reconnectRequested = false;
   private constructor(
@@ -62,6 +85,22 @@ export class CallEncryption {
   get ready(): boolean {
     return !this.stopped && this.acknowledged && (this.scope?.expires_at_ms ?? 0) > Date.now();
   }
+  /** A pending media operation must still belong to the same authorization. */
+  publicationGuard(): () => boolean {
+    const version = this.authorizationVersion;
+    const scope = this.scope;
+    return () => this.ready && this.scope === scope && this.authorizationVersion === version;
+  }
+  private invalidateAuthorization(): void {
+    this.acknowledged = false;
+    this.authorizationVersion++;
+  }
+  /** Invalidate immediately, before the SDK can resume a disconnected transport. */
+  suspendForReconnect(): void {
+    if (this.stopped) return;
+    this.reconnectRequested = true;
+    this.invalidateAuthorization();
+  }
   private content(): MatrixCallKeyContent {
     if (!this.scope) throw new MatrixSecurityError('reference');
     return {
@@ -73,28 +112,50 @@ export class CallEncryption {
     };
   }
   private async install(content: MatrixCallKeyContent): Promise<void> {
+    const scope = this.scope;
+    const key = content.key_b64;
     if (
       this.stopped ||
-      !this.scope ||
-      !content.key_b64 ||
-      content.generation !== this.scope.generation ||
-      content.expires_at !== this.scope.expires_at_ms
+      !scope ||
+      !key ||
+      content.generation !== scope.generation ||
+      content.expires_at !== scope.expires_at_ms
     )
       return;
-    if (this.key && this.key.key_b64 !== content.key_b64) throw new MatrixSecurityError('identity');
-    await this.provider.setKey(content.key_b64);
-    if (this.stopped || content.generation !== this.scope?.generation) return;
-    this.key = content;
-    this.waitForKey?.resolve();
+    if (this.key && this.key.key_b64 !== key) throw new MatrixSecurityError('identity');
+    if (this.key) return;
+    if (this.installing?.scope === scope) {
+      if (this.installing.content.key_b64 !== key) throw new MatrixSecurityError('identity');
+      await this.installing.done;
+      return;
+    }
+    // Reserve a private copy before yielding; serialize SDK writes across epochs.
+    const candidate = { ...content, key_b64: key };
+    const done = this.installQueue.then(async () => {
+      if (this.stopped || this.scope !== scope) throw new MatrixSecurityError('device');
+      await this.provider.setKey(key);
+      if (this.stopped || this.scope !== scope) throw new MatrixSecurityError('device');
+      this.key = candidate;
+      this.waitForKey?.resolve();
+    });
+    this.installing = { scope, content: candidate, done };
+    this.installQueue = done.catch(() => undefined);
+    try {
+      await done;
+    } finally {
+      if (this.installing?.done === done) this.installing = null;
+    }
   }
   private async bind(input: MatrixCallScope): Promise<void> {
-    const scope = validateCallScope(
+    const checked = validateCallScope(
       input,
       this.roomId,
       this.matrix.bootstrap.actor,
       this.matrix.deviceId,
     );
-    this.acknowledged = false;
+    // Keep the validated roster independent of callers retaining the response object.
+    const scope = { ...checked, members: checked.members.map((member) => ({ ...member })) };
+    this.invalidateAuthorization();
     await this.ui.pause();
     if (this.stopped) throw new MatrixSecurityError('device');
     for (const off of this.unsubscribe) off();
@@ -106,7 +167,9 @@ export class CallEncryption {
     await this.matrix.prepareCallScope(scope);
     this.unsubscribe.push(
       this.matrix.onEncryptedCustom(scope, 'org.sytue.rooms.call_key.v1', (content) => {
-        void this.install(content).catch(() => this.fail());
+        void this.install(content).catch(() => {
+          if (this.scope === scope) this.fail();
+        });
       }),
     );
     const leader =
@@ -180,18 +243,21 @@ export class CallEncryption {
     this.connected = true;
     await this.refresh();
     if (!this.scope || !this.key) throw new MatrixSecurityError('unverified');
-    if (!this.acknowledged) await this.acknowledge();
     this.schedule();
   }
   private async acknowledge(): Promise<void> {
     if (!this.scope || !this.key || this.stopped) throw new MatrixSecurityError('unverified');
-    await readyCallEncryption(this.roomId, this.joinId, this.scope.generation);
-    if (this.stopped) return;
+    const scope = this.scope;
+    const version = this.authorizationVersion;
+    await readyCallEncryption(this.roomId, this.joinId, scope.generation);
+    if (this.stopped || this.scope !== scope || this.authorizationVersion !== version) return;
     this.acknowledged = true;
     await this.ui.ready();
   }
   refresh(forceReconnect = false): Promise<void> {
-    if (forceReconnect) this.reconnectRequested = true;
+    if (forceReconnect) {
+      this.suspendForReconnect();
+    }
     if (this.updating) return this.updating;
     const run = async (): Promise<void> => {
       if (this.stopped) return;
@@ -202,29 +268,54 @@ export class CallEncryption {
           this.matrix.bootstrap.actor,
           this.matrix.deviceId,
         );
-        const changed =
-          scope.generation !== this.scope?.generation ||
-          scope.matrix_room_id !== this.scope?.matrix_room_id ||
-          scope.livekit_room !== this.scope?.livekit_room;
-        if (changed) await this.bind(scope);
+        const previous = this.scope;
+        if (!previous) throw new MatrixSecurityError('reference');
+        const changed = scope.generation !== previous.generation;
+        if (
+          (!changed && !sameCallEpoch(previous, scope)) ||
+          (changed &&
+            (scope.generation <= previous.generation ||
+              scope.matrix_room_id === previous.matrix_room_id ||
+              scope.livekit_room === previous.livekit_room))
+        )
+          throw new MatrixSecurityError('identity');
+        if (changed) {
+          // Preserve the obligation to reconnect even if a transient 5xx occurs
+          // after binding the new epoch but before establishing its transport.
+          this.reconnectRequested = true;
+          await this.bind(scope);
+        }
         const reconnect = this.reconnectRequested;
         this.reconnectRequested = false;
-        if ((changed || reconnect) && this.connected) {
-          const connection = await reconnectCallEncryption(
-            this.roomId,
-            this.joinId,
-            scope.generation,
-          );
-          if (
-            connection.identity !== this.matrix.bootstrap.actor ||
-            connection.joinId !== this.joinId ||
-            connection.encryption?.generation !== scope.generation ||
-            connection.encryption.matrix_room_id !== scope.matrix_room_id ||
-            connection.encryption.livekit_room !== scope.livekit_room
-          )
-            throw new MatrixSecurityError('identity');
-          await this.ui.connect(connection);
+        if (reconnect && this.connected) {
+          try {
+            const connection = await reconnectCallEncryption(
+              this.roomId,
+              this.joinId,
+              scope.generation,
+            );
+            if (
+              connection.identity !== this.matrix.bootstrap.actor ||
+              connection.joinId !== this.joinId ||
+              !connection.encryption ||
+              !sameCallEpoch(
+                scope,
+                validateCallScope(
+                  connection.encryption,
+                  this.roomId,
+                  this.matrix.bootstrap.actor,
+                  this.matrix.deviceId,
+                ),
+              )
+            )
+              throw new MatrixSecurityError('identity');
+            await this.ui.connect(connection);
+          } catch (error) {
+            this.reconnectRequested = true;
+            throw error;
+          }
         }
+        if (this.reconnectRequested) return;
         if (this.connected && (!this.acknowledged || reconnect)) await this.acknowledge();
       } catch (error) {
         if (this.stopped) return;
@@ -242,7 +333,6 @@ export class CallEncryption {
     };
     const job = run().finally(() => {
       if (this.updating === job) this.updating = null;
-      if (this.reconnectRequested && !this.stopped) void this.refresh().catch(() => undefined);
     });
     this.updating = job;
     return job;
@@ -261,14 +351,21 @@ export class CallEncryption {
   close(): void {
     if (this.stopped) return;
     this.stopped = true;
-    this.acknowledged = false;
+    this.invalidateAuthorization();
     clearTimeout(this.timer);
     clearTimeout(this.expiryTimer);
-    for (const off of this.unsubscribe) off();
+    const listeners = this.unsubscribe;
     this.unsubscribe = [];
     this.waitForKey?.reject(new MatrixSecurityError('device'));
     this.waitForKey = null;
     this.key = null;
     this.scope = null;
+    for (const off of listeners) {
+      try {
+        off();
+      } catch {
+        // The call is already closed; still remove the other listeners.
+      }
+    }
   }
 }

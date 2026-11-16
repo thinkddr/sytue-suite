@@ -8,7 +8,7 @@ export function RoomsApp(props: ComponentProps<typeof ChatApp>) {
   return (
     <I18nProvider locale={props.locale}>
       <ToastProvider key={JSON.stringify([props.user.id, props.user.tenant])}>
-        <MatrixRoomsGate actor={props.user.id} locale={props.locale}>
+        <MatrixRoomsGate actor={props.user.id} tenant={props.user.tenant} locale={props.locale}>
           <ChatApp {...props} />
         </MatrixRoomsGate>
       </ToastProvider>

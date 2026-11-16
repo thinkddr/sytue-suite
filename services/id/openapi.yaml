@@ -328,8 +328,13 @@ paths:
     get:
       tags: [Identity]
       summary: Perfil del usuario autenticado
+      description: >
+        Incluye `password_policy` ({ min_length, require_complexity }), solo lectura: la
+        política efectiva que se exigirá al cambiar la contraseña (la más estricta de las
+        organizaciones de la persona, con el suelo de 8 ya aplicado). Se omite si no se
+        puede calcular.
       security: [{ bearerAuth: [] }]
-      responses: { "200": { description: Perfil + membresías } }
+      responses: { "200": { description: Perfil + membresías + política de contraseña efectiva } }
 
   /api/v1/me/sessions:
     get:

@@ -86,9 +86,12 @@ export const POST: APIRoute = async (ctx) => {
   if (!carpeta.id) {
     return json({ error: 'drive', message: 'La carpeta Fotos no trae id.' }, 502);
   }
+  // `on_conflict=keep_both`: «IMG_0001.jpg» se repite en cada teléfono, y sin él Drive
+  // SUSTITUIRÍA la foto que ya estaba (una versión nueva del mismo fichero), que
+  // desaparecería de la galería. Con él, la nueva se guarda como «IMG_0001 (2).jpg».
   const destino =
     `${drive}/api/v1/folders/${encodeURIComponent(carpeta.id)}/files` +
-    `?${new URLSearchParams({ name: nombre })}`;
+    `?${new URLSearchParams({ name: nombre, on_conflict: 'keep_both' })}`;
   const res = await fetch(destino, {
     method: 'POST',
     headers: {

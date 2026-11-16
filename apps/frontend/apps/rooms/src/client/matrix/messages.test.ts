@@ -212,3 +212,54 @@ test('a meeting sender scope rejects logout generation even if the Matrix client
   setRoomsMatrix(original);
   expect(() => assertMatrixScope(scope)).toThrow('matrix_identity');
 });
+
+test('missing session provenance gives recovery guidance without keeping decrypted content', async () => {
+  const { MatrixSessionProvenanceMissing } = await import('@sytue/offline/matrix');
+  setRoomsMatrix(
+    client(async () => {
+      throw new MatrixSessionProvenanceMissing();
+    }),
+  );
+  const stale = {
+    ...message,
+    body: 'previously read private content',
+    attachments: [attachment],
+    card: { kind: 'task', assigneeSub: 'private-person' },
+    mentions: ['private-person'],
+    priority: 'urgent',
+    requiresAck: true,
+    identityVerified: true,
+    authenticityVerified: true,
+  } as ChatMessage;
+  const unreadable = await decryptMessage(stale);
+  expect(unreadable.requiresOriginalDevice).toBe(true);
+  expect(unreadable.decryptionFailed).toBe(true);
+  expect(unreadable.body).toBe('');
+  expect(unreadable.attachments).toEqual([]);
+  for (const key of ['card', 'mentions', 'priority', 'requiresAck'])
+    expect(Object.hasOwn(unreadable, key)).toBe(false);
+  expect(unreadable.identityVerified).toBe(false);
+  expect(unreadable.authenticityVerified).toBe(false);
+  expect(knownMessage(message.id)).toEqual(unreadable);
+});
+
+test('recovery guidance is local and clears after a successful retry', async () => {
+  setRoomsMatrix(
+    client(async () => {
+      throw new Error('other failure');
+    }),
+  );
+  const unavailable = await decryptMessage({ ...message, requiresOriginalDevice: true });
+  expect(unavailable.requiresOriginalDevice).toBe(false);
+  setRoomsMatrix(
+    client(async () => ({ body: 'recovered', authenticityVerified: true, identityVerified: true })),
+  );
+  const recovered = await decryptMessage({
+    ...unavailable,
+    card: { kind: 'task', assigneeSub: 'stale-person' },
+  } as ChatMessage);
+  expect(recovered.requiresOriginalDevice).toBe(false);
+  expect(recovered.decryptionFailed).toBe(false);
+  expect(recovered.body).toBe('recovered');
+  expect(Object.hasOwn(recovered, 'card')).toBe(false);
+});

@@ -13,12 +13,17 @@ import (
 	"sort"
 	"strconv"
 	"time"
+
+	"git.sytue.eu/sytue/one/apps/nucleo/notes/model"
 )
 
 // Notes es el cliente de Sytue Notepads: puerto de packages/api-clients/src/notes,
 // contrastado con services/notes (que es quien manda: el escritorio Fyne leía `body`
 // donde el servicio escribe `content`, y sus notas salían sin texto).
-type Notes struct{ c *Client }
+type Notes struct {
+	c    *Client
+	data NotesData
+}
 
 // NewNotes crea el cliente sobre la raíz del servicio (ServiceURL(apex, "notes")).
 func NewNotes(servicio string, s Session, h *http.Client) *Notes {
@@ -171,19 +176,23 @@ type TagState struct {
 type NoteInput struct {
 	CipherVersion  int             `json:"cipher_version,omitempty"`
 	ExpectedCrypto json.RawMessage `json:"expected_crypto,omitempty"`
-	Kind           string          `json:"kind,omitempty"`
-	Title          string          `json:"title"`
-	Content        string          `json:"content"`
-	ContentCipher  string          `json:"content_cipher,omitempty"`
-	Data           json.RawMessage `json:"data,omitempty"`
-	X              *int            `json:"x,omitempty"`
-	Y              *int            `json:"y,omitempty"`
-	Col            *int            `json:"col,omitempty"`
-	Position       *int            `json:"position,omitempty"`
-	Width          *int            `json:"width,omitempty"`
-	GroupID        *string         `json:"group_id,omitempty"`
-	Collapsed      *bool           `json:"collapsed,omitempty"`
-	Checked        *bool           `json:"checked,omitempty"`
+	// ExpectedUpdatedAt es la versión sobre la que se editó: si otro dispositivo ha
+	// guardado entretanto, el servicio responde 409 `note_edit_conflict` (CodigoConflicto)
+	// en vez de pisarla. Sin ella se escribe como siempre.
+	ExpectedUpdatedAt *time.Time      `json:"expected_updated_at,omitempty"`
+	Kind              string          `json:"kind,omitempty"`
+	Title             string          `json:"title"`
+	Content           string          `json:"content"`
+	ContentCipher     string          `json:"content_cipher,omitempty"`
+	Data              json.RawMessage `json:"data,omitempty"`
+	X                 *int            `json:"x,omitempty"`
+	Y                 *int            `json:"y,omitempty"`
+	Col               *int            `json:"col,omitempty"`
+	Position          *int            `json:"position,omitempty"`
+	Width             *int            `json:"width,omitempty"`
+	GroupID           *string         `json:"group_id,omitempty"`
+	Collapsed         *bool           `json:"collapsed,omitempty"`
+	Checked           *bool           `json:"checked,omitempty"`
 	// Cancelled cancela (true) o reactiva (false) una tarea; nil la deja como está.
 	Cancelled  *bool      `json:"cancelled,omitempty"`
 	Pinned     *bool      `json:"pinned,omitempty"`
@@ -196,12 +205,12 @@ type NoteInput struct {
 // `data`. Con la misma marca, el servicio devuelve la nota que ya creó en vez de otra:
 // es lo que deja reintentar una captura hecha sin conexión sin duplicarla.
 func (in NoteInput) ConClientID(id string) NoteInput {
-	d := map[string]any{}
+	d := map[string]json.RawMessage{}
 	_ = json.Unmarshal(in.Data, &d) // un `data` que no es objeto se sustituye
 	if d == nil {
-		d = map[string]any{}
+		d = map[string]json.RawMessage{}
 	}
-	d["client_id"] = id
+	d["client_id"], _ = json.Marshal(id)
 	in.Data, _ = json.Marshal(d)
 	return in
 }
@@ -218,13 +227,19 @@ func (in NoteInput) ClientID() string {
 // Input devuelve la nota ENTERA como entrada de actualización: se cambia lo que se haya
 // editado y el resto vuelve tal cual. Mandar solo el título borraría el contenido.
 func (n Note) Input() NoteInput {
+	var expected *time.Time
+	if !n.UpdatedAt.IsZero() {
+		value := n.UpdatedAt
+		expected = &value
+	}
 	data, version := n.Data, 0
 	if n.ContentCipher != "" {
 		data, version = DatosPublicosNotas(data), 2
 	}
 	return NoteInput{
-		CipherVersion: version,
-		Kind:          n.Kind, Title: n.Title, Content: n.Content, ContentCipher: n.ContentCipher, Data: data,
+		ExpectedUpdatedAt: expected,
+		CipherVersion:     version,
+		Kind:              n.Kind, Title: n.Title, Content: n.Content, ContentCipher: n.ContentCipher, Data: data,
 		X: &n.X, Y: &n.Y, Col: &n.Col, Position: &n.Position, Width: &n.Width, GroupID: n.GroupID,
 		Collapsed: &n.Collapsed, Checked: &n.Checked, Pinned: &n.Pinned,
 		Visibility: n.Visibility, Indexable: n.Indexable, Links: n.Links,
@@ -246,6 +261,9 @@ type NoteHit struct {
 
 // ListNotebooks lista los cuadernos de la persona.
 func (n *Notes) ListNotebooks(ctx context.Context) ([]Notebook, error) {
+	if n.data != nil {
+		return n.data.ListNotebooks(ctx)
+	}
 	r, err := JSON[struct {
 		Notebooks []Notebook `json:"notebooks"`
 	}](ctx, n.c, Request{Path: "/notebooks"})
@@ -333,26 +351,33 @@ func (n *Notes) ThisDay(ctx context.Context, date string) ([]DailyDay, error) {
 // quien lo cifra con el motor de criptografía de la web, que este cliente no tiene.
 // Conservar el cifrado que ya hay, sí.
 type NotebookInput struct {
-	ParentID   *string         `json:"parent_id"`
-	Title      string          `json:"title"`
-	Emoji      string          `json:"emoji"`
-	Color      string          `json:"color"`
-	Layout     string          `json:"layout"`
-	Visibility string          `json:"visibility"`
-	Indexable  *bool           `json:"indexable"`
-	Encrypted  bool            `json:"encrypted"`
-	Crypto     json.RawMessage `json:"crypto,omitempty"`
-	RoomID     string          `json:"room_id"`
-	Position   *int            `json:"position,omitempty"`
+	ExpectedUpdatedAt *time.Time      `json:"-"`
+	ParentID          *string         `json:"parent_id"`
+	Title             string          `json:"title"`
+	Emoji             string          `json:"emoji"`
+	Color             string          `json:"color"`
+	Layout            string          `json:"layout"`
+	Visibility        string          `json:"visibility"`
+	Indexable         *bool           `json:"indexable"`
+	Encrypted         bool            `json:"encrypted"`
+	Crypto            json.RawMessage `json:"crypto,omitempty"`
+	RoomID            string          `json:"room_id"`
+	Position          *int            `json:"position,omitempty"`
 }
 
 // Input devuelve el cuaderno ENTERO como entrada de actualización, por lo mismo que
 // Note.Input: el servicio sustituye, no parchea, y mandar solo el nombre le quitaría el
 // color, el icono, la disposición y —lo grave— el cifrado.
 func (nb Notebook) Input() NotebookInput {
+	var expected *time.Time
+	if !nb.UpdatedAt.IsZero() {
+		value := nb.UpdatedAt
+		expected = &value
+	}
 	indexable := nb.Indexable
 	return NotebookInput{
-		ParentID: nb.ParentID, Title: nb.Title, Emoji: nb.Emoji, Color: nb.Color,
+		ExpectedUpdatedAt: expected,
+		ParentID:          nb.ParentID, Title: nb.Title, Emoji: nb.Emoji, Color: nb.Color,
 		Layout: nb.Layout, Visibility: nb.Visibility, Indexable: &indexable,
 		Encrypted: nb.Encrypted, Crypto: nb.Crypto, RoomID: nb.RoomID,
 	}
@@ -360,11 +385,17 @@ func (nb Notebook) Input() NotebookInput {
 
 // CreateNotebook crea un cuaderno.
 func (n *Notes) CreateNotebook(ctx context.Context, in NotebookInput) (Notebook, error) {
+	if n.data != nil {
+		return n.data.CreateNotebook(ctx, in)
+	}
 	return PostJSON[Notebook](ctx, n.c, "/notebooks", in)
 }
 
 // UpdateNotebook sustituye un cuaderno. `in` sale de Notebook.Input().
 func (n *Notes) UpdateNotebook(ctx context.Context, id string, in NotebookInput) (Notebook, error) {
+	if n.data != nil {
+		return n.data.UpdateNotebook(ctx, id, in)
+	}
 	cuerpo, err := json.Marshal(in)
 	if err != nil {
 		return Notebook{}, err
@@ -377,6 +408,9 @@ func (n *Notes) UpdateNotebook(ctx context.Context, id string, in NotebookInput)
 
 // DeleteNotebook manda el cuaderno y su rama a la papelera.
 func (n *Notes) DeleteNotebook(ctx context.Context, id string) error {
+	if n.data != nil {
+		return n.data.DeleteNotebook(ctx, id)
+	}
 	return n.sinCuerpo(ctx, http.MethodDelete, "/notebooks/"+url.PathEscape(id), nil)
 }
 
@@ -393,6 +427,12 @@ func (n *Notes) ArchiveNotebook(ctx context.Context, id string, archivar bool) e
 // PinnedNotes son las notas fijadas de todos los cuadernos visibles (vista «Fijadas»),
 // con la forma de un resultado de búsqueda.
 func (n *Notes) PinnedNotes(ctx context.Context) ([]NoteHit, error) {
+	if n.data != nil {
+		if views, ok := n.data.(NotesViewsData); ok {
+			return views.PinnedNotes(ctx)
+		}
+		return nil, ErrPrivateNotesOperation
+	}
 	r, err := JSON[struct {
 		Notes []NoteHit `json:"notes"`
 	}](ctx, n.c, Request{Path: "/notes/pinned"})
@@ -410,6 +450,12 @@ var FormatosExport = []string{"md", "txt", "html", "onex", "pdf"}
 // Exportar es un DERECHO (RGPD art. 20) y por eso está en la barra y no escondido en
 // los ajustes, igual que en la web.
 func (n *Notes) ExportNotebook(ctx context.Context, cuaderno, nota, formato string) (io.ReadCloser, string, error) {
+	if n.data != nil {
+		if data, ok := n.data.(NotesExportData); ok {
+			return data.ExportNotebook(ctx, cuaderno, nota, formato)
+		}
+		return nil, "", ErrPrivateNotesOperation
+	}
 	q := url.Values{"format": {formato}}
 	if nota != "" {
 		q.Set("note", nota)
@@ -437,6 +483,9 @@ func (n *Notes) ListNotesForEncryption(ctx context.Context, cuaderno string) ([]
 }
 
 func (n *Notes) listNotes(ctx context.Context, cuaderno string, header http.Header) ([]Note, error) {
+	if n.data != nil {
+		return n.data.ListNotes(ctx, cuaderno)
+	}
 	var notes []Note
 	cursor := ""
 	seen := map[string]bool{}
@@ -513,11 +562,20 @@ func restoreNotePageData(notes []Note) error {
 
 // GetNotebook obtiene parámetros actuales antes de escribir desde la vista de tareas.
 func (n *Notes) GetNotebook(ctx context.Context, id string) (Notebook, error) {
+	if n.data != nil {
+		return n.data.GetNotebook(ctx, id)
+	}
 	return JSON[Notebook](ctx, n.c, Request{Path: "/notebooks/" + url.PathEscape(id), Header: http.Header{"Cache-Control": {"no-store"}}})
 }
 
 // CreateNote crea una nota en un cuaderno.
 func (n *Notes) CreateNote(ctx context.Context, cuaderno string, in NoteInput) (Note, error) {
+	if err := in.ValidarEnlacesCifrados(); err != nil {
+		return Note{}, err
+	}
+	if n.data != nil {
+		return n.data.CreateNote(ctx, cuaderno, in)
+	}
 	path := "/notebooks/" + url.PathEscape(cuaderno) + "/notes"
 	if in.encryptedWrite() {
 		path = "/notebooks/" + url.PathEscape(cuaderno) + "/encrypted-notes"
@@ -532,8 +590,26 @@ func (in NoteInput) encryptedWrite() bool {
 	return in.CipherVersion != 0 || len(in.ExpectedCrypto) != 0 || in.ContentCipher != ""
 }
 
+// ValidarEnlacesCifrados refuses legacy queued requests that would expose links.
+func (in NoteInput) ValidarEnlacesCifrados() error {
+	if err := in.validarTextoEntrada(); err != nil {
+		return err
+	}
+	raw, err := json.Marshal(in)
+	if err != nil {
+		return ErrDatosCifradosNotas
+	}
+	return ValidarEntradaNotaJSON(raw)
+}
+
 // UpdateNote sustituye una nota. `in` sale de Note.Input().
 func (n *Notes) UpdateNote(ctx context.Context, id, cuaderno string, in NoteInput) (Note, error) {
+	if err := in.ValidarEnlacesCifrados(); err != nil {
+		return Note{}, err
+	}
+	if n.data != nil {
+		return n.data.UpdateNote(ctx, id, cuaderno, in)
+	}
 	cuerpo, err := json.Marshal(struct {
 		NoteInput
 		NotebookID string `json:"notebook_id"`
@@ -553,11 +629,17 @@ func (n *Notes) UpdateNote(ctx context.Context, id, cuaderno string, in NoteInpu
 
 // DeleteNote manda una nota a la papelera.
 func (n *Notes) DeleteNote(ctx context.Context, id string) error {
+	if n.data != nil {
+		return n.data.DeleteNote(ctx, id)
+	}
 	return n.sinCuerpo(ctx, http.MethodDelete, "/notes/"+url.PathEscape(id), nil)
 }
 
 // RestoreNote la saca de la papelera y la devuelve a su cuaderno.
 func (n *Notes) RestoreNote(ctx context.Context, id string) error {
+	if n.data != nil {
+		return n.data.RestoreNote(ctx, id)
+	}
 	return n.sinCuerpo(ctx, http.MethodPost, "/notes/"+url.PathEscape(id)+"/restore", nil)
 }
 
@@ -628,16 +710,35 @@ func (n *Notes) sinCuerpo(ctx context.Context, metodo, ruta string, cuerpo []byt
 	return resp.Body.Close()
 }
 
+// TrashedNote es una nota de la papelera: la nota, el título del cuaderno de donde
+// viene y cuándo la destruirá el servicio. PurgeAt nil = no caduca (purga apagada o
+// retención legal; el servicio no dice cuál a propósito).
+type TrashedNote struct {
+	Note
+	DeletedAt     time.Time  `json:"deleted_at"`
+	NotebookTitle string     `json:"notebook_title"`
+	PurgeAt       *time.Time `json:"purge_at,omitempty"`
+}
+
 // ListTrash lista la papelera de la persona.
-func (n *Notes) ListTrash(ctx context.Context, limite int) ([]Note, error) {
+func (n *Notes) ListTrash(ctx context.Context, limite int) ([]TrashedNote, error) {
+	if n.data != nil {
+		return n.data.ListTrash(ctx, limite)
+	}
 	r, err := JSON[struct {
-		Notes []Note `json:"notes"`
+		Notes []TrashedNote `json:"notes"`
 	}](ctx, n.c, Request{Path: "/notes/trash", Query: url.Values{"limit": {strconv.Itoa(limite)}}})
 	return r.Notes, err
 }
 
 // ListTags lista las etiquetas de la persona, con sus estados.
 func (n *Notes) ListTags(ctx context.Context) ([]Tag, error) {
+	if n.data != nil {
+		if views, ok := n.data.(NotesViewsData); ok {
+			return views.ListTags(ctx)
+		}
+		return nil, ErrPrivateNotesOperation
+	}
 	r, err := JSON[struct {
 		Tags []Tag `json:"tags"`
 	}](ctx, n.c, Request{Path: "/tags"})
@@ -685,6 +786,12 @@ func (n *Notes) DeleteTag(ctx context.Context, id string) error {
 // VUELTA del enlace —qué apunta a esta nota—, que es lo que enseña el panel de
 // retroenlaces: un enlace que solo se ve desde el extremo que lo creó no es una red.
 func (n *Notes) LinkedNotes(ctx context.Context, kind, id string, limite int) ([]Note, error) {
+	if n.data != nil {
+		if views, ok := n.data.(NotesViewsData); ok {
+			return views.LinkedNotes(ctx, kind, id, limite)
+		}
+		return nil, ErrPrivateNotesOperation
+	}
 	// JSON y no Consulta: lo que viaja son dos identificadores, no un término de
 	// búsqueda que pueda pasarse de largo en la URL.
 	r, err := JSON[struct {
@@ -697,6 +804,9 @@ func (n *Notes) LinkedNotes(ctx context.Context, kind, id string, limite int) ([
 
 // Search busca en las notas de la persona.
 func (n *Notes) Search(ctx context.Context, q string, limite int, archivados bool) ([]NoteHit, error) {
+	if n.data != nil {
+		return n.data.Search(ctx, q, limite, archivados)
+	}
 	consulta := url.Values{"q": {q}, "limit": {strconv.Itoa(limite)}}
 	if archivados {
 		consulta.Set("archived", "1") // lo archivado solo sale si se pide
@@ -716,6 +826,12 @@ type Hashtag struct {
 // Hashtags son los hashtags de las notas visibles, del más usado al menos. Las notas
 // de uno se piden a Search con `#palabra`.
 func (n *Notes) Hashtags(ctx context.Context) ([]Hashtag, error) {
+	if n.data != nil {
+		if views, ok := n.data.(NotesViewsData); ok {
+			return views.Hashtags(ctx)
+		}
+		return nil, ErrPrivateNotesOperation
+	}
 	r, err := JSON[struct {
 		Hashtags []Hashtag `json:"hashtags"`
 	}](ctx, n.c, Request{Path: "/hashtags"})
@@ -743,19 +859,51 @@ const MaxVolcado = 32 << 20
 
 // PreviewNotebook lee un `.onex` y devuelve lo que entraría, sin crear nada: el ensayo
 // de la importación. Comparte límite y lectura con ImportNotebook.
-func (n *Notes) PreviewNotebook(ctx context.Context, volcado []byte) (VistaPreviaVolcado, error) {
+//
+// `nombre` es el nombre del fichero: además del `.onex` el servicio importa
+// Markdown (`.md`, `.zip`) y Evernote (`.enex`), y con él titula el cuaderno y
+// reconoce un Markdown suelto. Puede ir vacío.
+func (n *Notes) PreviewNotebook(ctx context.Context, volcado []byte, nombre string) (VistaPreviaVolcado, error) {
+	if err := validateNotebookBackup(volcado, nombre); err != nil {
+		return VistaPreviaVolcado{}, err
+	}
 	return JSON[VistaPreviaVolcado](ctx, n.c, Request{
-		Method: http.MethodPost, Path: "/notebooks/preview", Body: volcado,
+		Method: http.MethodPost, Path: "/notebooks/preview", Body: volcado, Query: queryNombre(nombre),
 		Header: http.Header{"Content-Type": {"application/json"}},
 	})
 }
 
-// ImportNotebook crea un cuaderno NUEVO a partir de un `.onex`. No sobrescribe ninguno.
-func (n *Notes) ImportNotebook(ctx context.Context, volcado []byte) (Importacion, error) {
+// ImportNotebook crea un cuaderno NUEVO a partir de un `.onex`, Markdown o Evernote.
+// No sobrescribe ninguno. `nombre`, como en PreviewNotebook.
+func (n *Notes) ImportNotebook(ctx context.Context, volcado []byte, nombre string) (Importacion, error) {
+	if err := validateNotebookBackup(volcado, nombre); err != nil {
+		return Importacion{}, err
+	}
 	return JSON[Importacion](ctx, n.c, Request{
-		Method: http.MethodPost, Path: "/notebooks/import", Body: volcado,
+		Method: http.MethodPost, Path: "/notebooks/import", Body: volcado, Query: queryNombre(nombre),
 		Header: http.Header{"Content-Type": {"application/json"}},
 	})
+}
+
+// validateNotebookBackup lee el fichero con el MISMO lector que el servicio
+// (model.LeerImportable: `.onex` estricto, Markdown y Evernote) antes de subirlo.
+func validateNotebookBackup(volcado []byte, nombre string) error {
+	if len(volcado) > MaxVolcado {
+		return model.ErrInvalidInput
+	}
+	book, notes, err := model.LeerImportable(volcado, nombre)
+	if err != nil {
+		return err
+	}
+	return model.ValidateBackupUpload(book, notes)
+}
+
+// queryNombre manda `?name=` solo si hay nombre: una query vacía es ruido en los registros.
+func queryNombre(nombre string) url.Values {
+	if nombre == "" {
+		return nil
+	}
+	return url.Values{"name": {nombre}}
 }
 
 // NoteCipherMigration sustituye únicamente el contenido bajo CAS, sin repetir una

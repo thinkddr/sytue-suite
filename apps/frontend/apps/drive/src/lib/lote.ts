@@ -31,37 +31,9 @@ export function conId(
   return out;
 }
 
-/** Cuántas llamadas van a la vez: las justas para no esperar en fila ni saturar al BFF. */
-export const EN_PARALELO = 4;
-
-/**
- * Hace `hacer` con cada elemento, de `enParalelo` en `enParalelo`, y separa lo que salió
- * de lo que no. Nunca rechaza: un fallo no corta el resto, que es lo que se espera de
- * «deshacer» o de «vaciar» (lo que se pudo, se hizo; lo que no, se dice).
- */
-export async function enTandas<T>(
-  items: readonly T[],
-  hacer: (x: T) => Promise<unknown>,
-  enParalelo = EN_PARALELO,
-): Promise<{ hechos: T[]; fallidos: T[] }> {
-  const hechos: T[] = [];
-  const fallidos: T[] = [];
-  let siguiente = 0;
-  const trabajador = async () => {
-    while (siguiente < items.length) {
-      const x = items[siguiente++] as T;
-      try {
-        await hacer(x);
-        hechos.push(x);
-      } catch {
-        fallidos.push(x);
-      }
-    }
-  };
-  const n = Math.max(1, Math.min(enParalelo, items.length));
-  await Promise.all(Array.from({ length: n }, trabajador));
-  return { hechos, fallidos };
-}
+// El reparto en tandas es de la suite (Fotos deshace igual): se reexporta para que
+// el explorador y sus tests lo sigan pidiendo aquí.
+export { EN_PARALELO, enTandas } from '@sytue/ui';
 
 /**
  * Lo que está a la vista cuando llega un «Deshacer». El aviso dura 10 s y en ese rato

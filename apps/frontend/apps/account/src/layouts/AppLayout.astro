@@ -14,15 +14,19 @@ import { serverEnv } from '@sytue/auth/server';
 import { SUFIJO_ICONOS, withBase } from '@sytue/ui';
 import { bff, toBffContext } from '../lib/bff.js';
 import { htmlLangAttrs } from '@sytue/i18n';
+import { useT } from '../i18n/index.js';
 
 interface Props {
   title?: string;
 }
 
-const { title = 'Mi cuenta' } = Astro.props;
 // El idioma lo negoció el middleware (cookie > Accept-Language > inglés): aquí
-// solo se pinta, para que el <html> y el cromo del shell no puedan discrepar.
+// solo se pinta, para que el <html> y el cromo del shell no puedan discrepar. Del
+// mismo catálogo salen el <title> y la descripción: con el título fijo en
+// castellano, quien entraba en inglés veía «Mi cuenta» en la pestaña.
 const { lang, dir } = htmlLangAttrs(Astro.locals.locale);
+const t = useT(Astro.locals.locale);
+const { title = t('app.title') } = Astro.props;
 // Guard: en .astro el redirect debe RETORNARSE (throw de Response solo se sigue
 // en middleware). Sin sesión -> login SSO.
 if (!(await bff.getSession(toBffContext(Astro)))) {
@@ -61,10 +65,7 @@ const prefijo = serverEnv(import.meta.env).SYTUE_BASE_PATH ?? import.meta.env.BA
     <meta name="viewport" content={APP_VIEWPORT} />
     <!-- Superficie autenticada: nunca se indexa (el SEO vive solo en www). -->
     <meta name="robots" content="noindex, nofollow" />
-    <meta
-      name="description"
-      content="Mi cuenta — perfil, seguridad y accesos de tu cuenta de Sytue."
-    />
+    <meta name="description" content={t('app.description')} />
     <title>{title}</title>
     <!-- El Hub es OTRO origen y la shell le hace 3 peticiones nada más hidratar:
          sin esto, la primera pagaría DNS + TCP + TLS enteros (3 RTT) DESPUÉS de

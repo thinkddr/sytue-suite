@@ -28,12 +28,23 @@ const (
 	SeparacionPista float32 = 6
 	// AnchoMaxPista es `max-w-[240px]`.
 	AnchoMaxPista float32 = 240
+	// MargenPista es el aire mínimo con el borde de la ventana: el `MARGEN` de
+	// Tooltip.tsx, que es el mismo de `useFitInViewport`.
+	MargenPista float32 = 8
+	// GrupoPista es el retardo de GRUPO: si otra pista se acaba de cerrar, la siguiente
+	// abre sin esperar. Recorrer una barra de iconos con el ratón no debe costar 300 ms
+	// por icono.
+	GrupoPista = 500 * time.Millisecond
 )
 
+// ultimoCierrePista es cuándo se cerró la última pista abierta, de cualquier pantalla:
+// es lo que hace «de grupo» al retardo. Solo se toca en la rutina de la interfaz.
+var ultimoCierrePista time.Time
+
 var (
-	margenXPista = tema.Espacio(2)   // px-2: 7
-	margenYPista = tema.Espacio(1)   // py-1: 3,5
-	ladoFlecha   = tema.Espacio(1.5) // h-1.5 w-1.5 del rombo: 5,25
+	margenXPista = tema.Espacio(2)   // px-2: 8
+	margenYPista = tema.Espacio(1)   // py-1: 4
+	ladoFlecha   = tema.Espacio(1.5) // h-1.5 w-1.5 del rombo: 6
 	// La flecha va `-bottom-[3px]` / `-top-[3px]`: tres píxeles fuera de la burbuja.
 	salidaFlecha float32 = 3
 )
@@ -88,6 +99,12 @@ type Pista struct {
 	// PLEGADO (64 px), que centrada encima se saldría de la ventana por la izquierda.
 	Derecha bool
 
+	// ancla, si la hay, es la caja del control cuando la pista NO lo envuelve: la que un
+	// BotonIcono lleva de serie va en una caja de lado cero dentro del propio botón
+	// (para que el puntero no la encuentre nunca y el `:hover` siga siendo del botón), y
+	// la burbuja se coloca con la medida del botón y no con la suya.
+	ancla func() fyne.Size
+
 	abierta bool
 	reloj   *time.Timer
 	r       *pistaRenderer
@@ -109,6 +126,23 @@ func NuevaPista(rotulo string, hijo fyne.CanvasObject) *Pista {
 	}
 	p.ExtendBaseWidget(p)
 	return p
+}
+
+// portalesPista es, para cada ventana, el portal de su pantalla: el que la barra de la
+// suite pone por encima de todo lo suyo (ver [BarraSuite]). Es el `createPortal(…,
+// document.body)` de Tooltip.tsx para las pistas que un control trae de serie.
+var portalesPista porLienzo[fyne.Container]
+
+// portalDePistas es el portal de la pantalla en la que está `o`, o nil si no hay o si
+// hay una capa encima: el portal va DEBAJO de las capas, así que la pista de un botón
+// de un diálogo se quedaría tapada por su propio diálogo. Con una capa arriba, además,
+// lo de debajo no recibe ni puntero ni foco, así que la pista que se abra es de la capa.
+func portalDePistas(o fyne.CanvasObject) *fyne.Container {
+	c := lienzoDe(o)
+	if c == nil || c.Overlays().Top() != nil {
+		return nil
+	}
+	return portalesPista.de(c)
 }
 
 // conPista es el control que avisa a su pista del foco y de Escape.
@@ -155,6 +189,10 @@ func (p *Pista) alPuntero(dentro bool) {
 	if p.reloj != nil || p.abierta {
 		return
 	}
+	if time.Since(ultimoCierrePista) < GrupoPista {
+		p.Abrir()
+		return
+	}
 	p.reloj = time.AfterFunc(RetardoPista, func() { fyne.Do(func() { p.Abrir() }) })
 }
 
@@ -187,6 +225,7 @@ func (p *Pista) Cerrar() {
 		return
 	}
 	p.abierta = false
+	ultimoCierrePista = time.Now()
 	p.Refresh()
 }
 
@@ -240,7 +279,7 @@ func (r *pistaRenderer) burbujaYFlecha() []fyne.CanvasObject {
 // el origen para pintarlas y se devuelven a su sitio.
 func (r *pistaRenderer) fundirEntrada() {
 	c := lienzoDe(r.p)
-	if c == nil || SinMovimiento || r.fundido != nil || r.p.Portal != nil {
+	if c == nil || MenosMovimiento() || r.fundido != nil || r.p.Portal != nil {
 		return
 	}
 	objs := r.burbujaYFlecha()
@@ -282,7 +321,11 @@ func (r *pistaRenderer) fundirEntrada() {
 		canvas.Refresh(r.sombra.img)
 		if t >= 1 {
 			r.fundido = nil
+			// `rehacer` arma líneas de texto NUEVAS, que nacen en el origen: sin volver
+			// a colocarlas, el rótulo saltaba a la esquina del control al acabar de
+			// entrar la burbuja.
 			r.rehacer()
+			r.Layout(r.p.Size())
 			canvas.Refresh(r.p)
 		}
 	})
@@ -384,24 +427,109 @@ func (r *pistaRenderer) Objects() []fyne.CanvasObject { return r.objetos }
 
 func (r *pistaRenderer) Destroy() {}
 
-// Layout coloca la burbuja centrada sobre el control (o bajo él) a 6 px, y la flecha
-// asomando 3 px por el lado que toca.
+// ladoPista es por dónde sale la burbuja, ya volteada si no cabía.
+type ladoPista int
+
+const (
+	pistaArriba ladoPista = iota
+	pistaAbajo
+	pistaDerecha
+	pistaIzquierda
+)
+
+// preferido es el lado que pide la pista; el que acaba teniendo lo decide
+// [colocarPista].
+func (p *Pista) preferido() ladoPista {
+	switch {
+	case p.Derecha:
+		return pistaDerecha
+	case p.Abajo:
+		return pistaAbajo
+	}
+	return pistaArriba
+}
+
+// colocarPista es `colocarTooltip` de Tooltip.tsx: la burbuja de medida `m` junto a un
+// control de medida `ancla`, VOLTEADA al lado opuesto si por el preferido no cabe y
+// acotada a la ventana con `MargenPista` de aire. Todo en coordenadas del control, que
+// está en `abs` de una ventana de medida `ventana` (cero: sin ventana, sin límites).
+//
+// Devuelve la esquina de la burbuja, el lado en que queda y dónde va la flecha a lo
+// largo de su borde, que sigue apuntando al centro del control aunque la burbuja se
+// haya corrido para caber.
+func colocarPista(ancla, m fyne.Size, abs fyne.Position, ventana fyne.Size, preferido ladoPista) (fyne.Position, ladoPista, float32) {
+	const sinLimite float32 = 1e9
+	lo, hi := fyne.NewPos(-sinLimite, -sinLimite), fyne.NewPos(sinLimite, sinLimite)
+	if !ventana.IsZero() {
+		lo = fyne.NewPos(MargenPista-abs.X, MargenPista-abs.Y)
+		hi = fyne.NewPos(ventana.Width-MargenPista-abs.X, ventana.Height-MargenPista-abs.Y)
+	}
+	acotar := func(v, a, b float32) float32 { return max(a, min(v, b)) }
+	if preferido == pistaDerecha || preferido == pistaIzquierda {
+		cabeDerecha := ancla.Width+SeparacionPista+m.Width <= hi.X
+		cabeIzquierda := -SeparacionPista-m.Width >= lo.X
+		lado, x := pistaDerecha, ancla.Width+SeparacionPista
+		if !cabeDerecha && cabeIzquierda {
+			lado, x = pistaIzquierda, -SeparacionPista-m.Width
+		}
+		x = acotar(x, lo.X, hi.X-m.Width)
+		centro := ancla.Height / 2
+		y := acotar(centro-m.Height/2, lo.Y, hi.Y-m.Height)
+		return fyne.NewPos(x, y), lado, acotar(centro-y, 6, m.Height-6)
+	}
+	cabeArriba := -SeparacionPista-m.Height >= lo.Y
+	cabeAbajo := ancla.Height+SeparacionPista+m.Height <= hi.Y
+	lado := preferido
+	if preferido == pistaArriba && !cabeArriba && cabeAbajo {
+		lado = pistaAbajo
+	}
+	if preferido == pistaAbajo && !cabeAbajo && cabeArriba {
+		lado = pistaArriba
+	}
+	y := -m.Height - SeparacionPista // `bottom-[calc(100%+6px)]`
+	if lado == pistaAbajo {
+		y = ancla.Height + SeparacionPista
+	}
+	centro := ancla.Width / 2
+	x := acotar(centro-m.Width/2, lo.X, hi.X-m.Width) // `left-1/2 -translate-x-1/2`
+	return fyne.NewPos(x, y), lado, acotar(centro-x, 6, m.Width-6)
+}
+
+// Layout coloca la burbuja centrada sobre el control (o bajo él, o a su lado) a 6 px,
+// dentro de la ventana, y la flecha asomando 3 px por el lado que toca.
 func (r *pistaRenderer) Layout(t fyne.Size) {
 	r.p.Hijo.Resize(t)
 	r.p.Hijo.Move(fyne.NewPos(0, 0))
+	// Cerrada, la burbuja está escondida y no hay nada que colocar: Abrir la vuelve a
+	// colocar. Y no se le pregunta al driver la posición absoluta: lo hace recorriendo
+	// el árbol y pidiendo renderers, y si el antepasado que está creando el suyo aún no
+	// lo tiene en la caché, lo vuelve a crear y vuelve aquí sin fin (Rooms: la fila de
+	// mensaje con reacciones, la cabecera del panel del hilo).
+	if !r.p.abierta {
+		return
+	}
+	ancla := t
+	if r.p.ancla != nil {
+		ancla = r.p.ancla()
+	}
 
 	m := MedidaPista(r.p.Rotulo)
-	x := (t.Width - m.Width) / 2 // `left-1/2 -translate-x-1/2`
-	y := -m.Height - SeparacionPista
-	switch {
-	case r.p.Derecha:
-		x, y = t.Width+SeparacionPista, (t.Height-m.Height)/2
-	case r.p.Abajo:
-		y = t.Height + SeparacionPista
+	var abs fyne.Position
+	var ventana fyne.Size
+	d := fyne.CurrentApp().Driver()
+	if c := lienzoDe(r.p); c != nil {
+		// El driver da (0, 0) cuando no encuentra el objeto en el lienzo (y el de
+		// pruebas, que hace trampa, devuelve siempre la última ventana): entonces no
+		// hay ventana que valga y la burbuja va sin acotar, como en la v1. El precio es
+		// un control pegado EXACTAMENTE a la esquina, que se queda sin volteo.
+		if abs = d.AbsolutePositionForObject(r.p); !abs.IsZero() {
+			ventana = c.Size()
+		}
 	}
+	pos, lado, flecha := colocarPista(ancla, m, abs, ventana, r.p.preferido())
+	x, y := pos.X, pos.Y
 	if portal := r.p.Portal; portal != nil {
 		// En el portal, lo mismo contado desde su esquina.
-		d := fyne.CurrentApp().Driver()
 		o := d.AbsolutePositionForObject(r.p).Subtract(d.AbsolutePositionForObject(portal))
 		x, y = x+o.X, y+o.Y
 	}
@@ -419,14 +547,18 @@ func (r *pistaRenderer) Layout(t fyne.Size) {
 	}
 
 	// La caja del rombo es su DIAGONAL, no su lado: un cuadrado de 5,25 girado 45°
-	// ocupa 7,42.
+	// ocupa 7,42. Su centro va a `flecha` a lo largo del borde que mira al control.
 	diag := ladoFlecha * float32(math.Sqrt2)
-	fx, fy := x+(m.Width-diag)/2, y+m.Height+salidaFlecha-diag/2-ladoFlecha/2
-	switch {
-	case r.p.Derecha:
-		fx, fy = x-salidaFlecha-diag/2+ladoFlecha/2, y+(m.Height-diag)/2
-	case r.p.Abajo:
-		fy = y - salidaFlecha - diag/2 + ladoFlecha/2
+	var fx, fy float32
+	switch lado {
+	case pistaArriba:
+		fx, fy = x+flecha-diag/2, y+m.Height+salidaFlecha-diag/2-ladoFlecha/2
+	case pistaAbajo:
+		fx, fy = x+flecha-diag/2, y-salidaFlecha-diag/2+ladoFlecha/2
+	case pistaDerecha:
+		fx, fy = x-salidaFlecha-diag/2+ladoFlecha/2, y+flecha-diag/2
+	case pistaIzquierda:
+		fx, fy = x+m.Width+salidaFlecha-diag/2-ladoFlecha/2, y+flecha-diag/2
 	}
 	r.flecha.Resize(fyne.NewSize(diag, diag))
 	r.flecha.Move(fyne.NewPos(fx, fy))

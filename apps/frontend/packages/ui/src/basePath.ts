@@ -23,11 +23,7 @@
  * El script publica además `window.__sytueBase`, que es lo que hace que `withBase`
  * acierte cuando el prefijo del HOST no es el del build: ver su comentario.
  */
-function stripTrailingSlashes(value: string): string {
-  let end = value.length;
-  while (end > 0 && value.charCodeAt(end - 1) === 47) end--;
-  return value.slice(0, end);
-}
+import { stripTrailingSlashes } from '@sytue/config/base-path';
 
 export function basePathScript(base: string): string {
   const b = stripTrailingSlashes(base || '/');
@@ -102,16 +98,4 @@ export function swRegisterScript(base: string): string {
  */
 export const SUFIJO_ICONOS = '?v=7';
 
-export function withBase(base: string, path: string): string {
-  // El prefijo del HOST manda sobre el del build cuando lo hay. La consola se
-  // sirve bajo `/admin` en `admin.<dominio>` y en la RAÍZ en `platform.<dominio>`
-  // —misma imagen, dos superficies—, pero `import.meta.env.BASE_URL` lo sustituye
-  // Vite al construir, así que vale `/admin` en las dos y en plataforma mandaba a
-  // `/admin/...`, que ahí es un 404 medido. Lo publica `basePathScript` con el
-  // valor que el servidor conoce (`SYTUE_BASE_PATH`).
-  const delHost =
-    typeof window !== 'undefined' ? (window as { __sytueBase?: string }).__sytueBase : undefined;
-  const b = stripTrailingSlashes(delHost ?? base ?? '/');
-  if (!b || !path.startsWith('/')) return path;
-  return path === b || path.startsWith(`${b}/`) ? path : `${b}${path}`;
-}
+export { withBase } from '@sytue/config/base-path';

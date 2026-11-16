@@ -14,21 +14,24 @@ import {
   Button,
   Card,
   CardBody,
-  Checkbox,
   EmptyState,
   Icon,
+  InlineHelp,
   Input,
   Modal,
-  SectionHeader,
+  SettingsSection,
+  SettingsShell,
   Spinner,
   ToastProvider,
   useToast,
 } from '@sytue/ui';
 import { contiene, formatNumber, type Locale } from '@sytue/i18n';
 import { useT, type T } from '../i18n/index.js';
-import type { ConsoleMessageKey } from '../i18n/index.js';
-import type { CustomRole, CustomRoleMember, DirectoryUser, PermissionKey } from '../lib/types.js';
+import { permissionLabelKey, togglePerm } from '../lib/roles.js';
+import type { CustomRole, CustomRoleMember, DirectoryUser } from '../lib/types.js';
 import { useUserSearch } from '../lib/useUserSearch.js';
+import { PermissionChecklist } from './PermissionChecklist.js';
+import RoleWizard from './RoleWizard.js';
 
 interface RolesPanelProps {
   /** Idioma negociado en el servidor; llega por props desde el `.astro`. */
@@ -40,37 +43,13 @@ interface RolesPanelProps {
   live?: boolean;
 }
 
-// Catálogo de permisos DELEGABLES. Espeja domain/roles.go MENOS roles.manage (reservado
-// a owner/admin: no se ofrece aquí). Sytue ID valida el envío. La etiqueta y el matiz
-// salen del catálogo de mensajes, uno por permiso.
-const PERMISSION_CATALOG: {
-  key: PermissionKey;
-  label: ConsoleMessageKey;
-  hint: ConsoleMessageKey;
-}[] = [
-  { key: 'users.manage', label: 'perm.usersManage', hint: 'perm.usersManageHint' },
-  { key: 'users.read', label: 'perm.usersRead', hint: 'perm.usersReadHint' },
-  { key: 'groups.manage', label: 'perm.groupsManage', hint: 'perm.groupsManageHint' },
-  { key: 'sso.manage', label: 'perm.ssoManage', hint: 'perm.ssoManageHint' },
-  { key: 'access_policies.manage', label: 'perm.accessManage', hint: 'perm.accessManageHint' },
-  { key: 'apps.manage', label: 'perm.appsManage', hint: 'perm.appsManageHint' },
-  { key: 'audit.view', label: 'perm.auditView', hint: 'perm.auditViewHint' },
-  { key: 'billing.manage', label: 'perm.billingManage', hint: 'perm.billingManageHint' },
-];
-
-const PERMISSION_LABEL = new Map(PERMISSION_CATALOG.map((p) => [p.key as string, p.label]));
-
 function permLabel(key: string, t: T): string {
-  const label = PERMISSION_LABEL.get(key);
+  const label = permissionLabelKey(key);
   return label ? t(label) : key;
 }
 
 function errorCode(err: unknown): string {
   return err instanceof Error ? err.message : '';
-}
-
-function togglePerm(list: string[], key: string): string[] {
-  return list.includes(key) ? list.filter((p) => p !== key) : [...list, key];
 }
 
 function sameSet(a: string[], b: string[]): boolean {
@@ -79,46 +58,14 @@ function sameSet(a: string[], b: string[]): boolean {
   return b.every((x) => s.has(x));
 }
 
-// Lista de casillas de permisos, compartida por el alta y la edición. El Checkbox
-// aporta su propia etiqueta accesible (p.label); el matiz va debajo, no anidado.
-function PermissionChecklist({
-  selected,
-  onToggle,
-  t,
-}: {
-  selected: string[];
-  onToggle: (key: string) => void;
-  t: T;
-}) {
-  return (
-    <fieldset class="border-border flex flex-col gap-2.5 rounded-md border p-3">
-      <legend class="text-text-subtle sytue-overline px-1">{t('roles.permissions')}</legend>
-      {PERMISSION_CATALOG.map((p) => (
-        <div key={p.key}>
-          <Checkbox
-            label={t(p.label)}
-            checked={selected.includes(p.key)}
-            onChange={() => onToggle(p.key)}
-          />
-          <p class="sytue-meta ml-6">{t(p.hint)}</p>
-        </div>
-      ))}
-      <p class="sytue-meta mt-1">{t('roles.notDelegable')}</p>
-    </fieldset>
-  );
-}
-
 function Inner({ locale, roles, users, live = true }: RolesPanelProps) {
   const t = useT(locale);
   const toast = useToast();
   const [items, setItems] = useState<CustomRole[]>(roles);
   const [query, setQuery] = useState('');
 
-  // Crear rol.
-  const [createOpen, setCreateOpen] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newPerms, setNewPerms] = useState<string[]>([]);
-  const [creating, setCreating] = useState(false);
+  // Alta guiada: sustituye la página entera, como el resto de asistentes de la consola.
+  const [creatingRole, setCreatingRole] = useState(false);
 
   // Detalle del rol seleccionado.
   const [selected, setSelected] = useState<CustomRole | null>(null);
@@ -189,42 +136,13 @@ function Inner({ locale, roles, users, live = true }: RolesPanelProps) {
     setConfirmingDelete(false);
   }
 
-  async function createRole(e: Event) {
-    e.preventDefault();
-    const name = newName.trim();
-    if (!name || creating) return;
-    setCreating(true);
-    try {
-      const res = await fetch('/api/admin/roles', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name, permissions: newPerms }),
-      });
-      if (!res.ok) throw new Error(String(res.status));
-      const role = (await res.json()) as CustomRole;
-      setItems((prev) => [{ ...role, memberCount: role.memberCount ?? 0 }, ...prev]);
-      toast.notify({
-        tone: 'success',
-        title: t('roles.toast.created'),
-        description: t('roles.toast.createdHint', { name: role.name }),
-      });
-      setCreateOpen(false);
-      setNewName('');
-      setNewPerms([]);
-    } catch (err) {
-      toast.notify({
-        tone: 'danger',
-        title: t('roles.toast.createFailed'),
-        description:
-          errorCode(err) === '409'
-            ? t('roles.toast.nameTaken')
-            : errorCode(err) === '400'
-              ? t('roles.toast.checkNameAndPerms')
-              : t('common.tryAgain'),
-      });
-    } finally {
-      setCreating(false);
-    }
+  function roleCreated(role: CustomRole) {
+    setItems((prev) => [role, ...prev.filter((r) => r.id !== role.id)]);
+    toast.notify({
+      tone: 'success',
+      title: t('roles.toast.created'),
+      description: t('roles.toast.createdHint', { name: role.name }),
+    });
   }
 
   async function saveEdit() {
@@ -342,42 +260,61 @@ function Inner({ locale, roles, users, live = true }: RolesPanelProps) {
     buscando: buscandoMiembro,
   } = useUserSearch(users, assigned);
 
-  return (
-    <div class="flex h-full min-h-0 flex-col">
-      <SectionHeader
-        level={1}
-        class="shrink-0"
-        title={t('page.roles')}
-        subtitle={t('roles.subtitle')}
-      />
-      {!live ? (
-        <p class="border-border bg-warning-bg text-warning-text mx-4 mt-3 rounded-md border px-3 py-2 text-sm">
-          {t('roles.offline')}
-        </p>
-      ) : null}
-
-      <div class="border-border bg-surface mt-3 flex shrink-0 flex-wrap items-center gap-2 border-y px-4 py-2.5">
-        <Input
-          type="search"
-          value={query}
-          placeholder={t('roles.searchPlaceholder')}
-          aria-label={t('roles.searchPlaceholder')}
-          leadingIcon={<Icon name="search" size={16} />}
-          class="w-60"
-          onInput={(e) => setQuery(e.currentTarget.value)}
+  if (creatingRole) {
+    return (
+      <SettingsShell title={t('roles.create')} description={t('roles.wizard.description')}>
+        <RoleWizard
+          t={t}
+          onCreated={roleCreated}
+          onAssign={(role) => {
+            setCreatingRole(false);
+            void openRole(role);
+          }}
+          onCancel={() => setCreatingRole(false)}
+          onDone={() => setCreatingRole(false)}
         />
+      </SettingsShell>
+    );
+  }
+
+  return (
+    <SettingsShell
+      title={t('page.roles')}
+      description={t('roles.subtitle')}
+      actions={
         <Button
           variant="primary"
-          class="ml-auto"
           leadingIcon={<Icon name="plus" size={16} />}
           disabled={!live}
-          onClick={() => setCreateOpen(true)}
+          onClick={() => setCreatingRole(true)}
         >
           {t('roles.create')}
         </Button>
-      </div>
-
-      <div class="min-h-0 flex-1 overflow-auto p-4">
+      }
+      banner={
+        live ? undefined : (
+          <InlineHelp tone="warning" title={t('common.offlineIdTitle')}>
+            {t('roles.offline')}
+          </InlineHelp>
+        )
+      }
+    >
+      <SettingsSection
+        plain
+        title={t('roles.listTitle')}
+        description={t('roles.listDescription')}
+        actions={
+          <Input
+            type="search"
+            value={query}
+            placeholder={t('roles.searchPlaceholder')}
+            aria-label={t('roles.searchPlaceholder')}
+            leadingIcon={<Icon name="search" size={16} />}
+            class="w-60 max-w-full"
+            onInput={(e) => setQuery(e.currentTarget.value)}
+          />
+        }
+      >
         {filtered.length === 0 ? (
           <Card>
             <CardBody class="p-0">
@@ -386,7 +323,7 @@ function Inner({ locale, roles, users, live = true }: RolesPanelProps) {
                 description={t(
                   items.length === 0 ? 'roles.empty.description' : 'roles.noResultsHint',
                 )}
-                illustration={<Icon name="lock" size={28} />}
+                icon="lock"
                 action={
                   items.length === 0 ? (
                     <Button
@@ -394,7 +331,7 @@ function Inner({ locale, roles, users, live = true }: RolesPanelProps) {
                       size="sm"
                       leadingIcon={<Icon name="plus" size={14} />}
                       disabled={!live}
-                      onClick={() => setCreateOpen(true)}
+                      onClick={() => setCreatingRole(true)}
                     >
                       {t('roles.create')}
                     </Button>
@@ -453,49 +390,7 @@ function Inner({ locale, roles, users, live = true }: RolesPanelProps) {
             ))}
           </div>
         )}
-      </div>
-
-      {/* Crear rol */}
-      <Modal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        title={t('roles.create')}
-        size="md"
-      >
-        <form class="flex flex-col gap-3" onSubmit={(e) => void createRole(e)}>
-          <div>
-            <label class="text-text mb-1 block text-sm font-medium" for="new-role-name">
-              {t('tenants.form.name')}
-            </label>
-            <Input
-              id="new-role-name"
-              value={newName}
-              placeholder={t('roles.namePlaceholder')}
-              onInput={(e) => setNewName(e.currentTarget.value)}
-              required
-            />
-          </div>
-          <PermissionChecklist
-            selected={newPerms}
-            onToggle={(key) => setNewPerms((prev) => togglePerm(prev, key))}
-            t={t}
-          />
-          <div class="mt-1 flex justify-end gap-2">
-            <Button variant="ghost" size="sm" type="button" onClick={() => setCreateOpen(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              type="submit"
-              loading={creating}
-              disabled={!newName.trim()}
-            >
-              {t('roles.create')}
-            </Button>
-          </div>
-        </form>
-      </Modal>
+      </SettingsSection>
 
       {/* Detalle / edición del rol */}
       <Modal
@@ -681,7 +576,7 @@ function Inner({ locale, roles, users, live = true }: RolesPanelProps) {
           </div>
         ) : null}
       </Modal>
-    </div>
+    </SettingsShell>
   );
 }
 

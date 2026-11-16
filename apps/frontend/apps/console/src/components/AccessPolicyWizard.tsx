@@ -910,13 +910,16 @@ export default function AccessPolicyWizard({
         </InlineHelp>
 
         {risk.blocking && form.enabled ? (
-          <div class="border-danger bg-danger-bg rounded-md border p-3">
+          // Sin icono ni anuncio: el riesgo ya lo cuenta la caja de arriba; esta solo
+          // aloja la casilla que lo reconoce, y una región viva con un control dentro
+          // se releería entera al marcarla.
+          <InlineHelp tone="danger" live="off" hideIcon>
             <Checkbox
               label={t('wizard.accessPolicy.review.understood')}
               checked={understood}
               onChange={(e) => setUnderstood(e.currentTarget.checked)}
             />
-          </div>
+          </InlineHelp>
         ) : null}
 
         <div class="border-border bg-surface-raised flex flex-col gap-4 rounded-lg border p-4">

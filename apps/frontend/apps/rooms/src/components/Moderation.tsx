@@ -11,7 +11,7 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { Button, Modal, Radio, Skeleton, Textarea, useToast } from '@sytue/ui';
+import { Button, Modal, Radio, Skeleton, Textarea, useToast, EmptyState } from '@sytue/ui';
 import {
   ChatHttpError,
   REPORT_REASONS,
@@ -194,6 +194,8 @@ export function ReportsModal({
   const [reports, setReports] = useState<ModerationReport[] | null>(null);
   const [error, setError] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Sube con «Reintentar»: vuelve a lanzar la carga sin cerrar el diálogo.
+  const [intento, setIntento] = useState(0);
 
   useEffect(() => {
     if (!open) return;
@@ -206,7 +208,7 @@ export function ReportsModal({
         if (!ac.signal.aborted) setError(true);
       });
     return () => ac.abort();
-  }, [open]);
+  }, [open, intento]);
 
   function resolve(r: ModerationReport, action: ReportAction): void {
     setBusyId(r.id);
@@ -222,13 +224,20 @@ export function ReportsModal({
   return (
     <Modal open={open} onClose={onClose} title={t('moderation.title')} size="lg">
       {error ? (
-        <p class="text-danger text-sm" role="alert">
-          {t('moderation.loadFailed')}
-        </p>
+        <EmptyState
+          compact
+          tone="error"
+          title={t('moderation.loadFailed')}
+          action={
+            <Button variant="secondary" size="sm" onClick={() => setIntento((n) => n + 1)}>
+              {t('action.retry')}
+            </Button>
+          }
+        />
       ) : reports === null ? (
         <Skeleton class="h-16 w-full" />
       ) : reports.length === 0 ? (
-        <p class="text-text-subtle text-sm">{t('moderation.empty')}</p>
+        <EmptyState compact icon="shield" title={t('moderation.empty')} />
       ) : (
         <ul class="divide-border divide-y">
           {reports.map((r) => (

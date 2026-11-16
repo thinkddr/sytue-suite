@@ -97,6 +97,11 @@ export const el: AppCatalog<typeof en> = {
   'form.copyId': 'Αντιγραφή αναγνωριστικού',
   'form.copiedId': 'Το αναγνωριστικό αντιγράφηκε στο πρόχειρο',
   'form.required': 'Υποχρεωτικό',
+  'form.discardTitle': 'Απόρριψη αλλαγών;',
+  'form.discardMessage':
+    'Αυτή η εγγραφή έχει αλλαγές που δεν έχουν αποθηκευτεί. Αν την κλείσετε τώρα, θα χαθούν.',
+  'form.discard': 'Απόρριψη',
+  'form.keepEditing': 'Συνέχεια επεξεργασίας',
   'toast.created': 'Δημιουργήθηκε',
   'toast.saved': 'Αποθηκεύτηκε',
   'toast.deleted': 'Μεταφέρθηκε στον κάδο',
@@ -104,6 +109,11 @@ export const el: AppCatalog<typeof en> = {
   'toast.undoFailed': 'Δεν ήταν δυνατή η αναίρεση',
   'toast.restored': 'Επαναφέρθηκε',
   'form.posted': 'Καταχωρίστηκε ως {ref}',
+  'form.requestApproval': 'Αίτημα έγκρισης',
+  'form.approvalRequested':
+    'Ζητήθηκε έγκριση: θα μπορείτε να το καταχωρίσετε μόλις το εγκρίνει άλλο πρόσωπο.',
+  'form.approvalNeeded':
+    'Αυτό το ποσό ξεπερνά το όριο της ενότητας. Ζητήστε από άλλο πρόσωπο να το εγκρίνει πριν την καταχώριση.',
   'action.duplicateDraft': 'Αντιγραφή ως πρόχειρο',
   'dashboard.greeting': 'Καλώς ήρθατε ξανά, {name}',
   'dashboard.subtitle':
@@ -115,6 +125,10 @@ export const el: AppCatalog<typeof en> = {
   'dashboard.kpiSales': 'Πωλήσεις και τιμολόγηση',
   'dashboard.invoiceCount': { one: '{count} τιμολόγιο', other: '{count} τιμολόγια' },
   'dashboard.kpiSalesHint': 'Τιμολόγια, προσφορές και παραγγελίες',
+  'dashboard.monthlyTitle': 'Τιμολόγηση ανά μήνα',
+  'dashboard.monthlyTotal': 'Τελευταίοι 12 μήνες: {amount}',
+  'dashboard.monthlyNone': 'Κανένα τιμολόγιο τους τελευταίους 12 μήνες',
+  'dashboard.monthlyMonth': 'Μήνας',
   'dashboard.kpiOperations': 'Λειτουργίες και απόθεμα',
   'dashboard.kpiOperationsHint': 'Απόθεμα, προϊόντα και αποστολές',
   'dashboard.kpiPeople': 'Κατάλογος και ομάδα',
@@ -141,6 +155,10 @@ export const el: AppCatalog<typeof en> = {
   'welcome.enable': 'Ενεργοποίηση',
   'welcome.enabled': 'Ενεργός',
   'welcome.disable': 'Απενεργοποίηση',
+  'welcome.enableConfirmTitle': 'Ενεργοποίηση του {module};',
+  'welcome.enableConfirmBody':
+    'Αυτό ενεργοποιεί την περιοχή {module} για ολόκληρο τον οργανισμό: όλοι θα τη βλέπουν στην πλαϊνή τους μπάρα. Μπορείτε να την απενεργοποιήσετε ξανά οποιαδήποτε στιγμή χωρίς να χάσετε τίποτα.',
+  'welcome.enableConfirmDeps': 'Ενεργοποιεί επίσης {deps}, που χρειάζεται.',
   'welcome.quickAccess': 'Συνεχίστε από εκεί που σταματήσατε',
   'welcome.recentEmpty': 'Η πρόσφατη εργασία σας θα εμφανιστεί εδώ',
   'welcome.recentEmptyBody':
@@ -153,6 +171,19 @@ export const el: AppCatalog<typeof en> = {
   'welcome.activeCount': { one: '{count} ενεργός τομέας', other: '{count} ενεργοί τομείς' },
   'palette.placeholder': 'Μετάβαση σε…',
   'palette.hint': 'Πατήστε {keys} από οπουδήποτε',
+  'palette.groupViews': 'Μετάβαση σε',
+  'palette.groupAreas': 'Περιοχές',
+  'palette.groupRecords': 'Εγγραφές',
+  'palette.searching': 'Αναζήτηση…',
+  'shortcuts.title': 'Συντομεύσεις πληκτρολογίου',
+  'shortcuts.group.move': 'Μετακίνηση',
+  'shortcuts.group.actions': 'Ενέργειες',
+  'shortcuts.palette': 'Μετάβαση σε οποιαδήποτε περιοχή ή λίστα',
+  'shortcuts.search': 'Αναζήτηση σε αυτή τη λίστα',
+  'shortcuts.new': 'Νέα εγγραφή σε αυτή τη λίστα',
+  'shortcuts.close': 'Κλείσιμο του «Μετάβαση σε»',
+  'shortcuts.help': 'Εμφάνιση αυτής της λίστας',
+  'shortcuts.key.esc': 'Esc',
   'relation.choose': 'Επιλέξτε…',
   'relation.search': 'Αναζήτηση',
   'relation.empty': 'Δεν ταιριάζει τίποτα',
@@ -174,6 +205,27 @@ export const el: AppCatalog<typeof en> = {
   'ledger.voidTitle': 'Ακύρωση {ref}',
   'ledger.voidReason': 'Γιατί ακυρώνεται αυτή η εγγραφή;',
   'ledger.voided': 'Το {ref} ακυρώθηκε',
+  'close.closedUntil': 'Κλειστό έως {fecha}',
+  'close.close': 'Κλείσιμο περιόδου…',
+  'close.closeTitle': 'Κλείσιμο της περιόδου',
+  'close.closeConfirm': 'Κλείσιμο περιόδου',
+  'close.closeUpTo': 'Κλείσιμο έως',
+  'close.consequence':
+    'Κανείς δεν θα μπορεί να καταχωρίσει ή να ακυρώσει εγγραφές με ημερομηνία έως και {fecha}. Το άνοιγμα αργότερα απαιτεί αιτιολογία και καταγράφεται στο ιστορικό.',
+  'close.endOfLastMonth': 'Τέλος προηγούμενου μήνα',
+  'close.endOfLastQuarter': 'Τέλος προηγούμενου τριμήνου',
+  'close.endOfLastYear': 'Τέλος προηγούμενου έτους',
+  'close.futureDate': 'Μπορείτε να κλείσετε μόνο περίοδο που έχει ήδη λήξει.',
+  'close.notAfterCurrent':
+    'Το ημερολόγιο είναι ήδη κλειστό έως {fecha}. Επιλέξτε μεταγενέστερη ημερομηνία.',
+  'close.reopen': 'Άνοιγμα ξανά…',
+  'close.reopenConfirm': 'Άνοιγμα ξανά',
+  'close.reopenTo': 'Άνοιγμα ξανά μετά τις {fecha}',
+  'close.reopenAll': 'Άνοιγμα ολόκληρου του ημερολογίου',
+  'close.reopenReason': 'Γιατί ανοίγει ξανά η περίοδος;',
+  'close.history': 'Ιστορικό κλεισιμάτων',
+  'close.historyReopened': 'Άνοιξε ξανά, κλειστό έως {fecha}',
+  'close.historyReopenedAll': 'Άνοιξε ξανά πλήρως',
   'balance.balance': 'Υπόλοιπο',
   'balance.total': 'Σύνολο',
   'balance.squares': 'Ισοσκελίζει',
@@ -182,6 +234,83 @@ export const el: AppCatalog<typeof en> = {
   'error.offline': 'Το ERP δεν αποκρίνεται.',
   'error.sinPermiso.titulo': 'Δεν έχετε πρόσβαση σε αυτήν την ενότητα',
   'error.sinPermiso': 'Ζητήστε την από τη διαχείριση του οργανισμού σας.',
+  'error.code.unreadableInvoice':
+    'Αυτό το αρχείο δεν είναι ηλεκτρονικό τιμολόγιο UBL, CII ή Facturae.',
+  'error.code.periodClosed':
+    'Αυτή η λογιστική περίοδος είναι κλειστή. Ανοίξτε την ξανά πρώτα ή χρησιμοποιήστε μεταγενέστερη ημερομηνία.',
+  'error.code.closeBackwards':
+    'Τα βιβλία έχουν ήδη κλείσει έως μεταγενέστερη ημερομηνία. Για να επιστρέψετε, ανοίξτε ξανά την περίοδο και αναφέρετε τον λόγο.',
+  'error.code.approvalRequired':
+    'Αυτό το ποσό υπερβαίνει το όριο έγκρισης της ενότητάς του: ζητήστε πρώτα από κάποιον άλλον να το εγκρίνει.',
+  'error.code.fourEyes':
+    'Δεν μπορείτε να εγκρίνετε έγγραφο που δημιουργήσατε εσείς ή για το οποίο ζητήσατε εσείς έγκριση.',
+  'error.code.approvalResolved': 'Αυτή η έγκριση έχει ήδη διεκπεραιωθεί.',
+  'error.code.unknownModel': 'Αυτό το είδος εγγραφής δεν υπάρχει.',
+  'error.code.invalidStatus': 'Αυτή η κατάσταση δεν ανήκει στη ροή εργασίας του εγγράφου.',
+  'error.code.notPostable': 'Αυτό το είδος εγγραφής δεν καταχωρίζεται στο γενικό καθολικό.',
+  'error.code.alreadyPosted': 'Αυτό το έγγραφο έχει ήδη καταχωριστεί στο γενικό καθολικό.',
+  'error.code.duplicateReference': 'Υπάρχει ήδη έγγραφο με αυτή την αναφορά.',
+  'error.code.invalidAction':
+    'Αυτή η ενέργεια δεν μπορεί να εφαρμοστεί σε πολλές εγγραφές ταυτόχρονα.',
+  'error.code.noIds': 'Επιλέξτε τουλάχιστον μία εγγραφή.',
+  'error.code.invalidBasesConnection':
+    'Αυτή η σύνδεση Sytue Bases δεν ισχύει για το ERP: μπορεί να έχει ανακληθεί, να έχει λήξει ή να ανήκει σε άλλο προϊόν ή άλλον οργανισμό.',
+  'error.code.attachmentType':
+    'Ανεβάστε ένα PDF, μια εικόνα (JPEG, PNG ή WebP) ή το XML ενός ηλεκτρονικού τιμολογίου.',
+  'error.code.attachmentTooLarge': 'Το αρχείο είναι μεγαλύτερο από 10 MB.',
+  'error.code.aiUnavailable':
+    'Το Sytue AI δεν είναι διαθέσιμο αυτή τη στιγμή. Δοκιμάστε ξανά σε λίγο.',
+  'error.code.aiLimit':
+    'Έχετε φτάσει το όριό σας στο Sytue AI προς το παρόν. Δοκιμάστε ξανά αργότερα.',
+  'error.code.aiNoReport':
+    'Το Sytue AI δεν μπόρεσε να το μετατρέψει σε αναφορά. Δοκιμάστε να το πείτε διαφορετικά.',
+  'error.code.invalidReport': 'Αυτή η αναφορά δεν είναι έγκυρη.',
+  'error.code.pdfNoText':
+    'Δεν ήταν δυνατή η ανάγνωση αυτού του PDF. Αν είναι φωτογραφία ή σάρωση, επικολλήστε καλύτερα το κείμενό του.',
+  'error.code.reportBusy': 'Ετοιμάζεται άλλη αναφορά. Δοκιμάστε ξανά σε λίγο.',
+  'error.code.orgNotConfigured': 'Το προφίλ του οργανισμού σας δεν έχει ρυθμιστεί ακόμη.',
+  'error.code.notComputable': 'Αυτή η υποχρέωση δεν μπορεί να υπολογιστεί από το γενικό καθολικό.',
+  'error.code.alreadyJustified': 'Αυτή η τραπεζική κίνηση έχει ήδη το τιμολόγιο ή την εξήγησή της.',
+  'error.code.notJustified': 'Αυτή η τραπεζική κίνηση εκκρεμεί ακόμη.',
+  'error.code.invoiceNotOpen': 'Το τιμολόγιο έχει ήδη εξοφληθεί ή ακυρωθεί.',
+  'error.code.invoiceDirection':
+    'Τα χρήματα που μπαίνουν αντιστοιχίζονται σε εκδοθέν τιμολόγιο και όσα βγαίνουν σε ληφθέν.',
+  'error.code.unknownReason':
+    'Επιλέξτε έναν από τους λόγους της λίστας για κίνηση χωρίς τιμολόγιο.',
+  'error.code.aiNoPlan':
+    'Το Sytue AI δεν μπόρεσε να το μετατρέψει σε εγγραφές. Δοκιμάστε να το πείτε διαφορετικά.',
+  'error.code.modulesDisabled': 'Ενεργοποιήστε πρώτα τις ενότητες Πωλήσεις και Τιμολόγηση.',
+  'error.code.verifactuUnavailable':
+    'Το VERI*FACTU δεν μπορεί να ενεργοποιηθεί για αυτόν τον οργανισμό.',
+  'error.code.invoiceIssued':
+    'Αυτό το τιμολόγιο έχει ήδη σταλεί στην ισπανική φορολογική αρχή: διορθώστε το με πιστωτικό τιμολόγιο.',
+  'error.code.verifactuPending':
+    'Η ισπανική φορολογική αρχή δεν έχει απαντήσει ακόμη για αυτό το τιμολόγιο.',
+  'error.code.nothingToCorrect':
+    'Δεν υπάρχει τίποτα να διορθωθεί για αυτό το τιμολόγιο στην ισπανική φορολογική αρχή.',
+  'error.code.taxIdWithVerifactu':
+    'Ο ΑΦΜ του οργανισμού δεν μπορεί να αλλάξει όσο το VERI*FACTU είναι ενεργοποιημένο.',
+  'error.code.invalidCsv': 'Δεν ήταν δυνατή η ανάγνωση του αρχείου ως CSV.',
+  'error.code.csvNoColumns':
+    'Καμία κεφαλίδα στήλης δεν αντιστοιχεί σε πεδίο αυτού του είδους εγγραφής.',
+  'error.code.importNotSimulable':
+    'Αυτό το αρχείο δεν έχει προεπισκόπηση: μόνο οι εισαγωγές CSV μπορούν να προσομοιωθούν.',
+  'error.code.alreadyReverted': 'Αυτή η εισαγωγή έχει ήδη αναιρεθεί.',
+  'error.code.unknownConnector': 'Αυτή η σύνδεση δεν είναι διαθέσιμη.',
+  'error.code.invalidIds': 'Επιλέξτε έως 500 εγγραφές για εξαγωγή.',
+  'error.code.actionNotAllowed':
+    'Ο ρόλος σας σε αυτή την ενότητα δεν επιτρέπει αυτή την ενέργεια. Τα καθήκοντα είναι διαχωρισμένα: ζητήστε το από τη διαχείριση του οργανισμού σας.',
+  'error.code.badRequest':
+    'Το αίτημα δεν είναι έγκυρο. Ελέγξτε τι καταχωρίσατε και δοκιμάστε ξανά.',
+  'error.code.sessionExpired': 'Η συνεδρία σας έληξε. Συνδεθείτε ξανά.',
+  'error.code.forbidden': 'Δεν έχετε άδεια να το κάνετε αυτό.',
+  'error.code.notFound': 'Δεν υπάρχει πια ή δεν μπορείτε να το δείτε.',
+  'error.code.unprocessable': 'Δεν ήταν δυνατή η αποθήκευση. Ελέγξτε τι καταχωρίσατε.',
+  'error.code.checkFields': 'Ελέγξτε τα επισημασμένα πεδία.',
+  'error.code.tooManyRequests': 'Πάρα πολλές προσπάθειες. Περιμένετε λίγο και δοκιμάστε ξανά.',
+  'error.code.noActiveOrg':
+    'Η συνεδρία σας δεν έχει ενεργό οργανισμό. Ολοκληρώστε τη συνδρομή του οργανισμού σας για να χρησιμοποιήσετε τη σουίτα.',
+  'error.code.tooLarge': 'Αυτό που στείλατε είναι πολύ μεγάλο.',
   'nav.obligations': 'Υποχρεώσεις',
   'dashboard.kpiReceivable': 'Απαιτήσεις',
   'dashboard.pendingInvoices': { one: '{count} σε εκκρεμότητα', other: '{count} σε εκκρεμότητα' },
@@ -198,6 +327,40 @@ export const el: AppCatalog<typeof en> = {
   'dashboard.seeAll': 'Δείτε ολόκληρο το ημερολόγιο',
   'welcome.disabled': 'Ανενεργός',
   'list.importInvoices': 'Εισαγωγή CSV ή τιμολογίων',
+  'migrate.cta': 'Φέρτε τα δεδομένα σας από άλλο πρόγραμμα',
+  'migrate.ctaBody':
+    'Holded, Odoo, Salesforce ή Business Central: επαφές, προϊόντα και τιμολόγια, χωρίς να τα πληκτρολογήσετε ξανά.',
+  'migrate.title': 'Εισαγωγή από άλλο πρόγραμμα',
+  'migrate.stepSource': 'Πρόγραμμα',
+  'migrate.sourceHeading': 'Πού βρίσκονται τώρα τα δεδομένα σας;',
+  'migrate.stepConnect': 'Σύνδεση',
+  'migrate.connectHeading': 'Σύνδεση με {name}',
+  'migrate.connectHint':
+    'Τα κλειδιά του {name} φυλάσσονται σφραγισμένα στην πύλη ενοποιήσεων, ποτέ στο ERP. Δημιουργήστε τη σύνδεση στην Κονσόλα, στις Ενοποιήσεις, και επικολλήστε εδώ το αναγνωριστικό της.',
+  'migrate.instanceLabel': 'Αναγνωριστικό σύνδεσης',
+  'migrate.invalidId': 'Αυτό δεν είναι αναγνωριστικό σύνδεσης.',
+  'migrate.test': 'Δοκιμή σύνδεσης',
+  'migrate.testOk': 'Λειτουργεί: το {name} απάντησε.',
+  'migrate.testFailed':
+    'Καμία απάντηση: ελέγξτε το αναγνωριστικό και ότι η σύνδεση είναι ενεργή στην Κονσόλα.',
+  'migrate.stepWhat': 'Τι θα φέρετε',
+  'migrate.whatHeading': 'Επιλέξτε τι θα εισαχθεί',
+  'migrate.whatHint': 'Η εκ νέου εισαγωγή ενημερώνει τα υπάρχοντα αντί να τα διπλασιάζει.',
+  'migrate.run': 'Εισαγωγή',
+  'migrate.stepDone': 'Έτοιμο',
+  'migrate.doneHeading': 'Η εισαγωγή ολοκληρώθηκε',
+  'migrate.created': 'Νέα',
+  'migrate.updated': 'Ενημερωμένα',
+  'migrate.failed': 'Απέτυχαν',
+  'migrate.obj.companies': 'Εταιρείες',
+  'migrate.obj.people': 'Πρόσωπα',
+  'migrate.obj.contacts': 'Επαφές',
+  'migrate.obj.suppliers': 'Προμηθευτές',
+  'migrate.obj.products': 'Προϊόντα',
+  'migrate.obj.services': 'Υπηρεσίες',
+  'migrate.obj.salesInvoices': 'Τιμολόγια πώλησης',
+  'migrate.obj.purchaseInvoices': 'Τιμολόγια αγοράς',
+  'migrate.obj.opportunities': 'Ευκαιρίες',
   'list.importInvoicesHint':
     'Ένα CSV με τις στήλες της εξαγωγής ή ηλεκτρονικά τιμολόγια UBL, CII (Factur-X, ZUGFeRD, XRechnung) και Facturae. Μπορείτε να επιλέξετε πολλά.',
   'list.import': 'Εισαγωγή CSV',
@@ -408,6 +571,8 @@ export const el: AppCatalog<typeof en> = {
   'obligations.ifLate': 'Αν καθυστερήσει',
   'nav.tasks': 'Εργασίες',
   'nav.tasksDue': { one: '{count} εργασία για σήμερα', other: '{count} εργασίες για σήμερα' },
+  'nav.approvals': 'Εγκρίσεις',
+  'nav.approvalsWaiting': 'Αναμένει έγκριση: {count}',
   'tasks.title': 'Εργασίες',
   'tasks.subtitle':
     'Τι πρέπει να γίνει, ανά ημερομηνία. Ανεβάστε το έγγραφο εδώ και η εργασία ολοκληρώνεται.',
@@ -436,6 +601,32 @@ export const el: AppCatalog<typeof en> = {
   'tasks.kind.email': 'Email',
   'tasks.kind.meeting': 'Σύσκεψη',
   'tasks.kind.todo': 'Εργασία',
+  'approvals.title': 'Εγκρίσεις',
+  'approvals.subtitle':
+    'Τα έγγραφα πάνω από το όριο της ενότητάς τους χρειάζονται δεύτερο πρόσωπο πριν περάσουν στο καθολικό.',
+  'approvals.pending': 'Σε εκκρεμότητα',
+  'approvals.approved': 'Εγκεκριμένες',
+  'approvals.rejected': 'Απορριφθείσες',
+  'approvals.waiting': 'Περιμένει άλλο πρόσωπο',
+  'approvals.empty': 'Τίποτα δεν περιμένει έγκριση',
+  'approvals.emptyHint': 'Όταν ένα έγγραφο ξεπεράσει το όριο της ενότητάς του, εμφανίζεται εδώ.',
+  'approvals.emptyResolved': 'Δεν υπάρχει τίποτα ακόμα',
+  'approvals.approve': 'Έγκριση',
+  'approvals.reject': 'Απόρριψη',
+  'approvals.rejectTitle': 'Απόρριψη αιτήματος',
+  'approvals.rejectReason': 'Γιατί το απορρίπτετε; Θα το δει όποιος το ζήτησε.',
+  'approvals.approvedToast': 'Εγκρίθηκε: μπορεί πλέον να καταχωριστεί',
+  'approvals.rejectedToast': 'Απορρίφθηκε',
+  'approvals.requestedOn': 'Ζητήθηκε στις {date}',
+  'approvals.byYou': 'το ζητήσατε εσείς',
+  'approvals.reason': 'Αιτία: {reason}',
+  'approvals.thresholds': 'Όρια έγκρισης',
+  'approvals.thresholdsHint':
+    'Από αυτό το ποσό, η καταχώριση εγγράφου της ενότητας χρειάζεται έγκριση από άλλο πρόσωπο. Κενό σημαίνει χωρίς όριο.',
+  'approvals.thresholdNone': 'Χωρίς όριο',
+  'approvals.thresholdFrom': 'Από {amount}',
+  'approvals.thresholdInvalid': 'Γράψτε θετικό ποσό ή αφήστε το κενό.',
+  'approvals.thresholdSaved': 'Το όριο αποθηκεύτηκε',
   'docs.title': 'Έγγραφα',
   'docs.upload': 'Ανέβασμα',
   'docs.uploaded': 'Το έγγραφο ανέβηκε',
@@ -485,6 +676,23 @@ export const el: AppCatalog<typeof en> = {
     'Οι προθεσμίες σας για φόρους, ασφαλιστικές εισφορές και οικονομικές καταστάσεις. Όποιος έχει πρόσβαση λαμβάνει email 10 ημέρες πριν από καθεμία.',
   'obligations.documents': 'Έγγραφα της υποβολής',
   'form.print': 'Εκτύπωση τιμολογίου',
+  'form.downloadPdf': 'Λήψη τιμολογίου σε PDF',
+  'send.action': 'Αποστολή με email',
+  'send.title': 'Αποστολή τιμολογίου {ref}',
+  'send.to': 'Προς',
+  'send.subject': 'Θέμα',
+  'send.message': 'Μήνυμα',
+  'send.defaultSubject': 'Τιμολόγιο {ref}',
+  'send.defaultMessage': 'Καλησπέρα,\n\nσας επισυνάπτουμε το τιμολόγιο {ref}.\n\nΜε εκτίμηση.',
+  'send.attachment': 'Το τιμολόγιο επισυνάπτεται σε PDF.',
+  'send.submit': 'Αποστολή',
+  'send.sent': 'Το τιμολόγιο στάλθηκε στο {to}',
+  'send.unavailable':
+    'Η αποστολή email δεν έχει ρυθμιστεί σε αυτόν τον διακομιστή. Κατεβάστε το PDF και επισυνάψτε το από το δικό σας email.',
+  'send.notIssued':
+    'Επιβεβαιώστε το τιμολόγιο πριν το στείλετε: πρόχειρα και ακυρωμένα τιμολόγια δεν αποστέλλονται.',
+  'send.invalidTo': 'Εισαγάγετε έγκυρη διεύθυνση email.',
+  'send.failed': 'Ο διακομιστής αλληλογραφίας δεν δέχτηκε το μήνυμα. Δοκιμάστε ξανά σε λίγα λεπτά.',
   'vf.intro':
     'Από το 2027 κάθε τιμολόγιο πρέπει να καταχωρίζεται στην ισπανική Φορολογική Υπηρεσία τη στιγμή της έκδοσής του. Με το VERI*FACTU, το Sytue το κάνει για εσάς όταν επιβεβαιώνετε ένα τιμολόγιο και προσθέτει τον κωδικό QR με τον οποίο ο πελάτης σας μπορεί να το ελέγξει.',
   'vf.activate': 'Ενεργοποίηση VERI*FACTU',
@@ -511,7 +719,7 @@ export const el: AppCatalog<typeof en> = {
     'Δεν είναι ακόμη διαθέσιμο στις Κανάριες Νήσους, τη Θέουτα και τη Μελίγια, όπου τα τιμολόγια δεν φέρουν ΦΠΑ.',
   'vf.reason.taxId': 'Ο ΑΦΜ του οργανισμού δεν είναι έγκυρος.',
   'vf.reason.certificate':
-    'Δεν είναι ακόμη διαθέσιμο σε αυτό το Sytue: λείπει το πιστοποιητικό για υποβολή στη Φορολογική Υπηρεσία.',
+    'Για την υποβολή των τιμολογίων στη Φορολογική Υπηρεσία χρειάζεται το ηλεκτρονικό πιστοποιητικό του οργανισμού.',
   'vf.reason.declaration':
     'Δεν είναι ακόμη διαθέσιμο: το Sytue δεν έχει υπογράψει ακόμη τη δήλωση συμμόρφωσης αυτής της έκδοσης.',
   'vf.state.pending': 'Αποστέλλεται στη Φορολογική Υπηρεσία',
@@ -523,6 +731,31 @@ export const el: AppCatalog<typeof en> = {
   'vf.fixHint': 'Διορθώστε τα στοιχεία του τιμολογίου ή του πελάτη και στείλτε το ξανά.',
   'vf.resend': 'Αποστολή ξανά',
   'vf.resent': 'Στάλθηκε ξανά',
+  'vf.cert.upload': 'Μεταφόρτωση πιστοποιητικού',
+  'vf.cert.change': 'Αλλαγή πιστοποιητικού',
+  'vf.cert.current': 'Πιστοποιητικό για {nif}',
+  'vf.cert.title': 'Πιστοποιητικό του οργανισμού',
+  'vf.cert.stepFile': 'Αρχείο',
+  'vf.cert.fileHeading': 'Επιλέξτε το ηλεκτρονικό πιστοποιητικό',
+  'vf.cert.fileHint':
+    'Το πιστοποιητικό εκπροσώπου ή σφραγίδας του οργανισμού, όπως το κατεβάσατε: αρχείο .p12 ή .pfx (γίνεται δεκτό και PEM).',
+  'vf.cert.fileLabel': 'Πιστοποιητικό',
+  'vf.cert.keyLabel': 'Ιδιωτικό κλειδί (PEM)',
+  'vf.cert.keyHint':
+    'Αυτό το αρχείο δεν περιέχει το ιδιωτικό κλειδί: επιλέξτε και το αρχείο του κλειδιού.',
+  'vf.cert.stepConfirm': 'Επιβεβαίωση',
+  'vf.cert.confirmHeading': 'Άνοιγμα και αποθήκευση του πιστοποιητικού',
+  'vf.cert.passwordLabel': 'Κωδικός πρόσβασης του πιστοποιητικού',
+  'vf.cert.passwordHint':
+    'Αυτός που ορίσατε κατά την εξαγωγή. Χρησιμοποιείται μόνο για το άνοιγμα και δεν αποθηκεύεται.',
+  'vf.cert.seal': 'Είναι πιστοποιητικό σφραγίδας νομικού προσώπου',
+  'vf.cert.privacy':
+    'Το αρχείο μεταφέρεται κρυπτογραφημένο και το ιδιωτικό κλειδί αποθηκεύεται κρυπτογραφημένο. Το Sytue ελέγχει ότι ο ΑΦΜ του πιστοποιητικού είναι του οργανισμού.',
+  'vf.cert.save': 'Αποθήκευση πιστοποιητικού',
+  'vf.cert.stepDone': 'Έτοιμο',
+  'vf.cert.saved': 'Το πιστοποιητικό αποθηκεύτηκε',
+  'vf.cert.savedBody':
+    'Το Sytue θα υποβάλλει τα τιμολόγια στη Φορολογική Υπηρεσία με το πιστοποιητικό για {nif}.',
   'history.title': 'Ιστορικό',
   'history.notePlaceholder': 'Γράψτε μια σημείωση για την ομάδα…',
   'history.addNote': 'Προσθήκη σημείωσης',
@@ -594,4 +827,5 @@ export const el: AppCatalog<typeof en> = {
     'Το πιστοποιητικό ή το ιδιωτικό του κλειδί δεν είναι έγκυρο εγκεκριμένο πιστοποιητικό με ισπανικό NIF.',
   'vf.error.certificateTaxIdMismatch':
     'Το ΑΦΜ (NIF) του πιστοποιητικού δεν αντιστοιχεί στο ΑΦΜ του οργανισμού.',
+  'vf.error.wrongPassword': 'Ο κωδικός πρόσβασης του πιστοποιητικού δεν είναι σωστός.',
 };

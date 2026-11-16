@@ -74,7 +74,7 @@ func (w *Worker) Run(ctx context.Context) error {
 func (w *Worker) tick(ctx context.Context) {
 	n, err := w.purger.PurgeExpiredTrash(ctx, w.retention)
 	if err != nil {
-		log.From(ctx).Error("auto-purga de papelera", "err", err)
+		log.From(ctx).Error("auto-purga de papelera", "err", err, "filas_confirmadas", n)
 		return
 	}
 	// Solo se anota cuando hubo algo: en régimen normal esto son cero filas casi

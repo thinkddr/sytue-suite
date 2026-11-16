@@ -20,7 +20,7 @@
   "devDependencies": {
     "@types/bun": "1.4.2",
     "prettier": "3.9.9",
-    "astro": "7.3.5",
+    "astro": "7.4.10",
     "@astrojs/preact": "6.0.5",
     "preact": "10.29.8",
     "playwright": "1.63.0"

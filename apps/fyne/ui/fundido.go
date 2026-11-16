@@ -51,6 +51,10 @@ func instantanea(o fyne.CanvasObject, esc float32) image.Image {
 	return img
 }
 
+// Instantanea es instantanea para quien necesita una capa de un subárbol fuera de `ui`:
+// Diapos pinta así sus cajas giradas, que Fyne no sabe girar como objetos.
+func Instantanea(o fyne.CanvasObject, esc float32) image.Image { return instantanea(o, esc) }
+
 // fundido es la entrada con opacidad de grupo de un panel: la imagen que se funde en su
 // lugar y la sombra que la acompaña.
 type fundido struct {
@@ -73,7 +77,7 @@ type fundido struct {
 // transparente, a su sitio, a su tamaño y opaco, en `dur` con CurvaEstandar. `poner` es
 // quien pinta la imagen (la capa): la recibe al empezar y nil al acabar, y repinta.
 //
-// Sin lienzo (el panel no está montado) o con SinMovimiento no anima: sale ya puesto.
+// Sin lienzo (el panel no está montado) o con «menos movimiento» (MenosMovimiento) no anima: sale ya puesto.
 func fundir(c fyne.Canvas, panel fyne.CanvasObject, sombra *Sombra, dur time.Duration,
 	dy, escala, anclaY float32, poner func(*fundido),
 ) {
@@ -83,7 +87,7 @@ func fundir(c fyne.Canvas, panel fyne.CanvasObject, sombra *Sombra, dur time.Dur
 func fundirDesplazado(c fyne.Canvas, panel fyne.CanvasObject, sombra *Sombra, dur time.Duration,
 	dx, dy, escala, anclaY float32, poner func(*fundido),
 ) {
-	if c == nil || SinMovimiento || panel.Size().IsZero() {
+	if c == nil || MenosMovimiento() || panel.Size().IsZero() {
 		return
 	}
 	f := nuevoFundido(c, panel, sombra, dy, escala)

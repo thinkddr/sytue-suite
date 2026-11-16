@@ -272,6 +272,33 @@ func TestLoQueNoSeEntiendeNoSeEscribe(t *testing.T) {
 	}
 }
 
+// TestLoQueNoSeEntiendeDiceQueEs: un dibujo fuera de su sitio (en una lista) y un informe
+// incrustado (un <iframe>) dejan el folio en solo lectura con el motivo de «no sé editar
+// esto», que lleva a la web, y con QUÉ en llano; no con el «Solo lectura» del permiso. El
+// documento siguiente, que sí se entiende, no hereda el motivo.
+func TestLoQueNoSeEntiendeDiceQueEs(t *testing.T) {
+	const dibujo = `<p>x</p><ul><li><figure data-dibujo data-escena="{}" contenteditable="false" tabindex="0">` +
+		`<img data-dibujo-respaldo hidden src="data:image/png;base64,AA"></figure></li></ul>`
+	const informe = `<p>x</p><iframe src="https://app.powerbi.com/view"></iframe>`
+	ctx := &editor.Contexto{Tipo: editor.Documento, Zoom: 100}
+	f := NuevoFolio(ctx)
+	ctx.Lienzo = f
+	for _, c := range []struct{ html, que string }{
+		{dibujo, "editor.readOnly.what.drawing"},
+		{informe, "editor.readOnly.what.embed"},
+	} {
+		if f.Cargar(c.html) {
+			t.Fatalf("Cargar ha dicho que entiende %s", c.html)
+		}
+		if ctx.MotivoSoloLectura != editor.MotivoNoSabeEditar || len(ctx.NoEditable) != 1 || ctx.NoEditable[0] != c.que {
+			t.Errorf("%s: motivo %q, %v; quiero %q", c.html, ctx.MotivoSoloLectura, ctx.NoEditable, c.que)
+		}
+	}
+	if !f.Cargar(`<p>hola</p>`) || ctx.MotivoSoloLectura != "" || ctx.NoEditable != nil {
+		t.Errorf("un documento entendido hereda el motivo del anterior: %q %v", ctx.MotivoSoloLectura, ctx.NoEditable)
+	}
+}
+
 // TestLaTablaSeMaquetaComoLaWeb: `table-layout: fixed; width: 100%` reparte el ancho a
 // partes iguales; cada celda tiene `padding: 4px 8px` y bordes de 1 px que se comparten;
 // una fila mide lo que su celda más alta (24 px de letra + 8 + 1 = 33); la tabla lleva

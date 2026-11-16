@@ -5,6 +5,7 @@ package bases
 
 import (
 	"slices"
+	"strconv"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -47,6 +48,9 @@ type fichaRegistro struct {
 	// curso, y lo último que ha pasado (un fallo, dónde ha quedado una descarga).
 	subiendo      bool
 	avisoAdjuntos string
+	// comentarios es cuántos tiene el registro (-1 mientras no se sabe): el rótulo de
+	// «Comentarios (n)».
+	comentarios int
 }
 
 // abrirRegistro abre la ficha de un registro. `nuevo` es que se acaba de añadir.
@@ -66,7 +70,7 @@ func (p *Pantalla) abrirRegistro(r api.BasesRecord, nuevo bool) {
 		p: p, b: b, r: r, n: n, nuevo: nuevo, puedeEditar: puedeEscribir(b.rol()),
 		entradas: map[string]*ui.Entrada{}, casillas: map[string]*ui.Eleccion{},
 		selectores: map[string]*ui.Selector{}, opcionesDe: map[string][]string{},
-		varios: map[string]map[string]bool{}, invalidos: map[string]bool{},
+		varios: map[string]map[string]bool{}, invalidos: map[string]bool{}, comentarios: -1,
 	}
 	f.armarControles()
 	f.d = ui.NuevoDialogo(p.t("grid.row", i18n.Vars{"n": n}), container.New(ui.Columna{})).Con(ui.DialogoMD, f.pie())
@@ -81,6 +85,47 @@ func (p *Pantalla) abrirRegistro(r api.BasesRecord, nuevo bool) {
 	}
 	f.rehacer()
 	f.d.Mostrar(p.ventana.Canvas())
+	if !nuevo {
+		f.contarComentarios()
+	}
+}
+
+// contarComentarios pide el hilo para saber cuántos hay, y lo pone en el botón.
+func (f *fichaRegistro) contarComentarios() {
+	p := f.p
+	if p.svc == nil {
+		return
+	}
+	p.fondo(func() {
+		ctx, cancelar := p.ctx()
+		defer cancelar()
+		lista, err := p.svc.ListComments(ctx, f.r.ID)
+		enHilo(func() {
+			if err == nil && p.ficha == f {
+				f.comentarios = contarComentarios(lista)
+				f.rehacer()
+			}
+		})
+	})
+}
+
+// verComentarios abre el hilo encima de la ficha; al cambiar, la ficha cuenta de nuevo.
+func (f *fichaRegistro) verComentarios() {
+	f.p.abrirComentarios(f.r, etiquetaDeRegistro(f.b.Campos, f.r), func(n int) {
+		if f.p.ficha == f && n != f.comentarios {
+			f.comentarios = n
+			f.rehacer()
+		}
+	})
+}
+
+// rotuloComentarios es «Comentarios (n)», o «Comentarios» mientras no se sabe.
+func (f *fichaRegistro) rotuloComentarios() string {
+	r := f.p.t("record.comments")
+	if f.comentarios >= 0 {
+		r += " (" + strconv.Itoa(f.comentarios) + ")"
+	}
+	return r
 }
 
 // cerrar cierra la ficha: lo que se suelte después ya no va a este registro.
@@ -119,6 +164,16 @@ func (f *fichaRegistro) armarControles() {
 			rotulos[0] = "—"
 			s := ui.NuevoSelector(rotulos, nil)
 			s.Rotulo, s.Elegida = c.Name, max(slices.Index(opciones, actual), 0)
+			f.selectores[c.ID], f.opcionesDe[c.ID] = s, opciones
+		case api.BasesKindRating:
+			// El `<select>` de estrellas de la web: «—» y de una a cinco.
+			opciones, rotulos := []string{""}, []string{"—"}
+			for n := 1; n <= maxValoracion; n++ {
+				opciones, rotulos = append(opciones, strconv.Itoa(n)), append(rotulos, estrellas(n))
+			}
+			s := ui.NuevoSelector(rotulos, nil)
+			s.Rotulo = c.Name
+			s.Elegida = max(slices.Index(opciones, textoDeValor(f.r.Data[c.ID])), 0)
 			f.selectores[c.ID], f.opcionesDe[c.ID] = s, opciones
 		case api.BasesKindMultiselect, api.BasesKindLink:
 			marcados := map[string]bool{}
@@ -177,6 +232,11 @@ func (f *fichaRegistro) rehacer() {
 	for _, c := range f.b.Campos {
 		hijos = append(hijos, f.grupo(c, v, ancho))
 	}
+	// Los comentarios, para quien lee el registro: también el lector los ve.
+	var acciones []fyne.CanvasObject
+	if !f.nuevo {
+		acciones = append(acciones, ui.NuevoBoton(f.rotuloComentarios(), f.verComentarios).Con(ui.Secundario, ui.TallaSM))
+	}
 	// Borrar va al final del cuerpo y no en el pie: ahí, junto a «Guardar», un toque
 	// de más se lleva el registro.
 	if f.puedeEditar && !f.nuevo {
@@ -184,7 +244,10 @@ func (f *fichaRegistro) rehacer() {
 			f.cerrar()
 			p.borrarRegistro(f.r)
 		}).Con(ui.Fantasma, ui.TallaSM).ConIcono(iconos.Papelera, 14)
-		hijos = append(hijos, container.New(ui.Fila{}, borrar))
+		acciones = append(acciones, borrar)
+	}
+	if len(acciones) > 0 {
+		hijos = append(hijos, container.New(ui.Fila{Hueco: tema.Espacio(2)}, acciones...))
 	}
 	f.d.CambiarCuerpo(container.New(ui.Columna{Hueco: tema.Espacio(4)}, hijos...))
 }
@@ -297,6 +360,9 @@ func (f *fichaRegistro) valorDe(c api.BasesField) (valor any, hay, vale bool) {
 	if s, ok := f.selectores[c.ID]; ok {
 		if o := f.opcionesDe[c.ID][s.Elegida]; o != "" {
 			valor = o
+		}
+		if c.Kind == api.BasesKindRating {
+			valor, _ = valorDeTexto(c, f.opcionesDe[c.ID][s.Elegida]) // de las opciones: siempre vale
 		}
 		return valor, true, true
 	}

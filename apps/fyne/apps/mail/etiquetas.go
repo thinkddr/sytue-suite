@@ -17,6 +17,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/tokens"
 )
 
 // # «Etiquetas» (`LabelsModal.tsx`)
@@ -35,8 +36,18 @@ type GestorEtiquetas interface {
 
 var _ GestorEtiquetas = (*api.Mail)(nil)
 
-// ColoresEtiqueta son los tokens de `LABEL_COLOR_TOKENS`, en su orden.
-var ColoresEtiqueta = []string{"slate", "brass", "sage", "clay", "blue", "plum", "teal", "rose"}
+// ColoresEtiqueta son los tokens de `LABEL_COLOR_TOKENS`, en su orden: los ids de la
+// paleta de colores de usuario de la suite.
+var ColoresEtiqueta = func() []string {
+	out := make([]string, 0, len(tokens.PaletaDeUsuario))
+	for _, c := range tokens.PaletaDeUsuario {
+		out = append(out, c.ID)
+	}
+	return out
+}()
+
+// colorNuevaEtiqueta es el de una etiqueta nueva: el gris, como con la paleta de antes.
+const colorNuevaEtiqueta = "slate"
 
 // Las medidas de la hoja: la muestra es `h-6 w-6 rounded-full border-2` con el tic de
 // 14 en la elegida y `gap-1.5`; la fila de la lista, `flex items-center gap-3 px-3
@@ -143,15 +154,15 @@ func (r *muestraRenderer) Refresh() {
 	}
 }
 
-// selectorColor es `ColorPicker`: las ocho muestras, una elegida.
+// selectorColor es `ColorPicker`: una muestra por tono, con su nombre del catálogo común.
 func selectorColor(t *i18n.Translator, elegido string, alElegir func(string)) *fyne.Container {
 	objs := make([]fyne.CanvasObject, 0, len(ColoresEtiqueta))
 	for _, token := range ColoresEtiqueta {
-		m := nuevaMuestraEtiqueta(token, t.T("colour."+token, nil), func() { alElegir(token) })
+		m := nuevaMuestraEtiqueta(token, t.T("userColor."+token, nil), func() { alElegir(token) })
 		m.Elegida = token == elegido
 		objs = append(objs, m)
 	}
-	return container.New(flujo{hueco: huecoMuestrasEtiqueta()}, objs...)
+	return container.New(ui.Flujo{Hueco: huecoMuestrasEtiqueta()}, objs...)
 }
 
 // ---- El diálogo ----
@@ -177,7 +188,7 @@ func (b *Buzon) verEtiquetas() {
 		return
 	}
 	t := b.P.T
-	g := &gestorEtiquetas{b: b, ancho: AnchoCuerpoDialogo(ui.DialogoLG, lienzo.Size().Width), color: ColoresEtiqueta[0]}
+	g := &gestorEtiquetas{b: b, ancho: AnchoCuerpoDialogo(ui.DialogoLG, lienzo.Size().Width), color: colorNuevaEtiqueta}
 	g.nombre = ui.NuevaEntrada(t.T("labels.namePlaceholder", nil))
 	g.nombre.Ancho = g.ancho
 	g.nombre.AlCambiar(func(string) { g.pintar() })

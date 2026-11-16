@@ -17,7 +17,7 @@ import { useToast } from '@sytue/ui';
 import { formatNumber, formatPercent, type Locale } from '@sytue/i18n';
 import type { DocsT } from '../../../i18n';
 import { useT } from '../../context';
-import { getEditorRoot, setColumns } from '../../canvas/exec';
+import { getEditorRoot, ponerCapaDelFolio, setColumns } from '../../canvas/exec';
 import { EditorIcon } from '../../icons';
 import type { EditorIconName } from '../../icons';
 import type { EditorContext, PageSetup } from '../../types';
@@ -136,16 +136,6 @@ const FIELD_CLASS = `${RIBBON_FIELD} w-full`;
 const PRESET_BTN =
   'border-border bg-surface text-text hover:bg-bg-subtle rounded-sm border px-2 py-1 text-xs ' +
   FOCUS_RING;
-
-/** Reemplaza (o quita, con html vacío) una capa decorativa del folio y emite
- *  `input`. La capa va como PRIMER hijo (fuera del flujo, no molesta al caret). */
-const applyLayer = (selector: string, html: string): void => {
-  const root = getEditorRoot();
-  if (!root) return;
-  root.querySelector(selector)?.remove();
-  if (html) root.insertAdjacentHTML('afterbegin', html);
-  root.dispatchEvent(new Event('input', { bubbles: true }));
-};
 
 /** Marca de agua actual del folio (releída de sus `data-*` y saneada), o null. */
 const readWatermark = (): WatermarkSpec | null => {
@@ -277,7 +267,7 @@ function WatermarkPanel({ locale }: { locale: Locale }): JSX.Element {
       size: next.size,
       diagonal: next.diagonal,
     });
-    applyLayer('[data-sytue-watermark]', spec ? watermarkHtml(spec) : '');
+    ponerCapaDelFolio('[data-sytue-watermark]', spec ? watermarkHtml(spec) : '');
   };
 
   const onFile = (e: TargetedEvent<HTMLInputElement>): void => {
@@ -303,7 +293,7 @@ function WatermarkPanel({ locale }: { locale: Locale }): JSX.Element {
   };
 
   const remove = (): void => {
-    applyLayer('[data-sytue-watermark]', '');
+    ponerCapaDelFolio('[data-sytue-watermark]', '');
     setWm({ ...wm, text: '', image: null });
   };
 
@@ -447,11 +437,11 @@ function PageBorderPanel({ close }: { close: () => void }): JSX.Element {
     const next = { ...b, ...p };
     setB(next);
     const spec = sanitizePageBorderSpec(next);
-    applyLayer('[data-sytue-page-border]', spec ? pageBorderHtml(spec) : '');
+    ponerCapaDelFolio('[data-sytue-page-border]', spec ? pageBorderHtml(spec) : '');
   };
 
   const remove = (): void => {
-    applyLayer('[data-sytue-page-border]', '');
+    ponerCapaDelFolio('[data-sytue-page-border]', '');
     close();
   };
 
@@ -530,7 +520,8 @@ export function DisposicionTab({ ctx }: { ctx: EditorContext }): JSX.Element {
   const ponerPagina = (cambio: Partial<PageSetup>): void => {
     const next = { ...pagina, ...cambio };
     ctx.setPageSetup(next);
-    if (paginaHtml(next) !== paginaHtml(pagina)) applyLayer('[data-sytue-page]', paginaHtml(next));
+    if (paginaHtml(next) !== paginaHtml(pagina))
+      ponerCapaDelFolio('[data-sytue-page]', paginaHtml(next));
   };
   /** Vertical o apaisada; la de un documento con su propio tamaño se gira. */
   const orientar = (landscape: boolean): void => {

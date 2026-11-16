@@ -16,6 +16,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/tokens"
 )
 
 // # Por qué esta fila no es `ui.FilaLista`
@@ -63,6 +64,11 @@ const (
 	// de la estrella que acompaña al remitente.
 	TallaClip     float32 = 14
 	TallaEstrella float32 = 16
+	// TallaRespondida es el `size={14}` de la flecha de «respondido», junto a la
+	// estrella: discreta, como la de Apple Mail.
+	TallaRespondida float32 = 14
+	// TallaRelojFila es el `size={14}` del reloj de una fila de «Pospuestos».
+	TallaRelojFila float32 = 14
 )
 
 // AltoTextoFila es el bloque de tres líneas: es lo que decide el alto de la fila, y no
@@ -154,26 +160,14 @@ func AnchoTextoFila(anchoFila float32) float32 {
 	return max(anchoFila-MargenFila-izquierda, 0)
 }
 
-// coloresEtiqueta es `LABEL_COLORS` de `components/utils.ts`: TOKEN → color del PUNTO.
-// Son hex literales de la app —tienen que coincidir con `domain.LabelColors` del
-// backend— y por eso NO salen de `tema.Color`, que es la paleta del cromo.
-var coloresEtiqueta = map[string]color.NRGBA{
-	"slate": {R: 0x5b, G: 0x6b, B: 0x7b, A: 255},
-	"brass": {R: 0x9a, G: 0x7b, B: 0x3f, A: 255},
-	"sage":  {R: 0x5f, G: 0x7a, B: 0x5a, A: 255},
-	"clay":  {R: 0xa4, G: 0x62, B: 0x3f, A: 255},
-	"blue":  {R: 0x3f, G: 0x66, B: 0x99, A: 255},
-	"plum":  {R: 0x7a, G: 0x54, B: 0x80, A: 255},
-	"teal":  {R: 0x3f, G: 0x7d, B: 0x7a, A: 255},
-	"rose":  {R: 0x9c, G: 0x54, B: 0x70, A: 255},
-}
-
-// ColorEtiqueta es `labelDot`: el token de color de una etiqueta a su hex. Uno
-// desconocido cae a `border-strong`, que es el respaldo que la web escribe en el
-// propio `var()`.
+// ColorEtiqueta es `labelDot`: el token de color de una etiqueta (un id de la paleta de
+// colores de usuario, `tokens.PaletaDeUsuario`) a su tono. NO sale de `tema.Color`, que es
+// la paleta del cromo: es un color que se guarda y tiene que casar con
+// `domain.LabelColors` del backend. Uno desconocido cae a `border-strong`, que es el
+// respaldo que la web escribe en el propio `var()`.
 func ColorEtiqueta(token string, v tema.Variante) color.NRGBA {
-	if c, hay := coloresEtiqueta[token]; hay {
-		return c
+	if c, hay := tokens.TonoDeUsuario(token); hay {
+		return c.NRGBA()
 	}
 	return tema.Color("border-strong", v)
 }
@@ -191,6 +185,15 @@ type FilaConversacion struct {
 	// Remitente y Fecha llegan YA escritos: el nombre y el formato de fecha dependen
 	// del idioma, y el idioma es de la app, no de un widget.
 	Remitente, Asunto, Fecha string
+	// Pospuesta dice que Fecha es cuándo VUELVE (en «Pospuestos»): va con el reloj de
+	// «Posponer» y en `text-primary-text`, para que no se lea como la de llegada.
+	Pospuesta bool
+	// Vuelta dice que Fecha es cuándo VOLVIÓ de «Pospuestos» (y por eso está arriba):
+	// lleva el mismo reloj, pero en el color de cualquier fecha, porque ya no espera.
+	Vuelta bool
+	// VueltaTexto lo dice con palabras al lector de pantalla («Pospuesto · volvió
+	// el…»): el reloj solo se ve.
+	VueltaTexto string
 	// Abierta es la conversación que el lector está enseñando (`aria-selected`).
 	Abierta bool
 	// Marcada es la casilla de multiselección.
@@ -202,6 +205,9 @@ type FilaConversacion struct {
 	SeleccionActiva bool
 	// SinLeerTexto es el prefijo que solo oye un lector de pantalla («No leído.»).
 	SinLeerTexto string
+	// RespondidaTexto es el nombre de la flecha de «respondido» (`list.answered`):
+	// en pantalla solo hay un glifo, y el lector de pantalla lo tiene que decir.
+	RespondidaTexto string
 	// T traduce los nombres accesibles del triaje. Sin él no hay triaje.
 	T *i18n.Translator
 	// Acciones son las del triaje; nil en solo lectura, que no tiene tira.
@@ -289,7 +295,14 @@ func (f *FilaConversacion) AccessibilityLabel() string {
 	if f.Conv.SinLeer && f.SinLeerTexto != "" {
 		s = f.SinLeerTexto + " "
 	}
-	return s + f.Remitente + " — " + f.Asunto
+	s += f.Remitente + " — " + f.Asunto
+	if f.Conv.Respondida && f.RespondidaTexto != "" {
+		s += ". " + f.RespondidaTexto
+	}
+	if f.Vuelta && f.VueltaTexto != "" {
+		s += ". " + f.VueltaTexto
+	}
+	return s
 }
 
 // AccessibilityRole es `option` dentro de un listbox, que es lo que emite la web.
@@ -340,19 +353,21 @@ func (f *FilaConversacion) CreateRenderer() fyne.WidgetRenderer {
 		f: f,
 		// El opaco de debajo no es decoración: dentro de un `widget.List` cada fila va
 		// sobre un `listItem` de Fyne que pinta su propio fondo con el tema de serie.
-		base:     canvas.NewRectangle(tema.Color("surface", v)),
-		velo:     canvas.NewRectangle(color.NRGBA{}),
-		galon:    canvas.NewRectangle(color.NRGBA{}),
-		filete:   canvas.NewRectangle(tema.Color("border", v)),
-		punto:    canvas.NewCircle(color.NRGBA{}),
-		avatar:   ui.NuevoAvatar(""),
-		nombre:   ui.Texto("", tema.TextoBase, ui.Normal, tema.Color("text", v)),
-		asunto:   ui.Texto("", tema.TextoSM, ui.Normal, tema.Color("text-muted", v)),
-		extracto: ui.Texto("", tema.TextoSM, ui.Normal, tema.Color("text-subtle", v)),
-		fecha:    ui.Texto("", tema.TextoXS, ui.Normal, tema.Color("text-subtle", v)),
-		cuantos:  ui.Texto("", tema.TextoXS, ui.Normal, tema.Color("text-subtle", v)),
-		estrella: GlifoRelleno(EstrellaD, TallaEstrella, "warning-text", v),
-		clip:     Glifo(ClipD, TallaClip, "text-subtle", v),
+		base:       canvas.NewRectangle(tema.Color("surface", v)),
+		velo:       canvas.NewRectangle(color.NRGBA{}),
+		galon:      canvas.NewRectangle(color.NRGBA{}),
+		filete:     canvas.NewRectangle(tema.Color("border", v)),
+		punto:      canvas.NewCircle(color.NRGBA{}),
+		avatar:     ui.NuevoAvatar(""),
+		nombre:     ui.Texto("", tema.TextoBase, ui.Normal, tema.Color("text", v)),
+		asunto:     ui.Texto("", tema.TextoSM, ui.Normal, tema.Color("text-muted", v)),
+		extracto:   ui.Texto("", tema.TextoSM, ui.Normal, tema.Color("text-subtle", v)),
+		fecha:      ui.Texto("", tema.TextoXS, ui.Normal, tema.Color("text-subtle", v)),
+		cuantos:    ui.Texto("", tema.TextoXS, ui.Normal, tema.Color("text-subtle", v)),
+		estrella:   GlifoRelleno(EstrellaD, TallaEstrella, "warning-text", v),
+		respondida: Glifo(ResponderD, TallaRespondida, "text-subtle", v),
+		clip:       Glifo(ClipD, TallaClip, "text-subtle", v),
+		reloj:      Glifo(RelojD, TallaRelojFila, "primary-text", v),
 	}
 	r.casilla = ui.NuevaCasilla("", func(bool) {
 		if f.AlMarcar != nil {
@@ -414,7 +429,8 @@ type filaRenderer struct {
 	avatar                    *ui.Avatar
 	nombre, asunto, extracto  *canvas.Text
 	fecha, cuantos            *canvas.Text
-	estrella, clip            *iconos.Dibujo
+	estrella, respondida      *iconos.Dibujo
+	clip, reloj               *iconos.Dibujo
 	triaje                    []*botonTriaje
 	tira                      *ui.TiraDeslizable
 	chips                     []chipFila
@@ -426,8 +442,8 @@ type filaRenderer struct {
 func (r *filaRenderer) montar() {
 	r.objetos = []fyne.CanvasObject{
 		r.base, r.velo, r.galon, r.casilla, r.punto, r.avatar,
-		r.nombre, r.cuantos, r.estrella.Objeto(), r.asunto, r.extracto,
-		r.fecha, r.clip.Objeto(), r.filete,
+		r.nombre, r.cuantos, r.respondida.Objeto(), r.estrella.Objeto(), r.asunto, r.extracto,
+		r.fecha, r.reloj.Objeto(), r.clip.Objeto(), r.filete,
 	}
 	r.objetos = append(r.objetos, r.tira)
 	for _, c := range r.chips {
@@ -492,8 +508,14 @@ func (r *filaRenderer) Layout(t fyne.Size) {
 	// los dos `shrink-0`: se reservan a la derecha y el nombre se trunca con el resto.
 	// La fecha es `ml-auto shrink-0 pl-2`: se pega a la derecha de la línea.
 	reservado := anchoFecha + HuecoFecha
+	if f.conReloj() {
+		reservado += TallaRelojFila + tema.Espacio(1)
+	}
 	if f.Conv.Total > 1 {
 		reservado += tema.Espacio(1) + ui.Medir(r.cuantos.Text, tema.TextoXS, ui.Normal).Width
+	}
+	if f.Conv.Respondida {
+		reservado += tema.Espacio(1) + TallaRespondida
 	}
 	if f.Conv.Destacada {
 		reservado += tema.Espacio(1) + TallaEstrella
@@ -505,10 +527,20 @@ func (r *filaRenderer) Layout(t fyne.Size) {
 		ui.ColocarTexto(r.cuantos, tema.TextoXS, nx, y+(tema.TextoBase.Linea-tema.TextoXS.Linea)/2)
 		nx += ui.Medir(r.cuantos.Text, tema.TextoXS, ui.Normal).Width + tema.Espacio(1)
 	}
+	// La flecha de «respondido» va antes que la estrella, como en la web.
+	if f.Conv.Respondida {
+		r.respondida.Colocar(nx, y+(tema.TextoBase.Linea-TallaRespondida)/2, TallaRespondida)
+		nx += TallaRespondida + tema.Espacio(1)
+	}
 	if f.Conv.Destacada {
 		r.estrella.Colocar(nx, y+(tema.TextoBase.Linea-TallaEstrella)/2, TallaEstrella)
 	}
 	ui.ColocarTexto(r.fecha, tema.TextoXS, derecha-anchoFecha, y+(tema.TextoBase.Linea-tema.TextoXS.Linea)/2)
+	if f.conReloj() {
+		// `inline-flex items-center gap-1`: el reloj de 14 a la izquierda de la fecha.
+		r.reloj.Colocar(derecha-anchoFecha-tema.Espacio(1)-TallaRelojFila,
+			y+(tema.TextoBase.Linea-TallaRelojFila)/2, TallaRelojFila)
+	}
 	y += tema.TextoBase.Linea
 
 	// El asunto es `flex-1 truncate` y el clip, `shrink-0` a su derecha.
@@ -563,6 +595,10 @@ func (r *filaRenderer) colocarChips(x, y, disponible float32) {
 
 // extracto es el texto ENTERO de la tercera línea, antes de truncar: el del mensaje o
 // «Sin vista previa».
+// conReloj: la fecha va con el reloj de «Posponer» si dice cuándo vuelve o cuándo
+// volvió.
+func (f *FilaConversacion) conReloj() bool { return f.Pospuesta || f.Vuelta }
+
 func (f *FilaConversacion) extracto() string {
 	if e := f.Conv.Ultimo.Extracto; e != "" || f.T == nil {
 		return e
@@ -611,6 +647,9 @@ func (r *filaRenderer) Refresh() {
 		tinta, tintaSub = tema.Color("primary-text", v), tema.Color("primary-text", v)
 		tintaFecha = tema.Color("primary-text", v)
 	}
+	if f.Pospuesta {
+		tintaFecha = tema.Color("primary-text", v)
+	}
 	cara := r.peso().Cara()
 	r.nombre.Text, r.nombre.Color, r.nombre.FontSource = f.Remitente, tinta, cara
 	r.asunto.Text, r.asunto.Color, r.asunto.FontSource = f.Asunto, tintaSub, cara
@@ -636,7 +675,9 @@ func (r *filaRenderer) Refresh() {
 	// al pasar por encima o con el dedo, que no tiene «encima» (`pointer-coarse`).
 	verlo(r.casilla, f.ConCasilla && (f.Marcada || f.SeleccionActiva || f.encima() || esTactil()))
 	r.estrella.Ver(f.Conv.Destacada)
+	r.respondida.Ver(f.Conv.Respondida)
 	r.clip.Ver(f.Conv.ConAdjunto)
+	r.reloj.Ver(f.conReloj())
 	// El extracto se aparta al pasar por encima AUNQUE no haya tira que poner
 	// (`group-hover:opacity-0` no mira si hay acciones): así lo hace la web en un buzón
 	// compartido.
@@ -708,19 +749,61 @@ func esTactil() bool {
 	return ui.EsTactil()
 }
 
+// AnchoIlustracionVacio es el `size = 160` por defecto de `<Illustration>`: el
+// ancho máximo del spot dentro del `max-w-[200px]` de EmptyState. Hoja.
+const AnchoIlustracionVacio float32 = 160
+
+// marcaVacio es la ilustración de un estado vacío y la variante con la que se pintó.
+// La variante va dentro porque `iconos.Pintar` resuelve los tokens al construir: un
+// spot hecho en claro se queda en claro aunque el tema cambie, así que cambiar de
+// variante es cambiar de marca y obliga a rehacer el estado.
+type marcaVacio struct {
+	ilus iconos.Ilustracion
+	hay  bool
+	v    tema.Variante
+}
+
+// conIlustracion es la marca de un estado que lleva el spot `i`
+// (`<Illustration name="…" />` en la web).
+func conIlustracion(i iconos.Ilustracion) marcaVacio { return marcaVacio{ilus: i, hay: true} }
+
+// ilustracionDeEstado es el spot de cada estado de fin: la web pinta `errorRetry` en el
+// error y `emptyMail` en los vacíos (MessageList.tsx y MessageReader.tsx). «Sin
+// conexión» es el mismo «no he podido preguntar» que el error y lleva su dibujo. «Sin
+// permiso» no tiene equivalente en la web —allí es una página del shell— y no lleva
+// ninguno: un sobre vacío diría «no hay correo», y lo que pasa es que no se puede ver.
+func ilustracionDeEstado(e Estado) marcaVacio {
+	switch e {
+	case Error, SinConexion:
+		return conIlustracion(iconos.ErrorReintentar)
+	case Vacio, Listo, Cargando:
+		return conIlustracion(iconos.VacioMail)
+	case SinPermiso:
+	}
+	return marcaVacio{}
+}
+
 // ponerEstado deja el estado vacío pedido, devolviendo un `ui.Vacio` NUEVO cuando el
-// contenido cambia y el mismo cuando no.
+// contenido cambia y el mismo cuando no. `marca` es la ilustración con la que se pintó
+// `viejo` (la guarda quien llama) y se actualiza con la de `quiere`.
 //
 // Se rehace y no se muta porque `ui.Vacio` arma sus `Objects()` en CreateRenderer:
 // ponerle una acción a uno ya montado deja el botón fuera de su layout y Fyne lo
 // pinta en la esquina superior izquierda del panel. Se vio en la captura del lector.
-func ponerEstado(viejo *ui.Vacio, titulo, desc string, accion fyne.CanvasObject) *ui.Vacio {
-	if viejo != nil && viejo.Titulo == titulo && viejo.Descripcion == desc &&
+func ponerEstado(viejo *ui.Vacio, marca *marcaVacio, titulo, desc string, accion fyne.CanvasObject, quiere marcaVacio) *ui.Vacio {
+	if quiere.hay {
+		quiere.v = tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	}
+	if viejo != nil && viejo.Titulo == titulo && viejo.Descripcion == desc && *marca == quiere &&
 		(viejo.Accion == nil) == (accion == nil) && textoDeAccion(viejo.Accion) == textoDeAccion(accion) {
 		return viejo
 	}
 	v := ui.NuevoVacio(titulo, desc)
 	v.Accion = accion
+	if quiere.hay {
+		v.Ilustracion = iconos.Pintar(quiere.ilus, quiere.v).A(AnchoIlustracionVacio).Objeto()
+	}
+	*marca = quiere
 	return v
 }
 
@@ -736,7 +819,17 @@ func textoDeAccion(o fyne.CanvasObject) string {
 // centrarVacio coloca el estado vacío CENTRADO en la caja, que es el `h-full` con
 // `justify-center` de la web. `ui.Vacio` se dispone desde arriba —es su mínimo—, así
 // que el centrado lo pone quien lo coloca, igual que en la web lo pone el contenedor.
+//
+// Si con la ilustración no cabe, va sin ella: en un móvil apaisado (390 de alto) el
+// spot de 128 empujaba «Redactar» fuera de la pantalla, y el botón es lo que hace
+// falta; el dibujo solo acompaña. La web aquí recorta, que es peor.
 func centrarVacio(v *ui.Vacio, pos fyne.Position, tam fyne.Size) {
+	if il := v.Ilustracion; il != nil {
+		il.Show()
+		if v.MedidaVacio(tam.Width) > tam.Height {
+			il.Hide()
+		}
+	}
 	alto := min(v.MedidaVacio(tam.Width), tam.Height)
 	v.Move(fyne.NewPos(pos.X, pos.Y+(tam.Height-alto)/2))
 	v.Resize(fyne.NewSize(tam.Width, alto))

@@ -125,5 +125,6 @@
       }
     ]
   },
-  "size": { "preset": "custom", "w": 33.87, "h": 19.05, "unit": "cm" }
+  "size": { "preset": "custom", "w": 33.87, "h": 19.05, "unit": "cm" },
+  "protect": { "hasPassword": true, "slides": ["s3"], "boxes": ["b9"], "master": false }
 }

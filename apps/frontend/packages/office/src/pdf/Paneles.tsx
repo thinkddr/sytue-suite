@@ -14,7 +14,7 @@
  * tiene vuelta atrás. Censurar destruye contenido, aplanar quita los campos y
  * proteger cambia quién puede abrir el fichero: enterarse después no sirve.
  */
-import { createContext } from 'preact';
+import { createContext, type ComponentChildren } from 'preact';
 import { createPortal } from 'preact/compat';
 import { useContext, useEffect, useRef, useState } from 'preact/hooks';
 import {
@@ -29,14 +29,17 @@ import {
   Checkbox,
   formatBytes,
 } from '@sytue/ui';
-import { contiene, documentLocale } from '@sytue/i18n';
+import { contiene, documentLocale, type Locale } from '@sytue/i18n';
 import { bloquesDe, textoPlano, type Bloque } from '@sytue/ai';
 import type { DocsKey, docsT } from '../i18n';
 import { descargarBlob, nombreDePagina, paginaComoImagen, type FormatoImagen } from './imagenes';
 import {
+  aPDF,
   api,
   firmas,
   pendienteDe,
+  rubrica,
+  rectEnSVG,
   rgbAColor,
   tramosDelIndice,
   type AnotacionLeida,
@@ -58,7 +61,20 @@ import { MASCARA_SCROLL_X, useScrollRestante, useTablist } from '@sytue/ui';
 import { r } from '../lib/rutas.js';
 import { HERRAMIENTAS_NACIONALES, LISTA_DE_CONFIANZA_UE, herramientaDe } from './firmaNacional.js';
 import { extractoLegible, sinCapaDeTexto as esEscaneo } from './extracto.js';
+import {
+  POSICIONES_FIRMA,
+  aFracciones,
+  cajaParaFirmar,
+  escalarRecuadro,
+  moverRecuadro,
+  recuadroArrastrado,
+  rectElegido,
+  type EleccionFirma,
+  type Fracciones,
+  type Rect,
+} from './firmaPosicion.js';
 import { PedirFirma } from './PedirFirma';
+import { Versiones } from './Versiones';
 import { CompararVisual } from './CompararVisual';
 import {
   claveDeMotivo,
@@ -112,7 +128,15 @@ export type PanelActivo =
 // barra, como en cualquier editor, y no escribiendo números de página a ciegas
 // en un formulario.
 export type Dialogo =
-  null | 'organizar' | 'capas' | 'proteger' | 'firmar' | 'pedirFirma' | 'comparar' | 'herramientas';
+  | null
+  | 'organizar'
+  | 'capas'
+  | 'proteger'
+  | 'firmar'
+  | 'pedirFirma'
+  | 'comparar'
+  | 'herramientas'
+  | 'versiones';
 
 /** Devuelve si el cambio se llegó a aplicar. */
 type Aplicar = (cuerpo: Record<string, unknown>, mensaje: string) => Promise<boolean>;
@@ -858,7 +882,7 @@ export function PanelLateral({
   );
 }
 
-function Miniaturas({
+export function Miniaturas({
   contenido,
   svgs,
   actual,
@@ -871,12 +895,38 @@ function Miniaturas({
   onIrA: (n: number) => void;
   t: ReturnType<typeof docsT>;
 }) {
+  const lista = useRef<HTMLUListElement>(null);
+  // Con el puntero dentro, quien manda es la persona: está mirando o arrastrando la
+  // tira, y moverla bajo el ratón le quitaría la fila que iba a pulsar.
+  const punteroDentroRef = useRef(false);
+  // LA TIRA ACOMPAÑA A LA PÁGINA QUE SE LEE, como en Acrobat o Vista Previa: al bajar
+  // por un documento largo la miniatura marcada se quedaba fuera de la vista. `nearest`
+  // no mueve nada si ya se ve, y `scrollIntoView` desplaza sin tocar el foco, que sigue
+  // donde estaba (en el documento, en la barra…).
+  useEffect(() => {
+    if (punteroDentroRef.current) return;
+    const fila = lista.current?.querySelector<HTMLElement>(`[data-pagina="${actual}"]`);
+    fila?.scrollIntoView?.({
+      block: 'nearest',
+      behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    });
+  }, [actual]);
   return (
-    <ul class="flex flex-col gap-2">
+    <ul
+      ref={lista}
+      class="flex flex-col gap-2"
+      onPointerEnter={() => {
+        punteroDentroRef.current = true;
+      }}
+      onPointerLeave={() => {
+        punteroDentroRef.current = false;
+      }}
+    >
       {contenido.paginas.map((p) => (
         <li key={p.numero}>
           <button
             type="button"
+            data-pagina={p.numero}
             onClick={() => onIrA(p.numero)}
             aria-current={actual === p.numero}
             class={`sytue-focus-ring flex w-full gap-2 rounded-md p-1.5 text-left transition ${
@@ -2227,6 +2277,8 @@ export function Dialogos({
   onAplicar,
   trabajando,
   svgs,
+  onRestaurada,
+  locale,
 }: {
   dialogo: Dialogo;
   onCerrar: () => void;
@@ -2238,6 +2290,10 @@ export function Dialogos({
   /** Las páginas ya dibujadas. Exportar a imagen rasteriza ESTAS, sin volver a
    *  pedirlas: el navegador ya las tiene. */
   svgs: Record<number, string>;
+  /** Tras volver a una versión anterior: el visor tiene que leer el documento otra vez. */
+  onRestaurada: (version: number) => void;
+  /** El idioma de las fechas del historial: esta isla no cuelga del contexto de la Shell. */
+  locale?: Locale | undefined;
 }) {
   // El pie del diálogo, donde las herramientas con formulario ponen «Cancelar» y
   // «Aplicar» (`BotonesDialogo`, por un portal): al final del cuerpo, en el teléfono
@@ -2292,6 +2348,8 @@ export function Dialogos({
             <Firmar
               t={t}
               path={path}
+              paginas={contenido.paginas}
+              svgs={svgs}
               onAplicar={onAplicar}
               onCerrar={onCerrar}
               trabajando={trabajando}
@@ -2299,6 +2357,15 @@ export function Dialogos({
           )}
           {dialogo === 'pedirFirma' && <PedirFirma t={t} path={path} onCerrar={onCerrar} />}
           {dialogo === 'comparar' && <Comparar t={t} path={path} />}
+          {dialogo === 'versiones' && (
+            <Versiones
+              t={t}
+              locale={locale}
+              path={path}
+              firmado={(contenido.firmas?.length ?? 0) > 0}
+              onRestaurada={onRestaurada}
+            />
+          )}
           {dialogo === 'herramientas' && (
             <Herramientas
               t={t}
@@ -2313,6 +2380,42 @@ export function Dialogos({
         </div>
       </PieDeHerramienta.Provider>
     </Modal>
+  );
+}
+
+/**
+ * Una opción de un control segmentado: un radio nativo oculto (`sr-only`) dentro de su
+ * etiqueta, que es lo que se ve. Las flechas, el foco y lo que anuncia el lector de
+ * pantalla los pone el navegador, y el aro lo pinta la etiqueta con su clase
+ * `sytue-focus-ring-…-within`. Lo comparten «Organizar» y la posición de la firma.
+ */
+function OpcionSegmento({
+  name,
+  value,
+  checked,
+  onChange,
+  class: cls,
+  children,
+}: {
+  name: string;
+  value?: string;
+  checked: boolean;
+  onChange: () => void;
+  class: string;
+  children: ComponentChildren;
+}) {
+  return (
+    <label class={cls}>
+      <input
+        type="radio"
+        name={name}
+        value={value}
+        class="sr-only"
+        checked={checked}
+        onChange={onChange}
+      />
+      {children}
+    </label>
   );
 }
 
@@ -2376,23 +2479,19 @@ function Organizar({
       <fieldset class="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <legend class="sr-only">{t('pdf.dialog.organizar.op')}</legend>
         {(['extraer', 'borrar', 'rotar', 'combinar'] as const).map((o) => (
-          <label
+          <OpcionSegmento
             key={o}
+            name="op"
+            checked={op === o}
+            onChange={() => setOp(o)}
             class={`sytue-focus-ring-within flex-1 cursor-pointer rounded-md border px-2 py-1.5 text-center text-xs ${
               op === o
                 ? 'border-border-strong bg-selected text-text'
                 : 'border-border text-text-muted'
             }`}
           >
-            <input
-              type="radio"
-              name="op"
-              class="sr-only"
-              checked={op === o}
-              onChange={() => setOp(o)}
-            />
             {t(`pdf.op.${o}`)}
-          </label>
+          </OpcionSegmento>
         ))}
       </fieldset>
       {op === 'combinar' ? (
@@ -2714,14 +2813,6 @@ function Proteger({
 }
 
 /**
- * El recuadro donde cae la rúbrica, en puntos de la página. Fijo abajo a la
- * izquierda: colocarlo arrastrando sobre el documento es la ola siguiente, y una
- * firma invisible —todo a cero— sigue valiendo para lo que solo necesita la
- * criptografía.
- */
-const RECT_FIRMA: [number, number, number, number] = [56, 56, 296, 130];
-
-/**
  * Lienzo para firmar de su puño y letra.
  *
  * Va con eventos de PUNTERO y no de ratón ni de toque, y esa es toda la razón de
@@ -2810,8 +2901,9 @@ function trazosAPagina(
   trazos: [number, number][][],
   ancho: number,
   alto: number,
+  rect: Rect,
 ): [number, number][][] {
-  const [x0, y0, x1, y1] = RECT_FIRMA;
+  const [x0, y0, x1, y1] = rect;
   const w = x1 - x0;
   const h = y1 - y0;
   return trazos.map((t) => t.map(([x, y]) => [x0 + (x / ancho) * w, y1 - (y / alto) * h]));
@@ -3041,6 +3133,241 @@ function ConLaAplicacionOficial({ t, path }: { t: ReturnType<typeof docsT>; path
 type ModoDeFirma = 'mano' | 'imagen' | 'certificado' | 'oficial';
 
 /**
+ * Dónde cae la firma visible: cuatro posiciones y la página en pequeño con el
+ * recuadro encima, para VER dónde va antes de firmar —una firma no se mueve
+ * después—.
+ *
+ * Radios nativos dentro de etiquetas, como `ChoiceCard`: las flechas, el foco y
+ * lo que anuncia el lector de pantalla los pone el navegador. La miniatura es
+ * decorativa (`aria-hidden`): lo que cuenta ya lo dice el radio marcado.
+ */
+function PosicionDeFirma({
+  t,
+  posicion,
+  onCambio,
+  pagina,
+  svg,
+  rect,
+  caja: cajaPDF,
+  onDibujo,
+}: {
+  t: ReturnType<typeof docsT>;
+  posicion: EleccionFirma;
+  onCambio: (p: EleccionFirma) => void;
+  pagina: Pagina | undefined;
+  svg: string | undefined;
+  rect: Rect;
+  /** La caja sobre la que se coloca (la de la página o la común): el dibujo no sale de ella. */
+  caja: Rect | undefined;
+  onDibujo: (r: Rect) => void;
+}) {
+  const caja = pagina ? rectEnSVG(pagina, rect) : undefined;
+  const claseOpcion = (marcada: boolean) =>
+    cx(
+      // `max(44px,2.75rem)` y no `min-h-11`: con la base de letra en 14 px, `11`
+      // son 38,5 px, por debajo del dedo (como en `Button`).
+      'sytue-focus-ring-inset-within rounded-control flex min-h-8 cursor-pointer items-center border px-2 py-1 text-xs transition-colors max-sm:min-h-[max(44px,2.75rem)] pointer-coarse:min-h-[max(44px,2.75rem)]',
+      marcada
+        ? 'border-primary bg-selected text-text font-medium'
+        : 'border-border bg-surface text-text-muted hover:bg-bg-subtle hover:text-text',
+    );
+  return (
+    <fieldset class="flex flex-col gap-1.5">
+      <legend class="text-text-muted mb-1.5 text-xs">{t('pdf.dialog.firmar.posicion')}</legend>
+      <div class="flex items-start gap-3">
+        <div class="grid min-w-0 flex-1 grid-cols-2 gap-1" data-posiciones-firma>
+          {POSICIONES_FIRMA.map((p) => (
+            <OpcionSegmento
+              key={p}
+              name="posicion-firma"
+              value={p}
+              checked={posicion === p}
+              onChange={() => onCambio(p)}
+              class={claseOpcion(posicion === p)}
+            >
+              {t(`pdf.dialog.firmar.posicion.${p}`)}
+            </OpcionSegmento>
+          ))}
+          {/* La quinta, a lo ancho: no es una esquina más sino otra manera de elegir. */}
+          <OpcionSegmento
+            name="posicion-firma"
+            value="dibujada"
+            checked={posicion === 'dibujada'}
+            onChange={() => onCambio('dibujada')}
+            class={cx('col-span-2 min-w-0', claseOpcion(posicion === 'dibujada'))}
+          >
+            {t('pdf.dialog.firmar.posicion.dibujada')}
+          </OpcionSegmento>
+        </div>
+        {pagina && caja && (
+          <span
+            aria-hidden="true"
+            data-miniatura-firma
+            class="border-border relative block w-20 shrink-0 overflow-hidden border bg-white"
+            style={{ aspectRatio: `${pagina.ancho} / ${pagina.alto}` }}
+          >
+            {svg ? (
+              <span
+                class="absolute inset-0 block [&>svg]:h-full [&>svg]:w-full"
+                // eslint-disable-next-line react/no-danger
+                dangerouslySetInnerHTML={{ __html: svg }}
+              />
+            ) : null}
+            <span
+              data-recuadro-firma
+              class="border-primary bg-primary/15 absolute block rounded-sm border"
+              style={{
+                left: `${(caja.x / pagina.ancho) * 100}%`,
+                top: `${(caja.y / pagina.alto) * 100}%`,
+                width: `${(caja.ancho / pagina.ancho) * 100}%`,
+                height: `${(caja.alto / pagina.alto) * 100}%`,
+              }}
+            />
+          </span>
+        )}
+      </div>
+      {posicion === 'dibujada' && pagina && cajaPDF && (
+        <DibujarRecuadro
+          t={t}
+          pagina={pagina}
+          svg={svg}
+          caja={cajaPDF}
+          rect={rect}
+          onCambio={onDibujo}
+        />
+      )}
+    </fieldset>
+  );
+}
+
+/**
+ * La página en grande para DIBUJAR el recuadro de la firma: se arrastra de una
+ * esquina a la otra (ratón, dedo o lápiz) y, con el teclado, las flechas lo
+ * mueven y + y − lo agrandan o encogen. La proporción va fija, la de la rúbrica,
+ * y nunca se sale del papel (`firmaPosicion.ts`).
+ *
+ * Vive DENTRO del diálogo de firmar en vez de cerrarlo para señalar en el visor:
+ * así lo ya dibujado en el lienzo —o el certificado cargado— no se pierde.
+ *
+ * Todo se calcula en coordenadas del dibujo de la página (las del SVG) y se pasa a
+ * las del PDF con `aPDF`, que ya sabe de /Rotate.
+ */
+function DibujarRecuadro({
+  t,
+  pagina,
+  svg,
+  caja,
+  rect,
+  onCambio,
+}: {
+  t: ReturnType<typeof docsT>;
+  pagina: Pagina;
+  svg: string | undefined;
+  caja: Rect;
+  rect: Rect;
+  onCambio: (r: Rect) => void;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const inicioRef = useRef<[number, number] | null>(null);
+  const enSVG = rectEnSVG(pagina, rect);
+
+  const puntoPDF = (e: PointerEvent): [number, number] => {
+    const el = ref.current;
+    if (!el) return [0, 0];
+    const r = el.getBoundingClientRect();
+    const fx = r.width > 0 ? (e.clientX - r.left) / r.width : 0;
+    const fy = r.height > 0 ? (e.clientY - r.top) / r.height : 0;
+    return aPDF(
+      pagina,
+      Math.min(1, Math.max(0, fx)) * pagina.ancho,
+      Math.min(1, Math.max(0, fy)) * pagina.alto,
+    );
+  };
+
+  // Un paso de teclado es un 1 % de la hoja (un 10 % con Mayúsculas), en la
+  // dirección de la PANTALLA: en una página girada no coincide con la del PDF.
+  const mover = (sx: number, sy: number) => {
+    const [ax, ay] = aPDF(pagina, 0, 0);
+    const [bx, by] = aPDF(pagina, sx, sy);
+    onCambio(moverRecuadro(caja, rect, bx - ax, by - ay));
+  };
+
+  return (
+    <div class="mt-2 flex flex-col gap-1.5">
+      <p id="ayuda-dibujar-firma" class="text-text-subtle text-2xs text-pretty">
+        {t('pdf.dialog.firmar.dibujar.ayuda')}
+      </p>
+      {/* eslint-disable jsx-a11y/no-noninteractive-tabindex, jsx-a11y/no-noninteractive-element-interactions -- un área de dibujo con teclado propio (flechas, + y −): `application` es su rol y necesita el foco */}
+      <div
+        ref={ref}
+        role="application"
+        tabIndex={0}
+        aria-label={t('pdf.dialog.firmar.posicion.dibujada')}
+        aria-describedby="ayuda-dibujar-firma"
+        data-dibujar-firma
+        class="border-border sytue-focus-ring relative block w-full max-w-64 cursor-crosshair touch-none self-center overflow-hidden border bg-white"
+        style={{ aspectRatio: `${pagina.ancho} / ${pagina.alto}` }}
+        onPointerDown={(e) => {
+          e.preventDefault();
+          e.currentTarget.setPointerCapture?.(e.pointerId);
+          e.currentTarget.focus();
+          const p = puntoPDF(e);
+          inicioRef.current = p;
+          onCambio(recuadroArrastrado(caja, p, p));
+        }}
+        onPointerMove={(e) => {
+          const inicio = inicioRef.current;
+          if (!inicio) return;
+          onCambio(recuadroArrastrado(caja, inicio, puntoPDF(e)));
+        }}
+        onPointerUp={() => {
+          inicioRef.current = null;
+        }}
+        onPointerCancel={() => {
+          inicioRef.current = null;
+        }}
+        onKeyDown={(e) => {
+          const paso = (e.shiftKey ? 0.1 : 0.01) * Math.max(pagina.ancho, pagina.alto);
+          const movs: Record<string, [number, number]> = {
+            ArrowLeft: [-paso, 0],
+            ArrowRight: [paso, 0],
+            ArrowUp: [0, -paso],
+            ArrowDown: [0, paso],
+          };
+          const m = movs[e.key];
+          if (m) mover(m[0], m[1]);
+          else if (e.key === '+' || e.key === '=') onCambio(escalarRecuadro(caja, rect, 1.1));
+          else if (e.key === '-' || e.key === '−') onCambio(escalarRecuadro(caja, rect, 1 / 1.1));
+          else return;
+          e.preventDefault();
+        }}
+      >
+        {svg ? (
+          <span
+            aria-hidden="true"
+            class="pointer-events-none absolute inset-0 block [&>svg]:h-full [&>svg]:w-full"
+            // eslint-disable-next-line react/no-danger
+            dangerouslySetInnerHTML={{ __html: svg }}
+          />
+        ) : null}
+        <span
+          aria-hidden="true"
+          data-recuadro-dibujado
+          class="border-primary bg-primary/15 pointer-events-none absolute block rounded-sm border-2"
+          style={{
+            left: `${(enSVG.x / pagina.ancho) * 100}%`,
+            top: `${(enSVG.y / pagina.alto) * 100}%`,
+            width: `${(enSVG.ancho / pagina.ancho) * 100}%`,
+            height: `${(enSVG.alto / pagina.alto) * 100}%`,
+          }}
+        />
+      </div>
+      {/* eslint-enable jsx-a11y/no-noninteractive-tabindex, jsx-a11y/no-noninteractive-element-interactions */}
+    </div>
+  );
+}
+
+/**
  * Firmar un PDF de las tres maneras en que se firma de verdad.
  *
  * LAS DOS PRIMERAS NO SON LO MISMO QUE LA TERCERA, y la interfaz lo dice: una
@@ -3048,15 +3375,20 @@ type ModoDeFirma = 'mano' | 'imagen' | 'certificado' | 'oficial';
  * para el «conforme» de un albarán; la que aguanta ante un tercero es la de
  * certificado, que es la única que deja una firma electrónica verificable.
  */
-function Firmar({
+export function Firmar({
   t,
   path,
+  paginas,
+  svgs,
   onAplicar,
   onCerrar,
   trabajando,
 }: {
   t: ReturnType<typeof docsT>;
   path: string;
+  /** Para colocar la firma con el tamaño real de la página y enseñarla. */
+  paginas: Pagina[];
+  svgs: Record<number, string>;
   onAplicar: Aplicar;
   onCerrar: () => void;
   trabajando: boolean;
@@ -3074,6 +3406,32 @@ function Firmar({
   const [visible, setVisible] = useState(true);
   const [todas, setTodas] = useState(false);
   const [bloquear, setBloquear] = useState(false);
+  const [posicion, setPosicion] = useState<EleccionFirma>(POSICIONES_FIRMA[0]!);
+  // El recuadro dibujado, en fracciones de la caja: sigue en su sitio aunque se
+  // cambie de página o de «firmar en todas».
+  const [dibujo, setDibujo] = useState<Fracciones | null>(null);
+  // «Recordar mi firma»: si hay una guardada se pone sola en el lienzo y la casilla
+  // sale marcada; desmarcarla y firmar la olvida. Nunca se guarda sin la casilla.
+  const [recordar, setRecordar] = useState(false);
+  const [guardada, setGuardada] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    void rubrica.leer().then((t) => {
+      if (!vivo || !t) return;
+      setGuardada(true);
+      setRecordar(true);
+      // Solo si aún no se ha empezado a dibujar: no se pisa lo que ya está en el lienzo.
+      setTrazos((actuales) => (actuales.length === 0 ? t : actuales));
+    });
+    return () => {
+      vivo = false;
+    };
+  }, []);
+  // El mismo recuadro para las tres vías que dejan marca (mano, imagen y
+  // certificado): elegir el sitio y que luego cada una lo pusiera donde quisiera
+  // sería peor que no dejar elegir.
+  const cajaVisible = cajaParaFirmar(paginas, pagina, todas);
+  const rectVisible = rectElegido(posicion, cajaVisible, dibujo);
 
   const leerTexto = (f: File | undefined, set: (v: string) => void) => {
     if (!f) return;
@@ -3111,7 +3469,7 @@ function Firmar({
       class="flex flex-col gap-3"
       onSubmit={(e) => {
         e.preventDefault();
-        const rect = visible ? RECT_FIRMA : ([0, 0, 0, 0] as [number, number, number, number]);
+        const rect: Rect = visible ? rectVisible : [0, 0, 0, 0];
         const comun = {
           Motivo: motivo,
           Lugar: lugar,
@@ -3131,6 +3489,12 @@ function Firmar({
           ).then(onCerrar);
           return;
         }
+        if (modo === 'mano') {
+          // Mejor esfuerzo y sin esperar: recordar la firma no puede retrasar ni
+          // impedir firmar este documento.
+          if (recordar) void rubrica.guardar(trazos);
+          else if (guardada) void rubrica.olvidar();
+        }
         void onAplicar(
           {
             op: 'firmar',
@@ -3141,7 +3505,7 @@ function Firmar({
               color: [0.12, 0.16, 0.22],
               grosor: 1.6,
               todas_las_paginas: todas,
-              ...(modo === 'mano' ? { trazos: trazosAPagina(trazos, 480, 148) } : {}),
+              ...(modo === 'mano' ? { trazos: trazosAPagina(trazos, 480, 148, rect) } : {}),
             },
             sufijo: t('pdf.suffix.signed'),
           },
@@ -3189,6 +3553,24 @@ function Firmar({
             >
               {t('pdf.dialog.firmar.limpiar')}
             </button>
+            <label class="text-text flex flex-col gap-0.5 text-xs">
+              <span class="flex items-center gap-1.5">
+                <Checkbox
+                  checked={recordar}
+                  onChange={(e) => setRecordar((e.target as HTMLInputElement).checked)}
+                  class="accent-primary"
+                  data-recordar-firma
+                />
+                {t('pdf.dialog.firmar.recordar')}
+              </span>
+              <span class="text-text-subtle text-2xs ml-5 text-pretty">
+                {t(
+                  guardada
+                    ? 'pdf.dialog.firmar.recordar.guardada'
+                    : 'pdf.dialog.firmar.recordar.help',
+                )}
+              </span>
+            </label>
           </div>
         )}
 
@@ -3290,6 +3672,7 @@ function Firmar({
             checked={visible}
             onChange={(e) => setVisible((e.target as HTMLInputElement).checked)}
             class="accent-primary"
+            data-firma-visible
           />
           {t('pdf.dialog.firmar.visible')}
         </label>
@@ -3316,6 +3699,21 @@ function Firmar({
           </label>
         )}
       </div>
+
+      {visible && modo !== 'oficial' && (
+        <PosicionDeFirma
+          t={t}
+          posicion={posicion}
+          onCambio={setPosicion}
+          pagina={paginas[pagina - 1] ?? paginas[0]}
+          svg={svgs[(paginas[pagina - 1] ?? paginas[0])?.numero ?? 1]}
+          rect={rectVisible}
+          caja={cajaVisible}
+          onDibujo={(r) => {
+            if (cajaVisible) setDibujo(aFracciones(cajaVisible, r));
+          }}
+        />
+      )}
 
       {modo === 'certificado' && (
         <label class="text-text flex flex-col gap-0.5 text-xs">

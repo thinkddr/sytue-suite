@@ -34,6 +34,12 @@ import {
   storageSessionsSecretId,
 } from './ssss-vault.js';
 import type { MatrixStorageScope } from './types.js';
+import {
+  sealStorageOwnerRecord,
+  verifyStorageOwnerRecord,
+  storageRecordDigest,
+  type StorageOwnerProof,
+} from './owner-proof.js';
 beforeAll(async () => {
   await initAsync();
 });
@@ -111,7 +117,38 @@ test('Rust SDK produces private records consumed independently by native Go with
       });
     }
     const sessions = JSON.parse(await machine.exportRoomKeys(() => true));
+    const owner = {
+      id: 'artificial-storage-js-owner',
+      key: crypto.getRandomValues(new Uint8Array(32)),
+    };
+    const owner_proofs = await Promise.all(
+      records.map((entry) =>
+        sealStorageOwnerRecord(entry.reference.room_id, entry.record, entry.record.scope, owner),
+      ),
+    );
+    const unicodeScope = { tenant: 'équipe', subject: 'person<>&💻', product: 'drive' as const };
+    const unicodeRoom = '!privée:matrix.test';
+    const unicodeRecord = createStorageRecord(
+      unicodeScope,
+      'object',
+      'revision',
+      'content',
+      text.encode(
+        '{"text":"private <filename> 💻","integer":900719925474099312345,"fraction":1.000000000000000001}',
+      ),
+      ['$old-é:matrix.test', '$old-two:matrix.test'],
+    );
+    const owner_unicode = {
+      room: unicodeRoom,
+      record: unicodeRecord,
+      digest: await storageRecordDigest(unicodeRoom, unicodeRecord, unicodeScope),
+      proof: await sealStorageOwnerRecord(unicodeRoom, unicodeRecord, unicodeScope, owner),
+    };
     const vector = {
+      owner_key: btoa(Array.from(owner.key, (byte) => String.fromCharCode(byte)).join('')),
+      owner_key_id: owner.id,
+      owner_proofs,
+      owner_unicode,
       artificial: true,
       generator: 'matrix-sdk-crypto-wasm 18.9.0; ARTIFICIAL PRIVATE STORAGE ONLY',
       scope,
@@ -171,6 +208,59 @@ test('Rust decrypts independently generated Go records and preserves concurrent 
     settings.free();
     machine.close();
   }
+});
+
+test('maintained JavaScript SSSS verifies independent Go owner proofs and exact Unicode/context checksums', async () => {
+  const vector = go as unknown as {
+    artificial: boolean;
+    owner_key: string;
+    owner_key_id: string;
+    owner_proofs: StorageOwnerProof[];
+    owner_unicode: {
+      room: string;
+      record: ReturnType<typeof createStorageRecord>;
+      digest: string;
+      proof: StorageOwnerProof;
+    };
+  };
+  expect(vector.artificial).toBe(true);
+  const owner = {
+    id: vector.owner_key_id,
+    key: Uint8Array.from(atob(vector.owner_key), (byte) => byte.charCodeAt(0)),
+  };
+  expect(owner.key.byteLength).toBe(32);
+  expect(vector.owner_proofs.length).toBe(go.entries.length);
+  for (let i = 0; i < go.entries.length; i++) {
+    const entry = go.entries[i]!;
+    const record = decodeStorageRecord(entry.record, scope);
+    await verifyStorageOwnerRecord(
+      entry.reference.room_id,
+      record,
+      scope,
+      vector.owner_proofs[i],
+      owner,
+    );
+    await expect(
+      verifyStorageOwnerRecord(
+        '!foreign:matrix.test',
+        record,
+        scope,
+        vector.owner_proofs[i],
+        owner,
+      ),
+    ).rejects.toThrow('matrix_unverified');
+  }
+  const unicode = vector.owner_unicode;
+  expect(await storageRecordDigest(unicode.room, unicode.record, unicode.record.scope)).toBe(
+    unicode.digest,
+  );
+  await verifyStorageOwnerRecord(
+    unicode.room,
+    unicode.record,
+    unicode.record.scope,
+    unicode.proof,
+    owner,
+  );
 });
 
 test('Web SSSS vault envelope and session attestation match Go mautrix wire encoding byte-for-byte', async () => {

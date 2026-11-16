@@ -12,6 +12,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/syphotos/internal/domain"
+	"git.sytue.eu/sytue/one/services/syphotos/internal/store"
 )
 
 // Limpieza borra del almacén lo generado para fotos que ya no existen.
@@ -21,9 +22,12 @@ import (
 // quedaría atrás en cuanto cambien las variantes.
 type Limpieza struct {
 	objetos *objectstore.Client
+	store   *store.Store
 }
 
-func NuevaLimpieza(o *objectstore.Client) *Limpieza { return &Limpieza{objetos: o} }
+func NuevaLimpieza(o *objectstore.Client, s *store.Store) *Limpieza {
+	return &Limpieza{objetos: o, store: s}
+}
 
 // BorrarDerivadas se lleva lo que sabe nombrar y devuelve cuántas no pudo.
 //
@@ -38,10 +42,23 @@ func NuevaLimpieza(o *objectstore.Client) *Limpieza { return &Limpieza{objetos: 
 // ponytail: las de ediciones anteriores se quedan. Para barrer todo lo de una
 // foto haría falta listar por prefijo (`a/<id>/`), que `objectstore` no ofrece;
 // cuando el espacio lo pida, ahí está el sitio.
-func (l *Limpieza) BorrarDerivadas(ctx context.Context, tenant string, activo uuid.UUID, huella string) int {
+func (l *Limpieza) BorrarDerivadas(ctx context.Context, tenant, owner string, activo uuid.UUID, huella string) int {
 	if l == nil || l.objetos == nil {
 		return 0
 	}
+	if l.store == nil || !tenancy.ValidSlug(tenant) || owner == "" {
+		return 1
+	}
+	ctx = tenancy.Into(ctx, tenancy.Tenant{Slug: tenant})
+	fallos := 0
+	err := l.store.WithLegacyOwnerWrite(ctx, owner, func() error { fallos = l.borrarDerivadas(ctx, tenant, activo, huella); return nil })
+	if err != nil {
+		return fallos + 1
+	}
+	return fallos
+}
+
+func (l *Limpieza) borrarDerivadas(ctx context.Context, tenant string, activo uuid.UUID, huella string) int {
 	huellas := []string{HuellaDelOriginal()}
 	if huella != "" && huella != HuellaDelOriginal() {
 		huellas = append(huellas, huella)

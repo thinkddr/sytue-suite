@@ -19,17 +19,24 @@
 // plataforma ni en su gate de osv/trivy.
 module git.sytue.eu/sytue/one/apps/nucleo
 
-go 1.27.3
+go 1.27.4
 
 require (
 	filippo.io/age v1.3.2
 	git.wow.st/gmp/jni v0.0.0-20210610011705-34026c7e22d0
 	github.com/coder/websocket v1.8.15
+	github.com/emersion/go-ical v0.0.0-20250609112844-439c63cef608
+	github.com/emersion/go-vcard v0.1.0
 	github.com/godbus/dbus/v5 v5.2.4
+	github.com/google/uuid v1.6.0
+	github.com/klauspost/compress v1.20.3
 	github.com/mattn/go-sqlite3 v1.14.52
 	github.com/rs/zerolog v1.35.1
 	github.com/zalando/go-keyring v0.2.8
+	go.mau.fi/util v0.11.0
+	golang.org/x/crypto v0.58.0
 	golang.org/x/image v0.47.0
+	golang.org/x/net v0.62.0
 	golang.org/x/sys v0.49.0
 	golang.org/x/text v0.43.0
 	maunium.net/go/mautrix v0.32.0
@@ -42,12 +49,10 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/petermattis/goid v0.0.0-20260918085751-abfca077860b // indirect
+	github.com/teambition/rrule-go v1.8.2 // indirect
 	github.com/tidwall/gjson v1.20.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
-	go.mau.fi/util v0.11.0 // indirect
-	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/exp v0.0.0-20261014143641-f0251eb4aa3e // indirect
-	golang.org/x/net v0.62.0 // indirect
 )

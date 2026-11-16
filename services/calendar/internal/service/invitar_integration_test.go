@@ -155,8 +155,17 @@ func TestLaInvitacionSaleConIMIPSoloHaciaFuera(t *testing.T) {
 			t.Fatalf("el PARTSTAT de luis es %q y contestó que sí", a.PartStat)
 		}
 	}
-	if err := svc.RecibirRespuesta(sinSesion, "luis@gmail.com", reply("luis@gmail.com", "ACCEPTED")); !errors.Is(err, domain.ErrNotFound) {
-		t.Fatalf("contestar dos veces la misma invitación: %v", err)
+	// Cambiar de opinión manda otro REPLY, y cuenta (D-CAL-01).
+	if err := svc.RecibirRespuesta(sinSesion, "luis@gmail.com", reply("luis@gmail.com", "DECLINED")); err != nil {
+		t.Fatalf("cambiar de respuesta por correo: %v", err)
+	}
+	if visto, err = svc.GetEvent(ctx, ev.ID); err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range visto.Attendees {
+		if a.Email == "luis@gmail.com" && a.PartStat != domain.PartDeclined {
+			t.Fatalf("el PARTSTAT de luis es %q y cambió a que no", a.PartStat)
+		}
 	}
 
 	if err := svc.DeleteEventNotifying(ctx, ev.ID, true); err != nil {

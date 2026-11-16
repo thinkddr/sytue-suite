@@ -36,3 +36,20 @@ func TestPorPersonaSeparaALasPersonas(t *testing.T) {
 		t.Errorf("poner vacío no lo borra: %q", got)
 	}
 }
+
+// Persona dice de quién es lo guardado en cada momento: lo usa quien además lo tiene en
+// memoria (las macros de los editores) para saber cuándo recargarlo.
+func TestPorPersonaDiceQuienEstaDentro(t *testing.T) {
+	quien := "ana"
+	p := NuevoPorPersona(test.NewApp().Preferences(), func() string { return quien })
+	if p.Persona() != "ana" {
+		t.Errorf("dentro está Ana y dice %q", p.Persona())
+	}
+	quien = ""
+	if p.Persona() != "" {
+		t.Errorf("sin nadie dentro dice %q", p.Persona())
+	}
+	if (PorPersona{}).Persona() != "" {
+		t.Error("sin preferencias no hay nadie")
+	}
+}

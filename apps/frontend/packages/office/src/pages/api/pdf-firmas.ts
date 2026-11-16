@@ -6,7 +6,9 @@
  * (services/docs/internal/http/pdfpedirfirma.go, ADR 0051 §7).
  *
  *   GET  /api/pdf-firmas                                  las recibidas y las pedidas
- *   POST /api/pdf-firmas { op: 'pedir', path, email, mensaje, confirm }
+ *   POST /api/pdf-firmas { op: 'pedir', path, email, mensaje, confirm,
+ *                          firmantes?, caducaDias?, recordarDias? }
+ *        `firmantes`: varias personas que firman EN ESE ORDEN (mig. 0034), en vez de `email`
  *   POST /api/pdf-firmas { op: 'entregar', id, path }     el firmado, ya en Drive
  *   POST /api/pdf-firmas { op: 'abrir', id }              de fuera: el PDF, a mi unidad
  *   POST /api/pdf-firmas { op: 'traer', id }              de fuera: el firmado, a mi unidad
@@ -120,12 +122,27 @@ export const POST: APIRoute = async (ctx) => {
       const path = texto('path');
       const fichero = path ? await idDe(path) : '';
       if (!fichero) return json({ code: 'download_failed' }, 404);
+      // Varias personas: cada una por su dirección, en el orden en que firman. El
+      // servicio las resuelve una a una; aquí solo se descarta lo que no es texto.
+      const firmantes = Array.isArray(c['firmantes'])
+        ? c['firmantes']
+            .filter((x): x is string => typeof x === 'string' && x.trim() !== '')
+            .map((x) => ({ email: x.trim() }))
+        : [];
+      const dias = (k: string) => {
+        const v = c[k];
+        return typeof v === 'number' && Number.isInteger(v) ? v : 0;
+      };
       return post('', {
         file_id: fichero,
         path,
-        email: texto('email'),
+        ...(firmantes.length > 1
+          ? { signers: firmantes }
+          : { email: firmantes[0]?.email ?? texto('email') }),
         message: texto('mensaje'),
         confirm: texto('confirm'),
+        expires_in_days: dias('caducaDias'),
+        remind_every_days: dias('recordarDias'),
       });
     }
     case 'entregar': {

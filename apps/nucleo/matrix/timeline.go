@@ -58,7 +58,7 @@ func (c *Client) History(ctx context.Context, roomID, from string, limit int) (T
 		if decrypted.Type != event.EventMessage {
 			continue
 		}
-		value, decodeErr := c.decryptedEvent(ctx, decrypted)
+		value, decodeErr := c.decryptedEvent(encryptedWireContext(ctx, encrypted), decrypted)
 		if decodeErr != nil {
 			return TimelinePage{}, decodeErr
 		}
@@ -72,7 +72,15 @@ func (c *Client) History(ctx context.Context, roomID, from string, limit int) (T
 }
 
 func (c *Client) decryptedEvent(ctx context.Context, evt *event.Event) (DecryptedEvent, error) {
-	if !c.allowedRoom(evt.RoomID.String()) {
+	if locked, _ := ctx.Value(stateReadKey{}).(bool); !locked {
+		// Sync callbacks can run inside guardedSyncer's read lease or later from
+		// the SDK. Never wait on a writer while borrowing the outer sync read lock.
+		if !c.stateMu.TryRLock() {
+			return DecryptedEvent{}, ErrIdentity
+		}
+		defer c.stateMu.RUnlock()
+	}
+	if !c.allowedRoomContext(ctx, evt.RoomID.String()) {
 		return DecryptedEvent{}, ErrIdentity
 	}
 	if !evt.Mautrix.WasEncrypted {
@@ -100,6 +108,9 @@ func (c *Client) decryptedEvent(ctx context.Context, evt *event.Event) (Decrypte
 	}
 	if !status.Verified {
 		return DecryptedEvent{}, ErrUnverified
+	}
+	if err := c.verifyRoomsEventProvenance(ctx, evt); err != nil {
+		return DecryptedEvent{}, err
 	}
 	content, err := eventContentBytes(evt)
 	if err != nil {

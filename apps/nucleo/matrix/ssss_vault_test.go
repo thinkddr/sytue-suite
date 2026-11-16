@@ -213,6 +213,11 @@ func TestSSSSVaultAndAttestedStorageRecoveryRejectUnauthenticatedBackupInjection
 	if err != nil {
 		t.Fatal(err)
 	}
+	// La clave de recuperación se muestra a su dueño y la app la reconoce antes de
+	// permitir la primera escritura privada (recovery_setup, diseño de la rama).
+	if err := writer.AcknowledgeRecoverySetup(ctx); err != nil {
+		t.Fatal(err)
+	}
 	writer.ready.Store(true)
 
 	// Missing secret returns found == false without error.

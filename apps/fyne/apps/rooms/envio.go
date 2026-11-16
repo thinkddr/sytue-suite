@@ -87,7 +87,7 @@ func (sa *Sala) Reprogramar(m Programado, cuando time.Time) {
 // Acusar es `handleAck`: se marca ya —confirmado y un acuse más— y se ajusta al total
 // que dé el servicio; si falla, se deshace. Uno ya confirmado no se vuelve a mandar.
 func (sa *Sala) Acusar(m Mensaje) {
-	if m.Acusado {
+	if m.Acusado || !sa.puede(AccionConfirmarAcuse) {
 		return
 	}
 	aplicar := func(f func(*api.RoomsMessage)) {

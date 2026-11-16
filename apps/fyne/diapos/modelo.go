@@ -24,9 +24,9 @@
 // serializa y compara los ÁRBOLES de valores, no los bytes (el orden de las claves y
 // `1` contra `1.0` son del codificador, no del documento).
 //
-// Hoy este paquete no escribe nunca —es un visor—, así que la pregunta que `Fiel`
-// contesta es la del cartel: «entiendo esto entero» o «hay cosas que no pinto». El día
-// que se añada edición, es la puerta que hay que cruzar antes de habilitar Guardar.
+// `Fiel` es la puerta que hay que cruzar antes de habilitar Guardar: lo que no se
+// reescribe igual se queda en solo lectura. Por eso `protect` está declarado (ver
+// proteger.go): sin él, toda presentación protegida se abría sin poder tocarse.
 //
 //nolint:tagliatelle // las claves son las de `SlidesModel` en la web: renombrarlas rompe el documento
 package diapos
@@ -67,6 +67,9 @@ type Modelo struct {
 	Patron *Patron `json:"master,omitempty"`
 	// Tamaño (proporción) del lienzo; ausente = 16:9.
 	Tamano *Tamano `json:"size,omitempty"`
+	// Proteccion es `protect`: lo bloqueado de la presentación (ver proteger.go). nil =
+	// sin proteger.
+	Proteccion *Proteccion `json:"protect,omitempty"`
 }
 
 // Patron es `SlideMaster`.
@@ -118,6 +121,10 @@ type Diapo struct {
 	SinPatron  *bool      `json:"hideMaster,omitempty"`
 	// Id del diseño (de `Patron.Disenos`) con el que está hecha.
 	Diseno string `json:"layout,omitempty"`
+	// Oculta es `hidden`: se edita igual, pero al presentar se salta (ver ocultas.go).
+	// Por puntero como SinPatron: la web solo escribe `true`, pero un `false` explícito
+	// se conserva y `Fiel` no deja el documento en solo lectura por él.
+	Oculta *bool `json:"hidden,omitempty"`
 }
 
 // Caja es `SlideBox`: x/y/w/h en % del lienzo (0..100).
@@ -137,8 +144,12 @@ type Caja struct {
 	Tipo string `json:"kind,omitempty"`
 	// HTML del texto; "" en imagen/forma/gráfico/diagrama/medio. NO lleva omitempty:
 	// la web lo emite siempre, también vacío.
-	HTML      string `json:"html"`
-	Src       string `json:"src,omitempty"`
+	HTML string `json:"html"`
+	Src  string `json:"src,omitempty"`
+	// Texto alternativo de una imagen (`alt`, WCAG 1.1.1): lo que el lector de pantalla
+	// dice de ella. Sin el campo, una presentación con imágenes descritas en la web se
+	// abriría de solo lectura (Fiel).
+	Alt       string `json:"alt,omitempty"`
 	TipoMedio string `json:"mediaType,omitempty"`
 	Cartel    string `json:"poster,omitempty"`
 	AutoPlay  *bool  `json:"autoplay,omitempty"`
@@ -159,6 +170,9 @@ type Caja struct {
 	// guarda crudo porque es una unión de tipos y aquí solo hay que conservarla.
 	Accion json.RawMessage `json:"action,omitempty"`
 	Grupo  string          `json:"groupId,omitempty"`
+	// Giro en grados, en sentido horario y alrededor del centro (`rot`; girar.go). x/y/w/h
+	// son los de la caja sin girar.
+	Giro float64 `json:"rot,omitempty"`
 }
 
 // Pista es `SlideTrack`: un subtítulo WebVTT de un vídeo o un audio, con su idioma (BCP 47)
@@ -252,6 +266,71 @@ func (m *Modelo) Fiel(crudo []byte) bool {
 		return false
 	}
 	return reflect.DeepEqual(antes, despues)
+}
+
+// NoFiel dice DÓNDE se pierde algo al volver a serializar: las rutas de JSON que no
+// vuelven igual («protect», «slides.notes»…), sin índices de lista, sin repetir y en
+// orden. Vacío si es [Fiel]. Es para explicar el solo lectura (y el registro), no para
+// decidirlo: eso lo hace Fiel.
+func (m *Modelo) NoFiel(crudo []byte) []string {
+	vuelta, err := json.Marshal(m)
+	if err != nil {
+		return []string{"json"}
+	}
+	var antes, despues any
+	if json.Unmarshal(crudo, &antes) != nil || json.Unmarshal(vuelta, &despues) != nil {
+		return []string{"json"}
+	}
+	rutas := map[string]bool{}
+	diferencias(antes, despues, "", rutas)
+	fuera := make([]string, 0, len(rutas))
+	for r := range rutas {
+		fuera = append(fuera, r)
+	}
+	slices.Sort(fuera)
+	return fuera
+}
+
+// diferencias apunta en `rutas` la más honda en la que a y b dejan de coincidir.
+func diferencias(a, b any, ruta string, rutas map[string]bool) {
+	if reflect.DeepEqual(a, b) {
+		return
+	}
+	switch x := a.(type) {
+	case map[string]any:
+		y, ok := b.(map[string]any)
+		if !ok {
+			break
+		}
+		for k, v := range x {
+			hija := k
+			if ruta != "" {
+				hija = ruta + "." + k
+			}
+			diferencias(v, y[k], hija, rutas)
+		}
+		for k := range y {
+			if _, esta := x[k]; !esta && ruta == "" {
+				rutas[k] = true
+			} else if !esta {
+				rutas[ruta+"."+k] = true
+			}
+		}
+		return
+	case []any:
+		y, ok := b.([]any)
+		if !ok || len(x) != len(y) {
+			break
+		}
+		for i := range x {
+			diferencias(x[i], y[i], ruta, rutas)
+		}
+		return
+	}
+	if ruta == "" {
+		ruta = "json"
+	}
+	rutas[ruta] = true
 }
 
 // Proporcion es el ancho/alto efectivo del lienzo, acotado al rango sano. Es

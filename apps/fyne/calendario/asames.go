@@ -45,6 +45,10 @@ const (
 	// VentanaVelocidad es `VENTANA_VELOCIDAD`: la velocidad al soltar se mide sobre los
 	// últimos milisegundos del gesto.
 	VentanaVelocidad = 100 * time.Millisecond
+	// EstironMax es `ESTIRON_MAX`: lo más que estira la hoja por debajo del mes. Tirar
+	// del asa hacia abajo con la rejilla entera no refresca nunca (eso es de la lista):
+	// la hoja cede con resistencia y al soltar vuelve.
+	EstironMax float32 = 48
 )
 
 // AlturaHoja es `alturaHoja`: el alto de la hoja (sin el asa) con `filas` semanas.
@@ -62,6 +66,17 @@ func AlturaHoja(pos PosicionAsa, filas int) float32 {
 // AlturaArrastre es `alturaArrastre`: la de partida más lo recorrido, sin salirse.
 func AlturaArrastre(desde PosicionAsa, dy float32, filas int) float32 {
 	return min(max(AlturaHoja(desde, filas)+dy, 0), AlturaHoja(PosMes, filas))
+}
+
+// AlturaVisible es `alturaVisible`: la de AlturaArrastre más el estirón elástico por
+// debajo del mes (tiende a EstironMax sin llegar). Al soltar decide AlturaArrastre.
+func AlturaVisible(desde PosicionAsa, dy float32, filas int) float32 {
+	tope := AlturaHoja(PosMes, filas)
+	exceso := AlturaHoja(desde, filas) + dy - tope
+	if exceso <= 0 {
+		return AlturaArrastre(desde, dy, filas)
+	}
+	return tope + EstironMax*exceso/(exceso+EstironMax)
 }
 
 // GeometriaHoja es `geometriaHoja`: `plegado` es lo que suben las semanas bajo las

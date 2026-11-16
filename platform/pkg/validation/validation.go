@@ -18,6 +18,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	devicevalidation "git.sytue.eu/sytue/one/apps/nucleo/validation"
 )
 
 // FieldError describe un error de validación asociado a un campo concreto.
@@ -227,27 +229,8 @@ func TruncateRunes(s string, n int) string {
 	return s
 }
 
-// CSVSafe neutraliza la inyección de fórmulas CSV (CWE-1236): si una celda
-// empieza por un carácter que Excel, LibreOffice o Google Sheets interpretarían
-// como el comienzo de una fórmula, la prefija con una comilla simple para que la
-// hoja de cálculo la trate como texto. Sin esto, un valor de usuario guardado en
-// la base de datos (el nombre de un contacto, la descripción de un evento) se
-// ejecuta al abrir el CSV exportado: =HYPERLINK(...) exfiltra, +cmd|... llega a
-// ejecutar en Windows.
-//
-// Es el saneado de SALIDA de toda exportación CSV de la suite (registros de
-// auditoría, contactos, gobernanza). El round-trip se revierte quitando la
-// comilla sólo si protege uno de estos caracteres.
-func CSVSafe(s string) string {
-	if s == "" {
-		return s
-	}
-	switch s[0] {
-	case '=', '+', '-', '@', '\t', '\r':
-		return "'" + s
-	}
-	return s
-}
+// CSVSafe shares the device-side export guard with all backend consumers.
+func CSVSafe(s string) string { return devicevalidation.CSVSafe(s) }
 
 // isBiDiOrZeroWidth detecta caracteres de control BiDi y de ancho cero usados en
 // ataques de homoglifos/spoofing (Trojan Source, CVE-2021-42574). Se usan

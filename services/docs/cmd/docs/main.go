@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/resource"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/cache"
 	"git.sytue.eu/sytue/one/platform/pkg/callaccess"
@@ -28,6 +29,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/log"
 	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
+	"git.sytue.eu/sytue/one/platform/pkg/resourcepg"
 	"git.sytue.eu/sytue/one/platform/pkg/telemetry"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	docsdb "git.sytue.eu/sytue/one/services/docs/db"
@@ -230,6 +232,17 @@ func run() error {
 	}
 	executor := connectors.NewExecutor(connectors.Limits{}, cfg.IntegrationsURL).ConBases(cfg.BasesURL)
 
+	var resourceSourceSessions *resource.SessionProvider
+	if cfg.ResourceSourceSecret != "" && cfg.ResourceSessionSecret != "" {
+		authority, err := resourcepg.NewSessionAuthorityClient("docs", cfg.RoomsURL, cfg.ResourceSessionSecret, nil)
+		if err != nil {
+			return fmt.Errorf("resource source authority configuration: %w", err)
+		}
+		resourceSourceSessions, err = authority.Provider()
+		if err != nil {
+			return fmt.Errorf("resource source authority provider: %w", err)
+		}
+	}
 	handler := dochttp.New(dochttp.Deps{
 		Service: svc, Store: st, Hub: hub, Objects: objects,
 		Verifier: verifier, SnapshotInlineLimit: cfg.SnapshotInlineLimit,
@@ -263,9 +276,11 @@ func run() error {
 			Timeout:  cfg.SelloTimeout,
 			Anclas:   cfg.SelloAnclas,
 		},
-		FirmaAnclas:    cfg.FirmaAnclas,
-		Env:            cfg.Base.Env,
-		SecretoInterno: cfg.DriveInternalSecret,
+		FirmaAnclas:            cfg.FirmaAnclas,
+		Env:                    cfg.Base.Env,
+		SecretoInterno:         cfg.DriveInternalSecret,
+		ResourceSourceSecret:   cfg.ResourceSourceSecret,
+		ResourceSourceSessions: resourceSourceSessions,
 	})
 
 	// Router base + sondas + rutas del servicio.
@@ -317,6 +332,7 @@ func run() error {
 
 	// Purga periódica del outbox en una goroutine ligada al contexto.
 	go runOutboxPurge(ctx, st)
+	go runBarridoFirmas(ctx, handler)
 	if handler.PapeleraCompartida() {
 		go runPapeleraCaducada(ctx, handler)
 	} else {
@@ -402,6 +418,27 @@ func runPapeleraCaducada(ctx context.Context, h *dochttp.Handler) {
 		} else if c != (dochttp.Caducidad{}) {
 			log.From(ctx).Info("papelera caducada", "purgados", c.Purgados, "retenidos", c.Retenidos,
 				"vivos", c.Vivos, "errores", c.Errores)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+// runBarridoFirmas caduca cada hora las peticiones de firma que pasaron su fecha y
+// recuerda a quien tiene el turno las que lo piden (mig. 0034). La primera vuelta, al
+// arrancar: un despliegue no retrasa una caducidad.
+func runBarridoFirmas(ctx context.Context, h *dochttp.Handler) {
+	ticker := time.NewTicker(time.Hour)
+	defer ticker.Stop()
+	for {
+		if b, err := h.BarrerPeticionesFirma(ctx); err != nil {
+			log.From(ctx).Warn("barrido de peticiones de firma", "error", err)
+		} else if b != (dochttp.Barrido{}) {
+			log.From(ctx).Info("peticiones de firma barridas", "caducadas", b.Caducadas,
+				"recordadas", b.Recordadas, "errores", b.Errores)
 		}
 		select {
 		case <-ctx.Done():

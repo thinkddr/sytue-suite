@@ -10,6 +10,7 @@ import (
 	"fyne.io/fyne/v2/container"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
+	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
@@ -35,6 +36,9 @@ type Pantalla struct {
 	Lector  *Lector
 	// Franja es la de solo lectura del buzón compartido abierto, o nil.
 	Franja fyne.CanvasObject
+	// Ajustes es la página de ajustes, abierta en lugar de la lista y el lector, o
+	// nil (`MailSettings.tsx`).
+	Ajustes *PaginaAjustes
 	// Acciones son las del triaje, compartidas por la lista y el lector: las dos
 	// columnas ofrecen lo mismo sobre la misma conversación.
 	Acciones *Acciones
@@ -173,11 +177,27 @@ func (p *Pantalla) DetalleAbierto(si bool) {
 // las tres columnas.
 func (p *Pantalla) Refrescar() {
 	p.Menu.CargandoLista = p.Bandeja.Estado == Cargando
-	// La franja del buzón compartido va sobre la lista, como en `MessageList.tsx`.
-	if p.Franja != nil {
+	if p.Menu.EnAjustes && p.Ajustes == nil {
+		// Vuelta de la página: la barra móvil recupera el nombre de la vista.
+		p.Movil.EnDetalle, p.Movil.Titulo = p.armazon.DetalleAbierto, p.Bandeja.nombre()
+		p.Movil.Refresh()
+	}
+	p.Menu.EnAjustes = p.Ajustes != nil
+	switch {
+	case p.Ajustes != nil:
+		// Sin lista: la página se lleva todo el ancho, también en el teléfono (sin
+		// panel, el armazón enseña el contenido y no el turno lista/lector).
+		p.armazon.Panel = nil
+		p.armazon.Contenido = p.Ajustes.Objeto(tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
+		p.Movil.EnDetalle, p.Movil.Titulo = false, p.T.T("settings.title", nil)
+		p.Movil.Refresh()
+	case p.Franja != nil:
+		// La franja del buzón compartido va sobre la lista, como en `MessageList.tsx`.
 		p.armazon.Panel = container.New(ui.Pila{Elastico: 1}, p.Franja, p.bandeja)
-	} else {
+		p.armazon.Contenido = p.Lector
+	default:
 		p.armazon.Panel = p.bandeja
+		p.armazon.Contenido = p.Lector
 	}
 	p.armazon.Menu = p.Menu.Construir()
 	p.armazon.Refresh()

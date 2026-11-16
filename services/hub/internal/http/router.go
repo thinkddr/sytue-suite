@@ -158,6 +158,8 @@ func NewRouter(d Deps) http.Handler {
 		// Antes que `{fichero}`: «sumas» no es un nombre de instalador.
 		api.Get("/instaladores/sumas", h.SumasInstaladores)
 		api.Get("/instaladores/{fichero}", h.BajarInstalador)
+
+		mountHubPrivateSource(api, d.Store)
 	})
 
 	// Endpoint INTERNO service-to-service. No público: autentica el secreto

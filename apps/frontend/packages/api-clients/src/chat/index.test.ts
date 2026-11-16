@@ -223,11 +223,14 @@ test('OAuth destinations do not turn a backend permission failure into an empty 
   const client = new ChatClient({
     baseUrl: 'https://rooms.test',
     auth: { getAccessToken: () => 'user-token' },
-    fetchImpl: (async () =>
-      Response.json(
-        { error: { code: 'forbidden', message: 'Only admins may connect accounts.' } },
-        { status: 403 },
-      )) as typeof fetch,
+    fetchImpl: Object.assign(
+      async () =>
+        Response.json(
+          { error: { code: 'forbidden', message: 'Only admins may connect accounts.' } },
+          { status: 403 },
+        ),
+      { preconnect: () => {} },
+    ),
   });
   await expect(client.integrationDestinations('account-1')).rejects.toMatchObject({ status: 403 });
 });
@@ -283,4 +286,27 @@ test('Matrix native broker keeps tokens in authenticated JSON requests and prese
       query: '',
     },
   ]);
+});
+
+test('private storage bootstrap preserves default legacy and sends only a supported explicit identity version', async () => {
+  const calls: URL[] = [];
+  const controller = new AbortController();
+  const client = new ChatClient({
+    baseUrl: 'https://rooms.test',
+    auth: { getAccessToken: () => 'synthetic-test-session' },
+    fetchImpl: (async (input, init) => {
+      calls.push(new URL(String(input)));
+      expect(init?.signal).toBe(controller.signal);
+      return Response.json({});
+    }) as typeof fetch,
+  });
+  await client.matrixStorageBootstrap('mail', controller.signal);
+  expect(calls[0]!.searchParams.get('product')).toBe('mail');
+  expect(calls[0]!.searchParams.has('identity_version')).toBe(false);
+  await client.matrixStorageBootstrap('mail', controller.signal, 2);
+  expect(calls[1]!.searchParams.getAll('identity_version')).toEqual(['2']);
+  await expect(client.matrixStorageBootstrap('mail', controller.signal, 3 as 2)).rejects.toThrow(
+    'Invalid storage identity version',
+  );
+  expect(calls).toHaveLength(2);
 });

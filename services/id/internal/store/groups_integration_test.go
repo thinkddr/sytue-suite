@@ -28,7 +28,7 @@ func TestGroupCRUDMembershipAndTenancy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateOrg(otra): %v", err)
 	}
-	ada := seedUser(t, ctx, st, "ada@acme.eu")
+	ada := seedUser(ctx, t, st, "ada@acme.eu")
 	if err := st.UpsertMembership(ctx, nil, domain.Membership{OrgID: acme.ID, UserID: ada.ID, Role: domain.RoleMember}); err != nil {
 		t.Fatalf("UpsertMembership(ada@acme): %v", err)
 	}

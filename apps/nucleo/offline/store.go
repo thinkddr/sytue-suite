@@ -67,6 +67,10 @@ func (s *Store) Encrypted() bool {
 // lives separately from the replaceable record; ordinary Read/Write remain usable
 // inside fn. Implementations without encrypted storage and OS locks fail closed.
 func (s *Store) Exclusive(ctx context.Context, owner, namespace, id string, fn func() error) error {
+	return s.exclusiveKey(ctx, clave(owner, namespace, id), fn)
+}
+
+func (s *Store) exclusiveKey(ctx context.Context, key string, fn func() error) error {
 	if !s.Encrypted() || fn == nil {
 		return ErrEncryptedStore
 	}
@@ -76,7 +80,7 @@ func (s *Store) Exclusive(ctx context.Context, owner, namespace, id string, fn f
 	if !ok {
 		return ErrEncryptedStore
 	}
-	unlock, err := b.lockRecord(ctx, clave(owner, namespace, id))
+	unlock, err := b.lockRecord(ctx, key)
 	if err != nil {
 		return err
 	}

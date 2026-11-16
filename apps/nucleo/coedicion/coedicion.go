@@ -95,6 +95,68 @@ func (c *CoEdicion) Fusionar() (string, bool) {
 	return c.seq.Texto(), true
 }
 
+// Offsets son el ancla y el extremo de un cursor en el texto visible del folio, en
+// unidades UTF-16 como `textContent` en la web (ver textohtml.go).
+type Offsets struct {
+	Anchor, Focus int
+}
+
+// Puntos son los caracteres a los que va anclado un cursor: el que tiene a la izquierda el
+// ancla y el que tiene el extremo (el punto cero, al principio del documento).
+type Puntos struct {
+	AnchorDot Punto `json:"anchorDot"` //nolint:tagliatelle // el nombre lo fija la web (state/cursors.ts)
+	FocusDot  Punto `json:"focusDot"`  //nolint:tagliatelle // el nombre lo fija la web (state/cursors.ts)
+}
+
+// htmlSiCoincide es el HTML de la secuencia si dice lo mismo que el folio (la misma
+// cantidad de texto visible): solo entonces un offset del folio es uno de la secuencia.
+func (c *CoEdicion) htmlSiCoincide(longitudFolio int) (string, bool) {
+	if !c.sincro {
+		return "", false
+	}
+	html := c.seq.Texto()
+	return html, LongitudVisible(html) == longitudFolio
+}
+
+// PuntosDeOffsets es `puntosDeOffsets`: ancla un cursor (offsets del folio) a la IDENTIDAD
+// de los caracteres que tiene detrás, para que otra persona lo coloque bien aunque haya
+// ediciones entre medias. false si la secuencia no coincide con el folio (se acaba de
+// teclear, o no está en sincronía): entonces se mandan solo los offsets.
+func (c *CoEdicion) PuntosDeOffsets(longitudFolio int, off Offsets) (Puntos, bool) {
+	html, ok := c.htmlSiCoincide(longitudFolio)
+	if !ok {
+		return Puntos{}, false
+	}
+	ia, oka := IndiceHTMLDeTexto(html, off.Anchor)
+	ifo, okf := IndiceHTMLDeTexto(html, off.Focus)
+	if !oka || !okf {
+		return Puntos{}, false
+	}
+	pa, oka := c.seq.PuntoEn(ia)
+	pf, okf := c.seq.PuntoEn(ifo)
+	if !oka || !okf {
+		return Puntos{}, false
+	}
+	return Puntos{AnchorDot: pa, FocusDot: pf}, true
+}
+
+// OffsetsDePuntos es `offsetsDePuntos`, lo inverso: dónde caen en el folio de AHORA los
+// caracteres a los que un par anclaba su cursor. false si aún no se conoce alguno (su
+// inserción no ha llegado) o la secuencia no coincide con el folio: se usan entonces los
+// offsets que acompañaban.
+func (c *CoEdicion) OffsetsDePuntos(longitudFolio int, p Puntos) (Offsets, bool) {
+	html, ok := c.htmlSiCoincide(longitudFolio)
+	if !ok {
+		return Offsets{}, false
+	}
+	ia, oka := c.seq.IndiceDe(p.AnchorDot)
+	ifo, okf := c.seq.IndiceDe(p.FocusDot)
+	if !oka || !okf {
+		return Offsets{}, false
+	}
+	return Offsets{Anchor: OffsetDeIndiceHTML(html, ia), Focus: OffsetDeIndiceHTML(html, ifo)}, true
+}
+
 // Anular: un par ha declarado su `set` autoritativo y la secuencia describe un estado que
 // ya no existe. Manda el registro; al volver a abrir, se evalúa de cero.
 func (c *CoEdicion) Anular() {

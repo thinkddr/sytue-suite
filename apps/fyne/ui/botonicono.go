@@ -7,6 +7,7 @@ import (
 	"image/color"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/widget"
 
@@ -82,8 +83,14 @@ type BotonIcono struct {
 	// qué no hace nada («Es la portada del álbum»). Un `disabled` de verdad se salta.
 	Apagado bool
 	// Rotulo es el nombre accesible, YA traducido. Obligatorio: un icono no dice nada
-	// a quien no lo ve.
-	Rotulo   string
+	// a quien no lo ve. Y es también la PISTA que el botón enseña al pasar el puntero o
+	// al enfocarlo, como el `showTitle` de IconButton.tsx, que viene encendido: un icono
+	// tampoco dice nada a quien sí lo ve y no sabe qué es.
+	Rotulo string
+	// SinPista apaga esa pista de serie: es el `showTitle={false}` de la web, para el
+	// botón cuyo rótulo ya está escrito a su lado o que cambia de sitio bajo el puntero.
+	// Envolverlo con [NuevaPista] también la apaga: manda la explícita.
+	SinPista bool
 	AlPulsar func()
 	// AlEnfocar permite que una tira desplazable revele el control al tabular.
 	AlEnfocar   func()
@@ -94,9 +101,16 @@ type BotonIcono struct {
 
 	encima, pulsado, enfocado bool
 	pista                     *Pista // la ayuda que lo envuelve, para abrirla con el teclado
+	// propia es la pista de serie: se crea la primera vez que hace falta, en una caja de
+	// lado cero dentro del botón (ver `Pista.ancla`), y no añade ninguna capa.
+	propia *Pista
+	r      *botonIconoRenderer
 	// alEncima avisa al padre que tenga que saber del `:hover` (una fila del menú con su
 	// pliegue dentro).
 	alEncima func(bool)
+	// alEnfoque avisa al padre de que el foco ha entrado o salido: el `focus-within`
+	// que retiene el reloj de un aviso.
+	alEnfoque func(bool)
 	// fueraDelTab aparta el botón del tabulador mientras diga que sí, sin apagarlo: el
 	// aspa de un aviso PRESTADO a un diálogo (ver `Aviso.prestado`).
 	fueraDelTab func() bool
@@ -117,7 +131,47 @@ func (b *BotonIcono) Disable() { b.Inerte = true; b.Refresh() }
 
 func (b *BotonIcono) avisarEncima(f func(bool)) { b.alEncima = f }
 
-func (b *BotonIcono) ponerPista(p *Pista) { b.pista = p }
+func (b *BotonIcono) ponerPista(p *Pista) {
+	b.pista = p
+	b.propia.alEscape() // manda la explícita: la de serie no vuelve a abrirse
+}
+
+// ayuda es la pista que hay que abrir: la que lo envuelve si la hay, y si no la de
+// serie, creada aquí la primera vez. Nil si no lleva ninguna.
+func (b *BotonIcono) ayuda() *Pista {
+	if b.pista != nil {
+		return b.pista
+	}
+	// Un `disabled` de verdad es `pointer-events-none` en la hoja: no hay `mouseenter`
+	// ni foco, así que tampoco ayuda. El apagado (`aria-disabled`) sí la tiene: es
+	// donde se dice por qué no hace nada.
+	if b.SinPista || b.Rotulo == "" || b.Inerte {
+		return nil
+	}
+	if b.propia == nil {
+		b.propia = NuevaPista(b.Rotulo, canvas.NewRectangle(color.NRGBA{}))
+		b.propia.ancla = b.Size
+		if b.r != nil {
+			b.r.ponerPropia()
+		}
+	}
+	if !b.propia.Abierta() {
+		// El rótulo y el portal se miran al abrir: el de un conmutador cambia con su
+		// estado, y el botón puede haber pasado a un diálogo, donde el portal no se ve.
+		b.propia.Rotulo = b.Rotulo
+		b.propia.Portal = portalDePistas(b)
+	}
+	return b.propia
+}
+
+// ayudaAbierta es la pista que hay que avisar de que se cierra: la que haya, sin
+// crear la de serie si no existe todavía.
+func (b *BotonIcono) ayudaAbierta() *Pista {
+	if b.pista != nil {
+		return b.pista
+	}
+	return b.propia
+}
 
 // Las tres tallas de IconButton.tsx, con el rem de 16.
 const (
@@ -217,7 +271,12 @@ func (b *BotonIcono) CreateRenderer() fyne.WidgetRenderer {
 	// ámbar de allí, como cualquier otro icono del menú.
 	r.ico = b.dibujo(trazo).DeToken(b.Trazo)
 	r.objetos = append(r.aro.Objetos(), r.caja.Objetos()...)
+	r.iIco = len(r.objetos)
 	r.objetos = append(r.objetos, r.ico.Objeto())
+	b.r = r
+	if b.propia != nil {
+		r.ponerPropia()
+	}
 	return r
 }
 
@@ -241,13 +300,17 @@ func (b *BotonIcono) Tapped(*fyne.PointEvent) {
 	if b.AlPulsar != nil {
 		b.AlPulsar()
 	}
+	// Pulsar descarta la ayuda, como el `onPointerDown` de Tooltip.tsx: ya se ha
+	// elegido, y si la pulsación abre un menú o cambia de pantalla la burbuja se
+	// quedaría encima, o huérfana en el portal. Volver a enfocarlo la abre otra vez.
+	b.ayudaAbierta().alEscape()
 }
 
 // MouseIn y MouseOut son `:hover`.
 func (b *BotonIcono) MouseIn(*desktop.MouseEvent) {
 	// La pista sale también en un botón apagado, como el `title` de uno `disabled`: es
 	// donde se dice POR QUÉ lo está.
-	b.pista.alPuntero(true)
+	b.ayuda().alPuntero(true)
 	if b.Inerte || b.Apagado {
 		return
 	}
@@ -267,7 +330,7 @@ func (b *BotonIcono) MouseOut() {
 	if b.alEncima != nil {
 		b.alEncima(false)
 	}
-	b.pista.alPuntero(false)
+	b.ayudaAbierta().alPuntero(false)
 	b.Refresh()
 }
 
@@ -297,8 +360,11 @@ func (b *BotonIcono) FocusGained() {
 		return
 	}
 	b.enfocado = true
-	b.pista.alFoco(true)
+	b.ayuda().alFoco(true)
 	b.Refresh()
+	if b.alEnfoque != nil {
+		b.alEnfoque(true)
+	}
 	if b.AlEnfocar != nil {
 		b.AlEnfocar()
 	}
@@ -310,7 +376,14 @@ func (b *BotonIcono) FocusGained() {
 func (b *BotonIcono) revelarAlFoco(f func()) { b.mostrarFoco = f }
 
 // FocusLost lo apaga.
-func (b *BotonIcono) FocusLost() { b.enfocado = false; b.pista.alFoco(false); b.Refresh() }
+func (b *BotonIcono) FocusLost() {
+	b.enfocado = false
+	b.ayudaAbierta().alFoco(false)
+	b.Refresh()
+	if b.alEnfoque != nil {
+		b.alEnfoque(false)
+	}
+}
 
 // TypedRune pulsa con la barra espaciadora, como un `<button>`.
 func (b *BotonIcono) TypedRune(r rune) {
@@ -326,7 +399,7 @@ func (b *BotonIcono) TypedKey(e *fyne.KeyEvent) {
 		return
 	}
 	if EsCierre(e) {
-		b.pista.alEscape()
+		b.ayudaAbierta().alEscape()
 	}
 	SubirEscape(b, e)
 }
@@ -339,6 +412,21 @@ type botonIconoRenderer struct {
 	icono   iconos.Icono
 	glifo   *iconos.Dibujo
 	objetos []fyne.CanvasObject
+	iIco    int // dónde va el glifo en los objetos
+}
+
+// ponerPropia mete la pista de serie en el botón, DESPUÉS del glifo para que la burbuja
+// se pinte encima, y en una caja de lado cero en su esquina: el puntero no la encuentra
+// nunca y el `:hover` sigue siendo del botón.
+func (r *botonIconoRenderer) ponerPropia() {
+	for _, o := range r.objetos {
+		if o == r.b.propia {
+			return
+		}
+	}
+	r.b.propia.Move(fyne.NewPos(0, 0))
+	r.b.propia.Resize(fyne.NewSize(0, 0))
+	r.objetos = append(r.objetos, r.b.propia)
 }
 
 func (r *botonIconoRenderer) MinSize() fyne.Size {
@@ -366,7 +454,7 @@ func (r *botonIconoRenderer) Refresh() {
 		// Cambiar solo el campo dejaba el SVG anterior en pantalla.
 		r.icono, r.glifo = r.b.Icono, r.b.Glifo
 		r.ico = r.b.dibujo(trazo).DeToken(r.b.Trazo)
-		r.objetos[len(r.objetos)-1] = r.ico.Objeto()
+		r.objetos[r.iIco] = r.ico.Objeto()
 	}
 	r.caja.CambiarRadio(r.b.Radio) // el de los botones de la barra es de la forma
 	r.aro.CambiarRadio(r.b.Radio)
@@ -379,5 +467,14 @@ func (r *botonIconoRenderer) Refresh() {
 	r.aro.Pintar(v)
 	r.aro.Ver(r.b.enfocado)
 	r.ico.DeToken(r.b.Trazo).TenirCon(trazo)
+	if p := r.b.propia; p != nil && p.Abierta() {
+		switch {
+		case r.b.pista != nil || r.b.SinPista || r.b.Rotulo == "":
+			p.Cerrar()
+		case p.Rotulo != r.b.Rotulo: // un conmutador que cambia de estado con la burbuja a la vista
+			p.Rotulo = r.b.Rotulo
+			p.Refresh()
+		}
+	}
 	r.Layout(r.b.Size())
 }

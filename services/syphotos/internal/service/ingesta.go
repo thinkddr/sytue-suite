@@ -9,14 +9,10 @@ import (
 	"context"
 	"fmt"
 	"image"
-	"image/color"
-	"image/draw"
-	"image/jpeg"
-	"image/png"
 	"io"
 	"strings"
 
-	"git.sytue.eu/sytue/one/platform/pkg/miniatura"
+	photorender "git.sytue.eu/sytue/one/apps/nucleo/photos/render"
 	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/syphotos/internal/domain"
@@ -116,10 +112,7 @@ func (i *Ingesta) Indexar(ctx context.Context, token, driveID, duenyo, idioma st
 // Descargar tres veces o decodificar tres veces es el desperdicio evidente que
 // hay que no cometer.
 //
-// De momento aplica la ORIENTACIÓN y nada más: los pasos de la receta se
-// aplicarán cuando el motor de píxeles esté, y hasta entonces la huella de la
-// receta sigue nombrando el fichero — así que cuando lleguen, las claves ya
-// están bien y no hay que renombrar nada.
+// La orientación y la receta se aplican en el motor compartido antes de reducir.
 // EsPNG determina si el activo corresponde a una imagen PNG que puede contener transparencia.
 func EsPNG(a domain.Activo) bool {
 	return strings.EqualFold(a.Tipo, "image/png") || strings.HasSuffix(strings.ToLower(a.Nombre), ".png")
@@ -128,15 +121,13 @@ func EsPNG(a domain.Activo) bool {
 // aplanarSobreBlanco compone una imagen sobre fondo blanco sólido para codificarla
 // en formatos sin soporte de transparencia (como JPEG), evitando que píxeles transparentes
 // se vuelvan negros.
-func aplanarSobreBlanco(src image.Image) image.Image {
-	b := src.Bounds()
-	dst := image.NewRGBA(b)
-	draw.Draw(dst, b, image.NewUniform(color.White), image.Point{}, draw.Src)
-	draw.Draw(dst, b, src, b.Min, draw.Over)
-	return dst
-}
+func aplanarSobreBlanco(src image.Image) image.Image { return photorender.AplanarSobreBlanco(src) }
 
 func (i *Ingesta) Derivar(ctx context.Context, token string, a domain.Activo, rec domain.Receta) error {
+	return i.store.WithLegacyOwnerWrite(ctx, a.Duenyo, func() error { return i.derivar(ctx, token, a, rec) })
+}
+
+func (i *Ingesta) derivar(ctx context.Context, token string, a domain.Activo, rec domain.Receta) error {
 	t, err := tenancy.From(ctx)
 	if err != nil {
 		return err
@@ -145,60 +136,25 @@ func (i *Ingesta) Derivar(ctx context.Context, token string, a domain.Activo, re
 	if err != nil {
 		return err
 	}
-	// Una foto a la vez en el proceso: el coste que mide miniatura.Cabe es el de
-	// UNA, y derivar y exportar a la vez lo multiplicaban (FILE-07).
-	liberar := miniatura.Turno()
-	defer liberar()
-	img, err := i.imagenEditada(ctx, token, a, rec)
-	if err != nil {
-		return err
-	}
-
-	esPng := EsPNG(a)
-	formato := "jpg"
-	contentType := "image/jpeg"
-	if esPng {
-		formato = "png"
-		contentType = "image/png"
-	}
-
-	for lado, variante := range i.cascadaPorVariante(img) {
-		var buf bytes.Buffer
-		if esPng {
-			if err := png.Encode(&buf, variante); err != nil {
-				return fmt.Errorf("syphotos: codificar la variante PNG de %d px: %w", lado, err)
-			}
-		} else {
-			if err := jpeg.Encode(&buf, aplanarSobreBlanco(variante), &jpeg.Options{Quality: miniatura.CalidadJPEG}); err != nil {
-				return fmt.Errorf("syphotos: codificar la variante de %d px: %w", lado, err)
-			}
-		}
-		d := domain.Derivada{
-			ActivoID: a.ID, Huella: huella,
-			Variante: varianteDeLado(lado), Formato: formato,
-		}
+	return photorender.Derivar(ctx, func(ctx context.Context) ([]byte, error) { return i.originalBytes(ctx, token, a) }, a.Orientacion, rec, EsPNG(a), i.lados, func(lado int, formato, contentType string, encoded []byte) error {
+		d := domain.Derivada{ActivoID: a.ID, Huella: huella, Variante: varianteDeLado(lado), Formato: formato}
 		clave, err := d.Clave()
 		if err != nil {
 			return err
 		}
-		if err := i.objetos.Put(ctx, t, clave, bytes.NewReader(buf.Bytes()),
-			int64(buf.Len()), objectstore.PutOptions{ContentType: contentType}); err != nil {
+		if err := i.objetos.Put(ctx, t, clave, bytes.NewReader(encoded), int64(len(encoded)), objectstore.PutOptions{ContentType: contentType}); err != nil {
 			return fmt.Errorf("syphotos: guardar %s: %w", clave, err)
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
-// maxOriginal acota lo que se lee de Drive. Solo se decodifica JPEG, PNG y GIF,
+// maxOriginal acota lo que se lee de Drive. Solo se decodifica JPEG, PNG, GIF y WebP,
 // y lo que cabe en miniatura.MaxBytes ya decodificado no ocupa más que esto
 // comprimido. Con 512 MiB, leer un fichero grande ya llenaba el pod (FILE-07).
-const maxOriginal = 96 << 20
+const maxOriginal = photorender.MaxOriginal
 
-// imagenEditada baja el original de Drive, lo decodifica con la barrera anti
-// bomba —`DecodeConfig` ANTES de `Decode`—, lo endereza según el EXIF y le
-// aplica la receta. Es lo que comparten las derivadas y la exportación: la
-// misma imagen, a distinto tamaño.
-func (i *Ingesta) imagenEditada(ctx context.Context, token string, a domain.Activo, rec domain.Receta) (image.Image, error) {
+func (i *Ingesta) originalBytes(ctx context.Context, token string, a domain.Activo) ([]byte, error) {
 	// El tamaño se mira ANTES de leer: el activo ya lo sabe.
 	if a.Bytes > maxOriginal {
 		return nil, fmt.Errorf("%w: la foto pesa más de lo que se puede procesar", domain.ErrInvalidInput)
@@ -210,49 +166,24 @@ func (i *Ingesta) imagenEditada(ctx context.Context, token string, a domain.Acti
 	defer rc.Close()
 	crudo, err := io.ReadAll(io.LimitReader(rc, maxOriginal+1))
 	if err != nil {
-		return nil, fmt.Errorf("syphotos: leer el original: %w", err)
+		return crudo, fmt.Errorf("syphotos: leer el original: %w", err)
 	}
 	if len(crudo) > maxOriginal {
-		return nil, fmt.Errorf("%w: la foto pesa más de lo que se puede procesar", domain.ErrInvalidInput)
+		return crudo, fmt.Errorf("%w: la foto pesa más de lo que se puede procesar", domain.ErrInvalidInput)
 	}
-	img, err := miniatura.Decodificar(crudo)
-	if err != nil {
-		return nil, fmt.Errorf("%w: imagen no soportada o demasiado grande para procesarla", domain.ErrInvalidInput)
-	}
-	return aplicarReceta(orientar(img, a.Orientacion), rec), nil
+	return crudo, nil
 }
 
 // CalidadExportacion: la exportación es lo que la persona se lleva; se codifica
 // con más calidad que las derivadas de pantalla.
-const CalidadExportacion = 92
+const CalidadExportacion = photorender.CalidadExportacion
 
 // Exportar escribe en w la foto a resolución completa con la receta aplicada:
 // PNG sin pérdida si formato es "png", JPEG con CalidadExportacion en cualquier
 // otro caso. No se guarda: exportar es raro y el resultado pesa lo que el
 // original.
 func (i *Ingesta) Exportar(ctx context.Context, w io.Writer, token string, a domain.Activo, rec domain.Receta, formato string) error {
-	// Una foto a la vez en el proceso: el coste que mide miniatura.Cabe es el de
-	// UNA, y derivar y exportar a la vez lo multiplicaban (FILE-07).
-	liberar := miniatura.Turno()
-	defer liberar()
-	img, err := i.imagenEditada(ctx, token, a, rec)
-	if err != nil {
-		return err
-	}
-	if formato == "png" {
-		if err := png.Encode(w, img); err != nil {
-			return fmt.Errorf("syphotos: codificar la exportación PNG: %w", err)
-		}
-		return nil
-	}
-	if err := jpeg.Encode(w, aplanarSobreBlanco(img), &jpeg.Options{Quality: CalidadExportacion}); err != nil {
-		return fmt.Errorf("syphotos: codificar la exportación: %w", err)
-	}
-	return nil
-}
-
-func (i *Ingesta) cascadaPorVariante(img image.Image) map[int]*image.NRGBA {
-	return miniatura.Cascada(img, i.lados)
+	return photorender.Exportar(ctx, w, func(ctx context.Context) ([]byte, error) { return i.originalBytes(ctx, token, a) }, a.Orientacion, rec, formato)
 }
 
 // varianteDeLado traduce el tamaño al nombre que va en la clave.

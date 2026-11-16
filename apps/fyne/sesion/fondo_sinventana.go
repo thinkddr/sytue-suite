@@ -88,26 +88,12 @@ func RefrescarSinVentana(ctx context.Context, o SinVentana) Resultado {
 		return SinCambios // ya hay uno en curso: publica lo mismo
 	}
 	defer sinVentanaMu.Unlock()
-	// Con el bloqueo de la suite puesto no se lee: sin interfaz no se le puede pedir al
-	// dueño que diga quién es (como en iOS, RefrescarWidgetEnFondo).
-	e := ajustes.Leer()
-	if bloqueoPuesto(e) {
-		return SinCambios
+	leida, r := leerSinVentana(ctx)
+	if leida.ses == nil {
+		return r
 	}
-	oidc := oidcDe(apexSinVentana, true)
-	almacen := oidc.Almacen()
-	cargar := func() (auth.Tokens, error) { return cargarAlmacen(almacen) }
-	guardados, marcas, err := leerSesionGuardada(ctx, cargar, almacen, true)
-	if err != nil {
-		slog.Info("sesion: sin ventana, la sesión guardada no se deja leer", "error", err)
-		return Fallo
-	}
-	if guardados.Subject == "" {
-		return SinCambios
-	}
-	ses := auth.NewSession(guardados, auth.Compartida(renovarSinVentana(oidc), cargar, almacen.Guardar), almacen.Guardar)
-	fuente := fabrica(comunesSinVentana(o, e), urlSinVentana, ses)
-	vista := widgets.NewView(o.Bundle, o.Producto, widgets.Capture(marcas.epoca))
+	fuente := fabrica(comunesSinVentana(o, leida.estado), urlSinVentana, leida.ses)
+	vista := widgets.NewView(o.Bundle, o.Producto, widgets.Capture(leida.marcas.epoca))
 	pub := widgets.NuevoPublicador(widgets.OpcionesPublicador{
 		Vista:  func() widgets.View { return vista },
 		Fuente: fuente,
@@ -118,6 +104,39 @@ func RefrescarSinVentana(ctx context.Context, o SinVentana) Resultado {
 	ctx, parar := context.WithTimeout(ctx, widgets.PlazoWidget)
 	defer parar()
 	return resultadoDeRonda(o.Bundle, antes, pub.RefrescarYa(ctx))
+}
+
+// sinVentanaLeida es la sesión guardada, leída sin Suite.
+type sinVentanaLeida struct {
+	ses    *auth.Session
+	marcas marcasSesion
+	estado ajustes.Estado
+}
+
+// leerSinVentana lee la sesión guardada como Abrir, sin Suite ni ventana: lo común al
+// refresco del widget y a las tareas en segundo plano (tareas_fondo.go). Sin sesión, con
+// el bloqueo de la suite o sin poder leerla, la sesión va vacía y el Resultado dice qué
+// contestar al sistema.
+func leerSinVentana(ctx context.Context) (sinVentanaLeida, Resultado) {
+	// Con el bloqueo de la suite puesto no se lee: sin interfaz no se le puede pedir al
+	// dueño que diga quién es (como en iOS, RefrescarWidgetEnFondo).
+	e := ajustes.Leer()
+	if bloqueoPuesto(e) {
+		return sinVentanaLeida{}, SinCambios
+	}
+	oidc := oidcDe(apexSinVentana, true)
+	almacen := oidc.Almacen()
+	cargar := func() (auth.Tokens, error) { return cargarAlmacen(almacen) }
+	guardados, marcas, err := leerSesionGuardada(ctx, cargar, almacen, true)
+	if err != nil {
+		slog.Info("sesion: sin ventana, la sesión guardada no se deja leer", "error", err)
+		return sinVentanaLeida{}, Fallo
+	}
+	if guardados.Subject == "" {
+		return sinVentanaLeida{}, SinCambios
+	}
+	ses := auth.NewSession(guardados, auth.Compartida(renovarSinVentana(oidc), cargar, almacen.Guardar), almacen.Guardar)
+	return sinVentanaLeida{ses: ses, marcas: marcas, estado: e}, SinCambios
 }
 
 // comunesSinVentana son los Comunes de Suite.ComunesWidget sin Suite: el idioma de la

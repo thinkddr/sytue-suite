@@ -30,10 +30,6 @@ import (
 //
 // ponytail: sin la confirmación de baja, porque la web tampoco la pide.
 
-// relajadaSM es `text-sm leading-relaxed` (1,625), el de la descripción de una
-// SettingsSection.
-var relajadaSM = tema.Escalon{Tam: tema.TextoSM.Tam, Linea: 1.625 * tema.TextoSM.Tam}
-
 // ajustadaXS es `text-xs leading-snug` (1,375), la explicación bajo el conmutador.
 var ajustadaXS = tema.Escalon{Tam: tema.TextoXS.Tam, Linea: 1.375 * tema.TextoXS.Tam}
 
@@ -63,7 +59,7 @@ func (a *App) gestionarRecursos() {
 		return
 	}
 	g := a.nuevoGestorRecursos()
-	g.d.Mostrar(c)
+	a.mostrarDialogo(g.d, c)
 	g.cargar()
 }
 
@@ -98,8 +94,8 @@ func (a *App) nuevoGestorRecursos() *gestorRecursos {
 // cargar es el `listResources()` del `useEffect`: el catálogo sin franja.
 func (g *gestorRecursos) cargar() {
 	a := g.a
-	a.lanzar(func() {
-		ctx, parar := context.WithTimeout(context.Background(), plazo)
+	a.lanzar(func(vida context.Context) {
+		ctx, parar := context.WithTimeout(vida, plazo)
 		defer parar()
 		l, err := a.Cal.Resources(ctx, time.Time{}, time.Time{})
 		a.enUI(func() {
@@ -142,7 +138,7 @@ func (g *gestorRecursos) rehacer() {
 		g.guardar.Texto = p.t("common.save", nil)
 	}
 	g.guardar.Refresh()
-	formulario := seccionAjustes(p.t(titulo, nil), p.t(desc, nil), ancho, v,
+	formulario := seccionAjustes(p.t(titulo, nil), p.t(desc, nil), ancho,
 		g.bloqueClase(ancho, v),
 		ui.GrupoCampo(p.t("resources.name", nil), false, g.conPista(g.nombre, g.pistaNombre(), ancho), "", ""),
 		container.New(&dosColumnas{Hueco: espacio3, Corte: CorteSM, ventana: g.ventana},
@@ -263,7 +259,7 @@ func (g *gestorRecursos) catalogo(ancho float32, v tema.Variante) fyne.CanvasObj
 		}
 		dentro = container.New(ui.Columna{Hueco: tema.Espacio(1)}, filas...)
 	}
-	seccion := seccionAjustes(p.t("resources.catalogueTitle", nil), p.t("resources.catalogueDesc", nil), ancho, v, dentro)
+	seccion := seccionAjustes(p.t("resources.catalogueTitle", nil), p.t("resources.catalogueDesc", nil), ancho, dentro)
 	filete := canvas.NewRectangle(tema.Color("border", v))
 	return container.New(&conFileteArriba{Pad: tema.Espacio(5)}, filete, seccion)
 }
@@ -403,14 +399,13 @@ func (g *gestorRecursos) quitar(r api.Resource) {
 
 // ---- Piezas ----
 
-// seccionAjustes es `SettingsSection plain`: `flex flex-col gap-3` con el `h2`
-// (`sytue-h4`) y su descripción (`mt-1 text-sm leading-relaxed text-text-muted`)
-// encima de lo de dentro.
-func seccionAjustes(titulo, desc string, ancho float32, v tema.Variante, hijos ...fyne.CanvasObject) fyne.CanvasObject {
-	cabeza := container.New(ui.Columna{Hueco: tema.Espacio(1)},
-		ui.NuevoParrafo(titulo, tema.TextoLG, ui.SemiNegrita, "text", v).A(ancho),
-		ui.NuevoParrafo(desc, relajadaSM, ui.Normal, "text-muted", v).A(min(ancho, 42*tema.Rem))) // `max-w-2xl`
-	return container.New(ui.Columna{Hueco: espacio3}, append([]fyne.CanvasObject{cabeza}, hijos...)...)
+// seccionAjustes es `SettingsSection plain`: la `ui.SeccionAjustes` sin tarjeta, con el
+// `h2` (`sytue-h4`) y su descripción encima de lo de dentro (`gap-3`), que va en
+// columna con el mismo `gap-3`. Se declara a su ancho: el diálogo pregunta el mínimo.
+func seccionAjustes(titulo, desc string, ancho float32, hijos ...fyne.CanvasObject) fyne.CanvasObject {
+	s := ui.NuevaSeccionAjustes(titulo, desc, container.New(ui.Columna{Hueco: espacio3}, hijos...))
+	s.Plana = true
+	return ui.AlAncho(ancho, s)
 }
 
 // dosLineas es `flex min-w-0 flex-col`: el nombre en `text-sm truncate` y, debajo, el

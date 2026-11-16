@@ -110,6 +110,9 @@ func (a *AlmacenSesion) Guardar(t Tokens) (err error) {
 		return ErrSesionAjena
 	}
 	identidad := (IdentitySnapshot{a.emisor, a.cliente, t.Subject, organizacionDe(t)}).IdentidadDrive()
+	if err := a.prepararAccesoTrabajo(t); err != nil {
+		return err
+	}
 	anterior, _ := ajustes.LeerAccesoDrive()
 	if t.Refresh == "" || anterior.Identidad != identidad {
 		if err := ajustes.PonerAccesoDrive("", false); err != nil {
@@ -126,7 +129,7 @@ func (a *AlmacenSesion) Guardar(t Tokens) (err error) {
 			return err
 		}
 		// Con el broker, la marca es su generación: la época se confirma con ella.
-		return errors.Join(a.publicarAccesoDrive(t), ajustes.MarcarIdentidad(a.IdentidadWidgets(t)))
+		return errors.Join(a.publicarAccesoDrive(t), a.publicarAccesoTrabajo(t), ajustes.MarcarIdentidad(a.IdentidadWidgets(t)))
 	}
 	var errMarca error
 	rutaCierre, errCierre := a.marcaCierre()
@@ -151,7 +154,7 @@ func (a *AlmacenSesion) Guardar(t Tokens) (err error) {
 		}
 	}
 	if err == nil && errCierre == nil {
-		errMarca = errors.Join(errMarca, a.publicarAccesoDrive(t))
+		errMarca = errors.Join(errMarca, a.publicarAccesoDrive(t), a.publicarAccesoTrabajo(t))
 	}
 	ajustes.MarcarSesion()
 	// Después de la marca y aún bajo CerrojoSesion: la época se confirma con la marca
@@ -179,14 +182,21 @@ func (a *AlmacenSesion) Migrar(ctx context.Context, permitirSinEmisor bool) erro
 	}
 	defer soltar()
 	if compartida, err := migrarCompartida(a, permitirSinEmisor); compartida {
-		return err
+		if err != nil {
+			return err
+		}
+		tokens, err := a.Cargar()
+		if err != nil {
+			return err
+		}
+		return a.publicarAccesoTrabajo(tokens)
 	}
 	t, err := a.Cargar()
 	if err != nil {
 		return err
 	}
 	if t.Refresh != "" {
-		return nil
+		return a.publicarAccesoTrabajo(t)
 	}
 	ruta, err := a.marcaMigracion()
 	if err != nil {
@@ -208,4 +218,18 @@ func (a *AlmacenSesion) Migrar(ctx context.Context, permitirSinEmisor bool) erro
 		return err
 	}
 	return guardar(Tokens{})
+}
+
+func (a *AlmacenSesion) prepararAccesoTrabajo(t Tokens) error {
+	identidadTrabajo := (IdentitySnapshot{a.emisor, a.cliente, t.Subject, organizacionDe(t)}).IdentidadSesion()
+	previousWork, err := ajustes.LeerAccesoSesion(a.cuenta)
+	if err != nil && !errors.Is(err, os.ErrNotExist) && t.Refresh != "" {
+		return errors.Join(ErrSesionNoDisponible, err)
+	}
+	if t.Refresh != "" && previousWork.Activo && (previousWork.Identidad != identidadTrabajo || t.adopcion) {
+		if err := ajustes.PonerAccesoSesion(a.cuenta, "", false); err != nil {
+			return errors.Join(ErrSesionNoDisponible, err)
+		}
+	}
+	return nil
 }

@@ -19,7 +19,7 @@ import (
 	"git.sytue.eu/sytue/one/services/rooms/internal/store"
 )
 
-func documentCall(t *testing.T, h *pgtest.Harness, ctx context.Context, doc uuid.UUID) mediadomain.Room {
+func documentCall(ctx context.Context, t *testing.T, h *pgtest.Harness, doc uuid.UUID) mediadomain.Room {
 	t.Helper()
 	room, err := mediastore.New(h.Pool).CreateRoom(ctx, mediastore.NewRoomRecord{Name: "doc-" + uuid.NewString(), Title: "Call", CreatedBy: "alice", Metadata: map[string]any{"source": map[string]any{"kind": "document", "ref_id": doc.String()}}})
 	if err != nil {
@@ -41,7 +41,7 @@ func TestDocumentCallFenceBlocksJoinWithPreCommitAuthorization(t *testing.T) {
 	st.SetCallMatrixGate(&callMatrixFake{})
 	transport := &callTransportFake{}
 	st.SetCallMediaTransport(transport)
-	first := documentCall(t, h, ctx, doc)
+	first := documentCall(ctx, t, h, doc)
 	if _, err := st.PrepareCallEncryption(documentProof(ctx, doc, "alice", 0, 0), first.ID, "alice", "A", uuid.New(), mediadomain.RoleHost); err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestDocumentCallFenceBlocksJoinWithPreCommitAuthorization(t *testing.T) {
 		t.Fatalf("revoker acknowledged before SFU closure: %+v transport=%+v %v", closed, transport, err)
 	}
 	// This call was created after the revoker's snapshot but before Docs commits.
-	next := documentCall(t, h, ctx, doc)
+	next := documentCall(ctx, t, h, doc)
 	join := uuid.New()
 	if _, err := st.PrepareCallEncryption(documentProof(ctx, doc, "alice", 0, 0), next.ID, "alice", "A", join, mediadomain.RoleHost); !errors.Is(err, mediadomain.ErrPermission) {
 		t.Fatalf("old authorization passed new fence: %v", err)
@@ -81,7 +81,7 @@ func TestDocumentLinkDeadlineCapsEpochAndRemovesExpiredGuest(t *testing.T) {
 	st.SetDocumentCallsEnabled(true)
 	st.SetCallMatrixGate(&callMatrixFake{})
 	st.SetCallMediaTransport(&callTransportFake{})
-	room := documentCall(t, h, ctx, doc)
+	room := documentCall(ctx, t, h, doc)
 	owner, guest := uuid.New(), uuid.New()
 	if _, err := st.PrepareCallEncryption(documentProof(ctx, doc, "alice", 0, 0), room.ID, "alice", "A", owner, mediadomain.RoleHost); err != nil {
 		t.Fatal(err)
@@ -135,7 +135,7 @@ func TestDocumentIdentityFenceRejectsOldProofAndPreservesOtherCallMembers(t *tes
 	st.SetDocumentCallsEnabled(true)
 	st.SetCallMatrixGate(&callMatrixFake{})
 	st.SetCallMediaTransport(&callTransportFake{})
-	room := documentCall(t, h, ctx, doc)
+	room := documentCall(ctx, t, h, doc)
 	alice, bob := uuid.New(), uuid.New()
 	proof := func(actor string, version int64) context.Context {
 		return mediadomain.WithDocumentCallAccess(ctx, mediadomain.DocumentCallAccess{DocumentID: doc.String(), Actor: actor, Tenant: "acme", IdentityVersion: version})

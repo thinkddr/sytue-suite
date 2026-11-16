@@ -28,7 +28,7 @@ La VERIFICACIÓN de las firmas del panel «Firmas» (`Firmas` y `FirmaVerificada
 `pdf/Paneles.tsx`, y `pdf/verificacion.ts`).
 
 TODO el juicio —integridad, cambios posteriores, sello de tiempo, cadena contra las
-anclas del despliegue— es del motor (`services/docs/internal/domain/pdfverificar.go`).
+anclas del despliegue— es del motor (`apps/nucleo/pdf/pdfverificar.go`).
 Aquí solo se traduce a claves del catálogo y a un tono, como en la web, para que una
 firma que falla no se pinte nunca igual que una que no se sabe comprobar.
 

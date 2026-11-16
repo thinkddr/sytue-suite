@@ -191,3 +191,23 @@ for (const maxResponseBytes of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
     expect(calls).toBe(0);
   });
 }
+
+test('binary bodies enforce advertised and streamed budgets before materializing the entire response', async () => {
+  const large = streamed([Uint8Array.of(1, 2), Uint8Array.of(3, 4), Uint8Array.of(5)]);
+  await expect(client(large.response).bytes({ maxResponseBytes: 3 })).rejects.toBeInstanceOf(
+    ResponseTooLargeError,
+  );
+  expect(large.state).toEqual({ reads: 2, cancels: 1 });
+  expect(large.body.locked).toBe(false);
+  const header = streamed([Uint8Array.of(1)], { 'content-length': '999' });
+  await expect(client(header.response).bytes({ maxResponseBytes: 3 })).rejects.toBeInstanceOf(
+    ResponseTooLargeError,
+  );
+  expect(header.state).toEqual({ reads: 0, cancels: 1 });
+  const exact = streamed([Uint8Array.of(1, 2), Uint8Array.of(3)]);
+  expect(await client(exact.response).bytes({ maxResponseBytes: 3 })).toEqual(
+    Uint8Array.of(1, 2, 3),
+  );
+  expect(exact.body.locked).toBe(false);
+  expect(await client(new Response(null)).bytes({ maxResponseBytes: 3 })).toEqual(new Uint8Array());
+});

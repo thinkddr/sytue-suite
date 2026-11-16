@@ -51,7 +51,15 @@ func TestLasPistasDeAtajoPasanPorAtajoDelSistema(t *testing.T) {
 			}
 			return nil
 		}
-		if !strings.HasSuffix(rel, ".go") || strings.HasSuffix(rel, "_test.go") || rel == "ui/tecla.go" {
+		// editor/atajos.go compone la CLAVE del registro común («Ctrl+Shift+B», la misma que
+		// casa la web), no un rótulo que se enseñe: no pasa por AtajoDelSistema. Lo mismo
+		// editor/atajosayuda.go, que escribe esas claves para la hoja con `TextoAtajo`, el
+		// AtajoDelSistema de las claves del registro (Mayús, ⌥ y los nombres del idioma).
+		// calcus/atajos.go es la TABLA de la hoja de atajos («Ctrl+D», como `gruposDeAtajosHoja`
+		// de la web): cada fila se escribe al pintarse con `teclaDeHoja`, que pasa por
+		// editor.TextoAtajoPara y da «⌘D» en un Mac.
+		if !strings.HasSuffix(rel, ".go") || strings.HasSuffix(rel, "_test.go") || rel == "ui/tecla.go" ||
+			rel == "editor/atajos.go" || rel == "editor/atajosayuda.go" || rel == "calcus/atajos.go" {
 			return nil
 		}
 		fuente, err := os.ReadFile(ruta) //nolint:gosec // G304: ficheros del propio módulo
@@ -60,7 +68,9 @@ func TestLasPistasDeAtajoPasanPorAtajoDelSistema(t *testing.T) {
 		}
 		for n, linea := range strings.Split(string(fuente), "\n") {
 			codigo, _, _ := strings.Cut(linea, "//")
-			if cadena.MatchString(codigo) && !strings.Contains(codigo, "AtajoDelSistema(") {
+			// `conCtrl` (apps/certipdf/atajos.go) es la hoja de atajos del visor: envuelve
+			// ui.AtajoDelSistema para cada fila de la tabla.
+			if cadena.MatchString(codigo) && !strings.Contains(codigo, "AtajoDelSistema(") && !strings.Contains(codigo, "conCtrl(") {
 				malos = append(malos, rel+":"+strconv.Itoa(n+1)+": "+strings.TrimSpace(codigo))
 			}
 		}

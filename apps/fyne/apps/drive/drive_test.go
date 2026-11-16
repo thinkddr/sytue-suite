@@ -49,6 +49,9 @@ func TestMain(m *testing.M) {
 	// captura el lienzo: una carrera que en la app no existe (ahí el reloj va en la rutina
 	// de la interfaz) y que se vio en `TestCompartirConUnaPersonaYConUnEnlace`.
 	ui.SinMovimiento = true
+	// Ninguna prueba recuerda vista ni orden para la siguiente: comparten la app y sus
+	// preferencias. Las que miran el recuerdo ponen su propio almacén.
+	prefs = func() Preferencias { return nil }
 	os.Exit(m.Run())
 }
 
@@ -76,16 +79,16 @@ func casi(t *testing.T, que string, tengo, quiero float32) {
 // ---- Las medidas declaradas, contra las clases CSS actuales ----
 
 func TestLasMedidasDelCromoSonLasDeProduccion(t *testing.T) {
-	casi(t, "el alto de la cabecera de vista", AltoCabeceraVista, 55)
-	casi(t, "la línea de la cabecera (el conmutador manda)", AltoLineaCabecera, 34)
+	casi(t, "el alto de la cabecera de vista", AltoCabeceraVista, 53)
+	casi(t, "la línea de la cabecera (la de un control)", AltoLineaCabecera, 32)
 	casi(t, "el alto de un control del cromo `h-8`", AltoControlCromo, 32)
 	casi(t, "el canalón `sm:px-6`", CanalonCabecera(1280), 24)
 	casi(t, "el canalón `px-4` por debajo de sm", CanalonCabecera(390), 16)
 	casi(t, "el ancho del buscador `sm:w-56`", AnchoBuscador, 224)
 
-	m := MedidaConmutadorVista()
-	casi(t, "el ancho del conmutador de vista", m.Width, 66)
-	casi(t, "el alto del conmutador de vista", m.Height, 34)
+	m := NuevoConmutadorVista("Vista", "Lista", "Cuadrícula", false, nil).MinSize()
+	casi(t, "el ancho del conmutador de vista (dos `w-7`, `gap-0.5` y `p-0.5`)", m.Width, 62)
+	casi(t, "el alto del conmutador de vista", m.Height, 32)
 
 	// La fila y la cabecera de columnas las declara el catálogo; aquí se comprueba
 	// que esta app usa ESAS y no unas propias.
@@ -117,8 +120,8 @@ func TestLaCabeceraColocaSusControlesDondeProduccion(t *testing.T) {
 	// carril, así que se le restan los 260.
 	const carril = tema.AnchoLateral
 	casi(t, "la ruta empieza en x=281", carril+lay.Ruta.Position().X, 284)
-	casi(t, "y la ruta se centra en la línea de 30, en y=66,63",
-		lay.Ruta.Position().Y, 12)
+	casi(t, "y la ruta se centra en la línea de 32",
+		lay.Ruta.Position().Y, 11)
 
 	if len(lay.Acciones) != 3 {
 		t.Fatalf("la cabecera tiene %d acciones y en producción hay tres (buscador, Nuevo, Subir)", len(lay.Acciones))
@@ -127,13 +130,13 @@ func TestLaCabeceraColocaSusControlesDondeProduccion(t *testing.T) {
 	casi(t, "el buscador mide 196 de ancho", buscador.Size().Width, 224)
 	casi(t, "el buscador mide 28 de alto", buscador.Size().Height, 32)
 	casi(t, "el conmutador acaba en x=1259", carril+conmutador.Position().X+conmutador.Size().Width, 1256)
-	casi(t, "los controles de 28 se centran en y=65,75",
-		buscador.Position().Y, 11)
+	casi(t, "los controles de 32 llenan la línea",
+		buscador.Position().Y, 10)
 
-	// El guardián, invertido a mano: con el conmutador fuera, la línea sería de 28 y
-	// TODO subiría un píxel. Es el error que este test existe para atrapar.
-	if AltoLineaCabecera == AltoControlCromo {
-		t.Fatal("la línea de la cabecera mide lo mismo que un control: falta el borde del conmutador")
+	// El conmutador no lleva borde: si volviera a llevarlo, estiraría la línea y TODO
+	// bajaría un píxel respecto de la web.
+	if conmutador.Size().Height != AltoControlCromo {
+		t.Errorf("el conmutador mide %v de alto; la línea es de %v", conmutador.Size().Height, AltoControlCromo)
 	}
 }
 
@@ -525,38 +528,25 @@ func TestUnFicheroAbreEnSuApp(t *testing.T) {
 	}
 }
 
-// TestElConmutadorDeVistaTieneElBordeEnteroYElOtroSegmentoLimpio: el segmento sin elegir
-// es la superficie (`text-text-muted` sin fondo) y el borde se ve en los cuatro lados, de
-// arriba a abajo del segmento elegido también.
-//
-// VISTO EN ROJO (2026-11-06): con el marco de dos rectángulos y relleno transparente, el
-// segmento sin elegir salía del color del borde (gris oscuro) y el elegido lo tapaba.
-func TestElConmutadorDeVistaTieneElBordeEnteroYElOtroSegmentoLimpio(t *testing.T) {
-	c := NuevoConmutadorVista("Lista", "Cuadrícula", nil)
-	w := test.NewWindow(c)
-	defer w.Close()
-	w.SetPadded(false)
-	m := MedidaConmutadorVista()
-	w.Resize(m)
-	img := w.Canvas().Capture()
-	escala := float32(img.Bounds().Dx()) / m.Width
-	px := func(x, y float32) color.NRGBA {
-		return color.NRGBAModel.Convert(img.At(int(x*escala), int(y*escala))).(color.NRGBA)
+// TestElConmutadorDeVistaEsElSegmentadoDeLaSuite: lista y cuadrícula son el
+// `SegmentedControl` de iconos solos, como en FileBrowser.tsx: un grupo de radios con la
+// vista activa elegida, las flechas cambian de vista y avisan con la de cuadrícula, y
+// cada opción se anuncia con su nombre.
+func TestElConmutadorDeVistaEsElSegmentadoDeLaSuite(t *testing.T) {
+	var vistas []bool
+	c := NuevoConmutadorVista("Vista de los archivos", "Lista", "Cuadrícula", true, func(r bool) { vistas = append(vistas, r) })
+	if c.Elegida != 1 || c.Talla != ui.SegmentoMD || !c.SoloIcono {
+		t.Fatalf("el conmutador en cuadrícula elige %d, talla %v, solo iconos %v", c.Elegida, c.Talla, c.SoloIcono)
 	}
-	cerca := func(a, b color.NRGBA) bool {
-		d := func(x, y uint8) int { return max(int(x)-int(y), int(y)-int(x)) }
-		return d(a.R, b.R) < 24 && d(a.G, b.G) < 24 && d(a.B, b.B) < 24
+	if got := c.AccessibilityLabel(); got != "Vista de los archivos: Cuadrícula" {
+		t.Errorf("se anuncia como %q", got)
 	}
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	borde := tema.Color("border-strong", v)
-	// En medio del segmento de la cuadrícula, lejos del glifo: superficie, no borde.
-	if p := px(m.Width-4, m.Height/2); cerca(p, borde) {
-		t.Errorf("el segmento sin elegir pinta %v, el color del borde", p)
+	c.TypedKey(&fyne.KeyEvent{Name: fyne.KeyLeft})
+	c.TypedKey(&fyne.KeyEvent{Name: fyne.KeyEnd})
+	if len(vistas) != 2 || vistas[0] || !vistas[1] {
+		t.Errorf("las flechas avisan %v; quiero [false true]", vistas)
 	}
-	// El borde de arriba encima del segmento elegido y el de la izquierda, a media altura.
-	for _, p := range []fyne.Position{{X: m.Width / 4, Y: 0.5}, {X: 0.5, Y: m.Height / 2}} {
-		if got := px(p.X, p.Y); !cerca(got, borde) {
-			t.Errorf("en %v el borde no se ve: %v", p, got)
-		}
+	if NuevoConmutadorVista("Vista", "Lista", "Cuadrícula", false, nil).Elegida != 0 {
+		t.Error("en lista el conmutador no elige la lista")
 	}
 }

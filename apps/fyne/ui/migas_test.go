@@ -4,6 +4,7 @@
 package ui
 
 import (
+	"slices"
 	"testing"
 
 	"fyne.io/fyne/v2"
@@ -25,9 +26,9 @@ func TestLaMigaMide26Coma25(t *testing.T) {
 	if got := m.MinSize(); got != d {
 		t.Errorf("MinSize() = %v y MedidaMiga dice %v", got, d)
 	}
-	// El relleno horizontal es `px-2`, o sea 7 por lado: 14 más que el rótulo.
+	// El relleno horizontal es `px-2`, o sea 8 por lado: 16 más que el rótulo.
 	if got, quiero := d.Width-Medir("Mi unidad", tema.TextoBase, SemiNegrita).Width, 2*tema.Espacio(2); got != quiero {
-		t.Errorf("la miga añade %v de relleno y `px-2` con el rem de 14 son %v", got, quiero)
+		t.Errorf("la miga añade %v de relleno y `px-2` con el rem de 16 son %v", got, quiero)
 	}
 }
 
@@ -137,4 +138,147 @@ func TestLasMigasDeLaBarraSonDeTextoPequeno(t *testing.T) {
 	defer w.Close()
 	w.Resize(fyne.NewSize(300, 30))
 	w.Canvas().Capture()
+}
+
+// rutaDeOcho es la del criterio de la pieza: ocho niveles, de la raíz al actual.
+var rutaDeOcho = []string{"Mi unidad", "Proyectos", "Clientes", "Acme", "Contratos", "2026", "Firmados", "Anexos"}
+
+// leidas son los rótulos de lo que se ve de la ruta, en orden de izquierda a derecha.
+func leidas(m *Migas) []string {
+	var out []string
+	var xs []float32
+	todos := append([]*Miga{}, m.segmentos...)
+	if m.puntos != nil {
+		todos = append(todos, m.puntos)
+	}
+	for _, s := range todos {
+		if !s.Visible() {
+			continue
+		}
+		i := 0
+		for i < len(xs) && xs[i] < s.Position().X {
+			i++
+		}
+		xs = append(xs[:i], append([]float32{s.Position().X}, xs[i:]...)...)
+		out = append(out[:i], append([]string{s.Rotulo}, out[i:]...)...)
+	}
+	return out
+}
+
+// TestA360LaRutaDeOchoNivelesSePliega es el criterio de Migas.tsx: a 360 una ruta de
+// ocho niveles se lee «Mi unidad › … › padre › actual», sin desbordar su hueco, y el
+// «…» se anuncia por lo que hace y no como tres puntos.
+func TestA360LaRutaDeOchoNivelesSePliega(t *testing.T) {
+	m := NuevasMigas("Ruta", rutaDeOcho, nil)
+	w := test.NewWindow(m)
+	defer w.Close()
+	w.Resize(fyne.NewSize(400, 60))
+	m.Resize(fyne.NewSize(360, AltoMiga))
+	m.Refresh()
+	fyne.DoAndWait(func() { test.WidgetRenderer(m).Layout(fyne.NewSize(360, AltoMiga)) })
+
+	if !m.Plegada() {
+		t.Fatal("la ruta de ocho niveles no se ha plegado a 360")
+	}
+	quiero := []string{"Mi unidad", "…", "Firmados", "Anexos"}
+	if got := leidas(m); !slices.Equal(got, quiero) {
+		t.Errorf("a 360 se lee %q y tenía que leerse %q", got, quiero)
+	}
+	visibles := 0
+	for _, g := range m.galones {
+		if g.Objeto().Visible() {
+			visibles++
+		}
+	}
+	if visibles != 3 {
+		t.Errorf("la ruta plegada pinta %d galones y son tres", visibles)
+	}
+	ultimo := m.segmentos[len(m.segmentos)-1]
+	if fin := ultimo.Position().X + ultimo.Size().Width; fin > 360+0.5 {
+		t.Errorf("la ruta plegada acaba en %v y solo tenía 360", fin)
+	}
+	if !ultimo.Actual {
+		t.Error("el último segmento ya no es el actual")
+	}
+	if got := m.puntos.AccessibilityLabel(); got != textoComun("ui.migas.ocultas") || got == "…" {
+		t.Errorf("el «…» se anuncia como %q", got)
+	}
+}
+
+// TestElEllipsisAbreLosNivelesOcultos: el «…» despliega un menú con los cinco niveles
+// que esconde, en orden, y cada uno lleva a SU índice de la ruta.
+func TestElEllipsisAbreLosNivelesOcultos(t *testing.T) {
+	visitado := -1
+	m := NuevasMigas("Ruta", rutaDeOcho, func(i int) { visitado = i })
+	w := test.NewWindow(m)
+	defer w.Close()
+	w.Resize(fyne.NewSize(400, 300))
+	fyne.DoAndWait(func() { test.WidgetRenderer(m).Layout(fyne.NewSize(360, AltoMiga)) })
+
+	fyne.DoAndWait(func() { test.Tap(m.puntos) })
+	menu := m.MenuOcultos()
+	if menu == nil {
+		t.Fatal("pulsar «…» no ha abierto ningún menú")
+	}
+	nombres := make([]string, 0, len(menu.Elementos))
+	for _, e := range menu.Elementos {
+		nombres = append(nombres, e.(*ElementoMenu).Texto)
+	}
+	if quiero := rutaDeOcho[1:6]; !slices.Equal(nombres, quiero) {
+		t.Errorf("el menú de «…» lleva %q y tenía que llevar %q", nombres, quiero)
+	}
+	fyne.DoAndWait(func() { test.Tap(menu.Elementos[2].(*ElementoMenu)) })
+	if visitado != 3 {
+		t.Errorf("«Acme» es el nivel 3 de la ruta y ha llevado al %d", visitado)
+	}
+	if m.MenuOcultos() != nil {
+		t.Error("el menú sigue abierto después de elegir un nivel")
+	}
+}
+
+// TestLaRutaQueCabeNoCambia: con sitio de sobra no hay «…», y los segmentos quedan
+// donde estaban antes del pliegue: en fila, a su ancho natural. Una ruta de tres niveles
+// no se pliega ni sin sitio, porque no tiene nada entre la raíz y el padre.
+func TestLaRutaQueCabeNoCambia(t *testing.T) {
+	m := NuevasMigas("Ruta", rutaDeOcho, nil)
+	d := MedidaMigas(m)
+	_ = test.WidgetRenderer(m)
+	m.Resize(d)
+	test.WidgetRenderer(m).Layout(d)
+	if m.Plegada() || m.puntos.Visible() {
+		t.Error("la ruta cabe y se ha plegado")
+	}
+	x := float32(0)
+	for i, s := range m.segmentos {
+		if i > 0 {
+			x += 2*huecoMig + LadoGalonMiga
+		}
+		if !s.Visible() || s.Position().X != x || s.Size().Width != MedidaMiga(s).Width {
+			t.Errorf("el segmento %d está en %v con %v de ancho; antes, en %v con %v",
+				i, s.Position().X, s.Size().Width, x, MedidaMiga(s).Width)
+		}
+		x += MedidaMiga(s).Width
+	}
+
+	corta := NuevasMigas("Ruta", rutaDeOcho[:3], nil)
+	_ = test.WidgetRenderer(corta)
+	test.WidgetRenderer(corta).Layout(fyne.NewSize(40, AltoMiga))
+	if corta.Plegada() || corta.puntos != nil {
+		t.Error("una ruta de tres niveles se ha plegado")
+	}
+}
+
+// TestLaRutaSeDespliegaAlEnsancharse: el pliegue se decide en cada Layout, así que al
+// darle sitio otra vez vuelven todos los niveles.
+func TestLaRutaSeDespliegaAlEnsancharse(t *testing.T) {
+	m := NuevasMigas("Ruta", rutaDeOcho, nil)
+	r := test.WidgetRenderer(m)
+	r.Layout(fyne.NewSize(360, AltoMiga))
+	if !m.Plegada() {
+		t.Fatal("no se ha plegado a 360")
+	}
+	r.Layout(MedidaMigas(m))
+	if got := leidas(m); !slices.Equal(got, rutaDeOcho) {
+		t.Errorf("con sitio de sobra se lee %q", got)
+	}
 }

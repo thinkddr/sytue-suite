@@ -26,6 +26,8 @@ import (
 //   - Ctrl+P imprime. En la web es el del navegador, que imprime la página; aquí va al
 //     diálogo de impresión del sistema con el PDF tal como está, que es lo que se quiere
 //     imprimir de un visor.
+//   - «?» abre la hoja que los enseña todos (`gruposDeAtajos`): los atajos que nadie
+//     enseña no los usa nadie.
 //
 // Las teclas sueltas solo llegan aquí sin nada enfocado, que es el `enCampoDeTexto` de la
 // web: dentro de un campo, Inicio va al principio de la línea.
@@ -50,7 +52,84 @@ func (p *Pantalla) Atajos(c fyne.Canvas) {
 	// Fyne le da el atajo a él antes que al lienzo.
 	c.AddShortcut(&fyne.ShortcutCopy{}, func(fyne.Shortcut) { p.copiarSeleccion() })
 	c.SetOnTypedKey(p.Tecla)
+	c.SetOnTypedRune(func(r rune) { p.Runa(c, r) })
 	ui.AlAtras(c, p.atras)
+}
+
+// Runa atiende los caracteres sueltos sin foco; de momento, solo «?». Con un diálogo o
+// un menú delante el teclado es de la capa, que es el `haySuperposicionAbierta` de la web.
+func (p *Pantalla) Runa(c fyne.Canvas, r rune) {
+	if r != '?' || c == nil || c.Overlays().Top() != nil {
+		return
+	}
+	ui.MostrarHojaAtajos(c, p.t("pdf.shortcuts.title"), p.t("ui.close"), p.gruposDeAtajos())
+}
+
+// filaDeAtajo es una fila de la hoja de «?» y lo que la engancha: los Ctrl+tecla que
+// `Atajos` deja en `p.atajos`. Sin ninguno es de `Tecla` (las sueltas) o Ctrl+C, que va
+// por `fyne.ShortcutCopy`.
+type filaDeAtajo struct {
+	teclas      func(t func(string) string) []string
+	descripcion string
+	ctrl        []fyne.KeyName
+}
+
+// conCtrl es la tecla de una fila de Ctrl+algo, ya escrita como en el sistema («⌘F»):
+// quien la llama pasa por `ui.AtajoDelSistema` en la MISMA línea, que es lo que vigila
+// TestLasPistasDeAtajoPasanPorAtajoDelSistema.
+func conCtrl(atajo string) func(func(string) string) []string {
+	return func(func(string) string) []string { return []string{atajo} }
+}
+
+// nombres son teclas con nombre propio, que van por el catálogo («AvPág», «Inicio»).
+func nombres(claves ...string) func(func(string) string) []string {
+	return func(t func(string) string) []string {
+		out := make([]string, len(claves))
+		for i, k := range claves {
+			out[i] = t(k)
+		}
+		return out
+	}
+}
+
+// gruposDelVisor es la hoja: las mismas filas, en el mismo orden, que `GRUPOS_VISOR` de
+// la web (`pdf/atajos.ts`).
+var gruposDelVisor = []struct {
+	titulo string
+	filas  []filaDeAtajo
+}{
+	{"pdf.shortcuts.group.move", []filaDeAtajo{
+		{nombres("slides.present.key.pageDown"), "pdf.shortcuts.nextPage", nil},
+		{nombres("slides.present.key.pageUp"), "pdf.shortcuts.prevPage", nil},
+		{nombres("slides.present.key.home", "slides.present.key.end"), "pdf.shortcuts.ends", nil},
+		{func(func(string) string) []string { return []string{"↑", "↓", "←", "→"} }, "pdf.shortcuts.scroll", nil},
+		{nombres("slides.present.key.space"), "pdf.shortcuts.screen", nil},
+	}},
+	{"pdf.shortcuts.group.view", []filaDeAtajo{
+		{conCtrl(ui.AtajoDelSistema("Ctrl+F")), "pdf.shortcuts.search", []fyne.KeyName{fyne.KeyF}},
+		{conCtrl(ui.AtajoDelSistema("Ctrl++")), "pdf.zoom.in", []fyne.KeyName{fyne.KeyPlus, fyne.KeyEqual}},
+		{conCtrl(ui.AtajoDelSistema("Ctrl+−")), "pdf.zoom.out", []fyne.KeyName{fyne.KeyMinus}},
+		{conCtrl(ui.AtajoDelSistema("Ctrl+0")), "pdf.zoom.width", []fyne.KeyName{fyne.Key0}},
+	}},
+	{"pdf.shortcuts.group.actions", []filaDeAtajo{
+		{conCtrl(ui.AtajoDelSistema("Ctrl+C")), "pdf.shortcuts.copy", nil},
+		{conCtrl(ui.AtajoDelSistema("Ctrl+P")), "pdf.menu.print", []fyne.KeyName{fyne.KeyP}},
+		{nombres("slides.present.key.esc"), "pdf.shortcuts.escape", nil},
+		{func(func(string) string) []string { return []string{"?"} }, "pdf.shortcuts.help", nil},
+	}},
+}
+
+// gruposDeAtajos son los grupos de la hoja, ya traducidos.
+func (p *Pantalla) gruposDeAtajos() []ui.GrupoDeAtajos {
+	out := make([]ui.GrupoDeAtajos, 0, len(gruposDelVisor))
+	for _, g := range gruposDelVisor {
+		grupo := ui.GrupoDeAtajos{Titulo: p.t(g.titulo)}
+		for _, f := range g.filas {
+			grupo.Atajos = append(grupo.Atajos, ui.AtajoDeTeclado{Teclas: f.teclas(p.t), Descripcion: p.t(f.descripcion)})
+		}
+		out = append(out, grupo)
+	}
+	return out
 }
 
 // copiarSeleccion deja en el portapapeles el texto seleccionado, si sigue a la vista.
@@ -71,8 +150,11 @@ var imprimirPDF = ficheros.ImprimirDatos
 //
 // ponytail: en Android (PrintManager) e iOS (UIPrintInteractionController) no se imprime;
 // el primero pide una clase de Java que la APK de Fyne no lleva.
+//
+// Lo que el documento pide que no se imprima no se imprime tampoco con Ctrl+P: el botón
+// apagado con su motivo no sirve de nada si el atajo lo salta.
 func (p *Pantalla) imprimir() {
-	if p.doc == nil || p.Contenido == nil {
+	if p.doc == nil || p.Contenido == nil || !puedeImprimir(p.Contenido.Permisos) || sinImpresion() {
 		return
 	}
 	f, _ := p.doc.paraElMotor()
@@ -82,6 +164,13 @@ func (p *Pantalla) imprimir() {
 		}
 	}()
 }
+
+// puedeImprimir es el `puedeAnotar` de `Barra.tsx` con el permiso de imprimir: abierto con
+// la contraseña del dueño no hay restricción ninguna.
+func puedeImprimir(pm Permisos) bool { return pm.Imprimir || !pm.SoloConClaveDeDueno }
+
+// sinImpresion dice si aquí no hay cadena de impresión (el móvil); las pruebas lo cambian.
+var sinImpresion = ui.EsTactil
 
 func (p *Pantalla) zoomConTeclado(d float64) {
 	if p.Contenido != nil {

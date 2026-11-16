@@ -3,7 +3,11 @@
 
 package hub
 
-import "testing"
+import (
+	"testing"
+
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
+)
 
 // TestEnWindowsDriveNoDiceQueNoHaySinConexion: con el botón de conectar, en Windows Drive
 // es la carpeta de archivos a petición y el texto tiene que decirlo; sin botón o en otro
@@ -42,8 +46,8 @@ func TestConElBotonLosPasosDeDriveVanPlegados(t *testing.T) {
 		}
 		r := pintaClientesExternos(t, d, 1280, "dispositivos-drive")
 		filas := 0
-		for _, o := range r.objetos {
-			if _, ok := o.(*FilaCopia); ok {
+		for _, o := range aplanar(r.objetos) {
+			if _, ok := o.(*ui.FilaCopia); ok {
 				filas++
 			}
 		}
@@ -73,7 +77,7 @@ func TestElPerfilDeAppleSeInstalaEnEsteMac(t *testing.T) {
 		d.AlEnlacePerfilApple = func(Plataforma) { abierto = "https://id.example/perfil/autenticado" }
 		r := pintaClientesExternos(t, d, 1280, "dispositivos-apple")
 		var boton *Accion
-		for _, o := range r.objetos {
+		for _, o := range aplanar(r.objetos) {
 			if a, ok := o.(*Accion); ok && a.Texto == d.T.T("devices.apple.download", nil) {
 				boton = a
 			}

@@ -135,6 +135,10 @@ type Compositor struct {
 	Prioridad  Prioridad
 	Acuse      bool
 	ProgramarA time.Time
+	// Cifrado dice si la conversación va cifrada de extremo a extremo: pedir acuse y
+	// programar siguen a la vista pero apagados, con la línea de por qué (cifrado.go).
+	// Nil: sin cifrar.
+	Cifrado func() bool
 	// Ahora es el reloj de los atajos de «Enviar más tarde»; los guardianes lo congelan.
 	Ahora func() time.Time
 
@@ -148,6 +152,9 @@ type Compositor struct {
 	// mensaje propio del canal. Devuelve false si no hay ninguno, y entonces la flecha
 	// hace lo de siempre. Nil en el compositor del hilo.
 	AlEditarUltimo func() bool
+	// AlNavegar es Alt+↑/↓ (paso ±1) y Alt+Mayús+↑/↓ (soloPendientes) con la caja
+	// vacía: cambia de canal y devuelve si se movió.
+	AlNavegar func(paso int, soloPendientes bool) bool
 	// AlComando despacha un comando integrado CON EFECTO (`onCommand`: presencia, tema,
 	// directo…) y AlComandoRemoto uno de servidor (`onRemoteCommand`). Sin ellos, el
 	// comando avisa «no disponible aquí» y no se envía, que es el compositor del hilo.
@@ -197,6 +204,11 @@ type Compositor struct {
 	aviso    string
 	objAviso []fyne.CanvasObject
 	formatos map[fyne.CanvasObject]bool
+	// arrastrando es el `dragOver` de la web: hay ficheros encima y se pueden soltar.
+	// objVelo es la superposición «Suelta para adjuntar» (fondo, borde discontinuo y
+	// texto) que se pinta entonces por encima de todo.
+	arrastrando bool
+	objVelo     []fyne.CanvasObject
 }
 
 var _ fyne.Widget = (*Compositor)(nil)
@@ -370,6 +382,56 @@ func (c *Compositor) PonerAvisoComando(s string) {
 		}
 	}
 	c.cambiaArriba(antes)
+}
+
+// PonerArrastrando enseña (o quita) la superposición de arrastrar y soltar: `absolute
+// inset-1 z-30 rounded-lg border-2 border-dashed border-primary bg-selected/80` con
+// «Suelta para adjuntar» centrado en `text-sm font-medium text-primary-text`. Es
+// `aria-hidden` en la web: no cambia lo que se anuncia, solo lo que se ve.
+func (c *Compositor) PonerArrastrando(si bool) {
+	if c.arrastrando == si {
+		return
+	}
+	c.arrastrando = si
+	c.objVelo = nil
+	if si {
+		v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+		fondo := tema.Color("selected", v)
+		fondo.A = uint8(float32(fondo.A) * 0.8)
+		velo := canvas.NewRectangle(fondo)
+		velo.CornerRadius = tema.RadioLG
+		c.objVelo = []fyne.CanvasObject{
+			velo,
+			ui.NuevoBordeDiscontinuo(2, tema.RadioLG, "primary"),
+			ui.Texto(c.T.T("composer.dropToAttach", nil), tema.TextoSM, ui.Medio, tema.Color("primary-text", v)),
+		}
+	}
+	if c.caja != nil {
+		c.montarObjetos()
+		c.Refresh()
+	}
+}
+
+// Arrastrando dice si la superposición de soltar está a la vista.
+func (c *Compositor) Arrastrando() bool { return c.arrastrando }
+
+// SoltarTexto escribe en la caja lo soltado (texto, o los enlaces uno por línea). Si cae
+// en el área de texto entra por donde cae, como en el `textarea` de la web; si cae en el
+// resto de la franja, en el cursor. Fuera del compositor, o con la caja apagada, no hace
+// nada y devuelve false. `pos` es absoluta en el lienzo, la de `soltar.Soltado`.
+func (c *Compositor) SoltarTexto(texto string, pos fyne.Position) bool {
+	if c.area == nil || c.Inerte || texto == "" || !c.Visible() {
+		return false
+	}
+	if ui.SoltarEnCampo(c.area, texto, pos) {
+		return true
+	}
+	a, t := fyne.CurrentApp().Driver().AbsolutePositionForObject(c), c.Size()
+	if pos.X < a.X || pos.Y < a.Y || pos.X >= a.X+t.Width || pos.Y >= a.Y+t.Height {
+		return false
+	}
+	c.Insertar(texto)
+	return true
 }
 
 // ---- El autocompletado ----
@@ -682,6 +744,8 @@ func (c *Compositor) montarObjetos() {
 	if c.SugerenciasAbiertas() {
 		c.objetos = append(c.objetos, c.sug)
 	}
+	// El velo de soltar, por encima incluso de la lista (`z-30` contra su `z-20`).
+	c.objetos = append(c.objetos, c.objVelo...)
 }
 
 // cuantosBotones son los que lleva la barra: añadir y emoji siempre, el «Aa» salvo
@@ -761,6 +825,11 @@ func (c *Compositor) barra() []fyne.CanvasObject {
 	prio = nuevo(glifoPrioridad, t.T("composer.priorityAndAck", nil), false, func() { c.abrirPrioridad(prio) })
 	reloj = nuevo(glifoReloj, t.T("composer.sendLater", nil), false, func() { c.abrirProgramar(reloj) })
 	return append(out, prio, reloj)
+}
+
+// puede es DisponibleConCifrado con el cifrado de esta caja.
+func (c *Compositor) puede(a AccionCifrada) bool {
+	return DisponibleConCifrado(a, c.Cifrado != nil && c.Cifrado())
 }
 
 // botonEnviar es el único control CON CAJA de toda la barra, y por eso se lee como la
@@ -873,6 +942,24 @@ func (r *compositorRenderer) Layout(t fyne.Size) {
 	c.barraLado.Move(fyne.NewPos(x+CanalonBarra, y))
 	c.barraLado.Resize(fyne.NewSize(max(derecha-HuecoBarra-x-CanalonBarra, 0), altoBarra))
 	c.barraLado.Refresh()
+	c.colocarVelo(t)
+}
+
+// colocarVelo pone la superposición de soltar a `inset-1` de la franja, con el texto
+// centrado.
+func (c *Compositor) colocarVelo(t fyne.Size) {
+	if len(c.objVelo) != 3 {
+		return
+	}
+	pos := fyne.NewPos(tema.Espacio(1), tema.Espacio(1))
+	tam := fyne.NewSize(max(t.Width-2*tema.Espacio(1), 0), max(t.Height-2*tema.Espacio(1), 0))
+	for _, o := range c.objVelo[:2] {
+		o.Move(pos)
+		o.Resize(tam)
+	}
+	tx := c.objVelo[2].(*canvas.Text) //nolint:errcheck,forcetypeassert // El velo se construye siempre con un canvas.Text en la tercera posición.
+	ancho := ui.Medir(tx.Text, tema.TextoSM, ui.Medio).Width
+	ui.ColocarTexto(tx, tema.TextoSM, pos.X+(tam.Width-ancho)/2, pos.Y+(tam.Height-tema.TextoSM.Linea)/2)
 }
 
 // Refresh repinta la caja y rehace la barra: encender el botón de enviar cambia su
@@ -901,5 +988,14 @@ func (r *compositorRenderer) Refresh() {
 	c.area.SetPlaceHolder(c.marcaDeAgua())
 	c.area.SoloLectura(c.Inerte)
 	c.area.Objeto().Refresh()
+	if len(c.objVelo) == 3 { // un cambio de tema con el velo a la vista
+		fondo := tema.Color("selected", v)
+		fondo.A = uint8(float32(fondo.A) * 0.8)
+		c.objVelo[0].(*canvas.Rectangle).FillColor = fondo                //nolint:errcheck,forcetypeassert // Construido en PonerArrastrando.
+		c.objVelo[2].(*canvas.Text).Color = tema.Color("primary-text", v) //nolint:errcheck,forcetypeassert // Construido en PonerArrastrando.
+		for _, o := range c.objVelo {
+			o.Refresh()
+		}
+	}
 	r.Layout(c.Size())
 }

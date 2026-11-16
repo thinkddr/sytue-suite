@@ -10,14 +10,23 @@
  *
  * Hacia dentro reenvía: content-type, content-length, range, if-none-match, idempotency-key.
  * Hacia fuera reenvía: content-type, content-length, cache-control, etag, content-range, content-disposition.
- * Nunca reenvía cabeceras X-Sytue-*. `x-forwarded-for` solo en las escrituras sin sesión.
+ * Nunca reenvía cabeceras X-Sytue-* del navegador; una política autenticada puede añadir
+ * explícitamente sus cabeceras validadas. `x-forwarded-for` solo en las escrituras sin sesión.
  * Soporta 304 Not Modified sin cuerpo, 400 si la ruta decodificada contiene `..` o `\`, y 503 legible si el servicio está caído.
  */
+import { sessionOwnerHeader } from '@sytue/config/session-owner';
 import type { APIRoute } from 'astro';
+import type { APIContext } from 'astro';
+import type { SytueSession } from '../types.js';
 import type { Bff } from './bff.js';
 import type { BffDeApp } from './app-bff.js';
 import { toBffContext } from './app-bff.js';
 
+/** A bounded private control body, validated before any upstream side effect. */
+export interface CuerpoProxyAutenticado {
+  readonly headers: Record<string, string>;
+  readonly body: Uint8Array<ArrayBuffer>;
+}
 export interface OpcionesProxyDeServicio {
   destino: string;
   bff: Bff | BffDeApp;
@@ -36,6 +45,21 @@ export interface OpcionesProxyDeServicio {
   escriturasPublicas?: RegExp[];
   /** Rutas denegadas que nunca se reenvían al servicio interno. */
   denegar?: string[] | ((ruta: string) => boolean);
+  /** Runs against the exact session used upstream. Only explicitly returned headers are added. */
+  prepararAutenticada?: (
+    ctx: APIContext,
+    session: SytueSession,
+    ruta: string,
+  ) =>
+    | Response
+    | Record<string, string>
+    | CuerpoProxyAutenticado
+    | Promise<Response | Record<string, string> | CuerpoProxyAutenticado>;
+  /** Recheck the captured opaque session after async preparation and upstream IO. */
+  revalidarSesion?: boolean;
+  /** Fixed private APIs must not replay credentials or transient MIME through redirects. */
+  rechazarRedirecciones?: boolean;
+  fetchImpl?: typeof fetch;
 }
 
 /** Tope del cuerpo de una escritura sin sesión: un JSON pequeño, no una subida. */
@@ -58,6 +82,7 @@ const HACIA_FUERA = [
   'etag',
   'content-range',
   'content-disposition',
+  'x-sytue-source-sha256',
 ] as const;
 
 /**
@@ -119,15 +144,42 @@ export function crearProxyDeServicio(opts: OpcionesProxyDeServicio): APIRoute {
       (esLectura && (opts.rutasPublicas ?? []).some((pub) => ruta.startsWith(pub)));
 
     const bffInstancia = 'getSession' in opts.bff ? opts.bff : opts.bff.bff;
+    if (!esPublica && ctx.request.headers.has(sessionOwnerHeader)) {
+      const rejected = await bffInstancia.sessionGuard(toBffContext(ctx));
+      if (rejected) return rejected;
+    }
     const sesion = esPublica ? null : await bffInstancia.getSession(toBffContext(ctx));
     if (!sesion && !esPublica) {
       return new Response(null, { status: 401 });
     }
 
+    const adicionales = sesion ? await opts.prepararAutenticada?.(ctx, sesion, ruta) : undefined;
+    if (adicionales instanceof Response) return adicionales;
+
+    const preparado =
+      adicionales && 'body' in adicionales && adicionales.body instanceof Uint8Array
+        ? (adicionales as CuerpoProxyAutenticado)
+        : undefined;
+    const extension = preparado
+      ? preparado.headers
+      : (adicionales as Record<string, string> | undefined);
+    const revalidar = async (): Promise<Response | null> =>
+      opts.revalidarSesion && sesion && ctx.request.headers.has(sessionOwnerHeader)
+        ? bffInstancia.sessionGuard(toBffContext(ctx))
+        : null;
+    const cambiado = await revalidar();
+    if (cambiado) {
+      preparado?.body.fill(0);
+      return cambiado;
+    }
     const url = new URL(ctx.request.url);
-    const cabeceras: Record<string, string> = sesion
-      ? { authorization: `Bearer ${sesion.tokens.accessToken}` }
-      : {};
+    const cabeceras: Record<string, string> = {};
+    // Normalize names before setting authorization; a mixed-case extension
+    // header must not create a second Authorization value.
+    new Headers(extension).forEach((value, name) => {
+      cabeceras[name] = value;
+    });
+    if (sesion) cabeceras.authorization = `Bearer ${sesion.tokens.accessToken}`;
 
     if (esEscrituraPublica) {
       const xff = ctx.request.headers.get('x-forwarded-for');
@@ -143,10 +195,12 @@ export function crearProxyDeServicio(opts: OpcionesProxyDeServicio): APIRoute {
 
     let res: Response;
     try {
-      res = await fetch(destino + ruta + url.search, {
+      res = await (opts.fetchImpl ?? fetch)(destino + ruta + url.search, {
         method: ctx.request.method,
         headers: cabeceras,
-        body: conCuerpo ? ctx.request.body : undefined,
+        body: conCuerpo ? (preparado?.body ?? ctx.request.body) : undefined,
+        signal: ctx.request.signal,
+        ...(opts.rechazarRedirecciones ? { redirect: 'error' as const } : {}),
         // @ts-expect-error duplex es obligatorio al enviar un cuerpo en streaming
         duplex: 'half',
       });
@@ -158,6 +212,13 @@ export function crearProxyDeServicio(opts: OpcionesProxyDeServicio): APIRoute {
           headers: { 'content-type': 'application/json' },
         },
       );
+    } finally {
+      preparado?.body.fill(0);
+    }
+    const cambiadoDespues = await revalidar();
+    if (cambiadoDespues) {
+      await res.body?.cancel().catch(() => {});
+      return cambiadoDespues;
     }
 
     if (res.status === 304) {

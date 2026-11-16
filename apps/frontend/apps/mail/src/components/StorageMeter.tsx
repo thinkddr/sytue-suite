@@ -14,7 +14,8 @@
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { formatPercent, type Locale } from '@sytue/i18n';
-import { getStorageQuota, type StorageQuota } from '../client/mailApi.js';
+import { type StorageQuota } from '../client/mailApi.js';
+import { usePrivateMailApi } from '../client/privateMailApi.js';
 import { useT } from '../i18n/index.js';
 import { formatBytes } from './utils.js';
 
@@ -32,6 +33,7 @@ export function StorageMeter({
   refreshKey?: number;
 }): JSX.Element | null {
   const t = useT(locale);
+  const { getStorageQuota } = usePrivateMailApi();
   const [quota, setQuota] = useState<StorageQuota | null>(null);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -47,7 +49,7 @@ export function StorageMeter({
     return () => {
       active = false;
     };
-  }, [refreshKey]);
+  }, [refreshKey, getStorageQuota]);
 
   // Primera carga: aviso discreto (no un spinner ruidoso en el pie).
   if (loading && !quota) {

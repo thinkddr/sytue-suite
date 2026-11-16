@@ -8,7 +8,7 @@
 // No ejecutar go mod tidy: al no haber fuentes, borraría este inventario deliberado.
 module git.sytue.eu/sytue/one/apps/fyne/upstream
 
-go 1.27.3
+go 1.27.4
 
 require (
 	fyne.io/fyne/v2 v2.8.2

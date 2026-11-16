@@ -34,6 +34,9 @@ func (s *Servicio) Limpiar(ctx context.Context) (int64, error) {
 		DELETE FROM chat_messages
 		 WHERE id IN (SELECT id FROM chat_messages
 		               WHERE created_at < now() - $1::interval
+                         AND NOT EXISTS(SELECT 1 FROM videos v WHERE v.tenant=chat_messages.tenant AND v.id=chat_messages.video_id
+                          AND public.sytue_private_storage_frozen('public.cast_private_storage_states'::regclass,v.tenant,v.owner_sub))
+                         AND NOT EXISTS(SELECT 1 FROM cast_private_storage_states s WHERE s.owner_sub=chat_messages.author_sub AND s.mode<>'legacy')
 		               ORDER BY created_at LIMIT 5000)`, RetencionChat)
 	if err != nil {
 		return n, fmt.Errorf("social: limpiar el chat: %w", err)
@@ -49,6 +52,9 @@ func (s *Servicio) PurgarDenuncias(ctx context.Context) (int64, error) {
 		DELETE FROM reports
 		 WHERE id IN (SELECT id FROM reports
 		               WHERE status <> 'open' AND resolved_at < now() - $1::interval
+                         AND NOT EXISTS(SELECT 1 FROM videos v WHERE v.tenant=reports.tenant AND v.id=reports.video_id
+                          AND public.sytue_private_storage_frozen('public.cast_private_storage_states'::regclass,v.tenant,v.owner_sub))
+                         AND NOT EXISTS(SELECT 1 FROM cast_private_storage_states s WHERE s.owner_sub=reports.reporter_sub AND s.mode<>'legacy')
 		               ORDER BY resolved_at LIMIT 5000)`, RetencionDenuncias)
 	if err != nil {
 		return n, fmt.Errorf("social: purgar denuncias: %w", err)

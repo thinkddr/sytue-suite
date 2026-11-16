@@ -21,11 +21,19 @@ import {
   Input,
   ReviewSummary,
   Textarea,
+  SelectorDeColor,
   Wizard,
   useToast,
 } from '@sytue/ui';
 import type { ReviewItem, WizardStep } from '@sytue/ui';
-import type { ConsoleMessageKey, T } from '../i18n/index.js';
+import type { T } from '../i18n/index.js';
+import {
+  PALETA_DE_USUARIO,
+  claveDeColorDeUsuario,
+  colorDeUsuario,
+  type IdColorDeUsuario,
+} from '@sytue/config';
+import { useI18n } from '@sytue/i18n/preact';
 import type { SensitivityLabel, SensitivityLabelInput } from '../lib/types.js';
 
 export interface SensitivityLabelWizardProps {
@@ -40,14 +48,16 @@ export interface SensitivityLabelWizardProps {
   onDone: () => void;
 }
 
-/** Paleta corta y sobria; el color solo sirve para reconocer la etiqueta de un vistazo. */
-const COLORS: { value: string; label: ConsoleMessageKey }[] = [
-  { value: '', label: 'wizard.label.color.none' },
-  { value: '#4b5563', label: 'wizard.label.color.grey' },
-  { value: '#1d4ed8', label: 'wizard.label.color.blue' },
-  { value: '#047857', label: 'wizard.label.color.green' },
-  { value: '#b45309', label: 'wizard.label.color.amber' },
-  { value: '#b91c1c', label: 'wizard.label.color.red' },
+/**
+ * Los colores de una marca: la paleta de colores de usuario de la suite (la misma de las
+ * etiquetas de Mail o los calendarios), medida en los cuatro modos, más «sin color». El
+ * color solo sirve para reconocer la etiqueta de un vistazo. Una marca guardada con la
+ * paleta de antes se ve y se marca con su tono más cercano, y no se reescribe hasta que
+ * se elige otro.
+ */
+const COLORS: ReadonlyArray<{ value: string; id?: IdColorDeUsuario }> = [
+  { value: '' },
+  ...PALETA_DE_USUARIO.map((c) => ({ value: c.valor, id: c.id })),
 ];
 
 /**
@@ -90,6 +100,10 @@ export default function SensitivityLabelWizard({
   onDone,
 }: SensitivityLabelWizardProps) {
   const toast = useToast();
+  // El nombre de cada tono es del catálogo común: lo comparten todas las apps.
+  const tc = useI18n().t;
+  const nombreDe = (c: (typeof COLORS)[number]): string =>
+    c.id ? tc(claveDeColorDeUsuario(c.id)) : t('wizard.label.color.none');
   // Al editar, la propia etiqueta no cuenta como referencia de nivel.
   const others = useMemo(
     () => labels.filter((l) => l.id !== editing?.id).sort((a, b) => a.rank - b.rank),
@@ -108,6 +122,8 @@ export default function SensitivityLabelWizard({
         }
       : { name: '', description: '', color: '', position: others.length, block: false },
   );
+  // El color guardado, como se pinta: el de la paleta de antes, en su tono más cercano.
+  const pintado = colorDeUsuario(form.color) ?? '';
 
   function set<K extends keyof FormState>(k: K, v: FormState[K]) {
     setForm((f) => ({ ...f, [k]: v }));
@@ -203,31 +219,16 @@ export default function SensitivityLabelWizard({
         </FieldGroup>
 
         <fieldset class="flex flex-col gap-2">
-          <legend class="text-text-muted text-xs font-medium">
+          <legend id="lbl-colour-legend" class="text-text-muted text-xs font-medium">
             {t('wizard.label.what.colourLegend')}
           </legend>
-          <div class="flex flex-wrap items-center gap-2">
-            {COLORS.map((c) => (
-              <button
-                key={c.value || 'none'}
-                type="button"
-                aria-pressed={form.color === c.value}
-                aria-label={t(c.label)}
-                title={t(c.label)}
-                onClick={() => set('color', c.value)}
-                class={`border-border rounded-control flex h-8 items-center gap-2 border px-2.5 text-xs transition-colors ${
-                  form.color === c.value ? 'border-primary bg-bg-subtle' : 'hover:bg-bg-subtle'
-                }`}
-              >
-                <span
-                  aria-hidden="true"
-                  class="border-border-subtle h-3 w-3 rounded-full border"
-                  style={c.value ? { backgroundColor: c.value } : undefined}
-                />
-                {t(c.label)}
-              </button>
-            ))}
-          </div>
+          <SelectorDeColor
+            colores={COLORS.map((c) => ({ valor: c.value, nombre: nombreDe(c) }))}
+            // Un color guardado fuera de la paleta se marca como su tono más cercano.
+            valor={pintado}
+            onChange={(v) => set('color', v)}
+            etiquetadoPor="lbl-colour-legend"
+          />
           <FieldHint>{t('wizard.label.what.colourHint')}</FieldHint>
         </fieldset>
       </div>

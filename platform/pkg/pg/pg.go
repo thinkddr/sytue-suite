@@ -39,6 +39,9 @@ func directDSN(dsn string) string {
 type Config struct {
 	// DSN es la cadena de conexión PostgreSQL (postgres://user:pass@host/db).
 	DSN string
+	// DirectDSN overrides DATABASE_DIRECT_URL for a deliberately derived database.
+	// Setting it to DSN keeps one direct pool without consulting that environment.
+	DirectDSN string
 	// MaxConns es el tamaño máximo del pool (por defecto 10; se acota a
 	// [1, 4096] para tolerar valores absurdos venidos del entorno).
 	MaxConns int
@@ -58,6 +61,16 @@ type Querier interface {
 	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+// Database keeps stores and domain transactions on either a pool or one locked
+// physical session. A Session never reacquires another connection after failure.
+type Database interface {
+	Querier
+	InTx(context.Context, func(pgx.Tx) error) error
+	InMergeTx(context.Context, func(pgx.Tx) error) error
+	InMaintenanceTx(context.Context, func(pgx.Tx) error) error
+	Healthz(context.Context) error
 }
 
 // Pool envuelve *pgxpool.Pool con helpers de Sytue One. Si DATABASE_DIRECT_URL
@@ -119,7 +132,11 @@ func Connect(ctx context.Context, cfg Config) (*Pool, error) {
 	}
 
 	p := &Pool{Pool: pool}
-	if direct := directDSN(cfg.DSN); direct != cfg.DSN {
+	direct := cfg.DirectDSN
+	if direct == "" {
+		direct = directDSN(cfg.DSN)
+	}
+	if direct != cfg.DSN {
 		dcfg, err := pgxpool.ParseConfig(direct)
 		if err != nil {
 			pool.Close()

@@ -87,12 +87,28 @@ func splitBloque(h string) (string, string, bool) {
 	return h, "", false
 }
 
-// PosicionCast es la posición de la diapositiva `i` (desde 0); false si no existe.
+// PosicionCast es `posicionDe`: la posición de la diapositiva `i` (desde 0) contada
+// entre las que se enseñan, porque el público no ve las ocultas: ni cuentan en el total
+// ni dejan huecos en la numeración. false si no existe o está oculta (a la que se llega
+// con «número + Intro»): no se anuncia y Cast se queda en la última que vio.
 func PosicionCast(m *Modelo, i int, docID string) (api.CastPosicion, bool) {
 	if i < 0 || i >= len(m.Diapos) {
 		return api.CastPosicion{}, false
 	}
-	p := api.CastPosicion{Index: i, Total: len(m.Diapos), Title: TituloCast(m.Diapos[i])}
+	ocultas := Saltables(m.Diapos)
+	if ocultas[i] {
+		return api.CastPosicion{}, false
+	}
+	indice, total := 0, 0
+	for j, o := range ocultas {
+		if !o {
+			total++
+			if j < i {
+				indice++
+			}
+		}
+	}
+	p := api.CastPosicion{Index: indice, Total: total, Title: TituloCast(m.Diapos[i])}
 	if ref := "docs:" + docID; reRefCast.MatchString(ref) {
 		p.Ref = ref
 	}
@@ -252,7 +268,7 @@ func (e *Editor) empezarCast(videoID string) *Presentacion {
 			avisar(p)
 		}
 	}
-	p := Presentar(e.m, e.activa, true, e.Idioma, e.ctx.T)
+	p := Presentar(e.m, e.activa, true, e.Idioma, e.ctx.T, e.Almacen)
 	p.AlCambiarDiapo = enviar
 	enviar(p.Diapo)
 	return p

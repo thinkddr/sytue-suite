@@ -7,7 +7,7 @@
  * denso (anti AI-slop), WCAG AA. docs/design.md §5.
  */
 import type { JSX } from 'preact';
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState, type MutableRef } from 'preact/hooks';
 import {
   BARRA_DE_EDICION,
   BOTON_DE_BARRA,
@@ -26,7 +26,12 @@ import { editingCommandState, executeEditingCommand } from '@sytue/ui/browser/ed
 import type { Locale } from '@sytue/i18n';
 import { useT } from '../i18n/index.js';
 import { Glyph, type GlyphName } from './glyphs.js';
-import { sanitizeHtml, isHtmlEmpty, incrustarImagenesPegadas } from '../client/richtext.js';
+import {
+  sanitizeHtml,
+  isHtmlEmpty,
+  incrustarImagenesPegadas,
+  textToHtml,
+} from '../client/richtext.js';
 import { construirPeticion, leerRespuesta, type AccionIA } from '../lib/ai.js';
 import { bloquesDe, type Bloque } from '@sytue/ai';
 import {
@@ -37,6 +42,21 @@ import {
   insertarColumna,
   insertarFila,
 } from '@sytue/ui/browser/tabla';
+
+/**
+ * Lo que quien usa el editor puede hacerle desde fuera, sin volverlo controlado (un
+ * `contenteditable` controlado pierde el cursor a cada tecla).
+ */
+export interface EditorControl {
+  /**
+   * Inserta TEXTO PLANO (los saltos de línea, como saltos) donde estaba el cursor la
+   * última vez que estuvo en el cuerpo; si no ha estado nunca, al principio, encima
+   * de la cita y la firma. Es texto y no HTML a propósito: lo que entra por aquí
+   * (una plantilla) lo escribió una persona en un campo de texto, y no hay marcado
+   * que sanear si nunca se interpreta como marcado.
+   */
+  insertarTexto: (texto: string) => void;
+}
 
 interface Props {
   /** Idioma ya negociado en el servidor; llega por props desde la isla raíz. */
@@ -64,6 +84,8 @@ interface Props {
    * redactar. Los demás usos (firma, respuestas automáticas) la dejan abierta.
    */
   mostrarBarra?: boolean;
+  /** Se rellena con el control del editor mientras está montado (ver EditorControl). */
+  controlRef?: MutableRef<EditorControl | null>;
 }
 
 /**
@@ -231,6 +253,7 @@ export function RichTextEditor({
   onChange,
   onInsertarImagen,
   mostrarBarra = true,
+  controlRef,
 }: Props): JSX.Element {
   const t = useT(locale);
   const ref = useRef<HTMLDivElement>(null);
@@ -262,6 +285,10 @@ export function RichTextEditor({
   // Marca que el siguiente pegado va sin formato (Ctrl/Cmd+Shift+V). El evento
   // `paste` no trae las teclas, así que se anota en el keydown que lo precede.
   const pegarPlano = useRef(false);
+  // Dónde estaba el cursor DENTRO del cuerpo la última vez. Lo que se inserta desde
+  // fuera (una plantilla, desde un menú del pie) llega cuando el foco ya está en ese
+  // menú: sin esto iría siempre al principio, y no donde se estaba escribiendo.
+  const ultimoRango = useRef<Range | null>(null);
 
   // Contenido inicial: se fija una vez (el padre fuerza remonte con `key` al
   // (re)abrir), evitando el problema del caret de un contenteditable controlado.
@@ -290,6 +317,7 @@ export function RichTextEditor({
     const sel = typeof window === 'undefined' ? null : window.getSelection();
     const nodo = sel?.anchorNode ?? null;
     if (!raiz || !nodo || !raiz.contains(nodo)) return;
+    if (sel && sel.rangeCount > 0) ultimoRango.current = sel.getRangeAt(0).cloneRange();
     const estado: Record<string, boolean> = {};
     for (const c of COMANDOS_CON_ESTADO) estado[c] = editingCommandState(c);
     setActivos(estado);
@@ -321,6 +349,68 @@ export function RichTextEditor({
     onChange(html);
     sincronizar();
   }
+
+  /** Ver EditorControl.insertarTexto. */
+  function insertarTexto(texto: string): void {
+    const raiz = ref.current;
+    if (!raiz || !texto) return;
+    raiz.focus();
+    let rango = ultimoRango.current;
+    if (!rango || !raiz.contains(rango.commonAncestorContainer)) {
+      rango = document.createRange();
+      rango.setStart(raiz, 0);
+      rango.collapse(true);
+    }
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(rango);
+    const antes = raiz.innerHTML;
+    // `insertHTML` primero: entra en el historial del navegador y Ctrl+Z la quita. El
+    // HTML es el texto ESCAPADO con sus saltos como <br>: no lleva otra cosa.
+    if (!executeEditingCommand('insertHTML', textToHtml(texto)) || raiz.innerHTML === antes) {
+      // Si el navegador no lo tiene (o no hizo nada), se construyen los nodos a mano:
+      // nodos de texto y <br>, sin pasar nunca por un intérprete de HTML.
+      const trozos = document.createDocumentFragment();
+      texto.split(/\r?\n/).forEach((linea, i) => {
+        if (i > 0) trozos.appendChild(document.createElement('br'));
+        if (linea) trozos.appendChild(document.createTextNode(linea));
+      });
+      const ultimo = trozos.lastChild;
+      if (!rango.collapsed) rango.deleteContents();
+      // Se parte el texto donde está el cursor y se mete delante de la segunda mitad.
+      let padre: Node = rango.startContainer;
+      let delante: Node | null;
+      if (padre.nodeType === Node.TEXT_NODE) {
+        delante = (padre as Text).splitText(rango.startOffset);
+        padre = delante.parentNode ?? raiz;
+      } else {
+        delante = padre.childNodes[rango.startOffset] ?? null;
+      }
+      padre.insertBefore(trozos, delante);
+      if (ultimo) {
+        rango.setStartAfter(ultimo);
+        rango.collapse(true);
+        sel?.removeAllRanges();
+        sel?.addRange(rango);
+      }
+    }
+    // Lo siguiente que se inserte va detrás de esto, no delante.
+    if (sel && sel.rangeCount > 0) ultimoRango.current = sel.getRangeAt(0).cloneRange();
+    emit();
+  }
+  // El control se renueva en cada render (así nunca llama a un `onChange` viejo), y
+  // al desmontar solo se retira si sigue siendo el nuestro: al remontar con otra
+  // `key`, el editor nuevo puede haberlo puesto antes de que el viejo se vaya.
+  const control = useRef<EditorControl>({ insertarTexto });
+  control.current.insertarTexto = insertarTexto;
+  if (controlRef) controlRef.current = control.current;
+  useEffect(
+    () => () => {
+      if (controlRef?.current === control.current) controlRef.current = null;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   // --- Asistente de IA ------------------------------------------------------
   //

@@ -165,3 +165,11 @@ export async function getAccessToken(): Promise<string> {
 }
 
 export type { SytueUser } from '../types.js';
+
+export {
+  openSessionOwner,
+  verifySessionOwner,
+  SessionOwnerError,
+  type OpaqueSessionOwner,
+  type SessionOwnerExpected,
+} from './session-owner.js';

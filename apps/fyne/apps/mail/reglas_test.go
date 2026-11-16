@@ -11,6 +11,7 @@ import (
 
 	"fyne.io/fyne/v2"
 
+	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
@@ -188,35 +189,36 @@ func TestElResumenLlevaEditar(t *testing.T) {
 	g.empezar(BorradorRegla{De: "banco@", Leido: true})
 	g.irA(2)
 	var editar []*ui.Enlace
-	var filas []*fyne.Container
+	var resumen *ui.Resumen
 	var mirar func(fyne.CanvasObject)
 	mirar = func(o fyne.CanvasObject) {
 		if e, ok := o.(*ui.Enlace); ok && e.Texto == tr.T("ui.review.edit", nil) {
 			editar = append(editar, e)
 		}
-		if c, ok := o.(*fyne.Container); ok {
-			if _, es := c.Layout.(filaDeResumen); es {
-				filas = append(filas, c)
-			}
+		if r, ok := o.(*ui.Resumen); ok {
+			resumen = r
 		}
 		for _, h := range hijos(o) {
 			mirar(h)
 		}
 	}
 	mirar(g.caja)
-	if len(editar) != 2 || len(filas) != 3 {
-		t.Fatalf("«Editar» en %d filas de %d; quiero 2 de 3", len(editar), len(filas))
+	if resumen == nil || len(editar) != 2 || len(resumen.Filas) != 3 {
+		t.Fatalf("«Editar» en %d filas; quiero 2 de 3 en el `ReviewSummary` de la suite", len(editar))
 	}
 	if editar[0].Texto != "Editar" || editar[0].Nombre != "Editar "+tr.T("rules.summaryWhich", nil) {
 		t.Errorf("«Editar»: %q, nombre accesible %q", editar[0].Texto, editar[0].Nombre)
 	}
-	for i, quiero := range []float32{42, 42, 38} {
-		if alto := filas[i].MinSize().Height + 2*margenYResumen; alto != quiero {
-			t.Errorf("fila %d: %g de alto y en la web %g", i, alto, quiero)
-		}
+	// Las filas, con su `py-2.5`: el resumen es el borde, las tres y sus dos filetes.
+	altos := []float32{42, 42, 38}
+	if alto, quiero := resumen.Size().Height, 2*tema.Borde+altos[0]+altos[1]+altos[2]+2*tema.Borde; alto != quiero {
+		t.Errorf("el resumen mide %g de alto y en la web %g (filas de %v)", alto, quiero, altos)
 	}
-	if y := editar[0].Position().Y; y != bajoEditar {
-		t.Errorf("«Editar» en y=%g y el texto en la web a 3", y)
+	if y := editar[0].Position().Y - tema.Borde - ui.MargenResumenY; y != 3 {
+		t.Errorf("«Editar» en y=%g de su fila y el texto en la web a 3", y)
+	}
+	if y := editar[1].Position().Y - tema.Borde - ui.MargenResumenY - altos[0] - tema.Borde; y != 3 {
+		t.Errorf("el segundo «Editar» en y=%g de su fila y en la web a 3", y)
 	}
 	editar[1].AlPulsar()
 	if g.paso != 1 {

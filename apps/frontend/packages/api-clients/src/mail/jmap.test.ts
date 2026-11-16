@@ -202,6 +202,44 @@ test('parseMessageBody: mensaje text/plain llano → text con LF, html vacío', 
   expect(b.html).toBe('');
 });
 
+// D-MAIL-04: la invitación iMIP llega como alternativa del cuerpo (Outlook) o como
+// `invite.ics` adjunto en base64 (Google). En los dos casos el lector la recibe.
+test('parseMessageBody: devuelve la invitación text/calendar, en línea o adjunta', () => {
+  const ics = 'BEGIN:VCALENDAR\r\nMETHOD:REQUEST\r\nEND:VCALENDAR';
+  const outlook = [
+    'Content-Type: multipart/alternative; boundary="A"',
+    '',
+    '--A',
+    'Content-Type: text/plain; charset=utf-8',
+    '',
+    'te invito',
+    '--A',
+    'Content-Type: text/calendar; method=REQUEST; charset=utf-8',
+    '',
+    ics,
+    '--A--',
+  ].join('\r\n');
+  expect(parseMessageBody(outlook).calendar).toBe(ics);
+  expect(parseMessageBody(outlook).text).toBe('te invito');
+  const google = [
+    'Content-Type: multipart/mixed; boundary="M"',
+    '',
+    '--M',
+    'Content-Type: text/plain; charset=utf-8',
+    '',
+    'te invito',
+    '--M',
+    'Content-Type: application/ics; name="invite.ics"',
+    'Content-Disposition: attachment; filename="invite.ics"',
+    'Content-Transfer-Encoding: base64',
+    '',
+    btoa(ics),
+    '--M--',
+  ].join('\r\n');
+  expect(parseMessageBody(google).calendar).toBe(ics);
+  expect('calendar' in parseMessageBody('Content-Type: text/plain\r\n\r\nhola')).toBe(false);
+});
+
 test('parseMessageBody: multipart/alternative → devuelve texto Y html', () => {
   const raw = [
     'Content-Type: multipart/alternative; boundary="A"',
@@ -421,4 +459,63 @@ test('send: el mensaje grande va subido (raw_blob_id)', async () => {
   await c.send({ ...email, textBody: 'corto' });
   expect(peticiones.some((p) => p.url.includes('/jmap/upload/'))).toBe(false);
   expect(JSON.parse(peticiones.at(-1)?.cuerpo ?? '{}').raw).toContain('corto');
+});
+
+// La CCO de un borrador viaja en su cabecera `Bcc` para poder volver al reabrirlo;
+// la de un envío, nunca: ahí la cabecera la verían todos los destinatarios.
+function clienteQueApunta(): { c: JmapClient; crudos: Map<string, string> } {
+  const crudos = new Map<string, string>();
+  const fetchImpl = (async (url: string, init: RequestInit) => {
+    if (url.endsWith('/.well-known/jmap')) {
+      return Response.json({
+        apiUrl: 'https://mail.test/jmap',
+        downloadUrl: '',
+        uploadUrl: 'https://mail.test/jmap/upload/{accountId}',
+        primaryAccounts: { 'urn:ietf:params:jmap:mail': 'acc-1' },
+        accounts: { 'acc-1': {} },
+      });
+    }
+    const cuerpo = JSON.parse(typeof init?.body === 'string' ? init.body : '{}');
+    crudos.set(`${init?.method ?? 'GET'} ${new URL(url).pathname}`, cuerpo.raw ?? '');
+    return Response.json({ id: 'd-2', status: 'queued' });
+  }) as unknown as typeof fetch;
+  const c = new JmapClient({
+    sessionUrl: 'https://mail.test/.well-known/jmap',
+    auth: { getAccessToken: () => 'token' },
+    fetchImpl,
+  });
+  return { c, crudos };
+}
+
+const conCco = {
+  from: { email: 'ada@acme.com' },
+  to: [{ email: 'bob@acme.com' }],
+  bcc: [{ email: 'oculto@acme.com' }, { name: 'Eva Ruiz', email: 'eva@acme.com' }],
+  subject: 'Con copia oculta',
+  textBody: 'hola',
+};
+
+test('saveDraft y updateDraft guardan la CCO como cabecera Bcc, y se relee', async () => {
+  const { c, crudos } = clienteQueApunta();
+  await c.saveDraft(conCco);
+  await c.updateDraft('d-1', conCco);
+  for (const clave of ['POST /api/v1/drafts', 'PUT /api/v1/drafts/d-1']) {
+    const raw = crudos.get(clave) ?? '';
+    expect(raw).toContain('\r\nBcc: oculto@acme.com, Eva Ruiz <eva@acme.com>\r\n');
+    expect(parseDraftContent(raw).bcc).toBe('oculto@acme.com, Eva Ruiz <eva@acme.com>');
+  }
+});
+
+test('send nunca escribe la cabecera Bcc aunque el correo traiga CCO', async () => {
+  const { c, crudos } = clienteQueApunta();
+  await c.send(conCco);
+  const raw = crudos.get('POST /api/v1/send') ?? '';
+  expect(raw).toContain('To: bob@acme.com');
+  expect(raw.toLowerCase()).not.toContain('bcc:');
+  expect(raw).not.toContain('oculto@acme.com');
+});
+
+test('parseDraftContent: un borrador sin Bcc devuelve la CCO vacía', () => {
+  const raw = 'From: a@b.eu\r\nTo: c@d.eu\r\nSubject: x\r\n\r\nhola';
+  expect(parseDraftContent(raw).bcc).toBe('');
 });

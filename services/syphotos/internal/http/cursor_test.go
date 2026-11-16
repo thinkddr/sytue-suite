@@ -60,3 +60,36 @@ func TestCursor_rechazaLoQueNoEs(t *testing.T) {
 		}
 	}
 }
+
+// `desde=` salta al final del periodo pedido: la primera página empieza por la
+// foto más reciente de ese año, mes o día, y nada del siguiente.
+func TestCursorDeFecha_saltaAlFinalDelPeriodo(t *testing.T) {
+	casos := map[string]time.Time{
+		"2019":       time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
+		"2019-12":    time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
+		"2019-07":    time.Date(2019, 8, 1, 0, 0, 0, 0, time.UTC),
+		"2019-07-31": time.Date(2019, 8, 1, 0, 0, 0, 0, time.UTC),
+		"2024-02":    time.Date(2024, 3, 1, 0, 0, 0, 0, time.UTC),
+	}
+	for entrada, quiero := range casos {
+		c, err := cursorDeFecha(entrada)
+		if err != nil {
+			t.Fatalf("%q: %v", entrada, err)
+		}
+		if !c.Fecha.Equal(quiero) {
+			t.Errorf("%q: límite %v, se esperaba %v", entrada, c.Fecha, quiero)
+		}
+		// Nil hace estricta la comparación por tupla: nada del límite entra.
+		if c.ID != uuid.Nil {
+			t.Errorf("%q: id %v, se esperaba Nil", entrada, c.ID)
+		}
+	}
+}
+
+func TestCursorDeFecha_rechazaLoQueNoEs(t *testing.T) {
+	for _, malo := range []string{"", "19", "2019-13", "2019-02-30", "ayer", "2019/07", "20190714"} {
+		if _, err := cursorDeFecha(malo); err == nil {
+			t.Errorf("%q se aceptó", malo)
+		}
+	}
+}

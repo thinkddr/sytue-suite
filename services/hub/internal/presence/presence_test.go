@@ -6,6 +6,7 @@ package presence
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -63,7 +64,7 @@ func TestCachePath(t *testing.T) {
 	svc, st, mr := newCacheSvc(t)
 	ctx := testCtx()
 
-	if err := svc.Heartbeat(ctx, "u1", domain.StateBusy, "en una llamada"); err != nil {
+	if err := svc.Heartbeat(ctx, "u1", domain.StateBusy, "en una llamada", ""); err != nil {
 		t.Fatalf("Heartbeat: %v", err)
 	}
 	got, err := svc.Query(ctx, []string{"u1", "u2"})
@@ -92,7 +93,7 @@ func TestCachePath(t *testing.T) {
 	}
 
 	// Offline explícito borra la clave.
-	if err := svc.Heartbeat(ctx, "u1", "", ""); err != nil { // "" => online
+	if err := svc.Heartbeat(ctx, "u1", "", "", ""); err != nil { // "" => online
 		t.Fatalf("Heartbeat: %v", err)
 	}
 	if err := svc.Offline(ctx, "u1"); err != nil {
@@ -115,7 +116,7 @@ func TestFallbackPostgres(t *testing.T) {
 	ctx := testCtx()
 	mr.SetError("dragonfly caído")
 
-	if err := svc.Heartbeat(ctx, "u1", domain.StateOnline, ""); err != nil {
+	if err := svc.Heartbeat(ctx, "u1", domain.StateOnline, "", ""); err != nil {
 		t.Fatalf("Heartbeat degradado: %v", err)
 	}
 	if err := svc.Offline(ctx, "u1"); err != nil {
@@ -144,7 +145,7 @@ func TestSinDragonfly(t *testing.T) {
 	if svc.TTL() != 45*time.Second {
 		t.Fatalf("TTL() = %v, quiero 45s por defecto", svc.TTL())
 	}
-	if err := svc.Heartbeat(ctx, "u1", domain.StateAway, ""); err != nil {
+	if err := svc.Heartbeat(ctx, "u1", domain.StateAway, "", ""); err != nil {
 		t.Fatalf("Heartbeat: %v", err)
 	}
 	if err := svc.Offline(ctx, "u1"); err != nil {
@@ -167,14 +168,40 @@ func TestHeartbeatValida(t *testing.T) {
 	svc, st, _ := newCacheSvc(t)
 	ctx := testCtx()
 
-	if err := svc.Heartbeat(ctx, "u1", "teleporting", ""); !errors.Is(err, domain.ErrInvalidInput) {
+	if err := svc.Heartbeat(ctx, "u1", "teleporting", "", ""); !errors.Is(err, domain.ErrInvalidInput) {
 		t.Fatalf("estado inválido: err = %v", err)
 	}
 	long := make([]byte, 141)
-	if err := svc.Heartbeat(ctx, "u1", domain.StateOnline, string(long)); !errors.Is(err, domain.ErrInvalidInput) {
+	if err := svc.Heartbeat(ctx, "u1", domain.StateOnline, string(long), ""); !errors.Is(err, domain.ErrInvalidInput) {
 		t.Fatalf("status demasiado largo: err = %v", err)
 	}
 	if st.calls() != 0 {
 		t.Fatalf("la validación no debe tocar el store: %+v", st)
+	}
+}
+
+// TestZonaHoraria: la zona del dispositivo viaja con el latido para la hora local
+// de la tarjeta de persona, y una que no existe se descarta sin tumbar la presencia.
+func TestZonaHoraria(t *testing.T) {
+	svc, _, _ := newCacheSvc(t)
+	ctx := testCtx()
+
+	if err := svc.Heartbeat(ctx, "u1", domain.StateOnline, "", "Europe/Madrid"); err != nil {
+		t.Fatalf("Heartbeat: %v", err)
+	}
+	if err := svc.Heartbeat(ctx, "u2", domain.StateOnline, "", "Marte/Olympus"); err != nil {
+		t.Fatalf("una zona rara no debe rechazar el latido: %v", err)
+	}
+	got, _ := svc.Query(ctx, []string{"u1", "u2"})
+	if got[0].TimeZone != "Europe/Madrid" {
+		t.Fatalf("u1 tz = %q, quiero Europe/Madrid", got[0].TimeZone)
+	}
+	if got[1].TimeZone != "" || got[1].State != domain.StateOnline {
+		t.Fatalf("u2 = %+v, quiero online y sin zona", got[1])
+	}
+	for _, z := range []string{"", "Local", strings.Repeat("a", 65)} {
+		if ZonaValida(z) {
+			t.Fatalf("ZonaValida(%q) = true", z)
+		}
 	}
 }

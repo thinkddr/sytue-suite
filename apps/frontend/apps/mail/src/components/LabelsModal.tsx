@@ -16,19 +16,17 @@ import {
   Input,
   Modal,
   Icon,
+  SelectorDeColor,
   SettingsSection,
   Spinner,
   useToast,
 } from '@sytue/ui';
-import {
-  listLabels,
-  createLabel,
-  updateLabel,
-  deleteLabel,
-  type Label,
-} from '../client/mailApi.js';
+import { type Label } from '../client/mailApi.js';
+import { usePrivateMailApi } from '../client/privateMailApi.js';
 import type { Locale } from '@sytue/i18n';
-import { useT, type MailMessageKey, type T } from '../i18n/index.js';
+import { useT, type T } from '../i18n/index.js';
+import { claveDeColorDeUsuario, type IdColorDeUsuario } from '@sytue/config';
+import { useI18n } from '@sytue/i18n/preact';
 import { LABEL_COLOR_TOKENS, labelDot } from './utils.js';
 
 interface Props {
@@ -40,19 +38,7 @@ interface Props {
   onChanged: () => void;
 }
 
-/** Clave del nombre de cada token de color, para el aria-label del selector. */
-const COLOR_KEYS: Record<string, MailMessageKey> = {
-  slate: 'colour.slate',
-  brass: 'colour.brass',
-  sage: 'colour.sage',
-  clay: 'colour.clay',
-  blue: 'colour.blue',
-  plum: 'colour.plum',
-  teal: 'colour.teal',
-  rose: 'colour.rose',
-};
-
-/** Selector de color (puntos): color + nombre (title/aria), no solo color. */
+/** Selector de color de la etiqueta: el común de la suite, con los tokens del correo. */
 function ColorPicker({
   t,
   value,
@@ -64,49 +50,36 @@ function ColorPicker({
   onSelect: (c: string) => void;
   class?: string;
 }): JSX.Element {
+  // El nombre de cada tono es del catálogo común: lo comparten todas las apps.
+  const tc = useI18n().t;
   return (
-    <div
-      class={`flex flex-wrap gap-1.5 pointer-coarse:gap-5 ${cls ?? ''}`}
-      role="group"
+    <SelectorDeColor
+      colores={LABEL_COLOR_TOKENS.map((token) => ({
+        valor: token,
+        nombre: tc(claveDeColorDeUsuario(token as IdColorDeUsuario)),
+      }))}
+      valor={value}
+      onChange={onSelect}
+      pintar={labelDot}
       aria-label={t('labels.colourGroup')}
-    >
-      {LABEL_COLOR_TOKENS.map((token) => {
-        const active = value === token;
-        const key = COLOR_KEYS[token];
-        const name = key ? t(key) : token;
-        return (
-          <button
-            key={token}
-            type="button"
-            // Puntos de 24px separados por 6: con el dedo, los objetivos se solapan y
-            // se elige el color de al lado. Con el puntero grueso el BLANCO es de 44
-            // (`after:-inset-2.5`) y el paso entre puntos también (`gap-5`): el punto
-            // se queda en 24. Agrandado entero, ocho puntos de 44 se comían la fila y
-            // el nombre de la etiqueta desaparecía.
-            class={`sytue-focus-ring relative grid h-6 w-6 place-items-center rounded-full border-2 transition-colors duration-150 pointer-coarse:after:absolute pointer-coarse:after:-inset-2.5 pointer-coarse:after:content-[''] ${active ? 'border-text' : 'border-transparent'}`}
-            style={{ background: labelDot(token) }}
-            aria-label={name}
-            aria-pressed={active}
-            title={name}
-            onClick={() => onSelect(token)}
-          >
-            {active ? <Icon name="check" size={14} class="text-[var(--sytue-neutral-0)]" /> : null}
-          </button>
-        );
-      })}
-    </div>
+      // 24 px: doce puntos de 28 no dejan sitio al nombre de la etiqueta en la fila.
+      tamano="sm"
+      class={cls}
+    />
   );
 }
 
 export function LabelsModal({ locale, open, onClose, onChanged }: Props): JSX.Element | null {
   const t = useT(locale);
+  const { listLabels, createLabel, updateLabel, deleteLabel } = usePrivateMailApi();
   const toast = useToast();
   const [labels, setLabels] = useState<Label[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [reload, setReload] = useState(0);
   const [newName, setNewName] = useState('');
-  const [newColor, setNewColor] = useState(LABEL_COLOR_TOKENS[0] ?? 'slate');
+  // El gris, como con la paleta de antes: una etiqueta nueva no estrena un color vivo.
+  const [newColor, setNewColor] = useState('slate');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -121,7 +94,7 @@ export function LabelsModal({ locale, open, onClose, onChanged }: Props): JSX.El
     return () => {
       active = false;
     };
-  }, [open, reload]);
+  }, [open, reload, listLabels]);
 
   // Validación en vivo: el fallo típico es repetir un nombre que ya existe (el
   // servidor lo rechaza y el usuario no sabe por qué).
@@ -218,7 +191,7 @@ export function LabelsModal({ locale, open, onClose, onChanged }: Props): JSX.El
             <EmptyState
               title={t('labels.emptyTitle')}
               description={t('labels.emptyDescription')}
-              illustration={<Icon name="bucket" size={32} />}
+              icon="bucket"
               action={
                 <Button
                   variant="secondary"

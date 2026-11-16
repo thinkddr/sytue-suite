@@ -318,18 +318,77 @@ func (r *lateralRenderer) cuerpo() fyne.CanvasObject {
 		return nil
 	}
 	if s, ya := o.(*container.Scroll); ya {
+		alCanalDeLaBarra(s)
 		RevelarFocoEnScroll(s, s.Content)
 		return s
 	}
 	if r.desplaza == nil {
 		r.desplaza = container.NewVScroll(o)
-	} else if r.desplaza.Content != o {
+	} else if dentroDelCanal(r.desplaza.Content) != o {
 		r.desplaza.Content = o
 		r.desplaza.Offset = fyne.Position{}
 		r.desplaza.Refresh()
 	}
-	RevelarFocoEnScroll(r.desplaza, o)
+	alCanalDeLaBarra(r.desplaza)
+	RevelarFocoEnScroll(r.desplaza, r.desplaza.Content)
 	return r.desplaza
+}
+
+// cuerpoEnElCanal es el contenido del cuerpo que desplaza: tan ancho como lo que se ve
+// menos el canalón derecho, que es donde va la barra.
+//
+// En la web el cuerpo es `overflow-y-auto px-4`: la barra se pinta en el borde del
+// carril, DENTRO del relleno, y lo de dentro tiene `min-w-0` hasta el último rótulo.
+// Aquí el desplazador iba dentro de los dos canalones y su contenido medía lo que
+// pidiera la fila más ancha, así que en el cajón del teléfono —más estrecho que los 260
+// del carril— la barra se pintaba ENCIMA de los contadores («2» cortado en Recibidos),
+// una dirección larga se salía por la derecha y con ella los galones y los contadores
+// de todas las filas. Ahora el desplazador llega al borde (la barra cae en el canalón,
+// lejos de los contadores) y el contenido no pide ancho: se queda con el que hay y cada
+// fila recorta su rótulo.
+type cuerpoEnElCanal struct{ der float32 }
+
+func (c cuerpoEnElCanal) MinSize(objetos []fyne.CanvasObject) fyne.Size {
+	if len(objetos) == 0 || !objetos[0].Visible() {
+		return fyne.Size{}
+	}
+	return fyne.NewSize(0, objetos[0].MinSize().Height)
+}
+
+func (c cuerpoEnElCanal) Layout(objetos []fyne.CanvasObject, t fyne.Size) {
+	for _, o := range objetos {
+		o.Move(fyne.Position{})
+		o.Resize(fyne.NewSize(max(t.Width-c.der, 0), t.Height))
+	}
+}
+
+// alCanalDeLaBarra envuelve, una sola vez, el contenido del desplazador del cuerpo, y
+// lo deja SOLO en vertical: un lateral nunca desplaza de lado (el `overflow-x-hidden`
+// de Sidebar.tsx). Si una app monta su cuerpo con `container.NewScroll`, aquí deja de
+// desplazar en horizontal y su contenido se ajusta al ancho del menú.
+func alCanalDeLaBarra(s *container.Scroll) {
+	if s.Direction != container.ScrollVerticalOnly {
+		s.Direction = container.ScrollVerticalOnly
+		s.Offset.X = 0
+	}
+	if c, ya := s.Content.(*fyne.Container); ya {
+		if _, es := c.Layout.(cuerpoEnElCanal); es {
+			return
+		}
+	}
+	if s.Content != nil {
+		s.Content = container.New(cuerpoEnElCanal{der: canalonMenu}, s.Content)
+	}
+}
+
+// dentroDelCanal es lo que la app puso de cuerpo, sin el envoltorio del canal.
+func dentroDelCanal(o fyne.CanvasObject) fyne.CanvasObject {
+	if c, es := o.(*fyne.Container); es && len(c.Objects) == 1 {
+		if _, canal := c.Layout.(cuerpoEnElCanal); canal {
+			return c.Objects[0]
+		}
+	}
+	return o
 }
 
 func (r *lateralRenderer) MinSize() fyne.Size           { return MedidaLateral(r.l) }
@@ -371,8 +430,10 @@ func (r *lateralRenderer) Layout(t fyne.Size) {
 		abajo -= tema.Borde
 	}
 	if cuerpo := r.cuerpo(); cuerpo != nil {
+		// Hasta el borde derecho: el canalón de ese lado es el de la barra
+		// (`cuerpoEnElCanal`), y el contenido sigue midiendo `ancho`.
 		cuerpo.Move(fyne.NewPos(canalonMenu, y+rellenoMenu))
-		cuerpo.Resize(fyne.NewSize(ancho, max(abajo-y-2*rellenoMenu, 0)))
+		cuerpo.Resize(fyne.NewSize(ancho+canalonMenu, max(abajo-y-2*rellenoMenu, 0)))
 		r.objetos = append(r.objetos, cuerpo)
 		s, _ := cuerpo.(*container.Scroll)
 		if RevelarFocoEnScroll(s, r.l.Cuerpo) {
@@ -662,6 +723,13 @@ func (r *seccionRenderer) Layout(t fyne.Size) {
 			// `flex items-center`: con acciones la línea mide 24 y el rótulo va en su
 			// centro, no arriba. Salía 5 px alto en las secciones con rueda o «+».
 			r.rotulo.Colocar(RellenoNav(), tema.Espacio(1)+(linea-tema.TextoXS.Linea)/2)
+			// `min-w-0 truncate`, con el `gap-2` hasta las acciones: en el cajón del
+			// teléfono «CUENTAS DE CORREO EXTERNAS» llegaba al borde y se salía.
+			cabe := x - RellenoNav()
+			if len(s.Acciones) > 0 {
+				cabe += tema.Espacio(0.5) - tema.Espacio(2)
+			}
+			r.rotulo.Recortar(cabe)
 		}
 	}
 	if s.AlPlegar != nil && !s.Abierta {
@@ -819,18 +887,37 @@ type FilaLateral struct {
 	// MantieneCajon impide que pulsar la fila cierre automáticamente el cajón móvil del
 	// armazón (por defecto `false`: todo destino de navegación recoge el cajón).
 	MantieneCajon bool
+	// RecorteEnMedio pone el rótulo en UNA línea y, si no cabe, con los puntos
+	// suspensivos en medio y el dominio entero (`recortaEnMedio`): es la fila de una
+	// dirección de correo, que partida en dos líneas o cortada por el final ya no dice
+	// de qué cuenta es. El rótulo entero sigue siendo el nombre accesible y sale en la
+	// pista al pasar el puntero, como el `title` de la web.
+	RecorteEnMedio bool
+	// Desplegable es una rama que se pliega (`aria-expanded` en la web), y Desplegada,
+	// cómo está. Con el foco en la fila, → la despliega y ← la pliega llamando a
+	// AlDesplegar; Intro y Espacio siguen siendo pulsarla. Lo pone RamaDesplegable.
+	Desplegable, Desplegada bool
+	AlDesplegar             func()
+	// AlPulsarSecundario es el clic derecho del escritorio y la pulsación larga del
+	// táctil (Fyne entrega las dos como `TappedSecondary`): el menú contextual de la
+	// fila. nil: la fila no tiene menú y el gesto no hace nada.
+	AlPulsarSecundario func()
 
 	// encimaHijo es que el puntero está sobre el pliegue: para la fila cuenta como
 	// encima, igual que el `:hover` de un padre en la web.
 	encimaHijo bool
 	// titulo es la pista del carril plegado (el `title` de la web), que abre la fila.
 	titulo *Pista
+	// recortado es que el último Layout no pudo pintar el rótulo entero: solo entonces
+	// sale la pista de una fila desplegada.
+	recortado bool
 }
 
-// MouseIn es el `:hover`, y en el carril plegado arranca además su `title`.
+// MouseIn es el `:hover`, y en el carril plegado —o con el rótulo recortado— arranca
+// además su `title`.
 func (f *FilaLateral) MouseIn(e *desktop.MouseEvent) {
 	f.pulsable.MouseIn(e)
-	f.titulo.alPuntero(!f.Inerte)
+	f.titulo.alPuntero(!f.Inerte && (f.Plegada || f.recortado))
 }
 
 // MouseOut devuelve la fila al reposo y recoge el `title`.
@@ -851,8 +938,25 @@ func (f *FilaLateral) Tapped(e *fyne.PointEvent) {
 	f.pulsable.Tapped(e)
 }
 
-// TypedKey recoge el cajón móvil al activar la fila con Intro o Espacio.
+// TappedSecondary abre el menú de la fila, si lo tiene. No recoge el cajón: lo que se
+// abre es un menú encima de la fila, no un destino.
+func (f *FilaLateral) TappedSecondary(*fyne.PointEvent) {
+	if !f.Inerte && f.AlPulsarSecundario != nil {
+		f.AlPulsarSecundario()
+	}
+}
+
+// TypedKey recoge el cajón móvil al activar la fila con Intro o Espacio. En una rama
+// plegable, → despliega y ← pliega, como un `treeitem`; la flecha que no cambia nada
+// no hace nada (no se convierte en pulsar).
 func (f *FilaLateral) TypedKey(e *fyne.KeyEvent) {
+	if f.Desplegable && !f.Inerte && f.AlDesplegar != nil &&
+		(e.Name == fyne.KeyRight || e.Name == fyne.KeyLeft) {
+		if (e.Name == fyne.KeyRight) != f.Desplegada {
+			f.AlDesplegar()
+		}
+		return
+	}
 	if !f.Inerte && !f.MantieneCajon && f.AlPulsar != nil &&
 		(e.Name == fyne.KeyReturn || e.Name == fyne.KeyEnter || e.Name == fyne.KeySpace) {
 		cerrarCajonMovil(f)
@@ -1026,6 +1130,9 @@ func (f *FilaLateral) lineasRotulo(m metricaFila, cabe float32) []string {
 	if f.Rama != nil {
 		return []string{recorta(f.Rotulo, m.texto, m.peso, cabe)}
 	}
+	if f.RecorteEnMedio {
+		return []string{recortaEnMedio(f.Rotulo, m.texto, m.peso, cabe)}
+	}
 	if l := LineasDe(&Parrafo{Texto: f.Rotulo, Escalon: m.texto, Peso: m.peso, Lineas: 2}, cabe); len(l) > 0 {
 		return l
 	}
@@ -1144,7 +1251,7 @@ func (f *FilaLateral) CreateRenderer() fyne.WidgetRenderer {
 			r.objetos = append(r.objetos, f.Accion)
 		}
 	}
-	if f.Plegada {
+	if f.Plegada || f.RecorteEnMedio {
 		// El `title={label}` de SidebarItem: en el carril plegado solo se ve el icono, y
 		// el rótulo sale al pasar el ratón. La pista va en una caja de ANCHO CERO pegada
 		// al borde derecho de la fila, para que el puntero no la encuentre nunca y siga
@@ -1241,11 +1348,11 @@ func (r *filaRenderer) Layout(t fyne.Size) {
 		centrado(r.punto, x+(m.cajaIcono-PuntoEtiqueta)/2, PuntoEtiqueta)
 		x += m.cajaIcono + m.hueco
 	}
+	if r.titulo != nil {
+		r.titulo.Move(fyne.NewPos(t.Width, 0))
+		r.titulo.Resize(fyne.NewSize(0, t.Height))
+	}
 	if f.Plegada {
-		if r.titulo != nil {
-			r.titulo.Move(fyne.NewPos(t.Width, 0))
-			r.titulo.Resize(fyne.NewSize(0, t.Height))
-		}
 		return
 	}
 	if f.conAccion() {
@@ -1269,6 +1376,7 @@ func (r *filaRenderer) Layout(t fyne.Size) {
 		der -= m.hueco
 	}
 	lineas := f.lineasRotulo(m, der-x)
+	f.recortado = len(lineas) == 1 && lineas[0] != f.Rotulo
 	y := (t.Height - float32(len(lineas))*m.texto.Linea) / 2
 	r.rotulo.Text = lineas[0]
 	ColocarTexto(r.rotulo, m.texto, x, y)
@@ -1364,7 +1472,7 @@ type AccionLateral struct {
 	Glifo *iconos.Dibujo
 	// Girando es el `animate-spin` del glifo: el «Actualizar» de Sytue Mail mientras la
 	// carpeta carga («sin eso, pulsar sobre una bandeja que no cambia no se distingue de
-	// un botón que no hace nada»). Con SinMovimiento se queda quieto.
+	// un botón que no hace nada»). Con «menos movimiento» (MenosMovimiento) se queda quieto.
 	Girando bool
 	// apagada es el `opacity-0` de una acción que solo se ve al pasar (ver
 	// `SeccionLateral.AccionesAlPasar`): el glifo no se pinta y el botón sigue ahí.
@@ -1394,7 +1502,7 @@ func (a *AccionLateral) icono() fyne.CanvasObject {
 // girar arranca o para el `animate-spin`. Una animación por acción que gira, y solo
 // mientras gira: la web no anima lo que está quieto.
 func (a *AccionLateral) girar() {
-	quiere := a.Girando && a.Glifo != nil && !SinMovimiento
+	quiere := a.Girando && a.Glifo != nil && !MenosMovimiento()
 	switch {
 	case quiere && a.giro == nil:
 		a.giro = fyne.NewAnimation(DuracionGiro, func(p float32) { a.Glifo.Girar(360 * p) })
@@ -1536,13 +1644,30 @@ const LadoGalon float32 = 14
 // o la fila con sus hijos. Nació como `(*Menu).rama` de Mail; Calendar la necesitaba
 // igual (los recordatorios del cajón del teléfono) y habría sido la segunda copia.
 func RamaDesplegable(f *FilaLateral, abierta bool, alPlegar func(), v tema.Variante, hijos ...fyne.CanvasObject) []fyne.CanvasObject {
+	return RamaDesplegableCon(f, abierta, alPlegar, SangriaRama, v, hijos...)
+}
+
+// SangriaRama es el `ml-7` de lo que cuelga de una rama: el hueco del icono y el
+// `gap-2`, así el icono de cada hijo cae bajo el rótulo de su rama.
+var SangriaRama = tema.Espacio(7)
+
+// SangriaRamaCompacta es el `ml-3` de `SidebarItem` con `compactChildren`: la cuenta
+// de correo externa con sus carpetas. Con `ml-7` el icono de cada carpeta caía bajo la
+// dirección y, en el cajón del teléfono, la doble sangría se comía el ancho que hace
+// falta para el rótulo y el contador; con 10,5 la jerarquía se sigue leyendo porque la
+// rama lleva su galón y su propio icono.
+var SangriaRamaCompacta = tema.Espacio(3)
+
+// RamaDesplegableCon es RamaDesplegable con otra sangría para los hijos.
+func RamaDesplegableCon(f *FilaLateral, abierta bool, alPlegar func(), sangria float32, v tema.Variante, hijos ...fyne.CanvasObject) []fyne.CanvasObject {
 	f.Cola = iconos.Trazo(galonDe(abierta), LadoGalon, "sidebar-fg-muted", v).Objeto()
 	f.MantieneCajon = true
 	f.AlPulsar = alPlegar
+	f.Desplegable, f.Desplegada, f.AlDesplegar = true, abierta, alPlegar
 	if !abierta || len(hijos) == 0 {
 		return []fyne.CanvasObject{f}
 	}
-	return []fyne.CanvasObject{f, container.New(Margen{Izq: tema.Espacio(7)},
+	return []fyne.CanvasObject{f, container.New(Margen{Izq: sangria},
 		container.New(Columna{Hueco: tema.Espacio(0.5)}, hijos...))}
 }
 

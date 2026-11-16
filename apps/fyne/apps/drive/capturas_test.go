@@ -31,11 +31,12 @@ func TestCapturasDeLasVistas(t *testing.T) {
 	hoy := time.Date(2026, 9, 6, 9, 0, 0, 0, time.UTC)
 	favs := map[string]bool{"f2": true}
 	recientes := NuevaVistaPlana(tr, Recientes, favs)
-	recientes.Fase, recientes.Ventana = Exito, 1280
+	// El 6 de septiembre de 2026 es domingo: los tres tramos de «Recientes» salen.
+	recientes.Fase, recientes.Ventana, recientes.Ahora = Exito, 1280, hoy
 	recientes.Elementos = []Elemento{
 		{ID: "f1", Nombre: "Notas de la reunión.md", Tamano: 4096, Modificado: hoy, Ruta: "/Notas de la reunión.md"},
-		{ID: "f2", Nombre: "informe.pdf", Tamano: 1536000, Modificado: hoy, Ruta: "/Contratos/informe.pdf"},
-		{ID: "f3", Nombre: "playa.jpg", Tamano: 2048000, Modificado: hoy, Ruta: "/Fotos/playa.jpg"},
+		{ID: "f2", Nombre: "informe.pdf", Tamano: 1536000, Modificado: hoy.AddDate(0, 0, -1), Ruta: "/Contratos/informe.pdf"},
+		{ID: "f3", Nombre: "playa.jpg", Tamano: 2048000, Modificado: hoy.AddDate(0, 0, -3), Ruta: "/Fotos/playa.jpg"},
 	}
 	compartido := NuevaVistaCompartido(tr)
 	compartido.Fase, compartido.Ventana = Exito, 1280
@@ -65,6 +66,9 @@ func TestCapturasDeLasVistas(t *testing.T) {
 		explorador.Elementos = append(explorador.Elementos, Elemento{ID: n, Nombre: n, Carpeta: true, Tamano: -1, Modificado: hoy})
 	}
 	explorador.Elementos = append(explorador.Elementos, recientes.Elementos...)
+	// Como en la web fuera de una búsqueda: las columnas ordenan, y la del nombre lleva
+	// la flecha del orden de siempre.
+	explorador.AlOrdenar = func(CampoOrden) {}
 
 	for _, ancho := range []float32{1280, 360} {
 		alto := float32(744)
@@ -78,6 +82,21 @@ func TestCapturasDeLasVistas(t *testing.T) {
 			"equipos":    func() fyne.CanvasObject { return equipos.Objeto(tema.Claro) },
 			"documentos": func() fyne.CanvasObject { return documentos.Objeto(tema.Claro) },
 			"explorador": func() fyne.CanvasObject { return explorador.Objeto(tema.Claro) },
+			// La cuadrícula, con «Ordenar» delante del conmutador (en el teléfono, en la
+			// primera fila) y ordenada por tamaño, de lo más grande a lo más pequeño.
+			// Uno nuevo y no el de arriba: la rejilla recuerda el ancho del pintado
+			// anterior, y el de la lista ancha la descuadraba a 360.
+			"explorador-rejilla": func() fyne.CanvasObject {
+				rej := NuevoExplorador(tr)
+				rej.Fase, rej.Ventana, rej.Elementos, rej.AlOrdenar = Exito, ancho, explorador.Elementos, explorador.AlOrdenar
+				rej.Rejilla, rej.Orden = true, Orden{Campo: OrdenTamano, Desc: true}
+				return rej.Objeto(tema.Claro)
+			},
+			"explorador-soltar": func() fyne.CanvasObject {
+				explorador.Arrastrando = true
+				defer func() { explorador.Arrastrando = false }()
+				return explorador.Objeto(tema.Claro)
+			},
 		} {
 			lat := NuevoLateral(tr, MiUnidad, nil)
 			arm := ui.NuevoArmazon(vista())

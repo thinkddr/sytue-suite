@@ -18,6 +18,7 @@ import (
 	"fyne.io/fyne/v2/test"
 
 	"git.sytue.eu/sytue/one/apps/fyne/catalogos"
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
@@ -87,25 +88,41 @@ func TestTusDatosMideLoQueMideLaWeb(t *testing.T) {
 		ven.Resize(fyne.NewSize(c.ventana, r.alto(c.ventana)))
 		guardar(t, ven.Canvas().Capture(), "datos-"+map[float32]string{1280: "ancho", 390: "estrecho", 360: "movil"}[c.ventana])
 
+		// Las piezas van dentro del marco y de sus secciones: se mira dónde caen en la
+		// ventana, que es lo que mide la web.
+		abs := fyne.CurrentApp().Driver().AbsolutePositionForObject
 		mira := func(nombre string, o fyne.CanvasObject, quiero caja, tol float32) {
 			if quiero.w == 0 {
 				return // no medido a ese ancho
 			}
-			p, s := o.Position(), o.Size()
+			p, s := abs(o), o.Size()
 			if !cerca(p.X, quiero.x, tol) || !cerca(p.Y, quiero.y, tol) || !cerca(s.Width, quiero.w, 0.5) || !cerca(s.Height, quiero.h, tol) {
 				t.Errorf("a %v, %s está en (%v, %v) y mide %v × %v; en producción (%v, %v) y %v × %v",
 					c.ventana, nombre, p.X, p.Y, s.Width, s.Height, quiero.x, quiero.y, quiero.w, quiero.h)
 			}
 		}
 		const tol = 0.1
-		mira("el título", r.titulo, c.titulo, tol)
-		mira("«Descargar una copia»", r.copia.caja.Objetos()[0], c.copia, tol)
+		mira("el título", parrafoCon(t, r.marco, d.T.T("data.title", nil)), c.titulo, tol)
+		mira("«Descargar una copia»", r.copia, c.copia, tol)
 		mira("la primera opción", r.opciones[0], c.opcion, tol)
 		mira("«Descargar copia»", r.accion, c.accion, tol)
-		mira("«Llevarlo a otro servicio»", r.mover.caja.Objetos()[0], c.mover, tol)
+		mira("«Llevarlo a otro servicio»", r.mover, c.mover, tol)
 		mira("«Ir a Migraciones»", r.migrar, c.migrar, tol)
 		ven.Close()
 	}
+}
+
+// parrafoCon es el párrafo de ese texto dentro de un widget: el título del marco lo
+// crea y lo guarda `ui.MarcoAjustes`.
+func parrafoCon(t *testing.T, w fyne.Widget, texto string) *ui.Parrafo {
+	t.Helper()
+	for _, o := range aplanar(test.WidgetRenderer(w).Objects()) {
+		if p, ok := o.(*ui.Parrafo); ok && p.Texto == texto {
+			return p
+		}
+	}
+	t.Fatalf("no hay ningún párrafo que diga %q", texto)
+	return nil
 }
 
 // exportadorDoble devuelve siempre la misma copia, o un fallo.

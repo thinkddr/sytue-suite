@@ -44,7 +44,7 @@ export interface ChannelRowProps {
 /**
  * Favorito y «…» de la fila. No es `SIDEBAR_ACTION_CLASS` por el hover: la fila ya
  * lleva el velo de `sidebar-hover` al pasar por encima, y el mismo velo encima no
- * se vería. Sí lleva su suelo de 24 px: `h-6` son 21 con la raíz a 14, y los dos
+ * se vería. Sí lleva su suelo de 24 px: `h-6` eran 21 con 1 rem en 14 px, y los dos
  * botones van pegados (`gap-0.5`), así que no cabían en la excepción de separación
  * de WCAG 2.5.8.
  */

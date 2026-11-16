@@ -26,7 +26,7 @@ import (
 // (una caja primaria, las que se añaden con Mayús y sus grupos), el marco discontinuo
 // de cada una, los dos tiradores de la primaria —la barra de mover arriba y el cuadro
 // de redimensionar en la esquina—, el distintivo del paso de animación y el teclado
-// del escenario (Supr, Escape, flechas y Mayús + flechas).
+// del escenario (Supr, Escape, flechas y Mayús + flechas, y el portapapeles de cajas).
 //
 // La estructura copia la del DOM y no por gusto: en la web cada caja es un elemento con
 // sus eventos y el fondo del escenario es otro. Aquí cada caja lleva un `marcoCaja`
@@ -35,7 +35,7 @@ import (
 // desplazador del área, como en la web, y no de la selección.
 //
 // Todo va dentro del escenario escalado, así que las medidas de la web (en px del
-// escenario, con el rem de 14) se multiplican por la escala `k`, igual que hace el
+// escenario, con el rem de 16) se multiplican por la escala `k`, igual que hace el
 // `transform: scale(k)` del navegador con los tiradores.
 var (
 	// La barra de mover: `-top-3 h-2.5 w-10 rounded-full`, centrada.
@@ -180,6 +180,96 @@ func (e *Editor) Organizar(op string) {
 	e.cambiar(func() { e.m.Organizar(e.objetivo(), ids, op, uuid()) }, true)
 }
 
+// ---- copiar, cortar, pegar y duplicar (portapapeles.go) ----
+
+// conectoresEdit son los conectores de lo que se edita: los de la diapositiva activa; el
+// patrón y sus diseños no tienen.
+func (e *Editor) conectoresEdit() []Conector {
+	if i := e.objetivo(); i >= 0 && e.m.valida(i) {
+		return e.m.Diapos[i].Conectores
+	}
+	return nil
+}
+
+// recorteDeSeleccion es la selección efectiva como recorte, o false si no hay nada.
+func (e *Editor) recorteDeSeleccion() (Recorte, bool) {
+	ids := e.efectiva()
+	if len(ids) == 0 {
+		return Recorte{}, false
+	}
+	r := Recortar(e.cajasEdit(), e.conectoresEdit(), ids)
+	return r, len(r.Cajas) > 0
+}
+
+// CopiarCajas es Ctrl/⌘+C (o +X con `cortar`) sobre el escenario: la selección efectiva
+// va al portapapeles del sistema en el formato de la web. En solo lectura cortar es
+// copiar: lo que se lee se puede llevar, no quitar.
+func (e *Editor) CopiarCajas(cb fyne.Clipboard, cortar bool) {
+	r, ok := e.recorteDeSeleccion()
+	if !ok || cb == nil {
+		return
+	}
+	cb.SetContent(r.Texto())
+	if cortar && !e.ctx.SoloLectura {
+		e.BorrarSeleccion()
+	}
+}
+
+// PegarCajas es Ctrl/⌘+V sobre el escenario: si el texto es un recorte de Diapos (de esta
+// app o de la web), pega sus cajas en lo que se edita y las deja elegidas. Dice si era
+// un recorte; otro texto no hace nada, como en la web.
+func (e *Editor) PegarCajas(texto string) bool {
+	r, ok := LeerRecorte(texto)
+	if !ok {
+		return false
+	}
+	e.pegar(r)
+	return true
+}
+
+// DuplicarCajas es Ctrl/⌘+D: la selección, pegada en la misma diapositiva y desplazada.
+func (e *Editor) DuplicarCajas() {
+	if r, ok := e.recorteDeSeleccion(); ok {
+		e.pegar(r)
+	}
+}
+
+// pegar mete el recorte en lo que se edita. Respeta el tope de guardado (las imágenes
+// `data:` pesan) y la protección, que deshace el cambio en `cambiar`.
+func (e *Editor) pegar(r Recorte) {
+	if e.ctx.SoloLectura {
+		return
+	}
+	obj := e.objetivo()
+	conConectores := obj >= 0
+	p := PegarRecorte(e.cajasEdit(), e.conectoresEdit(), r, uuid, conConectores)
+	aplicar := func(m *Modelo) {
+		m.cambiarCajas(obj, true, func([]Caja) []Caja { return p.Cajas })
+		if conConectores && m.valida(obj) {
+			m.Diapos[obj].Conectores = nil
+			if len(p.Conectores) > 0 {
+				m.Diapos[obj].Conectores = p.Conectores
+			}
+		}
+	}
+	if !e.cabeCon(aplicar) {
+		e.avisar("slides.msg.pasteFailed", "slides.msg.dupeFailed.detail")
+		return
+	}
+	e.TerminarEscritura()
+	antes, antesExtra := e.sel, e.extra
+	e.cambiar(func() {
+		aplicar(e.m)
+		e.sel, e.extra, e.selCon = p.IDs[0], slices.Clone(p.IDs[1:]), ""
+	}, true)
+	if e.m.caja(obj, p.IDs[0]) == nil {
+		// Vetado (diapositiva protegida): el modelo ha vuelto atrás y la selección también.
+		e.sel, e.extra = antes, antesExtra
+		e.recomponer()
+	}
+	e.refrescarCinta()
+}
+
 // ---- la capa ----
 
 // capaEdicion es el fondo del escenario con todo lo que se pinta ENCIMA de las cajas
@@ -197,6 +287,10 @@ type capaEdicion struct {
 	arrastreCon *arrastreConector
 	arrastreMov *arrastreMovimiento
 	cancelado   bool
+	// alt lleva Alt pulsado (desactiva las guías) y guias son las visibles durante
+	// el arrastre: solo de vista, nunca en el modelo.
+	alt   bool
+	guias []Guia
 }
 
 var (
@@ -205,6 +299,7 @@ var (
 	_ fyne.Focusable    = (*capaEdicion)(nil)
 	_ desktop.Keyable   = (*capaEdicion)(nil)
 	_ desktop.Mouseable = (*capaEdicion)(nil)
+	_ fyne.Shortcutable = (*capaEdicion)(nil)
 )
 
 func nuevaCapaEdicion(e *Editor) *capaEdicion {
@@ -239,9 +334,10 @@ func (c *capaEdicion) Tapped(ev *fyne.PointEvent) {
 	c.e.SeleccionarSolo("")
 }
 
-// MouseDown y MouseUp solo toman nota de Mayús: el toque no la trae.
+// MouseDown y MouseUp solo toman nota de Mayús y Alt: el toque no los trae.
 func (c *capaEdicion) MouseDown(ev *desktop.MouseEvent) {
 	c.mayus = ev.Modifier&fyne.KeyModifierShift != 0
+	c.alt = ev.Modifier&fyne.KeyModifierAlt != 0
 }
 
 // MouseUp no hace nada: la pulsación la atiende Tapped.
@@ -271,12 +367,18 @@ func (c *capaEdicion) KeyDown(ev *fyne.KeyEvent) {
 	if ev.Name == desktop.KeyShiftLeft || ev.Name == desktop.KeyShiftRight {
 		c.mayus = true
 	}
+	if ev.Name == desktop.KeyAltLeft || ev.Name == desktop.KeyAltRight {
+		c.alt = true
+	}
 }
 
 // KeyUp suelta Mayús.
 func (c *capaEdicion) KeyUp(ev *fyne.KeyEvent) {
 	if ev.Name == desktop.KeyShiftLeft || ev.Name == desktop.KeyShiftRight {
 		c.mayus = false
+	}
+	if ev.Name == desktop.KeyAltLeft || ev.Name == desktop.KeyAltRight {
+		c.alt = false
 	}
 }
 
@@ -324,6 +426,35 @@ func (c *capaEdicion) TypedKey(ev *fyne.KeyEvent) {
 		return
 	}
 	e.Empujar(dx, dy, c.mayus)
+}
+
+// TypedShortcut es el portapapeles del escenario (los eventos `copy`/`cut`/`paste` y el
+// Ctrl+D de la web): copiar, cortar, pegar y duplicar la selección efectiva. Dentro de una
+// caja que se escribe manda su folio, que tiene el foco: estos atajos no le llegan aquí.
+// Los demás atajos del marco (imprimir, zoom) siguen yendo al editor, porque la capa
+// enfocada se los lleva.
+func (c *capaEdicion) TypedShortcut(s fyne.Shortcut) {
+	e := c.e
+	switch a := s.(type) {
+	case *fyne.ShortcutCopy:
+		e.CopiarCajas(a.Clipboard, false)
+	case *fyne.ShortcutCut:
+		e.CopiarCajas(a.Clipboard, true)
+	case *fyne.ShortcutPaste:
+		if a.Clipboard != nil {
+			e.PegarCajas(a.Clipboard.Content())
+		}
+	case *desktop.CustomShortcut:
+		if a.KeyName == fyne.KeyD && a.Modifier == fyne.KeyModifierShortcutDefault {
+			e.DuplicarCajas()
+			return
+		}
+		if EsAtajoOcultar(a) {
+			e.AlternarOculta(e.activa)
+			return
+		}
+		e.ctx.AtajoDelEditor(a)
+	}
 }
 
 // AccessibilityLabel es el `aria-label` del escenario: «Diapositiva n de total».
@@ -428,6 +559,18 @@ func (r *capaRenderer) rehacer() {
 	}
 	objs = append(objs, r.asasConector(k, acento)...)
 	objs = append(objs, r.trayectorias(k, acento, efectiva)...)
+	// Guías inteligentes del arrastre: 1 px de pantalla, del acento.
+	for _, g := range c.guias {
+		l := canvas.NewRectangle(acento)
+		if g.Eje == "x" {
+			l.Move(fyne.NewPos(float32(g.Pos)/100*AnchoEscenario*k, float32(g.Desde)/100*sh*k))
+			l.Resize(fyne.NewSize(1, float32(g.Hasta-g.Desde)/100*sh*k))
+		} else {
+			l.Move(fyne.NewPos(float32(g.Desde)/100*AnchoEscenario*k, float32(g.Pos)/100*sh*k))
+			l.Resize(fyne.NewSize(float32(g.Hasta-g.Desde)/100*AnchoEscenario*k, 1))
+		}
+		objs = append(objs, l)
+	}
 	r.objetos = objs
 }
 
@@ -549,6 +692,9 @@ func distintivo(paso string, pos fyne.Position, k float32, acento color.NRGBA) [
 
 // ---- el arrastre ----
 
+// tolGuiaPx es la distancia en px de pantalla a la que se pega a una guía.
+const tolGuiaPx float32 = 6
+
 // arrastreCaja es `dragRef`: qué se mueve, desde dónde y con qué topes.
 type arrastreCaja struct {
 	objetivo      int
@@ -566,6 +712,10 @@ func (c *capaEdicion) empezar(id string, redimensionar bool) {
 	a := &arrastreCaja{objetivo: e.objetivo(), redimensionar: redimensionar, caja: id}
 	cs := e.cajasEdit()
 	if redimensionar {
+		if e.cajaFija(id) {
+			e.avisarProtegido()
+			return
+		}
 		if p := e.m.caja(e.objetivo(), id); p != nil {
 			a.origs = []Caja{*p}
 		}
@@ -577,6 +727,12 @@ func (c *capaEdicion) empezar(id string, redimensionar bool) {
 		base = e.explicita()
 	}
 	mueven := conjunto(append(ExpandirGrupos(cs, base), id))
+	for m := range mueven {
+		if e.cajaFija(m) { // ni se empieza: soltar lo devolvería a su sitio
+			e.avisarProtegido()
+			return
+		}
+	}
 	var rs []rect
 	for _, cj := range cs {
 		if mueven[cj.ID] {
@@ -602,11 +758,46 @@ func (c *capaEdicion) seguir(d fyne.Delta) {
 	k := e.escenario.Escala
 	dx := float64(a.dx / (AnchoEscenario * k) * 100)
 	dy := float64(a.dy / (e.m.AltoEscenario() * k) * 100)
+	// ~6 px de pantalla de tolerancia en cada eje, a cualquier zoom.
+	tolX := float64(tolGuiaPx / (AnchoEscenario * k) * 100)
+	tolY := float64(tolGuiaPx / (e.m.AltoEscenario() * k) * 100)
+	quietas := conjunto(nil)
+	for _, o := range a.origs {
+		quietas[o.ID] = true
+	}
+	var otros []rect
+	for _, cj := range e.cajasEdit() {
+		if !quietas[cj.ID] {
+			otros = append(otros, rectDe(cj))
+		}
+	}
+	lienzo := rect{0, 0, 100, 100}
+	c.guias = nil
 	if a.redimensionar {
 		o := a.origs[0]
-		e.m.Redimensionar(e.objetivo(), o.ID, o.W+dx, o.H+dy)
+		w, h := o.W+dx, o.H+dy
+		if !c.alt && o.Giro == 0 {
+			pw, ph := min(max(w, 4), 100-o.X), min(max(h, 4), 100-o.Y)
+			aj := guiasDeAjuste(rect{o.X, o.Y, pw, ph}, otros, lienzo, tolX, tolY, []string{anclaFin}, []string{anclaFin})
+			w, h = pw+aj.DX, ph+aj.DY
+			c.guias = aj.Lineas
+		}
+		e.m.Redimensionar(e.objetivo(), o.ID, w, h)
 	} else {
-		dx, dy = min(max(dx, a.min[0]), a.max[0]), min(max(dy, a.min[1]), a.max[1])
+		tope := func(dx, dy float64) (float64, float64) {
+			return min(max(dx, a.min[0]), a.max[0]), min(max(dy, a.min[1]), a.max[1])
+		}
+		dx, dy = tope(dx, dy)
+		if !c.alt {
+			var rs []rect
+			for _, o := range a.origs {
+				rs = append(rs, rectDe(o))
+			}
+			env := envolvente(rs)
+			aj := guiasDeAjuste(rect{env.x + dx, env.y + dy, env.w, env.h}, otros, lienzo, tolX, tolY, nil, nil)
+			dx, dy = tope(dx+aj.DX, dy+aj.DY)
+			c.guias = aj.Lineas
+		}
 		for _, o := range a.origs {
 			if p := e.m.caja(e.objetivo(), o.ID); p != nil {
 				p.X, p.Y = o.X+dx, o.Y+dy
@@ -627,7 +818,7 @@ func (c *capaEdicion) soltar() {
 	if c.arrastre == nil {
 		return
 	}
-	c.arrastre = nil
+	c.arrastre, c.guias = nil, nil
 	c.e.cambiar(func() {}, true)
 }
 
@@ -659,7 +850,7 @@ func (c *capaEdicion) CancelarArrastre() {
 			caja.Anims, caja.Anim = a.anims, a.anim
 		}
 	}
-	c.arrastre, c.arrastreCon, c.arrastreMov = nil, nil, nil
+	c.arrastre, c.arrastreCon, c.arrastreMov, c.guias = nil, nil, nil, nil
 	c.e.escenario.Refresh()
 	c.Refresh()
 }
@@ -699,6 +890,7 @@ func nuevoMarcoCaja(c *capaEdicion, id string, texto bool) *marcoCaja {
 // quita el foco del escenario antes del Tapped, y con él cualquier KeyUp.
 func (m *marcoCaja) MouseDown(ev *desktop.MouseEvent) {
 	m.capa.mayus = ev.Modifier&fyne.KeyModifierShift != 0
+	m.capa.alt = ev.Modifier&fyne.KeyModifierAlt != 0
 }
 
 // MouseUp no hace nada: la pulsación la atiende Tapped.
@@ -745,9 +937,13 @@ func (m *marcoCaja) DragEnd() { m.capa.soltar() }
 
 func (m *marcoCaja) CancelarArrastre() { m.capa.CancelarArrastre() }
 
-// AccessibilityLabel es el `aria-label` de una caja que no es de texto (`boxLabel`).
+// AccessibilityLabel es el `aria-label` de una caja que no es de texto (`boxLabel`): una
+// imagen con texto alternativo se anuncia por él.
 func (m *marcoCaja) AccessibilityLabel() string {
 	if p := m.capa.e.m.caja(m.capa.e.objetivo(), m.id); p != nil && !m.texto {
+		if alt := rotuloAlt(*p); alt != "" {
+			return alt
+		}
 		return m.capa.e.t(claveDe(*p))
 	}
 	return ""
@@ -769,7 +965,10 @@ type asa struct {
 	toque float32
 }
 
-var _ fyne.Draggable = (*asa)(nil)
+var (
+	_ fyne.Draggable    = (*asa)(nil)
+	_ desktop.Mouseable = (*asa)(nil)
+)
 
 func nuevaAsa(c *capaEdicion, id string, redimensionar bool, col color.NRGBA, radio float32) *asa {
 	a := &asa{capa: c, id: id, redimensionar: redimensionar, color: col, radio: radio}
@@ -790,6 +989,15 @@ func (a *asa) Dragged(ev *fyne.DragEvent) {
 
 // DragEnd suelta.
 func (a *asa) DragEnd() { a.capa.soltar() }
+
+// MouseDown lee Alt de la pulsación, como el marco: el KeyDown solo llega con el
+// escenario enfocado, y un Alt+Tab deja el KeyUp perdido y las guías apagadas.
+func (a *asa) MouseDown(ev *desktop.MouseEvent) {
+	a.capa.alt = ev.Modifier&fyne.KeyModifierAlt != 0
+}
+
+// MouseUp no hace nada: el arrastre lo cierra DragEnd.
+func (a *asa) MouseUp(*desktop.MouseEvent) {}
 
 func (a *asa) CancelarArrastre() { a.capa.CancelarArrastre() }
 

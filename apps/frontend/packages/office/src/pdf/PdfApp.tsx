@@ -20,6 +20,7 @@
  * subir el fichero por cada una.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { createPortal } from 'preact/compat';
 import { appUrl, driveFolderUrl } from '@sytue/config';
 import { docsT, type DocsKey } from '../i18n';
 // Alias: en este fichero `r` ya nombra la respuesta de varias llamadas al API.
@@ -37,6 +38,8 @@ import {
   pideContrasena,
   invalidaFirmas,
   rectEnSVG,
+  puedeImprimir,
+  rangosQueFaltan,
   type AnotacionNueva,
   type Enlace,
   type Contenido,
@@ -50,8 +53,11 @@ import {
   usePointerDrag,
   confirmarEnEditor,
   enCampoDeTexto,
+  haySuperposicionAbierta,
   preguntarEnEditor,
+  ShortcutsModal,
 } from '@sytue/ui';
+import { accionDeTecla, gruposDeAtajos } from './atajos';
 import { mensajeDeError } from './errores';
 import { BarraHerramientas, type Herramienta } from './Barra';
 import { PanelLateral, Dialogos, type Dialogo, type PanelActivo } from './Paneles';
@@ -61,6 +67,20 @@ const LOTE = 4;
 
 /** Cuántas páginas por delante se piden antes de llegar a ellas. */
 const ANTICIPO = 2;
+
+/**
+ * Hasta cuántas páginas se mandan a la impresora de una vez. Imprimir monta TODAS las
+ * hojas en el DOM a la vez, y un escaneo son megas de imagen por página: con cientos, la
+ * pestaña se queda sin memoria antes de abrir el diálogo. Pasado el tope se avisa y se
+ * imprimen las primeras; para el resto está «Descargar» y el programa de cada uno.
+ */
+const TOPE_IMPRESION = 300;
+
+/** Una hoja lista para el papel: el número y su dibujo. */
+interface HojaImpresa {
+  pagina: Pagina;
+  svg: string;
+}
 
 export interface PdfAppProps {
   /** Ruta del fichero en Drive. */
@@ -100,6 +120,8 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
   // esto, buscar, los comentarios y los campos del formulario no existían en un
   // móvil: la barra lateral se ocultaba y no había forma de sacarla.
   const [panelAbierto, setPanelAbierto] = useState(false);
+  // La hoja de atajos de teclado («?»): los de un visor de escritorio, que nadie descubría solo.
+  const [atajosAbiertos, setAtajosAbiertos] = useState(false);
   /** Zonas marcadas para censurar, aún sin aplicar. En coordenadas del PDF. */
   const [zonas, setZonas] = useState<ZonaCensura[]>([]);
   // Campos marcados y todavía sin crear. Como las zonas de censura, van en DOS
@@ -114,10 +136,19 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
   const [bloqueando, setBloqueando] = useState(false);
   /** El firmado que no se llegó a entregar: se ofrece reintentar. */
   const [sinEntregar, setSinEntregar] = useState('');
+  /** Mientras se piden las hojas que faltan para imprimir: cuántas hay ya de cuántas. */
+  const [preparando, setPreparando] = useState<{ hechas: number; total: number } | null>(null);
+  /** Las hojas montadas para el papel. Solo existen entre pedir imprimir y `afterprint`. */
+  const [paraImprimir, setParaImprimir] = useState<HojaImpresa[] | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const anchoDisponible = useRef(0);
   const pidiendo = useRef(new Set<number>());
+  // La impresión lee las hojas YA dibujadas desde aquí y no desde el estado: es una
+  // tarea larga (varias peticiones seguidas) y el `svgs` de su cierre se quedaría viejo.
+  const svgsRef = useRef(svgs);
+  svgsRef.current = svgs;
+  const imprimiendo = useRef(false);
 
   /* --- Carga inicial ----------------------------------------------------- */
 
@@ -360,6 +391,25 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
     [path, clave, cargar, t, peticion, entregar],
   );
 
+  /**
+   * Tras volver a una versión anterior: el fichero de Drive es otro, así que se lee
+   * todo de nuevo, como tras aplicar un cambio. Lo dibujado era de la versión que
+   * se acaba de dejar y mezclarlo con la nueva enseñaría un documento que no existe.
+   */
+  const restaurada = useCallback(
+    async (version: number) => {
+      setDialogo(null);
+      setCopia('');
+      setZonas([]);
+      setCamposNuevos([]);
+      setSvgs({});
+      setTextos(null);
+      await cargar(clave);
+      setAviso(t('pdf.versions.restored', { version }));
+    },
+    [cargar, clave, t],
+  );
+
   const anotar = useCallback(
     (anots: AnotacionNueva[]) => {
       if (anots.length === 0) return;
@@ -490,6 +540,73 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
     if (hecho) setCamposNuevos([]);
   }, [camposNuevos, aplicar, t]);
 
+  /* --- Imprimir ---------------------------------------------------------- */
+
+  /**
+   * Imprime el documento ENTERO. Ctrl+P a secas imprimía la página del navegador, y de
+   * ella solo las hojas ya dibujadas: la carga va por lotes según se llega a ellas, así
+   * que de un contrato de veinte páginas abierto en la primera salían cuatro. Aquí se
+   * piden las que faltan, en lotes como los de la pantalla y diciendo por dónde va, se
+   * monta una hoja por página en un contenedor que solo existe en papel y entonces sí se
+   * llama a `print`.
+   *
+   * No se le pasa el fichero al visor PDF del navegador: Sytue PDF dibuja él, y lo que
+   * sale en papel tiene que ser lo mismo que se ve.
+   */
+  const imprimir = useCallback(async () => {
+    if (!contenido || imprimiendo.current) return;
+    // El atajo tampoco salta lo que el documento prohíbe: el botón apagado con su
+    // motivo no sirve de nada si Ctrl+P lo imprime igual.
+    if (!puedeImprimir(contenido.permisos)) {
+      setError(t('pdf.blocked.print'));
+      return;
+    }
+    let total = contenido.total;
+    if (total > TOPE_IMPRESION) {
+      const seguir = await confirmarEnEditor({
+        mensaje: t('pdf.print.tooLong', { total, max: TOPE_IMPRESION }),
+        confirmLabel: t('pdf.menu.print'),
+      });
+      if (!seguir) return;
+      total = TOPE_IMPRESION;
+    }
+    imprimiendo.current = true;
+    const dibujadas: Record<number, string> = { ...svgsRef.current };
+    const rangos = rangosQueFaltan(dibujadas, total, LOTE);
+    let hechas = total - rangos.reduce((n, [a, b]) => n + b - a + 1, 0);
+    setPreparando({ hechas, total });
+    try {
+      for (const [desde, hasta] of rangos) {
+        const r = await api.render(path, `${desde}-${hasta}`, 1, clave);
+        // Como en pantalla: la que el motor no supo dibujar sale en blanco, no detiene
+        // la impresión de las demás.
+        for (let n = desde; n <= hasta; n++) dibujadas[n] = r.paginas[String(n)] ?? '';
+        hechas += hasta - desde + 1;
+        setPreparando({ hechas, total });
+      }
+      setParaImprimir(
+        contenido.paginas
+          .filter((p) => p.numero <= total)
+          .map((p) => ({ pagina: p, svg: dibujadas[p.numero] ?? '' })),
+      );
+    } catch (e) {
+      setError(mensajeDeError(e, t, 'pdf.error.render'));
+    } finally {
+      imprimiendo.current = false;
+      setPreparando(null);
+    }
+  }, [contenido, path, clave, t]);
+
+  // Con las hojas ya en el DOM (los efectos corren tras pintar), al papel. Se desmontan
+  // al acabar: son una copia de todo el documento y en pantalla no pintan nada.
+  useEffect(() => {
+    if (!paraImprimir) return;
+    const fin = () => setParaImprimir(null);
+    window.addEventListener('afterprint', fin);
+    window.print();
+    return () => window.removeEventListener('afterprint', fin);
+  }, [paraImprimir]);
+
   /* --- Teclado ------------------------------------------------------------ */
 
   // Los atajos que cualquiera trae aprendidos de un visor de escritorio. Ctrl+F
@@ -498,44 +615,59 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
   // así que sin esto decía «no encontrado» sobre un documento que sí lo tenía.
   useEffect(() => {
     const alPulsar = (e: KeyboardEvent) => {
-      const meta = e.ctrlKey || e.metaKey;
-      if (meta && (e.key === 'f' || e.key === 'F')) {
-        e.preventDefault();
-        setPanel('buscar');
-        setPanelAbierto(true);
-        return;
-      }
-      if (meta && (e.key === '+' || e.key === '=' || e.key === '-')) {
-        e.preventDefault();
-        cambiarZoom(e.key === '-' ? -0.15 : 0.15);
-        return;
-      }
-      if (meta && e.key === '0') {
-        e.preventDefault();
-        setAjuste('ancho');
-        return;
-      }
-      if (meta || e.altKey || enCampoDeTexto(e.target)) return;
-      if (e.key === 'Escape') {
+      // La tabla de `atajos.ts` es también la de la hoja de «?».
+      const accion = accionDeTecla(e, enCampoDeTexto(e.target));
+      if (accion === null) return;
+      // Pasar página con el teclado, como en cualquier visor de escritorio. Sin
+      // ratón, la única forma de llegar a la página 40 era escribir el número en la
+      // barra. El desplazamiento por defecto se cancela a propósito —salta media
+      // pantalla, no una hoja— que es justo lo que se espera aquí.
+      const sinDocumento =
+        !contenido &&
+        (accion === 'siguiente' ||
+          accion === 'anterior' ||
+          accion === 'primera' ||
+          accion === 'ultima');
+      // «?» con un diálogo o un menú delante es de esa capa (puede ser un campo de
+      // búsqueda que aún no tiene el foco), y la hoja ya abierta no se reabre.
+      if (sinDocumento || (accion === 'ayuda' && haySuperposicionAbierta())) return;
+      // Escape no se cancela: el diálogo o el menú que lo tengan lo siguen recibiendo.
+      if (accion !== 'soltar') e.preventDefault();
+      switch (accion) {
+        // Ctrl+P es el documento, no la página del navegador con cuatro hojas y la cinta.
+        case 'imprimir':
+          void imprimir();
+          break;
+        case 'buscar':
+          setPanel('buscar');
+          setPanelAbierto(true);
+          break;
+        case 'acercar':
+        case 'alejar':
+          cambiarZoom(accion === 'alejar' ? -0.15 : 0.15);
+          break;
+        case 'ancho':
+          setAjuste('ancho');
+          break;
         // Escape suelta la herramienta ANTES que cerrar el panel: quien acaba de
         // marcar algo sin querer quiere volver a la mano, no perder la vista.
-        if (herramienta !== 'mano') setHerramienta('mano');
-        else setPanelAbierto(false);
-        return;
-      }
-      // Pasar página con el teclado, como en cualquier visor de escritorio.
-      // Aquí no existía: sin ratón, la única forma de llegar a la página 40 era
-      // escribir el número en la barra, y desplazarse a mano no pedía los lotes
-      // por delante. El desplazamiento por defecto se cancela a propósito —salta
-      // media pantalla, no una hoja— que es justo lo que se espera aquí.
-      if (!contenido) return;
-      const salto = e.key === 'PageDown' ? 1 : e.key === 'PageUp' ? -1 : 0;
-      if (salto !== 0) {
-        e.preventDefault();
-        irAPagina(paginaActual + salto);
-      } else if (e.key === 'Home' || e.key === 'End') {
-        e.preventDefault();
-        irAPagina(e.key === 'Home' ? 1 : contenido.total);
+        case 'soltar':
+          if (herramienta !== 'mano') setHerramienta('mano');
+          else setPanelAbierto(false);
+          break;
+        case 'siguiente':
+        case 'anterior':
+          irAPagina(paginaActual + (accion === 'siguiente' ? 1 : -1));
+          break;
+        case 'primera':
+        case 'ultima':
+          if (contenido) irAPagina(accion === 'primera' ? 1 : contenido.total);
+          break;
+        case 'ayuda':
+          setAtajosAbiertos(true);
+          break;
+        default:
+          accion satisfies never;
       }
     };
     document.addEventListener('keydown', alPulsar);
@@ -547,7 +679,7 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
     // meterla aquí volvería a registrar el listener del teclado en TODOS. Lo que
     // esa función lee —`contenido` y la ref del scroll— ya está cubierto.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [herramienta, paginaActual, contenido]);
+  }, [herramienta, paginaActual, contenido, imprimir]);
 
   /* --- Buscar ------------------------------------------------------------ */
 
@@ -660,7 +792,11 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
           trabaja en algo. Una región viva SIEMPRE presente —una que aparece con su texto ya
           dentro no se anuncia—; los errores y los avisos tienen la suya más abajo. */}
       <div class="sr-only" role="status" aria-live="polite">
-        {trabajando ? t('pdf.working') : t('pdf.page.n', { n: paginaActual })}
+        {preparando
+          ? t('pdf.print.preparing', { n: preparando.hechas, total: preparando.total })
+          : trabajando
+            ? t('pdf.working')
+            : t('pdf.page.n', { n: paginaActual })}
       </div>
       <BarraHerramientas
         t={t}
@@ -684,7 +820,14 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
         onIrA={irAPagina}
         onDialogo={setDialogo}
         permisos={contenido.permisos}
-        trabajando={trabajando}
+        trabajando={trabajando || preparando !== null}
+        progreso={
+          preparando
+            ? t('pdf.print.preparing', { n: preparando.hechas, total: preparando.total })
+            : undefined
+        }
+        urlDescarga={ruta(`/api/pdf-descargar?path=${encodeURIComponent(path)}`)}
+        onImprimir={() => void imprimir()}
         panelAbierto={panelAbierto}
         onPanelAbierto={setPanelAbierto}
       />
@@ -695,7 +838,7 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
         // sobre un documento que no se guardó sin enterarse hasta mucho después.
         <div
           role={error ? 'alert' : 'status'}
-          class={`flex flex-wrap items-center justify-between gap-3 px-4 py-2 text-sm ${
+          class={`sytue-no-print flex flex-wrap items-center justify-between gap-3 px-4 py-2 text-sm ${
             error ? 'bg-danger-bg text-danger-text' : 'bg-success-bg text-success-text'
           }`}
         >
@@ -727,7 +870,7 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
       {peticion && (
         <div
           role="status"
-          class="bg-info-bg text-info-text flex flex-wrap items-center justify-between gap-3 px-4 py-2 text-sm"
+          class="sytue-no-print bg-info-bg text-info-text flex flex-wrap items-center justify-between gap-3 px-4 py-2 text-sm"
         >
           <span class="min-w-0">
             {t('pdf.signatureRequest.banner', { name: quienFirma(peticion, 'received') })}
@@ -822,7 +965,7 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
       {camposNuevos.length > 0 && (
         <div
           role="status"
-          class="bg-bg-subtle text-text flex flex-wrap items-center justify-between gap-3 px-4 py-2 text-sm"
+          class="sytue-no-print bg-bg-subtle text-text flex flex-wrap items-center justify-between gap-3 px-4 py-2 text-sm"
         >
           <span>{t('pdf.field.pending', { count: camposNuevos.length })}</span>
           <span class="flex items-center gap-2">
@@ -862,7 +1005,7 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
       {zonas.length > 0 && (
         <div
           role="status"
-          class="bg-warning-bg text-warning-text flex flex-wrap items-center justify-between gap-3 px-4 py-2 text-sm"
+          class="sytue-no-print bg-warning-bg text-warning-text flex flex-wrap items-center justify-between gap-3 px-4 py-2 text-sm"
         >
           <span>{t('pdf.redact.pending', { count: zonas.length })}</span>
           <span class="flex items-center gap-2">
@@ -885,7 +1028,7 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
         </div>
       )}
 
-      <div class="flex min-h-0 flex-1">
+      <div class="sytue-no-print flex min-h-0 flex-1">
         <PanelLateral
           t={t}
           panel={panel}
@@ -967,16 +1110,78 @@ export function PdfApp({ path, locale, autor, volverA }: PdfAppProps) {
         onAplicar={aplicar}
         trabajando={trabajando}
         svgs={svgs}
+        locale={locale}
+        onRestaurada={(v) => void restaurada(v)}
       />
+
+      {paraImprimir && <HojasParaImprimir hojas={paraImprimir} />}
 
       {/* Lo que usan las anotaciones para pedir su texto: sin esto montado,
           `preguntarEnEditor` se cae al diálogo del navegador. */}
       <DialogosDelEditor />
+
+      <ShortcutsModal
+        open={atajosAbiertos}
+        title={t('pdf.shortcuts.title')}
+        groups={gruposDeAtajos(t)}
+        onClose={() => setAtajosAbiertos(false)}
+      />
     </div>
   );
 }
 
 /* ------------------------------------------------------------------------ */
+
+/**
+ * El documento en papel: una hoja por página, cada una en su folio.
+ *
+ * En pantalla no existe (`hidden`) y en la hoja de impresión de la suite es lo único
+ * que queda: la cinta, el panel y las franjas llevan `sytue-no-print`. Cada hoja ocupa
+ * el ancho del folio sin pasarse de su alto —en papel, `100dvh` es el alto del folio—,
+ * con la proporción de su página, así que una apaisada no se parte en dos.
+ *
+ * `@page` sin margen: el documento ya trae los suyos, y con margen el navegador añade
+ * además la URL y la fecha en las esquinas, que no son del documento.
+ *
+ * Va colgado directamente de `<body>` y no dentro de la app: el marco de la suite mide
+ * `100dvh` con `overflow: hidden`, y en papel eso recorta todo lo que pase del primer
+ * folio —de veinte hojas salía una—. Por eso, al imprimir, lo demás del `<body>` se
+ * apaga entero.
+ *
+ * Los recursos de cada SVG (`clipPath`, patrones…) llevan identificadores del motor que
+ * son los mismos que los de la copia de pantalla. Un `url(#…)` va al PRIMERO del
+ * documento, que es el de pantalla, apagado en papel: con un prefijo propio la hoja usa
+ * los suyos.
+ */
+function HojasParaImprimir({ hojas }: { hojas: HojaImpresa[] }) {
+  return createPortal(
+    <div class="sytue-solo-print hidden" data-impresion aria-hidden="true">
+      <style>
+        {
+          '@page { margin: 0; } @media print { body > :not([data-impresion]) { display: none !important; } }'
+        }
+      </style>
+      {hojas.map(({ pagina, svg }) => (
+        <div
+          key={pagina.numero}
+          data-hoja-impresa={pagina.numero}
+          class="mx-auto break-inside-avoid break-after-page overflow-hidden bg-white [&>svg]:h-full [&>svg]:w-full"
+          style={{
+            width: `min(100%, calc(100dvh * ${pagina.ancho / pagina.alto}))`,
+            aspectRatio: `${pagina.ancho} / ${pagina.alto}`,
+          }}
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{ __html: svg.replaceAll(PREFIJO_IDS_MOTOR, PREFIJO_IDS_PAPEL) }}
+        />
+      ))}
+    </div>,
+    document.body,
+  );
+}
+
+/** El prefijo de los identificadores que el motor pone a los recursos de cada página. */
+const PREFIJO_IDS_MOTOR = 'sypdf-';
+const PREFIJO_IDS_PAPEL = 'sypdf-papel-';
 
 /** Zona marcada para censurar, en coordenadas del PDF. */
 interface ZonaCensura {

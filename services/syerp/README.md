@@ -199,6 +199,8 @@ GET    /api/v1/balance                     sumas y saldos
 POST   /api/v1/libro/{id}/anular           anular un asiento               (admin)
 GET    /api/v1/conexiones                  conectores configurados         (admin)
 POST   /api/v1/conexiones/{proveedor}      configurar Stripe/Salesforce    (admin)
-POST   /api/v1/importar/salesforce         importar                        (admin)
+POST   /api/v1/conexiones/{p}/probar       probar sin escribir (1 fila)    (admin)
+POST   /api/v1/importar/{p}                importar (salesforce, odoo,
+                                           business-central, holded)       (admin)
 POST   /webhooks/stripe/{org}              webhook de Stripe          (sin sesión)
 ```

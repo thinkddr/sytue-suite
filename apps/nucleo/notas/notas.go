@@ -11,6 +11,7 @@
 package notas
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"encoding/json"
@@ -25,6 +26,7 @@ import (
 	"unicode"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/notes/model"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 )
 
@@ -47,6 +49,7 @@ type Captura struct {
 	In        api.NoteInput `json:"input"`
 	At        int64         `json:"at"`
 	Rechazada bool          `json:"rechazada,omitempty"`
+	Insegura  bool          `json:"-"` // fuente local retenida sin decodificar ni enviar
 }
 
 // Envio es lo que la cola necesita del servicio.
@@ -84,13 +87,65 @@ func Pendientes(st *offline.Store, dueño string) []Captura {
 	}
 	out := make([]Captura, 0, len(rs))
 	for _, r := range rs {
-		var c Captura
-		if json.Unmarshal(r.Value, &c) == nil {
-			out = append(out, c)
-		}
+		out = append(out, capturaDesdeRegistro(r))
 	}
 	slices.SortStableFunc(out, func(a, b Captura) int { return int(a.At - b.At) })
 	return out
+}
+
+// capturaDesdeRegistro inspects the source bytes before Go's decoder folds
+// names or drops duplicates. Rejected records remain byte-for-byte in the WAL.
+func capturaDesdeRegistro(r offline.Record) Captura {
+	rejected := Captura{ClientID: r.ID, Rechazada: true, Insegura: true}
+	if err := model.ValidarJSONSinClavesDuplicadas(r.Value, func(path []string) bool { return len(path) == 0 }); err != nil {
+		return rejected
+	}
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(r.Value, &fields) != nil || fields == nil {
+		return rejected
+	}
+	allowed := map[string]bool{"client_id": true, "notebook_id": true, "date": true, "title": true, "input": true, "at": true, "rechazada": true}
+	for key := range fields {
+		if !allowed[key] {
+			return rejected
+		}
+	}
+	var header struct {
+		ClientID  string          `json:"client_id"`
+		Cuaderno  string          `json:"notebook_id"`
+		Fecha     string          `json:"date"`
+		Titulo    string          `json:"title"`
+		In        json.RawMessage `json:"input"`
+		At        int64           `json:"at"`
+		Rechazada bool            `json:"rechazada"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(r.Value))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&header) != nil || header.ClientID == "" || header.ClientID != r.ID {
+		return rejected
+	}
+	rejected.Cuaderno, rejected.Fecha, rejected.Titulo, rejected.At = header.Cuaderno, header.Fecha, header.Titulo, header.At
+	if err := api.ValidarEntradaNotaJSON(header.In); err != nil {
+		return rejected
+	}
+	var in api.NoteInput
+	if json.Unmarshal(header.In, &in) != nil {
+		return rejected
+	}
+	var data map[string]json.RawMessage
+	if json.Unmarshal(in.Data, &data) != nil || data == nil {
+		return rejected
+	}
+	for key := range data {
+		if key != "client_id" && strings.EqualFold(key, "client_id") {
+			return rejected
+		}
+	}
+	var inputID string
+	if json.Unmarshal(data["client_id"], &inputID) != nil || inputID != header.ClientID {
+		return rejected
+	}
+	return Captura{ClientID: header.ClientID, Cuaderno: header.Cuaderno, Fecha: header.Fecha, Titulo: header.Titulo, In: in, At: header.At, Rechazada: header.Rechazada}
 }
 
 // Vaciar envía en orden. Para en el primer fallo que no sea un rechazo (el resto
@@ -100,6 +155,12 @@ func Vaciar(ctx context.Context, st *offline.Store, dueño string, e Envio) map[
 	tocados := map[string]bool{}
 	for _, c := range Pendientes(st, dueño) {
 		if c.Rechazada {
+			continue
+		}
+		if err := c.In.ValidarEnlacesCifrados(); err != nil {
+			if err := marcarCapturaRechazada(ctx, st, dueño, c.ClientID); err != nil {
+				break
+			}
 			continue
 		}
 		nb := c.Cuaderno
@@ -127,6 +188,25 @@ func Vaciar(ctx context.Context, st *offline.Store, dueño string, e Envio) map[
 		_ = st.Write(dueño, EspacioCapturas, c.ClientID, c)
 	}
 	return tocados
+}
+
+func marcarCapturaRechazada(ctx context.Context, st *offline.Store, dueño, clientID string) error {
+	return st.Exclusive(ctx, dueño, EspacioCapturas, clientID, func() error {
+		return st.Mutate(dueño, EspacioCapturas, clientID, func(raw json.RawMessage) (any, error) {
+			if raw == nil {
+				return nil, nil
+			}
+			var current Captura
+			if err := json.Unmarshal(raw, &current); err != nil {
+				return nil, err
+			}
+			if current.In.ValidarEnlacesCifrados() == nil {
+				return current, nil
+			}
+			current.Rechazada = true
+			return current, nil
+		})
+	})
 }
 
 // Subir es lo que se hace al cerrar sesión con «Subir»: cada borrador pasa a la cola

@@ -7,9 +7,11 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/services/bases/internal/domain"
@@ -274,14 +276,22 @@ func (h *Handlers) renombrarCampo(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, err)
 		return
 	}
-	// {"name": …} renombra; {"formula": …} cambia la expresión de un campo de fórmula.
+	// {"name": …} renombra; {"formula": …} cambia la expresión de un campo de fórmula;
+	// {"choices": […]} sustituye las opciones de un campo de selección.
 	var in struct {
-		Name    string  `json:"name"`
-		Formula *string `json:"formula"`
+		Name    string    `json:"name"`
+		Formula *string   `json:"formula"`
+		Choices *[]string `json:"choices"`
 	}
 	if err := httpx.DecodeJSON(w, r, &in); err != nil {
 		httpx.Fail(w, r, err)
 		return
+	}
+	if in.Choices != nil {
+		if err := h.Store.CambiarOpciones(r.Context(), a, fid, *in.Choices); err != nil || in.Name == "" {
+			h.hecho(w, r, err)
+			return
+		}
 	}
 	if in.Formula != nil {
 		if err := h.Store.CambiarFormula(r.Context(), a, fid, *in.Formula); err != nil || in.Name == "" {
@@ -290,6 +300,24 @@ func (h *Handlers) renombrarCampo(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	h.hecho(w, r, h.Store.RenombrarCampo(r.Context(), a, fid, in.Name))
+}
+
+// reordenarCampos fija el orden de los campos de una tabla: {"fields": [ids…]}, todos.
+func (h *Handlers) reordenarCampos(w http.ResponseWriter, r *http.Request) {
+	a, err := actor(r)
+	tid, err2 := id(r, "tid")
+	if err = firstErr(err, err2); err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
+	var in struct {
+		Fields []string `json:"fields"`
+	}
+	if err := httpx.DecodeJSON(w, r, &in); err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
+	h.hecho(w, r, h.Store.ReordenarCampos(r.Context(), a, tid, in.Fields))
 }
 
 func (h *Handlers) borrarCampo(w http.ResponseWriter, r *http.Request) {
@@ -325,12 +353,52 @@ func (h *Handlers) listarRegistros(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	limite, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	p, err := h.Store.ListarRegistros(r.Context(), a, tid, vista, limite, r.URL.Query().Get("cursor"))
+	extra, ok := lecturaAdHoc(r.URL.Query())
+	if !ok {
+		httpx.Fail(w, r, httpx.ErrBadRequest)
+		return
+	}
+	p, err := h.Store.ListarRegistrosCon(r.Context(), a, tid, vista, limite, r.URL.Query().Get("cursor"), extra)
 	if err != nil {
 		httpx.Fail(w, r, errorAPI(err))
 		return
 	}
 	httpx.JSON(w, r, http.StatusOK, p)
+}
+
+// maxBusqueda y maxClavesOrden acotan lo que una lectura puede pedir de un momento.
+const (
+	maxBusqueda    = 200
+	maxClavesOrden = 3
+)
+
+// lecturaAdHoc lee `q` (búsqueda libre) y `sort` (`campo:asc,campo:desc`, sin
+// dirección = asc). Un campo inexistente se ignora como en una vista guardada; lo que
+// no es un orden válido, o una búsqueda desmedida, es una petición mal hecha.
+func lecturaAdHoc(v url.Values) (store.LecturaAdHoc, bool) {
+	out := store.LecturaAdHoc{Search: strings.TrimSpace(v.Get("q"))}
+	if utf8.RuneCountInString(out.Search) > maxBusqueda {
+		return out, false
+	}
+	s := strings.TrimSpace(v.Get("sort"))
+	if s == "" {
+		return out, true
+	}
+	partes := strings.Split(s, ",")
+	if len(partes) > maxClavesOrden {
+		return out, false
+	}
+	for _, p := range partes {
+		campo, dir, _ := strings.Cut(strings.TrimSpace(p), ":")
+		if dir == "" {
+			dir = "asc"
+		}
+		if campo == "" || (dir != "asc" && dir != "desc") {
+			return out, false
+		}
+		out.Sort = append(out.Sort, domain.Orden{Field: campo, Dir: dir})
+	}
+	return out, true
 }
 
 func (h *Handlers) crearRegistro(w http.ResponseWriter, r *http.Request) {
@@ -424,6 +492,33 @@ func (h *Handlers) crearVista(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, r, http.StatusCreated, v)
+}
+
+// entradaCambioVista es el cuerpo de PATCH /views/{vid}: lo que no viene no cambia, y el
+// tipo no está porque no se cambia (ver Store.ActualizarVista).
+type entradaCambioVista struct {
+	Name   *string             `json:"name"`
+	Config *domain.ConfigVista `json:"config"`
+}
+
+func (h *Handlers) actualizarVista(w http.ResponseWriter, r *http.Request) {
+	a, err := actor(r)
+	vid, err2 := id(r, "vid")
+	if err = firstErr(err, err2); err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
+	var in entradaCambioVista
+	if err := httpx.DecodeJSON(w, r, &in); err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
+	v, err := h.Store.ActualizarVista(r.Context(), a, vid, in.Name, in.Config)
+	if err != nil {
+		httpx.Fail(w, r, errorAPI(err))
+		return
+	}
+	httpx.JSON(w, r, http.StatusOK, v)
 }
 
 func (h *Handlers) borrarVista(w http.ResponseWriter, r *http.Request) {

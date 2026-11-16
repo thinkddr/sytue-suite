@@ -4,10 +4,11 @@
  * vacíos en el historial. La URL y el estado del router se conservan.
  */
 import { useLayoutEffect } from 'preact/hooks';
+import { CONSULTA_DEDO } from './useEnHoja.js';
 import { useUltimo } from './useUltimo.js';
 
 const CLAVE = '__sytueMobileBack';
-const DEDO = '(pointer: coarse)';
+const DEDO = CONSULTA_DEDO;
 
 interface Marca {
   sesion: string;

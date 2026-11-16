@@ -83,3 +83,21 @@ test('sin texto no hay nada que pegar', () => {
   expect(pegadoConFormato('<img src="x">')).toBe('');
   expect(pegadoConFormato('')).toBe('');
 });
+
+test('las tareas de una nota solo pasan si quien pega las pide, y sin atributos', () => {
+  const html =
+    '<div class="task-row" onclick="x()"><input type="checkbox" checked onclick="y()" class="z"> ' +
+    '<span style="color:red">Cajas</span></div>';
+  expect(pegadoConFormato(html, { tareas: true })).toBe(
+    '<div class="task-row"><input type="checkbox" checked=""> <span>Cajas</span></div>',
+  );
+  expect(pegadoConFormato(html)).toBe('<div> Cajas</div>');
+});
+
+test('una fila de tarea sin `<span>` toma el resto de la fila como texto', () => {
+  expect(
+    pegadoConFormato('<div class="task-row"><input type="checkbox"> <b>sola</b></div>', {
+      tareas: true,
+    }),
+  ).toBe('<div class="task-row"><input type="checkbox"> <span><b>sola</b></span></div>');
+});

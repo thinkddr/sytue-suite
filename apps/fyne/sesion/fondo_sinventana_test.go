@@ -337,6 +337,20 @@ func TestLaEntradaJNIEsLaDeJava(t *testing.T) {
 		!strings.Contains(entrada, "//export Java_eu_sytue_nativo_RefrescoWidgets_refrescar") {
 		t.Error("la exportación de Go no casa con RefrescoWidgets.refrescar")
 	}
+	// La tarea en segundo plano (tareas_fondo.go): la misma forma de entrada y la llamada
+	// con la que la app la programa.
+	tarea := leer(filepath.Join(java, "TareaFondo.java"))
+	if !strings.Contains(tarea, "static native int ejecutar(Context ctx, String paquete, String producto, String zona, int desfase);") {
+		t.Error("TareaFondo.ejecutar ya no es (Context, String, String, String, int) → int")
+	}
+	if !regexp.MustCompile(`func Java_eu_sytue_nativo_TareaFondo_ejecutar\(env \*C\.JNIEnv, _ C\.jclass, contexto C\.jobject,\s+paquete, producto, zona C\.jstring, desfase C\.jint\) \(r C\.jint\)`).MatchString(entrada) ||
+		!strings.Contains(entrada, "//export Java_eu_sytue_nativo_TareaFondo_ejecutar") {
+		t.Error("la exportación de Go no casa con TareaFondo.ejecutar")
+	}
+	if !strings.Contains(tarea, "public static void programar(Context ctx, String producto, boolean activa, boolean conDatos)") ||
+		!strings.Contains(leer("tareas_fondo_android.go"), `"programar", "(Landroid/content/Context;Ljava/lang/String;ZZ)V"`) {
+		t.Error("TareaFondo.programar no casa con la llamada de Go")
+	}
 	relevo := leer(filepath.Join(java, "RelevoWidgets.java"))
 	if !strings.Contains(relevo, "public static boolean avisar(Context ctx, String paquete)") ||
 		!strings.Contains(entrada, `"avisar", "(Landroid/content/Context;Ljava/lang/String;)Z"`) {

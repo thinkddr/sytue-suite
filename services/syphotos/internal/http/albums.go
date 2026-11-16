@@ -218,11 +218,42 @@ func (h *Handlers) Papelera(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, traducir(err))
 		return
 	}
-	items := make([]activoJSON, 0, len(fotos))
-	for _, a := range fotos {
-		items = append(items, aJSON(a))
+	httpx.JSON(w, r, http.StatusOK, papeleraJSON(fotos, h.cfg.TrashRetention))
+}
+
+// papeleraRespuesta es la papelera con su plazo.
+//
+// LA FECHA DE PURGA LA CALCULA EL SERVICIO, que es quien conoce la retención y
+// quien purga: si cada cliente sumara días por su cuenta, la web y el escritorio
+// podrían prometer fechas distintas para la misma foto. `retentionDays` va además
+// a nivel de lista porque la papelera VACÍA también tiene que poder decirlo.
+// A cero no caduca nada (`TRASH_RETENTION=0`), y entonces no se promete fecha.
+type papeleraRespuesta struct {
+	Items         []fotoEnPapeleraJSON `json:"items"`
+	RetentionDays int                  `json:"retentionDays"`
+}
+
+type fotoEnPapeleraJSON struct {
+	activoJSON
+	BorradaEn *time.Time `json:"deletedAt,omitempty"`
+	SeBorraEn *time.Time `json:"purgeAt,omitempty"`
+}
+
+func papeleraJSON(fotos []domain.Activo, retencion time.Duration) papeleraRespuesta {
+	out := papeleraRespuesta{Items: make([]fotoEnPapeleraJSON, 0, len(fotos))}
+	if retencion > 0 {
+		// Hacia arriba: una retención de 36 h no es «1 día».
+		out.RetentionDays = int((retencion + 24*time.Hour - 1) / (24 * time.Hour))
 	}
-	httpx.JSON(w, r, http.StatusOK, map[string]any{"items": items})
+	for _, a := range fotos {
+		f := fotoEnPapeleraJSON{activoJSON: aJSON(a), BorradaEn: a.BorradaEn}
+		if a.BorradaEn != nil && retencion > 0 {
+			t := a.BorradaEn.Add(retencion)
+			f.SeBorraEn = &t
+		}
+		out.Items = append(out.Items, f)
+	}
+	return out
 }
 
 // POST /api/v1/assets/{id}/restore.
@@ -280,7 +311,7 @@ func (h *Handlers) purgarDerivadas(r *http.Request, purgadas []store.Purgada) {
 	}
 	fallos := 0
 	for _, p := range purgadas {
-		fallos += h.limpieza.BorrarDerivadas(r.Context(), t.Slug, p.ID, p.Huella)
+		fallos += h.limpieza.BorrarDerivadas(r.Context(), t.Slug, p.Owner, p.ID, p.Huella)
 	}
 	if fallos > 0 {
 		log.From(r.Context()).Warn("quedaron derivadas sin borrar de fotos purgadas",

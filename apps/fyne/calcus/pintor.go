@@ -4,6 +4,7 @@
 package calcus
 
 import (
+	"fmt"
 	"image/color"
 	"math"
 	"slices"
@@ -18,6 +19,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/formula"
+	"git.sytue.eu/sytue/one/apps/nucleo/formula/analisis"
 	"git.sytue.eu/sytue/one/apps/nucleo/tokens"
 )
 
@@ -54,10 +56,12 @@ func (r *Rejilla) CreateRenderer() fyne.WidgetRenderer {
 	rr := &rejillaRenderer{
 		r: r, fondo: canvas.NewRectangle(FondoLienzo(v)), esquina: nuevaCabecera(v),
 		asa: canvas.NewRectangle(tema.Color("primary-500", v)), asaBorde: canvas.NewRectangle(Papel), botonVal: nuevaCabecera(v),
+		tiradores: nuevosTiradores(),
 	}
 	for i := range rr.marcoSel {
 		rr.marcoSel[i] = canvas.NewRectangle(tema.Color("primary-500", v))
 		rr.marcoFoco[i] = canvas.NewRectangle(tema.Color("focus-ring", v))
+		rr.marcoComentario[i] = canvas.NewRectangle(MarcaComentario)
 	}
 	r.r = rr
 	rr.recomponer()
@@ -68,6 +72,7 @@ func (r *Rejilla) CreateRenderer() fyne.WidgetRenderer {
 type celdaPintada struct {
 	fondo       *canvas.Rectangle
 	barra       *canvas.Rectangle   // la barra de datos del formato condicional
+	marca       *canvas.Raster      // el triángulo de una celda con comentarios (comentarios.go)
 	der, abajo  *canvas.Rectangle   // `border-r border-b`: la cuadrícula o el borde del estilo
 	arriba, izq *canvas.Rectangle   // los bordes de arriba e izquierda del estilo
 	trazos      []*canvas.Rectangle // los segmentos de los bordes discontinuos, de puntos o dobles
@@ -87,7 +92,7 @@ func nuevaCelda(rueda func(*fyne.ScrollEvent)) *celdaPintada {
 		fondo: canvas.NewRectangle(Papel), barra: canvas.NewRectangle(color.NRGBA{}),
 		der: canvas.NewRectangle(LineaRejillaAlfa), abajo: canvas.NewRectangle(LineaRejillaAlfa),
 		arriba: canvas.NewRectangle(color.NRGBA{}), izq: canvas.NewRectangle(color.NRGBA{}),
-		icono: &canvas.Image{FillMode: canvas.ImageFillStretch}, mini: nuevoRasterSVG(),
+		icono: &canvas.Image{FillMode: canvas.ImageFillStretch}, mini: nuevoRasterSVG(), marca: nuevaMarcaComentario(),
 		texto: ui.Texto("", EscalonCelda, ui.Normal, Tinta), otra: ui.Texto("", EscalonCelda, ui.Normal, Tinta),
 	}
 	cp.caja = nuevoRecorte(rueda, cp.texto, cp.otra)
@@ -95,8 +100,8 @@ func nuevaCelda(rueda func(*fyne.ScrollEvent)) *celdaPintada {
 }
 
 func (cp *celdaPintada) objetos() []fyne.CanvasObject {
-	o := make([]fyne.CanvasObject, 0, 9+len(cp.trazos))
-	o = append(o, cp.fondo, cp.barra, cp.der, cp.abajo, cp.arriba, cp.izq)
+	o := make([]fyne.CanvasObject, 0, 10+len(cp.trazos))
+	o = append(o, cp.fondo, cp.barra, cp.marca, cp.der, cp.abajo, cp.arriba, cp.izq)
 	for _, t := range cp.trazos {
 		o = append(o, t)
 	}
@@ -168,17 +173,41 @@ const (
 type cabeceraPintada struct {
 	fondo, der, abajo *canvas.Rectangle
 	rotulo            *canvas.Text
+	// marca es la raya doble de `.sytue-grid-head-tras-ocultas`: hay filas o columnas
+	// ocultas a mano justo antes de esta cabecera.
+	marca [2]*canvas.Rectangle
 }
 
 func nuevaCabecera(v tema.Variante) *cabeceraPintada {
-	return &cabeceraPintada{
+	cb := &cabeceraPintada{
 		fondo: canvas.NewRectangle(tema.Color("bg-subtle", v)), der: canvas.NewRectangle(tema.Color("border", v)),
 		abajo: canvas.NewRectangle(tema.Color("border", v)), rotulo: ui.Texto("", EscalonCabecera, ui.Normal, tema.Color("text-muted", v)),
+		marca: [2]*canvas.Rectangle{canvas.NewRectangle(tema.Color("border-strong", v)), canvas.NewRectangle(tema.Color("border-strong", v))},
 	}
+	cb.marca[0].Hide()
+	cb.marca[1].Hide()
+	return cb
 }
 
 func (cb *cabeceraPintada) objetos() []fyne.CanvasObject {
-	return []fyne.CanvasObject{cb.fondo, cb.der, cb.abajo, cb.rotulo}
+	return []fyne.CanvasObject{cb.fondo, cb.der, cb.abajo, cb.rotulo, cb.marca[0], cb.marca[1]}
+}
+
+// marcarOcultas pinta (o quita) la raya doble del borde de entrada: `border-style: double`
+// de 3 px, que son dos líneas de 1 px con 1 px en medio, a 2 px antes del borde.
+func (cb *cabeceraPintada) marcarOcultas(si, vertical bool, v tema.Variante, x, y, largo, z float32) {
+	for i, m := range cb.marca {
+		if !si {
+			m.Hide()
+			continue
+		}
+		d := (float32(2*i) - 2) * z // −2 y 0
+		if vertical {
+			caja(m, tema.Color("border-strong", v), x+d, y, tema.Borde*z, largo)
+		} else {
+			caja(m, tema.Color("border-strong", v), x, y+d, largo, tema.Borde*z)
+		}
+	}
 }
 
 func (cb *cabeceraPintada) esconder() {
@@ -198,10 +227,12 @@ type rejillaRenderer struct {
 	cabCols, cabFilas []*cabeceraPintada
 	esquina           *cabeceraPintada
 	marcoSel          [4]*canvas.Rectangle
+	marcoComentario   [4]*canvas.Rectangle // la celda del hilo con el puntero encima (comentarios.go)
 	marcoFoco         [4]*canvas.Rectangle
 	marcosFx          []*marcoFx
 	tinteCelda        tinte
 	asa, asaBorde     *canvas.Rectangle
+	tiradores         [2]*canvas.Circle   // los del rango con el dedo (`tactil.go`)
 	invalidas         []*canvas.Rectangle // el contorno rojo de lo que no cumple su validación
 	botonVal          *cabeceraPintada    // el «▾» de la validación de lista (misma receta: fondo, línea y rótulo)
 	botonesFiltro     []*cabeceraPintada  // los «▾» del autofiltro, uno por columna
@@ -215,6 +246,8 @@ type rejillaRenderer struct {
 	// Lo de la hoja que se mira en cada celda, leído una vez por pintado.
 	tablas []tablaCompilada
 	minis  map[Celda]Minigrafico
+	// marcas son las celdas de la hoja activa con hilos abiertos (comentarios.go).
+	marcas map[Celda]int
 }
 
 // marcoFx es el marco de color de una referencia de la fórmula en edición
@@ -247,6 +280,9 @@ func (rr *rejillaRenderer) recomponer() {
 	for _, cp := range rr.celdas {
 		o = append(o, cp.objetos()...)
 	}
+	for _, m := range rr.marcoComentario {
+		o = append(o, m)
+	}
 	for _, m := range rr.marcoSel {
 		o = append(o, m)
 	}
@@ -261,7 +297,7 @@ func (rr *rejillaRenderer) recomponer() {
 	for _, m := range rr.marcosTabla {
 		o = append(o, m)
 	}
-	o = append(o, rr.asaBorde, rr.asa)
+	o = append(o, rr.asaBorde, rr.asa, rr.tiradores[0], rr.tiradores[1])
 	o = append(o, rr.botonVal.objetos()...)
 	for _, b := range rr.botonesFiltro {
 		o = append(o, b.objetos()...)
@@ -286,6 +322,7 @@ func (rr *rejillaRenderer) recomponer() {
 		o = append(o, m)
 	}
 	o = append(o, rr.tinteCelda.objetos()...)
+	o = append(o, rr.r.anclaMenu)
 	rr.objetos = append(o, rr.r.ed.Objeto()) //nolint:gocritic // `o` es local y su único destino es este campo
 }
 
@@ -307,12 +344,15 @@ type vista struct {
 	z          float32
 	fc, ff     int     // columnas y filas inmovilizadas
 	desX, desY float32 // el desplazamiento, ya con el zoom
-	filas      mapaFilas
+	filas      eje
 	// cols son las columnas que se ven (el esquema puede esconder alguna), con el mismo
 	// mapa que las filas; cx y cy, el canalón del esquema (`RGUT` y `CGUT`) en px de la
 	// hoja: corren el origen de las celdas sin cambiar su tamaño, como en la web.
-	cols   mapaFilas
+	cols   eje
 	cx, cy float32
+	// fus son las combinadas que se miran al pintar: todas las de la hoja, o en Layout
+	// solo las que tocan la ventana (`fusionesEnVentana`).
+	fus []Fusion
 }
 
 // mapaFilas es el `visRows` de la web: con el autofiltro escondiendo filas, `antes[f]` es
@@ -367,14 +407,28 @@ func (m mapaFilas) oculta(f int) bool {
 	return m.antes != nil && f >= 0 && f < len(m.antes)-1 && m.antes[f+1] == m.antes[f]
 }
 
-func (v vista) ancho() float32 { return AnchoCelda * v.z }
-func (v vista) alto() float32  { return AltoCelda * v.z }
-func (v vista) ox() float32    { return (AnchoCabecera + v.cx) * v.z }
-func (v vista) oy() float32    { return (AltoCelda + v.cy) * v.z }
+// ancho y alto son lo que mide en la pantalla la columna c o la fila f: la medida
+// propia de la hoja o la de serie, por el zoom.
+func (v vista) ancho(c int) float32 { return v.cols.medida(c) * v.z }
+func (v vista) alto(f int) float32  { return v.filas.medida(f) * v.z }
+func (v vista) ox() float32         { return (AnchoCabecera + v.cx) * v.z }
+func (v vista) oy() float32         { return (AltoCelda + v.cy) * v.z }
+
+// caja es lo que mide en pantalla la celda (c, f): la combinada entera si es su ancla, y
+// `cubierta` si la tapa una combinada, que entonces no se pinta.
+func (v vista) caja(c, f int) (w, h float32, cubierta bool) {
+	if u, ok := fusionEn(v.fus, c, f); ok {
+		if c != u.C1 || f != u.F1 {
+			return 0, 0, true
+		}
+		return (v.cols.borde(u.C2+1) - v.cols.borde(u.C1)) * v.z, (v.filas.borde(u.F2+1) - v.filas.borde(u.F1)) * v.z, false
+	}
+	return v.ancho(c), v.alto(f), false
+}
 
 // x es dónde empieza la columna c en la pantalla: las inmovilizadas no se mueven.
 func (v vista) x(c int) float32 {
-	x := v.ox() + float32(v.cols.puesto(c))*v.ancho()
+	x := v.ox() + v.cols.borde(c)*v.z
 	if c >= v.fc {
 		x -= v.desX
 	}
@@ -382,7 +436,7 @@ func (v vista) x(c int) float32 {
 }
 
 func (v vista) y(f int) float32 {
-	y := v.oy() + float32(v.filas.puesto(f))*v.alto()
+	y := v.oy() + v.filas.borde(f)*v.z
 	if f >= v.ff {
 		y -= v.desY
 	}
@@ -392,7 +446,7 @@ func (v vista) y(f int) float32 {
 // finFijas es dónde acaban las columnas y filas inmovilizadas: lo que se desplaza y cae
 // antes de ahí está tapado.
 func (v vista) finFijas() (x, y float32) {
-	return v.ox() + float32(v.cols.puesto(v.fc))*v.ancho(), v.oy() + float32(v.filas.puesto(v.ff))*v.alto()
+	return v.ox() + v.cols.borde(v.fc)*v.z, v.oy() + v.filas.borde(v.ff)*v.z
 }
 
 // visibles son las columnas (o filas) que se ven: primero las que se desplazan —las de
@@ -419,6 +473,7 @@ func visibles(fijas, total, desde int, pos func(int) float32, limite float32, oc
 func (rr *rejillaRenderer) Layout(t fyne.Size) {
 	rr.ultimo = t
 	r := rr.r
+	r.crecer(r.desX, r.desY)
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	vw := r.vista()
 
@@ -426,23 +481,52 @@ func (rr *rejillaRenderer) Layout(t fyne.Size) {
 	rr.fondo.Move(fyne.NewPos(0, 0))
 	rr.fondo.Resize(t)
 	rr.tablas, rr.minis = r.L.tablasActivas(), r.L.minigraficosPorCelda()
+	rr.marcas = r.L.marcasDeComentarios(r.comentarios)
 
-	cols := visibles(vw.fc, r.Cols, vw.cols.fila(vw.cols.puesto(vw.fc)+int(r.desX/AnchoCelda)), vw.x, t.Width, vw.cols.oculta)
-	fils := visibles(vw.ff, r.Fils, vw.filas.fila(vw.filas.puesto(vw.ff)+int(r.desY/AltoCelda)), vw.y, t.Height, vw.filas.oculta)
-	rr.crecer(len(cols), len(fils), v)
+	cols := visibles(vw.fc, r.Cols, vw.cols.fila(vw.cols.puestoEn(vw.cols.borde(vw.fc)+r.desX)), vw.x, t.Width, vw.cols.oculta)
+	fils := visibles(vw.ff, r.Fils, vw.filas.fila(vw.filas.puestoEn(vw.filas.borde(vw.ff)+r.desY)), vw.y, t.Height, vw.filas.oculta)
+	// Las anclas de fuera de la vista solo hacen falta para las celdas: su cabecera, su
+	// canalón o su marca de no válida caerían fuera, o encima de las de lo inmovilizado.
+	conC, conF, fus := conAnclas(vw, cols, fils)
+	vw.fus = fus
+	rr.crecer(len(conC), len(conF), v)
 
-	rr.pintarCeldas(v, vw, cols, fils)
+	rr.pintarCeldas(v, vw, conC, conF)
 	rr.pintarInvalidas(vw, cols, fils)
 	rr.pintarMarcosTabla(vw, t)
 	rr.pintarCabeceras(v, vw, cols, fils)
 	rr.pintarCanal(v, vw, cols, fils)
+	rr.pintarResalteComentario(vw)
 	rr.pintarSeleccion(v, vw, t)
 	rr.pintarMarcosFx(vw)
 	rr.pintarAsa(v, vw)
+	rr.pintarTiradores(v)
 	rr.pintarBotonValores(v)
 	rr.pintarBotonesFiltro(v)
 	rr.colocarEditor(vw)
 	rr.pintarFlotantes(vw)
+}
+
+// conAnclas añade a lo que se pinta la fila y la columna del ancla de cada combinada que
+// toca la ventana, aunque el ancla quede fuera: ocupa todo el rango y sus cubiertas no se
+// pintan, así que sin ella una cabecera combinada desplazada a medias saldría en blanco
+// (lo mismo que hace SheetCanvas). Devuelve también esas combinadas, las únicas que hay
+// que mirar celda a celda.
+func conAnclas(vw vista, cols, fils []int) ([]int, []int, []Fusion) {
+	if len(vw.fus) == 0 || len(cols) == 0 || len(fils) == 0 {
+		return cols, fils, nil
+	}
+	fus := fusionesEnVentana(vw.fus, slices.Min(cols), slices.Min(fils), slices.Max(cols), slices.Max(fils), TopeFusionesVentana)
+	for _, u := range fus {
+		// Un ancla escondida (filtro, esquema, a mano) no se pinta: la web tampoco.
+		if !slices.Contains(cols, u.C1) && !vw.cols.oculta(u.C1) {
+			cols = append(cols, u.C1)
+		}
+		if !slices.Contains(fils, u.F1) && !vw.filas.oculta(u.F1) {
+			fils = append(fils, u.F1)
+		}
+	}
+	return cols, fils, fus
 }
 
 // pintarFlotantes coloca los gráficos y las segmentaciones, que pone el lienzo, y
@@ -534,7 +618,8 @@ func (rr *rejillaRenderer) pintarInvalidas(vw vista, cols, fils []int) {
 	if len(r.L.Validaciones()) > 0 {
 		for _, f := range fils {
 			for _, c := range cols {
-				if !r.L.marcaInvalida(c, f) {
+				w, h, cubierta := vw.caja(c, f) // la combinada, entera; sus cubiertas no se ven
+				if cubierta || !r.L.marcaInvalida(c, f) {
 					continue
 				}
 				for len(rr.invalidas) < n+4 {
@@ -543,7 +628,7 @@ func (rr *rejillaRenderer) pintarInvalidas(vw vista, cols, fils []int) {
 				}
 				var cuatro [4]*canvas.Rectangle
 				copy(cuatro[:], rr.invalidas[n:n+4])
-				marco(cuatro, Peligro, fyne.NewPos(vw.x(c), vw.y(f)), fyne.NewSize(vw.ancho(), vw.alto()), tema.Borde*vw.z, 0, 0, true)
+				marco(cuatro, Peligro, fyne.NewPos(vw.x(c), vw.y(f)), fyne.NewSize(w, h), tema.Borde*vw.z, 0, 0, true)
 				n += 4
 			}
 		}
@@ -560,7 +645,7 @@ func (rr *rejillaRenderer) pintarInvalidas(vw vista, cols, fils []int) {
 func (rr *rejillaRenderer) pintarAsa(v tema.Variante, vw vista) {
 	r := rr.r
 	primario := tema.Color("primary-500", v)
-	if r.editando {
+	if r.editando || esMovil() { // con el dedo, el rango va con los tiradores (`tactil.go`)
 		rr.asa.Hide()
 		rr.asaBorde.Hide()
 	} else {
@@ -576,7 +661,7 @@ func (rr *rejillaRenderer) pintarAsa(v tema.Variante, vw vista) {
 				// El trazo de 1 px, 2 px hacia dentro del borde de la celda.
 				dentro, g := 2*vw.z, tema.Borde*vw.z
 				pos := fyne.NewPos(vw.x(c)+dentro-g, vw.y(f)+dentro-g)
-				tam := fyne.NewSize(vw.ancho()-2*dentro+2*g, vw.alto()-2*dentro+2*g)
+				tam := fyne.NewSize(vw.ancho(c)-2*dentro+2*g, vw.alto(f)-2*dentro+2*g)
 				for _, t := range discontinuo(pos, tam, g) {
 					if n == len(rr.previa) {
 						rr.previa = append(rr.previa, canvas.NewRectangle(primario))
@@ -650,10 +735,10 @@ func (rr *rejillaRenderer) pintarMarcosFx(vw vista) {
 			continue
 		}
 		c2, f2 := min(ref.Rect.C2, r.Cols-1), min(ref.Rect.R2, r.Fils-1)
-		x := vw.ox() + float32(vw.cols.puesto(ref.Rect.C1))*vw.ancho() - vw.desX
-		y := vw.oy() + float32(vw.filas.puesto(ref.Rect.R1))*vw.alto() - vw.desY
-		w := float32(vw.cols.puesto(c2+1)-vw.cols.puesto(ref.Rect.C1)) * vw.ancho()
-		h := float32(vw.filas.puesto(f2+1)-vw.filas.puesto(ref.Rect.R1)) * vw.alto()
+		x := vw.ox() + vw.cols.borde(ref.Rect.C1)*vw.z - vw.desX
+		y := vw.oy() + vw.filas.borde(ref.Rect.R1)*vw.z - vw.desY
+		w := (vw.cols.borde(c2+1) - vw.cols.borde(ref.Rect.C1)) * vw.z
+		h := (vw.filas.borde(f2+1) - vw.filas.borde(ref.Rect.R1)) * vw.z
 		m := rr.marcosFx[n]
 		n++
 		c := ColorRef(ref.Color)
@@ -741,7 +826,13 @@ func (rr *rejillaRenderer) pintarCelda(cp *celdaPintada, c, f int, vw vista, enR
 	r := rr.r
 	z := vw.z
 	x, y := vw.x(c), vw.y(f)
-	w, h := vw.ancho(), vw.alto()
+	w, h, cubierta := vw.caja(c, f)
+	if cubierta {
+		for _, o := range cp.objetos() {
+			o.Hide()
+		}
+		return
+	}
 	e := r.L.Estilo(c, f)
 	d := r.L.decoracionDe(c, f)
 
@@ -753,6 +844,7 @@ func (rr *rejillaRenderer) pintarCelda(cp *celdaPintada, c, f int, vw vista, enR
 	pintarBarra(cp.barra, d, x, y, w-tema.Borde*z, h-tema.Borde*z)
 
 	anchoDer, anchoAbajo, bt, bl := rr.pintarBordesCelda(cp, c, f, vw, e.Bordes, x, y, w, h, fuerte)
+	pintarMarcaComentario(cp.marca, rr.marcas[Celda{C: c, F: f}] > 0, x, y, w, anchoDer, z)
 
 	icono := ""
 	if d != nil {
@@ -769,6 +861,14 @@ func (rr *rejillaRenderer) pintarCelda(cp *celdaPintada, c, f int, vw vista, enR
 	if d != nil && d.tinta != "" && !r.resaltes[Celda{C: c, F: f}] {
 		// El formato condicional gana al estilo y a la tabla, como su relleno; no a «Buscar».
 		e.Tinta = d.tinta
+	}
+	if r.L.Enlace(c, f) != "" {
+		// Enlace (`enlaces.go`): subrayado siempre, y el azul de la selección salvo que la
+		// celda ya traiga su tinta —la del usuario, la del condicional— o esté en «Buscar».
+		e.Subraya = true
+		if r.L.Estilo(c, f).Tinta == "" && (d == nil || d.tinta == "") && !r.resaltes[Celda{C: c, F: f}] {
+			e.Tinta = fmt.Sprintf("#%02x%02x%02x", primario.R, primario.G, primario.B)
+		}
 	}
 	if m, ok := rr.minis[Celda{C: c, F: f}]; ok {
 		cp.caja.Hide() // el texto va dentro de su recorte
@@ -1079,21 +1179,26 @@ func partirLineas(t *canvas.Text, texto string, ancho float32) []string {
 func (rr *rejillaRenderer) pintarCabeceras(v tema.Variante, vw vista, cols, fils []int) {
 	r := rr.r
 	c1, f1, c2, f2 := r.Rango()
+	ocultFilas, ocultCols := r.L.TramosOcultos()
 	// Con esquema, las cabeceras van tras su canalón: la de columnas debajo del de
-	// columnas y la de filas a la derecha del de filas. La esquina ocupa los dos.
+	// columnas y la de filas a la derecha del de filas. La esquina ocupa los dos. La banda
+	// de las columnas mide siempre lo de serie: el alto propio es de las filas de la hoja.
+	altoCab := AltoCelda * vw.z
 	for i, c := range cols {
 		rr.cabecera(rr.cabCols[i], v, c >= c1 && c <= c2, c == vw.fc-1, false, formula.NumToCol(c),
-			vw.x(c), vw.cy*vw.z, vw.ancho(), vw.alto(), vw.z)
+			vw.x(c), vw.cy*vw.z, vw.ancho(c), altoCab, vw.z)
 		if c >= c1 && c <= c2 {
-			caja(rr.cabCols[i].abajo, tema.Color("primary-500", v), vw.x(c), vw.cy*vw.z+vw.alto()-2*vw.z, vw.ancho(), 2*vw.z)
+			caja(rr.cabCols[i].abajo, tema.Color("primary-500", v), vw.x(c), vw.cy*vw.z+altoCab-2*vw.z, vw.ancho(c), 2*vw.z)
 		}
+		rr.cabCols[i].marcarOcultas(c > 0 && analisis.TramoOculto(ocultCols, c-1), true, v, vw.x(c), vw.cy*vw.z, altoCab, vw.z)
 	}
 	for i, f := range fils {
 		rr.cabecera(rr.cabFilas[i], v, f >= f1 && f <= f2, false, f == vw.ff-1, strconv.Itoa(f+1),
-			vw.cx*vw.z, vw.y(f), AnchoCabecera*vw.z, vw.alto(), vw.z)
+			vw.cx*vw.z, vw.y(f), AnchoCabecera*vw.z, vw.alto(f), vw.z)
 		if f >= f1 && f <= f2 {
-			caja(rr.cabFilas[i].der, tema.Color("primary-500", v), vw.cx*vw.z+AnchoCabecera*vw.z-2*vw.z, vw.y(f), 2*vw.z, vw.alto())
+			caja(rr.cabFilas[i].der, tema.Color("primary-500", v), vw.cx*vw.z+AnchoCabecera*vw.z-2*vw.z, vw.y(f), 2*vw.z, vw.alto(f))
 		}
+		rr.cabFilas[i].marcarOcultas(f > 0 && analisis.TramoOculto(ocultFilas, f-1), false, v, vw.cx*vw.z, vw.y(f), AnchoCabecera*vw.z, vw.z)
 	}
 	for i := len(cols); i < len(rr.cabCols); i++ {
 		rr.cabCols[i].esconder()
@@ -1101,7 +1206,8 @@ func (rr *rejillaRenderer) pintarCabeceras(v tema.Variante, vw vista, cols, fils
 	for i := len(fils); i < len(rr.cabFilas); i++ {
 		rr.cabFilas[i].esconder()
 	}
-	rr.cabecera(rr.esquina, v, false, false, false, "", 0, vw.cy*vw.z, vw.ox(), vw.alto(), vw.z)
+	rr.cabecera(rr.esquina, v, false, false, false, "", 0, vw.cy*vw.z, vw.ox(), altoCab, vw.z)
+	rr.esquina.marcarOcultas(false, false, v, 0, 0, 0, 0)
 }
 
 // cabecera pinta UNA cabecera: son todas el mismo `headCls`, con el rótulo centrado
@@ -1150,7 +1256,8 @@ func (rr *rejillaRenderer) cabecera(cb *cabeceraPintada, v tema.Variante, dentro
 func (rr *rejillaRenderer) pintarSeleccion(v tema.Variante, vw vista, t fyne.Size) {
 	r := rr.r
 	pos := fyne.NewPos(vw.x(r.sel.C), vw.y(r.sel.F))
-	tam := fyne.NewSize(vw.ancho(), vw.alto())
+	w, h, _ := vw.caja(r.sel.C, r.sel.F) // en una combinada, el marco la rodea entera
+	tam := fyne.NewSize(w, h)
 	finX, finY := vw.finFijas()
 	var minX, minY float32
 	if r.sel.C >= vw.fc {
@@ -1175,9 +1282,13 @@ func (rr *rejillaRenderer) colocarEditor(vw vista) {
 		return
 	}
 	x, y := vw.x(r.sel.C), vw.y(r.sel.F)
+	ancho, altoCaja, _ := vw.caja(r.sel.C, r.sel.F) // una combinada se escribe a todo su ancho
 	alto := r.ed.AltoFuente()
 	m := MargenCelda * vw.z
-	r.ed.Colocar(fyne.NewPos(x+m, y+(vw.alto()-alto)/2), fyne.NewSize(vw.ancho()-2*m, alto))
+	// En la primera caja de línea de la celda, que es donde la pinta (ver colocarLineas):
+	// en una fila alta, el texto no salta al abrirla.
+	linea := min(altoCaja, AltoCelda*vw.z)
+	r.ed.Colocar(fyne.NewPos(x+m, y+(linea-alto)/2), fyne.NewSize(ancho-2*m, alto))
 	r.ed.Objeto().Show()
 
 	// Y con la letra de la celda, como la web, que edita la celda misma: su familia, y la
@@ -1200,7 +1311,7 @@ func (rr *rejillaRenderer) colocarEditor(vw vista) {
 	if r.celdaFx {
 		esc := escalonCelda(r.L.Estilo(r.sel.C, r.sel.F), vw.z)
 		pintado, crecio = rr.tinteCelda.pintar(r.ed.Texto(), formula.ExtractRefsCon(r.ed.Texto(), r.L.ResolverParaResaltar(r.sel)), ColorRef, Tinta,
-			esc, x+m, y, vw.ancho()-2*m)
+			esc, x+m, y, ancho-2*m)
 	} else {
 		rr.tinteCelda.pintar("", nil, nil, color.NRGBA{}, EscalonCelda, 0, 0, 0)
 	}

@@ -1,0 +1,3 @@
+-- SPDX-License-Identifier: Apache-2.0
+-- Ciphertext-only ongoing ingress; domain-owned nonces, key plans and tasks.
+-- sytue:private-ingress-v1

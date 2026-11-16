@@ -29,7 +29,12 @@ var _ Logos = (*api.Mail)(nil)
 // estadoLogo es lo que se sabe del logo de un dominio en esta sesión: nil mientras
 // se pide o si no tiene. Un dominio se pide UNA vez por sesión: el servicio ya
 // cachea días, y una web sin icono no tiene por qué contestar distinto en un rato.
-type estadoLogo struct{ img image.Image }
+// Menu es que lo pidió también el lateral (el logo de una cuenta externa): al llegar
+// se rehace el menú, además de la bandeja y el lector.
+type estadoLogo struct {
+	img  image.Image
+	menu bool
+}
 
 // repintarLogos agrupa los logos que llegan seguidos —una bandeja nueva pide veinte
 // a la vez— en un solo repintado.
@@ -61,8 +66,21 @@ func (b *Buzon) enSpam() bool {
 // pide, y la bandeja y el lector se repintan cuando llegue—. Lo llaman la fila y la
 // tarjeta del lector al pintarse.
 func (b *Buzon) LogoDe(correo string) image.Image {
+	if b.enSpam() {
+		return nil
+	}
+	return b.logo(correo, false)
+}
+
+// logoDeCuenta es el logo de la web del dominio de una cuenta externa, para el lateral
+// (Menu.LogoCuenta). TAMBIÉN en la vista de spam: la cuenta es de la persona, no un
+// remitente que pueda suplantar a nadie.
+func (b *Buzon) logoDeCuenta(correo string) image.Image { return b.logo(correo, true) }
+
+// logo es lo común: la caché de la sesión y la petición al servicio.
+func (b *Buzon) logo(correo string, menu bool) image.Image {
 	s, ok := b.S.(Logos)
-	if !ok || b.enSpam() {
+	if !ok {
 		return nil
 	}
 	d := dominioCorreo(correo)
@@ -73,9 +91,10 @@ func (b *Buzon) LogoDe(correo string) image.Image {
 		b.logos = map[string]*estadoLogo{}
 	}
 	if e, hay := b.logos[d]; hay {
+		e.menu = e.menu || menu
 		return e.img
 	}
-	e := &estadoLogo{}
+	e := &estadoLogo{menu: menu}
 	b.logos[d] = e
 	pedir(b, func(ctx context.Context) (image.Image, error) {
 		datos, err := s.SenderLogo(ctx, d)
@@ -89,6 +108,10 @@ func (b *Buzon) LogoDe(correo string) image.Image {
 			return
 		}
 		e.img = img
+		if e.menu {
+			b.P.Refrescar()
+			return
+		}
 		b.repintarPorLogos()
 	})
 	return nil

@@ -75,7 +75,7 @@ func TestLaEscalaEsLaExactaDeLaWeb(t *testing.T) {
 			t.Errorf("%s: interlineado %v y en la web %v px", c.nombre, c.e.Linea, quiero)
 		}
 	}
-	// El texto sin clase hereda la raíz de 16px; text-base pide explícitamente 14px.
+	// text-base pide explícitamente 14px; el texto sin clase hereda los 16px de la raíz.
 	if TextoRaiz.Tam != 16 || TextoRaiz.Linea != 22 {
 		t.Errorf("el texto sin clase es %v/%v y la web declara 16 px con caja de 22", TextoRaiz.Tam, TextoRaiz.Linea)
 	}

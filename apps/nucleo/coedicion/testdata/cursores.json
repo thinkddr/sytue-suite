@@ -1,0 +1,542 @@
+{
+  "mapeo": [
+    {
+      "nombre": "texto con negrita, cursor en medio",
+      "html": "<p>Hola <b>mundo</b></p>",
+      "anchor": 3,
+      "focus": 3,
+      "puntos": {
+        "anchorDot": {
+          "a": "ada",
+          "c": 6
+        },
+        "focusDot": {
+          "a": "ada",
+          "c": 6
+        }
+      }
+    },
+    {
+      "nombre": "selección de principio a fin",
+      "html": "<p>Hola <b>mundo</b></p>",
+      "anchor": 0,
+      "focus": 10,
+      "puntos": {
+        "anchorDot": {
+          "a": "",
+          "c": 0
+        },
+        "focusDot": {
+          "a": "ada",
+          "c": 16
+        }
+      }
+    },
+    {
+      "nombre": "selección que cruza una etiqueta",
+      "html": "<p>Hola <b>mundo</b></p>",
+      "anchor": 5,
+      "focus": 7,
+      "puntos": {
+        "anchorDot": {
+          "a": "ada",
+          "c": 8
+        },
+        "focusDot": {
+          "a": "ada",
+          "c": 13
+        }
+      }
+    },
+    {
+      "nombre": "selección hacia atrás",
+      "html": "<p>Hola <b>mundo</b></p>",
+      "anchor": 8,
+      "focus": 2,
+      "puntos": {
+        "anchorDot": {
+          "a": "ada",
+          "c": 14
+        },
+        "focusDot": {
+          "a": "ada",
+          "c": 5
+        }
+      }
+    },
+    {
+      "nombre": "tras un emoji (dos unidades)",
+      "html": "<p>a😀b</p>",
+      "anchor": 3,
+      "focus": 1,
+      "puntos": {
+        "anchorDot": {
+          "a": "ada",
+          "c": 5
+        },
+        "focusDot": {
+          "a": "ada",
+          "c": 4
+        }
+      }
+    },
+    {
+      "nombre": "a mitad de un emoji no se ancla",
+      "html": "<p>a😀b</p>",
+      "anchor": 2,
+      "focus": 2,
+      "puntos": null
+    },
+    {
+      "nombre": "más allá del final no se ancla",
+      "html": "<p>Hola <b>mundo</b></p>",
+      "anchor": 11,
+      "focus": 0,
+      "puntos": null
+    },
+    {
+      "nombre": "referencias con nombre y numéricas",
+      "html": "<p>a&amp;b &#x1F600;c &#233;</p>",
+      "anchor": 2,
+      "focus": 7,
+      "puntos": {
+        "anchorDot": {
+          "a": "ada",
+          "c": 9
+        },
+        "focusDot": {
+          "a": "ada",
+          "c": 21
+        }
+      }
+    },
+    {
+      "nombre": "comentarios y comillas en atributos",
+      "html": "<p title=\"a>b\">x<!-- c>d -->y</p>",
+      "anchor": 1,
+      "focus": 2,
+      "puntos": {
+        "anchorDot": {
+          "a": "ada",
+          "c": 16
+        },
+        "focusDot": {
+          "a": "ada",
+          "c": 29
+        }
+      }
+    },
+    {
+      "nombre": "párrafos seguidos",
+      "html": "<p>uno</p><p>dos</p>",
+      "anchor": 3,
+      "focus": 4,
+      "puntos": {
+        "anchorDot": {
+          "a": "ada",
+          "c": 6
+        },
+        "focusDot": {
+          "a": "ada",
+          "c": 14
+        }
+      }
+    },
+    {
+      "nombre": "documento vacío",
+      "html": "",
+      "anchor": 0,
+      "focus": 0,
+      "puntos": {
+        "anchorDot": {
+          "a": "",
+          "c": 0
+        },
+        "focusDot": {
+          "a": "",
+          "c": 0
+        }
+      }
+    }
+  ],
+  "edicion": [
+    {
+      "nombre": "escribir delante desplaza el cursor",
+      "html": "<p>Hola <b>mundo</b></p>",
+      "nuevo": "<p>Bien: Hola <b>mundo</b></p>",
+      "anchor": 3,
+      "focus": 3,
+      "esperado": {
+        "anchor": 9,
+        "focus": 9
+      }
+    },
+    {
+      "nombre": "borrar el carácter anclado deja el cursor donde estaba",
+      "html": "<p>Hola mundo</p>",
+      "nuevo": "<p>Ho mundo</p>",
+      "anchor": 3,
+      "focus": 3,
+      "esperado": {
+        "anchor": 2,
+        "focus": 2
+      }
+    },
+    {
+      "nombre": "escribir detrás no mueve la selección",
+      "html": "<p>abc</p>",
+      "nuevo": "<p>abcXYZ</p>",
+      "anchor": 1,
+      "focus": 2,
+      "esperado": {
+        "anchor": 1,
+        "focus": 2
+      }
+    },
+    {
+      "nombre": "escribir dentro de la selección la estira",
+      "html": "<p>abcd</p>",
+      "nuevo": "<p>aZZbcd</p>",
+      "anchor": 1,
+      "focus": 3,
+      "esperado": {
+        "anchor": 1,
+        "focus": 5
+      }
+    },
+    {
+      "nombre": "negrita nueva alrededor de la selección",
+      "html": "<p>abcd</p>",
+      "nuevo": "<p>a<b>bc</b>d</p>",
+      "anchor": 1,
+      "focus": 3,
+      "esperado": {
+        "anchor": 1,
+        "focus": 3
+      }
+    }
+  ],
+  "posiciones": [
+    {
+      "nombre": "documento con sus puntos",
+      "crudo": {
+        "kind": "doc",
+        "anchor": 1,
+        "focus": 2,
+        "anchorDot": {
+          "a": "ada",
+          "c": 3
+        },
+        "focusDot": {
+          "a": "",
+          "c": 0
+        }
+      },
+      "esperado": {
+        "kind": "doc",
+        "anchor": 1,
+        "focus": 2,
+        "anchorDot": {
+          "a": "ada",
+          "c": 3
+        },
+        "focusDot": {
+          "a": "",
+          "c": 0
+        }
+      }
+    },
+    {
+      "nombre": "documento con un solo punto: sin puntos",
+      "crudo": {
+        "kind": "doc",
+        "anchor": 1,
+        "focus": 2,
+        "anchorDot": {
+          "a": "ada",
+          "c": 3
+        }
+      },
+      "esperado": {
+        "kind": "doc",
+        "anchor": 1,
+        "focus": 2
+      }
+    },
+    {
+      "nombre": "documento con decimales: se truncan",
+      "crudo": {
+        "kind": "doc",
+        "anchor": 2.7,
+        "focus": -1.5
+      },
+      "esperado": {
+        "kind": "doc",
+        "anchor": 2,
+        "focus": -1
+      }
+    },
+    {
+      "nombre": "documento con un offset que no es número",
+      "crudo": {
+        "kind": "doc",
+        "anchor": "2",
+        "focus": 1
+      },
+      "esperado": null
+    },
+    {
+      "nombre": "documento sin foco",
+      "crudo": {
+        "kind": "doc",
+        "anchor": 2
+      },
+      "esperado": null
+    },
+    {
+      "nombre": "punto con contador negativo: sin puntos",
+      "crudo": {
+        "kind": "doc",
+        "anchor": 0,
+        "focus": 0,
+        "anchorDot": {
+          "a": "a",
+          "c": -1
+        },
+        "focusDot": {
+          "a": "a",
+          "c": 1
+        }
+      },
+      "esperado": {
+        "kind": "doc",
+        "anchor": 0,
+        "focus": 0
+      }
+    },
+    {
+      "nombre": "punto con actor demasiado largo: sin puntos",
+      "crudo": {
+        "kind": "doc",
+        "anchor": 0,
+        "focus": 0,
+        "anchorDot": {
+          "a": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "c": 1
+        },
+        "focusDot": {
+          "a": "a",
+          "c": 1
+        }
+      },
+      "esperado": {
+        "kind": "doc",
+        "anchor": 0,
+        "focus": 0
+      }
+    },
+    {
+      "nombre": "hoja con sus anclas",
+      "crudo": {
+        "kind": "sheet",
+        "sheet": 1,
+        "c1": 0,
+        "r1": 2,
+        "c2": 3,
+        "r2": 4,
+        "sheetId": "h1",
+        "rows": ["f1", "f2"],
+        "cols": ["c1", "c9"]
+      },
+      "esperado": {
+        "kind": "sheet",
+        "sheet": 1,
+        "c1": 0,
+        "r1": 2,
+        "c2": 3,
+        "r2": 4,
+        "sheetId": "h1",
+        "rows": ["f1", "f2"],
+        "cols": ["c1", "c9"]
+      }
+    },
+    {
+      "nombre": "hoja con anclas que no encajan",
+      "crudo": {
+        "kind": "sheet",
+        "sheet": 0,
+        "c1": 0,
+        "r1": 0,
+        "c2": 0,
+        "r2": 0,
+        "sheetId": 7,
+        "rows": ["a", "b", "c"],
+        "cols": ["", "b"]
+      },
+      "esperado": {
+        "kind": "sheet",
+        "sheet": 0,
+        "c1": 0,
+        "r1": 0,
+        "c2": 0,
+        "r2": 0
+      }
+    },
+    {
+      "nombre": "hoja sin una esquina",
+      "crudo": {
+        "kind": "sheet",
+        "sheet": 0,
+        "c1": 0,
+        "r1": 0,
+        "c2": 0
+      },
+      "esperado": null
+    },
+    {
+      "nombre": "diapositiva con cajas mezcladas",
+      "crudo": {
+        "kind": "slide",
+        "slide": 2,
+        "boxes": ["b1", 3, null, "b2"]
+      },
+      "esperado": {
+        "kind": "slide",
+        "slide": 2,
+        "boxes": ["b1", "b2"]
+      }
+    },
+    {
+      "nombre": "diapositiva sin cajas",
+      "crudo": {
+        "kind": "slide",
+        "slide": 0
+      },
+      "esperado": {
+        "kind": "slide",
+        "slide": 0,
+        "boxes": []
+      }
+    },
+    {
+      "nombre": "un tipo desconocido se ignora",
+      "crudo": {
+        "kind": "pizarra",
+        "x": 1
+      },
+      "esperado": null
+    },
+    {
+      "nombre": "nulo",
+      "crudo": null,
+      "esperado": null
+    },
+    {
+      "nombre": "una lista",
+      "crudo": [1, 2],
+      "esperado": null
+    },
+    {
+      "nombre": "una cadena",
+      "crudo": "doc",
+      "esperado": null
+    }
+  ],
+  "pares": [
+    {
+      "nombre": "par con nombre y cursor",
+      "crudo": {
+        "sub": "u-1",
+        "name": "Ada",
+        "cursor": {
+          "kind": "doc",
+          "anchor": 4,
+          "focus": 4
+        }
+      },
+      "esperado": {
+        "id": "u-1",
+        "name": "Ada",
+        "color": "avatar-2",
+        "pos": {
+          "kind": "doc",
+          "anchor": 4,
+          "focus": 4
+        }
+      }
+    },
+    {
+      "nombre": "par sin nombre",
+      "crudo": {
+        "sub": "bea",
+        "cursor": {
+          "kind": "slide",
+          "slide": 1,
+          "boxes": []
+        }
+      },
+      "esperado": {
+        "id": "bea",
+        "name": "",
+        "color": "avatar-3",
+        "pos": {
+          "kind": "slide",
+          "slide": 1,
+          "boxes": []
+        }
+      }
+    },
+    {
+      "nombre": "par sin sub se descarta",
+      "crudo": {
+        "name": "Nadie",
+        "cursor": {
+          "kind": "doc",
+          "anchor": 0,
+          "focus": 0
+        }
+      },
+      "esperado": null
+    },
+    {
+      "nombre": "par con una posición inválida se descarta",
+      "crudo": {
+        "sub": "u-2",
+        "cursor": {
+          "kind": "doc",
+          "anchor": "x",
+          "focus": 0
+        }
+      },
+      "esperado": null
+    },
+    {
+      "nombre": "par sin cursor se descarta",
+      "crudo": {
+        "sub": "u-3"
+      },
+      "esperado": null
+    },
+    {
+      "nombre": "sub fuera del plano básico",
+      "crudo": {
+        "sub": "😀ana",
+        "cursor": {
+          "kind": "doc",
+          "anchor": 0,
+          "focus": 1
+        }
+      },
+      "esperado": {
+        "id": "😀ana",
+        "name": "",
+        "color": "avatar-6",
+        "pos": {
+          "kind": "doc",
+          "anchor": 0,
+          "focus": 1
+        }
+      }
+    }
+  ]
+}

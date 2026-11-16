@@ -1,12 +1,13 @@
 /**
  * GroupsPanel — grupos gestionables de Sytue ID (contrato /admin/groups). Lista de
- * grupos con nº de miembros, alta, edición (nombre/descripción), gestión de
- * miembros (picker sobre el directorio del tenant) y borrado con confirmación.
+ * grupos con nº de miembros, alta guiada (`CreateGroupWizard`), edición
+ * (nombre/descripción), gestión de miembros (picker sobre el directorio del
+ * tenant) y borrado con confirmación.
  * Todo pasa por el BFF (/api/admin/groups*), que proxya a Sytue ID con el access
  * token httpOnly bajo RLS del tenant. Estos grupos alimentan el share por-grupo de
  * Sytue Drive (claim `groups` del JWT). docs/CONVENTIONS.md §8, §9.
  */
-import { useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import {
   Badge,
   Button,
@@ -14,33 +15,23 @@ import {
   CardBody,
   EmptyState,
   Icon,
+  InlineHelp,
   Input,
   Modal,
   SectionHeader,
-  Select,
   Spinner,
   Switch,
   ToastProvider,
   useToast,
 } from '@sytue/ui';
 import { contiene, formatNumber, type Locale } from '@sytue/i18n';
-import { useT, type T } from '../i18n/index.js';
-import type {
-  AdminGroup,
-  AdminGroupMember,
-  DirectoryUser,
-  RuleAttribute,
-  RuleOp,
-} from '../lib/types.js';
-import {
-  builderToRule,
-  emptyBuilderRule,
-  ruleToBuilder,
-  RULE_ATTRIBUTES,
-  RULE_OPS,
-  type BuilderRule,
-} from '../lib/rules.js';
+import { useT } from '../i18n/index.js';
+import type { AdminGroup, AdminGroupMember, DirectoryUser } from '../lib/types.js';
+import { builderToRule, emptyBuilderRule, ruleToBuilder, type BuilderRule } from '../lib/rules.js';
+import { fetchPreview, PreviewBlock, RuleBuilder, type PreviewResult } from './GroupRule.js';
+import CreateGroupWizard from './CreateGroupWizard.js';
 import { useUserSearch } from '../lib/useUserSearch.js';
+import { accionPedida } from '../lib/paleta.js';
 
 interface GroupsPanelProps {
   /** Idioma negociado en el servidor; llega por props desde el `.astro`. */
@@ -56,165 +47,6 @@ function errorCode(err: unknown): string {
   return err instanceof Error ? err.message : '';
 }
 
-/** Resultado de la previsualización de una regla (contrato del BFF /groups/preview). */
-interface PreviewResult {
-  count: number;
-  members: AdminGroupMember[];
-}
-
-/**
- * Constructor de reglas de membresía dinámica: selector AND/OR + lista de condiciones
- * (atributo · operador · valor). El operador `in` acepta varios valores separados por
- * comas. Accesible: cada control tiene etiqueta asociada. La validación fuerte la aplica
- * Sytue ID al guardar/previsualizar.
- */
-function RuleBuilder({
-  rule,
-  onChange,
-  idPrefix,
-  t,
-}: {
-  rule: BuilderRule;
-  onChange: (r: BuilderRule) => void;
-  idPrefix: string;
-  t: T;
-}) {
-  function setCond(i: number, patch: Partial<BuilderRule['conditions'][number]>) {
-    onChange({
-      ...rule,
-      conditions: rule.conditions.map((c, idx) => (idx === i ? { ...c, ...patch } : c)),
-    });
-  }
-  return (
-    <div class="flex flex-col gap-3">
-      <div class="flex items-center gap-2">
-        <label class="text-text text-sm font-medium" for={`${idPrefix}-match`}>
-          {t('groups.rule.include')}
-        </label>
-        <Select
-          id={`${idPrefix}-match`}
-          value={rule.match}
-          class="w-40"
-          onChange={(e) =>
-            onChange({ ...rule, match: e.currentTarget.value === 'any' ? 'any' : 'all' })
-          }
-        >
-          <option value="all">{t('groups.rule.matchAll')}</option>
-          <option value="any">{t('groups.rule.matchAny')}</option>
-        </Select>
-      </div>
-
-      <ul class="flex flex-col gap-2">
-        {rule.conditions.map((c, i) => (
-          <li
-            key={i}
-            class="border-border bg-surface flex flex-wrap items-center gap-2 rounded-md border p-2"
-          >
-            <Select
-              value={c.attribute}
-              aria-label={t('groups.rule.attribute')}
-              class="w-40"
-              onChange={(e) => setCond(i, { attribute: e.currentTarget.value as RuleAttribute })}
-            >
-              {RULE_ATTRIBUTES.map((a) => (
-                <option key={a.value} value={a.value}>
-                  {t(a.label)}
-                </option>
-              ))}
-            </Select>
-            <Select
-              value={c.op}
-              aria-label={t('groups.rule.operator')}
-              class="w-40"
-              onChange={(e) => setCond(i, { op: e.currentTarget.value as RuleOp })}
-            >
-              {RULE_OPS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {t(o.label)}
-                </option>
-              ))}
-            </Select>
-            <Input
-              class="min-w-40 flex-1"
-              value={c.value}
-              aria-label={t('groups.rule.value')}
-              placeholder={t(c.op === 'in' ? 'groups.rule.valueListHint' : 'groups.rule.value')}
-              onInput={(e) => setCond(i, { value: e.currentTarget.value })}
-            />
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label={t('groups.rule.removeCondition')}
-              disabled={rule.conditions.length <= 1}
-              onClick={() =>
-                onChange({ ...rule, conditions: rule.conditions.filter((_, idx) => idx !== i) })
-              }
-            >
-              <Icon name="close" size={14} />
-            </Button>
-          </li>
-        ))}
-      </ul>
-
-      <div>
-        <Button
-          variant="secondary"
-          size="sm"
-          leadingIcon={<Icon name="plus" size={14} />}
-          onClick={() =>
-            onChange({
-              ...rule,
-              conditions: [...rule.conditions, { attribute: 'department', op: 'eq', value: '' }],
-            })
-          }
-        >
-          {t('groups.rule.addCondition')}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-/** Botón de previsualización + recuento y muestra de a quién incluiría la regla. */
-function PreviewBlock({
-  preview,
-  loading,
-  onPreview,
-  t,
-}: {
-  preview: PreviewResult | null;
-  loading: boolean;
-  onPreview: () => void;
-  t: T;
-}) {
-  return (
-    <div class="flex flex-col gap-2">
-      <div class="flex flex-wrap items-center gap-2">
-        <Button variant="secondary" size="sm" loading={loading} onClick={onPreview}>
-          {t('groups.rule.preview')}
-        </Button>
-        {preview ? (
-          <span class="text-text-muted text-sm">
-            {preview.count === 0
-              ? t('groups.rule.previewNone')
-              : t('groups.rule.previewCount', { count: preview.count })}
-          </span>
-        ) : null}
-      </div>
-      {preview && preview.members.length > 0 ? (
-        <ul class="border-border max-h-32 overflow-auto rounded-md border">
-          {preview.members.map((m) => (
-            <li key={m.userId} class="border-border flex flex-col border-b px-2 py-1 last:border-0">
-              <span class="text-text truncate text-sm font-medium">{m.name}</span>
-              <span class="text-text-muted truncate text-xs">{m.email}</span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </div>
-  );
-}
-
 function Inner({ locale, groups, users, live = true }: GroupsPanelProps) {
   const t = useT(locale);
   const toast = useToast();
@@ -223,13 +55,15 @@ function Inner({ locale, groups, users, live = true }: GroupsPanelProps) {
 
   // Crear grupo.
   const [createOpen, setCreateOpen] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newDesc, setNewDesc] = useState('');
-  const [creating, setCreating] = useState(false);
-  const [newDynamic, setNewDynamic] = useState(false);
-  const [newRule, setNewRule] = useState<BuilderRule>(emptyBuilderRule);
-  const [newPreview, setNewPreview] = useState<PreviewResult | null>(null);
-  const [previewingNew, setPreviewingNew] = useState(false);
+  // Llegada desde la paleta ⌘K (`?accion=`): se abre al montar y no en el estado
+  // inicial, para que el HTML del servidor y la hidratación coincidan.
+  useEffect(() => {
+    if (accionPedida('crear-grupo')) setCreateOpen(true);
+  }, []);
+  // Pie del diálogo donde el asistente pone su botonera (alcanzable sobre el teclado).
+  const [pieCrear, setPieCrear] = useState<HTMLDivElement | null>(null);
+  // Con una petición del asistente en vuelo el diálogo no se cierra (ver onBusyChange).
+  const [creandoGrupo, setCreandoGrupo] = useState(false);
 
   // Detalle del grupo seleccionado.
   const [selected, setSelected] = useState<AdminGroup | null>(null);
@@ -316,79 +150,9 @@ function Inner({ locale, groups, users, live = true }: GroupsPanelProps) {
     setConfirmingDelete(false);
   }
 
-  /** Previsualiza una regla contra el tenant (BFF); devuelve null si falla. */
-  async function fetchPreview(rule: BuilderRule): Promise<PreviewResult | null> {
-    const res = await fetch('/api/admin/groups/preview', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ membership_rule: builderToRule(rule) }),
-    });
-    if (!res.ok) throw new Error(String(res.status));
-    const data = (await res.json()) as PreviewResult;
-    return { count: data.count ?? 0, members: data.members ?? [] };
-  }
-
-  async function previewNew() {
-    if (previewingNew) return;
-    setPreviewingNew(true);
-    try {
-      setNewPreview(await fetchPreview(newRule));
-    } catch {
-      toast.notify({
-        tone: 'danger',
-        title: t('groups.toast.previewFailed'),
-        description: t('groups.toast.previewFailedHint'),
-      });
-    } finally {
-      setPreviewingNew(false);
-    }
-  }
-
-  function resetCreate() {
-    setCreateOpen(false);
-    setNewName('');
-    setNewDesc('');
-    setNewDynamic(false);
-    setNewRule(emptyBuilderRule());
-    setNewPreview(null);
-  }
-
-  async function createGroup(e: Event) {
-    e.preventDefault();
-    const name = newName.trim();
-    if (!name || creating) return;
-    setCreating(true);
-    try {
-      const res = await fetch('/api/admin/groups', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          description: newDesc.trim(),
-          ...(newDynamic ? { membership_rule: builderToRule(newRule) } : {}),
-        }),
-      });
-      if (!res.ok) throw new Error(String(res.status));
-      const group = (await res.json()) as AdminGroup;
-      setItems((prev) => [{ ...group, memberCount: group.memberCount ?? 0 }, ...prev]);
-      toast.notify({
-        tone: 'success',
-        title: t(newDynamic ? 'groups.toast.dynamicCreated' : 'groups.toast.created'),
-        description: t('groups.toast.createdHint', { name: group.name }),
-      });
-      resetCreate();
-    } catch (err) {
-      toast.notify({
-        tone: 'danger',
-        title: t('groups.toast.createFailed'),
-        description:
-          errorCode(err) === '409'
-            ? t('groups.toast.nameTaken')
-            : t(newDynamic ? 'groups.toast.checkNameAndRule' : 'groups.toast.checkName'),
-      });
-    } finally {
-      setCreating(false);
-    }
+  /** El asistente acaba de crear el grupo: entra en la lista sin recargar. */
+  function groupCreated(group: AdminGroup) {
+    setItems((prev) => [group, ...prev.filter((it) => it.id !== group.id)]);
   }
 
   async function saveEdit() {
@@ -656,9 +420,9 @@ function Inner({ locale, groups, users, live = true }: GroupsPanelProps) {
         subtitle={t('groups.subtitle')}
       />
       {!live ? (
-        <p class="border-border bg-warning-bg text-warning-text mx-4 mt-3 rounded-md border px-3 py-2 text-sm">
+        <InlineHelp tone="warning" class="mx-4 mt-3">
           {t('groups.offline')}
-        </p>
+        </InlineHelp>
       ) : null}
 
       <div class="border-border bg-surface mt-3 flex shrink-0 flex-wrap items-center gap-2 border-y px-4 py-2.5">
@@ -697,7 +461,7 @@ function Inner({ locale, groups, users, live = true }: GroupsPanelProps) {
                 description={t(
                   items.length === 0 ? 'groups.empty.description' : 'roles.noResultsHint',
                 )}
-                illustration={<Icon name="users" size={28} />}
+                icon="users"
                 action={
                   items.length === 0 ? (
                     <Button
@@ -757,72 +521,31 @@ function Inner({ locale, groups, users, live = true }: GroupsPanelProps) {
         )}
       </div>
 
-      {/* Crear grupo */}
+      {/* Crear grupo: asistente (tipo, nombre, miembros o regla, quién entra, repaso). */}
       <Modal
         open={createOpen}
-        onClose={resetCreate}
+        onClose={() => {
+          if (!creandoGrupo) setCreateOpen(false);
+        }}
         title={t('groups.create')}
-        size={newDynamic ? 'md' : 'sm'}
+        size="md"
+        footer={<div ref={setPieCrear} class="w-full min-w-0" />}
       >
-        <form class="flex flex-col gap-3" onSubmit={(e) => void createGroup(e)}>
-          <div>
-            <label class="text-text mb-1 block text-sm font-medium" for="new-group-name">
-              {t('tenants.form.name')}
-            </label>
-            <Input
-              id="new-group-name"
-              value={newName}
-              placeholder={t('groups.namePlaceholder')}
-              onInput={(e) => setNewName(e.currentTarget.value)}
-              required
-            />
-          </div>
-          <div>
-            <label class="text-text mb-1 block text-sm font-medium" for="new-group-desc">
-              {t('groups.description')}{' '}
-              <span class="text-text-subtle font-normal">({t('common.optional')})</span>
-            </label>
-            <Input
-              id="new-group-desc"
-              maxLength={256}
-              value={newDesc}
-              onInput={(e) => setNewDesc(e.currentTarget.value)}
-            />
-          </div>
-          <div class="border-border border-t pt-3">
-            <Switch
-              label={t('groups.dynamicSwitch')}
-              checked={newDynamic}
-              onChange={(e) => setNewDynamic(e.currentTarget.checked)}
-            />
-            {newDynamic ? (
-              <div class="mt-3 flex flex-col gap-3">
-                <p class="text-text-muted text-xs">{t('groups.dynamicHelp')}</p>
-                <RuleBuilder rule={newRule} onChange={setNewRule} idPrefix="new-rule" t={t} />
-                <PreviewBlock
-                  preview={newPreview}
-                  loading={previewingNew}
-                  onPreview={() => void previewNew()}
-                  t={t}
-                />
-              </div>
-            ) : null}
-          </div>
-          <div class="mt-1 flex justify-end gap-2">
-            <Button variant="ghost" size="sm" type="button" onClick={resetCreate}>
-              {t('common.cancel')}
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              type="submit"
-              loading={creating}
-              disabled={!newName.trim()}
-            >
-              {t('groups.create')}
-            </Button>
-          </div>
-        </form>
+        {createOpen ? (
+          <CreateGroupWizard
+            t={t}
+            locale={locale}
+            users={users}
+            onCreated={groupCreated}
+            onOpenGroup={(g) => {
+              setCreateOpen(false);
+              void openGroup(g);
+            }}
+            onClose={() => setCreateOpen(false)}
+            onBusyChange={setCreandoGrupo}
+            footerTarget={pieCrear}
+          />
+        ) : null}
       </Modal>
 
       {/* Detalle / edición del grupo */}

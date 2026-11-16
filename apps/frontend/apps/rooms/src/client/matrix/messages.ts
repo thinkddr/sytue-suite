@@ -2,10 +2,13 @@
 import type { ChatMessage, Attachment, MessageCard } from '../../lib/chat.js';
 import { roomsMatrix, type RoomsMatrix } from './client.js';
 import { MatrixSecurityError } from './types.js';
+import { MatrixSessionProvenanceMissing } from '@sytue/offline/matrix';
 let generation = 0;
+let generationLifetime = new AbortController();
 interface Scope {
   client: RoomsMatrix;
   generation: number;
+  signal: AbortSignal;
 }
 const messages = new Map<string, { scope: Scope; message: ChatMessage }>();
 const uploads = new Map<
@@ -13,7 +16,7 @@ const uploads = new Map<
   { scope: Scope; channel: string; room: string; file: Attachment }
 >();
 export function captureMatrixScope(): Scope {
-  return { client: roomsMatrix(), generation };
+  return { client: roomsMatrix(), generation, signal: generationLifetime.signal };
 }
 export function assertMatrixScope(scope: Scope): void {
   if (scope.generation !== generation || scope.client !== roomsMatrix())
@@ -68,17 +71,43 @@ export function knownMessage(id: string): ChatMessage {
 }
 export function clearMatrixMessages(): void {
   generation++;
+  generationLifetime.abort();
+  generationLifetime = new AbortController();
   messages.clear();
   uploads.clear();
 }
-export async function decryptMessage(message: ChatMessage): Promise<ChatMessage> {
+/** Search keeps only its returned results, never a plaintext index of history. */
+export function rememberDecryptedMessage(
+  scope: ReturnType<typeof captureMatrixScope>,
+  message: ChatMessage,
+): void {
+  assertMatrixScope(scope);
+  messages.set(message.id, { scope, message });
+}
+/** Drop all fields owned by the encrypted payload before displaying a new result. */
+function withoutPrivateContent(message: ChatMessage): ChatMessage {
+  const safe: ChatMessage = {
+    ...message,
+    body: '',
+    attachments: [],
+    identityVerified: false,
+    authenticityVerified: false,
+    requiresOriginalDevice: false,
+  };
+  delete safe.card;
+  delete safe.mentions;
+  delete safe.priority;
+  delete safe.requiresAck;
+  return safe;
+}
+export async function decryptMessage(message: ChatMessage, remember = true): Promise<ChatMessage> {
   const scope = captureMatrixScope();
   if (!message.matrix_event) {
     const safe =
       message.encryption === 'legacy' || message.type === 'call'
         ? message
-        : { ...message, body: '', attachments: [], decryptionFailed: true };
-    messages.set(message.id, { scope, message: safe });
+        : { ...withoutPrivateContent(message), decryptionFailed: true };
+    if (remember) rememberDecryptedMessage(scope, safe);
     return safe;
   }
   try {
@@ -88,7 +117,7 @@ export async function decryptMessage(message: ChatMessage): Promise<ChatMessage>
       message.author.id,
     );
     const decoded = {
-      ...message,
+      ...withoutPrivateContent(message),
       body: content.body,
       identityVerified: content.identityVerified === true,
       authenticityVerified: content.authenticityVerified === true,
@@ -100,12 +129,16 @@ export async function decryptMessage(message: ChatMessage): Promise<ChatMessage>
       decryptionFailed: false,
     };
     assertMatrixScope(scope);
-    messages.set(message.id, { scope, message: decoded });
+    if (remember) rememberDecryptedMessage(scope, decoded);
     return decoded;
-  } catch {
+  } catch (error) {
     assertMatrixScope(scope);
-    const unavailable = { ...message, body: '', attachments: [], decryptionFailed: true };
-    messages.set(message.id, { scope, message: unavailable });
+    const unavailable = {
+      ...withoutPrivateContent(message),
+      decryptionFailed: true,
+      requiresOriginalDevice: error instanceof MatrixSessionProvenanceMissing,
+    };
+    if (remember) rememberDecryptedMessage(scope, unavailable);
     return unavailable;
   }
 }

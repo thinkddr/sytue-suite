@@ -10,3 +10,8 @@ package ficheros
 func ordenElegir(titulo string, extensiones []string) (string, []string, error) {
 	return "powershell", []string{"-NoProfile", "-STA", "-Command", guionElegirWindows(titulo, extensiones)}, nil
 }
+
+// ordenElegirCarpeta es el FolderBrowserDialog por PowerShell, también en `-STA`.
+func ordenElegirCarpeta(titulo string) (string, []string, error) {
+	return "powershell", []string{"-NoProfile", "-STA", "-Command", guionCarpetaWindows(titulo)}, nil
+}

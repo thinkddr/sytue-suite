@@ -23,8 +23,6 @@ const REGLAS: { nombre: string; re: RegExp; usa: string; excepciones: Record<str
     re: /\.to(Locale)?LowerCase\(\)\.includes\((?!['"`])/,
     usa: '`contiene(texto, q)`',
     excepciones: {
-      'apps/calendar/src/components/CalendarApp.tsx':
-        'saber si una línea ATTENDEE es la de quien mira (su correo), no un buscador',
       'packages/office/src/editor/sheets/format.ts':
         'formato condicional «el texto contiene» de la hoja: la semántica de Excel (y de Calcus en Fyne), que distingue acentos',
     },
@@ -41,7 +39,10 @@ const REGLAS: { nombre: string; re: RegExp; usa: string; excepciones: Record<str
       'apps/notes/src/client/enlaces.ts':
         'ancla `h=` de un título: cambiarla rompería los enlaces ya guardados',
       'apps/rooms/src/lib/hookVariants.ts': 'alias de correo ASCII, no un buscador',
-      'apps/cloud-dashboard/src/components/TemplateWizard.tsx': 'subdominio ASCII, no un buscador',
+      'apps/contacts/src/client/iniciales.ts':
+        'cabecera de letra del índice: reduce una mayúscula a su base para compararla con la colación, no busca',
+      'apps/cloud-dashboard/src/lib/nuevo-proyecto.ts':
+        'subdominio ASCII del proyecto nuevo, no un buscador',
       'apps/console/src/components/ConnectIdpWizard.tsx':
         'slug ASCII del proveedor, no un buscador',
     },

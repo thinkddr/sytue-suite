@@ -28,9 +28,11 @@ import (
 //
 // Formas, Gráfico y SmartArt van en `figuras.go`.
 //
-// ponytail: faltan Power BI y Formulario. Escriben en el folio HTML que `rico` aún no
-// entiende (el `<iframe>` del informe, `<span data-formfield>`…): ofrecerlos aquí dejaría
-// el documento en solo lectura al insertarlos.
+// El grupo «Formulario» (rellenar y ver respuestas) va en `formularios.go`.
+//
+// ponytail: falta Power BI. El informe se conserva y se pinta como bloque atómico
+// (`rico/atomicos.go`); falta el diálogo que lo inserta. Del grupo «Formulario» faltan los
+// tres popovers que insertan campos nuevos (`CampoFieldPanel`).
 
 // MaxImagen es el tope de la web para una imagen del documento: la data: URL entera,
 // porque el documento viaja entero en cada guardado.
@@ -167,6 +169,11 @@ func (in *inicio) cuerpoInsertar(c *editor.Contexto) fyne.CanvasObject {
 			inerte(editor.NuevoBotonCinta(iconos.EdVertical, c.Traducir("insert.differentFirstPage"), mandar(editor.PrimeraPaginaDistinta, ""))),
 		),
 		editor.SeparadorGrupos(),
+	)
+	if f != nil {
+		grupos = append(grupos, grupoFormulario(c, f), editor.SeparadorGrupos())
+	}
+	grupos = append(grupos,
 		// «Comentario» es el mismo «Nuevo comentario» de Colaboración: pregunta el texto y
 		// lo ancla a la selección. El de la web es un popover que pone la cita delante
 		// del cuerpo, de cuando aún no había anclas.

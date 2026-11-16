@@ -50,12 +50,18 @@ type Visor struct {
 	// AlCalidad abre el menú de calidad colgado de su botón; nil, sin menú (un
 	// directo, o un vídeo con una sola calidad).
 	AlCalidad func(disparador fyne.CanvasObject)
+	// ConCalidad: el menú trae calidades además de la velocidad, y el botón se llama
+	// «Calidad»; sin ellas, «Velocidad».
+	ConCalidad bool
 	// AlPiP saca el vídeo a la ventana de imagen dentro de imagen; nil, sin botón.
 	AlPiP func()
 	// AlMedir avisa del tamaño del cuadro (en unidades de Fyne) cuando cambia: al
 	// redimensionar la ventana o pasar a pantalla completa. Lo usa la calidad
 	// «Automática».
 	AlMedir func(fyne.Size)
+	// AlDesdeInicio es «Empezar desde el principio», sobre el cuadro, cuando el vídeo
+	// sigue donde se dejó (reanudar.go); nil, no se ofrece.
+	AlDesdeInicio func()
 
 	// volumen es el del deslizador, de 0 a 1 (el reproductor no lo devuelve).
 	volumen float64
@@ -65,6 +71,7 @@ type Visor struct {
 	fondo    *canvas.Rectangle
 	imagen   *canvas.Image
 	aviso    fyne.CanvasObject
+	inicio   *ui.Boton
 	barra    *fyne.Container
 	toque    *toque
 	raiz     *fyne.Container
@@ -109,8 +116,8 @@ func (x *Visor) TieneImagen() bool { return x.imagen.Image != nil }
 // Aviso pone un mensaje encima del cuadro negro («procesando», «el directo no ha
 // empezado»). Vacío lo quita. `rueda` añade el indicador de trabajo.
 func (x *Visor) Aviso(texto string, rueda bool) {
-	if len(x.raiz.Objects) > 4 {
-		x.raiz.Objects = x.raiz.Objects[:4]
+	if x.aviso != nil {
+		x.raiz.Objects = sinObjeto(x.raiz.Objects, x.aviso)
 	}
 	x.aviso = nil
 	if texto != "" {
@@ -167,7 +174,11 @@ func (x *Visor) Rehacer() {
 	}
 	if x.AlCalidad != nil {
 		var b *ui.BotonIcono
-		b = botonIconoVisor(iconos.Ajustes, v.Traduce("player.quality"), func() { x.AlCalidad(b) })
+		rotulo := "player.speed"
+		if x.ConCalidad {
+			rotulo = "player.quality"
+		}
+		b = botonIconoVisor(iconos.Ajustes, v.Traduce(rotulo), func() { x.AlCalidad(b) })
 		derecha = append(derecha, b)
 	}
 	if x.AlPiP != nil {
@@ -178,7 +189,38 @@ func (x *Visor) Rehacer() {
 	x.barra.Objects = hijos
 	x.barra.Layout = &barraVisor{directo: x.Directo || x.Mando == nil, derecha: len(derecha), volumen: volumen}
 	x.barra.Refresh()
+	x.rehacerInicio()
 	x.raiz.Refresh()
+}
+
+// rehacerInicio pone o quita «Empezar desde el principio» (el botón de arriba a la
+// izquierda del Player de la web).
+func (x *Visor) rehacerInicio() {
+	if x.inicio != nil {
+		x.raiz.Objects = sinObjeto(x.raiz.Objects, x.inicio)
+		x.inicio = nil
+	}
+	if x.AlDesdeInicio == nil || x.Mando == nil || x.Directo {
+		return
+	}
+	b := ui.NuevoBoton(x.v.Traduce("player.restart"), x.AlDesdeInicio)
+	b.Variante, b.Icono, b.Talla = ui.Secundario, iconos.Rotar, ui.TallaSM
+	if x.v.Movil {
+		// En el teléfono, un objetivo de 44 px como el `h-11` de la web.
+		b.Talla = ui.TallaLG
+	}
+	x.inicio = b
+	x.raiz.Objects = append(x.raiz.Objects, b)
+}
+
+// TieneInicio dice si se ofrece «Empezar desde el principio».
+func (x *Visor) TieneInicio() bool { return x.inicio != nil }
+
+// DesdeInicio pulsa «Empezar desde el principio».
+func (x *Visor) DesdeInicio() {
+	if x.AlDesdeInicio != nil {
+		x.AlDesdeInicio()
+	}
 }
 
 // alternar es tocar el vídeo: pausa o sigue. En directo no hay nada que pausar.
@@ -284,9 +326,15 @@ func (l *visorLayout) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	objs[2].Resize(cuadro)
 	objs[3].Move(fyne.NewPos(0, alto))
 	objs[3].Resize(fyne.NewSize(t.Width, altoBarraVisor))
-	if len(objs) > 4 {
-		objs[4].Move(fyne.NewPos(0, 0))
-		objs[4].Resize(cuadro)
+	for _, o := range objs[4:] {
+		if b, ok := o.(*ui.Boton); ok && l.x != nil && b == l.x.inicio {
+			m := b.MinSize()
+			b.Move(fyne.NewPos(tema.Espacio(3), tema.Espacio(3)))
+			b.Resize(m)
+			continue
+		}
+		o.Move(fyne.NewPos(0, 0))
+		o.Resize(cuadro)
 	}
 }
 

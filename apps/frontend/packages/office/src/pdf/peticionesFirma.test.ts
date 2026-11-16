@@ -3,7 +3,7 @@
  * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
  */
 import { describe, expect, test } from 'bun:test';
-import { nombreDePeticion, pendienteDe, quienFirma, type PeticionFirma } from './api';
+import { nombreDePeticion, pedidasDe, pendienteDe, quienFirma, type PeticionFirma } from './api';
 
 const base: PeticionFirma = {
   id: '1',
@@ -50,5 +50,20 @@ describe('peticiones de firma', () => {
     expect(nombreDePeticion(base)).toBe('Contrato.pdf');
     const traida = { ...fuera, path: '/Sytue Docs/Contrato.pdf' };
     expect(pendienteDe({ received: [traida], sent: [] }, '/Sytue Docs/Contrato.pdf')?.id).toBe('1');
+  });
+
+  test('una cadena sale entera bajo el PDF original, aunque las siguientes firmen otra ruta', () => {
+    const firmado = '/PDF/Contrato (firmado).pdf';
+    const sent = [
+      { ...base, id: 's', created_at: '2026-09-27T10:00:00Z' },
+      { ...base, id: 'c1', chain: 'c', status: 'firmada' as const },
+      { ...base, id: 'c3', chain: 'c', step: 2, status: 'en_espera' as const },
+      { ...base, id: 'c2', chain: 'c', step: 1, path: firmado },
+      { ...base, id: 'otro', chain: 'd', path: '/PDF/Otro.pdf' },
+    ];
+    const grupos = pedidasDe(sent, '/PDF/Contrato.pdf');
+    expect(grupos.map((g) => g.map((p) => p.id))).toEqual([['s'], ['c1', 'c2', 'c3']]);
+    // Desde el firmado intermedio no se lista la cadena: su primera persona no es de ahí.
+    expect(pedidasDe(sent, firmado)).toEqual([]);
   });
 });

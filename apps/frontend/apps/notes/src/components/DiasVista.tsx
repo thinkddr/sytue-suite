@@ -11,7 +11,7 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { Button, Icon, Spinner, cx } from '@sytue/ui';
+import { Button, Icon, Spinner, cx, EmptyState } from '@sytue/ui';
 import { intlTag, type Locale } from '@sytue/i18n';
 import type { DailyDay, Note } from '@sytue/api-clients';
 import type { T } from '../i18n/index.js';
@@ -97,7 +97,7 @@ function ListaDia({
   // Una nota que es solo un separador no tiene línea que enseñar aquí.
   const notas = (day?.notes ?? []).filter((n) => resumenNota(n) !== '');
   if (!notas.length) {
-    return vacio ? <p class="text-text-subtle px-1 py-1 text-sm">{t('daily.empty')}</p> : null;
+    return vacio ? <EmptyState compact title={t('daily.empty')} /> : null;
   }
   return (
     <ul class="flex flex-col">

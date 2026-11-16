@@ -9,13 +9,16 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/driver/desktop"
+	"fyne.io/fyne/v2/layout"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/office"
 )
 
 // Las piezas de la portada de documentos (`DocList.tsx`): la tesela de un documento, sus
@@ -226,7 +229,8 @@ func (r *botonTeselaRenderer) Refresh() {
 // ---- tesela de documento ----
 
 // TeselaDoc es la tarjeta de un documento de la portada: se pulsa para abrirlo, y
-// lleva la estrella arriba a la izquierda y renombrar/copiar/eliminar arriba a la derecha.
+// lleva la estrella arriba a la izquierda y, arriba a la derecha, renombrar · más
+// acciones (copia y descargas) · compartir · eliminar, en el orden de `DocTile`.
 //
 // Las acciones se esconden hasta que el puntero pasa por encima o el foco entra
 // (`opacity-0 group-hover:opacity-100 focus-within:opacity-100`); la estrella de un
@@ -243,6 +247,11 @@ type TeselaDoc struct {
 
 	estrella *BotonTesela
 	acciones []*BotonTesela
+	// mas es «Más acciones»; menu, su menú mientras está abierto.
+	mas  *BotonTesela
+	menu *ui.Menu
+	t    func(string, i18n.Vars) string
+	acc  AccionesTesela
 	// sobreHijo cuenta si el puntero está sobre uno de sus botones.
 	sobreHijo bool
 	// SinRed esconde las acciones: sin conexión no se muta nada (`!offline`).
@@ -252,6 +261,12 @@ type TeselaDoc struct {
 // Acciones de una tesela. Van juntas porque la portada las pasa todas a la vez.
 type AccionesTesela struct {
 	Abrir, Destacar, Renombrar, Copiar, Eliminar func(api.Document)
+	// Descargar baja el documento en un formato de `office.Exports()` sin abrirlo. nil:
+	// el menú «Más acciones» sale sin el grupo de descargas.
+	Descargar func(d api.Document, formato string)
+	// Compartir abre el panel de compartir colgado de `desde`, el botón pulsado: el
+	// MISMO que el de la cabecera del editor. nil: el botón no sale.
+	Compartir func(d api.Document, desde fyne.CanvasObject)
 }
 
 // NuevaTeselaDoc monta la tesela. `t` traduce y `loc` es el idioma de la fecha.
@@ -277,21 +292,82 @@ func NuevaTeselaDoc(d api.Document, t func(string, i18n.Vars) string, loc i18n.L
 	}
 	s.estrella = NuevoBotonTesela(GlifoEstrella, t(clave+".label", i18n.Vars{"title": d.Title}), llamar(a.Destacar))
 	s.estrella.Pulsado = d.Starred
+	s.t, s.acc = t, a
 	ren := NuevoBotonTesela(GlifoLapiz, t("tile.rename.label", i18n.Vars{"title": d.Title}), llamar(a.Renombrar))
-	// «Hacer una copia»: en la web va en el menú «Más acciones» con las descargas, porque
-	// allí son cinco botones; aquí, sin descargas aún en la tesela, cabe como botón.
-	cop := NuevoBotonTesela(GlifoCopia, t("tile.copy.label", i18n.Vars{"title": d.Title}), llamar(a.Copiar))
+	// «Más acciones»: hacer una copia y descargar sin abrir el documento. En un menú y no
+	// en botones sueltos, como en la web: con cinco, a 180 —el mínimo de la rejilla— la
+	// fila pisaba la estrella.
+	s.mas = NuevoBotonTesela(GlifoMas, t("tile.more.label", i18n.Vars{"title": d.Title}), s.alternarMas)
 	bor := NuevoBotonTesela(GlifoPapelera, t("tile.delete.label", i18n.Vars{"title": d.Title}), llamar(a.Eliminar))
 	bor.Peligro = true
-	// ponytail: faltan «Descargar» y «Compartir» entre los dos: el SDK no tiene aún las
-	// exportaciones ni los permisos del servicio (`/exports`, `/permissions`). Van en el
-	// mismo sitio, en el orden de la web: renombrar · descargar · compartir · eliminar.
-	s.acciones = []*BotonTesela{ren, cop, bor}
+	s.acciones = []*BotonTesela{ren, s.mas}
+	if a.Compartir != nil {
+		var com *BotonTesela
+		com = NuevoBotonTesela(GlifoCompartir, t("tile.share.label", i18n.Vars{"title": d.Title}), func() {
+			a.Compartir(s.Doc, com)
+		})
+		s.acciones = append(s.acciones, com)
+	}
+	s.acciones = append(s.acciones, bor)
 	for _, b := range append([]*BotonTesela{s.estrella}, s.acciones...) {
 		b.AlEncima = func(si bool) { s.sobreHijo = si; s.Refresh() }
 	}
 	s.ExtendBaseWidget(s)
 	return s
+}
+
+// Medidas del rótulo del grupo «Descargar» del menú: `px-2.5 pt-1 pb-0.5 text-xs`.
+var (
+	MargenRotuloMenuTesela = tema.Espacio(2.5)
+	ArribaRotuloMenuTesela = tema.Espacio(1)
+	AbajoRotuloMenuTesela  = tema.Espacio(0.5)
+)
+
+// MenuMas es el menú de «Más acciones»: «Hacer una copia», un separador y, con su
+// rótulo, los formatos que exporta el editor en el orden de `office.Exports()`.
+func (s *TeselaDoc) MenuMas() *ui.Menu {
+	t, d := s.t, s.Doc
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	copia := ui.NuevoElementoMenu(t("copy.action", nil), iconos.Ninguno, func() {
+		if s.acc.Copiar != nil {
+			s.acc.Copiar(s.Doc)
+		}
+	})
+	copia.Glifo = iconos.TrazoDeRuta(GlifoCopia, GlifoBotonTesela, tema.Color("text-muted", v))
+	copia.TamIcono = GlifoBotonTesela
+	elems := []fyne.CanvasObject{copia}
+	if s.acc.Descargar != nil {
+		// Los formatos llevan su grupo en el nombre accesible: dentro de un menú el lector
+		// de pantalla solo lee los elementos, y «PDF» a secas no dice que descarga (el
+		// `role="group"` con `aria-labelledby` de la web).
+		descargar := t("tile.download", nil)
+		rotulo := ui.NuevoRotulo(descargar, tema.TextoXS, ui.Normal, "text-muted")
+		elems = append(elems, ui.NuevoSeparadorMenu(), container.New(layout.NewCustomPaddedLayout(
+			ArribaRotuloMenuTesela, AbajoRotuloMenuTesela, MargenRotuloMenuTesela, MargenRotuloMenuTesela), rotulo))
+		for _, c := range office.Exports() {
+			f := c.ID
+			e := ui.NuevoElementoMenu(t("export.format."+f, nil), iconos.Ninguno, func() {
+				if s.acc.Descargar != nil {
+					s.acc.Descargar(s.Doc, f)
+				}
+			})
+			e.Rotulo = descargar + " · " + e.Texto
+			elems = append(elems, e)
+		}
+	}
+	m := ui.NuevoMenu(elems...)
+	m.Rotulo = t("tile.more.label", i18n.Vars{"title": d.Title})
+	return m
+}
+
+// alternarMas abre el menú colgado del botón, o lo recoge si ya está abierto.
+func (s *TeselaDoc) alternarMas() {
+	if s.menu != nil && s.menu.Abierto() {
+		s.menu.Cerrar()
+		return
+	}
+	s.menu = s.MenuMas()
+	s.menu.Mostrar(s.mas)
 }
 
 // AccessibilityRole es el `<a href>` de la web: un enlace al editor.
@@ -452,7 +528,7 @@ type AccesoNuevo struct {
 var (
 	RellenoAcceso            = tema.Espacio(4)  // p-4 → 16
 	HuecoAcceso              = tema.Espacio(3)  // gap-3 → 12
-	LadoTeselaAcceso         = tema.Espacio(11) // h-11 w-11 → 38,5
+	LadoTeselaAcceso         = tema.Espacio(11) // h-11 w-11 → 44
 	GlifoAcceso      float32 = 22
 	RuedaAcceso      float32 = 18
 )
@@ -609,7 +685,7 @@ type FiltroDestacados struct {
 
 // Medidas del filtro.
 var (
-	AltoFiltro           = tema.Espacio(8)   // h-8 → 28
+	AltoFiltro           = tema.Espacio(8)   // h-8 → 32
 	MargenFiltro         = tema.Espacio(2.5) // px-2.5 → 10
 	HuecoFiltro          = tema.Espacio(1.5) // gap-1.5 → 6
 	GlifoFiltro  float32 = 14

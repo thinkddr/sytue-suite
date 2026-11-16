@@ -1,0 +1,131 @@
+{
+  "_": "Vectores COMPARTIDOS de estadisticas() (apps/frontend/apps/notes/src/client/extracto.ts) y htmltext.Stats: el mismo texto da los mismos números en la web y en Fyne.",
+  "casos": [
+    {
+      "nombre": "vacío",
+      "texto": "",
+      "palabras": 0,
+      "caracteres": 0,
+      "minutos": 0
+    },
+    {
+      "nombre": "solo blancos",
+      "texto": "  \n\t ",
+      "palabras": 0,
+      "caracteres": 0,
+      "minutos": 0
+    },
+    {
+      "nombre": "frase sencilla",
+      "texto": "Hola mundo",
+      "palabras": 2,
+      "caracteres": 10,
+      "minutos": 1
+    },
+    {
+      "nombre": "blancos juntados",
+      "texto": "  uno   dos\n\ntres  ",
+      "palabras": 3,
+      "caracteres": 12,
+      "minutos": 1
+    },
+    {
+      "nombre": "puntuación aparte",
+      "texto": "¿Qué tal? ¡Bien, gracias!",
+      "palabras": 4,
+      "caracteres": 25,
+      "minutos": 1
+    },
+    {
+      "nombre": "apóstrofo y guion dentro de la palabra",
+      "texto": "don't l’hiver e-mail",
+      "palabras": 3,
+      "caracteres": 20,
+      "minutos": 1
+    },
+    {
+      "nombre": "guion suelto y al final",
+      "texto": "a - b c-",
+      "palabras": 3,
+      "caracteres": 8,
+      "minutos": 1
+    },
+    {
+      "nombre": "cifras con separadores",
+      "texto": "1.250 personas, 3,5 km y 2024.",
+      "palabras": 6,
+      "caracteres": 30,
+      "minutos": 1
+    },
+    {
+      "nombre": "acentos y diacríticos combinados",
+      "texto": "canción cafe\u0301 Øre",
+      "palabras": 3,
+      "caracteres": 17,
+      "minutos": 1
+    },
+    {
+      "nombre": "emoji cuenta un carácter y no es palabra",
+      "texto": "hola 😀",
+      "palabras": 1,
+      "caracteres": 6,
+      "minutos": 1
+    },
+    {
+      "nombre": "chino: cada ideograma, una palabra",
+      "texto": "我们学习中文",
+      "palabras": 6,
+      "caracteres": 6,
+      "minutos": 1
+    },
+    {
+      "nombre": "japonés mezclado con latino",
+      "texto": "東京へ行く Sytue",
+      "palabras": 6,
+      "caracteres": 11,
+      "minutos": 1
+    },
+    {
+      "nombre": "coreano con espacios",
+      "texto": "안녕하세요 세계",
+      "palabras": 2,
+      "caracteres": 8,
+      "minutos": 1
+    },
+    {
+      "nombre": "griego y cirílico",
+      "texto": "Καλημέρα κόσμε привет мир",
+      "palabras": 4,
+      "caracteres": 25,
+      "minutos": 1
+    },
+    {
+      "nombre": "marcas combinantes no empiezan palabra (NFD y selector de variante)",
+      "texto": "cafe\u0301 か\u3099 te quiero ❤\ufe0f",
+      "palabras": 4,
+      "caracteres": 21,
+      "minutos": 1
+    },
+    {
+      "nombre": "blancos de JavaScript: el BOM junta, U+0085 no",
+      "texto": "a\ufeffb\u0085c",
+      "palabras": 3,
+      "caracteres": 5,
+      "minutos": 1
+    },
+    {
+      "nombre": "doscientas palabras, un minuto",
+      "texto": "palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra",
+      "palabras": 200,
+      "caracteres": 1599,
+      "minutos": 1
+    },
+    {
+      "nombre": "doscientas una, dos minutos",
+      "texto": "palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra",
+      "palabras": 201,
+      "caracteres": 1607,
+      "minutos": 2
+    }
+  ]
+}

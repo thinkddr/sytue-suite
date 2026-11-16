@@ -24,11 +24,12 @@ import (
 
 // Deps son las dependencias del router HTTP de Calendar.
 type Deps struct {
-	Cfg           config.Config
-	Service       *service.Service
-	Verifier      *authn.Verifier
-	CalDAV        http.Handler
-	ReadyCheckers []httpx.Checker
+	Cfg            config.Config
+	Service        *service.Service
+	Verifier       *authn.Verifier
+	CalDAV         http.Handler
+	PrivateIngress httpx.PrivateIngressPort
+	ReadyCheckers  []httpx.Checker
 	// Hub recibe la señal de cambios de cada escritura (hubnotify.TrasEscribir), para
 	// los widgets nativos. nil: sin señal.
 	Hub *hubnotify.Client
@@ -69,6 +70,13 @@ func NewRouter(d Deps) http.Handler {
 		// entera, no el uso normal.
 		api.Use(httpx.RateLimit(httpx.RateLimitConfig{Limiter: apiLimiter, KeyFunc: authn.RateKey}))
 		api.Use(cambios)
+
+		var source calendarPrivateStore
+		if d.Service != nil && d.Service.Store() != nil {
+			source = d.Service.Store()
+		}
+		mountCalendarPrivateSource(api, source)
+		mountCalendarPrivateIngress(api, d.PrivateIngress, d.Cfg.MaxObjectBytes*2+(128<<10))
 
 		// Calendarios (colecciones).
 		// «Exportar tus datos»: la entrega de la agenda (platform/pkg/portabilidad).
@@ -138,6 +146,9 @@ func NewRouter(d Deps) http.Handler {
 		// Invitaciones (scheduling inbox iTIP/RFC 6638).
 		api.Get("/invitations", h.ListInbox)
 		api.Post("/invitations/{id}/respond", h.RespondInvitation)
+		// Invitación de un organizador de fuera que llega por correo (iMIP): la
+		// contesta el lector de Mail. ANTES de cualquier /invitations/{id}/… nuevo.
+		api.Post("/invitations/import", h.ImportInvitation)
 
 		// Recursos reservables (salas, equipos) — patrón resource-calendar. Listar
 		// con disponibilidad y reservar/liberar: cualquier usuario del tenant. Alta:

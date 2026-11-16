@@ -349,7 +349,7 @@ services:
   # Esta imagen ya está en el catálogo (`managed-http-task`), espejada y firmada,
   # así que el cambio quita una dependencia de terceros en vez de añadirla.
   minio-init:
-    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
+    image: alpine/curl:8.23.0@sha256:c8df739636f42117e358bdffb4c243c460b31cbba8cc69241a22ab519546f34d
     networks: [backend]
     depends_on:
       minio:
@@ -705,6 +705,7 @@ services:
       # quién entregar. El MISMO dominio va en el servicio de Rooms, que lo publica.
       CHANNEL_MAIL_DOMAIN: ${CHANNEL_MAIL_DOMAIN:-rooms.sytue.localhost}
       ROOMS_URL: http://rooms:8085
+      ROOMS_INTERNAL_SECRET: ${ROOMS_INTERNAL_SECRET}
       # CONTRASEÑAS DE APLICACIÓN: lo que se escribe en Thunderbird. El AUTH de
       # IMAP/SMTP las verifica contra Sytue ID; sin el secreto solo se acepta un
       # JWT con scope `mail`, que dura minutos y no se puede teclear.
@@ -746,6 +747,8 @@ services:
       <<: *go-env
       PORT: "8087"
       PUBLIC_URL: https://calendar.sytue.localhost
+      ROOMS_URL: http://rooms:8085
+      ROOMS_INTERNAL_SECRET: ${ROOMS_INTERNAL_SECRET}
       DATABASE_URL: "postgres://${CALENDAR_DB_USER:-sytue_calendar}:${CALENDAR_DB_PASSWORD}@postgres:5432/${CALENDAR_DB_NAME:-sytue_calendar}?sslmode=disable"
     depends_on:
       postgres:

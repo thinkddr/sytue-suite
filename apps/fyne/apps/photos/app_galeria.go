@@ -5,8 +5,8 @@ package photos
 
 import (
 	"context"
+	"errors"
 	"mime"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -14,6 +14,7 @@ import (
 
 	"fyne.io/fyne/v2"
 
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
@@ -26,26 +27,59 @@ import (
 // entrarEnSeleccion es «Seleccionar». La lista de álbumes del selector se pide aquí y
 // no al pulsar el selector: `ui.Selector` no avisa de que se va a abrir.
 func (a *App) entrarEnSeleccion() {
-	a.g.seleccion = map[string]bool{}
+	a.g.seleccion, a.g.ancla = map[string]bool{}, ""
+	a.pintar()
+	a.conAlbumes(func([]api.Album) { a.pintar() })
+}
+
+// empezarSeleccion es mantener pulsada una tesela (en el escritorio, el clic derecho):
+// entra en el modo selección con esa foto ya marcada y de ancla, sin abrir el visor.
+// Es el gesto de Google Photos en el móvil, donde «Seleccionar» queda lejos del dedo.
+func (a *App) empezarSeleccion(f api.Photo) {
+	if a.g.seleccion != nil {
+		a.alternar(f)
+		return
+	}
+	a.g.seleccion, a.g.ancla = map[string]bool{f.ID: true}, f.ID
 	a.pintar()
 	a.conAlbumes(func([]api.Album) { a.pintar() })
 }
 
 func (a *App) salirDeSeleccion() {
-	a.g.seleccion = nil
+	a.g.seleccion, a.g.ancla = nil, ""
 	a.pintar()
 }
 
+// mayusPulsada es `ui.Mayus`, en variable para que las pruebas pulsen Mayús sin un
+// driver de escritorio.
+var mayusPulsada = ui.Mayus
+
+// alternar marca o desmarca una foto; con Mayús, añade el tramo desde el ancla. El tramo
+// se cuenta sobre `fotos`, el orden en que se ven (los meses la parten, no la reordenan).
 func (a *App) alternar(f api.Photo) {
 	if a.g.seleccion == nil {
 		return
 	}
-	if a.g.seleccion[f.ID] {
-		delete(a.g.seleccion, f.ID)
-	} else {
-		a.g.seleccion[f.ID] = true
+	desde := -1
+	if a.g.ancla != "" {
+		desde = a.posicionDe(a.g.ancla)
+	}
+	if i := ui.MarcarConTramo(a.g.seleccion, a.g.fotos, idDeFoto, a.posicionDe(f.ID), desde, mayusPulsada()); i >= 0 {
+		a.g.ancla = a.g.fotos[i].ID
 	}
 	a.pintar()
+}
+
+func idDeFoto(f api.Photo) string { return f.ID }
+
+// posicionDe es el índice de la foto en la línea de tiempo cargada; -1 si no está.
+func (a *App) posicionDe(id string) int {
+	for i, f := range a.g.fotos {
+		if f.ID == id {
+			return i
+		}
+	}
+	return -1
 }
 
 // alternarMes marca las fotos de un mes o, si ya estaban todas, las desmarca.
@@ -88,7 +122,7 @@ func (a *App) albumDeLaSeleccion() {
 					a.g.error = a.textoDeFallo(err)
 					return
 				}
-				a.g.aviso = a.v.T.T("gallery.addedToAlbum", i18n.Vars{"count": len(fotos), "title": al.Title})
+				a.avisar(ui.AvisoExito, a.v.T.T("gallery.addedToAlbum", i18n.Vars{"count": len(fotos), "title": al.Title}), "")
 				a.g.seleccion = nil
 			})
 		})
@@ -100,12 +134,12 @@ func (a *App) anyadirSeleccionA(al api.Album) {
 	if len(ids) == 0 {
 		return
 	}
-	pedir(a, func(x context.Context, c *api.Photos) (int, error) { return c.AddToAlbum(x, al.ID, ids) }, func(_ int, err error) {
+	pedirAlbum(a, func(x context.Context, c *api.Photos) (int, error) { return c.AddToAlbum(x, al.ID, ids) }, func(_ int, err error) {
 		if err != nil {
 			a.g.error = a.textoDeFallo(err)
 			return
 		}
-		a.g.aviso = a.v.T.T("gallery.addedToAlbum", i18n.Vars{"count": len(ids), "title": al.Title})
+		a.avisar(ui.AvisoExito, a.v.T.T("gallery.addedToAlbum", i18n.Vars{"count": len(ids), "title": al.Title}), "")
 		a.g.seleccion = nil
 	})
 }
@@ -116,6 +150,9 @@ func (a *App) parecidasALaSeleccion() { a.AbrirParecidas(idsDe(a.seleccionadas()
 // parecidasALosResultados es «Y las que se parecen»: los aciertos de una búsqueda como
 // punto de partida para llegar a las que nadie describió.
 func (a *App) parecidasALosResultados() { a.AbrirParecidas(idsDe(a.g.fotos)) }
+
+// guardarSeleccionEnSistema deja lo marcado en la galería del sistema (guardarEnSistema).
+func (a *App) guardarSeleccionEnSistema() { a.guardarEnSistema(a.seleccionadas()) }
 
 // descargarSeleccion exporta en JPEG lo marcado, una a una.
 func (a *App) descargarSeleccion() {
@@ -146,35 +183,25 @@ func (a *App) descargarSeleccion() {
 	})
 }
 
-// confirmarTirarSeleccion pregunta antes de mandar lo marcado a la papelera.
-func (a *App) confirmarTirarSeleccion() {
-	n := len(a.g.seleccion)
-	if n == 0 {
-		return
-	}
-	a.confirmar(a.v.Traduce("viewer.delete"), a.v.T.T("gallery.trashSelectedConfirm", i18n.Vars{"count": n}),
-		a.v.Traduce("viewer.delete"), a.tirarSeleccion)
-}
-
+// tirarSeleccion manda lo marcado a la papelera SIN preguntar: es reversible y lo
+// deshace el aviso (ver deshacer.go). Lo que el servicio no acepta se dice aparte.
 func (a *App) tirarSeleccion() {
-	ids := idsDe(a.seleccionadas())
-	pedir(a, func(x context.Context, c *api.Photos) ([]string, error) {
-		var hechas []string
-		for _, id := range ids {
-			if c.Trash(x, id) == nil {
-				hechas = append(hechas, id)
-			}
-		}
-		return hechas, nil
-	}, func(hechas []string, _ error) {
+	lista, gen, ruta := a.g.fotos, a.gen, a.ruta
+	a.tirarSinRepetir(idsDe(a.seleccionadas()), func(nuevas, hechas []string, _ error, misma bool) {
+		t := a.nuevaTirada(lista, hechas, gen, ruta)
+		// Lo tirado sale de la lista que se vea; la selección y el error son de la
+		// galería de cuando se tiró.
 		for _, id := range hechas {
 			a.g.fotos = quitarFoto(a.g.fotos, id)
 		}
-		a.g.seleccion = nil
-		a.g.aviso = a.v.T.T("gallery.trashed", i18n.Vars{"count": len(hechas)})
-		if len(hechas) < len(ids) {
-			a.g.error = a.v.T.T("gallery.trashFailed", i18n.Vars{"count": len(ids) - len(hechas)})
+		if misma {
+			a.g.seleccion = nil
+			if len(hechas) < len(nuevas) {
+				a.g.error = a.v.T.T("gallery.trashFailed", i18n.Vars{"count": len(nuevas) - len(hechas)})
+			}
 		}
+		a.avisarTirada(t)
+		a.pintar()
 	})
 }
 
@@ -262,7 +289,7 @@ func (a *App) favoritasDeLaSeleccion() {
 		if valor {
 			clave = "gallery.favorited"
 		}
-		a.g.aviso = a.v.T.T(clave, i18n.Vars{"count": len(hechas)})
+		a.avisar(ui.AvisoExito, a.v.T.T(clave, i18n.Vars{"count": len(hechas)}), "")
 		if len(hechas) < len(ids) {
 			a.g.error = a.v.T.T("gallery.favoriteFailed", i18n.Vars{"count": len(ids) - len(hechas)})
 		}
@@ -347,20 +374,28 @@ func (a *App) subir(rutas []string) {
 		a.pintar()
 		return
 	}
-	if a.cli == nil || a.Drive == nil || a.g.subida != nil {
+	if a.cli == nil || (!a.cli.CanImportPrivatePhotos() && a.Drive == nil) || a.g.subida != nil || a.reanudandoImportaciones {
 		return
 	}
 	a.g.aviso, a.g.subida = "", &[2]int{0, len(fotos)}
 	a.pintar()
 	gen := a.gen
 	a.enSesion(func(vida context.Context) {
-		carpeta, err := a.carpetaFotos(vida)
-		var fallos []string
+		d := nuevoDestinoDrive(a.Drive, a.cli)
+		_, err := d.carpetaFotos(vida)
+		var fallos, sinGaleria []string
 		for i, r := range fotos {
 			if vida.Err() != nil {
 				return
 			}
-			if err != nil || a.subirUna(vida, carpeta, r) != nil {
+			e := err
+			if e == nil {
+				e = a.subirUna(vida, d, r)
+			}
+			switch {
+			case errors.Is(e, ErrNoIndexable):
+				sinGaleria = append(sinGaleria, filepath.Base(r))
+			case e != nil:
 				fallos = append(fallos, filepath.Base(r))
 			}
 			//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
@@ -372,37 +407,46 @@ func (a *App) subir(rutas []string) {
 		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 		a.hilo(gen, func() {
 			a.g.subida = nil
-			hechas := len(fotos) - len(fallos)
-			if len(fallos) > 0 {
-				a.g.aviso = a.v.T.T("gallery.uploadFailed", i18n.Vars{"name": strings.Join(fallos, ", ")})
-			} else {
-				a.g.aviso = a.v.T.T("gallery.uploaded", i18n.Vars{"count": hechas})
+			hechas := len(fotos) - len(fallos) - len(sinGaleria)
+			// El progreso va en línea; cómo acabó, en el aviso. Lo que está en Drive pero la
+			// galería no sabe enseñar NO es un fallo: volver a subirlo no lo arreglaría.
+			switch {
+			case len(fallos) > 0:
+				a.avisar(ui.AvisoPeligro, a.v.T.T("gallery.uploadFailed", i18n.Vars{"name": strings.Join(fallos, ", ")}), "")
+			case len(sinGaleria) > 0:
+				a.avisar(ui.AvisoAdvertencia, a.v.T.T("gallery.uploadedNotShown", i18n.Vars{"name": strings.Join(sinGaleria, ", ")}), "")
+			default:
+				a.avisar(ui.AvisoExito, a.v.T.T("gallery.uploaded", i18n.Vars{"count": hechas}), "")
 			}
 			if hechas > 0 {
 				// La línea de tiempo se vuelve a pedir desde el principio: las nuevas
 				// caen donde les toque por fecha, no arriba por haber llegado las
 				// últimas.
-				aviso := a.g.aviso
 				a.gen++
-				a.g = estadoGaleria{texto: a.g.texto, aviso: aviso}
+				// En el año al que se había saltado: subir no tiene por qué mover la
+				// vista. Y la barra se vuelve a pedir, que las subidas pueden ser de un
+				// año que aún no tenía (como la web).
+				a.g = estadoGaleria{texto: a.g.texto, anyo: a.g.anyo}
 				a.cerrarVisor()
 				a.cargarMas()
+				a.pedirAnyos()
 			}
 			a.pintar()
 		})
 	})
 }
 
-// carpetaFotos es el id de «/Fotos» en la raíz del Drive, creándola si no está.
-func (a *App) carpetaFotos(vida context.Context) (string, error) {
+// carpetaFotosEn es el id de «/Fotos» en la raíz del Drive, creándola si no está. Con un
+// cliente de Drive cualquiera: también el de la copia con la app cerrada, sin App.
+func carpetaFotosEn(vida context.Context, drive *api.Drive) (string, error) {
 	c, fin := ctx(vida)
 	defer fin()
-	raiz, err := a.Drive.Root(c)
+	raiz, err := drive.Root(c)
 	if err != nil {
 		return "", err
 	}
 	for cursor := ""; ; {
-		hijos, err := a.Drive.Children(c, raiz.ID, cursor)
+		hijos, err := drive.Children(c, raiz.ID, cursor)
 		if err != nil {
 			return "", err
 		}
@@ -415,28 +459,32 @@ func (a *App) carpetaFotos(vida context.Context) (string, error) {
 			break
 		}
 	}
-	f, err := a.Drive.CreateFolder(c, raiz.ID, CarpetaFotos)
+	f, err := drive.CreateFolder(c, raiz.ID, CarpetaFotos)
 	return f.ID, err
 }
 
-func (a *App) subirUna(vida context.Context, carpeta, ruta string) error {
-	f, err := os.Open(ruta) //nolint:gosec // es la ruta que la persona ha elegido o soltado
+// subirUna sube una foto elegida o soltada sin sustituir ninguna de «/Fotos» y la
+// indexa. Lo que la galería no sabe enseñar (HEIC, WebP, AVIF) se pasa antes a JPEG con
+// sus metadatos donde el sistema sabe hacerlo, como en la copia de seguridad; si no, sube
+// tal cual y queda en Drive ([ErrNoIndexable]).
+func (a *App) subirUna(vida context.Context, d *destinoDrive, ruta string) error {
+	if d == nil {
+		d = nuevoDestinoDrive(a.Drive, a.cli)
+	}
+	nombre, tipo := filepath.Base(ruta), tipoDe(ruta)
+	if !SyphotosMide(tipo) && a.Galeria != nil && a.Galeria.Disponible() {
+		jpeg, limpiar, err := a.Galeria.Convertir(vida, ruta)
+		defer limpiar()
+		if err == nil {
+			ruta, tipo = jpeg, "image/jpeg"
+			nombre = strings.TrimSuffix(nombre, filepath.Ext(nombre)) + ".jpg"
+		}
+	}
+	s, err := d.Subir(vida, ruta, nombre, tipo)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = f.Close() }()
-	info, err := f.Stat()
-	if err != nil {
-		return err
-	}
-	c, fin := context.WithTimeout(vida, 10*time.Minute)
-	defer fin()
-	fichero, err := a.Drive.Upload(c, carpeta, filepath.Base(ruta), tipoDe(ruta), f, info.Size())
-	if err != nil {
-		return err
-	}
-	_, err = a.cli.Indexar(c, fichero.ID)
-	return err
+	return d.Indexar(vida, s.ID)
 }
 
 // ---- Los recuerdos ----

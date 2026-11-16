@@ -20,12 +20,12 @@ func TestUsername_SeAsignaAlCrear(t *testing.T) {
 	st, ctx := newStore(t)
 	st.SetSuiteDomain("sytue.eu")
 
-	ana := usuarioConNombre(t, ctx, st, "ana@acme.example", "Ana", "Pérez")
+	ana := usuarioConNombre(ctx, t, st, "ana@acme.example", "Ana", "Pérez")
 	if ana.Username != "ana.perez" {
 		t.Fatalf("@usuario por defecto = %q, quiero ana.perez", ana.Username)
 	}
 	// Homónima: desempata como las direcciones, no se queda con el de la primera.
-	otra := usuarioConNombre(t, ctx, st, "ana@otra.example", "Ana", "Pérez")
+	otra := usuarioConNombre(ctx, t, st, "ana@otra.example", "Ana", "Pérez")
 	if otra.Username != "ana.perez2" {
 		t.Fatalf("homónima = %q, quiero ana.perez2", otra.Username)
 	}
@@ -46,8 +46,8 @@ func TestUsername_SeAsignaAlCrear(t *testing.T) {
 
 	// luis@sytue.eu ya es de alguien: a otro Luis no se le puede dar @luis, porque
 	// @luis ES luis@sytue.eu.
-	org := orgConBuzones(t, ctx, st, "corporate")
-	dueno := usuarioConNombre(t, ctx, st, "dueno@corporate.example", "Dueño", "Uno")
+	org := orgConBuzones(ctx, t, st, "corporate")
+	dueno := usuarioConNombre(ctx, t, st, "dueno@corporate.example", "Dueño", "Uno")
 	if err := st.ReserveMailbox(ctx, nil, org.ID, dueno.ID, "luis@sytue.eu"); err != nil {
 		t.Fatalf("ReserveMailbox: %v", err)
 	}
@@ -70,8 +70,8 @@ func TestUsername_BarridoDePendientes(t *testing.T) {
 	st, ctx := newStore(t)
 	st.SetSuiteDomain("sytue.eu")
 
-	antigua := usuarioConNombre(t, ctx, st, "ana@acme.example", "Ana", "Ruiz")
-	personal := usuarioConNombre(t, ctx, st, "ana@gmail.example", "Ana", "Gómez")
+	antigua := usuarioConNombre(ctx, t, st, "ana@acme.example", "Ana", "Ruiz")
+	personal := usuarioConNombre(ctx, t, st, "ana@gmail.example", "Ana", "Gómez")
 	org, err := st.CreateOrg(ctx, nil, domain.Organization{
 		Slug: domain.PersonalSlug("ana@gmail.example"), Name: "ana@gmail.example", Kind: domain.OrgKindPersonal,
 	})

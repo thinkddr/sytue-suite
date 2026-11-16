@@ -45,9 +45,11 @@ type ssssVaultEnvelope struct {
 }
 
 type attestedStorageSession struct {
-	RoomID    string `json:"room_id"`
-	SessionID string `json:"session_id"`
-	SenderKey string `json:"sender_key"`
+	RoomID     string `json:"room_id"`
+	SessionID  string `json:"session_id"`
+	SenderKey  string `json:"sender_key"`
+	SenderUser string `json:"sender_user,omitempty"`
+	SigningKey string `json:"signing_key,omitempty"`
 }
 
 type attestedStorageSessionList struct {
@@ -59,6 +61,9 @@ func (c *Client) ssssSecretKey() string { return "rooms-matrix-ssss-" + c.accoun
 
 func (c *Client) vaultScope() storage.Scope {
 	product := c.cfg.Bootstrap.StorageProduct
+	if c.cfg.ResourceProduct != "" {
+		product = c.cfg.ResourceProduct
+	}
 	if product == "" {
 		product = "rooms"
 	}
@@ -286,7 +291,7 @@ func normalizeAttestedSessions(entries []attestedStorageSession) ([]attestedStor
 // sessions from unauthenticated Curve25519 backup injections.
 func (c *Client) attestStorageSessions(ctx context.Context, sessions []*mxcrypto.InboundGroupSession) error {
 	if c.cfg.Bootstrap.StorageProduct == "" {
-		return nil
+		return c.attestRoomSessions(ctx, sessions)
 	}
 	scope := c.storageScope()
 	if !scope.Valid() {

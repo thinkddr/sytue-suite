@@ -24,7 +24,7 @@
       ],
       "authorize_params": {
         "access_type": "offline",
-        "prompt": "consent"
+        "prompt": "consent select_account"
       },
       "revoke_url": "https://oauth2.googleapis.com/revoke"
     },

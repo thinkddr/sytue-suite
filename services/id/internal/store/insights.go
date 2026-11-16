@@ -36,11 +36,14 @@ type OrgInsights struct {
 // Las invitaciones sí van aparte —otra tabla— pero en la misma llamada.
 func (s *Store) OrgInsightsFor(ctx context.Context, orgID string, now time.Time) (OrgInsights, error) {
 	var o OrgInsights
-	const sql = `
+	// Los tres primeros recuentos usan el predicado del filtro del directorio
+	// (condicionFiltro): el aviso de la portada enlaza a esa lista, y tiene que
+	// contar exactamente a la gente que la lista enseña.
+	sql := `
 		SELECT
-			count(*) FILTER (WHERE u.status = 'active' AND NOT u.mfa_enabled),
-			count(*) FILTER (WHERE u.status = 'suspended'),
-			count(*) FILTER (WHERE u.status = 'active' AND NOT u.email_verified),
+			count(*) FILTER (WHERE ` + condicionFiltro[FiltroSinMFA] + `),
+			count(*) FILTER (WHERE ` + condicionFiltro[FiltroSuspendidos] + `),
+			count(*) FILTER (WHERE ` + condicionFiltro[FiltroSinVerificar] + `),
 			(SELECT count(*) FROM org_invitations i WHERE i.org_id = $1 AND i.expires_at <= $2),
 			(SELECT count(*) FROM org_invitations i WHERE i.org_id = $1 AND i.expires_at > $2)
 		FROM memberships m JOIN users u ON u.id = m.user_id

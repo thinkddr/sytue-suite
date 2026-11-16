@@ -52,6 +52,23 @@
   }
 }
 
+/* Lo buscado dentro de un resultado (Resaltado.tsx): el amarillo de rotulador de
+   Notes, que es quien lo estrenó, y con él Mail y Contacts. La tinta es la del texto
+   para que el contraste no dependa del color de la fila. */
+.sytue-resalte {
+  color: var(--sytue-text);
+  background-color: #fff3a3;
+  border-radius: 0.125rem;
+}
+[data-theme='dark'] .sytue-resalte {
+  background-color: #6b5d00;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .sytue-resalte {
+    background-color: #6b5d00;
+  }
+}
+
 /* La lista NATIVA de opciones es otra superficie: el select cerrado puede ser un
    cristal o estar sobre el cromo, pero su lista no puede heredar ese fondo ni su
    tinta. Chromium pinta el alfa de las opciones sin el desenfoque del control. */
@@ -311,7 +328,7 @@ dialog::backdrop {
   textarea,
   /* Y EL CAMPO RICO, que no es ninguno de los tres. El cuerpo de un correo es un
      `div[contenteditable]`, así que esta regla no lo alcanzaba: medía 12,25px
-     —`text-sm` con la raíz en 14— y al tocarlo para escribir, iOS hacía zoom y
+     —`text-sm` cuando 1 rem eran 14 px— y al tocarlo para escribir, iOS hacía zoom y
      el redactor se salía de la pantalla. Medido en producción sobre un iPhone
      14 Pro: de 34 elementos enfocables en siete apps, ese era el ÚNICO por
      debajo de 16.

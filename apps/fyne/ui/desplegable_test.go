@@ -5,6 +5,7 @@ package ui
 
 import (
 	"image/color"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -55,7 +56,7 @@ func TestElContratoDelMenuEsElDeDropdownTsx(t *testing.T) {
 }
 
 // TestElElementoDeMenuMideLoDeSuDensidad son las dos cifras absolutas: `px-3 py-2
-// text-base` da 33,25 de alto y `px-2.5 py-1.5 text-sm` da 26,25, con el rem de 14.
+// text-base` da 38 de alto y `px-2.5 py-1.5 text-sm` da 30, con el rem de 16.
 func TestElElementoDeMenuMideLoDeSuDensidad(t *testing.T) {
 	for _, c := range []struct {
 		denso  bool
@@ -721,9 +722,6 @@ func TestLaTransicionMezclaEnPremultiplicado(t *testing.T) {
 	if got := mezclaColor(velo, velo, 0.3); got != velo {
 		t.Errorf("entre dos colores iguales sale %v", got)
 	}
-	if got := CurvaColores(0.5); got < 0.77 || got > 0.78 {
-		t.Errorf("cubic-bezier(0.4, 0, 0.2, 1) a la mitad da %v y es 0,7756", got)
-	}
 }
 
 // La opción vigente (`aria-current`) se marca con `menu-selected`, sin tic; pulsada
@@ -795,4 +793,25 @@ func TestElAnclaDelMenuSoloCambiaSuGeometria(t *testing.T) {
 		t.Errorf("sin ancla el menú está en %v; antes estaba en (40,93.5)", pos)
 	}
 	menu.Cerrar()
+}
+
+// TestLasTransicionesDeColorLlevanLaCurvaDeLaHoja lee theme.css: la web manda a
+// `transition-*` por `--ease-standard`, y el hover nativo tiene que frenar igual. Si
+// alguien quita la reasignación de la hoja, o vuelve a poner aquí la de Tailwind, se pone
+// rojo.
+func TestLasTransicionesDeColorLlevanLaCurvaDeLaHoja(t *testing.T) {
+	tokens := webref.Read(t, "apps/frontend/packages/config/src/theme.css")
+	if !regexp.MustCompile(`--default-transition-timing-function:\s*var\(--ease-standard\);`).MatchString(tokens) {
+		t.Fatal("theme.css ya no lleva `transition-*` por `--ease-standard`: revisar CurvaColores")
+	}
+	for _, x := range []float32{0, 0.1, 0.25, 0.5, 0.75, 0.9, 1} {
+		if got, quiero := CurvaColores(x), CurvaEstandar(x); got != quiero {
+			t.Errorf("a %v del tiempo el hover va por %v y `--ease-standard` por %v", x, got, quiero)
+		}
+	}
+	// La de Tailwind, `cubic-bezier(0.4, 0, 0.2, 1)`, da 0,7756 a la mitad; la de la casa,
+	// 0,84. Con eso basta para que no se cuele la otra.
+	if m := CurvaColores(0.5); m < 0.8 {
+		t.Errorf("a mitad de tiempo el hover va por %v: eso es la curva de Tailwind", m)
+	}
 }

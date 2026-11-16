@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/test"
 
 	"git.sytue.eu/sytue/one/apps/fyne/editor"
@@ -341,5 +342,23 @@ func TestLaLetraDeArenaEsLaDelEquipo(t *testing.T) {
 	}
 	if got := letra(""); got != tema.Regular {
 		t.Errorf("sin tema pinta con %v y quiero Figtree", got.Name())
+	}
+}
+
+// TestLosAtajosDelRegistroEnLaCaja: en la caja de texto valen los mismos atajos de Google
+// Docs que en el folio (salen del registro común, como en la web): Ctrl+Alt+2 la hace
+// título 2 y Ctrl+Mayús+E la centra.
+func TestLosAtajosDelRegistroEnLaCaja(t *testing.T) {
+	e, _, w := montar(t, `{"slides":[{"id":"s","boxes":[`+
+		`{"id":"t","x":10,"y":10,"w":80,"h":40,"html":"<p>hola</p>"}]}]}`)
+	e.EmpezarEscritura("t")
+	teclado := enfocado(t, w).(fyne.Shortcutable)
+	teclado.TypedShortcut(&fyne.ShortcutSelectAll{})
+	ctrl := fyne.KeyModifierShortcutDefault
+	teclado.TypedShortcut(&desktop.CustomShortcut{KeyName: fyne.Key2, Modifier: ctrl | fyne.KeyModifierAlt})
+	teclado.TypedShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyE, Modifier: ctrl | fyne.KeyModifierShift})
+	e.TerminarEscritura()
+	if h := e.m.caja(0, "t").HTML; h != `<h2 style="text-align: center;">hola</h2>` {
+		t.Errorf("HTML = %q", h)
 	}
 }

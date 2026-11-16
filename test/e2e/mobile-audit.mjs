@@ -599,6 +599,8 @@ const APPS = {
     '/',
     '/billing',
     '/usage',
+    // El asistente «Nuevo proyecto»: es una página (el último paso mira el build).
+    '/new',
     '/team',
     '/settings',
     '/tokens',

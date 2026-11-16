@@ -1,20 +1,21 @@
 /**
  * CalendarModal — crear o editar (renombrar/color) un calendario con el design
  * system Sytue (Modal + Form de @sytue/ui). El color se elige de la paleta de
- * 14 tonos joya --sytue-* (valores hex: el servicio Go exige #RRGGBB) mediante
- * un radiogroup accesible (roving tabindex, flechas). docs/design.md §9.
+ * colores de usuario de la suite (valores hex: el servicio Go exige #RRGGBB)
+ * mediante un radiogroup accesible (roving tabindex, flechas). docs/design.md §9.
  */
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
+import { PALETA_DE_USUARIO, claveDeColorDeUsuario, colorDeUsuario } from '@sytue/config';
+import { useI18n } from '@sytue/i18n/preact';
 import {
   Button,
   FieldGroup,
   FieldHint,
-  Icon,
   InlineHelp,
   Input,
   Modal,
-  cx,
+  SelectorDeColor,
   useToast,
 } from '@sytue/ui';
 import {
@@ -23,32 +24,21 @@ import {
   updateCalendar,
   type Calendar,
 } from '../client/calendarApi.js';
-import type { CalendarMessageKey, T } from '../i18n/index.js';
+import type { T } from '../i18n/index.js';
 
 /**
- * Paleta de 14 tonos joya de la suite (mismos hex que los tokens
- * --sytue-product-* / --sytue-header-* de @sytue/config): AA-safe como relleno
- * con icono blanco. Hex literal porque el backend persiste calendar-color CalDAV.
- *
- * El NOMBRE del tono es texto de interfaz (lo lee el lector de pantalla y sale
- * en el `title`), así que aquí solo va su clave de catálogo.
+ * Los tonos de un calendario: la paleta de colores de usuario de la suite
+ * (`PALETA_DE_USUARIO` de @sytue/config), la misma que la de las etiquetas de
+ * Mail o los cuadernos de Notes, medida en los cuatro modos. Hex porque el
+ * backend persiste calendar-color CalDAV. Un color guardado fuera de ella (de
+ * la paleta de antes o de otro cliente) se PINTA con su tono más cercano
+ * (`colorDeUsuario`) y no se reescribe hasta que su dueño elige otro.
  */
-export const CALENDAR_PALETTE: ReadonlyArray<{ name: CalendarMessageKey; value: string }> = [
-  { name: 'colour.terracotta', value: '#b0470f' }, // --sytue-product-one
-  { name: 'colour.slate', value: '#334155' }, // --sytue-product-id
-  { name: 'colour.pine', value: '#146a47' }, // --sytue-product-drive
-  { name: 'colour.inkBlue', value: '#1e50a8' }, // --sytue-product-docs
-  { name: 'colour.jade', value: '#0f7052' }, // --sytue-product-sheets
-  { name: 'colour.ochre', value: '#94590f' }, // --sytue-product-slides
-  { name: 'colour.garnet', value: '#a31f38' }, // --sytue-product-mail
-  { name: 'colour.plum', value: '#6b3e9e' }, // --sytue-product-calendar
-  { name: 'colour.petrol', value: '#0e6c84' }, // --sytue-product-contacts
-  { name: 'colour.orchid', value: '#a23e8c' }, // --sytue-product-chat
-  { name: 'colour.purple', value: '#8446a8' }, // --sytue-product-meet
-  { name: 'colour.indigo', value: '#4338ca' }, // --sytue-product-rooms
-  { name: 'colour.steel', value: '#2e5a8c' }, // --sytue-product-cloud
-  { name: 'colour.viridian', value: '#0e7268' }, // --sytue-product-hub
-];
+export const CALENDAR_PALETTE = PALETA_DE_USUARIO;
+
+/** El tono de un calendario nuevo y el de una suscripción, por su id. */
+export const COLOR_NUEVO = PALETA_DE_USUARIO.find((c) => c.id === 'blue')!.valor;
+export const COLOR_SUSCRIPCION = PALETA_DE_USUARIO.find((c) => c.id === 'plum')!.valor;
 
 interface Props {
   /** Traductor ya atado al idioma de la petición; baja del padre. */
@@ -64,7 +54,7 @@ interface Props {
 export function CalendarModal({ t, open, editing, onClose, onSaved }: Props): JSX.Element | null {
   const toast = useToast();
   const [name, setName] = useState('');
-  const [color, setColor] = useState(CALENDAR_PALETTE[0]!.value);
+  const [color, setColor] = useState(COLOR_NUEVO);
   const [busy, setBusy] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
 
@@ -72,7 +62,7 @@ export function CalendarModal({ t, open, editing, onClose, onSaved }: Props): JS
   useEffect(() => {
     if (!open) return;
     setName(editing?.displayName ?? '');
-    setColor(editing?.color ?? CALENDAR_PALETTE[0]!.value);
+    setColor(editing?.color ?? COLOR_NUEVO);
     setNameError(null);
   }, [open, editing]);
 
@@ -220,93 +210,39 @@ export function DeleteCalendarModal({
 }
 
 /**
- * Selector de color como radiogroup accesible: un radio por tono, roving tabindex
- * y flechas para moverse; el elegido lleva anillo + check (estado no comunicado
- * solo por color). Reutilizado por el calendario y por el evento (color por
- * evento): `idPrefix` evita colisiones de id y `allowNone` antepone un swatch
- * «color del calendario» (valor vacio).
+ * Selector de color del calendario: el común de la suite (`SelectorDeColor`) con
+ * la paleta y los nombres de Calendar. Reutilizado por el calendario y por el
+ * evento (color por evento): `allowNone` antepone un swatch «color del
+ * calendario» (valor vacío).
  */
 export function ColorSwatches({
   t,
   value,
   onChange,
-  idPrefix = 'cal-color',
   allowNone = false,
   labelledBy,
 }: {
   t: T;
   value: string;
   onChange: (v: string) => void;
-  idPrefix?: string;
   allowNone?: boolean;
   labelledBy?: string | undefined;
 }): JSX.Element {
-  const items: ReadonlyArray<{ name: CalendarMessageKey; value: string }> = allowNone
-    ? [{ name: 'colour.inherit', value: '' }, ...CALENDAR_PALETTE]
-    : CALENDAR_PALETTE;
-  const idx = items.findIndex((p) => p.value.toLowerCase() === value.toLowerCase());
-  const tabStop = idx < 0 ? 0 : idx; // color fuera de paleta: primer swatch tabulable
-  const idOf = (v: string): string => `${idPrefix}-${v ? v.slice(1) : 'none'}`;
-
-  function onKeyDown(e: KeyboardEvent): void {
-    const delta =
-      e.key === 'ArrowRight' || e.key === 'ArrowDown'
-        ? 1
-        : e.key === 'ArrowLeft' || e.key === 'ArrowUp'
-          ? -1
-          : 0;
-    if (!delta) return;
-    e.preventDefault();
-    const next = items[(tabStop + delta + items.length) % items.length]!;
-    onChange(next.value);
-    document.getElementById(idOf(next.value))?.focus();
-  }
-
+  // Los nombres de los tonos son del catálogo común: los comparten todas las apps.
+  const tc = useI18n().t;
+  const items: ReadonlyArray<{ nombre: string; valor: string }> = [
+    ...(allowNone ? [{ nombre: t('colour.inherit'), valor: '' }] : []),
+    ...CALENDAR_PALETTE.map((c) => ({ nombre: tc(claveDeColorDeUsuario(c.id)), valor: c.valor })),
+  ];
+  // Un color guardado fuera de la paleta se ve, y se marca, como su tono más
+  // cercano; el valor guardado no se toca hasta que su dueño elige otro.
+  const pintado = colorDeUsuario(value) ?? '';
   return (
-    <div
-      role="radiogroup"
-      {...(labelledBy ? { 'aria-labelledby': labelledBy } : {})}
-      tabIndex={-1}
-      // Con el dedo, cada tono es un blanco de 44 (el círculo de 28 y 8 de cada lado,
-      // con `after:`) y el paso entre tonos, 44: se tocan sin pisarse.
-      class="flex flex-wrap gap-2 pointer-coarse:gap-4"
-      onKeyDown={onKeyDown}
-    >
-      {items.map((p, i) => {
-        const selected = i === idx;
-        const none = p.value === '';
-        const name = t(p.name);
-        return (
-          <button
-            key={p.value || 'none'}
-            id={idOf(p.value)}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            aria-label={name}
-            title={name}
-            tabIndex={i === tabStop ? 0 : -1}
-            onClick={() => onChange(p.value)}
-            class={cx(
-              'relative grid h-7 w-7 place-items-center rounded-full transition-shadow duration-150',
-              "pointer-coarse:after:absolute pointer-coarse:after:-inset-2 pointer-coarse:after:content-['']",
-              'sytue-focus-ring-inset',
-              selected &&
-                'shadow-[0_0_0_2px_var(--sytue-surface),0_0_0_4px_var(--sytue-border-strong)]',
-              // Contorno en TODOS, no solo en el «sin color». Sobre la superficie
-              // elevada del tema oscuro (#22262b) ninguno de los 14 colores llega a
-              // 3:1, así que sin borde el swatch no tiene forma reconocible: se lee
-              // como una mancha, y el de menos contraste (slate) casi desaparece.
-              none ? 'border-border border border-dashed' : 'border-border border',
-            )}
-            style={none ? undefined : { backgroundColor: p.value }}
-          >
-            {selected ? (
-              <Icon name="check" size={14} class={none ? 'text-text' : 'text-neutral-0'} />
-            ) : null}
-          </button>
-        );
-      })}
-    </div>
+    <SelectorDeColor
+      colores={items}
+      valor={pintado}
+      onChange={onChange}
+      etiquetadoPor={labelledBy}
+    />
   );
 }

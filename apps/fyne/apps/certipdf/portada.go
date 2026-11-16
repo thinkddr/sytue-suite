@@ -52,8 +52,8 @@ var (
 	// bordeAbrir es border-2 border-dashed y radioAbrir el token rounded-xl.
 	bordeAbrir float32 = 2
 	radioAbrir         = tema.RadioXL
-	// cuerpoCargando es el `py-10` de la rueda de 22.
-	cuerpoCargando = tema.Espacio(10)
+	// esqueletosRecientes son los `Array.from({ length: 6 })` del esqueleto de carga.
+	esqueletosRecientes = 6
 )
 
 // GlifoPDF es `PdfGlyph` de `DocList.tsx`: la hoja y el estampador dentro, escalado a
@@ -63,7 +63,7 @@ var (
 // el navegador encoge el trazo con el grupo y hay que compensarlo; `oksvg` no lo
 // encoge cuando el grosor es HEREDADO (ver `grosorEnGrupo` en iconos/pintar.go), así
 // que el sello sale ya con el mismo grosor que la hoja, que es lo que la web busca.
-const GlifoPDF = `<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5" />` +
+const GlifoPDF = `<path d="M13.5 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8.5ZM13.5 3.5V8.5h5" />` +
 	`<g transform="translate(4.4 7.6) scale(0.63)"><path d="M4.5 20.5h15M6.5 17.5h11v-1.8a2 2 0 0 0-1.5-1.9l-2.2-.6a1.3 1.3 0 0 1-.9-1.5l.5-2.9A3.4 3.4 0 0 0 12 3.5a3.4 3.4 0 0 0-3.4 4.3l.5 2.9a1.3 1.3 0 0 1-.9 1.5l-2.2.6a2 2 0 0 0-1.5 1.9Z" /></g>`
 
 // Portada es la pantalla sin documento.
@@ -91,6 +91,9 @@ type Portada struct {
 	// AlDesbloquear quita el bloqueo a una persona (ADR 0059): los ajustes de quien
 	// recibe, con la lista de quién ha bloqueado.
 	AlDesbloquear func(sub string)
+
+	// AlReintentar vuelve a pedir los recientes tras un fallo, sin salir de la portada.
+	AlReintentar func()
 
 	// AlCrear crea un PDF en blanco; AlElegir abre el selector de ficheros; AlEscanear,
 	// el de fotos; AlAbrir abre un reciente.
@@ -188,7 +191,12 @@ func (p *Portada) recomponer() {
 		m.insignia = ui.NuevaInsignia(i18n.FormatNumber(p.loc, float64(len(p.Lista))), ui.InsigniaNeutra)
 	}
 	m.peticiones = p.seccionPeticiones()
-	m.cuerpo, m.tarjetas = p.cuerpoRecientes(), nil
+	m.cuerpo, m.tarjetas, m.esqueletos = p.cuerpoRecientes(), nil, nil
+	if p.Lista == nil && !p.Fallo {
+		for range esqueletosRecientes {
+			m.esqueletos = append(m.esqueletos, nuevoMoldeTarjeta(v))
+		}
+	}
 	if len(p.Lista) > 0 {
 		for _, f := range Filtrados(p.Lista, p.consulta) {
 			file := f
@@ -209,6 +217,7 @@ func (p *Portada) recomponer() {
 	for _, c := range m.tarjetas {
 		objs = append(objs, c)
 	}
+	objs = append(objs, m.esqueletos...)
 	p.vista.Objects = objs
 }
 
@@ -301,16 +310,26 @@ func (p *Portada) filaPeticion(x api.PDFPeticionFirma, recibida bool, nombre, me
 		container.NewBorder(nil, nil, izq, der)))
 }
 
-// cuerpoRecientes es lo de debajo de «Recientes» cuando NO son tarjetas: la rueda, el
-// fallo, el vacío o «sin resultados». Nil si hay tarjetas.
+// cuerpoRecientes es lo de debajo de «Recientes» cuando NO son tarjetas ni sus
+// esqueletos: el fallo con «Reintentar», el vacío o «sin resultados». Nil si hay
+// tarjetas o se están cargando.
+//
+// ponytail: la fila del fallo no se parte en dos (`flex-wrap` en la web); la frase y el
+// botón caben juntos desde los 360 px.
 func (p *Portada) cuerpoRecientes() fyne.CanvasObject {
 	t := func(c string) string { return p.t(c, nil) }
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	switch {
 	case p.Fallo:
-		return ui.NuevoRotulo(t("pdf.list.loadFailed"), tema.TextoSM, ui.Normal, "danger-text")
+		// Sin salida, un fallo de red dejaba la portada muerta hasta volver a abrirla.
+		reintentar := ui.NuevoBoton(t("pdf.retry"), func() {
+			if p.AlReintentar != nil {
+				p.AlReintentar()
+			}
+		}).Con(ui.Secundario, ui.TallaSM)
+		return container.New(filaCentrada{hueco: tema.Espacio(3)},
+			ui.NuevoRotulo(t("pdf.list.loadFailed"), tema.TextoSM, ui.Normal, "danger-text"), reintentar)
 	case p.Lista == nil:
-		return container.New(centradoEnTodo{relleno: 0}, ui.NuevaRueda(22, "text-muted", v))
+		return nil
 	case len(p.Lista) == 0:
 		return ui.NuevoVacio(t("pdf.list.heading"), t("pdf.list.empty"))
 	case len(Filtrados(p.Lista, p.consulta)) == 0:
@@ -383,6 +402,7 @@ type marcoPortada struct {
 	cuerpo          fyne.CanvasObject
 	peticiones      *fyne.Container
 	tarjetas        []*tarjetaPDF
+	esqueletos      []fyne.CanvasObject
 	ventana, alto   float32
 }
 
@@ -463,23 +483,31 @@ func (m *marcoPortada) colocar(t fyne.Size, mover bool) float32 {
 
 	if m.cuerpo != nil {
 		alto := m.cuerpo.MinSize().Height
-		switch c := m.cuerpo.(type) {
-		case *ui.Vacio:
+		if c, ok := m.cuerpo.(*ui.Vacio); ok {
 			alto = c.MedidaVacio(ancho)
-		case *fyne.Container:
-			alto = 22 + 2*cuerpoCargando // la rueda de 22 con su `py-10`
 		}
 		mv(m.cuerpo, fyne.NewPos(x, y), fyne.NewSize(ancho, alto))
 		y += alto
-	} else if n := len(m.tarjetas); n > 0 {
-		cols := rejillaPDF.Columnas(ancho)
-		col := rejillaPDF.AnchoColumna(ancho)
-		alto := editor.MedidaTesela()
-		for i, c := range m.tarjetas {
-			mv(c, fyne.NewPos(x+rejillaPDF.X(ancho, i%cols), y+float32(i/cols)*(alto+rejillaPDF.Hueco)), fyne.NewSize(col, alto))
+	} else {
+		// Las tarjetas, o sus esqueletos mientras cargan: la misma rejilla y la misma
+		// medida, para que al llegar la lista no se mueva nada.
+		celdas := m.esqueletos
+		if len(m.tarjetas) > 0 {
+			celdas = make([]fyne.CanvasObject, len(m.tarjetas))
+			for i, c := range m.tarjetas {
+				celdas[i] = c
+			}
 		}
-		filas := (n + cols - 1) / cols
-		y += float32(filas)*alto + float32(filas-1)*rejillaPDF.Hueco
+		if n := len(celdas); n > 0 {
+			cols := rejillaPDF.Columnas(ancho)
+			col := rejillaPDF.AnchoColumna(ancho)
+			alto := editor.MedidaTesela()
+			for i, c := range celdas {
+				mv(c, fyne.NewPos(x+rejillaPDF.X(ancho, i%cols), y+float32(i/cols)*(alto+rejillaPDF.Hueco)), fyne.NewSize(col, alto))
+			}
+			filas := (n + cols - 1) / cols
+			y += float32(filas)*alto + float32(filas-1)*rejillaPDF.Hueco
+		}
 	}
 	return y + abajoPortada
 }
@@ -614,6 +642,50 @@ func (r *accesoPDFRenderer) Refresh() {
 	r.aro.Pintar(v)
 	r.aro.Ver(r.a.Enfocado())
 	r.Layout(r.a.Size())
+}
+
+// ---- El esqueleto de una tarjeta ----
+
+// moldeTarjeta es una tarjeta de reciente mientras carga, como el `<li>` del esqueleto
+// de `Portada.tsx`: la misma caja `rounded-lg border bg-surface`, la banda `h-24`
+// entera de esqueleto y, en `p-3 gap-0.5`, una línea de nombre (`1em` en su `1lh`, al
+// 70 %) y otra `text-sm` (`0.75em`, al 45 %). Mide lo que [tarjetaPDF]: al llegar la
+// lista, cada tarjeta ocupa el sitio de su molde.
+type moldeTarjeta struct {
+	caja                *ui.Caja
+	banda, nombre, meta *ui.Esqueleto
+}
+
+func nuevoMoldeTarjeta(v tema.Variante) *fyne.Container {
+	m := &moldeTarjeta{
+		caja:   ui.NuevaCaja(tema.Color("surface", v), tema.Color("border", v), tema.RadioLG),
+		banda:  ui.NuevoEsqueleto(0, editor.AltoBandaTesela),
+		nombre: ui.NuevoEsqueleto(0, tema.TextoRaiz.Tam),
+		meta:   ui.NuevoEsqueleto(0, 0.75*tema.TextoSM.Tam),
+	}
+	m.banda.Radio, m.banda.SoloArriba = tema.RadioLG-tema.Borde, true
+	return container.New(m, append(m.caja.Objetos(), m.banda, m.nombre, m.meta)...)
+}
+
+func (m *moldeTarjeta) MinSize([]fyne.CanvasObject) fyne.Size {
+	return fyne.NewSize(editor.MinTesela, editor.MedidaTesela())
+}
+
+func (m *moldeTarjeta) Layout(_ []fyne.CanvasObject, t fyne.Size) {
+	m.caja.Redimensionar(t)
+	b := tema.Borde
+	m.banda.Move(fyne.NewPos(b, b))
+	m.banda.Resize(fyne.NewSize(t.Width-2*b, editor.AltoBandaTesela))
+	x := b + editor.RellenoTesela
+	y := b + editor.AltoBandaTesela + editor.RellenoTesela
+	cabe := max(t.Width-2*x, 0)
+	linea := func(e *ui.Esqueleto, esc tema.Escalon, y, parte float32) {
+		alto := ui.MedidaEsqueleto(e).Height
+		e.Move(fyne.NewPos(x, y+(esc.Linea-alto)/2))
+		e.Resize(fyne.NewSize(cabe*parte, alto))
+	}
+	linea(m.nombre, tema.TextoRaiz, y, 0.7)
+	linea(m.meta, tema.TextoSM, y+tema.TextoRaiz.Linea+editor.HuecoTesela, 0.45)
 }
 
 // ---- La tarjeta de un reciente ----

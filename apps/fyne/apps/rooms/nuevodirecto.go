@@ -32,6 +32,9 @@ import (
 // filtra la gente del equipo por nombre y, si lo escrito es un correo o un @usuario,
 // ofrece buscarlo en Sytue One entero (ADR 0040): quien sale de otra organización va
 // marcada como tal.
+//
+// El cuerpo es también el campo «Personas» de «Crear canal» (SelectorDePersonas.tsx en
+// la web): un solo selector para las dos puertas.
 
 // MaxDirecto es `MAX_OTHERS`: cuántas personas además de ti.
 const MaxDirecto = 7
@@ -74,7 +77,10 @@ type NuevoDirecto struct {
 
 	T *i18n.Translator
 	// Equipo es la gente del equipo, sin quien mira.
-	Equipo   []Persona
+	Equipo []Persona
+	// Yo es quien mira (`selfId`): si se busca a sí mismo en Sytue One no se elige,
+	// porque no está en Equipo y saldría como si fuera de otra organización.
+	Yo       string
 	Elegidas []Persona
 	// Ocupado es el envío en camino; Fallo, que no se pudo abrir.
 	Ocupado, Fallo bool
@@ -82,12 +88,25 @@ type NuevoDirecto struct {
 	Buscando    bool
 	ErrorBuscar string
 
+	// Max es el tope de elegidas (sin poner, MaxDirecto). VacioEnTexto dice «no hay
+	// nadie» en una línea y no con la ilustración: es lo que toca cuando el selector es
+	// un campo más de un formulario («Crear canal») y no el diálogo entero.
+	Max          int
+	VacioEnTexto bool
+	// AlCambiar avisa de que el cuerpo ha cambiado de alto (una píldora, otra lista):
+	// dentro de un formulario, quien lo contiene se vuelve a medir.
+	AlCambiar func()
+
 	// AlBuscarPersona pide a Sytue ID a quien se escribió; AlAbrir abre el directo.
 	AlBuscarPersona func(q string)
 	AlAbrir         func([]Persona)
 
-	caja    *ui.Entrada
-	abrir   *ui.Boton
+	caja  *ui.Entrada
+	abrir *ui.Boton
+	// fila es la de las píldoras, que sobrevive a cada construir: recuerda el ancho de
+	// la última colocación y así mide bien al rehacerse. Nueva cada vez, medía sin ancho
+	// (una píldora por línea) y dejaba un hueco debajo hasta la siguiente colocación.
+	fila    *filaEnvuelta
 	cuerpo  *fyne.Container
 	objetos []fyne.CanvasObject
 }
@@ -102,7 +121,7 @@ func NuevoNuevoDirecto(t *i18n.Translator, equipo []Persona) *NuevoDirecto {
 	d.caja.Icono = iconos.Buscar
 	d.caja.AlCambiar(func(string) {
 		d.ErrorBuscar = "" // un error es de LO QUE se buscó
-		d.Refresh()
+		d.cambiado()
 	})
 	d.abrir = ui.NuevoBoton("", func() { d.Confirmar() }).Con(ui.Primario, ui.TallaMD)
 	return d
@@ -123,7 +142,15 @@ func (d *NuevoDirecto) elegida(id string) bool {
 	return false
 }
 
-func (d *NuevoDirecto) lleno() bool { return len(d.Elegidas) >= MaxDirecto }
+// tope es `max` del selector.
+func (d *NuevoDirecto) tope() int {
+	if d.Max > 0 {
+		return d.Max
+	}
+	return MaxDirecto
+}
+
+func (d *NuevoDirecto) lleno() bool { return len(d.Elegidas) >= d.tope() }
 
 // Conmutar es `toggle`: quita a quien ya está, y añade si no se ha llegado al tope.
 func (d *NuevoDirecto) Conmutar(p Persona) {
@@ -131,21 +158,28 @@ func (d *NuevoDirecto) Conmutar(p Persona) {
 	for i, x := range d.Elegidas {
 		if x.ID == p.ID {
 			d.Elegidas = append(d.Elegidas[:i:i], d.Elegidas[i+1:]...)
-			d.Refresh()
+			d.cambiado()
 			return
 		}
 	}
 	if !d.lleno() {
 		d.Elegidas = append(d.Elegidas, p)
 	}
+	d.cambiado()
+}
+
+func (d *NuevoDirecto) cambiado() {
 	d.Refresh()
+	if d.AlCambiar != nil {
+		d.AlCambiar()
+	}
 }
 
 // Encontrada es `addPersona`: la persona que devolvió Sytue ID va a las píldoras,
 // marcada como de fuera si no es del equipo. La caja se vacía.
 func (d *NuevoDirecto) Encontrada(p Persona) {
 	d.caja.PonerTexto("")
-	if d.elegida(p.ID) {
+	if (d.Yo != "" && p.ID == d.Yo) || d.elegida(p.ID) {
 		return
 	}
 	for _, m := range d.Equipo {
@@ -199,7 +233,10 @@ func (d *NuevoDirecto) construir(v tema.Variante) {
 			chips = append(chips, NuevoChipQuitable(rotulo, t.T("action.removePerson", i18n.Vars{"name": p.Nombre}),
 				ui.NuevoAvatar(p.Nombre).Con(ui.AvatarXS), func() { d.Conmutar(p) }))
 		}
-		hijos = append(hijos, container.New(&filaEnvuelta{hueco: tema.Espacio(1.5)}, chips...))
+		if d.fila == nil {
+			d.fila = &filaEnvuelta{hueco: tema.Espacio(1.5)}
+		}
+		hijos = append(hijos, container.New(d.fila, chips...))
 	}
 	hijos = append(hijos, d.caja)
 	if PareceIdentificador(q) {
@@ -222,21 +259,13 @@ func (d *NuevoDirecto) construir(v tema.Variante) {
 		hijos = append(hijos, ui.NuevoRotulo(t.T("dm.openFailed", nil), tema.TextoSM, ui.Normal, "danger-text"))
 	}
 	if d.lleno() {
-		hijos = append(hijos, ui.NuevoRotulo(t.T("dm.maxPeople", i18n.Vars{"count": MaxDirecto}), tema.TextoXS, ui.Normal, "text-muted"))
+		hijos = append(hijos, ui.NuevoRotulo(t.T("dm.maxPeople", i18n.Vars{"count": d.tope()}), tema.TextoXS, ui.Normal, "text-muted"))
 	}
 	candidatas := d.Candidatas()
 	switch {
 	case len(candidatas) == 0 && PareceIdentificador(q):
 	case len(candidatas) == 0:
-		titulo, ilus := t.T("dm.empty", nil), iconos.VacioContactos
-		if q != "" {
-			titulo, ilus = t.T("dm.emptyQuery", nil), iconos.VacioBusqueda
-		}
-		// ponytail: sin el «Invitar personas» que la web enseña a quien administra:
-		// abre la consola, y la sesión nativa todavía no sabe los roles de quien mira.
-		vac := ui.NuevoVacio(titulo, "")
-		vac.Ilustracion = iconos.Pintar(ilus, v).A(LadoIlustracionBusqueda).Objeto()
-		hijos = append(hijos, vac)
+		hijos = append(hijos, d.vacio(q, v))
 	default:
 		filas := make([]fyne.CanvasObject, 0, len(candidatas))
 		for _, p := range candidatas {
@@ -253,6 +282,24 @@ func (d *NuevoDirecto) construir(v tema.Variante) {
 	}
 	d.abrir.Inerte, d.abrir.Cargando = len(d.Elegidas) == 0, d.Ocupado
 	d.abrir.Refresh()
+}
+
+// vacio dice que no hay nadie: en una línea dentro de un formulario, con la
+// ilustración cuando el selector es el diálogo.
+func (d *NuevoDirecto) vacio(q string, v tema.Variante) fyne.CanvasObject {
+	t := d.T
+	titulo, ilus := t.T("dm.empty", nil), iconos.VacioContactos
+	if q != "" {
+		titulo, ilus = t.T("dm.emptyQuery", nil), iconos.VacioBusqueda
+	}
+	if d.VacioEnTexto {
+		return ui.NuevoRotulo(titulo, tema.TextoSM, ui.Normal, "text-muted")
+	}
+	// ponytail: sin el «Invitar personas» que la web enseña a quien administra:
+	// abre la consola, y la sesión nativa todavía no sabe los roles de quien mira.
+	vac := ui.NuevoVacio(titulo, "")
+	vac.Ilustracion = iconos.Pintar(ilus, v).A(LadoIlustracionBusqueda).Objeto()
+	return vac
 }
 
 // CreateRenderer monta la columna.

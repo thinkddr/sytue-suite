@@ -1,0 +1,43 @@
+---
+/**
+ * Nuevo proyecto — el asistente de alta a mano: origen → configurar → variables →
+ * revisar → desplegar con el log del primer build.
+ *
+ * Es una página y no un modal porque el último paso se queda mirando un build que
+ * puede tardar minutos: en un diálogo, cerrar por accidente perdía el secreto del
+ * webhook y la pista de qué estaba pasando. Las plantillas tienen su propio
+ * asistente (`/templates`); aquí se llega desde «Nuevo proyecto», la paleta ⌘K y
+ * los enlaces viejos `/?new=1`, que la lista de proyectos reenvía.
+ */
+import DashboardLayout from '../layouts/DashboardLayout.astro';
+import NewProjectWizard from '../components/NewProjectWizard';
+import { Icon, SectionHeader } from '@sytue/ui';
+import { requireSession } from '@sytue/auth/server';
+import { canonicaConOrg } from '@sytue/config';
+import { getBff, toBffContext } from '../server/bff.js';
+import { useT } from '../i18n/index.js';
+
+export const prerender = false;
+
+const locale = Astro.locals.locale;
+const t = useT(locale);
+
+const guard = await requireSession(getBff(), toBffContext(Astro));
+if (guard instanceof Response) return guard;
+// Ruta en `sinOrg` («new» es un slug de organización válido): con sesión, salto
+// local a la canónica con la org activa (ADR 0056), como `/templates`.
+const canonica = canonicaConOrg(Astro.url, getBff().basePath, guard.session.user.tenant);
+if (canonica) return Astro.redirect(canonica);
+---
+
+<DashboardLayout title={t('projects.new')} section="projects">
+  <SectionHeader
+    level={1}
+    icon={<Icon name="plus" size={20} />}
+    title={t('projects.new')}
+    subtitle={t('npw.subtitle')}
+  />
+  <div class="cloud-content">
+    <NewProjectWizard client:load locale={locale} />
+  </div>
+</DashboardLayout>

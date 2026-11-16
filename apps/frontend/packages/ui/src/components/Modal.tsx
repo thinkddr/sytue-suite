@@ -57,6 +57,13 @@ export interface ModalProps {
    * con el mismo `onClose` para las tres.
    */
   onCloseButtonClick?: () => void;
+  /**
+   * Dónde se monta el diálogo (por defecto, `document.body`). Existe para el modo
+   * presentación de Diapos: está a pantalla completa, y el navegador solo pinta lo que
+   * cuelga del elemento a pantalla completa; un diálogo en `body` se abriría detrás,
+   * invisible, con el foco dentro.
+   */
+  container?: Element | null | undefined;
 }
 
 const sizes: Record<ModalSize, string> = {
@@ -222,6 +229,7 @@ export function Modal({
   children,
   dismissable = true,
   onCloseButtonClick,
+  container,
 }: ModalProps): JSX.Element | null {
   const t = useT();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -561,6 +569,6 @@ export function Modal({
         ) : null}
       </div>
     </div>,
-    document.body,
+    container ?? document.body,
   );
 }

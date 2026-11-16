@@ -118,6 +118,7 @@ func (h *Handlers) montar(r chi.Router) {
 	j.Patch("/tables/{tid}", h.renombrarTabla)
 	j.Delete("/tables/{tid}", h.borrarTabla)
 	j.Post("/tables/{tid}/fields", h.crearCampo)
+	j.Put("/tables/{tid}/field-order", h.reordenarCampos)
 	j.Get("/tables/{tid}/records", h.listarRegistros)
 	j.Post("/tables/{tid}/records", h.crearRegistro)
 	j.Get("/tables/{tid}/views", h.listarVistas)
@@ -135,6 +136,7 @@ func (h *Handlers) montar(r chi.Router) {
 	j.Get("/records/{rid}/comments", h.listarComentarios)
 	j.Post("/records/{rid}/comments", h.crearComentario)
 	j.Delete("/comments/{coid}", h.borrarComentario)
+	j.Patch("/views/{vid}", h.actualizarVista)
 	j.Delete("/views/{vid}", h.borrarVista)
 	j.Get("/views/{vid}/form-links", h.listarEnlaces)
 	j.Post("/views/{vid}/form-links", h.crearEnlace)
@@ -143,6 +145,8 @@ func (h *Handlers) montar(r chi.Router) {
 	j.Post("/tables/{tid}/connections", h.crearConexion)
 	j.Delete("/connections/{cid}", h.revocarConexion)
 	j.Post("/connections/{cid}/rotate", h.rotarConexion)
+
+	mountBasesPrivateSource(r, h.Store)
 }
 
 // actor es quien llama: su sub, su organización y sus grupos, de los claims ya verificados.

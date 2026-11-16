@@ -4,6 +4,7 @@
 package contactos
 
 import (
+	"context"
 	"log/slog"
 	"net/url"
 	"regexp"
@@ -39,11 +40,13 @@ func IDDeEnlace(u *url.URL) string {
 // de quien lo pide o ya no existe, se queda en la vista sin decir cuál de las dos: es lo
 // que hace la web, porque un «no encontrado» propio delataría qué ids existen. Bloquea:
 // se llama en segundo plano.
-func (a *App) AbrirContacto(id string) {
-	if a.svc == nil {
+func (a *App) AbrirContacto(id string) { a.abrirContactoEn(a.capturar(), id) }
+
+func (a *App) abrirContactoEn(scope cargaContacts, id string) {
+	if a.svc == nil || !a.vigente(scope) {
 		return
 	}
-	ctx, fin := a.ctx()
+	ctx, fin := context.WithTimeout(scope.ctx, a.Plazo)
 	c, err := a.svc.Contact(ctx, id)
 	fin()
 	if err != nil {
@@ -52,6 +55,9 @@ func (a *App) AbrirContacto(id string) {
 	}
 	var abrir *api.AddressBook
 	fyne.DoAndWait(func() {
+		if !a.vigente(scope) {
+			return
+		}
 		a.pedido = c.ID
 		p := a.Pantalla
 		switch {
@@ -70,8 +76,8 @@ func (a *App) AbrirContacto(id string) {
 	// ponytail: si el enlace llega con la app arrancando y la respuesta cae entre que
 	// llegan las libretas y `Cargar` abre la primera, se cargan las dos y gana la última.
 	// Se releva haciendo que `Cargar` espere a la resolución del enlace pendiente.
-	if abrir != nil {
-		a.abrirLibreta(*abrir)
+	if abrir != nil && a.vigente(scope) {
+		a.abrirLibretaEn(scope, *abrir)
 	}
 }
 

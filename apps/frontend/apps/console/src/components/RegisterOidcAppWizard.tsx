@@ -19,6 +19,7 @@ import {
   Button,
   Checkbox,
   ChoiceCard,
+  CopyField,
   DataFlow,
   FieldGroup,
   FieldHint,
@@ -32,7 +33,7 @@ import {
   useToast,
 } from '@sytue/ui';
 import type { DataCategory, ReviewItem, WizardStep } from '@sytue/ui';
-import { CopyRow, NextStep } from './ConnectIdpWizard.js';
+import { NextStep } from './ConnectIdpWizard.js';
 import type { ConsoleMessageKey, T } from '../i18n/index.js';
 import type { OidcApp } from '../lib/types.js';
 
@@ -261,19 +262,6 @@ export default function RegisterOidcAppWizard({
       });
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function copy(text: string) {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.notify({ tone: 'success', title: t('common.copied') });
-    } catch {
-      toast.notify({
-        tone: 'danger',
-        title: t('sso.secret.copyFailed'),
-        description: t('sso.secret.copyFailedHint'),
-      });
     }
   }
 
@@ -566,22 +554,17 @@ export default function RegisterOidcAppWizard({
     content: created ? (
       <div class="flex flex-col gap-4">
         {created.secret ? (
-          <section class="border-warning bg-warning-bg rounded-lg border p-4">
-            <h3 class="text-warning-text text-sm font-semibold">
-              {t('wizard.oidc.done.secretTitle')}
-            </h3>
-            <p class="text-text-muted mt-1 text-sm leading-relaxed">
-              {t('wizard.oidc.done.secretBody')}
-            </p>
+          <InlineHelp
+            tone="warning"
+            live="off"
+            title={t('wizard.oidc.done.secretTitle')}
+            titleAs="h3"
+          >
+            <p>{t('wizard.oidc.done.secretBody')}</p>
             <div class="mt-3">
-              <CopyRow
-                label={t('wizard.oidc.done.secretLabel')}
-                value={created.secret}
-                copyLabel={t('common.copy')}
-                onCopy={(v) => void copy(v)}
-              />
+              <CopyField label={t('wizard.oidc.done.secretLabel')} value={created.secret} />
             </div>
-          </section>
+          </InlineHelp>
         ) : null}
 
         <section class="border-border bg-surface-raised rounded-lg border p-4">
@@ -590,30 +573,13 @@ export default function RegisterOidcAppWizard({
             {t('wizard.oidc.done.pasteBody')}
           </p>
           <div class="mt-3 flex flex-col gap-2">
-            <CopyRow
-              label={t('wizard.oidc.done.issuer')}
-              value={created.issuer}
-              copyLabel={t('common.copy')}
-              onCopy={(v) => void copy(v)}
-            />
-            <CopyRow
-              label={t('wizard.oidc.done.clientId')}
-              value={created.clientId}
-              copyLabel={t('common.copy')}
-              onCopy={(v) => void copy(v)}
-            />
-            <CopyRow
-              label={t('wizard.oidc.done.discovery')}
-              value={created.discoveryUrl}
-              copyLabel={t('common.copy')}
-              onCopy={(v) => void copy(v)}
-            />
+            <CopyField label={t('wizard.oidc.done.issuer')} value={created.issuer} />
+            <CopyField label={t('wizard.oidc.done.clientId')} value={created.clientId} />
+            <CopyField label={t('wizard.oidc.done.discovery')} value={created.discoveryUrl} />
             {created.scopes.some((sc) => sc.startsWith(G)) ? (
-              <CopyRow
+              <CopyField
                 label={t('wizard.oidc.done.googleDiscovery')}
                 value={`${created.issuer}/compat/google/.well-known/openid-configuration`}
-                copyLabel={t('common.copy')}
-                onCopy={(v) => void copy(v)}
               />
             ) : null}
           </div>
@@ -622,42 +588,18 @@ export default function RegisterOidcAppWizard({
               {t('wizard.oidc.done.separateTitle')}
             </summary>
             <div class="mt-3 flex flex-col gap-2">
-              <CopyRow
+              <CopyField
                 label={t('wizard.oidc.done.authorization')}
                 value={created.authorizationEndpoint}
-                copyLabel={t('common.copy')}
-                onCopy={(v) => void copy(v)}
               />
-              <CopyRow
-                label={t('wizard.oidc.done.token')}
-                value={created.tokenEndpoint}
-                copyLabel={t('common.copy')}
-                onCopy={(v) => void copy(v)}
-              />
-              <CopyRow
-                label={t('wizard.oidc.done.userinfo')}
-                value={created.userinfoEndpoint}
-                copyLabel={t('common.copy')}
-                onCopy={(v) => void copy(v)}
-              />
-              <CopyRow
-                label={t('wizard.oidc.done.jwks')}
-                value={created.jwksUri}
-                copyLabel={t('common.copy')}
-                onCopy={(v) => void copy(v)}
-              />
-              <CopyRow
+              <CopyField label={t('wizard.oidc.done.token')} value={created.tokenEndpoint} />
+              <CopyField label={t('wizard.oidc.done.userinfo')} value={created.userinfoEndpoint} />
+              <CopyField label={t('wizard.oidc.done.jwks')} value={created.jwksUri} />
+              <CopyField
                 label={t('wizard.oidc.done.endSession')}
                 value={created.endSessionEndpoint}
-                copyLabel={t('common.copy')}
-                onCopy={(v) => void copy(v)}
               />
-              <CopyRow
-                label={t('wizard.oidc.done.scopes')}
-                value={created.scopes.join(' ')}
-                copyLabel={t('common.copy')}
-                onCopy={(v) => void copy(v)}
-              />
+              <CopyField label={t('wizard.oidc.done.scopes')} value={created.scopes.join(' ')} />
             </div>
           </details>
         </section>

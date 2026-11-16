@@ -5,6 +5,7 @@
 import copy
 import importlib.util
 import json
+import shutil
 from pathlib import Path
 import tempfile
 import unittest
@@ -33,6 +34,12 @@ class CatalogTests(unittest.TestCase):
         generated = module.java(enabled, apps)
         self.assertIn("HABILITADO = false", generated)
         self.assertIn("Collections.unmodifiableMap", generated)
+        product_apps = module.products(apps)
+        self.assertEqual(set(product_apps.values()), set(apps))
+        self.assertEqual(len(product_apps), 15)
+        for product, app in {"hub": "one", "docs": "docus", "sheets": "calcus", "slides": "diapos", "pdf": "certipdf"}.items():
+            self.assertEqual(product_apps[product], "eu.sytue." + app)
+            self.assertIn(f'products.put("{product}", "eu.sytue.{app}");', generated)
 
     def test_missing_duplicate_or_foreign_packages_never_expand_trust(self):
         candidates = []
@@ -61,6 +68,41 @@ class CatalogTests(unittest.TestCase):
             invalid["runtime_enabled"] = value
             with self.assertRaises(ValueError):
                 self.parse(invalid)
+
+    def test_product_mapping_rejects_missing_duplicate_or_changed_project_metadata(self):
+        _, apps = self.parse(self.original)
+        for mutation in ("missing", "duplicate", "scheme", "package"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary) / "cmd"
+                root.mkdir()
+                for source in (module.FYNE / "cmd").glob("*/FyneApp.toml"):
+                    target = root / source.parent.name / source.name
+                    target.parent.mkdir()
+                    shutil.copyfile(source, target)
+                docs = root / "docus/FyneApp.toml"
+                if mutation == "missing":
+                    docs.unlink()
+                elif mutation == "duplicate":
+                    duplicate = root / "another/FyneApp.toml"
+                    duplicate.parent.mkdir()
+                    shutil.copyfile(docs, duplicate)
+                elif mutation == "scheme":
+                    docs.write_text(docs.read_text().replace('"sytue-docs"', '"sytue-slides"'))
+                else:
+                    docs.write_text(docs.read_text().replace('"eu.sytue.docus"', '"eu.sytue.unknown"'))
+                with self.assertRaises(ValueError):
+                    module.products(apps, metadata=root)
+
+    def test_product_mapping_rejects_duplicate_or_unknown_storage_product(self):
+        _, apps = self.parse(self.original)
+        for change in ("duplicate", "unknown"):
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as temporary:
+                catalog = Path(temporary) / "products.txt"
+                products = (module.FYNE.parent / "nucleo/storage/products.txt").read_text().split()
+                products[-1] = products[0] if change == "duplicate" else "foreign"
+                catalog.write_text("\n".join(products))
+                with self.assertRaises(ValueError):
+                    module.products(apps, product_catalog=catalog)
 
     def test_manifest_declares_only_the_fifteen_known_packages(self):
         _, apps = self.parse(self.original)

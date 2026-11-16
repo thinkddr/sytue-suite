@@ -31,6 +31,15 @@ func NuevoPorPersona(p fyne.Preferences, sujeto func() string) PorPersona {
 	return PorPersona{prefs: p, sujeto: sujeto}
 }
 
+// Persona es el `sub` de quien ha entrado, o "" sin nadie dentro: lo que necesita quien
+// guarda aquí algo y además lo tiene en memoria, para saber cuándo cambia de dueño.
+func (p PorPersona) Persona() string {
+	if p.prefs == nil || p.sujeto == nil {
+		return ""
+	}
+	return p.sujeto()
+}
+
 func (p PorPersona) clave(k string) (string, bool) {
 	if p.prefs == nil || p.sujeto == nil {
 		return "", false

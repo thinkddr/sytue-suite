@@ -1,0 +1,143 @@
+{
+  "_": "Cabeceras A–Z de la lista de contactos (CONT-05): GruposPorInicial en apps/fyne/contactos/iniciales.go y gruposPorInicial en apps/frontend/apps/contacts/src/client/iniciales.ts. La lista llega ordenada y cada nombre va a la cabecera de su inicial en mayúscula; la letra se reduce a su base solo si la colación del idioma dice que es la misma (Á con la A en español, pero la Ñ aparte; Ä con la A en alemán, pero aparte en sueco y finés). Lo que no empieza por letra va a «#», siempre al final. Un grupo partido se junta donde aparece primero.",
+  "casos": [
+    {
+      "nombre": "español: la Á va con la A y la Ñ tiene cabecera propia",
+      "locale": "es",
+      "nombres": ["Álvaro", "Ana", "Beatriz", "Nuria", "Ñoño", "Óscar", "Zoe"],
+      "grupos": [
+        { "inicial": "A", "nombres": ["Álvaro", "Ana"] },
+        { "inicial": "B", "nombres": ["Beatriz"] },
+        { "inicial": "N", "nombres": ["Nuria"] },
+        { "inicial": "Ñ", "nombres": ["Ñoño"] },
+        { "inicial": "O", "nombres": ["Óscar"] },
+        { "inicial": "Z", "nombres": ["Zoe"] }
+      ]
+    },
+    {
+      "nombre": "sueco: Å, Ä y Ö son letras propias, tras la Z",
+      "locale": "sv",
+      "nombres": ["Anna", "Erik", "Zlatan", "Åsa", "Ärla", "Örjan"],
+      "grupos": [
+        { "inicial": "A", "nombres": ["Anna"] },
+        { "inicial": "E", "nombres": ["Erik"] },
+        { "inicial": "Z", "nombres": ["Zlatan"] },
+        { "inicial": "Å", "nombres": ["Åsa"] },
+        { "inicial": "Ä", "nombres": ["Ärla"] },
+        { "inicial": "Ö", "nombres": ["Örjan"] }
+      ]
+    },
+    {
+      "nombre": "finés: también Å, Ä y Ö",
+      "locale": "fi",
+      "nombres": ["Aino", "Väinö", "Åke", "Äiti", "Önni"],
+      "grupos": [
+        { "inicial": "A", "nombres": ["Aino"] },
+        { "inicial": "V", "nombres": ["Väinö"] },
+        { "inicial": "Å", "nombres": ["Åke"] },
+        { "inicial": "Ä", "nombres": ["Äiti"] },
+        { "inicial": "Ö", "nombres": ["Önni"] }
+      ]
+    },
+    {
+      "nombre": "alemán: la Ä va con la A y la Ö con la O",
+      "locale": "de",
+      "nombres": ["Achim", "Ärne", "Bernd", "Otto", "Özil"],
+      "grupos": [
+        { "inicial": "A", "nombres": ["Achim", "Ärne"] },
+        { "inicial": "B", "nombres": ["Bernd"] },
+        { "inicial": "O", "nombres": ["Otto", "Özil"] }
+      ]
+    },
+    {
+      "nombre": "danés: Æ, Ø y Å al final, cada una con la suya",
+      "locale": "da",
+      "nombres": ["Anders", "Mads", "Æsa", "Øjvind", "Åse"],
+      "grupos": [
+        { "inicial": "A", "nombres": ["Anders"] },
+        { "inicial": "M", "nombres": ["Mads"] },
+        { "inicial": "Æ", "nombres": ["Æsa"] },
+        { "inicial": "Ø", "nombres": ["Øjvind"] },
+        { "inicial": "Å", "nombres": ["Åse"] }
+      ]
+    },
+    {
+      "nombre": "noruego: el mismo alfabeto que el danés",
+      "locale": "nb",
+      "nombres": ["Anne", "Øystein", "Åse"],
+      "grupos": [
+        { "inicial": "A", "nombres": ["Anne"] },
+        { "inicial": "Ø", "nombres": ["Øystein"] },
+        { "inicial": "Å", "nombres": ["Åse"] }
+      ]
+    },
+    {
+      "nombre": "inglés: la Ø es una O y la Ł una L, aunque no se descompongan",
+      "locale": "en",
+      "nombres": ["Lucy", "Łukasz", "Ørjan", "Oscar"],
+      "grupos": [
+        { "inicial": "L", "nombres": ["Lucy", "Łukasz"] },
+        { "inicial": "O", "nombres": ["Ørjan", "Oscar"] }
+      ]
+    },
+    {
+      "nombre": "polaco: la Ł y la Ż sí son letras propias",
+      "locale": "pl",
+      "nombres": ["Lech", "Łucja", "Zofia", "Żaneta"],
+      "grupos": [
+        { "inicial": "L", "nombres": ["Lech"] },
+        { "inicial": "Ł", "nombres": ["Łucja"] },
+        { "inicial": "Z", "nombres": ["Zofia"] },
+        { "inicial": "Ż", "nombres": ["Żaneta"] }
+      ]
+    },
+    {
+      "nombre": "griego: la tilde no hace letra",
+      "locale": "el",
+      "nombres": ["Άννα", "Βασίλης", "Ελένη"],
+      "grupos": [
+        { "inicial": "Α", "nombres": ["Άννα"] },
+        { "inicial": "Β", "nombres": ["Βασίλης"] },
+        { "inicial": "Ε", "nombres": ["Ελένη"] }
+      ]
+    },
+    {
+      "nombre": "búlgaro: la Й es letra propia",
+      "locale": "bg",
+      "nombres": ["Иван", "Йордан"],
+      "grupos": [
+        { "inicial": "И", "nombres": ["Иван"] },
+        { "inicial": "Й", "nombres": ["Йордан"] }
+      ]
+    },
+    {
+      "nombre": "cifras y signos van a «#», al final aunque lleguen primero; minúsculas a su mayúscula",
+      "locale": "en",
+      "nombres": ["+34 Oficina", "123 Taxi", "Alice", "bob", "Émile"],
+      "grupos": [
+        { "inicial": "A", "nombres": ["Alice"] },
+        { "inicial": "B", "nombres": ["bob"] },
+        { "inicial": "E", "nombres": ["Émile"] },
+        { "inicial": "#", "nombres": ["+34 Oficina", "123 Taxi"] }
+      ]
+    },
+    {
+      "nombre": "sin nombre va a «#» y los espacios del principio no cuentan",
+      "locale": "es",
+      "nombres": ["", "  Ana", "ana"],
+      "grupos": [
+        { "inicial": "A", "nombres": ["  Ana", "ana"] },
+        { "inicial": "#", "nombres": [""] }
+      ]
+    },
+    {
+      "nombre": "un grupo partido se junta donde aparece primero",
+      "locale": "en",
+      "nombres": ["Ana", "Bea", "alba"],
+      "grupos": [
+        { "inicial": "A", "nombres": ["Ana", "alba"] },
+        { "inicial": "B", "nombres": ["Bea"] }
+      ]
+    }
+  ]
+}

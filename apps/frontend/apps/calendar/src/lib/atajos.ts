@@ -11,7 +11,17 @@ import type { GrupoDeAtajos } from '@sytue/ui';
 import type { CalendarMessageKey, T } from '../i18n/index.js';
 
 export type AccionAtajo =
-  'today' | 'next' | 'prev' | 'month' | 'week' | 'day' | 'agenda' | 'create' | 'search' | 'help';
+  | 'today'
+  | 'next'
+  | 'prev'
+  | 'goto'
+  | 'month'
+  | 'week'
+  | 'day'
+  | 'agenda'
+  | 'create'
+  | 'search'
+  | 'help';
 
 interface Atajo {
   /** Las teclas, ya normalizadas: un carácter en minúscula. */
@@ -27,6 +37,7 @@ const GRUPOS: { titulo: CalendarMessageKey; atajos: Atajo[] }[] = [
       { teclas: ['t'], accion: 'today', descripcion: 'shortcuts.today' },
       { teclas: ['n', 'j'], accion: 'next', descripcion: 'shortcuts.next' },
       { teclas: ['p', 'k'], accion: 'prev', descripcion: 'shortcuts.prev' },
+      { teclas: ['g'], accion: 'goto', descripcion: 'shortcuts.goToDate' },
     ],
   },
   {

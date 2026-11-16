@@ -27,19 +27,25 @@ import (
 //	fila de cuaderno   30,5 × 231   MEDIDO
 //	fila de nota       21 × 231     MEDIDO (dentro de un `ul` con `py-0.5`)
 //	botón de acción    20 × 20      MEDIDO — `p-1` sobre un icono de 13
+//	«…» del cuaderno   24 × 24      SIDEBAR_ACTION_CLASS con `-my-[2px]`, glifo de 14
 //	entre filas        1,75         hoja, `gap-0.5`
 //
 // # LOS 0,75 QUE FALTABAN, cerrados
 //
 // El 30,5 no sale del texto: `py-1.5` (10,5) más la caja de línea de `text-base`
-// (19,25) dan **29,75**. Los 0,75 que faltan son **los dos botones de acción de la
-// derecha** —«nuevo cuaderno dentro» y «ajustes»—, que son `p-1` alrededor de un icono
-// de 13 y por tanto miden **20**, más que la línea de texto. Están en el layout
+// (19,25) dan **29,75**. Los 0,75 que faltan son **el botón de acción de la derecha**,
+// que en aquel barrido eran dos —«nuevo cuaderno dentro» y «ajustes»—, `p-1` alrededor
+// de un icono de 13 y por tanto de **20**, más que la línea de texto. Está en el layout
 // siempre, aunque a `opacity-0`, que es lo que hace que la fila no cambie de alto al
 // pasar el ratón por encima.
 //
 // Medido en el volcado: `button[aria-label="Nuevo cuaderno dentro"]` sale 20×20 con
 // `padding: 3.5px`, y el `li` del árbol da `alto.moda = 30,5`. 10,5 + 20 = 30,5.
+//
+// Hoy la web lleva UN botón, el «…» que abre «Nuevo cuaderno dentro», «Mover cuaderno
+// a…» y «Ajustes» (NotebookTree.tsx), con la medida de la acción del carril (24) y el
+// `-my-[2px]` que devuelve lo que crece: el alto de la fila no cambia, solo se libera el
+// ancho del segundo botón para el título.
 //
 // # Y los «5 px» de la fila de nota NO EXISTEN
 //
@@ -67,14 +73,16 @@ const (
 	GlifoArbol = 13
 	GlifoNota  = 12
 	// LadoAccionArbol es `p-1` sobre un icono de 13: 20. Es lo que manda en el alto de
-	// la fila y el número que cierra los 30,5. Lo miden el candado y, en el LAYOUT, los
-	// dos botones de acción (ver DesbordeAccion).
+	// la fila y el número que cierra los 30,5. Lo miden el candado y, en el LAYOUT, el
+	// «…» del cuaderno (ver DesbordeAccion).
 	LadoAccionArbol = GlifoArbol + 2*0.25*tema.Rem
-	// DesbordeAccion es el `-my-[2px]` de los dos botones de acción de un cuaderno: son
-	// la acción del carril, de 24 (`ui.LadoAccionLateral`), y devuelven los 4 px que
-	// crecen para que la fila siga midiendo 30,5 (web, PR #834).
+	// DesbordeAccion es el `-my-[2px]` del «…» de un cuaderno (ACCION_DE_CUADERNO): es
+	// la acción del carril, de 24 (`ui.LadoAccionLateral`), y devuelve los 4 px que
+	// crece para que la fila siga midiendo 30,5 (web, PR #834).
 	DesbordeAccion = 2
-	// HuecoAcciones es el `gap-0.5` entre los dos botones de acción.
+	// GlifoMasCuaderno es el `<Icon name="ellipsis" size={14}>` de ese «…».
+	GlifoMasCuaderno = 14
+	// HuecoAcciones es el `gap-0.5` entre las piezas de la cola de un cuaderno.
 	HuecoAcciones = 0.5 * 0.25 * tema.Rem
 	// RellenoNotas es el `py-0.5` del `ul` que envuelve las notas de un cuaderno.
 	RellenoNotas = 0.5 * 0.25 * tema.Rem
@@ -109,13 +117,21 @@ type Lateral struct {
 	Fase          Fase
 	filasCuaderno map[string]*ui.FilaLateral
 
-	AlHoy                 func()
-	AlDia                 func(string)
-	AlIrA                 func(Vista)
-	AlEtiquetas           func()
-	AlAbrir               func(Cuaderno)
-	AlAjustes             func(Cuaderno)
-	AlNuevoDentro         func(Cuaderno)
+	AlHoy         func()
+	AlDia         func(string)
+	AlIrA         func(Vista)
+	AlEtiquetas   func()
+	AlAbrir       func(Cuaderno)
+	AlAjustes     func(Cuaderno)
+	AlNuevoDentro func(Cuaderno)
+	// PuedeMover dice si el «…» de un cuaderno ofrece «Mover cuaderno a…»: es el
+	// `puedeMoverCuaderno` de la pantalla (con red, de escritura, no un día del diario
+	// y administrado por quien mira). nil: no se ofrece nunca.
+	PuedeMover func(Cuaderno) bool
+	AlMover    func(Cuaderno)
+	// AlMenu abre el menú de un cuaderno colgando de su disparador. nil: el «…» y el
+	// clic derecho no hacen nada, que es lo que necesitan los guardianes de píxel.
+	AlMenu                func(disparador fyne.CanvasObject, m *ui.Menu)
 	AlNuevoCuaderno       func()
 	AlImportar            func()
 	AlServiciosVinculados func()
@@ -195,8 +211,9 @@ func destinoIcono(l *Lateral, v tema.Variante, i iconos.Icono, vista Vista, clav
 func (l *Lateral) ramas(v tema.Variante) []fyne.CanvasObject {
 	switch l.Fase {
 	case Cargando:
-		// La web no pinta nada mientras carga el árbol (`cargandoArbol ? null : …`).
-		return nil
+		// Filas grises con la altura de un cuaderno (`EsqueletoCuadernos` de la web):
+		// al llegar el árbol no empuja hacia abajo lo que hay debajo.
+		return []fyne.CanvasObject{esqueletoCuadernos()}
 	case Fallo, SinSesion, Prohibida, SinConexion:
 		return []fyne.CanvasObject{ui.Texto(l.tr.T("error.loadFailed", nil),
 			tema.TextoBase, ui.Normal, tema.Color("sidebar-fg-muted", v))}
@@ -226,8 +243,8 @@ func (l *Lateral) ramas(v tema.Variante) []fyne.CanvasObject {
 	return filas
 }
 
-// fila es la de un cuaderno: sangría por nivel, marca de color o emoji, contador y los
-// dos botones de acción que cierran los 30,5.
+// fila es la de un cuaderno: sangría por nivel, marca de color o emoji, contador y el
+// «…» que cierra los 30,5.
 func (l *Lateral) fila(c Cuaderno, nivel int, v tema.Variante) *ui.FilaLateral {
 	if l.filasCuaderno == nil {
 		l.filasCuaderno = make(map[string]*ui.FilaLateral)
@@ -240,17 +257,21 @@ func (l *Lateral) fila(c Cuaderno, nivel int, v tema.Variante) *ui.FilaLateral {
 	} else {
 		// El punto de color: `h-2.5 w-2.5 rounded-full` con el color del CUADERNO,
 		// que es un dato y no un token. Suelto, sin caja: ocupa sus 8,75.
-		f.Punto, caja = hexO(c.Color, tema.Color("sidebar-fg-muted", v)), ui.PuntoEtiqueta
+		f.Punto, caja = tonoO(c.Color, tema.Color("sidebar-fg-muted", v)), ui.PuntoEtiqueta
 	}
 	f.Activa = c.ID == l.Activo
 	l.filasCuaderno[c.ID] = f
 	cola, acciones := l.cola(c, v)
+	// Clic derecho y pulsación larga abren el mismo menú que el «…». Cuelga de la fila
+	// alineado a su final, que es donde está el «…» (`align="end"`): el botón puede estar
+	// oculto en reposo y entonces no tiene una posición fiable de la que colgar.
+	f.AlPulsarSecundario = func() { l.abrirMenuCuaderno(f, c) }
 	f.Rama = &ui.RamaLateral{
 		Sangria:   SangriaBase + float32(nivel-1)*SangriaNivel,
 		RellenoY:  RellenoCuaderno,
 		CajaIcono: caja,
 		Cola:      cola,
-		// Solo los BOTONES se esconden. El contador, el distintivo de visibilidad y el
+		// Solo el «…» se esconde. El contador, el distintivo de visibilidad y el
 		// candado son información y la web los pinta siempre.
 		ColaAlPasar: acciones,
 	}
@@ -305,10 +326,10 @@ func (l *Lateral) marca(c Cuaderno, v tema.Variante) fyne.CanvasObject {
 }
 
 // cola es lo que va pegado al borde derecho de la fila: el distintivo de visibilidad o
-// el candado, el contador, y los dos botones de acción.
+// el candado, el contador, y el «…» del cuaderno.
 //
 // Va junto en un solo objeto porque es lo que la web tiene (`flex shrink-0`) y porque
-// su ALTO es el que manda en la fila: los botones son 20 y la línea de texto 19,25.
+// su ALTO es el que manda en la fila: el botón es 20 y la línea de texto 19,25.
 func (l *Lateral) cola(c Cuaderno, v tema.Variante) (cola, acciones fyne.CanvasObject) {
 	var piezas []fyne.CanvasObject
 
@@ -338,18 +359,40 @@ func (l *Lateral) cola(c Cuaderno, v tema.Variante) (cola, acciones fyne.CanvasO
 			tema.Color("sidebar-fg-muted", v)))
 	}
 
-	// LOS DOS BOTONES QUE CIERRAN LOS 30,5. Cuentan SIEMPRE para la medida aunque solo
-	// se vean al pasar por encima (`ColaAlPasar`): si entraran y salieran del layout,
-	// la fila pegaría un salto de 0,75 cada vez que el ratón la cruza.
-	botones := container.New(desborde{DesbordeAccion}, container.New(ui.Fila{Hueco: HuecoAcciones},
-		accionCuaderno(iconos.Mas, l.tr.T("notebook.newChild", nil),
-			func() { llamar1(l.AlNuevoDentro, c) }),
-		accionCuaderno(iconos.Ajustes, l.tr.T("notebook.settings", nil),
-			func() { llamar1(l.AlAjustes, c) }),
-	))
-	botones.Hide() // en reposo no se ven; la fila los enseña al pasar por encima
-	piezas = append(piezas, botones)
-	return container.New(colaArbol{hueco: HuecoAcciones}, piezas...), botones
+	// EL «…» QUE CIERRA LOS 30,5. Cuenta SIEMPRE para la medida aunque solo se vea al
+	// pasar por encima (`ColaAlPasar`): si entrara y saliera del layout, la fila pegaría
+	// un salto de 0,75 cada vez que el ratón la cruza. Su rótulo es «Ajustes», el
+	// `aria-label` que le pone la web.
+	mas := accionCuaderno(iconos.Puntos, l.tr.T("notebook.settings", nil), nil)
+	mas.TamIcono = GlifoMasCuaderno
+	mas.AlPulsar = func() { l.abrirMenuCuaderno(mas, c) }
+	boton := container.New(desborde{DesbordeAccion}, mas)
+	boton.Hide() // en reposo no se ve; la fila lo enseña al pasar por encima
+	piezas = append(piezas, boton)
+	return container.New(colaArbol{hueco: HuecoAcciones}, piezas...), boton
+}
+
+// menuCuaderno es el `<Dropdown>` de la fila en NotebookTree.tsx: «Nuevo cuaderno
+// dentro», «Mover cuaderno a…» si se puede y «Ajustes», en ese orden.
+func (l *Lateral) menuCuaderno(c Cuaderno) *ui.Menu {
+	t := l.tr.T
+	es := []fyne.CanvasObject{
+		ui.NuevoElementoMenu(t("notebook.newChild", nil), iconos.Ninguno, func() { llamar1(l.AlNuevoDentro, c) }),
+	}
+	if l.PuedeMover != nil && l.AlMover != nil && l.PuedeMover(c) {
+		es = append(es, ui.NuevoElementoMenu(t("notebook.moveTo", nil), iconos.Ninguno, func() { llamar1(l.AlMover, c) }))
+	}
+	es = append(es, ui.NuevoElementoMenu(t("notebook.settings", nil), iconos.Ninguno, func() { llamar1(l.AlAjustes, c) }))
+	m := ui.NuevoMenu(es...)
+	m.Rotulo = t("notebook.settings", nil)
+	return m
+}
+
+// abrirMenuCuaderno saca el menú del cuaderno colgando de `disparador`.
+func (l *Lateral) abrirMenuCuaderno(disparador fyne.CanvasObject, c Cuaderno) {
+	if l.AlMenu != nil {
+		l.AlMenu(disparador, l.menuCuaderno(c))
+	}
 }
 
 // colaArbol es la fila de la derecha de una rama: mide contando TAMBIÉN a los hijos
@@ -466,7 +509,7 @@ func accionArbol(i iconos.Icono, rotulo string, alPulsar func()) *ui.BotonIcono 
 	return b
 }
 
-// accionCuaderno es «nuevo cuaderno dentro» y «ajustes»: la acción del carril
+// accionCuaderno es el «…» de un cuaderno: la acción del carril
 // (SIDEBAR_ACTION_CLASS) con el glifo de 13 del árbol. 24 de lado, `rounded-md`, glifo
 // en `sidebar-fg-muted` que pasa a `sidebar-fg` con el velo de `sidebar-hover`.
 func accionCuaderno(i iconos.Icono, rotulo string, alPulsar func()) *ui.BotonIcono {

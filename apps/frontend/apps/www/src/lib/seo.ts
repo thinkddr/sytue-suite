@@ -15,6 +15,7 @@
  */
 import { LOCALES, DEFAULT_LOCALE, intlTag, type Locale } from '@sytue/i18n';
 import { localePath, type T } from '../i18n';
+import { CURRENCY, SEAT_PRICE_CENTS } from './pricing';
 
 /** Origen canónico de producción (contrato §1: sytue.eu / www.sytue.eu). */
 export const SITE_ORIGIN = 'https://sytue.eu';
@@ -118,7 +119,12 @@ export function webSiteJsonLd(): Record<string, unknown> {
  * clase de discrepancia entre lo que se ve y lo que se declara es justo lo que
  * penalizan los resultados enriquecidos.
  */
-export const PRECIO_SUITE = { importe: 5, moneda: 'EUR' } as const;
+export const PRECIO_SUITE = {
+  // La cifra misma sale de `pricing.ts`, el espejo comprobado de commerce en Go:
+  // el JSON-LD declara lo que se cobra, no lo que alguien recordaba.
+  importe: SEAT_PRICE_CENTS.pro / 100,
+  moneda: CURRENCY,
+} as const;
 
 /**
  * La oferta de la suite en schema.org.

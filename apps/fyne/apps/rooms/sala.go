@@ -212,6 +212,12 @@ type Sala struct {
 	// cada vez que cambia: es el número que va sobre el icono de la app, como el
 	// «(3)» del título de la pestaña en la web. Nil, nadie lo escucha.
 	AlCambiarNoLeidos func(int)
+	// Timbre hace sonar el de una llamada entrante por un directo y devuelve quien lo
+	// para (`llamada.SonarTimbre` con la tarjeta del sistema); nil, no suena.
+	Timbre func() (parar func())
+	// AvisarSistema saca el aviso del sistema operativo de una llamada entrante con la
+	// ventana sin foco (`escritorio.Avisar`); nil, no sale.
+	AvisarSistema func(titulo, cuerpo string)
 	// PedirMicro pide el permiso del micrófono al abrir la antesala (Android); nil, no
 	// hace falta.
 	PedirMicro func() error
@@ -288,6 +294,15 @@ type Sala struct {
 	claves map[string]string
 	// canalLlamada es el canal de la llamada en curso, si lo hay: su chat.
 	canalLlamada string
+	// llamadasVivas son los canales con una llamada empezada (`llamadasVivas` de la
+	// web): el punto de su fila. pararLlamadaActiva es el sondeo de cuántos hay
+	// dentro de la del canal abierto. Ver franjallamada.go.
+	llamadasVivas      map[string]bool
+	pararLlamadaActiva func()
+	// entrante es el aviso de llamada entrante puesto (CanalID vacío: ninguno) y
+	// pararTimbre, lo que calla su timbre. Ver llamada_entrante.go.
+	entrante    AvisoEntrante
+	pararTimbre func()
 	// imagenesEmoji son las imágenes del catálogo de la organización ya bajadas, por
 	// fichero, y pidiendoEmoji las que están en camino o no bajaron.
 	imagenesEmoji map[string]image.Image
@@ -424,6 +439,8 @@ func NuevaSala(p *Pantalla, s Servicio, yo string) *Sala {
 	p.Canal.Historial.AlAbrirHilo = sa.AbrirHilo
 	p.Canal.Historial.AlAcusar = sa.Acusar
 	p.Canal.Historial.AlVotar = sa.Votar
+	p.Canal.Historial.Cifrado = sa.conCifrado
+	p.Canal.Compositor.Cifrado = sa.conCifrado
 	p.Canal.Historial.AdjuntosDe = sa.adjuntosParaFila
 	p.Canal.Historial.EnlacesDe = sa.tarjetasEnlace
 	p.Canal.Historial.AlCargarAnteriores = sa.CargarAnteriores
@@ -432,6 +449,7 @@ func NuevaSala(p *Pantalla, s Servicio, yo string) *Sala {
 	p.Canal.Historial.AlCancelarEdicion = sa.CancelarEdicion
 	p.Canal.Compositor.AlEnviar = sa.Enviar
 	p.Canal.Compositor.AlEditarUltimo = sa.EditarUltimo
+	p.Canal.Compositor.AlNavegar = sa.Navegar
 	p.Canal.Compositor.AlComando = sa.Comando
 	p.Canal.Compositor.AlComandoRemoto = sa.ComandoRemoto
 	p.Canal.Compositor.AlFormato = sa.guardarFormato
@@ -453,6 +471,9 @@ func NuevaSala(p *Pantalla, s Servicio, yo string) *Sala {
 	p.Canal.Cabecera.AlCancelarTema = sa.CancelarTema
 	p.Canal.Cabecera.AlLlamar = sa.LlamarEnCanal
 	p.Canal.Historial.AlEntrarEnLlamada = func(Mensaje) { sa.LlamarEnCanal() }
+	p.Canal.Llamada.AlUnirse = sa.LlamarEnCanal
+	p.Entrante.AlContestar = sa.ContestarEntrante
+	p.Entrante.AlRechazar = sa.RechazarEntrante
 	p.Canal.AlIrAlFinal = sa.IrAlFinal
 	l.AlIrACanal = sa.AbrirConmutador
 	l.AlCrearCanal = sa.AbrirCrearCanal
@@ -697,7 +718,12 @@ func SumaNoVisto(enFondo bool, m api.RoomsMessage, yo string, c Canal) bool {
 
 // EnSegundoPlano apunta que la app ha dejado el primer plano (en escritorio, que la
 // ventana ha perdido el foco): desde ahora lo que llega al canal abierto suma al icono.
-func (sa *Sala) EnSegundoPlano() { sa.enFondo = true }
+//
+// El sondeo de la llamada del canal abierto se para: la franja no la ve nadie.
+func (sa *Sala) EnSegundoPlano() {
+	sa.enFondo = true
+	sa.pararSondeoLlamada()
+}
 
 // contarNoVisto suma al icono un mensaje del canal abierto si nadie lo está viendo.
 func (sa *Sala) contarNoVisto(carga json.RawMessage) {
@@ -734,6 +760,7 @@ func (sa *Sala) canalDe(c api.RoomsChannel) Canal {
 	out := Canal{
 		ID: c.ID, Nombre: c.Title(), Tema: c.Topic, Proposito: c.Purpose, CategoriaID: c.CategoryID,
 		Orden: c.SortOrder, Favorito: c.Favorite, Silenciado: c.Muted, Externo: c.External,
+		CreadoPor: c.CreatedBy, Creado: c.CreatedAt,
 	}
 	switch c.Kind {
 	case "direct":
@@ -742,6 +769,7 @@ func (sa *Sala) canalDe(c api.RoomsChannel) Canal {
 		out.Clase = Privado
 	}
 	sa.presenciaDe(c, &out)
+	out.EnLlamada = sa.llamadasVivas[c.ID]
 	switch c.NotifyLevel {
 	case "mentions":
 		out.Nivel = AvisarMenciones
@@ -1252,6 +1280,11 @@ func (sa *Sala) abrir(c Canal) {
 	sa.P.Abrir(c)
 	sa.cargarFijados(c.ID)
 	if cambia {
+		// Abrir el canal que está llamando es darse por enterado: ya lo cuenta su franja.
+		if c.ID == sa.entrante.CanalID {
+			sa.retirarEntrante()
+		}
+		sa.abrirLlamadaActiva()
 		sa.cargarRoster(c)
 		sa.restaurar(ambito{canal: c.ID}, sa.P.Canal.Compositor)
 	}
@@ -1272,6 +1305,9 @@ func (sa *Sala) cargarMensajes(canal string, noLeidos int) {
 	h := sa.P.Canal.Historial
 	h.Estado, h.Mensajes, h.IndiceNoLeidos, h.HayAnteriores = Cargando, nil, -1, false
 	sa.separador = ""
+	// Otro separador: «Saltar a no leído» vuelve a ofrecerse (el `setJumpUsed(false)`
+	// al cambiar `unreadDividerId`).
+	h.SaltoUsado = false
 	h.Refresh()
 	pedir(sa, func(ctx context.Context) ([]api.RoomsMessage, error) {
 		return sa.S.Messages(ctx, canal, time.Time{}, PorPagina)
@@ -1393,6 +1429,36 @@ func (sa *Sala) pintarMensajes() {
 	if len(h.Mensajes) == 0 {
 		h.Estado = Vacio
 	}
+	h.Inicio = sa.inicioCanal()
+}
+
+// inicioCanal es el `<InicioDelCanal>` que ChatApp pasa a MessageView: el canal abierto,
+// quién lo creó según el roster y las acciones que quien mira puede usar.
+func (sa *Sala) inicioCanal() *InicioCanal {
+	c := sa.P.Canal.Cabecera.Canal
+	if c.ID == "" {
+		return nil
+	}
+	in := &InicioCanal{Canal: c, Yo: sa.Yo}
+	if i := slices.IndexFunc(sa.roster, func(m Miembro) bool { return m.ID == c.CreadoPor }); i >= 0 && c.CreadoPor != "" {
+		in.NombreCreador = sa.roster[i].Nombre
+	}
+	if c.Clase != Directo && sa.gestiona() {
+		in.AlAnadirPersonas = sa.AnadirPersonas
+	}
+	if sa.P.Canal.Cabecera.PuedeEditarTema {
+		in.AlEditarTema = sa.EditarTema
+	}
+	return in
+}
+
+// AnadirPersonas es «Añadir personas» del inicio del canal: el panel de personas ya en
+// la vista de añadir, sin el segundo clic.
+func (sa *Sala) AnadirPersonas() {
+	sa.abrirMiembros()
+	if sa.miembros != nil {
+		sa.miembros.CambiarModo(true)
+	}
 }
 
 // mensajeDe es `toChatMessage`. Una tarjeta de llamada con el cuerpo vacío es «inició
@@ -1408,6 +1474,16 @@ func (sa *Sala) mensajeDe(m api.RoomsMessage) Mensaje {
 		Cuerpo: m.Body, Creado: m.CreatedAt.Local(), Editado: m.EditedAt != nil,
 		Respuestas: m.ReplyCount,
 		Siguiendo:  m.ParentID == nil && sa.sigue(m.ID),
+		Mio:        sa.Yo != "" && m.AuthorSub == sa.Yo,
+	}
+	if m.LastReplyAt != nil {
+		out.UltimaRespuesta = m.LastReplyAt.Local()
+	}
+	for _, p := range m.ThreadParticipants {
+		out.Participantes = append(out.Participantes, cmp.Or(p.Name, p.Sub))
+	}
+	if m.ParentID != nil && m.AlsoInChannel {
+		out.RaizHilo = *m.ParentID
 	}
 	if label := sa.seguridadMensaje(m); label != "" {
 		out.Cuerpo = label + "\n" + out.Cuerpo
@@ -1469,11 +1545,14 @@ func (sa *Sala) Enviar(texto string) {
 // enviar es `sendBody` ya confirmado.
 func (sa *Sala) enviar(canal, texto string) {
 	c := sa.P.Canal.Compositor
-	o := api.RoomsSend{Mentions: MencionesEn(texto, sa.roster), Priority: prioridadAPI[c.Prioridad], RequiresAck: c.Acuse}
+	o := api.RoomsSend{Mentions: MencionesEn(texto, sa.roster), Priority: prioridadAPI[c.Prioridad], RequiresAck: c.Acuse && sa.puede(AccionPedirAcuse)}
 	for _, a := range c.Subidos() {
 		o.FileIDs = append(o.FileIDs, a.FileID)
 	}
 	cuando := c.ProgramarA
+	if !sa.puede(AccionProgramar) {
+		cuando = time.Time{}
+	}
 	c.Vaciar()
 	if !cuando.IsZero() {
 		sa.programar(canal, texto, o.FileIDs, cuando)
@@ -1746,6 +1825,10 @@ func (sa *Sala) alLlegar(ev api.RoomsEvent) {
 		if ev.Type == "message" {
 			sa.subirSeguido(ev.Payload)
 		}
+		if ev.Type == "call_started" || ev.Type == "call_ended" {
+			sa.alEmpezarOAcabarLlamada(ev.ChannelID, ev.Type == "call_started")
+			sa.alLlamadaEntrante(ev.ChannelID, ev.Type == "call_started")
+		}
 		if sa.raizHilo != "" {
 			sa.cargarHilo(false)
 		}
@@ -1849,6 +1932,9 @@ func (sa *Sala) AbrirHilo(m Mensaje) {
 	if m.Enviando || m.Fallido {
 		return // solo mensajes que ya están en el servidor
 	}
+	if m.RaizHilo != "" {
+		m = sa.raizDe(m)
+	}
 	if sa.panel != "" {
 		sa.lista, sa.panel, sa.miembros = nil, "", nil
 		sa.P.Canal.Cabecera.Panel = ""
@@ -1858,6 +1944,7 @@ func (sa *Sala) AbrirHilo(m Mensaje) {
 	sa.verSeguido(m.ID)
 	if sa.hilo == nil {
 		h := NuevoPanelHilo(sa.P.T, sa.P.Locale)
+		h.Cifrado = sa.conCifrado()
 		h.AlCerrar = sa.CerrarHilo
 		h.AlReintentar = func() { sa.cargarHilo(true) }
 		h.AlSeguir = sa.SeguirHilo
@@ -1867,13 +1954,20 @@ func (sa *Sala) AbrirHilo(m Mensaje) {
 		h.Compositor.Remotos = sa.P.Canal.Compositor.Remotos
 		h.Compositor.FormatoVisible = sa.P.Canal.Compositor.FormatoVisible
 		h.Compositor.AlFormato = sa.guardarFormato
+		h.AlReaccionar = sa.ReaccionarEnHilo
+		h.AlEmojis = func(m Mensaje, d fyne.CanvasObject) {
+			sa.AbrirEmojis(d, func(e string) { sa.ReaccionarEnHilo(m, e) })
+		}
+		h.Menu = sa.menuHiloDe
+		h.AlGuardarEdicion = sa.GuardarEdicionHilo
+		h.AlCancelarEdicion = sa.CancelarEdicionHilo
 		sa.hilo = h
 	}
 	h := sa.hilo
 	h.Compositor.Miembros = sa.roster
 	sa.raizHilo, sa.canalHilo = m.ID, cmp.Or(m.CanalID, sa.abierto)
 	sa.restaurar(ambito{sa.canalHilo, m.ID}, h.Compositor)
-	h.Raiz, h.Respuestas, h.Siguiendo = m, nil, false
+	h.Raiz, h.Respuestas, h.Siguiendo, h.EditandoID, h.TambienAlCanal = m, nil, false, "", false
 	h.NombreCanal = sa.P.Canal.Cabecera.Canal.Nombre
 	if n := sa.nombresDeCanal()[m.CanalID]; n != "" {
 		h.NombreCanal = n // uno de «Hilos» puede ser de otro canal
@@ -1929,6 +2023,19 @@ func (sa *Sala) CerrarHilo() {
 	sa.P.PonerDerecho(nil)
 }
 
+// raizDe es la raíz del hilo de una respuesta mandada «también al canal»: la del feed
+// si está cargada y, si no, la propia respuesta con el id de la raíz, para que la caja
+// y su borrador sean ya los del hilo correcto mientras llega lo del servicio.
+func (sa *Sala) raizDe(m Mensaje) Mensaje {
+	for _, r := range sa.mensajes {
+		if r.ID == m.RaizHilo {
+			return sa.mensajeDe(r)
+		}
+	}
+	m.ID, m.RaizHilo, m.Respuestas = m.RaizHilo, "", 0
+	return m
+}
+
 // Responder publica en el hilo abierto. Como en el canal, la caja se vacía al momento
 // y el texto vuelve si el envío falla. La cuenta de «N respuestas» del canal se pone
 // al día recargando su final.
@@ -1948,13 +2055,17 @@ func (sa *Sala) Responder(texto string) {
 func (sa *Sala) responder(raiz, texto string) {
 	h := sa.hilo
 	h.Compositor.Vaciar()
-	o := api.RoomsSend{Mentions: MencionesEn(texto, sa.roster)}
+	o := api.RoomsSend{Mentions: MencionesEn(texto, sa.roster), AlsoInChannel: h.TambienAlCanal}
+	// Como en la web, la casilla se desmarca tras cada envío: difundir es la excepción.
+	h.PonerTambienAlCanal(false)
 	pedir(sa, func(ctx context.Context) (api.RoomsMessage, error) {
 		return sa.S.ReplyWith(ctx, raiz, texto, o)
 	}, func(m api.RoomsMessage, err error) {
 		if err != nil {
 			if raiz == sa.raizHilo && h.Compositor.Texto() == "" {
+				// Vuelve todo lo que se iba a mandar, también «Enviar también al canal».
 				h.Compositor.PonerTexto(texto)
+				h.PonerTambienAlCanal(o.AlsoInChannel)
 			}
 			return
 		}
@@ -2053,14 +2164,26 @@ func (sa *Sala) cargarGuardados() {
 
 // menuDe son las entradas del menú de un mensaje, en el orden de la web: fijar,
 // guardar, seguir, copiar el texto, copiar el enlace, marcar como no leído y, en los
-// propios, editar y borrar tras un separador. Solo lo llevan los mensajes del canal,
-// que son raíces: las respuestas del hilo no tienen «…».
+// propios, editar y borrar tras un separador. El hilo usa el mismo menú (menuHiloDe).
 //
 // Tras copiar el enlace van «Guardar en Notepads» y «Reenviar…»; y «Visto por», SOLO en
 // los propios: saber quién ha leído lo que escribió otro no ayuda a trabajar y sí
 // convierte el chat en un panel de control sobre los compañeros.
-func (sa *Sala) menuDe(m Mensaje) []fyne.CanvasObject {
+func (sa *Sala) menuDe(m Mensaje) []fyne.CanvasObject { return sa.menuMensaje(m, false) }
+
+// menuHiloDe es el «…» de un mensaje del panel del hilo, raíz o respuesta: el mismo
+// del canal (`entradasDelMenu` de AccionesDeMensaje.tsx) sin lo que es del canal y no
+// del hilo —«Seguir mensaje», que ya está en la cabecera del panel, «Marcar como no
+// leído» y «Visto por»—, y editando y borrando dentro del hilo.
+func (sa *Sala) menuHiloDe(m Mensaje) []fyne.CanvasObject { return sa.menuMensaje(m, true) }
+
+// menuMensaje construye el «…» de un mensaje del canal o, con `enHilo`, del hilo.
+func (sa *Sala) menuMensaje(m Mensaje, enHilo bool) []fyne.CanvasObject {
 	t := sa.P.T
+	canal := sa.abierto
+	if enHilo {
+		canal = cmp.Or(m.CanalID, sa.canalHilo, sa.abierto)
+	}
 	fijado, guardado := sa.fijados[m.ID], sa.guardados[m.ID]
 	fijar, guardar := t.T("message.pin", nil), t.T("action.save", nil)
 	if fijado {
@@ -2086,34 +2209,49 @@ func (sa *Sala) menuDe(m Mensaje) []fyne.CanvasObject {
 	out = append(out,
 		con(fijar, glifoChincheta, func() { sa.Fijar(m, !fijado) }),
 		con(guardar, glifoMarcador, func() { sa.Guardar(m, !guardado) }),
-		con(seguir, glifoHilos, func() { sa.AlternarSeguir(m.ID, m.Siguiendo) }),
+	)
+	if !enHilo {
+		out = append(out, con(seguir, glifoHilos, func() { sa.AlternarSeguir(m.ID, m.Siguiendo) }))
+	}
+	out = append(out,
 		con(t.T("message.copyText", nil), glifoCopiar, func() {
 			sa.Copiar(m.Cuerpo)
 			sa.P.Avisar(ui.AvisoExito, t.T("message.copied", nil))
 		}),
 		con(t.T("message.copyLink", nil), glifoEnlace, func() {
-			sa.Copiar(sa.enlaceA(m))
+			sa.Copiar(sa.enlaceEn(canal, m))
 			sa.P.Avisar(ui.AvisoExito, t.T("message.linkCopied", nil))
 		}),
 		con(t.T("message.saveToNotes", nil), glifoNota, func() { sa.GuardarEnNotes(m) }),
 		con(t.T("message.forward", nil), glifoReenviar, func() { sa.AbrirReenviar(m) }),
-		con(t.T("message.markUnread", nil), glifoNoLeido, func() { sa.MarcarNoLeido(m) }),
 	)
-	if m.Autor.ID != sa.Yo || sa.Yo == "" {
-		return append(out, sa.entradasModeracion(m)...)
+	if !enHilo {
+		out = append(out, con(t.T("message.markUnread", nil), glifoNoLeido, func() { sa.MarcarNoLeido(m) }))
 	}
-	out = append(out, con(t.T("message.readersTitle", nil), glifoVisto, func() { sa.AbrirLectores(m) }))
+	if m.Autor.ID != sa.Yo || sa.Yo == "" {
+		return append(out, sa.entradasModeracion(m, canal)...)
+	}
+	editar := func() { sa.Editar(m) }
+	if enHilo {
+		editar = func() { sa.EditarEnHilo(m) }
+	} else {
+		out = append(out, con(t.T("message.readersTitle", nil), glifoVisto, func() { sa.AbrirLectores(m) }))
+	}
 	borrar := con(t.T("action.delete", nil), glifoPapelera, func() { sa.PedirBorrar(m) })
 	borrar.Peligro = true
 	borrar.Glifo = dibujoRelleno(glifoPapelera, iconos.TallaSM, "danger-text", v)
-	return append(out, ui.NuevoSeparadorMenu(), con(t.T("action.edit", nil), glifoLapiz, func() { sa.Editar(m) }), borrar)
+	return append(out, ui.NuevoSeparadorMenu(), con(t.T("action.edit", nil), glifoLapiz, editar), borrar)
 }
 
 // enlaceA es `messageLink`: la página del canal con el mensaje, en la web de Rooms, con
 // la organización detrás del prefijo (ADR 0056): el enlace canónico dice a qué
 // organización apunta, y quien lo reenvía comparte ESA.
-func (sa *Sala) enlaceA(m Mensaje) string {
-	return api.AppURL(sa.Apex, "rooms", sa.org(), "/channels/"+url.PathEscape(sa.abierto)+"?message="+url.QueryEscape(m.ID))
+func (sa *Sala) enlaceA(m Mensaje) string { return sa.enlaceEn(sa.abierto, m) }
+
+// enlaceEn es el enlace al mensaje en ese canal: el del hilo puede no ser el abierto
+// (un hilo abierto desde «Hilos»).
+func (sa *Sala) enlaceEn(canal string, m Mensaje) string {
+	return api.AppURL(sa.Apex, "rooms", sa.org(), "/channels/"+url.PathEscape(canal)+"?message="+url.QueryEscape(m.ID))
 }
 
 // org es la organización activa de la sesión, o "" sin sesión y en el guardián.
@@ -2294,6 +2432,123 @@ func (sa *Sala) Borrar(m Mensaje) {
 		sa.mensajes = slices.DeleteFunc(sa.mensajes, func(x api.RoomsMessage) bool { return x.ID == m.ID })
 		sa.pintarMensajes()
 		sa.P.Canal.Historial.Refresh()
+		sa.quitarDelHilo(m.ID)
+	})
+}
+
+// quitarDelHilo saca del hilo abierto el mensaje borrado. Si era la raíz, el hilo se
+// cierra: ya no hay de qué colgar. Si era una respuesta, sale ya del panel y el canal
+// relee su final para bajar el «N respuestas» de la raíz.
+func (sa *Sala) quitarDelHilo(id string) {
+	h := sa.hilo
+	if h == nil || sa.raizHilo == "" {
+		return
+	}
+	if id == sa.raizHilo {
+		sa.CerrarHilo()
+		return
+	}
+	antes := len(h.Respuestas)
+	h.Respuestas = slices.DeleteFunc(h.Respuestas, func(x Mensaje) bool { return x.ID == id })
+	if len(h.Respuestas) == antes {
+		return
+	}
+	if h.EditandoID == id {
+		h.EditandoID = ""
+	}
+	h.Refresh()
+	sa.recargarMensajes()
+}
+
+// ---- Las acciones sobre los mensajes del hilo ----
+
+// ReaccionarEnHilo es reaccionar desde el panel del hilo: el mismo conmutador del
+// canal, y luego se relee el hilo. Si es la raíz, también el canal, que la enseña.
+func (sa *Sala) ReaccionarEnHilo(m Mensaje, emoji string) {
+	raiz := sa.raizHilo
+	poner := !slices.ContainsFunc(m.Reacciones, func(r Reaccion) bool { return r.Emoji == emoji && r.Mia })
+	pedir(sa, func(ctx context.Context) (struct{}, error) {
+		return struct{}{}, sa.S.React(ctx, m.ID, emoji, poner)
+	}, func(_ struct{}, err error) {
+		if err != nil || raiz == "" || raiz != sa.raizHilo {
+			return
+		}
+		sa.cargarHilo(false)
+		if m.ID == raiz {
+			sa.recargarMensajes()
+		}
+	})
+}
+
+// EditarEnHilo cambia el texto de ese mensaje del hilo por su caja de editar, con el
+// foco dentro.
+func (sa *Sala) EditarEnHilo(m Mensaje) {
+	h := sa.hilo
+	if h == nil {
+		return
+	}
+	h.EditandoID = m.ID
+	h.Refresh()
+	h.EnfocarEdicion()
+}
+
+// CancelarEdicionHilo la cierra sin tocar nada, y el foco vuelve a la barra de acciones
+// de la fila, de donde salió (design.md §2.6).
+func (sa *Sala) CancelarEdicionHilo() {
+	h := sa.hilo
+	if h == nil || h.EditandoID == "" {
+		return
+	}
+	id := h.EditandoID
+	h.EditandoID = ""
+	h.Refresh()
+	h.EnfocarAcciones(id)
+}
+
+// GuardarEdicionHilo es `saveEdit` en el hilo: un texto vacío o igual al de antes no se
+// manda; si no, el texto nuevo y «(editado)» se pintan YA y se deshacen si el servicio
+// dice que no. Con la respuesta se relee el hilo y, si era la raíz, el canal.
+func (sa *Sala) GuardarEdicionHilo(m Mensaje, texto string) {
+	sa.CancelarEdicionHilo()
+	h, raiz := sa.hilo, sa.raizHilo
+	if h == nil || strings.TrimSpace(texto) == "" || texto == m.Cuerpo {
+		return
+	}
+	cambiar := func(nuevo Mensaje) bool {
+		if h.Raiz.ID == nuevo.ID {
+			h.Raiz = nuevo
+			return true
+		}
+		for i := range h.Respuestas {
+			if h.Respuestas[i].ID == nuevo.ID {
+				h.Respuestas[i] = nuevo
+				return true
+			}
+		}
+		return false
+	}
+	editado := m
+	editado.Cuerpo, editado.Editado = texto, true
+	if !cambiar(editado) {
+		return
+	}
+	h.Refresh()
+	pedir(sa, func(ctx context.Context) (api.RoomsMessage, error) {
+		return sa.S.Edit(ctx, m.ID, texto)
+	}, func(_ api.RoomsMessage, err error) {
+		if raiz != sa.raizHilo {
+			return
+		}
+		if err != nil {
+			if cambiar(m) {
+				h.Refresh()
+			}
+			return
+		}
+		sa.cargarHilo(false)
+		if m.ID == raiz {
+			sa.recargarMensajes()
+		}
 	})
 }
 
@@ -2467,6 +2722,9 @@ func (sa *Sala) ponerEnLista(ms []api.RoomsMessage, err error) {
 	l := sa.lista
 	if err != nil {
 		l.Estado = Error
+		if l.Busqueda && cifradoImpideBuscar(err) {
+			l.Mensajes, l.Estado = nil, SinPermiso
+		}
 		l.Refresh()
 		return
 	}
@@ -2501,11 +2759,20 @@ func (sa *Sala) cargarProgramados() {
 			l.Programados = append(l.Programados, Programado{
 				ID: p.ID, Canal: p.ChannelID, Autor: cmp.Or(p.AuthorName, p.AuthorSub), Cuerpo: p.Body,
 				ConAdjuntos: len(p.FileIDs) > 0, Adjuntos: p.FileIDs, Cuando: p.SendAt.Local(),
+				Raiz: raizDe(p), AlCanal: p.AlsoInChannel,
 			})
 		}
 		l.Estado = Listo
 		l.Refresh()
 	})
+}
+
+// raizDe es el mensaje del hilo al que responde un programado, o "".
+func raizDe(p api.RoomsScheduled) string {
+	if p.ParentID == nil {
+		return ""
+	}
+	return *p.ParentID
 }
 
 // quitarProgramado lo saca de la lista, que es lo primero que hacen «Cancelar» y
@@ -2535,6 +2802,12 @@ func (sa *Sala) EnviarYa(m Programado) {
 	sa.quitarProgramado(m)
 	pedir(sa, func(ctx context.Context) (struct{}, error) {
 		if err := sa.S.CancelScheduled(ctx, m.ID); err != nil {
+			return struct{}{}, err
+		}
+		if m.Raiz != "" {
+			// Una respuesta programada sale en su hilo, y en el canal si se pidió: publicarla
+			// como mensaje de canal la sacaba del hilo.
+			_, err := sa.S.ReplyWith(ctx, m.Raiz, m.Cuerpo, api.RoomsSend{FileIDs: m.Adjuntos, AlsoInChannel: m.AlCanal})
 			return struct{}{}, err
 		}
 		_, err := sa.S.PostWith(ctx, m.Canal, m.Cuerpo, api.RoomsSend{FileIDs: m.Adjuntos})
@@ -2733,6 +3006,21 @@ func (sa *Sala) Buscar(q string) {
 // PorBusqueda es el `limit=30` de `searchAll`.
 const PorBusqueda = 30
 
+// cifradoImpideBuscar: con el cifrado de extremo a extremo el servidor no puede leer
+// los mensajes, así que no puede buscarlos. No es un fallo —repetir no cambia nada— y
+// no se pinta como tal. Llega de dos maneras: el servicio cifrado de la app
+// (`mx.RoomsService`, el de producción) la rechaza sin preguntar con
+// `mx.ErrUnsupported`, igual que la web con `MatrixSecurityError('unsupported')`; y
+// si alguien pregunta al servicio a pelo, `/api/search` contesta 409
+// `encrypted_client_required`.
+func cifradoImpideBuscar(err error) bool {
+	if errors.Is(err, mx.ErrUnsupported) {
+		return true
+	}
+	var e *api.Error
+	return errors.As(err, &e) && e.Status == http.StatusConflict && e.Code() == "encrypted_client_required"
+}
+
 // ---- Saltar a un mensaje: `goToMessage` ----
 
 // IrAEnlace es la llegada por el esquema a un canal, y a un mensaje si lo trae: el aviso
@@ -2771,6 +3059,7 @@ func (sa *Sala) IrAMensaje(canal, id string) {
 	h := sa.P.Canal.Historial
 	h.Estado, h.Mensajes, h.IndiceNoLeidos = Cargando, nil, -1
 	sa.separador = ""
+	h.SaltoUsado = false
 	h.Refresh()
 	pedir(sa, func(ctx context.Context) (ventana, error) {
 		ms, raiz, err := sa.S.Around(ctx, canal, id, PorPagina)
@@ -2861,13 +3150,94 @@ func (sa *Sala) AbrirConmutador() {
 	d.Mostrar(c)
 }
 
-// Atajos engancha Ctrl+G (y ⌘G) al lienzo de la ventana, que es donde la web lo
+// Atajos engancha Ctrl+G (y ⌘G), Alt+↑/↓ y «?» al lienzo de la ventana, que es donde la web los
 // escucha (`document`).
 func (sa *Sala) Atajos(c fyne.Canvas) {
 	ui.AlAtras(c, sa.atras)
 	for _, m := range []fyne.KeyModifier{fyne.KeyModifierControl, fyne.KeyModifierSuper} {
 		c.AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyG, Modifier: m},
 			func(fyne.Shortcut) { sa.AbrirConmutador() })
+	}
+	// Alt+↑/↓ y Alt+Mayús+↑/↓ sin nada enfocado (o con algo que no los quiere). Con la
+	// caja enfocada los atiende el compositor, que mira si está vacía.
+	for _, k := range []fyne.KeyName{fyne.KeyUp, fyne.KeyDown} {
+		for _, m := range []fyne.KeyModifier{fyne.KeyModifierAlt, fyne.KeyModifierAlt | fyne.KeyModifierShift} {
+			c.AddShortcut(&desktop.CustomShortcut{KeyName: k, Modifier: m},
+				func(s fyne.Shortcut) { sa.AtajoNavegar(c, s) })
+		}
+	}
+	// Las runas sueltas: lo que hubiera en la ranura sigue detrás, para no pisarle a
+	// nadie una tecla que no es nuestra.
+	previa := c.OnTypedRune()
+	c.SetOnTypedRune(func(r rune) {
+		if !sa.Atajo(c, r) && previa != nil {
+			previa(r)
+		}
+	})
+}
+
+// AtajoNavegar atiende Alt+↑/↓ y Alt+Mayús+↑/↓ en el lienzo; devuelve si se movió.
+// Con un diálogo o un menú delante el teclado es de la capa.
+func (sa *Sala) AtajoNavegar(c fyne.Canvas, s fyne.Shortcut) bool {
+	if c == nil || c.Overlays().Top() != nil {
+		return false
+	}
+	paso, solo, ok := PasoDeNavegacion(s)
+	return ok && sa.Navegar(paso, solo)
+}
+
+// Navegar es Alt+↑/↓ (paso ±1) y, con soloPendientes, Alt+Mayús+↑/↓: abre el canal
+// vecino en el orden del carril tal como se ve. Devuelve si se movió.
+func (sa *Sala) Navegar(paso int, soloPendientes bool) bool {
+	c, ok := sa.P.Lateral.Vecino(paso, soloPendientes)
+	if !ok {
+		return false
+	}
+	sa.Elegir(c)
+	return true
+}
+
+// Atajo atiende una tecla suelta del lienzo; devuelve si era suya. Fyne solo la entrega
+// sin nada enfocado —escribiendo en la caja «?» es texto, como en la web, que la ignora
+// en `INPUT`/`TEXTAREA`—, y con un diálogo o un menú abiertos el teclado es de la capa
+// (el `closest('[role="dialog"]')` de la web).
+func (sa *Sala) Atajo(c fyne.Canvas, r rune) bool {
+	if r != '?' || c == nil || c.Overlays().Top() != nil {
+		return false
+	}
+	sa.VerAtajos(c)
+	return true
+}
+
+// VerAtajos abre la hoja de atajos (`ShortcutsModal` de `ChatApp.tsx`) con sus dos
+// grupos y las mismas diez filas de la web. Las teclas de Ctrl+G van tal cual las pinta
+// la web, que es la referencia.
+func (sa *Sala) VerAtajos(c fyne.Canvas) *ui.Dialogo {
+	t := sa.P.T
+	return ui.MostrarHojaAtajos(c, t.T("shortcuts.title", nil), t.T("action.close", nil), sa.gruposDeAtajos())
+}
+
+// gruposDeAtajos es el contenido de la hoja, ya traducido.
+func (sa *Sala) gruposDeAtajos() []ui.GrupoDeAtajos {
+	t := sa.P.T
+	fila := func(descripcion string, teclas ...string) ui.AtajoDeTeclado {
+		return ui.AtajoDeTeclado{Teclas: teclas, Descripcion: t.T(descripcion, nil)}
+	}
+	return []ui.GrupoDeAtajos{
+		{Titulo: t.T("shortcuts.group.move", nil), Atajos: []ui.AtajoDeTeclado{
+			fila("shortcuts.switcher", "Ctrl", "G"),
+			fila("shortcuts.nextChannel", "Alt", "↑/↓"),
+			fila("shortcuts.nextUnread", "Alt", t.T("key.shift", nil), "↑/↓"),
+			fila("shortcuts.close", "Esc"),
+			fila("shortcuts.help", "?"),
+		}},
+		{Titulo: t.T("shortcuts.group.write", nil), Atajos: []ui.AtajoDeTeclado{
+			fila("composer.hintSend", t.T("key.enter", nil)),
+			fila("shortcuts.editLast", "↑"),
+			fila("composer.hintMention", "@"),
+			fila("composer.hintEmoji", ":"),
+			fila("composer.hintCommands", "/"),
+		}},
 	}
 }
 
@@ -2887,23 +3257,54 @@ func (sa *Sala) AbrirCrearCanal() {
 	pie := container.New(ui.Fila{Hueco: ui.HuecoPieDialogo}, cancelar, f.BotonCrear())
 	d = ui.NuevoDialogo(t.T("createChannel.title", nil), f).Con(ui.DialogoMD, pie)
 	d.RotuloCerrar, d.Foco = t.T("action.close", nil), f.Nombre()
-	f.AlCrear = func(nombre, asunto string, privado bool) {
+	sa.alimentarSelector(f.Personas)
+	f.Personas.AlCambiar = func() {
+		f.Refresh()
+		d.Recolocar()
+	}
+	f.AlCrear = func(nombre, asunto string, privado bool, personas []Persona) {
 		equipo := sa.equipo
 		pedir(sa, func(ctx context.Context) (api.RoomsChannel, error) {
 			return sa.S.CreateChannel(ctx, equipo, nombre, asunto, privado)
 		}, func(canal api.RoomsChannel, err error) {
-			f.Ocupado = false
 			if err != nil {
+				f.Ocupado = false
 				f.ErrorNombre, f.Fallo = errorDeCrear(t, err)
 				f.Refresh()
 				return
 			}
-			d.Cerrar()
-			sa.entrarEn(canal)
+			// `addInitialMembers`: el canal ya existe; cada persona entra (o se la
+			// invita) una tras otra, y las que fallan se dicen sin deshacer nada.
+			pedir(sa, func(ctx context.Context) ([]string, error) {
+				return anadirPersonas(ctx, sa.S.AddChannelMember, canal.ID, personas), nil
+			}, func(faltan []string, _ error) {
+				f.Ocupado = false
+				d.Cerrar()
+				sa.entrarEn(canal)
+				if len(faltan) > 0 {
+					sa.P.Avisar(ui.AvisoAdvertencia, t.T("createChannel.membersMissing",
+						i18n.Vars{"names": strings.Join(faltan, ", ")}))
+				}
+			})
 		})
 	}
 	sa.crearCanal = f
 	d.Mostrar(c)
+}
+
+// anadirMiembro es la firma de `AddChannelMember`.
+type anadirMiembro = func(ctx context.Context, canal, persona, nombre string) (api.RoomsMember, error)
+
+// anadirPersonas añade al canal a cada persona, en orden, y devuelve los nombres de las
+// que no se pudieron añadir. Un fallo no corta a las demás.
+func anadirPersonas(ctx context.Context, anadir anadirMiembro, canal string, personas []Persona) []string {
+	var faltan []string
+	for _, p := range personas {
+		if _, err := anadir(ctx, canal, p.ID, p.Nombre); err != nil {
+			faltan = append(faltan, p.Nombre)
+		}
+	}
+	return faltan
 }
 
 // errorDeCrear reparte el fallo de crear: 409, 400 y 403 van junto al nombre; lo
@@ -3130,43 +3531,7 @@ func (sa *Sala) AbrirNuevoDirecto() {
 	d = ui.NuevoDialogo(t.T("dm.title", nil), nd).Con(ui.DialogoSM, pie)
 	d.RotuloCerrar, d.Foco = t.T("action.close", nil), nd.Caja()
 	equipo := sa.equipo
-	pedir(sa, func(ctx context.Context) ([]api.RoomsMember, error) {
-		return sa.S.TeamMembers(ctx, equipo)
-	}, func(ms []api.RoomsMember, err error) {
-		if err != nil {
-			return // como la web: sin lista, se puede seguir buscando por @usuario
-		}
-		nd.Equipo = nd.Equipo[:0]
-		for _, m := range ms {
-			if m.Subject != sa.Yo {
-				nd.Equipo = append(nd.Equipo, Persona{ID: m.Subject, Nombre: nombreDe(m.Name, m.Subject)})
-			}
-		}
-		nd.Refresh()
-	})
-	nd.AlBuscarPersona = func(q string) {
-		nd.Buscando, nd.ErrorBuscar = true, ""
-		nd.Refresh()
-		pedir(sa, func(ctx context.Context) (api.RoomsPerson, error) {
-			return sa.S.ResolvePerson(ctx, q)
-		}, func(p api.RoomsPerson, err error) {
-			nd.Buscando = false
-			if err != nil {
-				nd.ErrorBuscar = t.T(ClaveFalloBusqueda(err), nil)
-				nd.Refresh()
-				return
-			}
-			nombre := p.Name
-			if nombre == "" && p.Username != "" {
-				nombre = "@" + p.Username
-			}
-			if p.UserID == sa.Yo {
-				nd.Caja().PonerTexto("")
-				return
-			}
-			nd.Encontrada(Persona{ID: p.UserID, Nombre: nombreDe(nombre, p.UserID)})
-		})
-	}
+	sa.alimentarSelector(nd)
 	nd.AlAbrir = func(elegidas []Persona) {
 		ids, nombres := make([]string, 0, len(elegidas)), make([]string, 0, len(elegidas))
 		for _, p := range elegidas {
@@ -3188,6 +3553,50 @@ func (sa *Sala) AbrirNuevoDirecto() {
 	}
 	sa.directo = nd
 	d.Mostrar(c)
+}
+
+// alimentarSelector da al selector de personas la gente del equipo (sin quien mira) y
+// la búsqueda en Sytue One; lo comparten «Nuevo mensaje» y «Crear canal».
+func (sa *Sala) alimentarSelector(nd *NuevoDirecto) {
+	t, equipo := sa.P.T, sa.equipo
+	nd.Yo = sa.Yo
+	pedir(sa, func(ctx context.Context) ([]api.RoomsMember, error) {
+		return sa.S.TeamMembers(ctx, equipo)
+	}, func(ms []api.RoomsMember, err error) {
+		if err != nil {
+			return // como la web: sin lista, se puede seguir buscando por @usuario
+		}
+		nd.Equipo = nd.Equipo[:0]
+		for _, m := range ms {
+			if m.Subject != sa.Yo {
+				nd.Equipo = append(nd.Equipo, Persona{ID: m.Subject, Nombre: nombreDe(m.Name, m.Subject)})
+			}
+		}
+		nd.cambiado()
+	})
+	nd.AlBuscarPersona = func(q string) {
+		nd.Buscando, nd.ErrorBuscar = true, ""
+		nd.cambiado() // se va el error de antes: dentro de «Crear canal», a remedir
+		pedir(sa, func(ctx context.Context) (api.RoomsPerson, error) {
+			return sa.S.ResolvePerson(ctx, q)
+		}, func(p api.RoomsPerson, err error) {
+			nd.Buscando = false
+			if err != nil {
+				nd.ErrorBuscar = t.T(ClaveFalloBusqueda(err), nil)
+				nd.cambiado() // una fila más: el diálogo de «Crear canal» se remide
+				return
+			}
+			nombre := p.Name
+			if nombre == "" && p.Username != "" {
+				nombre = "@" + p.Username
+			}
+			if p.UserID == sa.Yo {
+				nd.Caja().PonerTexto("")
+				return
+			}
+			nd.Encontrada(Persona{ID: p.UserID, Nombre: nombreDe(nombre, p.UserID)})
+		})
+	}
 }
 
 // nombreDe es el nombre, o el identificador si no lo hay.
@@ -3267,6 +3676,10 @@ func (sa *Sala) pintarRoster() {
 	if len(sa.mensajes) > 0 {
 		sa.pintarMensajes()
 		sa.P.Canal.Historial.Refresh()
+	} else if h := sa.P.Canal.Historial; h.Estado == Vacio {
+		// Con el roster se sabe quién creó el canal y si se puede añadir gente.
+		h.Inicio = sa.inicioCanal()
+		h.Refresh()
 	}
 	if p := sa.miembros; p != nil {
 		sa.presenciaRoster()
@@ -3453,6 +3866,7 @@ func (sa *Sala) MenuCanal(disparador fyne.CanvasObject) {
 // Olvidar removes decrypted process state when the Sytue account/tenant changes.
 func (sa *Sala) Olvidar() {
 	sa.Parar()
+	sa.retirarEntrante()
 	for key, stop := range sa.subidas {
 		stop()
 		delete(sa.subidas, key)
@@ -3531,6 +3945,8 @@ func (sa *Sala) seguridadMensaje(m api.RoomsMessage) string {
 	}
 	key := ""
 	switch {
+	case m.EncryptionError && m.RequiresOriginalDevice:
+		key = "matrix.originalDeviceRequired"
 	case m.EncryptionError:
 		key = "matrix.unreadable"
 	case m.MatrixEvent == nil && m.Type != "call":

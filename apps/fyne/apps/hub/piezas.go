@@ -37,7 +37,7 @@ const (
 	MargenTitulo float32 = 1.5 * 0.25 * tema.Rem
 	// MargenIntro es el `mt-2` entre el H1 y el párrafo de entrada.
 	MargenIntro float32 = 2 * 0.25 * tema.Rem
-	// AnchoIntro es el `max-w-2xl` del párrafo de entrada: 42rem con el rem de 14.
+	// AnchoIntro es el `max-w-2xl` del párrafo de entrada: 42rem, 672 px.
 	AnchoIntro float32 = 42 * tema.Rem
 )
 
@@ -264,6 +264,10 @@ type Textos struct {
 	Fallo, FalloCuerpo string
 	// Accion es la clave del botón del estado vacío; vacía, no hay botón.
 	Accion string
+	// Ilustracion es el `spot` del EmptyState del vacío: el dibujo de
+	// `branding/illustrations` a `ui.LadoSpotVacio`. Nil, el vacío va sin dibujo. Es un
+	// puntero porque el cero de `iconos.Ilustracion` ya es un spot (`VacioMail`).
+	Ilustracion *iconos.Ilustracion
 }
 
 // Aviso construye el bloque que sustituye al contenido cuando el estado no es Listo.
@@ -291,16 +295,15 @@ func Aviso(t *i18n.Translator, v tema.Variante, e Estado, x Textos, accion func(
 		descripcion = t.T(cuerpo, nil)
 	}
 	vacio := ui.NuevoVacio(t.T(titulo, nil), descripcion)
-	if icono != iconos.Ninguno {
+	switch {
+	case icono != iconos.Ninguno:
 		// `<Icon name="warning" size={32} class="text-danger-text" />`: el icono va
 		// suelto, sin tesela de fondo, como en EmptyState.tsx.
-		//
-		// ponytail: la web pone `Illustration name="emptySearch"` de 120 en el estado
-		// vacío de la actividad reciente. Las trece ilustraciones de `branding` usan
-		// `var(--sytue-primary-500)` sin valor de reserva y eso tumba el fichero
-		// entero en oksvg (roadmap.md, «Piezas que faltan»): hasta que se sustituya el
-		// token por su hex antes de rasterizar, el vacío va sin dibujo.
 		vacio.Ilustracion = Glifo(iconos.Trazo(icono, 32, tintaDe(e), v), 32)
+	case x.Ilustracion != nil:
+		// `<EmptyState spot=… />`: `<Illustration size={EMPTY_SPOT_SIZE} />`, que es un
+		// `max-width` de 120 con el alto en proporción.
+		vacio.Ilustracion = iconos.Pintar(*x.Ilustracion, v).A(ui.LadoSpotVacio).Objeto()
 	}
 	if boton != "" && accion != nil {
 		vacio.Accion = ui.NuevoBoton(t.T(boton, nil), accion).Con(ui.Secundario, ui.TallaSM)

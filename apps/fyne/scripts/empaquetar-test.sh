@@ -53,7 +53,7 @@ GO
 cat >"$tmp/go.mod" <<'GO'
 module ejemplo
 
-go 1.27.3
+go 1.27.4
 GO
 
 construir() { # <goos> <goarch> -> ruta
@@ -1713,16 +1713,28 @@ echo 'ok - el payload de Apple rechaza perfiles 0600 y directorios privados'
 # base_tienda_darwin.go, firmando el .pkg con SYTUE_MAS_IDENTIDAD, quitando `--tags tienda`,
 # convirtiendo el `elif` del Developer ID en `if`, quitando el `break` de los bundles,
 # devolviendo actualizar_darwin.go a `darwin && !ios` y quitando DeTienda de Plataforma.
+# La copia de seguridad de Photos con la app cerrada (TareaFondo, `fototeca`): sin el
+# servicio con BIND_JOB_SERVICE, JobScheduler no lo encola; sin RECEIVE_BOOT_COMPLETED,
+# el trabajo persistente lanza una excepción al programarse; sin ACCESS_NETWORK_STATE,
+# «solo con Wi-Fi» no sabe qué red hay. Solo en las apps que leen la galería.
+grep -q 'tarea_fondo" != si ] || printf .*android:name="eu.sytue.nativo.TareaFondo" android:permission="android.permission.BIND_JOB_SERVICE"' "$GUION" ||
+  mal "el manifiesto no declara TareaFondo (con BIND_JOB_SERVICE) en las apps con fototeca"
+for permiso in READ_MEDIA_VIDEO ACCESS_NETWORK_STATE RECEIVE_BOOT_COMPLETED; do
+  grep -q "^    permisos_extra+=(.*android.permission.$permiso" "$GUION" ||
+    mal "las apps con fototeca no piden $permiso"
+done
 equipo=VHC5QW7BZ3
 comunes='com.apple.application-identifier com.apple.developer.team-identifier com.apple.security.app-sandbox com.apple.security.application-groups com.apple.security.files.downloads.read-write com.apple.security.network.client com.apple.security.network.server keychain-access-groups'
 ficheros='com.apple.security.files.user-selected.read-write'
 llamadas='com.apple.security.device.audio-input com.apple.security.device.camera'
+fototeca='com.apple.security.personal-information.photos-library'
 derechos_esperados() { # <app> -> las claves, ordenadas, en una línea
   local extra=""
   case "$1" in
   bases | calendar | hub) ;;
   cast | rooms) extra="$ficheros $llamadas" ;;
-  calcus | certipdf | contacts | diapos | docus | drive | erp | mail | notes | photos) extra="$ficheros" ;;
+  calcus | certipdf | contacts | diapos | docus | drive | erp | mail | notes) extra="$ficheros" ;;
+  photos) extra="$ficheros $fototeca" ;;
   *) extra="app-sin-decidir" ;; # una app nueva tiene que decidirse AQUÍ, no heredar derechos
   esac
   printf '%s\n' $comunes $extra | sort | tr '\n' ' '
@@ -1773,6 +1785,7 @@ for activo in ('0', '1'):
             claves = [equipo + '.' + appid, llavero] + ([equipo + '.' + appid + '.shared'] if custom.get('archivos') == 'si' else [])
             assert p['keychain-access-groups'] == claves, (appid, modo, p)
             assert ('com.apple.security.device.camera' in p) == (modo == 'developerid' and custom.get('llamadas') == 'si')
+            assert ('com.apple.security.personal-information.photos-library' in p) == (modo == 'developerid' and custom.get('fototeca') == 'si')
             # El despertar por aviso silencioso: `aps-environment` solo en iOS, con su
             # interruptor y el de los widgets, y en las apps con widget. Visto en rojo
             # escribiéndolo también en developerid.
@@ -1783,6 +1796,8 @@ for activo in ('0', '1'):
                 assert d.get('aps-environment') == ('production' if quiere else None), (appid, modo, activo, despertar, d)
         tienda = plistlib.loads(subprocess.check_output(['bash', guion, 'derechos-tienda', str(toml.parent), equipo], env=entorno))
         assert tienda['com.apple.security.application-groups'] == [contenedor, llavero] + (['group.' + appid] if custom.get('archivos') == 'si' else []), (appid, activo)
+        # SecItemAdd uses the FIRST group; private SDK/cache items must not default to Suite.
+        assert tienda['keychain-access-groups'] == claves, (appid, activo, tienda)
 assert subprocess.run(['bash', guion, 'widgets-apple'], env=dict(os.environ, SYTUE_WIDGETS_APPLE='1'), capture_output=True, text=True).stdout == 'si\n'
 assert subprocess.run(['bash', guion, 'widgets-apple'], env=dict(os.environ, SYTUE_WIDGETS_APPLE='0'), capture_output=True, text=True).stdout == 'no\n'
 assert subprocess.run(['bash', guion, 'widgets-apple'], env=dict(os.environ, SYTUE_WIDGETS_APPLE='quizá'), capture_output=True).returncode != 0

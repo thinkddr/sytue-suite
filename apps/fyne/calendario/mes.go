@@ -124,6 +124,19 @@ type Mes struct {
 	AlCrear func(dia time.Time)
 	// AlAbrir abre la vista rápida del evento junto a lo pulsado.
 	AlAbrir func(o Ocurrencia, ancla fyne.CanvasObject)
+	// NumeroSemana, si no es nil, pone el número de semana ISO en la esquina del lunes
+	// de cada semana (`numeroSemana` de los ajustes) con su nombre accesible
+	// («Semana 45», `grid.weekNumber`).
+	NumeroSemana func(n int) string
+	// AlMas despliega todos los eventos del día junto a su «+N más» (`ancla`).
+	AlMas func(dia time.Time, ancla fyne.CanvasObject)
+	// AlMover guarda una ocurrencia arrastrada a otro día (`arrastremes.go`). nil: las
+	// píldoras y las barras solo se abren.
+	AlMover func(o Ocurrencia, inicio, fin time.Time)
+
+	// arr es el arrastre en curso y renderer, donde están las celdas que resalta.
+	arr      *arrastreMes
+	renderer *mesRenderer
 }
 
 var _ fyne.Widget = (*Mes)(nil)
@@ -210,6 +223,7 @@ func (m *Mes) MinSize() fyne.Size {
 func (m *Mes) CreateRenderer() fyne.WidgetRenderer {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	r := &mesRenderer{m: m, fondo: canvas.NewRectangle(tema.Color("surface", v))}
+	m.renderer = r
 	r.rehacer(v)
 	return r
 }
@@ -220,7 +234,8 @@ type mesRenderer struct {
 	dias    []*ui.Versal      // los siete nombres de día
 	filete  *canvas.Rectangle // el `border-b` de la fila de nombres
 	celdas  []*celdaMes
-	barras  [][]*barraEvento // por semana, las barras visibles
+	barras  [][]*barraEvento  // por semana, las barras visibles
+	semanas []*pastillaSemana // el número de cada semana, si se pide
 	objetos []fyne.CanvasObject
 }
 
@@ -280,6 +295,7 @@ func (r *mesRenderer) rehacer(v tema.Variante) {
 	d := m.disponer()
 	r.celdas = make([]*celdaMes, len(d.dias))
 	r.barras = make([][]*barraEvento, len(d.semanas))
+	var barras []fyne.CanvasObject
 	for w, tramos := range d.semanas {
 		// Filas de barras visibles de la semana (tope MAX_BAR_ROWS); lo demás cuenta
 		// como «+N más» por día, y los chips comparten el presupuesto de carriles.
@@ -296,13 +312,19 @@ func (r *mesRenderer) rehacer(v tema.Variante) {
 		// Las barras van DESPUÉS de las celdas de su semana: cruzan las celdas por
 		// encima y reciben el clic; el resto del área pasa a la celda de debajo.
 		for _, t := range visibles {
-			b := nuevaBarraEvento(t, m.rotuloEvento(t.Item), m.nombreBarra(t), m.AlAbrir)
+			b, obj := nuevaBarraMes(m, t, m.rotuloEvento(t.Item), m.nombreBarra(t))
 			r.barras[w] = append(r.barras[w], b)
+			barras = append(barras, obj)
 		}
 	}
-	for _, bs := range r.barras {
-		for _, b := range bs {
-			r.objetos = append(r.objetos, b)
+	r.objetos = append(r.objetos, barras...)
+	r.semanas = r.semanas[:0]
+	if m.NumeroSemana != nil {
+		for w := range len(d.semanas) {
+			_, n := d.dias[w*7].ISOWeek()
+			ps := nuevaPastillaSemana(n, m.NumeroSemana(n))
+			r.semanas = append(r.semanas, ps)
+			r.objetos = append(r.objetos, ps)
 		}
 	}
 }
@@ -358,6 +380,12 @@ func (r *mesRenderer) Layout(t fyne.Size) {
 		for _, b := range bs {
 			colocarBarra(b, b.t, 0, y+float32(b.t.Fila)*PasoBarra, t.Width, 7)
 		}
+	}
+	// `absolute top-[6px] right-1.5` en la celda del lunes, como la web.
+	for w, ps := range r.semanas {
+		y := arriba + float32(w)*alto + RellenoCelda
+		ps.Move(fyne.NewPos(Cuadricula.X(t.Width, 0)+ancho-RellenoCelda-LadoPastillaSemana, y))
+		ps.Resize(fyne.NewSize(LadoPastillaSemana, LadoPastillaSemana))
 	}
 }
 

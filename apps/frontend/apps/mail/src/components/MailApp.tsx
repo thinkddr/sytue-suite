@@ -10,7 +10,13 @@
 import type { JSX } from 'preact';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { MutableRef } from 'preact/hooks';
-import { SytueShell, ImportData, FranjaPeticion } from '@sytue/shell';
+import {
+  SytueShell,
+  ImportData,
+  FranjaPeticion,
+  abrirHojaDeAtajos,
+  useAtajosDeApp,
+} from '@sytue/shell';
 import { useConnectivity } from '@sytue/offline/preact';
 import {
   AppShell,
@@ -27,8 +33,8 @@ import {
   useToast,
   esAtajoDeApp,
   MobileFab,
-  ShortcutsModal,
   withBase,
+  useUltimo,
 } from '@sytue/ui';
 import {
   isICloudMail,
@@ -39,32 +45,35 @@ import type { SytueUser } from '@sytue/auth';
 import { translate, type Locale } from '@sytue/i18n';
 import { useT, type T } from '../i18n/index.js';
 import {
-  listMailboxes,
-  listEmails,
-  searchEmails,
-  batchMove,
-  batchSetFlag,
-  purgeEmails,
-  fetchChanges,
-  readDraft,
-  cancelScheduled,
-  listLabels,
-  listLabelEmails,
-  applyLabel,
-  listAliases,
-  listSharedMailboxes,
-  listSharedFolders,
-  listSharedEmails,
-  listThreadEmails,
-  getMessageBody,
-  getSignature,
-  saveSignature,
+  markMailboxRead,
+  getUndoSend,
+  saveUndoSend,
+  motivoDePosponer,
+  getReadingPrefs,
+  saveReadingPrefs,
+  listTrustedSenders,
+  addTrustedSender,
+  removeTrustedSender,
+  normalizarRemitente,
+  DEFAULT_READING_PREFS,
+  DEFAULT_UNDO_SEND,
+  type ReadingPrefs,
+  type SwipeAction,
+  type ReplyTemplate,
+  type UndoSendSeconds,
   type Mailbox,
   type EmailSummary,
   type EmailChange,
   type Label,
   type SharedMailbox,
 } from '../client/mailApi.js';
+import type { PrivateMailClient } from '../client/privateMail.js';
+import {
+  createPrivateMailApi,
+  PrivateMailApiContext,
+  usePrivateMailApi,
+} from '../client/privateMailApi.js';
+import { PrivateMailGate } from './PrivateMailGate.js';
 import { getAccessToken } from '@sytue/auth/client';
 import {
   mailboxLabel,
@@ -78,8 +87,15 @@ import {
   origenesDeMovimiento,
   filtrarConversaciones,
   atajoDeSeleccion,
+  atajoDeTriaje,
   pasoDelFiltroVacio,
+  fusionarPrimeraPagina,
+  masReciente,
   deshacerMovimiento,
+  fullDate,
+  idsDeLaEntrada,
+  componerConsulta,
+  OPCIONES_BUSQUEDA_VACIAS,
   type Conversation,
   type FiltroRapido,
   type ComposeDraft,
@@ -89,17 +105,25 @@ import { MessageList, SEARCH_INPUT_ID, CONVERSATION_LIST_ID } from './MessageLis
 import { MessageReader, disparadorDeAtajo } from './MessageReader.js';
 import { ComposeModal } from './ComposeModal.js';
 import { gruposDeAtajos } from './hojaDeAtajos.js';
+import { respuestasRetenidas } from './respondido.js';
 import { FiltersModal } from './FiltersModal.js';
 import { LabelsModal } from './LabelsModal.js';
 import { AliasesModal } from './AliasesModal.js';
 import { SharedMailboxesModal } from './SharedMailboxesModal.js';
 import { VacationModal } from './VacationModal.js';
+import { TemplatesModal } from './TemplatesModal.js';
 import { SmimeIdentityModal } from './SmimeIdentityModal.js';
 import { ScheduledModal } from './ScheduledModal.js';
 import { FoldersModal } from './FoldersModal.js';
+import { MailSettings, type AjusteMail } from './MailSettings.js';
+import { conversacionTrasQuitar } from './autoAvance.js';
+import { pasoDelCursor, vecinasDeLaAbierta } from './cursorConversaciones.js';
+import type { ConfianzaDeImagenes } from './confianzaImagenes.js';
+import type { GestoDeFila } from './MessageList.js';
 import { StorageMeter } from './StorageMeter.js';
 import { Glyph } from './glyphs.js';
 import { bajarAncla } from '../lib/ancla.js';
+import { bloquearRemitente, deshacerBloqueo, reglaDeBloqueo } from '../lib/bloqueoRemitente.js';
 import { ExternalMail } from './ExternalMail.js';
 import { valorExterno } from './remitentes.js';
 import {
@@ -129,13 +153,6 @@ import {
   type RolMezclado,
   type VistaExterna,
 } from './vistaExterna.js';
-
-/**
- * Ventana de deshacer (s) por defecto tras «Enviar» (estilo Gmail). El correo
- * queda retenido en la cola este tiempo; el toast «Deshacer» lo saca antes.
- * ponytail: constante; para hacerla ajustable por usuario, persistir como la firma.
- */
-const UNDO_WINDOW_SECONDS = 10;
 
 interface Props {
   user: SytueUser;
@@ -212,8 +229,62 @@ function ToastBridge({ apiRef }: { apiRef: MutableRef<ToastApi | null> }): null 
   return null;
 }
 
-export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Element {
+function PrivateMailProvider({
+  client,
+  children,
+}: {
+  client: PrivateMailClient;
+  children: JSX.Element;
+}): JSX.Element {
+  const api = useMemo(() => createPrivateMailApi(client), [client]);
+  return <PrivateMailApiContext.Provider value={api}>{children}</PrivateMailApiContext.Provider>;
+}
+
+export function MailApp(props: Props): JSX.Element {
+  if (!props.user.id) return <MailAppBody {...props} />;
+  return (
+    <PrivateMailGate actor={props.user.id} tenant={props.user.tenant} locale={props.locale}>
+      {(client) => (
+        <PrivateMailProvider client={client}>
+          <MailAppBody {...props} />
+        </PrivateMailProvider>
+      )}
+    </PrivateMailGate>
+  );
+}
+
+function MailAppBody({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Element {
   const t = useT(locale);
+  const {
+    listMailboxes,
+    listEmails,
+    searchEmails,
+    batchMove,
+    batchSetFlag,
+    saveFilter,
+    deleteFilter,
+    purgeEmails,
+    fetchChanges,
+    readDraft,
+    cancelScheduled,
+    listLabels,
+    listLabelEmails,
+    applyLabel,
+    listAliases,
+    listSharedMailboxes,
+    listSharedFolders,
+    listSharedEmails,
+    listThreadEmails,
+    getMessageBody,
+    getSignature,
+    saveSignature,
+    listTemplates,
+    admitePosponer,
+    listSnoozes,
+    snoozeThread,
+    unsnoozeThread,
+    muteThread,
+  } = usePrivateMailApi();
   const offline = useConnectivity() === 'offline';
   const [mailboxes, setMailboxes] = useState<Mailbox[]>([]);
   const [selectedMailbox, setSelectedMailbox] = useState<Mailbox | null>(null);
@@ -249,8 +320,9 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
     open: false,
   });
   const [filtersOpen, setFiltersOpen] = useState(false);
-  // Hoja de atajos («?»): once teclas que nadie descubría solo.
-  const [atajosOpen, setAtajosOpen] = useState(false);
+  // Hoja de atajos («?»): once teclas que nadie descubría solo. La hoja es la de la
+  // suite (`@sytue/shell`), que las enseña junto a ⌘K; Mail solo las declara.
+  useAtajosDeApp(gruposDeAtajos(t));
   // Regla a partir del correo abierto: el remitente ya puesto en el asistente.
   const [filtersInitial, setFiltersInitial] = useState<
     { name: string; matchFrom: string } | undefined
@@ -292,6 +364,11 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
   const [smimeIdentityOpen, setSmimeIdentityOpen] = useState(false);
   const [scheduledOpen, setScheduledOpen] = useState(false);
   const [signatureOpen, setSignatureOpen] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  // La página de ajustes ocupa la lista y el lector (design.md §8.4). Elegir una
+  // carpeta, una etiqueta o un buzón en el lateral la cierra: es navegación, como
+  // cualquier otra entrada del menú.
+  const [ajustesOpen, setAjustesOpen] = useState(false);
   // Conversaciones a la espera de que se confirme su borrado definitivo (null =
   // no hay ninguno pedido). El porqué de la acción, en `confirmPurge`.
   const [purgeTarget, setPurgeTarget] = useState<Conversation[] | null>(null);
@@ -301,6 +378,21 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
   const [emptying, setEmptying] = useState(false);
   const [purging, setPurging] = useState(false);
   const [signature, setSignature] = useState('');
+  // Ventana de deshacer el envío, por cuenta en el servidor. null = aún no leída:
+  // el redactor usa entonces la de por defecto (la que había), y el selector de
+  // ajustes espera en vez de enseñar un valor que quizá no es el guardado.
+  const [undoSend, setUndoSend] = useState<UndoSendSeconds | null>(null);
+  // Plantillas de respuesta de la cuenta, para el menú «Plantillas» del redactor. Se
+  // vuelven a leer cuando el diálogo que las gestiona dice que cambiaron.
+  const [templates, setTemplates] = useState<ReplyTemplate[]>([]);
+  // Lectura, por cuenta en el servidor: a dónde ir tras archivar y qué hace deslizar
+  // una fila. null = aún no leídas: se usan las de por defecto, y los selectores de
+  // ajustes esperan en vez de enseñar un valor que quizá no es el guardado.
+  const [readingPrefs, setReadingPrefs] = useState<ReadingPrefs | null>(null);
+  const lectura = readingPrefs ?? DEFAULT_READING_PREFS;
+  // Remitentes cuyas imágenes se enseñan sin preguntar (normalizados). null = sin leer.
+  const [confiados, setConfiados] = useState<string[] | null>(null);
+  const [templatesTry, setTemplatesTry] = useState(0);
   // Direcciones «De» del redactor: la primaria, los alias y, además, los buzones
   // compartidos/delegados con permiso de envío. Se derivan (useMemo) de estas
   // fuentes; el servidor verifica la autorización de cada identidad.
@@ -437,7 +529,108 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
     return () => {
       active = false;
     };
+  }, [getSignature]);
+
+  // Si la lectura falla, se queda en null y el envío sigue con la de por defecto:
+  // no se bloquea enviar por un ajuste.
+  useEffect(() => {
+    let active = true;
+    void getUndoSend()
+      .then((s) => active && setUndoSend(s))
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
   }, []);
+
+  // Si la lectura falla se quedan las de por defecto, y la lista de confianza vacía:
+  // en el peor caso se pregunta por unas imágenes, que es lo seguro.
+  useEffect(() => {
+    let active = true;
+    void getReadingPrefs()
+      .then((p) => active && setReadingPrefs(p))
+      .catch(() => undefined);
+    void listTrustedSenders()
+      .then((l) => active && setConfiados(l))
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Optimista, como la ventana de deshacer: si el servidor no lo guarda, vuelve atrás
+  // con un aviso.
+  function cambiarLectura(cambio: Partial<ReadingPrefs>): void {
+    const anterior = readingPrefs;
+    if (!anterior) return;
+    const nuevas = { ...anterior, ...cambio };
+    setReadingPrefs(nuevas);
+    void saveReadingPrefs(nuevas)
+      .then(() => toastRef.current?.notify({ tone: 'success', title: t('settings.readingSaved') }))
+      .catch(() => {
+        setReadingPrefs(anterior);
+        toastRef.current?.notify({ tone: 'danger', title: t('error.readingSettings') });
+      });
+  }
+
+  // «Mostrar siempre las imágenes de este remitente»: se apunta al momento (el correo
+  // abierto enseña ya sus imágenes) y, si el servidor no lo guarda, se quita.
+  function confiarRemitente(direccion: string): void {
+    const addr = normalizarRemitente(direccion);
+    setConfiados((l) => (l?.includes(addr) ? l : [...(l ?? []), addr].sort()));
+    void addTrustedSender(addr)
+      .then(() =>
+        toastRef.current?.notify({
+          tone: 'success',
+          title: t('reader.trustedSenderAdded', { address: addr }),
+        }),
+      )
+      .catch(() => {
+        setConfiados((l) => (l ?? []).filter((a) => a !== addr));
+        toastRef.current?.notify({ tone: 'danger', title: t('error.trustedSender') });
+      });
+  }
+
+  function dejarDeConfiar(direccion: string): void {
+    const addr = normalizarRemitente(direccion);
+    setConfiados((l) => (l ?? []).filter((a) => a !== addr));
+    void removeTrustedSender(addr).catch(() => {
+      setConfiados((l) => (l?.includes(addr) ? l : [...(l ?? []), addr].sort()));
+      toastRef.current?.notify({ tone: 'danger', title: t('error.trustedSender') });
+    });
+  }
+
+  // Si la lectura falla, el menú se queda con las que tenía (o vacío): no se
+  // interrumpe la bandeja por un ajuste del redactor. Se relee también al abrir el
+  // redactor: así una plantilla creada en otro equipo, o una lectura que falló sin
+  // red al cargar la página, llegan al menú sin recargar.
+  useEffect(() => {
+    let active = true;
+    void listTemplates()
+      .then(({ templates: lista }) => active && setTemplates(lista))
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [templatesTry, listTemplates]);
+  useEffect(() => {
+    if (compose.open) setTemplatesTry((n) => n + 1);
+  }, [compose.open]);
+
+  // Optimista: el selector cambia al momento y, si el servidor no lo guarda, vuelve
+  // al valor anterior con un aviso. Sin la vuelta atrás, el siguiente envío usaría
+  // una ventana que la cuenta no tiene y en otro equipo saldría otra.
+  function cambiarUndoSend(seconds: UndoSendSeconds): void {
+    const anterior = undoSend;
+    if (seconds === anterior) return;
+    setUndoSend(seconds);
+    void saveUndoSend(seconds)
+      .then(() => toastRef.current?.notify({ tone: 'success', title: t('settings.undoSendSaved') }))
+      .catch(() => {
+        setUndoSend(anterior);
+        toastRef.current?.notify({ tone: 'danger', title: t('error.undoSendSettings') });
+      });
+  }
 
   // Guardar es el camino que SÍ puede fallar (red, o firma demasiado larga). El
   // modal solo se cierra si el servidor lo confirmó: cerrarlo antes daría por
@@ -477,9 +670,13 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
   // respuesta en Enviados, lo archivado—, que es justo lo que hace útil una vista
   // de conversación. Se pide al abrir el hilo; si falla, el lector se queda con
   // los mensajes de la carpeta (degradación, no error visible).
-  const [fullThread, setFullThread] = useState<{ id: string; messages: EmailChange[] } | null>(
-    null,
-  );
+  // Con el hilo llega su estado: silenciado y hasta cuándo está pospuesto.
+  const [fullThread, setFullThread] = useState<{
+    id: string;
+    messages: EmailChange[];
+    muted?: boolean;
+    snoozedUntil?: string | null;
+  } | null>(null);
   const selectedConversation = useMemo(
     () => conversacionAbierta(todas, selectedThreadId, fullThread),
     [todas, selectedThreadId, fullThread],
@@ -491,14 +688,20 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
     if (!selectedThreadId || selectedThreadId.startsWith('msg:') || selectedShared) return;
     let active = true;
     void listThreadEmails(selectedThreadId)
-      .then(({ emails: msgs }) => {
-        if (active && msgs.length > 0) setFullThread({ id: selectedThreadId, messages: msgs });
+      .then(({ emails: msgs, muted, snoozedUntil }) => {
+        if (active && msgs.length > 0)
+          setFullThread({
+            id: selectedThreadId,
+            messages: msgs,
+            muted: muted === true,
+            snoozedUntil: snoozedUntil ?? null,
+          });
       })
       .catch(() => undefined);
     return () => {
       active = false;
     };
-  }, [selectedThreadId, selectedShared]);
+  }, [selectedThreadId, selectedShared, listThreadEmails]);
 
   // Carpetas que NO se mezclan en la conversación: lo que tiraste a la papelera o
   // marcaste como spam no reaparece dentro de un hilo de Recibidos (Gmail hace lo
@@ -510,6 +713,26 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
     }
     return ids;
   }, [mailboxes, selectedMailbox]);
+
+  // En «Pospuestos», cada fila dice cuándo vuelve, no cuándo llegó: es lo que se
+  // busca ahí. Se pide la lista al entrar y al recargar la carpeta.
+  const enPospuestos = viewKind === 'mailbox' && !inSearch && selectedMailbox?.role === 'snoozed';
+  const [pospuestos, setPospuestos] = useState<Map<string, string> | null>(null);
+  useEffect(() => {
+    if (!enPospuestos) {
+      setPospuestos(null);
+      return;
+    }
+    let active = true;
+    void listSnoozes()
+      .then(({ snoozes }) => {
+        if (active) setPospuestos(new Map(snoozes.map((sn) => [sn.threadId, sn.until])));
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [enPospuestos, listTry, listSnoozes]);
 
   // Mensajes que pinta el lector (ver mergeThread). null ⇒ aún no ha llegado el
   // hilo o no aplica: el lector se queda con los mensajes de la carpeta.
@@ -534,6 +757,7 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
   }
   // Elegir una carpeta de Sytue, desde «Carpetas» o desde un buzón de «Buzones».
   function selectMailbox(m: Mailbox): void {
+    setAjustesOpen(false);
     setSelectedMailbox(m);
     setSelectedLabel(null);
     setSelectedExternal(null);
@@ -543,6 +767,7 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
   // Una carpeta de una cuenta externa (sin carpeta: su Entrada), o un buzón unificado,
   // en el panel principal: la lista y el lector de siempre.
   function selectExternal(vista: VistaExterna): void {
+    setAjustesOpen(false);
     setSelectedExternal(vista);
     setSelectedMailbox(null);
     setSelectedLabel(null);
@@ -567,7 +792,7 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
     return () => {
       active = false;
     };
-  }, [boxesTry, locale]);
+  }, [boxesTry, locale, listMailboxes]);
 
   // Etiquetas de la cuenta (con contadores para el sidebar). Se recargan al
   // reintentar y tras crear/editar/borrar o (re)etiquetar (labelsTry).
@@ -579,7 +804,7 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
     return () => {
       active = false;
     };
-  }, [labelsTry]);
+  }, [labelsTry, listLabels]);
 
   // Alias de la cuenta para el selector «De» del redactor. Best-effort: si falla,
   // queda solo la primaria.
@@ -595,7 +820,7 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
     return () => {
       active = false;
     };
-  }, [aliasesTry, user.email]);
+  }, [aliasesTry, user.email, listAliases]);
 
   // Buzones compartidos/delegados accesibles (además del propio). Alimentan la
   // sección «Compartidos» del sidebar y el selector «De». Best-effort.
@@ -607,7 +832,7 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
     return () => {
       active = false;
     };
-  }, [sharedTry]);
+  }, [sharedTry, listSharedMailboxes]);
 
   // Opciones «De»: primaria + alias + buzones compartidos/delegados con permiso de
   // envío (send/manage). Dedup preservando el orden; el servidor verifica cada
@@ -617,6 +842,13 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
     const all = [primaryAddr, ...aliasAddrs, ...sendable];
     return all.filter((a, i) => Boolean(a) && all.indexOf(a) === i);
   }, [primaryAddr, aliasAddrs, sharedMailboxes]);
+
+  // Quién es uno mismo para el lector: a esas direcciones no se les ofrece «Añadir a
+  // Contactos» (la respuesta propia desde Enviados, o la de una cuenta externa).
+  const direccionesPropias = useMemo(
+    () => [...fromOptions, ...cuentasDelRedactor.map((c) => c.address)],
+    [fromOptions, cuentasDelRedactor],
+  );
 
   // Llegada desde el buscador global: /messages/{id} resuelve el correo a su hilo y
   // redirige aquí con `?thread=`. Se lee UNA vez y se quita de la URL, para que un
@@ -669,7 +901,7 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
       active = false;
     };
     // Depende del tipo+id de la vista (primitivos); listTry fuerza el reintento.
-  }, [viewKind, viewId, listTry]);
+  }, [viewKind, viewId, listTry, listEmails, listLabelEmails]);
 
   // ---- La vista externa: una carpeta de una cuenta, o un buzón unificado ----
 
@@ -923,7 +1155,7 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
       active = false;
       clearTimeout(handle);
     };
-  }, [query, searchTry]);
+  }, [query, searchTry, searchEmails]);
 
   // Scroll infinito: carga la siguiente página de la carpeta (keyset) o de la
   // búsqueda (offset) y la anexa sin duplicar. No-op si ya se está cargando.
@@ -1134,6 +1366,7 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
           draft: {
             to: d.to,
             cc: d.cc,
+            ...(d.bcc ? { bcc: d.bcc } : {}),
             subject: d.subject,
             body: d.textBody,
             ...(d.htmlBody ? { htmlBody: d.htmlBody } : {}),
@@ -1161,6 +1394,7 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
   function handleUndoSend(outboundId: string, reopen: ComposeDraft): void {
     void cancelScheduled(outboundId)
       .then(({ canceled }) => {
+        anularRespondido(outboundId, canceled);
         if (canceled) {
           setCompose({ open: true, draft: reopen });
           toastRef.current?.notify({ tone: 'success', title: t('undo.done') });
@@ -1176,6 +1410,37 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
       );
   }
 
+  // ---- Respondido ($answered) ----
+  // Contestar desde Sytue marca el original `\Answered`, el flag que leen Thunderbird
+  // o el iPhone, y la fila enseña la flecha. Solo cuando el envío SALE: durante la
+  // ventana de deshacer el correo sigue en la cola y puede no salir nunca. Si la
+  // pestaña se cierra dentro de la ventana, el correo sale igual y la marca no se
+  // pone: se pierde un adorno, no un dato.
+  const retenidas = useMemo(() => respuestasRetenidas(), []);
+  useEffect(() => () => retenidas.parar(), [retenidas]);
+
+  function ponerRespondido(id: string, value: boolean): void {
+    const poner = (v: boolean) =>
+      patchEmail(id, (e) => ({ ...e, keywords: { ...e.keywords, $answered: v } }));
+    poner(value);
+    void batchSetFlag([id], '$answered', value).catch(() => poner(!value));
+  }
+
+  function handleAnswered(id: string, outboundId: string | undefined, segundos: number): void {
+    // Lo de una cuenta externa se contesta por su proveedor, que lleva sus marcas.
+    if (origenExterno(id)) return;
+    // Ya estaba respondido (se contesta por segunda vez): nada que poner, y deshacer
+    // este envío no puede quitar la marca del anterior.
+    if ([...emails, ...results].some((e) => e.id === id && e.keywords.$answered)) return;
+    retenidas.retener(outboundId, id, segundos, () => ponerRespondido(id, true));
+  }
+
+  /** Al deshacer: si el envío no salió, el original vuelve a no estar respondido. */
+  function anularRespondido(outboundId: string, cancelado: boolean): void {
+    const quitar = retenidas.anular(outboundId, cancelado);
+    if (quitar) ponerRespondido(quitar, false);
+  }
+
   // Un borrador guardado/actualizado o enviado cambia la carpeta Borradores:
   // recarga la lista visible (sin tocar la selección de carpeta).
   function refreshList(): void {
@@ -1189,6 +1454,105 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
       .then(({ mailboxes: boxes }) => setMailboxes(sortMailboxes(locale, boxes)))
       .catch(() => undefined);
   }
+
+  // ---- Tirar para actualizar ----
+  // Sin nadie que absorba `sytue:refresh` (el evento de `usePullToRefresh` del
+  // shell), el gesto recargaba la página entera: se rehacía la isla —buzones,
+  // cuentas externas, cuota— y se perdía la conversación abierta. Aquí se pide otra
+  // vez la primera página de la vista actual SIN pasar por `listTry`, que vacía la
+  // selección, y se refrescan los contadores del lateral y la cuota. Es la pareja de
+  // `ui.RefrescarAlTirar` en Fyne y de la recarga en sitio de Contacts.
+  const [cuotaTry, setCuotaTry] = useState(0);
+  // Lo que enseña la lista en la última pintada, para fusionar lo que vuelve tarde.
+  const listaRef = useRef({ emails, cursor: folderCursor, results });
+  listaRef.current = { emails, cursor: folderCursor, results };
+
+  /** La primera página de la vista de ahora, fusionada con lo ya bajado. */
+  async function recargarListaEnSitio(): Promise<void> {
+    const clave = viewIdRef.current;
+    const vigente = (): boolean => clave === viewIdRef.current;
+    if (inSearch) {
+      // Con más de una página de resultados bajada, la búsqueda (por posición) no
+      // tiene un borde fiable con el que fusionar: se deja como está.
+      if (listaRef.current.results.length > PAGE_SIZE) return;
+      const q = query.trim();
+      const { emails: list } = await searchEmails(q, { limit: PAGE_SIZE });
+      if (q !== query.trim() || !vigente()) return;
+      setResults(list);
+      setSearchHasMore(list.length === PAGE_SIZE);
+      return;
+    }
+    if (viewKind === 'external') {
+      const vista = selectedExternalRef.current;
+      if (!vista || (vista.tipo === 'carpeta' && !vista.carpeta)) return;
+      // Un buzón unificado con más páginas mezcladas no tiene un cursor que conservar.
+      if (vista.tipo === 'unificado' && masExternos) return;
+      const r = await primeraPaginaExterna(vista, new AbortController().signal);
+      if (!vigente() || r.entrada !== undefined) return;
+      if (vista.tipo === 'unificado') {
+        setEmails(r.emails);
+        setMezcla(r.mezcla);
+        setMezclaCaida(r.caidas);
+        return;
+      }
+      const f = fusionarPrimeraPagina(listaRef.current, { emails: r.emails, cursor: r.cursor });
+      setEmails(f.emails);
+      setFolderCursor(f.cursor);
+      return;
+    }
+    if (!viewId) return;
+    const pagina =
+      viewKind === 'shared'
+        ? selectedShared
+          ? listSharedEmails(selectedShared.accountId, viewId, { limit: PAGE_SIZE })
+          : null
+        : viewKind === 'label'
+          ? listLabelEmails(viewId, { limit: PAGE_SIZE })
+          : listEmails(viewId, { limit: PAGE_SIZE });
+    if (!pagina) return;
+    const { emails: list, nextCursor } = await pagina;
+    if (!vigente()) return;
+    const f = fusionarPrimeraPagina(listaRef.current, { emails: list, cursor: nextCursor });
+    setEmails(f.emails);
+    setFolderCursor(f.cursor);
+  }
+
+  // Sin conexión no se absorbe: la recarga en sitio fallaría, y la de la página la
+  // sirve la caché offline. Con la lista o los buzones en error, el gesto es su
+  // «Reintentar» (no hay conversación abierta que conservar).
+  const alRefrescar = useUltimo((ev: Event) => {
+    if (offline) return;
+    ev.preventDefault();
+    if (boxesError) {
+      setBoxesTry((n) => n + 1);
+      return;
+    }
+    // El mismo camino que el «Reintentar» de la lista: la búsqueda tiene su propio
+    // error y su reintento, y el compartido no pasa por `listTry` (lo carga
+    // `selectShared`); por ahí el gesto no hacía nada o dejaba el aviso pintado.
+    if (inSearch ? searchError : listError) {
+      if (inSearch) setSearchTry((n) => n + 1);
+      else if (selectedShared) selectShared(selectedShared);
+      else setListTry((n) => n + 1);
+      return;
+    }
+    setLabelsTry((n) => n + 1);
+    setCuotaTry((n) => n + 1);
+    external.retry();
+    // Un fallo aquí no pinta nada: la lista que hay sigue valiendo, como en el sondeo.
+    const detalle = (ev as CustomEvent<{ esperar?: (p: Promise<unknown>) => void } | null>).detail;
+    detalle?.esperar?.(
+      Promise.allSettled([
+        recargarListaEnSitio(),
+        listMailboxes().then(({ mailboxes: boxes }) => setMailboxes(sortMailboxes(locale, boxes))),
+      ]),
+    );
+  });
+  useEffect(() => {
+    const oyente = (ev: Event) => alRefrescar.current(ev);
+    window.addEventListener('sytue:refresh', oyente);
+    return () => window.removeEventListener('sytue:refresh', oyente);
+  }, [alRefrescar]);
 
   // Selecciona un buzón compartido/delegado: carga sus carpetas (ACL-gated en el
   // servicio), localiza su Recibidos y lista sus mensajes. Vista de solo lectura
@@ -1206,6 +1570,7 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
   }, [sharedMailboxes, buzonDelAviso]);
 
   function selectShared(sm: SharedMailbox): void {
+    setAjustesOpen(false);
     setSelectedShared(sm);
     setSelectedExternal(null);
     setSelectedMailbox(null);
@@ -1264,6 +1629,13 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
   // preselecciona esa dirección como «De» (enviar-como / en-nombre-de); el
   // servidor la verifica server-side.
   function openCompose(): void {
+    abrirRedactorPara();
+  }
+
+  // `to`: la dirección de un enlace `mailto:` del cuerpo de un correo, que se escribe
+  // desde Sytue y no desde el programa de correo del sistema.
+  function abrirRedactorPara(to?: string): void {
+    const para: ComposeDraft = to ? { to } : {};
     // Con la carpeta de una cuenta a la vista, se escribe desde esa cuenta: es su
     // «De», que el redactor envía por su proveedor.
     const cuenta =
@@ -1271,14 +1643,14 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
         ? cuentasExternas.get(selectedExternal.cuenta)
         : undefined;
     if (cuenta?.capabilities.send) {
-      setCompose({ open: true, draft: { from: valorExterno(cuenta.instance_id) } });
+      setCompose({ open: true, draft: { ...para, from: valorExterno(cuenta.instance_id) } });
       return;
     }
     if (selectedShared && selectedShared.permission !== 'read') {
-      setCompose({ open: true, draft: { from: selectedShared.address } });
+      setCompose({ open: true, draft: { ...para, from: selectedShared.address } });
       return;
     }
-    setCompose({ open: true });
+    setCompose(to ? { open: true, draft: para } : { open: true });
   }
 
   // Llegada desde Drive: «Adjuntar a un correo» (intent attach-drive-to-mail).
@@ -1350,6 +1722,9 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
     }
     const draft = buildReplyDraft(t, locale, email, mode, user.email, bodyText);
     if (selectedShared && selectedShared.permission !== 'read') draft.from = selectedShared.address;
+    // El original de un buzón compartido es de otra cuenta: la marca en lote solo
+    // toca las propias (filtro owner) y la flecha saldría aquí sin llegar al servidor.
+    if (selectedShared) delete draft.answers;
     setCompose({ open: true, draft });
   }
 
@@ -1398,6 +1773,48 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
   // rechaza, se revierte y se avisa con un toast (ToastBridge: el provider vive
   // dentro de la shell).
   const toastRef = useRef<ToastApi | null>(null);
+  // El último triaje que se puede deshacer —lo que lleva el «Deshacer» de su aviso—,
+  // para «z». Uno solo, como Gmail: «z» deshace el último, no la historia entera.
+  const ultimoTriaje = useRef<Map<string, string[]> | null>(null);
+
+  // Cada fila de la página de ajustes abre su editor de siempre. Las claves son las
+  // de Fyne (`abrirAjuste` en redactar.go).
+  function abrirAjuste(ajuste: AjusteMail): void {
+    switch (ajuste) {
+      case 'signature':
+        setSignatureOpen(true);
+        return;
+      case 'undo-send':
+        // Se elige en la propia fila (un selector), no hay diálogo que abrir.
+        return;
+      case 'templates':
+        setTemplatesOpen(true);
+        return;
+      case 'vacation':
+        setVacationOpen(true);
+        return;
+      case 'aliases':
+        setAliasesOpen(true);
+        return;
+      case 'shared':
+        setSharedOpen(true);
+        return;
+      case 'rules':
+        setFiltersOpen(true);
+        return;
+      case 'smime-anchor':
+        void descargarAncla();
+        return;
+      case 'smime-identity':
+        setSmimeIdentityOpen(true);
+        return;
+      case 'mail-clients':
+        // Configurar Thunderbird, Outlook, Apple Mail o el móvil pide una CONTRASEÑA
+        // DE APLICACIÓN, y se crea en Sytue ID: la del inicio de sesión no vale ahí.
+        window.open(`${idBaseUrl}/account#app-passwords`, '_blank', 'noopener');
+        return;
+    }
+  }
 
   async function descargarAncla(): Promise<void> {
     const r = await bajarAncla();
@@ -1466,6 +1883,29 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
     setKeywordOnConvs([conv], '$seen', next, t('error.seen'));
   }
 
+  // La conversación abierta sale de la vista (archivada, tirada, movida, borrada):
+  // se abre la que toque según Ajustes → Lectura, marcándola leída como al elegirla.
+  // `conversations` es aún la lista de ANTES de quitar, que es la que hace falta
+  // para saber cuál venía detrás. Un borrador no se abre en el redactor por avanzar.
+  function avanzarTrasQuitar(quitadas: ReadonlySet<string>): void {
+    if (!selectedThreadId || !quitadas.has(selectedThreadId)) return;
+    const id = conversacionTrasQuitar(
+      conversations,
+      selectedThreadId,
+      quitadas,
+      lectura.autoAdvance,
+    );
+    const siguiente = id ? conversations.find((c) => c.threadId === id) : undefined;
+    if (
+      !siguiente ||
+      abreRedactor(selectedExternal, selectedMailbox?.role, siguiente.latest.id, inSearch)
+    ) {
+      setSelectedThreadId(null);
+      return;
+    }
+    handleSelectConversation(siguiente);
+  }
+
   // Mueve una o varias conversaciones completas a una carpeta en UNA llamada en
   // lote (id = ANY), no N (esto sustituye el antiguo Promise.allSettled por
   // conversación). Optimista + revert; refresca los no-leídos del sidebar al éxito.
@@ -1479,7 +1919,7 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
     const remove = (list: EmailSummary[]): EmailSummary[] => list.filter((e) => !idSet.has(e.id));
     setEmails(remove);
     setResults(remove);
-    if (selectedThreadId && threadSet.has(selectedThreadId)) setSelectedThreadId(null);
+    avanzarTrasQuitar(threadSet);
     clearSelection();
     // El origen se calcula ANTES de mover: después, el mensaje ya dice el destino.
     const origenes = origenesDeMovimiento(
@@ -1494,6 +1934,7 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
         // Archivar, tirar o marcar spam con una tecla se hace sin querer: el aviso
         // lleva «Deshacer», que devuelve cada mensaje a SU carpeta (no a la vista).
         if (origenes.size === 0) return;
+        ultimoTriaje.current = origenes;
         toastRef.current?.notify({
           tone: 'success',
           title: t('triage.moved', { folder: carpeta }),
@@ -1515,6 +1956,8 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
   // «Deshacer» del aviso de triaje: devuelve cada mensaje a su carpeta y vuelve a
   // pedir la carpeta, la búsqueda y los contadores (`deshacerMovimiento`, utils.ts).
   function deshacerMovimientoDelAviso(origenes: Map<string, string[]>): void {
+    // Deshecho una vez, «z» no lo repite: ni desde el aviso ni desde el teclado.
+    if (ultimoTriaje.current === origenes) ultimoTriaje.current = null;
     void deshacerMovimiento(origenes, batchMove, {
       carpeta: refreshList,
       busqueda: () => setSearchTry((n) => n + 1),
@@ -1526,6 +1969,61 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
           : { tone: 'danger', title: t('error.undoMove') },
       );
     });
+  }
+
+  /**
+   * «Bloquear a …» (MAIL-13): una regla `from` → Spam y el hilo a Spam, en un clic. Es
+   * optimista como el triaje: el hilo sale de la vista al pulsar y vuelve si algo
+   * falla (y entonces tampoco queda la regla: ver `bloquearRemitente`). El aviso lleva
+   * «Deshacer», que quita la regla y devuelve cada mensaje a su carpeta.
+   */
+  function bloquearDesde(conv: Conversation, spam: Mailbox): void {
+    const remitente = conv.latest.from[0]?.email?.trim() ?? '';
+    const ids = conv.messages.map((m) => m.id);
+    if (!remitente || ids.length === 0) return;
+    const idSet = new Set(ids);
+    const beforeEmails = emails;
+    const beforeResults = results;
+    const remove = (list: EmailSummary[]): EmailSummary[] => list.filter((e) => !idSet.has(e.id));
+    const origenes = origenesDeMovimiento(
+      [conv],
+      !inSearch && viewKind === 'mailbox' ? (selectedMailbox?.id ?? null) : null,
+      spam.id,
+    );
+    setEmails(remove);
+    setResults(remove);
+    avanzarTrasQuitar(new Set([conv.threadId]));
+    clearSelection();
+    const regla = reglaDeBloqueo(remitente, spam.id, t('reader.block', { sender: remitente }));
+    const llamadas = { guardarRegla: saveFilter, borrarRegla: deleteFilter, mover: batchMove };
+    void bloquearRemitente(regla, ids, llamadas)
+      .then((reglaId) => {
+        refreshMailboxCounts();
+        toastRef.current?.notify({
+          tone: 'success',
+          title: t('reader.blocked', { sender: remitente }),
+          action: {
+            label: t('compose.undo'),
+            onClick: () => {
+              void deshacerBloqueo(reglaId, origenes, llamadas).then((ok) => {
+                refreshList();
+                setSearchTry((n) => n + 1);
+                refreshMailboxCounts();
+                toastRef.current?.notify(
+                  ok
+                    ? { tone: 'success', title: t('triage.undone') }
+                    : { tone: 'danger', title: t('error.undoMove') },
+                );
+              });
+            },
+          },
+        });
+      })
+      .catch(() => {
+        setEmails((ahora) => devolverQuitados(beforeEmails, ahora, idSet));
+        setResults((ahora) => devolverQuitados(beforeResults, ahora, idSet));
+        toastRef.current?.notify({ tone: 'danger', title: t('reader.blockFailed') });
+      });
   }
 
   /**
@@ -1560,8 +2058,7 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
     const remove = (list: EmailSummary[]): EmailSummary[] => list.filter((e) => !idSet.has(e.id));
     setEmails(remove);
     setResults(remove);
-    if (selectedThreadId && convs.some((c) => c.threadId === selectedThreadId))
-      setSelectedThreadId(null);
+    avanzarTrasQuitar(new Set(convs.map((c) => c.threadId)));
     clearSelection();
     void Promise.all(
       llamadas.map((l) => accionExterna(l.origen, papelera ? 'trash' : 'move', l.destino)),
@@ -1618,6 +2115,151 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
       return;
     }
     batchMoveConvs([conv], dest);
+  }
+
+  // ---- Posponer y silenciar ----
+  // Son del HILO y del buzón propio: ni una cuenta externa ni un mensaje sin hilo
+  // (`msg:`) tienen conversación en el servicio que posponer o silenciar.
+  const hiloPropio = (c: Conversation): boolean =>
+    !origenExterno(c.latest.id) && !c.threadId.startsWith('msg:');
+
+  /** Quita el hilo de la lista visible (optimista) y devuelve cómo deshacerlo. */
+  function quitarDeLaLista(conv: Conversation): () => void {
+    const idSet = new Set(conv.messages.map((m) => m.id));
+    const beforeEmails = emails;
+    const beforeResults = results;
+    const remove = (list: EmailSummary[]): EmailSummary[] => list.filter((e) => !idSet.has(e.id));
+    setEmails(remove);
+    setResults(remove);
+    if (selectedThreadId === conv.threadId) setSelectedThreadId(null);
+    clearSelection();
+    return () => {
+      setEmails((ahora) => devolverQuitados(beforeEmails, ahora, idSet));
+      setResults((ahora) => devolverQuitados(beforeResults, ahora, idSet));
+    };
+  }
+
+  /** Cambia el estado del hilo abierto sin volver a pedirlo. */
+  function estadoDelHilo(
+    threadId: string,
+    cambio: { muted?: boolean; snoozedUntil?: string | null },
+  ): void {
+    setFullThread((f) => (f && f.id === threadId ? { ...f, ...cambio } : f));
+  }
+
+  // Posponer desde Recibidos saca el hilo de la lista; desde «Pospuestos» solo le
+  // cambia la fecha. El aviso lleva «Deshacer», como archivar: se pospone con un
+  // clic y se hace sin querer.
+  function handleSnooze(conv: Conversation, until: Date): void {
+    const cambiaFecha = enPospuestos;
+    const devolver = cambiaFecha ? null : quitarDeLaLista(conv);
+    void snoozeThread(conv.threadId, until)
+      .then(({ snooze }) => {
+        refreshMailboxCounts();
+        if (cambiaFecha) {
+          setPospuestos((m) => new Map(m ?? []).set(conv.threadId, snooze.until));
+          estadoDelHilo(conv.threadId, { snoozedUntil: snooze.until });
+        }
+        toastRef.current?.notify({
+          tone: 'success',
+          title: t('snooze.done', { date: fullDate(locale, snooze.until) }),
+          ...(cambiaFecha
+            ? {}
+            : {
+                action: {
+                  label: t('compose.undo'),
+                  onClick: () => deshacerPosponer(conv.threadId),
+                },
+              }),
+        });
+      })
+      .catch((err: unknown) => {
+        devolver?.();
+        const motivo = motivoDePosponer(err);
+        toastRef.current?.notify({
+          tone: 'danger',
+          title: t(
+            motivo === 'nothing'
+              ? 'snooze.nothing'
+              : motivo === 'invalid'
+                ? 'snooze.invalid'
+                : 'snooze.failed',
+          ),
+        });
+      });
+  }
+
+  /** Un hilo que vuelve a Recibidos deja de tener fecha de vuelta: si siguiera en el
+   *  mapa, su fila diría «vuelve el…» en vez de su fecha de llegada de siempre. */
+  function olvidarVuelta(threadId: string): void {
+    setPospuestos((m) => {
+      if (!m?.has(threadId)) return m;
+      const sin = new Map(m);
+      sin.delete(threadId);
+      return sin;
+    });
+  }
+
+  function deshacerPosponer(threadId: string): void {
+    void unsnoozeThread(threadId)
+      .then(() => {
+        olvidarVuelta(threadId);
+        refreshList();
+        refreshMailboxCounts();
+        toastRef.current?.notify({ tone: 'success', title: t('triage.undone') });
+      })
+      .catch(() => toastRef.current?.notify({ tone: 'danger', title: t('snooze.unsnoozeFailed') }));
+  }
+
+  // «Volver a Recibidos»: desde «Pospuestos» el hilo sale de la lista.
+  function handleUnsnooze(conv: Conversation): void {
+    const devolver = enPospuestos ? quitarDeLaLista(conv) : null;
+    void unsnoozeThread(conv.threadId)
+      .then(() => {
+        olvidarVuelta(conv.threadId);
+        refreshMailboxCounts();
+        estadoDelHilo(conv.threadId, { snoozedUntil: null });
+        toastRef.current?.notify({ tone: 'success', title: t('snooze.unsnoozed') });
+      })
+      .catch(() => {
+        devolver?.();
+        toastRef.current?.notify({ tone: 'danger', title: t('snooze.unsnoozeFailed') });
+      });
+  }
+
+  // Silenciar archiva lo que el hilo tenga en Recibidos: estando ahí, sale de la
+  // lista, y «Deshacer» lo deja como estaba (sin silenciar y de vuelta en Recibidos).
+  function handleMute(conv: Conversation, muted: boolean): void {
+    const enEntrada = viewKind === 'mailbox' && !inSearch && selectedMailbox?.role === 'inbox';
+    const devolver = muted && enEntrada ? quitarDeLaLista(conv) : null;
+    const entrada = mailboxes.find((m) => m.role === 'inbox') ?? null;
+    const ids = entrada ? idsDeLaEntrada(conv, entrada.id, enEntrada) : [];
+    void muteThread(conv.threadId, muted)
+      .then(({ archived }) => {
+        refreshMailboxCounts();
+        estadoDelHilo(conv.threadId, { muted });
+        const deshacer = (): void => {
+          void muteThread(conv.threadId, false)
+            .then(() =>
+              archived > 0 && entrada && ids.length > 0 ? batchMove(ids, entrada.id) : undefined,
+            )
+            .then(() => {
+              refreshList();
+              refreshMailboxCounts();
+              estadoDelHilo(conv.threadId, { muted: false });
+            })
+            .catch(() => toastRef.current?.notify({ tone: 'danger', title: t('mute.failed') }));
+        };
+        toastRef.current?.notify({
+          tone: 'success',
+          title: t(muted ? 'mute.done' : 'mute.undone'),
+          ...(muted ? { action: { label: t('compose.undo'), onClick: deshacer } } : {}),
+        });
+      })
+      .catch(() => {
+        devolver?.();
+        toastRef.current?.notify({ tone: 'danger', title: t('mute.failed') });
+      });
   }
 
   // Aplica/quita una etiqueta a TODO el hilo (N mensajes) en una sola llamada en
@@ -1707,14 +2349,39 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
     : !readOnly && !inSearch && selectedMailbox?.role === 'junk' && inboxBox
       ? (c: Conversation) => handleMove(c, inboxBox)
       : null;
+  // «Bloquear a …»: solo en el buzón propio (la regla es de la cuenta de Sytue; una
+  // cuenta externa no tiene reglas aquí) y fuera de Spam, donde ya está todo lo suyo.
+  const onBlock =
+    !vistaExterna && !readOnly && junkBox && selectedMailbox?.role !== 'junk'
+      ? (c: Conversation) => bloquearDesde(c, junkBox)
+      : null;
   // En spam la fila no pinta logos: ahí abundan los remitentes suplantados.
   const enSpam = vistaExterna ? rolExterno === 'junk' : selectedMailbox?.role === 'junk';
   // «Mover a…»: cualquier carpeta menos la actual y Borradores (un mensaje normal
   // movido a Borradores no sería editable como borrador). En un buzón compartido
   // (solo lectura) no hay destinos de movimiento.
+  // Tampoco «Pospuestos»: lo que se mete ahí a mano no tiene fecha de vuelta y se
+  // quedaría para siempre. Se entra posponiendo.
   const moveTargetsSytue = readOnly
     ? []
-    : mailboxes.filter((m) => m.id !== currentBoxId && m.role !== 'drafts');
+    : mailboxes.filter((m) => m.id !== currentBoxId && m.role !== 'drafts' && m.role !== 'snoozed');
+
+  // Posponer: desde Recibidos (o cambiar la fecha desde «Pospuestos»), solo en el
+  // buzón propio. Silenciar: en cualquier carpeta propia, también buscando.
+  const rolVisto = !inSearch && viewKind === 'mailbox' ? selectedMailbox?.role : undefined;
+  const conversacionPropia = Boolean(
+    selectedConversation &&
+    !readOnly &&
+    viewKind !== 'external' &&
+    hiloPropio(selectedConversation),
+  );
+  // El modo privado no pospone ni silencia (`admitePosponer`): ni el botón ni el menú.
+  const posponible = admitePosponer && conversacionPropia;
+  const onSnooze =
+    posponible && (rolVisto === 'inbox' || rolVisto === 'snoozed') ? handleSnooze : null;
+  const onMute = posponible && viewKind !== 'shared' ? handleMute : null;
+  const estadoAbierto =
+    selectedConversation && fullThread?.id === selectedConversation.threadId ? fullThread : null;
 
   const moveTargets =
     viewKind !== 'external' || inSearch
@@ -1758,10 +2425,57 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
     !inSearch &&
     (selectedMailbox?.role === 'trash' || selectedMailbox?.role === 'junk');
   const onPurge = enCarpetaSinVuelta ? (c: Conversation) => setPurgeTarget([c]) : null;
+  // Deslizar una fila en el móvil: la acción que eligió la cuenta, si en esta vista
+  // existe (no se archiva desde Archivo, ni se toca un buzón de solo lectura).
+  function gestoDe(accion: SwipeAction): GestoDeFila | null {
+    if (readOnly) return null;
+    const hacer =
+      accion === 'archive'
+        ? onArchive
+        : accion === 'trash'
+          ? onTrash
+          : accion === 'read'
+            ? handleToggleSeen
+            : null;
+    return hacer && accion !== 'none' ? { accion, hacer } : null;
+  }
+  // Lo que el cuerpo del mensaje necesita para abrir sin preguntar las imágenes de
+  // un remitente de confianza, o para ofrecer confiar en él (no en un buzón ajeno).
+  const confiadosSet = useMemo(() => new Set(confiados ?? []), [confiados]);
+  const confianza: ConfianzaDeImagenes = {
+    confiados: confiadosSet,
+    confiar: readOnly ? null : confiarRemitente,
+  };
   const onEmptyFolder =
     enCarpetaSinVuelta && selectedMailbox && (selectedMailbox.totalEmails ?? 0) > 0
       ? () => setEmptyFolderOpen(true)
       : null;
+  // «Marcar todo como leído»: solo en una carpeta propia (no externa, no delegada
+  // de solo lectura, no búsqueda) que aún tenga no leídos según su contador, que es
+  // el del buzón entero y no el de la página cargada.
+  const onMarkAllRead =
+    !readOnly &&
+    !inSearch &&
+    !selectedExternal &&
+    selectedMailbox &&
+    (selectedMailbox.unreadEmails ?? 0) > 0
+      ? () => void marcarCarpetaLeida(selectedMailbox.id)
+      : null;
+  async function marcarCarpetaLeida(mailboxId: string): Promise<void> {
+    try {
+      const { updated } = await markMailboxRead(mailboxId);
+      // `emails` es la carpeta abierta: lo cargado se pone al día al momento; el
+      // resto ya está leído en el servidor y llega así al paginar.
+      setEmails((list) => list.map((e) => (e.keywords.$seen ? e : setKeyword('$seen', true)(e))));
+      refreshMailboxCounts();
+      toastRef.current?.notify({
+        tone: 'success',
+        title: t('list.markedAllRead', { count: updated }),
+      });
+    } catch {
+      toastRef.current?.notify({ tone: 'danger', title: t('error.seen') });
+    }
+  }
   async function vaciarCarpeta(): Promise<void> {
     if (!selectedMailbox || emptying) return;
     setEmptying(true);
@@ -1809,9 +2523,7 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
       .then(() => {
         setEmails(remove);
         setResults(remove);
-        if (selectedThreadId && convs.some((c) => c.threadId === selectedThreadId)) {
-          setSelectedThreadId(null);
-        }
+        avanzarTrasQuitar(new Set(convs.map((c) => c.threadId)));
         clearSelection();
         setPurgeTarget(null);
         refreshList();
@@ -1881,9 +2593,9 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
           if (belongs(c)) byId.set(c.id, c);
           else byId.delete(c.id); // salió de esta vista (movido a otra carpeta)
         }
-        return [...byId.values()].sort(
-          (a, b) => b.receivedAt.localeCompare(a.receivedAt) || b.id.localeCompare(a.id),
-        );
+        // Por la fecha de orden, como el servicio: lo vuelto de «Pospuestos» no
+        // baja a su sitio de antes con el primer delta.
+        return [...byId.values()].sort(masReciente);
       });
       // Los cambios pueden alterar los no-leídos del sidebar: refréscalos.
       void listMailboxes()
@@ -1963,7 +2675,7 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
       flujo?.close();
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [offline, viewKind, viewId, inSearch, locale]);
+  }, [offline, viewKind, viewId, inSearch, locale, listMailboxes, fetchChanges]);
 
   // ---- Atajos de teclado ----
   // Los que cualquiera trae aprendidos de Gmail y Apple Mail: sin ellos hay que
@@ -1988,9 +2700,16 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
     smimeIdentityOpen ||
     scheduledOpen ||
     signatureOpen ||
+    templatesOpen ||
     foldersOpen ||
-    atajosOpen ||
     purgeTarget !== null;
+  // Lo que enseña la página de ajustes (la autorespuesta) se vuelve a leer al cerrar
+  // cualquier editor: lo que se acaba de guardar es lo primero que se mira.
+  const enAjustes = ajustesOpen && !offline;
+  const [ajustesVersion, setAjustesVersion] = useState(0);
+  useEffect(() => {
+    if (!modalAbierto) setAjustesVersion((n) => n + 1);
+  }, [modalAbierto]);
 
   // Responder/reenviar con el cuerpo COMPLETO citado, como el botón del lector:
   // con el extracto del sobre la cita saldría cortada a media frase.
@@ -2002,12 +2721,78 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
       .catch(() => handleReply(email, mode));
   }
 
+  // La conversación cuyo «Más antigua» pidió la página siguiente: cuando llega, se
+  // abre la que viene detrás de ella. Por ref y no por estado: no se pinta.
+  const avanceTrasCargar = useRef<string | null>(null);
+  const indiceAbierta = selectedConversation
+    ? conversations.findIndex((c) => c.threadId === selectedConversation.threadId)
+    : -1;
+
+  /**
+   * j/k y los botones «Más reciente»/«Más antigua» del lector: el mismo cálculo
+   * (`pasoDelCursor`). `enfocar` es del teclado: el foco viaja a la fila. Un botón
+   * del lector no se lo lleva —quien lo pulsa sigue leyendo, y en el teléfono la
+   * lista ni se ve—; solo trae la fila a la vista.
+   */
+  function moverCursor(siguiente: boolean, enfocar: boolean): void {
+    const paso = pasoDelCursor({
+      total: conversations.length,
+      actual: indiceAbierta,
+      cursor: atajoCursor.current,
+      siguiente,
+      hayMas,
+    });
+    if (!paso) return;
+    if (paso.tipo === 'cargar') {
+      avanceTrasCargar.current = selectedConversation?.threadId ?? null;
+      handleLoadMore();
+      return;
+    }
+    const destino = conversations[paso.indice];
+    if (!destino) return;
+    atajoCursor.current = paso.indice;
+    if (destino.threadId !== selectedConversation?.threadId) handleSelectConversation(destino);
+    traerFila(paso.indice, enfocar);
+  }
+
+  /** Enfoca la fila `indice` de la lista o, sin `enfocar`, solo la trae a la vista. */
+  function traerFila(indice: number, enfocar: boolean): void {
+    const fila = document.querySelectorAll<HTMLElement>(`#${CONVERSATION_LIST_ID} [role="option"]`)[
+      indice
+    ];
+    if (enfocar) fila?.focus();
+    else fila?.scrollIntoView?.({ block: 'nearest' });
+  }
+
+  // Cuando la página pedida por «Más antigua» termina (llegue o falle), se sigue a la
+  // conversación de detrás si la hay; si no trajo nada nuevo, el pendiente se olvida
+  // y el botón queda como diga la lista. Si entretanto se abrió otra, también.
+  useEffect(() => {
+    const pendiente = avanceTrasCargar.current;
+    if (!pendiente || cargandoMas) return;
+    avanceTrasCargar.current = null;
+    if (selectedThreadId !== pendiente) return;
+    const i = conversations.findIndex((c) => c.threadId === pendiente);
+    const siguiente = i >= 0 ? conversations[i + 1] : undefined;
+    if (!siguiente) return;
+    atajoCursor.current = i + 1;
+    handleSelectConversation(siguiente);
+    // Como `VerFila` en Fyne: la fila recién llegada, a la vista en la lista.
+    traerFila(i + 1, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al llegar la página
+  }, [conversations, cargandoMas]);
+
+  const vecinas = vecinasDeLaAbierta(conversations.length, indiceAbierta, hayMas);
+
   atajosRef.current = (e: KeyboardEvent): void => {
     // `modalAbierto` SIGUE, además de `esAtajoDeApp`: el estado sabe de diálogos
     // que esta app monta y que aún no han pintado su `role="dialog"`, y la
     // utilidad compartida sabe de menús y popovers que este estado no cuenta. Las
     // dos comprobaciones cubren cosas distintas.
     if (modalAbierto || !esAtajoDeApp(e)) return;
+    // En la página de ajustes no hay lista ni lector: j/k, archivar o destacar
+    // actuarían sobre una conversación que no se ve. Quedan la ayuda y redactar.
+    if (enAjustes && e.key !== '?' && e.key !== 'c') return;
     const conv = selectedConversation;
     switch (e.key) {
       // «?» abre la hoja de atajos, que es donde se aprenden los demás. Shift
@@ -2015,7 +2800,7 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
       // deja pasar la combinación porque no es un modificador de sistema.
       case '?':
         e.preventDefault();
-        setAtajosOpen(true);
+        abrirHojaDeAtajos();
         return;
       case 'c':
         e.preventDefault();
@@ -2030,24 +2815,9 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
       case 'k': {
         if (conversations.length === 0) return;
         e.preventDefault();
-        const actual = conv ? conversations.findIndex((c) => c.threadId === conv.threadId) : -1;
-        const destino =
-          actual < 0
-            ? // Sin nada abierto se retoma donde estaba el cursor: tras archivar,
-              // esa posición ya la ocupa la conversación siguiente (como Gmail).
-              Math.min(atajoCursor.current, conversations.length - 1)
-            : e.key === 'j'
-              ? Math.min(actual + 1, conversations.length - 1)
-              : Math.max(actual - 1, 0);
-        const siguiente = conversations[destino];
-        if (!siguiente) return;
-        atajoCursor.current = destino;
-        if (siguiente.threadId !== conv?.threadId) handleSelectConversation(siguiente);
         // Enfocar la fila la trae a la vista y mueve el tabindex de la lista: sin
         // esto, bajar más allá de lo visible sería navegar a ciegas.
-        document
-          .querySelectorAll<HTMLElement>(`#${CONVERSATION_LIST_ID} [role="option"]`)
-          [destino]?.focus();
+        moverCursor(e.key === 'j', true);
         return;
       }
       // Volver a la lista. `u` y no Escape: Escape ya lo escuchan los diálogos y
@@ -2099,6 +2869,28 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
         else clearSelection();
         return;
       }
+      // Los de Gmail que completan el triaje: `Mayús+I`/`Mayús+U` (leída/no leída),
+      // «!» (spam) y «z» (el «Deshacer» del último aviso). Llegan con Shift, que
+      // `esAtajoDeApp` deja pasar; «!» lo pide en casi todos los teclados.
+      case 'I':
+      case 'U':
+      case '!':
+      case 'z': {
+        const accion = atajoDeTriaje(e.key, {
+          conversaciones: conversations,
+          abierta: conv ?? null,
+          cursor: atajoCursor.current,
+          soloLectura: readOnly,
+          hayDeshacer: ultimoTriaje.current !== null,
+        });
+        if (!accion || (accion.tipo === 'spam' && !onSpam)) return;
+        e.preventDefault();
+        if (accion.tipo === 'deshacer') {
+          if (ultimoTriaje.current) deshacerMovimientoDelAviso(ultimoTriaje.current);
+        } else if (accion.tipo === 'spam') onSpam?.(accion.conversacion);
+        else handleToggleSeen(accion.conversacion);
+        return;
+      }
       // «l» y «v» abren los menús del lector («Etiquetar», «Mover a…») pulsando su
       // disparador: el foco entra en el menú y las flechas lo recorren como con ratón.
       case 'l':
@@ -2146,7 +2938,7 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
               a su administración que se lo migre. Se pinta solo si la organización tiene
               conectado un origen; al terminar, la lista se recarga sola. */}
           <ImportData domains={['mail', 'contacts']} onFinished={() => setListTry((n) => n + 1)} />
-          <StorageMeter locale={locale} refreshKey={listTry} />
+          <StorageMeter locale={locale} refreshKey={listTry + cuotaTry} />
         </div>
       }
     >
@@ -2157,9 +2949,13 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
         sytueFolders={mailboxes}
         sytueTitle={primaryAddr || t('nav.sytueMailbox')}
         selectedMailbox={
-          selectedLabel || selectedShared || selectedExternal ? undefined : selectedMailbox?.id
+          enAjustes || selectedLabel || selectedShared || selectedExternal
+            ? undefined
+            : selectedMailbox?.id
         }
-        selectedExternal={selectedExternal}
+        // Con la página de ajustes abierta, la entrada activa es «Ajustes»: dos
+        // `aria-current="page"` a la vez no dirían dónde se está.
+        selectedExternal={enAjustes ? null : selectedExternal}
         onSelectSytue={(id) => {
           const m = mailboxes.find((box) => box.id === id);
           if (m) selectMailbox(m);
@@ -2171,7 +2967,7 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
         t={t}
         accounts={arbol.cuentas}
         error={external.error}
-        selectedExternal={selectedExternal}
+        selectedExternal={enAjustes ? null : selectedExternal}
         onRetry={external.retry}
         onOpen={(instanceId) => openExternal(instanceId)}
         onOpenFolder={(cuenta, carpeta) => selectExternal({ tipo: 'carpeta', cuenta, carpeta })}
@@ -2223,10 +3019,12 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
             <SidebarItem
               key={m.id}
               label={mailboxLabel(t, m.name, m.role)}
-              active={selectedMailbox?.id === m.id}
-              {...(m.unreadEmails ? { count: m.unreadEmails } : {})}
+              active={!enAjustes && selectedMailbox?.id === m.id}
+              // «Pospuestos» sin contador: lo que hay ahí se apartó para no verlo
+              // hasta su fecha, y un número en el lateral lo volvería a reclamar.
+              {...(m.unreadEmails && m.role !== 'snoozed' ? { count: m.unreadEmails } : {})}
               icon={<Glyph name={mailboxGlyph(m.role)} size={18} />}
-              {...(selectedMailbox?.id === m.id
+              {...(!enAjustes && selectedMailbox?.id === m.id
                 ? {
                     // Actualizar, SOLO en la carpeta que se está viendo: es la
                     // única lista que el botón puede recargar, y repetirlo en las
@@ -2272,7 +3070,7 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
           <SidebarItem
             key={l.id}
             label={l.name}
-            active={selectedLabel?.id === l.id}
+            active={!enAjustes && selectedLabel?.id === l.id}
             {...(l.unreadEmails ? { count: l.unreadEmails } : {})}
             icon={
               <span class="grid h-[18px] w-[18px] place-items-center" aria-hidden="true">
@@ -2285,6 +3083,7 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
               </span>
             }
             onClick={() => {
+              setAjustesOpen(false);
               setSelectedLabel(l);
               setSelectedMailbox(null);
               setSelectedExternal(null);
@@ -2300,7 +3099,7 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
             <SidebarItem
               key={sm.accountId}
               label={sm.address}
-              active={selectedShared?.accountId === sm.accountId}
+              active={!enAjustes && selectedShared?.accountId === sm.accountId}
               icon={<Icon name={sm.kind === 'shared' ? 'users' : 'user'} size={18} />}
               onClick={() => selectShared(sm)}
             />
@@ -2317,65 +3116,15 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
         </SidebarSection>
       ) : null}
       {!offline ? (
-        // Plegado de serie: seis entradas de configuración abiertas hacían el
-        // lateral más largo que la lista de carpetas, y se leían como carpetas.
-        <SidebarSection title={t('nav.settings')} collapsible defaultOpen={false}>
+        // Una sola puerta a la página de ajustes, y no las ocho entradas de antes:
+        // plegadas se olvidaban y desplegadas hacían el lateral más largo que la
+        // lista de carpetas, leyéndose como carpetas (design.md §8.4).
+        <SidebarSection>
           <SidebarItem
-            label={t('nav.signature')}
-            icon={<Icon name="user" size={18} />}
-            onClick={() => setSignatureOpen(true)}
-          />
-          <SidebarItem
-            label={t('nav.rules')}
+            label={t('nav.settings')}
+            active={enAjustes}
             icon={<Icon name="settings" size={18} />}
-            onClick={() => setFiltersOpen(true)}
-          />
-          <SidebarItem
-            label={t('nav.aliases')}
-            icon={<Icon name="users" size={18} />}
-            onClick={() => setAliasesOpen(true)}
-          />
-          <SidebarItem
-            label={t('nav.sharedAndDelegation')}
-            icon={<Icon name="grid" size={18} />}
-            onClick={() => setSharedOpen(true)}
-          />
-          {/* EL ANCLA DE LA FIRMA, para instalar en el dispositivo.
-
-              El correo sale firmado con S/MIME por una autoridad de la propia
-              organización, así que cualquier cliente que no la conozca enseña
-              «el certificado no es fiable» en cada mensaje. Instalar este
-              fichero una vez lo convierte en «firmado y de confianza».
-
-              Es un botón y no un enlace: con el enlace, una organización que aún
-              no tiene autoridad (404) o un fallo de red dejaban a la persona
-              mirando el JSON crudo del BFF. Ahora esos dos casos se dicen con un
-              aviso, y lo bueno se guarda con su nombre. */}
-          <SidebarItem
-            label={t('nav.smimeAnchor')}
-            icon={<Icon name="download" size={18} />}
-            onClick={() => void descargarAncla()}
-          />
-          {/* La OTRA MITAD: instalar el propio certificado (de una CA pública) en
-              vez de repartir el ancla de la organización. Ver SmimeIdentityModal. */}
-          <SidebarItem
-            label={t('nav.smimeIdentity')}
-            icon={<Icon name="upload" size={18} />}
-            onClick={() => setSmimeIdentityOpen(true)}
-          />
-          <SidebarItem
-            label={t('nav.vacation')}
-            icon={<Glyph name="clock" size={18} />}
-            onClick={() => setVacationOpen(true)}
-          />
-          {/* Configurar Thunderbird, Outlook, Apple Mail o el móvil: hace falta una
-              CONTRASEÑA DE APLICACIÓN, y se crea en Sytue ID. Es la única forma de
-              entrar por IMAP/SMTP —la del inicio de sesión no vale ahí—, así que sin
-              este enlace la función existe y no la encuentra nadie. */}
-          <SidebarItem
-            label={t('nav.mailClients')}
-            icon={<Icon name="settings" size={18} />}
-            onClick={() => window.open(`${idBaseUrl}/account#app-passwords`, '_blank', 'noopener')}
+            onClick={() => setAjustesOpen(true)}
           />
         </SidebarSection>
       ) : null}
@@ -2403,130 +3152,176 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
         // otro, y sin conversación elegida se queda en la lista.
         detailOpen={Boolean(selectedConversation)}
         onBack={() => setSelectedThreadId(null)}
-        title={viewName}
+        title={enAjustes ? t('settings.title') : viewName}
         secondaryPanelResize={{
           label: viewName || 'Conversaciones',
           storageKey: 'sytue.mail.panel-width',
         }}
+        // En ajustes no hay lista: la página se lleva todo el ancho, también en el
+        // teléfono (sin panel, AppShell enseña el detalle y no el turno lista/lector).
         secondaryPanel={
-          <MessageList
-            readOnly={readOnly}
-            franja={
-              selectedExternal ? (
-                <AvisoExterno
-                  t={t}
-                  error={externalError}
-                  caidas={selectedExternal.tipo === 'unificado' && mezclaCaida}
-                  pop3={
-                    selectedExternal.tipo === 'carpeta' &&
-                    cuentasExternas.get(selectedExternal.cuenta)?.provider === 'pop3'
-                  }
-                  onReconnect={
-                    selectedExternal.tipo === 'carpeta'
-                      ? () => openExternal(selectedExternal.cuenta)
-                      : undefined
-                  }
-                />
-              ) : selectedShared && !offline ? (
-                <FranjaPeticion
-                  endpoint={`/api/edit-requests?account=${encodeURIComponent(selectedShared.accountId)}`}
-                  soloLectura={selectedShared.permission === 'read'}
-                  puedeConceder={
-                    selectedShared.permission === 'manage' ||
-                    selectedShared.accountId === buzonDelAviso
-                  }
-                  pedida={selectedShared.editRequested ?? false}
-                  mensaje={translate(locale, 'readOnly.sharedWithYou', {
-                    name: selectedShared.displayName || selectedShared.address,
-                  })}
-                  locale={locale}
-                  concedido="mail.access.granted"
-                  recurso={selectedShared.accountId}
-                  alConceder={() => setSharedTry((n) => n + 1)}
-                />
-              ) : null
+          enAjustes ? undefined : (
+            <MessageList
+              readOnly={readOnly}
+              franja={
+                selectedExternal ? (
+                  <AvisoExterno
+                    t={t}
+                    error={externalError}
+                    caidas={selectedExternal.tipo === 'unificado' && mezclaCaida}
+                    pop3={
+                      selectedExternal.tipo === 'carpeta' &&
+                      cuentasExternas.get(selectedExternal.cuenta)?.provider === 'pop3'
+                    }
+                    onReconnect={
+                      selectedExternal.tipo === 'carpeta'
+                        ? () => openExternal(selectedExternal.cuenta)
+                        : undefined
+                    }
+                  />
+                ) : selectedShared && !offline ? (
+                  <FranjaPeticion
+                    endpoint={`/api/edit-requests?account=${encodeURIComponent(selectedShared.accountId)}`}
+                    soloLectura={selectedShared.permission === 'read'}
+                    puedeConceder={
+                      selectedShared.permission === 'manage' ||
+                      selectedShared.accountId === buzonDelAviso
+                    }
+                    pedida={selectedShared.editRequested ?? false}
+                    mensaje={translate(locale, 'readOnly.sharedWithYou', {
+                      name: selectedShared.displayName || selectedShared.address,
+                    })}
+                    locale={locale}
+                    concedido="mail.access.granted"
+                    recurso={selectedShared.accountId}
+                    alConceder={() => setSharedTry((n) => n + 1)}
+                  />
+                ) : null
+              }
+              locale={locale}
+              conversations={conversations}
+              filtro={filtro}
+              onFiltro={(f) => {
+                setFiltro(f);
+                clearSelection();
+                atajoCursor.current = 0; // otra lista visible: j empieza por arriba, como en Fyne
+              }}
+              onMasFiltro={filtroEnTope ? () => setPaginasFiltro(0) : null}
+              loading={inSearch ? searching : loadingList}
+              // Si las CARPETAS no cargan, la lista también lo dice: en un teléfono el menú
+              // lateral es un cajón cerrado y su aviso no se ve; la lista mostraba «No hay
+              // correos en Correo», que es falso (medido el 2026-09-09 a 390 px).
+              error={inSearch ? searchError : listError || boxesError}
+              selectedThreadId={selectedThreadId}
+              mailboxName={viewName}
+              onEmptyFolder={onEmptyFolder}
+              onMarkAllRead={onMarkAllRead}
+              // Las etiquetas son de Sytue: una carpeta externa no las lleva.
+              labels={selectedExternal?.tipo === 'carpeta' ? [] : labels}
+              query={query}
+              searchMode={inSearch}
+              hasMore={hayMas}
+              loadingMore={cargandoMas}
+              onLoadMore={handleLoadMore}
+              onQueryChange={setQuery}
+              onSelect={handleSelectConversation}
+              onCompose={openCompose}
+              onRetry={() =>
+                boxesError
+                  ? setBoxesTry((n) => n + 1)
+                  : inSearch
+                    ? setSearchTry((n) => n + 1)
+                    : selectedShared
+                      ? selectShared(selectedShared)
+                      : setListTry((n) => n + 1)
+              }
+              onToggleFlag={handleToggleFlag}
+              onToggleSeen={handleToggleSeen}
+              gestoDerecha={gestoDe(lectura.swipeRight)}
+              gestoIzquierda={gestoDe(lectura.swipeLeft)}
+              onArchive={onArchive}
+              onTrash={onTrash}
+              onSpam={onSpam}
+              onNotSpam={onNotSpam}
+              enSpam={enSpam}
+              selected={selected}
+              onToggleSelect={toggleSelect}
+              onToggleSelectAll={toggleSelectAll}
+              onClearSelection={clearSelection}
+              onBatchArchive={onBatchArchive}
+              onBatchTrash={onBatchTrash}
+              onBatchSpam={onBatchSpam}
+              onBatchPurge={onBatchPurge}
+              onBatchRead={() => onBatchSetSeen(true)}
+              onBatchUnread={() => onBatchSetSeen(false)}
+              onBatchLabel={onBatchLabel}
+              pospuestos={pospuestos}
+            />
+          )
+        }
+      >
+        {enAjustes ? (
+          <MailSettings
+            t={t}
+            locale={locale}
+            signature={signature}
+            version={ajustesVersion}
+            undoSend={undoSend}
+            onUndoSendChange={cambiarUndoSend}
+            lectura={readingPrefs}
+            onLecturaChange={cambiarLectura}
+            confiados={confiados}
+            onDejarDeConfiar={dejarDeConfiar}
+            onOpen={abrirAjuste}
+          />
+        ) : (
+          <MessageReader
+            readOnly={
+              readOnly ||
+              (selectedConversation ? sinAcciones(selectedConversation.latest.id) : false)
             }
             locale={locale}
-            conversations={conversations}
-            filtro={filtro}
-            onFiltro={(f) => {
-              setFiltro(f);
-              clearSelection();
-              atajoCursor.current = 0; // otra lista visible: j empieza por arriba, como en Fyne
-            }}
-            onMasFiltro={filtroEnTope ? () => setPaginasFiltro(0) : null}
-            loading={inSearch ? searching : loadingList}
-            // Si las CARPETAS no cargan, la lista también lo dice: en un teléfono el menú
-            // lateral es un cajón cerrado y su aviso no se ve; la lista mostraba «No hay
-            // correos en Correo», que es falso (medido el 2026-09-09 a 390 px).
-            error={inSearch ? searchError : listError || boxesError}
-            selectedThreadId={selectedThreadId}
-            mailboxName={viewName}
-            onEmptyFolder={onEmptyFolder}
-            // Las etiquetas son de Sytue: una carpeta externa no las lleva.
-            labels={selectedExternal?.tipo === 'carpeta' ? [] : labels}
-            query={query}
-            searchMode={inSearch}
-            hasMore={hayMas}
-            loadingMore={cargandoMas}
-            onLoadMore={handleLoadMore}
-            onQueryChange={setQuery}
-            onSelect={handleSelectConversation}
+            conversation={selectedConversation}
+            threadMessages={threadMessages}
+            onReply={handleReply}
             onCompose={openCompose}
-            onRetry={() =>
-              boxesError
-                ? setBoxesTry((n) => n + 1)
-                : inSearch
-                  ? setSearchTry((n) => n + 1)
-                  : selectedShared
-                    ? selectShared(selectedShared)
-                    : setListTry((n) => n + 1)
-            }
+            onWriteTo={abrirRedactorPara}
             onToggleFlag={handleToggleFlag}
-            onToggleSeen={handleToggleSeen}
+            onMarkUnread={handleToggleSeen}
+            onCreateRule={crearReglaDesde}
+            onBlock={onBlock}
+            onSearchSender={(email) => {
+              setQuery(componerConsulta({ ...OPCIONES_BUSQUEDA_VACIAS, de: email }));
+              // Si ya se estaba buscando eso mismo (se abrió el hilo desde esos
+              // resultados), la consulta no cambia y el efecto de búsqueda no cierra el
+              // hilo: se cierra aquí, como hace Fyne al volver a buscar.
+              setSelectedThreadId(null);
+            }}
             onArchive={onArchive}
             onTrash={onTrash}
             onSpam={onSpam}
             onNotSpam={onNotSpam}
             enSpam={enSpam}
-            selected={selected}
-            onToggleSelect={toggleSelect}
-            onToggleSelectAll={toggleSelectAll}
-            onClearSelection={clearSelection}
-            onBatchArchive={onBatchArchive}
-            onBatchTrash={onBatchTrash}
-            onBatchSpam={onBatchSpam}
-            onBatchPurge={onBatchPurge}
-            onBatchRead={() => onBatchSetSeen(true)}
-            onBatchUnread={() => onBatchSetSeen(false)}
-            onBatchLabel={onBatchLabel}
+            onPurge={onPurge}
+            onMove={handleMove}
+            moveTargets={moveTargets}
+            labels={labels}
+            onToggleLabel={handleToggleLabel}
+            cuerpoExterno={leerExterno}
+            onSnooze={onSnooze}
+            snoozedUntil={estadoAbierto?.snoozedUntil ?? null}
+            onUnsnooze={posponible ? handleUnsnooze : null}
+            muted={estadoAbierto?.muted === true}
+            onMute={onMute}
+            confianza={confianza}
+            propias={direccionesPropias}
+            navegacion={{
+              anterior: vecinas.anterior ? () => moverCursor(false, false) : null,
+              siguiente: vecinas.siguiente ? () => moverCursor(true, false) : null,
+              cargando: cargandoMas && avanceTrasCargar.current !== null,
+            }}
           />
-        }
-      >
-        <MessageReader
-          readOnly={
-            readOnly || (selectedConversation ? sinAcciones(selectedConversation.latest.id) : false)
-          }
-          locale={locale}
-          conversation={selectedConversation}
-          threadMessages={threadMessages}
-          onReply={handleReply}
-          onCompose={openCompose}
-          onToggleFlag={handleToggleFlag}
-          onMarkUnread={handleToggleSeen}
-          onCreateRule={crearReglaDesde}
-          onArchive={onArchive}
-          onTrash={onTrash}
-          onSpam={onSpam}
-          onNotSpam={onNotSpam}
-          enSpam={enSpam}
-          onPurge={onPurge}
-          onMove={handleMove}
-          moveTargets={moveTargets}
-          labels={labels}
-          onToggleLabel={handleToggleLabel}
-          cuerpoExterno={leerExterno}
-        />
+        )}
       </AppShell>
       {/* Redactar al alcance del pulgar: en móvil el menú lateral es un cajón cerrado. */}
       <MobileFab
@@ -2546,17 +3341,12 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
         initialDriveAttachments={compose.driveAttachments}
         fromOptions={fromOptions}
         externalAccounts={cuentasDelRedactor}
-        undoSeconds={UNDO_WINDOW_SECONDS}
+        undoSeconds={undoSend ?? DEFAULT_UNDO_SEND}
+        templates={templates}
         onClose={() => setCompose({ open: false })}
         onSaved={refreshList}
         onUndoSend={handleUndoSend}
-      />
-
-      <ShortcutsModal
-        open={atajosOpen}
-        title={t('shortcuts.title')}
-        groups={gruposDeAtajos(t)}
-        onClose={() => setAtajosOpen(false)}
+        onAnswered={handleAnswered}
       />
 
       <FiltersModal
@@ -2625,6 +3415,12 @@ export function MailApp({ user, hubBaseUrl, idBaseUrl, locale }: Props): JSX.Ele
       />
 
       <VacationModal locale={locale} open={vacationOpen} onClose={() => setVacationOpen(false)} />
+      <TemplatesModal
+        locale={locale}
+        open={templatesOpen}
+        onClose={() => setTemplatesOpen(false)}
+        onChanged={() => setTemplatesTry((n) => n + 1)}
+      />
       <SmimeIdentityModal
         locale={locale}
         open={smimeIdentityOpen}

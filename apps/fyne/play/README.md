@@ -266,6 +266,31 @@ Se sube por la API desde `seguridad-datos.csv`. Resumen de lo declarado:
   `FOREGROUND_SERVICE_MEDIA_PROJECTION` (la voz y el vídeo de una llamada en Rooms; emitir
   en directo con cámara, micrófono o pantalla en Cast). Se piden al usarlos, no al
   instalar. Ninguna pide la ubicación, SMS, registro de llamadas ni «todos los ficheros».
+- Photos (`fototeca = "si"`): además `READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO` y
+  `READ_MEDIA_VISUAL_USER_SELECTED` (`READ_EXTERNAL_STORAGE` hasta Android 12),
+  `ACCESS_MEDIA_LOCATION` (sin él, Android borra el GPS de las fotos al leerlas y la vista
+  «Cerca» se queda vacía), `ACCESS_NETWORK_STATE` (la copia, por defecto, solo con Wi-Fi) y
+  `RECEIVE_BOOT_COMPLETED` (volver a programar la copia tras reiniciar). Los de la galería
+  se piden al encender la copia de seguridad, no al instalar.
+- **Permisos de fotos y vídeos** (_Contenido de la app → Permisos de fotos y vídeos_): Play
+  exige declararlos a quien pide `READ_MEDIA_IMAGES` o `READ_MEDIA_VIDEO`, y solo los admite
+  si leer la galería es una función PRINCIPAL; si no, hay que usar el selector de fotos del
+  sistema. En Photos lo es: la copia de seguridad lee la galería entera, de forma continua y
+  con la app cerrada, que el selector no permite. Lo presenta el dueño; el texto, listo
+  para pegar (la consola lo pide en inglés):
+
+  > Sytue Photos is a photo gallery and backup app. Its core feature is the automatic
+  > backup of the device's photo and video library to the user's own Sytue Drive: when the
+  > user turns backup on, the app reads every photo and video in the device library, uploads
+  > the ones that are not backed up yet, and keeps doing so for new ones in the background
+  > (JobScheduler, only while the device is unlocked and, by default, on Wi-Fi). This needs
+  > persistent access to the whole library, which the Android photo picker cannot provide.
+  > Location metadata (ACCESS_MEDIA_LOCATION) is kept so the gallery can sort and map photos
+  > by place. Nothing is read until the user turns backup on.
+
+  Y el vídeo corto que pide: encender «Copia de seguridad» en la nube de la galería,
+  aceptar el permiso y ver «Copiando 1 de N…» con fotos y vídeos. Lo graba el dueño.
+
 - **Servicios en primer plano** (_Contenido de la app → Permisos de servicios en primer
   plano_): Play pide declararlos a quien apunta a Android 14+. Rooms y Cast, «Proyección
   multimedia» (compartir la pantalla en una llamada o emitirla en directo; lo empieza la

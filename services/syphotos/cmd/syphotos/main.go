@@ -176,7 +176,7 @@ func run() error {
 
 	dr := drive.Nuevo(cfg.DriveBaseURL, cfg.DriveTimeout)
 	ingesta := service.NuevaIngesta(st, dr, objetos, cfg.BytesDeCabecera, cfg.LadosDeDerivada)
-	limpieza := service.NuevaLimpieza(objetos)
+	limpieza := service.NuevaLimpieza(objetos, st)
 
 	// Auto-purga de la papelera. La condición también va aquí, además de dentro
 	// del worker, para no dejar una gorutina viva que solo sabe salirse.

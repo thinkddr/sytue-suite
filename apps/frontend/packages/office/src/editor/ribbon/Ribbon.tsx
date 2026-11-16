@@ -5,8 +5,8 @@
  * Ribbon del editor (BLUEPRINT.md §6.2): tira de pestañas de 32 px + fila de
  * grupos de 68 px. La primera posición es «Archivo» (NO es pestaña: abre un
  * menú); después, las pestañas reales filtradas por tipo de documento, con
- * roles tablist/tab/tabpanel, foco roving (←/→/Inicio/Fin) y subrayado de
- * 2 px en latón de marca (Graphite & Brass) en la activa.
+ * roles tablist/tab/tabpanel y foco roving (←/→/Inicio/Fin) de `useTablist`, y
+ * subrayado de 2 px en latón de marca (Graphite & Brass) en la activa.
  *
  * La fila de grupos es UNA línea que se desplaza en horizontal (la banda). Si no cabe,
  * en escritorio aparece «Más» al final: despliega la banda sobre el lienzo, con todos
@@ -33,6 +33,7 @@ import {
   useFitInViewport,
   useMobileBack,
   usePrompt,
+  useTablist,
   useToast,
 } from '@sytue/ui';
 import { EditorIcon } from '../icons';
@@ -94,7 +95,6 @@ type Cuerpo = (props: { ctx: EditorContext }) => JSX.Element;
 
 export function Ribbon({ ctx }: { ctx: EditorContext }): JSX.Element {
   const [activeId, setActiveId] = useState<RibbonTabId>('inicio');
-  const tabRefs = useRef(new Map<RibbonTabId, HTMLButtonElement>());
   // El desvanecido del borde derecho avisa de que la tira sigue: a 360 px se ven
   // 248 px de los 439 que miden las seis pestañas de un documento.
   const { ref: listaRef, queda: quedaTira } = useScrollRestante<HTMLDivElement>();
@@ -115,11 +115,25 @@ export function Ribbon({ ctx }: { ctx: EditorContext }): JSX.Element {
   const cuerpos = CUERPOS[active.id];
   const ActiveBody = cuerpos.por[ctx.kind] ?? cuerpos.otro;
 
+  // Roving tabindex, flechas e Inicio/Fin (@sytue/ui): ver `useTablist`. Los ids de
+  // pestaña y panel se sobrescriben con los de siempre (`ribbon-tab-<id>`,
+  // `ribbon-tabpanel`): las pruebas de extremo a extremo y la auditoría de accesibilidad
+  // los buscan por nombre, y los que genera el hook (`useId`) son opacos.
+  const tl = useTablist(
+    visibles.map((t) => t.id),
+    active.id,
+    setActiveId,
+  );
+
   // `expandida` pausa la medida: ver `useDesborda`.
   const desborda = useDesborda(bandaRef, active.id, expandida);
   usePopoversFijos(bandaRef);
   // F6: de la cinta al lienzo, y de cualquier otro sitio a la pestaña activa.
-  const alCinta = useCallback(() => tabRefs.current.get(active.id)?.focus(), [active.id]);
+  // La pestaña activa es la única con `tabIndex` 0: la busca dentro de ESTA cinta.
+  const alCinta = useCallback(
+    () => cintaRef.current?.querySelector<HTMLElement>('[role="tab"][tabindex="0"]')?.focus(),
+    [],
+  );
   useSaltoF6(cintaRef, alCinta);
 
   // Otra pestaña u otro documento: la banda vuelve a plegarse.
@@ -159,21 +173,6 @@ export function Ribbon({ ctx }: { ctx: EditorContext }): JSX.Element {
     setExpandida(false);
   };
 
-  /** Foco roving del tablist (§0.6): las flechas MUEVEN la pestaña activa. */
-  const onTablistKeyDown = (e: KeyboardEvent): void => {
-    const idx = visibles.findIndex((t) => t.id === active.id);
-    let next: number;
-    if (e.key === 'ArrowRight') next = (idx + 1) % visibles.length;
-    else if (e.key === 'ArrowLeft') next = (idx - 1 + visibles.length) % visibles.length;
-    else if (e.key === 'Home') next = 0;
-    else if (e.key === 'End') next = visibles.length - 1;
-    else return;
-    e.preventDefault();
-    const id = visibles[next]!.id;
-    setActiveId(id);
-    tabRefs.current.get(id)?.focus();
-  };
-
   return (
     <div ref={cintaRef} data-ribbon>
       {/* Tira de pestañas (32 px). */}
@@ -204,7 +203,7 @@ export function Ribbon({ ctx }: { ctx: EditorContext }): JSX.Element {
             // hay más: sin él, la tira parece terminar donde termina la pantalla.
             quedaTira && MASCARA_SCROLL_X,
           )}
-          onKeyDown={onTablistKeyDown}
+          onKeyDown={tl.onKeyDown}
         >
           {visibles.map((t) => {
             const selected = t.id === active.id;
@@ -212,15 +211,9 @@ export function Ribbon({ ctx }: { ctx: EditorContext }): JSX.Element {
               <button
                 key={t.id}
                 type="button"
-                role="tab"
+                {...tl.tab(t.id)}
                 id={`ribbon-tab-${t.id}`}
-                aria-selected={selected}
                 aria-controls="ribbon-tabpanel"
-                tabIndex={selected ? 0 : -1}
-                ref={(el) => {
-                  if (el) tabRefs.current.set(t.id, el);
-                  else tabRefs.current.delete(t.id);
-                }}
                 class={
                   // shrink-0: dentro de un contenedor que ya desplaza, un tab que
                   // encoge parte su rótulo en dos líneas en vez de dejarse deslizar.
@@ -230,9 +223,6 @@ export function Ribbon({ ctx }: { ctx: EditorContext }): JSX.Element {
                     : 'text-text-muted hover:bg-bg-subtle hover:text-text ') +
                   FOCUS_RING
                 }
-                onClick={() => {
-                  setActiveId(t.id);
-                }}
               >
                 {ctx.t(t.labelKey)}
                 {selected && (
@@ -274,8 +264,8 @@ export function Ribbon({ ctx }: { ctx: EditorContext }): JSX.Element {
        * estilos, 64 px por debajo). Con la banda desplegada —fuera de flujo— el botón
        * queda en el mismo sitio, sobre su esquina. */}
       <div
+        {...tl.panel}
         id="ribbon-tabpanel"
-        role="tabpanel"
         aria-labelledby={`ribbon-tab-${active.id}`}
         ref={panelRef}
         class={cx(

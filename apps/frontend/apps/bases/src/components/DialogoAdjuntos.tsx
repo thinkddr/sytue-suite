@@ -8,14 +8,12 @@
  */
 import type { JSX } from 'preact';
 import { useRef, useState } from 'preact/hooks';
-import { Button, Icon, Modal, formatBytes } from '@sytue/ui';
+import { Button, Icon, Modal, formatBytes, EmptyState } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
-import { HttpError } from '@sytue/api-clients';
 import type { BasesAttachment, BasesField, BasesRecord } from '@sytue/api-clients/bases';
 import type { T } from '../i18n/index.js';
 import { cliente, mensajeDeError } from '../lib/api.js';
-import { MAX_BYTES_ADJUNTO } from '../lib/adjuntos.js';
-import { ruta } from '../lib/rutas.js';
+import { errorDeAdjunto, MAX_BYTES_ADJUNTO, urlDeAdjunto } from '../lib/adjuntos.js';
 
 export function DialogoAdjuntos(p: {
   t: T;
@@ -33,7 +31,7 @@ export function DialogoAdjuntos(p: {
   const [error, setError] = useState('');
   const entrada = useRef<HTMLInputElement>(null);
   const url = (a: BasesAttachment, miniatura = false) =>
-    ruta(`/api/records/${p.registro.id}/attachments/${a.id}${miniatura ? '/thumb' : ''}`);
+    urlDeAdjunto(p.registro.id, a.id, miniatura);
 
   async function subir(fichero: File): Promise<void> {
     setError('');
@@ -46,15 +44,7 @@ export function DialogoAdjuntos(p: {
       const nuevo = await cliente().uploadAttachment(p.registro.id, p.campo.id, fichero);
       p.onCambio([...adjuntos, nuevo]);
     } catch (e) {
-      setError(
-        e instanceof HttpError && e.status === 413
-          ? t('attach.tooLarge')
-          : e instanceof HttpError && e.status === 422
-            ? t('attach.badType')
-            : e instanceof HttpError && e.status === 503
-              ? t('attach.unavailable')
-              : mensajeDeError(e, t),
-      );
+      setError(errorDeAdjunto(e, t));
     } finally {
       setOcupado(false);
       if (entrada.current) entrada.current.value = '';
@@ -75,7 +65,7 @@ export function DialogoAdjuntos(p: {
     <Modal open onClose={p.onCerrar} title={p.campo.name}>
       <div class="flex flex-col gap-4">
         {adjuntos.length === 0 ? (
-          <p class="text-text-muted text-sm">{t('attach.none')}</p>
+          <EmptyState compact title={t('attach.none')} />
         ) : (
           <ul class="flex max-h-80 flex-col gap-2 overflow-y-auto">
             {adjuntos.map((a) => (

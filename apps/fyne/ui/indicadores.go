@@ -8,6 +8,7 @@ package ui
 
 import (
 	"image/color"
+	"slices"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -421,8 +422,33 @@ const (
 	// se SUMAN al `gap-3` de la columna: entre el dibujo y el título hay 17,5, no
 	// 10,5.
 	SeparacionExtra float32 = 2 * 0.25 * tema.Rem
-	// AnchoDescripcion es el `max-w-sm` del párrafo: 24rem con el rem de 14.
+	// AnchoDescripcion es el `max-w-sm` del párrafo: 24rem, 384 px.
 	AnchoDescripcion float32 = 24 * tema.Rem
+
+	// El compacto de paneles, diálogos y popovers: `gap-2 px-4 py-6` y el párrafo a
+	// `max-w-xs`.
+	HuecoVacioCompacto       float32 = 2 * 0.25 * tema.Rem
+	MargenXVacioCompacto     float32 = 4 * 0.25 * tema.Rem
+	MargenYVacioCompacto     float32 = 6 * 0.25 * tema.Rem
+	AnchoDescripcionCompacto float32 = 20 * tema.Rem
+	// HuecoAccionesVacio es el `gap-2` entre la acción principal y la secundaria.
+	HuecoAccionesVacio float32 = 2 * 0.25 * tema.Rem
+
+	// LadoGlifoVacio es el `icon` de EmptyState a 32, y LadoGlifoVacioCompacto a 20:
+	// `EMPTY_ICON_SIZE` y `EMPTY_ICON_SIZE_COMPACT`.
+	LadoGlifoVacio         float32 = 32
+	LadoGlifoVacioCompacto float32 = 20
+)
+
+// TonoVacio es el `tone` de EmptyState.
+type TonoVacio int
+
+const (
+	// VacioNeutro es el estado vacío de siempre: el glifo en `text-subtle`.
+	VacioNeutro TonoVacio = iota
+	// VacioError es el `tone="error"`: el glifo en `danger-text` y, si no se le da
+	// otro, el de peligro.
+	VacioError
 )
 
 // El título es `.sytue-h4`: `--text-lg` en semi-negrita (15,75 / 22,75), con la escala
@@ -453,9 +479,28 @@ type Vacio struct {
 	Glifo *iconos.Dibujo
 	// Accion es el botón principal, opcional.
 	Accion fyne.CanvasObject
+	// AccionSecundaria va a la derecha de la principal, con el `gap-2` y pasando debajo
+	// si no caben las dos (`flex-wrap`): el «Quitar filtro» de «sin resultados».
+	AccionSecundaria fyne.CanvasObject
+	// Tono y Compacto se fijan al crearlo, antes de mostrarlo, como en la web.
+	//
+	// Tono VacioError tiñe el glifo de `danger-text` y, sin Glifo ni Ilustracion (o en
+	// compacto), pone el de peligro.
+	// La web además le da `role="alert"`; Fyne 2.8 no tiene ese rol ni región viva, así
+	// que aquí queda en texto (el mismo techo que `ayuda.go`).
+	Tono TonoVacio
+	// Compacto es el `compact` de los paneles: `text-sm`, `py-6` y SIN Ilustracion (el
+	// Glifo sí; quien lo pase lo crea a LadoGlifoVacioCompacto).
+	Compacto bool
+
+	glifoError *iconos.Dibujo // el glifo de peligro por defecto del error
 }
 
 var _ fyne.Widget = (*Vacio)(nil)
+
+// LadoSpotVacio es `EMPTY_SPOT_SIZE` de EmptyState.tsx: el `max-width` de la ilustración
+// (`spot`) de un estado vacío. El alto va en proporción: 96 en los spots de 200×160.
+const LadoSpotVacio float32 = 120
 
 // NuevoVacio crea el estado vacío.
 func NuevoVacio(titulo, descripcion string) *Vacio {
@@ -464,35 +509,171 @@ func NuevoVacio(titulo, descripcion string) *Vacio {
 	return v
 }
 
-// ilustracion es lo que va arriba: el glifo que tiñe el estado vacío o la ilustración
-// que trae su color.
-func (v *Vacio) ilustracion() fyne.CanvasObject {
+// glifo es el glifo que tiñe el estado vacío: el que le den o, en error, el de peligro.
+// Como en la web, el de peligro es la marca POR DEFECTO del error y no una imposición:
+// una Ilustracion que se pida se respeta, salvo en compacto, que no lleva ilustración.
+func (v *Vacio) glifo() *iconos.Dibujo {
 	if v.Glifo != nil {
-		return v.Glifo.Objeto()
+		return v.Glifo
+	}
+	if v.Tono != VacioError || (!v.Compacto && v.Ilustracion != nil) {
+		return nil
+	}
+	lado := LadoGlifoVacio
+	if v.Compacto {
+		lado = LadoGlifoVacioCompacto
+	}
+	if v.glifoError == nil || v.glifoError.Medida().Width != lado {
+		t := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+		v.glifoError = iconos.Trazo(iconos.Peligro, lado, "danger-text", t)
+	}
+	return v.glifoError
+}
+
+// tinta es el color del glifo: el `text-text-subtle` del `<div>` que lo envuelve, o el
+// `text-danger-text` del error.
+func (v *Vacio) tinta() string {
+	if v.Tono == VacioError {
+		return "danger-text"
+	}
+	return "text-subtle"
+}
+
+// ilustracion es lo que va arriba: el glifo que tiñe el estado vacío o la ilustración
+// que trae su color. El compacto no lleva ilustración.
+func (v *Vacio) ilustracion() fyne.CanvasObject {
+	if g := v.glifo(); g != nil {
+		return g.Objeto()
+	}
+	if v.Compacto {
+		return nil
 	}
 	return v.Ilustracion
 }
 
+// Las medidas y escalones de cada tamaño. Hasta DS-06 solo existía el de página.
+func (v *Vacio) hueco() float32 {
+	if v.Compacto {
+		return HuecoVacioCompacto
+	}
+	return HuecoVacio
+}
+
+func (v *Vacio) margenX() float32 {
+	if v.Compacto {
+		return MargenXVacioCompacto
+	}
+	return MargenXVacio
+}
+
+func (v *Vacio) margenY() float32 {
+	if v.Compacto {
+		return MargenYVacioCompacto
+	}
+	return MargenYVacio
+}
+
+// separacionMarca es el `mb-2` que la marca suma al hueco; el compacto no lo lleva.
+func (v *Vacio) separacionMarca() float32 {
+	if v.Compacto {
+		return 0
+	}
+	return SeparacionExtra
+}
+
+// escalonTitulo y pesoTitulo: `.sytue-h4` en página, `text-sm font-semibold` en compacto.
+func (v *Vacio) escalonTitulo() tema.Escalon {
+	if v.Compacto {
+		return tema.TextoSM
+	}
+	return EscalonTitulo(4)
+}
+
+func (v *Vacio) pesoTitulo() Peso {
+	if v.Compacto {
+		return SemiNegrita
+	}
+	return PesoTitulo(4)
+}
+
+// escalonParrafo: `text-base` en página, `text-sm` en compacto.
+func (v *Vacio) escalonParrafo() tema.Escalon {
+	if v.Compacto {
+		return tema.TextoSM
+	}
+	return tema.TextoBase
+}
+
+// acciones son la principal y la secundaria que haya, en ese orden.
+func (v *Vacio) acciones() []fyne.CanvasObject {
+	var out []fyne.CanvasObject
+	for _, o := range []fyne.CanvasObject{v.Accion, v.AccionSecundaria} {
+		if o != nil {
+			out = append(out, o)
+		}
+	}
+	return out
+}
+
+// filasAcciones reparte las acciones en filas como hace `flex-wrap`: las dos juntas si
+// caben en la columna, una debajo de otra si no.
+func (v *Vacio) filasAcciones(ancho float32) [][]fyne.CanvasObject {
+	as := v.acciones()
+	if len(as) < 2 {
+		if len(as) == 0 {
+			return nil
+		}
+		return [][]fyne.CanvasObject{as}
+	}
+	junto := as[0].MinSize().Width + HuecoAccionesVacio + as[1].MinSize().Width
+	if ancho <= 0 || junto <= ancho-2*v.margenX() {
+		return [][]fyne.CanvasObject{as}
+	}
+	return [][]fyne.CanvasObject{{as[0]}, {as[1]}}
+}
+
+func altoFila(fila []fyne.CanvasObject) float32 {
+	alto := float32(0)
+	for _, o := range fila {
+		alto = max(alto, o.MinSize().Height)
+	}
+	return alto
+}
+
 // MedidaVacio es el alto que ocupa a un ancho dado. Depende del ancho porque el título
 // y la descripción se reparten en líneas.
+//
+// Una ilustración OCULTA no cuenta: quien coloca el estado puede esconderla cuando el
+// hueco no da para ella (un móvil apaisado) y el resto tiene que volver a centrarse sin
+// ella, no dejar su sitio en blanco.
 func (v *Vacio) MedidaVacio(ancho float32) float32 {
-	alto := 2 * MargenYVacio
-	if il := v.ilustracion(); il != nil {
-		alto += medidaIlustracion(il).Height + SeparacionExtra + HuecoVacio
+	alto := 2 * v.margenY()
+	if il := v.ilustracion(); il != nil && il.Visible() {
+		alto += medidaIlustracion(il).Height + v.separacionMarca() + v.hueco()
 	}
-	alto += float32(len(v.lineasTitulo(ancho))) * EscalonTitulo(4).Linea
+	alto += float32(len(v.lineasTitulo(ancho))) * v.escalonTitulo().Linea
 	if v.Descripcion != "" {
-		alto += HuecoVacio + float32(len(v.lineas(ancho)))*tema.TextoBase.Linea
+		alto += v.hueco() + float32(len(v.lineas(ancho)))*v.escalonParrafo().Linea
 	}
-	if v.Accion != nil {
-		alto += HuecoVacio + SeparacionExtra + v.Accion.MinSize().Height
+	if filas := v.filasAcciones(ancho); len(filas) > 0 {
+		alto += v.hueco() + SeparacionExtra
+		for i, f := range filas {
+			if i > 0 {
+				alto += HuecoAccionesVacio
+			}
+			alto += altoFila(f)
+		}
 	}
 	return alto
 }
 
 func (v *Vacio) lineas(ancho float32) []string {
-	cabe := min(ancho-2*MargenXVacio, AnchoDescripcion)
-	return Repartir(v.Descripcion, tema.TextoBase, Normal, cabe)
+	tope := AnchoDescripcion
+	if v.Compacto {
+		tope = AnchoDescripcionCompacto
+	}
+	cabe := min(ancho-2*v.margenX(), tope)
+	return Repartir(v.Descripcion, v.escalonParrafo(), Normal, cabe)
 }
 
 // lineasTitulo es el `<h3>` repartido en lo que deja el `px-6`: sin `max-w`, pasa de
@@ -503,7 +684,7 @@ func (v *Vacio) lineasTitulo(ancho float32) []string {
 	if ancho <= 0 {
 		return []string{v.Titulo}
 	}
-	if l := Repartir(v.Titulo, EscalonTitulo(4), PesoTitulo(4), ancho-2*MargenXVacio); len(l) > 0 {
+	if l := Repartir(v.Titulo, v.escalonTitulo(), v.pesoTitulo(), ancho-2*v.margenX()); len(l) > 0 {
 		return l
 	}
 	return []string{v.Titulo}
@@ -534,12 +715,10 @@ func (v *Vacio) CreateRenderer() fyne.WidgetRenderer {
 	if il := v.ilustracion(); il != nil {
 		r.objetos = append(r.objetos, il)
 	}
-	if v.Glifo != nil {
-		v.Glifo.Tenir("text-subtle", t)
+	if g := v.glifo(); g != nil {
+		g.Tenir(v.tinta(), t)
 	}
-	if v.Accion != nil {
-		r.objetos = append(r.objetos, v.Accion)
-	}
+	r.objetos = append(r.objetos, v.acciones()...)
 	return r
 }
 
@@ -580,7 +759,8 @@ func (r *vacioRenderer) rehacerPiezas() bool {
 		return false
 	}
 	cambia := false
-	for _, o := range []fyne.CanvasObject{v.ilustracion(), v.Accion} {
+	piezas := append([]fyne.CanvasObject{v.ilustracion()}, v.acciones()...)
+	for _, o := range piezas {
 		if o != nil && !tiene(o) {
 			r.objetos = append(r.objetos, o)
 			cambia = true
@@ -589,7 +769,7 @@ func (r *vacioRenderer) rehacerPiezas() bool {
 	// Y al revés: lo que ya no está colgado del widget sale de la lista.
 	vivos := r.objetos[:0]
 	for _, o := range r.objetos {
-		if (o == v.ilustracion() || o == v.Accion) && o != nil {
+		if o != nil && slices.Contains(piezas, o) {
 			vivos = append(vivos, o)
 			continue
 		}
@@ -608,13 +788,14 @@ func (r *vacioRenderer) rehacerPiezas() bool {
 // el ancho que ya tenga (o, sin colocar, el del título en una línea).
 func (r *vacioRenderer) MinSize() fyne.Size {
 	ancho := float32(0)
-	for _, p := range strings.Fields(r.v.Titulo) {
-		ancho = max(ancho, Medir(p, EscalonTitulo(4), PesoTitulo(4)).Width)
+	v := r.v
+	for _, p := range strings.Fields(v.Titulo) {
+		ancho = max(ancho, Medir(p, v.escalonTitulo(), v.pesoTitulo()).Width)
 	}
-	ancho += 2 * MargenXVacio
-	ref := r.v.Size().Width
+	ancho += 2 * v.margenX()
+	ref := v.Size().Width
 	if ref <= 0 {
-		ref = Medir(r.v.Titulo, EscalonTitulo(4), PesoTitulo(4)).Width + 2*MargenXVacio
+		ref = Medir(v.Titulo, v.escalonTitulo(), v.pesoTitulo()).Width + 2*v.margenX()
 	}
 	return fyne.NewSize(ancho, r.v.MedidaVacio(max(ref, ancho)))
 }
@@ -633,33 +814,52 @@ func (r *vacioRenderer) Layout(t fyne.Size) {
 
 	// `justify-center`: el bloque va centrado en el alto disponible, con el `py-8` de
 	// suelo cuando no cabe. `MedidaVacio` ya incluye los dos márgenes.
-	y := max((t.Height-(r.v.MedidaVacio(t.Width)-2*MargenYVacio))/2, MargenYVacio)
-	if il := v.ilustracion(); il != nil {
+	my, hueco := v.margenY(), v.hueco()
+	y := max((t.Height-(v.MedidaVacio(t.Width)-2*my))/2, my)
+	if il := v.ilustracion(); il != nil && il.Visible() {
 		m := medidaIlustracion(il)
 		m.Width = min(m.Width, 200)
 		il.Resize(m)
 		il.Move(fyne.NewPos((t.Width-m.Width)/2, y))
-		y += m.Height + SeparacionExtra + HuecoVacio
+		y += m.Height + v.separacionMarca() + hueco
 	}
+	et, pt := v.escalonTitulo(), v.pesoTitulo()
 	for _, l := range r.titulo { // `text-center`: cada línea en el centro
-		a := Medir(l.Text, EscalonTitulo(4), PesoTitulo(4)).Width
-		ColocarTexto(l, EscalonTitulo(4), (t.Width-a)/2, y)
-		y += EscalonTitulo(4).Linea
+		a := Medir(l.Text, et, pt).Width
+		ColocarTexto(l, et, (t.Width-a)/2, y)
+		y += et.Linea
 	}
 
 	if len(r.parrafo) > 0 {
-		y += HuecoVacio
+		y += hueco
+		ep := v.escalonParrafo()
 		for _, l := range r.parrafo {
-			a := Medir(l.Text, tema.TextoBase, Normal).Width
-			ColocarTexto(l, tema.TextoBase, (t.Width-a)/2, y)
-			y += tema.TextoBase.Linea
+			a := Medir(l.Text, ep, Normal).Width
+			ColocarTexto(l, ep, (t.Width-a)/2, y)
+			y += ep.Linea
 		}
 	}
-	if v.Accion != nil {
-		y += HuecoVacio + SeparacionExtra
-		m := v.Accion.MinSize()
-		v.Accion.Resize(m)
-		v.Accion.Move(fyne.NewPos((t.Width-m.Width)/2, y))
+	if filas := v.filasAcciones(t.Width); len(filas) > 0 {
+		y += hueco + SeparacionExtra
+		for i, fila := range filas {
+			if i > 0 {
+				y += HuecoAccionesVacio
+			}
+			// `justify-center`: la fila entera en el centro, cada botón a su `MinSize`.
+			ancho := HuecoAccionesVacio * float32(len(fila)-1)
+			for _, o := range fila {
+				ancho += o.MinSize().Width
+			}
+			x := (t.Width - ancho) / 2
+			alto := altoFila(fila)
+			for _, o := range fila {
+				m := o.MinSize()
+				o.Resize(m)
+				o.Move(fyne.NewPos(x, y+(alto-m.Height)/2)) // `items-center`
+				x += m.Width + HuecoAccionesVacio
+			}
+			y += alto
+		}
 	}
 }
 
@@ -684,7 +884,7 @@ func (r *vacioRenderer) rehacerParrafo(ancho float32) {
 	}
 	r.parrafo = nil
 	for _, l := range lineas {
-		c := Texto(l, tema.TextoBase, Normal, tema.Color("text-muted", t))
+		c := Texto(l, r.v.escalonParrafo(), Normal, tema.Color("text-muted", t))
 		r.parrafo = append(r.parrafo, c)
 		vivos = append(vivos, c)
 	}
@@ -710,7 +910,7 @@ func (r *vacioRenderer) rehacerTitulo(ancho float32) {
 	}
 	r.titulo = nil
 	for _, l := range lineas {
-		c := Texto(l, EscalonTitulo(4), PesoTitulo(4), tema.Color("text", t))
+		c := Texto(l, r.v.escalonTitulo(), r.v.pesoTitulo(), tema.Color("text", t))
 		r.titulo = append(r.titulo, c)
 		vivos = append(vivos, c)
 	}
@@ -739,8 +939,8 @@ func (r *vacioRenderer) Refresh() {
 	for _, l := range r.parrafo {
 		l.Color = tema.Color("text-muted", t)
 	}
-	if r.v.Glifo != nil {
-		r.v.Glifo.Tenir("text-subtle", t)
+	if g := r.v.glifo(); g != nil {
+		g.Tenir(r.v.tinta(), t)
 	}
 	// Una ilustración o una acción puestas después de montar el widget entran aquí, y
 	// hay que volver a colocar: `Layout` solo corre al redimensionar.

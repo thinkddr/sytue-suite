@@ -67,19 +67,23 @@ type Reproductor struct {
 	mu      sync.Mutex
 	hay     *sync.Cond
 
-	gen         int // sube con cada búsqueda: lo leído antes es de otra posición
-	base        time.Duration
-	muestras    int64     // de audio que han sonado desde base
-	pared       time.Time // cuándo arrancó el reloj de pared (desde base)
-	pausado     bool
-	cerrado     bool
-	finLectura  bool
-	fin         bool
-	err         error
-	leidoHasta  time.Duration
-	descartar   time.Duration // lo anterior a esto no se enseña ni suena (tras buscar)
-	pcm         []int16       // mono 48 kHz, lo que falta por sonar
-	cola        []Paquete     // vídeo comprimido, en orden
+	gen        int // sube con cada búsqueda: lo leído antes es de otra posición
+	base       time.Duration
+	muestras   int64     // de audio que han sonado desde base
+	pared      time.Time // cuándo arrancó el reloj de pared (desde base)
+	pausado    bool
+	cerrado    bool
+	finLectura bool
+	fin        bool
+	err        error
+	leidoHasta time.Duration
+	descartar  time.Duration // lo anterior a esto no se enseña ni suena (tras buscar)
+	pcm        []int16       // mono 48 kHz, lo que falta por sonar (sin estirar)
+	// velocidad de reproducción (1 la normal); a otra, el PCM pasa por `estirado` al
+	// sonar y el reloj avanza muestras × velocidad.
+	velocidad   float64
+	estirado    estirador
+	cola        []Paquete // vídeo comprimido, en orden
 	volumen     float64
 	silencio    bool
 	cerrarAudio func()
@@ -98,7 +102,7 @@ func Nuevo(src io.ReadSeeker, dispositivo llamada.Dispositivo) (*Reproductor, er
 	if err != nil {
 		return nil, err
 	}
-	r := &Reproductor{w: w, src: src, dispositivo: dispositivo, pausado: true, volumen: 1}
+	r := &Reproductor{w: w, src: src, dispositivo: dispositivo, pausado: true, volumen: 1, velocidad: 1}
 	r.hay = sync.NewCond(&r.mu)
 	if v := w.Pista(TipoVideo); v != nil && v.Codec == CodecVP9 {
 		r.video = v
@@ -177,12 +181,42 @@ func (r *Reproductor) Err() error {
 // reloj es el instante actual; con el cerrojo tomado.
 func (r *Reproductor) reloj() time.Duration {
 	if r.usaAudio() {
-		return r.base + time.Duration(r.muestras)*time.Second/llamada.Muestreo
+		if r.velocidad == 1 {
+			return r.base + time.Duration(r.muestras)*time.Second/llamada.Muestreo
+		}
+		return r.base + time.Duration(float64(r.muestras)*r.velocidad*float64(time.Second)/llamada.Muestreo)
 	}
 	if r.pausado || r.pared.IsZero() {
 		return r.base
 	}
-	return r.base + time.Since(r.pared)
+	return r.base + time.Duration(float64(time.Since(r.pared))*r.velocidad)
+}
+
+// Velocidad es la de reproducción: 1 la normal.
+func (r *Reproductor) Velocidad() float64 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.velocidad
+}
+
+// PonerVelocidad cambia la velocidad (de 0,5 a 2) sin cambiar el tono. El reloj sigue
+// desde donde iba y lo que estaba a medio estirar vuelve a la cola, así que no salta
+// ni el vídeo ni el sonido.
+func (r *Reproductor) PonerVelocidad(v float64) {
+	v = min(max(v, Velocidades[0]), Velocidades[len(Velocidades)-1])
+	r.mu.Lock()
+	if v == r.velocidad {
+		r.mu.Unlock()
+		return
+	}
+	r.base, r.muestras = r.reloj(), 0
+	r.pared = time.Now()
+	r.pcm = append(r.estirado.soltar(), r.pcm...)
+	r.velocidad = v
+	r.estirado.vel = v
+	r.mu.Unlock()
+	r.hay.Broadcast()
+	r.avisar()
 }
 
 func (r *Reproductor) usaAudio() bool { return r.audio != nil && r.cerrarAudio != nil }
@@ -215,6 +249,7 @@ func (r *Reproductor) Reproducir() {
 		} else {
 			r.sinTarjeta = true
 			r.pcm = r.pcm[:0]
+			r.estirado = estirador{vel: r.velocidad}
 		}
 		r.mu.Unlock()
 	}
@@ -264,6 +299,7 @@ func (r *Reproductor) Buscar(t time.Duration) {
 	r.base, r.muestras, r.descartar = t, 0, t
 	r.pared = time.Now()
 	r.pcm, r.cola = r.pcm[:0], r.cola[:0]
+	r.estirado = estirador{vel: r.velocidad}
 	r.leidoHasta, r.finLectura, r.fin, r.err = t, false, false, err
 	r.hayFotograma = false
 	if r.adec != nil {
@@ -332,16 +368,21 @@ func (r *Reproductor) alimentar(out []int16) {
 		clear(out)
 		return
 	}
-	n := min(len(out), len(r.pcm))
+	var n int
+	if r.velocidad == 1 {
+		n = copy(out, r.pcm)
+		r.pcm = r.pcm[n:]
+	} else {
+		n = r.estirado.leer(out, &r.pcm)
+	}
 	ganancia := r.volumen
 	if r.silencio {
 		ganancia = 0
 	}
 	for i := range n {
-		out[i] = int16(float64(r.pcm[i]) * ganancia)
+		out[i] = int16(float64(out[i]) * ganancia)
 	}
 	clear(out[n:])
-	r.pcm = r.pcm[n:]
 	r.muestras += int64(n)
 	if n > 0 {
 		r.hay.Broadcast()

@@ -7,6 +7,7 @@
   "block.short": "Loka á",
   "card.untitledOwner": "Óþekkt nafn",
   "card.watch": "Horfa á {title}",
+  "card.watched": "{percent}% horft",
   "channel.count": {
     "one": "{count} opinbert myndband",
     "other": "{count} opinber myndbönd"
@@ -153,7 +154,12 @@
   "player.qualityAuto": "Sjálfvirkt",
   "player.qualityAutoNow": "Sjálfvirkt ({quality})",
   "player.region": "Myndspilari",
+  "player.restart": "Byrja frá upphafi",
+  "player.resumedAt": "Heldur áfram frá {time}",
   "player.seek": "Staðsetning",
+  "player.speed": "Hraði",
+  "player.speedNormal": "Venjulegur",
+  "player.speedNow": "Hraði {rate}",
   "player.unmute": "Kveikja á hljóði",
   "player.volume": "Hljóðstyrkur",
   "quality.approximate": "Gróft mat: lengd myndskeiðsins er ekki enn þekkt.",

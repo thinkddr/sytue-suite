@@ -30,6 +30,14 @@ func (v *Vista) ConBuzon(b Buzon) *Vista {
 	v.avisos.AlMarcarTodas = v.marcarTodas
 	v.avisos.AlSilenciar = v.silenciar
 	v.avisos.AlCargarMas = v.cargarMas
+	v.avisos.AlReintentarReglas = func() {
+		v.mu.Lock()
+		ctx := v.ctxBandeja
+		v.mu.Unlock()
+		if ctx != nil {
+			go v.cargarReglas(ctx)
+		}
+	}
 	v.avisos.AlReintentar = func() {
 		v.cerrarBandeja()
 		v.abrirBandeja()
@@ -51,6 +59,7 @@ func (v *Vista) abrirBandeja() {
 	v.pararFlujo, v.ctxBandeja = parar, ctx
 	v.mu.Unlock()
 	go v.cargarAvisos(ctx)
+	go v.cargarReglas(ctx)
 	go v.escucharAvisos(ctx)
 }
 
@@ -65,8 +74,8 @@ func (v *Vista) cerrarBandeja() {
 	}
 }
 
-// cargarAvisos pide los cien últimos y, aparte, las reglas: si el Hub no sirve las
-// reglas, la bandeja sigue siendo útil y solo se queda esa sección con lo de siempre.
+// cargarAvisos pide los cien últimos. Las reglas van aparte (`cargarReglas`): si el Hub
+// no las sirve, la lista sigue siendo útil.
 func (v *Vista) cargarAvisos(ctx context.Context) {
 	v.enUI(func() { v.avisos.Estado, v.avisos.Items, v.avisos.HayMas = Cargando, nil, false; v.generacion++ })
 	c, cancelar := context.WithTimeout(ctx, 15*time.Second)
@@ -80,11 +89,30 @@ func (v *Vista) cargarAvisos(ctx context.Context) {
 		v.avisos.Items, v.avisos.Estado = items, EstadoDe(err)
 		v.avisos.HayMas = err == nil && len(items) >= MaxAvisosBandeja
 	})
+}
 
+// cargarReglas pide las reglas de silencio con su propio ciclo. Antes, si fallaban, la
+// sección se quedaba con todo ENCENDIDO aunque hubiera cosas calladas; ahora lo dice y
+// no ofrece interruptores hasta saber en qué posición están.
+func (v *Vista) cargarReglas(ctx context.Context) {
+	org := v.org()
+	v.enUI(func() {
+		v.avisos.CargaReglas, v.avisos.Organizacion = ReglasCargando, org
+		v.avisos.FalloRegla = nil
+	})
+	c, cancelar := context.WithTimeout(ctx, 15*time.Second)
+	defer cancelar()
 	reglas, err := v.buzon.NotificationPrefs(c)
-	if err == nil && ctx.Err() == nil {
-		v.enUI(func() { v.avisos.Reglas = reglas })
+	if ctx.Err() != nil {
+		return
 	}
+	v.enUI(func() {
+		if err != nil {
+			v.avisos.CargaReglas = ReglasFallo
+			return
+		}
+		v.avisos.Reglas, v.avisos.CargaReglas = reglas, ReglasListas
+	})
 }
 
 // cargarMas trae la página de detrás del último aviso de la lista y la añade sin
@@ -185,11 +213,48 @@ func (v *Vista) marcarTodas() {
 	v.segundoPlano(func(ctx context.Context) { _ = v.buzon.MarkAllRead(ctx) })
 }
 
+// silenciar es optimista, como en la web, pero no a ciegas: si el Hub no lo guarda se
+// deshace SOLO la regla de ese origen —las demás pueden haberse guardado entretanto— y
+// su fila lo dice. Mientras guarda, el interruptor no admite otro clic.
 func (v *Vista) silenciar(origen string, silenciar bool) {
-	v.enUI(func() { v.avisos.Reglas = ConRegla(v.avisos.Reglas, origen, silenciar) })
+	// Bajo el cerrojo y no en enUI: `antes` y `ocupado` hacen falta ya, y enUI puede
+	// correr más tarde.
+	v.mu.Lock()
+	if v.avisos.GuardandoRegla[origen] {
+		v.mu.Unlock()
+		return
+	}
+	antes := Silenciado(v.avisos.Reglas, origen)
+	v.avisos.Reglas = ConRegla(v.avisos.Reglas, origen, silenciar)
+	v.avisos.GuardandoRegla = conClave(v.avisos.GuardandoRegla, origen, true)
+	v.avisos.FalloRegla = conClave(v.avisos.FalloRegla, origen, false)
+	v.mu.Unlock()
+	v.enUI(func() {}) // repinta
 	v.segundoPlano(func(ctx context.Context) {
-		_, _ = v.buzon.SetNotificationPref(ctx, api.HubNotificationPref{Source: origen, Muted: silenciar})
+		_, err := v.buzon.SetNotificationPref(ctx, api.HubNotificationPref{Source: origen, Muted: silenciar})
+		v.enUI(func() {
+			if err != nil {
+				v.avisos.Reglas = ConRegla(v.avisos.Reglas, origen, antes)
+				v.avisos.FalloRegla = conClave(v.avisos.FalloRegla, origen, true)
+			}
+			v.avisos.GuardandoRegla = conClave(v.avisos.GuardandoRegla, origen, false)
+		})
 	})
+}
+
+// conClave devuelve una copia del conjunto con la clave dentro o fuera: el renderer lo
+// lee en su rutina y no se le cambia por debajo.
+func conClave(m map[string]bool, clave string, dentro bool) map[string]bool {
+	out := make(map[string]bool, len(m)+1)
+	for k := range m {
+		out[k] = true
+	}
+	if dentro {
+		out[clave] = true
+	} else {
+		delete(out, clave)
+	}
+	return out
 }
 
 // segundoPlano lanza un acuse al Hub con su propio plazo. Falla en silencio, como en la

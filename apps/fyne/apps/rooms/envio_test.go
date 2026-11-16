@@ -27,6 +27,9 @@ func (s *servicioFalso) PostWith(ctx context.Context, c, texto string, o api.Roo
 
 func (s *servicioFalso) ReplyWith(ctx context.Context, raiz, texto string, o api.RoomsSend) (api.RoomsMessage, error) {
 	s.envios = append(s.envios, o)
+	if s.errReply != nil {
+		return api.RoomsMessage{}, s.errReply
+	}
 	return s.Reply(ctx, raiz, texto)
 }
 
@@ -355,7 +358,7 @@ func TestLaFechaDeUnProgramado(t *testing.T) {
 	if got := RotuloProgramado("es", jueves); !strings.HasPrefix(got, "jue") || !strings.HasSuffix(got, "09:05") {
 		t.Errorf("la ficha dice %q", got)
 	}
-	if got := RotuloCuando("es", jueves); strings.HasPrefix(got, "jue") || !strings.HasSuffix(got, "09:05") {
+	if got := RotuloCuando("es", jueves, jueves); strings.HasPrefix(got, "jue") || !strings.HasSuffix(got, "09:05") {
 		t.Errorf("la fila dice %q", got)
 	}
 }

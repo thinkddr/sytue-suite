@@ -67,41 +67,57 @@ func visOrNil(v domain.Visibility) *string {
 	return &s
 }
 
+const noteCanvasOrder = "n.pinned DESC, n.col, n.position, n.created_at, n.id"
+
 // ListNotes devuelve las notas vivas de un cuaderno visible para `sub`, con sus
 // estados de etiqueta y sus enlaces ya adjuntos.
 func (s *Store) ListNotes(ctx context.Context, notebookID uuid.UUID, sub string) ([]domain.Note, error) {
-	return s.listNotes(ctx, notebookID, sub, nil, 0, "n.pinned DESC, n.col, n.position, n.created_at, n.id")
+	return s.listNotes(ctx, notebookID, sub, nil, 0, noteCanvasOrder)
 }
 
 func (s *Store) listNotes(ctx context.Context, notebookID uuid.UUID, sub string, after *uuid.UUID, fetch int, order string) ([]domain.Note, error) {
-	t := tenancy.MustFrom(ctx)
+	_ = tenancy.MustFrom(ctx)
 	var out []domain.Note
 	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
-		rows, err := tx.Query(ctx, `
-			SELECT `+noteCols+`
-			  FROM notes n
-			  JOIN notebooks nb ON nb.id = n.notebook_id AND nb.deleted_at IS NULL
-			 WHERE n.tenant = $1 AND n.notebook_id = $2 AND n.deleted_at IS NULL
-			   AND `+legiblePorCuaderno("$3")+`
-			 AND ($4::uuid IS NULL OR n.id > $4)
-			 ORDER BY `+order+` LIMIT NULLIF($5,0)`, t.Slug, notebookID, sub, after, fetch)
-		if err != nil {
-			return err
-		}
-		defer rows.Close()
-		for rows.Next() {
-			n, err := scanNote(rows, t.Slug)
-			if err != nil {
-				return err
-			}
-			out = append(out, n)
-		}
-		if err := rows.Err(); err != nil {
-			return err
-		}
-		return s.adjuntarEnPaquete(ctx, tx, t.Slug, out)
+		var err error
+		out, err = s.listNotesPageTx(ctx, tx, notebookID, sub, after, fetch, order)
+		return err
 	})
 	return out, err
+}
+
+// listNotesTx reads the same visible, ordered notes and related records in an
+// existing tenant transaction. The caller owns transaction scope and isolation.
+func (s *Store) listNotesTx(ctx context.Context, tx pgx.Tx, notebookID uuid.UUID, sub string) ([]domain.Note, error) {
+	return s.listNotesPageTx(ctx, tx, notebookID, sub, nil, 0, noteCanvasOrder)
+}
+
+func (s *Store) listNotesPageTx(ctx context.Context, tx pgx.Tx, notebookID uuid.UUID, sub string, after *uuid.UUID, fetch int, order string) ([]domain.Note, error) {
+	t := tenancy.MustFrom(ctx)
+	var out []domain.Note
+	rows, err := tx.Query(ctx, `
+		SELECT `+noteCols+`
+		  FROM notes n
+		  JOIN notebooks nb ON nb.id = n.notebook_id AND nb.deleted_at IS NULL
+		 WHERE n.tenant = $1 AND n.notebook_id = $2 AND n.deleted_at IS NULL
+		   AND `+legiblePorCuaderno("$3")+`
+		 AND ($4::uuid IS NULL OR n.id > $4)
+		 ORDER BY `+order+` LIMIT NULLIF($5,0)`, t.Slug, notebookID, sub, after, fetch)
+	if err != nil {
+		return out, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		n, err := scanNote(rows, t.Slug)
+		if err != nil {
+			return out, err
+		}
+		out = append(out, n)
+	}
+	if err := rows.Err(); err != nil {
+		return out, err
+	}
+	return out, s.adjuntarEnPaquete(ctx, tx, t.Slug, out)
 }
 
 // adjuntarEnPaquete rellena estados y enlaces de TODAS las notas con dos consultas
@@ -169,6 +185,11 @@ func (s *Store) CreateNote(ctx context.Context, notebookID uuid.UUID, sub string
 	t := tenancy.MustFrom(ctx)
 	var n domain.Note
 	err := s.inWriteTx(ctx, func(tx pgx.Tx) error {
+		if in.GroupID != nil {
+			if err := lockNoteTree(ctx, tx, t.Slug); err != nil {
+				return err
+			}
+		}
 		if err := normalizeNewNoteWrite(ctx, tx, t.Slug, notebookID, sub, &in); err != nil {
 			return err
 		}
@@ -273,6 +294,30 @@ type Antes struct {
 	Titulo, Contenido string
 }
 
+// admiteEscritura son las comprobaciones de un guardado con la nota ya bloqueada: las del
+// cifrado y, después, la de la versión esperada (conflicto entre dispositivos). Normaliza
+// `in` si el cuaderno está cifrado.
+func admiteEscritura(state noteWriteState, in *domain.NoteInput) error {
+	if state.encrypted || in.ContentCipher != "" {
+		if err := in.Normalize(state.encrypted); err != nil {
+			return err
+		}
+	}
+	if state.encrypted && !state.cryptoMatches {
+		return domain.ErrNotebookCryptoChanged
+	}
+	if state.encrypted && (state.note.Title != "" || state.note.Content != "" || !domain.EncryptedPublicData(state.note.Data, true)) {
+		return domain.ErrEncryptedMigrationRequired
+	}
+	// Después de las comprobaciones del cifrado (que piden otra cosa al cliente) y
+	// con la fila bloqueada (FOR UPDATE): dos escrituras con la misma versión
+	// esperada no pueden pasar las dos.
+	if in.ChocaCon(state.note.UpdatedAt) {
+		return domain.ErrNoteEditConflict
+	}
+	return nil
+}
+
 // ActualizarNota es UpdateNote diciendo además cómo estaba ANTES: repetir una tarea es
 // cosa del paso de sin hacer a hecha, no de reenviar `checked: true` al cambiarle el
 // texto. La fila se bloquea al leerla, así que dos guardados a la vez no ven los dos
@@ -282,92 +327,107 @@ func (s *Store) ActualizarNota(ctx context.Context, id uuid.UUID, sub string, in
 	var n domain.Note
 	var antes Antes
 	err := s.inWriteTx(ctx, func(tx pgx.Tx) error {
-		// POR DÓNDE ESCRIBE: por el cuaderno (dueño, organización o editora) o SOLO
-		// porque le compartieron la nota con edición (0010). Quien llega por lo
-		// segundo cambia su contenido y nada más: ni la visibilidad —abrir a todo el
-		// cuaderno una nota privada que le enseñaron es justo lo que no se le dio—,
-		// ni si se indexa, ni el grupo, que es colgarla de otra nota del cuaderno.
-		state, err := lockNoteWrite(ctx, tx, t.Slug, id, sub, in.ExpectedCrypto)
-		if err != nil {
-			return err
-		}
-		porCuaderno := state.byNotebook
-		antes = Antes{Checked: state.note.Checked, Titulo: state.note.Title, Contenido: state.note.Content}
-		if state.encrypted || in.ContentCipher != "" {
-			if err := in.Normalize(state.encrypted); err != nil {
-				return err
-			}
-		}
-		if state.encrypted && !state.cryptoMatches {
-			return domain.ErrNotebookCryptoChanged
-		}
-		if state.encrypted && (state.note.Title != "" || state.note.Content != "" || !domain.EncryptedPublicData(state.note.Data, true)) {
-			return domain.ErrEncryptedMigrationRequired
-		}
-		if !porCuaderno {
-			in.Visibility, in.Indexable, in.GroupID = state.note.Visibility, state.note.Indexable, nil
-			// Ni el tipo ni el sitio en el lienzo: son de quien ordena el cuaderno. Ni sus
-			// datos ni sus enlaces, que la cuelgan de otras cosas de la suite y la sacan en
-			// sus retroenlaces a quien lee el cuaderno.
-			in.Kind, in.Data = "", nil
-			in.X, in.Y, in.Col, in.Position, in.Width = nil, nil, nil, nil, nil
-			in.Collapsed, in.Pinned = nil, nil
-		}
-		if err := grupoAdmisible(ctx, tx, t.Slug, id, nil, in.GroupID); err != nil {
-			return err
-		}
-		row := tx.QueryRow(ctx, `
-			UPDATE notes n
-			   SET kind = COALESCE(NULLIF($4, ''), n.kind), title = $5, content = $6, content_cipher = $7,
-			       -- Task controls are authored by the service and survive content writes.
-			       data = CASE WHEN $8::jsonb IS NULL THEN n.data
-			                   WHEN jsonb_typeof($8::jsonb) = 'object'
-			                   THEN $8::jsonb || `+taskControls+`
-			                   ELSE $8::jsonb END,
-			       x = COALESCE($9, n.x), y = COALESCE($10, n.y), col = COALESCE($11, n.col),
-			       position = COALESCE($12, n.position), width = COALESCE($13, n.width),
-			       group_id = COALESCE($14, n.group_id), collapsed = COALESCE($15, n.collapsed),
-			       checked = COALESCE($16, n.checked), pinned = COALESCE($17, n.pinned),
-			       -- La fecha se guarda al marcar y se conserva al reeditar; desmarcar la borra.
-			       checked_at = CASE WHEN COALESCE($16, n.checked) THEN COALESCE(n.checked_at, now()) END,
-			       cancelled_at = CASE WHEN $20::boolean IS NULL THEN n.cancelled_at
-			                           WHEN $20 THEN COALESCE(n.cancelled_at, now()) END,
-			       visibility = $18, indexable = $19, updated_at = now()
-			  FROM notebooks nb
-			 WHERE n.tenant = $1 AND n.id = $2 AND n.deleted_at IS NULL
-			   AND nb.id = n.notebook_id AND nb.deleted_at IS NULL
-			   AND (((nb.owner_sub = $3 OR nb.visibility = 'organization' OR EXISTS (SELECT 1 FROM notebook_editores e WHERE e.notebook_id = nb.id AND e.sujeto = $3))
-			         AND (n.visibility IS NULL OR n.visibility <> 'private' OR n.owner_sub = $3))
-			        OR (EXISTS (SELECT 1 FROM note_personas c WHERE c.note_id = n.id AND c.sujeto = $3 AND c.puede_editar)
-			             AND (nb.owner_sub = n.owner_sub OR nb.visibility = 'organization' OR EXISTS (SELECT 1 FROM notebook_editores e WHERE e.notebook_id = nb.id AND e.sujeto = n.owner_sub))))
-			RETURNING `+noteCols, // con alias: hay un FROM notebooks y `id`, `title`… existen en las dos tablas
-			t.Slug, id, sub, in.Kind, in.Title, in.Content, in.ContentCipher, []byte(in.Data),
-			in.X, in.Y, in.Col, in.Position, in.Width, in.GroupID, in.Collapsed, in.Checked, in.Pinned,
-			visOrNil(in.Visibility), in.Indexable, in.Cancelled)
-		got, e := scanNote(row, t.Slug)
-		if isNoRows(e) {
-			return domain.ErrNotFound
-		}
-		if checkViolation(e) {
-			return domain.ErrInvalidInput
-		}
-		if e != nil {
-			return e
-		}
-		if !porCuaderno {
-			una := []domain.Note{got}
-			e := s.adjuntarEnPaquete(ctx, tx, t.Slug, una)
-			n = una[0]
-			return e
-		}
-		if err := reemplazarEnlaces(ctx, tx, t.Slug, got.ID, in.Links); err != nil {
-			return err
-		}
-		got.Links = in.Links
-		n = got
-		return nil
+		var err error
+		n, antes, err = s.actualizarNotaTx(ctx, tx, t.Slug, id, sub, in)
+		return err
 	})
 	return n, antes, err
+}
+
+func (s *Store) actualizarNotaTx(ctx context.Context, tx pgx.Tx, tenant string, id uuid.UUID, sub string, in domain.NoteInput) (domain.Note, Antes, error) {
+	if in.GroupID != nil {
+		if err := lockNoteTree(ctx, tx, tenant); err != nil {
+			return domain.Note{}, Antes{}, err
+		}
+	}
+	// POR DÓNDE ESCRIBE: por el cuaderno (dueño, organización o editora) o SOLO
+	// porque le compartieron la nota con edición (0010). Quien llega por lo
+	// segundo cambia su contenido y nada más: ni la visibilidad —abrir a todo el
+	// cuaderno una nota privada que le enseñaron es justo lo que no se le dio—,
+	// ni si se indexa, ni el grupo, que es colgarla de otra nota del cuaderno.
+	state, err := lockNoteWrite(ctx, tx, tenant, id, sub, in.ExpectedCrypto)
+	if err != nil {
+		return domain.Note{}, Antes{}, err
+	}
+	porCuaderno := state.byNotebook
+	antes := Antes{Checked: state.note.Checked, Titulo: state.note.Title, Contenido: state.note.Content}
+	if err := admiteEscritura(state, &in); err != nil {
+		return domain.Note{}, Antes{}, err
+	}
+	if !porCuaderno {
+		restringirEntradaCompartida(&in, state.note)
+	}
+	if err := grupoAdmisible(ctx, tx, tenant, id, nil, in.GroupID); err != nil {
+		return domain.Note{}, Antes{}, err
+	}
+	// Cómo estaba antes, al historial (versiones.go). Con la fila ya bloqueada y
+	// después de admitir la escritura: un guardado rechazado no deja versión.
+	if err := guardarVersion(ctx, tx, tenant, sub, state.note, in); err != nil {
+		return domain.Note{}, Antes{}, err
+	}
+	got, err := ejecutarUpdateNota(ctx, tx, tenant, id, sub, in)
+	if err != nil {
+		return domain.Note{}, Antes{}, err
+	}
+	if !porCuaderno {
+		una := []domain.Note{got}
+		err := s.adjuntarEnPaquete(ctx, tx, tenant, una)
+		return una[0], antes, err
+	}
+	if err := reemplazarEnlaces(ctx, tx, tenant, got.ID, in.Links); err != nil {
+		return domain.Note{}, Antes{}, err
+	}
+	got.Links = in.Links
+	return got, antes, nil
+}
+
+func restringirEntradaCompartida(in *domain.NoteInput, note domain.Note) {
+	in.Visibility, in.Indexable, in.GroupID = note.Visibility, note.Indexable, nil
+	// Ni el tipo ni el sitio en el lienzo: son de quien ordena el cuaderno. Ni sus
+	// datos ni sus enlaces, que la cuelgan de otras cosas de la suite y la sacan en
+	// sus retroenlaces a quien lee el cuaderno.
+	in.Kind, in.Data = "", nil
+	in.X, in.Y, in.Col, in.Position, in.Width = nil, nil, nil, nil, nil
+	in.Collapsed, in.Pinned = nil, nil
+}
+
+func ejecutarUpdateNota(ctx context.Context, tx pgx.Tx, tenant string, id uuid.UUID, sub string, in domain.NoteInput) (domain.Note, error) {
+	row := tx.QueryRow(ctx, `
+		UPDATE notes n
+		   SET kind = COALESCE(NULLIF($4, ''), n.kind), title = $5, content = $6, content_cipher = $7,
+		       -- Task controls are authored by the service and survive content writes.
+		       data = CASE WHEN $8::jsonb IS NULL THEN n.data
+		                   WHEN jsonb_typeof($8::jsonb) = 'object'
+		                   THEN $8::jsonb || `+taskControls+`
+		                   ELSE $8::jsonb END,
+		       x = COALESCE($9, n.x), y = COALESCE($10, n.y), col = COALESCE($11, n.col),
+		       position = COALESCE($12, n.position), width = COALESCE($13, n.width),
+		       group_id = COALESCE($14, n.group_id), collapsed = COALESCE($15, n.collapsed),
+		       checked = COALESCE($16, n.checked), pinned = COALESCE($17, n.pinned),
+		       -- La fecha se guarda al marcar y se conserva al reeditar; desmarcar la borra.
+		       checked_at = CASE WHEN COALESCE($16, n.checked) THEN COALESCE(n.checked_at, now()) END,
+		       cancelled_at = CASE WHEN $20::boolean IS NULL THEN n.cancelled_at
+		                           WHEN $20 THEN COALESCE(n.cancelled_at, now()) END,
+		       visibility = $18, indexable = $19, updated_at = now()
+		  FROM notebooks nb
+		 WHERE n.tenant = $1 AND n.id = $2 AND n.deleted_at IS NULL
+		   AND nb.id = n.notebook_id AND nb.deleted_at IS NULL
+		   AND (((nb.owner_sub = $3 OR nb.visibility = 'organization' OR EXISTS (SELECT 1 FROM notebook_editores e WHERE e.notebook_id = nb.id AND e.sujeto = $3))
+		         AND (n.visibility IS NULL OR n.visibility <> 'private' OR n.owner_sub = $3))
+		        OR (EXISTS (SELECT 1 FROM note_personas c WHERE c.note_id = n.id AND c.sujeto = $3 AND c.puede_editar)
+		             AND (nb.owner_sub = n.owner_sub OR nb.visibility = 'organization' OR EXISTS (SELECT 1 FROM notebook_editores e WHERE e.notebook_id = nb.id AND e.sujeto = n.owner_sub))))
+		RETURNING `+noteCols, // con alias: hay un FROM notebooks y `id`, `title`… existen en las dos tablas
+		tenant, id, sub, in.Kind, in.Title, in.Content, in.ContentCipher, []byte(in.Data),
+		in.X, in.Y, in.Col, in.Position, in.Width, in.GroupID, in.Collapsed, in.Checked, in.Pinned,
+		visOrNil(in.Visibility), in.Indexable, in.Cancelled)
+	got, err := scanNote(row, tenant)
+	if isNoRows(err) {
+		return domain.Note{}, domain.ErrNotFound
+	}
+	if checkViolation(err) {
+		return domain.Note{}, domain.ErrInvalidInput
+	}
+	return got, err
 }
 
 // MoveNote reubica una nota (lienzo libre o columnas) sin tocar su contenido. Es
@@ -375,6 +435,9 @@ func (s *Store) ActualizarNota(ctx context.Context, id uuid.UUID, sub string, in
 func (s *Store) MoveNote(ctx context.Context, id uuid.UUID, sub string, x, y, col, position int, groupID *uuid.UUID) error {
 	t := tenancy.MustFrom(ctx)
 	return s.inWriteTx(ctx, func(tx pgx.Tx) error {
+		if err := lockNoteTree(ctx, tx, t.Slug); err != nil {
+			return err
+		}
 		if err := grupoAdmisible(ctx, tx, t.Slug, id, nil, groupID); err != nil {
 			return err
 		}
@@ -405,48 +468,204 @@ func (s *Store) MoveNote(ctx context.Context, id uuid.UUID, sub string, x, y, co
 func (s *Store) MoveNoteToNotebook(ctx context.Context, id uuid.UUID, sub string, destino uuid.UUID) error {
 	t := tenancy.MustFrom(ctx)
 	return s.inWriteTx(ctx, func(tx pgx.Tx) error {
-		var origenCifrado, destinoCifrado bool
-		err := tx.QueryRow(ctx, `
-			SELECT o.encrypted, d.encrypted
-			  FROM notes n
-			  JOIN notebooks o ON o.id = n.notebook_id AND o.deleted_at IS NULL
-			  JOIN notebooks d ON d.tenant = $1 AND d.id = $4 AND d.deleted_at IS NULL
-			 WHERE n.tenant = $1 AND n.id = $2 AND n.deleted_at IS NULL AND d.id <> o.id
-			   AND (o.owner_sub = $3 OR o.visibility = 'organization' OR EXISTS (SELECT 1 FROM notebook_editores e WHERE e.notebook_id = o.id AND e.sujeto = $3))
-			   AND (d.owner_sub = $3 OR d.visibility = 'organization' OR EXISTS (SELECT 1 FROM notebook_editores e WHERE e.notebook_id = d.id AND e.sujeto = $3))`,
-			t.Slug, id, sub, destino).Scan(&origenCifrado, &destinoCifrado)
-		if isNoRows(err) {
-			// Nota, cuaderno de destino o permiso que faltan: se contestan igual
-			// para no revelar cuáles existen.
+		return moveNoteToNotebookTx(ctx, tx, t.Slug, id, sub, destino)
+	})
+}
+
+func moveNoteToNotebookTx(ctx context.Context, tx pgx.Tx, tenant string, id uuid.UUID, sub string, destino uuid.UUID) error {
+	if err := lockNoteTree(ctx, tx, tenant); err != nil {
+		return err
+	}
+	origen, err := resolveMoveOrigin(ctx, tx, tenant, id, sub, destino)
+	if err != nil {
+		return err
+	}
+	if err := lockAndVerifyMoveNotebooks(ctx, tx, tenant, sub, origen, destino); err != nil {
+		return err
+	}
+	if err := lockMoveRootNote(ctx, tx, tenant, id, origen); err != nil {
+		return err
+	}
+	familia, err := lockMoveFamily(ctx, tx, tenant, id, origen)
+	if err != nil {
+		return err
+	}
+	return executeMoveFamily(ctx, tx, tenant, id, destino, origen, familia)
+}
+
+func resolveMoveOrigin(ctx context.Context, tx pgx.Tx, tenant string, id uuid.UUID, sub string, destino uuid.UUID) (uuid.UUID, error) {
+	// Find the candidate origin, then lock both notebooks in a stable order.
+	// The candidate is rechecked below after waiting: a concurrent move may
+	// have changed it before these locks were acquired.
+	var origen uuid.UUID
+	err := tx.QueryRow(ctx, `SELECT n.notebook_id FROM notes n
+		JOIN notebooks o ON o.id=n.notebook_id AND o.tenant=n.tenant AND o.deleted_at IS NULL
+		JOIN notebooks d ON d.tenant=$1 AND d.id=$4 AND d.deleted_at IS NULL
+		WHERE n.tenant=$1 AND n.id=$2 AND n.deleted_at IS NULL AND d.id<>o.id
+		  AND (o.owner_sub=$3 OR o.visibility='organization' OR EXISTS
+		       (SELECT 1 FROM notebook_editores e WHERE e.notebook_id=o.id AND e.sujeto=$3))
+		  AND (d.owner_sub=$3 OR d.visibility='organization' OR EXISTS
+		       (SELECT 1 FROM notebook_editores e WHERE e.notebook_id=d.id AND e.sujeto=$3))`,
+		tenant, id, sub, destino).Scan(&origen)
+	if isNoRows(err) {
+		return uuid.Nil, domain.ErrNotFound
+	}
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if origen == destino {
+		return uuid.Nil, domain.ErrNotFound
+	}
+	return origen, nil
+}
+
+type moveNotebookAccess struct {
+	owner      string
+	visibility domain.Visibility
+	encrypted  bool
+}
+
+func lockAndVerifyMoveNotebooks(ctx context.Context, tx pgx.Tx, tenant, sub string, origen, destino uuid.UUID) error {
+	locked, err := queryLockedMoveNotebooks(ctx, tx, tenant, origen, destino)
+	if err != nil {
+		return err
+	}
+	if len(locked) != 2 {
+		return domain.ErrNotFound
+	}
+	editors, err := queryLockedMoveGrants(ctx, tx, tenant, sub, origen, destino)
+	if err != nil {
+		return err
+	}
+	for bookID, book := range locked {
+		if book.owner != sub && book.visibility != domain.VisOrganization && !editors[bookID] {
 			return domain.ErrNotFound
 		}
-		if err != nil {
-			return err
+	}
+	if locked[origen].encrypted || locked[destino].encrypted {
+		return domain.ErrInvalidInput
+	}
+	return nil
+}
+
+func queryLockedMoveNotebooks(ctx context.Context, tx pgx.Tx, tenant string, origen, destino uuid.UUID) (map[uuid.UUID]moveNotebookAccess, error) {
+	books, err := tx.Query(ctx, `SELECT id,owner_sub,visibility,encrypted FROM notebooks /* notes_move_lock_books */
+		WHERE tenant=$1 AND id=ANY($2::uuid[]) AND deleted_at IS NULL
+		ORDER BY id FOR UPDATE`, tenant, []uuid.UUID{origen, destino})
+	if err != nil {
+		return nil, err
+	}
+	defer books.Close()
+	locked := make(map[uuid.UUID]moveNotebookAccess, 2)
+	for books.Next() {
+		var bookID uuid.UUID
+		var book moveNotebookAccess
+		if err := books.Scan(&bookID, &book.owner, &book.visibility, &book.encrypted); err != nil {
+			return nil, err
 		}
-		if origenCifrado || destinoCifrado {
-			return domain.ErrInvalidInput
+		locked[bookID] = book
+	}
+	return locked, books.Err()
+}
+
+func queryLockedMoveGrants(ctx context.Context, tx pgx.Tx, tenant, sub string, origen, destino uuid.UUID) (map[uuid.UUID]bool, error) {
+	// A grant used for this move must survive until commit. Read and lock
+	// existing editor rows, rather than re-reading an unlocked EXISTS later.
+	grants, err := tx.Query(ctx, `SELECT notebook_id FROM notebook_editores /* notes_move_lock_grants */
+		WHERE tenant=$1 AND sujeto=$2 AND notebook_id=ANY($3::uuid[])
+		ORDER BY notebook_id FOR SHARE`, tenant, sub, []uuid.UUID{origen, destino})
+	if err != nil {
+		return nil, err
+	}
+	defer grants.Close()
+	editors := make(map[uuid.UUID]bool, 2)
+	for grants.Next() {
+		var bookID uuid.UUID
+		if err := grants.Scan(&bookID); err != nil {
+			return nil, err
 		}
-		_, err = tx.Exec(ctx, `
-			WITH RECURSIVE familia AS (
-				SELECT id, 0 AS nivel FROM notes WHERE tenant = $1 AND id = $2
-				UNION ALL
-				SELECT c.id, f.nivel + 1 FROM notes c JOIN familia f ON c.group_id = f.id
-				 WHERE c.tenant = $1 AND f.nivel < 64
-			)
-			UPDATE notes n
-			   SET notebook_id = $3,
-			       group_id = CASE WHEN n.id = $2 THEN NULL ELSE n.group_id END,
-			       col = CASE WHEN n.id = $2 THEN 0 ELSE n.col END,
-			       position = CASE WHEN n.id = $2
-			                       THEN (SELECT COALESCE(max(position), 0) + 1 FROM notes
-			                              WHERE tenant = $1 AND notebook_id = $3 AND col = 0
-			                                AND deleted_at IS NULL)
-			                       ELSE n.position END,
-			       updated_at = now()
-			 WHERE n.tenant = $1 AND n.id IN (SELECT id FROM familia)`,
-			t.Slug, id, destino)
+		editors[bookID] = true
+	}
+	return editors, grants.Err()
+}
+
+func lockMoveRootNote(ctx context.Context, tx pgx.Tx, tenant string, id, origen uuid.UUID) error {
+	var actual uuid.UUID
+	err := tx.QueryRow(ctx, `
+		SELECT n.notebook_id FROM notes n
+		 WHERE n.tenant=$1 AND n.id=$2 AND n.deleted_at IS NULL AND n.notebook_id=$3
+		 FOR UPDATE OF n`, tenant, id, origen).Scan(&actual)
+	if isNoRows(err) {
+		// Nota, cuaderno de destino o permiso que faltan: se contestan igual
+		// para no revelar cuáles existen.
+		return domain.ErrNotFound
+	}
+	return err
+}
+
+func lockMoveFamily(ctx context.Context, tx pgx.Tx, tenant string, id, origen uuid.UUID) ([]uuid.UUID, error) {
+	// Freeze and inspect every row we will move. An orphaned ciphertext in an
+	// otherwise unencrypted notebook cannot safely be copied to another one.
+	rows, err := tx.Query(ctx, `
+		WITH RECURSIVE familia AS (
+			SELECT id, 0 AS nivel FROM notes WHERE tenant = $1 AND id = $2
+			UNION ALL
+			SELECT c.id, f.nivel + 1 FROM notes c JOIN familia f ON c.group_id = f.id
+			 WHERE c.tenant = $1 AND f.nivel < 64
+		)
+		SELECT n.id,n.notebook_id,n.content_cipher,
+		       (f.nivel=64 AND EXISTS(SELECT 1 FROM notes child WHERE child.tenant=$1 AND child.group_id=n.id))
+		FROM notes n
+		JOIN familia f ON f.id=n.id WHERE n.tenant=$1
+		ORDER BY n.id FOR UPDATE OF n`, tenant, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var familia []uuid.UUID
+	for rows.Next() {
+		var noteID, notebookID uuid.UUID
+		var cipher string
+		var exceedsDepth bool
+		if err := rows.Scan(&noteID, &notebookID, &cipher, &exceedsDepth); err != nil {
+			return nil, err
+		}
+		if notebookID != origen || cipher != "" || exceedsDepth {
+			return nil, domain.ErrInvalidInput
+		}
+		familia = append(familia, noteID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(familia) == 0 {
+		return nil, domain.ErrNotFound
+	}
+	return familia, nil
+}
+
+func executeMoveFamily(ctx context.Context, tx pgx.Tx, tenant string, id, destino, origen uuid.UUID, familia []uuid.UUID) error {
+	tag, err := tx.Exec(ctx, `
+		UPDATE notes n
+		   SET notebook_id = $3,
+		       group_id = CASE WHEN n.id = $2 THEN NULL ELSE n.group_id END,
+		       col = CASE WHEN n.id = $2 THEN 0 ELSE n.col END,
+		       position = CASE WHEN n.id = $2
+		                       THEN (SELECT COALESCE(max(position), 0) + 1 FROM notes
+		                              WHERE tenant = $1 AND notebook_id = $3 AND col = 0
+		                                AND deleted_at IS NULL)
+		                       ELSE n.position END,
+		       updated_at = now()
+		 WHERE n.tenant = $1 AND n.notebook_id=$4 AND n.content_cipher=''
+		   AND n.id=ANY($5::uuid[])`,
+		tenant, id, destino, origen, familia)
+	if err != nil {
 		return err
-	})
+	}
+	if tag.RowsAffected() != int64(len(familia)) {
+		return domain.ErrInvalidInput
+	}
+	return nil
 }
 
 // DeleteNote manda una nota a la papelera (borrado suave).
@@ -462,6 +681,9 @@ func (s *Store) RestoreNote(ctx context.Context, id uuid.UUID, sub string) error
 func (s *Store) marcarBorrado(ctx context.Context, id uuid.UUID, sub string, borrar bool) error {
 	t := tenancy.MustFrom(ctx)
 	return s.inWriteTx(ctx, func(tx pgx.Tx) error {
+		if err := lockNoteTree(ctx, tx, t.Slug); err != nil {
+			return err
+		}
 		tag, err := tx.Exec(ctx, `
 			UPDATE notes n
 			   SET deleted_at = CASE WHEN $4 THEN now() ELSE NULL END, updated_at = now()
@@ -484,6 +706,9 @@ func (s *Store) marcarBorrado(ctx context.Context, id uuid.UUID, sub string, bor
 func (s *Store) PurgeNote(ctx context.Context, id uuid.UUID, sub string) error {
 	t := tenancy.MustFrom(ctx)
 	return s.inWriteTx(ctx, func(tx pgx.Tx) error {
+		if err := lockNoteTree(ctx, tx, t.Slug); err != nil {
+			return err
+		}
 		tag, err := tx.Exec(ctx,
 			`DELETE FROM notes WHERE tenant=$1 AND id=$2 AND owner_sub=$3 AND deleted_at IS NOT NULL`,
 			t.Slug, id, sub)
@@ -499,14 +724,32 @@ func (s *Store) PurgeNote(ctx context.Context, id uuid.UUID, sub string) error {
 	})
 }
 
-// ListTrash lista las notas que `sub` tiene en la papelera.
-func (s *Store) ListTrash(ctx context.Context, sub string, limit int) ([]domain.Note, error) {
+// lockNoteTree serializes only structural changes inside one tenant. Acquire
+// it before notebook/note rows or daily-notebook locks, so a family snapshot
+// cannot miss a concurrent insertion, reparent or another family move.
+func lockNoteTree(ctx context.Context, tx pgx.Tx, tenant string) error {
+	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('sytue:notes:tree:' || $1, 0)) /* notes_tree_guard */`, tenant)
+	return err
+}
+
+// ListTrash lista las notas que `sub` tiene en la papelera, con cuándo se borraron, el
+// título de su cuaderno y si una retención legal activa las cubre.
+//
+// El hold se evalúa con LA MISMA condición que la purga (retencion.go): si no casaran,
+// la papelera prometería «se borra en N días» de algo que el recolector no tocará, o
+// al revés, que es peor.
+func (s *Store) ListTrash(ctx context.Context, sub string, limit int) ([]domain.TrashedNote, error) {
 	t := tenancy.MustFrom(ctx)
-	var out []domain.Note
+	var out []domain.TrashedNote
 	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
-			SELECT `+noteCols+`
+			SELECT `+noteCols+`, n.deleted_at, COALESCE(nb.title, ''),
+			       EXISTS (
+			         SELECT 1 FROM legal_holds h
+			          WHERE h.tenant = n.tenant AND h.released_at IS NULL
+			            AND (h.subject IS NULL OR h.subject = n.owner_sub))
 			  FROM notes n
+			  LEFT JOIN notebooks nb ON nb.tenant = n.tenant AND nb.id = n.notebook_id
 			 WHERE n.tenant=$1 AND n.owner_sub=$2 AND n.deleted_at IS NOT NULL
 			 ORDER BY n.deleted_at DESC LIMIT $3`, t.Slug, sub, limit)
 		if err != nil {
@@ -514,11 +757,13 @@ func (s *Store) ListTrash(ctx context.Context, sub string, limit int) ([]domain.
 		}
 		defer rows.Close()
 		for rows.Next() {
-			n, err := scanNote(rows, t.Slug)
+			var tn domain.TrashedNote
+			n, err := scanNote(rows, t.Slug, &tn.DeletedAt, &tn.NotebookTitle, &tn.Held)
 			if err != nil {
 				return err
 			}
-			out = append(out, n)
+			tn.Note = n
+			out = append(out, tn)
 		}
 		return rows.Err()
 	})

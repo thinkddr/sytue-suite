@@ -6,8 +6,10 @@
  *
  *   GET    /api/files?path=/ruta      Lista el contenido de una carpeta con
  *          [&cursor=<opaco>&limit=N]  paginación keyset (carpetas completas en
- *                                     la primera página; ficheros por páginas).
- *                                     Devuelve nextCursor cuando hay más.
+ *          [&orden=&sentido=]         la primera página; ficheros por páginas).
+ *                                     Devuelve nextCursor cuando hay más. El
+ *                                     orden (nombre|modificado|tamano, asc|desc)
+ *                                     lo aplica el servicio.
  *   POST   /api/files                 { path, name? | toPath? } Renombra (name)
  *                                     o mueve (toPath) un recurso. POST y no
  *                                     PATCH: el CSRF de Astro rechaza métodos
@@ -21,6 +23,7 @@
 import type { APIRoute } from 'astro';
 import { upstreamStatus } from '@sytue/api-clients';
 import { driveClientFor } from '../../lib/auth';
+import { ordenDeLaPeticion } from '../../lib/orden';
 
 export const prerender = false;
 
@@ -49,6 +52,7 @@ export const GET: APIRoute = async (ctx) => {
     const page = await client.listPage(path, {
       ...(cursor ? { cursor } : {}),
       ...(Number.isFinite(limit) && limit > 0 ? { limit } : {}),
+      ...ordenDeLaPeticion(params),
     });
     return json({ items: page.items, ...(page.nextCursor ? { nextCursor: page.nextCursor } : {}) });
   } catch (e) {

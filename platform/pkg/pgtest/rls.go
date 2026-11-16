@@ -113,15 +113,10 @@ func ExigirRLSForzada(t *testing.T, h *Harness, excepciones map[string]string) {
 	}
 }
 
-// ExigirPoliticaDeFusion comprueba que TODA tabla con columna `tenant` tenga una
-// política de fusión que el preflight de Sytue ID reconozca. Usa la MISMA consulta que
-// ese preflight (pg.ConsultaTablasConTenant): una tabla que no la pase aborta TODAS
-// las fusiones de organizaciones de la suite, no solo las del servicio que la creó,
-// y eso se descubre meses después en la consola de administración.
-//
-// No admite excepciones, a diferencia de ExigirRLSForzada: una tabla con `tenant` que
-// la fusión no mueve deja las filas de la organización absorbida con un tenant que ya
-// no existe. `events_outbox` también la necesita, aunque no lleve RLS forzada.
+// ExigirPoliticaDeFusion requires an explicit contract for every tenant table:
+// either it can move, or its Scope-bound data blocks the entire source/target
+// merge. It uses the same inventory as the production preflight; a blocker is
+// never an exception granting permission to retag cryptographic identities.
 func ExigirPoliticaDeFusion(t *testing.T, h *Harness) {
 	t.Helper()
 	tablas, sinPolitica, err := pg.ConsultaTablasConTenant(context.Background(), h.Pool)
@@ -132,7 +127,6 @@ func ExigirPoliticaDeFusion(t *testing.T, h *Harness) {
 		t.Fatal("pgtest: ninguna tabla con columna `tenant`; ¿se aplicaron las migraciones?")
 	}
 	for _, tabla := range sinPolitica {
-		t.Errorf("tabla con `tenant` sin política de fusión: %s (el preflight de la fusión "+
-			"abortaría todas las de la suite; añade %s_platform_merge con app.merge)", tabla, tabla)
+		t.Errorf("tabla con tenant sin contrato completo de fusión: %s (declara escritura de merge o bloqueo Scope-bound explícito)", tabla)
 	}
 }

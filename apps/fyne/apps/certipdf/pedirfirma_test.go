@@ -15,6 +15,7 @@ import (
 
 	"fyne.io/fyne/v2"
 
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
 
@@ -264,4 +265,91 @@ func TestBloquearDesdeLaFranjaYDesbloquear(t *testing.T) {
 	if !s.vio("DELETE /api/v1/pdf/signature-blocks/u-ana") {
 		t.Error("no se desbloqueó en el servicio")
 	}
+}
+
+// deTipo junta, con `todos`, los objetos de tipo T del árbol de `o`, en orden.
+func deTipo[T fyne.CanvasObject](o fyne.CanvasObject) []T {
+	var out []T
+	todos(o, func(x fyne.CanvasObject) {
+		if y, ok := x.(T); ok {
+			out = append(out, y)
+		}
+	})
+	return out
+}
+
+// TestPedirFirmaConLasPiezasDeLaSuite (pieza CERT-07): el diálogo es el de la web nueva
+// —campos de la suite en su `FieldGroup`, el aviso de fuera como `InlineHelp` informativo
+// y el estado de cada pedida como insignia de su tono—, con las medidas de aquellas.
+func TestPedirFirmaConLasPiezasDeLaSuite(t *testing.T) {
+	for estado, tono := range map[string]ui.Tono{
+		api.PDFFirmaPendiente: ui.InsigniaInfo, api.PDFFirmaFirmada: ui.InsigniaExito,
+		api.PDFFirmaRechazada: ui.InsigniaPeligro, api.PDFFirmaCancelada: ui.InsigniaNeutra,
+		"en_espera": ui.InsigniaNeutra, "caducada": ui.InsigniaAviso,
+	} {
+		if got := tonoDeEstado(estado); got != tono {
+			t.Errorf("tonoDeEstado(%q) = %v, quiero %v", estado, got, tono)
+		}
+	}
+
+	s := &servicioDeFirmas{}
+	srv := httptest.NewServer(s)
+	defer srv.Close()
+	p, _, _ := dialogoDePrueba(t, DialogoProteger)
+	fyne.DoAndWait(func() {
+		p.dialogo.cerrar()
+		p.doc = &Documento{pdf: api.NewPDF(srv.URL, srv.URL, nil, nil), ruta: "/PDF/a.pdf", fichero: api.File{Name: "a.pdf"}}
+		p.abrirDialogo(DialogoPedirFirma)
+	})
+	var d *dialogoPedirFirma
+	fyne.DoAndWait(func() { d = nuevoDialogoPedirFirma(p.dialogo); p.dialogo.pintar = d.vista })
+	hasta(t, func() bool { return d.cargadas && len(d.pedidas) == 1 })
+
+	const ancho float32 = 360
+	fyne.DoAndWait(func() {
+		v := d.vista(ancho)
+		// El correo es `<Input>` md y el mensaje `<Textarea>`, a todo el ancho.
+		if got, quiero := d.email.MinSize().Height, ui.AltoCampo(ui.CampoMD); got != quiero {
+			t.Errorf("alto del correo = %v, quiero el de Input md %v", got, quiero)
+		}
+		if d.email.MinSize().Width != ancho || d.mensaje.MinSize().Width != ancho {
+			t.Errorf("campos a %v y %v, quiero %v", d.email.MinSize().Width, d.mensaje.MinSize().Width, ancho)
+		}
+		// La pedida firmada lleva su insignia de éxito y «Abrir el firmado» es un botón
+		// fantasma xs.
+		ins := deTipo[*ui.Insignia](v)
+		if len(ins) != 1 || ins[0].Tono != ui.InsigniaExito || ins[0].Texto != d.a.t("pdf.signatureRequest.status.firmada") {
+			t.Fatalf("insignias = %+v", ins)
+		}
+		var abrir *ui.Boton
+		for _, b := range deTipo[*ui.Boton](v) {
+			if b.Texto == d.a.t("pdf.dialog.pedirFirma.openSigned") {
+				abrir = b
+			}
+		}
+		if abrir == nil || abrir.MinSize() != ui.MedidaBotonDe(abrir) || abrir.MinSize().Height != ui.MedidaBoton(abrir.Texto, ui.TallaXS, 0).Height {
+			t.Errorf("«Abrir el firmado» = %+v", abrir)
+		}
+		if len(deTipo[*ui.AyudaEnLinea](v)) != 0 {
+			t.Error("aviso de fuera sin que nadie sea de fuera")
+		}
+	})
+
+	fyne.DoAndWait(func() { d.email.PonerTexto("@leire"); d.enviar() })
+	hasta(t, func() bool { return !d.enviando && d.fuera == "Leire" })
+	fyne.DoAndWait(func() {
+		avisos := deTipo[*ui.AyudaEnLinea](d.vista(ancho))
+		if len(avisos) != 1 {
+			t.Fatalf("avisos de fuera = %d", len(avisos))
+		}
+		a := avisos[0]
+		if a.Tono != ui.AyudaInfo || !strings.Contains(a.Titulo, "Leire") || a.Cuerpo != d.a.t("pdf.dialog.pedirFirma.external.help") {
+			t.Errorf("aviso = %+v", a)
+		}
+		// Medido a su ancho desde el principio: con el ancho a cero se repartía palabra
+		// a palabra y salía altísimo.
+		if got, quiero := a.MinSize().Height, ui.AltoAyudaEnLinea(a, ancho); got != quiero {
+			t.Errorf("alto del aviso = %v, quiero %v", got, quiero)
+		}
+	})
 }

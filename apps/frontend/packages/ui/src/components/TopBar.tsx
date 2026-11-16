@@ -10,6 +10,7 @@ import { useT } from '@sytue/i18n/preact';
 import { cx } from '../lib/cx.js';
 import type { DestinosBarra } from './BarraMovil.js';
 import { Icon } from './Icon.js';
+import { Tooltip } from './Tooltip.js';
 
 /**
  * La barra ÚNICA del teléfono (<768px): la topbar acoge la barra de la app
@@ -134,13 +135,13 @@ export function TopBar({
       role="banner"
       class={cx(
         // EL CANALÓN CRECE CON LA VENTANA. Con `px-4` a secas, la marca y el
-        // avatar quedaban a 14px del cristal lo mismo en un teléfono que en un
-        // monitor de 1440 —medido en las cinco apps: `padding: 14px/14px`, y son
-        // 14 y no 16 porque la raíz de la suite está en 14px—. En pantalla grande
-        // eso se lee como un cromo pinchado contra el borde, que es justo lo que
-        // no hace ninguna suite con la que nos comparan.
+        // avatar quedaban a 16px del cristal lo mismo en un teléfono que en un
+        // monitor de 1440 (medido en las cinco apps cuando 1 rem eran 14 px:
+        // `padding: 14px/14px`). En pantalla grande eso se lee como un cromo
+        // pinchado contra el borde, que es justo lo que no hace ninguna suite con
+        // la que nos comparan.
         //
-        // En el teléfono NO se toca: ahí 14px ya es el canalón de la casa y
+        // En el teléfono NO se toca: ahí `px-4` ya es el canalón de la casa y
         // estrecharlo sería robarle sitio al buscador.
         // LA LÍNEA DE ABAJO NO OCUPA ALTURA. Con `border-b` sí la ocupaba: la
         // barra mide 56px contando el borde, así que el área donde `items-center`
@@ -308,39 +309,42 @@ export function TopBarButton({
   botonRef,
   ...rest
 }: TopBarButtonProps): JSX.Element {
+  // Ayuda visible debajo (la barra está arriba del todo) en vez de `title`, que no se
+  // ve con el teclado ni con el dedo.
   return (
-    <button
-      {...(botonRef ? { ref: botonRef } : {})}
-      type="button"
-      aria-label={label}
-      title={label}
-      class={cx(
-        'text-topbar-fg rounded-control relative inline-flex h-9 w-9 items-center justify-center',
-        // CON EL DEDO, 44px. La escala de botones ya reserva ese mínimo para
-        // puntero grueso, pero este control está escrito a mano y se quedaba en
-        // los 31,5px de `h-9`: medido en un teléfono, 32×32 en las once apps.
-        'pointer-coarse:min-h-[max(44px,2.75rem)] pointer-coarse:min-w-[max(44px,2.75rem)]',
-        // Velo blanco del propio cromo: un gris fijo se vería como un parche sobre
-        // la barra de tinta.
-        'hover:bg-chrome-hover active:bg-chrome-active transition-colors duration-150',
-        // Anillo del cromo, como los items de la sidebar: blanco, porque el azul
-        // global no contrasta sobre la tinta (WCAG AA).
-        'sytue-focus-ring-chrome focus-visible:outline-none',
-        cls,
-      )}
-      {...rest}
-    >
-      {children}
-      {indicator ? (
-        // Sobre la barra clara, un hueco del color de la barra lo separa del icono. Sobre
-        // la barra de COLOR (`.sytue-topbar-carril`) el rojo de peligro no llega a 3:1
-        // —y con el color de Mail es rojo sobre rojo—: ahí `sytue-aro-carril` le pone el
-        // aro del texto del carril, como a las muestras de color (tokens/appearance.css).
-        <span
-          class="sytue-aro-carril bg-danger absolute top-2 right-2 h-2 w-2 rounded-full ring-2 ring-[var(--sytue-topbar-bg)]"
-          aria-hidden="true"
-        />
-      ) : null}
-    </button>
+    <Tooltip label={label} placement="bottom">
+      <button
+        {...(botonRef ? { ref: botonRef } : {})}
+        type="button"
+        aria-label={label}
+        class={cx(
+          'text-topbar-fg rounded-control relative inline-flex h-9 w-9 items-center justify-center',
+          // CON EL DEDO, 44px. La escala de botones ya reserva ese mínimo para
+          // puntero grueso, pero este control está escrito a mano y se quedaba en
+          // los 31,5px de `h-9`: medido en un teléfono, 32×32 en las once apps.
+          'pointer-coarse:min-h-[max(44px,2.75rem)] pointer-coarse:min-w-[max(44px,2.75rem)]',
+          // Velo blanco del propio cromo: un gris fijo se vería como un parche sobre
+          // la barra de tinta.
+          'hover:bg-chrome-hover active:bg-chrome-active transition-colors duration-150',
+          // Anillo del cromo, como los items de la sidebar: blanco, porque el azul
+          // global no contrasta sobre la tinta (WCAG AA).
+          'sytue-focus-ring-chrome focus-visible:outline-none',
+          cls,
+        )}
+        {...rest}
+      >
+        {children}
+        {indicator ? (
+          // Sobre la barra clara, un hueco del color de la barra lo separa del icono. Sobre
+          // la barra de COLOR (`.sytue-topbar-carril`) el rojo de peligro no llega a 3:1
+          // —y con el color de Mail es rojo sobre rojo—: ahí `sytue-aro-carril` le pone el
+          // aro del texto del carril, como a las muestras de color (tokens/appearance.css).
+          <span
+            class="sytue-aro-carril bg-danger absolute top-2 right-2 h-2 w-2 rounded-full ring-2 ring-[var(--sytue-topbar-bg)]"
+            aria-hidden="true"
+          />
+        ) : null}
+      </button>
+    </Tooltip>
   );
 }

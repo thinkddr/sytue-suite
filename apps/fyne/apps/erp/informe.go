@@ -147,12 +147,38 @@ type Barras struct {
 	Puntos []PuntoBarras
 	// Serie es qué mide: va en el nombre accesible.
 	Serie string
+	// Formato escribe un valor en el nombre accesible (`formatValue`): un importe con
+	// su moneda. nil, el número tal cual.
+	Formato func(float64) string
 }
 
 // PuntoBarras es una barra.
 type PuntoBarras struct {
 	Rotulo string
 	Valor  float64
+	// Eje es el rótulo corto bajo la barra (`axisLabel`, «nov»). Si algún punto lo
+	// trae, el gráfico lleva su fila de rótulos debajo; si no, no tiene ejes.
+	Eje string
+}
+
+// AltoEjeBarras es la fila de rótulos bajo las barras: `mt-1` y una línea de `text-xs`.
+var AltoEjeBarras = HuecoUno + tema.TextoXS.Linea
+
+// conEje dice si alguna barra trae rótulo corto.
+func (b *Barras) conEje() bool {
+	for _, p := range b.Puntos {
+		if p.Eje != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func (b *Barras) formato(n float64) string {
+	if b.Formato != nil {
+		return b.Formato(n)
+	}
+	return strconv.FormatFloat(n, 'f', -1, 64)
 }
 
 var (
@@ -174,9 +200,9 @@ func (b *Barras) AccessibilityLabel() string {
 	for _, p := range b.Puntos {
 		total += p.Valor
 	}
-	s := b.Serie + ": " + strconv.FormatFloat(total, 'f', -1, 64)
+	s := b.Serie + ": " + b.formato(total)
 	for _, p := range b.Puntos {
-		s += "; " + p.Rotulo + " " + strconv.FormatFloat(p.Valor, 'f', -1, 64)
+		s += "; " + p.Rotulo + " " + b.formato(p.Valor)
 	}
 	return s
 }
@@ -184,9 +210,13 @@ func (b *Barras) AccessibilityLabel() string {
 // AccessibilityRole es el de una imagen con texto alternativo.
 func (b *Barras) AccessibilityRole() fyne.AccessibleRole { return fyne.AccessibleRoleText }
 
-// MinSize es el alto de la serie; el ancho lo pone quien la coloca.
+// MinSize es el alto de la serie, con su fila de rótulos si la lleva; el ancho lo pone
+// quien la coloca.
 func (b *Barras) MinSize() fyne.Size {
 	b.ExtendBaseWidget(b)
+	if b.conEje() {
+		return fyne.NewSize(0, AltoBarras+AltoEjeBarras)
+	}
 	return fyne.NewSize(0, AltoBarras)
 }
 
@@ -217,8 +247,11 @@ func geometriaBarras(puntos []PuntoBarras, ancho float32) ([]fyne.Position, []fy
 // CreateRenderer pinta una barra por punto.
 func (b *Barras) CreateRenderer() fyne.WidgetRenderer {
 	r := &barrasRenderer{b: b}
-	for range b.Puntos {
+	for _, p := range b.Puntos {
 		r.barras = append(r.barras, canvas.NewRectangle(color.NRGBA{}))
+		if b.conEje() {
+			r.eje = append(r.eje, ui.Texto(p.Eje, tema.TextoXS, ui.Normal, color.NRGBA{}))
+		}
 	}
 	r.Refresh()
 	return r
@@ -227,13 +260,18 @@ func (b *Barras) CreateRenderer() fyne.WidgetRenderer {
 type barrasRenderer struct {
 	b      *Barras
 	barras []*canvas.Rectangle
+	// eje son los rótulos cortos, uno por barra; vacío sin fila de rótulos.
+	eje []*canvas.Text
 }
 
 func (r *barrasRenderer) MinSize() fyne.Size { return r.b.MinSize() }
 func (r *barrasRenderer) Objects() []fyne.CanvasObject {
-	out := make([]fyne.CanvasObject, len(r.barras))
-	for i, x := range r.barras {
-		out[i] = x
+	out := make([]fyne.CanvasObject, 0, len(r.barras)+len(r.eje))
+	for _, x := range r.barras {
+		out = append(out, x)
+	}
+	for _, x := range r.eje {
+		out = append(out, x)
 	}
 	return out
 }
@@ -247,6 +285,14 @@ func (r *barrasRenderer) Layout(t fyne.Size) {
 		// `rx={1}` en unidades del lienzo, que se estira a lo ancho.
 		x.CornerRadius = min(1, t.Width/VistaBarras)
 	}
+	// Los rótulos, en HTML en la web: cada uno en un hueco igual (`flex-1`), centrado
+	// y truncado si no cabe.
+	hueco := t.Width / float32(max(len(r.eje), 1))
+	for i, x := range r.eje {
+		ui.Truncar(x, r.b.Puntos[i].Eje, tema.TextoXS, ui.Normal, hueco)
+		w := ui.Medir(x.Text, tema.TextoXS, ui.Normal).Width
+		ui.ColocarTexto(x, tema.TextoXS, float32(i)*hueco+(hueco-w)/2, AltoBarras+HuecoUno)
+	}
 }
 
 func (r *barrasRenderer) Refresh() {
@@ -256,6 +302,10 @@ func (r *barrasRenderer) Refresh() {
 		if r.b.Puntos[i].Valor == 0 {
 			x.FillColor = tema.Color("accent-200", v)
 		}
+		x.Refresh()
+	}
+	for _, x := range r.eje {
+		x.Color = tema.Color("text-subtle", v)
 		x.Refresh()
 	}
 }

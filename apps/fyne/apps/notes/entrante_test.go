@@ -124,7 +124,10 @@ func esperarDurante(t *testing.T, tope time.Duration, listo func() bool) {
 }
 
 // TestElVinculoEsperaAlCuadernoCifrado: en un cuaderno cifrado cerrado la nota vinculada
-// no se crea —la web espera a `!bloqueado`—, y se crea, cifrada, en cuanto se abre.
+// no se crea —la web espera a `!bloqueado`—, y abierto se pregunta. Aceptarla tampoco
+// la manda: el cifrado v2 no lleva enlaces (`encrypted links require v3` en la web,
+// ErrDatosCifradosNotas aquí), así que el enlace no sale ni en claro ni cifrado y se
+// avisa del fallo en vez de crear una nota sin él.
 func TestElVinculoEsperaAlCuadernoCifrado(t *testing.T) {
 	_, clave, err := api.NuevoCifradoNotas("contraseña larga de prueba")
 	if err != nil {
@@ -149,14 +152,15 @@ func TestElVinculoEsperaAlCuadernoCifrado(t *testing.T) {
 	})
 	fyne.DoAndWait(p.aceptarVinculo)
 	esperar(t, func() bool {
-		var listo bool
-		fyne.DoAndWait(func() { _, listo = p.nota("n9") })
-		return listo
+		var avisado bool
+		fyne.DoAndWait(func() { avisado = len(p.avisos.Avisos()) > 0 })
+		return avisado
 	})
-	c := falso.ultima(t, "POST /notebooks/c1/encrypted-notes")
-	claro, err := api.DesempaquetarNota(clave, c["content_cipher"].(string))
-	if c["title"] != "" || err != nil || claro.Title != "Reunión" {
-		t.Errorf("la nota vinculada viaja con %v (dentro, %+v %v)", c, claro, err)
+	if r := falso.rutas(); len(r) != 0 {
+		t.Errorf("el enlace ha salido hacia el cuaderno cifrado: %v", r)
+	}
+	if _, creada := p.nota("n9"); creada {
+		t.Error("la nota vinculada se ha creado sin su enlace")
 	}
 }
 

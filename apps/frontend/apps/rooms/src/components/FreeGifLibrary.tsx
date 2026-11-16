@@ -4,7 +4,7 @@
 /** Catálogo CC0 paginado: miniaturas quietas; solo se anima el GIF pedido expresamente. */
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { Button, Input, Spinner, withBase } from '@sytue/ui';
+import { Button, Input, Spinner, withBase, EmptyState } from '@sytue/ui';
 import {
   importFreeGif,
   searchFreeGifs,
@@ -103,7 +103,7 @@ export function FreeGifLibrary({ onPick, t }: Props): JSX.Element {
             </span>
           </div>
         ) : page.items.length === 0 ? (
-          <p class="text-text-muted p-4 text-center">{t('search.noResults')}</p>
+          <EmptyState compact icon="search" title={t('search.noResults')} />
         ) : (
           <ul class="grid grid-cols-3 gap-2">
             {page.items.map((gif) => (

@@ -69,18 +69,6 @@
       @apply bg-[#6b5d00];
     }
   }
-  /* Lo buscado dentro de un resultado (Resaltado.tsx): el mismo amarillo. */
-  .notes-resalte {
-    @apply text-text rounded-sm bg-[#fff3a3];
-  }
-  [data-theme='dark'] .notes-resalte {
-    @apply bg-[#6b5d00];
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme]) .notes-resalte {
-      @apply bg-[#6b5d00];
-    }
-  }
   .sytue-prose a {
     @apply text-primary-text underline underline-offset-2;
   }
@@ -394,6 +382,12 @@
   .notes-sheet {
     @apply w-full rounded-none border-0 bg-transparent px-6 py-8 shadow-none! sm:px-10;
   }
+  /* «Ancho de lectura»: la hoja se estrecha a unos 80 caracteres y se centra, para que
+     en un monitor ancho las líneas no pasen de 120 (lo de antes de 0f5a06a5, ahora
+     a elección de cada nota). */
+  .notes-sheet--lectura {
+    @apply mx-auto max-w-[46rem];
+  }
   .notes-sheet-title {
     @apply text-[1.625rem]! leading-[2rem] font-bold! tracking-[-0.015em];
   }
@@ -645,7 +639,7 @@
 }
 
 /* La raya de una cosa que se puede editar es un botón: pulsarla la hace tarea. Mide 24 px
-   para el dedo (en px: la raíz es de 14) y sobresale lo mismo por cada lado de la columna
+   para el dedo (en px, para que no dependa de la raíz) y sobresale lo mismo por cada lado de la columna
    de las marcas, que no se mueve. Al pasar por encima o con el foco, la raya se vuelve la
    casilla vacía en la que se va a convertir, del tamaño de la de una tarea. */
 .notes-stream-bullet-btn {

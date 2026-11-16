@@ -10,12 +10,7 @@ import type { AppCatalog } from '@sytue/i18n';
 import type { en } from './en.js';
 
 export const it: AppCatalog<typeof en> = {
-  'matrix.verifyPeopleFirst':
-    'Verifica le persone in questa conversazione prima di inviare il primo messaggio.',
-
-  'matrix.verifyPerson': 'Verifica una persona',
-  'matrix.choosePerson': 'Scegli una persona di questo canale',
-
+  'matrix.notYetEncrypted': 'Non ancora disponibile nelle conversazioni cifrate end-to-end.',
   'external.title': 'Canali esterni',
   'external.body':
     'Leggi e rispondi in Slack, Teams e Google Chat. Il fornitore elabora questi messaggi; non usano la crittografia end-to-end di Rooms.',
@@ -44,7 +39,6 @@ export const it: AppCatalog<typeof en> = {
     'Disconnettere {provider}? Rooms perderà l’accesso a questo account. I messaggi resteranno presso il fornitore.',
   'external.sendUnconfirmed':
     'Impossibile confermare l’invio. Controlla i messaggi recenti prima di inviare di nuovo.',
-  'matrix.notices': 'Licenze di terze parti',
 
   // --- App ----------------------------------------------------------------
   'app.name': 'Sytue Rooms',
@@ -52,16 +46,11 @@ export const it: AppCatalog<typeof en> = {
 
   // --- Acciones comunes ---------------------------------------------------
   'action.add': 'Aggiungi',
-  'action.back': 'Indietro',
-  'action.cancel': 'Annulla',
   'action.clear': 'Rimuovi',
-  'action.close': 'Chiudi',
   'action.closeEsc': 'Chiudi (Esc)',
   'action.closeNamed': 'Chiudi {name}',
-  'action.copy': 'Copia',
   'action.create': 'Crea',
   'action.delete': 'Elimina',
-  'action.done': 'Fatto',
   'action.download': 'Scarica',
   'action.edit': 'Modifica',
   'action.hide': 'Nascondi',
@@ -78,7 +67,6 @@ export const it: AppCatalog<typeof en> = {
 
   // --- Estados y errores genéricos ----------------------------------------
   'state.error': 'Errore',
-  'state.loading': 'Caricamento…',
   'state.uploading': 'Caricamento…',
   'error.checkConnection': 'Controlla la connessione e riprova.',
   'error.loadFailed': 'Caricamento non riuscito.',
@@ -97,6 +85,12 @@ export const it: AppCatalog<typeof en> = {
   // Se anuncia solo mientras dura la llamada; el estado propio no se toca.
   'presence.inCall': '📞 In chiamata',
   'presence.offline': 'Offline',
+  'person.openProfile': 'Vedi il profilo di {name}',
+  'person.email': 'Email',
+  'person.localTimeLabel': 'Ora locale',
+  'person.localTime': '{time} ora locale',
+  'person.message': 'Messaggio',
+  'person.call': 'Chiama',
   'status.yours': 'Il tuo stato',
   'status.yoursIs': 'Il tuo stato: {state}',
   'status.yoursWithCustom': 'Il tuo stato: {state} · {status}',
@@ -109,6 +103,8 @@ export const it: AppCatalog<typeof en> = {
   'shortcuts.group.move': 'Muoversi',
   'shortcuts.group.write': 'Scrivere',
   'shortcuts.switcher': 'Vai a un canale',
+  'shortcuts.nextChannel': 'Canale precedente o successivo',
+  'shortcuts.nextUnread': 'Canale precedente o successivo con messaggi non letti',
   'shortcuts.close': 'Chiudi ciò che è aperto',
   'shortcuts.help': 'Mostra questa lista',
   'shortcuts.editLast': 'Modifica il tuo ultimo messaggio (casella vuota)',
@@ -222,6 +218,10 @@ export const it: AppCatalog<typeof en> = {
   'channel.saved': 'Salvati',
   'channel.files': 'File del canale',
   'channel.scheduledMessages': 'Messaggi programmati',
+  'channel.scheduleMeeting': 'Pianifica riunione',
+  'channel.meetingTitle': 'Riunione · #{name}',
+  'channel.meetingDescription': 'Conversazione: {link}',
+  'dm.meetingTitle': 'Riunione con {name}',
   'channel.scheduled': 'Programmati',
   'dm.peopleCount': { one: '{count} persona', other: '{count} persone' },
   'dm.youAnd': 'Tu, {name}',
@@ -258,6 +258,10 @@ export const it: AppCatalog<typeof en> = {
   'createChannel.privateHelp': 'Lo vede solo chi riceve un invito.',
   'createChannel.topicHelp': 'Facoltativo. A cosa serve questo canale.',
   'createChannel.topicPlaceholder': 'Di cosa si parla in questo canale?',
+  'createChannel.people': 'Persone',
+  'createChannel.peopleHelp': 'Facoltativo. Chi è di un’altra organizzazione riceve un invito.',
+  'createChannel.membersMissing':
+    'Il canale è stato creato, ma non è stato possibile aggiungere queste persone: {names}',
   'createChannel.duplicate': 'Esiste già un canale con questo nome.',
   'createChannel.invalidName': 'Nome non valido. Usa lettere, numeri e trattini.',
   'createChannel.forbidden': 'Non hai il permesso di creare canali.',
@@ -323,6 +327,7 @@ export const it: AppCatalog<typeof en> = {
   'composer.dateAndTime': 'Data e ora',
   'composer.customDateTime': 'Scegli data e ora…',
   'key.enter': 'Invio',
+  'key.shift': 'Maiusc',
   'composer.hintSend': 'per inviare',
   'composer.hintMention': 'per menzionare',
   'composer.hintEmoji': 'per le emoji',
@@ -446,9 +451,15 @@ export const it: AppCatalog<typeof en> = {
   'message.noneYet': 'Ancora nessun messaggio',
   'message.channelStart': 'Questo è l’inizio di #{channel}',
   'message.writeFirst': 'Scrivi il primo messaggio per avviare la conversazione.',
+  'message.introCreatedBy': '{name} ha creato questo canale il {date}.',
+  'message.introCreatedByYou': 'Hai creato questo canale il {date}.',
+  'message.introSomeone': 'Qualcuno',
+  'message.introDm': 'Conversazione con {name}',
+  'message.introDmStart': 'Questo è l’inizio della tua conversazione diretta con {name}.',
   'message.newMessages': 'Nuovi messaggi',
   'message.jumpToUnread': 'Vai ai non letti',
   'message.goToRecent': 'Vai ai messaggi recenti',
+  'message.newBelow': { one: '{count} nuovo messaggio', other: '{count} nuovi messaggi' },
   'message.fromLink': 'Messaggio aperto da un link',
   'message.moreActions': 'Altre azioni',
   'message.bot': 'BOT',
@@ -517,6 +528,10 @@ export const it: AppCatalog<typeof en> = {
   'thread.newReplies': { one: '{count} nuova risposta', other: '{count} nuove risposte' },
   'thread.replyPlaceholder': 'Rispondi…',
   'thread.replyAria': 'Scrivi una risposta nel thread',
+  'thread.alsoToChannel': 'Invia anche a #{channel}',
+  'thread.repliedInThread': 'Ha risposto in un thread',
+  'thread.viewThread': 'Vedi il thread',
+  'thread.lastReply': 'Ultima risposta {when}',
   'thread.follow': 'Segui il thread',
   'thread.followShort': 'Segui',
   'thread.followHint': 'Ricevi un avviso per le nuove risposte',
@@ -541,8 +556,16 @@ export const it: AppCatalog<typeof en> = {
   'search.busy': 'Ricerca…',
   'search.failed': 'Ricerca non riuscita',
   'search.failedRetry': 'Non è stato possibile eseguire la ricerca.',
+  'search.unavailable': 'Non disponibile con la crittografia',
+  'search.encryptedTitle': 'Non è ancora possibile cercare nei messaggi crittografati',
+  'search.encryptedBody':
+    'I messaggi crittografati si possono leggere solo sui tuoi dispositivi, quindi il server non può ancora cercarli.',
   'search.noResults': 'Nessun risultato',
   'search.resultCount': { one: '{count} risultato', other: '{count} risultati' },
+  'search.localScope': {
+    one: "cercato nell'ultimo {count} messaggio su questo dispositivo",
+    other: 'cercato negli ultimi {count} messaggi su questo dispositivo',
+  },
 
   // --- Panel de miembros --------------------------------------------------
   'members.title': 'Persone',
@@ -647,6 +670,11 @@ export const it: AppCatalog<typeof en> = {
   'notify.dndEnd': 'Non disturbare: fine',
   'notify.push': 'Notifiche push',
   'notify.pushHelp': 'Ricevi notifiche su questo dispositivo anche con Rooms chiuso.',
+  'notify.sound': 'Suono',
+  'notify.soundHelp':
+    'Suona su questo dispositivo quando arriva un messaggio che non stai guardando.',
+  'notify.soundDirect': 'Messaggi diretti e menzioni',
+  'notify.soundOthers': 'Altri messaggi',
   'notify.failed': 'Non è stato possibile salvare le impostazioni.',
   'notification.mentionedIn': 'Menzione di {name} in #{channel}',
   'notification.mentioned': 'Menzione di {name}',
@@ -1048,39 +1076,15 @@ export const it: AppCatalog<typeof en> = {
     'WhatsApp Business non è ancora disponibile per questa organizzazione.',
   'whatsappConnection.cancelled': 'La configurazione è stata annullata. Puoi riprovare.',
   'whatsappConnection.sameAccount': 'Accedi con lo stesso account Rooms usato nell’app e riprova.',
-  'matrix.title': 'Crittografia end-to-end',
-  'matrix.subtitle':
-    'Messaggi e file vengono cifrati sui tuoi dispositivi. Solo i dispositivi verificati possono leggerli.',
-  'matrix.connect': 'Configura questo dispositivo',
-  'matrix.setup': 'Crea una chiave di recupero',
-  'matrix.recover': 'Usa una chiave di recupero',
-  'matrix.verify': 'Verifica con un altro dispositivo',
-  'matrix.saveTitle': 'Conserva la chiave di recupero',
-  'matrix.saveBody': 'Ti servirà se perdi l’accesso ai tuoi dispositivi verificati.',
-  'matrix.saved': 'Ho salvato la chiave di recupero',
-  'matrix.recoveryKey': 'Chiave di recupero',
-  'matrix.recoverBody':
-    'Inserisci la chiave di recupero che hai salvato. Resta su questo dispositivo.',
-  'matrix.compare': 'Confronta queste emoji sui due dispositivi.',
-  'matrix.match': 'Corrispondono',
-  'matrix.mismatch': 'Non corrispondono',
-  'matrix.waiting': 'In attesa dell’altro dispositivo…',
-  'matrix.incoming': 'Verifica questo dispositivo',
-  'matrix.devices': 'I tuoi dispositivi',
-  'matrix.revoke': 'Disconnetti il dispositivo',
-  'matrix.trusted': 'Dispositivo verificato',
-  'matrix.failed': 'Non è stato possibile configurare la crittografia. Riprova.',
   'matrix.legacy': 'Messaggio precedente · senza crittografia end-to-end',
+  'matrix.originalDeviceRequired':
+    'Apri Rooms su un dispositivo già verificato per recuperare questo messaggio, poi riprova.',
   'matrix.unreadable': 'Questo dispositivo non può decifrare questo messaggio.',
   'matrix.unsupported': 'Questa azione non è disponibile per i messaggi cifrati.',
-  'matrix.auth': 'Conferma la tua identità',
-  'matrix.authContinue': 'Ho effettuato l’accesso',
-  'matrix.reset': 'Ho dimenticato la chiave di recupero',
-  'matrix.resetAction': 'Reimposta la crittografia',
-  'matrix.resetBody':
-    'Verrà creata una nuova chiave di recupero. I messaggi cifrati precedenti resteranno leggibili solo sui dispositivi che li hanno già e dovrai verificare di nuovo gli altri dispositivi e i tuoi contatti.',
-  'matrix.resetUnderstood': 'Capisco che potrei perdere l’accesso ai messaggi cifrati precedenti',
-  'matrix.tab': 'Rooms è aperto in un’altra scheda. Chiudila per usare questo dispositivo qui.',
   'matrix.identityUnverified': 'Identità non verificata',
   'matrix.senderUnverified': 'Non è possibile verificare il mittente su questo dispositivo',
+  'nativeResource.title': 'Collega {app}',
+  'nativeResource.description':
+    'Collega questa app al tuo account in {tenant}. Le autorizzazioni di accesso attuali restano invariate.',
+  'nativeResource.approve': 'Collega',
 };

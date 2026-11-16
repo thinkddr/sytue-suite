@@ -316,3 +316,11 @@ func TestElNombreDeUnAdjuntoNoGiraLaExtension(t *testing.T) {
 		t.Fatalf("nombre: %q", n)
 	}
 }
+
+func TestLeerConservaSobreDelBorradorSinInferirIdentidad(t *testing.T) {
+	raw := "From: =?utf-8?q?Ada_L=C3=B3pez?= <ada@example.test>\r\nReply-To: replies@example.test\r\nBcc: private@example.test\r\nMessage-ID: <draft@example.test>\r\nDate: Fri, 30 Oct 2026 10:20:30 +0200\r\nSubject: Borrador\r\n\r\ntexto"
+	m, err := Leer(strings.NewReader(raw))
+	if err != nil || m.De != "ada@example.test" || m.DeNombre != "Ada López" || m.ID != "draft@example.test" || len(m.ResponderA) != 1 || m.ResponderA[0] != "replies@example.test" || len(m.Cco) != 1 || m.Cco[0] != "private@example.test" || !m.Fecha.Equal(time.Date(2026, 10, 30, 8, 20, 30, 0, time.UTC)) {
+		t.Fatal("el borrador perdió su sobre", m, err)
+	}
+}

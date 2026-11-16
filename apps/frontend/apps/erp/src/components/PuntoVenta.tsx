@@ -2,7 +2,17 @@
  * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos */
 import { useContext, useEffect, useRef, useState } from 'preact/hooks';
 import type { JSX, TargetedSubmitEvent } from 'preact';
-import { Button, Icon, Spinner, withBase, CARD_TONES, Radio, Popover } from '@sytue/ui';
+import {
+  Button,
+  CARD_TONES,
+  EmptyState,
+  Icon,
+  InlineHelp,
+  Popover,
+  Radio,
+  Spinner,
+  withBase,
+} from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import { mutateOfflineValue, readOfflineValue } from '@sytue/offline';
 import type { T } from '../i18n/index.js';
@@ -491,11 +501,7 @@ export function PuntoVenta({
           }}
         />
       ) : null}
-      {error ? (
-        <p role="alert" class="bg-danger-bg text-danger-text rounded-md p-3">
-          {error}
-        </p>
-      ) : null}
+      {error ? <InlineHelp tone="danger">{error}</InlineHelp> : null}
       <div class="erp-tpv-layout">
         <section class="sytue-glass-surface erp-tpv-catalogue" aria-label={t('pos.catalogue')}>
           <label class="erp-tpv-search">
@@ -534,7 +540,7 @@ export function PuntoVenta({
           ) : null}
           {cargando && !productos.length ? <Spinner /> : null}
           {!cargando && !productos.length ? (
-            <p class="text-text-muted py-12">{t('relation.empty')}</p>
+            <EmptyState compact title={t('relation.empty')} />
           ) : null}
           <div class="erp-tpv-products">
             {productos

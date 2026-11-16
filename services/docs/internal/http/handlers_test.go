@@ -9,6 +9,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"path"
 	"slices"
 	"strings"
@@ -34,20 +35,23 @@ type borradoComentario struct {
 }
 
 type fakeStore struct {
-	doc        *domain.Document
-	perms      []domain.Permission
-	getErr     error
-	comments   []domain.Comment
-	blobs      []domain.Blob
-	shareRes   *domain.ShareResolution
-	shareErr   error
-	loaded     *domain.LoadedState
-	recorded   *domain.Blob
-	upsertPerm *domain.Permission
-	creado     *domain.CreateDocumentParams // lo último que se pidió crear
-	borrado    *borradoComentario           // lo último que se pidió borrar
-	maxDias    *int                         // techo de caducidad de enlaces (nil = por defecto)
-	claveHash  string                       // hash de contraseña del último enlace creado o cambiado
+	effectFenceErr error
+	doc            *domain.Document
+	listFiltro     domain.ListFilter
+	listDocs       []domain.Document
+	perms          []domain.Permission
+	getErr         error
+	comments       []domain.Comment
+	blobs          []domain.Blob
+	shareRes       *domain.ShareResolution
+	shareErr       error
+	loaded         *domain.LoadedState
+	recorded       *domain.Blob
+	upsertPerm     *domain.Permission
+	creado         *domain.CreateDocumentParams // lo último que se pidió crear
+	borrado        *borradoComentario           // lo último que se pidió borrar
+	maxDias        *int                         // techo de caducidad de enlaces (nil = por defecto)
+	claveHash      string                       // hash de contraseña del último enlace creado o cambiado
 	// baseSeq es el base_seq que llegó al último AppendOps (nil = sin condición).
 	baseSeq  *int64
 	appended int
@@ -62,7 +66,11 @@ func (f *fakeStore) GetDocument(_ context.Context, _ string) (*domain.Document, 
 	return f.doc, f.getErr
 }
 
-func (f *fakeStore) ListDocuments(_ context.Context, _ domain.Subject, _ domain.ListFilter) ([]domain.Document, error) {
+func (f *fakeStore) ListDocuments(_ context.Context, _ domain.Subject, lf domain.ListFilter) ([]domain.Document, error) {
+	f.listFiltro = lf
+	if f.listDocs != nil {
+		return f.listDocs, nil
+	}
 	if f.doc == nil {
 		return nil, nil
 	}
@@ -338,6 +346,53 @@ func TestParseListCursorRoundTrip(t *testing.T) {
 	gotAt, gotID, err := parseListCursor(at.Format(time.RFC3339Nano) + "~" + id)
 	if err != nil || !gotAt.Equal(at) || gotID != id {
 		t.Fatalf("parseListCursor => %v %q (%v)", gotAt, gotID, err)
+	}
+}
+
+// «Míos / Compartidos conmigo» y el orden por título llegan al almacén, y el cursor
+// de la página siguiente es el del orden pedido (el de fecha no sirve para seguir
+// por título).
+func TestListDocumentsAlcanceYOrdenPorTitulo(t *testing.T) {
+	fs := &fakeStore{listDocs: []domain.Document{
+		{ID: "0195a4c8-0000-7000-8000-000000000001", Title: "Acta"},
+		{ID: "0195a4c8-0000-7000-8000-000000000002", Title: "Bal~ance"},
+	}}
+	h := newHandler(fs)
+	rec := httptest.NewRecorder()
+	h.listDocuments(rec, req(t, "GET", "/v1/documents?limit=2&scope=shared&sort=title", ownerClaims(), nil, ""))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("code=%d", rec.Code)
+	}
+	if fs.listFiltro.Scope != domain.ScopeShared || !fs.listFiltro.ByTitle || fs.listFiltro.TitleCursor != nil {
+		t.Fatalf("filtro: %+v", fs.listFiltro)
+	}
+	next, _ := decodeBody(t, rec)["next_cursor"].(string)
+	tc, err := parseTitleCursor(next)
+	if err != nil || tc.Title != "Bal~ance" || tc.ID != "0195a4c8-0000-7000-8000-000000000002" {
+		t.Fatalf("next_cursor %q => %+v (%v)", next, tc, err)
+	}
+
+	// Y ese cursor vuelve como cursor de título.
+	rec = httptest.NewRecorder()
+	h.listDocuments(rec, req(t, "GET", "/v1/documents?scope=mine&sort=title&cursor="+url.QueryEscape(next), ownerClaims(), nil, ""))
+	if rec.Code != http.StatusOK || fs.listFiltro.Scope != domain.ScopeMine ||
+		fs.listFiltro.TitleCursor == nil || fs.listFiltro.TitleCursor.Title != "Bal~ance" {
+		t.Fatalf("segunda página: code=%d filtro=%+v", rec.Code, fs.listFiltro)
+	}
+
+	// Un alcance desconocido, o un cursor de fecha con orden por título, es un 400.
+	for _, q := range []string{"scope=todos", "sort=title&cursor=2026-01-02T03:04:05Z~0195a4c8-0000-7000-8000-000000000000"} {
+		rec = httptest.NewRecorder()
+		h.listDocuments(rec, req(t, "GET", "/v1/documents?"+q, ownerClaims(), nil, ""))
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("%s: code=%d, quería 400", q, rec.Code)
+		}
+	}
+}
+
+func TestPlegarTitulo(t *testing.T) {
+	if got := plegarTitulo("Ángel ÑANDÚ"); got != "angel nandu" {
+		t.Fatalf("plegarTitulo => %q", got)
 	}
 }
 
@@ -768,4 +823,18 @@ func TestWSOriginPatternsCerrada(t *testing.T) {
 	if !slices.Contains(wsOriginPatterns(pcfg.EnvDev), "calcus.sytue.localhost") {
 		t.Error("en dev la allowlist WS debe seguir admitiendo calcus.sytue.localhost")
 	}
+}
+
+func (f *fakeStore) WithLegacyDocumentEffect(_ context.Context, _ string, effect func() error) error {
+	if f.effectFenceErr != nil {
+		return f.effectFenceErr
+	}
+	return effect()
+}
+
+func (f *fakeStore) WithLegacyOfficeObjectWrite(_ context.Context, _ string, effect func() error) error {
+	if f.effectFenceErr != nil {
+		return f.effectFenceErr
+	}
+	return effect()
 }

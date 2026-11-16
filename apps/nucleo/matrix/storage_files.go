@@ -12,79 +12,56 @@ import (
 	"errors"
 	"io"
 	"slices"
-	"unicode/utf8"
-
-	"maunium.net/go/mautrix/crypto/attachment"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage/filesdk"
 )
 
 const (
-	fileFanout           = 16
-	fileLevels           = 6
-	maxFileBlocks        = 1 << 24
-	MaxStorageFileBytes  = int64(maxFileBlocks) * storage.MaxCipherBlockBytes
-	maxFileMetadataBytes = 8 << 10
-	fileKind             = "org.sytue.file.v1"
-	filePageKind         = "org.sytue.file.page.v1"
+	fileFanout           = filesdk.Fanout
+	fileLevels           = filesdk.Levels
+	maxFileBlocks        = filesdk.MaxBlocks
+	MaxStorageFileBytes  = storage.MaxFileBytes
+	maxFileMetadataBytes = storage.MaxFileMetadataBytes
+	fileKind             = filesdk.ManifestKind
+	filePageKind         = filesdk.PageKind
 )
 
-var ErrStorageSourceChanged = errors.New("matrix: storage source changed; original must be retained")
+var (
+	ErrStorageSourceChanged      = errors.New("matrix: storage source changed; original must be retained")
+	ErrStoragePublicationMissing = errors.New("matrix: storage journal has no verified publication target; original must be retained")
+	ErrStorageUploadMissing      = storage.ErrUploadMissing
+)
 
 // StorageFileRequest contains PRIVATE metadata. Journal and Matrix records are
 // encrypted on the client; no name, MIME type, source hash or file key is sent
 // to the blob service. Size is the exact immutable source revision being saved.
-type StorageFileRequest struct {
-	ObjectID   string   `json:"object_id"`
-	RevisionID string   `json:"revision_id"`
-	SizeBytes  int64    `json:"size_bytes"`
-	Metadata   []byte   `json:"metadata"`
-	Previous   []string `json:"previous,omitempty"`
-}
+type StorageFileRequest = storage.FileRequest
 
-// A page's authenticated record already binds scope, object and revision.
-// Do not repeat those values sixteen times in its private leaf descriptors.
-type storageFileBlock struct {
-	Blob        storage.BlobReceipt      `json:"blob"`
-	File        attachment.EncryptedFile `json:"matrix_file"`
-	PlainSHA256 string                   `json:"plain_sha256"`
-}
+// The shared codec preserves the existing encrypted manifest wire format.
+type storageFileBlock = filesdk.Descriptor
 
 func fileDescriptor(block StorageBlock, plainSHA string) *storageFileBlock {
-	return &storageFileBlock{Blob: block.Blob, File: block.File, PlainSHA256: plainSHA}
+	return filesdk.Describe(block, plainSHA)
 }
 
-func (b storageFileBlock) at(scope storage.Scope, object, revision string, part int) StorageBlock {
-	return StorageBlock{Scope: scope, ObjectID: object, RevisionID: revision, Part: part, Blob: b.Blob, File: b.File}
-}
-
-type storageFileLink struct {
-	Block *storageFileBlock `json:"block,omitempty"`
-	Event *EventRef         `json:"event,omitempty"`
-}
-
-type storageFilePage struct {
-	Kind  string            `json:"kind"`
-	Level int               `json:"level"`
-	Index int               `json:"index"`
-	Nodes []storageFileLink `json:"nodes"`
-}
-
-type storageFile struct {
-	Kind    string             `json:"kind"`
-	Request StorageFileRequest `json:"request"`
-	SHA256  string             `json:"sha256"`
-	Root    storageFilePage    `json:"root"`
-}
+type (
+	storageFileLink = filesdk.Link
+	storageFilePage = filesdk.Page
+	storageFile     = filesdk.Manifest
+)
 
 type storageFileIO struct {
-	scope   storage.Scope
-	gateway *api.Drive
-	records storageRecordIO
-	journal *offline.Store
-	closed  func() bool
+	scope            storage.Scope
+	gateway          *api.Drive
+	records          storageRecordIO
+	journal          *offline.Store
+	closed           func() bool
+	publicationCheck func() error
+	// A migrated immutable source carries an authenticated full-file commitment.
+	expectedSourceSHA256 string
 }
 
 func (f storageFileIO) guard(ctx context.Context) error {
@@ -94,49 +71,20 @@ func (f storageFileIO) guard(ctx context.Context) error {
 	if f.closed != nil && f.closed() {
 		return ErrClosed
 	}
+	if f.publicationCheck != nil {
+		return f.publicationCheck()
+	}
 	return nil
 }
 
-func (r StorageFileRequest) validate(scope storage.Scope) error {
-	if !scope.Valid() || r.SizeBytes < 0 || r.SizeBytes > MaxStorageFileBytes || len(r.Metadata) > maxFileMetadataBytes || !utf8.Valid(r.Metadata) || !json.Valid(r.Metadata) {
-		return storage.ErrRecord
-	}
-	return (storage.Record{Version: 1, Scope: scope, ObjectID: r.ObjectID, RevisionID: r.RevisionID, Role: "manifest", Payload: []byte(`{}`), Previous: r.Previous}).Validate(scope)
-}
-
-func fileBlocks(size int64) int {
-	if size == 0 {
-		return 1
-	}
-	return int(1 + (size-1)/storage.MaxCipherBlockBytes)
-}
-
-func fileBlockBytes(size int64, index int) int64 {
-	return min(storage.MaxCipherBlockBytes, max(int64(0), size-int64(index)*storage.MaxCipherBlockBytes))
-}
-
-func filePageSpan(level int) int {
-	span := 1
-	for range level + 1 {
-		span *= fileFanout
-	}
-	return span
-}
-
-func fileRootLevel(count int) int {
-	level := 0
-	for count > filePageSpan(level) {
-		level++
-	}
-	return level
-}
+func fileBlocks(size int64) int                  { return filesdk.BlockCount(size) }
+func fileBlockBytes(size int64, index int) int64 { return filesdk.BlockBytes(size, index) }
+func filePageSpan(level int) int                 { return filesdk.PageSpan(level) }
+func fileRootLevel(count int) int                { return filesdk.RootLevel(count) }
 
 func digestBytes(data []byte) string { sum := sha256.Sum256(data); return hex.EncodeToString(sum[:]) }
 
-func validFileHash(value string) bool {
-	raw, err := hex.DecodeString(value)
-	return err == nil && len(raw) == 32 && hex.EncodeToString(raw) == value
-}
+func validFileHash(value string) bool { return filesdk.ValidHash(value) }
 
 func (f storageFileIO) readRecord(ctx context.Context, ref EventRef, request StorageFileRequest) (storage.Record, error) {
 	if err := f.guard(ctx); err != nil {
@@ -174,40 +122,14 @@ func (f storageFileIO) root(ctx context.Context, ref EventRef, object, revision 
 		return storageFile{}, err
 	}
 	var file storageFile
-	if json.Unmarshal(rec.Payload, &file) != nil || file.Kind != fileKind || file.Request.validate(f.scope) != nil || file.Request.ObjectID != object || file.Request.RevisionID != revision || !validFileHash(file.SHA256) || !slices.Equal(file.Request.Previous, rec.Previous) {
+	if json.Unmarshal(rec.Payload, &file) != nil || file.Validate(f.scope, object, revision) != nil || !slices.Equal(file.Request.Previous, rec.Previous) {
 		return file, storage.ErrRecord
-	}
-	if err := validateFilePage(file.Root, file.Request, fileRootLevel(fileBlocks(file.Request.SizeBytes)), 0); err != nil {
-		return file, err
 	}
 	return file, nil
 }
 
 func validateFilePage(page storageFilePage, request StorageFileRequest, level, index int) error {
-	count := fileBlocks(request.SizeBytes)
-	if level < 0 || level >= fileLevels || index < 0 || index > count || page.Kind != filePageKind || page.Level != level || page.Index != index {
-		return storage.ErrRecord
-	}
-	span := filePageSpan(level)
-	if index > (count-1)/span {
-		return storage.ErrRecord
-	}
-	first := index * span
-	childSpan := span / fileFanout
-	wanted := 1 + (min(span, count-first)-1)/childSpan
-	if len(page.Nodes) != wanted {
-		return storage.ErrRecord
-	}
-	for _, node := range page.Nodes {
-		if level == 0 {
-			if node.Block == nil || node.Event != nil || !validFileHash(node.Block.PlainSHA256) {
-				return storage.ErrRecord
-			}
-		} else if node.Block != nil || node.Event == nil || !validFileEvent(*node.Event) {
-			return storage.ErrRecord
-		}
-	}
-	return nil
+	return filesdk.ValidatePage(page, request, level, index)
 }
 
 func validFileEvent(ref EventRef) bool {
@@ -254,7 +176,7 @@ func (f storageFileIO) download(ctx context.Context, ref EventRef, object, revis
 	}
 	hash := sha256.New()
 	err = f.walk(ctx, file, file.Root, file.Root.Level, 0, func(index int, descriptor storageFileBlock) error {
-		block := descriptor.at(f.scope, object, revision, index)
+		block := descriptor.At(f.scope, object, revision, index)
 		if block.Blob.SizeBytes != fileBlockBytes(file.Request.SizeBytes, index) {
 			return storage.ErrRecord
 		}
@@ -296,13 +218,22 @@ func (c *Client) DownloadStorageFile(ctx context.Context, gateway *api.Drive, re
 // StorageFileInfo reads authenticated private metadata without downloading file
 // bytes. The returned metadata must stay on the authorized device.
 func (c *Client) StorageFileInfo(ctx context.Context, ref EventRef, object, revision string) (StorageFileRequest, error) {
+	request, _, err := c.StorageFileCommitment(ctx, ref, object, revision)
+	return request, err
+}
+
+// StorageFileCommitment returns authenticated private metadata and its complete
+// plaintext digest without fetching media. It confirms a manifest's commitment,
+// not current provider availability. Copies must retain shared ciphertext while
+// any surviving file/version still references it; no original is retired here.
+func (c *Client) StorageFileCommitment(ctx context.Context, ref EventRef, object, revision string) (StorageFileRequest, string, error) {
 	scope, err := c.storageBlockScope(ctx)
 	if err != nil {
-		return StorageFileRequest{}, err
+		return StorageFileRequest{}, "", err
 	}
 	file, err := (storageFileIO{scope: scope, records: c, closed: c.closed.Load}).root(ctx, ref, object, revision)
 	if err != nil {
-		return StorageFileRequest{}, err
+		return StorageFileRequest{}, "", err
 	}
-	return file.Request, nil
+	return file.Request, file.SHA256, nil
 }

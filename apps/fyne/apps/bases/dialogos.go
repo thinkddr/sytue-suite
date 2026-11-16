@@ -115,32 +115,24 @@ func (p *Pantalla) dialogoVarios(r api.BasesRecord, campo api.BasesField) {
 var tiposDeCampo = []string{
 	api.BasesKindText, api.BasesKindNumber, api.BasesKindDate, api.BasesKindCheckbox, api.BasesKindSelect,
 	api.BasesKindMultiselect, api.BasesKindLink, api.BasesKindFormula, api.BasesKindAttachment,
+	api.BasesKindURL, api.BasesKindEmail, api.BasesKindPhone, api.BasesKindCurrency, api.BasesKindRating,
 }
 
-// lineas son las líneas con algo de un área de texto: una opción por línea.
-func lineas(s string) []string {
-	var out []string
-	for _, l := range strings.Split(s, "\n") {
-		if l = strings.TrimSpace(l); l != "" {
-			out = append(out, l)
-		}
-	}
-	return out
-}
-
-// formCampo es lo que se lleva escrito en «Añadir campo».
+// formCampo es lo que se lleva escrito en «Añadir campo», o en «Editar fórmula…» de
+// un campo que ya existe (editar): entonces solo se pide la expresión.
 type formCampo struct {
 	p      *Pantalla
 	b      *Base
+	editar *api.BasesField
 	otras  []api.BasesTable
 	tipos  []string
 	d      *ui.Dialogo
 	crear  *ui.Boton
 	nombre *ui.Entrada
 	// opciones son las de una elección (una por línea) y formula, la expresión con nombres.
-	opciones, formula        *ui.AreaTexto
-	tipo, destino, resultado *ui.Selector
-	fallo                    string
+	opciones, formula                *ui.AreaTexto
+	tipo, destino, resultado, moneda *ui.Selector
+	fallo                            string
 }
 
 // dialogoCampo es crear un campo nuevo (solo el propietario).
@@ -174,12 +166,22 @@ func (p *Pantalla) dialogoCampo() {
 	f.destino.Rotulo = p.t("field.linkTo")
 	f.resultado = ui.NuevoSelector([]string{p.t("field.kind.number"), p.t("field.kind.text")}, nil)
 	f.resultado.Rotulo = p.t("field.formulaResult")
+	f.moneda = ui.NuevoSelector(monedas, nil)
+	f.moneda.Rotulo = p.t("field.currency")
 	f.d, f.crear = p.dialogo(p.t("field.add"), container.New(ui.Columna{}), p.t("field.create"), f.enviar)
 
 	f.nombre.AlCambiar(func(string) { f.ajustar() })
 	f.opciones.AlCambiar(func(string) { f.ajustar() })
-	// El aviso de «ese campo no existe» sale y se va según se escribe.
-	hayAviso := false
+	f.vigilarFormula()
+	f.d.Foco = f.nombre
+	f.rehacer()
+	f.d.Mostrar(p.ventana.Canvas())
+}
+
+// vigilarFormula hace que el aviso de «ese campo no existe» salga y se vaya según se
+// escribe la fórmula.
+func (f *formCampo) vigilarFormula() {
+	hayAviso := f.formulaDesconocida()
 	f.formula.AlCambiar(func(string) {
 		if aviso := f.formulaDesconocida(); aviso != hayAviso {
 			hayAviso = aviso
@@ -188,9 +190,6 @@ func (p *Pantalla) dialogoCampo() {
 		}
 		f.ajustar()
 	})
-	f.d.Foco = f.nombre
-	f.rehacer()
-	f.d.Mostrar(p.ventana.Canvas())
 }
 
 // formulaDesconocida dice si la fórmula escrita nombra un campo que no existe.
@@ -205,7 +204,7 @@ func (f *formCampo) campo() (api.BasesNewField, bool) {
 	vale := c.Name != ""
 	switch c.Kind {
 	case api.BasesKindSelect, api.BasesKindMultiselect:
-		c.Choices = lineas(f.opciones.Texto())
+		c.Choices = listaDeOpciones(f.opciones.Texto())
 		vale = vale && len(c.Choices) > 0
 	case api.BasesKindLink:
 		c.LinkTableID = f.otras[f.destino.Elegida].ID
@@ -214,12 +213,19 @@ func (f *formCampo) campo() (api.BasesNewField, bool) {
 		ids, ok := formulaAIds(f.formula.Texto(), f.b.Campos, f.b.Tablas)
 		c.Formula, c.Result = ids, []string{api.BasesKindNumber, api.BasesKindText}[f.resultado.Elegida]
 		vale = vale && ok && strings.TrimSpace(f.formula.Texto()) != ""
+	case api.BasesKindCurrency:
+		c.Currency = monedas[f.moneda.Elegida]
 	}
 	return c, vale
 }
 
 func (f *formCampo) ajustar() {
-	_, vale := f.campo()
+	var vale bool
+	if f.editar != nil {
+		_, _, vale = formulaEditada(f.formula.Texto(), *f.editar, f.b.Campos, f.b.Tablas)
+	} else {
+		_, vale = f.campo()
+	}
 	f.crear.Inerte = !vale
 	f.crear.Refresh()
 }
@@ -228,26 +234,25 @@ func (f *formCampo) ajustar() {
 func (f *formCampo) rehacer() {
 	p := f.p
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	hijos := []fyne.CanvasObject{
-		ui.GrupoCampo(p.t("field.name"), true, f.nombre, "", ""),
-		ui.GrupoCampo(p.t("field.type"), false, f.tipo, "", ""),
-	}
-	switch f.tipos[f.tipo.Elegida] {
-	case api.BasesKindSelect, api.BasesKindMultiselect:
-		hijos = append(hijos, ui.GrupoCampo(p.t("field.choices"), false, f.opciones, p.t("field.choicesHelp"), ""))
-	case api.BasesKindLink:
-		hijos = append(hijos, ui.GrupoCampo(p.t("field.linkTo"), false, f.destino, "", ""))
-	case api.BasesKindFormula:
-		desconocido := ""
-		if f.formulaDesconocida() {
-			desconocido = p.t("field.formulaUnknown")
+	var hijos []fyne.CanvasObject
+	if f.editar != nil {
+		hijos = f.editorFormula(v)
+	} else {
+		hijos = []fyne.CanvasObject{
+			ui.GrupoCampo(p.t("field.name"), true, f.nombre, "", ""),
+			ui.GrupoCampo(p.t("field.type"), false, f.tipo, "", ""),
 		}
-		hijos = append(hijos,
-			container.New(ui.Columna{Hueco: tema.Espacio(1.5)},
-				ui.GrupoCampo(p.t("field.kind.formula"), true, f.formula, "", desconocido),
-				ui.NuevoParrafo(p.t("field.formulaHelp"), tema.TextoXS, ui.Normal, "text-muted", v).A(p.anchoDialogo(560))),
-			ui.NuevoParrafo(strings.Join(referenciasDeFormula(f.b.Campos, f.b.Tablas), "  "), tema.TextoXS, ui.Mono, "text-muted", v).A(p.anchoDialogo(560)),
-			ui.GrupoCampo(p.t("field.formulaResult"), false, f.resultado, "", ""))
+		switch f.tipos[f.tipo.Elegida] {
+		case api.BasesKindSelect, api.BasesKindMultiselect:
+			hijos = append(hijos, ui.GrupoCampo(p.t("field.choices"), false, f.opciones, p.t("field.choicesHelp"), ""))
+		case api.BasesKindLink:
+			hijos = append(hijos, ui.GrupoCampo(p.t("field.linkTo"), false, f.destino, "", ""))
+		case api.BasesKindCurrency:
+			hijos = append(hijos, ui.GrupoCampo(p.t("field.currency"), false, f.moneda, "", ""))
+		case api.BasesKindFormula:
+			hijos = append(hijos, f.editorFormula(v)...)
+			hijos = append(hijos, ui.GrupoCampo(p.t("field.formulaResult"), false, f.resultado, "", ""))
+		}
 	}
 	if f.fallo != "" {
 		hijos = append(hijos, alerta(f.fallo, v))
@@ -256,7 +261,27 @@ func (f *formCampo) rehacer() {
 	f.ajustar()
 }
 
+// editorFormula es la expresión con su ayuda y las referencias que se pueden escribir:
+// lo mismo al crear un campo de fórmula que al cambiar la de uno que ya existe.
+func (f *formCampo) editorFormula(v tema.Variante) []fyne.CanvasObject {
+	p := f.p
+	desconocido := ""
+	if f.formulaDesconocida() {
+		desconocido = p.t("field.formulaUnknown")
+	}
+	return []fyne.CanvasObject{
+		container.New(ui.Columna{Hueco: tema.Espacio(1.5)},
+			ui.GrupoCampo(p.t("field.kind.formula"), true, f.formula, "", desconocido),
+			ui.NuevoParrafo(p.t("field.formulaHelp"), tema.TextoXS, ui.Normal, "text-muted", v).A(p.anchoDialogo(560))),
+		ui.NuevoParrafo(strings.Join(referenciasDeFormula(f.b.Campos, f.b.Tablas), "  "), tema.TextoXS, ui.Mono, "text-muted", v).A(p.anchoDialogo(560)),
+	}
+}
+
 func (f *formCampo) enviar() {
+	if f.editar != nil {
+		f.enviarFormula()
+		return
+	}
 	c, vale := f.campo()
 	if !vale {
 		return
@@ -273,10 +298,27 @@ func (f *formCampo) enviar() {
 	})
 }
 
-// formVista es lo que se lleva escrito en «Añadir vista».
+// enviarFormula guarda la expresión de un campo de fórmula que ya existe.
+func (f *formCampo) enviarFormula() {
+	ids, _, cambia := formulaEditada(f.formula.Texto(), *f.editar, f.b.Campos, f.b.Tablas)
+	if !cambia {
+		return
+	}
+	p, campo := f.p, f.editar.ID
+	p.enDialogo(f.d, func() error {
+		ctx, cancelar := p.ctx()
+		defer cancelar()
+		return p.svc.SetFieldFormula(ctx, campo, ids)
+	}, func(m string) { f.fallo = m; f.rehacer() }, p.recargarCampos)
+}
+
+// formVista es lo que se lleva escrito en «Añadir vista» o «Editar vista».
 type formVista struct {
 	p *Pantalla
 	b *Base
+	// editada es la vista que se edita (nil: se crea una). Su tipo queda fijo: el
+	// servicio no lo cambia, porque de él cuelgan enlaces de formulario y conexiones.
+	editada *api.BasesView
 	// Los campos por lo que valen: una fórmula se filtra y se ordena como su resultado.
 	selecciones, ordenables, filtrables []api.BasesField
 	tipos                               []string
@@ -291,15 +333,26 @@ type formVista struct {
 	fallo      string
 }
 
-// dialogoVista es crear una vista guardada: rejilla (con un filtro y un orden
+// dialogoVista es crear una vista guardada: rejilla o galería (con un filtro y un orden
 // opcionales), tablero (por un campo de selección) o formulario (con los campos que pide).
-func (p *Pantalla) dialogoVista() {
+func (p *Pantalla) dialogoVista() { p.dialogoDeVista(nil) }
+
+// editarVista abre el mismo diálogo con la vista que se mira, para cambiar su nombre,
+// sus filtros, su orden o los campos que pide.
+func (p *Pantalla) editarVista() {
+	if v := p.abierta.vista(); v != nil {
+		copia := *v
+		p.dialogoDeVista(&copia)
+	}
+}
+
+func (p *Pantalla) dialogoDeVista(editada *api.BasesView) {
 	b := p.abierta
 	f := &formVista{
-		p: p, b: b, selectores: map[string]*ui.Selector{},
+		p: p, b: b, editada: editada, selectores: map[string]*ui.Selector{},
 		borrador: borradorVista{tipo: api.BasesGrid, filtroOp: "eq", ordenDir: "asc"},
 		// Un tablero necesita un campo de elección única: sin él, el tipo no se ofrece.
-		tipos: []string{api.BasesGrid, api.BasesForm},
+		tipos: []string{api.BasesGrid, api.BasesGallery, api.BasesForm},
 	}
 	for _, c := range b.Campos {
 		c = efectivo(c)
@@ -314,14 +367,24 @@ func (p *Pantalla) dialogoVista() {
 		}
 	}
 	if len(f.selecciones) > 0 {
-		f.tipos = []string{api.BasesGrid, api.BasesKanban, api.BasesForm}
+		f.tipos = []string{api.BasesGrid, api.BasesKanban, api.BasesGallery, api.BasesForm}
 		f.borrador.agrupar = f.selecciones[0].ID
+	}
+	titulo, accion := p.t("view.add"), p.t("view.create")
+	if editada != nil {
+		f.borrador, f.tipos = borradorDeVista(*editada, b.Campos), []string{editada.Kind}
+		titulo, accion = p.t("view.edit"), p.t("view.save")
 	}
 	f.nombre = ui.NuevaEntrada("")
 	f.nombre.Rotulo = p.t("view.name")
+	f.nombre.PonerTexto(f.borrador.nombre)
 	f.valor = ui.NuevaEntrada("")
+	f.valor.PonerTexto(f.borrador.filtroValor)
 	f.valor.Rotulo, f.valor.Ancho = p.t("view.filterValue"), 12*tema.Rem
-	f.d, f.crear = p.dialogo(p.t("view.add"), container.New(ui.Columna{}), p.t("view.create"), f.enviar)
+	if i := indiceDe(f.filtrables, f.borrador.filtroCampo); i >= 0 && f.filtrables[i].Kind == api.BasesKindDate {
+		f.valor.PonerMarcaDeAgua("2026-12-31")
+	}
+	f.d, f.crear = p.dialogo(titulo, container.New(ui.Columna{}), accion, f.enviar)
 	f.nombre.AlCambiar(func(string) { f.ajustar() })
 	f.valor.AlCambiar(func(s string) { f.borrador.filtroValor = s; f.ajustar() })
 	f.d.Foco = f.nombre
@@ -378,10 +441,16 @@ func (f *formVista) rehacer() {
 	for i, k := range f.tipos {
 		rotulosTipo[i] = p.t("view.kind." + k)
 	}
+	tipo, ayudaTipo := f.selector("view.kind", rotulosTipo, slices.Index(f.tipos, f.borrador.tipo), func(i int) { f.borrador.tipo = f.tipos[i] }), ""
+	if f.editada != nil {
+		tipo.Inerte(true)
+		ayudaTipo = p.t("view.kindFixed")
+	} else if f.borrador.tipo == api.BasesGallery {
+		ayudaTipo = p.t("view.galleryHelp")
+	}
 	hijos := []fyne.CanvasObject{
 		ui.GrupoCampo(p.t("view.name"), true, f.nombre, "", ""),
-		ui.GrupoCampo(p.t("view.kind"), false,
-			f.selector("view.kind", rotulosTipo, slices.Index(f.tipos, f.borrador.tipo), func(i int) { f.borrador.tipo = f.tipos[i] }), "", ""),
+		ui.GrupoCampo(p.t("view.kind"), false, tipo, ayudaTipo, ""),
 	}
 	if f.borrador.tipo == api.BasesKanban {
 		hijos = append(hijos, ui.GrupoCampo(p.t("view.groupBy"), false,
@@ -507,6 +576,10 @@ func (f *formVista) enviar() {
 	if !vale || f.borrador.nombre == "" {
 		return
 	}
+	if f.editada != nil {
+		f.guardarEdicion(cfg)
+		return
+	}
 	tabla, creada := b.Activa, api.BasesView{}
 	var vistas []api.BasesView
 	p.enDialogo(f.d, func() (err error) {
@@ -521,6 +594,31 @@ func (f *formVista) enviar() {
 		if p.abierta == b && b.Activa == tabla {
 			b.Vistas = vistas
 			p.elegirVista(creada.ID)
+		}
+	})
+}
+
+// guardarEdicion manda la vista editada y, si sigue abierta, la pone en su sitio de la
+// lista y vuelve a pedir los registros: el id no cambia, pero sí los filtros y el orden.
+func (f *formVista) guardarEdicion(cfg api.BasesViewConfig) {
+	p, b, id := f.p, f.b, f.editada.ID
+	var nueva api.BasesView
+	p.enDialogo(f.d, func() (err error) {
+		ctx, cancelar := p.ctx()
+		defer cancelar()
+		nueva, err = p.svc.UpdateView(ctx, id, f.borrador.nombre, cfg)
+		return err
+	}, func(m string) { f.fallo = m; f.rehacer() }, func() {
+		if p.abierta != b {
+			return
+		}
+		if i := slices.IndexFunc(b.Vistas, func(v api.BasesView) bool { return v.ID == id }); i >= 0 {
+			b.Vistas[i] = nueva
+		}
+		if b.VistaID == id {
+			p.elegirVista(id)
+		} else {
+			p.Repintar()
 		}
 	})
 }

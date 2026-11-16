@@ -10,21 +10,8 @@
 
 /* Administración de plataforma. Se escribe aquí y no con utilidades sueltas
    porque son piezas con estado propio (la barra de aforo cambia de color al
-   pasarse de plazas) y repetirlas inline en cada celda las haría divergir. */
-.sy-stats {
-  display: grid;
-  gap: var(--sy-space-4, 1rem);
-  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
-}
-.sy-stat__label {
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
-}
-.sy-stat__value {
-  font-size: 1.75rem;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
+   pasarse de plazas) y repetirlas inline en cada celda las haría divergir.
+   Las cifras de cabecera ya no viven aquí: son `Stat` de @sytue/ui. */
 .sy-capacity {
   display: flex;
   flex-direction: column;

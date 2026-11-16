@@ -29,12 +29,13 @@ import (
 
 // Server agrupa las dependencias del servicio y construye el router HTTP.
 type Server struct {
-	cfg    Config
-	log    *slog.Logger
-	store  *store.Store
-	keys   *oidc.KeyManager
-	issuer *oidc.Issuer
-	scim   *scim.Handler
+	mergeRunner *mergeRunnerState
+	cfg         Config
+	log         *slog.Logger
+	store       *store.Store
+	keys        *oidc.KeyManager
+	issuer      *oidc.Issuer
+	scim        *scim.Handler
 	// fed es el broker RP para el login federado (discovery/canje/validación del
 	// id_token contra el IdP upstream), con cliente HTTP SSRF-safe y caché de JWKS.
 	fed *federation.Broker
@@ -140,12 +141,13 @@ func (s *Server) UsarCache(c *cache.Client) { s.cache = c }
 // NewServer construye el Server con sus dependencias ya inicializadas.
 func NewServer(cfg Config, logger *slog.Logger, st *store.Store, km *oidc.KeyManager, iss *oidc.Issuer) *Server {
 	s := &Server{
-		cfg:    cfg,
-		log:    logger,
-		store:  st,
-		keys:   km,
-		issuer: iss,
-		hub:    clienteHub(cfg),
+		mergeRunner: newMergeRunnerState(),
+		cfg:         cfg,
+		log:         logger,
+		store:       st,
+		keys:        km,
+		issuer:      iss,
+		hub:         clienteHub(cfg),
 		// Login interactivo: 10 intentos/min por IP con ráfaga de 10 (anti
 		// credential-stuffing / fuerza bruta de contraseñas). Compartido entre
 		// réplicas (Postgres): un límite por proceso se multiplicaría por N.
@@ -594,6 +596,10 @@ func (s *Server) Router() http.Handler {
 			r.Get("/me/avatar", s.handleMeAvatarGet)
 			r.Put("/me/avatar", s.handleMeAvatarPut)
 			r.Delete("/me/avatar", s.handleMeAvatarDelete)
+			// La rúbrica que la persona pidió recordar en CertiPDF (cifrada en reposo).
+			r.Get("/me/rubrica", s.handleMeRubricaGet)
+			r.Put("/me/rubrica", s.handleMeRubricaPut)
+			r.Delete("/me/rubrica", s.handleMeRubricaDelete)
 			// «Exportar tus datos»: la entrega de la cuenta (platform/pkg/portabilidad).
 			r.Get("/me/export", s.handleMeExport)
 			r.Get("/me/sessions", s.handleMeSessions)

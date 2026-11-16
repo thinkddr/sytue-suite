@@ -10,6 +10,7 @@ import (
 	"image/png"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -82,4 +83,23 @@ func TestRecursosHTTP_Validacion(t *testing.T) {
 			t.Fatalf("debe reconocer magic bytes de PNG")
 		}
 	})
+}
+
+// Un WebP con transparencia se guarda en PNG y no en JPEG, donde lo transparente
+// saldría negro (D-DRIVE-03 registró el decodificador WebP en todo el proceso).
+func TestUnWebPConAlfaNoEsOpaco(t *testing.T) {
+	datos, err := os.ReadFile("../../../../platform/pkg/miniatura/testdata/rosa-con-alfa.webp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	img, formato, err := image.Decode(bytes.NewReader(datos))
+	if err != nil || formato != "webp" {
+		t.Fatalf("Decode = %q, %v", formato, err)
+	}
+	if opaca(img) {
+		t.Fatal("el WebP con alfa pasa por opaco y acabaría en JPEG")
+	}
+	if !opaca(image.NewYCbCr(image.Rect(0, 0, 4, 4), image.YCbCrSubsampleRatio420)) {
+		t.Fatal("una foto YCbCr es opaca")
+	}
 }

@@ -85,6 +85,11 @@
     "url": "https://mail.sytue.eu/erp/acme/?vista=tareas"
   },
   {
+    "tipo": "erp.approval.requested",
+    "producto": "erp",
+    "url": "https://mail.sytue.eu/erp/acme/?vista=aprobaciones"
+  },
+  {
     "tipo": "erp.access.requested",
     "producto": "erp",
     "url": "https://mail.sytue.eu/erp/acme/?peticion=clientes"

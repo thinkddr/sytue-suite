@@ -11,6 +11,7 @@
  */
 import type { Contact } from '@sytue/api-clients';
 import type { ContactInput } from './contactsApi.js';
+import { parseVcardDetails } from '../lib/vcard.js';
 
 /** Unión de listas con trim + dedupe case-insensitive; conserva el orden y la primera grafía. */
 export function unionValues(...lists: string[][]): string[] {
@@ -40,9 +41,15 @@ export function buildMergeInput(
   // La organización «hereda» la del perdedor si el superviviente no tiene:
   // fusionar nunca debe perder datos que sí proyectamos.
   const organization = chosen.organization ?? survivor.organization ?? loser.organization;
+  const fullName = chosen.fullName ?? survivor.fullName;
+  // Con el nombre del perdedor, el N del superviviente (que buildVcard conserva
+  // de la base si no llega otro) ya no le corresponde: va el N del perdedor.
+  const loserName = fullName !== survivor.fullName && fullName === loser.fullName;
+  const n = loserName ? parseVcardDetails(loser.vcard) : null;
   return {
     uid: survivor.uid,
-    fullName: chosen.fullName ?? survivor.fullName,
+    fullName,
+    ...(n ? { firstName: n.firstName, lastName: n.lastName } : {}),
     emails: unionValues(survivor.emails, loser.emails),
     phones: unionValues(survivor.phones, loser.phones),
     ...(organization ? { organization } : {}),

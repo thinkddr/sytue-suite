@@ -414,6 +414,30 @@ export interface DomainDnsInstructions {
   txt_value?: string;
 }
 
+/**
+ * Motivo de una comprobación DNS de un dominio propio (POST /domains/{id}/verify).
+ * `txt_ausente`: no hay TXT; `txt_distinto`: el TXT tiene otro valor;
+ * `cname_distinto`: la propiedad está probada pero el host no apunta al ingress
+ * (el certificado no se emitirá hasta que apunte); `ok`: todo en orden.
+ */
+export type DomainCheckReason = 'ok' | 'txt_ausente' | 'txt_distinto' | 'cname_distinto';
+
+/** Resultado de «Comprobar ahora» un dominio propio. */
+export interface DomainCheck {
+  /** La propiedad está probada (TXT correcto): el dominio pasa a `verified`. */
+  verified: boolean;
+  reason: DomainCheckReason;
+  /** Destino al que debe apuntar el host (el ingress). */
+  expected?: string;
+  /** A dónde apunta hoy (CNAME o IP); ausente si no resuelve. */
+  found?: string;
+}
+
+export interface VerifyDomainResult {
+  domain: CloudDomain;
+  check: DomainCheck;
+}
+
 export interface AddDomainResult {
   domain: CloudDomain;
   dns?: DomainDnsInstructions;
@@ -838,6 +862,15 @@ export class CloudClient {
         body: JSON.stringify({ is_primary: true }),
       })
       .then((r) => r.domain);
+  }
+
+  /**
+   * Comprueba AHORA el DNS de un dominio propio y devuelve el motivo exacto. Si el
+   * TXT es correcto, el dominio vuelve ya verificado. Tope: una comprobación cada
+   * 10 s por dominio (429 con Retry-After).
+   */
+  verifyDomain(domainId: string): Promise<VerifyDomainResult> {
+    return this.http.postJson(`/domains/${encodeURIComponent(domainId)}/verify`, {});
   }
 
   /** Cancela una build en curso o en cola. */

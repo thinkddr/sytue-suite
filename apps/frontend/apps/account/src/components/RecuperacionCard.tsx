@@ -14,6 +14,7 @@ import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { Button, Card, FieldGroup, Input } from '@sytue/ui';
 import type { T } from '../i18n/index.js';
+import { primeraLectura } from '../lib/primeraLectura.js';
 
 type Estado = 'quieto' | 'enviando' | 'enviado' | 'quitado' | 'error';
 
@@ -28,7 +29,7 @@ export function RecuperacionCard({ t }: { t: T }): JSX.Element {
   useEffect(() => {
     void (async () => {
       try {
-        const res = await fetch('/api/me');
+        const res = await primeraLectura('/api/me');
         if (!res.ok) return;
         const d = (await res.json()) as { phone?: string; recovery_email?: string };
         setMovil(d.phone ?? '');
@@ -62,7 +63,7 @@ export function RecuperacionCard({ t }: { t: T }): JSX.Element {
   }
 
   return (
-    <Card class="mb-6 break-inside-avoid">
+    <Card id="recuperacion">
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -123,10 +124,10 @@ export function RecuperacionCard({ t }: { t: T }): JSX.Element {
               {t('recovery.remove')}
             </Button>
           ) : null}
-          <span aria-live="polite" class="text-sm">
-            {estado === 'enviado' && <span class="text-success">{t('recovery.sent')}</span>}
-            {estado === 'quitado' && <span class="text-success">{t('recovery.removed')}</span>}
-            {estado === 'error' && <span class="text-danger">{t(`recovery.${fallo}`)}</span>}
+          <span role="status" class="text-sm">
+            {estado === 'enviado' && <span class="text-success-text">{t('recovery.sent')}</span>}
+            {estado === 'quitado' && <span class="text-success-text">{t('recovery.removed')}</span>}
+            {estado === 'error' && <span class="text-danger-text">{t(`recovery.${fallo}`)}</span>}
           </span>
         </div>
       </form>

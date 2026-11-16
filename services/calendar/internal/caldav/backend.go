@@ -526,25 +526,82 @@ func encodeCalendar(cal *ical.Calendar) (string, error) {
 }
 
 // objectOverlaps indica si algun VEVENT del recurso solapa [start, end).
+//
+// RFC 4791 §9.9 pide evaluar el time-range sobre el conjunto EXPANDIDO de
+// instancias: mirar solo DTSTART/DTEND dejaba fuera una serie semanal creada
+// hace dos meses al pedir el mes en curso (la web y Thunderbird piden por
+// rango). Para no expandir instancia a instancia basta con el intervalo de la
+// serie [DTSTART, fin de recurrencia), el mismo criterio que la consulta REST
+// (`recurrence_end IS NULL OR recurrence_end > desde`): sobreincluir algún hueco
+// entre instancias es inocuo porque el cliente expande y filtra.
 func objectOverlaps(cal *ical.Calendar, start, end time.Time) bool {
 	for _, child := range cal.Children {
 		if child.Name != ical.CompEvent {
 			continue
 		}
-		evt := &ical.Event{Component: child}
-		s, _, err := propTime(evt.Props, ical.PropDateTimeStart)
-		if err != nil {
-			continue
-		}
-		e, _, err := propTime(evt.Props, ical.PropDateTimeEnd)
-		if err != nil {
-			e = s
-		}
-		if s.Before(end) && start.Before(e) {
+		if eventOverlaps(&ical.Event{Component: child}, start, end) {
 			return true
 		}
 	}
 	return false
+}
+
+// eventOverlaps evalúa un VEVENT (suelto, maestro con RRULE/RDATE u override).
+func eventOverlaps(evt *ical.Event, start, end time.Time) bool {
+	s, allDay, err := propTime(evt.Props, ical.PropDateTimeStart)
+	if err != nil {
+		return false
+	}
+	e, _, err := propTime(evt.Props, ical.PropDateTimeEnd)
+	if err != nil {
+		// Sin DTEND, el mismo criterio que al guardar (eventFromICal): DURATION
+		// si la hay, un día si es de día completo y si no, duración nula.
+		e = s
+		if dur, ok := propDuration(evt.Props); ok {
+			e = s.Add(dur)
+		} else if allDay {
+			e = s.Add(24 * time.Hour)
+		}
+	}
+	dur := max(e.Sub(s), 0)
+
+	// Fin de la serie: el DTEND de la primera instancia salvo que haya RRULE.
+	seriesEnd := &e
+	if raw := propText(evt.Props, ical.PropRecurrenceRule); raw != "" {
+		rule, err := domain.ParseRRule(raw)
+		if err != nil {
+			// Una regla que no sabemos leer no debe esconder la serie: el
+			// cliente sí puede entenderla, así que se trata como infinita.
+			seriesEnd = nil
+		} else {
+			// En la zona del evento, como al guardar: con COUNT el último
+			// instante UTC depende del DST (±1 h).
+			loc := domain.EventLocation(tzidOf(evt.Props, ical.PropDateTimeStart), allDay)
+			seriesEnd = rule.RecurrenceEnd(s.In(loc), dur)
+		}
+	}
+	if s.Before(end) && (seriesEnd == nil || endsAfter(*seriesEnd, start, dur)) {
+		return true
+	}
+	// RDATE añade instancias sueltas, que pueden caer fuera del intervalo de la
+	// RRULE (o existir sin ella).
+	for _, r := range propTimes(evt.Props, ical.PropRecurrenceDates) {
+		if r.Before(end) && endsAfter(r.Add(dur), start, dur) {
+			return true
+		}
+	}
+	return false
+}
+
+// endsAfter indica si una instancia (o serie) que acaba en fin sigue viva en
+// start. RFC 4791 §9.9: un evento de duración nula ocupa su instante de inicio,
+// así que uno que empieza justo en start cuenta (fin == start); con duración,
+// el fin es exclusivo.
+func endsAfter(fin, start time.Time, dur time.Duration) bool {
+	if dur == 0 {
+		return !fin.Before(start)
+	}
+	return start.Before(fin)
 }
 
 // compFilterRange extrae el time-range del filtro de componentes de un

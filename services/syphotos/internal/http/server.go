@@ -89,6 +89,11 @@ func NewRouter(d Deps) http.Handler {
 		// La señal de cambios para el widget de Photos (hubnotify.TrasEscribir). Lo que
 		// termina después de contestar —miniaturas, EXIF— avisa por su cuenta (avisarProcesada).
 		api.Use(h.hub.TrasEscribir(nil, "photos"))
+		var privateSource photoPrivateSource
+		if source, err := store.NewPrivateSource(d.Store, d.Objetos); err == nil {
+			privateSource = source
+		}
+		mountPhotosPrivateSource(api, privateSource)
 
 		// QUERY ADEMÁS DE GET en los dos que lo piden, y en ninguno más.
 		//
@@ -101,6 +106,7 @@ func NewRouter(d Deps) http.Handler {
 		// sobra en una URL, y moverlo al cuerpo solo añadiría otra forma de llamar
 		// a lo mismo.
 		httpx.GetYQuery(api, "/timeline", h.LineaDeTiempo)
+		api.Get("/timeline/years", h.AnyosDeLaLinea)
 
 		// «Exportar tus datos»: lo que Fotos sabe de cada foto (platform/pkg/portabilidad).
 		api.Get("/export", h.ExportarDatos)

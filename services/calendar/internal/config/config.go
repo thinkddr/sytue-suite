@@ -84,6 +84,8 @@ type Config struct {
 	// visible de la organización que convoca. Vacío ⇒ solo su identificador.
 	IDNombresOrgsSecret string
 	HubInternalSecret   string
+	RoomsURL            string
+	RoomsInternalSecret string
 
 	// SMTP del buzón con el que salen las invitaciones por correo (iMIP) a quien NO es
 	// de la suite: el relé de Sytue Mail. Sin SMTPAddr o SMTPFrom no sale ninguna y el
@@ -135,6 +137,8 @@ func Load() (Config, error) {
 		HubInternalSecret:   l.HubInternalSecret(base.Env),
 		IDBaseURL:           l.GetDefault("ID_BASE_URL", "http://id:8081"),
 		IDNombresOrgsSecret: l.Get("ID_NOMBRES_ORGS_SECRET"),
+		RoomsURL:            l.GetDefault("ROOMS_URL", "http://rooms:8085"),
+		RoomsInternalSecret: l.Get("ROOMS_INTERNAL_SECRET"),
 
 		SMTPAddr:          l.Get("SMTP_ADDR"),
 		SMTPFrom:          l.Get("SMTP_FROM"),

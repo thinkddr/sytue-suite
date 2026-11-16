@@ -168,14 +168,17 @@ func startExterno(ctx context.Context, fsys fs.FS, dir, dsnBase string) (*Harnes
 	}
 	base := "pgtest_" + hex.EncodeToString(b[:])
 
+	return startNamedDatabase(ctx, fsys, dir, dsnBase, base)
+}
+
+func startNamedDatabase(ctx context.Context, fsys fs.FS, dir, dsnBase, base string) (*Harness, error) {
 	admin, err := pgx.Connect(ctx, dsnBase)
 	if err != nil {
 		return nil, fmt.Errorf("pgtest: conectar a PGTEST_DSN: %w", err)
 	}
-	// El identificador se compone a mano porque PostgreSQL no admite parámetros
-	// en CREATE DATABASE. Es seguro: `base` son 16 dígitos hexadecimales
-	// generados aquí mismo, no llega de fuera.
-	if _, err := admin.Exec(ctx, `CREATE DATABASE "`+base+`"`); err != nil {
+	// PostgreSQL does not accept a parameter for a database identifier. Quote
+	// the random harness name and optional service suffix with pgx.Identifier.
+	if _, err := admin.Exec(ctx, `CREATE DATABASE `+pgx.Identifier{base}.Sanitize()); err != nil {
 		_ = admin.Close(ctx)
 		return nil, fmt.Errorf("pgtest: crear base %s: %w", base, err)
 	}
@@ -197,7 +200,7 @@ func startExterno(ctx context.Context, fsys fs.FS, dir, dsnBase string) (*Harnes
 		// WITH (FORCE) cierra las conexiones que queden: sin él, un pool que
 		// tarde un instante en soltar deja la base colgada y el servidor se va
 		// llenando de bases huérfanas a lo largo de una tanda de tests.
-		_, _ = a.Exec(termCtx, `DROP DATABASE IF EXISTS "`+base+`" WITH (FORCE)`)
+		_, _ = a.Exec(termCtx, `DROP DATABASE IF EXISTS `+pgx.Identifier{base}.Sanitize()+` WITH (FORCE)`)
 	}
 
 	return terminarDeMontar(ctx, fsys, dir, dsn, nil, terminate)
@@ -328,6 +331,29 @@ type Harness struct {
 
 	container *tcpostgres.PostgresContainer
 	teardown  func()
+}
+
+// Sibling creates a disposable service database on the same PostgreSQL as h.
+// Its name is derived from the parent's random database, so suite tests exercise
+// DSNForDatabase and the real cross-service runner without bypassing RLS.
+func (h *Harness) Sibling(t *testing.T, service string, fsys fs.FS, dir string) *Harness {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), startupTimeout)
+	defer cancel()
+	cfg, err := pgx.ParseConfig(h.DSN)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if service == "" || len(cfg.Database)+len(service)+1 > 63 {
+		t.Fatal("pgtest: invalid sibling service")
+	}
+
+	result, err := startNamedDatabase(ctx, fsys, dir, h.DSN, cfg.Database+"_"+service)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(result.Teardown)
+	return result
 }
 
 // New arranca un PostgreSQL efimero, aplica las migraciones del FS embebido

@@ -7,6 +7,22 @@ import type { en } from './en.js';
 
 export const fi: AppCatalog<typeof en> = {
   'app.title': 'Oma tili',
+  'app.description': 'Oma tili — Sytue-tilisi profiili, tietoturva ja käyttöoikeudet.',
+  'app.lead': 'Profiilisi, miten kirjaudut ja suojaat tilin ja missä se on auki.',
+
+  // --- Revisión de seguridad ---
+  'checkup.title': 'Tietoturvatarkistus',
+  'checkup.all_good': 'Kaikki kunnossa: tilisi on hyvin suojattu.',
+  'checkup.dos_pasos': 'Kaksivaiheinen vahvistus on pois päältä: pelkkä salasana avaa tilin.',
+  'checkup.recuperacion':
+    'Ei palautussähköpostia eikä puhelinta: jos menetät pääsyn, takaisin ei pääse.',
+  'checkup.sesiones': 'Avoimet istunnot muilla laitteilla: {count}',
+  'checkup.contrasenas_app': 'Sovellussalasanat käyttämättä 90 päivää: {count}',
+  'checkup.dispositivos': 'Luotetut laitteet näkemättä 90 päivää: {count}',
+  'checkup.turn_on': 'Ota käyttöön',
+  'checkup.add': 'Lisää',
+  'checkup.review': 'Tarkista',
+
   'profile.title': 'Profiili',
   'profile.name': 'Näyttönimi',
   'profile.name.hint': 'Näin näyt koko paketissa.',
@@ -30,25 +46,55 @@ export const fi: AppCatalog<typeof en> = {
   'photo.errorRead': 'Kuvaa ei voitu lukea.',
   'sessions.title': 'Avoimet istunnot',
   'sessions.current': 'Tämä laite',
+  'sessions.signed_in': 'Kirjauduttu {time}',
   'sessions.close_one': 'Sulje tämä istunto',
+  'sessions.close_named': 'Sulje istunto laitteella {device}',
+  'sessions.close_one_confirm':
+    '{device} kirjataan ulos, ja sen on kirjauduttava uudelleen käyttääkseen tiliäsi.',
   'sessions.close_others': 'Sulje kaikki istunnot',
   'sessions.close_others_note': 'Myös tämä: sinun täytyy kirjautua uudelleen sisään.',
+  'sessions.close_all_confirm':
+    'Kaikki istunnot suljetaan, myös tämä. Sinun on kirjauduttava uudelleen jokaisella laitteella.',
   'sessions.empty': 'Muita istuntoja ei ole avoinna.',
   'sessions.failed': 'Istuntojasi ei voitu ladata.',
   'common.loading': 'Ladataan…',
+  'common.retry': 'Yritä uudelleen',
   'devices.title': 'Laitteet',
   'devices.current': 'Tämä laite',
   'devices.trusted': 'Luotettu',
   'devices.trust': 'Merkitse luotetuksi',
   'devices.forget': 'Unohda tämä laite',
+  'devices.forget_named': 'Unohda {device}',
+  'devices.forget_confirm':
+    '{device} ei ole enää tunnettu ja menettää luotetun tilansa. Uusi kirjautuminen siltä lasketaan uudeksi laitteeksi.',
   'devices.empty': 'Laitteita ei ole vielä tunnistettu.',
   'devices.failed': 'Laitteitasi ei voitu ladata.',
+  'signature.title': 'Tallennettu allekirjoitus',
+  'signature.help':
+    'Allekirjoitus, jonka pyysit CertiPDF:ää muistamaan käsin allekirjoittaessa. Se on tallennettu salattuna tiliisi.',
+  'signature.empty':
+    'Sinulla ei ole tallennettua allekirjoitusta. Kun allekirjoitat käsin CertiPDF:ssä, valitse «Muista allekirjoitukseni».',
+  'signature.failed': 'Tallennettua allekirjoitusta ei voitu ladata.',
+  'signature.preview': 'Tallennettu allekirjoituksesi',
+  'signature.saved_on': 'Tallennettu {date}',
+  'signature.delete': 'Poista tallennettu allekirjoitus',
+  'signature.delete_confirm':
+    'Tallennettu allekirjoituksesi poistetaan. Jo allekirjoitetut asiakirjat säilyttävät sen; kun seuraavan kerran allekirjoitat käsin, sinun on piirrettävä se uudelleen.',
   'security.title': 'Tietoturva',
   'security.failed': 'Jokin meni pieleen. Yritä uudelleen.',
   'security.password.title': 'Salasana',
   'security.password.warning': 'Vaihto kirjaa sinut ulos kaikkialta, myös täältä.',
   'security.password.current': 'Nykyinen salasana',
   'security.password.new': 'Uusi salasana',
+  'security.password.requirements': 'Uuden salasanan vaatimukset:',
+  'security.password.req_length': {
+    one: 'Vähintään {count} merkki',
+    other: 'Vähintään {count} merkkiä',
+  },
+  'security.password.req_complexity': 'Kirjaimia ja vähintään yksi numero',
+  'security.password.req_different': 'Eri kuin nykyinen salasana',
+  'security.password.req_met': 'Täyttyy',
+  'security.password.req_pending': 'Ei vielä',
   'security.password.submit': 'Vaihda salasana',
   'security.password.done': 'Salasana vaihdettu. Kaikki istunnot suljettiin, myös tämä.',
   'security.password.signin_again': 'Kirjaudu uudelleen',
@@ -71,6 +117,45 @@ export const fi: AppCatalog<typeof en> = {
   'security.codes.once':
     'Näytetään kerran. Tallenna ne turvalliseen paikkaan: kukin toimii vain yhden kerran.',
   'security.codes.saved': 'Olen tallentanut ne',
+  'security.codes.regenerate_confirm':
+    'Nykyiset palautuskoodisi lakkaavat toimimasta heti, myös tulostetut tai tallennetut.',
+  'security.mfa.step.need': 'Ennen kuin aloitat',
+  'security.mfa.step.need.heading': 'Mitä tarvitset',
+  'security.mfa.step.need.desc':
+    'Todennussovelluksen puhelimeesi. Se näyttää uuden kuusinumeroisen koodin 30 sekunnin välein.',
+  'security.mfa.step.need.apps_title': 'Mikä tahansa todennussovellus käy',
+  'security.mfa.step.need.apps':
+    'Esimerkiksi: Aegis, FreeOTP, Microsoft Authenticator, Google Authenticator, 1Password, Bitwarden. Jos sinulla ei ole sellaista, asenna se ennen kuin jatkat.',
+  'security.mfa.step.need.next': 'Aloita',
+  'security.mfa.step.scan': 'Skannaa',
+  'security.mfa.step.scan.heading': 'Lisää tilisi sovellukseen',
+  'security.mfa.key_label': 'Määritysavain',
+  'security.mfa.step.code': 'Koodi',
+  'security.mfa.step.code.heading': 'Kirjoita sovelluksen koodi',
+  'security.mfa.step.code.desc':
+    'Näin tarkistetaan ennen käyttöönottoa, että sovellus ja tili täsmäävät.',
+  'security.mfa.code.hint': 'Kuusi numeroa. Jos se vaihtuu kirjoittaessasi, käytä uutta.',
+  'security.mfa.step.codes.heading': 'Tallenna palautuskoodisi',
+  'security.codes.copy': 'Kopioi kaikki',
+  'security.codes.copied': 'Koodit kopioitu.',
+  'security.codes.copy_failed': 'Kopiointi ei onnistunut. Valitse koodit ja kopioi ne käsin.',
+  'security.codes.download': 'Lataa .txt',
+  'security.codes.file_title': 'Sytuen palautuskoodit',
+  'security.codes.file_account': 'Tili: {account}',
+  'security.codes.file_date': 'Luotu: {date}',
+  'security.codes.file_note':
+    'Kukin koodi toimii kerran. Säilytä tiedosto turvallisessa paikassa, erillään puhelimesta.',
+  'security.mfa.step.done': 'Valmis',
+  'security.mfa.step.done.heading': 'Kaksivaiheinen vahvistus on käytössä',
+  'security.mfa.step.done.desc':
+    'Seuraavalla kirjautumiskerralla sinulta kysytään sovelluksen koodia.',
+  'security.mfa.passkey_tip.title': 'Lisää myös pääsyavain',
+  'security.mfa.passkey_tip':
+    'Pääsyavaimella kirjaudut sormenjäljellä, kasvoilla tai näytön lukituksella ilman koodeja.',
+  'security.mfa.passkey_tip.action': 'Lisää pääsyavain',
+  'security.mfa.close': 'Sulje',
+  'security.mfa.disable_title': 'Poistetaanko kaksivaiheinen vahvistus käytöstä?',
+  'security.mfa.disable_warning': 'Silloin pelkkä salasana avaa tilin taas.',
   'common.cancel': 'Peruuta',
   'profile.given_name': 'Etunimi',
   'profile.family_name': 'Sukunimi',
@@ -81,6 +166,8 @@ export const fi: AppCatalog<typeof en> = {
   'profile.locale.hint': 'Käytössä koko Sytuessa ja viesteissä, joita lähetämme sinulle.',
   'security.passkeys.title': 'Pääsyavaimet',
   'security.passkeys.remove': 'Poista',
+  'security.passkeys.remove_named': 'Poista {name}',
+  'security.passkeys.remove_confirm': 'Et voi enää kirjautua avaimella {name}.',
   'security.passkeys.unnamed': 'Nimetön avain',
   'app_passwords.title': 'Sovellussalasanat',
   'app_passwords.hint':
@@ -89,6 +176,9 @@ export const fi: AppCatalog<typeof en> = {
   'app_passwords.label.hint': 'Esimerkiksi: kannettavan sähköposti, puhelin.',
   'app_passwords.create': 'Luo salasana',
   'app_passwords.revoke': 'Peru',
+  'app_passwords.revoke_named': 'Peru {label}',
+  'app_passwords.revoke_confirm':
+    'Sovellukset, jotka käyttävät salasanaa {label}, eivät voi enää kirjautua. Tätä ei voi perua.',
   'app_passwords.empty': 'Ei vielä sovellussalasanoja.',
   'app_passwords.failed': 'Sovellussalasanojasi ei voitu ladata.',
   'app_passwords.unnamed': 'Nimetön',

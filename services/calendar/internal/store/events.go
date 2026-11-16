@@ -138,13 +138,14 @@ func (s *Store) UpdateEvent(ctx context.Context, in domain.EventInput, expectETa
 			return err
 		}
 
-		// Reemplaza el evento maestro (recurrence_id IS NULL) del objeto.
-		if _, err := tx.Exec(ctx,
-			`DELETE FROM events WHERE tenant=$1 AND object_id=$2 AND recurrence_id IS NULL`,
-			t.Slug, objID); err != nil {
-			return fmt.Errorf("store: limpiar evento maestro: %w", err)
+		// Actualiza el evento maestro (recurrence_id IS NULL) EN SITIO: con DELETE+INSERT
+		// cada edición le daba otro id, y quien lo tenía abierto o enlazado
+		// (/events/{id}, la suite nativa, un enlace de Rooms) se quedaba con un 404.
+		ev, err = updateMasterRow(ctx, tx, t.Slug, objID, in)
+		if isNoRows(err) {
+			// Un objeto sin fila maestra (p. ej. solo excepciones): se crea.
+			ev, err = insertEventRow(ctx, tx, t.Slug, objID, in)
 		}
-		ev, err = insertEventRow(ctx, tx, t.Slug, objID, in)
 		if err != nil {
 			return err
 		}
@@ -195,6 +196,25 @@ func insertEventRow(ctx context.Context, tx pgx.Tx, tenant string, objectID uuid
 		return domain.Event{}, domain.ErrConflict
 	}
 	return ev, err
+}
+
+// updateMasterRow reescribe la fila maestra de un objeto conservando su id. Si el
+// objeto no tiene fila maestra devuelve pgx.ErrNoRows.
+func updateMasterRow(ctx context.Context, tx pgx.Tx, tenant string, objectID uuid.UUID, in domain.EventInput) (domain.Event, error) {
+	row := tx.QueryRow(ctx,
+		`UPDATE events SET uid=$3, summary=$4, description=$5, location=$6, organizer=$7,
+			dtstart=$8, dtend=$9, tzid=$10, all_day=$11, status=$12, classification=$13, transp=$14,
+			color=$15, conference_url=$16, rrule=$17, rdate=$18, exdate=$19, recurrence_end=$20,
+			sequence_no=$21, updated_at=now()
+		 WHERE tenant=$1 AND object_id=$2 AND recurrence_id IS NULL AND deleted_at IS NULL
+		 RETURNING `+eventCols,
+		tenant, objectID, in.UID, in.Summary, in.Description, in.Location, in.Organizer,
+		in.DTStart.UTC(), in.DTEnd.UTC(), in.TZID, in.AllDay, string(in.Status), string(in.Classification),
+		string(in.Transparency), domain.SanitizeColor(in.Color),
+		domain.SanitizeConferenceURL(in.ConferenceURL),
+		in.RRule, utcSlice(in.RDate), utcSlice(in.ExDate),
+		in.RecurrenceEnd, in.SequenceNo)
+	return scanEvent(row, tenant)
 }
 
 // GetEvent devuelve un evento maestro por ID, con sus asistentes.

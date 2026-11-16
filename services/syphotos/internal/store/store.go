@@ -55,11 +55,15 @@ const colsBase = "id, owner_sub, drive_file_id, name, media_type, bytes, " +
 // reemplazo sea evidente: no hay saltos ni tabuladores que esquivar.
 var cols = "a." + strings.ReplaceAll(colsBase, ", ", ", a.")
 
-func scanActivo(row pgx.Row, tenant string) (domain.Activo, error) {
+// `extra` son destinos para las columnas que la consulta ponga DETRÁS de cols.
+func scanActivo(row pgx.Row, tenant string, extra ...any) (domain.Activo, error) {
 	var a domain.Activo
 	var orient int16
-	err := row.Scan(&a.ID, &a.Duenyo, &a.DriveID, &a.Nombre, &a.Tipo, &a.Bytes,
+	dest := make([]any, 0, 18+len(extra))
+	dest = append(dest, &a.ID, &a.Duenyo, &a.DriveID, &a.Nombre, &a.Tipo, &a.Bytes,
 		&a.Ancho, &a.Alto, &orient, &a.TomadaEn, &a.SubidaEn, &a.Favorita, &a.Camara, &a.Objetivo, &a.Lat, &a.Lon, &a.Descripcion, &a.Etiquetas)
+	dest = append(dest, extra...)
+	err := row.Scan(dest...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Activo{}, domain.ErrNotFound
 	}
@@ -290,6 +294,48 @@ func (s *Store) LineaDeTiempo(ctx context.Context, f FiltroLinea) ([]domain.Acti
 	return activos, siguiente, err
 }
 
+// AnyoDeLinea es un año de la línea de tiempo con cuántas fotos tiene.
+type AnyoDeLinea struct {
+	Anyo  int
+	Fotos int
+}
+
+// AnyosDeLaLinea agrupa la línea de tiempo por año, con la MISMA fecha que la
+// ordena —`coalesce(taken_at, uploaded_at)`, en UTC como `desde=`—: si la
+// barra contase con otra, un año podría ofrecerse y abrir otro.
+func (s *Store) AnyosDeLaLinea(ctx context.Context, duenyo string, soloFavoritas bool) ([]AnyoDeLinea, error) {
+	var out []AnyoDeLinea
+	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		tenant, err := tenantDe(ctx)
+		if err != nil {
+			return err
+		}
+		cond := ""
+		if soloFavoritas {
+			cond = ` AND a.favorite`
+		}
+		rows, err := tx.Query(ctx, `
+			SELECT extract(year FROM coalesce(a.taken_at, a.uploaded_at) AT TIME ZONE 'UTC')::int AS anyo, count(*)::int
+			FROM assets a
+			WHERE a.tenant = $1 AND a.owner_sub = $2 AND a.deleted_at IS NULL`+cond+`
+			GROUP BY anyo
+			ORDER BY anyo DESC`, tenant, duenyo)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var a AnyoDeLinea
+			if err := rows.Scan(&a.Anyo, &a.Fotos); err != nil {
+				return err
+			}
+			out = append(out, a)
+		}
+		return rows.Err()
+	})
+	return out, err
+}
+
 // Activo devuelve una foto por id, SI es de esa persona.
 //
 // El dueño va en la consulta y no en una comprobación posterior porque la
@@ -418,7 +464,9 @@ func tenantDe(ctx context.Context) (string, error) {
 	return t.Slug, nil
 }
 
-// Papelera lista las fotos borradas de esa persona, la última borrada primero.
+// Papelera lista las fotos borradas de esa persona, la última borrada primero,
+// con cuándo se borró cada una: sin eso la interfaz no puede decir cuándo se va
+// para siempre.
 func (s *Store) Papelera(ctx context.Context, duenyo string) ([]domain.Activo, error) {
 	var out []domain.Activo
 	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
@@ -427,7 +475,7 @@ func (s *Store) Papelera(ctx context.Context, duenyo string) ([]domain.Activo, e
 			return err
 		}
 		rows, err := tx.Query(ctx, `
-			SELECT `+cols+` FROM assets a
+			SELECT `+cols+`, a.deleted_at FROM assets a
 			WHERE a.tenant = $1 AND a.owner_sub = $2 AND a.deleted_at IS NOT NULL
 			ORDER BY a.deleted_at DESC, a.id DESC LIMIT 500`, tenant, duenyo)
 		if err != nil {
@@ -435,10 +483,12 @@ func (s *Store) Papelera(ctx context.Context, duenyo string) ([]domain.Activo, e
 		}
 		defer rows.Close()
 		for rows.Next() {
-			a, err := scanActivo(rows, tenant)
+			var borrada time.Time
+			a, err := scanActivo(rows, tenant, &borrada)
 			if err != nil {
 				return err
 			}
+			a.BorradaEn = &borrada
 			out = append(out, a)
 		}
 		return rows.Err()
@@ -497,6 +547,8 @@ func (s *Store) MarcarFavorita(ctx context.Context, id uuid.UUID, duenyo string,
 // dueño en el almacén de objetos.
 type Purgada struct {
 	ID uuid.UUID
+	// Owner is captured before SQL deletion, for the S3 writer fence afterward.
+	Owner string
 	// Tenant: el worker de retención recorre todas las organizaciones, así que
 	// la clave del objeto no se puede componer sin saber de cuál es la foto.
 	Tenant string
@@ -530,7 +582,7 @@ func (s *Store) Purgar(ctx context.Context, duenyo string, id *uuid.UUID) ([]Pur
 			args = append(args, *id)
 		}
 		rows, err := tx.Query(ctx, `
-			SELECT a.id, coalesce(e.fingerprint, '')
+			SELECT a.id, a.owner_sub, coalesce(e.fingerprint, '')
 			FROM assets a
 			LEFT JOIN edits e
 			  ON e.tenant = a.tenant AND e.asset_id = a.id AND e.owner_sub = a.owner_sub
@@ -542,7 +594,7 @@ func (s *Store) Purgar(ctx context.Context, duenyo string, id *uuid.UUID) ([]Pur
 		out = out[:0]
 		for rows.Next() {
 			var p Purgada
-			if err := rows.Scan(&p.ID, &p.Huella); err != nil {
+			if err := rows.Scan(&p.ID, &p.Owner, &p.Huella); err != nil {
 				return err
 			}
 			out = append(out, p)

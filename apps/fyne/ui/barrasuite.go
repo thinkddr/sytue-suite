@@ -77,7 +77,7 @@ const (
 	MargenDivisorBarra         = 1 * 0.25 * tema.Rem   // el `mx-1` del filete vertical
 	AltoDivisorBarra           = 6 * 0.25 * tema.Rem   // su `h-6`
 	MargenCuentaBarra          = 0.5 * 0.25 * tema.Rem // el `ml-0.5` del avatar
-	AnchoBuscadorBarra         = 30 * tema.Rem         // el `max-w-[30rem]`: 420 con el rem de 14
+	AnchoBuscadorBarra         = 30 * tema.Rem         // el `max-w-[30rem]`: 480 con el rem de 16
 	TamGlifoBarra      float32 = 20                    // `<Icon size={20}>`
 	// El punto de aviso: `h-2 w-2` en `top-2 right-2` con `ring-2` del fondo de la
 	// barra, que es lo que lo despega del glifo de la campana.
@@ -248,9 +248,18 @@ type BarraSuite struct {
 	barraApp     bool
 	cerrarSuite  *BotonIcono
 	tituloApp    *canvas.Text
+	// portalPistas es el portal de la pantalla para las pistas (ver `portalesPista`):
+	// un contenedor sin layout y de lado cero, el ÚLTIMO de la barra, que es lo último
+	// que pinta el montaje. Así la burbuja de un botón queda encima del contenido y de
+	// la propia barra, y no la recorta ningún desplazador.
+	portalPistas *fyne.Container
 	// buscarPendiente espera a tener sesión y lienzo antes de mostrar el teclado.
 	buscarPendiente bool
 	busquedaSesion  sesion.Estado
+	// atajosDeApp son los grupos que la app enseña en la hoja de «?» (ConAtajosDeApp);
+	// ayudaUna engancha «?» al lienzo una sola vez, en cuanto lo hay.
+	atajosDeApp func() []GrupoDeAtajos
+	ayudaUna    sync.Once
 }
 
 // aparienciaVista es lo que decide cómo se pinta el marco: el tema, el color y la forma.
@@ -539,6 +548,17 @@ func (b *BarraSuite) PonerInsignia(n int) {
 	a.ponerInsignia()
 }
 
+// AlCambiarSinLeer avisa, en el hilo de la interfaz, cada vez que cambia el número de
+// avisos sin leer. Es para el Hub, que lo pone en su menú de la bandeja del sistema
+// («Avisos (3)»); se avisa enseguida con el número de ahora.
+func (b *BarraSuite) AlCambiarSinLeer(f func(int)) {
+	a := b.avisos
+	a.mu.Lock()
+	a.alSinLeer, a.avisado = f, -1
+	a.mu.Unlock()
+	a.refrescar()
+}
+
 // CallarAvisosSi deja que la app calle sus avisos al sistema mientras `f` diga que sí:
 // es «Pausar avisos» de Rooms. La campana los sigue mostrando; lo que no hacen es
 // interrumpir. Se llama desde la rutina del flujo del Hub, así que `f` ha de poder
@@ -564,6 +584,57 @@ func (b *BarraSuite) CederAtajo(f func()) { b.buscador.alAtajo = f }
 // se enfoca el buscador. Es el `defaultPrevented` de la web: Notepads lleva ⌘K a su
 // captura con un día abierto, y el segundo ⌘K (con la captura ya enfocada) busca.
 func (b *BarraSuite) CederAtajoSi(f func() bool) { b.buscador.alAtajoSi = f }
+
+// ConAtajosDeApp le da a la hoja de «?» los atajos de la app (`useAtajosDeApp` de la
+// web). Es una función porque los textos y las teclas se leen al abrir la hoja.
+func (b *BarraSuite) ConAtajosDeApp(f func() []GrupoDeAtajos) *BarraSuite {
+	b.atajosDeApp = f
+	return b
+}
+
+// VerAtajos abre la hoja de «?» de la suite sobre el lienzo: los atajos de la app y los
+// de la suite. Devuelve el diálogo, o nil sin lienzo.
+func (b *BarraSuite) VerAtajos(c fyne.Canvas) *Dialogo {
+	if c == nil {
+		return nil
+	}
+	var app []GrupoDeAtajos
+	if b.atajosDeApp != nil {
+		app = b.atajosDeApp()
+	}
+	return MostrarHojaAtajosDeSuite(c, b.t.Locale(), app)
+}
+
+// registrarAyuda engancha «?» al lienzo, UNA vez, como ⌘K (`registrarAtajo`). Lo que
+// hubiera en la ranura de runas sigue DELANTE: la app va primero, como con
+// `defaultPrevented` en la web. Si con su «?» abrió su propia hoja (o cualquier capa),
+// la de la suite no se abre encima. `SetOnTypedRune` solo llega sin nada enfocado, así
+// que dentro de un campo «?» sigue siendo texto.
+func (b *BarraSuite) registrarAyuda() {
+	c := lienzoDe(b)
+	if c == nil {
+		return
+	}
+	b.ayudaUna.Do(func() {
+		previa := c.OnTypedRune()
+		c.SetOnTypedRune(func(r rune) {
+			if previa != nil {
+				previa(r)
+			}
+			b.AtenderAyuda(c, r)
+		})
+	})
+}
+
+// AtenderAyuda abre la hoja de la suite si `r` es «?» y no hay ninguna capa delante.
+// Devuelve si lo hizo. La llaman las apps que se quedan la ranura de runas DESPUÉS de
+// montar la barra (y con ello pisan la suya) para su tecla que no es de ellas.
+func (b *BarraSuite) AtenderAyuda(c fyne.Canvas, r rune) bool {
+	if r != '?' || c == nil || c.Overlays().Top() != nil {
+		return false
+	}
+	return b.VerAtajos(c) != nil
+}
 
 // Parar suelta el flujo de avisos y la búsqueda que estuviera esperando. La llama
 // quien cierre la ventana; sin ella siguen hasta que muere el proceso, que en una
@@ -639,6 +710,11 @@ func (b *BarraSuite) CreateRenderer() fyne.WidgetRenderer {
 	// El panel de resultados va el ÚLTIMO: cuelga por debajo de la barra y se pinta
 	// sobre todo lo demás.
 	r.objetos = append(r.objetos, b.cuenta.boton, b.buscador.panel)
+	// Y el portal de las pistas, el último: una ayuda se lee encima de cualquier cosa.
+	if b.portalPistas == nil {
+		b.portalPistas = container.NewWithoutLayout()
+	}
+	r.objetos = append(r.objetos, b.portalPistas)
 	r.Refresh() // regla 7: el campo de búsqueda envuelve un `widget.Entry`
 	return r
 }
@@ -744,6 +820,10 @@ func (r *barraSuiteRenderer) Destroy()                     {}
 // Las acciones van de fuera hacia dentro, como en la web: el avatar con su `ml-0.5`,
 // el filete con su `mx-1` y la campana, con `gap-1` entre ellas.
 func (r *barraSuiteRenderer) Layout(t fyne.Size) {
+	if c := lienzoDe(r.b); c != nil && portalesPista.de(c) != r.b.portalPistas {
+		portalesPista.poner(c, r.b.portalPistas)
+	}
+	r.b.registrarAyuda()
 	if carril := barraDeCarril(t.Width); carril != r.carril {
 		r.carril = carril
 		r.pintar(tema.De(fyne.CurrentApp().Settings().ThemeVariant()))

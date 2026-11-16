@@ -8,7 +8,7 @@
  */
 import type { JSX } from 'preact';
 import { useCallback, useEffect, useState } from 'preact/hooks';
-import { Badge, Button, FieldGroup, Input, Modal, Select, useConfirm } from '@sytue/ui';
+import { Badge, Button, FieldGroup, Input, Modal, Select, useConfirm, EmptyState } from '@sytue/ui';
 import { formatDate, type Locale } from '@sytue/i18n';
 import {
   BASES_CONSUMERS,
@@ -199,7 +199,7 @@ export function DialogoConexiones(p: {
           </p>
         ) : null}
         {conexiones.length === 0 ? (
-          <p class="text-text-muted text-sm">{t('conn.none')}</p>
+          <EmptyState compact title={t('conn.none')} />
         ) : (
           <ul class="flex flex-col gap-3">
             {conexiones.map((c) => {

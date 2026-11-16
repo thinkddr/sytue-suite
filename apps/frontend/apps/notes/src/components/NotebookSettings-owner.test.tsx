@@ -219,7 +219,7 @@ test('un cuaderno nuevo conserva los controles de acceso por defecto', async () 
       parent_id: 'parent-notebook',
       title: 'New notebook',
       emoji: '',
-      color: '#86198f',
+      color: '#9259b8',
       layout: 'list',
       visibility: 'organization',
       indexable: true,
@@ -228,4 +228,22 @@ test('un cuaderno nuevo conserva los controles de acceso por defecto', async () 
       room_id: '',
     },
   ]);
+});
+
+// LA PALETA DE COLORES DE USUARIO. Cada muestra se nombra con el tono del catálogo común
+// —antes el lector de pantalla decía «almohadilla uno cuatro seis a…»— y un cuaderno
+// guardado con la paleta de antes (#146a47) se ve marcado en su tono más cercano, el
+// verde, sin que guardar lo reescriba (lo comprueba «sin permiso conserva acceso»).
+test('las muestras son la paleta de usuario, con nombre, y la de antes se marca en su tono', async () => {
+  mount({ notebook: notebook(), puedeCambiarAcceso: false, onSave: async () => {} });
+  await tick();
+  // El selector común es un radiogroup: cada tono, un radio.
+  const muestras = [...dialog().querySelectorAll<HTMLButtonElement>('button[role="radio"]')].filter(
+    (b) => b.style.backgroundColor !== '',
+  );
+  expect(muestras).toHaveLength(12);
+  expect(muestras.some((b) => (b.getAttribute('aria-label') ?? '').startsWith('#'))).toBe(false);
+  expect(
+    muestras.filter((b) => b.getAttribute('aria-checked') === 'true').map((b) => b.title),
+  ).toEqual(['Green']);
 });

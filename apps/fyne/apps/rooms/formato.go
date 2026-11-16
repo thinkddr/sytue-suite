@@ -154,6 +154,11 @@ func MarcaDeAtajo(s fyne.Shortcut) (MarcaFormato, bool) {
 
 // atajo es el gancho de combinaciones del editor: el formato se lo queda.
 func (c *Compositor) atajo(s fyne.Shortcut) bool {
+	// Alt+↑/↓ cambia de canal solo con la caja vacía: con texto, en macOS ⌥+flecha
+	// mueve el cursor por párrafos y es de quien escribe (lib/navegarCanales.ts).
+	if paso, solo, es := PasoDeNavegacion(s); es {
+		return c.Texto() == "" && c.AlNavegar != nil && c.AlNavegar(paso, solo)
+	}
 	m, ok := MarcaDeAtajo(s)
 	if ok {
 		c.AplicarMarca(m)

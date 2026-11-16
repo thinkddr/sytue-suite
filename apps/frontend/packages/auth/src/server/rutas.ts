@@ -75,7 +75,10 @@ export function rutasDeAuth<C>(bff: () => Bff, toBffContext: (ctx: C) => BffCont
      * docs/CONVENTIONS.md §11.
      */
     token: async (ctx: C) => {
-      const session = await bff().getSession(toBffContext(ctx));
+      const current = bff();
+      const guard = await current.sessionGuard(toBffContext(ctx));
+      if (guard) return guard;
+      const session = await current.getSession(toBffContext(ctx));
       if (!session) return json({ error: 'unauthenticated' }, 401);
       return json({
         accessToken: session.tokens.accessToken,

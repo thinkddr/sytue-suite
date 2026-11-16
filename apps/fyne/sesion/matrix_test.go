@@ -12,6 +12,7 @@ import (
 	"fyne.io/fyne/v2"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 )
 
 func TestMatrixStorageReturnBelongsToTheNativeAppAndPendingFlow(t *testing.T) {
@@ -20,12 +21,12 @@ func TestMatrixStorageReturnBelongsToTheNativeAppAndPendingFlow(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 			t.Error(err)
 		}
-		_ = json.NewEncoder(w).Encode(map[string]string{"product": input["product"], "state": "bound-state", "authorize_url": "https://rooms.sytue.eu/rooms/matrix/native/start?state=bound-state"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"native_consumer": input["native_consumer"], "product": input["product"], "state": "bound-state", "authorize_url": "https://rooms.sytue.eu/rooms/matrix/native/start?state=bound-state"})
 	}))
 	defer server.Close()
 	client := api.NewRooms(server.URL, nil, server.Client())
-	for _, tc := range []struct{ product, native string }{{"hub", "one"}, {"drive", "drive"}, {"mail", "mail"}, {"rooms", "rooms"}} {
-		start, err := client.MatrixNativeStartFor(t.Context(), tc.product)
+	for _, tc := range []struct{ product, native, consumer string }{{"hub", "one", ""}, {"drive", "drive", ""}, {"mail", "mail", ""}, {"rooms", "rooms", ""}, {"drive", "pdf", "pdf"}} {
+		start, err := client.MatrixNativeStartForConsumer(t.Context(), tc.product, tc.consumer, storage.LegacyIdentity)
 		if err != nil {
 			t.Fatal(err)
 		}

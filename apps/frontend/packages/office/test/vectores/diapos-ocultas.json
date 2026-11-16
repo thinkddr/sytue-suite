@@ -1,0 +1,175 @@
+{
+  "comentario": "VECTORES COMPARTIDOS de las diapositivas ocultas al presentar: los prueba la web (test/slides-ocultas.test.ts: presentAdvance, presentKeyTarget, la «siguiente» del moderador y posicionDe de Cast) y la app nativa (apps/fyne/diapos/ocultas_test.go: Avanzar, TeclaPresentandoEn, SiguienteVisible y PosicionCast). 'pasos' son los clics de animación de cada diapositiva; 'moderador' -1 = no hay siguiente; 'cast' null = no se anuncia. Índices desde 0.",
+  "casos": [
+    {
+      "nombre": "en la primera, avanzar salta la oculta",
+      "ocultas": [false, true, false, true, false],
+      "pasos": [0, 0, 2, 0, 1],
+      "diapo": 0,
+      "paso": 0,
+      "avanzar": [2, 0],
+      "retroceder": [0, 0],
+      "teclas": {
+        "siguiente": 2,
+        "anterior": 0,
+        "inicio": 0,
+        "fin": 4
+      },
+      "moderador": 2,
+      "cast": [0, 3]
+    },
+    {
+      "nombre": "con pasos pendientes, avanzar revela; retroceder salta la oculta",
+      "ocultas": [false, true, false, true, false],
+      "pasos": [0, 0, 2, 0, 1],
+      "diapo": 2,
+      "paso": 0,
+      "avanzar": [2, 1],
+      "retroceder": [0, 0],
+      "teclas": {
+        "siguiente": 4,
+        "anterior": 0,
+        "inicio": 0,
+        "fin": 4
+      },
+      "moderador": 4,
+      "cast": [1, 3]
+    },
+    {
+      "nombre": "agotados los pasos, avanzar salta la oculta",
+      "ocultas": [false, true, false, true, false],
+      "pasos": [0, 0, 2, 0, 1],
+      "diapo": 2,
+      "paso": 2,
+      "avanzar": [4, 0],
+      "retroceder": [2, 1],
+      "teclas": {
+        "siguiente": 4,
+        "anterior": 0,
+        "inicio": 0,
+        "fin": 4
+      },
+      "moderador": 4,
+      "cast": [1, 3]
+    },
+    {
+      "nombre": "en la última, retroceder vuelve construida saltando la oculta",
+      "ocultas": [false, true, false, true, false],
+      "pasos": [0, 0, 2, 0, 1],
+      "diapo": 4,
+      "paso": 0,
+      "avanzar": [4, 1],
+      "retroceder": [2, 2],
+      "teclas": {
+        "siguiente": 4,
+        "anterior": 2,
+        "inicio": 0,
+        "fin": 4
+      },
+      "moderador": -1,
+      "cast": [2, 3]
+    },
+    {
+      "nombre": "en una oculta (número + Intro) se sale con normalidad",
+      "ocultas": [false, true, false, true, false],
+      "pasos": [0, 0, 2, 0, 1],
+      "diapo": 1,
+      "paso": 0,
+      "avanzar": [2, 0],
+      "retroceder": [0, 0],
+      "teclas": {
+        "siguiente": 2,
+        "anterior": 0,
+        "inicio": 0,
+        "fin": 4
+      },
+      "moderador": 2,
+      "cast": null
+    },
+    {
+      "nombre": "en otra oculta, retroceder vuelve construida",
+      "ocultas": [false, true, false, true, false],
+      "pasos": [0, 0, 2, 0, 1],
+      "diapo": 3,
+      "paso": 0,
+      "avanzar": [4, 0],
+      "retroceder": [2, 2],
+      "teclas": {
+        "siguiente": 4,
+        "anterior": 2,
+        "inicio": 0,
+        "fin": 4
+      },
+      "moderador": 4,
+      "cast": null
+    },
+    {
+      "nombre": "ocultas en los extremos: Inicio y Fin van a las que se enseñan",
+      "ocultas": [true, false, false, true],
+      "pasos": [0, 0, 0, 0],
+      "diapo": 1,
+      "paso": 0,
+      "avanzar": [2, 0],
+      "retroceder": [1, 0],
+      "teclas": {
+        "siguiente": 2,
+        "anterior": 1,
+        "inicio": 1,
+        "fin": 2
+      },
+      "moderador": 2,
+      "cast": [0, 2]
+    },
+    {
+      "nombre": "tras la última que se enseña no hay más",
+      "ocultas": [true, false, false, true],
+      "pasos": [0, 0, 0, 0],
+      "diapo": 2,
+      "paso": 0,
+      "avanzar": [2, 0],
+      "retroceder": [1, 0],
+      "teclas": {
+        "siguiente": 2,
+        "anterior": 1,
+        "inicio": 1,
+        "fin": 2
+      },
+      "moderador": -1,
+      "cast": [1, 2]
+    },
+    {
+      "nombre": "todas ocultas = ninguna",
+      "ocultas": [true, true, true],
+      "pasos": [0, 0, 0],
+      "diapo": 1,
+      "paso": 0,
+      "avanzar": [2, 0],
+      "retroceder": [0, 0],
+      "teclas": {
+        "siguiente": 2,
+        "anterior": 0,
+        "inicio": 0,
+        "fin": 2
+      },
+      "moderador": 2,
+      "cast": [1, 3]
+    },
+    {
+      "nombre": "sin ocultas, la tabla de siempre",
+      "ocultas": [false, false, false],
+      "pasos": [1, 0, 0],
+      "diapo": 1,
+      "paso": 0,
+      "avanzar": [2, 0],
+      "retroceder": [0, 1],
+      "teclas": {
+        "siguiente": 2,
+        "anterior": 0,
+        "inicio": 0,
+        "fin": 2
+      },
+      "moderador": 2,
+      "cast": [1, 3]
+    }
+  ]
+}

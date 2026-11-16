@@ -24,6 +24,7 @@ import (
 	"html"
 	"net/http"
 	"net/mail"
+	"strconv"
 	"strings"
 	"time"
 
@@ -48,6 +49,94 @@ type inviteUserRequest struct {
 	// Vacío ⇒ invitación normal, que sigue siendo el camino recomendado: así la
 	// contraseña la elige quien la va a usar y no viaja por ningún canal.
 	Password string `json:"password"`
+	// Emails invita a VARIAS personas de una vez (hasta maxBatchInvites) con el
+	// mismo rol, como el alta inicial. Cada elemento puede traer una o varias
+	// direcciones separadas por comas, espacios o saltos de línea: así la consola
+	// puede mandar lo pegado tal cual sin reimplementar el separador. Excluye a
+	// Email, MailboxLocal y Password (ver validarLoteInvitaciones).
+	Emails []string `json:"emails"`
+}
+
+// detallesAdmin es lo que Sytue Admin dice de cada estado de una tanda. En
+// inglés, como el resto de mensajes de esta API (§13.1): la consola pinta el
+// suyo traducido por el estado y este texto solo lo ve quien llama a la API.
+var detallesAdmin = map[string]string{
+	"invalid":        "This does not look like an email address.",
+	"already_member": "Already a member of the organisation.",
+	"not_sent":       "The invitation was created but the email could not be sent.",
+	"failed":         "The invitation could not be created.",
+}
+
+// validarLoteInvitaciones comprueba una petición de invitación en lote ANTES de
+// tocar nada: separa las direcciones, aplica el tope y decide el rol. Es pura a
+// propósito, para poder probar sus reglas sin base de datos.
+//
+//   - Email junto a Emails se rechaza en vez de elegir uno: quien manda las dos
+//     cosas no sabe qué ha pedido, y adivinarlo invitaría a quien no debía.
+//   - Ni buzón personalizado ni contraseña: los dos son de UNA persona concreta,
+//     y repartir la misma contraseña a una lista sería repartir una credencial.
+//   - Owner no se reparte en lote, ni siquiera un owner: conceder la propiedad
+//     es una decisión por persona y se hace de una en una, mirando a quién.
+//   - Más de maxBatchInvites direcciones válidas se rechaza ENTERO (no se
+//     invita a las primeras 25 y se calla el resto).
+func validarLoteInvitaciones(req inviteUserRequest) (emails, bad []string, role domain.Role, err error) {
+	if strings.TrimSpace(req.Email) != "" {
+		return nil, nil, "", httpx.ErrBadRequest.WithMessage("Send either email or emails, not both.")
+	}
+	if strings.TrimSpace(req.MailboxLocal) != "" || req.Password != "" {
+		return nil, nil, "", httpx.ErrBadRequest.WithMessage(
+			"A custom address or an initial password can only be set when inviting one person.",
+		)
+	}
+	role = domain.Role(strings.TrimSpace(req.Role))
+	if role == "" {
+		role = domain.RoleMember
+	}
+	if !role.Valid() || role == domain.RoleOwner {
+		return nil, nil, "", httpx.ErrBadRequest.WithMessage("Invalid role for a batch (admin|member|billing).")
+	}
+	emails, bad = domain.ParseInviteEmails(strings.Join(req.Emails, "\n"))
+	if len(emails) > maxBatchInvites {
+		return nil, nil, "", httpx.ErrBadRequest.WithMessage("Too many addresses at once (25 maximum).")
+	}
+	if len(emails) == 0 && len(bad) == 0 {
+		return nil, nil, "", httpx.ErrBadRequest.WithMessage("Enter at least one email address.")
+	}
+	return emails, bad, role, nil
+}
+
+// adminInvitarVarias — la rama en lote de POST /api/v1/admin/invitations. El
+// alta inicial invita hasta 25 personas de golpe y, si se pasan, manda a «Sytue
+// Admin» a por el resto; sin esto, aquí solo se podía de una en una. Responde
+// 200 con el resultado de CADA dirección (como el alta), porque una tanda casi
+// nunca sale entera bien y un 201 o un error global esconderían cuáles fallaron.
+//
+// Va limitada por usuario como el alta (cada dirección es un correo que sale):
+// el límite solo se aplica a las tandas, para que invitar de una en una se
+// comporte igual que antes.
+func (s *Server) adminInvitarVarias(w http.ResponseWriter, r *http.Request, org domain.Organization, inviterID string, req inviteUserRequest) {
+	emails, bad, role, err := validarLoteInvitaciones(req)
+	if err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
+	if s.acctLimiter != nil {
+		res, lerr := s.acctLimiter.Allow(r.Context(), "admin-invite-batch:"+inviterID)
+		if lerr != nil {
+			httpx.Fail(w, r, httpx.ErrUnavailable.Wrap(lerr))
+			return
+		}
+		if !res.Allowed {
+			// Como httpx.RateLimit: quien llama sabe cuándo puede volver a probar.
+			if res.RetryAfter > 0 {
+				w.Header().Set("Retry-After", strconv.Itoa(max(1, int(res.RetryAfter.Seconds()))))
+			}
+			httpx.Fail(w, r, httpx.ErrTooManyRequests)
+			return
+		}
+	}
+	sent, results := s.invitarEnLote(r, org, role, inviterID, emails, bad, detallesAdmin)
+	httpx.JSON(w, r, http.StatusOK, map[string]any{"sent": sent, "results": results})
 }
 
 type invitationEmailRequest struct {
@@ -160,6 +249,9 @@ func (s *Server) handleAdminRevokeInvitation(w http.ResponseWriter, r *http.Requ
 // si el correo YA es miembro. Un correo que aún no tiene cuenta —o la tiene pero
 // no es miembro— recibe el enlace: al aceptarlo se materializa la membresía (y,
 // solo si la cuenta es nueva, se fija la contraseña que elija).
+//
+// Con `emails` en vez de `email` invita a varias de una vez (adminInvitarVarias);
+// el formato de una sola dirección no cambia.
 func (s *Server) handleAdminInviteUser(w http.ResponseWriter, r *http.Request) {
 	c, _ := claimsFrom(r.Context())
 	org, err := s.activeOrg(r)
@@ -170,6 +262,10 @@ func (s *Server) handleAdminInviteUser(w http.ResponseWriter, r *http.Request) {
 	var req inviteUserRequest
 	if err := httpx.DecodeJSON(w, r, &req); err != nil {
 		httpx.Fail(w, r, err)
+		return
+	}
+	if req.Emails != nil {
+		s.adminInvitarVarias(w, r, org, c.Subject, req)
 		return
 	}
 	role := domain.Role(strings.TrimSpace(req.Role))

@@ -6,6 +6,10 @@ package bases
 import (
 	"encoding/json"
 	"fmt"
+	"image"
+	"image/color"
+	"image/draw"
+	"image/jpeg"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -45,6 +49,8 @@ type falso struct {
 	// Con quién se comparte la base y los enlaces públicos de sus formularios.
 	permisos []m
 	enlaces  []m
+	// comentarios son los de todos los registros, en orden.
+	comentarios []m
 }
 
 func campoDe(id, tabla, nombre, tipo string, mas m) m {
@@ -162,6 +168,51 @@ func (f *falso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		t := f.tabla(x[1])
 		t["fields"] = append(t["fields"].([]m), pedido)
 		di(pedido)
+	case clave == "PATCH fields/2", clave == "DELETE fields/2":
+		for _, t := range f.tablas {
+			campos := t["fields"].([]m)
+			i := slices.IndexFunc(campos, func(c m) bool { return c["id"] == x[1] })
+			if i < 0 {
+				continue
+			}
+			if r.Method == http.MethodDelete {
+				t["fields"] = slices.Delete(campos, i, i+1)
+				nada()
+				return
+			}
+			// Un nombre repetido en la tabla no vale, como en el servicio.
+			if n, hay := pedido["name"]; hay && slices.ContainsFunc(campos, func(c m) bool { return c["name"] == n && c["id"] != x[1] }) {
+				falla(http.StatusUnprocessableEntity, "invalid")
+				return
+			}
+			for _, k := range []string{"name", "formula", "choices"} {
+				if v, hay := pedido[k]; hay {
+					campos[i][k] = v
+				}
+			}
+			nada()
+			return
+		}
+		falla(http.StatusNotFound, "not_found")
+	case clave == "PUT tables/3" && x[2] == "field-order":
+		t := f.tabla(x[1])
+		campos := t["fields"].([]m)
+		orden, _ := pedido["fields"].([]any)
+		if len(orden) != len(campos) {
+			falla(http.StatusConflict, "rev_conflict")
+			return
+		}
+		nuevos := make([]m, 0, len(campos))
+		for _, id := range orden {
+			i := slices.IndexFunc(campos, func(c m) bool { return c["id"] == id })
+			if i < 0 {
+				falla(http.StatusConflict, "rev_conflict")
+				return
+			}
+			nuevos = append(nuevos, campos[i])
+		}
+		t["fields"] = nuevos
+		nada()
 	case clave == "GET tables/3" && x[2] == "records":
 		q := r.URL.Query()
 		todos := slices.Clone(f.registros[x[1]])
@@ -171,6 +222,17 @@ func (f *falso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if cfg, _ := v["config"].(m); v["id"] == q.Get("view") && fmt.Sprint(cfg["sort"]) != "<nil>" {
 				slices.Reverse(todos)
 			}
+		}
+		// Buscar y ordenar de un momento (`q`, `sort`) también los resuelve el servicio:
+		// aquí, el nombre que contiene lo buscado y, con `:desc`, la vuelta.
+		if buscado := strings.ToLower(q.Get("q")); buscado != "" {
+			todos = slices.DeleteFunc(todos, func(x m) bool {
+				datos, _ := x["data"].(m)
+				return !strings.Contains(strings.ToLower(fmt.Sprint(datos["nom"])), buscado)
+			})
+		}
+		if strings.HasSuffix(q.Get("sort"), ":desc") {
+			slices.Reverse(todos)
 		}
 		desde, _ := strconv.Atoi(q.Get("cursor"))
 		limite, _ := strconv.Atoi(q.Get("limit"))
@@ -198,6 +260,18 @@ func (f *falso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		pedido["id"], pedido["table_id"] = fmt.Sprintf("v%d", f.n), x[1]
 		f.vistas[x[1]] = append(f.vistas[x[1]], pedido)
 		di(pedido)
+	case clave == "PATCH views/2":
+		// El servicio cambia nombre y configuración y deja el tipo como estaba.
+		for _, vs := range f.vistas {
+			for _, v := range vs {
+				if v["id"] == x[1] {
+					v["name"], v["config"] = pedido["name"], pedido["config"]
+					di(v)
+					return
+				}
+			}
+		}
+		falla(http.StatusNotFound, "not_found")
 	case clave == "DELETE views/2":
 		for t := range f.vistas {
 			f.vistas[t] = slices.DeleteFunc(f.vistas[t], func(v m) bool { return v["id"] == x[1] })
@@ -213,6 +287,38 @@ func (f *falso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		reg["rev"] = reg["rev"].(int) + 1
 		di(m{"record": reg, "conflict": f.conflicto, "replayed": false})
 		f.conflicto = false
+	case clave == "GET records/2":
+		if reg, _ := f.registro(x[1]); reg != nil {
+			di(reg)
+			return
+		}
+		falla(http.StatusNotFound, "not_found")
+	case clave == "GET records/3" && x[2] == "comments":
+		out := []m{}
+		for _, c := range f.comentarios {
+			if c["record_id"] == x[1] {
+				out = append(out, c)
+			}
+		}
+		di(out)
+	case clave == "POST records/3" && x[2] == "comments":
+		if f.rol == "viewer" {
+			falla(http.StatusForbidden, "forbidden")
+			return
+		}
+		c := m{
+			"id": fmt.Sprintf("k%d", f.n), "record_id": x[1], "author_sub": "u1", "author_name": "Yo",
+			"body": pedido["body"], "created_at": "2026-10-05T09:00:00Z", "can_delete": true,
+		}
+		if pa, hay := pedido["parent_id"]; hay {
+			c["parent_id"] = pa
+		}
+		f.comentarios = append(f.comentarios, c)
+		w.WriteHeader(http.StatusCreated)
+		di(c)
+	case clave == "DELETE comments/2":
+		f.comentarios = slices.DeleteFunc(f.comentarios, func(c m) bool { return c["id"] == x[1] })
+		nada()
 	case clave == "DELETE records/2":
 		if f.referenciado && r.URL.Query().Get("force") != "true" {
 			falla(http.StatusConflict, "referenced")
@@ -268,6 +374,12 @@ func (f *falso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		di(m{"id": fmt.Sprintf("a%d", f.n), "record_id": x[1], "field_id": q.Get("field"), "name": q.Get("name"), "mime": "text/plain", "size": len(cuerpo)})
+	case clave == "GET records/5" && x[4] == "thumb":
+		// La miniatura de una portada: un JPEG de verdad, como el del servicio.
+		img := image.NewRGBA(image.Rect(0, 0, 8, 6))
+		draw.Draw(img, img.Bounds(), &image.Uniform{C: color.RGBA{R: 200, G: 120, B: 40, A: 255}}, image.Point{}, draw.Src)
+		w.Header().Set("Content-Type", "image/jpeg")
+		_ = jpeg.Encode(w, img, nil)
 	case clave == "GET records/4" && x[2] == "attachments":
 		_, _ = io.WriteString(w, "contenido del adjunto")
 	case clave == "DELETE records/4" && x[2] == "attachments":
@@ -674,11 +786,11 @@ func TestEnUnTelefonoNoSeHablaDeTeclas(t *testing.T) {
 		t.Errorf("en un teléfono se explica el teclado:\n%s", got)
 	}
 	g := p.abierta.rejilla
-	g.Tapped(&fyne.PointEvent{Position: fyne.NewPos(g.r.ancho0+1, altoCabeza+1)})
+	g.Tapped(&fyne.PointEvent{Position: fyne.NewPos(g.r.ancho0+1, g.altoCab()+1)})
 	if g.editando {
 		t.Fatal("el primer toque ya edita: tiene que marcar la celda")
 	}
-	g.Tapped(&fyne.PointEvent{Position: fyne.NewPos(g.r.ancho0+1, altoCabeza+1)})
+	g.Tapped(&fyne.PointEvent{Position: fyne.NewPos(g.r.ancho0+1, g.altoCab()+1)})
 	if !g.editando || g.editor.Texto() != "Persona 1" {
 		t.Fatal("tocar la celda marcada no la edita")
 	}
@@ -786,6 +898,59 @@ func TestLasVistasGuardadas(t *testing.T) {
 	}
 }
 
+// Editar una vista guardada: el diálogo sale con lo guardado, el tipo no se cambia, y al
+// guardar se manda la configuración nueva y se vuelven a pedir los registros con ella.
+func TestEditarUnaVistaGuardada(t *testing.T) {
+	f := nuevoFalso(3)
+	f.vistas["t1"] = []m{{"id": "vm", "table_id": "t1", "name": "Mayores", "kind": "grid", "config": m{
+		"filters": []m{{"field": "eda", "op": "gt", "value": 30}, {"field": "nom", "op": "notempty"}},
+		"sort":    []m{{"field": "nom", "dir": "desc"}},
+	}}}
+	p, w := abrir(t, f)
+	b := p.abierta
+	if slices.Contains(elementosDe(t, w, "Personas"), "Editar vista") {
+		t.Error("con «todos los registros» no hay vista que editar")
+	}
+	elegir(t, w, "Vistas", "Mayores · Rejilla")
+	if b.rejilla.Registros[0].ID != "r003" {
+		t.Fatalf("la vista ordenada no se ha cargado: el primero es %s", b.rejilla.Registros[0].ID)
+	}
+	pulsarEnMenu(t, w, "Personas", "Editar vista")
+	if got := campoDeDialogo(t, w, "Nombre de la vista").Texto(); got != "Mayores" {
+		t.Errorf("el nombre no sale relleno: %q", got)
+	}
+	valor := campoDeDialogo(t, w, "Valor")
+	if valor.Texto() != "30" {
+		t.Errorf("el valor del filtro no sale relleno: %q", valor.Texto())
+	}
+	enCapas(w, func(o fyne.CanvasObject) {
+		if s, ok := o.(*ui.Selector); ok && s.Rotulo == "Tipo" && (len(s.Opciones) != 1 || s.Valor() != "Rejilla") {
+			t.Errorf("el tipo de una vista guardada no se elige: %v", s.Opciones)
+		}
+	})
+	if got := textos(w); !strings.Contains(got, "El tipo de una vista no se cambia.") {
+		t.Errorf("no se explica por qué el tipo está fijo:\n%s", got)
+	}
+	capturar(t, w, "dialogo-editar-vista")
+	campoDeDialogo(t, w, "Nombre de la vista").PonerTexto("Muy mayores")
+	valor.PonerTexto("40")
+	elegir(t, w, "Campo por el que ordenar", "Ninguno")
+	pulsar(t, w, "Guardar cambios")
+	// El segundo filtro, que el diálogo no enseña, se conserva.
+	if !f.vio(`PATCH /views/vm {"config":{"filters":[{"field":"eda","op":"gt","value":40},{"field":"nom","op":"notempty"}]},"name":"Muy mayores"}`) {
+		t.Fatalf("la vista no se ha editado como se pidió: %q", f.peticiones("PATCH /views/"))
+	}
+	if b.VistaID != "vm" || len(b.Vistas) != 1 || b.Vistas[0].Name != "Muy mayores" {
+		t.Fatalf("la lista de vistas no tiene la editada: %+v", b.Vistas)
+	}
+	if b.rejilla.Registros[0].ID != "r001" {
+		t.Errorf("los registros no se han vuelto a pedir sin el orden: el primero es %s", b.rejilla.Registros[0].ID)
+	}
+	if got := textos(w); !strings.Contains(got, "‹Vistas: Muy mayores · Rejilla›") {
+		t.Errorf("la barra no tiene el nombre nuevo:\n%s", got)
+	}
+}
+
 // TestElPropietarioCambiaElEsquema: añadir, renombrar y borrar tablas, y crear campos de
 // cada clase (con sus opciones, su tabla enlazada o su fórmula por ids).
 func TestElPropietarioCambiaElEsquema(t *testing.T) {
@@ -847,7 +1012,7 @@ func TestElPropietarioCambiaElEsquema(t *testing.T) {
 		t.Fatalf("la tabla nueva no se ha creado o no se ha abierto: activa %q", b.Activa)
 	}
 	capturar(t, w, "tabla-nueva-sin-campos")
-	if got := textos(w); !strings.Contains(got, "Esta tabla todavía no tiene campos.") {
+	if got := textos(w); !strings.Contains(got, "Esta tabla todavía no tiene campos") {
 		t.Errorf("una tabla sin campos lo dice:\n%s", got)
 	}
 	pulsarEnMenu(t, w, "Pedidos", "Borrar tabla")
@@ -857,10 +1022,49 @@ func TestElPropietarioCambiaElEsquema(t *testing.T) {
 	}
 }
 
-// TestElTableroMueveTarjetasConSuSelector: una vista de tablero reparte los registros en
+// accionesDeTarjeta abre el menú «⋯» de la tarjeta `nombre` y devuelve sus elementos.
+func accionesDeTarjeta(t *testing.T, w fyne.Window, nombre string) []*ui.ElementoMenu {
+	t.Helper()
+	b := botonIcono(w, "Acciones de "+nombre)
+	if b == nil {
+		t.Fatalf("la tarjeta %s no tiene menú «⋯»:\n%s", nombre, textos(w))
+	}
+	test.Tap(b)
+	var out []*ui.ElementoMenu
+	enCapas(w, func(o fyne.CanvasObject) {
+		if e, ok := o.(*ui.ElementoMenu); ok {
+			out = append(out, e)
+		}
+	})
+	return out
+}
+
+// pulsarEnTarjeta pulsa el elemento `texto` del menú «⋯» de la tarjeta `nombre`.
+func pulsarEnTarjeta(t *testing.T, w fyne.Window, nombre, texto string) {
+	t.Helper()
+	for _, e := range accionesDeTarjeta(t, w, nombre) {
+		if e.Texto == texto {
+			test.Tap(e)
+			return
+		}
+	}
+	t.Fatalf("el menú de %s no ofrece «%s»", nombre, texto)
+}
+
+// cerrarMenus cierra los menús que se hayan quedado abiertos.
+func cerrarMenus(w fyne.Window) {
+	enCapas(w, func(o fyne.CanvasObject) {
+		if m, ok := o.(*ui.Menu); ok {
+			defer m.Cerrar()
+		}
+	})
+}
+
+// TestElTableroMueveTarjetasDesdeSuMenu: una vista de tablero reparte los registros en
 // una columna por opción (y «Sin valor» para lo demás, también para un valor que ya no es
-// una opción), y «Mover a» escribe ese campo en el registro.
-func TestElTableroMueveTarjetasConSuSelector(t *testing.T) {
+// una opción), y «Mover a» del menú «⋯» de la tarjeta escribe ese campo en el registro.
+// Es la alternativa al arrastre (WCAG 2.5.7): ya no hay un selector en cada tarjeta.
+func TestElTableroMueveTarjetasDesdeSuMenu(t *testing.T) {
 	f := nuevoFalso(4)
 	for i, nivel := range []string{"Oro", "Plata", "Bronce"} {
 		f.registros["t1"][i]["data"].(m)["niv"] = nivel
@@ -897,7 +1101,12 @@ func TestElTableroMueveTarjetasConSuSelector(t *testing.T) {
 		t.Error("con un tablero no se pinta la rejilla")
 	}
 
-	elegir(t, w, "Mover Persona 2 a", "Oro")
+	recorrer(w.Canvas().Content(), func(o fyne.CanvasObject) {
+		if s, ok := o.(*ui.Selector); ok && strings.HasPrefix(s.Rotulo, "Mover ") {
+			t.Errorf("la tarjeta lleva aún el selector «%s» a la vista", s.Rotulo)
+		}
+	})
+	pulsarEnTarjeta(t, w, "Persona 2", "Mover a Oro")
 	if !f.vio(`PUT /records/r002/cells/niv?v=1 {"expected":"Plata","value":"Oro"}`) {
 		t.Fatalf("mover una tarjeta no escribe el campo: %q", f.peticiones("PUT"))
 	}
@@ -905,14 +1114,19 @@ func TestElTableroMueveTarjetasConSuSelector(t *testing.T) {
 		t.Errorf("la tarjeta no ha cambiado de columna: %v", got)
 	}
 	capturar(t, w, "tablero-tarjeta-movida")
-	elegir(t, w, "Mover Persona 1 a", "Sin valor")
+	pulsarEnTarjeta(t, w, "Persona 1", "Mover a Sin valor")
 	if !f.vio(`PUT /records/r001/cells/niv?v=1 {"expected":"Oro","value":null}`) {
 		t.Fatalf("mover a «Sin valor» vacía el campo: %q", f.peticiones("PUT"))
 	}
-	antes := len(f.peticiones("PUT"))
-	elegir(t, w, "Mover Persona 2 a", "Oro") // ya está ahí
-	if len(f.peticiones("PUT")) != antes {
-		t.Error("«mover» una tarjeta a su propia columna no escribe nada")
+	// Su propia columna no se ofrece: «mover» ahí no haría nada.
+	acciones := accionesDeTarjeta(t, w, "Persona 2")
+	ofrece := make([]string, 0, len(acciones))
+	for _, e := range acciones {
+		ofrece = append(ofrece, e.Texto)
+	}
+	cerrarMenus(w)
+	if !slices.Equal(ofrece, []string{"Abrir Persona 2", "Mover a Plata", "Mover a Sin valor"}) {
+		t.Errorf("el menú de una tarjeta de «Oro» ofrece %q", ofrece)
 	}
 
 	// Quien solo lee ve el tablero sin selectores.
@@ -920,16 +1134,91 @@ func TestElTableroMueveTarjetasConSuSelector(t *testing.T) {
 	p.Abrir("b1")
 	elegir(t, w, "Vistas", "Por nivel · Tablero")
 	recorrer(w.Canvas().Content(), func(o fyne.CanvasObject) {
-		if s, ok := o.(*ui.Selector); ok && s.Rotulo != "Vistas" { // el de las vistas, sí
+		if s, ok := o.(*ui.Selector); ok && s.Rotulo != "Vistas" && s.Rotulo != "Ordenar por" { // vistas y orden, sí
 			t.Error("un lector puede mover tarjetas")
 		}
 		if _, ok := o.(*ui.AsaArrastre); ok {
 			t.Error("un lector tiene un asa para mover tarjetas")
 		}
+		if b, ok := o.(*ui.Boton); ok && b.Texto == "Añadir tarjeta" {
+			t.Error("un lector puede añadir tarjetas")
+		}
 	})
+	for _, e := range accionesDeTarjeta(t, w, "Persona 1") {
+		if strings.HasPrefix(e.Texto, "Mover a") {
+			t.Errorf("un lector puede mover tarjetas desde el menú: %q", e.Texto)
+		}
+	}
+	cerrarMenus(w)
 	if !strings.Contains(textos(w), "Puedes leer esta tabla pero no cambiarla.") {
 		t.Error("el tablero de un lector no dice que es de solo lectura")
 	}
+}
+
+// TestElTableroAnadeEnSuColumnaYAbreLaFicha: «Añadir tarjeta» al pie de una columna crea
+// el registro ya con el valor de esa columna (sin pasar por la rejilla y moverlo) y abre
+// su ficha; la de «Sin valor» lo crea vacío. Pulsar una tarjeta abre su ficha, y una
+// columna vacía invita a soltar ahí una tarjeta.
+func TestElTableroAnadeEnSuColumnaYAbreLaFicha(t *testing.T) {
+	f := nuevoFalso(2)
+	f.registros["t1"][0]["data"].(m)["niv"] = "Oro"
+	f.vistas["t1"] = []m{{"id": "vk", "table_id": "t1", "name": "Por nivel", "kind": "kanban", "config": m{"group_by": "niv"}}}
+	p, w := abrir(t, f)
+	elegir(t, w, "Vistas", "Por nivel · Tablero")
+	if !strings.Contains(textos(w), "Arrastra aquí una tarjeta") {
+		t.Errorf("la columna vacía de «Plata» no invita a soltar una tarjeta:\n%s", textos(w))
+	}
+	capturar(t, w, "tablero-columna-vacia")
+
+	var anadir *ui.Boton
+	recorrer(w.Canvas().Content(), func(o fyne.CanvasObject) {
+		if b, ok := o.(*ui.Boton); ok && b.Rotulo == "Añadir tarjeta en Plata" {
+			anadir = b
+		}
+	})
+	if anadir == nil {
+		t.Fatalf("la columna «Plata» no tiene «Añadir tarjeta»:\n%s", textos(w))
+	}
+	test.Tap(anadir)
+	creadas := f.peticiones("POST /tables/t1/records")
+	if len(creadas) != 1 || !strings.Contains(creadas[0], `"niv":"Plata"`) {
+		t.Fatalf("la tarjeta no nace con el valor de su columna: %q", creadas)
+	}
+	if p.ficha == nil || !p.ficha.nuevo || p.ficha.r.Data["niv"] != "Plata" {
+		t.Fatal("añadir una tarjeta no abre la ficha del registro nuevo")
+	}
+	p.ficha.d.Cerrar()
+	campo, _ := p.abierta.campoDelTablero()
+	if cols := columnasDeTablero(campo, p.abierta.vent.registros()); len(cols[1].registros) != 1 {
+		t.Errorf("la tarjeta nueva no está en «Plata»: %d", len(cols[1].registros))
+	}
+
+	recorrer(w.Canvas().Content(), func(o fyne.CanvasObject) {
+		if b, ok := o.(*ui.Boton); ok && b.Rotulo == "Añadir tarjeta en Sin valor" {
+			anadir = b
+		}
+	})
+	test.Tap(anadir)
+	if creadas := f.peticiones("POST /tables/t1/records"); len(creadas) != 2 || strings.Contains(creadas[1], `"niv"`) {
+		t.Fatalf("en «Sin valor» la tarjeta nace sin valor: %q", creadas)
+	}
+	p.ficha.d.Cerrar()
+
+	// La tarjeta se pulsa para abrir la ficha.
+	var tarjeta *ui.FilaPulsable
+	recorrer(w.Canvas().Content(), func(o fyne.CanvasObject) {
+		if x, ok := o.(*ui.FilaPulsable); ok && x.AccessibilityLabel() == "Abrir Persona 1" {
+			tarjeta = x
+		}
+	})
+	if tarjeta == nil {
+		t.Fatal("la tarjeta de Persona 1 no se puede pulsar para abrirla")
+	}
+	test.Tap(tarjeta)
+	if p.ficha == nil || p.ficha.nuevo || p.ficha.r.ID != "r001" {
+		t.Fatal("pulsar una tarjeta no abre su ficha")
+	}
+	p.ficha.d.Cerrar()
 }
 
 // Las columnas del tablero son `bg-bg-subtle/50`, como la web: el gris a medias, que

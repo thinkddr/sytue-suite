@@ -8,7 +8,7 @@
  */
 import type { JSX } from 'preact';
 import { useCallback, useEffect, useState } from 'preact/hooks';
-import { Badge, Button, FieldGroup, Input } from '@sytue/ui';
+import { Badge, Button, FieldGroup, Input, EmptyState } from '@sytue/ui';
 import { formatDate, type Locale } from '@sytue/i18n';
 import type { T } from '../i18n/index.js';
 import { cliente, mensajeDeError } from '../lib/api.js';
@@ -128,7 +128,7 @@ export function PanelFormulario({
         </p>
       ) : null}
       {enlaces.length === 0 ? (
-        <p class="text-text-muted text-sm">{t('formlink.none')}</p>
+        <EmptyState compact title={t('formlink.none')} />
       ) : (
         <ul class="flex flex-col gap-2">
           {enlaces.map((e) => {

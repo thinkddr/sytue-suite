@@ -318,9 +318,19 @@ func (f filaCola) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 }
 
 // recuadroFino es el recuadro con `px-4 py-3`, el de las filas.
-type recuadroFino struct{ caja *ui.Caja }
+//
+// `x` e `y` cambian el relleno; a 0 es el `px-4 py-3` de siempre.
+type recuadroFino struct {
+	caja *ui.Caja
+	x, y float32
+}
 
-func (r *recuadroFino) m() (x, y float32) { return tema.Espacio(4), tema.Espacio(3) }
+func (r *recuadroFino) m() (x, y float32) {
+	if r.x > 0 || r.y > 0 {
+		return r.x, r.y
+	}
+	return tema.Espacio(4), tema.Espacio(3)
+}
 
 func (r *recuadroFino) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	x, y := r.m()

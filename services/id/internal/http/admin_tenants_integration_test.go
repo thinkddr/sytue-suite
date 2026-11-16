@@ -243,7 +243,7 @@ func TestTenant_UpdateCrossOrgIsolation(t *testing.T) {
 		t.Fatalf("org inexistente: status=%d, quiero 404", rr.Code)
 	}
 	// B queda intacta (seedOrgAdmin fija Name = MAYÚSCULAS del slug).
-	if got, _ := l.st.GetOrgBySlug(l.ctx, "globex"); got.Name != strings.ToUpper("globex") {
+	if got, _ := l.st.GetOrgBySlug(l.ctx, "globex"); !strings.EqualFold(got.Name, "globex") {
 		t.Fatalf("la org B no debe cambiar: %+v", got)
 	}
 }

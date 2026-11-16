@@ -62,6 +62,15 @@ type Libro struct {
 	// —con las flechas había que volver con Tab a cada paso—. En la web el `<select>`
 	// conserva el foco.
 	selPeriodo *ui.Selector
+
+	// El cierre del ejercicio (cierre.go). Cierre es lo que dice el servicio; nil, sin
+	// leer (y sin franja). PuedeCerrar ofrece cerrar y reabrir; los Al* son sus botones.
+	Cierre          *api.ERPCierre
+	PuedeCerrar     bool
+	VerHistorial    bool
+	AlCerrarPeriodo func()
+	AlReabrir       func()
+	AlHistorial     func()
 }
 
 // periodo es el elegido, con «todo» por defecto.
@@ -135,6 +144,12 @@ func anchoUtilDe(ventana, maximo float32) float32 {
 func (b *Libro) ObjetoLibro(v tema.Variante) fyne.CanvasObject {
 	p := &pila{}
 	p.add(b.cabecera("nav.ledger", v), tema.Texto2XL.Linea, 0)
+	// La franja del cierre va con su `mb-5` propio: lo que la sigue ya no lo repite.
+	antes := len(p.bloques)
+	b.franjaCierre(p, v)
+	if len(p.bloques) > antes {
+		p.bloques[antes].arriba = TituloLibroMB
+	}
 	if b.pendiente(p, b.Asientos == nil, v) {
 		o, alto := p.objeto()
 		return enPagina(o, alto, AnchoContenidoLista)

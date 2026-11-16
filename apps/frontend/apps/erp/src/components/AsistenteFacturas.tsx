@@ -2,7 +2,7 @@
  * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos */
 import type { JSX } from 'preact';
 import { useContext, useRef, useState } from 'preact/hooks';
-import { Button, ChoiceCard, Modal, Wizard, formatBytes, withBase } from '@sytue/ui';
+import { Button, ChoiceCard, formatBytes, InlineHelp, Modal, withBase, Wizard } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import type { T } from '../i18n/index.js';
 import { api, baseDeLaApp, ErrorApi, mensajeDeError } from '../lib/api.js';
@@ -324,9 +324,9 @@ export function AsistenteFacturas({
   return (
     <Modal open onClose={cerrar} dismissable={!busy} title={t('invoiceAssist.title')} size="lg">
       {error ? (
-        <p role="alert" class="bg-danger-bg text-danger-text mb-4 rounded-md p-3">
+        <InlineHelp tone="danger" class="mb-4">
           {error}
-        </p>
+        </InlineHelp>
       ) : null}
       <Wizard
         current={paso}

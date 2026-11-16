@@ -462,3 +462,25 @@ func TestGestoActualizarYMenuFuncionanBajoCapasHermanasEIndicador(t *testing.T) 
 		t.Fatal("el gesto de borde izquierdo no abrió el cajón bajo capas hermanas")
 	}
 }
+
+// zonaPropia es un widget con su propio gesto vertical (como el asa del mes de Calendar).
+type zonaPropia struct{ widget.Label }
+
+func (*zonaPropia) ZonaSinRefresco() {}
+
+// TestGestoQueEmpiezaEnUnaZonaSinRefrescoNoRefresca: con la lista arriba y lista para
+// refrescar, un tirón que empieza en una `ZonaSinRefresco` no lo toma el filtro (el
+// control lo recibe entero); el mismo tirón desde la lista, sí. VISTO EN ROJO sin
+// `ZonaSinRefresco` en `bloqueaRefrescoMovil`.
+func TestGestoQueEmpiezaEnUnaZonaSinRefrescoNoRefresca(t *testing.T) {
+	calls := 0
+	l := listaDeGesto(t, &RefrescoLista{Arriba: func() bool { return true }, Actualizar: func() { calls++ }})
+	g := &gestosMoviles{}
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterBegin, 100, 100, l, &zonaPropia{}), mobile.FilterPass)
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterBegin, 100, 100, l), mobile.FilterDefer)
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterMove, 100, 200), mobile.FilterClaim)
+	comprobarFiltro(t, g, eventoGesto(mobile.FilterEnd, 100, 200, l), mobile.FilterClaim)
+	if calls != 1 {
+		t.Fatalf("%d refrescos y es uno (el de la lista)", calls)
+	}
+}

@@ -25,7 +25,8 @@
         "files.content.write"
       ],
       "authorize_params": {
-        "token_access_type": "offline"
+        "token_access_type": "offline",
+        "force_reauthentication": "true"
       }
     }
   }

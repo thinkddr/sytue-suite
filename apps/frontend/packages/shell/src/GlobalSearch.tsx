@@ -12,11 +12,11 @@ import {
   EmptyState,
   formatBytes,
   Icon,
-  Illustration,
   Input,
   Spinner,
   ProductIcon,
   useAtajo,
+  Kbd,
 } from '@sytue/ui';
 import { useI18n } from '@sytue/i18n/preact';
 import type { Interpretado, SearchResult } from '@sytue/api-clients';
@@ -165,31 +165,8 @@ export function GlobalSearch(): JSX.Element {
     return () => clearTimeout(handle);
   }, [query, hub, attempt, literalDe]);
 
-  /**
-   * ⌘K / Ctrl+K abre el buscador desde cualquier app.
-   *
-   * No lo había, y es el atajo que la gente prueba sin pensarlo — Spotlight,
-   * Linear, GitHub, todos—. Sin él, buscar exigía ir con el ratón a la barra
-   * superior, que es justo lo que un buscador global viene a evitar.
-   *
-   * NO se roba el atajo si hay un campo enfocado ni un diálogo abierto: dentro de
-   * un modal, ⌘K puede ser el «insertar enlace» del editor, y pisárselo sería
-   * cambiar un hueco por un fallo peor.
-   */
-  useEffect(() => {
-    const alPulsar = (e: KeyboardEvent): void => {
-      if (e.key.toLowerCase() !== 'k' || !(e.metaKey || e.ctrlKey) || e.altKey) return;
-      // Una app que se lo ha quedado antes (Notepads lleva ⌘K a su captura) manda.
-      if (e.defaultPrevented) return;
-      if (document.querySelector('dialog[open], [role="dialog"]')) return;
-      e.preventDefault();
-      const campo = boxRef.current?.querySelector('input');
-      campo?.focus();
-      campo?.select();
-    };
-    document.addEventListener('keydown', alPulsar);
-    return () => document.removeEventListener('keydown', alPulsar);
-  }, []);
+  // ⌘K ya no enfoca este campo: abre la paleta de la suite (`PaletaDeLaSuite`), que
+  // busca en el mismo Hub y además ofrece lo que registre la app.
 
   useEffect(() => {
     // `pointerdown` y no `mousedown`: el mismo manejador vale para ratón, dedo y
@@ -345,14 +322,14 @@ export function GlobalSearch(): JSX.Element {
           busca en ningún manual. Solo en escritorio —en el móvil no hay
           teclado— y solo mientras el campo está en reposo, que es cuando el
           hueco de la derecha está libre (con texto, `type="search"` pinta ahí
-          su aspa de borrar). Decorativo: el atajo real lo escucha `document`. */}
+          su aspa de borrar). Decorativo: el atajo lo escucha la paleta de la
+          suite, que busca en el mismo Hub. */}
       {atajo && !enfocado && !query ? (
-        <kbd
-          aria-hidden="true"
-          class="border-chrome-border text-on-chrome-muted pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 items-center rounded-full border bg-transparent px-1.5 py-0.5 font-sans text-[11px] leading-none font-medium md:inline-flex"
-        >
-          {atajo}
-        </kbd>
+        // La envoltura coloca y esconde; la tecla es la del cromo. `hidden` no va en la
+        // propia `Kbd`, que ya es `inline-flex`: dos `display` pelearían por orden de hoja.
+        <span class="pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 md:flex">
+          <Kbd tone="chrome">{atajo}</Kbd>
+        </span>
       ) : null}
       {/* Anuncio del resultado para lectores de pantalla. */}
       <div class="sr-only" role="status" aria-live="polite">
@@ -375,7 +352,7 @@ export function GlobalSearch(): JSX.Element {
             <EmptyState
               title={t('search.failed')}
               description={t('error.connection')}
-              illustration={<Icon name="danger" size={28} />}
+              tone="error"
               action={
                 <Button variant="secondary" size="sm" onClick={() => setAttempt((n) => n + 1)}>
                   {t('action.retry')}
@@ -394,7 +371,7 @@ export function GlobalSearch(): JSX.Element {
               }
               // La misma ilustración de «sin resultados» que el resto de la suite; el
               // icono gris de 28px hacía del vacío una pantalla muerta.
-              illustration={<Illustration name="emptySearch" size={96} />}
+              spot="emptySearch"
             />
           ) : (
             <>

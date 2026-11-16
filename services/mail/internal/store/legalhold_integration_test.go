@@ -35,12 +35,12 @@ func TestLegalHoldPreservesThroughPurge(t *testing.T) {
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
 
-	held := seedAccount(t, ctx, st, "held@acme.eu")
-	free := seedAccount(t, ctx, st, "free@acme.eu")
+	held := seedAccount(ctx, t, st, "held@acme.eu")
+	free := seedAccount(ctx, t, st, "free@acme.eu")
 	inboxHeld, _ := st.MailboxByRole(ctx, held.ID, domain.RoleInbox)
 	inboxFree, _ := st.MailboxByRole(ctx, free.ID, domain.RoleInbox)
-	mHeld := seedMessage(t, ctx, st, held, inboxHeld.ID, "prueba retenida", "x@ext.eu", nil)
-	mFree := seedMessage(t, ctx, st, free, inboxFree.ID, "prueba libre", "x@ext.eu", nil)
+	mHeld := seedMessage(ctx, t, st, held, inboxHeld.ID, "prueba retenida", "x@ext.eu", nil)
+	mFree := seedMessage(ctx, t, st, free, inboxFree.ID, "prueba libre", "x@ext.eu", nil)
 
 	// Hold sobre el sujeto retenido.
 	hold, err := st.CreateHold(ctx, domain.LegalHold{Subject: held.Subject, Case: "C1", CreatedBy: "admin-1"})
@@ -64,10 +64,10 @@ func TestLegalHoldPreservesThroughPurge(t *testing.T) {
 	if n != 1 {
 		t.Fatalf("purgados = %d, quiero 1 (solo el no retenido)", n)
 	}
-	if got := searchCount(t, st, ctx, held.ID); got != 1 {
+	if got := searchCount(ctx, t, st, held.ID); got != 1 {
 		t.Fatalf("mensaje retenido: %d supervivientes, quiero 1 (preservado)", got)
 	}
-	if got := searchCount(t, st, ctx, free.ID); got != 0 {
+	if got := searchCount(ctx, t, st, free.ID); got != 0 {
 		t.Fatalf("mensaje libre: %d supervivientes, quiero 0 (purgado)", got)
 	}
 
@@ -82,7 +82,7 @@ func TestLegalHoldPreservesThroughPurge(t *testing.T) {
 	if n != 1 {
 		t.Fatalf("tras liberar purgados = %d, quiero 1", n)
 	}
-	if got := searchCount(t, st, ctx, held.ID); got != 0 {
+	if got := searchCount(ctx, t, st, held.ID); got != 0 {
 		t.Fatalf("tras liberar: %d supervivientes, quiero 0", got)
 	}
 }
@@ -93,9 +93,9 @@ func TestPurgeNoHoldUnchanged(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
-	acc := seedAccount(t, ctx, st, "u@acme.eu")
+	acc := seedAccount(ctx, t, st, "u@acme.eu")
 	inbox, _ := st.MailboxByRole(ctx, acc.ID, domain.RoleInbox)
-	m := seedMessage(t, ctx, st, acc, inbox.ID, "efímero", "x@ext.eu", nil)
+	m := seedMessage(ctx, t, st, acc, inbox.ID, "efímero", "x@ext.eu", nil)
 	if err := st.DeleteMessage(ctx, acc.ID, m.ID); err != nil {
 		t.Fatalf("DeleteMessage: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestPurgeNoHoldUnchanged(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PurgeDeleted: %v", err)
 	}
-	if n != 1 || searchCount(t, st, ctx, acc.ID) != 0 {
+	if n != 1 || searchCount(ctx, t, st, acc.ID) != 0 {
 		t.Fatalf("sin hold la purga debe llevarse el correo (n=%d)", n)
 	}
 }
@@ -114,12 +114,12 @@ func TestEDiscoveryFindsPreservedAndFilters(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
-	acc := seedAccount(t, ctx, st, "sue@acme.eu")
+	acc := seedAccount(ctx, t, st, "sue@acme.eu")
 	inbox, _ := st.MailboxByRole(ctx, acc.ID, domain.RoleInbox)
 
-	old := seedMsgAt(t, ctx, st, acc, inbox.ID, "Factura antigua", "billing@ext.eu", time.Date(2020, 1, 5, 0, 0, 0, 0, time.UTC))
-	recent := seedMsgAt(t, ctx, st, acc, inbox.ID, "Factura reciente", "billing@ext.eu", time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
-	_ = seedMsgAt(t, ctx, st, acc, inbox.ID, "Reunión equipo", "jefe@acme.eu", time.Date(2026, 6, 2, 0, 0, 0, 0, time.UTC))
+	old := seedMsgAt(ctx, t, st, acc, inbox.ID, "Factura antigua", "billing@ext.eu", time.Date(2020, 1, 5, 0, 0, 0, 0, time.UTC))
+	recent := seedMsgAt(ctx, t, st, acc, inbox.ID, "Factura reciente", "billing@ext.eu", time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
+	_ = seedMsgAt(ctx, t, st, acc, inbox.ID, "Reunión equipo", "jefe@acme.eu", time.Date(2026, 6, 2, 0, 0, 0, 0, time.UTC))
 
 	// Preservar (borrar) el reciente: bajo hold seguiría encontrándose.
 	if _, err := st.CreateHold(ctx, domain.LegalHold{Subject: acc.Subject, Case: "C2", CreatedBy: "admin-1"}); err != nil {
@@ -171,9 +171,9 @@ func TestEDiscoveryOrgIsolation(t *testing.T) {
 	ctxA := tenantCtx("acme")
 	ctxB := tenantCtx("globex")
 
-	accB := seedAccount(t, ctxB, st, "spy@globex.eu")
+	accB := seedAccount(ctxB, t, st, "spy@globex.eu")
 	inboxB, _ := st.MailboxByRole(ctxB, accB.ID, domain.RoleInbox)
-	seedMessage(t, ctxB, st, accB, inboxB.ID, "confidencial B", "x@ext.eu", nil)
+	seedMessage(ctxB, t, st, accB, inboxB.ID, "confidencial B", "x@ext.eu", nil)
 
 	// Admin de A busca el correo de una cuenta de B (por su id): 0 (RLS lo aísla).
 	hits, err := st.EDiscoverySearch(ctxA, accB.ID, store.EDiscoveryFilter{})
@@ -196,7 +196,7 @@ func TestLegalHoldAndAuditIsolation(t *testing.T) {
 	st := store.New(h.Pool)
 	ctxA := tenantCtx("acme")
 	ctxB := tenantCtx("globex")
-	accA := seedAccount(t, ctxA, st, "a@acme.eu")
+	accA := seedAccount(ctxA, t, st, "a@acme.eu")
 
 	// CreateHold audita en su propia transacción.
 	if _, err := st.CreateHold(ctxA, domain.LegalHold{Subject: accA.Subject, Case: "C3", CreatedBy: "admin-A"}); err != nil {
@@ -252,7 +252,7 @@ func TestDeleteMailboxRespectsHold(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
-	acc := seedAccount(t, ctx, st, "u@acme.eu")
+	acc := seedAccount(ctx, t, st, "u@acme.eu")
 
 	// Con hold: la carpeta con un mensaje soft-deleted NO se puede borrar.
 	if _, err := st.CreateHold(ctx, domain.LegalHold{Subject: acc.Subject, Case: "C4", CreatedBy: "admin-1"}); err != nil {
@@ -262,22 +262,22 @@ func TestDeleteMailboxRespectsHold(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateMailbox: %v", err)
 	}
-	m := seedMessage(t, ctx, st, acc, mb.ID, "material del caso", "x@ext.eu", nil)
+	m := seedMessage(ctx, t, st, acc, mb.ID, "material del caso", "x@ext.eu", nil)
 	if err := st.DeleteMessage(ctx, acc.ID, m.ID); err != nil {
 		t.Fatalf("DeleteMessage: %v", err)
 	}
 	if err := st.DeleteMailbox(ctx, acc.ID, mb.ID); !errors.Is(err, domain.ErrMailboxNotEmpty) {
 		t.Fatalf("DeleteMailbox bajo hold = %v, quiero ErrMailboxNotEmpty", err)
 	}
-	if got := searchCount(t, st, ctx, acc.ID); got != 1 {
+	if got := searchCount(ctx, t, st, acc.ID); got != 1 {
 		t.Fatalf("el correo del caso debe seguir vivo: %d", got)
 	}
 
 	// Sin hold: la misma carpeta (solo correo soft-deleted) sí es borrable
 	// (comportamiento normal inalterado). Se resuelve creando otra cuenta libre.
-	free := seedAccount(t, ctx, st, "free@acme.eu")
+	free := seedAccount(ctx, t, st, "free@acme.eu")
 	mbf, _ := st.CreateMailbox(ctx, free.ID, nil, "Temp")
-	mf := seedMessage(t, ctx, st, free, mbf.ID, "borrable", "x@ext.eu", nil)
+	mf := seedMessage(ctx, t, st, free, mbf.ID, "borrable", "x@ext.eu", nil)
 	if err := st.DeleteMessage(ctx, free.ID, mf.ID); err != nil {
 		t.Fatalf("DeleteMessage free: %v", err)
 	}
@@ -290,7 +290,7 @@ func TestDeleteMailboxRespectsHold(t *testing.T) {
 
 // searchCount cuenta cuántos mensajes (incl. preservados/soft-deleted) sobreviven
 // para la cuenta, vía eDiscovery (que no filtra deleted_at).
-func searchCount(t *testing.T, st *store.Store, ctx context.Context, accountID uuid.UUID) int {
+func searchCount(ctx context.Context, t *testing.T, st *store.Store, accountID uuid.UUID) int {
 	t.Helper()
 	hits, err := st.EDiscoverySearch(ctx, accountID, store.EDiscoveryFilter{})
 	if err != nil {
@@ -301,7 +301,7 @@ func searchCount(t *testing.T, st *store.Store, ctx context.Context, accountID u
 
 // seedMsgAt inserta un mensaje con un received_at concreto (para probar el filtro
 // de fechas de eDiscovery); seedMessage siempre usa now().
-func seedMsgAt(t *testing.T, ctx context.Context, st *store.Store, acc domain.Account, mbox uuid.UUID, subject, from string, when time.Time) domain.Message {
+func seedMsgAt(ctx context.Context, t *testing.T, st *store.Store, acc domain.Account, mbox uuid.UUID, subject, from string, when time.Time) domain.Message {
 	t.Helper()
 	m := &domain.Message{
 		AccountID:  acc.ID,

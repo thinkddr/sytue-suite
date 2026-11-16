@@ -86,10 +86,14 @@ func cborBytesH(b []byte) []byte {
 	return append(h, b...)
 }
 
-func coseKeyES256(pub *ecdsa.PublicKey) []byte {
-	x := pub.X.FillBytes(make([]byte, 32))
-	y := pub.Y.FillBytes(make([]byte, 32))
-	var m []byte
+func coseKeyES256(t *testing.T, pub *ecdsa.PublicKey) []byte {
+	t.Helper()
+	encoded, err := pub.Bytes()
+	if err != nil || len(encoded) != 65 || encoded[0] != 4 {
+		t.Fatal("invalid P-256 fixture", err)
+	}
+	x, y := encoded[1:33], encoded[33:]
+	m := make([]byte, 0, 77)
 	m = append(m, 0xA5)
 	m = append(m, cborUintH(1)...)
 	m = append(m, cborUintH(2)...) // kty EC2
@@ -143,7 +147,7 @@ func TestWebAuthnLogin_EndToEnd(t *testing.T) {
 	}
 	credID := []byte("credential-id-0001")
 	if err := l.st.InsertCredential(l.ctx, nil, domain.WebAuthnCredential{
-		UserID: u.ID, CredID: credID, PublicKey: coseKeyES256(&priv.PublicKey),
+		UserID: u.ID, CredID: credID, PublicKey: coseKeyES256(t, &priv.PublicKey),
 		SignCount: 0, Transports: []string{}, Name: "Passkey de prueba",
 	}); err != nil {
 		t.Fatalf("InsertCredential: %v", err)
@@ -158,8 +162,8 @@ func TestWebAuthnLogin_EndToEnd(t *testing.T) {
 	}
 	var opts struct {
 		Challenge        string              `json:"challenge"`
-		RPID             string              `json:"rpId"`
-		AllowCredentials []map[string]string `json:"allowCredentials"`
+		RPID             string              `json:"rpId"`             //nolint:tagliatelle // WebAuthn specifies rpId in its public protocol.
+		AllowCredentials []map[string]string `json:"allowCredentials"` //nolint:tagliatelle // WebAuthn specifies allowCredentials in its public protocol.
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &opts); err != nil {
 		t.Fatal(err)

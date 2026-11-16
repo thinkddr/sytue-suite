@@ -35,6 +35,18 @@ type PasswordPolicy struct {
 	RequireComplexity bool
 }
 
+// EffectiveMinLength es la longitud mínima (en runes) que de verdad se exige:
+// la de la política, con el suelo duro de PasswordMinFloor (una org no puede
+// rebajar por debajo de 8). Es la cifra que ValidatePassword aplica y la que se
+// enseña a la persona en /me: si salieran de sitios distintos, la lista de
+// requisitos podría dar por buena una contraseña que el servidor rechaza.
+func (p PasswordPolicy) EffectiveMinLength() int {
+	if p.MinLength < PasswordMinFloor {
+		return PasswordMinFloor
+	}
+	return p.MinLength
+}
+
 // DefaultPasswordPolicy es el default sensato que hereda toda org (y el fallback
 // cuando un usuario no tiene ninguna membresía). Debe coincidir con el DEFAULT de
 // la migración de `organizations`.
@@ -54,11 +66,7 @@ var ErrPasswordComplexity = fmt.Errorf("%w: la contraseña no cumple la compleji
 // max(policy.MinLength, PasswordMinFloor) y en bytes ≤ maxPasswordLen. Con
 // RequireComplexity exige al menos un dígito y una segunda clase de carácter.
 func ValidatePassword(policy PasswordPolicy, password string) error {
-	minLen := policy.MinLength
-	if minLen < PasswordMinFloor {
-		minLen = PasswordMinFloor // suelo duro: una org no puede rebajar por debajo de 8
-	}
-	if utf8.RuneCountInString(password) < minLen || len(password) > maxPasswordLen {
+	if utf8.RuneCountInString(password) < policy.EffectiveMinLength() || len(password) > maxPasswordLen {
 		return ErrWeakPassword
 	}
 	if policy.RequireComplexity && !hasComplexity(password) {

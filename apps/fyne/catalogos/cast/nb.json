@@ -7,6 +7,7 @@
   "block.short": "Blokker",
   "card.untitledOwner": "Ukjent navn",
   "card.watch": "Se {title}",
+  "card.watched": "{percent} % sett",
   "channel.count": {
     "one": "{count} offentlig video",
     "other": "{count} offentlige videoer"
@@ -153,7 +154,12 @@
   "player.qualityAuto": "Automatisk",
   "player.qualityAutoNow": "Automatisk ({quality})",
   "player.region": "Videospiller",
+  "player.restart": "Start fra begynnelsen",
+  "player.resumedAt": "Fortsetter fra {time}",
   "player.seek": "Posisjon",
+  "player.speed": "Hastighet",
+  "player.speedNormal": "Normal",
+  "player.speedNow": "Hastighet {rate}",
   "player.unmute": "Slå på lyden",
   "player.volume": "Volum",
   "quality.approximate": "Grovt anslag: lengden på videoen er ikke kjent ennå.",

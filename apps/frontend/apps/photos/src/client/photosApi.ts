@@ -6,6 +6,7 @@
  */
 import { withBase } from '@sytue/ui';
 import type { Foto } from '@sytue/api-clients';
+import { consultaDeZip } from '../lib/descargaZip.js';
 import type { Receta } from '../editor/receta.js';
 
 export type { Foto };
@@ -16,6 +17,20 @@ export interface Pagina {
 }
 
 const base = (ruta: string): string => withBase(import.meta.env.BASE_URL, ruta);
+
+/**
+ * Un fallo del servicio con su estado HTTP: 401 es la sesión, 403 el permiso y 507
+ * que no cabe (la cuota de la organización). TODA llamada que no sale bien lanza
+ * esto, y no un `Error` con una frase: el mensaje no se enseña nunca —no está en el
+ * idioma de nadie—, lo que se enseña lo decide `textoDeFallo` (lib/fallo.ts) con el
+ * estado.
+ */
+export class ErrorDeFotos extends Error {
+  constructor(readonly status: number) {
+    super(`HTTP ${status}`);
+    this.name = 'ErrorDeFotos';
+  }
+}
 
 async function pedir<T>(ruta: string): Promise<T> {
   const res = await fetch(base(ruta), {
@@ -34,9 +49,9 @@ async function pedir<T>(ruta: string): Promise<T> {
         `/auth/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`,
       ),
     );
-    throw new Error('No autenticado');
+    throw new ErrorDeFotos(401);
   }
-  if (!res.ok) throw new Error(`Sytue Fotos respondió ${res.status}`);
+  if (!res.ok) throw new ErrorDeFotos(res.status);
   return (await res.json()) as T;
 }
 
@@ -47,13 +62,29 @@ export function lineaDeTiempo(
   texto = '',
   soloFavoritas = false,
   tambien: string[] = [],
+  desde?: string,
 ): Promise<Pagina> {
   const q = new URLSearchParams({ limit: String(limite) });
   if (cursor) q.set('cursor', cursor);
+  // `desde` (AAAA, AAAA-MM o AAAA-MM-DD) solo sirve para la primera página: las
+  // siguientes las sitúa el cursor, que el servidor ya calculó desde ahí.
+  else if (desde) q.set('desde', desde);
   if (texto.trim()) q.set('q', texto.trim());
   if (soloFavoritas) q.set('favoritas', '1');
   if (tambien.length > 0) q.set('tambien', tambien.join(','));
   return pedir<Pagina>(`/api/v1/timeline?${q}`);
+}
+
+/** Un año de la galería con cuántas fotos tiene, para la barra de saltar. */
+export interface AnyoDeGaleria {
+  year: number;
+  count: number;
+}
+
+/** Los años con fotos, del más reciente al más antiguo. */
+export async function anyosDeLaGaleria(soloFavoritas = false): Promise<AnyoDeGaleria[]> {
+  const q = soloFavoritas ? '?favoritas=1' : '';
+  return (await pedir<{ years: AnyoDeGaleria[] }>(`/api/v1/timeline/years${q}`)).years;
 }
 
 /**
@@ -88,7 +119,7 @@ export async function guardarReceta(id: string, recipe: Receta): Promise<{ finge
     headers: { 'content-type': 'application/json', accept: 'application/json' },
     body: JSON.stringify({ recipe }),
   });
-  if (!res.ok) throw new Error(`Sytue Fotos respondió ${res.status} al guardar la receta`);
+  if (!res.ok) throw new ErrorDeFotos(res.status);
   return (await res.json()) as { fingerprint: string };
 }
 
@@ -177,18 +208,10 @@ async function mandar<T>(
       import.meta.env.BASE_URL,
       `/auth/login?returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`,
     );
-    throw new Error('sin sesión');
+    throw new ErrorDeFotos(401);
   }
   if (!res.ok) throw new ErrorDeFotos(res.status);
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
-}
-
-/** Un fallo del servicio con su estado: 507 es que no cabe (la cuota de la organización). */
-export class ErrorDeFotos extends Error {
-  constructor(readonly status: number) {
-    super(`Sytue Fotos respondió ${status}`);
-    this.name = 'ErrorDeFotos';
-  }
 }
 
 /** 507: lo que alguien con edición añade se copia al Drive de la dueña, y no cabe. */
@@ -247,6 +270,10 @@ export type FormatoExportacion = 'jpeg' | 'png';
 export const urlDeExportacion = (id: string, formato: FormatoExportacion = 'jpeg') =>
   base(`/api/v1/assets/${encodeURIComponent(id)}/export?formato=${formato}`);
 
+/** El ZIP de varias fotos, con sus originales, que arma Drive y reenvía el BFF. */
+export const urlDeZip = (ficheros: readonly string[], nombre: string) =>
+  base(`/api/zip?${consultaDeZip(ficheros, nombre)}`);
+
 /**
  * Da de alta en la galería una foto que ya está en Drive. El servicio solo la
  * indexa (128 KiB de cabecera) y contesta; las derivadas se generan al pedirlas.
@@ -258,12 +285,24 @@ export async function indexar(driveFileId: string): Promise<Foto> {
     headers: { 'content-type': 'application/json', accept: 'application/json' },
     body: JSON.stringify({ driveFileId }),
   });
-  if (!res.ok) throw new Error(`Sytue Fotos respondió ${res.status} al indexar`);
+  if (!res.ok) throw new ErrorDeFotos(res.status);
   return (await res.json()) as Foto;
 }
 export const alaPapelera = (id: string) =>
   mandar<void>('DELETE', `/api/v1/assets/${encodeURIComponent(id)}`);
-export const papelera = () => pedir<{ items: Foto[] }>('/api/v1/trash').then((r) => r.items);
+/**
+ * La papelera con su plazo. `retentionDays` son los días que pasa una foto allí antes
+ * de borrarse para siempre; 0, la organización no la caduca y solo se vacía a mano.
+ */
+export interface FotosEnPapelera {
+  items: Foto[];
+  retentionDays: number;
+}
+export const papelera = () =>
+  pedir<Partial<FotosEnPapelera>>('/api/v1/trash').then((r): FotosEnPapelera => ({
+    items: r.items ?? [],
+    retentionDays: r.retentionDays ?? 0,
+  }));
 export const restaurar = (id: string) =>
   mandar<void>('POST', `/api/v1/assets/${encodeURIComponent(id)}/restore`);
 

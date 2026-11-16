@@ -131,6 +131,41 @@ func TestBatchFlagsBadID(t *testing.T) {
 	}
 }
 
+// --- markMailboxRead ---------------------------------------------------
+
+func TestMarkMailboxReadPasaElBuzon(t *testing.T) {
+	mb := uuid.New()
+	st := &fakeStore{acc: domain.Account{ID: uuid.New()}}
+	a := newAPI(st, nil, nil)
+	rec := httptest.NewRecorder()
+	a.markMailboxRead(rec, req(http.MethodPost, "/x", "", true, map[string]string{"mailboxID": mb.String()}))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("código = %d, quiero 200 (%s)", rec.Code, rec.Body.String())
+	}
+	if st.lastReadAllMailbox != mb {
+		t.Fatalf("buzón = %v, quiero %v", st.lastReadAllMailbox, mb)
+	}
+	if m := decodeBody(t, rec); m["updated"] != float64(3) {
+		t.Fatalf("updated = %v, quiero 3", m["updated"])
+	}
+}
+
+func TestMarkMailboxReadBuzonInvalidoOAjeno(t *testing.T) {
+	st := &fakeStore{acc: domain.Account{ID: uuid.New()}}
+	a := newAPI(st, nil, nil)
+	rec := httptest.NewRecorder()
+	a.markMailboxRead(rec, req(http.MethodPost, "/x", "", true, map[string]string{"mailboxID": "bad"}))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("id inválido => %d, quiero 400", rec.Code)
+	}
+	st.batchErr = domain.ErrNotFound
+	rec = httptest.NewRecorder()
+	a.markMailboxRead(rec, req(http.MethodPost, "/x", "", true, map[string]string{"mailboxID": uuid.NewString()}))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("buzón ajeno => %d, quiero 404", rec.Code)
+	}
+}
+
 // --- changes -------------------------------------------------------------
 
 func TestChangesOK(t *testing.T) {

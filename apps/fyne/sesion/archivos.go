@@ -46,6 +46,10 @@ func RevocarArchivos(ctx context.Context, cuenta *api.Account) error {
 	if err != nil || len(crudo) == 0 {
 		return err
 	}
+	return revocarArchivosCapturada(ctx, cuenta, crudo)
+}
+
+func revocarArchivosCapturada(ctx context.Context, cuenta *api.Account, crudo []byte) error {
 	id, _, _ := strings.Cut(string(crudo), " ")
 	var e *api.Error
 	if err := cuenta.RevokeAppPassword(ctx, id); err != nil && (!errors.As(err, &e) || e.Status != http.StatusNotFound) {
@@ -60,11 +64,11 @@ func RevocarArchivos(ctx context.Context, cuenta *api.Account) error {
 
 // revocarArchivos es la parte de Salir: el token se coge AHORA, antes de olvidar la
 // sesión, y la revocación va aparte y con plazo, como la del refresh token.
-func (s *Suite) revocarArchivos() {
+func (s *Suite) revocarArchivos(parent context.Context) {
 	if id, err := auth.LeerSecreto(CuentaArchivos); err != nil || len(id) == 0 {
 		return
 	}
-	ctx, parar := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, parar := context.WithTimeout(parent, 2*time.Second)
 	tok, err := s.Sesion.AccessToken(ctx)
 	parar()
 	if err != nil {
@@ -73,7 +77,7 @@ func (s *Suite) revocarArchivos() {
 	}
 	cuenta := api.NewAccount(s.URL("id"), tokenFijo(tok), nil)
 	go func() {
-		ctx, parar := context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, parar := context.WithTimeout(context.WithoutCancel(parent), 10*time.Second)
 		defer parar()
 		if err := RevocarArchivos(ctx, cuenta); err != nil {
 			slog.Warn("sesion: la contraseña de Archivos no se ha podido revocar; la revoca el siguiente inicio de sesión en Drive", "error", err)

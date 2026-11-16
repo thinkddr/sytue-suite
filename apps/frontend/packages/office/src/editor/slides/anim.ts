@@ -253,10 +253,32 @@ export const boxFiringAtStep = (
 
 const clampInt = (n: number, min: number, max: number): number => Math.min(max, Math.max(min, n));
 
+/* ---------- Diapositivas ocultas (se saltan al presentar) ---------- */
+
+/** Qué diapositivas se saltan al presentar, por índice. Si TODAS están ocultas no se
+ *  salta ninguna: presentar no podría enseñar nada y quedarse en una oculta sin poder
+ *  moverse sería peor que ignorar la marca. Pura; Fyne repite la regla en `Saltables`. */
+export const hiddenMask = (slides: readonly Slide[]): boolean[] => {
+  const mask = slides.map((s) => s.hidden === true);
+  return mask.every(Boolean) ? mask.map(() => false) : mask;
+};
+
+/** La primera diapositiva que se ENSEÑA desde `from` (sin contarla) en el sentido
+ *  `dir`; null si no queda ninguna en ese sentido. `from` puede ser -1 o `length`
+ *  para buscar desde un extremo. Pura. */
+export const nextShown = (hidden: readonly boolean[], from: number, dir: 1 | -1): number | null => {
+  for (let i = from + dir; i >= 0 && i < hidden.length; i += dir) {
+    if (!hidden[i]) return i;
+  }
+  return null;
+};
+
 /** Siguiente posición {slide, step} al avanzar (dir 1) o retroceder (dir -1) en
  *  presentación, respetando los pasos de cada diapositiva: avanzar revela el
  *  paso siguiente y, agotados, salta a la próxima (paso 0); retroceder oculta el
- *  último paso o vuelve a la anterior YA construida. Con topes. */
+ *  último paso o vuelve a la anterior YA construida. Las ocultas se saltan en los
+ *  dos sentidos (a una se llega solo con «número + Intro»); estando en una, se sale
+ *  de ella con normalidad. Con topes. */
 export const presentAdvance = (
   slides: Slide[],
   slide: number,
@@ -267,14 +289,15 @@ export const presentAdvance = (
   const cur = clampInt(slide, 0, last);
   const steps = animStepCount(slides[cur] ?? { id: '', boxes: [] });
   const s = clampInt(step, 0, steps);
+  const hidden = hiddenMask(slides);
   if (dir === 1) {
     if (s < steps) return { slide: cur, step: s + 1 };
-    if (cur < last) return { slide: cur + 1, step: 0 };
-    return { slide: cur, step: s };
+    const n = nextShown(hidden, cur, 1);
+    return n === null ? { slide: cur, step: s } : { slide: n, step: 0 };
   }
   if (s > 0) return { slide: cur, step: s - 1 };
-  if (cur > 0) return { slide: cur - 1, step: animStepCount(slides[cur - 1]!) };
-  return { slide: cur, step: 0 };
+  const p = nextShown(hidden, cur, -1);
+  return p === null ? { slide: cur, step: 0 } : { slide: p, step: animStepCount(slides[p]!) };
 };
 
 /* ---------- Morph (emparejado entre diapositivas contiguas) ---------- */

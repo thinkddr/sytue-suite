@@ -24,7 +24,7 @@ func TestInterrogacionAbreLaHojaDeAtajos(t *testing.T) {
 	if capa == nil {
 		t.Fatal("«?» no abrió la hoja de atajos")
 	}
-	for _, texto := range []string{"Ir a hoy", "Ver esta lista", "Periodo siguiente"} {
+	for _, texto := range []string{"Ir a hoy", "Ver esta lista", "Periodo siguiente", "Ir a una fecha"} {
 		if buscarObjeto(capa, func(o fyne.CanvasObject) bool {
 			x, ok := o.(*canvas.Text)
 			return ok && x.Text == texto
@@ -49,7 +49,7 @@ func TestInterrogacionAbreLaHojaDeAtajos(t *testing.T) {
 			}
 		}
 	}
-	if accionDeTecla('M') != atajoMes || accionDeTecla('x') != "" {
+	if accionDeTecla('M') != atajoMes || accionDeTecla('g') != atajoIrA || accionDeTecla('x') != "" {
 		t.Error("las teclas de siempre ya no hacen lo suyo")
 	}
 }

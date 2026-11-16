@@ -257,6 +257,8 @@ sufijo() { # <plataforma> -> lo que va detrás de `sytue-<bundle>-`
 #   - files.user-selected.read-write: solo las que abren ficheros que la persona elige
 #     (`ficheros = "si"` en su FyneApp.toml).
 #   - device.audio-input y device.camera: solo las que tienen llamadas (`llamadas`).
+#   - personal-information.photos-library: solo las que leen la fototeca de Fotos
+#     (`fototeca = "si"`, Photos y su copia de seguridad, apps/nucleo/carrete).
 #   - un SEGUNDO keychain-access-group, `<equipo>.<App ID>.shared`: solo las que llevan
 #     la extensión File Provider (`archivos = "si"`, Drive). Ahí deja la app la contraseña
 #     de aplicación con la que la extensión habla WebDAV, y es un grupo aparte para que la
@@ -356,15 +358,18 @@ derechos_tienda() { # <dir de la app> <equipo de Apple (Team ID)>
   printf '\t<key>com.apple.security.application-groups</key><array><string>%s</string><string>%s</string>' "$GRUPO_CONTENEDOR_SUITE" "$GRUPO_LLAVERO_SUITE"
   [ "$(metadato "$1" archivos)" != si ] || printf '<string>group.%s</string>' "$appid"
   printf '</array>\n'
-  if [ "$(metadato "$1" archivos)" = si ]; then
-    printf '\t<key>keychain-access-groups</key><array><string>%s</string><string>%s.%s.shared</string></array>\n' "$GRUPO_LLAVERO_SUITE" "$equipo" "$appid"
-  else
-    printf '\t<key>keychain-access-groups</key><array><string>%s</string></array>\n' "$GRUPO_LLAVERO_SUITE"
-  fi
+  # SecItemAdd without an explicit agrp uses the FIRST group. Keep this app's
+  # implicit private group first, exactly as iOS/Developer ID; Suite sessions use
+  # their explicit shared group and File Provider keeps its separate credential.
+  printf '\t<key>keychain-access-groups</key><array><string>%s.%s</string><string>%s</string>' "$equipo" "$appid" "$GRUPO_LLAVERO_SUITE"
+  [ "$(metadato "$1" archivos)" != si ] || printf '<string>%s.%s.shared</string>' "$equipo" "$appid"
+  printf '</array>\n'
   [ "$(metadato "$1" ficheros)" != si ] ||
     printf '\t<key>com.apple.security.files.user-selected.read-write</key><true/>\n'
   [ "$(metadato "$1" llamadas)" != si ] ||
     printf '\t<key>com.apple.security.device.audio-input</key><true/>\n\t<key>com.apple.security.device.camera</key><true/>\n'
+  [ "$(metadato "$1" fototeca)" != si ] ||
+    printf '\t<key>com.apple.security.personal-information.photos-library</key><true/>\n'
   printf '</dict></plist>\n'
 }
 if [ "$plataforma" = derechos-tienda ]; then
@@ -387,6 +392,7 @@ derechos_sesion() { # <dir> <equipo> <ios|developerid>
     printf '\t<key>com.apple.application-identifier</key><string>%s.%s</string>\n' "$equipo" "$appid"
     printf '\t<key>com.apple.developer.team-identifier</key><string>%s</string>\n' "$equipo"
     [ "$(metadato "$1" llamadas)" != si ] || printf '\t<key>com.apple.security.device.audio-input</key><true/>\n\t<key>com.apple.security.device.camera</key><true/>\n'
+    [ "$(metadato "$1" fototeca)" != si ] || printf '\t<key>com.apple.security.personal-information.photos-library</key><true/>\n'
   fi
   # La marca compartida de acceso al proveedor existe independientemente de WidgetKit.
   printf '\t<key>com.apple.security.application-groups</key><array><string>%s</string>' "$GRUPO_CONTENEDOR_SUITE"
@@ -1870,6 +1876,9 @@ plist_apple() { # <macos|ios|iossimulator> <dir de la app> <Info.plist> <carpeta
     claves=(NSFaceIDUsageDescription=shell.lock.faceIdUsage)
   fi
   [ "$(metadato "$dir" llamadas)" != "si" ] || claves+=(NSMicrophoneUsageDescription=shell.call.microphoneUsage NSCameraUsageDescription=shell.call.cameraUsage)
+  # La fototeca (`fototeca`): leerla para la copia de seguridad y guardar en ella lo que se
+  # baja. Sin las dos claves, iOS y macOS matan la app al pedir el permiso (apps/nucleo/carrete).
+  [ "$(metadato "$dir" fototeca)" != "si" ] || claves+=(NSPhotoLibraryUsageDescription=shell.photos.libraryUsage NSPhotoLibraryAddUsageDescription=shell.photos.libraryAddUsage)
   [ "${#claves[@]}" -gt 0 ] || return 0
   python3 - "$RAIZ/apps/nucleo/i18n/locales" "$plist" "$recursos" "${claves[@]}" <<'PY'
 import json, os, subprocess, sys
@@ -2159,9 +2168,17 @@ android)
   "$(command -v javac || echo "$JAVA_HOME/bin/javac")" --release 17 -encoding UTF-8 -nowarn -d "$dex_tmp/prueba" \
     "$FYNE/android/java/eu/sytue/nativo/RefrescoReglas.java" "$FYNE/android/prueba/eu/sytue/nativo/RefrescoReglasPrueba.java"
   "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba" eu.sytue.nativo.RefrescoReglasPrueba
+  # Las de la tarea en segundo plano (la copia de seguridad de Photos con la app cerrada).
+  "$(command -v javac || echo "$JAVA_HOME/bin/javac")" --release 17 -encoding UTF-8 -nowarn -d "$dex_tmp/prueba" \
+    "$FYNE/android/java/eu/sytue/nativo/RefrescoReglas.java" "$FYNE/android/java/eu/sytue/nativo/TareaReglas.java" \
+    "$FYNE/android/prueba/eu/sytue/nativo/TareaReglasPrueba.java"
+  "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba" eu.sytue.nativo.TareaReglasPrueba
   "$(command -v javac || echo "$JAVA_HOME/bin/javac")" --release 17 -encoding UTF-8 -nowarn -d "$dex_tmp/prueba" \
     "$FYNE/android/java/eu/sytue/nativo/GestosRegion.java" "$FYNE/android/prueba/eu/sytue/nativo/GestosRegionPrueba.java"
   "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba" eu.sytue.nativo.GestosRegionPrueba
+  "$(command -v javac || echo "$JAVA_HOME/bin/javac")" --release 17 -encoding UTF-8 -nowarn -d "$dex_tmp/prueba" \
+    "$FYNE/android/java/eu/sytue/nativo/SesionTrabajo.java" "$FYNE/android/prueba/eu/sytue/nativo/SesionTrabajoPrueba.java"
+  "$(command -v java || echo "$JAVA_HOME/bin/java")" -cp "$dex_tmp/prueba" eu.sytue.nativo.SesionTrabajoPrueba
   SYTUE_AAPT2="$AAPT2" SYTUE_ANDROID_JAR="$ANDROID_JAR" python3 "$AQUI/android-widgets-test.py"
   clases=()
   while IFS= read -r fuente; do clases+=("$fuente"); done < <(find "$dex_tmp/cls" -name '*.class')
@@ -2304,6 +2321,18 @@ for app in "${apps[@]}"; do
   documentos=""
   [ "$app" != drive ] || documentos=si
   servicio_avisos=""
+  # LA GALERÍA DEL TELÉFONO (`fototeca`, Photos): leerla para la copia de seguridad
+  # (READ_MEDIA_IMAGES y READ_MEDIA_VIDEO desde la API 33, READ_EXTERNAL_STORAGE antes, y
+  # el acceso parcial de la 34) y con el GPS de cada foto (ACCESS_MEDIA_LOCATION, o
+  # Android lo borra al leer). Guardar en ella no pide nada desde la API 29. Clase Carrete.
+  # Y la copia CON LA APP CERRADA (TareaFondo): saber si la red es de pago
+  # (ACCESS_NETWORK_STATE: por defecto solo copia con Wi-Fi) y volver a programarse tras
+  # reiniciar el teléfono (RECEIVE_BOOT_COMPLETED, que exige `setPersisted`).
+  tarea_fondo=""
+  if [ "$(metadato "$dir" fototeca)" = si ]; then
+    tarea_fondo=si
+    permisos_extra+=(android.permission.READ_MEDIA_IMAGES android.permission.READ_MEDIA_VIDEO android.permission.READ_MEDIA_VISUAL_USER_SELECTED android.permission.READ_EXTERNAL_STORAGE android.permission.ACCESS_MEDIA_LOCATION android.permission.ACCESS_NETWORK_STATE android.permission.RECEIVE_BOOT_COMPLETED)
+  fi
   if [ "$app" = hub ]; then
     servicio_avisos=si
     permisos_extra+=(android.permission.FOREGROUND_SERVICE android.permission.FOREGROUND_SERVICE_SPECIAL_USE)
@@ -2445,7 +2474,7 @@ $1}
 	<provider android:name="eu.sytue.nativo.Captura"
 		android:authorities="$appid.sytue.captura"
 		android:exported="false"
-		android:grantUriPermissions="true" />$(servicio_de_avisos "$servicio_avisos")$(proveedor_documentos "$appid" "$documentos")$([ "$llamadas" != si ] || printf '\n\t<service android:name="eu.sytue.nativo.PantallaServicio" android:exported="false" />')${2:+
+		android:grantUriPermissions="true" />$(servicio_de_avisos "$servicio_avisos")$(proveedor_documentos "$appid" "$documentos")$([ "$llamadas" != si ] || printf '\n\t<service android:name="eu.sytue.nativo.PantallaServicio" android:exported="false" />')$([ "$tarea_fondo" != si ] || printf '\n\t<service android:name="eu.sytue.nativo.TareaFondo" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="false" />')${2:+
 $2}
 	</application>
 </manifest>
@@ -2721,6 +2750,7 @@ XML
           {
             printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n'
             [ "$llamadas" != si ] || printf '\t<key>com.apple.security.device.audio-input</key><true/>\n\t<key>com.apple.security.device.camera</key><true/>\n'
+            [ "$(metadato "$dir" fototeca)" != si ] || printf '\t<key>com.apple.security.personal-information.photos-library</key><true/>\n'
             printf '</dict></plist>\n'
           } >"$derechos"
         fi

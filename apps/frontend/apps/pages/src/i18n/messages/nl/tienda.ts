@@ -177,15 +177,10 @@ export const tienda = {
   'store.mode_test_help':
     'Gesimuleerde betalingen met de testsleutels van de provider. Er wordt niemand iets in rekening gebracht.',
   'store.mode_live_help': 'Echte betalingen van je klanten met de productiesleutels.',
-  'store.webhook_title': 'Stap 1: webhookadres',
   'store.webhook_help': 'Plak dit adres in het dashboard van {nombre}.',
   'store.webhook_label': 'Webhookadres',
   'store.webhook_error':
     'Het webhookadres kon niet worden opgehaald. Sluit het venster en probeer het opnieuw.',
-  'store.copy': 'Kopiëren',
-  'store.copied': 'Adres gekopieerd.',
-  'store.credentials_title': 'Toegangsgegevens',
-  'store.credentials_step': 'Stap 2: toegangsgegevens',
   'store.f_api_key': 'API-sleutel',
   'store.f_api_key_mode': 'API-sleutel ({modo})',
   'store.f_profile_id': 'Profiel-ID (optioneel)',
@@ -204,6 +199,48 @@ export const tienda = {
   'store.gateway_save': 'Opslaan en testen',
   'store.gateway_saved': 'Betaalprovider {nombre} getest en opgeslagen.',
   'store.gateway_save_error': 'De toegangsgegevens van de provider konden niet worden gevalideerd.',
+  'store.wz_progress': 'Stappen om de betaalprovider te koppelen',
+  'store.wz_step_mode': 'Modus',
+  'store.wz_step_webhook': 'Webhook',
+  'store.wz_step_keys': 'Sleutels',
+  'store.wz_step_check': 'Controleren',
+  'store.wz_step_done': 'Klaar',
+  'store.wz_mode_heading': 'Testbetalingen of echte betalingen?',
+  'store.wz_mode_desc':
+    'Begin in testmodus; als alles werkt, open je deze assistent opnieuw en kies je live.',
+  'store.wz_webhook_heading': 'Vertel {nombre} waar betaalmeldingen naartoe moeten',
+  'store.wz_keys_heading': 'Je sleutels van {nombre}',
+  'store.wz_keys_desc':
+    'Geheime sleutels worden verzegeld bewaard en nooit meer getoond: typ een sleutel opnieuw om hem te wijzigen.',
+  'store.wz_keys_rejected': '{nombre} heeft deze sleutels niet geaccepteerd',
+  'store.wz_check_heading': 'Controleren en opslaan',
+  'store.wz_check_desc':
+    'Sytue Web test de sleutels bij {nombre} voordat de betaalprovider wordt ingeschakeld. Er wordt niets opgeslagen tot de test slaagt.',
+  'store.wz_secret_hidden': 'Ingevuld (verborgen)',
+  'store.wz_empty_value': 'Niet opgegeven',
+  'store.wz_done_heading': '{nombre} is klaar',
+  'store.wz_finish': 'Afronden',
+  'store.hint_mollie_api_key':
+    'In Mollie: Developers › API keys. Testsleutels beginnen met test_ en livesleutels met live_.',
+  'store.hint_mollie_profile':
+    'In Mollie: Settings › Website profiles. Begint met pfl_; laat leeg om je standaardprofiel te gebruiken.',
+  'store.hint_adyen_api_key':
+    'In de Adyen Customer Area: Developers › API credentials › je credential › API key.',
+  'store.hint_adyen_merchant':
+    'In de Adyen Customer Area, in de accountkiezer bovenaan: het merchant-account, niet het bedrijfsaccount.',
+  'store.hint_adyen_hmac': 'In Adyen: Developers › Webhooks › je webhook › Security › HMAC key.',
+  'store.hint_adyen_live_prefix':
+    'In Adyen (live): Developers › API URLs. Het is het deel van het adres vóór -checkout-live.',
+  'store.hint_redsys_merchant':
+    'Je bank geeft hem bij het contract voor de virtuele betaalterminal; hij staat ook in het beheerportaal van Redsys.',
+  'store.hint_redsys_terminal':
+    'In het beheerportaal van Redsys, naast de merchantcode. Meestal is het 1.',
+  'store.hint_redsys_secret':
+    'In het beheerportaal van Redsys: winkelgegevens › SHA-256-sleutel. De test- en livesleutel verschillen.',
+  'store.hint_stripe_secret':
+    'In Stripe: Developers › API keys › Secret key. Begint met sk_test_ of sk_live_.',
+  'store.hint_stripe_webhook':
+    'In Stripe: Developers › Webhooks › je endpoint › Signing secret. Begint met whsec_.',
   'orders.subtitle': 'Bestellingen en aankopen op je website.',
   'orders.count': { one: '{count} bestelling', other: '{count} bestellingen' },
   'orders.loading': 'Bestellingen laden',

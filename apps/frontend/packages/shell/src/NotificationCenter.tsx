@@ -16,7 +16,6 @@ import {
   ListItem,
   Skeleton,
   TopBarButton,
-  Illustration,
 } from '@sytue/ui';
 import type { Notification } from '@sytue/api-clients';
 import { formatDateTime, formatTimeAgo } from '@sytue/i18n';
@@ -124,7 +123,7 @@ export function NotificationCenter({
         </TopBarButton>
       )}
     >
-      {/* 280 px (`w-80` con el rem de 14) y nunca más que el panel, que ya se queda
+      {/* 320 px (`w-80` con el rem de 16) y nunca más que el panel, que ya se queda
           a 8 px de cada borde de la ventana (`max-w-[calc(100vw-16px)]` de Dropdown).
           Con el ancho fijo a secas desbordaba en los móviles estrechos —la auditoría lo cazó
           42 veces, «+10px scroll-lateral en :root»—; con `w-full max-w-80`, en cambio,
@@ -178,7 +177,7 @@ export function NotificationCenter({
           <EmptyState
             title={t('notifications.failed')}
             description={t('error.connection')}
-            illustration={<Icon name="danger" size={28} />}
+            tone="error"
             action={
               <Button variant="secondary" size="sm" onClick={() => avisosRef.current?.reintentar()}>
                 {t('action.retry')}
@@ -192,7 +191,7 @@ export function NotificationCenter({
             description={t('notifications.emptyDescription')}
             // «Todo al día» con la ilustración de marca, no una campana gris: el
             // vacío aquí es la buena noticia, y se lee como tal.
-            illustration={<Illustration name="allDone" size={112} />}
+            spot="allDone"
             class="border-border border-t px-6 py-10"
           />
         ) : (

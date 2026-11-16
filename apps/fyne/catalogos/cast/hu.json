@@ -7,6 +7,7 @@
   "block.short": "Letiltás",
   "card.untitledOwner": "Ismeretlen név",
   "card.watch": "{title} megtekintése",
+  "card.watched": "{percent}% megtekintve",
   "channel.count": {
     "one": "{count} nyilvános videó",
     "other": "{count} nyilvános videó"
@@ -153,7 +154,12 @@
   "player.qualityAuto": "Automatikus",
   "player.qualityAutoNow": "Automatikus ({quality})",
   "player.region": "Videólejátszó",
+  "player.restart": "Kezdés az elejéről",
+  "player.resumedAt": "Folytatás innen: {time}",
   "player.seek": "Pozíció",
+  "player.speed": "Sebesség",
+  "player.speedNormal": "Normál",
+  "player.speedNow": "Sebesség: {rate}",
   "player.unmute": "Hang bekapcsolása",
   "player.volume": "Hangerő",
   "quality.approximate": "Durva becslés: a videó hossza még nem ismert.",

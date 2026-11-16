@@ -13,7 +13,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/widget"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
@@ -251,20 +250,13 @@ func (r *barraSeleccionRenderer) Refresh() {
 
 // ---- El estado de la selección, en el Buzón ----
 
-// teclaMayus dice si Mayúsculas está pulsada: el rango de Mayús + clic. Fyne no la
-// pasa en el `PointEvent` del clic; la sabe el driver de escritorio.
-func teclaMayus() bool {
-	d, ok := fyne.CurrentApp().Driver().(desktop.Driver)
-	return ok && d.CurrentKeyModifiers()&fyne.KeyModifierShift != 0
-}
-
 // marcarFila es `toggleSelect`: conmuta una conversación y fija el ancla; con
 // Mayúsculas, AÑADE el rango visible desde el ancla hasta esta.
 func (b *Buzon) marcarFila(c Conversacion, i int) {
 	m := b.P.Bandeja.Marcadas
 	convs := b.P.Bandeja.Conversaciones
 	switch {
-	case teclaMayus() && b.ancla >= 0:
+	case ui.Mayus() && b.ancla >= 0:
 		lo, hi := min(b.ancla, i), max(b.ancla, i)
 		for j := lo; j <= hi && j < len(convs); j++ {
 			m[convs[j].HiloID] = true
@@ -274,7 +266,7 @@ func (b *Buzon) marcarFila(c Conversacion, i int) {
 	default:
 		m[c.HiloID] = true
 	}
-	if !teclaMayus() {
+	if !ui.Mayus() {
 		b.ancla = i
 	}
 	b.pintarSeleccion()

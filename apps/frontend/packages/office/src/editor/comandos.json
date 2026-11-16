@@ -144,6 +144,11 @@
     "group": "group.font",
     "edits": true,
     "script": true,
+    "shortcuts": [
+      {
+        "keys": "Ctrl+."
+      }
+    ],
     "telemetry": true
   },
   "subscript": {
@@ -153,6 +158,11 @@
     "group": "group.font",
     "edits": true,
     "script": true,
+    "shortcuts": [
+      {
+        "keys": "Ctrl+,"
+      }
+    ],
     "telemetry": true
   },
   "color": {
@@ -180,6 +190,27 @@
     "group": "group.font",
     "edits": true,
     "script": true,
+    "shortcuts": [
+      {
+        "keys": "Ctrl+\\"
+      }
+    ],
+    "telemetry": true
+  },
+  "formatPainter": {
+    "labelKey": "format.painter",
+    "kinds": ["document"],
+    "tab": "inicio",
+    "group": "group.font",
+    "edits": true,
+    "telemetry": true
+  },
+  "changeCase": {
+    "labelKey": "format.changeCase",
+    "kinds": ["document"],
+    "tab": "inicio",
+    "group": "group.font",
+    "edits": true,
     "telemetry": true
   },
   "style": {
@@ -207,6 +238,11 @@
     "group": "group.paragraph",
     "edits": true,
     "script": true,
+    "shortcuts": [
+      {
+        "keys": "Ctrl+Shift+L"
+      }
+    ],
     "telemetry": true
   },
   "alignCenter": {
@@ -216,6 +252,11 @@
     "group": "group.paragraph",
     "edits": true,
     "script": true,
+    "shortcuts": [
+      {
+        "keys": "Ctrl+Shift+E"
+      }
+    ],
     "telemetry": true
   },
   "alignRight": {
@@ -225,6 +266,11 @@
     "group": "group.paragraph",
     "edits": true,
     "script": true,
+    "shortcuts": [
+      {
+        "keys": "Ctrl+Shift+R"
+      }
+    ],
     "telemetry": true
   },
   "alignJustify": {
@@ -234,6 +280,11 @@
     "group": "group.paragraph",
     "edits": true,
     "script": true,
+    "shortcuts": [
+      {
+        "keys": "Ctrl+Shift+J"
+      }
+    ],
     "telemetry": true
   },
   "listBullet": {
@@ -243,6 +294,11 @@
     "group": "group.paragraph",
     "edits": true,
     "script": true,
+    "shortcuts": [
+      {
+        "keys": "Ctrl+Shift+8"
+      }
+    ],
     "telemetry": true
   },
   "listNumber": {
@@ -252,6 +308,25 @@
     "group": "group.paragraph",
     "edits": true,
     "script": true,
+    "shortcuts": [
+      {
+        "keys": "Ctrl+Shift+7"
+      }
+    ],
+    "telemetry": true
+  },
+  "listCheck": {
+    "labelKey": "list.check",
+    "kinds": ["document"],
+    "tab": "inicio",
+    "group": "group.paragraph",
+    "edits": true,
+    "script": true,
+    "shortcuts": [
+      {
+        "keys": "Ctrl+Shift+9"
+      }
+    ],
     "telemetry": true
   },
   "outdent": {
@@ -261,6 +336,11 @@
     "group": "group.paragraph",
     "edits": true,
     "script": true,
+    "shortcuts": [
+      {
+        "keys": "Ctrl+["
+      }
+    ],
     "telemetry": true
   },
   "indent": {
@@ -270,6 +350,11 @@
     "group": "group.paragraph",
     "edits": true,
     "script": true,
+    "shortcuts": [
+      {
+        "keys": "Ctrl+]"
+      }
+    ],
     "telemetry": true
   },
   "lineHeight": {
@@ -288,6 +373,24 @@
     "group": "group.styles",
     "edits": true,
     "script": true,
+    "shortcuts": [
+      {
+        "keys": "Ctrl+Alt+0",
+        "value": "p"
+      },
+      {
+        "keys": "Ctrl+Alt+1",
+        "value": "h1"
+      },
+      {
+        "keys": "Ctrl+Alt+2",
+        "value": "h2"
+      },
+      {
+        "keys": "Ctrl+Alt+3",
+        "value": "h3"
+      }
+    ],
     "telemetry": true
   },
   "align": {
@@ -358,6 +461,24 @@
     "kinds": ["spreadsheet"],
     "tab": "inicio",
     "group": "group.merge",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "colwidth": {
+    "labelKey": "sheet.colWidth",
+    "kinds": ["spreadsheet"],
+    "tab": "inicio",
+    "group": "group.cells",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "rowheight": {
+    "labelKey": "sheet.rowHeight",
+    "kinds": ["spreadsheet"],
+    "tab": "inicio",
+    "group": "group.cells",
     "edits": true,
     "script": true,
     "telemetry": true
@@ -692,6 +813,11 @@
     "group": "group.link",
     "edits": true,
     "script": true,
+    "shortcuts": [
+      {
+        "keys": "Ctrl+K"
+      }
+    ],
     "telemetry": true
   },
   "insertHr": {
@@ -1005,6 +1131,15 @@
   },
   "delcol": {
     "labelKey": "table.deleteCols",
+    "kinds": ["spreadsheet"],
+    "tab": "datos",
+    "group": "group.cells",
+    "edits": true,
+    "script": true,
+    "telemetry": true
+  },
+  "hide": {
+    "labelKey": "data.hideShow",
     "kinds": ["spreadsheet"],
     "tab": "datos",
     "group": "group.cells",
@@ -1457,6 +1592,14 @@
     "edits": true,
     "telemetry": true
   },
+  "markdownAutoformat": {
+    "labelKey": "review.markdownAutoformat",
+    "kinds": ["document"],
+    "tab": "revisar",
+    "group": "group.review",
+    "edits": false,
+    "telemetry": true
+  },
   "reviewPanel": {
     "labelKey": "review.panel",
     "kinds": ["document"],
@@ -1547,6 +1690,14 @@
   },
   "settingsPanel": {
     "labelKey": "view.settingsPanel",
+    "kinds": ["document", "spreadsheet", "presentation"],
+    "tab": "vista",
+    "group": "group.show",
+    "edits": false,
+    "telemetry": true
+  },
+  "shortcutsHelp": {
+    "labelKey": "view.shortcuts",
     "kinds": ["document", "spreadsheet", "presentation"],
     "tab": "vista",
     "group": "group.show",

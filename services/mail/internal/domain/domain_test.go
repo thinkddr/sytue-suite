@@ -4,7 +4,11 @@
 // Tests unitarios de la lógica pura de dominio de Sytue Mail (sin BD/red).
 package domain
 
-import "testing"
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+)
 
 func TestParseAddress(t *testing.T) {
 	cases := []struct {
@@ -83,5 +87,18 @@ func TestDefaultMailboxesHasInboxFirst(t *testing.T) {
 			t.Fatalf("rol duplicado en DefaultMailboxes: %q", mb.Role)
 		}
 		seen[mb.Role] = true
+	}
+}
+
+// El lector resume la autenticación del remitente: los veredictos tienen que
+// viajar en el sobre, y no salir cuando no los hay (correo propio o importado).
+func TestMessageJSONLlevaLaAutenticacionDelRemitente(t *testing.T) {
+	b, err := json.Marshal(Message{SPFResult: AuthPass, DKIMResult: AuthFail})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(b)
+	if !strings.Contains(s, `"auth_spf":"pass"`) || !strings.Contains(s, `"auth_dkim":"fail"`) || strings.Contains(s, "auth_dmarc") {
+		t.Fatalf("sobre: %s", s)
 	}
 }

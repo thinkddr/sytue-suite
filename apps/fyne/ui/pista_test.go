@@ -25,14 +25,16 @@ import (
 func TestElContratoDeLaPistaEsElDeTooltipTsx(t *testing.T) {
 	fuente := webref.Read(t, "apps/frontend/packages/ui/src/components/Tooltip.tsx")
 	for _, c := range []struct{ trozo, porque string }{
-		{"setTimeout(() => setOpen(true), 300)", "el retardo del ratón"},
+		{"const RETARDO = 300;", "el retardo del ratón"},
+		{"timer = setTimeout(abrir, RETARDO)", "que el retardo es el de abrir"},
 		{"max-w-[240px]", "el tope de ancho"},
 		{"sytue-tooltip-surface px-2 py-1 text-xs font-medium", "la superficie invertida y el relleno"},
 		{"rounded-md", "la esquina de 6"},
-		{"bottom-[calc(100%+6px)]", "los 6 px de separación"},
-		{"h-1.5 w-1.5 -translate-x-1/2 rotate-45", "el rombo de 5,25"},
+		{"const GAP = 6;", "los 6 px de separación"},
+		{"h-1.5 w-1.5 rotate-45", "el rombo de 5,25"},
+		{"'-bottom-[3px] -translate-x-1/2'", "el rombo centrado bajo la burbuja"},
 		{"-bottom-[3px]", "los 3 px que la flecha asoma"},
-		{"if (e.key === 'Escape') hide()", "que Escape la quita"},
+		{"if (e.key === 'Escape') cerrar();", "que Escape la quita"},
 	} {
 		if !strings.Contains(fuente, c.trozo) {
 			t.Errorf("Tooltip.tsx ya no dice %q (%s)", c.trozo, c.porque)
@@ -44,9 +46,9 @@ func TestElContratoDeLaPistaEsElDeTooltipTsx(t *testing.T) {
 	}
 }
 
-// TestLaBurbujaDePistaMide21: `py-1` dos veces más la caja de línea de `text-xs`, que
-// con el rem de 14 son 3,5 + 14 + 3,5.
-func TestLaBurbujaDePistaMide21(t *testing.T) {
+// TestLaBurbujaDePistaMide24: `py-1` dos veces más la caja de línea de `text-xs`, que
+// con el rem de 16 son 4 + 16 + 4.
+func TestLaBurbujaDePistaMide24(t *testing.T) {
 	const quiero = 2*4 + 16
 	if got := MedidaPista("Marcar como leído").Height; got != quiero {
 		t.Errorf("la burbuja mide %v de alto y `py-1` con `text-xs` dan %v", got, float32(quiero))

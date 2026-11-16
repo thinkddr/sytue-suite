@@ -42,7 +42,12 @@ import { dibujoFigureHtml } from '../src/editor/dibujo';
 import { chartFigureHtml, newChartGrid, shapeFigureHtml } from '../src/editor/docblocks';
 import { buildFormFieldHtml } from '../src/editor/formfields';
 import { mergeFieldHtml } from '../src/editor/mailmerge';
-import { pageBorderHtml, watermarkHtml } from '../src/editor/pagedecor';
+import {
+  PAGINA_POR_DEFECTO,
+  pageBorderHtml,
+  paginaHtml,
+  watermarkHtml,
+} from '../src/editor/pagedecor';
 import { smartArtFigureHtml } from '../src/editor/smartart';
 import { deletionHtml, insertionHtml, TRACK_SENTINEL } from '../src/editor/trackchanges';
 import {
@@ -144,6 +149,12 @@ function muestrasDelEditor(): Record<string, string> {
       diagonal: false,
     }),
     bordeDePagina: pageBorderHtml({ style: 'dashed', width: 2, color: '#94A3B8' }),
+    paginaConIdioma: paginaHtml({
+      ...PAGINA_POR_DEFECTO,
+      margin: 48,
+      color: '#FFF2CC',
+      lang: 'de',
+    }),
     campoTexto: buildFormFieldHtml({ type: 'text', name: 'Nombre', placeholder: 'Tu nombre' }),
     campoCasilla: buildFormFieldHtml({ type: 'checkbox', name: 'Acepto', checked: true }),
     campoCombinado: mergeFieldHtml('Nombre'),
@@ -199,12 +210,12 @@ test('las plantillas del servicio pasan intactas', () => {
 /* ---------- la misma lista que el servidor ---------- */
 
 test('las listas son las del saneador del servicio', () => {
-  // El servicio sanea al guardar con las mismas reglas (saneado_html.go); si una lista se
+  // El servicio sanea al guardar con las mismas reglas (apps/nucleo/saneado); si una lista se
   // cambia en un lado y no en el otro, lo que uno deja pasar el otro lo quita.
-  const go = leer('../../../../../services/docs/internal/domain/saneado_html.go');
+  const go = leer('../../../../nucleo/saneado/saneado.go');
   const conjunto = (nombre: string): string[] => {
     const m = go.match(new RegExp(`${nombre}\\s*=\\s*conjunto\\(\`([^\`]*)\`\\)`));
-    if (!m) throw new Error(`no encuentro ${nombre} en saneado_html.go`);
+    if (!m) throw new Error(`no encuentro ${nombre} en saneado.go`);
     return m[1]!
       .split(/\s+/)
       .filter(Boolean)
@@ -213,7 +224,7 @@ test('las listas son las del saneador del servicio', () => {
   };
   const cadenas = (nombre: string): string[] => {
     const m = go.match(new RegExp(`${nombre}\\s*=\\s*\\[\\]string\\{([^}]*)\\}`));
-    if (!m) throw new Error(`no encuentro ${nombre} en saneado_html.go`);
+    if (!m) throw new Error(`no encuentro ${nombre} en saneado.go`);
     return [...m[1]!.matchAll(/"([^"]*)"/g)].map((x) => x[1]!).sort();
   };
   const orden = (xs: Iterable<string>): string[] => [...xs].sort();
@@ -247,7 +258,7 @@ test('un documento de cada tipo del editor, el mismo que mira el servicio', () =
   // dice: se regenera con SYTUE_REGENERAR_SANEADO=1 y se vuelven a pasar las dos pruebas.
   const ruta = fileURLToPath(
     new URL(
-      '../../../../../services/docs/internal/domain/testdata/saneado/editor.json',
+      '../../../../../apps/nucleo/office/model/testdata/saneado/editor.json',
       import.meta.url,
     ),
   );

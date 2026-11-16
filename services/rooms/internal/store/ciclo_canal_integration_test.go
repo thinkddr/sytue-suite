@@ -37,24 +37,24 @@ func TestSalirDeUnPublicoNoVuelve(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
 
-	tm, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	tm, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 	if err := st.AddTeamMember(ctx, tm.ID, "alice", "bob", "Bob", domain.RoleMember); err != nil {
 		t.Fatalf("AddTeamMember: %v", err)
 	}
 	// bob no es miembro de «canal»: no sale en su barra, sí en explorar.
-	if enLista(t, mustList(t, st, ctx, tm.ID, "bob"), ch.ID.String()) {
+	if enLista(t, mustList(ctx, t, st, tm.ID, "bob"), ch.ID.String()) {
 		t.Fatal("un público del que no es miembro no debe salir en la barra")
 	}
 	if _, err := st.JoinChannel(ctx, ch.ID, "bob", "Bob"); err != nil {
 		t.Fatalf("JoinChannel: %v", err)
 	}
-	if !enLista(t, mustList(t, st, ctx, tm.ID, "bob"), ch.ID.String()) {
+	if !enLista(t, mustList(ctx, t, st, tm.ID, "bob"), ch.ID.String()) {
 		t.Fatal("tras unirse, el canal debe salir en la barra")
 	}
 	if err := st.LeaveChannel(ctx, ch.ID, "bob"); err != nil {
 		t.Fatalf("LeaveChannel: %v", err)
 	}
-	if enLista(t, mustList(t, st, ctx, tm.ID, "bob"), ch.ID.String()) {
+	if enLista(t, mustList(ctx, t, st, tm.ID, "bob"), ch.ID.String()) {
 		t.Fatal("tras salir, el canal público no debe volver a la barra")
 	}
 	joinable, err := st.ListJoinableChannels(ctx, tm.ID, "bob", "", 50)
@@ -107,7 +107,7 @@ func TestDeleteChannel(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
 
-	tm, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	tm, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 	if err := st.AddTeamMember(ctx, tm.ID, "alice", "bob", "Bob", domain.RoleMember); err != nil {
 		t.Fatalf("AddTeamMember: %v", err)
 	}
@@ -129,7 +129,7 @@ func TestDeleteChannel(t *testing.T) {
 		t.Fatalf("DeleteChannel admin: %v", err)
 	}
 	for _, sub := range []string{"alice", "bob"} {
-		if enLista(t, mustList(t, st, ctx, tm.ID, sub), ch.ID.String()) {
+		if enLista(t, mustList(ctx, t, st, tm.ID, sub), ch.ID.String()) {
 			t.Fatalf("el canal borrado sigue en la barra de %s", sub)
 		}
 	}
@@ -149,7 +149,7 @@ func TestHideDirect(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
 
-	tm, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	tm, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 	if err := st.AddTeamMember(ctx, tm.ID, "alice", "bob", "Bob", domain.RoleMember); err != nil {
 		t.Fatalf("AddTeamMember: %v", err)
 	}
@@ -174,10 +174,10 @@ func TestHideDirect(t *testing.T) {
 	if err := st.HideDirect(ctx, dm.ID, "alice"); err != nil {
 		t.Fatalf("HideDirect: %v", err)
 	}
-	if enLista(t, mustList(t, st, ctx, tm.ID, "alice"), dm.ID.String()) {
+	if enLista(t, mustList(ctx, t, st, tm.ID, "alice"), dm.ID.String()) {
 		t.Fatal("el directo borrado sigue en la barra de alice")
 	}
-	if !enLista(t, mustList(t, st, ctx, tm.ID, "bob"), dm.ID.String()) {
+	if !enLista(t, mustList(ctx, t, st, tm.ID, "bob"), dm.ID.String()) {
 		t.Fatal("bob no lo ha borrado: debe seguir viéndolo")
 	}
 	if msgs, err := st.ListMessages(ctx, dm.ID, "alice", store.MessagePage{}); err != nil || len(msgs) != 0 {
@@ -192,7 +192,7 @@ func TestHideDirect(t *testing.T) {
 
 	// bob vuelve a escribir: reaparece para alice, solo con lo nuevo.
 	post("bob", "hola de nuevo")
-	if !enLista(t, mustList(t, st, ctx, tm.ID, "alice"), dm.ID.String()) {
+	if !enLista(t, mustList(ctx, t, st, tm.ID, "alice"), dm.ID.String()) {
 		t.Fatal("un mensaje nuevo debe devolver el directo a la barra de alice")
 	}
 	msgs, err := st.ListMessages(ctx, dm.ID, "alice", store.MessagePage{})
@@ -211,13 +211,13 @@ func TestHideDirect(t *testing.T) {
 	if err != nil || again.ID != dm.ID {
 		t.Fatalf("reabrir: id=%v err=%v", again.ID, err)
 	}
-	if !enLista(t, mustList(t, st, ctx, tm.ID, "alice"), dm.ID.String()) {
+	if !enLista(t, mustList(ctx, t, st, tm.ID, "alice"), dm.ID.String()) {
 		t.Fatal("reabrir debe devolver el directo a la barra de quien lo abre")
 	}
 	if _, err := st.OpenDirect(ctx, tm.ID, "bob", "alice"); err != nil {
 		t.Fatalf("bob reabriendo tras salir: %v", err)
 	}
-	if !enLista(t, mustList(t, st, ctx, tm.ID, "bob"), dm.ID.String()) {
+	if !enLista(t, mustList(ctx, t, st, tm.ID, "bob"), dm.ID.String()) {
 		t.Fatal("quien había salido de un directo debe poder reabrirlo")
 	}
 }
@@ -228,7 +228,7 @@ func TestHideDirectClearsSavedAndFollowedHistoryForActorOnly(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
-	tm, _ := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	tm, _ := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 	if err := st.AddTeamMember(ctx, tm.ID, "alice", "bob", "Bob", domain.RoleMember); err != nil {
 		t.Fatal(err)
 	}

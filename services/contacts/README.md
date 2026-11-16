@@ -20,7 +20,10 @@ propia**. Código propietario © Sytue; dependencias de terceros solo permisivas
   `sync_token` para sincronización incremental (RFC 6578).
 - **Contactos (vCard 4.0):** crear / leer / actualizar (condicional por
   **If-Match**/ETag) / borrar; proyección normalizada (N, FN, ORG, TITLE,
-  NICKNAME, BDAY, NOTE) más **correos** y **teléfonos** con `TYPE`/`PREF`.
+  NICKNAME, BDAY, NOTE) más **correos** y **teléfonos** con `TYPE`/`PREF`. El BDAY
+  sin año (`--0215`, o el año de relleno de Apple) va en `birthday_no_year`. Sitios
+  web (`urls`, solo http/https), personas relacionadas (`related`, RELATED de texto) y
+  aniversario (`anniversary`, fecha completa); lo que no se proyecta se conserva.
   Exportación de la vCard canónica (`text/vcard; version=4.0`).
 - **Grupos (vCard `KIND=group`):** miembros por `UID` (propiedad `MEMBER`,
   RFC 6350 6.6.5), crear / leer / actualizar / borrar.

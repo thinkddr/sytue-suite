@@ -1158,3 +1158,31 @@
   }
 }
 /* ==== fin del color de cada app ==== */
+
+/* ==== MÁS CONTRASTE (`prefers-contrast: more`) ====
+   Para quien lo pide al sistema (macOS «Aumentar contraste», el alto contraste de GNOME
+   o de Windows). En el modo normal los bordes y divisores se quedan por debajo de 3:1 a
+   propósito —separan sin pesar— y el texto sutil roza el 4,5:1; aquí pasan a lo que ya
+   cumple con holgura: todo borde es el contorno de control (`border-strong`, ≥ 3:1), el
+   texto sutil es el atenuado, el velo de los diálogos tapa más y, en el traslúcido, las
+   superficies dejan de ser velo sobre el fondo de color.
+
+   Todo es `var()` de tokens de rol, así que un solo bloque vale en los tres modos y en
+   cada color. `:is([data-theme], :not([data-theme]))` y su pareja de `data-color` no
+   filtran nada: suben el peso a tres para ganar a los modos de cada color, que pesan dos
+   o tres y van antes. Lo vigila contraste-paleta.test.ts («· más contraste»); las nativas
+   lo leen con `tokens.ElegirMasContraste`. */
+@media (prefers-contrast: more) {
+  :root:is([data-theme], :not([data-theme])):is([data-color], :not([data-color])) {
+    --sytue-border-subtle: var(--sytue-border-strong);
+    --sytue-border: var(--sytue-border-strong);
+    --sytue-text-subtle: var(--sytue-text-muted);
+    --sytue-overlay: rgba(0, 0, 0, 0.72);
+  }
+  :root[data-theme='translucent']:is([data-color], :not([data-color])) {
+    --sytue-surface: var(--sytue-surface-raised);
+    --sytue-bg-subtle: var(--sytue-menu-hover);
+    --sytue-topbar-bg: var(--sytue-surface-raised);
+    --sytue-header-bg: var(--sytue-surface-raised);
+  }
+}

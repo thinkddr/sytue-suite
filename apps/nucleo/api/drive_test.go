@@ -18,7 +18,7 @@ import (
 )
 
 func TestDrive(t *testing.T) {
-	var subida struct{ nombre, tipo, cuerpo, token string }
+	var subida struct{ nombre, tipo, cuerpo, token, conflicto string }
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method + " " + r.URL.Path {
 		case "GET /api/v1/folders/root":
@@ -38,6 +38,7 @@ func TestDrive(t *testing.T) {
 		case "POST /api/v1/folders/raiz/files":
 			cuerpo, _ := io.ReadAll(r.Body)
 			subida.nombre, subida.tipo, subida.cuerpo = r.URL.Query().Get("name"), r.Header.Get("Content-Type"), string(cuerpo)
+			subida.conflicto = r.URL.Query().Get("on_conflict")
 			subida.token = r.Header.Get("Authorization")
 			_, _ = io.WriteString(w, `{"id":"f2","folder_id":"raiz","name":"`+subida.nombre+`","size_bytes":4}`)
 		default:
@@ -81,8 +82,13 @@ func TestDrive(t *testing.T) {
 	// Un nombre con eñe, espacios y raya viaja en la query, no en una cabecera.
 	nombre := "Factura nº 3 — señal.pdf"
 	f, err := d.Upload(ctx, "raiz", nombre, "application/pdf", strings.NewReader("hola"), 4)
-	if err != nil || f.ID != "f2" || subida.nombre != nombre || subida.tipo != "application/pdf" || subida.cuerpo != "hola" || subida.token != "Bearer tok" {
+	if err != nil || f.ID != "f2" || subida.nombre != nombre || subida.tipo != "application/pdf" || subida.cuerpo != "hola" || subida.token != "Bearer tok" || subida.conflicto != "" {
 		t.Fatalf("Upload = %+v, %v; llegó %+v", f, err, subida)
+	}
+	// Las fotos no sustituyen: «IMG_0001.jpg» se repite en cada teléfono.
+	if _, err := d.UploadConservando(ctx, "raiz", "IMG_0001.jpg", "image/jpeg", strings.NewReader("ff"), 2); err != nil ||
+		subida.nombre != "IMG_0001.jpg" || subida.conflicto != "keep_both" || subida.cuerpo != "ff" {
+		t.Fatalf("UploadConservando: %v; llegó %+v", err, subida)
 	}
 }
 
@@ -424,5 +430,73 @@ func TestDirectorioResuelveEnLosDosSentidos(t *testing.T) {
 	var e *Error
 	if _, err := d.PorCorreo(ctx, "nadie@fuera.test"); !errors.As(err, &e) || e.Status != http.StatusNotFound {
 		t.Fatalf("una dirección de fuera tiene que ser 404: %v", err)
+	}
+}
+
+// TestExportarVistaDeBases: el token viaja en el CUERPO (nunca en la URL), el fichero
+// sale de `file`, y el 422 trae el código con el que la pantalla dice por qué no vale.
+func TestExportarVistaDeBases(t *testing.T) {
+	var cuerpo, consulta string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method+" "+r.URL.Path != "POST /api/v1/folders/c1/imports/bases" {
+			t.Errorf("petición inesperada %s %s", r.Method, r.URL.Path)
+		}
+		b, _ := io.ReadAll(r.Body)
+		cuerpo, consulta = string(b), r.URL.RawQuery
+		if strings.Contains(cuerpo, "caducado") {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			_, _ = io.WriteString(w, `{"code":"bases_connection_invalid","message":"no"}`)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		_, _ = io.WriteString(w, `{"file":{"id":"f9","folder_id":"c1","name":"Clientes.csv","content_type":"text/csv"},"provenance":{}}`)
+	}))
+	defer srv.Close()
+	d := NewDrive(srv.URL, &sesionFalsa{tokens: []string{"tok"}}, nil)
+
+	f, err := d.ExportBasesView(context.Background(), "c1", "sbc_123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.ID != "f9" || f.Name != "Clientes.csv" {
+		t.Errorf("el fichero exportado es %+v", f)
+	}
+	if cuerpo != `{"token":"sbc_123"}` || consulta != "" {
+		t.Errorf("el token tiene que ir solo en el cuerpo: cuerpo %q, consulta %q", cuerpo, consulta)
+	}
+
+	_, err = d.ExportBasesView(context.Background(), "c1", "caducado")
+	var e *Error
+	if !errors.As(err, &e) || e.Status != http.StatusUnprocessableEntity || e.Code() != CodigoBasesConexionInvalida {
+		t.Errorf("una conexión que no vale tiene que dar el 422 con su código, y da %v", err)
+	}
+}
+
+// El orden lo aplica el servicio: va en la consulta, también con el cursor (el cursor
+// lleva su orden y seguirlo con otro es un 400); el de siempre no añade nada, para que
+// la URL —y la caché sin conexión— sea la de antes.
+func TestChildrenEnPideElOrdenAlServicio(t *testing.T) {
+	var consultas []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		consultas = append(consultas, r.URL.RawQuery)
+		_, _ = io.WriteString(w, `{"folders":[],"files":[]}`)
+	}))
+	defer srv.Close()
+	ctx := context.Background()
+	d := NewDrive(srv.URL, &sesionFalsa{tokens: []string{"tok"}}, nil)
+	o := OrdenListado{Campo: "modificado", Sentido: "desc"}
+	if _, err := d.ChildrenEn(ctx, "raiz", "", o); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.ChildrenEn(ctx, "raiz", "c1", o); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.ChildrenEn(ctx, "raiz", "", OrdenListado{}); err != nil {
+		t.Fatal(err)
+	}
+	quiero := []string{"orden=modificado&sentido=desc", "cursor=c1&orden=modificado&sentido=desc", ""}
+	if !slices.Equal(consultas, quiero) {
+		t.Fatalf("consultas = %q, quiero %q", consultas, quiero)
 	}
 }

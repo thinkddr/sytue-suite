@@ -126,9 +126,12 @@ paths:
       tags: [folders]
       summary: Listar subcarpetas y ficheros
       description: >-
-        Los ficheros van con paginación keyset: la respuesta incluye next_cursor
-        cuando hay más; repetir con ?cursor= para la página siguiente. Las
-        subcarpetas solo viajan en la primera página (cursor vacío).
+        Los ficheros van con paginación keyset en el orden pedido (?orden= y
+        ?sentido=; por defecto nombre ascendente): la respuesta incluye
+        next_cursor cuando hay más; repetir con ?cursor= y el MISMO orden para la
+        página siguiente (un cursor de otro orden es un 400). Las subcarpetas solo
+        viajan en la primera página (cursor vacío), en el mismo orden que los
+        ficheros salvo por tamaño, que no tienen: entonces van por nombre.
       parameters:
         - in: query
           name: cursor
@@ -138,6 +141,8 @@ paths:
           name: limit
           schema: { type: integer, maximum: 500 }
           description: Máximo de ficheros por página (por defecto 500).
+        - $ref: "#/components/parameters/Orden"
+        - $ref: "#/components/parameters/Sentido"
       responses:
         "200":
           content:
@@ -165,7 +170,9 @@ paths:
       description: >-
         Cuerpo crudo (application/octet-stream u otro Content-Type). El nombre se
         indica en la cabecera X-File-Name o el parámetro de query ?name=. Si ya
-        existe un fichero con ese nombre, se sustituye (nueva versión).
+        existe un fichero con ese nombre, se sustituye (nueva versión), salvo con
+        `on_conflict=keep_both`, que lo guarda como «nombre (2).ext» y deja el que
+        había: lo que piden las subidas de fotos, donde «IMG_0001.jpg» se repite.
       parameters:
         - in: query
           name: name
@@ -173,6 +180,13 @@ paths:
         - in: header
           name: X-File-Name
           schema: { type: string }
+        - in: query
+          name: on_conflict
+          description: >-
+            Qué hacer si ya hay un fichero con ese nombre en la carpeta: `replace`
+            (por defecto) lo sustituye con una versión nueva; `keep_both` guarda este
+            con un nombre libre y el `name` de la respuesta dice cuál.
+          schema: { type: string, enum: [replace, keep_both], default: replace }
       requestBody:
         required: true
         content:
@@ -412,6 +426,18 @@ components:
       name: id
       required: true
       schema: { type: string, format: uuid }
+    Orden:
+      in: query
+      name: orden
+      schema: { type: string, enum: [nombre, modificado, tamano], default: nombre }
+      description: >-
+        Columna por la que se ordenan los ficheros (desempate por id). Un valor
+        desconocido es un 400.
+    Sentido:
+      in: query
+      name: sentido
+      schema: { type: string, enum: [asc, desc], default: asc }
+      description: Sentido del orden. Un valor desconocido es un 400.
 
   responses:
     Error:

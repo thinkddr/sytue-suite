@@ -13,12 +13,10 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 
-	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
-
-	"git.sytue.eu/sytue/one/apps/fyne/agenda"
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
 // La pareja en la web es apps/frontend/apps/calendar/src/components/MesCompacto.tsx.
@@ -37,7 +35,7 @@ import (
 // semana); ↑/↓ y Inicio/Fin también. En la semana la rejilla se pliega a la fila del
 // cursor; en la agenda desaparece y debajo va la agenda de siempre (`vistaAgenda`). Cada
 // cambio reconstruye la pantalla y la hoja nueva se anima desde el alto de la vieja,
-// salvo con `ui.SinMovimiento` (el `prefers-reduced-motion` de la web).
+// salvo con `ui.MenosMovimiento()` (el `prefers-reduced-motion` de la web).
 //
 // Tocar un día lo ELIGE (no crea: crear es el «+» de la barra, sobre el día elegido).
 // Teclado: ←→ un día, ↑↓ una semana, Inicio/Fin lunes/domingo, RePág/AvPág un mes
@@ -174,7 +172,7 @@ func (p *Pantalla) accionesBarraCompacta() []fyne.CanvasObject {
 // vistaMesCompacta es la vista entera: la hoja de la rejilla y, debajo, la lista del día
 // (o el panel de error en su sitio), desplazable y con tirar para refrescar.
 func (p *Pantalla) vistaMesCompacta() fyne.CanvasObject {
-	cargando := p.Estado == agenda.Cargando
+	cargando := p.Estado == ui.EstadoCargando
 	eventos := p.Eventos
 	if cargando {
 		eventos = nil // la misma hoja, sin puntos
@@ -183,16 +181,16 @@ func (p *Pantalla) vistaMesCompacta() fyne.CanvasObject {
 	enAgenda := p.posicion() == PosAgenda
 	var abajo fyne.CanvasObject
 	switch p.Estado {
-	case agenda.Error, agenda.SinPermiso, agenda.SinConexion:
+	case ui.EstadoError, ui.EstadoSinPermiso, ui.EstadoSinConexion:
 		enAgenda = false // el panel va bajo la hoja, desplazable, como en el mes
 		abajo = container.New(ui.Margen{Izq: tema.Espacio(6), Arr: tema.Espacio(6), Der: tema.Espacio(6), Abj: tema.Espacio(6)},
-			agenda.Panel(p.Estado, p.textosDeEstado(), nil))
-	case agenda.Cargando:
+			ui.PanelEstado(p.Estado, p.textosDeEstado(), nil))
+	case ui.EstadoCargando:
 		abajo = p.listaDia(true)
 		if enAgenda {
 			abajo = esqueletoAgendaCompacta()
 		}
-	case agenda.Exito, agenda.Vacia:
+	case ui.EstadoExito, ui.EstadoVacia:
 		abajo = p.listaDia(false)
 		if enAgenda {
 			// La agenda de siempre, con su buscador, su desplazamiento y su tirar para
@@ -279,8 +277,8 @@ func (p *Pantalla) listaDia(cargando bool) fyne.CanvasObject {
 func esqueletoFilaDia() fyne.CanvasObject {
 	return container.New(&filaEsqueleto{},
 		ui.NuevoEsqueletoRedondo(LadoPuntoFila),
-		agenda.Bloque(5*tema.Rem, 0.875*tema.Rem, false),
-		agenda.Bloque(8*tema.Rem, tema.Rem, false))
+		ui.NuevoEsqueleto(5*tema.Rem, 0.875*tema.Rem),
+		ui.NuevoEsqueleto(8*tema.Rem, tema.Rem))
 }
 
 // filaEsqueleto coloca el esqueleto con la geometría de `filaEventoDia`.
@@ -367,7 +365,16 @@ var (
 	_ fyne.Draggable  = (*mesCompacto)(nil)
 	_ fyne.Accessible = (*mesCompacto)(nil)
 	_ fyne.Scrollable = (*mesCompacto)(nil)
+
+	_ ui.ZonaSinRefresco = (*mesCompacto)(nil)
+	_ ui.ZonaSinRefresco = (*asaMes)(nil)
 )
+
+// ZonaSinRefresco: un toque que EMPIEZA en la hoja (iniciales, rejilla, columna de
+// semana o asa) es del asa o del deslizar de mes, nunca de tirar para refrescar, aunque
+// la lista esté arriba del todo. Refresca la lista de debajo (`data-sin-refresco` en la
+// web).
+func (m *mesCompacto) ZonaSinRefresco() {}
 
 func nuevoMesCompacto(p *Pantalla, eventos []Ocurrencia) *mesCompacto {
 	m := &mesCompacto{p: p}
@@ -416,7 +423,9 @@ func (m *mesCompacto) altoReposo() float32 {
 func (m *mesCompacto) alto() float32 {
 	switch {
 	case m.arrastrando:
-		return AlturaArrastre(m.p.posicion(), m.dyAsa, len(m.semanas))
+		// Con el estirón elástico por debajo del mes: tirar del asa hacia abajo con la
+		// rejilla entera cede y, al soltar, vuelve; nunca refresca.
+		return AlturaVisible(m.p.posicion(), m.dyAsa, len(m.semanas))
 	case m.animando:
 		return m.altoAnim
 	}
@@ -436,7 +445,7 @@ func (m *mesCompacto) arrancar() {
 		p.animHoja = nil
 	}
 	desde, hasta := p.altoHoja, m.altoReposo()
-	if !p.hayAltoHoja || desde == hasta || ui.SinMovimiento {
+	if !p.hayAltoHoja || desde == hasta || ui.MenosMovimiento() {
 		m.anotarAlto()
 		return
 	}
@@ -945,6 +954,9 @@ var (
 	_ fyne.Focusable = (*asaMes)(nil)
 )
 
+// ZonaSinRefresco: el asa, también por sí sola (va en la ruta del toque).
+func (a *asaMes) ZonaSinRefresco() {}
+
 func nuevaAsaMes(p *Pantalla, m *mesCompacto) *asaMes {
 	a := &asaMes{m: m}
 	vista := p.t("view.month", nil)
@@ -1000,6 +1012,7 @@ func (a *asaMes) Dragged(e *fyne.DragEvent) {
 		m.p.animHoja = nil
 	}
 	m.animando, m.arrastrando, m.dyAsa = false, true, a.dy
+	m.p.hojaEnGesto = true // el dedo es del asa: nada más refresca mientras
 	m.reajustar()
 }
 
@@ -1008,6 +1021,7 @@ func (a *asaMes) DragEnd() {
 	m, p := a.m, a.m.p
 	dy, v := a.dy, VelocidadFinal(a.muestras)
 	a.dy, a.inicio, a.muestras = 0, time.Time{}, nil
+	p.hojaEnGesto = false
 	if !m.arrastrando {
 		return // un temblor: ni arrastre ni toque
 	}

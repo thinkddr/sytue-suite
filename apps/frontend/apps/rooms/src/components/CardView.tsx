@@ -16,14 +16,26 @@ import { Icon } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import type { MessageCard } from '../client/chatApi.js';
 import type { T } from '../i18n/index.js';
+import { disponibleConCifrado } from '../lib/cifrado.js';
 
 interface Props {
   card: MessageCard;
   messageId: string;
   /** Marca (add) o retira un valor de la tarjeta. Ausente = tarjeta de solo lectura. */
   onVote?: (messageId: string, value: string, add: boolean) => void;
+  /**
+   * La conversación va cifrada de extremo a extremo: los votos los cuenta el servicio,
+   * que no ve el mensaje, así que la tarjeta se pinta en solo lectura y dice por qué
+   * (`lib/cifrado.ts`). Manda sobre `onVote`.
+   */
+  cifrado?: boolean;
   locale: Locale;
   t: T;
+}
+
+/** La línea bajo una tarjeta que no se puede votar por el cifrado. */
+function NotaCifrado({ t, class: cls }: { t: T; class: string }): JSX.Element {
+  return <p class={`sytue-meta ${cls}`}>{t('matrix.unsupported')}</p>;
 }
 
 /** Voto del usuario y total de un valor concreto de la tarjeta. */
@@ -38,7 +50,7 @@ function totalVotes(card: MessageCard): number {
 }
 
 /** Encuesta: opciones con barra de resultado, recuento y porcentaje en texto. */
-function Poll({ card, messageId, onVote, t }: Omit<Props, 'locale'>): JSX.Element {
+function Poll({ card, messageId, onVote, cifrado, t }: Omit<Props, 'locale'>): JSX.Element {
   const total = totalVotes(card);
   return (
     <div class="border-border bg-surface-sunken mt-1.5 rounded-md border p-2.5">
@@ -82,12 +94,13 @@ function Poll({ card, messageId, onVote, t }: Omit<Props, 'locale'>): JSX.Elemen
         {t('card.pollTotal', { count: total })}
         {card.multi ? ` · ${t('card.pollMulti')}` : ''}
       </p>
+      {cifrado ? <NotaCifrado t={t} class="mt-1.5" /> : null}
     </div>
   );
 }
 
 /** Tarea: casilla «hecha», responsable y fecha límite. */
-function Task({ card, messageId, onVote, locale, t }: Props): JSX.Element {
+function Task({ card, messageId, onVote, cifrado, locale, t }: Props): JSX.Element {
   const { count, mine } = voteOf(card, 'done');
   const done = count > 0;
   const due = card.due ? new Date(card.due) : null;
@@ -122,14 +135,21 @@ function Task({ card, messageId, onVote, locale, t }: Props): JSX.Element {
           })}
         </span>
       ) : null}
+      {/* `w-full`: la nota parte a su propia línea dentro del `flex-wrap`. */}
+      {cifrado ? <NotaCifrado t={t} class="w-full" /> : null}
     </div>
   );
 }
 
 export function CardView(props: Props): JSX.Element | null {
-  if (props.card.kind === 'task') return <Task {...props} />;
+  // Sin votar no hay mandos: quitar `onVote` es lo que ya deja la tarjeta en solo
+  // lectura (botones `disabled`), y `cifrado` solo queda para pintar la nota.
+  const { onVote, cifrado: _cifrado, ...base } = props;
+  const sinVoto = !disponibleConCifrado('votar', props.cifrado ?? false);
+  const efectiva: Props = { ...base, ...(sinVoto ? { cifrado: true } : onVote ? { onVote } : {}) };
+  if (props.card.kind === 'task') return <Task {...efectiva} />;
   if (props.card.kind === 'poll' && (props.card.options?.length ?? 0) > 0) {
-    const { locale: _locale, ...rest } = props;
+    const { locale: _locale, ...rest } = efectiva;
     return <Poll {...rest} />;
   }
   return null;

@@ -5,7 +5,62 @@
 import type { Catalog } from './catalog.js';
 
 export const nl: Catalog = {
+  'matrix.reset': 'Ik heb geen ander apparaat',
+  'matrix.resetAction': 'Versleuteling opnieuw instellen',
+  'matrix.resetBody':
+    'De versleuteling van je account wordt opnieuw ingesteld. Eerdere versleutelde berichten blijven alleen leesbaar op apparaten die ze al hebben, en je moet je andere apparaten en je contacten opnieuw verifiëren.',
+  'matrix.resetUnderstood':
+    'Ik begrijp dat ik de toegang tot eerdere versleutelde berichten kan verliezen',
+  'matrix.unknownKey':
+    'Dit account werd versleuteld voordat Sytue de sleutel met je aanmelding beschermde. Verifieer dit apparaat vanaf een ander apparaat waarop je al bent aangemeld.',
+  'matrix.unlockTitle': 'Je versleutelde gegevens openen',
+  'matrix.unlockBody':
+    'Bevestig met je passkey of je Sytue-wachtwoord dat jij het bent. Dit wordt op dit apparaat gecontroleerd: niemand anders kan je gegevens openen.',
+  'matrix.protectTitle': 'Je versleutelde gegevens beschermen',
+  'matrix.protectBody':
+    'Kies hoe je je versleutelde gegevens op je andere apparaten opent: met je passkey of je Sytue-wachtwoord. Alleen jij kunt ze openen.',
+  'matrix.usePasskey': 'Passkey gebruiken',
+  'matrix.usePassword': 'Wachtwoord gebruiken',
+  'matrix.password': 'Sytue-wachtwoord',
+  'matrix.passwordConfirm': 'Herhaal het wachtwoord',
+  'matrix.passwordMismatch': 'De wachtwoorden komen niet overeen.',
+  'matrix.unlockWrong': 'Dat werkte niet. Probeer het opnieuw.',
+  'matrix.passkeyUnsupported':
+    'Deze passkey kan geen versleutelde gegevens openen. Gebruik je wachtwoord.',
+  // Device verification and recovery shared by the suite.
+  'matrix.allowStorageTitle': 'Versleutelde verwerking toestaan',
+  'matrix.allowStorageBody':
+    'Laat dit geverifieerde apparaat nieuwe versleutelde gegevens voor deze app verwerken.',
+  'matrix.allowStorageAction': 'Dit apparaat toestaan',
+  'matrix.choosePerson': 'Kies iemand in dit kanaal',
+  'matrix.notices': 'Licenties van derden',
+  'action.cancel': 'Annuleren',
+  'action.done': 'Klaar',
+  'matrix.auth': 'Bevestig je identiteit',
+  'matrix.authContinue': 'Ik ben ingelogd',
+  'matrix.compare': 'Vergelijk deze emoji op beide apparaten.',
+  'matrix.connect': 'Dit apparaat instellen',
+  'matrix.devices': 'Je apparaten',
+  'matrix.failed': 'De versleuteling kon niet worden ingesteld. Probeer het opnieuw.',
+  'matrix.incoming': 'Dit apparaat verifiëren',
+  'matrix.match': 'Ze komen overeen',
+  'matrix.mismatch': 'Ze komen niet overeen',
+  'matrix.revoke': 'Apparaat afmelden',
+  'matrix.subtitle':
+    'Berichten en bestanden worden op je apparaten versleuteld. Alleen geverifieerde apparaten kunnen ze lezen.',
+  'matrix.tab':
+    'Rooms is geopend in een ander tabblad. Sluit het om dit apparaat hier te gebruiken.',
+  'matrix.title': 'End-to-end-versleuteling',
+  'matrix.trusted': 'Apparaat geverifieerd',
+  'matrix.verify': 'Met een ander apparaat verifiëren',
+  'matrix.verifyPeopleFirst':
+    'Verifieer de mensen in dit gesprek voordat je je eerste bericht verstuurt.',
+  'matrix.verifyPerson': 'Een persoon verifiëren',
+  'matrix.waiting': 'Wachten op het andere apparaat…',
+  'state.loading': 'Laden…',
+
   'action.retry': 'Opnieuw proberen',
+  'account.connectFailed': 'Dit account kon niet worden gekoppeld.',
   'error.connection': 'Controleer je verbinding en probeer het opnieuw.',
   'ui.save': 'Opslaan',
   'ui.cancel': 'Annuleren',
@@ -17,6 +72,7 @@ export const nl: Catalog = {
   'ui.mainNav': 'Hoofdnavigatie',
   'ui.openNav': 'Navigatie openen',
   'ui.closeNav': 'Navigatie sluiten',
+  'ui.settingsIndex': 'Onderdelen van deze pagina',
   'ui.backToList': 'Terug naar de lijst',
   'ui.suiteOpen': 'Sytue: apps, zoeken, meldingen en account',
   'ui.suiteClose': 'Terug naar de app',
@@ -25,6 +81,14 @@ export const nl: Catalog = {
   'ui.meter.full': 'vol',
   'ui.bulk.region': 'Acties voor de selectie',
   'ui.bulk.clear': 'Selectie wissen',
+
+  'ui.copy.copy': 'Kopiëren',
+  'ui.copy.copyLabel': '{label} kopiëren',
+  'ui.copy.copied': 'Gekopieerd',
+  'ui.copy.copiedLabel': 'Gekopieerd: {label}',
+  'ui.copy.failed': 'Kopiëren is niet gelukt. Selecteer de waarde en kopieer die handmatig.',
+  'ui.copy.secret': 'geheim',
+  'ui.migas.ocultas': 'Verborgen mappen tonen',
   'ui.wizard.back': 'Vorige',
   'ui.wizard.next': 'Doorgaan',
   'ui.wizard.cancel': 'Annuleren',
@@ -36,6 +100,13 @@ export const nl: Catalog = {
   'shell.appSwitcher': 'Sytue One — apps van de suite',
   'shell.apps': 'Sytue One-apps',
   'shell.shortcutHint': 'Sneltoets: {keys}',
+  'shell.shortcuts.title': 'Sneltoetsen',
+  'shell.shortcuts.group': 'Hele suite',
+  'shell.shortcuts.search': 'Zoeken in Sytue One',
+  'shell.shortcuts.help': 'Deze lijst tonen',
+  'shell.shortcuts.close': 'Een dialoogvenster of menu sluiten',
+  'shell.shortcuts.contextMenu': 'Contextmenu openen',
+  'shell.shortcuts.key.shift': 'Shift',
   'shell.launchAtLogin': 'Openen bij inloggen',
   'shell.mountDrive': 'Drive met deze computer verbinden',
   'shell.update.check': 'Zoeken naar updates',
@@ -62,6 +133,9 @@ export const nl: Catalog = {
   'shell.lock.reasonNotebook': 'je versleutelde notitieboek openen',
   'shell.lock.faceIdUsage':
     'Sytue gebruikt Face ID om je sessie te ontgrendelen wanneer je de app opent.',
+  'shell.photos.libraryUsage':
+    'Sytue leest de foto’s en video’s op dit apparaat om er een back-up van te maken in je Sytue Drive.',
+  'shell.photos.libraryAddUsage': 'Sytue bewaart de foto’s die je downloadt in je fotobibliotheek.',
   'shell.widgets.wake': 'Widgets bijwerken als de app gesloten is',
   'shell.widgets.wakeHelp':
     'Als er iets van jou verandert, wekt Sytue de app met een lege melding via Apple zodat die zijn widget kan vernieuwen. Apple ziet welke app en wanneer, nooit wat er veranderd is.',
@@ -114,6 +188,13 @@ export const nl: Catalog = {
   'search.kind.contact': 'contacten',
   'search.kind.note': 'notities',
   'search.kind.channel': 'kanalen',
+  'suitePalette.dialog': 'Ga naar of zoek',
+  'suitePalette.input': 'Zoeken of ga naar',
+  'suitePalette.placeholder': 'Zoeken in Sytue One of ga naar…',
+  'suitePalette.typeToSearch': 'Typ om in heel Sytue One te zoeken',
+  'suitePalette.hint.move': 'verplaatsen',
+  'suitePalette.hint.open': 'openen',
+  'suitePalette.hint.close': 'sluiten',
   'notifications.title': 'Meldingen',
   'notifications.viewAll': 'Alle meldingen bekijken',
   'notifications.historic': 'Van vóór het meldingenlogboek',
@@ -157,6 +238,10 @@ export const nl: Catalog = {
   'notifications.kind.docs.signature.requested': '{actor} vraagt je om “{name}” te ondertekenen',
   'notifications.kind.docs.signature.completed': '{actor} heeft “{name}” ondertekend',
   'notifications.kind.docs.signature.declined': '{actor} heeft geweigerd “{name}” te ondertekenen',
+  'notifications.kind.docs.signature.expired':
+    'Het verzoek om “{name}” te ondertekenen is verlopen',
+  'notifications.kind.docs.signature.reminder':
+    '{actor} wacht nog steeds tot je “{name}” ondertekent',
   'notifications.kind.docs.access.granted':
     '{actor} heeft je bewerkingstoegang tot “{name}” gegeven',
   'notifications.kind.erp.task.assigned': '{actor} heeft je ‘{title}’ toegewezen',
@@ -204,6 +289,18 @@ export const nl: Catalog = {
   'account.color.petroleo': 'Petrol',
   'account.color.cobalto': 'Kobaltblauw',
   'account.color.app': 'Per app',
+  'userColor.red': 'Rood',
+  'userColor.clay': 'Oranje',
+  'userColor.brass': 'Oker',
+  'userColor.sage': 'Olijf',
+  'userColor.green': 'Groen',
+  'userColor.teal': 'Blauwgroen',
+  'userColor.cyan': 'Petrol',
+  'userColor.blue': 'Blauw',
+  'userColor.indigo': 'Indigo',
+  'userColor.plum': 'Paars',
+  'userColor.rose': 'Roze',
+  'userColor.slate': 'Grijs',
   'account.forma': 'Vorm',
   'account.forma.marco': 'Kader',
   'account.forma.carril': 'Rail',
@@ -312,6 +409,7 @@ export const nl: Catalog = {
     'Dit blad is beveiligd: de cellen kunnen pas worden gewijzigd als de beveiliging is opgeheven.',
   'readOnly.password': 'Wachtwoord',
   'notifications.kind.erp.access.requested': '{actor} vraagt om “{name}” te bewerken',
+  'notifications.kind.erp.approval.requested': '{actor} vraagt je “{name}” goed te keuren',
   'notifications.kind.erp.access.granted':
     '{actor} heeft je bewerkingstoegang tot “{name}” gegeven',
   'readOnly.module': 'Alleen-lezen in “{name}”: je kunt het zien, maar niet wijzigen.',
@@ -397,4 +495,7 @@ export const nl: Catalog = {
     'Om ‘{name}’ te openen, wordt het bestand geüpload naar je Sytue One-account.',
   'localFile.confirmUpload.remember': 'Mijn keuze op dit apparaat onthouden',
   'localFile.confirmUpload.confirm': 'Uploaden en openen',
+  'action.back': 'Terug',
+  'action.close': 'Sluiten',
+  'action.copy': 'Kopiëren',
 };

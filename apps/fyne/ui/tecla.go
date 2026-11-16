@@ -3,6 +3,8 @@
 
 package ui
 
+// paridad-web: apps/frontend/packages/ui/src/components/Kbd.tsx
+
 import (
 	"image/color"
 	"runtime"
@@ -33,24 +35,27 @@ func atajoPara(goos, atajo string) string {
 	return strings.NewReplacer("Ctrl+Y", "⌘⇧Z", "Ctrl+", "⌘", "Ctrl ", "⌘", "Mayús+", "⇧").Replace(atajo)
 }
 
-// Tecla es el `<kbd>` de la suite: la pastilla con el nombre de un atajo.
+// Tecla es el `<kbd>` de la suite: la pastilla con el nombre de un atajo. Es la `Kbd`
+// de `@sytue/ui`.
 //
 // Es DECORACIÓN, siempre: en la web va con `aria-hidden` porque la tecla la nombra el
 // `aria-label` o el `title` del control que la lleva. Quien la pinta tiene que seguir
 // nombrando el atajo con palabras, no dejarlo en el dibujo.
 //
-// # Por qué es configurable y no hay una sola pastilla
+// # Dos presets, por el fondo en el que se posa
 //
-// Porque la web no tiene una sola: `GlobalSearch.tsx` la pinta como píldora perfilada
-// sobre el cromo (`⌘K`, `text-[11px]`, borde `chrome-border`), `ChatApp.tsx` la pinta
-// cuadrada, más pequeña y con el borde a 40 % de opacidad (`Ctrl+G`, `text-2xs`), y
-// `ShortcutsModal.tsx` la pinta con fondo `bg-subtle` y caja mínima de 24. La paridad
-// manda sobre la reutilización (`docs/CONVENTIONS.md` §13.2): lo que se comparte es la
-// pieza —caja, texto centrado, medida única—, no las medidas.
+// La web tenía una receta de `<kbd>` por sitio y ahora tiene dos tonos de una sola
+// medida (`h-5 min-w-5 px-1.5 rounded border text-xs`, cifras tabulares): `surface`
+// sobre el papel y `chrome` sobre el cromo. Aquí son TeclaSuperficie y TeclaCromo, y
+// las teclas de atajo se crean con ellas.
 //
-// ponytail: la web pone `font-mono` en dos de las tres y la suite no embebe ninguna
-// monoespaciada (solo los cinco Figtree). Se pinta con la cara que se le pida; el día
-// que haya una mono en `apps/nucleo/fuentes`, se cambia aquí y en un sitio.
+// Los campos siguen abiertos porque la misma pieza —caja, texto centrado, medida
+// única— sirve a pastillas que no son teclas (la cuenta de módulos del ERP); una TECLA
+// que necesite otros colores o medidas es un tercer preset aquí y un tercer tono en
+// `Kbd.tsx`, no unos campos retocados en el sitio que la usa.
+//
+// La web pinta las teclas con la cara de la suite, no con una mono: Fyne no embebe
+// ninguna (solo los cinco Figtree) y la paridad manda.
 type Tecla struct {
 	widget.BaseWidget
 
@@ -60,23 +65,60 @@ type Tecla struct {
 	// Fondo, Tinta y Borde son TOKENS. Fondo y Borde vacíos dejan la caja
 	// transparente y sin perfil.
 	Fondo, Tinta, Borde string
-	// OpacidadBorde es el `/40` del borde de Rooms. 0 vale por 1.
-	OpacidadBorde float32
+	// Debajo es el token sobre el que se compone Fondo cuando Fondo es un velo
+	// translúcido (el `bg-chrome-hover` de un botón del carril): `Caja` pinta el filete
+	// DEBAJO del relleno, y un relleno translúcido lo dejaría ver entero.
+	Debajo string
 	// Relleno es el `px-…` y el `py-…`; Radio, el de la caja.
 	RellenoX, RellenoY float32
 	Radio              float32
-	// Minimo es el `min-w-6 h-6` de la ventana de atajos: con 0 la pastilla mide lo
-	// que ocupe su texto con el relleno.
+	// Minimo es el `h-5 min-w-5` de los presets: con 0 la pastilla mide lo que ocupe
+	// su texto con el relleno.
 	Minimo fyne.Size
 }
 
 var _ fyne.Widget = (*Tecla)(nil)
 
-// NuevaTecla crea la pastilla y la extiende. Los campos se rellenan a continuación:
-// cada sitio de la web tiene los suyos y no hay un juego por defecto que valga.
+// NuevaTecla crea la pastilla desnuda y la extiende; los campos se rellenan a
+// continuación. Para una tecla de atajo, TeclaSuperficie o TeclaCromo.
 func NuevaTecla(texto string, e tema.Escalon, p Peso) *Tecla {
 	t := &Tecla{Texto: texto, Escalon: e, Peso: p, Radio: tema.RadioSM}
 	t.ExtendBaseWidget(t)
+	return t
+}
+
+// LadoTecla es el `h-5 min-w-5` de los dos presets: una letra suelta sale cuadrada.
+var LadoTecla = tema.Espacio(5)
+
+// teclaDeAtajo es lo común a los dos presets: `text-xs` normal, `px-1.5`, `rounded`
+// (el radio `sm`) y la caja mínima de LadoTecla.
+func teclaDeAtajo(texto string) *Tecla {
+	t := NuevaTecla(texto, tema.TextoXS, Normal)
+	t.RellenoX, t.Radio = tema.Espacio(1.5), tema.RadioSM
+	t.Minimo = fyne.NewSize(LadoTecla, LadoTecla)
+	return t
+}
+
+// TeclaSuperficie es `<Kbd>` (tono `surface`): la tecla sobre el papel —diálogos, pies
+// de paleta, barras de herramientas—, con fondo `bg-subtle`, filete `border` y tinta
+// `text-muted`.
+func TeclaSuperficie(texto string) *Tecla {
+	t := teclaDeAtajo(texto)
+	t.Fondo, t.Tinta, t.Borde = "bg-subtle", "text-muted", "border"
+	return t
+}
+
+// TeclaCromo es `<Kbd tone="chrome">`: la tecla sobre la barra o el menú lateral, con
+// filete `chrome-border` y tinta `on-chrome-muted`.
+//
+// La web no le pone fondo y deja ver el cromo. Aquí `Caja` pinta el filete como un
+// rectángulo RELLENO debajo del de dentro, así que sin fondo la pastilla saldría maciza
+// del color del filete: el fondo es el del carril (TokenCarril), que es lo que hay
+// detrás en el menú. Quien la posa sobre otra cosa —el campo del buscador— cambia
+// `Fondo` por el token de lo que tiene debajo, y solo ese.
+func TeclaCromo(texto string) *Tecla {
+	t := teclaDeAtajo(texto)
+	t.Fondo, t.Tinta, t.Borde = TokenCarril(), "on-chrome-muted", "chrome-border"
 	return t
 }
 
@@ -103,12 +145,12 @@ func (t *Tecla) MinSize() fyne.Size {
 func (t *Tecla) colores(v tema.Variante) (relleno, borde color.NRGBA) {
 	if t.Fondo != "" {
 		relleno = tema.Color(t.Fondo, v)
+		if t.Debajo != "" {
+			relleno = tokens.SobreSRGB(relleno, tema.Color(t.Debajo, v))
+		}
 	}
 	if t.Borde != "" {
 		borde = tema.Color(t.Borde, v)
-		if o := t.OpacidadBorde; o > 0 && o < 1 {
-			borde = tokens.ConAlfa(borde, float64(o))
-		}
 	}
 	return relleno, borde
 }

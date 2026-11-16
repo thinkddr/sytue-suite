@@ -394,7 +394,7 @@ func TestLasTresPiezasVanArribaALaDerecha(t *testing.T) {
 		}
 	}
 	if b.buscador.campo.Size().Width != AnchoBuscadorBarra {
-		t.Errorf("el buscador mide %v y el ancho canónico (`max-w-[30rem]` con el rem de 14) es %v",
+		t.Errorf("el buscador mide %v y el ancho canónico (`max-w-[30rem]` con el rem de 16) es %v",
 			b.buscador.campo.Size().Width, AnchoBuscadorBarra)
 	}
 }
@@ -710,7 +710,9 @@ func TestElBuscadorSeAbreYSeCierraSinRobarElFoco(t *testing.T) {
 // terminó», ci-desktop de v3.19.7). Si llega antes, vuelve en cuanto está listo.
 func esperar(t *testing.T, listo func() bool) {
 	t.Helper()
-	limite := time.Now().Add(10 * time.Second)
+	// 30 s y no 10: con -race y la máquina cargada (varias verificaciones a la vez) la
+	// pila de cuarenta avisos de TestLaPilaDeAvisosNoCorreCarreraConSuReloj pasaba de 10.
+	limite := time.Now().Add(30 * time.Second)
 	for time.Now().Before(limite) {
 		fyne.DoAndWait(func() {})
 		if listo() {

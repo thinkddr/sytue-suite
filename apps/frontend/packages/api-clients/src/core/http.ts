@@ -80,8 +80,92 @@ export class ResponseTooLargeError extends Error {
   }
 }
 
-async function responseText(res: Response, maxBytes?: number): Promise<string> {
-  if (maxBytes === undefined) return res.text();
+/** An exact source revision cannot silently shrink or grow while being imported. */
+export class ResponseLengthError extends Error {
+  constructor() {
+    super('HTTP response length does not match the expected source');
+    this.name = 'ResponseLengthError';
+  }
+}
+
+/** Inspect headers without acquiring or cancelling the caller's body. */
+export function hasExpectedResponseLengthHeaders(response: Response, expected: number): boolean {
+  const advertised = response.headers.get('content-length');
+  return (
+    Number.isSafeInteger(expected) &&
+    expected >= 0 &&
+    !response.headers.has('content-encoding') &&
+    (advertised === null || advertised === String(expected)) &&
+    (!!response.body || expected === 0)
+  );
+}
+
+/** Check declared headers without wrapping the byte stream. The consumer must
+ * still verify actual length and its source digest after reading. */
+export async function validateResponseLengthHeaders(
+  response: Response,
+  expected: number,
+): Promise<Response> {
+  if (!hasExpectedResponseLengthHeaders(response, expected)) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new ResponseLengthError();
+  }
+  return response;
+}
+
+export async function exactResponseLength(response: Response, expected: number): Promise<Response> {
+  await validateResponseLengthHeaders(response, expected);
+  if (!response.body) return response;
+  const reader = response.body.getReader();
+  let received = 0,
+    released = false;
+  const release = () => {
+    if (!released) {
+      released = true;
+      reader.releaseLock();
+    }
+  };
+  const body = new ReadableStream<Uint8Array<ArrayBuffer>>(
+    {
+      async pull(controller) {
+        try {
+          const { done, value } = await reader.read();
+          if (done) {
+            if (received !== expected) throw new ResponseLengthError();
+            release();
+            controller.close();
+            return;
+          }
+          if (value.byteLength > expected - received) {
+            value.fill(0);
+            throw new ResponseLengthError();
+          }
+          received += value.byteLength;
+          controller.enqueue(value);
+        } catch (error) {
+          await reader.cancel(error).catch(() => undefined);
+          release();
+          controller.error(error);
+        }
+      },
+      async cancel(reason) {
+        try {
+          await reader.cancel(reason);
+        } finally {
+          release();
+        }
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+}
+
+async function checkResponseBudget(res: Response, maxBytes: number): Promise<void> {
   const encoding = res.headers.get('content-encoding');
   const advertised = res.headers.get('content-length')?.trim();
   // Fetch exposes decompressed bytes; a compressed Content-Length measures a different body.
@@ -94,6 +178,11 @@ async function responseText(res: Response, maxBytes?: number): Promise<string> {
     await res.body?.cancel().catch(() => undefined);
     throw new ResponseTooLargeError(maxBytes);
   }
+}
+
+async function responseText(res: Response, maxBytes?: number): Promise<string> {
+  if (maxBytes === undefined) return res.text();
+  await checkResponseBudget(res, maxBytes);
   if (!res.body) return '';
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -238,6 +327,42 @@ export class HttpClient {
       throw new HttpError(res.status, res.statusText, url, text);
     }
     return res;
+  }
+
+  /** Bounded binary bodies for encrypted blocks; never materialize an unbounded response. */
+  async bytes(
+    opts: RequestOptions & { maxResponseBytes: number },
+  ): Promise<Uint8Array<ArrayBuffer>> {
+    const res = await this.request(opts);
+    await checkResponseBudget(res, opts.maxResponseBytes);
+    if (!res.body) return new Uint8Array();
+    const reader = res.body.getReader(),
+      chunks: Uint8Array<ArrayBuffer>[] = [];
+    let bytes = 0;
+    try {
+      for (;;) {
+        opts.signal?.throwIfAborted();
+        const { done, value } = await reader.read();
+        opts.signal?.throwIfAborted();
+        if (done) break;
+        if (value.byteLength > opts.maxResponseBytes - bytes)
+          throw new ResponseTooLargeError(opts.maxResponseBytes);
+        bytes += value.byteLength;
+        chunks.push(value.slice());
+      }
+      const out = new Uint8Array(bytes);
+      let offset = 0;
+      for (const chunk of chunks) {
+        out.set(chunk, offset);
+        offset += chunk.length;
+      }
+      return out;
+    } catch (error) {
+      await reader.cancel(error).catch(() => undefined);
+      throw error;
+    } finally {
+      reader.releaseLock();
+    }
   }
 
   async json<T>(opts: RequestOptions): Promise<T> {

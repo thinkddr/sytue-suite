@@ -175,23 +175,39 @@ const (
 	EdEmitirCast         // cast
 	EdDraw               // draw
 	EdEye                // eye
+	EdEyeOff             // eyeOff
 	EdPointer            // pointer
 	EdEraser             // eraser
 	EdOpenInApp          // openInApp
 	EdNombreDefinido     // definedName
 	EdLapiz              // pencil
+	EdBrocha             // formatPainter
+	EdMayusculas         // changeCase
+	EdCasilla            // checkbox
+	EdDesplegable        // dropdown
+	EdRellenar           // formFill
+	EdTeclado            // keyboard
+	EdAnchoCol           // colWidth
+	EdAltoFila           // rowHeight
 	// numEd va SIEMPRE el último y no es un icono: es cuántos hay.
 	numEd
 )
 
 // catalogoEd va indexado por el propio Ed, como `catalogo`.
 var catalogoEd = [...]entrada{
+	EdCasilla:         {"checkbox", "M6 4.5h12a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5V6A1.5 1.5 0 0 1 6 4.5Z M8.5 12l2.5 2.5 4.5-5.5"},
+	EdDesplegable:     {"dropdown", "M5 6.5h14a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 16V8A1.5 1.5 0 0 1 5 6.5Z M14.5 11l1.75 1.75L18 11"},
+	EdTeclado:         {"keyboard", "M4 6.5h16a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 16V8A1.5 1.5 0 0 1 4 6.5Z M6.5 10h.01 M10 10h.01 M14 10h.01 M17.5 10h.01 M8 14h8"},
+	EdRellenar:        {"formFill", "M5 4.5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1Z M7.5 9h9 M7.5 12.5h4.5 M7.5 16h3 M13 15.5l1.5 1.5 3-3.5"},
+	EdBrocha:          {"formatPainter", "M5.5 4h11a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z M17.5 6.5H20v5h-8v3.5 M11 15h2v5h-2Z"},
+	EdMayusculas:      {"changeCase", "M3.5 18 8 6l4.5 12 M5 14h6 M20 15.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Z M20 13v5"},
 	EdLapiz:           {"pencil", "M4.5 19.5 4 20l.5-4L15 5.5a1.8 1.8 0 0 1 2.6 0l.9.9a1.8 1.8 0 0 1 0 2.6L8 19.5Z M13.5 7l3.5 3.5"},
 	EdNombreDefinido:  {"definedName", "M3.5 12 8.5 6.5h12v11h-12Z M7.5 12h.01 M11.5 12h5.5"},
 	EdOpenInApp:       {"openInApp", "M4 4.5h16a1 1 0 0 1 1 1V15a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5.5a1 1 0 0 1 1-1Z M9 20h6 M12 16v4"},
 	EdEraser:          {"eraser", "M8 19h11 M4.5 14.5 13 6a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L10.5 19H8l-3.5-3.5a1.4 1.4 0 0 1 0-1Z"},
 	EdPointer:         {"pointer", "M5.5 3.5 18.5 10l-5.6 1.9L10.7 18Z"},
 	EdEye:             {"eye", "M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z M12 9.3a2.7 2.7 0 1 0 0 5.4 2.7 2.7 0 0 0 0-5.4Z"},
+	EdEyeOff:          {"eyeOff", "M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z M12 9.3a2.7 2.7 0 1 0 0 5.4 2.7 2.7 0 0 0 0-5.4Z M4 4l16 16"},
 	EdDraw:            {"draw", "M4 20l1-4.2L16.6 4.2a2 2 0 0 1 2.8 0l.4.4a2 2 0 0 1 0 2.8L8.2 19Z M14.5 6.3l3.2 3.2"},
 	EdEmitirCast:      {"cast", "M3.5 6h17v12h-5 M3.5 18h.01 M3.5 14.5a3.5 3.5 0 0 1 3.5 3.5 M3.5 11a7 7 0 0 1 7 7"},
 	EdNinguno:         {"", ""},
@@ -327,6 +343,8 @@ var catalogoEd = [...]entrada{
 	EdCorrespondencia: {"mailMerge", "M3.5 6.5h17v11h-17Z M4 7l8 6 8-6"},
 	EdMarcaAgua:       {"watermark", "M5.5 4.5h9L18.5 8.5v11a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-14a1 1 0 0 1 1-1Z M14.5 4.5V8.5h4 M8 17l1.4-5 1.6 3 1.6-3 1.4 5"},
 	EdBordePagina:     {"pageBorder", "M5 3.5h14a1.5 1.5 0 0 1 1.5 1.5v14a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5V5A1.5 1.5 0 0 1 5 3.5Z M8 7h8 M8 17h8 M8 7v10 M16 7v10"},
+	EdAnchoCol:        {"colWidth", "M4 4v16 M20 4v16 M7 12h10 M9.5 9.5 7 12l2.5 2.5 M14.5 9.5 17 12l-2.5 2.5"},
+	EdAltoFila:        {"rowHeight", "M4 4h16 M4 20h16 M12 7v10 M9.5 9.5 12 7l2.5 2.5 M9.5 14.5 12 17l2.5-2.5"},
 	EdRefCruzada:      {"xref", "M8.5 5.5H6a1.5 1.5 0 0 0-1.5 1.5v10A1.5 1.5 0 0 0 6 18.5h2.5 M15.5 5.5H18a1.5 1.5 0 0 1 1.5 1.5v10a1.5 1.5 0 0 1-1.5 1.5h-2.5 M8.5 12h6 M12 9.5l3 2.5-3 2.5"},
 }
 

@@ -98,9 +98,9 @@ const variants: Record<ButtonVariant, string> = {
  * el borde de uno activaría el otro. Un fallo así se diagnostica fatal.
  *
  * `max(44px,2.75rem)` Y NO `min-h-11`, que es lo que había. `11` son 2.75rem, y
- * eso solo mide 44 px si la raíz del navegador está en 16: con la base en 14 —un
- * ajuste de accesibilidad corriente— el objetivo quedaba en 38,5 px, por debajo
- * del mínimo que esta regla existe para garantizar. Justo a quien reduce el
+ * eso solo mide 44 px con la base de letra en 16, la de la suite. Si la persona la
+ * baja a 14 —un ajuste de accesibilidad corriente—, el objetivo queda en 38,5 px,
+ * por debajo del mínimo que esta regla existe para garantizar. Justo a quien reduce el
  * tamaño de letra, que suele ser quien más precisión necesita.
  *
  * El `max` conserva la otra mitad: a quien SUBE la base a 20, `2.75rem` son 55 px
@@ -111,15 +111,16 @@ const sizes: Record<ButtonSize, string> = {
   // El gap va en la TALLA y no en la base: dos utilidades `gap-*` en el mismo elemento
   // se resuelven por el orden de la hoja generada, no por el de la cadena de clases, así
   // que un `gap-1` local no habría ganado de forma fiable al `gap-2` de la base.
-  // Suelo de 24 px en px por lo mismo que IconButton `sm`: `h-6` son 21 px con la
-  // raíz a 14 (medido: «Apagar»/«Encender» del ERP, 52×21).
+  // Suelo de 24 px en px por lo mismo que IconButton `sm`: `h-6` son 1.5rem y bajan
+  // de 24 en cuanto baja la base de letra (con 1 rem en 14 px se midió
+  // «Apagar»/«Encender» del ERP en 52×21).
   xs: 'h-6 min-h-[24px] gap-1 px-2 text-xs pointer-coarse:min-h-[max(44px,2.75rem)]',
   sm: 'h-8 gap-2 px-3 text-sm pointer-coarse:min-h-[max(44px,2.75rem)]',
   md: 'h-9 gap-2 px-4 text-base pointer-coarse:min-h-[max(44px,2.75rem)]',
   // `lg` LLEVA LA RESERVA COMO LOS DEMÁS. Se había dejado fuera dando por hecho
-  // que `h-11` ya eran los 44px del dedo, y en esta suite NO: la raíz está en
-  // 14px, así que 2.75rem son 38,5. Medido en el portal en un teléfono: el CTA
-  // principal, 38,5px de alto.
+  // que `h-11` ya eran los 44px del dedo, y solo lo son con la base de letra en
+  // 16: cuando la suite tenía 1 rem en 14 px, 2.75rem eran 38,5 (medido en el
+  // portal en un teléfono: el CTA principal, 38,5px de alto).
   lg: 'h-11 gap-2 px-5 text-md pointer-coarse:min-h-[max(44px,2.75rem)]',
 };
 

@@ -23,12 +23,12 @@ import {
   Card,
   EmptyState,
   FieldGroup,
-  Icon,
+  formatBytes,
+  InlineHelp,
   Input,
   ProductIcon,
   SectionHeader,
   Skeleton,
-  formatBytes,
 } from '@sytue/ui';
 import { appUrl } from '@sytue/config';
 import type { Locale } from '@sytue/i18n';
@@ -78,7 +78,7 @@ export function DesdeDrive({ t, locale, fileId }: DesdeDriveProps): JSX.Element 
   if (!fileId) {
     cuerpo = (
       <EmptyState
-        illustration={<Icon name="video" size={48} />}
+        icon="video"
         title={t('upload.drive.empty.title')}
         description={t('upload.drive.empty.description')}
         action={abrirDrive}
@@ -91,7 +91,7 @@ export function DesdeDrive({ t, locale, fileId }: DesdeDriveProps): JSX.Element 
   } else if (fallo === 'sinPermiso') {
     cuerpo = (
       <EmptyState
-        illustration={<Icon name="lock" size={48} />}
+        icon="lock"
         title={t('upload.drive.forbidden.title')}
         description={t('upload.drive.forbidden.description')}
         action={abrirDrive}
@@ -100,7 +100,7 @@ export function DesdeDrive({ t, locale, fileId }: DesdeDriveProps): JSX.Element 
   } else if (fallo) {
     cuerpo = (
       <EmptyState
-        illustration={<Icon name="warning" size={48} />}
+        tone="error"
         title={t('upload.drive.error.title')}
         description={textoDelMotivo(t, locale, fallo, libres)}
         action={
@@ -268,11 +268,7 @@ function Formulario({
           avisar1080
           deshabilitado={enviando}
         />
-        {fallo ? (
-          <p class="bg-danger-bg text-danger-text rounded-md px-4 py-3 text-sm" role="alert">
-            {fallo}
-          </p>
-        ) : null}
+        {fallo ? <InlineHelp tone="danger">{fallo}</InlineHelp> : null}
         <div class="flex flex-wrap items-center gap-3">
           <Button
             type="submit"

@@ -13,11 +13,12 @@ const Rem = 16
 
 // # Los decimales se declaran y NO se redondean. Medido el 2026-09-21
 //
-// Casi toda la escala de la suite cae en medios píxeles: `0.25rem` con el rem de 14 son
-// 3,5, así que `p-3` es 10,5 y `h-9` es 31,5. La tentación es redondearlos aquí, y es un
-// error caro: el redondeo lo hace el pintor por coordenada y **depende de la escala del
-// lienzo**, así que redondear en el código congela a ×1 un error que la pantalla
-// arreglaría sola.
+// Con el rem de 16 los pasos habituales salen enteros (`p-3` es 12, `h-9` es 36), pero los
+// fraccionarios de Tailwind y las medidas en `em` siguen cayendo en medios y cuartos de
+// píxel: `Espacio(0.125)` es 0,5 y `Espacio(0.3125)`, 1,25. La tentación es redondearlos
+// aquí, y es un error caro: el redondeo lo hace el pintor por coordenada y **depende de
+// la escala del lienzo**, así que redondear en el código congela a ×1 un error que la
+// pantalla arreglaría sola.
 //
 // Lo medido con el pintor de software de Fyne v2.8.1, en filas de DISPOSITIVO:
 //
@@ -28,8 +29,8 @@ const Rem = 16
 //
 // A ×2 —cualquier pantalla Retina o HiDPI, y todos los teléfonos— **los medios píxeles
 // salen exactos**. A ×1 sobra medio píxel por borde, igual que le pasa al navegador, que
-// también tiene que elegir una fila. Los cuartos (19,25, que es el interlineado de
-// `text-base`) no son exactos ni a ×2; harían falta ×4.
+// también tiene que elegir una fila. Los cuartos (19,25, que era el interlineado de
+// `text-base` con el rem de entonces) no son exactos ni a ×2; harían falta ×4.
 //
 // No hay antialias en los lados rectos: el rectángulo se redondea, no se interpola. Las
 // esquinas redondeadas SÍ llevan antialias.

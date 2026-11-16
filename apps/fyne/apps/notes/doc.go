@@ -53,7 +53,11 @@ func (p *Pantalla) docDe(id string) docRemoto {
 		p.docs = map[string]docRemoto{}
 	}
 	p.docs[id] = docRemoto{}
-	go p.cargarDoc(id)
+	{
+		notaFuncion := p.cargarDoc
+		notaArgumento0 := id
+		p.iniciar(func() { notaFuncion(notaArgumento0) })
+	}
 	return docRemoto{}
 }
 
@@ -62,7 +66,7 @@ func (p *Pantalla) cargarDoc(id string) {
 	ctx, cancelar := p.ctx()
 	defer cancelar()
 	c, err := p.Docs.Content(ctx, id, api.DocContentKey(api.DocText))
-	enHilo(func() {
+	p.enHilo(func() {
 		if p.docs == nil {
 			p.docs = map[string]docRemoto{}
 		}

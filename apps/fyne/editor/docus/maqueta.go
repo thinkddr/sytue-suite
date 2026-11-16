@@ -19,6 +19,7 @@ import (
 	"fyne.io/fyne/v2"
 	_ "golang.org/x/image/webp" // descodificador
 
+	"git.sytue.eu/sytue/one/apps/fyne/editor"
 	"git.sytue.eu/sytue/one/apps/fyne/editor/docus/rico"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/nucleo/externo"
@@ -40,14 +41,14 @@ import (
 //     se hereda como número: un tramo a 24 px pide una línea de 36);
 //   - los márgenes entre bloques hermanos se COLAPSAN al mayor de los dos.
 
-// Métricas verticales de Figtree (hhea): ascendente 950 y descendente 250 por mil, que
-// es la caja de 1,2 em que `canvas.Text` declara de alto.
+// Métricas verticales de Figtree: viven en `editor`, que alinea con ellas la cabecera de
+// los comentarios.
 const (
-	ascFuente  = 0.95
-	cajaFuente = 1.2
+	ascFuente  = editor.AscFuente
+	cajaFuente = editor.CajaFuente
 )
 
-// Medidas de CONTENIDO de `editor.css`, en px literales (el folio no usa el rem de 14).
+// Medidas de CONTENIDO de `editor.css`, en px literales (el folio no usa el rem).
 const (
 	sangriaLista = 24 // `ul, ol { padding-left: 1.5em }` a 16 px
 	barraCita    = 3  // `blockquote { border-left: 3px }`
@@ -68,6 +69,8 @@ type pieza struct {
 	// atomo es una pieza que no se parte ni se junta con las de al lado: el número de
 	// página (su texto es de la vista, y ocupa una runa) y el hueco de una región.
 	atomo bool
+	// campo es el campo de formulario que es la pieza (`formularios.go`): una ficha atómica.
+	campo *rico.CampoFormulario
 }
 
 // linea es una línea de un bloque.
@@ -556,6 +559,13 @@ func fichaBlanca(r rune, pos int, e rico.Estilo) (ficha, bool) {
 func fichaObjeto(t rico.Tramo, pos int, ancho float32) ficha {
 	p := pieza{desde: pos, hasta: pos + 1, texto: string(rico.ObjetoRuna), est: t.Estilo}
 	f := ficha{desde: pos, hasta: pos + 1, objeto: true}
+	if t.Formulario != nil {
+		// Un campo de formulario: su caja, del ancho de su valor (o de su marcador), sin partir.
+		p.texto, p.atomo, p.campo = "", true, t.Formulario
+		p.ancho = anchoFicha(t.Formulario, t.Estilo)
+		f.trozos, f.ancho = []pieza{p}, p.ancho
+		return f
+	}
 	if t.CampoPagina || t.Rotulo != "" {
 		// Un objeto con texto (el número de página, `white-space: nowrap`, o el enlace de
 		// vuelta de una nota): el texto entero, sin partir, como una palabra.
@@ -1183,7 +1193,7 @@ func maquetarBloque(b rico.Bloque, ancho float32, fl *flotantes, y float32) caja
 			c.marcaEstilo = b.Tramos[0].Estilo
 		}
 		c.marcaEstilo.Vertical = 0
-		if b.Marca != "•" {
+		if b.Marca != "•" && !rico.EsMarcaDeCasilla(b.Marca) {
 			c.marcaTexto = b.Marca + " "
 			c.marcaAncho = medidor.ancho(c.marcaTexto, c.marcaEstilo)
 		}
@@ -1209,6 +1219,9 @@ func maquetarTabla(bls []rico.Bloque, out []caja, t *rico.Tabla, ancho, y0 float
 	px, py, borde := float32(celdaX), float32(celdaY), float32(1)
 	if len(bls) > 0 && bls[0].Base.DeHoja() {
 		px, py, borde, tm.sinBordes = 0, 0, 0, true
+	}
+	if !t.Bordes() { // «Bordes» apagado en «Ajustes»: `border: none` en cada celda, con su relleno
+		borde, tm.sinBordes = 0, true
 	}
 	col := ancho / float32(t.Cols)
 	type hecha struct {

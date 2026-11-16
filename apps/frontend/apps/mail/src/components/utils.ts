@@ -4,7 +4,7 @@
  * el `locale` ya negociado (o la `t` de la app) en vez de fijar un formato.
  */
 import { formatDate, formatDateTime, formatTime, intlTag, type Locale } from '@sytue/i18n';
-import { appUrl } from '@sytue/config';
+import { PALETA_DE_USUARIO, appUrl, colorDeUsuario } from '@sytue/config';
 import type { GlyphName } from './glyphs.js';
 import type { MailMessageKey, T } from '../i18n/index.js';
 import type { EmailAddress, EmailChange, EmailSummary } from '../client/mailApi.js';
@@ -62,6 +62,8 @@ export function addressToField(a: EmailAddress): string {
 export interface ComposeDraft {
   to?: string;
   cc?: string;
+  /** CCO inicial: solo la trae un borrador reabierto (al responder no hay). */
+  bcc?: string;
   subject?: string;
   body?: string;
   /** Formato enriquecido del cuerpo, si el borrador reabierto lo traía. Sin él
@@ -76,6 +78,12 @@ export interface ComposeDraft {
    * efecto si está entre las opciones «De» disponibles; el servidor la verifica.
    */
   from?: string;
+  /**
+   * El correo de Sytue al que se contesta («Responder» / «Responder a todos»). Con él,
+   * cuando el envío sale de verdad, el original se marca `$answered` (`\Answered` en
+   * IMAP): así Thunderbird o el iPhone también lo ven respondido. Un reenvío no lo lleva.
+   */
+  answers?: string;
 }
 
 /**
@@ -100,6 +108,12 @@ export interface Conversation {
   unread: boolean;
   flagged: boolean;
   hasAttachment: boolean;
+  /**
+   * El mensaje más reciente está respondido (`$answered`). Es del ÚLTIMO y no de
+   * cualquiera, como la flecha de Apple Mail: si después de contestar llegó otro, el
+   * hilo vuelve a estar pendiente de respuesta.
+   */
+  answered: boolean;
 }
 
 /**
@@ -123,6 +137,7 @@ export function groupByThread(emails: EmailSummary[]): Conversation[] {
         unread: false,
         flagged: false,
         hasAttachment: false,
+        answered: Boolean(e.keywords.$answered),
       };
       byThread.set(key, conv);
       order.push(key);
@@ -176,9 +191,26 @@ export function conversacionAbierta(
   if (enLista || hilo?.id !== threadId || hilo.messages.length === 0) return enLista ?? null;
   // La conversación va de más reciente a más antiguo, como la lista.
   const recientesPrimero = [...hilo.messages].sort((a, b) =>
-    b.receivedAt.localeCompare(a.receivedAt),
+    fechaDeOrden(b).localeCompare(fechaDeOrden(a)),
   );
   return groupByThread(recientesPrimero)[0] ?? null;
+}
+
+/**
+ * Los mensajes de la conversación que están en Recibidos (`entradaId`): lo que
+ * silenciar archiva, y por tanto lo único que su «Deshacer» debe devolver a la
+ * Entrada. Una conversación abierta desde una búsqueda o desde el hilo completo trae
+ * también lo enviado y lo archivado de antes, y meterlo en la Entrada sería inventar.
+ * Sin `mailboxId` (lecturas que no lo traen) vale la carpeta vista: `enEntrada`.
+ */
+export function idsDeLaEntrada(
+  conv: Pick<Conversation, 'messages'>,
+  entradaId: string,
+  enEntrada: boolean,
+): string[] {
+  return conv.messages
+    .filter((m) => (m.mailboxId ? m.mailboxId === entradaId : enEntrada))
+    .map((m) => m.id);
 }
 
 /**
@@ -253,6 +285,207 @@ export function pasoDelFiltroVacio(ctx: {
   return ctx.paginas >= TOPE_PAGINAS_FILTRO ? 'tope' : 'pedir';
 }
 
+/**
+ * Los campos del panel «Opciones de búsqueda». `desde` y `hasta` son AAAA-MM-DD y
+ * los DOS inclusivos, que es lo que entiende quien rellena «Hasta el 28»; vacíos,
+ * sin acotar.
+ *
+ * POR QUÉ EXISTE: el servicio entiende `from:`, `to:`, `subject:`, `has:attachment`,
+ * `is:unread`, `after:` y `before:` (services/mail/internal/domain/searchquery.go),
+ * pero eso solo lo decía un `title` en inglés técnico, que no llega ni a la pantalla
+ * táctil ni al lector de pantalla. El panel pregunta en lenguaje llano y escribe la
+ * consulta; los operadores no se traducen porque son los que entiende el servicio.
+ */
+export interface OpcionesBusqueda {
+  de: string;
+  para: string;
+  asunto: string;
+  contiene: string;
+  conAdjuntos: boolean;
+  sinLeer: boolean;
+  desde: string;
+  hasta: string;
+}
+
+export const OPCIONES_BUSQUEDA_VACIAS: OpcionesBusqueda = {
+  de: '',
+  para: '',
+  asunto: '',
+  contiene: '',
+  conAdjuntos: false,
+  sinLeer: false,
+  desde: '',
+  hasta: '',
+};
+
+/** Palabras sueltas: sin espacios de más, como `strings.Fields` en Fyne. */
+function palabras(s: string): string {
+  return s.split(/\s+/).filter(Boolean).join(' ');
+}
+
+/** Lo escrito en un campo, listo para ir detrás de `op:`. */
+function valorDeOperador(v: string): string {
+  const limpio = palabras(v.replaceAll('"', ''));
+  return limpio.includes(' ') ? `"${limpio}"` : limpio;
+}
+
+/** AAAA-MM-DD con el día de verdad (`2026-02-30` no vale), desplazado `dias`. */
+function leerDia(s: string, dias = 0): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s.trim());
+  if (!m) return null;
+  const [a, mes, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  // `setUTCFullYear` y no `Date.UTC`, que lleva los años 0–99 al siglo XX.
+  const fecha = new Date(0);
+  fecha.setUTCFullYear(a, mes - 1, d);
+  if (fecha.getUTCFullYear() !== a || fecha.getUTCMonth() !== mes - 1 || fecha.getUTCDate() !== d) {
+    return null;
+  }
+  fecha.setUTCDate(fecha.getUTCDate() + dias);
+  return fecha.toISOString().slice(0, 10);
+}
+
+/**
+ * La consulta que entiende el servicio a partir del panel. Es `ComponerConsulta` de
+ * `apps/fyne/apps/mail/consulta.go`; los casos, en
+ * `apps/fyne/apps/mail/testdata/consulta-busqueda.json`.
+ *
+ * - Un valor con espacios va entre comillas (`subject:"informe anual"`), y las que
+ *   traiga dentro se quitan: el servicio no tiene cómo escaparlas.
+ * - `before:` EXCLUYE su día, así que «Hasta el 28 de febrero» es
+ *   `before:2026-03-01`: escrito tal cual, ese día se quedaría fuera.
+ * - Una fecha que no sea AAAA-MM-DD válida no se escribe: el servicio la tomaría por
+ *   texto y buscaría la palabra.
+ */
+export function componerConsulta(o: OpcionesBusqueda): string {
+  const partes: string[] = [];
+  for (const [op, valor] of [
+    ['from', o.de],
+    ['to', o.para],
+    ['subject', o.asunto],
+  ] as const) {
+    const v = valorDeOperador(valor);
+    if (v) partes.push(`${op}:${v}`);
+  }
+  if (o.conAdjuntos) partes.push('has:attachment');
+  if (o.sinLeer) partes.push('is:unread');
+  const desde = leerDia(o.desde);
+  if (desde) partes.push(`after:${desde}`);
+  const hasta = leerDia(o.hasta, 1);
+  if (hasta) partes.push(`before:${hasta}`);
+  const texto = palabras(o.contiene);
+  if (texto) partes.push(texto);
+  return partes.join(' ');
+}
+
+/**
+ * Parte la consulta como `tokenizeQuery` del servicio: por espacios, tabuladores y
+ * saltos fuera de las comillas, que se conservan; una comilla sin cerrar llega hasta
+ * el final. `entrecomillado` es la frase que venía ENTERA entre comillas: texto,
+ * aunque lleve dos puntos.
+ */
+function trocearConsulta(q: string): { texto: string; entrecomillado: boolean }[] {
+  const out: { texto: string; entrecomillado: boolean }[] = [];
+  let cur = '';
+  let enComillas = false;
+  let empezoConComilla = false;
+  const soltar = (): void => {
+    if (cur) out.push({ texto: cur, entrecomillado: empezoConComilla });
+    cur = '';
+    empezoConComilla = false;
+  };
+  for (const c of q) {
+    if (c === '"') {
+      if (!enComillas && !cur) empezoConComilla = true;
+      enComillas = !enComillas;
+      cur += c;
+    } else if ((c === ' ' || c === '\t' || c === '\n') && !enComillas) {
+      soltar();
+    } else {
+      cur += c;
+    }
+  }
+  soltar();
+  return out;
+}
+
+/**
+ * Lo contrario de componerConsulta: al reabrir el panel con una consulta escrita,
+ * cada operador vuelve a su campo. Lee como `ParseSearchQuery` —sin distinguir
+ * mayúsculas en el operador, con sus sinónimos y ganando el último repetido— y lo que
+ * el panel no tiene (`is:starred`, un operador que no existe, una fecha mal escrita)
+ * se queda en «Contiene» tal cual, para que aplicar el panel no lo borre.
+ */
+export function desmontarConsulta(q: string): OpcionesBusqueda {
+  const o: OpcionesBusqueda = { ...OPCIONES_BUSQUEDA_VACIAS };
+  const libre: string[] = [];
+  for (const tok of trocearConsulta(q)) {
+    const i = tok.texto.indexOf(':');
+    const op = tok.texto.slice(0, i).toLowerCase();
+    const val = tok.texto.slice(i + 1).replace(/^"+|"+$/g, '');
+    if (i < 0 || tok.entrecomillado || i === tok.texto.length - 1) {
+      libre.push(tok.texto);
+      continue;
+    }
+    let entendido = true;
+    if (op === 'from') o.de = val;
+    else if (op === 'to') o.para = val;
+    else if (op === 'subject') o.asunto = val;
+    else if (op === 'has') {
+      entendido = /^attachments?$/i.test(val);
+      o.conAdjuntos ||= entendido;
+    } else if (op === 'is') {
+      entendido = /^(unread|unseen)$/i.test(val);
+      o.sinLeer ||= entendido;
+    } else if (op === 'after' || op === 'since') {
+      const d = leerDia(val);
+      entendido = d !== null;
+      if (d) o.desde = d;
+    } else if (op === 'before' || op === 'until') {
+      const d = leerDia(val, -1);
+      entendido = d !== null;
+      if (d) o.hasta = d;
+    } else entendido = false;
+    if (!entendido) libre.push(tok.texto);
+  }
+  o.contiene = libre.join(' ');
+  return o;
+}
+
+/**
+ * La fecha por la que se ordena la lista, como en el servicio: lo que volvió de
+ * «Pospuestos» al vencer va a la hora de VUELTA (arriba de Recibidos, como en Gmail);
+ * lo demás, a la de llegada. Es también la que enseña la fila.
+ */
+export function fechaDeOrden(e: Pick<EmailSummary, 'receivedAt' | 'unsnoozedAt'>): string {
+  return e.unsnoozedAt ?? e.receivedAt;
+}
+
+/** Orden de la lista: lo más reciente arriba; a igual fecha, por id (estable). */
+export function masReciente(a: EmailSummary, b: EmailSummary): number {
+  return fechaDeOrden(b).localeCompare(fechaDeOrden(a)) || b.id.localeCompare(a.id);
+}
+
+/**
+ * La lista tras pedir otra vez su primera página («tirar para actualizar»). Si solo
+ * se había cargado esa página, manda la fresca entera. Si ya se habían bajado más
+ * (scroll infinito), lo más viejo que la página fresca no alcanza se conserva con su
+ * cursor: cambiarlo por la primera página sola tiraría lo leído al bajar y cerraría
+ * la conversación abierta si estaba ahí abajo. Lo que la página fresca cubre lo
+ * dice ella: lo borrado o movido desaparece y lo nuevo entra arriba.
+ */
+export function fusionarPrimeraPagina(
+  previa: { emails: EmailSummary[]; cursor: string },
+  fresca: { emails: EmailSummary[]; cursor: string },
+): { emails: EmailSummary[]; cursor: string } {
+  const ultima = fresca.emails[fresca.emails.length - 1];
+  // Sin más páginas, la fresca es la carpeta entera; vacía, no hay borde que comparar.
+  if (!fresca.cursor || !ultima) return fresca;
+  const ids = new Set(fresca.emails.map((e) => e.id));
+  const cola = previa.emails.filter((e) => !ids.has(e.id) && masReciente(ultima, e) < 0);
+  if (cola.length === 0) return fresca;
+  return { emails: [...fresca.emails, ...cola].sort(masReciente), cursor: previa.cursor };
+}
+
 /** Lo que hace un atajo de la selección: marcar una fila o vaciarla. */
 export type AccionSeleccion =
   { tipo: 'marcar'; threadId: string; indice: number } | { tipo: 'vaciar' } | null;
@@ -280,6 +513,41 @@ export function atajoDeSeleccion(
     : Math.min(ctx.cursor, ctx.conversaciones.length - 1);
   const fila = ctx.conversaciones[indice];
   return fila ? { tipo: 'marcar', threadId: fila.threadId, indice } : null;
+}
+
+/** Lo que hace un atajo de triaje de Gmail: leída, no leída, spam o deshacer. */
+export type AccionTriaje =
+  { tipo: 'leida' | 'noLeida' | 'spam'; conversacion: Conversation } | { tipo: 'deshacer' } | null;
+
+/**
+ * `Mayús+I` (marcar leída), `Mayús+U` (marcar no leída), «!» (spam) y «z» (deshacer el
+ * último triaje, el «Deshacer» del aviso). Las tres primeras actúan sobre la abierta o,
+ * sin nada abierto, sobre la fila donde se quedó j/k, como «x». Marcar leída la que ya
+ * lo está —o no leída la que no— no es un atajo: la tecla sigue su camino en vez de
+ * cerrar el hilo o pedir al servidor lo que ya hay. En solo lectura no hay triaje. Es
+ * `atajoDeTriaje` de Fyne (atajos.go).
+ */
+export function atajoDeTriaje(
+  tecla: string,
+  ctx: {
+    conversaciones: Conversation[];
+    abierta: Conversation | null;
+    cursor: number;
+    soloLectura: boolean;
+    hayDeshacer: boolean;
+  },
+): AccionTriaje {
+  if (ctx.soloLectura) return null;
+  if (tecla === 'z') return ctx.hayDeshacer ? { tipo: 'deshacer' } : null;
+  const tipo = tecla === 'I' ? 'leida' : tecla === 'U' ? 'noLeida' : tecla === '!' ? 'spam' : null;
+  if (!tipo) return null;
+  const n = ctx.conversaciones.length;
+  const conversacion =
+    ctx.abierta ?? (n > 0 ? ctx.conversaciones[Math.min(ctx.cursor, n - 1)] : null);
+  if (!conversacion) return null;
+  if (tipo === 'leida' && !conversacion.unread) return null;
+  if (tipo === 'noLeida' && conversacion.unread) return null;
+  return { tipo, conversacion };
 }
 
 /**
@@ -375,6 +643,118 @@ function quotedBody(t: T, locale: Locale, email: EmailSummary, fullText?: string
 }
 
 /**
+ * Las cabeceras de atribución de `reader.quoteHeader` en los 26 idiomas de Mail.
+ *
+ * Están aquí, y no se leen del catálogo, porque el navegador baja SOLO el catálogo de
+ * su idioma, y un correo citado en sueco llega igual a quien lee en castellano. Que no
+ * se desvíen lo guarda `utils.test.ts`, que las compara con los 26 catálogos.
+ */
+export const ATRIBUCIONES_DE_CITA: readonly string[] = [
+  'On {date}, {name} wrote:',
+  'На {date} {name} написа:',
+  '{date}, {name} píše:',
+  'Den {date} skrev {name}:',
+  'Am {date} schrieb {name}:',
+  'Στις {date}, {name} έγραψε:',
+  'El {date}, {name} escribió:',
+  '{date} kirjutas {name}:',
+  '{name} kirjoitti {date}:',
+  'Le {date}, {name} a écrit :',
+  'Ar {date}, scríobh {name}:',
+  '{date}, {name} piše:',
+  '{name} ezt írta ({date}):',
+  '{date} skrifaði {name}:',
+  'Il {date}, {name} ha scritto:',
+  '{date}, {name} rašė:',
+  '{date} {name} rakstīja:',
+  'Fl-{date}, messaġġ minn {name}:',
+  '{date} skrev {name}:',
+  'Op {date} schreef {name}:',
+  '{date}, {name} pisze:',
+  'Em {date}, {name} escreveu:',
+  'Pe {date}, {name} a scris:',
+];
+
+/*
+ * Cada plantilla se vuelve una expresión que acepta lo que de verdad escriben los
+ * clientes: los huecos son «cualquier cosa», los espacios pueden faltar o sobrar y la
+ * coma es opcional —Gmail escribe «On Mon, Jan 5, 2026 at 10:00 Ana <a@b.eu> wrote:»,
+ * sin la coma de la plantilla—. La misma traducción hace `cita.go`.
+ */
+function expresionDeAtribucion(plantilla: string): RegExp {
+  const partes = plantilla.split(/\{(?:date|name)\}/);
+  // Se escapa primero: ni el espacio ni la coma son metacaracteres, así que los
+  // reemplazos de después no tocan nada escapado.
+  const literal = (s: string) =>
+    s
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\s+/gu, ' ?')
+      .replace(/,/g, ',?');
+  return new RegExp(`^${partes.map(literal).join('.+')}$`, 'iu');
+}
+
+const EXPRESIONES_DE_ATRIBUCION = ATRIBUCIONES_DE_CITA.map(expresionDeAtribucion);
+
+/** El separador con que Outlook encabeza el mensaje respondido. */
+const SEPARADOR_ORIGINAL = /^-{2,}\s*original message\s*-{2,}$/i;
+
+/*
+ * Una atribución de verdad cabe en un par de líneas (Gmail parte la suya a las 78
+ * columnas). El tope no es estético: con los huecos `.+` seguidos, una línea larga que
+ * no casa —un enlace o un párrafo sin saltos justo encima de la cita— hace que la
+ * expresión pruebe todos los repartos posibles, y con 8 000 caracteres la lectura del
+ * correo se colgaba segundos. `cita.go` aplica el mismo tope, contado igual (en unidades UTF-16).
+ */
+const LARGO_MAX_ATRIBUCION = 256;
+
+const esLineaCitada = (l: string) => l.trimStart().startsWith('>');
+const esAtribucion = (l: string) => {
+  const s = l.trim();
+  if (s.length > LARGO_MAX_ATRIBUCION) return false;
+  // Los espacios se juntan en uno antes de probar, y la plantilla los pide como « ?»:
+  // con `\s*` entre dos huecos `.+`, que también se comen espacios, una racha de
+  // espacios de 250 caracteres aún tardaba más de un segundo dentro del tope.
+  const junta = s.replace(/\s+/gu, ' ');
+  return EXPRESIONES_DE_ATRIBUCION.some((e) => e.test(junta));
+};
+
+/**
+ * Separa lo nuevo de una respuesta del historial que arrastra, como el «•••» de Gmail.
+ *
+ * La cita es lo que va desde el separador de Outlook, o el BLOQUE FINAL de líneas `>`
+ * con su línea de atribución delante (que puede venir partida en dos, como la parte
+ * Gmail al pasar de 78 columnas). Solo el bloque final: las respuestas intercaladas
+ * entre trozos citados son la respuesta, y plegarlas escondería lo que se contesta.
+ *
+ * Si no queda nada nuevo —un mensaje que es solo cita—, no se pliega: esconderlo
+ * todo tras un botón dejaría la tarjeta vacía. Gemela de `separarCita` en
+ * `apps/fyne/apps/mail/cita.go`; los casos, en `apps/fyne/apps/mail/testdata/cita.json`.
+ */
+export function separarCita(texto: string): { cuerpo: string; cita: string } {
+  const lineas = texto.replace(/\r\n/g, '\n').split('\n');
+  let corte = lineas.findIndex((l) => SEPARADOR_ORIGINAL.test(l.trim()));
+  if (corte < 0) corte = lineas.length;
+
+  let i = lineas.length - 1;
+  while (i >= 0 && lineas[i]!.trim() === '') i--;
+  if (i >= 0 && esLineaCitada(lineas[i]!)) {
+    let inicio = i;
+    for (let j = i; j >= 0 && (esLineaCitada(lineas[j]!) || lineas[j]!.trim() === ''); j--) {
+      if (esLineaCitada(lineas[j]!)) inicio = j;
+    }
+    let a = inicio - 1;
+    while (a >= 0 && lineas[a]!.trim() === '') a--;
+    if (a >= 0 && esAtribucion(lineas[a]!)) inicio = a;
+    else if (a >= 1 && esAtribucion(`${lineas[a - 1]!} ${lineas[a]!}`)) inicio = a - 1;
+    corte = Math.min(corte, inicio);
+  }
+
+  const cuerpo = lineas.slice(0, corte).join('\n').trimEnd();
+  if (cuerpo.trim() === '') return { cuerpo: texto, cita: '' };
+  return { cuerpo, cita: lineas.slice(corte).join('\n') };
+}
+
+/**
  * Construye el borrador para Responder / Responder a todos / Reenviar a partir del
  * correo leído: destinatarios, asunto con prefijo (Re:/Fwd:, sin duplicar) y cuerpo
  * citado. `selfEmail` es la dirección del usuario, para no incluirse en el CC al
@@ -402,6 +782,7 @@ export function buildReplyDraft(
     to: email.from.map(addressToField).join(', '),
     subject: RE_PREFIX.test(subject) ? subject : `Re: ${subject}`,
     body: quotedBody(t, locale, email, fullText),
+    answers: email.id,
   };
   if (mode === 'replyAll') {
     const self = (selfEmail ?? '').trim().toLowerCase();
@@ -452,6 +833,8 @@ const ROLE_KEYS = {
   trash: 'folder.trash',
   junk: 'folder.junk',
   archive: 'folder.archive',
+  outbox: 'folder.outbox',
+  snoozed: 'folder.snoozed',
 } as const satisfies Record<string, MailMessageKey>;
 
 export function mailboxLabel(t: T, name: string, role?: string): string {
@@ -478,6 +861,10 @@ export function sortMailboxes<M extends { name: string; role?: string | undefine
   boxes: readonly M[],
 ): M[] {
   const rank = (m: M): number => {
+    // «Pospuestos» justo debajo de Recibidos, como en Gmail: es la Entrada en
+    // espera. Va aparte de ROLE_ORDER porque no es un buzón que se unifique (solo
+    // Sytue lo tiene) ni existe en ninguna cuenta externa.
+    if (m.role === 'snoozed') return 0.5;
     const i = m.role ? ROLE_ORDER.indexOf(m.role as (typeof ROLE_ORDER)[number]) : -1;
     return i === -1 ? 99 : i;
   };
@@ -491,28 +878,19 @@ export function sortMailboxes<M extends { name: string; role?: string | undefine
 }
 
 /**
- * Paleta sobria de etiquetas: TOKEN → color del PUNTO. El chip
- * en sí es neutro (tokens del design system, contraste AA); el punto solo
- * desambigua y el NOMBRE siempre acompaña, así el color nunca es el único
- * indicador (WCAG AA). Debe coincidir con domain.LabelColors del backend.
+ * Los colores de una etiqueta: la paleta de colores de usuario de la suite
+ * (`PALETA_DE_USUARIO` de @sytue/config). Se guarda el TOKEN (el id del tono),
+ * no el hex, y el chip en sí es neutro (tokens del design system, contraste
+ * AA): el punto solo desambigua y el NOMBRE siempre acompaña, así el color nunca
+ * es el único indicador (WCAG AA). Los ids tienen que coincidir con
+ * domain.LabelColors del backend; las ocho etiquetas de antes guardan los
+ * mismos tokens y se pintan con el tono nuevo.
  */
-export const LABEL_COLORS: Record<string, string> = {
-  slate: '#5b6b7b',
-  brass: '#9a7b3f',
-  sage: '#5f7a5a',
-  clay: '#a4623f',
-  blue: '#3f6699',
-  plum: '#7a5480',
-  teal: '#3f7d7a',
-  rose: '#9c5470',
-};
-
-/** Lista ordenada de tokens de color (para el selector de la etiqueta). */
-export const LABEL_COLOR_TOKENS = Object.keys(LABEL_COLORS);
+export const LABEL_COLOR_TOKENS: readonly string[] = PALETA_DE_USUARIO.map((c) => c.id);
 
 /** Color del punto de una etiqueta (token → hex); vacío/desconocido = neutro. */
 export function labelDot(color: string): string {
-  return LABEL_COLORS[color] ?? 'var(--sytue-border-strong, #94a3b8)';
+  return colorDeUsuario(color) ?? 'var(--sytue-border-strong, #94a3b8)';
 }
 
 /**
@@ -556,6 +934,8 @@ const ROLE_GLYPHS: Record<string, GlyphName> = {
   trash: 'trash',
   junk: 'spam',
   archive: 'archive',
+  outbox: 'outbox',
+  snoozed: 'clock',
 };
 
 export function mailboxGlyph(role?: string): GlyphName {

@@ -152,18 +152,24 @@ func (t *Tareas) Objeto(v tema.Variante) fyne.CanvasObject {
 	return enPagina(o, alto, AnchoContenidoLista)
 }
 
-// cabecera es el título, la frase y el conmutador de «Mías · De todos». En el móvil el
-// conmutador baja (`flex-col sm:flex-row`).
+// cabecera es el título, la frase y el conmutador de «Mías · De todos».
 func (t *Tareas) cabecera(v tema.Variante, ancho float32) (fyne.CanvasObject, float32) {
-	titulo := ui.Texto(t.t("tasks.title"), tema.TextoLG, ui.SemiNegrita, tema.Color("text", v))
-	frase := ui.NuevoParrafo(t.t("tasks.subtitle"), tema.TextoSM, ui.Normal, "text-muted", v)
 	grupo := NuevoConmutadorMias(t.t("tasks.title"), t.t("tasks.mine"), t.t("tasks.all"), t.Mias, func(mias bool) {
 		if t.AlMias != nil {
 			t.AlMias(mias)
 		}
 	})
+	return cabeceraConGrupo(v, t.Ventana, ancho, t.t("tasks.title"), t.t("tasks.subtitle"), grupo)
+}
+
+// cabeceraConGrupo es la cabecera de Tareas y de Aprobaciones: título `text-lg`, frase
+// `text-sm` con `max-w-prose` y, a la derecha, el grupo de filtro; `pb-4` y filete. En el
+// móvil el grupo baja (`flex-col sm:flex-row`).
+func cabeceraConGrupo(v tema.Variante, ventana, ancho float32, texto, subtitulo string, grupo *GrupoFiltro) (fyne.CanvasObject, float32) {
+	titulo := ui.Texto(texto, tema.TextoLG, ui.SemiNegrita, tema.Color("text", v))
+	frase := ui.NuevoParrafo(subtitulo, tema.TextoSM, ui.Normal, "text-muted", v)
 	g := grupo.MinSize()
-	sm := t.Ventana == 0 || t.Ventana >= ui.CorteSM
+	sm := ventana == 0 || ventana >= ui.CorteSM
 	anchoTexto := ancho
 	if sm {
 		anchoTexto = max(ancho-g.Width-HuecoCabeceraFila, 0)
@@ -193,7 +199,7 @@ const (
 type cabeceraTareas struct {
 	titulo                *canvas.Text
 	frase                 *ui.Parrafo
-	grupo                 *ConmutadorMias
+	grupo                 *GrupoFiltro
 	anchoFrase, altoFrase float32
 	altoIzq, alto         float32
 	sm                    bool
@@ -218,21 +224,12 @@ func (c *cabeceraTareas) Layout(_ []fyne.CanvasObject, t fyne.Size) {
 
 // lista es un grupo: `ul.rounded-lg.border.divide-y` con una fila por tarea.
 func (t *Tareas) lista(v tema.Variante, filas []api.ERPActividad, hoy string) (fyne.CanvasObject, float32) {
-	caja := ui.NuevaCaja(tema.Color(ui.FondoHoja(), v), tema.Color("border", v), radioTarjeta())
-	col := &columnaFilas{}
-	var hijos []fyne.CanvasObject
-	for i, a := range filas {
+	bloques := make([]bloque, 0, len(filas))
+	for _, a := range filas {
 		o, alto := t.fila(v, a, hoy)
-		col.filas = append(col.filas, bloque{o, alto, 0})
-		hijos = append(hijos, o)
-		if i > 0 {
-			d := canvas.NewRectangle(tema.Color("border", v))
-			col.filetes = append(col.filetes, d)
-			hijos = append(hijos, d)
-		}
+		bloques = append(bloques, bloque{o, alto, 0})
 	}
-	lista := container.New(col, hijos...)
-	return container.New(&enCaja{caja: caja, hijo: lista}, append(caja.Objetos(), lista)...), col.alto() + 2*tema.Borde
+	return enListaConFiletes(v, bloques)
 }
 
 // fila es una tarea: resumen y, debajo, tipo · registro · responsable; a la derecha la
@@ -339,21 +336,40 @@ func (f *filaTarea) Layout(_ []fyne.CanvasObject, t fyne.Size) {
 	}
 }
 
-// ConmutadorMias es el grupo «Mías · De todos»: dos botones pegados dentro de un
-// perfil, el elegido en `bg-selected` y peso 600.
-type ConmutadorMias struct {
+// GrupoFiltro es el grupo de botones pegados dentro de un perfil, con UNO elegido en
+// `bg-selected` y peso 600: «Mías · De todos» de Tareas y «Pendientes · Aprobadas ·
+// Rechazadas» de Aprobaciones. Botones `px-3 py-1 text-sm`.
+type GrupoFiltro struct {
 	ui.Pulsable
-	Mias, Todos string
-	EnMias      bool
-	AlElegir    func(mias bool)
+	// Opciones son los rótulos, YA traducidos.
+	Opciones []string
+	// Elegida es el índice activo.
+	Elegida  int
+	AlElegir func(i int)
 }
 
-// NuevoConmutadorMias crea el grupo. `nombre` es su `aria-label`.
+// ConmutadorMias es el GrupoFiltro de Tareas.
+type ConmutadorMias = GrupoFiltro
+
+// NuevoGrupoFiltro crea el grupo. `nombre` es su `aria-label`.
+func NuevoGrupoFiltro(nombre string, opciones []string, elegida int, alElegir func(int)) *GrupoFiltro {
+	g := &GrupoFiltro{Opciones: opciones, Elegida: elegida, AlElegir: alElegir}
+	g.Nombre = nombre
+	g.ExtendBaseWidget(g)
+	return g
+}
+
+// NuevoConmutadorMias crea «Mías · De todos». `nombre` es su `aria-label`.
 func NuevoConmutadorMias(nombre, mias, todos string, enMias bool, alElegir func(bool)) *ConmutadorMias {
-	c := &ConmutadorMias{Mias: mias, Todos: todos, EnMias: enMias, AlElegir: alElegir}
-	c.Nombre = nombre
-	c.ExtendBaseWidget(c)
-	return c
+	elegida := 1
+	if enMias {
+		elegida = 0
+	}
+	return NuevoGrupoFiltro(nombre, []string{mias, todos}, elegida, func(i int) {
+		if alElegir != nil {
+			alElegir(i == 0)
+		}
+	})
 }
 
 func anchoMias(s string, activa bool) float32 {
@@ -367,77 +383,99 @@ func pesoOpcion2(activa bool) ui.Peso {
 	return ui.Normal
 }
 
-// MinSize son los dos botones con el borde. Medido: 114×24,75.
-func (c *ConmutadorMias) MinSize() fyne.Size {
+// anchoOpcion es lo que mide el botón `i`, con el peso que le toca.
+func (c *GrupoFiltro) anchoOpcion(i int) float32 { return anchoMias(c.Opciones[i], i == c.Elegida) }
+
+// MinSize son los botones con el borde. Medido «Mías · De todos»: 114×24,75.
+func (c *GrupoFiltro) MinSize() fyne.Size {
 	c.ExtendBaseWidget(c)
-	return fyne.NewSize(anchoMias(c.Mias, c.EnMias)+anchoMias(c.Todos, !c.EnMias)+2*tema.Borde,
-		tema.TextoSM.Linea+2*MiasPY+2*tema.Borde)
+	ancho := 2 * tema.Borde
+	for i := range c.Opciones {
+		ancho += c.anchoOpcion(i)
+	}
+	return fyne.NewSize(ancho, tema.TextoSM.Linea+2*MiasPY+2*tema.Borde)
 }
 
 // Tapped elige el botón que cae bajo el puntero.
-func (c *ConmutadorMias) Tapped(e *fyne.PointEvent) {
-	mias := e.Position.X < tema.Borde+anchoMias(c.Mias, c.EnMias)
-	if c.AlElegir != nil && mias != c.EnMias {
-		c.AlElegir(mias)
+func (c *GrupoFiltro) Tapped(e *fyne.PointEvent) {
+	x := tema.Borde
+	for i := range c.Opciones {
+		x += c.anchoOpcion(i)
+		if e.Position.X < x || i == len(c.Opciones)-1 {
+			if c.AlElegir != nil && i != c.Elegida {
+				c.AlElegir(i)
+			}
+			return
+		}
 	}
 }
 
-// CreateRenderer construye el perfil y los dos rótulos.
-func (c *ConmutadorMias) CreateRenderer() fyne.WidgetRenderer {
+// CreateRenderer construye el perfil y los rótulos.
+func (c *GrupoFiltro) CreateRenderer() fyne.WidgetRenderer {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	// El grupo no tiene fondo en la web: lo de detrás es la hoja, no `bg`.
-	r := &miasRenderer{
-		c:     c,
-		aro:   ui.NuevoAro(tema.RadioMD, ui.SinHueco, v),
-		caja:  ui.NuevaCaja(tema.Color(ui.FondoHoja(), v), tema.Color("border", v), tema.RadioMD),
-		sel:   canvas.NewRectangle(tema.Color("selected", v)),
-		mias:  ui.Texto(c.Mias, tema.TextoSM, pesoOpcion2(c.EnMias), tema.Color(tintaOpcion(c.EnMias, v), v)),
-		todos: ui.Texto(c.Todos, tema.TextoSM, pesoOpcion2(!c.EnMias), tema.Color(tintaOpcion(!c.EnMias, v), v)),
+	r := &grupoFiltroRenderer{
+		c:    c,
+		aro:  ui.NuevoAro(tema.RadioMD, ui.SinHueco, v),
+		caja: ui.NuevaCaja(tema.Color(ui.FondoHoja(), v), tema.Color("border", v), tema.RadioMD),
+		sel:  canvas.NewRectangle(tema.Color("selected", v)),
+	}
+	for i, s := range c.Opciones {
+		activa := i == c.Elegida
+		r.rotulos = append(r.rotulos, ui.Texto(s, tema.TextoSM, pesoOpcion2(activa), tema.Color(tintaOpcion(activa, v), v)))
 	}
 	r.Refresh()
 	return r
 }
 
-type miasRenderer struct {
-	c           *ConmutadorMias
-	aro         *ui.Aro
-	caja        *ui.Caja
-	sel         *canvas.Rectangle
-	mias, todos *canvas.Text
+type grupoFiltroRenderer struct {
+	c       *GrupoFiltro
+	aro     *ui.Aro
+	caja    *ui.Caja
+	sel     *canvas.Rectangle
+	rotulos []*canvas.Text
 }
 
-func (r *miasRenderer) MinSize() fyne.Size { return r.c.MinSize() }
-func (r *miasRenderer) Objects() []fyne.CanvasObject {
-	return append(append(r.aro.Objetos(), r.caja.Objetos()...), r.sel, r.mias, r.todos)
+func (r *grupoFiltroRenderer) MinSize() fyne.Size { return r.c.MinSize() }
+func (r *grupoFiltroRenderer) Objects() []fyne.CanvasObject {
+	objs := append(append(r.aro.Objetos(), r.caja.Objetos()...), r.sel)
+	for _, t := range r.rotulos {
+		objs = append(objs, t)
+	}
+	return objs
 }
-func (r *miasRenderer) Destroy() {}
+func (r *grupoFiltroRenderer) Destroy() {}
 
-func (r *miasRenderer) Layout(t fyne.Size) {
+func (r *grupoFiltroRenderer) Layout(t fyne.Size) {
 	r.aro.Colocar(t)
 	r.caja.Redimensionar(t)
-	a1 := anchoMias(r.c.Mias, r.c.EnMias)
-	a2 := anchoMias(r.c.Todos, !r.c.EnMias)
 	alto := t.Height - 2*tema.Borde
 	// El velo sigue la esquina de dentro del perfil por su lado de fuera: cuadrado,
-	// tapaba el borde redondeado en las dos esquinas de su extremo.
+	// tapaba el borde redondeado en las esquinas de su extremo. Por dentro va recto.
 	d := max(tema.RadioMD-tema.Borde, 0)
-	if r.c.EnMias {
-		r.sel.Move(fyne.NewPos(tema.Borde, tema.Borde))
-		r.sel.Resize(fyne.NewSize(a1, alto))
-		r.sel.TopLeftCornerRadius, r.sel.BottomLeftCornerRadius = d, d
-		r.sel.TopRightCornerRadius, r.sel.BottomRightCornerRadius = 0, 0
-	} else {
-		r.sel.Move(fyne.NewPos(tema.Borde+a1, tema.Borde))
-		r.sel.Resize(fyne.NewSize(a2, alto))
-		r.sel.TopLeftCornerRadius, r.sel.BottomLeftCornerRadius = 0, 0
-		r.sel.TopRightCornerRadius, r.sel.BottomRightCornerRadius = d, d
+	x, y := tema.Borde, tema.Borde+MiasPY
+	ultima := len(r.c.Opciones) - 1
+	for i, rot := range r.rotulos {
+		a := r.c.anchoOpcion(i)
+		if i == r.c.Elegida {
+			r.sel.Move(fyne.NewPos(x, tema.Borde))
+			r.sel.Resize(fyne.NewSize(a, alto))
+			izq, der := float32(0), float32(0)
+			if i == 0 {
+				izq = d
+			}
+			if i == ultima {
+				der = d
+			}
+			r.sel.TopLeftCornerRadius, r.sel.BottomLeftCornerRadius = izq, izq
+			r.sel.TopRightCornerRadius, r.sel.BottomRightCornerRadius = der, der
+		}
+		ui.ColocarTexto(rot, tema.TextoSM, x+MiasPX, y)
+		x += a
 	}
-	y := tema.Borde + MiasPY
-	ui.ColocarTexto(r.mias, tema.TextoSM, tema.Borde+MiasPX, y)
-	ui.ColocarTexto(r.todos, tema.TextoSM, tema.Borde+a1+MiasPX, y)
 }
 
-func (r *miasRenderer) Refresh() {
+func (r *grupoFiltroRenderer) Refresh() {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	r.aro.Ver(r.c.Enfocado())
 	r.aro.Pintar(v)

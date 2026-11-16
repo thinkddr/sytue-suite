@@ -368,7 +368,7 @@ type BotonFlotante struct {
 	Icono iconos.Icono
 }
 
-// LadoBotonFlotante es el `h-14 w-14`: 49 con el rem de 14.
+// LadoBotonFlotante es el `h-14 w-14`: 56 con el rem de 16.
 var LadoBotonFlotante = tema.Espacio(14)
 
 // MargenBotonFlotante es el `right-4` y el `bottom-[max(1rem,…)]`.

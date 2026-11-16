@@ -30,7 +30,7 @@ import { Icon, Spinner, Toolbar, cx, useTablist, type IconName } from '@sytue/ui
 import { RibbonGroup } from '../editor/ribbon/primitives';
 import { MASCARA_SCROLL_X, useScrollRestante } from '@sytue/ui';
 import type { DocsKey, docsT } from '../i18n';
-import type { Permisos } from './api';
+import { puedeImprimir, type Permisos } from './api';
 import type { Dialogo } from './Paneles';
 
 export type Herramienta =
@@ -74,6 +74,11 @@ interface Props {
   onDialogo: (d: Dialogo) => void;
   permisos: Permisos;
   trabajando: boolean;
+  /** Lo que se está preparando, si es largo («Preparando 8 de 20 páginas…»). */
+  progreso?: string | undefined;
+  /** Dónde se baja el documento tal como está en Drive (`/api/pdf-descargar`). */
+  urlDescarga: string;
+  onImprimir: () => void;
   panelAbierto: boolean;
   onPanelAbierto: (abierto: boolean) => void;
   /** Carpeta de Drive desde la que se abrió el PDF, si vino de allí. */
@@ -240,7 +245,14 @@ export function BarraHerramientas(p: Props) {
           ))}
         </div>
         <div class="flex-1" />
-        {p.trabajando && <Spinner size={16} class="mr-2" label={t('pdf.working')} />}
+        {p.trabajando && (
+          <span class="text-text-muted mr-2 flex shrink-0 items-center gap-1.5 text-xs">
+            <Spinner size={16} label={p.progreso ?? t('pdf.working')} />
+            {/* Visible y no solo anunciada: pedir las hojas de un documento largo para
+                imprimirlo tarda, y un círculo que gira sin más parece colgado. */}
+            {p.progreso && <span class="hidden tabular-nums sm:inline">{p.progreso}</span>}
+          </span>
+        )}
       </div>
 
       {/* Grupos de la pestaña activa. Se desliza de lado en pantallas estrechas,
@@ -305,7 +317,7 @@ export function BarraHerramientas(p: Props) {
                   aria-pressed={p.color === c.valor}
                   onClick={() => p.onColor(c.valor)}
                   class={cx(
-                    // 24 px de caja (WCAG 2.5.8: eran 17,5, 1,25 rem con el rem de 14) y 44 con
+                    // 24 px de caja (WCAG 2.5.8: eran 17,5, 1,25 rem con 1 rem en 14 px) y 44 con
                     // el dedo, por el suelo táctil de la zona (`data-suelo-tactil`).
                     'sytue-focus-ring h-[24px] w-[24px] rounded-full border transition',
                     p.color === c.valor ? 'border-text scale-110' : 'border-border',
@@ -342,6 +354,30 @@ export function BarraHerramientas(p: Props) {
               </BotonTexto>
               <BotonTexto onClick={() => p.onDialogo('comparar')} disabled={p.trabajando}>
                 {t('pdf.menu.compare')}
+              </BotonTexto>
+              {/* Volver a como estaba antes de un cambio: el visor no tiene «Deshacer»,
+                  pero Drive guarda cada escritura como una versión. */}
+              <BotonTexto onClick={() => p.onDialogo('versiones')} disabled={p.trabajando}>
+                {t('pdf.menu.versions')}
+              </BotonTexto>
+              {/* Lo que saca el documento de la app, detrás de lo que lo cambia y en el
+                  mismo orden que la app nativa. Antes solo se bajaba desde dentro de
+                  Firmar → aplicación oficial, que no es donde nadie lo busca, y no se
+                  imprimía de ninguna forma: Ctrl+P sacaba la página del navegador. Es un
+                  `<a>` porque es una descarga: el navegador la trata como tal. */}
+              <a
+                href={p.urlDescarga}
+                download
+                class={cx(CLASE_BOTON_TEXTO, 'inline-flex items-center')}
+              >
+                {t('pdf.menu.download')}
+              </a>
+              <BotonTexto
+                onClick={p.onImprimir}
+                disabled={p.trabajando || !puedeImprimir(p.permisos)}
+                motivo={puedeImprimir(p.permisos) ? undefined : t('pdf.blocked.print')}
+              >
+                {t('pdf.menu.print')}
               </BotonTexto>
             </RibbonGroup>
           )}
@@ -490,13 +526,21 @@ function BotonSimple({
   );
 }
 
+// shrink-0 + nowrap: dentro de una barra que se desliza, un rótulo que encoge se
+// parte en dos líneas en vez de dejarse arrastrar.
+const CLASE_BOTON_TEXTO =
+  'text-text hover:bg-bg-subtle sytue-focus-ring rounded-control shrink-0 px-2 py-1.5 text-xs font-medium whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-40';
+
 function BotonTexto({
   onClick,
   disabled,
+  motivo,
   children,
 }: {
   onClick: () => void;
   disabled?: boolean;
+  /** Por qué está apagado, cuando es el documento quien lo prohíbe. */
+  motivo?: string | undefined;
   children: preact.ComponentChildren;
 }) {
   return (
@@ -504,9 +548,8 @@ function BotonTexto({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      // shrink-0 + nowrap: dentro de una barra que se desliza, un rótulo que
-      // encoge se parte en dos líneas en vez de dejarse arrastrar.
-      class="text-text hover:bg-bg-subtle sytue-focus-ring rounded-control shrink-0 px-2 py-1.5 text-xs font-medium whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-40"
+      title={motivo}
+      class={CLASE_BOTON_TEXTO}
     >
       {children}
     </button>

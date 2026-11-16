@@ -67,6 +67,9 @@ type FilaEmergente struct {
 	Rotulo   string
 	Glifo    *iconos.Dibujo
 	AlPulsar func()
+	// Inerte es `disabled:pointer-events-none disabled:opacity-50`: a la vista, al 50 %,
+	// sin responder y fuera del recorrido del foco.
+	Inerte bool
 
 	encima, enfocado bool
 	fondo            *canvas.Rectangle
@@ -78,6 +81,7 @@ var (
 	_ fyne.Tappable     = (*FilaEmergente)(nil)
 	_ fyne.Focusable    = (*FilaEmergente)(nil)
 	_ desktop.Hoverable = (*FilaEmergente)(nil)
+	_ fyne.Disableable  = (*FilaEmergente)(nil)
 )
 
 // NuevaFilaEmergente crea la fila con su glifo (nil, sin él).
@@ -94,10 +98,16 @@ func MedidaFilaEmergente(rotulo string) fyne.Size {
 }
 
 func (f *FilaEmergente) Tapped(*fyne.PointEvent) {
-	if f.AlPulsar != nil {
+	if !f.Inerte && f.AlPulsar != nil {
 		f.AlPulsar()
 	}
 }
+
+// Disabled saca la fila inerte del recorrido del Tab (el foco de Fyne se salta lo
+// `Disableable` apagado), Enable y Disable la encienden y la apagan.
+func (f *FilaEmergente) Disabled() bool { return f.Inerte }
+func (f *FilaEmergente) Enable()        { f.Inerte = false; f.Refresh() }
+func (f *FilaEmergente) Disable()       { f.Inerte = true; f.Refresh() }
 
 func (f *FilaEmergente) FocusGained() { f.enfocado = true; f.Refresh() }
 func (f *FilaEmergente) FocusLost()   { f.enfocado = false; f.Refresh() }
@@ -115,7 +125,7 @@ func (f *FilaEmergente) TypedKey(k *fyne.KeyEvent) {
 		f.Tapped(nil)
 	}
 }
-func (f *FilaEmergente) MouseIn(*desktop.MouseEvent)    { f.encima = true; f.Refresh() }
+func (f *FilaEmergente) MouseIn(*desktop.MouseEvent)    { f.encima = !f.Inerte; f.Refresh() }
 func (f *FilaEmergente) MouseMoved(*desktop.MouseEvent) {}
 func (f *FilaEmergente) MouseOut()                      { f.encima = false; f.Refresh() }
 
@@ -131,15 +141,21 @@ func (f *FilaEmergente) CreateRenderer() fyne.WidgetRenderer {
 	f.fondo.CornerRadius = tema.RadioMD
 	f.texto = ui.Texto(f.Rotulo, tema.TextoSM, ui.Normal, tema.Color("text", v))
 	objs := []fyne.CanvasObject{f.fondo, f.texto}
+	r := &filaEmergenteRenderer{f: f}
 	if f.Glifo != nil {
 		objs = append(objs, f.Glifo.Objeto())
+		r.tintaGlifo = f.Glifo.Tinta()
 	}
-	return &filaEmergenteRenderer{f: f, objs: objs}
+	r.objs = objs
+	r.Refresh()
+	return r
 }
 
 type filaEmergenteRenderer struct {
 	f    *FilaEmergente
 	objs []fyne.CanvasObject
+	// tintaGlifo es la del glifo encendido, para volver a ella al reactivar la fila.
+	tintaGlifo color.NRGBA
 }
 
 func (r *filaEmergenteRenderer) MinSize() fyne.Size           { return MedidaFilaEmergente(r.f.Rotulo) }
@@ -163,12 +179,21 @@ func (r *filaEmergenteRenderer) Refresh() {
 	f := r.f
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	f.fondo.FillColor = color.NRGBA{}
-	if f.encima || f.enfocado {
+	if !f.Inerte && (f.encima || f.enfocado) {
 		f.fondo.FillColor = tema.Color("bg-subtle", v)
 	}
 	f.fondo.Refresh()
-	f.texto.Color = tema.Color("text", v)
+	alfa := float32(1)
+	if f.Inerte {
+		alfa = 0.5
+	}
+	f.texto.Color = tokenConAlfa("text", alfa, v)
 	f.texto.Refresh()
+	if f.Glifo != nil {
+		g := r.tintaGlifo
+		g.A = uint8(float32(g.A) * alfa)
+		f.Glifo.TenirCon(g)
+	}
 	r.Layout(f.Size())
 }
 
@@ -176,6 +201,13 @@ func (r *filaEmergenteRenderer) Refresh() {
 func rotuloEmergente(texto string) fyne.CanvasObject {
 	return container.New(ui.Margen{Izq: CanalonOpcion, Abj: tema.Espacio(1)},
 		ui.NuevoRotulo(ui.Versalitas(texto), tema.TextoXS, ui.SemiNegrita, "text-muted"))
+}
+
+// notaNoDisponible es NOTA_NO_DISPONIBLE de Composer.tsx: `sytue-meta px-1.5 pt-0.5
+// pb-1`, repartida al ancho del panel (`w-0 min-w-full`) para no ensancharlo.
+func notaNoDisponible(texto string, anchoPanel float32, v tema.Variante) fyne.CanvasObject {
+	p := ui.NuevoParrafo(texto, escalonMeta, ui.Normal, "text-subtle", v).A(anchoPanel - 2*CanalonOpcion)
+	return container.New(ui.Margen{Izq: CanalonOpcion, Arr: tema.Espacio(0.5), Der: CanalonOpcion, Abj: tema.Espacio(1)}, p)
 }
 
 // opcionElegible es POPOVER_OPTION: la casilla o el radio con su etiqueta en `text-sm`,
@@ -237,6 +269,11 @@ func (c *Compositor) abrirPrioridad(disparador fyne.CanvasObject) {
 		c.PonerAcuse(si)
 	}
 	filas = append(filas, container.New(ui.Margen{Arr: tema.Espacio(1.5), Abj: tema.Espacio(1.5)}, pelo), opcionElegible(acuse))
+	if !c.puede(AccionPedirAcuse) {
+		acuse.Marcada = false
+		acuse.Disable()
+		filas = append(filas, notaNoDisponible(t.T("matrix.notYetEncrypted", nil), AnchoPrioridad, v))
+	}
 	c.emergente = ui.MostrarPopover(disparador, container.New(anchoFijo(AnchoPrioridad), container.New(ui.Columna{}, filas...)))
 }
 
@@ -251,16 +288,24 @@ func (c *Compositor) abrirProgramar(disparador fyne.CanvasObject) {
 	var e *ui.Emergente
 	reloj := func() *iconos.Dibujo { return dibujo(glifoReloj, GlifoOpcion, "text", v) }
 	manana, lunes := PresetsProgramar(c.ahora())
-	filas := make([]fyne.CanvasObject, 0, 3)
+	// Programar lo guarda el servicio, que con cifrado no ve el texto: los atajos se
+	// quedan a la vista, apagados, bajo la línea que dice por qué.
+	inerte := !c.puede(AccionProgramar)
+	filas := make([]fyne.CanvasObject, 0, 4)
 	filas = append(filas, rotuloEmergente(t.T("composer.sendLater", nil)))
+	if inerte {
+		filas = append(filas, notaNoDisponible(t.T("matrix.notYetEncrypted", nil), AnchoProgramar, v))
+	}
 	for _, p := range []struct {
 		clave  string
 		cuando time.Time
 	}{{"schedule.tomorrow", manana}, {"schedule.monday", lunes}} {
-		filas = append(filas, NuevaFilaEmergente(t.T(p.clave, i18n.Vars{"time": i18n.FormatTime(c.Locale, p.cuando)}), reloj(), func() {
+		f := NuevaFilaEmergente(t.T(p.clave, i18n.Vars{"time": i18n.FormatTime(c.Locale, p.cuando)}), reloj(), func() {
 			c.PonerProgramado(p.cuando)
 			e.Cerrar()
-		}))
+		})
+		f.Inerte = inerte
+		filas = append(filas, f)
 	}
 	col := container.New(ui.Columna{}, filas...)
 	var personalizada *FilaEmergente
@@ -270,6 +315,7 @@ func (c *Compositor) abrirProgramar(disparador fyne.CanvasObject) {
 			col.Add(c.fechaPersonalizada(func() { e.Cerrar() }))
 			e.Recolocar()
 		})
+	personalizada.Inerte = inerte
 	col.Add(personalizada)
 	e = ui.MostrarPopover(disparador, container.New(anchoFijo(AnchoProgramar), col))
 	c.emergente = e

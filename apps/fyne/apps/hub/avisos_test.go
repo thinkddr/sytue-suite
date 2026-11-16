@@ -5,10 +5,14 @@ package hub
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"image/color"
+	"reflect"
+	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -19,23 +23,27 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/webref"
 )
 
-// Números DERIVADOS de las clases de `NotificationsInbox.tsx` con el rem de 14, no
+// Números DERIVADOS de las clases de `NotificationsInbox.tsx` con el rem de 16, no
 // medidos: la sonda del portal no recorre la bandeja todavía. La cuenta va escrita al
 // lado para que se pueda revisar sin abrir el código.
 const (
-	// `py-3` 21 + título 15,75 + `mt-0.5` 1,75 + cuerpo 15,75 + `mt-1` 3,5 + meta 14.
+	// `py-3` 24 + título 18 + `mt-0.5` 2 + cuerpo 18 + `mt-1` 4 + meta 16.
 	altoAvisoCompleto = 82
-	// Sin cuerpo: 21 + 15,75 + 3,5 + 14. La marca (1,75 + 18) no llega.
+	// Sin cuerpo: 24 + 18 + 4 + 16. La marca (2 + 18) no llega.
 	altoAvisoSinCuerpo = 62
-	// Carga: `py-3` 21 + la columna de 14 + `gap-2` 7 + 12.
+	// Carga: `py-3` 24 + la columna de 14 + `gap-2` 8 + 12.
 	altoFilaCarga = 58
-	// La barra con «Marcar todas»: el botón `h-9` (31,5) manda sobre la píldora.
+	// La barra con «Marcar todas»: el botón `h-9` (36) manda sobre la píldora.
 	altoBarraConBoton = 36
-	// Las reglas sin su párrafo: `mt-2` 7 + filete 1 + `pt-6` 21 + h2 19,25 + `mt-1`
-	// 3,5 + `mb-4` 14 + seis interruptores de 19,25 + cinco `gap-3` de 10,5.
-	altoReglasSinParrafo = 267
+	// Las reglas sin su párrafo, a dos columnas, con `tema.Rem`: la cabecera (`mt-2`,
+	// filete, `pt-6`, h2, `mt-1`, `mb-4`) 75; cinco leyendas de 16 con su `mb-3` de 12;
+	// diez filas de interruptores de 22 (4+7+2+3+2 orígenes de dos en dos), cinco
+	// `gap-y-3` de 12 dentro de los grupos y cuatro `gap-6` de 24 entre ellos.
+	// Y la fila fija de Sytue ID: `gap-6` 24 + interruptor 22 + `gap-0.5` 2 (sin su nota).
+	altoReglasSinParrafo = 75 + 5*(16+12) + 10*22 + 5*12 + 4*24 + 24 + 22 + 2
 )
 
 func avisosDePrueba() []api.HubNotification {
@@ -82,7 +90,8 @@ func TestLaBandejaMideLoQueDicenSusClases(t *testing.T) {
 	if got := r.barra(0, 0, ancho, false); !cerca(got, altoBarraConBoton) {
 		t.Errorf("la barra mide %v y sus clases dan %v", got, altoBarraConBoton)
 	}
-	if got := r.altoReglas() - ui.AltoParrafo(r.textoReglas, r.textoReglas.Ancho); !cerca(got, altoReglasSinParrafo) {
+	if got := r.altoReglas() - ui.AltoParrafo(r.textoReglas, r.textoReglas.Ancho) -
+		ui.AltoParrafo(r.notaFijo, r.notaFijo.Ancho); !cerca(got, altoReglasSinParrafo) {
 		t.Errorf("las reglas miden %v sin el párrafo y sus clases dan %v", got, altoReglasSinParrafo)
 	}
 	// Lo que Fyne coloca es lo que se declara: la segunda fila empieza donde acaba la
@@ -227,31 +236,210 @@ func TestLasReglasDeSilencio(t *testing.T) {
 	if len(r.conmutadores) != len(OrigenesSilenciables) {
 		t.Fatalf("hay %d interruptores y son %d", len(r.conmutadores), len(OrigenesSilenciables))
 	}
-	if r.conmutadores[5].Encendido || !r.conmutadores[0].Encendido {
+	if r.conmutadores["rooms"].Encendido || !r.conmutadores["mail"].Encendido {
 		t.Error("Rooms silenciado sale encendido, o Mail sin regla sale apagado")
 	}
-	if r.conmutadores[0].Etiqueta != "Sytue Mail" {
-		t.Errorf("el interruptor de Mail se llama %q y en la web «Sytue Mail»", r.conmutadores[0].Etiqueta)
+	if r.conmutadores["mail"].Etiqueta != "Sytue Mail" {
+		t.Errorf("el interruptor de Mail se llama %q y en la web «Sytue Mail»", r.conmutadores["mail"].Etiqueta)
 	}
-	test.Tap(r.conmutadores[0])
+	test.Tap(r.conmutadores["mail"])
 	if origen != "mail" || !silencio {
 		t.Errorf("apagar Mail pide al Hub %q silenciado=%v", origen, silencio)
 	}
+	// Sytue ID sale al final, encendido e inerte, con su porqué: como en la web.
+	if r.fijo == nil || !r.fijo.Encendido || !r.fijo.Disabled() || !seVe(r, r.fijo) {
+		t.Fatal("el interruptor de Sytue ID no sale fijo y encendido")
+	}
+	if r.notaFijo == nil || !seVe(r, r.notaFijo) || r.notaFijo.Texto == "" || r.notaFijo.Texto == "inbox.prefsAlwaysOn" {
+		t.Error("falta la nota «Siempre activos por tu seguridad» bajo Sytue ID")
+	}
+	if objs := r.Objects(); objs[len(objs)-2] != r.fijo {
+		t.Error("Sytue ID no sale al final de las reglas")
+	}
+	origen = ""
+	test.Tap(r.fijo)
+	if origen != "" || !r.fijo.Encendido {
+		t.Errorf("pulsar Sytue ID pide al Hub %q o lo apaga", origen)
+	}
+}
+
+// TestLosGruposDeAvisosSonLosDeLaWeb: la lista nativa es `ORIGENES_DE_AVISOS` de
+// @sytue/shell, grupo a grupo y en el mismo orden.
+//
+// Visto en ROJO a mano el 2026-11-10: con la lista de seis de antes no casa ni el
+// primer grupo.
+func TestLosGruposDeAvisosSonLosDeLaWeb(t *testing.T) {
+	ts := webref.Read(t, "apps/frontend/packages/shell/src/avisos.ts")
+	i := strings.Index(ts, "export const ORIGENES_DE_AVISOS")
+	if i < 0 {
+		t.Fatal("avisos.ts ya no exporta ORIGENES_DE_AVISOS: revisar el espejo")
+	}
+	bloque := ts[i:]
+	_, bloque, ok := strings.Cut(bloque, "= [")
+	bloque, _, ok2 := strings.Cut(bloque, "];")
+	if !ok || !ok2 {
+		t.Fatal("ORIGENES_DE_AVISOS ya no es una lista literal: revisar el espejo")
+	}
+	web := make([]GrupoAvisos, 0, len(GruposDeAvisos))
+	for _, m := range regexp.MustCompile(`(?s)grupo:\s*'(\w+)',\s*origenes:\s*\[([^\]]*)\]`).FindAllStringSubmatch(bloque, -1) {
+		g := GrupoAvisos{Grupo: m[1]}
+		for _, o := range regexp.MustCompile(`'(\w+)'`).FindAllStringSubmatch(m[2], -1) {
+			g.Origenes = append(g.Origenes, o[1])
+		}
+		web = append(web, g)
+	}
+	if len(web) == 0 || !reflect.DeepEqual(web, GruposDeAvisos) {
+		t.Errorf("los grupos nativos son\n%v\ny los de la web\n%v", GruposDeAvisos, web)
+	}
+}
+
+// seVe dice si el objeto está entre lo que la pantalla pinta.
+func seVe(r *avisosRenderer, o fyne.CanvasObject) bool { return slices.Contains(r.Objects(), o) }
+
+// TestLasReglasEnteras: todos los orígenes, por familias, con el nombre de cada uno, y el
+// ámbito de las reglas dicho; una cuenta personal no ve ERP, Bases ni Web.
+func TestLasReglasEnteras(t *testing.T) {
+	a := NuevaAvisos(traductor(t))
+	a.Estado, a.Organizacion = Listo, "Acme"
+	r := test.WidgetRenderer(a).(*avisosRenderer)
+	for _, o := range []string{"erp", "cast", "pages", "photos", "integrations"} {
+		if c := r.conmutadores[o]; c == nil || !seVe(r, c) {
+			t.Errorf("no hay interruptor para %q", o)
+		}
+	}
+	if got := r.conmutadores["integrations"].Etiqueta; got != a.T.T("inbox.prefsSource.integrations", nil) {
+		t.Errorf("Integraciones se llama %q", got)
+	}
+	if len(r.leyendas) != 5 || r.leyendas[0].Text != strings.ToUpper(a.T.T("inbox.prefsGroup.communication", nil)) {
+		t.Errorf("las leyendas no son las cinco familias: %d", len(r.leyendas))
+	}
+	if !strings.Contains(r.textoReglas.Texto, "Acme") {
+		t.Errorf("el texto no dice de qué organización son las reglas: %q", r.textoReglas.Texto)
+	}
+
+	a.Personal = true
+	a.Refresh()
+	for _, o := range SoloOrganizaciones {
+		if seVe(r, r.conmutadores[o]) {
+			t.Errorf("una cuenta personal ve el interruptor de %q", o)
+		}
+	}
+	if strings.Contains(r.textoReglas.Texto, "Acme") || !strings.Contains(r.textoReglas.Texto, a.T.T("inbox.prefsScopePersonal", nil)) {
+		t.Errorf("una cuenta personal no dice que sus reglas son las de su cuenta: %q", r.textoReglas.Texto)
+	}
+	if len(r.leyendas) != 4 {
+		t.Errorf("sin ERP ni Bases el grupo de negocio sobra y hay %d leyendas", len(r.leyendas))
+	}
+}
+
+// TestLasReglasSinCargarNoOfrecenInterruptores: mientras cargan, fantasmas sin nada que
+// pulsar; si fallan, el aviso con «Reintentar» y NINGÚN interruptor, que saldrían
+// encendidos aunque hubiera cosas calladas.
+//
+// Visto en ROJO a mano el 2026-11-10: sin `CargaReglas`, los diecinueve interruptores
+// salen pintados y encendidos en los dos estados.
+func TestLasReglasSinCargarNoOfrecenInterruptores(t *testing.T) {
+	a := NuevaAvisos(traductor(t))
+	a.Estado, a.CargaReglas = Listo, ReglasCargando
+	r := test.WidgetRenderer(a).(*avisosRenderer)
+	for o, c := range r.conmutadores {
+		if seVe(r, c) {
+			t.Errorf("cargando, se ofrece el interruptor de %q", o)
+		}
+	}
+	if seVe(r, r.fijo) {
+		t.Error("cargando, ya sale la fila fija de Sytue ID")
+	}
+	if len(r.fantasmas) != len(OrigenesSilenciables) {
+		t.Errorf("cargando hay %d fantasmas y son %d orígenes", len(r.fantasmas), len(OrigenesSilenciables))
+	}
+
+	reintentos := 0
+	a.CargaReglas, a.AlReintentarReglas = ReglasFallo, func() { reintentos++ }
+	a.Refresh()
+	for o, c := range r.conmutadores {
+		if seVe(r, c) {
+			t.Errorf("con la carga fallida, se ofrece el interruptor de %q", o)
+		}
+	}
+	if r.falloReglas == nil || r.falloReglas.Tono != ui.AyudaPeligro || r.falloReglas.Titulo != a.T.T("inbox.prefsLoadError", nil) {
+		t.Fatalf("con la carga fallida no se dice: %+v", r.falloReglas)
+	}
+	test.Tap(r.reintentar)
+	if reintentos != 1 {
+		t.Errorf("«Reintentar» pide las reglas %d veces", reintentos)
+	}
+	img := pintaWidget(t, a, r.alto)
+	guardar(t, img, "avisos-reglas-fallo")
+}
+
+// TestLasReglasConElHubQueFalla: si la carga falla lo dice y reintentar las trae; si el
+// guardado falla, el interruptor vuelve a donde estaba y su fila lo dice.
+//
+// Visto en ROJO a mano el 2026-11-10: con el `_, _ =` de antes en `silenciar`, Drive
+// se queda silenciado en pantalla aunque el Hub no lo haya guardado.
+func TestLasReglasConElHubQueFalla(t *testing.T) {
+	d := &buzonDoble{
+		items:       avisosDePrueba(),
+		reglas:      []api.HubNotificationPref{{Source: "mail", Muted: true}},
+		flujo:       make(chan api.HubNotification),
+		falloReglas: errors.New("503"),
+	}
+	v := NuevaVista(traductor(t), nil, time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC)).ConBuzon(d)
+	lee := func(f func(a *Avisos) bool) func() bool {
+		return func() bool {
+			v.mu.Lock()
+			defer v.mu.Unlock()
+			return f(v.avisos)
+		}
+	}
+	v.Ir(AAvisos)
+	defer v.Ir(AInicio)
+	esperar(t, "la carga fallida", lee(func(a *Avisos) bool { return a.Estado == Listo && a.CargaReglas == ReglasFallo }))
+
+	d.mira(func() bool { d.falloReglas = nil; return true })
+	fyne.DoAndWait(func() { v.avisos.AlReintentarReglas() })
+	esperar(t, "reintentar", lee(func(a *Avisos) bool { return a.CargaReglas == ReglasListas && Silenciado(a.Reglas, "mail") }))
+
+	d.mira(func() bool { d.falloGuardar = errors.New("500"); return true })
+	r := test.WidgetRenderer(v.avisos).(*avisosRenderer)
+	fyne.DoAndWait(func() { test.Tap(r.conmutadores["drive"]) })
+	esperar(t, "el guardado fallido", lee(func(a *Avisos) bool { return a.FalloRegla["drive"] && !a.GuardandoRegla["drive"] }))
+	if lee(func(a *Avisos) bool { return Silenciado(a.Reglas, "drive") || !Silenciado(a.Reglas, "mail") })() {
+		t.Error("tras el fallo Drive sigue silenciado, o se ha perdido la regla de Mail")
+	}
+	fyne.DoAndWait(func() {
+		if !r.conmutadores["drive"].Encendido {
+			t.Error("el interruptor de Drive no ha vuelto a su sitio")
+		}
+		if p := r.fallosFila["drive"]; p == nil || !seVe(r, p) || p.Texto != v.avisos.T.T("inbox.prefsSaveError", nil) {
+			t.Error("la fila de Drive no dice que no se ha guardado")
+		}
+	})
+
+	// Un guardado bueno borra el aviso de la fila.
+	d.mira(func() bool { d.falloGuardar = nil; return true })
+	fyne.DoAndWait(func() { test.Tap(r.conmutadores["drive"]) })
+	esperar(t, "el guardado bueno", lee(func(a *Avisos) bool {
+		return !a.FalloRegla["drive"] && !a.GuardandoRegla["drive"] && Silenciado(a.Reglas, "drive")
+	}))
 }
 
 // buzonDoble es un Hub de mentira para la bandeja, seguro entre gorutinas.
 type buzonDoble struct {
-	mu      sync.Mutex
-	items   []api.HubNotification
-	reglas  []api.HubNotificationPref
-	leidos  []string
-	todas   int
-	puestas []api.HubNotificationPref
-	flujo   chan api.HubNotification
-	mas     []api.HubNotification // la página de detrás
-	antes   []string              // a partir de qué id se pidió
-	soltar  chan struct{}         // si no es nil, «Cargar más» espera a que se cierre
-	cargas  int                   // cuántas veces se pidió la primera página
+	falloReglas  error // si no es nil, NotificationPrefs falla
+	falloGuardar error // si no es nil, SetNotificationPref falla
+	mu           sync.Mutex
+	items        []api.HubNotification
+	reglas       []api.HubNotificationPref
+	leidos       []string
+	todas        int
+	puestas      []api.HubNotificationPref
+	flujo        chan api.HubNotification
+	mas          []api.HubNotification // la página de detrás
+	antes        []string              // a partir de qué id se pidió
+	soltar       chan struct{}         // si no es nil, «Cargar más» espera a que se cierre
+	cargas       int                   // cuántas veces se pidió la primera página
 }
 
 func (b *buzonDoble) Notifications(context.Context, int) ([]api.HubNotification, error) {
@@ -300,6 +488,11 @@ func (b *buzonDoble) MarkAllRead(context.Context) error {
 }
 
 func (b *buzonDoble) NotificationPrefs(context.Context) ([]api.HubNotificationPref, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.falloReglas != nil {
+		return nil, b.falloReglas
+	}
 	return b.reglas, nil
 }
 
@@ -307,6 +500,9 @@ func (b *buzonDoble) SetNotificationPref(_ context.Context, p api.HubNotificatio
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.puestas = append(b.puestas, p)
+	if b.falloGuardar != nil {
+		return api.HubNotificationPref{}, b.falloGuardar
+	}
 	return p, nil
 }
 
@@ -319,10 +515,15 @@ func (b *buzonDoble) mira(f func() bool) bool {
 // esperar da hasta un segundo a que algo que va en segundo plano ocurra.
 func esperar(t *testing.T, que string, f func() bool) {
 	t.Helper()
-	for range 100 {
+	// Plazo por reloj, no por vueltas: con toda la suite en paralelo un segundo no
+	// bastaba y el foco llegaba tarde (TestConSinLeerElFocoPasaAlVecino).
+	for limite := time.Now().Add(5 * time.Second); ; {
 		fyne.DoAndWait(func() {}) // lo que el fondo manda pintar corre en la rutina del test
 		if f() {
 			return
+		}
+		if time.Now().After(limite) {
+			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}

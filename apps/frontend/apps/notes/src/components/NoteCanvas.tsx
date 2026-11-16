@@ -21,9 +21,7 @@ import type { JSX } from 'preact';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import {
   Button,
-  Illustration,
   EmptyState,
-  Spinner,
   cx,
   usePointerDrag,
   enCampoDeTexto,
@@ -36,6 +34,7 @@ import { colocarNota, conSangria } from '../client/arbol.js';
 import { interpretarCaptura, type Captura } from '../client/captura.js';
 import type { DestinoInterno } from '../client/enlaces.js';
 import type { FuentesDeEnlace } from './LinkTool.js';
+import { EsqueletoCuaderno } from './Esqueletos.js';
 import { NoteCard } from './NoteCard.js';
 import type { ClaroDeNota } from '../client/crypto.js';
 
@@ -57,6 +56,12 @@ interface Props {
   cargando: boolean;
   /** Contenidos ya descifrados, si el cuaderno está desbloqueado. */
   claro: ClaroPorNota;
+  /**
+   * Cuántas veces se ha sustituido cada nota por otra versión desde fuera del editor
+   * («Ver la otra» de un conflicto). Va en la `key` de su tarjeta: el editor abierto
+   * se cierra con lo que había y no vuelve a guardar el borrador que se descartó.
+   */
+  reinicios?: Record<string, number>;
   bloqueado: boolean;
   soloLectura?: boolean;
   /** La nota llena el panel: es el caso de la vista de árbol, donde se muestra
@@ -86,9 +91,12 @@ interface Props {
   onPostpone?: ((note: Note) => void) | undefined;
   onExport?: ((note: Note) => void) | undefined;
   onTogglePin: (note: Note) => void;
-  onShare: (note: Note) => void;
+  onShare?: (note: Note) => void;
   onTags: (note: Note) => void;
   onBacklinks: (note: Note) => void;
+  onInfo?: ((note: Note) => void) | undefined;
+  /** Historial de versiones (VersionesNota.tsx). */
+  onVersions?: ((note: Note) => void) | undefined;
   onNuevaDentro?: ((padre: Note) => void) | undefined;
   onSacar?: ((note: Note) => void) | undefined;
   onIcon?: ((note: Note) => void) | undefined;
@@ -131,6 +139,7 @@ export function NoteCanvas({
   ordenOcupado = false,
   cargando,
   claro,
+  reinicios,
   bloqueado,
   soloLectura,
   llenar = false,
@@ -147,6 +156,8 @@ export function NoteCanvas({
   onShare,
   onTags,
   onBacklinks,
+  onInfo,
+  onVersions,
   onNuevaDentro,
   onSacar,
   onIcon,
@@ -526,10 +537,11 @@ export function NoteCanvas({
   const zonaDeCaptura = capturaActiva ? { onDragOver: arrastrarEncima, onDrop: soltar } : {};
 
   if (cargando) {
+    // La forma de lo que va a llegar, no una rueda: así no salta nada al cargar.
     return (
-      <div class="grid h-full place-items-center" aria-busy="true">
-        <Spinner size={24} />
-      </div>
+      <EsqueletoCuaderno
+        forma={llenar ? 'hoja' : notebook.layout === 'list' ? 'filas' : 'tarjetas'}
+      />
     );
   }
 
@@ -569,7 +581,7 @@ export function NoteCanvas({
           <EmptyState
             title={t('empty.noNotes.title')}
             description={t('empty.noNotes.body')}
-            illustration={<Illustration name="emptyNotes" />}
+            spot="emptyNotes"
             action={
               onCreateFirst && !soloLectura ? (
                 <Button size="sm" onClick={onCreateFirst}>
@@ -588,7 +600,7 @@ export function NoteCanvas({
     <NoteCard
       diario={enFilas}
       nivel={nivel}
-      key={note.id}
+      key={`${note.id}:${reinicios?.[note.id] ?? 0}`}
       t={t}
       note={note}
       llenar={llenar}
@@ -604,9 +616,11 @@ export function NoteCanvas({
       {...(onPostpone ? { onPostpone: () => onPostpone(note) } : {})}
       {...(onExport ? { onExport: () => onExport(note) } : {})}
       onTogglePin={() => onTogglePin(note)}
-      onShare={() => onShare(note)}
+      {...(onShare ? { onShare: () => onShare(note) } : {})}
       onTags={() => onTags(note)}
       onBacklinks={() => onBacklinks(note)}
+      {...(onInfo ? { onInfo: () => onInfo(note) } : {})}
+      {...(onVersions ? { onVersions: () => onVersions(note) } : {})}
       {...(onNuevaDentro ? { onNuevaDentro: () => onNuevaDentro(note) } : {})}
       {...(onSacar ? { onSacar: () => onSacar(note) } : {})}
       {...(onIcon ? { onIcon: () => onIcon(note) } : {})}

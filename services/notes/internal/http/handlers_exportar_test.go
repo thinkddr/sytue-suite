@@ -98,3 +98,41 @@ func TestPreviewCortaLosFicherosEnormes(t *testing.T) {
 		t.Fatalf("código %d, quiero 400", rec.Code)
 	}
 }
+
+func TestEncryptedBackupRejectsLegacyLinksBeforePreviewOrImport(t *testing.T) {
+	backup := `{"formato":"sytue.notepads","version":1,"notebook":{"title":"book","encrypted":true,"crypto":{"v":1,"kdf":"PBKDF2-SHA256","salt":"abcdefghijklmnop","iterations":600000,"check":"encv1:test"}},"notas":[{"kind":"text","content_cipher":"encv1:AAAA","links":[{"target_kind":"note","target_id":"x","label":"secret"}]}]}`
+	for _, handler := range []func(http.ResponseWriter, *http.Request){(&Handlers{}).PreviewNotebook, (&Handlers{}).ImportNotebook} {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/notebooks/import", strings.NewReader(backup))
+		rec := httptest.NewRecorder()
+		handler(rec, req)
+		if rec.Code != http.StatusConflict || strings.Contains(rec.Body.String(), "secret") {
+			t.Fatalf("unsafe backup not rejected: %d %s", rec.Code, rec.Body.String())
+		}
+	}
+}
+
+// Importar desde otros programas pasa por la MISMA vista previa: el Markdown
+// llega saneado y el título del cuaderno sale del nombre del fichero.
+func TestPreviewAceptaMarkdownConElNombreDelFichero(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/notebooks/preview?name=Ideas.md",
+		strings.NewReader("Una **idea** <script>alert(1)</script>"))
+	rec := httptest.NewRecorder()
+	(&Handlers{}).PreviewNotebook(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("código %d: %s", rec.Code, rec.Body.String())
+	}
+	var out struct {
+		Notebook domain.Notebook `json:"notebook"`
+		Notas    []domain.Note   `json:"notas"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+	if out.Notebook.Title != "Ideas" || len(out.Notas) != 1 {
+		t.Fatalf("cuaderno %q con %d notas", out.Notebook.Title, len(out.Notas))
+	}
+	c := out.Notas[0].Content
+	if !strings.Contains(c, "<strong>idea</strong>") || strings.Contains(c, "<script") {
+		t.Errorf("contenido %q", c)
+	}
+}

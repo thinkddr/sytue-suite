@@ -76,6 +76,7 @@ export function VistasDemo({
         agrupar={CAMPOS[4]!}
         registros={registros}
         puedeEditar
+        onAbrir={() => undefined}
         onMover={(r, valor) => {
           setRegistros((rs) =>
             rs.map((x) => (x.id === r.id ? { ...x, data: { ...x.data, estado: valor } } : x)),

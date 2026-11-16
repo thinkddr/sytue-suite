@@ -8,3 +8,6 @@ package ficheros
 // ordenElegir: fuera del escritorio no hay un programa del sistema que abra un selector.
 // En móvil lo da el propio sistema a la app, y eso no pasa por aquí.
 func ordenElegir(string, []string) (string, []string, error) { return "", nil, ErrNoDisponible }
+
+// ordenElegirCarpeta: en el móvil no hay selector de carpetas que recorrer.
+func ordenElegirCarpeta(string) (string, []string, error) { return "", nil, ErrNoDisponible }

@@ -21,6 +21,7 @@ import type { JSX } from 'preact';
 import { useCallback, useEffect, useState } from 'preact/hooks';
 import {
   Button,
+  EmptyState,
   FieldGroup,
   FieldHint,
   Icon,
@@ -219,7 +220,7 @@ export function CompartirConPersonas(p: CompartirConPersonasProps): JSX.Element 
           </Button>
         </div>
       ) : personas && personas.length === 0 ? (
-        <p class="text-text-muted text-sm">{t('sharePeople.empty')}</p>
+        <EmptyState compact headingLevel={4} title={t('sharePeople.empty')} />
       ) : (
         <ul class="divide-border/60 border-border divide-y rounded-md border">
           {(personas ?? []).map((x) => (

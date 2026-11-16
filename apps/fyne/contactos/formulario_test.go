@@ -112,7 +112,8 @@ func TestSinNombreNoSeGuarda(t *testing.T) {
 }
 
 // TestEditarConservaLoQueNoSeVe: el PUT sustituye el contacto entero, así que lo que el
-// formulario no enseña —apellidos, cargo— tiene que viajar igual, con su etag.
+// formulario no enseña —los apellidos— tiene que viajar igual, con su etag; y el cargo,
+// que sí enseña, vuelve tal cual si no se toca.
 func TestEditarConservaLoQueNoSeVe(t *testing.T) {
 	c := fichaDeMuestra()
 	c.FamilyName, c.Title, c.ETag = "Lovelace", "Condesa", "e1"
@@ -279,5 +280,45 @@ func TestElAsistenteRellenaLaFichaYNoGuarda(t *testing.T) {
 	f.pedirFicha()
 	if !f.errIA || f.nombre.Texto() != "Ana Ruiz" {
 		t.Errorf("sin ficha: error %v, nombre %q", f.errIA, f.nombre.Texto())
+	}
+}
+
+// TestElFormularioEditaCargoYApodo: el cargo y el apodo salen rellenos al editar, la
+// vista previa dice «Cargo · Empresa» mientras se escribe y viajan recortados; vaciar
+// el apodo lo borra.
+func TestElFormularioEditaCargoYApodo(t *testing.T) {
+	c := fichaDeMuestra()
+	c.Title, c.Nickname, c.ETag = "Condesa", "Ada", "e1"
+	s := &servicioFalso{contactos: []api.Contact{c}}
+	_, f := formularioDePrueba(t, s, true)
+	if f.cargo.Texto() != "Condesa" || f.apodo.Texto() != "Ada" {
+		t.Fatalf("cargo %q y apodo %q; la ficha trae «Condesa» y «Ada»", f.cargo.Texto(), f.apodo.Texto())
+	}
+	if f.textoOrg != "Condesa · Analytical Engines" {
+		t.Errorf("la vista previa dice %q", f.textoOrg)
+	}
+	f.cargo.PonerTexto("  Matemática ")
+	if f.previaOrg.Text != "Matemática · Analytical Engines" {
+		t.Errorf("la vista previa no sigue al cargo: %q", f.previaOrg.Text)
+	}
+	f.apodo.PonerTexto("  ")
+	f.guardar()
+	in := cuerpoDe(t, s, "PUT /api/v1/contacts/ada")
+	if in.Title != "Matemática" || in.Nickname != "" {
+		t.Errorf("cargo %q y apodo %q; se esperaba «Matemática» y ninguno", in.Title, in.Nickname)
+	}
+}
+
+// TestElFormularioCreaConCargoYApodo: al crear, los dos viajan con lo escrito.
+func TestElFormularioCreaConCargoYApodo(t *testing.T) {
+	s := &servicioFalso{contactos: []api.Contact{persona("ana", "Ana")}}
+	_, f := formularioDePrueba(t, s, false)
+	f.nombre.PonerTexto("Grace Hopper")
+	f.cargo.PonerTexto("Contraalmirante")
+	f.apodo.PonerTexto("Amazing Grace")
+	f.guardar()
+	in := cuerpoDe(t, s, "POST /api/v1/address-books/l1/contacts")
+	if in.Title != "Contraalmirante" || in.Nickname != "Amazing Grace" {
+		t.Errorf("cargo %q y apodo %q", in.Title, in.Nickname)
 	}
 }

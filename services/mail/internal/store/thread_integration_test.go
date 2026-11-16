@@ -26,7 +26,7 @@ import (
 
 // seedReply inserta una respuesta a `to` en el buzón `mbox`: mismo hilo por
 // In-Reply-To. Devuelve el mensaje ya con su thread_id resuelto.
-func seedReply(t *testing.T, ctx context.Context, st *store.Store, acc domain.Account, mbox uuid.UUID, subject, from string, to domain.Message) domain.Message {
+func seedReply(ctx context.Context, t *testing.T, st *store.Store, acc domain.Account, mbox uuid.UUID, subject, from string, to domain.Message) domain.Message {
 	t.Helper()
 	m := &domain.Message{
 		AccountID:  acc.ID,
@@ -50,7 +50,7 @@ func TestListThreadMessagesAtraviesaCarpetas(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
-	acc := seedAccount(t, ctx, st, "ada@sytue.eu")
+	acc := seedAccount(ctx, t, st, "ada@sytue.eu")
 	inbox, err := st.MailboxByRole(ctx, acc.ID, domain.RoleInbox)
 	if err != nil {
 		t.Fatalf("MailboxByRole(inbox): %v", err)
@@ -66,10 +66,10 @@ func TestListThreadMessagesAtraviesaCarpetas(t *testing.T) {
 
 	// Un hilo repartido por tres carpetas: lo recibido, tu respuesta en Enviados
 	// y una réplica ya archivada. Más un mensaje suelto que NO es del hilo.
-	recibido := seedMessage(t, ctx, st, acc, inbox.ID, "Presupuesto Q3", "cliente@ext.eu", nil)
-	respuesta := seedReply(t, ctx, st, acc, sent.ID, "Re: Presupuesto Q3", "ada@sytue.eu", recibido)
-	archivado := seedReply(t, ctx, st, acc, archive.ID, "Re: Presupuesto Q3", "cliente@ext.eu", respuesta)
-	otro := seedMessage(t, ctx, st, acc, inbox.ID, "Nóminas", "rrhh@sytue.eu", nil)
+	recibido := seedMessage(ctx, t, st, acc, inbox.ID, "Presupuesto Q3", "cliente@ext.eu", nil)
+	respuesta := seedReply(ctx, t, st, acc, sent.ID, "Re: Presupuesto Q3", "ada@sytue.eu", recibido)
+	archivado := seedReply(ctx, t, st, acc, archive.ID, "Re: Presupuesto Q3", "cliente@ext.eu", respuesta)
+	otro := seedMessage(ctx, t, st, acc, inbox.ID, "Nóminas", "rrhh@sytue.eu", nil)
 
 	// Precondición del ceiling: el threading YA era por cuenta.
 	if respuesta.ThreadID != recibido.ThreadID || archivado.ThreadID != recibido.ThreadID {
@@ -123,13 +123,13 @@ func TestListThreadMessagesEsDelDuenoYDelTenant(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
-	ada := seedAccount(t, ctx, st, "ada@sytue.eu")
-	bob := seedAccount(t, ctx, st, "bob@sytue.eu")
+	ada := seedAccount(ctx, t, st, "ada@sytue.eu")
+	bob := seedAccount(ctx, t, st, "bob@sytue.eu")
 	inbox, err := st.MailboxByRole(ctx, ada.ID, domain.RoleInbox)
 	if err != nil {
 		t.Fatalf("MailboxByRole: %v", err)
 	}
-	m := seedMessage(t, ctx, st, ada, inbox.ID, "Confidencial", "cliente@ext.eu", nil)
+	m := seedMessage(ctx, t, st, ada, inbox.ID, "Confidencial", "cliente@ext.eu", nil)
 
 	if got, err := st.ListThreadMessages(ctx, bob.ID, m.ThreadID, 0); err != nil || len(got) != 0 {
 		t.Fatalf("otra cuenta del tenant ve el hilo: %d mensajes, err=%v", len(got), err)

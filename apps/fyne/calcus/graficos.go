@@ -965,7 +965,7 @@ func verGrafico(g Grafico, get func(c, f int) formula.Value, otros string) vista
 	var v vistaGrafico
 	var d datosGrafico
 	if ok {
-		r = formula.Rect{C1: min(r.C1, Columnas-1), R1: min(r.R1, Filas-1), C2: min(r.C2, Columnas-1), R2: min(r.R2, Filas-1)}
+		r = formula.Rect{C1: min(r.C1, MaxColumnas-1), R1: min(r.R1, MaxFilas-1), C2: min(r.C2, MaxColumnas-1), R2: min(r.R2, MaxFilas-1)}
 		d = extraerDatos(r, get, g.ByRow)
 	}
 	circ := g.Type == "pie" || g.Type == "donut"

@@ -14,6 +14,7 @@ import { bff, toBffContext } from '../lib/auth';
 import { hubBaseUrl } from '../lib/auth';
 import { canonicaConOrg, returnToCanonico } from '@sytue/config';
 import { NotificationsInbox } from '../components/NotificationsInbox';
+import { esCuentaPersonal } from '@sytue/auth';
 
 export const prerender = false;
 
@@ -45,6 +46,12 @@ const t = useT(locale);
       <p class="text-text-muted mt-2 max-w-2xl text-base">{t('inbox.intro')}</p>
     </header>
 
-    <NotificationsInbox client:load locale={locale} hubBaseUrl={hubBaseUrl()} />
+    <NotificationsInbox
+      client:load
+      locale={locale}
+      hubBaseUrl={hubBaseUrl()}
+      organizacion={session.user.tenant}
+      personal={esCuentaPersonal(session.user)}
+    />
   </div>
 </AppLayout>

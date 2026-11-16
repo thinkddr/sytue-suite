@@ -6,15 +6,16 @@
  */
 import type { ComponentChildren } from 'preact';
 import { useEffect } from 'preact/hooks';
-import { SytueShell } from '@sytue/shell';
+import { abrirPaleta, SytueShell } from '@sytue/shell';
 import { getAccessToken } from '@sytue/auth/client';
-import { AdminShell, Sidebar, SidebarSection, SidebarItem, Icon } from '@sytue/ui';
+import { Kbd, AdminShell, Sidebar, SidebarSection, SidebarItem, Icon, useAtajo } from '@sytue/ui';
 import type { IconName } from '@sytue/ui';
 import type { SytueUser } from '@sytue/auth';
 import { MARCA_ORG, orgActual, RE_SLUG_ORG, rutaConOrg } from '@sytue/config';
 import type { Locale } from '@sytue/i18n';
 import { useT, type ConsoleMessageKey } from '../i18n/index.js';
 import OrgSwitcher from './OrgSwitcher.js';
+import ComandosDeConsola from './ComandosDeConsola.js';
 
 interface ConsoleShellProps {
   user: SytueUser;
@@ -41,7 +42,7 @@ interface ConsoleShellProps {
 
 // La etiqueta NO va aquí: va al catálogo. Se guarda la CLAVE para que el orden del
 // menú (que es una decisión de producto) viva separado de su traducción.
-const NAV: { id: string; labelKey: ConsoleMessageKey; icon: IconName; href: string }[] = [
+export const NAV: { id: string; labelKey: ConsoleMessageKey; icon: IconName; href: string }[] = [
   { id: 'dashboard', labelKey: 'nav.dashboard', icon: 'grid', href: '/' },
   { id: 'tenants', labelKey: 'nav.tenants', icon: 'building', href: '/tenants' },
   { id: 'users', labelKey: 'nav.users', icon: 'user', href: '/users' },
@@ -109,6 +110,7 @@ export default function ConsoleShell({
   children,
 }: ConsoleShellProps) {
   const t = useT(locale);
+  const metaHint = useAtajo('Ctrl K');
 
   // --- La barra de direcciones converge a la canónica (ADR 0056) -----------
   // La vuelta del login aterriza en la forma que el middleware sirve POR DENTRO
@@ -166,6 +168,23 @@ export default function ConsoleShell({
         </div>
       }
     >
+      <div class="px-2 pb-2">
+        {/* El disparador visible de la paleta: el atajo no se descubre solo, y en
+            el teléfono no hay teclado con el que pulsarlo. */}
+        <button
+          type="button"
+          onClick={abrirPaleta}
+          class="text-sidebar-fg-muted hover:bg-sidebar-hover hover:text-sidebar-fg sytue-focus-ring-chrome flex min-h-11 w-full items-center gap-2 rounded-md px-2 text-sm transition-colors focus-visible:outline-none md:min-h-9"
+          aria-haspopup="dialog"
+          // La tecla dibujada es decoración (`Kbd` va con `aria-hidden`): el atajo se
+          // anuncia aquí, como en el disparador de Cloud.
+          aria-keyshortcuts="Meta+K Control+K"
+        >
+          <Icon name="search" size={16} />
+          <span class="flex-1 text-left">{t('palette.trigger')}</span>
+          <Kbd tone="chrome">{metaHint}</Kbd>
+        </button>
+      </div>
       <SidebarSection title={t('shell.sectionAdmin')}>
         {NAV.filter((n) => allowed === undefined || allowed.includes(n.id)).map((n) => (
           <SidebarItem
@@ -207,6 +226,13 @@ export default function ConsoleShell({
       locale={locale}
     >
       <AdminShell sidebar={sidebar}>{children}</AdminShell>
+      {/* La paleta es la de la suite (⌘K); la consola solo le pone su capa. */}
+      <ComandosDeConsola
+        t={t}
+        nav={NAV.map((n) => ({ id: n.id, label: t(n.labelKey), icon: n.icon, href: n.href }))}
+        allowed={allowed}
+        ruta={ruta}
+      />
     </SytueShell>
   );
 }

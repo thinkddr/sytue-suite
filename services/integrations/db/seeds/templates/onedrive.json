@@ -21,7 +21,10 @@
       "scopes": [
         "Files.ReadWrite",
         "offline_access"
-      ]
+      ],
+      "authorize_params": {
+        "prompt": "select_account"
+      }
     }
   }
 }

@@ -126,7 +126,7 @@ func TestLosRecientesSeFiltranPorNombre(t *testing.T) {
 func TestElGlifoPDFEsElDeLaWeb(t *testing.T) {
 	fuente := webref.Read(t, "apps/frontend/packages/office/src/components/DocList.tsx")
 	for _, trozo := range []string{
-		`d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5"`,
+		`d="M13.5 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8.5ZM13.5 3.5V8.5h5"`,
 		`transform="translate(4.4 7.6) scale(0.63)"`,
 		`d="M4.5 20.5h15M6.5 17.5h11v-1.8a2 2 0 0 0-1.5-1.9l-2.2-.6a1.3 1.3 0 0 1-.9-1.5l.5-2.9A3.4 3.4 0 0 0 12 3.5a3.4 3.4 0 0 0-3.4 4.3l.5 2.9a1.3 1.3 0 0 1-.9 1.5l-2.2.6a2 2 0 0 0-1.5 1.9Z"`,
 	} {

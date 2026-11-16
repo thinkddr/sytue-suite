@@ -17,6 +17,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   alturaArrastre,
   alturaHoja,
+  alturaVisible,
   geometriaHoja,
   posicionAlSoltar,
   posicionAlTocar,
@@ -65,6 +66,16 @@ describe('alturas', () => {
     expect(alturaArrastre('mes', 50, 5)).toBe(224);
     expect(alturaArrastre('agenda', -30, 5)).toBe(0);
     expect(alturaArrastre('semana', -10, 5)).toBe(54);
+  });
+  test('B4 estiron-elastico', () => {
+    expect(alturaVisible('mes', 48, 5)).toBe(248);
+    expect(alturaVisible('mes', 0, 5)).toBe(224);
+    expect(alturaVisible('semana', 100, 5)).toBe(164);
+    expect(alturaVisible('semana', 208, 5)).toBe(248);
+    expect(alturaVisible('agenda', -30, 5)).toBe(0);
+    expect(alturaVisible('mes', 100000, 5)).toBeLessThan(224 + 48);
+    // Sigue al dedo sin saltos al pasar del mes.
+    expect(alturaVisible('mes', 0.001, 5) - 224).toBeLessThan(0.01);
   });
   test('B3 geometria-continua', () => {
     expect(geometriaHoja(224, 5, 2)).toEqual({ plegado: 0, subida: 0 });

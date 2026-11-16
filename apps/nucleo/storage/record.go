@@ -31,7 +31,7 @@ var productIDs = strings.Fields(productCatalog)
 
 func Product(product string) bool { return slices.Contains(productIDs, product) }
 
-// Products is the shared routing registry for the private storage core.
+// Products is the routing registry also used by the Synapse configuration.
 // Callers receive a copy and cannot change accepted application namespaces.
 func Products() []string { return slices.Clone(productIDs) }
 

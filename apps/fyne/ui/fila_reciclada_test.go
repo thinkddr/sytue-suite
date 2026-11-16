@@ -111,3 +111,55 @@ func glifoVisible(f *FilaDrive) bool {
 	}
 	return visto
 }
+
+// TestLaCasillaRecicladaNombraSuFila: el rótulo de la casilla es el que pone quien pinta
+// la fila («Seleccionar informe.pdf») y sigue a la fila cuando se recicla con otro
+// fichero; sin rótulo cae en el «Seleccionar fila» de Table.tsx. Vale para la fila de
+// Drive, la de lista y la cabecera.
+func TestLaCasillaRecicladaNombraSuFila(t *testing.T) {
+	generico := textoComun("ui.selectRow")
+
+	drive := NuevaFilaDrive("", "")
+	drive.ConCasilla = true
+	lista := NuevaFilaLista("", "")
+	lista.ConCasilla = true
+	cab := NuevaCabeceraDrive("Nombre", "Tamaño", "Fecha")
+	cab.ConCasilla = true
+	casillas := map[string]struct {
+		w       fyne.Widget
+		poner   func(string)
+		casilla func() *Eleccion
+	}{
+		"la fila de Drive": {
+			w:       drive,
+			poner:   func(s string) { drive.RotuloCasilla = s },
+			casilla: func() *Eleccion { return test.WidgetRenderer(drive).(*filaDriveRenderer).casilla },
+		},
+		"la fila de lista": {
+			w:       lista,
+			poner:   func(s string) { lista.RotuloCasilla = s },
+			casilla: func() *Eleccion { return test.WidgetRenderer(lista).(*filaListaRenderer).casilla },
+		},
+		"la cabecera": {
+			w:       cab,
+			poner:   func(s string) { cab.RotuloCasilla = s },
+			casilla: func() *Eleccion { return test.WidgetRenderer(cab).(*cabeceraDriveRenderer).casilla },
+		},
+	}
+	for que, c := range casillas {
+		if got := c.casilla().AccessibilityLabel(); got != generico {
+			t.Errorf("%s sin rótulo se anuncia %q; quiero %q", que, got, generico)
+		}
+		for _, rotulo := range []string{"Seleccionar informe.pdf", "Seleccionar acta.odt", ""} {
+			c.poner(rotulo)
+			c.w.Refresh()
+			quiero := rotulo
+			if quiero == "" {
+				quiero = generico
+			}
+			if got := c.casilla().AccessibilityLabel(); got != quiero {
+				t.Errorf("%s reciclada se anuncia %q; quiero %q", que, got, quiero)
+			}
+		}
+	}
+}

@@ -42,7 +42,7 @@ func TestAccountRedirigeALaApp(t *testing.T) {
 	}
 
 	pedir := func() *httptest.ResponseRecorder {
-		r := httptest.NewRequest(http.MethodGet, "/account", nil)
+		r := httptest.NewRequest(http.MethodGet, "/account", http.NoBody)
 		r.AddCookie(&http.Cookie{Name: sessionCookieName, Value: token})
 		rr := httptest.NewRecorder()
 		l.mux.ServeHTTP(rr, r)
@@ -70,7 +70,7 @@ func TestAccountRedirigeALaApp(t *testing.T) {
 	}
 
 	// La query viaja hasta la app: `?mfa=required` es el aviso del step-up.
-	rMfa := httptest.NewRequest(http.MethodGet, "/account?mfa=required", nil)
+	rMfa := httptest.NewRequest(http.MethodGet, "/account?mfa=required", http.NoBody)
 	rMfa.AddCookie(&http.Cookie{Name: sessionCookieName, Value: token})
 	rrMfa := httptest.NewRecorder()
 	l.mux.ServeHTTP(rrMfa, rMfa)
@@ -98,7 +98,7 @@ func TestAccountRedirigeALaApp(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("InsertSession personal: %v", err)
 	}
-	rPers := httptest.NewRequest(http.MethodGet, "/account", nil)
+	rPers := httptest.NewRequest(http.MethodGet, "/account", http.NoBody)
 	rPers.AddCookie(&http.Cookie{Name: sessionCookieName, Value: tokPers})
 	rrPers := httptest.NewRecorder()
 	l.mux.ServeHTTP(rrPers, rPers)
@@ -114,7 +114,7 @@ func TestAccountRedirigeALaApp(t *testing.T) {
 	// hacer. Mandar a la app a alguien sin sesión la devolvería aquí, y el rebote
 	// entre dos hosts es lo que acaba en un bucle.
 	rrAnon := httptest.NewRecorder()
-	l.mux.ServeHTTP(rrAnon, httptest.NewRequest(http.MethodGet, "/account", nil))
+	l.mux.ServeHTTP(rrAnon, httptest.NewRequest(http.MethodGet, "/account", http.NoBody))
 	if rrAnon.Code != http.StatusFound || !strings.Contains(rrAnon.Header().Get("Location"), "/login/") {
 		t.Fatalf("sin sesión: status=%d destino=%q, quiero el login",
 			rrAnon.Code, rrAnon.Header().Get("Location"))

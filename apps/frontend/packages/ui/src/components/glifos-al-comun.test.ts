@@ -98,3 +98,49 @@ test('ningún trazado tiene una forma cerrada que se quede sin relleno', () => {
   }
   expect(sinRelleno).toEqual([]);
 });
+
+/*
+ * UN DIBUJO POR CONCEPTO: ningún catálogo de app redefine un nombre del común.
+ *
+ * Mail, Notepads y Drive tenían su `trash`, su `download`, su `link`, su `undo` o su
+ * `bold` dibujados OTRA VEZ, con un trazado distinto del de `Icon` —varios con la
+ * geometría de Feather—, así que la papelera de Mail no era la de Drive ni la del
+ * resto de la suite. Un mismo nombre en dos catálogos es eso, el mismo concepto con
+ * dos dibujos, y por eso aquí basta con mirar los NOMBRES: si una app necesita un
+ * dibujo distinto, es otro concepto y lleva otro nombre.
+ *
+ * SI ESTE TEST TE PARA: borra la entrada de la tabla de la app y añade el nombre a
+ * su `DEL_COMUN`, que lo pinta con `Icon`. Si el dibujo del común no vale, se cambia
+ * EN EL COMÚN, para todas a la vez.
+ *
+ * VISTO EN ROJO (2026-11-13, en el frontal): con la papelera de Drive de vuelta en
+ * su `GLYPHS`, el test nombra `apps/drive/src/components/glyphs.tsx: trash`.
+ */
+/** Las claves de primer nivel de `const PATHS|GLYPHS = { … } as const`. */
+function clavesDeCatalogo(codigo: string): string[] {
+  const inicio = codigo.search(/const (?:PATHS|GLYPHS) = \{/);
+  if (inicio < 0) return [];
+  const fin = codigo.indexOf('} as const', inicio);
+  return [...codigo.slice(inicio, fin).matchAll(/^ {2}([A-Za-z][A-Za-z0-9]*):/gm)].map(
+    ([, k = '']) => k,
+  );
+}
+
+test('ningún catálogo de app redefine un nombre del común', () => {
+  const comunes = new Set(
+    clavesDeCatalogo(FUENTES.get('packages/ui/src/components/Icon.tsx') ?? ''),
+  );
+  expect(comunes.size).toBeGreaterThan(80); // el patrón sigue leyendo Icon.tsx
+  const catalogos = [...FUENTES.keys()].filter((rel) =>
+    /^apps\/[^/]+\/src\/components\/glyphs\.tsx$/.test(rel),
+  );
+  // Mail, Notepads y Drive declaran tabla; si una deja de leerse, que se note.
+  const conTabla = catalogos.filter((rel) => clavesDeCatalogo(FUENTES.get(rel) ?? '').length);
+  expect(conTabla.length).toBeGreaterThanOrEqual(3);
+  const repetidos = catalogos.flatMap((rel) =>
+    clavesDeCatalogo(FUENTES.get(rel) ?? '')
+      .filter((k) => comunes.has(k))
+      .map((k) => `${rel}: ${k}`),
+  );
+  expect(repetidos).toEqual([]);
+});

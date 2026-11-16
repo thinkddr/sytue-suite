@@ -1,0 +1,111 @@
+---
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * PricingPlans — los tres planes, la nota del almacenamiento propio y las
+ * cuatro reglas del precio. Lo pintan la portada (`#pricing`) y la página de
+ * precios: una sola tarjeta por plan, para que las dos no puedan decir cosas
+ * distintas.
+ *
+ * Los IMPORTES salen de `lib/pricing.ts` (espejo comprobado de commerce en Go)
+ * y los formatea `Intl` en cada idioma; antes eran texto en 26 catálogos.
+ */
+import type { Locale } from '@sytue/i18n';
+import { appDomains } from '@sytue/config';
+import { useT } from '../i18n';
+import { SEAT_PRICE_CENTS, formatPrice } from '../lib/pricing';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = useT(locale);
+
+const facts = [
+  { title: t('home.pricing.commitment.title'), body: t('home.pricing.commitment.body') },
+  { title: t('home.pricing.included.title'), body: t('home.pricing.included.body') },
+  { title: t('home.pricing.metered.title'), body: t('home.pricing.metered.body') },
+  { title: t('home.pricing.storage.title'), body: t('home.pricing.storage.body') },
+];
+
+const paid = [
+  {
+    title: t('home.pricing.pro.title'),
+    amount: formatPrice(locale, SEAT_PRICE_CENTS.pro),
+    storage: t('home.pricing.pro.storage'),
+    extra: t('home.pricing.education'),
+  },
+  {
+    title: t('home.pricing.enterprise.title'),
+    amount: formatPrice(locale, SEAT_PRICE_CENTS.enterprise),
+    storage: t('home.pricing.enterprise.storage'),
+    extra: t('home.pricing.enterprise.support'),
+  },
+];
+---
+
+<div class="grid gap-6 lg:grid-cols-3">
+  {/* Tres planes y los mismos productos en los tres (ADR 0038, precios del
+       2026-09-13): lo que cambia es el espacio por usuario. GRATIS va el
+       primero porque es la puerta que no pide hablar con nadie: el botón
+       lleva al alta, no a ventas. Los de pago valen para una organización
+       (por usuario) y para una persona sola. */}
+  <div class="border-border bg-surface flex flex-col rounded-lg border p-6">
+    <p class="text-text-muted text-sm">{t('home.pricing.personal.title')}</p>
+    <p class="text-text mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+      <span class="sytue-h1 tabular-nums">{formatPrice(locale, 0)}</span>
+      <span class="text-text-muted text-base">{t('home.pricing.personal.freeStorage')}</span>
+    </p>
+    <p class="text-text-muted mt-3 text-base text-pretty">{t('home.pricing.personal.freeBody')}</p>
+    <p class="text-text-muted mt-3 text-sm text-pretty">{t('home.pricing.personal.note')}</p>
+    <div class="mt-auto flex justify-center pt-6">
+      <a
+        href={`${appDomains.id}/signup`}
+        class="bg-primary sytue-focus-ring-inset inline-flex h-11 items-center justify-center rounded-control px-6 font-semibold text-[var(--sytue-on-primary)] hover:bg-[var(--sytue-primary-hover)] pointer-coarse:min-h-[max(44px,2.75rem)]"
+      >
+        {t('home.pricing.personal.cta')}
+      </a>
+    </div>
+  </div>
+  {paid.map((plan) => (
+    <div class="border-border bg-surface flex flex-col rounded-lg border p-6">
+      <p class="text-text-muted text-sm">
+        {plan.title}
+        {/* Los planes de pago aún no se pueden contratar (commerce.PersonalUpgradeAvailable
+              y Mollie sin configurar): se dice al lado del nombre, no en la letra pequeña. */}
+        <span class="text-text-muted"> · {t('home.pricing.soon')}</span>
+      </p>
+      <p class="text-text mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <span class="sytue-h1 tabular-nums">{plan.amount}</span>
+        <span class="text-text-muted text-base">{t('home.pricing.per')}</span>
+      </p>
+      <p class="text-text mt-2 text-base font-semibold">{plan.storage}</p>
+      <p class="text-text-muted mt-1 text-sm">{plan.extra}</p>
+      {/* El impuesto, junto al precio y no en la letra pequeña: quien compara
+            suites suma mal, y se entera al recibir la primera factura. */}
+      <p class="text-text-muted mt-1 text-sm">{t('home.pricing.tax')}</p>
+      <p class="text-text-muted mt-3 text-base text-pretty">{t('home.pricing.paidBody')}</p>
+      <div class="mt-auto flex justify-center pt-6">
+        <a
+          href="mailto:ventas@sytue.eu"
+          class="bg-primary sytue-focus-ring-inset inline-flex h-11 items-center justify-center rounded-control px-6 font-semibold text-[var(--sytue-on-primary)] hover:bg-[var(--sytue-primary-hover)] pointer-coarse:min-h-[max(44px,2.75rem)]"
+        >
+          {t('home.pricing.cta')}
+        </a>
+      </div>
+    </div>
+  ))}
+</div>
+<p class="text-text-muted mt-6 max-w-3xl text-sm text-pretty">{t('home.pricing.thirdParty')}</p>
+<div class="mt-8">
+  <ul class="grid gap-4 sm:grid-cols-2">
+    {facts.map((x) => (
+      <li class="border-border bg-surface rounded-lg border p-5">
+        <h3 class="text-text font-semibold text-balance">{x.title}</h3>
+        <p class="text-text-muted mt-1.5 text-base text-pretty">{x.body}</p>
+      </li>
+    ))}
+  </ul>
+</div>

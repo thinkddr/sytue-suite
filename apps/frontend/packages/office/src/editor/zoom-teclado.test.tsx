@@ -66,6 +66,7 @@ test('el porcentaje de la barra de estado es un botón que vuelve al 100 %', () 
     kind: 'spreadsheet',
     stats: { page: 1, pages: 1, words: 0 },
     ui: { zoom: 130 },
+    pageSetup: { margin: 96, landscape: false },
     setUi: (p: Partial<EditorUi>) => pedidos.push(p),
   } as unknown as EditorContext;
   render(<StatusBar ctx={ctx} />, host);

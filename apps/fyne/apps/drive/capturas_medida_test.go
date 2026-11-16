@@ -22,9 +22,9 @@ import (
 )
 
 // TestCapturasDeLoHechoAMedida deja en SYTUE_CAPTURAS un PNG por diálogo nuevo
-// (clasificar, resumir, almacén propio en S3 y en NAS, calendario de la caducidad), a
-// 1280×800 y a 360×740 y en los dos temas, para mirarlos contra la web. Sin la variable
-// no hace nada.
+// (clasificar, resumir, almacén propio en S3 y en NAS, calendario de la caducidad,
+// detalles), a 1280×800 y a 360×740 y en los dos temas, para mirarlos contra la web. Sin
+// la variable no hace nada.
 func TestCapturasDeLoHechoAMedida(t *testing.T) {
 	dir := os.Getenv("SYTUE_CAPTURAS")
 	if dir == "" {
@@ -90,6 +90,16 @@ func TestCapturasDeLoHechoAMedida(t *testing.T) {
 				de.pintar()
 				guardar(p, "externo-"+clase+"-"+sufijo)
 			}
+
+			srvDetalles, _ := servicioDetalles(t, 0)
+			p = pantallaDePrueba(t, srvDetalles)
+			p.raizID = "raiz"
+			p.win.SetContent(p.Objeto())
+			p.win.Resize(tam)
+			p.explor.Ventana = tam.Width
+			p.pedirDetalles(Elemento{ID: "f1", Nombre: "acta.odt"})
+			esperar()
+			guardar(p, "detalles-"+sufijo)
 		}
 	}
 }

@@ -265,5 +265,5 @@ func (p *Pantalla) convertir(id string) {
 	if !p.activo.Cifrado {
 		pa.Enlaces = enlacesSincronizados(n.Crudo, Leer(c.contenido), p.AppURL)
 	}
-	lanzar(func() error { return p.editar(id, pa, true) })
+	p.lanzar(func() error { return p.editar(id, pa, true) })
 }

@@ -11,7 +11,7 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { Modal, Button, Input, Spinner, Icon, EmptyState, Illustration, Tabs } from '@sytue/ui';
+import { Modal, Button, Input, Spinner, Icon, EmptyState, Tabs } from '@sytue/ui';
 import { browseChannels, joinChannel, type Channel } from '../client/chatApi.js';
 import type { T } from '../i18n/index.js';
 import { ArchivedChannels } from './ArchivedChannels.js';
@@ -103,9 +103,7 @@ export function BrowseChannelsModal({
         <EmptyState
           class="py-4"
           title={query.trim() ? t('browse.emptyQuery') : t('browse.empty')}
-          illustration={
-            <Illustration name={query.trim() ? 'emptySearch' : 'emptyChat'} size={96} />
-          }
+          spot={query.trim() ? 'emptySearch' : 'emptyChat'}
         />
       ) : (
         <ul class="flex max-h-[46dvh] flex-col gap-1 overflow-y-auto">

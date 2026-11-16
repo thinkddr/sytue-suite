@@ -115,37 +115,13 @@ func (s *Store) WithMatrixIdentity(ctx context.Context, subject string, fn func(
 }
 
 // ApplyMatrixAccountAccess orders lifecycle commands by ID's monotonic version.
-// The remote suspend happens under the identity row lock. Room revocation runs
+// The remote access withdrawal happens under the identity row lock. Room revocation runs
 // after that commit, so it never holds an identity lock while waiting for channels.
 func (s *Store) ApplyMatrixAccountAccess(ctx context.Context, subject, status string, version int64, apply func(context.Context) error) error {
 	needsRevoke := false
 	err := s.pool.InMaintenanceTx(ctx, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, `INSERT INTO matrix_identity_access(subject) VALUES($1) ON CONFLICT DO NOTHING`, subject); err != nil {
-			return err
-		}
-		var current int64
-		var oldStatus string
-		var applied bool
-		if err := tx.QueryRow(ctx, `SELECT version,status,applied FROM matrix_identity_access WHERE subject=$1 FOR UPDATE`, subject).Scan(&current, &oldStatus, &applied); err != nil {
-			return err
-		}
-		if version < current || version == current && oldStatus == status && applied {
-			return nil
-		}
-		if version == current && oldStatus != status {
-			return domain.ErrConflict
-		}
-		if err := apply(ctx); err != nil {
-			return err
-		}
-		needsRevoke = status != "active"
-		// Con la cuenta borrada, su clave de recuperación custodiada no sirve a nadie.
-		if status == "deleted" {
-			if _, err := tx.Exec(ctx, `DELETE FROM matrix_recovery_keys WHERE subject=$1`, subject); err != nil {
-				return err
-			}
-		}
-		_, err := tx.Exec(ctx, `UPDATE matrix_identity_access SET status=$2,version=$3,applied=$4 WHERE subject=$1`, subject, status, version, !needsRevoke)
+		var err error
+		needsRevoke, err = applyMatrixAccountAccessTx(ctx, tx, subject, status, version, apply)
 		return err
 	})
 	if err != nil || !needsRevoke {
@@ -164,6 +140,50 @@ func (s *Store) ApplyMatrixAccountAccess(ctx context.Context, subject, status st
 		_, err := tx.Exec(ctx, `UPDATE matrix_identity_access SET applied=true WHERE subject=$1 AND version=$2`, subject, version)
 		return err
 	})
+}
+
+func applyMatrixAccountAccessTx(ctx context.Context, tx pgx.Tx, subject, status string, version int64, apply func(context.Context) error) (bool, error) {
+	if _, err := tx.Exec(ctx, `INSERT INTO matrix_identity_access(subject) VALUES($1) ON CONFLICT DO NOTHING`, subject); err != nil {
+		return false, err
+	}
+	var current int64
+	var oldStatus string
+	var applied bool
+	if err := tx.QueryRow(ctx, `SELECT version,status,applied FROM matrix_identity_access WHERE subject=$1 FOR UPDATE`, subject).Scan(&current, &oldStatus, &applied); err != nil {
+		return false, err
+	}
+	if version < current || (version == current && oldStatus == status && applied) {
+		return false, nil
+	}
+	if version == current && oldStatus != status {
+		return false, domain.ErrConflict
+	}
+	if err := apply(ctx); err != nil {
+		return false, err
+	}
+	needsRevoke := status != "active"
+	if needsRevoke {
+		if _, err := tx.Exec(ctx, `DELETE FROM matrix_native_consents WHERE subject=$1`, subject); err != nil {
+			return false, err
+		}
+	}
+	// Con la cuenta borrada, su clave de recuperación custodiada no sirve a nadie.
+	if status == "deleted" {
+		if _, err := tx.Exec(ctx, `DELETE FROM matrix_recovery_keys WHERE subject=$1`, subject); err != nil {
+			return false, err
+		}
+		// Y sus envoltorios (ADR 0082), de todas sus cuentas de Matrix.
+		if _, err := tx.Exec(ctx, `DELETE FROM matrix_recovery_wrappers WHERE subject=$1`, subject); err != nil {
+			return false, err
+		}
+	}
+	if _, err := tx.Exec(ctx, `UPDATE matrix_identity_access SET status=$2,version=$3,applied=$4 WHERE subject=$1`, subject, status, version, !needsRevoke); err != nil {
+		return false, err
+	}
+	if needsRevoke {
+		return true, revokeMatrixAuthoritiesTx(ctx, tx, subject, "", "identity", version)
+	}
+	return false, nil
 }
 
 func (s *Store) revokeMatrixIdentityRooms(ctx context.Context, subject string) error {
@@ -248,10 +268,27 @@ func (s *Store) ApplyMatrixTenantAccess(ctx context.Context, subject, status str
 			}
 		}
 		needsRevoke = status != "active"
-		_, err := tx.Exec(ctx, `UPDATE matrix_tenant_access SET status=$3,version=$4,applied=$5 WHERE tenant=$1 AND subject=$2`, t.Slug, subject, status, version, !needsRevoke)
-		return err
+		if needsRevoke {
+			if _, err := tx.Exec(ctx, `DELETE FROM matrix_native_consents WHERE tenant=$1 AND subject=$2`, t.Slug, subject); err != nil {
+				return err
+			}
+			// Sin acceso a la organización, los envoltorios de sus cuentas de producto sobran.
+			if _, err := tx.Exec(ctx, `DELETE FROM matrix_recovery_wrappers WHERE organizacion=$1 AND subject=$2`, t.Slug, subject); err != nil {
+				return err
+			}
+		}
+		if _, err := tx.Exec(ctx, `UPDATE matrix_tenant_access SET status=$3,version=$4,applied=$5 WHERE tenant=$1 AND subject=$2`, t.Slug, subject, status, version, !needsRevoke); err != nil {
+			return err
+		}
+		if needsRevoke {
+			return revokeMatrixAuthoritiesTx(ctx, tx, subject, t.Slug, "tenant", version)
+		}
+		return nil
 	})
 	if err != nil || !needsRevoke {
+		return err
+	}
+	if err := s.revokeMatrixTenantStorageAccess(ctx, subject); err != nil {
 		return err
 	}
 	err = s.enMantenimientoDe(ctx, func(tx pgx.Tx, _ string) error {

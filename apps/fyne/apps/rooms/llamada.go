@@ -330,7 +330,7 @@ func (r *huecoRenderer) Refresh() {
 // Medidas de la antesala. HOJA (`PreJoin.tsx`): la pantalla no la montaba el barrido,
 // porque para medirla hay que estar en una llamada.
 var (
-	// AnchoAntesala es el `max-w-3xl` del bloque centrado: 48rem con el rem de 14.
+	// AnchoAntesala es el `max-w-3xl` del bloque centrado: 48rem, 768 px.
 	AnchoAntesala float32 = 48 * tema.Rem
 	// AnchoAntesalaVideo es la columna `3fr` de su `md:grid-cols-[3fr_2fr]` con el
 	// `gap-4` en medio.

@@ -29,6 +29,7 @@ import {
   cx,
   useFitInViewport,
   useToast,
+  EmptyState,
 } from '@sytue/ui';
 import { listDueReminders, dismissReminder, type Reminder } from '../client/calendarApi.js';
 import { timeLabel, isToday, dayMonthLabel } from './dates.js';
@@ -54,6 +55,8 @@ export interface EstadoRecordatorios {
   /** Lleva el calendario al día del recordatorio. */
   irA: (r: Reminder) => void;
   pedirPermiso: () => Promise<void>;
+  /** Sondea YA, sin esperar al backoff: el «Reintentar» del vacío de error. */
+  reintentar: () => void;
 }
 
 interface Props {
@@ -109,6 +112,8 @@ export function useRecordatorios({ t, locale, onDeepLink }: Opciones): EstadoRec
   const dismissed = useRef<Set<string>>(new Set());
   const backoff = useRef<number>(BASE_INTERVAL);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // El sondeo vive dentro del efecto de montaje; esto lo deja llamar desde fuera.
+  const sondearYa = useRef<() => void>(() => {});
 
   // --- Sondeo con backoff + pausa por visibilidad -----------------------------
   useEffect(() => {
@@ -175,6 +180,11 @@ export function useRecordatorios({ t, locale, onDeepLink }: Opciones): EstadoRec
       saveNotified(notified.current);
     }
 
+    sondearYa.current = () => {
+      backoff.current = BASE_INTERVAL;
+      setLoading(true);
+      void poll();
+    };
     void poll();
     const onVisible = (): void => {
       if (!document.hidden) void poll();
@@ -225,6 +235,7 @@ export function useRecordatorios({ t, locale, onDeepLink }: Opciones): EstadoRec
     descartar: dismiss,
     irA: deepLink,
     pedirPermiso: requestPermission,
+    reintentar: () => sondearYa.current(),
   };
 }
 
@@ -293,14 +304,18 @@ export function ReminderCenter({
             <Spinner />
           </div>
         ) : error && count === 0 ? (
-          <div class="flex flex-col items-center gap-2 px-4 py-8 text-center">
-            <p class="text-text-muted text-sm">{t('reminders.loadError')}</p>
-          </div>
+          <EmptyState
+            compact
+            tone="error"
+            title={t('reminders.loadError')}
+            action={
+              <Button variant="secondary" size="sm" onClick={estado.reintentar}>
+                {t('common.retry')}
+              </Button>
+            }
+          />
         ) : count === 0 ? (
-          <div class="flex flex-col items-center gap-1 px-4 py-8 text-center">
-            <Icon name="bell" size={24} class="text-text-subtle" aria-hidden="true" />
-            <p class="text-text-muted text-sm">{t('reminders.empty')}</p>
-          </div>
+          <EmptyState compact icon="bell" title={t('reminders.empty')} />
         ) : (
           <ul class="divide-border divide-y">
             {reminders.map((r) => (

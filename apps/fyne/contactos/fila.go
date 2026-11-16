@@ -76,7 +76,20 @@ type FilaContacto struct {
 	// estrella de quien ya lo está, sin botón.
 	AlDestacar func()
 
-	encima bool
+	// EsCursor es la fila del cursor del teclado: la ÚNICA de la lista que está en el
+	// recorrido del tabulador (el `tabIndex={parada}` itinerante de la web). Las demás
+	// dicen `Disabled()` sin estar inertes, como `Boton.EnElRecorrido`.
+	EsCursor bool
+	// AlMover recibe ↑ ↓ Inicio Fin con la fila enfocada; la lista decide adónde.
+	AlMover func(fyne.KeyName)
+
+	// Cabecera, si no está vacía, convierte la fila en la cabecera A–Z de esa inicial
+	// (CONT-05): la versal de la web (`sytue-overline text-text-subtle`), sin casilla,
+	// avatar ni estrella, fuera del tabulador y sorda al toque. Es la MISMA fila y no
+	// otro widget porque `widget.List` recicla un solo tipo de plantilla.
+	Cabecera string
+
+	encima, enfocada bool
 }
 
 var (
@@ -84,6 +97,8 @@ var (
 	_ fyne.Tappable          = (*FilaContacto)(nil)
 	_ fyne.SecondaryTappable = (*FilaContacto)(nil)
 	_ desktop.Hoverable      = (*FilaContacto)(nil)
+	_ fyne.Focusable         = (*FilaContacto)(nil)
+	_ fyne.Disableable       = (*FilaContacto)(nil)
 )
 
 // NuevaFilaContacto crea una fila vacía, lista para reciclar.
@@ -103,6 +118,18 @@ func MedidaFilaContacto(conSubtitulo bool) float32 {
 	}
 	return 2*ui.RellenoYFila() + max(texto, ui.MedidaAvatar(ui.AvatarSM).Height, ui.LadoEleccion)
 }
+
+// AltoCabeceraLista es la cabecera A–Z de la web: `pt-3 pb-1` alrededor de la caja de
+// línea de `sytue-overline` (`text-xs`, 14). Son 28.
+var AltoCabeceraLista = RellenoArribaCabecera + tema.TextoXS.Linea + RellenoAbajoCabecera
+
+// RellenoArribaCabecera y RellenoAbajoCabecera son el `pt-3` y el `pb-1`: más aire
+// encima que debajo, para que la letra se lea como el título de lo que sigue y no
+// como el pie de lo anterior.
+const (
+	RellenoArribaCabecera = 3 * 0.25 * tema.Rem
+	RellenoAbajoCabecera  = 1 * 0.25 * tema.Rem
+)
 
 // xCasilla y xBoton son donde empiezan la casilla y el botón: tras el `border-l-2`
 // y el `px-3`, y tras la casilla y el `gap-3`.
@@ -126,6 +153,9 @@ func (f *FilaContacto) zonaEstrella() float32 {
 // web). Aquí la `Eleccion` recibe su propio clic dentro de sus 14 px y lo que cae en el
 // margen llega a la fila, que lo reenvía.
 func (f *FilaContacto) Tapped(e *fyne.PointEvent) {
+	if f.Cabecera != "" {
+		return
+	}
 	if x := e.Position.X; x >= xCasilla()-ToqueCasilla && x <= xCasilla()+ui.LadoEleccion+ToqueCasilla {
 		if f.AlMarcar != nil {
 			f.AlMarcar()
@@ -143,7 +173,7 @@ func (f *FilaContacto) Tapped(e *fyne.PointEvent) {
 
 // Mantener pulsado selecciona sin abrir la ficha: la misma acción que su casilla.
 func (f *FilaContacto) TappedSecondary(*fyne.PointEvent) {
-	if f.AlMarcar != nil {
+	if f.Cabecera == "" && f.AlMarcar != nil {
 		f.AlMarcar()
 	}
 }
@@ -157,8 +187,63 @@ func (f *FilaContacto) MouseMoved(*desktop.MouseEvent) {}
 // MouseOut devuelve la fila a su color de reposo.
 func (f *FilaContacto) MouseOut() { f.encima = false; f.Refresh() }
 
+// ---- Teclado ----
+//
+// Hasta CONT-04 la fila no era `Focusable`: con el teclado no se abría ningún contacto.
+// Ahora es el `<button data-abrir>` de la web: Intro y Espacio abren la ficha, las
+// flechas mueven el cursor por la lista y las demás letras SUBEN a la ventana, donde
+// `App.Atajo` las atiende (j, k, e, s, x, /, ?), igual que si no hubiera nada enfocado.
+
+// Disabled saca del tabulador a las filas que no son la del cursor. Siguen pulsándose y
+// la lista las enfoca con las flechas tras moverles el cursor.
+// Una cabecera nunca está en él.
+func (f *FilaContacto) Disabled() bool { return !f.EsCursor || f.Cabecera != "" }
+
+// Enable y Disable completan `fyne.Disableable`: el recorrido lo decide el cursor.
+func (f *FilaContacto) Enable()  {}
+func (f *FilaContacto) Disable() {}
+
+// FocusGained y FocusLost encienden el aro de dentro del botón (`sytue-focus-ring-inner`).
+func (f *FilaContacto) FocusGained() { f.enfocada = true; f.Refresh() }
+func (f *FilaContacto) FocusLost()   { f.enfocada = false; f.Refresh() }
+
+// Enfocada dice si la fila tiene el foco del teclado.
+func (f *FilaContacto) Enfocada() bool { return f.enfocada }
+
+// TypedRune abre con Espacio, como un `<button>`, y deja subir lo demás a la ventana:
+// con una fila enfocada siguen valiendo los atajos de la app.
+func (f *FilaContacto) TypedRune(r rune) {
+	if r == ' ' {
+		if f.AlAbrir != nil {
+			f.AlAbrir()
+		}
+		return
+	}
+	ui.SubirRuna(fyne.CurrentApp().Driver().CanvasForObject(f), r)
+}
+
+// TypedKey abre con Intro y lleva ↑ ↓ Inicio Fin a la lista. Escape y «atrás» son de
+// la capa de encima, si la hay.
+func (f *FilaContacto) TypedKey(k *fyne.KeyEvent) {
+	switch k.Name {
+	case fyne.KeyReturn, fyne.KeyEnter:
+		if f.AlAbrir != nil {
+			f.AlAbrir()
+		}
+	case fyne.KeyUp, fyne.KeyDown, fyne.KeyHome, fyne.KeyEnd:
+		if f.AlMover != nil {
+			f.AlMover(k.Name)
+		}
+	default:
+		ui.SubirEscape(f, k)
+	}
+}
+
 // AccessibilityLabel es el nombre y el correo, que es lo que lee el `<button>`.
 func (f *FilaContacto) AccessibilityLabel() string {
+	if f.Cabecera != "" {
+		return f.Cabecera
+	}
 	if f.Subtitulo == "" {
 		return f.Nombre
 	}
@@ -166,7 +251,13 @@ func (f *FilaContacto) AccessibilityLabel() string {
 }
 
 // AccessibilityRole: la fila es un botón que abre la ficha.
-func (f *FilaContacto) AccessibilityRole() fyne.AccessibleRole { return fyne.AccessibleRoleButton }
+// La cabecera es texto: el `role="presentation"` de la web, que no cuenta como elemento.
+func (f *FilaContacto) AccessibilityRole() fyne.AccessibleRole {
+	if f.Cabecera != "" {
+		return fyne.AccessibleRoleText
+	}
+	return fyne.AccessibleRoleButton
+}
 
 // CreateRenderer compone la fila con primitivas y la casilla del catálogo.
 func (f *FilaContacto) CreateRenderer() fyne.WidgetRenderer {
@@ -179,8 +270,13 @@ func (f *FilaContacto) CreateRenderer() fyne.WidgetRenderer {
 		avatar:    ui.NuevoAvatar(f.Nombre).Con(ui.AvatarSM),
 		nombre:    ui.Texto(f.Nombre, tema.TextoBase, ui.Medio, tema.Color("text", v)),
 		subtitulo: ui.Texto(f.Subtitulo, tema.TextoSM, ui.Normal, tema.Color("text-muted", v)),
+		cabecera:  ui.Texto(f.Cabecera, tema.TextoXS, ui.SemiNegrita, tema.Color("text-subtle", v)),
 		estrella:  GlifoRelleno(EstrellaD, LadoEstrellaFila, tema.Color("warning-text", v)),
 		boton:     nuevaEstrellaFila(),
+		// `sytue-focus-ring-inner`: el aro va DENTRO del botón, porque el `overflow` del
+		// panel recorta el que se pinta fuera (el comentario de la web). Abierto: el
+		// botón no tiene caja opaca que tape el centro.
+		aro: ui.NuevoAro(max(tema.RadioMD-tema.AnilloFoco, 0), ui.SinHueco, v).Abierto(),
 	}
 	r.boton.AlPulsar = func() {
 		if f.AlDestacar != nil {
@@ -197,9 +293,10 @@ func (f *FilaContacto) CreateRenderer() fyne.WidgetRenderer {
 		}
 	})
 	r.casilla.SinEtiqueta = true
-	r.objetos = []fyne.CanvasObject{
+	r.objetos = append([]fyne.CanvasObject{
 		r.base, r.velo, r.galon, r.casilla, r.avatar, r.nombre, r.subtitulo, r.estrella.Objeto(), r.boton,
-	}
+		r.cabecera,
+	}, r.aro.Objetos()...)
 	r.Refresh()
 	return r
 }
@@ -210,13 +307,19 @@ type filaContactoRenderer struct {
 	casilla           *ui.Eleccion
 	avatar            *ui.Avatar
 	nombre, subtitulo *canvas.Text
+	// cabecera es la letra del modo cabecera; oculta en una fila de contacto.
+	cabecera *canvas.Text
 	// estrella es la que se ve sin red, sin botón; con red la pinta `boton`.
 	estrella *iconos.Dibujo
 	boton    *estrellaFila
+	aro      *ui.Aro
 	objetos  []fyne.CanvasObject
 }
 
 func (r *filaContactoRenderer) MinSize() fyne.Size {
+	if r.f.Cabecera != "" {
+		return fyne.NewSize(xCasilla(), AltoCabeceraLista)
+	}
 	return fyne.NewSize(xBoton(), MedidaFilaContacto(r.f.Subtitulo != ""))
 }
 
@@ -227,6 +330,12 @@ func (r *filaContactoRenderer) Layout(t fyne.Size) {
 	f := r.f
 	r.base.Resize(t)
 	ui.ColocarVeloFila(r.velo, r.galon, t.Width, t.Height)
+	if f.Cabecera != "" {
+		// Alineada con la casilla: el `border-l-2 px-3` de las filas de contacto.
+		ui.ColocarTexto(r.cabecera, tema.TextoXS, xCasilla(), RellenoArribaCabecera)
+		r.aro.Ver(false)
+		return
+	}
 	centro := func(alto float32) float32 { return (t.Height - alto) / 2 }
 
 	m := ui.MedidaEleccion("")
@@ -256,20 +365,33 @@ func (r *filaContactoRenderer) Layout(t fyne.Size) {
 		alto += tema.TextoSM.Linea
 	}
 	y := centro(alto)
+	// La caja del `<button>`: del avatar al final del texto, con el alto de lo más alto
+	// de dentro (`items-center`). El aro se pinta por fuera de la caja que recibe, así
+	// que se le da la caja encogida en su grosor: queda dentro, como el `inset`.
+	altoBoton := max(alto, av.Height)
+	ma := r.aro.Margen()
+	r.aro.ColocarEn(fyne.NewPos(xBoton()+ma, centro(altoBoton)+ma),
+		fyne.NewSize(max(derecha-xBoton()-2*ma, 0), max(altoBoton-2*ma, 0)))
 	ui.Truncar(r.nombre, f.Nombre, tema.TextoBase, ui.Medio, cabe)
 	ui.ColocarTexto(r.nombre, tema.TextoBase, x, y)
 	if f.Subtitulo != "" {
 		ui.Truncar(r.subtitulo, f.Subtitulo, tema.TextoSM, ui.Normal, cabe)
 		ui.ColocarTexto(r.subtitulo, tema.TextoSM, x, y+tema.TextoBase.Linea)
 	}
+	// Tras colocarlo: el aro abierto no enciende franjas que aún miden cero.
+	r.aro.Ver(f.enfocada)
 }
 
 func (r *filaContactoRenderer) Refresh() {
 	f := r.f
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	r.base.FillColor = tema.Color("surface", v)
-	// El orden de la web: abierta gana, y el hover solo existe en la otra rama.
+	// El orden de la web: abierta gana, y el hover solo existe en la otra rama. La
+	// cabecera no se abre ni se ilumina.
 	switch {
+	case f.Cabecera != "":
+		r.velo.FillColor = color.NRGBA{}
+		r.galon.FillColor = color.NRGBA{}
 	case f.Abierta:
 		r.velo.FillColor = tema.Color("selected", v)
 		r.galon.FillColor = tema.Color("primary", v)
@@ -281,6 +403,10 @@ func (r *filaContactoRenderer) Refresh() {
 		r.galon.FillColor = color.NRGBA{}
 	}
 	r.casilla.Etiqueta, r.casilla.Marcada = f.RotuloCasilla, f.Marcada
+	// La casilla y la estrella solo son paradas del tabulador en la fila del cursor,
+	// como el `tabIndex={parada}` de la web: si no, cada fila pintada sumaba dos.
+	r.casilla.EnElRecorrido(f.EsCursor)
+	r.boton.fueraDelRecorrido = !f.EsCursor
 	r.avatar.Nombre, r.avatar.Foto = f.Nombre, f.Foto
 	r.nombre.Color = tema.Color("text", v)
 	r.subtitulo.Color = tema.Color("text-muted", v)
@@ -290,6 +416,21 @@ func (r *filaContactoRenderer) Refresh() {
 	// Oculto sin red: así tampoco es parada del tabulador.
 	r.boton.Hidden = f.AlDestacar == nil
 	r.boton.Nombre, r.boton.Activo, r.boton.FilaEncima = f.RotuloEstrella, f.Destacado, f.encima
+	r.aro.Pintar(v)
+	// `sytue-overline` pone la versalita por CSS; aquí, a mano.
+	r.cabecera.Text = ui.Versalitas(f.Cabecera)
+	r.cabecera.Color = tema.Color("text-subtle", v)
+	cabecera := f.Cabecera != ""
+	r.cabecera.Hidden = !cabecera
+	if cabecera {
+		for _, o := range []fyne.CanvasObject{r.casilla, r.avatar, r.nombre, r.subtitulo, r.estrella.Objeto(), r.boton} {
+			o.Hide()
+		}
+	} else {
+		r.casilla.Show()
+		r.avatar.Show()
+		r.nombre.Show()
+	}
 	for _, o := range r.objetos {
 		o.Refresh()
 	}

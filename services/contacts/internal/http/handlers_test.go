@@ -795,6 +795,35 @@ func TestImportCSVUnrecognized(t *testing.T) {
 	}
 }
 
+func TestImportCSVTooManyContactsDoesNotWrite(t *testing.T) {
+	f := &fakeStore{book: domain.AddressBook{OwnerSub: "user-1"}, emailSet: map[string]struct{}{}}
+	rec := httptest.NewRecorder()
+	body := "Given Name\n" + strings.Repeat("Ada\n", 50_001)
+	newHandlers(f).ImportCSV(rec, req(http.MethodPost, "/", body, id()))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("code = %d, want 400, body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "50,000") {
+		t.Fatalf("el error no explica el limite: %s", rec.Body.String())
+	}
+	if len(f.created) != 0 {
+		t.Fatalf("se crearon %d contactos", len(f.created))
+	}
+}
+
+func TestImportCSVChecksBodySizeAfterContactLimit(t *testing.T) {
+	f := &fakeStore{book: domain.AddressBook{OwnerSub: "user-1"}, emailSet: map[string]struct{}{}}
+	rec := httptest.NewRecorder()
+	body := "Given Name\n" + strings.Repeat("Ada\n", 50_000) + strings.Repeat("x", 5<<20)
+	newHandlers(f).ImportCSV(rec, req(http.MethodPost, "/", body, id()))
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("code = %d, want 413, body=%s", rec.Code, rec.Body.String())
+	}
+	if len(f.created) != 0 {
+		t.Fatalf("se crearon %d contactos", len(f.created))
+	}
+}
+
 func TestExportCSV(t *testing.T) {
 	f := &fakeStore{contacts: []domain.Contact{
 		{FormattedName: "Ada Lovelace", Emails: []domain.Email{{Email: "ada@example.com", Type: domain.EmailHome}}},

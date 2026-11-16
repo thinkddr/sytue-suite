@@ -7,6 +7,7 @@
   "block.short": "Блокиране",
   "card.untitledOwner": "Неизвестно име",
   "card.watch": "Гледане на {title}",
+  "card.watched": "Изгледано {percent}%",
   "channel.count": {
     "one": "{count} публично видео",
     "other": "{count} публични видеа"
@@ -153,7 +154,12 @@
   "player.qualityAuto": "Автоматично",
   "player.qualityAutoNow": "Автоматично ({quality})",
   "player.region": "Видеоплейър",
+  "player.restart": "Започни от началото",
+  "player.resumedAt": "Продължава от {time}",
   "player.seek": "Позиция",
+  "player.speed": "Скорост",
+  "player.speedNormal": "Нормална",
+  "player.speedNow": "Скорост {rate}",
   "player.unmute": "Включване на звука",
   "player.volume": "Сила на звука",
   "quality.approximate": "Приблизителна оценка: продължителността на видеото още не е известна.",

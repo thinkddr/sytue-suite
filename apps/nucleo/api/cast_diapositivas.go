@@ -57,8 +57,18 @@ func (c *Cast) AvanzarDiapositiva(ctx context.Context, id string, p CastPosicion
 
 // Diapositivas es la presentación del vídeo `id`; nil si no lleva ninguna.
 func (c *Cast) Diapositivas(ctx context.Context, id string) (*CastPresentacion, error) {
+	return c.diapositivas(ctx, c.c, id, false)
+}
+
+// PublicDiapositivas es Diapositivas sin sesión (`GET /public/videos/{id}/slides`): la
+// de quien mira un directo público o sin listar sin haber entrado.
+func (c *Cast) PublicDiapositivas(ctx context.Context, id string) (*CastPresentacion, error) {
+	return c.diapositivas(ctx, c.pub, id, true)
+}
+
+func (c *Cast) diapositivas(ctx context.Context, cli *Client, id string, anonima bool) (*CastPresentacion, error) {
 	r, err := JSON[struct {
 		Presentation *CastPresentacion `json:"presentation"`
-	}](ctx, c.c, Request{Path: "/videos/" + url.PathEscape(id) + "/slides"})
+	}](ctx, cli, Request{Path: "/videos/" + url.PathEscape(id) + "/slides", Anonymous: anonima})
 	return r.Presentation, err
 }

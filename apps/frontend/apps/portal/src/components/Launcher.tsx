@@ -14,15 +14,26 @@ import { createTranslate, formatDate, formatTime, formatTimeAgo } from '@sytue/i
 import { useT } from '../i18n/index.js';
 import { r } from '../lib/rutas.js';
 import {
+  eventosDeMas,
   haTerminado,
   limitesDelDia,
+  marcasDeLaAgenda,
   ordenarEventos,
   rutaDelEvento,
   type EventoDeHoy,
 } from '../lib/hoy.js';
 import { recientesVisibles } from '../lib/reciente.js';
+import {
+  TeselaConectada,
+  TeselaProducto,
+  navegarProducto,
+  type AppConectada,
+} from './TeselaProducto.js';
+import { PrimerosPasos } from './PrimerosPasos.js';
+import type { PasoPendiente } from '../lib/primeros-pasos.js';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import {
+  Badge,
   Button,
   Dropdown,
   MenuItem,
@@ -43,7 +54,6 @@ import {
   type SuiteApp,
   type ThemeForma,
   ProductIcon,
-  Illustration,
   cx,
   useAhora,
   Glifo,
@@ -51,17 +61,6 @@ import {
 import { appsRecordadas, detalleDe, recordarApps } from '@sytue/shell';
 import { appUrl, esSoloDeOrganizaciones, orgActual, suiteApex } from '@sytue/config';
 import type { SearchResult } from '@sytue/api-clients';
-/** App conectada (integración) tal como la sirve el gateway vía /api/my-apps: misma
- *  forma que un SuiteApp + estado. key es el id de instancia (no un ProductKey). */
-interface ConnectedApp {
-  key: string;
-  name: string;
-  description: string;
-  href: string;
-  iconUrl: string;
-  color: string;
-  status: string;
-}
 
 /**
  * El Hub no se lanza desde el Hub: es la única exclusión de esta galería.
@@ -90,7 +89,7 @@ const appHref = (key: SuiteApp['key']): string => APP_BY_KEY.get(key)?.href ?? '
  */
 const GLYPHS = {
   mail: 'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm-1 2 9 6 9-6',
-  file: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6',
+  file: 'M13.5 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8.5ZM13.5 3.5V8.5h5',
   upload: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 8l5-5 5 5M12 3v12',
   calendar:
     'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z',
@@ -227,36 +226,6 @@ type Momento = 'morning' | 'afternoon' | 'evening';
 export const momentoDelDia = (hora: number): Momento =>
   hora >= 5 && hora < 12 ? 'morning' : hora >= 12 && hora < 20 ? 'afternoon' : 'evening';
 
-function navegarProducto(e: KeyboardEvent): void {
-  if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
-  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) return;
-  const actual = e.currentTarget as HTMLAnchorElement;
-  const enlaces = Array.from(
-    actual.closest('ul')?.querySelectorAll<HTMLAnchorElement>('a[data-hub-product][href]') ?? [],
-  );
-  const i = enlaces.indexOf(actual);
-  if (i < 0) return;
-  let destino: HTMLAnchorElement | undefined;
-  if (e.key === 'Home') destino = enlaces[0];
-  else if (e.key === 'End') destino = enlaces[enlaces.length - 1];
-  else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight')
-    destino = enlaces[i + (e.key === 'ArrowLeft' ? -1 : 1)];
-  else {
-    const r = actual.getBoundingClientRect();
-    const dir = e.key === 'ArrowUp' ? -1 : 1;
-    destino = enlaces
-      .map((el) => ({ el, r: el.getBoundingClientRect() }))
-      .filter((c) => (c.r.top - r.top) * dir > 1)
-      .sort(
-        (a, b) =>
-          Math.abs(a.r.top - r.top) - Math.abs(b.r.top - r.top) ||
-          Math.abs(a.r.left - r.left) - Math.abs(b.r.left - r.left),
-      )[0]?.el;
-  }
-  e.preventDefault();
-  destino?.focus();
-}
-
 export function Launcher({
   locale,
   puedeAdmin,
@@ -265,6 +234,8 @@ export function Launcher({
   cuentaPersonal = false,
   org = null,
   nombre,
+  primerosPasos,
+  clavePasos,
 }: {
   locale: Locale;
   /** El nombre de pila, para el saludo de la forma «Marco». Sin él, el saludo solo. */
@@ -286,6 +257,13 @@ export function Launcher({
    * cuenta sin organización, para la que los enlaces siguen saliendo sin org.
    */
   org?: string | null | undefined;
+  /**
+   * Los «Primeros pasos» que le quedan, resueltos en SSR para que la tarjeta no
+   * empuje las apps al hidratar; `undefined` si Sytue ID no contestó a tiempo.
+   */
+  primerosPasos?: PasoPendiente[] | undefined;
+  /** Clave de `localStorage` de esta persona en esta organización; sin ella, no hay tarjeta. */
+  clavePasos?: string | undefined;
 }) {
   const t = useT(locale);
   // El saludo depende de la hora LOCAL de quien mira, que el servidor no conoce: se
@@ -320,14 +298,21 @@ export function Launcher({
   const [recent, setRecent] = useState<SearchResult[] | null>(null);
   const [recentError, setRecentError] = useState(false);
   const [retry, setRetry] = useState(0);
-  const [connected, setConnected] = useState<ConnectedApp[]>([]);
+  const [connected, setConnected] = useState<AppConectada[]>([]);
   // Quién sirve cada producto en esta organización. Vacío ⇒ todo lo sirve Sytue, que es
   // la degradación correcta si la pasarela no contesta.
   const [productMap, setProductMap] = useState<Record<string, { name: string; href: string }>>({});
   // «Hoy»: la agenda del día y el correo sin leer. `undefined` = cargando;
   // cada parte a `null` cuando su fuente no contesta.
   const [hoy, setHoy] = useState<
-    { eventos: EventoDeHoy[] | null; correo: { unread: number } | null } | undefined
+    | {
+        eventos: EventoDeHoy[] | null;
+        // Cuántos eventos tiene el día (el BFF corta a seis) y si falta algún calendario.
+        total: number;
+        parcial: boolean;
+        correo: { unread: number } | null;
+      }
+    | undefined
   >(undefined);
 
   // La organización que llevan las teselas (ADR 0056): la de la URL ACTUAL —este
@@ -417,6 +402,8 @@ export function Launcher({
         res.ok
           ? (res.json() as Promise<{
               eventos: EventoDeHoy[] | null;
+              total?: number;
+              parcial?: boolean;
               correo: { unread: number } | null;
             }>)
           : { eventos: null, correo: null },
@@ -424,11 +411,14 @@ export function Launcher({
       .then((data) =>
         setHoy({
           eventos: data.eventos ? ordenarEventos(data.eventos) : null,
+          total: data.total ?? data.eventos?.length ?? 0,
+          parcial: data.parcial ?? false,
           correo: data.correo,
         }),
       )
       .catch(() => {
-        if (!controller.signal.aborted) setHoy({ eventos: null, correo: null });
+        if (!controller.signal.aborted)
+          setHoy({ eventos: null, total: 0, parcial: false, correo: null });
       });
     return () => controller.abort();
   }, []);
@@ -458,7 +448,7 @@ export function Launcher({
     // Apps conectadas (integraciones) via BFF: el token nunca sale al cliente. Si el
     // gateway no responde, /api/my-apps degrada a [] y no mostramos la sección.
     fetch('/api/my-apps', { credentials: 'include', signal: controller.signal })
-      .then((res) => (res.ok ? (res.json() as Promise<{ apps: ConnectedApp[] }>) : { apps: [] }))
+      .then((res) => (res.ok ? (res.json() as Promise<{ apps: AppConectada[] }>) : { apps: [] }))
       .then((data) => setConnected(data.apps ?? []))
       .catch(() => {
         /* silencio: sección opcional. */
@@ -541,6 +531,16 @@ export function Launcher({
         </nav>
       </header>
 
+      {/* Lo que a esta persona le queda por dejar listo, encima de las apps. */}
+      {clavePasos ? (
+        <PrimerosPasos
+          locale={locale}
+          pasos={primerosPasos}
+          clave={clavePasos}
+          org={orgTeselas ?? null}
+        />
+      ) : null}
+
       {puedeAlmacenamientoExterno ? (
         <Card class="mb-4">
           <a
@@ -565,74 +565,23 @@ export function Launcher({
 
       {/* En «Marco», dos columnas desde 1024 px: lo principal y el lado. */}
       <div class="marco:lg:grid marco:lg:grid-cols-[minmax(0,1.9fr)_minmax(260px,1fr)] marco:lg:items-start marco:lg:gap-4">
-        <div class={cx('min-w-0', pocas && 'marco:lg:col-start-1 marco:lg:row-start-1')}>
+        {/* Las flechas recorren las DOS rejillas, la propia y la de conectadas, como una
+        sola galería: `navegarProducto` busca sus teselas desde aquí. */}
+        <div
+          data-hub-galeria
+          class={cx('min-w-0', pocas && 'marco:lg:col-start-1 marco:lg:row-start-1')}
+        >
           {/* Lanzadores de producto */}
           <section aria-labelledby="apps-heading" class="marco:lg:last:mb-0 mb-8">
             <h2 id="apps-heading" class="sytue-overline text-text-muted mb-4">
               {t('launcher.apps')}
             </h2>
             <ul class="marco:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] marco:gap-2.5 marco:lg:grid-cols-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-              {apps.map((app) => {
-                const disabled = app.disabled;
-                const caption = disabled
-                  ? `${app.name} — ${app.description} (${t('launcher.disabled')})`
-                  : t('launcher.appAria', { name: app.name, description: app.description });
-                return (
-                  <li key={app.key}>
-                    <a
-                      data-hub-product={app.key}
-                      onKeyDown={navegarProducto}
-                      aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Home End"
-                      href={disabled ? undefined : app.href}
-                      aria-disabled={disabled ? 'true' : undefined}
-                      aria-label={caption}
-                      title={caption}
-                      style={{
-                        '--hub-product-color': app.color,
-                      }}
-                      onClick={disabled ? (e) => e.preventDefault() : undefined}
-                      class={cx(
-                        // En «Marco», tesela compacta: el icono a la izquierda (42 px) y el
-                        // nombre y la descripción, en una línea cada uno, a la derecha.
-                        'hub-product-card group border-border-subtle rounded-card flex h-full flex-col items-start gap-3 border p-4 transition-colors',
-                        'marco:flex-row marco:items-center marco:px-3 marco:py-2.5 marco:[&>span:first-child]:scale-105',
-                        disabled
-                          ? 'cursor-not-allowed opacity-40 grayscale'
-                          : 'hover:border-border-strong',
-                      )}
-                    >
-                      {/* El icono va SOLO. El SVG del producto ya ES la tesela —lleva su
-                      `rect` redondeado con el color de la app y el glifo en blanco— y
-                      ProductIcon le añade encima su anillo. Envolverlo en otra caja
-                      teñida del mismo tono apilaba halo sobre badge sobre tarjeta sobre
-                      página; y el selector de aplicaciones, a un clic de aquí, pinta
-                      estas mismas marcas desnudas (AppGrid). Dos tratamientos de lo
-                      mismo tan cerca se leen como un descuido. */}
-                      <ProductIcon key={app.key} appKey={app.key} size={40} />
-                      <span class="flex w-full min-w-0 flex-col">
-                        <span class="flex items-center justify-between gap-1">
-                          <span
-                            class={cx(
-                              'truncate font-semibold',
-                              disabled ? 'text-text-muted' : 'text-text',
-                            )}
-                          >
-                            {app.name.replace('Sytue ', '')}
-                          </span>
-                          {disabled ? (
-                            <span class="text-text-muted bg-bg-subtle border-border shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-medium tracking-wider uppercase">
-                              {t('launcher.disabled')}
-                            </span>
-                          ) : null}
-                        </span>
-                        <span class="text-text-muted marco:line-clamp-1 line-clamp-2 text-sm leading-snug">
-                          {app.description}
-                        </span>
-                      </span>
-                    </a>
-                  </li>
-                );
-              })}
+              {apps.map((app) => (
+                <li key={app.key}>
+                  <TeselaProducto app={app} locale={locale} onKeyDown={navegarProducto} />
+                </li>
+              ))}
             </ul>
           </section>
 
@@ -646,37 +595,7 @@ export function Launcher({
               <ul class="marco:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] marco:gap-2.5 marco:lg:grid-cols-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                 {connected.map((app) => (
                   <li key={app.key}>
-                    <a
-                      href={app.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={t('launcher.appAria', {
-                        name: app.name,
-                        description: app.description,
-                      })}
-                      title={t('launcher.appAria', {
-                        name: app.name,
-                        description: app.description,
-                      })}
-                      class="group border-border bg-surface hover:border-border-strong flex h-full flex-col items-start gap-3 rounded-lg border p-4 transition-colors"
-                    >
-                      {/* Aquí la caja SÍ vale: el icono lo pone un tercero y su forma es
-                      impredecible, así que darle geometría estable evita que cada
-                      tarjeta mida distinto. Lo que sobra es el TINTE con el color de
-                      la app: teñir el logotipo de otro con nuestro acento no es
-                      nuestro. Fondo neutro del sistema. */}
-                      <span class="bg-bg-subtle flex h-12 w-12 shrink-0 items-center justify-center rounded-lg">
-                        {app.iconUrl ? (
-                          <img src={app.iconUrl} alt="" width={28} height={28} aria-hidden="true" />
-                        ) : null}
-                      </span>
-                      <span class="flex w-full min-w-0 flex-col">
-                        <span class="text-text truncate font-semibold">{app.name}</span>
-                        <span class="text-text-muted line-clamp-2 text-sm leading-snug">
-                          {app.description}
-                        </span>
-                      </span>
-                    </a>
+                    <TeselaConectada app={app} locale={locale} onKeyDown={navegarProducto} />
                   </li>
                 ))}
               </ul>
@@ -728,38 +647,90 @@ export function Launcher({
                     </div>
                   ) : hoy.eventos === null ? (
                     <p class="text-text-muted px-4 py-3 text-sm">{t('today.unavailable')}</p>
-                  ) : hoy.eventos.length === 0 ? (
-                    <p class="text-text-muted px-4 py-3 text-sm">{t('today.noEvents')}</p>
                   ) : (
-                    <ul class="divide-border divide-y">
-                      {hoy.eventos.map((e) => {
-                        const pasado = haTerminado(e, ahora);
-                        // Cada evento abre ESE evento en Calendar: la vista de día en su
-                        // fecha. Con Calendar sustituido por otra aplicación, esa
-                        // aplicación, como «Ver el calendario».
-                        const href =
-                          productMap['calendar']?.href ??
-                          appUrl('calendar', rutaDelEvento(e), orgTeselas ?? undefined);
-                        return (
-                          <li key={e.id} class={pasado ? 'opacity-60' : undefined}>
-                            <a
-                              href={href}
-                              class="hover:bg-bg-subtle focus-visible:bg-bg-subtle marco:py-1 flex items-baseline gap-3 px-4 py-2 transition-colors duration-150 focus-visible:outline-none"
-                            >
-                              <span class="text-text-muted w-12 shrink-0 text-xs tabular-nums">
-                                {e.allDay ? t('today.allDay') : formatTime(locale, e.start)}
-                              </span>
-                              <span
-                                class="text-text min-w-0 flex-1 truncate text-sm"
-                                title={e.summary}
-                              >
-                                {e.summary || t('today.untitled')}
-                              </span>
-                            </a>
-                          </li>
-                        );
-                      })}
-                    </ul>
+                    <>
+                      {/* Un calendario que no contestó deja la agenda a medias: se dice en
+                      una línea, encima, para que un día «tranquilo» no lo parezca. */}
+                      {hoy.parcial ? (
+                        <p
+                          role="status"
+                          class="border-border text-warning-text truncate border-b px-4 py-2 text-xs"
+                          title={t('today.partial')}
+                        >
+                          {t('today.partial')}
+                        </p>
+                      ) : null}
+                      {hoy.eventos.length === 0 ? (
+                        <p class="text-text-muted px-4 py-3 text-sm">{t('today.noEvents')}</p>
+                      ) : (
+                        <ul class="divide-border divide-y">
+                          {(() => {
+                            const marcas = marcasDeLaAgenda(hoy.eventos, ahora);
+                            return hoy.eventos.map((e, i) => {
+                              const pasado = haTerminado(e, ahora);
+                              const marca = marcas[i];
+                              // Cada evento abre ESE evento en Calendar: la vista de día en
+                              // su fecha. Con Calendar sustituido por otra aplicación, esa
+                              // aplicación, como «Ver el calendario».
+                              const href =
+                                productMap['calendar']?.href ??
+                                appUrl('calendar', rutaDelEvento(e), orgTeselas ?? undefined);
+                              return (
+                                <li key={e.id} class={pasado ? 'opacity-60' : undefined}>
+                                  <a
+                                    href={href}
+                                    aria-current={marca === 'ahora' ? 'time' : undefined}
+                                    class="hover:bg-bg-subtle focus-visible:bg-bg-subtle marco:py-1 flex items-baseline gap-3 px-4 py-2 transition-colors duration-150 focus-visible:outline-none"
+                                  >
+                                    <span class="text-text-muted w-12 shrink-0 text-xs tabular-nums">
+                                      {e.allDay ? t('today.allDay') : formatTime(locale, e.start)}
+                                    </span>
+                                    <span
+                                      class="text-text min-w-0 truncate text-sm"
+                                      title={e.summary}
+                                    >
+                                      {e.summary || t('today.untitled')}
+                                    </span>
+                                    {/* El lugar, apagado y detrás: cede antes que el título. */}
+                                    {e.location ? (
+                                      <span
+                                        class="text-text-muted max-w-[40%] min-w-0 shrink-0 truncate text-xs"
+                                        title={e.location}
+                                      >
+                                        {e.location}
+                                      </span>
+                                    ) : null}
+                                    {marca ? (
+                                      <Badge
+                                        tone={marca === 'ahora' ? 'primary' : 'neutral'}
+                                        class="ml-auto shrink-0 self-center"
+                                      >
+                                        {marca === 'ahora' ? t('today.now') : t('today.next')}
+                                      </Badge>
+                                    ) : null}
+                                  </a>
+                                </li>
+                              );
+                            });
+                          })()}
+                        </ul>
+                      )}
+                      {/* La tarjeta enseña seis: lo que no cabe se cuenta y lleva a Calendar,
+                      en el pie y con la misma forma que la línea del correo. */}
+                      {eventosDeMas(hoy.total, hoy.eventos.length) > 0 ? (
+                        <a
+                          href={apps.find((a) => a.key === 'calendar')?.href ?? appHref('calendar')}
+                          class="border-border text-text hover:bg-bg-subtle focus-visible:bg-bg-subtle marco:py-2 flex items-center gap-3 border-t px-4 py-2.5 text-sm transition-colors duration-150"
+                        >
+                          <ProductIcon appKey="calendar" size={20} class="shrink-0" />
+                          <span class="min-w-0 flex-1 truncate">
+                            {t('today.more', {
+                              count: eventosDeMas(hoy.total, hoy.eventos.length),
+                            })}
+                          </span>
+                        </a>
+                      ) : null}
+                    </>
                   )}
                   {/* El correo, en una línea al pie: el número es lo que se mira. */}
                   {hoy && hoy.correo !== null ? (
@@ -858,7 +829,7 @@ export function Launcher({
                   <EmptyState
                     title={t('launcher.activityError')}
                     description={t('recent.hubDown')}
-                    illustration={<Icon name="warning" size={32} class="text-danger-text" />}
+                    tone="error"
                     action={
                       <Button variant="secondary" size="sm" onClick={() => setRetry((n) => n + 1)}>
                         {t('recent.retry')}
@@ -869,7 +840,7 @@ export function Launcher({
                   <EmptyState
                     title={t('launcher.noActivity')}
                     description={t('recent.emptyBody')}
-                    illustration={<Illustration name="emptySearch" size={120} />}
+                    spot="emptySearch"
                     action={
                       // Enlace de verdad (`href`), no un botón que navega: se abre en otra
                       // pestaña con Cmd/Ctrl, se copia con el botón derecho y el lector de

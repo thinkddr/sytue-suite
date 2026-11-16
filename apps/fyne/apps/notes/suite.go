@@ -8,10 +8,9 @@ import (
 	"strings"
 	"sync"
 
-	"fyne.io/fyne/v2"
-
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/auth"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
@@ -27,6 +26,37 @@ import (
 // Sin `Suite` —o sin su cliente de Rooms o de Drive— la entrada no se ofrece: una acción
 // que siempre falla es peor que ninguna.
 
+// VincularAutorizacionSuite binds the presenter to its persistent login witness.
+// Each gesture obtains a fresh short intent, so a normal token refresh is allowed.
+func (p *Pantalla) VincularAutorizacionSuite(preparar func(context.Context) context.Context, verificar func(context.Context) error) {
+	p.prepararSuite, p.verificarSuite = preparar, verificar
+}
+
+func (p *Pantalla) capturarAutorizacionSuite() context.Context {
+	if p.prepararSuite == nil || p.verificarSuite == nil {
+		return nil
+	}
+	ctx, _ := p.contextoTrabajo()
+	if p.verificarSuite(ctx) != nil {
+		return nil
+	}
+	ctx = p.prepararSuite(ctx)
+	if ctx == nil || p.verificarSuite(ctx) != nil || !auth.RequestAuthorizationIntent(ctx).Current() {
+		return nil
+	}
+	return ctx
+}
+
+// A callback belongs to the persistent login, not the short token revision:
+// another request may refresh that token without changing the presenter owner.
+func (p *Pantalla) suiteVidaVigente(ctx context.Context) bool {
+	return ctx != nil && p.verificarSuite != nil && p.verificarSuite(context.WithoutCancel(ctx)) == nil
+}
+
+func (p *Pantalla) suiteSigueVigente(ctx context.Context) bool {
+	return p.suiteVidaVigente(ctx) && auth.RequestAuthorizationIntent(ctx).Current()
+}
+
 // ofreceCompartir dice si «Compartir en Rooms» tiene con qué hacerse.
 func (p *Pantalla) ofreceCompartir() bool { return p.Suite != nil && p.Suite.Rooms != nil }
 
@@ -41,21 +71,48 @@ func (p *Pantalla) textosSelector(titulo string) ui.TextosSelector {
 	}
 }
 
+// permiteEnviarContenidoExterno impide entregar texto de repositorios privados a
+// Rooms y Calendar mediante sus clientes HTTP, que reciben contenido en claro. El ámbito se comprueba de nuevo
+// al elegir sala, pues el selector puede seguir abierto al cambiar de cuaderno.
+func (p *Pantalla) permiteEnviarContenidoExterno(cuaderno string, n Nota) bool {
+	return p.vigente() && p.prepararSuite != nil && p.verificarSuite != nil && p.vida().work == nil && !p.activo.Cifrado &&
+		!n.Cifrada && p.activo.ID == cuaderno && n.Cuaderno == cuaderno
+}
+
 // compartirEnSala es el `onShare` de la web: elegir la sala y publicar. El texto es el
 // que compone su BFF (`api.MensajeNota`), con el título en claro de la nota.
 func (p *Pantalla) compartirEnSala(n Nota) {
-	if !p.ofreceCompartir() || p.win == nil {
+	if !p.ofreceCompartir() || p.win == nil || !p.permiteEnviarContenidoExterno(p.activo.ID, n) {
 		return
 	}
 	cuaderno := p.activo.ID
+	owner := p.claveAlmacen()
+	trabajo := p.capturarAutorizacionSuite()
+	if trabajo == nil {
+		return
+	}
+	suite := p.Suite
 	sel := &ui.SelectorSuite{
 		Origen: api.ElegirRooms, Locale: p.loc, Textos: p.textosSelector("picker.rooms.title"),
 		// Los glifos de SuitePicker.tsx: `link` para una sala; el de carpeta no se ve.
 		GlifoCarpeta: CuadernoD, GlifoElemento: EnlaceD,
 		Cargar: func(ctx context.Context, carpeta, q, cursor string) (api.PaginaSuite, error) {
-			return p.Suite.Listar(ctx, api.ElegirRooms, carpeta, q, cursor)
+			if err := ctx.Err(); err != nil {
+				return api.PaginaSuite{}, err
+			}
+			vinculado, cancelar := context.WithCancel(trabajo)
+			detener := context.AfterFunc(ctx, cancelar)
+			defer detener()
+			defer cancelar()
+			return suite.Listar(vinculado, api.ElegirRooms, carpeta, q, cursor)
 		},
-		AlElegir: func(e api.Elegible) { go p.publicarEnSala(cuaderno, n, e) },
+		AlElegir: func(e api.Elegible) {
+			if !p.permiteEnviarContenidoExterno(cuaderno, n) || trabajo.Err() != nil || p.claveAlmacen() != owner || p.Suite != suite {
+				return
+			}
+			organizacion := auth.RequestAuthorizationIntent(trabajo).Identity().Organization
+			p.iniciar(func() { p.publicarEnSalaConContexto(trabajo, suite, organizacion, cuaderno, n, e) })
+		},
 	}
 	sel.Mostrar(p.win.Canvas())
 }
@@ -63,12 +120,26 @@ func (p *Pantalla) compartirEnSala(n Nota) {
 // publicarEnSala manda el mensaje y lo dice: «Compartida en General» o que no se pudo.
 // Corre fuera del hilo de la interfaz.
 func (p *Pantalla) publicarEnSala(cuaderno string, n Nota, sala api.Elegible) {
+	if !p.permiteEnviarContenidoExterno(cuaderno, n) || !p.ofreceCompartir() {
+		return
+	}
+	ctx := p.capturarAutorizacionSuite()
+	if ctx == nil {
+		return
+	}
+	p.publicarEnSalaConContexto(ctx, p.Suite, auth.RequestAuthorizationIntent(ctx).Identity().Organization, cuaderno, n, sala)
+}
+
+func (p *Pantalla) publicarEnSalaConContexto(trabajo context.Context, suite *api.Elegir, organizacion, cuaderno string, n Nota, sala api.Elegible) {
 	t := p.tr.T
-	texto := api.MensajeNota(p.Suite.Apex, p.Suite.Organizacion(), cuaderno, n.ID, n.Titulo, t("note.untitled", nil))
-	ctx, cancelar := p.ctx()
+	texto := api.MensajeNota(suite.Apex, organizacion, cuaderno, n.ID, n.Titulo, t("note.untitled", nil))
+	ctx, cancelar := context.WithTimeout(trabajo, p.Plazo)
 	defer cancelar()
-	_, err := p.Suite.Rooms.Post(ctx, sala.ID, texto)
-	fyne.Do(func() {
+	_, err := suite.Rooms.Post(ctx, sala.ID, texto)
+	p.enHilo(func() {
+		if !p.suiteVidaVigente(trabajo) {
+			return
+		}
 		if err != nil {
 			p.avisar(ui.AvisoPeligro, t("share.failed", nil), "")
 			return

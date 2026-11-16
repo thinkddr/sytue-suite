@@ -1163,6 +1163,39 @@ func TestPostReplyOK(t *testing.T) {
 	}
 }
 
+// «También enviar al canal» llega al servicio en una respuesta y se ignora en un
+// mensaje raíz, donde no significa nada.
+func TestTambienAlCanalSoloEnRespuestas(t *testing.T) {
+	f := &fakeService{rootMsg: domain.Message{ChannelID: uuid.New()}, message: domain.Message{Body: "r"}}
+	rec := httptest.NewRecorder()
+	newHandlers(f).PostReply(rec, req(http.MethodPost, "/", `{"body":"r","also_in_channel":true}`, claims(), messageID(uuid.NewString())))
+	if rec.Code != http.StatusCreated || !f.gotPostIn.AlsoInChannel {
+		t.Fatalf("respuesta: code=%d AlsoInChannel=%v", rec.Code, f.gotPostIn.AlsoInChannel)
+	}
+	rec = httptest.NewRecorder()
+	newHandlers(f).PostMessage(rec, req(http.MethodPost, "/", `{"body":"r","also_in_channel":true}`, claims(), channelID(uuid.NewString())))
+	if rec.Code != http.StatusCreated || f.gotPostIn.AlsoInChannel {
+		t.Fatalf("raíz: code=%d AlsoInChannel=%v", rec.Code, f.gotPostIn.AlsoInChannel)
+	}
+}
+
+// Una respuesta PROGRAMADA lleva «También enviar al canal» a la cola, y un mensaje raíz
+// programado no.
+func TestTambienAlCanalEnUnaRespuestaProgramada(t *testing.T) {
+	sendAt := time.Now().Add(time.Hour).UTC().Format(time.RFC3339Nano)
+	f := &fakeService{rootMsg: domain.Message{ChannelID: uuid.New()}, scheduled: domain.ScheduledMessage{Body: "r"}}
+	rec := httptest.NewRecorder()
+	newHandlers(f).PostReply(rec, req(http.MethodPost, "/", `{"body":"r","also_in_channel":true,"send_at":"`+sendAt+`"}`, claims(), messageID(uuid.NewString())))
+	if rec.Code != http.StatusCreated || f.gotSchedIn.ParentID == nil || !f.gotSchedIn.AlsoInChannel {
+		t.Fatalf("respuesta programada: code=%d %+v", rec.Code, f.gotSchedIn)
+	}
+	rec = httptest.NewRecorder()
+	newHandlers(f).PostMessage(rec, req(http.MethodPost, "/", `{"body":"r","also_in_channel":true,"send_at":"`+sendAt+`"}`, claims(), channelID(uuid.NewString())))
+	if rec.Code != http.StatusCreated || f.gotSchedIn.AlsoInChannel {
+		t.Fatalf("raíz programada: code=%d AlsoInChannel=%v", rec.Code, f.gotSchedIn.AlsoInChannel)
+	}
+}
+
 func TestPostReplyRootNotFound(t *testing.T) {
 	f := &fakeService{threadErr: domain.ErrNotFound}
 	rec := httptest.NewRecorder()

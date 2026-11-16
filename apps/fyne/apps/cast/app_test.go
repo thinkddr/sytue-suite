@@ -37,6 +37,11 @@ import (
 func TestMain(m *testing.M) {
 	test.NewApp().Settings().SetTheme(tema.Sytue{})
 	tema.FormaDeLosGuardianes()
+	// Lo visto (reanudar.go) nunca va a la carpeta de la suite de quien corre las pruebas.
+	if dir, err := os.MkdirTemp("", "cast-reanudar-"); err == nil {
+		carpetaReanudar = func() (string, error) { return dir, nil }
+		defer func() { _ = os.RemoveAll(dir) }()
+	}
 	m.Run()
 }
 
@@ -178,6 +183,8 @@ type servicioFalso struct {
 	bloqueos     []api.CastBlocked
 	bloqueosOrg  []api.CastBlocked
 	noAdministra bool
+	// presentacion es la de Diapos que contesta /slides (de cualquier vídeo); nil, ninguna.
+	presentacion *api.CastPresentacion
 }
 
 func servicioCompleto() *servicioFalso {
@@ -375,6 +382,8 @@ func (s *servicioFalso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		k.Can.Delete = true
 		w.WriteHeader(http.StatusCreated)
 		escribir(k)
+	case strings.HasSuffix(ruta, "/slides"):
+		escribir(map[string]any{"presentation": s.presentacion})
 	case strings.HasSuffix(ruta, "/chat"):
 		escribir(map[string]any{"messages": []api.CastChatMessage{}})
 	case strings.HasSuffix(ruta, "/people") && r.Method == http.MethodGet:

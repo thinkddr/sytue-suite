@@ -32,7 +32,7 @@ func avisosDeAlta(t *testing.T, b *Buzon) []*ui.Aviso {
 // nueva queda elegida —con su rama desplegada, aunque se hubiera plegado— y se dice
 // qué cuenta se conectó (`onOpenAccount(account, true)` y su toast en MailApp.tsx).
 // «Abrir buzón» de una cuenta que ya estaba no avisa de nada. VISTO EN ROJO
-// (2026-11-07) sin el Avisar de cargarCuentas y sin el delete de la rama.
+// (2026-11-07) sin el Avisar de cargarCuentas y sin desplegar la rama.
 func TestAltaTerminadaCierraEligeLaEntradaYAvisa(t *testing.T) {
 	cuentas := cuentaGmailNueva()
 	s := &correoFalso{cuentas: cuentas, carpetas: map[string][]api.ExternalMailFolder{
@@ -41,7 +41,7 @@ func TestAltaTerminadaCierraEligeLaEntradaYAvisa(t *testing.T) {
 	c := correoDePrueba(t, s)
 	c.proveedor, c.asistente, c.paso, c.instancia = "gmail", true, 1, ""
 	c.cuentas = cuentas
-	c.b.P.Menu.Ramas = map[string]bool{claveCuenta("nueva"): true} // plegada antes
+	c.b.P.Menu.CuentasAbiertas = map[string]bool{"nueva": false} // plegada antes
 	c.b.AutorizarCorreo = func(context.Context, string, string, ...string) (string, error) {
 		return "nueva", nil
 	}
@@ -52,7 +52,7 @@ func TestAltaTerminadaCierraEligeLaEntradaYAvisa(t *testing.T) {
 	if v := c.b.externa; v == nil || v.Cuenta != "nueva" || v.Carpeta != "INBOX" {
 		t.Fatalf("se ve %+v y tenía que ser la Entrada de la cuenta nueva", v)
 	}
-	if !c.b.P.Menu.abierta(claveCuenta("nueva"), true) {
+	if !c.b.P.Menu.cuentaAbierta("nueva") {
 		t.Fatal("la rama de la cuenta nueva sigue plegada: su Entrada no se ve elegida")
 	}
 	if av := avisosDeAlta(t, c.b); len(av) != 1 || av[0].Tono != ui.AvisoExito {

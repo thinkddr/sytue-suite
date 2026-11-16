@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/webref"
 )
@@ -79,7 +80,7 @@ func TestLosCamposDePhotosSonLosDelServicio(t *testing.T) {
 	if derivadas := webref.Read(t, "services/syphotos/internal/http/derivadas.go"); !strings.Contains(derivadas, `json:"driveFileId"`) {
 		t.Error("services/syphotos ya no indexa por driveFileId")
 	}
-	variantes := webref.Read(t, "services/syphotos/internal/domain/derivada.go")
+	variantes := webref.Read(t, "apps/nucleo/photos/model/derivada.go")
 	for _, v := range []string{`VarianteMiniatura Variante = "` + PhotoThumb + `"`, `VariantePrevia Variante = "` + PhotoPreview + `"`} {
 		if !strings.Contains(variantes, v) {
 			t.Errorf("services/syphotos ya no declara %s", v)
@@ -228,11 +229,11 @@ func TestLasRutasNuevasSonLasDelServicio(t *testing.T) {
 		}
 	}
 	for fichero, literales := range map[string][]string{
-		"services/syphotos/internal/http/albums.go":     {`map[string]int{"added": n}`, `json:"ids"`},
-		"services/syphotos/internal/http/compartir.go":  {`map[string]string{"token": token}`},
-		"services/syphotos/internal/http/derivadas.go":  {`Query().Get("formato")`, `Query().Get("f")`},
-		"services/syphotos/internal/domain/receta.go":   {`Pasos   []Paso `, `json:"params,omitempty"`, `TipoPaso = "giro"`},
-		"services/syphotos/internal/domain/derivada.go": {`VarianteGrande Variante = "` + PhotoLarge + `"`},
+		"services/syphotos/internal/http/albums.go":    {`map[string]int{"added": n}`, `json:"ids"`},
+		"services/syphotos/internal/http/compartir.go": {`map[string]string{"token": token}`},
+		"services/syphotos/internal/http/derivadas.go": {`Query().Get("formato")`, `Query().Get("f")`},
+		"apps/nucleo/photos/model/receta.go":           {`Pasos   []Paso `, `json:"params,omitempty"`, `TipoPaso = "giro"`},
+		"apps/nucleo/photos/model/derivada.go":         {`VarianteGrande Variante = "` + PhotoLarge + `"`},
 	} {
 		texto := webref.Read(t, fichero)
 		for _, l := range literales {
@@ -277,5 +278,50 @@ func TestElAlbumPublicoVaSinSesion(t *testing.T) {
 	}
 	if _, err := c.PublicAlbum(ctx, "otro"); !EsNoEncontrado(err) {
 		t.Errorf("un token que no existe: %v", err)
+	}
+}
+
+// TestLaPapeleraTraeSuPlazo: el cliente lee la fecha de purga que pone el servicio y
+// cuenta los días hacia arriba; sin fecha (papelera que no caduca) no promete ninguna.
+// Los nombres de los campos son los del servicio, no una suposición.
+func TestLaPapeleraTraeSuPlazo(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method+" "+r.URL.Path != "GET /api/v1/trash" {
+			t.Errorf("petición inesperada: %s %s", r.Method, r.URL.Path)
+		}
+		_, _ = io.WriteString(w, `{"items":[{"id":"f1","width":4,"height":3,"deletedAt":"2026-11-01T10:00:00Z","purgeAt":"2026-12-01T10:00:00Z"},{"id":"f2","width":4,"height":3}],"retentionDays":30}`)
+	}))
+	defer srv.Close()
+	p, err := NewPhotos(srv.URL, nil, nil).Papelera(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.RetentionDays != 30 || len(p.Items) != 2 || p.Items[0].DeletedAt == nil {
+		t.Fatalf("papelera leída: %+v", p)
+	}
+	casos := []struct {
+		ahora string
+		dias  int
+	}{
+		{"2026-11-01T10:00:00Z", 30},
+		{"2026-11-30T04:00:00Z", 2}, // 30 h: quedan dos días, no uno
+		{"2026-12-01T09:00:00Z", 1},
+		{"2026-12-02T00:00:00Z", 0}, // pasada: el servicio aún no ha purgado
+	}
+	for _, c := range casos {
+		ahora, _ := time.Parse(time.RFC3339, c.ahora)
+		if d, ok := p.Items[0].DiasParaPurga(ahora); !ok || d != c.dias {
+			t.Errorf("a %s quedan %d días (ok=%v), se esperaban %d", c.ahora, d, ok, c.dias)
+		}
+	}
+	if _, ok := p.Items[1].DiasParaPurga(time.Now()); ok {
+		t.Error("una foto sin purgeAt promete fecha de purga")
+	}
+
+	servicio := webref.Read(t, "services/syphotos/internal/http/albums.go")
+	for _, literal := range []string{`json:"deletedAt,omitempty"`, `json:"purgeAt,omitempty"`, `json:"retentionDays"`} {
+		if !strings.Contains(servicio, literal) {
+			t.Errorf("services/syphotos/internal/http/albums.go ya no dice %s", literal)
+		}
 	}
 }

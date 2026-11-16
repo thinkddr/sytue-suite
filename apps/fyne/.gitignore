@@ -18,3 +18,7 @@
 /photos
 /rooms
 !/*/
+
+# `!/*/` también volvería a admitir `.claude/` (los ajustes locales de los agentes, que
+# ignora el .gitignore de la raíz): va después para que gane.
+.claude/

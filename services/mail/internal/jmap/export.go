@@ -92,7 +92,7 @@ func (a *API) exportar(r *http.Request, t tenancy.Tenant, cuenta uuid.UUID, p *p
 				break
 			}
 			ultimo := pagina[len(pagina)-1]
-			antes, antesID = ultimo.ReceivedAt, ultimo.ID
+			antes, antesID = ultimo.FechaDeOrden(), ultimo.ID
 		}
 	}
 	if err := portabilidad.Tabla(p, "messages", "message", portabilidad.Todas(filas)); err != nil {

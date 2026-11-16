@@ -51,6 +51,8 @@ type Handlers struct {
 	declaracionFecha string
 	// hub deja en la campana de quien la tiene una tarea que no se ha puesto él.
 	hub *hubnotify.Client
+	// enviarCorreo manda la factura al cliente; nulo = correo.EnviarAdjunto.
+	enviarCorreo enviarAdjunto
 }
 
 var (

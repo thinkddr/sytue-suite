@@ -192,6 +192,9 @@ var (
 	}
 	cmdsFormato = map[editor.Comando]bool{
 		CmdFormatoNum: true, CmdDecimales: true, CmdEstilo: true, CmdBordes: true, CmdQuitarEstil: true, CmdAlinear: true,
+		CmdOcultar:     true, // «Formato de filas/columnas» en Excel: el permiso más cercano es el de formato
+		CmdAnchoCol:    true, // ídem: el ancho y el alto, como `PROTECT_FORMAT_CMDS` de la web
+		CmdAltoFila:    true,
 		editor.Negrita: true, editor.Cursiva: true, editor.Subrayado: true, editor.Tachado: true, editor.SinFormato: true,
 		editor.AlinearIzq: true, editor.AlinearCen: true, editor.AlinearDer: true,
 	}

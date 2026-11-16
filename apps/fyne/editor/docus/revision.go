@@ -357,7 +357,7 @@ func (r *revisor) tarjeta(i int, c rico.Cambio, v tema.Variante) fyne.CanvasObje
 		fondo, borde = tokens.SobreSRGB(tema.Color("selected", v), fondo), tema.Color("primary", v)
 	}
 	caja := ui.NuevaCaja(fondo, borde, tema.RadioMD)
-	return container.New(&tarjetaComentario{caja: caja}, append(caja.Objetos(), contenido)...)
+	return container.New(&tarjetaComentario{Caja: caja}, append(caja.Objetos(), contenido)...)
 }
 
 // cabeceraCambio es `flex items-baseline gap-1.5`: el glifo, el tipo en `text-xs

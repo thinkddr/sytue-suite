@@ -4,6 +4,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -11,7 +12,8 @@ import (
 func setMinimalEnv(t *testing.T) {
 	t.Helper()
 	for _, k := range []string{
-		"PUBLIC_URL", "DB_MAX_CONNS", "OIDC_ISSUER", "OIDC_JWKS_URL", "OIDC_AUDIENCE",
+		"SYTUE_ROOMS_RESOURCE_SESSION_DOCS_SECRET",
+		"SYTUE_ROOMS_RESOURCE_SOURCE_DOCS_URL", "SYTUE_ROOMS_RESOURCE_SOURCE_DOCS_SECRET", "PUBLIC_URL", "DB_MAX_CONNS", "OIDC_ISSUER", "OIDC_JWKS_URL", "OIDC_AUDIENCE",
 		"DRIVE_URL", "INTEGRATIONS_URL", "INTEGRATIONS_INTERNAL_SECRET", "WS_ALLOWED_ORIGINS", "MAX_MESSAGE_KB", "MESSAGE_PAGE_SIZE",
 		"PRESENCE_TTL", "PORT", "HTTP_ADDR", "ENV", "VERSION", "CHANNEL_MAIL_DOMAIN",
 	} {
@@ -153,5 +155,52 @@ func TestChannelMailDomain(t *testing.T) {
 	t.Setenv("CHANNEL_MAIL_DOMAIN", " @Rooms.Sytue.EU. ")
 	if cfg, err = Load(); err != nil || cfg.ChannelMailDomain != "rooms.sytue.eu" {
 		t.Errorf("ChannelMailDomain = %q, %v", cfg.ChannelMailDomain, err)
+	}
+}
+
+func TestResourceSessionDocsCredentialIsOptionalAndCanonical(t *testing.T) {
+	for _, raw := range []string{"", strings.Repeat("a", 64)} {
+		setMinimalEnv(t)
+		t.Setenv("SYTUE_ROOMS_RESOURCE_SESSION_DOCS_SECRET", raw)
+		cfg, err := Load()
+		if err != nil || cfg.ResourceSessionDocsSecret != raw {
+			t.Fatal("valid resource session credential rejected", err)
+		}
+	}
+	for _, raw := range []string{"short", strings.Repeat("A", 64), strings.Repeat("0", 63), strings.Repeat("g", 64)} {
+		setMinimalEnv(t)
+		t.Setenv("SYTUE_ROOMS_RESOURCE_SESSION_DOCS_SECRET", raw)
+		if _, err := Load(); err == nil {
+			t.Fatal("malformed resource credential accepted")
+		}
+	}
+}
+
+func TestResourceSourceDocsRequiresFixedAuthenticatedBridge(t *testing.T) {
+	for _, tc := range []struct {
+		name, url, source, session string
+		ok                         bool
+	}{
+		{"off", "", "", "", true},
+		{"missing-secret", "http://docs:8083", "", strings.Repeat("a", 64), false},
+		{"missing-url", "", strings.Repeat("b", 64), strings.Repeat("a", 64), false},
+		{"missing-authority", "http://docs:8083", strings.Repeat("b", 64), "", false},
+		{"query-url", "http://docs:8083/?target=other", strings.Repeat("b", 64), strings.Repeat("a", 64), false},
+		{"userinfo-url", "http://user:password@docs:8083", strings.Repeat("b", 64), strings.Repeat("a", 64), false},
+		{"configured", "http://docs:8083", strings.Repeat("b", 64), strings.Repeat("a", 64), true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setMinimalEnv(t)
+			t.Setenv("SYTUE_ROOMS_RESOURCE_SOURCE_DOCS_URL", tc.url)
+			t.Setenv("SYTUE_ROOMS_RESOURCE_SOURCE_DOCS_SECRET", tc.source)
+			t.Setenv("SYTUE_ROOMS_RESOURCE_SESSION_DOCS_SECRET", tc.session)
+			value, err := Load()
+			if (err == nil) != tc.ok {
+				t.Fatal("fixed Source bridge configuration", tc.name, err)
+			}
+			if err == nil && (value.ResourceSourceDocsURL != tc.url || value.ResourceSourceDocsSecret != tc.source) {
+				t.Fatal("fixed Source selection was not retained")
+			}
+		})
 	}
 }

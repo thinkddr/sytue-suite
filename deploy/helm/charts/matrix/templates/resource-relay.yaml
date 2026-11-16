@@ -1,0 +1,7 @@
+{{/* The existing Secret volume owns registration and tokens; no second renderer. */}}
+{{- define "matrix.resourceRelay.config" -}}
+{{- if .Values.resourceRelay.enabled }}
+app_service_config_files:
+  - /secrets/resource-relay.yaml
+{{- end }}
+{{- end }}

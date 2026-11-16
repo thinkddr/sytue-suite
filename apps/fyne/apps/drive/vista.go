@@ -34,6 +34,10 @@ import (
 // `TEXT_EXTS` y hasta 1 MB— y las imágenes que SyPhotos no sabe leer (WebP, AVIF). El
 // SVG no tiene vista previa nativa desde FYS-07: se descarga.
 //
+// «Compartido conmigo» es la excepción: lo de otra persona no lo abre ninguna app
+// (abren ficheros de TU unidad por id), así que ahí la vista previa también enseña las
+// fotos —JPEG, PNG, GIF— que en tu unidad irían a SyPhotos.
+//
 // Un AVIF, con `gen2brain/avif` (libavif + dav1d en WASM, sin CGO), que se registra en
 // `image.Decode`: si el sistema tiene libavif la usa, y si no, la suya.
 
@@ -52,8 +56,14 @@ const TopeVistaImagen = 64 << 20
 // `<pre>` enorme congela la pestaña, y aquí un lienzo con cien mil líneas también.
 const TopeVistaTexto = 1_000_000
 
+// extensionesFotoSinApp son las fotos que en tu unidad abre SyPhotos y que, sin app que
+// pueda abrirlas (lo compartido contigo), se ven en la vista previa.
+var extensionesFotoSinApp = map[string]bool{"jpg": true, "jpeg": true, "png": true, "gif": true}
+
 // TipoVista es qué visor le toca a un fichero sin app: "texto", "imagen" o "".
-func TipoVista(el Elemento) string {
+// `sinApp` es para lo que ninguna app de la suite puede abrir (lo compartido contigo):
+// entonces también las fotos que de otro modo irían a SyPhotos.
+func TipoVista(el Elemento, sinApp bool) string {
 	if el.Carpeta {
 		return ""
 	}
@@ -61,6 +71,8 @@ func TipoVista(el Elemento) string {
 	switch {
 	case extensionesTexto[ext] && el.Tamano <= TopeVistaTexto:
 		return "texto"
+	case sinApp && extensionesFotoSinApp[ext]:
+		return "imagen"
 	// El SVG ya no tiene vista previa nativa (FYS-07, decidido por el dueño): un SVG de
 	// 90 bytes desbordaba la pila de oksvg y cerraba Drive. Se descarga, como lo que no
 	// tiene visor.
@@ -75,17 +87,18 @@ func (p *Pantalla) pedirVista(el Elemento) {
 	if p.svc == nil {
 		return
 	}
-	p.abrirVista(el, func(ctx context.Context) (io.ReadCloser, error) { return p.svc.Download(ctx, el.ID) },
+	p.abrirVista(el, false, func(ctx context.Context) (io.ReadCloser, error) { return p.svc.Download(ctx, el.ID) },
 		func() { go p.descargar(el) })
 }
 
 // abrirVista abre la vista previa y trae el contenido con `abrir`; `bajar` es el botón
 // «Descargar» del pie. Sirve igual para «Mi unidad» y para una unidad de equipo, que
-// descargan por rutas distintas.
-func (p *Pantalla) abrirVista(el Elemento, abrir func(context.Context) (io.ReadCloser, error), bajar func()) {
+// descargan por rutas distintas, y para lo compartido contigo, con `sinApp`.
+func (p *Pantalla) abrirVista(el Elemento, sinApp bool, abrir func(context.Context) (io.ReadCloser, error), bajar func()) {
 	if p.win == nil {
 		return
 	}
+	tipo := TipoVista(el, sinApp)
 	v := p.variante()
 	cuerpo := container.NewStack(container.New(&altoFijo{alto: AltoCargaVersiones},
 		container.NewCenter(ui.NuevaRueda(20, "text", v))))
@@ -104,14 +117,14 @@ func (p *Pantalla) abrirVista(el Elemento, abrir func(context.Context) (io.ReadC
 		r, err := abrir(ctx)
 		if err == nil {
 			tope := int64(TopeVistaTexto + 1)
-			if TipoVista(el) == "imagen" {
+			if tipo == "imagen" {
 				tope = TopeVistaImagen
 			}
 			datos, err = io.ReadAll(io.LimitReader(r, tope))
 			_ = r.Close()
 		}
 		enHilo(func() {
-			cuerpo.Objects = []fyne.CanvasObject{p.contenidoVista(el, datos, err, alto, v)}
+			cuerpo.Objects = []fyne.CanvasObject{p.contenidoVista(el, tipo, datos, err, alto, v)}
 			cuerpo.Refresh()
 			d.Recolocar()
 		})
@@ -119,7 +132,7 @@ func (p *Pantalla) abrirVista(el Elemento, abrir func(context.Context) (io.ReadC
 }
 
 // contenidoVista es lo que va dentro: la imagen, el texto, o «no se pudo».
-func (p *Pantalla) contenidoVista(el Elemento, datos []byte, err error, alto float32, v tema.Variante) fyne.CanvasObject {
+func (p *Pantalla) contenidoVista(el Elemento, tipo string, datos []byte, err error, alto float32, v tema.Variante) fyne.CanvasObject {
 	fallo := func() fyne.CanvasObject {
 		t := lineaTexto(ui.Texto(p.tr.T("preview.failed", nil), tema.TextoBase, ui.Normal, tema.Color("text-muted", v)), tema.TextoBase)
 		return container.New(&altoFijo{alto: AltoCargaVersiones}, container.NewCenter(t))
@@ -127,7 +140,7 @@ func (p *Pantalla) contenidoVista(el Elemento, datos []byte, err error, alto flo
 	if err != nil {
 		return fallo()
 	}
-	if TipoVista(el) == "imagen" {
+	if tipo == "imagen" {
 		c, proporcion, ok := ImagenVista(el.Nombre, datos)
 		if !ok {
 			return fallo()

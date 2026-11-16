@@ -41,7 +41,7 @@ func TestChannelPrefsPersistAndList(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
 
-	tm, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	tm, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 
 	yes := true
 	got, err := st.SetChannelPref(ctx, ch.ID, "alice", "Alice", &yes, nil, nil)
@@ -92,7 +92,7 @@ func TestListJoinableChannels(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
 
-	tm, canal := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	tm, canal := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 	if err := st.AddTeamMember(ctx, tm.ID, "alice", "bob", "Bob", domain.RoleMember); err != nil {
 		t.Fatalf("AddTeamMember: %v", err)
 	}
@@ -148,7 +148,7 @@ func TestOpenDirectIdempotent(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
 
-	tm, _ := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	tm, _ := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 	if err := st.AddTeamMember(ctx, tm.ID, "alice", "bob", "Bob", domain.RoleMember); err != nil {
 		t.Fatalf("AddTeamMember bob: %v", err)
 	}

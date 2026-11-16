@@ -8,6 +8,20 @@
  */
 export const en = {
   'app.title': 'My account',
+  'app.description': 'My account — profile, security and access for your Sytue account.',
+  'app.lead': "Your profile, how you sign in and keep the account safe, and where it's in use.",
+
+  // --- Revisión de seguridad ---
+  'checkup.title': 'Security checkup',
+  'checkup.all_good': 'All good: your account is well protected.',
+  'checkup.dos_pasos': 'Two-step verification is off: your password alone opens the account.',
+  'checkup.recuperacion': 'No recovery email or phone: if you lose access there is no way back in.',
+  'checkup.sesiones': 'Sessions open on other devices: {count}',
+  'checkup.contrasenas_app': 'App passwords unused for 90 days: {count}',
+  'checkup.dispositivos': 'Trusted devices not seen for 90 days: {count}',
+  'checkup.turn_on': 'Turn on',
+  'checkup.add': 'Add',
+  'checkup.review': 'Review',
 
   // --- Perfil ---
   'profile.title': 'Profile',
@@ -35,12 +49,19 @@ export const en = {
   // --- Sesiones ---
   'sessions.title': 'Open sessions',
   'sessions.current': 'This device',
+  'sessions.signed_in': 'Signed in {time}',
   'sessions.close_one': 'Close this session',
+  'sessions.close_named': 'Close the session on {device}',
+  'sessions.close_one_confirm':
+    '{device} will be signed out and will have to sign in again to use your account.',
   'sessions.close_others': 'Close all sessions',
   'sessions.close_others_note': 'This one included: you will have to sign in again.',
+  'sessions.close_all_confirm':
+    'Every session will be closed, this one included. You will have to sign in again on every device.',
   'sessions.empty': 'No other sessions are open.',
   'sessions.failed': 'Could not load your sessions.',
   'common.loading': 'Loading…',
+  'common.retry': 'Try again',
 
   // --- Dispositivos ---
   'devices.title': 'Devices',
@@ -48,8 +69,22 @@ export const en = {
   'devices.trusted': 'Trusted',
   'devices.trust': 'Mark as trusted',
   'devices.forget': 'Forget this device',
+  'devices.forget_named': 'Forget {device}',
+  'devices.forget_confirm':
+    '{device} will no longer be recognised and will lose its trusted status. Signing in from it again will count as a new device.',
   'devices.empty': 'No devices recognised yet.',
   'devices.failed': 'Could not load your devices.',
+  'signature.title': 'Saved signature',
+  'signature.help':
+    'The signature you asked CertiPDF to remember when signing by hand. It is stored encrypted in your account.',
+  'signature.empty':
+    'You have no saved signature. When signing by hand in CertiPDF, tick «Remember my signature».',
+  'signature.failed': 'Could not load your saved signature.',
+  'signature.preview': 'Your saved signature',
+  'signature.saved_on': 'Saved on {date}',
+  'signature.delete': 'Delete saved signature',
+  'signature.delete_confirm':
+    'Your saved signature will be deleted. Documents you have already signed keep it; next time you sign by hand you will have to draw it again.',
 
   // --- Seguridad ---
   'security.title': 'Security',
@@ -58,6 +93,15 @@ export const en = {
   'security.password.warning': 'Changing it signs you out everywhere, including here.',
   'security.password.current': 'Current password',
   'security.password.new': 'New password',
+  'security.password.requirements': 'Requirements for the new password:',
+  'security.password.req_length': {
+    one: 'At least {count} character',
+    other: 'At least {count} characters',
+  },
+  'security.password.req_complexity': 'Letters and at least one number',
+  'security.password.req_different': 'Different from your current password',
+  'security.password.req_met': 'Met',
+  'security.password.req_pending': 'Not yet',
   'security.password.submit': 'Change password',
   'security.password.done': 'Password changed. All sessions were closed, including this one.',
   'security.password.signin_again': 'Sign in again',
@@ -79,6 +123,45 @@ export const en = {
   'security.codes.title': 'Recovery codes',
   'security.codes.once': 'Shown once. Save them somewhere safe: each one works a single time.',
   'security.codes.saved': 'I have saved them',
+  'security.codes.regenerate_confirm':
+    'Your current recovery codes will stop working straight away, including any you have printed or saved.',
+  'security.mfa.step.need': 'Before you start',
+  'security.mfa.step.need.heading': 'What you need',
+  'security.mfa.step.need.desc':
+    'An authenticator app on your phone. It shows a new six-digit code every 30 seconds.',
+  'security.mfa.step.need.apps_title': 'Any authenticator app works',
+  'security.mfa.step.need.apps':
+    'For example: Aegis, FreeOTP, Microsoft Authenticator, Google Authenticator, 1Password, Bitwarden. If you do not have one, install it before you continue.',
+  'security.mfa.step.need.next': 'Start',
+  'security.mfa.step.scan': 'Scan',
+  'security.mfa.step.scan.heading': 'Add your account to the app',
+  'security.mfa.key_label': 'Setup key',
+  'security.mfa.step.code': 'Code',
+  'security.mfa.step.code.heading': 'Type the code from the app',
+  'security.mfa.step.code.desc':
+    'This checks that the app and your account agree before turning it on.',
+  'security.mfa.code.hint': 'Six digits. If it changes while you type, use the new one.',
+  'security.mfa.step.codes.heading': 'Save your recovery codes',
+  'security.codes.copy': 'Copy all',
+  'security.codes.copied': 'Codes copied.',
+  'security.codes.copy_failed': 'Could not copy. Select the codes and copy them by hand.',
+  'security.codes.download': 'Download .txt',
+  'security.codes.file_title': 'Sytue recovery codes',
+  'security.codes.file_account': 'Account: {account}',
+  'security.codes.file_date': 'Created: {date}',
+  'security.codes.file_note':
+    'Each code works once. Keep this file somewhere safe, away from your phone.',
+  'security.mfa.step.done': 'Done',
+  'security.mfa.step.done.heading': 'Two-step verification is on',
+  'security.mfa.step.done.desc':
+    'Next time you sign in, you will be asked for a code from the app.',
+  'security.mfa.passkey_tip.title': 'Add a passkey too',
+  'security.mfa.passkey_tip':
+    'A passkey lets you sign in with your fingerprint, face or screen lock, without typing codes.',
+  'security.mfa.passkey_tip.action': 'Add a passkey',
+  'security.mfa.close': 'Close',
+  'security.mfa.disable_title': 'Turn off two-step verification?',
+  'security.mfa.disable_warning': 'Your password alone will open the account again.',
   'common.cancel': 'Cancel',
 
   // --- Perfil: el resto de la ficha ---
@@ -93,6 +176,8 @@ export const en = {
   // --- Passkeys ---
   'security.passkeys.title': 'Passkeys',
   'security.passkeys.remove': 'Remove',
+  'security.passkeys.remove_named': 'Remove {name}',
+  'security.passkeys.remove_confirm': 'You will no longer be able to sign in with {name}.',
   'security.passkeys.unnamed': 'Unnamed key',
 
   // --- Contraseñas de aplicación ---
@@ -103,6 +188,9 @@ export const en = {
   'app_passwords.label.hint': 'For example: laptop mail, phone.',
   'app_passwords.create': 'Create password',
   'app_passwords.revoke': 'Revoke',
+  'app_passwords.revoke_named': 'Revoke {label}',
+  'app_passwords.revoke_confirm':
+    'Apps using {label} will no longer be able to sign in. This cannot be undone.',
   'app_passwords.empty': 'No app passwords yet.',
   'app_passwords.failed': 'Could not load your app passwords.',
   'app_passwords.unnamed': 'Unnamed',

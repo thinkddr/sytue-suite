@@ -258,6 +258,55 @@ func (e *Edicion) QuitarFormato(desde, hasta int) {
 	})
 }
 
+// PegarFormato es la mitad que pinta de «Copiar formato» (la brocha): deja [desde, hasta)
+// con el aspecto de carácter de `fuente`, el [Estilo] con que se veía lo copiado. Como la
+// web (`pasosDeFormato` de exec.ts), primero quita el formato de carácter propio del tramo
+// y luego pone solo lo que difiere: copiar texto normal sobre un título le NIEGA la
+// negrita, y el color del folio no se escribe como un `<span>` de más. `props` son las
+// declaraciones de CSS que lo copiado puede llevar (familia, tamaño, color, resalte), ya
+// escritas como las escribe el navegador; cada una entra solo si cambia lo que se ve. Lo
+// que no es formato —enlaces, comentarios, control de cambios— se queda donde estaba.
+func (e *Edicion) PegarFormato(desde, hasta int, fuente Estilo, props [][2]string) {
+	// Un nodo por marca y por propiedad para TODO el tramo: así las runas vecinas
+	// comparten el elemento y salen dentro del mismo, no uno por letra.
+	var marcas [Subindice + 1]*html.Node
+	for m := Negrita; m <= Subindice; m++ {
+		marcas[m] = envoltorio(m, fuente.lleva(m))
+	}
+	spans := make([]*html.Node, 0, len(props))
+	for _, p := range props {
+		spans = append(spans, elemento("span", html.Attribute{Key: "style", Val: p[0] + ": " + p[1] + ";"}))
+	}
+	e.aplicar(desde, hasta, func(c []*html.Node) []*html.Node {
+		out := slices.DeleteFunc(slices.Clone(c), esDeFormato)
+		for m := Negrita; m <= Subindice; m++ {
+			out = conMarca(out, e.base, m, fuente.lleva(m), marcas[m])
+		}
+		for _, s := range spans {
+			if prueba := append(slices.Clip(out), s); estiloDe(e.base, prueba) != estiloDe(e.base, out) {
+				out = prueba
+			}
+		}
+		return out
+	})
+}
+
+// esDeFormato dice si el elemento SOLO da formato de carácter: una etiqueta de marca sin
+// atributos, un `<font color>` o un `<span style>`. Es lo que la brocha quita antes de
+// pintar; un enlace, un comentario o una marca del control de cambios no lo son.
+func esDeFormato(n *html.Node) bool {
+	switch n.DataAtom {
+	case atom.B, atom.Strong, atom.I, atom.Em, atom.U, atom.S, atom.Strike, atom.Sup, atom.Sub:
+		return len(n.Attr) == 0
+	case atom.Font:
+		return len(n.Attr) == 1 && n.Attr[0].Namespace == "" && n.Attr[0].Key == "color"
+	case atom.Span:
+		return len(n.Attr) == 1 && n.Attr[0].Namespace == "" && n.Attr[0].Key == "style"
+	default:
+		return false
+	}
+}
+
 // Formato es el estilo con el que se ve lo que hay en [desde, hasta) —el de su primera
 // runa— o, con el tramo vacío, el de lo que se escribiría ahí. Es lo que la cinta refleja
 // en sus selectores (fuente, tamaño).
@@ -565,11 +614,14 @@ func (e *Edicion) Partir(pos int) (Lugar, bool) {
 	if viejo.DataAtom == atom.Li && len(e.runas) == 0 && viejo.NextSibling == nil && deLista(viejo.Parent) {
 		return sacarDeLista(viejo), true
 	}
-	// El de detrás no hereda lo que identifica al de delante: el ancla de un título ni el
-	// número de una nota al pie.
+	// El de detrás no hereda lo que identifica al de delante: el ancla de un título, el
+	// número de una nota al pie ni la casilla hecha (el elemento nuevo nace sin hacer).
 	nuevo := elemento(viejo.Data, slices.DeleteFunc(slices.Clone(viejo.Attr), func(a html.Attribute) bool {
-		return a.Namespace == "" && (a.Key == "id" || a.Key == "value")
+		return a.Namespace == "" && (a.Key == "id" || a.Key == "value" || a.Key == "data-checked")
 	})...)
+	if esCasilla(viejo) {
+		nuevo.Attr = append(nuevo.Attr, html.Attribute{Key: "data-checked", Val: "0"})
+	}
 	if e.Tipo() == Titulo && pos == len(e.runas) {
 		nuevo = elemento("p") // tras un título se sigue en texto corriente
 	}

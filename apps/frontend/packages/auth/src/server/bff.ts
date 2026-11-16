@@ -17,6 +17,14 @@
  *   GET  /auth/avatar     -> la foto propia de Sytue ID, pedida con el token
  */
 import { ORG_COLOR_COOKIE, ORG_FORMA_COOKIE } from '@sytue/config';
+import { isSessionGeneration } from '@sytue/config/session-owner';
+import {
+  SessionSlots,
+  newSessionGeneration,
+  sessionOwner,
+  sessionChangedResponse,
+  type SelectedSession,
+} from './session-slots.js';
 import type { OidcConfig, SytueSession, SytueUser, TokenSet } from '../types.js';
 import {
   buildAuthorizationRequest,
@@ -30,9 +38,7 @@ import {
   OIDC_STATE_COOKIE,
   SESSION_COOKIE,
   hostCookieName,
-  readSession,
   seal,
-  sealSession,
   sessionCookieAttributes,
   unseal,
 } from './cookies.js';
@@ -67,7 +73,7 @@ export interface BffOptions {
    * de Traefik. Era literalmente imposible iniciar sesión en ninguna:
    * `admin.sytue.eu/` → `/admin` → `/auth/login?returnTo=/admin` → 404.
    */
-  basePath?: string;
+  basePath?: string | undefined;
 }
 
 /** `/admin/` → `/admin`; `/` o vacío → ``. Deja el prefijo listo para concatenar. */
@@ -86,6 +92,7 @@ interface OidcState {
   codeVerifier: string;
   /** Ruta a la que volver tras el login. */
   returnTo: string;
+  intent: string;
 }
 
 /**
@@ -108,6 +115,7 @@ interface StateExterno {
   s: string;
   /** Destino, tal cual llegó a `/auth/login`. */
   r: string;
+  i?: string;
 }
 
 const DEFAULT_MAX_AGE = 60 * 60 * 24 * 30;
@@ -118,7 +126,7 @@ export function createBff(opts: BffOptions) {
   const maxAge = opts.sessionMaxAge ?? DEFAULT_MAX_AGE;
   const secure = opts.secureCookies ?? true;
   const cookieAttrs = sessionCookieAttributes({ maxAge, secure });
-  const sessionCookie = hostCookieName(SESSION_COOKIE, secure);
+  const slots = new SessionSlots(sessionSecret, secure, maxAge);
   const stateCookie = hostCookieName(OIDC_STATE_COOKIE, secure);
   // Atributos del BORRADO. `secure` NO es decorativo aqui: el navegador rechaza
   // ENTERO cualquier Set-Cookie de un nombre `__Host-` que no lo lleve —tambien
@@ -131,8 +139,16 @@ export function createBff(opts: BffOptions) {
   // color— y por eso la puede leer el navegador; es host-only como la de sesión,
   // porque cada app puede tener activa una organización distinta. Sin color propio
   // se borra, y la hoja pinta el de la casa.
-  const escribirSesion = async (ctx: BffContext, session: SytueSession): Promise<void> => {
-    ctx.cookies.set(sessionCookie, await sealSession(session, sessionSecret), cookieAttrs);
+  const escribirSesion = async (
+    ctx: BffContext,
+    captured: SelectedSession,
+    session: SytueSession,
+  ): Promise<void> => {
+    await slots.persist(ctx, captured, session);
+    escribirApariencia(ctx, session);
+  };
+
+  const escribirApariencia = (ctx: BffContext, session: SytueSession): void => {
     // La apariencia de la organización, al lado y legible: un eje por cookie.
     for (const [cookie, valor] of [
       [ORG_COLOR_COOKIE, session.user.orgColor],
@@ -167,7 +183,14 @@ export function createBff(opts: BffOptions) {
     if (!tokens.idToken) return { ...session, tokens };
     try {
       const claims = await verifyIdToken(config, tokens.idToken);
-      return { ...session, tokens, user: userFromClaims(claims) };
+      const user = userFromClaims(claims);
+      const unchanged = user.id === session.user.id && user.tenant === session.user.tenant;
+      return {
+        ...session,
+        tokens,
+        user,
+        generation: unchanged ? session.generation! : newSessionGeneration(),
+      };
     } catch {
       return { ...session, tokens };
     }
@@ -254,16 +277,18 @@ export function createBff(opts: BffOptions) {
       // los logins, así que se arregla una vez para las trece apps.
       const returnTo = conPrefijo(basePath, ctx.url.searchParams.get('returnTo') ?? '/');
       const authReq = await buildAuthorizationRequest(config);
+      const selection = await slots.begin(ctx);
       const state: OidcState = {
         state: authReq.state,
         nonce: authReq.nonce,
         codeVerifier: authReq.pkce.codeVerifier,
         returnTo,
+        intent: selection.candidate.id,
       };
       const sealed = await seal(state, sessionSecret);
       // El mismo `state` aleatorio que guarda la cookie, más el destino, sellados
       // en el parámetro que el IdP devuelve tal cual (lo trata como opaco).
-      const externo: StateExterno = { s: authReq.state, r: returnTo };
+      const externo: StateExterno = { s: authReq.state, r: returnTo, i: state.intent };
       const url = new URL(authReq.url);
       url.searchParams.set('state', await seal(externo, sessionSecret));
       // `reauth=1`: una acción sensible ha pedido confirmar la identidad (step-up,
@@ -273,7 +298,7 @@ export function createBff(opts: BffOptions) {
       if (ctx.url.searchParams.get('reauth') === '1') url.searchParams.set('max_age', '0');
       // Cookie de estado efimera (30 min: la gente tarda en el formulario del IdP),
       // host-only, httpOnly. Si aun asi caduca, el callback reinicia el flujo.
-      ctx.cookies.set(stateCookie, sealed, {
+      ctx.cookies.set(slots.stateCookie(state.intent), sealed, {
         path: '/',
         httpOnly: true,
         secure,
@@ -287,44 +312,45 @@ export function createBff(opts: BffOptions) {
     async callback(ctx: BffContext): Promise<Response> {
       const code = ctx.url.searchParams.get('code');
       const returnedState = ctx.url.searchParams.get('state');
+      const externo = await unseal<StateExterno>(returnedState ?? undefined, sessionSecret);
+      const intent = externo?.i;
+      const stateInterno = externo?.s ?? returnedState;
+      const stateName = isSessionGeneration(intent) ? slots.stateCookie(intent) : stateCookie;
+      const stored = await unseal<OidcState>(ctx.cookies.get(stateName)?.value, sessionSecret);
+      const matched =
+        stored &&
+        stored.state === stateInterno &&
+        stored.intent === intent &&
+        isSessionGeneration(intent);
+      const selected = await slots.selection(ctx);
+      const destination = safeReturnTo(stored?.returnTo ?? externo?.r ?? '') || `${basePath}/`;
+      // An old or replayed callback never starts another login over a newer
+      // selected intent. In-flight pre-slot flows restart once without redeeming
+      // a code whose PKCE state is no longer bound to a selected intent.
+      if (intent && selected?.candidate.id !== intent) {
+        return (await slots.read(ctx)) ? redirect(destination) : sessionChangedResponse();
+      }
       const error = ctx.url.searchParams.get('error');
       if (error) {
-        // TERMINAL, nunca una redirección. Rebotar a `/?auth_error=...` metía al
-        // navegador en un bucle infinito: el guard de `/` no lee ese parámetro y
-        // reinicia el login, que vuelve a fallar por lo mismo. El usuario veía
-        // ERR_TOO_MANY_REDIRECTS y el motivo real (p. ej. invalid_scope por una
-        // configuración incorrecta del client) quedaba oculto.
-        ctx.cookies.delete(stateCookie, clearAttrs);
+        if (matched) {
+          slots.cancel(ctx, intent);
+          ctx.cookies.delete(stateName, clearAttrs);
+        }
         return authErrorResponse(error, ctx.url.searchParams.get('error_description'));
       }
-      if (!code || !returnedState) return redirect(`${basePath}/auth/login`);
-
-      // El `state` de vuelta trae dentro el aleatorio y el destino. Un `state`
-      // plano es un flujo empezado antes de este cambio (o por otro cliente): se
-      // acepta como el aleatorio a secas, para no tirar los logins en vuelo
-      // durante un despliegue.
-      const externo = await unseal<StateExterno>(returnedState, sessionSecret);
-      const stateInterno = externo?.s ?? returnedState;
-
-      const stored = await unseal<OidcState>(ctx.cookies.get(stateCookie)?.value, sessionSecret);
-      if (!stored || stored.state !== stateInterno) {
-        // Estado ausente/caducado/desincronizado (p. ej. el usuario tardó más que
-        // la vida de la cookie en el formulario del IdP, o pestañas en paralelo).
-        // NO es un fallo terminal: se descarta el code (nunca se acepta sin su
-        // verifier, que es la defensa CSRF real) y se REINICIA el flujo con estado
-        // fresco. Con la sesión SSO del IdP viva, el reintento es transparente.
-        ctx.cookies.delete(stateCookie, clearAttrs);
-        // CON el destino: este reinicio es el caso normal cuando el callback cae
-        // en un host distinto del que empezó, y sin esto aterrizaba siempre en la
-        // portada de la app.
-        const destino = externo ? safeReturnTo(externo.r) : '';
+      if (!code || !matched) {
+        if (selected)
+          return (await slots.read(ctx)) ? redirect(destination) : sessionChangedResponse();
+        ctx.cookies.delete(stateName, clearAttrs);
         return redirect(
-          destino && destino !== '/'
-            ? `${basePath}/auth/login?returnTo=${encodeURIComponent(destino)}`
+          externo?.r && safeReturnTo(externo.r) !== '/'
+            ? `${basePath}/auth/login?returnTo=${encodeURIComponent(safeReturnTo(externo.r))}`
             : `${basePath}/auth/login`,
         );
       }
-      ctx.cookies.delete(stateCookie, clearAttrs);
+      if (!(await slots.canComplete(ctx, intent)))
+        return (await slots.read(ctx)) ? redirect(destination) : sessionChangedResponse();
+      ctx.cookies.delete(stateName, clearAttrs);
 
       // UN FALLO AQUÍ NO PUEDE ESCAPAR COMO EXCEPCIÓN. Astro la convierte en un
       // 500 sin Content-Type ni cuerpo, y Safari no la pinta: la DESCARGA como un
@@ -340,7 +366,7 @@ export function createBff(opts: BffOptions) {
         const motivo = e instanceof Error ? e.message : String(e);
         // `invalid_grant` es casi siempre recargar la URL de retorno o pulsar Atrás
         // (el code es de un solo uso): con el SSO vivo, reiniciar es transparente.
-        if (motivo.includes('invalid_grant')) return redirect(`${basePath}/auth/login`);
+        if (motivo.includes('invalid_grant')) return redirect(destination);
         console.error(`[auth] callback: ${motivo}`);
         return authErrorResponse(motivo, null);
       }
@@ -348,15 +374,20 @@ export function createBff(opts: BffOptions) {
         user: userFromClaims(claims),
         tokens,
         clientId: config.clientId,
+        generation: intent,
       };
-      await escribirSesion(ctx, session);
+      await slots.complete(ctx, intent, session);
+      escribirApariencia(ctx, session);
       return redirect(safeReturnTo(stored.returnTo) || `${basePath}/`);
     },
 
     /** POST /auth/logout — logout local + SSO (end_session) */
     async logout(ctx: BffContext): Promise<Response> {
-      const session = await readSession(ctx.cookies.get(sessionCookie)?.value, sessionSecret);
-      ctx.cookies.delete(sessionCookie, clearAttrs);
+      const captured = await slots.read(ctx);
+      const guard = slots.guard(ctx, captured);
+      if (guard) return guard;
+      const session = captured?.session;
+      await slots.revokeCurrent(ctx);
       clearLegacyDomainCookie(ctx);
       // Cierre LOCAL (`?scope=local`): borra solo la cookie de ESTA app y
       // termina. Lo pide Sytue ID a las diez superficies al cerrar el SSO, porque
@@ -377,9 +408,17 @@ export function createBff(opts: BffOptions) {
 
     /** GET /auth/session — usuario actual (para hidratar la shell) o 401 */
     async session(ctx: BffContext): Promise<Response> {
+      const guard = await this.sessionGuard(ctx);
+      if (guard) return guard;
       const session = await this.getSession(ctx);
       if (!session) return json({ authenticated: false }, 401);
-      return json({ authenticated: true, user: session.user, tenant: session.user.tenant });
+      const owner = sessionOwner(session);
+      return json({
+        authenticated: true,
+        user: session.user,
+        tenant: session.user.tenant,
+        ...(owner ? { owner } : {}),
+      });
     },
 
     /**
@@ -396,6 +435,8 @@ export function createBff(opts: BffOptions) {
      * sesión de Sytue ID viva eso es una redirección, no un login.
      */
     async organizations(ctx: BffContext): Promise<Response> {
+      const guard = await this.sessionGuard(ctx);
+      if (guard) return guard;
       const session = await this.getSession(ctx);
       if (!session) return json({ authenticated: false }, 401);
       const api = (config.internalBaseUrl ?? config.issuer).replace(/\/$/, '');
@@ -448,6 +489,8 @@ export function createBff(opts: BffOptions) {
      * 304 sin cuerpo. Sin foto, 404: el `<Avatar>` cae a las iniciales.
      */
     async avatar(ctx: BffContext): Promise<Response> {
+      const guard = await this.sessionGuard(ctx);
+      if (guard) return guard;
       const session = await this.getSession(ctx);
       if (!session) return new Response(null, { status: 401 });
       const api = (config.internalBaseUrl ?? config.issuer).replace(/\/$/, '');
@@ -481,20 +524,48 @@ export function createBff(opts: BffOptions) {
       return new Response(res.body, { status: 200, headers: out });
     },
 
+    /**
+     * Pide `ruta` a la API de Sytue ID con el access token de la sesión y devuelve su
+     * respuesta tal cual (401 sin sesión, 502 si el IdP no contesta). Es la plomería
+     * de los datos «de la cuenta» que usa una app que no es Mi cuenta —la rúbrica
+     * guardada de CertiPDF—, para que ninguna se escriba su propio proxy.
+     */
+    async idApi(ctx: BffContext, ruta: string, init?: RequestInit): Promise<Response> {
+      const session = await this.getSession(ctx);
+      if (!session) return new Response(null, { status: 401 });
+      const api = (config.internalBaseUrl ?? config.issuer).replace(/\/$/, '');
+      const headers = new Headers(init?.headers);
+      headers.set('authorization', `Bearer ${session.tokens.accessToken}`);
+      try {
+        return await fetch(`${api}${ruta}`, { ...init, headers });
+      } catch {
+        return new Response(null, { status: 502, headers: { 'cache-control': 'no-store' } });
+      }
+    },
+
     /** POST /auth/refresh — renueva tokens si hay refresh_token */
     async refresh(ctx: BffContext): Promise<Response> {
-      const session = await readSession(ctx.cookies.get(sessionCookie)?.value, sessionSecret);
-      if (!session?.tokens.refreshToken) return json({ refreshed: false }, 401);
+      const captured = await slots.read(ctx);
+      const guard = slots.guard(ctx, captured);
+      if (guard) return guard;
+      const session = captured?.session;
+      if (!captured || !session?.tokens.refreshToken) return json({ refreshed: false }, 401);
       try {
         const tokens = await refreshTokens(config, session.tokens.refreshToken);
         const next = await nextSession(session, tokens);
-        await escribirSesion(ctx, next);
-        return json({ refreshed: true, expiresAt: tokens.expiresAt });
+        await escribirSesion(ctx, captured, next);
+        const mismatch = slots.guard(ctx, { ...captured, session: next });
+        return mismatch ?? json({ refreshed: true, expiresAt: tokens.expiresAt });
       } catch {
-        ctx.cookies.delete(sessionCookie, clearAttrs);
+        await slots.revokeCurrent(ctx);
         clearLegacyDomainCookie(ctx);
         return json({ refreshed: false }, 401);
       }
+    },
+
+    /** Reject a retained caller before refreshing tokens or making upstream IO. */
+    async sessionGuard(ctx: BffContext): Promise<Response | null> {
+      return slots.guard(ctx, await slots.read(ctx));
     },
 
     /**
@@ -503,15 +574,18 @@ export function createBff(opts: BffOptions) {
      * hay sesion valida. Uso en middleware / guards del lado servidor.
      */
     async getSession(ctx: BffContext): Promise<SytueSession | null> {
-      const session = await readSession(ctx.cookies.get(sessionCookie)?.value, sessionSecret);
-      if (!session) return null;
+      const captured = await slots.read(ctx);
+      if (slots.guard(ctx, captured)) return null;
+      const session = captured?.session;
+      if (!captured || !session || session.clientId !== config.clientId) return null;
+      if (session.tokens.expiresAt <= Date.now() && !session.tokens.refreshToken) return null;
       const aboutToExpire = session.tokens.expiresAt - Date.now() < 60_000;
       if (aboutToExpire && session.tokens.refreshToken) {
         try {
           const tokens = await refreshTokens(config, session.tokens.refreshToken);
           const next = await nextSession(session, tokens);
-          await escribirSesion(ctx, next);
-          return conAvatarPropio(next);
+          await escribirSesion(ctx, captured, next);
+          return slots.guard(ctx, { ...captured, session: next }) ? null : conAvatarPropio(next);
         } catch {
           return session.tokens.expiresAt > Date.now() ? conAvatarPropio(session) : null;
         }

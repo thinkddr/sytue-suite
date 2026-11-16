@@ -206,6 +206,8 @@ func textos(w fyne.Window) string {
 			b.WriteString(x.Texto + "\n")
 		case *ui.Insignia:
 			b.WriteString(x.AccessibilityLabel() + "\n")
+		case *ui.Vacio:
+			b.WriteString(x.Titulo + "\n" + x.Descripcion + "\n")
 		case *ui.Pestana:
 			b.WriteString("<" + x.Rotulo + ">\n")
 		}
@@ -299,12 +301,12 @@ func TestCrearUnaBaseLaAbre(t *testing.T) {
 	}
 	capturar(t, w, "base-sin-tablas")
 	got := textos(w)
-	for _, quiero := range []string{"Clientes", "Esta base todavía no tiene tablas.", "[Añadir tabla]"} {
+	for _, quiero := range []string{"Clientes", "Esta base todavía no tiene tablas", "[Añadir tabla]"} {
 		if !strings.Contains(got, quiero) {
 			t.Errorf("falta %q en:\n%s", quiero, got)
 		}
 	}
-	if got := elementosDe(t, w, "Clientes"); !slices.Equal(got, []string{"Renombrar base", "Añadir tabla", "Borrar base"}) {
+	if got := elementosDe(t, w, "Clientes"); !slices.Equal(got, []string{"Renombrar base", "Editar la descripción", "Actividad", "Añadir tabla", "Borrar base"}) {
 		t.Errorf("el menú de la base ofrece %q", got)
 	}
 	if p.nombre.Texto() != "" {

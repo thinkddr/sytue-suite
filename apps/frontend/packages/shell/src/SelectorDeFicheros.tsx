@@ -52,7 +52,7 @@ export interface SelectorDeFicherosProps {
 function FolderGlyph({ size = 16, class: cls }: { size?: number; class?: string }): JSX.Element {
   return (
     <Glifo
-      d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"
+      d="M3.5 6.5A1.5 1.5 0 0 1 5 5h4.4l2 2.5H19a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 19.5H5a1.5 1.5 0 0 1-1.5-1.5ZM3.5 10.5h17"
       size={size}
       class={cls}
     />
@@ -62,8 +62,7 @@ function FolderGlyph({ size = 16, class: cls }: { size?: number; class?: string 
 function FileGlyph({ size = 16, class: cls }: { size?: number; class?: string }): JSX.Element {
   return (
     <Glifo size={size} class={cls}>
-      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z" />
-      <path d="M14 3v5h5" />
+      <path d="M13.5 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8.5ZM13.5 3.5V8.5h5" />
     </Glifo>
   );
 }
@@ -197,7 +196,7 @@ export function SelectorDeFicheros({
             <EmptyState
               title={error === 'session' ? textos.sessionExpired : textos.loadFailed}
               description={error === 'session' ? textos.sessionExpiredHelp : textos.checkConnection}
-              illustration={<Icon name="warning" size={36} class="text-danger-text" />}
+              tone="error"
               action={
                 error === 'session' ? (
                   <Button size="sm" onClick={() => location.reload()}>

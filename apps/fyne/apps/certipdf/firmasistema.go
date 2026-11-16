@@ -6,7 +6,6 @@ package certipdf
 import (
 	"context"
 	"errors"
-	"strconv"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -178,13 +177,8 @@ func (d *dialogoFirmar) buscarCertificados() {
 
 // opcionesDeFirma son las del recuadro y el motivo, como las de la firma con .p12.
 func (d *dialogoFirmar) opcionesDeFirma() api.PDFFirmaOpciones {
-	rect := rectFirma
-	if !d.visible {
-		rect = [4]float64{}
-	}
-	pagina, _ := strconv.Atoi(strings.TrimSpace(d.pagina.Texto()))
 	return api.PDFFirmaOpciones{
-		Motivo: d.motivo.Texto(), Lugar: d.lugar.Texto(), Pagina: pagina - 1, Rect: rect, Bloquear: d.bloquear,
+		Motivo: d.motivo.Texto(), Lugar: d.lugar.Texto(), Pagina: d.numeroDePagina() - 1, Rect: d.rectEnviado(), Bloquear: d.bloquear,
 	}
 }
 

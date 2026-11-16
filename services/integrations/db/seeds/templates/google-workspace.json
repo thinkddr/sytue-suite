@@ -35,7 +35,7 @@
       }
     ],
     "oauth": {
-      "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth?access_type=offline&prompt=consent",
+      "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth?access_type=offline&prompt=consent%20select_account",
       "token_url": "https://oauth2.googleapis.com/token",
       "scopes": [
         "openid",

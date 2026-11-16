@@ -5,7 +5,6 @@ package calcus
 
 import (
 	"maps"
-	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -53,6 +52,10 @@ type Libro struct {
 	// version cuenta los cambios, para no recalcular el formato condicional en cada
 	// pintado si nada ha cambiado.
 	version uint64
+	// fusFuente y fusCache son la última lista de combinadas leída y lo que dio
+	// (`Fusiones`): la rejilla las mira en cada pintado.
+	fusFuente []string
+	fusCache  []Fusion
 	// ocultas es lo último que se le dijo al motor de las filas que no se ven, por hoja,
 	// y en qué versión: SUBTOTAL lo necesita. Ver sincronizarOcultas.
 	ocultas struct {
@@ -65,6 +68,24 @@ type Libro struct {
 		version uint64
 		activa  int
 		mapa    map[Celda]*decoracion
+	}
+	// extUsada es la última columna y fila con algo de la hoja activa, que la rejilla pide
+	// en cada fotograma para su extensión: se recorre el mapa una vez por versión.
+	extUsada struct {
+		version uint64
+		activa  int
+		listo   bool
+		c, f    int
+	}
+	// filasOcultas es FilasOcultas de la hoja activa, que la rejilla pide varias veces
+	// por fotograma y que con autofiltro lee cada fila usada del motor. Además de la
+	// versión va el autofiltro: sus cambios (`Filtrar`…) lo sustituyen sin tocarla.
+	filasOcultas struct {
+		version uint64
+		activa  int
+		filtro  *Autofiltro
+		listo   bool
+		v       []bool
 	}
 	// rotulo traduce lo poco que el libro PINTA con palabras (el «Total» de la fila de
 	// totales). Lo pone el lienzo; sin él sale la clave.
@@ -107,6 +128,9 @@ type hojaLibro struct {
 	// grupFilas y grupCols son el esquema (`rowGroups`, `colGroups`); inmutables, así
 	// que la foto los comparte: cambiarlos es poner otra lista.
 	grupFilas, grupCols []analisis.Grupo
+	// ocultFilas y ocultCols son las filas y columnas ocultas a mano (`hiddenRows`,
+	// `hiddenCols`, en tramos); inmutables como el esquema.
+	ocultFilas, ocultCols []analisis.Tramo
 	// dinamicas son las tablas dinámicas (`pivots`).
 	dinamicas []analisis.Dinamica
 	// escenarios son los del análisis de hipótesis (`scenarios`).
@@ -118,12 +142,19 @@ type hojaLibro struct {
 	graficos []Grafico
 	segs     []Segmentacion
 	// anchos y altos son las medidas personalizadas de la web (`colWidths`, `rowHeights`):
-	// no se pintan, pero se conservan al guardar. Inmutables, así que la foto los comparte.
+	// la rejilla las pinta (`geometria.go`) y se cambian a mano (`redimensionar.go`).
+	// Inmutables, así que la foto los comparte: cambiarlas es poner otro mapa.
 	anchos, altos map[string]float64
-	// fusiones son las celdas combinadas (`merges`), tampoco pintadas y conservadas.
+	// fusiones son las celdas combinadas (`merges`, ver fusiones.go); inmutables como
+	// las medidas.
 	fusiones []string
 	// pestana es el color de la pestaña (`tabColor`, #RRGGBB); "" = sin color.
 	pestana string
+	// id es la identidad de la hoja (`id`, sheets/idhoja.ts), "" en un libro anterior a
+	// ellas; filasA y colsA, la de sus filas y columnas (`rowIds`, `colIds`). Anclan los
+	// comentarios de una celda (anclas.go).
+	id            string
+	filasA, colsA ejeAnclas
 }
 
 // Fijas es `freeze`: cuántas columnas y filas se quedan quietas desde el origen.
@@ -172,7 +203,6 @@ func (l *Libro) h() *hojaLibro { return &l.f.hojas[l.f.activa] }
 // Hoja es el nombre de la hoja activa.
 func (l *Libro) Hoja() string { return l.h().nombre }
 
-// Hojas son los nombres de las hojas del libro, en orden.
 // ColorPestana es el color de la pestaña de la hoja i (#RRGGBB); "" si no tiene.
 func (l *Libro) ColorPestana(i int) string {
 	if i < 0 || i >= len(l.f.hojas) {
@@ -181,6 +211,28 @@ func (l *Libro) ColorPestana(i int) string {
 	return l.f.hojas[i].pestana
 }
 
+// PonerColorPestana le pone a la pestaña de la hoja i otro color (#RRGGBB, el
+// `tabColor` que sale en el .xlsx); "" se lo quita. Un valor que no es #RRGGBB también la
+// deja sin color, como `conColorDePestana` de la web. Sin cambio no se apunta nada en el
+// historial: deshacer no tiene que gastar un paso en no hacer nada.
+func (l *Libro) PonerColorPestana(i int, c string) {
+	if i < 0 || i >= len(l.f.hojas) {
+		return
+	}
+	if !reColorPestana.MatchString(c) {
+		c = ""
+	}
+	c = strings.ToUpper(c)
+	if strings.EqualFold(l.f.hojas[i].pestana, c) {
+		return
+	}
+	l.anotar()
+	f := l.copia()
+	f.hojas[i].pestana = c
+	l.restaurar(f)
+}
+
+// Hojas son los nombres de las hojas del libro, en orden.
 func (l *Libro) Hojas() []string {
 	out := make([]string, len(l.f.hojas))
 	for i, h := range l.f.hojas {
@@ -445,10 +497,11 @@ func (l *Libro) cambiarHTML(c1, f1, c2, f2 int, fn func(*partes)) {
 	}
 }
 
-// Combinar es el comando `merge`: junta el texto del rango, separado por espacios, en
-// la celda de arriba a la izquierda y vacía las demás. Es combinación de CONTENIDO, sin
-// celda extendida, igual que en la web. Devuelve false si no había rango.
-func (l *Libro) Combinar(c1, f1, c2, f2 int) bool {
+// CombinarContenido es `merge` con `content` («Combinar contenido»): junta el texto del
+// rango, separado por espacios, en la celda de arriba a la izquierda y vacía las demás,
+// sin celda extendida, igual que en la web. Es la alternativa de quien no quiere perder
+// nada. Devuelve false si no había rango.
+func (l *Libro) CombinarContenido(c1, f1, c2, f2 int) bool {
 	if c1 == c2 && f1 == f2 {
 		return false
 	}
@@ -553,7 +606,7 @@ func (l *Libro) PonerBordes(modo string, c1, f1, c2, f2 int) {
 // Fijar es el comando `freeze`: inmoviliza `cols` columnas y `filas` filas (0, 0
 // descongela). Se acotan a la rejilla menos una, como en la web.
 func (l *Libro) Fijar(cols, filas int) {
-	nuevo := Fijas{Cols: clamp(cols, Columnas-1), Rows: clamp(filas, Filas-1)}
+	nuevo := Fijas{Cols: clamp(cols, MaxColumnas-1), Rows: clamp(filas, MaxFilas-1)}
 	if nuevo == l.h().fijas {
 		return
 	}
@@ -577,7 +630,9 @@ func (l *Libro) Activar(i int) {
 func (l *Libro) Anadir(nombre string) {
 	l.anotar()
 	f := l.copia()
-	f.hojas = append(f.hojas, nuevaHoja(nombre))
+	nueva := nuevaHoja(nombre)
+	nueva.id = nuevoIDHoja()
+	f.hojas = append(f.hojas, nueva)
 	f.activa = len(f.hojas) - 1
 	l.restaurar(f)
 }
@@ -596,6 +651,7 @@ func (l *Libro) Duplicar() {
 	i := f.activa + 1
 	nueva := f.hojas[f.activa].clonar()
 	nueva.nombre = src + " (" + strconv.Itoa(n) + ")"
+	nueva.id = nuevoIDHoja()
 	f.hojas = slices.Insert(f.hojas, i, nueva)
 	f.activa = i
 	l.restaurar(f)
@@ -624,6 +680,11 @@ func (l *Libro) Renombrar(i int, nombre string) {
 	l.anotar()
 	f := l.copia()
 	f.nombres = renombrarHojaEnNombres(f.nombres, f.hojas[i].nombre, nombre)
+	// Una hoja sin id se ancla por el que se deduce de su nombre (`h:Datos`): se fija antes
+	// de cambiarlo, o sus comentarios se quedarían sin hoja.
+	if f.hojas[i].id == "" {
+		f.hojas[i].id = l.IDsHojas()[i]
+	}
 	f.hojas[i].nombre = nombre
 	l.restaurar(f)
 }
@@ -724,8 +785,8 @@ func (l *Libro) rehacerMotor() {
 // ---- resumen ----
 
 // Resumen es lo que enseña la barra de hojas de un rango: sus valores pasados por
-// resumenDe.
-func (l *Libro) Resumen(c1, f1, c2, f2 int) (recuento int, suma, media float64, ok bool) {
+// resumenDe (`resumen.go`).
+func (l *Libro) Resumen(c1, f1, c2, f2 int) (Estadisticas, bool) {
 	vals := make([]formula.Value, 0, (c2-c1+1)*(f2-f1+1))
 	for f := f1; f <= f2; f++ {
 		for c := c1; c <= c2; c++ {
@@ -733,34 +794,6 @@ func (l *Libro) Resumen(c1, f1, c2, f2 int) (recuento int, suma, media float64, 
 		}
 	}
 	return resumenDe(vals)
-}
-
-// resumenDe es `selectionStats` de `sheets/format.ts`: cuántas celdas tienen algo
-// —también el texto, que es el criterio de Excel—, cuánto suman las numéricas y su
-// promedio. ok es false si no hay ningún número, que es cuando la web no enseña nada.
-func resumenDe(vals []formula.Value) (recuento int, suma, media float64, ok bool) {
-	nums := 0
-	for _, v := range vals {
-		if s, es := v.(string); es && s == "" {
-			continue
-		}
-		recuento++
-		if n, es := v.(float64); es && !math.IsNaN(n) && !math.IsInf(n, 0) {
-			nums++
-			suma += n
-		}
-	}
-	if nums == 0 {
-		return 0, 0, 0, false
-	}
-	// Seis decimales como en la web, y los números enormes tal cual: multiplicarlos por
-	// 1e6 los sacaría del entero seguro. `Floor(x+0,5)` y no `Round`, que es como
-	// redondea `Math.round` los negativos (−2,5 → −2).
-	media = suma / float64(nums)
-	if math.Abs(media) < 1e9 {
-		media = math.Floor(media*1e6+0.5) / 1e6
-	}
-	return recuento, suma, media, true
 }
 
 // Ref es la referencia A1 de una celda por índices de base cero: (1, 2) es «B3».
@@ -791,6 +824,48 @@ func (l *Libro) UltimaUsada(fila int, soloFila bool) (Celda, bool) {
 		c, f = max(c, k.C), max(f, k.F)
 	}
 	return Celda{C: c, F: f}, c >= 0
+}
+
+// Usado es `usedRange` de la hoja activa: su última columna y su última fila con algo
+// (-1, -1 si está vacía). Sale de las celdas del libro y no de la marca de agua del
+// motor, que solo crece y cuenta la celda de apoyo del formato condicional: con ella
+// la rejilla se estiraría hasta el final de la hoja.
+func (l *Libro) Usado() (c, f int) {
+	u := &l.extUsada
+	if !u.listo || u.version != l.version || u.activa != l.f.activa {
+		u.listo, u.version, u.activa = true, l.version, l.f.activa
+		u.c, u.f = usadoDe(l.h())
+	}
+	return u.c, u.f
+}
+
+func usadoDe(h *hojaLibro) (c, f int) {
+	c, f = -1, -1
+	for k, v := range h.celdas {
+		if v != "" {
+			c, f = max(c, k.C), max(f, k.F)
+		}
+	}
+	return c, f
+}
+
+// llenasEn son las posiciones con algo de la columna c (enColumna) o de la fila f de la
+// hoja activa, ordenadas: lo que necesita Ctrl+flecha (`moveToData` en la web). Una
+// pasada por las celdas, solo al pulsar.
+func (l *Libro) llenasEn(c, f int, enColumna bool) []int {
+	var out []int
+	for k, v := range l.h().celdas {
+		if textoPlano(v) == "" {
+			continue
+		}
+		if enColumna && k.C == c {
+			out = append(out, k.F)
+		} else if !enColumna && k.F == f {
+			out = append(out, k.C)
+		}
+	}
+	slices.Sort(out)
+	return out
 }
 
 // ---- formato condicional ----
@@ -840,8 +915,9 @@ func (l *Libro) MoverCondicion(i, dir int) {
 }
 
 // celdaApoyo es `SCRATCH`: la celda de apoyo del motor donde se evalúan las reglas de
-// fórmula, fuera de la rejilla.
-const celdaApoyo = "ZZ1000"
+// fórmula. Es la última celda de Excel: con la rejilla ya sin el tope de 26×100, ZZ1000
+// podía ser una celda de verdad de la hoja y se pisaba.
+const celdaApoyo = "XFD1048576"
 
 // decoracionDe es lo que el formato condicional le pone a la celda (c, f) de la hoja
 // activa, o nil. Se recalcula solo cuando el libro cambia.
@@ -879,7 +955,9 @@ func (l *Libro) decorar() map[Celda]*decoracion {
 		}
 		return false
 	}
-	mapa := decorar(reglas, l.Valor, evaluar)
+	uc, uf := l.Usado()
+	topeC, topeF := extension(uc, uf, 0, 0, Vista{}, AnchoCelda, AltoCelda)
+	mapa := decorar(reglas, l.Valor, evaluar, topeC, topeF)
 	if usada {
 		_ = l.motor.SetCell(hoja, celdaApoyo, "")
 	}

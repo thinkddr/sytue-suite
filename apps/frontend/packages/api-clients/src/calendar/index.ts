@@ -159,6 +159,20 @@ function instanciaAEvento(i: InstanciaCruda): Event {
   };
 }
 
+/** Respuesta a una invitación (RFC 5545 PARTSTAT): Sí, Quizá o No. */
+export type InvitationPartStat = 'ACCEPTED' | 'TENTATIVE' | 'DECLINED';
+
+/** Resultado de contestar una invitación llegada por correo. */
+export interface ImportedInvitation {
+  calendarId: string;
+  uid: string;
+  /** La dirección propia con la que figuraba como invitado. */
+  attendee: string;
+  partstat: InvitationPartStat;
+  /** Si el REPLY ha salido por correo hacia quien organiza. */
+  replySent: boolean;
+}
+
 export class CalendarClient {
   private readonly http: HttpClient;
 
@@ -207,6 +221,21 @@ export class CalendarClient {
    * justo lo que un cliente tipado viene a hacer.
    */
   async listEvents(params: { calendarIds?: string[]; from: string; to: string }): Promise<Event[]> {
+    return (await this.listEventsDetallado(params)).events;
+  }
+
+  /**
+   * `listEvents` diciendo TAMBIÉN qué calendarios no contestaron (`failed`, sus
+   * ids). `listEvents` los tira en silencio, y una agenda a la que le falta un
+   * calendario parece una agenda con menos eventos: quien pinta la agenda (la
+   * tarjeta «Hoy» del Hub) necesita saberlo para avisar de que está incompleta.
+   * Si falla la lista de calendarios, falla esto entero, como `listEvents`.
+   */
+  async listEventsDetallado(params: {
+    calendarIds?: string[];
+    from: string;
+    to: string;
+  }): Promise<{ events: Event[]; failed: string[]; calendars: number }> {
     const { calendars } = await this.http.json<{ calendars: CalendarioCrudo[] }>({
       path: '/calendars',
     });
@@ -222,14 +251,14 @@ export class CalendarClient {
         }),
       ),
     );
-    return (
-      tandas
-        .flatMap((r) => (r.status === 'fulfilled' ? r.value.instances : []))
-        .map((i) => instanciaAEvento(i))
-        // La instancia manda sobre el maestro: una repetición cae en SU día y no
-        // en el del primer evento de la serie.
-        .sort((a, b) => a.start.localeCompare(b.start))
-    );
+    const failed = elegidos.filter((_, i) => tandas[i]?.status === 'rejected').map((c) => c.id);
+    const events = tandas
+      .flatMap((r) => (r.status === 'fulfilled' ? r.value.instances : []))
+      .map((i) => instanciaAEvento(i))
+      // La instancia manda sobre el maestro: una repetición cae en SU día y no
+      // en el del primer evento de la serie.
+      .sort((a, b) => a.start.localeCompare(b.start));
+    return { events, failed, calendars: elegidos.length };
   }
 
   /**
@@ -282,6 +311,28 @@ export class CalendarClient {
       body: JSON.stringify(aCuerpo({ ...actual, ...patch })),
     });
     return eventoAEvento(crudo);
+  }
+
+  /**
+   * Contesta la invitación de un organizador de FUERA de la suite que llegó por
+   * correo (iMIP): el servicio guarda el evento en el calendario por defecto con la
+   * respuesta y manda el REPLY a quien organiza. `ics` es el REQUEST tal cual llegó.
+   */
+  async importInvitation(ics: string, partstat: InvitationPartStat): Promise<ImportedInvitation> {
+    const r = await this.http.postJson<{
+      calendar_id: string;
+      uid: string;
+      attendee: string;
+      partstat: InvitationPartStat;
+      reply_sent: boolean;
+    }>('/invitations/import', { ics, partstat });
+    return {
+      calendarId: r.calendar_id,
+      uid: r.uid,
+      attendee: r.attendee,
+      partstat: r.partstat,
+      replySent: r.reply_sent,
+    };
   }
 
   /** Elimina un evento. */

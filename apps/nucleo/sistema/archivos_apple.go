@@ -3,6 +3,10 @@
 
 //go:build (ios || darwin) && cgo
 
+// gocritic lee este fichero ya pasado por cgo y da avisos de otro código («dupImport»
+// de `C` y `unsafe`): se silencia en el fichero, y el resto de linters sí lo miran.
+//
+//nolint:gocritic // cgo: los avisos no son de este fichero, ver arriba
 package sistema
 
 /*

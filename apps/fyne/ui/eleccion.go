@@ -12,7 +12,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 )
 
-// LadoEleccion es el `h-4 w-4` de la casilla y del radio: 1rem con el rem de 14.
+// LadoEleccion es el `h-4 w-4` de la casilla y del radio: 1rem, 16 px.
 var LadoEleccion = tema.Espacio(4)
 
 // HuecoEleccion es el `gap-2` entre el control y su etiqueta.
@@ -71,6 +71,16 @@ type Eleccion struct {
 	AlCambiar func(bool)
 
 	inerte, enfocado, encima bool
+	// fueraDelRecorrido es el `tabIndex={-1}` de la casilla de una fila que no es la del
+	// cursor en una lista itinerante: se sigue pulsando, pero el tabulador se la salta.
+	fueraDelRecorrido bool
+	// SubeTeclas deja que las teclas y letras que la casilla no usa lleguen a la ventana
+	// ([SubirTecla], [SubirRuna]), como un `keydown` del `<input>` sube al documento. Lo
+	// pide quien cuelga atajos del lienzo y marca con esta casilla: en Drive se marca
+	// con un clic en ella, el clic le da el foco, y sin esto Supr, F2 o Esc justo después
+	// no llegaban a nadie. Opcional: subir las teclas de todas las casillas de la suite
+	// cambiaría lo que hace cada pantalla que ya escucha el lienzo.
+	SubeTeclas bool
 }
 
 var (
@@ -182,8 +192,13 @@ func (e *Eleccion) Disable() { e.inerte = true; e.Refresh() }
 // Enable lo devuelve a la vida.
 func (e *Eleccion) Enable() { e.inerte = false; e.Refresh() }
 
-// Disabled dice si está inerte.
-func (e *Eleccion) Disabled() bool { return e.inerte }
+// Disabled dice si está fuera del recorrido del tabulador, por inerte o por apartada.
+func (e *Eleccion) Disabled() bool { return e.inerte || e.fueraDelRecorrido }
+
+// EnElRecorrido pone o quita la casilla del recorrido del tabulador SIN atenuarla ni
+// dejarla sin respuesta, como `Boton.EnElRecorrido`. Disable no sirve para eso: la pinta
+// al 50 % y no se deja marcar.
+func (e *Eleccion) EnElRecorrido(si bool) { e.fueraDelRecorrido = !si }
 
 // FocusGained enciende el aro.
 func (e *Eleccion) FocusGained() { e.enfocado = true; e.Refresh() }
@@ -195,12 +210,21 @@ func (e *Eleccion) FocusLost() { e.enfocado = false; e.Refresh() }
 func (e *Eleccion) TypedRune(r rune) {
 	if r == ' ' {
 		e.Tapped(nil)
+		return
+	}
+	if e.SubeTeclas {
+		SubirRuna(lienzoDe(e), r)
 	}
 }
 
 // TypedKey no atiende ninguna otra tecla: el recorrido de un grupo de radios con las
 // flechas lo lleva quien monta el grupo, que es el único que sabe cuáles son hermanos.
-func (e *Eleccion) TypedKey(k *fyne.KeyEvent) { SubirEscape(e, k) }
+// Con SubeTeclas, lo que no es Escape de una capa sigue hacia la ventana.
+func (e *Eleccion) TypedKey(k *fyne.KeyEvent) {
+	if !SubirEscape(e, k) && e.SubeTeclas {
+		SubirTecla(lienzoDe(e), k)
+	}
+}
 
 // AccessibilityLabel es el rótulo que anuncia el lector de pantalla. Con SinEtiqueta el
 // texto no se escribe pero SÍ se anuncia: por eso el campo sigue estando.

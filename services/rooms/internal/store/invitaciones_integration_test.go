@@ -31,7 +31,7 @@ func TestLaGenteDeFueraAceptaAntesDeEntrar(t *testing.T) {
 	acme, bg := tenantCtx("acme"), context.Background()
 	const bea, carla = "bea", "carla" // de las organizaciones «otra» y «tercera»
 
-	tm, publico := seedTeamChannel(t, acme, st, "alice", domain.ChannelPublic)
+	tm, publico := seedTeamChannel(acme, t, st, "alice", domain.ChannelPublic)
 	priv, err := st.CreateChannel(acme, store.NewChannelRecord{
 		TeamID: tm.ID, Slug: "proyecto", Name: "Proyecto", Kind: domain.ChannelPrivate, CreatedBy: "alice",
 	})

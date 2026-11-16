@@ -89,3 +89,49 @@ func TestElRecorteVaAlPortapapeles(t *testing.T) {
 		t.Errorf("sin xclip ni wl-copy CopiarImagen da %v", err)
 	}
 }
+
+// TestElegirCarpetaPideUnaCarpetaAZenity: el selector se abre en modo carpeta y lo que
+// escribe es la ruta, limpia; cancelar (salir con 1) es nada, sin error.
+func TestElegirCarpetaPideUnaCarpetaAZenity(t *testing.T) {
+	dir := t.TempDir()
+	apunte := filepath.Join(dir, "apunte")
+	guion := "#!/bin/sh\nfor a in \"$@\"; do echo \"$a\" >> " + apunte + "; done\necho /home/ana/Proyecto/\n"
+	if err := os.WriteFile(filepath.Join(dir, "zenity"), []byte(guion), 0o755); err != nil { //nolint:gosec // G306: tiene que poder ejecutarse
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	ruta, err := ElegirCarpeta("Subir carpeta")
+	if err != nil || ruta != "/home/ana/Proyecto" {
+		t.Fatalf("ElegirCarpeta = %q, %v", ruta, err)
+	}
+	datos, _ := os.ReadFile(apunte) //nolint:gosec // G304: fichero del propio test
+	if string(datos) != "--file-selection\n--directory\n--title=Subir carpeta\n" {
+		t.Errorf("zenity recibió:\n%s", datos)
+	}
+
+	if err := os.WriteFile(filepath.Join(dir, "zenity"), []byte("#!/bin/sh\nexit 1\n"), 0o755); err != nil { //nolint:gosec // G306: tiene que poder ejecutarse
+		t.Fatal(err)
+	}
+	if ruta, err := ElegirCarpeta("Subir carpeta"); ruta != "" || err != nil {
+		t.Errorf("cancelar dio %q, %v", ruta, err)
+	}
+}
+
+// TestElegirCarpetaConKdialog: en KDE, `--getexistingdirectory`.
+func TestElegirCarpetaConKdialog(t *testing.T) {
+	dir := t.TempDir()
+	apunte := filepath.Join(dir, "apunte")
+	guion := "#!/bin/sh\necho \"$*\" > " + apunte + "\necho /home/ana/Fotos\n"
+	if err := os.WriteFile(filepath.Join(dir, "kdialog"), []byte(guion), 0o755); err != nil { //nolint:gosec // G306: tiene que poder ejecutarse
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	ruta, err := ElegirCarpeta("Subir carpeta")
+	if err != nil || ruta != "/home/ana/Fotos" {
+		t.Fatalf("ElegirCarpeta = %q, %v", ruta, err)
+	}
+	datos, _ := os.ReadFile(apunte) //nolint:gosec // G304: fichero del propio test
+	if string(datos) != "--title Subir carpeta --getexistingdirectory .\n" {
+		t.Errorf("kdialog recibió %q", datos)
+	}
+}

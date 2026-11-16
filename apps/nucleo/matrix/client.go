@@ -35,6 +35,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/auth"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage/pqc"
 )
 
 var (
@@ -59,9 +60,16 @@ type Secrets interface {
 	Write(string, []byte) error
 	Delete(string) error
 }
-type systemSecrets struct{}
+type systemSecrets struct{ migrate func(string) ([]byte, error) }
 
-func (systemSecrets) Read(key string) ([]byte, error)      { return auth.LeerSecreto(key) }
+func (s systemSecrets) Read(key string) ([]byte, error) {
+	data, err := auth.LeerSecreto(key)
+	if errors.Is(err, auth.ErrSecretoLegadoCompartido) && s.migrate != nil {
+		return s.migrate(key)
+	}
+	return data, err
+}
+
 func (systemSecrets) Write(key string, value []byte) error { return auth.GuardarSecreto(key, value) }
 func (systemSecrets) Delete(key string) error              { return auth.BorrarSecreto(key) }
 
@@ -74,6 +82,17 @@ type VerificationCallbacks interface {
 
 // Config binds Matrix identity and the local store to the active Sytue actor/tenant.
 type Config struct {
+	// ResourceProduct uses a separate SDK device and local encrypted store for
+	// canonical-user resource collaboration. It never enables isolated storage.
+	ResourceProduct string
+	// RequirePublicationAdmission is activated only after the origin pipeline is
+	// deployed and verified. Each write still requires its own durable hook.
+	RequirePublicationAdmission bool
+
+	// NativeConsumer identifies a suite app borrowing another product's data.
+	// It must be bound by the native PKCE broker; the storage product stays unchanged.
+	NativeConsumer        string
+	NativeRecovery        *NativeRecoveryConfig
 	Bootstrap             Bootstrap
 	SytueApex             string
 	Subject               string
@@ -86,12 +105,14 @@ type Config struct {
 }
 
 type credentials struct {
-	Homeserver  string      `json:"homeserver"`
-	UserID      id.UserID   `json:"user_id"`
-	DeviceID    id.DeviceID `json:"device_id"`
-	AccessToken string      `json:"access_token"`
-	Subject     string      `json:"subject"`
-	Tenant      string      `json:"tenant"`
+	ResourceProduct string      `json:"resource_product,omitempty"`
+	NativeConsumer  string      `json:"native_consumer,omitempty"`
+	Homeserver      string      `json:"homeserver"`
+	UserID          id.UserID   `json:"user_id"`
+	DeviceID        id.DeviceID `json:"device_id"`
+	AccessToken     string      `json:"access_token"`
+	Subject         string      `json:"subject"`
+	Tenant          string      `json:"tenant"`
 }
 
 // EventRef is safe for the Rooms metadata API: it contains no message plaintext.
@@ -100,44 +121,50 @@ type EventRef = api.RoomsMatrixEventRef
 // DecryptedEvent is delivered only after Matrix authenticated decryption and trust
 // checks. Content stays in the calling client, never the Rooms metadata API.
 type DecryptedEvent struct {
-	ChannelID    string
-	Reference    EventRef
-	SenderDevice string
-	Sender       string
-	SessionID    string
-	SenderKey    string
-	Timestamp    int64
-	Type         string
-	Content      json.RawMessage
-	Trust        id.TrustState
-	Recovered    bool
+	ChannelID         string
+	Reference         EventRef
+	SenderDevice      string
+	Sender            string
+	SessionID         string
+	SenderKey         string
+	Timestamp         int64
+	Type              string
+	Content           json.RawMessage
+	Trust             id.TrustState
+	Recovered         bool
+	OuterCipherSHA256 string
 }
 
 // Client owns one person's Matrix device and encrypted SQLite session store.
 type Client struct {
-	cfg          Config
-	account      string
-	directory    string
-	session      credentials
-	cli          *mautrix.Client
-	crypto       *cryptohelper.CryptoHelper
-	verify       *verificationhelper.VerificationHelper
-	master       []byte
-	mu           sync.Mutex
-	callKeys     map[*CallKeys]struct{}
-	attested     map[attestedStorageSession]struct{}
-	backupMu     sync.Mutex
-	stateMu      sync.RWMutex
-	done         chan struct{}
-	cancel       context.CancelFunc
-	syncing      atomic.Bool
-	ready        atomic.Bool
-	firstSync    chan struct{}
-	firstOnce    sync.Once
-	closed       atomic.Bool
-	delivery     chan deliveryResult
-	deliveryCtx  context.Context
-	backupSignal chan struct{}
+	storageKeyDecoder pqc.StorageKeyDecoder
+	resourceLeafMu    sync.Mutex
+	resourceGrant     *api.MatrixResourceGrant
+	cfg               Config
+	account           string
+	directory         string
+	session           credentials
+	cli               *mautrix.Client
+	crypto            *cryptohelper.CryptoHelper
+	verify            *verificationhelper.VerificationHelper
+	master            []byte
+	mu                sync.Mutex
+	callKeys          map[*CallKeys]struct{}
+	attested          map[attestedStorageSession]struct{}
+	backupMu          sync.Mutex
+	stateMu           sync.RWMutex
+	done              chan struct{}
+	cancel            context.CancelFunc
+	syncing           atomic.Bool
+	ready             atomic.Bool
+	firstSync         chan struct{}
+	firstOnce         sync.Once
+	closed            atomic.Bool
+	delivery          chan deliveryResult
+	deliveryCtx       context.Context
+	backupSignal      chan struct{}
+	storeMu           sync.Mutex
+	releaseStore      func()
 }
 
 func newClient(cfg Config) (*Client, error) {
@@ -149,12 +176,18 @@ func newClient(cfg Config) (*Client, error) {
 		return nil, ErrIdentity
 	}
 	namespace := ""
-	if cfg.Bootstrap.StorageProduct != "" {
+	switch {
+	case cfg.ResourceProduct != "":
+		if !validResourceIdentity(cfg) {
+			return nil, ErrIdentity
+		}
+		namespace = "resources:" + cfg.ResourceProduct
+	case cfg.Bootstrap.StorageProduct != "":
 		if !storage.Product(cfg.Bootstrap.StorageProduct) || !validStorageBindings(cfg.Bootstrap) {
 			return nil, ErrIdentity
 		}
 		namespace = "storage:" + cfg.Bootstrap.StorageProduct
-	} else if cfg.Bootstrap.StorageRoomID != "" || len(cfg.Bootstrap.StorageRoomIDs) != 0 {
+	case cfg.Bootstrap.StorageIdentityVersion != 0 || cfg.Bootstrap.LegacyStorage != nil || cfg.Bootstrap.StorageRoomID != "" || len(cfg.Bootstrap.StorageRoomIDs) != 0:
 		return nil, ErrIdentity
 	}
 	return newAccountClient(cfg, u, namespace)
@@ -163,19 +196,26 @@ func newClient(cfg Config) (*Client, error) {
 // newAccountClient only constructs the shared local account/HTTP engine. Each
 // public constructor validates its own identity and authorization policy first.
 func newAccountClient(cfg Config, u *url.URL, namespace string) (*Client, error) {
+	if cfg.NativeConsumer != "" {
+		if namespace != "storage:drive" || cfg.Bootstrap.StorageProduct != "drive" || storage.NativeReturnApp("drive", cfg.NativeConsumer) == "" {
+			return nil, ErrIdentity
+		}
+		namespace = "native:" + cfg.NativeConsumer + "\x00" + namespace
+	}
+	if cfg.NativeRecovery != nil {
+		recovery := *cfg.NativeRecovery
+		cfg.NativeRecovery = &recovery
+	}
 	cfg.Bootstrap.Channels = slices.Clone(cfg.Bootstrap.Channels)
 	cfg.Bootstrap.DraftRoomIDs = slices.Clone(cfg.Bootstrap.DraftRoomIDs)
 	cfg.Bootstrap.StorageRoomIDs = slices.Clone(cfg.Bootstrap.StorageRoomIDs)
 	cfg.Bootstrap.HomeserverURL = strings.TrimRight(u.String(), "/")
-	if cfg.Secrets == nil {
-		cfg.Secrets = systemSecrets{}
-	}
+
 	accountScope := cfg.Bootstrap.HomeserverURL + "\x00" + cfg.Bootstrap.MatrixUserID + "\x00" + cfg.Subject + "\x00" + cfg.Tenant
 	if namespace != "" {
 		accountScope = namespace + "\x00" + accountScope
 	}
-	h := sha256.Sum256([]byte(accountScope))
-	account := hex.EncodeToString(h[:])
+	account := matrixAccountName(accountScope)
 	cli, err := mautrix.NewClient(cfg.Bootstrap.HomeserverURL, id.UserID(cfg.Bootstrap.MatrixUserID), "")
 	if err != nil {
 		return nil, err
@@ -195,14 +235,34 @@ func newAccountClient(cfg Config, u *url.URL, namespace string) (*Client, error)
 	cli.Client = &httpc
 	cli.Log = zerolog.Nop() // no plaintext, login tokens, recovery keys or HTTP bodies in logs
 	cli.UserAgent = "Sytue Rooms"
-	return &Client{cfg: cfg, account: account, directory: filepath.Join(cfg.StoreDir, account), cli: cli, backupSignal: make(chan struct{}, 1), firstSync: make(chan struct{})}, nil
+	client := &Client{cfg: cfg, account: account, directory: filepath.Join(cfg.StoreDir, account), cli: cli, backupSignal: make(chan struct{}, 1), firstSync: make(chan struct{})}
+	if client.cfg.Secrets == nil {
+		client.cfg.Secrets = systemSecrets{migrate: client.migrateNativeSecret}
+	}
+	return client, nil
+}
+
+func matrixAccountName(scope string) string {
+	h := sha256.Sum256([]byte(scope))
+	return hex.EncodeToString(h[:])
 }
 
 // Open restores only a keychain-bound device. Missing/lost private storage never
 // causes automatic replacement of device keys or a fallback to plaintext.
-func Open(ctx context.Context, cfg Config) (*Client, error) {
+func Open(ctx context.Context, cfg Config) (_ *Client, err error) {
 	c, err := newClient(cfg)
 	if err != nil {
+		return nil, err
+	}
+	if err := c.acquireStore(ctx); err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err != nil {
+			_ = c.Close()
+		}
+	}()
+	if err := c.resumeLogout(ctx); err != nil {
 		return nil, err
 	}
 	saved, err := c.readSession()
@@ -226,14 +286,22 @@ func (c *Client) readSession() (credentials, error) {
 	if len(data) == 0 {
 		return credentials{}, ErrLoginRequired
 	}
+	return c.decodeSession(data)
+}
+
+func (c *Client) decodeSession(data []byte) (credentials, error) {
 	var saved credentials
-	if json.Unmarshal(data, &saved) != nil || saved.Homeserver != c.cfg.Bootstrap.HomeserverURL ||
-		saved.UserID != id.UserID(c.cfg.Bootstrap.MatrixUserID) || saved.Subject != c.cfg.Subject || saved.Tenant != c.cfg.Tenant ||
-		saved.DeviceID == "" || saved.AccessToken == "" {
+	if json.Unmarshal(data, &saved) != nil || !c.validSession(saved) {
 		return credentials{}, ErrIdentity
 	}
 	return saved, nil
 }
+
+func (c *Client) validSession(saved credentials) bool {
+	return saved.Homeserver == c.cfg.Bootstrap.HomeserverURL && saved.UserID == id.UserID(c.cfg.Bootstrap.MatrixUserID) &&
+		saved.Subject == c.cfg.Subject && saved.Tenant == c.cfg.Tenant && saved.NativeConsumer == c.cfg.NativeConsumer && saved.ResourceProduct == c.cfg.ResourceProduct && saved.DeviceID != "" && saved.AccessToken != ""
+}
+
 func (c *Client) sessionKey() string { return "rooms-matrix-session-" + c.account }
 func (c *Client) masterKey() string  { return "rooms-matrix-master-" + c.account }
 func (c *Client) loadMaster(create bool) error {
@@ -266,7 +334,7 @@ func (c *Client) devicePath(device id.DeviceID) string {
 }
 
 func (c *Client) initialize(ctx context.Context, create bool) error {
-	if err := c.loadMaster(false); err != nil {
+	if err := c.loadStoreMaster(ctx); err != nil {
 		return err
 	}
 	c.cli.UserID, c.cli.DeviceID, c.cli.AccessToken = c.session.UserID, c.session.DeviceID, c.session.AccessToken
@@ -437,7 +505,18 @@ func (c *Client) Verification() *verificationhelper.VerificationHelper { return 
 // Close stops sync and closes the encrypted store while keeping resumable secrets
 // in the OS keychain. Logout below explicitly revokes and forgets them.
 func (c *Client) Close() error {
-	if c == nil || !c.closed.CompareAndSwap(false, true) {
+	if c == nil {
+		return nil
+	}
+	c.storeMu.Lock()
+	defer c.storeMu.Unlock()
+	defer c.unlockStore()
+	return c.closeStore()
+}
+
+// The lifetime lock remains held until sync, readers and the SDK database drain.
+func (c *Client) closeStore() error {
+	if !c.closed.CompareAndSwap(false, true) {
 		return nil
 	}
 	c.ready.Store(false)
@@ -449,6 +528,7 @@ func (c *Client) Close() error {
 	c.mu.Lock()
 	cancel, done := c.cancel, c.done
 	c.delivery, c.deliveryCtx = nil, nil
+	c.resourceGrant = nil
 	c.mu.Unlock()
 	if cancel != nil {
 		cancel()
@@ -460,6 +540,7 @@ func (c *Client) Close() error {
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()
 	defer clear(c.master)
+	c.storageKeyDecoder.Reset()
 	if c.crypto != nil {
 		return c.crypto.Close()
 	}
@@ -471,12 +552,35 @@ func (c *Client) Logout(ctx context.Context) error {
 	if c == nil {
 		return nil
 	}
-	_, remoteErr := c.cli.Logout(ctx)
-	localErr := c.Close()
-	forgetErr := errors.Join(c.cfg.Secrets.Delete(c.sessionKey()), c.cfg.Secrets.Delete(c.masterKey()), c.cfg.Secrets.Delete(c.backupSecretKey()), c.cfg.Secrets.Delete(c.ssssSecretKey()))
-	// The directory was constructed exclusively from the authenticated account hash.
-	removeErr := os.RemoveAll(c.directory)
-	return errors.Join(remoteErr, localErr, forgetErr, removeErr)
+	c.storeMu.Lock()
+	defer c.storeMu.Unlock()
+	defer c.unlockStore()
+	if c.session.DeviceID == "" || c.session.AccessToken == "" {
+		return errors.Join(ErrLoginRequired, c.closeStore())
+	}
+	if err := c.lockStore(ctx); err != nil {
+		return errors.Join(err, c.closeStore())
+	}
+	saved, err := c.readSession()
+	if err != nil && !errors.Is(err, ErrLoginRequired) {
+		return errors.Join(err, c.closeStore())
+	}
+	if err == nil && saved != c.session {
+		return errors.Join(ErrIdentity, c.closeStore())
+	}
+	pending, err := c.readLogoutIntent()
+	if (err != nil && !errors.Is(err, errNoLogoutIntent)) || (err == nil && *pending != c.session) {
+		return errors.Join(ErrIdentity, err, c.closeStore())
+	}
+	var queueErr error
+	if errors.Is(err, errNoLogoutIntent) {
+		queueErr = c.saveLogoutIntent(c.session)
+	}
+	localErr := c.closeStore()
+	if queueErr != nil {
+		return errors.Join(queueErr, localErr)
+	}
+	return errors.Join(queueErr, localErr, c.finishLogout(ctx, c.session))
 }
 
 func (c *Client) requireEncrypted(ctx context.Context, roomID string) error {
@@ -486,7 +590,7 @@ func (c *Client) requireEncrypted(ctx context.Context, roomID string) error {
 	if !c.ready.Load() {
 		return ErrNotReady
 	}
-	if !c.allowedRoom(roomID) {
+	if !c.allowedRoomContext(ctx, roomID) {
 		return ErrIdentity
 	}
 	var state event.EncryptionEventContent
@@ -502,6 +606,9 @@ func (c *Client) requireEncrypted(ctx context.Context, roomID string) error {
 	}
 	if !status.Verified {
 		return ErrUnverified
+	}
+	if status.RecoverySetupPending {
+		return ErrRecoveryRequired
 	}
 	return nil
 }
@@ -521,33 +628,26 @@ func (c *Client) sendEvent(ctx context.Context, roomID string, kind event.Type, 
 }
 
 func (c *Client) sendEventWithTxn(ctx context.Context, roomID string, kind event.Type, content any, transaction string) (EventRef, error) {
-	c.stateMu.RLock()
-	defer c.stateMu.RUnlock()
-	if err := c.requireEncrypted(ctx, roomID); err != nil {
-		return EventRef{}, err
-	}
-	if err := c.checkRoomIdentities(ctx, id.RoomID(roomID)); err != nil {
-		return EventRef{}, err
-	}
-	encrypted, err := c.crypto.Encrypt(ctx, id.RoomID(roomID), kind, content)
+	return c.sendEventWithTxnAdmission(ctx, roomID, kind, content, transaction, nil)
+}
+
+func (c *Client) sendEventWithTxnAdmission(ctx context.Context, roomID string, kind event.Type, content any, transaction string, hook PublicationAdmissionHook) (EventRef, error) {
+	prepared, err := c.prepareEncryptedPublication(ctx, roomID, kind, content, transaction)
 	if err != nil {
 		return EventRef{}, err
 	}
-	response, err := c.cli.SendMessageEvent(ctx, id.RoomID(roomID), event.EventEncrypted, encrypted, mautrix.ReqSendEvent{TransactionID: transaction})
-	if err != nil {
-		return EventRef{}, err
-	}
-	if response == nil || response.EventID == "" {
-		return EventRef{}, errors.New("matrix: missing event receipt")
-	}
-	c.scheduleBackup()
-	return EventRef{RoomID: roomID, EventID: response.EventID.String()}, nil
+	defer prepared.Close()
+	return prepared.Send(ctx, hook)
 }
 
 // Compile-time assertion: key sharing is provided by the maintained crypto store.
 var _ mxcrypto.Store = (*mxcrypto.SQLCryptoStore)(nil)
 
 func (c *Client) allowedRoom(roomID string) bool {
+	// Resource rooms are admitted by the typed epoch adapter, never raw Rooms routing.
+	if c.cfg.ResourceProduct != "" {
+		return false
+	}
 	if roomID == "" {
 		return false
 	}
@@ -650,3 +750,7 @@ func (c *Client) checkRoomIdentities(ctx context.Context, roomID id.RoomID) erro
 func validIdentityConfig(cfg Config) bool {
 	return cfg.Subject != "" && cfg.Tenant != "" && cfg.StoreDir != "" && cfg.Bootstrap.Actor == cfg.Subject && cfg.Bootstrap.Tenant == cfg.Tenant && validController(cfg.Bootstrap)
 }
+
+// NativeConsumer identifies the recipient bound by this device's own PKCE login.
+// It is independent of the product whose encrypted data the device may access.
+func (c *Client) NativeConsumer() string { return c.cfg.NativeConsumer }

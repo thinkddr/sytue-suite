@@ -93,6 +93,38 @@ misconfigurations:
     statement: "Falso positivo sobre el marcador SYTUE_REDIS_PASSWORD; la credencial solo llega desde un Secret al emptyDir privado del pod, con guardián que impide publicarla en el ConfigMap"
     expired_at: 2027-02-01
 
+  # IMÁGENES DE TERCEROS RECONSTRUIDAS (deploy/upstream-reconstruidas) que upstream
+  # publica SIN USER, y así tienen que seguir: cada receta solo cambia un binario o
+  # unos paquetes y no puede alterar con qué usuario arranca la imagen.
+  #   · buildkit (la variante con root) es precisamente la que necesita root;
+  #   · postgres y dragonfly arrancan como root y su entrypoint baja de privilegios
+  #     (gosu / setpriv) tras preparar el volumen;
+  #   · synapse, livekit y cert-manager-webhook-scaleway corren con el usuario que
+  #     les fija el chart (runAsUser), que es lo que manda en el pod.
+  # Las reconstruidas que upstream sí publica sin root llevan su USER explícito.
+  - id: DS-0002
+    paths:
+      - "**/upstream-reconstruidas/buildkit/Dockerfile"
+      - "**/upstream-reconstruidas/managed-postgres/Dockerfile"
+      - "**/upstream-reconstruidas/dragonfly/Dockerfile"
+      - "**/upstream-reconstruidas/synapse/Dockerfile"
+      - "**/upstream-reconstruidas/livekit/Dockerfile"
+      - "**/upstream-reconstruidas/cert-manager-webhook-scaleway/Dockerfile"
+    statement: "Imágenes de terceros que upstream publica sin USER; la reconstrucción no puede cambiar el usuario con el que arrancan, y el pod fija el suyo"
+    expired_at: 2027-02-01
+
+  # La etapa `debs` de estas recetas solo BAJA paquetes (`apt-get download`) en la
+  # arquitectura nativa para instalarlos con dpkg en la final: bajo QEMU, apt no
+  # verifica firmas. No es la imagen que se publica, así que no hay `install`
+  # que poner detrás del `update`.
+  - id: DS-0017
+    paths:
+      - "**/upstream-reconstruidas/managed-postgres/Dockerfile"
+      - "**/upstream-reconstruidas/dragonfly/Dockerfile"
+      - "**/upstream-reconstruidas/synapse/Dockerfile"
+    statement: "Etapa intermedia que solo descarga .deb verificados en la arquitectura nativa; la imagen publicada los instala con dpkg"
+    expired_at: 2027-02-01
+
 vulnerabilities:
   # OpenSSL en la base de las imágenes de frontal: `oven/bun:1.4.2-alpine` trae
   # libcrypto3/libssl3 3.5.7-r0 y Alpine ya publica 3.5.8-r0.

@@ -81,12 +81,20 @@ type TarjetaMensaje struct {
 
 	ancho  float32 // lo pone el hilo al colocarla: el alto depende de él
 	encima bool
+	// citaAbierta es el `aria-expanded` del botón de la cita: plegada al montar la
+	// tarjeta, como en la web.
+	citaAbierta bool
+	// zonas son las dianas de los enlaces del cuerpo, que pone Layout; sobreEnlace, que
+	// el puntero está en una (la mano del cursor). Ver `enlaces.go`.
+	zonas       []zonaEnlace
+	sobreEnlace bool
 }
 
 var (
-	_ fyne.Widget       = (*TarjetaMensaje)(nil)
-	_ fyne.Tappable     = (*TarjetaMensaje)(nil)
-	_ desktop.Hoverable = (*TarjetaMensaje)(nil)
+	_ fyne.Widget        = (*TarjetaMensaje)(nil)
+	_ fyne.Tappable      = (*TarjetaMensaje)(nil)
+	_ desktop.Hoverable  = (*TarjetaMensaje)(nil)
+	_ desktop.Cursorable = (*TarjetaMensaje)(nil)
 )
 
 func nuevaTarjetaMensaje(l *Lector, m Mensaje, expandida bool) *TarjetaMensaje {
@@ -96,9 +104,13 @@ func nuevaTarjetaMensaje(l *Lector, m Mensaje, expandida bool) *TarjetaMensaje {
 }
 
 // Tapped pliega y despliega, que es lo que hace el `<button aria-expanded>` de la
-// web. Solo la CABECERA es el botón: pulsar en el cuerpo es para seleccionar texto.
+// web. Solo la CABECERA es el botón: en el cuerpo, pulsar abre el enlace que haya
+// debajo y nada más.
 func (t *TarjetaMensaje) Tapped(e *fyne.PointEvent) {
 	if e != nil && e.Position.Y > tema.Borde+t.altoCabecera() {
+		if d := t.enlaceEn(e.Position); d != "" && t.L.AlAbrirEnlace != nil {
+			t.L.AlAbrirEnlace(d)
+		}
 		return
 	}
 	t.Expandida = !t.Expandida
@@ -114,8 +126,10 @@ func (t *TarjetaMensaje) Tapped(e *fyne.PointEvent) {
 // MouseIn es `hover:bg-bg-subtle`, solo sobre la cabecera.
 func (t *TarjetaMensaje) MouseIn(e *desktop.MouseEvent) { t.MouseMoved(e) }
 
-// MouseMoved enciende el velo mientras el puntero está en la cabecera.
+// MouseMoved enciende el velo mientras el puntero está en la cabecera, y pone la mano
+// sobre un enlace del cuerpo.
 func (t *TarjetaMensaje) MouseMoved(e *desktop.MouseEvent) {
+	t.sobreEnlace = t.enlaceEn(e.Position) != ""
 	dentro := e.Position.Y <= tema.Borde+t.altoCabecera()
 	if dentro != t.encima {
 		t.encima = dentro
@@ -125,6 +139,7 @@ func (t *TarjetaMensaje) MouseMoved(e *desktop.MouseEvent) {
 
 // MouseOut apaga el velo.
 func (t *TarjetaMensaje) MouseOut() {
+	t.sobreEnlace = false
 	if t.encima {
 		t.encima = false
 		t.Refresh()
@@ -149,7 +164,9 @@ func (t *TarjetaMensaje) talla() ui.TallaAvatar {
 }
 
 // lineasCabecera son las líneas de `text-sm` bajo el remitente: el extracto plegada, y
-// desplegada la dirección y —si hay destinatarios— el «Para».
+// desplegada la dirección y una línea por cada lista de destinatarios que no esté
+// vacía —«Para», «CC» y, en lo propio que la traiga, «CCO»—. Sin el CC no se sabía a
+// quién iba a llegar «Responder a todos»; una lista vacía no deja hueco.
 func (t *TarjetaMensaje) lineasCabecera() []string {
 	m, tr := t.Mensaje, t.L.T
 	if !t.Expandida {
@@ -163,8 +180,13 @@ func (t *TarjetaMensaje) lineasCabecera() []string {
 		correo = m.De[0].Correo
 	}
 	out := []string{correo}
-	if len(m.Para) > 0 {
-		out = append(out, tr.T("reader.to", i18n.Vars{"addresses": UnirDirecciones(m.Para)}))
+	for _, d := range []struct {
+		clave string
+		lista []Direccion
+	}{{"reader.to", m.Para}, {"reader.cc", m.CC}, {"reader.bcc", m.CCO}} {
+		if len(d.lista) > 0 {
+			out = append(out, tr.T(d.clave, i18n.Vars{"addresses": UnirDirecciones(d.lista)}))
+		}
 	}
 	return out
 }
@@ -182,17 +204,26 @@ func (t *TarjetaMensaje) anchoUtilCuerpo(ancho float32) float32 {
 
 // cuerpo decide qué enseña el cuerpo desplegado, en el orden de `MessageBodyView`:
 // el cuerpo leído, el extracto mientras llega (o si falló), y si no hay nada, el aviso.
-func (t *TarjetaMensaje) cuerpo() (texto string, cargando, conFormato, vacio bool) {
+//
+// Del cuerpo leído se aparta la cita (`separarCita`), que espera tras su botón: en un
+// hilo cada respuesta repetía todas las anteriores, y aquí, donde hasta el HTML se lee
+// como texto, era leer el hilo entero una vez por mensaje. El extracto no se pliega:
+// son unos cientos de caracteres y la cita casi nunca cabe en ellos.
+func (t *TarjetaMensaje) cuerpo() (texto, cita string, cargando, conFormato, vacio bool) {
 	c, ya := t.L.cuerpoDe(t.Mensaje.ID)
 	switch {
 	case ya && c.Texto != "":
-		return recortar(c.Texto), false, c.ConFormato, false
+		nuevo, cita := separarCita(c.Texto)
+		if cita != "" {
+			cita = recortar(cita)
+		}
+		return recortar(nuevo), cita, false, c.ConFormato, false
 	case t.Mensaje.Extracto != "":
-		return t.Mensaje.Extracto, !ya, false, false
+		return t.Mensaje.Extracto, "", !ya, false, false
 	case !ya:
-		return t.L.T.T("reader.loadingBody", nil), true, false, true
+		return t.L.T.T("reader.loadingBody", nil), "", true, false, true
 	}
-	return t.L.T.T("reader.noTextContent", nil), false, false, true
+	return t.L.T.T("reader.noTextContent", nil), "", false, false, true
 }
 
 func recortar(s string) string {
@@ -202,10 +233,11 @@ func recortar(s string) string {
 	return strings.ToValidUTF8(s[:maxCuerpo], "") + "…"
 }
 
-// medidaCuerpo es lo que ocupan el aviso de formato y las líneas del cuerpo.
-func (t *TarjetaMensaje) medidaCuerpo(ancho float32) (aviso, lineas []string, alto float32) {
+// medidaCuerpo es lo que ocupan el aviso de formato, las líneas del cuerpo y, si hay
+// cita, su botón (`mt-2`) y —desplegada— sus líneas (otro `mt-2`).
+func (t *TarjetaMensaje) medidaCuerpo(ancho float32) (aviso, lineas, citadas []string, conCita bool, alto float32) {
 	util := t.anchoUtilCuerpo(ancho)
-	texto, cargando, conFormato, _ := t.cuerpo()
+	texto, cita, cargando, conFormato, _ := t.cuerpo()
 	if conFormato {
 		aviso = ui.Repartir(t.L.T.T("reader.plainTextOnly", nil), tema.TextoSM, ui.Normal,
 			util-2*tema.Borde-2*margenAvisoX-TallaGlifoLector-huecoAviso)
@@ -213,10 +245,34 @@ func (t *TarjetaMensaje) medidaCuerpo(ancho float32) (aviso, lineas []string, al
 	}
 	lineas = repartirPre(texto, tema.TextoBase, ui.Normal, util)
 	alto += float32(len(lineas)) * LineaCuerpo
+	if cita != "" {
+		conCita = true
+		alto += aireCita + altoBotonCita()
+		if t.citaAbierta {
+			citadas = repartirPre(cita, tema.TextoBase, ui.Normal, util)
+			alto += aireCita + float32(len(citadas))*LineaCuerpo
+		}
+	}
 	if cargando && t.Mensaje.Extracto != "" {
 		alto += tema.Espacio(3) + esqueletoCuerpo // el `mt-3` y la barra de 0,9rem
 	}
-	return aviso, lineas, alto
+	return aviso, lineas, citadas, conCita, alto
+}
+
+// aireCita es el `mt-2` del botón de la cita y el de la cita desplegada.
+var aireCita = tema.Espacio(2)
+
+// altoBotonCita es el `Button size="sm"` de «Mostrar texto citado».
+func altoBotonCita() float32 { return ui.MedidaBoton("", ui.TallaSM, 1).Height }
+
+// alternarCita es el botón de la cita: la despliega o la pliega, y el hilo se recoloca
+// porque la tarjeta cambia de alto.
+func (t *TarjetaMensaje) alternarCita() {
+	t.citaAbierta = !t.citaAbierta
+	t.Refresh()
+	if p := t.L; p != nil {
+		p.Refresh()
+	}
 }
 
 // esqueletoCuerpo es el `height="0.9rem"` de la barra que dice «aún carga».
@@ -231,7 +287,7 @@ func altoAviso(lineas int) float32 {
 func MedidaTarjeta(t *TarjetaMensaje, ancho float32) float32 {
 	alto := 2*tema.Borde + t.altoCabecera()
 	if t.Expandida {
-		_, _, c := t.medidaCuerpo(ancho)
+		_, _, _, _, c := t.medidaCuerpo(ancho)
 		alto += RellenoCuerpoArriba + c + t.altoAdjuntos() + t.altoPie(ancho) + RellenoCuerpoAbajo
 	}
 	return alto
@@ -295,6 +351,7 @@ func (t *TarjetaMensaje) CreateRenderer() fyne.WidgetRenderer {
 		carga:     ui.NuevoEsqueleto(0, 0),
 		fileteAdj: canvas.NewRectangle(tema.Color("border", v)),
 	}
+	r.botonCita = ui.NuevoBoton("", t.alternarCita).Con(ui.Fantasma, ui.TallaSM)
 	r.pie = t.pie()
 	r.Refresh()
 	return r
@@ -318,7 +375,7 @@ func (t *TarjetaMensaje) pie() *fyne.Container {
 			t.L.AlOriginal(t.Mensaje)
 		}))
 	}
-	return container.New(flujo{hueco: HuecoBarraLector}, objs...)
+	return container.New(ui.Flujo{Hueco: HuecoBarraLector}, objs...)
 }
 
 type tarjetaRenderer struct {
@@ -332,8 +389,15 @@ type tarjetaRenderer struct {
 	avisoCaja     *ui.Caja
 	avisoIcon     *iconos.Dibujo
 	aviso         []*canvas.Text
-	parrafo       []*canvas.Text
-	carga         *ui.Esqueleto
+	// parrafo y citadas son los tramos de las líneas del cuerpo y de la cita desplegada
+	// (`text-muted`): una línea es un texto, o varios si lleva enlaces. Dónde cae cada
+	// uno lo dicen trozos y trozosCita, y cuántas líneas son, lineas y lineasCita.
+	parrafo            []*canvas.Text
+	botonCita          *ui.Boton // «Mostrar / Ocultar texto citado»
+	citadas            []*canvas.Text
+	trozos, trozosCita []trozoPintado
+	lineas, lineasCita int
+	carga              *ui.Esqueleto
 	// Los adjuntos: el filete, el rótulo en versalitas, una fila por adjunto (o la
 	// caja de «trae adjuntos») y la clave con la que se sabe si hay que rehacerlos.
 	fileteAdj *canvas.Rectangle
@@ -413,6 +477,7 @@ func (r *tarjetaRenderer) Layout(tam fyne.Size) {
 	}
 
 	if !t.Expandida {
+		t.zonas = nil
 		return
 	}
 	x = tema.Borde + MargenTarjeta
@@ -430,15 +495,25 @@ func (r *tarjetaRenderer) Layout(tam fyne.Size) {
 		}
 		y += alto + bajoAviso
 	}
-	for _, l := range r.parrafo {
-		ui.ColocarTexto(l, tema.Escalon{Tam: tema.TextoBase.Tam, Linea: LineaCuerpo}, x, y)
-		y += LineaCuerpo
+	var zonas []zonaEnlace
+	y, zonas = colocarTramos(r.parrafo, r.trozos, r.lineas, x, y, zonas)
+	if r.botonCita.Visible() {
+		y += aireCita
+		mb := r.botonCita.MinSize()
+		r.botonCita.Move(fyne.NewPos(x, y))
+		r.botonCita.Resize(fyne.NewSize(min(mb.Width, util), altoBotonCita()))
+		y += altoBotonCita()
+		if len(r.citadas) > 0 {
+			y += aireCita
+		}
+		y, zonas = colocarTramos(r.citadas, r.trozosCita, r.lineasCita, x, y, zonas)
 	}
+	t.zonas = zonas
 	if r.carga.Visible() {
 		r.carga.Move(fyne.NewPos(x, y+tema.Espacio(3)))
 		r.carga.Resize(fyne.NewSize(util*0.6, esqueletoCuerpo))
 	}
-	_, _, altoCuerpo := t.medidaCuerpo(tam.Width)
+	_, _, _, _, altoCuerpo := t.medidaCuerpo(tam.Width)
 	y = tema.Borde + cab + RellenoCuerpoArriba + altoCuerpo
 	y = r.colocarAdjuntos(x, y, util)
 	altoPie := t.altoPie(tam.Width) - aireAcciones
@@ -585,13 +660,14 @@ func (r *tarjetaRenderer) pintarCabecera(v tema.Variante) bool {
 // Dice si ha cambiado el número de objetos.
 func (r *tarjetaRenderer) pintarCuerpo(v tema.Variante) bool {
 	t := r.t
-	var aviso, lineas []string
-	var cargando, vacio bool
+	var aviso, lineas, citadas []string
+	var texto, cita string
+	var cargando, vacio, conCita bool
 	if t.Expandida {
-		aviso, lineas, _ = t.medidaCuerpo(t.ancho)
-		_, cargando, _, vacio = t.cuerpo()
+		aviso, lineas, citadas, conCita, _ = t.medidaCuerpo(t.ancho)
+		texto, cita, cargando, _, vacio = t.cuerpo()
 	}
-	var c1, c2 bool
+	var c1, c2, c3 bool
 	r.aviso, c1 = textos(r.aviso, len(aviso), tema.TextoSM, tema.Color("text-subtle", v))
 	for i, l := range aviso {
 		r.aviso[i].Text, r.aviso[i].Color = l, tema.Color("text-subtle", v)
@@ -607,12 +683,30 @@ func (r *tarjetaRenderer) pintarCuerpo(v tema.Variante) bool {
 	if vacio {
 		tintaCuerpo = tema.Color("text-subtle", v)
 	}
-	r.parrafo, c2 = textos(r.parrafo, len(lineas), tema.TextoBase, tintaCuerpo)
-	for i, l := range lineas {
-		r.parrafo[i].Text, r.parrafo[i].Color = l, tintaCuerpo
-	}
+	enlazar := t.Expandida && t.leido()
+	r.lineas = len(lineas)
+	r.parrafo, r.trozos, c2 = pintarTramos(r.parrafo, tramosDeLineas(texto, lineas, enlazar), tintaCuerpo, v)
+	c3 = r.pintarCita(v, conCita, cita, citadas, enlazar)
 	verlo(r.carga, t.Expandida && cargando && t.Mensaje.Extracto != "")
-	return c1 || c2
+	return c1 || c2 || c3
+}
+
+// pintarCita pone el botón de la cita con el rótulo de su estado y el galón que dice
+// hacia dónde va, y las líneas de la cita desplegada en `text-muted`. Dice si ha
+// cambiado el número de líneas.
+func (r *tarjetaRenderer) pintarCita(v tema.Variante, conCita bool, cita string, citadas []string, enlazar bool) bool {
+	t := r.t
+	clave, galon := "reader.showQuoted", iconos.ChevronAbajo
+	if t.citaAbierta {
+		clave, galon = "reader.hideQuoted", iconos.ChevronArriba
+	}
+	r.botonCita.Texto, r.botonCita.IconoDetras = t.L.T.T(clave, nil), galon
+	verlo(r.botonCita, conCita)
+	tinta := tema.Color("text-muted", v)
+	var cambio bool
+	r.lineasCita = len(citadas)
+	r.citadas, r.trozosCita, cambio = pintarTramos(r.citadas, tramosDeLineas(cita, citadas, enlazar), tinta, v)
+	return cambio
 }
 
 // pintarAdjuntos rehace el bloque de adjuntos si ha cambiado lo que enseña. Dice si
@@ -681,6 +775,10 @@ func (r *tarjetaRenderer) montar() {
 		r.objetos = append(r.objetos, l)
 	}
 	for _, l := range r.parrafo {
+		r.objetos = append(r.objetos, l)
+	}
+	r.objetos = append(r.objetos, r.botonCita)
+	for _, l := range r.citadas {
 		r.objetos = append(r.objetos, l)
 	}
 	r.objetos = append(r.objetos, r.carga, r.fileteAdj)

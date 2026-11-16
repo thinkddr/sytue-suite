@@ -135,3 +135,33 @@ test('un filtro que oculta todas las notas lo dice y ofrece quitarlo', () => {
   boton!.click();
   expect(quitado).toBe(1);
 });
+
+test('mientras llegan las notas el árbol enseña ramas grises, sin recuento ni «sin notas»', () => {
+  const element = host();
+  render(
+    <NoteTree
+      t={((key: string) => key) as never}
+      locale="en"
+      notes={[]}
+      cargando
+      claro={{}}
+      bloqueado={false}
+      soloLectura
+      seleccionada={null}
+      onSelect={nothing}
+      onNueva={nothing}
+      onNuevaDentro={nothing}
+      onSacar={nothing}
+      onToggle={nothing}
+      onRenombrar={nothing}
+      onQuitarFiltro={nothing}
+    />,
+    element,
+  );
+  const zona = element.querySelector('[data-esqueleto="ramas"]');
+  expect(zona?.getAttribute('aria-busy')).toBe('true');
+  expect(zona!.querySelectorAll('.sytue-skeleton').length).toBeGreaterThan(2);
+  expect(element.textContent).not.toContain('empty.noNotes.title');
+  expect(element.textContent).not.toContain('filter.noMatches');
+  expect(element.textContent).not.toContain('notebook.notes');
+});

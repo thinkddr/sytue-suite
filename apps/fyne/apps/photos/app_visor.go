@@ -57,11 +57,11 @@ type estadoVisor struct {
 	i      int
 	suelta []api.Photo
 
-	conFicha, borrando, pase, tamanyoReal bool
-	girando, describiendo, pensando       bool
-	editandoDesc, guardandoDesc           bool
-	aviso, respuesta                      string
-	campoDesc                             *AreaFicha
+	conFicha, pase, tamanyoReal     bool
+	girando, describiendo, pensando bool
+	editandoDesc, guardandoDesc     bool
+	aviso, respuesta                string
+	campoDesc                       *AreaFicha
 	// lados son los de la foto tras girarla: se intercambian aquí para que la caja
 	// no deje bandas mientras llega la variante nueva.
 	lados map[string][2]int
@@ -96,6 +96,12 @@ func (e *estadoVisor) lista() []api.Photo {
 	return e.suelta
 }
 
+// enLaFoto dice si el visor está en la foto `id`.
+func enLaFoto(e *estadoVisor, id string) bool {
+	f, ok := e.foto()
+	return ok && f.ID == id
+}
+
 // foto es la que se enseña, con sus lados de después de girarla.
 func (e *estadoVisor) foto() (api.Photo, bool) {
 	l := e.lista()
@@ -123,7 +129,7 @@ func (e *estadoVisor) nuevaFoto() {
 			g.Cancelar()
 		}
 	}
-	e.borrando, e.tamanyoReal, e.respuesta, e.pensando = false, false, "", false
+	e.tamanyoReal, e.respuesta, e.pensando = false, "", false
 	e.desplazamiento = fyne.Position{}
 	e.original, e.pidiendo = nil, "" // una foto de 48 Mpx son 72 MB decodificada
 	e.editandoDesc = false
@@ -202,42 +208,46 @@ func (a *App) pintarVisor() {
 		AltoFicha: a.medidaFicha(prefAltoFicha, AltoFicha, AltoFichaMin, AltoFichaMax), Fondo: a.fondoLienzo(),
 		Pase: e.pase, TamanyoReal: e.tamanyoReal, Original: e.originalDe(f.ID, a.Huella(f.ID)), Aviso: e.aviso,
 		HayAnterior: e.i > 0, HaySiguiente: e.haySiguiente(), Posicion: a.textoPosicion(e),
-		Borrando: e.borrando, Girando: e.girando, Describiendo: e.describiendo,
+		Girando: e.girando, Describiendo: e.describiendo,
 		ConFavorita: e.origen == desdeGaleria, ConBorrar: e.origen == desdeGaleria,
 		ConDescribir: e.origen == desdeGaleria || e.origen == desdeAlbum,
 		Pregunta:     e.pregunta, Respuesta: e.respuesta, Pensando: e.pensando,
 		EditandoDesc: e.editandoDesc, GuardandoDesc: e.guardandoDesc, CampoDesc: e.campoDesc,
 
-		AlCerrar:          a.cerrarVisor,
-		AlAnterior:        a.anterior,
-		AlSiguiente:       a.siguiente,
-		AlFavorita:        func() { a.cambiarFavorita(f, !f.Favorite) },
-		AlDescribir:       a.describirFoto,
-		AlGirar:           a.girar,
-		AlPase:            a.alternarPase,
-		AlZoom:            a.alternarTamanyoReal,
-		AlZoomEn:          a.tamanyoRealEn,
-		Desplazamiento:    e.desplazamiento,
-		AlDesplazar:       func(p fyne.Position) { e.desplazamiento = p },
-		AlFicha:           func() { e.conFicha = !e.conFicha; a.pintarVisor() },
-		AlVerIA:           func() { e.conFicha = true; a.pintarVisor() },
-		AlBorrar:          func() { e.borrando = true; a.pintarVisor() },
-		AlCancelarBorrar:  func() { e.borrando = false; a.pintarVisor() },
-		AlConfirmarBorrar: func() { a.tirarDelVisor(f) },
-		AlParecidas:       func() { a.AbrirParecidas([]string{f.ID}) },
-		AlCerca:           func() { a.AbrirCerca(f.ID) },
-		AlDescargar:       func(formato string) { a.descargar(f, formato) },
-		AlFondo:           a.ponerFondo,
-		AlMenuAlbumes:     a.conAlbumes,
-		AlAnyadirA:        func(al api.Album) { a.anyadirFotoA(f, al) },
-		AlPreguntar:       a.preguntarFoto,
-		AlAnchoFicha:      func(m float32, _ bool) { a.ponerMedidaFicha(prefAnchoFicha, m, AnchoFichaMin, AnchoFichaMax) },
-		AlAltoFicha:       func(m float32, _ bool) { a.ponerMedidaFicha(prefAltoFicha, m, AltoFichaMin, AltoFichaMax) },
-		AlEditarDesc:      a.editarDescripcion,
-		AlCancelarDesc:    func() { e.editandoDesc = false; a.pintarVisor() },
-		AlGuardarDesc:     a.guardarDescripcion,
+		AlCerrar:       a.cerrarVisor,
+		AlAnterior:     a.anterior,
+		AlSiguiente:    a.siguiente,
+		AlFavorita:     func() { a.cambiarFavorita(f, !f.Favorite) },
+		AlDescribir:    a.describirFoto,
+		AlGirar:        a.girar,
+		AlPase:         a.alternarPase,
+		AlZoom:         a.alternarTamanyoReal,
+		AlZoomEn:       a.tamanyoRealEn,
+		Desplazamiento: e.desplazamiento,
+		AlDesplazar:    func(p fyne.Position) { e.desplazamiento = p },
+		AlFicha:        func() { e.conFicha = !e.conFicha; a.pintarVisor() },
+		AlVerIA:        func() { e.conFicha = true; a.pintarVisor() },
+		// Sin pregunta: la papelera se deshace desde el aviso (design §5.4).
+		AlBorrar:       func() { a.tirarDelVisor(f) },
+		AlAtajos:       a.verAtajos,
+		AlParecidas:    func() { a.AbrirParecidas([]string{f.ID}) },
+		AlCerca:        func() { a.AbrirCerca(f.ID) },
+		AlDescargar:    func(formato string) { a.descargar(f, formato) },
+		AlFondo:        a.ponerFondo,
+		AlMenuAlbumes:  a.conAlbumes,
+		AlAnyadirA:     func(al api.Album) { a.anyadirFotoA(f, al) },
+		AlPreguntar:    a.preguntarFoto,
+		AlAnchoFicha:   func(m float32, _ bool) { a.ponerMedidaFicha(prefAnchoFicha, m, AnchoFichaMin, AnchoFichaMax) },
+		AlAltoFicha:    func(m float32, _ bool) { a.ponerMedidaFicha(prefAltoFicha, m, AltoFichaMin, AltoFichaMax) },
+		AlEditarDesc:   a.editarDescripcion,
+		AlCancelarDesc: func() { e.editandoDesc = false; a.pintarVisor() },
+		AlGuardarDesc:  a.guardarDescripcion,
 	}
 	d.AlEditar = func() { a.AbrirEditor(f, "") }
+	if a.ofreceGaleria() {
+		d.ClaveSistema, _ = a.DestinoGaleria.claves()
+		d.AlSistema = func() { a.guardarEnSistema([]api.Photo{f}) }
+	}
 	if l := f.Location; l != nil && a.AbrirWeb != nil {
 		// El mapa es un ENLACE y no un mapa incrustado: así la posición de la foto
 		// solo sale de aquí si se pulsa.
@@ -317,9 +327,13 @@ func saltoVisor(tecla fyne.KeyName, i, total int) (int, bool) {
 
 // textoPosicion es el «12 / 240» del visor, o «12 / 100+» si quedan páginas.
 func (a *App) textoPosicion(e *estadoVisor) string {
-	total := len(e.lista())
-	hayMas := e.origen == desdeGaleria && !a.g.fin
-	indice, ok := posicionVisor(e.i, total, hayMas)
+	return a.textoDePosicion(e.i, len(e.lista()), e.origen == desdeGaleria && !a.g.fin)
+}
+
+// textoDePosicion escribe la posición de la foto i de una lista de total: lo comparten
+// el visor de la galería y el de un álbum compartido conmigo.
+func (a *App) textoDePosicion(i, total int, hayMas bool) string {
+	indice, ok := posicionVisor(i, total, hayMas)
 	if !ok {
 		return ""
 	}
@@ -342,40 +356,46 @@ func (a *App) irAFoto(i int) {
 	a.pintarVisor()
 }
 
-// teclaVisor son los atajos del `onKeyDown` del `<dialog>`.
+// teclaVisor son los atajos del `onKeyDown` del `<dialog>`, por la tabla de atajos.go.
 func (a *App) teclaVisor(k *fyne.KeyEvent) {
 	e := a.vis
-	switch k.Name {
-	case fyne.KeyLeft:
+	switch accionDe(atajosVisor, string(k.Name)) {
+	case atajoAnterior:
 		a.anterior()
-	case fyne.KeyRight:
+	case atajoSiguiente:
 		a.siguiente()
-	case fyne.KeyHome, fyne.KeyEnd:
+	case atajoPrimera, atajoUltima:
 		if i, ok := saltoVisor(k.Name, e.i, len(e.lista())); ok {
 			a.irAFoto(i)
 		}
-	case fyne.KeyEscape:
+	case atajoCerrar:
 		a.cerrarVisor()
-	case fyne.KeyDelete, fyne.KeyBackspace:
-		if e.origen == desdeGaleria {
-			e.borrando = true
-			a.pintarVisor()
+	case atajoPapelera:
+		// Sin pregunta, como el botón: se deshace desde el aviso.
+		if f, ok := e.foto(); ok && e.origen == desdeGaleria {
+			a.tirarDelVisor(f)
 		}
 	default:
 	}
 }
 
-// runaVisor: Espacio, «i» y «z». El Espacio llega como runa, no como tecla.
+// runaVisor: Espacio, «i», «z» y «?». El Espacio llega como runa, no como tecla.
 func (a *App) runaVisor(r rune) {
 	e := a.vis
-	switch r {
-	case ' ':
+	switch accionDe(atajosVisor, teclaDeRuna(r)) {
+	case atajoPase:
 		a.alternarPase()
-	case 'i', 'I':
+	case atajoFicha:
 		e.conFicha = !e.conFicha
 		a.pintarVisor()
-	case 'z', 'Z':
+	case atajoTamanyoReal:
 		a.alternarTamanyoReal()
+	case atajoAyuda:
+		// Solo con el visor encima de todo: sobre un menú suyo, el teclado es del menú.
+		if a.w == nil || a.w.Canvas().Overlays().Top() == e.capa {
+			a.verAtajos()
+		}
+	default:
 	}
 }
 
@@ -485,26 +505,28 @@ func (a *App) pararPase() {
 	}
 }
 
-// tirarDelVisor manda la foto a la papelera y cierra el visor.
+// tirarDelVisor manda la foto a la papelera, cierra el visor y ofrece «Deshacer»
+// durante 10 s. No pregunta antes: es reversible (design §5.4).
 func (a *App) tirarDelVisor(f api.Photo) {
-	if a.cli == nil {
-		return
-	}
-	gen := a.gen
-	a.enSesion(func(vida context.Context) {
-		c, fin := ctx(vida)
-		defer fin()
-		err := a.cli.Trash(c, f.ID)
-		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
-		a.hilo(gen, func() {
-			if err != nil {
-				a.g.error = a.textoDeFallo(err)
-			} else {
-				a.g.fotos = quitarFoto(a.g.fotos, f.ID)
+	lista, gen, ruta := a.g.fotos, a.gen, a.ruta
+	a.tirarSinRepetir([]string{f.ID}, func(_, hechas []string, fallo error, misma bool) {
+		switch {
+		case fallo != nil:
+			if misma {
+				a.g.error = a.textoDeFallo(fallo)
+			}
+		default:
+			// Un refresco entretanto cambia la generación sin cerrar el visor: si sigue
+			// en la foto tirada, se cierra igual. Se mira ANTES de quitarla, que el visor
+			// lee la lista viva y luego ya estaría en otra.
+			cerrar := misma || a.vis != nil && enLaFoto(a.vis, f.ID)
+			a.g.fotos = quitarFoto(a.g.fotos, f.ID)
+			if cerrar {
 				a.cerrarVisor()
 			}
-			a.pintar()
-		})
+			a.avisarTirada(a.nuevaTirada(lista, hechas, gen, ruta))
+		}
+		a.pintar()
 	})
 }
 
@@ -662,7 +684,7 @@ func editablesConmigo(c context.Context, cli *api.Photos, dir *api.Directorio) [
 func (a *App) anyadirFotoA(f api.Photo, al api.Album) {
 	gen := a.gen
 	a.enSesion(func(vida context.Context) {
-		c, fin := ctx(vida)
+		c, fin := a.ctxAlbum(vida)
 		defer fin()
 		_, err := a.cli.AddToAlbum(c, al.ID, []string{f.ID})
 		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
@@ -680,7 +702,7 @@ func (a *App) anyadirFotoA(f api.Photo, al api.Album) {
 func (a *App) quitarDelAlbum(f api.Photo) {
 	gen, album := a.gen, a.uno.id
 	a.enSesion(func(vida context.Context) {
-		c, fin := ctx(vida)
+		c, fin := a.ctxAlbum(vida)
 		defer fin()
 		err := a.cli.RemoveFromAlbum(c, album, f.ID)
 		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.

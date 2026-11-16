@@ -146,7 +146,7 @@ function Panel({ tokens: initial, live, error, locale }: Props) {
       <div class="cloud-content">
         {tokens.length === 0 ? (
           <EmptyState
-            illustration={<Icon name="lock" size={24} />}
+            icon="lock"
             title={t('tokens.empty.title')}
             description={t('tokens.empty.desc')}
           />

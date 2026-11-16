@@ -4,7 +4,8 @@
  *
  * BFF de Sytue Docs — documentos.
  *
- *   GET    /api/documents                 Lista paginada (limit, cursor, q, kind) → {documents, nextCursor?}.
+ *   GET    /api/documents                 Lista paginada (limit, cursor, q, kind, starred,
+ *                                          scope=mine|shared, sort=title) → {documents, nextCursor?}.
  *   GET    /api/documents?id=<id>         Metadatos de un documento concreto.
  *   DELETE /api/documents?id=<id>         Elimina un documento (el servicio Go valida el rol).
  *
@@ -46,6 +47,7 @@ export const GET: APIRoute = async (ctx) => {
     const kindParam = params.get('kind');
     const q = params.get('q')?.trim();
     const cursor = params.get('cursor');
+    const scope = params.get('scope');
     // Página acotada al rango del servicio (1..200); 100 por defecto.
     const parsed = Number.parseInt(params.get('limit') ?? '', 10);
     const limit = Number.isNaN(parsed) ? 100 : Math.min(Math.max(parsed, 1), 200);
@@ -57,6 +59,9 @@ export const GET: APIRoute = async (ctx) => {
       // ?starred=1 — el filtro «Destacados» lo resuelve el servicio; con keyset,
       // filtrar la página traída mentiría en cuanto hubiera más de una.
       ...(params.get('starred') === '1' ? { starred: true } : {}),
+      // «Míos / Compartidos conmigo» y el orden por título, también en el servicio.
+      ...(scope === 'mine' || scope === 'shared' ? { scope } : {}),
+      ...(params.get('sort') === 'title' ? { sort: 'title' as const } : {}),
     });
     return json(page);
   } catch (e) {

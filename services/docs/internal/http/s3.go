@@ -55,8 +55,9 @@ func (h *Handler) uploadSnapshot(ctx context.Context, key string, data []byte) e
 	// Comprimido: un snapshot CRDT es JSON y baja un 79 % medido; solo se lee
 	// por el servicio (hydrateFromS3), nunca por URL prefirmada. Los exports NO:
 	// se sirven prefirmados y llegarían al navegador tal cual están.
-	return h.objects.Put(ctx, t, key, bytes.NewReader(data), int64(len(data)),
-		objectstore.PutOptions{ContentType: "application/json", Comprimir: true})
+	return h.withLegacyObjectWrite(ctx, key, func() error {
+		return h.objects.Put(ctx, t, key, bytes.NewReader(data), int64(len(data)), objectstore.PutOptions{ContentType: "application/json", Comprimir: true})
+	})
 }
 
 // uploadExport sube un export (OOXML/ODF/PDF/...) a Object Storage.
@@ -68,8 +69,9 @@ func (h *Handler) uploadExport(ctx context.Context, key, contentType string, dat
 	if err != nil {
 		return err
 	}
-	return h.objects.Put(ctx, t, key, bytes.NewReader(data), int64(len(data)),
-		objectstore.PutOptions{ContentType: contentType})
+	return h.withLegacyObjectWrite(ctx, key, func() error {
+		return h.objects.Put(ctx, t, key, bytes.NewReader(data), int64(len(data)), objectstore.PutOptions{ContentType: contentType})
+	})
 }
 
 // snapshotKey deriva la clave S3 (relativa al prefijo de tenant) de un snapshot.
@@ -92,4 +94,29 @@ func snapshotKey(docID string, seq int64) string {
 // recalcula.
 func exportKey(docID string, seq int64, id, ext string) string {
 	return fmt.Sprintf("docs/%s/exports/%d-%s.%s", docID, seq, id, ext)
+}
+
+// The actual SQL owner fence must cover the entire object effect.
+func (h *Handler) withLegacyObjectWrite(ctx context.Context, key string, write func() error) error {
+	guard, ok := h.store.(interface {
+		WithLegacyOfficeObjectWrite(context.Context, string, func() error) error
+	})
+	if !ok {
+		return fmt.Errorf("docs: object write fence unavailable")
+	}
+	return guard.WithLegacyOfficeObjectWrite(ctx, key, write)
+}
+
+// Hold the authoritative owner lock across a complete cross-service effect.
+func (h *Handler) withLegacyDocumentEffect(ctx context.Context, document string, effect func() error) error {
+	type guard interface {
+		WithLegacyDocumentEffect(context.Context, string, func() error) error
+	}
+	if store, ok := h.store.(guard); ok {
+		return store.WithLegacyDocumentEffect(ctx, document, effect)
+	}
+	if h.papelera != nil {
+		return h.papelera.WithLegacyDocumentEffect(ctx, document, effect)
+	}
+	return fmt.Errorf("docs: document effect fence unavailable")
 }

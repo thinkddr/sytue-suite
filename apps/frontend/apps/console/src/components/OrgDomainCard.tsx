@@ -34,39 +34,11 @@ import {
   ToastProvider,
   useToast,
   ConfirmDialog,
+  CopyField,
 } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import { useT, type T } from '../i18n/index.js';
 import type { OrgMailDomain, OrgMailDomainsState } from '../lib/admin.js';
-
-/**
- * Una fila «etiqueta · valor · copiar» del registro DNS.
- *
- * ponytail: el asistente de alta tiene su propio CopyRow en la app del portal. Dos
- * copias de quince líneas de presentación no justifican mover un componente a
- * @sytue/ui y tocar tres paquetes; a la tercera, se extrae.
- */
-function FilaCopiable({
-  etiqueta,
-  valor,
-  copiar,
-  onCopiar,
-}: {
-  etiqueta: string;
-  valor: string;
-  copiar: string;
-  onCopiar: () => void;
-}) {
-  return (
-    <div class="border-border bg-bg-subtle flex items-center gap-3 rounded-md border px-3 py-2">
-      <span class="text-text-muted w-20 shrink-0 text-xs">{etiqueta}</span>
-      <code class="text-text min-w-0 flex-1 font-mono text-xs break-all">{valor}</code>
-      <Button size="sm" variant="ghost" onClick={onCopiar}>
-        {copiar}
-      </Button>
-    </div>
-  );
-}
 
 /** El estado del DNS, en una frase. Texto además de color, nunca solo color. */
 function EstadoDNS({ d, t }: { d: OrgMailDomain; t: T }) {
@@ -108,7 +80,6 @@ function FilaDominio({
   onComprobar,
   onPrincipal,
   onQuitar,
-  onCopiar,
 }: {
   d: OrgMailDomain;
   live: boolean;
@@ -117,7 +88,6 @@ function FilaDominio({
   onComprobar: () => void;
   onPrincipal: () => void;
   onQuitar: () => void;
-  onCopiar: (texto: string) => void;
 }) {
   return (
     <div class="border-border flex flex-col gap-3 rounded-md border p-3">
@@ -133,24 +103,9 @@ function FilaDominio({
       {!d.verified ? (
         <div class="flex flex-col gap-2">
           <p class="text-text-muted text-sm leading-relaxed">{t('orgDomain.recordHint')}</p>
-          <FilaCopiable
-            etiqueta={t('orgDomain.recordType')}
-            valor="TXT"
-            copiar={t('orgDomain.copy')}
-            onCopiar={() => onCopiar('TXT')}
-          />
-          <FilaCopiable
-            etiqueta={t('orgDomain.recordName')}
-            valor={d.record_name}
-            copiar={t('orgDomain.copy')}
-            onCopiar={() => onCopiar(d.record_name)}
-          />
-          <FilaCopiable
-            etiqueta={t('orgDomain.recordValue')}
-            valor={d.record_value}
-            copiar={t('orgDomain.copy')}
-            onCopiar={() => onCopiar(d.record_value)}
-          />
+          <CopyField label={t('orgDomain.recordType')} value="TXT" labelWidth="sm" />
+          <CopyField label={t('orgDomain.recordName')} value={d.record_name} labelWidth="sm" />
+          <CopyField label={t('orgDomain.recordValue')} value={d.record_value} labelWidth="sm" />
         </div>
       ) : null}
 
@@ -187,17 +142,6 @@ function Inner({ state, live, t }: { state: OrgMailDomainsState | null; live: bo
   const [host, setHost] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const dominios = actual?.items ?? [];
-
-  async function copiar(texto: string) {
-    try {
-      await navigator.clipboard.writeText(texto);
-      toast.notify({ tone: 'success', title: t('orgDomain.copied') });
-    } catch {
-      // Sin permiso de portapapeles no se finge que se copió: el valor sigue
-      // visible y seleccionable, que es lo que de verdad hace falta.
-      toast.notify({ tone: 'danger', title: t('orgDomain.copyFailed') });
-    }
-  }
 
   function fallo(e?: string) {
     toast.notify({
@@ -353,7 +297,6 @@ function Inner({ state, live, t }: { state: OrgMailDomainsState | null; live: bo
                 onComprobar={() => void comprobar(d.host)}
                 onPrincipal={() => setConfirmando({ accion: 'principal', dominio: d })}
                 onQuitar={() => setConfirmando({ accion: 'quitar', dominio: d })}
-                onCopiar={(texto) => void copiar(texto)}
               />
             ))}
           </div>

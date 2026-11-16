@@ -125,6 +125,29 @@ func (o *OneDrive) Get(ctx context.Context, t tenancy.Tenant, key string) (io.Re
 	return res.Body, nil
 }
 
+func (o *OneDrive) GetRaw(ctx context.Context, t tenancy.Tenant, key string) (io.ReadCloser, error) {
+	if !rawHTTPClient(o.http) {
+		return nil, ErrRawUnsupported
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	res, err := conProveedor(ctx, o.http, o.tok, http.MethodGet, o.item(t, key)+":/content", http.NoBody, 0, map[string]string{"Accept-Encoding": "identity"})
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	if res.StatusCode == http.StatusNotFound {
+		cancel()
+		_ = res.Body.Close()
+		return nil, ErrNotFound
+	}
+	if res.StatusCode != http.StatusOK {
+		defer cancel()
+		defer res.Body.Close()
+		return nil, errorDe(res, "onedrive: descargar")
+	}
+	return acceptRawHTTP(res, cancel)
+}
+
 func (o *OneDrive) Delete(ctx context.Context, t tenancy.Tenant, key string) error {
 	res, err := conProveedor(ctx, o.http, o.tok, http.MethodDelete, o.item(t, key), http.NoBody, 0, nil)
 	if err != nil {

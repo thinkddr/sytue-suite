@@ -221,6 +221,8 @@ func (d *ImportarDatos) pararReloj() {
 }
 
 // traer lanza la importación desde un origen.
+//
+//nolint:contextcheck // el importador usa la vida que guardó al cargarse; lo lanza un clic, no el flujo que lo pinta.
 func (d *ImportarDatos) traer(o api.OrigenImportacion) {
 	parent, ciclo := d.ctx, d.ciclo
 	if d.enviando || d.svc == nil || parent == nil || !d.vigente(parent, ciclo) {

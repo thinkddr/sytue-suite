@@ -119,6 +119,9 @@ type PanelLateral struct {
 	Imagen func(n int) image.Image
 
 	miniaturas map[int]*filaMiniatura
+	// desplazador es el que mueve el cuerpo del panel: el que acompaña a la página que
+	// se lee para que su miniatura no se quede fuera de la vista.
+	desplazador *container.Scroll
 	// pant es la pantalla, que es quien habla con el motor. Nil en las pruebas del
 	// panel suelto: entonces sus acciones no hacen nada.
 	pant *Pantalla
@@ -149,18 +152,29 @@ func (p *PanelLateral) PonerContenido(c *Contenido) {
 	if p.comentariosP != nil {
 		p.comentariosP.respondiendo, p.comentariosP.replica = -1, nil
 	}
-	if p.raiz != nil {
-		p.raiz.Objects = p.componer()
-		p.raiz.Refresh()
-	}
+	p.rehacerConservando()
 }
 
 // Recomponer vuelve a pintar el panel abierto, con su estado.
-func (p *PanelLateral) Recomponer() {
-	if p.raiz != nil {
-		p.raiz.Objects = p.componer()
-		p.raiz.Refresh()
+func (p *PanelLateral) Recomponer() { p.rehacerConservando() }
+
+// rehacerConservando rehace el panel abierto sin perder por dónde iba su desplazamiento:
+// en la web el componente sigue montado al volver a leer el documento y la tira no
+// salta al principio. Después sigue a la página que se lee, por si el cambio la movió.
+func (p *PanelLateral) rehacerConservando() {
+	if p.raiz == nil {
+		return
 	}
+	var antes fyne.Position
+	if p.desplazador != nil {
+		antes = p.desplazador.Offset
+	}
+	p.raiz.Objects = p.componer()
+	p.raiz.Refresh()
+	if antes.Y > 0 {
+		p.desplazador.ScrollToOffset(antes)
+	}
+	p.seguirMiniaturaActual()
 }
 
 // trabajando es que hay una operación en vuelo: los botones que escriben se apagan.
@@ -210,6 +224,38 @@ func (p *PanelLateral) RefrescarActual() {
 			f.Refresh()
 		}
 	}
+	p.seguirMiniaturaActual()
+}
+
+// seguirMiniaturaActual desplaza la lista de Páginas lo justo para que se vea la
+// miniatura de la página que se lee, como `scrollIntoView({ block: 'nearest' })` en la
+// web: si ya se ve no se mueve, y si no, queda pegada al borde por el que asomaba. Sin
+// esto, al leer un documento largo la miniatura marcada se quedaba fuera, cuando en
+// Acrobat o Vista Previa la tira acompaña. El salto es seco, sin animación, que es lo
+// que pide `prefers-reduced-motion` y lo que hace el visor al pasar de página.
+func (p *PanelLateral) seguirMiniaturaActual() {
+	s := p.desplazador
+	if s == nil || p.on != PanelPaginas {
+		return
+	}
+	f := p.miniaturas[p.PaginaActual]
+	if f == nil || s.Size().Height <= 0 || f.Size().Height <= 0 {
+		return // sin colocar todavía: no hay posición que perseguir
+	}
+	// La lista va dentro del `p-2` del cuerpo: la fila empieza un relleno más abajo.
+	arriba := f.Position().Y + rellenoPanel
+	abajo := arriba + f.Size().Height
+	alto := s.Size().Height
+	y := s.Offset.Y
+	switch {
+	case arriba < y:
+		y = arriba
+	case abajo > y+alto:
+		y = min(arriba, abajo-alto)
+	default:
+		return
+	}
+	s.ScrollToOffset(fyne.NewPos(s.Offset.X, max(y, 0)))
 }
 
 // Abierto es el panel que se ve.
@@ -224,6 +270,10 @@ func (p *PanelLateral) Abrir(a PanelActivo) {
 	if p.raiz != nil {
 		p.raiz.Objects = p.componer()
 		p.raiz.Refresh()
+		// Volver a Páginas monta la lista de nuevo, arriba del todo: como el
+		// `useEffect` de `Miniaturas` al montarse, se lleva a la vista la de la página
+		// que se lee.
+		p.seguirMiniaturaActual()
 	}
 }
 
@@ -258,7 +308,8 @@ func (p *PanelLateral) componer() []fyne.CanvasObject {
 	tira := conMascara(container.New(conLineaAbajo{}, canvas.NewRectangle(tema.Color("border", v)), deslizante), s, "menu-surface")
 	cuerpo := container.New(ui.Margen{Izq: rellenoPanel, Arr: rellenoPanel, Der: rellenoPanel, Abj: rellenoPanel},
 		p.panel())
-	return []fyne.CanvasObject{tira, container.NewVScroll(cuerpo)}
+	p.desplazador = container.NewVScroll(cuerpo)
+	return []fyne.CanvasObject{tira, p.desplazador}
 }
 
 // anchoUtil es lo que le queda al contenido de un panel: la columna menos su borde y

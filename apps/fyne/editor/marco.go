@@ -36,6 +36,14 @@ type Marco struct {
 	panel    *PanelLateral
 	ajustes  *PanelLateral
 	centro   fyne.CanvasObject
+	// cubre es la pantalla que ocupa el marco ENTERO mientras el documento carga (el
+	// esqueleto del cromo) o si no se pudo abrir (el error con sus dos salidas), como
+	// `EditorApp.tsx`, que en esos dos casos no monta el editor. nil: el editor.
+	cubre fyne.CanvasObject
+	// cubreDe es el estado de `cubre`: recomponer en el mismo estado conserva la
+	// pantalla, porque rehacer el esqueleto en cada `Refrescar` dejaría vivo el pulso
+	// de los bloques viejos.
+	cubreDe Estado
 	// lienzo es el objeto del lienzo, pedido UNA vez: se conserva aunque el centro
 	// enseñe un estado, para no perder su desplazamiento ni su selección.
 	lienzo fyne.CanvasObject
@@ -92,6 +100,11 @@ func NuevoMarco(ctx *Contexto, r *Registro, alVolver func()) *Marco {
 			m.cabecera.EnfocarTitulo()
 		}
 	}
+	ctx.Atajos = func() {
+		if l := fyne.CurrentApp().Driver().CanvasForObject(m); l != nil {
+			ctx.AlternarAtajos(l)
+		}
+	}
 	m.cinta = NuevaCinta(ctx, r)
 	m.carril = NuevoCarril(ctx)
 	// La barra se construye UNA vez y aquí.
@@ -134,7 +147,15 @@ func (m *Marco) recomponer() {
 	if clave == "" {
 		clave = "editor.readOnly"
 	}
-	m.franja = peticion.Franja(&c.Peticion, c.SoloLectura, c.Traducir(clave), func(k string, v i18n.Vars) string { return c.Traducir(k, v) })
+	if c.SoloLectura && clave == MotivoNoSabeEditar {
+		// No es el permiso, así que pedir acceso no lo arregla: la salida es la web.
+		m.franja = ui.NuevaFranjaSoloLectura(c.textoNoSabeEditar())
+		if c.EnLaWeb != nil {
+			m.franja.Con(c.Traducir("editor.readOnly.openInWeb"), c.EnLaWeb)
+		}
+	} else {
+		m.franja = peticion.Franja(&c.Peticion, c.SoloLectura, c.Traducir(clave), func(k string, v i18n.Vars) string { return c.Traducir(k, v) })
+	}
 	if m.franja == nil && !c.SoloLectura && c.BloqueoPropio != nil {
 		if aviso, desbloquear := c.BloqueoPropio(); desbloquear != nil {
 			m.franja = ui.NuevaFranjaSoloLectura(aviso).Con(c.Traducir("readOnly.edit"), desbloquear)
@@ -167,15 +188,35 @@ func (m *Marco) recomponer() {
 	// El lienzo se guarda aparte del centro: antes se comprobaba `m.centro == nil`, y
 	// un documento que llegaba de la red pasaba por «cargando» primero, así que el
 	// centro ya no era nil y se quedaba enseñando «Abriendo…» con el documento listo.
-	if c.Estado == Listo && c.Lienzo != nil {
+	m.ponerCentro()
+	m.cinta.Reconstruir()
+}
+
+// ponerCentro elige qué ocupa el centro —o el marco entero— según el estado.
+func (m *Marco) ponerCentro() {
+	c := m.ctx
+	cubre, cubreDe := m.cubre, m.cubreDe
+	m.cubre = nil
+	switch {
+	case c.Estado == Listo && c.Lienzo != nil:
 		if m.lienzo == nil {
 			m.lienzo = c.Lienzo.Objeto()
 		}
 		m.centro = m.lienzo
-	} else {
+	case c.Estado == Cargando || c.Estado == Error:
+		if cubre == nil || cubreDe != c.Estado {
+			if e, ok := cubre.(*EsqueletoEditor); ok {
+				e.Parar()
+			}
+			cubre = PantallaEstado(c)
+		}
+		m.cubre, m.cubreDe, m.centro = cubre, c.Estado, nil
+	default:
 		m.centro = PantallaEstado(c)
 	}
-	m.cinta.Reconstruir()
+	if e, ok := cubre.(*EsqueletoEditor); ok && m.cubre == nil {
+		e.Parar() // el documento ya llegó: el pulso se acaba con el esqueleto
+	}
 }
 
 // MinSize es lo que el editor necesita como mínimo: las bandas fijas más un hueco para
@@ -203,6 +244,9 @@ type marcoRenderer struct {
 func (r *marcoRenderer) MinSize() fyne.Size { return r.m.MinSize() }
 
 func (r *marcoRenderer) Objects() []fyne.CanvasObject {
+	if r.m.cubre != nil {
+		return []fyne.CanvasObject{r.fondo, r.m.cubre}
+	}
 	objs := []fyne.CanvasObject{r.fondo, r.m.cabecera, r.m.cinta}
 	if r.m.franja != nil {
 		objs = append(objs, r.m.franja)
@@ -245,6 +289,11 @@ func (r *marcoRenderer) Layout(t fyne.Size) {
 	m := r.m
 	r.fondo.Move(fyne.NewPos(0, 0))
 	r.fondo.Resize(t)
+	if m.cubre != nil {
+		m.cubre.Move(fyne.NewPos(0, 0))
+		m.cubre.Resize(t)
+		return
+	}
 
 	banda := func(o fyne.CanvasObject, y, alto float32) float32 {
 		o.Move(fyne.NewPos(0, y))
@@ -340,19 +389,20 @@ func (r *marcoRenderer) Refresh() {
 
 // ---- los seis estados ----
 
-// PantallaEstado es lo que se pinta en el centro cuando el documento no está listo:
-// los cinco estados que no son «éxito».
+// PantallaEstado es lo que se pinta cuando el documento no está listo: los cinco
+// estados que no son «éxito». «Cargando» y «Error» ocupan el marco entero (el esqueleto
+// del cromo y el fallo con «Reintentar» y «Volver»); los demás, el centro.
 //
 // Los seis van juntos y en un solo sitio a propósito: repartidos por cada pantalla es
 // como se acaba con una que solo sabe pintar tres.
 func PantallaEstado(c *Contexto) fyne.CanvasObject {
 	switch c.Estado {
 	case Cargando:
-		return ui.NuevoVacio(c.Traducir("editor.opening"), "")
+		return NuevoEsqueletoEditor(c)
 	case Vacio:
 		return ui.NuevoVacio(c.Traducir("list.empty.title"), c.Traducir("list.empty.description"))
 	case Error:
-		return ui.NuevoVacio(c.Traducir("editor.error.title"), c.Traducir("editor.error.description"))
+		return PantallaFallo(c)
 	case SinConexion:
 		return ui.NuevoVacio(c.Traducir("list.offline.title"), c.Traducir("list.offline.description"))
 	case SinPermiso:
@@ -394,8 +444,14 @@ func cuerpoPanel(c *Contexto, p Panel) fyne.CanvasObject {
 	return container.New(layout.NewCustomPaddedLayout(MargenPanel, MargenPanel, MargenPanel, MargenPanel), o)
 }
 
-// cuerpoAjustes es el panel derecho (§6.6): alineación y sangría del párrafo.
+// cuerpoAjustes es el panel derecho (§6.6): el del producto si lo da, y si no la
+// alineación del párrafo (Calcus, Diapos).
 func cuerpoAjustes(c *Contexto) fyne.CanvasObject {
+	if c.PanelAjustes != nil {
+		if o := c.PanelAjustes(); o != nil {
+			return o
+		}
+	}
 	f := c.formato()
 	return container.New(layout.NewCustomPaddedLayout(MargenPanel, MargenPanel, MargenPanel, MargenPanel), NuevoGrupo(c.Traducir("settings.paragraph.heading"),
 		c.boton(iconos.EdAlinearIzq, "align.left", f.Alineacion == Izquierda, false, AlinearIzq),

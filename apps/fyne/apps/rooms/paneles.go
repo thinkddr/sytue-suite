@@ -69,7 +69,8 @@ type PanelLista struct {
 	RotuloCerrar string
 	// Busqueda enseña la caja de buscar y la línea de estado.
 	Busqueda bool
-	// Estado es Cargando, Listo o Error.
+	// Estado es Cargando, Listo o Error; en la búsqueda, también SinPermiso: el
+	// servidor no puede buscar porque los mensajes están cifrados.
 	Estado   Estado
 	Mensajes []Mensaje
 	// Canales es id → nombre, para el «#canal» de cada fila (guardados y búsqueda).
@@ -208,6 +209,8 @@ func (p *PanelLista) textoEstado() string {
 		return ""
 	case p.Estado == Cargando:
 		return t.T("search.busy", nil)
+	case p.Estado == SinPermiso:
+		return t.T("search.unavailable", nil)
 	case p.Estado == Error:
 		return t.T("search.failed", nil)
 	}
@@ -238,6 +241,11 @@ func (p *PanelLista) construirCuerpo(v tema.Variante) fyne.CanvasObject {
 		}
 	case p.Busqueda && !p.activa():
 		cosas = append(cosas, NuevoTextoCentrado(t.T("search.hint", nil)))
+	case p.Estado == SinPermiso && p.Busqueda:
+		// Con cifrado no hay búsqueda en el servidor: se explica, sin «reintentar».
+		vac := ui.NuevoVacio(t.T("search.encryptedTitle", nil), t.T("search.encryptedBody", nil))
+		vac.Ilustracion = iconos.Pintar(iconos.VacioBusqueda, v).A(LadoIlustracionBusqueda).Objeto()
+		cosas = append(cosas, vac)
 	case p.Estado == Error && p.Busqueda:
 		cosas = append(cosas, NuevoAvisoHilo(t.T("search.failedRetry", nil), "", nil))
 	case p.Estado == Error:
@@ -512,8 +520,16 @@ func (f *FilaLista) MouseOut() { f.encima = false; f.Refresh() }
 // ponytail: se compone con la fecha corta sin año y la hora de la suite, unidas por
 // «, »; Intl elige el enlace por idioma. Si un idioma lo escribe distinto, se genera
 // su vector en `apps/nucleo/i18n` como los otros formatos.
-func RotuloCuando(l i18n.Locale, t time.Time) string {
-	return i18n.FormatDayMonth(l, t) + ", " + i18n.FormatTimeDigits(l, t)
+//
+// Con el año solo si no es el de `ahora`, como `whenLabel` de la web. ponytail: ahí la
+// fecha es la media de la suite, que en alemán es «07.11.2025» donde Intl da
+// «7. Nov. 2025»; es la misma fecha legible y no paga un vector propio.
+func RotuloCuando(l i18n.Locale, t, ahora time.Time) string {
+	fecha := i18n.FormatDayMonth(l, t)
+	if t.Year() != ahora.Year() {
+		fecha = i18n.FormatDate(l, t)
+	}
+	return fecha + ", " + i18n.FormatTimeDigits(l, t)
 }
 
 // RotuloProgramado es `formatSchedule`, la ficha de «Se enviará»: lo mismo con el día
@@ -609,14 +625,14 @@ func (f *FilaLista) CreateRenderer() fyne.WidgetRenderer {
 	f.fondo = canvas.NewRectangle(color.NRGBA{})
 	f.avatar = ui.NuevoAvatar(f.Mensaje.Autor.Nombre).Con(ui.AvatarSM)
 	f.nombre = ui.Texto(f.Mensaje.Autor.Nombre, tema.TextoSM, ui.SemiNegrita, tema.Color("text", v))
-	f.cuando = ui.Texto(RotuloCuando(f.Locale, f.Mensaje.Creado), escalonMeta, ui.Normal, tema.Color("text-subtle", v))
+	f.cuando = ui.Texto(RotuloCuando(f.Locale, f.Mensaje.Creado, time.Now()), escalonMeta, ui.Normal, tema.Color("text-subtle", v))
 	f.canal = ui.Texto(f.rotuloCanal(), escalonMeta, ui.Normal, tema.Color("text-subtle", v))
 	f.objetos = []fyne.CanvasObject{f.fondo, f.avatar, f.nombre, f.cuando}
 	if f.ConCanal || (f.Resumen != nil && f.Canal != "") {
 		f.objetos = append(f.objetos, f.canal)
 	}
 	if h := f.Resumen; h != nil {
-		f.cuando.Text = RotuloCuando(f.Locale, h.Actividad)
+		f.cuando.Text = RotuloCuando(f.Locale, h.Actividad, time.Now())
 		f.respuestas = ui.Texto(t.T("thread.replyCount", i18n.Vars{"count": f.Mensaje.Respuestas}),
 			escalonMeta, ui.Normal, tema.Color("text-subtle", v))
 		f.objetos = append(f.objetos, f.respuestas)
@@ -1190,6 +1206,10 @@ type Programado struct {
 	ConAdjuntos bool
 	Adjuntos    []string
 	Cuando      time.Time
+	// Raiz es el mensaje del hilo al que responde un programado ("" en uno de canal), y
+	// AlCanal su «También enviar al canal»: «Enviar ya» lo publica igual que al vencer.
+	Raiz    string
+	AlCanal bool
 }
 
 // FilaProgramado es una fila de «Programados»: `flex gap-3 border-b px-4 py-3`, el
@@ -1340,7 +1360,7 @@ func (f *FilaProgramado) CreateRenderer() fyne.WidgetRenderer {
 	f.avatar = ui.NuevoAvatar(m.Autor).Con(ui.AvatarSM)
 	f.nombre = ui.Texto(m.Autor, tema.TextoSM, ui.SemiNegrita, tema.Color("text", v))
 	f.canal = ui.Texto("#"+f.Canal, escalonMeta, ui.Normal, tema.Color("text-subtle", v))
-	f.cuando = ui.Texto(t.T("scheduled.sendsAt", i18n.Vars{"when": RotuloCuando(f.Locale, m.Cuando)}),
+	f.cuando = ui.Texto(t.T("scheduled.sendsAt", i18n.Vars{"when": RotuloCuando(f.Locale, m.Cuando, time.Now())}),
 		tema.TextoXS, ui.Medio, tema.Color("text-muted", v))
 	f.objetos = []fyne.CanvasObject{f.filete, f.avatar, f.nombre, f.cuando}
 	f.objetos = append(f.objetos, f.controles()...)

@@ -20,6 +20,8 @@ import (
 // IdP y esto solo decide si se ofrece una puerta. Quien autoriza es el servicio, que sí
 // verifica —una tesela de Sytue Admin pintada de más da un 403, no un agujero—.
 type Reclamos struct {
+	// Iss es el emisor: el mismo `sub` en otra instalación de Sytue ID es otra persona.
+	Iss    string `json:"iss"`
 	Sub    string `json:"sub"`
 	Tenant string `json:"tenant"`
 	// Email va en el token si se concedió el scope `email`, que las apps nativas piden.

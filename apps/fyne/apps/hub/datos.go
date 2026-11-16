@@ -147,6 +147,14 @@ var claveFormato = map[api.HubFormato]string{
 func (d *Datos) CreateRenderer() fyne.WidgetRenderer {
 	t := d.T
 	r := &datosRenderer{d: d, fondo: ui.NuevoFondoSuite(tema.De(fyne.CurrentApp().Settings().ThemeVariant()))}
+	// Lo de dentro de cada sección va en la columna de `max-w-2xl`.
+	r.copia = ui.NuevaSeccionAjustes("", "", nuevoColocado(func(x, y, ancho float32, mover bool) float32 {
+		return r.cuerpoCopia(x, y, min(ancho, AnchoIntro), mover)
+	}, r.objetosCopia))
+	r.mover = ui.NuevaSeccionAjustes("", "", nuevoColocado(func(x, y, ancho float32, mover bool) float32 {
+		return r.cuerpoMover(x, y, min(ancho, AnchoIntro), mover)
+	}, func() []fyne.CanvasObject { return []fyne.CanvasObject{r.cuerpo2, r.migrar} }))
+	r.marco = ui.NuevoMarcoAjustes("", "", r.copia, r.mover)
 	for _, f := range api.HubFormatos {
 		// El título es el nombre del formato, que no se traduce («CSV»): la constante
 		// del SDK va en minúsculas porque es lo que viaja.
@@ -188,9 +196,11 @@ func (d *Datos) formato() api.HubFormato {
 type datosRenderer struct {
 	d *Datos
 
-	fondo            *ui.FondoSuite
-	titulo, entrada  *ui.Parrafo
-	copia, mover     *seccion
+	fondo *ui.FondoSuite
+	// marco es el `SettingsShell` de la página y copia y mover sus dos secciones. Viven
+	// lo que la pantalla: lo de dentro se rehace, el armazón no.
+	marco            *ui.MarcoAjustes
+	copia, mover     *ui.SeccionAjustes
 	cuerpo, leyenda  *ui.Parrafo
 	ayudaFormato     *ui.Parrafo
 	opciones         []*ui.TarjetaEleccion
@@ -215,9 +225,8 @@ func (r *datosRenderer) rehacer() {
 		return ui.NuevoParrafo(t.T(clave, nil), e, peso, token, v)
 	}
 	r.fondo.PonerVariante(v)
-	r.titulo = p("data.title", ui.EscalonTitulo(2), ui.PesoTitulo(2), "text")
-	r.entrada = p("data.lead", baseRelajada, ui.Normal, "text-muted")
-	r.copia = nuevaSeccion(v, t.T("data.export.section", nil))
+	r.marco.Titulo, r.marco.Descripcion = t.T("data.title", nil), t.T("data.lead", nil)
+	r.copia.Titulo = t.T("data.export.section", nil)
 	r.cuerpo = p("data.export.body", smRelajada, ui.Normal, "text-muted")
 	r.leyenda = p("data.export.formatLegend", tema.TextoSM, ui.SemiNegrita, "text")
 	r.ayudaFormato = p("data.export.formatHelp", tema.TextoXS, ui.Normal, "text-muted")
@@ -238,67 +247,64 @@ func (r *datosRenderer) rehacer() {
 	case SinDescarga:
 	}
 	r.alcance = p("data.export.scope", xsRelajada, ui.Normal, "text-muted")
-	r.mover = nuevaSeccion(v, t.T("data.move.section", nil))
+	r.mover.Titulo = t.T("data.move.section", nil)
 	r.cuerpo2 = p("data.move.body", smRelajada, ui.Normal, "text-muted")
+	r.objetos = []fyne.CanvasObject{r.fondo, r.marco}
+}
 
-	r.objetos = []fyne.CanvasObject{r.fondo, r.titulo, r.entrada}
-	r.objetos = append(r.objetos, r.copia.objetos()...)
-	r.objetos = append(r.objetos, r.cuerpo)
+// objetosCopia es lo que hay ahora dentro de «Descargar una copia».
+func (r *datosRenderer) objetosCopia() []fyne.CanvasObject {
+	out := []fyne.CanvasObject{r.cuerpo}
 	if r.hayOrgs() {
-		r.objetos = append(r.objetos, r.leyendaOrg, r.ayudaOrg)
+		out = append(out, r.leyendaOrg, r.ayudaOrg)
 		for _, o := range r.opcionesOrg {
-			r.objetos = append(r.objetos, o)
+			out = append(out, o)
 		}
 	}
-	r.objetos = append(r.objetos, r.leyenda, r.ayudaFormato)
+	out = append(out, r.leyenda, r.ayudaFormato)
 	for _, o := range r.opciones {
-		r.objetos = append(r.objetos, o)
+		out = append(out, o)
 	}
-	r.objetos = append(r.objetos, r.botonDescarga())
+	out = append(out, r.botonDescarga())
 	if r.fallo != nil {
-		r.objetos = append(r.objetos, r.fallo)
+		out = append(out, r.fallo)
 	}
 	if r.empezada != nil {
-		r.objetos = append(r.objetos, r.empezada)
+		out = append(out, r.empezada)
 	}
-	r.objetos = append(r.objetos, r.alcance)
-	r.objetos = append(r.objetos, r.mover.objetos()...)
-	r.objetos = append(r.objetos, r.cuerpo2, r.migrar)
+	return append(out, r.alcance)
 }
 
 func (r *datosRenderer) MinSize() fyne.Size           { return fyne.NewSize(0, r.alto(r.d.Ancho())) }
 func (r *datosRenderer) Objects() []fyne.CanvasObject { return r.objetos }
 func (r *datosRenderer) Destroy()                     {}
 
-// Refresh rehace la pantalla (ver el comentario del lanzador).
+// Refresh rehace la pantalla (ver el comentario del lanzador). Lo de dentro de las
+// secciones se ha rehecho aunque no cambie de tamaño, y un `Resize` al mismo tamaño no
+// recoloca: se repinta de fuera adentro, y cada pieza coloca la suya al tamaño que ya
+// le ha dado la de fuera.
 func (r *datosRenderer) Refresh() {
 	r.rehacer()
 	r.Layout(r.d.Size())
+	r.marco.Refresh()
+	for _, s := range []*ui.SeccionAjustes{r.copia, r.mover} {
+		s.Refresh()
+		s.Cuerpo.Refresh()
+	}
 	canvas.Refresh(r.d)
 }
 
-// alto es lo que ocupa la pantalla entera. `Layout` recorre lo mismo.
-func (r *datosRenderer) alto(ventana float32) float32 {
-	return r.colocar(ventana, false)
-}
+// alto es lo que ocupa la pantalla entera: el del `SettingsShell` a ese ancho.
+func (r *datosRenderer) alto(ventana float32) float32 { return r.marco.AltoPara(ventana) }
 
 func (r *datosRenderer) Layout(t fyne.Size) {
 	if t.Width <= 0 {
 		return
 	}
-	r.fondo.Resize(fyne.NewSize(t.Width, max(t.Height, r.alto(t.Width))))
-	r.colocar(t.Width, true)
-}
-
-// colocar recorre la pantalla de arriba abajo; con `mover` a false solo mide, y así
-// `alto` y `Layout` no pueden discrepar.
-func (r *datosRenderer) colocar(ventana float32, mover bool) float32 {
-	x, ancho := CajaAjustes(ventana)
-	y := ponerParrafo(r.titulo, x, MargenAjustesY, ancho, mover) + MargenEntradaAjustes
-	y = ponerParrafo(r.entrada, x, y, min(ancho, AnchoIntro), mover) + MargenAjustesY
-	y = ponerSeccion(r.copia, x, y, ancho, mover, r.cuerpoCopia) + MargenAjustesY
-	y = ponerSeccion(r.mover, x, y, ancho, mover, r.cuerpoMover)
-	return y + MargenAjustesY
+	alto := r.alto(t.Width)
+	r.fondo.Resize(fyne.NewSize(t.Width, max(t.Height, alto)))
+	r.marco.Move(fyne.Position{})
+	r.marco.Resize(fyne.NewSize(t.Width, alto))
 }
 
 // hayOrgs: el `fieldset` de organizaciones sale con dos o más, como en la web.

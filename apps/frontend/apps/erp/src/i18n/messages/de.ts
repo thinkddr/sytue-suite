@@ -115,6 +115,11 @@ export const de: AppCatalog<typeof en> = {
   'form.copyId': 'ID kopieren',
   'form.copiedId': 'ID in die Zwischenablage kopiert',
   'form.required': 'Pflichtfeld',
+  'form.discardTitle': 'Änderungen verwerfen?',
+  'form.discardMessage':
+    'Dieser Datensatz enthält ungespeicherte Änderungen. Wenn Sie ihn jetzt schließen, gehen sie verloren.',
+  'form.discard': 'Verwerfen',
+  'form.keepEditing': 'Weiter bearbeiten',
   'toast.created': 'Angelegt',
   'toast.saved': 'Gespeichert',
   'toast.deleted': 'In den Papierkorb verschoben',
@@ -122,6 +127,11 @@ export const de: AppCatalog<typeof en> = {
   'toast.undoFailed': 'Rückgängig machen fehlgeschlagen',
   'toast.restored': 'Wiederhergestellt',
   'form.posted': 'Gebucht als {ref}',
+  'form.requestApproval': 'Freigabe anfordern',
+  'form.approvalRequested':
+    'Freigabe angefordert: Sie können buchen, sobald jemand anderes freigibt.',
+  'form.approvalNeeded':
+    'Dieser Betrag liegt über dem Schwellenwert des Moduls. Bitten Sie eine andere Person um Freigabe, bevor Sie buchen.',
   'action.duplicateDraft': 'Als Entwurf duplizieren',
 
   'dashboard.greeting': 'Willkommen, {name}',
@@ -134,6 +144,10 @@ export const de: AppCatalog<typeof en> = {
   'dashboard.kpiSales': 'Verkauf & Abrechnung',
   'dashboard.invoiceCount': { one: '{count} Rechnung', other: '{count} Rechnungen' },
   'dashboard.kpiSalesHint': 'Rechnungen, Angebote und Bestellungen',
+  'dashboard.monthlyTitle': 'Umsatz nach Monat',
+  'dashboard.monthlyTotal': 'Letzte 12 Monate: {amount}',
+  'dashboard.monthlyNone': 'Keine Rechnungen in den letzten 12 Monaten',
+  'dashboard.monthlyMonth': 'Monat',
   'dashboard.kpiOperations': 'Betrieb & Lager',
   'dashboard.kpiOperationsHint': 'Inventar, Produkte und Lieferungen',
   'dashboard.kpiPeople': 'Kontakte & Team',
@@ -161,6 +175,10 @@ export const de: AppCatalog<typeof en> = {
   'welcome.enable': 'Einschalten',
   'welcome.enabled': 'Ein',
   'welcome.disable': 'Ausschalten',
+  'welcome.enableConfirmTitle': '{module} einschalten?',
+  'welcome.enableConfirmBody':
+    'Damit wird der Bereich {module} für die gesamte Organisation eingeschaltet: Alle sehen ihn in ihrer Seitenleiste. Sie können ihn jederzeit wieder ausschalten, ohne etwas zu verlieren.',
+  'welcome.enableConfirmDeps': 'Außerdem wird {deps} eingeschaltet, das benötigt wird.',
   'welcome.quickAccess': 'Mach dort weiter, wo du aufgehört hast',
   'welcome.recentEmpty': 'Deine zuletzt genutzten Bereiche erscheinen hier',
   'welcome.recentEmptyBody': 'Öffne einen Bereich und ERP hält ihn für diese Sitzung bereit.',
@@ -174,6 +192,19 @@ export const de: AppCatalog<typeof en> = {
 
   'palette.placeholder': 'Gehe zu…',
   'palette.hint': 'Drücke {keys} von überall',
+  'palette.groupViews': 'Gehe zu',
+  'palette.groupAreas': 'Bereiche',
+  'palette.groupRecords': 'Datensätze',
+  'palette.searching': 'Suche läuft…',
+  'shortcuts.title': 'Tastenkürzel',
+  'shortcuts.group.move': 'Navigieren',
+  'shortcuts.group.actions': 'Aktionen',
+  'shortcuts.palette': 'Zu einem beliebigen Bereich oder einer Liste wechseln',
+  'shortcuts.search': 'In dieser Liste suchen',
+  'shortcuts.new': 'Neuer Datensatz in dieser Liste',
+  'shortcuts.close': '„Gehe zu“ schließen',
+  'shortcuts.help': 'Diese Liste anzeigen',
+  'shortcuts.key.esc': 'Esc',
 
   // --- Relaciones, libro diario y balance ---
   'relation.choose': 'Auswählen…',
@@ -197,6 +228,27 @@ export const de: AppCatalog<typeof en> = {
   'ledger.voidTitle': '{ref} stornieren',
   'ledger.voidReason': 'Warum wird diese Buchung storniert?',
   'ledger.voided': '{ref} storniert',
+  'close.closedUntil': 'Abgeschlossen bis {fecha}',
+  'close.close': 'Periode abschließen…',
+  'close.closeTitle': 'Periode abschließen',
+  'close.closeConfirm': 'Abschließen',
+  'close.closeUpTo': 'Abschließen bis',
+  'close.consequence':
+    'Niemand kann dann Buchungen mit Datum am oder vor dem {fecha} erfassen oder stornieren. Ein späteres Wiedereröffnen erfordert eine Begründung und wird im Verlauf festgehalten.',
+  'close.endOfLastMonth': 'Ende des Vormonats',
+  'close.endOfLastQuarter': 'Ende des Vorquartals',
+  'close.endOfLastYear': 'Ende des Vorjahres',
+  'close.futureDate': 'Abschließen lässt sich nur eine bereits beendete Periode.',
+  'close.notAfterCurrent':
+    'Das Journal ist bereits bis {fecha} abgeschlossen. Wählen Sie ein späteres Datum.',
+  'close.reopen': 'Wiedereröffnen…',
+  'close.reopenConfirm': 'Wiedereröffnen',
+  'close.reopenTo': 'Alles nach dem {fecha} wiedereröffnen',
+  'close.reopenAll': 'Das ganze Journal wiedereröffnen',
+  'close.reopenReason': 'Warum wird die Periode wiedereröffnet?',
+  'close.history': 'Abschlussverlauf',
+  'close.historyReopened': 'Wiedereröffnet, abgeschlossen bis {fecha}',
+  'close.historyReopenedAll': 'Vollständig wiedereröffnet',
   'balance.balance': 'Saldo',
   'balance.total': 'Summe',
   'balance.squares': 'Ausgeglichen',
@@ -206,6 +258,85 @@ export const de: AppCatalog<typeof en> = {
   'error.offline': 'ERP antwortet nicht.',
   'error.sinPermiso.titulo': 'Du hast keinen Zugriff auf dieses Modul',
   'error.sinPermiso': 'Bitte die Administration deiner Organisation darum.',
+  'error.code.unreadableInvoice':
+    'Diese Datei ist keine elektronische Rechnung im Format UBL, CII oder Facturae.',
+  'error.code.periodClosed':
+    'Diese Buchungsperiode ist abgeschlossen. Öffnen Sie sie zuerst wieder oder verwenden Sie ein späteres Datum.',
+  'error.code.closeBackwards':
+    'Die Bücher sind bereits bis zu einem späteren Datum abgeschlossen. Um zurückzugehen, öffnen Sie die Periode mit einer Begründung wieder.',
+  'error.code.approvalRequired':
+    'Dieser Betrag liegt über der Freigabeschwelle seines Moduls: Lassen Sie ihn zuerst von jemand anderem freigeben.',
+  'error.code.fourEyes':
+    'Sie können kein Dokument freigeben, das Sie selbst erstellt oder zur Freigabe eingereicht haben.',
+  'error.code.approvalResolved': 'Diese Freigabe ist bereits erledigt.',
+  'error.code.unknownModel': 'Diese Art von Datensatz gibt es nicht.',
+  'error.code.invalidStatus': 'Dieser Status gehört nicht zum Ablauf dieses Dokuments.',
+  'error.code.notPostable': 'Diese Art von Datensatz wird nicht ins Hauptbuch gebucht.',
+  'error.code.alreadyPosted': 'Dieses Dokument ist bereits ins Hauptbuch gebucht.',
+  'error.code.duplicateReference': 'Es gibt bereits ein Dokument mit dieser Referenz.',
+  'error.code.invalidAction':
+    'Diese Aktion lässt sich nicht auf mehrere Datensätze gleichzeitig anwenden.',
+  'error.code.noIds': 'Wählen Sie mindestens einen Datensatz aus.',
+  'error.code.invalidBasesConnection':
+    'Diese Sytue-Bases-Verbindung gilt nicht für das ERP: Sie wurde vielleicht widerrufen, ist abgelaufen oder gehört zu einem anderen Produkt oder einer anderen Organisation.',
+  'error.code.attachmentType':
+    'Laden Sie ein PDF, ein Bild (JPEG, PNG oder WebP) oder das XML einer E-Rechnung hoch.',
+  'error.code.attachmentTooLarge': 'Die Datei ist größer als 10 MB.',
+  'error.code.aiUnavailable':
+    'Sytue AI ist gerade nicht verfügbar. Versuchen Sie es gleich noch einmal.',
+  'error.code.aiLimit':
+    'Sie haben Ihr Sytue-AI-Limit vorerst erreicht. Versuchen Sie es später noch einmal.',
+  'error.code.aiNoReport':
+    'Sytue AI konnte daraus keinen Bericht machen. Formulieren Sie es anders.',
+  'error.code.invalidReport': 'Dieser Bericht ist ungültig.',
+  'error.code.pdfNoText':
+    'Dieses PDF ließ sich nicht lesen. Wenn es ein Foto oder ein Scan ist, fügen Sie stattdessen den Text ein.',
+  'error.code.reportBusy':
+    'Gerade wird ein anderer Bericht erstellt. Versuchen Sie es gleich noch einmal.',
+  'error.code.orgNotConfigured': 'Das Profil Ihrer Organisation ist noch nicht eingerichtet.',
+  'error.code.notComputable': 'Diese Pflicht lässt sich nicht aus dem Hauptbuch berechnen.',
+  'error.code.alreadyJustified': 'Diese Bankbewegung hat bereits ihre Rechnung oder Erklärung.',
+  'error.code.notJustified': 'Diese Bankbewegung ist noch offen.',
+  'error.code.invoiceNotOpen': 'Die Rechnung ist bereits bezahlt oder storniert.',
+  'error.code.invoiceDirection':
+    'Eingehendes Geld wird einer ausgestellten Rechnung zugeordnet, ausgehendes einer erhaltenen.',
+  'error.code.unknownReason':
+    'Wählen Sie für eine Bewegung ohne Rechnung einen der aufgeführten Gründe.',
+  'error.code.aiNoPlan':
+    'Sytue AI konnte daraus keine Datensätze machen. Formulieren Sie es anders.',
+  'error.code.modulesDisabled': 'Aktivieren Sie zuerst die Module Verkauf und Rechnungsstellung.',
+  'error.code.verifactuUnavailable':
+    'VERI*FACTU kann für diese Organisation nicht aktiviert werden.',
+  'error.code.invoiceIssued':
+    'Diese Rechnung wurde bereits an die spanische Steuerbehörde gesendet: Korrigieren Sie sie mit einer Korrekturrechnung.',
+  'error.code.verifactuPending':
+    'Die spanische Steuerbehörde hat zu dieser Rechnung noch nicht geantwortet.',
+  'error.code.nothingToCorrect':
+    'Bei der spanischen Steuerbehörde gibt es zu dieser Rechnung nichts zu korrigieren.',
+  'error.code.taxIdWithVerifactu':
+    'Die Steuernummer der Organisation kann nicht geändert werden, solange VERI*FACTU aktiviert ist.',
+  'error.code.invalidCsv': 'Die Datei ließ sich nicht als CSV lesen.',
+  'error.code.csvNoColumns':
+    'Keine Spaltenüberschrift passt zu einem Feld dieser Art von Datensatz.',
+  'error.code.importNotSimulable':
+    'Für diese Datei gibt es keine Vorschau: Nur CSV-Importe lassen sich simulieren.',
+  'error.code.alreadyReverted': 'Dieser Import wurde bereits rückgängig gemacht.',
+  'error.code.unknownConnector': 'Dieser Konnektor ist nicht verfügbar.',
+  'error.code.invalidIds': 'Wählen Sie höchstens 500 Datensätze zum Exportieren aus.',
+  'error.code.actionNotAllowed':
+    'Ihre Rolle in diesem Modul erlaubt diese Aktion nicht. Die Aufgaben sind getrennt: Wenden Sie sich an die Administration Ihrer Organisation.',
+  'error.code.badRequest':
+    'Die Anfrage ist ungültig. Prüfen Sie Ihre Eingaben und versuchen Sie es noch einmal.',
+  'error.code.sessionExpired': 'Ihre Sitzung ist abgelaufen. Melden Sie sich erneut an.',
+  'error.code.forbidden': 'Sie haben keine Berechtigung dafür.',
+  'error.code.notFound': 'Es existiert nicht mehr, oder Sie können es nicht sehen.',
+  'error.code.unprocessable': 'Speichern war nicht möglich. Prüfen Sie Ihre Eingaben.',
+  'error.code.checkFields': 'Prüfen Sie die markierten Felder.',
+  'error.code.tooManyRequests':
+    'Zu viele Versuche. Warten Sie einen Moment und versuchen Sie es noch einmal.',
+  'error.code.noActiveOrg':
+    'Ihre Sitzung hat keine aktive Organisation. Schließen Sie das Abonnement Ihrer Organisation ab, um die Suite zu nutzen.',
+  'error.code.tooLarge': 'Was Sie gesendet haben, ist zu groß.',
 
   // --- Organisationsprofil, Pflichten und Import ---
   'nav.obligations': 'Pflichten',
@@ -224,6 +355,40 @@ export const de: AppCatalog<typeof en> = {
   'dashboard.seeAll': 'Ganzen Kalender ansehen',
   'welcome.disabled': 'Aus',
   'list.importInvoices': 'CSV oder Rechnungen importieren',
+  'migrate.cta': 'Daten aus einem anderen Programm übernehmen',
+  'migrate.ctaBody':
+    'Holded, Odoo, Salesforce oder Business Central: Kontakte, Produkte und Rechnungen, ohne sie neu einzutippen.',
+  'migrate.title': 'Aus einem anderen Programm importieren',
+  'migrate.stepSource': 'Programm',
+  'migrate.sourceHeading': 'Wo liegen deine Daten jetzt?',
+  'migrate.stepConnect': 'Verbindung',
+  'migrate.connectHeading': '{name} verbinden',
+  'migrate.connectHint':
+    'Die Schlüssel für {name} liegen versiegelt im Integrations-Gateway, nie im ERP. Lege die Verbindung in der Konsole unter Integrationen an und füge hier ihre Kennung ein.',
+  'migrate.instanceLabel': 'Kennung der Verbindung',
+  'migrate.invalidId': 'Das ist keine Verbindungskennung.',
+  'migrate.test': 'Verbindung testen',
+  'migrate.testOk': 'Es klappt: {name} hat geantwortet.',
+  'migrate.testFailed':
+    'Keine Antwort: Prüfe die Kennung und ob die Verbindung in der Konsole aktiv ist.',
+  'migrate.stepWhat': 'Was übernehmen',
+  'migrate.whatHeading': 'Wähle, was importiert wird',
+  'migrate.whatHint': 'Erneutes Importieren aktualisiert Vorhandenes, statt es zu verdoppeln.',
+  'migrate.run': 'Importieren',
+  'migrate.stepDone': 'Fertig',
+  'migrate.doneHeading': 'Import abgeschlossen',
+  'migrate.created': 'Neu',
+  'migrate.updated': 'Aktualisiert',
+  'migrate.failed': 'Fehlgeschlagen',
+  'migrate.obj.companies': 'Unternehmen',
+  'migrate.obj.people': 'Personen',
+  'migrate.obj.contacts': 'Kontakte',
+  'migrate.obj.suppliers': 'Lieferanten',
+  'migrate.obj.products': 'Produkte',
+  'migrate.obj.services': 'Dienstleistungen',
+  'migrate.obj.salesInvoices': 'Ausgangsrechnungen',
+  'migrate.obj.purchaseInvoices': 'Eingangsrechnungen',
+  'migrate.obj.opportunities': 'Verkaufschancen',
   'list.importInvoicesHint':
     'Eine CSV mit den Spalten des Exports oder E-Rechnungen als UBL, CII (Factur-X, ZUGFeRD, XRechnung) und Facturae. Mehrfachauswahl möglich.',
   'list.import': 'CSV importieren',
@@ -440,6 +605,8 @@ export const de: AppCatalog<typeof en> = {
   'obligations.ifLate': 'Bei Verspätung',
   'nav.tasks': 'Aufgaben',
   'nav.tasksDue': { one: '{count} fällige Aufgabe', other: '{count} fällige Aufgaben' },
+  'nav.approvals': 'Freigaben',
+  'nav.approvalsWaiting': 'Warten auf Freigabe: {count}',
   'tasks.title': 'Aufgaben',
   'tasks.subtitle':
     'Was zu tun ist, nach Datum. Laden Sie das Dokument direkt hier hoch, dann ist die Aufgabe erledigt.',
@@ -468,6 +635,34 @@ export const de: AppCatalog<typeof en> = {
   'tasks.kind.email': 'E-Mail',
   'tasks.kind.meeting': 'Besprechung',
   'tasks.kind.todo': 'Aufgabe',
+  'approvals.title': 'Freigaben',
+  'approvals.subtitle':
+    'Belege über dem Schwellenwert ihres Moduls brauchen eine zweite Person, bevor sie ins Hauptbuch gehen.',
+  'approvals.pending': 'Offen',
+  'approvals.approved': 'Freigegeben',
+  'approvals.rejected': 'Abgelehnt',
+  'approvals.waiting': 'Wartet auf eine andere Person',
+  'approvals.empty': 'Nichts wartet auf Freigabe',
+  'approvals.emptyHint':
+    'Wenn ein Beleg den Schwellenwert seines Moduls überschreitet, erscheint er hier.',
+  'approvals.emptyResolved': 'Hier ist noch nichts',
+  'approvals.approve': 'Freigeben',
+  'approvals.reject': 'Ablehnen',
+  'approvals.rejectTitle': 'Anfrage ablehnen',
+  'approvals.rejectReason': 'Warum lehnen Sie sie ab? Die anfragende Person sieht es.',
+  'approvals.approvedToast': 'Freigegeben: kann jetzt gebucht werden',
+  'approvals.rejectedToast': 'Abgelehnt',
+  'approvals.requestedOn': 'Angefragt am {date}',
+  'approvals.byYou': 'von Ihnen angefragt',
+  'approvals.reason': 'Grund: {reason}',
+  'approvals.thresholds': 'Freigabe-Schwellenwerte',
+  'approvals.thresholdsHint':
+    'Ab diesem Betrag braucht das Buchen eines Belegs im Modul die Freigabe einer anderen Person. Leer lassen für keinen Schwellenwert.',
+  'approvals.thresholdNone': 'Kein Schwellenwert',
+  'approvals.thresholdFrom': 'Ab {amount}',
+  'approvals.thresholdInvalid':
+    'Geben Sie einen positiven Betrag ein oder lassen Sie das Feld leer.',
+  'approvals.thresholdSaved': 'Schwellenwert gespeichert',
   'docs.title': 'Dokumente',
   'docs.upload': 'Hochladen',
   'docs.uploaded': 'Dokument hochgeladen',
@@ -514,6 +709,25 @@ export const de: AppCatalog<typeof en> = {
     'Ihre Fristen für Steuern, Sozialversicherung und Jahresabschluss. Alle mit Zugriff erhalten 10 Tage vorher eine E-Mail.',
   'obligations.documents': 'Unterlagen zur Abgabe',
   'form.print': 'Rechnung drucken',
+  'form.downloadPdf': 'Rechnung als PDF herunterladen',
+  'send.action': 'Per E-Mail senden',
+  'send.title': 'Rechnung {ref} senden',
+  'send.to': 'An',
+  'send.subject': 'Betreff',
+  'send.message': 'Nachricht',
+  'send.defaultSubject': 'Rechnung {ref}',
+  'send.defaultMessage':
+    'Guten Tag,\n\nanbei erhalten Sie die Rechnung {ref}.\n\nMit freundlichen Grüßen',
+  'send.attachment': 'Die Rechnung wird als PDF angehängt.',
+  'send.submit': 'Senden',
+  'send.sent': 'Rechnung an {to} gesendet',
+  'send.unavailable':
+    'Auf diesem Server ist kein E-Mail-Versand eingerichtet. Laden Sie das PDF herunter und hängen Sie es in Ihrem E-Mail-Programm an.',
+  'send.notIssued':
+    'Bestätigen Sie die Rechnung vor dem Versand: Entwürfe und stornierte Rechnungen können nicht gesendet werden.',
+  'send.invalidTo': 'Geben Sie eine gültige E-Mail-Adresse ein.',
+  'send.failed':
+    'Der Mailserver hat die Nachricht nicht angenommen. Versuchen Sie es in ein paar Minuten erneut.',
   'vf.intro':
     'Ab 2027 muss jede Rechnung bei der Ausstellung bei der spanischen Steuerbehörde registriert werden. Mit VERI*FACTU erledigt Sytue das beim Bestätigen jeder Rechnung und fügt den QR-Code hinzu, mit dem Ihr Kunde sie prüfen kann.',
   'vf.activate': 'VERI*FACTU aktivieren',
@@ -540,7 +754,7 @@ export const de: AppCatalog<typeof en> = {
     'Auf den Kanarischen Inseln, in Ceuta und Melilla noch nicht verfügbar: Dort enthalten Rechnungen keine Mehrwertsteuer.',
   'vf.reason.taxId': 'Die Steuernummer der Organisation ist ungültig.',
   'vf.reason.certificate':
-    'In diesem Sytue noch nicht verfügbar: Es fehlt das Zertifikat für die Übermittlung an die Steuerbehörde.',
+    'Für die Übermittlung der Rechnungen an die Steuerbehörde wird das elektronische Zertifikat der Organisation benötigt.',
   'vf.reason.declaration':
     'Noch nicht verfügbar: Sytue hat die Konformitätserklärung für diese Version noch nicht unterzeichnet.',
   'vf.state.pending': 'Wird an die Steuerbehörde übermittelt',
@@ -552,6 +766,31 @@ export const de: AppCatalog<typeof en> = {
   'vf.fixHint': 'Korrigieren Sie die Rechnungs- oder Kundendaten und senden Sie sie erneut.',
   'vf.resend': 'Erneut senden',
   'vf.resent': 'Erneut gesendet',
+  'vf.cert.upload': 'Zertifikat hochladen',
+  'vf.cert.change': 'Zertifikat ändern',
+  'vf.cert.current': 'Zertifikat für {nif}',
+  'vf.cert.title': 'Zertifikat der Organisation',
+  'vf.cert.stepFile': 'Datei',
+  'vf.cert.fileHeading': 'Elektronisches Zertifikat auswählen',
+  'vf.cert.fileHint':
+    'Das Vertreter- oder Siegelzertifikat der Organisation, so wie Sie es heruntergeladen haben: eine .p12- oder .pfx-Datei (PEM geht auch).',
+  'vf.cert.fileLabel': 'Zertifikat',
+  'vf.cert.keyLabel': 'Privater Schlüssel (PEM)',
+  'vf.cert.keyHint':
+    'Diese Datei enthält keinen privaten Schlüssel: Wählen Sie auch die Schlüsseldatei aus.',
+  'vf.cert.stepConfirm': 'Bestätigen',
+  'vf.cert.confirmHeading': 'Zertifikat öffnen und speichern',
+  'vf.cert.passwordLabel': 'Passwort des Zertifikats',
+  'vf.cert.passwordHint':
+    'Das Passwort, das Sie beim Exportieren festgelegt haben. Es dient nur zum Öffnen und wird nicht gespeichert.',
+  'vf.cert.seal': 'Es ist ein Siegelzertifikat einer Organisation',
+  'vf.cert.privacy':
+    'Die Datei wird verschlüsselt übertragen und der private Schlüssel verschlüsselt gespeichert. Sytue prüft, ob die Steuernummer im Zertifikat die der Organisation ist.',
+  'vf.cert.save': 'Zertifikat speichern',
+  'vf.cert.stepDone': 'Fertig',
+  'vf.cert.saved': 'Zertifikat gespeichert',
+  'vf.cert.savedBody':
+    'Sytue übermittelt die Rechnungen mit dem Zertifikat für {nif} an die Steuerbehörde.',
   'history.title': 'Verlauf',
   'history.notePlaceholder': 'Notiz für das Team schreiben…',
   'history.addNote': 'Notiz hinzufügen',
@@ -604,4 +843,5 @@ export const de: AppCatalog<typeof en> = {
     'Das Zertifikat oder der private Schlüssel ist kein gültiges qualifiziertes Zertifikat mit spanischer Steuernummer (NIF).',
   'vf.error.certificateTaxIdMismatch':
     'Die Steuernummer (NIF) im Zertifikat stimmt nicht mit der Steuernummer der Organisation überein.',
+  'vf.error.wrongPassword': 'Das Passwort des Zertifikats ist nicht korrekt.',
 };

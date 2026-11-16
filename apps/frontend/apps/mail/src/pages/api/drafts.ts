@@ -29,6 +29,9 @@ interface Payload {
   delete?: boolean;
   to?: EmailAddress[];
   cc?: EmailAddress[];
+  // La CCO se perdía al autoguardar: el borrador es el único sitio donde puede
+  // quedar, y solo aquí se escribe como cabecera (el SDK nunca la pone al enviar).
+  bcc?: EmailAddress[];
   subject?: string;
   textBody?: string;
   // Los dos siguientes: el borrador guardaba SOLO texto plano, y el editor
@@ -74,6 +77,7 @@ export const POST: APIRoute = async (ctx) => {
     to: Array.isArray(body.to) ? body.to : [],
     subject: body.subject ?? '(Sin asunto)',
     ...(body.cc ? { cc: body.cc } : {}),
+    ...(Array.isArray(body.bcc) && body.bcc.length ? { bcc: body.bcc } : {}),
     textBody: body.textBody ?? '',
     ...(body.htmlBody != null ? { htmlBody: body.htmlBody } : {}),
     ...(attachments.length ? { attachments } : {}),
@@ -100,6 +104,7 @@ export const GET: APIRoute = async (ctx) => {
     return json({
       to: draft.to,
       cc: draft.cc,
+      bcc: draft.bcc,
       subject: draft.subject,
       textBody: draft.textBody,
       htmlBody: draft.htmlBody,

@@ -34,6 +34,16 @@ import (
 // no tiene más sitio; en escritorio el canal sigue a mano y la llamada se mueve aparte,
 // que es lo que la web busca con «Sacar a otra ventana». En móvil una ventana nueva es
 // la pantalla entera, que es lo mismo que la web en un teléfono.
+//
+// Por eso esta ventana es la contrapartida de `pip.astro`, la ventana emergente de la
+// web, y lo es con una DIFERENCIA DELIBERADA: la web necesita esa ventana mínima de
+// 420x320, sin shell ni chat, porque cada app de la suite es un documento aparte y
+// navegar mataría la sesión de LiveKit. En escritorio la llamada nunca vive dentro del
+// canal, así que no hay nada que «sacar»: nace ya en su ventana, completa, y cambiar de
+// canal o de app no la toca. No hay modo mini aparte; la ventana se redimensiona como
+// cualquier otra.
+//
+// paridad-web: apps/frontend/apps/rooms/src/pages/pip.astro
 
 // EnCurso es la llamada conectada que la vista pinta; la cumple *llamada.Llamada.
 type EnCurso interface {
@@ -61,6 +71,14 @@ type Llamador interface {
 }
 
 var _ Llamador = (*api.Rooms)(nil)
+
+// VigiaLlamada cuenta quién está dentro de la llamada de un canal sin crearla; lo cumple
+// *api.Rooms. Sin él, la franja solo sabe lo que dicen las tramas del vivo.
+type VigiaLlamada interface {
+	LlamadaActiva(ctx context.Context, canal string) (int, error)
+}
+
+var _ VigiaLlamada = (*api.Rooms)(nil)
 
 // Moderador es lo que modera la llamada; lo cumple *api.Rooms.
 type Moderador interface {
@@ -138,6 +156,7 @@ type VistaLlamada struct {
 	protagonista                 string
 	extrasLlamada
 	panelObj, grabObj, flotObj fyne.CanvasObject
+	avisoObj                   fyne.CanvasObject
 	fondo                      *canvas.Rectangle
 	filete                     *canvas.Rectangle
 	titulo                     *canvas.Text
@@ -181,11 +200,14 @@ func (v *VistaLlamada) AlternarMicro() {
 	v.Refresh()
 }
 
-// componerExtras rehace el panel, el aviso de grabación y las reacciones en vuelo.
+// componerExtras rehace el panel, el aviso de grabación, el de la sala vacía y las
+// reacciones en vuelo. El panel va encima del aviso: abierto, tapa lo que se le cruce,
+// como en la web.
 func (v *VistaLlamada) componerExtras(vr tema.Variante) {
 	v.panelObj, v.grabObj, v.flotObj = v.panel(vr), v.grabacion(vr), v.flotantes()
+	v.avisoObj = v.avisoSala(vr)
 	objs := v.objetos[:6]
-	for _, o := range []fyne.CanvasObject{v.flotObj, v.panelObj, v.grabObj} {
+	for _, o := range []fyne.CanvasObject{v.avisoObj, v.flotObj, v.panelObj, v.grabObj} {
 		if o != nil {
 			objs = append(objs, o)
 		}
@@ -362,6 +384,12 @@ func (r *vistaLlamadaRenderer) Layout(t fyne.Size) {
 		g := v.grabObj.MinSize()
 		v.grabObj.Move(fyne.NewPos(t.Width-tema.Espacio(4)-g.Width, (AltoCabeceraLlamada-g.Height)/2))
 		v.grabObj.Resize(g)
+	}
+	// «Todavía no hay nadie más», centrado a `top-6` del escenario con su `px-4`.
+	if v.aviso != nil && v.avisoObj != nil {
+		a := v.aviso.Medida(max(t.Width-2*tema.Espacio(4), 0))
+		v.aviso.Move(fyne.NewPos((t.Width-a.Width)/2, AltoCabeceraLlamada+tema.Espacio(6)))
+		v.aviso.Resize(a)
 	}
 	if v.flotObj != nil {
 		f := v.flotObj.MinSize()
@@ -750,9 +778,13 @@ func (sa *Sala) abrirLlamada(titulo, canal string, obtener func(context.Context)
 		sa.ventanaLlamada.RequestFocus() // una llamada a la vez, como en la web
 		return
 	}
+	// Entrar en una llamada calla la entrante que estuviera sonando: con la antesala
+	// abierta (o ya dentro) el timbre se mezclaría con la previa del micrófono.
+	sa.retirarEntrante()
 	t := sa.P.T
 	w := fyne.CurrentApp().NewWindow(titulo)
 	sa.ventanaLlamada = w
+	sa.pintarFranjaLlamada()
 	callCtx, cancelarLlamada := context.WithCancel(sa.ctx)
 	a := NuevaAntesala(t, titulo)
 	// La cámara empieza APAGADA: se enciende cuando la persona lo pide, que es cuando
@@ -778,10 +810,17 @@ func (sa *Sala) abrirLlamada(titulo, canal string, obtener func(context.Context)
 		if parar != nil {
 			parar()
 		}
+		// «Copiado» no tiene que volver a «Copiar enlace» en una ventana ya cerrada.
+		if vista != nil && vista.pararCopiado != nil {
+			vista.pararCopiado()
+		}
 		if enCurso != nil {
 			enCurso.Colgar()
 		}
 		sa.ventanaLlamada, sa.llamada, sa.canalLlamada = nil, nil, ""
+		// Fuera de la llamada vuelve la franja si siguen dentro, y con cuántos quedan.
+		sa.pintarFranjaLlamada()
+		sa.refrescarLlamadaActiva()
 	})
 	a.AlCancelar = w.Close
 
@@ -866,6 +905,8 @@ func (sa *Sala) abrirLlamada(titulo, canal string, obtener func(context.Context)
 				vista.AlColgar = w.Close
 				vista.ConCamara, vista.ConPantalla = sa.Camara != nil, sa.Pantalla != nil
 				vista.Lanzar = sa.Lanzar
+				vista.Ventana, vista.Esperar = w, sa.Esperar
+				w.Canvas().SetOnTypedKey(vista.Tecla)
 				sa.prepararBarra(vista, c, canal, l)
 				if conCamara {
 					vista.AlternarCamara() // se entra como se eligió en la antesala

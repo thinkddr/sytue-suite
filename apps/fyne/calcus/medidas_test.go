@@ -45,6 +45,8 @@ const (
 	lienzoWeb  = "apps/frontend/packages/office/src/editor/sheets/SheetCanvas.tsx"
 	rejillaWeb = "apps/frontend/packages/office/src/editor/sheets/rejilla.ts"
 	hojaWeb    = "apps/frontend/packages/office/src/editor/editor.css"
+	// cuadroWeb es el cuadro de nombres de la barra de fórmulas, que vive aparte.
+	cuadroWeb = "apps/frontend/packages/office/src/editor/sheets/CuadroNombres.tsx"
 )
 
 // TestLaGeometriaSaleDeSheetCanvas compara las constantes de este paquete con las de
@@ -54,16 +56,19 @@ const (
 // contrasta se desincroniza en el primer cambio de la web y nadie se entera hasta que
 // alguien compara capturas.
 func TestLaGeometriaSaleDeSheetCanvas(t *testing.T) {
-	// La rejilla de aquí es la MÍNIMA de la web: allí crece con los datos y el
-	// desplazamiento hasta los límites de Excel, y aquí todavía no (deuda de paridad).
+	// La rejilla crece como la de la web: desde la mínima, con lo usado, la selección y
+	// el desplazamiento, hasta los límites de Excel.
 	rejilla := webref.Read(t, rejillaWeb)
 	for _, c := range []struct {
 		nombre  string
 		nuestra float32
 	}{
-		{"MIN_COLS", Columnas},
-		{"MIN_ROWS", Filas},
+		{"MIN_COLS", MinColumnas},
+		{"MIN_ROWS", MinFilas},
 		{"MAX_COLS", MaxColumnas},
+		{"MAX_ROWS", MaxFilas},
+		{"ADELANTO_COLS", adelantoCols},
+		{"ADELANTO_FILAS", adelantoFilas},
 	} {
 		if suya := constanteJSEn(t, rejilla, rejillaWeb, c.nombre); suya != c.nuestra {
 			t.Errorf("%s vale %v en rejilla.ts y aquí %v", c.nombre, suya, c.nuestra)
@@ -95,7 +100,7 @@ func TestLaGeometriaSaleDeSheetCanvas(t *testing.T) {
 // `text-sm` por `text-xs` en la celda, este test lo dice, y ninguna medida derivada lo
 // haría — el alto de la celda seguiría siendo 24.
 func TestLasClasesDeLaRejillaSiguenSiendoLasMismas(t *testing.T) {
-	fuente := webref.Read(t, lienzoWeb)
+	fuente := webref.Read(t, lienzoWeb) + webref.Read(t, cuadroWeb)
 	for _, c := range []struct {
 		trozo, porQue string
 	}{
@@ -112,8 +117,13 @@ func TestLasClasesDeLaRejillaSiguenSiendoLasMismas(t *testing.T) {
 		{"w-[40px] cursor-cell", "la cabecera de fila mide `HEAD_W`"},
 		{"sytue-grid-head-hl", "el realce de la cabecera dentro del rango"},
 		{"flex h-8 shrink-0 items-center gap-2 border-b px-2", "la barra de fórmulas: `h-8`, `gap-2`, `px-2`"},
-		{"h-6 w-16 shrink-0 items-center justify-center rounded-sm border text-xs font-medium tabular-nums", "el rótulo de la celda activa: `w-16` y `text-xs`"},
+		{"h-6 w-24 shrink-0 items-center rounded-sm border text-xs font-medium tabular-nums", "el cuadro de nombres: `w-24` y `text-xs`"},
 		{"h-5 w-full min-w-0 rounded-sm bg-transparent px-1 text-sm", "el campo de la fórmula"},
+		{"flex shrink-0 items-start gap-2 border-b px-2 py-1", "la barra desplegada: `items-start py-1`"},
+		{"'mt-0.5 items-start'", "el campo desplegado baja `mt-0.5`"},
+		{"z-[1] block h-15 w-full min-w-0 resize-none", "el `<textarea>`: `h-15`"},
+		{"rounded-sm bg-transparent px-1 text-sm leading-5 break-all", "el `<textarea>`: `px-1`, `leading-5` y su reparto"},
+		{"class={`${BOTON_DE_BARRA} shrink-0`}", "el ▾ que despliega la barra es el botón de la cinta"},
 		{"inset 0 0 0 2px", "el marco de la celda ancla son 2 px por dentro"},
 		{"color-mix(in srgb, ${ACCENT} 12%", "el rango mezcla editor-select al 12 %"},
 	} {
@@ -221,7 +231,7 @@ func TestLasMedidasEnRemSalenDelRemDe16(t *testing.T) {
 	}{
 		{"px-1 de la celda", MargenCelda, 4},
 		{"h-8 de la barra", AltoBarra, 32},
-		{"w-16 del rótulo", AnchoRef, 64},
+		{"w-24 del cuadro de nombres", AnchoRef, 96},
 		{"px-2 de la barra", MargenBarra, 8},
 		{"h-5 del campo", AltoEntradaFx, 20},
 	} {

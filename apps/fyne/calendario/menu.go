@@ -9,13 +9,11 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 
-	"git.sytue.eu/sytue/one/apps/nucleo/api"
-	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
-
-	"git.sytue.eu/sytue/one/apps/fyne/agenda"
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
 // El menú de Sytue Calendar: «Crear evento» arriba, el mini-mes, «Mis calendarios» y,
@@ -55,10 +53,17 @@ func (p *Pantalla) menu() fyne.CanvasObject {
 	if len(p.Compartidos) > 0 {
 		bloques = append(bloques, p.seccionCompartidos())
 	}
+	// Una sola puerta a la página de ajustes, como en Mail.
+	if p.AlAbrirAjustes != nil {
+		f := ui.NuevaFilaLateral(p.t("nav.settings", nil), iconos.Trazo(iconos.Ajustes, ui.GlifoMenu, "sidebar-fg", tema.De(fyne.CurrentApp().Settings().ThemeVariant())).Objeto(), func() { p.cajonAbierto = false; p.AlAbrirAjustes() })
+		// Con la página abierta, la fila se marca como en la web (`active={ajustesOpen}`).
+		f.Activa = p.EnAjustes
+		bloques = append(bloques, f)
+	}
 	// El cuerpo NO desplaza por su cuenta: `ui.Lateral` deja esa decisión a quien lo
 	// monta, para no traer la barra del tema de Fyne a los seis menús de la suite.
 	// Aquí cabe: mini-mes (177,25) y dos secciones cortas dentro de 744 − cabecera.
-	cuerpo := agenda.EnColumna(0, bloques...)
+	cuerpo := ui.EnColumna(0, bloques...)
 
 	l := ui.NuevoLateral(p.t("nav.myCalendars", nil), cuerpo).ConCabecera(crear)
 	// El pie es `<ImportData>` («Trae tus calendarios»), que solo se pinta si la
@@ -79,10 +84,10 @@ func (p *Pantalla) menu() fyne.CanvasObject {
 func (p *Pantalla) seccionVistaMovil() *ui.SeccionLateral {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	s := ui.NuevaSeccionLateral(p.t("view.label", nil))
-	grupo := NuevoGrupoVista([4]string{
+	grupo := NuevoGrupoVista(p.t("view.label", nil), [4]string{
 		p.t("view.month", nil), p.t("view.week", nil), p.t("view.day", nil), p.t("view.agenda", nil),
 	}, p.Vista, func(vista Vista) { p.cajonAbierto = false; p.cambiarVista(vista) })
-	grupo.Rejilla = true
+	grupo.Rejilla = 2
 	buscar := ui.NuevaFilaLateral(p.t("search.events", nil), iconos.Trazo(iconos.Buscar, ui.GlifoMenu, "sidebar-fg", v).Objeto(), func() {
 		p.cajonAbierto = false
 		if p.AlBuscar != nil {
@@ -148,8 +153,8 @@ func (p *Pantalla) seccionMisCalendarios() *ui.SeccionLateral {
 		// El esqueleto del menú va TEÑIDO para el cromo oscuro: `bg-subtle` ahí sería
 		// un destello claro sobre negro, que es lo que dice el comentario de la web.
 		s.Filas = []fyne.CanvasObject{
-			agenda.Bloque(0, 36, true),
-			agenda.Bloque(0, 36, true),
+			ui.NuevoEsqueleto(0, 36).SobreCromo(),
+			ui.NuevoEsqueleto(0, 36).SobreCromo(),
 		}
 		return s
 	}

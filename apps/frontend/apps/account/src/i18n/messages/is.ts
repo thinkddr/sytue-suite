@@ -7,6 +7,23 @@ import type { en } from './en.js';
 
 export const is: AppCatalog<typeof en> = {
   'app.title': 'Reikningurinn minn',
+  'app.description': 'Reikningurinn minn — prófíll, öryggi og aðgangur að Sytue-reikningnum þínum.',
+  'app.lead':
+    'Prófíllinn þinn, hvernig þú skráir þig inn og verndar reikninginn og hvar hann er opinn.',
+
+  // --- Revisión de seguridad ---
+  'checkup.title': 'Öryggisskoðun',
+  'checkup.all_good': 'Allt í lagi: reikningurinn þinn er vel varinn.',
+  'checkup.dos_pasos': 'Tveggja þrepa staðfesting er óvirk: lykilorðið eitt opnar reikninginn.',
+  'checkup.recuperacion':
+    'Ekkert endurheimtarnetfang eða sími: ef þú missir aðgang er engin leið til baka.',
+  'checkup.sesiones': 'Opnar lotur á öðrum tækjum: {count}',
+  'checkup.contrasenas_app': 'Forritalykilorð ónotuð í 90 daga: {count}',
+  'checkup.dispositivos': 'Traust tæki ekki séð í 90 daga: {count}',
+  'checkup.turn_on': 'Kveikja',
+  'checkup.add': 'Bæta við',
+  'checkup.review': 'Yfirfara',
+
   'profile.title': 'Prófíll',
   'profile.name': 'Birtingarnafn',
   'profile.name.hint': 'Hvernig þú birtist í öllum pakkanum.',
@@ -30,25 +47,55 @@ export const is: AppCatalog<typeof en> = {
   'photo.errorRead': 'Ekki tókst að lesa myndina.',
   'sessions.title': 'Opnar lotur',
   'sessions.current': 'Þetta tæki',
+  'sessions.signed_in': 'Innskráð {time}',
   'sessions.close_one': 'Loka þessari lotu',
+  'sessions.close_named': 'Loka lotunni á {device}',
+  'sessions.close_one_confirm':
+    '{device} verður skráð út og þarf að skrá sig inn aftur til að nota aðganginn þinn.',
   'sessions.close_others': 'Loka öllum setum',
   'sessions.close_others_note': 'Þessari líka: þú þarft að skrá þig inn aftur.',
+  'sessions.close_all_confirm':
+    'Öllum lotum verður lokað, líka þessari. Þú þarft að skrá þig inn aftur á hverju tæki.',
   'sessions.empty': 'Engar aðrar lotur eru opnar.',
   'sessions.failed': 'Ekki tókst að sækja loturnar þínar.',
   'common.loading': 'Hleður…',
+  'common.retry': 'Reyna aftur',
   'devices.title': 'Tæki',
   'devices.current': 'Þetta tæki',
   'devices.trusted': 'Treyst',
   'devices.trust': 'Merkja sem treyst',
   'devices.forget': 'Gleyma þessu tæki',
+  'devices.forget_named': 'Gleyma {device}',
+  'devices.forget_confirm':
+    '{device} verður ekki lengur þekkt og missir stöðu sína sem traust tæki. Ný innskráning þaðan telst nýtt tæki.',
   'devices.empty': 'Engin tæki hafa verið þekkt enn.',
   'devices.failed': 'Ekki tókst að sækja tækin þín.',
+  'signature.title': 'Vistuð undirskrift',
+  'signature.help':
+    'Undirskriftin sem þú baðst CertiPDF að muna þegar þú undirritaðir í höndunum. Hún er geymd dulkóðuð á reikningnum þínum.',
+  'signature.empty':
+    'Þú átt enga vistaða undirskrift. Þegar þú undirritar í höndunum í CertiPDF skaltu haka við «Muna undirskriftina mína».',
+  'signature.failed': 'Ekki tókst að hlaða vistuðu undirskriftinni.',
+  'signature.preview': 'Vistaða undirskriftin þín',
+  'signature.saved_on': 'Vistuð {date}',
+  'signature.delete': 'Eyða vistaðri undirskrift',
+  'signature.delete_confirm':
+    'Vistuðu undirskriftinni þinni verður eytt. Skjöl sem þú hefur þegar undirritað halda henni; næst þegar þú undirritar í höndunum þarftu að teikna hana aftur.',
   'security.title': 'Öryggi',
   'security.failed': 'Eitthvað fór úrskeiðis. Reyndu aftur.',
   'security.password.title': 'Lykilorð',
   'security.password.warning': 'Að breyta því skráir þig út alls staðar, líka hér.',
   'security.password.current': 'Núverandi lykilorð',
   'security.password.new': 'Nýtt lykilorð',
+  'security.password.requirements': 'Kröfur til nýja lykilorðsins:',
+  'security.password.req_length': {
+    one: 'Að minnsta kosti {count} stafur',
+    other: 'Að minnsta kosti {count} stafir',
+  },
+  'security.password.req_complexity': 'Bókstafir og að minnsta kosti einn tölustafur',
+  'security.password.req_different': 'Annað en núverandi lykilorð',
+  'security.password.req_met': 'Uppfyllt',
+  'security.password.req_pending': 'Ekki enn',
   'security.password.submit': 'Breyta lykilorði',
   'security.password.done': 'Lykilorði breytt. Öllum lotum var lokað, þar á meðal þessari.',
   'security.password.signin_again': 'Skrá inn aftur',
@@ -71,6 +118,45 @@ export const is: AppCatalog<typeof en> = {
   'security.codes.once':
     'Sýndir einu sinni. Geymdu þá á öruggum stað: hver virkar aðeins einu sinni.',
   'security.codes.saved': 'Ég hef vistað þá',
+  'security.codes.regenerate_confirm':
+    'Núverandi endurheimtarkóðar hætta strax að virka, líka þeir sem þú hefur prentað út eða vistað.',
+  'security.mfa.step.need': 'Áður en þú byrjar',
+  'security.mfa.step.need.heading': 'Það sem þú þarft',
+  'security.mfa.step.need.desc':
+    'Auðkenningarforrit í símanum. Það sýnir nýjan sex stafa kóða á 30 sekúndna fresti.',
+  'security.mfa.step.need.apps_title': 'Hvaða auðkenningarforrit sem er virkar',
+  'security.mfa.step.need.apps':
+    'Til dæmis: Aegis, FreeOTP, Microsoft Authenticator, Google Authenticator, 1Password, Bitwarden. Ef þú átt ekkert slíkt skaltu setja það upp áður en þú heldur áfram.',
+  'security.mfa.step.need.next': 'Byrja',
+  'security.mfa.step.scan': 'Skanna',
+  'security.mfa.step.scan.heading': 'Bættu reikningnum þínum við forritið',
+  'security.mfa.key_label': 'Uppsetningarlykill',
+  'security.mfa.step.code': 'Kóði',
+  'security.mfa.step.code.heading': 'Sláðu inn kóðann úr forritinu',
+  'security.mfa.step.code.desc':
+    'Þannig er gengið úr skugga um að forritið og reikningurinn passi saman áður en kveikt er á þessu.',
+  'security.mfa.code.hint':
+    'Sex tölustafir. Ef hann breytist á meðan þú skrifar skaltu nota þann nýja.',
+  'security.mfa.step.codes.heading': 'Vistaðu endurheimtarkóðana',
+  'security.codes.copy': 'Afrita alla',
+  'security.codes.copied': 'Kóðar afritaðir.',
+  'security.codes.copy_failed': 'Ekki tókst að afrita. Veldu kóðana og afritaðu þá handvirkt.',
+  'security.codes.download': 'Sækja .txt',
+  'security.codes.file_title': 'Endurheimtarkóðar Sytue',
+  'security.codes.file_account': 'Reikningur: {account}',
+  'security.codes.file_date': 'Búið til: {date}',
+  'security.codes.file_note':
+    'Hver kóði virkar einu sinni. Geymdu skrána á öruggum stað, fjarri símanum.',
+  'security.mfa.step.done': 'Lokið',
+  'security.mfa.step.done.heading': 'Kveikt er á tveggja þrepa staðfestingu',
+  'security.mfa.step.done.desc': 'Næst þegar þú skráir þig inn verður beðið um kóða úr forritinu.',
+  'security.mfa.passkey_tip.title': 'Bættu líka við aðgangslykli',
+  'security.mfa.passkey_tip':
+    'Með aðgangslykli skráir þú þig inn með fingrafari, andliti eða skjálás, án þess að slá inn kóða.',
+  'security.mfa.passkey_tip.action': 'Bæta við aðgangslykli',
+  'security.mfa.close': 'Loka',
+  'security.mfa.disable_title': 'Slökkva á tveggja þrepa staðfestingu?',
+  'security.mfa.disable_warning': 'Þá dugir lykilorðið eitt aftur til að opna reikninginn.',
   'common.cancel': 'Hætta við',
   'profile.given_name': 'Fornafn',
   'profile.family_name': 'Eftirnafn',
@@ -81,6 +167,8 @@ export const is: AppCatalog<typeof en> = {
   'profile.locale.hint': 'Notað í öllu Sytue og í skilaboðunum sem við sendum þér.',
   'security.passkeys.title': 'Aðgangslyklar',
   'security.passkeys.remove': 'Fjarlægja',
+  'security.passkeys.remove_named': 'Fjarlægja {name}',
+  'security.passkeys.remove_confirm': 'Þú getur ekki lengur skráð þig inn með {name}.',
   'security.passkeys.unnamed': 'Ónefndur lykill',
   'app_passwords.title': 'Forritalykilorð',
   'app_passwords.hint':
@@ -89,6 +177,9 @@ export const is: AppCatalog<typeof en> = {
   'app_passwords.label.hint': 'Til dæmis: póstur á fartölvu, sími.',
   'app_passwords.create': 'Búa til lykilorð',
   'app_passwords.revoke': 'Afturkalla',
+  'app_passwords.revoke_named': 'Afturkalla {label}',
+  'app_passwords.revoke_confirm':
+    'Forrit sem nota {label} geta ekki lengur skráð sig inn. Ekki er hægt að afturkalla þetta.',
   'app_passwords.empty': 'Engin forritalykilorð enn.',
   'app_passwords.failed': 'Ekki tókst að sækja forritalykilorðin þín.',
   'app_passwords.unnamed': 'Ónefnt',

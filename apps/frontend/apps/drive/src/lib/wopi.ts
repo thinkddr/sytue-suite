@@ -35,7 +35,7 @@ export function extensionOf(name: string): string {
 }
 
 /**
- * Formatos que Sytue Docs sabe abrir (services/docs/internal/domain/import.go).
+ * Formatos que Sytue Docs sabe abrir (apps/nucleo/office/model/import.go).
  *
  * Es una lista fija y no una pregunta al servidor: son los formatos que el propio
  * editor de la suite convierte, no los de un editor que despliegue otro, así que no

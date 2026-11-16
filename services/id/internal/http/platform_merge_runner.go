@@ -5,6 +5,9 @@ package http
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"log/slog"
 	"time"
 
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
@@ -21,32 +24,59 @@ import (
 // la fusión a mitad. Se usa un contexto propio con un tope generoso.
 const mergeTimeout = 30 * time.Minute
 
-// runMerge arranca la fusión en segundo plano. Idempotente frente a llamadas
-// solapadas: StartOrgMerge solo transiciona desde pending/failed, así que una
-// segunda petición sobre una fusión ya en curso no lanza un segundo proceso.
-func (s *Server) runMerge(mergeID, sourceSlug, targetSlug, sourceOrgID, targetOrgID string) {
-	ctx := context.Background()
-	if err := s.store.StartOrgMerge(ctx, mergeID); err != nil {
-		s.log.Warn("merge: no se pudo marcar en curso (¿ya lo estaba?)",
-			"merge_id", mergeID, "error", err)
+// wakeMergeRunner coalesces requests for already persisted intents. Requests
+// never start an additional acquisition/worker goroutine in this replica.
+func (s *Server) wakeMergeRunner() {
+	if s.mergeRunner == nil {
 		return
 	}
-	go func() { //nolint:contextcheck // contexto propio deliberado: heredar el de la petición abortaría la fusión al responder 202.
-		ctx, cancel := context.WithTimeout(context.Background(), mergeTimeout)
-		defer cancel()
-		if err := s.executeMerge(ctx, mergeID, sourceSlug, targetSlug, sourceOrgID, targetOrgID); err != nil {
-			s.log.Error("merge: fallo", "merge_id", mergeID, "error", err)
-			if err := s.store.FinishOrgMerge(context.Background(), mergeID, err.Error()); err != nil {
-				s.log.Error("merge: no se pudo registrar el fallo", "merge_id", mergeID, "error", err)
-			}
-			return
+	select {
+	case s.mergeRunner.wake <- struct{}{}:
+	default:
+	}
+}
+
+func (s *Server) runOwnedMerge(ctx context.Context, mergeID, sourceSlug, targetSlug, sourceOrgID, targetOrgID string) {
+	owner, err := merge.AcquireOwnership(ctx, s.cfg.DatabaseDSN, mergeID)
+	if errors.Is(err, pg.ErrSessionLockBusy) {
+		return
+	}
+	if err != nil {
+		s.log.Error("merge: cannot acquire job ownership", "merge_id", mergeID, "error", err)
+		return
+	}
+	defer closeMergeOwnership(ctx, s.log, owner)
+	execution := &mergeExecution{Server: s, store: s.store.WithDatabase(owner.Identity()), owner: owner}
+	if err := execution.store.StartOwnedOrgMerge(ctx, mergeID); err != nil {
+		s.log.Warn("merge: cannot start owned job", "merge_id", mergeID, "error", err)
+		return
+	}
+	if err := execution.executeMerge(ctx, mergeID, sourceSlug, targetSlug, sourceOrgID, targetOrgID); err != nil {
+		s.log.Error("merge: fallo", "merge_id", mergeID, "error", err)
+		if err := execution.store.FinishOrgMerge(ctx, mergeID, err.Error()); err != nil {
+			s.log.Error("merge: cannot persist owned failure; recovery remains pending", "merge_id", mergeID, "error", err)
 		}
-		if err := s.store.FinishOrgMerge(context.Background(), mergeID, ""); err != nil {
-			s.log.Error("merge: no se pudo cerrar", "merge_id", mergeID, "error", err)
-		}
-		s.log.Info("merge: completada", "merge_id", mergeID,
-			"origen", sourceSlug, "destino", targetSlug)
-	}()
+		return
+	}
+	if err := execution.store.FinishOrgMerge(ctx, mergeID, ""); err != nil {
+		s.log.Error("merge: cannot complete owned job; recovery remains pending", "merge_id", mergeID, "error", err)
+		return
+	}
+	s.log.Info("merge: completada", "merge_id", mergeID, "origen", sourceSlug, "destino", targetSlug)
+}
+
+type mergeExecution struct {
+	*Server
+	store *store.Store
+	owner *merge.Ownership
+}
+
+func closeMergeOwnership(ctx context.Context, logger *slog.Logger, owner *merge.Ownership) {
+	cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	defer cancel()
+	if err := owner.Close(cleanup); err != nil {
+		logger.Warn("merge: closing ownership sessions", "error", err)
+	}
 }
 
 // auditMerge deja constancia de UN paso de la fusión en el registro de
@@ -62,7 +92,7 @@ func (s *Server) runMerge(mergeID, sourceSlug, targetSlug, sourceOrgID, targetOr
 // escribir una fila de registro sería peor que la fusión sin registro, y el
 // progreso real se puede reconstruir desde `org_merges`. Queda en el log a nivel
 // error, que es lo que dispara la alerta.
-func (s *Server) auditMerge(ctx context.Context, mergeID, orgID, action, service string, detail map[string]any) {
+func (s *mergeExecution) auditMerge(ctx context.Context, mergeID, orgID, action, service string, detail map[string]any) {
 	d := map[string]any{
 		"at":      time.Now().UTC().Format(time.RFC3339),
 		"service": service,
@@ -88,26 +118,60 @@ func (s *Server) auditMerge(ctx context.Context, mergeID, orgID, action, service
 // organización con parte de sus datos ya movidos, pero SIGUEN pudiendo entrar y
 // la fusión se reanuda. Al revés —identidad primero— un fallo dejaría a esos
 // usuarios en el destino sin sus datos y sin forma de volver.
-func (s *Server) executeMerge(ctx context.Context, mergeID, sourceSlug, targetSlug, sourceOrgID, targetOrgID string) error {
-	// Preflight antes de tocar la primera fila: comprueba que las diez bases son
-	// alcanzables y que ninguna tabla se quedaría fuera por falta de política.
-	if err := merge.Preflight(ctx, s.cfg.DatabaseDSN); err != nil {
+func (s *mergeExecution) executeMerge(ctx context.Context, mergeID, sourceSlug, targetSlug, sourceOrgID, targetOrgID string) (resultErr error) {
+	committed, err := s.mergeIdentityCommitted(ctx, sourceOrgID, targetOrgID)
+	if err != nil {
 		return err
 	}
+	if committed {
+		if err := merge.CompleteOwnedAdmission(ctx, s.owner, sourceSlug, targetSlug); err != nil {
+			return err
+		}
+		return s.store.MarkMergeService(ctx, mergeID, "identity", "completed")
+	}
+	admission, err := merge.PrepareOwnedAdmission(ctx, s.owner, sourceSlug, targetSlug)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if resultErr != nil {
+			resultErr = s.settleFailedMergeAdmission(ctx, admission, sourceOrgID, targetOrgID, resultErr)
+		}
+	}()
+	return s.executePreparedMerge(ctx, mergeID, sourceSlug, targetSlug, sourceOrgID, targetOrgID, admission)
+}
+
+func (s *mergeExecution) mergeIdentityCommitted(ctx context.Context, sourceOrgID, targetOrgID string) (bool, error) {
+	return s.store.MergeIdentityOutcome(ctx, sourceOrgID, targetOrgID)
+}
+
+func (s *mergeExecution) settleFailedMergeAdmission(ctx context.Context, admission *merge.Admission, sourceOrgID, targetOrgID string, cause error) error {
+	// A lost ID COMMIT ACK is not proof of rollback. Observe the authoritative
+	// identity on a fresh read before deciding whether source can reopen.
+	cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+	defer cancel()
+	committed, err := s.mergeIdentityCommitted(cleanup, sourceOrgID, targetOrgID)
+	if err != nil {
+		return errors.Join(cause, fmt.Errorf("merge: identity outcome unknown; admission remains closed: %w", err))
+	}
+	if committed {
+		err = admission.Complete(cleanup)
+	} else {
+		err = admission.Abort(cleanup)
+	}
+	return errors.Join(cause, err)
+}
+
+func (s *mergeExecution) executePreparedMerge(ctx context.Context, mergeID, sourceSlug, targetSlug, sourceOrgID, targetOrgID string, admission *merge.Admission) error {
 	for _, svc := range merge.Services {
 		if err := s.store.MarkMergeService(ctx, mergeID, svc, "running"); err != nil {
 			return err
 		}
-		dsn, err := merge.DSNForDatabase(s.cfg.DatabaseDSN, svc)
-		if err != nil {
-			return err
+		database := s.owner.Service(svc)
+		if database == nil {
+			return fmt.Errorf("merge: service %s not owned", svc)
 		}
-		pool, err := pg.Connect(ctx, pg.Config{DSN: dsn, MaxConns: 2})
-		if err != nil {
-			return err
-		}
-		res, err := merge.MoveService(ctx, pool, sourceSlug, targetSlug, s.documentCallRevoker())
-		pool.Close()
+		res, err := merge.MoveService(ctx, database, sourceSlug, targetSlug, s.documentCallRevoker())
 		if err != nil {
 			_ = s.store.MarkMergeService(ctx, mergeID, svc, "failed")
 			return err
@@ -149,7 +213,7 @@ func (s *Server) executeMerge(ctx context.Context, mergeID, sourceSlug, targetSl
 	// Que los diez MoveService no dieran error no demuestra que no quede nada:
 	// declaran movido lo que vieron al abrir su transacción, y el origen estuvo
 	// escribiendo todo el rato. Por eso se cuenta, y por eso se cuenta aquí.
-	restos, err := merge.Verify(ctx, s.cfg.DatabaseDSN, sourceSlug)
+	restos, err := merge.VerifyOwned(ctx, s.owner, sourceSlug)
 	if err != nil {
 		return err
 	}
@@ -177,6 +241,9 @@ func (s *Server) executeMerge(ctx context.Context, mergeID, sourceSlug, targetSl
 	moved, err := s.store.MergeIdentity(ctx, sourceOrgID, targetOrgID)
 	if err != nil {
 		_ = s.store.MarkMergeService(ctx, mergeID, "identity", "failed")
+		return err
+	}
+	if err := admission.Complete(ctx); err != nil {
 		return err
 	}
 	s.log.Info("merge: identidad movida", "merge_id", mergeID, "miembros", moved)

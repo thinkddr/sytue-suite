@@ -25,13 +25,13 @@ import {
   ToastProvider,
   useToast,
   formatBytes,
+  CopyField,
 } from '@sytue/ui';
 import type { TableColumn } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import type { StorageView } from '../lib/cloud.js';
 import { useT } from '../i18n/index.js';
 import { postBff, notifyDemoIfNeeded, demoDesc } from '../lib/bff-client.js';
-import { CopyField } from './CopyField.js';
 import DemoBanner from './DemoBanner.js';
 
 /** Mismo tope que el BFF (lib/cloud.ts MAX_UPLOAD_BYTES), para decirlo antes. */
@@ -213,8 +213,16 @@ function Inner({ project, storage, live, locale, error }: Props) {
             <Badge tone="accent">{t('storage.injected')}</Badge>
           </CardHeader>
           <CardBody class="grid gap-4 sm:grid-cols-2">
-            <CopyField t={t} label={t('storage.endpoint')} value={storage.endpoint} />
-            <CopyField t={t} label={t('storage.accessKey')} value={storage.accessKey} />
+            <CopyField
+              labelWidth="stacked"
+              label={t('storage.endpoint')}
+              value={storage.endpoint}
+            />
+            <CopyField
+              labelWidth="stacked"
+              label={t('storage.accessKey')}
+              value={storage.accessKey}
+            />
           </CardBody>
         </Card>
 
@@ -264,7 +272,7 @@ function Inner({ project, storage, live, locale, error }: Props) {
           <Card>
             <CardBody class="p-0">
               <EmptyState
-                illustration={<Icon name="bucket" size={24} />}
+                icon="bucket"
                 title={t('storage.empty.title')}
                 description={t('storage.empty.desc')}
               />

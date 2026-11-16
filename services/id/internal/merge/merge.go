@@ -216,7 +216,7 @@ var tenantTables = pg.ConsultaTablasConTenant
 // que no tiene sentido mover, lo dice en prosa (ServiceResult.Prepared) y ocurre
 // en esta misma transacción. La decisión la escribe quien conoce esos datos, no
 // este bucle.
-func MoveService(ctx context.Context, pool *pg.Pool, source, target string, revokers ...callaccess.Revoker) (ServiceResult, error) {
+func MoveService(ctx context.Context, pool pg.Database, source, target string, revokers ...callaccess.Revoker) (ServiceResult, error) {
 	res := ServiceResult{Rows: map[string]int{}}
 	if source == target {
 		return res, nil
@@ -227,13 +227,17 @@ func MoveService(ctx context.Context, pool *pg.Pool, source, target string, revo
 		if err := notesdb.MarkWriteTransaction(ctx, tx); err != nil {
 			return fmt.Errorf("merge: notes write contract: %w", err)
 		}
-		tables, sinPolitica, err := tenantTables(ctx, tx)
+		inventory, err := pg.ConsultaInventarioDeFusion(ctx, tx)
+		tables, sinPolitica := inventory.Movable, inventory.Missing
 		if err != nil {
 			return err
 		}
 		if len(sinPolitica) > 0 {
 			return fmt.Errorf("merge: sin política de fusión en %s: la reescritura sería muda",
 				strings.Join(sinPolitica, ", "))
+		}
+		if err := pg.CheckScopeBoundMerge(ctx, tx, inventory, source, target); err != nil {
+			return err
 		}
 		if res.Prepared, err = prepare(ctx, tx, source, target); err != nil {
 			return err
@@ -280,18 +284,25 @@ type Leftover struct {
 // verificador que se salte eso no comprueba nada, y además CONFIRMA la fusión —es
 // el peor resultado posible, porque convierte «no lo he mirado» en «está limpio».
 func Verify(ctx context.Context, idDSN, source string) ([]Leftover, error) {
+	return verify(ctx, idDSN, nil, source)
+}
+
+func VerifyOwned(ctx context.Context, owner *Ownership, source string) ([]Leftover, error) {
+	if owner == nil {
+		return nil, fmt.Errorf("merge: missing ownership")
+	}
+	return verify(ctx, "", owner, source)
+}
+
+func verify(ctx context.Context, idDSN string, owner *Ownership, source string) ([]Leftover, error) {
 	var restos []Leftover
 	for _, svc := range Services {
-		dsn, err := DSNForDatabase(idDSN, svc)
+		pool, closeDatabase, err := serviceDatabase(ctx, idDSN, owner, svc)
 		if err != nil {
 			return nil, err
 		}
-		pool, err := pg.Connect(ctx, pg.Config{DSN: dsn, MaxConns: 1})
-		if err != nil {
-			return nil, fmt.Errorf("merge: verificar %s: %w", svc, err)
-		}
 		delSvc, err := LeftoversIn(ctx, pool, svc, source)
-		pool.Close()
+		closeDatabase()
 		if err != nil {
 			return nil, fmt.Errorf("merge: verificar %s: %w", svc, err)
 		}
@@ -304,7 +315,7 @@ func Verify(ctx context.Context, idDSN, source string) ([]Leftover, error) {
 // Verify porque es la parte que se puede probar: un test levanta un esquema real
 // y comprueba que una fila rezagada se ve, mientras que Verify solo repite esto
 // diez veces sobre DSN que en un test no existen.
-func LeftoversIn(ctx context.Context, pool *pg.Pool, service, source string) ([]Leftover, error) {
+func LeftoversIn(ctx context.Context, pool pg.Database, service, source string) ([]Leftover, error) {
 	var restos []Leftover
 	err := pool.InMergeTx(ctx, func(tx pgx.Tx) error {
 		tables, _, err := tenantTables(ctx, tx)
@@ -344,20 +355,38 @@ func LeftoversError(restos []Leftover) error {
 // que ninguna tabla se quedaría fuera por falta de política. Una fusión a medias
 // es cara de deshacer; descubrir en el servicio noveno que falta una política lo
 // sería mucho más.
-func Preflight(ctx context.Context, idDSN string) error {
+func Preflight(ctx context.Context, idDSN, source, target string) error {
+	return preflight(ctx, idDSN, nil, source, target)
+}
+
+func PreflightOwned(ctx context.Context, owner *Ownership, source, target string) error {
+	if owner == nil {
+		return fmt.Errorf("merge: missing ownership")
+	}
+	return preflight(ctx, "", owner, source, target)
+}
+
+func preflight(ctx context.Context, idDSN string, owner *Ownership, source, target string) error {
 	var problemas []string
 	for _, svc := range Services {
-		dsn, err := DSNForDatabase(idDSN, svc)
-		if err != nil {
-			return err
-		}
-		pool, err := pg.Connect(ctx, pg.Config{DSN: dsn, MaxConns: 1})
+		pool, closeDatabase, err := serviceDatabase(ctx, idDSN, owner, svc)
 		if err != nil {
 			problemas = append(problemas, fmt.Sprintf("%s: sin conexión (%v)", svc, err))
 			continue
 		}
-		_, sinPolitica, err := tenantTables(ctx, pool)
-		pool.Close()
+		var sinPolitica []string
+		err = pool.InTx(ctx, func(tx pgx.Tx) error {
+			inventory, err := pg.ConsultaInventarioDeFusion(ctx, tx)
+			if err != nil {
+				return err
+			}
+			sinPolitica = inventory.Missing
+			if len(sinPolitica) > 0 {
+				return nil
+			}
+			return pg.CheckScopeBoundMerge(ctx, tx, inventory, source, target)
+		})
+		closeDatabase()
 		switch {
 		case err != nil:
 			problemas = append(problemas, fmt.Sprintf("%s: %v", svc, err))

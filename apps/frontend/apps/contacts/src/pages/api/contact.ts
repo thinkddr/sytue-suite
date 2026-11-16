@@ -11,7 +11,7 @@
 import type { APIRoute } from 'astro';
 import { getApiSession } from '../../lib/session.js';
 import { cardDavClient, rutaDav } from '../../lib/carddav.js';
-import { buildVcard, newUid, type ContactInput } from '../../lib/vcard.js';
+import { buildVcard, newUid, type ContactInput, type TypedValue } from '../../lib/vcard.js';
 
 export const prerender = false;
 
@@ -49,8 +49,12 @@ export const POST: APIRoute = async (ctx) => {
     phonesDetailed: body.contactInput.phonesDetailed,
     addresses: body.contactInput.addresses,
     birthday: body.contactInput.birthday,
+    anniversary: body.contactInput.anniversary,
+    urls: typedList(body.contactInput.urls),
+    related: typedList(body.contactInput.related),
     organization: body.contactInput.organization,
     title: body.contactInput.title,
+    nickname: body.contactInput.nickname,
     note: body.contactInput.note,
     // vCard base para conservar campos no proyectados (PHOTO/X-*…, y ADR/BDAY si
     // el editor no los gestiona).
@@ -88,4 +92,19 @@ function json(body: unknown, status = 200): Response {
     status,
     headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
   });
+}
+
+/**
+ * Lista de valores tipados del cuerpo, que llega del navegador: lo que no tenga forma
+ * de `{ value, type }` con textos se descarta en vez de romper buildVcard. Ausente
+ * sigue ausente (no gestionado: se conserva lo de la base).
+ */
+function typedList(raw: unknown): TypedValue[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  return raw
+    .filter(
+      (x): x is TypedValue =>
+        typeof x === 'object' && x !== null && typeof (x as TypedValue).value === 'string',
+    )
+    .map((x) => ({ value: x.value, type: typeof x.type === 'string' ? x.type : '' }));
 }

@@ -27,6 +27,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
@@ -141,6 +142,7 @@ type Tokens struct {
 	// se ha atendido bajo su cerrojo, incluso si guardar falló. Se consume antes de
 	// poner los tokens en memoria; no se serializa ni se hereda en otra renovación.
 	persistenciaAtendida bool
+	adopcion             bool // interactive login, never retained in memory or serialized
 }
 
 // nombreDeApariencia deja pasar solo un nombre de color o de forma: letras minúsculas, o
@@ -163,19 +165,23 @@ type Renewer func(ctx context.Context, actuales Tokens) (Tokens, error)
 
 // Session entrega siempre un access token vigente. Es segura entre goroutines.
 type Session struct {
-	mu       sync.Mutex
-	tokens   Tokens
-	renovar  Renewer
-	guardar  func(Tokens) error
-	ahora    func() time.Time
-	revision uint64 // changes whenever tokens are replaced or synchronized
+	mu             sync.Mutex
+	tokens         Tokens
+	renovar        Renewer
+	guardar        func(Tokens) error
+	ahora          func() time.Time
+	actionVersion  uint64
+	actionIdentity atomic.Pointer[ActionIdentity]
+	revision       uint64 // changes whenever tokens are replaced or synchronized
 }
 
 // NewSession arranca con los tokens que hubiera guardados (o ninguno). `guardar` recibe
 // cada juego nuevo —y uno vacío al cerrar sesión—; en la web es nil.
 func NewSession(guardados Tokens, renovar Renewer, guardar func(Tokens) error) *Session {
 	guardados.persistenciaAtendida = false
-	return &Session{tokens: guardados, renovar: renovar, guardar: guardar, ahora: time.Now}
+	session := &Session{tokens: guardados, renovar: renovar, guardar: guardar, ahora: time.Now, actionVersion: 1}
+	session.cacheActionIdentity()
+	return session
 }
 
 // AccessToken devuelve el token vigente, renovándolo antes si le queda menos del Margen.
@@ -245,12 +251,14 @@ func (s *Session) Invalidate(rechazado string) {
 // dejaba hablando con la sesión vacía de antes del login.
 func (s *Session) Adoptar(t Tokens) {
 	if err := s.AdoptarCon(context.Background(), t); err != nil {
-		slog.Warn("auth: no se pudo bloquear el inicio de sesión", "error", err)
+		slog.Warn("auth: no se pudo adoptar el inicio de sesión", "error", err)
 	}
 }
 
 // AdoptarCon es Adoptar con el plazo del login para esperar una renovación de otra
-// app. Un login cancelado no escribe después de que su contexto haya terminado.
+// app. Un login cancelado no escribe después de que su contexto haya terminado. Si
+// no se puede guardar, devuelve el error y la sesión conserva los tokens anteriores:
+// un login que no es durable no se adopta.
 func (s *Session) AdoptarCon(ctx context.Context, t Tokens) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -261,6 +269,8 @@ func (s *Session) AdoptarCon(ctx context.Context, t Tokens) error {
 	defer soltar()
 	// Adoptar siempre guarda, incluso si le reenvían un resultado de Compartida.
 	t.persistenciaAtendida = false
+	t.adopcion = true
+	s.actionVersion++
 	return s.poner(t)
 }
 
@@ -355,6 +365,13 @@ func reclamosDe(jwt string, en any) bool {
 func (s *Session) Sincronizar(t Tokens) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	before := s.identityLocked()
+	defer func() {
+		if before != s.identityLocked() {
+			s.actionVersion++
+		}
+		s.cacheActionIdentity()
+	}()
 	s.revision++
 	if t.Refresh == "" || t.Subject != s.tokens.Subject || t.Organizacion != organizacionDe(s.tokens) || t.Issuer != s.tokens.Issuer || t.Cliente != s.tokens.Cliente {
 		t.persistenciaAtendida = false
@@ -371,25 +388,72 @@ func (s *Session) Sincronizar(t Tokens) {
 // bloqueos es el de AccessToken: primero esta Session, después el de los procesos.
 // Se espera al propietario vivo; salir con un plazo y escribir sin exclusión
 // permitiría que su renovación guardara después y resucitara la sesión.
-func (s *Session) Logout() error {
+func (s *Session) Logout() error { return s.LogoutCon(context.Background()) }
+
+// LogoutCon is the legacy logout API with a caller's bounded lock wait.
+func (s *Session) LogoutCon(ctx context.Context) error { return s.LogoutConGuardia(ctx, nil, nil) }
+
+// LogoutConGuardia runs a captured-action guard under both session locks. Local
+// cleanup follows confirmed persistence under the same lock so a new login cannot
+// install credentials between deletion and cleanup. Callbacks perform no network.
+func (s *Session) LogoutConGuardia(ctx context.Context, guard, cleanup func() error) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	// La memoria queda vacía incluso si el broker o el disco no dejan cerrar.
-	s.replaceTokens(Tokens{})
-	soltar, err := ajustes.CerrojoSesion(context.Background())
-	if err != nil {
-		return errors.Join(err, ajustes.PonerAccesoDrive("", false))
+	if guard != nil {
+		if err := guard(); err != nil {
+			return err
+		}
+	} else {
+		s.replaceTokens(Tokens{})
 	}
-	defer soltar()
-	// A diferencia de un guardado ordinario, un error aquí no es recuperable
-	// conservando la sesión: el llamador debe comunicar que no se pudo retirar.
-	return guardarTokens(Tokens{}, s.guardar)
+	release, err := ajustes.CerrojoSesion(ctx)
+	if err != nil {
+		if guard != nil {
+			return err
+		}
+		final, cancel := context.WithTimeout(context.WithoutCancel(ctx), 250*time.Millisecond)
+		defer cancel()
+		return errors.Join(err, ajustes.PonerAccesoDriveCon(final, "", false))
+	}
+	defer release()
+	if guard != nil {
+		if err := guard(); err != nil {
+			return err
+		}
+		s.replaceTokens(Tokens{})
+	}
+	if err := guardarTokens(Tokens{}, s.guardar); err != nil {
+		return err
+	}
+	if cleanup != nil {
+		return cleanup()
+	}
+	return nil
 }
 
 func (s *Session) poner(t Tokens) error {
 	atendida := t.persistenciaAtendida
 	t.persistenciaAtendida = false
-	s.replaceTokens(t)
+	stored := t
+	stored.adopcion = false
+	if t.adopcion {
+		// An interactive login is only adopted once it is durable. Otherwise this
+		// process would act as the new identity while every other app, and this
+		// one after a restart, still holds the previous login. The previous tokens
+		// stay in memory because they are what the store still contains; the
+		// caller reports the error and must not confirm the transition.
+		if err := guardarTokens(t, s.guardar); err != nil {
+			if errors.Is(err, ErrSesionNoDisponible) {
+				s.replaceTokens(Tokens{})
+			} else {
+				s.cacheActionIdentity()
+			}
+			return err
+		}
+		s.replaceTokens(stored)
+		return nil
+	}
+	s.replaceTokens(stored)
 	if atendida {
 		return nil
 	}
@@ -402,16 +466,22 @@ func (s *Session) poner(t Tokens) error {
 
 // replaceTokens requires mu. Revisions are never reused, even for identical tokens.
 func (s *Session) replaceTokens(t Tokens) {
+	before := s.identityLocked()
 	s.revision++
 	s.tokens = t
+	if before != s.identityLocked() {
+		s.actionVersion++
+	}
+	s.cacheActionIdentity()
 }
 
 func guardarTokens(t Tokens, guardar func(Tokens) error) error {
 	if guardar == nil {
 		return nil
 	}
-	// Un fallo ordinario al guardar permite esta ejecución. ErrSesionNoDisponible
-	// exige además olvidar lo recibido: el broker puede haber cerrado otra sesión.
+	// Un fallo ordinario al guardar una renovación permite esta ejecución; uno al
+	// adoptar un login interactivo no (ver poner). ErrSesionNoDisponible exige
+	// además olvidar lo recibido: el broker puede haber cerrado otra sesión.
 	if err := guardar(t); err != nil {
 		slog.Warn("auth: no se pudo guardar la sesión", "error", err)
 		return err
@@ -513,4 +583,59 @@ func conservar(nuevos, viejos Tokens) Tokens {
 		nuevos.OrgColor, nuevos.OrgForma = viejos.OrgColor, viejos.OrgForma
 	}
 	return nuevos
+}
+
+// LogoutConTestigo closes only the login that was drained. A concurrent login
+// remains intact both in this process and in the shared credential store. Unlike
+// the classic Logout API, a failed persistence keeps memory available for retry.
+//
+//nolint:contextcheck // Native credential callbacks have their own deadline.
+func (s *Session) LogoutConTestigo(ctx context.Context, store *AlmacenSesion, witness TestigoTrabajo) error {
+	return s.LogoutConTestigoConLimpieza(ctx, store, witness, nil)
+}
+
+// LogoutConTestigoConLimpieza performs local data cleanup while the captured
+// identity still owns both session locks. Cleanup must not perform network IO.
+// A cleanup failure retains credentials and memory so the same action can retry.
+//
+//nolint:contextcheck // Native credential callbacks have their own deadline.
+func (s *Session) LogoutConTestigoConLimpieza(ctx context.Context, store *AlmacenSesion, witness TestigoTrabajo, cleanup func() error) error {
+	if available, err := ajustes.EstadoTrabajoSesionCompartido(); err != nil || !available {
+		return errors.Join(ajustes.ErrTrabajoCompartidoNoDisponible, err)
+	}
+	if store == nil || witness.Almacen != store.Identificador() {
+		return ErrTrabajoSesion
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.identityLocked().IdentidadSesion() != witness.Acceso.Identidad {
+		return ErrTrabajoSesion
+	}
+	release, err := ajustes.CerrojoSesion(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+	current, err := ajustes.LeerAccesoSesion(witness.Almacen)
+	if err != nil || !current.Activo || current.Identidad != witness.Acceso.Identidad || current.Revision != witness.Acceso.Revision {
+		return errors.Join(ErrTrabajoSesion, err)
+	}
+	persisted, err := store.Cargar()
+	if err != nil {
+		return err
+	}
+	identity := IdentitySnapshot{store.emisor, store.cliente, persisted.Subject, organizacionDe(persisted)}
+	if persisted.Refresh == "" || identity.IdentidadSesion() != witness.Acceso.Identidad {
+		return ErrTrabajoSesion
+	}
+	if cleanup != nil {
+		if err := cleanup(); err != nil {
+			return err
+		}
+	}
+	if err := store.Guardar(Tokens{}); err != nil {
+		return err
+	}
+	s.replaceTokens(Tokens{})
+	return nil
 }

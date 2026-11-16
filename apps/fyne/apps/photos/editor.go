@@ -48,6 +48,8 @@ type Editor struct {
 	Lienzo *LienzoEditor
 	// Cargando es «todavía no ha llegado la foto»: la rueda en el hueco del lienzo.
 	Cargando, Guardando bool
+	// Pendiente keeps the captured attempt available for exact retry before editing.
+	Pendiente bool
 	// Aviso es el `role="status"` del pie del panel.
 	Aviso string
 	// VolverDrive cambia «Volver a la galería» por «Volver a Sytue Drive»: la foto se
@@ -144,7 +146,7 @@ func cabeceraEditor(v Vista, d Editor) fyne.CanvasObject {
 	}
 	deshacer := ui.NuevoBotonIcono(iconos.Deshacer, v.Traduce("editor.undo"), d.AlDeshacer)
 	deshacer.Lado, deshacer.TamIcono = ui.LadoIconoMD, IconoMando
-	deshacer.Inerte = len(d.Receta.Pasos) == 0
+	deshacer.Inerte = d.Pendiente || d.Guardando || len(d.Receta.Pasos) == 0
 	guardar := ui.NuevoBoton(v.Traduce("editor.save"), d.AlGuardar).Con(ui.Primario, ui.TallaSM)
 	guardar.Cargando, guardar.Inerte = d.Guardando, !d.Sucia
 	textoEstado := ParrafoEn(estado, tema.TextoXS, ui.Normal, "text-muted", v.Variante)
@@ -194,13 +196,18 @@ func sinColor(r api.Receta) api.Receta {
 // toque, el aviso y los atajos.
 func panelEditor(v Vista, d Editor) fyne.CanvasObject {
 	var cuerpo []ui.Bloque
-	if d.PestanaIA {
+	switch {
+	case d.Pendiente:
+		cuerpo = nil
+	case d.PestanaIA:
 		cuerpo = pestanaIA(v, d)
-	} else {
+	default:
 		cuerpo = pestanaAjustes(v, d)
 	}
 	bloques := make([]ui.Bloque, 0, 1+len(cuerpo)+2)
-	bloques = append(bloques, ui.Bloque{Obj: pestanasEditor(v, d), Margen: tema.Espacio(1) + HuecoPanel})
+	if !d.Pendiente {
+		bloques = append(bloques, ui.Bloque{Obj: pestanasEditor(v, d), Margen: tema.Espacio(1) + HuecoPanel})
+	}
 	for _, b := range cuerpo {
 		b.Margen += HuecoPanel
 		bloques = append(bloques, dentro(b))
@@ -439,18 +446,18 @@ func estiloOpcion(v tema.Variante, b *BotonEditor) (fondo, borde, tinta color.NR
 
 // ---- El fondo del lienzo ----
 
-// Las muestras de los cuatro fondos son LITERALES de la web, no tokens: son el color de
-// un papel (`bg-[#faf9f6]`, `border-[#d8d3c6]`…) y los grises por defecto de Tailwind 4
-// (`gray-300`, `gray-700`) y el `#cbd5e1` del damero.
-var (
-	bordeMuestra = map[FondoLienzo]color.NRGBA{
-		FondoCrema:  {R: 0xd8, G: 0xd3, B: 0xc6, A: 255},
-		FondoBlanco: {R: 0xd1, G: 0xd5, B: 0xdc, A: 255},
-		FondoOscuro: {R: 0x36, G: 0x41, B: 0x53, A: 255},
-		FondoDamero: {R: 0xd1, G: 0xd5, B: 0xdc, A: 255},
+// bordeMuestra es el borde de la muestra de cada fondo y cuadroDamero, los cuadros de la
+// del damero: los de `clasesMuestraFondo`, de la escala de neutros como el relleno. Los
+// cuadros van un escalón más oscuros que los del lienzo (neutral-300 y no 200): con
+// baldosas de 6 px en un círculo de 12, los del lienzo apenas se verían.
+func bordeMuestra(f FondoLienzo) color.NRGBA {
+	if f == FondoOscuro {
+		return tema.Color("neutral-700", tema.Claro)
 	}
-	cuadroDamero = color.NRGBA{R: 0xcb, G: 0xd5, B: 0xe1, A: 255}
-)
+	return tema.Color("neutral-300", tema.Claro)
+}
+
+func cuadroDamero() color.NRGBA { return tema.Color("neutral-300", tema.Claro) }
 
 // muestraFondo es el círculo de color de un fondo (`rounded-full border`), de ese lado
 // y con la baldosa del damero de `baldosa` px (`bg-[length:…]`): la de la barra
@@ -467,7 +474,7 @@ func muestraFondo(f FondoLienzo, lado, baldosa float32) *iconos.Dibujo {
 	l, r, paso := float64(lado), float64(lado)/2, float64(baldosa)
 	var b strings.Builder
 	fmt.Fprintf(&b, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %[1]g %[1]g" width="%[1]g" height="%[1]g">`, l)
-	fmt.Fprintf(&b, `<circle cx="%[1]g" cy="%[1]g" r="%[1]g" fill="%[2]s"/>`, r, hex(bordeMuestra[f]))
+	fmt.Fprintf(&b, `<circle cx="%[1]g" cy="%[1]g" r="%[1]g" fill="%[2]s"/>`, r, hex(bordeMuestra(f)))
 	fmt.Fprintf(&b, `<circle cx="%[1]g" cy="%[1]g" r="%[2]g" fill="%[3]s"/>`, r, r-1, hex(f.colorFondo()))
 	if f == FondoDamero {
 		// El 0 %–25 % del gradiente cónico es el cuarto de arriba a la derecha de cada
@@ -481,7 +488,7 @@ func muestraFondo(f FondoLienzo, lado, baldosa float32) *iconos.Dibujo {
 					if len(p) < 3 {
 						continue
 					}
-					fmt.Fprintf(&b, `<path fill="%s" d="M`, hex(cuadroDamero))
+					fmt.Fprintf(&b, `<path fill="%s" d="M`, hex(cuadroDamero()))
 					for i, v := range p {
 						if i > 0 {
 							b.WriteString(" L")

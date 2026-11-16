@@ -33,17 +33,15 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 
-	"git.sytue.eu/sytue/one/apps/nucleo/api"
-	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
-
-	"git.sytue.eu/sytue/one/apps/fyne/agenda"
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
 // Estado son los seis estados de pantalla del encargo.
-type Estado = agenda.Estado
+type Estado = ui.Estado
 
 // AccionLote es lo que hace un botón de la barra de lote.
 type AccionLote uint8
@@ -192,11 +190,21 @@ type Pantalla struct {
 	// AlServiciosVinculados abre libretas vivas de las cuentas externas.
 	AlServiciosVinculados func()
 
+	// Cursor es la fila del cursor del teclado (índice en Contactos): la parada del
+	// tabulador de la lista y desde donde se mueven j/k y las flechas.
+	Cursor int
+
 	// Lo que NO se rehace al repintar: ver buscadorVivo y listaViva.
 	buscador *ui.Entrada
 	callando bool // el buscador se está poniendo al día desde fuera
 	virtual  *widget.List
 	cuerpo   fyne.CanvasObject
+	// filas es qué índice enseña cada fila que la lista ha rellenado (ver tecladoDeFila).
+	filas map[*FilaContacto]int
+	// filasLista son las filas de la lista virtual, cabeceras A–Z incluidas, y filaDe
+	// la fila de cada contacto (ver montarFilas).
+	filasLista []filaLista
+	filaDe     []int
 }
 
 func (p *Pantalla) t(clave string, vars i18n.Vars) string {
@@ -305,7 +313,7 @@ func (p *Pantalla) menu() fyne.CanvasObject {
 	}
 	// ConCabecera y no `l.Cabecera = crear`: es quien lo marca «sobre cromo», y sin eso
 	// el botón primario sale tinta sobre la tinta del menú, sin contorno.
-	l := ui.NuevoLateral(p.t("nav.views", nil), agenda.EnColumna(0, bloques...)).ConCabecera(crear)
+	l := ui.NuevoLateral(p.t("nav.views", nil), ui.EnColumna(0, bloques...)).ConCabecera(crear)
 	// El pie es el de `footer={<ImportData domains={['contacts']} …/>}`, «Trae tus
 	// contactos»: solo sale si la organización ha conectado Google o Microsoft 365. Sin
 	// él no hay pie: ni franja ni filete (en la web, `empty:hidden` en Sidebar.tsx).
@@ -471,7 +479,7 @@ func textoDeMenu(s string) fyne.CanvasObject {
 func (p *Pantalla) errorDeMenu(clave string, reintentar func()) fyne.CanvasObject {
 	otra := ui.NuevoEnlace(p.t("common.retry", nil), tema.TextoSM, ui.SemiNegrita, "sidebar-fg", reintentar)
 	otra.TokenAro, otra.Boton = "sidebar-focus", true
-	return conRelleno(margenTextoMenu, agenda.EnColumna(0.25*tema.Rem,
+	return conRelleno(margenTextoMenu, ui.EnColumna(0.25*tema.Rem,
 		ui.NuevoRotulo(p.t(clave, nil), tema.TextoSM, ui.Normal, "sidebar-fg-muted"), otra))
 }
 

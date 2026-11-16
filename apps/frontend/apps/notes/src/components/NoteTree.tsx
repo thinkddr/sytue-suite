@@ -13,6 +13,7 @@
  * un lector de pantalla no sepa ya leer.
  */
 import type { JSX } from 'preact';
+import { colorDeUsuario } from '@sytue/config';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Button, Dropdown, Icon, IconButton, MenuItem, MenuSeparator, cx } from '@sytue/ui';
 import type { Note, Reminder } from '@sytue/api-clients';
@@ -22,6 +23,7 @@ import { construirArbol, type Nodo } from '../client/arbol.js';
 import { terminada } from '../client/diario.js';
 import { extracto } from '../client/extracto.js';
 import type { ClaroPorNota } from './NoteCanvas.js';
+import { EsqueletoRamas } from './Esqueletos.js';
 import { Glyph, type GlyphName } from './glyphs.js';
 import { RecordatorioEnFila } from './NoteCard.js';
 
@@ -31,6 +33,8 @@ interface Props {
   t: T;
   locale: Locale;
   notes: Note[];
+  /** Las notas del cuaderno aún no han llegado: ramas grises, no «sin notas». */
+  cargando?: boolean;
   claro: ClaroPorNota;
   bloqueado: boolean;
   soloLectura: boolean;
@@ -51,6 +55,9 @@ interface Props {
   onShare?: (note: Note) => void;
   onTags?: (note: Note) => void;
   onBacklinks?: (note: Note) => void;
+  onInfo?: (note: Note) => void;
+  /** Historial de versiones (VersionesNota.tsx). */
+  onVersions?: (note: Note) => void;
   onDelete?: (id: string) => void;
   onIcon?: (note: Note) => void;
   /** Mis recordatorios, por nota. */
@@ -73,7 +80,8 @@ export function NoteTree(p: Props): JSX.Element {
             entero y «Nueva nota» partía en dos líneas. Se vio con el plural sin
             resolver, pero pasa igual con un contador grande o en alemán. */}
         <span class="text-text-muted min-w-0 truncate text-sm font-medium">
-          {p.t('notebook.notes', { count: p.notes.length })}
+          {/* Cargando, el recuento aún sería «0 notas»: mejor nada que un dato falso. */}
+          {p.cargando ? null : p.t('notebook.notes', { count: p.notes.length })}
         </span>
         {/* Solo por debajo de `md`: ahí la barra del cuaderno no se ve y este es
             el único «Nueva nota». En escritorio las dos franjas van juntas y
@@ -90,7 +98,9 @@ export function NoteTree(p: Props): JSX.Element {
           </Button>
         ) : null}
       </div>
-      {arbol.length === 0 && p.onQuitarFiltro ? (
+      {p.cargando ? (
+        <EsqueletoRamas />
+      ) : arbol.length === 0 && p.onQuitarFiltro ? (
         <div class="grid justify-items-start gap-2 p-4" data-sin-coincidencias="">
           <p class="text-text-muted text-base">{p.t('filter.noMatches')}</p>
           <Button size="sm" variant="secondary" onClick={p.onQuitarFiltro}>
@@ -231,7 +241,7 @@ function Rama({ nodo, nivel, ...p }: Props & { nodo: Nodo; nivel: number }): JSX
                 key={s.state_id}
                 aria-label={`${s.tag_name}: ${s.name}`}
                 class="inline-block h-2 w-2 shrink-0 rounded-full"
-                style={{ background: s.color }}
+                style={{ background: colorDeUsuario(s.color) ?? s.color }}
               />
             ))}
           </button>
@@ -286,6 +296,12 @@ function Rama({ nodo, nivel, ...p }: Props & { nodo: Nodo; nivel: number }): JSX
             ) : null}
             {p.onShare ? (
               <MenuItem onClick={() => p.onShare?.(n)}>{p.t('share.toRoom')}</MenuItem>
+            ) : null}
+            {p.onInfo ? (
+              <MenuItem onClick={() => p.onInfo?.(n)}>{p.t('note.info')}</MenuItem>
+            ) : null}
+            {p.onVersions && !p.soloLectura ? (
+              <MenuItem onClick={() => p.onVersions?.(n)}>{p.t('note.versions')}</MenuItem>
             ) : null}
             {p.onBacklinks ? (
               <MenuItem onClick={() => p.onBacklinks?.(n)}>{p.t('backlinks.title')}</MenuItem>

@@ -28,16 +28,7 @@
  *
  * Solo @sytue/ui + tokens del tema (claro y oscuro salen de las variables). §14.
  */
-import {
-  Card,
-  CardBody,
-  CardHeader,
-  CardTitle,
-  Badge,
-  Icon,
-  EmptyState,
-  formatBytes,
-} from '@sytue/ui';
+import { Card, CardBody, CardHeader, CardTitle, Badge, EmptyState, formatBytes } from '@sytue/ui';
 
 /** Percentil por el vecino más cercano, igual que el motor del control-plane. */
 function percentile(values: number[], p: number): number {
@@ -195,7 +186,7 @@ export default function MetricsCard({ metrics, locale }: Props) {
       <Card class="mb-4">
         <CardBody class="p-0">
           <EmptyState
-            illustration={<Icon name="chart" size={24} />}
+            icon="chart"
             title={t('metrics.empty.title')}
             description={t('metrics.empty.desc')}
           />

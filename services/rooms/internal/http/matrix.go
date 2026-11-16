@@ -3,6 +3,12 @@ package chathttp
 
 import (
 	"net/http"
+	"strconv"
+
+	"git.sytue.eu/sytue/one/apps/nucleo/recoverywrap"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
+	"git.sytue.eu/sytue/one/services/rooms/internal/domain"
+	"git.sytue.eu/sytue/one/services/rooms/internal/service"
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 )
@@ -20,7 +26,16 @@ func (h *Handlers) MatrixBootstrap(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) MatrixStorageBootstrap(w http.ResponseWriter, r *http.Request) {
 	actor, _ := caller(r)
-	result, err := h.svc.BootstrapMatrixStorage(r.Context(), actor, r.URL.Query().Get("product"))
+	version := storage.LegacyIdentity
+	if raw, ok := r.URL.Query()["identity_version"]; ok {
+		n, err := strconv.Atoi(raw[0])
+		version = storage.IdentityVersion(n)
+		if len(raw) != 1 || err != nil || !version.Valid() {
+			httpx.Fail(w, r, toAPIError(domain.ErrInvalidInput))
+			return
+		}
+	}
+	result, err := h.svc.BootstrapMatrixStorageForIdentity(r.Context(), actor, r.URL.Query().Get("product"), version)
 	if err != nil {
 		httpx.Fail(w, r, toAPIError(err))
 		return
@@ -77,7 +92,8 @@ func (h *Handlers) MatrixRecoveryKey(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, r, http.StatusOK, map[string]string{"recovery_key": key})
 }
 
-// StoreMatrixRecoveryKey custodia la clave que el navegador acaba de generar.
+// StoreMatrixRecoveryKey ya no custodia nada (ADR 0082): responde 410 para que un
+// cliente viejo no crea que su clave quedó guardada.
 func (h *Handlers) StoreMatrixRecoveryKey(w http.ResponseWriter, r *http.Request) {
 	actor, _ := caller(r)
 	var req struct {
@@ -92,4 +108,67 @@ func (h *Handlers) StoreMatrixRecoveryKey(w http.ResponseWriter, r *http.Request
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// MatrixRecoveryWrappers devuelve los envoltorios de la clave de recuperación de
+// una cuenta de quien llama (ADR 0082). Sin parámetros es la cuenta de Rooms;
+// `product` (e `identity_version=2` para la cuenta aislada de ese producto en la
+// organización de la petición) elige una cuenta de almacenamiento.
+func (h *Handlers) MatrixRecoveryWrappers(w http.ResponseWriter, r *http.Request) {
+	actor, _ := caller(r)
+	account, ok := recoveryAccount(r)
+	if !ok {
+		httpx.Fail(w, r, toAPIError(domain.ErrInvalidInput))
+		return
+	}
+	result, err := h.svc.MatrixRecoveryWrappers(r.Context(), actor, account)
+	if err != nil {
+		httpx.Fail(w, r, toAPIError(err))
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	httpx.JSON(w, r, http.StatusOK, result)
+}
+
+// PutMatrixRecoveryWrapper guarda un envoltorio hecho en el dispositivo.
+func (h *Handlers) PutMatrixRecoveryWrapper(w http.ResponseWriter, r *http.Request) {
+	actor, _ := caller(r)
+	account, ok := recoveryAccount(r)
+	if !ok {
+		httpx.Fail(w, r, toAPIError(domain.ErrInvalidInput))
+		return
+	}
+	var req recoverywrap.Wrapper
+	if err := httpx.DecodeJSON(w, r, &req); err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
+	id, err := h.svc.PutMatrixRecoveryWrapper(r.Context(), actor, account, req)
+	if err != nil {
+		httpx.Fail(w, r, toAPIError(err))
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	httpx.JSON(w, r, http.StatusOK, map[string]string{"id": id})
+}
+
+// recoveryAccount lee `product` e `identity_version` de la consulta. Cada uno a lo
+// sumo una vez; la versión sin producto no elige ninguna cuenta y se rechaza.
+func recoveryAccount(r *http.Request) (service.MatrixRecoveryAccount, bool) {
+	query := r.URL.Query()
+	var account service.MatrixRecoveryAccount
+	if raw, ok := query["product"]; ok {
+		if len(raw) != 1 || raw[0] == "" {
+			return account, false
+		}
+		account.Product = raw[0]
+	}
+	if raw, ok := query["identity_version"]; ok {
+		n, err := strconv.Atoi(raw[0])
+		account.IdentityVersion = storage.IdentityVersion(n)
+		if len(raw) != 1 || err != nil || !account.IdentityVersion.Valid() || account.Product == "" {
+			return account, false
+		}
+	}
+	return account, true
 }

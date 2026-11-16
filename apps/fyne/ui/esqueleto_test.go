@@ -9,6 +9,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/test"
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 )
@@ -72,6 +73,25 @@ func TestLaMedidaDelEsqueletoEsLaDeLaHoja(t *testing.T) {
 	e := NuevoEsqueleto(80, 12)
 	if m, d := MedidaEsqueleto(e), e.MinSize(); m != d {
 		t.Errorf("MedidaEsqueleto dice %v y MinSize %v: la medida se declara UNA vez (regla 2)", m, d)
+	}
+}
+
+// TestElEsqueletoEnPorcentajeOcupaEsaParteDelAncho es el `width="62%"`: el contenedor
+// le da todo el ancho y el bloque pinta solo esa parte, pegado a la izquierda, sin pedir
+// ancho mínimo (el porcentaje lo decide el padre, como en CSS).
+func TestElEsqueletoEnPorcentajeOcupaEsaParteDelAncho(t *testing.T) {
+	e := NuevoEsqueletoFraccion(0.62, 0)
+	if m := e.MinSize(); m.Width != 0 || m.Height != AltoEsqueleto {
+		t.Errorf("una línea al 62 %% pide %v y tiene que pedir 0×%g", m, float32(AltoEsqueleto))
+	}
+	e.Resize(fyne.NewSize(200, AltoEsqueleto))
+	r := test.WidgetRenderer(e).(*esqueletoRenderer)
+	r.Layout(e.Size())
+	if w := r.bloque.Size().Width; w != 124 {
+		t.Errorf("al 62 %% de 200 el bloque mide %g y tiene que medir 124", w)
+	}
+	if NuevoEsqueleto(0, 0).Fraccion != 0 {
+		t.Error("un esqueleto corriente no lleva fracción: ocupa todo el ancho")
 	}
 }
 

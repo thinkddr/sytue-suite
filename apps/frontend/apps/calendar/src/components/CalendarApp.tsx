@@ -10,8 +10,16 @@
  */
 import type { JSX } from 'preact';
 import { translate, type Locale } from '@sytue/i18n';
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { SytueShell, ImportData, LinkedServices, FranjaPeticion } from '@sytue/shell';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import {
+  SytueShell,
+  ImportData,
+  LinkedServices,
+  FranjaPeticion,
+  abrirHojaDeAtajos,
+  useAtajosDeApp,
+} from '@sytue/shell';
+import { MatrixStorageGate } from '@sytue/shell/matrix';
 import { useConnectivity } from '@sytue/offline/preact';
 import {
   AppShell,
@@ -26,18 +34,19 @@ import {
   Icon,
   Skeleton,
   EmptyState,
-  Illustration,
   esAtajoDeApp,
-  ShortcutsModal,
   useToast,
   ToastProvider,
   cx,
   useScrollRestante,
   MobileFab,
   SidebarAction,
+  SidebarItem,
+  SidebarSection,
   Checkbox,
   Glifo,
   useEstrecha,
+  DURACION_DESHACER,
 } from '@sytue/ui';
 import type { SytueUser } from '@sytue/auth';
 import {
@@ -49,12 +58,18 @@ import {
   refreshSubscription,
   saveEvent,
   deleteEvent,
+  restoreEvent,
   type Calendar,
   type CalendarEvent,
   type EventInput,
   type RecurrenceScope,
 } from '../client/calendarApi.js';
-import { applyRecurringEdit, applyRecurringDelete, type RecurTarget } from '../lib/recurrence.js';
+import {
+  applyRecurringEdit,
+  applyRecurringDelete,
+  permiteSiguientes,
+  type RecurTarget,
+} from '../lib/recurrence.js';
 import { getAccessToken } from '@sytue/auth/client';
 import {
   type ViewMode,
@@ -70,19 +85,24 @@ import {
   toDatetimeLocal,
   parseIcalDate,
   parseTzid,
-  expandOccurrences,
   isToday,
   isSameDay,
   dayMonthYearLabel,
   weekdayNarrowLabels,
+  finInclusivo,
 } from './dates.js';
 import { accionDeTecla, gruposDeAtajos } from '../lib/atajos.js';
+import { entradaConHorario, horarioAnterior, puedeDeshacerBorrado } from '../lib/deshacer.js';
+import { IrAFecha } from './IrAFecha.js';
 import {
   guestPartstats,
+  miRespuesta,
   parseAlarms,
   parseAttendees,
   parseColor,
   parseRecurrence,
+  rruleCruda,
+  tieneRepeticion,
 } from '../lib/ical.js';
 import { CalendarGrid, DEFAULT_ACCENT, type GridEvent } from './CalendarGrid.js';
 import { EventModal, type EditingEvent } from './EventModal.js';
@@ -99,8 +119,20 @@ import { posicionDeVista, vistaDePosicion } from './asaMes.js';
 import { SelectorVista } from './SelectorVista.js';
 import { SearchPanel } from './SearchPanel.js';
 import { fechaDelEnlace } from '../lib/search.js';
+import {
+  guardarAjustes,
+  guardarOcultos,
+  guardarVista,
+  leerAjustes,
+  leerOcultos,
+  leerVista,
+  visiblesTrasCarga,
+  type AjustesCalendario,
+} from '../lib/preferencias.js';
+import { CalendarSettings } from './CalendarSettings.js';
 import { useT } from '../i18n/index.js';
 import { I18nProvider } from '@sytue/i18n/preact';
+import { colorDeUsuario } from '@sytue/config';
 
 interface Props {
   /** Idioma ya negociado en el servidor (middleware): baja a las vistas. */
@@ -195,6 +227,20 @@ function readCreateIntent(search: string): EditingEvent | null {
 
 export function CalendarApp(props: Props): JSX.Element {
   return (
+    <MatrixStorageGate
+      actor={props.user.id}
+      tenant={props.user.tenant}
+      locale={props.locale}
+      product="calendar"
+      deviceName="Sytue Calendar · Web"
+    >
+      <CalendarAppBody {...props} />
+    </MatrixStorageGate>
+  );
+}
+
+function CalendarAppBody(props: Props): JSX.Element {
+  return (
     <I18nProvider locale={props.locale}>
       <ToastProvider key={JSON.stringify([props.user.id, props.user.tenant])}>
         <CalendarView {...props} />
@@ -237,7 +283,27 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
     byCal: {},
   });
   const [seq, setSeq] = useState(0); // fuerza la recarga de eventos (guardar/reintentar)
-  const [mode, setMode] = useState<ViewMode>('month');
+  // La vista con la que se quedó esta persona la última vez (lib/preferencias.ts). Un
+  // enlace profundo (`?date=`, un recordatorio) la cambia después de montar sin
+  // guardarla: manda sobre lo guardado, pero no lo pisa.
+  const [mode, setMode] = useState<ViewMode>(() => leerVista(user.id) ?? 'month');
+  // Los ajustes de la persona (duración, recordatorio, jornada, fines de semana y
+  // número de semana) y si su página ocupa ahora el sitio de la rejilla.
+  const [ajustes, setAjustes] = useState<AjustesCalendario>(() => leerAjustes(user.id));
+  const [ajustesOpen, setAjustesOpen] = useState(false);
+  function cambiarAjustes(nuevos: AjustesCalendario): void {
+    setAjustes(nuevos);
+    guardarAjustes(user.id, nuevos);
+  }
+  // Cambiar de vista por decisión de quien mira (selector, teclas, asa del teléfono) es
+  // lo único que se recuerda.
+  const elegirVista = useCallback(
+    (v: ViewMode) => {
+      setMode(v);
+      guardarVista(user.id, v);
+    },
+    [user.id],
+  );
   const [cursor, setCursor] = useState(new Date());
   // El mes del teléfono: por debajo de `sm:`, mes, semana y agenda son el mes compacto,
   // con su cabecera en la barra móvil y lo demás de la cabecera en el cajón. Su asa ES la
@@ -263,8 +329,10 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
   // Solo los administradores del tenant dan de alta/gestionan salas y recursos.
   const canManageResources = user.roles.includes('admin') || user.roles.includes('owner');
   const [searchOpen, setSearchOpen] = useState(false);
-  // La hoja de atajos de teclado («?»).
-  const [atajosOpen, setAtajosOpen] = useState(false);
+  // La hoja de atajos de teclado («?») es la de la suite: Calendar declara los suyos y
+  // la shell los enseña junto a ⌘K.
+  useAtajosDeApp(gruposDeAtajos(t));
+  const [irAFechaOpen, setIrAFechaOpen] = useState(false);
   const [deleting, setDeleting] = useState<Calendar | null>(null);
   const [invitesOpen, setInvitesOpen] = useState(false);
   const [pendingInvites, setPendingInvites] = useState(0);
@@ -290,11 +358,17 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
     },
   });
 
-  // Nº de invitaciones pendientes para el badge de la cabecera (carga inicial).
-  useEffect(() => {
+  // Nº de invitaciones pendientes para el badge de la cabecera: al cargar y tras
+  // responder desde un evento, que también contesta su invitación.
+  function contarInvitaciones(): void {
     void listInvitations(true)
       .then(({ invitations }) => setPendingInvites(invitations.length))
       .catch(() => {});
+  }
+  // Solo al montar: luego lo pide quien cambia el número.
+  useEffect(() => {
+    contarInvitaciones();
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Deep-link «crear evento desde correo» (intent del Hub): abre el modal de
@@ -369,17 +443,12 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
         setCalendars(cals);
         setSharedCalendars(shared);
         const all = [...cals, ...shared];
-        setVisible((prev) => {
-          const next = new Set<string>();
-          for (const c of all) {
-            // Primera carga: todos visibles. Después: conserva la selección y
-            // enciende solo los recién creados/compartidos.
-            if (knownUrls.current.size === 0 || prev.has(c.url) || !knownUrls.current.has(c.url)) {
-              next.add(c.url);
-            }
-          }
-          return next;
-        });
+        // Primera carga: todos menos los que esta persona dejó ocultos. Después:
+        // conserva la selección y enciende solo los recién creados/compartidos.
+        const conocidos = knownUrls.current;
+        const ocultos = conocidos.size === 0 ? leerOcultos(user.id) : new Set<string>();
+        const urls = all.map((c) => c.url);
+        setVisible((prev) => visiblesTrasCarga(urls, prev, conocidos, ocultos));
         knownUrls.current = new Set(all.map((c) => c.url));
         setError(null);
       })
@@ -463,8 +532,8 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
   }, [rangeKey, visibleKey, allCalendars, seq]);
 
   // Fusion de los eventos visibles, cada uno etiquetado con el color y la URL de
-  // su calendario; el backend devuelve el VEVENT maestro con su RRULE (sin
-  // expandir) y aqui se expanden las ocurrencias del rango visible.
+  // su calendario. Ya llegan expandidos: una entrada por ocurrencia, con las fechas
+  // del motor del servicio (el de Fyne) y el href/iCal de su maestro.
   const shownEvents = useMemo<GridEvent[]>(() => {
     const byCal = eventsByCal.range === rangeKey ? eventsByCal.byCal : {};
     const merged: GridEvent[] = [];
@@ -473,21 +542,21 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
       for (const ev of byCal[c.url] ?? [])
         // Color POR evento (X-APPLE-CALENDAR-COLOR/COLOR del VEVENT) si lo tiene;
         // si no, el color del calendario de origen. readOnly marca los eventos de
-        // una suscripción ICS (no arrastrables/editables).
+        // una suscripción ICS (no arrastrables/editables). Se pinta con el tono de la
+        // paleta de usuario más cercano; lo guardado no se toca (mover o editar
+        // relee el iCal).
         merged.push({
           ...ev,
-          color: (ev.ical ? parseColor(ev.ical) : undefined) ?? c.color,
+          color:
+            colorDeUsuario(ev.ical ? parseColor(ev.ical) : undefined) ?? colorDeUsuario(c.color),
           calendarUrl: c.url,
           readOnly: c.readOnly || offline,
         });
     }
-    const from = parseIcalDate(range.start);
-    const to = parseIcalDate(range.end);
-    // expandOccurrences copia cada ocurrencia por spread: conserva color/calendarUrl.
-    return from && to ? expandOccurrences(merged, from, to) : merged;
+    return merged;
     // `visible` se relee vía `visibleKey` (recomputa al cambiar la selección).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventsByCal, visibleKey, allCalendars, rangeKey, range.start, range.end, offline]);
+  }, [eventsByCal, visibleKey, allCalendars, rangeKey, offline]);
 
   /** Invalida la cache y relanza la carga (tras guardar/borrar un evento). */
   function reload(): void {
@@ -500,6 +569,7 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
       const next = new Set(prev);
       if (next.has(url)) next.delete(url);
       else next.add(url);
+      guardarOcultos(user.id, knownUrls.current, next);
       return next;
     });
   }
@@ -533,12 +603,13 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
       const accion = accionDeTecla(e.key);
       if (accion === 'today') setCursor(new Date());
       else if (accion === 'month' || accion === 'week' || accion === 'day' || accion === 'agenda')
-        setMode(accion);
+        elegirVista(accion);
       else if (accion === 'next') navigate(1);
       else if (accion === 'prev') navigate(-1);
+      else if (accion === 'goto') setIrAFechaOpen(true);
       else if (accion === 'create') openCreate(cursor);
       else if (accion === 'search') setSearchOpen(true);
-      else if (accion === 'help') setAtajosOpen(true);
+      else if (accion === 'help') abrirHojaDeAtajos();
       else return;
       e.preventDefault();
     };
@@ -550,14 +621,21 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, cursor, offline, compacto]);
 
+  // Moverse por el calendario (otra vista, otra fecha) es volver a él: la página de
+  // ajustes no se queda tapando la rejilla que se acaba de pedir.
+  useEffect(() => {
+    setAjustesOpen(false);
+  }, [mode, cursor]);
+
   function openCreate(day: Date): void {
     if (offline) return;
     const start = new Date(day);
-    // Mes/agenda no fijan hora al elegir día: por defecto a las 9:00. Tampoco la semana
-    // del teléfono, que es el mes plegado y no la rejilla horaria.
-    if (mode === 'month' || mode === 'agenda' || compacto) start.setHours(9, 0, 0, 0);
-    const end = new Date(start);
-    end.setHours(start.getHours() + 1);
+    // Mes/agenda no fijan hora al elegir día: por defecto, al comienzo de la jornada de
+    // los ajustes. Tampoco la semana del teléfono, que es el mes plegado.
+    if (mode === 'month' || mode === 'agenda' || compacto) {
+      start.setHours(ajustes.inicioLaboral, 0, 0, 0);
+    }
+    const end = new Date(start.getTime() + ajustes.duracion * 60_000);
     setModal({ open: true, editing: { href: null, summary: '', start, end } });
   }
 
@@ -568,11 +646,16 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
   }
 
   /**
-   * Persistir un mover/redimensionar de la rejilla horaria (semana/día): reescribe
+   * Persistir un mover/redimensionar de la rejilla horaria (semana/día) o un arrastre
+   * a otro día en el mes (que puede ser de un día completo): reescribe
    * el evento con su nuevo inicio/fin por el mismo PUT CalDAV que el modal (href +
    * etag), conservando resumen/lugar/descripción y los ATTENDEE/VALARM del maestro
-   * que la UI no edita. La rejilla no arrastra eventos recurrentes, así que aquí no
-   * hay RRULE que reescribir. Al terminar, `reload()` trae la posición guardada.
+   * que la UI no edita; el BFF funde el resto sobre lo guardado (`recurrenceUnchanged`:
+   * un arrastre nunca toca la repetición). Al terminar, `reload()` trae la posición
+   * guardada.
+   *
+   * El aviso de éxito trae «Deshacer»: un arrastre accidental se tira con el mismo
+   * PUT, devolviendo el inicio/fin de antes.
    */
   async function moveResizeEvent(event: GridEvent, start: Date, end: Date): Promise<void> {
     if (offline) return;
@@ -581,31 +664,45 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
     // Recurrente: preguntar el alcance (este / este y siguientes / todos) antes de
     // persistir; el split lo aplica el ScopeDialog. La rejilla mantiene el bloque
     // en su nueva posición (optimista) hasta que la recarga concilie.
-    if (event.ical && parseRecurrence(event.ical)) {
+    // Cualquier RRULE cuenta, la sepa editar el formulario o no: una serie con BYDAY
+    // arrastrada como evento suelto movía TODA la serie a la hora de esta ocurrencia.
+    if (tieneRepeticion(event.ical)) {
       setDragScope({ event, start, end });
       return;
     }
-    const attendees = event.ical ? parseAttendees(event.ical) : [];
-    const alarms = event.ical ? parseAlarms(event.ical) : [];
-    const color = event.ical ? parseColor(event.ical) : undefined;
-    const eventInput: EventInput = {
-      summary: event.summary,
-      start: toDatetimeLocal(start),
-      end: toDatetimeLocal(end),
-      ...(event.uid ? { uid: event.uid } : {}),
-      ...(event.location ? { location: event.location } : {}),
-      ...(event.description ? { description: event.description } : {}),
-      ...(color ? { color } : {}),
-      ...(attendees.length ? { attendees, partstats: guestPartstats(event.ical) } : {}),
-      ...(alarms.length ? { alarms } : {}),
-    };
+    const antes = horarioAnterior(event, start, end);
     await saveEvent({
       calendarUrl: event.calendarUrl,
-      eventInput,
+      eventInput: entradaConHorario(event, start, end),
       href: event.href,
       ...(event.etag ? { etag: event.etag } : {}),
     });
     reload();
+    if (!antes) return;
+    toast.notify({
+      tone: 'success',
+      title: t('toast.eventMoved'),
+      duration: DURACION_DESHACER,
+      action: { label: t('common.undo'), onClick: () => deshacerMovimiento(event, antes) },
+    });
+  }
+
+  /**
+   * Devuelve el bloque a su hora. Sin ETag: el que traía el evento ya no vale tras
+   * el arrastre, y el BFF usa el del recurso que acaba de leer para fundir.
+   */
+  function deshacerMovimiento(event: GridEvent, antes: { start: Date; end: Date }): void {
+    if (offline || !event.calendarUrl || !event.href) return;
+    void saveEvent({
+      calendarUrl: event.calendarUrl,
+      eventInput: entradaConHorario(event, antes.start, antes.end),
+      href: event.href,
+    })
+      .then(reload)
+      .catch(() => {
+        reload();
+        toast.notify({ tone: 'danger', title: t('cal.error.updateEvent') });
+      });
   }
 
   /** Aplica el alcance elegido tras arrastrar una instancia recurrente. */
@@ -616,15 +713,23 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
     const attendees = d.event.ical ? parseAttendees(d.event.ical) : [];
     const alarms = d.event.ical ? parseAlarms(d.event.ical) : [];
     const color = d.event.ical ? parseColor(d.event.ical) : undefined;
+    const rruleRaw = rruleCruda(d.event.ical);
+    // Una serie de días completos arrastrada en el mes sigue siendo de días completos.
+    const allDay = /^\d{8}$/.test(d.event.start);
     const edited: EventInput = {
       summary: d.event.summary,
       start: toDatetimeLocal(d.start),
       end: toDatetimeLocal(d.end),
+      ...(allDay ? { allDay } : {}),
       ...(d.event.location ? { location: d.event.location } : {}),
       ...(d.event.description ? { description: d.event.description } : {}),
       ...(color ? { color } : {}),
+      ...(d.event.conferenceUrl ? { conferenceUrl: d.event.conferenceUrl } : {}),
       ...(attendees.length ? { attendees, partstats: guestPartstats(d.event.ical) } : {}),
       ...(alarms.length ? { alarms } : {}),
+      ...(rruleRaw ? { rruleRaw } : {}),
+      // Arrastrar mueve la hora, no cambia la regla.
+      recurrenceUnchanged: true,
     };
     const target: RecurTarget = {
       calendarId: cal?.id ?? '',
@@ -634,7 +739,7 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
       etag: d.event.etag,
       masterIcal: d.event.ical ?? '',
       recurrenceId: parseIcalDate(d.event.start) ?? d.start,
-      allDay: false,
+      allDay,
     };
     const rule = d.event.ical ? (parseRecurrence(d.event.ical) ?? undefined) : undefined;
     setDragScope(null);
@@ -659,11 +764,16 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
   /** El evento de la rejilla, como lo entiende el modal de edición. */
   function editingDe(event: GridEvent): EditingEvent {
     const start = parseIcalDate(event.start) ?? new Date();
-    const end = event.end ? (parseIcalDate(event.end) ?? undefined) : undefined;
+    const allDay = /^\d{8}$/.test(event.start);
+    const dtend = event.end ? (parseIcalDate(event.end) ?? undefined) : undefined;
+    // El DTEND de un día completo es exclusivo; el campo «Fin» enseña el último día,
+    // como la rejilla (un «8–10» de Apple se abría con fin el 11).
+    const end = allDay ? finInclusivo(start, dtend) : dtend;
     // Recupera la RRULE, los invitados y los VALARM del maestro para no
     // perderlos al guardar (los recordatorios pueden venir de un cliente
     // CalDAV externo; la UI no los edita, solo los preserva).
     const recurrence = event.ical ? (parseRecurrence(event.ical) ?? undefined) : undefined;
+    const rruleRaw = rruleCruda(event.ical);
     const invitees = event.ical ? parseAttendees(event.ical) : [];
     const alarms = event.ical ? parseAlarms(event.ical) : [];
     return {
@@ -673,13 +783,14 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
       summary: event.summary,
       start,
       end,
-      allDay: /^\d{8}$/.test(event.start),
+      allDay,
       ...(parseTzid(event.ical) ? { tzid: parseTzid(event.ical)! } : {}),
       location: event.location,
       description: event.description,
       color: event.ical ? parseColor(event.ical) : undefined,
       conferenceUrl: event.conferenceUrl,
       recurrence,
+      ...(rruleRaw ? { rruleRaw } : {}),
       invitees,
       alarms,
       calendarUrl: event.calendarUrl,
@@ -726,7 +837,9 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
    * nada que responder, así que había que salir y buscar el mismo evento otra vez.
    *
    * Se recarga después: el estado de la respuesta se pinta en el evento, y dejarlo
-   * sin refrescar haría dudar de si se guardó.
+   * sin refrescar haría dudar de si se guardó. Y se recuenta la bandeja: el servicio
+   * contesta también la invitación (y avisa a quien organiza), así que deja de estar
+   * pendiente.
    */
   function responderInvitacion(
     event: GridEvent,
@@ -743,26 +856,21 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
         if (!r.ok) throw new Error(String(r.status));
         toast.notify({ tone: 'success', title: t('popover.responded') });
         reload();
+        contarInvitaciones();
       })
       .catch(() => toast.notify({ tone: 'danger', title: t('popover.respondFailed') }));
   }
 
   /**
-   * ¿Estoy yo entre los asistentes de este evento?
+   * ¿Estoy yo entre los asistentes de este evento? Y, si estoy, ¿qué he contestado?
    *
    * Se mira en el iCalendar crudo porque es lo único que trae el evento —no hay
    * lista de asistentes en el modelo—, y se comprueba MI dirección y no solo que
    * haya asistentes: al organizador no se le pregunta «¿vas a ir?» a su propia
-   * reunión, y ofrecerle un botón que el servicio va a rechazar con un 403 es
-   * exactamente lo que no se hace.
+   * reunión, y ofrecerle un botón que el servicio va a rechazar con un 404 es
+   * exactamente lo que no se hace. null: no me han invitado.
    */
-  function meHanInvitado(event: GridEvent | null | undefined): boolean {
-    if (!event?.ical || !user.email) return false;
-    const mio = user.email.toLowerCase();
-    return event.ical
-      .split(/\r?\n/)
-      .some((linea) => linea.startsWith('ATTENDEE') && linea.toLowerCase().includes(mio));
-  }
+  const respuestaVista = miRespuesta(quickView?.event.ical, user.email);
 
   function editFromQuickView(event: GridEvent): void {
     setQuickView(null);
@@ -773,20 +881,44 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
    * «Eliminar» de la vista rápida. Los eventos de solo lectura no llegan aquí (el
    * popover no muestra la acción). Una serie recurrente pregunta el alcance
    * (este / este y siguientes / todos) antes de borrar, para no perder la serie.
+   * Un evento suelto y sin invitados se puede recuperar desde el aviso
+   * (`puedeDeshacerBorrado`): se vuelve a escribir su .ics, recordatorios incluidos.
    */
   function deleteFromQuickView(event: GridEvent): void {
     setQuickView(null);
     if (offline || event.readOnly || !event.href) return;
-    if (event.ical && parseRecurrence(event.ical)) {
+    if (tieneRepeticion(event.ical)) {
       setDeleteScope(event);
       return;
     }
-    void deleteEvent(event.href)
+    const href = event.href;
+    const ical = puedeDeshacerBorrado(event) ? event.ical : undefined;
+    void deleteEvent(href)
       .then(() => {
-        toast.notify({ tone: 'success', title: t('toast.eventDeleted') });
+        toast.notify({
+          tone: 'success',
+          title: t('toast.eventDeleted'),
+          ...(ical
+            ? {
+                duration: DURACION_DESHACER,
+                action: { label: t('common.undo'), onClick: () => deshacerBorrado(href, ical) },
+              }
+            : {}),
+        });
         reload();
       })
       .catch(() => toast.notify({ tone: 'danger', title: t('cal.error.deleteEvent') }));
+  }
+
+  /** Recrea el evento recién borrado en su mismo href, con su UID y su .ics. */
+  function deshacerBorrado(href: string, ical: string): void {
+    if (offline) return;
+    void restoreEvent(href, ical)
+      .then(() => {
+        toast.notify({ tone: 'success', title: t('toast.eventRestored') });
+        reload();
+      })
+      .catch(() => toast.notify({ tone: 'danger', title: t('toast.eventRestoreFailed') }));
   }
 
   /** Aplica el alcance elegido para borrar una instancia recurrente. */
@@ -868,7 +1000,7 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
         <BloqueVistaMovil
           t={t}
           mode={mode}
-          onMode={setMode}
+          onMode={elegirVista}
           onBuscar={() => setSearchOpen(true)}
           recordatorios={
             <ReminderCenter t={t} locale={locale} estado={recordatorios} disparador="fila" />
@@ -949,7 +1081,7 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
                     // nativo); esquema claro para que el estado sin marcar se
                     // vea sobre el fondo de marca oscuro.
                     style={{
-                      accentColor: c.color ?? 'var(--sytue-primary-500)',
+                      accentColor: colorDeUsuario(c.color) ?? 'var(--sytue-primary-500)',
                       colorScheme: 'light',
                     }}
                   />
@@ -1061,7 +1193,7 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
                     // El mismo aro que en «Mis calendarios».
                     class="ring-sidebar-fg h-3.5 w-3.5 shrink-0 cursor-pointer rounded-[2px] ring-[1.5px]"
                     style={{
-                      accentColor: c.color ?? 'var(--sytue-primary-500)',
+                      accentColor: colorDeUsuario(c.color) ?? 'var(--sytue-primary-500)',
                       colorScheme: 'light',
                     }}
                   />
@@ -1090,6 +1222,15 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
           </ul>
         </div>
       ) : null}
+      {/* Una sola puerta a la página de ajustes, como en Mail (design.md §8.4). */}
+      <SidebarSection>
+        <SidebarItem
+          label={t('nav.settings')}
+          active={ajustesOpen}
+          icon={<Icon name="settings" size={18} />}
+          onClick={() => setAjustesOpen(true)}
+        />
+      </SidebarSection>
     </Sidebar>
   );
 
@@ -1233,7 +1374,7 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
                   </Badge>
                 ) : null}
               </button>
-              <SelectorVista t={t} mode={mode} onChange={setMode} />
+              <SelectorVista t={t} mode={mode} onChange={elegirVista} />
             </header>
           )}
           {/* La franja de solo lectura de cada calendario compartido de lector que está a
@@ -1268,7 +1409,14 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
           ) : null}
 
           <div class="min-h-0 flex-1 overflow-auto">
-            {posicion ? (
+            {ajustesOpen ? (
+              <CalendarSettings
+                t={t}
+                ajustes={ajustes}
+                onChange={cambiarAjustes}
+                onClose={() => setAjustesOpen(false)}
+              />
+            ) : posicion ? (
               // La geometría no depende de los datos: cargando, la hoja es la misma sin
               // puntos y la lista enseña su esqueleto; el error va en el sitio de la lista.
               <MesCompacto
@@ -1278,7 +1426,7 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
                 hoy={new Date()}
                 events={shownEvents}
                 posicion={posicion}
-                onPosicion={(p) => setMode(vistaDePosicion(p))}
+                onPosicion={(p) => elegirVista(vistaDePosicion(p))}
                 agenda={
                   <CalendarGrid
                     locale={locale}
@@ -1289,6 +1437,7 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
                     onCreateAt={openCreate}
                     onCreateRange={openCreateRange}
                     onMoveResize={moveResizeEvent}
+                    vista={ajustes}
                   />
                 }
                 cargando={loadingCals || (loadingEvents && shownEvents.length === 0)}
@@ -1299,7 +1448,8 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
                       <EmptyState
                         title={t('load.error')}
                         description={error}
-                        illustration={<Illustration name="errorRetry" />}
+                        tone="error"
+                        spot="errorRetry"
                         action={
                           <Button
                             variant="secondary"
@@ -1328,7 +1478,8 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
                 <EmptyState
                   title={t('load.error')}
                   description={error}
-                  illustration={<Illustration name="errorRetry" />}
+                  tone="error"
+                  spot="errorRetry"
                   action={
                     <Button
                       variant="secondary"
@@ -1357,8 +1508,13 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
                   events={shownEvents}
                   onSelectEvent={openQuickView}
                   onCreateAt={openCreate}
+                  onOpenDay={(d) => {
+                    setCursor(d);
+                    setMode('day');
+                  }}
                   onCreateRange={openCreateRange}
                   onMoveResize={moveResizeEvent}
+                  vista={ajustes}
                 />
               </div>
             )}
@@ -1384,6 +1540,7 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
         open={modal.open}
         calendars={eventTargets}
         editing={modal.editing}
+        recordatorioPorDefecto={ajustes.recordatorio}
         onClose={() => setModal({ open: false, editing: null })}
         onSaved={reload}
       />
@@ -1407,11 +1564,12 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
 
       <ResourcesModal t={t} open={resourcesOpen} onClose={() => setResourcesOpen(false)} />
 
-      <ShortcutsModal
-        open={atajosOpen}
-        title={t('shortcuts.title')}
-        groups={gruposDeAtajos(t)}
-        onClose={() => setAtajosOpen(false)}
+      <IrAFecha
+        t={t}
+        open={irAFechaOpen}
+        cursor={cursor}
+        onIr={setCursor}
+        onClose={() => setIrAFechaOpen(false)}
       />
       <SearchPanel
         t={t}
@@ -1446,6 +1604,7 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
         t={t}
         open={dragScope !== null}
         op="edit"
+        conSiguientes={permiteSiguientes(rruleCruda(dragScope?.event.ical))}
         onConfirm={confirmDragScope}
         onClose={cancelDragScope}
       />
@@ -1470,7 +1629,9 @@ function CalendarView({ user, hubBaseUrl, locale }: Props): JSX.Element {
         onDuplicate={duplicateFromQuickView}
         // Solo donde HAY invitación que contestar: si el evento no tiene
         // asistentes, ofrecer «¿vas a ir?» sobre una cita propia no significa nada.
-        {...(meHanInvitado(quickView?.event) ? { onResponder: responderInvitacion } : {})}
+        {...(respuestaVista !== null
+          ? { onResponder: responderInvitacion, respuesta: respuestaVista }
+          : {})}
       />
     </SytueShell>
   );
@@ -1509,7 +1670,7 @@ function MiniMonth({
         </span>
         <div class="flex items-center gap-0.5">
           {/* `SidebarAction` y no dos copias de sus clases: las copias se quedaron en
-              `h-6`, que con la raíz a 14 son 21 px, cuando la pieza subió a 24. */}
+              `h-6`, que con 1 rem en 14 px eran 21, cuando la pieza subió a 24. */}
           <SidebarAction
             label={t('nav.prevMonth')}
             icon={<Icon name="chevronLeft" size={16} />}

@@ -2,22 +2,35 @@
  * SearchPanel — panel lateral (RHS) de búsqueda global de Sytue Rooms. Reusa el
  * patrón visual de MessageListPanel (cabecera sólida bg-header + cerrar, cuerpo
  * desplazable con filas de mensaje), añadiendo una caja de búsqueda con debounce y
- * resultados clicables. Consulta GET /api/search (cross-team, respeta el acceso) y
+ * resultados clicables. Busca en el dispositivo con páginas de metadatos autorizados y
  * resuelve el nombre del canal contra la lista del cliente (el mensaje no lo lleva).
  *
- * La query admite operadores from:/in:/before:/after:, que se pasan tal cual al
- * backend. Accesible: input con foco al abrir, resultados como botones (teclado),
+ * La query admite operadores from:/in:/before:/after:, evaluados localmente con
+ * el mismo núcleo Go de Fyne. Accesible: input con foco al abrir, resultados como botones (teclado),
  * conteo en aria-live, y Esc cierra. docs/design.md §7.
  *
  * El clic en un resultado navega al mensaje (abre su canal, carga una ventana centrada
  * y hace scroll-to + resalte, vía onSelect → goToMessage en ChatApp). ponytail: sin
- * virtualización (el backend acota a 30 resultados).
+ * virtualización (se muestran hasta 30 coincidencias locales).
+ *
+ * Con el cifrado de extremo a extremo (siempre, en producción) el servidor no puede
+ * leer los mensajes y la búsqueda no existe: eso NO es un fallo y no se pinta como tal.
+ * Sale un estado vacío que lo explica, sin «reintentar» —repetir no cambia nada—.
+ * «Archivos del canal» y «/search» abren este mismo panel, así que heredan el estado.
+ *
+ * Si el que lo monta da `cargarLocal` (la historia ya descifrada de los canales), el panel
+ * busca EN EL DISPOSITIVO en lugar del estado vacío, y dice cuántos mensajes recorrió
+ * («en los últimos N mensajes»). La historia vive en un estado de este panel —memoria—
+ * y se suelta al cerrarlo: nunca se escribe texto descifrado en disco (lib/busquedaLocal).
  */
 import type { JSX } from 'preact';
-import { useEffect, useState } from 'preact/hooks';
-import { EmptyState, Illustration, Avatar, Icon, Input, Skeleton, IconButton } from '@sytue/ui';
-import { formatDateTime, type Locale } from '@sytue/i18n';
+import { useEffect, useRef, useState } from 'preact/hooks';
+import { EmptyState, Avatar, Button, Icon, Input, Skeleton, IconButton } from '@sytue/ui';
+import type { Locale } from '@sytue/i18n';
+import { whenLabel } from '../lib/fechas.js';
 import { searchMessages, type ChatMessage } from '../client/chatApi.js';
+import { MatrixSecurityError } from '../client/matrix/types.js';
+import { buscarEnLocal } from '../lib/busquedaLocal.js';
 import type { T } from '../i18n/index.js';
 import { MessageBody } from './MessageBody.js';
 import { Attachments } from './Attachments.js';
@@ -32,6 +45,11 @@ interface Props {
   onClose: () => void;
   /** Query inicial (p. ej. la del slash command «/search <consulta>»). */
   initialQuery?: string;
+  /** Historia descifrada para buscar en el dispositivo cuando el servidor no puede
+   *  (cifrado). Se pide una vez por apertura del panel. Sin ella, el estado vacío. */
+  cargarLocal?: () => Promise<ChatMessage[]>;
+  /** Tope de resultados en el dispositivo («Archivos del canal» enseña más que una búsqueda). */
+  maxLocal?: number | undefined;
   /** Idioma activo (formato de fecha/hora) y traductor ya atado a él. */
   locale: Locale;
   t: T;
@@ -40,13 +58,16 @@ interface Props {
 /** Longitud mínima de la query para lanzar la búsqueda (evita el ruido de 1 letra). */
 const MIN_QUERY = 2;
 
-function timeLabel(locale: Locale, iso: string): string {
-  return formatDateTime(locale, iso, {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+/** Cómo acabó la última búsqueda que no trajo resultados: fallo de verdad, o
+ *  búsqueda imposible porque los mensajes están cifrados. */
+type Failure = 'error' | 'encrypted' | null;
+
+/** El cliente cifrado rechaza la búsqueda con `MatrixSecurityError('unsupported')`
+ *  sin preguntar al servicio (que respondería un 409 `encrypted_client_required`). */
+function failureOf(e: unknown): Exclude<Failure, null> {
+  return e instanceof MatrixSecurityError && (e.reason === 'unsupported' || e.reason === 'device')
+    ? 'encrypted'
+    : 'error';
 }
 
 export function SearchPanel({
@@ -55,6 +76,8 @@ export function SearchPanel({
   onSelect,
   onClose,
   initialQuery,
+  cargarLocal,
+  maxLocal,
   locale,
   t,
 }: Props): JSX.Element {
@@ -63,42 +86,82 @@ export function SearchPanel({
   const [query, setQuery] = useState(initialQuery ?? '');
   const [results, setResults] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
+  const [failure, setFailure] = useState<Failure>(null);
   // ¿Hay una búsqueda "vigente"? (query con longitud suficiente). Gobierna si el
   // conteo/estado vacío se anuncian o si solo se muestra la pista inicial.
   const active = query.trim().length >= MIN_QUERY;
+  // Búsqueda en el dispositivo: cuántos mensajes se recorrieron (null = no se usa) y la
+  // carga compartida entre consultas (una sola por apertura del panel).
+  const [localScanned, setLocalScanned] = useState<number | null>(null);
+  const historia = useRef<Promise<ChatMessage[]> | null>(null);
+  // Sube con «Reintentar»: relanza la misma consulta tras un fallo sin tocar el texto.
+  const [intento, setIntento] = useState(0);
 
   // Búsqueda con debounce (250 ms), como «Explorar canales». Query corta → limpia.
   useEffect(() => {
     if (!active) {
       setResults([]);
-      setError(false);
+      setFailure(null);
+      setLocalScanned(null);
       setLoading(false);
       return;
     }
     let live = true;
+    const controller = new AbortController();
     setLoading(true);
-    setError(false);
+    setFailure(null);
     const timer = setTimeout(() => {
-      searchMessages(query.trim())
-        .then(({ messages }) => live && setResults(messages))
-        .catch(() => live && setError(true))
+      const q = query.trim();
+      searchMessages(q, controller.signal)
+        .then(({ messages }) => {
+          if (!live) return;
+          setLocalScanned(null);
+          setResults(messages);
+        })
+        .catch(async (e: unknown) => {
+          const motivo = failureOf(e);
+          if (motivo !== 'encrypted' || !cargarLocal) {
+            if (live) {
+              setLocalScanned(null);
+              setFailure(motivo);
+            }
+            return;
+          }
+          historia.current ??= cargarLocal();
+          try {
+            const todos = await historia.current;
+            if (!live) return;
+            setLocalScanned(todos.length);
+            setResults(buscarEnLocal(q, todos, channelNames, maxLocal));
+          } catch {
+            historia.current = null;
+            if (live) {
+              setLocalScanned(null);
+              setFailure('error');
+            }
+          }
+        })
         .finally(() => live && setLoading(false));
     }, 250);
     return () => {
       live = false;
+      controller.abort();
       clearTimeout(timer);
     };
-  }, [query, active]);
+  }, [query, active, cargarLocal, maxLocal, channelNames, intento]);
 
   // Mensaje de estado accesible (aria-live): acompaña al conteo visible.
   const statusText = !active
     ? ''
     : loading
       ? t('search.busy')
-      : error
-        ? t('search.failed')
-        : t('search.resultCount', { count: results.length });
+      : failure === 'encrypted'
+        ? t('search.unavailable')
+        : failure === 'error'
+          ? t('search.failed')
+          : localScanned !== null
+            ? `${t('search.resultCount', { count: results.length })} · ${t('search.localScope', { count: localScanned })}`
+            : t('search.resultCount', { count: results.length });
 
   return (
     // onKeyDown a nivel de panel: Escape cierra desde cualquier hijo (burbujeo).
@@ -148,13 +211,24 @@ export function SearchPanel({
       <div class="min-h-0 flex-1 overflow-y-auto pb-2">
         {!active ? (
           <p class="text-text-muted px-4 py-6 text-center text-sm">{t('search.hint')}</p>
-        ) : error ? (
-          <div class="text-danger-text px-4 py-3 text-sm">
-            <p class="flex items-center gap-1.5">
-              <Icon name="warning" size={14} />
-              <span>{t('search.failedRetry')}</span>
-            </p>
-          </div>
+        ) : failure === 'encrypted' ? (
+          <EmptyState
+            class="py-4"
+            title={t('search.encryptedTitle')}
+            description={t('search.encryptedBody')}
+            spot="emptySearch"
+          />
+        ) : failure === 'error' ? (
+          <EmptyState
+            compact
+            tone="error"
+            title={t('search.failedRetry')}
+            action={
+              <Button variant="secondary" size="sm" onClick={() => setIntento((n) => n + 1)}>
+                {t('action.retry')}
+              </Button>
+            }
+          />
         ) : loading ? (
           <div class="flex flex-col gap-3 px-4 py-2" aria-busy="true">
             {[60, 45, 52].map((w, i) => (
@@ -168,11 +242,7 @@ export function SearchPanel({
             ))}
           </div>
         ) : results.length === 0 ? (
-          <EmptyState
-            class="py-4"
-            title={t('search.noResults')}
-            illustration={<Illustration name="emptySearch" size={96} />}
-          />
+          <EmptyState class="py-4" title={t('search.noResults')} spot="emptySearch" />
         ) : (
           results.map((m) => {
             const channelName = channelNames[m.channelId];
@@ -191,7 +261,7 @@ export function SearchPanel({
                     <span class="text-text min-w-0 truncate text-sm font-semibold">
                       {m.author.name}
                     </span>
-                    <span class="sytue-meta shrink-0">{timeLabel(locale, m.createdAt)}</span>
+                    <span class="sytue-meta shrink-0">{whenLabel(locale, m.createdAt)}</span>
                     <span class="sytue-meta shrink-0 truncate">
                       {channelName ? `#${channelName}` : t('channel.word')}
                     </span>

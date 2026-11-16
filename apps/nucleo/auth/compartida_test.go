@@ -94,6 +94,39 @@ func TestBrokerRechazaGuardadoTardioSinAdoptarAccessNuevo(t *testing.T) {
 	}
 }
 
+// Un login interactivo que no se puede guardar no se adopta: el error llega a quien
+// entra y la memoria sigue con lo que el almacén aún contiene. Una renovación con el
+// mismo fallo ordinario sigue permitiendo esta ejecución.
+func TestAdoptarNoAdoptaUnLoginQueNoSeGuarda(t *testing.T) {
+	aparte(t)
+	fallo := errors.New("synthetic ordinary save failure")
+	var guardado Tokens
+	guardar := func(t Tokens) error {
+		if t.Subject == "nueva" {
+			return fallo
+		}
+		guardado = t
+		return nil
+	}
+	renovar := func(context.Context, Tokens) (Tokens, error) {
+		return Tokens{Access: "synthetic-renewed", Refresh: "synthetic-renewed-refresh", Expiry: time.Now().Add(time.Hour)}, nil
+	}
+	s := NewSession(Tokens{Refresh: "synthetic-old", Subject: "vieja"}, renovar, guardar)
+	before := s.SnapshotActionIdentity()
+	if err := s.AdoptarCon(t.Context(), Tokens{Access: "synthetic-new", Refresh: "synthetic-new-refresh", Subject: "nueva", Expiry: time.Now().Add(time.Hour)}); !errors.Is(err, fallo) {
+		t.Fatal("el fallo al guardar el login no llegó a quien entra", err)
+	}
+	if s.Subject() != "vieja" || s.SnapshotIdentity().Subject != "vieja" {
+		t.Fatal("se adoptó en memoria un login que no se guardó", s.Subject())
+	}
+	if after := s.SnapshotActionIdentity(); after.Identity.Subject != "vieja" || after.Incarnation == before.Incarnation {
+		t.Fatal("las acciones capturadas antes del login fallido siguen valiendo", before, after)
+	}
+	if token, err := s.AccessToken(t.Context()); err != nil || token != "synthetic-renewed" || guardado.Subject != "vieja" {
+		t.Fatal("la renovación de la sesión anterior dejó de funcionar", token, err, guardado.Subject)
+	}
+}
+
 // El guardián de la carrera de renovación: mientras Compartida está pidiendo el token
 // nuevo, NINGUNA otra app puede entrar a renovar. Sytue ID rota el refresh token y revoca
 // la familia entera si le presentan uno gastado, así que dos renovaciones a la vez dejan

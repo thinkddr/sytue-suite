@@ -151,22 +151,25 @@ func TestLasHojasSeAnadenDuplicanMuevenYBorran(t *testing.T) {
 // `packages/office/test/sheets-format.test.ts`, uno a uno.
 func TestElResumenEsElDeLaWeb(t *testing.T) {
 	for _, c := range []struct {
-		vals        []formula.Value
-		n           int
-		suma, media float64
-		ok          bool
+		vals []formula.Value
+		e    Estadisticas
+		ok   bool
 	}{
-		{[]formula.Value{1.0, 2.0, 3.0, "texto", ""}, 4, 6, 2, true},
-		{[]formula.Value{10.0, formula.ErrDiv0, true, ""}, 3, 10, 10, true},
-		{[]formula.Value{"a", "b"}, 0, 0, 0, false},
-		{nil, 0, 0, 0, false},
-		{[]formula.Value{1.0, 1.0, 0.0}, 3, 2, 0.666667, true},
-		{[]formula.Value{1e12, 1e12}, 2, 2e12, 1e12, true},
+		{[]formula.Value{1.0, 2.0, 3.0, "texto", ""}, Estadisticas{Recuento: 4, Numeros: 3, Suma: 6, Media: 2, Min: 1, Max: 3}, true},
+		{[]formula.Value{10.0, formula.ErrDiv0, true, ""}, Estadisticas{Recuento: 3, Numeros: 1, Suma: 10, Media: 10, Min: 10, Max: 10}, true},
+		{[]formula.Value{5.0, -2.0, "x", 0.0}, Estadisticas{Recuento: 4, Numeros: 3, Suma: 3, Media: 1, Min: -2, Max: 5}, true},
+		{[]formula.Value{"a", "b"}, Estadisticas{}, false},
+		{nil, Estadisticas{}, false},
+		{[]formula.Value{1.0, 1.0, 0.0}, Estadisticas{Recuento: 3, Numeros: 3, Suma: 2, Media: 0.666667, Min: 0, Max: 1}, true},
+		{[]formula.Value{1e12, 1e12}, Estadisticas{Recuento: 2, Numeros: 2, Suma: 2e12, Media: 1e12, Min: 1e12, Max: 1e12}, true},
 	} {
-		n, suma, media, ok := resumenDe(c.vals)
-		if n != c.n || suma != c.suma || math.Abs(media-c.media) > 1e-12 || ok != c.ok {
-			t.Errorf("resumen de %v = (%d, %v, %v, %v) y la web da (%d, %v, %v, %v)",
-				c.vals, n, suma, media, ok, c.n, c.suma, c.media, c.ok)
+		e, ok := resumenDe(c.vals)
+		if ok != c.ok || math.Abs(e.Media-c.e.Media) > 1e-12 {
+			t.Errorf("resumen de %v = (%+v, %v) y la web da (%+v, %v)", c.vals, e, ok, c.e, c.ok)
+		}
+		e.Media = c.e.Media
+		if e != c.e {
+			t.Errorf("resumen de %v = %+v y la web da %+v", c.vals, e, c.e)
 		}
 	}
 }

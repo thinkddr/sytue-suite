@@ -4,7 +4,7 @@
  * Monta la Sytue Shell (barra superior, conmutador de aplicaciones) y debajo la
  * cuadrícula de fotos agrupada por mes, de la más reciente a la más antigua.
  */
-import { Fragment, type ComponentChildren, type JSX } from 'preact';
+import { Fragment, type ComponentChildren, type JSX, type TargetedKeyboardEvent } from 'preact';
 import {
   useCallback,
   useEffect,
@@ -16,17 +16,17 @@ import {
 } from 'preact/hooks';
 import {
   Button,
-  ConfirmDialog,
+  DURACION_DESHACER,
   Dropdown,
   EmptyState,
   FILA_UNICA_EN_MOVIL,
   Icon,
   IconButton,
-  Illustration,
   Input,
   MASCARA_SCROLL_X,
   MenuItem,
   MenuSeparator,
+  ShortcutsModal,
   Spinner,
   Toolbar,
   cx,
@@ -34,8 +34,12 @@ import {
   useScrollRestante,
   usePrompt,
   useMobileBack,
+  useToast,
   esAtajoDeApp,
   Glifo,
+  marcarConTramo,
+  moverFocoEnRejilla,
+  useLongPress,
 } from '@sytue/ui';
 import { formatDateTime, translate, type Locale } from '@sytue/i18n';
 import {
@@ -45,15 +49,18 @@ import {
   crearAlbum,
   describirFoto,
   preguntarFoto,
+  restaurar,
   guardarDescripcion,
   guardarReceta,
   lineaDeTiempo,
+  anyosDeLaGaleria,
+  type AnyoDeGaleria,
   marcarFavorita,
   obtenerReceta,
-  sinEspacio,
   terminosRelacionados,
   textoAlternativo,
   urlDeExportacion,
+  urlDeZip,
   urlDeVariante,
   urlDeVarianteCon,
   type Album,
@@ -63,13 +70,24 @@ import {
 import { esImagen, subirFotos } from '../client/subida.js';
 import type { Receta } from '../editor/receta.js';
 import { Nav } from './Nav.js';
+import { BarraDeAnyos } from './BarraDeAnyos.js';
 import { Recuerdos } from './Recuerdos.js';
 import { porMes } from '../lib/agrupar.js';
 import { planDeDescarga, programarDescarga } from '../lib/descargaEnLote.js';
+import { nombreDeZip, planDeZip } from '../lib/descargaZip.js';
 import { conFavoritas, planFavoritas, unLoteALaVez } from '../lib/favoritasEnLote.js';
+import {
+  deshacerTirada,
+  tirada,
+  tirarSinRepetir,
+  type GaleriaViva,
+  type Tirada,
+} from '../lib/deshacer.js';
 import { sinResultados } from '../lib/sinResultados.js';
 import { posicionVisor, saltoVisor, type PosicionVisor } from '../lib/posicionVisor.js';
+import { accionDeGaleria, accionDelVisor, gruposDeAtajos } from '../lib/atajos.js';
 import { estiloDeTesela } from '../lib/filas.js';
+import { EsqueletoFilas } from './Esqueletos.js';
 import { CAMPO_TACTIL } from '../lib/tactil.js';
 import { RUTA } from '../lib/ruta.js';
 import { tituloSugerido } from '../lib/tituloAlbum.js';
@@ -78,11 +96,16 @@ import {
   obtenerFondoLienzo,
   guardarFondoLienzo,
   estilosFondoLienzo,
+  FONDOS_DISPONIBLES,
   type FondoLienzo,
 } from '../lib/fondoLienzo.js';
+import { MuestraFondo } from './MuestraFondo.js';
+import { conAvisos, FalloDeCarga, useAvisoDeFallo } from './Fallo.js';
+import { textoDeFallo } from '../lib/fallo.js';
 import { Marco } from './Marco.js';
-import { EscenarioVisor } from './EscenarioVisor.js';
+import { ContadorVisor, EscenarioVisor } from './EscenarioVisor.js';
 import type { SytueUser } from '@sytue/auth';
+import { MatrixStorageGate } from '@sytue/shell/matrix';
 
 interface Props {
   locale: Locale;
@@ -96,8 +119,29 @@ interface Props {
   soloFavoritas?: boolean;
 }
 
-export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: Props): JSX.Element {
+/**
+ * Los avisos de la galería son los toasts de la casa, y la galería vive POR ENCIMA de
+ * la Sytue Shell que monta `Marco`: sin un proveedor aquí, `useToast` caería en el que
+ * no pinta nada. `conAvisos` pone el proveedor; el de la shell, anidado, se suma a este
+ * y no abre otra cola.
+ */
+export const PhotosApp = conAvisos(function PhotosAppWithGate(props: Props): JSX.Element {
+  return (
+    <MatrixStorageGate
+      actor={props.user.id}
+      tenant={props.user.tenant}
+      locale={props.locale}
+      product="photos"
+      deviceName="Sytue Photos · Web"
+    >
+      <Galeria {...props} />
+    </MatrixStorageGate>
+  );
+});
+
+function Galeria({ locale, user, hubBaseUrl, soloFavoritas = false }: Props): JSX.Element {
   const t = useT(locale);
+  const toast = useToast();
   const { preguntar, dialogo: dialogoPreguntar } = usePrompt();
   const [fotos, setFotos] = useState<Foto[]>([]);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
@@ -105,7 +149,12 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
   // La búsqueda escrita que aún no se ha pedido (espera los 250 ms del temporizador).
   const [pendiente, setPendiente] = useState(false);
   const [fin, setFin] = useState(false);
+  // `error` es el aviso ya traducido que va en la línea de `role="alert"`; `fallo`,
+  // la página de la línea de tiempo que no llegó. Sin fotos, `fallo` ocupa la
+  // pantalla con su salida; con fotos, solo dice qué pasó y deja reintentar.
   const [error, setError] = useState<string | null>(null);
+  const [fallo, setFallo] = useState<unknown>(null);
+  const avisarFallo = useAvisoDeFallo(locale);
   const centinela = useRef<HTMLDivElement>(null);
   const [abierta, setAbierta] = useState<number | null>(null);
   const [texto, setTexto] = useState('');
@@ -114,6 +163,11 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
   // `cargarMas` los usa, y en JavaScript una constante de bloque no existe
   // antes de su línea.
   const [tambien, setTambien] = useState<string[]>([]);
+  /** Los años con fotos (barra de saltar) y al que se saltó; `null` es «desde lo último». */
+  const [anyos, setAnyos] = useState<AnyoDeGaleria[]>([]);
+  const [anyo, setAnyo] = useState<number | null>(null);
+  /** Cuenta los saltos: pulsar otra vez el año ya elegido con la galería vacía recarga. */
+  const [salto, setSalto] = useState(0);
   const [ampliando, setAmpliando] = useState(false);
   const generacion = useRef(0);
   // Subida: progreso, aviso final y la zona de soltar.
@@ -132,42 +186,83 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
     cancelarDescarga.current = null;
   }, []);
   useEffect(() => pararDescarga, [pararDescarga]);
+  // El ancla de Mayús + clic: el id de la última marcada SIN Mayús. Va por id y no por
+  // posición porque `fotos` cambia en pleno modo selección (quitar una favorita en su
+  // vista, deshacer una tirada) y una posición guardada apuntaría a otra foto. Va en
+  // una ref porque no pinta nada y cambia en el mismo clic que la selección.
+  const ancla = useRef<string | null>(null);
   const salirDeSeleccion = useCallback(() => {
     pararDescarga();
     setSeleccion(null);
+    ancla.current = null;
   }, [pararDescarga]);
+  /**
+   * Entra en el modo selección; con una foto, ya marcada y de ancla. Es lo que hace
+   * mantener pulsada una tesela en el móvil, como en Google Photos: ahí no hay casilla
+   * que asome al pasar por encima y buscar «Seleccionar» arriba es un viaje.
+   */
+  const empezarSeleccion = (id?: string) => {
+    const esta = id !== undefined && fotos.some((f) => f.id === id);
+    ancla.current = esta ? id : null;
+    setSeleccion(esta ? new Set([id]) : new Set());
+  };
   // La barra de selección, para el aviso de que queda contenido a la derecha.
   // Depende de `seleccion` porque la barra SOLO existe con selección marcada.
   const barraSeleccion = useScrollRestante<HTMLDivElement>(seleccion !== null);
-  const [confirmarPapelera, setConfirmarPapelera] = useState(false);
   const [albumesLista, setAlbumesLista] = useState<Album[] | null>(null);
+  // ---- Teclado (lib/atajos.ts) ----
+  //
+  // La tabla dice qué hace cada tecla y la hoja de «?» la cuenta. El manejador se
+  // registra UNA vez y lee el estado fresco por ref, como en Contacts.
+  const [atajosAbiertos, setAtajosAbiertos] = useState(false);
+  const atajosRef = useRef<(e: KeyboardEvent) => void>(() => undefined);
+  atajosRef.current = (e: KeyboardEvent): void => {
+    // `esAtajoDeApp`: con un menú o un diálogo abiertos, la tecla es SUYA. Sin esto,
+    // cerrar «Álbum nuevo» con Escape se llevaba también la selección. El visor es
+    // un `<dialog>` nativo sin `role`, que `esAtajoDeApp` no ve: se cuenta aparte,
+    // y con él abierto el teclado es de sus atajos.
+    if (abierta !== null || atajosAbiertos || !esAtajoDeApp(e)) return;
+    switch (accionDeGaleria(e.key)) {
+      case 'salirDeSeleccion':
+        if (seleccion !== null) salirDeSeleccion();
+        return;
+      // «u» añade fotos: el atajo que pulsa el menú nativo de la app de escritorio.
+      case 'subir':
+        if (subida !== null) return;
+        e.preventDefault();
+        selector.current?.click();
+        return;
+      // «?» abre la hoja, que es donde se aprenden los demás. Shift incluido: en un
+      // teclado español el signo lo pide, y no es un modificador de sistema.
+      case 'ayuda':
+        e.preventDefault();
+        setAtajosAbiertos(true);
+        return;
+      default:
+    }
+  };
   useEffect(() => {
-    if (seleccion === null || confirmarPapelera) return;
-    // `esAtajoDeApp`: con un menú o un diálogo abiertos, Escape es SUYO. Sin esto,
-    // cerrar «Álbum nuevo» con Escape se llevaba también la selección.
-    const alPulsar = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && esAtajoDeApp(e)) salirDeSeleccion();
-    };
+    const alPulsar = (e: KeyboardEvent): void => atajosRef.current(e);
     window.addEventListener('keydown', alPulsar);
     return () => window.removeEventListener('keydown', alPulsar);
-  }, [seleccion, confirmarPapelera, salirDeSeleccion]);
-  // «u» añade fotos: el atajo que pulsa el menú nativo de la app de escritorio.
-  useEffect(() => {
-    const alPulsar = (e: KeyboardEvent) => {
-      if (e.key !== 'u' || !esAtajoDeApp(e) || subida !== null) return;
-      e.preventDefault();
-      selector.current?.click();
-    };
-    window.addEventListener('keydown', alPulsar);
-    return () => window.removeEventListener('keydown', alPulsar);
-  }, [subida]);
-  const alternar = (id: string) =>
-    setSeleccion((prev) => {
-      const s = new Set(prev);
-      if (s.has(id)) s.delete(id);
-      else s.add(id);
-      return s;
-    });
+  }, []);
+  /**
+   * Marca o desmarca una foto; con Mayús, añade el tramo desde el ancla. El tramo se
+   * cuenta sobre `fotos`, que es el orden en que se ven (los meses la parten, no la
+   * reordenan), así que cruza meses igual que en Google Photos.
+   */
+  const alternar = (id: string, mayus: boolean) => {
+    const desde = ancla.current;
+    const r = marcarConTramo(
+      seleccion ?? new Set<string>(),
+      fotos,
+      fotos.findIndex((f) => f.id === id),
+      desde === null ? -1 : fotos.findIndex((f) => f.id === desde),
+      mayus,
+    );
+    ancla.current = fotos[r.ancla]?.id ?? null;
+    setSeleccion(r.marcadas);
+  };
   /** Marca (o desmarca, si ya estaban todas) las fotos de un mes. */
   const alternarMes = (ids: string[]) =>
     setSeleccion((prev) => {
@@ -183,6 +278,27 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
   // Un enlace pulsado no confirma que el archivo se haya guardado.
   const descargarSeleccion = () => {
     if (!seleccion) return;
+    // Varias fotos van en UN ZIP con los originales: una sola descarga, sin goteo
+    // ni el tope de 25. Una sola sigue siendo la foto suelta, que no pide abrir nada.
+    if (seleccion.size > 1) {
+      const zip = planDeZip([...seleccion], fotos);
+      if (zip.ficheros.length > 0) {
+        pararDescarga();
+        try {
+          descargar(urlDeZip(zip.ficheros, nombreDeZip(t('gallery.zipName'), new Date())));
+        } catch (e) {
+          avisarFallo(e);
+          return;
+        }
+        setSeleccion(null);
+        setAviso(
+          zip.fuera > 0
+            ? `${t('gallery.downloadingZip', { count: zip.ficheros.length })} · ${t('gallery.downloadCapped', { count: zip.fuera })}`
+            : t('gallery.downloadingZip', { count: zip.ficheros.length }),
+        );
+        return;
+      }
+    }
     const plan = planDeDescarga([...seleccion]);
     if (plan.ahora.length === 0) return;
     pararDescarga();
@@ -191,7 +307,7 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
       try {
         descargar(urlDeExportacion(id, 'jpeg'));
       } catch (e) {
-        setError(String(e));
+        avisarFallo(e);
         return;
       }
       iniciadas++;
@@ -231,7 +347,7 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
       );
       if (soloFavoritas && !valor) setAbierta(null);
     } catch (e) {
-      setError(String(e));
+      avisarFallo(e);
     }
   };
 
@@ -252,7 +368,10 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
         const hechas = new Set(ids.filter((_, i) => resultados[i]?.status === 'fulfilled'));
         setFotos((l) => conFavoritas(l, hechas, valor, soloFavoritas));
         salirDeSeleccion();
-        setAviso(t(valor ? 'gallery.favorited' : 'gallery.unfavorited', { count: hechas.size }));
+        toast.notify({
+          tone: 'success',
+          title: t(valor ? 'gallery.favorited' : 'gallery.unfavorited', { count: hechas.size }),
+        });
         if (hechas.size < ids.length)
           setError(t('gallery.favoriteFailed', { count: ids.length - hechas.size }));
       } finally {
@@ -285,10 +404,13 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
       // La lista de álbumes cacheada se queda vieja: se tira para que la próxima
       // vez que se abra el selector traiga el nuevo.
       setAlbumesLista(null);
-      setAviso(t('gallery.addedToAlbum', { count: seleccion.size, title: album.title }));
+      toast.notify({
+        tone: 'success',
+        title: t('gallery.addedToAlbum', { count: seleccion.size, title: album.title }),
+      });
       salirDeSeleccion();
     } catch (e) {
-      setError(String(e));
+      avisarFallo(e);
     }
   };
   const anyadirSeleccionA = async (albumId: string) => {
@@ -296,11 +418,15 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
     if (!al || !seleccion || seleccion.size === 0) return;
     try {
       await anyadirAlAlbum(al.id, [...seleccion]);
-      setAviso(t('gallery.addedToAlbum', { count: seleccion.size, title: al.title }));
+      toast.notify({
+        tone: 'success',
+        title: t('gallery.addedToAlbum', { count: seleccion.size, title: al.title }),
+      });
       salirDeSeleccion();
     } catch (e) {
-      // En un álbum de otra persona lo añadido se copia a su Drive: si no cabe, se dice.
-      setError(sinEspacio(e) ? translate(locale, 'sharedAlbum.quotaFull') : String(e));
+      // En un álbum de otra persona lo añadido se copia a su Drive: si no cabe, el
+      // aviso lo dice (507 → `sharedAlbum.quotaFull`, en `textoDeFallo`).
+      avisarFallo(e);
     }
   };
   /** Tope por pasada. Cada foto es una llamada de visión, y se cobra. */
@@ -356,22 +482,73 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
       setDescribiendoLote({ hechas, total: lote.length });
     }
     setDescribiendoLote(null);
-    setAviso(
-      pendientes.length > TOPE_DESCRIBIR
-        ? `${t('gallery.described', { count: hechas })} · ${t('gallery.describeCapped', { count: TOPE_DESCRIBIR })}`
-        : t('gallery.described', { count: hechas }),
-    );
+    // El progreso va en línea mientras dura; lo acabado, en el toast.
+    toast.notify({
+      tone: 'success',
+      title: t('gallery.described', { count: hechas }),
+      ...(pendientes.length > TOPE_DESCRIBIR
+        ? { description: t('gallery.describeCapped', { count: TOPE_DESCRIBIR }) }
+        : {}),
+    });
   };
+
+  /**
+   * Lo que el «Deshacer» mira al pulsarlo, no lo de cuando se tiró: en sus 10 s se
+   * puede buscar otra cosa o salir de la galería, y entonces la lista ya no es esa.
+   */
+  const galeriaViva = useRef<GaleriaViva>({ montada: true, generacion: 0 });
+  useEffect(() => {
+    const viva = galeriaViva.current;
+    viva.montada = true;
+    return () => {
+      viva.montada = false;
+    };
+  }, []);
+  // Las búsquedas suben `generacion` fuera del render: se lee en cada pulsación.
+  const vistaAhora = () => {
+    galeriaViva.current.generacion = generacion.current;
+    return galeriaViva;
+  };
+
+  /**
+   * Saca de la galería lo que el servicio aceptó y lo dice en un toast de 10 s con
+   * «Deshacer». NO se pregunta antes: ir a la papelera es reversible (design §5.4), y
+   * el botón deshace ESTA tanda —se la lleva en su cierre—, no la última que se tiró.
+   */
+  const avisarTirada = (hechas: ReadonlySet<string>) => {
+    if (hechas.size === 0) return;
+    const tanda = tirada(fotos, hechas, generacion.current);
+    setFotos((l) => l.filter((f) => !hechas.has(f.id)));
+    toast.notify({
+      tone: 'success',
+      title: t('gallery.trashed', { count: hechas.size }),
+      description: t('gallery.trashedStays', { count: hechas.size }),
+      duration: DURACION_DESHACER,
+      action: { label: t('gallery.undo'), onClick: () => void deshacer(tanda) },
+    });
+  };
+  const deshacer = async (tanda: Tirada<Foto>) => {
+    const { devueltas, fallidas } = await deshacerTirada(tanda, restaurar, vistaAhora(), (c) =>
+      setFotos(c),
+    );
+    if (fallidas > 0)
+      toast.notify({ tone: 'danger', title: t('gallery.restoreFailed', { count: fallidas }) });
+    else if (devueltas > 0)
+      toast.notify({ tone: 'success', title: t('gallery.restored', { count: devueltas }) });
+  };
+
+  // Sin la pregunta de antes nada frena un segundo toque mientras la primera llamada
+  // sigue en vuelo: se manda cada foto una sola vez.
+  const tirandoYa = useRef(new Set<string>());
+  const aLaPapeleraUnaVez = (ids: readonly string[]) =>
+    tirarSinRepetir(ids, alaPapelera, tirandoYa.current);
 
   const tirarSeleccion = async () => {
     if (!seleccion || seleccion.size === 0) return;
-    const ids = [...seleccion];
-    setConfirmarPapelera(false);
-    const resultados = await Promise.allSettled(ids.map((id) => alaPapelera(id)));
-    const hechas = new Set(ids.filter((_, i) => resultados[i]?.status === 'fulfilled'));
-    setFotos((l) => l.filter((f) => !hechas.has(f.id)));
+    const { nuevas: ids, hechas } = await aLaPapeleraUnaVez([...seleccion]);
+    if (ids.length === 0) return;
     salirDeSeleccion();
-    setAviso(t('gallery.trashed', { count: hechas.size }));
+    avisarTirada(hechas);
     if (hechas.size < ids.length)
       setError(t('gallery.trashFailed', { count: ids.length - hechas.size }));
   };
@@ -389,16 +566,26 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
       // La línea de tiempo se vuelve a pedir desde el principio: las fotos nuevas
       // caen donde les toque por fecha, no arriba por haber llegado las últimas.
       generacion.current++;
-      const pagina = await lineaDeTiempo(undefined, 100, texto, soloFavoritas);
+      // En el año al que se había saltado: subir no tiene por qué mover la vista.
+      const desde = anyo !== null && !texto.trim() ? String(anyo) : undefined;
+      const pagina = await lineaDeTiempo(undefined, 100, texto, soloFavoritas, [], desde);
       setFotos(pagina.items);
       setCursor(pagina.nextCursor);
       setFin(!pagina.nextCursor);
       setAbierta(null);
+      // Las fotos subidas pueden ser de un año que la barra aún no tenía.
+      anyosDeLaGaleria(soloFavoritas)
+        .then(setAnyos)
+        .catch(() => {});
     }
-    setAviso(
+    // El progreso va en línea; cómo acabó, en el toast.
+    toast.notify(
       resultado.fallos.length > 0
-        ? t('gallery.uploadFailed', { name: resultado.fallos.join(', ') })
-        : t('gallery.uploaded', { count: resultado.fotos.length }),
+        ? {
+            tone: 'danger',
+            title: t('gallery.uploadFailed', { name: resultado.fallos.join(', ') }),
+          }
+        : { tone: 'success', title: t('gallery.uploaded', { count: resultado.fotos.length }) },
     );
   };
   // La misma zona de soltar para la galería llena y para la vacía.
@@ -485,25 +672,73 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
     setCargando(true);
     const gen = generacion.current;
     try {
-      const pagina = await lineaDeTiempo(cursor, 100, texto, soloFavoritas, tambien);
+      // Sin cursor y con un año elegido, la primera página empieza en ese año.
+      const desde = !cursor && anyo !== null && !texto.trim() ? String(anyo) : undefined;
+      const pagina = await lineaDeTiempo(cursor, 100, texto, soloFavoritas, tambien, desde);
       // Si la búsqueda cambió mientras llegaba esta página, es de otra línea.
       if (gen !== generacion.current) return;
       setFotos((previas) => [...previas, ...pagina.items]);
       setCursor(pagina.nextCursor);
       if (!pagina.nextCursor) setFin(true);
       setError(null);
+      setFallo(null);
     } catch (e) {
-      setError(String(e));
+      if (gen !== generacion.current) return;
+      setFallo(e);
+      setError(textoDeFallo(locale, e));
     } finally {
       setCargando(false);
     }
-  }, [cursor, fin, texto, soloFavoritas, tambien]);
+  }, [cursor, fin, texto, soloFavoritas, tambien, anyo, locale]);
+  const reintentar = () => {
+    setFallo(null);
+    setError(null);
+    void cargarMas();
+  };
 
   useEffect(() => {
     void cargarMas();
     // Solo la primera página: las siguientes las pide el centinela.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // La barra de años se pide aparte y sin bloquear la galería: si falla, la
+  // galería sigue y simplemente no hay barra.
+  useEffect(() => {
+    anyosDeLaGaleria(soloFavoritas)
+      .then(setAnyos)
+      .catch(() => setAnyos([]));
+  }, [soloFavoritas]);
+
+  /**
+   * Saltar a un año: la línea empieza de nuevo, vacía y sin cursor, y su primera
+   * página la sitúa `desde=` en la foto más reciente de ese año. Al seguir
+   * bajando se entra en los años anteriores con la paginación de siempre.
+   */
+  const saltarAAnyo = (nuevo: number | null) => {
+    if (nuevo === anyo && fotos.length > 0) return;
+    generacion.current++;
+    setPendiente(true);
+    // Cargando YA, como al montar: la lista vacía deja el centinela a la vista y el
+    // observador, que se vuelve a enlazar con el nuevo `cargarMas`, pediría la misma
+    // primera página que el efecto de abajo, y la galería saldría duplicada.
+    setCargando(true);
+    setAnyo(nuevo);
+    setSalto((n) => n + 1);
+    setFotos([]);
+    setCursor(undefined);
+    setFin(false);
+    setAbierta(null);
+    window.scrollTo({ top: 0 });
+  };
+  useEffect(() => {
+    // Por el contador y no por el año: elegir el mismo año con la galería vacía no
+    // cambia `anyo`, y la marca de cargando se quedaría puesta para siempre.
+    if (salto === 0) return;
+    void cargarMas();
+    // Solo tras un salto: `cargarMas` se recrea con cada cursor.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [salto]);
 
   /**
    * Ampliar la búsqueda con Sytue AI.
@@ -547,6 +782,8 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
     // consulta anterior y arrastrarlos daría resultados que nadie pidió.
     setTambien([]);
     setAviso(null);
+    // Buscar es en toda la galería: el año al que se saltó deja de valer.
+    if (nuevo.trim()) setAnyo(null);
     // Solo si cambia: con el mismo texto el efecto del temporizador no corre y la
     // marca se quedaría puesta.
     if (nuevo !== texto) setPendiente(true);
@@ -580,7 +817,9 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
    */
   useEffect(() => {
     const nodo = centinela.current;
-    if (!nodo || fin) return;
+    // Con un fallo el centinela se queda quieto: volvería a pedir la misma página
+    // cada vez que acabase la anterior, en bucle. La salida es «Reintentar».
+    if (!nodo || fin || fallo !== null) return;
     const obs = new IntersectionObserver(
       (entradas) => {
         if (entradas[0]?.isIntersecting && !cargando) void cargarMas();
@@ -589,7 +828,7 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
     );
     obs.observe(nodo);
     return () => obs.disconnect();
-  }, [cargarMas, cargando, fin]);
+  }, [cargarMas, cargando, fin, fallo]);
 
   if (!cargando && !pendiente && fotos.length === 0 && !error && !texto) {
     return (
@@ -607,7 +846,7 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
             description={t(
               soloFavoritas ? 'favorites.empty.description' : 'gallery.empty.description',
             )}
-            illustration={<Illustration name="emptyPhotos" />}
+            spot="emptyPhotos"
             action={botonAnyadir(true)}
           />
         </div>
@@ -662,7 +901,7 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
               <Button
                 variant="ghost"
                 leadingIcon={<Icon name="check" />}
-                onClick={() => setSeleccion(new Set())}
+                onClick={() => empezarSeleccion()}
               >
                 {t('gallery.select')}
               </Button>
@@ -671,6 +910,11 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
           <span class="mb-4">{botonAnyadir(false)}</span>
           {selectorDeFicheros}
         </div>
+        {/* Solo mirando la línea entera: con una búsqueda o una selección en
+            marcha, saltar de año descolocaría lo que se está haciendo. */}
+        {!texto.trim() && seleccion === null ? (
+          <BarraDeAnyos t={t} anyos={anyos} activo={anyo} onElegir={saltarAAnyo} />
+        ) : null}
         {seleccion !== null ? (
           // Pegajosa: en una galería de miles, la barra de acciones tiene que seguir
           // a mano cuando lo marcado está tres pantallas más arriba.
@@ -839,16 +1083,23 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
               tone="danger"
               size="lg"
               disabled={seleccion.size === 0}
-              onClick={() => setConfirmarPapelera(true)}
+              onClick={() => void tirarSeleccion()}
             >
               <Icon name="trash" />
             </IconButton>
           </Toolbar>
         ) : null}
         {estadoSubida}
-        {error ? (
-          <p class="text-danger-text mb-4 text-sm" role="alert">
+        {fallo !== null && fotos.length === 0 ? (
+          <FalloDeCarga locale={locale} fallo={fallo} alReintentar={reintentar} class="mb-6" />
+        ) : error ? (
+          <p class="text-danger-text mb-4 flex flex-wrap items-center gap-2 text-sm" role="alert">
             {error}
+            {fallo !== null ? (
+              <Button variant="secondary" size="sm" onClick={reintentar}>
+                {translate(locale, 'action.retry')}
+              </Button>
+            ) : null}
           </p>
         ) : null}
 
@@ -888,7 +1139,7 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
           return (
             <EmptyState
               class="mb-6"
-              illustration={<Illustration name="emptySearch" />}
+              spot="emptySearch"
               title={t('gallery.noResults.title', { query: vacio.consulta })}
               description={t(
                 vacio.ampliar ? 'gallery.searchWiderHint' : 'gallery.noResults.description',
@@ -923,75 +1174,89 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
           );
         })()}
 
-        {grupos.map((grupo) => (
-          <section key={grupo.clave} class="mb-8">
-            {/* `sticky`: el mes se queda arriba mientras se recorre, que es lo que
+        {/* La PRIMERA carga (o la de otra búsqueda, que empieza la línea vacía): el
+            esqueleto con un mes y sus filas, al mismo alto de fila. La rueda del pie
+            queda para las páginas siguientes, cuando ya hay fotos encima. También
+            mientras se escribe (`pendiente`): la línea se vacía al teclear y la página
+            no se pide hasta 250 ms después; sin esto la galería se quedaba en blanco
+            ese rato y el esqueleto parpadeaba con cada tecla. */}
+        {(cargando || pendiente) && fotos.length === 0 ? (
+          <section class="mb-8">
+            <EsqueletoFilas mes cuantas={18} />
+          </section>
+        ) : null}
+
+        {/* Un solo oyente para todos los meses: las flechas pasan de uno a otro. */}
+        {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- las teselas son los botones y las paradas de Tab; el contenedor solo recoge sus flechas */}
+        <div onKeyDown={alTeclearEnGaleria}>
+          {grupos.map((grupo) => (
+            <section key={grupo.clave} class="mb-8">
+              {/* `sticky`: el mes se queda arriba mientras se recorre, que es lo que
               permite saber dónde estás en una galería de miles. Opaca y del color
               de la hoja: pegada tapa las fotos, y suelta no pinta una banda (con
               `bg-bg`, sobre papel era gris dentro de la hoja blanca). En Carril no hay
               hoja que pinte y el fondo es el lienzo: `bg-bg`, como `ui.FondoHoja`. */}
-            <h2
-              class={cx(
-                'text-text in-data-[forma=carril]:bg-bg sticky z-10 flex items-center gap-3 bg-[var(--sytue-sheet-bg)] py-2 text-sm font-semibold',
-                // Bajo la barra de selección cuando está: si no, el mes se escondía detrás.
-                // Su alto: 12 de relleno, 2 de borde y los 32 de un mando —44 con el dedo—.
-                seleccion !== null ? 'top-[2.875rem] pointer-coarse:top-[3.625rem]' : 'top-0',
-              )}
-            >
-              {grupo.titulo}
-              {(() => {
-                const aproximadas = grupo.fotos.filter((f) => !f.takenAtFromExif).length;
-                return aproximadas > 0 ? (
-                  <span class="text-text-muted text-xs font-normal">
-                    {t('gallery.approxCount', { count: aproximadas })}
-                  </span>
-                ) : null;
-              })()}
-              {seleccion !== null ? (
-                <BotonDelMes
-                  fotos={grupo.fotos}
-                  seleccion={seleccion}
-                  onToggle={alternarMes}
-                  t={t}
-                />
-              ) : null}
-            </h2>
-            {/* Filas justificadas (`.filas`, en styles/app.css): cada foto con su
+              <h2
+                class={cx(
+                  'text-text in-data-[forma=carril]:bg-bg sticky z-10 flex items-center gap-3 bg-[var(--sytue-sheet-bg)] py-2 text-sm font-semibold',
+                  // Bajo la barra de selección cuando está: si no, el mes se escondía detrás.
+                  // Su alto: 12 de relleno, 2 de borde y los 32 de un mando —44 con el dedo—.
+                  seleccion !== null ? 'top-[2.875rem] pointer-coarse:top-[3.625rem]' : 'top-0',
+                )}
+              >
+                {grupo.titulo}
+                {(() => {
+                  const aproximadas = grupo.fotos.filter((f) => !f.takenAtFromExif).length;
+                  return aproximadas > 0 ? (
+                    <span class="text-text-muted text-xs font-normal">
+                      {t('gallery.approxCount', { count: aproximadas })}
+                    </span>
+                  ) : null;
+                })()}
+                {seleccion !== null ? (
+                  <BotonDelMes
+                    fotos={grupo.fotos}
+                    seleccion={seleccion}
+                    onToggle={alternarMes}
+                    t={t}
+                  />
+                ) : null}
+              </h2>
+              {/* Filas justificadas (`.filas`, en styles/app.css): cada foto con su
                 proporción, y la fila crece con la pantalla. */}
-            <ul class="filas">
-              {grupo.fotos.map((f) => (
-                <Miniatura
-                  key={f.id}
-                  foto={f}
-                  t={t}
-                  onOpen={() => setAbierta(posiciones.get(f.id) ?? 0)}
-                  onFavorite={() => void cambiarFavorita(f, !f.favorite)}
-                  {...(seleccion !== null
-                    ? { seleccionada: seleccion.has(f.id), onToggle: () => alternar(f.id) }
-                    : {})}
-                />
-              ))}
-            </ul>
-          </section>
-        ))}
+              <ul class="filas">
+                {grupo.fotos.map((f) => (
+                  <Miniatura
+                    key={f.id}
+                    foto={f}
+                    t={t}
+                    onOpen={() => setAbierta(posiciones.get(f.id) ?? 0)}
+                    onFavorite={() => void cambiarFavorita(f, !f.favorite)}
+                    {...(seleccion !== null
+                      ? {
+                          seleccionada: seleccion.has(f.id),
+                          onToggle: (mayus: boolean) => alternar(f.id, mayus),
+                        }
+                      : { onMantener: () => empezarSeleccion(f.id) })}
+                  />
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
 
         <div ref={centinela} class="flex h-16 items-center justify-center">
-          {cargando ? <Spinner /> : null}
+          {cargando && fotos.length > 0 ? <Spinner /> : null}
         </div>
 
         {dialogoPreguntar}
-        <ConfirmDialog
-          open={confirmarPapelera}
-          onClose={() => setConfirmarPapelera(false)}
-          onConfirm={() => void tirarSeleccion()}
-          title={t('viewer.delete')}
-          confirmLabel={t('viewer.delete')}
-          tone="danger"
-        >
-          <p class="text-text text-sm leading-relaxed">
-            {t('gallery.trashSelectedConfirm', { count: seleccion?.size ?? 0 })}
-          </p>
-        </ConfirmDialog>
+
+        <ShortcutsModal
+          open={atajosAbiertos}
+          title={t('shortcuts.title')}
+          groups={gruposDeAtajos(t, 'galeria')}
+          onClose={() => setAtajosAbiertos(false)}
+        />
 
         {abierta !== null && fotos[abierta] ? (
           <Visor
@@ -1004,12 +1269,15 @@ export function PhotosApp({ locale, user, hubBaseUrl, soloFavoritas = false }: P
             locale={locale}
             onClose={() => setAbierta(null)}
             onDelete={(f) =>
-              void alaPapelera(f.id)
-                .then(() => {
-                  setFotos((l) => l.filter((x) => x.id !== f.id));
-                  setAbierta(null);
-                })
-                .catch((e) => setError(String(e)))
+              void aLaPapeleraUnaVez([f.id]).then(({ nuevas, hechas, fallo }) => {
+                if (nuevas.length === 0) return;
+                if (fallo) {
+                  avisarFallo(fallo.reason);
+                  return;
+                }
+                setAbierta(null);
+                avisarTirada(hechas);
+              })
             }
             vecinas={[fotos[abierta - 1], fotos[abierta + 1]]}
             posicion={posicionVisor(abierta, fotos.length, !fin)}
@@ -1259,11 +1527,6 @@ export function Visor({
     },
     [enAncho],
   );
-  // La confirmación de borrado va DENTRO del <dialog>: con showModal() todo lo
-  // de fuera queda inerte, así que un Modal en portal no se podría pulsar. Y el
-  // confirm() del navegador habla el idioma del sistema, no el de la app.
-  const [borrando, setBorrando] = useState(false);
-  useEffect(() => setBorrando(false), [foto.id]);
   // Pase automático (4 s por foto) y tamaño real. El pase se para solo en la
   // última foto; el tamaño real se olvida al cambiar de foto, porque lo que se
   // amplía es UNA foto, no el visor.
@@ -1329,6 +1592,14 @@ export function Visor({
     return () => clearInterval(id);
   }, [pase, onNext]);
   const atajosId = useId();
+  // La hoja de «?» se monta DENTRO del `<dialog>`: es un `showModal()` en la capa
+  // superior, y una hoja colgada de `body` se abriría detrás, inerte.
+  const [hojaAbierta, setHojaAbierta] = useState(false);
+  // El `<dialog>` como estado, no leyendo `ref.current` al pintar: la hoja necesita el
+  // nodo ya montado, y el primer pintado aún no lo tiene.
+  const [dialogo, setDialogo] = useState<HTMLDialogElement | null>(null);
+  useLayoutEffect(() => setDialogo(ref.current), []);
+  const opcionesHoja = { saltos: Boolean(posicion && onIr), papelera: Boolean(onDelete) };
   const cargarAlbumes = () => {
     if (lista === null)
       void albumesParaAnyadir()
@@ -1342,7 +1613,7 @@ export function Visor({
       await anyadirAlAlbum(al.id, [foto.id]);
       setAviso(t('albums.added', { title: al.title }));
     } catch (e) {
-      setAviso(sinEspacio(e) ? translate(locale, 'sharedAlbum.quotaFull') : String(e));
+      setAviso(textoDeFallo(locale, e));
     }
   };
   type Fila = [string, ComponentChildren];
@@ -1411,39 +1682,62 @@ export function Visor({
     [t('viewer.infoDimensions'), `${lados[0]} × ${lados[1]}`],
     [t('viewer.infoSize'), formatBytes(locale, foto.sizeBytes)],
   ];
-  // «240», o «100+» si quedan páginas por pedir: el total es lo cargado.
-  const totalVisor = posicion
-    ? posicion.hayMas
-      ? t('viewer.counterMore', { count: posicion.total })
-      : posicion.total
-    : 0;
   return (
     <dialog
       ref={ref}
       onClose={onClose}
       aria-describedby={atajosId}
       onKeyDown={(e) => {
-        // Un campo y un menú abierto son de quien los tiene: en un menú las flechas
-        // recorren sus opciones, no las fotos.
+        // Un campo, un menú abierto y la hoja de atajos son de quien los tiene: en un
+        // menú las flechas recorren sus opciones, no las fotos.
         if (
-          e.target instanceof HTMLElement &&
-          e.target.closest('select, input, textarea, [role="menu"]')
+          hojaAbierta ||
+          e.ctrlKey ||
+          e.metaKey ||
+          e.altKey ||
+          (e.target instanceof HTMLElement &&
+            e.target.closest('select, input, textarea, [role="menu"], [role="dialog"]'))
         )
           return;
-        const salto =
-          posicion && onIr ? saltoVisor(e.key, posicion.indice - 1, posicion.total) : null;
-        if (salto !== null) {
-          // Sin esto, Inicio y Fin desplazan la ficha o el diálogo además de saltar.
-          e.preventDefault();
-          onIr?.(salto);
-        } else if (e.key === 'ArrowLeft') onPrev?.();
-        else if (e.key === 'ArrowRight') onNext?.();
-        else if (e.key === ' ') {
-          e.preventDefault();
-          setPase((v) => !v);
-        } else if (e.key === 'i' || e.key === 'I') setConFicha((v) => !v);
-        else if (e.key === 'z' || e.key === 'Z') alternarReal();
-        else if ((e.key === 'Delete' || e.key === 'Backspace') && onDelete) setBorrando(true);
+        // La tabla de lib/atajos.ts: la misma que cuenta la hoja de «?».
+        switch (accionDelVisor(e.key)) {
+          case 'primera':
+          case 'ultima': {
+            const salto =
+              posicion && onIr ? saltoVisor(e.key, posicion.indice - 1, posicion.total) : null;
+            if (salto === null) return;
+            // Sin esto, Inicio y Fin desplazan la ficha o el diálogo además de saltar.
+            e.preventDefault();
+            onIr?.(salto);
+            return;
+          }
+          case 'anterior':
+            onPrev?.();
+            return;
+          case 'siguiente':
+            onNext?.();
+            return;
+          case 'pase':
+            e.preventDefault();
+            setPase((v) => !v);
+            return;
+          case 'ficha':
+            setConFicha((v) => !v);
+            return;
+          case 'tamanyoReal':
+            alternarReal();
+            return;
+          // Sin pregunta: la papelera se deshace desde el aviso (design §5.4).
+          case 'papelera':
+            if (onDelete && !e.repeat) onDelete(foto);
+            return;
+          case 'ayuda':
+            e.preventDefault();
+            setHojaAbierta(true);
+            return;
+          // Escape lo atiende el propio `<dialog>` (su `cancel`).
+          default:
+        }
       }}
       class="sytue-safe-fullscreen bg-bg text-text h-dvh max-h-none w-screen max-w-none p-0 backdrop:bg-black/80"
     >
@@ -1465,18 +1759,7 @@ export function Visor({
             fotos; cerrar es el aspa de cualquier diálogo de la casa. */}
         <header class="border-border flex items-center gap-2 border-b px-3 py-2 max-lg:flex-wrap">
           <span class="truncate text-sm font-medium max-lg:min-w-0 max-lg:flex-1">{foto.name}</span>
-          {posicion ? (
-            // Dónde se está en la lista: «12 / 240», o «12 / 100+» si quedan páginas
-            // por pedir. Se ve corto y se lee entero («Foto 12 de 240»).
-            <span class="text-text-muted shrink-0 text-xs tabular-nums">
-              <span aria-hidden="true">
-                {t('viewer.counter', { index: posicion.indice, total: totalVisor })}
-              </span>
-              <span class="sr-only">
-                {t('viewer.counterLabel', { index: posicion.indice, total: totalVisor })}
-              </span>
-            </span>
-          ) : null}
+          <ContadorVisor posicion={posicion} t={t} />
           <span role="status" aria-live="polite" class="text-text-muted ml-auto truncate text-xs">
             {aviso}
           </span>
@@ -1622,19 +1905,10 @@ export function Visor({
                 </IconButton>
               )}
             >
-              {(['crema', 'blanco', 'oscuro', 'damero'] as const).map((opcion) => (
+              {FONDOS_DISPONIBLES.map((opcion) => (
                 <MenuItem key={opcion} onClick={() => cambiarFondo(opcion)}>
                   <span class="flex items-center gap-2">
-                    <span
-                      class={cx(
-                        'h-3 w-3 shrink-0 rounded-full border',
-                        opcion === 'crema' && 'border-[#d8d3c6] bg-[#faf9f6]',
-                        opcion === 'blanco' && 'border-gray-300 bg-white',
-                        opcion === 'oscuro' && 'border-gray-700 bg-[#131619]',
-                        opcion === 'damero' &&
-                          'border-gray-300 bg-white bg-[repeating-conic-gradient(#cbd5e1_0%_25%,transparent_0%_50%)] bg-[length:6px_6px]',
-                      )}
-                    />
+                    <MuestraFondo fondo={opcion} />
                     <span>{t(`editor.bg_${opcion}`)}</span>
                     {fondo === opcion ? (
                       <Icon name="check" size={14} class="text-primary ml-auto" />
@@ -1643,6 +1917,16 @@ export function Visor({
                 </MenuItem>
               ))}
             </Dropdown>
+            {/* La hoja de atajos, para quien no sabe que existe «?»: con ratón no
+              hay otra forma de enterarse de que el visor se maneja con el teclado. */}
+            <IconButton
+              label={t('shortcuts.help')}
+              size="lg"
+              aria-keyshortcuts="?"
+              onClick={() => setHojaAbierta(true)}
+            >
+              <Icon name="teclado" />
+            </IconButton>
             {onDelete ? (
               <>
                 <Filete />
@@ -1650,7 +1934,7 @@ export function Visor({
                   label={t('viewer.delete')}
                   tone="danger"
                   size="lg"
-                  onClick={() => setBorrando(true)}
+                  onClick={() => onDelete(foto)}
                 >
                   <Icon name="trash" />
                 </IconButton>
@@ -1671,21 +1955,6 @@ export function Visor({
             <Icon name="close" />
           </IconButton>
         </header>
-        {borrando && onDelete ? (
-          <div
-            role="group"
-            aria-label={t('viewer.delete')}
-            class="border-border bg-surface mx-3 mb-2 flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-sm"
-          >
-            <span class="min-w-0 flex-1">{t('viewer.deleteConfirm')}</span>
-            <Button variant="danger" size="sm" onClick={() => onDelete(foto)}>
-              {t('viewer.delete')}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setBorrando(false)}>
-              {t('common.cancel')}
-            </Button>
-          </div>
-        ) : null}
         <div class="flex min-h-0 flex-1 max-md:flex-col">
           <EscenarioVisor
             prev={t('viewer.prev')}
@@ -1951,6 +2220,13 @@ export function Visor({
           ) : null}
         </div>
       </div>
+      <ShortcutsModal
+        open={hojaAbierta}
+        title={t('shortcuts.title')}
+        groups={gruposDeAtajos(t, 'visor', opcionesHoja)}
+        onClose={() => setHojaAbierta(false)}
+        container={dialogo}
+      />
       <p id={atajosId} class="sr-only">
         {t('viewer.shortcuts')}
         {posicion && onIr ? ` ${t('viewer.shortcutsJump')}` : null}
@@ -2097,6 +2373,16 @@ export function Filete(): JSX.Element {
 const SOBRE_FOTO = 'bg-black/60 text-white';
 
 /**
+ * El `onKeyDown` de una galería de filas justificadas: las flechas van de foto en foto
+ * por su sitio en pantalla (cada fila tiene las suyas, así que no hay «columnas» que
+ * contar), Inicio y Fin a la primera y a la última. Sirve igual para un `<ul class="filas">`
+ * que para un contenedor con varios meses.
+ */
+export function alTeclearEnGaleria(e: TargetedKeyboardEvent<HTMLElement>): void {
+  moverFocoEnRejilla(e, [...e.currentTarget.querySelectorAll<HTMLElement>('[data-foto-tesela]')]);
+}
+
+/**
  * Una tesela de las filas justificadas (`.filas`, en styles/app.css).
  *
  * EL HUECO SE RESERVA ANTES DE QUE LLEGUE LA IMAGEN. Sin eso, cada miniatura que
@@ -2126,18 +2412,25 @@ export function Miniatura({
   onOpen,
   seleccionada,
   onToggle,
+  onMantener,
   onFavorite,
 }: {
   foto: Foto;
   t: ReturnType<typeof useT>;
   onOpen: () => void;
-  /** En modo selección la tesela marca y desmarca en vez de abrir. */
+  /**
+   * En modo selección la tesela marca y desmarca en vez de abrir; `mayus` dice si el
+   * clic llevaba Mayús, que marca el tramo desde la anterior.
+   */
   seleccionada?: boolean;
-  onToggle?: () => void;
+  onToggle?: (mayus: boolean) => void;
+  /** Mantener pulsada la tesela (táctil) entra en el modo selección con ella marcada. */
+  onMantener?: (() => void) | undefined;
   /** Marcar favorita sin abrir la foto; sin él, la tesela solo la enseña. */
   onFavorite?: (() => void) | undefined;
 }): JSX.Element {
   const seleccionando = onToggle !== undefined;
+  const mantener = useLongPress<undefined>(seleccionando ? undefined : onMantener);
   return (
     <li
       style={estiloDeTesela(foto)}
@@ -2145,9 +2438,20 @@ export function Miniatura({
     >
       <button
         type="button"
-        onClick={seleccionando ? onToggle : onOpen}
+        onClick={(e) => (onToggle ? onToggle(e.shiftKey) : onOpen())}
+        // Mayús + clic, sin más, también extiende la selección de TEXTO del navegador
+        // por los títulos de los meses que hay en medio; aquí la tecla es de las fotos.
+        onMouseDown={(e) => {
+          if (seleccionando && e.shiftKey) e.preventDefault();
+        }}
+        onPointerDown={(e) => mantener.iniciar(e, undefined)}
+        onClickCapture={mantener.onClickCapture}
+        onContextMenuCapture={mantener.onContextMenuCapture}
         {...(seleccionando ? {} : { 'aria-haspopup': 'dialog' as const })}
-        class="sytue-focus-ring-inset block h-full w-full overflow-hidden rounded-sm"
+        data-foto-tesela=""
+        // Al llegar con las flechas, que la cabecera pegajosa del mes (y la barra de
+        // selección, si está) no tape la foto enfocada.
+        class="sytue-focus-ring-inset block h-full w-full scroll-mt-24 overflow-hidden rounded-sm"
         title={foto.description?.trim() ? `${foto.name} — ${foto.description}` : foto.name}
         aria-label={
           seleccionando

@@ -408,6 +408,9 @@ func (r *lienzoRenderer) rehacer(t fyne.Size) {
 		pos := o.AddXY(float32(c.X)/100*AnchoEscenario*k, float32(c.Y)/100*sh*k)
 		tam := fyne.NewSize(float32(c.W)/100*AnchoEscenario*k, float32(c.H)/100*sh*k)
 		objs := r.l.pintarCaja(c, pos, tam, k, v)
+		if g := GiroDe(c); g != 0 {
+			objs = girada(objs, pos, tam, g)
+		}
 		if r.l.ConPasos {
 			r.porCaja[c.ID] = primitivas(objs)
 			r.centros[c.ID] = pos.AddXY(tam.Width/2, tam.Height/2)

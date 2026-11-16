@@ -571,7 +571,7 @@ func (b *Boton) CreateRenderer() fyne.WidgetRenderer {
 	}
 	r.objetos = append(r.objetos, r.texto)
 	if b.IconoDetras != iconos.Ninguno {
-		r.detras = iconos.TrazoConTinta(b.IconoDetras, b.tamIcono(), tinta)
+		r.detras, r.iconoDetras = iconos.TrazoConTinta(b.IconoDetras, b.tamIcono(), tinta), b.IconoDetras
 		if sobreRelleno {
 			r.detras.AcentoTinta()
 		}
@@ -618,6 +618,11 @@ func atenuar(c color.NRGBA, inerte bool) color.NRGBA {
 	}
 	return atenuarCon(c, 0.5)
 }
+
+// Atenuar es la `opacity` de un elemento entero aplicada a uno de sus colores, compuesta
+// sobre la superficie: lo que hace el navegador con un control `disabled` que no es un
+// botón (la tesela de un producto sin precio en el TPV del ERP).
+func Atenuar(c color.NRGBA, o float32) color.NRGBA { return atenuarCon(c, o) }
 
 // atenuarCon es atenuar con la opacidad del grupo, que en un botón cargando es 0,75 y
 // no 0,5. El alfa se TRUNCA, que es lo que hacía la división entera de la primera
@@ -716,6 +721,8 @@ type botonRenderer struct {
 	caja            *Caja
 	texto           *canvas.Text
 	delante, detras *iconos.Dibujo
+	// iconoDetras es el dibujo que pinta `detras`, para saber si `IconoDetras` ha cambiado.
+	iconoDetras iconos.Icono
 	// tenirDelante es falso cuando el glifo lo trae la app con su propio color: un
 	// `Glifo` puesto a mano no se repinta con la tinta del rótulo.
 	tenirDelante bool
@@ -879,6 +886,13 @@ func (r *botonRenderer) Refresh() {
 	// `Dibujo` solo rehace su mapa de bits si el color ha cambiado de verdad.
 	if r.delante != nil && r.tenirDelante {
 		r.delante.TenirCon(tinta)
+	}
+	// El de detrás puede cambiar de dibujo: es el galón de un botón que despliega
+	// («Mostrar texto citado» ▾ / «Ocultar texto citado» ▴), que en la web es el
+	// mismo `<Icon>` con otro `name`. Quitarlo o ponerlo después de montar no cuenta.
+	if r.detras != nil && r.b.IconoDetras != iconos.Ninguno && r.b.IconoDetras != r.iconoDetras {
+		r.iconoDetras = r.b.IconoDetras
+		r.detras.Cambiar(r.iconoDetras, tinta)
 	}
 	if r.detras != nil {
 		r.detras.TenirCon(tinta)

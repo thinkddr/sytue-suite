@@ -16,6 +16,7 @@ import (
 	"errors"
 	"reflect"
 	"strings"
+	"unicode/utf8"
 )
 
 // EL CIFRADO DE LOS CUADERNOS DE NOTEPADS, el mismo que el de la web
@@ -168,6 +169,9 @@ type NotaEnClaro struct {
 	Title   string          `json:"title"`
 	Content string          `json:"content"`
 	Data    json.RawMessage `json:"data,omitempty"`
+	// LinksJSON is an optional future envelope field. Nil means legacy; [] is
+	// distinct and says the client sealed an explicitly empty list.
+	LinksJSON json.RawMessage `json:"links_json,omitempty"`
 }
 
 // EmpaquetarNota cifra el contenido de una nota en UN criptograma.
@@ -178,7 +182,11 @@ func EmpaquetarNota(clave []byte, n NotaEnClaro) (string, error) {
 		Title    string `json:"title"`
 		Content  string `json:"content"`
 		DataJSON string `json:"data_json,omitempty"`
-	}{Title: n.Title, Content: n.Content}
+		Links    string `json:"links_json,omitempty"`
+	}{Title: n.Title, Content: n.Content, Links: string(n.LinksJSON)}
+	if n.LinksJSON != nil && !enlacesCifradosValidos(n.LinksJSON) {
+		return "", ErrDatosCifradosNotas
+	}
 	if len(n.Data) > 0 {
 		if !json.Valid(n.Data) {
 			return "", ErrDatosCifradosNotas
@@ -212,11 +220,20 @@ func DesempaquetarNota(clave []byte, criptograma string) (NotaEnClaro, error) {
 		DataJSON string                     `json:"data_json"`
 		Patch    map[string]json.RawMessage `json:"data_patch"`
 		Removed  []string                   `json:"data_removed"`
+		Links    json.RawMessage            `json:"links_json"`
 	}
 	if json.Unmarshal([]byte(t), &stored) != nil {
 		return NotaEnClaro{}, ErrCifrado
 	}
-	n := NotaEnClaro{Title: stored.Title, Content: stored.Content, Data: stored.Data}
+	var linksJSON json.RawMessage
+	if len(stored.Links) > 0 {
+		var links string
+		if string(stored.Links) == "null" || json.Unmarshal(stored.Links, &links) != nil || !enlacesCifradosValidos(json.RawMessage(links)) {
+			return NotaEnClaro{}, ErrCifrado
+		}
+		linksJSON = json.RawMessage(links)
+	}
+	n := NotaEnClaro{Title: stored.Title, Content: stored.Content, Data: stored.Data, LinksJSON: linksJSON}
 	if stored.DataJSON != "" {
 		n.Data = json.RawMessage(stored.DataJSON)
 		if !json.Valid(n.Data) {
@@ -244,6 +261,24 @@ func DesempaquetarNota(clave []byte, criptograma string) (NotaEnClaro, error) {
 	}
 
 	return n, nil
+}
+
+// Validate the outer shape without dropping unknown link fields on round trip.
+func enlacesCifradosValidos(raw json.RawMessage) bool {
+	if !utf8.Valid(raw) {
+		return false
+	}
+	var links []json.RawMessage
+	if json.Unmarshal(raw, &links) != nil || links == nil {
+		return false
+	}
+	for _, link := range links {
+		var fields map[string]json.RawMessage
+		if json.Unmarshal(link, &fields) != nil || fields == nil {
+			return false
+		}
+	}
+	return true
 }
 
 // MaxCipherNotas coincide con el límite de escritura del servicio, tras base64.
@@ -360,11 +395,20 @@ func AbrirContenidoNota(clave []byte, n Note) (claro NotaEnClaro, migrar bool, e
 
 // CifrarContenidoNota prepara la escritura v2 completa antes de tocar la entrada.
 func CifrarContenidoNota(clave []byte, in *NoteInput) error {
+	return CifrarContenidoNotaConEnlaces(clave, in, nil)
+}
+
+// CifrarContenidoNotaConEnlaces fails closed until the server supports v3 CAS.
+// A v2 write of a v3 envelope could be silently erased by older clients.
+func CifrarContenidoNotaConEnlaces(clave []byte, in *NoteInput, links json.RawMessage) error {
+	if links != nil || len(in.Links) != 0 {
+		return ErrDatosCifradosNotas
+	}
 	privado, err := DatosPrivadosNotas(in.Data)
 	if err != nil {
 		return err
 	}
-	cifrado, err := EmpaquetarNota(clave, NotaEnClaro{Title: in.Title, Content: in.Content, Data: privado})
+	cifrado, err := EmpaquetarNota(clave, NotaEnClaro{Title: in.Title, Content: in.Content, Data: privado, LinksJSON: links})
 	if err != nil {
 		return err
 	}

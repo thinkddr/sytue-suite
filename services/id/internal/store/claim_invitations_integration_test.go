@@ -22,11 +22,11 @@ import (
 func TestInvitacionPendienteSeMaterializaAlEntrar(t *testing.T) {
 	st, ctx := newStore(t)
 	org, _ := st.CreateOrg(ctx, nil, domain.Organization{Slug: "acme", Name: "Acme"})
-	quienInvita := seedUser(t, ctx, st, "jefa@acme.test")
+	quienInvita := seedUser(ctx, t, st, "jefa@acme.test")
 	ahora := time.Now()
 
 	// Invitada con rol admin, con el correo esperándola.
-	invitada := seedUser(t, ctx, st, "ops@acme.test")
+	invitada := seedUser(ctx, t, st, "ops@acme.test")
 	if err := st.InsertInvitation(ctx, nil, "hash-viva", org.ID, "ops@acme.test",
 		string(domain.RoleAdmin), quienInvita.ID, "", "", ahora.Add(48*time.Hour)); err != nil {
 		t.Fatalf("InsertInvitation: %v", err)
@@ -60,7 +60,7 @@ func TestInvitacionPendienteSeMaterializaAlEntrar(t *testing.T) {
 
 	// Una invitación CADUCADA no vale: es el mismo plazo que el del enlace, y si
 	// no lo fuera, esta vía sería una puerta trasera a las que ya expiraron.
-	otro := seedUser(t, ctx, st, "tarde@acme.test")
+	otro := seedUser(ctx, t, st, "tarde@acme.test")
 	if err := st.InsertInvitation(ctx, nil, "hash-caducada", org.ID, "tarde@acme.test",
 		string(domain.RoleMember), quienInvita.ID, "", "", ahora.Add(-time.Hour)); err != nil {
 		t.Fatalf("InsertInvitation caducada: %v", err)
@@ -77,7 +77,7 @@ func TestInvitacionPendienteSeMaterializaAlEntrar(t *testing.T) {
 	}
 
 	// Y el correo de otra persona no arrastra invitaciones ajenas.
-	ajeno := seedUser(t, ctx, st, "nadie@acme.test")
+	ajeno := seedUser(ctx, t, st, "nadie@acme.test")
 	ninguna, err := st.ClaimPendingInvitations(ctx, nil, ajeno.ID, "nadie@acme.test", ahora)
 	if err != nil || len(ninguna) != 0 {
 		t.Errorf("sin invitación se materializaron %d (%v)", len(ninguna), err)

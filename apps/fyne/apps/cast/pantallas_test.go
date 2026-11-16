@@ -100,6 +100,10 @@ func pantallaDe(t *testing.T, nombre string, v Vista) (fyne.CanvasObject, Seccio
 			Administra: true, Mios: bloqueadosDePrueba(), Denuncias: denunciasDePrueba(),
 		}), SecModeracion
 	case "inicio":
+		// Lo que se lleva visto de dos vídeos: la barra al pie de su tarjeta.
+		v.Visto = func(id string) float64 {
+			return map[string]float64{s.mios[0].ID: 0.35, s.org[0].ID: 0.8}[id]
+		}
 		return PantallaInicio(v, Inicio{Mios: s.mios, EnDirecto: s.directos, Compartidos: s.comp, Organizacion: s.org}), SecInicio
 	case "explorar":
 		busca := ui.NuevaEntrada(v.Traduce("explore.search")).Con(ui.CampoSM)
@@ -111,6 +115,8 @@ func pantallaDe(t *testing.T, nombre string, v Vista) (fyne.CanvasObject, Seccio
 		visor := NuevoVisor(v)
 		visor.Mando = &mandoFalso{pos: 83_000_000_000, dur: s.mios[0].DurationMS * 1_000_000}
 		visor.AlAmpliar, visor.AlSilencio = func() {}, func() {}
+		// Sigue donde se dejó: con «Empezar desde el principio».
+		visor.AlDesdeInicio = func() {}
 		visor.Rehacer()
 		visor.Imagen(decodificar(posterDe("v01")))
 		vid := s.mios[0]
@@ -138,10 +144,30 @@ func pantallaDe(t *testing.T, nombre string, v Vista) (fyne.CanvasObject, Seccio
 		}
 		return PantallaVer(v, Ver{
 			Video: vid, Visor: visor.Objeto(),
+			Diapositivas: &api.CastPresentacion{Index: 2, Total: 12, Title: "Ventas por región"},
 			Chat: &Chat{
 				Mensajes: mensajes, Campo: entrada(""), Activo: true, ConSesion: true, Moderar: true, Conectado: true, Viendo: 42,
 				MiSub: "u3", AlDenunciar: func(api.CastChatMessage) {}, AlBloquear: func(api.CastChatMessage) {},
 			},
+		}), 255
+	case "grabacion":
+		// La grabación de un directo presentado con Diapos: sus capítulos.
+		visor := NuevoVisor(v)
+		visor.Mando = &mandoFalso{pos: 83_000_000_000, dur: 40 * 60_000_000_000}
+		visor.AlAmpliar, visor.AlSilencio = func() {}, func() {}
+		visor.Rehacer()
+		visor.Imagen(decodificar(posterDe("v10")))
+		vid := directoDePrueba()
+		vid.Status, vid.DurationMS = api.CastStatusReady, 40*60_000
+		return PantallaVer(v, Ver{
+			Video: vid, Visor: visor.Objeto(), AlCapitulo: func(int64) {},
+			Diapositivas: &api.CastPresentacion{Index: 3, Total: 4, Marks: []api.CastMarca{
+				{AtMS: 0, Index: 0, Title: "Portada"},
+				{AtMS: 95_000, Index: 1, Title: "Ventas por región"},
+				{AtMS: 610_000, Index: 2, Title: "Margen bruto y previsión para el cierre del año"},
+				{AtMS: 1_420_000, Index: 3},
+			}},
+			Comentarios: Comentarios{Lista: s.comentarios, Campo: entrada(""), ConSesion: true},
 		}), 255
 	case "subir":
 		q := api.CastQuota{LimitBytes: 200 << 30, UsedBytes: 57 << 30, AvailableBytes: 143 << 30, CastBytes: 12 << 30}
@@ -224,7 +250,11 @@ var pantallasConVacia = map[string]bool{"inicio": true, "explorar": true, "canal
 //
 // Con SYTUE_CAPTURA=/ruta deja las capturas para MIRARLAS.
 func TestLasPantallasEnSusSeisEstados(t *testing.T) {
-	pantallas := []string{"inicio", "explorar", "canal", "ver", "directo", "subir", "gestionar", "emitir", "moderacion"}
+	if conRaza {
+		t.Skip("el barrido de píxeles se ejecuta en el gate de capturas sin -race; las interacciones conservan el detector")
+	}
+
+	pantallas := []string{"inicio", "explorar", "canal", "ver", "directo", "grabacion", "subir", "gestionar", "emitir", "moderacion"}
 	for _, variante := range []tema.Variante{tema.Claro, tema.Oscuro} {
 		nombreVar := "claro"
 		if variante == tema.Oscuro {
@@ -238,7 +268,7 @@ func TestLasPantallasEnSusSeisEstados(t *testing.T) {
 					if e.e == Vacia && !pantallasConVacia[p] {
 						continue
 					}
-					if e.e != Lista && p == "directo" {
+					if e.e != Lista && (p == "directo" || p == "grabacion") {
 						continue
 					}
 					// En oscuro, la lista y un estado de fallo: los demás estados son los

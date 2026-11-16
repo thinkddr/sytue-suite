@@ -7,7 +7,8 @@
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { expect, test } from 'bun:test';
 import { render } from 'preact';
-import { Dropdown, MenuItem, encajarPanel } from './Dropdown.js';
+import { Dropdown, MenuItem, cajaDePunto, encajarPanel } from './Dropdown.js';
+import type { PuntoDeMenu } from './Dropdown.js';
 
 // Idempotente: otro fichero de test puede haber registrado ya happy-dom.
 if (typeof document === 'undefined') GlobalRegistrator.register();
@@ -127,6 +128,47 @@ test('Escape cierra y devuelve el foco al disparador', async () => {
   host.remove();
 });
 
+test('las opciones marcables (menuitemradio) también se recorren con las flechas', async () => {
+  const host = document.body.appendChild(document.createElement('div'));
+  render(
+    <Dropdown
+      label="Hoja"
+      trigger={(props) => (
+        <button type="button" {...props}>
+          Hoja
+        </button>
+      )}
+    >
+      <MenuItem onClick={() => {}}>Renombrar</MenuItem>
+      <button type="button" role="menuitemradio" aria-checked="false">
+        Rojo
+      </button>
+      <button type="button" role="menuitemradio" aria-checked="true" disabled>
+        Azul
+      </button>
+      <button type="button" role="menuitemradio" aria-checked="false">
+        Verde
+      </button>
+    </Dropdown>,
+    host,
+  );
+  host.querySelector('button')?.click();
+  await tick();
+  expect(enFoco()).toBe('Renombrar');
+  const menu = document.querySelector<HTMLElement>('[role="menu"]')!;
+  for (const el of menu.querySelectorAll<HTMLElement>('[role="menuitemradio"]')) {
+    expect(el.tabIndex).toBe(-1);
+  }
+  tecla('ArrowDown');
+  expect(enFoco()).toBe('Rojo');
+  tecla('ArrowDown'); // la inerte se salta
+  expect(enFoco()).toBe('Verde');
+  tecla('End');
+  expect(enFoco()).toBe('Verde');
+  render(null, host);
+  host.remove();
+});
+
 // El panel no tapa su disparador: se queda en el hueco de un lado y lo que no entra se
 // desplaza por dentro. Las medidas son las del menú de cuenta, que al ganar los
 // selectores de color y forma pasó a medir más que el hueco bajo la barra (2026-10-05).
@@ -238,4 +280,161 @@ test('en el teléfono el menú es una hoja inferior con el velo de los diálogos
     render(null, host);
     host.remove();
   }
+});
+
+/* ---------- Modo controlado: el menú contextual (clic derecho, Mayús+F10) ---------- */
+
+/** Una «rejilla» enfocable y su menú contextual, abierto y cerrado desde fuera. */
+function montarContextual(host: HTMLElement): {
+  rejilla: HTMLElement;
+  abrir: (p: PuntoDeMenu) => Promise<void>;
+  cierres: () => number;
+  acciones: string[];
+} {
+  const rejilla = document.body.appendChild(document.createElement('div'));
+  rejilla.tabIndex = 0;
+  let cierres = 0;
+  const acciones: string[] = [];
+  const pintar = (punto: PuntoDeMenu | null): void =>
+    render(
+      <Dropdown
+        label="Acciones de la celda B2"
+        abiertoEn={punto}
+        onCerrar={() => {
+          cierres++;
+          pintar(null);
+        }}
+      >
+        {(close) => (
+          <>
+            <MenuItem
+              onClick={() => {
+                close();
+                acciones.push('copiar');
+              }}
+            >
+              Copiar
+            </MenuItem>
+            <MenuItem disabled title="La hoja está protegida">
+              Eliminar filas
+            </MenuItem>
+            <MenuItem onClick={() => close()}>Borrar contenido</MenuItem>
+          </>
+        )}
+      </Dropdown>,
+      host,
+    );
+  pintar(null);
+  return {
+    rejilla,
+    abrir: async (p) => {
+      rejilla.focus();
+      pintar(p);
+      await tick();
+    },
+    cierres: () => cierres,
+    acciones,
+  };
+}
+
+test('controlado: sin punto no hay menú; con punto se abre allí, con el foco en el primer ítem', async () => {
+  const host = document.body.appendChild(document.createElement('div'));
+  const m = montarContextual(host);
+  await tick();
+  expect(document.querySelector('[role="menu"]')).toBeNull();
+  // Sin disparador no deja ningún botón en la página.
+  expect(host.querySelector('button')).toBeNull();
+  await m.abrir({ x: 120, y: 90 });
+  const menu = document.querySelector<HTMLElement>('[role="menu"]')!;
+  expect(menu.getAttribute('aria-label')).toBe('Acciones de la celda B2');
+  expect(menu.parentElement).toBe(document.body);
+  expect(enFoco()).toBe('Copiar');
+  // Las flechas se saltan la opción deshabilitada (vetada por la protección).
+  tecla('ArrowDown');
+  expect(enFoco()).toBe('Borrar contenido');
+  render(null, host);
+  m.rejilla.remove();
+  host.remove();
+});
+
+test('controlado: Escape cierra, avisa y devuelve el foco a lo que lo tenía (la celda)', async () => {
+  const host = document.body.appendChild(document.createElement('div'));
+  const m = montarContextual(host);
+  await m.abrir({ x: 40, y: 40 });
+  expect(document.activeElement).not.toBe(m.rejilla);
+  tecla('Escape');
+  await tick();
+  expect(m.cierres()).toBe(1);
+  expect(document.querySelector('[role="menu"]')).toBeNull();
+  expect(document.activeElement).toBe(m.rejilla);
+  render(null, host);
+  m.rejilla.remove();
+  host.remove();
+});
+
+test('controlado: una acción cierra el menú y el foco vuelve a la celda', async () => {
+  const host = document.body.appendChild(document.createElement('div'));
+  const m = montarContextual(host);
+  await m.abrir({ x: 40, y: 40 });
+  (document.activeElement as HTMLElement).click();
+  await tick();
+  expect(m.acciones).toEqual(['copiar']);
+  expect(m.cierres()).toBe(1);
+  expect(document.querySelector('[role="menu"]')).toBeNull();
+  expect(document.activeElement).toBe(m.rejilla);
+  render(null, host);
+  m.rejilla.remove();
+  host.remove();
+});
+
+test('controlado: el clic fuera cierra y el clic derecho dentro del menú no abre el del navegador', async () => {
+  const host = document.body.appendChild(document.createElement('div'));
+  const m = montarContextual(host);
+  await m.abrir({ x: 40, y: 40 });
+  const menu = document.querySelector<HTMLElement>('[role="menu"]')!;
+  const ev = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+  menu.dispatchEvent(ev);
+  expect(ev.defaultPrevented).toBe(true);
+  document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  await tick();
+  expect(m.cierres()).toBe(1);
+  expect(document.querySelector('[role="menu"]')).toBeNull();
+  render(null, host);
+  m.rejilla.remove();
+  host.remove();
+});
+
+test('desde un punto, el panel sale con la esquina en él y sube si abajo no cabe', () => {
+  const ventana = { ancho: 1280, alto: 800 };
+  const abajo = encajarPanel(
+    cajaDePunto({ x: 300, y: 200 }),
+    { ancho: 240, alto: 300 },
+    ventana,
+    'bottom',
+    'start',
+  );
+  expect(abajo.top).toBe(200);
+  expect(abajo.left).toBe(300);
+  const arriba = encajarPanel(
+    cajaDePunto({ x: 1200, y: 760 }),
+    { ancho: 240, alto: 300 },
+    ventana,
+    'bottom',
+    'start',
+  );
+  // Arriba del punto y metido dentro de la ventana por la derecha.
+  expect(arriba.top).toBe(460);
+  expect(arriba.left).toBe(1280 - 240 - 8);
+});
+
+test('desde una caja (la celda activa con Mayús+F10), el panel cuelga de ella sin taparla', () => {
+  const caja = encajarPanel(
+    cajaDePunto({ x: 100, y: 300, ancho: 96, alto: 24 }),
+    { ancho: 240, alto: 200 },
+    { ancho: 1280, alto: 800 },
+    'bottom',
+    'start',
+  );
+  expect(caja.top).toBe(300 + 24 + 6);
+  expect(caja.left).toBe(100);
 });

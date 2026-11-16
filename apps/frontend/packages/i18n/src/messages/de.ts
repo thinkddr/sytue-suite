@@ -5,7 +5,62 @@
 import type { Catalog } from './catalog.js';
 
 export const de: Catalog = {
+  'matrix.reset': 'Ich habe kein anderes Gerät',
+  'matrix.resetAction': 'Verschlüsselung zurücksetzen',
+  'matrix.resetBody':
+    'Die Verschlüsselung deines Kontos wird zurückgesetzt. Ältere verschlüsselte Nachrichten bleiben nur auf Geräten lesbar, die sie bereits haben, und du musst deine anderen Geräte und deine Kontakte erneut verifizieren.',
+  'matrix.resetUnderstood':
+    'Mir ist klar, dass ich den Zugriff auf ältere verschlüsselte Nachrichten verlieren kann',
+  'matrix.unknownKey':
+    'Dieses Konto wurde verschlüsselt, bevor Sytue seinen Schlüssel mit deiner Anmeldung geschützt hat. Verifiziere dieses Gerät mit einem anderen, auf dem du bereits angemeldet bist.',
+  'matrix.unlockTitle': 'Verschlüsselte Daten öffnen',
+  'matrix.unlockBody':
+    'Bestätige mit deinem Passkey oder deinem Sytue-Passwort, dass du es bist. Die Prüfung erfolgt auf diesem Gerät: Niemand sonst kann deine Daten öffnen.',
+  'matrix.protectTitle': 'Verschlüsselte Daten schützen',
+  'matrix.protectBody':
+    'Wähle, wie du deine verschlüsselten Daten auf deinen anderen Geräten öffnest: mit deinem Passkey oder deinem Sytue-Passwort. Nur du kannst sie öffnen.',
+  'matrix.usePasskey': 'Passkey verwenden',
+  'matrix.usePassword': 'Passwort verwenden',
+  'matrix.password': 'Sytue-Passwort',
+  'matrix.passwordConfirm': 'Passwort wiederholen',
+  'matrix.passwordMismatch': 'Die Passwörter stimmen nicht überein.',
+  'matrix.unlockWrong': 'Das hat nicht geklappt. Versuche es erneut.',
+  'matrix.passkeyUnsupported':
+    'Dieser Passkey kann keine verschlüsselten Daten öffnen. Verwende dein Passwort.',
+  // Device verification and recovery shared by the suite.
+  'matrix.allowStorageTitle': 'Verschlüsselte Verarbeitung erlauben',
+  'matrix.allowStorageBody':
+    'Erlaube diesem verifizierten Gerät, neue verschlüsselte Daten dieser App zu verarbeiten.',
+  'matrix.allowStorageAction': 'Dieses Gerät erlauben',
+  'matrix.choosePerson': 'Wähle jemanden aus diesem Kanal',
+  'matrix.notices': 'Lizenzen Dritter',
+  'action.cancel': 'Abbrechen',
+  'action.done': 'Fertig',
+  'matrix.auth': 'Bestätige deine Identität',
+  'matrix.authContinue': 'Ich habe mich angemeldet',
+  'matrix.compare': 'Vergleiche diese Emojis auf beiden Geräten.',
+  'matrix.connect': 'Dieses Gerät einrichten',
+  'matrix.devices': 'Deine Geräte',
+  'matrix.failed': 'Die Verschlüsselung konnte nicht eingerichtet werden. Versuche es erneut.',
+  'matrix.incoming': 'Dieses Gerät verifizieren',
+  'matrix.match': 'Sie stimmen überein',
+  'matrix.mismatch': 'Sie stimmen nicht überein',
+  'matrix.revoke': 'Gerät abmelden',
+  'matrix.subtitle':
+    'Nachrichten und Dateien werden auf deinen Geräten verschlüsselt. Nur verifizierte Geräte können sie lesen.',
+  'matrix.tab':
+    'Rooms ist in einem anderen Tab geöffnet. Schließe ihn, um dieses Gerät hier zu verwenden.',
+  'matrix.title': 'Ende-zu-Ende-Verschlüsselung',
+  'matrix.trusted': 'Gerät verifiziert',
+  'matrix.verify': 'Mit einem anderen Gerät verifizieren',
+  'matrix.verifyPeopleFirst':
+    'Verifiziere die Personen in dieser Unterhaltung, bevor du deine erste Nachricht sendest.',
+  'matrix.verifyPerson': 'Eine Person verifizieren',
+  'matrix.waiting': 'Warten auf das andere Gerät…',
+  'state.loading': 'Wird geladen…',
+
   'action.retry': 'Erneut versuchen',
+  'account.connectFailed': 'Dieses Konto konnte nicht verbunden werden.',
   'error.connection': 'Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
 
   'ui.save': 'Speichern',
@@ -18,6 +73,7 @@ export const de: Catalog = {
   'ui.mainNav': 'Hauptnavigation',
   'ui.openNav': 'Navigation öffnen',
   'ui.closeNav': 'Navigation schließen',
+  'ui.settingsIndex': 'Abschnitte auf dieser Seite',
   'ui.backToList': 'Zurück zur Liste',
   'ui.suiteOpen': 'Sytue: Apps, Suche, Benachrichtigungen und Konto',
   'ui.suiteClose': 'Zurück zur App',
@@ -28,6 +84,14 @@ export const de: Catalog = {
 
   'ui.bulk.region': 'Aktionen für die Auswahl',
   'ui.bulk.clear': 'Auswahl aufheben',
+
+  'ui.copy.copy': 'Kopieren',
+  'ui.copy.copyLabel': '{label} kopieren',
+  'ui.copy.copied': 'Kopiert',
+  'ui.copy.copiedLabel': 'Kopiert: {label}',
+  'ui.copy.failed': 'Kopieren nicht möglich. Markieren Sie den Wert und kopieren Sie ihn von Hand.',
+  'ui.copy.secret': 'geheim',
+  'ui.migas.ocultas': 'Ausgeblendete Ordner anzeigen',
 
   'ui.wizard.back': 'Zurück',
   'ui.wizard.next': 'Weiter',
@@ -41,6 +105,13 @@ export const de: Catalog = {
   'shell.appSwitcher': 'Sytue One — Apps der Suite',
   'shell.apps': 'Apps von Sytue One',
   'shell.shortcutHint': 'Tastenkürzel: {keys}',
+  'shell.shortcuts.title': 'Tastenkürzel',
+  'shell.shortcuts.group': 'Gesamte Suite',
+  'shell.shortcuts.search': 'In Sytue One suchen',
+  'shell.shortcuts.help': 'Diese Liste anzeigen',
+  'shell.shortcuts.close': 'Dialog oder Menü schließen',
+  'shell.shortcuts.contextMenu': 'Kontextmenü öffnen',
+  'shell.shortcuts.key.shift': 'Umschalt',
   'shell.launchAtLogin': 'Beim Anmelden öffnen',
   'shell.mountDrive': 'Drive mit diesem Computer verbinden',
   'shell.update.check': 'Nach Updates suchen',
@@ -69,6 +140,10 @@ export const de: Catalog = {
   'shell.lock.reasonNotebook': 'dein verschlüsseltes Notizbuch öffnen',
   'shell.lock.faceIdUsage':
     'Sytue verwendet Face ID, um deine Sitzung beim Öffnen der App zu entsperren.',
+  'shell.photos.libraryUsage':
+    'Sytue liest die Fotos und Videos auf diesem Gerät, um sie in deinem Sytue Drive zu sichern.',
+  'shell.photos.libraryAddUsage':
+    'Sytue speichert die Fotos, die du herunterlädst, in deiner Fotomediathek.',
   'shell.widgets.wake': 'Widgets bei geschlossener App aktualisieren',
   'shell.widgets.wakeHelp':
     'Wenn sich bei dir etwas ändert, weckt Sytue die App mit einer leeren Mitteilung über Apple, damit sie ihr Widget aktualisiert. Apple sieht, welche App und wann, aber nie, was sich geändert hat.',
@@ -126,6 +201,13 @@ export const de: Catalog = {
   'search.kind.contact': 'Kontakte',
   'search.kind.note': 'Notizen',
   'search.kind.channel': 'Kanäle',
+  'suitePalette.dialog': 'Gehe zu oder suche',
+  'suitePalette.input': 'Suchen oder springen',
+  'suitePalette.placeholder': 'In Sytue One suchen oder springen…',
+  'suitePalette.typeToSearch': 'Tippen, um in ganz Sytue One zu suchen',
+  'suitePalette.hint.move': 'bewegen',
+  'suitePalette.hint.open': 'öffnen',
+  'suitePalette.hint.close': 'schließen',
 
   'notifications.title': 'Benachrichtigungen',
   'notifications.viewAll': 'Alle Benachrichtigungen ansehen',
@@ -167,6 +249,9 @@ export const de: Catalog = {
   'notifications.kind.docs.signature.requested': '{actor} bittet Sie, „{name}“ zu signieren',
   'notifications.kind.docs.signature.completed': '{actor} hat „{name}“ signiert',
   'notifications.kind.docs.signature.declined': '{actor} hat die Signatur von „{name}“ abgelehnt',
+  'notifications.kind.docs.signature.expired': 'Die Signaturanfrage für „{name}“ ist abgelaufen',
+  'notifications.kind.docs.signature.reminder':
+    '{actor} wartet noch auf Ihre Signatur für „{name}“',
   'notifications.kind.docs.access.granted':
     '{actor} hat Ihnen Bearbeitungszugriff auf „{name}“ gegeben',
   'notifications.kind.erp.task.assigned': '{actor} hat Ihnen „{title}“ zugewiesen',
@@ -215,6 +300,18 @@ export const de: Catalog = {
   'account.color.petroleo': 'Petrol',
   'account.color.cobalto': 'Kobaltblau',
   'account.color.app': 'Je App',
+  'userColor.red': 'Rot',
+  'userColor.clay': 'Orange',
+  'userColor.brass': 'Ocker',
+  'userColor.sage': 'Oliv',
+  'userColor.green': 'Grün',
+  'userColor.teal': 'Blaugrün',
+  'userColor.cyan': 'Petrol',
+  'userColor.blue': 'Blau',
+  'userColor.indigo': 'Indigo',
+  'userColor.plum': 'Lila',
+  'userColor.rose': 'Rosa',
+  'userColor.slate': 'Grau',
   'account.forma': 'Form',
   'account.forma.marco': 'Rahmen',
   'account.forma.carril': 'Schiene',
@@ -326,6 +423,7 @@ export const de: Catalog = {
     'Dieses Blatt ist geschützt: Die Zellen können erst nach Aufheben des Schutzes geändert werden.',
   'readOnly.password': 'Passwort',
   'notifications.kind.erp.access.requested': '{actor} möchte „{name}“ bearbeiten',
+  'notifications.kind.erp.approval.requested': '{actor} bittet Sie, „{name}“ freizugeben',
   'notifications.kind.erp.access.granted':
     '{actor} hat Ihnen Bearbeitungszugriff auf „{name}“ gegeben',
   'readOnly.module': 'Schreibgeschützt in „{name}“: Sie können es sehen, aber nicht ändern.',
@@ -411,4 +509,7 @@ export const de: Catalog = {
     'Um „{name}“ zu öffnen, wird die Datei in dein Sytue-One-Konto hochgeladen.',
   'localFile.confirmUpload.remember': 'Meine Auswahl auf diesem Gerät merken',
   'localFile.confirmUpload.confirm': 'Hochladen und öffnen',
+  'action.back': 'Zurück',
+  'action.close': 'Schließen',
+  'action.copy': 'Kopieren',
 };

@@ -34,6 +34,11 @@ type Ver struct {
 	// DescripcionAbierta es el «Mostrar más» de una descripción larga.
 	DescripcionAbierta bool
 
+	// Diapositivas es la presentación de Diapos del directo o de su grabación; nil,
+	// ninguna. AlCapitulo lleva la grabación a una marca (ms desde el comienzo).
+	Diapositivas *api.CastPresentacion
+	AlCapitulo   func(ms int64)
+
 	AlCompartir, AlDescargar, AlAlternarDescripcion func()
 	AlGestionar, AlCanal, AlTerminar                func()
 	// AlDenunciar y AlDenunciarAutor abren la denuncia del vídeo y de quien lo publica;
@@ -56,6 +61,11 @@ func PantallaVer(v Vista, d Ver) *fyne.Container {
 	principal := []ui.Bloque{}
 	if d.Visor != nil && !bordeABorde {
 		principal = append(principal, ui.Bloque{Obj: d.Visor, Margen: tema.Espacio(4)})
+	}
+	// La diapositiva en curso o los capítulos van entre el reproductor y el título, como
+	// en WatchApp.tsx.
+	if o := BloqueDiapositivas(v, d.Diapositivas, d.Video.EnDirecto(), d.AlCapitulo); o != nil {
+		principal = append(principal, ui.Bloque{Obj: o, Margen: tema.Espacio(4)})
 	}
 	principal = append(principal, fichaVideo(v, d)...)
 	var pagina *fyne.Container
@@ -115,7 +125,9 @@ func fichaVideo(v Vista, d Ver) []ui.Bloque {
 	izquierda := []fyne.CanvasObject{ui.NuevoAvatar(vid.Owner.Name).Con(ui.AvatarSM), autor, datos}
 
 	var mandos []fyne.CanvasObject
-	mandos = append(mandos, ui.NuevoBoton(v.Traduce("watch.share"), d.AlCompartir).Con(ui.Secundario, ui.TallaSM).ConIcono(iconos.Enlace, iconos.TallaSM))
+	if d.AlCompartir != nil {
+		mandos = append(mandos, ui.NuevoBoton(v.Traduce("watch.share"), d.AlCompartir).Con(ui.Secundario, ui.TallaSM).ConIcono(iconos.Enlace, iconos.TallaSM))
+	}
 	if d.Descargar {
 		mandos = append(mandos, ui.NuevoBoton(v.Traduce("watch.download"), d.AlDescargar).Con(ui.Secundario, ui.TallaSM).ConIcono(iconos.Descargar, iconos.TallaSM))
 	}

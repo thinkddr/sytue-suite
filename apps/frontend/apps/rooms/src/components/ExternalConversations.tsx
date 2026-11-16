@@ -27,6 +27,7 @@ import {
   Textarea,
   Wizard,
   type WizardStep,
+  EmptyState,
 } from '@sytue/ui';
 import type { T } from '../i18n/index.js';
 import { ExternalMeetings, type MeetingScope, type MeetingChannel } from './ExternalMeetings.js';
@@ -708,7 +709,7 @@ function ExternalConversation({
         {loading ? (
           <Spinner />
         ) : !messages.length ? (
-          <p class="text-text-muted py-6 text-center text-sm">{t('message.noneYet')}</p>
+          <EmptyState compact icon="comment" title={t('message.noneYet')} />
         ) : null}
         <ol class="space-y-4">
           {sorted.map((message) => (

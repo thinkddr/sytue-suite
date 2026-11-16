@@ -4,7 +4,8 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { afterEach, expect, test } from 'bun:test';
 import { render } from 'preact';
 import type { NoteInput, Notebook } from '@sytue/api-clients';
-import { NotebookDashboard } from './NotebookDashboard.js';
+import { NotebookDashboard, textoPendiente } from './NotebookDashboard.js';
+import type { CapturaPendiente } from '../client/cola.js';
 if (typeof document === 'undefined') GlobalRegistrator.register();
 const t = ((key: string) => key) as never;
 let host: HTMLElement | null = null;
@@ -16,6 +17,12 @@ afterEach(() => {
   }
 });
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+test('una captura heredada malformada se puede mostrar sin descartar el registro', () => {
+  const captura = { client_id: 'legacy', input: null, at: 1, rechazada: true };
+  expect(textoPendiente(captura as unknown as CapturaPendiente)).toBe('');
+});
+
 function montar(
   capture: () => Promise<boolean>,
   draft: (s: string) => void,

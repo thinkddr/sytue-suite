@@ -11,9 +11,25 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
 
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/auth"
 )
+
+// aplanar baja a lo de dentro de las secciones (`ui.SeccionAjustes` y el `colocado` del
+// Hub), que son widgets con sus propios objetos: lo que se busca en una pantalla puede
+// estar dentro de una.
+func aplanar(objetos []fyne.CanvasObject) []fyne.CanvasObject {
+	var out []fyne.CanvasObject
+	for _, o := range objetos {
+		out = append(out, o)
+		switch w := o.(type) {
+		case *ui.SeccionAjustes, *ui.MarcoAjustes, *colocado:
+			out = append(out, aplanar(test.WidgetRenderer(w.(fyne.Widget)).Objects())...)
+		}
+	}
+	return out
+}
 
 // coordenadasDePrueba son las de producción.
 var coordenadasDePrueba = api.Coordenadas{
@@ -141,9 +157,9 @@ func TestElAsistenteVaYVuelve(t *testing.T) {
 	if d.Paso != 1 {
 		t.Fatalf("tras «Continuar» se está en el paso %d", d.Paso+1)
 	}
-	var filas []*FilaCopia
-	for _, o := range r.objetos {
-		if f, ok := o.(*FilaCopia); ok {
+	var filas []*ui.FilaCopia
+	for _, o := range aplanar(r.objetos) {
+		if f, ok := o.(*ui.FilaCopia); ok {
 			filas = append(filas, f)
 		}
 	}
@@ -152,15 +168,15 @@ func TestElAsistenteVaYVuelve(t *testing.T) {
 	if len(filas) != 4 {
 		t.Fatalf("hay %d filas de copiar a la vista y Thunderbird enseña cuatro", len(filas))
 	}
-	filas[0].boton.Tapped(nil)
+	filas[0].Boton().Tapped(nil)
 	if copiado != "ada@acme.eu" || aviso != "devices.copied.address" {
 		t.Errorf("«Copiar» manda %q con el aviso %q", copiado, aviso)
 	}
 
 	r.siguiente.Tapped(nil)
 	pintaClientesExternos(t, d, 1280, "dispositivos-paso3")
-	res, ok := r.cuerpo.(tope).b.(*columna).hijos[0].(*resumen)
-	if d.Paso != 2 || !ok || len(res.claves) != 2 {
+	res, ok := r.cuerpo.(tope).b.(*columna).hijos[0].(objetoB).o.(*ui.Resumen)
+	if d.Paso != 2 || !ok || len(res.Filas) != 2 {
 		t.Fatalf("en el paso %d el resumen tiene que decir dos cosas (correo y calendario)", d.Paso+1)
 	}
 	otra := r.cuerpo.(tope).b.(*columna).hijos[2].(fijo).o
@@ -184,8 +200,10 @@ func TestSinCoordenadasNoSeInventaNada(t *testing.T) {
 	}
 	v.controlClientes.pantalla.Show() // la vista la tiene escondida detrás del inicio
 	r := pintaClientesExternos(t, v.controlClientes.pantalla, 1280, "dispositivos-sin-datos")
-	if _, ok := r.cuerpo.(*bSeccion); !ok {
+	if b, ok := r.cuerpo.(objetoB); !ok {
 		t.Errorf("sin datos el cuerpo es %T y tiene que ser la sección del aviso", r.cuerpo)
+	} else if _, ok := b.o.(*ui.SeccionAjustes); !ok {
+		t.Errorf("sin datos el cuerpo lleva %T y tiene que ser la sección del aviso", b.o)
 	}
 
 	v.ConCoordenadasClientesExternos(func(context.Context) (api.Coordenadas, error) { return coordenadasDePrueba, nil })

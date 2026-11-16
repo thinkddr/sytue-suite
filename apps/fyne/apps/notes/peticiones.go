@@ -31,7 +31,7 @@ func (p *Pantalla) engancharPeticion(c Cuaderno) {
 		Recomponer:    p.Repintar,
 		T:             p.tPeticion,
 		Concedido:     "notes.access.granted", Recurso: c.ID,
-		AlConceder: func() { go p.cargarCuadernos() },
+		AlConceder: func() { p.iniciar(p.cargarCuadernos) },
 	})
 }
 

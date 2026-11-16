@@ -41,3 +41,8 @@ Website = "https://sytue.eu"
   # la Mac App Store, `empaquetar.sh macappstore` le da el derecho de sandbox
   # `files.user-selected.read-write`. Las que no lo declaran no lo llevan.
   ficheros = "si"
+  # Lee la galería DEL SISTEMA (la copia de seguridad) y guarda en ella lo que se baja
+  # (apps/nucleo/carrete): `empaquetar.sh` le da los permisos de la galería en Android,
+  # las claves NSPhotoLibrary* del Info.plist y, en macOS, el derecho
+  # `personal-information.photos-library`. Las que no lo declaran no lo llevan.
+  fototeca = "si"

@@ -14,6 +14,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/test"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
@@ -38,6 +39,7 @@ func TestElContratoDelAvisoEsElDeToastTsx(t *testing.T) {
 		{"mt-1.5 rounded-sm text-sm font-semibold", "la acción"},
 		{"mt-1 inline-flex h-7 w-7 shrink-0", "el aspa de 28"},
 		{"duration ?? (persistent ? 0 : 5000)", "los 5 s, y que advertencia y peligro persisten"},
+		{"MAX_AVISOS_VISIBLES = 3", "el tope de avisos en pantalla, el de MaxAvisosVisibles"},
 	} {
 		if !strings.Contains(fuente, c.trozo) {
 			t.Errorf("Toast.tsx ya no dice %q (%s)", c.trozo, c.porque)
@@ -115,12 +117,148 @@ func pilaQueSeVacia(t *testing.T) *PilaAvisos {
 	// (ci-desktop de v3.19.7: el aviso en {0 56} midiendo 60). Con ventana propia no
 	// hereda nada.
 	test.NewTempWindow(t, p)
+	// Descartar uno de pantalla trae el siguiente de la cola, así que se vacía hasta que
+	// no quede ninguno: uno en cola con reloj lo arrancaría al entrar, ya sin su test.
 	t.Cleanup(func() {
-		for _, a := range p.Avisos() {
-			p.Descartar(a)
+		for len(p.Avisos()) > 0 {
+			for _, a := range p.Avisos() {
+				p.Descartar(a)
+			}
 		}
 	})
 	return p
+}
+
+// dejarPasar deja correr el reloj de pared `d`, atendiendo mientras tanto los
+// `fyne.Do` que encolen los relojes de los avisos.
+func dejarPasar(d time.Duration) {
+	limite := time.Now().Add(d)
+	for time.Now().Before(limite) {
+		fyne.DoAndWait(func() {})
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// avisoCorto es un aviso de éxito de 60 ms, con su renderer ya hecho para que tenga
+// aspa y acción.
+func avisoCorto(t *testing.T, titulo string) *Aviso {
+	t.Helper()
+	a := NuevoAviso(AvisoExito, titulo, "")
+	a.Duracion = 60 * time.Millisecond
+	a.RotuloAccion = "Deshacer"
+	test.WidgetRenderer(a)
+	return a
+}
+
+// TestElAvisoNoSeVaConElPunteroEncima: con el puntero en la tarjeta —o en su aspa,
+// que para Fyne es otro `Hoverable`— el reloj se para, y al salir sigue con lo que le
+// quedaba (WCAG 2.2.1, design.md §3.11). Espejo del de Toast.test.tsx.
+//
+// VISTO EN ROJO: sin `Aviso.MouseIn`, el aviso de 60 ms se va con el puntero encima.
+func TestElAvisoNoSeVaConElPunteroEncima(t *testing.T) {
+	p := pilaQueSeVacia(t)
+	a := avisoCorto(t, "Guardado")
+	p.Notificar(a)
+
+	a.MouseIn(&desktop.MouseEvent{})
+	dejarPasar(200 * time.Millisecond)
+	if len(p.Avisos()) != 1 {
+		t.Fatal("con el puntero encima, el aviso se ha ido solo")
+	}
+	// Al pasar al aspa, Fyne saca el puntero de la tarjeta: sigue retenido.
+	a.MouseOut()
+	a.aspa.MouseIn(&desktop.MouseEvent{})
+	dejarPasar(200 * time.Millisecond)
+	if len(p.Avisos()) != 1 {
+		t.Fatal("con el puntero en el aspa, el aviso se ha ido solo")
+	}
+
+	a.aspa.MouseOut()
+	esperar(t, func() bool { return len(p.Avisos()) == 0 })
+	if len(p.Avisos()) != 0 {
+		t.Error("al sacar el puntero, el aviso no se ha ido cuando le tocaba")
+	}
+}
+
+// TestElAvisoNoSeVaConElFocoDentro: tabular hasta «Deshacer» o hasta el aspa también
+// para el reloj; al salir el foco, sigue.
+//
+// VISTO EN ROJO: sin `alEnfoque` ni `alCambio`, el aviso se va con el foco dentro.
+func TestElAvisoNoSeVaConElFocoDentro(t *testing.T) {
+	p := pilaQueSeVacia(t)
+	a := avisoCorto(t, "Movido a la papelera")
+	p.Notificar(a)
+
+	a.accion.FocusGained()
+	dejarPasar(200 * time.Millisecond)
+	if len(p.Avisos()) != 1 {
+		t.Fatal("con el foco en la acción, el aviso se ha ido solo")
+	}
+	// Tab de la acción al aspa: sigue dentro.
+	a.accion.FocusLost()
+	a.aspa.FocusGained()
+	dejarPasar(200 * time.Millisecond)
+	if len(p.Avisos()) != 1 {
+		t.Fatal("con el foco en el aspa, el aviso se ha ido solo")
+	}
+
+	a.aspa.FocusLost()
+	esperar(t, func() bool { return len(p.Avisos()) == 0 })
+	if len(p.Avisos()) != 0 {
+		t.Error("al sacar el foco, el aviso no se ha ido cuando le tocaba")
+	}
+}
+
+// TestElCuartoAvisoEsperaEnCola: como mucho tres en pantalla; el cuarto espera, sin
+// gastar su tiempo, y entra cuando se va uno. Y los de peligro siguen sin reloj al
+// salir de la cola.
+//
+// VISTO EN ROJO: sin el tope, los cuatro en pantalla y el de 60 ms se va esperando.
+func TestElCuartoAvisoEsperaEnCola(t *testing.T) {
+	p := pilaQueSeVacia(t)
+	p.Resize(fyne.NewSize(1280, 800))
+	peligros := make([]*Aviso, 0, 3)
+	for _, titulo := range []string{"1", "2", "3"} {
+		a := NuevoAviso(AvisoPeligro, titulo, "")
+		peligros = append(peligros, a)
+		p.Notificar(a)
+	}
+	cuarto := avisoCorto(t, "4")
+	p.Notificar(cuarto)
+	quinto := NuevoAviso(AvisoAdvertencia, "5", "")
+	p.Notificar(quinto)
+
+	titulos := func(l []*Aviso) []string {
+		out := make([]string, 0, len(l))
+		for _, a := range l {
+			out = append(out, a.Titulo)
+		}
+		return out
+	}
+	if got := titulos(p.Avisos()); !slices.Equal(got, []string{"1", "2", "3"}) || MaxAvisosVisibles != 3 {
+		t.Fatalf("en pantalla %v; quiero los tres primeros", got)
+	}
+	if got := titulos(p.EnCola()); !slices.Equal(got, []string{"4", "5"}) {
+		t.Fatalf("en cola %v; quiero 4 y 5", got)
+	}
+
+	dejarPasar(200 * time.Millisecond)
+	if len(p.EnCola()) != 2 {
+		t.Fatal("el aviso en cola ha gastado su tiempo esperando")
+	}
+	peligros[0].Cerrar()
+	if got := titulos(p.Avisos()); !slices.Equal(got, []string{"2", "3", "4"}) {
+		t.Fatalf("tras cerrar uno, en pantalla %v; quiero 2, 3 y 4", got)
+	}
+	esperar(t, func() bool { return len(p.EnCola()) == 0 })
+	if got := titulos(p.Avisos()); !slices.Equal(got, []string{"2", "3", "5"}) {
+		t.Fatalf("al irse el de éxito, en pantalla %v; quiero 2, 3 y 5", got)
+	}
+	// Advertencia y peligro siguen persistiendo: el que entró de la cola no lleva reloj.
+	dejarPasar(100 * time.Millisecond)
+	if len(p.Avisos()) != 3 {
+		t.Errorf("quedan %d: un aviso de advertencia o peligro se ha ido solo", len(p.Avisos()))
+	}
 }
 
 // TestLaPilaSeQuedaEnLaEsquinaInferiorDerecha, con el más nuevo abajo.
@@ -214,15 +352,13 @@ func TestLaPilaDeAvisosNoCorreCarreraConSuReloj(t *testing.T) {
 		p.Notificar(a)
 	}
 
-	plazo := time.Now().Add(2 * time.Second)
-	for time.Now().Before(plazo) {
-		fyne.DoAndWait(func() {}) // los Descartar que los relojes han encolado
-		if len(p.Avisos()) == 0 {
-			return
-		}
-		time.Sleep(time.Millisecond)
+	// Con el tope de MaxAvisosVisibles van de tres en tres: cada uno que entra de la cola
+	// arranca su reloj y su fundido al irse otro. Bajo `-race` eso pasa de los 2 s que
+	// bastaban con los cuarenta a la vez, así que espera con el reloj de `esperar`.
+	esperar(t, func() bool { return len(p.Avisos()) == 0 })
+	if len(p.Avisos()) != 0 {
+		t.Errorf("quedan %d avisos y %d en cola: los relojes no los han descartado", len(p.Avisos()), len(p.EnCola()))
 	}
-	t.Errorf("quedan %d avisos: los relojes no los han descartado", len(p.Avisos()))
 }
 
 // TestElAvisoLargoPasaDeLineaYSuAccionSePulsa: el título y la descripción son `<p>` y

@@ -1,0 +1,115 @@
+{
+  "_comentario": "Vectores COMPARTIDOS de los campos de formulario: los recorren packages/office/test/formfields.test.ts (formfields.ts) y rico/formularios_test.go. «Ver respuestas» tiene que listar lo mismo en la web y en Fyne con el mismo HTML.",
+  "opciones": [
+    { "crudo": "a|b|c", "opciones": ["a", "b", "c"] },
+    {
+      "crudo": " rojo | verde |  | rojo | azul ",
+      "opciones": ["rojo", "verde", "azul"]
+    },
+    { "crudo": "", "opciones": [] },
+    { "crudo": "|||", "opciones": [] }
+  ],
+  "valores": [
+    { "tipo": "checkbox", "crudo": "sí", "valor": "1" },
+    { "tipo": "checkbox", "crudo": "Si", "valor": "1" },
+    { "tipo": "checkbox", "crudo": "1", "valor": "1" },
+    { "tipo": "checkbox", "crudo": "X", "valor": "1" },
+    { "tipo": "checkbox", "crudo": " yes ", "valor": "1" },
+    { "tipo": "checkbox", "crudo": "no", "valor": "0" },
+    { "tipo": "checkbox", "crudo": "", "valor": "0" },
+    {
+      "tipo": "select",
+      "crudo": "M",
+      "opciones": ["S", "M", "L"],
+      "valor": "M"
+    },
+    {
+      "tipo": "select",
+      "crudo": " L ",
+      "opciones": ["S", "M", "L"],
+      "valor": "L"
+    },
+    { "tipo": "select", "crudo": "", "opciones": ["S", "M", "L"], "valor": "" },
+    {
+      "tipo": "select",
+      "crudo": "XL",
+      "opciones": ["S", "M", "L"],
+      "valor": null
+    },
+    { "tipo": "text", "crudo": "hola mundo", "valor": "hola mundo" }
+  ],
+  "respuestas": [
+    {
+      "nombre": "los tres tipos, en orden, con atributos en otro orden",
+      "html": "<p>Nombre: <span data-formfield=\"text\" data-name=\"Nombre\" data-placeholder=\"Tu nombre\">Ana</span></p><p>Acepto <span data-formfield=\"checkbox\" contenteditable=\"false\" data-name=\"Acepto\" data-checked=\"1\"></span></p><p>Sin marcar <span data-formfield=\"checkbox\" contenteditable=\"false\" data-name=\"Boletín\" data-checked=\"0\"></span></p><p>Talla <span data-value=\"M\" data-formfield=\"select\" contenteditable=\"false\" data-name=\"Talla\" data-options=\"S|M|L\" data-placeholder=\"Elegir…\"></span></p>",
+      "respuestas": [
+        { "name": "Nombre", "type": "text", "value": "Ana" },
+        { "name": "Acepto", "type": "checkbox", "value": "Sí" },
+        { "name": "Boletín", "type": "checkbox", "value": "No" },
+        { "name": "Talla", "type": "select", "value": "M" }
+      ],
+      "texto": "Nombre: Ana\nAcepto: Sí\nBoletín: No\nTalla: M"
+    },
+    {
+      "nombre": "texto vacío con su <br> y desescape de nombre y valor",
+      "html": "<span data-formfield=\"text\" data-name=\"R&amp;D\" data-placeholder=\"x\"><br></span><span data-formfield=\"text\" data-name=\"Cita\" data-placeholder=\"x\">dijo &quot;hola&quot;</span>",
+      "respuestas": [
+        { "name": "R&D", "type": "text", "value": "" },
+        { "name": "Cita", "type": "text", "value": "dijo \"hola\"" }
+      ],
+      "texto": "R&D: \nCita: dijo \"hola\""
+    },
+    {
+      "nombre": "campo sin nombre y desplegable sin elegir",
+      "html": "<p><span data-formfield=\"text\" data-placeholder=\"x\">Ana</span> <span data-formfield=\"select\" data-name=\"Color\" data-options=\"rojo|verde\" data-value=\"\" data-placeholder=\"Elegir…\"></span></p>",
+      "respuestas": [
+        { "name": "", "type": "text", "value": "Ana" },
+        { "name": "Color", "type": "select", "value": "" }
+      ],
+      "texto": "(sin nombre): Ana\nColor: "
+    },
+    {
+      "nombre": "atributos con >, comillas simples y spans anidados",
+      "html": "<span title='a > b' data-name='Nombre' data-formfield='text'>Ana <span><b>María</b></span> López</span>",
+      "respuestas": [
+        { "name": "Nombre", "type": "text", "value": "Ana María López" }
+      ],
+      "texto": "Nombre: Ana María López"
+    },
+    {
+      "nombre": "marcado malformado: no se reconstruyen etiquetas",
+      "html": "<span data-formfield=\"text\" data-name=\"x\"><<script>script>alert(1)</script>fin</span>",
+      "respuestas": [{ "name": "x", "type": "text", "value": "<fin" }],
+      "texto": "x: <fin"
+    },
+    {
+      "nombre": "scripts, estilos, plantillas y comentarios no cuentan",
+      "html": "<!--<span data-formfield=\"text\" data-name=\"falso\">oculto</span>--><script><span data-formfield=\"text\" data-name=\"falso\">oculto</span></script><template><span data-formfield=\"text\" data-name=\"falso\">oculto</span></template><span data-formfield=\"text\" data-name=\"real\">antes<script>alert(1)</script><style>body{}</style>después</span>",
+      "respuestas": [
+        { "name": "real", "type": "text", "value": "antesdespués" }
+      ],
+      "texto": "real: antesdespués"
+    },
+    {
+      "nombre": "entidades decodificadas una sola vez",
+      "html": "<span data-formfield=\"text\" data-name=\"&#78;ombre\">&amp;lt;script&amp;gt; &#x1f600; &lt;b&gt;</span><span data-formfield=\"select\" data-name=\"Opción\" data-value=\"&amp;lt; &quot;x&quot;\"></span>",
+      "respuestas": [
+        { "name": "Nombre", "type": "text", "value": "&lt;script&gt; 😀 <b>" },
+        { "name": "Opción", "type": "select", "value": "&lt; \"x\"" }
+      ],
+      "texto": "Nombre: &lt;script&gt; 😀 <b>\nOpción: &lt; \"x\""
+    },
+    {
+      "nombre": "tipo en mayúsculas y atributos prefijados",
+      "html": "<span data-formfield=\"CHECKBOX\" data-name=\"Sí\" data-checked=\"1\"></span><span other-data-formfield=\"text\" data-name=\"x\">no</span><span data-formfield=\"radio\" data-name=\"y\">no</span>",
+      "respuestas": [{ "name": "Sí", "type": "checkbox", "value": "Sí" }],
+      "texto": "Sí: Sí"
+    },
+    {
+      "nombre": "sin campos",
+      "html": "<p>Hola <b>mundo</b></p>",
+      "respuestas": [],
+      "texto": ""
+    }
+  ]
+}

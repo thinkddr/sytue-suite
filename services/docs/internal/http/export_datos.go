@@ -66,7 +66,7 @@ func (h *Handler) exportarDocumentos(ctx context.Context, subj domain.Subject, p
 				return err
 			}
 			var comments []domain.Comment
-			if d.Kind == domain.KindDocument {
+			if d.Kind == domain.KindDocument || d.Kind == domain.KindSpreadsheet {
 				if comments, err = h.store.ListComments(ctx, d.ID, true); err != nil {
 					return err
 				}

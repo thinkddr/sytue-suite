@@ -13,6 +13,7 @@ import (
 	"math/rand"
 	"net"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -109,7 +110,43 @@ func (q *QueueWorker) Run(ctx context.Context) {
 			}
 		}
 	}()
+	// Despertar los hilos pospuestos vencidos: vuelven a Recibidos sin leer. Una sola
+	// goroutine por réplica basta (SKIP LOCKED reparte entre réplicas) y el ritmo del
+	// sondeo de la cola es de sobra: posponer se elige al minuto, no al segundo.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		t := time.NewTicker(q.pollInterval)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				q.despertarPospuestos(ctx)
+			}
+		}
+	}()
 	wg.Wait()
+}
+
+// despertarPospuestos devuelve a Recibidos los hilos cuya posposición venció, por
+// lotes hasta vaciar lo pendiente, y manda la señal de cambios del widget de Mail a
+// cada cuenta: su contador de la Entrada acaba de cambiar sin que nadie escribiera.
+func (q *QueueWorker) despertarPospuestos(ctx context.Context) {
+	for {
+		lote, err := q.store.DespertarPospuestos(ctx, time.Now(), 50)
+		if err != nil {
+			q.logger.Error("queue: despertar pospuestos", "error", err)
+			return
+		}
+		for _, d := range lote {
+			q.hubNotifier.AvisarCambio(ctx, d.Tenant, "mail", d.Subject)
+		}
+		if len(lote) < 50 {
+			return
+		}
+	}
 }
 
 func (q *QueueWorker) loop(ctx context.Context, id int) {
@@ -241,11 +278,13 @@ func (q *QueueWorker) backoffFor(attempts int) time.Duration {
 
 // SMTPSender relaya mensajes a los MTA remotos con STARTTLS oportunista.
 type SMTPSender struct {
-	logger   *slog.Logger
-	resolver *net.Resolver
-	hostname string
-	timeout  time.Duration
-	relay    *Relay
+	logger           *slog.Logger
+	resolver         *net.Resolver
+	hostname         string
+	timeout          time.Duration
+	relay            *Relay
+	privateTransit   bool
+	privateTLSConfig *tls.Config
 }
 
 // Relay es un servidor SMTP de salida (smarthost) por el que se entrega TODO en
@@ -307,6 +346,7 @@ func (s *SMTPSender) Send(ctx context.Context, mailFrom string, recipients []str
 	if err != nil {
 		return false, err
 	}
+	defer clear(body)
 
 	var lastErr error
 	for _, host := range hosts {
@@ -315,6 +355,9 @@ func (s *SMTPSender) Send(ctx context.Context, mailFrom string, recipients []str
 			return false, nil
 		}
 		lastErr = err
+		if errors.Is(err, ErrSMTPAmbiguous) {
+			return false, err
+		}
 		if permanent {
 			return true, err // 5xx: no probar más MX
 		}
@@ -323,39 +366,11 @@ func (s *SMTPSender) Send(ctx context.Context, mailFrom string, recipients []str
 }
 
 func (s *SMTPSender) deliverTo(ctx context.Context, host, mailFrom string, rcpts []string, body []byte) (permanent bool, err error) {
-	puerto := "25"
-	if s.relay != nil {
-		puerto = s.relay.Port
-	}
-	dialer := &net.Dialer{Timeout: s.timeout}
-	conn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(host, puerto))
+	c, stopCancel, err := s.openSMTPClient(ctx, host)
 	if err != nil {
 		return false, err
 	}
-
-	// STARTTLS oportunista (RFC 3207): si el MX lo soporta, ciframos el canal.
-	// NewClientStartTLS hace EHLO + STARTTLS + handshake y cierra la conexión si
-	// falla; en ese caso reconectamos y seguimos en claro (best effort de entrega).
-	tlsCfg := &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}
-	c, err := gosmtp.NewClientStartTLS(conn, tlsCfg)
-	if err != nil {
-		// CON RELÉ NO HAY VUELTA ATRÁS EN CLARO, y esta es la diferencia que de
-		// verdad importa: hacia el smarthost viajan usuario y contraseña. El
-		// «best effort» que tiene sentido hacia un MX ajeno —mejor entregar sin
-		// cifrar que no entregar— aquí significaría publicar la credencial en la
-		// red. Se falla, y como temporal: el mensaje se reintenta.
-		if s.relay != nil {
-			return false, fmt.Errorf("relé %s: STARTTLS obligatorio y no disponible: %w", host, err)
-		}
-		s.logger.Warn("smtpsender: STARTTLS no disponible, continuando en claro", "host", host, "error", err)
-		conn, err = dialer.DialContext(ctx, "tcp", net.JoinHostPort(host, puerto))
-		if err != nil {
-			return false, err
-		}
-		// NewClient no dial­a ni valida: el saludo/errores del servidor SMTP surgen
-		// en el primer comando (HELO/EHLO), que comprobamos justo debajo.
-		c = gosmtp.NewClient(conn)
-	}
+	defer stopCancel()
 	defer c.Close()
 
 	// (Re)envía EHLO con nuestro hostname; tras STARTTLS el saludo previo se
@@ -383,17 +398,79 @@ func (s *SMTPSender) deliverTo(ctx context.Context, host, mailFrom string, rcpts
 			return isPermanent(err), err
 		}
 	}
+	return sendSMTPData(c, body)
+}
+
+func (s *SMTPSender) openSMTPClient(ctx context.Context, host string) (*gosmtp.Client, func() bool, error) {
+	puerto := "25"
+	if s.relay != nil {
+		puerto = s.relay.Port
+	}
+	dialer := &net.Dialer{Timeout: s.timeout}
+	conn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(host, puerto))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	stopCancel := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	deadline := time.Now().Add(s.timeout)
+	if limit, ok := ctx.Deadline(); ok && limit.Before(deadline) {
+		deadline = limit
+	}
+	_ = conn.SetDeadline(deadline)
+
+	// STARTTLS oportunista (RFC 3207): si el MX lo soporta, ciframos el canal.
+	// NewClientStartTLS hace EHLO + STARTTLS + handshake y cierra la conexión si
+	// falla; en ese caso reconectamos y seguimos en claro (best effort de entrega).
+	tlsCfg := &tls.Config{ServerName: strings.TrimSuffix(host, "."), MinVersion: tls.VersionTLS12}
+	if s.privateTLSConfig != nil {
+		tlsCfg = s.privateTLSConfig.Clone()
+		tlsCfg.ServerName = strings.TrimSuffix(host, ".")
+	}
+	c, err := gosmtp.NewClientStartTLS(conn, tlsCfg)
+	if err != nil {
+		stopCancel()
+		// CON RELÉ NO HAY VUELTA ATRÁS EN CLARO, y esta es la diferencia que de
+		// verdad importa: hacia el smarthost viajan usuario y contraseña. El
+		// «best effort» que tiene sentido hacia un MX ajeno —mejor entregar sin
+		// cifrar que no entregar— aquí significaría publicar la credencial en la
+		// red. Se falla, y como temporal: el mensaje se reintenta.
+		if s.relay != nil || s.privateTransit {
+			return nil, nil, fmt.Errorf("SMTP: STARTTLS obligatorio y no disponible: %w", err)
+		}
+		s.logger.Warn("smtpsender: STARTTLS no disponible, continuando en claro", "host", host, "error", err)
+		conn, err = dialer.DialContext(ctx, "tcp", net.JoinHostPort(host, puerto))
+		if err != nil {
+			return nil, nil, err
+		}
+		stopCancel = context.AfterFunc(ctx, func() { _ = conn.Close() })
+		_ = conn.SetDeadline(deadline)
+		// NewClient no dial­a ni valida: el saludo/errores del servidor SMTP surgen
+		// en el primer comando (HELO/EHLO), que comprobamos justo debajo.
+		c = gosmtp.NewClient(conn)
+	}
+	return c, stopCancel, nil
+}
+
+func sendSMTPData(c *gosmtp.Client, body []byte) (bool, error) {
 	w, err := c.Data()
 	if err != nil {
 		return isPermanent(err), err
 	}
 	if _, err := w.Write(body); err != nil {
-		return false, err
+		return false, errors.Join(ErrSMTPAmbiguous, err)
 	}
 	if err := w.Close(); err != nil {
-		return isPermanent(err), err
+		var failure *gosmtp.SMTPError
+		if errors.As(err, &failure) {
+			return isPermanent(err), err
+		}
+		return false, errors.Join(ErrSMTPAmbiguous, err)
 	}
-	return false, c.Quit()
+	// DATA acceptance is final. A lost QUIT response must never trigger a
+	// second delivery to this host or the next MX.
+	_ = c.Quit()
+	return false, nil
 }
 
 func (s *SMTPSender) mxHosts(ctx context.Context, dom string) []string {

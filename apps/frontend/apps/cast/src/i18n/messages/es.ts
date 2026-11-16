@@ -103,6 +103,8 @@ export const es: AppCatalog<typeof en> = {
   'player.unmute': 'Activar sonido',
   'player.volume': 'Volumen',
   'player.seek': 'Posición',
+  'player.restart': 'Empezar desde el principio',
+  'player.resumedAt': 'Sigue desde {time}',
   'player.fullscreen': 'Pantalla completa',
   'player.exitFullscreen': 'Salir de pantalla completa',
   'player.pip': 'Imagen dentro de imagen',
@@ -290,6 +292,7 @@ export const es: AppCatalog<typeof en> = {
   'share.restricted': 'Solo podrá abrir el enlace quien ya pueda ver el vídeo.',
 
   'card.watch': 'Ver {title}',
+  'card.watched': 'Visto el {percent} %',
   'card.untitledOwner': 'Autoría desconocida',
 
   'embed.watchOn': 'Ver en Sytue Cast',
@@ -331,6 +334,9 @@ export const es: AppCatalog<typeof en> = {
   'player.quality': 'Calidad',
   'player.qualityAuto': 'Automática',
   'player.qualityAutoNow': 'Automática ({quality})',
+  'player.speed': 'Velocidad',
+  'player.speedNormal': 'Normal',
+  'player.speedNow': 'Velocidad {rate}',
   'player.pipBack': 'Volver a la ventana principal',
   'player.pipClose': 'Cerrar imagen dentro de imagen',
   'player.pipActive': 'Se está reproduciendo en imagen dentro de imagen.',

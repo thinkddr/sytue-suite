@@ -9,7 +9,7 @@
  * `const` declarada en el script de la página caería en TDZ al generarse las
  * rutas. Los imports sí se elevan.
  */
-import { esSoloDeOrganizaciones, type ProductKey } from '@sytue/config';
+import { esSoloDeOrganizaciones, segmentoDeFicha, type ProductKey } from '@sytue/config';
 import { CATALOGO, type Disponibilidad } from '@sytue/ui';
 import type { T } from '../i18n';
 
@@ -55,15 +55,12 @@ export const PRODUCT_KEYS = [
 export type MarketingKey = (typeof PRODUCT_KEYS)[number];
 
 /**
- * El segmento de URL de una ficha cuando NO es la clave del producto. Sytue Web
- * conserva la clave `pages` —es la del catálogo, la del token de color y la de sus
- * textos (`product.pages.*`)—, pero su dirección pública es `/product/web`.
+ * Segmento de la ficha de `key` en `/product/<segmento>`. La tabla de las que no usan
+ * su clave (Sytue Web: `pages` por dentro, `/product/web` fuera) vive en `@sytue/config`
+ * (`segmentoDeFicha`), porque el lanzador del portal también enlaza a las fichas.
  */
-const SLUG_DE_FICHA: Partial<Record<MarketingKey, string>> = { pages: 'web' };
-
-/** Segmento de la ficha de `key` en `/product/<segmento>`. */
 export function slugDeFicha(key: MarketingKey): string {
-  return SLUG_DE_FICHA[key] ?? key;
+  return segmentoDeFicha(key);
 }
 
 /** Ruta BASE (sin prefijo de idioma) de la ficha de `key`: `/product/mail`, `/product/web`. */

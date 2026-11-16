@@ -136,6 +136,7 @@ export function Tienda({
     return (
       <div class="border-border bg-surface rounded-xl border">
         <EmptyState
+          tone="error"
           title={t('store.load_error')}
           description={t('store.load_error_help')}
           action={

@@ -16,6 +16,7 @@ import (
 	"fyne.io/fyne/v2/test"
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
 
@@ -141,6 +142,63 @@ func TestLasFilasDeEquipoMidenLoDeLaWeb(t *testing.T) {
 	unidad.RellenoY, unidad.Filete = RellenoYFilaUnidad, SinFilete
 	casi(t, "la primera unidad de la lista", unidad.AltoFilaPlana(), 60)
 	casi(t, "la cabecera de una unidad", AltoCabeceraEquipo, 53)
+}
+
+// TestLaListaDeUnidadesEsElMarcoDeAjustes: la página es el `SettingsShell` y la
+// `SettingsSection` de la suite, con «Nueva unidad» a la derecha del título y el margen
+// `sm:px-6` resuelto contra la VENTANA: en una ventana de 1280, la hoja de 600 lleva 24 a
+// cada lado. Las filas de la lista se reparten al ancho de dentro de la tarjeta.
+//
+// Visto en ROJO a mano: midiendo el corte en la hoja, la sección empieza en 16.
+func TestLaListaDeUnidadesEsElMarcoDeAjustes(t *testing.T) {
+	tr := traductor(t)
+	q := NuevaVistaEquipos(tr)
+	q.Fase, q.Ventana = Exito, 1280
+	q.Unidades = []api.UnidadEquipo{{ID: "u1", Name: "Ventas", Role: api.RolGestionar}}
+	w := test.NewWindow(q.Objeto(tema.Claro))
+	defer w.Close()
+	w.SetPadded(false)
+	w.Resize(fyne.NewSize(600, 800))
+
+	marco, ok := q.desplazable.Content.(*ui.MarcoAjustes)
+	if !ok {
+		t.Fatalf("la página es %T y tiene que ser el marco de ajustes de la suite", q.desplazable.Content)
+	}
+	sec, ok := marco.Secciones[0].(*ui.SeccionAjustes)
+	if !ok || sec.Titulo != tr.T("team.listTitle", nil) {
+		t.Fatalf("la sección es %T y tiene que ser la de la suite con su título", marco.Secciones[0])
+	}
+	abs := fyne.CurrentApp().Driver().AbsolutePositionForObject
+	if x, ancho := abs(sec).X, sec.Size().Width; x != 24 || ancho != 552 {
+		t.Errorf("la sección empieza en %v y mide %v; con la ventana a 1280, 24 y 552", x, ancho)
+	}
+	nueva := marco.Acciones[0]
+	if fin := abs(nueva).X + nueva.Size().Width; fin != 576 {
+		t.Errorf("«Nueva unidad» acaba en %v y va pegada al margen derecho (576)", fin)
+	}
+	var fila *FilaPlana
+	var buscar func(fyne.CanvasObject)
+	buscar = func(o fyne.CanvasObject) {
+		switch x := o.(type) {
+		case *FilaPlana:
+			fila = x
+		case *fyne.Container:
+			for _, h := range x.Objects {
+				buscar(h)
+			}
+		case fyne.Widget:
+			for _, h := range test.WidgetRenderer(x).Objects() {
+				buscar(h)
+			}
+		}
+	}
+	buscar(sec)
+	if fila == nil {
+		t.Fatal("la sección no lleva la lista de unidades")
+	}
+	if got, quiero := fila.AnchoDe(), ui.InteriorSeccionAjustes(552)-2*tema.Borde; got != quiero {
+		t.Errorf("la fila se reparte a %v y lo de dentro de la tarjeta mide %v", got, quiero)
+	}
 }
 
 // TestLasUnidadesSePintan pinta la lista y el detalle en sus fases y en los dos temas.

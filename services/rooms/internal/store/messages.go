@@ -19,7 +19,7 @@ import (
 	"git.sytue.eu/sytue/one/services/rooms/internal/domain"
 )
 
-const messageCols = `id, channel_id, parent_id, author_sub, author_name, body, mentions, attachments, reply_count, edited_at, created_at, type, priority, requires_ack, mentions_all, card, matrix_room_id, matrix_event_id`
+const messageCols = `id, channel_id, parent_id, author_sub, author_name, body, mentions, attachments, reply_count, edited_at, created_at, type, priority, requires_ack, mentions_all, card, matrix_room_id, matrix_event_id, also_in_channel`
 
 // scanMessage escanea las columnas de messageCols en ese orden. `extra` recibe los
 // destinos de las columnas que la consulta añade DESPUÉS de messageCols (cursores,
@@ -32,7 +32,7 @@ func scanMessage(row pgx.Row, t string, extra ...any) (domain.Message, error) {
 	dest := append([]any{
 		&m.ID, &m.ChannelID, &m.ParentID, &m.AuthorSub, &m.AuthorName,
 		&m.Body, &m.Mentions, &attachments, &m.ReplyCount, &m.EditedAt, &m.CreatedAt, &m.Type,
-		&m.Priority, &m.RequiresAck, &m.MentionsAll, &card, &matrixRoom, &matrixEvent,
+		&m.Priority, &m.RequiresAck, &m.MentionsAll, &card, &matrixRoom, &matrixEvent, &m.AlsoInChannel,
 	}, extra...)
 	if err := row.Scan(dest...); err != nil {
 		return domain.Message{}, err
@@ -99,6 +99,9 @@ type NewMessageRecord struct {
 	Priority string
 	// RequiresAck pide acuse de recibo explícito a los lectores (Ola 12).
 	RequiresAck bool
+	// AlsoInChannel publica una respuesta de hilo también en el feed del canal
+	// («También enviar al canal»). Sin ParentID no significa nada y se ignora.
+	AlsoInChannel bool
 }
 
 // CreateMessage publica un mensaje en un canal (o respuesta en hilo), validando
@@ -230,10 +233,11 @@ func createMessageTx(ctx context.Context, tx pgx.Tx, tenant string, rec NewMessa
 		matrixRoom, matrixEvent = rec.MatrixEvent.RoomID, rec.MatrixEvent.EventID
 	}
 	row := tx.QueryRow(ctx,
-		`INSERT INTO messages (tenant, channel_id, parent_id, author_sub, author_name, body, mentions, mentions_all, attachments, type, priority, requires_ack, card, matrix_room_id, matrix_event_id)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING `+messageCols,
+		`INSERT INTO messages (tenant, channel_id, parent_id, author_sub, author_name, body, mentions, mentions_all, attachments, type, priority, requires_ack, card, matrix_room_id, matrix_event_id, also_in_channel)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING `+messageCols,
 		tenant, rec.ChannelID, rec.ParentID, rec.AuthorSub, rec.AuthorName,
-		rec.Body, mentions, rec.MentionsAll, attachments, msgType, priority, rec.RequiresAck, card, matrixRoom, matrixEvent)
+		rec.Body, mentions, rec.MentionsAll, attachments, msgType, priority, rec.RequiresAck, card, matrixRoom, matrixEvent,
+		rec.tambienAlCanal())
 	m, err = scanMessage(row, tenant)
 	if err != nil {
 		return domain.Message{}, err
@@ -318,9 +322,10 @@ type MessagePage struct {
 	Limit  int
 }
 
-// ListMessages devuelve la página de mensajes raíz de un canal (orden
-// cronológico inverso por created_at), con paginación keyset. Adjunta las
-// reacciones agregadas en una sola pasada (sin N+1).
+// ListMessages devuelve la página del feed de un canal —las raíces y las respuestas
+// mandadas también al canal— en orden cronológico inverso por created_at, con
+// paginación keyset. Adjunta las reacciones y el indicador de hilo agregados en una
+// sola pasada cada uno (sin N+1).
 func (s *Store) ListMessages(ctx context.Context, channelID uuid.UUID, subject string, page MessagePage) ([]domain.Message, error) {
 	t := tenancy.MustFrom(ctx)
 	if page.Limit <= 0 || page.Limit > 200 {
@@ -345,7 +350,7 @@ func (s *Store) ListMessages(ctx context.Context, channelID uuid.UUID, subject s
 		}
 		rows, err := tx.Query(ctx,
 			`SELECT `+messageCols+` FROM messages
-			 WHERE tenant=$1 AND channel_id=$2 AND parent_id IS NULL AND deleted_at IS NULL
+			 WHERE tenant=$1 AND channel_id=$2 AND `+enElFeed+` AND deleted_at IS NULL
 			   AND created_at < $3
 			   AND ($5::timestamptz IS NULL OR created_at > $5)
 			 ORDER BY created_at DESC, id DESC LIMIT $4`,
@@ -357,13 +362,7 @@ func (s *Store) ListMessages(ctx context.Context, channelID uuid.UUID, subject s
 		if err != nil {
 			return err
 		}
-		if err := attachReactions(ctx, tx, t.Slug, msgs); err != nil {
-			return err
-		}
-		if err := attachAcks(ctx, tx, t.Slug, subject, msgs); err != nil {
-			return err
-		}
-		return attachCardVotes(ctx, tx, t.Slug, msgs)
+		return completarFeed(ctx, tx, t.Slug, subject, msgs)
 	})
 	return msgs, err
 }
@@ -462,7 +461,7 @@ func (s *Store) MessagesAround(ctx context.Context, channelID uuid.UUID, subject
 		// Anteriores estrictos por keyset (created_at, id) < (anchor, messageID), DESC.
 		beforeRows, err := tx.Query(ctx,
 			`SELECT `+messageCols+` FROM messages
-			 WHERE tenant=$1 AND channel_id=$2 AND parent_id IS NULL AND deleted_at IS NULL
+			 WHERE tenant=$1 AND channel_id=$2 AND `+enElFeed+` AND deleted_at IS NULL
 			   AND (created_at < $3 OR (created_at = $3 AND id < $4))
 			   AND ($6::timestamptz IS NULL OR created_at > $6)
 			 ORDER BY created_at DESC, id DESC LIMIT $5`,
@@ -481,7 +480,7 @@ func (s *Store) MessagesAround(ctx context.Context, channelID uuid.UUID, subject
 		// Objetivo + posteriores por keyset (created_at, id) >= (anchor, messageID), ASC.
 		afterRows, err := tx.Query(ctx,
 			`SELECT `+messageCols+` FROM messages
-			 WHERE tenant=$1 AND channel_id=$2 AND parent_id IS NULL AND deleted_at IS NULL
+			 WHERE tenant=$1 AND channel_id=$2 AND `+enElFeed+` AND deleted_at IS NULL
 			   AND (created_at > $3 OR (created_at = $3 AND id >= $4))
 			 ORDER BY created_at ASC, id ASC LIMIT $5`,
 			t.Slug, channelID, anchor, messageID, half+1)
@@ -493,13 +492,7 @@ func (s *Store) MessagesAround(ctx context.Context, channelID uuid.UUID, subject
 			return err
 		}
 		out = append(before, after...) //nolint:gocritic // appendAssign: 'before' no se reutiliza tras esto
-		if err := attachReactions(ctx, tx, t.Slug, out); err != nil {
-			return err
-		}
-		if err := attachAcks(ctx, tx, t.Slug, subject, out); err != nil {
-			return err
-		}
-		return attachCardVotes(ctx, tx, t.Slug, out)
+		return completarFeed(ctx, tx, t.Slug, subject, out)
 	})
 	return out, rootID, err
 }
@@ -550,6 +543,9 @@ func (s *Store) ListThread(ctx context.Context, rootID uuid.UUID, subject string
 		}
 		all := append([]domain.Message{root}, replies...)
 		if err := attachReactions(ctx, tx, t.Slug, all); err != nil {
+			return err
+		}
+		if err := attachThreadInfo(ctx, tx, t.Slug, all[:1]); err != nil {
 			return err
 		}
 		if err := attachAcks(ctx, tx, t.Slug, subject, all); err != nil {
@@ -798,6 +794,13 @@ func searchFilters(qb *sqlArgs, sq domain.SearchQuery, subj string) string {
 // texto (AND de términos, frase entrecomillada, exclusión con «-») y los operadores
 // from:/in:/before:/after:/on:/has:/is: (ver domain.ParseSearchQuery), que solo acotan.
 func (s *Store) SearchAll(ctx context.Context, subject, query string, limit int) ([]domain.Message, error) {
+	active, accessErr := s.SearchIdentityActive(ctx, subject)
+	if accessErr != nil {
+		return nil, accessErr
+	}
+	if !active {
+		return nil, domain.ErrForbidden
+	}
 	t := tenancy.MustFrom(ctx)
 	if limit <= 0 || limit > 100 {
 		limit = 30
@@ -810,13 +813,7 @@ func (s *Store) SearchAll(ctx context.Context, subject, query string, limit int)
 	lim := qb.add(limit)
 	sql := `SELECT ` + prefixed("msg", messageCols) + ` FROM messages msg
 		 JOIN channels c ON c.tenant=msg.tenant AND c.id=msg.channel_id
-		 WHERE msg.tenant=` + tenant + ` AND msg.deleted_at IS NULL AND c.deleted_at IS NULL` + filters + filtroVaciado("msg", subj) + `
-		   AND (
-		        EXISTS (SELECT 1 FROM channel_members m
-		                WHERE m.tenant=c.tenant AND m.channel_id=c.id AND m.subject=` + subj + `)
-		        OR (c.kind='public' AND EXISTS (SELECT 1 FROM team_members tm
-		                WHERE tm.tenant=c.tenant AND tm.team_id=c.team_id AND tm.subject=` + subj + `))
-		   )
+		 WHERE msg.tenant=` + tenant + ` AND msg.deleted_at IS NULL AND c.deleted_at IS NULL` + filters + searchAccess(subj, false) + `
 		 ORDER BY msg.created_at DESC LIMIT ` + lim
 	var out []domain.Message
 	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
@@ -827,12 +824,28 @@ func (s *Store) SearchAll(ctx context.Context, subject, query string, limit int)
 		out, err = collectMessages(rows, t.Slug)
 		return err
 	})
+	if err == nil {
+		active, accessErr = s.SearchIdentityActive(ctx, subject)
+		if accessErr != nil {
+			return nil, accessErr
+		}
+		if !active {
+			return nil, domain.ErrForbidden
+		}
+	}
 	return out, err
 }
 
 // SearchMessages busca mensajes vivos en canales accesibles al usuario dentro de un
 // team. Comparte con SearchAll el parser de operadores y el ensamblado de filtros.
 func (s *Store) SearchMessages(ctx context.Context, teamID uuid.UUID, subject, query string, limit int) ([]domain.Message, error) {
+	active, accessErr := s.SearchIdentityActive(ctx, subject)
+	if accessErr != nil {
+		return nil, accessErr
+	}
+	if !active {
+		return nil, domain.ErrForbidden
+	}
 	t := tenancy.MustFrom(ctx)
 	if limit <= 0 || limit > 100 {
 		limit = 30
@@ -847,12 +860,7 @@ func (s *Store) SearchMessages(ctx context.Context, teamID uuid.UUID, subject, q
 	sql := `SELECT ` + prefixed("msg", messageCols) + ` FROM messages msg
 		 JOIN channels c ON c.tenant=msg.tenant AND c.id=msg.channel_id
 		 WHERE msg.tenant=` + tenant + ` AND c.team_id=` + team + ` AND msg.deleted_at IS NULL
-		   AND c.deleted_at IS NULL` + filters + filtroVaciado("msg", subj) + `
-		   AND (
-		        c.kind='public'
-		        OR EXISTS (SELECT 1 FROM channel_members m
-		                   WHERE m.tenant=c.tenant AND m.channel_id=c.id AND m.subject=` + subj + `)
-		   )
+		   AND c.deleted_at IS NULL` + filters + searchAccess(subj, false) + `
 		 ORDER BY msg.created_at DESC LIMIT ` + lim
 	var out []domain.Message
 	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
@@ -866,5 +874,14 @@ func (s *Store) SearchMessages(ctx context.Context, teamID uuid.UUID, subject, q
 		out, err = collectMessages(rows, t.Slug)
 		return err
 	})
+	if err == nil {
+		active, accessErr = s.SearchIdentityActive(ctx, subject)
+		if accessErr != nil {
+			return nil, accessErr
+		}
+		if !active {
+			return nil, domain.ErrForbidden
+		}
+	}
 	return out, err
 }

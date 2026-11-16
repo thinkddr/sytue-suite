@@ -58,7 +58,7 @@ paths:
           required: false
           description: Lista CSV de orígenes a consultar (vacío = todos)
           schema: { type: string, example: "drive,mail,chat" }
-        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200 }, description: Tamaño de la página del agregado }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200 }, description: "Tamaño de la página del agregado. Por omisión, SEARCH_LIMIT; tope, 10 × SEARCH_LIMIT (200 con la configuración por defecto). A cada origen se le piden como mucho SEARCH_LIMIT" }
         - name: offset
           in: query
           required: false
@@ -125,6 +125,15 @@ paths:
 
         El filtro se aplica al ENTREGAR: un aviso silenciado no se persiste, para que el
         contador de no leídos siga diciendo la verdad.
+
+        No se pueden silenciar los avisos de seguridad (`source=id`) ni los tipos
+        críticos (`pages.order.oversold`, `pages.payment.duplicated`, `pages.erp.failed`,
+        `pages.store.busy`, `pages.withdrawal.requested`, `rooms.report`, `cast.report`):
+        pedirlo responde 400, y se entregan aunque se calle su origen entero.
+
+        `muted=false` de un tipo solo se guarda (como excepción) mientras su origen esté
+        callado; si no, borra la regla del tipo. Y `muted=false` de un origen borra
+        también esas excepciones: callar más tarde el origen lo calla entero.
       requestBody:
         required: true
         content:

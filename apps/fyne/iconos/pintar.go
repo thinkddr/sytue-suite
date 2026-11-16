@@ -845,6 +845,35 @@ func (d *Dibujo) Girar(grados float32) {
 	}
 }
 
+// GirarImagen es el `rotate(grados)` de CSS de un mapa de bits entero: lo gira en el
+// sentido del reloj alrededor de su centro y devuelve la ENVOLVENTE del resultado (más
+// grande que el original salvo en múltiplos de 180°), con lo que sobra transparente. A
+// diferencia de Girar, aquí no se recorta: es para una caja girada (las de Diapos), que se
+// ve entera.
+func GirarImagen(img image.Image, grados float64) *image.NRGBA {
+	b := img.Bounds()
+	w, h := float64(b.Dx()), float64(b.Dy())
+	s, c := math.Sincos(grados * math.Pi / 180)
+	ew := int(math.Ceil(math.Abs(w*c) + math.Abs(h*s) - 1e-6))
+	eh := int(math.Ceil(math.Abs(w*s) + math.Abs(h*c) - 1e-6))
+	// Mismo par/impar que el original para que el centro caiga en el mismo medio píxel.
+	ew += (ew - b.Dx()) & 1
+	eh += (eh - b.Dy()) & 1
+	// Se gira en un lienzo donde quepan el original y su envolvente, los dos centrados, y
+	// luego se recorta a la envolvente.
+	lw, lh := max(ew, b.Dx()), max(eh, b.Dy())
+	lienzo := image.NewNRGBA(image.Rect(0, 0, lw, lh))
+	ox, oy := (lw-b.Dx())/2, (lh-b.Dy())/2
+	draw.Draw(lienzo, image.Rect(ox, oy, ox+b.Dx(), oy+b.Dy()), img, b.Min, draw.Src)
+	girado := rotar(lienzo, float32(grados))
+	if lw == ew && lh == eh {
+		return girado
+	}
+	fuera := image.NewNRGBA(image.Rect(0, 0, ew, eh))
+	draw.Draw(fuera, fuera.Bounds(), girado, image.Pt((lw-ew)/2, (lh-eh)/2), draw.Src)
+	return fuera
+}
+
 // rotar gira `img` alrededor de su centro, en el sentido del reloj como `rotate()` de
 // CSS, con interpolación bilineal sobre el color PREMULTIPLICADO (como compone el
 // navegador): sin premultiplicar, el borde suavizado se oscurece al mezclarse con el

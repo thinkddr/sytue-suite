@@ -186,8 +186,8 @@ func coloresDeSerie(v any) []string {
 	if !ok {
 		return nil
 	}
-	out := make([]string, 0, min(len(lista), Columnas))
-	for _, x := range lista[:min(len(lista), Columnas)] {
+	out := make([]string, 0, min(len(lista), MaxColumnas))
+	for _, x := range lista[:min(len(lista), MaxColumnas)] {
 		c, _ := x.(string)
 		if !reHex.MatchString(c) {
 			c = ""

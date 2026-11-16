@@ -4,7 +4,6 @@
 package certipdf
 
 import (
-	"bytes"
 	"image"
 	"image/color"
 	"math"
@@ -39,9 +38,6 @@ salga del equipo (firmasistema.go, ADR 0051). «¿Tu certificado está en el sis
 sigue explicando, como en la web, cómo firmarlo con la aplicación de tu país.
 */
 
-// rectFirma es el recuadro donde cae la rúbrica, en puntos de la página.
-var rectFirma = [4]float64{56, 56, 296, 130}
-
 // La resolución interna del lienzo de firma (`width={480} height={148}`).
 const anchoLienzo, altoLienzo = 480.0, 148.0
 
@@ -69,7 +65,15 @@ type dialogoFirmar struct {
 	pkcs12, certificado, clavePrivada ficheroElegido
 	claveP12, motivo, lugar, pagina   *ui.Entrada
 	visible, todas, bloquear          bool
-	sistemaAbierto                    bool
+	// posicion es dónde cae la firma visible (firmaposicion.go); miniatura, la que se
+	// pinta ahora, para saber si escribir otra página la cambia.
+	posicion  PosicionFirma
+	miniatura *miniaturaFirma
+	// recuadro es el dibujado, en fracciones de la caja (`dibujo` de la web); dibujo, el
+	// área donde se dibuja ahora mismo.
+	recuadro       *Rect
+	dibujo         *dibujoFirma
+	sistemaAbierto bool
 	// La aplicación oficial.
 	lanzada, errorOficial, subiendo bool
 	// sistema es la firma con el certificado del sistema (firmasistema.go).
@@ -77,7 +81,7 @@ type dialogoFirmar struct {
 }
 
 func nuevoDialogoFirmar(a *dialogoAbierto) *dialogoFirmar {
-	d := &dialogoFirmar{a: a, modo: "mano", visible: true}
+	d := &dialogoFirmar{a: a, modo: "mano", visible: true, posicion: posicionesFirma[0]}
 	d.lienzo = nuevoLienzoFirma(func() { a.rehacer() })
 	d.claveP12 = entradaDialogo("", 0)
 	d.claveP12.Contrasena(true)
@@ -85,6 +89,15 @@ func nuevoDialogoFirmar(a *dialogoAbierto) *dialogoFirmar {
 	d.pagina = ui.NuevaEntrada("").ConPropia(ui.CampoPropio{MargenX: tema.Espacio(1.5), MargenY: tema.Espacio(1), Texto: tema.TextoXS, Borde: "border"})
 	d.pagina.Radio, d.pagina.Ancho = tema.RadioMD, tema.Espacio(16)
 	d.pagina.PonerTexto("1")
+	// Otra página puede tener otro tamaño: la miniatura y su recuadro la siguen, como en
+	// la web. Solo se rehace si cambia lo pintado, no a cada tecla.
+	d.pagina.AlCambiar(func(string) {
+		if m := d.miniatura; m != nil {
+			if p, _ := paginaParaFirmar(d.paginas(), d.numeroDePagina()); p.Numero != m.pagina.Numero || d.rectVisible() != m.rect {
+				a.rehacer()
+			}
+		}
+	})
 	return d
 }
 
@@ -121,6 +134,10 @@ func (d *dialogoFirmar) vista(ancho float32) fyne.CanvasObject {
 		partes = append(partes, d.oficial(ancho))
 	}
 	partes = append(partes, d.opciones(ancho))
+	d.miniatura, d.dibujo = nil, nil
+	if d.visible && d.modo != "oficial" {
+		partes = append(partes, d.posicionDeFirma(ancho))
+	}
 	if d.modo == "certificado" {
 		partes = append(partes, d.bloquearDespues(ancho))
 	}
@@ -463,11 +480,7 @@ func (d *dialogoFirmar) descargar() {
 func (d *dialogoFirmar) guardarDocumento() (string, error) {
 	doc := d.a.p.doc
 	datos, _ := doc.paraElMotor()
-	carpeta, err := ficheros.Carpeta()
-	if err != nil {
-		return "", err
-	}
-	return ficheros.Guardar(carpeta, nombreDeRuta(doc.Ruta()), bytes.NewReader(datos.Datos))
+	return guardarEnDescargas(nombreDeRuta(doc.Ruta()), datos.Datos)
 }
 
 // firmarConLaApp es el puente de la app de escritorio (`sytueFirmarNativo`): el
@@ -583,10 +596,41 @@ func vigilarFirmado(carpeta, original string, abrir func(string)) {
 
 // ---- firmar ----
 
-// trazosAPagina lleva los trazos del lienzo a la página, con el eje vertical al derecho:
-// en un PDF crece hacia ARRIBA y en el lienzo hacia abajo.
-func trazosAPagina(trazos [][][2]float64) [][][2]float64 {
-	x0, y0, x1, y1 := rectFirma[0], rectFirma[1], rectFirma[2], rectFirma[3]
+// numeroDePagina es la página escrita en «Página» (1-based); cero si no es un número.
+func (d *dialogoFirmar) numeroDePagina() int {
+	n, _ := strconv.Atoi(strings.TrimSpace(d.pagina.Texto()))
+	return n
+}
+
+// rectVisible es el recuadro de la posición elegida sobre la página donde se firma (o la
+// zona común, si se firma en todas). El MISMO para las tres vías que dejan marca —a
+// mano, imagen y certificado, también el del sistema—: elegir el sitio y que luego cada
+// una lo pusiera donde quisiera sería peor que no dejar elegir.
+func (d *dialogoFirmar) rectVisible() Rect {
+	return rectElegido(d.posicion, cajaParaFirmar(d.paginas(), d.numeroDePagina(), d.todas), d.recuadro)
+}
+
+// paginas son las del documento abierto; ninguna si aún no se sabe.
+func (d *dialogoFirmar) paginas() []Pagina {
+	if c := d.a.p.Contenido; c != nil {
+		return c.Paginas
+	}
+	return nil
+}
+
+// rectEnviado es lo que va al motor: el recuadro elegido, o todo a cero si la firma es
+// invisible.
+func (d *dialogoFirmar) rectEnviado() Rect {
+	if !d.visible {
+		return Rect{}
+	}
+	return d.rectVisible()
+}
+
+// trazosAPagina lleva los trazos del lienzo al recuadro de la página, con el eje
+// vertical al derecho: en un PDF crece hacia ARRIBA y en el lienzo hacia abajo.
+func trazosAPagina(trazos [][][2]float64, rect Rect) [][][2]float64 {
+	x0, y0, x1, y1 := rect[0], rect[1], rect[2], rect[3]
 	r := make([][][2]float64, len(trazos))
 	for i, t := range trazos {
 		r[i] = make([][2]float64, len(t))
@@ -599,11 +643,8 @@ func trazosAPagina(trazos [][][2]float64) [][][2]float64 {
 
 // cambio es lo que manda «Aplicar», según el modo.
 func (d *dialogoFirmar) cambio() api.PDFCambio {
-	rect := rectFirma
-	if !d.visible {
-		rect = [4]float64{}
-	}
-	pagina, _ := strconv.Atoi(strings.TrimSpace(d.pagina.Texto()))
+	rect := d.rectEnviado()
+	pagina := d.numeroDePagina()
 	sufijo := d.a.t("pdf.suffix.signed")
 	if d.modo == "certificado" {
 		c := api.PDFCambio{Op: "firmar-certificado", Sufijo: sufijo, Datos: map[string]any{
@@ -626,7 +667,7 @@ func (d *dialogoFirmar) cambio() api.PDFCambio {
 	c := api.PDFCambio{Op: "firmar", Datos: datos, Sufijo: sufijo}
 	switch d.modo {
 	case "mano":
-		datos["trazos"] = trazosAPagina(d.lienzo.trazos)
+		datos["trazos"] = trazosAPagina(d.lienzo.trazos, rect)
 	case "imagen":
 		c.Partes = []api.PDFParte{{Campo: "imagen", Nombre: "firma.png", Datos: d.imagen.datos}}
 	}

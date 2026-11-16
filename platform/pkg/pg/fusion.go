@@ -5,7 +5,6 @@ package pg
 
 import (
 	"context"
-	"fmt"
 )
 
 // consultaTablasConTenant lista las tablas con columna `tenant` y si tienen política de
@@ -40,6 +39,9 @@ import (
 // sin ella: la fusión habría empezado a abortar sola al día siguiente de
 // desplegarse. Actualizar por la madre alcanza a todas sus particiones y solo
 // necesita una política.
+// A Scope-bound table instead declares the complete restrictive guard,
+// CHECK and read-only source/target preflight policy. It remains in the
+// inventory, but is never added to Movable. Partial declarations fail closed.
 const consultaTablasConTenant = `
 	SELECT c.relname,
 	       EXISTS (
@@ -50,7 +52,21 @@ const consultaTablasConTenant = `
 	             AND p.cmd = 'ALL'
 	             AND p.qual LIKE '%app.merge%'
 	             AND COALESCE(p.with_check, p.qual) LIKE '%app.merge%'
-	       )
+	       ),
+        c.relrowsecurity AND c.relforcerowsecurity AND EXISTS (SELECT 1 FROM pg_constraint k WHERE k.conrelid=c.oid AND k.conname='scope_bound_merge_contract' AND pg_get_constraintdef(k.oid)='CHECK (sytue_scope_merge_allowed())') AND EXISTS (
+         SELECT 1 FROM pg_policies p WHERE p.schemaname=n.nspname AND p.tablename=c.relname
+         AND p.permissive='RESTRICTIVE' AND p.cmd='ALL'
+         AND p.qual='sytue_scope_merge_allowed()' AND p.with_check='sytue_scope_merge_allowed()'
+        ) AND EXISTS (
+         SELECT 1 FROM pg_policies p WHERE p.schemaname=n.nspname AND p.tablename=c.relname
+         AND p.permissive='PERMISSIVE' AND p.cmd='SELECT' AND p.qual='sytue_scope_merge_preflight(tenant)'
+        ),
+        EXISTS(SELECT 1 FROM pg_trigger t JOIN pg_proc f ON f.oid=t.tgfoid
+         WHERE t.tgrelid=c.oid AND NOT t.tgisinternal
+         AND (f.proname='sytue_private_storage_state_scope_guard' OR (f.proname='sytue_scope_admission_data_guard' AND t.tgargs=convert_to('state','UTF8')||decode('00','hex')))),
+        EXISTS(SELECT 1 FROM pg_constraint k WHERE k.conrelid=c.oid AND k.conname='scope_bound_merge_contract')
+        OR EXISTS(SELECT 1 FROM pg_policies p WHERE p.schemaname=n.nspname AND p.tablename=c.relname
+        AND (p.qual LIKE '%sytue_scope_merge_%' OR p.with_check LIKE '%sytue_scope_merge_%'))
 	FROM pg_class c
 	JOIN pg_namespace n ON n.oid = c.relnamespace
 	JOIN pg_attribute a ON a.attrelid = c.oid AND a.attname = 'tenant' AND a.attnum > 0
@@ -60,27 +76,13 @@ const consultaTablasConTenant = `
 	ORDER BY c.relname`
 
 // ConsultaTablasConTenant devuelve las tablas con columna `tenant` del esquema
-// actual y, de ellas, las que una fusión de organizaciones NO podría mover por
-// faltarles la política. La usan el preflight de la fusión de Sytue ID
+// actual y los contratos ausentes. Un bloqueo explícito Scope-bound también
+// satisface el inventario; nunca concede permiso para mover esa tabla. Los
+// escritores deben usar ConsultaInventarioDeFusion.Movable. La usan el preflight de la fusión de Sytue ID
 // (services/id/internal/merge) y el guardián de cada servicio,
 // pgtest.ExigirPoliticaDeFusion: la misma consulta en los dos, para que el test no
 // dé por buena una política que el preflight rechazaría.
 func ConsultaTablasConTenant(ctx context.Context, q Querier) (tablas, sinPolitica []string, err error) {
-	rows, err := q.Query(ctx, consultaTablasConTenant)
-	if err != nil {
-		return nil, nil, fmt.Errorf("pg: listar tablas con tenant: %w", err)
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var nombre string
-		var conPolitica bool
-		if err := rows.Scan(&nombre, &conPolitica); err != nil {
-			return nil, nil, fmt.Errorf("pg: leer tabla: %w", err)
-		}
-		tablas = append(tablas, nombre)
-		if !conPolitica {
-			sinPolitica = append(sinPolitica, nombre)
-		}
-	}
-	return tablas, sinPolitica, rows.Err()
+	inventory, err := ConsultaInventarioDeFusion(ctx, q)
+	return inventory.Tables, inventory.Missing, err
 }

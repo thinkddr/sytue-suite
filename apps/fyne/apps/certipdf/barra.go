@@ -167,6 +167,11 @@ type Barra struct {
 	Grosor int
 	// PuedeAnotar sale de los permisos del documento.
 	PuedeAnotar bool
+	// PuedeImprimir también: con él a false «Imprimir» sale apagado y con el motivo.
+	PuedeImprimir bool
+	// SinImpresion quita «Imprimir»: el móvil no tiene cadena de impresión que pedir y
+	// un botón que no hace nada es peor que no tenerlo.
+	SinImpresion bool
 
 	// Lo de «Ver»: página, zoom y lectura.
 	Pagina, Total int
@@ -197,6 +202,9 @@ type Barra struct {
 	AlLeer          func()
 	AlVolver        func()
 	AlPanel         func(abierto bool)
+	// AlDescargar y AlImprimir son «Descargar» e «Imprimir» del grupo «Documento». Nil:
+	// el botón no sale.
+	AlDescargar, AlImprimir func()
 	// AlNuevo y AlAbrir son «Crear nuevo» y «Abrir un archivo» del grupo «Archivo»:
 	// orden del dueño para los editores de Fyne (2026-09-23), que la cinta de la web no
 	// tiene —allí se crea y se abre desde la portada—. Nil: el grupo no sale.
@@ -227,6 +235,7 @@ const (
 	DialogoProteger
 	DialogoFirmar
 	DialogoPedirFirma
+	DialogoVersiones
 )
 
 // Las medidas de `Barra.tsx`, con raíz de16px.
@@ -284,7 +293,7 @@ func repartoBanda(grupos []*editor.Grupo) (anchos []float32, alto float32) {
 
 // NuevaBarra monta la cinta con la pestaña de Inicio abierta, que es como nace.
 func NuevaBarra(t Traductor) *Barra {
-	b := &Barra{t: t, PuedeAnotar: true, Zoom: 1}
+	b := &Barra{t: t, PuedeAnotar: true, PuedeImprimir: true, Zoom: 1}
 	b.reiniciar()
 	return b
 }
@@ -451,11 +460,7 @@ func (b *Barra) bandaDeGrupos() fyne.CanvasObject {
 
 	switch b.activa {
 	case PestOrganizar:
-		grupos = append(grupos, editor.NuevoGrupo(b.t("pdf.ribbon.group.document"),
-			b.botonDialogo("pdf.menu.organize", DialogoOrganizar),
-			b.botonDialogo("pdf.menu.tools", DialogoHerramientas),
-			b.botonDialogo("pdf.menu.stamp", DialogoCapas),
-			b.botonDialogo("pdf.menu.compare", DialogoComparar)))
+		grupos = append(grupos, editor.NuevoGrupo(b.t("pdf.ribbon.group.document"), b.botonesDeDocumento()...))
 	case PestVer:
 		grupos = append(grupos, b.gruposDeVer()...)
 	case PestInicio, PestAnotar, PestFormulario, PestFirmar:
@@ -679,6 +684,36 @@ func (b *Barra) botonesDeHerramienta(hs []Herramienta) []fyne.CanvasObject {
 		bot.Pulsado = b.Herramienta == h.id
 		bot.Inerte = bloqueada
 		objs = append(objs, b.pista(bot, pista))
+	}
+	return objs
+}
+
+// botonesDeDocumento es el grupo «Documento» de Organizar: los cinco diálogos y, detrás,
+// lo que saca el documento de la app tal como está —con lo anotado ya aplicado—, que es
+// donde la web pone «Descargar» e «Imprimir». Fuera de la cinta solo se llegaba a ellos
+// con Ctrl+P o desde dentro de Firmar, que no es donde nadie los busca.
+func (b *Barra) botonesDeDocumento() []fyne.CanvasObject {
+	objs := []fyne.CanvasObject{
+		b.botonDialogo("pdf.menu.organize", DialogoOrganizar),
+		b.botonDialogo("pdf.menu.tools", DialogoHerramientas),
+		b.botonDialogo("pdf.menu.stamp", DialogoCapas),
+		b.botonDialogo("pdf.menu.compare", DialogoComparar),
+		// Volver a como estaba antes de un cambio: Drive guarda cada escritura.
+		b.botonDialogo("pdf.menu.versions", DialogoVersiones),
+	}
+	if b.AlDescargar != nil {
+		objs = append(objs, b.botonAccion("pdf.menu.download", b.AlDescargar))
+	}
+	if b.AlImprimir != nil && !b.SinImpresion {
+		imprimir := NuevaAccion(b.t("pdf.menu.print"), b.AlImprimir)
+		imprimir.Inerte = b.Trabajando || !b.PuedeImprimir
+		if b.PuedeImprimir {
+			objs = append(objs, imprimir)
+		} else {
+			// Como las herramientas que el documento prohíbe: apagado y con el MOTIVO de
+			// pista, para que no se pruebe tres veces.
+			objs = append(objs, b.pista(imprimir, b.t("pdf.blocked.print")))
+		}
 	}
 	return objs
 }

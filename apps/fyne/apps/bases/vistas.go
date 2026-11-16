@@ -12,7 +12,7 @@ import (
 )
 
 // Lo que la interfaz hace con las vistas guardadas: armar la configuración de una vista
-// nueva. Espejo de `lib/vistas.ts`. El servicio valida y ejecuta los filtros y el orden
+// nueva y volver a abrir una guardada para editarla. Espejo de `lib/vistas.ts`. El servicio valida y ejecuta los filtros y el orden
 // (no se evalúa nada aquí); esto solo decide cómo se PINTA.
 
 // operadores son los de cada tipo de campo, espejo de `domain.operadores` del servicio.
@@ -50,6 +50,48 @@ type borradorVista struct {
 	campos                             []string
 	filtroCampo, filtroOp, filtroValor string
 	ordenCampo, ordenDir               string
+	// Al editar: los filtros y órdenes que la vista ya tenía después del primero. El
+	// diálogo solo enseña uno de cada (la API admite más), y editar una vista no debe
+	// perder lo que no se ve; se reenvían tal cual detrás del primero.
+	restoFiltros []api.BasesFilter
+	restoOrden   []api.BasesSort
+}
+
+// borradorDeVista es el borrador de una vista guardada, para abrirla en el diálogo y
+// editarla.
+func borradorDeVista(v api.BasesView, campos []api.BasesField) borradorVista {
+	b := borradorVista{nombre: v.Name, tipo: v.Kind, agrupar: v.Config.GroupBy, filtroOp: "eq", ordenDir: "asc"}
+	if b.agrupar == "" {
+		if i := slices.IndexFunc(campos, func(c api.BasesField) bool { return efectivo(c).Kind == api.BasesKindSelect }); i >= 0 {
+			b.agrupar = campos[i].ID
+		}
+	}
+	b.campos = slices.Clone(v.Config.Fields)
+	// Un formulario sin lista pide todos los que admite: se abre con todos marcados, que
+	// es lo mismo que guardarlo así.
+	if v.Kind == api.BasesForm && len(b.campos) == 0 {
+		for _, c := range camposDeFormulario(campos) {
+			b.campos = append(b.campos, c.ID)
+		}
+	}
+	if len(v.Config.Filters) > 0 {
+		f := v.Config.Filters[0]
+		b.filtroCampo, b.filtroOp = f.Field, f.Op
+		switch x := f.Value.(type) {
+		case string:
+			b.filtroValor = x
+		case float64:
+			b.filtroValor = strconv.FormatFloat(x, 'f', -1, 64)
+		case bool:
+			b.filtroValor = strconv.FormatBool(x)
+		}
+		b.restoFiltros = slices.Clone(v.Config.Filters[1:])
+	}
+	if len(v.Config.Sort) > 0 {
+		b.ordenCampo, b.ordenDir = v.Config.Sort[0].Field, v.Config.Sort[0].Dir
+		b.restoOrden = slices.Clone(v.Config.Sort[1:])
+	}
+	return b
 }
 
 // configDeBorrador es la configuración que se envía al servicio; `ok` falso si el
@@ -90,8 +132,23 @@ func configDeBorrador(b borradorVista, campos []api.BasesField) (cfg api.BasesVi
 		}
 		cfg.Filters = []api.BasesFilter{filtro}
 	}
+	// Lo que se conserva de la vista editada, salvo lo de campos que ya no existen: el
+	// servicio rechazaría la vista entera por un filtro sobre un campo borrado.
+	existe := func(id string) bool {
+		return slices.ContainsFunc(campos, func(c api.BasesField) bool { return c.ID == id })
+	}
+	for _, x := range b.restoFiltros {
+		if existe(x.Field) {
+			cfg.Filters = append(cfg.Filters, x)
+		}
+	}
 	if b.ordenCampo != "" {
 		cfg.Sort = []api.BasesSort{{Field: b.ordenCampo, Dir: b.ordenDir}}
+	}
+	for _, x := range b.restoOrden {
+		if existe(x.Field) {
+			cfg.Sort = append(cfg.Sort, x)
+		}
 	}
 	return cfg, true
 }

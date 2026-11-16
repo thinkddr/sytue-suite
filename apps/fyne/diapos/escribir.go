@@ -41,6 +41,10 @@ func (e *Editor) EmpezarEscritura(id string) {
 	if c == nil || !esTexto(*c) || e.ctx.SoloLectura {
 		return
 	}
+	if e.cajaFija(id) { // lo escrito no se podría guardar
+		e.avisarProtegido()
+		return
+	}
 	e.TerminarEscritura()
 	e.sel, e.extra = id, nil
 	w := &escritura{id: id}
@@ -73,6 +77,13 @@ func (w *escritura) caja(e *Editor, tam fyne.Size, k float32, tinta color.NRGBA)
 	c := cajaFolio(tam, k, hojaCaja(tinta, e.m.Visuales(e.activa).Familia, ""))
 	c.AlDesplazar = e.desliz.Scrolled
 	c.Rotulo = e.t("slides.textBox")
+	c.AlPegar = func(texto string) string {
+		// Dentro de un texto se pega texto, nunca cajas (ni su JSON).
+		if r, ok := LeerRecorte(texto); ok {
+			return TextoDeRecorte(r)
+		}
+		return texto
+	}
 	c.AlSalir = func() {
 		e.TerminarEscritura()
 		e.capa.enfocar() // Escape devuelve el teclado al escenario

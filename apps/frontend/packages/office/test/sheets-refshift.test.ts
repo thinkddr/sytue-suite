@@ -69,6 +69,11 @@ test('un rango se ENCOGE si le borran un trozo, y muere si se lo borran entero',
   expect(reescribirFormula('=SUMA(A4:A8)', delFila(2, 3))).toBe('=SUMA(A3:A5)');
   // El rango entero desaparece.
   expect(reescribirFormula('=SUMA(A3:A5)', delFila(2, 3))).toBe(`=SUMA(${REF_ROTA})`);
+  // Si lo borrado se lleva el FINAL, el fin se pega a la última que queda antes del
+  // corte: `A1:A3` ya sería la antigua fila 6, un dato que el rango nunca tuvo.
+  expect(reescribirFormula('=SUMA(A1:A5)', delFila(2, 3))).toBe('=SUMA(A1:A2)');
+  expect(reescribirFormula('=SUMA(A5:A1)', delFila(2, 3))).toBe('=SUMA(A2:A1)');
+  expect(moverReferencia('B2:E2', delCol(3, 5))).toBe('B2:C2');
 });
 
 test('los $ NO eximen del desplazamiento', () => {
@@ -174,4 +179,163 @@ test('el autofiltro y las vistas de filtro siguen la inserción y el borrado', (
 
   // Sin criterios no sobra ninguna clave vacía.
   expect(moverVista({ id: 'v2', name: 'Vacía' }, del)).toEqual({ id: 'v2', name: 'Vacía' });
+});
+
+// El formato condicional y las validaciones siguen a sus celdas (antes se quedaban en las
+// de antes y pintaban o vetaban filas ajenas sin ningún aviso).
+test('el formato condicional y las validaciones siguen a sus celdas', () => {
+  const hoja = {
+    name: 'H',
+    cells: {},
+    condFormats: [
+      { range: 'B2:B10', kind: 'formula' as const, formula: '=B2>$D$1', fill: '#FFEB9C' },
+      { range: 'C3', op: 'gt' as const, value: '5', fill: '#FFC7CE' },
+    ],
+    validations: [{ range: 'B2:B10', type: 'formula' as const, formula: '=B2<>""' }],
+  };
+  // Insertar una fila encima: la regla B2:B10 pasa a B3:B11 y su fórmula, con ella.
+  const ins = moverObjetos(hoja, insFila(0));
+  expect(ins.condFormats).toEqual([
+    { range: 'B3:B11', kind: 'formula', formula: '=B3>$D$2', fill: '#FFEB9C' },
+    { range: 'C4', op: 'gt', value: '5', fill: '#FFC7CE' },
+  ]);
+  expect(ins.validations).toEqual([{ range: 'B3:B11', type: 'formula', formula: '=B3<>""' }]);
+  // Insertar dentro: la regla crece y su fórmula, que mira a la primera celda, no cambia.
+  expect(moverObjetos(hoja, insFila(4)).condFormats?.[0]?.range).toBe('B2:B11');
+  // Borrar su primera fila: la fórmula pasa a ser la de la nueva primera celda, no #¡REF!.
+  const sinPrimera = moverObjetos(hoja, delFila(1));
+  expect(sinPrimera.condFormats?.[0]).toMatchObject({ range: 'B2:B9', formula: '=B2>$D$1' });
+  expect(sinPrimera.validations?.[0]).toMatchObject({ range: 'B2:B9', formula: '=B2<>""' });
+  // Borrar todas sus filas la elimina; la que queda en una celda es esa celda, no «B2:B2».
+  const todas = moverObjetos(hoja, delFila(1, 9));
+  expect(todas.condFormats).toBeUndefined();
+  expect(todas.validations).toBeUndefined();
+  expect(moverObjetos(hoja, delFila(2, 8)).validations?.[0]?.range).toBe('B2');
+  // Una columna: la regla de C se va con C; la de B no se entera.
+  const sinC = moverObjetos(hoja, delCol(2));
+  expect(sinC.condFormats?.map((c) => c.range)).toEqual(['B2:B10']);
+  expect(sinC.condFormats?.[0]?.formula).toBe('=B2>$C$1');
+});
+
+// Con la hoja protegida, lo que el servidor veta sin su permiso no se toca: si se movieran,
+// rechazaría el guardado entero (services/docs/internal/domain/proteccion.go).
+test('con la hoja protegida sin «objects», el FC y las validaciones se quedan quietos', () => {
+  const hoja = {
+    name: 'H',
+    cells: {},
+    protect: { insertRows: true },
+    condFormats: [{ range: 'B2:B10', op: 'gt' as const, value: '5', fill: '#FFC7CE' }],
+    validations: [{ range: 'B2:B10', values: ['Sí', 'No'] }],
+    charts: [{ id: 'g', type: 'bar' as const, range: 'B2:C10' }],
+    autofilter: { row: 1, c1: 1, c2: 2 },
+    tables: [{ name: 'T', range: 'B2:C10' }],
+  };
+  const out = moverObjetos(hoja, insFila(0));
+  expect(out.condFormats).toBe(hoja.condFormats);
+  expect(out.validations).toBe(hoja.validations);
+  expect(out.charts).toBe(hoja.charts);
+  expect(out.autofilter).toBe(hoja.autofilter);
+  // Las tablas no las gobierna ningún permiso: se mueven.
+  expect(out.tables?.[0]?.range).toBe('B3:C11');
+  const concedido = moverObjetos(
+    { ...hoja, protect: { insertRows: true, objects: true } },
+    insFila(0),
+  );
+  expect(concedido.condFormats?.[0]?.range).toBe('B3:B11');
+  expect(concedido.autofilter).toBe(hoja.autofilter);
+});
+
+// Los rangos editables viajan con sus celdas (D-CALC-02): si no, el de Ana cubriría el
+// contenido bloqueado que baja a su primera fila. El servidor reproduce el mismo
+// desplazamiento (services/docs/internal/domain/proteccion_desplazar.go).
+test('los rangos editables de la hoja protegida siguen a sus celdas', () => {
+  const hoja = {
+    name: 'H',
+    cells: {},
+    protect: {
+      hasPassword: true,
+      insertRows: true,
+      ranges: [
+        { ref: 'B2:B3', users: ['ana'] },
+        { ref: 'A1:A2', groups: ['contabilidad'] },
+        { ref: 'D5', users: ['luis'] },
+      ],
+    },
+  };
+  const arriba = moverObjetos(hoja, insFila(0));
+  expect(arriba.protect).toEqual({
+    hasPassword: true,
+    insertRows: true,
+    ranges: [
+      { ref: 'B3:B4', users: ['ana'] },
+      { ref: 'A2:A3', groups: ['contabilidad'] },
+      { ref: 'D6', users: ['luis'] },
+    ],
+  });
+  // Dentro de un rango, crece; por debajo de todos, nada cambia.
+  expect(moverObjetos(hoja, insFila(2)).protect?.ranges?.map((g) => g.ref)).toEqual([
+    'B2:B4',
+    'A1:A2',
+    'D6',
+  ]);
+  expect(moverObjetos(hoja, insFila(10)).protect?.ranges).toEqual(hoja.protect.ranges);
+  // Borrar encoge, y lo que se borra entero desaparece.
+  expect(moverObjetos(hoja, delFila(1, 2)).protect?.ranges?.map((g) => g.ref)).toEqual([
+    'A1',
+    'D3',
+  ]);
+  expect(moverObjetos(hoja, insCol(0, 2)).protect?.ranges?.map((g) => g.ref)).toEqual([
+    'D2:D3',
+    'C1:C2',
+    'F5',
+  ]);
+  // Sin ningún rango vivo, la hoja SIGUE protegida: solo se va la lista.
+  const sinRangos = moverObjetos(
+    { ...hoja, protect: { insertRows: true, ranges: [{ ref: 'B2', users: ['ana'] }] } },
+    delFila(1),
+  );
+  expect(sinRangos.protect).toEqual({ insertRows: true });
+  // Sin rangos, la protección es la misma de antes.
+  const sinLista = { name: 'H', cells: {}, protect: { insertRows: true } };
+  expect(moverObjetos(sinLista, insFila(0)).protect).toBe(sinLista.protect);
+});
+
+// El esquema crece, encoge o desaparece con su detalle; los anchos, los altos y las
+// combinadas, igual.
+test('el esquema, los anchos y las combinadas siguen a sus filas y columnas', () => {
+  const hoja = {
+    name: 'H',
+    cells: {},
+    rowGroups: [
+      { start: 1, end: 4, level: 1 },
+      { start: 2, end: 3, level: 2, collapsed: true },
+    ],
+    colGroups: [{ start: 1, end: 2, level: 1 }],
+    merges: ['A1:C1', 'B5:B6'],
+    colWidths: { '1': 120, '3': 60 },
+    rowHeights: { '4': 30 },
+  };
+  // Encima: baja entero. Dentro: crece. En el resumen (end+1): no lo estira.
+  expect(moverObjetos(hoja, insFila(1)).rowGroups).toEqual([
+    { start: 2, end: 5, level: 1 },
+    { start: 3, end: 4, level: 2, collapsed: true },
+  ]);
+  expect(moverObjetos(hoja, insFila(3)).rowGroups).toEqual([
+    { start: 1, end: 5, level: 1 },
+    { start: 2, end: 4, level: 2, collapsed: true },
+  ]);
+  expect(moverObjetos(hoja, insFila(5)).rowGroups).toEqual(hoja.rowGroups);
+  // Borrar el detalle interior entero se lleva el grupo interior y encoge el exterior.
+  expect(moverObjetos(hoja, delFila(2, 2)).rowGroups).toEqual([{ start: 1, end: 2, level: 1 }]);
+  // Las filas no tocan el esquema de columnas, y al revés.
+  expect(moverObjetos(hoja, insFila(0)).colGroups).toBe(hoja.colGroups);
+  const conCol = moverObjetos(hoja, insCol(0));
+  expect(conCol.colGroups).toEqual([{ start: 2, end: 3, level: 1 }]);
+  expect(conCol.rowGroups).toBe(hoja.rowGroups);
+  expect(conCol.colWidths).toEqual({ '2': 120, '4': 60 });
+  expect(conCol.merges).toEqual(['B1:D1', 'C5:C6']);
+  expect(moverObjetos(hoja, delCol(1, 2)).colGroups).toBeUndefined();
+  const sinFila = moverObjetos(hoja, delFila(4));
+  expect(sinFila.merges).toEqual(['A1:C1']);
+  expect(sinFila.rowHeights).toBeUndefined();
 });

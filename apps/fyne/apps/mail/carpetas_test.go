@@ -29,7 +29,8 @@ func TestLosMotivosDeCarpetaSonLosDeLaWeb(t *testing.T) {
 
 // ultimoAviso es el título del aviso más reciente, o "".
 func ultimoAviso(b *Buzon) (ui.TonoAviso, string) {
-	av := b.P.Avisos.Avisos()
+	// El último en llegar está al final de la cola si la pantalla ya tiene sus tres.
+	av := append(b.P.Avisos.Avisos(), b.P.Avisos.EnCola()...)
 	if len(av) == 0 {
 		return 0, ""
 	}

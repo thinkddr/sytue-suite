@@ -4439,16 +4439,16 @@ Desde el 2026-10-04 «Descargar como PDF» produce un PDF **etiquetado y conform
 (ISO 14289-1) por defecto. Solo se etiqueta lo que Sytue exporta, donde la estructura se conoce;
 un PDF ajeno no se reetiqueta (habría que adivinar el orden de lectura).
 
-| Pieza                    | Dónde                                            | Qué hace                                                                                                                                                                                                |
-| ------------------------ | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Fuentes                  | `platform/pkg/pdffuente`                         | Subconjunto TrueType incrustado: `Type0` Identity-H › `CIDFontType2` con `/W` y `/ToUnicode`. Figtree (marca) y Liberation Sans (reserva: griego y cirílico), las dos SIL OFL 1.1 y con `fsType` 0      |
-| Escritor                 | `platform/pkg/pdfdoc`                            | Maqueta con las métricas reales; contenido marcado (MCID), árbol de estructura, `ParentTree`, artefactos (reglas, bordes, número de página), `/Lang`, `MarkInfo`, `DisplayDocTitle`, XMP `pdfuaid:part` |
-| Tablas e imágenes        | `pdfdoc/tabla.go`, `pdfdoc/imagen.go`            | `Table › TR › TH/TD` con `Scope`, `ColSpan`, `RowSpan`; `Figure` con `/Alt`, y la imagen sin alt como artefacto contado                                                                                 |
-| Mapeo de Docus           | `services/docs/internal/domain/export_pdf_ua.go` | `ExportPDFAccesible`: del modelo que ya usa DOCX/ODT a `pdfdoc`; devuelve un `InformePDF` (imágenes sin alt, perdidas, caracteres sin glifo)                                                            |
-| Petición                 | `services/docs/internal/http/exports.go`         | `POST …/exports {format:"pdf", accessible?}`; sin el campo, accesible. El idioma del documento es el de `Accept-Language`                                                                               |
-| Interruptor              | `apps/nucleo/office/catalog.json` (`option`)     | «PDF accesible» en Archivo, web (`Ribbon.tsx`, `localStorage`) y Fyne (`editor/archivo.go`); apagado pide el PDF simple de `pdfsimple`                                                                  |
-| Comprobación de CertiPDF | `domain/pdfarchivo.go`                           | `ComprobarArchivo` añade `declara_pdfua` (MarkInfo, DisplayDocTitle y `pdfuaid:part=1`)                                                                                                                 |
-| Validación               | `platform/pkg/pdfdoc/uacheck`                    | Verificador estructural propio (siempre) y veraPDF como control externo (`SYTUE_VERAPDF`, solo desarrollo/CI; `scripts/verapdf-instalar.sh`)                                                            |
+| Pieza                    | Dónde                                        | Qué hace                                                                                                                                                                                                |
+| ------------------------ | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fuentes                  | `platform/pkg/pdffuente`                     | Subconjunto TrueType incrustado: `Type0` Identity-H › `CIDFontType2` con `/W` y `/ToUnicode`. Figtree (marca) y Liberation Sans (reserva: griego y cirílico), las dos SIL OFL 1.1 y con `fsType` 0      |
+| Escritor                 | `platform/pkg/pdfdoc`                        | Maqueta con las métricas reales; contenido marcado (MCID), árbol de estructura, `ParentTree`, artefactos (reglas, bordes, número de página), `/Lang`, `MarkInfo`, `DisplayDocTitle`, XMP `pdfuaid:part` |
+| Tablas e imágenes        | `pdfdoc/tabla.go`, `pdfdoc/imagen.go`        | `Table › TR › TH/TD` con `Scope`, `ColSpan`, `RowSpan`; `Figure` con `/Alt`, y la imagen sin alt como artefacto contado                                                                                 |
+| Mapeo de Docus           | `apps/nucleo/office/model/export_pdf_ua.go`  | `ExportPDFAccesible`: del modelo que ya usa DOCX/ODT a `pdfdoc`; devuelve un `InformePDF` (imágenes sin alt, perdidas, caracteres sin glifo)                                                            |
+| Petición                 | `services/docs/internal/http/exports.go`     | `POST …/exports {format:"pdf", accessible?}`; sin el campo, accesible. El idioma del documento es el de `Accept-Language`                                                                               |
+| Interruptor              | `apps/nucleo/office/catalog.json` (`option`) | «PDF accesible» en Archivo, web (`Ribbon.tsx`, `localStorage`) y Fyne (`editor/archivo.go`); apagado pide el PDF simple de `pdfsimple`                                                                  |
+| Comprobación de CertiPDF | `domain/pdfarchivo.go`                       | `ComprobarArchivo` añade `declara_pdfua` (MarkInfo, DisplayDocTitle y `pdfuaid:part=1`)                                                                                                                 |
+| Validación               | `platform/pkg/pdfdoc/uacheck`                | Verificador estructural propio (siempre) y veraPDF como control externo (`SYTUE_VERAPDF`, solo desarrollo/CI; `scripts/verapdf-instalar.sh`)                                                            |
 
 Límites declarados: sin justificado (Identity-H no admite `Tw`), sin kerning, escrituras no
 europeas sustituidas por «?» y contadas, listas dentro de una celda sin `L`/`LI`, cabeceras de
@@ -4463,10 +4463,10 @@ Abrir un fichero de fuera (`domain.Import`) y descargarlo (`domain.Export`) son 
 traducciones entre el formato y el modelo del editor (`doc:html`, `doc:sheet`, `doc:slides`),
 y cada una pierde lo que no sabe traducir. Esta sección es la **medida** de esas pérdidas, no
 una lista de deseos: la escribe `TestMatrizDeFidelidad`
-(`services/docs/internal/domain/fidelidad_test.go`), que falla si lo medido y lo escrito no
+(`apps/nucleo/office/model/fidelidad_test.go`), que falla si lo medido y lo escrito no
 coinciden.
 
-**Cómo se mide.** El corpus está en `services/docs/internal/domain/testdata/fidelidad/`:
+**Cómo se mide.** El corpus está en `apps/nucleo/office/model/testdata/fidelidad/`:
 
 - `fuentes/*.fodt|fods|fodp`: documento, hoja y presentación en ODF plano, escritos a mano
   con contenido inventado, y de ellos salen con LibreOffice los ficheros de `libreoffice/`
@@ -4482,7 +4482,7 @@ cumplen al abrir el fichero (todas, «completa»; ninguna, «perdida»; si no, �
 nada que conservar). Para regenerarla tras un cambio, en el frontal:
 
 ```sh
-SYTUE_FIDELIDAD_ESCRIBIR=1 go test ./services/docs/internal/domain -run TestMatrizDeFidelidad
+SYTUE_FIDELIDAD_ESCRIBIR=1 go -C apps/nucleo test ./office/model -run TestMatrizDeFidelidad
 ```
 
 **Lo que la matriz de Diapos mide poco.** Los medios (vídeo y audio, con su póster, su bucle y
@@ -4567,7 +4567,7 @@ del PDF que saca LibreOffice del original (como caja negra, §4 de security.md).
 
 ```sh
 SYTUE_CORPUS_TERCEROS=/ruta/corpus SYTUE_CORPUS_SALIDA=/ruta/salida \
-  go test ./services/docs/internal/domain -run '^TestCorpusTerceros$' -timeout 180m
+  go -C apps/nucleo test ./office/model -run '^TestCorpusTerceros$' -timeout 180m
 ```
 
 Medido el 2026-10-15 sobre 3530 .xlsx y 501 .pptx, con el importador de antes de la serie
@@ -4791,7 +4791,9 @@ pintar. Lo que conviene saber:
   Calc en `.xlsx` puede diferir unos píxeles de lo que dibuja. La rejilla de Calcus las respeta
   (`rejilla.ts`: posiciones acumuladas y búsqueda por bisección; sin medidas propias, la
   geometría es la de paso fijo de siempre). Los gráficos flotantes se anclan a la rejilla de
-  serie. El lienzo nativo (Fyne) no las pinta, pero las conserva al guardar.
+  serie. El lienzo nativo (Fyne) las pinta con el mismo cálculo (`calcus/geometria.go`, contra
+  los vectores compartidos) y las cambia igual: arrastre del borde de la cabecera, doble clic
+  para autoajustar y los comandos `colwidth`/`rowheight`.
 - **Fechas, formatos de número y fórmulas compartidas.** Una fecha del editor sale de ODS como
   `office:value-type="date"` con su `office:date-value`, y al leer los `date-value` y
   `time-value` vuelven a número de serie. Los estilos de datos de ODF (`number-style`,
@@ -4891,13 +4893,13 @@ Pérdidas:
 #### Corpus de .docx reales
 
 La matriz mide documentos escritos a propósito; los de verdad traen otra cosa. `TestCorpusDocx`
-(`services/docs/internal/domain/corpus_docx_test.go`) importa una carpeta de `.docx` ajenos y
+(`apps/nucleo/office/model/corpus_docx_test.go`) importa una carpeta de `.docx` ajenos y
 cuenta cuántos fallan, cuántos pierden texto (las letras de `document.xml`, sin el respaldo de
 `mc:AlternateContent`, que no llegan al HTML; más del 1 %) y qué propiedades se leen y no se
 traducen, por el número de ficheros que las llevan. El corpus no vive en el repositorio:
 
 ```sh
-SYTUE_CORPUS_DOCX=/ruta/al/corpus go test ./services/docs/internal/domain -run TestCorpusDocx -v
+SYTUE_CORPUS_DOCX=/ruta/al/corpus go -C apps/nucleo test ./office/model -run TestCorpusDocx -v
 ```
 
 Medido el 2026-10-14 con 883 ficheros de licencia permisiva: los de prueba de Apache POI (134),
@@ -5241,7 +5243,7 @@ y no entre, contiene/no contiene/empieza/termina, vacías, N superiores/inferior
 porcentaje—, por encima/debajo de la media y por color manual de relleno o de texto). Valores
 y condición son dos maneras de filtrar la misma columna: elegir una quita la otra. La
 semántica vive en `packages/office/src/editor/sheets/filtro.ts` y se repite, con la misma tabla de
-casos, en `services/docs/internal/domain/sheet_filtro.go` (`TestPasaCondicion` y
+casos, en `apps/nucleo/office/model/sheet_filtro.go` (`TestPasaCondicion` y
 `sheets-filtro.test.ts`): si una cambia, cambia la otra.
 
 Una **vista de filtro** es una foto con nombre de esos criterios y es **de una persona**: se
@@ -6198,7 +6200,7 @@ Medición en Scaleway ARM64, con claves y datos artificiales:
 artificial original; una integración debe distinguir cancelación y fallo sin aceptar una
 salida incompleta.
 
-**No se adopta todavía.** El [formato age](https://c2sp.org/age) por sí solo no autentica al
+**El prototipo Typage anterior no se incorpora al producto.** El [formato age](https://c2sp.org/age) por sí solo no autentica al
 remitente ni vincula el archivo a la aplicación, propietario o revisión esperados. Hace falta
 un descriptor protegido que fije ese contexto y la identidad del criptograma; siguen vigentes
 los requisitos de custodia, recuperación y frescura siguientes. Abrir `ReaderAt` tampoco
@@ -6211,6 +6213,70 @@ Fuentes, lockfiles y resultados quedan en el snapshot de sesión
 `/tmp/sytue-age-stream-research-evidence-20261020.tgz`, SHA-256
 `90b07810e1e85ad2e58870ccd4d7f05e1c05fc8b15ee6b69951ff030eeeda3c9`.
 El servidor HTTP del harness se apagó al terminar. Las claves del fixture son sintéticas.
+
+<a id="almacenamiento-e2e-nucleo"></a>
+
+#### Núcleo compartido implementado y límites de activación
+
+La evaluación anterior conserva sus medidas originales. El repositorio incorpora ahora el
+paquete Go `apps/nucleo/storage/pqc`: usa la implementación mantenida de age y el perfil
+`age-MLKEM768-X25519-v1`, con ML-KEM-768 y X25519 del destinatario híbrido upstream. Web,
+Fyne y los motores de procesamiento importan las mismas fuentes Go. No se ha incorporado
+Typage ni un combinador criptográfico alternativo en JavaScript. Las identidades antiguas
+se conservan para lectura; recuperar un secreto no autoriza sustituir su identidad ni su
+versión silenciosamente.
+
+El registro privado cifra contenido, índices y descriptores de archivos antes de publicarlos.
+El codec común fija ámbito, identidad, objeto, revisión y compromisos de contenido. La
+fragmentación respeta el límite de los eventos Matrix y conserva el límite original del
+registro. El transporte exterior sigue usando los SDK oficiales de Matrix y Megolm; el sobre
+interior híbrido protege los datos de aplicación y sus claves. SSSS custodia las identidades
+privadas con nombres y pines derivados por Go de su ámbito, versión, homeserver, usuario y
+clave de recuperación. Conserva las limitaciones de frescura de SSSS descritas abajo.
+
+El navegador carga el núcleo criptográfico en un Worker. Los motores `office` y `mail`
+son módulos perezosos separados para que abrir otra app no cargue sus procesadores completos.
+El manifiesto liga identificador de módulo, versión y SHA-256; las rutas son fijas y del mismo
+origen. Un documento nunca elige una URL ejecutable. Cada instancia y puerto conserva su
+ámbito y SDK reales; sus handles no se intercambian entre módulos. Las peticiones BFF de
+estos puertos conservan la generación inmutable de su sesión Sytue, que el servidor
+contrasta antes de consultar el servicio. Retirar la sesión cancela y drena todos
+sus módulos, puertos y operaciones antes de borrar las claves. El cierre ordinario conserva
+los diarios cifrados; borrar datos exige pausar el motor y comprobar su trabajo pendiente.
+
+Las publicaciones requieren respaldo recuperable de la sesión Matrix y la política original
+antes de cada HTTP. La admisión durable liga ámbito, dispositivo, transacción y ciphertext;
+sólo su reserva exacta permite el primer envío. Una confirmación de recuperación no concede
+otro envío. Resolver un ACK ambiguo requiere obtener el evento real con el SDK y contrastar
+su contenido con la intención y el diario originales. Un estado REST o un 404 no sustituye
+esa comprobación. La activación de cada producto sigue condicionada al cierre de ese recorrido.
+
+La colaboración usa el paquete común `resource`: una identidad híbrida por recurso y época,
+grants individuales a miembros autorizados y certificados ligados al SDK y sus roles. No se
+monta la bóveda personal del propietario para dar acceso a un colaborador. La retirada de
+un miembro rota la época; la historia y el checkpoint actual mantienen políticas distintas.
+El gateway de archivos grandes por capacidad de recurso, los repositorios privados completos
+de Office y la equivalencia de las funciones compartidas siguen siendo requisitos de cierre.
+No se anuncia E2E de toda la suite ni se activa una app por disponer sólo de su transporte.
+
+El bootstrap nativo exige conservar y releer la clave de su plan firmado en el SSSS del
+SDK de almacenamiento aislado de ese producto antes de preparar el primer descriptor.
+El diario cifrado retiene el respaldo pendiente hasta comprobar los bytes exactos. La
+clave local no se sustituye al perderse y el SSSS canónico global de Rooms no sirve como
+custodia alternativa. El codec de recuperación es el mismo Go en nativo y Wasm: liga
+propietario, plan, firma SDK histórica, recurso, destinatario y época inicial verificada.
+Devuelve un handle de época; las operaciones siguen exigiendo la sesión actual, sus
+capacidades y el cerrojo de la fuente original. No restablece al dispositivo retirado.
+Las pruebas separan la recuperación con un SDK2 nuevo y Synapse real de la verificación
+de firmas de un productor retirado. Falta componer ambos recorridos con el registro y
+la fuente SQL originales, conectar el puerto web de custodia y probar los SO físicos.
+
+La migración mantiene las fuentes originales congeladas hasta copiar, verificar y confirmar
+el resultado desde un dispositivo autorizado. Captura SQL, cambio de identidad Matrix y
+época de recurso son estados diferentes. Búsqueda, OCR, IA y transcodificación del contenido
+privado se ejecutan en los dispositivos autorizados, sin enviar claves al backend. Los canales
+externos que el usuario autorice para intercambiar contenido legible y el tránsito SMTP
+conservan sus propias garantías: no se describen como E2E nativo de Rooms o del almacenamiento.
 
 #### Contrato para una implementación posterior
 
@@ -6283,3 +6349,80 @@ una nueva referencia de forma atómica, sin borrar el original antes de comproba
 Versiones, índices, derivados, backups y políticas de retención deben contabilizarse antes de
 anunciar que ya no quedan copias legibles. Esta propuesta no activa dicha migración ni permite
 anunciar cifrado global.
+
+El motor original de Docus, Calcus y Diapos reside ahora en
+`apps/nucleo/office/model`: el backend importa sus tipos y funciones en vez de mantener otra
+implementación. Incluye CRDT, protección, formatos, comentarios e historial. La fuente congelada
+de Docs conserva las relaciones originales y la secuencia `int64`; los números que cruzan un
+protocolo firmado viajan como cadenas decimales. Su activación como repositorio cifrado sigue
+pendiente de cerrar colaboración, objetos grandes, fuentes completas y las interfaces.
+
+`apps/nucleo/resource` define la autoridad y los compromisos comunes de recursos colaborativos.
+La identidad híbrida age ML-KEM768+X25519 pertenece a cada recurso y época; sus concesiones van
+a los destinatarios autorizados, sin dar acceso al vault personal del dueño. El `Baseline` firmado
+conserva la historia original; el `Checkpoint` de cada época representa el estado actual con una
+referencia distinta y no reemplaza la cabeza lógica. Los contextos públicos canónicos se conservan
+por hash para que un dispositivo recuperado no tenga que reconstruir al creador antiguo.
+En Rooms, el estado actual para un miembro nuevo comprende sólo metadatos del canal, sin
+transcripciones anteriores a su incorporación.
+
+`platform/pkg/resourcepg` es el relay SQL común: los candidatos conservan ciphertext SDK exacto,
+la publicación adquiere un hold durable antes de la red y ACL/época/posición se vuelven a
+comprobar bajo el bloqueo de fila. La misma transacción confirma referencia, secuencia y outbox.
+No hay caducidad que libere una aceptación ambigua. El descriptor de reserva y las evidencias SDK
+públicas se guardan una sola vez por hash; la recuperación verifica la reserva retenida y el GET
+del SDK para confirmar únicamente ese envío, sin devolver autoridad de publicación al dispositivo
+antiguo. El esquema se importa con `pg.WithResourceRelayDDL`; cada servicio aporta sus concesiones
+SQL, el validador de rutas de dominio y la notificación. Estas piezas no activan los Mains ni
+retiran las fuentes históricas en claro por sí solas.
+
+<a id="custodia-envuelta-de-la-clave-de-recuperacion"></a>
+
+## Custodia envuelta de la clave de recuperación (2026-11-12)
+
+El porqué está en el [ADR 0082](decisions.md#0082). Esto es el formato, que comparten
+`apps/nucleo/recoverywrap` (Go: escritorio y validación del servicio) y el cliente de la web.
+Lo fijan los vectores de `apps/nucleo/recoverywrap/testdata/vectors.json`: cada entrada lleva
+la contraseña o la salida PRF, la clave de envoltorio (`wrap_key`, hex), el AAD (hex) y el
+envoltorio resultante. Se regeneran con `go test ./recoverywrap -update`, y solo con un
+cambio de versión del formato: si cambian sin querer, los envoltorios guardados dejan de abrir.
+
+**Cuenta.** El selector de la API es la consulta de `GET`/`PUT /api/v1/matrix/recovery-wrappers`:
+sin parámetros, la cuenta de Rooms (`@sytue_<sub>`); `product` solo, o con
+`identity_version=1`, esa misma cuenta; `product` con `identity_version=2`, la cuenta aislada de
+ese producto en la organización de la petición. `identity_version` sin `product` es un 400.
+En el AAD, la cuenta es su ID de Matrix (`matrix_user_id` del bootstrap).
+
+**Envoltorio** (JSON; los bytes en base64 estándar con relleno, `credential_id` en base64url
+sin relleno, como en WebAuthn):
+
+```json
+{"id": "uuid", "v": 1, "kind": "password | passkey", "key_id": "<id de la clave SSSS>",
+ "credential_id": "<'' en contraseña>", "kdf": {…}, "nonce": "<12 bytes>",
+ "ciphertext": "<salida de AES-GCM con la etiqueta de 16 bytes>", "created_at": "RFC 3339"}
+```
+
+`id` y `created_at` los pone el servicio y no se mandan al guardar. El servicio valida la forma
+y los mínimos de la derivación con el mismo `Validate` y guarda el JSON tal cual.
+
+**Derivación.**
+
+| `kind`     | `kdf`                                                        | Clave de envoltorio (32 bytes)                                                                                                          |
+| ---------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `password` | `{"alg":"argon2id","m":65536,"t":3,"p":1,"salt":<16 bytes>}` | `HKDF-SHA256(Argon2id(contraseña en UTF-8 sin normalizar, salt, t, m KiB, p, 32), sal vacía, "sytue-matrix-recovery-wrap-v1/password")` |
+| `passkey`  | `{"alg":"webauthn-prf-hkdf-sha256","prf_salt":<32 bytes>}`   | `HKDF-SHA256(salida PRF «first» de 32 bytes con entrada prf_salt, sal vacía, "sytue-matrix-recovery-wrap-v1/passkey")`                  |
+
+Argon2id es la versión 0x13. Los límites que aceptan cliente y servicio son
+`65536 ≤ m ≤ 1048576`, `3 ≤ t ≤ 10` y `1 ≤ p ≤ 4`; `p = 1` es para que el navegador lo calcule en
+un solo hilo. La passkey es la de Sytue ID (RP ID `WEBAUTHN_RP_ID`).
+
+**Cifrado.** AES-256-GCM con un nonce aleatorio de 12 bytes. El texto en claro es la clave de
+recuperación tal como la codifica el SDK (grupos base58 separados por espacios), en UTF-8. El
+AAD es, en UTF-8 y separado por un byte `0x00`:
+`"sytue-matrix-recovery-wrap-v1" ‖ kind ‖ cuenta ‖ key_id ‖ credential_id`. Un envoltorio
+copiado a otra cuenta, a otra clave o a otra passkey no abre.
+
+**Orden.** Al crear el cifrado o al restablecerlo, el envoltorio se guarda **antes** de publicar
+la clave como clave de almacenamiento secreto; si el servicio no lo acepta, no se publica nada.
+Guardar un envoltorio de otra `key_id` borra los de la clave anterior; en la cuenta de Rooms
+borra además la copia con KEK de la [0081](decisions.md#0081).

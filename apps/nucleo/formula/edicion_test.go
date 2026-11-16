@@ -182,6 +182,10 @@ func TestInsertarYBorrarReescribeLasFormulas(t *testing.T) {
 		{delFila(2, 3), "=SUMA(A1:A10)", "=SUMA(A1:A7)"},
 		{delFila(2, 3), "=SUMA(A4:A8)", "=SUMA(A3:A5)"},
 		{delFila(2, 3), "=SUMA(A3:A5)", "=SUMA(" + RefRota + ")"},
+		// Si lo borrado se lleva el final, el fin se pega a la última que queda antes.
+		{delFila(2, 3), "=SUMA(A1:A5)", "=SUMA(A1:A2)"},
+		{delFila(2, 3), "=SUMA(A5:A1)", "=SUMA(A2:A1)"},
+		{delCol(3, 5), "B2:E2", "B2:C2"},
 		{insFila(0), "$A$3", "$A$4"},
 		{insFila(0), "A$3", "A$4"},
 		{insFila(3), "=$B$2+$B$7", "=$B$2+$B$8"},

@@ -106,9 +106,11 @@ func (c *Contexto) AtajoZoom(s *desktop.CustomShortcut) bool {
 }
 
 // AtajoDelEditor son los atajos del marco que también tiene que oír el lienzo con el
-// foco (Ctrl/Cmd+P y el zoom): dice si era uno de ellos, y si lo era lo hace.
+// foco (Ctrl/Cmd+P, el zoom, el recuento de Docus y la hoja de atajos): dice si era uno de
+// ellos, y si lo era lo hace. La hoja (`AtajosDelMarco`) los enseña: si se añade uno aquí,
+// va también allí.
 func (c *Contexto) AtajoDelEditor(s *desktop.CustomShortcut) bool {
-	return c.AtajoImprimir(s) || c.AtajoZoom(s)
+	return c.AtajoImprimir(s) || c.AtajoZoom(s) || c.AtajoRecuento(s) || c.AtajoAyudaPulsado(s)
 }
 
 // AtajosDelEditor son las combinaciones que [Contexto.AtajoDelEditor] atiende, para
@@ -123,14 +125,45 @@ func AtajosDelEditor() []*desktop.CustomShortcut {
 		{KeyName: fyne.KeyEqual, Modifier: ctrl | fyne.KeyModifierShift},
 		{KeyName: fyne.KeyMinus, Modifier: ctrl},
 		{KeyName: fyne.Key0, Modifier: ctrl},
+		{KeyName: fyne.KeySlash, Modifier: ctrl},
+		{KeyName: fyne.KeyC, Modifier: ctrl | fyne.KeyModifierShift},
 	}
 }
 
-// PDFSimple es «PDF accesible» APAGADO en el menú Archivo: la descarga en PDF pide el simple
-// en vez del etiquetado (PDF/UA-1). El valor cero es el de la web: accesible.
-// ponytail: vive lo que el proceso; la web lo guarda en localStorage. Llevarlo a las
-// preferencias de la app cuando haya quien lo eche de menos entre sesiones.
-var PDFSimple bool
+// ClavePDFAccesible es la de la web (`exportName.ts`), con el mismo valor: «0» cuando está
+// apagado y nada cuando está encendido, que es lo de siempre.
+const ClavePDFAccesible = "sytue.docs.pdfAccesible"
+
+// PDFAccesible es «PDF accesible» del menú Archivo: encendido, la descarga en PDF pide el
+// etiquetado (PDF/UA-1); apagado, el simple de catorce fuentes estándar. Es preferencia de
+// quien descarga en este equipo, como en la web la del navegador, y por eso va a las
+// preferencias de la app y no a las de la persona: sobrevive a cerrar la app. Sin app
+// —o sin preferencias— es el valor por defecto, encendido.
+func PDFAccesible() bool {
+	if p := preferencias(); p != nil {
+		return p.String(ClavePDFAccesible) != "0"
+	}
+	return true
+}
+
+// FijarPDFAccesible la guarda; sin preferencias no se guarda.
+func FijarPDFAccesible(activo bool) {
+	p := preferencias()
+	switch {
+	case p == nil:
+	case activo:
+		p.RemoveValue(ClavePDFAccesible)
+	default:
+		p.SetString(ClavePDFAccesible, "0")
+	}
+}
+
+func preferencias() fyne.Preferences {
+	if a := fyne.CurrentApp(); a != nil {
+		return a.Preferences()
+	}
+	return nil
+}
 
 // Descargar es «Descargar como…»: `antes` guarda lo pendiente —el servicio serializa
 // desde SU estado, y un autoguardado en cola exportaría una versión anterior a lo que se
@@ -187,7 +220,7 @@ func (s Servicio) descargarCon(id, titulo string, t Tipo, formato string, planti
 
 func (s Servicio) descargar(c context.Context, id, titulo string, t Tipo, formato string, plantilla bool) (string, error) {
 	exportar, nombre := s.Svc.Export, api.ExportFilename(titulo, t.Kind(), formato)
-	if formato == "pdf" && PDFSimple {
+	if formato == "pdf" && !PDFAccesible() {
 		exportar = func(c context.Context, id, _ string) ([]byte, error) { return s.Svc.ExportPDFSimple(c, id) }
 	}
 	if plantilla {

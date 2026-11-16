@@ -4,8 +4,6 @@
 package calendario
 
 import (
-	"image/color"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
@@ -34,14 +32,7 @@ const (
 	AltoBotonCabecera float32 = 8 * 0.25 * tema.Rem
 	// LadoBotonIcono es el `h-8 w-8` de los botones de solo icono.
 	LadoBotonIcono = AltoBotonCabecera
-	// AltoGrupoVista es el `h-7` de cada botón del conmutador de vista, y
-	// RellenoGrupoVista su `p-0.5`.
-	AltoGrupoVista    float32 = 7 * 0.25 * tema.Rem
-	RellenoGrupoVista float32 = 0.5 * 0.25 * tema.Rem
 )
-
-// transparente es «sin relleno»: una caja que no pinta fondo.
-var transparente = color.NRGBA{}
 
 var (
 	cabeceraPX   = tema.Espacio(4)   // px-4
@@ -245,7 +236,7 @@ func (r *cabeceraVistaRenderer) crearTiraMovil() {
 			}
 		case *botonInvitaciones:
 			o.alEnfocar = mostrar
-		case *GrupoVista:
+		case *ui.Segmentado:
 			o.AlEnfocar = mostrar
 		}
 	}
@@ -348,227 +339,28 @@ const (
 	VistaAgenda
 )
 
-// GrupoVista es el `role="group"` de la cabecera: una píldora sobre `bg-subtle` con
-// cuatro botones de `h-7`, y el activo sobre `surface` con su sombra.
+// NuevoGrupoVista es el conmutador Mes · Semana · Día · Agenda: el `SelectorVista` de
+// la web, que es el `SegmentedControl` mediano de `@sytue/ui`. Aquí es `ui.Segmentado`
+// en su talla `SegmentoMD` (`h-7`, `text-sm` seminegrita, `gap-0.5`, la elegida sobre
+// `surface` en `primary-text`), y no una copia propia: era la segunda receta de la misma
+// píldora, con un botón enfocable por vista y sin flechas.
 //
-// El activo va en `primary-text` y NO en `primary`: el relleno no se reasigna en
-// oscuro y sobre `surface` oscuro daba 2,96:1. El rol de texto sí invierte. Es el
-// comentario que la web lleva en esa misma clase, y por eso está aquí.
-type GrupoVista struct {
-	widget.BaseWidget
-
-	// Rotulos son los cuatro textos, ya traducidos.
-	Rotulos [4]string
-	// Activa es la vista pintada como seleccionada.
-	Activa Vista
-	// AlElegir cambia de vista.
-	AlElegir func(Vista)
-	// AlEnfocar enseña el grupo cuando sus botones ganan foco en una tira móvil.
-	AlEnfocar func()
-	// Rejilla lo pinta en 2×2 a todo el ancho que le den, y no en una fila a su ancho
-	// natural: es el cajón del teléfono (`<SelectorVista rejilla>`). En una fila el
-	// grupo llega a 294 en finés y a 290 en búlgaro, y el cajón deja 244: la última
-	// vista salía cortada. Cada botón trunca antes que desbordar.
-	Rejilla bool
-}
-
-var _ fyne.Widget = (*GrupoVista)(nil)
-
-// NuevoGrupoVista crea el conmutador.
-func NuevoGrupoVista(rotulos [4]string, activa Vista, alElegir func(Vista)) *GrupoVista {
-	g := &GrupoVista{Rotulos: rotulos, Activa: activa, AlElegir: alElegir}
-	g.ExtendBaseWidget(g)
+// En el cajón del teléfono va con `Rejilla = 2`: en una fila el grupo llega a 294 en
+// finés y a 290 en búlgaro y el cajón deja 244; en 2×2 cada opción trunca antes que
+// desbordar.
+//
+// La elegida es `Vista(g.Elegida)`: las opciones van en el orden de las vistas.
+func NuevoGrupoVista(nombre string, rotulos [4]string, activa Vista, alElegir func(Vista)) *ui.Segmentado {
+	g := ui.NuevoSegmentado(nombre, rotulos[:], func(i int) {
+		// Por tabla y no con Vista(i): las opciones son las cuatro vistas, en su orden.
+		vistas := [...]Vista{VistaMes, VistaSemana, VistaDia, VistaAgenda}
+		if alElegir != nil && i >= 0 && i < len(vistas) {
+			alElegir(vistas[i])
+		}
+	})
+	g.Talla = ui.SegmentoMD
+	g.Elegida = int(activa)
 	return g
-}
-
-// AccessibilityRole: agrupa cuatro botones.
-func (g *GrupoVista) AccessibilityRole() fyne.AccessibleRole { return fyne.AccessibleRoleContainer }
-
-// MedidaGrupoVista es lo que ocupa: cuatro rótulos con su `px-2.5`, el `gap-0.5` entre
-// ellos y el `p-0.5` de la píldora.
-func MedidaGrupoVista(rotulos [4]string) fyne.Size {
-	ancho := 2 * RellenoGrupoVista
-	for i, r := range rotulos {
-		if i > 0 {
-			ancho += RellenoGrupoVista
-		}
-		ancho += ui.Medir(r, tema.TextoSM, ui.SemiNegrita).Width + 2*espacio2p5
-	}
-	return fyne.NewSize(ancho, AltoGrupoVista+2*RellenoGrupoVista)
-}
-
-// CreateRenderer construye la píldora y sus cuatro botones.
-func (g *GrupoVista) CreateRenderer() fyne.WidgetRenderer {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	r := &grupoVistaRenderer{g: g, fondo: canvas.NewRectangle(tema.Color("bg-subtle", v))}
-	r.fondo.CornerRadius = tema.RadioMD
-	r.objetos = []fyne.CanvasObject{r.fondo}
-	for i := range g.Rotulos {
-		b := nuevoBotonVista(g, Vista(i))
-		r.botones = append(r.botones, b)
-		r.objetos = append(r.objetos, b)
-	}
-	return r
-}
-
-type grupoVistaRenderer struct {
-	g       *GrupoVista
-	fondo   *canvas.Rectangle
-	botones []*botonVista
-	objetos []fyne.CanvasObject
-}
-
-func (r *grupoVistaRenderer) MinSize() fyne.Size {
-	if r.g.Rejilla {
-		// Como `min-w-0` en la web: el ancho lo pone quien lo coloca, no los rótulos.
-		return fyne.NewSize(3*RellenoGrupoVista, 2*AltoGrupoVista+3*RellenoGrupoVista)
-	}
-	return MedidaGrupoVista(r.g.Rotulos)
-}
-func (r *grupoVistaRenderer) Objects() []fyne.CanvasObject { return r.objetos }
-func (r *grupoVistaRenderer) Destroy()                     {}
-
-func (r *grupoVistaRenderer) Layout(t fyne.Size) {
-	r.fondo.Resize(t)
-	if r.g.Rejilla {
-		// `grid grid-cols-2 gap-0.5 p-0.5`: dos columnas iguales, dos filas de `h-7`.
-		ancho := max((t.Width-3*RellenoGrupoVista)/2, 0)
-		for i, b := range r.botones {
-			col, fila := float32(i%2), float32(i/2)
-			b.Move(fyne.NewPos(RellenoGrupoVista+col*(ancho+RellenoGrupoVista), RellenoGrupoVista+fila*(AltoGrupoVista+RellenoGrupoVista)))
-			b.Resize(fyne.NewSize(ancho, AltoGrupoVista))
-		}
-		return
-	}
-	x := RellenoGrupoVista
-	for i, b := range r.botones {
-		m := b.MinSize()
-		b.Move(fyne.NewPos(x, RellenoGrupoVista))
-		b.Resize(fyne.NewSize(m.Width, AltoGrupoVista))
-		x += m.Width
-		if i < len(r.botones)-1 {
-			x += RellenoGrupoVista
-		}
-	}
-}
-
-func (r *grupoVistaRenderer) Refresh() {
-	r.fondo.FillColor = tema.Color("bg-subtle", tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
-	for _, o := range r.objetos {
-		o.Refresh()
-	}
-}
-
-// botonVista es uno de los cuatro. Es un widget aparte porque cada uno se enfoca y se
-// anuncia con su `aria-pressed`.
-//
-// Puntero, pulsación, teclado y rol de botón son los de `ui.Pulsable`. Fyne 2.8.1 no
-// sabe decir «pulsado», así que el `aria-pressed` de la web NO llega al lector: es uno
-// de los cuatro roles del techo del toolkit y está en `docs/roadmap.md`.
-type botonVista struct {
-	ui.Pulsable
-	g *GrupoVista
-	v Vista
-}
-
-var _ fyne.Widget = (*botonVista)(nil)
-
-func nuevoBotonVista(g *GrupoVista, v Vista) *botonVista {
-	b := &botonVista{g: g, v: v}
-	b.AlPulsar = func() {
-		if g.AlElegir != nil {
-			g.AlElegir(v)
-		}
-	}
-	b.ExtendBaseWidget(b)
-	return b
-}
-
-// AccessibilityLabel es el rótulo de la vista, leído cada vez: el grupo puede cambiarlos.
-func (b *botonVista) AccessibilityLabel() string { return b.g.Rotulos[b.v] }
-
-func (b *botonVista) FocusGained() {
-	b.Pulsable.FocusGained()
-	if b.g.AlEnfocar != nil {
-		b.g.AlEnfocar()
-	}
-}
-
-func (b *botonVista) MinSize() fyne.Size {
-	if b.g.Rejilla {
-		return fyne.NewSize(2*espacio1p5, AltoGrupoVista)
-	}
-	ancho := ui.Medir(b.g.Rotulos[b.v], tema.TextoSM, ui.SemiNegrita).Width + 2*espacio2p5
-	return fyne.NewSize(ancho, AltoGrupoVista)
-}
-
-// CabeRotulo dice si el rótulo entra entero en el botón tal como está colocado: con el
-// `px-1.5` de la rejilla o el `px-2.5` de la fila. Es el `scrollWidth <= clientWidth`
-// que el banco e2e afirma en la web.
-func (b *botonVista) CabeRotulo() bool {
-	relleno := espacio2p5
-	if b.g.Rejilla {
-		relleno = espacio1p5
-	}
-	return ui.Medir(b.g.Rotulos[b.v], tema.TextoSM, ui.SemiNegrita).Width <= b.Size().Width-2*relleno
-}
-
-func (b *botonVista) CreateRenderer() fyne.WidgetRenderer {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	r := &botonVistaRenderer{
-		b:     b,
-		caja:  ui.NuevaCaja(transparente, transparente, tema.RadioSM),
-		texto: ui.Texto(b.g.Rotulos[b.v], tema.TextoSM, ui.SemiNegrita, tema.Color("text-muted", v)),
-		aro:   ui.NuevoAro(tema.RadioSM, 0, v).Abierto(),
-	}
-	r.objetos = append(r.caja.Objetos(), r.texto)
-	r.objetos = append(r.objetos, r.aro.Objetos()...)
-	r.aro.Ver(false)
-	r.Refresh() // regla 7 de `ui`: la vista activa nace ya marcada
-	return r
-}
-
-type botonVistaRenderer struct {
-	b       *botonVista
-	caja    *ui.Caja
-	texto   *canvas.Text
-	aro     *ui.Aro
-	objetos []fyne.CanvasObject
-}
-
-func (r *botonVistaRenderer) MinSize() fyne.Size           { return r.b.MinSize() }
-func (r *botonVistaRenderer) Objects() []fyne.CanvasObject { return r.objetos }
-func (r *botonVistaRenderer) Destroy()                     {}
-
-func (r *botonVistaRenderer) Layout(t fyne.Size) {
-	r.caja.Redimensionar(t)
-	completo := r.b.g.Rotulos[r.b.v]
-	var ancho float32
-	if r.b.g.Rejilla {
-		ancho = ui.Truncar(r.texto, completo, tema.TextoSM, ui.SemiNegrita, max(t.Width-2*espacio1p5, 0))
-	} else {
-		r.texto.Text = completo
-		ancho = ui.Medir(completo, tema.TextoSM, ui.SemiNegrita).Width
-	}
-	ui.ColocarTexto(r.texto, tema.TextoSM, (t.Width-ancho)/2, (t.Height-tema.TextoSM.Linea)/2)
-	r.aro.Colocar(t)
-}
-
-func (r *botonVistaRenderer) Refresh() {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	switch {
-	case r.b.g.Activa == r.b.v:
-		r.caja.Pintar(tema.Color("surface", v), transparente)
-		r.texto.Color = tema.Color("primary-text", v)
-	case r.b.Encima():
-		r.caja.Pintar(tema.Color("surface", v), transparente)
-		r.texto.Color = tema.Color("text", v)
-	default:
-		r.caja.Pintar(transparente, transparente)
-		r.texto.Color = tema.Color("text-muted", v)
-	}
-	r.texto.Refresh()
-	r.aro.Ver(r.b.Enfocado())
 }
 
 // BotonIconoCabecera es el `HEADER_ICON_BTN` de CalendarApp.tsx:

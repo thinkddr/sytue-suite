@@ -17,15 +17,15 @@ import (
 
 const contactCols = `c.id, c.address_book_id, c.object_id, c.uid, c.formatted_name,
 	c.family_name, c.given_name, c.additional_name, c.honorific_prefix, c.honorific_suffix,
-	c.organization, c.title, c.nickname, c.note, c.birthday, c.photo_url,
-	o.has_photo, o.etag, c.created_at, c.updated_at`
+	c.organization, c.title, c.nickname, c.note, c.birthday, c.birthday_no_year, c.photo_url,
+	c.urls, c.related, c.anniversary, o.has_photo, o.etag, c.created_at, c.updated_at`
 
 func scanContact(row pgx.Row, t string) (domain.Contact, error) {
 	var c domain.Contact
 	if err := row.Scan(&c.ID, &c.AddressBookID, &c.ObjectID, &c.UID, &c.FormattedName,
 		&c.FamilyName, &c.GivenName, &c.AdditionalName, &c.HonorificPrefix, &c.HonorificSuffix,
-		&c.Organization, &c.Title, &c.Nickname, &c.Note, &c.Birthday, &c.PhotoURL,
-		&c.HasPhoto, &c.ETag, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		&c.Organization, &c.Title, &c.Nickname, &c.Note, &c.Birthday, &c.BirthdayNoYear, &c.PhotoURL,
+		&c.URLs, &c.Related, &c.Anniversary, &c.HasPhoto, &c.ETag, &c.CreatedAt, &c.UpdatedAt); err != nil {
 		return domain.Contact{}, err
 	}
 	c.Tenant = t
@@ -126,12 +126,15 @@ func (s *Store) UpdateContact(ctx context.Context, subject string, id uuid.UUID,
 			`UPDATE contacts SET
 				uid=$3, formatted_name=$4, family_name=$5, given_name=$6, additional_name=$7,
 				honorific_prefix=$8, honorific_suffix=$9, organization=$10, title=$11,
-				nickname=$12, note=$13, birthday=$14, photo_url=$15, updated_at=now()
+				nickname=$12, note=$13, birthday=$14, photo_url=$15, birthday_no_year=$16,
+				urls=$17, related=$18, anniversary=$19, updated_at=now()
 			 WHERE tenant=$1 AND id=$2 AND deleted_at IS NULL`,
 			t.Slug, id, in.Contact.UID, in.Contact.FormattedName, in.Contact.FamilyName,
 			in.Contact.GivenName, in.Contact.AdditionalName, in.Contact.HonorificPrefix,
 			in.Contact.HonorificSuffix, in.Contact.Organization, in.Contact.Title,
-			in.Contact.Nickname, in.Contact.Note, in.Contact.Birthday, in.Contact.PhotoURL); err != nil {
+			in.Contact.Nickname, in.Contact.Note, in.Contact.Birthday, in.Contact.PhotoURL,
+			in.Contact.BirthdayNoYear, listaJSON(in.Contact.URLs), listaJSON(in.Contact.Related),
+			in.Contact.Anniversary); err != nil {
 			return fmt.Errorf("store: actualizar contacto: %w", err)
 		}
 		if err := replaceChannels(ctx, tx, t.Slug, id, in.Contact.Emails, in.Contact.Phones); err != nil {
@@ -330,12 +333,14 @@ func insertContactRow(ctx context.Context, tx pgx.Tx, tenant string, bookID, obj
 	err := tx.QueryRow(ctx,
 		`INSERT INTO contacts (tenant, address_book_id, object_id, uid, formatted_name,
 			family_name, given_name, additional_name, honorific_prefix, honorific_suffix,
-			organization, title, nickname, note, birthday, photo_url)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+			organization, title, nickname, note, birthday, photo_url, birthday_no_year,
+			urls, related, anniversary)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
 		 RETURNING id`,
 		tenant, bookID, objectID, c.UID, c.FormattedName, c.FamilyName, c.GivenName,
 		c.AdditionalName, c.HonorificPrefix, c.HonorificSuffix, c.Organization, c.Title,
-		c.Nickname, c.Note, c.Birthday, c.PhotoURL).Scan(&id)
+		c.Nickname, c.Note, c.Birthday, c.PhotoURL, c.BirthdayNoYear,
+		listaJSON(c.URLs), listaJSON(c.Related), c.Anniversary).Scan(&id)
 	if err != nil {
 		return domain.Contact{}, fmt.Errorf("store: insertar contacto: %w", err)
 	}
@@ -344,6 +349,15 @@ func insertContactRow(ctx context.Context, tx pgx.Tx, tenant string, bookID, obj
 	c.AddressBookID = bookID
 	c.ObjectID = objectID
 	return c, nil
+}
+
+// listaJSON es la lista para una columna jsonb: vacía y no nil, que pgx escribiría
+// como el `null` de JSON y no como el '[]' del resto de la proyección.
+func listaJSON[T any](xs []T) []T {
+	if xs == nil {
+		return []T{}
+	}
+	return xs
 }
 
 // replaceChannels reemplaza por completo los correos y telefonos de un contacto.

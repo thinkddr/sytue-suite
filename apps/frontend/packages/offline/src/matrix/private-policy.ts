@@ -4,6 +4,21 @@ import type { DeviceVerificationStatus } from 'matrix-js-sdk/lib/crypto-api';
 
 type Fetch = typeof globalThis.fetch;
 
+/** Bind the maintained SDK's requests and response bodies to the owning device.
+ * Keep the caller's cancellation and the runtime fetch helpers intact. */
+export function matrixLifetimeFetch(lifetime?: AbortSignal, send: Fetch = globalThis.fetch): Fetch {
+  const dispatch = (input: Parameters<Fetch>[0], init?: Parameters<Fetch>[1]) => {
+    if (!lifetime) return send.call(globalThis, input, init);
+    const inherited = init?.signal ?? (input instanceof Request ? input.signal : undefined);
+    const signal = inherited ? AbortSignal.any([inherited, lifetime]) : lifetime;
+    signal.throwIfAborted();
+    return send.call(globalThis, input, { ...init, signal });
+  };
+  return new Proxy(send, {
+    apply: (_target, _receiver, args) => dispatch(...(args as Parameters<Fetch>)),
+  });
+}
+
 /**
  * Private storage must never deliver a room key to another person, even if that
  * person is verified for Rooms and joins between the UI's membership check and
@@ -16,8 +31,10 @@ export function privateDeviceFetch(
   verification: (device: string) => Promise<DeviceVerificationStatus | null>,
   closed: () => boolean,
   send: Fetch = globalThis.fetch,
+  lifetime?: AbortSignal,
 ): Fetch {
   const origin = new URL(home).origin;
+  const dispatch = matrixLifetimeFetch(lifetime, send);
   const guarded = async (input: Parameters<Fetch>[0], init?: Parameters<Fetch>[1]) => {
     if (closed()) throw new MatrixSecurityError('device');
     const url = new URL(input instanceof Request ? input.url : String(input), origin);
@@ -37,7 +54,7 @@ export function privateDeviceFetch(
     const match = /^\/_matrix\/client\/[^/]+\/sendToDevice\/([^/]+)\/[^/]+$/.exec(url.pathname);
     if (!match) {
       if (url.pathname.includes('sendToDevice')) throw new MatrixSecurityError('unsupported');
-      return send.call(globalThis, input, init);
+      return dispatch(input, init);
     }
     let type: string;
     try {
@@ -90,7 +107,7 @@ export function privateDeviceFetch(
     }
     if (closed()) throw new MatrixSecurityError('device');
     // Avoid redirects carrying an encrypted key batch to a different endpoint.
-    return send.call(globalThis, outgoing);
+    return dispatch(outgoing);
   };
   // Preserve runtime fetch helpers without replacing their implementation. Only
   // actual requests pass through the recipient policy.

@@ -47,11 +47,16 @@
  * Solo se recorta un segmento y solo si detrás viene una raíz interna conocida,
  * para no tocar rutas de contenido: `/docs/edit` se queda como está.
  */
+import { OFFLINE_DATABASES } from './database-names.js';
+
 export const RE_BASE_DE_APP = /^\/[a-z-]+(?=\/(?:auth|api|_astro)\/)/;
 
 const SOURCE = String.raw`
 const VERSION = 'sytue-native-v2';
-const STATIC_CACHE = VERSION + '-static';
+const OFFLINE_DATABASES = ${JSON.stringify(OFFLINE_DATABASES)};
+// A previous worker could put authenticated responses in the shared cache.
+// Never reuse it: entries there cannot be attributed to a session.
+const STATIC_CACHE = VERSION + '-static-v2';
 const META_CACHE = VERSION + '-meta';
 const CONTEXT_URL = '/__sytue_offline_context__';
 const PRIVATE_PREFIXES = [
@@ -141,8 +146,22 @@ function ownerCache(kind, context) {
 }
 const RE_BASE = ${RE_BASE_DE_APP.toString()};
 function sinBase(pathname) { return pathname.replace(RE_BASE, ''); }
+function decodedPath(pathname) {
+  try { return decodeURI(pathname); } catch { return null; }
+}
+// URLs may contain an app prefix and an organization that Astro rewrites away.
+function isApi(pathname) {
+  const path = decodedPath(pathname);
+  return path === null || /^\/(?:[a-z-]+\/)?(?:[a-z0-9-]+\/)?api(?:\/|$)/.test(path);
+}
 function isPrivate(pathname) {
-  return PRIVATE_PREFIXES.some((prefix) => sinBase(pathname).startsWith(prefix));
+  const path = decodedPath(pathname);
+  if (path === null) return true;
+  const noOrg = path.replace(/^\/[a-z-]+\/[a-z0-9-]+(?=\/(?:auth|api)\/)/, '');
+  return PRIVATE_PREFIXES.some((prefix) => sinBase(noOrg).startsWith(prefix));
+}
+function isBundledAsset(pathname) {
+  return sinBase(pathname).startsWith('/_astro/');
 }
 async function cacheable(response, request, allowPrivateNoStore = false) {
   if (!response.ok || response.status !== 200 || request.headers.has('range') || response.headers.has('set-cookie')) return false;
@@ -159,12 +178,16 @@ async function cacheable(response, request, allowPrivateNoStore = false) {
 }
 function safeUrls(values, includeApi = false) {
   if (!Array.isArray(values)) return [];
-  return values.filter((raw) => {
+  const out = [];
+  for (const raw of values) {
     try {
       const url = new URL(raw, self.location.origin);
-      return url.origin === self.location.origin && !isPrivate(url.pathname) && (includeApi || !sinBase(url.pathname).startsWith('/api/'));
-    } catch { return false; }
-  });
+      if (url.origin === self.location.origin && !isPrivate(url.pathname) && (includeApi || !isApi(url.pathname))) {
+        out.push(url.href);
+      }
+    } catch {}
+  }
+  return out;
 }
 async function budget(cacheName, request, size) {
   const entries = [];
@@ -214,6 +237,11 @@ async function persist(cacheName, request, response, chunks, size, scope, revisi
   });
 }
 async function streamToCache(response, request, cacheName, scope, event, allowPrivateNoStore = false) {
+  // Bundled assets alone use the shared cache, and only after the response
+  // confirms it is not a redirect or explicitly private/revalidating content.
+  if (cacheName === STATIC_CACHE && (response.redirected ||
+      /(?:^|,)\s*(?:private|no-cache|no-store)\b/i.test(response.headers.get('cache-control') || '') ||
+      /(?:^|,)\s*(?:cookie|authorization|\*)\s*(?:,|$)/i.test(response.headers.get('vary') || ''))) return response;
   if (!(await cacheable(response, request, allowPrivateNoStore)) || !response.body) return response;
   const finish = lifetime(event);
   const revision = epoch;
@@ -259,12 +287,16 @@ async function streamToCache(response, request, cacheName, scope, event, allowPr
   });
   return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
 }
-async function precachePrivate(raw, scope, event) {
+async function precachePrivate(raw, scope, event, allowPrivateNoStore = true) {
   if (!current(scope)) return;
   const request = new Request(raw, { credentials: 'include' });
   const response = await fetch(request);
+  if (!allowPrivateNoStore && /(?:^|,)\s*no-store\b/i.test(response.headers.get('cache-control') || '')) {
+    await response.body?.cancel();
+    return;
+  }
   const kind = sinBase(new URL(request.url).pathname).startsWith('/api/') ? 'api' : 'pages';
-  const streamed = await streamToCache(response, request, ownerCache(kind, scope.context), scope, event, true);
+  const streamed = await streamToCache(response, request, ownerCache(kind, scope.context), scope, event, allowPrivateNoStore);
   // Precache has no page consumer. Drain bounded chunks, never tee/clone the network stream.
   if (streamed.body) {
     const reader = streamed.body.getReader();
@@ -275,8 +307,12 @@ self.addEventListener('message', (event) => {
   const data = event.data || {};
   if (data.type === 'INVALIDATE') {
     background(event, (async () => {
+      // A newer INITIALISE may arrive while persisted metadata is loading.
+      // Retire only the context observed in this epoch and owned by this client.
+      const revision = epoch;
       const context = await readContext();
-      if (context?.scopeId !== data.scopeId) return;
+      if (revision !== epoch || !context || !event.source?.id ||
+          context.clientId !== event.source.id || context.scopeId !== data.scopeId) return;
       await forgetContext();
     })());
     return;
@@ -292,18 +328,20 @@ self.addEventListener('message', (event) => {
   const scope = { context, revision };
   event.waitUntil((async () => {
     await serialWrite(() => writeContext(context, revision));
+    const assets = safeUrls(data.assetUrls);
     await Promise.allSettled([
-      ...safeUrls(data.assetUrls).map(async (url) => {
+      ...assets.filter((url) => isBundledAsset(new URL(url).pathname)).map(async (url) => {
         const request = new Request(url);
         const response = await streamToCache(await fetch(request), request, STATIC_CACHE, null, event);
         if (response.body) await response.body.pipeTo(new WritableStream());
       }),
+      ...assets.filter((url) => !isBundledAsset(new URL(url).pathname)).map((url) => precachePrivate(url, scope, event, false)),
       ...safeUrls(data.privateUrls, true).map((url) => precachePrivate(url, scope, event)),
     ]);
   })());
 });
-function isPublicAsset(request, url) {
-  return request.destination === 'script' || request.destination === 'style' || request.destination === 'font' || sinBase(url.pathname).startsWith('/_astro/');
+function isPublicAsset(url) {
+  return isBundledAsset(url.pathname);
 }
 async function notify(state) {
   const clients = await self.clients.matchAll({ type: 'window' });
@@ -340,13 +378,15 @@ self.addEventListener('fetch', (event) => {
         serialWrite(async () => {
           for (const key of await caches.keys()) if (key.startsWith(VERSION + '-')) await caches.delete(key);
         }),
-        new Promise((resolve) => {
-          const deletion = indexedDB.deleteDatabase('sytue-offline');
+        ...OFFLINE_DATABASES.map((name) => new Promise((resolve) => {
+          let deletion;
+          try { deletion = indexedDB.deleteDatabase(name); }
+          catch { resolve(undefined); return; }
           const timeout = setTimeout(() => resolve(undefined), 2000);
           deletion.onsuccess = () => { clearTimeout(timeout); resolve(undefined); };
           deletion.onerror = () => { clearTimeout(timeout); resolve(undefined); };
           deletion.onblocked = () => undefined;
-        }),
+        })),
       ]);
     })());
     return;
@@ -361,7 +401,7 @@ self.addEventListener('fetch', (event) => {
   }
   if (request.method !== 'GET' || request.headers.has('range') || isPrivate(url.pathname)) return;
   event.respondWith((async () => {
-    if (isPublicAsset(request, url)) {
+    if (isPublicAsset(url)) {
       const cache = await caches.open(STATIC_CACHE);
       const hit = await cache.match(request);
       return hit || streamToCache(await fetch(request), request, STATIC_CACHE, null, event);

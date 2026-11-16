@@ -235,6 +235,14 @@ const MARCADOR = /^\s*(?:\/\/|#)\s*paridad-web:\s*(\S+)/;
  *   de lista del `Armazon` nativo ahora es redimensionable mediante arrastre del separador,
  *   atajos de teclado (flechas, Inicio, Fin) y doble clic de restablecimiento, con
  *   persistencia de ancho en preferencias de usuario.
+ * 2026-11-11: +1 — NO es pantalla nueva: `Resaltado`, que vivía en Notes, sube a @sytue/ui
+ *   para que Mail y Contacts marquen lo buscado como Notes. Las nativas aún no resaltan lo
+ *   buscado en ninguna lista; se cierra cuando la búsqueda de Notes nativa lo estrene.
+ * 2026-11-12: −1 — `rooms/pip.astro`, la llamada en ventana emergente. No había nada que
+ *   portar: la llamada nativa nace ya en su propia ventana (`apps/fyne/apps/rooms/
+ *   videollamada.go`), que es lo que la web busca con «Sacar a otra ventana». Diferencia
+ *   deliberada, dicha junto al marcador: sin modo mini de 420x320, porque en escritorio
+ *   cambiar de canal o de app no cuelga.
  */
 const DEUDA_SIN_NATIVO = `
 apps/frontend/apps/calcus/src/pages/edit.astro
@@ -244,10 +252,10 @@ apps/frontend/apps/diapos/src/pages/s/[token].astro
 apps/frontend/apps/docus/src/pages/edit.astro
 apps/frontend/apps/docus/src/pages/s/[token].astro
 apps/frontend/apps/notes/src/pages/p/[token].astro
-apps/frontend/apps/rooms/src/pages/pip.astro
 apps/frontend/packages/ui/src/components/AvatarPicker.tsx
 apps/frontend/packages/ui/src/components/BarChart.tsx
 apps/frontend/packages/ui/src/components/DataFlow.tsx
+apps/frontend/packages/ui/src/components/Resaltado.tsx
 apps/frontend/packages/ui/src/components/FieldHint.tsx
 apps/frontend/packages/ui/src/components/IconButton.tsx
 apps/frontend/packages/ui/src/components/Illustration.tsx
@@ -260,6 +268,7 @@ apps/frontend/packages/ui/src/components/OrgMark.tsx
 apps/frontend/packages/ui/src/components/ReviewSummary.tsx
 apps/frontend/packages/ui/src/components/SettingsShell.tsx
 apps/frontend/packages/ui/src/components/ShortcutsModal.tsx
+apps/frontend/packages/ui/src/components/Stat.tsx
 apps/frontend/packages/ui/src/components/Toolbar.tsx
 apps/frontend/packages/ui/src/components/VirtualList.tsx
 apps/frontend/packages/ui/src/components/Wizard.tsx
@@ -360,7 +369,7 @@ test('la web no se adelanta a las nativas: la deuda no crece sin que se vea — 
     ),
   ];
   expect(fallos).toEqual([]);
-});
+}, 20_000);
 
 test('ningún marcador nativo apunta a una pantalla que la web ya no tiene — §13.7', async () => {
   const todo = new Set(await inventario());

@@ -200,7 +200,7 @@ func TestLasClasesDeLasQueSalenLosNumerosSiguenAHI(t *testing.T) {
 		{"la fila de Drive", "apps/frontend/apps/drive/src/components/FileBrowser.tsx", "border-b px-3 py-2"},
 		{"la tesela del explorador", "apps/frontend/apps/drive/src/components/FileBrowser.tsx", "<FileIcon resource={item} size={36} />"},
 		{"la cabecera del explorador", "apps/frontend/apps/drive/src/components/FileBrowser.tsx", "shadow-[inset_0_-1px_0_var(--sytue-border)]"},
-		{"las columnas del explorador", "apps/frontend/apps/drive/src/components/FileBrowser.tsx", "hidden w-24 truncate text-right sm:block"},
+		{"las columnas del explorador", "apps/frontend/apps/drive/src/components/FileBrowser.tsx", "hidden w-24 shrink-0 text-right whitespace-nowrap tabular-nums sm:block"},
 		// El medidor y la insignia.
 		{"la barra del medidor", "apps/frontend/packages/ui/src/components/Meter.tsx", "h-1.5 w-full overflow-hidden rounded-full"},
 		{"la insignia", "apps/frontend/packages/ui/src/components/Badge.tsx", "px-2 py-1 text-xs"},

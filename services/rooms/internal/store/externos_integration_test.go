@@ -29,7 +29,7 @@ func TestPersonaDeOtraOrganizacion_DirectoYCanal(t *testing.T) {
 	acme := tenantCtx("acme")
 	const bea = "bea" // de la organización «otra»
 
-	tm, publico := seedTeamChannel(t, acme, st, "alice", domain.ChannelPublic)
+	tm, publico := seedTeamChannel(acme, t, st, "alice", domain.ChannelPublic)
 	if err := st.AddTeamMember(acme, tm.ID, "alice", "bob", "Bob", domain.RoleMember); err != nil {
 		t.Fatalf("AddTeamMember: %v", err)
 	}

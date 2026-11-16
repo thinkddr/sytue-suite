@@ -112,7 +112,9 @@ func (s *Store) Reclamar(ctx context.Context, quien string) (domain.Job, error) 
 		if _, err := tx.Exec(ctx, `
 			UPDATE transcode_jobs
 			   SET status = 'pending', claimed_by = '', error = 'réplica perdida: se reintenta', updated_at = now()
-			 WHERE status = 'running' AND claimed_at < now() - $1::interval`, domain.Huerfano); err != nil {
+			 WHERE status = 'running' AND claimed_at < now() - $1::interval
+                 AND NOT EXISTS(SELECT 1 FROM videos v WHERE v.tenant=transcode_jobs.tenant AND v.id=transcode_jobs.video_id
+                  AND public.sytue_private_storage_frozen('public.cast_private_storage_states'::regclass,v.tenant,v.owner_sub))`, domain.Huerfano); err != nil {
 			return fmt.Errorf("cast: recuperar trabajos huérfanos: %w", err)
 		}
 		var err error
@@ -121,6 +123,8 @@ func (s *Store) Reclamar(ctx context.Context, quien string) (domain.Job, error) 
 			   SET status = 'running', attempts = attempts + 1, claimed_at = now(), claimed_by = $1, updated_at = now()
 			 WHERE id = (SELECT id FROM transcode_jobs
 			              WHERE status = 'pending' AND next_attempt_at <= now()
+                          AND NOT EXISTS(SELECT 1 FROM videos v WHERE v.tenant=transcode_jobs.tenant AND v.id=transcode_jobs.video_id
+                           AND public.sytue_private_storage_frozen('public.cast_private_storage_states'::regclass,v.tenant,v.owner_sub))
 			              ORDER BY next_attempt_at, created_at
 			              FOR UPDATE SKIP LOCKED
 			              LIMIT 1)

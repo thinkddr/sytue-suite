@@ -13,7 +13,16 @@
  * nadie que no haya escrito el backend.
  */
 import { useState } from 'preact/hooks';
-import { Badge, Button, EmptyState, Icon, Input, SectionHeader, Table } from '@sytue/ui';
+import {
+  Badge,
+  Button,
+  EmptyState,
+  Icon,
+  InlineHelp,
+  Input,
+  SectionHeader,
+  Table,
+} from '@sytue/ui';
 import type { TableColumn } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import { formatDateTime } from '@sytue/i18n';
@@ -271,14 +280,14 @@ export default function AuditPanel({ events, nextCursor, live, error, locale }: 
         </form>
 
         {failed ? (
-          <p class="bg-danger-bg text-danger-text mb-3 rounded-md px-3 py-2 text-sm" role="alert">
+          <InlineHelp tone="danger" class="mb-3">
             {t('audit.loadFail')}
-          </p>
+          </InlineHelp>
         ) : null}
 
         {items.length === 0 ? (
           <EmptyState
-            illustration={<Icon name="audit" size={24} />}
+            icon="audit"
             title={filtered ? t('audit.empty.filtered.title') : t('audit.empty.title')}
             description={filtered ? t('audit.empty.filtered.desc') : t('audit.empty.desc')}
             action={

@@ -1,0 +1,69 @@
+{
+  "albums": [
+    {
+      "id": "a1",
+      "title": "Viaje 10",
+      "count": 4,
+      "updatedAt": "2026-05-01T10:00:00Z"
+    },
+    {
+      "id": "a2",
+      "title": "viaje 2",
+      "count": 12,
+      "updatedAt": "2026-06-01T10:00:00Z"
+    },
+    {
+      "id": "a3",
+      "title": "Ávila",
+      "count": 4,
+      "updatedAt": "2026-04-01T10:00:00Z"
+    },
+    {
+      "id": "a4",
+      "title": "avila",
+      "count": 0,
+      "updatedAt": "2026-07-01T10:00:00Z"
+    },
+    {
+      "id": "a5",
+      "title": "Boda",
+      "count": 12,
+      "updatedAt": "2026-06-01T10:00:00Z"
+    },
+    {
+      "id": "a6",
+      "title": "Zoo",
+      "count": 30,
+      "updatedAt": "2026-01-01T10:00:00Z"
+    },
+    {
+      "id": "a7",
+      "title": "Casa",
+      "count": 1,
+      "updatedAt": "2026-07-01T11:00:00.5+02:00"
+    },
+    {
+      "id": "a8",
+      "title": "Delta",
+      "count": 5,
+      "updatedAt": "2026-06-01T10:00:00.25Z"
+    }
+  ],
+  "casos": [
+    {
+      "orden": "recent",
+      "locale": "es",
+      "ids": ["a4", "a7", "a8", "a5", "a2", "a1", "a3", "a6"]
+    },
+    {
+      "orden": "title",
+      "locale": "es",
+      "ids": ["a4", "a3", "a5", "a7", "a8", "a2", "a1", "a6"]
+    },
+    {
+      "orden": "count",
+      "locale": "es",
+      "ids": ["a6", "a5", "a2", "a8", "a3", "a1", "a7", "a4"]
+    }
+  ]
+}

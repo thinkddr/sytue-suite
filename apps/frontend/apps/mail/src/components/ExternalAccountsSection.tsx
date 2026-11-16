@@ -9,6 +9,7 @@ import {
 import { Button, Icon, SidebarItem, SidebarSection } from '@sytue/ui';
 import type { MailMessageKey, T } from '../i18n/index.js';
 import { externalMailClient } from '../client/externalMail.js';
+import { senderLogoUrl } from '../client/mailApi.js';
 import {
   CUENTA_SYTUE,
   type BuzonUnificado,
@@ -262,6 +263,80 @@ export function MailboxesSection({
   );
 }
 
+/** Where this device keeps how each account was left (folded or open), by instance. */
+export const CUENTAS_KEY = 'sytue-mail-cuentas-abiertas';
+
+function readFolds(): Record<string, boolean> {
+  try {
+    const raw = typeof localStorage === 'undefined' ? null : localStorage.getItem(CUENTAS_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, boolean>) : {};
+  } catch {
+    // A private window or blocked storage: as if nothing had been chosen.
+    return {};
+  }
+}
+
+function writeFolds(folds: Record<string, boolean>): void {
+  try {
+    localStorage.setItem(CUENTAS_KEY, JSON.stringify(folds));
+  } catch {
+    // Not remembered on this device; the choice still holds while the page lives.
+  }
+}
+
+/**
+ * Which accounts are open. Each one is as the person left it on this device and,
+ * if they never touched it, open only when it is the only account: with three
+ * accounts open by default the phone's drawer was a list of twenty folders. The
+ * third function opens one whatever it was: an account whose folder is shown.
+ * Fyne's `cuentaAbierta` (apps/fyne/apps/mail/menu.go) is this same rule.
+ */
+function useAccountFolds(
+  count: number,
+): [(id: string) => boolean, (id: string) => void, (id: string) => void] {
+  const [folds, setFolds] = useState<Record<string, boolean>>(readFolds);
+  const isOpen = (id: string) => folds[id] ?? count <= 1;
+  const put = useCallback(
+    (id: string, open: boolean) =>
+      setFolds((previous) => {
+        const next = { ...previous, [id]: open };
+        writeFolds(next);
+        return next;
+      }),
+    [],
+  );
+  const reveal = useCallback((id: string) => put(id, true), [put]);
+  return [isOpen, (id) => put(id, !isOpen(id)), reveal];
+}
+
+/**
+ * The mark of an external account: the logo of its domain's website when it has
+ * one (a company account; free mailboxes have none, `senderLogoUrl`), on the white
+ * tile of a sender's logo, and otherwise its glyph — the cloud for iCloud, the
+ * person for the rest. Fyne's `marcaDeCuenta` is the same.
+ */
+function AccountMark({ account }: { account: CuentaDeBuzones }): JSX.Element {
+  const src = account.icloud ? undefined : senderLogoUrl(account.titulo);
+  const [broken, setBroken] = useState<string | null>(null);
+  if (src && broken !== src) {
+    return (
+      <img
+        src={src}
+        alt=""
+        width={18}
+        height={18}
+        loading="lazy"
+        decoding="async"
+        onError={() => setBroken(src)}
+        // The `logo` of Avatar.tsx: fixed white, logos are drawn for white.
+        class="h-[18px] w-[18px] rounded-[22%] bg-white object-contain p-px ring-1 ring-[var(--sytue-border)] ring-inset"
+      />
+    );
+  }
+  return <Icon name={account.icloud ? 'cloud' : 'user'} />;
+}
+
 /**
  * «External email accounts»: always there and above «Folders», with «Add email
  * account» as its last row. Each account is a branch that folds, as an account in
@@ -293,7 +368,7 @@ export function ExternalAccountsSection({
   onOpenFolder: (instanceId: string, folderId: string) => void;
   onAdd: () => void;
 }): JSX.Element {
-  const [isOpen, toggle, reveal] = useBranches(true);
+  const [isOpen, toggle, reveal] = useAccountFolds(accounts.length);
   // An account opened from the dialog —just connected, or «Open mailbox»— comes
   // without a folder until its inbox is found: its branch opens, so the inbox
   // that is about to be selected can be seen, also if it had been folded.
@@ -329,8 +404,10 @@ export function ExternalAccountsSection({
           <SidebarItem
             key={account.id}
             label={account.titulo}
-            // An iCloud mailbox: a cloud instead of the person, as in Fyne.
-            icon={<Icon name={account.icloud ? 'cloud' : 'user'} />}
+            icon={<AccountMark account={account} />}
+            // An address keeps its domain: «daniel.del…@outlook.com».
+            middleTruncate
+            compactChildren
             // Open, the inbox below already says it.
             {...(!open && account.noLeidos ? { count: account.noLeidos } : {})}
             expanded={open}

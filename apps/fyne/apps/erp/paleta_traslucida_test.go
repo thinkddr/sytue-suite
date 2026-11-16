@@ -30,7 +30,9 @@ func TestLaPaletaTraslucidaOcultaLaPantalla(t *testing.T) {
 	img := w.Canvas().Capture()
 	escala := float32(img.Bounds().Dx()) / ancho
 	x := (ancho-AnchoPaleta)/2 + AnchoPaleta - 10
-	y := alto*FraccionArribaPaleta + tema.Borde + AltoCampoPaleta + tema.Borde + ListaPaletaP + 1.5*AltoFilaPaleta()
+	// Bajo el rótulo del grupo («Áreas»), en mitad de la segunda fila: la primera lleva
+	// el `bg-selected` del cursor.
+	y := alto*FraccionArribaPaleta + tema.Borde + AltoCampoPaleta + tema.Borde + ListaPaletaP + AltoGrupoPaleta(true) + 1.5*AltoFilaPaleta()
 	if got, want := pixel(img, x*escala, y*escala), tema.Color("menu-surface", tema.Translucido); !cercaDe(got, want) {
 		t.Errorf("la pantalla se mezcla con los módulos: %v; el papel opaco es %v", got, want)
 	}

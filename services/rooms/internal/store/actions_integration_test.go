@@ -24,7 +24,7 @@ import (
 
 // seedPrivateChannel crea un team aparte (slug "eq2") con un canal privado del
 // que `creator` es admin. Evita el choque de slug con seedTeamChannel ("eq").
-func seedPrivateChannel(t *testing.T, ctx context.Context, st *store.Store, creator string) (domain.Team, domain.Channel) {
+func seedPrivateChannel(ctx context.Context, t *testing.T, st *store.Store, creator string) (domain.Team, domain.Channel) {
 	t.Helper()
 	tm, err := st.CreateTeam(ctx, store.NewTeamRecord{Slug: "eq2", Name: "Equipo 2", CreatedBy: creator, CreatorName: "Creador"})
 	if err != nil {
@@ -40,7 +40,7 @@ func seedPrivateChannel(t *testing.T, ctx context.Context, st *store.Store, crea
 }
 
 // unreadOf devuelve el contador de no leídos de un canal concreto para el usuario.
-func unreadOf(t *testing.T, st *store.Store, ctx context.Context, teamID, channelID uuid.UUID, subject string) int {
+func unreadOf(ctx context.Context, t *testing.T, st *store.Store, teamID, channelID uuid.UUID, subject string) int {
 	t.Helper()
 	states, err := st.UnreadByChannel(ctx, teamID, subject)
 	if err != nil {
@@ -60,7 +60,7 @@ func TestPinsFlowAndAuthorization(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
 
-	_, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	_, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 	m, err := st.CreateMessage(ctx, store.NewMessageRecord{ChannelID: ch.ID, AuthorSub: "alice", Body: "fíjame"})
 	if err != nil {
 		t.Fatalf("CreateMessage: %v", err)
@@ -98,7 +98,7 @@ func TestPinsFlowAndAuthorization(t *testing.T) {
 	}
 
 	// Autorización: no-miembro de canal privado no puede fijar ni listar.
-	tm2, priv := seedPrivateChannel(t, ctx, st, "owner")
+	tm2, priv := seedPrivateChannel(ctx, t, st, "owner")
 	if err := st.AddTeamMember(ctx, tm2.ID, "owner", "bob", "Bob", domain.RoleMember); err != nil {
 		t.Fatalf("AddTeamMember: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestSavesFlowAndAccessFilter(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
 
-	tm, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	tm, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 	m1, err := st.CreateMessage(ctx, store.NewMessageRecord{ChannelID: ch.ID, AuthorSub: "alice", Body: "uno"})
 	if err != nil {
 		t.Fatalf("CreateMessage: %v", err)
@@ -204,11 +204,11 @@ func TestMarkUnreadRecomputesBadge(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
 
-	tm, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	tm, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 	if err := st.AddTeamMember(ctx, tm.ID, "alice", "bob", "Bob", domain.RoleMember); err != nil {
 		t.Fatalf("AddTeamMember: %v", err)
 	}
-	var msgs []domain.Message
+	msgs := make([]domain.Message, 0, 3)
 	for _, b := range []string{"uno", "dos", "tres"} {
 		m, err := st.CreateMessage(ctx, store.NewMessageRecord{ChannelID: ch.ID, AuthorSub: "alice", Body: b})
 		if err != nil {
@@ -221,7 +221,7 @@ func TestMarkUnreadRecomputesBadge(t *testing.T) {
 	if err := st.MarkRead(ctx, ch.ID, "bob", nil); err != nil {
 		t.Fatalf("MarkRead: %v", err)
 	}
-	if u := unreadOf(t, st, ctx, tm.ID, ch.ID, "bob"); u != 0 {
+	if u := unreadOf(ctx, t, st, tm.ID, ch.ID, "bob"); u != 0 {
 		t.Fatalf("tras leer, unread=%d, quiero 0", u)
 	}
 
@@ -229,7 +229,7 @@ func TestMarkUnreadRecomputesBadge(t *testing.T) {
 	if err := st.MarkUnread(ctx, msgs[1].ID, "bob"); err != nil {
 		t.Fatalf("MarkUnread m2: %v", err)
 	}
-	if u := unreadOf(t, st, ctx, tm.ID, ch.ID, "bob"); u != 2 {
+	if u := unreadOf(ctx, t, st, tm.ID, ch.ID, "bob"); u != 2 {
 		t.Fatalf("tras marcar no leído desde m2, unread=%d, quiero 2", u)
 	}
 
@@ -237,7 +237,7 @@ func TestMarkUnreadRecomputesBadge(t *testing.T) {
 	if err := st.MarkUnread(ctx, msgs[0].ID, "bob"); err != nil {
 		t.Fatalf("MarkUnread m1: %v", err)
 	}
-	if u := unreadOf(t, st, ctx, tm.ID, ch.ID, "bob"); u != 3 {
+	if u := unreadOf(ctx, t, st, tm.ID, ch.ID, "bob"); u != 3 {
 		t.Fatalf("tras marcar no leído desde m1, unread=%d, quiero 3", u)
 	}
 

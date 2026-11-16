@@ -15,7 +15,9 @@
 // Solo texto plano: un aviso es una frase y un enlace, y cada parte MIME de más es
 // una ocasión más de acabar en la carpeta de spam. La excepción es la invitación de
 // calendario (iMIP, RFC 6047), que necesita su parte `text/calendar` para que el
-// cliente de quien la recibe la reconozca y la conteste: EnviarCalendario.
+// cliente de quien la recibe la reconozca y la conteste: EnviarCalendario. La otra
+// es un documento que el correo ENTREGA (la factura en PDF que el ERP manda a su
+// cliente): EnviarAdjunto.
 package correo
 
 import (
@@ -119,6 +121,31 @@ func presentar(from string, op Opciones) (remitente, responder string, err error
 func EnviarCalendario(ctx context.Context, c Config, para, asunto, cuerpo string, ics []byte, metodo string) error {
 	return enviar(ctx, c, para, func(from, to string) []byte {
 		return MensajeCalendario(from, to, asunto, cuerpo, ics, metodo, time.Now())
+	})
+}
+
+// Adjunto es un fichero que viaja con el correo.
+type Adjunto struct {
+	// Nombre es el del fichero en el cliente de quien lo recibe («F-2026-0001.pdf»).
+	Nombre string
+	// Tipo es su tipo MIME («application/pdf»).
+	Tipo  string
+	Datos []byte
+}
+
+// EnviarAdjunto es EnviarCon con un fichero: el texto y el adjunto en un
+// `multipart/mixed`. Para entregar un documento, no para avisar: un aviso va sin
+// adjuntos (ver el comentario del paquete).
+func EnviarAdjunto(ctx context.Context, c Config, op Opciones, para, asunto, cuerpo string, a Adjunto) error {
+	if !c.Activo() {
+		return ErrSinConfigurar
+	}
+	from, responder, err := presentar(c.From, op)
+	if err != nil {
+		return err
+	}
+	return enviar(ctx, c, para, func(_, to string) []byte {
+		return MensajeAdjunto(from, to, responder, asunto, cuerpo, a, time.Now())
 	})
 }
 
@@ -237,6 +264,57 @@ func crlf(s string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(s, "\r\n", "\n"), "\n", "\r\n")
 }
 
+// MensajeAdjunto es el correo con un fichero: `multipart/mixed` con el texto y el
+// adjunto en base64. El nombre del fichero va en la forma de RFC 2231 que entiende
+// mime.FormatMediaType: con tildes o comillas no rompe la cabecera.
+func MensajeAdjunto(from, to, responderA, asunto, cuerpo string, a Adjunto, fecha time.Time) []byte {
+	frontera := fronteraNueva()
+	var b strings.Builder
+	cabeceras(&b, from, to, asunto, fecha)
+	if responderA != "" {
+		b.WriteString("Reply-To: " + strings.NewReplacer("\r", " ", "\n", " ").Replace(responderA) + "\r\n")
+	}
+	b.WriteString("Content-Type: multipart/mixed; boundary=\"" + frontera + "\"\r\n\r\n")
+	b.WriteString("--" + frontera + "\r\n")
+	b.WriteString("Content-Type: text/plain; charset=utf-8\r\n")
+	b.WriteString("Content-Transfer-Encoding: 8bit\r\n\r\n")
+	b.WriteString(crlf(cuerpo) + "\r\n")
+	b.WriteString("--" + frontera + "\r\n")
+	tipo := a.Tipo
+	if _, _, err := mime.ParseMediaType(tipo); err != nil || tipo == "" {
+		tipo = "application/octet-stream"
+	}
+	nombre := strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f {
+			return -1
+		}
+		return r
+	}, a.Nombre)
+	b.WriteString("Content-Type: " + mime.FormatMediaType(tipo, map[string]string{"name": nombre}) + "\r\n")
+	b.WriteString("Content-Disposition: " + mime.FormatMediaType("attachment", map[string]string{"filename": nombre}) + "\r\n")
+	b.WriteString("Content-Transfer-Encoding: base64\r\n\r\n")
+	base64EnLineas(&b, a.Datos)
+	b.WriteString("--" + frontera + "--\r\n")
+	return []byte(b.String())
+}
+
+// fronteraNueva es un separador MIME que no aparece en el contenido.
+func fronteraNueva() string {
+	limite := make([]byte, 12)
+	_, _ = rand.Read(limite)
+	return "sytue-" + hex.EncodeToString(limite)
+}
+
+// base64EnLineas escribe datos en base64 partidos a 76 columnas (RFC 2045 §6.8).
+func base64EnLineas(b *strings.Builder, datos []byte) {
+	enc := base64.StdEncoding.EncodeToString(datos)
+	for len(enc) > 76 {
+		b.WriteString(enc[:76] + "\r\n")
+		enc = enc[76:]
+	}
+	b.WriteString(enc + "\r\n")
+}
+
 // MensajeCalendario es el mensaje iMIP: `multipart/alternative` con el texto y la
 // parte `text/calendar; method=…` (RFC 6047 §2.4). El iCalendar va en base64: sus
 // líneas plegadas a 75 octetos no necesitan más, pero un DESCRIPTION con tildes y un
@@ -248,9 +326,7 @@ func MensajeCalendario(from, to, asunto, cuerpo string, ics []byte, metodo strin
 		}
 		return -1
 	}, metodo))
-	limite := make([]byte, 12)
-	_, _ = rand.Read(limite)
-	frontera := "sytue-" + hex.EncodeToString(limite)
+	frontera := fronteraNueva()
 	var b strings.Builder
 	cabeceras(&b, from, to, asunto, fecha)
 	b.WriteString("Content-Type: multipart/alternative; boundary=\"" + frontera + "\"\r\n\r\n")
@@ -261,12 +337,7 @@ func MensajeCalendario(from, to, asunto, cuerpo string, ics []byte, metodo strin
 	b.WriteString("--" + frontera + "\r\n")
 	b.WriteString("Content-Type: text/calendar; charset=utf-8; method=" + metodo + "\r\n")
 	b.WriteString("Content-Transfer-Encoding: base64\r\n\r\n")
-	enc := base64.StdEncoding.EncodeToString(ics)
-	for len(enc) > 76 {
-		b.WriteString(enc[:76] + "\r\n")
-		enc = enc[76:]
-	}
-	b.WriteString(enc + "\r\n")
+	base64EnLineas(&b, ics)
 	b.WriteString("--" + frontera + "--\r\n")
 	return []byte(b.String())
 }

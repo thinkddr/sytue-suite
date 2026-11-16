@@ -31,6 +31,20 @@ func Carpeta() (string, error) {
 	return filepath.Join(casa, "Downloads"), nil
 }
 
+// CarpetaImagenes es la de imágenes del perfil (FOLDERID_Pictures), que es la que lee la
+// app Fotos de Windows y donde la cámara deja el «Álbum de cámara». Con el mismo
+// fallback que [Carpeta].
+func CarpetaImagenes() (string, error) {
+	if ruta, err := windows.KnownFolderPath(windows.FOLDERID_Pictures, windows.KF_FLAG_DEFAULT); err == nil && ruta != "" {
+		return ruta, nil
+	}
+	casa, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(casa, "Pictures"), nil
+}
+
 // Revelar abre el Explorador con el fichero ya seleccionado. `/select,<ruta>` va como UN
 // solo argumento —así lo quiere explorer.exe— y por eso no se separa en dos.
 //

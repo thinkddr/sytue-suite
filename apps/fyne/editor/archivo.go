@@ -111,12 +111,12 @@ func (b *BotonArchivo) Menu() *ui.Menu {
 		elems = append(elems, item(rotuloFormato(c.Tipo, f), !command.Available(c.SinRed, c.Exportando != ""), hacer))
 		if command.Option != nil { // «PDF accesible»: el interruptor con tic de Ribbon.tsx
 			op := item(command.Option.Label, false, func() {
-				PDFSimple = !PDFSimple
+				FijarPDFAccesible(!PDFAccesible())
 				if c.Refrescar != nil {
 					c.Refrescar()
 				}
 			})
-			op.Marcada, op.MantieneAbierto = !PDFSimple, true
+			op.Marcada, op.MantieneAbierto = PDFAccesible(), true
 			elems = append(elems, op)
 		}
 	}

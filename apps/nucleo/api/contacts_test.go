@@ -7,6 +7,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -256,14 +259,40 @@ func TestLaFotoVaPorUIDYSinFotoNoEsUnError(t *testing.T) {
 }
 
 func TestLosCamposDeContactsSonLosDelServicio(t *testing.T) {
-	dominio := webref.Read(t, "services/contacts/internal/domain/domain.go")
+	dominio := webref.Read(t, "apps/nucleo/contacts/card/domain.go")
+	backend := webref.Read(t, "services/contacts/internal/domain/domain.go")
+	parsed, err := parser.ParseFile(token.NewFileSet(), "domain.go", backend, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	aliases := map[string]string{}
+	ast.Inspect(parsed, func(node ast.Node) bool {
+		declared, ok := node.(*ast.TypeSpec)
+		if !ok || !declared.Assign.IsValid() {
+			return true
+		}
+		target, ok := declared.Type.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+		source, ok := target.X.(*ast.Ident)
+		if ok && source.Name == "card" {
+			aliases[declared.Name.Name] = target.Sel.Name
+		}
+		return true
+	})
+	for name, target := range map[string]string{"Contact": "Contact", "AddressBook": "AddressBook", "CardObject": "Object", "Email": "Email", "Phone": "Phone", "Address": "Address", "Group": "Group"} {
+		if aliases[name] != target {
+			t.Errorf("services/contacts no comparte el modelo %s con el dispositivo", name)
+		}
+	}
 	for _, campo := range []string{
 		`json:"formatted_name"`, `json:"address_book_id"`, `json:"is_primary"`, `json:"postal_code,omitempty"`,
 		`json:"photo_url,omitempty"`, `json:"birthday,omitempty"`, `json:"etag"`, `json:"is_default"`, `json:"display_name"`,
-		`json:"has_photo"`,
+		`json:"has_photo"`, `json:"birthday_no_year,omitempty"`,
 	} {
 		if !strings.Contains(dominio, campo) {
-			t.Errorf("services/contacts ya no declara %s: revisar internal/api/contacts.go", campo)
+			t.Errorf("el modelo compartido de Contacts ya no declara %s: revisar api/contacts.go", campo)
 		}
 	}
 	rutas := webref.Read(t, "services/contacts/internal/http/server.go")
@@ -358,5 +387,52 @@ func TestBatchVCardEsUnaPeticionALaRutaDelServicio(t *testing.T) {
 	if !strings.Contains(webref.Read(t, "services/contacts/internal/http/batch_photo.go"),
 		fmt.Sprintf("const maxBatchUIDs = %d", MaxLoteContactos)) {
 		t.Errorf("MaxLoteContactos (%d) ya no es el tope del lote del servicio", MaxLoteContactos)
+	}
+}
+
+// El cumpleaños sin año llega en su propio campo y vuelve en el PUT: como el servicio
+// SUSTITUYE el contacto, editar el teléfono no puede borrarlo.
+func TestElCumpleanosSinAnoVaYVuelve(t *testing.T) {
+	var c Contact
+	if err := json.Unmarshal([]byte(`{"id":"c1","formatted_name":"Ada","birthday_no_year":"--12-10"}`), &c); err != nil {
+		t.Fatal(err)
+	}
+	if c.BirthdayNoYear != "--12-10" || c.Birthday != nil {
+		t.Fatalf("leído: %q / %v", c.BirthdayNoYear, c.Birthday)
+	}
+	cuerpo, err := json.Marshal(c.Input())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(cuerpo), `"birthday_no_year":"--12-10"`) || strings.Contains(string(cuerpo), `"birthday":`) {
+		t.Errorf("PUT: %s", cuerpo)
+	}
+}
+
+// Los sitios web, las relaciones y el aniversario llegan proyectados y vuelven en el
+// PUT: sin esto, editar el teléfono desde la app nativa los borraba de la tarjeta.
+func TestWebRelacionesYAniversarioVanYVuelven(t *testing.T) {
+	var c Contact
+	if err := json.Unmarshal([]byte(`{"id":"c1","formatted_name":"Ada",
+		"urls":[{"url":"https://ada.example","type":"work"}],
+		"related":[{"name":"William","type":"spouse"}],
+		"anniversary":"2012-06-09T00:00:00Z"}`), &c); err != nil {
+		t.Fatal(err)
+	}
+	if len(c.URLs) != 1 || c.URLs[0].URL != "https://ada.example" || len(c.Related) != 1 || c.Anniversary == nil {
+		t.Fatalf("leído: %+v", c)
+	}
+	cuerpo, err := json.Marshal(c.Input())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, debe := range []string{
+		`"urls":[{"url":"https://ada.example","type":"work"}]`,
+		`"related":[{"name":"William","type":"spouse"}]`,
+		`"anniversary":"2012-06-09"`,
+	} {
+		if !strings.Contains(string(cuerpo), debe) {
+			t.Errorf("PUT sin %s: %s", debe, cuerpo)
+		}
 	}
 }

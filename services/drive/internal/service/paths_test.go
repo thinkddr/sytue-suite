@@ -21,7 +21,7 @@ import (
 // del nombre (para tests reproducibles).
 func storeCursor(name string) store.FileCursor {
 	id := uuid.NewSHA1(uuid.NameSpaceOID, []byte(name))
-	return store.FileCursor{NameLower: strings.ToLower(name), ID: id}
+	return store.FileCursor{Orden: store.OrdenFicheros{Campo: store.OrdenNombre}, NameLower: strings.ToLower(name), ID: id}
 }
 
 // encodeGarbage devuelve un token base64 válido cuyo contenido NO es JSON.

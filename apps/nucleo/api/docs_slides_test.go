@@ -215,11 +215,11 @@ func TestSlidesContratoConElServicio(t *testing.T) {
 			`q.Get("kind")`, `q.Get("q")`, `q.Get("cursor")`, `q.Get("limit")`, `resp["next_cursor"]`, `"documents": docs`,
 		},
 		"services/docs/internal/http/collab.go": {`json:"ops"`, `"seq":   seq`, `"state": state`, `"seq": newSeq`},
-		"services/docs/internal/domain/crdt.go": {
+		"apps/nucleo/office/model/crdt.go": {
 			`json:"a"`, `json:"c"`, `json:"dot"`, `json:"key,omitempty"`, `json:"value,omitempty"`, `json:"lamport"`,
 			`json:"registers"`, `OpSet OpKind = "set"`,
 		},
-		"services/docs/internal/domain/doc.go": {
+		"apps/nucleo/office/model/doc.go": {
 			`json:"owner_sub"`, `json:"starred"`, `json:"updated_at"`, `json:"source_ref,omitempty"`,
 			`KindPresentation Kind = "presentation"`, `RoleEditor    Role = "editor"`, `RoleOwner     Role = "owner"`,
 		},

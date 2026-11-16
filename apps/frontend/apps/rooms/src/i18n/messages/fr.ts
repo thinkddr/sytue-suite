@@ -11,12 +11,8 @@ import type { AppCatalog } from '@sytue/i18n';
 import type { en } from './en.js';
 
 export const fr: AppCatalog<typeof en> = {
-  'matrix.verifyPeopleFirst':
-    'Vérifiez les personnes de cette conversation avant d’envoyer votre premier message.',
-
-  'matrix.verifyPerson': 'Vérifier une personne',
-  'matrix.choosePerson': 'Choisissez une personne de ce canal',
-
+  'matrix.notYetEncrypted':
+    'Pas encore disponible dans les conversations chiffrées de bout en bout.',
   'external.title': 'Canaux externes',
   'external.body':
     'Lisez et répondez dans Slack, Teams et Google Chat. Le fournisseur traite ces messages ; ils ne sont pas chiffrés de bout en bout par Rooms.',
@@ -46,7 +42,6 @@ export const fr: AppCatalog<typeof en> = {
     'Déconnecter {provider} ? Rooms perdra l’accès à ce compte. Les messages resteront chez le fournisseur.',
   'external.sendUnconfirmed':
     'L’envoi n’a pas pu être confirmé. Vérifiez les messages récents avant de renvoyer.',
-  'matrix.notices': 'Licences tierces',
 
   // --- App ----------------------------------------------------------------
   'app.name': 'Sytue Rooms',
@@ -54,16 +49,11 @@ export const fr: AppCatalog<typeof en> = {
 
   // --- Acciones comunes ---------------------------------------------------
   'action.add': 'Ajouter',
-  'action.back': 'Retour',
-  'action.cancel': 'Annuler',
   'action.clear': 'Effacer',
-  'action.close': 'Fermer',
   'action.closeEsc': 'Fermer (Échap)',
   'action.closeNamed': 'Fermer {name}',
-  'action.copy': 'Copier',
   'action.create': 'Créer',
   'action.delete': 'Supprimer',
-  'action.done': 'Terminé',
   'action.download': 'Télécharger',
   'action.edit': 'Modifier',
   'action.hide': 'Masquer',
@@ -80,7 +70,6 @@ export const fr: AppCatalog<typeof en> = {
 
   // --- Estados y errores genéricos ----------------------------------------
   'state.error': 'Erreur',
-  'state.loading': 'Chargement…',
   'state.uploading': 'Envoi…',
   'error.checkConnection': 'Vérifiez votre connexion et réessayez.',
   'error.loadFailed': 'Le chargement a échoué.',
@@ -99,6 +88,12 @@ export const fr: AppCatalog<typeof en> = {
   // Se anuncia solo mientras dura la llamada; el estado propio no se toca.
   'presence.inCall': '📞 En appel',
   'presence.offline': 'Hors ligne',
+  'person.openProfile': 'Voir le profil de {name}',
+  'person.email': 'E-mail',
+  'person.localTimeLabel': 'Heure locale',
+  'person.localTime': '{time} heure locale',
+  'person.message': 'Message',
+  'person.call': 'Appeler',
   'status.yours': 'Votre statut',
   'status.yoursIs': 'Votre statut — {state}',
   'status.yoursWithCustom': 'Votre statut — {state} · {status}',
@@ -111,6 +106,8 @@ export const fr: AppCatalog<typeof en> = {
   'shortcuts.group.move': 'Se déplacer',
   'shortcuts.group.write': 'Écrire',
   'shortcuts.switcher': 'Aller à un canal',
+  'shortcuts.nextChannel': 'Canal précédent ou suivant',
+  'shortcuts.nextUnread': 'Canal précédent ou suivant avec des messages non lus',
   'shortcuts.close': 'Fermer ce qui est ouvert',
   'shortcuts.help': 'Afficher cette liste',
   'shortcuts.editLast': 'Modifier votre dernier message (zone vide)',
@@ -224,6 +221,10 @@ export const fr: AppCatalog<typeof en> = {
   'channel.saved': 'Enregistrés',
   'channel.files': 'Fichiers du salon',
   'channel.scheduledMessages': 'Messages programmés',
+  'channel.scheduleMeeting': 'Planifier une réunion',
+  'channel.meetingTitle': 'Réunion · #{name}',
+  'channel.meetingDescription': 'Conversation : {link}',
+  'dm.meetingTitle': 'Réunion avec {name}',
   'channel.scheduled': 'Programmés',
   'dm.peopleCount': { one: '{count} personne', other: '{count} personnes' },
   'dm.youAnd': 'Vous, {name}',
@@ -260,6 +261,11 @@ export const fr: AppCatalog<typeof en> = {
   'createChannel.privateHelp': 'Seules les personnes invitées le voient.',
   'createChannel.topicHelp': 'Facultatif. À quoi sert ce canal.',
   'createChannel.topicPlaceholder': 'De quoi parle ce canal ?',
+  'createChannel.people': 'Personnes',
+  'createChannel.peopleHelp':
+    'Facultatif. Les personnes d’autres organisations reçoivent une invitation.',
+  'createChannel.membersMissing':
+    'Le canal a été créé, mais ces personnes n’ont pas pu être ajoutées : {names}',
   'createChannel.duplicate': 'Un canal porte déjà ce nom.',
   'createChannel.invalidName': 'Ce nom n’est pas valide. Utilisez lettres, chiffres et tirets.',
   'createChannel.forbidden': 'Vous n’avez pas le droit de créer des canaux.',
@@ -325,6 +331,7 @@ export const fr: AppCatalog<typeof en> = {
   'composer.dateAndTime': 'Date et heure',
   'composer.customDateTime': 'Choisir date et heure…',
   'key.enter': 'Entrée',
+  'key.shift': 'Maj',
   'composer.hintSend': 'pour envoyer',
   'composer.hintMention': 'pour mentionner',
   'composer.hintEmoji': 'pour les emojis',
@@ -448,9 +455,15 @@ export const fr: AppCatalog<typeof en> = {
   'message.noneYet': 'Aucun message pour l’instant',
   'message.channelStart': 'C’est le début de #{channel}',
   'message.writeFirst': 'Écrivez le premier message pour lancer la conversation.',
+  'message.introCreatedBy': '{name} a créé ce canal le {date}.',
+  'message.introCreatedByYou': 'Vous avez créé ce canal le {date}.',
+  'message.introSomeone': 'Quelqu’un',
+  'message.introDm': 'Conversation avec {name}',
+  'message.introDmStart': 'C’est le début de votre conversation privée avec {name}.',
   'message.newMessages': 'Nouveaux messages',
   'message.jumpToUnread': 'Aller aux non lus',
   'message.goToRecent': 'Aller aux messages récents',
+  'message.newBelow': { one: '{count} nouveau message', other: '{count} nouveaux messages' },
   'message.fromLink': 'Message ouvert depuis un lien',
   'message.moreActions': 'Plus d’actions',
   'message.bot': 'BOT',
@@ -522,6 +535,10 @@ export const fr: AppCatalog<typeof en> = {
   },
   'thread.replyPlaceholder': 'Répondre…',
   'thread.replyAria': 'Écrire une réponse dans le fil',
+  'thread.alsoToChannel': 'Envoyer aussi à #{channel}',
+  'thread.repliedInThread': 'A répondu dans un fil',
+  'thread.viewThread': 'Voir le fil',
+  'thread.lastReply': 'Dernière réponse {when}',
   'thread.follow': 'Suivre le fil',
   'thread.followShort': 'Suivre',
   'thread.followHint': 'Soyez prévenu des nouvelles réponses',
@@ -546,8 +563,16 @@ export const fr: AppCatalog<typeof en> = {
   'search.busy': 'Recherche…',
   'search.failed': 'Échec de la recherche',
   'search.failedRetry': 'La recherche n’a pas pu aboutir.',
+  'search.unavailable': 'Indisponible avec le chiffrement',
+  'search.encryptedTitle': 'Les messages chiffrés ne peuvent pas encore être recherchés',
+  'search.encryptedBody':
+    'Les messages chiffrés ne peuvent être lus que sur vos appareils : le serveur ne peut donc pas encore y effectuer de recherche.',
   'search.noResults': 'Aucun résultat',
   'search.resultCount': { one: '{count} résultat', other: '{count} résultats' },
+  'search.localScope': {
+    one: 'recherche dans le dernier message ({count}) de cet appareil',
+    other: 'recherche dans les {count} derniers messages de cet appareil',
+  },
 
   // --- Panel de miembros --------------------------------------------------
   'members.title': 'Personnes',
@@ -652,6 +677,10 @@ export const fr: AppCatalog<typeof en> = {
   'notify.dndEnd': 'Ne pas déranger — fin',
   'notify.push': 'Notifications push',
   'notify.pushHelp': 'Recevez des notifications avec Rooms fermé sur cet appareil.',
+  'notify.sound': 'Son',
+  'notify.soundHelp': 'Retentit sur cet appareil quand arrive un message que vous ne regardez pas.',
+  'notify.soundDirect': 'Messages directs et mentions',
+  'notify.soundOthers': 'Autres messages',
   'notify.failed': 'Les paramètres n’ont pas pu être enregistrés.',
   'notification.mentionedIn': 'Mention de {name} dans #{channel}',
   'notification.mentioned': 'Mention de {name}',
@@ -1058,39 +1087,15 @@ export const fr: AppCatalog<typeof en> = {
   'whatsappConnection.cancelled': 'La configuration a été annulée. Vous pouvez réessayer.',
   'whatsappConnection.sameAccount':
     'Connectez-vous avec le même compte Rooms que dans l’application, puis réessayez.',
-  'matrix.title': 'Chiffrement de bout en bout',
-  'matrix.subtitle':
-    'Les messages et fichiers sont chiffrés sur tes appareils. Seuls les appareils vérifiés peuvent les lire.',
-  'matrix.connect': 'Configurer cet appareil',
-  'matrix.setup': 'Créer une clé de récupération',
-  'matrix.recover': 'Utiliser une clé de récupération',
-  'matrix.verify': 'Vérifier avec un autre appareil',
-  'matrix.saveTitle': 'Conserve ta clé de récupération',
-  'matrix.saveBody': 'Tu en auras besoin si tu perds l’accès à tes appareils vérifiés.',
-  'matrix.saved': 'J’ai conservé la clé de récupération',
-  'matrix.recoveryKey': 'Clé de récupération',
-  'matrix.recoverBody':
-    'Saisis la clé de récupération que tu as conservée. Elle reste sur cet appareil.',
-  'matrix.compare': 'Compare ces émojis sur les deux appareils.',
-  'matrix.match': 'Ils correspondent',
-  'matrix.mismatch': 'Ils ne correspondent pas',
-  'matrix.waiting': 'En attente de l’autre appareil…',
-  'matrix.incoming': 'Vérifier cet appareil',
-  'matrix.devices': 'Tes appareils',
-  'matrix.revoke': 'Déconnecter l’appareil',
-  'matrix.trusted': 'Appareil vérifié',
-  'matrix.failed': 'Le chiffrement n’a pas pu être configuré. Réessaie.',
   'matrix.legacy': 'Message antérieur · sans chiffrement de bout en bout',
+  'matrix.originalDeviceRequired':
+    'Ouvrez Rooms sur un appareil déjà vérifié pour récupérer ce message, puis réessayez.',
   'matrix.unreadable': 'Cet appareil ne peut pas déchiffrer ce message.',
   'matrix.unsupported': 'Cette action n’est pas disponible pour les messages chiffrés.',
-  'matrix.auth': 'Confirme ton identité',
-  'matrix.authContinue': 'Je me suis connecté',
-  'matrix.reset': 'J’ai oublié ma clé de récupération',
-  'matrix.resetAction': 'Réinitialiser le chiffrement',
-  'matrix.resetBody':
-    'Une nouvelle clé de récupération sera créée. Les anciens messages chiffrés ne resteront lisibles que sur les appareils qui les ont déjà, et vous devrez vérifier à nouveau vos autres appareils et vos contacts.',
-  'matrix.resetUnderstood': 'Je comprends que je peux perdre l’accès aux anciens messages chiffrés',
-  'matrix.tab': 'Rooms est ouvert dans un autre onglet. Ferme-le pour utiliser cet appareil ici.',
   'matrix.identityUnverified': 'Identité non vérifiée',
   'matrix.senderUnverified': 'L’expéditeur ne peut pas être vérifié sur cet appareil',
+  'nativeResource.title': 'Connecter {app}',
+  'nativeResource.description':
+    'Connectez cette app à votre compte dans {tenant}. Vos autorisations actuelles sont conservées.',
+  'nativeResource.approve': 'Connecter',
 };

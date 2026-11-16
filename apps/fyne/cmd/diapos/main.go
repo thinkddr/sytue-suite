@@ -13,6 +13,7 @@
 // disco con el JSON de un registro `doc:slides`, que se guarda en ese mismo fichero; o
 // convertida de Drive, en solo lectura. Lo que corre en cualquier sitio, sin CGO y sin
 // servidor gráfico, es `go test ./diapos/...`.
+// paridad-web: apps/frontend/apps/diapos/src/pages/auth/matrix/callback.astro
 package main
 
 // La portada y la papelera son las de `editor` (portada.go, papelera.go), compartidas por
@@ -35,6 +36,7 @@ import (
 	"fyne.io/fyne/v2/app"
 
 	"git.sytue.eu/sytue/one/apps/fyne/catalogos"
+	"git.sytue.eu/sytue/one/apps/fyne/cifrado"
 	"git.sytue.eu/sytue/one/apps/fyne/diapos"
 	"git.sytue.eu/sytue/one/apps/fyne/editor"
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
@@ -44,6 +46,8 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	mx "git.sytue.eu/sytue/one/apps/nucleo/matrix"
+	"git.sytue.eu/sytue/one/apps/nucleo/office"
 )
 
 func main() {
@@ -53,6 +57,8 @@ func main() {
 	// La sesión, la apariencia y el idioma son TRANSVERSALES a las trece apps: esto lo
 	// lee de donde lo dejó la última que lo tocó. `Abrir` no habla con la red.
 	s := sesion.Abrir(a, "")
+	// Las macros grabadas son de quien ha entrado, como en la web (una clave por `sub`).
+	editor.Personal = s.PorPersona()
 	// El cromo «papel» de toda la suite (ADR 0080). Aquí y no en `sesion.Abrir`: las
 	// pruebas que abren sesión comprueban también el cromo de color.
 	tema.ElegirCromo(tema.CromoPapel)
@@ -69,11 +75,27 @@ func main() {
 	w := a.NewWindow(a.Metadata().Name)
 	w.SetPadded(false)
 
-	// La portada de presentaciones y el editor hablan con el servicio con la sesión
-	// TRANSVERSAL: sin sesión, la portada lo dice y ofrece entrar.
-	d := diapos.NuevaApp(tr.T, idioma,
-		api.NewDocs(s.URL("docs"), s.Sesion, s.ClienteConAviso(nil)), api.NewSlides(s.URL("slides"), s.Sesion, s.ClienteConAviso(nil)))
+	// La portada de presentaciones y el editor hablan con el repositorio privado
+	// cifrado; nunca se entrega un cliente HTTP en claro a la vista.
+	d := diapos.NuevaApp(tr.T, idioma, api.NewPrivateDocs(), api.NewPrivateSlides())
+	setSlidesClient := func(client *api.Slides) {
+		if client == nil {
+			client = api.NewPrivateSlides()
+		}
+		docsClient := client.Docs()
+		if docsClient == nil {
+			docsClient = api.NewPrivateDocs()
+		}
+		d.Slides = client
+		if p := d.Portada(); p != nil {
+			p.Svc = docsClient
+		}
+		if d.AbrirArchivo != nil {
+			d.AbrirArchivo.Svc = docsClient
+		}
+	}
 	d.Asistir = api.NewIA(s.URL("ai"), s.Sesion, nil).Asistir // el panel «Asistente»
+	d.Almacen = s.PorPersona()                                // el tamaño de las notas del moderador
 	// Lo que copia «Compartir», como en Docus y Calcus: el editor en la web bajo la
 	// organización activa (ADR 0056) y el enlace público sin ella.
 	org := s.Sesion.Organizacion
@@ -106,14 +128,6 @@ func main() {
 			}
 		}()
 	}
-	// Entrar o salir desde el menú de cuenta de ESTA o de otra app recarga la lista.
-	dentro := s.Estado().Dentro()
-	s.AlCambiar(func(e sesion.Estado) {
-		if e.Dentro() != dentro {
-			dentro = e.Dentro()
-			d.Arrancar()
-		}
-	})
 	// «Insertar → Imagen»: el selector de ficheros del SISTEMA (`ficheros.Elegir`), el
 	// mismo con el que CertiPDF abre del disco; la web dice `accept="image/*"`.
 	//
@@ -151,10 +165,44 @@ func main() {
 			listo(nombre, datos, false)
 		})
 	}
-	w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.Slides).ConSinSesionPropia().Montar(d.Objeto()))
+	private, err := cifrado.NewPrivateApplication(cifrado.PrivateApplicationConfig[*office.Repository]{
+		Suite:       s,
+		Application: a,
+		Window:      w,
+		Product:     "slides",
+		Translate:   func(key string) string { return tr.T(key, nil) },
+		Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*office.Repository], error) {
+			return diaposPlan(ctx, resources, s)
+		},
+		//nolint:contextcheck // The presenter retains its own mounted lifetime, not this short mount request.
+		Mount: func(_ context.Context, resources *cifrado.Resources[*mx.Client], repository *office.Repository) (cifrado.ApplicationView, error) {
+			facade, err := api.NewSlides(s.URL("slides"), resources.HTTP(), nil).WithPrivateData(repository)
+			if err != nil {
+				return cifrado.ApplicationView{}, err
+			}
+			setSlidesClient(facade)
+			d.Arrancar()
+			return cifrado.ApplicationView{
+				Object: d.Objeto(),
+				Detach: func() {
+					setSlidesClient(nil)
+				},
+			}, nil
+		},
+	})
+	if err != nil {
+		w.SetContent(ui.NuevoVacio(tr.T("matrix.failed", nil), ""))
+	} else {
+		w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.Slides).ConSinSesionPropia().Montar(private.Objeto()))
+		w.SetOnClosed(private.Close)
+	}
 	w.Resize(fyne.NewSize(1280, 800))
 	// Con interfaz: lanzada por iOS solo para el widget no se pide la portada.
-	s.CuandoHayaEscena(d.Arrancar)
+	s.CuandoHayaEscena(func() {
+		if private != nil {
+			private.Start()
+		}
+	})
 
 	// El argumento es el JSON de un registro `doc:slides` del disco, que se guarda en ese
 	// mismo fichero. Un `.pptx` o un `.odp` también llega como argumento, pero ese lo

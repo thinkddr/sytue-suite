@@ -13,7 +13,16 @@
 import type { JSX, TargetedEvent } from 'preact';
 import { createPortal } from 'preact/compat';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { cx, Icon, Button, Modal, limitesViewport, useEnHoja, useFitInViewport } from '@sytue/ui';
+import {
+  cx,
+  Icon,
+  Button,
+  Modal,
+  limitesViewport,
+  useEnHoja,
+  useFitInViewport,
+  EmptyState,
+} from '@sytue/ui';
 import { EmojiGlyph } from './glyphs.js';
 import { searchEmoji } from '../lib/emoji.js';
 import {
@@ -278,7 +287,7 @@ export function EmojiPickerButton({
         class="border-border bg-bg text-text placeholder:text-text-subtle sytue-focus-ring mb-2 w-full rounded-md border px-2.5 py-1.5 text-sm outline-none"
       />
       {results.length === 0 ? (
-        <p class="text-text-muted px-1 py-6 text-center text-sm">{t('search.noResults')}</p>
+        <EmptyState compact icon="search" title={t('search.noResults')} />
       ) : (
         <div
           ref={listRef}

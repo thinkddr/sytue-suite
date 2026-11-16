@@ -2,28 +2,22 @@ import type { APIRoute } from 'astro';
 import { CalendarClient, JmapClient, bearer, type Event, type Mailbox } from '@sytue/api-clients';
 import { serverEnv } from '@sytue/auth/server';
 import { getApiSession } from '../../lib/auth';
+import { recortarAgenda, type EventoDeHoy } from '../../lib/hoy';
 
 export const prerender = false;
 
 const env = serverEnv(import.meta.env);
 const CALENDAR_BASE_URL = env.SYTUE_CALENDAR_BASE_URL ?? 'https://calendar.sytue.eu';
 const JMAP_SESSION_URL = env.SYTUE_JMAP_SESSION_URL ?? 'https://mail.sytue.eu/.well-known/jmap';
-const MAX_EVENTOS = 6;
-
-export interface EventoDeHoy {
-  id: string;
-  summary: string;
-  start: string;
-  end?: string;
-  allDay: boolean;
-  location?: string;
-}
 
 /**
  * Lo que la portada del Hub enseña de «hoy»: los eventos del día y el correo
  * sin leer. Cada fuente va por su lado y falla por su lado (`null`): un Mail
- * caído no deja la agenda a oscuras. Los límites del día los pone el navegador
- * (`from`/`to`), que es quien sabe en qué zona horaria vive la persona.
+ * caído no deja la agenda a oscuras. De la agenda van los seis primeros, cuántos
+ * hay en total (`total`, para el «+N más») y si falta algún calendario que no
+ * contestó (`parcial`): sin eso, un calendario caído parece un día más tranquilo.
+ * Los límites del día los pone el navegador (`from`/`to`), que es quien sabe en
+ * qué zona horaria vive la persona.
  */
 export const GET: APIRoute = async (ctx) => {
   const session = await getApiSession(ctx);
@@ -33,17 +27,22 @@ export const GET: APIRoute = async (ctx) => {
   if (!esInstante(from) || !esInstante(to)) return json({ error: 'invalid_range' }, 400);
   const auth = bearer(session.accessToken);
 
-  const [eventos, correo] = await Promise.all([
+  const [agenda, correo] = await Promise.all([
     new CalendarClient({ baseUrl: CALENDAR_BASE_URL, auth })
-      .listEvents({ from, to })
-      .then((lista) => lista.slice(0, MAX_EVENTOS).map(resumir))
+      .listEventsDetallado({ from, to })
+      .then((r) => recortarAgenda(r.events.map(resumir), r.failed.length, r.calendars))
       .catch(() => null),
     new JmapClient({ sessionUrl: JMAP_SESSION_URL, auth })
       .listMailboxes()
       .then((buzones) => ({ unread: sinLeer(buzones) }))
       .catch(() => null),
   ]);
-  return json({ eventos, correo });
+  return json({
+    eventos: agenda?.eventos ?? null,
+    total: agenda?.total ?? 0,
+    parcial: agenda?.parcial ?? false,
+    correo,
+  });
 };
 
 function resumir(e: Event): EventoDeHoy {

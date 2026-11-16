@@ -5,6 +5,7 @@ package ui
 
 import (
 	"image/color"
+	"slices"
 	"testing"
 
 	"fyne.io/fyne/v2"
@@ -21,20 +22,20 @@ import (
 // Comprueba tres cosas distintas, y las tres hacen falta:
 //
 //  1. El alto declarado es el de la web. El número viene de Button.tsx (`h-9` = 2,25rem
-//     con el rem de 14 = 31,5 px) y no de esta implementación.
+//     con el rem de 16 = 36 px) y no de esta implementación.
 //  2. Lo declarado y lo que el widget le pide a Fyne son lo mismo (`MinSize`).
 //  3. Lo declarado y lo PINTADO son lo mismo. Sin esto, un widget puede decir 32 y
 //     dejar 33 filas de tinta, que es justo el fallo que nadie ve hasta comparar
 //     capturas.
 func TestElBotonMideLoQueDiceMedir(t *testing.T) {
-	// `h-9` de Button.tsx son 2,25rem, y con el rem de 14 de esta suite, 31,5 px de
-	// CSS. Sin redondear: a ×2 son 63 filas clavadas (TestLaGeometriaEsExactaADoble).
+	// `h-9` de Button.tsx son 2,25rem, y con el rem de 16 de esta suite, 36 px de
+	// CSS. Sin redondear: a ×2 son 72 filas clavadas (TestLaGeometriaEsExactaADoble).
 	const altoWeb = 2.25 * tema.Rem
 
 	b := NuevoBoton("Guardar cambios", nil)
 	declarada := MedidaBoton(b.Texto, b.Talla, b.Ancho)
 	if declarada.Height != altoWeb {
-		t.Errorf("MedidaBoton dice %v de alto y `h-9` con el rem de 14 son %v", declarada.Height, float32(altoWeb))
+		t.Errorf("MedidaBoton dice %v de alto y `h-9` con el rem de 16 son %v", declarada.Height, float32(altoWeb))
 	}
 	if got := b.MinSize(); got != declarada {
 		t.Errorf("MinSize() = %v y MedidaBoton dice %v: hay dos cuentas donde tiene que haber una", got, declarada)
@@ -338,5 +339,33 @@ func TestAlInicioElBotonArrancaEnSuRelleno(t *testing.T) {
 	}
 	if x := pintar(false).delante.Objeto().Position().X; x <= px4 {
 		t.Errorf("sin AlInicio el glifo empieza en %v: el bloque tenía que ir centrado", x)
+	}
+}
+
+// TestElGalonDeDetrasCambiaDeDibujo: el botón que despliega («Mostrar texto citado» ▾)
+// cambia el `trailingIcon` al abrirse, como el `<Icon name>` de la web. El renderer
+// fijaba el dibujo al montar y el galón seguía apuntando abajo con la cita abierta.
+func TestElGalonDeDetrasCambiaDeDibujo(t *testing.T) {
+	b := NuevoBoton("Mostrar", func() {}).Con(Fantasma, TallaSM)
+	b.IconoDetras = iconos.ChevronAbajo
+	w := test.NewWindow(b)
+	t.Cleanup(w.Close)
+	r := test.WidgetRenderer(b).(*botonRenderer)
+	pinta := func() []uint8 {
+		img := r.detras.Objeto().(*canvas.Raster).Generator(32, 32)
+		px := make([]uint8, 0, 32*32)
+		for y := range 32 {
+			for x := range 32 {
+				_, _, _, a := img.At(x, y).RGBA()
+				px = append(px, uint8(a>>8))
+			}
+		}
+		return px
+	}
+	abajo := pinta()
+	b.IconoDetras = iconos.ChevronArriba
+	fyne.DoAndWait(b.Refresh)
+	if slices.Equal(abajo, pinta()) {
+		t.Error("cambiar IconoDetras no cambia el dibujo del galón")
 	}
 }

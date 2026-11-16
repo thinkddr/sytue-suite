@@ -200,3 +200,45 @@ func TestStorageSDKDecodingPreservesPrivatePayloadExactly(t *testing.T) {
 		t.Fatal("SDK reserialization changed precise private data", err)
 	}
 }
+
+func TestStorageBindingsCannotSwitchIdentityVersionsInPlace(t *testing.T) {
+	server := httptest.NewTLSServer(http.NotFoundHandler())
+	defer server.Close()
+	cfg := storageConfig(t, server, "drive")
+	client, err := newClient(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	next := cfg.Bootstrap
+	next.StorageIdentityVersion = storage.IsolatedIdentity
+	if err := client.UpdateBindings(next); !errors.Is(err, ErrIdentity) {
+		t.Fatal("active device switched account namespace", err)
+	}
+	next.StorageIdentityVersion = storage.LegacyIdentity
+	if err := client.UpdateBindings(next); err != nil {
+		t.Fatal("explicit legacy metadata rejected", err)
+	}
+	cfg.Bootstrap.StorageIdentityVersion = 3
+	if _, err := newClient(cfg); !errors.Is(err, ErrIdentity) {
+		t.Fatal("unsupported storage account accepted", err)
+	}
+}
+
+func TestIsolatedStorageBindingsCannotBorrowAnotherAccountsRecoveryNamespace(t *testing.T) {
+	server := httptest.NewTLSServer(http.NotFoundHandler())
+	defer server.Close()
+	cfg := storageConfig(t, server, "drive")
+	cfg.Bootstrap.StorageIdentityVersion = storage.IsolatedIdentity
+	for _, user := range []string{"@person:matrix.test", "@sytue_storage_mail_org_person:matrix.test", "@sytue_storage_drive_other_person:matrix.test", "@sytue_storage_drive_org_other:matrix.test", "@sytue_storage_drive_org_person:"} {
+		cfg.Bootstrap.MatrixUserID = user
+		if c, err := newClient(cfg); c != nil || !errors.Is(err, ErrIdentity) {
+			t.Fatal("isolated metadata selected foreign account keys", err)
+		}
+	}
+	cfg.Bootstrap.MatrixUserID = "@sytue_storage_drive_org_person:matrix.test"
+	c, err := newClient(cfg)
+	if err != nil {
+		t.Fatal("correct scoped identity rejected", err)
+	}
+	_ = c.Close()
+}

@@ -44,9 +44,8 @@ repetido en prosa envejece sin que nadie lo note.
 ## Entorno de desarrollo
 
 ```bash
-cp .env.example .env
-cp deploy/compose/.env.example deploy/compose/.env
-make dev-up          # levanta toda la suite en local (*.sytue.localhost)
+./sytue-deploy       # genera deploy/compose/.env y levanta toda la suite (*.sytue.localhost)
+make dev-up          # después: reconstruye lo cambiado y arranca
 
 make go-build        # compila todos los servicios Go
 make go-test         # tests del módulo

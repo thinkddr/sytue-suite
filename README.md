@@ -43,30 +43,23 @@ Reúne identidad (SSO/OIDC/MFA/Passkeys/SCIM), correo, almacenamiento en la nube
 
 ---
 
-## Despliegue guiado en 1 comando (`./sytue-deploy`)
+## Instalar en 3 comandos
 
-Ningún archivo del repositorio contiene contraseñas ni secretos predefinidos. El asistente interactivo **`./sytue-deploy`** te guía paso a paso para elegir el modo de despliegue (**Docker Compose** o **Kubernetes con Helm**), seleccionar los servicios deseados, configurar la cuenta administradora inicial y **autogenerar criptográficamente todas las contraseñas y claves AES-256 / HMAC / OIDC**:
+Necesitas **Docker** (con 8 GB de memoria para la suite completa) y **mkcert**. Después:
 
 ```bash
 git clone https://github.com/thinkddr/sytue-suite.git
 cd sytue-suite
-
-# Lanza el asistente interactivo paso a paso:
 ./sytue-deploy
-# (o bien: make deploy)
 ```
 
-También puedes usarlo en modo no interactivo para automatizaciones:
+Pulsa Enter en cada pregunta. El asistente comprueba los requisitos, genera todas las
+contraseñas y claves (ninguna viene en el repositorio), construye y arranca la suite, crea
+tu administrador y verifica que todo responde. Al terminar, entra en
+**https://one.sytue.localhost** con las credenciales que te muestra.
 
-```bash
-# Generar deploy/compose/.env con todos los secretos autogenerados sin iniciar contenedores:
-./sytue-deploy --mode compose --profile full --non-interactive --only-config
-
-# Generar deploy/helm/values-custom.yaml y deploy/helm/apply-secrets.sh para Kubernetes:
-./sytue-deploy --mode helm --domain suite.miempresa.eu --namespace sytue-prod --non-interactive --only-config
-```
-
-Consulta la guía rápida en [`QUICKSTART.md`](QUICKSTART.md) y la referencia completa de variables de entorno en [`docs/operations.md`](docs/operations.md#variables-de-entorno).
+Guía completa, credenciales, día a día y solución de problemas: **[`QUICKSTART.md`](QUICKSTART.md)**.
+Instalación en Kubernetes y referencia de variables: [`docs/operations.md`](docs/operations.md).
 
 ---
 

@@ -36,42 +36,49 @@ Guía completa para **configurar, desplegar, verificar y operar** Sytue Suite en
 
 <a id="11-bootstrap-inicial-una-sola-vez-por-estacion--por-entorno"></a>
 
-### 1.1 Despliegue guiado paso a paso con `./sytue-deploy`
+### 1.1 Instalación guiada con `./sytue-deploy`
 
-La forma recomendada de configurar cualquier entorno por primera vez es ejecutar el asistente interactivo incluido en la raíz del repositorio:
+La forma recomendada de instalar la suite es el asistente de la raíz del repositorio
+(guía de usuario: [`QUICKSTART.md`](../QUICKSTART.md)):
 
 ```bash
-./sytue-deploy
-# o equivalente con Make:
-make deploy
+./sytue-deploy          # o: make deploy
 ```
 
-El asistente guía paso a paso por 5 etapas:
+**Modo local (Docker Compose, recomendado).** Cinco pasos, todos con un valor por defecto
+que basta aceptar con Enter:
 
-1. **Modo de despliegue**: elección entre **Docker Compose** (`compose`) o **Kubernetes / Helm** (`helm`).
-2. **Topología y servicios**:
-   - En **Docker Compose**: dominio base (por defecto `sytue.localhost`) y perfil de servicios:
-     - `full`: toda la suite (16 servicios Go + 22 frontends web + infraestructura).
-     - `office`: núcleo + Drive, Docs/Sheets/Slides/CertiPDF, Mail, Calendar, Contacts, Portal y Console.
-     - `core`: solo el núcleo (Traefik, PostgreSQL, MinIO, Dragonfly, Sytue ID, Sytue Hub, Portal y Console).
-     - `custom`: selección a medida (por ejemplo `mail,drive,docs,rooms,portal`).
-   - En **Kubernetes / Helm**: dominio raíz (p. ej. `suite.miempresa.eu`), namespace de Kubernetes, correo para ACME/Let's Encrypt, endpoint de PostgreSQL y credenciales de Object Storage S3.
-3. **Organización y administrador inicial**: slug de la primera organización (p. ej. `acme`), correo del administrador y contraseña (introducida manualmente o autogenerada con alta entropía), más configuración opcional de **Sytue AI**.
-4. **Generación automática de secretos criptográficos**:
-   - Crea contraseñas únicas de 192 bits (`openssl rand -hex 24`) para el superusuario de PostgreSQL y para cada una de las **17 bases de datos de servicio** (`id`, `drive`, `docs`, `mail`, `calendar`, `contacts`, `syerp`, `notes`, `photos`, `cast`, `pages`, `bases`, `rooms`, `hub`, `integrations`, `cloud`, `analytics`), además del rol `authenticator` de PostgREST y MinIO.
-   - Genera claves AES-256-GCM de 32 bytes en Base64 (`openssl rand -base64 32`) para el cifrado en reposo de secretos en Cloud (`CLOUD_SECRET_ENC_KEY`), Docs (`DOCS_SECRET_ENC_KEY`), ERP (`SYERP_SECRET_ENC_KEY`), Integrations (`INTEGRATIONS_KEY_ENCRYPTION_KEY`) y la sal diaria de Analytics (`SYTUE_ANALYTICS_KEY_ENCRYPTION_KEY`).
-   - Genera secretos de 256 bits (`openssl rand -hex 32`) para las cookies de sesión BFF (`SYTUE_SESSION_SECRET`), clientes OIDC (`SYTUE_DEV_CLIENT_SECRET`), comunicación interna entre microservicios (`ID_INTERNAL_SECRET`, `ROOMS_INTERNAL_SECRET`, `CAST_INTERNAL_SECRET`, `CAST_MEDIA_SIGNING_KEY`) y LiveKit (`LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`), sincronizando además `deploy/compose/livekit/livekit.yaml`.
-   - Escribe `deploy/compose/.env` (modo Compose) o `deploy/helm/values-custom.yaml` + `deploy/helm/apply-secrets.sh` (modo Helm) con permisos restringidos (`0600` / `0700`).
-5. **Puesta en marcha**: verifica las herramientas instaladas, ofrece emitir los certificados locales con `mkcert` y lanza el despliegue si el operador lo confirma.
+1. **Dónde instalar**: este equipo con Docker (`compose`) o un clúster (`helm`).
+2. **Requisitos**: Docker en marcha, Compose v2, memoria asignada a Docker (aviso por debajo
+   de 8 GB con la suite completa), `mkcert` y puertos 80/443 libres. Si falta algo explica
+   cómo instalarlo y se detiene sin escribir nada.
+3. **Servicios** (`COMPOSE_PROFILES`): `full` (todo), `office` (Drive, Docus/Calcus/Diapos/
+   CertiPDF, Mail, Calendar, Contacts, portal y consola), `core` (identidad, portal y
+   consola) o una lista a medida (`mail,drive,docs,rooms`).
+4. **Configuración y secretos**: contraseña del administrador (Enter = aleatoria), Sytue AI
+   opcional y `deploy/compose/.env` con valores únicos generados con `openssl rand`: las 17
+   bases de datos, claves AES-256, secretos OIDC/HMAC, MinIO, LiveKit y PostgREST. Si el
+   `.env` ya existe **se reutiliza** (sus contraseñas ya están en el volumen de PostgreSQL) y
+   solo se completan las variables que falten de versiones anteriores.
+5. **Construcción y arranque**: certificado `mkcert` para `*.sytue.localhost`, `docker compose
+   build` + `up -d`, alta del administrador en Sytue ID (`id seed` con la contraseña del
+   `.env`), espera a que todos los contenedores estén `healthy` y verificación de extremo a
+   extremo con `scripts/e2e/smoke.sh` (resultado en `deploy/compose/.verificacion.log`).
 
-También puede ejecutarse de forma no interactiva en pipelines o scripts automatizados:
+El entorno Compose vive siempre en `*.sytue.localhost` (los hosts están fijados en el
+`docker-compose.yml`, en Traefik y en los clientes OIDC sembrados). Cuentas creadas:
+`admin@sytue.localhost` (rol admin, TOTP de desarrollo `JBSWY3DPEHPK3PXP`) y
+`member@sytue.localhost` (rol miembro, sin segundo factor), ambas en la organización `acme`.
+
+Opciones útiles:
 
 ```bash
-# Generar configuración completa para Docker Compose sin preguntas:
-./sytue-deploy --mode compose --profile full --non-interactive --only-config
-
-# Generar overlay y script de secretos para Kubernetes/Helm:
-./sytue-deploy --mode helm --domain suite.ejemplo.eu --namespace sytue-prod --non-interactive --only-config
+./sytue-deploy --yes                       # sin preguntas, suite completa
+./sytue-deploy --yes --profile office      # sin preguntas, versión ligera
+./sytue-deploy --only-config               # solo genera deploy/compose/.env
+./sytue-deploy --reset                     # BORRA los datos locales y reinstala
+./sytue-deploy --admin-password '…'        # fija la contraseña (también SYTUE_ADMIN_PASSWORD)
+./sytue-deploy --help                      # todas las opciones
 ```
 
 ---
@@ -87,13 +94,8 @@ Ninguna variable tiene secretos predefinidos en el repositorio. A continuación 
 | Variable | Descripción | Cómo se genera / Ejemplo |
 | --- | --- | --- |
 | `COMPOSE_PROFILES` | Perfiles de Docker Compose a levantar además del núcleo (`full`, o lista separada por comas: `mail,drive,docs,rooms,portal,console`). | `full` |
-| `SYTUE_DOMAIN` | Dominio base del despliegue. | `sytue.localhost` (local) o `ejemplo.eu` (prod) |
-| `SYTUE_ADMIN_EMAIL` | Correo del propietario/administrador inicial. | `admin@sytue.localhost` |
-| `SYTUE_ORG_SLUG` | Identificador (slug) de la organización inicial. | `acme` |
-| `SYTUE_ID_DEV_SEED_PASSWORD` | Contraseña del administrador para `make dev-seed` en entorno `dev`. | Generada por `./sytue-deploy` |
-| `SYTUE_ID_BOOTSTRAP_EMAIL` | Correo del propietario inicial para el comando `id bootstrap-owner` en producción. | `admin@ejemplo.eu` |
-| `SYTUE_ID_BOOTSTRAP_ORG_SLUG` | Slug de la organización inicial en producción (`id bootstrap-owner`). | `acme` |
-| `SYTUE_ID_BOOTSTRAP_PASSWORD` | Contraseña inicial (mínimo 12 caracteres) para `id bootstrap-owner`. | Generada por `./sytue-deploy` |
+| `SYTUE_ID_DEV_SEED_PASSWORD` | Contraseña de `admin@sytue.localhost` y `member@sytue.localhost` (Compose). La aplican `./sytue-deploy` y `make dev-seed`. | Elegida en el asistente o `Sytue-<hex>!` aleatoria |
+| `SYTUE_ID_BOOTSTRAP_EMAIL` · `SYTUE_ID_BOOTSTRAP_ORG_SLUG` · `SYTUE_ID_BOOTSTRAP_PASSWORD` | Propietario inicial en Kubernetes (`id bootstrap-owner`, lanzado por `deploy/helm/bootstrap-admin.sh`). | Pedidos por el asistente en modo Helm |
 
 #### Variables de bases de datos PostgreSQL (aislamiento por servicio)
 
@@ -146,61 +148,64 @@ Cada microservicio Go dispone de su propia base de datos y rol de PostgreSQL ini
 
 ### 1.2 Despliegue con Docker Compose
 
-Una vez generado `deploy/compose/.env` con `./sytue-deploy`:
+`./sytue-deploy` hace todo lo de esta sección. Para operar la suite después:
 
-```bash
-# Levantar los servicios configurados en COMPOSE_PROFILES (con generación de certificados mkcert):
-make dev-up
-
-# Crear la organización inicial y el usuario administrador en Sytue ID:
-make dev-seed
-
-# (Opcional) Levantar únicamente perfiles concretos para ahorrar memoria RAM:
-make dev-app P=docs,mail,portal
-
-# (Opcional) Levantar la suite con los frontends precompilados (menor consumo de RAM):
-make dev-up-built
-```
-
-Comandos de gestión:
-
-- `make dev-ps`: muestra el estado y salud (`healthy`) de cada contenedor.
-- `make dev-logs SVC=id`: sigue los logs de un servicio específico.
-- `make dev-down`: detiene los contenedores conservando los volúmenes de datos.
-- `make dev-clean`: detiene los contenedores y elimina todos los volúmenes locales.
+| Comando | Qué hace |
+| --- | --- |
+| `make dev-up` | Construye lo que haya cambiado y arranca los perfiles de `COMPOSE_PROFILES` (si no hay `.env`, lo genera el asistente). |
+| `make dev-seed` | Crea o reafirma las cuentas de desarrollo con la contraseña de `SYTUE_ID_DEV_SEED_PASSWORD`. Idempotente. |
+| `make dev-app P=docs,mail` | Solo el núcleo y los perfiles indicados. |
+| `make dev-up-built` | Frontends compilados (menos memoria, sin recarga en caliente). |
+| `make dev-ps` · `make dev-logs SVC=id` | Estado y logs. |
+| `make dev-down` | Para los contenedores conservando los datos. |
+| `make dev-clean` / `./sytue-deploy --reset` | Borra los volúmenes (el segundo además regenera los secretos y reinstala). |
+| `scripts/e2e/smoke.sh` | Verificación de extremo a extremo. |
 
 ---
 
 <a id="13-prod-en-scaleway-terraform--helm"></a>
 
-### 1.3 Despliegue en Kubernetes con Helm
+### 1.3 Despliegue en Kubernetes con Helm (avanzado)
 
-Para desplegar en cualquier clúster de Kubernetes (k3s, Kapsule o clúster gestionado):
+El chart `deploy/helm/sytue-one` no despliega PostgreSQL ni S3 y descarga las imágenes de
+`global.imageRegistry`. El asistente prepara todo lo demás:
 
-1. **Generar los secretos y el overlay de valores**:
-   ```bash
-   ./sytue-deploy --mode helm --domain suite.miempresa.eu --namespace sytue-prod --only-config
-   ```
-2. **Aplicar los Secrets en el clúster**:
-   ```bash
-   bash deploy/helm/apply-secrets.sh
-   ```
-3. **Preparar las dependencias vendorizadas del chart y desplegar con Helm**:
-   ```bash
-   make helm-vendor-prepare
-   HELM_REPOSITORY_CONFIG="deploy/helm/.vendor/no-repositories.yaml" \
-   HELM_REPOSITORY_CACHE="deploy/helm/.vendor/repository-cache" \
-     helm dependency build deploy/helm/sytue-one
+```bash
+./sytue-deploy --mode helm --domain suite.miempresa.eu
+```
 
-   helm upgrade --install sytue-one deploy/helm/sytue-one \
-     --namespace sytue-prod --create-namespace \
-     -f deploy/helm/sytue-one/values.yaml \
-     -f deploy/helm/values-custom.yaml
-   ```
-4. **Dar de alta el propietario inicial y reconciliar los secretos OIDC en Sytue ID**:
-   ```bash
-   kubectl -n sytue-prod exec deploy/sytue-one-id -- /app/id bootstrap-owner
-   ```
+Genera en `deploy/helm/` (Git los ignora; contienen secretos):
+
+| Fichero | Para qué |
+| --- | --- |
+| `values-custom.yaml` | Dominio, registro, PostgreSQL, S3, ACME, `livekit.webhook.apiKey` y CIDR del balanceador. |
+| `apply-secrets.sh` | Todos los Secrets que referencia el chart: DSN de las 17 bases, S3, claves de cifrado, LiveKit, cookies y **un secreto OIDC por app web** (el mismo en `sytue-frontend-bff` y en `sytue-id-client-secrets`, que Sytue ID reconcilia al arrancar). |
+| `create-databases.sh` | Un rol y una base por servicio en tu PostgreSQL (idempotente). |
+| `bootstrap-admin.sh` | Job de una ejecución que crea el propietario inicial (`id bootstrap-owner`). |
+| `apply-integrations.sh` · `values-integrations.yaml` | Base del Integration Gateway y apps OAuth (§ integraciones del README). |
+
+Y después, en orden:
+
+```bash
+docker login <registro>
+bash deploy/helm/publicar-imagenes.sh <registro> suite.miempresa.eu   # construye y sube 42 imágenes
+PGUSER=postgres PGPASSWORD=… bash deploy/helm/create-databases.sh
+bash deploy/helm/apply-secrets.sh && bash deploy/helm/apply-integrations.sh
+bash scripts/prepare-helm-vendor.sh
+HELM_REPOSITORY_CONFIG=deploy/helm/.vendor/no-repositories.yaml \
+HELM_REPOSITORY_CACHE=deploy/helm/.vendor/repository-cache \
+  helm dependency build deploy/helm/sytue-one
+helm upgrade --install sytue-one deploy/helm/sytue-one -n sytue-prod --create-namespace \
+  -f deploy/helm/sytue-one/values.yaml -f deploy/helm/values-custom.yaml \
+  -f deploy/helm/values-integrations.yaml
+bash deploy/helm/bootstrap-admin.sh
+```
+
+El propietario entra en `https://id.<dominio>/account` y activa su segundo factor: hasta
+entonces el rol `owner` mantiene cerrada Sytue Admin. El correo (SMTP/IMAP) usa el Secret
+`tls-wildcard-sytue-eu`; si no existe, `apply-secrets.sh` crea uno autofirmado para que
+Mail arranque: sustitúyelo por el certificado comodín de tu dominio. La imagen de
+Dragonfly (`ghcr.io/thinkddr/upstream-dragonfly`) no la construye `publicar-imagenes.sh`.
 
 ---
 

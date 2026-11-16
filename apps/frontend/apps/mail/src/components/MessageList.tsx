@@ -396,11 +396,14 @@ export function MessageList({
           ) : null}
         </form>
         {/* Filtros rápidos: conmutadores (`aria-pressed`), uno a la vez; pulsar el
-            activo vuelve a «todas». Filtran lo ya cargado, sin otra consulta. */}
+            activo vuelve a «todas». Filtran lo ya cargado, sin otra consulta.
+            `flex-wrap`: en alemán («Mit Anhängen», «Ungelesen»…) no caben en la
+            columna estrecha de la lista de una tableta, y el panel los recortaba
+            sin forma de llegar al último (barrido móvil de producción, iPad Mini). */}
         <div
           role="group"
           aria-label={t('filter.group')}
-          class="border-border flex items-center gap-1 border-b px-4 py-1.5"
+          class="border-border flex flex-wrap items-center gap-1 border-b px-4 py-1.5"
         >
           {FILTROS_RAPIDOS.filter((f) => f !== 'todas').map((f) => {
             const activo = filtro === f;

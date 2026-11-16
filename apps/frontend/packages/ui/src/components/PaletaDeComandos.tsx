@@ -9,8 +9,14 @@
  *
  * Es la misma capa que un diálogo (`Modal`): el mismo velo, la superficie del panel, el
  * radio de tarjeta de la forma y la sombra `xl`. No usa `Modal` porque su cabecera es el
- * CAMPO —no un título con aspa— y el foco no sale de él: las flechas mueven la opción
- * activa y Tab no tiene adónde ir.
+ * CAMPO —no un título con aspa— y el foco vive en él: las flechas mueven la opción
+ * activa, y las opciones no son paradas del Tab (patrón APG del combobox).
+ *
+ * Tab solo va del campo a los controles del `aviso` y vuelta, en círculo (Mayús+Tab al
+ * revés): es la única forma de llegar con el teclado al «Buscar las palabras exactas» de
+ * la banda de la IA sin sacar el foco del diálogo. Sin controles en el aviso, Tab se
+ * queda en el campo. Si el control enfocado desaparece (la banda se va al pulsarlo), el
+ * foco vuelve al campo.
  *
  * - **Escritorio** (≥ 768): tarjeta de 560 alineada arriba (a 12 dvh), como la de Cloud.
  * - **Teléfono**: la HOJA de los diálogos a toda la altura disponible —con el aire de
@@ -83,7 +89,24 @@ export function PaletaDeComandos<O extends OpcionDePaleta>({
 }: PaletaDeComandosProps<O>): JSX.Element | null {
   const t = useT();
   const campo = useRef<HTMLInputElement>(null);
+  const avisoRef = useRef<HTMLDivElement>(null);
   const previoRef = useRef<HTMLElement | null>(null);
+
+  /** Tab y Mayús+Tab: del campo a los controles del aviso y vuelta, sin salir. */
+  function tabular(e: KeyboardEvent): void {
+    e.preventDefault();
+    const paradas: HTMLElement[] = campo.current ? [campo.current] : [];
+    avisoRef.current
+      ?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )
+      .forEach((el) => paradas.push(el));
+    if (paradas.length < 2) return;
+    const n = paradas.indexOf(document.activeElement as HTMLElement);
+    const d = e.shiftKey ? -1 : 1;
+    paradas[((((n < 0 ? 0 : n) + d) % paradas.length) + paradas.length) % paradas.length]?.focus();
+  }
+
   const base = useId();
   const lista = `${base}-lista`;
   const [activa, setActiva] = useState(0);
@@ -123,6 +146,45 @@ export function PaletaDeComandos<O extends OpcionDePaleta>({
     if (idActiva) document.getElementById(idActiva)?.scrollIntoView({ block: 'nearest' });
   }, [idActiva]);
 
+  // Tras cada pintado: si el foco se ha quedado en el limbo —el control del aviso que lo
+  // tenía ya no está—, vuelve al campo. Solo desde el `body` (o un nodo ya fuera del
+  // documento): si está en otro sitio, es que alguien lo ha llevado allí a propósito.
+  const recogerFoco = (): void => {
+    const a = document.activeElement;
+    if (a === null || a === document.body || !a.isConnected) {
+      campo.current?.focus({ preventScroll: true });
+    }
+  };
+  useEffect(() => {
+    if (open) recogerFoco();
+  });
+
+  // Las teclas que llegan desde los controles del aviso: Tab sigue el círculo y Escape
+  // cierra, como desde el campo. Oyente nativo: el envoltorio no es un control. Y como
+  // el aviso se repinta solo (la banda se quita a sí misma), también se vigila que no
+  // se lleve el foco consigo. Sin dependencias: se vuelve a poner en cada pintado, con
+  // el `onClose` de ese pintado. De maquetación y no `useEffect`: este corre tras el
+  // pintado, y una Tab pulsada en ese hueco salía del diálogo.
+  useLayoutEffect(() => {
+    const zona = avisoRef.current;
+    if (!open || !zona) return;
+    const alPulsar = (e: KeyboardEvent): void => {
+      if (e.key === 'Tab') tabular(e);
+      else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    zona.addEventListener('keydown', alPulsar);
+    const vigia = new MutationObserver(recogerFoco);
+    vigia.observe(zona, { childList: true, subtree: true });
+    return () => {
+      zona.removeEventListener('keydown', alPulsar);
+      vigia.disconnect();
+    };
+  });
+
   if (!open || typeof document === 'undefined') return null;
 
   const mover = (d: number) =>
@@ -159,9 +221,10 @@ export function PaletaDeComandos<O extends OpcionDePaleta>({
         e.stopPropagation();
         onClose();
         break;
-      // Solo el campo es enfocable: Tab se queda en el diálogo.
+      // Las opciones no son paradas: Tab va a los controles del aviso, si los hay, y
+      // nunca sale del diálogo.
       case 'Tab':
-        e.preventDefault();
+        tabular(e);
         break;
     }
   };
@@ -224,7 +287,11 @@ export function PaletaDeComandos<O extends OpcionDePaleta>({
             {t('ui.cancel')}
           </Button>
         </div>
-        {aviso ? <div class="shrink-0">{aviso}</div> : null}
+        {aviso ? (
+          <div ref={avisoRef} class="shrink-0">
+            {aviso}
+          </div>
+        ) : null}
         <ul
           id={lista}
           role="listbox"

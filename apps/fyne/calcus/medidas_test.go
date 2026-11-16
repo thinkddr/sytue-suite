@@ -15,6 +15,7 @@ import (
 	"fyne.io/fyne/v2/test"
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/tokens"
 	"git.sytue.eu/sytue/one/apps/nucleo/webref"
 )
@@ -117,7 +118,7 @@ func TestLasClasesDeLaRejillaSiguenSiendoLasMismas(t *testing.T) {
 		{"w-[40px] cursor-cell", "la cabecera de fila mide `HEAD_W`"},
 		{"sytue-grid-head-hl", "el realce de la cabecera dentro del rango"},
 		{"flex h-8 shrink-0 items-center gap-2 border-b px-2", "la barra de fórmulas: `h-8`, `gap-2`, `px-2`"},
-		{"h-6 w-24 shrink-0 items-center rounded-sm border text-xs font-medium tabular-nums", "el cuadro de nombres: `w-24` y `text-xs`"},
+		{"h-6 w-16 shrink-0 items-center rounded-sm border text-xs font-medium tabular-nums sm:w-24", "el cuadro de nombres: `w-16 sm:w-24` y `text-xs`"},
 		{"h-5 w-full min-w-0 rounded-sm bg-transparent px-1 text-sm", "el campo de la fórmula"},
 		{"flex shrink-0 items-start gap-2 border-b px-2 py-1", "la barra desplegada: `items-start py-1`"},
 		{"'mt-0.5 items-start'", "el campo desplegado baja `mt-0.5`"},
@@ -231,7 +232,8 @@ func TestLasMedidasEnRemSalenDelRemDe16(t *testing.T) {
 	}{
 		{"px-1 de la celda", MargenCelda, 4},
 		{"h-8 de la barra", AltoBarra, 32},
-		{"w-24 del cuadro de nombres", AnchoRef, 96},
+		{"sm:w-24 del cuadro de nombres", AnchoRef, 96},
+		{"w-16 del cuadro de nombres en pantalla estrecha", AnchoRefEstrecho, 64},
 		{"px-2 de la barra", MargenBarra, 8},
 		{"h-5 del campo", AltoEntradaFx, 20},
 	} {
@@ -273,4 +275,22 @@ func hexCSS(t *testing.T, hoja, nombre string) color.NRGBA {
 		t.Fatal(err)
 	}
 	return color.NRGBA{R: uint8(v >> 16), G: uint8(v >> 8), B: uint8(v), A: 0xff}
+}
+
+// TestElCuadroDeNombresEsEstrechoBajoSM: `w-16 sm:w-24` (49dc52f726). A 320 px el de
+// 96 dejaba el campo de la fórmula por debajo del objetivo táctil de 44 px.
+func TestElCuadroDeNombresEsEstrechoBajoSM(t *testing.T) {
+	for _, c := range []struct {
+		ventana, quiero float32
+	}{
+		{0, AnchoRef},
+		{320, AnchoRefEstrecho},
+		{ui.CorteSM - 1, AnchoRefEstrecho},
+		{ui.CorteSM, AnchoRef},
+		{1280, AnchoRef},
+	} {
+		if got := anchoCuadroNombres(c.ventana); got != c.quiero {
+			t.Errorf("con la ventana a %v el cuadro mide %v, y debe medir %v", c.ventana, got, c.quiero)
+		}
+	}
 }

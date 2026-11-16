@@ -5,7 +5,8 @@
  */
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { expect, test } from 'bun:test';
-import { render } from 'preact';
+import { render, type ComponentChildren, type JSX } from 'preact';
+import { useState } from 'preact/hooks';
 import { PaletaDeComandos, type OpcionDePaleta } from './PaletaDeComandos.js';
 
 if (typeof document === 'undefined') GlobalRegistrator.register();
@@ -20,6 +21,7 @@ function montar(extra: {
   onElegir?: (o: OpcionDePaleta) => void;
   onClose?: () => void;
   opciones?: OpcionDePaleta[];
+  aviso?: ComponentChildren;
 }) {
   const host = document.body.appendChild(document.createElement('div'));
   render(
@@ -36,6 +38,7 @@ function montar(extra: {
       opciones={extra.opciones ?? OPCIONES}
       onElegir={extra.onElegir ?? (() => {})}
       pie={<span>atajos</span>}
+      aviso={extra.aviso}
     />,
     host,
   );
@@ -47,9 +50,9 @@ function montar(extra: {
 }
 
 /** Pulsa la tecla en lo enfocado y espera a que Preact repinte. */
-const tecla = async (key: string): Promise<void> => {
+const tecla = async (key: string, shiftKey = false): Promise<void> => {
   document.activeElement!.dispatchEvent(
-    new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
+    new KeyboardEvent('keydown', { key, shiftKey, bubbles: true, cancelable: true }),
   );
   await new Promise((r) => setTimeout(r, 20));
 };
@@ -128,6 +131,49 @@ test('Intro durante composición IME (isComposing o keyCode 229) no ejecuta el c
     Object.defineProperty(safariIme, 'keyCode', { value: 229 });
     campo.dispatchEvent(safariIme);
     expect(elegida).toBe('');
+  } finally {
+    quitar();
+  }
+});
+
+/** La banda de la IA en pequeño: un aviso con su botón, que se va al pulsarlo. */
+function Banda(): JSX.Element | null {
+  const [visible, setVisible] = useState(true);
+  if (!visible) return null;
+  return (
+    <div role="status">
+      Entendido como… <button onClick={() => setVisible(false)}>Buscar las palabras exactas</button>
+    </div>
+  );
+}
+
+// Visto en ROJO: con `Tab` siempre en `preventDefault`, el botón del aviso no se
+// alcanzaba con el teclado (el foco no salía del campo).
+test('Tab va del campo al botón del aviso y vuelve, sin salir; Escape cierra desde él', async () => {
+  let cierres = 0;
+  const quitar = montar({ onClose: () => cierres++, aviso: <Banda /> });
+  try {
+    const campo = document.activeElement as HTMLInputElement;
+    const boton = document.querySelector('[role="status"] button') as HTMLButtonElement;
+    await tecla('Tab');
+    expect(document.activeElement).toBe(boton);
+    await tecla('Tab'); // da la vuelta al campo
+    expect(document.activeElement).toBe(campo);
+    await tecla('Tab', true); // Mayús+Tab, al revés: del campo al último del aviso
+    expect(document.activeElement).toBe(boton);
+    // Desde el botón, las flechas no son suyas, pero Escape sí cierra la paleta.
+    await tecla('Escape');
+    expect(cierres).toBe(1);
+    // Intro lo pulsa (el `click` nativo): la banda se va y el foco vuelve al campo.
+    boton.click();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(document.querySelector('[role="status"]')).toBeNull();
+    expect(document.activeElement).toBe(campo);
+    // Sin controles en el aviso, Tab se queda en el campo.
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    campo.dispatchEvent(tab);
+    expect(tab.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(campo);
   } finally {
     quitar();
   }

@@ -335,6 +335,41 @@ func abrirPaletaEn(t *testing.T, tam fyne.Size, fondo fyne.CanvasObject) (*Palet
 	return p, w
 }
 
+// TestLasFilasDeLaPaletaNoSonParadasDelTab: como en la web (`<li role="option">` sin
+// foco, patrón APG del combobox), Tab y Mayús+Tab no sacan el foco del campo, las
+// flechas siguen moviendo el resaltado y la fila se sigue pulsando con el ratón.
+//
+// VISTO EN ROJO: sin `opcionPaleta.Disabled`, el Tab llevaba el foco a la primera fila
+// y las flechas dejaban de mover el resaltado.
+func TestLasFilasDeLaPaletaNoSonParadasDelTab(t *testing.T) {
+	p, w := abrirPaletaEn(t, fyne.NewSize(1280, 800), canvas.NewRectangle(tema.Color("bg", tema.Claro)))
+	c := w.Canvas()
+	if len(p.Opciones()) < 2 || p.disp.lista == nil {
+		t.Fatal("la paleta de prueba no tiene filas")
+	}
+	// El campo es una `Entrada` con su editor dentro, y Fyne los cuenta como dos
+	// paradas: las dos son «el campo». Tres Tab y tres Mayús+Tab recorren de sobra.
+	enCampo := func() bool {
+		f := c.Focused()
+		return f == p.Campo() || f == fyne.Focusable(p.campo.editor)
+	}
+	for _, mover := range []func(){c.FocusNext, c.FocusNext, c.FocusNext, c.FocusPrevious, c.FocusPrevious, c.FocusPrevious} {
+		mover()
+		if !enCampo() {
+			t.Fatalf("el Tab lleva el foco a %T y no lo deja en el campo", c.Focused())
+		}
+	}
+	c.Focused().TypedKey(&fyne.KeyEvent{Name: fyne.KeyDown})
+	if p.Cursor() != 1 {
+		t.Errorf("tras el Tab, la flecha abajo deja el resaltado en %d", p.Cursor())
+	}
+	elegida := p.disp.lista.filas[0]
+	test.Tap(elegida)
+	if p.Abierta() {
+		t.Error("la fila apartada del Tab ya no se pulsa con el ratón")
+	}
+}
+
 // TestLaPaletaSeColocaComoEnChromium: a 1280×800 el panel va en (360, 96) con 560 de
 // ancho, el velo atenúa lo de detrás y el pie lleva las teclas; a 390×844 es la hoja,
 // desde 40 y a todo el ancho, con «Cancelar» y sin pie.
@@ -453,6 +488,8 @@ func TestElContratoDeLaPaletaEsElDeLaWeb(t *testing.T) {
 		{comandos, "PaletaDeComandos.tsx", "case 'Home':", "Inicio va a la primera"},
 		{comandos, "PaletaDeComandos.tsx", "case 'End':", "Fin va a la última"},
 		{comandos, "PaletaDeComandos.tsx", "border-t px-4 py-2 max-md:hidden", "el pie, solo en escritorio"},
+		{comandos, "PaletaDeComandos.tsx", "la opción no es enfocable", "las filas no son paradas del Tab (opcionPaleta.Disabled)"},
+		{comandos, "PaletaDeComandos.tsx", "case 'Tab':\n        tabular(e);", "Tab no sale del diálogo: del campo solo va a los controles del aviso, que aquí no hay"},
 	} {
 		if !strings.Contains(c.fuente, c.trozo) {
 			t.Errorf("%s ya no dice %q (%s)", c.nombre, c.trozo, c.porque)

@@ -83,6 +83,10 @@ type RayaEsqueleto struct {
 	// Cola es un bloque a la derecha EN LA MISMA LÍNEA, centrado con la raya: la meta de
 	// la fila de Mail (`justify-between gap-3`). La raya encoge antes que pisarla.
 	Cola fyne.Size
+	// Radio es el `rounded-*` de la raya; cero es el `rounded-md` de Skeleton.tsx. Una
+	// raya a todo el alto de la fila hace de fila entera: los cuadernos del menú de
+	// Notes son `radius-nav`, como el destino que van a ser.
+	Radio float32
 }
 
 // RecetaEsqueleto es la geometría de las filas de una lista que no es la de `ListItem`:
@@ -159,9 +163,55 @@ type FilasEsqueleto struct {
 	// menú es `sidebar-hover-bg` (SobreCromo), como el Esqueleto suelto.
 	Tinte string
 
+	latidoEsqueleto
+}
+
+// latidoEsqueleto es el ÚNICO latido de un grupo de bloques de carga: una animación que
+// lleva la fase y tiñe todos sus rectángulos a la vez. Lo comparten FilasEsqueleto y
+// BloquesEsqueleto.
+type latidoEsqueleto struct {
 	mu   sync.Mutex
 	fase float32
 	anim *fyne.Animation
+}
+
+// latir lanza el latido; `tenir` repinta los bloques en cada fotograma. Con «menos
+// movimiento» no late: los bloques se quedan opacos, como el Esqueleto suelto.
+func (l *latidoEsqueleto) latir(tenir func()) {
+	if MenosMovimiento() {
+		return
+	}
+	a := fyne.NewAnimation(DuracionPulso, func(p float32) {
+		l.mu.Lock()
+		l.fase = p
+		l.mu.Unlock()
+		tenir()
+	})
+	a.Curve = fyne.AnimationLinear
+	a.RepeatCount = fyne.AnimationRepeatForever
+	l.mu.Lock()
+	l.anim = a
+	l.mu.Unlock()
+	a.Start()
+}
+
+// Parar detiene el latido. Lo llama el renderer al destruirse.
+func (l *latidoEsqueleto) Parar() {
+	l.mu.Lock()
+	a := l.anim
+	l.anim = nil
+	l.mu.Unlock()
+	if a != nil {
+		a.Stop()
+	}
+}
+
+// tinta es el relleno de los bloques en el instante del latido.
+func (l *latidoEsqueleto) tinta(tinte string) color.NRGBA {
+	l.mu.Lock()
+	fase := l.fase
+	l.mu.Unlock()
+	return tintaEsqueleto(tinte, fase)
 }
 
 var (
@@ -261,40 +311,9 @@ func (f *FilasEsqueleto) CreateRenderer() fyne.WidgetRenderer {
 		}
 		r.filas = append(r.filas, fila)
 	}
-	f.arrancar(r)
+	f.latir(r.tenir)
 	r.Refresh()
 	return r
-}
-
-// arrancar lanza el único latido. Con «menos movimiento» los bloques se quedan opacos,
-// como el Esqueleto suelto.
-func (f *FilasEsqueleto) arrancar(r *filasEsqueletoRenderer) {
-	if MenosMovimiento() {
-		return
-	}
-	a := fyne.NewAnimation(DuracionPulso, func(p float32) {
-		f.mu.Lock()
-		f.fase = p
-		f.mu.Unlock()
-		r.tenir()
-	})
-	a.Curve = fyne.AnimationLinear
-	a.RepeatCount = fyne.AnimationRepeatForever
-	f.mu.Lock()
-	f.anim = a
-	f.mu.Unlock()
-	a.Start()
-}
-
-// Parar detiene el latido. Lo llama el renderer al destruirse.
-func (f *FilasEsqueleto) Parar() {
-	f.mu.Lock()
-	a := f.anim
-	f.anim = nil
-	f.mu.Unlock()
-	if a != nil {
-		a.Stop()
-	}
 }
 
 type filasEsqueletoRenderer struct {
@@ -433,6 +452,9 @@ func (r *filasEsqueletoRenderer) layoutReceta(t fyne.Size) {
 			}
 			ponerBloque(fila.rayas[j], x, ty, ancho, l.Alto)
 			fila.rayas[j].CornerRadius = tema.RadioMD
+			if l.Radio > 0 {
+				fila.rayas[j].CornerRadius = l.Radio
+			}
 			ty += l.Alto + rc.HuecoRayas
 		}
 	}
@@ -470,10 +492,7 @@ func (r *filasEsqueletoRenderer) colocarMeta(fila filaEsq, der float32, centro f
 
 // tenir pinta todos los bloques con el instante del latido.
 func (r *filasEsqueletoRenderer) tenir() {
-	r.f.mu.Lock()
-	fase := r.f.fase
-	r.f.mu.Unlock()
-	c := tintaEsqueleto(r.f.Tinte, fase)
+	c := r.f.tinta(r.f.Tinte)
 	for _, b := range r.bloques {
 		b.FillColor = c
 		b.Refresh()

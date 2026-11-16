@@ -524,7 +524,8 @@ func (p *PaletaDeLaSuite) Mover(d int) {
 
 // Teclear son las teclas del campo: las flechas recorren, Inicio y Fin van a los
 // extremos, Intro abre lo resaltado, Escape (o «atrás») cierra y Tab no tiene adónde
-// ir. Devuelve si se quedó la tecla; el resto es del campo.
+// ir (las filas no son paradas: `opcionPaleta.Disabled`). Devuelve si se quedó la
+// tecla; el resto es del campo.
 func (p *PaletaDeLaSuite) Teclear(k *fyne.KeyEvent) bool {
 	switch {
 	case k == nil:
@@ -873,6 +874,23 @@ func nuevaOpcionPaleta(rotulo, pista string, icono iconos.Icono, resaltada bool,
 	f.ExtendBaseWidget(f)
 	return f
 }
+
+var _ fyne.Disableable = (*opcionPaleta)(nil)
+
+// Disabled aparta la fila del recorrido del Tab, y es lo ÚNICO que aparta: se sigue
+// pulsando con el ratón o el dedo y se sigue resaltando al pasar. Es el `<li
+// role="option">` de la web, que no es enfocable: en el patrón del combobox el foco se
+// queda en el campo y las flechas mueven la opción activa (`Teclear`). Fyne no tiene
+// `tabIndex={-1}`, y su gestor de foco salta los `Disableable` inhabilitados (ver
+// `Boton.Disabled`). Con las filas como paradas, el Tab sacaba el foco del campo y las
+// flechas dejaban de mover el resaltado.
+func (f *opcionPaleta) Disabled() bool { return true }
+
+// Enable y Disable no hacen nada: la fila nunca es parada del Tab.
+func (f *opcionPaleta) Enable() {}
+
+// Disable no hace nada (ver Enable).
+func (f *opcionPaleta) Disable() {}
 
 // MouseIn mueve el cursor a esta fila además del hover de `pulsable`.
 func (f *opcionPaleta) MouseIn(e *desktop.MouseEvent) {

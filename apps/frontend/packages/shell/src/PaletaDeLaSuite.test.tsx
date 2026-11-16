@@ -275,12 +275,23 @@ test('si la búsqueda literal no encuentra nada, la paleta la entiende con IA co
   const banda = document.querySelector<HTMLElement>('[role="dialog"] [role="status"]');
   expect(banda?.textContent).toContain('Entendido como');
   expect(banda?.textContent).toContain('Drive');
-  // «Buscar las palabras exactas» vuelve a lo literal para ESTA consulta.
+  // «Buscar las palabras exactas» vuelve a lo literal para ESTA consulta. Se llega con
+  // Tab desde el campo (visto en ROJO: la paleta se comía el Tab y el botón solo se
+  // alcanzaba con el ratón), y al irse la banda el foco vuelve al campo.
   const literal = [...banda!.querySelectorAll('button')].at(-1)!;
+  const campo = document.activeElement as HTMLInputElement;
+  expect(campo.getAttribute('role')).toBe('combobox');
+  act(() => {
+    campo.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }),
+    );
+  });
+  expect(document.activeElement).toBe(literal);
   act(() => literal.click());
   await act(() => new Promise((r) => setTimeout(r, ESPERA_BUSQUEDA_MS + 20)));
   expect(pedidas.at(-1)).toBe('la factura de acme');
   expect(document.querySelector('[role="dialog"] [role="status"]')).toBeNull();
+  expect(document.activeElement).toBe(campo);
   expect(opciones()).toEqual([]);
   act(() => render(null, host));
   host.remove();

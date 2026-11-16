@@ -265,7 +265,7 @@ export function EditorHeader({ ctx }: { ctx: EditorContext }): JSX.Element {
       <input
         id="editor-title-input"
         aria-label={t('header.title.label')}
-        class="text-text hover:bg-bg-subtle focus:bg-bg-subtle sytue-focus-ring field-sizing-content h-7 max-w-[360px] min-w-24 shrink rounded-sm bg-transparent px-1.5 text-sm font-semibold transition-colors duration-150 max-md:max-w-[40vw] max-md:flex-1"
+        class="text-text hover:bg-bg-subtle focus:bg-bg-subtle sytue-focus-ring field-sizing-content h-7 max-w-[360px] min-w-24 shrink rounded-sm bg-transparent px-1.5 text-sm font-semibold transition-colors duration-150 max-md:max-w-[40vw] max-md:min-w-16 max-md:flex-1"
         value={ctx.title}
         size={Math.min(Math.max(ctx.title.length + 2, 10), 44)}
         onInput={(e) => ctx.setTitle(e.currentTarget.value)}

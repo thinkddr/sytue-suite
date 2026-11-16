@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/test"
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
@@ -119,15 +120,37 @@ func TestElArbolYElMenuCarganConFilasGrises(t *testing.T) {
 		}
 	})
 
+	// Los cuadernos del menú son UNA `ui.FilasEsqueleto` de tres filas, tintada para el
+	// cromo: un solo latido y un solo «Cargando». VISTO EN ROJO con los tres
+	// `ui.Esqueleto` sueltos de antes: «0 filas de carga y 3 esqueletos sueltos».
 	l := NuevoLateral(tr)
 	l.Fase = Cargando
-	esqueletos, _, ruedas := piezasDeCarga(l.Objeto(tema.Claro))
-	if len(esqueletos) < 3 || ruedas != 0 {
-		t.Fatalf("el menú cargando pinta %d esqueletos y %d ruedas", len(esqueletos), ruedas)
+	var menu []*ui.FilasEsqueleto
+	recorrerInterno(l.Objeto(tema.Claro), func(x fyne.CanvasObject) {
+		if f, es := x.(*ui.FilasEsqueleto); es {
+			menu = append(menu, f)
+		}
+	})
+	sueltos, filas, ruedas := piezasDeCarga(l.Objeto(tema.Claro))
+	if len(menu) != 1 || filas != 3 || len(sueltos) != 0 || ruedas != 0 {
+		t.Fatalf("el menú cargando pinta %d filas de carga en %d grupos, %d esqueletos sueltos y %d ruedas",
+			filas, len(menu), len(sueltos), ruedas)
 	}
-	for _, e := range esqueletos {
-		if e.Tinte != "sidebar-hover-bg" {
-			t.Errorf("un esqueleto del menú lleva el tinte %q: sobre el cromo es `sidebar-hover-bg`", e.Tinte)
+	if menu[0].Tinte != "sidebar-hover-bg" {
+		t.Errorf("las filas del menú llevan el tinte %q: sobre el cromo es `sidebar-hover-bg`", menu[0].Tinte)
+	}
+	// La geometría de antes, al píxel: tres filas de 2rem a todo el ancho, con el
+	// `gap-0.5` entre ellas y el radio de un destino.
+	cuadernos := esqueletoCuadernos()
+	cuadernos.Resize(fyne.NewSize(240, cuadernos.MinSize().Height))
+	if got := cuadernos.MinSize().Height; got != 3*2*tema.Rem+2*0.5*0.25*tema.Rem {
+		t.Errorf("los cuadernos de carga miden %g de alto", got)
+	}
+	for i, b := range test.WidgetRenderer(cuadernos.(fyne.Widget)).Objects() {
+		r := b.(*canvas.Rectangle)
+		y := float32(i) * (2*tema.Rem + 0.5*0.25*tema.Rem)
+		if r.Position() != fyne.NewPos(0, y) || r.Size() != fyne.NewSize(240, 2*tema.Rem) || r.CornerRadius != tema.Forma("radius-nav") {
+			t.Errorf("cuaderno %d de carga en %v, %v, radio %g", i, r.Position(), r.Size(), r.CornerRadius)
 		}
 	}
 }

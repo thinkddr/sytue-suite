@@ -18,7 +18,8 @@ import (
 // diario), tarjetas (columnas y lienzo libre) y la hoja (la nota del árbol)—, más las
 // ramas del panel del árbol y los cuadernos del menú.
 //
-// El pulso y su «menos movimiento» los pone `ui.Esqueleto`; aquí solo hay medidas.
+// El pulso y su «menos movimiento» los ponen `ui.Esqueleto` y `ui.FilasEsqueleto`; aquí
+// solo hay medidas.
 
 // FormaEsqueleto es cuál de las tres formas pinta el lienzo mientras carga.
 type FormaEsqueleto uint8
@@ -108,14 +109,13 @@ func esqueletoRamas() fyne.CanvasObject {
 // esqueletoCuadernos son los cuadernos del menú mientras se cargan: filas con la altura
 // de una fila del árbol y la forma de un destino, tintadas para el cromo oscuro (un
 // `bg-subtle` ahí sería un destello claro), como el lateral de Calendar.
+//
+// Es `ui.FilasEsqueleto` con una raya a toda la fila: un solo latido para las tres.
 func esqueletoCuadernos() fyne.CanvasObject {
-	filas := make([]fyne.CanvasObject, 3)
-	for i := range filas {
-		e := ui.NuevoEsqueleto(0, 2*tema.Rem).SobreCromo()
-		e.Radio = tema.Forma("radius-nav")
-		filas[i] = e
-	}
-	return ui.EnColumna(0.5*0.25*tema.Rem, filas...)
+	return ui.NuevasFilasEsqueleto(3, ui.SinDelantero, 1).ConReceta(ui.RecetaEsqueleto{
+		Alto: 2 * tema.Rem, Hueco: 0.5 * 0.25 * tema.Rem,
+		Rayas: []ui.RayaEsqueleto{{Alto: 2 * tema.Rem, Radio: tema.Forma("radius-nav")}},
+	}).SobreCromo()
 }
 
 // filasEsqueleto son las filas de carga (`flex h-8 items-center gap-2.5 px-2`): una

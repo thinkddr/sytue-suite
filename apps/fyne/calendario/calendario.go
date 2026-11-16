@@ -451,23 +451,25 @@ func (p *Pantalla) crearHoy() {
 
 // esqueleto es el `GridSkeleton` de la web: la GEOMETRÍA de la rejilla sin datos, para
 // que cambiar de mes no dé un salto de layout.
+//
+// Los 49 bloques son de UN `ui.BloquesEsqueleto`: laten a una y la rejilla se anuncia
+// una vez, como el `role="status"` con `loading.calendar` de la web.
 func (p *Pantalla) esqueleto() fyne.CanvasObject {
+	b := ui.NuevosBloquesEsqueleto().ConRotulo(p.t("loading.calendar", nil))
 	// La fila de nombres: siete bloques de `2rem × 0.75rem` con `px-2.5 py-2.5`.
 	cabecera := make([]fyne.CanvasObject, 0, 7)
 	for range 7 {
-		cabecera = append(cabecera, conMargenSimple(espacio2p5,
-			ui.NuevoEsqueleto(2*tema.Rem, 0.75*tema.Rem)))
+		cabecera = append(cabecera, conMargenSimple(espacio2p5, b.Bloque(2*tema.Rem, 0.75*tema.Rem)))
 	}
 	// Y 42 celdas con su círculo de `1.5rem` y su `p-1.5`, que es lo que hace que el
 	// esqueleto tenga la GEOMETRÍA de la rejilla y no haya salto de layout al cargar.
 	celdas := make([]fyne.CanvasObject, 0, 42)
 	for range 42 {
-		celdas = append(celdas, conMargenSimple(espacio1p5,
-			ui.NuevoEsqueleto(1.5*tema.Rem, 1.5*tema.Rem)))
+		celdas = append(celdas, conMargenSimple(espacio1p5, b.Bloque(1.5*tema.Rem, 1.5*tema.Rem)))
 	}
-	return container.New(&arriba{Alto: AltoDiasSemana + tema.Borde},
+	return b.Con(container.New(&arriba{Alto: AltoDiasSemana + tema.Borde},
 		container.New(Cuadricula, cabecera...),
-		container.New(ui.Rejilla{Fijas: 7}, celdas...))
+		container.New(ui.Rejilla{Fijas: 7}, celdas...)))
 }
 
 // conMargenSimple envuelve un objeto con el mismo relleno por los cuatro lados, que es

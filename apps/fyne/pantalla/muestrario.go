@@ -368,11 +368,20 @@ func seccionEsqueleto(v tema.Variante) (fyne.CanvasObject, func(fyne.Canvas)) {
 	filasConAvatar := ui.NuevasFilasEsqueleto(2, ui.DelanteroAvatar, 2)
 	filasConAvatar.Meta = []ui.MetaEsqueleto{{Ancho: 42}}
 	filasConAvatar.Filete = true
+	// Lo que no son filas: una semana de la rejilla del mes de Calendar, que late a una
+	// con un solo «Cargando».
+	rejilla := ui.NuevosBloquesEsqueleto()
+	celdas := make([]fyne.CanvasObject, 0, 7)
+	for range 7 {
+		celdas = append(celdas, container.New(ui.Margen{Izq: 4, Arr: 4, Der: 4, Abj: 4}, rejilla.Bloque(20, 20)))
+	}
+	rejilla.Con(container.New(ui.Rejilla{Fijas: 7}, celdas...))
 	return columna(tema.Espacio(4),
 		rotulo("Filas cargando"),
 		filaEsqueleto(), filaEsqueleto(),
-		rotulo("Bloque a fracción del ancho"),
-		ancho(420, columna(tema.Espacio(2), ui.NuevoEsqueletoFraccion(1, 12), ui.NuevoEsqueletoFraccion(0.6, 12))),
+		rotulo("Bloque a fracción del ancho y bloques de una rejilla (BloquesEsqueleto)"),
+		fila(ancho(420, columna(tema.Espacio(2), ui.NuevoEsqueletoFraccion(1, 12), ui.NuevoEsqueletoFraccion(0.6, 12))),
+			ancho(220, rejilla)),
 		rotulo("Filas de carga de una lista (SkeletonRows)"),
 		fila(ancho(360, filasConAvatar), ancho(300, ui.NuevasFilasEsqueleto(2, ui.DelanteroTesela, 1))),
 		rotulo("Rueda"),

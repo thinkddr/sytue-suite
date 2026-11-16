@@ -163,9 +163,12 @@ func (p *Pantalla) seccionMisCalendarios() *ui.SeccionLateral {
 	if p.CargandoCalendarios {
 		// El esqueleto del menú va TEÑIDO para el cromo oscuro: `bg-subtle` ahí sería
 		// un destello claro sobre negro, que es lo que dice el comentario de la web.
+		// Dos filas de 36 separadas por el `gap-0.5` de la sección: `ui.FilasEsqueleto`
+		// con esa receta, un solo latido y un solo «Cargando».
 		s.Filas = []fyne.CanvasObject{
-			ui.NuevoEsqueleto(0, 36).SobreCromo(),
-			ui.NuevoEsqueleto(0, 36).SobreCromo(),
+			ui.NuevasFilasEsqueleto(2, ui.SinDelantero, 1).ConReceta(ui.RecetaEsqueleto{
+				Alto: 36, Hueco: tema.Espacio(0.5), Rayas: []ui.RayaEsqueleto{{Alto: 36}},
+			}).SobreCromo(),
 		}
 		return s
 	}

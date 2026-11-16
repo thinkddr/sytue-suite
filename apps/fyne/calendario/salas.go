@@ -100,7 +100,9 @@ func (f *formulario) bloqueRecursos() fyne.CanvasObject {
 	case s.fallo:
 		return grupo(ui.NuevoParrafo(p.t("picker.error", nil), tema.TextoSM, ui.Normal, "text-subtle", v))
 	case s.lista == nil:
-		return grupo(ui.NuevoEsqueleto(0, tema.Espacio(9))) // `<Skeleton height="2.25rem" />`
+		// `<Skeleton height="2.25rem" />`: un bloque del grupo, que anuncia la carga.
+		b := ui.NuevosBloquesEsqueleto()
+		return grupo(b.Con(b.Bloque(0, tema.Espacio(9))))
 	}
 
 	porID := map[string]api.Resource{}

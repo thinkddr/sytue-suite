@@ -384,6 +384,17 @@ func (r *barraRenderer) MinSize() fyne.Size           { return r.b.MinSize() }
 func (r *barraRenderer) Objects() []fyne.CanvasObject { return r.objetos }
 func (r *barraRenderer) Destroy()                     {}
 
+// anchoVentana es el ancho del lienzo en el que vive la barra, o 0 si aún no tiene.
+func (r *barraRenderer) anchoVentana() float32 {
+	if fyne.CurrentApp() == nil {
+		return 0
+	}
+	if c := fyne.CurrentApp().Driver().CanvasForObject(r.b); c != nil {
+		return c.Size().Width
+	}
+	return 0
+}
+
 func (r *barraRenderer) Layout(t fyne.Size) {
 	defer r.ocupar()()
 	r.ultimoAncho = t.Width
@@ -402,19 +413,21 @@ func (r *barraRenderer) Layout(t fyne.Size) {
 		centro = func(float32) float32 { return MargenBarraDesplegada }
 	}
 	x := MargenBarra
-	// El rótulo va centrado en su `w-24`, y lo que no quepa en su `px-1` se corta con
-	// puntos (`truncate`); el editor del cuadro ocupa la misma caja.
+	// El rótulo va centrado en su `w-24` (`w-16` por debajo de `sm`), y lo que no quepa
+	// en su `px-1` se corta con puntos (`truncate`); el editor del cuadro ocupa la misma
+	// caja.
+	anchoRef := anchoCuadroNombres(r.anchoVentana())
 	cuadro := fyne.NewPos(x, centro(AltoRotulo))
 	r.refCaja.Move(cuadro)
-	r.refCaja.Resize(fyne.NewSize(AnchoRef, AltoRotulo))
-	r.aroNombre.ColocarEn(cuadro, fyne.NewSize(AnchoRef, AltoRotulo))
-	ancho := ui.Truncar(r.rotulo, r.b.Rotulo(), tema.TextoXS, ui.Medio, AnchoRef-2*MargenCelda)
+	r.refCaja.Resize(fyne.NewSize(anchoRef, AltoRotulo))
+	r.aroNombre.ColocarEn(cuadro, fyne.NewSize(anchoRef, AltoRotulo))
+	ancho := ui.Truncar(r.rotulo, r.b.Rotulo(), tema.TextoXS, ui.Medio, anchoRef-2*MargenCelda)
 	yRotulo := cuadro.Y + (AltoRotulo-tema.TextoXS.Linea)/2
-	ui.ColocarTexto(r.rotulo, tema.TextoXS, x+(AnchoRef-ancho)/2, yRotulo)
+	ui.ColocarTexto(r.rotulo, tema.TextoXS, x+(anchoRef-ancho)/2, yRotulo)
 	altoNombre := r.b.nombre.AltoFuente()
 	r.b.nombre.Colocar(fyne.NewPos(x+MargenCelda, cuadro.Y+(AltoRotulo-altoNombre)/2),
-		fyne.NewSize(AnchoRef-2*MargenCelda, altoNombre))
-	x += AnchoRef + HuecoBarra
+		fyne.NewSize(anchoRef-2*MargenCelda, altoNombre))
+	x += anchoRef + HuecoBarra
 
 	// La «fx» es `leading-6`: su caja mide lo que el rótulo y va a su altura.
 	anchoFx := ui.Medir("fx", tema.TextoXS, ui.Normal).Width
@@ -535,4 +548,13 @@ func (r *barraRenderer) Refresh() {
 	for _, o := range r.objetos {
 		o.Refresh()
 	}
+}
+
+// anchoCuadroNombres es `w-16 sm:w-24`: el del cuadro de nombres según el ancho de la
+// ventana (0 = sin ventana todavía, que se trata como ancha).
+func anchoCuadroNombres(ventana float32) float32 {
+	if ventana > 0 && ventana < ui.CorteSM {
+		return AnchoRefEstrecho
+	}
+	return AnchoRef
 }

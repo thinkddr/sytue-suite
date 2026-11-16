@@ -137,11 +137,15 @@ const (
 // (0,25rem), así que con el rem de 16 son 4 px.
 var MargenCelda = tema.Espacio(1)
 
-// AltoBarra es el `h-8` de la barra de fórmulas, y AnchoRef el `w-24` del rótulo de la
-// celda activa (el cuadro de nombres). Los dos en rem: 32 y 96.
+// AltoBarra es el `h-8` de la barra de fórmulas, y AnchoRef el `sm:w-24` del rótulo de
+// la celda activa (el cuadro de nombres). Los dos en rem: 32 y 96. Por debajo de `sm`
+// el cuadro es `w-16` (AnchoRefEstrecho): a 320 px el de 96 dejaba el campo de la
+// fórmula por debajo del objetivo táctil de 44 px.
 var (
 	AltoBarra = tema.Espacio(8)
 	AnchoRef  = tema.Espacio(24)
+	// AnchoRefEstrecho es el `w-16` del cuadro de nombres por debajo de `sm`.
+	AnchoRefEstrecho = tema.Espacio(16)
 	// MargenBarra es su `px-2` y HuecoBarra su `gap-2`.
 	MargenBarra = tema.Espacio(2)
 	HuecoBarra  = tema.Espacio(2)

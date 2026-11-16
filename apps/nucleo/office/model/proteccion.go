@@ -483,7 +483,7 @@ func contenidoProtegido(ambito string, prev, nuevo *libro, pp, np map[string]jso
 	if p == nil || n == nil || repeticiones(nuevo.nombres, nombre) != 1 {
 		return ErrProtegido
 	}
-	return contenidoHoja(p, n, pp, np, quien)
+	return contenidoHoja(p, n, pp, np, quien, desplazablesDesde(prev, nuevo, nombre))
 }
 
 // permisosEstructurales mueven celdas de sitio: con alguno concedido el contenido
@@ -503,7 +503,7 @@ var camposSiempreVetados = []string{"pivots", "externalTables"}
 type estilo = map[string]any
 
 //nolint:gocognit,gocyclo // las reglas de una hoja protegida, en el orden en que se explican.
-func contenidoHoja(p, n, pp, np map[string]json.RawMessage, quien Subject) error {
+func contenidoHoja(p, n, pp, np map[string]json.RawMessage, quien Subject, ajenas *hojasAjenas) error {
 	// Rangos editables movidos: solo si los explica una inserción o un borrado
 	// concedido, con las celdas movidas igual (proteccion_desplazar.go).
 	if distinto(pp, np, "ranges") && !rangosHojaMovidos(p, n, pp, np, quien) {
@@ -544,38 +544,11 @@ func contenidoHoja(p, n, pp, np map[string]json.RawMessage, quien Subject) error
 		}
 	}
 
-	// Contenido.
-	if relajado {
-		// Con insertar/borrar/ordenar concedido el contenido bloqueado puede MOVERSE o
-		// desaparecer con su fila, pero no aparecer contenido nuevo salvo donde la celda
-		// ya era editable.
-		// ponytail: techo conocido —quien tiene concedido borrar filas puede vaciar una
-		// celda bloqueada sin borrar su fila—; cerrarlo exigiría reproducir cada
-		// operación de fila en el servidor.
-		disponible := map[string]int{}
-		for ref, v := range pc {
-			if v != "" && nc[ref] != v {
-				disponible[v]++
-			}
-		}
-		for ref, v := range nc {
-			if v == "" || pc[ref] == v {
-				continue
-			}
-			if disponible[v] > 0 {
-				disponible[v]--
-				continue
-			}
-			if bloqueada(ref) {
-				return ErrProtegido
-			}
-		}
-	} else {
-		for ref := range union(pc, nc) {
-			if pc[ref] != nc[ref] && bloqueada(ref) {
-				return ErrProtegido
-			}
-		}
+	// Contenido. Si no pasa tal cual, puede ser que las fórmulas bloqueadas que citan
+	// otra hoja hayan seguido a su dato al insertar o borrar filas allí: se acepta solo
+	// si es EXACTAMENTE ese desplazamiento (proteccion_ajenas.go).
+	if !celdasPermitidas(pc, nc, bloqueada, relajado) && !ajenas.explican(pc, nc, bloqueada, relajado) {
+		return ErrProtegido
 	}
 
 	// Formato.
@@ -619,6 +592,45 @@ func contenidoHoja(p, n, pp, np map[string]json.RawMessage, quien Subject) error
 		}
 	}
 	return nil
+}
+
+// celdasPermitidas: ¿puede pasar el contenido de las celdas de pc a nc quien no está
+// autorizado? `bloqueada` dice qué celdas no puede escribir; `relajado`, si tiene
+// concedido mover celdas (insertar, borrar u ordenar).
+func celdasPermitidas(pc, nc map[string]string, bloqueada func(string) bool, relajado bool) bool {
+	if relajado {
+		// Con insertar/borrar/ordenar concedido el contenido bloqueado puede MOVERSE o
+		// desaparecer con su fila, pero no aparecer contenido nuevo salvo donde la celda
+		// ya era editable.
+		// ponytail: techo conocido —quien tiene concedido borrar filas puede vaciar una
+		// celda bloqueada sin borrar su fila—; cerrarlo exigiría reproducir cada
+		// operación de fila en el servidor.
+		disponible := map[string]int{}
+		for ref, v := range pc {
+			if v != "" && nc[ref] != v {
+				disponible[v]++
+			}
+		}
+		for ref, v := range nc {
+			if v == "" || pc[ref] == v {
+				continue
+			}
+			if disponible[v] > 0 {
+				disponible[v]--
+				continue
+			}
+			if bloqueada(ref) {
+				return false
+			}
+		}
+	} else {
+		for ref := range union(pc, nc) {
+			if pc[ref] != nc[ref] && bloqueada(ref) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // --- Lectura del modelo ---

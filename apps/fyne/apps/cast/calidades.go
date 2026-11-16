@@ -150,9 +150,13 @@ func SelectorCalidades(v Vista, d SelCalidades) fyne.CanvasObject {
 	case d.Error:
 		bloques = append(bloques, ui.Bloque{Obj: Parrafo(v, v.Traduce("quality.estimateError"), tema.TextoSM, ui.Normal, "text-muted")})
 	case d.Estimacion == nil:
-		for i := range 4 {
-			bloques = append(bloques, ui.Bloque{Obj: ui.NuevoEsqueleto(0, []float32{tema.Espacio(10), tema.Espacio(5), tema.Espacio(5), tema.Espacio(5)}[i]), Margen: tema.Espacio(2)})
+		// Las cuatro barras son UN grupo de carga: laten a una y dicen «Cargando» una vez.
+		carga := ui.NuevosBloquesEsqueleto()
+		barras := make([]ui.Bloque, 0, 4)
+		for _, alto := range []float32{tema.Espacio(10), tema.Espacio(5), tema.Espacio(5), tema.Espacio(5)} {
+			barras = append(barras, ui.Bloque{Obj: carga.Bloque(0, alto), Margen: tema.Espacio(2)})
 		}
+		bloques = append(bloques, ui.Bloque{Obj: carga.Con(ui.PilaBloques(barras...))})
 	default:
 		bloques = append(bloques, cuerpoCalidades(v, d, *d.Estimacion)...)
 	}

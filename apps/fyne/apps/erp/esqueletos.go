@@ -58,7 +58,9 @@ func (l *Lista) esqueletoLista(v tema.Variante, ancho float32) (fyne.CanvasObjec
 	return esqueletoDeLista(v, ancho, l.columnasEsqueleto())
 }
 
+// Las barras son UN `ui.BloquesEsqueleto`: laten a una y la tabla dice «Cargando» una vez.
 func esqueletoDeLista(v tema.Variante, ancho float32, cols int) (fyne.CanvasObject, float32) {
+	b := ui.NuevosBloquesEsqueleto()
 	lz := &lienzo{}
 	caja := ui.NuevaCaja(tema.Color("surface", v), tema.Color("border", v), radioTarjeta())
 	sombra := ui.NuevaSombra(tema.SombraXS, radioTarjeta())
@@ -74,13 +76,14 @@ func esqueletoDeLista(v tema.Variante, ancho float32, cols int) (fyne.CanvasObje
 		}
 		x := tema.Borde + EsqueletoPX
 		for c := range cols {
-			barra := ui.NuevoEsqueletoFraccion(AnchosEsqueleto[(f+c)%len(AnchosEsqueleto)], 0)
+			barra := b.BloqueFraccion(AnchosEsqueleto[(f+c)%len(AnchosEsqueleto)], 0)
 			lz.poner(barra, x, y+EsqueletoPY, celda, ui.AltoEsqueleto)
 			x += celda + EsqueletoHueco
 		}
 		y += AltoFilaEsqueleto
 	}
-	return lz.objeto(AltoEsqueletoLista)
+	o, alto := lz.objeto(AltoEsqueletoLista)
+	return b.Con(o), alto
 }
 
 // Medidas de las líneas de una tarjeta del resumen sin datos (`EsqueletoKPI`): el
@@ -92,39 +95,43 @@ const (
 )
 
 // cifraCargando es `CifraCargando`: la barra centrada en la caja de línea de `text-xl`.
+// Es una sola barra por tarjeta, y por eso un `ui.Esqueleto` suelto.
 func cifraCargando(l *lienzo, x, y, dentro float32) {
 	l.poner(ui.NuevoEsqueletoFraccion(0.5, AltoBarraCifra), x, y+(tema.TextoXL.Linea-AltoBarraCifra)/2, dentro, AltoBarraCifra)
 }
 
 // tarjetaKPIEsqueleto es `EsqueletoKPI`: la caja de `tarjetaKPI`, a su mismo alto, con
-// tres barras donde irán el rótulo, la cifra y la pista.
-func tarjetaKPIEsqueleto(v tema.Variante, ancho float32) (fyne.CanvasObject, float32) {
+// tres barras donde irán el rótulo, la cifra y la pista; son bloques del grupo `b`, el
+// de la portada entera.
+func tarjetaKPIEsqueleto(v tema.Variante, b *ui.BloquesEsqueleto, ancho float32) (fyne.CanvasObject, float32) {
 	dentro := max(ancho-2*tema.Borde-2*TarjetaPX, 0)
 	x0 := tema.Borde + TarjetaPX
 	l := &lienzo{}
 	fondo, _ := fondoConCaja(v, tema.Color("surface-raised", v), tema.Color("border", v), tema.SombraSM)
 	l.poner(fondo, 0, 0, ancho, AltoKPI)
 	fila := ui.MedidaInsignia("").Height
-	l.poner(ui.NuevoEsqueletoFraccion(0.4, AltoBarraRotulo), x0, x0+(fila-AltoBarraRotulo)/2, dentro, AltoBarraRotulo)
+	l.poner(b.BloqueFraccion(0.4, AltoBarraRotulo), x0, x0+(fila-AltoBarraRotulo)/2, dentro, AltoBarraRotulo)
 	y := x0 + fila + HuecoUno
-	l.poner(ui.NuevoEsqueletoFraccion(0.6, AltoBarraCifra), x0, y+(tema.TextoXL.Linea-AltoBarraCifra)/2, dentro, AltoBarraCifra)
+	l.poner(b.BloqueFraccion(0.6, AltoBarraCifra), x0, y+(tema.TextoXL.Linea-AltoBarraCifra)/2, dentro, AltoBarraCifra)
 	y += tema.TextoXL.Linea + HuecoUno
-	l.poner(ui.NuevoEsqueletoFraccion(0.8, AltoBarraRotulo), x0, y+(tema.TextoXS.Linea-AltoBarraRotulo)/2, dentro, AltoBarraRotulo)
+	l.poner(b.BloqueFraccion(0.8, AltoBarraRotulo), x0, y+(tema.TextoXS.Linea-AltoBarraRotulo)/2, dentro, AltoBarraRotulo)
 	return l.objeto(AltoKPI)
 }
 
 // esqueleto es lo que pinta la portada mientras llega el catálogo (`EsqueletoKPIs`):
-// los tres indicadores en su rejilla, dentro de la página de siempre.
+// los tres indicadores en su rejilla, dentro de la página de siempre. Sus nueve barras
+// son UN grupo de carga.
 func (b *Bienvenida) esqueleto(v tema.Variante) fyne.CanvasObject {
+	carga := ui.NuevosBloquesEsqueleto()
 	ancho := anchoUtilDe(b.Ventana, AnchoContenidoLista)
 	rej := ui.RejillaTarjetas(b.Ventana, HuecoTarjetas, CortesResumen)
 	cols := max(rej.Columnas(ancho), 1)
 	w := rej.AnchoColumna(ancho)
 	celdas := make([]celdaRejilla, 0, 3)
 	for range 3 {
-		o, alto := tarjetaKPIEsqueleto(v, w)
+		o, alto := tarjetaKPIEsqueleto(v, carga, w)
 		celdas = append(celdas, celdaRejilla{o, alto})
 	}
 	o, alto := enRejilla(rej, cols, ancho, celdas)
-	return enPagina(o, alto, AnchoContenidoLista)
+	return carga.Con(enPagina(o, alto, AnchoContenidoLista))
 }

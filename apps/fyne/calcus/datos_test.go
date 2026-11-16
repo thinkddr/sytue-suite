@@ -259,8 +259,9 @@ func TestLaEstructuraMueveLasFormulasDeLasOtrasHojas(t *testing.T) {
 		{1, "A1", "=Ventas!B5"},
 		{1, "A2", "=SUM(Ventas!A1:B10)"},
 		{1, "A3", "=ventas!$B$5*B4"},
-		// «Hoja 2» está protegida y su celda, bloqueada: el servidor vetaría cambiarla.
-		{2, "A1", "='Ventas'!B4+Ventas!A1"},
+		// «Hoja 2» está protegida y su celda, bloqueada: sigue a su dato igual, porque no
+		// es editarla y el servidor lo acepta (proteccion_ajenas.go).
+		{2, "A1", "='Ventas'!B5+Ventas!A1"},
 	} {
 		if got := celda(c.hoja, c.ref); got != c.quiero {
 			t.Errorf("tras insertar una fila, %d!%s es %q y la web da %q", c.hoja, c.ref, got, c.quiero)

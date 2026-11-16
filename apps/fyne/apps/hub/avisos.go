@@ -323,6 +323,7 @@ type avisosRenderer struct {
 	filtros   []*Pildora
 	marcar    *ui.Boton
 	esqueleto []fyne.CanvasObject
+	carga     *ui.BloquesEsqueleto // el grupo de `esqueleto`
 	aviso     *ui.Vacio
 	filas     []*FilaAviso
 	// leidos es el botón del punto de cada fila sin leer, a su par en `filas` (nil en
@@ -342,7 +343,8 @@ type avisosRenderer struct {
 	// el texto de la fila cuyo guardado falló.
 	grupos      []GrupoAvisos
 	leyendas    []*canvas.Text
-	fantasmas   map[string][2]*ui.Esqueleto
+	fantasmas   map[string][2]*canvas.Rectangle
+	cargaReglas *ui.BloquesEsqueleto // el grupo de los fantasmas
 	falloReglas *ui.AyudaEnLinea
 	reintentar  *ui.Boton
 	fallosFila  map[string]*ui.Parrafo
@@ -371,15 +373,21 @@ func (r *avisosRenderer) rehacer() {
 	r.cabecera = nuevaCabecera(v, t.T("inbox.overline", nil), t.T("inbox.heading", nil), t.T("inbox.intro", nil))
 	r.cabecera.preparar(v, ancho)
 	r.hacerBarra(t)
-	r.esqueleto, r.aviso, r.filas, r.filetes, r.mas, r.leidos, r.ids = nil, nil, nil, nil, nil, nil, nil
+	r.esqueleto, r.carga, r.aviso, r.filas, r.filetes, r.mas, r.leidos, r.ids = nil, nil, nil, nil, nil, nil, nil, nil
 
 	visibles := Visibles(a.Items, a.SoloSinLeer, a.Producto)
 	switch {
 	case a.Estado == Cargando:
+		// Las cuatro filas son UN grupo, que se anuncia con `inbox.loading` como el
+		// `role="status"` de la web.
+		g := ui.NuevosBloquesEsqueleto()
 		for range FilasEsqueletoAvisos {
-			r.esqueleto = append(r.esqueleto, ui.NuevoEsqueletoRedondo(LadoMarcaAviso),
-				ui.NuevoEsqueleto(0, AltoBarraEsqueleto1), ui.NuevoEsqueleto(0, AltoBarraEsqueleto2))
+			circulo := g.Bloque(LadoMarcaAviso, LadoMarcaAviso)
+			circulo.CornerRadius = LadoMarcaAviso / 2 // `circle`
+			r.esqueleto = append(r.esqueleto, circulo,
+				g.Bloque(0, AltoBarraEsqueleto1), g.Bloque(0, AltoBarraEsqueleto2))
 		}
+		r.carga = g.AMano().ConRotulo(t.T("inbox.loading", nil))
 		r.filetes = Divisores(v, FilasEsqueletoAvisos)
 	case a.Estado == Fallo:
 		// Sin icono y con el botón en su talla de siempre: es el EmptyState de la
@@ -512,7 +520,9 @@ func (r *avisosRenderer) recomponer() {
 	if r.marcar != nil {
 		r.objetos = append(r.objetos, r.marcar)
 	}
-	r.objetos = append(r.objetos, r.esqueleto...)
+	if r.carga != nil {
+		r.objetos = append(r.objetos, r.carga)
+	}
 	if r.aviso != nil {
 		r.objetos = append(r.objetos, r.aviso)
 	}
@@ -538,11 +548,13 @@ func (r *avisosRenderer) recomponer() {
 		}
 		return
 	}
+	if r.cargaReglas != nil {
+		r.objetos = append(r.objetos, r.cargaReglas)
+	}
 	for i, g := range r.grupos {
 		r.objetos = append(r.objetos, r.leyendas[i])
 		for _, o := range g.Origenes {
-			if f, ok := r.fantasmas[o]; ok {
-				r.objetos = append(r.objetos, f[0], f[1])
+			if _, ok := r.fantasmas[o]; ok {
 				continue
 			}
 			r.objetos = append(r.objetos, r.conmutadores[o])
@@ -565,6 +577,7 @@ func (r *avisosRenderer) conFijo() bool { return r.a.CargaReglas == ReglasListas
 func (r *avisosRenderer) rehacerReglas(v tema.Variante) {
 	a, t := r.a, r.a.T
 	r.grupos, r.leyendas, r.fantasmas, r.falloReglas, r.reintentar, r.fallosFila = a.gruposVisibles(), nil, nil, nil, nil, nil
+	r.cargaReglas = nil
 	if a.CargaReglas == ReglasFallo {
 		r.falloReglas = ui.NuevaAyudaEnLinea(t.T("inbox.prefsLoadErrorBody", nil)).
 			ConTono(ui.AyudaPeligro).ConTitulo(t.T("inbox.prefsLoadError", nil))
@@ -578,12 +591,14 @@ func (r *avisosRenderer) rehacerReglas(v tema.Variante) {
 			tema.TextoXS, ui.SemiNegrita, tema.Color("text-subtle", v)))
 		for _, o := range g.Origenes {
 			if a.CargaReglas == ReglasCargando {
+				// Todos los fantasmas son UN grupo: laten a una.
 				if r.fantasmas == nil {
-					r.fantasmas = map[string][2]*ui.Esqueleto{}
+					r.fantasmas = map[string][2]*canvas.Rectangle{}
+					r.cargaReglas = ui.NuevosBloquesEsqueleto()
 				}
-				r.fantasmas[o] = [2]*ui.Esqueleto{
-					ui.NuevoEsqueleto(AnchoFantasmaRegla, AltoFantasmaRegla),
-					ui.NuevoEsqueleto(0, AltoEtiquetaFantasma),
+				r.fantasmas[o] = [2]*canvas.Rectangle{
+					r.cargaReglas.Bloque(AnchoFantasmaRegla, AltoFantasmaRegla),
+					r.cargaReglas.Bloque(0, AltoEtiquetaFantasma),
 				}
 				continue
 			}
@@ -601,6 +616,9 @@ func (r *avisosRenderer) rehacerReglas(v tema.Variante) {
 				r.fallosFila[o] = ui.NuevoParrafo(t.T("inbox.prefsSaveError", nil), tema.TextoXS, ui.Normal, "danger-text", v)
 			}
 		}
+	}
+	if r.cargaReglas != nil {
+		r.cargaReglas.AMano()
 	}
 }
 
@@ -755,7 +773,10 @@ func (r *avisosRenderer) Layout(t fyne.Size) {
 	if t.Width <= 0 {
 		return
 	}
-	r.fondo.Resize(fyne.NewSize(t.Width, max(t.Height, r.alto(t.Width))))
+	tam := fyne.NewSize(t.Width, max(t.Height, r.alto(t.Width)))
+	r.fondo.Resize(tam)
+	r.carga.Cubrir(tam)
+	r.cargaReglas.Cubrir(tam)
 	x, ancho := CajaContenido(t.Width)
 	y := r.cabecera.colocar(x) + MargenCabeceraActividad
 	y += r.barra(x, y, ancho, true) + HuecoBandeja

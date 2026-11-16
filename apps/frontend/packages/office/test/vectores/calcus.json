@@ -6660,7 +6660,52 @@
       "rowHeights": {
         "0": 32,
         "9": 20
-      }
+      },
+      "pivots": [
+        {
+          "name": "TD1",
+          "source": "B2:D6",
+          "anchor": "J2",
+          "range": "J2:K5",
+          "rows": [
+            {
+              "field": 0
+            }
+          ],
+          "cols": [
+            {
+              "field": 1
+            }
+          ],
+          "values": [
+            {
+              "field": 2,
+              "fn": "sum"
+            }
+          ]
+        },
+        {
+          "name": "TD2",
+          "source": "F10:G12",
+          "anchor": "J20",
+          "rows": [
+            {
+              "field": 0
+            }
+          ],
+          "cols": [
+            {
+              "field": 1
+            }
+          ],
+          "values": [
+            {
+              "field": 1,
+              "fn": "count"
+            }
+          ]
+        }
+      ]
     },
     "casos": [
       {
@@ -6796,7 +6841,52 @@
           "rowHeights": {
             "0": 32,
             "10": 20
-          }
+          },
+          "pivots": [
+            {
+              "name": "TD1",
+              "source": "B2:D7",
+              "anchor": "J2",
+              "range": "J2:K6",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 2,
+                  "fn": "sum"
+                }
+              ]
+            },
+            {
+              "name": "TD2",
+              "source": "F11:G13",
+              "anchor": "J21",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 1,
+                  "fn": "count"
+                }
+              ]
+            }
+          ]
         }
       },
       {
@@ -6932,7 +7022,52 @@
           "rowHeights": {
             "2": 32,
             "11": 20
-          }
+          },
+          "pivots": [
+            {
+              "name": "TD1",
+              "source": "B4:D8",
+              "anchor": "J4",
+              "range": "J4:K7",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 2,
+                  "fn": "sum"
+                }
+              ]
+            },
+            {
+              "name": "TD2",
+              "source": "F12:G14",
+              "anchor": "J22",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 1,
+                  "fn": "count"
+                }
+              ]
+            }
+          ]
         }
       },
       {
@@ -7058,7 +7193,52 @@
           },
           "rowHeights": {
             "0": 32
-          }
+          },
+          "pivots": [
+            {
+              "name": "TD1",
+              "source": "B2:D6",
+              "anchor": "J2",
+              "range": "J2:K5",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 2,
+                  "fn": "sum"
+                }
+              ]
+            },
+            {
+              "name": "TD2",
+              "source": "F10:G11",
+              "anchor": "J19",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 1,
+                  "fn": "count"
+                }
+              ]
+            }
+          ]
         }
       },
       {
@@ -7185,7 +7365,52 @@
           "rowHeights": {
             "0": 32,
             "8": 20
-          }
+          },
+          "pivots": [
+            {
+              "name": "TD1",
+              "source": "B2:D5",
+              "anchor": "J2",
+              "range": "J2:K4",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 2,
+                  "fn": "sum"
+                }
+              ]
+            },
+            {
+              "name": "TD2",
+              "source": "F9:G11",
+              "anchor": "J19",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 1,
+                  "fn": "count"
+                }
+              ]
+            }
+          ]
         }
       },
       {
@@ -7299,7 +7524,52 @@
           "rowHeights": {
             "0": 32,
             "6": 20
-          }
+          },
+          "pivots": [
+            {
+              "name": "TD1",
+              "source": "B2:D3",
+              "anchor": "J2",
+              "range": "J2:K2",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 2,
+                  "fn": "sum"
+                }
+              ]
+            },
+            {
+              "name": "TD2",
+              "source": "F7:G9",
+              "anchor": "J17",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 1,
+                  "fn": "count"
+                }
+              ]
+            }
+          ]
         }
       },
       {
@@ -7435,7 +7705,52 @@
           "rowHeights": {
             "0": 32,
             "9": 20
-          }
+          },
+          "pivots": [
+            {
+              "name": "TD1",
+              "source": "B2:E6",
+              "anchor": "K2",
+              "range": "K2:L5",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 2,
+                  "fn": "sum"
+                }
+              ]
+            },
+            {
+              "name": "TD2",
+              "source": "G10:H12",
+              "anchor": "K20",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 1,
+                  "fn": "count"
+                }
+              ]
+            }
+          ]
         }
       },
       {
@@ -7557,7 +7872,52 @@
           "rowHeights": {
             "0": 32,
             "9": 20
-          }
+          },
+          "pivots": [
+            {
+              "name": "TD1",
+              "source": "B2:C6",
+              "anchor": "I2",
+              "range": "I2:J5",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 2,
+                  "fn": "sum"
+                }
+              ]
+            },
+            {
+              "name": "TD2",
+              "source": "E10:F12",
+              "anchor": "I20",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 1,
+                  "fn": "count"
+                }
+              ]
+            }
+          ]
         }
       },
       {
@@ -7605,7 +7965,30 @@
           "rowHeights": {
             "0": 32,
             "9": 20
-          }
+          },
+          "pivots": [
+            {
+              "name": "TD2",
+              "source": "C10:D12",
+              "anchor": "G20",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 1,
+                  "fn": "count"
+                }
+              ]
+            }
+          ]
         }
       },
       {
@@ -7674,6 +8057,52 @@
             "range": "C2",
             "values": ["Sí", "No"]
           }
+        ],
+        "pivots": [
+          {
+            "name": "TD1",
+            "source": "A1:C9",
+            "sourceSheet": "Ventas",
+            "anchor": "E1",
+            "range": "E1:F4",
+            "rows": [
+              {
+                "field": 0
+              }
+            ],
+            "cols": [
+              {
+                "field": 1
+              }
+            ],
+            "values": [
+              {
+                "field": 2,
+                "fn": "sum"
+              }
+            ]
+          },
+          {
+            "name": "TD2",
+            "source": "A1:A6",
+            "anchor": "E10",
+            "rows": [
+              {
+                "field": 0
+              }
+            ],
+            "cols": [
+              {
+                "field": 0
+              }
+            ],
+            "values": [
+              {
+                "field": 0,
+                "fn": "count"
+              }
+            ]
+          }
         ]
       },
       {
@@ -7734,6 +8163,52 @@
               "range": "C2",
               "values": ["Sí", "No"]
             }
+          ],
+          "pivots": [
+            {
+              "name": "TD1",
+              "source": "A1:C10",
+              "sourceSheet": "Ventas",
+              "anchor": "E1",
+              "range": "E1:F4",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 2,
+                  "fn": "sum"
+                }
+              ]
+            },
+            {
+              "name": "TD2",
+              "source": "A1:A6",
+              "anchor": "E10",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 0
+                }
+              ],
+              "values": [
+                {
+                  "field": 0,
+                  "fn": "count"
+                }
+              ]
+            }
           ]
         }
       },
@@ -7772,6 +8247,52 @@
             {
               "range": "C2",
               "values": ["Sí", "No"]
+            }
+          ],
+          "pivots": [
+            {
+              "name": "TD1",
+              "source": "A1:C8",
+              "sourceSheet": "Ventas",
+              "anchor": "E1",
+              "range": "E1:F4",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 2,
+                  "fn": "sum"
+                }
+              ]
+            },
+            {
+              "name": "TD2",
+              "source": "A1:A6",
+              "anchor": "E10",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 0
+                }
+              ],
+              "values": [
+                {
+                  "field": 0,
+                  "fn": "count"
+                }
+              ]
             }
           ]
         }
@@ -7812,6 +8333,52 @@
               "range": "C2",
               "values": ["Sí", "No"]
             }
+          ],
+          "pivots": [
+            {
+              "name": "TD1",
+              "source": "A1:C6",
+              "sourceSheet": "Ventas",
+              "anchor": "E1",
+              "range": "E1:F4",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 2,
+                  "fn": "sum"
+                }
+              ]
+            },
+            {
+              "name": "TD2",
+              "source": "A1:A6",
+              "anchor": "E10",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 0
+                }
+              ],
+              "values": [
+                {
+                  "field": 0,
+                  "fn": "count"
+                }
+              ]
+            }
           ]
         }
       },
@@ -7850,6 +8417,52 @@
             {
               "range": "C2",
               "values": ["Sí", "No"]
+            }
+          ],
+          "pivots": [
+            {
+              "name": "TD1",
+              "source": "A1:C9",
+              "sourceSheet": "Ventas",
+              "anchor": "E1",
+              "range": "E1:F4",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 2,
+                  "fn": "sum"
+                }
+              ]
+            },
+            {
+              "name": "TD2",
+              "source": "A1:A6",
+              "anchor": "E10",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 0
+                }
+              ],
+              "values": [
+                {
+                  "field": 0,
+                  "fn": "count"
+                }
+              ]
             }
           ]
         }
@@ -7890,6 +8503,52 @@
               "range": "C2",
               "values": ["Sí", "No"]
             }
+          ],
+          "pivots": [
+            {
+              "name": "TD1",
+              "source": "A1:C9",
+              "sourceSheet": "Ventas",
+              "anchor": "E1",
+              "range": "E1:F4",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 2,
+                  "fn": "sum"
+                }
+              ]
+            },
+            {
+              "name": "TD2",
+              "source": "A1:A6",
+              "anchor": "E10",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 0
+                }
+              ],
+              "values": [
+                {
+                  "field": 0,
+                  "fn": "count"
+                }
+              ]
+            }
           ]
         }
       },
@@ -7929,6 +8588,52 @@
               "range": "C2",
               "values": ["Sí", "No"]
             }
+          ],
+          "pivots": [
+            {
+              "name": "TD1",
+              "source": "A1:C9",
+              "sourceSheet": "Ventas",
+              "anchor": "E1",
+              "range": "E1:F4",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 1
+                }
+              ],
+              "values": [
+                {
+                  "field": 2,
+                  "fn": "sum"
+                }
+              ]
+            },
+            {
+              "name": "TD2",
+              "source": "A1:A6",
+              "anchor": "E10",
+              "rows": [
+                {
+                  "field": 0
+                }
+              ],
+              "cols": [
+                {
+                  "field": 0
+                }
+              ],
+              "values": [
+                {
+                  "field": 0,
+                  "fn": "count"
+                }
+              ]
+            }
           ]
         }
       },
@@ -7943,7 +8648,7 @@
         },
         "sale": {
           "cells": {
-            "A1": "=Ventas!B4",
+            "A1": "=Ventas!B5",
             "A2": "=Ventas!B5"
           },
           "validations": [
@@ -7966,7 +8671,7 @@
         },
         "sale": {
           "cells": {
-            "A1": "=Ventas!B4",
+            "A1": "=#¡REF!",
             "A2": "=#¡REF!"
           },
           "validations": [
@@ -7989,7 +8694,7 @@
         },
         "sale": {
           "cells": {
-            "A1": "=Ventas!B4",
+            "A1": "=#¡REF!",
             "A2": "=#¡REF!"
           },
           "validations": [
@@ -8012,7 +8717,7 @@
         },
         "sale": {
           "cells": {
-            "A1": "=Ventas!B4",
+            "A1": "=Ventas!C4",
             "A2": "=Ventas!C4"
           },
           "validations": [

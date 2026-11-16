@@ -778,7 +778,7 @@ func PantallaAlbumes(v Vista, d Albumes) *fyne.Container {
 	bloques = append(bloques, ui.Bloque{Obj: ui.PilaBloques(seccion...), Margen: SeparacionSeccion})
 
 	vacio := EstadoVacio(v, "albums.empty.title", "albums.empty.description", nil)
-	if cuerpo := CuerpoConEsqueleto(v, vacio, func() *Ocupado {
+	if cuerpo := CuerpoConEsqueleto(v, vacio, func() *ui.BloquesEsqueleto {
 		return EsqueletoAlbumes(v, TarjetasEsqueleto, tema.Espacio(6))
 	}); cuerpo != nil {
 		bloques = append(bloques, ui.Bloque{Obj: cuerpo})
@@ -1295,7 +1295,7 @@ func PantallaRepetidas(v Vista, d Repetidas) *fyne.Container {
 		bloques = append(bloques, ui.Bloque{Obj: ParrafoEn(d.Error, tema.TextoSM, ui.Normal, "danger-text", v.Variante), Margen: SeparacionBloque})
 	}
 	vacio := EstadoVacio(v, "dup.empty.title", "dup.empty.description", nil)
-	if cuerpo := CuerpoConEsqueleto(v, vacio, func() *Ocupado { return EsqueletoRepetidas(v, GruposEsqueletoRepetidas) }); cuerpo != nil {
+	if cuerpo := CuerpoConEsqueleto(v, vacio, func() *ui.BloquesEsqueleto { return EsqueletoRepetidas(v, GruposEsqueletoRepetidas) }); cuerpo != nil {
 		bloques = append(bloques, ui.Bloque{Obj: cuerpo})
 		return Envolver(v, false, ui.PilaBloques(bloques...))
 	}

@@ -859,6 +859,26 @@ const HOJA_OBJETOS: SheetData = {
   merges: ['A1:D1', 'F3:G4'],
   colWidths: { '1': 120, '3': 60 },
   rowHeights: { '0': 32, '9': 20 },
+  // El origen y la esquina siguen a sus celdas; sin origen, la tabla dinámica se va.
+  pivots: [
+    {
+      name: 'TD1',
+      source: 'B2:D6',
+      anchor: 'J2',
+      range: 'J2:K5',
+      rows: [{ field: 0 }],
+      cols: [{ field: 1 }],
+      values: [{ field: 2, fn: 'sum' }],
+    },
+    {
+      name: 'TD2',
+      source: 'F10:G12',
+      anchor: 'J20',
+      rows: [{ field: 0 }],
+      cols: [{ field: 1 }],
+      values: [{ field: 1, fn: 'count' }],
+    },
+  ],
 };
 const DESPLAZAMIENTOS: Desplazamiento[] = [
   { eje: 'fila', desde: 3, cantidad: 1, tope: 100 },
@@ -874,7 +894,7 @@ const DESPLAZAMIENTOS: Desplazamiento[] = [
 
 /* ---------- Las fórmulas de OTRAS hojas que citan la que se mueve ---------- */
 
-/** «Resumen» cita «Ventas» y «Hoja 2»; la protegida solo reescribe su celda desbloqueada. */
+/** «Resumen» cita «Ventas» y «Hoja 2»; la protegida reescribe también su celda bloqueada. */
 const HOJAS_AJENAS: SheetData[] = [
   {
     name: 'Resumen',
@@ -890,6 +910,27 @@ const HOJAS_AJENAS: SheetData[] = [
     validations: [
       { range: 'C1', type: 'formula', formula: '=COUNTIF(Ventas!$A$1:$A$9,C1)>0' },
       { range: 'C2', values: ['Sí', 'No'] },
+    ],
+    // La que lee de «Ventas» mueve su origen (no su esquina); la que lee de aquí, nada.
+    pivots: [
+      {
+        name: 'TD1',
+        source: 'A1:C9',
+        sourceSheet: 'Ventas',
+        anchor: 'E1',
+        range: 'E1:F4',
+        rows: [{ field: 0 }],
+        cols: [{ field: 1 }],
+        values: [{ field: 2, fn: 'sum' }],
+      },
+      {
+        name: 'TD2',
+        source: 'A1:A6',
+        anchor: 'E10',
+        rows: [{ field: 0 }],
+        cols: [{ field: 0 }],
+        values: [{ field: 0, fn: 'count' }],
+      },
     ],
   },
   {
@@ -986,7 +1027,7 @@ export function calcularVectores(): unknown {
       casos: DESPLAZAMIENTOS.map((d) => {
         const m = moverObjetos(HOJA_OBJETOS, d);
         const { tables, sparklines, charts, slicers, autofilter, condFormats, validations } = m;
-        const { rowGroups, colGroups, merges, colWidths, rowHeights } = m;
+        const { rowGroups, colGroups, merges, colWidths, rowHeights, pivots } = m;
         return {
           d,
           sale: {
@@ -1002,6 +1043,7 @@ export function calcularVectores(): unknown {
             merges,
             colWidths,
             rowHeights,
+            pivots,
           },
         };
       }),
@@ -1010,8 +1052,8 @@ export function calcularVectores(): unknown {
       hojas: HOJAS_AJENAS,
       casos: HOJAS_AJENAS.flatMap((h, hoja) =>
         DESPLAZAMIENTOS_AJENOS.map((d) => {
-          const { cells, condFormats, validations } = moverReferenciasAjenas(h, d);
-          return { hoja, d, sale: { cells, condFormats, validations } };
+          const { cells, condFormats, validations, pivots } = moverReferenciasAjenas(h, d);
+          return { hoja, d, sale: { cells, condFormats, validations, pivots } };
         }),
       ),
     },

@@ -77,7 +77,7 @@ func PantallaCompartidos(v Vista, d Compartidos) *fyne.Container {
 		{Obj: Nav(v, SecCompartidos, d.AlIr), Margen: SeparacionBloque},
 		{Obj: ParrafoEn(v.Traduce("sharedWithMe.title"), tema.TextoLG, ui.SemiNegrita, "text", v.Variante), Margen: SeparacionBloque},
 	}
-	if cuerpo := CuerpoConEsqueleto(v, EstadoVacio(v, "sharedWithMe.empty", "", nil), func() *Ocupado {
+	if cuerpo := CuerpoConEsqueleto(v, EstadoVacio(v, "sharedWithMe.empty", "", nil), func() *ui.BloquesEsqueleto {
 		return EsqueletoAlbumes(v, TarjetasEsqueleto, 0)
 	}); cuerpo != nil {
 		bloques = append(bloques, ui.Bloque{Obj: cuerpo})

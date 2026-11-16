@@ -1154,22 +1154,26 @@ func (e *Explorador) esqueletoCuerpo(v tema.Variante) fyne.CanvasObject {
 	filas.Margen = CanalonLista
 	filas.Rotulo = e.t("files.loading")
 	filas.Meta = []ui.MetaEsqueleto{{Ancho: 44, Oculta: !haySM}, {Ancho: 76, Oculta: !hayMD}}
-	s := &esqueletoLista{haySM: haySM, hayMD: hayMD, filas: filas}
-	hijos := []fyne.CanvasObject{canvas.NewRectangle(tema.Color(ui.FondoHoja(), v))}
-	// La cabecera: tres rayas de `0.6rem` donde van los tres rótulos de columna.
+	// La cabecera: tres rayas de `0.6rem` donde van los tres rótulos de columna, en UN
+	// grupo de carga que late a una; las coloca esqueletoLista en las coordenadas de la
+	// lista, porque el grupo la cubre entera.
+	s := &esqueletoLista{haySM: haySM, hayMD: hayMD, filas: filas, grupo: ui.NuevosBloquesEsqueleto()}
+	rayas := make([]fyne.CanvasObject, 0, 3)
 	for _, ancho := range []float32{56, 48, 72} {
-		b := ui.NuevoEsqueleto(ancho, 0.6*tema.Rem)
+		b := s.grupo.Bloque(ancho, 0.6*tema.Rem)
 		s.cabecera = append(s.cabecera, b)
-		hijos = append(hijos, b)
+		rayas = append(rayas, b)
 	}
-	return container.New(s, append(hijos, filas)...)
+	s.grupo.Con(container.NewWithoutLayout(rayas...))
+	return container.New(s, canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)), s.grupo, filas)
 }
 
 // esqueletoLista coloca la cabecera con `px-3 py-2.5` dentro del `px-3` del contenedor,
 // y debajo las filas.
 type esqueletoLista struct {
 	haySM, hayMD bool
-	cabecera     []*ui.Esqueleto
+	grupo        *ui.BloquesEsqueleto
+	cabecera     []*canvas.Rectangle
 	filas        *ui.FilasEsqueleto
 }
 
@@ -1187,7 +1191,11 @@ func (s *esqueletoLista) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	}
 	izq := 2 * CanalonLista // el `px-3` del contenedor más el de la fila
 	der := t.Width - izq
-	poner := func(r *ui.Esqueleto, x, y, w, h float32, visible bool) {
+	if s.grupo != nil {
+		s.grupo.Move(fyne.NewPos(0, 0))
+		s.grupo.Resize(fyne.NewSize(t.Width, altoCabeceraEsqueleto))
+	}
+	poner := func(r *canvas.Rectangle, x, y, w, h float32, visible bool) {
 		if !visible {
 			r.Hide()
 			return

@@ -36,6 +36,7 @@ import (
 	"unicode/utf8"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
@@ -449,33 +450,98 @@ func (p *Pantalla) crearHoy() {
 	}
 }
 
-// esqueleto es el `GridSkeleton` de la web: la GEOMETRÍA de la rejilla sin datos, para
-// que cambiar de mes no dé un salto de layout.
+// esqueleto es el `GridSkeleton` del mes de la web: la GEOMETRÍA de la rejilla sin
+// datos, para que cambiar de mes no dé un salto de layout.
+//
+// Es la de la web pieza a pieza: la fila de nombres con un bloque de `2rem × 0.75rem`
+// en `px-2.5 py-2.5` y su `border-b`; debajo, seis semanas que se reparten el alto
+// (`flex-1 grid-rows-6`), cada celda con `border-r border-b` y un círculo de `1.5rem`
+// en su `p-1.5`. Los bloques NO se estiran con la celda: hasta el 2026-11-16 eran
+// `Bloque` dentro de un `Margen` y la rejilla salía con barras de 128 × 24 en vez de
+// círculos, apiladas arriba sin líneas.
 //
 // Los 49 bloques son de UN `ui.BloquesEsqueleto`: laten a una y la rejilla se anuncia
 // una vez, como el `role="status"` con `loading.calendar` de la web.
 func (p *Pantalla) esqueleto() fyne.CanvasObject {
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	b := ui.NuevosBloquesEsqueleto().ConRotulo(p.t("loading.calendar", nil))
-	// La fila de nombres: siete bloques de `2rem × 0.75rem` con `px-2.5 py-2.5`.
-	cabecera := make([]fyne.CanvasObject, 0, 7)
+	c := &cargaMes{fondo: canvas.NewRectangle(tema.Color("surface", v))}
+	objs := []fyne.CanvasObject{c.fondo}
 	for range 7 {
-		cabecera = append(cabecera, conMargenSimple(espacio2p5, b.Bloque(2*tema.Rem, 0.75*tema.Rem)))
+		c.dias = append(c.dias, b.BloqueFijo(AnchoDiaCarga, AltoDiaCarga))
 	}
-	// Y 42 celdas con su círculo de `1.5rem` y su `p-1.5`, que es lo que hace que el
-	// esqueleto tenga la GEOMETRÍA de la rejilla y no haya salto de layout al cargar.
-	celdas := make([]fyne.CanvasObject, 0, 42)
 	for range 42 {
-		celdas = append(celdas, conMargenSimple(espacio1p5, b.Bloque(1.5*tema.Rem, 1.5*tema.Rem)))
+		c.celdas = append(c.celdas, b.Circulo(LadoCeldaCarga))
 	}
-	return b.Con(container.New(&arriba{Alto: AltoDiasSemana + tema.Borde},
-		container.New(Cuadricula, cabecera...),
-		container.New(ui.Rejilla{Fijas: 7}, celdas...)))
+	linea := func() *canvas.Rectangle {
+		r := canvas.NewRectangle(tema.Color("border", v))
+		objs = append(objs, r)
+		return r
+	}
+	objs = append(objs, c.dias...)
+	objs = append(objs, c.celdas...)
+	c.filete = linea()
+	for range 7 {
+		c.verticales = append(c.verticales, linea())
+	}
+	for range 6 {
+		c.horizontales = append(c.horizontales, linea())
+	}
+	return b.Con(container.New(c, objs...))
 }
 
-// conMargenSimple envuelve un objeto con el mismo relleno por los cuatro lados, que es
-// lo único que el esqueleto necesita: `ui.Margen`.
-func conMargenSimple(m float32, hijo fyne.CanvasObject) fyne.CanvasObject {
-	return container.New(ui.Margen{Izq: m, Arr: m, Der: m, Abj: m}, hijo)
+// Las medidas de los bloques de `GridSkeleton` (CalendarApp.tsx): el nombre del día es
+// `<Skeleton width="2rem" height="0.75rem" />` y la celda `<Skeleton width="1.5rem"
+// height="1.5rem" circle />`.
+const (
+	AnchoDiaCarga  float32 = 2 * tema.Rem
+	AltoDiaCarga   float32 = 0.75 * tema.Rem
+	LadoCeldaCarga float32 = 1.5 * tema.Rem
+)
+
+// cargaMes coloca la rejilla de carga como `mesRenderer` coloca la de verdad: las
+// columnas de `Cuadricula`, la fila de nombres de `AltoDiasSemana` y las semanas de
+// `AltoSemana`. Así el esqueleto y el mes que lo sustituye caen en el mismo sitio.
+type cargaMes struct {
+	fondo, filete            *canvas.Rectangle
+	dias, celdas             []fyne.CanvasObject
+	verticales, horizontales []*canvas.Rectangle
+}
+
+var _ fyne.Layout = (*cargaMes)(nil)
+
+// MinSize es el de un mes vacío: la fila de nombres y seis semanas con su círculo.
+func (c *cargaMes) MinSize([]fyne.CanvasObject) fyne.Size {
+	return fyne.NewSize(0, AltoDiasSemana+tema.Borde+6*(2*RellenoCelda+LadoCeldaCarga+tema.Borde))
+}
+
+func (c *cargaMes) Layout(_ []fyne.CanvasObject, t fyne.Size) {
+	c.fondo.Resize(t)
+	ancho := Cuadricula.AnchoColumna(t.Width)
+	for i, d := range c.dias {
+		// `px-2.5 py-2.5`: el bloque de 12 de alto deja la fila en los 32 de la de verdad.
+		d.Move(fyne.NewPos(Cuadricula.X(t.Width, i)+espacio2p5, espacio2p5))
+		d.Resize(fyne.NewSize(max(ancho-2*espacio2p5, 0), AltoDiaCarga))
+	}
+	c.filete.Move(fyne.NewPos(0, AltoDiasSemana))
+	c.filete.Resize(fyne.NewSize(t.Width, tema.Borde))
+	arriba := AltoDiasSemana + tema.Borde
+	alto := AltoSemana(t.Height)
+	for i, d := range c.celdas {
+		fila, col := i/7, i%7
+		d.Move(fyne.NewPos(Cuadricula.X(t.Width, col)+RellenoCelda, arriba+float32(fila)*alto+RellenoCelda))
+		d.Resize(fyne.NewSize(max(ancho-2*RellenoCelda, 0), max(alto-2*RellenoCelda-tema.Borde, 0)))
+	}
+	// `border-r border-b` de cada celda: la raya derecha de cada columna y la de abajo
+	// de cada semana, por dentro de la celda.
+	for col, r := range c.verticales {
+		r.Move(fyne.NewPos(Cuadricula.X(t.Width, col)+ancho-tema.Borde, arriba))
+		r.Resize(fyne.NewSize(tema.Borde, 6*alto))
+	}
+	for fila, r := range c.horizontales {
+		r.Move(fyne.NewPos(0, arriba+float32(fila+1)*alto-tema.Borde))
+		r.Resize(fyne.NewSize(t.Width, tema.Borde))
+	}
 }
 
 // AbrirNuevoEvento es la ruta `/calendar/events/new`: el enlace profundo de creación.

@@ -499,7 +499,7 @@ func TestVectoresDeMoverObjetos(t *testing.T) {
 		got := hoja{
 			Tables: h.tablas, Sparklines: h.minis, Charts: h.graficos, Slicers: h.segs, Autofilter: h.filtro,
 			CondFormats: h.condiciones, Validations: h.validaciones, RowGroups: h.grupFilas, ColGroups: h.grupCols,
-			Merges: h.fusiones, ColWidths: h.anchos, RowHeights: h.altos,
+			Merges: h.fusiones, ColWidths: h.anchos, RowHeights: h.altos, Pivots: h.dinamicas,
 		}
 		m, _ := comoJSON(t, got).(map[string]any)
 		delete(m, "name")
@@ -528,7 +528,7 @@ func TestVectoresDeReferenciasAjenas(t *testing.T) {
 		}
 		moverReferenciasAjenas(&l.f.hojas[1], d)
 		h := l.f.hojas[1].serializar()
-		got := hoja{Cells: h.Cells, CondFormats: h.CondFormats, Validations: h.Validations}
+		got := hoja{Cells: h.Cells, CondFormats: h.CondFormats, Validations: h.Validations, Pivots: h.Pivots}
 		m, _ := comoJSON(t, got).(map[string]any)
 		delete(m, "name")
 		if want := crudoJSON(c.Sale); !reflect.DeepEqual(m, want) {

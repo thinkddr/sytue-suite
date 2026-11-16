@@ -1167,6 +1167,14 @@ DO \\\$\\\$ BEGIN
   END IF;
 END \\\$\\\$;
 SELECT 'CREATE DATABASE "\$1" OWNER "\$1"' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '\$1')\\gexec
+-- Las migraciones definen funciones con SET app.<x>='on': desde PostgreSQL 15 un
+-- rol sin superusuario necesita este permiso. Si quien ejecuta no puede darlo
+-- (PostgreSQL gestionado), avisa en vez de cortar.
+DO \\\$\\\$ BEGIN
+  EXECUTE 'GRANT SET ON PARAMETER app.maintenance, app.docs_definer, app.merge, app.scope_admission_internal TO "\$1"';
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE WARNING 'Sin permiso para GRANT SET ON PARAMETER a %: concédelo como superusuario o las migraciones fallarán', '\$1';
+END \\\$\\\$;
 SQL
   echo "✓ \$1"
 }

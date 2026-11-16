@@ -28,6 +28,14 @@ create_role_db() {
     \$\$;
     SELECT 'CREATE DATABASE "${db}" OWNER "${role}"'
     WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${db}')\gexec
+    -- Las migraciones definen funciones con SET app.<x>='on' (p. ej. el SQL
+    -- común de platform/pkg/pg/private_storage_v1.sql). Desde PostgreSQL 15, fijar
+    -- un parámetro propio en la cláusula SET de CREATE FUNCTION exige este permiso
+    -- a quien no es superusuario; sin él la migración aborta con «permission denied
+    -- to set parameter "app.maintenance"» y deja la base «dirty». No da ninguna
+    -- capacidad nueva: cualquier sesión ya puede hacer SET de estos parámetros.
+    GRANT SET ON PARAMETER app.maintenance, app.docs_definer, app.merge,
+      app.scope_admission_internal TO "${role}";
 SQL
 }
 

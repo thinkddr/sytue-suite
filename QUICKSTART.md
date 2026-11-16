@@ -17,7 +17,7 @@ administrador y verifica que todo responde.
 | **mkcert** (HTTPS local de confianza) | `mkcert -version` | macOS: `brew install mkcert nss` · Debian/Ubuntu: `sudo apt install mkcert libnss3-tools` · Windows: `choco install mkcert` |
 | **git**, **bash** y **openssl** | `git --version` | Vienen con macOS y Linux. En Windows, usa WSL 2. |
 
-Unos **20 GB de disco** libres y los puertos **80** y **443** de tu equipo sin usar.
+Unos **30 GB de disco** libres (la primera construcción llega a ~25 GB entre imágenes y caché) y los puertos **80** y **443** de tu equipo sin usar.
 
 ---
 

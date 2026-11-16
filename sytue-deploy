@@ -559,6 +559,19 @@ requisitos_compose() {
     else
       ok "Memoria disponible para Docker: ${mem} GB"
     fi
+    # Disco: la primera construcción completa llega a ~25 GB entre imágenes y caché.
+    # Solo se mide donde el directorio de Docker es visible (Linux); en Docker
+    # Desktop vive dentro de su máquina virtual.
+    local raiz libre
+    raiz="$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || true)"
+    if [ -n "$raiz" ] && [ -d "$raiz" ]; then
+      libre=$(( $(df -Pk "$raiz" | awk 'NR==2 {print $4}') / 1024 / 1024 ))
+      if [ "$libre" -lt 25 ]; then
+        warn "Quedan ${libre} GB libres en ${raiz}; la primera construcción necesita unos 25 GB (libera con «docker system prune»)."
+      else
+        ok "Disco libre para Docker: ${libre} GB"
+      fi
+    fi
   fi
   if check_cmd mkcert; then
     ok "mkcert $(mkcert -version 2>/dev/null)"

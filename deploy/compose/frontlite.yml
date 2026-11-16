@@ -44,7 +44,7 @@ x-runtime-svc: &runtime-svc
   command:
     - /bin/sh
     - -c
-    - 'if [ "$$SYTUE_FRONTEND_APP" = www ]; then exec bun ./static-serve.mjs; else exec bun ./dist/server/entry.mjs; fi'
+    - 'if [ "$$SYTUE_FRONTEND_APP" = www ]; then exec bun --smol ./static-serve.mjs; else exec bun --smol ./dist/server/entry.mjs; fi'
   entrypoint:
     - /bin/sh
     - -c

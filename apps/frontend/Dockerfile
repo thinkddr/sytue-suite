@@ -179,4 +179,6 @@ USER bun
 EXPOSE 8080
 # Nueve apps generan Astro SSR. `www` es SSG y usa el servidor estático común.
 # La selección depende solo del ARG horneado, no de una imagen diferente.
-CMD ["sh", "-c", "if [ \"$SYTUE_FRONTEND_APP\" = www ]; then exec bun ./static-serve.mjs; else exec bun ./dist/server/entry.mjs; fi"]
+# `--smol`: el GC de Bun recoge antes. Medido con 1500 peticiones a una app SSR
+# (2026-11-16): 73 -> 67 MiB de pico y 59 -> 54 MiB en reposo, ~8 % menos por pod.
+CMD ["sh", "-c", "if [ \"$SYTUE_FRONTEND_APP\" = www ]; then exec bun --smol ./static-serve.mjs; else exec bun --smol ./dist/server/entry.mjs; fi"]

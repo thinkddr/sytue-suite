@@ -133,6 +133,11 @@ x-frontend-env: &frontend-env
   SYTUE_ROOMS_WS_URL: wss://rooms-api.sytue.localhost/ws
   SYTUE_CHAT_WS_URL: wss://rooms-api.sytue.localhost/ws
   SYTUE_LIVEKIT_URL: wss://rooms-sfu.sytue.localhost
+  # Complemento de cifrado de extremo a extremo (Matrix). Este entorno no trae
+  # servidor Matrix, así que por defecto va DESACTIVADO: las apps guardan sus datos
+  # en el servidor (cifrados en tránsito y en reposo) en vez de quedarse en
+  # «Cargando…» esperando a un homeserver que no existe. `activado` exige uno.
+  SYTUE_CIFRADO_E2E: ${SYTUE_CIFRADO_E2E:-desactivado}
 
 # Entrypoint de las apps web en dev: arranca el relé de loopback y después el
 # entrypoint de la imagen. Bun resuelve cualquier *.localhost a 127.0.0.1 sin
@@ -544,6 +549,10 @@ services:
       # confidenciales con este valor, el MISMO que usan los BFF de las apps
       # (SYTUE_OIDC_CLIENT_SECRET). Sin él quedan deshabilitados y el login falla.
       SYTUE_ID_DEV_CLIENT_SECRET: ${SYTUE_DEV_CLIENT_SECRET}
+      # Complemento de verificación por SMS (alta y segundo factor). Sin clave de
+      # Sweego, en desarrollo el código se escribe en el log; con ella, se envía.
+      SYTUE_ID_SMS_SWEEGO_API_KEY: ${SYTUE_SMS_SWEEGO_API_KEY:-}
+      SYTUE_ID_SMS_SENDER: ${SYTUE_SMS_SENDER:-Sytue}
     depends_on:
       postgres:
         condition: service_healthy
@@ -1222,6 +1231,10 @@ services:
       - "127.0.0.1:8092:8092"
     environment:
       <<: *go-env
+      # Productos que levanta ESTA instalación («one,mail,…»): el lanzador no ofrece
+      # los demás. Vacía = toda la suite. La fija ./sytue-deploy según los complementos
+      # elegidos (ERP, DevX) y sin `photos`, que no tiene app web en Compose.
+      APPS: ${SYTUE_APPS:-}
       PORT: "8092"
       PUBLIC_URL: https://hub.sytue.localhost
       DATABASE_URL: "postgres://${HUB_DB_USER:-sytue_hub}:${HUB_DB_PASSWORD}@postgres:5432/${HUB_DB_NAME:-sytue_hub}?sslmode=disable"
@@ -1351,6 +1364,8 @@ services:
       - "127.0.0.1:8085:8085"
     environment:
       <<: *go-env
+      # Sin el complemento de cifrado E2E no hay Matrix: Rooms acepta mensajes en claro.
+      SYTUE_ROOMS_MATRIX_REQUIRED: ${SYTUE_ROOMS_MATRIX_REQUIRED:-false}
       PORT: "8085"
       PUBLIC_URL: https://rooms-api.sytue.localhost
       # Correo a canal: el MISMO dominio que el de `mail`, que es quien recibe y

@@ -88,6 +88,18 @@ export class MatrixSecurityError extends Error {
     this.name = 'MatrixSecurityError';
   }
 }
+/**
+ * El despliegue funciona SIN cifrado de extremo a extremo (complemento Matrix
+ * desactivado: `SYTUE_CIFRADO_E2E=desactivado` en el BFF). No es un fallo de
+ * seguridad que haya que mostrar: la puerta deja pasar a la app, que trabaja con
+ * sus datos en claro en el servidor (cifrados en reposo y en tránsito, no E2E).
+ */
+export class CifradoDesactivado extends Error {
+  constructor() {
+    super('cifrado_desactivado');
+    this.name = 'CifradoDesactivado';
+  }
+}
 /** Never turn an arbitrary rejection value (which may contain private input) into a message. */
 export function matrixFailure(reason: unknown): Error {
   return reason instanceof Error ? reason : new MatrixSecurityError('device');

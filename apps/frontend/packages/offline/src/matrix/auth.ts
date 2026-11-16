@@ -7,6 +7,7 @@ import { BrowserKeyCustody } from './custody-browser.js';
 import type { MatrixClient, ICreateClientOpts } from 'matrix-js-sdk';
 import { readOfflineValue, mutateOfflineValue, deleteOfflineValue } from '../storage.js';
 import {
+  CifradoDesactivado,
   MatrixSecurityError,
   matrixStorePrefix,
   isMatrixDeviceId,
@@ -138,7 +139,10 @@ export class MatrixBrowserAuth implements MatrixSessionAdapter {
       ...(signal ? { signal } : {}),
     });
     if (!response.ok) throw new MatrixSecurityError('login');
-    return this.binding((await response.json()) as MatrixBootstrap);
+    const data = (await response.json()) as MatrixBootstrap | { cifrado?: unknown };
+    // Despliegue sin el complemento de cifrado E2E: no hay homeserver que abrir.
+    if ('cifrado' in data && data.cifrado === 'desactivado') throw new CifradoDesactivado();
+    return this.binding(data as MatrixBootstrap);
   };
   private key(bootstrap: MatrixBootstrap): [string, string, string] {
     return [

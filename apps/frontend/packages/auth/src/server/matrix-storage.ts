@@ -3,7 +3,7 @@ import type { APIRoute } from 'astro';
 import { appDomains } from '@sytue/config';
 import { isStorageProduct, type MatrixStorageProduct } from '@sytue/config/matrix';
 import { ChatClient, bearer, upstreamStatus } from '@sytue/api-clients';
-import { serverEnv, type EnvLike } from '../config.js';
+import { cifradoE2EDesactivado, serverEnv, type EnvLike } from '../config.js';
 import { sesionApi } from './app-bff.js';
 import type { Bff } from './bff.js';
 
@@ -26,6 +26,10 @@ export function rutaBootstrapMatrixPrivado(options: {
     const actor = session.user.id,
       tenant = session.user.tenant;
     if (!tenant) return Response.json({ error: 'organisation_required' }, { status: 409, headers });
+    // Complemento de cifrado E2E desactivado en este despliegue (no hay Matrix): la
+    // puerta de la app la deja pasar y la app trabaja con sus datos en el servidor.
+    if (cifradoE2EDesactivado(env))
+      return Response.json({ cifrado: 'desactivado' }, { status: 200, headers });
     const versions = new URL(context.request.url).searchParams.getAll('identity_version');
     if (
       versions.length > 1 ||

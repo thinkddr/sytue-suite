@@ -137,3 +137,34 @@ test('bootstrap selects only explicit supported identity versions and preserves 
     expect((await wrong.route(wrong.context)).status).toBe(502);
   }
 });
+
+test('sin el complemento de cifrado E2E responde «desactivado» sin llamar a Rooms, y solo con sesión', async () => {
+  const requests: Request[] = [];
+  let session: unknown = { user: { id: actor, tenant: 'acme' }, tokens: { accessToken: 'token' } };
+  const route = rutaBootstrapMatrixPrivado({
+    bff: { getSession: async () => session } as unknown as Bff,
+    product: 'notes',
+    env: {
+      SYTUE_ROOMS_INTERNAL_URL: 'https://rooms.sytue.invalid',
+      SYTUE_CIFRADO_E2E: 'desactivado',
+    },
+    fetchImpl: (async (input, init) => {
+      requests.push(new Request(input, init));
+      return Response.json({});
+    }) as typeof fetch,
+  });
+  const contexto = () => {
+    const request = new Request('https://suite.test/notes/api/matrix/storage/bootstrap');
+    return {
+      request,
+      url: new URL(request.url),
+      cookies: { get: () => undefined, set: () => {}, delete: () => {} },
+    } as unknown as APIContext;
+  };
+  const res = await route(contexto());
+  expect(res.status).toBe(200);
+  expect(await res.json()).toEqual({ cifrado: 'desactivado' });
+  expect(requests).toHaveLength(0);
+  session = null;
+  expect((await route(contexto())).status).toBe(401);
+});

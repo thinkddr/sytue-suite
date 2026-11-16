@@ -75,6 +75,10 @@ Opciones:
   --admin-password <pwd>    Contraseña del administrador (también SYTUE_ADMIN_PASSWORD).
                             Si se omite, se genera una aleatoria
   --skip-verify             (Compose) No ejecuta la verificación final (smoke test)
+  --sin-erp                 Sin el complemento SyERP (facturación, contabilidad, TPV…)
+  --sin-devx                Sin el complemento DevX: Sytue Cloud (PaaS) y Sytue Analytics
+  --sms-sweego-key <clave>  Activa el complemento de verificación por SMS (Sweego)
+                            (también SYTUE_SMS_SWEEGO_API_KEY)
   --no-build                (Compose) Arranca con las imágenes ya construidas, sin reconstruir
   --domain <dominio>        (Helm) Dominio raíz, p. ej. suite.miempresa.eu
   --admin-email <correo>    (Helm) Correo del propietario inicial
@@ -110,6 +114,9 @@ INTEGRATIONS_ONLY=0
 DO_RESET=0
 SKIP_VERIFY=0
 NO_BUILD=0
+CON_ERP=""
+CON_DEVX=""
+SMS_KEY="${SYTUE_SMS_SWEEGO_API_KEY:-}"
 
 need_arg() { [ $# -ge 2 ] && [ -n "$2" ] || die "La opción $1 necesita un valor."; }
 while [ $# -gt 0 ]; do
@@ -126,6 +133,9 @@ while [ $# -gt 0 ]; do
     --reset)           DO_RESET=1; shift ;;
     --skip-verify)     SKIP_VERIFY=1; shift ;;
     --no-build)        NO_BUILD=1; shift ;;
+    --sin-erp)         CON_ERP=0; shift ;;
+    --sin-devx)        CON_DEVX=0; shift ;;
+    --sms-sweego-key)  need_arg "$@"; SMS_KEY="$2"; shift 2 ;;
     --integrations|integraciones) INTEGRATIONS_ONLY=1; shift ;;
     -h|--help)         usage; exit 0 ;;
     *) err "Opción desconocida: $1"; usage; exit 2 ;;
@@ -530,13 +540,34 @@ livekit_api_key() {
   printf '%s' "${k:-changeme-livekit-api-key}"
 }
 
+# Perfiles de Compose de la suite sin complementos; ERP y DevX se añaden aparte.
+PERFILES_BASE="portal,console,www,hub,mail,drive,docs,calendar,contacts,notes,photos,rooms,cast,pages,bases"
 perfiles_compose() {
+  local p
   case "$1" in
-    full)   echo "full" ;;
+    full)
+      if [ "${CON_ERP:-1}" = 1 ] && [ "${CON_DEVX:-1}" = 1 ]; then echo "full"; return; fi
+      p="$PERFILES_BASE"
+      [ "${CON_ERP:-1}" = 1 ] && p="${p},erp"
+      [ "${CON_DEVX:-1}" = 1 ] && p="${p},cloud,analytics"
+      echo "$p" ;;
     office) echo "drive,docs,mail,calendar,contacts,portal,console" ;;
     core)   echo "portal,console" ;;
     *)      echo "$1" ;;
   esac
+}
+
+# Productos que ofrece el lanzador (Hub, variable APPS) a partir de los perfiles.
+# `photos` no entra: en Compose no tiene app web y su tesela llevaba a la API.
+apps_lanzador() {
+  local perfiles=",$1," apps="one,console,id" par perfil app
+  case "$perfiles" in *,full,*) perfiles=",${PERFILES_BASE},erp,cloud," ;; esac
+  for par in mail:mail drive:drive docs:docs calendar:calendar contacts:contacts notes:notes \
+    rooms:rooms cast:cast pages:pages bases:bases erp:erp cloud:cloud; do
+    perfil="${par%%:*}"; app="${par##*:}"
+    case "$perfiles" in *,"$perfil",*) apps="${apps},${app}" ;; esac
+  done
+  echo "$apps"
 }
 
 datos_locales_existen() {
@@ -724,6 +755,15 @@ ID_INTERNAL_SECRET=$(rand_hex 32)
 SYTUE_SESSION_SECRET=$(rand_hex 32)
 SYTUE_DEV_CLIENT_SECRET=$(rand_hex 32)
 
+# --- Complementos -----------------------------------------------------------
+# Productos que ofrece el lanzador (los que levanta esta instalación).
+SYTUE_APPS=$(apps_lanzador "$perfiles")
+# Cifrado de extremo a extremo: necesita un servidor Matrix, que este entorno no trae.
+SYTUE_CIFRADO_E2E=desactivado
+SYTUE_ROOMS_MATRIX_REQUIRED=false
+# Verificación por SMS (Sweego). Vacía: sin SMS (en local el código va al log).
+SYTUE_SMS_SWEEGO_API_KEY=${SMS_KEY}
+
 # --- Sytue AI (opcional) ---------------------------------------------------
 # Sin clave el servicio arranca y el asistente responde «no configurado».
 # Proveedores: scaleway (por defecto) u openai-compat (+ AI_BASE_URL, p. ej. Ollama).
@@ -752,6 +792,8 @@ completar_env() {
   if [ "$(env_get LIVEKIT_API_KEY)" != "$(livekit_api_key)" ]; then
     env_set LIVEKIT_API_KEY "$(livekit_api_key)"; nuevas+=(LIVEKIT_API_KEY)
   fi
+  [ -n "$(env_get SYTUE_CIFRADO_E2E)" ] || { env_set SYTUE_CIFRADO_E2E desactivado; nuevas+=(SYTUE_CIFRADO_E2E); }
+  [ -n "$(env_get SYTUE_ROOMS_MATRIX_REQUIRED)" ] || { env_set SYTUE_ROOMS_MATRIX_REQUIRED false; nuevas+=(SYTUE_ROOMS_MATRIX_REQUIRED); }
   if [ -z "$(env_get SYTUE_ID_DEV_SEED_PASSWORD)" ]; then
     env_set SYTUE_ID_DEV_SEED_PASSWORD "$ADMIN_PASSWORD"; nuevas+=(SYTUE_ID_DEV_SEED_PASSWORD)
   fi
@@ -881,9 +923,32 @@ instalar_compose() {
       esac
     fi
   fi
+  # Complementos: se pueden quitar sin que el resto pierda funciones.
+  if [ "$PROFILE" = "full" ] || [ "$PROFILE" = "$perfil_previo" ]; then
+    case ",${perfil_previo}," in
+      ,full,|,,) ;;
+      *) [ -z "$CON_ERP" ] && case ",$perfil_previo," in *,erp,*) CON_ERP=1 ;; *) CON_ERP=0 ;; esac
+         [ -z "$CON_DEVX" ] && case ",$perfil_previo," in *,cloud,*) CON_DEVX=1 ;; *) CON_DEVX=0 ;; esac ;;
+    esac
+  fi
+  if [ "$PROFILE" = "full" ] && [ "$NON_INTERACTIVE" -eq 0 ] && [ -z "$perfil_previo" ]; then
+    echo ""
+    echo "  Complementos (se pueden quitar sin que el resto de la suite pierda nada):"
+    if [ -z "$CON_ERP" ]; then
+      prompt_yes_no "¿Incluir SyERP (facturación, contabilidad, inventario, TPV, RR. HH.)?" "s" && CON_ERP=1 || CON_ERP=0
+    fi
+    if [ -z "$CON_DEVX" ]; then
+      prompt_yes_no "¿Incluir DevX (Sytue Cloud: despliegues desde Git y analítica web)?" "s" && CON_DEVX=1 || CON_DEVX=0
+    fi
+    if [ -z "$SMS_KEY" ] && prompt_yes_no "¿Activar la verificación por SMS (necesita una cuenta de Sweego)?" "n"; then
+      read -r -s -p "  Clave de API de Sweego: " SMS_KEY; echo ""
+    fi
+  fi
+  CON_ERP="${CON_ERP:-1}"; CON_DEVX="${CON_DEVX:-1}"
   local perfiles
   perfiles="$(perfiles_compose "$PROFILE")"
   ok "Perfiles: ${BOLD}${perfiles}${RESET} · dominio local: ${BOLD}*.${LOCAL_DOMAIN}${RESET}"
+  info "Complementos: ERP $([ "$CON_ERP" = 1 ] && echo sí || echo no) · DevX $([ "$CON_DEVX" = 1 ] && echo sí || echo no) · SMS $([ -n "$SMS_KEY" ] && echo sí || echo no) · cifrado E2E no (necesita un servidor Matrix, que el modo local no incluye)"
 
   # --- Paso 4: configuración y secretos --------------------------------------
   step "Paso 4 de 5 · Configuración y secretos"
@@ -903,7 +968,9 @@ instalar_compose() {
     [ -z "$ADMIN_PASSWORD" ] && ADMIN_PASSWORD="$(env_get SYTUE_ID_DEV_SEED_PASSWORD)"
     if [ -z "$ADMIN_PASSWORD" ]; then resolver_password_admin; fi
     completar_env
-    if [ "$PROFILE" != "$perfil_previo" ]; then env_set COMPOSE_PROFILES "$perfiles"; fi
+    if [ "$perfiles" != "$perfil_previo" ]; then env_set COMPOSE_PROFILES "$perfiles"; fi
+    env_set SYTUE_APPS "$(apps_lanzador "$perfiles")"
+    [ -n "$SMS_KEY" ] && env_set SYTUE_SMS_SWEEGO_API_KEY "$SMS_KEY"
     if [ "$(env_get SYTUE_ID_DEV_SEED_PASSWORD)" != "$ADMIN_PASSWORD" ]; then
       env_set SYTUE_ID_DEV_SEED_PASSWORD "$ADMIN_PASSWORD"
       ok "Contraseña del administrador actualizada."

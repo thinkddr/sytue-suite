@@ -8,7 +8,7 @@
  * La decisión de gastar una llamada a un modelo, y la de qué se le enseña a
  * quien busca, no deberían depender de montar un combobox para verificarlas.
  */
-import type { Interpretado } from '@sytue/api-clients';
+import type { HubClient, Interpretado, SearchResponse } from '@sytue/api-clients';
 
 /**
  * ¿Da esta consulta para preguntarle al modelo?
@@ -65,4 +65,43 @@ export function fichasDe(
     fichas.push({ clave: 'f', texto: t.hasta(fecha(i.to)) });
   }
   return fichas;
+}
+
+/** Lo que deja una búsqueda en la suite: la respuesta y, si hizo falta, lo que entendió la IA. */
+export interface BusquedaInterpretada {
+  respuesta: SearchResponse;
+  /** `null` = se buscó literalmente, que es lo normal y lo de siempre. */
+  interpretado: Interpretado | null;
+}
+
+/**
+ * Busca en el Hub y, si la búsqueda de siempre no encuentra nada, le pide a la IA que
+ * entienda la frase. La usan el buscador de la barra y la paleta de la suite (⌘K): la
+ * misma consulta tiene que dar lo mismo en los dos sitios.
+ *
+ * LA IA ENTRA SOLO CUANDO LA BÚSQUEDA DE SIEMPRE NO ENCUENTRA NADA, y esto es lo que
+ * hace que la función salga gratis: mientras buscar funciona, no se gasta ni una
+ * llamada ni un milisegundo. Cuando falla —que es cuando alguien ha escrito una frase
+ * en vez de una palabra— no hay nada que perder: peor que cero resultados no se puede
+ * quedar. Con `literal` (quien pulsó «Buscar las palabras exactas» para ESTA consulta)
+ * no se pregunta. `alEntender` avisa de la segunda vuelta, que tarda más y se dice.
+ */
+export async function buscarConInterpretacion(
+  hub: Pick<HubClient, 'search'>,
+  consulta: string,
+  opciones: { literal?: boolean; alEntender?: (entendiendo: boolean) => void } = {},
+): Promise<BusquedaInterpretada> {
+  const respuesta = await hub.search(consulta);
+  if (respuesta.results.length > 0 || opciones.literal || !mereceInterpretarse(consulta)) {
+    return { respuesta, interpretado: null };
+  }
+  opciones.alEntender?.(true);
+  try {
+    const conIa = await hub.search(consulta, undefined, { ia: true });
+    if (conIa.results.length > 0)
+      return { respuesta: conIa, interpretado: conIa.interpretado ?? null };
+  } finally {
+    opciones.alEntender?.(false);
+  }
+  return { respuesta, interpretado: null };
 }

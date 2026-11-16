@@ -100,11 +100,11 @@ type buscadorBarra struct {
 	estrecho bool
 	espera   *time.Timer
 	atajoUna sync.Once
-	// alAtajo, si una app se ha quedado ⌘K (`BarraSuite.CederAtajo`), se llama en vez de
-	// enfocar este campo. alAtajoSi es lo mismo pero puede devolverlo: con false, ⌘K
-	// enfoca el buscador como siempre (`BarraSuite.CederAtajoSi`).
-	alAtajo   func()
+	// alAtajoSi es la app que se queda ⌘K cuando quiere (`BarraSuite.CederAtajoSi`): si
+	// devuelve false, ⌘K abre la paleta como siempre.
 	alAtajoSi func() bool
+	// paleta es la de la suite, que es lo que abre ⌘K (la pone la barra).
+	paleta *PaletaDeLaSuite
 }
 
 func nuevoBuscadorBarra(t *i18n.Translator, s *sesion.Suite) *buscadorBarra {
@@ -246,29 +246,50 @@ func (b *buscadorBarra) parar() {
 //
 // En la web lo escucha `document`; aquí el equivalente es el lienzo de la ventana, al
 // que solo se llega cuando el widget ya está montado — de ahí que se intente en cada
-// colocación y se quede con la primera que encuentra algo.
+// colocación y se quede con la primera que encuentra algo. Es también cuando la paleta
+// sabe sobre qué ventana abrirse.
 func (b *buscadorBarra) registrarAtajo() {
 	c := lienzoDe(b.campo)
 	if c == nil {
 		return
 	}
 	b.atajoUna.Do(func() {
+		if b.paleta != nil {
+			b.paleta.EnLienzo(c)
+		}
 		c.AddShortcut(&desktop.CustomShortcut{
 			KeyName: fyne.KeyK, Modifier: fyne.KeyModifierShortcutDefault,
 		}, func(fyne.Shortcut) { b.pulsarAtajo(c) })
 	})
 }
 
-// pulsarAtajo es lo que hace ⌘K: lo de la app que se lo quedó, o enfocar este campo.
+// pulsarAtajo es lo que hace ⌘K: lo de la app que se lo quedó o, si no, abrir la paleta
+// de la suite (y cerrarla si ya lo está). Con otro diálogo encima, ⌘K es de ese diálogo:
+// abrir otra capa encima lo taparía. Ya no enfoca este campo, como en la web: el
+// buscador de la barra sigue ahí para buscar con el ratón, y su tecla es decoración.
 func (b *buscadorBarra) pulsarAtajo(c fyne.Canvas) {
 	if b.alAtajoSi != nil && b.alAtajoSi() {
 		return
 	}
-	if b.alAtajo != nil {
-		b.alAtajo()
+	if b.paleta == nil {
+		enfocar(c, b.campo)
 		return
 	}
-	enfocar(c, b.campo)
+	b.paleta.EnLienzo(c)
+	if !b.paleta.Abierta() && c != nil && c.Overlays().Top() != nil {
+		return
+	}
+	b.paleta.Alternar()
+}
+
+// buscarParaPaleta es la pregunta de la paleta al Hub: la misma que la de este campo,
+// con su tope y su sesión. Sin nadie dentro no se pregunta.
+func (b *buscadorBarra) buscarParaPaleta(ctx context.Context, q string) ([]api.HubHit, error) {
+	if b.s != nil && !b.s.Estado().Dentro() {
+		return nil, nil
+	}
+	res, err := b.hub.Search(ctx, q, MaxResultadosBarra)
+	return res.Hits, err
 }
 
 func (b *buscadorBarra) alEnfocar(enfocado bool) {

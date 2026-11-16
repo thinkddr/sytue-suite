@@ -51,7 +51,7 @@ func pantallaConServicio(t *testing.T, responder func(w http.ResponseWriter, r *
 	p := NuevaPantalla(traductor(t), api.NewERP(srv.URL, nil, nil, "es"), nil)
 	p.fondo = func(f func()) { f() }
 	p.Catalogo = catalogoEjemplo()
-	p.paleta.Modelos = p.Modelos()
+	p.ponerCapas()
 	p.Objeto()
 	return p, sf
 }
@@ -236,9 +236,10 @@ func TestElImporteCaeALaSumaDeLaPagina(t *testing.T) {
 	}
 }
 
-// TestLaPaletaSeAbreConElFocoEnSuCampo: es el `autofocus` de la web; se abre para
-// escribir. (Que ⌘K llegue aquí y no al buscador de la suite lo guarda
-// `ui.TestUnaAppSeQuedaElAtajoDelBuscador`: el lienzo de pruebas no dispara atajos.)
+// TestLaPaletaSeAbreConElFocoEnSuCampo: «Ir a…» abre la paleta de la SUITE —la de la
+// barra, no una propia— con el foco en su campo: es el `autofocus` de la web. (Que ⌘K la
+// abra lo guarda `ui.TestElAtajoAbreLaPaletaDeLaSuite`: el lienzo de pruebas no dispara
+// atajos.)
 func TestLaPaletaSeAbreConElFocoEnSuCampo(t *testing.T) {
 	p := pantallaDePrueba(t)
 	barra := ui.NuevaBarraSuite(p.tr, nil, iconos.ERP)
@@ -249,8 +250,8 @@ func TestLaPaletaSeAbreConElFocoEnSuCampo(t *testing.T) {
 	p.Atajos(w.Canvas(), barra)
 
 	p.AbrirPaleta()
-	if !p.abierta {
-		t.Fatal("la paleta no se abre")
+	if !p.paleta.Abierta() || p.paleta != barra.Paleta() {
+		t.Fatal("no se abre la paleta de la suite")
 	}
 	if w.Canvas().Focused() != p.paleta.Campo() {
 		t.Errorf("la paleta se abre sin el foco en su campo (enfocado: %T)", w.Canvas().Focused())
@@ -266,19 +267,19 @@ func TestLaPaletaSeRecorreConElTeclado(t *testing.T) {
 	// «cli» deja solo las dos áreas: sin escribir nada van antes las pantallas.
 	pa.Escribir("cli")
 	pa.Teclear(&fyne.KeyEvent{Name: fyne.KeyDown})
-	if pa.Cursor != 1 {
-		t.Fatalf("la flecha abajo deja el cursor en %d", pa.Cursor)
+	if pa.Cursor() != 1 {
+		t.Fatalf("la flecha abajo deja el cursor en %d", pa.Cursor())
 	}
 	pa.Teclear(&fyne.KeyEvent{Name: fyne.KeyReturn})
-	if p.abierta || p.lista.Modelo.Clave != "cliente" {
-		t.Fatalf("Intro no abre lo resaltado: abierta %v, modelo %q", p.abierta, p.lista.Modelo.Clave)
+	if pa.Abierta() || p.lista.Modelo.Clave != "cliente" {
+		t.Fatalf("Intro no abre lo resaltado: abierta %v, modelo %q", pa.Abierta(), p.lista.Modelo.Clave)
 	}
 	p.AbrirPaleta()
-	if pa.Cursor != 0 || pa.Consulta != "" {
-		t.Errorf("la paleta reabre con cursor %d y consulta %q", pa.Cursor, pa.Consulta)
+	if pa.Cursor() != 0 || pa.Consulta() != "" {
+		t.Errorf("la paleta reabre con cursor %d y consulta %q", pa.Cursor(), pa.Consulta())
 	}
 	pa.Teclear(&fyne.KeyEvent{Name: fyne.KeyEscape})
-	if p.abierta {
+	if pa.Abierta() {
 		t.Error("Escape no cierra la paleta")
 	}
 	// Una letra NO es de la paleta: va al campo.

@@ -260,6 +260,8 @@ type BarraSuite struct {
 	// ayudaUna engancha «?» al lienzo una sola vez, en cuanto lo hay.
 	atajosDeApp func() []GrupoDeAtajos
 	ayudaUna    sync.Once
+	// paleta es la de la suite (⌘K): la abre el atajo y las apps le ponen sus capas.
+	paleta *PaletaDeLaSuite
 }
 
 // aparienciaVista es lo que decide cómo se pinta el marco: el tema, el color y la forma.
@@ -303,6 +305,11 @@ func NuevaBarraSuite(t *i18n.Translator, s *sesion.Suite, p iconos.Producto) *Ba
 	b := &BarraSuite{t: t, s: s}
 	b.marca = nuevaMarcaBarra(p)
 	b.buscador = nuevoBuscadorBarra(t, s)
+	b.paleta = NuevaPaletaDeLaSuite(t)
+	if b.buscador.hub != nil {
+		b.paleta.BuscarEnHub = b.buscador.buscarParaPaleta
+	}
+	b.buscador.paleta = b.paleta
 	b.avisos = nuevoAvisosBarra(t, s)
 	b.cuenta = nuevaCuentaBarra(t, s)
 	// La foto cambia EN VIVO: el aviso llega por el flujo de la campana y la cuenta
@@ -570,18 +577,12 @@ func (b *BarraSuite) CallarAvisosSi(f func() bool) {
 	a.mu.Unlock()
 }
 
-// CederAtajo le da ⌘K / Ctrl+K a la app: al pulsarlo se llama `f` en vez de llevar
-// el foco al buscador de la suite.
-//
-// Existe por la paleta del ERP. En la web escuchan los dos —el buscador global en
-// `document` y el ERP en `window`— y gana el ERP, que abre su paleta y se queda el
-// foco. Aquí no se puede registrar el mismo atajo dos veces (el segundo pisa al
-// primero, y cuál se engancha antes depende de cuándo se coloque la barra), así que
-// la barra lo cede de forma explícita.
-func (b *BarraSuite) CederAtajo(f func()) { b.buscador.alAtajo = f }
+// Paleta es la paleta de la suite de esta ventana: ⌘K la abre, y cada app le pone sus
+// capas (`PonerCapa`) y la abre desde sus botones (`Abrir`).
+func (b *BarraSuite) Paleta() *PaletaDeLaSuite { return b.paleta }
 
 // CederAtajoSi cede ⌘K solo cuando la app lo quiere: f devuelve si lo atendió y, si no,
-// se enfoca el buscador. Es el `defaultPrevented` de la web: Notepads lleva ⌘K a su
+// se abre la paleta de la suite. Es el `defaultPrevented` de la web: Notepads lleva ⌘K a su
 // captura con un día abierto, y el segundo ⌘K (con la captura ya enfocada) busca.
 func (b *BarraSuite) CederAtajoSi(f func() bool) { b.buscador.alAtajoSi = f }
 
@@ -642,6 +643,7 @@ func (b *BarraSuite) AtenderAyuda(c fyne.Canvas, r rune) bool {
 func (b *BarraSuite) Parar() {
 	b.avisos.parar()
 	b.buscador.parar()
+	b.paleta.Parar()
 }
 
 // plegada es la cara de la app de la barra única: teléfono y suite sin desplegar.

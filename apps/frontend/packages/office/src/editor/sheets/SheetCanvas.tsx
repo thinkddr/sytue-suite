@@ -196,7 +196,12 @@ import {
   validationAt,
   validationMessage,
 } from './format';
-import { moverObjetos, reescribirCelda, type Desplazamiento } from './refshift';
+import {
+  moverObjetos,
+  moverReferenciasAjenas,
+  reescribirCelda,
+  type Desplazamiento,
+} from './refshift';
 import {
   applyNameCommand,
   moverNombres,
@@ -2952,8 +2957,10 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     // sumando cinco filas cuando ya eran seis. Ni error ni aviso — solo un
     // resultado que pasaba a estar mal, que es la peor forma de fallar que tiene
     // una hoja de cálculo. Ver sheets/refshift.ts para las reglas.
-    const desplazamiento: Desplazamiento =
-      cmd === 'insrow'
+    // `hoja`: solo se mueven las referencias que apuntan a esta hoja, estén donde estén.
+    const desplazamiento: Desplazamiento = {
+      hoja: s.name,
+      ...(cmd === 'insrow'
         ? { eje: 'fila', desde: value === 'below' ? rc.r2 + 1 : rc.r1, cantidad: 1, tope: MAX_ROWS }
         : cmd === 'delrow'
           ? { eje: 'fila', desde: rc.r1, cantidad: -(rc.r2 - rc.r1 + 1), tope: MAX_ROWS }
@@ -2964,7 +2971,8 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
                 cantidad: 1,
                 tope: MAX_COLS,
               }
-            : { eje: 'columna', desde: rc.c1, cantidad: -(rc.c2 - rc.c1 + 1), tope: MAX_COLS };
+            : { eje: 'columna', desde: rc.c1, cantidad: -(rc.c2 - rc.c1 + 1), tope: MAX_COLS }),
+    };
     const celdas = remap(s.cells);
     for (const ref in celdas) celdas[ref] = reescribirCelda(celdas[ref]!, desplazamiento);
     // Los objetos de la hoja —tablas, minigráficos, gráficos, segmentaciones, el
@@ -2983,13 +2991,16 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     const styles = remap(s.styles);
     if (Object.keys(styles).length > 0) next.styles = styles;
     else delete next.styles;
-    // Y los nombres definidos que apuntan a esta hoja, igual (sheets/nombres.ts).
+    // Y las fórmulas de las OTRAS hojas que la citan (`=Ventas!B4` en «Resumen») y
+    // los nombres definidos que apuntan a ella, igual (refshift.ts, nombres.ts).
     const first = cur.model.sheets[0]?.name ?? s.name;
     apply(
       withNames(
         {
           ...cur.model,
-          sheets: cur.model.sheets.map((x, i) => (i === cur.model.active ? next : x)),
+          sheets: cur.model.sheets.map((x, i) =>
+            i === cur.model.active ? next : moverReferenciasAjenas(x, desplazamiento),
+          ),
         },
         moverNombres(cur.model.names, s.name, first, desplazamiento),
       ),

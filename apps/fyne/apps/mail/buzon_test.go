@@ -876,39 +876,54 @@ func TestElEsqueletoMideLaFila(t *testing.T) {
 		}
 		return float32(f)
 	}
-	l1, meta, l2, l3 := num(barras[1])/100, num(barras[2]), num(barras[3])/100, num(barras[4])/100
+	l1p, meta, l2p, l3p := num(barras[1])/100, num(barras[2]), num(barras[3])/100, num(barras[4])/100
 
-	e := nuevoEsqueleto()
+	e := nuevoEsqueleto("Cargando conversaciones…")
 	const ancho float32 = 600
 	e.Resize(fyne.NewSize(ancho, FilasEsqueleto*AltoEsqueleto))
-	r := test.WidgetRenderer(e).(*esqueletoRenderer)
-	r.Layout(e.Size())
-	cerca := func(a, b float32) bool { return a-b < 0.01 && b-a < 0.01 }
-	for i, f := range r.filas {
-		x := f.l1.Position().X
+	if e.MinSize().Height != FilasEsqueleto*AltoEsqueleto {
+		t.Errorf("las ocho filas piden %v y miden %v", e.MinSize().Height, FilasEsqueleto*AltoEsqueleto)
+	}
+	if e.AccessibilityLabel() != "Cargando conversaciones…" {
+		t.Errorf("el esqueleto se anuncia como %q", e.AccessibilityLabel())
+	}
+	// Los bloques de cada fila, en orden: el avatar, el remitente, la meta, las líneas 2
+	// y 3, y el filete.
+	objs := test.WidgetRenderer(e).Objects()
+	if len(objs) != 6*FilasEsqueleto {
+		t.Fatalf("el esqueleto tiene %d bloques y quiero 6 por fila", len(objs))
+	}
+	cerca := func(a, b float32) bool { return a-b < 0.51 && b-a < 0.51 }
+	for i := range FilasEsqueleto {
+		f := objs[6*i : 6*i+6]
+		avatar, l1, me, l2, l3 := f[0], f[1], f[2], f[3], f[4]
+		if avatar.Size() != ui.MedidaAvatar(ui.AvatarMD) {
+			t.Errorf("fila %d: el avatar mide %v", i, avatar.Size())
+		}
+		x := l1.Position().X
 		derecha := ancho - MargenFila
 		util := derecha - x
-		if fin := f.meta.Position().X + f.meta.Size().Width; !cerca(fin, derecha) || !cerca(f.meta.Size().Width, meta) {
+		if fin := me.Position().X + me.Size().Width; !cerca(fin, derecha) || !cerca(me.Size().Width, meta) {
 			t.Errorf("fila %d: la meta acaba en %v con %v de ancho; la web la pinta de %vpx contra el `px-3` (%v)",
-				i, fin, f.meta.Size().Width, meta, derecha)
+				i, fin, me.Size().Width, meta, derecha)
 		}
-		c1 := f.l1.Position().Y + f.l1.Size().Height/2
-		cm := f.meta.Position().Y + f.meta.Size().Height/2
+		c1 := l1.Position().Y + l1.Size().Height/2
+		cm := me.Position().Y + me.Size().Height/2
 		if !cerca(c1, cm) {
 			t.Errorf("fila %d: la meta se centra en %v y el remitente en %v: no comparten línea", i, cm, c1)
 		}
 		for _, b := range []struct {
 			nombre string
-			r      *ui.Esqueleto
+			r      fyne.CanvasObject
 			parte  float32
-		}{{"l1", f.l1, l1}, {"l2", f.l2, l2}, {"l3", f.l3, l3}} {
+		}{{"l1", l1, l1p}, {"l2", l2, l2p}, {"l3", l3, l3p}} {
 			if !cerca(b.r.Position().X, x) || !cerca(b.r.Size().Width, util*b.parte) {
 				t.Errorf("fila %d: %s en x=%v con %v de ancho; la web la pinta en x=%v al %v %% de %v",
 					i, b.nombre, b.r.Position().X, b.r.Size().Width, x, b.parte*100, util)
 			}
 		}
-		if f.l2.Position().Y <= f.meta.Position().Y+f.meta.Size().Height {
-			t.Errorf("fila %d: la segunda barra (y=%v) no queda bajo la meta", i, f.l2.Position().Y)
+		if l2.Position().Y <= me.Position().Y+me.Size().Height {
+			t.Errorf("fila %d: la segunda barra (y=%v) no queda bajo la meta", i, l2.Position().Y)
 		}
 	}
 }

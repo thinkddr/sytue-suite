@@ -185,6 +185,10 @@ type Editor struct {
 	notas       *panelNotas
 	avisos      *ui.PilaAvisos
 	menuDiapos  *ui.Menu
+	// alt es el campo «Texto alternativo» de la mini-barra con una imagen elegida
+	// (alt.go). Se crea una vez y se reutiliza en cada recomposición: así la mini-barra
+	// se puede rehacer mientras se escribe sin quitarle el foco ni el cursor.
+	alt campoAlt
 }
 
 var _ editor.Lienzo = (*Editor)(nil)
@@ -601,6 +605,7 @@ func (e *Editor) variante() tema.Variante {
 // recompone sus cajas él solo, y el área de notas no puede perder el cursor).
 func (e *Editor) recomponer() {
 	e.activa = min(max(e.activa, 0), max(len(e.m.Diapos)-1, 0))
+	e.confirmarAltAjeno()
 	// Lo elegido que ya no existe —se borró, se deshizo, cambió la disposición— se suelta.
 	if e.sel != "" && e.m.caja(e.objetivo(), e.sel) == nil {
 		e.sel, e.extra = "", nil
@@ -795,9 +800,7 @@ func (e *Editor) controlesSeleccion() []fyne.CanvasObject {
 	var objs []fyne.CanvasObject
 	switch p.Tipo {
 	case "image":
-		alt := editor.NuevoBotonCinta(iconos.EdImagen, e.t("image.alt.label"), e.PedirAlt)
-		alt.Activo, alt.Inerte = AltDe(*p) != "", ro
-		objs = append(objs, editor.Divisor(), alt)
+		objs = append(objs, editor.Divisor(), e.campoAltPara(*p))
 	case "shape":
 		objs = append(objs, editor.Divisor())
 		if p.Forma != "line" && p.Forma != "arrow" {

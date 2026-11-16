@@ -23,7 +23,8 @@ import type { Interpretado, SearchResult } from '@sytue/api-clients';
 import type { ProductKey } from '@sytue/config';
 import type { Locale } from '@sytue/i18n';
 import { useShell } from './context.js';
-import { fichasDe, mereceInterpretarse } from './interpretacion.js';
+import { buscarConInterpretacion } from './interpretacion.js';
+import { BandaInterpretacion } from './BandaInterpretacion.js';
 
 /** Agrupa los resultados por producto preservando el orden de aparición (ya
  * vienen rankeados globalmente por el Hub: el mejor producto encabeza). */
@@ -127,25 +128,16 @@ export function GlobalSearch(): JSX.Element {
       void (async () => {
         try {
           const q = query.trim();
-          let res = await hub.search(q);
-          let entendido: Interpretado | null = null;
-          // LA IA ENTRA SOLO CUANDO LA BÚSQUEDA DE SIEMPRE NO ENCUENTRA NADA, y
-          // esto es lo que hace que la función salga gratis: mientras buscar
-          // funciona, no se gasta ni una llamada ni un milisegundo. Cuando falla
-          // —que es cuando alguien ha escrito una frase en vez de una palabra—
-          // no hay nada que perder: peor que cero resultados no se puede quedar.
-          if (res.results.length === 0 && q !== literalDe && mereceInterpretarse(q)) {
-            setEntendiendo(true);
-            try {
-              const conIa = await hub.search(q, undefined, { ia: true });
-              if (conIa.results.length > 0) {
-                res = conIa;
-                entendido = conIa.interpretado ?? null;
-              }
-            } finally {
-              setEntendiendo(false);
-            }
-          }
+          // La IA entra solo si la búsqueda de siempre no encuentra nada: ver
+          // `buscarConInterpretacion`, que es la misma que usa la paleta (⌘K).
+          const { respuesta: res, interpretado: entendido } = await buscarConInterpretacion(
+            hub,
+            q,
+            {
+              literal: q === literalDe,
+              alEntender: setEntendiendo,
+            },
+          );
           setResults(res.results);
           setFallidos(res.fallidos);
           setInterpretado(entendido);
@@ -214,61 +206,18 @@ export function GlobalSearch(): JSX.Element {
     setActivo((i) => (i + (e.key === 'ArrowDown' ? 1 : -1) + ordenados.length) % ordenados.length);
   };
 
-  /**
-   * La banda de «entendido como», con una ficha por filtro aplicado y la salida
-   * a la búsqueda literal.
-   *
-   * ES OBLIGATORIA, no un adorno. Una búsqueda que ha acotado a un producto o a
-   * un rango de fechas que nadie ha visto devuelve pocos resultados —o ninguno—
-   * sin explicar por qué, y quien busca concluye que lo que busca no existe.
-   * Enseñarlo Y poder deshacerlo en un clic es lo que convierte una deducción en
-   * una ayuda en vez de en una jugarreta.
-   */
-  const fichas = interpretado
-    ? fichasDe(
-        interpretado,
-        (k) => appForKey(k)?.name.replace('Sytue ', '') ?? k,
-        (kind) => t(`search.kind.${kind}` as Parameters<typeof t>[0]),
-        (ms) => new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
-        {
-          fuente: (nombre) => t('search.ai.source', { name: nombre }),
-          tipo: (kind) => t('search.ai.kind', { kind }),
-          rango: (desde, hasta) => t('search.ai.range', { from: desde, to: hasta }),
-          desde: (d) => t('search.ai.since', { from: d }),
-          hasta: (h) => t('search.ai.until', { to: h }),
-        },
-      )
-    : [];
-
-  const banda =
-    interpretado && fichas.length > 0 ? (
-      <div
-        role="status"
-        class="border-border flex flex-wrap items-center gap-1.5 border-b px-3 py-2 text-xs"
-      >
-        {/* Sin `label`: es decorativo, el texto de al lado ya lo dice. */}
-        <Icon name="ai" size={14} class="text-text-muted shrink-0" />
-        <span class="text-text-muted">{t('search.ai.applied')}</span>
-        {fichas.map((f) => (
-          <span key={f.clave} class="bg-bg-subtle text-text rounded px-1.5 py-0.5">
-            {f.texto}
-          </span>
-        ))}
-        <Button
-          size="sm"
-          variant="ghost"
-          class="ml-auto"
-          onClick={() => {
-            // Se recuerda PARA ESTA CONSULTA: al cambiar el texto vuelve a
-            // ofrecerse, porque la preferencia era sobre esta búsqueda.
-            setLiteralDe(query.trim());
-            setInterpretado(null);
-          }}
-        >
-          {t('search.ai.literal')}
-        </Button>
-      </div>
-    ) : null;
+  // La banda de «entendido como», compartida con la paleta de la suite.
+  const banda = (
+    <BandaInterpretacion
+      interpretado={interpretado}
+      onLiteral={() => {
+        // Se recuerda PARA ESTA CONSULTA: al cambiar el texto vuelve a ofrecerse,
+        // porque la preferencia era sobre esta búsqueda.
+        setLiteralDe(query.trim());
+        setInterpretado(null);
+      }}
+    />
+  );
 
   return (
     <div

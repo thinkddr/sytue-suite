@@ -306,6 +306,59 @@ func TestEtiquetarEsOptimistaYVuelveAtras(t *testing.T) {
 	}
 }
 
+// TestLasAspasSeApaganMientrasSeGuardaUnaEtiqueta: como `removeDisabled={busyId !== null}`
+// de la web, mientras la petición de poner o quitar una etiqueta va, ni las aspas ni el
+// «Añadir» de la ficha responden; al volver, se encienden otra vez.
+func TestLasAspasSeApaganMientrasSeGuardaUnaEtiqueta(t *testing.T) {
+	s := &servicioFalso{contactos: []api.Contact{persona("ana", "Ana")}}
+	a := appDePrueba(t, s)
+	a.Cargar()
+	p := a.Pantalla
+	ana := p.Contactos[0]
+	p.Etiquetas = []api.ContactGroup{
+		{ID: "f", Name: "Familia", Members: []string{ana.UID}},
+		{ID: "t", Name: "Trabajo", Members: []string{ana.UID}},
+	}
+	var apagadas, anadirApagado bool
+	var pendiente func()
+	a.enFondo = func(f func()) {
+		caja := p.etiquetasDe(ana).(*fyne.Container)
+		apagadas = true
+		for _, o := range caja.Objects {
+			switch w := o.(type) {
+			case *ui.Etiqueta:
+				apagadas = apagadas && w.Aspa() != nil && w.Aspa().Disabled()
+			case *ui.Boton:
+				anadirApagado = w.Disabled()
+			}
+		}
+		pendiente = f
+	}
+	a.etiquetar(p.Etiquetas[0], ana)
+	if !apagadas {
+		t.Error("mientras se guarda la etiqueta, alguna aspa sigue encendida")
+	}
+	if !anadirApagado {
+		t.Error("mientras se guarda la etiqueta, «Añadir» sigue encendido")
+	}
+	// Un segundo toque mientras va no lanza otra petición.
+	otra := false
+	a.enFondo = func(func()) { otra = true }
+	a.etiquetar(p.Etiquetas[1], ana)
+	if otra {
+		t.Error("un segundo toque con la etiqueta en vuelo lanzó otra petición")
+	}
+	pendiente()
+	if p.EtiquetaOcupada != "" {
+		t.Errorf("al volver la petición la etiqueta %q sigue ocupada", p.EtiquetaOcupada)
+	}
+	for _, o := range p.etiquetasDe(ana).(*fyne.Container).Objects {
+		if e, es := o.(*ui.Etiqueta); es && e.Aspa().Disabled() {
+			t.Errorf("al volver la petición el aspa de %q sigue apagada", e.Texto)
+		}
+	}
+}
+
 func TestLaFichaVaciaAlGirarPermiteAlcanzarCrearContacto(t *testing.T) {
 	defer ui.TactilDePrueba(true)()
 	p := pantallaDeMuestra(t)

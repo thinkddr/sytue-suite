@@ -278,7 +278,7 @@ func (b *Bandeja) CreateRenderer() fyne.WidgetRenderer {
 	r.lista = lista
 	r.cuerpo = ui.EnvolverLista(lista)
 
-	r.esqueleto = nuevoEsqueleto()
+	r.esqueleto = nuevoEsqueleto(b.T.T("list.loading", nil))
 	r.vacio = ui.NuevoVacio("", "")
 	b.r = r
 	r.objetos = []fyne.CanvasObject{
@@ -355,7 +355,7 @@ type bandejaRenderer struct {
 	seleccion                                  *BarraSeleccion
 	lista                                      *widget.List
 	cuerpo                                     fyne.CanvasObject
-	esqueleto                                  *Esqueleto
+	esqueleto                                  *ui.FilasEsqueleto
 	vacio                                      *ui.Vacio
 	marcaVacio                                 marcaVacio // con qué se pintó `vacio`
 	objetos                                    []fyne.CanvasObject
@@ -550,64 +550,6 @@ func (r *bandejaRenderer) ponerVacio() {
 	}
 }
 
-// Esqueleto son las ocho filas grises de la carga, con la geometría de la fila real.
-type Esqueleto struct {
-	widget.BaseWidget
-}
-
-var _ fyne.Widget = (*Esqueleto)(nil)
-
-func nuevoEsqueleto() *Esqueleto {
-	e := &Esqueleto{}
-	e.ExtendBaseWidget(e)
-	return e
-}
-
-// AccessibilityLabel: la web lo marca `aria-hidden` y anuncia «Cargando…» aparte. Lo
-// anunciable es el estado, no los rectángulos.
-func (e *Esqueleto) AccessibilityLabel() string { return "" }
-
-// AccessibilityRole implementa fyne.Accessible.
-func (e *Esqueleto) AccessibilityRole() fyne.AccessibleRole { return fyne.AccessibleRoleContainer }
-
-// CreateRenderer compone las ocho filas.
-func (e *Esqueleto) CreateRenderer() fyne.WidgetRenderer {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	r := &esqueletoRenderer{e: e}
-	for range FilasEsqueleto {
-		f := filaEsqueleto{
-			filete: canvas.NewRectangle(tema.Color("border", v)),
-			avatar: ui.NuevoEsqueletoRedondo(ui.MedidaAvatar(ui.AvatarMD).Width),
-			l1:     ui.NuevoEsqueleto(0, 0),
-			l2:     ui.NuevoEsqueleto(0, 0),
-			l3:     ui.NuevoEsqueleto(0, 0),
-			meta:   ui.NuevoEsqueleto(0, 0),
-		}
-		r.filas = append(r.filas, f)
-		r.objetos = append(r.objetos, f.filete, f.avatar, f.l1, f.l2, f.l3, f.meta)
-	}
-	return r
-}
-
-type filaEsqueleto struct {
-	filete           *canvas.Rectangle
-	avatar           *ui.Esqueleto
-	l1, l2, l3, meta *ui.Esqueleto
-}
-
-type esqueletoRenderer struct {
-	e       *Esqueleto
-	filas   []filaEsqueleto
-	objetos []fyne.CanvasObject
-}
-
-func (r *esqueletoRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(ui.AnchoPanelBase, FilasEsqueleto*AltoEsqueleto)
-}
-
-func (r *esqueletoRenderer) Objects() []fyne.CanvasObject { return r.objetos }
-func (r *esqueletoRenderer) Destroy()                     {}
-
 // Proporciones de las barras del esqueleto, las mismas `width` que escribe la web.
 // Son fracciones de la columna de texto ENTERA: desde 7ee588aa la meta vive en la
 // línea del remitente y las líneas 2 y 3 ocupan todo el ancho, como en la fila real.
@@ -618,65 +560,35 @@ const (
 	anchoMetaEsqueleto float32 = 36
 )
 
-// Layout copia el marcado de la web: `h-[83px] gap-3 px-3` con el punto de 7, el
-// avatar de 40 y una columna `flex-1` cuya primera línea es `justify-between
-// items-center` (remitente al 45 % y meta de 36 px a la derecha, centrada con él) y
-// después dos barras de 12 px al 80 % y 65 % de la columna. Todo se centra en la caja
-// de CONTENIDO, que es la fila menos su `border-b` (`box-sizing: border-box`).
+// nuevoEsqueleto son las ocho filas grises de la carga, con la geometría de la fila
+// real: `h-[83px] gap-3 px-3` con el punto de 7, el avatar de 40 y una columna `flex-1`
+// cuya primera línea es `justify-between items-center` (remitente al 45 % y meta de
+// 36 px a la derecha, centrada con él) y después dos barras de 12 px al 80 % y 65 % de
+// la columna, con el `mt-2` entre ellas. Todo se centra en la caja de CONTENIDO, que
+// es la fila menos su `border-b`.
 //
-// Antes la meta era una columna aparte centrada en la fila y recortaba las tres
-// barras: al llegar los datos la fila real (33f08443) saltaba respecto al esqueleto.
-func (r *esqueletoRenderer) Layout(t fyne.Size) {
+// Es `ui.FilasEsqueleto` con la receta de la bandeja: un solo latido para las ocho y un
+// solo «Cargando conversaciones…», que es el `sr-only role="status"` de la web.
+func nuevoEsqueleto(rotulo string) *ui.FilasEsqueleto {
 	const (
 		altoL1 float32 = 14
 		altoL2 float32 = 12
-		aire   float32 = 2 * 0.25 * tema.Rem // el `mt-2` entre barras
 	)
-	contenido := AltoEsqueleto - tema.Borde
-	for i, f := range r.filas {
-		y := float32(i) * AltoEsqueleto
-		f.filete.Move(fyne.NewPos(0, y+AltoEsqueleto-tema.Borde))
-		f.filete.Resize(fyne.NewSize(t.Width, tema.Borde))
-
-		x := ui.InicioFila() + PuntoSinLeer + HuecoDelantero
-		lado := ui.MedidaAvatar(ui.AvatarMD)
-		f.avatar.Move(fyne.NewPos(x, y+(contenido-lado.Height)/2))
-		f.avatar.Resize(lado)
-		x += lado.Width + HuecoBloque
-
-		derecha := t.Width - MargenFila
-		util := max(derecha-x, 0)
-		bloque := altoL1 + aire + altoL2 + aire + altoL2
-		by := y + (contenido-bloque)/2
-
-		// Primera línea: el remitente no puede comerse la meta (en la web el
-		// `justify-between` con `gap-3` encoge la barra antes que solaparlas).
-		anchoL1 := min(util*parteL1Esqueleto, max(util-anchoMetaEsqueleto-HuecoBloque, 0))
-		f.l1.Move(fyne.NewPos(x, by))
-		f.l1.Resize(fyne.NewSize(anchoL1, altoL1))
-		f.meta.Move(fyne.NewPos(derecha-anchoMetaEsqueleto, by+(altoL1-altoL2)/2))
-		f.meta.Resize(fyne.NewSize(anchoMetaEsqueleto, altoL2))
-		by += altoL1 + aire
-
-		for _, b := range []struct {
-			r     *ui.Esqueleto
-			parte float32
-		}{{f.l2, parteL2Esqueleto}, {f.l3, parteL3Esqueleto}} {
-			b.r.Move(fyne.NewPos(x, by))
-			b.r.Resize(fyne.NewSize(util*b.parte, altoL2))
-			by += altoL2 + aire
-		}
-	}
-}
-
-func (r *esqueletoRenderer) Refresh() {
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	// Los bloques se recolorean solos: `ui.Esqueleto` lee el tema en su Refresh. Aquí
-	// solo queda el filete, que no es esqueleto sino el `divide-y` de la lista.
-	for _, f := range r.filas {
-		f.filete.FillColor = tema.Color("border", v)
-	}
-	for _, o := range r.objetos {
-		o.Refresh()
-	}
+	f := ui.NuevasFilasEsqueleto(FilasEsqueleto, ui.DelanteroAvatar, 3).ConReceta(ui.RecetaEsqueleto{
+		Alto:           AltoEsqueleto,
+		Izq:            ui.InicioFila() + PuntoSinLeer + HuecoDelantero,
+		Der:            MargenFila,
+		Delantero:      ui.MedidaAvatar(ui.AvatarMD),
+		HuecoDelantero: HuecoBloque,
+		Rayas: []ui.RayaEsqueleto{
+			// El remitente no puede comerse la meta: en la web el `justify-between` con
+			// `gap-3` encoge la barra antes que solaparlas.
+			{Alto: altoL1, Partes: []float32{parteL1Esqueleto}, Cola: fyne.NewSize(anchoMetaEsqueleto, altoL2)},
+			{Alto: altoL2, Partes: []float32{parteL2Esqueleto}},
+			{Alto: altoL2, Partes: []float32{parteL3Esqueleto}},
+		},
+		HuecoRayas: 2 * 0.25 * tema.Rem, // el `mt-2` entre barras
+	}).ConRotulo(rotulo)
+	f.Filete = true // el `divide-y` de la lista
+	return f
 }

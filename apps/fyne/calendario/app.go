@@ -605,7 +605,8 @@ func (a *App) pintar() {
 	if c != nil {
 		foco = c.Focused()
 	}
-	p.diaElegido, p.asaMes = nil, nil // si ya no hay mes del teléfono, no hay adónde volver
+	grupoAntes := p.grupoCajon
+	p.diaElegido, p.asaMes, p.grupoCajon = nil, nil, nil // si ya no hay mes del teléfono, no hay adónde volver
 	a.raiz.Objects = []fyne.CanvasObject{p.Construir(), a.capaFlotante(), a.avisos}
 	a.raiz.Refresh()
 	switch foco.(type) {
@@ -616,6 +617,12 @@ func (a *App) pintar() {
 	case *asaMes:
 		if p.asaMes != nil {
 			ui.Enfocar(c, p.asaMes)
+		}
+	case *ui.Segmentado:
+		// Una flecha en el selector del cajón cambia la vista y repinta con el cajón
+		// abierto: el foco pasa al selector nuevo para que la siguiente flecha siga.
+		if foco == grupoAntes && p.grupoCajon != nil {
+			ui.Enfocar(c, p.grupoCajon)
 		}
 	}
 }

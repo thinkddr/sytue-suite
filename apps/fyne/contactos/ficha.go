@@ -506,6 +506,7 @@ func (p *Pantalla) etiquetasDe(c api.Contact) fyne.CanvasObject {
 		}
 	}
 	escribe := p.AlEtiquetar != nil && !p.SinConexion
+	ocupada := p.EtiquetaOcupada != ""
 	var hijos []fyne.CanvasObject
 	if len(miembro) == 0 {
 		hijos = append(hijos, ui.NuevoRotulo(p.t("detail.noLabels", nil), tema.TextoBase, ui.Normal, "text-subtle"))
@@ -515,6 +516,10 @@ func (p *Pantalla) etiquetasDe(c api.Contact) fyne.CanvasObject {
 		if escribe {
 			grupo := g
 			chip.ConAspa(p.t("detail.removeLabel", i18n.Vars{"label": g.Name}), func() { p.AlEtiquetar(grupo, c) })
+			// `removeDisabled={busyId !== null}`: mientras se guarda, ninguna aspa quita nada.
+			if ocupada {
+				chip.Aspa().Disable()
+			}
 		}
 		hijos = append(hijos, chip)
 	}
@@ -524,6 +529,9 @@ func (p *Pantalla) etiquetasDe(c api.Contact) fyne.CanvasObject {
 			m := ui.NuevoMenu(p.menuAnadirEtiqueta(c, libres)...)
 			m.Rotulo, m.AlInicio = p.t("detail.addLabel", nil), true
 			m.Mostrar(anadir)
+		}
+		if ocupada {
+			anadir.Disable()
 		}
 		hijos = append(hijos, anadir)
 	}

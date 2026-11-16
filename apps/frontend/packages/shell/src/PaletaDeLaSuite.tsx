@@ -18,8 +18,10 @@ import { createContext, type ComponentChildren, type JSX } from 'preact';
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { appForKey, Kbd, PaletaDeComandos, useAtajo, type OpcionDePaleta } from '@sytue/ui';
 import { useI18n } from '@sytue/i18n/preact';
-import type { HubClient, SearchResult } from '@sytue/api-clients';
+import type { HubClient, Interpretado, SearchResult } from '@sytue/api-clients';
+import { BandaInterpretacion } from './BandaInterpretacion.js';
 import { detalleDe } from './GlobalSearch.js';
+import { buscarConInterpretacion } from './interpretacion.js';
 import {
   comandosQueCasan,
   crearRegistroDePaleta,
@@ -100,8 +102,12 @@ export function ProveedorDePaleta({
         setAbierta(false);
         return;
       }
-      // Dentro de otro diálogo, ⌘K es de ese diálogo: abrir otra capa encima lo taparía.
-      if (document.querySelector('dialog[open], [role="dialog"], [role="alertdialog"]')) return;
+      // TAMBIÉN CON OTRO DIÁLOGO ABIERTO: antes se dejaba pasar «porque ⌘K es de ese
+      // diálogo», pero ningún diálogo de la suite lo usa sin quedárselo (y quien se lo
+      // queda ya ha hecho `preventDefault`, arriba); dejarlo pasar solo servía para que
+      // el navegador se llevara el Ctrl+K a su barra de direcciones. La paleta se abre
+      // encima —en un <dialog> modal, dentro de él (`PaletaDeComandos`)— y al cerrarla
+      // el foco vuelve adonde estaba, dentro del diálogo.
       e.preventDefault();
       abrir();
     };
@@ -163,6 +169,12 @@ function PaletaDeLaSuite({
   const [resultados, setResultados] = useState<SearchResult[]>([]);
   const [buscando, setBuscando] = useState(false);
   const [fallo, setFallo] = useState(false);
+  // Lo que entendió la IA cuando la búsqueda de siempre no encontró nada (la misma
+  // segunda vuelta que el buscador de la barra), si está preguntándoselo, y la consulta
+  // para la que se pidió «Buscar las palabras exactas».
+  const [interpretado, setInterpretado] = useState<Interpretado | null>(null);
+  const [entendiendo, setEntendiendo] = useState(false);
+  const [literalDe, setLiteralDe] = useState('');
 
   const q = consulta.trim();
   useEffect(() => {
@@ -172,22 +184,31 @@ function PaletaDeLaSuite({
       setResultados([]);
       setFallo(false);
       setBuscando(false);
+      setInterpretado(null);
+      setEntendiendo(false);
       return;
     }
     setBuscando(true);
     // Una respuesta que llega tarde, de una consulta ya cambiada, no pisa la nueva.
     let vigente = true;
     const espera = setTimeout(() => {
-      hub.search(q).then(
-        (r) => {
+      buscarConInterpretacion(hub, q, {
+        literal: q === literalDe,
+        alEntender: (si) => {
+          if (vigente) setEntendiendo(si);
+        },
+      }).then(
+        ({ respuesta, interpretado: entendido }) => {
           if (!vigente) return;
-          setResultados(r.results);
+          setResultados(respuesta.results);
+          setInterpretado(entendido);
           setFallo(false);
           setBuscando(false);
         },
         () => {
           if (!vigente) return;
           setResultados([]);
+          setInterpretado(null);
           setFallo(true);
           setBuscando(false);
         },
@@ -196,8 +217,9 @@ function PaletaDeLaSuite({
     return () => {
       vigente = false;
       clearTimeout(espera);
+      setEntendiendo(false);
     };
-  }, [abierta, q, hub]);
+  }, [abierta, q, hub, literalDe]);
 
   if (!abierta) return null;
 
@@ -230,6 +252,7 @@ function PaletaDeLaSuite({
 
   const vacio = (): string => {
     if (!q) return t('suitePalette.typeToSearch');
+    if (entendiendo) return t('search.ai.busy');
     if (buscando || registro.capas().some((c) => c.buscando)) return t('search.busy');
     if (fallo) return t('search.failedShort');
     return t('search.emptyTitle', { query: q });
@@ -247,6 +270,16 @@ function PaletaDeLaSuite({
       consulta={consulta}
       onConsulta={onConsulta}
       opciones={[...deApp, ...deSuite]}
+      aviso={
+        <BandaInterpretacion
+          interpretado={interpretado}
+          onLiteral={() => {
+            // Para ESTA consulta: al cambiar el texto vuelve a ofrecerse.
+            setLiteralDe(q);
+            setInterpretado(null);
+          }}
+        />
+      }
       onElegir={(o) => {
         // La paleta se va antes: si lo elegido pregunta algo (dejar una ficha a
         // medias), que la pregunta no quede debajo de otra capa.

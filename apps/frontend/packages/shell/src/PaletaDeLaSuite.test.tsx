@@ -137,7 +137,7 @@ test('sin capa, la paleta invita a buscar en la suite', () => {
   m.quitar();
 });
 
-test('respeta el ⌘K que ya se ha quedado una app y el de otro diálogo', () => {
+test('respeta el ⌘K que ya se ha quedado una app', () => {
   const m = montar(
     <>
       <Capa />
@@ -150,12 +150,34 @@ test('respeta el ⌘K que ya se ha quedado una app y el de otro diálogo', () =>
   pulsarK(editor);
   expect(dialogo()).toBeNull();
   editor.removeEventListener('keydown', reclamar);
+  m.quitar();
+});
 
+// Visto en ROJO: con otro diálogo abierto la paleta no se abría y el Ctrl+K, sin
+// `preventDefault`, se lo llevaba el navegador.
+test('con otro diálogo abierto, ⌘K abre la paleta encima y el foco vuelve a él', () => {
+  const m = montar(<Capa />);
   const otro = document.body.appendChild(document.createElement('div'));
   otro.setAttribute('role', 'dialog');
+  const boton = otro.appendChild(document.createElement('button'));
+  boton.focus();
+  const e = pulsarK(boton);
+  expect(e.defaultPrevented).toBe(true);
+  const paleta = document.querySelector<HTMLElement>('[role="dialog"][aria-label="Ir a o buscar"]');
+  expect(paleta).not.toBeNull();
+  expect(opciones()).toEqual(['FacturasVentas', 'ClientesCRM']);
   pulsarK();
-  expect(dialogo()).toBe(otro);
+  expect(document.querySelector('[aria-label="Ir a o buscar"]')).toBeNull();
+  expect(document.activeElement).toBe(boton);
   otro.remove();
+
+  // Un <dialog> modal deja inerte todo lo de fuera: la paleta va dentro de él.
+  const modal = document.body.appendChild(document.createElement('dialog'));
+  modal.setAttribute('open', '');
+  pulsarK();
+  expect(modal.querySelector('[aria-label="Ir a o buscar"]')).not.toBeNull();
+  pulsarK();
+  modal.remove();
   m.quitar();
 });
 
@@ -215,6 +237,51 @@ test('con dos letras pregunta al Hub y pone sus resultados debajo, por producto'
     (g) => g.textContent,
   );
   expect(grupos).toEqual(['Ir a', 'Drive', 'Mail']);
+  act(() => render(null, host));
+  host.remove();
+});
+
+// Visto en ROJO: la paleta solo buscaba literalmente; la frase que el buscador de la
+// barra entendía con IA aquí decía «Sin resultados».
+test('si la búsqueda literal no encuentra nada, la paleta la entiende con IA como la barra', async () => {
+  const pedidas: string[] = [];
+  const hub = {
+    search: async (q: string, _f?: unknown, pag?: { ia?: boolean }): Promise<SearchResponse> => {
+      pedidas.push(pag?.ia ? `ia:${q}` : q);
+      if (!pag?.ia) return { results: [], fallidos: [] } as unknown as SearchResponse;
+      return {
+        results: [{ id: '9', source: 'drive', title: 'Factura Acme.pdf', url: '/drive/9' }],
+        fallidos: [],
+        interpretado: { text: 'factura acme', sources: ['drive'] },
+      } as unknown as SearchResponse;
+    },
+  } as unknown as HubClient;
+  const host = document.body.appendChild(document.createElement('div'));
+  act(() => {
+    render(
+      <I18nProvider locale="es">
+        <ProveedorDePaleta hub={hub}>
+          <Capa comandos={[]} />
+        </ProveedorDePaleta>
+      </I18nProvider>,
+      host,
+    );
+  });
+  act(() => abrirPaleta());
+  escribir('la factura de acme');
+  await act(() => new Promise((r) => setTimeout(r, ESPERA_BUSQUEDA_MS + 20)));
+  expect(pedidas).toEqual(['la factura de acme', 'ia:la factura de acme']);
+  expect(opciones()).toEqual(['Factura Acme.pdf']);
+  const banda = document.querySelector<HTMLElement>('[role="dialog"] [role="status"]');
+  expect(banda?.textContent).toContain('Entendido como');
+  expect(banda?.textContent).toContain('Drive');
+  // «Buscar las palabras exactas» vuelve a lo literal para ESTA consulta.
+  const literal = [...banda!.querySelectorAll('button')].at(-1)!;
+  act(() => literal.click());
+  await act(() => new Promise((r) => setTimeout(r, ESPERA_BUSQUEDA_MS + 20)));
+  expect(pedidas.at(-1)).toBe('la factura de acme');
+  expect(document.querySelector('[role="dialog"] [role="status"]')).toBeNull();
+  expect(opciones()).toEqual([]);
   act(() => render(null, host));
   host.remove();
 });

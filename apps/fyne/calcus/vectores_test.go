@@ -124,6 +124,19 @@ type vectores struct {
 			Sale json.RawMessage
 		}
 	} `json:"moverObjetos"` //nolint:tagliatelle // el nombre lo fija la web
+	ReferenciasAjenas struct {
+		Hojas []json.RawMessage
+		Casos []struct {
+			Hoja int
+			D    struct {
+				Eje             string
+				Desde, Cantidad int
+				Tope            int
+				Hoja            string
+			}
+			Sale json.RawMessage
+		}
+	} `json:"referenciasAjenas"` //nolint:tagliatelle // el nombre lo fija la web
 	Minigraficos struct {
 		Geometria []struct {
 			Valores []float64
@@ -493,6 +506,33 @@ func TestVectoresDeMoverObjetos(t *testing.T) {
 		delete(m, "cells")
 		if want := crudoJSON(c.Sale); !reflect.DeepEqual(m, want) {
 			t.Errorf("moverObjetos(%+v):\n  aquí:   %v\n  la web: %v", c.D, m, want)
+		}
+	}
+}
+
+// TestVectoresDeReferenciasAjenas: insertar o borrar filas y columnas en una hoja
+// reescribe las fórmulas de las OTRAS que la citan —celdas, formato condicional y
+// validaciones, respetando la protección— igual que la web.
+func TestVectoresDeReferenciasAjenas(t *testing.T) {
+	v := leerVectores(t)
+	if len(v.ReferenciasAjenas.Casos) == 0 {
+		t.Fatal("calcus.json no trae la sección «referenciasAjenas»")
+	}
+	for _, c := range v.ReferenciasAjenas.Casos {
+		// La hoja del desplazamiento delante, para que el libro sea de verdad.
+		contenido := `{"active":0,"sheets":[{"name":"Otra hoja","cells":{}},` +
+			string(v.ReferenciasAjenas.Hojas[c.Hoja]) + `]}`
+		l := libroDePrueba(t, contenido).Libro
+		d := formula.Desplazamiento{
+			Filas: c.D.Eje == "fila", Desde: c.D.Desde, Cantidad: c.D.Cantidad, Tope: c.D.Tope, Hoja: c.D.Hoja,
+		}
+		moverReferenciasAjenas(&l.f.hojas[1], d)
+		h := l.f.hojas[1].serializar()
+		got := hoja{Cells: h.Cells, CondFormats: h.CondFormats, Validations: h.Validations}
+		m, _ := comoJSON(t, got).(map[string]any)
+		delete(m, "name")
+		if want := crudoJSON(c.Sale); !reflect.DeepEqual(m, want) {
+			t.Errorf("moverReferenciasAjenas(hoja %d, %+v):\n  aquí:   %v\n  la web: %v", c.Hoja, c.D, m, want)
 		}
 	}
 }

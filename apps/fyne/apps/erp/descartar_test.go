@@ -136,9 +136,10 @@ func TestElMenuYLaPaletaPreguntanAntesDeDejarLaFicha(t *testing.T) {
 	}
 
 	p.AbrirPaleta()
-	p.paleta.AlElegir(modelo)
+	p.paleta.Escribir(modelo.Etiqueta)
+	p.paleta.Elegir(opcionDe(t, p, "modelo:"+modelo.Clave))
 	d = dialogoArriba(w)
-	if d == nil || p.abierta || p.ficha != f {
+	if d == nil || p.paleta.Abierta() || p.ficha != f {
 		t.Fatal("elegir en la paleta con cambios debe cerrarla y preguntar antes")
 	}
 	pulsarDelPie(t, d, p.t("form.discard"))

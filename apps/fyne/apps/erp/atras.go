@@ -7,7 +7,7 @@ package erp
 // La ficha conserva su propia acción de cierre, igual que el botón visible.
 func (p *Pantalla) atras() bool {
 	switch {
-	case p.abierta:
+	case p.paleta.Abierta():
 		p.CerrarPaleta()
 	case p.ficha != nil:
 		if p.ficha.AlCerrar == nil {

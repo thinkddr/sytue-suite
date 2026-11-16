@@ -100,8 +100,8 @@ func pintarSeccion(t *testing.T, comb, clave string, v tema.Variante) image.Imag
 		t.Fatalf("%s en %s: la captura mide %dx%d y el lienzo %dx%d", clave, comb, b.Dx(), b.Dy(), AnchoMuestrario, AltoMuestrario)
 	}
 	papel := tema.Color("bg", v)
-	// El rincón de abajo a la derecha queda siempre libre; el diálogo lo vela.
-	if esquina := enNRGBA(img, AnchoMuestrario-2, AltoMuestrario-2); clave != "dialogo" && papel.A == 0xff && !casi(esquina, papel) {
+	// El rincón de abajo a la derecha queda siempre libre; el diálogo y la paleta lo velan.
+	if esquina := enNRGBA(img, AnchoMuestrario-2, AltoMuestrario-2); clave != "dialogo" && clave != "paleta" && papel.A == 0xff && !casi(esquina, papel) {
 		t.Errorf("%s en %s: el papel pinta %v y el token `bg` es %v", clave, comb, esquina, papel)
 	}
 	// Por debajo de la cabecera, la sección tiene que pintar algo: una que se

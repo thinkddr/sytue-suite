@@ -209,6 +209,38 @@ func TestElAvisoNoSeVaConElFocoDentro(t *testing.T) {
 	}
 }
 
+// TestElRelojQueLlegaTardeNoSeLlevaElAvisoRetenido: el reloj dispara en su rutina y su
+// `Descartar` espera turno en la de la interfaz. Si entre medias el foco o el puntero
+// entran en el aviso —el Tab de «Deshacer» al aspa suelta y retiene en la misma
+// pulsación—, ese descarte ya no vale: quien está con el aviso manda (WCAG 2.2.1).
+//
+// Era la causa de TestElAvisoNoSeVaConElFocoDentro intermitente bajo `-race` y carga:
+// con lo que le quedaba casi agotado, el `FocusLost` de la acción soltaba el reloj, este
+// disparaba antes del `FocusGained` del aspa y el descarte encolado se lo llevaba igual.
+//
+// VISTO EN ROJO: sin `PilaAvisos.vencer`, el aviso se va con el foco en la acción.
+func TestElRelojQueLlegaTardeNoSeLlevaElAvisoRetenido(t *testing.T) {
+	p := pilaQueSeVacia(t)
+	a := avisoCorto(t, "Movido a la papelera")
+	a.Duracion = time.Millisecond
+	p.Notificar(a)
+
+	// Sin `fyne.DoAndWait`: el reloj dispara y su descarte se queda encolado.
+	time.Sleep(50 * time.Millisecond)
+	a.accion.FocusGained()
+	dejarPasar(100 * time.Millisecond)
+	if len(p.Avisos()) != 1 {
+		t.Fatal("con el foco en la acción, el descarte que llegó tarde se ha llevado el aviso")
+	}
+
+	// Al salir el foco, el tiempo que quedaba (ninguno) se cumple de verdad.
+	a.accion.FocusLost()
+	esperar(t, func() bool { return len(p.Avisos()) == 0 })
+	if len(p.Avisos()) != 0 {
+		t.Error("al sacar el foco, el aviso no se ha ido cuando le tocaba")
+	}
+}
+
 // TestElCuartoAvisoEsperaEnCola: como mucho tres en pantalla; el cuarto espera, sin
 // gastar su tiempo, y entra cuando se va uno. Y los de peligro siguen sin reloj al
 // salir de la cola.

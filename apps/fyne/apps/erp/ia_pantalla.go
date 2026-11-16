@@ -339,7 +339,7 @@ func (p *Pantalla) destinosTableros() []Destino {
 // guardó.
 func (p *Pantalla) AbrirTablero(tb api.ERPTablero) {
 	p.pararEspera()
-	p.Vista, p.ficha, p.cajon, p.abierta = VistaTablero, nil, false, false
+	p.Vista, p.ficha, p.cajon = VistaTablero, nil, false
 	p.lista.Modelo = Modelo{}
 	t := NuevoTablero(p.tr, tb)
 	t.AlExcel = func() { p.excelTablero(t) }

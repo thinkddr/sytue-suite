@@ -202,7 +202,7 @@ func pantallaDeVentas(t *testing.T, responder func(w http.ResponseWriter, r *htt
 	t.Helper()
 	p, sf := pantallaConServicio(t, responder)
 	p.Catalogo = catalogoVentas()
-	p.paleta.Modelos = p.Modelos()
+	p.ponerCapas()
 	p.Permisos, p.SabePermisos = permisosDeVenta(), true
 	var abierto bool
 	fyne.DoAndWait(func() {

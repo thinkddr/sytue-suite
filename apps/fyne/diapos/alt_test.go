@@ -62,43 +62,107 @@ func TestAltDe(t *testing.T) {
 	}
 }
 
-// TestElTextoAlternativoSeEditaDesdeLaMiniBarra: con una imagen seleccionada, la mini-barra
-// lleva «Texto alternativo de la imagen» (encendido si ya lo tiene), que lo pregunta con el
-// texto de ahora; lo aceptado se guarda limpio y vacío lo quita, como CampoAlt de la web.
+// campoAltDe es el campo «Texto alternativo» de la mini-barra, si está.
+func campoAltDe(e *Editor) *ui.Entrada {
+	for _, o := range e.miniBarra.Objects {
+		if c, ok := o.(*ui.Entrada); ok && c.Rotulo == e.t("image.alt.label") {
+			return c
+		}
+	}
+	return nil
+}
+
+// escribirEn enfoca el campo y escribe en él como el teclado (letra a letra).
+func escribirEn(w fyne.Window, c *ui.Entrada, texto string) {
+	w.Canvas().Focus(c)
+	for _, r := range texto {
+		c.TypedRune(r)
+	}
+}
+
+// TestElTextoAlternativoSeEditaDesdeLaMiniBarra: con una imagen elegida, la mini-barra
+// lleva el campo «Texto alternativo» de CampoAlt.tsx con el texto de ahora; se escribe en
+// línea, Intro (o salir del campo) lo guarda limpio, y vacío lo quita.
 func TestElTextoAlternativoSeEditaDesdeLaMiniBarra(t *testing.T) {
 	e, ctx, w := montar(t, conImagenDescrita)
-	botonAlt := func() *editor.BotonCinta {
-		for _, o := range e.miniBarra.Objects {
-			if b, ok := o.(*editor.BotonCinta); ok && b.Rotulo == e.t("image.alt.label") {
-				return b
-			}
-		}
-		return nil
-	}
-	if botonAlt() != nil {
+	if campoAltDe(e) != nil {
 		t.Error("sin imagen seleccionada la mini-barra lleva el texto alternativo")
 	}
 	e.SeleccionarSolo("i")
-	b := botonAlt()
-	if b == nil || !b.Activo {
-		t.Fatalf("con la imagen descrita seleccionada, el botón: %+v", b)
+	c := campoAltDe(e)
+	if c == nil || c.Texto() != "Mapa de las oficinas de Madrid y Lisboa" {
+		t.Fatalf("con la imagen descrita elegida, el campo: %+v", c)
 	}
-	b.Tapped(&fyne.PointEvent{})
-	campo, ok := w.Canvas().Focused().(*ui.Entrada)
-	if !ok || campo.Texto() != "Mapa de las oficinas de Madrid y Lisboa" {
-		t.Fatalf("el diálogo no pregunta con el texto de ahora: %T", w.Canvas().Focused())
+	if w.Canvas().Overlays().Top() != nil {
+		t.Error("el texto alternativo no abre ningún diálogo")
 	}
-	campo.PonerTexto("  Oficinas\nde Madrid ")
-	campo.TypedKey(&fyne.KeyEvent{Name: fyne.KeyReturn})
+	c.PonerTexto("")
+	escribirEn(w, c, "  Oficinas de Madrid ")
+	if got := e.m.caja(0, "i").Alt; got != "Mapa de las oficinas de Madrid y Lisboa" {
+		t.Errorf("mientras se escribe ya se ha guardado %q", got)
+	}
+	c.TypedKey(&fyne.KeyEvent{Name: fyne.KeyReturn})
 	if got := e.m.caja(0, "i").Alt; got != "Oficinas de Madrid" || ctx.Guardado != editor.Sucio {
-		t.Errorf("se guarda %q (chip %v)", got, ctx.Guardado)
+		t.Errorf("Intro guarda %q (chip %v)", got, ctx.Guardado)
 	}
-	e.m.PonerAlt(0, "i", "   ")
+	if w.Canvas().Focused() == fyne.Focusable(c) {
+		t.Error("Intro no suelta el campo")
+	}
+	if c.Texto() != "Oficinas de Madrid" {
+		t.Errorf("tras guardar, el campo enseña %q y no lo guardado", c.Texto())
+	}
+	// Vacío lo quita, al salir del campo.
+	w.Canvas().Focus(c)
+	c.PonerTexto("   ")
+	w.Canvas().Unfocus()
 	if strings.Contains(e.Serializar(), `"alt"`) {
 		t.Error("vacío tiene que quitar el campo, no dejar \"alt\":\"\"")
 	}
 	e.SeleccionarSolo("j")
-	if b := botonAlt(); b == nil || b.Activo {
-		t.Errorf("la imagen sin alt lleva el botón apagado: %+v", b)
+	if c := campoAltDe(e); c == nil || c.Texto() != "" {
+		t.Errorf("la imagen sin alt: %+v", c)
+	}
+}
+
+// TestElCampoAltConservaElFocoAlRehacerseLaMiniBarra es por lo que era un diálogo: la
+// mini-barra se rehace con cada cambio, y un campo nuevo en cada recomposición perdía el
+// foco y lo escrito. Ahora es el mismo campo: se rehace la barra (un cambio de otro, el
+// chip de guardado) y se sigue escribiendo en él. Y si se elige otra imagen con algo a
+// medias, se guarda en la suya y no en la nueva. VISTO EN ROJO con un campo nuevo por
+// recomposición: el foco se quedaba en un campo que ya no estaba en la barra.
+func TestElCampoAltConservaElFocoAlRehacerseLaMiniBarra(t *testing.T) {
+	e, _, w := montar(t, conImagenDescrita)
+	e.SeleccionarSolo("i")
+	c := campoAltDe(e)
+	c.PonerTexto("")
+	escribirEn(w, c, "Oficinas ")
+	e.Refrescar() // la mini-barra entera, otra vez
+	e.cambiar(func() { e.m.PonerFondo(0, "#FFFFFF") }, true)
+	if campoAltDe(e) != c {
+		t.Fatal("la mini-barra se rehace con otro campo")
+	}
+	if w.Canvas().Focused() != fyne.Focusable(c) {
+		t.Fatalf("al rehacerse la mini-barra el foco pasa a %T", w.Canvas().Focused())
+	}
+	escribirEn(w, c, "de Lisboa")
+	if c.Texto() != "Oficinas de Lisboa" {
+		t.Errorf("se pierde lo escrito: %q", c.Texto())
+	}
+	guarda(t, "diapos-alt-en-la-mini-barra.png", w.Canvas().Capture())
+
+	// Elegir la otra imagen con el campo a medias: se guarda en «i», y el campo pasa a «j».
+	e.SeleccionarSolo("j")
+	if got := e.m.caja(0, "i").Alt; got != "Oficinas de Lisboa" {
+		t.Errorf("lo pendiente no se guarda en su imagen: %q", got)
+	}
+	if got := e.m.caja(0, "j").Alt; got != "" {
+		t.Errorf("lo de «i» se copia en «j»: %q", got)
+	}
+	if c.Texto() != "" {
+		t.Errorf("el campo sigue con el texto de la otra imagen: %q", c.Texto())
+	}
+	w.Canvas().Unfocus()
+	if got := e.m.caja(0, "j").Alt; got != "" {
+		t.Errorf("salir del campo sin escribir guarda %q en «j»", got)
 	}
 }

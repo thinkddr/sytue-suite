@@ -417,6 +417,9 @@ type relojAviso struct {
 	restante           time.Duration
 	desde              time.Time
 	retenido, iniciado bool
+	// vuelta cuenta las veces que se ha puesto en marcha: el disparo de una vuelta ya
+	// parada o retenida no vale (ver `vencer`).
+	vuelta uint64
 }
 
 var _ fyne.Widget = (*PilaAvisos)(nil)
@@ -470,9 +473,25 @@ func (p *PilaAvisos) correr(a *Aviso, r *relojAviso) {
 		return
 	}
 	r.desde = time.Now()
+	r.vuelta++
+	vuelta := r.vuelta
 	// `fyne.Do` y no una llamada directa: el reloj dispara en OTRA rutina, y desde
 	// Fyne 2.6 tocar la interfaz fuera de la principal es carrera.
-	r.t = time.AfterFunc(r.restante, func() { fyne.Do(func() { p.Descartar(a) }) })
+	r.t = time.AfterFunc(r.restante, func() { fyne.Do(func() { p.vencer(a, r, vuelta) }) })
+}
+
+// vencer es el disparo del reloj, ya en la rutina de la interfaz. Entre que el reloj
+// dispara y esto corre, el foco o el puntero pueden haber entrado en el aviso (el Tab
+// de la acción al aspa suelta y retiene en la misma pulsación): entonces el disparo
+// llegó tarde y el aviso se queda, que quien está con él manda (WCAG 2.2.1). Al
+// soltarlo, `correr` arranca otra vuelta con lo que quedaba.
+func (p *PilaAvisos) vencer(a *Aviso, r *relojAviso, vuelta uint64) {
+	p.mu.Lock()
+	vale := p.relojes[a] == r && r.vuelta == vuelta && r.t != nil && !r.retenido
+	p.mu.Unlock()
+	if vale {
+		p.Descartar(a)
+	}
 }
 
 // retener para (o reanuda) el reloj del aviso: el puntero o el foco están en él.
@@ -489,7 +508,7 @@ func (p *PilaAvisos) retener(a *Aviso, si bool) {
 		return
 	}
 	if r.t != nil {
-		// Si ya había disparado, su `Descartar` está encolado y se irá igual: llegó tarde.
+		// Si ya había disparado, su `vencer` está encolado y lo ignora: llegó tarde.
 		r.t.Stop()
 		r.t = nil
 		r.restante = max(r.restante-time.Since(r.desde), 0)

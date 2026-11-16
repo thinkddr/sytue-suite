@@ -826,7 +826,7 @@ func (a *App) Vaciar() {
 	clear(a.fotosPedidas)
 	p.Libretas, p.Activa, p.Etiquetas, p.Seleccionado = nil, nil, nil, nil
 	p.Busqueda, p.EtiquetaActiva, p.SoloDestacados = "", "", false
-	p.ImportOcupado, p.Importando, p.LoteOcupado = false, "", false
+	p.ImportOcupado, p.Importando, p.LoteOcupado, p.EtiquetaOcupada = false, "", false, ""
 	p.CargandoLibretas, p.ErrorLibretas, p.CargandoEtiquetas, p.ErrorEtiquetas = false, false, false, false
 	p.DetalleAbierto = false
 	p.Estado = ui.EstadoCargando
@@ -1340,12 +1340,16 @@ func NombreExportacion(nombre string) string {
 func (a *App) etiquetar(g api.ContactGroup, c api.Contact) {
 	scope := a.capturar()
 	p := a.Pantalla
+	if p.EtiquetaOcupada != "" {
+		return
+	}
 	antes := slices.Clone(p.Etiquetas)
 	miembros := slices.DeleteFunc(slices.Clone(g.Members), func(u string) bool { return u == c.UID })
 	if len(miembros) == len(g.Members) {
 		miembros = append(miembros, c.UID)
 	}
 	a.ponerMiembros(g.ID, miembros)
+	p.EtiquetaOcupada = g.ID
 	a.repintar()
 	a.programarEn(scope, func(scope cargaContacts) {
 		ctx, fin := context.WithTimeout(scope.ctx, a.Plazo)
@@ -1355,6 +1359,7 @@ func (a *App) etiquetar(g api.ContactGroup, c api.Contact) {
 			if !a.vigente(scope) {
 				return
 			}
+			p.EtiquetaOcupada = ""
 			if err != nil {
 				slog.Warn("contactos: no se pudo etiquetar", "error", err)
 				p.Etiquetas = antes

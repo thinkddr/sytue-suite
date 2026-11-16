@@ -150,12 +150,13 @@ func TestInterrogacionAbreLaHojaDeAtajos(t *testing.T) {
 		t.Error("Escape no cierra la hoja de atajos")
 	}
 
+	fyne.DoAndWait(func() { p.AbrirPaleta() })
+	n = len(c.Overlays().List())
 	fyne.DoAndWait(func() {
-		p.AbrirPaleta()
 		c.Unfocus()
 		c.OnTypedRune()('?')
 	})
-	if c.Overlays().Top() != nil {
-		t.Error("con la paleta abierta «?» abre la hoja encima")
+	if got := len(c.Overlays().List()); got != n {
+		t.Errorf("con la paleta abierta «?» abre la hoja encima: %d → %d capas", n, got)
 	}
 }

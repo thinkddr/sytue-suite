@@ -228,6 +228,9 @@ type lectorRenderer struct {
 	// barra son los botones de la cabecera y chips las etiquetas del hilo (nil sin
 	// ninguna); se rehacen solo cuando cambia su clave (ver `claveBarra`).
 	barra, chips *fyne.Container
+	// franjas son «Pospuesto hasta…» y «Silenciada» (posponer.go), entre la barra y
+	// los chips; se rehacen con la barra (el estado del hilo va en `claveBarra`).
+	franjas []*fyne.Container
 	// nav son los botones «Más reciente»/«Más antigua» de la fila del asunto; nil
 	// sin `AlNavegar`. Se rehacen con la barra (su estado va en `claveBarra`).
 	nav        *fyne.Container
@@ -312,7 +315,8 @@ func (r *lectorRenderer) Layout(t fyne.Size) {
 	lineas := r.lineasAsunto(t.Width)
 	r.ponerTitulo(lineas)
 	altoBarra, altoChips := r.altos(t.Width)
-	alto := AltoCabeceraLector(len(lineas), r.altoNav(), altoBarra, altoChips)
+	util := max(t.Width-2*MargenLector, 0)
+	alto := AltoCabeceraLector(len(lineas), r.altoNav(), altoBarra, altoChips) + AltoFranjas(r.franjas, util)
 	r.banda.Move(fyne.NewPos(0, 0))
 	r.banda.Resize(fyne.NewSize(t.Width, alto))
 	r.filete.Move(fyne.NewPos(0, alto-tema.Borde))
@@ -338,12 +342,19 @@ func (r *lectorRenderer) Layout(t fyne.Size) {
 			RellenoLector+lineaBase(ui.EscalonTitulo(3), ui.PesoTitulo(3))-lineaBase(tema.TextoSM, ui.Normal)))
 	}
 
-	util := max(t.Width-2*MargenLector, 0)
 	y := RellenoLector + AltoAsuntoLector(len(lineas), r.altoNav()) + AireAcciones
 	r.barra.Move(fyne.NewPos(MargenLector, y))
 	r.barra.Resize(fyne.NewSize(util, altoBarra))
+	y += altoBarra
+	for _, f := range r.franjas {
+		h := franjaLayout{}.alto(f.Objects, util)
+		y += AireChipsLector
+		f.Move(fyne.NewPos(MargenLector, y))
+		f.Resize(fyne.NewSize(util, h))
+		y += h
+	}
 	if r.chips != nil {
-		r.chips.Move(fyne.NewPos(MargenLector, y+altoBarra+AireChipsLector))
+		r.chips.Move(fyne.NewPos(MargenLector, y+AireChipsLector))
 		r.chips.Resize(fyne.NewSize(util, altoChips))
 	}
 
@@ -378,6 +389,9 @@ func (r *lectorRenderer) montar() {
 		r.objetos = append(r.objetos, l)
 	}
 	r.objetos = append(r.objetos, r.cuenta, r.barra)
+	for _, f := range r.franjas {
+		r.objetos = append(r.objetos, f)
+	}
 	if r.nav != nil {
 		r.objetos = append(r.objetos, r.nav)
 	}
@@ -395,6 +409,7 @@ func (r *lectorRenderer) ponerBarra() {
 		r.clave = k
 		r.barra = x.barra(angosta)
 		r.chips = x.chips()
+		r.franjas = x.franjas()
 		r.nav = x.navegacion()
 		r.montar()
 	}
@@ -420,6 +435,9 @@ func (r *lectorRenderer) Refresh() {
 	}
 	if r.nav != nil {
 		verlo(r.nav, abierto)
+	}
+	for _, f := range r.franjas {
+		verlo(f, abierto)
 	}
 	for _, l := range r.titulo {
 		verlo(l, abierto)

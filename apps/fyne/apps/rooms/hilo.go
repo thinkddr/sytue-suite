@@ -768,13 +768,17 @@ func (r *avisoHiloRenderer) Layout(fyne.Size) {
 
 func (r *avisoHiloRenderer) Refresh() { r.Layout(r.a.Size()) }
 
-// NuevoEsqueletoHilo son las dos filas de «cargando» del hilo: `flex flex-col gap-3
-// px-4 py-2`, cuadro de `2rem` y barras de `6rem` y del 60 y 45 %.
-func NuevoEsqueletoHilo(nombre string) *EsqueletoMensajes {
-	e := NuevoEsqueletoMensajes(nombre)
-	e.Partes, e.AnchoNombre = []float32{0.60, 0.45}, 6*tema.Rem
-	e.Arriba, e.Aire, e.SinAireArriba, e.Canalon = tema.Espacio(2), tema.Espacio(3), true, CanalonFilaHilo
-	return e
+// NuevoEsqueletoHilo son las filas de «cargando» del hilo: `flex flex-col gap-3
+// px-4 py-2`, cuadro de `2rem` y barras de `6rem` y, sin partes, del 60 y 45 %. Los
+// paneles que cargan tres piden las suyas.
+func NuevoEsqueletoHilo(nombre string, partes ...float32) *ui.FilasEsqueleto {
+	if len(partes) == 0 {
+		partes = []float32{0.60, 0.45}
+	}
+	return RecetaMensajes{
+		Partes: partes, AnchoNombre: 6 * tema.Rem,
+		Arriba: tema.Espacio(2), Aire: tema.Espacio(3), SinAireArriba: true, Canalon: CanalonFilaHilo,
+	}.Filas(nombre)
 }
 
 // hueco es un espacio en blanco de ese alto, para una `ui.Columna`.

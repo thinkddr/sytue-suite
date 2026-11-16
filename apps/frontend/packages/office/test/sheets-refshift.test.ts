@@ -5,11 +5,13 @@ import {
   moverCriterios,
   moverObjetos,
   moverReferencia,
+  moverReferenciasAjenas,
   moverVista,
   reescribirFormula,
   REF_ROTA,
   type Desplazamiento,
 } from '../src/editor/sheets/refshift';
+import type { SheetData } from '../src/editor/types';
 
 /** Insertar `n` filas en `desde` (0-based). Rejilla de 100×26, como el lienzo. */
 const insFila = (desde: number, n = 1): Desplazamiento => ({
@@ -338,4 +340,76 @@ test('el esquema, los anchos y las combinadas siguen a sus filas y columnas', ()
   const sinFila = moverObjetos(hoja, delFila(4));
   expect(sinFila.merges).toEqual(['A1:C1']);
   expect(sinFila.rowHeights).toBeUndefined();
+});
+
+// Las fórmulas de OTRAS hojas que citan la que se mueve. Antes solo se reescribía la
+// hoja activa: «Resumen» con `=Ventas!B4` seguía mirando B4 después de insertar una
+// fila encima en «Ventas», y la hoja activa movía también sus `=Resumen!A5`, que no
+// tenían nada que ver.
+
+const enVentas = (d: Desplazamiento): Desplazamiento => ({ ...d, hoja: 'Ventas' });
+
+test('en la hoja que se mueve, solo sus referencias: las de otra hoja se quedan', () => {
+  const d = enVentas(insFila(1));
+  expect(reescribirFormula('=B4+Resumen!B4+Ventas!$B$4', d)).toBe('=B5+Resumen!B4+Ventas!$B$5');
+  // Sin `hoja` (quien no sabe de libros) se mueven todas, como siempre.
+  expect(reescribirFormula('=B4+Resumen!B4', insFila(1))).toBe('=B5+Resumen!B5');
+});
+
+test('desde otra hoja: celdas, rangos, comillas, $ y mayúsculas', () => {
+  const d = enVentas(insFila(1));
+  const f = (t: string): string => reescribirFormula(t, d, 'Resumen');
+  expect(f('=Ventas!B4')).toBe('=Ventas!B5');
+  expect(f('=SUM(Ventas!A1:B9)')).toBe('=SUM(Ventas!A1:B10)');
+  expect(f('=ventas!$B$4*B4')).toBe('=ventas!$B$5*B4'); // la suya, B4, no
+  expect(f('=Ventas!A1')).toBe('=Ventas!A1'); // antes del corte
+  const conEspacio: Desplazamiento = { ...insCol(1), hoja: 'Hoja 2' };
+  expect(reescribirFormula("='Hoja 2'!C3+Hoja2!C3", conEspacio, 'Resumen')).toBe(
+    "='Hoja 2'!D3+Hoja2!C3",
+  );
+});
+
+test('desde otra hoja, borrar la fila referida da #¡REF! y un rango se encoge', () => {
+  const d = enVentas(delFila(3)); // borra la fila 4
+  const f = (t: string): string => reescribirFormula(t, d, 'Resumen');
+  expect(f('=Ventas!B4')).toBe(`=${REF_ROTA}`);
+  expect(f('=SUM(Ventas!B2:B6)')).toBe('=SUM(Ventas!B2:B5)');
+  expect(f('=Ventas!B9')).toBe('=Ventas!B8');
+});
+
+test('moverReferenciasAjenas: celdas, formato condicional y validaciones de la otra hoja', () => {
+  const resumen: SheetData = {
+    name: 'Resumen',
+    cells: { A1: '=Ventas!B4', A2: '<b>=Ventas!B4*2</b>', A3: '=B4', A4: 'Ventas!B4' },
+    condFormats: [{ range: 'A1:A3', kind: 'formula', formula: '=A1>Ventas!$B$4' }],
+    validations: [{ range: 'C1', type: 'formula', formula: '=COUNTIF(Ventas!$A$1:$A$9,C1)>0' }],
+  };
+  const m = moverReferenciasAjenas(resumen, enVentas(insFila(0)));
+  expect(m.cells).toEqual({
+    A1: '=Ventas!B5',
+    A2: '<b>=Ventas!B5*2</b>',
+    A3: '=B4',
+    A4: 'Ventas!B4',
+  });
+  expect(m.condFormats?.[0]?.formula).toBe('=A1>Ventas!$B$5');
+  expect(m.condFormats?.[0]?.range).toBe('A1:A3');
+  expect(m.validations?.[0]?.formula).toBe('=COUNTIF(Ventas!$A$2:$A$10,C1)>0');
+  // La propia hoja y una hoja que no la cita salen tal cual (el mismo objeto).
+  const ventas = { name: 'Ventas', cells: { A1: '=B4' } } as SheetData;
+  expect(moverReferenciasAjenas(ventas, enVentas(insFila(0)))).toBe(ventas);
+  const otra = { name: 'Otra', cells: { A1: '=B4' } } as SheetData;
+  expect(moverReferenciasAjenas(otra, enVentas(insFila(0)))).toBe(otra);
+});
+
+test('moverReferenciasAjenas respeta la protección: solo celdas desbloqueadas', () => {
+  const s = {
+    name: 'Resumen',
+    cells: { A1: '=Ventas!B4', A2: '=Ventas!B4' },
+    styles: { A2: { locked: false } },
+    protect: {},
+    validations: [{ range: 'C1', type: 'formula', formula: '=COUNTIF(Ventas!$A$1:$A$9,C1)>0' }],
+  } as SheetData;
+  const m = moverReferenciasAjenas(s, enVentas(insFila(0)));
+  expect(m.cells).toEqual({ A1: '=Ventas!B4', A2: '=Ventas!B5' });
+  expect(m.validations?.[0]?.formula).toBe('=COUNTIF(Ventas!$A$1:$A$9,C1)>0');
 });

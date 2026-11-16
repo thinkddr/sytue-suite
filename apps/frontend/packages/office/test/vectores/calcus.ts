@@ -33,7 +33,7 @@ import {
 } from '../../src/editor/sheets/format';
 import { chartView } from '../../src/editor/sheets/Chart';
 import type { ChartSpec, SheetData, Sparkline, SheetTable } from '../../src/editor/types';
-import { moverObjetos } from '../../src/editor/sheets/refshift';
+import { moverObjetos, moverReferenciasAjenas } from '../../src/editor/sheets/refshift';
 import {
   AIRE_AJUSTE,
   ALTO_MAX,
@@ -872,6 +872,43 @@ const DESPLAZAMIENTOS: Desplazamiento[] = [
   { eje: 'columna', desde: 0, cantidad: 25, tope: 26 },
 ];
 
+/* ---------- Las fórmulas de OTRAS hojas que citan la que se mueve ---------- */
+
+/** «Resumen» cita «Ventas» y «Hoja 2»; la protegida solo reescribe su celda desbloqueada. */
+const HOJAS_AJENAS: SheetData[] = [
+  {
+    name: 'Resumen',
+    cells: {
+      A1: '=Ventas!B4',
+      A2: '<b>=SUM(Ventas!A1:B9)</b>',
+      A3: '=ventas!$B$4*B4',
+      A4: "='Hoja 2'!C3+Hoja2!C3",
+      A5: '=Ventas!B4:B6',
+      A6: 'Ventas!B4',
+    },
+    condFormats: [{ range: 'A1:A3', kind: 'formula', formula: '=A1>Ventas!$B$4', fill: '#FFEB9C' }],
+    validations: [
+      { range: 'C1', type: 'formula', formula: '=COUNTIF(Ventas!$A$1:$A$9,C1)>0' },
+      { range: 'C2', values: ['Sí', 'No'] },
+    ],
+  },
+  {
+    name: 'Protegida',
+    cells: { A1: '=Ventas!B4', A2: '=Ventas!B4' },
+    styles: { A2: { locked: false } },
+    protect: {},
+    validations: [{ range: 'C1', type: 'formula', formula: '=Ventas!$B$4>0' }],
+  },
+];
+const DESPLAZAMIENTOS_AJENOS: Desplazamiento[] = [
+  { eje: 'fila', desde: 1, cantidad: 1, tope: 100, hoja: 'Ventas' },
+  { eje: 'fila', desde: 3, cantidad: -1, tope: 100, hoja: 'Ventas' },
+  { eje: 'fila', desde: 3, cantidad: -3, tope: 100, hoja: 'Ventas' },
+  { eje: 'columna', desde: 1, cantidad: 1, tope: 26, hoja: 'VENTAS' },
+  { eje: 'columna', desde: 0, cantidad: 2, tope: 26, hoja: 'Hoja 2' },
+  { eje: 'fila', desde: 0, cantidad: 1, tope: 100, hoja: 'Resumen' },
+];
+
 /* ---------- Cálculo ---------- */
 
 /** Lo que dicen las funciones de la web de cada entrada. */
@@ -968,6 +1005,15 @@ export function calcularVectores(): unknown {
           },
         };
       }),
+    },
+    referenciasAjenas: {
+      hojas: HOJAS_AJENAS,
+      casos: HOJAS_AJENAS.flatMap((h, hoja) =>
+        DESPLAZAMIENTOS_AJENOS.map((d) => {
+          const { cells, condFormats, validations } = moverReferenciasAjenas(h, d);
+          return { hoja, d, sale: { cells, condFormats, validations } };
+        }),
+      ),
     },
     funciones: { datos: DATOS_FUNCIONES, casos: evaluarFunciones() },
     minigraficos: {

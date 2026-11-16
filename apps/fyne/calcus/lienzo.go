@@ -114,6 +114,7 @@ func NuevoLienzo(l *Libro) *Lienzo {
 	c.ExtendBaseWidget(c)
 	l.rotulo = func(clave string) string { return c.t(clave, nil) }
 	c.Rejilla = NuevaRejilla(l)
+	c.Rejilla.T = c.t
 	c.Rejilla.Flotantes = c.flotantes
 	c.Barra = NuevaBarra(c.Rejilla)
 	c.Barra.T = func(clave string) string { return c.t(clave, nil) }

@@ -640,7 +640,7 @@ func (p *Pantalla) atajoDiario(a string) bool {
 }
 
 // EnfocarCaptura es el ⌘K que la barra de la suite cede (`CederAtajoSi`): con un día
-// abierto lleva a la captura; si no, o si la captura ya tiene el foco, el buscador.
+// abierto lleva a la captura; si no, o si la captura ya tiene el foco, la paleta de la suite.
 func (p *Pantalla) EnfocarCaptura() bool { return p.vigente() && p.atajoDiario("capture") }
 
 // nuevoCampoCaptura es el campo sin caja de la captura: Intro guarda, `dd`/`tt` se

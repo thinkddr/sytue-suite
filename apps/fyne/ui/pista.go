@@ -145,6 +145,11 @@ func portalDePistas(o fyne.CanvasObject) *fyne.Container {
 	return portalesPista.de(c)
 }
 
+// PortalDePistas es [portalDePistas] para las pistas que un paquete de fuera coloca él
+// mismo (la de la marca de comentario de una celda de Calcus): el portal de la pantalla
+// de `o`, o nil sin portal o con una capa encima.
+func PortalDePistas(o fyne.CanvasObject) *fyne.Container { return portalDePistas(o) }
+
 // conPista es el control que avisa a su pista del foco y de Escape.
 type conPista interface{ ponerPista(*Pista) }
 

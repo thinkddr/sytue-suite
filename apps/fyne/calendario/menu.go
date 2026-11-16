@@ -86,8 +86,19 @@ func (p *Pantalla) seccionVistaMovil() *ui.SeccionLateral {
 	s := ui.NuevaSeccionLateral(p.t("view.label", nil))
 	grupo := NuevoGrupoVista(p.t("view.label", nil), [4]string{
 		p.t("view.month", nil), p.t("view.week", nil), p.t("view.day", nil), p.t("view.agenda", nil),
-	}, p.Vista, func(vista Vista) { p.cajonAbierto = false; p.cambiarVista(vista) })
+	}, p.Vista, p.cambiarVista)
 	grupo.Rejilla = 2
+	// Moverse con las flechas solo cambia la vista: cerrar el cajón a cada una dejaba sin
+	// selector a quien recorría las vistas con el teclado. Pulsar una, Intro o el espacio
+	// la confirman y cierran el cajón, como cualquier destino del menú.
+	grupo.AlConfirmar = func(int) {
+		if p.cajonAbierto && p.AlConmutarCajon != nil {
+			p.AlConmutarCajon()
+		} else {
+			p.cajonAbierto = false
+		}
+	}
+	p.grupoCajon = grupo
 	buscar := ui.NuevaFilaLateral(p.t("search.events", nil), iconos.Trazo(iconos.Buscar, ui.GlifoMenu, "sidebar-fg", v).Objeto(), func() {
 		p.cajonAbierto = false
 		if p.AlBuscar != nil {

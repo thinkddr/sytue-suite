@@ -11,6 +11,7 @@ import (
 	"fyne.io/fyne/v2/driver/desktop"
 
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/nucleo/formula"
 )
 
 // TestOrdenarEsElDeLaWeb: por la columna de la celda ancla, las vacías al final, las
@@ -230,5 +231,70 @@ func TestElAsaRellenaEnMosaico(t *testing.T) {
 	c.Deshacer(false)
 	if c.Libro.Crudo(0, 3) != "" {
 		t.Error("el relleno no se deshace en un paso")
+	}
+}
+
+// TestLaEstructuraMueveLasFormulasDeLasOtrasHojas: insertar o borrar filas y columnas en
+// «Ventas» reescribe las fórmulas de «Resumen» que la citan —celdas, rangos, nombres con
+// comillas, `$`, formato condicional y validaciones—, como la web (refshift.ts); y en
+// «Ventas», una fórmula que cita «Resumen» se queda. Antes «Resumen» seguía mirando la
+// celda vieja sin avisar, y la hoja activa movía también las referencias a otras hojas.
+func TestLaEstructuraMueveLasFormulasDeLasOtrasHojas(t *testing.T) {
+	l := libroDePrueba(t, `{"active":0,"sheets":[`+
+		`{"name":"Ventas","cells":{"B4":"7","C1":"=B4+Resumen!A1"}},`+
+		`{"name":"Resumen","cells":{"A1":"=Ventas!B4","A2":"=SUM(Ventas!A1:B9)","A3":"=ventas!$B$4*B4","A4":"='Hoja 2'!C3+Hoja2!C3"},`+
+		`"condFormats":[{"range":"A1:A3","kind":"formula","formula":"=A1>Ventas!$B$4","fill":"#FFEB9C"}],`+
+		`"validations":[{"range":"C1","type":"formula","formula":"=COUNTIF(Ventas!$A$1:$A$9,C1)>0"}]},`+
+		`{"name":"Hoja 2","cells":{"A1":"='Ventas'!B4+Ventas!A1"},"protect":{},"styles":{}}]}`).Libro
+	celda := func(hoja int, ref string) string {
+		r, _ := formula.ParseRangeRef(ref)
+		return textoPlano(l.f.hojas[hoja].celdas[Celda{C: r.C1, F: r.R1}])
+	}
+	l.Estructura("insrow", "above", 0, 1, 0, 1) // una fila encima de la 2
+	for _, c := range []struct {
+		hoja        int
+		ref, quiero string
+	}{
+		{0, "C1", "=B5+Resumen!A1"},
+		{1, "A1", "=Ventas!B5"},
+		{1, "A2", "=SUM(Ventas!A1:B10)"},
+		{1, "A3", "=ventas!$B$5*B4"},
+		// «Hoja 2» está protegida y su celda, bloqueada: el servidor vetaría cambiarla.
+		{2, "A1", "='Ventas'!B4+Ventas!A1"},
+	} {
+		if got := celda(c.hoja, c.ref); got != c.quiero {
+			t.Errorf("tras insertar una fila, %d!%s es %q y la web da %q", c.hoja, c.ref, got, c.quiero)
+		}
+	}
+	r := l.f.hojas[1]
+	if r.condiciones[0].Rango != "A1:A3" || r.condiciones[0].Formula != "=A1>Ventas!$B$5" {
+		t.Errorf("la regla de «Resumen» es %+v", r.condiciones[0])
+	}
+	if f := r.validaciones[0].Formula; f != "=COUNTIF(Ventas!$A$1:$A$10,C1)>0" {
+		t.Errorf("la validación de «Resumen» es %q", f)
+	}
+	// Borrar la fila del total: quien la citaba pasa a #¡REF!, como en la propia hoja.
+	l.Estructura("delrow", "", 0, 4, 0, 4)
+	if got := celda(1, "A1"); got != "="+formula.RefRota {
+		t.Errorf("tras borrar la fila referida, Resumen!A1 es %q", got)
+	}
+	if got := celda(1, "A2"); got != "=SUM(Ventas!A1:B9)" {
+		t.Errorf("tras borrar una fila del rango, Resumen!A2 es %q", got)
+	}
+	// Deshacer lo devuelve todo, también en las otras hojas.
+	l.Deshacer()
+	l.Deshacer()
+	if got := celda(1, "A1"); got != "=Ventas!B4" {
+		t.Errorf("deshacer no devuelve Resumen!A1: %q", got)
+	}
+	// Una columna en una hoja con espacio en el nombre: se mueve lo que la cita con sus
+	// comillas, y no lo que cita «Ventas».
+	l.Activar(2)
+	l.Estructura("inscol", "left", 1, 0, 1, 0)
+	if got := celda(1, "A4"); got != "='Hoja 2'!D3+Hoja2!C3" {
+		t.Errorf("insertar una columna en «Hoja 2»: Resumen!A4 es %q", got)
+	}
+	if got := celda(1, "A1"); got != "=Ventas!B4" {
+		t.Errorf("insertar en «Hoja 2» mueve lo que cita «Ventas»: %q", got)
 	}
 }

@@ -10,7 +10,9 @@ import (
 	"fyne.io/fyne/v2/canvas"
 
 	"git.sytue.eu/sytue/one/apps/fyne/editor"
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	"git.sytue.eu/sytue/one/apps/nucleo/tokens"
 )
 
@@ -119,4 +121,92 @@ func (rr *rejillaRenderer) pintarResalteComentario(vw vista) {
 		minY = finY
 	}
 	marco(rr.marcoComentario, MarcaComentario, fyne.NewPos(vw.x(k.C), vw.y(k.F)), fyne.NewSize(w, h), GrosorSeleccion*vw.z, minX, minY, true)
+}
+
+// marcaDeComentario es lo que dice la marca de una celda de la hoja activa (`MarcaComentario`
+// de la web): cuántos hilos abiertos tiene y el primero, el más antiguo. 0 hilos: no hay
+// marca.
+func (l *Libro) marcaDeComentario(cs []api.DocComment, k Celda) (primero api.DocComment, hilos int) {
+	for _, x := range cs {
+		if x.Resolved || x.ParentID != "" {
+			continue
+		}
+		a, ok := x.AnclaCelda()
+		if !ok {
+			continue
+		}
+		hoja, c, ok := l.CeldaDeAncla(a)
+		if !ok || hoja != l.f.activa || c != k {
+			continue
+		}
+		if hilos == 0 || x.CreatedAt.Before(primero.CreatedAt) {
+			primero = x
+		}
+		hilos++
+	}
+	return primero, hilos
+}
+
+// TextoMarcaComentario es `textoDeMarca`: el primer comentario con su autor y, si hay más
+// hilos, cuántos.
+func TextoMarcaComentario(t func(string, i18n.Vars) string, primero api.DocComment, hilos int) string {
+	if t == nil {
+		t = func(clave string, _ i18n.Vars) string { return clave }
+	}
+	s := t("sheet.comment.mark", i18n.Vars{"author": primero.Autor(), "text": primero.Body})
+	if hilos > 1 {
+		s += " " + t("sheet.comment.more", i18n.Vars{"n": hilos - 1})
+	}
+	return s
+}
+
+// nuevaPistaComentario es la pista de la marca: una caja de ALTO CERO sobre el borde de
+// arriba de la celda, para que el puntero no la encuentre nunca y siga siendo de la rejilla
+// (el arrastre, el «▾», el menú), y la burbuja sale centrada encima, como la de un control.
+func nuevaPistaComentario() *ui.Pista {
+	return ui.NuevaPista("", canvas.NewRectangle(color.NRGBA{}))
+}
+
+// seguirPistaComentario es el `title` de la celda en la web (y su `aria-description`): al
+// pasar el puntero por una celda con marca, tras el retardo de Tooltip.tsx, el primer
+// comentario. Cambiar de celda la cierra y la vuelve a poner; salir de las marcadas, la
+// cierra.
+func (r *Rejilla) seguirPistaComentario(p fyne.Position) {
+	k, ok := r.celdaEn(p)
+	if ok {
+		if fu, es := r.L.FusionEn(k.C, k.F); es {
+			k = Celda{C: fu.C1, F: fu.F1}
+		}
+	}
+	var texto string
+	if ok && len(r.comentarios) > 0 {
+		if primero, n := r.L.marcaDeComentario(r.comentarios, k); n > 0 {
+			texto = TextoMarcaComentario(r.T, primero, n)
+		}
+	}
+	if texto == "" {
+		r.cerrarPistaComentario()
+		return
+	}
+	if r.hayPista && k == r.celdaPista {
+		return
+	}
+	pista := r.pistaComentario
+	pista.Cerrar()
+	pista.Rotulo = texto
+	pista.Portal = ui.PortalDePistas(r)
+	vw := r.vista()
+	w, _, _ := vw.caja(k.C, k.F)
+	pista.Move(fyne.NewPos(vw.x(k.C), vw.y(k.F)))
+	pista.Resize(fyne.NewSize(w, 0))
+	r.celdaPista, r.hayPista = k, true
+	pista.MouseIn(nil)
+}
+
+// cerrarPistaComentario la quita (y su retardo, si estaba en marcha).
+func (r *Rejilla) cerrarPistaComentario() {
+	if r.hayPista {
+		r.hayPista = false
+		r.pistaComentario.Cerrar()
+	}
 }

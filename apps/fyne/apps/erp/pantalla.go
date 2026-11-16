@@ -47,11 +47,20 @@ type Pantalla struct {
 	// negocio ni cruza sesiones.
 	Recientes []string
 
-	menu    *Menu
-	lista   *Lista
-	inicio  *Bienvenida
-	paleta  *Paleta
-	abierta bool
+	menu   *Menu
+	lista  *Lista
+	inicio *Bienvenida
+	// paleta es la de la suite: la de la barra en cuanto la hay (`Atajos`) y, en una
+	// pantalla suelta (los guardianes), una propia. Ver paleta.go.
+	paleta      *ui.PaletaDeLaSuite
+	dejarPaleta func()
+	// pantallasPaleta son los destinos fijos del menú, que la paleta ofrece en «Ir a»;
+	// registrosPaleta, lo que contestó el servicio a `consultaRegistros`, y
+	// buscandoRegistros, que aún no ha contestado.
+	pantallasPaleta   []Destino
+	registrosPaleta   []Registro
+	consultaRegistros string
+	buscandoRegistros bool
 	// ficha es el panel del registro abierto; nil, ninguno.
 	ficha *Ficha
 	altas []*altaRapida
@@ -173,8 +182,8 @@ func NuevaPantalla(tr *i18n.Translator, svc *api.ERP, red *offline.Monitor) *Pan
 		banco:   NuevoBanco(tr),
 		tpv:     NuevoTPV(tr),
 	}
-	p.paleta = NuevaPaleta(tr, nil)
 	p.enganchar()
+	p.usarPaleta(ui.NuevaPaletaDeLaSuite(tr))
 	return p
 }
 
@@ -249,11 +258,7 @@ func (p *Pantalla) marco() fyne.CanvasObject {
 		arm.CerrarCajon()
 	}
 	arm.Refresh()
-	capas := []fyne.CanvasObject{arm}
-	if p.abierta {
-		capas = append(capas, p.paleta.Objeto(v, p.Ventana))
-	}
-	return container.NewStack(append(capas, p.avisos)...)
+	return container.NewStack(arm, p.avisos)
 }
 
 // principal es `main` —desplazable, con el botón del cajón arriba en el móvil— y, a su
@@ -492,7 +497,10 @@ func (p *Pantalla) rellenarMenu() {
 	}
 	// ⌘K lleva a las mismas pantallas que el menú, con sus mismas condiciones: la
 	// paleta no ofrece lo que el menú esconde.
-	p.paleta.Pantallas = m.Fijas
+	p.pantallasPaleta = m.Fijas
+	if p.paleta != nil {
+		p.ponerCapaVistas()
+	}
 }
 
 // Las vistas que no son la lista de un modelo ni la portada.
@@ -513,7 +521,7 @@ func (p *Pantalla) IrA(vista string) { p.dejarFicha(func() { p.irA(vista) }) }
 
 func (p *Pantalla) irA(vista string) {
 	p.pararEspera()
-	p.Vista, p.ficha, p.cajon, p.abierta = vista, nil, false, false
+	p.Vista, p.ficha, p.cajon = vista, nil, false
 	p.lista.Modelo = Modelo{}
 	switch vista {
 	case VistaTareas:
@@ -583,7 +591,7 @@ func (p *Pantalla) abrir(m Modelo) {
 	l.Total, l.SumaDinero, l.PorEstado = -1, 0, nil
 	l.CargandoMas = false
 	l.Marcadas = map[string]bool{}
-	p.abierta, p.cajon, p.ficha, p.Vista = false, false, nil, ""
+	p.cajon, p.ficha, p.Vista = false, nil, ""
 	// Lo de ESTE modelo, o nada: sin esto se quedaban en pantalla las filas del modelo
 	// anterior, pintadas con las columnas del nuevo, mientras llegaba la lista.
 	l.Pagina, l.HayMas, l.Aviso = Pagina{}, false, ""
@@ -614,20 +622,6 @@ func (p *Pantalla) enganchar() {
 	p.menu.AlPaleta = func() { p.cerrarCajon(); p.AbrirPaleta() }
 	p.menu.AlIA = func() { p.cerrarCajon(); p.AbrirIA() }
 	p.menu.AlCerrar = p.cerrarCajon
-
-	p.paleta.AlCerrar = p.CerrarPaleta
-	// La paleta se va antes de abrir: si hay que preguntar por la ficha, que la
-	// pregunta no quede con la paleta abierta detrás (como en la web).
-	p.paleta.AlElegir = func(m Modelo) { p.CerrarPaleta(); p.Abrir(m) }
-	p.paleta.AlIr = func(d Destino) {
-		p.CerrarPaleta()
-		if d.AlPulsar != nil {
-			d.AlPulsar()
-		}
-	}
-	p.paleta.AlRegistro = func(r Registro) { p.CerrarPaleta(); p.abrirRegistro(r.Modelo, r.ID) }
-	p.paleta.AlBuscar = p.buscarEnPaleta
-	p.paleta.AlMover = p.Repintar
 
 	l := p.lista
 	l.AlBuscar = p.buscar
@@ -692,27 +686,12 @@ func (p *Pantalla) enganchar() {
 	b.AlBanco = func() { p.IrA(VistaBanco) }
 }
 
-// AbrirPaleta y CerrarPaleta son ⌘K y Escape.
-func (p *Pantalla) AbrirPaleta() {
-	p.paleta.Escribir("")
-	p.abierta = true
-	p.Repintar()
-	// El `autofocus` de la web: se abre para escribir.
-	if p.lienzo != nil {
-		p.lienzo.Focus(p.paleta.Campo())
-	}
-}
+// AbrirPaleta abre la paleta de la suite: la piden el botón «Ir a…» del carril, el del
+// cajón y el de la portada (⌘K lo atiende la barra). CerrarPaleta la retira.
+func (p *Pantalla) AbrirPaleta() { p.paleta.Abrir() }
 
 // CerrarPaleta la esconde sin elegir nada.
-func (p *Pantalla) CerrarPaleta() {
-	if !p.abierta {
-		return
-	}
-	p.abierta = false
-	// Lo que estuviera buscando ya no lo va a ver nadie.
-	p.buscarEnPaleta("")
-	p.Repintar()
-}
+func (p *Pantalla) CerrarPaleta() { p.paleta.Cerrar() }
 
 // EsperaBusqueda es lo que la web espera a que se deje de teclear antes de pedir la
 // lista: una lista por pulsación es una consulta por pulsación contra la base de datos
@@ -771,7 +750,6 @@ func (p *Pantalla) buscarEnPaleta(q string) {
 		return
 	}
 	if p.svc == nil {
-		p.paleta.Buscando = false
 		return
 	}
 	// La cancelación es de la consulta y el plazo, de la petición: si contara desde la
@@ -795,9 +773,7 @@ func (p *Pantalla) buscarEnPaleta(q string) {
 			if err != nil {
 				regs = nil
 			}
-			if p.paleta.Encontrados(q, regs) && p.abierta {
-				p.Repintar()
-			}
+			p.encontrados(q, regs)
 		})
 	})
 }
@@ -887,11 +863,8 @@ func (p *Pantalla) cargarCatalogo() {
 		if errReq == nil {
 			p.Requisitos = &req
 		}
-		p.paleta.Modelos = p.Modelos()
-		p.paleta.Areas = map[string]string{}
-		for _, m := range cat.Modulos {
-			p.paleta.Areas[m.Clave] = m.Etiqueta
-		}
+		p.ponerCapaAreas()
+		p.ponerCapaRegistros()
 		p.Fase = FaseDe(err, p.hayRed(), len(cat.Modulos))
 		if p.Vista == "" && p.lista.Modelo.Clave == "" {
 			// Primera vez: sin perfil y sin ningún área encendida, lo que toca es el
@@ -966,7 +939,7 @@ func (p *Pantalla) traerLista(modelo, clave string, f api.ERPFiltro, visto bool)
 
 func (p *Pantalla) puedeRefrescarLista() bool {
 	l := p.lista
-	return p.svc != nil && p.hayRed() && p.Vista == "" && p.ficha == nil && !p.abierta && len(p.altas) == 0 &&
+	return p.svc != nil && p.hayRed() && p.Vista == "" && p.ficha == nil && !p.paleta.Abierta() && len(p.altas) == 0 &&
 		l.Modelo.Clave != "" && l.Fase != Cargando && !l.CargandoMas && !l.EnLote && len(l.Marcadas) == 0 && p.peticionesLista == 0
 }
 
@@ -1076,14 +1049,11 @@ func (p *Pantalla) cargarEstadisticas(modelo string) {
 	})
 }
 
-// Atajos engancha el teclado de la web al lienzo de la ventana: ⌘K abre la paleta,
-// «/» lleva al buscador de la lista, «n» abre una ficha nueva, Escape cierra la
-// paleta y «?» enseña todos ellos (`atajos.go`).
+// Atajos engancha el teclado de la web al lienzo de la ventana: «/» lleva al buscador
+// de la lista, «n» abre una ficha nueva y «?» enseña todos los atajos (`atajos.go`).
 //
-// ⌘K es de la PALETA y no del buscador de la suite, igual que en la web: allí los dos
-// escuchan y el del ERP abre la paleta, que se queda el foco. Por eso se le quita a la
-// barra (`BarraSuite.CederAtajo`) en vez de registrarlo encima, que dependería de cuál
-// de los dos se enganchó el último.
+// ⌘K es de la barra, que abre la paleta de la SUITE: el ERP le pone sus capas
+// (`usarPaleta`) en vez de tener la suya, igual que en la web.
 //
 // Las teclas sueltas van por `SetOnTypedRune`, que Fyne solo dispara cuando NO hay
 // nada enfocado: es exactamente `esAtajoDeApp` de la web —teclear «/» en el nombre de
@@ -1091,7 +1061,9 @@ func (p *Pantalla) cargarEstadisticas(modelo string) {
 func (p *Pantalla) Atajos(c fyne.Canvas, b *ui.BarraSuite) {
 	p.lienzo = c
 	if b != nil {
-		b.CederAtajo(p.AbrirPaleta)
+		p.usarPaleta(b.Paleta())
+	} else {
+		p.paleta.EnLienzo(c)
 	}
 	c.SetOnTypedRune(func(r rune) {
 		// La hoja de atajos no depende de tener una lista abierta: se pide también
@@ -1100,7 +1072,7 @@ func (p *Pantalla) Atajos(c fyne.Canvas, b *ui.BarraSuite) {
 			p.verAtajos()
 			return
 		}
-		if p.lista.Modelo.Clave == "" || p.abierta {
+		if p.lista.Modelo.Clave == "" || p.paleta.Abierta() {
 			return
 		}
 		switch r {
@@ -1110,11 +1082,6 @@ func (p *Pantalla) Atajos(c fyne.Canvas, b *ui.BarraSuite) {
 			// «n» abre una ficha nueva, como en la web (y como allí, no con el foco en
 			// un campo: `SetOnTypedRune` solo llega sin nada enfocado).
 			p.NuevaFicha(nil)
-		}
-	})
-	c.SetOnTypedKey(func(k *fyne.KeyEvent) {
-		if k.Name == fyne.KeyEscape {
-			p.CerrarPaleta()
 		}
 	})
 	ui.AlAtras(c, p.atras)

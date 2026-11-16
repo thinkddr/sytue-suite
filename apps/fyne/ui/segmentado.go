@@ -116,6 +116,12 @@ type Segmentado struct {
 	// Rotulo es el nombre accesible del grupo (`aria-label`).
 	Rotulo   string
 	AlElegir func(int)
+	// AlConfirmar avisa cuando la persona da por buena una opción: al pulsarla (aunque ya
+	// fuera la elegida), con Intro o con el espacio. Las flechas, Inicio y Fin solo
+	// mueven la elección (AlElegir) y no confirman: así un grupo dentro del cajón del
+	// teléfono cambia la vista sin cerrarlo a cada flecha, y lo cierra al confirmar,
+	// que es el clic sobre el `<aside>` de la web. Opcional.
+	AlConfirmar func(int)
 	// Muestras son los círculos de color que acompañan a los rótulos (`muestra` en
 	// AccountMenu.tsx), una por opción; nil, no hay. Cada una es un color o, con
 	// varios, los sectores iguales de un `conic-gradient` sin fundido, que es como se
@@ -316,8 +322,22 @@ func (s *Segmentado) Elegir(i int) {
 	}
 }
 
-// Tapped elige la opción sobre la que se ha pulsado.
-func (s *Segmentado) Tapped(e *fyne.PointEvent) { s.Elegir(s.enQue(e.Position)) }
+// Tapped elige la opción sobre la que se ha pulsado y la confirma.
+func (s *Segmentado) Tapped(e *fyne.PointEvent) {
+	i := s.enQue(e.Position)
+	s.Elegir(i)
+	if i >= 0 && i < len(s.Opciones) {
+		s.confirmar()
+	}
+}
+
+// confirmar es la segunda mitad de pulsar, Intro y el espacio: AlConfirmar con la
+// opción activa.
+func (s *Segmentado) confirmar() {
+	if s.AlConfirmar != nil {
+		s.AlConfirmar(s.Elegida)
+	}
+}
 
 // enQue es qué opción cae bajo ese punto. Fuera de todas, -1.
 func (s *Segmentado) enQue(p fyne.Position) int {
@@ -363,6 +383,7 @@ func (s *Segmentado) TypedRune(r rune) {
 		if s.AlElegir != nil {
 			s.AlElegir(s.Elegida)
 		}
+		s.confirmar()
 		return
 	}
 	if s.SubeTeclas {
@@ -395,6 +416,7 @@ func (s *Segmentado) TypedKey(e *fyne.KeyEvent) {
 		if s.AlElegir != nil {
 			s.AlElegir(s.Elegida)
 		}
+		s.confirmar()
 		return
 	default:
 		if !SubirEscape(s, e) && s.SubeTeclas {

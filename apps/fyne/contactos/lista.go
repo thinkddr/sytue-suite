@@ -602,19 +602,22 @@ func subtituloDe(c api.Contact) string {
 
 // esqueletoLista es `ContactListSkeleton`: seis filas con el ritmo de las de verdad
 // —un círculo de 2rem y dos barras de 0,75 y 0,625 rem—, alternando los anchos de las
-// barras (70/65 % y 55/80 %) para que no parezca una rejilla.
+// barras (70/65 % y 55/80 %) para que no parezca una rejilla. Es `ui.FilasEsqueleto`
+// con esa receta: `flex items-center gap-3 px-3 py-2` y las barras en una columna
+// `flex-1`, un solo latido y un solo «Cargando».
 func (p *Pantalla) esqueletoLista() fyne.CanvasObject {
-	filas := make([]fyne.CanvasObject, 0, 6)
-	for i := range 6 {
-		a, b := float32(0.70), float32(0.65)
-		if i%2 == 1 {
-			a, b = 0.55, 0.80
-		}
-		filas = append(filas, container.New(&filaEsqueleto{Anchos: [2]float32{a, b}},
-			ui.NuevoEsqueletoRedondo(LadoEsqueleto),
-			ui.NuevoEsqueleto(0, BarraEsqueleto1), ui.NuevoEsqueleto(0, BarraEsqueleto2)))
-	}
-	return ui.EnColumna(0, filas...)
+	return ui.NuevasFilasEsqueleto(6, ui.DelanteroAvatar, 2).ConReceta(ui.RecetaEsqueleto{
+		Alto:           AltoFilaEsqueleto,
+		Izq:            ui.MargenFila,
+		Der:            ui.MargenFila,
+		Delantero:      fyne.NewSize(LadoEsqueleto, LadoEsqueleto),
+		HuecoDelantero: ui.HuecoFila,
+		Rayas: []ui.RayaEsqueleto{
+			{Alto: BarraEsqueleto1, Partes: []float32{0.70, 0.55}},
+			{Alto: BarraEsqueleto2, Partes: []float32{0.65, 0.80}},
+		},
+		HuecoRayas: HuecoBarras,
+	})
 }
 
 // La geometría de `ContactListSkeleton`.
@@ -634,32 +637,6 @@ const (
 // sobre las dos barras con su hueco y su relleno (26,25).
 var AltoFilaEsqueleto = 2*ui.AltoFila + max(LadoEsqueleto,
 	BarraEsqueleto1+HuecoBarras+BarraEsqueleto2+2*RellenoBarras)
-
-// filaEsqueleto coloca el círculo y las dos barras de una fila del esqueleto:
-// `flex items-center gap-3 px-3 py-2`, y las barras en una columna `flex-1`.
-type filaEsqueleto struct{ Anchos [2]float32 }
-
-var _ fyne.Layout = (*filaEsqueleto)(nil)
-
-func (f *filaEsqueleto) MinSize([]fyne.CanvasObject) fyne.Size {
-	return fyne.NewSize(2*ui.MargenFila+LadoEsqueleto, AltoFilaEsqueleto)
-}
-
-func (f *filaEsqueleto) Layout(objs []fyne.CanvasObject, t fyne.Size) {
-	if len(objs) < 3 {
-		return
-	}
-	x := ui.MargenFila
-	objs[0].Move(fyne.NewPos(x, (t.Height-LadoEsqueleto)/2))
-	objs[0].Resize(fyne.NewSize(LadoEsqueleto, LadoEsqueleto))
-	x += LadoEsqueleto + ui.HuecoFila
-	util := max(t.Width-ui.MargenFila-x, 0)
-	y := (t.Height - (BarraEsqueleto1 + HuecoBarras + BarraEsqueleto2)) / 2
-	objs[1].Move(fyne.NewPos(x, y))
-	objs[1].Resize(fyne.NewSize(util*f.Anchos[0], BarraEsqueleto1))
-	objs[2].Move(fyne.NewPos(x, y+BarraEsqueleto1+HuecoBarras))
-	objs[2].Resize(fyne.NewSize(util*f.Anchos[1], BarraEsqueleto2))
-}
 
 // textosDeEstado es la copia de los estados de la LISTA. El error lleva el aviso de
 // 40 de la web (`<Icon name="warning" size={40} />`) en lugar de ilustración.

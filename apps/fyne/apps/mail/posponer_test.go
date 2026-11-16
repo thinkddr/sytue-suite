@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
 
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
@@ -283,5 +284,79 @@ func TestSinElServicioNoSePospone(t *testing.T) {
 		if a.Posponer != nil || a.Silenciar != nil || a.QuitarPosposicion != nil {
 			t.Errorf("%T: se ofrece posponer o silenciar", s)
 		}
+	}
+}
+
+// franjasDelLector devuelve los textos de las franjas montadas y sus botones.
+func franjasDelLector(t *testing.T, x *Lector) (textos []string, botones []*ui.Boton) {
+	t.Helper()
+	r := test.WidgetRenderer(x).(*lectorRenderer)
+	for _, f := range r.franjas {
+		if !f.Visible() {
+			continue
+		}
+		textos = append(textos, f.Objects[0].(*ui.AyudaEnLinea).Cuerpo)
+		if len(f.Objects) > 1 {
+			botones = append(botones, f.Objects[1].(*ui.Boton))
+		}
+	}
+	return textos, botones
+}
+
+// TestElLectorEnseñaLasFranjasDePospuestoYSilenciada son las franjas de
+// `MessageReader.tsx`: bajo la barra, «Pospuesto hasta el …» con «Volver a Recibidos» y
+// «Has silenciado esta conversación…» con «Dejar de silenciar», cada botón con su
+// acción. Sin estado, ninguna; y en solo lectura, el aviso sin botón. VISTO EN ROJO sin
+// `franjas`: el lector no decía nada y el estado solo se adivinaba en «Más acciones».
+func TestElLectorEnseñaLasFranjasDePospuestoYSilenciada(t *testing.T) {
+	s := conPospuestos()
+	hasta := time.Date(2026, 12, 24, 8, 0, 0, 0, time.Local)
+	s.estado = api.MailEstadoHilo{Muted: true, SnoozedUntil: &hasta}
+	b, _, _ := buzonConVentana(t, s, fyne.NewSize(1280, 800))
+	c := b.P.Bandeja.Conversaciones[0]
+	b.Abrir(c)
+	x := b.P.Lector
+	if !slices.Contains(s.llamadas, "ThreadState("+c.HiloID+")") {
+		t.Fatalf("al abrir no se pregunta el estado del hilo: %v", s.llamadas)
+	}
+	textos, botones := franjasDelLector(t, x)
+	if len(textos) != 2 || !strings.HasPrefix(textos[0], "Pospuesto hasta el ") ||
+		!strings.Contains(textos[0], FechaLarga("es", hasta)) || !strings.HasPrefix(textos[1], "Has silenciado esta conversación") {
+		t.Fatalf("franjas del lector: %q", textos)
+	}
+	if len(botones) != 2 || botones[0].Texto != "Volver a Recibidos" || botones[1].Texto != "Dejar de silenciar" {
+		t.Fatalf("botones de las franjas: %d", len(botones))
+	}
+	// Las franjas van entre la barra y el hilo, dentro de la banda de la cabecera.
+	r := test.WidgetRenderer(x).(*lectorRenderer)
+	fin := r.barra.Position().Y + r.barra.Size().Height
+	for _, f := range r.franjas {
+		if f.Position().Y < fin || f.Position().Y+f.Size().Height > r.banda.Size().Height {
+			t.Errorf("franja en y=%v (alto %v) fuera de la banda (barra hasta %v, banda %v)",
+				f.Position().Y, f.Size().Height, fin, r.banda.Size().Height)
+		}
+		fin = f.Position().Y + f.Size().Height
+	}
+
+	botones[0].Tapped(nil)
+	if !slices.Contains(s.llamadas, "UnsnoozeThread("+c.HiloID+")") {
+		t.Errorf("«Volver a Recibidos» no devuelve el hilo: %v", s.llamadas)
+	}
+	botones[1].Tapped(nil)
+	if !slices.Contains(s.llamadas, "MuteThread("+c.HiloID+",false)") {
+		t.Errorf("«Dejar de silenciar» no deja de silenciar: %v", s.llamadas)
+	}
+
+	// Sin estado, sin franjas.
+	x.Silenciada, x.PospuestaHasta = false, time.Time{}
+	x.Refresh()
+	if textos, _ := franjasDelLector(t, x); len(textos) != 0 {
+		t.Errorf("sin pospuesto ni silenciado hay franjas: %q", textos)
+	}
+	// En solo lectura se dice el estado, pero no hay a dónde volver.
+	x.Silenciada, x.SoloLectura = true, true
+	x.Refresh()
+	if textos, botones := franjasDelLector(t, x); len(textos) != 1 || len(botones) != 0 {
+		t.Errorf("en solo lectura: %q con %d botones", textos, len(botones))
 	}
 }

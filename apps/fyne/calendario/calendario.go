@@ -142,6 +142,9 @@ type Pantalla struct {
 	// teléfono: adonde vuelve el foco tras repintar si estaba en un día o en el asa.
 	diaElegido *diaCompacto
 	asaMes     *asaMes
+	// grupoCajon es el selector de vista del cajón del teléfono en el último pintado: las
+	// flechas cambian la vista sin cerrar el cajón y el repintado devuelve aquí el foco.
+	grupoCajon *ui.Segmentado
 	// recEnCajon es la rama de recordatorios desplegada en el cajón del teléfono, y
 	// recCargando/recFallo el estado del sondeo, que la App copia aquí al pintar.
 	recEnCajon            bool

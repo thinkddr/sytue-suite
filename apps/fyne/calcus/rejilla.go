@@ -15,6 +15,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/formula"
+	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
 // Celda son las coordenadas de una celda, de base cero.
@@ -153,6 +154,13 @@ type Rejilla struct {
 	copiado *copia
 	// anclaMenu es el punto transparente del que cuelga el menú contextual.
 	anclaMenu *canvas.Rectangle
+	// T traduce (la del lienzo); nil, las claves tal cual.
+	T func(clave string, vars i18n.Vars) string
+	// pistaComentario es el `title` de una celda con comentarios: el primero, al pasar el
+	// puntero (comentarios.go). celdaPista es la celda a la que está puesta, si hayPista.
+	pistaComentario *ui.Pista
+	celdaPista      Celda
+	hayPista        bool
 }
 
 var (
@@ -175,6 +183,7 @@ var (
 // NuevaRejilla crea la cuadrícula de ese libro.
 func NuevaRejilla(l *Libro) *Rejilla {
 	r := &Rejilla{L: l, Cols: MinColumnas, Fils: MinFilas, anclaMenu: nuevaAnclaMenu()}
+	r.pistaComentario = nuevaPistaComentario()
 	r.ExtendBaseWidget(r)
 	r.ed = ui.NuevoEditorPlano(EscalonCelda, nil)
 	r.ed.Tecla = r.teclaEnEdicion
@@ -377,6 +386,7 @@ func (r *Rejilla) bloqueado(c1, f1, c2, f2 int) bool {
 // Scrolled es la rueda. Implementarlo es además lo que hace que Fyne recorte el
 // contenido a la caja de la rejilla (ver el comentario del tipo).
 func (r *Rejilla) Scrolled(e *fyne.ScrollEvent) {
+	r.cerrarPistaComentario() // la celda de debajo se ha movido
 	r.Desplazar(-e.Scrolled.DX, -e.Scrolled.DY)
 }
 
@@ -579,6 +589,7 @@ func (r *Rejilla) celdaEn(p fyne.Position) (Celda, bool) {
 // referencia para la fórmula en edición: hay que saberlo antes de que Fyne le quite el
 // foco al editor, que es justo después.
 func (r *Rejilla) MouseDown(e *desktop.MouseEvent) {
+	r.cerrarPistaComentario() // como el `title` del navegador, que se va al pulsar
 	r.mayRaton = e.Modifier&fyne.KeyModifierShift != 0
 	// Solo Ctrl/⌘ a secas, como la web: Ctrl+Mayús o Ctrl+Alt+clic no abren el enlace.
 	r.ctrlRaton = e.Modifier&(fyne.KeyModifierControl|fyne.KeyModifierSuper) != 0 &&
@@ -1306,10 +1317,21 @@ func (r *Rejilla) teclaEnEdicion(k *fyne.KeyEvent) bool {
 // AccessibilityLabel anuncia la celda ancla y lo que hay en ella, que es lo que el
 // `aria-activedescendant` de la web le da al lector de pantalla. Sin esto, moverse con
 // las flechas no dice nada.
+//
+// Con comentarios, detrás va lo que dice su marca: es el `aria-description` de la celda.
 func (r *Rejilla) AccessibilityLabel() string {
 	ref := Ref(r.sel.C, r.sel.F)
 	if texto := r.L.Texto(r.sel.C, r.sel.F); texto != "" {
-		return ref + ": " + texto
+		ref += ": " + texto
+	}
+	if len(r.comentarios) > 0 {
+		k := r.sel
+		if fu, es := r.L.FusionEn(k.C, k.F); es {
+			k = Celda{C: fu.C1, F: fu.F1}
+		}
+		if primero, n := r.L.marcaDeComentario(r.comentarios, k); n > 0 {
+			ref += ". " + TextoMarcaComentario(r.T, primero, n)
+		}
 	}
 	return ref
 }
@@ -1358,4 +1380,5 @@ func (r *Rejilla) seguirPuntero(p fyne.Position) {
 		r.boton = boton
 		r.Refresh()
 	}
+	r.seguirPistaComentario(p)
 }

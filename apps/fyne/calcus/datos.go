@@ -4,6 +4,7 @@
 package calcus
 
 import (
+	"maps"
 	"regexp"
 	"slices"
 	"strconv"
@@ -200,8 +201,9 @@ func (l *Libro) TextoEnColumnas(sep string, c1, f1, f2 int) {
 }
 
 // Estructura es el comando `insrow`, `inscol`, `delrow` o `delcol` sobre el rango: se
-// mueven las celdas con su formato y se reescriben las fórmulas de la hoja activa para
-// que sigan apuntando a su dato (`formula.Desplazamiento`, las reglas de Excel).
+// mueven las celdas con su formato y se reescriben las fórmulas de la hoja activa, y las
+// de las otras hojas que la citan, para que sigan apuntando a su dato
+// (`formula.Desplazamiento`, las reglas de Excel).
 // `lado` es "above"/"below" o "left"/"right" al insertar.
 func (l *Libro) Estructura(cmd, lado string, c1, f1, c2, f2 int) {
 	var d formula.Desplazamiento
@@ -236,6 +238,8 @@ func (l *Libro) Estructura(cmd, lado string, c1, f1, c2, f2 int) {
 	}
 	l.anotar()
 	h := l.h()
+	// Solo se mueven las referencias que apuntan a esta hoja, estén donde estén.
+	d.Hoja = h.nombre
 	viejas, formatos, estilos := h.celdas, h.formatos, h.estilos
 	h.celdas, h.formatos, h.estilos = map[Celda]string{}, map[Celda]FormatoNum{}, map[Celda]Estilo{}
 	for k, html := range viejas {
@@ -267,8 +271,61 @@ func (l *Libro) Estructura(cmd, lado string, c1, f1, c2, f2 int) {
 	} else {
 		h.ocultCols = tramosONil(analisis.MoverTramos(h.ocultCols, d.Desde, d.Cantidad, MaxColumnas))
 	}
+	for i := range l.f.hojas {
+		if i != l.f.activa {
+			moverReferenciasAjenas(&l.f.hojas[i], d)
+		}
+	}
 	l.f.nombres = moverNombres(l.f.nombres, h.nombre, l.f.hojas[0].nombre, d)
 	l.restaurar(l.f)
+}
+
+// moverReferenciasAjenas es `moverReferenciasAjenas` de refshift.ts: en una hoja que NO
+// es la del desplazamiento, las fórmulas que la citan (`=Ventas!B4`) siguen a su dato
+// —las celdas y las del formato condicional y las validaciones; sus rangos son de esta
+// hoja y no se mueven—. Antes «Resumen» se quedaba mirando la celda vieja sin avisar.
+//
+// Con la hoja protegida se respeta lo que veta el servidor, como en `moverObjetos`: solo
+// las celdas desbloqueadas, y las reglas solo con `objects` concedido.
+func moverReferenciasAjenas(h *hojaLibro, d formula.Desplazamiento) {
+	if strings.EqualFold(h.nombre, d.Hoja) {
+		return
+	}
+	var celdas map[Celda]string
+	for k, html := range h.celdas {
+		if h.proteccion != nil {
+			if b := h.estilos[k].Bloqueada; b == nil || *b {
+				continue
+			}
+		}
+		if nuevo := reescribirCeldaEn(html, d, h.nombre); nuevo != html {
+			if celdas == nil {
+				celdas = maps.Clone(h.celdas)
+			}
+			celdas[k] = nuevo
+		}
+	}
+	if celdas != nil {
+		h.celdas = celdas
+	}
+	if h.proteccion != nil && !h.proteccion.Objects {
+		return
+	}
+	// Las reglas son inmutables y la foto las comparte: se ponen listas nuevas.
+	if len(h.condiciones) > 0 {
+		conds := slices.Clone(h.condiciones)
+		for i := range conds {
+			conds[i].Formula = d.ReescribirFormulaEn(conds[i].Formula, h.nombre)
+		}
+		h.condiciones = conds
+	}
+	if len(h.validaciones) > 0 {
+		vals := slices.Clone(h.validaciones)
+		for i := range vals {
+			vals[i].Formula = d.ReescribirFormulaEn(vals[i].Formula, h.nombre)
+		}
+		h.validaciones = vals
+	}
 }
 
 // moverObjetos es `moverObjetos` de `refshift.ts`: las tablas, los minigráficos, los
@@ -547,11 +604,22 @@ func moverIndice(i int, d formula.Desplazamiento) (int, bool) {
 // reescribirCelda es `reescribirCelda`: la fórmula de la celda con sus referencias
 // movidas, conservando el envoltorio. Un literal sale tal cual.
 func reescribirCelda(html string, d formula.Desplazamiento) string {
+	return reescribirCeldaEn(html, d, d.Hoja)
+}
+
+// reescribirCeldaEn es `reescribirCelda` con la hoja en la que vive la celda (`base`).
+// Sin cambios, el HTML sale tal cual, como en la web.
+func reescribirCeldaEn(html string, d formula.Desplazamiento, base string) string {
 	if html == "" || !esFormula(html) {
 		return html
 	}
+	raw := textoPlano(html)
+	nuevo := d.ReescribirFormulaEn(raw, base)
+	if nuevo == raw {
+		return html
+	}
 	p := leerCelda(html)
-	p.dentro = escaparHTML(d.ReescribirFormula(textoPlano(html)))
+	p.dentro = escaparHTML(nuevo)
 	return p.html()
 }
 

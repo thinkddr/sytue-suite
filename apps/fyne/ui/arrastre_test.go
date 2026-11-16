@@ -102,11 +102,13 @@ func TestElBordeSigueDesplazandoSinMoverElDedoYSeDetieneAlCancelar(t *testing.T)
 		}
 		pasos++
 	})
-	limite := time.Now().Add(time.Second)
-	for pasos < 2 && time.Now().Before(limite) {
-		time.Sleep(10 * time.Millisecond)
-		fyne.DoAndWait(func() {})
-	}
+	// Con `esperar` y no con un segundo propio: los dos pasos son dos relojes encadenados
+	// (180 + 35 ms) que solo avanzan cuando la rutina del test atiende su `fyne.Do`, y con
+	// `-race` y la CPU repartida entre varias verificaciones la cadena pasaba del segundo
+	// (reproducido con la prueba en `nice -n 19` contra seis bucles ocupados: de 0,29 s a
+	// 0,68 s, y uno a 1,10 s). Lo que se comprueba es que el borde sigue SIN otro
+	// `Actualizar`, no cuánto tarda; el plazo solo corta si no llega nunca.
+	esperar(t, func() bool { return pasos >= 2 })
 	if pasos < 2 {
 		t.Fatal("el desplazamiento exige mover el dedo otra vez")
 	}

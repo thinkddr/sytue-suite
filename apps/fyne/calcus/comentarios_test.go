@@ -10,10 +10,15 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/driver/desktop"
+	"fyne.io/fyne/v2/test"
 
+	"git.sytue.eu/sytue/one/apps/fyne/catalogos"
 	"git.sytue.eu/sytue/one/apps/fyne/editor"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
 // libroConIDs es un libro guardado por la web: con el id de cada hoja y una fila insertada
@@ -200,5 +205,77 @@ func TestElHiloDeUnaCeldaLlevaASuCelda(t *testing.T) {
 	boton.Tapped(&fyne.PointEvent{})
 	if ab.lz.Libro.Activa() != 1 || ab.lz.Rejilla.sel != (Celda{C: 1, F: 4}) {
 		t.Errorf("el botón lleva a la hoja %d, celda %+v", ab.lz.Libro.Activa(), ab.lz.Rejilla.sel)
+	}
+}
+
+// TestLaMarcaDeComentarioEnseñaElPrimeroAlPasarElPuntero es el `title` (y el
+// `aria-description`) de la celda en la web: con el puntero sobre una celda con marca,
+// tras el retardo de la pista, «Autor: texto» del hilo más antiguo y cuántos más hay; en
+// una celda sin marca, nada; al salir o al pulsar, se cierra. VISTO EN ROJO sin
+// `seguirPistaComentario`: Fyne no decía nada al pasar por la marca.
+func TestLaMarcaDeComentarioEnseñaElPrimeroAlPasarElPuntero(t *testing.T) {
+	tr, err := i18n.New("es", i18n.Common(), catalogos.Docs())
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := rejillaDePrueba(500, 200)
+	r.T = tr.T
+	id := r.L.IDsHojas()[0]
+	b2 := api.AnclaCelda{Hoja: id, Fila: "t1", Col: "t1", Text: "B2"}
+	viejo, nuevo := hiloEn("c1", b2, false, ""), hiloEn("c2", b2, false, "")
+	viejo.AuthorName, viejo.Body, viejo.CreatedAt = "Ana", "¿Cuadra con marzo?", time.Now().Add(-time.Hour)
+	nuevo.AuthorName = "Luis"
+	r.PonerComentarios([]api.DocComment{nuevo, viejo, hiloEn("c3", b2, true, "")})
+
+	w := test.NewTempWindow(t, container.NewWithoutLayout(r))
+	w.SetPadded(false)
+	w.Resize(fyne.NewSize(500, 200))
+	r.Resize(fyne.NewSize(500, 200))
+	r.Move(fyne.NewPos(0, 0))
+
+	vw := r.vista()
+	enB2 := fyne.NewPos(vw.x(1)+10, vw.y(1)+5)
+	test.MoveMouse(w.Canvas(), enB2)
+	p := r.pistaComentario
+	if want := "Ana: ¿Cuadra con marzo? Más hilos: 1"; p.Rotulo != want {
+		t.Fatalf("la pista de B2 dice %q, y en la web %q", p.Rotulo, want)
+	}
+	time.Sleep(ui.RetardoPista + 150*time.Millisecond)
+	fyne.DoAndWait(func() {})
+	if !p.Abierta() {
+		t.Fatal("con el puntero sobre B2, la pista no se ha abierto")
+	}
+	// La caja de la pista es el borde de arriba de B2, de alto cero: el puntero no la
+	// encuentra y sigue siendo de la rejilla.
+	if p.Position() != fyne.NewPos(vw.x(1), vw.y(1)) || p.Size().Height != 0 || p.Size().Width != vw.ancho(1) {
+		t.Errorf("la pista está en %v %v", p.Position(), p.Size())
+	}
+	guarda(t, w.Canvas().Capture())
+
+	// Una celda sin marca la cierra; volver a B2 la pone otra vez; pulsar la cierra.
+	test.MoveMouse(w.Canvas(), fyne.NewPos(vw.x(3)+10, vw.y(3)+5))
+	if p.Abierta() || r.hayPista {
+		t.Error("en una celda sin marca la pista sigue")
+	}
+	test.MoveMouse(w.Canvas(), enB2)
+	if !r.hayPista {
+		t.Fatal("al volver a B2 no se pone la pista")
+	}
+	r.MouseDown(&desktop.MouseEvent{PointEvent: fyne.PointEvent{Position: enB2}, Button: desktop.MouseButtonPrimary})
+	r.MouseUp(&desktop.MouseEvent{PointEvent: fyne.PointEvent{Position: enB2}, Button: desktop.MouseButtonPrimary})
+	if p.Abierta() || r.hayPista {
+		t.Error("al pulsar, la pista sigue")
+	}
+
+	// El lector de pantalla lo oye en la celda activa (el `aria-description` de la web).
+	r.Seleccionar(1, 1, false)
+	if got := r.AccessibilityLabel(); got != "B2. Ana: ¿Cuadra con marzo? Más hilos: 1" {
+		t.Errorf("la celda activa se anuncia %q", got)
+	}
+
+	// Un solo hilo: sin «Más hilos».
+	r.PonerComentarios([]api.DocComment{viejo})
+	if primero, n := r.L.marcaDeComentario(r.comentarios, Celda{C: 1, F: 1}); TextoMarcaComentario(tr.T, primero, n) != "Ana: ¿Cuadra con marzo?" {
+		t.Errorf("con un hilo: %q", TextoMarcaComentario(tr.T, primero, n))
 	}
 }

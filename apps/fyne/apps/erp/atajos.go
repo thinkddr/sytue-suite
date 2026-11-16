@@ -60,7 +60,7 @@ func (p *Pantalla) gruposDeAtajos() []ui.GrupoDeAtajos {
 // abierta su campo tiene el foco y la «?» se escribe en él.
 func (p *Pantalla) verAtajos() {
 	c := p.lienzo
-	if c == nil || p.abierta || c.Overlays().Top() != nil {
+	if c == nil || p.paleta.Abierta() || c.Overlays().Top() != nil {
 		return
 	}
 	ui.MostrarHojaAtajos(c, p.t("shortcuts.title"), p.t("ui.close"), p.gruposDeAtajos())

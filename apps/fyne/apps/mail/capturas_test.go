@@ -214,6 +214,94 @@ func TestLasCapturasDeLaApp(t *testing.T) {
 	}
 }
 
+// TestLasCapturasDePosponerYSilenciar: el lector de un hilo pospuesto y silenciado con
+// sus dos franjas, el menú del reloj abierto y Recibidos con lo vuelto de «Pospuestos»
+// arriba (con su reloj y la hora de vuelta). Con SYTUE_CAPTURAS escribe los PNG.
+func TestLasCapturasDePosponerYSilenciar(t *testing.T) {
+	t.Cleanup(func() { tema.Elegir("") })
+	hasta := time.Date(2026, 12, 24, 8, 0, 0, 0, time.Local)
+	for _, c := range []struct {
+		nombre      string
+		ancho, alto float32
+		modo        string
+		menu        bool
+	}{
+		{"escritorio-lector-franjas", 1280, 800, "claro", false},
+		{"escritorio-lector-franjas-oscuro", 1280, 800, "oscuro", false},
+		{"movil-lector-franjas", 390, 844, "claro", false},
+		{"escritorio-lector-posponer-menu", 1280, 800, "claro", true},
+	} {
+		t.Run(c.nombre, func(t *testing.T) {
+			tema.Elegir(c.modo)
+			s := conPospuestos()
+			s.estado = api.MailEstadoHilo{Muted: true, SnoozedUntil: &hasta}
+			b, w, _ := buzonConVentana(t, s, fyne.NewSize(c.ancho, c.alto))
+			b.Abrir(b.P.Bandeja.Conversaciones[0])
+			if textos, _ := franjasDelLector(t, b.P.Lector); len(textos) != 2 {
+				t.Fatalf("el lector no enseña las dos franjas: %q", textos)
+			}
+			if c.menu {
+				r := test.WidgetRenderer(b.P.Lector).(*lectorRenderer)
+				var reloj *ui.Boton
+				var buscar func(os []fyne.CanvasObject)
+				buscar = func(os []fyne.CanvasObject) {
+					for _, o := range os {
+						switch v := o.(type) {
+						case *ui.Boton:
+							if v.Rotulo == "Cambiar la fecha" {
+								reloj = v
+							}
+						case *fyne.Container:
+							buscar(v.Objects)
+						}
+					}
+				}
+				buscar(r.barra.Objects)
+				if reloj == nil {
+					t.Fatal("no está el reloj de posponer en la barra")
+				}
+				reloj.Tapped(nil)
+			}
+			img := w.Canvas().Capture()
+			if img.Bounds().Dx() == 0 {
+				t.Fatal("la captura ha salido vacía")
+			}
+			guardarCaptura(t, img, "mail-"+c.nombre)
+		})
+	}
+	for _, c := range []struct {
+		nombre      string
+		ancho, alto float32
+		modo        string
+	}{
+		{"escritorio-recibidos-vuelto-arriba", 1280, 800, "claro"},
+		{"movil-recibidos-vuelto-arriba", 390, 844, "oscuro"},
+	} {
+		t.Run(c.nombre, func(t *testing.T) {
+			tema.Elegir(c.modo)
+			s := conPospuestos()
+			volvio := hace.Add(-10 * time.Minute)
+			vuelto := sobre("mv", "hv", "in", "Factura de marzo", false, 30*24*time.Hour)
+			vuelto.UnsnoozedAt = &volvio
+			s.paginas = map[string][]api.MailMessage{"": {
+				vuelto,
+				sobre("mn", "hn", "in", "Hoy", true, time.Hour),
+				sobre("mo", "ho", "in", "Ayer", true, 26*time.Hour),
+			}}
+			s.siguiente = nil
+			b, w, _ := buzonConVentana(t, s, fyne.NewSize(c.ancho, c.alto))
+			if cs := b.P.Bandeja.Conversaciones; len(cs) == 0 || cs[0].HiloID != "hv" {
+				t.Fatalf("lo vuelto no encabeza Recibidos: %+v", cs)
+			}
+			img := w.Canvas().Capture()
+			if img.Bounds().Dx() == 0 {
+				t.Fatal("la captura ha salido vacía")
+			}
+			guardarCaptura(t, img, "mail-"+c.nombre)
+		})
+	}
+}
+
 // MAIL-15: en el cajón del teléfono, más estrecho que los 260 del carril, una dirección
 // larga se salía por la derecha y con ella el contenido entero del cuerpo: los galones
 // quedaban fuera, los contadores debajo de la barra de desplazamiento («2» cortado en

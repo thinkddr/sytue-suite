@@ -4,6 +4,11 @@
 package ui
 
 import (
+	"io/fs"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 
 	"fyne.io/fyne/v2"
@@ -146,6 +151,119 @@ func TestLasFilasEsqueletoSinUltimoFilete(t *testing.T) {
 	for i, fila := range r.filas {
 		if quiere := i < 2; (fila.filete != nil) != quiere {
 			t.Errorf("la fila %d lleva filete: %v, y tiene que llevarlo: %v", i, fila.filete != nil, quiere)
+		}
+	}
+}
+
+// TestLasFilasConRecetaSiguenSuGeometria: una lista con fila propia (la bandeja de Mail,
+// el historial de Rooms…) pone sus medidas en la receta y FilasEsqueleto las respeta:
+// el alto, el aire entre filas y el de encima, el delantero con su medida, las rayas
+// con su ancho fijo o su parte en ciclo, la cola en la línea de la primera y, con
+// `items-start`, todo colgado del relleno de arriba.
+//
+// VISTO EN ROJO: sin receta, cada app montaba su receta con un `Esqueleto` por bloque.
+func TestLasFilasConRecetaSiguenSuGeometria(t *testing.T) {
+	cerca := func(a, b float32) bool { return a-b < 0.51 && b-a < 0.51 }
+	t.Run("centrada", func(t *testing.T) {
+		f := NuevasFilasEsqueleto(3, DelanteroAvatar, 2).ConReceta(RecetaEsqueleto{
+			Alto: 60, Hueco: 4, Encima: 10, Izq: 12, Der: 8,
+			Delantero: fyne.NewSize(40, 40), HuecoDelantero: 12,
+			Rayas: []RayaEsqueleto{
+				{Alto: 14, Partes: []float32{0.5}, Cola: fyne.NewSize(36, 12)},
+				{Alto: 12, Partes: []float32{0.8, 0.6}},
+			},
+			HuecoRayas: 8,
+		})
+		f.Filete = true
+		defer f.Parar()
+		if f.Lineas != 2 || f.Meta != nil {
+			t.Errorf("con receta las líneas son %d (quiero las rayas) y la meta %v", f.Lineas, f.Meta)
+		}
+		if h := f.MinSize().Height; h != 10+3*60+2*4 {
+			t.Errorf("tres filas de 60 con 4 entre ellas y 10 encima piden %g", h)
+		}
+		f.Resize(fyne.NewSize(400, f.MinSize().Height))
+		r := test.WidgetRenderer(f).(*filasEsqueletoRenderer)
+		r.Layout(f.Size())
+		for i, fila := range r.filas {
+			y := 10 + float32(i)*64
+			caja := 60 - tema.Borde
+			if p := fila.filete.Position(); p.Y != y+caja {
+				t.Errorf("fila %d: el filete está en %g y la fila acaba en %g", i, p.Y, y+60)
+			}
+			d := fila.delantero
+			if d.Size() != fyne.NewSize(40, 40) || d.Position().X != 12 || !cerca(d.Position().Y, y+(caja-40)/2) || d.CornerRadius != 20 {
+				t.Errorf("fila %d: el avatar está en %v con %v y radio %g", i, d.Position(), d.Size(), d.CornerRadius)
+			}
+			util := float32(400 - 8 - 64)
+			l1, l2, cola := fila.rayas[0], fila.rayas[1], fila.colas[0]
+			if l1.Position().X != 64 || !cerca(l1.Size().Width, util*0.5) {
+				t.Errorf("fila %d: la primera raya está en %g y mide %g", i, l1.Position().X, l1.Size().Width)
+			}
+			if fin := cola.Position().X + cola.Size().Width; fin != 392 || !cerca(cola.Position().Y+6, l1.Position().Y+7) {
+				t.Errorf("fila %d: la cola acaba en %g y se centra en %g; la raya, en %g", i, fin, cola.Position().Y+6, l1.Position().Y+7)
+			}
+			parte := []float32{0.8, 0.6}[i%2]
+			if !cerca(l2.Size().Width, util*parte) || l2.Position().Y != l1.Position().Y+14+8 {
+				t.Errorf("fila %d: la segunda raya mide %g en y=%g", i, l2.Size().Width, l2.Position().Y)
+			}
+			if !cerca(l1.Position().Y, y+(caja-34)/2) {
+				t.Errorf("fila %d: las rayas no se centran en la fila (y=%g)", i, l1.Position().Y)
+			}
+		}
+	})
+	t.Run("arriba", func(t *testing.T) {
+		f := NuevasFilasEsqueleto(2, DelanteroTesela, 2).ConReceta(RecetaEsqueleto{
+			Alto: 48, Izq: 16, Delantero: fyne.NewSize(10, 10), HuecoDelantero: 12,
+			Rayas:  []RayaEsqueleto{{Alto: 14, Ancho: 80}, {Alto: 16, Ancho: 1000}},
+			Arriba: true, Relleno: 8, BajaDelantero: 6, BajaRayas: 2,
+			Sangrias: []float32{0, 20},
+		}).SobreCromo()
+		defer f.Parar()
+		f.Resize(fyne.NewSize(300, f.MinSize().Height))
+		r := test.WidgetRenderer(f).(*filasEsqueletoRenderer)
+		r.Layout(f.Size())
+		for i, fila := range r.filas {
+			y, sangria := float32(i)*48, []float32{0, 20}[i]
+			if p := fila.delantero.Position(); p != fyne.NewPos(16+sangria, y+14) || fila.delantero.CornerRadius != tema.RadioMD {
+				t.Errorf("fila %d: la tesela está en %v con radio %g", i, p, fila.delantero.CornerRadius)
+			}
+			if p := fila.rayas[0].Position(); p != fyne.NewPos(38+sangria, y+10) || fila.rayas[0].Size().Width != 80 {
+				t.Errorf("fila %d: la raya de ancho fijo está en %v y mide %g", i, p, fila.rayas[0].Size().Width)
+			}
+			if w := fila.rayas[1].Size().Width; w != 300-38-sangria {
+				t.Errorf("fila %d: la raya más ancha que la fila mide %g y no cabe", i, w)
+			}
+		}
+		if c := r.bloques[0].FillColor; c != tintaEsqueleto("sidebar-hover-bg", f.fase) {
+			t.Errorf("sobre el cromo los bloques pintan %v", c)
+		}
+	})
+}
+
+// TestNingunaAppMontaSusFilasDeCarga: las filas de carga de las listas de la suite son
+// FilasEsqueleto con su receta, no un layout propio con un `Esqueleto` por bloque, que
+// late cada uno a su aire y anuncia la carga por su cuenta (o no la anuncia).
+//
+// VISTO EN ROJO con las recetas de Mail, Contactos, Rooms, Notes y Calendar.
+func TestNingunaAppMontaSusFilasDeCarga(t *testing.T) {
+	receta := regexp.MustCompile(`(?m)^type (filaEsqueleto|filaCarga|EsqueletoMensajes|EsqueletoCanales|Esqueleto)\b`)
+	for _, dir := range []string{"../apps", "../contactos", "../calendario"} {
+		err := filepath.WalkDir(dir, func(ruta string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() || !strings.HasSuffix(ruta, ".go") || strings.HasSuffix(ruta, "_test.go") {
+				return err
+			}
+			fuente, err := os.ReadFile(ruta)
+			if err != nil {
+				return err
+			}
+			if m := receta.Find(fuente); m != nil {
+				t.Errorf("%s monta sus propias filas de carga (%s): son ui.NuevasFilasEsqueleto con su receta", ruta, m)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
 		}
 	}
 }

@@ -58,7 +58,18 @@ export interface Desplazamiento {
   cantidad: number;
   /** Tope de la rejilla en ese eje (filas o columnas). Lo que rebosa deja de existir. */
   tope: number;
+  /**
+   * La hoja en la que se abre o se cierra el tramo. Con ella, una fórmula solo mueve
+   * las referencias que apuntan a ESA hoja —las suyas sin prefijo si vive en ella, y
+   * las `Hoja!A1` que la nombran desde cualquier otra—: `=Resumen!A5` escrita en
+   * «Ventas» no se mueve porque en «Ventas» se inserte una fila. Sin ella (los usos que
+   * no saben de libros, como los tests de una sola hoja) se mueven todas.
+   */
+  hoja?: string;
 }
+
+/** ¿Son la misma hoja? Como en Excel, sin distinguir mayúsculas: `ventas!B4` es «Ventas». */
+const mismaHoja = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
 
 /** Lo que devuelve `#¡REF!` en el texto de una fórmula. */
 export const REF_ROTA = '#¡REF!';
@@ -190,18 +201,26 @@ export function moverReferencia(ref: string, d: Desplazamiento): string {
 }
 
 /**
- * Reescribe TODAS las referencias de una fórmula.
+ * Reescribe las referencias de una fórmula que apuntan a la hoja del desplazamiento
+ * (`d.hoja`; todas si no la dice). `base` es la hoja en la que VIVE la fórmula, a la
+ * que pertenecen sus referencias sin prefijo: por defecto, la del desplazamiento.
  *
  * Se sustituye de derecha a izquierda para que las posiciones que devolvió
  * `extractRefs` sigan siendo válidas mientras se reemplaza: hacerlo al revés
  * desplaza el texto bajo los pies de las sustituciones siguientes.
  */
-export function reescribirFormula(texto: string, d: Desplazamiento): string {
+export function reescribirFormula(
+  texto: string,
+  d: Desplazamiento,
+  base: string | undefined = d.hoja,
+): string {
   if (!texto.startsWith('=')) return texto;
   const refs = extractRefs(texto);
   if (refs.length === 0) return texto;
   let out = texto;
   for (const r of [...refs].sort((x, y) => y.start - x.start)) {
+    const de = r.sheet ?? base;
+    if (d.hoja !== undefined && (de === undefined || !mismaHoja(de, d.hoja))) continue;
     const nuevo = moverReferencia(r.text, d);
     if (nuevo !== r.text) out = out.slice(0, r.start) + nuevo + out.slice(r.end);
   }
@@ -219,12 +238,17 @@ export function reescribirFormula(texto: string, d: Desplazamiento): string {
 export function reescribirCelda(
   html: string,
   d: Desplazamiento | ((formula: string) => string),
+  base?: string,
 ): string {
   if (html === '' || !isFormula(html)) return html;
-  const p = parseCell(html);
   const raw = rawText(html);
   // Una función: otro reescrito de la fórmula (p. ej. renombrar un nombre definido).
-  p.inner = escapeHtml(typeof d === 'function' ? d(raw) : reescribirFormula(raw, d));
+  const nuevo = typeof d === 'function' ? d(raw) : reescribirFormula(raw, d, base ?? d.hoja);
+  // Sin cambios, el HTML tal cual: las celdas de las otras hojas casi nunca citan la
+  // que se mueve, y recomponerlas todas cambiaría texto que nadie ha tocado.
+  if (nuevo === raw) return html;
+  const p = parseCell(html);
+  p.inner = escapeHtml(nuevo);
   return renderCellHtml(p);
 }
 
@@ -497,4 +521,50 @@ export function moverObjetos(s: SheetData, d: Desplazamiento): SheetData {
     }
   }
   return out;
+}
+
+/**
+ * Una hoja que NO es la del desplazamiento: sus fórmulas que citan aquella
+ * (`=Ventas!B4`, `SUMA('Hoja 2'!A1:A9)`) siguen a su dato con las mismas reglas —se
+ * desplazan, se encogen o pasan a `#¡REF!`— y todo lo demás queda igual. Antes solo se
+ * reescribía la hoja activa, y «Resumen» se quedaba sumando la fila de al lado sin
+ * avisar: el mismo error silencioso que motivó este fichero, una hoja más allá.
+ *
+ * Cubre las celdas y las fórmulas del formato condicional y de las validaciones (una
+ * lista `=Ventas!A1:A9`); sus RANGOS son de esta hoja y no se mueven. Los nombres
+ * definidos van aparte (`moverNombres`, nombres.ts).
+ *
+ * Con la hoja PROTEGIDA se respeta lo que veta el servidor (ver `moverObjetos`): solo
+ * se reescriben las celdas desbloqueadas, y las reglas solo con `objects` concedido.
+ * Una fórmula bloqueada que se queda mirando la celda vieja es el mal menor frente a
+ * que el servidor rechace el guardado entero.
+ */
+export function moverReferenciasAjenas(s: SheetData, d: Desplazamiento): SheetData {
+  if (d.hoja === undefined || mismaHoja(s.name, d.hoja)) return s;
+  const out: SheetData = { ...s };
+  let cambia = false;
+  let celdas: Record<string, string> | null = null;
+  for (const ref in s.cells) {
+    const html = s.cells[ref]!;
+    if (s.protect && s.styles?.[ref]?.locked !== false) continue;
+    const nuevo = reescribirCelda(html, d, s.name);
+    if (nuevo !== html) (celdas ??= { ...s.cells })[ref] = nuevo;
+  }
+  if (celdas) {
+    out.cells = celdas;
+    cambia = true;
+  }
+  const reglas = <T extends { formula?: string }>(rs: T[]): T[] =>
+    rs.map((r) => {
+      if (r.formula === undefined) return r;
+      const f = reescribirFormula(r.formula, d, s.name);
+      if (f === r.formula) return r;
+      cambia = true;
+      return { ...r, formula: f };
+    });
+  if (isPermissionGranted(s.protect, 'objects')) {
+    if (s.condFormats) out.condFormats = reglas(s.condFormats);
+    if (s.validations) out.validations = reglas(s.validations);
+  }
+  return cambia ? out : s;
 }

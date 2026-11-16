@@ -50,7 +50,11 @@ export function CuadroNombres({ campoRef, ...p }: CuadroNombresProps): JSX.Eleme
   return (
     // `w-24`, no el `w-16` de antes: «AA1000:AB1200» no cabía. Lo que aun así no quepa
     // se corta con puntos y se lee entero en el `title`.
-    <div class="border-border bg-bg-subtle text-text flex h-6 w-24 shrink-0 items-center rounded-sm border text-xs font-medium tabular-nums">
+    // SALVO EN PANTALLA ESTRECHA, donde sigue en `w-16`: a 320 px los 32 px de más
+    // salían del campo de la fórmula, que se quedaba en 40 px —por debajo de los
+    // 44 de un objetivo táctil (accesibilidad-office, calcus-light-320)—. Ahí el
+    // rango largo se corta con puntos igual y el `title` lo sigue dando entero.
+    <div class="border-border bg-bg-subtle text-text flex h-6 w-16 shrink-0 items-center rounded-sm border text-xs font-medium tabular-nums sm:w-24">
       <input
         ref={campoRef}
         type="text"

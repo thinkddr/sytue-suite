@@ -224,11 +224,7 @@ func (p *Pantalla) vistaMesCompacta() fyne.CanvasObject {
 // esqueletoAgendaCompacta es la agenda del teléfono mientras carga: tres filas como las
 // de la lista del día (`pt-2` y `EsqueletoListaDia` en la web).
 func esqueletoAgendaCompacta() fyne.CanvasObject {
-	filas := make([]fyne.CanvasObject, 0, 3)
-	for range 3 {
-		filas = append(filas, esqueletoFilaDia())
-	}
-	return container.New(ui.Margen{Arr: espacio2}, container.New(ui.Columna{}, filas...))
+	return container.New(ui.Margen{Arr: espacio2}, esqueletoListaDia())
 }
 
 // hojaYLista pone la hoja arriba con su sombra debajo (`shadow-sm` y `z-10`) y la lista
@@ -259,9 +255,7 @@ func (p *Pantalla) listaDia(cargando bool) fyne.CanvasObject {
 	filas := []fyne.CanvasObject{titulo}
 	switch dia := EventosDelDia(p.Cursor, p.zona(), p.Eventos); {
 	case cargando:
-		for range 3 {
-			filas = append(filas, esqueletoFilaDia())
-		}
+		filas = append(filas, esqueletoListaDia())
 	case len(dia) == 0:
 		filas = append(filas, renglon(p.t("day.noEvents", nil), tema.TextoSM, ui.Normal, "text-muted",
 			ui.Margen{Izq: espacio4, Arr: espacio2, Der: espacio4, Abj: espacio2}))
@@ -273,27 +267,28 @@ func (p *Pantalla) listaDia(cargando bool) fyne.CanvasObject {
 	return container.New(ui.Margen{Abj: espacio4}, container.New(ui.Columna{}, filas...))
 }
 
-// esqueletoFilaDia es una fila de la lista sin datos: el punto y las dos líneas.
-func esqueletoFilaDia() fyne.CanvasObject {
-	return container.New(&filaEsqueleto{},
-		ui.NuevoEsqueletoRedondo(LadoPuntoFila),
-		ui.NuevoEsqueleto(5*tema.Rem, 0.875*tema.Rem),
-		ui.NuevoEsqueleto(8*tema.Rem, tema.Rem))
-}
+// FilasEsqueletoDia son las filas de la lista del día mientras carga.
+const FilasEsqueletoDia = 3
 
-// filaEsqueleto coloca el esqueleto con la geometría de `filaEventoDia`.
-type filaEsqueleto struct{}
-
-func (filaEsqueleto) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(0, altoMinFilaDia) }
-
-func (filaEsqueleto) Layout(objs []fyne.CanvasObject, _ fyne.Size) {
-	objs[0].Move(fyne.NewPos(espacio4, espacio2+arribaPuntoFila+1))
-	objs[0].Resize(fyne.NewSize(LadoPuntoFila, LadoPuntoFila))
-	x := espacio4 + LadoPuntoFila + espacio3
-	objs[1].Move(fyne.NewPos(x, espacio2))
-	objs[1].Resize(objs[1].MinSize())
-	objs[2].Move(fyne.NewPos(x, espacio2+0.875*tema.Rem+espacio1p5))
-	objs[2].Resize(objs[2].MinSize())
+// esqueletoListaDia son las filas de la lista sin datos, con la geometría de
+// `filaEventoDia` (`EsqueletoListaDia` en la web): `flex items-start gap-3 px-4 py-2`,
+// el punto de 10 con su `mt-[5px]` y las dos líneas de 5 y 8 rem con el `gap-1.5`. Es
+// `ui.FilasEsqueleto` con esa receta: un solo latido y un solo «Cargando».
+func esqueletoListaDia() *ui.FilasEsqueleto {
+	return ui.NuevasFilasEsqueleto(FilasEsqueletoDia, ui.DelanteroAvatar, 2).ConReceta(ui.RecetaEsqueleto{
+		Alto:           altoMinFilaDia,
+		Izq:            espacio4,
+		Delantero:      fyne.NewSize(LadoPuntoFila, LadoPuntoFila),
+		HuecoDelantero: espacio3,
+		Rayas: []ui.RayaEsqueleto{
+			{Alto: 0.875 * tema.Rem, Ancho: 5 * tema.Rem},
+			{Alto: tema.Rem, Ancho: 8 * tema.Rem},
+		},
+		HuecoRayas:    espacio1p5,
+		Arriba:        true,
+		Relleno:       espacio2,
+		BajaDelantero: arribaPuntoFila + 1,
+	})
 }
 
 // cuandoFila es la primera línea de una fila: «Todo el día», «14:00 – 15:00», solo la

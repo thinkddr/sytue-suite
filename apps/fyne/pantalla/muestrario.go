@@ -69,6 +69,7 @@ var secciones = []seccion{
 	{"filas", "Tarjeta y filas", seccionFilas},
 	{"dialogo", "Diálogo", seccionDialogo},
 	{"menu", "Menú", seccionMenu},
+	{"paleta", "Paleta de la suite", seccionPaleta},
 }
 
 // Secciones son las claves del muestrario, en orden: lo que acepta `SYTUE_SECCION`.
@@ -493,4 +494,28 @@ func seccionMenu(tema.Variante) (fyne.CanvasObject, func(fyne.Canvas)) {
 		ui.NuevoSeparadorMenu(),
 		ui.NuevoElementoMenu("Mover a la papelera", iconos.Papelera, nil))
 	return fila(disparador), func(fyne.Canvas) { m.Mostrar(disparador) }
+}
+
+func seccionPaleta(tema.Variante) (fyne.CanvasObject, func(fyne.Canvas)) {
+	// Lo de detrás del velo, como en el diálogo.
+	fondo := columna(tema.Espacio(1))
+	for _, s := range []string{"Facturas de cliente", "Pedidos de compra", "Libro diario"} {
+		fondo.Add(ui.NuevaFilaLista(s, "Contabilidad · hoy"))
+	}
+	// La paleta lee el catálogo común: es la de la barra de la suite.
+	tr, _ := i18n.New(idiomaMuestrario, i18n.Common())
+	p := ui.NuevaPaletaDeLaSuite(tr)
+	p.PonerCapa("acciones", ui.CapaDePaleta{Comandos: []ui.ComandoDePaleta{
+		{ID: "nuevo", Rotulo: "Nueva factura", Grupo: "Acciones", Icono: iconos.Mas},
+		{ID: "subir", Rotulo: "Subir un archivo", Grupo: "Acciones", Icono: iconos.Subir},
+	}})
+	p.PonerCapa("areas", ui.CapaDePaleta{Comandos: []ui.ComandoDePaleta{
+		{ID: "fv", Rotulo: "Facturas de cliente", Grupo: "Áreas", Pista: "Ventas"},
+		{ID: "pc", Rotulo: "Pedidos de compra", Grupo: "Áreas", Pista: "Compras"},
+		{ID: "ld", Rotulo: "Libro diario", Grupo: "Áreas", Pista: "Contabilidad"},
+	}})
+	return fondo, func(c fyne.Canvas) {
+		p.EnLienzo(c)
+		p.Abrir()
+	}
 }

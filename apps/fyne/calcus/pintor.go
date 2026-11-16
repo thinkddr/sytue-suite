@@ -322,7 +322,7 @@ func (rr *rejillaRenderer) recomponer() {
 		o = append(o, m)
 	}
 	o = append(o, rr.tinteCelda.objetos()...)
-	o = append(o, rr.r.anclaMenu)
+	o = append(o, rr.r.anclaMenu, rr.r.pistaComentario)
 	rr.objetos = append(o, rr.r.ed.Objeto()) //nolint:gocritic // `o` es local y su único destino es este campo
 }
 

@@ -256,10 +256,8 @@ func TestCargandoElMesDelTelefonoNoCambiaDeForma(t *testing.T) {
 	}
 	n := 0
 	buscarObjeto(w.Content(), func(o fyne.CanvasObject) bool {
-		if c, es := o.(*fyne.Container); es {
-			if _, es := c.Layout.(*filaEsqueleto); es {
-				n++
-			}
+		if f, es := o.(*ui.FilasEsqueleto); es {
+			n += f.Filas
 		}
 		return false
 	})
@@ -732,6 +730,55 @@ func TestElCajonDelTelefonoLlevaLoDeLaCabecera(t *testing.T) {
 	a.saltarA(p.Recordatorios[1])
 	if p.Vista != VistaDia || p.cajonAbierto {
 		t.Errorf("el enlace del recordatorio deja la vista %d y el cajón abierto %v", p.Vista, p.cajonAbierto)
+	}
+}
+
+// TestLasFlechasDelSelectorNoCierranElCajon: en el cajón del teléfono, ←/→ sobre el
+// selector de vista cambian la vista con el cajón abierto y el foco sigue en el
+// selector (el repintado lo rehace); pulsar una vista, Intro o el espacio la confirman
+// y cierran el cajón, como el clic del `<aside>` de la web. VISTO EN ROJO cerrando el
+// cajón con cada flecha.
+func TestLasFlechasDelSelectorNoCierranElCajon(t *testing.T) {
+	a, w := appTelefono(t)
+	p := a.P
+	p.cajonAbierto = true
+	a.pintar()
+	grupo := func() *ui.Segmentado {
+		g, _ := buscarObjeto(w.Content(), func(o fyne.CanvasObject) bool { _, es := o.(*ui.Segmentado); return es }).(*ui.Segmentado)
+		if g == nil {
+			t.Fatal("el cajón no lleva el selector de vista")
+		}
+		return g
+	}
+	c := w.Canvas()
+	c.Focus(grupo())
+	antes := p.Vista
+	c.Focused().TypedKey(&fyne.KeyEvent{Name: fyne.KeyRight})
+	if !p.cajonAbierto {
+		t.Fatal("una flecha en el selector de vista cerró el cajón")
+	}
+	if p.Vista == antes {
+		t.Error("la flecha no cambió la vista")
+	}
+	if g, es := c.Focused().(*ui.Segmentado); !es || g != grupo() {
+		t.Fatalf("tras la flecha el foco está en %T y no en el selector nuevo", c.Focused())
+	}
+	c.Focused().TypedKey(&fyne.KeyEvent{Name: fyne.KeyLeft})
+	if !p.cajonAbierto || p.Vista != antes {
+		t.Fatalf("la flecha de vuelta deja la vista %d y el cajón abierto %v", p.Vista, p.cajonAbierto)
+	}
+	c.Focused().TypedKey(&fyne.KeyEvent{Name: fyne.KeyReturn})
+	if p.cajonAbierto {
+		t.Error("Intro sobre el selector no cerró el cajón")
+	}
+
+	p.cajonAbierto = true
+	a.pintar()
+	// En el 2×2 la agenda es la celda de abajo a la derecha.
+	g := grupo()
+	test.TapAt(g, fyne.NewPos(g.Size().Width*3/4, g.Size().Height*3/4))
+	if p.Vista != VistaAgenda || p.cajonAbierto {
+		t.Errorf("pulsar «Agenda» deja la vista %d y el cajón abierto %v", p.Vista, p.cajonAbierto)
 	}
 }
 

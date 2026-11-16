@@ -59,6 +59,11 @@ export interface PaletaDeComandosProps<O extends OpcionDePaleta> {
   onElegir: (opcion: O) => void;
   /** El pie de escritorio (los atajos). En el teléfono no se pinta. */
   pie?: ComponentChildren;
+  /**
+   * Lo que va entre el campo y la lista: la banda de «entendido como» de la búsqueda
+   * con IA de la paleta de la suite. Sin él, nada.
+   */
+  aviso?: ComponentChildren;
 }
 
 export function PaletaDeComandos<O extends OpcionDePaleta>({
@@ -74,6 +79,7 @@ export function PaletaDeComandos<O extends OpcionDePaleta>({
   opciones,
   onElegir,
   pie,
+  aviso,
 }: PaletaDeComandosProps<O>): JSX.Element | null {
   const t = useT();
   const campo = useRef<HTMLInputElement>(null);
@@ -160,6 +166,13 @@ export function PaletaDeComandos<O extends OpcionDePaleta>({
     }
   };
 
+  // Al body, SALVO CON UN <dialog> MODAL ABIERTO, donde va al propio diálogo (como los
+  // menús de `Dropdown`): `showModal()` lo sube a la capa superior y deja inerte todo lo
+  // demás, así que una paleta abierta encima desde el body quedaría debajo y sin poder
+  // escribir en ella. Con varios, el último abierto es el de arriba.
+  const abiertos = document.querySelectorAll('dialog[open]');
+  const destino = abiertos[abiertos.length - 1] ?? document.body;
+
   return createPortal(
     <div
       // Alto y origen = viewport VISUAL, como el `Modal`: con el teclado fuera, la hoja
@@ -211,6 +224,7 @@ export function PaletaDeComandos<O extends OpcionDePaleta>({
             {t('ui.cancel')}
           </Button>
         </div>
+        {aviso ? <div class="shrink-0">{aviso}</div> : null}
         <ul
           id={lista}
           role="listbox"
@@ -272,6 +286,6 @@ export function PaletaDeComandos<O extends OpcionDePaleta>({
         ) : null}
       </div>
     </div>,
-    document.body,
+    destino,
   );
 }

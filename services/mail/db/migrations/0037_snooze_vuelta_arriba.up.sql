@@ -16,13 +16,10 @@
 -- Columna NULLable sin DEFAULT: añadirla no reescribe la tabla.
 --
 -- El índice del listado de carpeta pasa a ordenar por la fecha de orden (expresión),
--- para que el cursor keyset siga siendo O(1) por página: sustituye al de 0001, que
--- ordenaba por received_at y ya no lo usaría ninguna consulta de lista.
+-- para que el cursor keyset siga siendo O(1) por página. NO va aquí: `messages` es la
+-- tabla más grande de Mail y un CREATE INDEX normal bloquea sus escrituras (el correo
+-- que entra, marcar leído, mover…) mientras lo construye. Va CONCURRENTLY en la 0038 y
+-- la retirada del índice de 0001 en la 0039, cada uno solo en su fichero porque
+-- CONCURRENTLY no admite transacción (el patrón de la 0008 del Hub).
 
-ALTER TABLE messages ADD COLUMN unsnoozed_at timestamptz;
-
-CREATE INDEX messages_mailbox_orden_idx
-    ON messages (tenant, mailbox_id, (COALESCE(unsnoozed_at, received_at)) DESC)
-    WHERE deleted_at IS NULL;
-
-DROP INDEX IF EXISTS messages_mailbox_idx;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS unsnoozed_at timestamptz;

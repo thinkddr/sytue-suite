@@ -173,6 +173,10 @@ type Pantalla struct {
 	MiembrosEtiqueta func() int
 	// LoteOcupado apaga los botones de la barra mientras su petición va.
 	LoteOcupado bool
+	// EtiquetaOcupada es el `busyId` de `GroupChips`: el ID de la etiqueta que se está
+	// poniendo o quitando. Mientras va, las aspas y el «Añadir» de la ficha se apagan: un
+	// segundo toque partiría de unos miembros que el servidor aún no ha confirmado.
+	EtiquetaOcupada string
 	// Duplicados son los grupos de posibles duplicados de la libreta: con alguno sale
 	// «Revisar duplicados (n)».
 	Duplicados int

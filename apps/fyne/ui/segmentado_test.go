@@ -159,6 +159,30 @@ func TestElTecladoDelSegmentadoSigueElPatronDeRadios(t *testing.T) {
 	}
 }
 
+// TestSoloPulsarIntroYEspacioConfirmanElSegmentado: las flechas, Inicio y Fin mueven
+// la elección sin confirmarla; pulsar una opción (también la ya elegida), Intro y el
+// espacio la confirman. El cajón del calendario cierra al confirmar y no a cada flecha.
+func TestSoloPulsarIntroYEspacioConfirmanElSegmentado(t *testing.T) {
+	var confirmadas []int
+	s := NuevoSegmentado("Vista", []string{"Mes", "Semana", "Día", "Agenda"}, nil)
+	s.AlConfirmar = func(i int) { confirmadas = append(confirmadas, i) }
+	s.Resize(s.MinSize())
+	for _, k := range []fyne.KeyName{fyne.KeyRight, fyne.KeyLeft, fyne.KeyEnd, fyne.KeyHome, fyne.KeyDown, fyne.KeyUp} {
+		s.TypedKey(&fyne.KeyEvent{Name: k})
+	}
+	if len(confirmadas) != 0 {
+		t.Fatalf("moverse con el teclado confirmó %v", confirmadas)
+	}
+	s.TypedKey(&fyne.KeyEvent{Name: fyne.KeyRight})
+	s.TypedKey(&fyne.KeyEvent{Name: fyne.KeyReturn})
+	s.TypedRune(' ')
+	test.TapAt(s, fyne.NewPos(s.Size().Width-RellenoSegmentado-1, s.Size().Height/2))
+	test.TapAt(s, fyne.NewPos(s.Size().Width-RellenoSegmentado-1, s.Size().Height/2))
+	if want := []int{1, 1, 3, 3}; len(confirmadas) != len(want) || confirmadas[0] != 1 || confirmadas[2] != 3 || confirmadas[3] != 3 {
+		t.Errorf("confirma %v; quiero %v", confirmadas, want)
+	}
+}
+
 // TestLaMedianaPintaLaElegidaEnPrimaryText: la elegida va en `primary-text` (que
 // invierte en oscuro) y la que está bajo el puntero gana el fondo `surface`.
 func TestLaMedianaPintaLaElegidaEnPrimaryText(t *testing.T) {

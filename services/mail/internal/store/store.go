@@ -402,7 +402,7 @@ func resolveThread(ctx context.Context, tx pgx.Tx, tenant string, m *domain.Mess
 
 // ordenLista es la fecha de orden de las listas (ver domain.Message.FechaDeOrden):
 // lo vuelto de «Pospuestos» sube a la hora de vuelta. Es la MISMA expresión que el
-// índice messages_mailbox_orden_idx (0037), letra a letra: el planner solo usa un
+// índice messages_mailbox_orden_idx (0038), letra a letra: el planner solo usa un
 // índice de expresión si la consulta repite la expresión.
 const ordenLista = `COALESCE(unsnoozed_at, received_at)`
 

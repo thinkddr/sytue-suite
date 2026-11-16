@@ -231,7 +231,10 @@ export interface FuncionParidad {
 // 2026-11-16: −1 en escritorio por «calcus-comentarios» (PEND-CALC-11N): Fyne ancla el
 // comentario nuevo a la celda activa, marca la rejilla y lleva a la celda desde el panel; en
 // móvil sigue planificada hasta verla en un teléfono.
-export const TOPE_DEUDA = { escritorio: 59, movil: 84 } as const;
+// 2026-11-16: +1 en las dos por «suite-paleta» (D-DS-02 y PEND-PALETA-FYNE): la paleta de la
+// suite con las capas de cada app llega a la web y a Fyne a la vez; en Fyne con sus tests del
+// driver y las capturas del pintor de software, falta verla en una ventana real.
+export const TOPE_DEUDA = { escritorio: 60, movil: 85 } as const;
 
 /**
  * DÓNDE SE CIERRA LA DEUDA. Una sola sección y no tres cadenas: las tres que
@@ -288,6 +291,24 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     // 2026-11-09: la web pide lo enseñado en UNA búsqueda al Hub (`buscarPaginas`, `limit =
     // páginas × 20`; el Hub admite páginas de hasta 10 × SEARCH_LIMIT) y desaparece
     // `unirPaginas`; Fyne sigue pidiendo solo la página nueva.
+    escritorio: 'planificado',
+    movil: 'planificado',
+    deuda: DEUDA_AMBAS,
+  },
+  {
+    id: 'suite-paleta',
+    nombre:
+      'Paleta de la suite (⌘K / Ctrl+K): buscar en Sytue One y saltar a lo que cada app registra como capa',
+    producto: 'suite',
+    web: true,
+    // Web: `ProveedorDePaleta` de @sytue/shell sobre `PaletaDeComandos` de @sytue/ui (D-DS-02).
+    // Fyne: `ui.PaletaDeLaSuite`, que crea `ui.BarraSuite` y abre con ⌘K (ya no enfoca el
+    // buscador de la barra), con capas registrables (`PonerCapa`/`QuitarCapa`), el filtro de
+    // `filterCommands` (`ComandosQueCasan`, sobre `nucleo/buscar`), el «buscando» por capa,
+    // la búsqueda en el Hub con dos letras y su pie de teclas (`ui.Tecla`). El ERP deja su
+    // paleta propia y registra `erp:vistas`, `erp` y `erp:registros` como la web; Cloud y
+    // Admin, las otras dos apps con capa en la web, no tienen app de Fyne. Tests del driver
+    // y sección «paleta» del muestrario; sin ventana real aún.
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,
@@ -647,8 +668,12 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     // silenciar y «Volver a Recibidos» en «Más acciones», y en «Pospuestos» la fila dice
     // cuándo vuelve, con su reloj; fuera, la fecha de llegada. Probado con el servicio
     // falso del driver; sigue en `planificado` hasta verlo en una ventana real contra el
-    // servicio. Las franjas del lector («Pospuesto hasta…», «Silenciada») aún no: el
-    // estado se dice en el menú. En el modo privado no se ofrece (es del servicio).
+    // servicio. En el modo privado no se ofrece (es del servicio).
+    // 2026-11-16 (PEND-MAIL-FRANJAS): el lector de Fyne enseña las franjas de la web
+    // («Pospuesto hasta…» con «Volver a Recibidos», «Has silenciado…» con «Dejar de
+    // silenciar»). Posponer, silenciar y lo vuelto arriba de Recibidos revisados en las
+    // capturas del driver (TestLasCapturasDePosponerYSilenciar); el listón de 'si' es la
+    // ventana real, que necesita la cuenta de auditoría: sigue en `planificado`.
     escritorio: 'planificado',
     movil: 'planificado',
     deuda: DEUDA_AMBAS,

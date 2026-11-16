@@ -15,17 +15,20 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
-// piezasDeCarga cuenta los bloques de esqueleto y las ruedas de lo que se pinta.
-func piezasDeCarga(o fyne.CanvasObject) (esqueletos []*ui.Esqueleto, ruedas int) {
+// piezasDeCarga cuenta los bloques de esqueleto sueltos, las filas de carga
+// (`ui.FilasEsqueleto`) y las ruedas de lo que se pinta.
+func piezasDeCarga(o fyne.CanvasObject) (esqueletos []*ui.Esqueleto, filas, ruedas int) {
 	recorrerInterno(o, func(x fyne.CanvasObject) {
 		switch y := x.(type) {
 		case *ui.Esqueleto:
 			esqueletos = append(esqueletos, y)
+		case *ui.FilasEsqueleto:
+			filas += y.Filas
 		case *ui.Rueda:
 			ruedas++
 		}
 	})
-	return esqueletos, ruedas
+	return esqueletos, filas, ruedas
 }
 
 // TestCargarUnCuadernoEnseñaSuFormaYNoUnaRueda es NOTA-03: mientras llegan las notas, el
@@ -65,9 +68,9 @@ func TestCargarUnCuadernoEnseñaSuFormaYNoUnaRueda(t *testing.T) {
 				t.Fatalf("la forma es %d y tiene que ser %d", f, c.forma)
 			}
 			o := l.Objeto(tema.Claro)
-			esqueletos, ruedas := piezasDeCarga(o)
-			if len(esqueletos) < 3 || ruedas != 0 {
-				t.Fatalf("cargando pinta %d esqueletos y %d ruedas: la forma del cuaderno, sin rueda", len(esqueletos), ruedas)
+			esqueletos, filas, ruedas := piezasDeCarga(o)
+			if len(esqueletos)+filas < 3 || ruedas != 0 {
+				t.Fatalf("cargando pinta %d esqueletos, %d filas de carga y %d ruedas: la forma del cuaderno, sin rueda", len(esqueletos), filas, ruedas)
 			}
 		})
 	}
@@ -77,13 +80,16 @@ func TestCargarUnCuadernoEnseñaSuFormaYNoUnaRueda(t *testing.T) {
 // ancho que deja la marca, y pinta su fracción; así las filas no miden todas lo mismo.
 func TestLasFilasDeCargaOcupanLaColumnaDeLectura(t *testing.T) {
 	test.NewTempApp(t)
-	marca := ui.NuevoEsqueleto(1.25*tema.Rem, 0.375*tema.Rem)
-	linea := ui.NuevoEsqueletoFraccion(0.5, 0.875*tema.Rem)
-	fila := filaEsqueleto(0, marca, linea)
+	fila := filasEsqueleto(1, fyne.NewSize(1.25*tema.Rem, 0.375*tema.Rem), []float32{1}, nil, 0)
 	fila.Resize(fyne.NewSize(400, AltoFilaEsqueleto))
 	if fila.MinSize().Height != AltoFilaEsqueleto {
 		t.Fatalf("la fila mide %g de alto y la de la lista mide %g", fila.MinSize().Height, float32(AltoFilaEsqueleto))
 	}
+	objs := test.WidgetRenderer(fila).Objects()
+	if len(objs) != 2 {
+		t.Fatalf("la fila tiene %d bloques y son la marca y la línea", len(objs))
+	}
+	marca, linea := objs[0], objs[1]
 	if x := marca.Position().X; x != RellenoFilaX {
 		t.Errorf("la marca empieza en %g y tiene que caer en el relleno (%g)", x, float32(RellenoFilaX))
 	}
@@ -102,9 +108,9 @@ func TestElArbolYElMenuCarganConFilasGrises(t *testing.T) {
 	a := NuevoArbolNotas(tr, "es")
 	a.Fase = Cargando
 	o := a.Objeto(tema.Claro)
-	esqueletos, ruedas := piezasDeCarga(o)
-	if len(esqueletos) < 3 || ruedas != 0 {
-		t.Fatalf("el árbol cargando pinta %d esqueletos y %d ruedas", len(esqueletos), ruedas)
+	_, filas, ruedas := piezasDeCarga(o)
+	if filas < 3 || ruedas != 0 {
+		t.Fatalf("el árbol cargando pinta %d filas de carga y %d ruedas", filas, ruedas)
 	}
 	cero := tr.T("notebook.notes", i18n.Vars{"count": 0})
 	recorrerInterno(o, func(x fyne.CanvasObject) {
@@ -115,7 +121,7 @@ func TestElArbolYElMenuCarganConFilasGrises(t *testing.T) {
 
 	l := NuevoLateral(tr)
 	l.Fase = Cargando
-	esqueletos, ruedas = piezasDeCarga(l.Objeto(tema.Claro))
+	esqueletos, _, ruedas := piezasDeCarga(l.Objeto(tema.Claro))
 	if len(esqueletos) < 3 || ruedas != 0 {
 		t.Fatalf("el menú cargando pinta %d esqueletos y %d ruedas", len(esqueletos), ruedas)
 	}

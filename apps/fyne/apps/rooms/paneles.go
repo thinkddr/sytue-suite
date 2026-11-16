@@ -251,8 +251,7 @@ func (p *PanelLista) construirCuerpo(v tema.Variante) fyne.CanvasObject {
 	case p.Estado == Error:
 		cosas = append(cosas, NuevoAvisoHilo(t.T("error.loadFailed", nil), t.T("action.retry", nil), p.AlReintentar))
 	case p.Estado == Cargando:
-		e := NuevoEsqueletoHilo(t.T("state.loading", nil))
-		e.Partes = []float32{0.60, 0.45, 0.52}
+		e := NuevoEsqueletoHilo(t.T("state.loading", nil), 0.60, 0.45, 0.52)
 		cosas = append(cosas, e)
 	case len(p.Mensajes) == 0 && p.Busqueda:
 		vac := ui.NuevoVacio(t.T("search.noResults", nil), "")
@@ -322,8 +321,7 @@ func (p *PanelLista) cuerpoProgramados(v tema.Variante) []fyne.CanvasObject {
 	case p.Estado == Error:
 		return []fyne.CanvasObject{NuevoAvisoHilo(t.T("error.loadFailed", nil), t.T("action.retry", nil), p.AlReintentar)}
 	case p.Estado == Cargando:
-		e := NuevoEsqueletoHilo(t.T("state.loading", nil))
-		e.Partes = []float32{0.60, 0.45, 0.52}
+		e := NuevoEsqueletoHilo(t.T("state.loading", nil), 0.60, 0.45, 0.52)
 		return []fyne.CanvasObject{e}
 	case len(p.Programados) == 0:
 		vac := ui.NuevoVacio(t.T("scheduled.empty", nil), "")
@@ -348,8 +346,7 @@ func (p *PanelLista) cuerpoHilos(v tema.Variante) []fyne.CanvasObject {
 	case p.Estado == Error:
 		return []fyne.CanvasObject{NuevoAvisoHilo(t.T("threads.loadFailed", nil), t.T("action.retry", nil), p.AlReintentar)}
 	case p.Estado == Cargando:
-		e := NuevoEsqueletoHilo(t.T("threads.loading", nil))
-		e.Partes = []float32{0.60, 0.45, 0.52}
+		e := NuevoEsqueletoHilo(t.T("threads.loading", nil), 0.60, 0.45, 0.52)
 		return []fyne.CanvasObject{e}
 	case len(p.Hilos) == 0:
 		vac := ui.NuevoVacio(t.T("threads.empty", nil), "")

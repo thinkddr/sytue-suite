@@ -70,6 +70,61 @@ type MetaEsqueleto struct {
 	Oculta      bool
 }
 
+// RayaEsqueleto es una línea de texto de una fila con receta propia (RecetaEsqueleto).
+type RayaEsqueleto struct {
+	// Alto es el `height` de la raya.
+	Alto float32
+	// Ancho es un `width` fijo (`width="7rem"`), acotado a lo que deje la fila; gana a
+	// Partes.
+	Ancho float32
+	// Partes son los `width="NN%"` de la columna de texto, una por fila y en ciclo: las
+	// rayas no miden todas lo mismo. Vacío es todo el ancho.
+	Partes []float32
+	// Cola es un bloque a la derecha EN LA MISMA LÍNEA, centrado con la raya: la meta de
+	// la fila de Mail (`justify-between gap-3`). La raya encoge antes que pisarla.
+	Cola fyne.Size
+}
+
+// RecetaEsqueleto es la geometría de las filas de una lista que no es la de `ListItem`:
+// la bandeja de Mail, la libreta de Contactos, el historial de Rooms, las filas y el
+// árbol de Notes o la lista del día de Calendar. Cada una copia la fila real a la que
+// sustituye —sin eso el layout salta al llegar los datos—; lo común (un único latido, un
+// único «Cargando», el filete y el reparto) lo pone FilasEsqueleto.
+type RecetaEsqueleto struct {
+	// Alto es lo que mide cada fila, con su filete; Hueco, el aire entre dos filas (el
+	// `gap` o el `mt` de la columna); Encima, el de antes de la primera.
+	Alto, Hueco, Encima float32
+	// Izq y Der son el relleno horizontal de la fila (su `px`), por dentro del Margen.
+	Izq, Der float32
+	// Delantero es la medida de la pieza delantera; con cero, la de LadoDelanteroEsqueleto.
+	// La forma la dice el DelanteroEsqueleto de las filas: círculo el avatar y caja
+	// `rounded-md` la tesela. HuecoDelantero es el `gap` hasta el texto.
+	Delantero      fyne.Size
+	HuecoDelantero float32
+	// Rayas son las líneas de texto, de arriba abajo, separadas por HuecoRayas.
+	Rayas      []RayaEsqueleto
+	HuecoRayas float32
+	// Arriba es `items-start`: el delantero y las rayas cuelgan de Relleno (el `pt` de la
+	// fila), bajados BajaDelantero y BajaRayas. Sin él, los dos se centran en la fila.
+	Arriba                            bool
+	Relleno, BajaDelantero, BajaRayas float32
+	// Sangrias es lo que entra cada fila por la izquierda (las ramas de un árbol), una
+	// por fila; las que faltan, cero.
+	Sangrias []float32
+}
+
+// altoRayas es lo que mide la columna de texto de la receta.
+func (r *RecetaEsqueleto) altoRayas() float32 {
+	var h float32
+	for i, l := range r.Rayas {
+		if i > 0 {
+			h += r.HuecoRayas
+		}
+		h += l.Alto
+	}
+	return h
+}
+
 // FilasEsqueleto es `SkeletonRows`: las filas de carga de una lista, ya montadas.
 //
 // Cada app se hacía las suyas —Drive tenía tres, con tres geometrías—, todas con un
@@ -97,6 +152,12 @@ type FilasEsqueleto struct {
 	SinUltimoFilete bool
 	// Rotulo es el `label`; vacío es «Cargando» (`ui.loading`).
 	Rotulo string
+	// Receta cambia la geometría de `SkeletonRows` por la de una lista propia; con ella,
+	// Lineas y Meta no se usan (ConReceta).
+	Receta *RecetaEsqueleto
+	// Tinte es el token de los bloques; vacío es `bg-subtle`. Sobre el cromo oscuro del
+	// menú es `sidebar-hover-bg` (SobreCromo), como el Esqueleto suelto.
+	Tinte string
 
 	mu   sync.Mutex
 	fase float32
@@ -112,6 +173,26 @@ var (
 func NuevasFilasEsqueleto(filas int, d DelanteroEsqueleto, lineas int) *FilasEsqueleto {
 	f := &FilasEsqueleto{Filas: filas, Delantero: d, Lineas: lineas}
 	f.ExtendBaseWidget(f)
+	return f
+}
+
+// ConReceta les da la geometría de una lista propia y las devuelve, para encadenarlo.
+func (f *FilasEsqueleto) ConReceta(r RecetaEsqueleto) *FilasEsqueleto {
+	f.Receta = &r
+	f.Lineas, f.Meta = len(r.Rayas), nil
+	return f
+}
+
+// ConRotulo cambia el «Cargando» por el de la lista («Cargando mensajes…»), ya
+// traducido, y las devuelve.
+func (f *FilasEsqueleto) ConRotulo(rotulo string) *FilasEsqueleto {
+	f.Rotulo = rotulo
+	return f
+}
+
+// SobreCromo tiñe los bloques para el carril oscuro y las devuelve.
+func (f *FilasEsqueleto) SobreCromo() *FilasEsqueleto {
+	f.Tinte = "sidebar-hover-bg"
 	return f
 }
 
@@ -137,6 +218,8 @@ func parteSub(i int) float32    { return float32(50+(i*17)%35) / 100 }
 type filaEsq struct {
 	delantero, titulo, sub, filete *canvas.Rectangle
 	meta                           []*canvas.Rectangle
+	// rayas y colas son las de una receta (una cola por raya, nil sin ella).
+	rayas, colas []*canvas.Rectangle
 }
 
 // CreateRenderer monta los rectángulos y arranca el latido.
@@ -153,12 +236,23 @@ func (f *FilasEsqueleto) CreateRenderer() fyne.WidgetRenderer {
 		if f.Delantero != SinDelantero {
 			fila.delantero = nuevo()
 		}
-		fila.titulo = nuevo()
-		if f.Lineas >= 2 {
-			fila.sub = nuevo()
-		}
-		for range f.Meta {
-			fila.meta = append(fila.meta, nuevo())
+		if f.Receta != nil {
+			for _, l := range f.Receta.Rayas {
+				fila.rayas = append(fila.rayas, nuevo())
+				var cola *canvas.Rectangle
+				if l.Cola.Width > 0 {
+					cola = nuevo()
+				}
+				fila.colas = append(fila.colas, cola)
+			}
+		} else {
+			fila.titulo = nuevo()
+			if f.Lineas >= 2 {
+				fila.sub = nuevo()
+			}
+			for range f.Meta {
+				fila.meta = append(fila.meta, nuevo())
+			}
 		}
 		if f.Filete && (!f.SinUltimoFilete || len(r.filas) != f.Filas-1) {
 			// El filete es borde, no esqueleto: no late.
@@ -211,11 +305,27 @@ type filasEsqueletoRenderer struct {
 }
 
 func (r *filasEsqueletoRenderer) alto() float32 {
+	if r.f.Receta != nil {
+		return r.f.Receta.Alto
+	}
 	return AltoFilaEsqueleto(r.f.Delantero, r.f.Lineas)
 }
 
+// paso es lo que hay de una fila a la siguiente y encima lo de antes de la primera.
+func (r *filasEsqueletoRenderer) paso() (paso, encima float32) {
+	if rc := r.f.Receta; rc != nil {
+		return rc.Alto + rc.Hueco, rc.Encima
+	}
+	return r.alto(), 0
+}
+
 func (r *filasEsqueletoRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(0, float32(len(r.filas))*r.alto())
+	n := float32(len(r.filas))
+	if n == 0 {
+		return fyne.NewSize(0, 0)
+	}
+	paso, encima := r.paso()
+	return fyne.NewSize(0, encima+n*paso-(paso-r.alto()))
 }
 
 func (r *filasEsqueletoRenderer) Objects() []fyne.CanvasObject { return r.objetos }
@@ -228,6 +338,10 @@ func ponerBloque(b *canvas.Rectangle, x, y, w, h float32) {
 }
 
 func (r *filasEsqueletoRenderer) Layout(t fyne.Size) {
+	if r.f.Receta != nil {
+		r.layoutReceta(t)
+		return
+	}
 	alto := r.alto()
 	izq := r.f.Margen + MargenFila
 	der := t.Width - r.f.Margen - MargenFila
@@ -261,6 +375,65 @@ func (r *filasEsqueletoRenderer) Layout(t fyne.Size) {
 		if fila.sub != nil {
 			ponerBloque(fila.sub, x, ty+AltoTituloEsqueleto+huecoLineasEsq, float32(int(util*parteSub(i)+0.5)), AltoSubEsqueleto)
 			fila.sub.CornerRadius = tema.RadioMD
+		}
+	}
+}
+
+// layoutReceta reparte las filas con la geometría de una lista propia.
+func (r *filasEsqueletoRenderer) layoutReceta(t fyne.Size) {
+	rc := r.f.Receta
+	paso, encima := r.paso()
+	lado := rc.Delantero
+	if lado.Width <= 0 || lado.Height <= 0 {
+		l := LadoDelanteroEsqueleto(r.f.Delantero)
+		lado = fyne.NewSize(l, l)
+	}
+	der := t.Width - r.f.Margen - rc.Der
+	texto := rc.altoRayas()
+	for i, fila := range r.filas {
+		y := encima + float32(i)*paso
+		caja := rc.Alto
+		if fila.filete != nil {
+			caja -= tema.Borde
+			ponerBloque(fila.filete, r.f.Margen, y+caja, t.Width-2*r.f.Margen, tema.Borde)
+		}
+		x := r.f.Margen + rc.Izq
+		if i < len(rc.Sangrias) {
+			x += rc.Sangrias[i]
+		}
+		if fila.delantero != nil {
+			dy := y + (caja-lado.Height)/2
+			if rc.Arriba {
+				dy = y + rc.Relleno + rc.BajaDelantero
+			}
+			ponerBloque(fila.delantero, x, dy, lado.Width, lado.Height)
+			fila.delantero.CornerRadius = tema.RadioMD
+			if r.f.Delantero == DelanteroAvatar {
+				fila.delantero.CornerRadius = min(lado.Width, lado.Height) / 2
+			}
+			x += lado.Width + rc.HuecoDelantero
+		}
+		util := max(der-x, 0)
+		ty := y + (caja-texto)/2
+		if rc.Arriba {
+			ty = y + rc.Relleno + rc.BajaRayas
+		}
+		for j, l := range rc.Rayas {
+			ancho := util
+			switch {
+			case l.Ancho > 0:
+				ancho = min(l.Ancho, util)
+			case len(l.Partes) > 0:
+				ancho = float32(int(util*l.Partes[i%len(l.Partes)] + 0.5))
+			}
+			if cola := fila.colas[j]; cola != nil {
+				ancho = min(ancho, max(util-l.Cola.Width-rc.HuecoDelantero, 0))
+				ponerBloque(cola, der-l.Cola.Width, ty+(l.Alto-l.Cola.Height)/2, l.Cola.Width, l.Cola.Height)
+				cola.CornerRadius = tema.RadioMD
+			}
+			ponerBloque(fila.rayas[j], x, ty, ancho, l.Alto)
+			fila.rayas[j].CornerRadius = tema.RadioMD
+			ty += l.Alto + rc.HuecoRayas
 		}
 	}
 }
@@ -300,7 +473,7 @@ func (r *filasEsqueletoRenderer) tenir() {
 	r.f.mu.Lock()
 	fase := r.f.fase
 	r.f.mu.Unlock()
-	c := tintaEsqueleto("", fase)
+	c := tintaEsqueleto(r.f.Tinte, fase)
 	for _, b := range r.bloques {
 		b.FillColor = c
 		b.Refresh()

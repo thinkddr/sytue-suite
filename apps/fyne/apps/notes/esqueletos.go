@@ -73,14 +73,10 @@ func (l *Lienzo) esqueleto() fyne.CanvasObject {
 	case EsqueletoFilas:
 		// La misma columna y el mismo sangrado que `reparto` en filas: la marca cae en
 		// el borde de la columna y la línea empieza donde empezará el título.
-		filas := make([]fyne.CanvasObject, 0, len(anchosFilaEsqueleto))
-		for _, f := range anchosFilaEsqueleto {
-			filas = append(filas, filaEsqueleto(0, ui.NuevoEsqueleto(1.25*tema.Rem, 0.375*tema.Rem),
-				ui.NuevoEsqueletoFraccion(f, 0.875*tema.Rem)))
-		}
+		filas := filasEsqueleto(len(anchosFilaEsqueleto), fyne.NewSize(1.25*tema.Rem, 0.375*tema.Rem), anchosFilaEsqueleto, nil, 0)
 		margen := max(l.margenDiario()-RellenoFilaX, 0)
 		return container.New(&acotado{ancho: AnchoLectura + 2*tema.Espacio(6)},
-			container.New(ui.Margen{Izq: margen, Der: margen, Abj: tema.Espacio(10)}, ui.EnColumna(0, filas...)))
+			container.New(ui.Margen{Izq: margen, Der: margen, Abj: tema.Espacio(10)}, filas))
 	case EsqueletoTarjetas:
 	}
 	// La rejilla de columnas tal cual: en el teléfono es una, y en escritorio, tres.
@@ -100,12 +96,13 @@ func (l *Lienzo) esqueleto() fyne.CanvasObject {
 // esqueletoRamas son las filas del panel de notas del árbol mientras carga: a la altura
 // de una rama, con alguna sangrada para que se lea como árbol y no como lista.
 func esqueletoRamas() fyne.CanvasObject {
-	filas := make([]fyne.CanvasObject, 0, len(ramasEsqueleto))
-	for _, r := range ramasEsqueleto {
-		filas = append(filas, filaEsqueleto(float32(r.nivel)*1.25*tema.Rem, ui.NuevoEsqueletoFraccion(r.ancho, 0.875*tema.Rem)))
+	anchos := make([]float32, len(ramasEsqueleto))
+	sangrias := make([]float32, len(ramasEsqueleto))
+	for i, r := range ramasEsqueleto {
+		anchos[i], sangrias[i] = r.ancho, float32(r.nivel)*1.25*tema.Rem
 	}
 	return container.New(ui.Margen{Izq: RellenoListaArbol, Der: RellenoListaArbol, Arr: RellenoListaArbol, Abj: RellenoListaArbol},
-		ui.EnColumna(0.5*0.25*tema.Rem, filas...))
+		filasEsqueleto(len(ramasEsqueleto), fyne.Size{}, anchos, sangrias, 0.5*0.25*tema.Rem))
 }
 
 // esqueletoCuadernos son los cuadernos del menú mientras se cargan: filas con la altura
@@ -121,38 +118,23 @@ func esqueletoCuadernos() fyne.CanvasObject {
 	return ui.EnColumna(0.5*0.25*tema.Rem, filas...)
 }
 
-// filaEsqueleto es una fila de carga (`flex h-8 items-center gap-2.5 px-2`): una marca
-// opcional y la línea, que se queda con el resto del ancho y pinta su fracción.
-func filaEsqueleto(sangria float32, partes ...fyne.CanvasObject) fyne.CanvasObject {
-	return container.New(&filaCarga{sangria: sangria}, partes...)
-}
-
-type filaCarga struct{ sangria float32 }
-
-var _ fyne.Layout = (*filaCarga)(nil)
-
-func (f *filaCarga) MinSize(objs []fyne.CanvasObject) fyne.Size {
-	ancho := 2*RellenoFilaX + f.sangria
-	for i, o := range objs {
-		if i > 0 {
-			ancho += 2.5 * 0.25 * tema.Rem
-		}
-		ancho += o.MinSize().Width
+// filasEsqueleto son las filas de carga (`flex h-8 items-center gap-2.5 px-2`): una
+// marca opcional (con medida cero no la hay) y la línea, que se queda con el resto del
+// ancho y pinta su fracción. Las sangrías hacen que se lea como árbol; hueco es el aire
+// entre filas. Es `ui.FilasEsqueleto` con esa receta: un solo latido para todas.
+func filasEsqueleto(n int, marca fyne.Size, anchos, sangrias []float32, hueco float32) *ui.FilasEsqueleto {
+	delantero := ui.SinDelantero
+	if marca.Width > 0 {
+		delantero = ui.DelanteroTesela
 	}
-	return fyne.NewSize(ancho, AltoFilaEsqueleto)
-}
-
-func (f *filaCarga) Layout(objs []fyne.CanvasObject, t fyne.Size) {
-	x := RellenoFilaX + f.sangria
-	for i, o := range objs {
-		m := o.MinSize()
-		ancho := m.Width
-		if i == len(objs)-1 {
-			// La última es la línea: llega hasta el relleno de la derecha.
-			ancho = max(t.Width-x-RellenoFilaX, m.Width)
-		}
-		o.Move(fyne.NewPos(x, float32(int((t.Height-m.Height)/2))))
-		o.Resize(fyne.NewSize(ancho, m.Height))
-		x += ancho + 2.5*0.25*tema.Rem
-	}
+	return ui.NuevasFilasEsqueleto(n, delantero, 1).ConReceta(ui.RecetaEsqueleto{
+		Alto:           AltoFilaEsqueleto,
+		Hueco:          hueco,
+		Izq:            RellenoFilaX,
+		Der:            RellenoFilaX,
+		Delantero:      marca,
+		HuecoDelantero: 2.5 * 0.25 * tema.Rem,
+		Rayas:          []ui.RayaEsqueleto{{Alto: 0.875 * tema.Rem, Partes: anchos}},
+		Sangrias:       sangrias,
+	})
 }

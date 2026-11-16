@@ -831,31 +831,6 @@ func TestElPuntoAparecePorPrimeraVez(t *testing.T) {
 	}
 }
 
-// TestUnaAppSeQuedaElAtajoDelBuscador: la paleta del ERP gana ⌘K como en la web, donde
-// escuchan los dos y la paleta se queda el foco. Sin `CederAtajo`, el atajo lleva al
-// buscador de la suite, que es lo de las otras doce apps.
-//
-// VISTO EN ROJO: con `pulsarAtajo` enfocando siempre el campo —sin mirar `alAtajo`—,
-// la app no se entera y el foco acaba en el buscador.
-func TestUnaAppSeQuedaElAtajoDelBuscador(t *testing.T) {
-	b := barraPrueba(t)
-	w := test.NewWindow(b)
-	defer w.Close()
-	c := w.Canvas()
-
-	b.buscador.pulsarAtajo(c)
-	if c.Focused() != b.buscador.campo {
-		t.Fatal("sin nadie que se lo quede, ⌘K no lleva al buscador de la suite")
-	}
-	c.Unfocus()
-	llamada := false
-	b.CederAtajo(func() { llamada = true })
-	b.buscador.pulsarAtajo(c)
-	if !llamada || c.Focused() != nil {
-		t.Errorf("cedido, ⌘K %s y el foco queda en %T", map[bool]string{true: "avisa a la app", false: "NO avisa a la app"}[llamada], c.Focused())
-	}
-}
-
 // TestLosResultadosVanAgrupadosPorProducto es GlobalSearch.tsx: un grupo por producto,
 // en el orden en que aparece cada uno, con su cabecera —la marca de 15 y el nombre en
 // versalitas— y debajo sus filas de título y fragmento, sin marca ni meta por fila. Las

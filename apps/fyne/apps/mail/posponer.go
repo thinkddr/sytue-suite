@@ -404,8 +404,8 @@ func (x *Lector) botonPosponer() *ui.Boton {
 	return b
 }
 
-// elementosPosponer son, en «Más acciones», lo que en la web son las franjas del lector
-// («Volver a Recibidos», «Dejar de silenciar») y «Silenciar conversación».
+// elementosPosponer son, en «Más acciones», «Volver a Recibidos» (que también está en
+// la franja del lector) y «Silenciar conversación» / «Dejar de silenciar».
 func (x *Lector) elementosPosponer() []fyne.CanvasObject {
 	t, a := x.T, x.Acciones
 	var els []fyne.CanvasObject
@@ -460,4 +460,100 @@ func (x *Lector) elegirFechaDePosponer() {
 func FechaDePosponerValida(cuando, ahora time.Time) bool {
 	d := cuando.Sub(ahora)
 	return d >= MinimoPosponer && d <= MaximoPosponer
+}
+
+// franjas son las del lector bajo la barra (`MessageReader.tsx`): el estado del hilo
+// con su salida a mano. Sin ellas un hilo pospuesto o silenciado no se distingue de uno
+// cualquiera, y nadie recuerda dónde se deshacía. Cada una es el `InlineHelp` informativo
+// y, si hay a dónde volver, su botón secundario `sm`. En solo lectura, el aviso sin botón.
+func (x *Lector) franjas() []*fyne.Container {
+	t, a := x.T, x.Acciones
+	puede := a != nil && !x.SoloLectura
+	var out []*fyne.Container
+	if !x.PospuestaHasta.IsZero() {
+		fecha := FechaLarga(x.Locale, x.PospuestaHasta.In(time.Local))
+		ayuda := ui.NuevaAyudaEnLinea(t.T("snooze.banner", i18n.Vars{"date": fecha})).ConTono(ui.AyudaInfo)
+		var boton *ui.Boton
+		if puede && a.QuitarPosposicion != nil {
+			c := x.Conversacion
+			boton = ui.NuevoBoton(t.T("snooze.unsnooze", nil), func() { a.QuitarPosposicion(c) }).Con(ui.Secundario, ui.TallaSM)
+		}
+		out = append(out, nuevaFranja(ayuda, boton))
+	}
+	if x.Silenciada {
+		ayuda := ui.NuevaAyudaEnLinea(t.T("mute.banner", nil)).ConTono(ui.AyudaInfo)
+		var boton *ui.Boton
+		if puede && a.Silenciar != nil {
+			c := x.Conversacion
+			boton = ui.NuevoBoton(t.T("mute.unmute", nil), func() { a.Silenciar(c, false) }).Con(ui.Secundario, ui.TallaSM)
+		}
+		out = append(out, nuevaFranja(ayuda, boton))
+	}
+	return out
+}
+
+func nuevaFranja(ayuda *ui.AyudaEnLinea, boton *ui.Boton) *fyne.Container {
+	if boton == nil {
+		return container.New(franjaLayout{}, ayuda)
+	}
+	return container.New(franjaLayout{}, ayuda, boton)
+}
+
+// franjaLayout es el `flex items-center gap-2` de la franja: el aviso es `min-w-0
+// flex-1` (base 0, así que el botón no salta de línea: el aviso se estrecha y reparte
+// su texto) y el botón conserva su ancho, centrado en el alto del aviso.
+type franjaLayout struct{}
+
+func (franjaLayout) anchoAyuda(objs []fyne.CanvasObject, ancho float32) float32 {
+	if len(objs) > 1 {
+		return max(ancho-objs[1].MinSize().Width-HuecoAcciones, 0)
+	}
+	return ancho
+}
+
+// alto es el de la franja a ese ancho: el del aviso repartido o el del botón.
+func (l franjaLayout) alto(objs []fyne.CanvasObject, ancho float32) float32 {
+	a, ok := objs[0].(*ui.AyudaEnLinea)
+	if !ok {
+		return 0
+	}
+	alto := ui.AltoAyudaEnLinea(a, l.anchoAyuda(objs, ancho))
+	if len(objs) > 1 {
+		alto = max(alto, objs[1].MinSize().Height)
+	}
+	return alto
+}
+
+func (l franjaLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
+	w := float32(0)
+	if len(objs) > 1 {
+		w = objs[1].MinSize().Width + HuecoAcciones
+	}
+	return fyne.NewSize(w, 0)
+}
+
+func (l franjaLayout) Layout(objs []fyne.CanvasObject, t fyne.Size) {
+	wa := l.anchoAyuda(objs, t.Width)
+	a, ok := objs[0].(*ui.AyudaEnLinea)
+	if !ok {
+		return
+	}
+	ha := ui.AltoAyudaEnLinea(a, wa)
+	objs[0].Resize(fyne.NewSize(wa, ha))
+	objs[0].Move(fyne.NewPos(0, (t.Height-ha)/2))
+	if len(objs) > 1 {
+		m := objs[1].MinSize()
+		objs[1].Resize(m)
+		objs[1].Move(fyne.NewPos(wa+HuecoAcciones, (t.Height-m.Height)/2))
+	}
+}
+
+// AltoFranjas es lo que suman las franjas del lector a ese ancho, cada una con su
+// `mt-3` encima.
+func AltoFranjas(fs []*fyne.Container, ancho float32) float32 {
+	alto := float32(0)
+	for _, f := range fs {
+		alto += AireChipsLector + franjaLayout{}.alto(f.Objects, ancho)
+	}
+	return alto
 }

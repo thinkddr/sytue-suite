@@ -75,6 +75,7 @@ Opciones:
   --admin-password <pwd>    Contraseña del administrador (también SYTUE_ADMIN_PASSWORD).
                             Si se omite, se genera una aleatoria
   --skip-verify             (Compose) No ejecuta la verificación final (smoke test)
+  --no-build                (Compose) Arranca con las imágenes ya construidas, sin reconstruir
   --domain <dominio>        (Helm) Dominio raíz, p. ej. suite.miempresa.eu
   --admin-email <correo>    (Helm) Correo del propietario inicial
   --org-slug <slug>         (Helm) Organización inicial
@@ -108,6 +109,7 @@ ONLY_CONFIG=0
 INTEGRATIONS_ONLY=0
 DO_RESET=0
 SKIP_VERIFY=0
+NO_BUILD=0
 
 need_arg() { [ $# -ge 2 ] && [ -n "$2" ] || die "La opción $1 necesita un valor."; }
 while [ $# -gt 0 ]; do
@@ -123,6 +125,7 @@ while [ $# -gt 0 ]; do
     --only-config)     ONLY_CONFIG=1; shift ;;
     --reset)           DO_RESET=1; shift ;;
     --skip-verify)     SKIP_VERIFY=1; shift ;;
+    --no-build)        NO_BUILD=1; shift ;;
     --integrations|integraciones) INTEGRATIONS_ONLY=1; shift ;;
     -h|--help)         usage; exit 0 ;;
     *) err "Opción desconocida: $1"; usage; exit 2 ;;
@@ -904,10 +907,14 @@ instalar_compose() {
   # --- Paso 5: arranque ------------------------------------------------------
   step "Paso 5 de 5 · Construcción y arranque"
   generar_certificados
-  info "Construyendo las imágenes. La primera vez tarda (≈15-40 min según el equipo); después es incremental."
-  DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 dc build
+  if [ "$NO_BUILD" -eq 1 ]; then
+    info "Sin reconstruir (--no-build): se usan las imágenes ya construidas."
+  else
+    info "Construyendo las imágenes. La primera vez tarda (≈15-40 min según el equipo); después es incremental."
+    DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 dc build
+  fi
   info "Arrancando contenedores..."
-  dc up -d --remove-orphans
+  dc up -d --no-build --remove-orphans
   info "Esperando a Sytue ID..."
   local t=0
   until [ "$(docker inspect -f '{{.State.Health.Status}}' "$(dc ps -q id)" 2>/dev/null)" = "healthy" ]; do

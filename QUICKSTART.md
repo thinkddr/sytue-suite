@@ -32,7 +32,7 @@ cd sytue-suite
 Pulsa **Enter** en cada pregunta para quedarte con la opción recomendada. El asistente
 recorre cinco pasos:
 
-1. **Dónde instalar** → *En este equipo con Docker*.
+1. **Dónde instalar** → *En este equipo con Docker* (para un servidor con tu dominio, mira la [sección 6](#6-instalar-en-un-servidor-con-tu-dominio)).
 2. **Requisitos** → comprueba Docker, su memoria, mkcert y los puertos. Si falta algo, te
    dice cómo instalarlo y se detiene sin tocar nada.
 3. **Servicios** → *Suite completa*, *Ofimática* (menos memoria), *Mínimo* o *A medida*.
@@ -119,7 +119,70 @@ resuelven `.localhost` a `127.0.0.1`.
 
 ---
 
-## 6. Instalar en un clúster Kubernetes (avanzado)
+## 6. Instalar en un servidor con tu dominio
+
+Toda la suite en **una sola máquina Linux con Docker**, accesible como
+`https://<app>.tu-dominio` y con certificados de **Let's Encrypt** que se renuevan solos.
+
+**Antes:** un registro DNS comodín `*.suite.tuempresa.eu` (y `suite.tuempresa.eu`)
+apuntando a la IP del servidor, y abiertos los puertos `80` y `443/TCP` (web y
+certificados), `7881/TCP` y `50000-50100/UDP` (videollamadas). No hace falta mkcert.
+
+```bash
+./sytue-deploy --mode servidor --domain suite.tuempresa.eu --acme-email tu@tuempresa.eu
+```
+
+El asistente te pregunta además:
+
+- **Quién la usa** (`--usuarios`):
+  - `uno`: solo tu cuenta, sin registro público. Ideal para uso personal.
+  - `varios` (por defecto): un equipo. Invitas a cada persona desde
+    `https://admin.suite.tuempresa.eu`; con `--registro-abierto`, además, cualquiera puede
+    crearse una cuenta en `https://id.suite.tuempresa.eu/signup` (`--registro-cerrado` lo
+    vuelve a cerrar).
+- **Propietario** (`--admin-email`) y **organización** (`--org-slug`). La contraseña del
+  propietario se genera y queda en `deploy/compose/.env` (`SYTUE_PROPIETARIO_PASSWORD`).
+  Al entrar por primera vez, activa la verificación en dos pasos en
+  `https://id.suite.tuempresa.eu/account`.
+
+Para una **red local o pruebas** sin Internet, usa `--tls interno` (certificados de
+mkcert: cada equipo que entre debe confiar en su CA, `mkcert -CAROOT`).
+
+Volver a ejecutar el mismo comando es seguro: reutiliza la configuración, construye solo lo
+que cambió y vuelve a levantar lo que estuviera parado. Así se cambia también el modo de
+usuarios (`--usuarios uno|varios`) sin tocar los datos. `--reset` empieza de cero
+**borrando los datos**.
+
+> SMTP e IMAP para clientes de correo externos no se publican en este modo: el correo web
+> funciona completo. Para publicar un servidor de correo, usa el clúster (sección 8).
+
+---
+
+## 7. Todo en un solo contenedor
+
+El mismo modo servidor, empaquetado en **un contenedor y un volumen**: dentro corre su
+propio Docker (Docker in Docker, por eso pide `--privileged`) con toda la suite.
+
+```bash
+docker build -f deploy/todo-en-uno/Dockerfile -t sytue-suite .
+docker run -d --name sytue --privileged --restart unless-stopped \
+  -p 80:80 -p 443:443 -p 7881:7881 -p 50000-50100:50000-50100/udp \
+  -v sytue-datos:/datos \
+  -e SYTUE_DOMINIO=suite.tuempresa.eu -e SYTUE_ACME_EMAIL=tu@tuempresa.eu \
+  -e SYTUE_USUARIOS=varios \
+  sytue-suite
+docker logs -f sytue          # la primera vez construye la suite dentro (20-60 min)
+```
+
+Sin `SYTUE_DOMINIO`, se queda en `https://one.suite.localhost` para probarla en tu propio
+equipo (certificados internos: `docker cp sytue:/datos/ca/rootCA.pem .` e impórtalo
+como autoridad de confianza). Todas las variables están en la cabecera de
+[`deploy/todo-en-uno/Dockerfile`](deploy/todo-en-uno/Dockerfile). Todo lo que hay que
+conservar vive en el volumen `sytue-datos`: borrar el contenedor no borra la suite.
+
+---
+
+## 8. Instalar en un clúster Kubernetes (avanzado)
 
 Para producción con tu propio dominio. Necesitas `kubectl`, `helm`, un registro de
 imágenes, PostgreSQL 16+ y almacenamiento S3.

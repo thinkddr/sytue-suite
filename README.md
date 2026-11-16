@@ -40,25 +40,49 @@ Guía completa, credenciales, día a día y solución de problemas: **[`QUICKSTA
 
 ## Requisitos mínimos para desplegar en un servidor
 
-Hay dos formas de instalar, y cada una tiene su sitio:
+El mismo asistente instala la suite de cuatro formas:
 
-- **`./sytue-deploy`** (Docker Compose) monta la suite en **un solo equipo** bajo
-  `https://*.sytue.localhost`, escuchando solo en `127.0.0.1`. Sirve para probarla,
-  enseñarla o desarrollar; **no publica nada en Internet**.
-- **`./sytue-deploy --mode helm`** (Kubernetes) es la instalación para un **servidor
-  accesible con tu dominio**. Un único servidor con [k3s](https://k3s.io) basta para
-  empezar. Guía: [`docs/operations.md` §1.3](docs/operations.md#13-prod-en-scaleway-terraform--helm).
+| Modo | Comando | Para qué |
+| --- | --- | --- |
+| **En tu equipo** | `./sytue-deploy` | Probar, enseñar o desarrollar en `https://*.sytue.localhost` (solo `127.0.0.1`) |
+| **Servidor único** | `./sytue-deploy --mode servidor --domain suite.tuempresa.eu` | Toda la suite en **una máquina con Docker** y tu dominio, con certificados de **Let's Encrypt** (o `--tls interno` para una red local) |
+| **Un solo contenedor** | `docker run --privileged … sytue-suite` ([`deploy/todo-en-uno`](deploy/todo-en-uno/Dockerfile)) | Lo mismo que el servidor único, pero en **un contenedor y un volumen** (Docker dentro de Docker) |
+| **Clúster** | `./sytue-deploy --mode helm` | Kubernetes con tu registro, PostgreSQL y S3 ([`docs/operations.md` §1.3](docs/operations.md#13-despliegue-en-kubernetes-con-helm-avanzado)) |
 
-| | Prueba en un equipo (Compose) | Servidor pequeño (k3s, 1 nodo) | Producción para clientes |
-| --- | --- | --- | --- |
-| **Para qué** | Evaluar y desarrollar | Uso propio o piloto con carga ligera | Servicio a terceros |
-| **CPU** | 4 núcleos | 6 núcleos x86-64 | 12–16 núcleos (24–32 recomendados) |
-| **RAM** | 4 GB para Docker (la suite completa usa ~1,4 GB); 8 GB para la primera construcción | 8 GB sin Sytue Cloud · 16 GB con Cloud | 64 GB ECC (128 GB recomendados) |
-| **Disco** | 30 GB libres (imágenes y caché de compilación) | 80 GB SSD; construye las imágenes en otra máquina | 2 × 1,92 TB NVMe enterprise en RAID 1 + backup en otro equipo |
-| **Sistema** | macOS, Linux o Windows con WSL 2 | Linux x86-64 (Debian 12 / Ubuntu 24.04 o similar) | Linux x86-64, nodo dedicado |
-| **Red** | Ninguna (todo local) | IPv4 pública fija, sin CGNAT | 1 Gbit/s simétrico, IPv4 fija (IPv6 recomendada) |
+En el servidor y en el contenedor único eliges también **quién la usa**: `--usuarios uno`
+(solo tu cuenta, sin registro público) o `--usuarios varios` (un equipo: invitas desde
+Sytue Admin y, con `--registro-abierto`, cualquiera puede crearse una cuenta). Se cambia
+cuando quieras volviendo a ejecutar el asistente, sin tocar los datos.
 
-Además, para un servidor:
+**Complementos opcionales** (no quitan funciones a las demás apps): ERP (`--sin-erp`),
+DevX (`--sin-devx`), verificación por SMS (`--sms-sweego-key`) y cifrado de extremo a
+extremo con Matrix (`SYTUE_CIFRADO_E2E=activado` con un servidor Matrix; sin él, los datos
+se guardan cifrados en el servidor).
+
+Servidor único o contenedor único en marcha:
+
+```bash
+# DNS: *.suite.tuempresa.eu → IP del servidor. Puertos abiertos: 80 y 443/TCP (web),
+# 7881/TCP y 50000-50100/UDP (videollamadas).
+./sytue-deploy --mode servidor --domain suite.tuempresa.eu --acme-email tu@tuempresa.eu
+
+# O todo en un contenedor:
+docker build -f deploy/todo-en-uno/Dockerfile -t sytue-suite .
+docker run -d --name sytue --privileged --restart unless-stopped \
+  -p 80:80 -p 443:443 -p 7881:7881 -p 50000-50100:50000-50100/udp -v sytue-datos:/datos -e SYTUE_DOMINIO=suite.tuempresa.eu \
+  -e SYTUE_ACME_EMAIL=tu@tuempresa.eu -e SYTUE_USUARIOS=varios sytue-suite
+```
+
+| | En tu equipo | Servidor único / un contenedor | Servidor pequeño (k3s, 1 nodo) | Producción para clientes |
+| --- | --- | --- | --- | --- |
+| **Para qué** | Evaluar y desarrollar | Uso propio, una pyme o un piloto | Piloto con carga ligera y Sytue Cloud | Servicio a terceros |
+| **CPU** | 4 núcleos | 4 núcleos x86-64 o ARM64 | 6 núcleos x86-64 | 12–16 núcleos (24–32 recomendados) |
+| **RAM** | 4 GB para Docker (la suite completa usa ~1,4 GB); 8 GB para la primera construcción | 4 GB (8 GB para la primera construcción) | 8 GB sin Sytue Cloud · 16 GB con Cloud | 64 GB ECC (128 GB recomendados) |
+| **Disco** | 30 GB libres (imágenes y caché de compilación) | 40 GB SSD + tus datos | 80 GB SSD; construye las imágenes en otra máquina | 2 × 1,92 TB NVMe enterprise en RAID 1 + backup en otro equipo |
+| **Sistema** | macOS, Linux o Windows con WSL 2 | Linux con Docker 25+ | Linux x86-64 (Debian 12 / Ubuntu 24.04 o similar) | Linux x86-64, nodo dedicado |
+| **Red** | Ninguna (todo local) | IPv4 pública (o red local con `--tls interno`); 80 y 443 abiertos | IPv4 pública fija, sin CGNAT | 1 Gbit/s simétrico, IPv4 fija (IPv6 recomendada) |
+
+Además, para un clúster (`--mode helm`):
 
 - **Kubernetes 1.31 o superior** con [cert-manager](https://cert-manager.io/docs/installation/)
   instalado. En k3s, instálalo con `--disable traefik`: el chart trae su propio Traefik.

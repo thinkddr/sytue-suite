@@ -59,12 +59,19 @@ Modo local (Docker Compose, recomendado)
   ./sytue-deploy --only-config        Solo genera deploy/compose/.env (no arranca nada)
   ./sytue-deploy --reset              Borra los datos locales y vuelve a instalar desde cero
 
+Modo servidor único (tu dominio, una sola máquina con Docker)
+  ./sytue-deploy --mode servidor --domain suite.miempresa.eu
+                                      Con certificados de Let's Encrypt (por defecto)
+  ./sytue-deploy --mode servidor --domain suite.lan --tls interno
+                                      Red local o pruebas (certificados de mkcert)
+
 Modo clúster (Kubernetes/Helm, avanzado)
   ./sytue-deploy --mode helm          Genera values y scripts de Secrets para tu clúster
   ./sytue-deploy --integrations       Solo las apps OAuth de terceros sobre un Helm existente
 
 Opciones:
-  --mode <compose|helm>     Modo de despliegue (por defecto: compose)
+  --mode <compose|servidor|helm>
+                            Modo de despliegue (por defecto: compose)
   --profile <full|office|core|lista>
                             Servicios de Compose: full (todo), office, core o una lista
                             de perfiles separados por comas (p. ej. mail,drive,docs)
@@ -80,9 +87,15 @@ Opciones:
   --sms-sweego-key <clave>  Activa el complemento de verificación por SMS (Sweego)
                             (también SYTUE_SMS_SWEEGO_API_KEY)
   --no-build                (Compose) Arranca con las imágenes ya construidas, sin reconstruir
-  --domain <dominio>        (Helm) Dominio raíz, p. ej. suite.miempresa.eu
-  --admin-email <correo>    (Helm) Correo del propietario inicial
-  --org-slug <slug>         (Helm) Organización inicial
+  --domain <dominio>        (Servidor/Helm) Dominio raíz, p. ej. suite.miempresa.eu
+  --tls <letsencrypt|interno>
+                            (Servidor) Certificados HTTPS (por defecto: letsencrypt)
+  --acme-email <correo>     (Servidor) Correo para Let's Encrypt
+  --usuarios <uno|varios>   (Servidor) Solo tú, o un equipo con invitaciones (por defecto: varios)
+  --registro-abierto        (Servidor, varios) Cualquiera puede crearse una cuenta en /signup
+  --registro-cerrado        (Servidor) Vuelve a cerrar el registro público
+  --admin-email <correo>    (Servidor/Helm) Correo del propietario inicial
+  --org-slug <slug>         (Servidor/Helm) Organización inicial
   --namespace <ns>          (Helm) Namespace de Kubernetes (por defecto: sytue-prod)
   --integrations            Solo el asistente de integraciones (Helm)
   -h, --help                Muestra esta ayuda
@@ -114,6 +127,9 @@ INTEGRATIONS_ONLY=0
 DO_RESET=0
 SKIP_VERIFY=0
 NO_BUILD=0
+TLS_MODO=""
+USUARIOS=""
+REGISTRO_ABIERTO=""
 CON_ERP=""
 CON_DEVX=""
 SMS_KEY="${SYTUE_SMS_SWEEGO_API_KEY:-}"
@@ -133,6 +149,11 @@ while [ $# -gt 0 ]; do
     --reset)           DO_RESET=1; shift ;;
     --skip-verify)     SKIP_VERIFY=1; shift ;;
     --no-build)        NO_BUILD=1; shift ;;
+    --tls)             need_arg "$@"; TLS_MODO="$2"; shift 2 ;;
+    --acme-email)      need_arg "$@"; TLS_EMAIL="$2"; shift 2 ;;
+    --usuarios)        need_arg "$@"; USUARIOS="$2"; shift 2 ;;
+    --registro-abierto) REGISTRO_ABIERTO="true"; shift ;;
+    --registro-cerrado) REGISTRO_ABIERTO="false"; shift ;;
     --sin-erp)         CON_ERP=0; shift ;;
     --sin-devx)        CON_DEVX=0; shift ;;
     --sms-sweego-key)  need_arg "$@"; SMS_KEY="$2"; shift 2 ;;
@@ -141,7 +162,7 @@ while [ $# -gt 0 ]; do
     *) err "Opción desconocida: $1"; usage; exit 2 ;;
   esac
 done
-case "$MODE" in ""|compose|helm) ;; *) die "--mode debe ser «compose» o «helm»." ;; esac
+case "$MODE" in ""|compose|servidor|helm) ;; *) die "--mode debe ser «compose», «servidor» o «helm»." ;; esac
 
 prompt_default() {
   local prompt_text="$1" default_val="$2" var_name="$3" input=""
@@ -527,8 +548,16 @@ env_set() {
   tmp="$(mktemp "${ENV_FILE}.XXXXXX")"
   grep -v "^${clave}=" "$ENV_FILE" > "$tmp" || true
   printf '%s=%s\n' "$clave" "$valor" >> "$tmp"
-  chmod 600 "$tmp"
-  mv "$tmp" "$ENV_FILE"
+  # Reescribe en el sitio: .env puede ser un enlace a un volumen (todo en uno).
+  cat "$tmp" > "$ENV_FILE"
+  rm -f "$tmp"
+}
+
+# Aparta el .env a .env.bak (para --reset). Si es un enlace, conserva el enlace.
+apartar_env() {
+  [ -f "$ENV_FILE" ] || return 0
+  cp "$ENV_FILE" "${ENV_FILE}.bak" && chmod 600 "${ENV_FILE}.bak"
+  if [ -L "$ENV_FILE" ]; then rm -f -- "$(readlink "$ENV_FILE")"; else rm -f -- "$ENV_FILE"; fi
 }
 
 # La api_key de LiveKit es un identificador público (el secreto es api_secret). Va
@@ -617,7 +646,9 @@ requisitos_compose() {
       fi
     fi
   fi
-  if check_cmd mkcert; then
+  if [ "$MODE" = "servidor" ] && [ "$TLS_MODO" = "letsencrypt" ]; then
+    : # Let's Encrypt emite los certificados: mkcert no hace falta.
+  elif check_cmd mkcert; then
     ok "mkcert $(mkcert -version 2>/dev/null)"
   else
     err "Falta mkcert (certificados HTTPS locales de confianza). Instálalo:"
@@ -983,7 +1014,7 @@ instalar_compose() {
       info "Parando la suite y borrando sus volúmenes..."
       dc --profile full down -v --remove-orphans >/dev/null 2>&1 || true
     fi
-    [ -f "$ENV_FILE" ] && mv "$ENV_FILE" "${ENV_FILE}.bak" && chmod 600 "${ENV_FILE}.bak" && info "Configuración anterior guardada en deploy/compose/.env.bak"
+    [ -f "$ENV_FILE" ] && apartar_env && info "Configuración anterior guardada en deploy/compose/.env.bak"
   fi
 
   if [ -f "$ENV_FILE" ]; then
@@ -1365,6 +1396,296 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
+# Modo servidor único: toda la suite en una máquina con tu dominio
+# ---------------------------------------------------------------------------
+SERVIDOR_DIR="${COMPOSE_DIR}/.servidor"
+
+dominio_valido() { [[ "$1" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$ ]]; }
+
+# Compose renderizado para el dominio: el mismo docker-compose.yml y frontlite.yml
+# con sytue.localhost cambiado por el dominio, más los ajustes de servidor que no
+# caben en un overlay (están dentro de anclas YAML).
+renderizar_servidor() {
+  mkdir -p "$SERVIDOR_DIR"
+  local tls_verificar="0"
+  [ "$TLS_MODO" = "letsencrypt" ] && tls_verificar="1"
+  DOMINIO="$DOMAIN" VERIFICAR="$tls_verificar" perl -pe '
+    s/sytue\.localhost/$ENV{DOMINIO}/g;
+    s/SYTUE_SECURE_COOKIES: "false".*/SYTUE_SECURE_COOKIES: "true"/;
+    s/NODE_TLS_REJECT_UNAUTHORIZED: "0"/NODE_TLS_REJECT_UNAUTHORIZED: "$ENV{VERIFICAR}"/;
+    s/^  LOG_LEVEL: debug$/  LOG_LEVEL: info/;
+    s/^  GO_ENV: development$/  GO_ENV: development\n  SYTUE_BASE_DOMAIN: $ENV{DOMINIO}/;
+  ' "${COMPOSE_DIR}/docker-compose.yml" > "${SERVIDOR_DIR}/docker-compose.yml"
+  DOMINIO="$DOMAIN" perl -pe 's/sytue\.localhost/$ENV{DOMINIO}/g' "${COMPOSE_DIR}/frontlite.yml" > "${SERVIDOR_DIR}/frontlite.yml"
+  # Todos los <app>.<dominio> resuelven a Traefik DENTRO de la red de la suite: el
+  # BFF de cada app llama a otras por su nombre público, y no todo servidor llega
+  # a su propia IP pública desde dentro (hairpin NAT).
+  {
+    echo "name: sytue-one-dev"
+    echo "services:"
+    echo "  traefik:"
+    echo "    networks:"
+    echo "      edge: {}"
+    echo "      backend:"
+    echo "        aliases:"
+    grep -oE "Host\(\`[a-z0-9.-]+\`\)" "${SERVIDOR_DIR}/docker-compose.yml" | sed -E 's/Host\(`([^`]+)`\)/          - \1/' | sort -u
+  } > "${SERVIDOR_DIR}/alias.yml"
+  # Videollamadas: el SFU anuncia a los navegadores la IP por la que le llegan.
+  # Con Let's Encrypt (Internet), la pública que descubre por STUN; en una red
+  # local, la IP de esta máquina en esa red.
+  # SYTUE_IP_MEDIOS la fija a mano (p. ej. detrás de NAT o en el contenedor único).
+  local ip_lan="${SYTUE_IP_MEDIOS:-}"
+  if [ -z "$ip_lan" ] && [ "$TLS_MODO" = "interno" ]; then
+    ip_lan="$(ip -4 route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p' | head -1)"
+    [ -n "$ip_lan" ] || ip_lan="$(hostname -I 2>/dev/null | awk '{print $1}')"
+  fi
+  IP_LAN="$ip_lan" perl -pe '
+    if ($ENV{IP_LAN} eq "") { s/use_external_ip: false/use_external_ip: true/; $_ = "" if /^\s*node_ip:/; }
+    else { s/node_ip: "127\.0\.0\.1"/node_ip: "$ENV{IP_LAN}"/; }
+  ' "${COMPOSE_DIR}/livekit/livekit.yaml" > "${SERVIDOR_DIR}/livekit.yaml"
+  if [ "$TLS_MODO" = "letsencrypt" ]; then
+    CORREO="$TLS_EMAIL" perl -pe 's/__ACME_EMAIL__/$ENV{CORREO}/g' "${COMPOSE_DIR}/traefik/traefik-letsencrypt.yml.tpl" > "${SERVIDOR_DIR}/traefik.yml"
+  fi
+  COMPOSE_FILES=("${SERVIDOR_DIR}/docker-compose.yml" "${SERVIDOR_DIR}/frontlite.yml"
+    "${COMPOSE_DIR}/servidor.yml" "${SERVIDOR_DIR}/alias.yml")
+  [ "$TLS_MODO" = "letsencrypt" ] && COMPOSE_FILES+=("${COMPOSE_DIR}/letsencrypt.yml")
+  return 0
+}
+
+certificado_interno() {
+  if [ -s "${CERT_DIR}/servidor.pem" ] && openssl x509 -in "${CERT_DIR}/servidor.pem" -noout -text 2>/dev/null | grep -q "DNS:\*\.${DOMAIN}"; then
+    ok "Certificado interno para *.${DOMAIN} ya presente."
+    return
+  fi
+  check_cmd mkcert || die "El TLS interno usa mkcert, que no está instalado (o elige Let's Encrypt)."
+  mkcert -install >/dev/null 2>&1 || true
+  mkdir -p "$CERT_DIR"
+  mkcert -cert-file "${CERT_DIR}/servidor.pem" -key-file "${CERT_DIR}/servidor-key.pem" \
+    "${DOMAIN}" "*.${DOMAIN}" >/dev/null 2>&1
+  ok "Certificado interno para *.${DOMAIN} creado (confía en él cada equipo con «mkcert -install» y la CA de $(mkcert -CAROOT))."
+}
+
+# Con Let's Encrypt, un certificado autofirmado solo para lo que no tiene uno de
+# ACME (accesos por IP o nombres desconocidos): tls.yml lo usa por defecto.
+certificado_respaldo() {
+  [ -s "${CERT_DIR}/servidor.pem" ] && return 0
+  mkdir -p "$CERT_DIR"
+  openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=${DOMAIN}" \
+    -keyout "${CERT_DIR}/servidor-key.pem" -out "${CERT_DIR}/servidor.pem" >/dev/null 2>&1 ||
+    die "No se pudo crear el certificado de respaldo (¿está openssl instalado?)."
+}
+
+# Clientes OIDC de las apps web: el mismo secreto que usan sus BFF y sus
+# direcciones de vuelta en tu dominio. Idempotente.
+configurar_clientes_oidc() {
+  local tmp secreto c clientes
+  secreto="$(env_get SYTUE_DEV_CLIENT_SECRET)"
+  clientes="$(dc config 2>/dev/null | sed -n 's/^ *SYTUE_OIDC_CLIENT_ID: *"\{0,1\}\([a-z0-9-]*\)"\{0,1\}$/\1/p' | sort -u)"
+  tmp="$(mktemp -d)"
+  chmod 755 "$tmp"
+  for c in $clientes; do
+    printf '%s' "$secreto" > "${tmp}/${c}"
+    chmod 644 "${tmp}/${c}"
+  done
+  if ! dc run --rm --no-deps -T -v "${tmp}:/secretos:ro" id reconcile-client-secrets /secretos >/dev/null 2>&1; then
+    rm -rf "$tmp"
+    die "No se pudieron fijar los secretos de los clientes OIDC (make dev-logs SVC=id)."
+  fi
+  rm -rf "$tmp"
+  dc exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(env_get POSTGRES_SUPERUSER)" -d "$(env_get ID_DB_NAME)" -q >/dev/null <<SQL || die "No se pudieron registrar las direcciones de vuelta de ${DOMAIN} en Sytue ID."
+UPDATE oauth_clients c SET
+  redirect_uris = ARRAY(SELECT DISTINCT u FROM unnest(c.redirect_uris || ARRAY(
+    SELECT replace(x, '.sytue.localhost/', '.${DOMAIN}/') FROM unnest(c.redirect_uris) x
+    WHERE x LIKE 'https://%.sytue.localhost/%')) u),
+  post_logout_redirect_uris = ARRAY(SELECT DISTINCT u FROM unnest(c.post_logout_redirect_uris || ARRAY(
+    SELECT replace(x, '.sytue.localhost/', '.${DOMAIN}/') FROM unnest(c.post_logout_redirect_uris) x
+    WHERE x LIKE 'https://%.sytue.localhost/%')) u)
+WHERE EXISTS (SELECT 1 FROM unnest(c.redirect_uris) x WHERE x LIKE 'https://%.sytue.localhost/%');
+SQL
+  ok "Clientes OIDC de las apps listos para ${DOMAIN} ($(echo "$clientes" | wc -w | tr -d ' ') apps)."
+}
+
+alta_propietario() {
+  dc run --rm --no-deps -T \
+    -e SYTUE_ID_BOOTSTRAP_EMAIL="$ADMIN_EMAIL" \
+    -e SYTUE_ID_BOOTSTRAP_ORG_SLUG="$ORG_SLUG" \
+    -e SYTUE_ID_BOOTSTRAP_ORG_NAME="$ORG_SLUG" \
+    -e SYTUE_ID_BOOTSTRAP_PASSWORD="$(env_get SYTUE_PROPIETARIO_PASSWORD)" \
+    id bootstrap-owner >/dev/null 2>&1 ||
+    die "No se pudo crear el propietario inicial (make dev-logs SVC=id)."
+  ok "Propietario listo: ${BOLD}${ADMIN_EMAIL}${RESET} (organización ${ORG_SLUG})."
+}
+
+# Un usuario: solo la cuenta del propietario, sin alta pública. Varios: el
+# propietario invita desde Sytue Admin y, si se pide, cualquiera puede darse de
+# alta en /signup. Se cambia volviendo a ejecutar el asistente: no toca datos.
+elegir_usuarios() {
+  [ -n "$USUARIOS" ] || USUARIOS="$(env_get SYTUE_USUARIOS)"
+  if [ -z "$USUARIOS" ]; then
+    if [ "$NON_INTERACTIVE" -eq 1 ]; then
+      USUARIOS="varios"
+    else
+      echo "  ¿Quién va a usar la suite?"
+      echo "    1) Solo yo          — una sola cuenta (la tuya); sin registro público"
+      echo "    2) Un equipo        — invitas a más personas desde Sytue Admin"
+      local o=""
+      prompt_default "Opción" "2" o
+      case "$o" in 1|uno) USUARIOS="uno" ;; *) USUARIOS="varios" ;; esac
+    fi
+  fi
+  case "$USUARIOS" in uno|varios) ;; *) die "--usuarios debe ser «uno» o «varios»." ;; esac
+  if [ "$USUARIOS" = "uno" ]; then
+    [ "$REGISTRO_ABIERTO" != "true" ] || die "--registro-abierto solo tiene sentido con --usuarios varios."
+    REGISTRO_ABIERTO="false"
+  else
+    [ -n "$REGISTRO_ABIERTO" ] || REGISTRO_ABIERTO="$(env_get SYTUE_REGISTRO_ABIERTO)"
+    if [ -z "$REGISTRO_ABIERTO" ]; then
+      REGISTRO_ABIERTO="false"
+      if [ "$NON_INTERACTIVE" -eq 0 ] && prompt_yes_no "¿Permitir que cualquiera se cree una cuenta (registro abierto)? Si no, solo entran las personas que invites" "n"; then
+        REGISTRO_ABIERTO="true"
+      fi
+    fi
+  fi
+  if [ "$USUARIOS" = "uno" ]; then
+    ok "Usuarios: ${BOLD}solo el propietario${RESET} (registro cerrado)"
+  elif [ "$REGISTRO_ABIERTO" = "true" ]; then
+    ok "Usuarios: ${BOLD}equipo${RESET} · invitaciones y registro abierto en /signup"
+  else
+    ok "Usuarios: ${BOLD}equipo${RESET} · por invitación desde Sytue Admin"
+  fi
+}
+
+instalar_servidor() {
+  step "Paso 2 de 5 · Servidor, dominio y requisitos"
+  echo "  Toda la suite en esta máquina, en <app>.<tu dominio>. Necesitas un registro DNS"
+  echo "  comodín (*.tu-dominio) apuntando a este servidor y los puertos 80 y 443 libres."
+  [ -n "$DOMAIN" ] || prompt_default "Dominio de la suite (ej: suite.miempresa.eu)" "" DOMAIN
+  DOMAIN="$(printf '%s' "$DOMAIN" | tr '[:upper:]' '[:lower:]')"
+  dominio_valido "$DOMAIN" || die "«${DOMAIN}» no es un dominio válido (ej: suite.miempresa.eu)."
+  [ "$DOMAIN" != "$LOCAL_DOMAIN" ] || die "Para *.${LOCAL_DOMAIN} usa el modo local (./sytue-deploy)."
+  if [ -z "$TLS_MODO" ]; then
+    if [ "$NON_INTERACTIVE" -eq 1 ]; then
+      TLS_MODO="letsencrypt"
+    else
+      echo "  Certificados HTTPS:"
+      echo "    1) Let's Encrypt — gratuitos y automáticos (el servidor tiene que ser accesible desde Internet)"
+      echo "    2) Internos      — para una red local o pruebas (mkcert; cada equipo debe confiar en su CA)"
+      local o=""
+      prompt_default "Opción" "1" o
+      case "$o" in 2) TLS_MODO="interno" ;; *) TLS_MODO="letsencrypt" ;; esac
+    fi
+  fi
+  case "$TLS_MODO" in letsencrypt|interno) ;; *) die "--tls debe ser «letsencrypt» o «interno»." ;; esac
+  if [ "$TLS_MODO" = "letsencrypt" ]; then
+    [ -n "$TLS_EMAIL" ] || prompt_default "Correo para Let's Encrypt (avisos de caducidad)" "admin@${DOMAIN}" TLS_EMAIL
+    [[ "$TLS_EMAIL" =~ ^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$ ]] || die "Correo no válido: ${TLS_EMAIL}"
+  fi
+  if [ "$ONLY_CONFIG" -eq 0 ]; then requisitos_compose; fi
+  ok "Dominio ${BOLD}${DOMAIN}${RESET} · HTTPS ${BOLD}${TLS_MODO}${RESET}"
+
+  step "Paso 3 de 5 · Servicios y propietario"
+  PROFILE="${PROFILE:-full}"
+  CON_ERP="${CON_ERP:-1}"; CON_DEVX="${CON_DEVX:-1}"
+  local perfiles
+  perfiles="$(perfiles_compose "$PROFILE")"
+  [ -n "$ORG_SLUG" ] || ORG_SLUG="$(env_get SYTUE_ORGANIZACION)"
+  [ -n "$ADMIN_EMAIL" ] || ADMIN_EMAIL="$(env_get SYTUE_PROPIETARIO)"
+  [ -n "$ORG_SLUG" ] || prompt_default "Organización (slug, minúsculas)" "$(printf '%s' "${DOMAIN%%.*}" | tr -cd 'a-z0-9-')" ORG_SLUG
+  [ -n "$ADMIN_EMAIL" ] || prompt_default "Correo del propietario" "admin@${DOMAIN}" ADMIN_EMAIL
+  elegir_usuarios
+  ok "Perfiles: ${BOLD}${perfiles}${RESET} · propietario ${BOLD}${ADMIN_EMAIL}${RESET} (${ORG_SLUG})"
+
+  step "Paso 4 de 5 · Configuración y secretos"
+  if [ "$DO_RESET" -eq 1 ]; then
+    if [ "$NON_INTERACTIVE" -eq 0 ] && ! prompt_yes_no "Se BORRARÁN todos los datos de la suite en esta máquina. ¿Continuar?" "n"; then
+      die "Cancelado: no se ha borrado nada."
+    fi
+    if [ -f "$ENV_FILE" ]; then
+      renderizar_servidor
+      dc --profile full down -v --remove-orphans >/dev/null 2>&1 || true
+      apartar_env
+    fi
+  fi
+  if [ -f "$ENV_FILE" ] && [ "$(env_get SYTUE_DOMINIO)" != "$DOMAIN" ]; then
+    die "deploy/compose/.env es de otra instalación ($(env_get SYTUE_DOMINIO || true)). Empieza de cero con --reset."
+  fi
+  if [ -f "$ENV_FILE" ]; then
+    ok "Se reutiliza ${BOLD}deploy/compose/.env${RESET}."
+    completar_env
+  else
+    if datos_locales_existen; then
+      die "Hay datos de otra instalación en Docker. Empieza de cero con ${BOLD}./sytue-deploy --mode servidor --reset${RESET}."
+    fi
+    resolver_password_admin
+    escribir_env "$perfiles"
+    {
+      echo ""
+      echo "# --- Servidor único -------------------------------------------------------"
+      echo "SYTUE_DOMINIO=${DOMAIN}"
+      echo "SYTUE_TLS=${TLS_MODO}"
+      echo "SYTUE_ACME_EMAIL=${TLS_EMAIL}"
+      echo "SYTUE_PROPIETARIO=${ADMIN_EMAIL}"
+      echo "SYTUE_ORGANIZACION=${ORG_SLUG}"
+      echo "SYTUE_PROPIETARIO_PASSWORD=${ADMIN_PASSWORD}"
+      echo "ID_KEY_ENCRYPTION_KEY=$(rand_b64 32)"
+      echo "CONTACTS_INTERNAL_SECRET=$(rand_hex 32)"
+      echo "SYTUE_MAIL_FROM=Sytue <no-reply@${DOMAIN}>"
+      echo "# Correo saliente de Sytue ID. Vacío: el servidor de correo de la propia suite."
+      echo "SYTUE_SMTP_ADDR="
+      echo "SYTUE_SMTP_USERNAME="
+      echo "SYTUE_SMTP_PASSWORD="
+    } >> "$ENV_FILE"
+    ok "Creado ${BOLD}deploy/compose/.env${RESET} (permisos 0600, ignorado por Git)."
+  fi
+  env_set SYTUE_USUARIOS "$USUARIOS"
+  env_set SYTUE_REGISTRO_ABIERTO "$REGISTRO_ABIERTO"
+  ADMIN_PASSWORD="$(env_get SYTUE_PROPIETARIO_PASSWORD)"
+  renderizar_servidor
+  ok "Compose para ${DOMAIN} en deploy/compose/.servidor/"
+  if [ "$ONLY_CONFIG" -eq 1 ]; then
+    ok "Configuración lista. Para arrancar: ${BOLD}./sytue-deploy --mode servidor --domain ${DOMAIN}${RESET}"
+    exit 0
+  fi
+
+  step "Paso 5 de 5 · Construcción y arranque"
+  if [ "$TLS_MODO" = "interno" ]; then certificado_interno; else certificado_respaldo; fi
+  if [ "$NO_BUILD" -eq 0 ]; then
+    info "Construyendo las imágenes para ${DOMAIN} (la primera vez, 20-60 min)..."
+    construir_por_tandas
+  fi
+  info "Arrancando contenedores..."
+  dc up -d --no-build --remove-orphans
+  info "Esperando a Sytue ID..."
+  local t=0
+  until [ "$(docker inspect -f '{{.State.Health.Status}}' "$(dc ps -q id)" 2>/dev/null)" = "healthy" ]; do
+    t=$((t + 5)); [ "$t" -lt 300 ] || die "Sytue ID no arranca. Revisa: ${BOLD}make dev-logs SVC=id${RESET}"
+    sleep 5
+  done
+  configurar_clientes_oidc
+  alta_propietario
+  info "Esperando a que el resto de servicios estén sanos..."
+  local sanos=1
+  esperar_salud 900 || sanos=0
+  printf "\r%-120s\r" ""
+  [ "$sanos" -eq 1 ] && ok "Todos los servicios están en marcha y sanos."
+
+  printf "\n${BOLD}${GREEN}Sytue Suite está en marcha en https://one.%s${RESET}\n\n" "$DOMAIN"
+  printf "  Propietario : ${BOLD}%s${RESET} · contraseña en deploy/compose/.env (SYTUE_PROPIETARIO_PASSWORD)\n" "$ADMIN_EMAIL"
+  printf "  Primer paso : entra en https://id.%s/account y activa la verificación en dos pasos;\n" "$DOMAIN"
+  printf "                hasta entonces Sytue Admin sigue cerrada para el propietario.\n"
+  if [ "$USUARIOS" = "uno" ]; then
+    printf "  Usuarios    : solo tu cuenta. Para abrirla a un equipo: ./sytue-deploy --mode servidor --usuarios varios\n"
+  else
+    printf "  Usuarios    : invita a tu equipo en https://admin.%s" "$DOMAIN"
+    [ "$REGISTRO_ABIERTO" = "true" ] && printf " · registro abierto en https://id.%s/signup" "$DOMAIN"
+    printf "\n"
+  fi
+  [ "$TLS_MODO" = "letsencrypt" ] && printf "  Certificados: Let's Encrypt los emite en el primer acceso a cada app (unos segundos).\n"
+  printf "  Correo SMTP/IMAP para clientes externos aún no se publica: el correo web funciona.\n\n"
+  [ "$sanos" -eq 1 ] || { warn "Algún servicio no está sano todavía: ${BOLD}make dev-ps${RESET}."; exit 1; }
+}
+
+# ---------------------------------------------------------------------------
 # Inicio
 # ---------------------------------------------------------------------------
 printf "${BOLD}${CYAN}"
@@ -1390,19 +1711,21 @@ if [ -z "$MODE" ]; then
     MODE="compose"
   else
     echo "    1) En este equipo con Docker  — recomendado: prueba o servidor único, en https://*.${LOCAL_DOMAIN}"
-    echo "    2) En un clúster Kubernetes   — avanzado: tu dominio, tu registro, tu PostgreSQL y tu S3"
+    echo "    2) En un servidor con tu dominio — una máquina con Docker, HTTPS con Let's Encrypt"
+    echo "    3) En un clúster Kubernetes   — avanzado: tu dominio, tu registro, tu PostgreSQL y tu S3"
     eleccion=""
     prompt_default "Opción" "1" eleccion
     case "$eleccion" in
-      2|helm|k8s) MODE="helm" ;;
+      2|servidor) MODE="servidor" ;;
+      3|helm|k8s) MODE="helm" ;;
       *)          MODE="compose" ;;
     esac
   fi
 fi
 ok "Modo: ${BOLD}${MODE}${RESET}"
 
-if [ "$MODE" = "compose" ]; then
-  instalar_compose
-else
-  instalar_helm
-fi
+case "$MODE" in
+  compose)  instalar_compose ;;
+  servidor) instalar_servidor ;;
+  *)        instalar_helm ;;
+esac

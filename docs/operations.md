@@ -161,6 +161,30 @@ Cada microservicio Go dispone de su propia base de datos y rol de PostgreSQL ini
 | `make dev-clean` / `./sytue-deploy --reset` | Borra los volúmenes (el segundo además regenera los secretos y reinstala). |
 | `scripts/e2e/smoke.sh` | Verificación de extremo a extremo. |
 
+#### Servidor único y contenedor único
+
+`./sytue-deploy --mode servidor --domain <dominio>` usa los mismos ficheros de Compose,
+renderizados para tu dominio en `deploy/compose/.servidor/` (fuera de Git), más dos
+overlays:
+
+| Fichero | Qué cambia |
+| --- | --- |
+| [`servidor.yml`](../deploy/compose/servidor.yml) | Traefik publica 80/443 en todas las interfaces y sin panel; LiveKit publica 7881/TCP y anuncia la IP pública (o `SYTUE_IP_MEDIOS`); Sytue ID en producción autoalojada (`SYTUE_ID_SELF_HOSTED`, clave de firma cifrada, SMTP, registro abierto o cerrado según `--usuarios`/`--registro-abierto`). |
+| [`letsencrypt.yml`](../deploy/compose/letsencrypt.yml) | Con `--tls letsencrypt` (por defecto): emisor ACME HTTP-01 de Traefik y volumen `acme` para los certificados. Con `--tls interno`, un certificado de mkcert para `*.<dominio>`. |
+
+Después del arranque, el asistente fija los secretos de los clientes OIDC de las apps
+(`id reconcile-client-secrets`), añade sus direcciones de vuelta en tu dominio y crea el
+propietario (`id bootstrap-owner`); todo es idempotente. Variables propias del modo en
+`deploy/compose/.env`: `SYTUE_DOMINIO`, `SYTUE_TLS`, `SYTUE_ACME_EMAIL`,
+`SYTUE_PROPIETARIO`, `SYTUE_ORGANIZACION`, `SYTUE_PROPIETARIO_PASSWORD`, `SYTUE_USUARIOS`,
+`SYTUE_REGISTRO_ABIERTO`, `ID_KEY_ENCRYPTION_KEY` y `SYTUE_SMTP_*` (vacías: el servidor de
+correo de la propia suite envía el correo de Sytue ID).
+
+[`deploy/todo-en-uno/`](../deploy/todo-en-uno/Dockerfile) empaqueta exactamente ese modo
+en una imagen con Docker interno: el contenedor guarda en `/datos` las imágenes, los
+volúmenes, `.env`, los certificados y la CA, y en cada arranque vuelve a ejecutar el
+asistente sin preguntas (`--no-build` desde la segunda vez).
+
 ---
 
 <a id="13-prod-en-scaleway-terraform--helm"></a>

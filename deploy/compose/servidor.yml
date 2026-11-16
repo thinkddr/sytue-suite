@@ -1,0 +1,66 @@
+# Sytue Suite — SERVIDOR ÚNICO (overlay de docker-compose.yml + frontlite.yml) ====
+# ---------------------------------------------------------------------------
+# Toda la suite en UNA máquina con tu dominio (<app>.<dominio>), accesible desde
+# Internet o desde tu red. Lo genera y lo aplica ./sytue-deploy --mode servidor:
+#
+#   1. renderiza docker-compose.yml y frontlite.yml cambiando sytue.localhost por
+#      tu dominio (deploy/compose/.servidor/, fuera de Git);
+#   2. añade este overlay y, con Let's Encrypt, letsencrypt.yml.
+#
+# Qué cambia respecto al entorno local:
+#   - Traefik publica 80 y 443 en todas las interfaces, y LiveKit los puertos de
+#     medios de las videollamadas (el resto sigue en 127.0.0.1). Sin panel de Traefik.
+#   - Sytue ID corre en producción autoalojada: sin cuentas de prueba ni TOTP
+#     conocido, con la clave de firma cifrada en reposo y correo saliente. El
+#     propietario lo crea `id bootstrap-owner` y los secretos OIDC de las apps,
+#     `id reconcile-client-secrets` (los lanza el asistente).
+#   - Cookies `Secure` y orígenes de CSP/CORS para tu dominio (SYTUE_BASE_DOMAIN).
+#
+# Los demás servicios Go mantienen su configuración de desarrollo, que ya recibe
+# todas sus claves: su modo producción exige un registro de imágenes (Cloud) y
+# certificados en fichero para SMTP/IMAP (Mail) que este despliegue no tiene. Por
+# eso SMTP/IMAP siguen solo en 127.0.0.1: el correo web funciona por HTTPS.
+# ---------------------------------------------------------------------------
+name: sytue-one-dev
+
+services:
+  traefik:
+    ports: !override
+      - "80:80"
+      - "443:443"
+    volumes: !override
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./traefik/traefik.yml:/etc/traefik/traefik.yml:ro"
+      - "./traefik/dynamic-servidor:/etc/traefik/dynamic:ro"
+      - "./traefik/certs:/etc/traefik/certs:ro"
+    # Sin panel de Traefik en Internet: no lleva autenticación.
+    labels: !override
+      - "traefik.enable=false"
+
+  # Videollamadas desde fuera: medios por UDP 50000-50100 (ya publicados) y el
+  # respaldo ICE/TCP 7881, que en local solo escucha en 127.0.0.1.
+  livekit:
+    ports: !override
+      - "127.0.0.1:7880:7880"
+      - "7881:7881"
+      - "50000-50100:50000-50100/udp"
+    volumes: !override
+      - "./.servidor/livekit.yaml:/etc/livekit/livekit.yaml:ro"
+
+  id:
+    environment:
+      SYTUE_ID_ENV: prod
+      SYTUE_ID_SELF_HOSTED: "true"
+      SYTUE_ID_REQUIRE_PAID_SUBSCRIPTION: "false"
+      SYTUE_ID_LOG_LEVEL: info
+      SYTUE_ID_KEY_ENCRYPTION_KEY: ${ID_KEY_ENCRYPTION_KEY}
+      SYTUE_ID_CONTACTS_INTERNAL_SECRET: ${CONTACTS_INTERNAL_SECRET:-}
+      # Usuarios (./sytue-deploy --usuarios uno|varios): el alta pública en /signup
+      # solo se abre con --registro-abierto. Cerrada, se entra por invitación.
+      SYTUE_ID_SIGNUP_ENABLED: ${SYTUE_REGISTRO_ABIERTO:-false}
+      # Correo transaccional (restablecer contraseña, invitaciones). Obligatorio en
+      # producción: por defecto, el servidor de correo de la propia suite.
+      SYTUE_ID_SMTP_ADDR: ${SYTUE_SMTP_ADDR:-mail:25}
+      SYTUE_ID_SMTP_USERNAME: ${SYTUE_SMTP_USERNAME:-}
+      SYTUE_ID_SMTP_PASSWORD: ${SYTUE_SMTP_PASSWORD:-}
+      SYTUE_ID_MAIL_FROM: ${SYTUE_MAIL_FROM}

@@ -13,7 +13,7 @@ administrador y verifica que todo responde.
 
 | Necesitas | Cómo comprobarlo | Si no lo tienes |
 | --- | --- | --- |
-| **Docker** con **12 GB de memoria** para la suite completa (~8 GB la versión «Ofimática», ~2 GB la «Mínima»): en local cada app web corre en modo desarrollo | `docker info` | [Docker Desktop](https://docs.docker.com/get-docker/) (macOS/Windows) o Docker Engine (Linux). En Docker Desktop: *Settings → Resources → Memory*. |
+| **Docker** con **4 GB de memoria** (la suite completa arrancada usa ~1,4 GB; la primera construcción compila en paralelo y agradece 8 GB) | `docker info` | [Docker Desktop](https://docs.docker.com/get-docker/) (macOS/Windows) o Docker Engine (Linux). En Docker Desktop: *Settings → Resources → Memory*. |
 | **mkcert** (HTTPS local de confianza) | `mkcert -version` | macOS: `brew install mkcert nss` · Debian/Ubuntu: `sudo apt install mkcert libnss3-tools` · Windows: `choco install mkcert` |
 | **git**, **bash** y **openssl** | `git --version` | Vienen con macOS y Linux. En Windows, usa WSL 2. |
 

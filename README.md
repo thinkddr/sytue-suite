@@ -16,7 +16,7 @@ ERP y PaaS, con **una sola cuenta y una sola experiencia**.
 
 ## Instalar en 3 comandos
 
-Necesitas **Docker** (con 12 GB de memoria para la suite completa; ~8 GB la versión «Ofimática») y
+Necesitas **Docker** (con 4 GB de memoria; 8 GB para la primera construcción) y
 [**mkcert**](https://github.com/FiloSottile/mkcert#installation). Después:
 
 ```bash
@@ -53,7 +53,7 @@ Hay dos formas de instalar, y cada una tiene su sitio:
 | --- | --- | --- | --- |
 | **Para qué** | Evaluar y desarrollar | Uso propio o piloto con carga ligera | Servicio a terceros |
 | **CPU** | 4 núcleos | 6 núcleos x86-64 | 12–16 núcleos (24–32 recomendados) |
-| **RAM** | 12 GB asignados a Docker (16 GB en el equipo) | 8 GB sin Sytue Cloud · 16 GB con Cloud | 64 GB ECC (128 GB recomendados) |
+| **RAM** | 4 GB para Docker (la suite completa usa ~1,4 GB); 8 GB para la primera construcción | 8 GB sin Sytue Cloud · 16 GB con Cloud | 64 GB ECC (128 GB recomendados) |
 | **Disco** | 30 GB libres (imágenes y caché de compilación) | 80 GB SSD; construye las imágenes en otra máquina | 2 × 1,92 TB NVMe enterprise en RAID 1 + backup en otro equipo |
 | **Sistema** | macOS, Linux o Windows con WSL 2 | Linux x86-64 (Debian 12 / Ubuntu 24.04 o similar) | Linux x86-64, nodo dedicado |
 | **Red** | Ninguna (todo local) | IPv4 pública fija, sin CGNAT | 1 Gbit/s simétrico, IPv4 fija (IPv6 recomendada) |

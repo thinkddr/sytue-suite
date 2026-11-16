@@ -565,10 +565,10 @@ requisitos_compose() {
     local mem
     mem="$(docker info --format '{{.MemTotal}}' 2>/dev/null || echo 0)"
     mem=$(( ${mem:-0} / 1024 / 1024 / 1024 ))
-    # Medido con todo arrancado: ~12 GB la suite completa (cada app web en modo
-    # desarrollo ronda 0,7 GB), ~8 GB «Ofimática» y ~2 GB «Mínimo».
-    if [ "$mem" -gt 0 ] && [ "$mem" -lt 12 ]; then
-      warn "Docker tiene ${mem} GB de memoria: la suite completa usa unos 12 GB. Sube la memoria de Docker o elige «Ofimática» (~8 GB) o «Mínimo» (~2 GB) en el paso siguiente."
+    # Medido con todo arrancado y las apps web compiladas: ~1,4 GiB la suite
+    # completa. La primera construcción (Go + 18 apps en paralelo) pide más.
+    if [ "$mem" -gt 0 ] && [ "$mem" -lt 4 ]; then
+      warn "Docker tiene ${mem} GB de memoria: la suite necesita al menos 4 GB (8 GB para la primera construcción). Súbela en la configuración de Docker."
     else
       ok "Memoria disponible para Docker: ${mem} GB"
     fi
@@ -867,9 +867,9 @@ instalar_compose() {
       PROFILE="full"
     else
       echo "  ¿Qué quieres levantar? (siempre se incluyen Sytue ID, Hub, PostgreSQL, S3 y Traefik)"
-      echo "    1) Suite completa      — todas las aplicaciones (~12 GB de RAM para Docker)"
-      echo "    2) Ofimática           — Drive, Docus/Calcus/Diapos/CertiPDF, Mail, Calendar, Contacts (~8 GB)"
-      echo "    3) Mínimo              — solo identidad, portal y consola de administración (~2 GB)"
+      echo "    1) Suite completa      — todas las aplicaciones (~1,4 GB de RAM)"
+      echo "    2) Ofimática           — Drive, Docus/Calcus/Diapos/CertiPDF, Mail, Calendar, Contacts (~0,8 GB)"
+      echo "    3) Mínimo              — solo identidad, portal y consola de administración (~0,5 GB)"
       echo "    4) A medida            — perfiles separados por comas (p. ej. mail,drive,docs,rooms)"
       local opcion=""
       prompt_default "Opción" "1" opcion

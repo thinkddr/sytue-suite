@@ -31,6 +31,10 @@
 
 name: sytue-one-dev
 
+# Healthchecks: cada 5 s mientras arranca (start_interval, dentro de start_period) y
+# cada 60 s después. Antes eran cada 10-15 s siempre: con 26 servicios, decenas de
+# procesos nuevos por minuto solo para preguntar «¿sigues vivo?».
+
 # --- Anclas reutilizables ----------------------------------------------------
 x-restart: &restart
   restart: unless-stopped
@@ -207,10 +211,12 @@ services:
       - "traefik.http.routers.traefik.service=api@internal"
     healthcheck:
       test: ["CMD", "traefik", "healthcheck", "--ping"]
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 120s
+
+      start_interval: 5s
 
   # ===========================================================================
   # POSTGRESQL 16 — ÚNICO datastore (estado + colas + caché). Una BD por
@@ -305,10 +311,12 @@ services:
       - "./postgres/init:/docker-entrypoint-initdb.d:ro"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_SUPERUSER:-postgres} -d postgres"]
-      interval: 10s
+      interval: 60s
       timeout: 5s
       retries: 10
-      start_period: 20s
+      start_period: 120s
+
+      start_interval: 5s
 
   # ===========================================================================
   # S3 — Object Storage (dev): SeaweedFS. Equivale a Scaleway Object Storage en prod.
@@ -347,6 +355,10 @@ services:
       - -s3.port=9000
       - -master.telemetry=false
       - -master.volumeSizeLimitMB=1024
+      # Sin interfaz de administración ni WebDAV: no los usa nadie y suponían
+      # ~2/3 de su CPU en reposo (medido: 22-29 % -> ~8 %).
+      - -webdav=false
+      - -admin.ui=false
     volumes:
       - "s3-data:/data"
     labels:
@@ -360,10 +372,12 @@ services:
     # abre unos segundos después que el primero, y es la que usan los servicios.
     healthcheck:
       test: ["CMD-SHELL", "nc -z 127.0.0.1 9000 && curl -fsS http://127.0.0.1:9333/cluster/healthz >/dev/null"]
-      interval: 10s
+      interval: 60s
       timeout: 5s
       retries: 10
-      start_period: 10s
+      start_period: 120s
+
+      start_interval: 5s
 
   # Job efímero: crea los buckets dev (drive/mail/docs blobs, cloud, build-cache).
   #
@@ -417,10 +431,12 @@ services:
       memlock: -1
     healthcheck:
       test: ["CMD", "redis-cli", "-p", "6379", "ping"]
-      interval: 10s
+      interval: 60s
       timeout: 5s
       retries: 10
-      start_period: 10s
+      start_period: 120s
+
+      start_interval: 5s
 
   # ===========================================================================
   # LIVEKIT server (SFU WebRTC, Apache-2.0) — Sytue Meet, SIN modificar (imagen
@@ -455,10 +471,12 @@ services:
       - "traefik.http.services.livekit.loadbalancer.server.port=7880"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:7880/ >/dev/null 2>&1 || exit 1"]
-      interval: 20s
+      interval: 60s
       timeout: 5s
       retries: 5
-      start_period: 20s
+      start_period: 120s
+
+      start_interval: 5s
 
   # ===========================================================================
   # POSTGREST — API REST automática sobre Postgres (Sytue Cloud DB Studio, dev).
@@ -537,10 +555,12 @@ services:
       - "traefik.http.services.id.loadbalancer.server.port=8081"
     healthcheck:
       test: ["CMD", "/app/id", "healthcheck"]
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 10
-      start_period: 20s
+      start_period: 120s
+
+      start_interval: 5s
 
   # --- Sytue Drive :8082 — WebDAV + API REST; PG + S3 ---
   drive:
@@ -598,10 +618,12 @@ services:
       - "traefik.http.routers.drive-dav-wk.service=drive"
     healthcheck:
       test: ["CMD", "/app/drive", "healthcheck"]
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 10
-      start_period: 20s
+      start_period: 120s
+
+      start_interval: 5s
 
   # --- Sytue Docs :8083 — modelo documental + colab CRDT/OT (WS); PG + S3 ---
   # Sytue OCR — reconocimiento de texto para Sytue PDF (ADR-0034). Motor Tesseract 5
@@ -699,10 +721,12 @@ services:
       - "traefik.http.services.docs-api.loadbalancer.server.port=8083"
     healthcheck:
       test: ["CMD", "/app/docs", "healthcheck"]
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 10
-      start_period: 20s
+      start_period: 120s
+
+      start_interval: 5s
 
   # --- Sytue Mail :8086 (HTTP/JMAP) + SMTP/IMAP 25/465/587/993; PG + S3 ---
   mail:
@@ -756,10 +780,12 @@ services:
       - "traefik.http.services.mail-api.loadbalancer.server.port=8086"
     healthcheck:
       test: ["CMD", "/app/mail", "healthcheck"]
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 10
-      start_period: 20s
+      start_period: 120s
+
+      start_interval: 5s
 
   # --- Sytue Calendar :8087 — CalDAV + API REST; PG ---
   calendar:
@@ -800,10 +826,12 @@ services:
       - "traefik.http.routers.calendar-dav-wk.service=calendar"
     healthcheck:
       test: ["CMD", "/app/calendar", "healthcheck"]
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 10
-      start_period: 20s
+      start_period: 120s
+
+      start_interval: 5s
 
   # --- Sytue Contacts :8088 — CardDAV + API REST; PG ---
   contacts:
@@ -840,10 +868,12 @@ services:
       - "traefik.http.routers.contacts-dav-wk.service=contacts"
     healthcheck:
       test: ["CMD", "/app/contacts", "healthcheck"]
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 10
-      start_period: 20s
+      start_period: 120s
+
+      start_interval: 5s
 
   # --- Sytue Notepads :8089 — cuadernos, notas y referencias cruzadas; PG ---
   # Reaprovecha el puerto que dejó libre la señalización de Meet al unificarse
@@ -879,10 +909,12 @@ services:
       - "traefik.http.services.notes-api.loadbalancer.server.port=8089"
     healthcheck:
       test: ["CMD", "/app/notes", "healthcheck"]
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 10
-      start_period: 20s
+      start_period: 120s
+
+      start_interval: 5s
 
   # --- SyERP :8098 — el ERP de la suite ---
   # Los treinta y seis modelos del catálogo salen de un único servicio y una
@@ -933,10 +965,12 @@ services:
       - "traefik.http.services.erp-api.loadbalancer.server.port=8098"
     healthcheck:
       test: ["CMD", "/app/syerp", "healthcheck"]
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 10
-      start_period: 20s
+      start_period: 120s
+
+      start_interval: 5s
 
   # --- Sytue Hub :8092 — búsqueda federada, notificaciones e intents cross-app ---
   # La Sytue Shell lo llama desde TODAS las apps en cada carga (notificaciones y
@@ -977,10 +1011,12 @@ services:
       - "traefik.http.services.photos-api.loadbalancer.server.port=8097"
     healthcheck:
       test: ["CMD", "/app/syphotos", "healthcheck"]
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 10
-      start_period: 20s
+      start_period: 120s
+
+      start_interval: 5s
 
   # --- Sytue Cast :8099 — vídeo bajo demanda y directo (ADR 0061); PG + S3 ---
   # DOS contenedores del MISMO binario: el servicio HTTP y el transcodificador
@@ -1033,10 +1069,12 @@ services:
       - "traefik.http.services.cast-api.loadbalancer.server.port=8099"
     healthcheck:
       test: ["CMD", "/app/cast", "healthcheck"]
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 10
-      start_period: 20s
+      start_period: 120s
+
+      start_interval: 5s
 
   # --- Sytue Web :8100 — webs y tiendas de la organización (ADR 0062); PG + S3 ---
   # Solo la API. El servidor de las webs publicadas (`pages sitios`, :8101) sirve
@@ -1083,10 +1121,12 @@ services:
       - "traefik.http.services.pages-api.loadbalancer.server.port=8100"
     healthcheck:
       test: ["CMD", "/app/pages", "healthcheck"]
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 10
-      start_period: 20s
+      start_period: 120s
+
+      start_interval: 5s
 
   # --- Sytue Bases :8102 — tablas relacionales (ADR 0068); solo PG ---
   bases:
@@ -1114,10 +1154,12 @@ services:
     # el conector de Calcus, por la red interna desde Sytue Docs.
     healthcheck:
       test: ["CMD", "/app/bases", "healthcheck"]
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 10
-      start_period: 20s
+      start_period: 120s
+
+      start_interval: 5s
 
   cast-transcoder:
     build:
@@ -1225,10 +1267,12 @@ services:
       - "traefik.http.services.hub.loadbalancer.server.port=8092"
     healthcheck:
       test: ["CMD", "/app/hub", "healthcheck"]
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 10
-      start_period: 20s
+      start_period: 120s
+
+      start_interval: 5s
 
   # --- Sytue Analytics :8094 colector · :8095 API — analitica web anonima ---
   # Dos binarios y no uno a proposito (ADR 0026): el colector es el endpoint
@@ -1256,10 +1300,12 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "/app/analytics-ingest", "healthcheck"]
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 10
-      start_period: 20s
+      start_period: 120s
+
+      start_interval: 5s
 
   analytics-api:
     build:
@@ -1286,10 +1332,12 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "/app/analytics-api", "healthcheck"]
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 10
-      start_period: 20s
+      start_period: 120s
+
+      start_interval: 5s
 
   # --- Sytue Rooms :8085 — mensajería (WS + REST) y videollamada; PG ---
   rooms:
@@ -1346,10 +1394,12 @@ services:
       - "traefik.http.services.rooms-api.loadbalancer.server.port=8085"
     healthcheck:
       test: ["CMD", "/app/rooms", "healthcheck"]
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 10
-      start_period: 20s
+      start_period: 120s
+
+      start_interval: 5s
 
   # --- Sytue AI :8084 — asistente del editor (LLM); STATELESS, sin BD ---
   # Autentica el JWT de Sytue ID (JWKS) y delega en un proveedor LLM configurable
@@ -1384,10 +1434,12 @@ services:
       - "traefik.http.services.ai.loadbalancer.server.port=8084"
     healthcheck:
       test: ["CMD", "/app/ai", "healthcheck"]
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 10
-      start_period: 20s
+      start_period: 120s
+
+      start_interval: 5s
 
   # --- Sytue Cloud API :8090 — control plane del PaaS + PostgREST; PG + S3 ---
   cloud-api:
@@ -1430,10 +1482,12 @@ services:
       - "traefik.http.services.cloud-api.loadbalancer.server.port=8090"
     healthcheck:
       test: ["CMD", "/app/cloud-api", "healthcheck"]
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 10
-      start_period: 20s
+      start_period: 120s
+
+      start_interval: 5s
 
   # --- Sytue Cloud builder :8091 — builds (Kaniko-style); S3 build-cache ---
   cloud-builder:
@@ -1462,10 +1516,12 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "/app/cloud-builder", "healthcheck"]
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 10
-      start_period: 20s
+      start_period: 120s
+
+      start_interval: 5s
 
   # --- Sytue Cloud controller :8094 — reconciliador del PaaS; PG + S3 ---
   # DEV: RUNNER_MODE=stub (no hay clúster local) => Platform/Provisioner stub, SIN
@@ -1498,10 +1554,12 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "/app/cloud-controller", "healthcheck"]
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 10
-      start_period: 20s
+      start_period: 120s
+
+      start_interval: 5s
 
   # ===========================================================================
   # APPS FRONTEND (Astro 5 + Preact 10) — build/serve local en modo dev.

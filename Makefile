@@ -81,7 +81,7 @@ dev-up-built: ## Suite COMPLETA en modo COMPILADO (SSR runtime, ~1.2 GB vs ~4.8 
 
 .PHONY: dev-app
 dev-app: ## Solo núcleo + apps concretas (DEV, cabe en 8 GB): make dev-app P=docs,mail
-	@# DEV-ONLY: núcleo (traefik/postgres/minio/dragonfly/id/hub) + los perfiles de P.
+	@# DEV-ONLY: núcleo (traefik/postgres/s3/dragonfly/id/hub) + los perfiles de P.
 	@# COMPOSE_PROFILES en la línea de comandos GANA al `full` del .env (mismo compose).
 	@test -n "$(P)" || (echo "ERROR: indica el/los perfiles, p.ej. make dev-app P=docs,mail" && exit 1)
 	@test -f $(COMPOSE_DIR)/.env || $(ROOT_DIR)/sytue-deploy --mode compose --yes --only-config

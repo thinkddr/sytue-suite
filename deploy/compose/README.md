@@ -4,7 +4,7 @@ Levanta **toda la suite Sytue One** en tu máquina con un solo comando, bajo
 `*.sytue.localhost` con TLS local (mkcert) vía Traefik.
 
 **Stack único:** Go (backend) + Astro 7 / Preact 10.29 con Bun (frontend) + **PostgreSQL**
-(estado, colas y caché) + **S3** (blobs; MinIO en dev). Cada producto es un
+(estado, colas y caché) + **S3** (blobs; SeaweedFS en dev). Cada producto es un
 **servicio Go propio** (clean-room, Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr)) en `services/<svc>`.
 
 **Sin motores AGPL** (Keycloak/Nextcloud/OnlyOffice/Mattermost/Stalwart quedan
@@ -76,7 +76,7 @@ contenedor tiene `mem_limit` y el runtime Go está afinado. `dev-up`/`dev-down`
 leen `COMPOSE_PROFILES` del `.env` (por defecto `full`).
 
 **2) Perfiles on-demand** — levanta solo lo que necesitas. El **núcleo**
-(traefik, postgres, minio, dragonfly, id, hub) va SIEMPRE; cada app cuelga de su
+(traefik, postgres, s3, dragonfly, id, hub) va SIEMPRE; cada app cuelga de su
 perfil:
 
 | Perfil | Servicios que añade al núcleo |
@@ -136,7 +136,7 @@ Todos los frontends son Astro+Preact; todos los backends son **servicios Go**.
 | Sytue Hub | — | https://hub.sytue.localhost | 8092 |
 | Sitio público (www) | https://sytue.localhost · https://www.sytue.localhost | — | — |
 | Traefik dashboard | https://traefik.sytue.localhost | :8080 | — |
-| MinIO API / consola | https://minio.sytue.localhost · https://minio-admin.sytue.localhost | :9000 / :9001 | — |
+| S3 (SeaweedFS) | https://s3.sytue.localhost | :9000 | — |
 
 **LiveKit (SFU de medios de Sytue Meet, Apache-2.0):** señalización WS en
 https://rooms-sfu.sytue.localhost. **Hosts legados**: `chat.sytue.localhost` y
@@ -187,7 +187,7 @@ con sesión única en cookie httpOnly de dominio `.sytue.localhost`.
 - **PostgreSQL** es el único datastore: estado, colas y caché (LISTEN/NOTIFY,
   `pgmq`/`riverqueue`). Una **BD + rol por servicio** (aislamiento); multi-tenant
   por esquema/RLS dentro de cada BD. **Sin Redis/Valkey.**
-- **S3 (MinIO en dev)** solo para blobs grandes: ficheros de Drive, adjuntos de
+- **S3 (SeaweedFS en dev)** solo para blobs grandes: ficheros de Drive, adjuntos de
   Mail, documentos de Docs, build-cache del PaaS, backups.
 
 ## Notas

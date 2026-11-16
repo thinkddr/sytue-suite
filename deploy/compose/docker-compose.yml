@@ -141,7 +141,7 @@ networks:
 
 volumes:
   postgres-data:
-  minio-data:
+  s3-data:
 
 services:
   # ===========================================================================
@@ -294,53 +294,59 @@ services:
       start_period: 20s
 
   # ===========================================================================
-  # MINIO — Object Storage S3 (dev). Equivale a Scaleway Object Storage en prod.
+  # S3 — Object Storage (dev): SeaweedFS. Equivale a Scaleway Object Storage en prod.
   # ===========================================================================
-  minio:
-    # Digest fijado, como el resto del repo: sin él la etiqueta puede moverse por
-    # detrás. Y OJO con esta pieza —es la única del compose que nadie vigila—:
-    # MinIO no publica imagen nueva desde 2025-09-07 y es AGPL-3.0. Está en la
-    # lista de vigencia desde el 2026-08-18 para que su estado se revise; el
-    # relevo natural es SeaweedFS (Apache-2.0), que ya se usa en el despliegue
-    # privado, pero cambiarlo toca el entorno de todas las sesiones y es una
-    # decisión aparte.
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+  # SeaweedFS (Apache-2.0) en modo `mini`: un único proceso con maestro, volumen,
+  # filer y pasarela S3, la misma imagen y el mismo modo que el despliegue privado
+  # (deploy/private-production, SEAWEEDFS_IMAGE). Sustituye a MinIO el 2026-11-16:
+  # minio/minio dejó de existir en Docker Hub («repository does not exist»), así
+  # que `docker compose up` fallaba en cualquier equipo nuevo; además MinIO es
+  # AGPL-3.0 y llevaba sin imagen nueva desde 2025-09-07.
+  #
+  # El nombre de red `minio` se conserva como alias: los servicios siguen
+  # hablando con http://minio:9000 y con las mismas credenciales del .env
+  # (MINIO_ROOT_USER/PASSWORD), sin tocar su configuración. Volumen nuevo
+  # (s3-data): los datos de un MinIO anterior no se migran (entorno de dev).
+  s3:
+    image: chrislusf/seaweedfs:4.40@sha256:52194fba4fecd0083c842158b3a902ba6e04a63619b2b0efcd08007bdb6a4602
     <<: [*restart, *logging]
     mem_limit: 384m             # DEV-ONLY (prod: Helm)
-    networks: [edge, backend]
+    networks:
+      edge: {}
+      backend:
+        aliases: [minio]
     ports:
       - "127.0.0.1:9000:9000"  # API S3
-      - "127.0.0.1:9001:9001"  # Consola web
     environment:
-      GOMEMLIMIT: 256MiB        # DEV-ONLY: MinIO es Go
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-      MINIO_BROWSER_REDIRECT_URL: https://minio-console.sytue.localhost
-      MINIO_SERVER_URL: https://minio.sytue.localhost
-      MINIO_REGION: fr-par
-    command: ["server", "/data", "--console-address", ":9001"]
+      GOMEMLIMIT: 256MiB        # DEV-ONLY: SeaweedFS es Go
+      # En modo `mini`, estas dos variables dan de alta la identidad S3 con permisos
+      # de administración (las mismas claves que firman los servicios).
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+    command:
+      - mini
+      - -dir=/data
+      - -s3=true
+      - -s3.port=9000
+      - -master.telemetry=false
+      - -master.volumeSizeLimitMB=1024
     volumes:
-      - "minio-data:/data"
+      - "s3-data:/data"
     labels:
       - "traefik.enable=true"
-      # API S3
-      - "traefik.http.routers.minio-api.rule=Host(`minio.sytue.localhost`)"
-      - "traefik.http.routers.minio-api.entrypoints=websecure"
-      - "traefik.http.routers.minio-api.tls=true"
-      - "traefik.http.routers.minio-api.service=minio-api"
-      - "traefik.http.services.minio-api.loadbalancer.server.port=9000"
-      # Consola
-      - "traefik.http.routers.minio-console.rule=Host(`minio-console.sytue.localhost`)"
-      - "traefik.http.routers.minio-console.entrypoints=websecure"
-      - "traefik.http.routers.minio-console.tls=true"
-      - "traefik.http.routers.minio-console.service=minio-console"
-      - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
+      - "traefik.http.routers.s3-api.rule=Host(`s3.sytue.localhost`) || Host(`minio.sytue.localhost`)"
+      - "traefik.http.routers.s3-api.entrypoints=websecure"
+      - "traefik.http.routers.s3-api.tls=true"
+      - "traefik.http.routers.s3-api.service=s3-api"
+      - "traefik.http.services.s3-api.loadbalancer.server.port=9000"
+    # El maestro (/cluster/healthz en 9333) Y la pasarela S3 (9000): la segunda
+    # abre unos segundos después que el primero, y es la que usan los servicios.
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 15s
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 9000 && curl -fsS http://127.0.0.1:9333/cluster/healthz >/dev/null"]
+      interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 20s
+      retries: 10
+      start_period: 10s
 
   # Job efímero: crea los buckets dev (drive/mail/docs blobs, cloud, build-cache).
   #
@@ -352,7 +358,7 @@ services:
     image: alpine/curl:8.23.0@sha256:c8df739636f42117e358bdffb4c243c460b31cbba8cc69241a22ab519546f34d
     networks: [backend]
     depends_on:
-      minio:
+      s3:
         condition: service_healthy
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
@@ -1392,7 +1398,7 @@ services:
         condition: service_healthy
       id:
         condition: service_healthy
-      minio:
+      s3:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
@@ -1430,7 +1436,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      minio:
+      s3:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "/app/cloud-builder", "healthcheck"]
@@ -1465,7 +1471,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      minio:
+      s3:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "/app/cloud-controller", "healthcheck"]

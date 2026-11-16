@@ -675,7 +675,7 @@ ANALYTICS_DB_USER=sytue_analytics
 ANALYTICS_DB_PASSWORD=$(rand_hex 24)
 SYTUE_ANALYTICS_KEY_ENCRYPTION_KEY=$(rand_b64 32)
 
-# --- Almacenamiento S3 (MinIO) ---------------------------------------------
+# --- Almacenamiento S3 (SeaweedFS; variables con nombre histórico MINIO_*) ---
 MINIO_ROOT_USER=sytue_minio
 MINIO_ROOT_PASSWORD=$(rand_hex 24)
 
@@ -820,7 +820,7 @@ instalar_compose() {
     elif [ "$NON_INTERACTIVE" -eq 1 ]; then
       PROFILE="full"
     else
-      echo "  ¿Qué quieres levantar? (siempre se incluyen Sytue ID, Hub, PostgreSQL, MinIO y Traefik)"
+      echo "  ¿Qué quieres levantar? (siempre se incluyen Sytue ID, Hub, PostgreSQL, S3 y Traefik)"
       echo "    1) Suite completa      — todas las aplicaciones (≈8 GB de RAM para Docker)"
       echo "    2) Ofimática           — Drive, Docus/Calcus/Diapos/CertiPDF, Mail, Calendar, Contacts"
       echo "    3) Mínimo              — solo identidad, portal y consola de administración"

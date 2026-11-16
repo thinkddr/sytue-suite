@@ -1502,7 +1502,7 @@ services:
     profiles: ["full", "portal"]
     networks: [edge, backend]
     command: ["bun", "run", "--filter", "@sytue/portal", "dev", "--host", "0.0.0.0", "--port", "4321"]
-    ports: ["4321:4321"]
+    ports: ["127.0.0.1:4321:4321"]
     environment:
       <<: *frontend-env
       SYTUE_OIDC_CLIENT_ID: sytue-one
@@ -1514,51 +1514,67 @@ services:
       # host (macOS): volúmenes anónimos que enmascaran el bind mount para la raíz
       # del workspace y para cada app (Bun coloca .bin/astro por app, sin hoisting).
       - "/app/node_modules"
-      - "/app/packages/ui/node_modules"
-      - "/app/packages/shell/node_modules"
-      - "/app/packages/auth/node_modules"
+      - "/app/packages/ai/node_modules"
       - "/app/packages/api-clients/node_modules"
+      - "/app/packages/auth/node_modules"
+      - "/app/packages/cloud/node_modules"
       - "/app/packages/config/node_modules"
+      - "/app/packages/escena/node_modules"
+      - "/app/packages/formula/node_modules"
+      - "/app/packages/i18n/node_modules"
+      - "/app/packages/office/node_modules"
+      - "/app/packages/offline/node_modules"
+      - "/app/packages/pages-render/node_modules"
+      - "/app/packages/scripts/node_modules"
+      - "/app/packages/shell/node_modules"
+      - "/app/packages/ui/node_modules"
+      - "/app/apps/account/node_modules"
+      - "/app/apps/bases/node_modules"
+      - "/app/apps/calcus/node_modules"
+      - "/app/apps/calendar/node_modules"
+      - "/app/apps/cast/node_modules"
+      - "/app/apps/certipdf/node_modules"
+      - "/app/apps/cloud-dashboard/node_modules"
+      - "/app/apps/console/node_modules"
+      - "/app/apps/contacts/node_modules"
+      - "/app/apps/diapos/node_modules"
+      - "/app/apps/docus/node_modules"
+      - "/app/apps/drive/node_modules"
+      - "/app/apps/erp/node_modules"
+      - "/app/apps/mail/node_modules"
+      - "/app/apps/notes/node_modules"
+      - "/app/apps/pages/node_modules"
+      - "/app/apps/photos/node_modules"
+      - "/app/apps/portal/node_modules"
+      - "/app/apps/rooms/node_modules"
+      - "/app/apps/www/node_modules"
       # Estos cuatro se añadieron al workspace DESPUÉS de escribirse esta lista y
       # nadie los enmascaró: el bind mount les colaba los node_modules de macOS
       # dentro de un contenedor Linux. `i18n` lo importa toda la suite.
-      - "/app/packages/i18n/node_modules"
-      - "/app/packages/offline/node_modules"
-      - "/app/packages/formula/node_modules"
-      - "/app/packages/cloud/node_modules"
-      - "/app/packages/office/node_modules"
-      - "/app/apps/portal/node_modules"
-      - "/app/apps/console/node_modules"
-      - "/app/apps/cloud-dashboard/node_modules"
-      - "/app/apps/www/node_modules"
-      - "/app/apps/mail/node_modules"
-      - "/app/apps/drive/node_modules"
-      - "/app/apps/calendar/node_modules"
-      - "/app/apps/contacts/node_modules"
-      - "/app/apps/docus/node_modules"
-      - "/app/apps/calcus/node_modules"
-      - "/app/apps/diapos/node_modules"
-      - "/app/apps/certipdf/node_modules"
-      - "/app/apps/notes/node_modules"
-      - "/app/apps/rooms/node_modules"
       # .astro guarda un lock del dev-server (PID) por app: si se bind-montea el
       # del host (con locks obsoletos de un `astro dev` local previo) Astro aborta
       # con "Another astro dev server is already running". Volúmenes anónimos por
       # app => cada contenedor arranca con un .astro limpio.
-      - "/app/apps/portal/.astro"
-      - "/app/apps/console/.astro"
-      - "/app/apps/cloud-dashboard/.astro"
-      - "/app/apps/www/.astro"
-      - "/app/apps/mail/.astro"
-      - "/app/apps/drive/.astro"
-      - "/app/apps/calendar/.astro"
-      - "/app/apps/contacts/.astro"
-      - "/app/apps/docus/.astro"
+      - "/app/apps/account/.astro"
+      - "/app/apps/bases/.astro"
       - "/app/apps/calcus/.astro"
-      - "/app/apps/diapos/.astro"
+      - "/app/apps/calendar/.astro"
+      - "/app/apps/cast/.astro"
       - "/app/apps/certipdf/.astro"
+      - "/app/apps/cloud-dashboard/.astro"
+      - "/app/apps/console/.astro"
+      - "/app/apps/contacts/.astro"
+      - "/app/apps/diapos/.astro"
+      - "/app/apps/docus/.astro"
+      - "/app/apps/drive/.astro"
+      - "/app/apps/erp/.astro"
+      - "/app/apps/mail/.astro"
       - "/app/apps/notes/.astro"
+      - "/app/apps/pages/.astro"
+      - "/app/apps/photos/.astro"
+      - "/app/apps/portal/.astro"
       - "/app/apps/rooms/.astro"
+      - "/app/apps/www/.astro"
     depends_on:
       id:
         condition: service_healthy
@@ -1575,7 +1591,7 @@ services:
     profiles: ["full", "console"]
     networks: [edge, backend]
     command: ["bun", "run", "--filter", "@sytue/app-console", "dev", "--host", "0.0.0.0", "--port", "4322"]
-    ports: ["4322:4322"]
+    ports: ["127.0.0.1:4322:4322"]
     environment:
       <<: *frontend-env
       # El client_id sigue siendo `sytue-console`: es un identificador estable, no
@@ -1617,7 +1633,7 @@ services:
     profiles: ["full", "cloud"]
     networks: [edge, backend]
     command: ["bun", "run", "--filter", "@sytue/app-cloud-dashboard", "dev", "--host", "0.0.0.0", "--port", "4323"]
-    ports: ["4323:4323"]
+    ports: ["127.0.0.1:4323:4323"]
     environment:
       <<: *frontend-env
       SYTUE_OIDC_CLIENT_ID: sytue-cloud
@@ -1644,7 +1660,7 @@ services:
     profiles: ["full", "www"]
     networks: [edge, backend]
     command: ["bun", "run", "--filter", "@sytue/app-www", "dev", "--host", "0.0.0.0", "--port", "4324"]
-    ports: ["4324:4324"]
+    ports: ["127.0.0.1:4324:4324"]
     environment: *frontend-env
     volumes: *frontend-volumes
     labels:
@@ -1660,7 +1676,7 @@ services:
     profiles: ["full", "mail"]
     networks: [edge, backend]
     command: ["bun", "run", "--filter", "@sytue/mail", "dev", "--host", "0.0.0.0", "--port", "4325"]
-    ports: ["4325:4325"]
+    ports: ["127.0.0.1:4325:4325"]
     environment:
       <<: *frontend-env
       SYTUE_OIDC_CLIENT_ID: sytue-mail
@@ -1683,7 +1699,7 @@ services:
     profiles: ["full", "drive"]
     networks: [edge, backend]
     command: ["bun", "run", "--filter", "@sytue/drive", "dev", "--host", "0.0.0.0", "--port", "4326"]
-    ports: ["4326:4326"]
+    ports: ["127.0.0.1:4326:4326"]
     environment:
       <<: *frontend-env
       SYTUE_OIDC_CLIENT_ID: sytue-drive
@@ -1706,7 +1722,7 @@ services:
     profiles: ["full", "calendar"]
     networks: [edge, backend]
     command: ["bun", "run", "--filter", "@sytue/calendar", "dev", "--host", "0.0.0.0", "--port", "4327"]
-    ports: ["4327:4327"]
+    ports: ["127.0.0.1:4327:4327"]
     environment:
       <<: *frontend-env
       SYTUE_OIDC_CLIENT_ID: sytue-calendar
@@ -1733,7 +1749,7 @@ services:
     profiles: ["full", "contacts"]
     networks: [edge, backend]
     command: ["bun", "run", "--filter", "@sytue/contacts", "dev", "--host", "0.0.0.0", "--port", "4328"]
-    ports: ["4328:4328"]
+    ports: ["127.0.0.1:4328:4328"]
     environment:
       <<: *frontend-env
       SYTUE_OIDC_CLIENT_ID: sytue-contacts
@@ -1756,7 +1772,7 @@ services:
     profiles: ["full", "notes"]
     networks: [edge, backend]
     command: ["bun", "run", "--filter", "@sytue/notes", "dev", "--host", "0.0.0.0", "--port", "4331"]
-    ports: ["4331:4331"]
+    ports: ["127.0.0.1:4331:4331"]
     environment:
       <<: *frontend-env
       SYTUE_OIDC_CLIENT_ID: sytue-notes
@@ -1792,7 +1808,7 @@ services:
     profiles: ["full", "erp"]
     networks: [edge, backend]
     command: ["bun", "run", "--filter", "@sytue/erp", "dev", "--host", "0.0.0.0", "--port", "4334"]
-    ports: ["4334:4334"]
+    ports: ["127.0.0.1:4334:4334"]
     environment:
       <<: *frontend-env
       SYTUE_OIDC_CLIENT_ID: sytue-syerp
@@ -1817,7 +1833,7 @@ services:
     profiles: ["full", "cast"]
     networks: [edge, backend]
     command: ["bun", "run", "--filter", "@sytue/cast", "dev", "--host", "0.0.0.0", "--port", "4335"]
-    ports: ["4335:4335"]
+    ports: ["127.0.0.1:4335:4335"]
     environment:
       <<: *frontend-env
       SYTUE_OIDC_CLIENT_ID: sytue-cast
@@ -1845,7 +1861,7 @@ services:
     profiles: ["full", "pages"]
     networks: [edge, backend]
     command: ["bun", "run", "--filter", "@sytue/pages", "dev", "--host", "0.0.0.0", "--port", "4336"]
-    ports: ["4336:4336"]
+    ports: ["127.0.0.1:4336:4336"]
     environment:
       <<: *frontend-env
       SYTUE_OIDC_CLIENT_ID: sytue-pages
@@ -1870,7 +1886,7 @@ services:
     profiles: ["full", "bases"]
     networks: [edge, backend]
     command: ["bun", "run", "--filter", "@sytue/bases", "dev", "--host", "0.0.0.0", "--port", "4337"]
-    ports: ["4337:4337"]
+    ports: ["127.0.0.1:4337:4337"]
     environment:
       <<: *frontend-env
       SYTUE_OIDC_CLIENT_ID: sytue-bases
@@ -1896,7 +1912,7 @@ services:
     profiles: ["full", "docs", "docus"]
     networks: [edge, backend]
     command: ["bun", "run", "--filter", "@sytue/docus", "dev", "--host", "0.0.0.0", "--port", "4338"]
-    ports: ["4338:4338"]
+    ports: ["127.0.0.1:4338:4338"]
     environment:
       <<: *frontend-env
       SYTUE_OIDC_CLIENT_ID: sytue-docus
@@ -1922,7 +1938,7 @@ services:
     profiles: ["full", "docs", "calcus"]
     networks: [edge, backend]
     command: ["bun", "run", "--filter", "@sytue/calcus", "dev", "--host", "0.0.0.0", "--port", "4339"]
-    ports: ["4339:4339"]
+    ports: ["127.0.0.1:4339:4339"]
     environment:
       <<: *frontend-env
       SYTUE_OIDC_CLIENT_ID: sytue-calcus
@@ -1948,7 +1964,7 @@ services:
     profiles: ["full", "docs", "diapos"]
     networks: [edge, backend]
     command: ["bun", "run", "--filter", "@sytue/diapos", "dev", "--host", "0.0.0.0", "--port", "4340"]
-    ports: ["4340:4340"]
+    ports: ["127.0.0.1:4340:4340"]
     environment:
       <<: *frontend-env
       SYTUE_OIDC_CLIENT_ID: sytue-diapos
@@ -1974,7 +1990,7 @@ services:
     profiles: ["full", "docs", "certipdf"]
     networks: [edge, backend]
     command: ["bun", "run", "--filter", "@sytue/certipdf", "dev", "--host", "0.0.0.0", "--port", "4341"]
-    ports: ["4341:4341"]
+    ports: ["127.0.0.1:4341:4341"]
     environment:
       <<: *frontend-env
       SYTUE_OIDC_CLIENT_ID: sytue-certipdf
@@ -1998,7 +2014,7 @@ services:
     profiles: ["full", "rooms"]
     networks: [edge, backend]
     command: ["bun", "run", "--filter", "@sytue/rooms", "dev", "--host", "0.0.0.0", "--port", "4330"]
-    ports: ["4330:4330"]
+    ports: ["127.0.0.1:4330:4330"]
     environment:
       <<: *frontend-env
       # `sytue-chat`, no `sytue-rooms`: la migración 0023 renombró el client a

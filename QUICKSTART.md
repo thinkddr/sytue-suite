@@ -13,7 +13,7 @@ administrador y verifica que todo responde.
 
 | Necesitas | Cómo comprobarlo | Si no lo tienes |
 | --- | --- | --- |
-| **Docker** con **8 GB de memoria** para la suite completa (la versión «Ofimática» necesita menos) | `docker info` | [Docker Desktop](https://docs.docker.com/get-docker/) (macOS/Windows) o Docker Engine (Linux). En Docker Desktop: *Settings → Resources → Memory*. |
+| **Docker** con **12 GB de memoria** para la suite completa (~8 GB la versión «Ofimática», ~2 GB la «Mínima»): en local cada app web corre en modo desarrollo | `docker info` | [Docker Desktop](https://docs.docker.com/get-docker/) (macOS/Windows) o Docker Engine (Linux). En Docker Desktop: *Settings → Resources → Memory*. |
 | **mkcert** (HTTPS local de confianza) | `mkcert -version` | macOS: `brew install mkcert nss` · Debian/Ubuntu: `sudo apt install mkcert libnss3-tools` · Windows: `choco install mkcert` |
 | **git**, **bash** y **openssl** | `git --version` | Vienen con macOS y Linux. En Windows, usa WSL 2. |
 
@@ -59,8 +59,9 @@ Al terminar, el asistente muestra tus credenciales. Abre **https://one.sytue.loc
 | Contraseña | la que elegiste o la que generó el asistente (está en `deploy/compose/.env`, variable `SYTUE_ID_DEV_SEED_PASSWORD`) |
 | Código de verificación | la cuenta de administración pide un segundo factor: añade a tu app de autenticación (Google Authenticator, 1Password, Aegis…) la clave **`JBSWY3DPEHPK3PXP`** |
 
-`member@sytue.localhost`, con la misma contraseña y sin segundo factor, es una cuenta de
-usuario normal (sin acceso a Sytue Admin).
+En la pantalla de acceso, marca la casilla de **verificación humana** antes de pulsar
+*Continuar* (se resuelve sola en un segundo). `member@sytue.localhost`, con la misma
+contraseña y sin segundo factor, es una cuenta de usuario normal (sin acceso a Sytue Admin).
 
 Cada aplicación vive en su subdominio:
 
@@ -70,13 +71,20 @@ Cada aplicación vive en su subdominio:
 | Sytue Admin | https://admin.sytue.localhost |
 | Mail · Drive · Calendar · Contacts | https://mail.sytue.localhost · https://drive.sytue.localhost · https://calendar.sytue.localhost · https://contacts.sytue.localhost |
 | SyDocus · SyCalcus · SyDiapos · SyCertiPDF | https://docus.sytue.localhost · https://calcus.sytue.localhost · https://diapos.sytue.localhost · https://certipdf.sytue.localhost |
-| Rooms · Notepads · Photos | https://rooms.sytue.localhost · https://notes.sytue.localhost · https://photos.sytue.localhost |
-| SyERP · Cast · Web · Bases | https://erp.sytue.localhost · https://cast.sytue.localhost · https://pages.sytue.localhost · https://bases.sytue.localhost |
+| Rooms · Notepads | https://rooms.sytue.localhost · https://notes.sytue.localhost |
+| SyERP · Cast · Web · Bases | https://erp.sytue.localhost · https://cast.sytue.localhost · https://web.sytue.localhost · https://bases.sytue.localhost |
 | Sytue Cloud | https://cloud.sytue.localhost |
 | Sitio público | https://www.sytue.localhost |
 
 `*.sytue.localhost` apunta a tu propio equipo sin configurar nada: los navegadores
 resuelven `.localhost` a `127.0.0.1`.
+
+> **Limitación conocida del modo local.** Varias apps guardan tus datos cifrados en el
+> dispositivo con claves custodiadas por el servidor de mensajería cifrada (Matrix), que
+> producción despliega y el entorno local **todavía no incluye**. Hasta entonces, en local
+> funcionan Sytue Admin, Sytue Web, Sytue Cloud y Sytue Cast; Mail, Drive, Docus, Calcus,
+> Diapos, CertiPDF, Calendar, Contacts, Notepads, Rooms, SyERP, Bases y la portada del
+> portal se quedan en «Cargando…». Lo mismo ocurre en el entorno local de sytue-one.
 
 ---
 

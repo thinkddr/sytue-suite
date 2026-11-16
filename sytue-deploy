@@ -557,8 +557,10 @@ requisitos_compose() {
     local mem
     mem="$(docker info --format '{{.MemTotal}}' 2>/dev/null || echo 0)"
     mem=$(( ${mem:-0} / 1024 / 1024 / 1024 ))
-    if [ "$mem" -gt 0 ] && [ "$mem" -lt 7 ] && [ "$(perfiles_compose "$PROFILE")" = "full" ]; then
-      warn "Docker tiene ${mem} GB de memoria. La suite completa necesita unos 8 GB: sube la memoria de Docker o usa ${BOLD}--profile office${RESET}."
+    # Medido con todo arrancado: ~12 GB la suite completa (cada app web en modo
+    # desarrollo ronda 0,7 GB), ~8 GB «Ofimática» y ~2 GB «Mínimo».
+    if [ "$mem" -gt 0 ] && [ "$mem" -lt 12 ]; then
+      warn "Docker tiene ${mem} GB de memoria: la suite completa usa unos 12 GB. Sube la memoria de Docker o elige «Ofimática» (~8 GB) o «Mínimo» (~2 GB) en el paso siguiente."
     else
       ok "Memoria disponible para Docker: ${mem} GB"
     fi
@@ -765,6 +767,14 @@ generar_certificados() {
 
 # Espera a que todos los contenedores del perfil estén «healthy» (o «running» si
 # no declaran healthcheck). Devuelve 1 si alguno sale o no lo consigue a tiempo.
+# Servicio y número de reinicios de cada contenedor de la suite.
+reinicios() {
+  local c
+  for c in $(dc ps -aq 2>/dev/null); do
+    docker inspect -f '{{index .Config.Labels "com.docker.compose.service"}} {{.RestartCount}}' "$c" 2>/dev/null
+  done | sort
+}
+
 esperar_salud() {
   local limite="${1:-900}" inicio ahora estado pendientes caidos
   inicio="$(date +%s)"
@@ -774,7 +784,18 @@ esperar_salud() {
     pendientes="$(printf '%s\n' "$estado" | awk 'NF && $1!="minio-init" && !($2=="running" && ($3=="" || $3=="healthy")) {print $1}' | sort -u | tr '\n' ' ')"
     caidos="$(printf '%s\n' "$estado" | awk 'NF && $1!="minio-init" && ($2=="exited" || $2=="dead" || $3=="unhealthy") {print $1}' | sort -u | tr '\n' ' ')"
     if [ -z "${pendientes// /}" ]; then
-      return 0
+      # Las apps web no declaran healthcheck: una que se reinicia en bucle aparece
+      # «running» unos segundos entre caída y caída. Se da por buena la foto solo si
+      # nadie se reinicia durante los 30 s siguientes.
+      local antes despues
+      antes="$(reinicios)"
+      sleep 30
+      despues="$(reinicios)"
+      if [ "$antes" = "$despues" ]; then
+        return 0
+      fi
+      caidos="$(diff <(printf '%s\n' "$antes") <(printf '%s\n' "$despues") | sed -n 's/^> \([^ ]*\) .*/\1/p' | tr '\n' ' ')"
+      pendientes="$caidos"
     fi
     ahora="$(date +%s)"
     if [ $((ahora - inicio)) -ge "$limite" ]; then
@@ -809,8 +830,9 @@ resumen_compose() {
   printf "    • Código 2FA  : la cuenta admin pide un código TOTP. Añade en tu app de\n"
   printf "                    autenticación la clave ${BOLD}%s${RESET} (o: oathtool --totp -b %s)\n" "$LOCAL_TOTP_SEED" "$LOCAL_TOTP_SEED"
   printf "    • Sin 2FA     : %s (rol miembro, misma contraseña)\n\n" "$LOCAL_MEMBER_EMAIL"
+  printf "    (en el login, marca la casilla de verificación humana antes de continuar)\n\n"
   printf "  Aplicaciones: mail · drive · docus · calcus · diapos · certipdf · calendar · contacts\n"
-  printf "                notes · photos · rooms · erp · cast · pages · bases · cloud · admin\n"
+  printf "                notes · rooms · erp · cast · web · bases · cloud · admin\n"
   printf "                → https://<app>.%s\n\n" "$LOCAL_DOMAIN"
   printf "  Día a día: ${BOLD}make dev-down${RESET} (parar) · ${BOLD}make dev-up${RESET} (arrancar) · ${BOLD}make dev-ps${RESET} (estado)\n"
   printf "             ${BOLD}make dev-logs SVC=id${RESET} (logs) · ${BOLD}./sytue-deploy --reset${RESET} (empezar de cero)\n"
@@ -837,9 +859,9 @@ instalar_compose() {
       PROFILE="full"
     else
       echo "  ¿Qué quieres levantar? (siempre se incluyen Sytue ID, Hub, PostgreSQL, S3 y Traefik)"
-      echo "    1) Suite completa      — todas las aplicaciones (≈8 GB de RAM para Docker)"
-      echo "    2) Ofimática           — Drive, Docus/Calcus/Diapos/CertiPDF, Mail, Calendar, Contacts"
-      echo "    3) Mínimo              — solo identidad, portal y consola de administración"
+      echo "    1) Suite completa      — todas las aplicaciones (~12 GB de RAM para Docker)"
+      echo "    2) Ofimática           — Drive, Docus/Calcus/Diapos/CertiPDF, Mail, Calendar, Contacts (~8 GB)"
+      echo "    3) Mínimo              — solo identidad, portal y consola de administración (~2 GB)"
       echo "    4) A medida            — perfiles separados por comas (p. ej. mail,drive,docs,rooms)"
       local opcion=""
       prompt_default "Opción" "1" opcion

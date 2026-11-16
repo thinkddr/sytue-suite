@@ -50,7 +50,7 @@ que basta aceptar con Enter:
 
 1. **Dónde instalar**: este equipo con Docker (`compose`) o un clúster (`helm`).
 2. **Requisitos**: Docker en marcha, Compose v2, memoria asignada a Docker (aviso por debajo
-   de 8 GB con la suite completa), `mkcert` y puertos 80/443 libres. Si falta algo explica
+   de 12 GB con la suite completa, que es lo que ocupa con todo arrancado), `mkcert` y puertos 80/443 libres. Si falta algo explica
    cómo instalarlo y se detiene sin escribir nada.
 3. **Servicios** (`COMPOSE_PROFILES`): `full` (todo), `office` (Drive, Docus/Calcus/Diapos/
    CertiPDF, Mail, Calendar, Contacts, portal y consola), `core` (identidad, portal y

@@ -213,6 +213,15 @@ test('actual Notes screen encrypts migration and edits, then clears plaintext wh
   const clear = await desempaquetar(key, String(body.content_cipher));
   expect(clear?.data?.attachments).toHaveLength(1);
   expect(clear?.title).toBe('historic private');
+  // A decrypted title must not leave through the legacy Rooms HTTP endpoint.
+  const more = host.querySelector<HTMLButtonElement>(
+    '[data-note-id="n"] button[aria-label="More actions"]',
+  );
+  expect(more).not.toBeNull();
+  more!.click();
+  await until(() => Boolean(document.querySelector('[role="menu"]')));
+  expect(document.body.textContent).not.toContain('Share in Rooms');
+  more!.click();
   await until(() =>
     [...(host?.querySelectorAll('[data-note-id="n"] button') ?? [])].some(
       (b) => b.textContent?.trim() === 'historic private',
@@ -265,8 +274,10 @@ test('actual Notes screen encrypts migration and edits, then clears plaintext wh
     await new Promise((r) => setTimeout(r, 0));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
   };
+  // El «Retry» es la acción del aviso: la tarjeta es `[data-toast]` (el `role` está en
+  // las regiones vivas de Toast.tsx, que solo llevan texto).
   const retryButton = () =>
-    [...document.querySelectorAll('[role="alert"] button')].find(
+    [...document.querySelectorAll('[data-toast] button')].find(
       (b) => b.textContent?.trim() === 'Retry',
     ) as HTMLButtonElement;
   oldBackend = true;
@@ -297,9 +308,9 @@ test('actual Notes screen encrypts migration and edits, then clears plaintext wh
   expect(recovered?.data?.attachments).toHaveLength(1);
   let currentDraft = 'unsaved private draft';
   for (const kind of ['server', 'network', 'conflict'] as const) {
-    for (const alert of document.querySelectorAll('[role="alert"]'))
-      (alert.querySelector('button[aria-label]') as HTMLButtonElement).click();
-    await until(() => document.querySelectorAll('[role="alert"]').length === 0);
+    for (const aviso of document.querySelectorAll('[data-toast]'))
+      (aviso.querySelector('button[aria-label]') as HTMLButtonElement).click();
+    await until(() => document.querySelectorAll('[data-toast]').length === 0);
     uncertainEdit = { kind, calls: 0 };
     const nextDraft = `private ${kind} draft`;
     await editTitle(currentDraft, nextDraft);

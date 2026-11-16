@@ -321,3 +321,56 @@ func (s *Store) Aprobaciones(ctx context.Context, estado string) ([]Aprobacion, 
 	})
 	return out, err
 }
+
+// Candidato es alguien de la organización con lo que se le ha puesto en un
+// módulo: lo justo para decidir, con permisos.PuedeVerbo, si puede aprobar.
+type Candidato struct {
+	Sub    string
+	Roles  []string
+	Nivel  string    // "" = nada puesto a mano en el módulo
+	Verbos *[]string // nil = sin lista puesta: mandan los del nivel
+}
+
+// CandidatosAprobacion son las personas que han entrado en el ERP con lo que
+// tienen puesto en `modulo`. Quién de ellas aprueba lo decide quien llama con
+// las mismas reglas que la ruta de aprobar: así el aviso no llega a quien
+// después recibiría un 403, ni deja fuera a quien sí podría.
+func (s *Store) CandidatosAprobacion(ctx context.Context, modulo string) ([]Candidato, error) {
+	tenant, err := tenantDe(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var out []Candidato
+	err = s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		filas, err := tx.Query(ctx, `
+			SELECT u.sub, u.roles, coalesce(p.nivel, ''), v.sub IS NOT NULL, coalesce(v.verbos, '{}')
+			  FROM usuarios u
+			  LEFT JOIN permisos p ON p.tenant = u.tenant AND p.sub = u.sub AND p.modulo = $2
+			  LEFT JOIN permisos_verbo v ON v.tenant = u.tenant AND v.sub = u.sub AND v.modulo = $2
+			 WHERE u.tenant = $1
+			 ORDER BY u.sub`, tenant, modulo)
+		if err != nil {
+			return err
+		}
+		defer filas.Close()
+		for filas.Next() {
+			var c Candidato
+			var verbos []string
+			var hay bool
+			if err := filas.Scan(&c.Sub, &c.Roles, &c.Nivel, &hay, &verbos); err != nil {
+				return err
+			}
+			// Una lista vacía puesta retira todos los gestos; sin fila, mandan
+			// los del nivel. Por eso se pregunta por la fila y no por el array.
+			if hay {
+				if verbos == nil {
+					verbos = []string{}
+				}
+				c.Verbos = &verbos
+			}
+			out = append(out, c)
+		}
+		return filas.Err()
+	})
+	return out, err
+}

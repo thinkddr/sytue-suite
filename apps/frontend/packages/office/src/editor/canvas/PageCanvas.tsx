@@ -13,12 +13,25 @@
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { saneaHtmlDeDocumento, useFitInViewport, useMobileBack } from '@sytue/ui';
-import type { CursorPos, EditorCommand, EditorContext } from '../types';
-import { comandoDelAtajo } from '../comandos';
+import { intlTag } from '@sytue/i18n';
+import type { CursorPos, EditorContext } from '../types';
 import { parseOptions } from '../formfields';
 import { anclarPos, cursorPosKey, peerName } from '../state/cursors';
 import { readTrackFlag, withTrackFlag } from '../trackchanges';
 import { pageFieldText, setEditorRoot, trackDelete, trackInsert } from './exec';
+import { atenderAtajoDeTexto } from './atajos';
+import {
+  autoformatear,
+  autoformatoActivo,
+  deshacerAutoformato,
+  olvidarAutoformato,
+} from './autoformato';
+import {
+  alternarCasilla,
+  alternarCasillasDeLaSeleccion,
+  casillaDelClic,
+  trasNuevoElemento,
+} from './casillas';
 import { hydrateEmbeds, stripEmbedLive } from './embedDom';
 import { quitarTabulaciones, tabular } from './tabulaciones';
 import { MIN_ZOOM } from './metrics';
@@ -396,7 +409,7 @@ export function PageCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
             }));
       out.push({
         id: pc.id,
-        name: peerName(pc.name),
+        name: peerName(pc.name, t('header.peerUnnamed')),
         color: pc.color,
         posKey: cursorPosKey(pc.pos),
         caret: {
@@ -409,7 +422,7 @@ export function PageCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     }
     ancladosRef.current = anclados;
     setPeerCarets(out);
-  }, [peerCursors, contentEpoch, zoom, pageSetup, cursorDots]);
+  }, [peerCursors, contentEpoch, zoom, pageSetup, cursorDots, t]);
 
   /* Modo «Rellenar formulario» (§ campos): el folio pasa a solo lectura
    * (contentEditable=false, abajo en el JSX) pero los campos siguen interactivos.
@@ -490,6 +503,34 @@ export function PageCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     return () => page.removeEventListener('beforeinput', onBeforeInput as EventListener);
   }, [track]);
 
+  /* Autoformato Markdown al escribir (canvas/autoformato.ts) y las casillas de las listas
+   * de casillas. Fuera con el control de cambios (lo tecleado lo inserta trackInsert, que
+   * no sabe de formato), al rellenar un formulario y en solo lectura. */
+  const editable = !track && !formFill && !ctx.soloLectura;
+  useEffect(() => {
+    const page = pageRef.current;
+    if (!page || !editable) return;
+    const onBeforeInput = (event: InputEvent): void => {
+      if (autoformatoActivo()) autoformatear(page, event);
+    };
+    const onDown = (event: MouseEvent): void => {
+      olvidarAutoformato();
+      const li = event.button === 0 ? casillaDelClic(page, event.target, event.clientX) : null;
+      if (!li) return;
+      // La casilla no es texto: el clic la marca y no mueve el cursor.
+      event.preventDefault();
+      alternarCasilla(li);
+      page.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    page.addEventListener('beforeinput', onBeforeInput as EventListener);
+    page.addEventListener('mousedown', onDown);
+    return () => {
+      olvidarAutoformato();
+      page.removeEventListener('beforeinput', onBeforeInput as EventListener);
+      page.removeEventListener('mousedown', onDown);
+    };
+  }, [editable]);
+
   /* Interacción de los campos en modo rellenar: casilla conmuta y desplegable
    * abre su menú (por clic o teclado). El campo de texto se edita nativo (isla
    * contentEditable). Cada cambio emite `input` (burbujea al folio → autosave). */
@@ -569,10 +610,41 @@ export function PageCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
    * Ctrl/Cmd+Z e Y no se capturan: van marcados `canvas` y los atiende el historial
    * nativo del contenteditable. */
   const onKeyDown = (event: KeyboardEvent): void => {
-    const atajo = comandoDelAtajo(event, 'document');
-    if (!atajo) return;
-    event.preventDefault();
-    ctx.exec(atajo.id as EditorCommand, atajo.value);
+    // Ctrl+Z justo tras un autoformato: deja la marca escrita en vez del formato.
+    if (deshacerAutoformato(event)) return;
+    // El autoformato, en la tecla: el espacio tras «#», el «*» que cierra una negrita…
+    if (
+      editable &&
+      pageRef.current &&
+      event.key.length === 1 &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      autoformatoActivo() &&
+      autoformatear(pageRef.current, {
+        inputType: 'insertText',
+        data: event.key,
+        isComposing: event.isComposing,
+        preventDefault: () => event.preventDefault(),
+      })
+    ) {
+      return;
+    }
+    // Ctrl+Alt+Intro (el de Google Docs): marca o desmarca la casilla del cursor.
+    const page = pageRef.current;
+    if (
+      editable &&
+      page &&
+      event.key === 'Enter' &&
+      event.altKey &&
+      (event.ctrlKey || event.metaKey) &&
+      alternarCasillasDeLaSeleccion(page)
+    ) {
+      event.preventDefault();
+      page.dispatchEvent(new Event('input', { bubbles: true }));
+      return;
+    }
+    atenderAtajoDeTexto(event, ctx);
   };
 
   /* Paginación VISUAL: una línea de corte cada alto de página, pintada como
@@ -645,7 +717,9 @@ export function PageCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
             tabIndex={0}
             aria-multiline="true"
             aria-label={ctx.title || t('kind.document')}
-            lang="es"
+            // El idioma del documento (su capa de página) o, sin él, el de la interfaz: el
+            // corrector del navegador usa el diccionario de este `lang`.
+            lang={intlTag(ctx.pageSetup.lang ?? ctx.locale)}
             spellcheck
             style={pageStyle}
             onInput={(event) => {
@@ -656,6 +730,8 @@ export function PageCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
               // Al teclear solo cambia el párrafo del cursor; lo demás (pegar, un comando)
               // puede tocar cualquiera. quitarTabulaciones retira sus envoltorios vivos.
               const tipo = (event as InputEvent).inputType ?? '';
+              // El elemento nuevo de una lista de casillas nace sin hacer.
+              if (tipo === 'insertParagraph') trasNuevoElemento(event.currentTarget);
               const tecleo =
                 /^(insertText|insertCompositionText|insertReplacementText|delete)/.test(tipo);
               tabular(

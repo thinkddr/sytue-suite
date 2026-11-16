@@ -53,6 +53,9 @@ type TarjetaVF struct {
 	Administrador, Activando bool
 
 	AlActivar, AlDeclaracion, AlExportar func()
+	// AlCertificado abre el asistente para subir (o cambiar) el certificado de la
+	// organización; nil, no se ofrece.
+	AlCertificado func()
 }
 
 // MargenTarjetaVF es el `mx-4 md:mx-6` a ese ancho de ventana.
@@ -146,32 +149,91 @@ func (t *TarjetaVF) Objeto(v tema.Variante, ancho float32) (fyne.CanvasObject, f
 		l.piezas(cs, pos, x0, y)
 		y += ocupa.Height
 	} else {
-		y += HuecoUno
-		intro := ui.NuevoParrafo(tr("vf.intro"), relajadoXS, ui.Normal, "text-muted", v)
-		w := min(dentro, ProsaVF)
-		h := ui.AltoParrafo(intro, w)
-		l.poner(intro, x0, y, w, h)
-		y += h + HuecoDos
-		switch {
-		case e.Motivo != "":
-			m := ui.NuevoParrafo(tr(motivosVF[e.Motivo]), tema.TextoXS, ui.Normal, "text-subtle", v)
-			h := ui.AltoParrafo(m, dentro)
-			l.poner(m, x0, y, dentro, h)
-			y += h
-		case t.Administrador:
-			b := ui.NuevoBoton(tr("vf.activate"), t.AlActivar).Con(ui.Primario, ui.TallaXS)
-			b.Cargando = t.Activando
-			m := b.MinSize()
-			l.poner(b, x0, y, m.Width, m.Height)
-			y += m.Height
-		default:
-			m := ui.NuevoParrafo(tr("vf.adminOnly"), tema.TextoXS, ui.Normal, "text-subtle", v)
-			h := ui.AltoParrafo(m, dentro)
-			l.poner(m, x0, y, dentro, h)
-			y += h
-		}
+		y = t.sinActivar(l, v, x0, y, dentro)
 	}
+	y = t.lineaCertificado(l, v, x0, y, dentro)
 	alto := y + TarjetaVFPY + tema.Borde
 	l.puestos[0].w, l.puestos[0].h = ancho, alto
 	return l.objeto(alto)
+}
+
+func (t *TarjetaVF) puedeSubir() bool { return t.Administrador && t.AlCertificado != nil }
+
+// lineaCertificado es el `mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs` de
+// debajo: de quién es el certificado guardado y «Cambiar certificado» (caducan: los de la
+// FNMT, a los dos o tres años), también con VERI*FACTU activo. Sin certificado y sin
+// nada que lo impida, quien administra puede subir ya el suyo aunque en el entorno de
+// pruebas baste el del despliegue. Devuelve dónde acaba.
+func (t *TarjetaVF) lineaCertificado(l *lienzo, v tema.Variante, x0, y, dentro float32) float32 {
+	e := t.Estado
+	var ps []pieza
+	enlace := func(clave string) {
+		en := NuevoPulsador(t.tr.T(clave, nil), tema.TextoXS, ui.Normal, t.AlCertificado)
+		en.Subrayado, en.Radio = true, tema.RadioSM
+		ps = append(ps, piezaDe(en, en.MinSize()))
+	}
+	switch {
+	case e.TieneCertificado:
+		if e.CertificadoNIF != "" {
+			s := t.tr.T("vf.cert.current", i18n.Vars{"nif": e.CertificadoNIF})
+			ps = append(ps, textoPieza(s, tema.TextoXS, ui.Normal, "text-subtle", v))
+		}
+		if t.puedeSubir() {
+			enlace("vf.cert.change")
+		}
+	case e.Motivo == "" && t.puedeSubir():
+		enlace("vf.cert.upload")
+	}
+	if len(ps) == 0 {
+		return y
+	}
+	an, al := medidasDe(ps)
+	pos, ocupa := Envolver(an, al, HuecoFaltasX, HuecoUno, dentro)
+	y += HuecoDos
+	l.piezas(ps, pos, x0, y)
+	return y + ocupa.Height
+}
+
+// sinActivar es la frase de qué es y, debajo (`space-y-2`), por qué no se puede, el
+// botón de activar o «Lo activa quien administra». Devuelve dónde acaba.
+func (t *TarjetaVF) sinActivar(l *lienzo, v tema.Variante, x0, y, dentro float32) float32 {
+	e := t.Estado
+	tr := func(clave string) string { return t.tr.T(clave, nil) }
+	y += HuecoUno
+	intro := ui.NuevoParrafo(tr("vf.intro"), relajadoXS, ui.Normal, "text-muted", v)
+	w := min(dentro, ProsaVF)
+	h := ui.AltoParrafo(intro, w)
+	l.poner(intro, x0, y, w, h)
+	y += h + HuecoDos
+	switch {
+	case e.Motivo == "sin_certificado" && t.puedeSubir():
+		// `flex flex-wrap items-center gap-2` con la frase en `flex-1`: su base es
+		// cero, así que el botón no baja; es la frase la que se reparte en líneas.
+		b := ui.NuevoBoton(tr("vf.cert.upload"), t.AlCertificado).Con(ui.Primario, ui.TallaXS)
+		mb := b.MinSize()
+		w := max(dentro-mb.Width-HuecoDos, 0)
+		m := ui.NuevoParrafo(tr(motivosVF[e.Motivo]), tema.TextoXS, ui.Normal, "text-subtle", v)
+		h := ui.AltoParrafo(m, w)
+		fila := max(h, mb.Height)
+		l.poner(m, x0, y+(fila-h)/2, w, h)
+		l.poner(b, x0+w+HuecoDos, y+(fila-mb.Height)/2, mb.Width, mb.Height)
+		y += fila
+	case e.Motivo != "":
+		m := ui.NuevoParrafo(tr(motivosVF[e.Motivo]), tema.TextoXS, ui.Normal, "text-subtle", v)
+		h := ui.AltoParrafo(m, dentro)
+		l.poner(m, x0, y, dentro, h)
+		y += h
+	case t.Administrador:
+		b := ui.NuevoBoton(tr("vf.activate"), t.AlActivar).Con(ui.Primario, ui.TallaXS)
+		b.Cargando = t.Activando
+		m := b.MinSize()
+		l.poner(b, x0, y, m.Width, m.Height)
+		y += m.Height
+	default:
+		m := ui.NuevoParrafo(tr("vf.adminOnly"), tema.TextoXS, ui.Normal, "text-subtle", v)
+		h := ui.AltoParrafo(m, dentro)
+		l.poner(m, x0, y, dentro, h)
+		y += h
+	}
+	return y
 }

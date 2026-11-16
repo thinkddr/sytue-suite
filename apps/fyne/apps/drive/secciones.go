@@ -5,6 +5,7 @@ package drive
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"slices"
 	"strings"
@@ -200,10 +201,14 @@ func DePlanos(c api.Compartidos) []Elemento {
 // ese formato, y si no, se descarga. Que dependiera de por dónde se llegó sería un
 // comportamiento que nadie puede explicar.
 func (p *Pantalla) abrirPlano(el Elemento) {
+	if el.Carpeta {
+		p.abrirCarpetaLejana(el)
+		return
+	}
 	if p.abrirEnSuApp(el) {
 		return
 	}
-	if TipoVista(el) != "" {
+	if TipoVista(el, false) != "" {
 		p.pedirVista(el)
 		return
 	}
@@ -243,7 +248,8 @@ func (p *Pantalla) estrellaPlana(el Elemento, quiere bool) {
 }
 
 // menuPlano es el «⋯» de «Recientes» y «Destacados»: `ActionsMenu` solo con descargar
-// —un fichero; una carpeta no se descarga desde aquí—, compartir y copiar el enlace. Sin
+// —un fichero; una carpeta no se descarga desde aquí—, mostrar en su carpeta, compartir y
+// copiar el enlace. Sin
 // nada que ofrecer el menú no se abre, en vez de abrirse vacío.
 func (p *Pantalla) menuPlano(el Elemento, disparador fyne.CanvasObject) {
 	acciones := p.accionesPlano(el, p.sec.recientes.SinRed())
@@ -258,12 +264,19 @@ func (p *Pantalla) menuPlano(el Elemento, disparador fyne.CanvasObject) {
 // accionesPlano son las acciones de `menuPlano`, puras para que el guardián las compare
 // sin abrir ningún menú. «Copiar enlace» sale con las mismas condiciones que en «Mi
 // unidad» (`AccionesDe`): no necesita red, y un fichero sin id no tiene enlace estable.
+// «Mostrar en su carpeta» sin red solo si esa carpeta está en la caché (`ubicable`).
 func (p *Pantalla) accionesPlano(el Elemento, sinRed bool) []accionMenu {
 	var acciones []accionMenu
 	if !el.Carpeta {
 		acciones = append(acciones, accionMenu{
 			texto: p.tr.T("action.download", nil), cuerpo: glifoDescargar,
 			hacer: func() { go p.descargar(el) },
+		})
+	}
+	if p.ubicable(el, sinRed) {
+		acciones = append(acciones, accionMenu{
+			texto: p.tr.T("action.showInFolder", nil), cuerpo: glifoCarpeta,
+			hacer: func() { p.mostrarEnSuCarpeta(el) },
 		})
 	}
 	if !sinRed {
@@ -311,7 +324,7 @@ func (p *Pantalla) abrirRaizCompartida(r api.Compartido) {
 		return
 	}
 	if !r.IsDir {
-		go p.descargarCompartido(r.ID, "", r.Name)
+		p.verODescargarCompartido(r, r.ID, "")
 		return
 	}
 	c := p.sec.compartido
@@ -346,7 +359,7 @@ func (p *Pantalla) engancharPeticion(r api.Compartido) {
 	})
 }
 
-// abrirEnCompartido entra en una subcarpeta o descarga el fichero.
+// abrirEnCompartido entra en una subcarpeta, o enseña o descarga el fichero.
 func (p *Pantalla) abrirEnCompartido(x api.Compartido) {
 	c := p.sec.compartido
 	if c.Raiz == nil {
@@ -357,7 +370,20 @@ func (p *Pantalla) abrirEnCompartido(x api.Compartido) {
 		go p.cargarCarpetaCompartida()
 		return
 	}
-	go p.descargarCompartido(c.Raiz.ID, x.Path, x.Name)
+	p.verODescargarCompartido(x, c.Raiz.ID, x.Path)
+}
+
+// verODescargarCompartido enseña en la vista previa un texto (hasta 1 MB) o una imagen
+// ráster compartidos contigo, con su «Descargar» en el pie; lo demás se descarga, como
+// antes. Ninguna app de la suite abre un fichero de otra persona, de ahí el `sinApp`.
+func (p *Pantalla) verODescargarCompartido(x api.Compartido, raiz, sub string) {
+	bajar := func() { go p.descargarCompartido(raiz, sub, x.Name) }
+	el := deCompartido(x)
+	if p.svc == nil || TipoVista(el, true) == "" {
+		bajar()
+		return
+	}
+	p.abrirVista(el, true, func(ctx context.Context) (io.ReadCloser, error) { return p.svc.SharedContent(ctx, raiz, sub) }, bajar)
 }
 
 // cargarCarpetaCompartida pide lo de dentro. Un 403 o un 404 es que el share se revocó o

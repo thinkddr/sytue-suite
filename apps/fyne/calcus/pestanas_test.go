@@ -30,13 +30,24 @@ func TestLaBarraDeHojasSaleDeSheetCanvas(t *testing.T) {
 		{"relative h-full max-w-[12rem] shrink-0 truncate px-2", "la pestaña: `px-2` y el tope de 12rem"},
 		{"'text-text font-medium' : 'text-text-muted hover:text-text'", "la activa en `font-medium`, las demás apagadas"},
 		{"bg-indicator absolute inset-x-1 bottom-0 h-0.5 rounded-full", "el subrayado de la activa"},
-		{"text-text-muted shrink-0 truncate tabular-nums", "el resumen del rango"},
 		{`icon="plus"`, "el botón de añadir hoja"},
 		{`icon="copy"`, "el de duplicar"},
 		{`icon="trash"`, "el de eliminar"},
 	} {
 		if !strings.Contains(fuente, c.trozo) {
 			t.Errorf("SheetCanvas.tsx ya no contiene %q (%s)", c.trozo, c.porQue)
+		}
+	}
+	// El resumen del rango es un botón aparte, con su ▾ (`MedidaBotonResumen`).
+	resumen := webref.Read(t, "apps/frontend/packages/office/src/editor/sheets/ResumenSeleccion.tsx")
+	for _, c := range []struct{ trozo, porQue string }{
+		{"flex h-6 max-w-full min-w-0 items-center gap-1 rounded-sm px-1", "el botón: `h-6`, `gap-1` y `px-1`"},
+		{`<output class="truncate tabular-nums">`, "el texto, recortado"},
+		{`<Icon name="chevronDown" size={12}`, "el ▾ de 12"},
+		{"text-text-muted hover:text-text", "apagado, y en `text` al pasar por encima"},
+	} {
+		if !strings.Contains(resumen, c.trozo) {
+			t.Errorf("ResumenSeleccion.tsx ya no contiene %q (%s)", c.trozo, c.porQue)
 		}
 	}
 	for _, c := range []struct {
@@ -95,14 +106,18 @@ func TestLaBarraDeHojasPintaDondeLaWeb(t *testing.T) {
 	if got := px(img, MargenPestanas+SangriaIndicador/2, yInd); !cerca(got, tema.Color("surface", v)) {
 		t.Errorf("la sangría del subrayado pinta %v: `inset-x-1` no se respeta", got)
 	}
-	otra := MargenPestanas + activa.Width + HuecoPestanas + MedidaPestanaHoja("Ventas", false).Width/2
+	otra := MargenPestanas + activa.Width + AnchoChevronPestana + HuecoPestanas + MedidaPestanaHoja("Ventas", false).Width/2
 	if got := px(img, otra, yInd); !cerca(got, tema.Color("surface", v)) {
 		t.Errorf("la pestaña que no está activa lleva subrayado: %v", got)
 	}
 
-	// Los botones: el de eliminar, el último, acaba a `px-2` del borde; cada uno mide
-	// 28 px (`h-7 w-7`) y los separa `gap-1` (4 px).
-	borrar := 560 - MargenPestanas - editor.LadoBotonCinta
+	// Los botones: el de la hoja de atajos, el último, acaba a `px-2` del borde; cada uno
+	// mide 28 px (`h-7 w-7`) y los separa `gap-1` (4 px).
+	teclado := 560 - MargenPestanas - editor.LadoBotonCinta
+	if pos := p.teclado.Position(); pos.X != teclado {
+		t.Errorf("el botón de la hoja de atajos cae en x=%v y en la web en %v", pos.X, teclado)
+	}
+	borrar := teclado - editor.LadoBotonCinta - HuecoPestanas
 	if pos := p.borrar.Position(); pos.X != borrar {
 		t.Errorf("el botón de eliminar hoja cae en x=%v y en la web en %v", pos.X, borrar)
 	}
@@ -127,7 +142,8 @@ func TestLaBarraDeHojasResumeElRango(t *testing.T) {
 		t.Errorf("con una celda suelta no hay resumen y sale %q", got)
 	}
 	c.Rejilla.Seleccionar(0, 2, true)
-	if got, quiero := c.Pestanas.Resumen(), "Recuento: 3 · Suma: 3 · Promedio: 1.5"; got != quiero {
+	// Sin haber elegido nada, solo la suma (`RESUMEN_POR_DEFECTO`).
+	if got, quiero := c.Pestanas.Resumen(), "Suma: 3"; got != quiero {
 		t.Errorf("el resumen de A1:A3 es %q y la web dice %q", got, quiero)
 	}
 }

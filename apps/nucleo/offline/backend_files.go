@@ -8,10 +8,13 @@ package offline
 import (
 	"context"
 	"crypto/cipher"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io/fs"
 	"os"
 	"path"
+	"sort"
 	"strings"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
@@ -35,20 +38,8 @@ const recordLockPrefix = ".record-lock-"
 
 func (f ficheros) encrypted() bool { return f.sealed != nil }
 
-func openRootLockFile(root *os.Root, name string) (*os.File, error) {
-	// En macOS (XNU/APFS), dos openat(O_CREAT) simultáneos sobre un nombre nuevo
-	// dentro de os.Root pueden devolver ENOENT al perdedor mientras se crea el vnode.
-	for range 4 {
-		file, err := root.OpenFile(name, os.O_CREATE|os.O_RDWR, 0o600)
-		if !errors.Is(err, fs.ErrNotExist) {
-			return file, err
-		}
-	}
-	return root.OpenFile(name, os.O_CREATE|os.O_RDWR, 0o600)
-}
-
 func (f ficheros) lockRecord(ctx context.Context, key string) (func(), error) {
-	file, err := openRootLockFile(f.raiz, recordLockPrefix+clave(key))
+	file, err := ajustes.AbrirCreandoEnRaiz(f.raiz, recordLockPrefix+clave(key), os.O_RDWR, 0o600)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +100,7 @@ func OpenWithSecretsContext(ctx context.Context, dir string, secrets CacheSecret
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil { //nolint:gosec // G703: native caller establishes the cache root; all records are confined with os.Root below.
 		return nil, err
 	}
 	raiz, err := os.OpenRoot(dir)
@@ -188,21 +179,46 @@ func (f ficheros) contar(espacio string) (int, error) {
 		if !d.IsDir() {
 			continue
 		}
-		entradas, err := fs.ReadDir(f.raiz.FS(), path.Join(d.Name(), espacio))
-		if errors.Is(err, fs.ErrNotExist) {
-			continue
-		}
+		count, err := f.countPrefix(path.Join(d.Name(), espacio))
 		if err != nil {
 			return n, err
 		}
-		for _, e := range entradas {
-			_, temporary := cacheTemporary(e)
-			if !e.IsDir() && (path.Ext(e.Name()) == ".json" || temporary) {
-				n++
-			}
-		}
+		n += count
 	}
 	return n, nil
+}
+
+func (f ficheros) countPrefix(prefix string) (int, error) {
+	entries, err := fs.ReadDir(f.raiz.FS(), prefix)
+	if errors.Is(err, fs.ErrNotExist) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	count := 0
+	for _, entry := range entries {
+		_, temporary := cacheTemporary(entry)
+		if entry.IsDir() || (path.Ext(entry.Name()) != ".json" && !temporary) {
+			return 0, ErrPendingJournal
+		}
+		count++
+	}
+	return count, nil
+}
+
+// CountDirectoryOwner uses only hashed path metadata, even with a locked keychain.
+func CountDirectoryOwner(dir, owner string, namespaces ...string) (int, error) {
+	root, err := os.OpenRoot(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = root.Close() }()
+	store := Store{b: ficheros{raiz: root}}
+	return store.CountOwner(owner, namespaces...)
 }
 
 func (f ficheros) clear() error {
@@ -219,4 +235,166 @@ func (f ficheros) clear() error {
 		}
 	}
 	return nil
+}
+
+func (f ficheros) recordIDs(prefix string) ([]string, error) {
+	entries, err := fs.ReadDir(f.raiz.FS(), prefix)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		id, err := f.recordID(prefix, entry)
+		if err != nil {
+			return nil, err
+		}
+		if id != "" {
+			ids = append(ids, id)
+		}
+	}
+	return ids, nil
+}
+
+func (f ficheros) recordID(prefix string, entry fs.DirEntry) (string, error) {
+	if _, temporary := cacheTemporary(entry); temporary {
+		return "", ErrPendingJournal
+	}
+	if entry.IsDir() || path.Ext(entry.Name()) != ".json" {
+		return "", ErrPendingJournal
+	}
+	raw, err := f.get(path.Join(prefix, strings.TrimSuffix(entry.Name(), ".json")))
+	if errors.Is(err, fs.ErrNotExist) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	var record struct {
+		ID string `json:"id"`
+	}
+	err = json.Unmarshal(raw, &record)
+	clear(raw)
+	if err != nil {
+		return "", err
+	}
+	if record.ID == "" || entry.Name() != clave(record.ID)+".json" {
+		return "", ErrPendingJournal
+	}
+	return record.ID, nil
+}
+
+func (f ficheros) recordIDsPage(ctx context.Context, prefix, after string, limit int) ([]string, string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, "", err
+	}
+	if after != "" {
+		decoded, err := hex.DecodeString(after)
+		if err != nil || len(decoded) != 16 || hex.EncodeToString(decoded) != after {
+			return nil, "", ErrPendingJournal
+		}
+	}
+	entries, err := fs.ReadDir(f.raiz.FS(), prefix)
+	if errors.Is(err, fs.ErrNotExist) {
+		return []string{}, "", nil
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	first := 0
+	if after != "" {
+		first = sort.Search(len(entries), func(i int) bool { return entries[i].Name() > after+".json" })
+	}
+	last := min(first+limit, len(entries))
+	ids := make([]string, 0, last-first)
+	for _, entry := range entries[first:last] {
+		if err := ctx.Err(); err != nil {
+			return nil, "", err
+		}
+		id, err := f.recordID(prefix, entry)
+		if err != nil {
+			return nil, "", err
+		}
+		if id != "" {
+			ids = append(ids, id)
+		}
+	}
+	next := ""
+	if last < len(entries) {
+		next = strings.TrimSuffix(entries[last-1].Name(), ".json")
+	}
+	return ids, next, nil
+}
+
+// ClearDirectoryKeeping removes ephemeral state while retaining durable work of
+// every account. Namespace names come from the suite's shared journal registry.
+func ClearDirectoryKeeping(dir string, namespaces ...string) error {
+	return ClearDirectoryKeepingContext(context.Background(), dir, namespaces...)
+}
+
+func ClearDirectoryKeepingContext(ctx context.Context, dir string, namespaces ...string) error {
+	return withDirectoryForClear(ctx, dir, func(files ficheros) error {
+		keep := make(map[string]bool, len(namespaces))
+		for _, namespace := range namespaces {
+			keep[clave(namespace)] = true
+		}
+		owners, err := fs.ReadDir(files.raiz.FS(), ".")
+		if err != nil {
+			return err
+		}
+		for _, owner := range owners {
+			if !owner.IsDir() {
+				continue
+			}
+			entries, err := fs.ReadDir(files.raiz.FS(), owner.Name())
+			if err != nil {
+				return err
+			}
+			for _, entry := range entries {
+				if !keep[entry.Name()] {
+					if err := files.raiz.RemoveAll(path.Join(owner.Name(), entry.Name())); err != nil {
+						return err
+					}
+				}
+			}
+		}
+		return nil
+	})
+}
+
+// DiscardDirectoryOwner requires the caller's exclusive scope lease and explicit
+// user choice. It never erases another account or replaces stable lock inodes.
+func DiscardDirectoryOwner(dir, owner string, namespaces ...string) error {
+	return DiscardDirectoryOwnerContext(context.Background(), dir, owner, namespaces...)
+}
+
+func DiscardDirectoryOwnerContext(ctx context.Context, dir, owner string, namespaces ...string) error {
+	return withDirectoryForClear(ctx, dir, func(files ficheros) error {
+		for _, namespace := range namespaces {
+			if err := files.raiz.RemoveAll(clave(owner, namespace)); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func withDirectoryForClear(ctx context.Context, dir string, fn func(ficheros) error) error {
+	root, err := os.OpenRoot(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer func() { _ = root.Close() }()
+	files := ficheros{raiz: root}
+	release, err := files.lockHTTP(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+	return fn(files)
 }

@@ -75,8 +75,13 @@ func NuevoArbolNotas(tr *i18n.Translator, l i18n.Locale) *ArbolNotas {
 
 // Objeto arma el panel con su cabecera y su lista.
 func (a *ArbolNotas) Objeto(v tema.Variante) fyne.CanvasObject {
-	cuenta := lineaTok(a.tr.T("notebook.notes", i18n.Vars{"count": len(a.Notas)}),
-		tema.TextoSM, ui.Medio, "text-muted", v)
+	// Cargando, el recuento aún sería «0 notas»: mejor nada que un dato falso. La línea
+	// se queda (vacía) para que la franja no cambie de alto al llegar.
+	recuento := a.tr.T("notebook.notes", i18n.Vars{"count": len(a.Notas)})
+	if a.Fase == Cargando {
+		recuento = ""
+	}
+	cuenta := lineaTok(recuento, tema.TextoSM, ui.Medio, "text-muted", v)
 	derecha := []fyne.CanvasObject{}
 	// «Nueva nota» solo por debajo de `md`: ahí la barra del cuaderno no se ve y este
 	// es el único. En escritorio las dos franjas van juntas y serían dos botones iguales.
@@ -104,7 +109,7 @@ func (a *ArbolNotas) lista(v tema.Variante) fyne.CanvasObject {
 	}
 	switch a.Fase {
 	case Cargando:
-		return centrar(ui.NuevaRueda(24, "text-muted", v), v)
+		return esqueletoRamas()
 	case Fallo, SinSesion, Prohibida, SinConexion:
 		return parrafo("error.loadFailed")
 	case Vacia, Exito:
@@ -179,7 +184,7 @@ func (a *ArbolNotas) fila(n Nodo, nivel int, v tema.Variante) fyne.CanvasObject 
 		f.Glifo, f.TintaGlifo = EnlaceD, "text-subtle"
 	}
 	for _, e := range nota.Estados {
-		f.Puntos = append(f.Puntos, hexO(e.Color, tema.Color("text-muted", v)))
+		f.Puntos = append(f.Puntos, tonoO(e.Color, tema.Color("text-muted", v)))
 	}
 	if len(n.Hijos) > 0 {
 		rotulo := a.tr.T("tree.collapse", nil)
@@ -488,6 +493,9 @@ type Papelera struct {
 
 	Notas []Nota
 	Fase  Fase
+	// Ahora es el reloj de «se borra en N días»; nil = time.Now. Inyectable para que
+	// las pruebas y las capturas no dependan del día en que se corren.
+	Ahora func() time.Time
 
 	AlVaciar    func()
 	AlRestaurar func(Nota)
@@ -514,7 +522,8 @@ func (p *Papelera) Objeto(v tema.Variante) fyne.CanvasObject {
 }
 
 // fila es una nota de la papelera (`.notes-row`): su glifo, su título —o su texto, si no
-// lo tiene— y los dos botones, en fantasma.
+// lo tiene— con el cuaderno y la caducidad debajo en `sytue-meta`, y los dos botones,
+// en fantasma.
 //
 // «Borrar del todo» va en fantasma y no en peligro, igual que en la web: el rojo se
 // reserva para la CONFIRMACIÓN, que es donde de verdad se pierde algo.
@@ -526,13 +535,53 @@ func (p *Papelera) fila(n Nota, v tema.Variante) fyne.CanvasObject {
 	if nombre == "" {
 		nombre = p.tr.T("note.untitled", nil)
 	}
+	textos := container.New(ui.Columna{},
+		ui.NuevoParrafo(nombre, tema.TextoBase, ui.Normal, "text", v).Recortado(1),
+		ui.NuevoParrafo(p.meta(n), tema.TextoXS, ui.Normal, "text-subtle", v).Recortado(1))
 	restaurar := ui.NuevoBoton(p.tr.T("trash.restore", nil), func() { llamar1(p.AlRestaurar, n) })
 	restaurar.Variante, restaurar.Talla = ui.Fantasma, ui.TallaXS
 	purgar := ui.NuevoBoton(p.tr.T("trash.purge", nil), func() { llamar1(p.AlPurgar, n) })
 	purgar.Variante, purgar.Talla = ui.Fantasma, ui.TallaXS
 	return container.New(ui.Margen{Arr: tema.Espacio(1.5), Abj: tema.Espacio(1.5), Izq: tema.Espacio(2), Der: tema.Espacio(2)},
 		container.New(&filaElastica{hueco: tema.Espacio(2), elastico: 1},
-			glifoDeHit(n.Tipo, v), lineaTok(nombre, tema.TextoBase, ui.Normal, "text", v), restaurar, purgar))
+			glifoDeHit(n.Tipo, v), textos, restaurar, purgar))
+}
+
+// meta es `metaPapelera` de Papelera.tsx: «Cuaderno · Se borra en N días».
+func (p *Papelera) meta(n Nota) string {
+	var cuaderno string
+	var seBorra *time.Time
+	if n.Papelera != nil {
+		cuaderno, seBorra = n.Papelera.Cuaderno, n.Papelera.SeBorra
+	}
+	ahora := time.Now
+	if p.Ahora != nil {
+		ahora = p.Ahora
+	}
+	clave, dias := caducidadPapelera(seBorra, ahora())
+	cuando := p.tr.T(clave, nil)
+	if clave == "trash.purgeIn" {
+		cuando = p.tr.T(clave, i18n.Vars{"count": dias})
+	}
+	if cuaderno == "" {
+		return cuando
+	}
+	return cuaderno + " · " + cuando
+}
+
+// caducidadPapelera es `caducidad` de client/papelera.ts, con la misma regla: sin fecha
+// no caduca; vencida, «en breve» (el recolector pasa cada hora); si no, días hacia
+// ARRIBA, para que lo borrado hoy diga «30 días» y no «29».
+func caducidadPapelera(seBorra *time.Time, ahora time.Time) (clave string, dias int) {
+	if seBorra == nil {
+		return "trash.kept", 0
+	}
+	quedan := seBorra.Sub(ahora)
+	if quedan <= 0 {
+		return "trash.purgeSoon", 0
+	}
+	const dia = 24 * time.Hour
+	return "trash.purgeIn", int((quedan + dia - 1) / dia)
 }
 
 // enCaja mete un hijo dentro de una `ui.Caja` con su relleno: es el `rounded-md border

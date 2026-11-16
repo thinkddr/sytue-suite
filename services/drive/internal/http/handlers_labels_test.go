@@ -11,8 +11,11 @@ import (
 
 	"github.com/google/uuid"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
+	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/drive/internal/config"
 	"git.sytue.eu/sytue/one/services/drive/internal/domain"
+	"git.sytue.eu/sytue/one/services/drive/internal/store"
 )
 
 // idStub simula la API de taxonomía de Sytue ID (GET /api/v1/sensitivity-labels). Su
@@ -60,6 +63,41 @@ const taxonomiaConfidencial = `{"items":[
 	{"id":"11111111-1111-1111-1111-111111111111","name":"Interno","rank":10,"block_external_share":false},
 	{"id":"22222222-2222-2222-2222-222222222222","name":"Confidencial","rank":30,"block_external_share":true}
 ]}`
+
+func TestPrivateTaxonomyRejectsScopeBeforeContactingID(t *testing.T) {
+	stub := newIDStub(t, taxonomiaConfidencial)
+	h := handlersWithID(&fakeSvc{}, stub.URL)
+	scope := storage.Scope{Tenant: "acme", Subject: "user-1", Product: "drive"}
+	header, err := storage.EncodeScopeHeader(scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	check := func(headers []string, want int) {
+		t.Helper()
+		r := labelReq(http.MethodGet, "/api/v1/sensitivity-labels", "", nil)
+		r.Header[storage.ScopeHeader] = headers
+		ctx := store.WithOwner(tenancy.Into(r.Context(), tenancy.Tenant{Slug: "acme"}), "user-1")
+		w := httptest.NewRecorder()
+		h.ListSensitivityLabels(w, r.WithContext(ctx))
+		if w.Code != want || w.Header().Get("Cache-Control") != "no-store" {
+			t.Fatal("taxonomy scope response changed", w.Code, want)
+		}
+		if want != http.StatusOK && stub.gotAuthz != "" {
+			t.Fatal("foreign private scope contacted ID")
+		}
+	}
+	for _, bad := range [][]string{{""}, {"v1.invalid"}, {header, header}} {
+		check(bad, http.StatusBadRequest)
+	}
+	for _, other := range []storage.Scope{{Tenant: "other", Subject: "user-1", Product: "drive"}, {Tenant: "acme", Subject: "other", Product: "drive"}, {Tenant: "acme", Subject: "user-1", Product: "mail"}} {
+		pin, err := storage.EncodeScopeHeader(other)
+		if err != nil {
+			t.Fatal(err)
+		}
+		check([]string{pin}, http.StatusConflict)
+	}
+	check([]string{header}, http.StatusOK)
+}
 
 // Etiquetar resuelve la etiqueta contra la TAXONOMÍA: el cliente solo manda el id y el
 // servidor pone nombre, nivel y política. Lo que el cliente intente colar se ignora.

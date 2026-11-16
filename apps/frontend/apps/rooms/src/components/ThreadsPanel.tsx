@@ -10,17 +10,9 @@
  * paginación keyset); si crecieran a miles, portar a <VirtualList> como el feed.
  */
 import type { JSX } from 'preact';
-import {
-  EmptyState,
-  Illustration,
-  Avatar,
-  Button,
-  Icon,
-  Skeleton,
-  cx,
-  IconButton,
-} from '@sytue/ui';
-import { formatDateTime, type Locale } from '@sytue/i18n';
+import { EmptyState, Avatar, Button, Icon, Skeleton, cx, IconButton } from '@sytue/ui';
+import type { Locale } from '@sytue/i18n';
+import { whenLabel } from '../lib/fechas.js';
 import type { ThreadSummary } from '../client/chatApi.js';
 import type { T } from '../i18n/index.js';
 import { MessageBody } from './MessageBody.js';
@@ -43,16 +35,6 @@ interface Props {
   /** Idioma activo (formato de fecha/hora) y traductor ya atado a él. */
   locale: Locale;
   t: T;
-}
-
-/** Fecha corta + hora en el idioma del usuario (el orden y el reloj los pone el locale). */
-function timeLabel(locale: Locale, iso: string): string {
-  return formatDateTime(locale, iso, {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 }
 
 export function ThreadsPanel({
@@ -121,11 +103,7 @@ export function ThreadsPanel({
             ))}
           </div>
         ) : threads.length === 0 ? (
-          <EmptyState
-            class="py-4"
-            title={t('threads.empty')}
-            illustration={<Illustration name="emptyChat" size={96} />}
-          />
+          <EmptyState class="py-4" title={t('threads.empty')} spot="emptyChat" />
         ) : (
           <>
             {threads.map((thread) => {
@@ -156,7 +134,7 @@ export function ThreadsPanel({
                         </span>
                       ) : null}
                       <span class="sytue-meta ml-auto shrink-0">
-                        {timeLabel(locale, thread.lastActivity)}
+                        {whenLabel(locale, thread.lastActivity)}
                       </span>
                     </div>
                     {root.body ? (

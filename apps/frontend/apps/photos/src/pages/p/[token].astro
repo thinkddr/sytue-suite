@@ -18,6 +18,7 @@ import { htmlLangAttrs } from '@sytue/i18n';
 import { serverEnv } from '@sytue/auth/server';
 import { useT } from '../../i18n/index.js';
 import { proporcion } from '../../lib/filas.js';
+import { VisorPublico } from '../../components/VisorPublico.js';
 
 export const prerender = false;
 
@@ -49,6 +50,8 @@ const t = useT(Astro.locals.locale);
 const prefijo = env.SYTUE_BASE_PATH ?? import.meta.env.BASE_URL;
 const img = (id: string, variante: string) =>
   withBase(prefijo, `/p/${encodeURIComponent(token)}/img/${encodeURIComponent(id)}/${variante}`);
+// Lo justo para el visor: las URLs ya salen de aquí con la verja del token.
+const fotosVisor = datos.items.map((f) => ({ ...f, grande: img(f.id, 'grande') }));
 ---
 
 <!doctype html>
@@ -77,12 +80,13 @@ const img = (id: string, variante: string) =>
           rejilla de antes daba a cada foto su proporción dentro de una celda, y
           dejaba bandas vacías bajo las más bajas de cada fila. */}
       <ul class="filas">
-        {datos.items.map((f) => (
+        {datos.items.map((f, i) => (
           <li style={`--r: ${proporcion(f)}`} class="bg-bg-subtle rounded-sm">
-            {/* Enlace a la variante grande: sin sesión no hay visor con
-                  atajos, pero abrir la foto entera sí tiene que poder hacerse. */}
+            {/* Enlace a la variante grande: sin JS abre la foto entera, como
+                  siempre; con JS, `VisorPublico` lo recoge y abre el visor. */}
             <a
               href={img(f.id, 'grande')}
+              data-visor={i}
               class="sytue-focus-ring-inset block h-full w-full overflow-hidden rounded-sm"
             >
               <img
@@ -98,6 +102,7 @@ const img = (id: string, variante: string) =>
           </li>
         ))}
       </ul>
+      <VisorPublico client:load fotos={fotosVisor} locale={Astro.locals.locale} />
       <p class="text-text-subtle mt-8 text-center text-xs">{t('public.by')}</p>
     </div>
   </body>

@@ -41,7 +41,7 @@ func TestAvisosRevision(t *testing.T) {
 		if err == nil {
 			t.Fatal("se pudo cambiar el título de un aviso")
 		}
-		if err := st.MarkRead(domain.ConBuzonesPersonales(acme, []string{"bea"}, time.Now()), n.ID, []string{"bea"}); err != nil {
+		if err := st.MarkRead(domain.ConBuzonesPersonales(acme, "bea", []string{"bea"}, time.Now()), n.ID, []string{"bea"}); err != nil {
 			t.Fatalf("marcar como leído: %v", err)
 		}
 	})
@@ -57,7 +57,7 @@ func TestAvisosRevision(t *testing.T) {
 		if n.ID.String() != "00000000-0000-0000-0000-000000000000" {
 			t.Errorf("carla calló Drive en globex y le llegó uno de acme: %+v", n)
 		}
-		if l, _ := st.ListNotifications(domain.ConBuzonesPersonales(globex, []string{"carla"}, time.Now()), []string{"carla"}, false, nil, 50); len(l) != 0 {
+		if l, _ := st.ListNotifications(domain.ConBuzonesPersonales(globex, "carla", []string{"carla"}, time.Now()), []string{"carla"}, false, nil, 50); len(l) != 0 {
 			t.Errorf("en su campana: %+v", l)
 		}
 	})
@@ -103,7 +103,7 @@ func TestAvisosRevision(t *testing.T) {
 		if n, err := st.OlvidarBuzon(context.Background(), "email:vieja@acme.test"); err != nil || n != 2 {
 			t.Fatalf("olvidados %d (%v), quiero 2", n, err)
 		}
-		nueva := domain.ConBuzonesPersonales(globex, []string{"otra", "email:vieja@acme.test"}, time.Now())
+		nueva := domain.ConBuzonesPersonales(globex, "otra", []string{"otra", "email:vieja@acme.test"}, time.Now())
 		if l, _ := st.ListNotifications(nueva, []string{"otra", "email:vieja@acme.test"}, false, nil, 50); len(l) != 0 {
 			t.Errorf("quien recibe la dirección hereda: %+v", l)
 		}
@@ -116,12 +116,12 @@ func TestAvisosRevision(t *testing.T) {
 			t.Fatal(err)
 		}
 		antes := time.Now().Add(-time.Minute)
-		enGlobex := domain.ConBuzonesPersonales(globex, []string{"eva", "email:eva@globex.test", "email:eva@acme.test"}, antes)
+		enGlobex := domain.ConBuzonesPersonales(globex, "eva", []string{"eva", "email:eva@globex.test", "email:eva@acme.test"}, antes)
 		if c, _ := st.UnreadCount(enGlobex, []string{"eva", "email:eva@globex.test"}); c != 1 {
 			t.Fatalf("desde globex, eva cuenta %d avisos a su buzón de acme; quiero 1", c)
 		}
 		// Sin esa dirección en el token (ya no es miembro de acme), no la ve.
-		sinAcme := domain.ConBuzonesPersonales(globex, []string{"eva", "email:eva@globex.test"}, time.Now())
+		sinAcme := domain.ConBuzonesPersonales(globex, "eva", []string{"eva", "email:eva@globex.test"}, time.Now())
 		if c, _ := st.UnreadCount(sinAcme, []string{"eva", "email:eva@globex.test"}); c != 0 {
 			t.Fatalf("fuera de acme, eva sigue viendo %d avisos a su buzón de allí", c)
 		}
@@ -136,7 +136,7 @@ func TestAvisosRevision(t *testing.T) {
 			t.Fatalf("con un token anterior a la retirada, eva ve %d avisos del nuevo titular", c)
 		}
 		// Quien la recibe después, con un token nuevo, sí.
-		nuevo := domain.ConBuzonesPersonales(acme, []string{"fran", "email:eva@acme.test"}, time.Now().Add(time.Second))
+		nuevo := domain.ConBuzonesPersonales(acme, "fran", []string{"fran", "email:eva@acme.test"}, time.Now())
 		if c, _ := st.UnreadCount(nuevo, []string{"fran", "email:eva@acme.test"}); c != 1 {
 			t.Fatalf("el nuevo titular cuenta %d, quiero 1", c)
 		}

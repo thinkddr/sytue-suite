@@ -46,17 +46,17 @@ serviceMonitor:
 # config.go. Sustituye a Kaniko, que Google archivó en junio de 2025: sin
 # versiones nuevas ni parches, y esto compila código de terceros.
 buildkit:
-  image: moby/buildkit:v0.34.2-rootless@sha256:c8252268760e1baba80780d63d738ef9f260fb7c7c0973c78494cb9ddd99eda1
+  image: ghcr.io/thinkddr/upstream-buildkit-rootless:v0.35.0-rootless-sytue.1@sha256:ee432bae1ca7fbcedfb879eac8cf7e2befee7ac456a210b59c727301e55a6106
 
 crane:
-  image: gcr.io/go-containerregistry/crane:v0.22.1@sha256:1f968817b95790bed063f71175aa6b8ff879fa17064020415f3e18bb6e6a36e1
+  image: ghcr.io/thinkddr/upstream-crane:v0.22.1-sytue.1@sha256:5454663a99fbfdbec0e5d007f3d51c848280d21d03d0e7794ad3033bce7d4f7f
 
 # Cloud Native Buildpacks (deploy sin Dockerfile). CNB_* en config.go; pinneadas por tag.
 cnb:
-  builderImage: paketobuildpacks/builder-jammy-base:0.4.681@sha256:7192795369e3c5bed59f5f63ed2542dee9efdfd016404d417bcda36f47c602d8
-  gitImage: alpine/git:2.54.0@sha256:6a1fdb962814ca11508ca8d1bab94375b5b7ac4e4a9a40981c29fc32c02f095d
+  builderImage: paketobuildpacks/builder-jammy-base:0.4.686@sha256:5cd813b834965d9b9daf4d94b35d22bd76f743961dd5cfa7f141804bc4cef815
+  gitImage: alpine/git:2.54.1@sha256:2306e2b05ee0ef99f5d25b0779f645b24ae9f91ba187107503592fcdfe78da3a
   # Base de ejecución fijada junto con el builder, sin depender de latest.
-  runImage: "paketobuildpacks/run-jammy-base:0.1.296@sha256:45384b20b4b7d3795c01c80e1d678efc834bc526bf825f9e0b5527ce41b11b01"
+  runImage: "paketobuildpacks/run-jammy-base:0.1.301@sha256:6031575989ab077c94b58a44886353e74224cf61c6f0f571cd3c4037efe2b2ac"
 
 # Nombres de env: services/cloud/internal/config/config.go. No-secretos por value.
 config:

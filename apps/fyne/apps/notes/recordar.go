@@ -4,6 +4,7 @@
 package notes
 
 import (
+	"bytes"
 	"context"
 	"log/slog"
 
@@ -51,13 +52,22 @@ func (p *Pantalla) conRecordada(c api.NotesCrypto, id string) (clave []byte, rec
 	if err != nil || len(guardada) == 0 {
 		return nil, false
 	}
-	if err := r.Verificar(context.Background(), r.Motivo); err != nil {
+	guardada = bytes.Clone(guardada)
+	ctx, cancel := p.ctx()
+	defer cancel()
+	if err := r.Verificar(ctx, r.Motivo); err != nil || ctx.Err() != nil {
+		clear(guardada)
 		return nil, true // canceló o no se reconoció: la contraseña, con la casilla marcada
 	}
 	if api.ComprobarClaveNotas(c, guardada) != nil {
+		clear(guardada)
 		// La contraseña se cambió: la guardada ya no vale y no se ofrece más.
 		p.olvidarClave(id)
 		return nil, false
+	}
+	if !p.vigente() {
+		clear(guardada)
+		return nil, true
 	}
 	return guardada, true
 }
@@ -67,12 +77,19 @@ func (p *Pantalla) conRecordada(c api.NotesCrypto, id string) (clave []byte, rec
 // y no la ata a Touch ID quien solo conoce la contraseña. Si no se verifica, el cuaderno
 // se abre igual; solo no se recuerda.
 func (p *Pantalla) recordarClave(id string, clave []byte, recordar bool) {
+	clave = bytes.Clone(clave)
+	defer clear(clave)
 	r := p.Recordar
+	if !p.vigente() {
+		return
+	}
 	if !recordar {
 		p.olvidarClave(id)
 		return
 	}
-	if err := r.Verificar(context.Background(), r.Motivo); err != nil {
+	ctx, cancel := p.ctx()
+	defer cancel()
+	if err := r.Verificar(ctx, r.Motivo); err != nil || ctx.Err() != nil {
 		return
 	}
 	if err := r.Guardar(cuentaCuaderno(id), clave); err != nil {
@@ -83,7 +100,7 @@ func (p *Pantalla) recordarClave(id string, clave []byte, recordar bool) {
 // olvidarClave quita la clave recordada de un cuaderno: al desmarcar la casilla, cuando ya
 // no abre, o al borrar el cuaderno.
 func (p *Pantalla) olvidarClave(id string) {
-	if p.Recordar == nil {
+	if p.Recordar == nil || !p.vigente() {
 		return
 	}
 	if err := p.Recordar.Borrar(cuentaCuaderno(id)); err != nil {

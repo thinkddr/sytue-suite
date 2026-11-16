@@ -34,6 +34,7 @@ var errBoom = errors.New("boom")
 
 // fakeStore implementa dataStore en memoria.
 type fakeStore struct {
+	lastAfter          store.FileCursor // último cursor recibido por ListFilesPage
 	uploadReservations int
 	retenido           bool // SujetoRetenido (docs.go)
 	folderPath         string
@@ -332,7 +333,8 @@ func (f *fakeStore) ClaimAndPurgeExpiredTrash(_ context.Context, cutoff time.Tim
 	return len(batch), batch, nil
 }
 
-func (f *fakeStore) ListFilesPage(context.Context, uuid.UUID, store.FileCursor, int) (store.FilePage, error) {
+func (f *fakeStore) ListFilesPage(_ context.Context, _ uuid.UUID, after store.FileCursor, _ int) (store.FilePage, error) {
+	f.lastAfter = after
 	return f.page, f.pageErr
 }
 
@@ -484,6 +486,10 @@ func (b *fakeBlobs) Get(context.Context, tenancy.Tenant, string) (io.ReadCloser,
 		return nil, b.getErr
 	}
 	return io.NopCloser(strings.NewReader(b.getBody)), nil
+}
+
+func (b *fakeBlobs) GetRaw(ctx context.Context, t tenancy.Tenant, key string) (io.ReadCloser, error) {
+	return b.Get(ctx, t, key)
 }
 
 func (b *fakeBlobs) Delete(_ context.Context, _ tenancy.Tenant, key string) error {
@@ -1283,6 +1289,41 @@ func TestStreamZipBlobError(t *testing.T) {
 	}
 }
 
+func TestStreamZipSanitizedAliasesDoNotOverwriteFilesOrDirectories(t *testing.T) {
+	s := newSvc(&fakeStore{}, &fakeBlobs{getBody: "DATA"}, nil)
+	entries := []ZipEntry{
+		{StorageKey: "colon", Path: "foo:bar.txt"},
+		{StorageKey: "underscore", Path: "foo_bar.txt"},
+		{StorageKey: "upper", Path: "REPORT.TXT"},
+		{StorageKey: "lower", Path: "report.txt"},
+		{StorageKey: "file", Path: "Folder"},
+		{StorageKey: "child", Path: "Folder/child.txt"},
+		{StorageKey: "sigma", Path: "Σ.txt"},
+		{StorageKey: "final-sigma", Path: "ς.txt"},
+	}
+	var output bytes.Buffer
+	if err := s.StreamZip(tenantCtx(t), &output, entries); err != nil {
+		t.Fatal(err)
+	}
+	archive, err := zip.NewReader(bytes.NewReader(output.Bytes()), int64(output.Len()))
+	if err != nil || len(archive.File) != len(entries) {
+		t.Fatal("ZIP lost entries after name normalization", err)
+	}
+	seen := map[string]bool{}
+	for _, file := range archive.File {
+		key := strings.ToLower(file.Name)
+		for previous := range seen {
+			if strings.EqualFold(previous, file.Name) {
+				t.Fatal("ZIP would overwrite a Unicode case alias", file.Name)
+			}
+		}
+		if seen[key] || key == "folder" || strings.Contains(file.Name, ":") {
+			t.Fatal("ZIP would overwrite a sanitized alias or directory", file.Name)
+		}
+		seen[key] = true
+	}
+}
+
 func TestSanitizeZipPath(t *testing.T) {
 	cases := map[string]string{
 		"a/b.txt":          "a/b.txt",
@@ -1293,6 +1334,7 @@ func TestSanitizeZipPath(t *testing.T) {
 		"..":               "",
 		"":                 "",
 		"a//b":             "a/b",
+		`C:\temp\file`:     "C_/temp/file",
 		"a/\x00\x01/c":     "a/__/c", // control neutralizado
 	}
 	for in, want := range cases {
@@ -1409,7 +1451,7 @@ func TestListFilesPageCursorRoundTrip(t *testing.T) {
 	next := store.FileCursor{NameLower: "b.txt", ID: uuid.New()}
 	fs := &fakeStore{page: store.FilePage{Files: []domain.File{{ID: uuid.New()}}, Next: &next}}
 	s := newSvc(fs, &fakeBlobs{}, nil)
-	page, err := s.ListFilesPage(tenantCtx(t), uuid.New(), "", 10)
+	page, err := s.ListFilesPage(tenantCtx(t), uuid.New(), store.OrdenFicheros{}, "", 10)
 	if err != nil {
 		t.Fatalf("ListFilesPage: %v", err)
 	}
@@ -1417,11 +1459,11 @@ func TestListFilesPageCursorRoundTrip(t *testing.T) {
 		t.Fatal("esperaba cursor de continuación")
 	}
 	// El cursor generado se acepta como entrada de la siguiente página.
-	if _, err := s.ListFilesPage(tenantCtx(t), uuid.New(), page.NextCursor, 10); err != nil {
+	if _, err := s.ListFilesPage(tenantCtx(t), uuid.New(), store.OrdenFicheros{}, page.NextCursor, 10); err != nil {
 		t.Fatalf("cursor no round-trip: %v", err)
 	}
 	// Cursor corrupto es entrada inválida.
-	if _, err := s.ListFilesPage(tenantCtx(t), uuid.New(), "!!!not-base64!!!", 10); !errors.Is(err, domain.ErrInvalidName) {
+	if _, err := s.ListFilesPage(tenantCtx(t), uuid.New(), store.OrdenFicheros{}, "!!!not-base64!!!", 10); !errors.Is(err, domain.ErrInvalidName) {
 		t.Fatalf("cursor corrupto: %v", err)
 	}
 }

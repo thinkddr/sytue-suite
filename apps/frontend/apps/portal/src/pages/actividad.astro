@@ -16,7 +16,7 @@ import { bff, toBffContext } from '../lib/auth';
 import { canonicaConOrg, returnToCanonico } from '@sytue/config';
 import { hubClient } from '../lib/hub';
 import { groupByDay, dayLabelKey } from '../lib/activity';
-import { appForKey, ProductIcon } from '@sytue/ui';
+import { appForKey, EmptyState, ProductIcon } from '@sytue/ui';
 import { formatDate, formatTimeAgo } from '@sytue/i18n';
 import type { SearchResult } from '@sytue/api-clients';
 import type { ProductKey } from '@sytue/config';
@@ -133,7 +133,7 @@ const etiquetaDia = (day: string, at: Date): string => {
         </a>
       </div>
     ) : items.length === 0 ? (
-      <p class="text-text-muted max-w-xl text-base">{t('activity.empty')}</p>
+      <EmptyState icon="clock" title={t('activity.emptyTitle')} description={t('activity.empty')} />
     ) : (
       <div class="flex flex-col gap-8">
         <p class="sr-only" role="status">

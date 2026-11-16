@@ -16,6 +16,8 @@ interface ImportMetaEnv {
   /** Sytue ID: de ahí sale el directorio de la organización. */
   readonly SYTUE_ID_BASE_URL?: string;
   readonly SYTUE_HUB_BASE_URL?: string;
+  /** El Hub por la red interna del clúster (búsqueda de «Interacciones recientes»). */
+  readonly SYTUE_HUB_INTERNAL_URL?: string;
 }
 
 interface ImportMeta {

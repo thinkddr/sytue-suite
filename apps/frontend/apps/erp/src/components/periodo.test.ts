@@ -3,7 +3,13 @@
  * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
  */
 import { describe, expect, it } from 'bun:test';
-import { PERIODOS, ROTULO_PERIODO, rangoDePeriodo } from './periodo.js';
+import {
+  PERIODOS,
+  ROTULO_PERIODO,
+  ROTULO_PROPUESTA,
+  propuestasDeCierre,
+  rangoDePeriodo,
+} from './periodo.js';
 import { en } from '../i18n/messages/en.js';
 
 // 5 de noviembre de 2026, a mediodía LOCAL.
@@ -46,5 +52,36 @@ describe('rangoDePeriodo', () => {
   });
   it('cada período tiene su rótulo en el catálogo', () => {
     for (const p of PERIODOS) expect(en[ROTULO_PERIODO[p]]).toBeTruthy();
+  });
+});
+
+// VISTO EN ROJO: sin quitar las repetidas, en enero se proponían tres «31 de diciembre».
+describe('propuestasDeCierre', () => {
+  it('el fin del mes, del trimestre y del año ya acabados', () => {
+    expect(propuestasDeCierre(hoy)).toEqual([
+      { propuesta: 'mesAnterior', hasta: '2026-10-31' },
+      { propuesta: 'trimestreAnterior', hasta: '2026-09-30' },
+      { propuesta: 'anioAnterior', hasta: '2025-12-31' },
+    ]);
+  });
+  it('las que coinciden se dejan una vez, con el rótulo de la más amplia', () => {
+    expect(propuestasDeCierre(new Date(2027, 0, 15))).toEqual([
+      { propuesta: 'anioAnterior', hasta: '2026-12-31' },
+    ]);
+    expect(propuestasDeCierre(new Date(2026, 3, 2))).toEqual([
+      { propuesta: 'trimestreAnterior', hasta: '2026-03-31' },
+      { propuesta: 'anioAnterior', hasta: '2025-12-31' },
+    ]);
+  });
+  it('ninguna cae después de hoy', () => {
+    for (let m = 0; m < 12; m++) {
+      const dia = new Date(2026, m, 1, 12);
+      for (const { hasta } of propuestasDeCierre(dia)) {
+        expect(new Date(`${hasta}T00:00:00`) < dia).toBe(true);
+      }
+    }
+  });
+  it('cada propuesta tiene su rótulo en el catálogo', () => {
+    for (const k of Object.values(ROTULO_PROPUESTA)) expect(en[k]).toBeTruthy();
   });
 });

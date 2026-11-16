@@ -285,8 +285,8 @@ func TestElAlfaSeComponeEnSRGB(t *testing.T) {
 //
 // Hasta el 2026-09-21 el conformador escalaba la fuente a `ceil(tamaño)` antes de pedir
 // los avances (`shaping/shaping.go`: `font.XScale = int32(input.Size.Ceil()) << …`), así
-// que pedir 11,375 px daba EXACTAMENTE los avances de 12. Con `1 rem = 14 px` casi toda
-// la escala de la suite es fraccionaria: `text-base` salía un +6,12 % más ancho,
+// que pedir 11,375 px daba EXACTAMENTE los avances de 12. Con la suite medida entonces a
+// 14 px el rem, casi toda la escala era fraccionaria: `text-base` salía un +6,12 % más ancho,
 // `text-sm` un +5,49 %, `text-3xl` un +1,59 %. El fork del go.mod pasa el tamaño en
 // crudo y conforma al ppem exacto.
 //

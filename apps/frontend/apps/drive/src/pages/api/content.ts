@@ -6,6 +6,7 @@
  *
  *   GET /api/content?path=/ruta                       Descarga un archivo (proxy del blob).
  *   GET /api/content?path=/ruta&disposition=inline    Sirve el archivo para vista previa.
+ *                                                     Admite Range (vídeo y audio).
  *   PUT /api/content?path=/ruta                       Sube/sobrescribe un archivo (cuerpo = bytes).
  *
  * Proxy sobre el servicio Go propio (drive.sytue.eu) via DriveClient con el access
@@ -14,6 +15,7 @@
 import type { APIRoute } from 'astro';
 import { HttpError, upstreamStatus } from '@sytue/api-clients';
 import { driveClientFor } from '../../lib/auth';
+import { respuestaDeContenido } from '../../lib/respuesta-contenido';
 
 export const prerender = false;
 
@@ -43,38 +45,17 @@ export const GET: APIRoute = async (ctx) => {
     // materializaba el fichero ENTERO en un Blob antes de contestar el primer byte, así
     // que descargar 2 GB reservaba 2 GB en el app-server —compartido por todos los
     // usuarios— y retrasaba el arranque de la descarga hasta tenerlo todo.
-    const res = await client.openDownload(path);
+    // Range/If-Range se reenvían: <video> y <audio> piden tramos para buscar.
+    const res = await client.openDownload(path, {
+      range: ctx.request.headers.get('range'),
+      ifRange: ctx.request.headers.get('if-range'),
+    });
     const name = basename(path).replace(/["\\]/g, '');
-    // Content-type real del backend (el servicio Go guarda el tipo al subir).
-    let type = res.headers.get('content-type') || 'application/octet-stream';
-    const headers: Record<string, string> = {
-      'cache-control': 'no-store',
-      'x-content-type-options': 'nosniff',
-    };
-    if (url.searchParams.get('disposition') === 'inline') {
-      // Solo tipos seguros se sirven inline. Todo texto baja como text/plain:
-      // servir text/html en el origen de la app con cookies seria XSS almacenado.
-      if (type.startsWith('text/') || type === 'application/json')
-        type = 'text/plain; charset=utf-8';
-      const safe =
-        type.startsWith('image/') || type === 'application/pdf' || type.startsWith('text/plain');
-      headers['content-disposition'] = safe
-        ? `inline; filename="${name}"`
-        : `attachment; filename="${name}"`;
-      // Cinturon para navegacion directa (p.ej. SVG con <script>): documento
-      // sandbox sin scripts ni origen; no afecta a <img>/<pre> y el visor PDF
-      // del navegador renderiza igual.
-      if (safe) headers['content-security-policy'] = 'sandbox';
-    } else {
-      headers['content-disposition'] = `attachment; filename="${name}"`;
-    }
-    headers['content-type'] = type;
-    // El service worker nativo exige tamaño explícito para aplicar de verdad el
-    // límite offline de 50 MiB. Al transmitir ya no hay Blob del que sacarlo: se
-    // propaga el Content-Length que el servicio Go fija desde el metadato (size_bytes).
-    const length = res.headers.get('content-length');
-    if (length) headers['content-length'] = length;
-    return new Response(res.body, { headers });
+    const { status, headers } = respuestaDeContenido(res, {
+      name,
+      inline: url.searchParams.get('disposition') === 'inline',
+    });
+    return new Response(res.body, { status, headers });
   } catch (e) {
     return json({ error: 'download_failed' }, upstreamStatus(e));
   }

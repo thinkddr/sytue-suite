@@ -110,3 +110,10 @@ test('con la hoja protegida, ninguno de los permisos de datos viene concedido', 
   expect(isPermissionGranted(solo, 'objects')).toBe(false);
   expect(isPermissionGranted(solo, 'autoFilter')).toBe(false);
 });
+
+test('ancho de columna y alto de fila son FORMATO: con la hoja protegida, solo si `formatCells`', () => {
+  for (const c of ['colwidth', 'rowheight'] as const) {
+    expect(COMANDOS).toContain(c);
+    expect(PROTECT_FORMAT_CMDS.has(c)).toBe(true);
+  }
+});

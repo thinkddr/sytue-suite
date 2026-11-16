@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 )
 
 // Las tres llamadas de «Clasificar» van a las rutas del servicio y quitar la etiqueta es
@@ -50,5 +52,32 @@ func TestDriveEtiquetas(t *testing.T) {
 		if pedidas[i] != quiero[i] {
 			t.Errorf("petición %d = %q; quiero %q", i, pedidas[i], quiero[i])
 		}
+	}
+}
+
+func TestPrivateSensitivityTaxonomyPinsScopeWithoutSendingAFileOrAssignment(t *testing.T) {
+	scope := storage.Scope{Tenant: "org", Subject: "owner", Product: "drive"}
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		got, err := storage.DecodeScopeHeader(r.Header.Get(storage.ScopeHeader))
+		if err != nil || got != scope || r.Method != http.MethodGet || r.URL.Path != "/api/v1/sensitivity-labels" || r.URL.RawQuery != "" || r.Header.Get("Cache-Control") != "no-store" || r.ContentLength > 0 {
+			t.Error("private policy request lost scope, freshness or content privacy", err)
+		}
+		_, _ = io.WriteString(w, `{"labels":[{"id":"l1","name":"Restricted","rank":30,"block_external_share":true}]}`)
+	}))
+	defer server.Close()
+	client := NewDrive(server.URL, nil, server.Client())
+	labels, err := client.SensitivityLabelsForScope(t.Context(), scope)
+	if err != nil || len(labels) != 1 || !labels[0].BlockExternalShare {
+		t.Fatal(labels, err)
+	}
+	for _, invalid := range []storage.Scope{{Tenant: "org", Product: "drive"}, {Tenant: "org", Subject: "owner", Product: "mail"}} {
+		if _, err := client.SensitivityLabelsForScope(t.Context(), invalid); err == nil {
+			t.Fatal("invalid policy scope accepted")
+		}
+	}
+	if calls != 1 {
+		t.Fatal("invalid policy scope reached the network", calls)
 	}
 }

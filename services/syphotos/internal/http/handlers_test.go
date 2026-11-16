@@ -4,6 +4,8 @@
 package http
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -43,5 +45,53 @@ func TestAJSON_diceSiLaFechaEsDeCaptura(t *testing.T) {
 	sin := aJSON(domain.Activo{SubidaEn: subida})
 	if sin.DeCaptura || !sin.Cuando.Equal(subida) {
 		t.Errorf("sin EXIF: cuando=%v deCaptura=%v", sin.Cuando, sin.DeCaptura)
+	}
+}
+
+// LA PAPELERA DICE CUÁNDO SE VA CADA FOTO. La fecha la pone el servicio, que es
+// quien purga: si la sumara cada cliente, la web y el escritorio podrían prometer
+// días distintos para la misma foto.
+func TestPapeleraJSON_diceCuandoSeBorraCadaFoto(t *testing.T) {
+	borrada := time.Date(2026, 11, 1, 9, 30, 0, 0, time.UTC)
+	fotos := []domain.Activo{{ID: uuid.New(), Ancho: 10, Alto: 10, BorradaEn: &borrada}}
+
+	r := papeleraJSON(fotos, 30*24*time.Hour)
+	if r.RetentionDays != 30 {
+		t.Errorf("retentionDays = %d, se esperaba 30", r.RetentionDays)
+	}
+	if len(r.Items) != 1 {
+		t.Fatalf("salieron %d fotos", len(r.Items))
+	}
+	f := r.Items[0]
+	if f.BorradaEn == nil || !f.BorradaEn.Equal(borrada) {
+		t.Errorf("deletedAt = %v, se esperaba %v", f.BorradaEn, borrada)
+	}
+	if want := borrada.Add(30 * 24 * time.Hour); f.SeBorraEn == nil || !f.SeBorraEn.Equal(want) {
+		t.Errorf("purgeAt = %v, se esperaba %v", f.SeBorraEn, want)
+	}
+
+	// Y en el JSON, junto a los campos de siempre (la tesela los sigue necesitando).
+	b, err := json.Marshal(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, clave := range []string{`"deletedAt":"2026-11-01T09:30:00Z"`, `"purgeAt":"2026-12-01T09:30:00Z"`, `"retentionDays":30`, `"width":10`} {
+		if !strings.Contains(string(b), clave) {
+			t.Errorf("falta %s en %s", clave, b)
+		}
+	}
+}
+
+// SIN RETENCIÓN NO SE PROMETE FECHA: con `TRASH_RETENTION=0` nada caduca, y decir
+// «se borrará en 0 días» sería mentir. Una retención que no es de días enteros se
+// redondea hacia arriba: 36 h no son «1 día».
+func TestPapeleraJSON_sinRetencionNoPrometeFecha(t *testing.T) {
+	borrada := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	r := papeleraJSON([]domain.Activo{{BorradaEn: &borrada}}, 0)
+	if r.RetentionDays != 0 || r.Items[0].SeBorraEn != nil || r.Items[0].BorradaEn == nil {
+		t.Errorf("sin retención: %+v", r)
+	}
+	if r := papeleraJSON(nil, 36*time.Hour); r.RetentionDays != 2 || r.Items == nil {
+		t.Errorf("36 h dieron %d días (o items nulo: %v)", r.RetentionDays, r.Items == nil)
 	}
 }

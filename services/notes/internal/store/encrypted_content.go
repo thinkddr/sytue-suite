@@ -56,13 +56,34 @@ func safeExpectedCrypto(raw json.RawMessage) []byte {
 // shared by ordinary updates and migration; an inaccessible note is always 404.
 func lockNoteWrite(ctx context.Context, tx pgx.Tx, tenant string, id uuid.UUID, sub string, expectedCrypto json.RawMessage) (noteWriteState, error) {
 	var state noteWriteState
+	// Match the order used by a family move: notebook before note. The first
+	// authorized read finds a candidate only; all authorization and membership
+	// checks are repeated after waiting for the notebook lock.
+	var notebookID uuid.UUID
+	err := tx.QueryRow(ctx, `SELECT n.notebook_id FROM notes n
+		JOIN notebooks nb ON nb.id=n.notebook_id AND nb.deleted_at IS NULL
+		WHERE n.tenant=$1 AND n.id=$2 AND n.deleted_at IS NULL AND `+notaEscribible("$3"), tenant, id, sub).Scan(&notebookID)
+	if isNoRows(err) {
+		return state, domain.ErrNotFound
+	}
+	if err != nil {
+		return state, err
+	}
+	var locked uuid.UUID
+	err = tx.QueryRow(ctx, `SELECT id FROM notebooks WHERE tenant=$1 AND id=$2 AND deleted_at IS NULL FOR UPDATE`, tenant, notebookID).Scan(&locked)
+	if isNoRows(err) {
+		return state, domain.ErrNotFound
+	}
+	if err != nil {
+		return state, err
+	}
 	note, err := scanNote(tx.QueryRow(ctx, `
 		SELECT `+noteCols+`, `+escribiblePorCuaderno("$3")+`,
 		       nb.encrypted, COALESCE(nb.crypto=$4::jsonb, false)
 		  FROM notes n JOIN notebooks nb ON nb.id=n.notebook_id AND nb.deleted_at IS NULL
-		 WHERE n.tenant=$1 AND n.id=$2 AND n.deleted_at IS NULL
+		 WHERE n.tenant=$1 AND n.id=$2 AND n.deleted_at IS NULL AND n.notebook_id=$5
 		   AND `+notaEscribible("$3")+`
-		 FOR UPDATE OF n, nb`, tenant, id, sub, safeExpectedCrypto(expectedCrypto)), tenant,
+		 FOR UPDATE OF n`, tenant, id, sub, safeExpectedCrypto(expectedCrypto), notebookID), tenant,
 		&state.byNotebook, &state.encrypted, &state.cryptoMatches)
 	if isNoRows(err) {
 		return state, domain.ErrNotFound
@@ -110,6 +131,15 @@ func (s *Store) MigrateEncryptedContent(ctx context.Context, id uuid.UUID, sub s
 			 WHERE n.tenant=$1 AND n.id=$2 RETURNING `+noteCols,
 			t.Slug, id, in.ContentCipher, []byte(in.Data)), t.Slug)
 		if err != nil {
+			return err
+		}
+		// El historial (versiones.go) guardó la nota en claro mientras el cuaderno no
+		// estaba cifrado: si se quedara, el servidor seguiría teniendo el texto que el
+		// cifrado acaba de quitarle. Se borra lo que no sea criptograma.
+		if _, err := tx.Exec(ctx, `
+			DELETE FROM note_versions
+			 WHERE tenant=$1 AND note_id=$2 AND (title<>'' OR content<>'' OR content_cipher='')`,
+			t.Slug, id); err != nil {
 			return err
 		}
 		notes := []domain.Note{note}

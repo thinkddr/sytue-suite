@@ -24,12 +24,12 @@ import (
 )
 
 // La vista AGENDA: `AgendaView` y `AgendaRow` de CalendarGrid.tsx. Los números salen de
-// sus clases con el rem de 14:
+// sus clases con el rem de 16:
 //
-//	buscador          `border-b p-2`, campo `h-9`                          31,5 + 14 + 1
+//	buscador          `border-b p-2`, campo `h-9`                          36 + 16 + 1
 //	día (li)          `flex gap-3 px-3 py-2.5`, `divide-y` entre días
-//	columna de fecha  `w-14 pt-0.5 text-center`: overline, `text-lg`, meta  49 × 52,5
-//	fila              `px-2 py-1.5` con `border` transparente              28,25
+//	columna de fecha  `w-14 pt-0.5 text-center`: overline, `text-lg`, meta  56 de ancho
+//	fila              `px-2 py-1.5` con `border` transparente
 //	  punto 8 · hora `w-20 text-xs` · título `text-sm` · lugar `sytue-meta` (≥ sm)
 const (
 	// AnchoColumnaDia es el `w-14` de la columna de fecha.
@@ -318,6 +318,9 @@ type filaAgenda struct {
 	widget.BaseWidget
 	p *Pantalla
 	o Ocurrencia
+	// alAbrir sustituye a `AlAbrirEvento` cuando la fila vive en un panel que tiene que
+	// cerrarse antes (la lista de «+N más» del mes).
+	alAbrir func(o Ocurrencia, ancla fyne.CanvasObject)
 
 	encima, enfocada bool
 }
@@ -335,6 +338,10 @@ func (p *Pantalla) nuevaFilaAgenda(o Ocurrencia) *filaAgenda {
 }
 
 func (f *filaAgenda) Tapped(*fyne.PointEvent) {
+	if f.alAbrir != nil {
+		f.alAbrir(f.o, f)
+		return
+	}
 	if f.p.AlAbrirEvento != nil {
 		f.p.AlAbrirEvento(f.o, f)
 	}
@@ -378,7 +385,10 @@ func (f *filaAgenda) CreateRenderer() fyne.WidgetRenderer {
 		hora:   ui.Texto(f.hora(), tema.TextoXS, ui.Medio, tema.Color("text-muted", v)),
 		titulo: ui.Texto(f.titulo(), tema.TextoSM, ui.Normal, tema.Color("text", v)),
 		lugar:  ui.Texto(f.o.Event.Location, tema.TextoXS, ui.Normal, tema.Color("text-subtle", v)),
-		aro:    ui.NuevoAro(tema.RadioMD, 0, v),
+		// Abierto: la caja de la fila es transparente en reposo, y un aro relleno tapaba
+		// la fila entera al enfocarla (se ve al abrir la lista de «+N más» del mes, que
+		// enfoca la primera).
+		aro: ui.NuevoAro(tema.RadioMD, 0, v).Abierto(),
 	}
 	r.punto.CornerRadius = LadoPunto / 2
 	r.objetos = append(r.caja.Objetos(), r.punto, r.hora, r.titulo, r.lugar)

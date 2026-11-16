@@ -47,6 +47,7 @@ func conjunto(t *testing.T, fichero, nombre string) []string {
 func TestLaTablaDeAperturaEsLaDeLaWeb(t *testing.T) {
 	const drive = "apps/frontend/apps/drive/src/lib/abrir-con.ts"
 	const navegador = "apps/frontend/apps/drive/src/components/FileBrowser.tsx"
+	const miniaturas = "apps/frontend/apps/drive/src/lib/miniaturas.ts"
 
 	web := map[string]string{}
 	for conj, producto := range map[string]string{
@@ -57,8 +58,8 @@ func TestLaTablaDeAperturaEsLaDeLaWeb(t *testing.T) {
 		}
 	}
 	// Las imágenes van a Fotos SOLO si el servicio sabe leerlas, y eso en la web es lo
-	// mismo que decide si hay miniatura (`conMiniatura: thumbable(item)`).
-	for _, ext := range conjunto(t, navegador, "THUMB_EXTS") {
+	// mismo que decide si hay miniatura (`conMiniatura: thumbable(item)`, en `miniaturas.ts`).
+	for _, ext := range conjunto(t, miniaturas, "THUMB_EXTS") {
 		web[ext] = "photos"
 	}
 	// El PDF no está en ningún conjunto: es un `kind` propio, reconocido por la

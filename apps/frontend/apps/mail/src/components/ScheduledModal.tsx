@@ -6,13 +6,9 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { Button, FieldGroup, Input, Modal, Icon, Spinner, useToast } from '@sytue/ui';
-import {
-  listScheduled,
-  cancelScheduled,
-  rescheduleScheduled,
-  type ScheduledItem,
-} from '../client/mailApi.js';
+import { Button, FieldGroup, Input, Modal, Icon, Spinner, useToast, EmptyState } from '@sytue/ui';
+import { type ScheduledItem } from '../client/mailApi.js';
+import { usePrivateMailApi } from '../client/privateMailApi.js';
 import type { Locale } from '@sytue/i18n';
 import { useT } from '../i18n/index.js';
 import { fullDate, toLocalInput } from './utils.js';
@@ -32,6 +28,7 @@ function minimoReprogramable(): string {
 
 export function ScheduledModal({ locale, open, onClose }: Props): JSX.Element | null {
   const t = useT(locale);
+  const { listScheduled, cancelScheduled, rescheduleScheduled } = usePrivateMailApi();
   const toast = useToast();
   const [items, setItems] = useState<ScheduledItem[]>([]);
   const [cursor, setCursor] = useState('');
@@ -68,7 +65,7 @@ export function ScheduledModal({ locale, open, onClose }: Props): JSX.Element | 
     return () => {
       active = false;
     };
-  }, [open, reload]);
+  }, [open, reload, listScheduled]);
 
   // Al revelar el editor, lleva el foco al input; al cerrarlo, lo devuelve al
   // botón «Editar hora» de esa fila.
@@ -171,7 +168,7 @@ export function ScheduledModal({ locale, open, onClose }: Props): JSX.Element | 
           </Button>
         </div>
       ) : items.length === 0 ? (
-        <p class="text-text-subtle py-6 text-sm">{t('scheduled.empty')}</p>
+        <EmptyState compact icon="clock" title={t('scheduled.empty')} />
       ) : (
         <ul class="divide-border border-border flex flex-col divide-y rounded-md border">
           {items.map((s) => (

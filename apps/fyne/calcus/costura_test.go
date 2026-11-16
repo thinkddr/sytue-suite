@@ -40,14 +40,14 @@ func TestNoSeAbreLoQueNoSeSabeReescribir(t *testing.T) {
 		nombre, doc string
 	}{
 		{"datos externos", `{"active":0,"sheets":[{"name":"H","cells":{},"externalTables":[{"name":"T","range":"A1:B2"}]}]}`},
-		{"un formato fuera de la rejilla", `{"active":0,"sheets":[{"name":"H","cells":{},"formats":{"AA1":{"id":"number"}}}]}`},
-		{"un estilo fuera de la rejilla", `{"active":0,"sheets":[{"name":"H","cells":{},"styles":{"A101":{"u":true}}}]}`},
+		{"un formato fuera de la rejilla", `{"active":0,"sheets":[{"name":"H","cells":{},"formats":{"XFE1":{"id":"number"}}}]}`},
+		{"un estilo fuera de la rejilla", `{"active":0,"sheets":[{"name":"H","cells":{},"styles":{"A1048577":{"u":true}}}]}`},
 		{"celda con un color en línea", `{"active":0,"sheets":[{"name":"H","cells":{"A1":"<span style=\"color:red\">x</span>"}}]}`},
 		{"celda subrayada con etiqueta", `{"active":0,"sheets":[{"name":"H","cells":{"A1":"<u>x</u>"}}]}`},
 		{"celda con un salto de línea", `{"active":0,"sheets":[{"name":"H","cells":{"A1":"x<br>y"}}]}`},
 		{"celda con una entidad que stripHtml no decodifica", `{"active":0,"sheets":[{"name":"H","cells":{"A1":"caf&eacute;"}}]}`},
-		{"celda fuera de la rejilla A1:Z100", `{"active":0,"sheets":[{"name":"H","cells":{"AA1":"x"}}]}`},
-		{"fila fuera de la rejilla", `{"active":0,"sheets":[{"name":"H","cells":{"A101":"x"}}]}`},
+		{"celda pasada la columna XFD de Excel", `{"active":0,"sheets":[{"name":"H","cells":{"XFE1":"x"}}]}`},
+		{"fila pasada la 1.048.576 de Excel", `{"active":0,"sheets":[{"name":"H","cells":{"A1048577":"x"}}]}`},
 		{"no es JSON", `{rota`},
 		{"sin hojas", `{"active":0,"sheets":[]}`},
 	} {
@@ -225,6 +225,37 @@ func TestLoQueNoSeHaTocadoSaleConLosMismosBytes(t *testing.T) {
 	}
 	if got := vuelta.Sheets[0].Cells["A1"]; got != "<b>x&lt;y</b>" {
 		t.Errorf("«x<y» escrito sobre una celda en negrita ha salido como %q", got)
+	}
+}
+
+// TestUnLibroMasAllaDeZ100SeEditaYSaleIgual (CALC-06): un libro con datos en A5000 y en
+// AB3 —casi cualquier libro real— ya no se abre en solo lectura: la rejilla llega a los
+// límites de Excel como en la web. Sin tocar nada vuelve a salir con los mismos bytes, y
+// lo de lejos se navega y se escribe.
+func TestUnLibroMasAllaDeZ100SeEditaYSaleIgual(t *testing.T) {
+	const doc = `{"active":0,"sheets":[{"name":"H","cells":{"A1":"1","A5000":"=A1+1","AB3":"<b>lejos</b>"},` +
+		`"formats":{"AB3":{"id":"number"}},"styles":{"A5000":{"u":true}}}]}`
+	c := lienzoDePrueba()
+	if !c.Cargar(doc) {
+		t.Fatal("un libro con A5000 y AB3 se abre en solo lectura")
+	}
+	if !igual(t, doc, c.Serializar()) {
+		t.Error("sin tocar nada no sale igual que entra")
+	}
+	if got := c.Libro.Texto(0, 4999); got != "2" {
+		t.Errorf("A5000 (=A1+1) da %q", got)
+	}
+	c.Rejilla.Seleccionar(27, 2, false)
+	c.Rejilla.Escribir("cerca")
+	var vuelta modelo
+	if err := json.Unmarshal([]byte(c.Serializar()), &vuelta); err != nil {
+		t.Fatal(err)
+	}
+	if got := vuelta.Sheets[0].Cells["AB3"]; got != "<b>cerca</b>" {
+		t.Errorf("escribir en AB3 guarda %q", got)
+	}
+	if c.Rejilla.Fils < 5000 {
+		t.Errorf("con A5000 usada la rejilla solo recorre %d filas", c.Rejilla.Fils)
 	}
 }
 

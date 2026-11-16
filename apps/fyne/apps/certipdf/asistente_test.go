@@ -153,6 +153,9 @@ func TestResumirMandaElDocumentoConSusPaginas(t *testing.T) {
 	listo := make(chan struct{}, 4)
 	p.trasRed = func() { listo <- struct{}{} }
 	p.IA = api.NewIA(srv.URL, nil, nil)
+	// Bind the legacy document facade checked by the assistant. A panel-only
+	// fixture has no authorized document and correctly sends no remote request.
+	p.doc = &Documento{pdf: api.NewPDF(srv.URL, srv.URL, nil, srv.Client())}
 	p.textos = [][]Fragmento{{{Texto: "Contrato"}, {Texto: "de obra"}}, {}, {{Texto: "Precio"}}}
 	a := p.panel.asistenteP
 	a.preguntar(instruccionResumen, "resumir")

@@ -6,6 +6,9 @@ package docus
 import (
 	"image/color"
 	"math"
+	"slices"
+	"strconv"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -24,8 +27,10 @@ import (
 // una anclada detrás o delante del texto la mueve— y la cinta enseña sus herramientas:
 // ajuste del texto, alineación, texto alternativo, quitar el recorte y eliminar.
 //
-// ponytail: falta la barra flotante de encima de la imagen (ancho y alto exactos y el
-// recorte por lados en %); lo demás de ella está en la cinta.
+// Lo que la barra flotante de la web tiene y la cinta no —el ancho y el alto exactos y el
+// recorte por lados en %— va en «Herramientas de imagen», el `aria-label` de esa barra:
+// un emergente de la cinta, como el texto alternativo, para que reconstruir la cinta tras
+// cada cifra no le quite el foco al campo en el que se escribe.
 
 // imagenMaq es una imagen del folio con lo que se ve de ella, en px de maqueta.
 type imagenMaq struct {
@@ -292,19 +297,62 @@ func (f *Folio) ordenImagen(c editor.Comando, valor string) bool {
 		}
 		return true
 	}
-	antes := im.img.Ajuste
-	switch c {
-	case cmdAjusteImagen:
-		im.img.Ajuste = valor
-	case cmdAlinearImagen:
-		im.img.Alinear = valor
-	case cmdAltImagen:
-		im.img.Alt = valor
-	case cmdSinRecorte:
-		im.img.Recorte = [4]float32{}
-	default:
+	f.cambiarImagen(im, foto, c == cmdAltImagen, func(img *rico.Imagen) bool {
+		switch c {
+		case cmdAjusteImagen:
+			img.Ajuste = valor
+		case cmdAlinearImagen:
+			img.Alinear = valor
+		case cmdAltImagen:
+			img.Alt = valor
+		case cmdSinRecorte:
+			img.Recorte = [4]float32{}
+		default:
+		}
+		return true
+	})
+	return true
+}
+
+// Las medidas de la barra flotante. En la web no pasan por `exec` ni por el registro de
+// comandos —cada campo llama a `applyImage`—, y aquí tampoco: no se graban en una macro.
+const (
+	medidaAncho = iota
+	medidaAlto
+)
+
+// medirSeleccionada pone el ancho o el alto exactos de la imagen seleccionada.
+func (f *Folio) medirSeleccionada(cual int, valor string) {
+	if im, ok := f.imagenSeleccionada(); ok && f.editable() {
+		f.cambiarImagen(im, paso{f.doc.HTML(), f.cur, f.anc}, true, func(img *rico.Imagen) bool {
+			return f.medirImagen(img, cual == medidaAncho, valor)
+		})
 	}
+}
+
+// recortarSeleccionada pone lo recortado de un lado («lado=%») de la imagen seleccionada;
+// «» la deja sin recorte.
+func (f *Folio) recortarSeleccionada(valor string) {
+	if im, ok := f.imagenSeleccionada(); ok && f.editable() {
+		f.cambiarImagen(im, paso{f.doc.HTML(), f.cur, f.anc}, valor != "", func(img *rico.Imagen) bool {
+			if valor == "" {
+				img.Recorte = [4]float32{}
+				return true
+			}
+			return recortarLado(img, valor)
+		})
+	}
+}
+
+// cambiarImagen es `applyImage`: completa el tamaño de una imagen que la web no ha tocado,
+// aplica el cambio y, si pasa a anclada, la deja donde está. `agrupar` junta en un paso de
+// deshacer lo que se teclea seguido, como el texto.
+func (f *Folio) cambiarImagen(im imagenMaq, foto paso, agrupar bool, cambio func(*rico.Imagen) bool) {
+	antes := im.img.Ajuste
 	f.completar(im)
+	if !cambio(im.img) {
+		return
+	}
 	if im.img.Absoluta() && antes != "behind" && antes != "front" {
 		// Pasa a anclada donde está ahora: la esquina de su elemento, en el folio.
 		x, y, _, _ := marcoImagen(im)
@@ -312,11 +360,63 @@ func (f *Folio) ordenImagen(c editor.Comando, valor string) bool {
 		im.img.X, im.img.Y = x+mg[3], y+mg[0]
 	}
 	if f.doc.PonerImagen(im.img) {
-		f.apuntar(foto, c == cmdAltImagen)
+		f.apuntar(foto, agrupar)
 		f.reestructurado()
+	}
+}
+
+// MaxAltoImagen es el tope del alto exacto (`clamp(…, MIN_SIZE, 4000)` de `setHeight`).
+const MaxAltoImagen = 4000
+
+// MaxRecorteLado es el tope de lo recortado de un lado, en % (`clamp(…, 0, 90)`).
+const MaxRecorteLado = 90
+
+// medirImagen es `setWidth`/`setHeight` de la barra flotante: la medida pedida, acotada
+// —el ancho al del texto, el alto a [MaxAltoImagen]—, y la otra con la proporción de ahora.
+// Un texto que no es una cifra no cambia nada: la web lo lleva a `MIN_SIZE` porque su
+// campo solo avisa al confirmar, y aquí se aplica según se escribe.
+func (f *Folio) medirImagen(img *rico.Imagen, ancho bool, valor string) bool {
+	n, err := strconv.ParseFloat(strings.TrimSpace(valor), 32)
+	if err != nil || math.IsNaN(n) || math.IsInf(n, 0) {
+		return false
+	}
+	proporcion := img.Ancho / max(img.Alto, 1)
+	if proporcion <= 0 {
+		proporcion = 1
+	}
+	if ancho {
+		w := min(max(float32(n), rico.MinImagen), max(f.anchoTexto(), rico.MinImagen))
+		img.Ancho, img.Alto = redondear2(w), redondear2(w/proporcion)
+	} else {
+		h := min(max(float32(n), rico.MinImagen), MaxAltoImagen)
+		img.Ancho, img.Alto = redondear2(h*proporcion), redondear2(h)
 	}
 	return true
 }
+
+// ladosRecorte son los de `data-crop`, en su orden: arriba, derecha, abajo, izquierda.
+var ladosRecorte = [4]string{"t", "r", "b", "l"}
+
+// clavesRecorte son las de `CROP_SIDE_KEY`, en el mismo orden.
+var clavesRecorte = [4]string{"image.crop.top", "image.crop.right", "image.crop.bottom", "image.crop.left"}
+
+// recortarLado es `setCropSide`: «lado=%» pone ese lado entre 0 y 90 % y acota el conjunto
+// con [rico.ClampRecorte], como `applyImage`. Lo que no se entiende no cambia nada.
+func recortarLado(img *rico.Imagen, valor string) bool {
+	lado, pct, ok := strings.Cut(valor, "=")
+	i := slices.Index(ladosRecorte[:], lado)
+	n, err := strconv.ParseFloat(strings.TrimSpace(pct), 32)
+	if !ok || i < 0 || err != nil || math.IsNaN(n) || math.IsInf(n, 0) {
+		return false
+	}
+	r := img.Recorte
+	r[i] = float32(min(max(n, 0), MaxRecorteLado)) / 100
+	img.Recorte = rico.ClampRecorte(r)
+	return true
+}
+
+// cifra es como la web enseña una medida en su campo numérico: redondeada a la unidad.
+func cifra(n float32) string { return strconv.Itoa(int(math.Round(float64(n)))) }
 
 // AjustesImagen son los de `IMAGE_WRAPS`, con la clave de su nombre.
 var AjustesImagen = []struct{ Valor, Clave string }{
@@ -368,8 +468,105 @@ func (f *Folio) grupoImagen(c *editor.Contexto) fyne.CanvasObject {
 		return b
 	}
 	alt.Inerte = c.SoloLectura
-	controles = append(controles, alt, boton(iconos.EdRecorte, "image.removeCrop", cmdSinRecorte), boton(iconos.EdPapelera, "image.remove", cmdEliminarImagen))
+	herramientas := editor.NuevoBotonEmergente(iconos.EdTamanoPagina, c.Traducir("image.toolbar"), func(func()) fyne.CanvasObject {
+		return f.panelMedidas(c)
+	})
+	herramientas.Inerte = c.SoloLectura
+	controles = append(controles, alt, herramientas, boton(iconos.EdRecorte, "image.removeCrop", cmdSinRecorte), boton(iconos.EdPapelera, "image.remove", cmdEliminarImagen))
 	return editor.NuevoGrupo(c.Traducir("group.image"), controles...)
+}
+
+// Los anchos de los campos del panel: `w-16` los de la medida y `w-12` los del recorte.
+var (
+	anchoCampoMedidaImagen  = tema.Espacio(16)
+	anchoCampoRecorteImagen = tema.Espacio(12)
+)
+
+// panelMedidas es lo que la barra flotante de la web (`ImageOverlay.tsx`) añade a la cinta:
+// «An» y «Al» en px, que guardan la proporción, y el recorte de cada lado en % con
+// «Reiniciar». Cada cifra válida se aplica según se escribe, y los demás campos pasan a
+// decir lo que quedó: el alto que sigue al ancho, o el recorte acotado del lado opuesto.
+func (f *Folio) panelMedidas(c *editor.Contexto) fyne.CanvasObject {
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	im, ok := f.imagenSeleccionada()
+	if !ok {
+		return ui.NuevoParrafo(c.Traducir("image.none"), tema.TextoXS, ui.Normal, "text-muted", v)
+	}
+	rotulo := func(clave string) fyne.CanvasObject {
+		return ui.NuevoRotulo(c.Traducir(clave), tema.TextoXS, ui.Normal, "text-muted")
+	}
+	// poniendo calla los campos mientras se les pone texto desde aquí: sin ello, poner el
+	// alto que sigue al ancho mandaría ese alto, que volvería a poner el ancho, y así.
+	poniendo := false
+	campo := func(nombre string, ancho float32, valor string, alCambiar func(string)) *ui.Entrada {
+		e := campoPanel("", ancho)
+		e.Rotulo = c.Traducir(nombre)
+		e.PonerTexto(valor)
+		e.AlCambiar(func(s string) {
+			if !poniendo && strings.TrimSpace(s) != "" {
+				alCambiar(s)
+			}
+		})
+		return e
+	}
+	var ancho, alto *ui.Entrada
+	var lados [4]*ui.Entrada
+	// releer pone en los campos lo que tiene ahora la imagen, salvo en el que se escribe:
+	// el alto sigue al ancho, y al revés, sin pisar lo que se está tecleando.
+	releer := func(menos *ui.Entrada) {
+		im, ok := f.imagenSeleccionada()
+		if !ok {
+			return
+		}
+		poniendo = true
+		defer func() { poniendo = false }()
+		for _, x := range []struct {
+			e *ui.Entrada
+			n float32
+		}{{ancho, im.img.Ancho}, {alto, im.img.Alto}} {
+			if x.e != menos && x.n > 0 {
+				x.e.PonerTexto(cifra(x.n))
+			}
+		}
+		for i, e := range lados {
+			if e != menos {
+				e.PonerTexto(cifra(im.img.Recorte[i] * 100))
+			}
+		}
+	}
+	medir := func(cual int, desde **ui.Entrada) func(string) {
+		return func(s string) {
+			f.medirSeleccionada(cual, s)
+			releer(*desde)
+		}
+	}
+	w, h := im.img.Ancho, im.img.Alto
+	if w <= 0 || h <= 0 {
+		_, _, w, h = marcoImagen(im)
+	}
+	ancho = campo("image.width", anchoCampoMedidaImagen, cifra(w), medir(medidaAncho, &ancho))
+	alto = campo("image.height", anchoCampoMedidaImagen, cifra(h), medir(medidaAlto, &alto))
+	medidas := container.New(ui.Fila{Hueco: tema.Espacio(1)},
+		rotulo("image.width.short"), ancho, rotulo("image.height.short"), alto)
+	recorte := []fyne.CanvasObject{rotulo("image.crop.percent")}
+	for i := range lados {
+		lado := ladosRecorte[i]
+		lados[i] = campo(clavesRecorte[i], anchoCampoRecorteImagen, cifra(im.img.Recorte[i]*100), func(s string) {
+			f.recortarSeleccionada(lado + "=" + s)
+			releer(lados[i])
+		})
+		recorte = append(recorte, lados[i])
+	}
+	reiniciar := ui.NuevoBoton(c.Traducir("image.crop.reset"), func() {
+		f.recortarSeleccionada("")
+		releer(nil)
+	}).Con(ui.Fantasma, ui.TallaXS)
+	recorte = append(recorte, reiniciar)
+	for _, e := range append([]*ui.Entrada{ancho, alto}, lados[:]...) {
+		e.Inerte(c.SoloLectura)
+	}
+	reiniciar.Inerte = c.SoloLectura
+	return container.New(ui.Columna{Hueco: tema.Espacio(1)}, medidas, container.New(ui.Fila{Hueco: tema.Espacio(1)}, recorte...))
 }
 
 // panelAlt es `ImagenAltPanel`: el texto alternativo, que se aplica mientras se escribe;

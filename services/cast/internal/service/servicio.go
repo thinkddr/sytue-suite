@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"path"
 	"slices"
 	"strings"
 	"sync"
@@ -234,27 +233,7 @@ func claveDe(v domain.Video, ruta string) (string, error) {
 // /media lo repite si el almacén no trae uno. `application/vnd.apple.mpegurl`
 // para que Safari reproduzca en nativo, `video/iso.segment` para los fMP4 (RFC
 // 6381 / ISO 23000-19).
-func TipoDe(ruta string) string {
-	switch strings.ToLower(path.Ext(ruta)) {
-	case ".m3u8":
-		return "application/vnd.apple.mpegurl"
-	case ".m4s":
-		return "video/iso.segment"
-	case ".mp4":
-		return "video/mp4"
-	case ".ts":
-		return "video/mp2t"
-	case ".webm":
-		return "video/webm"
-	case ".jpg", ".jpeg":
-		return "image/jpeg"
-	case ".webp":
-		return "image/webp"
-	case ".png":
-		return "image/png"
-	}
-	return "application/octet-stream"
-}
+func TipoDe(ruta string) string { return domain.TipoDe(ruta) }
 
 // Cuota es la cuota del plan, que lleva Drive (§8). Cast pregunta con el token de
 // la persona y declara su total por organización con el secreto interno.

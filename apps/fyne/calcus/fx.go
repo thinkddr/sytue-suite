@@ -260,7 +260,7 @@ func (c *Lienzo) sincronizarFx(barra bool) {
 		}
 		return
 	}
-	cursor := cursorEnBytes(texto, ed.CursorColumn)
+	cursor := cursorEnBytes(texto, ed.CursorTextOffset())
 	nueva := c.fx == nil || c.fx.barra != barra
 	if !nueva && c.fx.texto == texto && c.fx.cursor == cursor {
 		return
@@ -325,7 +325,7 @@ func (c *Lienzo) aplicarFx(texto string, cursor int) {
 	ed := c.editorFx(fe.barra)
 	c.fxAplicando = true
 	ed.SetText(texto)
-	ed.CursorColumn = utf8.RuneCountInString(texto[:cursor])
+	ed.PonerCursor(utf8.RuneCountInString(texto[:cursor]))
 	ed.Refresh()
 	c.fxAplicando = false
 	fe.texto, fe.cursor = texto, cursor

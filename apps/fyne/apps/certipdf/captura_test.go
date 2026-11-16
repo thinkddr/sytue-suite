@@ -11,10 +11,12 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"fyne.io/fyne/v2"
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
+	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/ia"
 )
 
@@ -154,12 +156,17 @@ func TestCapturaDeLaPantalla(t *testing.T) {
 		{"proteger", fyne.NewSize(1280, 800), false, PanelPaginas},
 		{"firmar", fyne.NewSize(1280, 800), false, PanelPaginas},
 		{"firmar-oficial", fyne.NewSize(1280, 800), false, PanelPaginas},
+		{"firmar-dibujada", fyne.NewSize(1280, 800), false, PanelPaginas},
 		{"organizar-360", fyne.NewSize(360, 740), false, PanelPaginas},
 		{"capas-360", fyne.NewSize(360, 740), false, PanelPaginas},
 		{"proteger-360", fyne.NewSize(360, 740), false, PanelPaginas},
 		{"comparar-360", fyne.NewSize(360, 740), false, PanelPaginas},
 		{"herramientas-360", fyne.NewSize(360, 740), false, PanelPaginas},
 		{"firmar-360", fyne.NewSize(360, 740), false, PanelPaginas},
+		{"versiones", fyne.NewSize(1280, 800), false, PanelPaginas},
+		{"versiones-360", fyne.NewSize(360, 740), false, PanelPaginas},
+		{"atajos", fyne.NewSize(1280, 800), false, PanelPaginas},
+		{"atajos-360", fyne.NewSize(360, 740), false, PanelPaginas},
 	} {
 		base := strings.TrimSuffix(c.nombre, "-360")
 		p := NuevaPantalla(traductorES(t))
@@ -190,22 +197,42 @@ func TestCapturaDeLaPantalla(t *testing.T) {
 		w.Resize(c.tam)
 		if d, ok := map[string]Dialogo{
 			"organizar": DialogoOrganizar, "capas": DialogoCapas, "proteger": DialogoProteger,
-			"firmar": DialogoFirmar, "firmar-oficial": DialogoFirmar,
-			"comparar": DialogoComparar, "herramientas": DialogoHerramientas,
+			"firmar": DialogoFirmar, "firmar-oficial": DialogoFirmar, "firmar-dibujada": DialogoFirmar,
+			"comparar": DialogoComparar, "herramientas": DialogoHerramientas, "versiones": DialogoVersiones,
 		}[base]; ok {
 			p.doc = &Documento{}
 			p.abrirDialogo(d)
 		}
-		if base == "firmar" || base == "firmar-oficial" {
+		if base == "firmar" || base == "firmar-oficial" || base == "firmar-dibujada" {
 			f := nuevoDialogoFirmar(p.dialogo)
-			if c.nombre == "firmar" {
+			if c.nombre == "firmar" || c.nombre == "firmar-dibujada" {
 				f.lienzo.trazos = [][][2]float64{{{40, 100}, {80, 40}, {120, 110}, {170, 50}, {230, 90}, {300, 60}}}
 			}
 			if c.nombre == "firmar-oficial" {
 				f.modo, f.sistemaAbierto = "oficial", true
 			}
+			if c.nombre == "firmar-dibujada" {
+				// Sobre la banda gris de la página de prueba, como quien señala una línea.
+				f.posicion = FirmaDibujada
+				r := aFracciones(cajaA4, Rect{300, 700, 480, 755.5})
+				f.recuadro = &r
+			}
 			p.dialogo.pintar = f.vista
 			p.dialogo.rehacer()
+		}
+		if base == "versiones" {
+			v := nuevoDialogoVersiones(p.dialogo)
+			v.cargadas, v.lista = true, []api.DriveVersion{
+				{Version: 3, SizeBytes: 182_000, IsCurrent: true, CreatedAt: time.Date(2026, 11, 10, 10, 5, 0, 0, time.UTC)},
+				{Version: 2, SizeBytes: 176_000, AuthorSub: "ana", CreatedAt: time.Date(2026, 11, 9, 17, 40, 0, 0, time.UTC)},
+				{Version: 1, SizeBytes: 171_000, CreatedAt: time.Date(2026, 11, 2, 9, 0, 0, 0, time.UTC)},
+			}
+			p.dialogo.pintar = v.vista
+			p.dialogo.rehacer()
+		}
+		if base == "atajos" {
+			p.Atajos(w.Canvas())
+			w.Canvas().OnTypedRune()('?')
 		}
 		f, err := os.Create(dir + "/pantalla-" + c.nombre + sufijo + ".png")
 		if err != nil {

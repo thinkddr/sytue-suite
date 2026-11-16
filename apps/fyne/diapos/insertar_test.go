@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 
+	"fyne.io/fyne/v2/test"
+
 	"git.sytue.eu/sytue/one/apps/fyne/editor"
 	"git.sytue.eu/sytue/one/apps/nucleo/office"
 )
@@ -71,6 +73,37 @@ func TestLoInsertadoNaceElegidoYDondeLaWeb(t *testing.T) {
 	}
 	if !e.m.Fiel([]byte(e.Serializar())) {
 		t.Error("lo insertado no se vuelve a leer igual")
+	}
+}
+
+// TestInsertarDeDiaposTieneElGrafico: «Gráfico» está en Insertar, tras Conectores y
+// antes de SmartArt como en la web, y su botón inserta lo mismo que el de la mini-barra:
+// una caja de barras elegida y con el panel de sus datos abierto. Antes solo vivía en la
+// mini-barra, y quien lo buscaba donde está en Docus no lo encontraba.
+func TestInsertarDeDiaposTieneElGrafico(t *testing.T) {
+	e, ctx, _ := montar(t, `{"slides":[{"id":"a","boxes":[]}]}`)
+	banda := e.cuerpoInsertar(ctx)
+	rotulos := strings.Join(editor.RotulosDe(banda), " · ")
+	conectores, grafico, smart := strings.Index(rotulos, "Conectores"), strings.Index(rotulos, "Gráfico"), strings.Index(rotulos, "SmartArt")
+	if grafico < 0 || conectores > grafico || grafico > smart {
+		t.Fatalf("Insertar no tiene «Gráfico» entre Conectores y SmartArt: %s", rotulos)
+	}
+	var boton *editor.BotonCinta
+	for _, b := range buscar[*editor.BotonCinta](banda) {
+		if b.Rotulo == "Insertar gráfico" {
+			boton = b
+		}
+	}
+	if boton == nil || boton.Inerte {
+		t.Fatal("«Insertar gráfico» está en Insertar y se puede pulsar")
+	}
+	test.Tap(boton)
+	cs := e.m.Diapos[0].Cajas
+	if len(cs) != 1 || cs[0].Tipo != "chart" || cs[0].Grafico == nil || cs[0].Grafico.Tipo != "bar" {
+		t.Fatalf("el botón no insertó un gráfico de barras: %+v", cs)
+	}
+	if e.sel != cs[0].ID || e.abajo != abajoGrafico {
+		t.Error("el gráfico nace elegido y con el panel de sus datos abierto")
 	}
 }
 

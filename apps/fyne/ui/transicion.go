@@ -15,11 +15,11 @@ import (
 // 150 ms.
 const DuracionColores = 150 * time.Millisecond
 
-// CurvaColores es la curva por defecto de Tailwind para `transition-*`,
-// `cubic-bezier(0.4, 0, 0.2, 1)`. NO es CurvaEstandar, que es la de las entradas.
-var CurvaColores fyne.AnimationCurve = func(t float32) float32 {
-	return bezier(t, 0.4, 0, 0.2, 1)
-}
+// CurvaColores es la de `transition-*` en la web: theme.css reasigna
+// `--default-transition-timing-function` a `--ease-standard`, así que el hover, el foco y
+// el pulsado van con la misma curva que las entradas (§1.5) y no con la que Tailwind trae
+// de serie. Lo vigila `TestLasTransicionesDeColorLlevanLaCurvaDeLaHoja`.
+var CurvaColores = CurvaEstandar
 
 // transicion es un color que va a su destino en DuracionColores en vez de saltar: el
 // `transition-colors` de la hoja, para un relleno.
@@ -40,7 +40,7 @@ type transicion struct {
 // hacia lleva el color a `c` y llama a `pintar` en cada fotograma.
 func (t *transicion) hacia(c color.NRGBA, pintar func(color.NRGBA)) {
 	t.pintar = pintar
-	if !t.puesta || SinMovimiento {
+	if !t.puesta || MenosMovimiento() {
 		t.puesta, t.visto, t.destino = true, c, c
 		t.parar()
 		pintar(c)

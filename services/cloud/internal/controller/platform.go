@@ -108,9 +108,10 @@ type Platform interface {
 	RunRelease(ctx context.Context, spec AppSpec) (ReleaseState, error)
 	// RetireApp elimina los objetos de un deployment (preview cerrado, rollback).
 	RetireApp(ctx context.Context, namespace, deploymentID string) error
-	// VerifyDomain comprueba que el hostname apunta al ingress (CNAME) y/o que el
-	// registro TXT de verificación está presente.
-	VerifyDomain(ctx context.Context, hostname, token, ingressTarget string) (bool, error)
+	// VerifyDomain comprueba el registro TXT de propiedad (lo que decide
+	// Verified) y si el hostname apunta al ingress, y devuelve el motivo exacto
+	// (txt_ausente, txt_distinto, cname_distinto, ok).
+	VerifyDomain(ctx context.Context, hostname, token, ingressTarget string) (domain.DomainCheck, error)
 	// EnsureTLS aplica el Certificate de cert-manager y devuelve si ya está emitido.
 	EnsureTLS(ctx context.Context, req TLSRequest) (issued bool, err error)
 	// RemoveDomainTLS elimina Certificate y Secret TLS de un hostname.

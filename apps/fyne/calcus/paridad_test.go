@@ -26,6 +26,7 @@ var pendientesDeParidad = map[string]string{
 	"aifill":  "web: id heredado del relleno con IA; el control es `fillcells` (Fórmulas en nativo, Datos en la web)",
 	"copy":    "web: copiar y pegar se hacen con Ctrl+C y Ctrl+V sobre la rejilla; la cinta de la hoja no tiene grupo Portapapeles",
 	"paste":   "web: ídem copy",
+	"merge":   "web: el botón es «Combinar y centrar» y «Combinar celdas» vive en el menú «▾» de al lado, que la medida no abre",
 
 	"scenadd":    "web: los cuatro verbos del administrador de escenarios viven dentro de su diálogo (`data.scenarios`), no en la cinta",
 	"scendel":    "web: ídem scenadd",

@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
+
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/docs/internal/domain"
 	"git.sytue.eu/sytue/one/services/docs/internal/drive"
@@ -423,5 +425,21 @@ func TestReconciliarPapelera(t *testing.T) {
 	h := handlerConPapelera(t, &driveFalso{}, &papeleraFalsa{}, &fakeStore{})
 	if _, err := h.ReconciliarPapelera(context.Background(), "../x", false); err == nil {
 		t.Fatal("una organización inválida no se reconcilia")
+	}
+}
+
+func (p *papeleraFalsa) WithLegacyDocumentEffect(_ context.Context, _ string, effect func() error) error {
+	return effect()
+}
+
+func TestPrivateLegacyTrashFenceDeniesBeforeDriveOrSQL(t *testing.T) {
+	doc := docConFichero("d1")
+	df := &driveFalso{}
+	fs := &storeConBorrado{fakeStore: &fakeStore{doc: &doc, effectFenceErr: &pgconn.PgError{Code: "PST01"}}}
+	h := handlerConPapelera(t, df, &papeleraFalsa{}, fs)
+	rec := httptest.NewRecorder()
+	h.deleteDocument(rec, conTenant(req(t, "DELETE", "/v1/documents/d1", ownerClaims(), map[string]string{"id": "d1"}, "")))
+	if rec.Code != http.StatusConflict || fs.borrados != 0 || len(df.pedidos) != 0 {
+		t.Fatal("frozen owner reached external or SQL effects", rec.Code, fs.borrados, len(df.pedidos))
 	}
 }

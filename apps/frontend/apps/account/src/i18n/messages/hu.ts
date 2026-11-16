@@ -7,6 +7,23 @@ import type { en } from './en.js';
 
 export const hu: AppCatalog<typeof en> = {
   'app.title': 'Saját fiók',
+  'app.description': 'Saját fiók — a Sytue-fiókod profilja, biztonsága és hozzáférései.',
+  'app.lead': 'A profilod, hogyan lépsz be és véded a fiókot, és hol van megnyitva.',
+
+  // --- Revisión de seguridad ---
+  'checkup.title': 'Biztonsági ellenőrzés',
+  'checkup.all_good': 'Minden rendben: a fiókja jól védett.',
+  'checkup.dos_pasos':
+    'A kétlépéses azonosítás ki van kapcsolva: a jelszó egymagában megnyitja a fiókot.',
+  'checkup.recuperacion':
+    'Nincs helyreállítási e-mail vagy telefon: ha elveszíti a hozzáférést, nincs visszaút.',
+  'checkup.sesiones': 'Más eszközökön nyitott munkamenetek: {count}',
+  'checkup.contrasenas_app': '90 napja nem használt alkalmazásjelszavak: {count}',
+  'checkup.dispositivos': '90 napja nem látott megbízható eszközök: {count}',
+  'checkup.turn_on': 'Bekapcsolás',
+  'checkup.add': 'Hozzáadás',
+  'checkup.review': 'Áttekintés',
+
   'profile.title': 'Profil',
   'profile.name': 'Megjelenített név',
   'profile.name.hint': 'Így jelenik meg az egész csomagban.',
@@ -30,25 +47,55 @@ export const hu: AppCatalog<typeof en> = {
   'photo.errorRead': 'A képet nem sikerült beolvasni.',
   'sessions.title': 'Nyitott munkamenetek',
   'sessions.current': 'Ez az eszköz',
+  'sessions.signed_in': 'Bejelentkezve: {time}',
   'sessions.close_one': 'Munkamenet bezárása',
+  'sessions.close_named': 'Munkamenet bezárása ezen: {device}',
+  'sessions.close_one_confirm':
+    '{device} kijelentkezik, és a fiókod használatához újra be kell jelentkeznie.',
   'sessions.close_others': 'Minden munkamenet lezárása',
   'sessions.close_others_note': 'Ezt is beleértve: újra be kell jelentkeznie.',
+  'sessions.close_all_confirm':
+    'Minden munkamenet bezárul, ez is. Minden eszközön újra be kell jelentkezned.',
   'sessions.empty': 'Nincs más nyitott munkamenet.',
   'sessions.failed': 'A munkameneteket nem sikerült betölteni.',
   'common.loading': 'Betöltés…',
+  'common.retry': 'Próbáld újra',
   'devices.title': 'Eszközök',
   'devices.current': 'Ez az eszköz',
   'devices.trusted': 'Megbízható',
   'devices.trust': 'Megjelölés megbízhatóként',
   'devices.forget': 'Eszköz elfelejtése',
+  'devices.forget_named': '{device} elfelejtése',
+  'devices.forget_confirm':
+    '{device} többé nem lesz felismerve, és elveszíti a megbízható állapotát. Az onnan történő új bejelentkezés új eszköznek számít.',
   'devices.empty': 'Még nincs felismert eszköz.',
   'devices.failed': 'Az eszközöket nem sikerült betölteni.',
+  'signature.title': 'Mentett aláírás',
+  'signature.help':
+    'Az aláírás, amelyet a kézi aláíráskor a CertiPDF-fel megjegyeztetett. Titkosítva tároljuk a fiókjában.',
+  'signature.empty':
+    'Nincs mentett aláírása. Amikor kézzel ír alá a CertiPDF-ben, jelölje be az «Aláírásom megjegyzése» lehetőséget.',
+  'signature.failed': 'A mentett aláírást nem sikerült betölteni.',
+  'signature.preview': 'Az Ön mentett aláírása',
+  'signature.saved_on': 'Mentve: {date}',
+  'signature.delete': 'Mentett aláírás törlése',
+  'signature.delete_confirm':
+    'A mentett aláírása törlődik. A már aláírt dokumentumok megőrzik; amikor legközelebb kézzel ír alá, újra meg kell rajzolnia.',
   'security.title': 'Biztonság',
   'security.failed': 'Valami hiba történt. Próbálja újra.',
   'security.password.title': 'Jelszó',
   'security.password.warning': 'A módosítás mindenhol kijelentkezteti, itt is.',
   'security.password.current': 'Jelenlegi jelszó',
   'security.password.new': 'Új jelszó',
+  'security.password.requirements': 'Az új jelszó követelményei:',
+  'security.password.req_length': {
+    one: 'Legalább {count} karakter',
+    other: 'Legalább {count} karakter',
+  },
+  'security.password.req_complexity': 'Betűk és legalább egy számjegy',
+  'security.password.req_different': 'Eltér a jelenlegi jelszótól',
+  'security.password.req_met': 'Teljesül',
+  'security.password.req_pending': 'Még nem',
   'security.password.submit': 'Jelszó módosítása',
   'security.password.done': 'Jelszó módosítva. Minden munkamenet bezárult, ez is.',
   'security.password.signin_again': 'Bejelentkezés újra',
@@ -71,6 +118,44 @@ export const hu: AppCatalog<typeof en> = {
   'security.codes.once':
     'Egyszer jelennek meg. Mentse el őket biztonságos helyre: mindegyik egyszer működik.',
   'security.codes.saved': 'Elmentettem őket',
+  'security.codes.regenerate_confirm':
+    'A jelenlegi helyreállítási kódjaid azonnal érvényüket vesztik, a kinyomtatottak és mentettek is.',
+  'security.mfa.step.need': 'Mielőtt elkezdené',
+  'security.mfa.step.need.heading': 'Amire szüksége lesz',
+  'security.mfa.step.need.desc':
+    'Egy hitelesítő alkalmazás a telefonján. 30 másodpercenként új, hatjegyű kódot mutat.',
+  'security.mfa.step.need.apps_title': 'Bármely hitelesítő alkalmazás megfelel',
+  'security.mfa.step.need.apps':
+    'Például: Aegis, FreeOTP, Microsoft Authenticator, Google Authenticator, 1Password, Bitwarden. Ha nincs ilyen, telepítsen egyet, mielőtt továbblép.',
+  'security.mfa.step.need.next': 'Kezdés',
+  'security.mfa.step.scan': 'Beolvasás',
+  'security.mfa.step.scan.heading': 'Adja hozzá fiókját az alkalmazáshoz',
+  'security.mfa.key_label': 'Beállítókulcs',
+  'security.mfa.step.code': 'Kód',
+  'security.mfa.step.code.heading': 'Írja be az alkalmazás kódját',
+  'security.mfa.step.code.desc':
+    'Így bekapcsolás előtt ellenőrizzük, hogy az alkalmazás és a fiók egyezik.',
+  'security.mfa.code.hint': 'Hat számjegy. Ha gépelés közben megváltozik, az újat használja.',
+  'security.mfa.step.codes.heading': 'Mentse el a helyreállítási kódokat',
+  'security.codes.copy': 'Összes másolása',
+  'security.codes.copied': 'Kódok kimásolva.',
+  'security.codes.copy_failed': 'Nem sikerült másolni. Jelölje ki a kódokat, és másolja kézzel.',
+  'security.codes.download': '.txt letöltése',
+  'security.codes.file_title': 'Sytue helyreállítási kódok',
+  'security.codes.file_account': 'Fiók: {account}',
+  'security.codes.file_date': 'Létrehozva: {date}',
+  'security.codes.file_note':
+    'Minden kód egyszer használható. Tartsa ezt a fájlt biztonságos helyen, a telefonjától távol.',
+  'security.mfa.step.done': 'Kész',
+  'security.mfa.step.done.heading': 'A kétlépcsős ellenőrzés bekapcsolva',
+  'security.mfa.step.done.desc': 'A következő bejelentkezéskor kódot kérünk az alkalmazásból.',
+  'security.mfa.passkey_tip.title': 'Adjon hozzá hozzáférési kulcsot is',
+  'security.mfa.passkey_tip':
+    'Hozzáférési kulccsal ujjlenyomattal, arccal vagy képernyőzárral lép be, kódok beírása nélkül.',
+  'security.mfa.passkey_tip.action': 'Hozzáférési kulcs hozzáadása',
+  'security.mfa.close': 'Bezárás',
+  'security.mfa.disable_title': 'Kikapcsolja a kétlépcsős ellenőrzést?',
+  'security.mfa.disable_warning': 'Ezután ismét a jelszó egyedül is megnyitja a fiókot.',
   'common.cancel': 'Mégse',
   'profile.given_name': 'Keresztnév',
   'profile.family_name': 'Vezetéknév',
@@ -81,6 +166,8 @@ export const hu: AppCatalog<typeof en> = {
   'profile.locale.hint': 'A teljes Sytue-ban és az Önnek küldött üzenetekben használjuk.',
   'security.passkeys.title': 'Hozzáférési kulcsok',
   'security.passkeys.remove': 'Eltávolítás',
+  'security.passkeys.remove_named': '{name} eltávolítása',
+  'security.passkeys.remove_confirm': 'Többé nem tudsz bejelentkezni ezzel: {name}.',
   'security.passkeys.unnamed': 'Névtelen kulcs',
   'app_passwords.title': 'Alkalmazásjelszavak',
   'app_passwords.hint':
@@ -89,6 +176,9 @@ export const hu: AppCatalog<typeof en> = {
   'app_passwords.label.hint': 'Például: laptop levelezés, telefon.',
   'app_passwords.create': 'Jelszó létrehozása',
   'app_passwords.revoke': 'Visszavonás',
+  'app_passwords.revoke_named': '{label} visszavonása',
+  'app_passwords.revoke_confirm':
+    'A(z) {label} jelszót használó alkalmazások többé nem tudnak bejelentkezni. Ez nem vonható vissza.',
   'app_passwords.empty': 'Még nincs alkalmazásjelszó.',
   'app_passwords.failed': 'Az alkalmazásjelszavakat nem sikerült betölteni.',
   'app_passwords.unnamed': 'Névtelen',

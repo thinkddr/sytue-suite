@@ -8,6 +8,7 @@
       {"clave":"tipo","tipo":"seleccion","opciones":["organizacion","persona"],"requerido":true},
       {"clave":"nif","tipo":"texto"},
       {"clave":"correo","tipo":"correo"},
+      {"clave":"email_facturas","tipo":"correo"},
       {"clave":"telefono","tipo":"telefono"},
       {"clave":"web","tipo":"url"},
       {"clave":"direccion","tipo":"texto"},

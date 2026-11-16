@@ -34,6 +34,9 @@ type Documento struct {
 	fichero api.File
 	datos   []byte
 	clave   string
+	// recargar dice que en Drive hay otro contenido (se acaba de restaurar una versión)
+	// y lo que hay en memoria ya no es el documento: lo próximo que lo lea lo baja antes.
+	recargar bool
 }
 
 // AbrirDocumento trae de Drive el PDF de esa RUTA, que es como se abre CertiPDF en la web
@@ -169,6 +172,9 @@ func (d *Documento) Comparar(ctx context.Context, otra string) (Comparacion, err
 
 // Contenido es `op: contenido`: todo lo que la pantalla necesita saber del documento.
 func (d *Documento) Contenido(ctx context.Context) (*Contenido, error) {
+	if err := d.alDia(ctx); err != nil {
+		return nil, err
+	}
 	var c Contenido
 	if err := d.Leer(ctx, "/pdf/content", nil, &c); err != nil {
 		return nil, err
@@ -217,6 +223,10 @@ func (d *Documento) Imagenes(ctx context.Context, desde, hasta int, escala float
 // sus bytes pasan a ser el documento; si es una copia, el documento sigue siendo el que
 // era y la copia se abre aparte.
 func (d *Documento) Aplicar(ctx context.Context, c api.PDFCambio) (api.PDFAplicado, error) {
+	// Cambiar sobre lo que había antes de restaurar desharía la restauración.
+	if err := d.alDia(ctx); err != nil {
+		return api.PDFAplicado{}, err
+	}
 	d.mu.Lock()
 	f := d.fichero
 	d.mu.Unlock()
@@ -243,4 +253,74 @@ func (d *Documento) RutaDe(f api.File) string {
 		return "/" + f.Name
 	}
 	return d.ruta[:i] + f.Name
+}
+
+// asistir keeps text and page images out of the legacy AI service when the
+// document came from private Drive, including requests queued before a UI change.
+func (d *Documento) asistir(ctx context.Context, client *api.IA, request api.PeticionIA) (string, error) {
+	if d == nil || client == nil {
+		return "", api.ErrPrivatePDFOperation
+	}
+	if err := d.pdf.CheckRemoteProcessing(ctx); err != nil {
+		return "", err
+	}
+	return client.Asistir(ctx, request)
+}
+
+// Versiones es una página del historial del documento en Drive, la actual primero.
+func (d *Documento) Versiones(ctx context.Context, cursor string) ([]api.DriveVersion, string, error) {
+	d.mu.Lock()
+	id := d.fichero.ID
+	d.mu.Unlock()
+	return d.pdf.Versiones(ctx, id, cursor)
+}
+
+// Version trae los bytes de una versión archivada, para verla aparte.
+func (d *Documento) Version(ctx context.Context, n int) ([]byte, error) {
+	d.mu.Lock()
+	id := d.fichero.ID
+	d.mu.Unlock()
+	return d.pdf.DescargarVersion(ctx, id, n)
+}
+
+// Restaurar hace actual la versión `n` en Drive. Lo que hay en memoria es la versión
+// que se acaba de dejar, y seguir anotando sobre ella pisaría lo restaurado con el
+// siguiente cambio: queda marcado para bajarlo otra vez, y eso lo hace [Documento.Contenido],
+// que es lo primero que pide el visor. Así, si la red cae justo después de restaurar, no se
+// dice «no se ha podido restaurar» de algo que sí se restauró, y «Reintentar» del visor
+// vuelve a intentar la bajada en vez de enseñar el documento viejo.
+func (d *Documento) Restaurar(ctx context.Context, n int) error {
+	d.mu.Lock()
+	id := d.fichero.ID
+	d.mu.Unlock()
+	if err := d.pdf.RestaurarVersion(ctx, id, n); err != nil {
+		return err
+	}
+	d.mu.Lock()
+	d.recargar = true
+	d.mu.Unlock()
+	return nil
+}
+
+// alDia vuelve a traer de Drive el documento si se restauró una versión desde la última
+// vez: el fichero (su versión nueva, que el siguiente cambio necesita) y sus bytes.
+func (d *Documento) alDia(ctx context.Context) error {
+	d.mu.Lock()
+	toca, ruta := d.recargar, d.ruta
+	d.mu.Unlock()
+	if !toca {
+		return nil
+	}
+	f, err := d.pdf.PorRuta(ctx, ruta)
+	if err != nil {
+		return err
+	}
+	datos, err := d.pdf.Descargar(ctx, f.ID)
+	if err != nil {
+		return err
+	}
+	d.mu.Lock()
+	d.fichero, d.datos, d.recargar = f, datos, false
+	d.mu.Unlock()
+	return nil
 }

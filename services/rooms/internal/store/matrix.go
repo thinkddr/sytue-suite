@@ -15,6 +15,7 @@ import (
 
 // MatrixGate only controls access metadata; it has no encryption keys.
 type MatrixGate interface {
+	RevokeStorageAccess(context.Context, string, string) error
 	Reconcile(context.Context, string, []string, bool, bool) error
 	Redact(context.Context, domain.MatrixEventRef) error
 }

@@ -310,7 +310,7 @@ func (s *Server) handleGoogleDirUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		tras = &store.UserCursor{CreatedAt: cur.T, ID: cur.I}
 	}
-	usuarios, mas, err := s.store.ListOrgUsersPage(r.Context(), org.ID, googleQuery(q.Get("query")), tras, limite)
+	usuarios, mas, err := s.store.ListOrgUsersPage(r.Context(), org.ID, googleQuery(q.Get("query")), "", tras, limite)
 	if err != nil {
 		httpx.Fail(w, r, httpx.ErrInternal.Wrap(err))
 		return

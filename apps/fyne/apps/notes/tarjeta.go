@@ -34,9 +34,9 @@ import (
 // que cambia entre una nota de texto y un evento vinculado es el CUERPO; el marco, el
 // menú, las etiquetas y el foco son idénticos. Es la misma decisión que la web.
 //
-// Medidas, de la hoja de NoteCard.tsx con el rem de 14:
+// Medidas, de la hoja de NoteCard.tsx con el rem de 16:
 //
-//	marco     `rounded-lg border p-3 gap-1.5 shadow-sm`   → radio 8, relleno 10,5
+//	marco     `rounded-lg border p-3 gap-1.5 shadow-sm`   → radio 8, relleno 12
 //	cabecera  `flex items-start gap-1.5`, glifo de 15
 //	título    text-base peso 500 (`font-medium`)
 //	cuerpo    text-base, interlineado `leading-relaxed`
@@ -543,7 +543,7 @@ func (t *Tarjeta) convertible() bool {
 }
 
 // LadoRayaPulsable es el botón de la raya: 24 px para el dedo (`.notes-stream-bullet-btn`,
-// en px porque la raíz es de 14).
+// en px para que no dependa del tamaño de la raíz).
 const LadoRayaPulsable = 24
 
 // rayaPulsable es la raya de una línea de texto hecha botón. Mide 24 y sobresale lo mismo
@@ -764,6 +764,8 @@ func (t *Tarjeta) cuerpoContenido(v tema.Variante) fyne.CanvasObject {
 	}
 	if t.Editor != nil {
 		t.Editor.Estirado = t.estirada()
+		// La hoja del árbol y la fila de lista o diario son papel: sin aro (NoteCard.tsx).
+		t.Editor.SinAro = t.Llenar || t.Diario
 		return t.Editor
 	}
 	// Texto y tarea. Sin contenido y editable, se dice qué hacer (`note.placeholder`),
@@ -875,7 +877,7 @@ func insigniaEstado(e api.NoteState, v tema.Variante) fyne.CanvasObject {
 	caja := ui.NuevaCaja(fondo, color.NRGBA{}, tema.RadioPill)
 	dentro := container.New(ui.Margen{Izq: ui.MargenInsignia, Der: ui.MargenInsignia, Arr: ui.AltoInsignia, Abj: ui.AltoInsignia},
 		container.New(ui.Fila{Hueco: 1 * 0.25 * tema.Rem},
-			punto(PuntoEstado, hexO(e.Color, tema.Color("text-muted", v))),
+			punto(PuntoEstado, tonoO(e.Color, tema.Color("text-muted", v))),
 			linea(rotulo, escalonInsignia, ui.SemiNegrita, tema.Color("text-muted", v))))
 	return container.New(&enCaja{caja: caja}, append(caja.Objetos(), dentro)...)
 }
@@ -1318,6 +1320,17 @@ func (t *Tarjeta) TypedKey(e *fyne.KeyEvent) {
 func hexO(s string, reserva color.NRGBA) color.NRGBA {
 	if c, ok := tokens.ParseColor(s); ok {
 		return c
+	}
+	return reserva
+}
+
+// tonoO es el color con que se PINTA un color elegido por la gente (el de un cuaderno o
+// el de un estado de etiqueta): su tono de la paleta de colores de usuario, el más
+// cercano si se guardó con la paleta de antes (`colorDeUsuario` de la web), o el de
+// reserva si no hay o no se entiende. Lo guardado no se reescribe.
+func tonoO(s string, reserva color.NRGBA) color.NRGBA {
+	if c, ok := tokens.TonoDeUsuario(s); ok {
+		return c.NRGBA()
 	}
 	return reserva
 }

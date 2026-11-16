@@ -401,7 +401,12 @@ const DATOS: Record<string, Record<string, Dato>> = {
     PSL_USER_GENERATED_CONTENT: FUNCION,
     PSL_FILES_AND_DOCS: { opcional: true, para: ["PSL_APP_FUNCTIONALITY"] },
   },
-  photos: { PSL_PHOTOS: FUNCION },
+  // Los vídeos solo si se enciende la copia de seguridad de la galería y no se dejan
+  // fuera (apps/fyne/apps/photos/copia.go): por eso son opcionales.
+  photos: {
+    PSL_PHOTOS: FUNCION,
+    PSL_VIDEOS: { opcional: true, para: ["PSL_APP_FUNCTIONALITY"] },
+  },
   // La voz y la cámara (o la pantalla) de una llamada van al SFU. No son efímeras: desde
   // el teléfono también se graba la reunión (`RecordMeeting`), y la grabación se guarda.
   rooms: {

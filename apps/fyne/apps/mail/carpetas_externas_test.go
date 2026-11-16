@@ -61,9 +61,9 @@ func TestLasCarpetasExternasSonLasDeLaWeb(t *testing.T) {
 			}
 			for i, want := range c.Esperado {
 				f := got[i]
-				glifo, hay := glifosPropios[want.Glifo]
-				if !hay {
-					t.Fatalf("el glifo %q de los vectores no está en glifosPropios", want.Glifo)
+				glifo := glifoPorNombre(want.Glifo)
+				if glifo == "" {
+					t.Fatalf("el glifo %q de los vectores no está en glifosPropios ni en el común", want.Glifo)
 				}
 				rotulo := RotuloCarpeta(tr, f.Name, f.Role)
 				if f.ID != want.ID || rotulo != want.Rotulo || GlifoCarpeta(f.Role) != glifo {

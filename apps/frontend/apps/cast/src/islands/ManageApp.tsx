@@ -17,6 +17,7 @@ import {
   Card,
   FieldGroup,
   Icon,
+  InlineHelp,
   Input,
   SectionHeader,
   Skeleton,
@@ -204,13 +205,7 @@ function Formulario({ t, locale, inicial }: { t: T; locale: Locale; inicial: Vid
         }
       />
       {v.status === 'failed' && v.failure ? (
-        <p
-          class="bg-danger-bg text-danger-text flex items-start gap-2 rounded-md px-4 py-3 text-sm"
-          role="alert"
-        >
-          <Icon name="danger" size={16} />
-          {t('manage.failure', { reason: v.failure })}
-        </p>
+        <InlineHelp tone="danger">{t('manage.failure', { reason: v.failure })}</InlineHelp>
       ) : null}
       <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
         <div class="flex min-w-0 flex-col gap-6">

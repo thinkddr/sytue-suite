@@ -50,6 +50,44 @@ func Java_eu_sytue_nativo_RefrescoWidgets_refrescar(env *C.JNIEnv, _ C.jclass, c
 			r = C.jint(Fallo)
 		}
 	}()
+	o, ok := entradaSinVentana(env, contexto, paquete, producto, zona, desfase)
+	if !ok {
+		return C.jint(Fallo)
+	}
+	ctx, parar := context.WithTimeout(context.Background(), widgets.PlazoWidget+5*time.Second)
+	defer parar()
+	return C.jint(RefrescarSinVentana(ctx, o))
+}
+
+// PlazoTareaSinVentana es lo que dura como mucho una tarea en segundo plano de Android:
+// por debajo de los diez minutos que JobScheduler da a un trabajo antes de pararlo.
+const PlazoTareaSinVentana = 9 * time.Minute
+
+// Java_eu_sytue_nativo_TareaFondo_ejecutar es `TareaFondo.ejecutar(Context, String
+// paquete, String producto, String zona, int desfase)`: corre la TareaEnFondo registrada
+// del producto (tareas_fondo.go) y devuelve el Resultado.
+//
+//export Java_eu_sytue_nativo_TareaFondo_ejecutar
+func Java_eu_sytue_nativo_TareaFondo_ejecutar(env *C.JNIEnv, _ C.jclass, contexto C.jobject,
+	paquete, producto, zona C.jstring, desfase C.jint) (r C.jint) {
+	defer func() {
+		if recover() != nil {
+			r = C.jint(Fallo)
+		}
+	}()
+	o, ok := entradaSinVentana(env, contexto, paquete, producto, zona, desfase)
+	if !ok {
+		return C.jint(Fallo)
+	}
+	ctx, parar := context.WithTimeout(context.Background(), PlazoTareaSinVentana)
+	defer parar()
+	return C.jint(TareaSinVentana(ctx, o))
+}
+
+// entradaSinVentana es lo común a las entradas JNI sin ventana: lee los argumentos y,
+// sin la app abierta en este proceso, prepara la puerta a Java y la casa. false si no hay
+// máquina de Java.
+func entradaSinVentana(env *C.JNIEnv, contexto C.jobject, paquete, producto, zona C.jstring, desfase C.jint) (SinVentana, bool) {
 	e := jni.EnvFor(uintptr(unsafe.Pointer(env)))
 	o := SinVentana{
 		Bundle:   jni.GoString(e, jni.String(paquete)),
@@ -59,7 +97,7 @@ func Java_eu_sytue_nativo_RefrescoWidgets_refrescar(env *C.JNIEnv, _ C.jclass, c
 	if suiteViva.Load() == nil {
 		vm := C.sytue_fondo_vm(env)
 		if vm == nil {
-			return C.jint(Fallo)
+			return o, false
 		}
 		// Una vez por proceso: la referencia global al contexto de la APLICACIÓN (no
 		// el de este JobService, que muere al acabar) vive lo que el proceso.
@@ -67,11 +105,9 @@ func Java_eu_sytue_nativo_RefrescoWidgets_refrescar(env *C.JNIEnv, _ C.jclass, c
 			global := jni.NewGlobalRef(e, jni.Object(contexto))
 			sistema.EnAndroid = conRespaldo(sistema.EnAndroid, javaPropia(vm, uintptr(global)))
 		})
-		prepararCasa() // HOME y XDG: sin ellos ni ajustes ni el snapshot tienen carpeta
+		prepararCasa() // HOME, XDG y TMPDIR: sin ellos ni ajustes ni el snapshot tienen carpeta
 	}
-	ctx, parar := context.WithTimeout(context.Background(), widgets.PlazoWidget+5*time.Second)
-	defer parar()
-	return C.jint(RefrescarSinVentana(ctx, o))
+	return o, true
 }
 
 // javaPropia ejecuta f en un hilo enganchado a `vm`, con el contexto `ctx`: lo que hace

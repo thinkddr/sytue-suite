@@ -26,8 +26,8 @@ func TestSignaturePersisteYEsPorCuenta(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
-	ada := seedAccount(t, ctx, st, "ada@sytue.eu")
-	bob := seedAccount(t, ctx, st, "bob@sytue.eu")
+	ada := seedAccount(ctx, t, st, "ada@sytue.eu")
+	bob := seedAccount(ctx, t, st, "bob@sytue.eu")
 
 	// Cuenta recién creada: sin firma, y eso no es un error.
 	if sig, err := st.GetSignature(ctx, ada.ID); err != nil || sig != "" {
@@ -66,7 +66,7 @@ func TestSignaturePersisteYEsPorCuenta(t *testing.T) {
 func TestSignatureNoCruzaOrganizaciones(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
-	ada := seedAccount(t, tenantCtx("acme"), st, "ada@sytue.eu")
+	ada := seedAccount(tenantCtx("acme"), t, st, "ada@sytue.eu")
 	if err := st.SetSignature(tenantCtx("acme"), ada.ID, "Ada · Acme"); err != nil {
 		t.Fatalf("SetSignature: %v", err)
 	}

@@ -32,7 +32,10 @@
         "Team.ReadBasic.All",
         "Channel.ReadBasic.All",
         "Chat.Read"
-      ]
+      ],
+      "authorize_params": {
+        "prompt": "select_account"
+      }
     },
     "substitutes": [
       {

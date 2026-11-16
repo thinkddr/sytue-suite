@@ -7,6 +7,9 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,7 +29,9 @@ type fakeCanje struct {
 	tenant     string
 	canjearon  []string
 	deFuera    []domain.Document
-	noEscribe  bool
+	// pedidosDeFuera cuenta las veces que la lista pidió los de fuera.
+	pedidosDeFuera int
+	noEscribe      bool
 }
 
 func (f *fakeCanje) EnlaceParaCanjear(context.Context, string) (*store.EnlaceCanjeable, error) {
@@ -51,7 +56,8 @@ func (f *fakeCanje) CanjeadosDe(context.Context, string, string) ([]string, erro
 }
 
 func (f *fakeCanje) DeFuera(context.Context, string, domain.ListFilter) ([]domain.Document, error) {
-	return f.deFuera, nil
+	f.pedidosDeFuera++
+	return slices.Clone(f.deFuera), nil
 }
 
 func enlaceDe(rol domain.Role) *store.EnlaceCanjeable {
@@ -153,5 +159,48 @@ func TestListaConLosDeFuera(t *testing.T) {
 	docs, _ := body["documents"].([]any)
 	if len(docs) != 1 || docs[0].(map[string]any)["id"] != "d9" {
 		t.Fatalf("la página no lleva el de fuera, más reciente: %v", docs)
+	}
+}
+
+// Por título, los de fuera se mezclan en su sitio alfabético (sin acentos) y a partir
+// del cursor; con «Míos» ni se piden: nunca son de quien pregunta.
+func TestListaConLosDeFueraPorTituloYAlcance(t *testing.T) {
+	fs := &fakeStore{listDocs: []domain.Document{
+		{ID: "00000000-0000-0000-0000-000000000001", OwnerSub: "bea", Title: "Balance"},
+		{ID: "00000000-0000-0000-0000-000000000002", OwnerSub: "bea", Title: "Diario"},
+	}}
+	h := newHandler(fs)
+	fc := &fakeCanje{deFuera: []domain.Document{
+		{ID: "00000000-0000-0000-0000-000000000009", Title: "Álbum"},
+		{ID: "00000000-0000-0000-0000-000000000008", Title: "Cuentas"},
+	}}
+	h.canje = fc
+	bea := &authn.Claims{Subject: "bea", Tenant: "globex"}
+	rec := httptest.NewRecorder()
+	h.listDocuments(rec, req(t, "GET", "/v1/documents?limit=3&sort=title", bea, nil, ""))
+	lista := decodeBody(t, rec)["documents"].([]any)
+	titulos := make([]string, 0, len(lista))
+	for _, d := range lista {
+		titulos = append(titulos, d.(map[string]any)["title"].(string))
+	}
+	if strings.Join(titulos, ",") != "Álbum,Balance,Cuentas" {
+		t.Fatalf("orden por título: %v", titulos)
+	}
+
+	// Desde el cursor de «Balance», «Álbum» ya pasó y no se repite.
+	cursor := titleCursor(domain.Document{ID: "00000000-0000-0000-0000-000000000001", Title: "Balance"})
+	rec = httptest.NewRecorder()
+	h.listDocuments(rec, req(t, "GET", "/v1/documents?sort=title&cursor="+url.QueryEscape(cursor), bea, nil, ""))
+	for _, d := range decodeBody(t, rec)["documents"].([]any) {
+		if d.(map[string]any)["title"] == "Álbum" {
+			t.Fatal("el de fuera anterior al cursor se repite")
+		}
+	}
+
+	antes := fc.pedidosDeFuera
+	rec = httptest.NewRecorder()
+	h.listDocuments(rec, req(t, "GET", "/v1/documents?scope=mine", bea, nil, ""))
+	if fc.pedidosDeFuera != antes {
+		t.Fatal("con «Míos» no se piden los de fuera")
 	}
 }

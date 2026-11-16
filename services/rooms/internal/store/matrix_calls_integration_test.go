@@ -59,7 +59,7 @@ func (f *callTransportFake) RotateCallTransport(_ context.Context, oldName, newN
 	return f.err
 }
 
-func seedCall(t *testing.T, h *pgtest.Harness, ctx context.Context, st *store.Store, ch uuid.UUID) (mediadomain.Room, *callMatrixFake, *callTransportFake) {
+func seedCall(ctx context.Context, t *testing.T, h *pgtest.Harness, st *store.Store, ch uuid.UUID) (mediadomain.Room, *callMatrixFake, *callTransportFake) {
 	t.Helper()
 	var metadata map[string]any
 	if ch != uuid.Nil {
@@ -79,7 +79,7 @@ func TestCallEpochDeviceReplacementRejectsStaleConnectionEvents(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
-	room, matrix, transport := seedCall(t, h, ctx, st, uuid.Nil)
+	room, matrix, transport := seedCall(ctx, t, h, st, uuid.Nil)
 	firstJoin := uuid.New()
 	first, err := st.PrepareCallEncryption(ctx, room.ID, "alice", "DEVICE-A", firstJoin, mediadomain.RoleHost)
 	if err != nil {
@@ -132,7 +132,7 @@ func TestCallReadyPreservesViewerRoleAndRejectsOldGeneration(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
-	room, _, transport := seedCall(t, h, ctx, st, uuid.Nil)
+	room, _, transport := seedCall(ctx, t, h, st, uuid.Nil)
 	join := uuid.New()
 	first, err := st.PrepareCallEncryption(ctx, room.ID, "alice", "VIEWER", join, mediadomain.RoleViewer)
 	if err != nil {
@@ -163,7 +163,7 @@ func TestCallKickCannotRejoinThroughHistoricalParticipation(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
-	room, _, _ := seedCall(t, h, ctx, st, uuid.Nil)
+	room, _, _ := seedCall(ctx, t, h, st, uuid.Nil)
 	join := uuid.New()
 	if _, err := st.PrepareCallEncryption(ctx, room.ID, "alice", "A", join, mediadomain.RoleHost); err != nil {
 		t.Fatal(err)
@@ -186,14 +186,14 @@ func TestCallChannelRevocationRollsBackIfSFUCannotRevoke(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
-	tm, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPrivate)
+	tm, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPrivate)
 	if err := st.AddTeamMember(ctx, tm.ID, "alice", "bob", "Bob", domain.RoleMember); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := st.AddChannelMember(ctx, ch.ID, "alice", "bob", "Bob"); err != nil {
 		t.Fatal(err)
 	}
-	room, _, transport := seedCall(t, h, ctx, st, ch.ID)
+	room, _, transport := seedCall(ctx, t, h, st, ch.ID)
 	alice, bob := uuid.New(), uuid.New()
 	if _, err := st.PrepareCallEncryption(ctx, room.ID, "alice", "A", alice, mediadomain.RoleHost); err != nil {
 		t.Fatal(err)
@@ -221,7 +221,7 @@ func TestCallPendingJoinExpiresAndLifecycleRevokesStandalone(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
-	room, _, _ := seedCall(t, h, ctx, st, uuid.Nil)
+	room, _, _ := seedCall(ctx, t, h, st, uuid.Nil)
 	join := uuid.New()
 	if _, err := st.PrepareCallEncryption(ctx, room.ID, "alice", "A", join, mediadomain.RoleHost); err != nil {
 		t.Fatal(err)
@@ -254,11 +254,11 @@ func TestDeletingChannelEndsCallsBeforeAcknowledgingDeletion(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
-	_, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPrivate)
-	bindMatrix(t, st, ctx, ch.ID, "alice")
+	_, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPrivate)
+	bindMatrix(ctx, t, st, ch.ID, "alice")
 	gate := &matrixGate{}
 	st.SetMatrixGate(gate)
-	room, matrix, transport := seedCall(t, h, ctx, st, ch.ID)
+	room, matrix, transport := seedCall(ctx, t, h, st, ch.ID)
 	join := uuid.New()
 	binding, err := st.PrepareCallEncryption(ctx, room.ID, "alice", "A", join, mediadomain.RoleHost)
 	if err != nil {

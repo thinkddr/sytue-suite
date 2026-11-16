@@ -28,10 +28,16 @@ const EXCEPCIONES: Record<string, string> = {
     'página de desarrollo que prueba a propósito un pie propio que no desborda (test/e2e/superposiciones.mjs)',
   'apps/mail/src/components/ExternalMail.tsx':
     'el pie aloja el contenedor de destino con ref para los botones del Wizard de cuentas de correo externas',
+  'apps/pages/src/tienda/AsistentePasarela.tsx':
+    'el pie aloja el contenedor de destino con ref para las acciones del asistente de conectar una pasarela de pago',
   'apps/rooms/src/components/ExternalConversations.tsx':
     'el pie aloja el contenedor de destino con ref para las acciones del Wizard de conversaciones externas',
   'apps/rooms/src/components/IntegrationsModal.tsx':
     'el pie aloja el contenedor de destino con ref para las acciones del Wizard de conexiones de WhatsApp',
+  'apps/console/src/components/GroupsPanel.tsx':
+    'el pie aloja el contenedor de destino con ref para las acciones del asistente de crear un grupo',
+  'apps/console/src/components/UsersPanel.tsx':
+    'el pie aloja el contenedor de destino con ref para las acciones del asistente de invitar a una persona',
 };
 
 /** Los pies de `<Modal>`/`<ConfirmDialog>` del código (no los `footer` de una barra lateral). */

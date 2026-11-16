@@ -73,6 +73,10 @@ type avisosBarra struct {
 	correo *int
 	// insignia es el último número puesto sobre el icono, para no repetirlo.
 	enIcono int
+	// alSinLeer es quien quiere saber del contador ([BarraSuite.AlCambiarSinLeer]), y
+	// avisado lo último que se le dijo, para no despertarlo por nada (-1: nada aún).
+	alSinLeer func(int)
+	avisado   int
 	// propia es el número que la app cuenta por su cuenta ([BarraSuite.PonerInsignia]);
 	// nil, el icono lleva lo que dicen los avisos del Hub ([insigniaDe]).
 	propia *int
@@ -416,7 +420,17 @@ func (a *avisosBarra) llega(n api.HubNotification) {
 // refrescar repinta la campana y, si el panel está abierto, su contenido.
 func (a *avisosBarra) refrescar() {
 	a.ponerInsignia()
+	a.mu.Lock()
+	alSinLeer, n := a.alSinLeer, a.sinLeer
+	cambia := alSinLeer != nil && n != a.avisado
+	if cambia {
+		a.avisado = n
+	}
+	a.mu.Unlock()
 	fyne.Do(func() {
+		if cambia {
+			alSinLeer(n)
+		}
 		a.boton.Refresh()
 		a.repintar(tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
 		a.anillo.Refresh()

@@ -28,3 +28,8 @@ func ordenElegir(titulo string, extensiones []string) (string, []string, error) 
 	}, "\n")
 	return "osascript", []string{"-e", script}, nil
 }
+
+// ordenElegirCarpeta es `choose folder`: el panel del Finder para una carpeta.
+func ordenElegirCarpeta(titulo string) (string, []string, error) {
+	return "osascript", []string{"-e", guionCarpetaApple(titulo)}, nil
+}

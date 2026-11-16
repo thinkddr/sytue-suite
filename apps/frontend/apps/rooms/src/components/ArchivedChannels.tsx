@@ -12,7 +12,7 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { Button, EmptyState, Illustration, Input, Spinner } from '@sytue/ui';
+import { Button, EmptyState, Input, Spinner } from '@sytue/ui';
 import {
   ChatHttpError,
   listArchivedChannels,
@@ -180,13 +180,7 @@ export function ArchivedChannels({ onUnarchived, t }: Props): JSX.Element {
     );
   }
   if (canales.length === 0) {
-    return (
-      <EmptyState
-        class="py-4"
-        title={t('archived.empty')}
-        illustration={<Illustration name="emptyChat" size={96} />}
-      />
-    );
+    return <EmptyState class="py-4" title={t('archived.empty')} spot="emptyChat" />;
   }
   return (
     <div class="flex flex-col gap-2">

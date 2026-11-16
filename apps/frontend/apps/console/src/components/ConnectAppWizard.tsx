@@ -29,6 +29,7 @@ import {
   ReviewSummary,
   Wizard,
   useToast,
+  EmptyState,
 } from '@sytue/ui';
 import type { DataCategory, IconName, ReviewItem, WizardStep } from '@sytue/ui';
 import { contiene, formatList, type Locale } from '@sytue/i18n';
@@ -403,7 +404,7 @@ export default function ConnectAppWizard({
           onInput={(e) => setQuery(e.currentTarget.value)}
         />
         {filtered.length === 0 ? (
-          <p class="text-text-muted py-6 text-center text-sm">{t('wizard.app.choose.noResults')}</p>
+          <EmptyState compact title={t('wizard.app.choose.noResults')} />
         ) : (
           <ul class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {filtered.map((item) => {
@@ -779,13 +780,13 @@ export default function ConnectAppWizard({
           </section>
 
           {result.oidcClientSecret ? (
-            <section class="border-warning bg-warning-bg rounded-lg border p-4">
-              <h3 class="text-warning-text text-sm font-semibold">
-                {t('wizard.app.done.oidcTitle')}
-              </h3>
-              <p class="text-text-muted mt-1 text-sm">
-                {t('wizard.app.done.oidcBody', { app: app.name })}
-              </p>
+            <InlineHelp
+              tone="warning"
+              live="off"
+              title={t('wizard.app.done.oidcTitle')}
+              titleAs="h3"
+            >
+              <p>{t('wizard.app.done.oidcBody', { app: app.name })}</p>
               <div class="mt-3 flex flex-col gap-2">
                 <Secret
                   label="client_id"
@@ -800,7 +801,7 @@ export default function ConnectAppWizard({
                   onCopy={copy}
                 />
               </div>
-            </section>
+            </InlineHelp>
           ) : null}
 
           {result.samlMetadataUrl ? (

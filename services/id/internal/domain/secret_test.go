@@ -56,6 +56,31 @@ func TestValidatePassword(t *testing.T) {
 	}
 }
 
+// La cifra que se enseña a la persona (/me) y la que ValidatePassword aplica
+// salen del mismo método: con el suelo duro incluido, una org con un mínimo
+// por debajo de 8 no puede anunciar «4 caracteres» y luego rechazarlos.
+func TestEffectiveMinLength(t *testing.T) {
+	for _, c := range []struct{ min, quiero int }{
+		{0, PasswordMinFloor},
+		{1, PasswordMinFloor},
+		{PasswordMinFloor, PasswordMinFloor},
+		{12, 12},
+		{64, 64},
+	} {
+		if got := (PasswordPolicy{MinLength: c.min}).EffectiveMinLength(); got != c.quiero {
+			t.Errorf("EffectiveMinLength(%d) = %d, quiero %d", c.min, got, c.quiero)
+		}
+		p := PasswordPolicy{MinLength: c.min}
+		justo := strings.Repeat("x", p.EffectiveMinLength())
+		if err := ValidatePassword(p, justo); err != nil {
+			t.Errorf("min=%d: %d caracteres anunciados no pasan: %v", c.min, len(justo), err)
+		}
+		if err := ValidatePassword(p, justo[1:]); !errors.Is(err, ErrWeakPassword) {
+			t.Errorf("min=%d: uno menos de lo anunciado debe rechazarse", c.min)
+		}
+	}
+}
+
 func TestHashPasswordRoundTrip(t *testing.T) {
 	const pw = "correcto-caballo-batería-grapa"
 	h, err := HashPassword(pw)

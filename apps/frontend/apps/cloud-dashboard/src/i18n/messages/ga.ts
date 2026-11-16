@@ -67,14 +67,6 @@ export const ga: AppCatalog<typeof en> = {
   'palette.group.navigation': 'Nascleanúint',
   'palette.group.actions': 'Gníomhartha',
   'palette.group.projects': 'Tionscadail',
-  'palette.dialog': 'Pailéad orduithe',
-  'palette.inputLabel': 'Cuardaigh orduithe, tionscadail agus gníomhartha',
-  'palette.placeholder': 'Cuardaigh nó léim chuig…',
-  'palette.results': 'Torthaí',
-  'palette.noResults': 'Níl aon toradh do “{query}”.',
-  'palette.hint.move': 'bog',
-  'palette.hint.open': 'oscail',
-  'palette.hint.close': 'dún',
   'palette.createProject': 'Cruthaigh tionscadal',
   'palette.createProject.keywords':
     'nua stórlann ceangail imscar git new repository connect deploy',
@@ -320,6 +312,24 @@ export const ga: AppCatalog<typeof en> = {
   'domains.dns.txtValue': 'TXT · luach',
   'domains.dns.after':
     'Seiceálaimid gach cúpla nóiméad. Nuair a bheidh do DNS scaipthe, beidh an fearann fíoraithe agus eiseofar an teastas go huathoibríoch.',
+  'domains.check': 'Seiceáil anois',
+  'domains.check.ok.title': 'Fearann fíoraithe',
+  'domains.check.ok.desc':
+    'Tá an taifead TXT i bhfeidhm agus díríonn {host} ar Sytue. Tá an teastas á eisiúint anois.',
+  'domains.check.txtMissing.title': 'Níor aimsíodh an taifead TXT',
+  'domains.check.txtMissing.desc':
+    'Ní féidir linn {record} a aimsiú. Cruthaigh é leis an luach thuas; má rinne tú díreach anois é, d’fhéadfadh cúpla nóiméad a bheith ag teastáil chun an DNS a scaipeadh.',
+  'domains.check.txtMismatch.title': 'Tá luach eile ag an taifead TXT',
+  'domains.check.txtMismatch.desc':
+    'Tá {record} ann, ach ní hé comhartha an fhearainn seo a luach. Cuir an luach thuas ina áit.',
+  'domains.check.cname.title': 'Fíoraithe, ach téann an trácht áit éigin eile',
+  'domains.check.cname.desc':
+    'Díríonn {host} ar {found}. Dírigh a CNAME ar {expected}: ní eiseofar an teastas go dtí sin.',
+  'domains.check.cname.descNone':
+    'Níl {host} á réiteach fós. Dírigh a CNAME ar {expected}: ní eiseofar an teastas go dtí sin.',
+  'domains.check.tooSoon': 'Fan cúpla soicind sula seiceálann tú arís.',
+  'domains.check.fail': 'Níorbh fhéidir an fearann a sheiceáil. Bain triail eile as.',
+  'domains.check.demo': 'I mód taispeána níl aon DNS le seiceáil.',
   'domains.deleted': 'Fearann bainte',
   'domains.deleted.desc': 'Ní fhreastalaíonn {host} ar thrácht sa tionscadal seo a thuilleadh.',
   'domains.delete.fail': 'Níorbh fhéidir an fearann a bhaint',
@@ -645,15 +655,9 @@ export const ga: AppCatalog<typeof en> = {
   'tasks.confirm.title': 'An tasc seo a bhaint?',
   'tasks.confirm.body':
     'Ní rithfidh {name} a thuilleadh as seo amach. Ní chealaítear aon rud a ritheadh cheana.',
-  'copy.secret': 'rúnda',
   'copy.manage': 'Bainistigh',
   'copy.manageLabel': 'Bainistigh {label} in Athróga timpeallachta',
   'copy.copy': 'Cóipeáil',
-  'copy.copyLabel': 'Cóipeáil {label}',
-  'copy.copied': 'Cóipeáilte',
-  'copy.copied.desc': 'Cóipeáladh {label} chuig an ngearrthaisce.',
-  'copy.fail': 'Níorbh fhéidir cóipeáil',
-  'copy.fail.desc': 'Cóipeáil an luach de láimh.',
   'billing.subtitle':
     'Do phlean, caiteachas na tréimhse seo agus do shonraisc. Praghsanna simplí in aghaidh an aonaid, gan iontas.',
   'billing.planBadge': 'Plean {plan}',
@@ -860,6 +864,55 @@ export const ga: AppCatalog<typeof en> = {
   'tplw.demo': 'Níl plána rialaithe ceangailte',
   'tplw.demo.desc':
     'Níor cruthaíodh aon rud. Bain triail eile as nuair a bheidh an t-inneall ar fáil.',
+  'npw.subtitle': 'Ó do stór go seoladh beo, céim ar chéim.',
+  'npw.step.origin': 'Foinse',
+  'npw.step.origin.heading': 'Cá bhfuil do chód?',
+  'npw.step.origin.desc':
+    'Greamaigh seoladh do stóir Git. Breathnóimid isteach ann chun an chuid eile a líonadh duit.',
+  'npw.step.configure': 'Cumraigh',
+  'npw.step.configure.heading': 'Tabhair ainm dó agus seiceáil conas a thógtar é',
+  'npw.step.configure.desc':
+    'Beidh an t-ainm mar sheoladh gréasáin aige. Tagann na socruithe tógála ó do stór: ná hathraigh iad ach amháin má tá siad mícheart.',
+  'npw.step.variables': 'Athróga',
+  'npw.step.variables.heading': 'An bhfuil athróga de dhíth ar d’aip?',
+  'npw.step.variables.desc':
+    'Eochracha API, seoltaí bunachar sonraí… Cuir leo anois agus beidh siad ag an gcéad imscaradh cheana. Is féidir leat iad a chur leis níos déanaí freisin.',
+  'npw.vars.add': 'Cuir athróg leis',
+  'npw.vars.skip': 'Lean ar aghaidh gan athróga',
+  'npw.vars.empty': 'Níl aon athróga fós. Ní miste mura bhfuil aon cheann de dhíth ar d’aip.',
+  'npw.vars.keyLabel': 'Eochair athróg {n}',
+  'npw.vars.valueLabel': 'Luach athróg {n}',
+  'npw.vars.remove': 'Bain athróg {n}',
+  'npw.vars.duplicate': 'Tá an eochair seo ann níos mó ná uair amháin: coinnigh ceann amháin.',
+  'npw.vars.scope':
+    'Baineann siad le táirgeadh agus le réamhamhairc. Is féidir leat gach ceann a chúngú níos déanaí faoi Athróga.',
+  'npw.review.vars': 'Athróga',
+  'npw.review.vars.none': 'Dada faoi láthair',
+  'npw.review.deploy.value':
+    'Tosaíonn sé a luaithe a chruthaítear an tionscadal, agus is féidir leat é a leanúint anseo.',
+  'npw.review.order': 'San ord seo',
+  'npw.review.order.desc':
+    'Cruthaímid an tionscadal, sábhálaimid a athróga agus tosaímid an chéad imscaradh. Má theipeann ar chéim, stopaimid ansin agus insímid duit cén fáth; ní chailltear aon rud atá déanta cheana.',
+  'npw.step.deploy': 'Imscar',
+  'npw.task.project': 'Cruthaigh an tionscadal',
+  'npw.task.vars': 'Sábháil na hathróga ({done} as {total})',
+  'npw.task.deploy': 'Tosaigh an chéad imscaradh',
+  'npw.task.build': 'Tóg agus foilsigh',
+  'npw.task.build.status': 'Tóg agus foilsigh: {status}',
+  'npw.task.state.pending': 'ar feitheamh',
+  'npw.task.state.running': 'ar siúl',
+  'npw.task.state.done': 'déanta',
+  'npw.task.state.failed': 'theip air',
+  'npw.fail.vars': 'Níorbh fhéidir {key} a shábháil',
+  'npw.fail.deploy': 'Níorbh fhéidir an chéad imscaradh a thosú',
+  'npw.fail.keep': 'Tá an tionscadal ann cheana: leanann iarracht eile ar aghaidh as seo.',
+  'npw.logs.title': 'Logchomhad tógála',
+  'npw.logs.waiting': 'Ag fanacht go dtosóidh an tógáil…',
+  'npw.result.ready': 'Tá d’aip ar líne',
+  'npw.result.ready.desc': 'Freagraíonn sé ag {url}.',
+  'npw.result.error': 'Theip ar an tógáil',
+  'npw.result.error.desc':
+    'De ghnáth insíonn na línte deireanacha den logchomhad cad atá in easnamh. Ceartaigh é agus brúigh commit, nó imscar arís ón tionscadal.',
   'monitoring.subtitle':
     'Seiceálacha infhaighteachta do do URLanna agus foláirimh in aghaidh teagmhais chuig Slack, Discord nó webhook.',
   'monitoring.status.up': 'Ar líne',

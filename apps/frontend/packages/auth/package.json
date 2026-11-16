@@ -8,7 +8,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./server": "./src/server/index.ts",
-    "./client": "./src/client/index.ts"
+    "./client": "./src/client/index.ts",
+    "./matrix-callback.astro": "./src/client/MatrixCallback.astro"
   },
   "files": [
     "src"
@@ -22,7 +23,9 @@
     "@sytue/config": "workspace:*",
     "@sytue/i18n": "workspace:*",
     "jose": "6.2.13",
-    "@sytue/api-clients": "workspace:*"
+    "@sytue/api-clients": "workspace:*",
+    "@sytue/offline": "workspace:*",
+    "@sytue/ui": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

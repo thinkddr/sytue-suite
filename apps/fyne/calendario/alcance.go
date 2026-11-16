@@ -5,6 +5,7 @@ package calendario
 
 import (
 	"image/color"
+	"slices"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -24,11 +25,19 @@ import (
 //	Radio `hover:bg-bg-subtle w-full rounded-md px-2 py-2 text-sm`
 //	pie: Cancelar (secondary) · Guardar (primary) o Eliminar (danger)
 func (p *Pantalla) DialogoAlcance(borrar bool, alConfirmar func(alcance string), alCancelar func()) *ui.Dialogo {
+	return p.dialogoAlcance(borrar, []string{AlcanceEste, AlcanceSiguientes, AlcanceTodos}, alConfirmar, alCancelar)
+}
+
+// dialogoAlcance es DialogoAlcance con solo los alcances de `ofrecidos` (alcancesDe).
+func (p *Pantalla) dialogoAlcance(borrar bool, ofrecidos []string, alConfirmar func(alcance string), alCancelar func()) *ui.Dialogo {
 	elegido := AlcanceEste
 	filas := make([]*filaAlcance, 0, 3)
 	for _, o := range []struct{ alcance, clave string }{
 		{AlcanceEste, "scope.this"}, {AlcanceSiguientes, "scope.following"}, {AlcanceTodos, "scope.all"},
 	} {
+		if !slices.Contains(ofrecidos, o.alcance) {
+			continue
+		}
 		f := nuevaFilaAlcance(p.t(o.clave, nil), o.alcance == elegido)
 		alcance := o.alcance
 		f.alElegir = func() {

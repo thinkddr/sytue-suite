@@ -24,7 +24,7 @@ func TestTrabajoMasivoSeVeYSePara(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateOrg: %v", err)
 	}
-	jefa := seedUser(t, ctx, st, "jefa@acme.test")
+	jefa := seedUser(ctx, t, st, "jefa@acme.test")
 
 	id, err := st.CrearTrabajo(ctx, org.ID, "suspend", jefa.ID, 5)
 	if err != nil {

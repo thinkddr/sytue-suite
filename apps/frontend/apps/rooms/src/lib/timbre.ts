@@ -24,22 +24,30 @@ const MAXIMO_MS = 30_000;
 
 type Ctor = typeof AudioContext;
 
-/** Constructor de AudioContext del navegador, o null donde no exista (SSR, tests). */
-function contextoDisponible(): Ctor | null {
+/** Constructor de AudioContext del navegador, o null donde no exista (SSR, tests).
+ *  Exportado para el sonido de aviso de mensajes (`sonidoAviso.ts`). */
+export function contextoDisponible(): Ctor | null {
   if (typeof window === 'undefined') return null;
   const w = window as unknown as { AudioContext?: Ctor; webkitAudioContext?: Ctor };
   return w.AudioContext ?? w.webkitAudioContext ?? null;
 }
 
-/** Un pitido con ataque y caída suaves: un seno a pelo chasquea al empezar y al parar. */
-function pitido(ctx: AudioContext, hz: number, empieza: number, dura: number): void {
+/** Un pitido con ataque y caída suaves: un seno a pelo chasquea al empezar y al parar.
+ *  `volumen` es la ganancia de meseta; el aviso de mensajes va más bajo que el timbre. */
+export function pitido(
+  ctx: AudioContext,
+  hz: number,
+  empieza: number,
+  dura: number,
+  volumen = 0.14,
+): void {
   const osc = ctx.createOscillator();
   const gan = ctx.createGain();
   osc.type = 'sine';
   osc.frequency.value = hz;
   gan.gain.setValueAtTime(0, empieza);
-  gan.gain.linearRampToValueAtTime(0.14, empieza + 0.02);
-  gan.gain.setValueAtTime(0.14, empieza + dura - 0.04);
+  gan.gain.linearRampToValueAtTime(volumen, empieza + 0.02);
+  gan.gain.setValueAtTime(volumen, empieza + dura - 0.04);
   gan.gain.linearRampToValueAtTime(0, empieza + dura);
   osc.connect(gan).connect(ctx.destination);
   osc.start(empieza);

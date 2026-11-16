@@ -11,7 +11,6 @@ import (
 	"fyne.io/fyne/v2/container"
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
-	"git.sytue.eu/sytue/one/apps/nucleo/sistema"
 )
 
 // DesplazarSuave lleva `s` a la altura `y` como `scrollTo({behavior: 'smooth'})` de
@@ -26,7 +25,7 @@ func DesplazarSuave(s *container.Scroll, y float32, previa *fyne.Animation) *fyn
 	}
 	x, desde := s.Offset.X, s.Offset.Y
 	delta := y - desde
-	if delta == 0 || sistema.MenosMovimiento() {
+	if delta == 0 || MenosMovimiento() {
 		s.ScrollToOffset(fyne.NewPos(x, y))
 		return nil
 	}

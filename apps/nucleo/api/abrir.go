@@ -340,8 +340,8 @@ func rutaEsquema(ruta string) string {
 
 // abre es QUÉ PRODUCTO ABRE CADA EXTENSIÓN, el espejo de `abrir-con.ts`.
 //
-// Las imágenes son las CUATRO que el servicio de fotos sabe leer (`THUMB_EXTS`, las
-// mismas que tienen miniatura): un SVG o un AVIF darían un error tras salir de Drive, que
+// Las imágenes son las que el servicio de fotos sabe leer (`THUMB_EXTS` de
+// `miniaturas.ts`, las mismas que tienen miniatura, WebP incluido): un SVG o un AVIF darían un error tras salir de Drive, que
 // es peor que quedarse donde se estaba. Lo que no está aquí —un `.csv`, un `.zip`, un
 // `.go`— no tiene app dueña y se queda con quien lo listó.
 //
@@ -357,6 +357,7 @@ var abre = map[string]string{
 	"jpeg":    "photos",
 	"png":     "photos",
 	"gif":     "photos",
+	"webp":    "photos",
 	"odt":     "docs",
 	"docx":    "docs",
 	"ott":     "docs",

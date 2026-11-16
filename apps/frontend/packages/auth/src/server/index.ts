@@ -53,3 +53,19 @@ export type { Directorio, Persona } from './directorio.js';
 export type { EnvLike } from '../config.js';
 export { crearProxyDeServicio, rutaQueEscapa } from './proxy.js';
 export type { OpcionesProxyDeServicio } from './proxy.js';
+export { rutaBootstrapMatrixPrivado } from './matrix-storage.js';
+export { rutasRecuperacionMatrix } from './matrix-recovery.js';
+export { rutaBlobsMatrixPrivados } from './matrix-storage-blobs.js';
+export { rutaMigracionMatrixPrivada } from './matrix-storage-migration.js';
+
+export {
+  rutaAutoridadMatrixPrivada,
+  rutaPublicacionesMatrixPrivadas,
+} from './matrix-storage-authority.js';
+
+// Public maintained client core; shares the transport without requiring a data session.
+export { clientCoreProxy, roomsServiceBase } from '@sytue/api-clients';
+
+export { rutaMailPrivado, rutaCorteIdentidadMatrixPrivada } from './mail-private-storage.js';
+
+export { rutaMetadataMailPrivado } from './mail-private-metadata.js';

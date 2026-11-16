@@ -84,8 +84,8 @@ func TestLaDinamicaSeEscribeComoEnLaWeb(t *testing.T) {
 		t.Error("quitar la tabla deja algo")
 	}
 	// Una que no cabe no toca nada.
-	lz.Mandar(CmdDinamica, `{"source":"A1:B4","anchor":"Z99","rows":[{"field":0}],"cols":[],"values":[{"field":1,"fn":"sum"}]}`)
-	if l.Dinamicas() != nil || l.HTML(25, 98) != "" {
+	lz.Mandar(CmdDinamica, `{"source":"A1:B4","anchor":"XFD1048576","rows":[{"field":0}],"cols":[],"values":[{"field":1,"fn":"sum"}]}`)
+	if l.Dinamicas() != nil || l.HTML(MaxColumnas-1, MaxFilas-1) != "" {
 		t.Error("una tabla que no cabe se escribe igual")
 	}
 	// La de antes (la de las macros grabadas) sigue entendiéndose.

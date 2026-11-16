@@ -180,6 +180,20 @@ export const fr: AppCatalog<typeof en> = {
   'nav.sensitivityLabels': 'Étiquettes de confidentialité',
   'nav.audit': 'Audit',
   'nav.account': 'Mon compte',
+  // --- Paleta de órdenes (⌘K) ---
+  'palette.group.sections': 'Sections',
+  'palette.group.actions': 'Actions',
+  'palette.group.people': 'Personnes',
+  'palette.action.invitar': 'Inviter une personne',
+  'palette.action.invitar.keywords': 'nouvel utilisateur ajouter membre compte',
+  'palette.action.crear-grupo': 'Créer un groupe',
+  'palette.action.crear-grupo.keywords': 'nouvelle équipe liste de diffusion',
+  'palette.action.conectar-app': 'Connecter une application',
+  'palette.action.conectar-app.keywords': 'intégration oauth saml',
+  'palette.action.conectar-sso': 'Connecter le SSO',
+  'palette.action.conectar-sso.keywords':
+    "authentification unique fournisseur d'identité idp saml oidc",
+  'palette.trigger': 'Rechercher',
   'shell.brand': 'Sytue Admin',
   'org.active': 'Organisation active',
   'org.switch': "Changer d'organisation",
@@ -314,6 +328,29 @@ export const fr: AppCatalog<typeof en> = {
     one: '{count} compte suspendu reste ouvert',
     other: '{count} comptes suspendus restent ouverts',
   },
+  // Guía de primeros pasos de la organización.
+  'dashboard.setup.title': 'Configurez votre organisation',
+  'dashboard.setup.progress': '{done} sur {total} terminés',
+  'dashboard.setup.open': 'Ouvrir',
+  'dashboard.setup.step.domain': 'Connectez votre propre domaine',
+  'dashboard.setup.hint.domain': "Prouvez qu'il vous appartient avec un enregistrement DNS TXT.",
+  'dashboard.setup.step.mail': 'Envoyez des e-mails depuis votre domaine',
+  'dashboard.setup.hint.mail':
+    'Faites de votre domaine vérifié le domaine principal des nouvelles adresses.',
+  'dashboard.setup.step.invite': 'Invitez votre équipe',
+  'dashboard.setup.hint.invite': "Ajoutez les personnes qui travailleront dans l'organisation.",
+  'dashboard.setup.step.mfa': 'Activez la validation en deux étapes',
+  'dashboard.setup.hint.mfa': 'Chacun devrait avoir un second facteur.',
+  'dashboard.setup.step.sso': 'Authentification unique',
+  'dashboard.setup.hint.sso':
+    "Facultatif : connectez-vous avec le fournisseur d'identité de votre entreprise.",
+  'dashboard.setup.step.apps': 'Connectez des applications',
+  'dashboard.setup.hint.apps':
+    'Facultatif : enregistrez les applications qui se connectent avec Sytue ID.',
+  'dashboard.setup.status.done': 'Terminé',
+  'dashboard.setup.status.pending': 'À faire',
+  'dashboard.setup.status.optional': 'Facultatif',
+  'dashboard.setup.status.unknown': 'Aucune donnée',
 
   // Destino SIEM de la auditoría (mig 0035, sin pantalla hasta ahora).
   'sink.title': 'Envoyer ce journal d’audit à votre SIEM',
@@ -443,9 +480,6 @@ export const fr: AppCatalog<typeof en> = {
   'orgDomain.recordType': 'Type',
   'orgDomain.recordName': 'Nom',
   'orgDomain.recordValue': 'Valeur',
-  'orgDomain.copy': 'Copier',
-  'orgDomain.copied': 'Copié',
-  'orgDomain.copyFailed': 'Copie impossible : sélectionnez la valeur et copiez-la à la main.',
   'orgDomain.check': 'Enregistrer et vérifier',
   'orgDomain.recheck': 'Vérifier à nouveau',
   'orgDomain.verified': 'Domaine vérifié',
@@ -491,6 +525,11 @@ export const fr: AppCatalog<typeof en> = {
   'users.searchLabel': 'Rechercher une personne',
   'users.filterTenant': 'Filtrer par organisation',
   'users.allTenants': 'Toutes les organisations',
+  'users.filterState': 'Filtrer par statut',
+  'users.state.all': 'Tout le monde',
+  'users.state.withoutMfa': 'Sans second facteur',
+  'users.state.suspended': 'Suspendus',
+  'users.state.unverifiedEmail': 'E-mail non vérifié',
   'users.invite': 'Inviter une personne',
   'users.listLabel': 'Comptes Sytue ID',
   'users.openRecord': 'Ouvrir la fiche de {name}',
@@ -540,6 +579,10 @@ export const fr: AppCatalog<typeof en> = {
   'users.impact.lastOwner':
     'C’est la seule personne propriétaire : sans elle, personne ne peut administrer cette organisation.',
   'users.empty.noMatch': 'Personne dans cette organisation ne correspond à votre saisie.',
+  'users.empty.filter.withoutMfa': 'Toutes les personnes actives ont un second facteur.',
+  'users.empty.filter.suspended': 'Aucun compte n’est suspendu.',
+  'users.empty.filter.unverifiedEmail':
+    'Toutes les personnes actives ont vérifié leur adresse e-mail.',
   'users.toast.searchFailed': 'La recherche n’a pas pu être effectuée',
   'users.detail.lastLogin': 'Dernière connexion',
   'users.detail.created': 'Créé le',
@@ -582,6 +625,89 @@ export const fr: AppCatalog<typeof en> = {
   'users.inviteMailbox': 'Adresse de la boîte',
   'users.inviteMailboxPlaceholder': 'prenom.nom',
   'users.inviteMailboxHint': 'Laissez vide pour utiliser prenom.nom automatiquement.',
+  'users.inviteWizard.step.who': 'Qui ?',
+  'users.inviteWizard.step.role': 'Que pourra-t-elle faire ?',
+  'users.inviteWizard.step.review': 'Vérifier',
+  'users.inviteWizard.step.done': 'Terminé',
+  'users.inviteWizard.who.heading': 'Qui voulez-vous inviter ?',
+  'users.inviteWizard.who.emailHint':
+    "L'adresse où elle recevra le lien. Elle peut être extérieure à l'organisation.",
+  'users.inviteWizard.who.invalid':
+    "Vérifiez l'e-mail ou l'adresse de la boîte : l'un des deux n'est pas valide.",
+  'users.inviteWizard.who.invalidWithPassword':
+    "Vérifiez l'e-mail, l'adresse de la boîte ou le mot de passe initial : l'un d'eux n'est pas valide. Le mot de passe doit respecter la politique de l'organisation.",
+  'users.inviteWizard.who.accountExists':
+    'Un compte existe déjà avec cet e-mail : il ne peut donc pas être créé avec un mot de passe. Laissez le mot de passe vide et invitez la personne.',
+  'users.inviteWizard.role.heading': 'Que pourra-t-elle faire ?',
+  'users.inviteWizard.role.description':
+    'Le rôle décide de ce à quoi elle aura accès dès le premier jour. Vous pourrez le changer ensuite dans sa fiche.',
+  'users.inviteWizard.role.ownerBody':
+    "Contrôle total, y compris la facturation et la nomination ou le retrait d'autres propriétaires.",
+  'users.inviteWizard.role.adminBody':
+    "Gère les personnes, les groupes, les applications et la sécurité de l'organisation. Ne peut pas nommer de propriétaires.",
+  'users.inviteWizard.role.memberBody':
+    "Utilise les applications de la suite avec son compte. Ne voit pas la console d'administration.",
+  'users.inviteWizard.role.billingBody':
+    "Consulte et gère l'abonnement et les factures. Ne gère ni les personnes ni les données.",
+  'users.inviteWizard.review.heading': "Vérifiez avant d'inviter",
+  'users.inviteWizard.review.description':
+    "Rien n'est envoyé tant que vous n'appuyez pas sur le bouton.",
+  'users.inviteWizard.review.mailboxAuto': 'prenom.nom (automatique)',
+  'users.inviteWizard.review.access': 'Accès',
+  'users.inviteWizard.review.accessPassword': 'Mot de passe initial, sans e-mail',
+  'users.inviteWizard.review.accessLink': "Lien d'invitation par e-mail",
+  'users.inviteWizard.review.create': 'Créer le compte',
+  'users.inviteWizard.done.heading': "C'est fait",
+  'users.inviteWizard.done.expires':
+    "{email} recevra un lien pour rejoindre l'organisation. Il expire le {date} ; s'il n'est pas utilisé à temps, vous pourrez réinviter depuis « Invitations en attente ».",
+  'users.inviteWizard.done.another': 'Inviter une autre personne',
+  'users.inviteWizard.mode.label': 'Combien de personnes ?',
+  'users.inviteWizard.mode.one': 'Une personne',
+  'users.inviteWizard.mode.oneBody':
+    'Avec son adresse de boîte mail ou un mot de passe initial si besoin.',
+  'users.inviteWizard.mode.many': 'Plusieurs personnes',
+  'users.inviteWizard.mode.manyBody':
+    'Jusqu’à 25 à la fois avec le même rôle. Collez une liste ou un CSV.',
+  'users.inviteWizard.many.label': 'Adresses e-mail',
+  'users.inviteWizard.many.placeholder': 'ana@entreprise.fr, luis@entreprise.fr…',
+  'users.inviteWizard.many.hint':
+    'Séparées par des virgules, des espaces ou une par ligne ; vous pouvez aussi coller un CSV. Chaque personne reçoit son propre lien et une adresse prenom.nom.',
+  'users.inviteWizard.many.count': {
+    one: '{count} adresse',
+    other: '{count} adresses',
+  },
+  'users.inviteWizard.many.ignored': {
+    one: '{count} fragment sans @ ignoré (un en-tête ou un nom)',
+    other: '{count} fragments sans @ ignorés (en-têtes ou noms)',
+  },
+  'users.inviteWizard.many.tooMany':
+    'Cela fait {count} adresses et un lot en accepte 25 au maximum. Invitez les autres ensuite.',
+  'users.inviteWizard.many.invalid':
+    'Sytue ID a refusé la liste. Vérifiez qu’elle ne dépasse pas 25 adresses.',
+  'users.inviteWizard.many.rateLimited':
+    'Vous avez envoyé plusieurs lots d’affilée. Attendez une minute et réessayez.',
+  'users.inviteWizard.many.people': 'Personnes',
+  'users.inviteWizard.many.submit': {
+    one: 'Envoyer {count} invitation',
+    other: 'Envoyer {count} invitations',
+  },
+  'users.inviteWizard.many.doneTitle': 'Envoyées : {sent} sur {total}',
+  'users.inviteWizard.many.doneAll':
+    'Chaque personne recevra un lien pour rejoindre l’organisation. Vous les verrez dans « Invitations en attente » jusqu’à ce qu’elles acceptent.',
+  'users.inviteWizard.many.doneSome':
+    'Voici ce qui s’est passé pour chaque adresse et que faire de celles qui ne sont pas parties.',
+  'users.inviteWizard.many.status.sent': 'envoyée',
+  'users.inviteWizard.many.status.already_member': 'déjà membre',
+  'users.inviteWizard.many.status.invalid': 'pas une adresse e-mail',
+  'users.inviteWizard.many.status.not_sent': 'non envoyée',
+  'users.inviteWizard.many.status.failed': 'échec',
+  'users.inviteWizard.many.body.sent': 'L’invitation expire le {date}.',
+  'users.inviteWizard.many.body.already_member':
+    'Fait déjà partie de l’organisation : inutile de l’inviter.',
+  'users.inviteWizard.many.body.invalid': 'Corrigez l’adresse et invitez-la de nouveau.',
+  'users.inviteWizard.many.body.not_sent':
+    'L’invitation est créée mais l’e-mail n’est pas parti. Renvoyez-la depuis « Invitations en attente ».',
+  'users.inviteWizard.many.body.failed': 'L’invitation n’a pas pu être créée. Réessayez.',
   'users.pending.title': 'Invitations en attente',
   'users.pending.hint':
     "Envoyées et pas encore acceptées. Elles expirent d'elles-mêmes ; les révoquer invalide le lien immédiatement.",
@@ -655,7 +781,6 @@ export const fr: AppCatalog<typeof en> = {
   'users.toast.inviteFailed': "Impossible d'inviter",
   'users.toast.alreadyMember': "Cette adresse fait déjà partie de l'organisation.",
   'users.toast.roleForbidden': "Vous n'avez pas l'autorisation d'accorder ce rôle.",
-  'users.toast.checkEmail': "Vérifiez l'adresse et réessayez.",
   'users.toast.inviteNotSent': 'Invitation créée, mais l’e-mail n’est pas parti',
   'users.toast.inviteNotSentHint':
     'L’adresse est correcte : c’est notre système de messagerie qui a échoué. L’invitation est déjà dans la liste — réinvitez quand la messagerie fonctionnera et elle remplacera celle-ci.',
@@ -1157,6 +1282,7 @@ export const fr: AppCatalog<typeof en> = {
   'apps.empty.action': 'Connecter la première',
   'apps.configured': 'Connexion configurée.',
   'apps.runs.none': 'Aucune synchronisation enregistrée pour le moment.',
+  'apps.runs.failed': 'Impossible de lire la dernière synchronisation.',
   'apps.runs.last':
     'Dernière synchronisation : {created} créations, {updated} modifications, {deactivated} départs',
   'apps.runs.errors': { one: '{count} en erreur', other: '{count} en erreur' },
@@ -1277,7 +1403,6 @@ export const fr: AppCatalog<typeof en> = {
   'sso.secret.body':
     "Voici le nouveau secret de {name}. Le précédent nʼest plus valable : collez celui-ci dans l'application au plus vite. Nous ne pourrons plus vous le montrer.",
   'sso.secret.label': 'Secret client',
-  'sso.secret.copied': 'Secret copié',
   'sso.secret.copyFailed': 'Copie impossible',
   'sso.secret.copyFailedHint': 'Sélectionnez-le et copiez-le à la main.',
   'sso.secret.done': 'Je l’ai copié',
@@ -1343,6 +1468,34 @@ export const fr: AppCatalog<typeof en> = {
   'roles.toast.deleted': 'Habilitation supprimée',
   'roles.toast.deletedHint': '« {name} » n’existe plus.',
   'roles.toast.deleteFailed': "Impossible de supprimer l'habilitation",
+  'roles.listTitle': 'Rôles de l’organisation',
+  'roles.listDescription':
+    'Ouvrez un rôle pour modifier ses autorisations ou les personnes qui le détiennent.',
+  'roles.wizard.description':
+    'Trois questions : son nom, ce qu’il permet et une vérification avant de le créer.',
+  'roles.wizard.step.name': 'Nom',
+  'roles.wizard.step.permissions': 'Autorisations',
+  'roles.wizard.step.review': 'Vérifier',
+  'roles.wizard.step.done': 'Terminé',
+  'roles.wizard.name.heading': 'Comment s’appelle le rôle ?',
+  'roles.wizard.name.description': 'Nommez-le d’après la tâche, pas d’après une personne.',
+  'roles.wizard.name.hint': 'Il doit être unique dans l’organisation. Vous pourrez le renommer.',
+  'roles.wizard.permissions.heading': 'Que peuvent faire les personnes qui ont ce rôle ?',
+  'roles.wizard.permissions.description':
+    'N’accordez que le nécessaire. Propriétaires et administrateurs ont déjà tout.',
+  'roles.wizard.permissions.noneTitle': 'Aucune autorisation choisie',
+  'roles.wizard.permissions.noneBody':
+    'Le rôle peut être créé, mais il ne permettra rien tant que vous n’ajoutez pas d’autorisation.',
+  'roles.wizard.review.heading': 'Vérifiez le rôle avant de le créer',
+  'roles.wizard.review.description':
+    'Personne ne reçoit ces autorisations avant que vous n’attribuiez le rôle.',
+  'roles.wizard.review.noteTitle': 'Ensuite : attribuez-le',
+  'roles.wizard.review.noteBody': 'Une fois créé, vous pourrez l’attribuer tout de suite.',
+  'roles.wizard.done.heading': 'Rôle créé',
+  'roles.wizard.done.body':
+    'Il existe, mais personne ne l’a encore. Attribuez-le pour donner ses autorisations.',
+  'roles.wizard.done.assign': 'Attribuer à des personnes',
+  'roles.wizard.done.back': 'Retour aux rôles',
   'perm.usersManage': 'Gérer les comptes',
   'perm.usersManageHint':
     'Création/suppression, rôle, réinitialisation du mot de passe et de la MFA, sessions.',
@@ -1414,15 +1567,45 @@ export const fr: AppCatalog<typeof en> = {
   'pim.newElig.user': 'Personne',
   'pim.newElig.selectUser': 'Choisissez une personne…',
   'pim.newElig.role': 'Habilitation',
-  'pim.newElig.selectRole': 'Choisissez une habilitation…',
   'pim.newElig.customRoles': 'Habilitations personnalisées',
   'pim.newElig.builtinRoles': 'Rôles intégrés',
   'pim.newElig.builtinAdmin': 'admin (superutilisateur)',
   'pim.newElig.builtinOwner': 'owner (superutilisateur)',
   'pim.newElig.maxLabel': 'Durée maximale (minutes)',
   'pim.newElig.maxHelp': 'Fenêtre maximale de chaque activation (1–1440).',
-  'pim.newElig.requiresApproval': "Exige l'approbation de l’administration",
   'pim.newElig.submit': "Créer l'éligibilité",
+  'pim.wizard.description': 'Choisissez qui, pour quel rôle et selon quelles règles.',
+  'pim.wizard.step.who': 'Qui',
+  'pim.wizard.step.role': 'Rôle',
+  'pim.wizard.step.rules': 'Règles',
+  'pim.wizard.step.review': 'Vérifier',
+  'pim.wizard.step.done': 'Terminé',
+  'pim.wizard.who.heading': 'Qui pourra s’élever ?',
+  'pim.wizard.who.description':
+    'L’éligibilité ne donne rien en soi : la personne doit activer le rôle au besoin.',
+  'pim.wizard.who.hint': 'Seules les personnes de cette organisation apparaissent.',
+  'pim.wizard.role.heading': 'Quel rôle pourra-t-elle activer ?',
+  'pim.wizard.role.description': 'Préférez un rôle personnalisé limité au nécessaire.',
+  'pim.wizard.role.noCustom': 'Aucun rôle personnalisé pour l’instant. Créez-en dans Rôles.',
+  'pim.wizard.role.builtinBody': 'Contrôle total de l’organisation tant qu’il est actif.',
+  'pim.wizard.role.builtinWarnTitle': 'C’est un rôle de super-utilisateur',
+  'pim.wizard.role.builtinWarnBody':
+    'Qui l’active pourra tout modifier, y compris les autres administrateurs. Envisagez d’exiger une approbation.',
+  'pim.wizard.rules.heading': 'Comment pourra-t-elle l’activer ?',
+  'pim.wizard.rules.description': 'Chaque activation demande un motif et expire d’elle-même.',
+  'pim.wizard.rules.directBody': 'Le rôle s’active dès qu’un motif est donné.',
+  'pim.wizard.rules.approvalBody': 'L’administration doit d’abord approuver chaque demande.',
+  'pim.wizard.review.activation': 'Activation',
+  'pim.wizard.review.heading': 'Vérifiez l’éligibilité avant de la créer',
+  'pim.wizard.review.description': 'Vous pourrez la retirer à tout moment depuis la liste.',
+  'pim.wizard.review.noteTitle': 'Tout est enregistré',
+  'pim.wizard.review.noteBody':
+    'Chaque activation, avec son motif et sa durée, est consignée dans l’audit.',
+  'pim.wizard.done.heading': 'Éligibilité créée',
+  'pim.wizard.done.bodyDirect': 'La personne peut désormais activer le rôle depuis « Mon accès ».',
+  'pim.wizard.done.bodyApproval':
+    'La personne peut demander le rôle depuis « Mon accès » ; les demandes apparaîtront ici.',
+  'pim.wizard.done.back': 'Retour à l’accès privilégié',
   'pim.toast.requested': 'Demande envoyée',
   'pim.toast.requestedHint': 'L’administration doit l’approuver.',
   'pim.toast.activated': 'Habilitation activée',
@@ -1460,7 +1643,83 @@ export const fr: AppCatalog<typeof en> = {
   'groups.noDescription': 'Sans description',
   'groups.description': 'Description',
   'groups.namePlaceholder': 'p. ex. Ingénierie',
-  'groups.dynamicSwitch': 'Groupe dynamique (appartenance par règle)',
+  'groups.wizard.step.type': 'Type',
+  'groups.wizard.step.name': 'Nom',
+  'groups.wizard.step.members': 'Membres',
+  'groups.wizard.step.rule': 'Règle',
+  'groups.wizard.step.preview': 'Qui entre',
+  'groups.wizard.step.review': 'Vérification',
+  'groups.wizard.step.done': 'Terminé',
+  'groups.wizard.type.heading': 'Comment les personnes entrent-elles dans ce groupe ?',
+  'groups.wizard.type.description':
+    'Choisissez comment l’appartenance est tenue à jour. Un groupe manuel peut devenir dynamique plus tard.',
+  'groups.wizard.type.label': 'Type de groupe',
+  'groups.wizard.type.manual': 'Je choisis les personnes',
+  'groups.wizard.type.manualBody':
+    'Vous ajoutez et retirez les membres à la main. Idéal pour les équipes projet et les comités.',
+  'groups.wizard.type.dynamic': 'Elles entrent seules selon leurs données',
+  'groups.wizard.type.dynamicBody':
+    'Une règle sur le service, la fonction, le site, l’e-mail ou le nom décide qui en fait partie, et Sytue ID la tient à jour.',
+  'groups.wizard.name.heading': 'Comment s’appelle le groupe ?',
+  'groups.wizard.name.description':
+    'C’est le nom affiché lors du partage de fichiers ou de l’attribution d’accès.',
+  'groups.wizard.name.hint': 'Il doit être unique dans l’organisation.',
+  'groups.wizard.name.descHint': 'Une ligne sur l’objet du groupe.',
+  'groups.wizard.members.heading': 'Qui fait partie du groupe ?',
+  'groups.wizard.members.description':
+    'Cherchez dans l’annuaire et ajoutez des personnes. Vous pouvez le laisser vide et les ajouter plus tard.',
+  'groups.wizard.members.candidates': 'Personnes que vous pouvez ajouter',
+  'groups.wizard.members.addAria': 'Ajouter {name}',
+  'groups.wizard.members.removeAria': 'Retirer {name}',
+  'groups.wizard.members.chosen': {
+    one: '{count} personne choisie',
+    other: '{count} personnes choisies',
+  },
+  'groups.wizard.members.optional': 'Personne n’est encore choisi. Le groupe peut commencer vide.',
+  'groups.wizard.rule.heading': 'Qui doit entrer ?',
+  'groups.wizard.rule.incomplete':
+    'Chaque condition doit avoir une valeur avant de voir qui entre.',
+  'groups.wizard.rule.previewNext': 'Voir qui entre',
+  'groups.wizard.preview.heading': 'Voici qui entrerait',
+  'groups.wizard.preview.description':
+    'Rien n’a encore été créé. Si ce n’est pas ce que vous attendiez, revenez en arrière pour ajuster.',
+  'groups.wizard.preview.count': {
+    one: '{count} personne entrerait :',
+    other: '{count} personnes entreraient :',
+  },
+  'groups.wizard.preview.more': { one: '…et {count} autre.', other: '…et {count} autres.' },
+  'groups.wizard.preview.failed': 'Impossible de vérifier qui entrerait',
+  'groups.wizard.preview.nobodyManual': 'Vous n’avez choisi personne',
+  'groups.wizard.preview.nobodyManualBody':
+    'Le groupe sera créé vide ; vous pourrez ajouter des membres depuis son détail.',
+  'groups.wizard.preview.nobodyRuleBody':
+    'Le groupe sera créé vide et se remplira dès que les données de quelqu’un correspondront.',
+  'groups.wizard.review.heading': 'Vérifiez avant de créer',
+  'groups.wizard.review.description': 'Le groupe n’est créé que lorsque vous confirmez.',
+  'groups.wizard.review.type': 'Type',
+  'groups.wizard.review.manual': 'Manuel',
+  'groups.wizard.review.rule': 'La règle en une phrase',
+  'groups.wizard.done.heading': 'Groupe créé',
+  'groups.wizard.done.open': 'Ouvrir le groupe',
+  'groups.wizard.done.another': 'En créer un autre',
+  'groups.wizard.done.someFailed': {
+    one: 'Impossible d’ajouter {count} personne',
+    other: 'Impossible d’ajouter {count} personnes',
+  },
+  'groups.wizard.done.someFailedBody': 'Ajoutez-les depuis le détail du groupe.',
+  'groups.sentence.rule': 'Les personnes entrent si {clauses}.',
+  'groups.sentence.empty': 'La règle n’a encore aucune condition avec une valeur.',
+  'groups.sentence.quoted': '« {value} »',
+  'groups.sentence.attr.department': 'leur service',
+  'groups.sentence.attr.title': 'leur fonction',
+  'groups.sentence.attr.location': 'leur site',
+  'groups.sentence.attr.email': 'leur e-mail',
+  'groups.sentence.attr.name': 'leur nom',
+  'groups.sentence.op.eq': '{attr} est {value}',
+  'groups.sentence.op.ne': '{attr} n’est pas {value}',
+  'groups.sentence.op.contains': '{attr} contient {value}',
+  'groups.sentence.op.startsWith': '{attr} commence par {value}',
+  'groups.sentence.op.in': '{attr} est {value}',
   'groups.dynamicHelp':
     "L'appartenance est calculée à partir des attributs de chaque compte (service, fonction, site…). Personne n’est ajouté à la main.",
   'groups.ruleMembership': 'Appartenance par règle',
@@ -1508,7 +1767,6 @@ export const fr: AppCatalog<typeof en> = {
   'groups.toast.createFailed': 'Impossible de créer le groupe',
   'groups.toast.nameTaken': 'Un groupe porte déjà ce nom.',
   'groups.toast.checkName': 'Vérifiez le nom et réessayez.',
-  'groups.toast.checkNameAndRule': 'Vérifiez le nom et la règle, puis réessayez.',
   'groups.toast.updated': 'Groupe mis à jour',
   'groups.toast.alreadyUpToDate': "L'appartenance était déjà à jour",
   'groups.toast.recomputed': 'Appartenance recalculée',
@@ -2100,11 +2358,6 @@ export const fr: AppCatalog<typeof en> = {
 
   // --- Asistente: etiqueta de confidencialidad (SensitivityLabelWizard) -----
   'wizard.label.color.none': 'Sans couleur',
-  'wizard.label.color.grey': 'Gris',
-  'wizard.label.color.blue': 'Bleu',
-  'wizard.label.color.green': 'Vert',
-  'wizard.label.color.amber': 'Ambre',
-  'wizard.label.color.red': 'Rouge',
   'wizard.label.toast.saveFailed': 'Impossible d’enregistrer',
   'wizard.label.toast.nameTaken':
     'Vous avez déjà une étiquette portant ce nom. Choisissez-en un autre.',

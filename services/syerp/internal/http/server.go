@@ -201,6 +201,7 @@ func NewRouter(d Deps) http.Handler {
 		api.With(d.Verifier.RequireRole("owner", "admin")).Group(func(adm chi.Router) {
 			adm.Get("/conexiones", h.ListarConexiones)
 			adm.Post("/conexiones/{proveedor}", h.GuardarConexion)
+			adm.Post("/conexiones/{proveedor}/probar", h.ProbarConexion)
 			adm.Post("/importar/salesforce", h.ImportarSalesforce)
 			adm.Post("/importar/odoo", h.ImportarOdoo)
 			adm.Post("/importar/business-central", h.ImportarBusinessCentral)
@@ -238,6 +239,8 @@ func NewRouter(d Deps) http.Handler {
 
 		api.Post("/tpv/cobrar", h.CobrarTPV)
 		api.Post("/tpv/presupuesto", h.PresupuestoTPV)
+
+		mountERPPrivateSource(api, d.Store)
 
 		// El CRUD genérico, una vez, para todos los modelos.
 		api.Route("/{modelo}", func(mod chi.Router) {
@@ -280,6 +283,11 @@ func NewRouter(d Deps) http.Handler {
 			// La factura para el cliente, con su QR tributario, y sus registros de
 			// VERI*FACTU con lo que contestó la AEAT.
 			mod.Get("/{id}/imprimir", h.Imprimir)
+			// La misma factura en PDF, y enviada por correo al cliente con el PDF
+			// adjunto. Enviar es escribir (POST): lo puede quien edita ventas.
+			mod.Get("/{id}/pdf", h.PDFFactura)
+			mod.Get("/{id}/enviar", h.EnvioFactura)
+			mod.Post("/{id}/enviar", h.EnviarFactura)
 			mod.Get("/{id}/verifactu", h.RegistrosFacturaVerifactu)
 			mod.Post("/{id}/verifactu/subsanar", h.SubsanarVerifactu)
 			mod.Post("/ia/rellenar", h.RellenarFicha)

@@ -174,6 +174,9 @@ func (r *networkRelay) initialize(ctx context.Context, req networkRequest) error
 		return err
 	}
 	// Recovery material is confined to this process and discarded, never stdout.
+	if err := client.AcknowledgeRecoverySetup(ctx); err != nil {
+		return err
+	}
 	go func() {
 		_ = client.Sync(ctx, func(value DecryptedEvent, err error) {
 			if err != nil {

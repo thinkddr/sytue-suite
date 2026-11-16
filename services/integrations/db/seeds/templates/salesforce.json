@@ -39,7 +39,10 @@
         "refresh_token",
         "offline_access"
       ],
-      "revoke_url": "https://{subdomain}.my.salesforce.com/services/oauth2/revoke"
+      "revoke_url": "https://{subdomain}.my.salesforce.com/services/oauth2/revoke",
+      "authorize_params": {
+        "prompt": "select_account"
+      }
     }
   }
 }

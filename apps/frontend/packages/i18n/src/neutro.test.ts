@@ -143,6 +143,7 @@ const EXCEPCIONES: Record<string, string> = {
   'sk/office:share.role.owner.desc':
     '«vrátane toho, kto…»: «toho» es el pronombre neutro de la frase, no una persona',
   'pl/mail:aliases.whatBody': '«skrzynki odbiorczej» es la bandeja de entrada, no una persona',
+  'pl/mail:folder.outbox': '«nadawcza» es el adjetivo de la bandeja de salida, no una persona',
   'pl/office:extdata.field.audience':
     '«Odbiorcy» traduce el `audience` de OAuth: el término técnico',
   'hr/drive:storage.external.nas.commandHelp':

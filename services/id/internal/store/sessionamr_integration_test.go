@@ -22,7 +22,7 @@ import (
 
 func TestSessionAMRDevuelveLoQueSeGuardo(t *testing.T) {
 	st, ctx := newStore(t)
-	u := seedUser(t, ctx, st, "amr@sytue.eu")
+	u := seedUser(ctx, t, st, "amr@sytue.eu")
 
 	casos := map[string][]string{
 		"solo contraseña":        {"pwd"},
@@ -64,7 +64,7 @@ func TestSessionAMRDevuelveLoQueSeGuardo(t *testing.T) {
 // emitiendo tokens que dicen «esta persona pasó por MFA».
 func TestSessionAMRNoAcreditaSesionRevocada(t *testing.T) {
 	st, ctx := newStore(t)
-	u := seedUser(t, ctx, st, "amr-revocada@sytue.eu")
+	u := seedUser(ctx, t, st, "amr-revocada@sytue.eu")
 
 	id, err := st.InsertSession(ctx, nil, domain.Session{
 		TokenHash: "hash-revocada",

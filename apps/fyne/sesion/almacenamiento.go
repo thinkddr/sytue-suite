@@ -8,6 +8,8 @@ import (
 	"errors"
 	"sync"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/correo"
 	"git.sytue.eu/sytue/one/apps/nucleo/notas"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 )
@@ -17,10 +19,11 @@ import (
 var ErrSesionCerrada = errors.New("sesion: sesión cerrada")
 
 // PendientesAlmacenamiento cuenta todo lo que las apps guardaron sin subir en
-// el almacén local de este equipo: capturas y borradores de Notepads más los
-// diarios de subidas cifradas por bloques (`storage-file-uploads-v1`).
+// el almacén local de este equipo: capturas y borradores de Notepads, las copias
+// locales del redactor de Mail y los diarios de subidas cifradas por bloques
+// (`storage-file-uploads-v1`).
 func PendientesAlmacenamiento() int {
-	n, _ := contarAlmacen(notas.EspacioCapturas, notas.EspacioBorradores, storage.PendingUploadsNamespace)
+	n, _ := contarAlmacen(notas.EspacioCapturas, notas.EspacioBorradores, correo.EspacioRedactor, storage.PendingUploadsNamespace)
 	return n
 }
 
@@ -28,7 +31,24 @@ func PendientesAlmacenamiento() int {
 // sesión actual y devuelve cuánto sigue pendiente en disco antes de salir.
 func (s *Suite) SubirPendientes(ctx context.Context) int {
 	_ = s.SubirNotepads(ctx)
-	return PendientesAlmacenamiento()
+	s.SubirCorreo(ctx)
+	return PendientesAlmacenamiento() //nolint:contextcheck // el recuento no se corta con ctx: un 0 por cancelación haría creer que no queda nada pendiente.
+}
+
+// SubirCorreo lleva a Borradores las copias locales del redactor de Mail de la persona
+// y la organización de ahora (las de otras cuentas, con esta sesión, no se pueden).
+// Lo que no llega se queda y se vuelve a contar.
+func (s *Suite) SubirCorreo(ctx context.Context) {
+	dueño := s.dueñoNotas()
+	if dueño == "" {
+		return
+	}
+	alm, err := AlmacenConContexto(ctx)
+	if err != nil {
+		return
+	}
+	m := api.NewMail(s.URL("mail"), s.Sesion, nil)
+	correo.Subir(ctx, alm, dueño, m.SaveDraft)
 }
 
 // IniciarTareaAlmacenamiento enlaza un ejecutor de almacenamiento cifrado a la

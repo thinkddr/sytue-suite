@@ -47,9 +47,7 @@ const EscalaEntrada float32 = 0.98
 // diferencia se ve: esta arranca casi recta y frena largo, que es lo que hace que un
 // diálogo parezca que se posa. Con `Linear` o con la de Fyne, entra y se planta.
 //
-// Ojo, porque conviven dos curvas en la suite: los controles (color, fondo, borde)
-// transicionan en 0,15 s con la de Tailwind, `cubic-bezier(0.4, 0, 0.2, 1)`, que NO es
-// esta. Aquí solo está la de las entradas.
+// También es la de los controles (color, fondo, borde) en sus 0,15 s: ver CurvaColores.
 var CurvaEstandar fyne.AnimationCurve = func(t float32) float32 {
 	return bezier(t, 0.2, 0, 0, 1)
 }

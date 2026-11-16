@@ -103,12 +103,10 @@ func TestHacerUnaCopiaEnArchivoYEnLaTesela(t *testing.T) {
 	var copiado api.Document
 	d := api.Document{ID: "d1", Kind: api.DocSheet, Title: "Cuentas"}
 	s := NuevaTeselaDoc(d, nil, "es", AccionesTesela{Copiar: func(x api.Document) { copiado = x }})
-	if len(s.acciones) != 3 || s.acciones[1].Rotulo != "tile.copy.label" {
-		t.Fatalf("la tesela: renombrar · copiar · eliminar; tiene %d", len(s.acciones))
-	}
-	s.acciones[1].AlPulsar()
+	copia := elementoDe(t, s.MenuMas(), "copy.action")
+	copia.AlPulsar()
 	if copiado.ID != "d1" {
-		t.Errorf("el botón de copiar no llama a Copiar: %+v", copiado)
+		t.Errorf("«Hacer una copia» de «Más acciones» no llama a Copiar: %+v", copiado)
 	}
 }
 

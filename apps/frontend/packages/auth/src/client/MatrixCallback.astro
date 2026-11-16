@@ -1,0 +1,108 @@
+---
+import { APP_VIEWPORT, prefijoDeApp } from '@sytue/config';
+import type { MatrixStorageProduct } from '@sytue/config/matrix';
+import { createTranslate, htmlLangAttrs, isLocale, DEFAULT_LOCALE } from '@sytue/i18n';
+import { suiteApps } from '@sytue/ui';
+interface Props {
+  product: MatrixStorageProduct;
+}
+const { product } = Astro.props;
+const key = product === 'hub' ? 'one' : product;
+const title = suiteApps.find((app) => app.key === key)?.name ?? 'Sytue';
+const base = prefijoDeApp(key) ?? '/';
+const locale = isLocale(Astro.locals.locale) ? Astro.locals.locale : DEFAULT_LOCALE;
+const t = createTranslate(locale);
+Astro.response.headers.set('cache-control', 'no-store');
+Astro.response.headers.set('referrer-policy', 'no-referrer');
+---
+
+<!doctype html>
+<html {...htmlLangAttrs(locale)}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content={APP_VIEWPORT} />
+    <meta name="text-scale" content="scale" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <main>
+      <h1>{title}</h1>
+      <p
+        id="matrix-status"
+        role="status"
+        data-product={product}
+        data-device={`${title} · Web`}
+        data-failed={t('account.connectFailed')}
+      >
+        {t('ui.loading')}
+      </p>
+      <p id="matrix-retry" hidden>
+        <a href={base}>{t('action.retry')}</a>
+      </p>
+    </main>
+    <script>
+      import { MatrixBrowserAuth } from '@sytue/offline/matrix/auth';
+      import { isStorageProduct } from '@sytue/config/matrix';
+      const status = document.getElementById('matrix-status');
+      const retry = document.getElementById('matrix-retry');
+      if (status instanceof HTMLElement && isStorageProduct(status.dataset.product)) {
+        const auth = new MatrixBrowserAuth({
+          storageProduct: status.dataset.product,
+          identityVersion:
+            new URL(window.location.href).searchParams.get('identity_version') === '2' ? 2 : 1,
+          deviceName: status.dataset.device ?? 'Sytue · Web',
+        });
+        void auth
+          .complete()
+          .then((destination) => window.location.replace(destination))
+          .catch(() => {
+            status.textContent = status.dataset.failed ?? '';
+            if (retry instanceof HTMLElement) {
+              retry.hidden = false;
+              retry.querySelector('a')?.focus();
+            }
+          });
+      }
+    </script>
+  </body>
+</html>
+<style>
+  :global(html) {
+    color-scheme: light dark;
+  }
+  :global(body) {
+    margin: 0;
+    min-block-size: 100svh;
+    display: grid;
+    place-items: center;
+    background: Canvas;
+    color: CanvasText;
+    font-family: system-ui, sans-serif;
+    line-height: 1.5;
+  }
+  main {
+    box-sizing: border-box;
+    inline-size: min(100%, 32rem);
+    padding: max(1.5rem, env(safe-area-inset-top)) max(1.5rem, env(safe-area-inset-right))
+      max(1.5rem, env(safe-area-inset-bottom)) max(1.5rem, env(safe-area-inset-left));
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+  h1 {
+    font-size: 1.375rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  p {
+    margin-block: 1rem;
+  }
+  a {
+    color: LinkText;
+    text-underline-offset: 0.2em;
+  }
+  a:focus-visible {
+    outline: 0.125rem solid Highlight;
+    outline-offset: 0.3rem;
+    border-radius: 0.125rem;
+  }
+</style>

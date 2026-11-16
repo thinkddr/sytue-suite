@@ -325,3 +325,65 @@ func TestElAltaMideLoQueMideLaWeb(t *testing.T) {
 		ven.Close()
 	}
 }
+
+// TestLasFilasDelAltaNoSeSalenEnElMovil: a 360 de ancho ningún objeto del cuerpo del
+// alta pasa del borde derecho de su caja (16 de canalón). Las filas de botones son
+// `flex flex-wrap` en la web: «Buscar» y «Usar este dominio» no caben juntos a 328 y el
+// segundo baja de línea, igual que la nota de «Enviar invitaciones».
+//
+// Visto en ROJO a mano: con la `filaB` de antes (sin `flex-wrap`) «Usar este dominio»
+// acaba en x ≈ 464, 120 píxeles fuera de la pantalla, y la nota de las invitaciones
+// en 391.
+func TestLasFilasDelAltaNoSeSalenEnElMovil(t *testing.T) {
+	const ancho, borde = 360, 344
+	a := &altaDoble{estado: api.AltaEstado{SuiteDomain: "sytue.eu", Account: &api.AltaCuenta{Email: "ada@acme.eu"}}}
+	b, r := nuevaBienvenidaDePrueba(t, a)
+	b.Cargar(context.Background(), false)
+	r.c.modoOrg.Tapped(nil)
+	r.c.siguiente.Tapped(nil)
+	if b.paso != 1 {
+		t.Fatalf("tras elegir, el paso es %d", b.paso)
+	}
+	ven := test.NewWindow(b)
+	defer ven.Close()
+	ven.SetPadded(false)
+	abs := fyne.CurrentApp().Driver().AbsolutePositionForObject
+	mirar := func(caso string, filas ...fyne.CanvasObject) {
+		t.Helper()
+		b.Refresh()
+		b.Resize(fyne.NewSize(ancho, r.alto(ancho)))
+		ven.Resize(fyne.NewSize(ancho, r.alto(ancho)))
+		guardar(t, ven.Canvas().Capture(), "alta-movil-"+caso)
+		for _, o := range r.cuerpo.objetos() {
+			if !o.Visible() || o.Size().Width == 0 {
+				continue
+			}
+			if d := abs(o).X + o.Size().Width; d > borde+0.5 {
+				t.Errorf("%s: %T acaba en x = %v y el borde está en %v", caso, o, d, borde)
+			}
+		}
+		// Y los de las filas, que es lo que se vino a arreglar, están DE VERDAD en la
+		// pantalla: un hijo fuera del árbol no lo cogería el recorrido de arriba.
+		for _, o := range filas {
+			if d := abs(o).X + o.Size().Width; o.Size().Width == 0 || d > borde+0.5 {
+				t.Errorf("%s: %T acaba en x = %v (ancho %v); el borde está en %v", caso, o, d, o.Size().Width, borde)
+			}
+		}
+	}
+
+	b.mu.Lock()
+	b.eleccion, b.buscado = "search", "acme.eu"
+	b.disponible = &api.AltaDisponibilidad{Domain: "acme.eu", Status: "available"}
+	b.mu.Unlock()
+	mirar("busqueda", r.c.buscarBtn, r.c.usarBtn)
+	if abs(r.c.usarBtn).Y <= abs(r.c.buscarBtn).Y {
+		t.Errorf("«Usar este dominio» no baja de línea: y = %v y «Buscar» en %v", abs(r.c.usarBtn).Y, abs(r.c.buscarBtn).Y)
+	}
+
+	test.Type(r.c.nombre, "Acme")
+	r.c.siguiente.Tapped(nil)
+	if b.paso != 2 {
+		t.Fatalf("tras crear la organización, el paso es %d", b.paso)
+	}
+	mirar("personas", r.c.enviar)
+}

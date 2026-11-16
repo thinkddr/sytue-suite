@@ -28,7 +28,7 @@ import (
 // foto aquí, y añadir fotos propias desde la galería («Añadir a un álbum…» ya los
 // lista), que se copian al Drive de su dueña. Las imágenes van por
 // `/api/v1/shared/albums/<álbum>/…`, cuya verja es que el álbum esté compartido conmigo;
-// la foto abierta va sola sobre negro con la cabecera de `VisorCompartido`.
+// la foto abierta va sola, con la cabecera de `VisorCompartido`.
 //
 // Y al revés, «Compartir con personas» del álbum propio: el diálogo común de
 // `apps/fyne/compartir`, para ver o para editar, como la web.
@@ -77,7 +77,9 @@ func PantallaCompartidos(v Vista, d Compartidos) *fyne.Container {
 		{Obj: Nav(v, SecCompartidos, d.AlIr), Margen: SeparacionBloque},
 		{Obj: ParrafoEn(v.Traduce("sharedWithMe.title"), tema.TextoLG, ui.SemiNegrita, "text", v.Variante), Margen: SeparacionBloque},
 	}
-	if cuerpo := CuerpoDeEstado(v, EstadoVacio(v, "sharedWithMe.empty", "", nil)); cuerpo != nil {
+	if cuerpo := CuerpoConEsqueleto(v, EstadoVacio(v, "sharedWithMe.empty", "", nil), func() *Ocupado {
+		return EsqueletoAlbumes(v, TarjetasEsqueleto, 0)
+	}); cuerpo != nil {
 		bloques = append(bloques, ui.Bloque{Obj: cuerpo})
 		return Envolver(v, false, ui.PilaBloques(bloques...))
 	}
@@ -165,7 +167,7 @@ func PantallaCompartido(v Vista, d CompartidoAbierto) *fyne.Container {
 	if d.Fallo != "" {
 		bloques = append(bloques, ui.Bloque{Obj: ParrafoEn(d.Fallo, tema.TextoSM, ui.Normal, "danger-text", v.Variante), Margen: SeparacionBloque})
 	}
-	if cuerpo := CuerpoDeEstado(v, EstadoVacio(v, "sharedWithMe.empty", "", nil)); cuerpo != nil {
+	if cuerpo := CuerpoConEsqueleto(v, EstadoVacio(v, "sharedWithMe.empty", "", nil), esqueletoDeFilas(v)); cuerpo != nil {
 		bloques = append(bloques, ui.Bloque{Obj: cuerpo})
 		return Envolver(v, false, ui.PilaBloques(bloques...))
 	}
@@ -375,10 +377,17 @@ var (
 )
 
 // VisorCompartido es la foto de un álbum compartido conmigo: la cabecera de
-// `VisorCompartido` de la web —el nombre, «Quitar del álbum» si puedo editar y cerrar—
-// sobre la foto sola del enlace, con las flechas del visor a los lados.
-func VisorCompartido(v Vista, f api.Photo, aTamanyoReal bool, alZoom, alAnterior, alSiguiente, alCerrar func(), alQuitar func(api.Photo)) fyne.CanvasObject {
-	nombre := ParrafoEn(f.Name, tema.TextoSM, ui.Medio, "text", v.Variante)
+// `VisorCompartido` de la web —el nombre, el «5 / 30» si hay más de una, «Quitar del
+// álbum» si puedo editar y cerrar— sobre la foto sola del enlace, con las flechas del
+// visor a los lados. posicion es el contador ya escrito (`textoDePosicion`); "", no va.
+func VisorCompartido(v Vista, f api.Photo, posicion string, aTamanyoReal bool, alZoom, alAnterior, alSiguiente, alCerrar func(), alQuitar func(api.Photo)) fyne.CanvasObject {
+	var nombre fyne.CanvasObject = ParrafoEn(f.Name, tema.TextoSM, ui.Medio, "text", v.Variante)
+	if posicion != "" {
+		// El contador va pegado al nombre (`gap-2`), en el `text-xs text-text-muted` del
+		// visor de la galería, y no junto a los mandos: se lee «IMG_0042.jpg 5 / 30».
+		contador := ParrafoEn(posicion, tema.TextoXS, ui.Normal, "text-muted", v.Variante)
+		nombre = container.New(ui.FilaAuto{Hueco: tema.Espacio(2), Derecha: 2}, nombre, contador)
+	}
 	var mandos []fyne.CanvasObject
 	if alQuitar != nil {
 		mandos = append(mandos, botonQuitarDelAlbum(v, func() { alQuitar(f) }))
@@ -396,7 +405,10 @@ func VisorCompartido(v Vista, f api.Photo, aTamanyoReal bool, alZoom, alAnterior
 	filete.SetMinSize(fyne.NewSize(0, tema.Borde))
 	cabecera := container.NewStack(fondo, container.NewBorder(nil, filete, nil, nil,
 		container.New(ui.Margen{Izq: pxCabeceraVisor, Der: pxCabeceraVisor, Arr: pyCabeceraVisor, Abj: pyCabeceraVisor}, fila)))
-	return container.NewBorder(cabecera, nil, nil, nil, visorSuelto(v, f, aTamanyoReal, alZoom, alAnterior, alSiguiente))
+	// El escenario lleva el fondo del visor de la galería (`bg`), no el negro de la foto
+	// suelta del enlace: es un visor de la app, con su cabecera.
+	cuerpo := visorSuelto(v, f, tema.Color("bg", v.Variante), aTamanyoReal, alZoom, alAnterior, alSiguiente)
+	return container.NewBorder(cabecera, nil, nil, nil, cuerpo)
 }
 
 // compartirConPersonas abre el diálogo común sobre el álbum abierto: ver o editar.

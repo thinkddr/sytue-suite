@@ -77,7 +77,11 @@ func Aros(v tema.Variante) (fyne.CanvasObject, []MuestraAro) {
 	poner("enlace", ui.NuevoEnlace("Ver el calendario", tema.TextoBase, ui.Medio, "primary-text", nil), 0, ui.SinHueco, "focus-ring")
 	poner("miga", ui.NuevaMiga("Documentos", nil), 0, ui.SinHueco, "focus-ring")
 	poner("pestaña", ui.NuevaPestana("Actividad", nil), 0, ui.SinHueco, "focus-ring")
-	poner("botón de icono", ui.NuevoBotonIcono(iconos.Ajustes, "Ajustes", nil), 0, ui.SinHueco, "focus-ring")
+	// Sin su pista de serie: con el foco se abre al instante y la burbuja tapa el aro que
+	// se mide. La pista tiene su propio test (botonicono_pista_test.go).
+	icono := ui.NuevoBotonIcono(iconos.Ajustes, "Ajustes", nil)
+	icono.SinPista = true
+	poner("botón de icono", icono, 0, ui.SinHueco, "focus-ring")
 	poner("botón fantasma", ui.NuevoBoton("Más opciones", nil).Con(ui.Fantasma, ui.TallaMD), 0, ui.ConHueco, "focus-ring")
 	poner("opción de menú", ui.NuevoElementoMenu("Cambiar el nombre", iconos.Ninguno, nil), anchoFijo, ui.SinHueco, "focus-ring")
 	// Los dos de aro RELLENO, que son la referencia: su caja es opaca y lo tapa.

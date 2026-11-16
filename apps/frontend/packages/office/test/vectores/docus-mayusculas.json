@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "nota": "Cada caso: un modo, lo que hay en el primer párrafo antes de la selección (previo, opcional) y los párrafos seleccionados, cada uno en trozos (los nodos de texto de la web). La web los recorre en docs-mayusculas.test.ts y Go en rico/mayusculas_test.go.",
+  "casos": [
+    {
+      "nombre": "mayúsculas con acentos y eñe",
+      "modo": "upper",
+      "parrafos": [["el año pasó por aquí"]],
+      "esperado": [["EL AÑO PASÓ POR AQUÍ"]]
+    },
+    {
+      "nombre": "minúsculas",
+      "modo": "lower",
+      "parrafos": [["ÉRASE UNA VEZ", " En MADRID"]],
+      "esperado": [["érase una vez", " en madrid"]]
+    },
+    {
+      "nombre": "la ß no se convierte en dos letras",
+      "modo": "upper",
+      "parrafos": [["straße"]],
+      "esperado": [["STRAßE"]]
+    },
+    {
+      "nombre": "la İ turca pasa a i, una sola letra, como en Go",
+      "modo": "lower",
+      "parrafos": [["İSTANBUL"]],
+      "esperado": [["istanbul"]]
+    },
+    {
+      "nombre": "la iota suscrita griega sube a una sola letra, como en Go",
+      "modo": "upper",
+      "parrafos": [["ᾳ ῃ ῳ ᾀ"]],
+      "esperado": [["ᾼ ῌ ῼ ᾈ"]]
+    },
+    {
+      "nombre": "cada palabra, con la palabra partida entre dos nodos",
+      "modo": "title",
+      "parrafos": [["el pRIMER dí", "a de clase"]],
+      "esperado": [["El Primer Dí", "a De Clase"]]
+    },
+    {
+      "nombre": "cada palabra: el apóstrofo y las cifras siguen la palabra",
+      "modo": "title",
+      "parrafos": [["l’été de 2024ab o'neill-smith"]],
+      "esperado": [["L’été De 2024ab O'neill-Smith"]]
+    },
+    {
+      "nombre": "tipo oración: una frase nueva tras punto y blanco",
+      "modo": "sentence",
+      "parrafos": [["HOLA MUNDO. ¿QUÉ TAL? bien… GRACIAS!adiós"]],
+      "esperado": [["Hola mundo. ¿Qué tal? Bien… Gracias!adiós"]]
+    },
+    {
+      "nombre": "tipo oración: el punto de un decimal no abre frase; el de un ordinal sí",
+      "modo": "sentence",
+      "parrafos": [["cuesta 3.5 EUROS y 2. Ojo"]],
+      "esperado": [["Cuesta 3.5 euros y 2. Ojo"]]
+    },
+    {
+      "nombre": "cada párrafo empieza frase y palabra nuevas",
+      "modo": "sentence",
+      "parrafos": [["PRIMERO"], ["SEGUNDO párrafo"]],
+      "esperado": [["Primero"], ["Segundo párrafo"]]
+    },
+    {
+      "nombre": "cada palabra: lo que hay antes de la selección decide si empieza palabra",
+      "modo": "title",
+      "previo": "ho",
+      "parrafos": [["la MUNDO"]],
+      "esperado": [["la Mundo"]]
+    },
+    {
+      "nombre": "tipo oración: a media frase no se pone mayúscula",
+      "modo": "sentence",
+      "previo": "hola ",
+      "parrafos": [["MUNDO. ADIÓS"]],
+      "esperado": [["mundo. Adiós"]]
+    },
+    {
+      "nombre": "tipo oración: tras un punto anterior a la selección sí",
+      "modo": "sentence",
+      "previo": "Hola mundo. ",
+      "parrafos": [["ADIÓS amigo"]],
+      "esperado": [["Adiós amigo"]]
+    },
+    {
+      "nombre": "griego y cirílico",
+      "modo": "title",
+      "parrafos": [["αθήνα και москва"]],
+      "esperado": [["Αθήνα Και Москва"]]
+    }
+  ]
+}

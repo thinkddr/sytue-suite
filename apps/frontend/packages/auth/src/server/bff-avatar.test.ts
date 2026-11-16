@@ -57,7 +57,11 @@ async function contexto(sesion: SytueSession, headers: Record<string, string> = 
   return {
     request: new Request(url, { headers }),
     url,
-    cookies: { get: () => ({ value: cookie }), set: () => {}, delete: () => {} },
+    cookies: {
+      get: (name: string) => (name === '__Host-sytue_session' ? { value: cookie } : undefined),
+      set: () => {},
+      delete: () => {},
+    },
   };
 }
 
@@ -174,4 +178,37 @@ test('toda app con BFF sirve GET /auth/avatar', () => {
     }
     expect({ dir, get: /\bavatar as GET\b/.test(src) }).toEqual({ dir, get: true });
   }
+});
+
+// `idApi` es la misma plomería que el avatar para los datos de la cuenta que pide
+// otra app (la rúbrica guardada de CertiPDF): con el token de la sesión, a la URL
+// INTERNA del IdP, y sin sesión no se pregunta nada.
+test('idApi pide a Sytue ID con el token de la sesión y devuelve su respuesta', async () => {
+  const bff = bffDePrueba();
+  const ctx = await contexto(sesionCon());
+  const { out, pedidas } = await conIdP(
+    () => new Response('{"ok":true}', { status: 200 }),
+    () =>
+      bff.idApi(ctx, '/api/v1/me/rubrica', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: '{}',
+      }),
+  );
+  expect(out.status).toBe(200);
+  expect(pedidas).toHaveLength(1);
+  expect(pedidas[0]!.url).toBe('http://sytue-one-id/api/v1/me/rubrica');
+  expect(pedidas[0]!.headers.get('authorization')).toBe('Bearer tok');
+  expect(pedidas[0]!.headers.get('content-type')).toBe('application/json');
+
+  const sinSesion = {
+    ...ctx,
+    cookies: { get: () => undefined, set: () => {}, delete: () => {} },
+  };
+  const nada = await conIdP(
+    () => new Response(null, { status: 200 }),
+    () => bff.idApi(sinSesion, '/api/v1/me/rubrica'),
+  );
+  expect(nada.out.status).toBe(401);
+  expect(nada.pedidas).toHaveLength(0);
 });

@@ -27,6 +27,8 @@
 import type { ComponentChildren, JSX, Ref } from 'preact';
 import { Icon, IconButton, cx } from '@sytue/ui';
 import { useGestosVisor } from '../lib/gestos.js';
+import type { PosicionVisor } from '../lib/posicionVisor.js';
+import type { useT } from '../i18n/index.js';
 
 /**
  * Con ratón el botón cubre una franja de 80 × 288 px pegada al canto (48 de placa + 16 de
@@ -102,5 +104,30 @@ export function EscenarioVisor({
       {onPrev ? <FlechaVisor lado="anterior" label={prev} onClick={onPrev} /> : null}
       {onNext ? <FlechaVisor lado="siguiente" label={next} onClick={onNext} /> : null}
     </div>
+  );
+}
+
+/**
+ * Dónde se está en la lista: «12 / 240», o «12 / 100+» si quedan páginas por pedir. Se
+ * ve corto y se lee entero («Foto 12 de 240»). Lo llevan en la cabecera el visor de la
+ * galería y el de un álbum compartido conmigo; sin posición (`posicionVisor` da `null`
+ * con una foto sola), no se pinta.
+ */
+export function ContadorVisor({
+  posicion,
+  t,
+}: {
+  posicion: PosicionVisor | null;
+  t: ReturnType<typeof useT>;
+}): JSX.Element | null {
+  if (!posicion) return null;
+  const total = posicion.hayMas
+    ? t('viewer.counterMore', { count: posicion.total })
+    : posicion.total;
+  return (
+    <span class="text-text-muted shrink-0 text-xs tabular-nums">
+      <span aria-hidden="true">{t('viewer.counter', { index: posicion.indice, total })}</span>
+      <span class="sr-only">{t('viewer.counterLabel', { index: posicion.indice, total })}</span>
+    </span>
   );
 }

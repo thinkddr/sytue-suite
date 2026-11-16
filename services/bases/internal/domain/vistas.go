@@ -12,12 +12,14 @@ import (
 // TipoVista es la forma de mirar una tabla.
 type TipoVista string
 
-// Tipos de vista: rejilla, tablero Kanban (por un campo de selección) y formulario
-// para recoger datos.
+// Tipos de vista: rejilla, tablero Kanban (por un campo de selección), formulario
+// para recoger datos y galería (tarjetas con el primer adjunto de imagen como portada;
+// se filtra y se ordena como la rejilla, y la portada la elige quien pinta).
 const (
 	VistaRejilla    TipoVista = "grid"
 	VistaKanban     TipoVista = "kanban"
 	VistaFormulario TipoVista = "form"
+	VistaGaleria    TipoVista = "gallery"
 )
 
 // Filtro y Orden son la configuración de una vista, que NUNCA se concatena en SQL:
@@ -42,6 +44,9 @@ type ConfigVista struct {
 	GroupBy string   `json:"group_by,omitempty"` // Kanban: campo select
 	// Fields: campos visibles del formulario, en orden. Vacío = todos los que no son enlaces.
 	Fields []string `json:"fields,omitempty"`
+	// Search: búsqueda libre de una lectura concreta (`?q=`). Nunca se guarda con la
+	// vista: es lo que alguien teclea un momento, no parte de su definición.
+	Search string `json:"-"`
 }
 
 // Vista guardada.
@@ -70,7 +75,7 @@ var operadores = map[Tipo][]string{
 //
 //nolint:gocognit,gocyclo // un bloque por parte de la configuración, todas con el mismo mapa de campos.
 func ValidarConfig(kind TipoVista, c ConfigVista, campos []Campo) (ConfigVista, error) {
-	if kind != VistaRejilla && kind != VistaKanban && kind != VistaFormulario {
+	if !slices.Contains([]TipoVista{VistaRejilla, VistaKanban, VistaFormulario, VistaGaleria}, kind) {
 		return c, ErrInvalido
 	}
 	porID := make(map[string]Campo, len(campos))

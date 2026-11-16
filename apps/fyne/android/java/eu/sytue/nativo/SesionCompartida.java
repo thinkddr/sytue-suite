@@ -27,6 +27,9 @@ import org.json.JSONObject;
 public final class SesionCompartida {
     private static final Binder PROCESO = new Binder();
     private static final Map<String, String> REVISIONES = new HashMap<>();
+    private static final Map<String, String> REVISIONES_TRABAJO = new HashMap<>();
+    private static final Map<String, String> PERMISOS_TRABAJO = new HashMap<>();
+    private static boolean trabajoConocido;
     private static long ultimaDrive = -1;
 
     private SesionCompartida() {}
@@ -179,7 +182,10 @@ public final class SesionCompartida {
     }
 
     public static int cerrojo(Context ctx) throws IOException {
-        Uri uri = destino(ctx).buildUpon().appendPath("cerrojo").build();
+        return descriptor(ctx, destino(ctx).buildUpon().appendPath("cerrojo").build());
+    }
+
+    private static int descriptor(Context ctx, Uri uri) throws IOException {
         ParcelFileDescriptor fd = ctx.getContentResolver().openFileDescriptor(uri, "rw");
         if (fd == null) {
             throw new IOException("The broker did not provide a session lock");
@@ -192,6 +198,80 @@ public final class SesionCompartida {
         }
     }
 
+    @SuppressWarnings("deprecation") // Raw types must be checked; typed Bundle getters can coerce malformed replies.
+    private static Object valorBundle(Bundle respuesta, String clave) { return respuesta.get(clave); }
+
+    private static synchronized boolean protocoloTrabajo(Bundle respuesta) {
+        if (!respuesta.containsKey("trabajo_protocolo")) {
+            if (trabajoConocido) { throw new SecurityException("The adopted native work protocol disappeared"); }
+            return false;
+        }
+        Object version = valorBundle(respuesta, "trabajo_protocolo");
+        if (!(version instanceof Integer) || ((Integer) version) != 1) {
+            throw new SecurityException("Unsupported native session work protocol");
+        }
+        trabajoConocido = true;
+        return true;
+    }
+
+    private static synchronized void adoptarRespuesta(String cuenta, Bundle respuesta) throws IOException {
+        REVISIONES.put(cuenta, respuesta.getString("revision"));
+        if (protocoloTrabajo(respuesta)) {
+            try {
+                SesionTrabajo.Marca marca = SesionTrabajo.marcaDesdeMapa(SesionBoveda.mapa(
+                        new JSONObject(respuesta.getString("trabajo_acceso", ""))));
+                REVISIONES_TRABAJO.put(cuenta, marca.revision);
+            } catch (Exception fallo) {
+                throw new IOException("Invalid native work witness in session reply");
+            }
+        }
+    }
+
+    /** Zero is only an explicitly known old broker or an unenabled build. */
+    public static int capacidadTrabajo(Context ctx) throws IOException {
+        if (!habilitada()) { return 0; }
+        return protocoloTrabajo(llamar(ctx, "estado", null, new Bundle())) ? 1 : 0;
+    }
+
+    public static int cerrojoTrabajo(Context ctx, String json) throws IOException {
+        if (capacidadTrabajo(ctx) != 1) { throw new SecurityException("The broker has no private work protocol"); }
+        return descriptor(ctx, destino(ctx).buildUpon().appendPath("trabajo").appendQueryParameter("json", json).build());
+    }
+
+    public static String trabajo(Context ctx, String accion, String json) throws IOException {
+        if (capacidadTrabajo(ctx) != 1) { throw new SecurityException("The broker has no private work protocol"); }
+        try {
+            JSONObject pedido = new JSONObject(json);
+            String cuenta = pedido.getString("account");
+            Bundle entrada = new Bundle();
+            entrada.putString("accion", accion);
+            entrada.putString("json", json);
+            Bundle salida = llamar(ctx, "trabajo", cuenta, entrada);
+            if (!protocoloTrabajo(salida)) { throw new SecurityException("Native work protocol was lost"); }
+            String datos = salida.getString("json", "");
+            JSONObject respuesta = new JSONObject(datos);
+            if (respuesta.getInt("v") != 1 || !cuenta.equals(respuesta.getString("account"))
+                    || !accion.equals(respuesta.getString("action"))) { throw new SecurityException("Native work routing changed"); }
+            synchronized (SesionCompartida.class) {
+                if ("soltar".equals(accion)) {
+                    // A late release from A never overwrites B's marker or permit.
+                    if (pedido.getString("permit").equals(PERMISOS_TRABAJO.get(cuenta))) { PERMISOS_TRABAJO.remove(cuenta); }
+                } else {
+                    SesionTrabajo.Marca marca = SesionTrabajo.marcaDesdeMapa(SesionBoveda.mapa(respuesta.getJSONObject("access")));
+                    REVISIONES_TRABAJO.put(cuenta, marca.revision);
+                    if ("confirmar".equals(accion) && pedido.getBoolean("exclusive")) {
+                        PERMISOS_TRABAJO.put(cuenta, respuesta.getString("permit"));
+                    }
+                }
+            }
+            return datos;
+        } catch (IOException fallo) {
+            throw fallo;
+        } catch (Exception fallo) {
+            throw new IOException("The native work reply is unavailable or inconsistent");
+        }
+    }
+
     private static Bundle cuenta(String emisor, String cliente) {
         Bundle datos = new Bundle();
         datos.putString("issuer", emisor);
@@ -201,14 +281,14 @@ public final class SesionCompartida {
 
     public static synchronized String cargar(Context ctx, String nombre, String emisor, String cliente) throws IOException {
         Bundle salida = llamar(ctx, "leer", nombre, cuenta(emisor, cliente));
-        REVISIONES.put(nombre, salida.getString("revision"));
+        adoptarRespuesta(nombre, salida);
         return salida.getString("datos", "");
     }
 
     private static synchronized boolean preferenciaDrive(Context ctx, Bundle respuesta) {
         SharedPreferences cache = ctx.getSharedPreferences("sytue-drive-sistema", Context.MODE_PRIVATE);
         boolean presente = respuesta.containsKey(DrivePreferencia.CLAVE);
-        Object valor = presente ? respuesta.get(DrivePreferencia.CLAVE) : null;
+        Object valor = presente ? valorBundle(respuesta, DrivePreferencia.CLAVE) : null;
         long ahora = SystemClock.elapsedRealtime();
         boolean conocida = cache.contains("desactivado"), anterior = cache.getBoolean("desactivado", false);
         boolean desactivado = DrivePreferencia.respuesta(presente, valor, conocida, anterior,
@@ -226,6 +306,7 @@ public final class SesionCompartida {
     /** Provider access uses the same authenticated read, with the latest shared opt-out. */
     public static synchronized String cargarDrive(Context ctx, String nombre, String emisor, String cliente) throws IOException {
         Bundle salida = llamar(ctx, "leer", nombre, cuenta(emisor, cliente));
+        adoptarRespuesta(nombre, salida);
         return DrivePreferencia.datosParaDrive(preferenciaDrive(ctx, salida), salida.getString("datos", ""));
     }
 
@@ -243,7 +324,7 @@ public final class SesionCompartida {
         Bundle entrada = cuenta(emisor, cliente);
         entrada.putBoolean("permitir_historica", historica);
         Bundle salida = llamar(ctx, "migrar", nombre, entrada);
-        REVISIONES.put(nombre, salida.getString("revision"));
+        adoptarRespuesta(nombre, salida);
     }
 
     public static synchronized void guardar(Context ctx, String nombre, String emisor, String cliente, String claro) throws IOException {
@@ -254,8 +335,16 @@ public final class SesionCompartida {
         Bundle entrada = cuenta(emisor, cliente);
         entrada.putString("datos", claro);
         entrada.putString("revision", revision);
+        if (trabajoConocido) {
+            String testigo = REVISIONES_TRABAJO.get(nombre);
+            if (testigo == null) { throw new SecurityException("Read the current native work witness before saving the session"); }
+            entrada.putInt("trabajo_protocolo", 1);
+            entrada.putString("trabajo_revision", testigo);
+            String permiso = PERMISOS_TRABAJO.get(nombre);
+            if (permiso != null) { entrada.putString("trabajo_permiso", permiso); }
+        }
         Bundle salida = llamar(ctx, "guardar", nombre, entrada);
-        REVISIONES.put(nombre, salida.getString("revision"));
+        adoptarRespuesta(nombre, salida);
     }
 
     public static void bloqueo(Context ctx, boolean puesto) throws IOException {

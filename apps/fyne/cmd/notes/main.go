@@ -9,9 +9,16 @@
 // `FyneApp.toml` y del que la cadena de empaquetado hace las cinco copias que cada
 // sistema necesita.
 //
+// El contenido de la cuenta vive en el repositorio PRIVADO del dispositivo verificado:
+// aquí ya no se construye el cliente HTTP legible del servicio. Sin dispositivo
+// verificado no se ve contenido —los paneles de cifrado piden verificar y recuperar—
+// y ninguna operación cae al texto en claro. Las funciones que necesitan contenido
+// legible en el servidor (previsualizar un `doc`, el asistente de IA, compartir) no se
+// ofrecen: la fachada privada las rechaza y no existe un interruptor que las simule.
 // Para VERLA hace falta una máquina con pantalla. Lo que corre en cualquier sitio, sin
 // CGO y sin servidor gráfico, es `go test ./apps/notes/...`, que pinta lo mismo con el
 // pintor de software y compara los píxeles.
+// paridad-web: apps/frontend/apps/notes/src/pages/auth/matrix/callback.astro
 package main
 
 import (
@@ -19,15 +26,14 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
-	"slices"
 	"strings"
-	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 
 	"git.sytue.eu/sytue/one/apps/fyne/apps/notes"
 	"git.sytue.eu/sytue/one/apps/fyne/catalogos"
+	"git.sytue.eu/sytue/one/apps/fyne/cifrado"
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/sesion"
 	"git.sytue.eu/sytue/one/apps/fyne/soltar"
@@ -37,6 +43,8 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/auth"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	mx "git.sytue.eu/sytue/one/apps/nucleo/matrix"
+	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 	"git.sytue.eu/sytue/one/apps/nucleo/sistema/escritorio"
 )
 
@@ -47,12 +55,47 @@ const (
 	altoInicial  = 800
 )
 
-// administraCuadernos liga los roles a la identidad adoptada por esta app. Una
-// respuesta de otra organización o de un inicio anterior nunca habilita ajustes.
-func administraCuadernos(r auth.Reclamos, generacion string, actual sesion.Estado, org string) bool {
-	return actual.Dentro() && generacion != "" && generacion == actual.GeneracionSesion &&
-		r.Sub == actual.Sujeto && org != "" && r.Tenant == org && !r.EsCuentaPersonal() &&
-		(slices.Contains(r.Roles, "owner") || slices.Contains(r.Roles, "admin"))
+// montarNotepads es el camino REAL de arranque de la app: arma el presentador sobre el
+// dueño registrado —el mismo que cuenta y drena las fuentes locales— y nunca construye
+// el servicio HTTP legible. Las funciones que mandarían contenido al servidor
+// (previsualizar un `doc`, el asistente de IA, compartir, enlaces públicos) se quedan
+// sin cablear hasta que exista su versión privada: no se simulan.
+func montarNotepads(ctx context.Context, repository *notepadsRepository, tr *i18n.Translator, l i18n.Locale, red *offline.Monitor, win fyne.Window, abrirCalendar func(string)) (*notes.Pantalla, error) {
+	if repository == nil {
+		return nil, cifrado.ErrPrivateResources
+	}
+	p, err := notes.NuevaPantallaPrivada(ctx, repository.local, tr, l, repository, red, win)
+	if err != nil {
+		return nil, err
+	}
+	p.AbrirCalendar = abrirCalendar
+	// Abrir un cuaderno cifrado con Touch ID, Face ID o Windows Hello, si el sistema los
+	// tiene (decisión del dueño, 2026-09-24): la clave derivada, en el almacén seguro.
+	if metodo, _ := escritorio.Biometria(); metodo != "" {
+		p.Recordar = &notes.Recordador{
+			Metodo: metodo, Motivo: tr.T("shell.lock.reasonNotebook", nil),
+			Verificar: escritorio.Verificar,
+			Leer:      auth.LeerSecreto, Guardar: auth.GuardarSecreto, Borrar: auth.BorrarSecreto,
+		}
+	}
+	return p, nil
+}
+
+// interceptarCierre keeps the window and its editor available when a pending
+// encrypted edit has not yet reached its original journal. A later close gesture
+// retries the same preparation; the interceptor is removed only on success.
+func interceptarCierre(w interface {
+	SetCloseIntercept(func())
+	Close()
+}, preparar func() bool,
+) {
+	w.SetCloseIntercept(func() {
+		if !preparar() {
+			return
+		}
+		w.SetCloseIntercept(nil)
+		w.Close()
+	})
 }
 
 func main() {
@@ -62,6 +105,9 @@ func main() {
 	// La sesión, la apariencia y el idioma son TRANSVERSALES a las trece apps: esto lo
 	// lee de donde lo dejó la última que lo tocó. `Abrir` no habla con la red.
 	s := sesion.Abrir(a, "")
+	// El cromo «papel» de toda la suite (ADR 0080). Aquí y no en `sesion.Abrir`: las
+	// pruebas que abren sesión comprueban también el cromo de color.
+	tema.ElegirCromo(tema.CromoPapel)
 
 	l := s.Idioma()
 	tr, err := i18n.New(l, i18n.Common(), catalogos.Notes())
@@ -74,119 +120,96 @@ func main() {
 	// idiomas, igual que en la web.
 	w := a.NewWindow("Sytue Notepads")
 	w.SetPadded(false)
-	// El servicio con la sesión TRANSVERSAL: la misma con la que han entrado las otras
-	// doce apps, así que si ya hay sesión no se vuelve a pedir.
-	// La caché «red primero» de la suite: sin red se leen los cuadernos y las notas que
-	// ya se abrieron. Y el almacén, para la cola de capturas y los borradores.
-	// Las exportaciones no se guardan: la de toda la cuenta, por prefijo; la de un
-	// cuaderno, con `Cache-Control: no-store` desde el SDK (ExportNotebook).
-	red, cliente := s.Conexion("notes", "/api/v1/export")
-	p := notes.NuevaPantalla(tr, l, api.NewNotes(s.URL("notes"), s.Sesion, s.ClienteConAviso(cliente)), red, w)
 	// El widget nativo lo lee su propia Fuente, SIN la caché de trabajar sin conexión,
 	// y se vuelve a publicar tras cada escritura de Notepads.
 	s.PublicadorWidget(s.FuenteWidget(tr))
-	if almacen, err := sesion.Almacen(); err == nil {
-		p.Almacen = almacen
-	} else {
-		slog.Warn("notes: sin almacén, sin red no se captura", "error", err)
-	}
-	// La organización activa encabeza los enlaces de página (ADR 0056), menos el del
-	// cuaderno PÚBLICO (`/p/<token>`): es para quien no tiene sesión, y va sin org como
-	// el `/s/<token>` de la web (ShareModal la compone aparte por lo mismo).
-	org := s.Sesion.Organizacion
-	p.AppURL = func(ruta string) string {
-		if strings.HasPrefix(ruta, "/p/") {
-			return api.AppURL(s.Apex(), "notes", "", ruta)
-		}
-		return api.AppURL(s.Apex(), "notes", org(), ruta)
-	}
-	p.Docs = api.NewDocs(s.URL("docs"), s.Sesion, nil)
-	// Compartir un cuaderno o una nota con alguien, y decir quién me compartió una.
-	p.Directorio, p.Yo = api.NewDirectorio(s.URL("id"), s.Sesion, nil), s.Sesion.Subject
-	// La cola y los borradores van por persona Y organización (claveAlmacen).
-	p.Org = org
-	p.GeneracionSesion = func() string { return s.Estado().GeneracionSesion }
-	// Como en Rooms, los claims se leen fuera del hilo de la interfaz. Su caché solo
-	// se consulta y publica en ese hilo, con la generación y organización vigentes.
-	var rolesCuadernos auth.Reclamos
-	var generacionRoles string
-	p.AdminOrg = func() bool {
-		return administraCuadernos(rolesCuadernos, generacionRoles, s.Estado(), org())
-	}
-	// El asistente del editor, con Sytue AI en directo (el `/api/ai` de la web).
-	p.Asistir = api.NewIA(s.URL("ai"), s.Sesion, nil).Asistir
-	// «Compartir en Rooms» y los ficheros de Drive de la herramienta de enlaces: los
-	// servicios de esas apps, con la misma sesión, como el `/api/suite` de la web.
-	p.Suite = &api.Elegir{
-		Apex:     s.Apex(),
-		Org:      s.Sesion.Organizacion,
-		Drive:    api.NewDrive(s.URL("drive"), s.Sesion, nil),
-		Rooms:    api.NewRooms(s.URL("rooms"), s.Sesion, nil),
-		Docs:     p.Docs,
-		Calendar: api.NewCalendars(s.URL("calendar"), s.Sesion, nil),
-		Notes:    api.NewNotes(s.URL("notes"), s.Sesion, nil),
-	}
-	p.AbrirCalendar = func(ruta string) { _ = api.AbrirEn(a, s.Apex(), "calendar", org(), ruta) }
-	// Abrir un cuaderno cifrado con Touch ID, Face ID o Windows Hello, si el sistema los
-	// tiene (decisión del dueño, 2026-09-24): la clave derivada, en el almacén seguro.
-	if metodo, _ := escritorio.Biometria(); metodo != "" {
-		p.Recordar = &notes.Recordador{
-			Metodo: metodo, Motivo: tr.T("shell.lock.reasonNotebook", nil),
-			Verificar: escritorio.Verificar,
-			Leer:      auth.LeerSecreto, Guardar: auth.GuardarSecreto, Borrar: auth.BorrarSecreto,
-		}
-	}
-	barra := ui.NuevaBarraSuite(tr, s, iconos.Notes)
-	p.ConServiciosVinculados(vinculados.Nuevo(s, w, tr, "notes").Abrir)
-	barra.CederAtajoSi(p.EnfocarCaptura)
-	w.SetContent(barra.Montar(p.Objeto()))
-	// Soltar texto o un enlace sobre el cuaderno crea la nota, como en la web.
-	soltar.AlSoltar(w, func(x soltar.Soltado) { p.Soltar(x.Texto, x.URLs, x.Posicion) })
 	w.Resize(fyne.NewSize(anchoInicial, altoInicial))
+	// Del cliente HTTP de la suite sólo queda el MONITOR de conectividad, para la fase
+	// «sin conexión» con el diario local. El contenido va cifrado por el repositorio
+	// del dispositivo verificado.
+	red, _ := s.Conexion("notes")
 
+	// El presentador privado en curso y el enlace que llegó antes de montarse: se
+	// atiende al montar, como las props `notebookInicial`/`vinculoInicial` de la isla.
+	var current *notes.Pantalla
+	var pendiente *url.URL
+
+	barra := ui.NuevaBarraSuite(tr, s, iconos.Notes)
+	private, err := cifrado.NewPrivateApplication(cifrado.PrivateApplicationConfig[*notepadsRepository]{
+		Suite: s, Application: a, Window: w, Product: "notes",
+		Translate: func(key string) string { return tr.T(key, nil) },
+		Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*notepadsRepository], error) {
+			return notesPlan(ctx, resources, s)
+		},
+		//nolint:contextcheck // The presenter retains its own mounted lifetime, not this short mount request.
+		Mount: func(ctx context.Context, resources *cifrado.Resources[*mx.Client], repository *notepadsRepository) (cifrado.ApplicationView, error) {
+			organization := repository.PrivateStorageScope().Tenant
+			p, err := montarNotepads(ctx, repository, tr, l, red, w, func(ruta string) { _ = api.AbrirEn(a, s.Apex(), "calendar", organization, ruta) }) //nolint:contextcheck // The presenter retains its own mounted lifetime; future gestures must not inherit the mount request.
+			if err != nil {
+				return cifrado.ApplicationView{}, err
+			}
+			p.VincularAutorizacionSuite(s.Sesion.WithAuthorizationIntent, resources.Check)
+			// Las páginas del proveedor sin copiarlas ni convertirlas a notas nativas.
+			p.ConServiciosVinculados(vinculados.Nuevo(s, w, tr, "notes").Abrir)
+			barra.CederAtajoSi(p.EnfocarCaptura)
+			current = p
+			p.Arrancar()
+			if u := pendiente; u != nil {
+				pendiente = nil
+				p.AtenderEnlace(u)
+			}
+			return cifrado.ApplicationView{
+				Object: p.Objeto(),
+				Detach: func() {
+					p.Cerrar()
+					if current == p {
+						current = nil
+					}
+				},
+				Join: p.Join,
+			}, nil
+		},
+	})
+	if err != nil {
+		w.SetContent(ui.NuevoVacio(tr.T("matrix.failed", nil), ""))
+	} else {
+		w.SetContent(barra.Montar(private.Objeto()))
+		w.SetOnClosed(private.Close)
+	}
+	// Soltar texto o un enlace sobre el cuaderno crea la nota, como en la web.
+	soltar.AlSoltar(w, func(x soltar.Soltado) {
+		if current != nil {
+			current.Soltar(x.Texto, x.URLs, x.Posicion)
+		}
+	})
 	// Los enlaces entrantes: `?notebook=&note=&h=` y `/notebooks/<id>` abren esa nota, y
 	// `?link=<tipo>:<id>&label=` crea la nota vinculada, como `pages/index.astro`.
+	// Antes del montaje se quedan pendientes y sacan los paneles de verificación al
+	// frente, que el buzón de Mail también espera al suyo.
 	s.AlAbrirURL(func(u *url.URL) {
 		fyne.Do(func() {
-			if !p.AtenderEnlace(u) && (strings.Trim(u.Path, "/") != "" || strings.Trim(u.Opaque, "/") != "") {
+			if current != nil && current.AtenderEnlace(u) {
+				return
+			}
+			if current == nil {
+				if _, ok := notes.LeerEntrante(u); ok {
+					pendiente = u
+					private.Show()
+					return
+				}
+			}
+			if strings.Trim(u.Path, "/") != "" || strings.Trim(u.Opaque, "/") != "" {
 				s.NoEncontrado() // con un receptor apuntado, la sesión ya no sabe qué no es de nadie
 			}
 		})
 	})
-	// Se carga en cuanto HAY sesión, y no antes: sin ella cada petición sería un 401 y
-	// la pantalla se llenaría de «tu sesión ha caducado» a quien todavía no ha entrado.
-	// Si entra —aquí o en otra app de la suite—, se carga entonces.
-	generacion, sujeto, organizacion, dentro := "", "", "", false
-	arrancar := func(e sesion.Estado) {
-		orgActual := org()
-		cambio := e.GeneracionSesion != generacion || e.Sujeto != sujeto || orgActual != organizacion
-		if cambio || !e.Dentro() || !dentro {
-			rolesCuadernos, generacionRoles = auth.Reclamos{}, ""
-			p.ReiniciarSesion()
-		}
-		if e.Dentro() && (!dentro || cambio) {
-			p.Arrancar()
-			go func(adoptada sesion.Estado, orgAdoptada string) {
-				ctx, cancelar := context.WithTimeout(context.Background(), 10*time.Second)
-				defer cancelar()
-				r, err := s.Sesion.Reclamos(ctx)
-				if err != nil {
-					return
-				}
-				fyne.Do(func() {
-					actual := s.Estado()
-					if actual.GeneracionSesion == adoptada.GeneracionSesion &&
-						actual.Sujeto == adoptada.Sujeto && org() == orgAdoptada {
-						rolesCuadernos, generacionRoles = r, adoptada.GeneracionSesion
-					}
-				})
-			}(e, orgActual)
-		}
-		generacion, sujeto, organizacion, dentro = e.GeneracionSesion, e.Sujeto, orgActual, e.Dentro()
-	}
-	s.AlCambiar(arrancar)
 	// Con interfaz: lanzada por iOS solo para el widget no se pide nada.
-	s.CuandoHayaEscena(func() { arrancar(s.Estado()) })
+	s.CuandoHayaEscena(func() {
+		if private != nil {
+			interceptarCierre(w, func() bool { return current == nil || current.PrepararRetirada() })
+			private.Start()
+		}
+	})
 	s.Arrancar(context.Background())
 	w.ShowAndRun()
 }

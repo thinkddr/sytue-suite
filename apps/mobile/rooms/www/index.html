@@ -1174,6 +1174,34 @@
 }
 /* ==== fin del color de cada app ==== */
 
+/* ==== MÁS CONTRASTE (`prefers-contrast: more`) ====
+   Para quien lo pide al sistema (macOS «Aumentar contraste», el alto contraste de GNOME
+   o de Windows). En el modo normal los bordes y divisores se quedan por debajo de 3:1 a
+   propósito —separan sin pesar— y el texto sutil roza el 4,5:1; aquí pasan a lo que ya
+   cumple con holgura: todo borde es el contorno de control (`border-strong`, ≥ 3:1), el
+   texto sutil es el atenuado, el velo de los diálogos tapa más y, en el traslúcido, las
+   superficies dejan de ser velo sobre el fondo de color.
+
+   Todo es `var()` de tokens de rol, así que un solo bloque vale en los tres modos y en
+   cada color. `:is([data-theme], :not([data-theme]))` y su pareja de `data-color` no
+   filtran nada: suben el peso a tres para ganar a los modos de cada color, que pesan dos
+   o tres y van antes. Lo vigila contraste-paleta.test.ts («· más contraste»); las nativas
+   lo leen con `tokens.ElegirMasContraste`. */
+@media (prefers-contrast: more) {
+  :root:is([data-theme], :not([data-theme])):is([data-color], :not([data-color])) {
+    --sytue-border-subtle: var(--sytue-border-strong);
+    --sytue-border: var(--sytue-border-strong);
+    --sytue-text-subtle: var(--sytue-text-muted);
+    --sytue-overlay: rgba(0, 0, 0, 0.72);
+  }
+  :root[data-theme='translucent']:is([data-color], :not([data-color])) {
+    --sytue-surface: var(--sytue-surface-raised);
+    --sytue-bg-subtle: var(--sytue-menu-hover);
+    --sytue-topbar-bg: var(--sytue-surface-raised);
+    --sytue-header-bg: var(--sytue-surface-raised);
+  }
+}
+
 /* ---- Forma «Carril»: el menú lateral es de color ----
    El color de marca vive en el menú lateral, del color elegido de arriba abajo: texto blanco,
    velos blancos para el hover y el ítem activo y ÁMBAR para «estás aquí».
@@ -1659,7 +1687,7 @@ html {
     backdrop-filter: none;
   }
 }
-@media (prefers-reduced-transparency: reduce) {
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   [data-theme='translucent'] .sytue-glass-surface,
   [data-theme='translucent'] .sytue-menu-surface,
   [data-theme='translucent'] .sytue-popover-surface {
@@ -1676,8 +1704,9 @@ html {
    es opaco; un carril que pinta su propio fondo —el del ERP— sí pasa a opaco. La barra
    superior de <768px en «Carril» es cristal Y carril: sin su regla se quedaba con el
    fondo claro del cristal y el texto blanco del carril. Donde el navegador no entienda
-   el color relativo, la declaración se ignora y el carril se queda como estaba. */
-@media (prefers-reduced-transparency: reduce) {
+   el color relativo, la declaración se ignora y el carril se queda como estaba. Con «más
+   contraste» pasa lo mismo: un velo deja ver el fondo y le quita contraste al texto. */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   [data-theme='translucent'] .bg-sidebar,
   [data-theme='translucent'] .bg-rail {
     background-color: rgb(from var(--sytue-sidebar-bg) r g b / 1);
@@ -1748,6 +1777,22 @@ html {
   --sytue-rail-item-fill: var(--sytue-sidebar-indicator);
   --sytue-rail-active-bg: var(--sytue-sidebar-primary);
   --sytue-rail-active-fg: var(--sytue-sidebar-on-primary);
+}
+
+/* Con MÁS CONTRASTE (`prefers-contrast: more`, ver el final de colors.css) el carril y la
+   hoja del traslúcido dejan de ser velo: el carril, su paso 800 macizo —el mismo del que
+   sale el velo del «color de cada app», un punto más oscuro que el de petróleo y cobalto,
+   así que el texto blanco gana— y la hoja de Marco, la superficie elevada. Pesan tres
+   atributos para ganar al carril traslúcido de cada color; van antes del cromo «papel»,
+   que sigue mandando en lo suyo. Las nativas los leen con `tokens.ElegirMasContraste`. */
+@media (prefers-contrast: more) {
+  :root[data-theme='translucent']:is([data-color], :not([data-color])) {
+    --sytue-rail: var(--sytue-rail-800);
+    --sytue-sidebar-bg: var(--sytue-rail-800);
+  }
+  :root[data-theme='translucent']:not([data-forma='carril']) {
+    --sytue-sheet-bg: var(--sytue-surface-raised);
+  }
 }
 
 /* Las páginas que desplazan el DOCUMENTO (el Hub, Docs) no tienen carcasa de alto fijo:

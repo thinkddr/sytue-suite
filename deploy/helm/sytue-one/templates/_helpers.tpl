@@ -243,3 +243,15 @@ Uso (nindent al nivel de los items de ports, normalmente 8):
       key: {{ $calls.secretKey | default "secret" }}
       optional: {{ not ($calls.enabled | default false) }}
 {{- end -}}
+
+{{/* Mail and Calendar use Rooms' dedicated storage authority, never Hub's secret. */}}
+{{- define "sytue.storageIngressEnv" -}}
+- name: ROOMS_URL
+  value: {{ .Values.config.roomsUrl | default (printf "http://%s-rooms" .Release.Name) | quote }}
+- name: ROOMS_INTERNAL_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.existingSecret }}
+      key: rooms-internal-secret
+      optional: true
+{{- end -}}

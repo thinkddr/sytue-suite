@@ -3,6 +3,8 @@
 
 package ui
 
+// paridad-web: apps/frontend/packages/ui/src/components/Migas.tsx
+
 import (
 	"image/color"
 
@@ -92,6 +94,9 @@ type Miga struct {
 	Actual bool
 	// Estilo es el de la ruta a la que pertenece.
 	Estilo EstiloMigas
+	// Etiqueta es el `aria-label`, ya traducido, cuando el rótulo no dice qué hace: el
+	// «…» de una ruta plegada. Vacía: el rótulo.
+	Etiqueta string
 }
 
 var _ fyne.Widget = (*Miga)(nil)
@@ -104,8 +109,13 @@ func NuevaMiga(rotulo string, alPulsar func()) *Miga {
 	return m
 }
 
-// AccessibilityLabel es el nombre de la carpeta.
-func (m *Miga) AccessibilityLabel() string { return m.Rotulo }
+// AccessibilityLabel es el nombre de la carpeta, o la Etiqueta si la hay.
+func (m *Miga) AccessibilityLabel() string {
+	if m.Etiqueta != "" {
+		return m.Etiqueta
+	}
+	return m.Rotulo
+}
 
 func (m *Miga) peso() Peso {
 	if m.Actual && !m.Estilo.Iguales {
@@ -179,9 +189,14 @@ func (r *migaRenderer) Refresh() {
 
 // Migas es la ruta entera: los segmentos con sus galones.
 //
-// El último es el actual y los demás llevan a su carpeta. Cuando no caben, los
-// segmentos se estrechan TODOS en la misma proporción y se recortan con puntos
-// suspensivos, que es lo que hace el `flex` con `min-w-0` y `truncate` de la web.
+// El último es el actual y los demás llevan a su carpeta.
+//
+// CUANDO NO CABE, PLIEGA, como Migas.tsx: con cuatro niveles o más, si la ruta entera
+// no entra en su hueco se queda en «raíz › … › padre › actual», y el «…» abre un menú
+// con los niveles que esconde. Antes se estrechaban todos a la vez y una ruta de ocho
+// carpetas en un teléfono eran ocho «Pro…» ilegibles. Si plegada aún no cabe, lo que
+// queda se estrecha en la misma proporción y se recorta con puntos suspensivos, que
+// es lo que hace el `flex` con `min-w-0` y `truncate` de la web.
 type Migas struct {
 	pulsable
 
@@ -194,7 +209,32 @@ type Migas struct {
 
 	segmentos []*Miga
 	galones   []*iconos.Dibujo
+	// puntos es el «…» de la ruta plegada; nil si la ruta es demasiado corta.
+	puntos *Miga
+	// plegada dice si el último Layout escondió los niveles intermedios.
+	plegada bool
+	// menu es el de los niveles ocultos, mientras está abierto.
+	menu *Menu
 }
+
+// MinimoParaPlegar: con menos de cuatro niveles no hay nada entre la raíz y el padre.
+const MinimoParaPlegar = 4
+
+// PliegueDeMigas es `pliegueDeMigas` de Migas.tsx: qué índices se ven de una ruta de
+// `n` niveles y cuáles esconde el «…». Plegada es raíz, padre y actual; sin plegar,
+// todos.
+func PliegueDeMigas(n int, plegada bool) (visibles, ocultos []int) {
+	for i := range n {
+		visibles = append(visibles, i)
+	}
+	if !plegada || n < MinimoParaPlegar {
+		return visibles, nil
+	}
+	return []int{0, n - 2, n - 1}, visibles[1 : n-2]
+}
+
+// Plegada dice si la ruta enseña ahora el «…» en vez de los niveles intermedios.
+func (m *Migas) Plegada() bool { return m.plegada }
 
 var _ fyne.Widget = (*Migas)(nil)
 
@@ -241,7 +281,51 @@ func (m *Migas) CreateRenderer() fyne.WidgetRenderer {
 		}
 		r.objetos = append(r.objetos, s)
 	}
+	m.puntos = nil
+	if len(m.Ruta) >= MinimoParaPlegar {
+		m.puntos = NuevaMiga("…", m.abrirOcultos)
+		m.puntos.Etiqueta, m.puntos.Estilo = textoComun("ui.migas.ocultas"), m.Estilo
+		m.puntos.Hide()
+		r.objetos = append(r.objetos, m.puntos)
+	}
 	return r
+}
+
+// abrirOcultos despliega el menú de los niveles que el «…» esconde, alineado con su
+// borde izquierdo (`align="start"`), como el Dropdown de la web.
+func (m *Migas) abrirOcultos() {
+	if m.puntos == nil || (m.menu != nil && m.menu.Abierto()) {
+		return
+	}
+	_, ocultos := PliegueDeMigas(len(m.Ruta), true)
+	elementos := make([]fyne.CanvasObject, 0, len(ocultos))
+	for _, i := range ocultos {
+		elementos = append(elementos, NuevoElementoMenu(m.Ruta[i], iconos.Ninguno, func() {
+			if m.AlIr != nil {
+				m.AlIr(i)
+			}
+		}))
+	}
+	m.menu = NuevoMenu(elementos...)
+	m.menu.AlInicio, m.menu.Rotulo = true, m.puntos.Etiqueta
+	m.menu.Mostrar(m.puntos)
+}
+
+// MenuOcultos es el menú del «…» mientras está abierto (nil si no).
+func (m *Migas) MenuOcultos() *Menu {
+	if m.menu == nil || !m.menu.Abierto() {
+		return nil
+	}
+	return m.menu
+}
+
+// medidaPlegada es lo que ocupa la ruta plegada: raíz, «…», padre y actual con sus
+// tres galones.
+func (m *Migas) medidaPlegada() float32 {
+	n := len(m.segmentos)
+	ancho := MedidaMiga(m.segmentos[0]).Width + MedidaMiga(m.puntos).Width
+	ancho += MedidaMiga(m.segmentos[n-2]).Width + MedidaMiga(m.segmentos[n-1]).Width
+	return ancho + 3*(2*huecoMig+LadoGalonMiga)
 }
 
 // tintaGalon es `text-text/50` en el cromo y `text-text-subtle` dentro de un diálogo.
@@ -267,27 +351,98 @@ func (r *migasRenderer) MinSize() fyne.Size           { return MedidaMigas(r.m) 
 func (r *migasRenderer) Objects() []fyne.CanvasObject { return r.objetos }
 func (r *migasRenderer) Destroy()                     {}
 
-// Layout pone segmento, galón, segmento… y encoge todos por igual si la ruta no cabe.
+// piezaMiga es un segmento de la fila que se pinta, con el galón que lleva delante
+// (nil la raíz) y si encoge cuando la ruta no cabe.
+type piezaMiga struct {
+	galon  *iconos.Dibujo
+	miga   *Miga
+	encoge bool
+}
+
+// fila es lo que se pinta de la ruta, de izquierda a derecha, plegada o no.
+func (m *Migas) fila() []piezaMiga {
+	visibles, _ := PliegueDeMigas(len(m.segmentos), m.plegada)
+	var fila []piezaMiga
+	for _, i := range visibles {
+		if i == 0 {
+			fila = append(fila, piezaMiga{miga: m.segmentos[0], encoge: true})
+			if m.plegada {
+				// El «…» no encoge (`shrink-0`): es lo único que lleva a lo escondido.
+				fila = append(fila, piezaMiga{galon: m.galones[0], miga: m.puntos})
+			}
+			continue
+		}
+		fila = append(fila, piezaMiga{galon: m.galones[i-1], miga: m.segmentos[i], encoge: true})
+	}
+	return fila
+}
+
+// verSolo enseña lo que va en la fila y esconde lo demás. Cambia la visibilidad solo
+// de lo que cambia: cada Show o Hide refresca, y el Layout corre en cada cambio de
+// tamaño de la ventana.
+func (m *Migas) verSolo(fila []piezaMiga) {
+	vistos := map[fyne.CanvasObject]bool{}
+	for _, p := range fila {
+		vistos[p.miga] = true
+		if p.galon != nil {
+			vistos[p.galon.Objeto()] = true
+		}
+	}
+	todos := make([]fyne.CanvasObject, 0, len(m.segmentos)+len(m.galones)+1)
+	for _, s := range m.segmentos {
+		todos = append(todos, s)
+	}
+	for _, g := range m.galones {
+		todos = append(todos, g.Objeto())
+	}
+	if m.puntos != nil {
+		todos = append(todos, m.puntos)
+	}
+	for _, o := range todos {
+		if v := vistos[o]; v && !o.Visible() {
+			o.Show()
+		} else if !v && o.Visible() {
+			o.Hide()
+		}
+	}
+}
+
+// Layout pone segmento, galón, segmento…; pliega los intermedios en «…» si la ruta
+// no cabe, y encoge por igual lo que quede si ni así cabe.
 func (r *migasRenderer) Layout(t fyne.Size) {
-	pedido := MedidaMigas(r.m).Width
+	m := r.m
+	pedido := MedidaMigas(m).Width
+	m.plegada = m.puntos != nil && pedido > t.Width
+	fila := m.fila()
+	m.verSolo(fila)
+	if m.plegada {
+		pedido = m.medidaPlegada()
+	}
+
 	factor := float32(1)
 	if pedido > t.Width && pedido > 0 {
-		// Los galones y los huecos no encogen (`shrink-0`): el déficit se reparte
-		// entre los rótulos, en proporción a lo que cada uno pedía.
-		fijo := float32(len(r.m.galones)) * (2*huecoMig + LadoGalonMiga)
+		// Los galones y los huecos no encogen (`shrink-0`), ni el «…»: el déficit se
+		// reparte entre los rótulos, en proporción a lo que cada uno pedía.
+		fijo := float32(len(fila)-1) * (2*huecoMig + LadoGalonMiga)
+		if m.plegada {
+			fijo += MedidaMiga(m.puntos).Width
+		}
 		factor = max(t.Width-fijo, 0) / max(pedido-fijo, 1)
 	}
 	x := float32(0)
-	for i, s := range r.m.segmentos {
-		if i > 0 {
+	alto := m.Estilo.Alto()
+	for _, p := range fila {
+		if p.galon != nil {
 			x += huecoMig
-			r.m.galones[i-1].Colocar(x, (t.Height-LadoGalonMiga)/2, LadoGalonMiga)
+			p.galon.Colocar(x, (t.Height-LadoGalonMiga)/2, LadoGalonMiga)
 			x += LadoGalonMiga + huecoMig
 		}
-		ancho := MedidaMiga(s).Width * factor
-		alto := r.m.Estilo.Alto()
-		s.Move(fyne.NewPos(x, (t.Height-alto)/2))
-		s.Resize(fyne.NewSize(ancho, alto))
+		ancho := MedidaMiga(p.miga).Width
+		if p.encoge {
+			ancho *= factor
+		}
+		p.miga.Move(fyne.NewPos(x, (t.Height-alto)/2))
+		p.miga.Resize(fyne.NewSize(ancho, alto))
 		x += ancho
 	}
 }

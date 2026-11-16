@@ -112,7 +112,7 @@ export function cabecerasCerradas(
   } = {},
 ): Readonly<Record<string, string>> {
   const shell = origenesDeLaShell(hubBaseUrl);
-  const { marcos, conectar = [], imagenes = [], wasm = false } = propios;
+  const { marcos, conectar = [], imagenes = [], wasm = true } = propios;
   return {
     'content-security-policy': [
       SYTUE_SECURITY_HEADERS['content-security-policy'],

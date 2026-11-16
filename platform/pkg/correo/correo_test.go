@@ -125,3 +125,52 @@ func TestOpcionesNoFabricanOtroRemitente(t *testing.T) {
 		t.Errorf("sin servidor: %v", err)
 	}
 }
+
+// El correo con la factura se deja leer con la biblioteca estándar: el texto, y el
+// PDF entero de vuelta con su nombre aunque lleve tildes; el Reply-To va y el
+// nombre no abre cabeceras.
+func TestMensajeAdjunto(t *testing.T) {
+	t.Parallel()
+	pdf := bytes.Repeat([]byte("%PDF-1.7 \x00\xff"), 40)
+	crudo := MensajeAdjunto("Acme <erp@sytue.eu>", "ana@cliente.es", "ana@acme.es", "Factura F-1",
+		"Hola.\nAdjunta.", Adjunto{Nombre: "Factura F-1 «año».pdf\r\nX: y", Tipo: "application/pdf", Datos: pdf}, time.Now())
+	m, err := mail.ReadMessage(bytes.NewReader(crudo))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.Header.Get("Reply-To") != "ana@acme.es" || m.Header.Get("X") != "" {
+		t.Fatalf("cabeceras: %v", m.Header)
+	}
+	tipo, params, err := mime.ParseMediaType(m.Header.Get("Content-Type"))
+	if err != nil || tipo != "multipart/mixed" {
+		t.Fatalf("Content-Type %q: %v", m.Header.Get("Content-Type"), err)
+	}
+	r := multipart.NewReader(m.Body, params["boundary"])
+	texto, err := r.NextPart()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cuerpo, _ := io.ReadAll(texto); string(cuerpo) != "Hola.\r\nAdjunta." {
+		t.Fatalf("texto %q", cuerpo)
+	}
+	adj, err := r.NextPart()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if adj.FileName() != "Factura F-1 «año».pdfX: y" {
+		t.Fatalf("nombre %q", adj.FileName())
+	}
+	if ct, _, _ := mime.ParseMediaType(adj.Header.Get("Content-Type")); ct != "application/pdf" {
+		t.Fatalf("tipo %q", adj.Header.Get("Content-Type"))
+	}
+	datos, _ := io.ReadAll(base64.NewDecoder(base64.StdEncoding, adj))
+	if !bytes.Equal(datos, pdf) {
+		t.Fatal("el PDF no vuelve entero")
+	}
+	if _, err := r.NextPart(); err != io.EOF {
+		t.Fatalf("sobra una parte: %v", err)
+	}
+	if err := EnviarAdjunto(context.Background(), Config{}, Opciones{}, "ana@cliente.es", "x", "y", Adjunto{}); !errors.Is(err, ErrSinConfigurar) {
+		t.Fatalf("sin servidor no se intenta: %v", err)
+	}
+}

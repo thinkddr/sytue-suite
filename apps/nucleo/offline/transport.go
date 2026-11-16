@@ -55,11 +55,14 @@ func tienePrefijo(ruta string, prefijos []string) bool {
 // y había copia, sirve la copia marcada con `X-Sytue-Offline: cache`. Solo para GET y
 // solo con sesión: sin dueño no hay a nombre de quién guardar.
 type Transport struct {
-	Base    http.RoundTripper // nil es http.DefaultTransport
-	Store   *Store
-	Owner   func() string // el `sub` de la sesión, o "" sin ella
-	Product string
-	Monitor *Monitor // opcional
+	Base  http.RoundTripper // nil es http.DefaultTransport
+	Store *Store
+	// ResolveStore follows a verified native app relocation. Each request retains
+	// one store for its complete response body; implementations must be thread-safe.
+	ResolveStore func(context.Context) (*Store, error)
+	Owner        func() string // el `sub` de la sesión, o "" sin ella
+	Product      string
+	Monitor      *Monitor // opcional
 	// Private añade prefijos que este servicio no quiere ver guardados. Los de
 	// worker.ts son rutas del BFF; una API de servicio llamada en directo puede tener
 	// las suyas.
@@ -100,6 +103,10 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		tienePrefijo(ruta, prefijosPrivados) || tienePrefijo(ruta, t.Private) {
 		return base.RoundTrip(req)
 	}
+	store := t.requestStore(req.Context())
+	if store == nil {
+		return base.RoundTrip(req)
+	}
 	espacio, id := espacioHTTP(t.Product), req.URL.String()
 
 	resp, err := base.RoundTrip(req)
@@ -112,7 +119,7 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 			return nil, err
 		}
 		var g respuestaGuardada
-		if ok, _ := t.Store.Read(owner, espacio, id, &g); !ok || !valid() {
+		if ok, _ := store.Read(owner, espacio, id, &g); !ok || !valid() {
 			return nil, err
 		}
 		t.informar(Offline)
@@ -128,7 +135,7 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return resp, nil
 	}
 	resp.Body = &cacheBody{
-		body: resp.Body, ctx: req.Context(), owner: owner, current: valid, store: t.Store,
+		body: resp.Body, ctx: req.Context(), owner: owner, current: valid, store: store,
 		product: t.Product, products: t.CacheProducts, id: id, status: resp.StatusCode,
 		header: resp.Header.Clone(), expected: resp.ContentLength,
 	}
@@ -170,4 +177,15 @@ func guardable(resp *http.Response, req *http.Request) bool {
 		return false
 	}
 	return resp.ContentLength <= MaxCacheBytes
+}
+
+func (t *Transport) requestStore(ctx context.Context) *Store {
+	if t.ResolveStore == nil {
+		return t.Store
+	}
+	store, err := t.ResolveStore(ctx)
+	if err != nil {
+		return nil
+	}
+	return store
 }

@@ -153,7 +153,7 @@ export function ShareLanding({ user, hubBaseUrl, locale }: Props): JSX.Element {
             <EmptyState
               title={t('browse.loadFailed')}
               description={t('error.checkConnection')}
-              illustration={<Icon name="warning" size={36} class="text-danger-text" />}
+              tone="error"
               action={
                 <Button size="sm" variant="secondary" onClick={() => location.reload()}>
                   {t('action.retry')}
@@ -161,9 +161,10 @@ export function ShareLanding({ user, hubBaseUrl, locale }: Props): JSX.Element {
               }
             />
           ) : candidates.length === 0 ? (
-            <p class="text-text-muted py-8 text-center text-sm">
-              {query.trim() ? t('forward.emptyQuery') : t('share.noChannels')}
-            </p>
+            <EmptyState
+              compact
+              title={query.trim() ? t('forward.emptyQuery') : t('share.noChannels')}
+            />
           ) : (
             <ul class="flex flex-col gap-0.5">
               {candidates.map((c) => (
@@ -193,7 +194,7 @@ export function ShareLanding({ user, hubBaseUrl, locale }: Props): JSX.Element {
 
 export function EncryptedShareLanding(props: Props): JSX.Element {
   return (
-    <MatrixRoomsGate actor={props.user.id} locale={props.locale}>
+    <MatrixRoomsGate actor={props.user.id} tenant={props.user.tenant} locale={props.locale}>
       <ShareLanding {...props} />
     </MatrixRoomsGate>
   );

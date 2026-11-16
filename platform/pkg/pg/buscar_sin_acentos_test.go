@@ -40,11 +40,12 @@ var excepcionesGo = map[string]string{
 
 // excepcionesNFD: normalizadores hechos a mano que NO son un buscador.
 var excepcionesNFD = map[string]string{
-	"apps/nucleo/buscar/buscar.go":                     "es la regla",
-	"apps/fyne/apps/notes/escritura.go":                "slugDe: el ancla `h=` de un título, igual que la de la web",
-	"apps/fyne/apps/hub/bienvenida.go":                 "Slugify: el identificador ASCII de la organización, igual que el de la web",
-	"services/docs/internal/domain/pdfcodificacion.go": "nombres de glifos Adobe: conserva mayúsculas y diacríticos al descomponer; no es un buscador",
-	"services/docs/internal/domain/pdffont.go":         "métricas AFM de las 14 fuentes estándar PDF: aproxima el ancho de caracteres acentuados por su base ASCII; no es un buscador",
+	"apps/nucleo/buscar/buscar.go":       "es la regla",
+	"apps/fyne/contactos/iniciales.go":   "cabecera de letra del índice: reduce una mayúscula a su base para compararla con la colación, no busca",
+	"apps/fyne/apps/notes/escritura.go":  "slugDe: el ancla `h=` de un título, igual que la de la web",
+	"apps/fyne/apps/hub/bienvenida.go":   "Slugify: el identificador ASCII de la organización, igual que el de la web",
+	"apps/nucleo/pdf/pdfcodificacion.go": "nombres de glifos Adobe: conserva mayúsculas y diacríticos al descomponer; no es un buscador",
+	"apps/nucleo/pdf/pdffont.go":         "métricas AFM de las 14 fuentes estándar PDF: aproxima el ancho de caracteres acentuados por su base ASCII; no es un buscador",
 }
 
 var (

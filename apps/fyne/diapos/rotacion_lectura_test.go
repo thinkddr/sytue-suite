@@ -155,6 +155,7 @@ func TestLaRotacionDeDiaposConPocaAlturaPermiteEditarTrasDesplazar(t *testing.T)
 		k := e.escenario.Escala
 		m = marcoDe(t, e, "f")
 		p = d.AbsolutePositionForObject(m).AddXY(m.Size().Width/2, m.Size().Height/2)
+		e.capa.alt = true // sin guías: se mide el desplazamiento puro
 		test.Drag(w.Canvas(), p, 9.6*k, 5.4*k)
 		if c := e.m.caja(0, "f"); !casi(c.X, antes.X+1) || !casi(c.Y, antes.Y+1) || ctx.Guardado != editor.Sucio {
 			t.Fatalf("tras desplazar/girar el arrastre no mueve 1 %% del modelo: antes=%+v, después=%+v", antes, c)

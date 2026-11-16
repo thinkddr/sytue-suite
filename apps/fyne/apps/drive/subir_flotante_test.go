@@ -4,6 +4,7 @@
 package drive
 
 import (
+	"slices"
 	"testing"
 
 	"fyne.io/fyne/v2"
@@ -71,5 +72,50 @@ func TestEnElTelefonoSubirFlota(t *testing.T) {
 	_ = w.Canvas().Capture()
 	if visible() {
 		t.Error("a 1280 el «Subir» flotante sigue a la vista")
+	}
+}
+
+// TestSubirCarpetaConElBotonSoloDondeHaySelector: «Nuevo → Subir carpeta» está junto a
+// «Carpeta» cuando el escritorio pone el selector de carpetas, abre ese selector con su
+// título y le pasa a la subida la carpeta elegida; en el móvil (`ElegirCarpeta` nil) no
+// se ofrece, y sin red no abre nada.
+func TestSubirCarpetaConElBotonSoloDondeHaySelector(t *testing.T) {
+	w := test.NewWindow(nil)
+	defer w.Close()
+	p := NuevaPantalla(traductor(t), nil, nil, w)
+	p.explor.Fase = Exito
+	rotulo := p.tr.T("files.upload.folder", nil)
+	textos := func() []string {
+		var out []string
+		for _, o := range p.elementosNuevo() {
+			if e, ok := o.(*ui.ElementoMenu); ok {
+				out = append(out, e.Texto)
+			}
+		}
+		return out
+	}
+	if slices.Contains(textos(), rotulo) {
+		t.Fatal("sin selector de carpetas (el móvil) «Subir carpeta» se ofrece")
+	}
+
+	var titulo string
+	abiertos := 0
+	p.ElegirCarpeta = func(tit string, _ func([]Entrada)) {
+		titulo = tit
+		abiertos++
+	}
+	got := textos()
+	if len(got) < 2 || got[1] != rotulo || got[0] != p.tr.T("files.new.folder", nil) {
+		t.Fatalf("«Nuevo» = %q; «Subir carpeta» tiene que ir tras «Carpeta»", got)
+	}
+	e := p.elementosNuevo()[1].(*ui.ElementoMenu)
+	e.AlPulsar()
+	if abiertos != 1 || titulo != rotulo {
+		t.Errorf("el selector se abrió %d veces, con título %q", abiertos, titulo)
+	}
+	p.conexion(false)
+	e.AlPulsar()
+	if abiertos != 1 {
+		t.Error("sin red «Subir carpeta» abre el selector")
 	}
 }

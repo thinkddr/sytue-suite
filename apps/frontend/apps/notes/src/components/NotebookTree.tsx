@@ -14,6 +14,7 @@
  * es un detalle que deba costar un clic.
  */
 import type { JSX } from 'preact';
+import { colorDeUsuario } from '@sytue/config';
 import { useRef, useState } from 'preact/hooks';
 import { Dropdown, Icon, MenuItem, SIDEBAR_ACTION_CLASS, cx, usePointerDrag } from '@sytue/ui';
 import type { Note, Notebook } from '@sytue/api-clients';
@@ -308,7 +309,7 @@ export function NotebookTree({
             <span
               aria-hidden="true"
               class="h-2.5 w-2.5 shrink-0 rounded-full"
-              style={{ background: nb.color }}
+              style={{ background: colorDeUsuario(nb.color) ?? nb.color }}
             />
           )}
 

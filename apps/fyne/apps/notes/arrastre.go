@@ -77,7 +77,7 @@ func (p *Pantalla) reordenarNota(n Nota, destino string, despues bool, columna i
 	for i, c := range cambios {
 		destinos[i] = posicionNota{c.id, c.despues}
 	}
-	lanzar(func() error { return p.colocarVarias(destinos, true) })
+	p.lanzar(func() error { return p.colocarVarias(destinos, true) })
 }
 
 func contienePunto(o fyne.CanvasObject, en fyne.Position) bool {
@@ -210,7 +210,7 @@ func (p *Pantalla) soltarNota(n Nota, en fyne.Position) {
 		return
 	}
 	if c, ok := p.cuadernoEnArrastre(en); ok {
-		lanzar(func() error { return p.moverACuaderno(n.ID, c, true) })
+		p.lanzar(func() error { return p.moverACuaderno(n.ID, c, true) })
 		return
 	}
 	columna := -1

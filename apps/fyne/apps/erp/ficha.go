@@ -6,6 +6,7 @@ package erp
 import (
 	"context"
 	"image/color"
+	"maps"
 	"slices"
 	"strings"
 
@@ -91,6 +92,11 @@ type Ficha struct {
 	Valores, Rotulos, Errores map[string]string
 	// Fallo es la banda roja y Aviso la verde.
 	Fallo, Aviso string
+	// FaltaAprobacion: asentar contestó 409 `requiere_aprobacion`. En vez del error a
+	// secas, la banda ámbar ofrece pedirla desde aquí mismo.
+	FaltaAprobacion bool
+	// AlPedirAprobacion abre la solicitud de aprobación del documento.
+	AlPedirAprobacion func()
 	// Guardando es el `guardando` de la web: las acciones esperan.
 	Guardando bool
 	// EstadoActual es el de la barra de etapas.
@@ -121,6 +127,13 @@ type Ficha struct {
 	alCreado           func(Registro)
 	alRepintar         func()
 
+	// PuedeCrear es el `altas.puedeCrear` de la web: el módulo del modelo está activo y
+	// el servicio concede «crear» en él. Nil: no se ofrece nada que cree en otro modelo.
+	PuedeCrear func(modelo string) bool
+
+	// AlConvertir es «Crear pedido» o «Crear factura»: ver `DestinoConversion`.
+	AlConvertir func()
+
 	AlCerrar, AlGuardar, AlAsentar, AlBorrar, AlRestaurar, AlDuplicar, AlCopiarID func()
 	AlEstado                                                                      func(estado string)
 	AlAnular                                                                      func(api.ERPAsiento)
@@ -144,6 +157,9 @@ type Ficha struct {
 	// Los controles y los campos que se teclean fuera de ellos viven lo que la ficha:
 	// ver `Control`.
 	controles []*Control
+	// iniciales son los Valores con los que nació la ficha: lo que difiera de ellos
+	// se pierde al cerrar, y cerrar lo pregunta (ver `Cambiada`).
+	iniciales map[string]string
 	nota      *ui.AreaTexto
 	plan      *planTarea
 	ancho     float32
@@ -165,6 +181,7 @@ func NuevaFicha(tr *i18n.Translator, m Modelo, r, semilla *Registro, etiquetas m
 		origen = semilla
 	}
 	f.Valores = ValoresIniciales(m, origen)
+	f.iniciales = maps.Clone(f.Valores)
 	switch {
 	case r != nil && r.Estado != "":
 		f.EstadoActual = r.Estado
@@ -188,6 +205,26 @@ func (f *Ficha) fijar(clave, valor string) {
 	f.Valores[clave] = valor
 	delete(f.Errores, clave)
 }
+
+// Cambiada dice si hay algo escrito sin guardar: el `hayCambios` de la web
+// (lib/cambios.ts). Una clave que falta cuenta como vacía, así que escribir y borrar
+// un campo que el registro no traía no es un cambio.
+func (f *Ficha) Cambiada() bool {
+	for k, v := range f.Valores {
+		if f.iniciales[k] != v {
+			return true
+		}
+	}
+	for k, v := range f.iniciales {
+		if f.Valores[k] != v {
+			return true
+		}
+	}
+	return false
+}
+
+// descartar da por buenos los valores de ahora: lo que se descarta ya no pregunta.
+func (f *Ficha) descartar() { f.iniciales = maps.Clone(f.Valores) }
 
 // Rellenar escribe lo que Sytue AI ha leído: solo esos campos, el resto se queda.
 func (f *Ficha) Rellenar(data map[string]any, etiquetas map[string]string) {
@@ -256,14 +293,18 @@ func (f *Ficha) Objeto(v tema.Variante, ancho float32) fyne.CanvasObject {
 		add(b, alto, siguiente, true)
 		siguiente = CabeceraFichaMB
 	}
-	for _, a := range []struct {
-		texto        string
-		fondo, tinta string
-	}{{f.Fallo, "danger-bg", "danger-text"}, {f.Aviso, "success-bg", "success-text"}} {
-		if a.texto == "" {
-			continue
-		}
-		o, alto := avisoFicha(v, a.texto, a.fondo, a.tinta, f.anchoCampos())
+	if f.Fallo != "" {
+		o, alto := avisoFicha(v, f.Fallo, "danger-bg", "danger-text", f.anchoCampos())
+		add(o, alto, siguiente, false)
+		siguiente = AvisoFichaMB
+	}
+	if f.FaltaAprobacion {
+		o, alto := f.avisoAprobacion(v, f.anchoCampos())
+		add(o, alto, siguiente, false)
+		siguiente = AvisoFichaMB
+	}
+	if f.Aviso != "" {
+		o, alto := avisoFicha(v, f.Aviso, "success-bg", "success-text", f.anchoCampos())
 		add(o, alto, siguiente, false)
 		siguiente = AvisoFichaMB
 	}
@@ -439,6 +480,19 @@ func (f *Ficha) botonesCabecera() []fyne.CanvasObject {
 	if r != nil && f.Modelo.Cobro && f.Facturae {
 		botones = append(botones, boton("Facturae", f.t("form.downloadFacturae"), iconos.Descargar, descargar("facturae")))
 	}
+	if destino := f.Convertible(); destino != "" {
+		texto := f.t("sales.createInvoice")
+		if destino == ModeloPedidoVenta {
+			texto = f.t("sales.createOrder")
+		}
+		c := ui.NuevoBoton(texto, func() {
+			if f.AlConvertir != nil {
+				f.AlConvertir()
+			}
+		}).Con(ui.Secundario, ui.TallaSM)
+		c.Inerte = f.Guardando || f.AlConvertir == nil
+		botones = append(botones, c)
+	}
 	if !f.EnPapelera {
 		// «Rellenar con Sytue AI» abre `RellenarIA`.
 		ia := boton("", f.t("ai.fill"), iconos.IA, f.AlIA)
@@ -447,6 +501,42 @@ func (f *Ficha) botonesCabecera() []fyne.CanvasObject {
 	}
 	botones = append(botones, boton(f.t("action.close"), "", iconos.Ninguno, f.AlCerrar))
 	return botones
+}
+
+// Los modelos de la venta que se convierten uno en otro en el servidor
+// (`services/syerp/internal/http/ventas.go`, `ConvertirVenta`).
+const (
+	ModeloPresupuesto = "presupuesto"
+	ModeloPedidoVenta = "pedido_venta"
+)
+
+// DestinoConversion dice en qué modelo se convierte un documento de `modelo` en
+// `estado`, o "" si no se convierte: el presupuesto ACEPTADO pasa a pedido, y el pedido
+// confirmado o entregado a factura. Son las mismas condiciones que el botón de la web;
+// el servicio, de todos modos, rechaza lo demás.
+func DestinoConversion(modelo, estado string) string {
+	switch {
+	case modelo == ModeloPresupuesto && estado == "aceptado":
+		return ModeloPedidoVenta
+	case modelo == ModeloPedidoVenta && (estado == "confirmado" || estado == "entregado"):
+		return api.ERPFacturaVenta
+	}
+	return ""
+}
+
+// Convertible es el modelo en que se puede convertir el registro abierto, o "": hace
+// falta que exista, poder escribir, no estar en la papelera y poder crear en el destino.
+// Mira el estado de la barra de etapas, no el guardado: es el que ve quien la tiene
+// abierta, como en la web.
+func (f *Ficha) Convertible() string {
+	if f.Registro == nil || f.SoloLectura || f.EnPapelera || f.PuedeCrear == nil {
+		return ""
+	}
+	destino := DestinoConversion(f.Modelo.Clave, f.EstadoActual)
+	if destino == "" || !f.PuedeCrear(destino) {
+		return ""
+	}
+	return destino
 }
 
 // avisoFacturae ocupa una fila propia con su enlace FACe al final.
@@ -715,6 +805,64 @@ func avisoFicha(v tema.Variante, texto, fondo, tinta string, ancho float32) (fyn
 	caja := ui.NuevaCaja(tema.Color(fondo, v), sinColor, tema.RadioMD)
 	l := &cajaConTexto{caja: caja, p: p, px: AvisoFichaPX, py: AvisoFichaPY}
 	return container.New(l, append(caja.Objetos(), p)...), alto
+}
+
+// HuecoAvisoAprobacion es el `gap-2` entre la frase y «Pedir aprobación».
+const HuecoAvisoAprobacion float32 = 2 * 0.25 * tema.Rem
+
+// avisoAprobacion es la banda ámbar de «pasa del umbral»: `bg-warning-bg
+// text-warning-text rounded-md px-3 py-2 text-sm` con «Pedir aprobación» a la derecha
+// (`sm:flex-row`) o debajo, si la frase no deja sitio al botón.
+func (f *Ficha) avisoAprobacion(v tema.Variante, ancho float32) (fyne.CanvasObject, float32) {
+	p := ui.NuevoParrafo(f.t("form.approvalNeeded"), tema.TextoSM, ui.Normal, "warning-text", v)
+	b := ui.NuevoBoton(f.t("form.requestApproval"), func() {
+		if f.AlPedirAprobacion != nil {
+			f.AlPedirAprobacion()
+		}
+	}).Con(ui.Secundario, ui.TallaXS)
+	b.Cargando = f.Guardando
+	tb := b.MinSize()
+	util := ancho - 2*AvisoFichaPX
+	l := &avisoConBoton{caja: ui.NuevaCaja(tema.Color("warning-bg", v), sinColor, tema.RadioMD), p: p, b: b, tb: tb}
+	// En fila, la frase se queda con lo que deja el botón; si eso es menos de la mitad,
+	// el botón baja, que es lo que hace la web en un panel estrecho.
+	if !f.Movil && util-tb.Width-HuecoAvisoAprobacion >= util/2 {
+		l.fila = true
+		l.anchoP = util - tb.Width - HuecoAvisoAprobacion
+		l.altoP = ui.AltoParrafo(p, l.anchoP)
+		l.alto = max(l.altoP, tb.Height) + 2*AvisoFichaPY
+	} else {
+		l.anchoP = util
+		l.altoP = ui.AltoParrafo(p, util)
+		l.alto = l.altoP + HuecoAvisoAprobacion + tb.Height + 2*AvisoFichaPY
+	}
+	return container.New(l, append(l.caja.Objetos(), p, b)...), l.alto
+}
+
+type avisoConBoton struct {
+	caja                *ui.Caja
+	p                   *ui.Parrafo
+	b                   *ui.Boton
+	tb                  fyne.Size
+	fila                bool
+	anchoP, altoP, alto float32
+}
+
+func (c *avisoConBoton) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(0, c.alto) }
+
+func (c *avisoConBoton) Layout(_ []fyne.CanvasObject, t fyne.Size) {
+	c.caja.Redimensionar(t)
+	c.b.Resize(c.tb)
+	if c.fila {
+		dentro := t.Height - 2*AvisoFichaPY
+		c.p.Move(fyne.NewPos(AvisoFichaPX, AvisoFichaPY+(dentro-c.altoP)/2))
+		c.p.Resize(fyne.NewSize(c.anchoP, c.altoP))
+		c.b.Move(fyne.NewPos(t.Width-AvisoFichaPX-c.tb.Width, AvisoFichaPY+(dentro-c.tb.Height)/2))
+		return
+	}
+	c.p.Move(fyne.NewPos(AvisoFichaPX, AvisoFichaPY))
+	c.p.Resize(fyne.NewSize(c.anchoP, c.altoP))
+	c.b.Move(fyne.NewPos(AvisoFichaPX, AvisoFichaPY+c.altoP+HuecoAvisoAprobacion))
 }
 
 type cajaConTexto struct {

@@ -20,6 +20,7 @@
  */
 import type { JSX } from 'preact';
 import { cx } from '../lib/cx.js';
+import { Tooltip } from './Tooltip.js';
 
 /**
  * Las tres tallas del cromo denso (`sm`, `md`, `lg`) y `xl`, la de los mandos SOBRE UNA
@@ -42,8 +43,12 @@ export type IconButtonSize = 'sm' | 'md' | 'lg' | 'xl';
  *   Y un FILETE blanco al 40 %: sobre una foto negra la placa negra se funde con ella
  *   (medido: 1:1 contra la foto) y del botón solo quedaba el glifo; con el filete el borde
  *   queda a 3,7:1 sobre negro, el 3:1 de WCAG 1.4.11.
+ * - `subtle`: DENTRO de otro control (el aspa de un `Tag`). El glifo va apagado y solo se
+ *   enciende al pasar: un aspa azul en cada chip de una fila de diez pesa más que las
+ *   etiquetas. El velo es `border`, porque el chip ya está pintado en `bg-subtle` y un
+ *   velo de ese mismo tono no se vería.
  */
-export type IconButtonTone = 'default' | 'danger' | 'header' | 'media';
+export type IconButtonTone = 'default' | 'danger' | 'header' | 'media' | 'subtle';
 
 export interface IconButtonProps extends Omit<
   JSX.ButtonHTMLAttributes<HTMLButtonElement>,
@@ -58,7 +63,11 @@ export interface IconButtonProps extends Omit<
    * porque el color por sí solo no comunica estado (WCAG 1.4.1).
    */
   pressed?: boolean;
-  /** Muestra el `label` también como `title` (tooltip nativo del sistema). */
+  /**
+   * Muestra el `label` también como ayuda visible (`Tooltip`) al pasar el puntero o al
+   * enfocar. Antes era un `title`, que no se ve con el teclado ni con el dedo
+   * (WCAG 1.4.13) y aparece tarde y con el estilo del sistema.
+   */
   showTitle?: boolean;
   /**
    * Destino: renderiza un `<a>` con el mismo aspecto, igual que `Button` y por lo mismo:
@@ -67,6 +76,8 @@ export interface IconButtonProps extends Omit<
    * de al lado.
    */
   href?: string;
+  /** Con `href`: el nombre con el que el navegador guarda lo enlazado (`<a download>`). */
+  download?: string;
   children: JSX.Element | JSX.Element[];
 }
 
@@ -80,16 +91,17 @@ export interface IconButtonProps extends Omit<
  * y un móvil con ratón conectado no.
  */
 const SIZE: Record<IconButtonSize, string> = {
-  // `h-6` son 1.5rem, y la raíz de la suite está en 14 px: 21 px, por debajo de los
-  // 24 que exige WCAG 2.5.8 (medido el 2026-09-14 en Notepads: deshacer y rehacer
-  // de 21×21). El suelo va en px para que la talla lo cumpla con cualquier raíz.
+  // `h-6` son 1.5rem: 24 px con la raíz de 16 de la suite, pero menos en cuanto la
+  // base de letra baja (con 1 rem en 14 px eran 21, y así se midió el 2026-09-14 en
+  // Notepads: deshacer y rehacer de 21×21). El suelo va en px para que la talla
+  // cumpla WCAG 2.5.8 con cualquier raíz.
   sm: 'h-6 w-6 min-h-[24px] min-w-[24px] pointer-coarse:min-h-[max(44px,2.75rem)] pointer-coarse:min-w-[max(44px,2.75rem)]',
-  // 24,5 y 28 px, NO 28 y 32: `h-7` son 1.75rem y la raíz de esta suite está en 14.
-  // El comentario que decía 28/32 daba por hecha una raíz de 16 y engañó al menos a
-  // una lectura del catálogo — es la misma fosilización que tenía el esqueleto de la
-  // bandeja de Mail con su `h-[83px]`.
-  md: 'h-7 w-7 pointer-coarse:min-h-[max(44px,2.75rem)] pointer-coarse:min-w-[max(44px,2.75rem)]', // 24,5 px
-  lg: 'h-8 w-8 pointer-coarse:min-h-[max(44px,2.75rem)] pointer-coarse:min-w-[max(44px,2.75rem)]', // 28 px
+  // 28 y 32 px: `h-7` y `h-8` son 1.75rem y 2rem, con la raíz de 16 de la suite
+  // (`tema.Rem` en la nativa). Los números de estos comentarios salen de esa raíz:
+  // copiarlos de una raíz que ya no es la de la suite es la fosilización que tuvo el
+  // esqueleto de la bandeja de Mail con su `h-[83px]`.
+  md: 'h-7 w-7 pointer-coarse:min-h-[max(44px,2.75rem)] pointer-coarse:min-w-[max(44px,2.75rem)]', // 28 px
+  lg: 'h-8 w-8 pointer-coarse:min-h-[max(44px,2.75rem)] pointer-coarse:min-w-[max(44px,2.75rem)]', // 32 px
   // 48 px con cualquier raíz y con cualquier puntero: pasa ya del suelo táctil.
   xl: 'h-12 w-12 min-h-[48px] min-w-[48px]',
 };
@@ -108,6 +120,7 @@ const TONE: Record<IconButtonTone, string> = {
   default: 'text-primary-text hover:bg-selected hover:text-primary-text',
   danger: 'text-primary-text hover:bg-bg-subtle hover:text-danger-text',
   header: 'text-primary-text hover:bg-chrome-hover active:bg-chrome-active',
+  subtle: 'text-text-muted hover:bg-border hover:text-text',
   media:
     'border border-white/40 bg-black/60 text-white hover:border-white/60 hover:bg-black/75 active:bg-black/85',
 };
@@ -131,11 +144,13 @@ export function IconButton({
     pressed && (tone === 'header' ? 'bg-chrome-active' : 'bg-selected text-text'),
     className,
   );
-  const nombre = { 'aria-label': label, ...(showTitle ? { title: label } : {}) };
+  const nombre = { 'aria-label': label };
+  const conAyuda = (control: JSX.Element): JSX.Element =>
+    showTitle ? <Tooltip label={label}>{control}</Tooltip> : control;
   // Variante ENLACE, como la de `Button`: un `<a>` no entiende `disabled`, así que
   // inerte es sin `href` (fuera de la tabulación) y con `aria-disabled`.
   if (href !== undefined) {
-    return (
+    return conAyuda(
       <a
         href={disabled ? undefined : href}
         aria-disabled={disabled ? 'true' : undefined}
@@ -144,10 +159,10 @@ export function IconButton({
         {...(rest as unknown as JSX.HTMLAttributes<HTMLAnchorElement>)}
       >
         {children}
-      </a>
+      </a>,
     );
   }
-  return (
+  return conAyuda(
     <button
       type="button"
       disabled={disabled}
@@ -157,6 +172,6 @@ export function IconButton({
       {...rest}
     >
       {children}
-    </button>
+    </button>,
   );
 }

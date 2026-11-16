@@ -249,12 +249,12 @@ func (c *Lienzo) tablaDatos(valor string) bool {
 		return false
 	}
 	r, ok := formula.ParseRangeRef(req.Range)
-	if !ok || r.C1 >= Columnas || r.R1 >= Filas {
+	if !ok || r.C1 >= MaxColumnas || r.R1 >= MaxFilas {
 		return false
 	}
 	fila, conFila := celdaUnica(req.RowInput)
 	col, conCol := celdaUnica(req.ColInput)
-	plan, fallo := analisis.PlanearTabla(r.C1, r.R1, min(r.C2, Columnas-1), min(r.R2, Filas-1), conFila, conCol)
+	plan, fallo := analisis.PlanearTabla(r.C1, r.R1, min(r.C2, MaxColumnas-1), min(r.R2, MaxFilas-1), conFila, conCol)
 	if fallo != "" {
 		c.aviso(ui.AvisoAdvertencia, "sheet.msg.dataTable", map[string]string{
 			"no-input": "sheet.msg.dataTable.noInput", "too-small": "sheet.msg.dataTable.tooSmall", "too-many": "sheet.msg.dataTable.tooMany",
@@ -284,7 +284,7 @@ func (c *Lienzo) tablaDatos(valor string) bool {
 	for k, txt := range valores {
 		l.poner(l.f.activa, k.C, k.F, escaparHTML(txt))
 	}
-	c.Rejilla.sel, c.Rejilla.ext = Celda{C: r.C1, F: r.R1}, &Celda{C: min(r.C2, Columnas-1), F: min(r.R2, Filas-1)}
+	c.Rejilla.sel, c.Rejilla.ext = Celda{C: r.C1, F: r.R1}, &Celda{C: min(r.C2, MaxColumnas-1), F: min(r.R2, MaxFilas-1)}
 	c.aviso(ui.AvisoInfo, "sheet.msg.dataTable", "sheet.msg.dataTable.detail", i18n.Vars{"count": len(plan.Celdas), "ref": Ref(fc, ff)})
 	return true
 }
@@ -387,8 +387,8 @@ func (c *Lienzo) anadirEscenario(valor string) bool {
 		}
 	}
 	vals := map[string]string{}
-	for f := r.R1; f <= min(r.R2, Filas-1); f++ {
-		for col := r.C1; col <= min(r.C2, Columnas-1); col++ {
+	for f := r.R1; f <= min(r.R2, MaxFilas-1); f++ {
+		for col := r.C1; col <= min(r.C2, MaxColumnas-1); col++ {
 			vals[Ref(col, f)] = l.Crudo(col, f)
 		}
 	}
@@ -447,7 +447,7 @@ func (c *Lienzo) informeEscenarios(valor string) bool {
 		ancho = len(rejilla[0])
 	}
 	c.Rejilla.sel = Celda{C: destino.C1, F: destino.R1}
-	c.Rejilla.ext = &Celda{C: min(Columnas-1, destino.C1+ancho-1), F: min(Filas-1, destino.R1+len(rejilla)-1)}
+	c.Rejilla.ext = &Celda{C: min(MaxColumnas-1, destino.C1+ancho-1), F: min(MaxFilas-1, destino.R1+len(rejilla)-1)}
 	c.aviso(ui.AvisoInfo, "sheet.msg.scenarioReport", "sheet.msg.scenarioReport.detail", i18n.Vars{"count": len(esc), "ref": Ref(destino.C1, destino.R1)})
 	return true
 }
@@ -459,7 +459,7 @@ func (l *Libro) escribirRejilla(rejilla [][]string, esquina Celda) {
 	for i, fila := range rejilla {
 		for j, txt := range fila {
 			k := Celda{C: esquina.C + j, F: esquina.F + i}
-			if k.C >= Columnas || k.F >= Filas {
+			if k.C >= MaxColumnas || k.F >= MaxFilas {
 				continue
 			}
 			html := ""

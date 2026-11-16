@@ -14,6 +14,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/portabilidad"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
+	"git.sytue.eu/sytue/one/services/drive/internal/store"
 )
 
 // archivoExportado es una fila de files.<formato>: dónde quedó en el ZIP y qué era.
@@ -73,7 +74,7 @@ func (h *Handlers) exportar(ctx context.Context, sub string, p *portabilidad.Paq
 			cola = append(cola, pendiente{id: s.ID, ruta: path.Join(c.ruta, s.Name)})
 		}
 		for cursor := ""; ; {
-			pagina, err := h.svc.ListFilesPage(ctx, c.id, cursor, 200)
+			pagina, err := h.svc.ListFilesPage(ctx, c.id, store.OrdenFicheros{}, cursor, 200)
 			if err != nil {
 				return err
 			}

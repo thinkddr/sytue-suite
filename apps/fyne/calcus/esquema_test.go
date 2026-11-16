@@ -30,8 +30,9 @@ func TestUnLibroConEsquemaSeEditaYSaleIgual(t *testing.T) {
 		t.Errorf("entra\n %s\ny sale\n %s", doc, lz.Serializar())
 	}
 	oc := lz.Libro.FilasOcultas()
-	if len(oc) < 5 || !oc[1] || !oc[2] || !oc[3] || oc[4] {
-		t.Errorf("el grupo contraído no esconde las filas 2 a 4: %v", oc[:5])
+	oculta := func(f int) bool { return f < len(oc) && oc[f] }
+	if !oculta(1) || !oculta(2) || !oculta(3) || oculta(4) {
+		t.Errorf("el grupo contraído no esconde las filas 2 a 4: %v", oc)
 	}
 	if lz.Libro.ColumnasOcultas() != nil {
 		t.Error("un grupo de columnas abierto no esconde nada")

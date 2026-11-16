@@ -10,7 +10,7 @@
  */
 import type { JSX } from 'preact';
 import { useCallback, useEffect, useState } from 'preact/hooks';
-import { Button, FieldGroup, Input, Modal, Select, useConfirm } from '@sytue/ui';
+import { Button, FieldGroup, Input, Modal, Select, useConfirm, EmptyState } from '@sytue/ui';
 import type { BasesPermission } from '@sytue/api-clients/bases';
 import type { T } from '../i18n/index.js';
 import { cliente, mensajeDeError } from '../lib/api.js';
@@ -222,7 +222,7 @@ export function DialogoCompartir(p: {
           </p>
         ) : null}
         {permisos.length === 0 ? (
-          <p class="text-text-muted text-sm">{t('share.none')}</p>
+          <EmptyState compact title={t('share.none')} />
         ) : (
           <ul aria-label={t('share.listLabel')} class="flex flex-col gap-2">
             {permisos.map((x) => (

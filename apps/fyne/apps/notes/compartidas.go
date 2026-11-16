@@ -60,7 +60,7 @@ func (p *Pantalla) cargarCompartidas() {
 			}
 		}
 	}
-	enHilo(func() {
+	p.enHilo(func() {
 		p.comp.fase = FaseDe(err, p.hayRed(), len(ns))
 		if err == nil {
 			p.comp.notas, p.comp.nombres = ns, nombres
@@ -72,6 +72,9 @@ func (p *Pantalla) cargarCompartidas() {
 // abrirCompartida abre una nota de la lista (o vuelve a ella con "").
 func (p *Pantalla) abrirCompartida(id string) {
 	p.cerrarEditor()
+	if p.edicion != nil {
+		return
+	}
 	p.comp.abierta = id
 	p.comp.lienzo.Renombrando, p.comp.lienzo.CampoTitulo = "", nil
 	p.Repintar()
@@ -89,6 +92,11 @@ func (p *Pantalla) compartida(id string) (api.NotaCompartida, bool) {
 // vistaCompartidas es la página: la lista, o la nota abierta.
 func (p *Pantalla) vistaCompartidas(v tema.Variante) fyne.CanvasObject {
 	t := p.tr.T
+	if p.comp.fase == Cargando {
+		// La página ya tiene su título mientras llegan: filas de carga con las dos líneas
+		// de cada fila (título y quién la compartió), no una rueda en medio de la nada.
+		return paginaDe(t("sharedWithMe.title", nil), nil, filasDeCarga(FilasEsqueletoCompartidas, 2), v)
+	}
 	if o, ok := estadoDeFase(p.tr, p.comp.fase, "sharedWithMe.title", "sharedWithMe.empty", v); ok {
 		return o
 	}
@@ -166,7 +174,7 @@ func (p *Pantalla) engancharCompartidas() {
 	l.AlEditar = p.abrirEditorCompartida
 	l.AlRenombrar = p.renombrarCompartida
 	l.AlMarcar = func(n Nota, m bool) {
-		lanzar(func() error { return p.guardarCompartida(n.ID, Parche{Marcada: &m}) })
+		p.lanzar(func() error { return p.guardarCompartida(n.ID, Parche{Marcada: &m}) })
 	}
 	p.comp = estadoCompartidas{lienzo: l, fase: Cargando}
 }
@@ -178,6 +186,9 @@ func (p *Pantalla) abrirEditorCompartida(n Nota) {
 		return
 	}
 	p.cerrarEditor()
+	if p.edicion != nil {
+		return
+	}
 	if nc, ok := p.compartida(n.ID); !ok || nc.Permiso != api.NivelEditar || !n.Editable(!p.hayRed(), false) {
 		return
 	}
@@ -210,7 +221,7 @@ func (p *Pantalla) renombrarCompartida(n Nota) {
 		nuevo := strings.TrimSpace(s)
 		cerrar()
 		if nuevo != n.Titulo {
-			lanzar(func() error { return p.guardarCompartida(n.ID, Parche{Titulo: &nuevo}) })
+			p.lanzar(func() error { return p.guardarCompartida(n.ID, Parche{Titulo: &nuevo}) })
 		}
 	}
 	c.AlCancelar = cerrar
@@ -224,14 +235,14 @@ func (p *Pantalla) renombrarCompartida(n Nota) {
 func (p *Pantalla) guardarCompartida(id string, pa Parche) error {
 	var nc api.NotaCompartida
 	var ok bool
-	fyne.DoAndWait(func() { nc, ok = p.compartida(id) })
+	p.enHiloEsperar(func() { nc, ok = p.compartida(id) })
 	if !ok || p.svc == nil {
 		return nil
 	}
 	ctx, cancelar := p.ctx()
 	defer cancelar()
 	hecha, err := p.svc.UpdateNote(ctx, id, nc.NotebookID, pa.sobre(nc.Note).Input())
-	enHilo(func() {
+	p.enHilo(func() {
 		if err != nil {
 			p.fallo("note.saveFailed", err)
 			return

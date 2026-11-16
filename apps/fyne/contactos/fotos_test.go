@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
@@ -140,5 +141,52 @@ func TestLaListaEnsenaLaFotoDeQuienLaTiene(t *testing.T) {
 	s.correrCola()
 	if len(s.fotosVistas) != 2 {
 		t.Fatalf("con la tarjeta cambiada: %v", s.fotosVistas)
+	}
+}
+
+func TestLaCacheDeFotosDistingueContactoRevisionYSolicitud(t *testing.T) {
+	a := NuevaApp(traductor(t), nil)
+	a.Pantalla.Activa = &api.AddressBook{ID: "book"}
+	ana := api.Contact{ID: "contacto-a", UID: "uid-repetido", ETag: "r1"}
+	bea := api.Contact{ID: "contacto-b", UID: "uid-repetido", ETag: "r1"}
+	rojo := image.NewRGBA(image.Rect(0, 0, 1, 1))
+	azul := image.NewRGBA(image.Rect(0, 0, 1, 1))
+	primera := peticionFoto{libreta: "book", etag: "r1", serial: 1}
+	a.fotosPedidas[ana.ID] = primera
+	if !a.aceptarFoto(ana.ID, primera, rojo, nil) || a.fotoDe(ana) != rojo || a.fotoDe(bea) != nil {
+		t.Fatal("una foto se compartió entre contactos con el mismo UID")
+	}
+	a.Pantalla.Activa = &api.AddressBook{ID: "otra"}
+	if a.fotoDe(ana) != nil {
+		t.Fatal("una foto se compartió entre libretas")
+	}
+	a.Pantalla.Activa = &api.AddressBook{ID: "book"}
+	ana.ETag = "r2"
+	if a.fotoDe(ana) != nil {
+		t.Fatal("la revisión nueva mostró la foto anterior")
+	}
+	segunda := peticionFoto{libreta: "book", etag: "r2", serial: 2}
+	a.fotosPedidas[ana.ID] = segunda
+	if a.aceptarFoto(ana.ID, primera, rojo, nil) || !a.aceptarFoto(ana.ID, segunda, azul, nil) || a.fotoDe(ana) != azul {
+		t.Fatal("una respuesta tardía sustituyó la solicitud nueva")
+	}
+	a.olvidarFoto(ana.ID)
+	tercera := peticionFoto{libreta: "book", etag: "r2", serial: 3}
+	a.fotosPedidas[ana.ID] = tercera
+	if a.aceptarFoto(ana.ID, segunda, azul, nil) || a.fotoDe(ana) != nil {
+		t.Fatal("una respuesta anterior recuperó la caché invalidada")
+	}
+}
+
+func TestReintentoDeFotoFallidaEsAcotado(t *testing.T) {
+	a := NuevaApp(traductor(t), nil)
+	p := peticionFoto{etag: "r1", serial: 1}
+	a.fotosPedidas["id"] = p
+	if a.aceptarFoto("id", p, nil, errors.New("ambiguous")) {
+		t.Fatal("un error produjo una foto")
+	}
+	fallida := a.fotosPedidas["id"]
+	if fallida.reintentar.IsZero() || debePedirFoto(fallida, "", "r1", fallida.reintentar.Add(-time.Nanosecond)) || !debePedirFoto(fallida, "", "r1", fallida.reintentar) || !debePedirFoto(fallida, "", "r2", fallida.reintentar.Add(-time.Nanosecond)) || !debePedirFoto(fallida, "other", "r1", fallida.reintentar.Add(-time.Nanosecond)) {
+		t.Fatal("el reintento no respetó margen o revisión")
 	}
 }

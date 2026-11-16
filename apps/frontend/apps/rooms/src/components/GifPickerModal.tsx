@@ -14,7 +14,7 @@
  */
 import type { JSX } from 'preact';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { Button, EmptyState, Icon, Input, Modal, Spinner, Tabs } from '@sytue/ui';
+import { Button, EmptyState, Input, Modal, Spinner, Tabs } from '@sytue/ui';
 import { FreeGifLibrary } from './FreeGifLibrary.js';
 import {
   listCustomEmoji,
@@ -145,9 +145,10 @@ export function GifPickerModal({ onClose, onPick, t }: Props): JSX.Element {
                   ) : error ? (
                     <div class="grid h-full place-items-center p-4 text-center">
                       <EmptyState
+                        compact
                         title={t('gif.loadFailed')}
                         description={t('error.checkConnection')}
-                        illustration={<Icon name="warning" size={36} class="text-danger-text" />}
+                        tone="error"
                         action={
                           <Button variant="secondary" size="sm" onClick={() => void load()}>
                             {t('action.retry')}
@@ -157,7 +158,7 @@ export function GifPickerModal({ onClose, onPick, t }: Props): JSX.Element {
                     </div>
                   ) : gifs.length === 0 ? (
                     <div class="grid h-full place-items-center p-4 text-center">
-                      <p class="text-text-muted text-base">{t('gif.empty')}</p>
+                      <EmptyState compact icon="image" title={t('gif.empty')} />
                     </div>
                   ) : (
                     <ul class="grid grid-cols-3 gap-2">

@@ -130,3 +130,45 @@ func TestCatalogMaximumFieldsFitPrivateRecordWithoutTruncation(t *testing.T) {
 		t.Fatal("private metadata would be silently normalized by a JSON parser")
 	}
 }
+
+func TestPrivateObjectCommitExactReadbackPreservesMetadataAndParents(t *testing.T) {
+	original := ObjectCommit{Kind: ObjectKind, State: "live", Metadata: []byte(`{"integer":900719925474099312345}`), Content: &ContentPointer{Kind: "record", RevisionID: "content", Reference: Reference{RoomID: "!private:test", EventID: "$content"}}, Parents: []Reference{{RoomID: "!private:test", EventID: "$first"}, {RoomID: "!private:test", EventID: "$second"}}}
+	if !original.MatchesExact(original) {
+		t.Fatal("exact commit rejected")
+	}
+	for _, fault := range []string{"kind", "state", "metadata", "content-kind", "content-revision", "content-ref", "parents", "parent-order"} {
+		t.Run(fault, func(t *testing.T) {
+			actual := original
+			pointer := *original.Content
+			actual.Content = &pointer
+			switch fault {
+			case "kind":
+				actual.Kind = "foreign"
+			case "state":
+				actual.State = "trash"
+			case "metadata":
+				actual.Metadata = []byte(`{"integer":900719925474099300000}`)
+			case "content-kind":
+				actual.Content.Kind = "file"
+			case "content-revision":
+				actual.Content.RevisionID = "other"
+			case "content-ref":
+				actual.Content.Reference.EventID = "$other"
+			case "parents":
+				actual.Parents = actual.Parents[:1]
+			case "parent-order":
+				actual.Parents = []Reference{original.Parents[1], original.Parents[0]}
+			}
+			if original.MatchesExact(actual) || actual.MatchesExact(original) {
+				t.Fatal("substituted commit accepted", fault)
+			}
+		})
+	}
+	deleted := ObjectCommit{Kind: ObjectKind, State: "deleted", Metadata: []byte("{}")}
+	if !deleted.MatchesExact(deleted) {
+		t.Fatal("valid tombstone rejected")
+	}
+	if (ObjectCommit{}).MatchesExact(ObjectCommit{}) {
+		t.Fatal("invalid empty commit matched")
+	}
+}

@@ -9,7 +9,7 @@
  * proyectos puede tocar quién lo sigue decidiendo el token y el control-plane.
  *
  * Sin org se dejan las rutas comunes (api, auth, assets…) más las de esta app:
- * las OCHO rutas de página, todas con nombre de slug válido (`audit`, `billing`,
+ * las rutas de página, todas con nombre de slug válido (`audit`, `billing`,
  * `projects`, `settings`…), que sin excepción colisionan con el namespace de
  * organizaciones: `/cloud/projects/x` tratado como org se reescribiría a
  * `/cloud/x` —un 404—. El guard de cada página compone ahí la canónica con la
@@ -36,6 +36,7 @@ export const onRequest = sequence(
       'audit',
       'billing',
       'confirm-alert',
+      'new',
       'projects',
       'settings',
       'team',

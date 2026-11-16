@@ -55,7 +55,7 @@ var capasPropias = []string{
 }
 
 // aperturasSuite son las llamadas de `ui` que ponen algo encima.
-var aperturasSuite = regexp.MustCompile(`^(NuevoDialogo|Confirmacion|Pregunta|PreguntaOpcional|MostrarPopover|MostrarEmergente|MostrarEmergenteEn|MostrarCalendario|NuevoMenu|NuevoFlotante)$`)
+var aperturasSuite = regexp.MustCompile(`^(NuevoDialogo|Confirmacion|Pregunta|PreguntaOpcional|PreguntaCon|MostrarPopover|MostrarEmergente|MostrarEmergenteEn|MostrarCalendario|NuevoMenu|NuevoFlotante)$`)
 
 func inventario(t *testing.T) (suite map[string]int, propias, avisos, tragones []string) {
 	t.Helper()
@@ -117,7 +117,9 @@ func inventario(t *testing.T) (suite map[string]int, propias, avisos, tragones [
 					if !es || sel.Sel.Name != "AlCerrar" || i >= len(v.Rhs) {
 						continue
 					}
-					if lit, es := v.Rhs[i].(*ast.FuncLit); es && !cierra(fuente(lit.Body)) {
+					// Dialogo.AlCerrar has no result. Device lifecycle hooks return
+					// a cleanup function and are not requests to dismiss a modal.
+					if lit, es := v.Rhs[i].(*ast.FuncLit); es && (lit.Type.Results == nil || len(lit.Type.Results.List) == 0) && !cierra(fuente(lit.Body)) {
 						avisos = append(avisos, rel+": "+fuente(v))
 					}
 				}
@@ -174,8 +176,11 @@ func leer(t *testing.T, p string) []byte {
 
 var sube = regexp.MustCompile(`Escape|EsCierre|KeyBack|Descartar|\.TypedKey\(`)
 
+// cierra: el cuerpo llama a algo que cierra, o se lo pasa a quien lo llamará después
+// (`p.dejarFicha(p.cerrarFicha)` pregunta si hay cambios y luego cierra: el método va
+// como valor, sin paréntesis detrás).
 func cierra(cuerpo string) bool {
-	return regexp.MustCompile(`(?i)cerrar\w*\(|Descartar\(`).MatchString(cuerpo)
+	return regexp.MustCompile(`(?i)cerrar\w*\(|\.cerrar\w*[),]|Descartar\(`).MatchString(cuerpo)
 }
 
 // TestInventarioDeModales: el recuento sale al registro con -v y las tres reglas, en rojo.

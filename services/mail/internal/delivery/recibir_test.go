@@ -6,7 +6,9 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -54,7 +56,7 @@ func TestRecibirCortaPorTamanoYNoDejaTemporales(t *testing.T) {
 	defer soltar()
 	leido, err := io.ReadAll(r)
 	if err != nil || string(leido) != "12345678" {
-		t.Fatalf("lo releído del temporal no es lo recibido: %q (err=%v)", leido, err)
+		t.Fatalf("lo releído de la sección no es lo recibido: %q (err=%v)", leido, err)
 	}
 	sinTemporales(t, tmp)
 }
@@ -76,18 +78,17 @@ func (a *almBlobMemoria) Put(_ context.Context, _ tenancy.Tenant, _ string, r io
 	return err
 }
 
-// Una vez admitido en el fichero temporal, el parseo MIME, la verificación DKIM y la
-// subida al almacén de blobs trabajan en flujo sobre el propio lector del fichero sin
-// volcar el mensaje entero a un []byte en memoria (COM-06).
-func TestProcesadoEnFlujoDesdeFichero(t *testing.T) {
+// Tras la reserva previa, MIME, DKIM y blobs usan secciones independientes del
+// mismo búfer RAM. No hacen una segunda copia completa ni un temporal en claro.
+func TestProcesadoEnFlujoDesdeMemoriaAcotada(t *testing.T) {
 	in, tmp := inboundDe(t, 4096)
 	eml := "From: Ana <ana@acme.example>\r\n" +
 		"To: Luis <luis@sytue.eu>\r\n" +
-		"Subject: Flujo desde temporal\r\n" +
+		"Subject: Flujo sin copia\r\n" +
 		"Message-ID: <flujo-1@acme.example>\r\n" +
 		"MIME-Version: 1.0\r\n" +
 		"Content-Type: text/plain; charset=utf-8\r\n\r\n" +
-		"Cuerpo procesado desde el fichero temporal sin cargarlo en RAM.\r\n"
+		"Cuerpo procesado en flujo sin duplicar el mensaje ni escribirlo en disco.\r\n"
 
 	r, soltar, err := in.recibir(context.Background(), strings.NewReader(eml))
 	if err != nil {
@@ -100,7 +101,7 @@ func TestProcesadoEnFlujoDesdeFichero(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseSobre: %v", err)
 	}
-	if env.Subject != "Flujo desde temporal" || env.FromAddr != "ana@acme.example" || env.SizeBytes != int64(len(eml)) {
+	if env.Subject != "Flujo sin copia" || env.FromAddr != "ana@acme.example" || env.SizeBytes != int64(len(eml)) {
 		t.Fatalf("sobre inesperado: %+v", env)
 	}
 
@@ -165,8 +166,7 @@ func TestRecibirDejaConvivirALosPequenos(t *testing.T) {
 	}
 }
 
-// El disco también está acotado: con todas las recepciones ocupadas, la siguiente se
-// rechaza en el acto (451 en el MX) en vez de abrir otro temporal.
+// Con todas las recepciones ocupadas, la siguiente se rechaza antes de leer.
 func TestRecibirRechazaCuandoNoQuedanRecepciones(t *testing.T) {
 	in, tmp := inboundDe(t, 8)
 	recepciones, _ := in.cupos()
@@ -182,5 +182,187 @@ func TestRecibirRechazaCuandoNoQuedanRecepciones(t *testing.T) {
 		t.Fatalf("con hueco tiene que entrar: %v", err)
 	} else {
 		soltar()
+	}
+}
+
+// The unknown-length network reader must not be touched while its allocation is
+// unavailable. Cancellation releases the admission slot without reading DATA.
+type countedInboundReader struct {
+	reader io.Reader
+	reads  atomic.Int32
+}
+
+func (r *countedInboundReader) Read(out []byte) (int, error) {
+	r.reads.Add(1)
+	return r.reader.Read(out)
+}
+
+func TestRecibirReservesBeforeReadingAndHonorsCancellation(t *testing.T) {
+	in, tmp := inboundDe(t, 8)
+	first, release, err := in.recibir(context.Background(), bytes.NewReader([]byte("12345678")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader := &countedInboundReader{reader: bytes.NewReader([]byte("secret"))}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	defer release()
+	finished := make(chan error, 1)
+	go func() {
+		_, done, err := in.recibir(ctx, reader)
+		if done != nil {
+			done()
+		}
+		finished <- err
+	}()
+	select {
+	case err := <-finished:
+		t.Fatalf("admitted without memory: %v", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+	if reader.reads.Load() != 0 {
+		t.Fatal("read body before memory reservation")
+	}
+	cancel()
+	select {
+	case err := <-finished:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("cancel: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("admission ignored cancel")
+	}
+	if reader.reads.Load() != 0 {
+		t.Fatal("canceled admission read body")
+	}
+	release()
+	release()
+	if !bytes.Equal(first.raw, make([]byte, len(first.raw))) {
+		t.Fatal("release retained plaintext")
+	}
+	sinTemporales(t, tmp)
+	_, done, err := in.recibir(context.Background(), bytes.NewReader([]byte("12345678")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	done()
+}
+
+func TestRecibirCancelledOrBusyNeverReads(t *testing.T) {
+	in, tmp := inboundDe(t, 8)
+	reader := &countedInboundReader{reader: bytes.NewReader([]byte("secret"))}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, _, err := in.recibir(ctx, reader); !errors.Is(err, context.Canceled) {
+		t.Fatal(err)
+	}
+	receptions, _ := in.cupos()
+	if !receptions.TryAcquire(recepcionesALaVez) {
+		t.Fatal("reserve")
+	}
+	if _, _, err := in.recibir(context.Background(), reader); !errors.Is(err, errOcupado) {
+		t.Fatal(err)
+	}
+	receptions.Release(recepcionesALaVez)
+	if reader.reads.Load() != 0 {
+		t.Fatal("rejected request read body")
+	}
+	sinTemporales(t, tmp)
+}
+
+func TestRecibirUnknownLengthIsBoundedAndReleasesAfterReadError(t *testing.T) {
+	in, tmp := inboundDe(t, 8)
+	reader := &countedInboundReader{reader: bytes.NewReader([]byte("123456789more"))}
+	if _, _, err := in.recibir(context.Background(), reader); !errors.Is(err, domain.ErrMessageTooLarge) {
+		t.Fatal(err)
+	}
+	if reader.reader.(*bytes.Reader).Len() != 4 {
+		t.Fatal("read beyond one overflow byte")
+	}
+	for _, body := range []io.Reader{io.MultiReader(bytes.NewReader([]byte("1234")), failingInboundReader{}), bytes.NewReader([]byte("12345678"))} {
+		raw, release, err := in.recibir(context.Background(), body)
+		if err == nil {
+			if raw.Size() != 8 {
+				t.Fatal("short success")
+			}
+			release()
+		} else if !errors.Is(err, io.ErrClosedPipe) {
+			t.Fatal(err)
+		}
+	}
+	sinTemporales(t, tmp)
+}
+
+type failingInboundReader struct{}
+
+func (failingInboundReader) Read([]byte) (int, error) { return 0, io.ErrClosedPipe }
+
+func TestRecibirCancellationClosesActiveNetworkReader(t *testing.T) {
+	in, tmp := inboundDe(t, 8)
+	reader, writer := io.Pipe()
+	defer writer.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	finished := make(chan error, 1)
+	go func() {
+		_, done, err := in.recibir(ctx, reader)
+		if done != nil {
+			done()
+		}
+		finished <- err
+	}()
+	if _, err := writer.Write([]byte("123")); err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	select {
+	case err := <-finished:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("network reader not closed")
+	}
+	_, done, err := in.recibir(context.Background(), bytes.NewReader([]byte("12345678")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	done()
+	sinTemporales(t, tmp)
+}
+
+type retainedFailingReader struct{ allocated []byte }
+
+func (r *retainedFailingReader) Read(out []byte) (int, error) {
+	r.allocated = out
+	return copy(out, "private"), io.ErrClosedPipe
+}
+
+func TestRecibirClearsAllocationAfterBodyReadFailure(t *testing.T) {
+	in, _ := inboundDe(t, 8)
+	reader := &retainedFailingReader{}
+	if _, _, err := in.recibir(t.Context(), reader); !errors.Is(err, io.ErrClosedPipe) {
+		t.Fatal(err)
+	}
+	if len(reader.allocated) != 8 || !bytes.Equal(reader.allocated, make([]byte, 8)) {
+		t.Fatal("failed receive retained plaintext")
+	}
+	_, release, err := in.recibir(t.Context(), bytes.NewReader([]byte("12345678")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	release()
+}
+
+func TestRecibirPlaintextDoesNotDependOnTemporaryFilesystem(t *testing.T) {
+	in, _ := inboundDe(t, 8)
+	t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "missing-directory"))
+	body, release, err := in.recibir(t.Context(), strings.NewReader("private"))
+	if err != nil {
+		t.Fatal("plaintext receiver tried to open a filesystem spool", err)
+	}
+	defer release()
+	raw, err := io.ReadAll(body.section())
+	if err != nil || string(raw) != "private" {
+		t.Fatal("bounded RAM source lost original", err)
 	}
 }

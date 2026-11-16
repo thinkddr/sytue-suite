@@ -135,7 +135,7 @@ func NuevoLienzo(tr *i18n.Translator) *Lienzo { return &Lienzo{tr: tr} }
 // que hay que hacer es otro: volver a entrar.
 func (l *Lienzo) Objeto(v tema.Variante) fyne.CanvasObject {
 	t := l.tr.T
-	if l.Llenar && len(l.Notas) == 0 {
+	if l.Llenar && len(l.Notas) == 0 && (l.Fase != Cargando || l.Seleccionada == "") {
 		// La vista de árbol sin nota elegida. Va ANTES que las fases, como en la web
 		// (`enArbol && !notaSeleccionada`): el panel de la derecha no carga nada por su
 		// cuenta, enseña la nota que se elija en el árbol.
@@ -143,7 +143,8 @@ func (l *Lienzo) Objeto(v tema.Variante) fyne.CanvasObject {
 	}
 	switch l.Fase {
 	case Cargando:
-		return centrar(ui.NuevaRueda(24, "text-muted", v), v)
+		// La forma de lo que va a llegar, no una rueda: así no salta nada al cargar.
+		return l.esqueleto()
 	case Fallo:
 		return centrar(l.vacio(t("error.loadFailed", nil), "", t("common.retry", nil),
 			l.AlReintentar, v), v)

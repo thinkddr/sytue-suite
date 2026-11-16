@@ -64,6 +64,9 @@ func (r Resource) Ocupado(desde, hasta time.Time) bool {
 // Resources lista los recursos activos. Con una franja (las dos horas no nulas) cada uno
 // trae sus tramos ocupados en ella; sin franja, solo el catálogo.
 func (c *Calendars) Resources(ctx context.Context, desde, hasta time.Time) ([]Resource, error) {
+	if c.data != nil {
+		return c.data.Resources(ctx, desde, hasta)
+	}
 	var q url.Values
 	if !desde.IsZero() && !hasta.IsZero() {
 		q = url.Values{"start": {desde.UTC().Format(time.RFC3339)}, "end": {hasta.UTC().Format(time.RFC3339)}}
@@ -87,12 +90,18 @@ type ResourceInput struct {
 
 // CreateResource da de alta un recurso.
 func (c *Calendars) CreateResource(ctx context.Context, in ResourceInput) (Resource, error) {
+	if c.data != nil {
+		return c.data.CreateResource(ctx, in)
+	}
 	return PostJSON[Resource](ctx, c.c, "/resources", in)
 }
 
 // UpdateResource cambia un recurso (PATCH: nombre, aforo, ubicación, correo y si acepta
 // solo).
 func (c *Calendars) UpdateResource(ctx context.Context, id string, in ResourceInput) (Resource, error) {
+	if c.data != nil {
+		return c.data.UpdateResource(ctx, id, in)
+	}
 	in.Kind = ""
 	datos, err := json.Marshal(in)
 	if err != nil {
@@ -106,6 +115,9 @@ func (c *Calendars) UpdateResource(ctx context.Context, id string, in ResourceIn
 
 // DeleteResource da de baja un recurso.
 func (c *Calendars) DeleteResource(ctx context.Context, id string) error {
+	if c.data != nil {
+		return c.data.DeleteResource(ctx, id)
+	}
 	resp, err := c.c.Do(ctx, Request{Method: http.MethodDelete, Path: "/resources/" + url.PathEscape(id)})
 	if err != nil {
 		return err
@@ -128,6 +140,9 @@ type Booking struct {
 // estaba cogido) o ReservaPendiente (lo aprueba alguien a mano). El servicio comprueba
 // la disponibilidad de forma atómica.
 func (c *Calendars) BookResource(ctx context.Context, id string, b Booking) (string, error) {
+	if c.data != nil {
+		return c.data.BookResource(ctx, id, b)
+	}
 	r, err := PostJSON[struct {
 		Status string `json:"status"`
 	}](ctx, c.c, "/resources/"+url.PathEscape(id)+"/book", b)

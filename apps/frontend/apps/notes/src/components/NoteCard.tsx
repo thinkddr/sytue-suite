@@ -16,6 +16,7 @@
  * papel no se borra sola, y aquí tampoco.
  */
 import type { JSX } from 'preact';
+import { colorDeUsuario } from '@sytue/config';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import {
   Badge,
@@ -117,10 +118,14 @@ interface Props {
   /** «Exportar…»: descarga esta nota sola. */
   onExport?: (() => void) | undefined;
   onTogglePin: () => void;
-  onShare: () => void;
+  onShare?: () => void;
   onTags: () => void;
   /** Abre «qué apunta aquí». Es la vuelta de la referencia entre notas. */
   onBacklinks: () => void;
+  /** «Información»: palabras, caracteres, lectura, fechas y cuaderno (NoteInfo.tsx). */
+  onInfo?: (() => void) | undefined;
+  /** Historial de versiones: verlas y volver a una (VersionesNota.tsx). */
+  onVersions?: (() => void) | undefined;
   /** Nueva nota dentro de esta (anidada). */
   onNuevaDentro?: (() => void) | undefined;
   /** Sacar nota de su grupo / nota padre. */
@@ -178,6 +183,9 @@ function texto(data: Note['data'], clave: string): string {
   return typeof v === 'string' ? v : '';
 }
 
+/** Clave de `note.data` que estrecha la hoja del árbol al ancho de lectura. */
+export const CLAVE_ANCHO_LECTURA = 'reading_width';
+
 export function NoteCard({
   t,
   note: rawNote,
@@ -199,6 +207,8 @@ export function NoteCard({
   onShare,
   onTags,
   onBacklinks,
+  onInfo,
+  onVersions,
   onNuevaDentro,
   onSacar,
   onIcon,
@@ -231,6 +241,17 @@ export function NoteCard({
   const contenido = claro ? claro.content : (note.content ?? '');
   const enlace: NoteLink | undefined = note.links?.[0];
   const editable = !soloLectura && !bloqueado && (note.kind === 'text' || note.kind === 'todo');
+  // Ancho de lectura (D-NOTA-04): la hoja de un árbol va a todo el ancho del panel, que
+  // es lo que eligió el dueño; quien quiera líneas de libro la estrecha a 46rem (~80
+  // caracteres) con «Ancho de lectura», como el «Full width» de Notion. Es de la nota y
+  // va en su `data`, como el icono: viaja con ella a otro dispositivo y, en un cuaderno
+  // cifrado, se sella con el resto del contenido.
+  const hoja = llenar && !diario;
+  const anchoLectura = hoja && note.data?.[CLAVE_ANCHO_LECTURA] === true;
+  const alternarAnchoLectura = () => {
+    const { [CLAVE_ANCHO_LECTURA]: _previo, ...resto } = note.data ?? {};
+    onChange({ data: anchoLectura ? resto : { ...resto, [CLAVE_ANCHO_LECTURA]: true } });
+  };
 
   const adjuntos: NoteAttachment[] = Array.isArray(note.data?.attachments)
     ? (note.data.attachments as NoteAttachment[])
@@ -495,6 +516,8 @@ export function NoteCard({
       onChange={setBorrador}
       onDone={() => guardar()}
       estirado={estirada}
+      // La hoja del árbol (`llenar`) y la fila de lista o diario son papel: sin aro.
+      sinAro={llenar || diario}
       {...(enlaces ? { enlaces } : {})}
     />
   ) : separador ? (
@@ -545,7 +568,7 @@ export function NoteCard({
         diario
           ? 'notes-stream-note'
           : llenar
-            ? 'notes-sheet'
+            ? cx('notes-sheet', anchoLectura && 'notes-sheet--lectura')
             : 'bg-surface border-border-subtle hover:border-border rounded-lg border p-3',
         // La elegida: un fondo en la fila y un anillo fino en la tarjeta. Editando
         // manda el anillo del propio editor, y la hoja es lo único que hay en su panel.
@@ -759,15 +782,24 @@ export function NoteCard({
             ) : null}
             {onMoveTo ? <MenuItem onClick={onMoveTo}>{t('note.moveTo')}</MenuItem> : null}
             {onIcon ? <MenuItem onClick={onIcon}>{t('note.setIcon')}</MenuItem> : null}
+            {hoja ? (
+              <MenuItem onClick={alternarAnchoLectura}>
+                {t(anchoLectura ? 'note.fullWidth' : 'note.readingWidth')}
+              </MenuItem>
+            ) : null}
             <MenuSeparator />
             {onCrearEvento ? (
               <MenuItem onClick={onCrearEvento}>{t('event.create')}</MenuItem>
             ) : null}
             {compartir ? <MenuItem onClick={compartir.onClick}>{compartir.rotulo}</MenuItem> : null}
-            <MenuItem onClick={onShare}>{t('share.toRoom')}</MenuItem>
+            {onShare ? <MenuItem onClick={onShare}>{t('share.toRoom')}</MenuItem> : null}
             {onExport ? <MenuItem onClick={onExport}>{t('note.export')}</MenuItem> : null}
             {!soloLectura ? (
               <MenuItem onClick={() => fileInputRef.current?.click()}>{t('note.attach')}</MenuItem>
+            ) : null}
+            {onInfo ? <MenuItem onClick={onInfo}>{t('note.info')}</MenuItem> : null}
+            {onVersions && !soloLectura ? (
+              <MenuItem onClick={onVersions}>{t('note.versions')}</MenuItem>
             ) : null}
             <MenuItem onClick={onBacklinks}>{t('backlinks.title')}</MenuItem>
             <MenuSeparator />
@@ -854,7 +886,7 @@ export function NoteCard({
               <span
                 aria-hidden="true"
                 class="inline-block h-2 w-2 rounded-full"
-                style={{ background: s.color }}
+                style={{ background: colorDeUsuario(s.color) ?? s.color }}
               />
               {s.emoji ? <span aria-hidden="true">{s.emoji}</span> : null}
               <span class="sr-only">{s.tag_name}: </span>

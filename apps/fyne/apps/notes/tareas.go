@@ -38,24 +38,31 @@ var estadosTarea = [...][2]string{
 // verTareas abre la vista en un estado y la carga.
 func (p *Pantalla) verTareas(estado string) {
 	p.cerrarEditor()
+	if p.edicion != nil {
+		return
+	}
 	p.vista, p.cajon = VistaTareas, false
 	p.tareas = estadoTareas{fase: Cargando, estado: estado}
 	p.Repintar()
 	// Por valor: la carga es de la vista, no hereda el contexto de quien repinta.
 	cargar := p.cargarTareas
-	go cargar(estado)
+	{
+		notaFuncion := cargar
+		notaArgumento0 := estado
+		p.iniciar(func() { notaFuncion(notaArgumento0) })
+	}
 }
 
 // cargarTareas trae las tareas de un estado. Fuera del hilo.
 func (p *Pantalla) cargarTareas(estado string) {
 	if p.svc == nil || !p.hayRed() {
-		enHilo(func() { p.tareas.fase = SinConexion; p.Repintar() })
+		p.enHilo(func() { p.tareas.fase = SinConexion; p.Repintar() })
 		return
 	}
 	ctx, cancelar := p.ctx()
 	defer cancelar()
 	ls, err := p.svc.ListTasks(ctx, estado)
-	enHilo(func() {
+	p.enHilo(func() {
 		if p.tareas.estado != estado {
 			return // se ha cambiado de pestaña mientras llegaba
 		}
@@ -77,7 +84,7 @@ func (p *Pantalla) vistaTareas(v tema.Variante) fyne.CanvasObject {
 	var cuerpo fyne.CanvasObject
 	switch p.tareas.fase {
 	case Cargando:
-		cuerpo = centrar(ui.NuevaRueda(24, "text-muted", v), v)
+		cuerpo = filasDeCarga(FilasEsqueletoTareas, 1)
 	case Vacia:
 		cuerpo = fraseVacia(t("tasks.empty."+p.tareas.estado, nil), v)
 	case Fallo:
@@ -137,7 +144,14 @@ func (p *Pantalla) filaTarea(x api.Tarea, v tema.Variante) fyne.CanvasObject {
 	n := DeNota(x.Note)
 	// Por valor, como en verTareas: las escrituras no heredan el contexto del repintado.
 	cambiar, posponer := p.cambiarTarea, p.posponer
-	casilla := ui.NuevaCasilla("", func(m bool) { go cambiar(x, Parche{Marcada: &m}) })
+	casilla := ui.NuevaCasilla("", func(m bool) {
+		{
+			notaFuncion := cambiar
+			notaArgumento0 := x
+			notaArgumento1 := Parche{Marcada: &m}
+			p.iniciar(func() { notaFuncion(notaArgumento0, notaArgumento1) })
+		}
+	})
 	casilla.Marcada = x.Checked
 	titulo := n.Titulo
 	if titulo == "" {
@@ -155,7 +169,12 @@ func (p *Pantalla) filaTarea(x api.Tarea, v tema.Variante) fyne.CanvasObject {
 	}
 	if p.tareas.estado == api.TareaAbierta {
 		piezas = append(piezas, botonDiario(t("task.tomorrow", nil), ui.TallaXS, !p.hayRed(), func() {
-			go posponer(x.Note, time.Now().AddDate(0, 0, 1).Format(time.DateOnly))
+			{
+				notaFuncion := posponer
+				notaArgumento0 := x.Note
+				notaArgumento1 := time.Now().AddDate(0, 0, 1).Format(time.DateOnly)
+				p.iniciar(func() { notaFuncion(notaArgumento0, notaArgumento1) })
+			}
 		}))
 	}
 	var mas *ui.BotonIcono
@@ -169,7 +188,12 @@ func (p *Pantalla) filaTarea(x api.Tarea, v tema.Variante) fyne.CanvasObject {
 			cancelar = "task.reopen"
 		}
 		el = append(el, ui.NuevoElementoMenu(t(cancelar, nil), iconos.Ninguno, func() {
-			go cambiar(x, Parche{Cancelada: ptr(!n.Cancelada)})
+			{
+				notaFuncion := cambiar
+				notaArgumento0 := x
+				notaArgumento1 := Parche{Cancelada: ptr(!n.Cancelada)}
+				p.iniciar(func() { notaFuncion(notaArgumento0, notaArgumento1) })
+			}
 		}))
 		m := ui.NuevoMenu(el...)
 		m.Rotulo = t("common.more", nil)
@@ -216,7 +240,7 @@ func (p *Pantalla) cambiarTarea(x api.Tarea, pa Parche) {
 		in.ExpectedCrypto = nb.Crypto
 	}
 	actualizada, err := p.svc.UpdateNote(ctx, x.ID, x.NotebookID, in)
-	enHilo(func() {
+	p.enHilo(func() {
 		if err != nil {
 			p.fallo("note.saveFailed", err)
 			return
@@ -224,8 +248,12 @@ func (p *Pantalla) cambiarTarea(x api.Tarea, pa Parche) {
 		p.quitarTarea(x.ID)
 		p.Repintar()
 		if actualizada.RepeatedInto != nil {
-			go p.cargarTareas(p.tareas.estado)
-			go p.cargarRecordatorios()
+			{
+				notaFuncion := p.cargarTareas
+				notaArgumento0 := p.tareas.estado
+				p.iniciar(func() { notaFuncion(notaArgumento0) })
+			}
+			p.iniciar(p.cargarRecordatorios)
 		}
 	})
 }
@@ -253,7 +281,7 @@ func (p *Pantalla) posponer(n api.Note, dia string) {
 	ctx, cancelar := p.ctx()
 	defer cancelar()
 	_, err = p.svc.PostponeTask(ctx, n.ID, dia, titulo)
-	enHilo(func() {
+	p.enHilo(func() {
 		if err != nil {
 			p.fallo("task.postponeFailed", err)
 			return
@@ -262,9 +290,13 @@ func (p *Pantalla) posponer(n api.Note, dia string) {
 		p.avisos.Notificar(ui.NuevoAviso(ui.AvisoExito, p.tr.T("task.postponed", i18n.Vars{"date": titulo}), ""))
 		// Lo que colgaba de ella se fue con ella: el cuaderno abierto se vuelve a leer.
 		if p.vista == VistaCuaderno && p.activo.ID == n.NotebookID {
-			go p.cargarNotas(p.activo)
+			{
+				notaFuncion := p.cargarNotas
+				notaArgumento0 := p.activo
+				p.iniciar(func() { notaFuncion(notaArgumento0) })
+			}
 		}
-		go p.cargarCuadernos()
+		p.iniciar(p.cargarCuadernos)
 		p.Repintar()
 	})
 }
@@ -279,7 +311,12 @@ func (p *Pantalla) dialogoPosponer(n api.Note) {
 	posponer := p.posponer
 	elegir := func(dia time.Time) {
 		d.Cerrar()
-		go posponer(n, dia.Format(time.DateOnly))
+		{
+			notaFuncion := posponer
+			notaArgumento0 := n
+			notaArgumento1 := dia.Format(time.DateOnly)
+			p.iniciar(func() { notaFuncion(notaArgumento0, notaArgumento1) })
+		}
 	}
 	aceptar := ui.NuevoBoton(t("task.postponeAction", nil), func() {
 		if dia, vacia, ok := ui.LeerFecha(campo.Texto(), time.Local); ok && !vacia {

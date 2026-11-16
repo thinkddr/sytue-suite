@@ -35,7 +35,7 @@ const (
 	// Estrecho es el `md` de la hoja: por debajo, el menú es un cajón y la lista y el
 	// detalle se turnan la pantalla.
 	Estrecho float32 = 768
-	// AnchoPanelBase es `md:w-80` con el rem de 14.
+	// AnchoPanelBase es `md:w-80`: 320 con el rem de 16.
 	AnchoPanelBase = 20 * tema.Rem
 	// AnchoPanel2XL es `2xl:w-96`, desde 1536.
 	AnchoPanel2XL = 24 * tema.Rem
@@ -303,7 +303,7 @@ func refrescarFlotantesEn(o fyne.CanvasObject) {
 func (a *Armazon) animarHaciaAbierto(desde float32) {
 	t := a.Size()
 	ancho := a.anchoCajon(t.Width, t.Width < Estrecho)
-	if a.Menu == nil || SinMovimiento || lienzoDe(a) == nil || ancho <= 0 || desde >= 0 {
+	if a.Menu == nil || MenosMovimiento() || lienzoDe(a) == nil || ancho <= 0 || desde >= 0 {
 		a.entrada = 0
 		a.Refresh()
 		a.refrescarFlotantes()
@@ -332,7 +332,7 @@ func (a *Armazon) animarHaciaAbierto(desde float32) {
 func (a *Armazon) animarHaciaCerrado(desde float32) {
 	t := a.Size()
 	ancho := a.anchoCajon(t.Width, t.Width < Estrecho)
-	if a.Menu == nil || SinMovimiento || lienzoDe(a) == nil || ancho <= 0 || desde <= -ancho {
+	if a.Menu == nil || MenosMovimiento() || lienzoDe(a) == nil || ancho <= 0 || desde <= -ancho {
 		a.cerrandoCajon = false
 		a.entrada = 0
 		a.Refresh()

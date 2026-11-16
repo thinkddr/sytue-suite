@@ -16,9 +16,8 @@ var esUUID = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[
 // misma página de la web, con o sin la organización en la ruta— y dice qué base abre
 // ("" es «Mis bases») y si la app sabe enseñarlo. Lo demás de la web (el formulario
 // público `/f/<token>`, un banco de pruebas) no existe aquí.
-//
-// ponytail: solo la base. La tabla y el registro del aviso de un comentario
-// (`?table=&record=`) no se siguen: la base se abre en su primera tabla.
+// La tabla y el registro del aviso de un comentario (`?table=&record=`) los da
+// [RegistroDeEnlace].
 func DestinoDeEnlace(u *url.URL) (base string, ok bool) {
 	partes := strings.FieldsFunc(cmp.Or(u.Path, u.Opaque), func(r rune) bool { return r == '/' })
 	// `[bases/][<org>/]base/<id>`: se mira por el final, que la organización puede llamarse
@@ -28,4 +27,16 @@ func DestinoDeEnlace(u *url.URL) (base string, ok bool) {
 	}
 	// El prefijo `/bases` y, como mucho, la organización.
 	return "", len(partes) <= 2
+}
+
+// RegistroDeEnlace es la tabla y el registro que pide un enlace de aviso
+// (`?table=…&record=…`, `registroDelEnlace` de la web), o dos vacíos si falta alguno o no
+// es un id.
+func RegistroDeEnlace(u *url.URL) (tabla, registro string) {
+	q := u.Query()
+	tabla, registro = q.Get("table"), q.Get("record")
+	if !esUUID.MatchString(tabla) || !esUUID.MatchString(registro) {
+		return "", ""
+	}
+	return strings.ToLower(tabla), strings.ToLower(registro)
 }

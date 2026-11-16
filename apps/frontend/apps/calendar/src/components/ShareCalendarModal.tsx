@@ -217,7 +217,7 @@ export function ShareCalendarModal({ t, calendar, onClose }: Props): JSX.Element
             <EmptyState
               title={t('share.onlyYou')}
               description={t('share.empty.hint')}
-              illustration={<Icon name="lock" size={32} />}
+              icon="lock"
             />
           ) : (
             <ul class="flex flex-col gap-1">

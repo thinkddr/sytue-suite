@@ -81,7 +81,7 @@ afterEach(() => {
   intents.length = 0;
 });
 
-async function montar(): Promise<HTMLElement> {
+async function montar(mensaje: EmailSummary = correo): Promise<HTMLElement> {
   const host = document.createElement('div');
   document.body.appendChild(host);
   const nada = (): void => {};
@@ -90,7 +90,7 @@ async function montar(): Promise<HTMLElement> {
       <ThemeProvider>
         <MessageReader
           locale="es"
-          conversation={groupByThread([correo])[0] ?? null}
+          conversation={groupByThread([mensaje])[0] ?? null}
           onReply={nada}
           onCompose={nada}
           onToggleFlag={nada}
@@ -189,4 +189,33 @@ test('«l» y «v» encuentran los disparadores de «Etiquetar» y «Mover a…�
     'Mover a',
   );
   expect(disparadorDeAtajo('x')).toBeNull();
+});
+
+/** Las líneas `text-sm` de destinatarios bajo el remitente del mensaje desplegado. */
+function destinatarios(host: ParentNode): string[] {
+  return Array.from(host.querySelectorAll<HTMLElement>('span.text-text-subtle.truncate'))
+    .map((el) => el.textContent ?? '')
+    .filter((x) => /^(Para|CC|CCO): /.test(x));
+}
+
+test('la cabecera enseña el CC, y la CCO solo si el mensaje la trae', async () => {
+  const host = await montar({
+    ...correo,
+    cc: [{ email: 'luis@ejemplo.eu' }, { name: 'Eva', email: 'eva@ejemplo.eu' }],
+    bcc: [{ email: 'jefa@ejemplo.eu' }],
+  });
+  const lineas = destinatarios(host);
+  expect(lineas).toHaveLength(3);
+  expect(lineas[0]).toBe('Para: yo@ejemplo.eu');
+  expect(lineas[1]).toMatch(/^CC: luis@ejemplo\.eu, .*Eva/);
+  expect(lineas[2]).toBe('CCO: jefa@ejemplo.eu');
+  // El `title` lleva la lista entera para cuando el `truncate` la corta.
+  const cc = Array.from(host.querySelectorAll<HTMLElement>('[title^="CC: "]'));
+  expect(cc).toHaveLength(1);
+});
+
+test('sin CC ni CCO no queda línea vacía en la cabecera', async () => {
+  const host = await montar();
+  expect(destinatarios(host)).toEqual(['Para: yo@ejemplo.eu']);
+  expect(host.querySelector('[title^="CC"]')).toBeNull();
 });

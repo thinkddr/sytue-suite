@@ -13,7 +13,7 @@
  * avanza de una en una y un fallo no se lleva a las demás.
  */
 import { withBase } from '@sytue/ui';
-import { indexar, type Foto } from './photosApi.js';
+import { ErrorDeFotos, indexar, type Foto } from './photosApi.js';
 
 /** Carpeta del Drive donde van los originales que se suben desde aquí. */
 export const CARPETA_FOTOS = '/Fotos';
@@ -37,9 +37,10 @@ async function subirADrive(f: File): Promise<string> {
       body: f,
     },
   );
-  if (!res.ok) throw new Error(`Drive respondió ${res.status}`);
+  if (!res.ok) throw new ErrorDeFotos(res.status);
   const { id } = (await res.json()) as { id?: string };
-  if (!id) throw new Error('Drive no devolvió el id del fichero');
+  // Sin id no hay qué indexar: el BFF contestó algo que no es lo pactado (502).
+  if (!id) throw new ErrorDeFotos(502);
   return id;
 }
 

@@ -36,13 +36,6 @@ import (
 
 // Medidas de las unidades de equipo.
 const (
-	// AnchoPaginaEquipos es el `max-w-5xl` con el rem de 14.
-	AnchoPaginaEquipos float32 = 64 * tema.Rem
-	// RellenoYPagina es el `py-6` de SettingsShell y SeparaSecciones su `mt-6`.
-	RellenoYPagina  float32 = 6 * 0.25 * tema.Rem
-	SeparaSecciones float32 = 6 * 0.25 * tema.Rem
-	// AnchoProsa es el `max-w-2xl` de las descripciones.
-	AnchoProsa float32 = 42 * tema.Rem
 	// RellenoYFilaUnidad es el `py-2.5` de una unidad de la lista.
 	RellenoYFilaUnidad float32 = 2.5 * 0.25 * tema.Rem
 	// LadoGlifoEquipo es el `size={22}` de los glifos y CajaGlifoEquipo su `h-9 w-9`.
@@ -151,35 +144,55 @@ func (q *VistaEquipos) Objeto(v tema.Variante) fyne.CanvasObject {
 // ---- La lista ----
 
 func (q *VistaEquipos) lista(v tema.Variante) fyne.CanvasObject {
-	titulo := ui.NuevoParrafo(q.t("team.title"), ui.EscalonTitulo(2), ui.PesoTitulo(2), "text", v)
-	relajado := tema.Escalon{Tam: tema.TextoBase.Tam, Linea: 1.625 * tema.TextoBase.Tam}
-	desc := ui.NuevoParrafo(q.t("team.description"), relajado, ui.Normal, "text-muted", v)
 	nueva := ui.NuevoBoton(q.t("team.new"), q.AlNueva).Con(ui.Primario, ui.TallaMD).ConIcono(iconos.Mas, 16)
 	nueva.Inerte = q.SinRed()
 
-	secTitulo := ui.NuevoParrafo(q.t("team.listTitle"), ui.EscalonTitulo(4), ui.PesoTitulo(4), "text", v)
-	secDesc := ui.NuevoParrafo(q.t("team.listDescription"), tema.Escalon{Tam: tema.TextoSM.Tam, Linea: 1.625 * tema.TextoSM.Tam}, ui.Normal, "text-muted", v)
+	// `SettingsShell` con su acción y una `SettingsSection`: las piezas de la suite
+	// (§2.8), con el `sm:` del margen medido en la ventana y no en la hoja.
 	var ancho float32
-	cuerpoSeccion := container.New(&pilaSeparada{separas: []float32{0, tema.Espacio(1), tema.Espacio(4)}, ancho: &ancho},
-		secTitulo, secDesc, q.contenidoLista(v, &ancho))
-	tarjeta := ui.NuevaTarjeta("", cuerpoSeccion)
-
-	p := &paginaAjustes{ventana: q.Ventana, titulo: titulo, desc: desc, accion: nueva, seccion: tarjeta, anchoSeccion: &ancho}
-	pagina := container.New(p, titulo, desc, nueva, tarjeta)
+	seccion := ui.NuevaSeccionAjustes(q.t("team.listTitle"), q.t("team.listDescription"),
+		container.New(conAncho{ancho: &ancho}, q.contenidoLista(v, &ancho)))
+	marco := ui.NuevoMarcoAjustes(q.t("team.title"), q.t("team.description"), seccion)
+	marco.Acciones, marco.Ventana = []fyne.CanvasObject{nueva}, q.Ventana
+	// El marco mide su alto al ancho al que está puesto; hasta su primer Layout, el
+	// desplazamiento lo mide a lo que mide la hoja.
+	marco.Resize(fyne.NewSize(max(ui.AnchoHoja(q.Ventana, ui.AnchoMenu(false), 0), 1), 0))
 	if q.desplazable == nil {
-		q.desplazable = container.NewVScroll(pagina)
+		q.desplazable = container.NewVScroll(marco)
 	} else {
-		q.desplazable.Content = pagina
+		q.desplazable.Content = marco
 		q.desplazable.Refresh()
 	}
 	return container.NewStack(canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)), q.desplazable)
+}
+
+// conAncho apunta el ancho al que se mide y se coloca lo de dentro de la sección: las
+// filas de la lista lo leen (`AnchoDe`) para partir su meta en el móvil.
+type conAncho struct{ ancho *float32 }
+
+func (c conAncho) MinSize(objs []fyne.CanvasObject) fyne.Size { return objs[0].MinSize() }
+
+// AltoCon es el alto a ese ancho, que es lo que pide la sección (`ui.AltoA`). Medir no
+// es colocar: al acabar, las filas vuelven al ancho al que están puestas, o un mínimo
+// pedido a otro ancho (el del desplazamiento) las dejaría repartidas a ese.
+func (c conAncho) AltoCon(objs []fyne.CanvasObject, ancho float32) float32 {
+	puesto := *c.ancho
+	*c.ancho = ancho
+	defer func() { *c.ancho = puesto }()
+	return ui.AltoA(objs[0], ancho)
+}
+
+func (c conAncho) Layout(objs []fyne.CanvasObject, t fyne.Size) {
+	*c.ancho = t.Width
+	objs[0].Move(fyne.NewPos(0, 0))
+	objs[0].Resize(t)
 }
 
 // contenidoLista es lo que va dentro de la tarjeta de la sección.
 func (q *VistaEquipos) contenidoLista(v tema.Variante, ancho *float32) fyne.CanvasObject {
 	switch q.Fase {
 	case Cargando:
-		return esqueletoFilas()
+		return esqueletoFilas(q.t("team.loading"))
 	case Vacia:
 		x := ui.NuevoVacio(q.t("team.empty.title"), q.t("team.empty.body"))
 		x.Ilustracion = ilustracion(iconos.VacioDrive, v)
@@ -235,49 +248,13 @@ func (q *VistaEquipos) contenidoLista(v tema.Variante, ancho *float32) fyne.Canv
 // FilasEsqueletoEquipos son las seis filas de carga de la lista.
 const FilasEsqueletoEquipos = 6
 
-// esqueleto es el `TeamDriveListSkeleton`: la caja de 36, una raya de `0.85rem` con un
-// ancho que varía por fila y otra de 60 × `1.1rem` al final, en filas de `px-3 py-2.5`
-// dentro de un `px-3`.
-func esqueletoFilas() fyne.CanvasObject {
-	e := &esqueletoEquipos{}
-	hijos := make([]fyne.CanvasObject, 0, 3*FilasEsqueletoEquipos)
-	for i := range FilasEsqueletoEquipos {
-		f := [3]*ui.Esqueleto{
-			ui.NuevoEsqueleto(36, 36),
-			ui.NuevoEsqueleto(0, 0.85*tema.Rem),
-			ui.NuevoEsqueleto(60, 1.1*tema.Rem),
-		}
-		e.filas = append(e.filas, f)
-		e.pct = append(e.pct, float32(40+(i*13)%40)/100)
-		hijos = append(hijos, f[0], f[1], f[2])
-	}
-	return container.New(e, hijos...)
-}
-
-type esqueletoEquipos struct {
-	filas [][3]*ui.Esqueleto
-	pct   []float32
-}
-
-func (e *esqueletoEquipos) alto() float32 { return 2*RellenoYFilaUnidad + 36 }
-
-func (e *esqueletoEquipos) MinSize([]fyne.CanvasObject) fyne.Size {
-	return fyne.NewSize(0, float32(len(e.filas))*e.alto())
-}
-
-func (e *esqueletoEquipos) Layout(_ []fyne.CanvasObject, t fyne.Size) {
-	x := 2 * CanalonLista
-	util := max(t.Width-4*CanalonLista, 0)
-	for i, f := range e.filas {
-		y := float32(i) * e.alto()
-		c := func(h float32) float32 { return y + (e.alto()-h)/2 }
-		f[0].Move(fyne.NewPos(x, c(36)))
-		f[0].Resize(fyne.NewSize(36, 36))
-		f[1].Move(fyne.NewPos(x+36+HuecoFilaPlana, c(0.85*tema.Rem)))
-		f[1].Resize(fyne.NewSize(max(util-36-HuecoFilaPlana, 0)*e.pct[i], 0.85*tema.Rem))
-		f[2].Move(fyne.NewPos(x+util-60, c(1.1*tema.Rem)))
-		f[2].Resize(fyne.NewSize(60, 1.1*tema.Rem))
-	}
+// esqueletoFilas es el `TeamDriveListSkeleton`: las filas comunes de carga con la tesela
+// de 36, la raya del nombre y la de 60 × `1.1rem` de la insignia, dentro de un `px-3`.
+func esqueletoFilas(rotulo string) fyne.CanvasObject {
+	filas := ui.NuevasFilasEsqueleto(FilasEsqueletoEquipos, ui.DelanteroTesela, 1)
+	filas.Margen, filas.Rotulo = CanalonLista, rotulo
+	filas.Meta = []ui.MetaEsqueleto{{Ancho: 60, Alto: 1.1 * tema.Rem}}
+	return filas
 }
 
 // vacioEnLinea es un EmptyState dentro de una tarjeta: el alto que pida al ancho que le
@@ -301,58 +278,6 @@ func (a *vacioAncho) Layout(_ []fyne.CanvasObject, t fyne.Size) {
 	a.ancho = t.Width
 	a.x.Move(fyne.NewPos(0, 0))
 	a.x.Resize(fyne.NewSize(t.Width, a.x.MedidaVacio(t.Width)))
-}
-
-// paginaAjustes es `SettingsShell` con una sección: el título y su descripción a la
-// izquierda, la acción a la derecha, y la tarjeta debajo con `mt-6`.
-type paginaAjustes struct {
-	ventana      float32
-	titulo, desc *ui.Parrafo
-	accion       fyne.CanvasObject
-	seccion      *ui.Tarjeta
-	anchoSeccion *float32
-}
-
-func (p *paginaAjustes) reparto(ancho float32) (izq, util float32) {
-	canalon := CanalonCabecera(p.ventana)
-	caja := min(ancho, AnchoPaginaEquipos)
-	return (ancho-caja)/2 + canalon, max(caja-2*canalon, 0)
-}
-
-func (p *paginaAjustes) cabecera(util float32) (textoAncho, alto float32) {
-	a := p.accion.MinSize()
-	textoAncho = max(util-a.Width-tema.Espacio(4), 0)
-	prosa := min(textoAncho, AnchoProsa)
-	alto = max(ui.AltoParrafo(p.titulo, textoAncho)+tema.Espacio(1.5)+ui.AltoParrafo(p.desc, prosa), a.Height)
-	return textoAncho, alto
-}
-
-func (p *paginaAjustes) altoSeccion(util float32) float32 {
-	*p.anchoSeccion = max(util-2*(tema.Espacio(4)+tema.Borde), 0)
-	return ui.MedidaTarjeta("", p.seccion.Cuerpo).Height
-}
-
-func (p *paginaAjustes) MinSize([]fyne.CanvasObject) fyne.Size {
-	_, util := p.reparto(max(ui.AnchoHoja(p.ventana, ui.AnchoMenu(false), 0), 1))
-	_, alto := p.cabecera(util)
-	return fyne.NewSize(0, 2*RellenoYPagina+alto+SeparaSecciones+p.altoSeccion(util))
-}
-
-func (p *paginaAjustes) Layout(_ []fyne.CanvasObject, t fyne.Size) {
-	izq, util := p.reparto(t.Width)
-	textoAncho, alto := p.cabecera(util)
-	y := RellenoYPagina
-	p.titulo.Move(fyne.NewPos(izq, y))
-	p.titulo.Resize(fyne.NewSize(textoAncho, ui.AltoParrafo(p.titulo, textoAncho)))
-	prosa := min(textoAncho, AnchoProsa)
-	p.desc.Move(fyne.NewPos(izq, y+ui.AltoParrafo(p.titulo, textoAncho)+tema.Espacio(1.5)))
-	p.desc.Resize(fyne.NewSize(prosa, ui.AltoParrafo(p.desc, prosa)))
-	a := p.accion.MinSize()
-	p.accion.Move(fyne.NewPos(izq+util-a.Width, y))
-	p.accion.Resize(a)
-	y += alto + SeparaSecciones
-	p.seccion.Move(fyne.NewPos(izq, y))
-	p.seccion.Resize(fyne.NewSize(util, p.altoSeccion(util)))
 }
 
 // ---- El detalle de una unidad ----
@@ -474,7 +399,7 @@ func (q *VistaEquipos) cuerpoDetalle(v tema.Variante) fyne.CanvasObject {
 	escribe := q.Abierta.PuedeEscribir() && !q.SinRed()
 	switch {
 	case q.FaseDetalle == Cargando:
-		return container.NewStack(canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)), container.NewVScroll(esqueletoFilas()))
+		return container.NewStack(canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)), container.NewVScroll(esqueletoFilas(q.t("team.loading"))))
 	case q.Denegada:
 		x := ui.NuevoVacio(q.t("team.detail.deniedTitle"), q.t("team.detail.deniedBody"))
 		x.Ilustracion = iconos.Trazo(iconos.Aviso, 40, "danger-text", v).Objeto()

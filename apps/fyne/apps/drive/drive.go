@@ -9,7 +9,7 @@
 // `apps/frontend/apps/drive/src/components/FileBrowser.tsx`, y los números salen del
 // barrido de producción (`test/e2e/medidas-web.mjs drive`, 1280×800, es-ES, DSF 1,
 // corporate.sytue.eu v3.3.9). Cada constante de aquí lleva de dónde salió: «medido» es
-// del volcado del DOM, «hoja» es de la clase de Tailwind convertida con el rem de 14.
+// del volcado del DOM, «hoja» es de la clase de Tailwind convertida con el rem de 16.
 //
 // # La app es SUYA
 //
@@ -86,16 +86,24 @@ type Elemento struct {
 	Etiqueta *api.DriveLabel
 	// Tipo es el `content_type` del fichero: «Subir a Cast» solo se ofrece en vídeos.
 	Tipo string
+	// Padre es el id de la carpeta que lo contiene, cuando el servicio lo da (el
+	// listado de una carpeta y la búsqueda; «Recientes» y «Destacados», no). Es lo que
+	// «Mostrar en su carpeta» abre sin tener que preguntar.
+	Padre string
 }
 
 // DeCarpeta convierte una carpeta del cliente en un Elemento.
 func DeCarpeta(f api.Folder) Elemento {
-	return Elemento{ID: f.ID, Nombre: f.Name, Carpeta: true, Tamano: -1, Modificado: f.UpdatedAt, Ruta: f.Path}
+	e := Elemento{ID: f.ID, Nombre: f.Name, Carpeta: true, Tamano: -1, Modificado: f.UpdatedAt, Ruta: f.Path}
+	if f.ParentID != nil {
+		e.Padre = *f.ParentID
+	}
+	return e
 }
 
 // DeFichero convierte un fichero del cliente en un Elemento.
 func DeFichero(f api.File) Elemento {
-	return Elemento{ID: f.ID, Nombre: f.Name, Tamano: f.SizeBytes, Modificado: f.UpdatedAt, Ruta: f.Path, Etiqueta: f.Label, Tipo: f.ContentType}
+	return Elemento{ID: f.ID, Nombre: f.Name, Tamano: f.SizeBytes, Modificado: f.UpdatedAt, Ruta: f.Path, Etiqueta: f.Label, Tipo: f.ContentType, Padre: f.FolderID}
 }
 
 // DeHijos aplana una página de contenido en la lista que pinta la pantalla: primero las

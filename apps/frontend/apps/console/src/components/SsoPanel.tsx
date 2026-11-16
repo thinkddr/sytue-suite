@@ -11,11 +11,14 @@
  * client_secret solo se ESCRIBE (nunca vuelve al cliente). CRUD vía el BFF, solo
  * @sytue/ui. docs/CONVENTIONS.md §8.
  */
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
+import { accionPedida } from '../lib/paleta.js';
 import {
   Badge,
   Button,
   Card,
+  ConfirmDialog,
+  CopyField,
   EmptyState,
   Icon,
   InlineHelp,
@@ -26,11 +29,10 @@ import {
   Table,
   ToastProvider,
   useToast,
-  ConfirmDialog,
 } from '@sytue/ui';
 import type { TableColumn } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
-import ConnectIdpWizard, { CopyRow } from './ConnectIdpWizard.js';
+import ConnectIdpWizard from './ConnectIdpWizard.js';
 import RegisterOidcAppWizard from './RegisterOidcAppWizard.js';
 import { useT } from '../i18n/index.js';
 import type { OidcApp, SamlSp, SsoProvider } from '../lib/types.js';
@@ -64,6 +66,11 @@ function Inner({ locale, providers, apps, samlSps, samlSpsLive, live }: SsoPanel
   const toast = useToast();
   const [items, setItems] = useState<SsoProvider[]>(providers);
   const [wizard, setWizard] = useState<{ open: boolean; provider?: SsoProvider }>({ open: false });
+  // Llegada desde la paleta ⌘K (`?accion=`): se abre al montar y no en el estado
+  // inicial, para que el HTML del servidor y la hidratación coincidan.
+  useEffect(() => {
+    if (accionPedida('conectar-sso')) setWizard({ open: true });
+  }, []);
   // Aplicaciones que entran CON Sytue (sentido contrario a los proveedores).
   const [appItems, setAppItems] = useState<OidcApp[]>(apps);
   const [appWizard, setAppWizard] = useState(false);
@@ -211,20 +218,6 @@ function Inner({ locale, providers, apps, samlSps, samlSpsLive, live }: SsoPanel
     } finally {
       setAppBusyId(null);
     }
-  }
-
-  /** Copia al portapapeles avisando del resultado (los datos del IdP se pegan en el SP). */
-  function copyValue(value: string) {
-    void navigator.clipboard
-      .writeText(value)
-      .then(() => toast.notify({ tone: 'success', title: t('common.copied') }))
-      .catch(() =>
-        toast.notify({
-          tone: 'danger',
-          title: t('sso.secret.copyFailed'),
-          description: t('sso.secret.copyFailedHint'),
-        }),
-      );
   }
 
   /** Corta o restablece la federación con un SP sin perder su configuración. */
@@ -573,7 +566,7 @@ function Inner({ locale, providers, apps, samlSps, samlSpsLive, live }: SsoPanel
             <EmptyState
               title={t('sso.providers.emptyTitle')}
               description={t('sso.providers.emptyDescription')}
-              illustration={<Icon name="lock" size={28} />}
+              icon="lock"
               action={
                 <Button
                   variant="primary"
@@ -618,7 +611,7 @@ function Inner({ locale, providers, apps, samlSps, samlSpsLive, live }: SsoPanel
             <EmptyState
               title={t('sso.apps.emptyTitle')}
               description={t('sso.apps.emptyDescription')}
-              illustration={<Icon name="globe" size={28} />}
+              icon="globe"
               action={
                 <Button variant="primary" disabled={!live} onClick={() => setAppWizard(true)}>
                   {t('sso.apps.emptyAction')}
@@ -648,7 +641,7 @@ function Inner({ locale, providers, apps, samlSps, samlSpsLive, live }: SsoPanel
             <EmptyState
               title={t('sso.saml.emptyTitle')}
               description={t('sso.saml.emptyDescription')}
-              illustration={<Icon name="lock" size={28} />}
+              icon="lock"
             />
           </Card>
         ) : (
@@ -672,39 +665,14 @@ function Inner({ locale, providers, apps, samlSps, samlSpsLive, live }: SsoPanel
             <p class="text-text-muted text-sm leading-relaxed">
               {t('sso.saml.detailsBody', { name: spDetails.name })}
             </p>
-            <CopyRow
-              label={t('sso.saml.entityId')}
-              value={spDetails.idpEntityId}
-              copyLabel={t('common.copy')}
-              onCopy={copyValue}
-            />
-            <CopyRow
-              label={t('sso.saml.metadataUrl')}
-              value={spDetails.idpMetadataUrl}
-              copyLabel={t('common.copy')}
-              onCopy={copyValue}
-            />
-            <CopyRow
-              label={t('sso.saml.ssoUrl')}
-              value={spDetails.idpSsoUrl}
-              copyLabel={t('common.copy')}
-              onCopy={copyValue}
-            />
-            <CopyRow
-              label={t('sso.saml.sloUrl')}
-              value={spDetails.idpSloUrl}
-              copyLabel={t('common.copy')}
-              onCopy={copyValue}
-            />
+            <CopyField label={t('sso.saml.entityId')} value={spDetails.idpEntityId} />
+            <CopyField label={t('sso.saml.metadataUrl')} value={spDetails.idpMetadataUrl} />
+            <CopyField label={t('sso.saml.ssoUrl')} value={spDetails.idpSsoUrl} />
+            <CopyField label={t('sso.saml.sloUrl')} value={spDetails.idpSloUrl} />
             {/* Solo si el SP acepta SSO iniciado por el IdP: si no, esa URL no lleva a
                 ninguna parte y enseñarla invita a pegar algo que no funciona. */}
             {spDetails.idpInitiated ? (
-              <CopyRow
-                label={t('sso.saml.initiateUrl')}
-                value={spDetails.initiateUrl}
-                copyLabel={t('common.copy')}
-                onCopy={copyValue}
-              />
+              <CopyField label={t('sso.saml.initiateUrl')} value={spDetails.initiateUrl} />
             ) : null}
           </div>
         ) : null}
@@ -739,23 +707,7 @@ function Inner({ locale, providers, apps, samlSps, samlSpsLive, live }: SsoPanel
             <p class="text-text-muted text-sm leading-relaxed">
               {t('sso.secret.body', { name: newSecret.app.name })}
             </p>
-            <CopyRow
-              label={t('sso.secret.label')}
-              value={newSecret.secret}
-              copyLabel={t('common.copy')}
-              onCopy={(v) => {
-                void navigator.clipboard
-                  .writeText(v)
-                  .then(() => toast.notify({ tone: 'success', title: t('sso.secret.copied') }))
-                  .catch(() =>
-                    toast.notify({
-                      tone: 'danger',
-                      title: t('sso.secret.copyFailed'),
-                      description: t('sso.secret.copyFailedHint'),
-                    }),
-                  );
-              }}
-            />
+            <CopyField label={t('sso.secret.label')} value={newSecret.secret} />
             <div class="flex justify-end">
               <Button variant="primary" onClick={() => setNewSecret(null)}>
                 {t('sso.secret.done')}

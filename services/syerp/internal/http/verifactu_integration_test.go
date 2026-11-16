@@ -18,6 +18,7 @@ import (
 	"encoding/xml"
 	"math/big"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -199,6 +200,18 @@ func TestVerifactuProduccionExigeCertificadoPropioPorHTTP(t *testing.T) {
 	w = llamar(t, "acme", http.MethodPut, "/api/v1/verifactu/certificado", "application/json", string(cuerpoAjeno), nil, hs.GuardarCertificadoVerifactu)
 	if w.Code != http.StatusUnprocessableEntity || !strings.Contains(w.Body.String(), "certificado_nif_no_coincide") {
 		t.Fatalf("certificado con NIF ajeno: %d %s", w.Code, w.Body.String())
+	}
+
+	// El `.p12` tal como lo entrega el emisor llega al mismo control de NIF (el
+	// del fixture es B89890001): se convierte y se valida igual que el PEM.
+	p12, err := os.ReadFile("../verifactu/testdata/moderno.p12")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cuerpoP12, _ := json.Marshal(map[string]any{"fichero": p12, "contrasena": "secreta"})
+	w = llamar(t, "acme", http.MethodPut, "/api/v1/verifactu/certificado", "application/json", string(cuerpoP12), nil, hs.GuardarCertificadoVerifactu)
+	if w.Code != http.StatusUnprocessableEntity || !strings.Contains(w.Body.String(), "certificado_nif_no_coincide") {
+		t.Fatalf(".p12 con NIF ajeno: %d %s", w.Code, w.Body.String())
 	}
 
 	// Certificado propio con el mismo NIF (B12345678) -> 200 y permite activar en producción.

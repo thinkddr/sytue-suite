@@ -1,0 +1,69 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Daniel Delgado Ramos
+
+package api
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+)
+
+// # El punto de venta (`PuntoVenta.tsx`)
+//
+// Las formas son las de `services/syerp/internal/store/tpv.go` (LineaTPV, CobroTPV,
+// VentaTPV). El cobro NO carga una tarjeta: registra un pago que ya hizo el terminal
+// bancario, y el servicio confirma factura, asiento, cobro y sesión en una sola
+// transacción.
+
+// ERPModeloSesionTPV es la clave del modelo de las sesiones de caja.
+const ERPModeloSesionTPV = "sesion_tpv"
+
+// Los dos medios de cobro que admite el servicio.
+const (
+	ERPMedioEfectivo = "efectivo"
+	ERPMedioTarjeta  = "tarjeta"
+)
+
+// ERPLineaTPV es una línea de la cesta. `Precio` es el precio con IVA que se VIO, en
+// céntimos: si el catálogo cambió entretanto, el servicio rechaza el cobro y pide revisar
+// la cesta en vez de cobrar otra cosa.
+type ERPLineaTPV struct {
+	Producto string `json:"producto"`
+	Cantidad int64  `json:"cantidad"`
+	Precio   int64  `json:"precio"`
+	TipoIVA  string `json:"tipo_iva"`
+}
+
+// ERPCobroTPV es un cobro. `Operacion` es un UUID que pone quien cobra y es lo que hace
+// el reintento seguro: el servicio reconoce la misma operación y devuelve la factura que
+// ya emitió en vez de emitir otra. Por eso un reintento manda EXACTAMENTE el mismo cuerpo
+// —el servicio compara también su huella—.
+type ERPCobroTPV struct {
+	Operacion string        `json:"operacion"`
+	Sesion    string        `json:"sesion"`
+	Cliente   string        `json:"cliente"`
+	Medio     string        `json:"medio"`
+	Recibido  int64         `json:"recibido"`
+	Lineas    []ERPLineaTPV `json:"lineas"`
+}
+
+// ERPVentaTPV es lo que devuelve un cobro: la factura emitida y el cambio en céntimos.
+type ERPVentaTPV struct {
+	Factura ERPRegistro `json:"factura"`
+	Cambio  int64       `json:"cambio"`
+}
+
+// CobrarTPV registra un cobro (`POST /api/v1/tpv/cobrar`). No reintenta solo: tras un
+// error de red no se sabe si la venta se registró, y es la pantalla la que vuelve a
+// llamar con el MISMO cobro.
+func (e *ERP) CobrarTPV(ctx context.Context, c ERPCobroTPV) (ERPVentaTPV, error) {
+	datos, err := json.Marshal(c)
+	if err != nil {
+		return ERPVentaTPV{}, err
+	}
+	r := e.pedir("/tpv/cobrar", nil)
+	r.Method, r.Body = http.MethodPost, datos
+	r.Header.Set("Content-Type", "application/json")
+	return JSON[ERPVentaTPV](ctx, e.c, r)
+}

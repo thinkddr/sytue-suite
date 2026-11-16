@@ -59,11 +59,10 @@ func casi(t *testing.T, que string, tengo, quiero float32) {
 // TestLaFilaDeCuadernoMide30Coma5 es EL número que había abierto.
 //
 // 30,5 es lo medido en producción, y no sale del texto: `py-1.5` (10,5) más la caja de
-// línea de `text-base` (19,25) dan 29,75. Los 0,75 que faltan son los DOS BOTONES DE
-// ACCIÓN de la derecha —«nuevo cuaderno dentro» y «ajustes»—, que son `p-1` alrededor
-// de un icono de 13 y por tanto miden 20, más que la línea. Están en el layout aunque
-// vayan a `opacity-0`, que es lo que hace que la fila no cambie de alto al pasar el
-// ratón.
+// línea de `text-base` (19,25) dan 29,75. Los 0,75 que faltan son el BOTÓN DE ACCIÓN
+// de la derecha —hoy el «…» del cuaderno; en aquel barrido, «nuevo cuaderno dentro» y
+// «ajustes»—, más alto que la línea. Está en el layout aunque vaya a `opacity-0`, que es
+// lo que hace que la fila no cambie de alto al pasar el ratón.
 //
 // VISTO EN ROJO (2026-09-22, en el piloto): quitándole la `Cola` a la rama, la fila
 // baja a 29,75 y el test lo dice con los dos números. Deshecho.
@@ -77,8 +76,8 @@ func TestLaFilaDeCuadernoMide30Coma5(t *testing.T) {
 
 	// Y el botón que la explica: 20 × 20, medido en el DOM con `padding: 3.5px`.
 	casi(t, "el botón de acción del árbol", notes.LadoAccionArbol, 21)
-	// Desde el PR #834 de la web, «nuevo dentro» y «ajustes» son la acción del carril
-	// (24) con `-my-[2px]`: se pintan más grandes y la fila NO crece. VISTO EN ROJO con
+	// Desde el PR #834 de la web, el botón del cuaderno es la acción del carril
+	// (24) con `-my-[2px]`: se pinta más grande y la fila NO crece. VISTO EN ROJO con
 	// DesbordeAccion a 0: la fila sube a 34,5.
 	casi(t, "el desborde de las acciones de cuaderno", notes.DesbordeAccion, 2)
 }
@@ -143,9 +142,9 @@ func TestLaListaNoDuplicaLasNotasEnElLateral(t *testing.T) {
 	}
 }
 
-// TestLaBarraMide42: `min-h-12` con el rem de 14. Los botones que van dentro son de
-// talla `sm` (28) y de icono `sm` (24), los dos MEDIDOS en producción.
-func TestLaBarraMide42(t *testing.T) {
+// TestLaBarraMide49: `min-h-12` (48 con el rem de 16) más el filete de abajo. Los botones
+// que van dentro son de talla `sm` y de icono `sm` (24).
+func TestLaBarraMide49(t *testing.T) {
 	b := notes.NuevaBarra(traductor(t))
 	b.Cuaderno = notes.Cuaderno{ID: "n1", Titulo: "test"}
 	o := b.Objeto(tema.Claro)

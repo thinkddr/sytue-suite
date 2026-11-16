@@ -48,6 +48,9 @@ type Accion struct {
 	// Envuelto reparte el rótulo en líneas centradas a lo que deje Ancho, como un
 	// `<button>` al que una fila `flex` encoge por debajo de su texto (ver [repartirFila]).
 	Envuelto bool
+	// AlInicio pone el rótulo a la izquierda, tras el relleno, y no centrado: es una
+	// `<label class="flex items-center">` y no un `<button>`.
+	AlInicio bool
 	// Alto fija el alto (el `align-items: stretch` de una fila); 0 es el del rótulo.
 	Alto float32
 	// Icono va delante del rótulo, con `Hueco` entre los dos. IconoEd es lo mismo con
@@ -179,7 +182,11 @@ func (r *accionRenderer) Layout(t fyne.Size) {
 		// Envuelto: cada renglón centrado, y el bloque centrado en el alto.
 		y := (t.Height - float32(len(r.rotulos))*a.Escalon.Linea) / 2
 		for i, x := range r.rotulos {
-			ui.ColocarTexto(x, a.Escalon, (t.Width-ui.Medir(x.Text, a.Escalon, a.Peso).Width)/2, y+float32(i)*a.Escalon.Linea)
+			izq := (t.Width - ui.Medir(x.Text, a.Escalon, a.Peso).Width) / 2
+			if a.AlInicio {
+				izq = a.PX + bordeAccion(a)
+			}
+			ui.ColocarTexto(x, a.Escalon, izq, y+float32(i)*a.Escalon.Linea)
 		}
 		return
 	}
@@ -193,6 +200,9 @@ func (r *accionRenderer) Layout(t fyne.Size) {
 	}
 	// Centrado, que es lo que hace un `<button>` con su texto cuando le dan más ancho.
 	x := (t.Width - contenido) / 2
+	if a.AlInicio {
+		x = a.PX + bordeAccion(a)
+	}
 	if r.glifo != nil {
 		r.glifo.Colocar(x, (t.Height-a.TamIcono)/2, a.TamIcono)
 		x += a.TamIcono + a.Hueco

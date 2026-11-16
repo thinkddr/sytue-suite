@@ -25,6 +25,7 @@ import {
   useConfirm,
   useSondeo,
   useToast,
+  EmptyState,
 } from '@sytue/ui';
 import { formatDateTime, type Locale } from '@sytue/i18n';
 import type { SytueUser } from '@sytue/auth';
@@ -317,7 +318,7 @@ function MisDirectos({
           </div>
         )
       ) : directos.length === 0 ? (
-        <p class="text-text-muted text-sm">{t('studio.lives.empty')}</p>
+        <EmptyState compact title={t('studio.lives.empty')} />
       ) : (
         <ul class="divide-border -mx-5 divide-y">
           {directos.map((v) => (

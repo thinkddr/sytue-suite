@@ -1,0 +1,2358 @@
+{
+  "version": 1,
+  "base": {
+    "slides": [
+      {
+        "id": "s1",
+        "boxes": [
+          {
+            "id": "b1",
+            "x": 10,
+            "y": 10,
+            "w": 50,
+            "h": 20,
+            "html": "a"
+          }
+        ]
+      },
+      {
+        "id": "s2",
+        "boxes": [
+          {
+            "id": "b2",
+            "x": 10,
+            "y": 10,
+            "w": 50,
+            "h": 20,
+            "html": "b"
+          }
+        ]
+      },
+      {
+        "id": "s3",
+        "boxes": [
+          {
+            "id": "b3",
+            "x": 10,
+            "y": 10,
+            "w": 50,
+            "h": 20,
+            "html": "c"
+          },
+          {
+            "id": "b4",
+            "x": 10,
+            "y": 10,
+            "w": 50,
+            "h": 20,
+            "html": "d"
+          }
+        ]
+      }
+    ],
+    "theme": "carbon",
+    "master": {
+      "boxes": [
+        {
+          "id": "m1",
+          "x": 10,
+          "y": 10,
+          "w": 50,
+          "h": 20,
+          "html": "logo"
+        }
+      ]
+    },
+    "protect": {
+      "slides": ["s1"],
+      "boxes": ["b3"],
+      "master": true
+    }
+  },
+  "casos": [
+    {
+      "nombre": "editar una diapositiva libre",
+      "protegido": false,
+      "despues": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b nueva"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1"],
+          "boxes": ["b3"],
+          "master": true
+        }
+      }
+    },
+    {
+      "nombre": "reordenar las diapositivas",
+      "protegido": false,
+      "despues": {
+        "slides": [
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1"],
+          "boxes": ["b3"],
+          "master": true
+        }
+      }
+    },
+    {
+      "nombre": "editar una caja libre de una diapositiva con otra bloqueada",
+      "protegido": false,
+      "despues": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "D nueva"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1"],
+          "boxes": ["b3"],
+          "master": true
+        }
+      }
+    },
+    {
+      "nombre": "mover una caja libre",
+      "protegido": false,
+      "despues": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 40,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1"],
+          "boxes": ["b3"],
+          "master": true
+        }
+      }
+    },
+    {
+      "nombre": "añadir una diapositiva",
+      "protegido": false,
+      "despues": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "boxes": []
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1"],
+          "boxes": ["b3"],
+          "master": true
+        }
+      }
+    },
+    {
+      "nombre": "borrar una diapositiva libre",
+      "protegido": false,
+      "despues": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1"],
+          "boxes": ["b3"],
+          "master": true
+        }
+      }
+    },
+    {
+      "nombre": "notas de una diapositiva libre",
+      "protegido": false,
+      "despues": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ],
+            "notes": "hola"
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1"],
+          "boxes": ["b3"],
+          "master": true
+        }
+      }
+    },
+    {
+      "nombre": "editar la diapositiva bloqueada",
+      "protegido": true,
+      "despues": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "X"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1"],
+          "boxes": ["b3"],
+          "master": true
+        }
+      }
+    },
+    {
+      "nombre": "notas de la diapositiva bloqueada",
+      "protegido": true,
+      "despues": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ],
+            "notes": "X"
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1"],
+          "boxes": ["b3"],
+          "master": true
+        }
+      }
+    },
+    {
+      "nombre": "borrar la diapositiva bloqueada",
+      "protegido": true,
+      "despues": {
+        "slides": [
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1"],
+          "boxes": ["b3"],
+          "master": true
+        }
+      }
+    },
+    {
+      "nombre": "editar la caja bloqueada",
+      "protegido": true,
+      "despues": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "X"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1"],
+          "boxes": ["b3"],
+          "master": true
+        }
+      }
+    },
+    {
+      "nombre": "mover la caja bloqueada",
+      "protegido": true,
+      "despues": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 30,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1"],
+          "boxes": ["b3"],
+          "master": true
+        }
+      }
+    },
+    {
+      "nombre": "borrar la caja bloqueada",
+      "protegido": true,
+      "despues": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1"],
+          "boxes": ["b3"],
+          "master": true
+        }
+      }
+    },
+    {
+      "nombre": "mover la caja bloqueada a otra diapositiva",
+      "protegido": true,
+      "despues": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              },
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1"],
+          "boxes": ["b3"],
+          "master": true
+        }
+      }
+    },
+    {
+      "nombre": "duplicar la caja bloqueada",
+      "protegido": true,
+      "despues": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              },
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "copia"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1"],
+          "boxes": ["b3"],
+          "master": true
+        }
+      }
+    },
+    {
+      "nombre": "duplicar la diapositiva bloqueada",
+      "protegido": true,
+      "despues": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": []
+          },
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1"],
+          "boxes": ["b3"],
+          "master": true
+        }
+      }
+    },
+    {
+      "nombre": "añadir una caja a la diapositiva bloqueada",
+      "protegido": true,
+      "despues": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              },
+              {
+                "id": "n",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": ""
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1"],
+          "boxes": ["b3"],
+          "master": true
+        }
+      }
+    },
+    {
+      "nombre": "cambiar el tema",
+      "protegido": true,
+      "despues": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "arena",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1"],
+          "boxes": ["b3"],
+          "master": true
+        }
+      }
+    },
+    {
+      "nombre": "cambiar el patrón",
+      "protegido": true,
+      "despues": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "otro"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1"],
+          "boxes": ["b3"],
+          "master": true
+        }
+      }
+    },
+    {
+      "nombre": "quitar el patrón",
+      "protegido": true,
+      "despues": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "protect": {
+          "slides": ["s1"],
+          "boxes": ["b3"],
+          "master": true
+        }
+      }
+    },
+    {
+      "nombre": "cambiar el tamaño",
+      "protegido": true,
+      "despues": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1"],
+          "boxes": ["b3"],
+          "master": true
+        },
+        "size": {
+          "preset": "4:3"
+        }
+      }
+    },
+    {
+      "nombre": "quitar la protección",
+      "protegido": true,
+      "despues": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "nombre": "desbloquear una diapositiva",
+      "protegido": true,
+      "despues": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "boxes": ["b3"],
+          "master": true
+        }
+      }
+    },
+    {
+      "nombre": "bloquear una más",
+      "protegido": true,
+      "despues": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1", "s2"],
+          "boxes": ["b3"],
+          "master": true
+        }
+      }
+    },
+    {
+      "nombre": "proteger es de cualquiera",
+      "protegido": false,
+      "antes": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        }
+      },
+      "despues": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1"],
+          "boxes": ["b3"],
+          "master": true
+        }
+      }
+    },
+    {
+      "nombre": "sin protección nada se veta",
+      "protegido": false,
+      "antes": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        }
+      },
+      "despues": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "X"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1"],
+          "boxes": ["b3"],
+          "master": true
+        }
+      }
+    },
+    {
+      "nombre": "hasPassword lo fija el servidor",
+      "protegido": false,
+      "antes": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1"],
+          "boxes": ["b3"],
+          "master": true,
+          "hasPassword": true
+        }
+      },
+      "despues": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1"],
+          "boxes": ["b3"],
+          "master": true
+        }
+      }
+    },
+    {
+      "nombre": "sin master el tema es libre",
+      "protegido": false,
+      "antes": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "carbon",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1"]
+        }
+      },
+      "despues": {
+        "slides": [
+          {
+            "id": "s1",
+            "boxes": [
+              {
+                "id": "b1",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "a"
+              }
+            ]
+          },
+          {
+            "id": "s2",
+            "boxes": [
+              {
+                "id": "b2",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "b"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "boxes": [
+              {
+                "id": "b3",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "c"
+              },
+              {
+                "id": "b4",
+                "x": 10,
+                "y": 10,
+                "w": 50,
+                "h": 20,
+                "html": "d"
+              }
+            ]
+          }
+        ],
+        "theme": "arena",
+        "master": {
+          "boxes": [
+            {
+              "id": "m1",
+              "x": 10,
+              "y": 10,
+              "w": 50,
+              "h": 20,
+              "html": "logo"
+            }
+          ]
+        },
+        "protect": {
+          "slides": ["s1"]
+        }
+      }
+    }
+  ]
+}

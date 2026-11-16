@@ -18,7 +18,7 @@
  */
 import type { JSX } from 'preact';
 import { useMemo, useState } from 'preact/hooks';
-import { Avatar, Badge, Button, Icon, Input, Skeleton } from '@sytue/ui';
+import { Avatar, Badge, Button, Icon, Input, Skeleton, EmptyState } from '@sytue/ui';
 import { ChatHttpError, type ChannelMember } from '../client/chatApi.js';
 import type { PresenceStatus } from '@sytue/config';
 import { toPresenceStatus, type Presence } from '../client/presenceApi.js';
@@ -27,6 +27,7 @@ import { pareceIdentificador } from '../lib/personas.js';
 import { addableMembers, filterMembers } from '../lib/roster.js';
 import { BuscarPersona } from './BuscarPersona.js';
 import { MessageMenu, type MenuEntry } from './MessageMenu.js';
+import { PersonCard, type TarjetaContexto } from './PersonCard.js';
 
 interface Props {
   /** Nombre del canal (subtítulo de la cabecera). */
@@ -53,6 +54,11 @@ interface Props {
   onClose: () => void;
   /** Presencia conocida por sub (la del Hub): el punto del avatar de cada fila. */
   presences?: Record<string, Presence>;
+  /** Tarjeta de persona al pulsar el avatar de una fila del roster (D-ROOM-04). */
+  tarjeta?: TarjetaContexto;
+  /** Vista con la que se abre: «add» cuando se llega desde «Añadir personas» del
+   *  inicio del canal (ROOM-13), para no obligar a un segundo clic. */
+  initialMode?: 'list' | 'add';
   /** Traductor ya atado al idioma. */
   t: T;
 }
@@ -84,6 +90,8 @@ export function MembersPanel({
   onRetry,
   onClose,
   presences = {},
+  tarjeta,
+  initialMode = 'list',
   t,
 }: Props): JSX.Element {
   // El punto de presencia de una persona, si el Hub la conoce.
@@ -91,7 +99,10 @@ export function MembersPanel({
     const p = presences[sub];
     return p ? { presence: toPresenceStatus(p.state) } : {};
   };
-  const [mode, setMode] = useState<'list' | 'add'>('list');
+  const [mode, setMode] = useState<'list' | 'add'>(() =>
+    // Sin permiso no hay vista «add» a la que abrir.
+    canManage ? initialMode : 'list',
+  );
   const [query, setQuery] = useState('');
   const [busySub, setBusySub] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
@@ -270,9 +281,10 @@ export function MembersPanel({
             ))
           )
         ) : shown.length === 0 ? (
-          <p class="text-text-muted px-4 py-6 text-center text-sm">
-            {members.length === 0 ? t('members.empty') : t('members.emptyQuery')}
-          </p>
+          <EmptyState
+            compact
+            title={members.length === 0 ? t('members.empty') : t('members.emptyQuery')}
+          />
         ) : (
           shown.map((m) => {
             const isSelf = m.sub === selfSub;
@@ -330,7 +342,13 @@ export function MembersPanel({
               : propias;
             return (
               <div key={m.sub} class="hover:bg-bg-subtle flex items-center gap-3 px-4 py-1.5">
-                <Avatar name={m.name} size="sm" {...presencia(m.sub)} />
+                {tarjeta && !m.pending ? (
+                  <PersonCard sub={m.sub} name={m.name} ctx={tarjeta} class="rounded-full">
+                    <Avatar name={m.name} size="sm" {...presencia(m.sub)} />
+                  </PersonCard>
+                ) : (
+                  <Avatar name={m.name} size="sm" {...presencia(m.sub)} />
+                )}
                 <span class="text-text min-w-0 flex-1 truncate text-sm font-semibold" title={m.sub}>
                   {m.name}
                   {isSelf ? (

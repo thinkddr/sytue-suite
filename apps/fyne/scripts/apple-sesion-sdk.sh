@@ -19,6 +19,8 @@ import (
 
     "git.sytue.eu/sytue/one/apps/nucleo/ajustes"
     "git.sytue.eu/sytue/one/apps/nucleo/auth"
+    "git.sytue.eu/sytue/one/apps/nucleo/carrete"
+    "git.sytue.eu/sytue/one/apps/nucleo/ficheros"
     "git.sytue.eu/sytue/one/apps/nucleo/sistema"
     "git.sytue.eu/sytue/one/apps/nucleo/widgets"
 )
@@ -41,6 +43,20 @@ func main() {
         sistema.RegistrarArchivos,
         sistema.AbrirArchivos,
         sistema.OlvidarArchivos,
+        // La galería del sistema de Photos (PhotoKit, ImageIO, Network), el selector de
+        // Fotos de iOS (PHPicker) y el tiempo extra al pasar a segundo plano: Objective-C
+        // que solo compila un SDK de Apple. Referencias, no llamadas: no se pide permiso
+        // a ninguna fototeca.
+        carrete.Disponible,
+        carrete.EstadoPermiso,
+        carrete.PedirPermiso,
+        carrete.Listar,
+        carrete.Abrir,
+        carrete.Guardar,
+        carrete.Convertir,
+        carrete.RedMedida,
+        ficheros.ElegirImagenes,
+        sistema.SeguirEnFondo,
     })
 }
 GO

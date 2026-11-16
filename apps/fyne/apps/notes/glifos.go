@@ -35,23 +35,11 @@ const (
 	NotaD = "M7 4h8.5a1.5 1.5 0 0 1 1.5 1.5v6.5L12.5 17H7a1.5 1.5 0 0 1-1.5-1.5v-10A1.5 1.5 0 0 1 7 4ZM17 12h-3a1.5 1.5 0 0 0-1.5 1.5V17"
 	// TareaD es el `todo`: dos casillas con sus renglones.
 	TareaD = "M4.5 6.5h3v3h-3zM4.5 14.5h3v3h-3zM11 8h9M11 16h9"
-	// PapeleraD es el `trash` de ESTA app, que NO es el `trash` del catálogo
-	// compartido: dibujan cosas distintas y por eso está aquí y no allí.
-	PapeleraD = "M4.5 6.5h15M9.5 6.5V4.5h5v2M6.5 6.5 7.5 20a1.5 1.5 0 0 0 1.5 1.4h6a1.5 1.5 0 0 0 1.5-1.4l1-13.5"
-	// SubirD es el `upload`: la bandeja con la flecha saliendo. Es «importar una copia».
-	SubirD = "M12 14.5v-11M8 7.5l4-4 4 4M4.5 16.5v3a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1v-3"
-	// BajarD es el `download`: el mismo dibujo con la punta al revés, para que exportar
-	// e importar se lean como la ida y la vuelta de lo mismo.
-	BajarD = "M12 3.5v11M8 10.5l4 4 4-4M4.5 16.5v3a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1v-3"
 	// OrdenD es el `sort`: dos flechas en sentidos opuestos. En el móvil este botón se
 	// queda sin rótulo y el dibujo tiene que decirlo solo.
 	OrdenD = "M7.5 4.5v15M7.5 4.5 4 8M7.5 4.5 11 8M16.5 19.5v-15M16.5 19.5 13 16M16.5 19.5 20 16"
 	// FiltroD es el `filter`: el embudo de «filtrar por etiqueta».
 	FiltroD = "M3.5 5.5h17l-6.5 7.5v6l-4 2v-8Z"
-	// DeshacerD y RehacerD son el `undo` y el `redo` de la barra del cuaderno, que son
-	// los del BasKet clásico: deshacen crear, editar, mover y eliminar, no el texto.
-	DeshacerD = "M8.5 8H14a4.5 4.5 0 0 1 0 9H9M8.5 8l3.5-3.5M8.5 8 12 11.5"
-	RehacerD  = "M15.5 8H10a4.5 4.5 0 0 0 0 9h5M15.5 8 12 4.5M15.5 8 12 11.5"
 	// FijarD es el `pin`: la chincheta de una nota fijada.
 	FijarD = "M9.5 3.5h5l-.8 5.5 3.3 3.5H7l3.3-3.5ZM12 12.5V20.5"
 	// ArchivoD es el `archive`: la caja de la vista «Archivo».
@@ -60,13 +48,8 @@ const (
 	// desbloqueado. El CERRADO es `iconos.Candado`, que sí está en el catálogo común,
 	// igual que en la web.
 	AbiertoD = "M8 10V7a4 4 0 0 1 7.5-2M5 11a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-8Z"
-	// EnlaceD es el `link`: el distintivo de un cuaderno compartido o público y el tipo
-	// de nota «enlace».
-	EnlaceD = "M10 13.5a3.5 3.5 0 0 0 5 0l3-3a3.5 3.5 0 0 0-5-5l-1 1M14 10.5a3.5 3.5 0 0 0-5 0l-3 3a3.5 3.5 0 0 0 5 5l1-1"
 	// FicheroD es el `file`: el tipo de nota que apunta a un documento o a Drive.
 	FicheroD = "M13.5 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8.5ZM13.5 3.5V8.5h5"
-	// ImagenD es el `image`.
-	ImagenD = "M4 5.5h16v13H4zM8 11a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM4 16l4.5-4 4 3.5L16 12l4 4"
 	// PaletaD es el `palette`: la nota de color.
 	PaletaD = "M12 3.5a8.5 8.5 0 0 0 0 17c1.4 0 2-.9 2-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.7-1.6 1.6-1.6h1.4A4.5 4.5 0 0 0 20.5 10c0-3.6-3.8-6.5-8.5-6.5ZM7.5 12h.01M9.5 8.5h.01M14 7.5h.01"
 	// AsaD es el `drag`: los seis puntos del asa de arrastre de una tarjeta.
@@ -77,14 +60,27 @@ const (
 	LibreD    = "M4 4.5h6v5H4zM13 6.5h7v4h-7zM6 13h7v6.5H6zM16 14.5h4v5h-4z"
 	ColumnasD = "M4.5 4.5h5v15h-5zM14.5 4.5h5v15h-5z"
 	ListaD    = "M4.5 5.5h15v4h-15zM4.5 14.5h15v4h-15z"
-	// CitaD es el `quote`: las dos comillas de apertura.
-	CitaD = "M7 16.5c-1.5 0-2.5-1-2.5-2.5v-3A3.5 3.5 0 0 1 8 7.5M17 16.5c-1.5 0-2.5-1-2.5-2.5v-3A3.5 3.5 0 0 1 18 7.5M4.5 11h3.5v5.5M14.5 11H18v5.5"
 	// ChispasD es el `sparkles`: la chispa de cuatro puntas del asistente.
 	ChispasD = "M12 3.5 13.7 8.3 18.5 10 13.7 11.7 12 16.5 10.3 11.7 5.5 10 10.3 8.3ZM18 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8Z"
 	// EnvioD es el `send`: el avión de papel.
 	EnvioD = "M20.5 3.5 3.5 10l7 3 3 7Z"
-	// TablaD es el `table`: la rejilla de tres por tres.
-	TablaD = "M3 5h18v14H3zM3 10h18M3 15h18M9 5v14M15 5v14"
+)
+
+// Los que Notepads pide por un nombre que también es del catálogo COMPARTIDO. Antes se
+// dibujaban aquí con OTRO trazado —la papelera, el enlace, la imagen, deshacer…—, así
+// que la misma acción se veía distinta en Notepads que en Mail o en Drive. Ahora la web
+// los pinta con `Icon` y aquí salen de `iconos`: una sola ruta por concepto. Se quedan
+// las variables para que las pantallas no cambien.
+var (
+	PapeleraD = iconos.Papelera.Ruta()  // `trash`
+	SubirD    = iconos.Subir.Ruta()     // `upload`: importar una copia
+	BajarD    = iconos.Descargar.Ruta() // `download`: exportar
+	DeshacerD = iconos.Deshacer.Ruta()  // `undo`, el del cuaderno (crear, mover, eliminar)
+	RehacerD  = iconos.Rehacer.Ruta()   // `redo`
+	EnlaceD   = iconos.Enlace.Ruta()    // `link`: cuaderno compartido y nota «enlace»
+	ImagenD   = iconos.Imagen.Ruta()    // `image`
+	CitaD     = iconos.Cita.Ruta()      // `quote`
+	TablaD    = iconos.Tabla.Ruta()     // `table`
 )
 
 // FuenteGlifos es el `.tsx` del que salen, relativo a la raíz del repositorio. Lo usa
@@ -97,27 +93,18 @@ var Glifos = map[string]string{
 	"notebook": CuadernoD,
 	"note":     NotaD,
 	"todo":     TareaD,
-	"trash":    PapeleraD,
-	"upload":   SubirD,
-	"download": BajarD,
 	"sort":     OrdenD,
 	"filter":   FiltroD,
-	"undo":     DeshacerD,
-	"redo":     RehacerD,
 	"pin":      FijarD,
 	"archive":  ArchivoD,
 	"unlock":   AbiertoD,
-	"link":     EnlaceD,
 	"file":     FicheroD,
-	"image":    ImagenD,
 	"palette":  PaletaD,
 	"drag":     AsaD,
-	// Los del selector de iconos de una nota (IconPickerModal.tsx) y, `table` y
-	// `sparkles`, también los de la tabla y el asistente de la barra del editor.
-	"quote":    CitaD,
+	// Los del selector de iconos de una nota (IconPickerModal.tsx) y, `sparkles`,
+	// también el del asistente de la barra del editor.
 	"sparkles": ChispasD,
 	"send":     EnvioD,
-	"table":    TablaD,
 	"heading":  TituloD,
 
 	"layoutTree":    ArbolD,
@@ -173,6 +160,16 @@ func GlifoDeTipo(tipo string) string {
 }
 
 // GlifoPorNombre resuelve el icono que una nota guarda en `data.icon`, que es una clave
-// de `glyphs.tsx` elegida en el selector de iconos. Vacío si no se ha portado: un icono
-// que no se conoce no se pinta, y no es una nota rota.
-func GlifoPorNombre(nombre string) string { return Glifos[nombre] }
+// de `glyphs.tsx` elegida en el selector de iconos. Los nombres que también son del
+// catálogo compartido (`trash`, `link`…) salen de ahí, como en la web, donde `Glyph`
+// se los pasa a `Icon`. Vacío si no se ha portado: un icono que no se conoce no se
+// pinta, y no es una nota rota.
+func GlifoPorNombre(nombre string) string {
+	if d, ok := Glifos[nombre]; ok {
+		return d
+	}
+	if i, ok := iconos.Comun(nombre); ok {
+		return i.Ruta()
+	}
+	return ""
+}

@@ -23,11 +23,11 @@ import (
 // columna de su resumen, la de después del grupo. En la esquina, la barra de niveles
 // 1…N+1. Todo corre el origen de las celdas sin cambiar su tamaño.
 //
-// Medidas, de SheetCanvas.tsx con 1 rem = 14 px:
+// Medidas, de SheetCanvas.tsx con 1 rem = 16 px:
 //
 //	carril       OUTLINE_STEP = 14, más OUTLINE_PAD = 5 de aire
-//	+/−          h-3 w-3 (10,5) rounded-[2px] border bg-surface text-2xs leading-none
-//	niveles      h-3.5 w-3.5 (12,25), gap-px entre ellos; la barra, justify-end px-0.5
+//	+/−          h-3 w-3 (12) rounded-[2px] border bg-surface text-2xs leading-none
+//	niveles      h-3.5 w-3.5 (14), gap-px entre ellos; la barra, justify-end px-0.5
 //	celda        bg-bg-subtle border-r border-b, como las cabeceras
 
 // PasoEsquema y AireEsquema son `OUTLINE_STEP` y `OUTLINE_PAD`.
@@ -250,11 +250,11 @@ func (rr *rejillaRenderer) pintarCanalFilas(u *usoCanal, vw vista, fils []int, g
 		for _, f := range fils {
 			c := u.celda(&k.filas, usadas)
 			usadas++
-			y, alto := vw.y(f), vw.alto()
+			y, alto := vw.y(f), vw.alto(f)
 			rr.cabecera(c, v, false, false, false, "", 0, y, vw.cx*z, alto, z)
 			for l := range nf {
 				x := float32(l) * paso
-				if g := conmutadorEn(gf, f, l+1, Filas); g != nil {
+				if g := conmutadorEn(gf, f, l+1, MaxFilas); g != nil {
 					bx, by := x+(paso-lado)/2, y+(alto-b-lado)/2
 					u.conmutador().pintar(v, bx, by, lado, signoEsquema(g.Collapsed), z)
 					k.zonas = append(k.zonas, zonaCanal{
@@ -282,11 +282,11 @@ func (rr *rejillaRenderer) pintarCanalCols(u *usoCanal, vw vista, cols []int, gc
 		for _, c := range cols {
 			cp := u.celda(&k.cols, usadas)
 			usadas++
-			x, ancho := vw.x(c), vw.ancho()
+			x, ancho := vw.x(c), vw.ancho(c)
 			rr.cabecera(cp, v, false, false, false, "", x, 0, ancho, vw.cy*z, z)
 			for l := range nc {
 				y := float32(l) * paso
-				if g := conmutadorEn(gc, c, l+1, Columnas); g != nil {
+				if g := conmutadorEn(gc, c, l+1, MaxColumnas); g != nil {
 					bx, by := x+(ancho-b-lado)/2, y+(paso-lado)/2
 					u.conmutador().pintar(v, bx, by, lado, signoEsquema(g.Collapsed), z)
 					k.zonas = append(k.zonas, zonaCanal{
@@ -328,7 +328,7 @@ func (rr *rejillaRenderer) pintarNiveles(u *usoCanal, vw vista, nf, nc int) {
 		}
 	}
 	if nf > 0 {
-		barra("row", nf, vw.cy*z, vw.alto())
+		barra("row", nf, vw.cy*z, AltoCelda*z)
 	}
 	if nc > 0 {
 		barra("col", nc, 0, vw.cy*z)

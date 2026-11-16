@@ -5,6 +5,9 @@
 import { describe, expect, it } from 'bun:test';
 import {
   exigeRegistro,
+  faltanEnSeccion,
+  fusionarSeccionLegal,
+  seccionLegalCambiada,
   legalFaltante,
   leerFallo,
   ejecutarPublicacion,
@@ -145,5 +148,54 @@ describe('orígenes y esquemas', () => {
     expect(primerEsquemaInvalido(['miapp', 'sytue.app', 'a+b-c'])).toBe(0);
     expect(primerEsquemaInvalido(['miapp', '1app'])).toBe(2);
     expect(primerEsquemaInvalido(['mi app'])).toBe(1);
+  });
+});
+
+describe('ficha legal por secciones', () => {
+  const guardado = {
+    holder_name: 'Acme SL',
+    tax_id: 'B12345678',
+    country: 'ES',
+    address: { street: 'Calle Mayor 1', postal_code: '28001', city: 'Madrid' },
+    email: 'legal@acme.es',
+  };
+
+  it('al guardar una sección solo viajan sus campos; lo demás sale de lo guardado', () => {
+    const borrador = {
+      ...guardado,
+      holder_name: 'Otro titular',
+      address: { ...guardado.address, city: 'Sevilla' },
+      phone: '+34 600 000 000',
+    };
+    expect(fusionarSeccionLegal(guardado, borrador, 'contacto')).toEqual({
+      ...guardado,
+      phone: '+34 600 000 000',
+      privacy_contact: '',
+    });
+    const direccion = fusionarSeccionLegal(guardado, borrador, 'direccion');
+    expect(direccion.holder_name).toBe('Acme SL');
+    expect(direccion.address?.city).toBe('Sevilla');
+    expect(direccion.phone).toBeUndefined();
+  });
+
+  it('no comparte la dirección con lo guardado', () => {
+    const fusion = fusionarSeccionLegal(guardado, { address: { city: 'Bilbao' } }, 'direccion');
+    expect(guardado.address.city).toBe('Madrid');
+    expect(fusion.address?.city).toBe('Bilbao');
+  });
+
+  it('marca como pendiente solo la sección tocada, y el país vacío cuenta como ES', () => {
+    const borrador = { ...guardado, phone: '600' };
+    expect(seccionLegalCambiada(guardado, borrador, 'contacto')).toBe(true);
+    expect(seccionLegalCambiada(guardado, borrador, 'titular')).toBe(false);
+    expect(seccionLegalCambiada(guardado, borrador, 'direccion')).toBe(false);
+    expect(seccionLegalCambiada({}, { country: 'ES' }, 'direccion')).toBe(false);
+  });
+
+  it('reparte los campos que faltan entre las secciones', () => {
+    const faltan = legalFaltante({ tax_id: 'B1', country: 'ES' });
+    expect(faltanEnSeccion(faltan, 'titular')).toEqual(['holder_name', 'registry']);
+    expect(faltanEnSeccion(faltan, 'direccion')).toEqual(['street', 'postal_code', 'city']);
+    expect(faltanEnSeccion(faltan, 'contacto')).toEqual(['email']);
   });
 });

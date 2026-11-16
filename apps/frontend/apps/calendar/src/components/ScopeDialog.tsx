@@ -17,6 +17,11 @@ interface Props {
   /** 'delete' pinta el confirmar en peligro y ajusta el título por defecto. */
   op: 'edit' | 'delete';
   busy?: boolean | undefined;
+  /**
+   * Ofrecer «este y los siguientes». No se ofrece al editar una serie con una regla
+   * que la interfaz no sabe contar y un fin por COUNT (ver `permiteSiguientes`).
+   */
+  conSiguientes?: boolean | undefined;
   onConfirm: (scope: RecurrenceScope) => void;
   onClose: () => void;
 }
@@ -30,7 +35,15 @@ const OPTIONS: ReadonlyArray<{
   { value: 'all', key: 'scope.all' },
 ];
 
-export function ScopeDialog({ t, open, op, busy, onConfirm, onClose }: Props): JSX.Element {
+export function ScopeDialog({
+  t,
+  open,
+  op,
+  busy,
+  conSiguientes = true,
+  onConfirm,
+  onClose,
+}: Props): JSX.Element {
   const [scope, setScope] = useState<RecurrenceScope>('this');
   // Cada apertura arranca en «solo este» (la opción menos destructiva).
   useEffect(() => {
@@ -63,7 +76,7 @@ export function ScopeDialog({ t, open, op, busy, onConfirm, onClose }: Props): J
     >
       <fieldset class="flex flex-col gap-1">
         <legend class="text-text-muted mb-2 text-sm">{t('scope.legend')}</legend>
-        {OPTIONS.map((o) => (
+        {OPTIONS.filter((o) => conSiguientes || o.value !== 'following').map((o) => (
           <Radio
             key={o.value}
             name="recur-scope"

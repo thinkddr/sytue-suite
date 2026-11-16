@@ -84,19 +84,88 @@ test('importVcf manda cada tarjeta entera al alta vCard del servicio, foto inclu
   const original = globalThis.fetch;
   const pedidas: Array<{ url: string; cuerpo: unknown }> = [];
   globalThis.fetch = (async (url: string, init?: RequestInit) => {
-    pedidas.push({ url, cuerpo: JSON.parse(String(init?.body)) });
+    const cuerpo = JSON.parse(String(init?.body)) as { vcard: string };
+    pedidas.push({ url, cuerpo });
+    if (!cuerpo.vcard.includes('FN:')) return new Response('invalid', { status: 400 });
     return new Response(JSON.stringify({ id: 'k1', uid: 'u1' }), {
       status: 201,
       headers: { 'content-type': 'application/json' },
     });
   }) as unknown as typeof fetch;
   try {
-    // Una tarjeta sin FN no se manda: no hay contacto que crear.
+    // El servicio rechaza la tarjeta sin FN ni N; no se oculta el fallo.
     const sinNombre = 'BEGIN:VCARD\r\nVERSION:3.0\r\nEMAIL:x@y.eu\r\nEND:VCARD';
     const res = await importVcf('b1', `${tarjeta}\r\n${sinNombre}\r\n`);
-    expect(res).toEqual({ imported: 1, failed: 0 });
+    expect(res).toEqual({ imported: 1, failed: 1 });
     expect(pedidas).toEqual([
       { url: '/api/import-vcard', cuerpo: { addressBookId: 'b1', vcard: tarjeta } },
+      { url: '/api/import-vcard', cuerpo: { addressBookId: 'b1', vcard: sinNombre } },
+    ]);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('importVcf conserva FN citado vacío y deja que el servicio valide N', async () => {
+  const valida = [
+    'BEGIN:VCARD',
+    'VERSION:4.0',
+    'FN;X-LABEL="a:b":Ana',
+    'NOTE:valor original',
+    'END:VCARD',
+  ].join('\r\n');
+  const vacia = [
+    'BEGIN:VCARD',
+    'VERSION:4.0',
+    'FN;X-LABEL="a:b":',
+    'EMAIL:sin-nombre@example.test',
+    'END:VCARD',
+  ].join('\r\n');
+  const conN = [
+    'BEGIN:VCARD',
+    'VERSION:4.0',
+    'FN;X-LABEL="a:b":',
+    'N:Ruiz;Ana;;;',
+    'END:VCARD',
+  ].join('\r\n');
+  const conEscape = [
+    'BEGIN:VCARD',
+    'VERSION:4.0',
+    'FN:',
+    'N:Ruiz\\;Pérez;Ana;;;',
+    'END:VCARD',
+  ].join('\r\n');
+  const original = globalThis.fetch;
+  const pedidas: Array<{ url: string; cuerpo: unknown }> = [];
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    const cuerpo = JSON.parse(String(init?.body)) as { vcard: string };
+    pedidas.push({ url, cuerpo });
+    if (cuerpo.vcard === vacia) return new Response('invalid', { status: 400 });
+    return new Response(JSON.stringify({ id: 'k1', uid: 'u1' }), {
+      status: 201,
+      headers: { 'content-type': 'application/json' },
+    });
+  }) as unknown as typeof fetch;
+  try {
+    const avance: Array<[number, number]> = [];
+    const res = await importVcf(
+      'b1',
+      `${valida}\r\n${conN}\r\n${vacia}\r\n${conEscape}\r\n`,
+      (done, total) => avance.push([done, total]),
+    );
+    expect(res).toEqual({ imported: 3, failed: 1 });
+    expect(avance).toEqual([
+      [0, 4],
+      [1, 4],
+      [2, 4],
+      [3, 4],
+      [4, 4],
+    ]);
+    expect(pedidas).toEqual([
+      { url: '/api/import-vcard', cuerpo: { addressBookId: 'b1', vcard: valida } },
+      { url: '/api/import-vcard', cuerpo: { addressBookId: 'b1', vcard: conN } },
+      { url: '/api/import-vcard', cuerpo: { addressBookId: 'b1', vcard: vacia } },
+      { url: '/api/import-vcard', cuerpo: { addressBookId: 'b1', vcard: conEscape } },
     ]);
   } finally {
     globalThis.fetch = original;

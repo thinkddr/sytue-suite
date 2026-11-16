@@ -120,6 +120,50 @@ func TestPasswordPolicyEndpoint(t *testing.T) {
 	}
 }
 
+// TestMePasswordPolicy: /me le cuenta a la persona los requisitos que se le van a
+// exigir al cambiar la contraseña, y son los de la org MÁS estricta de las suyas
+// (los mismos que aplica changeUserPassword), no los de la org activa.
+func TestMePasswordPolicy(t *testing.T) {
+	l := newLiveServer(t)
+	blanda, admin := l.seedOrgAdmin(t, "blanda")
+	dura, err := l.st.CreateOrg(l.ctx, nil, domain.Organization{Slug: "dura", Name: "Dura"})
+	if err != nil {
+		t.Fatalf("CreateOrg(dura): %v", err)
+	}
+	tok := l.token(t, admin.ID, blanda.Slug, []string{"admin"})
+	politica := func() map[string]any {
+		t.Helper()
+		rr, me := l.do(t, http.MethodGet, "/api/v1/me", tok, nil)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("GET /me: status=%d cuerpo=%s", rr.Code, rr.Body)
+		}
+		p, ok := me["password_policy"].(map[string]any)
+		if !ok {
+			t.Fatalf("/me sin password_policy: %v", me)
+		}
+		return p
+	}
+
+	// Default de la migración.
+	if p := politica(); p["min_length"] != float64(12) || p["require_complexity"] != false {
+		t.Fatalf("política por defecto inesperada: %v", p)
+	}
+
+	// Una segunda org más exigente manda aunque NO sea la activa.
+	if err := l.st.UpsertMembership(l.ctx, nil, domain.Membership{
+		OrgID: dura.ID, UserID: admin.ID, Role: domain.RoleMember,
+	}); err != nil {
+		t.Fatalf("UpsertMembership: %v", err)
+	}
+	if err := l.st.UpdateOrgPasswordPolicy(l.ctx, nil, dura.ID,
+		domain.PasswordPolicy{MinLength: 20, RequireComplexity: true}); err != nil {
+		t.Fatalf("UpdateOrgPasswordPolicy: %v", err)
+	}
+	if p := politica(); p["min_length"] != float64(20) || p["require_complexity"] != true {
+		t.Fatalf("no refleja la org más estricta: %v", p)
+	}
+}
+
 // TestPasswordPolicyEnforcement verifica que TODOS los puntos que fijan/cambian una
 // contraseña respetan la política de la org: con min_length=16, una contraseña de
 // 12 (que pasaría el default) es rechazada en cada punto.

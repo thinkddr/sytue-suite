@@ -1579,7 +1579,7 @@ export function cellStyleCss(style: CellStyle): Record<string, string> {
  * Estilo EFECTIVO de una celda para quien edita: igual que el guardado, pero
  * DESBLOQUEADO si la celda cae en un rango editable concedido a esta persona (`sub`) o a
  * uno de sus grupos. Es lo que ve el editor; quien decide es el servidor, que aplica la
- * misma regla (services/docs/internal/domain/proteccion_rangos.go).
+ * misma regla (apps/nucleo/office/model/proteccion_rangos.go).
  * ponytail: solo rangos «A1:C5»; las columnas o filas enteras que el servidor acepta
  * aquí no desbloquean (la celda se ve bloqueada aunque el servidor la deje escribir).
  */
@@ -1778,10 +1778,16 @@ export interface SelectionStats {
   sum: number;
   /** Promedio de las numéricas, a seis decimales. */
   avg: number;
+  /** Cuántas son numéricas («Recuento numérico» de Excel). */
+  numbers: number;
+  /** La menor y la mayor de las numéricas. */
+  min: number;
+  max: number;
 }
 
 /**
- * Recuento, suma y promedio de los valores de una selección; null si no hay ni
+ * Recuento, suma, promedio, recuento numérico, mínimo y máximo de los valores de una
+ * selección (la barra enseña los que elija cada cual: `resumenBarra.ts`); null si no hay ni
  * un número (sin nada que resumir, la barra no pinta el bloque). Los errores y
  * los booleanos cuentan como celda ocupada pero no entran en la aritmética,
  * como en Excel. Quien llama pasa SOLO los valores visibles: lo que el filtro o
@@ -1791,12 +1797,16 @@ export function selectionStats(values: Iterable<CellValue>): SelectionStats | nu
   let count = 0;
   let nums = 0;
   let sum = 0;
+  let min = Infinity;
+  let max = -Infinity;
   for (const v of values) {
     if (v === '') continue;
     count++;
     if (typeof v === 'number' && Number.isFinite(v)) {
       nums++;
       sum += v;
+      if (v < min) min = v;
+      if (v > max) max = v;
     }
   }
   if (nums === 0) return null;
@@ -1804,7 +1814,14 @@ export function selectionStats(values: Iterable<CellValue>): SelectionStats | nu
   // y aquí es un vistazo, no un dato. Los números enormes se dejan tal cual, que
   // multiplicarlos por 1e6 los sacaría del entero seguro y falsearía el redondeo.
   const avg = sum / nums;
-  return { count, sum, avg: Math.abs(avg) < 1e9 ? Math.round(avg * 1e6) / 1e6 : avg };
+  return {
+    count,
+    sum,
+    avg: Math.abs(avg) < 1e9 ? Math.round(avg * 1e6) / 1e6 : avg,
+    numbers: nums,
+    min,
+    max,
+  };
 }
 
 /* ---------- Sparklines (mini-gráficos de celda) ---------- */

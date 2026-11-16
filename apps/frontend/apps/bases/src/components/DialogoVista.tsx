@@ -2,45 +2,48 @@
  * SPDX-License-Identifier: Apache-2.0
  * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
  *
- * Crear una vista guardada: rejilla (con un filtro y un orden opcionales), tablero
- * Kanban (por un campo de selección) o formulario (con los campos que se piden).
+ * Crear una vista guardada: rejilla o galería (con un filtro y un orden opcionales),
+ * tablero Kanban (por un campo de selección) o formulario (con los campos que se piden).
+ * Con `vista`, el mismo diálogo la edita: sale relleno con lo guardado y el tipo queda
+ * fijo (el servicio no lo cambia: de él cuelgan enlaces de formulario y conexiones).
  */
 import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
 import { Button, Checkbox, FieldGroup, Input, Modal, Select } from '@sytue/ui';
-import type { BasesField, BasesViewConfig, BasesViewKind } from '@sytue/api-clients/bases';
+import type {
+  BasesField,
+  BasesView,
+  BasesViewConfig,
+  BasesViewKind,
+} from '@sytue/api-clients/bases';
 import type { T } from '../i18n/index.js';
 import {
   operadoresDe,
+  borradorDeVista,
   camposDeFormulario,
   configDeBorrador,
   type BorradorVista,
 } from '../lib/vistas.js';
 import { efectivo } from '../lib/formulas.js';
 
-const TIPOS: BasesViewKind[] = ['grid', 'kanban', 'form'];
+const TIPOS: BasesViewKind[] = ['grid', 'kanban', 'gallery', 'form'];
 
 export function DialogoVista(p: {
   t: T;
   campos: BasesField[];
   error: string;
+  /** La vista que se edita; sin ella, el diálogo crea una nueva. */
+  vista?: BasesView;
   onCrear: (nombre: string, tipo: BasesViewKind, cfg: BasesViewConfig) => void;
   onCerrar: () => void;
 }): JSX.Element {
   // Una fórmula se filtra y se ordena como el tipo de su resultado.
   const campos = p.campos.map(efectivo);
   const selecciones = campos.filter((c) => c.kind === 'select');
-  const [b, setB] = useState<BorradorVista>({
-    nombre: '',
-    tipo: 'grid',
-    agrupar: selecciones[0]?.id ?? '',
-    campos: [],
-    filtroCampo: '',
-    filtroOp: 'eq',
-    filtroValor: '',
-    ordenCampo: '',
-    ordenDir: 'asc',
-  });
+  const editando = p.vista !== undefined;
+  const [b, setB] = useState<BorradorVista>(() =>
+    p.vista ? borradorDeVista(p.vista, p.campos) : nuevoBorrador(selecciones[0]?.id ?? ''),
+  );
   const set = (parcial: Partial<BorradorVista>): void => setB((x) => ({ ...x, ...parcial }));
   const cfg = configDeBorrador(b, p.campos);
   const valido = b.nombre.trim() !== '' && cfg !== null;
@@ -59,14 +62,14 @@ export function DialogoVista(p: {
     <Modal
       open
       onClose={p.onCerrar}
-      title={p.t('view.add')}
+      title={editando ? p.t('view.edit') : p.t('view.add')}
       footer={
         <>
           <Button variant="ghost" onClick={p.onCerrar}>
             {p.t('common.cancel')}
           </Button>
           <Button type="submit" form="form-vista" disabled={!valido}>
-            {p.t('view.create')}
+            {editando ? p.t('view.save') : p.t('view.create')}
           </Button>
         </>
       }
@@ -80,10 +83,19 @@ export function DialogoVista(p: {
             onInput={(e) => set({ nombre: e.currentTarget.value })}
           />
         </FieldGroup>
-        <FieldGroup label={p.t('view.kind')} htmlFor="vista-tipo">
+        <FieldGroup
+          label={p.t('view.kind')}
+          htmlFor="vista-tipo"
+          {...(editando
+            ? { help: p.t('view.kindFixed') }
+            : b.tipo === 'gallery'
+              ? { help: p.t('view.galleryHelp') }
+              : {})}
+        >
           <Select
             id="vista-tipo"
             value={b.tipo}
+            disabled={editando}
             onChange={(e) => set({ tipo: e.currentTarget.value as BasesViewKind })}
           >
             {TIPOS.map((k) => (
@@ -235,4 +247,18 @@ export function DialogoVista(p: {
       </form>
     </Modal>
   );
+}
+
+function nuevoBorrador(agrupar: string): BorradorVista {
+  return {
+    nombre: '',
+    tipo: 'grid',
+    agrupar,
+    campos: [],
+    filtroCampo: '',
+    filtroOp: 'eq',
+    filtroValor: '',
+    ordenCampo: '',
+    ordenDir: 'asc',
+  };
 }

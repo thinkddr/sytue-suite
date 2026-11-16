@@ -302,15 +302,15 @@ func (a *panelAsistente) terminar(clave string, respuesta []ia.Bloque) {
 // enviar es la consulta en sí, en el modo calidad, que es el de la web.
 func (a *panelAsistente) enviar(contexto, instruccion, accion string) {
 	p := a.l.pant
-	if p == nil || p.IA == nil {
+	if p == nil || p.IA == nil || p.doc == nil {
 		a.terminar("pdf.ai.failed", nil)
 		return
 	}
-	cliente := p.IA
+	doc, cliente := p.doc, p.IA
 	go func() {
 		ctx, parar := context.WithTimeout(p.ctx, plazoIA)
 		defer parar()
-		texto, err := cliente.Asistir(ctx, api.PeticionIA{
+		texto, err := doc.asistir(ctx, cliente, api.PeticionIA{
 			Accion: accion, Instruccion: instruccion, Contexto: contexto, Tipo: "pdf", Modo: "calidad",
 		})
 		texto = strings.TrimSpace(texto)
@@ -366,6 +366,9 @@ func (a *panelAsistente) leerEscaneo() {
 // transcribir es la consulta de visión de UNA página. Lo que falle deja la página
 // vacía, que es lo que hace la web con una respuesta que no llega.
 func transcribir(ctx context.Context, doc *Documento, cliente *api.IA, n int) string {
+	if doc == nil || doc.pdf.CheckRemoteProcessing(ctx) != nil {
+		return ""
+	}
 	ctx, parar := context.WithTimeout(ctx, plazoIA)
 	defer parar()
 	imgs, err := doc.Imagenes(ctx, n, n, 2)
@@ -376,7 +379,7 @@ func transcribir(ctx context.Context, doc *Documento, cliente *api.IA, n int) st
 	if jpeg.Encode(&buf, imgs[n], &jpeg.Options{Quality: 92}) != nil {
 		return ""
 	}
-	texto, _ := cliente.Asistir(ctx, api.PeticionIA{
+	texto, _ := doc.asistir(ctx, cliente, api.PeticionIA{
 		Accion: "transcribir", Instruccion: instruccionOCR, Tipo: "pdf", Modo: "calidad",
 		Imagen: buf.Bytes(), ImagenTipo: "image/jpeg",
 	})

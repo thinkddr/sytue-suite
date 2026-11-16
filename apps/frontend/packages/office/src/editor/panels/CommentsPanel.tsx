@@ -21,6 +21,13 @@ import { EditorIcon } from '../icons';
 import { AnclaDibujo } from '../dibujo/AnclaDibujo';
 import type { CommentItem, EditorContext } from '../types';
 import { findTextRanges, setEditorHighlight } from './SearchPanel';
+import { autorDe, leerAnclaCelda } from '../sheets/anclaCelda';
+import {
+  highlightCommentCell,
+  readCommentCellRef,
+  revealCommentCell,
+  subscribeSheetState,
+} from '../sheets/SheetCanvas';
 
 const HL_ANCHOR = 'sytue-comment-anchor';
 
@@ -43,12 +50,9 @@ function anchorMark(anchor: unknown): string | null {
   return null;
 }
 
-/** Fecha legible en el idioma activo; cadena vacía si el ISO no parsea. */
-/** Quién lo escribió: su nombre del directorio, o el principio del `sub` si no se resolvió. */
-export function autorDe(c: Pick<CommentItem, 'author_sub' | 'author_name'>): string {
-  return c.author_name || c.author_sub.slice(0, 8);
-}
+export { autorDe };
 
+/** Fecha legible en el idioma activo; cadena vacía si el ISO no parsea. */
 function commentDate(locale: Locale, iso: string): string {
   const date = new Date(iso);
   return Number.isNaN(date.getTime()) ? '' : formatDateTime(locale, date);
@@ -181,6 +185,13 @@ export function CommentsPanel({ ctx }: { ctx: EditorContext }): JSX.Element {
 
   /** Rango del comentario en el lienzo: por id de marca; texto citado de respaldo. */
   const showAnchor = (comment: CommentItem): void => {
+    // El de una celda se sigue con su botón («Celda B5»): pasar el ratón por el panel no
+    // debe mover la selección de la hoja, solo enmarcar la celda.
+    const celda = ctx.kind === 'spreadsheet' ? leerAnclaCelda(comment.anchor) : null;
+    if (celda !== null) {
+      highlightCommentCell(celda);
+      return;
+    }
     const root = getEditorRoot();
     if (root === null) return;
     let range: Range | null = null;
@@ -202,8 +213,32 @@ export function CommentsPanel({ ctx }: { ctx: EditorContext }): JSX.Element {
       behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
     });
   };
+  // En una hoja, la celda que dice cada hilo («Celda B5») es la de HOY: se rehace cuando el
+  // libro cambia (insertar una fila encima la mueve), y también cuando el lienzo se monta
+  // después que el panel.
+  const [, setVersionHoja] = useState(0);
+  useEffect(
+    () =>
+      ctx.kind === 'spreadsheet'
+        ? subscribeSheetState(() => setVersionHoja((v) => v + 1))
+        : undefined,
+    [ctx.kind],
+  );
+  /** El ancla de celda de un hilo de una hoja (`sheets/anclaCelda.ts`), o null. */
+  const celdaDe = (comment: CommentItem) =>
+    ctx.kind === 'spreadsheet' ? leerAnclaCelda(comment.anchor) : null;
+  /** Dónde está hoy la celda: tras insertar una fila encima ya no es la que se citó. */
+  const refDeCelda = (a: NonNullable<ReturnType<typeof celdaDe>>): string =>
+    readCommentCellRef(a) ?? a.text;
+  /** Selecciona la celda del hilo y la trae a la vista (cambia de hoja si hace falta). */
+  const irACelda = (comment: CommentItem): void => {
+    const a = celdaDe(comment);
+    if (a !== null && !revealCommentCell(a))
+      notify({ tone: 'warning', title: t('comments.cellGone') });
+  };
   const hideAnchor = (): void => {
     setEditorHighlight(HL_ANCHOR, []);
+    highlightCommentCell(null);
   };
   // Al desmontar el panel no queda ancla pintada en el lienzo.
   useEffect(() => hideAnchor, []);
@@ -237,11 +272,20 @@ export function CommentsPanel({ ctx }: { ctx: EditorContext }): JSX.Element {
                     {commentDate(ctx.locale, comment.created_at)}
                   </time>
                 </div>
-                {anchorText(comment.anchor) !== null && (
+                {celdaDe(comment) !== null ? (
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    class={`${TEXT_BTN_INICIO} mt-1`}
+                    onClick={() => irACelda(comment)}
+                  >
+                    {t('comments.cell', { ref: refDeCelda(celdaDe(comment)!) })}
+                  </Button>
+                ) : anchorText(comment.anchor) !== null ? (
                   <p class="border-primary/50 text-text-muted mt-1 border-l-2 pl-2 text-xs italic">
                     «{anchorText(comment.anchor)}»
                   </p>
-                )}
+                ) : null}
                 <AnclaDibujo anchor={comment.anchor} />
                 <p class="text-text mt-1 text-sm break-words whitespace-pre-wrap">{comment.body}</p>
 

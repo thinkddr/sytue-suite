@@ -21,6 +21,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/correo"
 	"git.sytue.eu/sytue/one/platform/pkg/log"
+	"git.sytue.eu/sytue/one/services/calendar/internal/caldav"
 	"git.sytue.eu/sytue/one/services/calendar/internal/domain"
 )
 
@@ -247,6 +248,53 @@ func (s *Service) mandarIMIP(ctx context.Context, ev domain.Event, metodo domain
 	}()
 }
 
+// asuntoRespuesta es el asunto del REPLY por correo: el de los clientes de calendario
+// («Aceptado:», «Rechazado:», «Provisional:»), en castellano como asuntoIMIP.
+func asuntoRespuesta(quien, resumen string, partstat domain.ParticipationStatus) (asunto, cuerpo string) {
+	switch partstat {
+	case domain.PartAccepted:
+		return "Aceptado: " + resumen, fmt.Sprintf("%s ha aceptado «%s».", quien, resumen)
+	case domain.PartDeclined:
+		return "Rechazado: " + resumen, fmt.Sprintf("%s ha rechazado «%s».", quien, resumen)
+	default:
+		return "Provisional: " + resumen, fmt.Sprintf("%s quizá vaya a «%s».", quien, resumen)
+	}
+}
+
+// mandarRespuestaPorCorreo manda a quien organiza desde FUERA de la suite el REPLY de
+// `email` sobre el evento `data`: no tiene bandeja de Sytue, y sin esto se quedaba
+// creyendo la respuesta de antes. Dice si sale. No sale si quien organiza es de dentro
+// (su respuesta va por la bandeja), si no hay organizador o quien contesta no figura
+// como invitado, si es la misma persona, sin relé o sin cupo. Best effort y en segundo
+// plano, como mandarIMIP: un relé caído no puede frenar la respuesta.
+func (s *Service) mandarRespuestaPorCorreo(ctx context.Context, data, email string, partstat domain.ParticipationStatus) bool {
+	if s.correo == nil {
+		return false
+	}
+	if _, ok := partstatAInvitacion(string(partstat)); !ok {
+		return false
+	}
+	ics, org, resumen, err := caldav.Respuesta(data, email, partstat)
+	if err != nil || strings.EqualFold(org, email) || !EsDeFuera(org, s.dominiosInternos()) {
+		return false
+	}
+	lg := log.From(ctx)
+	if c, _ := authn.FromContext(ctx); !s.cupoCorreo.tomar(c.Subject, 1, time.Now()) {
+		lg.Warn("calendar: tope de correos de esta hora; la respuesta no sale por correo")
+		return false
+	}
+	asunto, cuerpo := asuntoRespuesta(email, resumen, partstat)
+	enviar := s.correo
+	go func() {
+		c, cancelar := context.WithTimeout(context.WithoutCancel(ctx), 45*time.Second)
+		defer cancelar()
+		if err := enviar(c, org, asunto, cuerpo, []byte(ics), string(domain.MethodReply)); err != nil {
+			lg.Warn("calendar: respuesta por correo", "error", err)
+		}
+	}()
+	return true
+}
+
 // Las respuestas que vuelven por correo: el cliente de quien recibió la invitación
 // manda un REPLY al ORGANIZER, que es un buzón de Sytue Mail, y Mail lo pasa aquí
 // (`POST /internal/imip/reply`) con la dirección que lo firma. Contestar es lo mismo que
@@ -266,6 +314,21 @@ func partstatAInvitacion(p string) (domain.InvitationStatus, bool) {
 		return domain.InvDeclined, true
 	case string(domain.PartTentative):
 		return domain.InvTentative, true
+	}
+	return "", false
+}
+
+// invitacionAPartstat es la inversa de partstatAInvitacion: el PARTSTAT de una
+// invitación contestada; ok=false si aún no lo está.
+func invitacionAPartstat(st domain.InvitationStatus) (domain.ParticipationStatus, bool) {
+	switch st {
+	case domain.InvAccepted:
+		return domain.PartAccepted, true
+	case domain.InvDeclined:
+		return domain.PartDeclined, true
+	case domain.InvTentative:
+		return domain.PartTentative, true
+	case domain.InvPending, domain.InvDelivered, domain.InvCancelled:
 	}
 	return "", false
 }
@@ -298,8 +361,9 @@ func LeerRespuesta(ics string) (uid string, respuestas map[string]domain.Invitat
 }
 
 // RecibirRespuesta aplica un REPLY que ha llegado por correo firmado por `remitente`.
-// Solo cuenta la respuesta del propio remitente, y solo si tiene una invitación
-// pendiente de ese evento: nada de lo que diga el correo sobre otras personas.
+// Solo cuenta la respuesta del propio remitente, y solo si tiene una invitación de
+// ese evento (pendiente o ya contestada: quien cambia de opinión manda otro REPLY):
+// nada de lo que diga el correo sobre otras personas.
 func (s *Service) RecibirRespuesta(ctx context.Context, remitente, ics string) error {
 	uid, respuestas, ok := LeerRespuesta(ics)
 	if !ok {
@@ -310,19 +374,15 @@ func (s *Service) RecibirRespuesta(ctx context.Context, remitente, ics string) e
 	if !ok || remitente == "" {
 		return ErrRespuestaAjena
 	}
-	id, err := s.store.InvitacionPendiente(ctx, uid, remitente)
+	pend, err := s.store.InvitacionDeEvento(ctx, uid, []string{remitente}, "")
 	if err != nil {
 		return err
 	}
-	inv, err := s.store.RespondInvitation(ctx, id, estado, []string{remitente}, "")
+	inv, err := s.store.RespondInvitation(ctx, pend.ID, estado, []string{remitente}, "")
 	if err != nil {
 		return err
 	}
-	if inv.EventID != nil && inv.Organizer != "" {
-		if ev, err := s.store.GetEvent(ctx, *inv.EventID); err == nil {
-			s.deliverReply(ctx, ev, inv.Recipient)
-		}
-	}
+	s.replyDeInvitacion(ctx, inv)
 	s.publish(ctx, "calendar.invitation.responded", map[string]any{
 		"invitation_id": inv.ID, "status": inv.Status, "via": "imip",
 	})

@@ -35,6 +35,8 @@ func escalonTituloTarjeta() tema.Escalon {
 const (
 	HuecoPieTarjeta = 3 * 0.25 * tema.Rem
 	margenMarcas    = 2 * 0.25 * tema.Rem
+	// altoVisto es la barra de lo visto (`h-1`).
+	altoVisto = 0.25 * tema.Rem
 )
 
 // AltoTarjeta es lo que mide una tarjeta de ese ancho.
@@ -52,6 +54,9 @@ type Tarjeta struct {
 	Propia bool
 	// SinPie enseña solo el póster (el de «Gestionar»: el título ya está en la página).
 	SinPie bool
+	// Visto es lo que lleva visto quien está dentro (de 0 a 1): una barra fina al pie
+	// del póster. Un directo no la lleva: no hay dónde seguir.
+	Visto float64
 
 	v    Vista
 	cols atomic.Uint32 // ancho de CSS del póster, para el radio en píxeles de dispositivo
@@ -63,6 +68,9 @@ var _ fyne.Widget = (*Tarjeta)(nil)
 func NuevaTarjeta(v Vista, video api.CastVideo, propia bool, alAbrir func(api.CastVideo)) *Tarjeta {
 	t := &Tarjeta{Video: video, Propia: propia, v: v}
 	t.Nombre = video.Title
+	if v.Visto != nil && !video.EnDirecto() {
+		t.Visto = min(v.Visto(video.ID), 1)
+	}
 	if alAbrir != nil {
 		t.AlPulsar = func() { alAbrir(video) }
 	}
@@ -74,7 +82,17 @@ func NuevaTarjeta(v Vista, video api.CastVideo, propia bool, alAbrir func(api.Ca
 func (t *Tarjeta) AccessibilityRole() fyne.AccessibleRole { return fyne.AccessibleRoleLink }
 
 // AccessibilityLabel es el título y los datos, como los lee la web.
-func (t *Tarjeta) AccessibilityLabel() string { return t.Video.Title + ". " + t.datos() }
+// Con algo visto, lo dice también (la barra no se ve con un lector de pantalla).
+func (t *Tarjeta) AccessibilityLabel() string {
+	etiqueta := t.Video.Title + ". " + t.datos()
+	if t.Visto > 0 {
+		etiqueta += ". " + t.v.Traduce("card.watched", i18n.Vars{"percent": t.porcentaje()})
+	}
+	return etiqueta
+}
+
+// porcentaje es lo visto en enteros, como lo escribe la web.
+func (t *Tarjeta) porcentaje() int { return int(math.Round(t.Visto * 100)) }
 
 // autor es quien publica; en la biblioteca propia, la visibilidad del vídeo.
 func (t *Tarjeta) autor() string {
@@ -141,6 +159,13 @@ func (t *Tarjeta) CreateRenderer() fyne.WidgetRenderer {
 		r.objetos = append(r.objetos, r.pildora.Objetos()...)
 		r.objetos = append(r.objetos, r.duracion)
 	}
+	if t.Visto > 0 {
+		v := t.v.Variante
+		r.pista = ui.NuevaCaja(color.NRGBA{A: 102}, color.NRGBA{}, altoVisto/2)
+		r.visto = ui.NuevaCaja(tema.Color("primary", v), color.NRGBA{}, altoVisto/2)
+		r.objetos = append(r.objetos, r.pista.Objetos()...)
+		r.objetos = append(r.objetos, r.visto.Objetos()...)
+	}
 	if !t.SinPie {
 		r.objetos = append(r.objetos, r.titulo, r.autor, r.datos)
 	}
@@ -157,6 +182,8 @@ type tarjetaRenderer struct {
 	marca    *ui.Insignia
 	pildora  *ui.Caja
 	duracion *canvas.Text
+	pista    *ui.Caja
+	visto    *ui.Caja
 	titulo   *ui.Parrafo
 	autor    *canvas.Text
 	datos    *canvas.Text
@@ -207,6 +234,17 @@ func (r *tarjetaRenderer) Layout(t fyne.Size) {
 		x, y := t.Width-margenMarcas-w, alto-margenMarcas-h
 		ui.MoverCaja(r.pildora, fyne.NewPos(x, y), fyne.NewSize(w, h))
 		ui.ColocarTexto(r.duracion, tema.TextoXS, x+tema.Espacio(1.5), y+tema.Espacio(0.25))
+	}
+	if r.visto != nil {
+		// La barra de la web es `h-1` a todo el ancho y la recorta el `overflow-hidden`
+		// del póster redondeado; aquí no hay recorte, así que va entre las curvas de las
+		// esquinas, con los extremos redondos.
+		x0 := radioTarjeta()
+		ancho := max(t.Width-2*x0, 0)
+		y0 := alto - altoVisto
+		ui.MoverCaja(r.pista, fyne.NewPos(x0, y0), fyne.NewSize(ancho, altoVisto))
+		lleno := max(ancho*float32(r.t.porcentaje())/100, ancho*0.02)
+		ui.MoverCaja(r.visto, fyne.NewPos(x0, y0), fyne.NewSize(lleno, altoVisto))
 	}
 	y := alto + HuecoPieTarjeta
 	r.titulo.Move(fyne.NewPos(0, y))

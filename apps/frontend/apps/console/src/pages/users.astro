@@ -6,6 +6,7 @@ import { requireSession } from '@sytue/auth/server';
 import { canonicaConOrg } from '@sytue/config';
 import { getBff, toBffContext } from '../server/bff.js';
 import { loadUsers, loadTenants } from '../lib/admin.js';
+import { filtroDeParametro } from '../lib/filtros-usuarios.js';
 
 export const prerender = false;
 
@@ -25,12 +26,20 @@ const { session } = guard;
 // demostración, y una lista de gente inventada que se lee como la plantilla real
 // es peor que una pantalla vacía — se suspende a alguien que no existe y el
 // fallo se atribuye a la acción, no a que no hay servicio detrás.
+//
+// `?filter=` llega de los avisos de la portada («N personas no tienen segundo
+// factor» → la lista de esas N). Se aplica YA en la primera página del servidor:
+// pintar a todo el mundo y filtrar al hidratar enseñaría un instante la lista
+// equivocada. Un valor que no se reconoce es «sin filtro», no una página de error.
+const filtro = filtroDeParametro(Astro.url.searchParams.get('filter'));
 const [{ data: usersPage, live }, { data: tenants }] = await Promise.all([
-  loadUsers(session),
+  loadUsers(session, undefined, filtro ? { filter: filtro } : {}),
   loadTenants(session),
 ]);
 
 // El idioma lo negoció el middleware; la isla lo recibe por props (nunca lo detecta).
+// Mismo criterio que Sytue ID al invitar: solo un propietario concede «Propietario».
+const canGrantOwner = session.user.roles.includes('owner');
 const locale = Astro.locals.locale;
 const t = useT(locale);
 ---
@@ -42,6 +51,8 @@ const t = useT(locale);
     users={usersPage.items}
     tenants={tenants}
     nextCursor={usersPage.nextCursor}
+    filter={filtro}
     live={live}
+    canGrantOwner={canGrantOwner}
   />
 </ConsoleLayout>

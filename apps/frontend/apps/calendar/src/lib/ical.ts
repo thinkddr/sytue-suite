@@ -4,17 +4,40 @@
  * VCALENDAR de salida. Formato de fechas: UTC basico (yyyymmddThhmmssZ) o DATE
  * para todo el dia. Minimo viable RFC 5545.
  */
+import { instantFromZonedWallClock, zoneOffsetMinutes } from '../components/tz.js';
+
+/** Día de la semana de un BYDAY (RFC 5545 3.3.10), sin ordinal. */
+export type Weekday = 'MO' | 'TU' | 'WE' | 'TH' | 'FR' | 'SA' | 'SU';
+
+/** Los siete, de lunes a domingo: el orden de las columnas y de `weekdayNarrowLabels`. */
+export const WEEKDAYS: readonly Weekday[] = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
+
+/** «Cada día laborable»: de lunes a viernes, como lo guarda Google Calendar. */
+export const WORKWEEK: readonly Weekday[] = ['MO', 'TU', 'WE', 'TH', 'FR'];
 
 /**
  * Recurrencia iCalendar (RRULE) — subconjunto que expone la UI: FREQ diaria/
- * semanal/mensual, INTERVAL y un fin por COUNT o UNTIL (mutuamente excluyentes,
- * como exige el backend Go). `until` es 'yyyy-mm-dd' (valor de <input type=date>).
+ * semanal/mensual/anual, INTERVAL, los días de una semanal (`byday`: «lunes y
+ * miércoles», «cada día laborable») y un fin por COUNT o UNTIL (mutuamente
+ * excluyentes, como exige el backend Go). `until` es 'yyyy-mm-dd' (valor de
+ * <input type=date>).
  */
 export interface Recurrence {
-  freq: 'DAILY' | 'WEEKLY' | 'MONTHLY';
+  freq: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
   interval?: number | undefined;
+  /** Solo con WEEKLY: los días de la semana en que cae, de lunes a domingo. */
+  byday?: Weekday[] | undefined;
   count?: number | undefined;
   until?: string | undefined;
+}
+
+/**
+ * Los días válidos de `days`, sin repetir y de lunes a domingo. Ordenarlos hace que
+ * «miércoles y lunes» y «lunes y miércoles» sean la misma regla, y filtrar impide que
+ * un valor ajeno (viene del navegador) se cuele en la línea RRULE.
+ */
+export function normalizeWeekdays(days: readonly string[]): Weekday[] {
+  return WEEKDAYS.filter((d) => days.includes(d));
 }
 
 export interface EventInput {
@@ -68,6 +91,19 @@ export interface EventInput {
    * excepciones posteriores al corte se arrastran a la serie nueva.
    */
   exdates?: string[] | undefined;
+  /**
+   * La regla de repetición del evento tal cual, sin «RRULE:» (`FREQ=WEEKLY;BYDAY=MO,WE`),
+   * cuando el formulario no sabe editarla (`parseRecurrence` → null). Viaja para que una
+   * serie de Apple, Google o un .ics importado no se quede en un evento suelto al
+   * guardarla. `recurrence` manda si vienen las dos.
+   */
+  rruleRaw?: string | undefined;
+  /**
+   * El usuario no ha tocado la repetición. Al editar un recurso que ya existe, el BFF
+   * conserva entonces la RRULE guardada byte a byte; sin esto, que no venga
+   * `recurrence` quiere decir que la ha quitado.
+   */
+  recurrenceUnchanged?: boolean | undefined;
 }
 
 /**
@@ -117,12 +153,15 @@ function escapeText(value: string): string {
 
 /**
  * Genera la linea RRULE (RFC 5545 3.8.5.3) desde una Recurrence. INTERVAL se
- * omite cuando es 1; el fin es COUNT o UNTIL (nunca ambos). UNTIL toma el fin
- * del dia elegido en UTC para que ese ultimo dia quede incluido.
+ * omite cuando es 1; BYDAY solo acompaña a una semanal; el fin es COUNT o UNTIL
+ * (nunca ambos). UNTIL toma el fin del dia elegido en UTC para que ese ultimo dia
+ * quede incluido. Mismo orden de partes que `Recurrencia.RRule` en Fyne.
  */
 export function buildRRule(rec: Recurrence): string {
   const parts = [`FREQ=${rec.freq}`];
   if (rec.interval && rec.interval > 1) parts.push(`INTERVAL=${rec.interval}`);
+  const byday = rec.freq === 'WEEKLY' && rec.byday ? normalizeWeekdays(rec.byday) : [];
+  if (byday.length) parts.push(`BYDAY=${byday.join(',')}`);
   if (rec.count && rec.count > 0) {
     parts.push(`COUNT=${rec.count}`);
   } else if (rec.until) {
@@ -133,9 +172,10 @@ export function buildRRule(rec: Recurrence): string {
 
 /**
  * Extrae la Recurrence de un VEVENT crudo (para reabrir un evento recurrente en
- * el modal y para expandir ocurrencias en cliente). Solo reconoce el
- * subconjunto DAILY/WEEKLY/MONTHLY que produce la UI; cualquier otra FREQ (o
- * regla con BY*) devuelve null y el evento se trata como puntual.
+ * el modal). Solo reconoce el subconjunto que produce la UI: DAILY/WEEKLY/MONTHLY/
+ * YEARLY y, en una semanal, BYDAY con días sueltos («MO,WE»). Cualquier otra FREQ,
+ * otro BY* (BYMONTH, BYMONTHDAY, «2MO»…) devuelve null: el formulario la enseña
+ * como «Personalizada» y la conserva tal cual (`rruleCruda`).
  */
 export function parseRecurrence(ical: string): Recurrence | null {
   const line = ical.match(/^RRULE:(.*)$/m);
@@ -146,13 +186,27 @@ export function parseRecurrence(ical: string): Recurrence | null {
     if (k && v) map.set(k.toUpperCase(), v.trim());
   }
   const freq = map.get('FREQ');
-  if (freq !== 'DAILY' && freq !== 'WEEKLY' && freq !== 'MONTHLY') return null;
-  // BY* (BYDAY, BYMONTHDAY, ...) no las genera esta UI: no las sabemos expandir
-  // aqui, asi que degradamos a evento puntual en vez de pintar mal.
-  if ([...map.keys()].some((k) => k.startsWith('BY'))) return null;
+  if (freq !== 'DAILY' && freq !== 'WEEKLY' && freq !== 'MONTHLY' && freq !== 'YEARLY') {
+    return null;
+  }
+  // De los BY* el formulario solo sabe editar el BYDAY de una semanal sin ordinales;
+  // reescribir cualquier otro lo cambiaría (o lo perdería) al guardar.
+  if ([...map.keys()].some((k) => k.startsWith('BY') && !(k === 'BYDAY' && freq === 'WEEKLY'))) {
+    return null;
+  }
   const rec: Recurrence = { freq };
   const interval = Number(map.get('INTERVAL'));
   if (interval > 1) rec.interval = interval;
+  const bydayRaw = map.get('BYDAY');
+  if (bydayRaw !== undefined) {
+    const tokens = bydayRaw.toUpperCase().split(',');
+    if (!tokens.every((d) => (WEEKDAYS as readonly string[]).includes(d))) return null;
+    // Con INTERVAL > 1 la semana en que empieza cada salto depende de WKST, que el
+    // formulario no guarda: rehacerla sin él movería las repeticiones.
+    const wkst = map.get('WKST')?.toUpperCase();
+    if (interval > 1 && wkst && wkst !== 'MO') return null;
+    rec.byday = normalizeWeekdays(tokens);
+  }
   const count = Number(map.get('COUNT'));
   if (count > 0) rec.count = count;
   const until = map.get('UNTIL');
@@ -189,6 +243,7 @@ export function buildVevent(input: EventInput): string {
   }
 
   if (input.recurrence) lines.push(buildRRule(input.recurrence));
+  else if (input.rruleRaw && esRRuleSegura(input.rruleRaw)) lines.push(`RRULE:${input.rruleRaw}`);
 
   // EXDATE arrastrados al desgajar una serie (RFC 5545 3.8.5.1). Tipo de valor
   // acorde al DTSTART (DATE para todo el día; DATE-TIME UTC si no).
@@ -246,10 +301,15 @@ export function buildVevent(input: EventInput): string {
   return lines.join('\r\n') + '\r\n';
 }
 
-/** Extrae los bloques VALARM crudos de un VEVENT (passthrough al editar). */
+/**
+ * Extrae los bloques VALARM crudos del VEVENT maestro (passthrough al editar). Los de
+ * una excepción (otro VEVENT con RECURRENCE-ID en el mismo recurso) son de esa
+ * ocurrencia: sumarlos al maestro los repetiría en toda la serie.
+ */
 export function parseAlarms(ical: string): string[] {
   const out: string[] = [];
-  for (const m of ical.matchAll(/^BEGIN:VALARM\r?\n[\s\S]*?^END:VALARM/gm)) {
+  const vevent = ical.match(/^BEGIN:VEVENT\r?\n[\s\S]*?^END:VEVENT/m)?.[0] ?? ical;
+  for (const m of vevent.matchAll(/^BEGIN:VALARM\r?\n[\s\S]*?^END:VALARM/gm)) {
     out.push(m[0].replace(/\r?\n/g, '\r\n'));
   }
   return out;
@@ -464,6 +524,406 @@ export function guestPartstats(ical: string | undefined): Record<string, string>
     if (g.status !== 'pending') out[g.email.toLowerCase()] = g.status.toUpperCase();
   }
   return out;
+}
+
+/**
+ * Lo que ha contestado `email` a la invitación del evento, o null si no figura
+ * entre sus asistentes. Es lo que decide si la vista rápida pregunta «¿vas a ir?»
+ * y qué respuesta sale marcada: se compara la DIRECCIÓN entera y no un trozo de la
+ * línea, que «ana@sytue.eu» está dentro de «juana@sytue.eu».
+ */
+export function miRespuesta(
+  ical: string | undefined,
+  email: string | undefined,
+): GuestStatus | null {
+  const mio = email?.trim().toLowerCase();
+  if (!ical || !mio) return null;
+  return parseGuests(ical).find((g) => g.email.toLowerCase() === mio)?.status ?? null;
+}
+
+/**
+ * La RRULE del maestro tal cual (sin «RRULE:»), solo si el formulario NO la sabe
+ * editar: `FREQ=MONTHLY;BYDAY=2MO`, `FREQ=YEARLY;BYMONTH=3`… Con una regla que sí entiende
+ * (`parseRecurrence`) devuelve undefined: esa viaja como `recurrence`.
+ */
+export function rruleCruda(ical: string | undefined): string | undefined {
+  if (!ical || parseRecurrence(ical)) return undefined;
+  const v = propLines(maestro(ical), 'RRULE')[0]?.value;
+  return v && esRRuleSegura(v) ? v : undefined;
+}
+
+/** El evento se repite (RRULE en el maestro), la entienda el formulario o no. */
+export function tieneRepeticion(ical: string | undefined): boolean {
+  return Boolean(ical && propLines(maestro(ical), 'RRULE').length > 0);
+}
+
+/**
+ * Una RRULE que puede volver al .ics sin abrir otra propiedad: pares NOMBRE=valor
+ * separados por «;», con FREQ, y en el valor solo lo que usa RFC 5545 §3.3.10
+ * (dígitos, letras, «,», «+», «-», y «:» no hace falta: UNTIL es yyyymmddThhmmssZ).
+ */
+export function esRRuleSegura(regla: string): boolean {
+  return (
+    regla.length <= 512 &&
+    /^[A-Z][A-Z-]*=[A-Z0-9,+-]+(?:;[A-Z][A-Z-]*=[A-Z0-9,+-]+)*$/i.test(regla) &&
+    /(?:^|;)FREQ=/i.test(regla)
+  );
+}
+
+// --- Fundir un guardado con el recurso que ya existe -------------------------------
+
+/** Una línea lógica del .ics: las físicas (con su plegado) y el texto desplegado. */
+interface Linea {
+  fisicas: string[];
+  texto: string;
+  nombre: string;
+}
+
+function lineasDe(ical: string): Linea[] {
+  const out: Linea[] = [];
+  for (const fisica of ical.split(/\r?\n/)) {
+    const ultima = out[out.length - 1];
+    if (/^[ \t]/.test(fisica) && ultima) {
+      ultima.fisicas.push(fisica);
+      ultima.texto += fisica.slice(1);
+      continue;
+    }
+    if (!fisica.trim()) continue;
+    out.push({
+      fisicas: [fisica],
+      texto: fisica,
+      nombre: (fisica.match(/^[A-Za-z0-9-]+/)?.[0] ?? '').toUpperCase(),
+    });
+  }
+  return out;
+}
+
+/** Parámetros (con su «;» inicial) y valor de una línea lógica. */
+function partes(texto: string): { params: string; value: string } {
+  const m = texto.match(/^[A-Za-z0-9-]+((?:;(?:"[^"]*"|[^;:"])*)*):([\s\S]*)$/);
+  return { params: m?.[1] ?? '', value: m?.[2] ?? '' };
+}
+
+interface Bloque {
+  /** Índice de BEGIN:VEVENT y de END:VEVENT en las líneas. */
+  ini: number;
+  fin: number;
+  /** Propiedades del propio VEVENT (no las de sus VALARM). */
+  props: Linea[];
+  /** Subcomponentes (VALARM y cualquier otro), cada uno con sus líneas. */
+  hijos: { nombre: string; lineas: Linea[] }[];
+}
+
+function veventsDe(lineas: Linea[]): Bloque[] {
+  const out: Bloque[] = [];
+  let actual: Bloque | null = null;
+  let hijo: { nombre: string; lineas: Linea[]; prof: number } | null = null;
+  lineas.forEach((l, i) => {
+    const t = l.texto.trim().toUpperCase();
+    if (!actual) {
+      if (t === 'BEGIN:VEVENT') actual = { ini: i, fin: i, props: [], hijos: [] };
+      return;
+    }
+    if (hijo) {
+      hijo.lineas.push(l);
+      if (t.startsWith('BEGIN:')) hijo.prof++;
+      else if (t.startsWith('END:') && --hijo.prof === 0) {
+        actual.hijos.push({ nombre: hijo.nombre, lineas: hijo.lineas });
+        hijo = null;
+      }
+      return;
+    }
+    if (t === 'END:VEVENT') {
+      actual.fin = i;
+      out.push(actual);
+      actual = null;
+    } else if (t.startsWith('BEGIN:')) {
+      hijo = { nombre: t.slice(6), lineas: [l], prof: 1 };
+    } else {
+      actual.props.push(l);
+    }
+  });
+  return out;
+}
+
+/**
+ * Lo que el formulario (o el arrastre) decide de un evento. Todo lo demás —CLASS,
+ * TRANSP, STATUS, CATEGORIES, ATTACH, URL, RDATE, EXDATE, X-*, las excepciones de la
+ * serie…— se queda como estaba en el recurso guardado.
+ */
+const GESTIONADAS = new Set([
+  'DTSTAMP',
+  'DTSTART',
+  'DTEND',
+  'DURATION',
+  'SUMMARY',
+  'LOCATION',
+  'DESCRIPTION',
+  'X-APPLE-CALENDAR-COLOR',
+  'CONFERENCE',
+  'ORGANIZER',
+  'ATTENDEE',
+  'LAST-MODIFIED',
+  'SEQUENCE',
+]);
+
+/** Un CONFERENCE es del formulario solo si es un enlace web: el de teléfono no se ve. */
+function esConferenciaWeb(l: Linea): boolean {
+  return l.nombre === 'CONFERENCE' && /^https?:\/\//i.test(partes(l.texto).value.trim());
+}
+
+/**
+ * Clave de un DTSTART/DTEND por su INSTANTE, no por cómo se escribe: el formulario
+ * reabre un `…Z` en la zona del navegador, y sin esto cambiar solo el título
+ * reescribía la hora (y subía SEQUENCE) sin moverla.
+ */
+function claveHora(l: Linea): string {
+  const { params, value } = partes(l.texto);
+  const v = value.trim();
+  if (/^\d{8}$/.test(v)) return `${l.nombre}:D${v}`;
+  const m = v.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z)?$/);
+  if (!m) return `${l.nombre}:${l.texto.replace(/"/g, '').toUpperCase()}`;
+  const n = m.slice(1, 7).map(Number) as [number, number, number, number, number, number];
+  if (m[7]) return `${l.nombre}:${Date.UTC(n[0], n[1] - 1, n[2], n[3], n[4], n[5])}`;
+  const tz = param(params, 'TZID');
+  if (!tz) return `${l.nombre}:F${v}`;
+  try {
+    return `${l.nombre}:${instantFromZonedWallClock(...n, tz).getTime()}`;
+  } catch {
+    return `${l.nombre}:${tz}|${v}`; // zona que Intl no conoce: se compara como texto
+  }
+}
+
+/** Un valor de fecha del .ics leído como instante: día (D) o fecha-hora resoluble (T). */
+type Instante = { tipo: 'D' | 'T'; ms: number };
+
+function instanteDe(valor: string, tz: string | undefined): Instante | null {
+  const v = valor.trim();
+  const d = v.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (d) return { tipo: 'D', ms: Date.UTC(+d[1]!, +d[2]! - 1, +d[3]!) };
+  const m = v.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z)?$/);
+  if (!m) return null;
+  const n = m.slice(1, 7).map(Number) as [number, number, number, number, number, number];
+  if (m[7]) return { tipo: 'T', ms: Date.UTC(n[0], n[1] - 1, n[2], n[3], n[4], n[5]) };
+  if (!tz) return null; // hora flotante: en el servidor no hay zona con la que leerla
+  try {
+    return { tipo: 'T', ms: instantFromZonedWallClock(...n, tz).getTime() };
+  } catch {
+    return null;
+  }
+}
+
+function dosCifras(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
+/** Un valor desplazado `delta` ms, escrito de la misma forma (día, …Z o en su TZID). */
+function desplazarValor(valor: string, tz: string | undefined, delta: number): string {
+  const v = valor.trim();
+  const i = instanteDe(v, tz);
+  if (!i) return valor;
+  let ms = i.ms + delta;
+  if (!v.endsWith('Z') && i.tipo === 'T' && tz) ms += zoneOffsetMinutes(new Date(ms), tz) * 60_000;
+  const f = new Date(ms);
+  const dia = `${f.getUTCFullYear()}${dosCifras(f.getUTCMonth() + 1)}${dosCifras(f.getUTCDate())}`;
+  if (i.tipo === 'D') return dia;
+  const hora = `${dosCifras(f.getUTCHours())}${dosCifras(f.getUTCMinutes())}${dosCifras(f.getUTCSeconds())}`;
+  return `${dia}T${hora}${v.endsWith('Z') ? 'Z' : ''}`;
+}
+
+/** La línea con todos sus valores (lista por comas) desplazados. */
+function desplazarLinea(l: Linea, delta: number): Linea {
+  const { params, value } = partes(l.texto);
+  const tz = param(params, 'TZID');
+  const valores = value.split(',').map((v) => desplazarValor(v, tz, delta));
+  const texto = `${l.texto.match(/^[A-Za-z0-9-]+/)?.[0] ?? l.nombre}${params}:${valores.join(',')}`;
+  return texto === l.texto ? l : { fisicas: [texto], texto, nombre: l.nombre };
+}
+
+/** Instante de la primera (única) fecha de una línea DTSTART/RECURRENCE-ID. */
+function instanteLinea(l: Linea | undefined): Instante | null {
+  if (!l) return null;
+  const { params, value } = partes(l.texto);
+  return instanteDe(value.split(',')[0] ?? '', param(params, 'TZID'));
+}
+
+/** Lo que cambia la serie para un invitado (RFC 5545 §3.8.7.4): hora y repetición. */
+function claveSecuencia(props: Linea[]): string {
+  return props
+    .filter((l) => ['DTSTART', 'DTEND', 'DURATION', 'RRULE'].includes(l.nombre))
+    .map((l) => (l.nombre === 'DTSTART' || l.nombre === 'DTEND' ? claveHora(l) : l.texto))
+    .sort()
+    .join('\n');
+}
+
+/**
+ * Funde un guardado sobre el recurso que ya existe: sustituye SOLO lo que el
+ * formulario gestiona y deja el resto tal cual.
+ *
+ * Regenerar el VEVENT entero desde `EventInput` borraba en silencio lo que la web no
+ * sabe expresar: una serie con BYDAY de Apple se quedaba en un evento, se perdían las
+ * excepciones (otros VEVENT con RECURRENCE-ID del mismo recurso), CLASS:PRIVATE, las
+ * categorías, los adjuntos, el CN de los invitados…
+ *
+ * - Lo que no cambia de valor conserva su línea original, con sus parámetros
+ *   (LANGUAGE de un SUMMARY, CN y ROLE de un ATTENDEE, la RRULE byte a byte…).
+ * - La RRULE se conserva tal cual con `recurrenceUnchanged`; si no, manda la del
+ *   formulario, y sin ninguna se quita (RDATE y EXDATE se quedan).
+ * - Los VALARM del maestro son los de `input.alarms` (los editables más los que el
+ *   cliente arrastró verbatim); los de las excepciones no se tocan.
+ * - SEQUENCE sube cuando cambia la hora o la repetición; DTSTAMP y LAST-MODIFIED se
+ *   renuevan.
+ *
+ * Sin un maestro reconocible en `original`, devuelve `buildVevent(input)`.
+ */
+export function fundirVevent(original: string, input: EventInput): string {
+  const viejas = lineasDe(original);
+  const bloques = veventsDe(viejas);
+  const maestroViejo = bloques.find((b) => !b.props.some((l) => l.nombre === 'RECURRENCE-ID'));
+  const nuevo = veventsDe(lineasDe(buildVevent(input)))[0];
+  if (!maestroViejo || !nuevo) return buildVevent(input);
+
+  const gestionadas = new Set(GESTIONADAS);
+  if (!input.recurrenceUnchanged) gestionadas.add('RRULE');
+  const esGestionada = (l: Linea): boolean =>
+    l.nombre === 'CONFERENCE' ? esConferenciaWeb(l) : gestionadas.has(l.nombre);
+  const mismoValor = (a: Linea, b: Linea): boolean => {
+    const va = partes(a.texto).value.trim();
+    const vb = partes(b.texto).value.trim();
+    return a.nombre === 'X-APPLE-CALENDAR-COLOR'
+      ? va.toUpperCase() === vb.toUpperCase()
+      : va === vb;
+  };
+  const deVieja = (nombre: string): Linea[] =>
+    maestroViejo.props.filter((l) => l.nombre === nombre);
+
+  // COLOR (nombre CSS, RFC 7986) no lo edita el formulario, pero `parseColor` lo lee
+  // cuando no hay X-APPLE-CALENDAR-COLOR: si quien guarda cambia o quita el color que
+  // traía el evento, el COLOR viejo no puede quedarse mandando.
+  const appleViejo = deVieja('X-APPLE-CALENDAR-COLOR')[0];
+  const appleNuevo = nuevo.props.find((l) => l.nombre === 'X-APPLE-CALENDAR-COLOR');
+  if (appleViejo && !(appleNuevo && mismoValor(appleViejo, appleNuevo))) gestionadas.add('COLOR');
+
+  const props: Linea[] = deVieja('UID').slice(0, 1);
+  for (const l of nuevo.props) {
+    if (l.nombre === 'UID') continue;
+    if (l.nombre === 'EXDATE') {
+      // Solo las que añade quien guarda; las del recurso ya van entre las conservadas.
+      if (!deVieja('EXDATE').some((v) => v.texto === l.texto)) props.push(l);
+      continue;
+    }
+    if (!esGestionada(l)) continue;
+    let igual: Linea | undefined;
+    if (l.nombre === 'ATTENDEE' || l.nombre === 'ORGANIZER') {
+      // El mismo invitado conserva su línea: su CN, su ROLE, su PARTSTAT real.
+      const email = sinMailto(partes(l.texto).value).toLowerCase();
+      igual = deVieja(l.nombre).find(
+        (v) => sinMailto(partes(v.texto).value).toLowerCase() === email,
+      );
+      // El ORGANIZER de un evento que otro organizó no pasa a ser quien guarda.
+      if (l.nombre === 'ORGANIZER') igual ??= deVieja('ORGANIZER')[0];
+    } else if (l.nombre === 'DTSTART' || l.nombre === 'DTEND') {
+      igual = deVieja(l.nombre).find((v) => claveHora(v) === claveHora(l));
+    } else if (l.nombre !== 'DTSTAMP') {
+      igual = deVieja(l.nombre).find((v) => esGestionada(v) && mismoValor(v, l));
+    }
+    props.push(igual ?? l);
+  }
+  for (const l of maestroViejo.props) {
+    if (l.nombre !== 'UID' && !esGestionada(l)) props.push(l);
+  }
+
+  const secuenciaVieja = Number(partes(deVieja('SEQUENCE')[0]?.texto ?? '').value) || 0;
+  const cambia = claveSecuencia(maestroViejo.props) !== claveSecuencia(props);
+  const ahora = partes(nuevo.props.find((l) => l.nombre === 'DTSTAMP')?.texto ?? '').value;
+  const extra: string[] = [];
+  if (cambia || deVieja('SEQUENCE').length) {
+    extra.push(`SEQUENCE:${secuenciaVieja + (cambia ? 1 : 0)}`);
+  }
+  if (ahora) extra.push(`LAST-MODIFIED:${ahora}`);
+
+  // La serie entera se mueve («todos», o arrastrar la serie): las excepciones y los
+  // EXDATE apuntan a ocurrencias por su hora de inicio, así que se mueven con ella; si
+  // no, la ocurrencia excluida volvía a la hora nueva y la movida salía dos veces. Con
+  // otra regla (o sin ella) esas excepciones ya no son de ninguna ocurrencia y se quitan,
+  // como hace el backend al editar por REST (`caldav.CarryOver`).
+  const reglaDe = (ps: Linea[]): string =>
+    ps
+      .filter((l) => l.nombre === 'RRULE')
+      .map((l) => l.texto.trim())
+      .join('\n');
+  const reglaVieja = reglaDe(maestroViejo.props);
+  const mismaSerie = reglaVieja !== '' && reglaVieja === reglaDe(props);
+  const iniViejo = instanteLinea(deVieja('DTSTART')[0]);
+  const iniNuevo = instanteLinea(props.find((l) => l.nombre === 'DTSTART'));
+  const delta =
+    mismaSerie && iniViejo && iniNuevo && iniViejo.tipo === iniNuevo.tipo
+      ? iniNuevo.ms - iniViejo.ms
+      : 0;
+  const finalProps = delta
+    ? props.map((l) =>
+        l.nombre === 'EXDATE' && deVieja('EXDATE').includes(l) ? desplazarLinea(l, delta) : l,
+      )
+    : props;
+  const excepciones = new Map<number, Linea[]>();
+  const excepcionesViejas = bloques.filter(
+    (b) => b !== maestroViejo && b.props.some((l) => l.nombre === 'RECURRENCE-ID'),
+  );
+  for (const b of excepcionesViejas) {
+    if (reglaVieja && !mismaSerie) {
+      excepciones.set(b.ini, []);
+      continue;
+    }
+    if (!delta) continue;
+    const rid = b.props.find((l) => l.nombre === 'RECURRENCE-ID');
+    // Una excepción que no se había movido (solo otro título, otro aviso…) sigue a la
+    // serie; una que sí, se queda donde la dejaron.
+    const sinMover =
+      instanteLinea(rid)?.ms === instanteLinea(b.props.find((l) => l.nombre === 'DTSTART'))?.ms;
+    const mover = (l: Linea): Linea =>
+      l.nombre === 'RECURRENCE-ID' || (sinMover && (l.nombre === 'DTSTART' || l.nombre === 'DTEND'))
+        ? desplazarLinea(l, delta)
+        : l;
+    const lineas = viejas.slice(b.ini, b.fin + 1);
+    // Solo las propiedades del propio VEVENT, no las de sus VALARM.
+    const propias = new Set(b.props);
+    excepciones.set(
+      b.ini,
+      lineas.map((l) => (propias.has(l) ? mover(l) : l)),
+    );
+  }
+
+  const hijos = [
+    ...maestroViejo.hijos.filter((h) => h.nombre !== 'VALARM'),
+    ...nuevo.hijos.filter((h) => h.nombre === 'VALARM'),
+  ];
+  const cuerpo = [
+    ...viejas[maestroViejo.ini]!.fisicas,
+    ...finalProps.flatMap((l) => l.fisicas),
+    ...extra,
+    ...hijos.flatMap((h) => h.lineas.flatMap((l) => l.fisicas)),
+    ...viejas[maestroViejo.fin]!.fisicas,
+  ];
+  // Fuera del maestro, todo como estaba salvo las excepciones movidas o quitadas.
+  const resto = (desde: number, hasta: number): string[] => {
+    const out: string[] = [];
+    for (let i = desde; i < hasta; i++) {
+      const exc = excepciones.get(i);
+      if (exc) {
+        out.push(...exc.flatMap((l) => l.fisicas));
+        i = excepcionesViejas.find((b) => b.ini === i)!.fin;
+        continue;
+      }
+      out.push(...viejas[i]!.fisicas);
+    }
+    return out;
+  };
+  const salida = [
+    ...resto(0, maestroViejo.ini),
+    ...cuerpo,
+    ...resto(maestroViejo.fin + 1, viejas.length),
+  ];
+  return salida.join('\r\n') + '\r\n';
 }
 
 /** Genera un UID estable para un evento nuevo. */

@@ -40,7 +40,7 @@ func TestMergeIdentityCierraElAltaDelOrigen(t *testing.T) {
 		t.Fatalf("CreateOrg(destino): %v", err)
 	}
 
-	ada := seedUser(t, ctx, st, "ada@huerfana.example")
+	ada := seedUser(ctx, t, st, "ada@huerfana.example")
 	if err := st.UpsertMembership(ctx, nil, domain.Membership{
 		OrgID: origen.ID, UserID: ada.ID, Role: domain.RoleOwner,
 	}); err != nil {
@@ -96,7 +96,7 @@ func TestMergeIdentityNoReescribeAltasYaCompletadas(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateOrg(destino): %v", err)
 	}
-	grace := seedUser(t, ctx, st, "grace@origen.example")
+	grace := seedUser(ctx, t, st, "grace@origen.example")
 	if err := st.UpsertMembership(ctx, nil, domain.Membership{
 		OrgID: origen.ID, UserID: grace.ID, Role: domain.RoleOwner,
 	}); err != nil {
@@ -141,7 +141,7 @@ func TestMergeIdentityNoReescribeAltasYaCompletadas(t *testing.T) {
 func TestCleanupExpiredEjecutaTodasSusConsultas(t *testing.T) {
 	st, ctx := newStore(t)
 
-	ada := seedUser(t, ctx, st, "ada@cleanup.example")
+	ada := seedUser(ctx, t, st, "ada@cleanup.example")
 	// Una sesión caducada hace mucho más que el margen de retención: si la purga
 	// llega hasta ella, desaparece; si la consulta revienta, ni se intenta.
 	vieja := time.Now().UTC().Add(-90 * 24 * time.Hour)
@@ -180,7 +180,7 @@ func TestAltaDeOrganizacionesFusionadasQuedaReparada(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateOrg(destino): %v", err)
 	}
-	hedy := seedUser(t, ctx, st, "hedy@absorbida.example")
+	hedy := seedUser(ctx, t, st, "hedy@absorbida.example")
 	if _, err := st.UpsertOnboarding(ctx, nil, hedy.ID, "organization", "personas", origen.ID, false); err != nil {
 		t.Fatalf("UpsertOnboarding: %v", err)
 	}

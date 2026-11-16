@@ -43,13 +43,14 @@ import {
   CardTitle,
   ToastProvider,
   useToast,
+  CopyField,
+  Stat,
 } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import type { AnalyticsRow, AnalyticsSite, AnalyticsView } from '../lib/analytics.js';
 import type { T } from '../i18n/index.js';
 import { useT } from '../i18n/index.js';
 import { postBff, type BffOk } from '../lib/bff-client.js';
-import { CopyField } from './CopyField.js';
 
 interface Props {
   projectSlug: string;
@@ -64,17 +65,6 @@ export default function AnalyticsPanel(props: Props) {
     <ToastProvider>
       <Inner {...props} t={useT(props.locale)} />
     </ToastProvider>
-  );
-}
-
-/** Cifra grande con su etiqueta debajo. El número manda; el texto explica. */
-function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div class="min-w-28">
-      <p class="text-2xl font-semibold tabular-nums">{value}</p>
-      <p class="text-text-subtle text-sm">{label}</p>
-      {hint ? <p class="sytue-meta mt-0.5">{hint}</p> : null}
-    </div>
   );
 }
 
@@ -179,7 +169,7 @@ function Inner({ projectSlug, host, view, locale, t }: Props & { t: T }) {
       <Card>
         <CardBody>
           <EmptyState
-            illustration={<Icon name="chart" size={32} />}
+            icon="chart"
             title={t('analytics.unavailable.title')}
             description={t('analytics.unavailable.desc')}
           />
@@ -239,16 +229,33 @@ function Inner({ projectSlug, host, view, locale, t }: Props & { t: T }) {
         </CardHeader>
         <CardBody>
           <div class="flex flex-wrap gap-8">
-            <Kpi label={t('analytics.kpi.pageviews')} value={nf.format(totals?.pageviews ?? 0)} />
+            <Stat
+              surface="plain"
+              class="min-w-28"
+              label={t('analytics.kpi.pageviews')}
+              value={nf.format(totals?.pageviews ?? 0)}
+            />
             {/* La etiqueta honesta va pegada a la cifra, no en una nota al pie:
                 sin ella el número parece un único de rango y está inflado. */}
-            <Kpi
+            <Stat
+              surface="plain"
+              class="min-w-28"
               label={t('analytics.kpi.visitors')}
               value={nf.format(totals?.visitors ?? 0)}
               {...(view.visitorsAreDailySum ? { hint: t('analytics.kpi.visitorsHint') } : {})}
             />
-            <Kpi label={t('analytics.kpi.visits')} value={nf.format(totals?.visits ?? 0)} />
-            <Kpi label={t('analytics.kpi.bounce')} value={`${bounceRate} %`} />
+            <Stat
+              surface="plain"
+              class="min-w-28"
+              label={t('analytics.kpi.visits')}
+              value={nf.format(totals?.visits ?? 0)}
+            />
+            <Stat
+              surface="plain"
+              class="min-w-28"
+              label={t('analytics.kpi.bounce')}
+              value={`${bounceRate} %`}
+            />
           </div>
 
           <div class="mt-6">
@@ -437,7 +444,7 @@ function Inner({ projectSlug, host, view, locale, t }: Props & { t: T }) {
           <CardBody>
             <div>
               <CopyField
-                t={t}
+                labelWidth="stacked"
                 label={t('analytics.snippet.label')}
                 value={`<script defer src="/_sytue/s.js"></script>`}
               />

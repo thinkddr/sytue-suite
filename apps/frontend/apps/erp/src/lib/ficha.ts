@@ -17,12 +17,21 @@
  * @param modelo  Clave del modelo (`contacto`, `factura_venta`…).
  * @param ficha   El registro abierto, o `'nueva'` para un alta.
  * @param semilla De dónde copia sus valores un alta (duplicar); nulo si parte en blanco.
+ * @param descartes Cuántas veces se han descartado sus cambios (`useGuardaDeFicha`):
+ *   descartar sin cambiar de ficha —«Nuevo» con un alta en blanco abierta— también
+ *   tiene que rehacer el formulario.
  */
 export function claveDeFicha(
   modelo: string,
   ficha: { id: string } | 'nueva',
   semilla: { id: string } | null,
+  descartes = 0,
 ): string {
-  if (ficha !== 'nueva') return `${modelo}:registro:${ficha.id}`;
-  return semilla ? `${modelo}:copia:${semilla.id}` : `${modelo}:nueva`;
+  const base =
+    ficha !== 'nueva'
+      ? `${modelo}:registro:${ficha.id}`
+      : semilla
+        ? `${modelo}:copia:${semilla.id}`
+        : `${modelo}:nueva`;
+  return descartes ? `${base}#${descartes}` : base;
 }

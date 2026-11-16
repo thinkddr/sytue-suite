@@ -18,6 +18,7 @@ import (
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/drive/internal/domain"
 	"git.sytue.eu/sytue/one/services/drive/internal/service"
+	"git.sytue.eu/sytue/one/services/drive/internal/store"
 )
 
 // arbol es un Drive con carpetas de verdad: el fake general devuelve lo mismo para
@@ -33,7 +34,7 @@ func (a *arbol) ListSubfolders(_ context.Context, id uuid.UUID) ([]domain.Folder
 }
 
 // ListFilesPage entrega los archivos de uno en uno, para que el cursor tenga que avanzar.
-func (a *arbol) ListFilesPage(_ context.Context, id uuid.UUID, cursor string, _ int) (service.FilePage, error) {
+func (a *arbol) ListFilesPage(_ context.Context, id uuid.UUID, _ store.OrdenFicheros, cursor string, _ int) (service.FilePage, error) {
 	fs := a.archivos[id]
 	i := 0
 	if cursor != "" {

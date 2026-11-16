@@ -21,6 +21,7 @@ import {
   Tabs,
   useConfirm,
   usePrompt,
+  useUltimo,
 } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import type { SytueUser } from '@sytue/auth';
@@ -37,22 +38,48 @@ import type {
   BasesViewConfig,
   BasesViewKind,
 } from '@sytue/api-clients/bases';
-import { DialogoCampo, DialogoImportar, DialogoVarios } from '../components/Dialogos.js';
+import {
+  DialogoBorrarCampo,
+  DialogoCampo,
+  DialogoFormulaCampo,
+  DialogoImportar,
+  DialogoOpcionesCampo,
+  DialogoRenombrarCampo,
+  DialogoVarios,
+} from '../components/Dialogos.js';
 import { DialogoCompartir } from '../components/DialogoCompartir.js';
 import { DialogoAdjuntos } from '../components/DialogoAdjuntos.js';
 import { DialogoConexiones } from '../components/DialogoConexiones.js';
 import { DialogoVista } from '../components/DialogoVista.js';
+import { FichaRegistro } from '../components/FichaRegistro.js';
+import { BarraLectura } from '../components/BarraLectura.js';
 import { Marco } from '../components/Marco.js';
+import { PanelActividad, DialogoDescripcion } from '../components/PanelActividad.js';
 import { PanelComentarios } from '../components/PanelComentarios.js';
 import { PanelFormulario } from '../components/PanelFormulario.js';
 import { PanelScripts } from '../components/PanelScripts.js';
-import { Rejilla } from '../components/Rejilla.js';
+import { Rejilla, type AccionCampo } from '../components/Rejilla.js';
+import { VacioGuiado } from '../components/VacioGuiado.js';
+import { esRecorte, vacioDe } from '../lib/vacios.js';
 import { Tablero } from '../components/Tablero.js';
+import { Galeria } from '../components/Galeria.js';
+import { datosDeColumna } from '../lib/vistas.js';
 import { useT } from '../i18n/index.js';
 import { cliente, mensajeDeError } from '../lib/api.js';
 import { tonoDeBase } from '../lib/aspecto.js';
 import { registroDelEnlace } from '../lib/comentarios.js';
+import { moverCampo as moverCampoEn } from '../lib/esquema.js';
+import { hayCambios } from '../lib/ficha.js';
+import {
+  SIN_LECTURA,
+  crearTurnos,
+  hayLectura,
+  opcionesDeLectura,
+  type Lectura,
+} from '../lib/lectura.js';
 import { MAX_OPCIONES_ENLACE, PAGINA } from '../lib/limites.js';
+import { errorDeAdjunto, MAX_BYTES_ADJUNTO } from '../lib/adjuntos.js';
+import { campoDeAdjuntos, esCSV, llevaFicheros } from '../lib/pegar.js';
 import { ruta } from '../lib/rutas.js';
 import {
   idAleatorio,
@@ -88,11 +115,15 @@ interface Props {
 
 type Dialogo =
   | { tipo: 'campo' }
+  | { tipo: 'editarCampo'; accion: AccionCampo; campo: BasesField }
   | { tipo: 'compartir' }
-  | { tipo: 'importar' }
+  | { tipo: 'importar'; fichero?: File }
   | { tipo: 'vista' }
+  | { tipo: 'editarVista'; vista: BasesView }
   | { tipo: 'conexiones' }
   | { tipo: 'scripts' }
+  | { tipo: 'actividad' }
+  | { tipo: 'descripcion' }
   | { tipo: 'varios'; registro: BasesRecord; campo: BasesField }
   | { tipo: 'adjuntos'; registro: string; campo: BasesField };
 
@@ -130,9 +161,19 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
   const [vistas, setVistas] = useState<BasesView[]>([]);
   /** La vista guardada que se está mirando; '' = todos los registros, en rejilla. */
   const [vistaId, setVistaId] = useState('');
+  // Búsqueda y orden de un momento, encima de la vista; se leen por ref para que todas
+  // las recargas (tiempo real, «cargar más») pidan lo mismo que se está viendo.
+  const [lectura, setLectura] = useState<Lectura>(SIN_LECTURA);
+  const lecturaRef = useUltimo(lectura);
+  const turnos = useMemo(crearTurnos, []);
   const selectorVistaId = useId();
   /** El registro cuyos comentarios están abiertos en el panel lateral. */
   const [comentando, setComentando] = useState<{ id: string; nombre: string } | null>(null);
+  /**
+   * La ficha abierta: el registro TAL COMO SE ABRIÓ (lo que se guarda se compara con él,
+   * no con el de ahora) y si se acaba de añadir.
+   */
+  const [ficha, setFicha] = useState<{ registro: BasesRecord; nuevo: boolean } | null>(null);
   /** Tiempo real: quién más está, si el flujo está caído y si se ha perdido el acceso. */
   const [presentes, setPresentes] = useState<BasesPresence[]>([]);
   const [sinConexion, setSinConexion] = useState(false);
@@ -202,12 +243,15 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
       const v = hacia === 'inicio' ? SIN_VENTANAS : ventanasRef.current;
       const cursor = hacia === 'mas' ? v.siguiente : hacia === 'antes' ? cursorAnterior(v) : '';
       if (cursor === null) return;
+      const turno = hacia === 'inicio' ? turnos.nuevo() : turnos.actual();
       try {
         const pag = await cliente().listRecords(tablaId, {
           limit: PAGINA,
           ...(cursor ? { cursor } : {}),
           ...(vista ? { view: vista } : {}),
+          ...opcionesDeLectura(lecturaRef.current),
         });
+        if (!turnos.vigente(turno)) return;
         setCampos(pag.fields);
         setRolTabla(pag.role);
         setRecalculando(pag.recalculating === true);
@@ -234,18 +278,21 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
           setEtiquetas((m) => ({ ...m, [dest]: new Map(lista.map((x) => [x.id, x.etiqueta])) }));
         }
       } catch (e) {
+        if (!turnos.vigente(turno)) return; // el fallo de una lectura ya dejada atrás
         // El cursor es del orden de la vista: si la vista cambió, se vuelve a empezar.
         if (hacia !== 'inicio' && e instanceof HttpError && e.status === 422)
           return cargar(tablaId, vista);
         setError(mensajeDeError(e, t));
       }
     },
-    [t],
+    [t, turnos, lecturaRef],
   );
 
   // Al cambiar de tabla: sus vistas guardadas, y se vuelve a «todos los registros».
   useEffect(() => {
+    setFicha(null);
     setVistaId('');
+    setLectura(SIN_LECTURA);
     setVistas([]);
     if (!activa) return;
     cliente()
@@ -262,7 +309,7 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
     }
     setVentanas(SIN_VENTANAS);
     void cargarRegistros(activa, vistaId);
-  }, [activa, vistaId, cargarRegistros]);
+  }, [activa, vistaId, lectura, cargarRegistros]);
 
   /**
    * Escribe UNA celda (o los enlaces de un campo) como operación con identificador: no
@@ -297,14 +344,85 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
     }
   }
 
-  async function nuevoRegistro(): Promise<void> {
+  /** Añade un registro con `datos` de partida (los de la columna del tablero, si viene de ahí). */
+  async function nuevoRegistro(datos: Record<string, BasesValue> = {}): Promise<void> {
     try {
-      const r = await cliente().createRecord(activa, {});
+      const r = await cliente().createRecord(activa, datos);
       setVentanas((v) => anadir(v, r));
       setEstado(t('grid.added'));
+      // Añadir es rellenar: la ficha del registro nuevo se abre sola.
+      setFicha({ registro: r, nuevo: true });
     } catch (e) {
       setError(mensajeDeError(e, t));
     }
+  }
+
+  /**
+   * Crea, en orden, los registros de las filas pegadas que no cabían en las que hay. No
+   * abre la ficha: quien pega un bloque ya ha rellenado los valores.
+   */
+  async function crearVarios(filas: Record<string, BasesValue>[]): Promise<string | null> {
+    try {
+      for (const datos of filas) {
+        const r = await cliente().createRecord(activa, datos);
+        setVentanas((v) => anadir(v, r));
+      }
+      setEstado(t('grid.added'));
+      return null;
+    } catch (e) {
+      return mensajeDeError(e, t);
+    }
+  }
+
+  /**
+   * Ficheros soltados sobre la base: un CSV abre «Importar» con él ya elegido (si se
+   * puede cambiar el esquema); lo demás, soltado sobre una fila, son adjuntos de esa fila
+   * en la columna de adjuntos sobre la que cae o en la primera de la tabla.
+   */
+  function soltarFicheros(ficheros: File[], r?: BasesRecord, col = -1): void {
+    const csv = ficheros.find((f) => esCSV(f.name));
+    if (csv && esPropietario) {
+      setErrorDialogo('');
+      setDialogo({ tipo: 'importar', fichero: csv });
+      return;
+    }
+    const campo = r && puedeEditar ? campoDeAdjuntos(campos, col) : null;
+    if (r && campo) void subirAdjuntos(r, campo, ficheros);
+  }
+
+  /** Sube los ficheros, uno tras otro, al campo de adjuntos de un registro. */
+  async function subirAdjuntos(r: BasesRecord, campo: BasesField, ficheros: File[]): Promise<void> {
+    setError('');
+    // Se avisa ANTES de mandar nada: uno que pasa del tope no se sube ni deja a medias
+    // los demás.
+    if (ficheros.some((f) => f.size > MAX_BYTES_ADJUNTO)) {
+      setError(t('attach.tooLarge'));
+      return;
+    }
+    setEstado(t('attach.uploading'));
+    for (const f of ficheros) {
+      try {
+        const nuevo = await cliente().uploadAttachment(r.id, campo.id, f);
+        setRegistros((rs) =>
+          rs.map((x) =>
+            x.id === r.id
+              ? {
+                  ...x,
+                  attachments: {
+                    ...x.attachments,
+                    [campo.id]: [...(x.attachments?.[campo.id] ?? []), nuevo],
+                  },
+                }
+              : x,
+          ),
+        );
+      } catch (e) {
+        setError(errorDeAdjunto(e, t));
+        setEstado('');
+        return;
+      }
+    }
+    setEstado(t('grid.saved'));
   }
 
   async function borrarRegistro(r: BasesRecord): Promise<void> {
@@ -343,6 +461,29 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
     }
   }
 
+  /**
+   * Lo que guarda la ficha. Se cierra ANTES de escribir, como en Fyne: el foco vuelve a
+   * la fila y lo escrito viaja celda a celda con `cambiar`. Con `otro`, se añade después
+   * un registro y se abre su ficha, para rellenar una tabla seguida.
+   */
+  async function guardarFicha(
+    datos: Record<string, BasesValue>,
+    enlaces: Record<string, string[]>,
+    otro: boolean,
+  ): Promise<void> {
+    if (!ficha) return;
+    const { registro } = ficha;
+    setFicha(null);
+    if (hayCambios({ datos, enlaces, invalidos: [] })) {
+      const err = await cambiar(registro, datos, enlaces);
+      if (err) {
+        setError(err);
+        return;
+      }
+    }
+    if (otro) await nuevoRegistro();
+  }
+
   async function guardarVarios(ids: string[]): Promise<void> {
     if (dialogo?.tipo !== 'varios') return;
     const { registro, campo } = dialogo;
@@ -366,6 +507,57 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
     }
   }
 
+  function abrirAccionCampo(accion: AccionCampo, campo: BasesField): void {
+    setErrorDialogo('');
+    setDialogo({ tipo: 'editarCampo', accion, campo });
+  }
+
+  /**
+   * Renombrar, cambiar la fórmula o borrar un campo. El error del servicio se queda en
+   * el diálogo, que sigue abierto; si sale bien se recargan la estructura (los nombres y
+   * las fórmulas) y los registros (los valores recalculados o ya sin ese campo).
+   */
+  async function cambiarCampo(op: () => Promise<void>): Promise<void> {
+    setOcupado(true);
+    setErrorDialogo('');
+    try {
+      await op();
+      setDialogo(null);
+      await cargarEstructura();
+      await cargarRegistros(activa, vistaId);
+    } catch (e) {
+      setErrorDialogo(mensajeDeError(e, t));
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  /**
+   * Mueve un campo al sitio de otro. Se pinta ya (la columna no espera a la red) y se
+   * manda el orden de TODOS los campos de la tabla, no solo de los que se ven; si el
+   * servicio lo rechaza (otra persona cambió los campos entretanto), se recarga.
+   */
+  async function moverCampo(campo: BasesField, destino: BasesField): Promise<void> {
+    const todos = tablas.find((x) => x.id === activa)?.fields ?? campos;
+    const orden = moverCampoEn(
+      todos.map((c) => c.id),
+      campo.id,
+      destino.id,
+    );
+    const pos = new Map(orden.map((id, i) => [id, i]));
+    const ordenar = (l: BasesField[]): BasesField[] =>
+      [...l].sort((a, b) => (pos.get(a.id) ?? 0) - (pos.get(b.id) ?? 0));
+    setCampos(ordenar);
+    setTablas((ts) => ts.map((x) => (x.id === activa ? { ...x, fields: ordenar(x.fields) } : x)));
+    try {
+      await cliente().reorderFields(activa, orden);
+    } catch (e) {
+      setEstado(mensajeDeError(e, t));
+      await cargarEstructura();
+      await cargarRegistros(activa, vistaId);
+    }
+  }
+
   async function crearVista(
     nombre: string,
     tipo: BasesViewKind,
@@ -377,6 +569,20 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
       setDialogo(null);
       setVistas(await cliente().listViews(activa));
       setVistaId(v.id);
+    } catch (e) {
+      setErrorDialogo(mensajeDeError(e, t));
+    }
+  }
+
+  async function editarVista(v: BasesView, nombre: string, cfg: BasesViewConfig): Promise<void> {
+    setErrorDialogo('');
+    try {
+      const nueva = await cliente().updateView(v.id, { name: nombre, config: cfg });
+      setDialogo(null);
+      setVistas((vs) => vs.map((x) => (x.id === nueva.id ? nueva : x)));
+      // El id no cambia, así que el efecto de la vista no salta: los registros se piden
+      // otra vez a mano, con los filtros y el orden nuevos.
+      if (vistaId === nueva.id) void cargarRegistros(activa, nueva.id);
     } catch (e) {
       setErrorDialogo(mensajeDeError(e, t));
     }
@@ -453,6 +659,22 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
       await cargarEstructura();
     } catch (e) {
       setError(mensajeDeError(e, t));
+    }
+  }
+
+  /** La descripción se guarda con el nombre de ahora: el servicio cambia los dos. */
+  async function guardarDescripcion(descripcion: string): Promise<void> {
+    if (!base) return;
+    setOcupado(true);
+    setErrorDialogo('');
+    try {
+      await cliente().updateBase(baseId, base.name, descripcion);
+      setDialogo(null);
+      await cargarEstructura();
+    } catch (e) {
+      setErrorDialogo(mensajeDeError(e, t));
+    } finally {
+      setOcupado(false);
     }
   }
 
@@ -558,8 +780,8 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
             break;
           case 'registro':
             // Con una vista (filtro u orden) un alta puede no tocar aquí o ir a otro sitio: se recarga.
-            if (plan.nuevo && (v.vistaId || v.hayMas)) {
-              if (v.vistaId) recargar(false);
+            if (plan.nuevo && (v.vistaId || v.hayMas || hayLectura(lecturaRef.current))) {
+              if (v.vistaId || hayLectura(lecturaRef.current)) recargar(false);
               break;
             }
             cliente()
@@ -600,7 +822,7 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
       if (recarga) clearTimeout(recarga);
       window.removeEventListener('bases:foco', alEnfocar);
     };
-  }, [baseId, conn]);
+  }, [baseId, conn, lecturaRef]);
 
   // La celda con el foco se dice a los demás sin esperar al latido (con un respiro, para
   // no mandar una petición por cada flecha).
@@ -619,6 +841,15 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
 
   const comentar = (r: BasesRecord) =>
     setComentando({ id: r.id, nombre: etiquetaDeRegistro(campos, r) });
+  const abrirFicha = (r: BasesRecord) => setFicha({ registro: r, nuevo: false });
+  /** El registro de la ficha como está ahora (adjuntos recién subidos, cambios de otros). */
+  const fichaActual = ficha
+    ? (registros.find((r) => r.id === ficha.registro.id) ?? ficha.registro)
+    : null;
+  const filaFicha = ficha
+    ? ventanas.primera * PAGINA +
+      (registros.findIndex((r) => r.id === ficha.registro.id) + 1 || registros.length + 1)
+    : 0;
 
   const exportar = (formato: 'csv' | 'json') =>
     ruta(`/api/tables/${activa}/export?format=${formato}`);
@@ -628,6 +859,12 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
   const nombreVista = vista
     ? `${vista.name} · ${t(`view.kind.${vista.kind}`)}`
     : `${t('view.kind.grid')} · ${t('view.all')}`;
+  // «Ver todos los registros» desde un recorte vacío: fuera la búsqueda y, si la vista
+  // filtra, a «todos». El orden elegido se queda: no esconde nada.
+  const verTodos = (): void => {
+    setLectura((l) => ({ ...l, q: '' }));
+    if ((vista?.config.filters ?? []).length > 0) setVistaId('');
+  };
   const elegirVista = (id: string, cerrar: () => void): void => {
     cerrar();
     setVistaId(id);
@@ -636,7 +873,24 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
 
   return (
     <Marco user={user} hubBaseUrl={hubBaseUrl} locale={locale} activa="bases">
-      <div class="flex min-w-0 flex-col gap-2 p-4 sm:gap-3 md:p-6">
+      {/* Un CSV soltado en cualquier sitio de la base abre «Importar»; lo soltado sobre
+          una fila de la rejilla lo recoge ella antes (adjuntos). Sin esto, el navegador
+          abriría el fichero y se perdería la página. */}
+      <div
+        class="flex min-w-0 flex-col gap-2 p-4 sm:gap-3 md:p-6"
+        onDragOver={(e: DragEvent) => {
+          // Se para SIEMPRE que lleve ficheros, también para quien no puede importar:
+          // soltarlos donde no se aceptan no debe sacarle de la página.
+          if (!llevaFicheros(e.dataTransfer)) return;
+          e.preventDefault();
+          if (e.dataTransfer) e.dataTransfer.dropEffect = esPropietario ? 'copy' : 'none';
+        }}
+        onDrop={(e: DragEvent) => {
+          if (!llevaFicheros(e.dataTransfer)) return;
+          e.preventDefault();
+          if (esPropietario) soltarFicheros(Array.from(e.dataTransfer?.files ?? []));
+        }}
+      >
         <div class="border-border-subtle flex min-w-0 items-center justify-between gap-2 border-b pb-3">
           <div class="flex min-w-0 flex-1 items-center gap-2">
             <IconButton href={ruta('/')} label={t('base.back')}>
@@ -709,6 +963,24 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
                           {t('base.rename')}
                         </MenuItem>
                         <MenuItem
+                          onClick={() => {
+                            cerrar();
+                            setErrorDialogo('');
+                            setDialogo({ tipo: 'descripcion' });
+                          }}
+                        >
+                          {t('base.editDescription')}
+                        </MenuItem>
+                        <MenuItem
+                          icon={<Icon name="clock" size={16} />}
+                          onClick={() => {
+                            cerrar();
+                            setDialogo({ tipo: 'actividad' });
+                          }}
+                        >
+                          {t('activity.open')}
+                        </MenuItem>
+                        <MenuItem
                           danger
                           onClick={() => {
                             cerrar();
@@ -725,6 +997,11 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
             </div>
           ) : null}
         </div>
+        {base?.description ? (
+          <p class="text-text-muted line-clamp-3 max-w-3xl text-sm whitespace-pre-line">
+            {base.description}
+          </p>
+        ) : null}
 
         {error ? (
           <p role="alert" class="text-danger-text text-sm">
@@ -754,17 +1031,14 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
         {cargando ? (
           <Skeleton height="12rem" />
         ) : tablas.length === 0 ? (
-          <div class="flex flex-col items-start gap-3">
-            <p class="text-text-muted text-sm">{t('base.noTables')}</p>
-            {esPropietario ? (
-              <div class="flex gap-2">
-                <Button onClick={() => void nuevaTabla()}>{t('table.add')}</Button>
-                <Button variant="secondary" onClick={() => setDialogo({ tipo: 'importar' })}>
-                  {t('import.open')}
-                </Button>
-              </div>
-            ) : null}
-          </div>
+          <VacioGuiado
+            t={t}
+            vacio={vacioDe('sinTablas', { esquema: esPropietario, escribir: puedeEditar })}
+            acciones={{
+              crearTabla: () => void nuevaTabla(),
+              importarCsv: () => setDialogo({ tipo: 'importar' }),
+            }}
+          />
         ) : (
           <Tabs
             class="min-w-0"
@@ -828,6 +1102,17 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
                                 >
                                   {t('view.add')}
                                 </MenuItem>
+                                {vista ? (
+                                  <MenuItem
+                                    onClick={() => {
+                                      cerrar();
+                                      setErrorDialogo('');
+                                      setDialogo({ tipo: 'editarVista', vista });
+                                    }}
+                                  >
+                                    {t('view.edit')}
+                                  </MenuItem>
+                                ) : null}
                                 {vista ? (
                                   <MenuItem
                                     danger
@@ -963,18 +1248,42 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
                           <PanelFormulario t={t} locale={locale} vista={vista.id} />
                         ) : null}
                       </div>
-                    ) : campoTablero ? (
+                    ) : campoTablero || vista?.kind === 'gallery' ? (
                       <>
-                        <Tablero
+                        {/* La búsqueda y el orden siguen al cambiar de vista: el tablero
+                            y la galería también llevan la barra, o filtrarían sin enseñarlo. */}
+                        <BarraLectura
                           t={t}
                           campos={campos}
-                          agrupar={campoTablero}
-                          registros={registros}
-                          puedeEditar={puedeEditar}
-                          onMover={(r, valor) => cambiar(r, { [campoTablero.id]: valor })}
-                          onComentar={comentar}
-                          presentes={enCeldas}
+                          lectura={lectura}
+                          onCambiar={setLectura}
                         />
+                        {campoTablero ? (
+                          <Tablero
+                            t={t}
+                            campos={campos}
+                            agrupar={campoTablero}
+                            registros={registros}
+                            puedeEditar={puedeEditar}
+                            onMover={(r, valor) => cambiar(r, { [campoTablero.id]: valor })}
+                            onAbrir={abrirFicha}
+                            onAnadir={(valor) =>
+                              void nuevoRegistro(datosDeColumna(campoTablero, valor))
+                            }
+                            onComentar={comentar}
+                            presentes={enCeldas}
+                          />
+                        ) : (
+                          <Galeria
+                            t={t}
+                            campos={campos}
+                            registros={registros}
+                            puedeEditar={puedeEditar}
+                            onAbrir={abrirFicha}
+                            onComentar={comentar}
+                            presentes={enCeldas}
+                          />
+                        )}
                         <div class="flex flex-wrap gap-2">
                           {hayAntes ? (
                             <Button
@@ -997,31 +1306,62 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
                         </div>
                       </>
                     ) : (
-                      <Rejilla
-                        t={t}
-                        nombreTabla={x.name}
-                        campos={campos}
-                        registros={registros}
-                        puedeEditar={puedeEditar}
-                        etiquetas={etiquetas}
-                        onCambiar={cambiar}
-                        onElegirVarios={(registro, campo) =>
-                          setDialogo({ tipo: 'varios', registro, campo })
-                        }
-                        onAdjuntos={(registro, campo) =>
-                          setDialogo({ tipo: 'adjuntos', registro: registro.id, campo })
-                        }
-                        onBorrar={(r) => void borrarRegistro(r)}
-                        onComentar={comentar}
-                        presentes={enCeldas}
-                        onFoco={alEnfocarCelda}
-                        onNuevo={() => void nuevoRegistro()}
-                        desde={ventanas.primera * PAGINA}
-                        hayAntes={hayAntes}
-                        onAntes={() => void cargarRegistros(activa, vistaId, 'antes')}
-                        hayMas={hayMas}
-                        onMas={() => void cargarRegistros(activa, vistaId, 'mas')}
-                      />
+                      <>
+                        <BarraLectura
+                          t={t}
+                          campos={campos}
+                          lectura={lectura}
+                          onCambiar={setLectura}
+                        />
+                        <Rejilla
+                          t={t}
+                          nombreTabla={x.name}
+                          campos={campos}
+                          registros={registros}
+                          puedeEditar={puedeEditar}
+                          {...(lectura.q.trim()
+                            ? { recorte: 'busqueda' as const }
+                            : esRecorte(lectura, vista)
+                              ? { recorte: 'vista' as const }
+                              : {})}
+                          onVerTodos={verTodos}
+                          etiquetas={etiquetas}
+                          onCambiar={cambiar}
+                          onElegirVarios={(registro, campo) =>
+                            setDialogo({ tipo: 'varios', registro, campo })
+                          }
+                          onAdjuntos={(registro, campo) =>
+                            setDialogo({ tipo: 'adjuntos', registro: registro.id, campo })
+                          }
+                          onAbrir={abrirFicha}
+                          onComentar={comentar}
+                          presentes={enCeldas}
+                          onFoco={alEnfocarCelda}
+                          onNuevo={() => void nuevoRegistro()}
+                          onCrearVarios={crearVarios}
+                          onSoltarFicheros={soltarFicheros}
+                          {...(esPropietario
+                            ? {
+                                onCampo: abrirAccionCampo,
+                                ...((vista?.config.fields ?? []).length === 0
+                                  ? {
+                                      onMoverCampo: (c: BasesField, d: BasesField) =>
+                                        void moverCampo(c, d),
+                                    }
+                                  : {}),
+                                onNuevoCampo: () => {
+                                  setErrorDialogo('');
+                                  setDialogo({ tipo: 'campo' });
+                                },
+                              }
+                            : {})}
+                          desde={ventanas.primera * PAGINA}
+                          hayAntes={hayAntes}
+                          onAntes={() => void cargarRegistros(activa, vistaId, 'antes')}
+                          hayMas={hayMas}
+                          onMas={() => void cargarRegistros(activa, vistaId, 'mas')}
+                        />
+                      </>
                     )}
                   </div>
                 ) : null,
@@ -1049,6 +1389,55 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
           onCerrar={() => setDialogo(null)}
         />
       ) : null}
+      {dialogo?.tipo === 'editarCampo' && dialogo.accion === 'renombrar' ? (
+        <DialogoRenombrarCampo
+          t={t}
+          campo={dialogo.campo}
+          error={errorDialogo}
+          ocupado={ocupado}
+          onGuardar={(nombre) =>
+            void cambiarCampo(() => cliente().renameField(dialogo.campo.id, nombre))
+          }
+          onCerrar={() => setDialogo(null)}
+        />
+      ) : null}
+      {dialogo?.tipo === 'editarCampo' && dialogo.accion === 'formula' ? (
+        <DialogoFormulaCampo
+          t={t}
+          campo={dialogo.campo}
+          campos={campos}
+          tablas={tablas}
+          error={errorDialogo}
+          ocupado={ocupado}
+          onGuardar={(formula) =>
+            void cambiarCampo(() => cliente().setFieldFormula(dialogo.campo.id, formula))
+          }
+          onCerrar={() => setDialogo(null)}
+        />
+      ) : null}
+      {dialogo?.tipo === 'editarCampo' && dialogo.accion === 'opciones' ? (
+        <DialogoOpcionesCampo
+          t={t}
+          campo={dialogo.campo}
+          error={errorDialogo}
+          ocupado={ocupado}
+          onGuardar={(opciones) =>
+            void cambiarCampo(() => cliente().setFieldChoices(dialogo.campo.id, opciones))
+          }
+          onCerrar={() => setDialogo(null)}
+        />
+      ) : null}
+      {dialogo?.tipo === 'editarCampo' && dialogo.accion === 'borrar' ? (
+        <DialogoBorrarCampo
+          t={t}
+          campo={dialogo.campo}
+          tablas={tablas}
+          error={errorDialogo}
+          ocupado={ocupado}
+          onBorrar={() => void cambiarCampo(() => cliente().deleteField(dialogo.campo.id))}
+          onCerrar={() => setDialogo(null)}
+        />
+      ) : null}
       {dialogo?.tipo === 'compartir' ? (
         <DialogoCompartir
           t={t}
@@ -1065,6 +1454,16 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
           campos={campos}
           error={errorDialogo}
           onCrear={(n, k, c) => void crearVista(n, k, c)}
+          onCerrar={() => setDialogo(null)}
+        />
+      ) : null}
+      {dialogo?.tipo === 'editarVista' ? (
+        <DialogoVista
+          t={t}
+          campos={campos}
+          error={errorDialogo}
+          vista={dialogo.vista}
+          onCrear={(n, _k, c) => void editarVista(dialogo.vista, n, c)}
           onCerrar={() => setDialogo(null)}
         />
       ) : null}
@@ -1091,13 +1490,60 @@ export function BaseApp({ baseId, locale, user, hubBaseUrl }: Props): JSX.Elemen
           onCerrar={() => setDialogo(null)}
         />
       ) : null}
+      {dialogo?.tipo === 'actividad' ? (
+        <PanelActividad
+          t={t}
+          locale={locale}
+          baseId={baseId}
+          nombre={nombreBase}
+          yo={user.id}
+          tablas={tablas}
+          onCerrar={() => setDialogo(null)}
+        />
+      ) : null}
+      {dialogo?.tipo === 'descripcion' && base ? (
+        <DialogoDescripcion
+          t={t}
+          valor={base.description}
+          ocupado={ocupado}
+          error={errorDialogo}
+          onGuardar={(d) => void guardarDescripcion(d)}
+          onCerrar={() => setDialogo(null)}
+        />
+      ) : null}
       {dialogo?.tipo === 'importar' ? (
         <DialogoImportar
           t={t}
+          {...(dialogo.fichero ? { fichero: dialogo.fichero } : {})}
           error={errorDialogo}
           ocupado={ocupado}
           onImportar={(n, c) => void importar(n, c)}
           onCerrar={() => setDialogo(null)}
+        />
+      ) : null}
+      {ficha && fichaActual ? (
+        <FichaRegistro
+          key={ficha.registro.id}
+          t={t}
+          campos={campos}
+          registro={ficha.registro}
+          actual={fichaActual}
+          n={filaFicha}
+          nuevo={ficha.nuevo}
+          puedeEditar={puedeEditar && !sinAcceso}
+          opciones={opciones}
+          etiquetas={etiquetas}
+          onGuardar={(datos, enlaces, otro) => void guardarFicha(datos, enlaces, otro)}
+          onBorrar={() => {
+            const r = ficha.registro;
+            setFicha(null);
+            void borrarRegistro(r);
+          }}
+          onAdjuntos={(campo) =>
+            setDialogo({ tipo: 'adjuntos', registro: ficha.registro.id, campo })
+          }
+          onComentar={() => comentar(fichaActual)}
+          onCerrar={() => setFicha(null)}
         />
       ) : null}
       {dialogo?.tipo === 'adjuntos' && registros.some((r) => r.id === dialogo.registro) ? (

@@ -54,6 +54,7 @@ import {
   urlPermitida,
 } from './valores';
 import type { OrigenesPermitidos } from './valores';
+import { MODOS_MAYUSCULAS } from './mayusculas';
 
 /* ---------- Límites ---------- */
 
@@ -151,11 +152,14 @@ export const stopRecording = (): { steps: MacroStep[]; descartados: number } => 
  *    navegador en claro es peor que no tener macro.
  *  - `extdata` lleva el id de una conexión de datos y el resultado de una consulta: lo
  *    que contiene es de esa conexión, no de la macro.
+ *  - `formatPainter` (la brocha) pinta con el formato de lo que había bajo el cursor AL
+ *    GRABAR: la macro no lo lleva y, reproducida, armaría la brocha a ciegas.
  */
 export const NON_REPLAYABLE: ReadonlySet<string> = new Set([
   'undo',
   'redo',
   'presentar',
+  'formatPainter',
   'protect',
   'unprotect',
   'protectbook',
@@ -284,6 +288,7 @@ const VALORES: Readonly<Record<string, Valor>> = {
   color,
   highlight: colorOTransparente,
   lineHeight: unoDe(INTERLINEADOS),
+  changeCase: unoDe(MODOS_MAYUSCULAS),
   heading: unoDe(BLOQUES),
   insertTable: conforme(/^\d{1,2}\s*[x×]\s*\d{1,2}$/i),
   insertImage: imagen,
@@ -332,6 +337,7 @@ const VALORES: Readonly<Record<string, Valor>> = {
   tablestyle: conforme(/^[\w-]{1,64}$/),
   tabletotalfn: json,
   outline: json,
+  hide: json,
   subtotal: json,
   // Diapositivas
   nueva: opcional(unoDe(DISPOSICIONES)),

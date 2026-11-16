@@ -111,14 +111,36 @@ func (p *Pantalla) objetoLista(v tema.Variante) fyne.CanvasObject {
 	case len(p.Lista) == 0 && p.Fallo == "":
 		hijos = append(hijos, ui.NuevoVacio(p.t("bases.empty.title"), p.t("bases.empty.body")))
 	default:
-		filas := make([]fyne.CanvasObject, 0, len(p.Lista))
-		for _, b := range p.Lista {
+		// Con una sola base no hay nada que buscar; con lo escrito, el campo se queda
+		// aunque la lista se quede en una.
+		q := strings.TrimSpace(p.buscar.Texto())
+		if len(p.Lista) > 1 || p.buscar.Texto() != "" {
+			hijos = append(hijos, p.buscar)
+		}
+		vistas := filtrarBases(p.Lista, q)
+		if len(vistas) == 0 && q != "" {
+			hijos = append(hijos, ui.NuevoParrafo(p.t("bases.noMatches", i18n.Vars{"q": q}), tema.TextoSM, ui.Normal, "text-muted", v).A(p.anchoContenido()))
+		}
+		filas := make([]fyne.CanvasObject, 0, len(vistas))
+		for _, b := range vistas {
 			filas = append(filas, p.tarjeta(b))
 		}
-		hijos = append(hijos, container.New(ui.Columna{Hueco: tema.Espacio(2)}, filas...))
+		if len(filas) > 0 {
+			hijos = append(hijos, container.New(ui.Columna{Hueco: tema.Espacio(2)}, filas...))
+		}
 	}
 	return container.New(acotado{Max: anchoLista, Margen: tema.Espacio(6)},
 		container.New(ui.Columna{Hueco: tema.Espacio(6)}, hijos...))
+}
+
+// primeraLinea es la primera línea con texto de una descripción: en la fila solo cabe una.
+func primeraLinea(s string) string {
+	for l := range strings.Lines(s) {
+		if l = strings.TrimSpace(l); l != "" {
+			return l
+		}
+	}
+	return ""
 }
 
 // tarjeta es el `<a>` de una base: su nombre, cuándo se actualizó (y de qué organización
@@ -136,7 +158,7 @@ func (p *Pantalla) tarjeta(b api.BasesBase) *tarjetaBase {
 		tono = ui.InsigniaPrimaria
 	}
 	id := b.ID
-	x := &tarjetaBase{Nombre: b.Name, Detalle: detalle, Rol: rol, Tono: tono, Color: tonoDeBase(id), AlPulsar: func() { p.Abrir(id) }}
+	x := &tarjetaBase{Nombre: b.Name, Descripcion: primeraLinea(b.Description), Detalle: detalle, Rol: rol, Tono: tono, Color: tonoDeBase(id), AlPulsar: func() { p.Abrir(id) }}
 	x.ExtendBaseWidget(x)
 	return x
 }
@@ -148,7 +170,9 @@ func (p *Pantalla) tarjeta(b api.BasesBase) *tarjetaBase {
 type tarjetaBase struct {
 	widget.BaseWidget
 	Nombre, Detalle, Rol string
-	Tono                 ui.Tono
+	// Descripcion es la primera línea de la de la base; vacía, la fila no la pinta.
+	Descripcion string
+	Tono        ui.Tono
 	// Color es el color de grupo de la base, en su icono (`CardIcon`).
 	Color    ui.TonoTarjeta
 	AlPulsar func()
@@ -172,7 +196,16 @@ var (
 
 func (x *tarjetaBase) MinSize() fyne.Size {
 	return fyne.NewSize(ladoIconoBase+tema.Espacio(3)+ui.MedidaInsignia(x.Rol).Width+2*margenTarjeta+tema.Espacio(2),
-		2*margenTarjeta+max(tema.TextoBase.Linea+tema.TextoSM.Linea, ladoIconoBase))
+		2*margenTarjeta+max(x.altoTexto(), ladoIconoBase))
+}
+
+// altoTexto es lo que ocupan las líneas de texto: nombre, descripción si la hay y detalle.
+func (x *tarjetaBase) altoTexto() float32 {
+	alto := tema.TextoBase.Linea + tema.TextoSM.Linea
+	if x.Descripcion != "" {
+		alto += tema.TextoSM.Linea
+	}
+	return alto
 }
 
 func (x *tarjetaBase) Tapped(*fyne.PointEvent) {
@@ -201,7 +234,12 @@ func (x *tarjetaBase) TypedKey(k *fyne.KeyEvent) {
 }
 
 // AccessibilityLabel dice el nombre, el detalle y el rol, que es lo que lee el enlace.
-func (x *tarjetaBase) AccessibilityLabel() string { return x.Nombre + ", " + x.Detalle + ", " + x.Rol }
+func (x *tarjetaBase) AccessibilityLabel() string {
+	if x.Descripcion != "" {
+		return x.Nombre + ", " + x.Descripcion + ", " + x.Detalle + ", " + x.Rol
+	}
+	return x.Nombre + ", " + x.Detalle + ", " + x.Rol
+}
 
 // AccessibilityRole: es el enlace a la base.
 func (x *tarjetaBase) AccessibilityRole() fyne.AccessibleRole { return fyne.AccessibleRoleLink }
@@ -213,6 +251,7 @@ func (x *tarjetaBase) CreateRenderer() fyne.WidgetRenderer {
 		caja:     canvas.NewRectangle(tema.Color("surface", v)),
 		nombre:   ui.Texto(x.Nombre, tema.TextoBase, ui.SemiNegrita, tema.Color("text", v)),
 		detalle:  ui.Texto(x.Detalle, tema.TextoSM, ui.Normal, tema.Color("text-muted", v)),
+		descr:    ui.Texto(x.Descripcion, tema.TextoSM, ui.Normal, tema.Color("text-muted", v)),
 		insignia: ui.NuevaInsignia(x.Rol, x.Tono),
 		icono:    canvas.NewRectangle(color.Transparent),
 	}
@@ -230,6 +269,7 @@ type tarjetaRenderer struct {
 	x               *tarjetaBase
 	caja            *canvas.Rectangle
 	nombre, detalle *canvas.Text
+	descr           *canvas.Text
 	insignia        *ui.Insignia
 	icono           *canvas.Rectangle
 	glifo           *iconos.Dibujo
@@ -238,7 +278,7 @@ type tarjetaRenderer struct {
 func (r *tarjetaRenderer) Destroy()           {}
 func (r *tarjetaRenderer) MinSize() fyne.Size { return r.x.MinSize() }
 func (r *tarjetaRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{r.caja, r.icono, r.glifo.Objeto(), r.nombre, r.detalle, r.insignia}
+	return []fyne.CanvasObject{r.caja, r.icono, r.glifo.Objeto(), r.nombre, r.descr, r.detalle, r.insignia}
 }
 
 func (r *tarjetaRenderer) Layout(t fyne.Size) {
@@ -254,9 +294,16 @@ func (r *tarjetaRenderer) Layout(t fyne.Size) {
 	cabe := max(t.Width-xTexto-margenTarjeta-ins.Width-tema.Espacio(2), 0)
 	ui.Truncar(r.nombre, r.x.Nombre, tema.TextoBase, ui.SemiNegrita, cabe)
 	ui.Truncar(r.detalle, r.x.Detalle, tema.TextoSM, ui.Normal, cabe)
-	yTexto := (t.Height - tema.TextoBase.Linea - tema.TextoSM.Linea) / 2
+	ui.Truncar(r.descr, r.x.Descripcion, tema.TextoSM, ui.Normal, cabe)
+	yTexto := (t.Height - r.x.altoTexto()) / 2
 	ui.ColocarTexto(r.nombre, tema.TextoBase, xTexto, yTexto)
-	ui.ColocarTexto(r.detalle, tema.TextoSM, xTexto, yTexto+tema.TextoBase.Linea)
+	y := yTexto + tema.TextoBase.Linea
+	r.descr.Hidden = r.x.Descripcion == ""
+	if !r.descr.Hidden {
+		ui.ColocarTexto(r.descr, tema.TextoSM, xTexto, y)
+		y += tema.TextoSM.Linea
+	}
+	ui.ColocarTexto(r.detalle, tema.TextoSM, xTexto, y)
 }
 
 func (r *tarjetaRenderer) Refresh() {
@@ -266,6 +313,7 @@ func (r *tarjetaRenderer) Refresh() {
 	r.glifo.TenirCon(tinta)
 	r.nombre.Color = tema.Color("text", v)
 	r.detalle.Color = tema.Color("text-muted", v)
+	r.descr.Color = tema.Color("text-muted", v)
 	r.insignia.Refresh()
 	fondo := "surface"
 	if r.x.encima {

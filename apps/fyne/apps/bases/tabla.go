@@ -29,7 +29,14 @@ func (p *Pantalla) elegirTabla(id string) {
 	b := p.abierta
 	b.Activa, b.VistaID, b.Vistas, b.Estado = id, "", nil, ""
 	b.Campos, b.vent, b.RolTabla, b.Recalculando = nil, sinVentanas(), "", false
+	// Otra tabla, otros campos: la búsqueda y el orden de un momento no la siguen.
+	if b.espera != nil {
+		b.espera.Stop()
+	}
+	b.lectura, b.espera = lectura{}, nil
+	b.busqueda = p.nuevoBuscador(b)
 	b.rejilla = nuevaRejilla(p.t)
+	b.rejilla.idioma = p.tr.Locale()
 	b.rejilla.AlCambiar = func(r api.BasesRecord, campo api.BasesField, valor any) {
 		p.cambiar(r, map[string]any{campo.ID: valor}, nil)
 	}
@@ -38,7 +45,10 @@ func (p *Pantalla) elegirTabla(id string) {
 	// Intro sobre una celda de adjuntos abre la ficha, que es donde se ven y se suben.
 	b.rejilla.AlPegar = p.pegar
 	b.rejilla.AlAdjuntos = func(r api.BasesRecord, _ api.BasesField) { p.abrirRegistro(r, false) }
-	b.rejilla.AlMover = p.dejarALaVista
+	b.rejilla.AlMover = func(pos fyne.Position, tam fyne.Size) {
+		p.dejarALaVista(pos, tam)
+		p.alEnfocarCelda(b)
+	}
 	// `overflow-auto`: la rejilla se desplaza de lado y la rueda sigue bajando la página.
 	b.lado = ui.NuevoDesplazaLado(b.rejilla, 0, func() fyne.Scrollable {
 		if p.scroll == nil {
@@ -48,6 +58,9 @@ func (p *Pantalla) elegirTabla(id string) {
 	})
 	if p.scroll != nil {
 		p.scroll.Offset = fyne.Position{}
+	}
+	if b.rt != nil {
+		b.rt.ponerLatido(p.latidoDe(b), true) // otra tabla: los demás lo saben ya
 	}
 	p.Repintar()
 	if id == "" || p.svc == nil {
@@ -121,7 +134,7 @@ func (p *Pantalla) cargarRegistros(hacia string) {
 	if b == nil || b.Activa == "" || p.svc == nil {
 		return
 	}
-	tabla, vista, v, cursor := b.Activa, b.VistaID, b.vent, ""
+	tabla, vista, v, cursor, l := b.Activa, b.VistaID, b.vent, "", b.lectura
 	switch hacia {
 	case "mas":
 		if cursor = v.siguiente; cursor == "" {
@@ -136,13 +149,13 @@ func (p *Pantalla) cargarRegistros(hacia string) {
 	p.fondo(func() {
 		ctx, cancelar := p.ctx()
 		defer cancelar()
-		pag, err := p.svc.ListRecords(ctx, tabla, vista, cursor, pagina)
+		pag, err := p.svc.ListRecordsCon(ctx, tabla, vista, cursor, pagina, l.api())
 		var opciones map[string][]opcion
 		if err == nil && hacia == "inicio" {
 			opciones, err = p.opcionesDeEnlaces(ctx, pag.Fields)
 		}
 		enHilo(func() {
-			if p.abierta == b && b.Activa == tabla && b.VistaID == vista {
+			if p.abierta == b && b.Activa == tabla && b.VistaID == vista && b.lectura == l {
 				p.recibirPagina(hacia, v, pag, opciones, err)
 			}
 		})
@@ -208,6 +221,35 @@ func (p *Pantalla) recibirPagina(hacia string, v ventanas, pag api.BasesRecordPa
 	}
 	p.ponerRejilla()
 	p.Repintar()
+	if hacia == "inicio" && b.irA.registro != "" && b.irA.tabla == b.Activa {
+		p.irAlRegistro(b.irA.registro)
+		b.irA.tabla, b.irA.registro = "", ""
+	}
+}
+
+// irAlRegistro abre la ficha del registro de un enlace con sus comentarios. Se pide
+// suelto: no tiene por qué estar en la primera ventana de la rejilla.
+func (p *Pantalla) irAlRegistro(id string) {
+	b := p.abierta
+	p.fondo(func() {
+		ctx, cancelar := p.ctx()
+		defer cancelar()
+		r, err := p.svc.GetRecord(ctx, id)
+		enHilo(func() {
+			if p.abierta != b {
+				return
+			}
+			if err != nil {
+				b.Fallo = p.mensajeDeError(err)
+				p.Repintar()
+				return
+			}
+			p.abrirRegistro(r, false)
+			if p.ficha != nil {
+				p.ficha.verComentarios()
+			}
+		})
+	})
 }
 
 // ponerRejilla le da a la rejilla lo que hay en memoria.
@@ -218,6 +260,19 @@ func (p *Pantalla) ponerRejilla() {
 		g.Tabla = t.Name
 	}
 	g.PuedeEditar, g.Etiquetas, g.Desde = puedeEscribir(b.rol()), b.etiquetas, b.vent.primera*pagina
+	if b.rt != nil {
+		g.Presentes = presentesPorCelda(b.rt.presentes, b.Activa, p.conn)
+	}
+	// El menú ▾ de cada cabecera, solo para quien puede cambiar el esquema.
+	g.AlCampo, g.AlMoverCampo = nil, nil
+	if puedeEsquema(b.Datos.Role) {
+		g.AlCampo = p.alCampo
+		// Mover solo cuando la rejilla enseña el orden de la tabla: con una vista que
+		// elige sus campos manda el orden de la vista, y mover no se vería.
+		if v := b.vista(); v == nil || len(v.Config.Fields) == 0 {
+			g.AlMoverCampo = p.moverCampo
+		}
+	}
 	g.Poner(b.Campos, b.vent.registros())
 }
 
@@ -264,7 +319,9 @@ func (p *Pantalla) cambiar(r api.BasesRecord, datos map[string]any, enlaces map[
 				return
 			}
 			var res api.BasesCellResult
-			if res, err = p.svc.WriteCell(ctx, r.ID, campo, celda, idAleatorio()); err == nil {
+			op := idAleatorio()
+			b.propias.anadir(op) // antes de escribir: el eco puede llegar antes que la respuesta
+			if res, err = p.svc.WriteCell(ctx, r.ID, campo, celda, op); err == nil {
 				pisado, ultimo = pisado || res.Conflict, res.Record
 			}
 		}
@@ -311,14 +368,18 @@ func (p *Pantalla) trasCambiar(r api.BasesRecord, pisado bool, err error) {
 	p.Repintar() // el tablero se pinta con lo que hay: una tarjeta movida cambia de columna
 }
 
-func (p *Pantalla) nuevoRegistro() {
+func (p *Pantalla) nuevoRegistro() { p.crearRegistro(nil) }
+
+// crearRegistro añade un registro con `datos` de partida (los de la columna del tablero
+// donde se añade, o nada) y abre su ficha.
+func (p *Pantalla) crearRegistro(datos map[string]any) {
 	b := p.abierta
 	tabla := b.Activa
 	var r api.BasesRecord
 	p.hacer(func() (err error) {
 		ctx, cancelar := p.ctx()
 		defer cancelar()
-		r, err = p.svc.CreateRecord(ctx, tabla, nil, nil)
+		r, err = p.svc.CreateRecord(ctx, tabla, datos, nil)
 		return err
 	}, func() {
 		if b.Activa != tabla {
@@ -460,6 +521,9 @@ func (p *Pantalla) accionesDeTabla() []fyne.CanvasObject {
 	}
 	if puedeEditar {
 		acciones = append(acciones, ui.NuevoElementoMenu(p.t("view.add"), iconos.Mas, p.dialogoVista))
+		if b.vista() != nil {
+			acciones = append(acciones, ui.NuevoElementoMenu(p.t("view.edit"), iconos.Ajustes, p.editarVista))
+		}
 	}
 	if p.Guardar != nil {
 		acciones = append(acciones,
@@ -533,7 +597,11 @@ func (p *Pantalla) objetoTabla(v tema.Variante) fyne.CanvasObject {
 	case vista != nil && vista.Kind == api.BasesForm:
 		hijos = append(hijos, p.vistaFormulario(v, *vista))
 	case hay:
-		hijos = append(hijos, p.objetoTablero(v, campo, puedeEditar))
+		// La búsqueda y el orden se conservan al cambiar de vista: el tablero también
+		// lleva la barra, o filtraría con algo que ni se ve ni se puede quitar.
+		hijos = append(hijos, p.barraLectura(), p.objetoTablero(v, campo, puedeEditar))
+	case vista != nil && vista.Kind == api.BasesGallery:
+		hijos = append(hijos, p.barraLectura(), p.objetoGaleria(v, puedeEditar))
 	default:
 		hijos = append(hijos, p.objetoRejilla(puedeEditar))
 	}
@@ -572,13 +640,16 @@ func (p *Pantalla) vistaFormulario(v tema.Variante, vista api.BasesView) fyne.Ca
 func (p *Pantalla) objetoRejilla(puedeEditar bool) fyne.CanvasObject {
 	b := p.abierta
 	if len(b.Campos) == 0 {
-		return ui.NuevoRotulo(p.t("grid.noFields"), tema.TextoSM, ui.Normal, "text-muted")
+		// Sin campos no hay rejilla que pintar: solo el paso siguiente, si es suyo darlo.
+		esquema := puedeEsquema(b.Datos.Role)
+		return p.vacioGuiado(vacioDe(sinCampos, permisos{esquema: esquema, escribir: puedeEditar}, false),
+			map[accionVacio]func(){anadirCampo: p.dialogoCampo}, false)
 	}
 	// La ayuda de teclado no dice nada en una pantalla táctil: ahí se toca la celda o se
 	// abre la ficha de la fila. Que no se pueda cambiar, en cambio, se dice siempre.
 	// Es un párrafo y no un rótulo: en una ventana estrecha parte en líneas en vez de
 	// ensanchar la página entera y sacar de la vista lo que va a la derecha.
-	var hijos []fyne.CanvasObject
+	hijos := []fyne.CanvasObject{p.barraLectura()}
 	ayuda := func(clave string) fyne.CanvasObject {
 		v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 		return ui.NuevoParrafo(p.t(clave), tema.TextoXS, ui.Normal, "text-muted", v).A(p.anchoContenido())
@@ -594,11 +665,24 @@ func (p *Pantalla) objetoRejilla(puedeEditar bool) fyne.CanvasObject {
 			botonSM(p.t("grid.loadPrevious"), ui.Fantasma, func() { p.cargarRegistros("antes") })))
 	}
 	hijos = append(hijos, b.lado)
-	if len(b.rejilla.Registros) == 0 {
-		hijos = append(hijos, ui.NuevoRotulo(p.t("grid.empty"), tema.TextoSM, ui.Normal, "text-muted"))
+	// Sin filas, el estado vacío dice si la tabla está vacía o si nada pasa el recorte
+	// (una búsqueda o una vista con filtros), y ofrece el paso siguiente.
+	recorte := esRecorte(b.lectura, b.vista())
+	vacia := len(b.rejilla.Registros) == 0
+	if vacia {
+		estado := sinRegistros
+		if recorte {
+			estado = sinResultados
+		}
+		vc := vacioDe(estado, permisos{escribir: puedeEditar}, b.lectura.Q != "")
+		hijos = append(hijos, p.vacioGuiado(vc, map[accionVacio]func(){
+			anadirRegistro: p.nuevoRegistro,
+			verTodos:       p.verTodosLosRegistros,
+		}, true))
 	}
 	pie := []fyne.CanvasObject{}
-	if puedeEditar {
+	// Con la tabla vacía, «Añadir registro» ya es la acción del estado vacío.
+	if puedeEditar && (!vacia || recorte) {
 		pie = append(pie, botonSM(p.t("grid.addRecord"), ui.Secundario, p.nuevoRegistro).ConIcono(iconos.Mas, 14))
 	}
 	if b.vent.siguiente != "" {

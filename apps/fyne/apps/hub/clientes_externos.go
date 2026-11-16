@@ -355,8 +355,8 @@ func PoliticaDePrivacidad(apex string, idioma i18n.Locale) string {
 }
 
 // fila crea una fila de copiar con su rótulo del catálogo.
-func (r *clientesExternosRenderer) fila(rotulo, valor, copiado string) *FilaCopia {
-	f := nuevaFilaCopia(r.d.T, r.d.T.T(rotulo, nil), valor, r.d.copiar(copiado))
+func (r *clientesExternosRenderer) fila(rotulo, valor, copiado string) filaCopia {
+	f := nuevaFilaCopia(r.d.T.T(rotulo, nil), valor, r.d.copiar(copiado))
 	f.Ventana = r.d.Ancho()
 	return f
 }

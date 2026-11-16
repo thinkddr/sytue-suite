@@ -47,7 +47,7 @@ func (p *Pantalla) pegar(s fyne.Shortcut) {
 		return
 	}
 	if in, ok := p.captura(s); ok {
-		lanzar(func() error { return p.crear(in) })
+		p.lanzar(func() error { return p.crear(in) })
 	}
 }
 
@@ -84,7 +84,7 @@ func (p *Pantalla) enFilas() bool {
 // web solo mira `text/plain` y `text/uri-list`.
 func (p *Pantalla) Soltar(texto string, urls []string, pos fyne.Position) {
 	if in, ok := p.soltado(texto, urls, pos); ok {
-		lanzar(func() error { return p.crear(in) })
+		p.lanzar(func() error { return p.crear(in) })
 	}
 }
 

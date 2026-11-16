@@ -12,6 +12,7 @@ import (
 	"maunium.net/go/mautrix/id"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/resource"
 )
 
 var ErrUnsupported = errors.New("matrix: this action is unavailable for encrypted content")
@@ -47,6 +48,16 @@ func (c *Client) SendContent(ctx context.Context, roomID string, content Message
 // SendContentWithTxn retains the Matrix transaction across an explicit retry, so
 // an accepted event whose receipt was lost cannot become a second message.
 func (c *Client) SendContentWithTxn(ctx context.Context, roomID string, content MessageContent, relation Relation, transaction string) (EventRef, error) {
+	return c.sendContentWithAdmission(ctx, roomID, content, relation, transaction, nil)
+}
+
+// SendContentWithAdmission uses the same message/relation codec and exact SDK
+// preparation as every normal send, with a durable hook for this operation.
+func (c *Client) SendContentWithAdmission(ctx context.Context, roomID string, content MessageContent, relation Relation, transaction string, hook PublicationAdmissionHook) (EventRef, error) {
+	return c.sendContentWithAdmission(ctx, roomID, content, relation, transaction, hook)
+}
+
+func (c *Client) sendContentWithAdmission(ctx context.Context, roomID string, content MessageContent, relation Relation, transaction string, hook PublicationAdmissionHook) (EventRef, error) {
 	content.Version = 1
 	if err := validateContent(content); err != nil {
 		return EventRef{}, err
@@ -68,7 +79,7 @@ func (c *Client) SendContentWithTxn(ctx context.Context, roomID string, content 
 		}
 		payload["m.relates_to"] = relationContent
 	}
-	return c.sendEventWithTxn(ctx, roomID, event.EventMessage, payload, transaction)
+	return c.sendEventWithTxnAdmission(ctx, roomID, event.EventMessage, payload, transaction, hook)
 }
 
 func validateContent(content MessageContent) error {
@@ -177,14 +188,32 @@ func (c *Client) readEncryptedEvent(ctx context.Context, reference EventRef) (De
 		return DecryptedEvent{}, err
 	}
 	wire := encrypted.Content.AsEncrypted()
+	var outerDigest string
+	if c.cfg.ResourceProduct != "" {
+		raw, err := eventContentBytes(encrypted)
+		if err != nil {
+			return DecryptedEvent{}, err
+		}
+		outerDigest, err = resource.OuterCipherDigest(raw)
+		clear(raw)
+		if err != nil {
+			return DecryptedEvent{}, err
+		}
+	}
+	if c.cfg.ResourceProduct != "" {
+		if err := c.validateResourceReadCipher(ctx, reference, encrypted.Sender, outerDigest, wire); err != nil {
+			return DecryptedEvent{}, err
+		}
+	}
 	clearEvent, err := c.crypto.Decrypt(ctx, encrypted)
 	if err != nil {
 		return DecryptedEvent{}, err
 	}
-	value, err := c.decryptedEvent(ctx, clearEvent)
+	value, err := c.decryptedEvent(encryptedWireContext(ctx, encrypted), clearEvent)
 	if err == nil && wire != nil {
 		value.SessionID = wire.SessionID.String()
 		value.SenderKey = wire.SenderKey.String()
+		value.OuterCipherSHA256 = outerDigest
 	}
 	return value, err
 }

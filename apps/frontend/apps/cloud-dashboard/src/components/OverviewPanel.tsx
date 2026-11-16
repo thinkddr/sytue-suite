@@ -17,6 +17,7 @@ import {
   useConfirm,
   ToastProvider,
   InlineHelp,
+  Stat,
 } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import { formatList } from '@sytue/i18n';
@@ -434,22 +435,25 @@ function OverviewInner({
         {/* Uso */}
         <div class="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
           {usage.map((m) => (
-            <Card key={m.label} raised={false}>
-              <CardBody>
-                <p class="text-text-muted truncate text-sm">{m.label}</p>
-                <p class="sytue-h3 text-text mt-1 tabular-nums">{m.value}</p>
-                {m.delta ? (
-                  <p
-                    class={
-                      'mt-0.5 text-sm font-medium tabular-nums ' +
-                      (m.trend === 'down' ? 'text-success-text' : 'text-text-muted')
-                    }
-                  >
-                    {m.delta}
-                  </p>
-                ) : null}
-              </CardBody>
-            </Card>
+            <Stat
+              key={m.label}
+              label={m.label}
+              value={m.value}
+              {...(m.delta
+                ? {
+                    hint: (
+                      <span
+                        class={
+                          'text-sm font-medium tabular-nums ' +
+                          (m.trend === 'down' ? 'text-success-text' : 'text-text-muted')
+                        }
+                      >
+                        {m.delta}
+                      </span>
+                    ),
+                  }
+                : {})}
+            />
           ))}
         </div>
 

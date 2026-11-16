@@ -517,7 +517,7 @@ func TestGetProjectHidesSecretFromMember(t *testing.T) {
 }
 
 // CLOUD-12 — mientras Sytue Cloud esté cerrado a terceros (AbiertoATerceros=false
-// y TenantsPermitidos=["sytue"]), cualquier otro tenant recibe 403 tanto con
+// y TenantsPermitidos=["corporate"]), cualquier otro tenant recibe 403 tanto con
 // sesión humana como con token de API.
 func TestCloudCerradoATercerosRechazaTenantFueraDeLista(t *testing.T) {
 	f := &fakeSvc{
@@ -531,7 +531,7 @@ func TestCloudCerradoATercerosRechazaTenantFueraDeLista(t *testing.T) {
 	h := newHandlers(f)
 	h.cfg.Env = "prod"
 	h.cfg.AbiertoATerceros = false
-	h.cfg.TenantsPermitidos = []string{"sytue"}
+	h.cfg.TenantsPermitidos = []string{"corporate"}
 
 	// Humano de "acme" => 403.
 	if h.admitCloudHuman(httptest.NewRecorder(), cloudHumanReq(http.MethodGet, "/api/v1/projects", "owner")) {

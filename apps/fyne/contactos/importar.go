@@ -46,9 +46,12 @@ func Tarjetas(texto string) []string {
 // importarVCard crea, UNA a una y en serie para no ametrallar el servicio, las tarjetas
 // del fichero, con el avance real en el propio botón («Importando 3 de 20»): el total se
 // sabe antes de la primera escritura. Bloquea: en segundo plano.
-func (a *App) importarVCard(datos []byte) {
+func (a *App) importarVCard(scope cargaContacts, datos []byte) {
 	var libreta string
 	fyne.DoAndWait(func() {
+		if !a.vigente(scope) {
+			return
+		}
 		if a.Pantalla.Activa != nil {
 			libreta = a.Pantalla.Activa.ID
 		}
@@ -59,16 +62,23 @@ func (a *App) importarVCard(datos []byte) {
 	entradas := Tarjetas(string(datos))
 	hechas, fallos := 0, 0
 	avance := func() {
+		completadas := hechas + fallos
 		fyne.Do(func() {
+			if !a.vigente(scope) {
+				return
+			}
 			p := a.Pantalla
 			p.ImportOcupado = true
-			p.Importando = p.t("io.importProgress", i18n.Vars{"done": hechas + fallos, "total": len(entradas)})
+			p.Importando = p.t("io.importProgress", i18n.Vars{"done": completadas, "total": len(entradas)})
 			a.repintar()
 		})
 	}
 	avance()
 	for _, tarjeta := range entradas {
-		ctx, fin := a.ctx()
+		if !a.vigente(scope) {
+			return
+		}
+		ctx, fin := context.WithTimeout(scope.ctx, a.Plazo)
 		_, err := a.svc.ImportCard(ctx, libreta, tarjeta)
 		fin()
 		if err != nil {
@@ -78,14 +88,21 @@ func (a *App) importarVCard(datos []byte) {
 		}
 		avance()
 	}
-	fyne.Do(func() { a.informarImportacion(hechas, fallos, "io.noneImportedVcard") })
+	fyne.Do(func() {
+		if a.vigente(scope) {
+			a.informarImportacion(scope, hechas, fallos, "io.noneImportedVcard")
+		}
+	})
 }
 
 // importarCSV manda el CSV entero en UNA petición: el servicio detecta el dialecto
 // (Google u Outlook), se salta las filas malas y no repite correos.
-func (a *App) importarCSV(datos []byte) {
+func (a *App) importarCSV(scope cargaContacts, datos []byte) {
 	var libreta string
 	fyne.DoAndWait(func() {
+		if !a.vigente(scope) {
+			return
+		}
 		if p := a.Pantalla; p.Activa != nil {
 			libreta = p.Activa.ID
 			p.ImportOcupado, p.Importando = true, ""
@@ -95,10 +112,13 @@ func (a *App) importarCSV(datos []byte) {
 	if libreta == "" {
 		return
 	}
-	ctx, fin := context.WithTimeout(context.Background(), 4*a.Plazo)
+	ctx, fin := context.WithTimeout(scope.ctx, 4*a.Plazo)
 	n, omitidos, err := a.svc.ImportCSV(ctx, libreta, datos)
 	fin()
 	fyne.Do(func() {
+		if !a.vigente(scope) {
+			return
+		}
 		if err != nil {
 			slog.Warn("contactos: no se pudo importar el CSV", "error", err)
 			a.Pantalla.ImportOcupado = false
@@ -106,13 +126,13 @@ func (a *App) importarCSV(datos []byte) {
 			a.repintar()
 			return
 		}
-		a.informarImportacion(n, omitidos, "io.noneImportedCsv")
+		a.informarImportacion(scope, n, omitidos, "io.noneImportedCsv")
 	})
 }
 
 // informarImportacion es `reportImport`: cuántos entraron (y cuántos se omitieron), o
 // que no entró ninguno y por qué. En el hilo de la interfaz.
-func (a *App) informarImportacion(hechas, omitidas int, sinNinguno string) {
+func (a *App) informarImportacion(scope cargaContacts, hechas, omitidas int, sinNinguno string) {
 	p := a.Pantalla
 	p.ImportOcupado, p.Importando = false, ""
 	if hechas == 0 {
@@ -126,6 +146,6 @@ func (a *App) informarImportacion(hechas, omitidas int, sinNinguno string) {
 	}
 	a.avisos.Notificar(ui.NuevoAviso(ui.AvisoExito, p.t("io.imported", i18n.Vars{"count": hechas}), d))
 	if p.Activa != nil {
-		a.recargar(*p.Activa)
+		a.recargarEn(scope, *p.Activa)
 	}
 }

@@ -36,7 +36,7 @@ import (
 // de un lienzo fijo de 25,4 × 14,288 y no de los 28 × 15,75 de Impress— todas las cajas
 // de las diapositivas acababan al 104,7 % del ancho.
 func TestUnODPDeDriveSeAbreEnDiapos(t *testing.T) {
-	odp := webref.Read(t, "services/docs/internal/domain/testdata/odf/impress-7-1.odp")
+	odp := webref.Read(t, "apps/nucleo/office/model/testdata/odf/impress-7-1.odp")
 	convertido, err := os.ReadFile("testdata/odp-libreoffice.json")
 	if err != nil {
 		t.Fatal(err)

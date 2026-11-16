@@ -13,6 +13,7 @@ import { HttpClient, HttpError, bearer } from '@sytue/api-clients';
 import type { SytueSession } from '@sytue/auth';
 import { adminBaseUrl } from './auth.js';
 import * as seed from './data.js';
+import { cumpleFiltro, type FiltroUsuarios } from './filtros-usuarios.js';
 
 /**
  * ¿Ha CONTESTADO el backend? Un 4xx es una respuesta —«no puedes» o «no hay»— y
@@ -311,11 +312,14 @@ function toDirectoryUser(w: AdminUserWire, tenant: string): DirectoryUser {
  * `q` busca en el SERVIDOR por correo o nombre. Filtrar lo ya cargado daba la
  * misma respuesta —«sin resultados»— tanto si alguien no está en la
  * organización como si está en la página doce.
+ *
+ * `filter` acota a un estado (sin segundo factor, suspendidas, sin verificar);
+ * también lo resuelve el servidor, por lo mismo que `q`.
  */
 export async function loadUsers(
   session: SytueSession,
   tenant?: string,
-  opts: { cursor?: string; limit?: number; q?: string } = {},
+  opts: { cursor?: string; limit?: number; q?: string; filter?: FiltroUsuarios | '' } = {},
 ): Promise<Sourced<UsersPage>> {
   try {
     // `consulta` y no `json`: va por QUERY si el servicio lo entiende, y si no
@@ -327,7 +331,12 @@ export async function loadUsers(
       nextCursor?: string;
     }>({
       path: '/users',
-      query: { cursor: opts.cursor || undefined, limit: opts.limit, q: opts.q || undefined },
+      query: {
+        cursor: opts.cursor || undefined,
+        limit: opts.limit,
+        q: opts.q || undefined,
+        filter: opts.filter || undefined,
+      },
     });
     if (!Array.isArray(page?.items)) throw new Error('bad_shape');
     const org = session.user.tenant ?? '';
@@ -343,7 +352,10 @@ export async function loadUsers(
     // de un entorno de demostración devolvería siempre el directorio entero.
     const todos = tenant ? seed.usersForTenant(tenant) : seed.users;
     const q = opts.q?.trim().toLowerCase() ?? '';
-    const items = q ? todos.filter((u) => contiene(u.fullName, q) || contiene(u.email, q)) : todos;
+    const filtro = opts.filter ?? '';
+    const items = todos.filter(
+      (u) => cumpleFiltro(u, filtro) && (!q || contiene(u.fullName, q) || contiene(u.email, q)),
+    );
     return { live: false, data: { items, nextCursor: '' } };
   }
 }
@@ -768,6 +780,31 @@ export function inviteUser(
   });
 }
 
+/** Cómo acabó una dirección de una tanda de invitaciones. */
+export type InviteBatchStatus = 'sent' | 'already_member' | 'invalid' | 'not_sent' | 'failed';
+
+export interface InviteBatchResult {
+  email: string;
+  status: InviteBatchStatus;
+  role?: SytueRole;
+  expires_at?: string;
+  /** Texto de Sytue ID (en inglés): la consola pinta el suyo por `status`. */
+  detail?: string;
+}
+
+/**
+ * Invita a VARIAS personas con el mismo rol (hasta 25). Sytue ID separa y
+ * valida las direcciones y contesta el resultado de cada una: una tanda casi
+ * nunca sale entera bien, y lo que importa es saber cuáles no.
+ */
+export function inviteUsers(
+  session: SytueSession,
+  emails: string[],
+  role: SytueRole,
+): Promise<{ sent: number; results: InviteBatchResult[] }> {
+  return adminHttp(session).postJson('/invitations', { emails, role });
+}
+
 /** Una invitación emitida y todavía sin aceptar. */
 export interface PendingInvitation {
   email: string;
@@ -999,11 +1036,20 @@ const SIN_INSIGHTS: OrgInsights = {
  * enseña ningún aviso, que es lo correcto — inventar uno sería peor que callar.
  */
 export async function loadInsights(session: SytueSession): Promise<OrgInsights> {
+  return (await loadInsightsSourced(session)).data;
+}
+
+/**
+ * Lo mismo, pero diciendo si la respuesta es real. Los avisos pueden callar con
+ * ceros; la guía de primeros pasos no: con ceros inventados daría por hecha la
+ * verificación en dos pasos de una organización que no ha contestado.
+ */
+export async function loadInsightsSourced(session: SytueSession): Promise<Sourced<OrgInsights>> {
   try {
     const res = await adminHttp(session).json<Partial<OrgInsights>>({ path: '/insights' });
-    return { ...SIN_INSIGHTS, ...res };
+    return { live: true, data: { ...SIN_INSIGHTS, ...res } };
   } catch {
-    return SIN_INSIGHTS;
+    return { live: false, data: SIN_INSIGHTS };
   }
 }
 

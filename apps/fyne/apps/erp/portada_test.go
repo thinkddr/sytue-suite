@@ -69,7 +69,11 @@ func TestLaPortadaMideLoDeLaWeb(t *testing.T) {
 	cerca(t, "Empleados (sin «Requiere»)", b.tarjeta(tema.Claro, b.Modulos[3], w).alto, 155)
 	antes := textoTecla
 	textoTecla = "⌘K" // la medida de la web, que es la de un Mac
-	cerca(t, "la lupa con ⌘K", NuevoBotonLupa("", nil).MinSize().Width, 76.40625)
+	// La tecla es la `Kbd` del papel desde DS-16 (Figtree con filete, antes mono sin él):
+	// `px-3` + lupa 14 + 10,5 + «⌘K» en `text-xs` con `px-1.5` y el filete. La cifra es
+	// la de la hoja con la métrica de Figtree; la medida del navegador era 76,41 con la
+	// receta vieja.
+	cerca(t, "la lupa con ⌘K", NuevoBotonLupa("", nil).MinSize().Width, 83.3125)
 	textoTecla = antes
 
 	m := portadaArnes(t, 360)
@@ -118,4 +122,37 @@ func TestLaPortadaSePinta(t *testing.T) {
 	p.Ventana = fyne.NewSize(360, 740)
 	p.Repintar()
 	guardarPNG(t, w.Canvas().Capture(), "erp-portada-movil.png")
+}
+
+// TestLasProximasCarganConFilas es la paridad del `SkeletonRows` de la portada web
+// (DS-14): mientras llegan las próximas obligaciones, tres filas de carga de dos líneas
+// en la caja de la lista, y ninguna rueda.
+//
+// VISTO EN ROJO: con la rueda de 16 de antes, «0 listas de carga y 1 rueda».
+func TestLasProximasCarganConFilas(t *testing.T) {
+	b := portadaArnes(t, 1280)
+	b.Proximas = nil
+	o, alto := b.proximas(tema.Claro, 854)
+	var filas []*ui.FilasEsqueleto
+	ruedas := 0
+	recorrer(o, func(x fyne.CanvasObject) {
+		switch y := x.(type) {
+		case *ui.FilasEsqueleto:
+			filas = append(filas, y)
+		case *ui.Rueda:
+			ruedas++
+		}
+	})
+	for _, f := range filas {
+		f.Parar()
+	}
+	if len(filas) != 1 || ruedas != 0 {
+		t.Fatalf("las próximas cargando pintan %d listas de carga y %d ruedas", len(filas), ruedas)
+	}
+	if f := filas[0]; f.Filas != FilasEsqueletoProximas || f.Lineas != 2 || !f.SinUltimoFilete {
+		t.Errorf("las filas de carga son %d de %d líneas (sin último filete: %v)", f.Filas, f.Lineas, f.SinUltimoFilete)
+	}
+	if minimo := float32(FilasEsqueletoProximas) * ui.AltoFilaEsqueleto(ui.SinDelantero, 2); alto < minimo {
+		t.Errorf("la sección mide %g y solo las filas ya miden %g", alto, minimo)
+	}
 }

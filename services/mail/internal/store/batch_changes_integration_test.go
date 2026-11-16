@@ -29,15 +29,15 @@ func TestBatchMoveAndFlagsOwnerScoped(t *testing.T) {
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
 
-	ada := seedAccount(t, ctx, st, "ada@sytue.eu")
-	bob := seedAccount(t, ctx, st, "bob@sytue.eu")
+	ada := seedAccount(ctx, t, st, "ada@sytue.eu")
+	bob := seedAccount(ctx, t, st, "bob@sytue.eu")
 	adaInbox, _ := st.MailboxByRole(ctx, ada.ID, domain.RoleInbox)
 	adaArchive, _ := st.MailboxByRole(ctx, ada.ID, domain.RoleArchive)
 	bobInbox, _ := st.MailboxByRole(ctx, bob.ID, domain.RoleInbox)
 
-	m1 := seedMessage(t, ctx, st, ada, adaInbox.ID, "Uno", "x@y.eu", nil)
-	m2 := seedMessage(t, ctx, st, ada, adaInbox.ID, "Dos", "x@y.eu", nil)
-	bobMsg := seedMessage(t, ctx, st, bob, bobInbox.ID, "Ajeno", "z@y.eu", nil)
+	m1 := seedMessage(ctx, t, st, ada, adaInbox.ID, "Uno", "x@y.eu", nil)
+	m2 := seedMessage(ctx, t, st, ada, adaInbox.ID, "Dos", "x@y.eu", nil)
+	bobMsg := seedMessage(ctx, t, st, bob, bobInbox.ID, "Ajeno", "z@y.eu", nil)
 
 	// Mover en lote m1+m2 a Archivo, incluyendo el mensaje AJENO de Bob: solo se
 	// mueven los de Ada (owner-scoped por account_id); el de Bob se omite.
@@ -49,14 +49,14 @@ func TestBatchMoveAndFlagsOwnerScoped(t *testing.T) {
 		t.Fatalf("movidos = %d, quiero 2 (el ajeno se omite)", moved)
 	}
 	// Ada: Inbox queda vacío, Archivo con 2. Con UIDs distintos (índice único).
-	if got := countMessages(t, ctx, st, adaInbox.ID); got != 0 {
+	if got := countMessages(ctx, t, st, adaInbox.ID); got != 0 {
 		t.Fatalf("Inbox de Ada = %d, quiero 0", got)
 	}
-	if got := countMessages(t, ctx, st, adaArchive.ID); got != 2 {
+	if got := countMessages(ctx, t, st, adaArchive.ID); got != 2 {
 		t.Fatalf("Archivo de Ada = %d, quiero 2", got)
 	}
 	// El mensaje de Bob NO se movió.
-	if got := countMessages(t, ctx, st, bobInbox.ID); got != 1 {
+	if got := countMessages(ctx, t, st, bobInbox.ID); got != 1 {
 		t.Fatalf("Inbox de Bob = %d, quiero 1 (intacto)", got)
 	}
 
@@ -84,6 +84,22 @@ func TestBatchMoveAndFlagsOwnerScoped(t *testing.T) {
 	if am, _ := st.GetMessage(ctx, m1.ID); am.HasFlag(domain.FlagSeen) {
 		t.Fatalf("m1 debía quedar sin leer")
 	}
+
+	// «Marcar todo como leído» de la carpeta: m1 está en Archivo sin leer y m2 ya
+	// leído, así que solo cuenta m1. El buzón de Bob es ajeno: ErrNotFound.
+	n, err = st.MarkMailboxRead(ctx, ada.ID, adaArchive.ID)
+	if err != nil || n != 1 {
+		t.Fatalf("MarkMailboxRead = %d, %v; quiero 1, nil", n, err)
+	}
+	if am, _ := st.GetMessage(ctx, m1.ID); !am.HasFlag(domain.FlagSeen) {
+		t.Fatalf("m1 debía quedar leído")
+	}
+	if _, err := st.MarkMailboxRead(ctx, ada.ID, bobInbox.ID); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("buzón ajeno = %v, quiero ErrNotFound", err)
+	}
+	if bm, _ := st.GetMessage(ctx, bobMsg.ID); bm.HasFlag(domain.FlagSeen) {
+		t.Fatalf("el mensaje de Bob no debía marcarse leído")
+	}
 }
 
 func TestChangesIncrementalOwnerScoped(t *testing.T) {
@@ -91,8 +107,8 @@ func TestChangesIncrementalOwnerScoped(t *testing.T) {
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
 
-	ada := seedAccount(t, ctx, st, "ada2@sytue.eu")
-	bob := seedAccount(t, ctx, st, "bob2@sytue.eu")
+	ada := seedAccount(ctx, t, st, "ada2@sytue.eu")
+	bob := seedAccount(ctx, t, st, "bob2@sytue.eu")
 	adaInbox, _ := st.MailboxByRole(ctx, ada.ID, domain.RoleInbox)
 	adaTrash, _ := st.MailboxByRole(ctx, ada.ID, domain.RoleTrash)
 	bobInbox, _ := st.MailboxByRole(ctx, bob.ID, domain.RoleInbox)
@@ -107,9 +123,9 @@ func TestChangesIncrementalOwnerScoped(t *testing.T) {
 	}
 
 	// Tras el bootstrap: llega correo a Ada y a Bob; Ada marca uno leído y borra otro.
-	m1 := seedMessage(t, ctx, st, ada, adaInbox.ID, "Nuevo", "x@y.eu", nil)
-	m2 := seedMessage(t, ctx, st, ada, adaInbox.ID, "Otro", "x@y.eu", nil)
-	seedMessage(t, ctx, st, bob, bobInbox.ID, "Ajeno", "z@y.eu", nil) // no debe aparecer
+	m1 := seedMessage(ctx, t, st, ada, adaInbox.ID, "Nuevo", "x@y.eu", nil)
+	m2 := seedMessage(ctx, t, st, ada, adaInbox.ID, "Otro", "x@y.eu", nil)
+	seedMessage(ctx, t, st, bob, bobInbox.ID, "Ajeno", "z@y.eu", nil) // no debe aparecer
 	if err := st.SetFlags(ctx, ada.ID, m1.ID, domain.FlagSeen, true); err != nil {
 		t.Fatalf("SetFlags: %v", err)
 	}
@@ -169,7 +185,7 @@ func TestChangesIncrementalOwnerScoped(t *testing.T) {
 }
 
 // countMessages cuenta los mensajes vivos de un buzón (helper de estos tests).
-func countMessages(t *testing.T, ctx context.Context, st *store.Store, mbox uuid.UUID) int {
+func countMessages(ctx context.Context, t *testing.T, st *store.Store, mbox uuid.UUID) int {
 	t.Helper()
 	msgs, err := st.ListMessages(ctx, mbox, 200, time.Time{}, uuid.Nil)
 	if err != nil {

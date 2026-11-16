@@ -3,7 +3,11 @@
 
 package htmltext
 
-import "testing"
+import (
+	"encoding/json"
+	"os"
+	"testing"
+)
 
 func TestText(t *testing.T) {
 	for html, quiero := range map[string]string{
@@ -62,5 +66,50 @@ func TestRawYEscapeSonLosDeLaHoja(t *testing.T) {
 	}
 	if got := Raw("&amp;lt;"); got != "&lt;" {
 		t.Errorf("Raw(&amp;lt;) = %q, quiero &lt;", got)
+	}
+}
+
+// TestEstadisticasVectoresComunes recorre los vectores que también recorre
+// extracto.test.ts: la web y Fyne tienen que contar lo mismo del mismo texto.
+func TestEstadisticasVectoresComunes(t *testing.T) {
+	crudo, err := os.ReadFile("testdata/estadisticas.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var v struct {
+		Casos []struct {
+			Nombre string `json:"nombre"`
+			Texto  string `json:"texto"`
+			TextStats
+		} `json:"casos"`
+	}
+	if err := json.Unmarshal(crudo, &v); err != nil {
+		t.Fatal(err)
+	}
+	if len(v.Casos) < 10 {
+		t.Fatalf("solo %d vectores", len(v.Casos))
+	}
+	for _, c := range v.Casos {
+		if got := Stats(c.Texto); got != c.TextStats {
+			t.Errorf("%s: Stats(%q) = %+v, quiero %+v", c.Nombre, c.Texto, got, c.TextStats)
+		}
+	}
+}
+
+// TestFlatEsElTextoDeLaNota: lo que se cuenta es el texto de textoDeNota, en una línea,
+// sin las viñetas de Text y con las celdas y los bloques separados.
+func TestFlatEsElTextoDeLaNota(t *testing.T) {
+	for html, quiero := range map[string]string{
+		"":            "",
+		"<p><br></p>": "",
+		"<p>one<br>two</p><div>three</div><ul><li>four</li><li>five</li></ul>":                    "one two three four five",
+		"a<strong>b</strong><em>c</em>":                                                           "abc",
+		"<table><tr><td>a</td><td>b</td></tr></table>":                                            "a b",
+		"<p>safe</p><!--hidden--><script>alert(1)</script><style>x</style><noscript>n</noscript>": "safe",
+		"a&nbsp;\n\t b &amp; c":                                                                   "a b & c",
+	} {
+		if got := Flat(html); got != quiero {
+			t.Errorf("Flat(%q) = %q, quiero %q", html, got, quiero)
+		}
 	}
 }

@@ -1,7 +1,8 @@
 /**
  * UsersPanel — directorio de usuarios (API de administración de Sytue ID). Tabla
  * con estado, roles, MFA y aprovisionamiento por servicio Sytue (Drive/Chat/Mail).
- * Buscador, filtro por organización y detalle en panel lateral (Modal) con
+ * Buscador, filtros por organización y por estado (sin segundo factor,
+ * suspendidas, correo sin verificar) y detalle en panel lateral (Modal) con
  * acciones de administración. A escala de cientos de miles de usuarios las filas
  * van VIRTUALIZADAS con VirtualList de @sytue/ui (solo se pinta la ventana
  * visible + overscan), cabecera de columnas fija fuera del scroll (mismo patrón
@@ -10,27 +11,35 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import {
+  Avatar,
   Badge,
   Button,
   Checkbox,
   EmptyState,
   Icon,
+  InlineHelp,
   Input,
-  Select,
-  Avatar,
   Modal,
-  Switch,
   SectionHeader,
+  Select,
+  Switch,
   ToastProvider,
-  VirtualList,
   useToast,
+  VirtualList,
 } from '@sytue/ui';
 import { formatDate, formatDateTime, type Locale } from '@sytue/i18n';
-import { useT, type T } from '../i18n/index.js';
+import { useT, type ConsoleMessageKey, type T } from '../i18n/index.js';
 import UserMailboxes from './UserMailboxes.js';
+import InviteUserWizard from './InviteUserWizard.js';
 import type { DirectoryUser, SytueRole, SytueService, Tenant } from '../lib/types.js';
 import type { PendingInvitation, UserImpact } from '../lib/admin.js';
 import { pedirReautenticacion } from '../lib/reautenticar.js';
+import { accionPedida, consultaPedida } from '../lib/paleta.js';
+import {
+  FILTROS_USUARIOS,
+  filtroDeParametro,
+  type FiltroUsuarios,
+} from '../lib/filtros-usuarios.js';
 import {
   formatWhen,
   provisionLabelKey,
@@ -39,13 +48,31 @@ import {
   roleTone,
 } from '../lib/format.js';
 
-/** Query de una página del directorio: término de búsqueda y cursor keyset. */
-function paginaQuery(q: string, cursor: string): string {
+/** Query de una página del directorio: término, filtro de estado y cursor keyset. */
+function paginaQuery(q: string, filtro: FiltroUsuarios | '', cursor: string): string {
   const p = new URLSearchParams();
   if (q) p.set('q', q);
+  if (filtro) p.set('filter', filtro);
   if (cursor) p.set('cursor', cursor);
   return p.toString();
 }
+
+/** Rótulo de cada filtro de estado en el desplegable. */
+const ROTULO_FILTRO: Record<FiltroUsuarios, ConsoleMessageKey> = {
+  without_mfa: 'users.state.withoutMfa',
+  suspended: 'users.state.suspended',
+  unverified_email: 'users.state.unverifiedEmail',
+};
+
+/**
+ * Lo que dice la lista vacía con un filtro puesto y sin búsqueda. Es una buena
+ * noticia —nadie sin segundo factor—, y «Nadie coincide» la leería como un fallo.
+ */
+const VACIO_FILTRO: Record<FiltroUsuarios, ConsoleMessageKey> = {
+  without_mfa: 'users.empty.filter.withoutMfa',
+  suspended: 'users.empty.filter.suspended',
+  unverified_email: 'users.empty.filter.unverifiedEmail',
+};
 
 // Nombres de producto: no se traducen (son marcas).
 const SERVICES: { key: SytueService; label: string }[] = [
@@ -168,24 +195,37 @@ interface UsersPanelProps {
   tenants: Tenant[];
   /** Cursor keyset de la página siguiente ('' = directorio completo cargado). */
   nextCursor?: string;
+  /**
+   * Filtro de estado con el que el servidor pintó la primera página (`?filter=`,
+   * al que enlazan los avisos de la portada). '' = todas las personas.
+   */
+  filter?: FiltroUsuarios | '';
   /** false = Sytue ID no contestó y esto es el seed de demostración. */
   live?: boolean;
   /** Idioma ya negociado en el servidor; llega por props. */
   locale: Locale;
+  /**
+   * Quien mira es propietario de la organización activa: solo entonces puede
+   * invitar como propietario (Sytue ID lo rechaza con 403 a un admin).
+   */
+  canGrantOwner?: boolean;
 }
 
 function Inner({
   users,
   tenants,
   nextCursor = '',
+  filter = '',
   live = true,
   locale,
+  canGrantOwner = false,
   t,
 }: UsersPanelProps & { t: T }) {
   const toast = useToast();
   const [items, setItems] = useState<DirectoryUser[]>(users);
   const [query, setQuery] = useState('');
   const [tenant, setTenant] = useState('all');
+  const [filtro, setFiltro] = useState<FiltroUsuarios | ''>(filter);
   const [selected, setSelected] = useState<DirectoryUser | null>(null);
   const [cursor, setCursor] = useState(nextCursor);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -226,19 +266,17 @@ function Inner({
   const [removing, setRemoving] = useState(false);
   // Invitar usuario (modal aparte).
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<SytueRole>('member');
-  const [inviting, setInviting] = useState(false);
-  // Dirección de correo del invitado. Vacía = patrón nombre.apellidos, que es lo
-  // normal; el campo existe para las excepciones (`ventas@`, un homónimo). El
-  // dominio se pide una vez y se enseña pegado al campo, para que quien escribe
-  // vea la dirección entera que va a crear y no tenga que imaginársela.
-  const [inviteMailbox, setInviteMailbox] = useState('');
-  // Contraseña inicial OPCIONAL. Existe porque el correo se cae, y entonces una
-  // invitación deja a alguien esperando un enlace que no llega mientras quien la
-  // envió cree que ya está dentro. Vacía = invitación normal, que sigue siendo lo
-  // recomendado: así la contraseña la elige quien la va a usar.
-  const [invitePassword, setInvitePassword] = useState('');
+  // Llegada desde la paleta ⌘K (`?accion=`): se abre al montar y no en el estado
+  // inicial, para que el HTML del servidor y la hidratación coincidan.
+  useEffect(() => {
+    if (accionPedida('invitar')) setInviteOpen(true);
+    // Una persona elegida en la paleta llega como búsqueda del directorio.
+    const q = consultaPedida();
+    if (q) setQuery(q);
+  }, []);
+  // Pie del diálogo donde el asistente de invitar pone su botonera: dentro del
+  // cuerpo, en el teléfono «Continuar» quedaba bajo el teclado.
+  const [pieInvitar, setPieInvitar] = useState<HTMLDivElement | null>(null);
   const [mailDomain, setMailDomain] = useState('');
   // Invitaciones emitidas y sin aceptar. Se sabían enviar y no se podían ver: una
   // enviada a la dirección equivocada no había forma de quitarla, solo esperar a
@@ -346,9 +384,12 @@ function Inner({
     if (!cursor || loadingMore) return;
     setLoadingMore(true);
     try {
-      const res = await fetch(`/api/admin/users?${paginaQuery(aplicada.current, cursor)}`, {
-        headers: { accept: 'application/json' },
-      });
+      const res = await fetch(
+        `/api/admin/users?${paginaQuery(aplicada.current, filtroAplicado.current, cursor)}`,
+        {
+          headers: { accept: 'application/json' },
+        },
+      );
       if (!res.ok) throw new Error(String(res.status));
       const page = (await res.json()) as { items?: DirectoryUser[]; nextCursor?: string };
       setItems((prev) => [...prev, ...(page.items ?? [])]);
@@ -364,10 +405,13 @@ function Inner({
     }
   }
 
-  // Término que produjo lo que hay en pantalla, y último pedido al servidor. El
-  // segundo descarta respuestas que llegan tarde: con dos búsquedas en vuelo, la
-  // primera en volver no tiene por qué ser la que el admin está escribiendo.
+  // Término y filtro que produjeron lo que hay en pantalla, y último pedido al
+  // servidor. El pedido descarta respuestas que llegan tarde: con dos búsquedas
+  // en vuelo, la primera en volver no tiene por qué ser la que el admin está
+  // escribiendo. El filtro aplicado empieza siendo el de la primera página, que
+  // ya llegó filtrada del servidor.
   const aplicada = useRef('');
+  const filtroAplicado = useRef<FiltroUsuarios | ''>(filter);
   const pedido = useRef('');
 
   // La búsqueda la resuelve el SERVIDOR. Filtrar aquí solo miraba las filas ya
@@ -450,36 +494,58 @@ function Inner({
   // El cuerpo va DENTRO del efecto: una función declarada fuera se recrea en
   // cada render, así que ponerla en las dependencias relanzaría la búsqueda sin
   // parar y dejarla fuera obliga a silenciar el aviso del linter.
+  //
+  // El filtro de estado va por el mismo camino y por lo mismo: «quién no tiene
+  // segundo factor» mirado sobre lo cargado es una muestra, no la respuesta.
+  // Cambiarlo no espera al teclado: es un clic, no una pulsación de una palabra.
   useEffect(() => {
     const q = query.trim();
-    if (q === aplicada.current) return;
-    const id = setTimeout(() => {
-      void (async () => {
-        pedido.current = q;
-        setBuscando(true);
-        try {
-          const res = await fetch(`/api/admin/users?${paginaQuery(q, '')}`, {
-            headers: { accept: 'application/json' },
-          });
-          if (!res.ok) throw new Error(String(res.status));
-          const page = (await res.json()) as { items?: DirectoryUser[]; nextCursor?: string };
-          if (pedido.current !== q) return; // ya hay otra búsqueda más nueva en vuelo
-          aplicada.current = q;
-          setItems(page.items ?? []);
-          setCursor(typeof page.nextCursor === 'string' ? page.nextCursor : '');
-        } catch {
-          toast.notify({
-            tone: 'danger',
-            title: t('users.toast.searchFailed'),
-            description: t('common.tryAgain'),
-          });
-        } finally {
-          if (pedido.current === q) setBuscando(false);
-        }
-      })();
-    }, 250);
+    if (q === aplicada.current && filtro === filtroAplicado.current) return;
+    const clave = `${filtro}\n${q}`;
+    const id = setTimeout(
+      () => {
+        void (async () => {
+          pedido.current = clave;
+          setBuscando(true);
+          try {
+            const res = await fetch(`/api/admin/users?${paginaQuery(q, filtro, '')}`, {
+              headers: { accept: 'application/json' },
+            });
+            if (!res.ok) throw new Error(String(res.status));
+            const page = (await res.json()) as { items?: DirectoryUser[]; nextCursor?: string };
+            if (pedido.current !== clave) return; // ya hay otra búsqueda más nueva en vuelo
+            aplicada.current = q;
+            filtroAplicado.current = filtro;
+            setItems(page.items ?? []);
+            setCursor(typeof page.nextCursor === 'string' ? page.nextCursor : '');
+          } catch {
+            toast.notify({
+              tone: 'danger',
+              title: t('users.toast.searchFailed'),
+              description: t('common.tryAgain'),
+            });
+          } finally {
+            if (pedido.current === clave) setBuscando(false);
+          }
+        })();
+      },
+      q === aplicada.current ? 0 : 250,
+    );
     return () => clearTimeout(id);
-  }, [query, t, toast]);
+  }, [query, filtro, t, toast]);
+
+  // El filtro vive también en la URL (`?filter=`): recargar, volver atrás o
+  // pasarle el enlace a otra persona enseña la misma lista. replaceState y no
+  // pushState: cambiar de filtro no es navegar, y llenar el historial de pasos
+  // haría que «atrás» recorriera desplegables en vez de salir de la pantalla.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if ((url.searchParams.get('filter') ?? '') === filtro) return;
+    if (filtro) url.searchParams.set('filter', filtro);
+    else url.searchParams.delete('filter');
+    window.history.replaceState(window.history.state, '', url);
+  }, [filtro]);
 
   function marcar(id: string, on: boolean) {
     setMarcados((prev) => {
@@ -522,9 +588,10 @@ function Inner({
       // por delante el aviso que acaba de salir —justo el «28 de 30», que es lo
       // único que dice qué pasó— y además borra el término de búsqueda con el
       // que se eligió a esas treinta personas.
-      const page = await fetch(`/api/admin/users?${paginaQuery(aplicada.current, '')}`, {
-        headers: { accept: 'application/json' },
-      })
+      const page = await fetch(
+        `/api/admin/users?${paginaQuery(aplicada.current, filtroAplicado.current, '')}`,
+        { headers: { accept: 'application/json' } },
+      )
         .then((r) =>
           r.ok ? (r.json() as Promise<{ items?: DirectoryUser[]; nextCursor?: string }>) : null,
         )
@@ -818,80 +885,6 @@ function Inner({
     }
   }
 
-  // Invitar por email a la organización activa: Sytue ID emite el token y envía el
-  // enlace de aceptación donde el invitado fija su contraseña.
-  async function submitInvite(e: Event) {
-    e.preventDefault();
-    const email = inviteEmail.trim();
-    if (!email.includes('@') || inviting) return;
-    setInviting(true);
-    try {
-      const res = await fetch('/api/admin/invitations', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          role: inviteRole,
-          mailbox_local: inviteMailbox.trim(),
-          ...(invitePassword ? { password: invitePassword } : {}),
-        }),
-      });
-      if (!res.ok) throw new Error(String(res.status));
-      // Con contraseña no se ha enviado ningún correo: decir «le hemos enviado
-      // una invitación» sería mentir, y encima haría esperar un mensaje que no
-      // existe.
-      const conPassword = invitePassword !== '';
-      toast.notify({
-        tone: 'success',
-        title: conPassword ? t('users.toast.created') : t('users.toast.invited'),
-        description: conPassword
-          ? t('users.toast.createdHint', { email })
-          : t('users.toast.invitedHint', {
-              email,
-              role: t(roleLabelKey[inviteRole]),
-            }),
-      });
-      setInviteOpen(false);
-      setInviteEmail('');
-      setInviteRole('member');
-      setInviteMailbox('');
-      setInvitePassword('');
-      // Con contraseña la cuenta ya existe y no hay invitación que listar; sin
-      // ella acaba de aparecer una pendiente. Se recarga en los dos casos porque
-      // la lista es la fuente, no lo que creamos aquí.
-      void cargarPendientes();
-    } catch (err) {
-      const code = err instanceof Error ? err.message : '';
-      // El 503 NO es culpa de la dirección: la invitación se creó y lo que falló
-      // fue el envío. Decir «revisa el correo» mandaba a corregir un dato que
-      // estaba bien, y callaba lo único accionable — que la persona invitada
-      // existe ya en la lista y que basta con reinvitar cuando el correo vuelva.
-      const esEnvio = code === '503' || code === '502';
-      toast.notify({
-        tone: esEnvio ? 'warning' : 'danger',
-        title: esEnvio ? t('users.toast.inviteNotSent') : t('users.toast.inviteFailed'),
-        description: esEnvio
-          ? t('users.toast.inviteNotSentHint')
-          : code === '409'
-            ? t('users.toast.alreadyMember')
-            : code === '403'
-              ? t('users.toast.roleForbidden')
-              : t('users.toast.checkEmail'),
-      });
-      if (esEnvio) {
-        // La invitación ESTÁ creada: cerrar el formulario evita que se reintente
-        // creyendo que no pasó nada, que es como se acaban acumulando cinco
-        // invitaciones a la misma persona.
-        setInviteOpen(false);
-        setInviteEmail('');
-        setInviteMailbox('');
-        setInvitePassword('');
-      }
-    } finally {
-      setInviting(false);
-    }
-  }
-
   return (
     // h-full + min-h-0: la lista virtualizada necesita altura acotada; el scroll
     // vive DENTRO del VirtualList, no en el main.
@@ -909,9 +902,9 @@ function Inner({
         quién tiene MFA o quién sigue activo.
       */}
       {!live ? (
-        <p class="border-border bg-warning-bg text-warning-text mx-4 mt-3 shrink-0 rounded-md border px-3 py-2 text-sm">
+        <InlineHelp tone="warning" class="mx-4 mt-3 shrink-0">
           {t('users.offline')}
-        </p>
+        </InlineHelp>
       ) : null}
       <div class="border-border bg-surface flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2.5">
         <Input
@@ -933,6 +926,19 @@ function Inner({
           {tenants.map((org) => (
             <option key={org.slug} value={org.slug}>
               {org.name}
+            </option>
+          ))}
+        </Select>
+        <Select
+          aria-label={t('users.filterState')}
+          value={filtro}
+          class="w-56"
+          onChange={(e) => setFiltro(filtroDeParametro(e.currentTarget.value))}
+        >
+          <option value="">{t('users.state.all')}</option>
+          {FILTROS_USUARIOS.map((f) => (
+            <option key={f} value={f}>
+              {t(ROTULO_FILTRO[f])}
             </option>
           ))}
         </Select>
@@ -1084,9 +1090,11 @@ function Inner({
                 ? ''
                 : aplicada.current
                   ? t('users.empty.noMatch')
-                  : t('users.empty.description')
+                  : filtroAplicado.current && tenant === 'all'
+                    ? t(VACIO_FILTRO[filtroAplicado.current])
+                    : t('users.empty.description')
             }
-            illustration={<Icon name="user" size={28} />}
+            icon="user"
             action={
               <Button
                 variant="secondary"
@@ -1094,6 +1102,7 @@ function Inner({
                 onClick={() => {
                   setQuery('');
                   setTenant('all');
+                  setFiltro('');
                 }}
               >
                 {t('users.empty.clearFilters')}
@@ -1537,101 +1546,44 @@ function Inner({
         open={inviteOpen}
         onClose={() => setInviteOpen(false)}
         title={t('users.invite')}
-        size="sm"
+        size="md"
+        footer={<div ref={setPieInvitar} class="w-full min-w-0" />}
       >
-        <form class="flex flex-col gap-3" onSubmit={(e) => void submitInvite(e)}>
-          <p class="text-text-muted text-sm">{t('users.inviteIntro')}</p>
-          <div>
-            <label class="text-text mb-1 block text-sm font-medium" for="invite-email">
-              {t('users.inviteEmail')}
-            </label>
-            <Input
-              id="invite-email"
-              type="email"
-              autocomplete="off"
-              placeholder={t('users.inviteEmailPlaceholder')}
-              value={inviteEmail}
-              onInput={(e) => setInviteEmail(e.currentTarget.value)}
-              required
-            />
-          </div>
-          <div>
-            <label class="text-text mb-1 block text-sm font-medium" for="invite-mailbox">
-              {t('users.inviteMailbox')}
-            </label>
-            <div class="flex items-center gap-1.5">
-              <Input
-                id="invite-mailbox"
-                autocomplete="off"
-                placeholder={t('users.inviteMailboxPlaceholder')}
-                value={inviteMailbox}
-                onInput={(e) => setInviteMailbox(e.currentTarget.value)}
-              />
-              {mailDomain ? (
-                <span class="text-text-muted shrink-0 font-mono text-sm">@{mailDomain}</span>
-              ) : null}
-            </div>
-            <p class="text-text-muted mt-1 text-xs">{t('users.inviteMailboxHint')}</p>
-          </div>
-          <div>
-            <label class="text-text mb-1 block text-sm font-medium" for="invite-password">
-              {t('users.invitePassword')}
-            </label>
-            <Input
-              id="invite-password"
-              type="password"
-              autocomplete="new-password"
-              placeholder={t('users.invitePasswordPlaceholder')}
-              value={invitePassword}
-              onInput={(e) => setInvitePassword(e.currentTarget.value)}
-            />
-            <p class="text-text-muted mt-1 text-xs">{t('users.invitePasswordHint')}</p>
-          </div>
-          <div>
-            <label class="text-text mb-1 block text-sm font-medium" for="invite-role">
-              {t('users.inviteRoleLabel')}
-            </label>
-            <Select
-              id="invite-role"
-              value={inviteRole}
-              onChange={(e) => setInviteRole(e.currentTarget.value as SytueRole)}
-            >
-              {ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {t(roleLabelKey[r])}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div class="mt-1 flex justify-end gap-2">
-            <Button variant="ghost" size="sm" type="button" onClick={() => setInviteOpen(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              type="submit"
-              loading={inviting}
-              disabled={!inviteEmail.includes('@')}
-            >
-              {t('users.inviteSubmit')}
-            </Button>
-          </div>
-        </form>
+        {inviteOpen ? (
+          <InviteUserWizard
+            t={t}
+            locale={locale}
+            mailDomain={mailDomain}
+            canGrantOwner={canGrantOwner}
+            onInvited={() => void cargarPendientes()}
+            onClose={() => setInviteOpen(false)}
+            footerTarget={pieInvitar}
+          />
+        ) : null}
       </Modal>
     </div>
   );
 }
 
-export default function UsersPanel({ users, tenants, nextCursor, live, locale }: UsersPanelProps) {
+export default function UsersPanel({
+  users,
+  tenants,
+  nextCursor,
+  filter,
+  live,
+  locale,
+  canGrantOwner,
+}: UsersPanelProps) {
   return (
     <ToastProvider>
       <Inner
         users={users}
         tenants={tenants}
         nextCursor={nextCursor ?? ''}
+        filter={filter ?? ''}
         live={live ?? true}
         locale={locale}
+        canGrantOwner={canGrantOwner ?? false}
         t={useT(locale)}
       />
     </ToastProvider>

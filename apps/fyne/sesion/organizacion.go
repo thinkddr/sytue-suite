@@ -5,6 +5,8 @@ package sesion
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
@@ -46,25 +48,65 @@ func (s *Suite) Organizaciones(ctx context.Context) ([]api.Organizacion, error) 
 // el token la lleve. BLOQUEA hasta que se vuelve del navegador, como Entrar: se llama
 // desde una goroutine.
 //
-// Si el cambio falla no se abre nada y la sesión sigue en la de antes. Si falla la
-// vuelta, el servicio ya ha revocado los refresh tokens —es a propósito, para que el
-// tenant viejo no sobreviva días— y la sesión se acaba al caducar el token: es lo mismo
-// que le pasa a la web si se cierra la pestaña a mitad de la redirección.
+// Si la petición falla, el servidor puede haber aplicado el cambio sin que llegara
+// la respuesta. Si falla la vuelta tras una respuesta exitosa, el servicio ya ha
+// revocado los refresh tokens y el acceso anterior puede requerir identificarse.
 //
 // Antes del cambio se olvidan, en el Hub y con la sesión de la organización de antes, los
 // aparatos de iOS de las quince apps (despertar.go): las filas son de cada organización,
 // y después ya no habría sesión con que borrarlas. Al volver a entrar, la vuelta del
 // despertar los registra en la nueva si el interruptor sigue encendido.
 func (s *Suite) CambiarOrganizacion(ctx context.Context, id string) error {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer cancel()
+	// Reserve the login before making the server-side change. Otherwise an
+	// existing browser login could reject re-entry after the old refresh was revoked.
+	s.mu.Lock()
+	if s.entrando {
+		s.mu.Unlock()
+		return ErrYaEntrando
+	}
+	s.entrando = true
+	s.mu.Unlock()
+	defer func() {
+		s.mu.Lock()
+		s.entrando, s.autorizando = false, ""
+		s.mu.Unlock()
+	}()
+	transition, err := s.prepararTransicionPrivada(ctx, cancel, nil)
+	if err != nil {
+		return err
+	}
+	committed, remoteConfirmed := false, false
+	defer func() {
+		if committed {
+			transition.completada()
+		} else {
+			transition.fallo(remoteConfirmed)
+		}
+	}()
+	if err := transition.empezarEnvio(); err != nil {
+		return err
+	}
 	s.olvidarDespertares(ctx, true)
 	if err := s.cuenta().CambiarOrganizacion(ctx, id); err != nil {
 		// Se sigue en la de antes: se vuelve a registrar ahí, en una vuelta aparte con sus
 		// propios plazos y no con los de esta petición.
 		s.levantarVetoDespertar() //nolint:contextcheck // la vuelta va aparte, con sus plazos
-		return err
+		return fmt.Errorf("sesion: no se pudo confirmar el cambio de organización en el servidor: %w", err)
+	}
+	remoteConfirmed = true
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("sesion: organización cambiada en el servidor, acceso incompleto: %w", err)
 	}
 	if s.reentrar != nil {
-		return s.reentrar(ctx)
+		err = s.reentrar(ctx)
+	} else {
+		err = s.entrar(ctx, transition)
 	}
-	return s.Entrar(ctx)
+	if err != nil {
+		return fmt.Errorf("sesion: organización cambiada en el servidor, acceso incompleto: %w", err)
+	}
+	committed = true
+	return err
 }

@@ -45,6 +45,9 @@ var (
 	ErrPermission       = errors.New("cloud: permiso insuficiente")
 	ErrDomainTaken      = errors.New("cloud: el dominio ya está en uso")
 	ErrSignatureInvalid = errors.New("cloud: firma de webhook inválida")
+	// ErrTooSoon: la misma acción se repitió antes de su intervalo mínimo (p. ej.
+	// «Comprobar ahora» un dominio). Se mapea a 429 con Retry-After.
+	ErrTooSoon = errors.New("cloud: demasiado pronto; espera unos segundos")
 )
 
 // slugRe valida slugs DNS-compatibles (usados en subdominios de apps/previews).
@@ -706,6 +709,44 @@ type Domain struct {
 	IsPrimary   bool         `json:"is_primary"`
 	CreatedAt   time.Time    `json:"created_at"`
 	VerifiedAt  *time.Time   `json:"verified_at,omitempty"`
+}
+
+// DomainCheckReason es el MOTIVO de una comprobación DNS de un dominio propio.
+//
+// «Sigue pendiente» no le dice a nadie qué tocar. El motivo sí: falta el TXT, el
+// TXT tiene otro valor (un token viejo o de otro dominio) o el tráfico apunta a
+// otro sitio. Los valores viajan tal cual a la API y el panel los traduce.
+//
+//nolint:revive // mismo cruce de sentidos que DomainStatus.
+type DomainCheckReason string
+
+const (
+	// DomainCheckOK: la propiedad está probada y el tráfico llega a nuestro ingress.
+	DomainCheckOK DomainCheckReason = "ok"
+	// DomainCheckTXTMissing: no hay registro TXT `_sytue-challenge.<host>` (o el
+	// DNS aún no lo ha propagado).
+	DomainCheckTXTMissing DomainCheckReason = "txt_ausente"
+	// DomainCheckTXTMismatch: el TXT existe pero su valor no es el token emitido.
+	DomainCheckTXTMismatch DomainCheckReason = "txt_distinto"
+	// DomainCheckCNAMEMismatch: la propiedad está probada (el dominio SE VERIFICA),
+	// pero el hostname no resuelve a nuestro ingress y el certificado no se podrá
+	// emitir hasta que apunte. Es un aviso, no un bloqueo de la verificación.
+	DomainCheckCNAMEMismatch DomainCheckReason = "cname_distinto"
+)
+
+// DomainCheck es el resultado de comprobar el DNS de un dominio propio.
+//
+//nolint:revive // mismo cruce de sentidos que DomainStatus.
+type DomainCheck struct {
+	// Verified: la propiedad está probada (TXT correcto). Es lo único que decide
+	// el paso a `verified`; el enrutado lo exige después la emisión del TLS.
+	Verified bool              `json:"verified"`
+	Reason   DomainCheckReason `json:"reason"`
+	// Expected es el destino al que debería apuntar el hostname (el ingress).
+	Expected string `json:"expected,omitempty"`
+	// Found es a dónde apunta HOY (destino del CNAME o primera IP), cuando no
+	// coincide. Vacío si el hostname no resuelve.
+	Found string `json:"found,omitempty"`
 }
 
 // hostnameRe valida un FQDN básico.

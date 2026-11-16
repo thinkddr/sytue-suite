@@ -379,7 +379,7 @@ function Inner({ tenants, nextCursor = '', locale, t }: TenantsPanelProps & { t:
               <EmptyState
                 title={t('tenants.empty.title')}
                 description={t('tenants.empty.description')}
-                illustration={<Icon name="grid" size={28} />}
+                icon="grid"
                 action={
                   <Button
                     variant="primary"
@@ -395,7 +395,7 @@ function Inner({ tenants, nextCursor = '', locale, t }: TenantsPanelProps & { t:
               <EmptyState
                 title={t('tenants.noResults', { query: query.trim() })}
                 description={t('tenants.noResultsHint')}
-                illustration={<Icon name="search" size={28} />}
+                icon="search"
                 action={
                   <Button variant="secondary" size="sm" onClick={() => setQuery('')}>
                     {t('tenants.clearSearch')}

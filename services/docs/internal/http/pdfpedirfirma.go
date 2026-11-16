@@ -45,6 +45,10 @@ import (
 type peticionesFirmaStore interface {
 	PuedePedirFirma(ctx context.Context, p store.PeticionFirma) error
 	CrearPeticionFirma(ctx context.Context, p store.PeticionFirma) (store.PeticionFirma, error)
+	CrearCadenaFirma(ctx context.Context, filas []store.PeticionFirma) ([]store.PeticionFirma, error)
+	PeticionesFirmaPorBarrer(ctx context.Context) (vencidas, recordar []store.PorBarrer, err error)
+	CaducarPeticionFirma(ctx context.Context, id string) (store.PeticionFirma, error)
+	RecordarPeticionFirma(ctx context.Context, id string) (store.PeticionFirma, error)
 	PeticionesFirma(ctx context.Context, sub string) (recibidas, pedidas []store.PeticionFirma, err error)
 	PeticionFirmaPendiente(ctx context.Context, id, destinatario string) (store.PeticionFirma, error)
 	ResolverPeticionFirma(ctx context.Context, id, quien, estado, firmado, firmadoRuta string, enlace []byte, firmadoHuella string) (store.PeticionFirma, error)
@@ -92,6 +96,19 @@ type pedirFirmaJSON struct {
 	// Drive, cuando quien firma es de otra organización: el `confirm` que trajo el 409,
 	// que es a QUIÉN se confirmó. Sin ella, 409 y nada creado.
 	Confirm string `json:"confirm"`
+	// Signers son varias personas que firman EN ESE ORDEN (mig. 0034), en lugar de
+	// "to"/"email"; con una sola es lo mismo que pedírselo a ella.
+	Signers []firmanteJSON `json:"signers"`
+	// ExpiresInDays: a los cuántos días deja de poder firmarse (0 = nunca).
+	// RemindEveryDays: cada cuántos días se le recuerda a quien tiene el turno (0 = no).
+	ExpiresInDays   int `json:"expires_in_days"`
+	RemindEveryDays int `json:"remind_every_days"`
+}
+
+// firmanteJSON es una persona de una cadena: su id o su correo (o @usuario).
+type firmanteJSON struct {
+	To    string `json:"to"`
+	Email string `json:"email"`
 }
 
 // pedirFirma — POST /api/v1/pdf/signature-requests.
@@ -121,9 +138,12 @@ func (h *Handler) pedirFirma(w http.ResponseWriter, r *http.Request) {
 	// Y la ruta tiene que ser la de ESE fichero: el aviso enseña el nombre y abre la
 	// ruta, así que una ruta de otro llevaría a firmar un documento distinto del pedido.
 	// Antes que buscar a nadie: sin un PDF suyo, no se pregunta por personas.
-	f, err := h.ficheros.Metadatos(r.Context(), token, in.FileID)
-	if err != nil || f.Name != nombreDeRuta(in.Path) {
-		httpx.Fail(w, r, httpx.ErrNotFound.WithMessage("The PDF is not in Drive, or you cannot open it."))
+	if err := h.esSuPDF(r.Context(), token, in); err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
+	if len(in.Signers) > 1 {
+		h.pedirFirmaEnCadena(w, r, subj.Sub, in)
 		return
 	}
 	destinatario, correo, fuera, err := h.destinatarioDeFirma(r.Context(), token, in)
@@ -147,6 +167,7 @@ func (h *Handler) pedirFirma(w http.ResponseWriter, r *http.Request) {
 	fila := store.PeticionFirma{
 		Solicitante: subj.Sub, SolicitanteNombre: quien, Destinatario: destinatario, DestinatarioCorreo: correo,
 		Fichero: in.FileID, Ruta: in.Path, Mensaje: in.Message, Externo: externo,
+		Caduca: caducaEn(in.ExpiresInDays), RecordarDias: in.RemindEveryDays,
 	}
 	// Los topes, antes de crear en Drive un enlace que habría que quitar.
 	if err := h.peticionesFirma.PuedePedirFirma(r.Context(), fila); err != nil {
@@ -191,6 +212,15 @@ func (h *Handler) pedirFirma(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, r, http.StatusCreated, p.ParaQuienPide())
 }
 
+// esSuPDF: quien pide ve el fichero `in.FileID`, y `in.Path` es su ruta.
+func (h *Handler) esSuPDF(ctx context.Context, token string, in pedirFirmaJSON) error {
+	f, err := h.ficheros.Metadatos(ctx, token, in.FileID)
+	if err != nil || f.Name != nombreDeRuta(in.Path) {
+		return httpx.ErrNotFound.WithMessage("The PDF is not in Drive, or you cannot open it.")
+	}
+	return nil
+}
+
 // conPie añade `pie` al cuerpo del correo; sin cuerpo no hay correo.
 func conPie(cuerpo, pie string) string {
 	if cuerpo == "" {
@@ -203,12 +233,37 @@ func conPie(cuerpo, pie string) string {
 func (in *pedirFirmaJSON) validar() error {
 	in.Message = strings.TrimSpace(in.Message)
 	in.To, in.Email = strings.TrimSpace(in.To), strings.TrimSpace(in.Email)
+	if len(in.Signers) > 0 {
+		if in.To != "" || in.Email != "" {
+			return httpx.ErrBadRequest.WithMessage(`Say who signs in "signers" or in "to"/"email", not both.`)
+		}
+		if len(in.Signers) > store.MaxFirmantesEnCadena {
+			return httpx.ErrBadRequest.WithCode("pdf_signature_chain_too_long").
+				WithMessage("Too many people in the signing order.")
+		}
+		for i := range in.Signers {
+			s := &in.Signers[i]
+			s.To, s.Email = strings.TrimSpace(s.To), strings.TrimSpace(s.Email)
+			if (s.To == "") == (s.Email == "") {
+				return httpx.ErrBadRequest.WithMessage(`Say who signs: "to" (their id) or "email", not both.`)
+			}
+		}
+		if len(in.Signers) == 1 {
+			in.To, in.Email, in.Signers = in.Signers[0].To, in.Signers[0].Email, nil
+		}
+	}
+	switch {
+	case in.ExpiresInDays < 0 || in.ExpiresInDays > store.MaxCaducidadDias:
+		return httpx.ErrBadRequest.WithMessage(`"expires_in_days" goes from 0 (never) to 90.`)
+	case in.RemindEveryDays < 0 || in.RemindEveryDays > store.MaxRecordarDias:
+		return httpx.ErrBadRequest.WithMessage(`"remind_every_days" goes from 0 (never) to 30.`)
+	}
 	switch {
 	case in.FileID == "" || len(in.FileID) > maxIDFichero:
 		return httpx.ErrBadRequest.WithMessage(`Send the Drive file in "file_id".`)
 	case !rutaDePDF(in.Path):
 		return httpx.ErrBadRequest.WithMessage(`"path" must be the Drive path of a PDF.`)
-	case (in.To == "") == (in.Email == ""):
+	case len(in.Signers) == 0 && (in.To == "") == (in.Email == ""):
 		return httpx.ErrBadRequest.WithMessage(`Say who signs: "to" (their id) or "email", not both.`)
 	case utf8.RuneCountInString(in.Message) > maxMensajeFirma:
 		return httpx.ErrBadRequest.WithMessage("The message is too long.")
@@ -353,6 +408,10 @@ func (h *Handler) firmarPeticion(w http.ResponseWriter, r *http.Request) {
 	}
 	h.avisoDeFirma(r, p.ID, p.Solicitante, "docs.signature.completed", actor+" signed “"+nombre+"”",
 		h.enlacePDF(r, firmadoRuta), map[string]string{"actor": actor, "name": nombre}, token, cuerpo)
+	if p.Siguiente != nil {
+		// En una cadena, ahora le toca a la siguiente, sobre lo que se acaba de firmar.
+		h.avisarDeTurno(r, *p.Siguiente, token)
+	}
 	httpx.JSON(w, r, http.StatusOK, p.ParaQuienFirma())
 }
 
@@ -497,14 +556,20 @@ func (h *Handler) enlacePDF(r *http.Request, ruta string) string {
 // con `cuerpo`, el correo desde avisos@.
 func (h *Handler) avisoDeFirma(r *http.Request, id, para, tipo, titulo, enlace string, params map[string]string, token, cuerpo string) {
 	t, _ := tenancy.From(r.Context())
+	h.avisarDeFirma(r.Context(), t.Slug, id, para, tipo, titulo, enlace, params, token, cuerpo)
+}
+
+// avisarDeFirma es [Handler.avisoDeFirma] sin petición: el barrido de cada hora
+// también avisa, y dice él de qué organización.
+func (h *Handler) avisarDeFirma(ctx context.Context, tenant, id, para, tipo, titulo, enlace string, params map[string]string, token, cuerpo string) {
 	// Lo pendiente de la otra parte ha cambiado: su widget de CertiPDF también.
-	hubnotify.AvisarTambien(r.Context(), para)
+	hubnotify.AvisarTambien(ctx, para)
 	asunto := ""
 	if cuerpo != "" {
 		asunto = titulo
 	}
-	h.avisador().Avisar(r.Context(), peticiones.Aviso{
-		Tenant: t.Slug, Para: para, Source: "pdf", Type: tipo, Titulo: titulo,
+	h.avisador().Avisar(ctx, peticiones.Aviso{
+		Tenant: tenant, Para: para, Source: "pdf", Type: tipo, Titulo: titulo,
 		URL: enlace, Recurso: id, Params: params,
 		Token: token, Asunto: asunto, Cuerpo: cuerpo,
 	})

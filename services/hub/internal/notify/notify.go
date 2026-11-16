@@ -46,7 +46,13 @@ func (e wireEnvelope) evento() Evento {
 	if e.Event != "" {
 		return Evento{Nombre: e.Event, Datos: e.Data}
 	}
-	return Evento{Nombre: "notification", Datos: e.Notification}
+	// Tenant and Subject are intentionally omitted from Notification's JSON.
+	// Restore them from the internal routing envelope after the relay decodes it:
+	// VistoDesde needs the real origin, while public serialization still hides
+	// both fields.
+	n := e.Notification
+	n.Tenant, n.Subject = e.Tenant, e.Subject
+	return Evento{Nombre: "notification", Datos: n}
 }
 
 // TopeAvisosPorHora es cuántos avisos puede dejar una organización a un mismo

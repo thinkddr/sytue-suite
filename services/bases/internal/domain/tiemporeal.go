@@ -86,7 +86,7 @@ var accionesDelFlujo = map[string]bool{
 	"record.create": true, "record.update": true, "record.link": true, "record.delete": true,
 	"field.create": true, "field.rename": true, "field.delete": true,
 	"table.create": true, "table.rename": true, "table.delete": true, "table.import": true,
-	"view.create": true, "view.delete": true,
+	"view.create": true, "view.update": true, "view.delete": true,
 	"comment.create": true, "comment.delete": true,
 	"base.update": true,
 }

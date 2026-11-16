@@ -96,6 +96,16 @@ func (s *Store) EnsureAccountConCuota(ctx context.Context, subject, address, dis
 			(displayName == "" || displayName == got.DisplayName):
 			acc = got
 			return nil
+		case errors.Is(gerr, pgx.ErrNoRows):
+			id, created, err := insertAccountIfAbsent(ctx, tx, t, subject, address, displayName, quotaBytes)
+			if err != nil {
+				return err
+			}
+			if created {
+				var err error
+				acc, err = scanAccount(tx.QueryRow(ctx, "SELECT id,tenant,subject,address,display_name,quota_bytes,used_bytes,created_at,updated_at FROM accounts WHERE tenant=$1 AND id=$2", t, id))
+				return err
+			}
 		case gerr != nil && !errors.Is(gerr, pgx.ErrNoRows):
 			return fmt.Errorf("store: leer cuenta: %w", gerr)
 		}
@@ -233,19 +243,22 @@ func (s *Store) ListMailboxes(ctx context.Context, accountID uuid.UUID) ([]domai
 
 // MailboxByRole devuelve el buzón con el rol dado de una cuenta (p. ej. Inbox).
 func (s *Store) MailboxByRole(ctx context.Context, accountID uuid.UUID, role domain.SpecialUse) (domain.Mailbox, error) {
-	var mb domain.Mailbox
+	var mailbox domain.Mailbox
 	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
-		row := tx.QueryRow(ctx, `
-			SELECT id, tenant, account_id, parent_id, name, role, uid_validity, uid_next, created_at, updated_at
-			FROM mailboxes WHERE tenant = current_setting('app.tenant', true) AND account_id = $1 AND role = $2`, accountID, string(role))
 		var err error
-		mb, err = scanMailboxRow(row)
+		mailbox, err = mailboxByRoleTx(ctx, tx, accountID, role)
 		return err
 	})
+	return mailbox, err
+}
+
+func mailboxByRoleTx(ctx context.Context, tx pgx.Tx, accountID uuid.UUID, role domain.SpecialUse) (domain.Mailbox, error) {
+	row := tx.QueryRow(ctx, `SELECT id,tenant,account_id,parent_id,name,role,uid_validity,uid_next,created_at,updated_at FROM mailboxes WHERE tenant=current_setting('app.tenant',true) AND account_id=$1 AND role=$2`, accountID, string(role))
+	mailbox, err := scanMailboxRow(row)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Mailbox{}, domain.ErrNotFound
 	}
-	return mb, err
+	return mailbox, err
 }
 
 // MailboxByID devuelve un buzón CONCRETO de una cuenta. El filtro por cuenta no
@@ -308,6 +321,19 @@ func (s *Store) InsertMessage(ctx context.Context, m *domain.Message) error {
 // Sent DENTRO de la misma transacción de mantenimiento (exactly-once). `tenant`
 // debe estar fijado en la sesión (app.tenant) para que el INSERT pase su RLS.
 func insertMessageTx(ctx context.Context, tx pgx.Tx, tenant string, m *domain.Message) error {
+	// Threading: agrupar por In-Reply-To/Message-ID dentro de la cuenta.
+	threadID, err := resolveThread(ctx, tx, tenant, m)
+	if err != nil {
+		return err
+	}
+	m.ThreadID = threadID
+	return insertarEnHiloTx(ctx, tx, tenant, m)
+}
+
+// insertarEnHiloTx inserta el sobre con el hilo ya resuelto en m.ThreadID. Va
+// aparte de insertMessageTx porque la entrega (InsertMessageEntrante) necesita el
+// hilo ANTES de decidir el buzón: uno silenciado no entra en Recibidos.
+func insertarEnHiloTx(ctx context.Context, tx pgx.Tx, tenant string, m *domain.Message) error {
 	// Reservar UID y bloquear el buzón para serializar inserciones concurrentes.
 	var uid uint32
 	if err := tx.QueryRow(ctx, `
@@ -319,13 +345,6 @@ func insertMessageTx(ctx context.Context, tx pgx.Tx, tenant string, m *domain.Me
 		return fmt.Errorf("store: reservar UID: %w", err)
 	}
 	m.UID = uid
-
-	// Threading: agrupar por In-Reply-To/Message-ID dentro de la cuenta.
-	threadID, err := resolveThread(ctx, tx, tenant, m)
-	if err != nil {
-		return err
-	}
-	m.ThreadID = threadID
 
 	// Normalizar slices de direcciones/flags: las columnas text[] son NOT NULL
 	// DEFAULT '{}', pero un []string nil de Go se envía como SQL NULL y viola la
@@ -381,31 +400,38 @@ func resolveThread(ctx context.Context, tx pgx.Tx, tenant string, m *domain.Mess
 	return tid, nil
 }
 
-// ListMessages pagina los sobres de un buzón (más recientes primero) por
-// KEYSET: before/beforeID son el (received_at, id) del último mensaje de la
-// página anterior; con before en cero devuelve la primera página. Sin OFFSET:
+// ordenLista es la fecha de orden de las listas (ver domain.Message.FechaDeOrden):
+// lo vuelto de «Pospuestos» sube a la hora de vuelta. Es la MISMA expresión que el
+// índice messages_mailbox_orden_idx (0038), letra a letra: el planner solo usa un
+// índice de expresión si la consulta repite la expresión.
+const ordenLista = `COALESCE(unsnoozed_at, received_at)`
+
+// ListMessages pagina los sobres de un buzón (más recientes primero, por fecha de
+// orden) por KEYSET: before/beforeID son la (fecha de orden, id) del último mensaje
+// de la página anterior; con before en cero devuelve la primera página. Sin OFFSET:
 // el coste por página es constante aunque el buzón tenga millones de mensajes
-// (el índice messages_mailbox_idx ya ordena por received_at DESC; id desempata).
+// (el índice messages_mailbox_orden_idx ya ordena por la fecha de orden DESC; id
+// desempata).
 func (s *Store) ListMessages(ctx context.Context, mailboxID uuid.UUID, limit int, before time.Time, beforeID uuid.UUID) ([]domain.Message, error) {
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
 	q := selectMessageColsConHilo + `
 		WHERE m.tenant = current_setting('app.tenant', true) AND mailbox_id = $1 AND deleted_at IS NULL
-		ORDER BY received_at DESC, id DESC LIMIT $2`
+		ORDER BY ` + ordenLista + ` DESC, id DESC LIMIT $2`
 	args := []any{mailboxID, limit}
 	if !before.IsZero() {
-		// received_at <= $3 es redundante con la comparación de fila, pero es lo
+		// El predicado escalar es redundante con la comparación de fila, pero es lo
 		// que permite al planner acotar el arranque del index scan en el cursor:
 		// una row comparison solo actúa de index qual si TODAS sus columnas están
-		// en el índice, y messages_mailbox_idx no incluye id. Sin el predicado
+		// en el índice, y messages_mailbox_orden_idx no incluye id. Sin el predicado
 		// escalar degradaría a filtro post-scan (coste O(posición), como OFFSET).
-		// La comparación de fila queda para descartar los empates exactos de
-		// received_at con id >= cursor.
+		// La comparación de fila queda para descartar los empates exactos de la
+		// fecha de orden con id >= cursor.
 		q = selectMessageColsConHilo + `
 			WHERE m.tenant = current_setting('app.tenant', true) AND mailbox_id = $1 AND deleted_at IS NULL
-			  AND received_at <= $3 AND (received_at, id) < ($3, $4)
-			ORDER BY received_at DESC, id DESC LIMIT $2`
+			  AND ` + ordenLista + ` <= $3 AND (` + ordenLista + `, id) < ($3, $4)
+			ORDER BY ` + ordenLista + ` DESC, id DESC LIMIT $2`
 		args = append(args, before, beforeID)
 	}
 	var out []domain.Message
@@ -571,7 +597,7 @@ const selectMessageCols = `
 	SELECT id, tenant, account_id, mailbox_id, thread_id, uid, rfc822_msg_id, in_reply_to,
 	       subject, from_addr, from_name, to_addrs, cc_addrs, bcc_addrs, reply_to,
 	       snippet, blob_key, size_bytes, flags, has_attach,
-	       spf_result, dkim_result, dmarc_result, received_at, sent_at
+	       spf_result, dkim_result, dmarc_result, received_at, sent_at, unsnoozed_at
 	FROM messages
 	WHERE tenant = current_setting('app.tenant', true)`
 
@@ -584,7 +610,7 @@ const selectMessageColsConHilo = `
 	SELECT m.id, m.tenant, m.account_id, m.mailbox_id, m.thread_id, m.uid, m.rfc822_msg_id, m.in_reply_to,
 	       m.subject, m.from_addr, m.from_name, m.to_addrs, m.cc_addrs, m.bcc_addrs, m.reply_to,
 	       m.snippet, m.blob_key, m.size_bytes, m.flags, m.has_attach,
-	       m.spf_result, m.dkim_result, m.dmarc_result, m.received_at, m.sent_at,
+	       m.spf_result, m.dkim_result, m.dmarc_result, m.received_at, m.sent_at, m.unsnoozed_at,
 	       (SELECT count(*) FROM messages t
 	         WHERE t.tenant = m.tenant AND t.thread_id = m.thread_id
 	           AND t.account_id = m.account_id AND t.deleted_at IS NULL) AS thread_count

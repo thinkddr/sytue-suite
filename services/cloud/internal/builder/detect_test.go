@@ -59,7 +59,7 @@ func TestGeneratedDockerfilesPinStableToolchains(t *testing.T) {
 		image     string
 	}{
 		{framework: domain.FrameworkAstro, image: "FROM oven/bun:1.4.4@sha256:1d22548f177f4ff38e0c15baa3c2c46c6c2060ba2d1bc573bb4720b407548f1d AS build"},
-		{framework: domain.FrameworkGo, image: "FROM golang:1.27.3@sha256:f24164268fc1e741bbdc0066dbadcf1c8426c5a8489f0729c02c3905a53032fd AS build"},
+		{framework: domain.FrameworkGo, image: "FROM golang:1.27.4@sha256:08bcb99a38f85a265f9a93d1d3323e2440eec333380f3ea26ee0dec9264bb41c AS build"},
 	}
 
 	for _, test := range tests {

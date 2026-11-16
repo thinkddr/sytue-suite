@@ -34,7 +34,7 @@ const hubBaseUrl = env.SYTUE_HUB_BASE_URL ?? 'https://hub.sytue.eu';
 const idBaseUrl = (env.SYTUE_OIDC_ISSUER ?? 'https://id.sytue.eu').replace(/\/$/, '');
 ---
 
-<AppLayout title="Mi cuenta">
+<AppLayout>
   <AccountApp
     slot="app"
     client:load

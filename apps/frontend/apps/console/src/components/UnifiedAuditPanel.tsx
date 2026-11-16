@@ -297,7 +297,7 @@ export default function UnifiedAuditPanel({
           <EmptyState
             title={t('audit.empty.title')}
             description={t('audit.empty.description')}
-            illustration={<Icon name="audit" size={28} />}
+            icon="audit"
             action={
               <Button variant="secondary" size="sm" onClick={clear}>
                 {t('users.empty.clearFilters')}

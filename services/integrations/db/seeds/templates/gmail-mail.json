@@ -21,7 +21,7 @@
       "scopes": ["https://www.googleapis.com/auth/gmail.modify"],
       "authorize_params": {
         "access_type": "offline",
-        "prompt": "consent"
+        "prompt": "consent select_account"
       }
     }
   }

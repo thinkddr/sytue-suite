@@ -5,6 +5,8 @@ package notes
 
 import (
 	"cmp"
+	"context"
+	"errors"
 	"net/url"
 	"regexp"
 	"slices"
@@ -22,6 +24,8 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/buscar"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/notas"
+	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 )
 
 // Paridad web: escribir una nota —el `editando` de NoteCard.tsx— y la herramienta de
@@ -44,7 +48,13 @@ type sesionEdicion struct {
 	reloj          *time.Timer
 	// compartida es una nota que me han compartido con edición: se guarda con
 	// `guardarCompartida` y vive en el lienzo de «Compartido conmigo» (compartidas.go).
-	compartida bool
+	compartida      bool
+	borradorID      string
+	borrador        *borradorEdicion
+	errorBorrador   error
+	bloqueoBorrador bool
+	durable         *notas.DraftReceipt
+	esperaDurable   bool
 }
 
 // agendaMenciones es la gente a la que se menciona con «@»: se pide UNA vez por sesión, a
@@ -58,21 +68,47 @@ func (p *Pantalla) agendaMenciones() *ui.AgendaMenciones {
 
 // abrirEditor abre una nota para escribir, cerrando (y guardando) la que hubiera.
 func (p *Pantalla) abrirEditor(n Nota) {
+	if !p.vigente() {
+		return
+	}
 	if s := p.edicion; s != nil && s.nota == n.ID {
 		p.enfocar(s.editor.Zona())
 		return
 	}
 	p.cerrarEditor()
+	if p.edicion != nil {
+		return
+	}
 	if !n.Editable(!p.hayRed(), p.bloqueado) {
 		return
 	}
-	ed := NuevoEditorNota(p.tr, n.Doc, p.tr.T("note.placeholder", nil))
+	// Unsafe encrypted edits need a durable encrypted destination even when
+	// their original contents cannot yet be re-encrypted safely.
+	if p.activo.Cifrado && (p.Almacen == nil || (p.vida().work == nil && !p.Almacen.Encrypted())) {
+		p.fallo("note.saveFailed", offline.ErrEncryptedStore)
+		return
+	}
+	id, borrador, receipt, recuperado, err := p.recuperarEdicion(n)
+	if err != nil {
+		p.fallo("note.saveFailed", err)
+	}
+	doc := n.Doc
+	if recuperado {
+		doc = Leer(borrador.EditorHTML())
+	}
+	ed := NuevoEditorNota(p.tr, doc, p.tr.T("note.placeholder", nil))
 	ed.Afuera = p.afuera
 	s := &sesionEdicion{
 		nota: n.ID, editor: ed, fusion: n.ID + ":" + strconv.FormatInt(time.Now().UnixNano(), 36),
 	}
 	s.html = ed.HTML()
-	s.guardado = s.html
+	s.guardado = n.Doc.ParaGuardar()
+	if recuperado {
+		s.borradorID = id
+		s.borrador = &borrador
+		s.bloqueoBorrador = borrador.Blocked
+		s.durable = receipt
+	}
 	ed.AlCambiar = func(html string) { p.alEscribir(s, html) }
 	ed.AlTerminar = p.cerrarEditor
 	ed.conservaEdicion = p.barra.conservaEdicion
@@ -87,10 +123,14 @@ func (p *Pantalla) abrirEditor(n Nota) {
 	ed.AlCrecer = p.recolocarLienzo
 	ed.AlIrA = p.abrirIrA
 	ed.portal = p.portal
-	if p.Asistir != nil {
+	if p.vida().work == nil && p.Asistir != nil {
 		ed.ConAsistente(p.Asistir, string(p.loc))
 	}
 	p.edicion = s
+	if receipt != nil {
+		ctx, _ := p.contextoTrabajo()
+		p.observarEdicionDurable(ctx, s, receipt)
+	}
 	p.lienzo.Seleccionada, p.lienzo.Editando, p.lienzo.Editor = n.ID, n.ID, ed
 	p.Repintar()
 	p.enfocar(ed.Zona())
@@ -99,6 +139,27 @@ func (p *Pantalla) abrirEditor(n Nota) {
 // alEscribir programa el guardado: la pausa, o lo que quede del techo de 2 s contando
 // desde el primer cambio sin guardar.
 func (p *Pantalla) alEscribir(s *sesionEdicion, html string) {
+	if !p.vigente() || p.edicion != s {
+		s.editor.rechazarCambio(s.html)
+		return
+	}
+	_, done, err := p.admitir()
+	if err != nil {
+		s.editor.rechazarCambio(s.html)
+		return
+	}
+	defer done()
+	previousID, previousDraft, previousError, previousReceipt, previousBlocked := s.borradorID, s.borrador, s.errorBorrador, s.durable, s.bloqueoBorrador
+	if err := p.conservarEdicion(s, html); err != nil {
+		if (errors.Is(err, notas.ErrLocalAdmission) || errors.Is(err, api.ErrDatosCifradosNotas)) && !s.bloqueoBorrador {
+			s.borradorID, s.borrador, s.errorBorrador, s.durable = previousID, previousDraft, previousError, previousReceipt
+			s.bloqueoBorrador = previousBlocked
+			s.editor.rechazarCambio(s.html)
+			p.fallo("note.saveFailed", err)
+			return
+		}
+		p.fallo("note.saveFailed", err)
+	}
 	s.html = html
 	if s.reloj != nil {
 		s.reloj.Stop()
@@ -112,13 +173,29 @@ func (p *Pantalla) alEscribir(s *sesionEdicion, html string) {
 		s.sucioDesde = ahora
 	}
 	s.reloj = time.AfterFunc(EsperaDeAutoguardado(s.sucioDesde, ahora), func() {
-		enHilo(func() { p.guardarEdicion(s) })
+		p.enHilo(func() { p.guardarEdicion(s) })
 	})
 }
 
 // guardarEdicion manda lo escrito si ha cambiado desde lo último que se mandó, con los
 // enlaces a otras notas que haya en el texto.
 func (p *Pantalla) guardarEdicion(s *sesionEdicion) {
+	if work := p.vida().work; work != nil && work.EditorPending(s.borradorID) {
+		s.esperaDurable = true
+		return
+	}
+	if s.durable != nil {
+		durable, err := s.durable.Status()
+		s.errorBorrador = err
+		if !durable {
+			s.esperaDurable = true
+			return
+		}
+	}
+	s.esperaDurable = false
+	if s.errorBorrador != nil || s.bloqueoBorrador {
+		return
+	}
 	if s.html == s.guardado {
 		return
 	}
@@ -130,14 +207,26 @@ func (p *Pantalla) guardarEdicion(s *sesionEdicion) {
 			pa.Enlaces = enlacesSincronizados(n.Note, s.editor.Documento(), p.AppURL)
 		}
 		nota := s.nota
-		lanzar(func() error { return p.guardarCompartida(nota, pa) })
+		p.lanzar(func() error { return p.guardarCompartida(nota, pa) })
 		return
 	}
 	if n, ok := p.nota(s.nota); ok && !p.activo.Cifrado {
 		pa.Enlaces = enlacesSincronizados(n.Crudo, s.editor.Documento(), p.AppURL)
 	}
 	nota, fusion := s.nota, s.fusion
-	lanzar(func() error { return p.editarCon(nota, pa, true, fusion) })
+	if p.Almacen != nil && s.borradorID != "" {
+		id := s.borradorID
+		p.lanzar(func() error {
+			ctx, cancel := p.ctx()
+			defer cancel()
+			return p.enviarEdicionConfirmada(ctx, id, func(ctx context.Context, d borradorEdicion, acknowledge func(context.Context, api.Note) error) (api.Note, error) {
+				html := d.EditorHTML()
+				return p.editarConEntradaConfirmada(ctx, nota, Parche{Contenido: &html, Enlaces: d.Input.Links}, true, fusion, &d.Input, acknowledge)
+			})
+		})
+		return
+	}
+	p.lanzar(func() error { return p.editarCon(nota, pa, true, fusion) })
 }
 
 // cerrarEditor guarda lo pendiente y vuelve a la lectura.
@@ -145,6 +234,28 @@ func (p *Pantalla) cerrarEditor() {
 	s := p.edicion
 	if s == nil {
 		return
+	}
+	if s.bloqueoBorrador {
+		if s.errorBorrador != nil {
+			// Retry while this presenter still owns the original session. A
+			// failed admission has never granted permission to write elsewhere.
+			_ = p.conservarEdicion(s, s.html)
+			if s.errorBorrador != nil {
+				p.fallo("note.saveFailed", s.errorBorrador)
+				return
+			}
+		}
+		if s.borrador == nil || s.borradorID == "" {
+			p.fallo("note.saveFailed", offline.ErrEncryptedStore)
+			return
+		}
+		if s.durable != nil {
+			durable, err := s.durable.Status()
+			if !durable || err != nil || s.durable.Revision != s.borrador.Revision {
+				p.fallo("note.saveFailed", api.ErrDatosCifradosNotas)
+				return
+			}
+		}
 	}
 	p.portal.poner(s.editor) // el menú y la burbuja se van con el editor
 	if s.reloj != nil {
@@ -160,6 +271,17 @@ func (p *Pantalla) cerrarEditor() {
 	}
 	p.guardarEdicion(s)
 	p.Repintar()
+}
+
+// PrepararRetirada keeps an unpreserved encrypted edit in the editor and retries
+// its original-scope journal before the host closes the window or presenter.
+// It must be called on the UI thread before invalidating the presenter session.
+func (p *Pantalla) PrepararRetirada() bool {
+	if p.edicion == nil || !p.edicion.bloqueoBorrador {
+		return true
+	}
+	p.cerrarEditor()
+	return p.edicion == nil
 }
 
 // recolocarLienzo vuelve a colocar el lienzo cuando la nota que se escribe cambia de alto:
@@ -394,7 +516,7 @@ func (b *busquedaEnlaces) buscar(q string, hay bool) {
 	mia, drive := b.vuelta, b.drive
 	b.reloj = time.AfterFunc(esperaEnlace, func() {
 		r, d := p.buscarFuera(q, drive)
-		fyne.Do(func() {
+		p.enHilo(func() {
 			if mia != b.vuelta {
 				return
 			}

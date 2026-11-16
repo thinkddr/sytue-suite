@@ -47,6 +47,8 @@ export interface ClaroDeNota {
   data_json?: string;
   data_patch?: Record<string, unknown>;
   data_removed?: string[];
+  /** Optional future link envelope; absent means legacy, [] means explicitly empty. */
+  links_json?: string;
 }
 
 const ITERACIONES = 600_000;
@@ -161,11 +163,34 @@ export async function abrir(params: NotesCrypto, passphrase: string): Promise<Cr
  * viajara en claro «para poder listarlas», el cifrado protegería el detalle y
  * publicaría el titular.
  */
+function enlacesValidos(raw: unknown): raw is string {
+  if (typeof raw !== 'string') return false;
+  // JSON strings must survive UTF-8 conversion identically on both clients.
+  for (let i = 0; i < raw.length; i++) {
+    const c = raw.charCodeAt(i);
+    if (c >= 0xd800 && c <= 0xdbff) {
+      const next = raw.charCodeAt(++i);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return false;
+    } else if (c >= 0xdc00 && c <= 0xdfff) return false;
+  }
+  try {
+    const links: unknown = JSON.parse(raw);
+    return (
+      Array.isArray(links) &&
+      links.every((link) => typeof link === 'object' && link !== null && !Array.isArray(link))
+    );
+  } catch {
+    return false;
+  }
+}
+
 export async function empaquetar(
   key: CryptoKey,
   claro: ClaroDeNota,
   dataJSON?: string,
 ): Promise<string> {
+  if (claro.links_json !== undefined && !enlacesValidos(claro.links_json))
+    throw new Error('notes: invalid encrypted links');
   const source = dataJSON ?? claro.data_json;
   if (source !== undefined) JSON.parse(source);
   const stored = {
@@ -174,6 +199,7 @@ export async function empaquetar(
     data_json: source ?? JSON.stringify(claro.data ?? {}),
     ...(claro.data_patch ? { data_patch: claro.data_patch } : {}),
     ...(claro.data_removed?.length ? { data_removed: claro.data_removed } : {}),
+    ...(claro.links_json === undefined ? {} : { links_json: claro.links_json }),
   };
   const cipher = await cifrarTexto(key, JSON.stringify(stored));
   if (cipher.length > 16 * 1024 * 1024) throw new Error('notes: encrypted content too large');
@@ -193,6 +219,7 @@ export async function desempaquetar(
     const parsed: unknown = JSON.parse(await descifrarTexto(key, criptograma));
     if (typeof parsed !== 'object' || parsed === null) return null;
     const o = parsed as Partial<ClaroDeNota>;
+    if (o.links_json !== undefined && !enlacesValidos(o.links_json)) return null;
     const source = typeof o.data_json === 'string' ? o.data_json : undefined;
     const base: unknown = source === undefined ? o.data : JSON.parse(source);
     if (base != null && (typeof base !== 'object' || Array.isArray(base))) return null;
@@ -207,6 +234,7 @@ export async function desempaquetar(
     for (const k of removed) delete data[k];
     return {
       ...(source === undefined ? {} : { data_json: source }),
+      ...(o.links_json === undefined ? {} : { links_json: o.links_json }),
       ...(Object.keys(patch).length ? { data_patch: patch } : {}),
       ...(removed.length ? { data_removed: removed } : {}),
       title: typeof o.title === 'string' ? o.title : '',

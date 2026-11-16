@@ -8,6 +8,7 @@ import { resolveOidcConfig } from '../config.js';
 import { hostCookieName, seal, sessionCookieAttributes, unseal } from './cookies.js';
 import { conPrefijo, createBff, safeReturnTo } from './bff.js';
 import { returnToCanonico } from '@sytue/config';
+import { SessionSlots } from './session-slots.js';
 
 const BASE = 'https://mail.sytue.eu';
 
@@ -341,7 +342,11 @@ test('el login en el host del callback va directo al IdP con la cookie de estado
   expect(location.searchParams.get('redirect_uri')).toBe(
     'https://corporate.sytue.eu/docs/auth/callback',
   );
-  expect(puestas).toEqual([hostCookieName('sytue_oidc_state', true)]);
+  expect(puestas).toEqual([
+    '__Host-sytue_session_selection',
+    expect.stringMatching(/^__Host-sytue_session_pending_[a-f0-9]{64}$/),
+    expect.stringMatching(/^__Host-sytue_session_oidc_[a-f0-9]{64}$/),
+  ]);
 });
 
 test('reauth=1 pide a Sytue ID autenticar de nuevo (max_age=0); sin él, no', async () => {
@@ -447,11 +452,34 @@ test('conPrefijo: idempotente, respeta el límite de segmento y no toca lo que n
 // sin Content-Type y Safari la DESCARGA (Cast, 2026-09-28, `invalid_client`).
 async function callbackConCanje(estado: number, error: string) {
   const secreto = 'x'.repeat(32);
-  const cookie = await seal(
-    { state: 'aleatorio', nonce: 'n', codeVerifier: 'v', returnTo: '/docs/' },
-    secreto,
+  const values = new Map<string, string>();
+  const cookies = {
+    get: (name: string) => {
+      const value = values.get(name);
+      return value === undefined ? undefined : { value };
+    },
+    set: (name: string, value: string) => {
+      values.set(name, value);
+    },
+    delete: (name: string) => {
+      values.delete(name);
+    },
+  };
+  const slots = new SessionSlots(secreto, true, 3600);
+  const start = new URL('https://corporate.sytue.eu/docs/auth/login');
+  const selected = await slots.begin({ request: new Request(start), url: start, cookies });
+  const intent = selected.candidate.id;
+  values.set(
+    slots.stateCookie(intent),
+    await seal(
+      { state: 'aleatorio', nonce: 'n', codeVerifier: 'v', returnTo: '/docs/', intent },
+      secreto,
+    ),
   );
-  const url = new URL('https://corporate.sytue.eu/docs/auth/callback?code=c&state=aleatorio');
+  const state = await seal({ s: 'aleatorio', r: '/docs/', i: intent }, secreto);
+  const url = new URL(
+    'https://corporate.sytue.eu/docs/auth/callback?code=c&state=' + encodeURIComponent(state),
+  );
   const original = globalThis.fetch;
   globalThis.fetch = (async (entrada: string | URL | Request) =>
     String(entrada instanceof Request ? entrada.url : entrada).endsWith('/oauth2/token')
@@ -473,7 +501,7 @@ async function callbackConCanje(estado: number, error: string) {
     return await bffDeDocs().callback({
       request: new Request(url),
       url,
-      cookies: { get: () => ({ value: cookie }), set: () => {}, delete: () => {} },
+      cookies,
     });
   } finally {
     globalThis.fetch = original;
@@ -487,9 +515,9 @@ test('un canje rechazado (invalid_client) es una página HTML, no una excepción
   expect(await res.text()).toContain('invalid_client');
 });
 
-test('un code ya canjeado (invalid_grant, recargar o Atrás) reinicia el login', async () => {
+test('un code ya canjeado vuelve al destino sin sobrescribir otro intento de login', async () => {
   const res = await callbackConCanje(400, 'invalid_grant');
-  expect(res.headers.get('location')).toBe('/docs/auth/login');
+  expect(res.headers.get('location')).toBe('/docs/');
 });
 
 test('la página de error escapa lo que devuelve el IdP', async () => {
@@ -546,7 +574,7 @@ async function refrescarCon(orgColor: string | undefined, orgForma?: string) {
       request: new Request(url, { method: 'POST' }),
       url,
       cookies: {
-        get: () => ({ value: sesion }),
+        get: (name: string) => (name === '__Host-sytue_session' ? { value: sesion } : undefined),
         set: (name: string, value: string, options?: Record<string, unknown>) =>
           void puestas.push(options === undefined ? { name, value } : { name, value, options }),
         delete: (name: string) => void borradas.push(name),
@@ -556,12 +584,17 @@ async function refrescarCon(orgColor: string | undefined, orgForma?: string) {
   } finally {
     globalThis.fetch = original;
   }
-  return { puestas, borradas };
+  // Assignment writes a slot once before refresh, then refresh updates that slot.
+  const final = new Map(puestas.map((cookie) => [cookie.name, cookie]));
+  return { puestas: [...final.values()], borradas };
 }
 
 test('la sesión deja a su lado el color de la organización, legible y host-only', async () => {
   const { puestas, borradas } = await refrescarCon('cobalto');
-  expect(puestas.map((c) => c.name)).toEqual(['__Host-sytue_session', 'sytue-color-org']);
+  expect(puestas.map((c) => c.name)).toEqual([
+    expect.stringMatching(/^__Host-sytue_session_slot_[a-f0-9]{64}$/),
+    'sytue-color-org',
+  ]);
   const color = puestas[1];
   expect(color?.value).toBe('cobalto');
   expect(color?.options).toMatchObject({ path: '/', secure: true, httpOnly: false });
@@ -571,7 +604,10 @@ test('la sesión deja a su lado el color de la organización, legible y host-onl
 
 test('y la forma de la organización, por el mismo camino', async () => {
   const { puestas, borradas } = await refrescarCon(undefined, 'carril');
-  expect(puestas.map((c) => c.name)).toEqual(['__Host-sytue_session', 'sytue-forma-org']);
+  expect(puestas.map((c) => c.name)).toEqual([
+    expect.stringMatching(/^__Host-sytue_session_slot_[a-f0-9]{64}$/),
+    'sytue-forma-org',
+  ]);
   expect(puestas[1]?.value).toBe('carril');
   expect(puestas[1]?.options).toMatchObject({ path: '/', secure: true, httpOnly: false });
   expect(borradas).toEqual(['sytue-color-org']);
@@ -579,6 +615,8 @@ test('y la forma de la organización, por el mismo camino', async () => {
 
 test('una organización con el color de la casa no deja cookie de color', async () => {
   const { puestas, borradas } = await refrescarCon(undefined);
-  expect(puestas.map((c) => c.name)).toEqual(['__Host-sytue_session']);
+  expect(puestas.map((c) => c.name)).toEqual([
+    expect.stringMatching(/^__Host-sytue_session_slot_[a-f0-9]{64}$/),
+  ]);
   expect(borradas).toEqual(['sytue-color-org', 'sytue-forma-org']);
 });

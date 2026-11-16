@@ -158,14 +158,15 @@ func teamFolderOrRoot(drive domain.TeamDrive, folderID uuid.UUID) uuid.UUID {
 }
 
 // TeamListChildren lista subcarpetas + una página de ficheros de una carpeta de la
-// unidad (folderID vacío = raíz). Cualquier miembro (viewer+) puede leer.
-func (s *Service) TeamListChildren(ctx context.Context, driveID uuid.UUID, subject string, folderID uuid.UUID, cursor string, limit int) (TeamListing, error) {
+// unidad (folderID vacío = raíz), en el orden pedido (como ListFilesPage). Cualquier
+// miembro (viewer+) puede leer.
+func (s *Service) TeamListChildren(ctx context.Context, driveID uuid.UUID, subject string, folderID uuid.UUID, orden store.OrdenFicheros, cursor string, limit int) (TeamListing, error) {
 	drive, role, err := s.team.TeamDriveAccess(ctx, driveID, subject)
 	if err != nil {
 		return TeamListing{}, err
 	}
 	target := teamFolderOrRoot(drive, folderID)
-	after, err := decodeFileCursor(cursor)
+	after, err := cursorEnOrden(cursor, orden)
 	if err != nil {
 		return TeamListing{}, err
 	}
@@ -173,6 +174,7 @@ func (s *Service) TeamListChildren(ctx context.Context, driveID uuid.UUID, subje
 	if err != nil {
 		return TeamListing{}, err
 	}
+	OrdenarCarpetas(subs, orden)
 	page, err := s.team.TeamListFilesPage(ctx, driveID, target, after, limit)
 	if err != nil {
 		return TeamListing{}, err

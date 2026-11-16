@@ -181,6 +181,7 @@ func (s *Store) PapeleraCaducada(ctx context.Context, antes time.Time, despues *
 	err := s.pool.InMaintenanceTx(ctx, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `SELECT `+colsDocumento+` FROM documents
 			WHERE deleted_at IS NOT NULL AND deleted_at < $1
+			 AND NOT docs_private_owner_frozen(tenant,owner_sub,kind::text)
 			  AND (deleted_at, id) > ($3::timestamptz, $4::uuid)
 			ORDER BY deleted_at, id LIMIT $2`, antes, limit, desde, desdeID)
 		if err != nil {
@@ -207,7 +208,7 @@ func (s *Store) SigueCaducado(ctx context.Context, id string, antes time.Time) (
 	var ok bool
 	err := s.tenantTx(ctx, func(tx pgx.Tx) error {
 		return tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM documents
-			WHERE id = $1 AND deleted_at IS NOT NULL AND deleted_at < $2)`, id, antes).Scan(&ok)
+			WHERE id = $1 AND deleted_at IS NOT NULL AND deleted_at < $2 AND NOT docs_private_owner_frozen(tenant,owner_sub,kind::text))`, id, antes).Scan(&ok)
 	})
 	if err != nil {
 		return false, fmt.Errorf("store: sigue caducado: %w", err)
@@ -233,6 +234,7 @@ func (s *Store) SinReconciliar(ctx context.Context) ([]domain.Document, error) {
 		rows, err := tx.Query(ctx, `SELECT DISTINCT ON (d.owner_sub, d.source_ref, d.kind) `+colsDocumentoD+`
 			FROM documents d
 			WHERE d.deleted_at IS NOT NULL AND d.source_ref LIKE 'drive:%'
+			 AND NOT docs_private_owner_frozen(d.tenant,d.owner_sub,d.kind::text)
 			  AND NOT EXISTS (
 				SELECT 1 FROM documents v
 				 WHERE v.owner_sub = d.owner_sub AND v.source_ref = d.source_ref AND v.deleted_at IS NULL)

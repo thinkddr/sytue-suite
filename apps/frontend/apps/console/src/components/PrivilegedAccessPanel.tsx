@@ -16,14 +16,13 @@ import {
   Button,
   Card,
   CardBody,
-  Checkbox,
   EmptyState,
   FieldGroup,
   Icon,
+  InlineHelp,
   Input,
   Modal,
-  SectionHeader,
-  Select,
+  SettingsShell,
   Tabs,
   Textarea,
   ToastProvider,
@@ -35,6 +34,7 @@ import { useT, type T } from '../i18n/index.js';
 import type { ConsoleMessageKey } from '../i18n/index.js';
 import { formatWhen } from '../lib/format.js';
 import type { PimActivation, PimEligibility } from '../lib/types.js';
+import PimEligibilityWizard, { roleRefFromValue } from './PimEligibilityWizard.js';
 
 interface DirectoryRef {
   id: string;
@@ -93,13 +93,6 @@ function minutesLeft(expiresAt?: string): number {
   return Math.max(0, Math.round((new Date(expiresAt).getTime() - Date.now()) / 60000));
 }
 
-/** Valor del picker de rol: 'builtin:<role>' para built-in, o el uuid del personalizado. */
-function roleRefFromValue(value: string): { role_id?: string; builtin_role?: string } {
-  return value.startsWith('builtin:')
-    ? { builtin_role: value.slice('builtin:'.length) }
-    : { role_id: value };
-}
-
 function Inner({
   locale,
   myEligibilities,
@@ -124,12 +117,10 @@ function Inner({
   const [eligs, setEligs] = useState<PimEligibility[]>(eligibilities);
   const [acts, setActs] = useState<PimActivation[]>(activations);
   const [busyId, setBusyId] = useState('');
+  // Alta guiada de elegibilidad: sustituye la página, como el resto de asistentes.
   const [newOpen, setNewOpen] = useState(false);
-  const [newUserId, setNewUserId] = useState('');
-  const [newRoleValue, setNewRoleValue] = useState('');
-  const [newRequiresApproval, setNewRequiresApproval] = useState(false);
-  const [newMaxDuration, setNewMaxDuration] = useState(60);
-  const [creating, setCreating] = useState(false);
+  // Controlada: al volver del asistente hay que aterrizar en «Administración», no en «Mi acceso».
+  const [tab, setTab] = useState('me');
 
   const pending = useMemo(() => acts.filter((a) => a.status === 'pending'), [acts]);
   const activeNow = useMemo(() => acts.filter((a) => a.effectiveStatus === 'active'), [acts]);
@@ -247,44 +238,9 @@ function Inner({
     }
   }
 
-  async function createEligibility(ev: Event) {
-    ev.preventDefault();
-    if (creating || !newUserId || !newRoleValue) return;
-    setCreating(true);
-    try {
-      const res = await fetch('/api/admin/pim/eligibilities', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          user_id: newUserId,
-          ...roleRefFromValue(newRoleValue),
-          requires_approval: newRequiresApproval,
-          max_duration_minutes: newMaxDuration,
-        }),
-      });
-      if (!res.ok) throw new Error(String(res.status));
-      const elig = (await res.json()) as PimEligibility;
-      setEligs((prev) => [elig, ...prev]);
-      toast.notify({ tone: 'success', title: t('pim.toast.eligCreated') });
-      setNewOpen(false);
-      setNewUserId('');
-      setNewRoleValue('');
-      setNewRequiresApproval(false);
-      setNewMaxDuration(60);
-    } catch (err) {
-      toast.notify({
-        tone: 'danger',
-        title: t('pim.toast.eligCreateFailed'),
-        description:
-          errorCode(err) === '409'
-            ? t('pim.toast.eligDuplicate')
-            : errorCode(err) === '400'
-              ? t('pim.toast.eligCheckFields')
-              : t('common.tryAgain'),
-      });
-    } finally {
-      setCreating(false);
-    }
+  function eligibilityCreated(elig: PimEligibility) {
+    setEligs((prev) => [elig, ...prev]);
+    toast.notify({ tone: 'success', title: t('pim.toast.eligCreated') });
   }
 
   async function deleteEligibility(e: PimEligibility) {
@@ -355,7 +311,7 @@ function Inner({
               <EmptyState
                 title={t('pim.me.emptyTitle')}
                 description={t('pim.me.emptyDescription')}
-                illustration={<Icon name="lock" size={28} />}
+                icon="lock"
               />
             </CardBody>
           </Card>
@@ -500,7 +456,7 @@ function Inner({
               <EmptyState
                 title={t('pim.admin.emptyTitle')}
                 description={t('pim.admin.emptyDescription')}
-                illustration={<Icon name="lock" size={28} />}
+                icon="lock"
                 action={
                   <Button
                     variant="primary"
@@ -554,22 +510,41 @@ function Inner({
     </div>
   );
 
-  return (
-    <div class="flex h-full min-h-0 flex-col">
-      <SectionHeader
-        level={1}
-        class="shrink-0"
-        title={t('page.pim')}
-        subtitle={t('pim.subtitle')}
-      />
-      {!live ? (
-        <p class="border-border bg-warning-bg text-warning-text mx-4 mt-3 rounded-md border px-3 py-2 text-sm">
-          {t('pim.offline')}
-        </p>
-      ) : null}
+  if (newOpen) {
+    return (
+      <SettingsShell
+        title={t('pim.admin.newEligibility')}
+        description={t('pim.wizard.description')}
+      >
+        <PimEligibilityWizard
+          t={t}
+          locale={locale}
+          users={users}
+          roles={roles}
+          onCreated={eligibilityCreated}
+          onCancel={() => setNewOpen(false)}
+          onDone={() => setNewOpen(false)}
+        />
+      </SettingsShell>
+    );
+  }
 
-      <div class="min-h-0 flex-1 overflow-auto p-4">
+  return (
+    <SettingsShell
+      title={t('page.pim')}
+      description={t('pim.subtitle')}
+      banner={
+        live ? undefined : (
+          <InlineHelp tone="warning" title={t('common.offlineIdTitle')}>
+            {t('pim.offline')}
+          </InlineHelp>
+        )
+      }
+    >
+      <div>
         <Tabs
+          value={tab}
+          onChange={setTab}
           items={[
             {
               id: 'me',
@@ -587,7 +562,7 @@ function Inner({
         />
       </div>
 
-      {/* Activar un rol elegible */}
+      {/* Activar un rol elegible: una decisión, se queda en diálogo */}
       <Modal
         open={Boolean(activateFor)}
         onClose={() => setActivateFor(null)}
@@ -601,9 +576,7 @@ function Inner({
         {activateFor ? (
           <form class="flex flex-col gap-3" onSubmit={(e) => void submitActivate(e)}>
             {activateFor.requiresApproval ? (
-              <p class="border-border bg-warning-bg text-warning-text rounded-md border px-3 py-2 text-xs">
-                {t('pim.approvalNotice')}
-              </p>
+              <InlineHelp tone="warning">{t('pim.approvalNotice')}</InlineHelp>
             ) : null}
             <FieldGroup label={t('pim.justification')} htmlFor="pim-justification">
               <Textarea
@@ -653,87 +626,7 @@ function Inner({
           </form>
         ) : null}
       </Modal>
-
-      {/* Nueva elegibilidad (admin) */}
-      <Modal
-        open={newOpen}
-        onClose={() => setNewOpen(false)}
-        title={t('pim.admin.newEligibility')}
-        size="sm"
-      >
-        <form class="flex flex-col gap-3" onSubmit={(e) => void createEligibility(e)}>
-          <FieldGroup label={t('pim.newElig.user')} htmlFor="pim-user">
-            <Select
-              id="pim-user"
-              value={newUserId}
-              invalid={newUserId === ''}
-              onChange={(e) => setNewUserId(e.currentTarget.value)}
-            >
-              <option value="">{t('pim.newElig.selectUser')}</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name} · {u.email}
-                </option>
-              ))}
-            </Select>
-          </FieldGroup>
-          <FieldGroup label={t('pim.newElig.role')} htmlFor="pim-role">
-            <Select
-              id="pim-role"
-              value={newRoleValue}
-              invalid={newRoleValue === ''}
-              onChange={(e) => setNewRoleValue(e.currentTarget.value)}
-            >
-              <option value="">{t('pim.newElig.selectRole')}</option>
-              <optgroup label={t('pim.newElig.customRoles')}>
-                {roles.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label={t('pim.newElig.builtinRoles')}>
-                <option value="builtin:admin">{t('pim.newElig.builtinAdmin')}</option>
-                <option value="builtin:owner">{t('pim.newElig.builtinOwner')}</option>
-              </optgroup>
-            </Select>
-          </FieldGroup>
-          <FieldGroup
-            label={t('pim.newElig.maxLabel')}
-            htmlFor="pim-max"
-            help={t('pim.newElig.maxHelp')}
-          >
-            <Input
-              id="pim-max"
-              type="number"
-              min={1}
-              max={1440}
-              value={String(newMaxDuration)}
-              onInput={(e) => setNewMaxDuration(Number(e.currentTarget.value) || 0)}
-            />
-          </FieldGroup>
-          <Checkbox
-            label={t('pim.newElig.requiresApproval')}
-            checked={newRequiresApproval}
-            onChange={(e) => setNewRequiresApproval(e.currentTarget.checked)}
-          />
-          <div class="mt-1 flex justify-end gap-2">
-            <Button variant="ghost" size="sm" type="button" onClick={() => setNewOpen(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              type="submit"
-              loading={creating}
-              disabled={!newUserId || !newRoleValue || newMaxDuration < 1 || newMaxDuration > 1440}
-            >
-              {t('pim.newElig.submit')}
-            </Button>
-          </div>
-        </form>
-      </Modal>
-    </div>
+    </SettingsShell>
   );
 }
 

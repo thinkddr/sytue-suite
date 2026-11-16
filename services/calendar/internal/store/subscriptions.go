@@ -185,6 +185,7 @@ func (s *Store) ClaimDueSubscriptions(ctx context.Context, limit int) ([]SubJob,
 			  WHERE s.id IN (
 			        SELECT id FROM calendar_subscriptions
 			         WHERE next_refresh_at <= now()
+			           AND NOT calendar_private_calendar_frozen(tenant,calendar_id)
 			         ORDER BY next_refresh_at
 			         FOR UPDATE SKIP LOCKED
 			         LIMIT $1)

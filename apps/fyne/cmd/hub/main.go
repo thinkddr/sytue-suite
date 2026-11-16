@@ -16,6 +16,7 @@
 // Lo que NO lleva es el selector de aplicaciones: ir de un producto a otro es cosa del
 // sistema, no de una ventana. Aquí lo que la web pone en ese selector lo pone el MENÚ
 // de la ventana, que es lo que un usuario de escritorio espera.
+// paridad-web: apps/frontend/apps/portal/src/pages/auth/matrix/callback.astro
 package main
 
 import (
@@ -34,12 +35,15 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/fyne/apps/hub"
 	"git.sytue.eu/sytue/one/apps/fyne/catalogos"
+	"git.sytue.eu/sytue/one/apps/fyne/cifrado"
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/sesion"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	privateHub "git.sytue.eu/sytue/one/apps/nucleo/hub"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	mx "git.sytue.eu/sytue/one/apps/nucleo/matrix"
 	"git.sytue.eu/sytue/one/apps/nucleo/sistema"
 	"git.sytue.eu/sytue/one/apps/nucleo/sistema/escritorio"
 	"git.sytue.eu/sytue/one/apps/nucleo/widgets/fuentes"
@@ -116,6 +120,11 @@ func main() {
 	// que solo instala perfiles desde Safari, se abre allí un enlace de un solo uso.
 	cuenta := api.NewAccount(s.URL("id"), s.Sesion, nil)
 	v.ConEnlacePerfilApple(cuenta.EnlacePerfilApple)
+	// «Primeros pasos» en la portada: lo que a esta persona le queda por dejar listo.
+	// Instalada siempre: es la app instalada.
+	v.ConPrimerosPasos(s.URL("id"), func(ctx context.Context) ([]api.PasoPendiente, bool) {
+		return cuenta.PrimerosPasos(ctx, true)
+	})
 	switch runtime.GOOS {
 	case "darwin":
 		v.ConPerfilApple(hub.Mac, func(ctx context.Context) (func() error, error) {
@@ -150,19 +159,66 @@ func main() {
 	})
 	v.AlMostrar = func(d hub.Destino) { w.SetTitle(t.T(d.ClaveTitulo(), nil)) }
 	w.SetPadded(false)
+	private, err := cifrado.NewPrivateApplication(cifrado.PrivateApplicationConfig[*privateHub.Repository]{
+		Suite:       s,
+		Application: a,
+		Window:      w,
+		Product:     "hub",
+		Translate:   func(key string) string { return t.T(key, nil) },
+		Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*privateHub.Repository], error) {
+			return hubPlan(ctx, resources, s)
+		},
+		//nolint:contextcheck // The presenter retains its own mounted lifetime, not this short mount request.
+		Mount: func(_ context.Context, resources *cifrado.Resources[*mx.Client], repository *privateHub.Repository) (cifrado.ApplicationView, error) {
+			facade, err := api.NewHub(s.URL("hub"), resources.HTTP(), nil).WithPrivateData(repository)
+			if err != nil {
+				return cifrado.ApplicationView{}, err
+			}
+			v.ConBuzon(facade)
+			v.Arrancar()
+			return cifrado.ApplicationView{
+				Object: container.NewStack(v.Desplazable(), v.Avisos()),
+				Detach: func() {
+					v.ConBuzon(s.Hub)
+				},
+			}, nil
+		},
+	})
 	// Los avisos flotantes van por ENCIMA del desplazador: dentro se irían al bajar.
-	w.SetContent(ui.NuevaBarraSuite(t, s, iconos.One).Montar(container.NewStack(v.Desplazable(), v.Avisos())))
+	barra := ui.NuevaBarraSuite(t, s, iconos.One)
+	if err != nil {
+		w.SetContent(ui.NuevoVacio(t.T("matrix.failed", nil), ""))
+	} else {
+		w.SetContent(barra.Montar(private.Objeto()))
+	}
 	v.Atajos(w.Canvas())
 	ponerMenu(w, runtime.GOOS, menu(t, v.Ir))
 	// El Hub se queda en la bandeja al cerrar la ventana: es la bandeja de avisos de la
 	// suite, y así sigue avisando de lo de las apps cerradas (regla 4 de
-	// `ui/avisosistema.go`). La misma lista de pantallas, que además trae la ventana.
+	// `ui/avisosistema.go`). Arriba lo de hoy (`hub.MenuBandeja`: avisos sin leer,
+	// acciones del día y recientes); debajo la misma lista de pantallas, que además trae
+	// la ventana, y los ajustes del sistema.
 	traer := func(d hub.Destino) {
 		v.Ir(d)
 		w.Show()
 		w.RequestFocus()
 	}
-	bandeja := menu(t, traer)
+	pantallas := menu(t, traer)
+	bandeja := fyne.NewMenu(pantallas.Label)
+	var delSistema []*fyne.MenuItem
+	sinLeer := 0
+	montarBandeja := func() {
+		hoy := hub.MenuBandeja(t, sinLeer, v.AccesosBandeja(), v.RecientesBandeja(), hub.AccionesBandeja{
+			Ir: traer, Saltar: v.Saltar, AbrirURL: v.AbrirURL,
+		})
+		items := make([]*fyne.MenuItem, 0, len(hoy.Items)+1+len(pantallas.Items)+len(delSistema))
+		items = append(items, hoy.Items...)
+		items = append(items, fyne.NewMenuItemSeparator())
+		items = append(items, pantallas.Items...)
+		items = append(items, delSistema...)
+		bandeja.Items = items
+		bandeja.Refresh()
+	}
 	if m := a.Metadata(); m.ID != "" && !a.Driver().Device().IsMobile() {
 		// Y el actualizador propio: el Hub es la app que se queda en la bandeja, así que
 		// es quien mira si hay versión nueva (`sesion.ElementoActualizar`).
@@ -170,15 +226,22 @@ func main() {
 		// (un actualizador propio está prohibido), y el agente de inicio de sesión se
 		// escribiría dentro del contenedor del sandbox, donde launchd no lo lee.
 		if !escritorio.DeTienda {
-			bandeja.Items = append(bandeja.Items, fyne.NewMenuItemSeparator(), alIniciarSesion(t, m, bandeja),
+			delSistema = append(delSistema, fyne.NewMenuItemSeparator(), alIniciarSesion(t, m, bandeja),
 				s.ElementoActualizar(t, bandeja))
 		}
 		// «Pedir Touch ID al abrir» (o Windows Hello): bloquea la sesión de las trece.
 		if b := s.ElementoBloqueo(t, bandeja); b != nil {
-			bandeja.Items = append(bandeja.Items, b)
+			delSistema = append(delSistema, b)
 		}
 	}
+	montarBandeja()
 	enBandeja := sesion.Residente(a, w, bandeja)
+	if enBandeja {
+		// Se vuelve a montar cuando cambia el contador o lo de hoy; las dos llamadas
+		// llegan en el hilo de la interfaz.
+		barra.AlCambiarSinLeer(func(n int) { sinLeer = n; montarBandeja() })
+		v.AlCambiarHoy(montarBandeja)
+	}
 	// Y el atajo global de la suite (Ctrl+Alt+Espacio; ⌃⌥⌘Espacio en macOS) trae su
 	// buscador desde cualquier sitio. Sin él —otro programa tiene la combinación, o el
 	// escritorio no ofrece atajos— la suite sigue igual.
@@ -222,6 +285,9 @@ func main() {
 	// Con interfaz: lanzada por iOS solo para el widget no se pide la portada.
 	s.CuandoHayaEscena(func() {
 		conEscena = true
+		if private != nil {
+			private.Start()
+		}
 		v.Arrancar()
 		if dentro {
 			avisosEnSegundoPlano(a, t, true)

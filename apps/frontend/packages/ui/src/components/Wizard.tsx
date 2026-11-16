@@ -50,6 +50,14 @@ export interface WizardStep {
   onNext?: () => void | Promise<void>;
   /** Paso terminal: sin barra de acciones ni vuelta atrás. */
   done?: boolean;
+  /**
+   * false quita «Atrás» y deja el progreso sin enlaces, pero conserva el avance. Es
+   * para el paso que viene DESPUÉS de algo que ya no se deshace desde aquí (un alta
+   * confirmada en el servidor) y aún pide algo antes de terminar —guardar unos
+   * códigos que solo se enseñan una vez—: volver al paso anterior sería volver a un
+   * formulario que ya no tiene sentido enviar. Por defecto true.
+   */
+  canGoBack?: boolean;
 }
 
 /**
@@ -247,6 +255,7 @@ export function Wizard({
   const step = steps[current];
   if (!step) return null;
   const terminal = step.done === true;
+  const sinVuelta = terminal || step.canGoBack === false;
 
   const advance = () => {
     if (step.onNext) void step.onNext();
@@ -268,7 +277,7 @@ export function Wizard({
         </Button>
       ) : null}
       <div class="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
-        {current > 0 ? (
+        {current > 0 && !sinVuelta ? (
           <Button
             variant="secondary"
             disabled={busy}
@@ -295,7 +304,7 @@ export function Wizard({
       <Stepper
         steps={steps}
         current={current}
-        {...(terminal || busy ? {} : { onStepClick: onCurrentChange })}
+        {...(sinVuelta || busy ? {} : { onStepClick: onCurrentChange })}
         {...(labels ? { labels } : {})}
       />
 

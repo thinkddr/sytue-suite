@@ -29,6 +29,7 @@ export const en = {
   'common.remove': 'Remove',
   'common.retry': 'Retry',
   'common.done': 'Done',
+  'common.undo': 'Undo',
   'common.loading': 'Loading…',
   'common.colour': 'Colour',
 
@@ -39,6 +40,7 @@ export const en = {
   // --- Barra lateral ------------------------------------------------------
   'nav.createEvent': 'Create event',
   'nav.myCalendars': 'My calendars',
+  'nav.settings': 'Settings',
   'nav.manageResources': 'Manage rooms and equipment',
   'nav.resourcesTitle': 'Rooms and equipment',
   'nav.subscribeAria': 'Subscribe to a calendar by URL',
@@ -85,6 +87,7 @@ export const en = {
   'grid.weekNumber': 'Week {week}',
   'grid.dayEvents': { one: '{date}, {count} event', other: '{date}, {count} events' },
   'grid.todayLabel': 'Today, {date}',
+  'grid.openDay': 'Open {date} in day view',
   // Solo Fyne: la web anuncia el día elegido con `aria-pressed`.
   'grid.daySelected': '{label}, selected',
   // El asa del mes del teléfono. La web la anuncia como `slider` con la vista en
@@ -129,6 +132,7 @@ export const en = {
   'popover.join': 'Join the video call',
   'popover.duplicate': 'Duplicate',
   'popover.copyToMine': 'Copy to my calendar',
+  'popover.downloadIcs': 'Download .ics',
   'popover.readOnly': 'Subscribed calendar (read-only).',
   'notes.linked': 'Notes',
   'notes.create': 'Write a note for this event',
@@ -159,6 +163,10 @@ export const en = {
   'event.repeatDaily': 'Daily',
   'event.repeatWeekly': 'Weekly',
   'event.repeatMonthly': 'Monthly',
+  'event.repeatYearly': 'Yearly',
+  'event.repeatWeekdays': 'Every weekday (Monday to Friday)',
+  'event.repeatOn': 'Repeat on',
+  'event.repeatCustom': 'Custom',
   'event.repeatEnds': 'Ends',
   'event.repeatEndNever': 'Never',
   'event.repeatEndCount': 'After a number of times',
@@ -197,6 +205,25 @@ export const en = {
   'event.unitDays': 'days before',
 
   // --- Recordatorios: la etiqueta sale de la cantidad, no de una tabla ----
+  'settings.title': 'Calendar settings',
+  'settings.description':
+    'Choose how new events start and what the calendar shows. These settings are saved on this device.',
+  'settings.back': 'Back to calendar',
+  'settings.eventsTitle': 'New events',
+  'settings.eventsDescription': 'What a new event comes with before you change anything.',
+  'settings.duration': 'Default duration',
+  'settings.durationMinutes': '{count} min',
+  'settings.durationHours': '{count} h',
+  'settings.reminder': 'Default reminder',
+  'settings.reminderNone': 'No reminder',
+  'settings.workTitle': 'Working hours',
+  'settings.workDescription': 'The week and day views open at the start of your working day.',
+  'settings.workStart': 'Starts at',
+  'settings.workEnd': 'Ends at',
+  'settings.viewTitle': 'View',
+  'settings.viewDescription': 'What the month and week views show.',
+  'settings.weekends': 'Show weekends',
+  'settings.weekNumbers': 'Show week numbers',
   'reminder.atTime': 'At the time of the event',
   'reminder.minutes': { one: '{count} minute before', other: '{count} minutes before' },
   'reminder.hours': { one: '{count} hour before', other: '{count} hours before' },
@@ -230,20 +257,6 @@ export const en = {
 
   // --- Paleta de colores ---------------------------------------------------
   'colour.inherit': 'Calendar colour',
-  'colour.terracotta': 'Terracotta',
-  'colour.slate': 'Slate',
-  'colour.pine': 'Pine',
-  'colour.inkBlue': 'Ink blue',
-  'colour.jade': 'Jade',
-  'colour.ochre': 'Ochre',
-  'colour.garnet': 'Garnet',
-  'colour.plum': 'Plum',
-  'colour.petrol': 'Petrol',
-  'colour.orchid': 'Orchid',
-  'colour.purple': 'Purple',
-  'colour.indigo': 'Indigo',
-  'colour.steel': 'Steel',
-  'colour.viridian': 'Viridian',
 
   // --- Compartir calendario ------------------------------------------------
   'share.title': 'Share “{name}”',
@@ -435,9 +448,12 @@ export const en = {
   'toast.selectCalendar': 'Select a calendar',
   'toast.eventCreated': 'Event created',
   'toast.eventUpdated': 'Event updated',
+  'toast.eventMoved': 'Event moved',
   'toast.eventSaveFailed': 'The event could not be saved',
   'toast.eventDeleted': 'Event deleted',
   'toast.eventDeleteFailed': 'The event could not be deleted',
+  'toast.eventRestored': 'Event restored',
+  'toast.eventRestoreFailed': 'The event could not be restored',
   'toast.subscriptionRefreshed': 'Subscription updated',
   'toast.subscriptionRefreshFailed': 'The subscription could not be updated',
   'toast.calendarCreated': 'Calendar created',
@@ -504,6 +520,7 @@ export const en = {
   'cal.error.saveEvent': 'Could not save the event',
   'cal.error.deleteEvent': 'Could not delete the event',
   'cal.error.updateSub': 'Could not update the subscription',
+  'cal.untitled': '(no title)',
   'share.recipient.hint':
     'Someone in your organisation. If you enter the address of a list or a group, everyone in it will see your calendar.',
   'share.role.manage.hint':
@@ -540,4 +557,7 @@ export const en = {
   'shortcuts.today': 'Go to today',
   'shortcuts.next': 'Next period',
   'shortcuts.prev': 'Previous period',
+  'shortcuts.goToDate': 'Go to a date',
+  'shortcuts.goToDateField': 'Date',
+  'shortcuts.goToDateSubmit': 'Go',
 } satisfies Record<string, MessageEntry>;

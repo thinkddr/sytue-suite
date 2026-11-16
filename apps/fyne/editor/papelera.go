@@ -39,8 +39,8 @@ import (
 // cabecera con `mb-6`, la vuelta con `mb-2` y las filas `px-3 py-2 border-b` con un
 // glifo de 28.
 var (
-	BajoCabeceraPapelera          = tema.Espacio(6) // mb-6 → 21
-	BajoVuelta                    = tema.Espacio(2) // mb-2 → 7
+	BajoCabeceraPapelera          = tema.Espacio(6) // mb-6 → 24
+	BajoVuelta                    = tema.Espacio(2) // mb-2 → 8
 	GlifoFilaPapelera     float32 = 28
 	MargenFilaPapelera            = tema.Espacio(3) // px-3
 	RellenoFilaPapelera           = tema.Espacio(2) // py-2

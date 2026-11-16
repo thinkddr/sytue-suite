@@ -377,7 +377,7 @@ function Inner({
                 active.length > 0 ? 'migrations.empty.titleActive' : 'migrations.empty.title',
               )}
               description={t('migrations.empty.description')}
-              illustration={<Icon name="database" size={28} />}
+              icon="database"
               action={
                 active.length > 0 ? undefined : (
                   <Button variant="primary" disabled={!live} onClick={() => setWizard('auto')}>

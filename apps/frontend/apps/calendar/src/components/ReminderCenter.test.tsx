@@ -125,6 +125,7 @@ const ESTADO: EstadoRecordatorios = {
   descartar: async () => {},
   irA: () => {},
   pedirPermiso: async () => {},
+  reintentar: () => {},
 };
 
 test('la fila: rama con contador; descartar y activar avisos no cierran el cajón, el enlace sí', () => {
@@ -216,6 +217,42 @@ test('Escape en el cajón con la rama desplegada: cierra el cajón, el foco al �
   expect(document.activeElement).toBe(menu);
   // La rama conserva su estado, como cualquier rama del lateral (y `recEnCajon` en Fyne).
   expect(rama.getAttribute('aria-expanded')).toBe('true');
+  render(null, host);
+  host.remove();
+});
+
+test('si el sondeo falla, la rama dice el fallo (no «sin recordatorios») y «Reintentar» sondea ya', async () => {
+  let n = 0;
+  let falla = true;
+  globalThis.fetch = (async (url: string) => {
+    if (String(url).includes('/api/reminders')) n++;
+    if (falla) return new Response('{}', { status: 503 });
+    return new Response(JSON.stringify({ reminders: [RECORDATORIO], next_cursor: '' }), {
+      headers: { 'content-type': 'application/json' },
+    });
+  }) as typeof fetch;
+  function App() {
+    const estado = useRecordatorios({ t, locale: 'es', onDeepLink: () => {} });
+    return (
+      <ul>
+        <ReminderCenter t={t} locale="es" estado={estado} disparador="fila" />
+      </ul>
+    );
+  }
+  const host = montar(<App />);
+  act(() => host.querySelector<HTMLButtonElement>('button[aria-expanded]')!.click());
+  await esperar(() => n === 1 && host.querySelector('[role="alert"]') !== null);
+  const alerta = host.querySelector('[role="alert"]');
+  expect(alerta?.textContent).toContain(t('reminders.loadError'));
+  expect(host.textContent).not.toContain(t('reminders.empty'));
+  const reintentar = [...alerta!.querySelectorAll('button')].find(
+    (b) => b.textContent === t('common.retry'),
+  )!;
+  falla = false;
+  act(() => reintentar.click());
+  // Sin esperar al backoff (que tras un fallo es de minutos): la petición sale ya.
+  await esperar(() => n === 2 && (host.textContent ?? '').includes('Tenis'));
+  expect(host.querySelector('[role="alert"]')).toBeNull();
   render(null, host);
   host.remove();
 });

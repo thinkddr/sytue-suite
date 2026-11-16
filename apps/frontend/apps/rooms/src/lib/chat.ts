@@ -13,7 +13,23 @@
  */
 import { serverEnv } from '@sytue/auth/server';
 import type { MatrixReference, MatrixFile } from '../client/matrix/types.js';
-import { ChatClient as SharedChatClient, bearer } from '@sytue/api-clients';
+import { ChatClient as SharedChatClient, bearer, roomsServiceBase } from '@sytue/api-clients';
+import { threadInfo } from './hilos.js';
+
+/** Authorization/routing projection only; message.body is deliberately empty. */
+export interface SearchMetadata {
+  id: string;
+  tenant: string;
+  channel_slug: string;
+  channel_name: string;
+  saved: boolean;
+  pinned: boolean;
+  message: ChatMessage;
+}
+export interface SearchMetadataPage {
+  messages: SearchMetadata[];
+  next_cursor?: string;
+}
 
 export interface Channel {
   id: string;
@@ -62,6 +78,10 @@ export interface Channel {
   external?: boolean;
   /** Archivado: ya no sale en la barra; se ve y se restaura desde «Explorar canales». */
   archived?: boolean;
+  /** Sub de quien creó el canal (`created_by`): el inicio del historial dice quién. */
+  createdBy?: string;
+  /** Cuándo se creó (ISO 8601, `created_at`). */
+  createdAt?: string;
 }
 
 /** Alguien de Sytue One encontrado por su @usuario o su correo (people:resolve):
@@ -236,10 +256,18 @@ export interface MessageCard {
   votes?: CardVote[];
 }
 
+/** Una persona que respondió en un hilo (avatar del indicador del canal). */
+export interface ThreadParticipant {
+  id: string;
+  name: string;
+}
+
 export interface ChatMessage {
   matrix_event?: MatrixReference;
   encryption?: 'm.megolm.v1.aes-sha2' | 'legacy';
   decryptionFailed?: boolean;
+  /** Local recovery state; never supplied by the message sender. */
+  requiresOriginalDevice?: boolean;
   identityVerified?: boolean;
   authenticityVerified?: boolean;
   id: string;
@@ -263,8 +291,16 @@ export interface ChatMessage {
   reactions?: MessageReaction[];
   /** Numero de respuestas en hilo (si el mensaje abre un hilo). */
   replyCount?: number;
+  /** Instante de la última respuesta del hilo (ISO 8601): «Última respuesta hace…». */
+  lastReplyAt?: string;
+  /** Quienes respondieron más recientemente (hasta 3, la más reciente primero): los
+   *  avatares del indicador de hilo. */
+  threadParticipants?: ThreadParticipant[];
   /** Id del mensaje raiz si este mensaje es una respuesta en hilo. */
   parentId?: string;
+  /** Respuesta de hilo mandada «también al canal»: se ve en el feed además de en el
+   *  hilo, con la línea «Respondió en un hilo». */
+  alsoInChannel?: boolean;
   /** Subs de usuarios mencionados en el mensaje (para resaltar @Nombre). */
   mentions?: string[];
   /** El mensaje menciona a TODO el canal (@channel/@here/@all): sube el badge de
@@ -303,6 +339,8 @@ export interface ScheduledMessage {
   /** Instante de envío programado (ISO 8601). */
   sendAt: string;
   createdAt: string;
+  /** «También enviar al canal» de una respuesta programada (con parentId). */
+  alsoInChannel?: boolean;
 }
 
 /**
@@ -415,18 +453,7 @@ interface ChatClientDeps {
 }
 
 function apiBase(): string {
-  const env = serverEnv(import.meta.env);
-  // Por el Service INTERNO: esto corre en un pod y el nombre público no
-  // resuelve desde dentro (`getaddrinfo ETIMEOUT`, medido el 2026-09-10). Sale
-  // como 502 —«la llamada no llegó a ser HTTP»—. Mismo patrón que
-  // `SYTUE_MAIL_INTERNAL_URL`; la pública queda de respaldo para un despliegue
-  // que aún no tenga la variable nueva.
-  return (
-    env.SYTUE_ROOMS_INTERNAL_URL ??
-    env.SYTUE_ROOMS_API_URL ??
-    env.SYTUE_CHAT_API_URL ??
-    'https://rooms.sytue.eu'
-  );
+  return roomsServiceBase(serverEnv(import.meta.env));
 }
 
 /** Mapea un adjunto crudo del servicio Go (snake_case) al Attachment del UI. */
@@ -447,6 +474,8 @@ export function toAttachment(a: {
 /** Canal crudo del servicio Go: como Channel pero con category_id/sort_order/notify_level/
  *  peer_subs en snake. */
 type RawChannel = Channel & {
+  created_by?: string;
+  created_at?: string;
   category_id?: string;
   sort_order?: number;
   notify_level?: string;
@@ -456,9 +485,11 @@ type RawChannel = Channel & {
 /** Mapea un canal crudo (category_id/sort_order/notify_level/peer_subs snake) al Channel
  *  del UI. El resto de campos son de una sola palabra y casan directamente. */
 export function toChannel(raw: RawChannel): Channel {
-  const { category_id, sort_order, notify_level, peer_subs, ...c } = raw;
+  const { category_id, sort_order, notify_level, peer_subs, created_by, created_at, ...c } = raw;
   return {
     ...c,
+    ...(created_by ? { createdBy: created_by } : {}),
+    ...(created_at ? { createdAt: created_at } : {}),
     ...(category_id ? { categoryId: category_id } : {}),
     ...(peer_subs?.length ? { peerSubs: peer_subs } : {}),
     sortOrder: sort_order ?? 0,
@@ -681,6 +712,9 @@ export function chatClient({ accessToken, userId }: ChatClientDeps) {
     attachments?: { file_id: string; name?: string; content_type?: string; size_bytes?: number }[];
     reactions?: { emoji: string; count: number; subs?: string[] }[];
     reply_count?: number;
+    last_reply_at?: string;
+    thread_participants?: { sub: string; name?: string }[];
+    also_in_channel?: boolean;
     edited_at?: string;
     created_at: string;
     priority?: string;
@@ -689,6 +723,19 @@ export function chatClient({ accessToken, userId }: ChatClientDeps) {
     acked?: boolean;
     is_bot?: boolean;
     card?: RawCard;
+  }
+
+  type RawSearchMetadata = Omit<RawMessage, 'body'> & Omit<SearchMetadata, 'message'>;
+  function toSearchMetadata(row: RawSearchMetadata): SearchMetadata {
+    return {
+      id: row.id,
+      tenant: row.tenant,
+      channel_slug: row.channel_slug,
+      channel_name: row.channel_name,
+      saved: row.saved,
+      pinned: row.pinned,
+      message: toChatMessage({ ...row, body: '' }),
+    };
   }
 
   /** Tarjeta tal y como la emite el servicio Go (snake_case). */
@@ -749,6 +796,7 @@ export function chatClient({ accessToken, userId }: ChatClientDeps) {
         ? { attachments: m.attachments.map(toAttachment) }
         : {}),
       ...(m.reply_count ? { replyCount: m.reply_count } : {}),
+      ...threadInfo(m),
       ...(m.card?.kind ? { card: toCard(m.card) } : {}),
       ...(m.reactions
         ? {
@@ -791,6 +839,7 @@ export function chatClient({ accessToken, userId }: ChatClientDeps) {
     file_ids?: string[];
     send_at: string;
     created_at: string;
+    also_in_channel?: boolean;
   }
 
   /** Mapea el programado del servicio Go al ScheduledMessage del UI. */
@@ -804,6 +853,7 @@ export function chatClient({ accessToken, userId }: ChatClientDeps) {
       createdAt: s.created_at,
       ...(s.parent_id ? { parentId: s.parent_id } : {}),
       ...(s.file_ids && s.file_ids.length ? { fileIds: s.file_ids } : {}),
+      ...(s.parent_id && s.also_in_channel ? { alsoInChannel: true } : {}),
     };
   }
 
@@ -1126,6 +1176,8 @@ export function chatClient({ accessToken, userId }: ChatClientDeps) {
         matrix_event?: MatrixReference;
         mentions?: string[];
         fileIds?: string[];
+        /** «También enviar al canal»: la respuesta se ve además en el feed. */
+        alsoToChannel?: boolean;
       },
     ): Promise<ChatMessage> {
       const msg = await call<RawMessage>(
@@ -1136,6 +1188,7 @@ export function chatClient({ accessToken, userId }: ChatClientDeps) {
           ...(input.matrix_event ? { matrix_event: input.matrix_event } : {}),
           ...(input.mentions?.length ? { mentions: input.mentions } : {}),
           ...(input.fileIds?.length ? { file_ids: input.fileIds } : {}),
+          ...(input.alsoToChannel ? { also_in_channel: true } : {}),
         },
       );
       return toChatMessage(msg);
@@ -1449,6 +1502,32 @@ export function chatClient({ accessToken, userId }: ChatClientDeps) {
     /** Deja el canal del mensaje como no leído a partir de ese mensaje. */
     async markUnread(messageID: string): Promise<void> {
       await call<void>('POST', `/messages/${encodeURIComponent(messageID)}/unread`, {});
+    },
+
+    async messageMetadata(cursor = '', signal?: AbortSignal): Promise<SearchMetadataPage> {
+      const params = new URLSearchParams({ cursor, limit: '100' });
+      const data = await call<{ messages: RawSearchMetadata[]; next_cursor?: string }>(
+        'GET',
+        '/messages/metadata?' + params.toString(),
+        undefined,
+        signal,
+      );
+      return {
+        messages: (data.messages ?? []).map(toSearchMetadata),
+        ...(data.next_cursor ? { next_cursor: data.next_cursor } : {}),
+      };
+    },
+    async messageMetadataVisible(
+      messages: { id: string; tenant: string }[],
+      signal?: AbortSignal,
+    ): Promise<SearchMetadata[]> {
+      const data = await call<{ messages: RawSearchMetadata[] }>(
+        'POST',
+        '/messages/metadata/visible',
+        { messages },
+        signal,
+      );
+      return (data.messages ?? []).map(toSearchMetadata);
     },
 
     /**

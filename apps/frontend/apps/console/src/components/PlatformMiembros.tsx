@@ -22,6 +22,7 @@ import {
   Modal,
   Table,
   type useToast,
+  EmptyState,
 } from '@sytue/ui';
 import type { ConsoleMessageKey as MessageKey, T } from '../i18n/index.js';
 import type { PlatformMember, PlatformOrg } from '../lib/platform.js';
@@ -132,7 +133,7 @@ export function PlatformMiembros({ org, t, toast }: { org: PlatformOrg; t: T; to
 
   return (
     <>
-      <h4 class="sy-stat__label">{t('platform.members.title')}</h4>
+      <h4 class="text-text-muted text-sm">{t('platform.members.title')}</h4>
       {admitePropietario && (
         <div class="sy-row-actions">
           <Button size="sm" onClick={() => setAccion({ tipo: 'assign', email: '' })}>
@@ -163,7 +164,7 @@ export function PlatformMiembros({ org, t, toast }: { org: PlatformOrg; t: T; to
       ) : items === null ? (
         <p class="sy-hint">{t('common.loading')}</p>
       ) : items.length === 0 ? (
-        <p class="sy-hint">{t('platform.members.empty')}</p>
+        <EmptyState compact title={t('platform.members.empty')} />
       ) : (
         <Table<PlatformMember>
           rowKey={(m) => m.id}

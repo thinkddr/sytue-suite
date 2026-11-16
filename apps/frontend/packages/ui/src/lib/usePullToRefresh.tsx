@@ -9,7 +9,9 @@
  *
  * Solo captura el gesto cuando:
  *   · hay un único dedo,
- *   · ninguna superposición modal o menú está abierta,
+ *   · ninguna superposición modal o menú está abierta, ni el cajón de navegación del
+ *     teléfono (`.sytue-drawer-in`), ni otro control tiene ya el dedo
+ *     (`[data-gesto-en-curso]`: el asa del mes del teléfono mientras se arrastra),
  *   · el toque no nace en un campo editable, barra horizontal (`data-scroll-x`),
  *     barra de herramientas, lienzo o editor (`data-suelo-tactil`), y
  *   · toda caja desplazable entre el dedo y el contenedor está ya arriba del todo
@@ -88,7 +90,13 @@ export function hayDesplazamientoVerticalPrevio(
 function hayCapaModalAbierta(): boolean {
   if (haySuperposicionAbierta()) return true;
   if (typeof document === 'undefined') return false;
-  return document.querySelector('[role="alertdialog"], dialog[open]') !== null;
+  // El cajón abierto tapa la hoja, y un gesto ajeno en curso es de quien lo reclamó
+  // primero: un segundo dedo en la lista no lo convierte en un refresco.
+  return (
+    document.querySelector(
+      '[role="alertdialog"], dialog[open], .sytue-drawer-in, [data-gesto-en-curso]',
+    ) !== null
+  );
 }
 
 export function usePullToRefresh(

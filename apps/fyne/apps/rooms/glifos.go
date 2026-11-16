@@ -48,7 +48,7 @@ const (
 	// glifoReloj es «Mensajes programados».
 	glifoReloj = `<circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" />`
 	// glifoClip es «Archivos del canal».
-	glifoClip = `<path d="M21.44 11.05 12.25 20.24a5 5 0 0 1-7.07-7.07l9.19-9.19a3 3 0 0 1 4.24 4.24l-9.2 9.19a1 1 0 0 1-1.41-1.41l8.48-8.49" />`
+	glifoClip = `<path d="M6.75 10v5a5.25 5.25 0 0 0 10.5 0V7a3.5 3.5 0 0 0-7 0v8.5a1.75 1.75 0 0 0 3.5 0V9" />`
 	// glifoPrioridad es el «!» en cuadro: prioridad y acuse de recibo.
 	glifoPrioridad = `<rect x="3.5" y="3.5" width="17" height="17" rx="4" /><path d="M12 8v4.5" /><path d="M12 16h.01" />`
 	// glifoEmoji es la cara del selector de emoji.
@@ -62,7 +62,7 @@ const (
 	// glifoNota es «Guardar en Sytue Notepads».
 	glifoNota = `<path d="M7 4h9a1.5 1.5 0 0 1 1.5 1.5v7L12 18H7a1.5 1.5 0 0 1-1.5-1.5v-11A1.5 1.5 0 0 1 7 4Z" /><path d="M17.5 12.5h-3.9A1.6 1.6 0 0 0 12 14.1V18" />`
 	// glifoReenviar es «Reenviar…».
-	glifoReenviar = `<polyline points="15 17 20 12 15 7" /><path d="M4 18v-2a4 4 0 0 1 4-4h13" />`
+	glifoReenviar = `<path d="M14.5 6l5 5-5 5M19.5 11H10a5.5 5.5 0 0 0-5.5 5.5V18" />`
 	// glifoNoLeido es «Marcar como no leído»: el sobre con su punto RELLENO, que se tiñe
 	// al pintarlo (ver `dibujoRelleno`).
 	glifoNoLeido = `<path d="M4 8a2 2 0 0 1 2-2h9M4 8v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6" /><path d="M4 8l8 5 3-2" /><circle cx="19" cy="6" r="2.4" fill="currentColor" stroke="none" />`
@@ -78,7 +78,7 @@ const (
 // rutaEstrella es la `d` de la estrella suelta, porque la de un favorito se pinta
 // RELLENA (`fill="currentColor"`) y eso lo hace `iconos.TrazoDeRutaRelleno`, que pide
 // la ruta y no el cuerpo.
-const rutaEstrella = "M12 3.5l2.6 5.27 5.82.85-4.21 4.1.99 5.79L12 17.77 6.8 19.5l.99-5.79-4.21-4.1 5.82-.85L12 3.5Z"
+const rutaEstrella = "M12 3.6L14.4 9.3L20.6 9.8L15.9 13.9L17.3 19.9L12 16.7L6.7 19.9L8.1 13.9L3.4 9.8L9.6 9.3Z"
 
 // La antesala de la llamada NO lleva iconos, y no es un olvido: `PreJoin.tsx` pone
 // BOTONES CON TEXTO —«Micrófono activado» / «Cámara desactivada»— porque ahí el rótulo
@@ -90,6 +90,10 @@ const rutaEstrella = "M12 3.5l2.6 5.27 5.82.85-4.21 4.1.99 5.79L12 17.77 6.8 19.
 // los tres caminos siguen ahí.
 const glifoLlamadaFin = `<path d="m1 1 22 22" /><path d="M23 7 16 12l3.5 2.5V7Z" />` +
 	`<path d="M14 5h-9a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h9" />`
+
+// glifoSaltarNoLeido es la flecha hacia arriba de «Saltar a no leído»: el `<Glifo
+// d="M12 19V5M6 11l6-6 6 6" size={14} />` en línea de MessageView.tsx.
+const glifoSaltarNoLeido = `<path d="M12 19V5M6 11l6-6 6 6" />`
 
 // dibujo es un glifo propio ya teñido con un token, que es como lo piden las pantallas
 // y lo que esperan `ui.Boton.Glifo` y `ui.BotonIcono.Glifo`.

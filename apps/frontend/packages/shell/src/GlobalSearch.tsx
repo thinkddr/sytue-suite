@@ -12,18 +12,19 @@ import {
   EmptyState,
   formatBytes,
   Icon,
-  Illustration,
   Input,
   Spinner,
   ProductIcon,
   useAtajo,
+  Kbd,
 } from '@sytue/ui';
 import { useI18n } from '@sytue/i18n/preact';
 import type { Interpretado, SearchResult } from '@sytue/api-clients';
 import type { ProductKey } from '@sytue/config';
 import type { Locale } from '@sytue/i18n';
 import { useShell } from './context.js';
-import { fichasDe, mereceInterpretarse } from './interpretacion.js';
+import { buscarConInterpretacion } from './interpretacion.js';
+import { BandaInterpretacion } from './BandaInterpretacion.js';
 
 /** Agrupa los resultados por producto preservando el orden de aparición (ya
  * vienen rankeados globalmente por el Hub: el mejor producto encabeza). */
@@ -127,25 +128,16 @@ export function GlobalSearch(): JSX.Element {
       void (async () => {
         try {
           const q = query.trim();
-          let res = await hub.search(q);
-          let entendido: Interpretado | null = null;
-          // LA IA ENTRA SOLO CUANDO LA BÚSQUEDA DE SIEMPRE NO ENCUENTRA NADA, y
-          // esto es lo que hace que la función salga gratis: mientras buscar
-          // funciona, no se gasta ni una llamada ni un milisegundo. Cuando falla
-          // —que es cuando alguien ha escrito una frase en vez de una palabra—
-          // no hay nada que perder: peor que cero resultados no se puede quedar.
-          if (res.results.length === 0 && q !== literalDe && mereceInterpretarse(q)) {
-            setEntendiendo(true);
-            try {
-              const conIa = await hub.search(q, undefined, { ia: true });
-              if (conIa.results.length > 0) {
-                res = conIa;
-                entendido = conIa.interpretado ?? null;
-              }
-            } finally {
-              setEntendiendo(false);
-            }
-          }
+          // La IA entra solo si la búsqueda de siempre no encuentra nada: ver
+          // `buscarConInterpretacion`, que es la misma que usa la paleta (⌘K).
+          const { respuesta: res, interpretado: entendido } = await buscarConInterpretacion(
+            hub,
+            q,
+            {
+              literal: q === literalDe,
+              alEntender: setEntendiendo,
+            },
+          );
           setResults(res.results);
           setFallidos(res.fallidos);
           setInterpretado(entendido);
@@ -165,31 +157,8 @@ export function GlobalSearch(): JSX.Element {
     return () => clearTimeout(handle);
   }, [query, hub, attempt, literalDe]);
 
-  /**
-   * ⌘K / Ctrl+K abre el buscador desde cualquier app.
-   *
-   * No lo había, y es el atajo que la gente prueba sin pensarlo — Spotlight,
-   * Linear, GitHub, todos—. Sin él, buscar exigía ir con el ratón a la barra
-   * superior, que es justo lo que un buscador global viene a evitar.
-   *
-   * NO se roba el atajo si hay un campo enfocado ni un diálogo abierto: dentro de
-   * un modal, ⌘K puede ser el «insertar enlace» del editor, y pisárselo sería
-   * cambiar un hueco por un fallo peor.
-   */
-  useEffect(() => {
-    const alPulsar = (e: KeyboardEvent): void => {
-      if (e.key.toLowerCase() !== 'k' || !(e.metaKey || e.ctrlKey) || e.altKey) return;
-      // Una app que se lo ha quedado antes (Notepads lleva ⌘K a su captura) manda.
-      if (e.defaultPrevented) return;
-      if (document.querySelector('dialog[open], [role="dialog"]')) return;
-      e.preventDefault();
-      const campo = boxRef.current?.querySelector('input');
-      campo?.focus();
-      campo?.select();
-    };
-    document.addEventListener('keydown', alPulsar);
-    return () => document.removeEventListener('keydown', alPulsar);
-  }, []);
+  // ⌘K ya no enfoca este campo: abre la paleta de la suite (`PaletaDeLaSuite`), que
+  // busca en el mismo Hub y además ofrece lo que registre la app.
 
   useEffect(() => {
     // `pointerdown` y no `mousedown`: el mismo manejador vale para ratón, dedo y
@@ -237,61 +206,18 @@ export function GlobalSearch(): JSX.Element {
     setActivo((i) => (i + (e.key === 'ArrowDown' ? 1 : -1) + ordenados.length) % ordenados.length);
   };
 
-  /**
-   * La banda de «entendido como», con una ficha por filtro aplicado y la salida
-   * a la búsqueda literal.
-   *
-   * ES OBLIGATORIA, no un adorno. Una búsqueda que ha acotado a un producto o a
-   * un rango de fechas que nadie ha visto devuelve pocos resultados —o ninguno—
-   * sin explicar por qué, y quien busca concluye que lo que busca no existe.
-   * Enseñarlo Y poder deshacerlo en un clic es lo que convierte una deducción en
-   * una ayuda en vez de en una jugarreta.
-   */
-  const fichas = interpretado
-    ? fichasDe(
-        interpretado,
-        (k) => appForKey(k)?.name.replace('Sytue ', '') ?? k,
-        (kind) => t(`search.kind.${kind}` as Parameters<typeof t>[0]),
-        (ms) => new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
-        {
-          fuente: (nombre) => t('search.ai.source', { name: nombre }),
-          tipo: (kind) => t('search.ai.kind', { kind }),
-          rango: (desde, hasta) => t('search.ai.range', { from: desde, to: hasta }),
-          desde: (d) => t('search.ai.since', { from: d }),
-          hasta: (h) => t('search.ai.until', { to: h }),
-        },
-      )
-    : [];
-
-  const banda =
-    interpretado && fichas.length > 0 ? (
-      <div
-        role="status"
-        class="border-border flex flex-wrap items-center gap-1.5 border-b px-3 py-2 text-xs"
-      >
-        {/* Sin `label`: es decorativo, el texto de al lado ya lo dice. */}
-        <Icon name="ai" size={14} class="text-text-muted shrink-0" />
-        <span class="text-text-muted">{t('search.ai.applied')}</span>
-        {fichas.map((f) => (
-          <span key={f.clave} class="bg-bg-subtle text-text rounded px-1.5 py-0.5">
-            {f.texto}
-          </span>
-        ))}
-        <Button
-          size="sm"
-          variant="ghost"
-          class="ml-auto"
-          onClick={() => {
-            // Se recuerda PARA ESTA CONSULTA: al cambiar el texto vuelve a
-            // ofrecerse, porque la preferencia era sobre esta búsqueda.
-            setLiteralDe(query.trim());
-            setInterpretado(null);
-          }}
-        >
-          {t('search.ai.literal')}
-        </Button>
-      </div>
-    ) : null;
+  // La banda de «entendido como», compartida con la paleta de la suite.
+  const banda = (
+    <BandaInterpretacion
+      interpretado={interpretado}
+      onLiteral={() => {
+        // Se recuerda PARA ESTA CONSULTA: al cambiar el texto vuelve a ofrecerse,
+        // porque la preferencia era sobre esta búsqueda.
+        setLiteralDe(query.trim());
+        setInterpretado(null);
+      }}
+    />
+  );
 
   return (
     <div
@@ -345,14 +271,14 @@ export function GlobalSearch(): JSX.Element {
           busca en ningún manual. Solo en escritorio —en el móvil no hay
           teclado— y solo mientras el campo está en reposo, que es cuando el
           hueco de la derecha está libre (con texto, `type="search"` pinta ahí
-          su aspa de borrar). Decorativo: el atajo real lo escucha `document`. */}
+          su aspa de borrar). Decorativo: el atajo lo escucha la paleta de la
+          suite, que busca en el mismo Hub. */}
       {atajo && !enfocado && !query ? (
-        <kbd
-          aria-hidden="true"
-          class="border-chrome-border text-on-chrome-muted pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 items-center rounded-full border bg-transparent px-1.5 py-0.5 font-sans text-[11px] leading-none font-medium md:inline-flex"
-        >
-          {atajo}
-        </kbd>
+        // La envoltura coloca y esconde; la tecla es la del cromo. `hidden` no va en la
+        // propia `Kbd`, que ya es `inline-flex`: dos `display` pelearían por orden de hoja.
+        <span class="pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 md:flex">
+          <Kbd tone="chrome">{atajo}</Kbd>
+        </span>
       ) : null}
       {/* Anuncio del resultado para lectores de pantalla. */}
       <div class="sr-only" role="status" aria-live="polite">
@@ -375,7 +301,7 @@ export function GlobalSearch(): JSX.Element {
             <EmptyState
               title={t('search.failed')}
               description={t('error.connection')}
-              illustration={<Icon name="danger" size={28} />}
+              tone="error"
               action={
                 <Button variant="secondary" size="sm" onClick={() => setAttempt((n) => n + 1)}>
                   {t('action.retry')}
@@ -394,7 +320,7 @@ export function GlobalSearch(): JSX.Element {
               }
               // La misma ilustración de «sin resultados» que el resto de la suite; el
               // icono gris de 28px hacía del vacío una pantalla muerta.
-              illustration={<Illustration name="emptySearch" size={96} />}
+              spot="emptySearch"
             />
           ) : (
             <>

@@ -298,6 +298,17 @@ test('la t de un idioma es estable entre llamadas', () => {
   expect(appT('es')('project.create')).toBe('Crear proyecto');
 });
 
+test('app translators compose the shared device catalogue without copying it', () => {
+  for (const locale of LOCALES) {
+    expect(appT(locale)('matrix.title')).toBe(translate(locale, 'matrix.title'));
+    expect(appT(locale)('action.cancel')).toBe(translate(locale, 'action.cancel'));
+    expect(appT(locale)('state.loading')).toBe(translate(locale, 'state.loading'));
+  }
+  const specific = createAppTranslator({ en: { 'action.cancel': 'Keep this document' } });
+  expect(specific('en')('action.cancel')).toBe('Keep this document');
+  expect(specific('en')('matrix.title')).toBe(translate('en', 'matrix.title'));
+});
+
 test('los plurales de una app los decide Intl, no un if', () => {
   expect(appT('en')('project.count', { count: 1 })).toBe('1 project');
   expect(appT('en')('project.count', { count: 5 })).toBe('5 projects');
@@ -390,6 +401,15 @@ describe('loadAppTranslator', () => {
     const useT = await loadAppTranslator<{ saludo: string }>(cargadores(pedidos));
     expect(pedidos).toEqual(['de']);
     expect(useT('de')('saludo')).toBe('Hallo');
+    quitarDocumento();
+  });
+
+  test('a lazy app catalogue also uses shared labels without loading another app', async () => {
+    ponerLang('es');
+    const pedidos: string[] = [];
+    const useT = await loadAppTranslator<{ saludo: string }>(cargadores(pedidos));
+    expect(useT('es')('matrix.title')).toBe(translate('es', 'matrix.title'));
+    expect(pedidos).toEqual(['es']);
     quitarDocumento();
   });
 

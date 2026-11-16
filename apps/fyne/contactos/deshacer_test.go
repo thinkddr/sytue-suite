@@ -93,7 +93,7 @@ func TestBorrarUnoSeDeshaceYDiceSiNoVuelve(t *testing.T) {
 	s := &servicioFalso{contactos: []api.Contact{persona("ana", "Ana")}, noVuelven: 1}
 	a := appDePrueba(t, s)
 	a.Cargar()
-	a.borrarContacto(*a.Pantalla.Activa, a.Pantalla.Contactos[0], func(error) {})
+	a.borrarContacto(a.capturar(), *a.Pantalla.Activa, a.Pantalla.Contactos[0], func(error) {})
 	av := avisoConDeshacer(a)
 	if av == nil {
 		t.Fatal("el aviso de «movido a la papelera» no ofrece deshacer")

@@ -193,3 +193,21 @@ test('las lecturas con sesión no llevan la IP de quien llama', async () => {
   >;
   expect(h['x-forwarded-for']).toBeUndefined();
 });
+
+test('an authenticated policy cannot replace the session bearer through header casing and forwards cancellation', async () => {
+  const f = espia(),
+    context = ctx('bases');
+  const handler = crearProxyDeServicio({
+    destino: 'http://servicio:8102',
+    bff: bff('current'),
+    prepararAutenticada: (_context, session) => {
+      expect(session.tokens.accessToken).toBe('current');
+      return { Authorization: 'Bearer never', 'X-Internal-Checked': 'yes' };
+    },
+  });
+  expect((await handler(context)).status).toBe(200);
+  const init = (f.mock.calls[0] as unknown as [string, RequestInit])[1];
+  expect(new Headers(init.headers).get('authorization')).toBe('Bearer current');
+  expect(new Headers(init.headers).get('x-internal-checked')).toBe('yes');
+  expect(init.signal).toBe(context.request.signal);
+});

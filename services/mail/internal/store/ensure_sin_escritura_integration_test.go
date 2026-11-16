@@ -29,7 +29,7 @@ import (
 )
 
 // xminCuenta devuelve el xmin de la fila de la cuenta.
-func xminCuenta(t *testing.T, ctx context.Context, h *pgtest.Harness, id uuid.UUID) string {
+func xminCuenta(ctx context.Context, t *testing.T, h *pgtest.Harness, id uuid.UUID) string {
 	t.Helper()
 	var x string
 	err := h.Pool.InTenantTx(ctx, func(tx pgx.Tx) error {
@@ -46,8 +46,8 @@ func TestEnsureAccountNoEscribeCuandoNadaCambia(t *testing.T) {
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
 
-	acc := seedAccount(t, ctx, st, "ada@sytue.eu")
-	antes := xminCuenta(t, ctx, h, acc.ID)
+	acc := seedAccount(ctx, t, st, "ada@sytue.eu")
+	antes := xminCuenta(ctx, t, h, acc.ID)
 
 	// Diez peticiones JMAP con el MISMO token, que es el caso de siempre.
 	for i := range 10 {
@@ -59,7 +59,7 @@ func TestEnsureAccountNoEscribeCuandoNadaCambia(t *testing.T) {
 			t.Fatalf("EnsureAccount #%d devolvió otra cuenta: %+v", i, got)
 		}
 	}
-	if despues := xminCuenta(t, ctx, h, acc.ID); despues != antes {
+	if despues := xminCuenta(ctx, t, h, acc.ID); despues != antes {
 		t.Fatalf("xmin %s -> %s: EnsureAccount reescribe la fila de la cuenta aunque el token "+
 			"no traiga nada nuevo. Son una tupla muerta y un bloqueo de fila por CADA petición JMAP", antes, despues)
 	}
@@ -85,7 +85,7 @@ func TestEnsureAccountNoEscribeCuandoNadaCambia(t *testing.T) {
 	if movida.Address != "ada@acme.sytue.eu" {
 		t.Fatalf("Address = %q, quiero la nueva", movida.Address)
 	}
-	if despues := xminCuenta(t, ctx, h, acc.ID); despues == antes {
+	if despues := xminCuenta(ctx, t, h, acc.ID); despues == antes {
 		t.Fatal("el camino rápido se tragó un cambio de dirección del token: la fila no se reescribió")
 	}
 }

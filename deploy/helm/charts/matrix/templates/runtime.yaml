@@ -5,6 +5,7 @@ metadata:
   name: {{ $name }}
 data:
   homeserver.yaml: |
+    {{- include "matrix.resourceRelay.config" . | nindent 4 }}
     server_name: {{ .Values.serverName | quote }}
     public_baseurl: {{ .Values.publicURL | quote }}
     pid_file: /tmp/synapse.pid
@@ -95,6 +96,9 @@ spec:
         app.kubernetes.io/component: matrix
       annotations:
         checksum/config: {{ toJson .Values | sha256sum }}
+        {{- if .Values.publication.enabled }}
+        checksum/publication-module: {{ .Files.Get "files/sytue_publication.py" | sha256sum }}
+        {{- end }}
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -108,6 +112,10 @@ spec:
           image: {{ .Values.image | quote }}
           command: [python, -m, synapse.app.homeserver]
           args: [-c, /config/homeserver.yaml, -c, /secrets/config.yaml, --generate-keys]
+          {{- if .Values.publication.enabled }}
+          env:
+            - {name: PYTHONPATH, value: /modules}
+          {{- end }}
           securityContext:
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
@@ -116,6 +124,9 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
             - {name: config, mountPath: /config, readOnly: true}
+            {{- if .Values.publication.enabled }}
+            - {name: publication-module, mountPath: /modules, readOnly: true}
+            {{- end }}
             - {name: secrets, mountPath: /secrets, readOnly: true}
             - {name: data, mountPath: /data}
             - {name: tmp, mountPath: /tmp}
@@ -124,6 +135,10 @@ spec:
           image: {{ .Values.image | quote }}
           command: [python, -m, synapse.app.homeserver]
           args: [-c, /config/homeserver.yaml, -c, /secrets/config.yaml]
+          {{- if .Values.publication.enabled }}
+          env:
+            - {name: PYTHONPATH, value: /modules}
+          {{- end }}
           ports: [{name: http, containerPort: 8008}]
           securityContext:
             readOnlyRootFilesystem: true
@@ -136,17 +151,28 @@ spec:
             periodSeconds: 5
             failureThreshold: 60
           readinessProbe:
+            {{- if .Values.publication.enabled }}
+            httpGet: {path: /_synapse/client/sytue/publication, port: http}
+            {{- else }}
             httpGet: {path: /health, port: http}
+            {{- end }}
             periodSeconds: 5
           livenessProbe:
             httpGet: {path: /health, port: http}
             periodSeconds: 30
           volumeMounts:
             - {name: config, mountPath: /config, readOnly: true}
+            {{- if .Values.publication.enabled }}
+            - {name: publication-module, mountPath: /modules, readOnly: true}
+            {{- end }}
             - {name: secrets, mountPath: /secrets, readOnly: true}
             - {name: data, mountPath: /data}
             - {name: tmp, mountPath: /tmp}
       volumes:
+        {{- if .Values.publication.enabled }}
+        - name: publication-module
+          configMap: {name: {{ $name }}-publication-module}
+        {{- end }}
         - name: config
           configMap: {name: {{ $name }}}
         - name: secrets

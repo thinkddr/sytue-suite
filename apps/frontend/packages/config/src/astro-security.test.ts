@@ -8,7 +8,7 @@ import {
   SYTUE_PERMISSIONS_POLICY_ROOMS,
   SYTUE_SECURITY_HEADERS,
 } from './astro-security.js';
-import { appDomains, integrationsDomain } from './tokens.js';
+import { appDomains, integrationsDomain, matrixDomain } from './tokens.js';
 
 describe('applySecurityHeaders', () => {
   it('protege del clickjacking por las dos vías (CSP y cabecera heredada)', () => {
@@ -35,6 +35,16 @@ describe('applySecurityHeaders', () => {
     expect(headers.get('permissions-policy')).toContain('microphone=()');
     expect(headers.get('permissions-policy')).toContain('geolocation=()');
     expect(headers.get('cross-origin-opener-policy')).toBe('same-origin');
+  });
+
+  it('conserva no-referrer en un retorno SSO, incluso al aplicar la CSP cerrada', () => {
+    const headers = new Headers({ 'referrer-policy': 'no-referrer' });
+    applySecurityHeaders(headers, {}, cabecerasCerradas(undefined));
+    expect(headers.get('referrer-policy')).toBe('no-referrer');
+    expect(headers.get('content-security-policy')).toContain("connect-src 'self'");
+    const unsafe = new Headers({ 'referrer-policy': 'unsafe-url' });
+    applySecurityHeaders(unsafe);
+    expect(unsafe.get('referrer-policy')).toBe('strict-origin-when-cross-origin');
   });
 
   it('Rooms concede cámara y micrófono a su propio origen, no al mundo', () => {
@@ -210,12 +220,12 @@ describe('cabecerasCerradas', () => {
 
   it('sigue cerrada: orígenes exactos, ni comodines ni esquemas enteros', () => {
     expect(fuentes('connect-src').toSorted()).toEqual(
-      ["'self'", HUB, integrationsDomain].toSorted(),
+      ["'self'", HUB, integrationsDomain, matrixDomain].toSorted(),
     );
     expect(fuentes('img-src').toSorted()).toEqual(
       ["'self'", 'data:', 'blob:', appDomains.id].toSorted(),
     );
-    expect(fuentes('script-src')).toEqual(["'self'", "'unsafe-inline'"]);
+    expect(fuentes('script-src')).toEqual(["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'"]);
     for (const directiva of ['connect-src', 'img-src', 'script-src']) {
       for (const fuente of fuentes(directiva)) {
         expect(fuente).not.toContain('*');
@@ -233,7 +243,8 @@ describe('cabecerasCerradas', () => {
         .split('; ')
         .find((d) => d.startsWith('script-src '));
     expect(script({ wasm: true })).toBe("script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'");
-    expect(script({})).toBe("script-src 'self' 'unsafe-inline'");
+    expect(script({})).toBe("script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'");
+    expect(script({ wasm: false })).toBe("script-src 'self' 'unsafe-inline'");
     expect(script({ wasm: true })).not.toContain("'unsafe-eval'");
   });
 
@@ -251,7 +262,11 @@ describe('cabecerasCerradas', () => {
   });
 
   it('un Hub mal configurado no tumba la app: se omite', () => {
-    expect(fuentes('connect-src', 'no-es-una-url')).toEqual(["'self'", integrationsDomain]);
+    expect(fuentes('connect-src', 'no-es-una-url')).toEqual([
+      "'self'",
+      integrationsDomain,
+      matrixDomain,
+    ]);
   });
 
   /*

@@ -24,9 +24,9 @@ import (
 // sondeo, como en la web; la presencia se renueva por HTTP siempre, que es lo único que
 // ve también a quien está sin canal.
 //
-// ponytail: los cursores de los demás aún no se pintan. Tras fusionar, el cursor propio
-// se queda en su bloque y su posición, sin correrse con lo que otro haya escrito delante
-// en la misma línea.
+// Por el canal viajan también los cursores (`cursores_app.go`): el propio sale en cada
+// movimiento con el ritmo de la web y los de los demás se pintan en el folio. Sin canal
+// (solo sondeo) no se manda ni se pinta ninguno, como en la web.
 
 // SondeoCoedicion es el POLL_MS de la web; cada tres rondas se renueva la presencia, que
 // el servicio olvida a los 30 s.
@@ -41,6 +41,7 @@ func (a *App) iniciarCoedicion(ab *abierto, cont api.DocContent) {
 	ab.co = coedicion.Nueva(a.actor, coedicion.ElementosDeEstado(cont.Elementos), cont.Value)
 	ab.lamport, ab.seq = cont.MaxLamport, cont.Seq
 	ab.co.FijarContador(ab.cuenta)
+	ab.folio.AlCursor = func(editado bool) { a.cursorMovido(ab, editado) }
 	a.sondear(ab) // ya: la presencia dice si se puede sembrar antes del primer guardado
 	a.programarSondeo(ab)
 	if a.EnVivo {
@@ -59,17 +60,35 @@ const (
 func (a *App) abrirCanal(ab *abierto) {
 	c, cancelar := context.WithCancel(context.Background())
 	ab.cerrarCanal = cancelar
+	// Lo que llegue de un canal ya sustituido (al recargar se abre otro sobre el mismo
+	// documento) no toca el de ahora: su cierre tardío dejaría sin canal ni cursor al nuevo.
+	ab.genCanal++
+	gen := ab.genCanal
 	id := ab.id
 	ab.seqVista.Store(ab.seq)
 	go func() {
 		espera := esperaCanal
 		for c.Err() == nil {
 			//nolint:contextcheck // un `role` recarga el documento, y la carga abre su propio plazo
-			err := a.Svc.Coeditar(c, id, ab.seqVista.Load(), func(m api.DocMensaje) {
+			err := a.Svc.CoeditarConCursor(c, id, ab.seqVista.Load(), func(canal *api.CanalDoc) {
+				fyne.Do(func() {
+					if ab.genCanal == gen {
+						ab.canal = canal
+					}
+				})
+			}, func(m api.DocMensaje) {
 				espera = esperaCanal
-				fyne.Do(func() { a.enVivo(ab, m) })
+				fyne.Do(func() {
+					if ab.genCanal == gen {
+						a.enVivo(ab, m)
+					}
+				})
 			})
-			fyne.Do(func() { ab.canalAbierto = false })
+			fyne.Do(func() {
+				if ab.genCanal == gen {
+					a.canalCerrado(ab)
+				}
+			})
 			if c.Err() != nil || err == nil {
 				return
 			}
@@ -93,6 +112,8 @@ func (a *App) enVivo(ab *abierto, m api.DocMensaje) {
 		ab.canalAbierto = true
 	case "ops":
 		a.recibir(ab, m.Ops)
+	case "presence":
+		a.presencia(ab, m)
 	case "role":
 		if api.CanWrite(m.Role) && ab.ctx.SoloLectura {
 			a.recargarPorRol(ab)
@@ -215,7 +236,7 @@ func (a *App) recibir(ab *abierto, ops []api.DocOpSecuenciada) {
 		// LWW de toda la vida: lo del otro es más nuevo y aquí no hay nada que perder.
 		registro.MaxLamport = ab.lamport
 		ab.base, ab.conflicto = *registro, false
-		ab.folio.Fusionar(registro.Value)
+		a.fusionarFolio(ab, registro.Value, nil)
 		ab.guardado = ab.folio.Cambios()
 		a.ponerGuardado(ab, editor.Limpio)
 	}
@@ -233,11 +254,18 @@ func (a *App) fusionar(ab *abierto) bool {
 	if ab.co == nil || !a.sinNadaPropio(ab) {
 		return false
 	}
+	// Los caracteres a los que está anclado el cursor propio, antes de que entre lo ajeno:
+	// la secuencia aún dice lo mismo que el folio.
+	f := ab.folio
+	var anclado *coedicion.Puntos
+	if p, ok := ab.co.PuntosDeOffsets(len(f.textoVisible()), coedicion.Offsets{Anchor: f.offsetDe(f.anc), Focus: f.offsetDe(f.cur)}); ok {
+		anclado = &p
+	}
 	txt, ok := ab.co.Fusionar()
 	if !ok {
 		return false
 	}
-	ab.folio.Fusionar(txt)
+	a.fusionarFolio(ab, txt, anclado)
 	ab.forzar = true
 	a.programarGuardado(ab)
 	return true

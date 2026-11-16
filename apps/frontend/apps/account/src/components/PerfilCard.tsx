@@ -25,6 +25,7 @@ import {
 } from '@sytue/ui';
 import { LOCALES, LOCALE_NAMES } from '@sytue/i18n';
 import type { AccountMessageKey, T } from '../i18n/index.js';
+import { primeraLectura } from '../lib/primeraLectura.js';
 
 /** Código de fallo de imagen -> clave de catálogo (mismo mapa que Contactos). */
 const PHOTO_ERROR_KEY: Record<ImageErrorCode, AccountMessageKey> = {
@@ -91,7 +92,7 @@ export function PerfilCard({ t, nombreInicial, email, idBaseUrl }: Props): JSX.E
   useEffect(() => {
     void (async () => {
       try {
-        const res = await fetch('/api/me');
+        const res = await primeraLectura('/api/me');
         if (!res.ok) return;
         const d = (await res.json()) as Partial<Record<Clave | 'username', string>> & {
           has_avatar?: boolean;
@@ -177,7 +178,8 @@ export function PerfilCard({ t, nombreInicial, email, idBaseUrl }: Props): JSX.E
   }
 
   return (
-    <Card class="mb-6 break-inside-avoid">
+    // `#perfil`: a donde lleva «Pon una foto de perfil» desde la portada.
+    <Card id="perfil">
       <form onSubmit={(e) => void guardar(e)} class="flex flex-col gap-4 p-4 sm:p-5">
         <h2 class="text-lg font-semibold">{t('profile.title')}</h2>
 
@@ -265,7 +267,7 @@ export function PerfilCard({ t, nombreInicial, email, idBaseUrl }: Props): JSX.E
           // línea de texto, y por debajo del mínimo de WCAG 2.5.8 (AA). La
           // excepción de ese criterio es para enlaces DENTRO de una frase; este
           // va suelto, con su propia línea, así que cuenta como control. En px y no
-          // `min-h-6`: eso es 1,5 rem, 21 px con la raíz de la suite a 14.
+          // `min-h-6`: eso es 1,5 rem, que bajan de 24 px con una base de letra menor.
           class="text-primary inline-flex min-h-[24px] items-center self-start text-sm font-medium underline"
         >
           {t('profile.apple')}
@@ -276,12 +278,13 @@ export function PerfilCard({ t, nombreInicial, email, idBaseUrl }: Props): JSX.E
           <Button type="submit" disabled={estado === 'guardando' || !ficha.name.trim()}>
             {estado === 'guardando' ? t('profile.saving') : t('profile.save')}
           </Button>
-          {/* `aria-live` y no un toast: el resultado de guardar es la única
+          {/* `role="status"` (región viva educada, que está siempre en la
+              página) y no un toast: el resultado de guardar es la única
               información nueva de la tarjeta, y un lector de pantalla debe
               anunciarla sin que haya que ir a buscarla. */}
-          <span aria-live="polite" class="text-sm">
-            {estado === 'guardado' && <span class="text-success">{t('profile.saved')}</span>}
-            {estado === 'error' && <span class="text-danger">{t('profile.failed')}</span>}
+          <span role="status" class="text-sm">
+            {estado === 'guardado' && <span class="text-success-text">{t('profile.saved')}</span>}
+            {estado === 'error' && <span class="text-danger-text">{t('profile.failed')}</span>}
           </span>
         </div>
       </form>

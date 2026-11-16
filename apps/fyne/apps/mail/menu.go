@@ -4,6 +4,7 @@
 package mail
 
 import (
+	"image"
 	"math"
 	"slices"
 
@@ -46,9 +47,16 @@ type Menu struct {
 	// Externa es la carpeta externa, o el buzón unificado, en el panel
 	// principal: se marca a la vista. Nil, una vista de Sytue.
 	Externa *VistaExterna
-	// Ramas son las ramas del árbol que la persona ha plegado o desplegado, por su
-	// clave (claveRol, claveCuenta): cada una arranca como dice su sección.
+	// Ramas son las ramas de «Buzones» que la persona ha plegado o desplegado, por su
+	// clave (claveRol): cada una arranca como dice su sección.
 	Ramas map[string]bool
+	// CuentasAbiertas es cómo dejó la persona cada cuenta externa, por su instancia: lo
+	// recuerda el dispositivo (Buzon.recordarCuentas). La que no está arranca abierta si
+	// es la única y plegada si hay más (cuentaAbierta), como en la web.
+	CuentasAbiertas map[string]bool
+	// LogoCuenta es el logo de la web del dominio de una dirección si ya ha llegado
+	// (`Logos`, el de los remitentes), o nil: la cuenta lleva entonces su glifo.
+	LogoCuenta func(correo string) image.Image
 	// EstadoExternas es el de su sección: Error pinta el aviso con reintento, como la
 	// web; mientras carga no se pinta nada más que «Añadir cuenta de correo».
 	EstadoExternas Estado
@@ -61,8 +69,9 @@ type Menu struct {
 	// SinConexion esconde lo que no se puede hacer sin servidor, igual que la web:
 	// gestionar carpetas y etiquetas, programados y todos los ajustes.
 	SinConexion bool
-	// AjustesAbiertos es el plegado de la sección de ajustes, cerrada de serie.
-	AjustesAbiertos bool
+	// EnAjustes marca «Ajustes» como la entrada activa: la página está abierta, y
+	// ninguna otra fila dice «estás aquí» a la vez.
+	EnAjustes bool
 
 	// Cuota alimenta el medidor del pie. Los textos llegan ya escritos porque el «%»
 	// y el «de» son del idioma; los calcula Cuota. EstadoCuota es Cargando mientras
@@ -85,14 +94,17 @@ type Menu struct {
 	// AlAbrirUnificado abre un buzón unificado («Todos los buzones de entrada», «Todos
 	// los enviados», «Todos los borradores») en el panel principal, por su rol.
 	AlAbrirUnificado func(rol string)
-	// AlPlegarRama pliega o despliega una rama del árbol (Ramas).
-	AlPlegarRama         func(clave string)
+	// AlPlegarRama pliega o despliega una rama de «Buzones» (Ramas).
+	AlPlegarRama func(clave string)
+	// AlPlegarCuenta pliega o despliega una cuenta externa (CuentasAbiertas).
+	AlPlegarCuenta       func(id string)
 	AlReintentarExternas func()
 	AlRedactar           func()
 	AlGestionarCarpetas  func()
 	AlGestionarEtiquetas func()
-	AlPlegarAjustes      func()
-	AlAbrir              func(string) // una entrada de ajustes, por su clave
+	// AlAjustes abre la página de ajustes; AlAbrir, «Programados» (por su clave).
+	AlAjustes            func()
+	AlAbrir              func(string)
 	AlReintentarCarpetas func()
 	// AlRefrescar es «Actualizar», que solo lleva la carpeta que se está viendo: es la
 	// única lista que puede recargar, y repetirlo en las seis haría de la barra una
@@ -101,6 +113,9 @@ type Menu struct {
 	// CargandoLista es el `loadingList` de la web: el «Actualizar» gira y se apaga
 	// mientras la carpeta carga. Lo pone la pantalla al refrescar.
 	CargandoLista bool
+
+	// desplaza es el del cuerpo, que dura lo que el menú (ver Construir).
+	desplaza *container.Scroll
 }
 
 // Construir devuelve el `ui.Lateral` ya montado.
@@ -119,7 +134,17 @@ func (m *Menu) Construir() *ui.Lateral {
 	// `overflow-y-auto`: el cuerpo desplaza y no empuja al pie. Lo decide quien monta
 	// el menú, que es lo que dice `ui.Lateral`: meter un scroll dentro del widget
 	// traería la barra del tema de Fyne a los seis menús de la suite a la vez.
-	cuerpo := container.NewVScroll(container.New(ui.Columna{}, m.secciones(v)...))
+	//
+	// El desplazador es SIEMPRE el mismo y solo cambia lo de dentro: la app rehace el
+	// menú con cada dato, y con uno nuevo cada vez plegar una cuenta al fondo del cajón
+	// del teléfono lo devolvía arriba del todo.
+	contenido := container.New(ui.Columna{}, m.secciones(v)...)
+	if m.desplaza == nil {
+		m.desplaza = container.NewVScroll(contenido)
+	} else {
+		m.desplaza.Content = contenido
+	}
+	cuerpo := m.desplaza
 
 	l := ui.NuevoLateral(t.T("ui.mainNav", nil), cuerpo).ConCabecera(redactar)
 	l.Pie = m.pie()
@@ -190,7 +215,7 @@ func (m *Menu) seccionCarpetas(v tema.Variante) *ui.SeccionLateral {
 
 func (m *Menu) filaCarpeta(c Carpeta, v tema.Variante) *ui.FilaLateral {
 	token := "sidebar-fg"
-	if c.ID == m.CarpetaID && m.EtiquetaID == "" {
+	if c.ID == m.CarpetaID && m.EtiquetaID == "" && !m.EnAjustes {
 		token = "sidebar-active-fg"
 	}
 	f := ui.NuevaFilaLateral(
@@ -199,7 +224,9 @@ func (m *Menu) filaCarpeta(c Carpeta, v tema.Variante) *ui.FilaLateral {
 		func() { m.AlElegirCarpeta(c) },
 	)
 	f.Activa = token == "sidebar-active-fg"
-	if c.SinLeer > 0 {
+	// «Pospuestos» sin contador, como en la web: lo apartado hasta su fecha no
+	// reclama atención en el lateral.
+	if c.SinLeer > 0 && c.Rol != "snoozed" {
 		f.Contador = numero(c.SinLeer)
 	}
 	if f.Activa && m.AlRefrescar != nil {
@@ -228,7 +255,7 @@ func (m *Menu) seccionEtiquetas(v tema.Variante) *ui.SeccionLateral {
 	for _, e := range m.Etiquetas {
 		f := ui.NuevaFilaLateral(e.Nombre, nil, func() { m.AlElegirEtiqueta(e) })
 		f.Punto = ColorEtiqueta(e.Color, v)
-		f.Activa = e.ID == m.EtiquetaID
+		f.Activa = e.ID == m.EtiquetaID && !m.EnAjustes
 		if e.SinLeer > 0 {
 			f.Contador = numero(e.SinLeer)
 		}
@@ -254,10 +281,23 @@ func (m *Menu) seccionCompartidos(v tema.Variante) *ui.SeccionLateral {
 				m.AlElegirCompartido(c)
 			}
 		})
-		f.Activa = c.ID == m.CompartidoID
+		f.Activa = c.ID == m.CompartidoID && !m.EnAjustes
 		s.Filas = append(s.Filas, f)
 	}
 	return s
+}
+
+// marcaDeCuenta es lo que lleva a la izquierda una cuenta externa: el logo de la web de
+// su dominio si lo tiene (una cuenta de empresa; los buzones gratuitos no tienen), en su
+// losa blanca como el avatar de un remitente, y si no su glifo, en el `size` por defecto
+// de Icon.tsx como en la web.
+func (m *Menu) marcaDeCuenta(c CuentaDeBuzones, v tema.Variante) fyne.CanvasObject {
+	if m.LogoCuenta != nil && !c.ICloud {
+		if img := m.LogoCuenta(c.Titulo); img != nil {
+			return ui.LogoEnLosa(img, v)
+		}
+	}
+	return iconos.Trazo(iconoExterna(c), ui.GlifoMenu, "sidebar-fg", v).Objeto()
 }
 
 // iconoExterna es el glifo de una cuenta externa en el lateral: la nube para iCloud,
@@ -269,11 +309,20 @@ func iconoExterna(c CuentaDeBuzones) iconos.Icono {
 	return iconos.Usuario
 }
 
-// Las claves de las ramas del árbol en Menu.Ramas: un buzón unificado por su rol y una
-// cuenta por su instancia, que no se pueden confundir.
+// La clave de una rama de «Buzones» en Menu.Ramas: el buzón unificado por su rol.
 func claveRol(rol string) string                        { return "rol:" + rol }
-func claveCuenta(id string) string                      { return "cuenta:" + id }
 func (m *Menu) abierta(clave string, deSerie bool) bool { return m.Ramas[clave] != deSerie }
+
+// cuentaAbierta es si la cuenta externa `id` se ve desplegada: lo que eligió la persona
+// en este dispositivo y, si nunca la tocó, abierta solo cuando es la única. Con tres
+// cuentas abiertas de serie el cajón del teléfono era una lista de veinte carpetas.
+// Es `useAccountFolds` de ExternalAccountsSection.tsx.
+func (m *Menu) cuentaAbierta(id string) bool {
+	if abierta, hay := m.CuentasAbiertas[id]; hay {
+		return abierta
+	}
+	return len(m.Cuentas) <= 1
+}
 
 // rotulosUnificados son los nombres de los buzones de «Buzones» (`UNIFIED_KEYS`).
 var rotulosUnificados = map[string]string{
@@ -312,10 +361,12 @@ func (m *Menu) ramaConDestino(f *ui.FilaLateral, clave, rotuloTriangulo string, 
 			m.AlPlegarRama(clave)
 		}
 	})
+	// ← y → con el foco en la fila, como en una rama que solo pliega; Intro la abre.
+	f.Desplegable, f.Desplegada, f.AlDesplegar = true, abierta, f.Accion.AlPulsar
 	if !abierta || len(hijos) == 0 {
 		return []fyne.CanvasObject{f}
 	}
-	return []fyne.CanvasObject{f, container.New(ui.Margen{Izq: tema.Espacio(7)},
+	return []fyne.CanvasObject{f, container.New(ui.Margen{Izq: ui.SangriaRama},
 		container.New(ui.Columna{Hueco: tema.Espacio(0.5)}, hijos...))}
 }
 
@@ -368,7 +419,7 @@ func (m *Menu) seccionBuzones(v tema.Variante) *ui.SeccionLateral {
 			}
 			c := m.Cuentas[i]
 			// Marcada a la vista; la «página actual» es la de su cuenta, más abajo.
-			activa := m.enVista(c.ID, fuente.Carpeta)
+			activa := m.enVista(c.ID, fuente.Carpeta) && !m.EnAjustes
 			f := ui.NuevaFilaLateral(c.Titulo, iconos.Trazo(iconoExterna(c), ui.GlifoMenu, tinta(activa), v).Objeto(), m.abrirExterna(c.ID, fuente.Carpeta))
 			f.Activa = activa
 			if j := slices.IndexFunc(c.Carpetas, func(f api.ExternalMailFolder) bool { return f.ID == fuente.Carpeta }); j >= 0 && c.Carpetas[j].Unread > 0 {
@@ -382,7 +433,7 @@ func (m *Menu) seccionBuzones(v tema.Variante) *ui.SeccionLateral {
 			// borradores» son buzones en sí: esa carpeta de todas las cuentas, mezclada
 			// por fecha (fase B, punto 5). Archivo, Spam y Papelera solo se despliegan.
 			rol := u.Rol
-			activa := m.Externa != nil && m.Externa.Unificado == rol
+			activa := m.Externa != nil && m.Externa.Unificado == rol && !m.EnAjustes
 			f := ui.NuevaFilaLateral(m.T.T(rotulosUnificados[rol], nil), Glifo(GlifoCarpeta(rol), ui.GlifoMenu, tinta(activa), v).Objeto(), func() {
 				if m.AlAbrirUnificado != nil {
 					m.AlAbrirUnificado(rol)
@@ -408,7 +459,7 @@ func (m *Menu) seccionBuzones(v tema.Variante) *ui.SeccionLateral {
 // en «Carpetas», y se marca igual a la vista (en la web, sin `aria-current`: esa es la
 // de «Carpetas»). Lleva sus no leídos, para que la suma de la rama cuadre debajo.
 func (m *Menu) fuenteSytue(id string, v tema.Variante) *ui.FilaLateral {
-	activa := id == m.CarpetaID && m.EtiquetaID == "" && m.CompartidoID == "" && m.Externa == nil
+	activa := id == m.CarpetaID && m.EtiquetaID == "" && m.CompartidoID == "" && m.Externa == nil && !m.EnAjustes
 	token := "sidebar-fg"
 	if activa {
 		token = "sidebar-active-fg"
@@ -449,8 +500,7 @@ func (m *Menu) seccionExternas(v tema.Variante) *ui.SeccionLateral {
 		)
 	}
 	for _, c := range m.Cuentas {
-		clave := claveCuenta(c.ID)
-		abierta := m.abierta(clave, true)
+		abierta := m.cuentaAbierta(c.ID)
 		var hijos []fyne.CanvasObject
 		switch c.Estado {
 		case api.ExternalMailReconnect:
@@ -465,7 +515,7 @@ func (m *Menu) seccionExternas(v tema.Variante) *ui.SeccionLateral {
 				}))
 		default:
 			for _, carpeta := range c.Carpetas {
-				activa := m.enVista(c.ID, carpeta.ID)
+				activa := m.enVista(c.ID, carpeta.ID) && !m.EnAjustes
 				f := ui.NuevaFilaLateral(RotuloCarpeta(t, carpeta.Name, carpeta.Role),
 					Glifo(GlifoCarpeta(carpeta.Role), ui.GlifoMenu, tinta(activa), v).Objeto(), m.abrirExterna(c.ID, carpeta.ID))
 				f.Activa = activa
@@ -475,13 +525,19 @@ func (m *Menu) seccionExternas(v tema.Variante) *ui.SeccionLateral {
 				hijos = append(hijos, f)
 			}
 		}
-		// El icono, en el `size` por defecto de Icon.tsx como en la web.
-		f := ui.NuevaFilaLateral(c.Titulo, iconos.Trazo(iconoExterna(c), ui.GlifoMenu, "sidebar-fg", v).Objeto(), nil)
+		f := ui.NuevaFilaLateral(c.Titulo, m.marcaDeCuenta(c, v), nil)
+		// Una dirección no se parte en dos líneas ni se corta por el dominio.
+		f.RecorteEnMedio = true
 		if !abierta && c.NoLeidos > 0 {
 			// Abierta, ya lo dice su Entrada.
 			f.Contador = numero(int(c.NoLeidos))
 		}
-		s.Filas = append(s.Filas, m.rama(f, clave, abierta, hijos, v)...)
+		id := c.ID
+		s.Filas = append(s.Filas, ui.RamaDesplegableCon(f, abierta, func() {
+			if m.AlPlegarCuenta != nil {
+				m.AlPlegarCuenta(id)
+			}
+		}, ui.SangriaRamaCompacta, v, hijos...)...)
 	}
 	s.Filas = append(s.Filas, ui.NuevaFilaLateral(
 		t.T("externalMail.add", nil),
@@ -505,60 +561,22 @@ func (m *Menu) seccionEnvios(v tema.Variante) *ui.SeccionLateral {
 	return ui.NuevaSeccionLateral(t.T("nav.sending", nil), f)
 }
 
-// entradaAjuste es una fila de la sección plegable de ajustes.
-//
-// El icono puede venir del catálogo compartido (`icono`) o ser uno de los glifos
-// propios de esta app (`propio`, una ruta de `glifos.go`). No es un `any` ni una
-// interfaz: son dos campos, y el que esté puesto manda.
-type entradaAjuste struct {
-	clave  string
-	texto  string
-	icono  iconos.Icono
-	propio string
-}
-
-// ajustes son las entradas de «Ajustes» de MailApp.tsx, en su orden. Se pliega de
-// serie porque seis entradas abiertas hacían el lateral más largo que la lista de
-// carpetas y se leían como carpetas. Las cuentas externas no están aquí: tienen su
-// sección arriba, con su «Añadir», como en la web.
-var ajustes = []entradaAjuste{
-	{clave: "signature", texto: "nav.signature", icono: iconos.Usuario},
-	{clave: "rules", texto: "nav.rules", icono: iconos.Ajustes},
-	{clave: "aliases", texto: "nav.aliases", icono: iconos.Usuarios},
-	{clave: "shared", texto: "nav.sharedAndDelegation", icono: iconos.Rejilla},
-	{clave: "smime-anchor", texto: "nav.smimeAnchor", icono: iconos.Descargar},
-	{clave: "smime-identity", texto: "nav.smimeIdentity", icono: iconos.Subir},
-	{clave: "vacation", texto: "nav.vacation", propio: RelojD},
-	{clave: "mail-clients", texto: "nav.mailClients", icono: iconos.Ajustes},
-}
-
-// dibujo es el glifo de la entrada, venga del catálogo o de `glifos.go`.
-func (a entradaAjuste) dibujo(v tema.Variante) *iconos.Dibujo {
-	if a.propio != "" {
-		return Glifo(a.propio, ui.GlifoMenu, "sidebar-fg", v)
-	}
-	return iconos.Trazo(a.icono, ui.GlifoMenu, "sidebar-fg", v)
-}
-
+// seccionAjustes es la puerta a la página de ajustes: UNA fila, y no las ocho de antes,
+// que plegadas se olvidaban y desplegadas hacían el lateral más largo que la lista de
+// carpetas, leyéndose como carpetas (design.md §8.4). Sin título: «Ajustes» encima de
+// «Ajustes» sería decirlo dos veces.
 func (m *Menu) seccionAjustes(v tema.Variante) *ui.SeccionLateral {
-	s := ui.NuevaSeccionLateral(m.T.T("nav.settings", nil))
-	s.AlPlegar = m.AlPlegarAjustes
-	s.Abierta = m.AjustesAbiertos
-	if !s.Abierta {
-		// La sección plegada no MONTA sus filas. `ui.SeccionLateral` las redimensiona
-		// a cero al plegarse, y un `canvas.Text` a cero sigue pintando su texto: la
-		// lista de ajustes se veía entera debajo del rótulo plegado. Está en el
-		// informe como fallo de `ui`; aquí se evita no dándoselas.
-		return s
-	}
-	for _, a := range ajustes {
-		s.Filas = append(s.Filas, ui.NuevaFilaLateral(
-			m.T.T(a.texto, nil),
-			a.dibujo(v).Objeto(),
-			func() { m.AlAbrir(a.clave) },
-		))
-	}
-	return s
+	f := ui.NuevaFilaLateral(
+		m.T.T("nav.settings", nil),
+		iconos.Trazo(iconos.Ajustes, ui.GlifoMenu, "sidebar-fg", v).Objeto(),
+		func() {
+			if m.AlAjustes != nil {
+				m.AlAjustes()
+			}
+		},
+	)
+	f.Activa = m.EnAjustes
+	return ui.NuevaSeccionLateral("", f)
 }
 
 // pie es el `space-y-2` del pie de la web: «Trae tu correo» (`ImportData`), si la

@@ -140,9 +140,9 @@ func (a *App) compartir(c api.Calendar) {
 	d = ui.NuevoDialogo(p.t("share.title", i18n.Vars{"name": c.Title()}), cuerpo).Con(ui.DialogoMD, hecho)
 	d.RotuloCerrar = p.t("common.close", nil)
 	d.Foco = correo
-	d.Mostrar(lienzo)
-	a.lanzar(func() {
-		ctx, parar := context.WithTimeout(context.Background(), plazo)
+	a.mostrarDialogo(d, lienzo)
+	a.lanzar(func(vida context.Context) {
+		ctx, parar := context.WithTimeout(vida, plazo)
 		defer parar()
 		l, err := a.Cal.Shares(ctx, c.ID)
 		a.enUI(func() {

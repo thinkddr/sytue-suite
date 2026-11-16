@@ -23,6 +23,7 @@ import (
 	"git.sytue.eu/sytue/one/services/drive/internal/compat"
 	"git.sytue.eu/sytue/one/services/drive/internal/config"
 	"git.sytue.eu/sytue/one/services/drive/internal/domain"
+	"git.sytue.eu/sytue/one/services/drive/internal/store"
 )
 
 // Capa de compatibilidad de ficheros: Sytue Drive respondiendo un subconjunto
@@ -214,7 +215,7 @@ func (h *compatHandlers) listFolder(ctx context.Context, folderID uuid.UUID, tok
 	if !wantFiles {
 		return folders, nil, "", nil
 	}
-	page, err := h.svc.ListFilesPage(ctx, folderID, token, size)
+	page, err := h.svc.ListFilesPage(ctx, folderID, store.OrdenFicheros{}, token, size)
 	if err != nil {
 		return nil, nil, "", err
 	}

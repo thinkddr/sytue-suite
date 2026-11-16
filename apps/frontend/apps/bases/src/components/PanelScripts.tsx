@@ -15,7 +15,17 @@
  */
 import type { JSX } from 'preact';
 import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
-import { Badge, Button, FieldGroup, Input, Modal, Select, Textarea, useConfirm } from '@sytue/ui';
+import {
+  Badge,
+  Button,
+  FieldGroup,
+  Input,
+  Modal,
+  Select,
+  Textarea,
+  useConfirm,
+  EmptyState,
+} from '@sytue/ui';
 import { formatDate, type Locale } from '@sytue/i18n';
 import type {
   BasesScript,
@@ -315,7 +325,7 @@ export function PanelScripts(p: {
               {t('scripts.new')}
             </Button>
             {lista.length === 0 ? (
-              <p class="text-text-muted text-sm">{t('scripts.list.empty')}</p>
+              <EmptyState compact title={t('scripts.list.empty')} />
             ) : (
               <ul class="flex flex-col gap-1" aria-label={t('scripts.list.label')}>
                 {lista.map((s) => (

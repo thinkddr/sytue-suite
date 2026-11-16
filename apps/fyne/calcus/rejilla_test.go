@@ -8,6 +8,8 @@ import (
 	"image/color"
 	"image/png"
 	"os"
+	"strconv"
+	"strings"
 	"testing"
 
 	"fyne.io/fyne/v2"
@@ -16,6 +18,7 @@ import (
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/driver/software"
 
+	"git.sytue.eu/sytue/one/apps/fyne/editor"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/nucleo/formula"
 )
@@ -348,11 +351,150 @@ func TestElDesplazamientoNoSeSaleDeLaHoja(t *testing.T) {
 	if r.desX != 0 || r.desY != 0 {
 		t.Errorf("desplazar hacia arriba desde el origen ha dejado la vista en %v,%v", r.desX, r.desY)
 	}
+	// La rueda hace crecer la extensión por delante de la vista, y la vista llega a
+	// donde se ha pedido sin pasar de lo que mide la rejilla.
 	r.Scrolled(&fyne.ScrollEvent{Scrolled: fyne.Delta{DX: -99999, DY: -99999}})
-	maxX := float32(Columnas)*AnchoCelda + AnchoCabecera - 400
-	maxY := float32(Filas)*AltoCelda + AltoCelda - 200
-	if r.desX != maxX || r.desY != maxY {
+	maxX := float32(r.Cols)*AnchoCelda + AnchoCabecera - 400
+	maxY := float32(r.Fils)*AltoCelda + AltoCelda - 200
+	if r.desX != 99999 || r.desY != 99999 || r.desX > maxX || r.desY > maxY {
 		t.Errorf("el tope es %v,%v y la vista se ha quedado en %v,%v", maxX, maxY, r.desX, r.desY)
+	}
+	// Y nunca de los límites de Excel, por mucho que se gire la rueda.
+	for range 400 {
+		r.Scrolled(&fyne.ScrollEvent{Scrolled: fyne.Delta{DX: -1e7, DY: -1e7}})
+	}
+	if r.Cols != MaxColumnas || r.Fils != MaxFilas {
+		t.Errorf("la extensión ha llegado a %d×%d y el límite es %d×%d", r.Cols, r.Fils, MaxColumnas, MaxFilas)
+	}
+	if maxY := float32(MaxFilas)*AltoCelda + AltoCelda - 200; r.desY != maxY {
+		t.Errorf("al fondo de la hoja la vista está en %v y no en %v", r.desY, maxY)
+	}
+}
+
+// TestPasadaLaFila100AparecenMasFilas (CALC-06): la rejilla ya no se queda en A1:Z100.
+// Al bajar con la rueda la extensión crece como en la web, se pintan las filas de
+// más abajo y se puede seleccionar y escribir en ellas.
+func TestPasadaLaFila100AparecenMasFilas(t *testing.T) {
+	r := rejillaDePrueba(400, 200)
+	if r.Cols != MinColumnas || r.Fils != MinFilas {
+		t.Fatalf("una hoja vacía nace con %d×%d y no con la mínima de la web", r.Cols, r.Fils)
+	}
+	for range 10 {
+		r.Scrolled(&fyne.ScrollEvent{Scrolled: fyne.Delta{DY: -float32(MinFilas) * AltoCelda}})
+	}
+	if r.Fils <= MinFilas || r.desY <= float32(MinFilas)*AltoCelda {
+		t.Fatalf("tras bajar mil filas la rejilla mide %d filas y la vista está en %v", r.Fils, r.desY)
+	}
+	if f := r.filaEn(AltoCelda + 1); f < MinFilas {
+		t.Errorf("arriba de la vista se ve la fila %d, que no pasa de la 100", f+1)
+	}
+	r.Seleccionar(0, 4999, false)
+	r.Escribir("lejos")
+	if r.Seleccion() != (Celda{C: 0, F: 4999}) || r.L.Texto(0, 4999) != "lejos" {
+		t.Errorf("A5000 no se selecciona o no se escribe: %v %q", r.Seleccion(), r.L.Texto(0, 4999))
+	}
+	r.Seleccionar(27, 2, false)
+	if r.Seleccion() != (Celda{C: 27, F: 2}) || r.Cols < 28 {
+		t.Errorf("AB3 no se selecciona: %v con %d columnas", r.Seleccion(), r.Cols)
+	}
+	// Lo usado empuja la extensión: con A5000 escrita, hay holgura de 100 filas debajo.
+	r.Seleccionar(0, 0, false)
+	r.desY = 0
+	r.crecer(0, 0)
+	if r.Fils != 5000+MinFilas {
+		t.Errorf("con A5000 usada la rejilla mide %d filas y no %d", r.Fils, 5000+MinFilas)
+	}
+}
+
+// TestPegarNoSeCortaEnLaExtension (CALC-06): la extensión es lo que se recorre, no un
+// límite. Pegar 300 filas en una hoja vacía (que mide 26×100) las pega enteras, como la
+// web, que solo recorta en los límites de Excel; y la selección cubre todo lo pegado.
+func TestPegarNoSeCortaEnLaExtension(t *testing.T) {
+	r := rejillaDePrueba(400, 200)
+	var b strings.Builder
+	for f := range 300 {
+		b.WriteString("fila" + strconv.Itoa(f+1))
+		if f == 0 {
+			b.WriteString(strings.Repeat("\tx", 39))
+		}
+		b.WriteString("\n")
+	}
+	r.Pegar(b.String(), false)
+	if got := r.L.Texto(0, 299); got != "fila300" {
+		t.Errorf("A300 tiene %q: el pegado se ha cortado en la extensión de %d filas", got, MinFilas)
+	}
+	if got := r.L.Texto(39, 0); got != "x" {
+		t.Errorf("AN1 tiene %q: el pegado se ha cortado en la columna Z", got)
+	}
+	if _, _, c2, f2 := r.Rango(); c2 != 39 || f2 != 299 {
+		t.Errorf("tras pegar queda seleccionado hasta (%d, %d) y no hasta AN300", c2, f2)
+	}
+}
+
+// TestCtrlFlechaSaltaAlBordeDelBloque (CALC-06): Ctrl+↓ con el criterio de Excel, el
+// mismo de `saltoADatos` en la web: al final del bloque, al siguiente bloque, y al borde
+// de la hoja si no queda nada; con Mayús, extiende el rango.
+func TestCtrlFlechaSaltaAlBordeDelBloque(t *testing.T) {
+	r := rejillaDePrueba(400, 200)
+	for _, f := range []int{0, 1, 2, 3, 9, 10, 4999} {
+		r.L.Escribir(0, f, "x")
+	}
+	r.L.Escribir(3, 0, "y")
+	ctrl := fyne.KeyModifierShortcutDefault
+	pulsa := func(k fyne.KeyName, m fyne.KeyModifier) {
+		r.TypedShortcut(&desktop.CustomShortcut{KeyName: k, Modifier: m})
+	}
+	r.Seleccionar(0, 0, false)
+	for _, quiero := range []int{3, 9, 10, 4999, MaxFilas - 1} {
+		pulsa(fyne.KeyDown, ctrl)
+		if got := r.Seleccion().F; got != quiero {
+			t.Fatalf("Ctrl+↓ ha ido a la fila %d y la web va a la %d", got+1, quiero+1)
+		}
+	}
+	pulsa(fyne.KeyUp, ctrl)
+	if got := r.Seleccion().F; got != 4999 {
+		t.Errorf("Ctrl+↑ desde el fondo va a la fila %d y no a la 5000", got+1)
+	}
+	r.Seleccionar(0, 0, false)
+	pulsa(fyne.KeyRight, ctrl)
+	if got := r.Seleccion().C; got != 3 {
+		t.Errorf("Ctrl+→ desde A1 va a la columna %d y no a la D", got)
+	}
+	pulsa(fyne.KeyRight, ctrl)
+	if got := r.Seleccion().C; got != MaxColumnas-1 {
+		t.Errorf("Ctrl+→ sin más datos va a la columna %d y no a XFD", got)
+	}
+	pulsa(fyne.KeyLeft, ctrl)
+	r.Seleccionar(0, 0, false)
+	pulsa(fyne.KeyDown, ctrl|fyne.KeyModifierShift)
+	if c1, f1, c2, f2 := r.Rango(); c1 != 0 || f1 != 0 || c2 != 0 || f2 != 3 {
+		t.Errorf("Ctrl+Mayús+↓ selecciona %d,%d..%d,%d y no A1:A4", c1, f1, c2, f2)
+	}
+}
+
+// TestSaltoADatosEsElDeLaWeb: los casos de `saltoADatos` de sheets/rejilla.ts.
+func TestSaltoADatosEsElDeLaWeb(t *testing.T) {
+	llenas := []int{2, 3, 4, 8}
+	casos := []struct{ desde, paso, quiero int }{
+		{0, 1, 2},
+		{2, 1, 4},
+		{4, 1, 8},
+		{8, 1, 99},
+		{99, 1, 99},
+		{8, -1, 4},
+		{4, -1, 2},
+		{2, -1, 0},
+		{0, -1, 0},
+		{5, 1, 8},
+		{5, -1, 4},
+	}
+	for _, c := range casos {
+		if got := saltoADatos(llenas, c.desde, c.paso, 100); got != c.quiero {
+			t.Errorf("saltoADatos(%v, %d, %d) = %d, quiero %d", llenas, c.desde, c.paso, got, c.quiero)
+		}
+	}
+	if got := saltoADatos(nil, 5, 1, 100); got != 99 {
+		t.Errorf("sin datos, Ctrl+↓ va al borde: %d", got)
 	}
 }
 
@@ -479,10 +621,11 @@ func BenchmarkRejilla(b *testing.B) {
 	} {
 		b.Run(caso.nombre, func(b *testing.B) {
 			r := NuevaRejilla(NuevoLibro())
-			r.Cols, r.Fils = caso.cols, caso.fils
+			// La extensión sale de lo usado: la última fila escrita la estira a caso.fils.
 			for f := range min(caso.fils, 200) {
 				r.L.Escribir(f%caso.cols, f, "12345")
 			}
+			r.L.Escribir(0, caso.fils-1-MinFilas, "fin")
 			tam := fyne.NewSize(1200, 800)
 			r.Resize(tam)
 			r.desX, r.desY = caso.desX, caso.desY
@@ -536,9 +679,9 @@ func TestElAroDeLaBarraEsUnRebordeYNoUnBloque(t *testing.T) {
 	img := pinta(t, w, h, c)
 	guarda(t, img)
 
-	// El campo empieza tras el rótulo y la «fx»; se mira bien adentro, donde no hay
-	// letra que valga.
-	dentroX := w - MargenBarra - 12
+	// El campo empieza tras el rótulo y la «fx» y acaba antes del ▾ que despliega la
+	// barra; se mira bien adentro, donde no hay letra que valga.
+	dentroX := w - MargenBarra - editor.LadoBotonCinta - HuecoBarra - 12
 	medio := (AltoBarra - tema.Borde) / 2
 	if got, quiero := px(img, dentroX, medio), tema.Color("surface", tema.Claro); !cerca(got, quiero) {
 		t.Errorf("el centro del campo enfocado pinta %v y la superficie es %v:"+

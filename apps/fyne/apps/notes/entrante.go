@@ -150,6 +150,6 @@ func (p *Pantalla) aceptarVinculo() {
 	in := p.vinculoPendiente
 	p.vinculoPendiente = nil
 	if in != nil {
-		lanzar(func() error { return p.crear(*in) })
+		p.lanzar(func() error { return p.crear(*in) })
 	}
 }

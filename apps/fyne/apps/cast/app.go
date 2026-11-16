@@ -156,10 +156,16 @@ type App struct {
 	pip, pendiente *ventanaPiP
 	esperaBusqueda *time.Timer
 	pararReloj     chan struct{}
-	pararSondeo    chan struct{}
-	sinSondeo      bool
-	fuente         Fuente
-	sala           Sala
+	// Seguir donde se dejó (reanudar.go): los puntos de quien está dentro (y de quién
+	// son), el vídeo de la página que se está recordando y cuándo se guardó por última vez.
+	puntos      Puntos
+	puntosDe    string
+	reanudo     string
+	guardadoEn  time.Time
+	pararSondeo chan struct{}
+	sinSondeo   bool
+	fuente      Fuente
+	sala        Sala
 	// emiSala es la sala en la que se EMITE desde aquí; sobrevive a cambiar de pantalla.
 	emiSala         Sala
 	chat            *api.CastChat
@@ -230,6 +236,14 @@ type estadoVer struct {
 	viendo       int
 	// descAbierta es el «Mostrar más» de la descripción.
 	descAbierta bool
+	// reanudado: ya se miró dónde se dejó (cambiar de calidad no vuelve a saltar); desde
+	// es adónde se saltó, cero si empezó desde el principio.
+	reanudado bool
+	desde     time.Duration
+	// diapositivas es la presentación de Diapos (diapositivas.go); nil, ninguna.
+	// pidiendoDiapos evita amontonar sondeos si el servicio tarda más que el intervalo.
+	diapositivas   *api.CastPresentacion
+	pidiendoDiapos bool
 	// cursorCom es la página siguiente de comentarios; errorCargaCom, que la primera
 	// no se pudo leer.
 	cursorCom     string
@@ -505,6 +519,7 @@ func (a *App) vistaDe(e estadoCarga, sinDatos, vacia bool, reintentar func()) Vi
 	v := a.v
 	v.AlEntrar = a.AlEntrar
 	v.AlReintentar = reintentar
+	v.Visto = a.visto
 	switch {
 	case e.fallo != nil && sinDatos:
 		v.Estado = estadoDeFallo(e.fallo)

@@ -196,6 +196,93 @@ func TestReunionInvocaACalendar(t *testing.T) {
 	}
 }
 
+// TestLasEtiquetasDeLaFichaEnvuelven: con doce etiquetas las píldoras se reparten en
+// varias filas (`flex-wrap`), ninguna se sale de la columna `1fr` y la fila del `<dl>`
+// crece con ellas. Antes iban en una sola fila y las últimas sobresalían.
+func TestLasEtiquetasDeLaFichaEnvuelven(t *testing.T) {
+	p := pantallaDeMuestra(t)
+	c := fichaDeMuestra()
+	p.AlEtiquetar = func(api.ContactGroup, api.Contact) {}
+	p.Etiquetas = nil
+	for _, n := range []string{
+		"Familia", "Trabajo", "Proveedores", "Clientes clave", "Club de lectura", "Vecinos",
+		"Congreso 2026", "Universidad", "Voluntariado", "Pádel", "Prensa", "Inversores",
+	} {
+		p.Etiquetas = append(p.Etiquetas, api.ContactGroup{ID: n, Name: n, Members: []string{c.UID}})
+	}
+	ancho := p.anchoValor()
+	caja, es := p.etiquetasDe(c).(*fyne.Container)
+	if !es {
+		t.Fatal("las etiquetas no son un contenedor")
+	}
+	m := caja.MinSize()
+	if m.Width > ancho {
+		t.Errorf("las etiquetas piden %v de ancho y la columna mide %v", m.Width, ancho)
+	}
+	caja.Resize(fyne.NewSize(ancho, m.Height))
+	filas := map[float32]bool{}
+	for _, o := range caja.Objects {
+		if d := o.Position().X + o.Size().Width; d > ancho+0.01 {
+			t.Errorf("una píldora acaba en x = %v y la columna mide %v", d, ancho)
+		}
+		filas[o.Position().Y] = true
+	}
+	if len(filas) < 2 {
+		t.Errorf("doce etiquetas van en %d fila(s) y deberían repartirse en varias", len(filas))
+	}
+	alto := ui.MedidaEtiqueta("Familia", false, true, false, 0).Height
+	if m.Height < 2*alto+HuecoChips {
+		t.Errorf("el campo mide %v de alto y con dos filas de píldoras de %v pide al menos %v", m.Height, alto, 2*alto+HuecoChips)
+	}
+
+	// La fila del `<dl>` suma el alto del flujo ya partido.
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	fila := p.campo("Etiquetas", caja, v, true)
+	if h := fila.MinSize().Height; h < m.Height+2*RellenoVCampo {
+		t.Errorf("la fila de las etiquetas mide %v y el flujo partido pide %v más su `py-3`", h, m.Height)
+	}
+}
+
+// TestElAspaDeUnaEtiquetaTieneDianaDe24: la píldora es `ui.Etiqueta` y su aspa mide
+// los 24 de WCAG 2.5.8 con ratón y los 44 con el dedo. La copia local se quedó en los
+// 20 del `h-5 w-5`, y sin red no hay aspa que pulsar.
+func TestElAspaDeUnaEtiquetaTieneDianaDe24(t *testing.T) {
+	for _, c := range []struct {
+		tactil bool
+		lado   float32
+	}{{false, 24}, {true, 44}} {
+		func() {
+			defer ui.TactilDePrueba(c.tactil)()
+			p := pantallaDeMuestra(t)
+			f := fichaDeMuestra()
+			p.AlEtiquetar = func(api.ContactGroup, api.Contact) {}
+			p.Etiquetas = []api.ContactGroup{{ID: "f", Name: "Familia", Members: []string{f.UID}}}
+			caja := p.etiquetasDe(f).(*fyne.Container)
+			caja.Resize(caja.MinSize())
+			chip, es := caja.Objects[0].(*ui.Etiqueta)
+			if !es {
+				t.Fatalf("la etiqueta es un %T y debería ser ui.Etiqueta", caja.Objects[0])
+			}
+			a := chip.Aspa()
+			if a == nil {
+				t.Fatal("con permiso de escritura la etiqueta no tiene aspa")
+			}
+			if s := a.Size(); s.Width < c.lado || s.Height < c.lado {
+				t.Errorf("táctil=%v: el aspa mide %v y la diana pide %v", c.tactil, s, c.lado)
+			}
+			if a.AccessibilityLabel() == "" {
+				t.Error("el aspa no tiene nombre accesible")
+			}
+
+			p.SinConexion = true
+			sin := p.etiquetasDe(f).(*fyne.Container).Objects[0].(*ui.Etiqueta)
+			if sin.Aspa() != nil {
+				t.Error("sin red la etiqueta sigue ofreciendo quitarla")
+			}
+		}()
+	}
+}
+
 // TestEtiquetarEsOptimistaYVuelveAtras: la píldora aparece al pulsar y, si el servicio
 // dice que no, desaparece y se avisa.
 func TestEtiquetarEsOptimistaYVuelveAtras(t *testing.T) {
@@ -216,6 +303,59 @@ func TestEtiquetarEsOptimistaYVuelveAtras(t *testing.T) {
 	}
 	if len(a.avisos.Avisos()) != 1 {
 		t.Errorf("hay %d avisos y debería haber uno", len(a.avisos.Avisos()))
+	}
+}
+
+// TestLasAspasSeApaganMientrasSeGuardaUnaEtiqueta: como `removeDisabled={busyId !== null}`
+// de la web, mientras la petición de poner o quitar una etiqueta va, ni las aspas ni el
+// «Añadir» de la ficha responden; al volver, se encienden otra vez.
+func TestLasAspasSeApaganMientrasSeGuardaUnaEtiqueta(t *testing.T) {
+	s := &servicioFalso{contactos: []api.Contact{persona("ana", "Ana")}}
+	a := appDePrueba(t, s)
+	a.Cargar()
+	p := a.Pantalla
+	ana := p.Contactos[0]
+	p.Etiquetas = []api.ContactGroup{
+		{ID: "f", Name: "Familia", Members: []string{ana.UID}},
+		{ID: "t", Name: "Trabajo", Members: []string{ana.UID}},
+	}
+	var apagadas, anadirApagado bool
+	var pendiente func()
+	a.enFondo = func(f func()) {
+		caja := p.etiquetasDe(ana).(*fyne.Container)
+		apagadas = true
+		for _, o := range caja.Objects {
+			switch w := o.(type) {
+			case *ui.Etiqueta:
+				apagadas = apagadas && w.Aspa() != nil && w.Aspa().Disabled()
+			case *ui.Boton:
+				anadirApagado = w.Disabled()
+			}
+		}
+		pendiente = f
+	}
+	a.etiquetar(p.Etiquetas[0], ana)
+	if !apagadas {
+		t.Error("mientras se guarda la etiqueta, alguna aspa sigue encendida")
+	}
+	if !anadirApagado {
+		t.Error("mientras se guarda la etiqueta, «Añadir» sigue encendido")
+	}
+	// Un segundo toque mientras va no lanza otra petición.
+	otra := false
+	a.enFondo = func(func()) { otra = true }
+	a.etiquetar(p.Etiquetas[1], ana)
+	if otra {
+		t.Error("un segundo toque con la etiqueta en vuelo lanzó otra petición")
+	}
+	pendiente()
+	if p.EtiquetaOcupada != "" {
+		t.Errorf("al volver la petición la etiqueta %q sigue ocupada", p.EtiquetaOcupada)
+	}
+	for _, o := range p.etiquetasDe(ana).(*fyne.Container).Objects {
+		if e, es := o.(*ui.Etiqueta); es && e.Aspa().Disabled() {
+			t.Errorf("al volver la petición el aspa de %q sigue apagada", e.Texto)
+		}
 	}
 }
 
@@ -248,5 +388,30 @@ func TestLaFichaVaciaAlGirarPermiteAlcanzarCrearContacto(t *testing.T) {
 	}
 	if creados != 4 {
 		t.Fatal("la acción de crear dejó de responder tras girar")
+	}
+}
+
+// TestLaFichaDiceCargoYApodo: «Cargo · Empresa» bajo el nombre y el apodo como campo;
+// sin ellos, solo la empresa y ninguna fila de apodo vacía.
+func TestLaFichaDiceCargoYApodo(t *testing.T) {
+	p := pantallaDeMuestra(t)
+	c := fichaDeMuestra()
+	c.Title, c.Nickname = "Condesa", "Ada"
+	p.Seleccionado = &c
+	textos := textosDe(p.ficha())
+	for _, quiero := range []string{"Condesa · Analytical Engines", "Apodo", "Ada"} {
+		if !contieneTexto(textos, quiero) {
+			t.Errorf("la ficha no dice %q", quiero)
+		}
+	}
+
+	sin := fichaDeMuestra()
+	p.Seleccionado = &sin
+	textos = textosDe(p.ficha())
+	if contieneTexto(textos, "Apodo") || contieneTexto(textos, " · Analytical Engines") {
+		t.Errorf("sin cargo ni apodo la ficha pinta de más: %q", textos)
+	}
+	if got := lineaCargo("  ", "Acme"); got != "Acme" {
+		t.Errorf("solo empresa: %q", got)
 	}
 }

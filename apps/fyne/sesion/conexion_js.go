@@ -20,9 +20,6 @@ func (s *Suite) Conexion(string, ...string) (*offline.Monitor, *http.Client) {
 	return &offline.Monitor{}, nil
 }
 
-// vaciarAlmacen: en `js` no hay almacén propio que vaciar.
-func (s *Suite) vaciarAlmacen() {}
-
 // ponerSoloLectura: en `js` no hay variables de entorno con las que pedirlo.
 func ponerSoloLectura() {}
 
@@ -40,3 +37,10 @@ func AlmacenConContexto(ctx context.Context) (*offline.Store, error) {
 }
 
 func contarAlmacen(...string) (int, error) { return 0, nil }
+
+func (s *Suite) vaciarAlmacenCon(ctx context.Context) error { return ctx.Err() }
+func directorioAlmacen() (string, error)                    { return "", offline.ErrEncryptedStore }
+
+func directorioAlmacenActivo(context.Context) (string, error) { return "", offline.ErrEncryptedStore }
+
+func contarAlmacenCon(ctx context.Context, _ ...string) (int, error) { return 0, ctx.Err() }

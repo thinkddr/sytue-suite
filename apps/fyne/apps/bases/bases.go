@@ -48,12 +48,18 @@ type Pantalla struct {
 	nombre *ui.Entrada
 	crear  *ui.Boton
 
+	// buscar es el campo de búsqueda de la lista, el MISMO entre repintados.
+	buscar *ui.Entrada
+
 	// abierta es la base que se está mirando; nil, la lista.
 	abierta *Base
 
 	// Org es la organización de la sesión: el principal de «toda la organización» al
 	// compartir. Nil, se manda vacío y decide el servicio.
 	Org func() string
+	// Yo es el `sub` de quien mira: en la actividad, sus entradas son «Tú». Nil, nadie
+	// lo es.
+	Yo func() string
 	// URLPublica compone la dirección web de una ruta pública de Bases (`/f/<token>`, el
 	// formulario): lleva el host y el prefijo, y nunca la organización.
 	URLPublica func(ruta string) string
@@ -79,6 +85,19 @@ type Pantalla struct {
 	// fondo lanza lo que habla con la red. Es `go f()`; los guardianes lo cambian por
 	// `f()` para que la carga ocurra en su rutina y en orden.
 	fondo func(func())
+
+	// Tiempo real (tiemporeal.go). conn es esta ventana ante el servicio: la presencia y
+	// el flujo la llevan, y con ella se descuenta a sí misma de quienes están. vivo lanza
+	// el flujo y el latido, que no vuelven hasta cerrar la base: es `go f()` también en
+	// los guardianes, que no pueden quedarse dentro. cadaLatido y esperaRecarga los
+	// acortan las pruebas.
+	conn          string
+	vivo          func(func())
+	cadaLatido    time.Duration
+	esperaRecarga time.Duration
+	// comentando es el panel de comentarios abierto, si lo hay: un comentario de otra
+	// persona en ese registro lo vuelve a cargar.
+	comentando *panelComentarios
 }
 
 // NuevaPantalla monta la aplicación sobre su ventana. `svc` nil la deja pintarse sin red.
@@ -88,11 +107,20 @@ func NuevaPantalla(tr *i18n.Translator, svc *api.Bases, w fyne.Window) *Pantalla
 		Cargando: true,
 		Plazo:    30 * time.Second,
 		fondo:    func(f func()) { go f() },
-		tam:      fyne.NewSize(1280, 800),
+		vivo:     func(f func()) { go f() },
+		conn:     idAleatorio(),
+
+		cadaLatido:    cadaLatido,
+		esperaRecarga: esperaRecarga,
+		tam:           fyne.NewSize(1280, 800),
 	}
 	p.nombre = ui.NuevaEntrada("")
 	p.nombre.Rotulo = p.t("bases.newName")
 	p.nombre.AlCambiar(func(string) { p.ajustarCrear() })
+	// La búsqueda filtra la lista que ya está entera: repintar basta.
+	p.buscar = ui.NuevaEntrada(p.t("bases.search"))
+	p.buscar.Rotulo, p.buscar.Icono, p.buscar.Busqueda = p.t("bases.search"), iconos.Buscar, true
+	p.buscar.AlCambiar(func(string) { p.Repintar() })
 	p.nombre.AlTeclear = func(k *fyne.KeyEvent) bool {
 		if k.Name != fyne.KeyReturn && k.Name != fyne.KeyEnter {
 			return false
@@ -203,56 +231,9 @@ func (v *vigia) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	v.p.tam = t
 }
 
-// flujo es `flex flex-wrap items-center gap-*`: los hijos en fila, a su tamaño, y el que
-// no cabe en Ancho baja a la siguiente.
-//
-// ponytail: el ancho se le da al armarlo (Fyne mide sin saber el ancho que tendrá) y
-// `vigia` repinta cuando la ventana cambia. Si un día hay filas así dentro de algo que
-// cambie de ancho sin que cambie la ventana, hará falta un layout que se mida dos veces.
-type flujo struct{ Hueco, Ancho float32 }
-
-// repartir coloca (o solo mide) los hijos y devuelve el alto que ocupan. Cada fila es tan
-// alta como su hijo más alto, y los demás van centrados en ella (`items-center`).
-func (f flujo) repartir(objs []fyne.CanvasObject, colocar bool) float32 {
-	var x, y, altoFila float32
-	fila := objs[:0:0]
-	cerrar := func() {
-		for _, o := range fila {
-			if colocar {
-				o.Move(fyne.NewPos(o.Position().X, y+(altoFila-o.MinSize().Height)/2))
-			}
-		}
-		fila = fila[:0]
-	}
-	for _, o := range objs {
-		if !o.Visible() {
-			continue
-		}
-		m := o.MinSize()
-		if x > 0 && x+m.Width > f.Ancho {
-			cerrar()
-			x, y, altoFila = 0, y+altoFila+f.Hueco, 0
-		}
-		if colocar {
-			o.Move(fyne.NewPos(x, y))
-			o.Resize(m)
-		}
-		fila = append(fila, o)
-		x += m.Width + f.Hueco
-		altoFila = max(altoFila, m.Height)
-	}
-	cerrar()
-	return y + altoFila
-}
-
-func (f flujo) MinSize(objs []fyne.CanvasObject) fyne.Size {
-	return fyne.NewSize(0, f.repartir(objs, false))
-}
-
-func (f flujo) Layout(objs []fyne.CanvasObject, _ fyne.Size) { f.repartir(objs, true) }
-
 // volverALista es el «Todas las bases» de la web: deja la base y vuelve a pedir la lista.
 func (p *Pantalla) volverALista() {
+	p.dejarDeSeguir(p.abierta)
 	p.abierta = nil
 	p.cargarLista()
 }

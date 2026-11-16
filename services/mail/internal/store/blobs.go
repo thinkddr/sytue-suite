@@ -23,38 +23,42 @@ import (
 // ReservarBlobCompartido anota que un mensaje con ese hash va a existir bajo
 // `key`. Devuelve si ya había fila (otro buzón de la organización ya lo trajo)
 // y si su objeto está subido entero. Quien la crea es quien sube.
-func (s *Store) ReservarBlobCompartido(ctx context.Context, hash, key string, size int64) (existe, listo bool, err error) {
-	err = s.pool.InTx(ctx, func(tx pgx.Tx) error {
-		tag, err := tx.Exec(ctx, `
-			INSERT INTO blob_refs (hash, key, size_bytes) VALUES ($1, $2, $3)
-			ON CONFLICT (hash) DO NOTHING`, hash, key, size)
-		if err != nil {
-			return fmt.Errorf("store: reservar blob: %w", err)
-		}
-		if tag.RowsAffected() == 1 {
-			return nil
-		}
-		existe = true
-		return tx.QueryRow(ctx, `SELECT listo FROM blob_refs WHERE hash = $1`, hash).Scan(&listo)
-	})
-	return existe, listo, err
+func (s *Store) ReservarBlobCompartido(ctx context.Context, hash, key string, size int64) (exists, ready bool, err error) {
+	err = s.pool.InTx(ctx, func(tx pgx.Tx) error { exists, ready, err = reserveSharedBlobTx(ctx, tx, hash, key, size); return err })
+	return exists, ready, err
 }
 
-// MarcarBlobListo confirma que el objeto ya está subido entero.
+func reserveSharedBlobTx(ctx context.Context, tx pgx.Tx, hash, key string, size int64) (bool, bool, error) {
+	tag, err := tx.Exec(ctx, `INSERT INTO blob_refs(hash,key,size_bytes) VALUES($1,$2,$3) ON CONFLICT(hash) DO NOTHING`, hash, key, size)
+	if err != nil {
+		return false, false, fmt.Errorf("store: reservar blob: %w", err)
+	}
+	if tag.RowsAffected() == 1 {
+		return false, false, nil
+	}
+	var ready bool
+	err = tx.QueryRow(ctx, `SELECT listo FROM blob_refs WHERE hash=$1`, hash).Scan(&ready)
+	return true, ready, err
+}
+
+// MarcarBlobListo confirms the complete uploaded object in its caller transaction.
 func (s *Store) MarcarBlobListo(ctx context.Context, hash string) error {
-	return s.pool.InTx(ctx, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `UPDATE blob_refs SET listo = true WHERE hash = $1`, hash)
-		return err
-	})
+	return s.pool.InTx(ctx, func(tx pgx.Tx) error { return markSharedBlobReadyTx(ctx, tx, hash) })
 }
 
-// LiberarBlobCompartido retira una reserva cuya subida falló. Solo si nadie la
-// referencia ya: una carrera con otro buzón que sí subió no debe borrarle la fila.
+func markSharedBlobReadyTx(ctx context.Context, tx pgx.Tx, hash string) error {
+	_, err := tx.Exec(ctx, `UPDATE blob_refs SET listo=true WHERE hash=$1`, hash)
+	return err
+}
+
+// LiberarBlobCompartido preserves blobs already referenced by another mailbox.
 func (s *Store) LiberarBlobCompartido(ctx context.Context, hash string) error {
-	return s.pool.InTx(ctx, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `DELETE FROM blob_refs WHERE hash = $1 AND refs = 0 AND NOT listo`, hash)
-		return err
-	})
+	return s.pool.InTx(ctx, func(tx pgx.Tx) error { return releaseSharedBlobTx(ctx, tx, hash) })
+}
+
+func releaseSharedBlobTx(ctx context.Context, tx pgx.Tx, hash string) error {
+	_, err := tx.Exec(ctx, `DELETE FROM blob_refs WHERE hash=$1 AND refs=0 AND NOT listo`, hash)
+	return err
 }
 
 // BlobCompartido dice si una clave de mensaje vive en el espacio compartido.
@@ -93,6 +97,13 @@ func soltarBlobs(ctx context.Context, tx pgx.Tx, claves []string) ([]string, err
 			continue
 		}
 		vistas[key] = true
+		var retained bool
+		if err := tx.QueryRow(ctx, `SELECT mail_private_storage_retains_blob($1)`, key).Scan(&retained); err != nil {
+			return nil, err
+		}
+		if retained {
+			continue
+		}
 		if BlobCompartido(key) {
 			var refs int
 			err := tx.QueryRow(ctx, `

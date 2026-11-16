@@ -51,7 +51,7 @@ func (s *Store) Changes(ctx context.Context, accountID uuid.UUID, since time.Tim
 			SELECT id, tenant, account_id, mailbox_id, thread_id, uid, rfc822_msg_id, in_reply_to,
 			       subject, from_addr, from_name, to_addrs, cc_addrs, bcc_addrs, reply_to,
 			       snippet, blob_key, size_bytes, flags, has_attach,
-			       spf_result, dkim_result, dmarc_result, received_at, sent_at,
+			       spf_result, dkim_result, dmarc_result, received_at, sent_at, unsnoozed_at,
 			       updated_at, deleted_at
 			FROM messages
 			WHERE tenant = current_setting('app.tenant', true) AND account_id = $1 AND (updated_at, id) > ($2, $3)
@@ -98,7 +98,7 @@ func scanChangeRow(s scanner) (domain.Message, time.Time, bool, error) {
 	err := s.Scan(&m.ID, &m.Tenant, &m.AccountID, &m.MailboxID, &m.ThreadID, &uid,
 		&m.MessageID, &m.InReplyTo, &m.Subject, &m.FromAddr, &m.FromName,
 		&m.To, &m.Cc, &m.Bcc, &m.ReplyTo, &m.Snippet, &m.BlobKey, &m.SizeBytes,
-		&m.Flags, &m.HasAttach, &spf, &dkim, &dmarc, &m.ReceivedAt, &sentAt,
+		&m.Flags, &m.HasAttach, &spf, &dkim, &dmarc, &m.ReceivedAt, &sentAt, &m.UnsnoozedAt,
 		&updatedAt, &deletedAt)
 	if err != nil {
 		return m, time.Time{}, false, err

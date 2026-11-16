@@ -6,7 +6,7 @@
  */
 import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
-import { Button, Checkbox, EmptyState, FieldGroup, Input } from '@sytue/ui';
+import { Button, Checkbox, EmptyState, FieldGroup, InlineHelp, Input } from '@sytue/ui';
 import { formatList, intlTag, type Locale } from '@sytue/i18n';
 import { ruta } from '../lib/rutas.js';
 import { CampoImporte } from './CampoImporte.js';
@@ -96,20 +96,14 @@ export function AjustesTienda({
   return (
     <div class="space-y-6">
       {!settings.enabled ? (
-        <section
-          class="border-border bg-warning-bg rounded-xl border p-5"
-          aria-labelledby="req-titulo"
-        >
-          <h3 id="req-titulo" class="sytue-h4 text-warning-text">
-            {t('store.checklist_title')}
-          </h3>
-          <ul class="text-warning-text mt-2 list-disc space-y-1 pl-5 text-sm">
+        <InlineHelp tone="warning" live="off" title={t('store.checklist_title')} titleAs="h3">
+          <ul class="list-disc space-y-1 pl-5">
             <li>{t('store.checklist_legal')}</li>
             <li>{t('store.checklist_gateway')}</li>
             <li>{t('store.checklist_shipping')}</li>
             <li>{t('store.checklist_notify')}</li>
           </ul>
-        </section>
+        </InlineHelp>
       ) : null}
 
       <section

@@ -2,12 +2,14 @@
  * SPDX-License-Identifier: Apache-2.0
  * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
  *
- * Los COMENTARIOS de un fichero importado (.docx/.odt). El servicio los devuelve junto al
- * contenido (`/import?comments=1`) y deja en el HTML un `<mark data-comment-id>` por cada
- * uno con texto al que anclarse. Quien importa los guarda al crear el documento
- * (`POST /documents/{id}/comments/import`, el autor es quien importa, con la autoría
- * original delante del texto) y SIEMPRE siembra el contenido con `conservarMarks`: un mark
- * sin comentario queda resaltado para siempre y no hay forma de quitarlo desde la interfaz.
+ * Los COMENTARIOS de un fichero importado (.docx/.odt, y las notas de las celdas de un
+ * .xlsx/.ods). El servicio los devuelve junto al contenido (`/import?comments=1`); en un texto
+ * deja en el HTML un `<mark data-comment-id>` por cada uno con texto al que anclarse, y en una
+ * hoja cada uno lleva su celda (`cell`), que el servicio guarda como su ancla. Quien importa
+ * los guarda al crear el documento (`POST /documents/{id}/comments/import`, el autor es quien
+ * importa, con la autoría original delante del texto) y SIEMPRE siembra el contenido de un
+ * texto con `conservarMarks`: un mark sin comentario queda resaltado para siempre y no hay
+ * forma de quitarlo desde la interfaz.
  */
 
 import type { DocKind } from '@sytue/api-clients';
@@ -20,6 +22,9 @@ export interface ComentarioImportado {
   quote?: string;
   anchored: boolean;
   resolved?: boolean;
+  /** La celda de un comentario de una hoja: la hoja (su id) y la identidad de su fila y de su
+   *  columna (sheets/anclas.ts), más la referencia que se ve («B4»). */
+  cell?: { hoja: string; fila: string; col: string; text: string };
 }
 
 /** Contenido convertido con sus comentarios (`ImportResult`). */
@@ -59,9 +64,19 @@ export async function guardarComentarios(
   enviar: (comments: ComentarioImportado[]) => Promise<string[]>,
 ): Promise<{ content: string; fallo: boolean }> {
   const content = conv.content ?? '';
-  // Solo un documento de texto lleva marks (el contenido de una hoja o una presentación es JSON).
-  if (conv.kind !== 'document') return { content, fallo: false };
   const comments = conv.comments ?? [];
+  // Solo un documento de texto lleva marks (el contenido de una hoja es JSON): los comentarios
+  // de una hoja se anclan a su celda y el contenido va tal cual.
+  if (conv.kind === 'spreadsheet') {
+    if (comments.length === 0) return { content, fallo: false };
+    try {
+      await enviar(comments);
+      return { content, fallo: false };
+    } catch {
+      return { content, fallo: true };
+    }
+  }
+  if (conv.kind !== 'document') return { content, fallo: false };
   if (comments.length === 0) return { content: conservarMarks(content, new Set()), fallo: false };
   try {
     const anclados = new Set(await enviar(comments));

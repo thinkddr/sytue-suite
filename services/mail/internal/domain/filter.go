@@ -9,51 +9,18 @@ import (
 	"github.com/google/uuid"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/buscar"
+	"git.sytue.eu/sytue/one/apps/nucleo/mail/model"
 )
 
 // Filter es una regla de filtrado del lado servidor: cuando sus condiciones casan
 // con un mensaje entrante, se aplican sus acciones. Modelo propio, minimalista y
 // clean-room sobre la idea de Sieve (RFC 5228); no ejecuta un lenguaje, solo un
 // AND de subcadenas + un puñado de acciones.
-type Filter struct {
-	ID        uuid.UUID `json:"id"`
-	Tenant    string    `json:"-"`
-	AccountID uuid.UUID `json:"-"`
-	Name      string    `json:"name"`
-	Enabled   bool      `json:"enabled"`
-	// Priority ordena la evaluación (ascendente); la primera regla que casa gana.
-	Priority int `json:"priority"`
+type Filter model.Filter
 
-	// Condiciones: subcadena case-insensitive. Una condición vacía no restringe;
-	// el AND de las presentes debe cumplirse. Al menos una debe ser no vacía.
-	MatchFrom    string `json:"match_from,omitempty"`
-	MatchSubject string `json:"match_subject,omitempty"`
-
-	// Acciones.
-	MoveTo      *uuid.UUID `json:"move_to,omitempty"` // buzón destino (nil = no mover)
-	MarkRead    bool       `json:"mark_read"`
-	MarkFlagged bool       `json:"mark_flagged"`
-}
-
-// HasCondition indica si la regla tiene al menos una condición (si no, casaría
-// con todo el correo, lo que se prohíbe al crearla).
-func (f Filter) HasCondition() bool {
-	return strings.TrimSpace(f.MatchFrom) != "" || strings.TrimSpace(f.MatchSubject) != ""
-}
-
-// HasAction indica si la regla tiene al menos una acción con efecto.
-func (f Filter) HasAction() bool {
-	return f.MoveTo != nil || f.MarkRead || f.MarkFlagged
-}
-
-// Validate comprueba que la regla es aplicable: al menos una condición, al menos
-// una acción y un nombre de longitud razonable.
-func (f Filter) Validate() error {
-	if !f.HasCondition() || !f.HasAction() || len(f.Name) > 255 {
-		return ErrInvalidFilter
-	}
-	return nil
-}
+func (f Filter) HasCondition() bool { return model.Filter(f).HasCondition() }
+func (f Filter) HasAction() bool    { return model.Filter(f).HasAction() }
+func (f Filter) Validate() error    { return model.Filter(f).Validate() }
 
 // Matches reporta si un mensaje satisface las condiciones (AND de las no vacías).
 // Sin ninguna condición devuelve false (defensivo: una regla así no debe existir).

@@ -12,6 +12,7 @@
 // corre en cualquier sitio, sin CGO y sin servidor gráfico, es
 // `go test ./apps/rooms/...`, que pinta lo mismo con el pintor de software y compara
 // los píxeles contra lo medido en producción.
+// paridad-web: apps/frontend/apps/rooms/src/pages/auth/matrix/callback.astro
 package main
 
 import (
@@ -30,6 +31,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/llamada/altavoz"
 	"git.sytue.eu/sytue/one/apps/fyne/llamada/camara"
 	"git.sytue.eu/sytue/one/apps/fyne/sesion"
+	"git.sytue.eu/sytue/one/apps/fyne/soltar"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
@@ -70,7 +72,7 @@ func main() {
 	sala := rooms.NuevaSala(p, content, "")
 	sala.AlCambiarDatos = s.AvisarWidget
 	store, storeErr := ajustes.Carpeta()
-	secure = &rooms.Cifrado{Sala: sala, API: base, Base: mx.Config{SytueApex: s.Apex(), StoreDir: filepath.Join(store, "rooms-matrix"), DeviceName: "Sytue Rooms · " + runtime.GOOS}, Abrir: func(target string) error { return api.AbrirFuera(a, target) }}
+	secure = rooms.NuevoCifrado(sala, base, mx.Config{SytueApex: s.Apex(), StoreDir: filepath.Join(store, "rooms-matrix"), DeviceName: "Sytue Rooms · " + runtime.GOOS}, func(target string) error { return api.AbrirFuera(a, target) })
 	if storeErr != nil {
 		secure.Base.StoreDir = ""
 	}
@@ -125,6 +127,11 @@ func main() {
 			return secure.ConectarLlamada(ctx, call, o, func(u, token string, opciones llamada.Opciones) (rooms.EnCurso, error) {
 				return llamada.Entrar(u, token, opciones)
 			})
+		}
+		// El timbre de una llamada entrante, solo por el altavoz (sin micrófono) y por el
+		// elegido en «Dispositivos», que es por donde se va a oír la llamada.
+		sala.Timbre = func() func() {
+			return llamada.SonarTimbre(altavoz.Sistema{Altavoz: sala.AltavozElegido})
 		}
 		sala.AudioDe = func(micro, alt string) llamada.Dispositivo {
 			return altavoz.Sistema{Micro: micro, Altavoz: alt}
@@ -279,8 +286,19 @@ func main() {
 	sala.AlCambiarNoLeidos = barra.PonerInsignia
 	// «Pausar avisos»: mientras dure, los de Rooms no salen al sistema.
 	barra.CallarAvisosSi(sala.AvisosEnPausa)
+	// La llamada entrante con la ventana sin foco sale también al sistema; pulsarla trae
+	// la ventana, donde esperan «Contestar» y «Rechazar».
+	sala.AvisarSistema = func(titulo, cuerpo string) {
+		go s.AvisarSistema(titulo, cuerpo, func() { fyne.Do(w.RequestFocus) })
+	}
 	w.SetContent(barra.Montar(p.Objeto()))
 	sala.Atajos(w.Canvas())
+	// Soltar sobre la ventana, como el `onDrop` del compositor de la web: los ficheros se
+	// adjuntan al canal abierto y el texto o el enlace entra en la caja. Mientras hay
+	// ficheros encima, la caja dice «Suelta para adjuntar».
+	w.SetOnDropped(sala.Soltado)
+	soltar.AlArrastrar(w, sala.Arrastrando)
+	soltar.AlSoltar(w, func(x soltar.Soltado) { sala.SoltarTexto(x.ComoTexto(), x.Posicion) })
 	w.Resize(fyne.NewSize(1280, 744))
 	s.Arrancar(ctx)
 	// Con interfaz: lanzada por iOS solo para el widget, ni sala, ni Matrix, ni el

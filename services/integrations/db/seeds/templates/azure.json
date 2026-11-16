@@ -30,7 +30,10 @@
       "scopes": [
         "offline_access",
         "https://management.azure.com/user_impersonation"
-      ]
+      ],
+      "authorize_params": {
+        "prompt": "select_account"
+      }
     },
     "substitutes": [
       {

@@ -21,9 +21,8 @@ import (
 // Bajar de aquí un icono es portarlo: se le da constante y entrada, y se borra su
 // línea. Subirlo no: un icono que ya se usa no se retira a esta lista.
 var pendientesEd = []string{
-	"checkbox", "dropdown",
-	"formFill",
 	"margins",
+	"listCheck", "markdown", // lista de casillas y autoformato Markdown: la cinta nativa aún no los tiene
 }
 
 // rutasDelEditor saca los `PATHS` de `editor/icons.tsx`, igual que rutasDeLaWeb con

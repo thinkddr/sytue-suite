@@ -126,7 +126,9 @@ export function activateNativeOffline(options: NativeOfflineOptions): () => void
   let active = true;
   const scoped = { ...options, scopeId: options.scopeId ?? crypto.randomUUID() };
   const initialise = (): void => {
-    if (isNativeShell()) void installNativeOffline(scoped, () => active).catch(() => undefined);
+    if (active && isNativeShell()) {
+      void installNativeOffline(scoped, () => active).catch(() => undefined);
+    }
   };
   initialise();
   const onOnline = (): void => {
@@ -135,7 +137,11 @@ export function activateNativeOffline(options: NativeOfflineOptions): () => void
   const onWorkerMessage = (event: MessageEvent): void => {
     const data = event.data as { type?: string } | null;
     if (data?.type === 'SYTUE_CLEAR_OFFLINE') {
-      void clearOfflineStorage();
+      // Retire this mount before any pending registration or online callback can
+      // initialise the old scope again. Messages already sent remain in flight.
+      active = false;
+      // A failure leaves storage's runtime gate closed until an explicit retry.
+      void clearOfflineStorage().catch(() => undefined);
     }
   };
   window.addEventListener('online', onOnline);

@@ -175,15 +175,10 @@ export const tienda = {
   'store.mode_test_help':
     'Симулирани плащания с тестовите ключове на доставчика. Никой не бива таксуван.',
   'store.mode_live_help': 'Реални плащания от вашите клиенти с продукционните ключове.',
-  'store.webhook_title': 'Стъпка 1: адрес на уебхука',
   'store.webhook_help': 'Поставете този адрес в панела на {nombre}.',
   'store.webhook_label': 'Адрес на уебхука',
   'store.webhook_error':
     'Адресът на уебхука не можа да бъде получен. Затворете прозореца и опитайте отново.',
-  'store.copy': 'Копиране',
-  'store.copied': 'Адресът е копиран.',
-  'store.credentials_title': 'Данни за достъп',
-  'store.credentials_step': 'Стъпка 2: данни за достъп',
   'store.f_api_key': 'API ключ',
   'store.f_api_key_mode': 'API ключ ({modo})',
   'store.f_profile_id': 'Идентификатор на профил (по избор)',
@@ -202,6 +197,48 @@ export const tienda = {
   'store.gateway_save': 'Запазване и тест',
   'store.gateway_saved': 'Порталът {nombre} е тестван и запазен.',
   'store.gateway_save_error': 'Данните за достъп до портала не можаха да бъдат потвърдени.',
+  'store.wz_progress': 'Стъпки за свързване на платежния доставчик',
+  'store.wz_step_mode': 'Режим',
+  'store.wz_step_webhook': 'Webhook',
+  'store.wz_step_keys': 'Ключове',
+  'store.wz_step_check': 'Проверка',
+  'store.wz_step_done': 'Готово',
+  'store.wz_mode_heading': 'Тестови или истински плащания?',
+  'store.wz_mode_desc':
+    'Започнете в тестов режим; когато всичко работи, отворете отново този съветник и изберете реален режим.',
+  'store.wz_webhook_heading': 'Кажете на {nombre} къде да изпраща известията за плащания',
+  'store.wz_keys_heading': 'Вашите ключове за {nombre}',
+  'store.wz_keys_desc':
+    'Тайните ключове се пазят запечатани и повече не се показват: за да смените ключ, въведете го отново.',
+  'store.wz_keys_rejected': '{nombre} не прие тези ключове',
+  'store.wz_check_heading': 'Проверка и запазване',
+  'store.wz_check_desc':
+    'Sytue Web изпробва ключовете в {nombre}, преди да включи платежния доставчик. Нищо не се запазва, докато проверката не успее.',
+  'store.wz_secret_hidden': 'Въведен (скрит)',
+  'store.wz_empty_value': 'Не е посочено',
+  'store.wz_done_heading': '{nombre} е готов',
+  'store.wz_finish': 'Край',
+  'store.hint_mollie_api_key':
+    'В Mollie: Developers › API keys. Тестовите ключове започват с test_, а реалните с live_.',
+  'store.hint_mollie_profile':
+    'В Mollie: Settings › Website profiles. Започва с pfl_; оставете празно за профила по подразбиране.',
+  'store.hint_adyen_api_key':
+    'В Adyen Customer Area: Developers › API credentials › вашите идентификационни данни › API key.',
+  'store.hint_adyen_merchant':
+    'В Adyen Customer Area, в избора на акаунт горе: търговският акаунт, а не фирменият.',
+  'store.hint_adyen_hmac': 'В Adyen: Developers › Webhooks › вашият webhook › Security › HMAC key.',
+  'store.hint_adyen_live_prefix':
+    'В Adyen (реален режим): Developers › API URLs. Това е частта от адреса преди -checkout-live.',
+  'store.hint_redsys_merchant':
+    'Банката ви го дава с договора за виртуален POS терминал; виждате го и в административния портал на Redsys.',
+  'store.hint_redsys_terminal':
+    'В административния портал на Redsys, до кода на търговеца. Обикновено е 1.',
+  'store.hint_redsys_secret':
+    'В административния портал на Redsys: данни на търговеца › ключ SHA-256. Тестовият и реалният ключ са различни.',
+  'store.hint_stripe_secret':
+    'В Stripe: Developers › API keys › Secret key. Започва с sk_test_ или sk_live_.',
+  'store.hint_stripe_webhook':
+    'В Stripe: Developers › Webhooks › вашата крайна точка › Signing secret. Започва с whsec_.',
   'orders.subtitle': 'Поръчки и покупки, направени на вашия уебсайт.',
   'orders.count': { one: '{count} поръчка', other: '{count} поръчки' },
   'orders.loading': 'Зареждане на поръчките',

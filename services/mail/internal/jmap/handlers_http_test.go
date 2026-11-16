@@ -35,6 +35,7 @@ import (
 // --- fakes ---------------------------------------------------------------
 
 type fakeStore struct {
+	lastReadAllMailbox uuid.UUID
 	// compartidos es cuántos buzones compartidos tiene ya la organización.
 	compartidos  int
 	dominios     []string
@@ -97,6 +98,17 @@ type fakeStore struct {
 	signature    string
 	getSigErr    error
 	setSigErr    error
+	undoSend     int
+	getUndoErr   error
+	setUndoErr   error
+	// Lectura: preferencias y remitentes de confianza.
+	readingPrefs   domain.ReadingPrefs
+	readingErr     error
+	lastReading    *domain.ReadingPrefs
+	trusted        []string
+	trustedErr     error
+	lastTrustedAdd string
+	lastTrustedDel string
 	// Hilo completo (cross-carpeta).
 	threadMsgs   []domain.Message
 	threadErr    error
@@ -133,6 +145,7 @@ type fakeStore struct {
 	lastAliasID    uuid.UUID
 	lastVacation   domain.Vacation
 	lastSignature  string
+	lastUndoSend   int
 	lastBatchIDs   []uuid.UUID
 	lastBatchDest  uuid.UUID
 	lastBatchFlag  string
@@ -169,6 +182,11 @@ type fakeStore struct {
 	// Mudanza de la dirección principal (la organización conecta su dominio).
 	mudadaA  string
 	mudarErr error
+
+	// Plantillas de respuesta: su estado y sus métodos, en templates_http_test.go.
+	// Pospuestos y silenciados, en snooze_http_test.go.
+	plantillas fakePlantillas
+	pospuestos fakePospuestos
 }
 
 func (f *fakeStore) EnsureAccountConCuota(ctx context.Context, s, a, d string, q int64, _ bool) (domain.Account, error) {
@@ -250,6 +268,14 @@ func (f *fakeStore) MoveMessages(_ context.Context, _ uuid.UUID, ids []uuid.UUID
 		return 0, f.batchErr
 	}
 	return len(ids), nil
+}
+
+func (f *fakeStore) MarkMailboxRead(_ context.Context, _, mailboxID uuid.UUID) (int, error) {
+	f.lastReadAllMailbox = mailboxID
+	if f.batchErr != nil {
+		return 0, f.batchErr
+	}
+	return 3, nil
 }
 
 //nolint:gocritic // la firma la impone la interfaz del store (contrato JMAP Email/changes).
@@ -409,6 +435,45 @@ func (f *fakeStore) GetSignature(context.Context, uuid.UUID) (string, error) {
 func (f *fakeStore) SetSignature(_ context.Context, _ uuid.UUID, sig string) error {
 	f.lastSignature = sig
 	return f.setSigErr
+}
+
+func (f *fakeStore) GetUndoSendSeconds(context.Context, uuid.UUID) (int, error) {
+	return f.undoSend, f.getUndoErr
+}
+
+func (f *fakeStore) SetUndoSendSeconds(_ context.Context, _ uuid.UUID, secs int) error {
+	f.lastUndoSend = secs
+	return f.setUndoErr
+}
+
+func (f *fakeStore) GetReadingPrefs(context.Context, uuid.UUID) (domain.ReadingPrefs, error) {
+	return f.readingPrefs, f.readingErr
+}
+
+func (f *fakeStore) SetReadingPrefs(_ context.Context, _ uuid.UUID, p domain.ReadingPrefs) error {
+	f.lastReading = &p
+	return f.readingErr
+}
+
+func (f *fakeStore) ListTrustedSenders(context.Context, uuid.UUID) ([]string, error) {
+	return f.trusted, f.trustedErr
+}
+
+func (f *fakeStore) AddTrustedSender(_ context.Context, _ uuid.UUID, address string) (string, error) {
+	f.lastTrustedAdd = address
+	if f.trustedErr != nil {
+		return "", f.trustedErr
+	}
+	return domain.NormalizarRemitente(address)
+}
+
+func (f *fakeStore) RemoveTrustedSender(_ context.Context, _ uuid.UUID, address string) error {
+	f.lastTrustedDel = address
+	if f.trustedErr != nil {
+		return f.trustedErr
+	}
+	_, err := domain.NormalizarRemitente(address)
+	return err
 }
 
 func (f *fakeStore) ListAccessibleMailboxes(context.Context, string) ([]domain.SharedMailbox, error) {
@@ -791,6 +856,35 @@ func TestListMessagesKeysetCursor(t *testing.T) {
 	}
 	if !st.lastBefore.Equal(last.ReceivedAt) || st.lastBeforeID != last.ID {
 		t.Fatalf("cursor propagado = %v/%v, quiero %v/%v", st.lastBefore, st.lastBeforeID, last.ReceivedAt, last.ID)
+	}
+}
+
+// Lo vuelto de «Pospuestos» se ordena por la hora de vuelta (0037): el cursor de
+// una página que acaba en él ha de llevar esa hora, no la de llegada, o la página
+// siguiente repetiría o saltaría mensajes.
+func TestListMessagesCursorDeLoVueltoDePospuestos(t *testing.T) {
+	mbID := uuid.New()
+	vuelta := time.Date(2026, 11, 16, 9, 0, 0, 0, time.UTC)
+	last := domain.Message{
+		ID: uuid.New(), ReceivedAt: time.Date(2026, 3, 1, 8, 0, 0, 0, time.UTC), UnsnoozedAt: &vuelta,
+	}
+	st := &fakeStore{mbInAccount: true, messages: []domain.Message{{ID: uuid.New()}, last}}
+	a := newAPI(st, nil, nil)
+	rec := httptest.NewRecorder()
+	a.listMessages(rec, req(http.MethodGet, "/x?limit=2", "", true, map[string]string{"mailboxID": mbID.String()}))
+	var got struct {
+		Messages []struct {
+			UnsnoozedAt *time.Time `json:"unsnoozed_at"`
+		} `json:"messages"`
+		NextCursor string `json:"next_cursor"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &got)
+	if len(got.Messages) != 2 || got.Messages[0].UnsnoozedAt != nil || got.Messages[1].UnsnoozedAt == nil || !got.Messages[1].UnsnoozedAt.Equal(vuelta) {
+		t.Fatalf("unsnoozed_at en la respuesta = %s", rec.Body.String())
+	}
+	a.listMessages(httptest.NewRecorder(), req(http.MethodGet, "/x?limit=2&cursor="+got.NextCursor, "", true, map[string]string{"mailboxID": mbID.String()}))
+	if !st.lastBefore.Equal(vuelta) || st.lastBeforeID != last.ID {
+		t.Fatalf("cursor propagado = %v/%v, quiero la hora de vuelta %v", st.lastBefore, st.lastBeforeID, vuelta)
 	}
 }
 

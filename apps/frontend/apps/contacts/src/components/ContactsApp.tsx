@@ -7,6 +7,7 @@
 import type { JSX } from 'preact';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { SytueShell, ImportData, LinkedServices } from '@sytue/shell';
+import { MatrixStorageGate } from '@sytue/shell/matrix';
 import { useConnectivity } from '@sytue/offline/preact';
 import {
   AppShell,
@@ -27,6 +28,8 @@ import {
   List,
   ListItem,
   VirtualList,
+  type VirtualListHandle,
+  ShortcutsModal,
   EmptyState,
   SectionHeader,
   cx,
@@ -36,11 +39,12 @@ import {
   useLongPress,
   BulkActionBar,
   withBase,
-  Illustration,
   MobileFab,
   esAtajoDeApp,
   Checkbox,
   Glifo,
+  useUltimo,
+  Resaltado,
 } from '@sytue/ui';
 import type { SytueUser } from '@sytue/auth';
 import { appUrl } from '@sytue/config';
@@ -48,6 +52,7 @@ import { contiene, intlTag, type Locale } from '@sytue/i18n';
 import { useT, type T } from '../i18n/index.js';
 import { BirthdaysModal } from './BirthdaysModal.js';
 import { proximosCumpleanos } from '../client/cumpleanos.js';
+import { listaConCabeceras, type FilaLista } from '../client/iniciales.js';
 import {
   batchFavorite,
   batchGroupMembers,
@@ -85,6 +90,7 @@ import { ContactModal, type EditingContact } from './ContactModal.js';
 import { ContactDetail, FavoriteToggle } from './ContactDetail.js';
 import { correosDe, enlaceCorreoATodos } from '../client/seleccion.js';
 import { avisarPapelera } from './avisoPapelera.js';
+import { accionDeAtajo, accionDeFlecha, filaDestino, gruposDeAtajos } from './hojaDeAtajos.js';
 
 interface Props {
   user: SytueUser;
@@ -102,6 +108,10 @@ interface Props {
 const CHECKBOX_HIT = '-m-2.5 grid shrink-0 cursor-pointer place-items-center p-2.5';
 const CHECKBOX_CLASS = 'border-border h-4 w-4 cursor-pointer accent-[var(--sytue-primary)]';
 
+/** La lista y el buscador, para que el teclado los encuentre (`/`, foco de la fila). */
+export const CONTACT_LIST_ID = 'contacts-list';
+export const CONTACT_SEARCH_ID = 'contacts-search';
+
 /**
  * Normaliza un UID a su forma desnuda (sin el prefijo urn:uuid:), que es como el
  * backend guarda contacts.uid y como devuelve los favoritos. La vCard servida por
@@ -112,7 +122,22 @@ function cleanUid(uid: string): string {
   return uid.toLowerCase().startsWith('urn:uuid:') ? uid.slice(9) : uid;
 }
 
-export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
+export function ContactsApp(props: Props): JSX.Element {
+  if (!props.user.id) return <ContactsAppBody {...props} />;
+  return (
+    <MatrixStorageGate
+      actor={props.user.id}
+      tenant={props.user.tenant}
+      locale={props.locale}
+      product="contacts"
+      deviceName="Sytue Contacts · Web"
+    >
+      <ContactsAppBody {...props} />
+    </MatrixStorageGate>
+  );
+}
+
+function ContactsAppBody({ user, hubBaseUrl, locale }: Props): JSX.Element {
   const t = useT(locale);
   const offline = useConnectivity() === 'offline';
   const [books, setBooks] = useState<AddressBook[]>([]);
@@ -226,12 +251,18 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
     anchorRef.current = null;
   }
 
+  // `reload*` son los de siempre (botones, avisos); `cargar*` devuelven la promesa
+  // para que tirar para actualizar sepa cuándo ha terminado.
   function reload(): void {
-    if (!activeBook) return;
+    void cargarContactos();
+  }
+
+  function cargarContactos(): Promise<void> {
+    if (!activeBook) return Promise.resolve();
     clearSelection(); // una recarga de la lista invalida la selección por href
     setLoadingContacts(true);
     setContactsError(false);
-    listContacts(activeBook.url)
+    return listContacts(activeBook.url)
       .then(({ contacts: list }) => {
         // El orden alfabético depende del idioma (diéresis, ñ, acentos): se
         // compara con el locale del usuario, no con uno fijo.
@@ -255,13 +286,17 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
   }
 
   function reloadGroups(): void {
+    void cargarEtiquetas();
+  }
+
+  function cargarEtiquetas(): Promise<void> {
     if (!activeBook) {
       setGroups([]);
-      return;
+      return Promise.resolve();
     }
     setLoadingGroups(true);
     setGroupsError(false);
-    listGroups(activeBook.url)
+    return listGroups(activeBook.url)
       .then(({ groups: list }) => setGroups(list))
       .catch(() => {
         setGroups([]);
@@ -271,7 +306,11 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
   }
 
   function reloadFavorites(): void {
-    void listFavorites()
+    void cargarDestacados();
+  }
+
+  function cargarDestacados(): Promise<void> {
+    return listFavorites()
       .then(({ uids }) => setFavorites(new Set(uids)))
       .catch(() => setFavorites(new Set()));
   }
@@ -295,19 +334,29 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeBook?.url]);
 
-  // «n» crea un contacto: el atajo que pulsa el menú nativo de la app de
-  // escritorio («Contacto → Nuevo contacto ⌘N»).
+  // Tirar para actualizar (`usePullToRefresh` del shell): sin nadie que lo absorba,
+  // el gesto recarga la página entera y se pierde la ficha abierta, la etiqueta y
+  // la búsqueda. Aquí se recargan en sitio la lista, las etiquetas y los
+  // destacados; `reload` ya hace que la ficha siga al dato fresco. Si falló la
+  // carga de libretas se reintenta esa. Sin conexión no se absorbe: la recarga
+  // vaciaría la lista con un error, y la de la página la sirve la caché offline.
+  const alRefrescar = useUltimo((ev: Event) => {
+    if (offline) return;
+    ev.preventDefault();
+    if (booksError || !activeBook) {
+      setBooksAttempt((n) => n + 1);
+      return;
+    }
+    const detalle = (ev as CustomEvent<{ esperar?: (p: Promise<unknown>) => void } | null>).detail;
+    detalle?.esperar?.(
+      Promise.allSettled([cargarContactos(), cargarEtiquetas(), cargarDestacados()]),
+    );
+  });
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'n' || !esAtajoDeApp(e)) return;
-      e.preventDefault();
-      openCreate();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-    // `openCreate` es una declaración de función del componente: estable por render.
-    // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const oyente = (ev: Event) => alRefrescar.current(ev);
+    window.addEventListener('sytue:refresh', oyente);
+    return () => window.removeEventListener('sytue:refresh', oyente);
+  }, [alRefrescar]);
 
   /**
    * Destaca o quita el destacado de un contacto (por UID). Actualización
@@ -434,7 +483,7 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
   // La raíz de Mail con la org de la sesión (ADR 0056), como el «Enviar correo» de la ficha.
   const mailBase = appUrl('mail', '', user.tenant);
 
-  const filtered = useMemo(() => {
+  const filtrados = useMemo(() => {
     const memberSet = activeGroup ? new Set(activeGroup.members) : null;
     const q = query.trim().toLowerCase();
     // El teléfono se busca por DÍGITOS: nadie teclea «+34 600 00 00 00» tal y
@@ -455,9 +504,194 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
     );
   }, [contacts, query, activeGroup, favFilter, favorites]);
 
+  // Cabeceras A–Z (client/iniciales.ts), solo con la libreta entera a la vista: con
+  // búsqueda, etiqueta o destacados la lista es un resultado y no hace falta situarse.
+  // `filtered` queda en el orden en que se ve (lo que no empieza por letra, al final) y
+  // todo lo demás —cursor, j/k, selección por rango— sigue hablando en sus índices: las
+  // cabeceras solo existen para la lista virtual, que traduce con `filaDe`.
+  const conCabeceras = !query.trim() && !activeGroup && !favFilter;
+  const lista = useMemo(
+    () => listaConCabeceras(filtrados, (c) => c.fullName, locale, conCabeceras),
+    [filtrados, locale, conCabeceras],
+  );
+  const filtered = lista.items;
+
   // Clave estable por fila para el virtualizador (es su clave de caché de
   // medidas: si cambia en cada render, remide todo y el scroll salta).
-  const rowKey = useCallback((index: number) => filtered[index]?.href ?? index, [filtered]);
+  const rowKey = useCallback(
+    (index: number) => {
+      const fila = lista.filas[index];
+      if (!fila) return index;
+      return fila.tipo === 'cabecera'
+        ? `cabecera:${fila.inicial}`
+        : (lista.items[fila.indice]?.href ?? index);
+    },
+    [lista],
+  );
+  const esCabecera = useCallback(
+    (index: number) => lista.filas[index]?.tipo === 'cabecera',
+    [lista],
+  );
+  // La fila mide 48 (avatar de 32 y `py-2`) y la cabecera 28 (`pt-3`, la línea de
+  // `text-xs` y `pb-1`). El virtualizador mide el DOM igualmente.
+  const altoDeFila = useCallback(
+    (index: number) => (lista.filas[index]?.tipo === 'cabecera' ? 28 : 48),
+    [lista],
+  );
+
+  // ---- Teclado (hojaDeAtajos.ts) ----
+  //
+  // La lista es de tabulación itinerante: UNA parada de Tab (la fila del cursor) y
+  // las flechas para recorrerla, como un listbox. Antes eran tres paradas por
+  // contacto —casilla, fila y estrella— y ninguna flecha: 1.000 contactos eran 3.000
+  // pulsaciones de Tab. La casilla y la estrella siguen con el puntero y el lector
+  // de pantalla, y con el teclado son `x` y `s`.
+  const [cursor, setCursor] = useState(0);
+  const cursorFila = filtered.length > 0 ? Math.min(cursor, filtered.length - 1) : -1;
+  const listaRef = useRef<VirtualListHandle>(null);
+  // La fila a enfocar cuando el virtualizador la pinte: lejos de la ventana aún no
+  // existe en el DOM, y es su `ref` quien recoge el foco al montarse.
+  const focoPendiente = useRef<number | null>(null);
+  const [atajosOpen, setAtajosOpen] = useState(false);
+
+  // El cursor sigue a la ficha abierta (clic, cumpleaños, enlace): Tab entra en la
+  // lista por el contacto que se está viendo, no por el primero. Solo al cambiar de
+  // ficha: con `filtered` de dependencia, destacar con «s» otra fila (que rehace el
+  // filtro) devolvía el cursor a la ficha con el foco aún en la fila.
+  useEffect(() => {
+    if (!selected) return;
+    const i = filtered.findIndex((c) => c.href === selected.href);
+    if (i >= 0) setCursor(i);
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.href]);
+
+  /** El botón que abre la ficha de la fila `i`, si está pintada. */
+  function botonDeFila(i: number): HTMLElement | null {
+    return document.querySelector<HTMLElement>(
+      `#${CONTACT_LIST_ID} [data-fila="${i}"] [data-abrir]`,
+    );
+  }
+
+  /** La fila que tiene el foco (el botón, la casilla o la estrella), o null. */
+  function filaEnfocada(): number | null {
+    const activo = document.activeElement;
+    const fila =
+      activo instanceof HTMLElement ? activo.closest(`#${CONTACT_LIST_ID} [data-fila]`) : null;
+    const n = fila ? Number(fila.getAttribute('data-fila')) : Number.NaN;
+    return Number.isInteger(n) ? n : null;
+  }
+
+  function irAFila(i: number): void {
+    setCursor(i);
+    const boton = botonDeFila(i);
+    if (boton) {
+      focoPendiente.current = null;
+      boton.focus();
+      return;
+    }
+    focoPendiente.current = i;
+    listaRef.current?.scrollToIndex(lista.filaDe[i] ?? i, { align: 'auto' });
+  }
+
+  /** La estrella de un contacto: la de su fila si es la enfocada, si no la de la ficha. */
+  function estrellaDe(href: string, fila: number | null): HTMLElement | null {
+    const botones = [...document.querySelectorAll<HTMLElement>('[data-estrella-contacto]')].filter(
+      (b) => b.getAttribute('data-estrella-contacto') === href,
+    );
+    const enLaFila =
+      fila === null ? undefined : botones.find((b) => b.closest(`[data-fila="${fila}"]`));
+    return enLaFila ?? botones[0] ?? null;
+  }
+
+  // El manejador se registra UNA vez y lee el estado fresco por ref: si dependiera
+  // de la lista, cada recarga reengancharía el listener (como en Mail).
+  const atajosRef = useRef<(e: KeyboardEvent) => void>(() => undefined);
+  atajosRef.current = (e: KeyboardEvent): void => {
+    // `esAtajoDeApp` ya calla con un campo, un modificador de sistema o una capa
+    // abierta; la hoja se cuenta aparte por si aún no ha pintado su diálogo.
+    if (atajosOpen || !esAtajoDeApp(e)) return;
+    const accion = accionDeAtajo(e.key);
+    if (!accion) return;
+    const enFila = filaEnfocada();
+    const abierta = selected ? filtered.findIndex((c) => c.href === selected.href) : -1;
+    // Sobre quién actúan e, s y x: la fila con el foco; si no, la ficha abierta.
+    const indice = enFila ?? (abierta >= 0 ? abierta : null);
+    const objetivo = enFila === null ? selected : (filtered[enFila] ?? null);
+    switch (accion) {
+      // «?» abre la hoja, que es donde se aprenden los demás. Shift incluido: en un
+      // teclado español el signo lo pide, y no es un modificador de sistema.
+      case 'ayuda':
+        e.preventDefault();
+        setAtajosOpen(true);
+        return;
+      case 'buscar':
+        // preventDefault o Firefox se queda con su búsqueda rápida.
+        e.preventDefault();
+        document.getElementById(CONTACT_SEARCH_ID)?.focus();
+        return;
+      // «n» es también lo que pulsa el menú nativo («Contacto → Nuevo contacto ⌘N»).
+      // Sin libreta activa tampoco: el botón «Nuevo contacto» está apagado y guardar
+      // fallaría (como `escribe` en Fyne).
+      case 'nuevo':
+        if (offline || !activeBook) return;
+        e.preventDefault();
+        openCreate();
+        return;
+      case 'siguiente':
+      case 'anterior': {
+        // Sin foco en la lista ni ficha abierta, la primera j aterriza en el cursor
+        // en vez de saltárselo (como en Gmail).
+        const desde = enFila !== null || abierta >= 0;
+        const base = enFila ?? (abierta >= 0 ? abierta : cursorFila);
+        const destino = filaDestino(accion, base, filtered.length, desde);
+        if (destino === null) return;
+        e.preventDefault();
+        irAFila(destino);
+        // Con una ficha abierta, la ficha sigue al cursor: leer una libreta de
+        // corrido es j, j, j, sin Intro entre medias.
+        const siguiente = filtered[destino];
+        if (selected && siguiente && siguiente.href !== selected.href) setSelected(siguiente);
+        return;
+      }
+      case 'editar':
+        if (offline || !activeBook || !objetivo) return;
+        e.preventDefault();
+        openEdit(objetivo);
+        return;
+      case 'destacar': {
+        if (offline || !objetivo) return;
+        const estrella = estrellaDe(objetivo.href, enFila);
+        if (!estrella) return;
+        e.preventDefault();
+        estrella.click();
+        return;
+      }
+      case 'marcar':
+        if (indice === null) return;
+        e.preventDefault();
+        toggleRow(indice, false);
+        return;
+      default:
+    }
+  };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => atajosRef.current(e);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
+  /** ↑ ↓ Inicio Fin con el foco en una fila: mueven el cursor sin abrir la ficha. */
+  function teclaDeLista(e: KeyboardEvent): void {
+    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    const accion = accionDeFlecha(e.key);
+    const fila = e.target instanceof HTMLElement ? e.target.closest('[data-fila]') : null;
+    if (!accion || !fila) return;
+    const destino = filaDestino(accion, Number(fila.getAttribute('data-fila')), filtered.length);
+    if (destino === null) return;
+    e.preventDefault();
+    irAFila(destino);
+  }
 
   // Grupos de posibles duplicados en la libreta cargada (nombre/correo/teléfono).
   const duplicateGroups = useMemo(() => findDuplicateGroups(contacts), [contacts]);
@@ -778,6 +1012,7 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
       />
       <div class="border-border border-b p-3">
         <Input
+          id={CONTACT_SEARCH_ID}
           type="search"
           placeholder={t('list.search')}
           aria-label={t('list.search')}
@@ -832,7 +1067,7 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
             class="h-full"
             title={t('list.errorTitle')}
             description={t('list.errorDescription')}
-            illustration={<Icon name="warning" size={40} />}
+            tone="error"
             action={
               <Button
                 variant="secondary"
@@ -844,8 +1079,6 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
             }
           />
         ) : filtered.length === 0 ? (
-          // Icono del DS en lugar de las ilustraciones SVG externas: dentro de
-          // <img> sus var(--sytue-*) no se resuelven y quedaban invisibles.
           // Cada filtro explica lo SUYO y ofrece su salida: en «Destacados» sin
           // destacados se leía «tu libreta está vacía» —con la libreta llena— y
           // el único botón creaba un contacto que tampoco iba a salir ahí.
@@ -861,7 +1094,7 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
                     ? t('list.emptyStarred')
                     : t('list.emptyBook')
             }
-            illustration={<Illustration name={query ? 'emptySearch' : 'emptyContacts'} />}
+            spot={query ? 'emptySearch' : 'emptyContacts'}
             action={
               query ? (
                 <Button variant="secondary" size="sm" onClick={() => setQuery('')}>
@@ -894,20 +1127,36 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
           // solo existe la ventana visible + overscan, así que el coste deja de
           // depender del tamaño de la libreta. Es la misma receta de la casa que
           // ya usan el directorio de la consola, Drive, Docs y Rooms.
-          <VirtualList
-            items={filtered}
-            // Alto real de la fila: 32 px de avatar + py-2 (8+8). El
-            // virtualizador mide el DOM de todas formas; esto es la estimación
-            // de arranque.
-            estimateSize={48}
+          <VirtualList<FilaLista>
+            items={lista.filas}
+            estimateSize={altoDeFila}
             getItemKey={rowKey}
+            isSeparator={esCabecera}
+            id={CONTACT_LIST_ID}
             aria-label={t('list.title')}
             class="min-h-0 flex-1"
-            renderItem={(c, index) => {
+            handleRef={listaRef}
+            // La fila del cursor no se desmonta al desplazar: es la parada de Tab.
+            keepMounted={lista.filaDe[cursorFila] ?? -1}
+            onKeyDown={teclaDeLista}
+            renderItem={(fila) => {
+              if (fila.tipo === 'cabecera') {
+                // Alineada con la casilla: el `border-l-2 px-3` de las filas.
+                return (
+                  <div class="sytue-overline text-text-subtle border-l-2 border-l-transparent px-3 pt-3 pb-1">
+                    {fila.inicial}
+                  </div>
+                );
+              }
+              const index = fila.indice;
+              const c = filtered[index];
+              if (!c) return null;
               const isSelected = selected?.href === c.href;
               const subtitle = c.emails[0] ?? c.organization;
+              const parada = index === cursorFila ? 0 : -1;
               return (
                 <div
+                  data-fila={index}
                   class={cx(
                     'group flex items-center gap-3 border-l-2 px-3 py-2 text-base transition-colors duration-150',
                     isSelected
@@ -924,6 +1173,7 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
                   <label class={CHECKBOX_HIT}>
                     <Checkbox
                       class={CHECKBOX_CLASS}
+                      tabIndex={parada}
                       checked={selection.has(c.href)}
                       aria-label={t('list.select', { name: c.fullName })}
                       onClick={(e) => toggleRow(index, (e as unknown as MouseEvent).shiftKey)}
@@ -934,6 +1184,15 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
                       §3.7): el global de 3 px lo recorta el overflow del panel. */}
                   <button
                     type="button"
+                    data-abrir
+                    tabIndex={parada}
+                    ref={(el) => {
+                      if (el && focoPendiente.current === index) {
+                        focoPendiente.current = null;
+                        el.focus();
+                      }
+                    }}
+                    onFocus={() => setCursor(index)}
                     class="sytue-focus-ring-inner flex min-w-0 flex-1 items-center gap-2.5 rounded-md text-left"
                     aria-current={isSelected ? 'true' : undefined}
                     onPointerDown={(e) => mantenerContacto.iniciar(e, c.href)}
@@ -944,11 +1203,11 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
                     <Avatar name={c.fullName} src={avatarSrc(c)} size="sm" />
                     <span class="flex min-w-0 flex-1 flex-col">
                       <span class="text-text truncate font-medium" title={c.fullName}>
-                        {c.fullName}
+                        <Resaltado texto={c.fullName} consulta={query} />
                       </span>
                       {subtitle ? (
                         <span class="text-text-muted truncate text-sm" title={subtitle}>
-                          {subtitle}
+                          <Resaltado texto={subtitle} consulta={query} />
                         </span>
                       ) : null}
                     </span>
@@ -958,6 +1217,7 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
                   {!offline ? (
                     <FavoriteToggle
                       row
+                      tabIndex={parada}
                       t={t}
                       contact={c}
                       active={favorites.has(cleanUid(c.uid))}
@@ -1068,6 +1328,12 @@ export function ContactsApp({ user, hubBaseUrl, locale }: Props): JSX.Element {
         onClose={() => setReviewingDups(false)}
         onPick={pickDuplicateGroup}
       />
+      <ShortcutsModal
+        open={atajosOpen}
+        title={t('shortcuts.title')}
+        groups={gruposDeAtajos(t)}
+        onClose={() => setAtajosOpen(false)}
+      />
       <BirthdaysModal
         t={t}
         locale={locale}
@@ -1130,11 +1396,22 @@ function VcardToolbar({
   function reportImport(imported: number, skipped: number, kind: 'vCard' | 'CSV'): void {
     if (imported > 0) {
       toast.notify({
-        tone: 'success',
+        tone: kind === 'vCard' && skipped > 0 ? 'warning' : 'success',
         title: t('io.imported', { count: imported }),
-        ...(skipped ? { description: t('io.skipped', { count: skipped }) } : {}),
+        ...(skipped
+          ? {
+              description: t(kind === 'vCard' ? 'io.vcardUnconfirmed' : 'io.skipped', {
+                count: skipped,
+              }),
+            }
+          : {}),
       });
       onImported();
+    } else if (kind === 'vCard' && skipped > 0) {
+      toast.notify({
+        tone: 'danger',
+        title: t('io.vcardUnconfirmed', { count: skipped }),
+      });
     } else {
       toast.notify({
         tone: 'danger',
@@ -1148,10 +1425,9 @@ function VcardToolbar({
     const file = input.files?.[0];
     input.value = ''; // permite reimportar el mismo fichero
     if (!file) return;
-    // Sin id REST no hay alta (el listado REST de libretas falló): se dice, en vez de
-    // no hacer nada al elegir el fichero.
+    // Sin id REST no se puede mandar el alta, aunque exista una URL CardDAV.
     if (!addressBookId) {
-      reportImport(0, 0, 'vCard');
+      toast.notify({ tone: 'danger', title: t('io.missingBookId') });
       return;
     }
     setImporting(true);
@@ -1528,7 +1804,7 @@ function CakeGlyph({ size = 18 }: { size?: number }): JSX.Element {
 function StarGlyph({ filled, size = 18 }: { filled: boolean; size?: number }): JSX.Element {
   return (
     <Glifo
-      d="M12 2.5l2.9 5.9 6.5.95-4.7 4.58 1.11 6.47L12 17.9l-5.81 3.06 1.11-6.47-4.7-4.58 6.5-.95L12 2.5z"
+      d="M12 3.6L14.4 9.3L20.6 9.8L15.9 13.9L17.3 19.9L12 16.7L6.7 19.9L8.1 13.9L3.4 9.8L9.6 9.3Z"
       size={size}
       fill={filled ? 'currentColor' : undefined}
     />
@@ -1797,7 +2073,7 @@ function DuplicatesModal({
       }
     >
       {groups.length === 0 ? (
-        <p class="text-text-muted py-6 text-center text-sm">{t('duplicates.empty')}</p>
+        <EmptyState compact title={t('duplicates.empty')} />
       ) : (
         <div class="flex flex-col gap-3">
           <p class="text-text-muted text-sm">{t('duplicates.description')}</p>
@@ -2088,6 +2364,8 @@ function TrashModal({
   const [error, setError] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  // Sube con «Reintentar»: vuelve a pedir la papelera sin cerrar el diálogo.
+  const [intento, setIntento] = useState(0);
 
   useEffect(() => {
     if (!open) return;
@@ -2098,7 +2376,7 @@ function TrashModal({
       .then((res) => setItems(res.items))
       .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, [open]);
+  }, [open, intento]);
 
   async function restore(it: TrashItem): Promise<void> {
     setBusyId(it.id);
@@ -2156,11 +2434,18 @@ function TrashModal({
           <Spinner class="text-text-muted" label={t('trash.loading')} />
         </div>
       ) : error ? (
-        <p class="text-text-muted py-6 text-center text-sm" role="alert">
-          {t('trash.loadFailed')}
-        </p>
+        <EmptyState
+          compact
+          tone="error"
+          title={t('trash.loadFailed')}
+          action={
+            <Button variant="secondary" size="sm" onClick={() => setIntento((n) => n + 1)}>
+              {t('common.retry')}
+            </Button>
+          }
+        />
       ) : items.length === 0 ? (
-        <p class="text-text-muted py-6 text-center text-sm">{t('trash.empty')}</p>
+        <EmptyState compact icon="trash" title={t('trash.empty')} />
       ) : (
         <div class="flex flex-col gap-2">
           <p class="text-text-muted text-sm">{t('trash.description')}</p>

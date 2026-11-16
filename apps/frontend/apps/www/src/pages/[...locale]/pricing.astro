@@ -1,0 +1,81 @@
+---
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
+ *
+ * Precios — los tres planes y la calculadora que responde «¿cuánto me cuesta
+ * con N personas?». Estática en los 26 idiomas; la única pieza con JS es la
+ * calculadora, y llega con el total ya pintado en el HTML (10 personas, Pro):
+ * sin JS se lee un ejemplo correcto, y con él se ajusta.
+ *
+ * Ni una cifra escrita aquí: los importes salen de `lib/pricing.ts`, que un test
+ * compara con `platform/pkg/commerce/subscription.go`.
+ */
+import { LOCALES } from '@sytue/i18n';
+import MarketingLayout from '../../layouts/MarketingLayout.astro';
+import PricingCalculator, {
+  type PricingCalculatorLabels,
+} from '../../components/PricingCalculator';
+import PricingPlans from '../../components/PricingPlans.astro';
+import { localeFromParam, localeParams, useT } from '../../i18n';
+
+export const getStaticPaths = localeParams;
+
+const locale = localeFromParam(Astro.params.locale);
+const t = useT(locale);
+
+const calcLabels: PricingCalculatorLabels = {
+  plan: t('pricing.calc.plan'),
+  seats: t('pricing.calc.seats'),
+  seatsHelp: t('pricing.calc.seatsHelp'),
+  education: t('pricing.calc.education'),
+  perUser: t('pricing.calc.perUser'),
+  total: t('pricing.calc.total'),
+  tax: t('home.pricing.tax'),
+  plans: {
+    pro: { title: t('home.pricing.pro.title'), storage: t('home.pricing.pro.storage') },
+    enterprise: {
+      title: t('home.pricing.enterprise.title'),
+      storage: t('home.pricing.enterprise.storage'),
+    },
+  },
+};
+---
+
+<MarketingLayout
+  locale={locale}
+  path="/pricing"
+  title={t('meta.pricing.title')}
+  description={t('meta.pricing.description')}
+  alternates={LOCALES}
+>
+  <section class="mx-auto max-w-6xl px-6 pt-16 md:pt-20">
+    <h1 class="sytue-h1 text-text text-balance">{t('nav.pricing')}</h1>
+    <p class="text-text-muted mt-3 max-w-2xl text-base text-pretty">
+      {t('meta.pricing.description')}
+    </p>
+  </section>
+
+  <section aria-labelledby="calculadora" class="mx-auto max-w-6xl px-6 pt-10">
+    <h2 id="calculadora" class="sytue-h2 text-text text-balance">
+      {t('pricing.calc.title')}
+    </h2>
+    <p class="text-text-muted mt-2 max-w-2xl text-base text-pretty">{t('pricing.calc.body')}</p>
+    <div class="mt-6">
+      {/* `client:visible`: la página se pinta y se mide sin esperar a la isla. */}
+      <PricingCalculator client:visible locale={locale} labels={calcLabels} />
+    </div>
+  </section>
+
+  {/* Los planes, con su encabezado de la portada: las cuatro reglas de debajo son
+       h3 y cuelgan de aquí, no de la calculadora. */}
+  <section aria-labelledby="planes" class="mx-auto max-w-6xl px-6 py-16 md:py-20">
+    <h2 id="planes" class="sytue-h2 text-text text-balance">
+      {t('home.pricing.title')}
+    </h2>
+    <p class="text-text-muted mt-3 max-w-2xl text-base text-pretty">{t('home.pricing.body')}</p>
+    <div class="mt-8">
+      <PricingPlans locale={locale} />
+    </div>
+  </section>
+</MarketingLayout>

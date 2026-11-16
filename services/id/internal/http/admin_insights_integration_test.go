@@ -82,3 +82,75 @@ func TestAdminInsights(t *testing.T) {
 		}
 	}
 }
+
+// TestAdminUsersFiltroCuadraConLosAvisos: cada aviso de la portada enlaza a
+// Usuarios con su filtro puesto, y la lista tiene que enseñar EXACTAMENTE a la
+// gente que el aviso cuenta. Si el aviso dice 4 y el enlace abre 5 —porque uno
+// mira solo las cuentas activas y el otro no—, el número deja de creerse.
+func TestAdminUsersFiltroCuadraConLosAvisos(t *testing.T) {
+	l := newLiveServer(t)
+	org, admin := l.seedOrgAdmin(t, "acme")
+	adminTok := l.token(t, admin.ID, org.Slug, []string{"admin"})
+
+	sinMFA := l.addMember(t, org, "sinmfa@acme.test", domain.RoleMember)
+	conMFA := l.addMember(t, org, "conmfa@acme.test", domain.RoleMember)
+	suspendido := l.addMember(t, org, "fuera@acme.test", domain.RoleMember)
+	sinVerificar := l.addMember(t, org, "sinverificar@acme.test", domain.RoleMember)
+	for _, q := range []struct {
+		sql string
+		id  string
+	}{
+		{`UPDATE users SET mfa_enabled = true WHERE id = $1`, conMFA.ID},
+		// El suspendido no tiene MFA: aun así NO es de «sin verificación en dos
+		// pasos», porque ya no entra.
+		{`UPDATE users SET status = 'suspended' WHERE id = $1`, suspendido.ID},
+		{`UPDATE users SET email_verified = false, mfa_enabled = true WHERE id = $1`, sinVerificar.ID},
+	} {
+		if _, err := l.st.DB().Exec(l.ctx, q.sql, q.id); err != nil {
+			t.Fatalf("preparar %s: %v", q.id, err)
+		}
+	}
+	otra, _ := l.st.CreateOrg(l.ctx, nil, domain.Organization{Slug: "otra", Name: "Otra"})
+	l.addMember(t, otra, "ajeno@otra.test", domain.RoleMember)
+
+	rr, avisos := l.do(t, http.MethodGet, "/api/v1/admin/insights", adminTok, nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("insights: código=%d body=%v", rr.Code, avisos)
+	}
+	quiero := map[string][]string{
+		"without_mfa":      {admin.ID, sinMFA.ID},
+		"suspended":        {suspendido.ID},
+		"unverified_email": {sinVerificar.ID},
+	}
+	for filtro, ids := range quiero {
+		rr, body := l.do(t, http.MethodGet, "/api/v1/admin/users?filter="+filtro, adminTok, nil)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("filter=%s: código=%d body=%v", filtro, rr.Code, body)
+		}
+		items, _ := body["items"].([]any)
+		got := map[string]bool{}
+		for _, it := range items {
+			m, _ := it.(map[string]any)
+			id, _ := m["id"].(string)
+			got[id] = true
+		}
+		if len(got) != len(ids) {
+			t.Errorf("filter=%s devolvió %d personas, quiero %d (%v)", filtro, len(got), len(ids), items)
+		}
+		for _, id := range ids {
+			if !got[id] {
+				t.Errorf("filter=%s no trae a %s", filtro, id)
+			}
+		}
+		if n, _ := avisos[filtro].(float64); int(n) != len(items) {
+			t.Errorf("el aviso %s cuenta %v y su lista enseña %d", filtro, avisos[filtro], len(items))
+		}
+	}
+
+	// Un filtro que no existe es un 400, no la lista entera: quien pide «los
+	// suspendidos» con una errata y recibe a todo el mundo cree que lo están todos.
+	rr, body := l.do(t, http.MethodGet, "/api/v1/admin/users?filter=suspendidos", adminTok, nil)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("filter desconocido: código=%d body=%v, quiero 400", rr.Code, body)
+	}
+}

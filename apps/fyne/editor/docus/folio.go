@@ -5,6 +5,7 @@ package docus
 
 import (
 	"fmt"
+	"html"
 	"image"
 	"image/color"
 	"regexp"
@@ -39,7 +40,7 @@ import (
 // lectura, y la franja lo dice.
 
 // Las medidas del folio, de `canvas/metrics.ts` y `editor.css`. Van en PÍXELES en la hoja,
-// así que el rem de 14 no las toca.
+// así que el rem no las toca.
 const (
 	// AnchoPagina y AltoPagina son el A4 a 96 dpi y zoom 100 (210 × 297 mm).
 	AnchoPagina float32 = 794
@@ -58,9 +59,10 @@ var (
 	PapelBlanco = rico.Papel
 	// TintaContenido es el `color: #0a0a0a` de `.sytue-page`.
 	TintaContenido = rico.Tinta
-	// LienzoClaro y LienzoOscuro son `--editor-canvas-bg` en los dos temas.
-	LienzoClaro  = color.NRGBA{R: 0xE9, G: 0xE6, B: 0xDD, A: 0xFF}
-	LienzoOscuro = color.NRGBA{R: 0x18, G: 0x1A, B: 0x1C, A: 0xFF}
+	// LienzoClaro y LienzoOscuro son `--editor-canvas-bg` en los dos temas: los mismos
+	// del esqueleto de carga del editor, que es donde viven.
+	LienzoClaro  = editor.MesaClara
+	LienzoOscuro = editor.MesaOscura
 	// LienzoSepia es `--editor-canvas-bg-sepia`, el «Sepia» de Vista. Solo está en el
 	// `:root` claro de la hoja, así que en oscuro vale lo mismo.
 	LienzoSepia = color.NRGBA{R: 0xEC, G: 0xE4, B: 0xD2, A: 0xFF}
@@ -85,6 +87,8 @@ type Pagina struct {
 	// mandan sobre Tamano, Apaisada y Margen mientras no se elija otro en la cinta.
 	Ancho, Alto float32
 	Margenes    [4]float32 // arriba, derecha, abajo, izquierda; todo 0 es Margen en los cuatro
+	// Idioma es el del documento (`data-lang`); "" es el de la interfaz.
+	Idioma string
 }
 
 // margenes son los cuatro márgenes: arriba, derecha, abajo, izquierda.
@@ -115,6 +119,7 @@ func paginaDe(d *rico.PaginaDoc, ahora Pagina) Pagina {
 	if c, ok := editor.Hex(d.Color); ok {
 		p.Papel = c
 	}
+	p.Idioma = d.Idioma
 	return p
 }
 
@@ -125,7 +130,7 @@ func paginaDoc(p Pagina) *rico.PaginaDoc {
 		return nil
 	}
 	ancho, alto := p.medidas()
-	d := &rico.PaginaDoc{Ancho: ancho, Alto: alto, Margenes: p.margenes()}
+	d := &rico.PaginaDoc{Ancho: ancho, Alto: alto, Margenes: p.margenes(), Idioma: p.Idioma}
 	if p.Papel.A > 0 {
 		d.Color = hexDe(p.Papel)
 	}
@@ -215,6 +220,7 @@ type Folio struct {
 	ancla    []coincidencia
 	revisado []coincidencia
 	buscador *editor.Buscador
+	ajustes  *panelAjustes // el cuerpo de «Ajustes», hecho la primera vez que se pide
 	revisor  *revisor
 
 	// Autor es quien firma las marcas del control de cambios: el de la sesión. Vacío, la
@@ -236,16 +242,30 @@ type Folio struct {
 	laminas   map[string]*canvas.Image
 	laminasMu sync.Mutex
 
-	pag          *pagina
-	scroll       *container.Scroll
-	autoArrastre ui.AutoScrollArrastre
-	envoltorio   *container.ThemeOverride
+	pag *pagina
+	// enlaceAbierto es el panel del enlace que abrió Ctrl+K, o nil (lo miran las pruebas).
+	enlaceAbierto *ui.Emergente
+	scroll        *container.Scroll
+	autoArrastre  ui.AutoScrollArrastre
+	envoltorio    *container.ThemeOverride
 
 	// AlEditar se llama tras CADA cambio del documento: quien lo pone programa el
 	// guardado. nil en solo lectura.
 	AlEditar func()
 	// AlGuardarYa es Ctrl/Cmd+S: adelantar el guardado que ya está programado.
 	AlGuardarYa func()
+	// AlCursor se llama cuando el cursor, la selección o el documento cambian (como el
+	// `selectionchange` de la web): la coedición manda el cursor propio y recoloca los
+	// ajenos. avisado es lo último que se avisó.
+	AlCursor func(editado bool)
+	avisado  estadoCursor
+	// pares son los cursores de los demás que se pintan (`cursores.go`).
+	pares []parFolio
+	// LeerHTML lee el HTML del portapapeles del sistema para pegar con formato (`pegar.go`);
+	// nil, `portapapeles.HTML`. Lanzar lo corre fuera del hilo de la interfaz; nil, en una
+	// rutina. Las pruebas cambian los dos.
+	LeerHTML func() (string, error)
+	Lanzar   func(func())
 	// Programar corre f dentro de d en el hilo de la interfaz. Las pruebas lo cambian
 	// para no depender del reloj.
 	Programar        func(d time.Duration, f func())
@@ -253,6 +273,19 @@ type Folio struct {
 	ultimoFormato    editor.Formato
 	// campoPuesto es el texto que lleva ahora el número de página, o "" si no hay.
 	campoPuesto string
+	// brocha es «Copiar formato» armado: el estilo copiado, o nil. brochaDe es la
+	// selección de la que se copió (ver `brocha.go`).
+	brocha   *rico.Estilo
+	brochaDe [2]punto
+	// rellenando es el modo «Rellenar formulario» (`formularios.go`): el folio no se escribe y
+	// sus campos responden. campoFoco es el campo con el foco del teclado (-1, ninguno), y
+	// panelCampo el menú del desplegable o el campo del texto que esté abierto; opcionesCampo
+	// y entradaCampo son lo que lleva, para las pruebas.
+	rellenando    bool
+	campoFoco     int
+	panelCampo    *ui.Emergente
+	opcionesCampo []*ui.ElementoMenu
+	entradaCampo  *ui.Entrada
 }
 
 var (
@@ -263,7 +296,7 @@ var (
 // NuevoFolio crea el lienzo. El contexto se guarda para leer el zoom, la regla y el
 // permiso; puede ser nil en un guardián.
 func NuevoFolio(ctx *editor.Contexto) *Folio {
-	f := &Folio{ctx: ctx, doc: rico.Parse(""), caretVisible: true, pagina: PaginaPorDefecto(), zoomPuesto: 100}
+	f := &Folio{ctx: ctx, doc: rico.Parse(""), caretVisible: true, pagina: PaginaPorDefecto(), zoomPuesto: 100, campoFoco: -1}
 	f.ExtendBaseWidget(f)
 	f.pag = &pagina{f: f}
 	f.pag.ExtendBaseWidget(f.pag)
@@ -295,10 +328,15 @@ func (f *Folio) Cargar(contenido string) bool {
 	f.crudo = contenido
 	f.doc = rico.ParseCon(contenido, f.hoja())
 	entendido := f.doc.Editable()
+	switch {
+	case f.ctx == nil:
+	case entendido:
+		f.ctx.SinMotivo() // el de la carga anterior no vale para esta
+	default:
+		f.ctx.NoSabeEditar("docus", f.doc.NoEntendido())
+	}
 	if entendido {
 		f.doc.Asegurar()
-	} else if f.ctx != nil {
-		f.ctx.MotivoSoloLectura = "editor.readOnly"
 	}
 	f.cur, f.anc, f.ed, f.conCursor = punto{}, punto{}, nil, false
 	f.resaltes, f.revisado, f.sel, f.arrastre, f.previa = nil, nil, nil, nil, nil
@@ -370,9 +408,14 @@ func (f *Folio) paginas() (unidad, total int) {
 // «…<strong>dos fines de semana</strong>, sin…» la coma queda suelta y cuenta como una
 // palabra más. Se replica y no se mejora: la cifra sale en la barra de estado de los dos
 // sitios, y dos números distintos para el mismo documento es peor que uno discutible.
-func Palabras(html string) int {
-	html = reScript.ReplaceAllString(html, " ")
-	return len(strings.Fields(reEtiqueta.ReplaceAllString(html, " ")))
+//
+// El navegador lee el texto con las entidades ya resueltas: «d&nbsp;e» son dos palabras
+// para el `\s` de `countWords`, y sin desescapar aquí eran una. Por eso también se parte
+// con [editor.RecuentoDelTexto] (el `\s` de JavaScript) y no con `strings.Fields`: la
+// selección de todo el documento no puede decir más palabras que el documento.
+func Palabras(fuente string) int {
+	fuente = reScript.ReplaceAllString(fuente, " ")
+	return editor.RecuentoDelTexto(html.UnescapeString(reEtiqueta.ReplaceAllString(fuente, " "))).Palabras
 }
 
 var (
@@ -394,7 +437,7 @@ func (f *Folio) conRegla() bool { return f.ctx != nil && f.ctx.Regla }
 
 // editable dice si se puede escribir: el documento se entiende y el permiso lo deja.
 func (f *Folio) editable() bool {
-	return f.doc != nil && f.doc.Editable() && (f.ctx == nil || !f.ctx.SoloLectura) && f.previa == nil
+	return f.doc != nil && f.doc.Editable() && (f.ctx == nil || !f.ctx.SoloLectura) && f.previa == nil && !f.rellenando
 }
 
 // altoPapel es el folio continuo: el contenido con sus dos márgenes, y un A4 como mínimo.
@@ -433,6 +476,22 @@ func (f *Folio) GuardarPagina(p Pagina) {
 	f.doc.PonerPaginaDoc(ahora)
 	f.reestructurado()
 }
+
+// IdiomaDocumento es el idioma que guarda el documento ("" sin él) y si se puede cambiar:
+// el `<select>` de la barra de estado.
+func (f *Folio) IdiomaDocumento() (string, bool) { return f.pagina.Idioma, f.editable() }
+
+// PonerIdiomaDocumento lo guarda en la capa de la página, como el resto de la página.
+func (f *Folio) PonerIdiomaDocumento(idioma string) {
+	if !i18n.IsLocale(idioma) || !f.editable() || idioma == f.pagina.Idioma {
+		return
+	}
+	p := f.pagina
+	p.Idioma = idioma
+	f.GuardarPagina(p)
+}
+
+var _ editor.LienzoConIdioma = (*Folio)(nil)
 
 // PonerPagina cambia la disposición y remaqueta: el texto se reparte al ancho nuevo.
 func (f *Folio) PonerPagina(p Pagina) {
@@ -684,11 +743,13 @@ func (p *pagina) MinSize() fyne.Size {
 }
 
 func (p *pagina) CreateRenderer() fyne.WidgetRenderer {
+	regla := NuevaRegla()
+	regla.Cambiar, regla.Traducir = p.f.sangrarConRegla, p.f.traducir
 	return &paginaRenderer{
 		p:      p,
 		sombra: ui.NuevaSombraCon(editor.CapasSombraPagina, 0),
 		papel:  canvas.NewRectangle(PapelBlanco),
-		regla:  NuevaRegla(),
+		regla:  regla,
 		caret:  canvas.NewRectangle(color.NRGBA{}),
 	}
 }
@@ -873,7 +934,10 @@ func pintar(f *Folio, papel fyne.Position, v tema.Variante) []fyne.CanvasObject 
 			objs = append(objs, r)
 		}
 	}
-	return f.pintarTiradoresTexto(f.pintarSeleccion(f.pintarContenido(objs, papel, ox, oy, z), ox, oy, z, v), v)
+	// La de los demás también va debajo; sus carets y etiquetas, encima de todo.
+	objs = f.pintarSeleccionesPares(objs, ox, oy, z, v)
+	objs = f.pintarTiradoresTexto(f.pintarSeleccion(f.pintarContenido(objs, papel, ox, oy, z), ox, oy, z, v), v)
+	return f.pintarCaretsPares(objs, ox, oy, z, v)
 }
 
 // pintarContenido añade las cajas del folio con su contenido en (ox, oy) de pantalla y el
@@ -985,6 +1049,9 @@ func (f *Folio) pintarCaja(objs []fyne.CanvasObject, c caja, ox, oy, z float32, 
 	if c.b.Marca == "•" && len(c.lineas) > 0 {
 		objs = append(objs, pintarVineta(c, ox, oy, z))
 	}
+	if rico.EsMarcaDeCasilla(c.b.Marca) && len(c.lineas) > 0 {
+		objs = append(objs, pintarCasilla(c, ox, oy, z)...)
+	}
 	if c.marcaTexto != "" && len(c.lineas) > 0 {
 		l := c.lineas[0]
 		t := textoContenido(c.marcaTexto, c.marcaEstilo, z)
@@ -1018,6 +1085,11 @@ func (f *Folio) pintarLineas(objs []fyne.CanvasObject, c caja, ox, oy, z float32
 				continue
 			}
 			base := top + l.base + desplazamientoVertical(p.est)
+			if p.campo != nil {
+				enfocada := f.rellenando && f.enfocado && f.campoFoco >= 0 && f.esCampoFoco(c.b.Lugar, p.desde)
+				objs = f.pintarFicha(objs, p, x, base, ox, oy, z, enfocada)
+				continue
+			}
 			e := p.est
 			if e.Fondo.A > 0 {
 				// El fondo de un tramo en línea cubre la caja de su LETRA, no la línea.
@@ -1067,6 +1139,40 @@ func pintarVineta(c caja, ox, oy, z float32) fyne.CanvasObject {
 	o.Move(pos)
 	o.Resize(tam)
 	return o
+}
+
+// pintarCasilla dibuja la casilla de un elemento de una lista de casillas, como el `::before`
+// de editor.css: un cuadrado de 0,95 em con el borde pizarra y, hecha, relleno de latón con
+// el tic en el color del papel. Va en el margen, centrada en la primera línea.
+func pintarCasilla(c caja, ox, oy, z float32) []fyne.CanvasObject {
+	e := c.marcaEstilo
+	lado := 0.95 * e.Tamano
+	l := c.lineas[0]
+	x := c.izq - 1.6*e.Tamano
+	y := c.y + c.arribaTexto + l.base - ascFuente*e.Tamano + 0.3*e.Tamano
+	caja := canvas.NewRectangle(color.NRGBA{})
+	caja.StrokeColor, caja.StrokeWidth = rico.TintaCasilla, max(1.5*z, 1)
+	caja.CornerRadius = 3 * z
+	hecha := c.b.Marca == rico.CasillaHecha
+	if hecha {
+		caja.FillColor, caja.StrokeColor = rico.RellenoCasilla, rico.RellenoCasilla
+	}
+	caja.Move(fyne.NewPos(ox+x*z, oy+y*z))
+	caja.Resize(fyne.NewSize(lado*z, lado*z))
+	if !hecha {
+		return []fyne.CanvasObject{caja}
+	}
+	// El tic: dos trazos, del 20 % al 42 % y de ahí al 80 % del lado.
+	punto := func(fx, fy float32) fyne.Position {
+		return fyne.NewPos(ox+(x+fx*lado)*z, oy+(y+fy*lado)*z)
+	}
+	corto := canvas.NewLine(rico.Papel)
+	corto.StrokeWidth = max(2*z, 1)
+	corto.Position1, corto.Position2 = punto(0.22, 0.52), punto(0.42, 0.72)
+	largo := canvas.NewLine(rico.Papel)
+	largo.StrokeWidth = corto.StrokeWidth
+	largo.Position1, largo.Position2 = punto(0.42, 0.72), punto(0.78, 0.28)
+	return []fyne.CanvasObject{caja, corto, largo}
 }
 
 // pintarTabla dibuja el fondo de cada celda y la rejilla, con los bordes de 1 px de
@@ -1125,4 +1231,28 @@ func textoContenido(s string, e rico.Estilo, z float32) *canvas.Text {
 	t.FontSource = caraDe(e)
 	t.Resize(t.MinSize())
 	return t
+}
+
+var _ editor.LienzoConRecuento = (*Folio)(nil)
+
+// Recuento son las cifras del «Recuento de palabras»: las palabras del documento son las
+// de la barra ([Palabras]), y lo demás sale del texto que se ve, sin las imágenes.
+func (f *Folio) Recuento() (documento editor.Recuento, seleccion *editor.Recuento) {
+	if f.doc != nil {
+		documento = editor.RecuentoDelTexto(strings.ReplaceAll(f.doc.Texto(), string(rico.ObjetoRuna), ""))
+	}
+	documento.Palabras = Palabras(f.Serializar())
+	if f.haySeleccion() {
+		s := editor.RecuentoDelTexto(f.textoSeleccionado())
+		seleccion = &s
+	}
+	return documento, seleccion
+}
+
+// PalabrasSeleccionadas son las de la selección, para el «12 de 340» de la barra.
+func (f *Folio) PalabrasSeleccionadas() (int, bool) {
+	if !f.haySeleccion() {
+		return 0, false
+	}
+	return editor.RecuentoDelTexto(f.textoSeleccionado()).Palabras, true
 }

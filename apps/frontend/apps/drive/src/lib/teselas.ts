@@ -41,18 +41,3 @@ export function partirEnTeselas<T extends { isDirectory: boolean }>(
 export function posicionEnLista<T>(partes: Partes<T>, indiceEnLaLista: number): number {
   return partes.carpetas.length + indiceEnLaLista;
 }
-
-/** Los ids del tramo que va del ancla al índice pulsado, los dos incluidos. */
-export function idsDelRango<T extends { id?: string | undefined }>(
-  enOrden: readonly T[],
-  ancla: number,
-  indice: number,
-): string[] {
-  const [lo, hi] = ancla < indice ? [ancla, indice] : [indice, ancla];
-  const ids: string[] = [];
-  for (let i = lo; i <= hi; i++) {
-    const id = enOrden[i]?.id;
-    if (id) ids.push(id);
-  }
-  return ids;
-}

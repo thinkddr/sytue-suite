@@ -100,7 +100,7 @@ func (sa *Sala) repintarPorBloqueo() {
 //
 // ponytail: la web enseña «Mostrar» dentro del propio mensaje plegado; aquí va en su
 // menú. Pasa a la fila cuando el historial admita un control dentro del cuerpo.
-func (sa *Sala) entradasModeracion(m Mensaje) []fyne.CanvasObject {
+func (sa *Sala) entradasModeracion(m Mensaje, canal string) []fyne.CanvasObject {
 	if sa.denuncias() == nil || m.Autor.Bot || m.Autor.ID == sa.Yo || sa.Yo == "" {
 		return nil
 	}
@@ -119,7 +119,7 @@ func (sa *Sala) entradasModeracion(m Mensaje) []fyne.CanvasObject {
 		sa.AbrirDenuncia(m.ID, "", "", m.Autor.Nombre)
 	})
 	denunciar.Peligro = true
-	return append(out, denunciar, sa.entradaBloqueo(sa.abierto, m.Autor.ID, m.Autor.Nombre))
+	return append(out, denunciar, sa.entradaBloqueo(canal, m.Autor.ID, m.Autor.Nombre))
 }
 
 // entradaBloqueo es «Bloquear a X» o «Desbloquear a X».

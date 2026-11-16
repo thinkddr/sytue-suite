@@ -1,0 +1,86 @@
+[
+  {
+    "nombre": "el caso del plan: título, tarea y viñeta con negrita",
+    "md": "## Plan\n- [ ] Cajas\n- **Camión**",
+    "parece": true,
+    "html": "<h2>Plan</h2><div class=\"task-row\"><input type=\"checkbox\"> <span>Cajas</span></div><ul><li><b>Camión</b></li></ul>"
+  },
+  {
+    "nombre": "prosa normal no es Markdown",
+    "md": "Hola, quedamos el martes.\nLleva el *ticket* y la #factura.",
+    "parece": false,
+    "html": "<p>Hola, quedamos el martes.</p><p>Lleva el <i>ticket</i> y la #factura.</p>"
+  },
+  {
+    "nombre": "una sola marca de bloque no basta",
+    "md": "- solo una línea con guion\ny otra normal",
+    "parece": false,
+    "html": "<ul><li>solo una línea con guion</li></ul><p>y otra normal</p>"
+  },
+  {
+    "nombre": "títulos del uno al seis (el seis baja a h5) y regla",
+    "md": "# Uno\n###### Seis\n---\n#etiqueta no es título",
+    "parece": true,
+    "html": "<h1>Uno</h1><h5>Seis</h5><hr><p>#etiqueta no es título</p>"
+  },
+  {
+    "nombre": "listas con y sin número, separadas al cambiar de tipo",
+    "md": "* uno\n+ dos\n1. primero\n2) segundo\n\n- otra lista",
+    "parece": true,
+    "html": "<ul><li>uno</li><li>dos</li></ul><ol><li>primero</li><li>segundo</li></ol><ul><li>otra lista</li></ul>"
+  },
+  {
+    "nombre": "tareas hechas y por hacer, con y sin guion",
+    "md": "- [x] Hecha\n- [X] También\n[ ] Pendiente\n* [] Vacía",
+    "parece": true,
+    "html": "<div class=\"task-row\"><input type=\"checkbox\" checked> <span>Hecha</span></div><div class=\"task-row\"><input type=\"checkbox\" checked> <span>También</span></div><div class=\"task-row\"><input type=\"checkbox\"> <span>Pendiente</span></div><div class=\"task-row\"><input type=\"checkbox\"> <span>Vacía</span></div>"
+  },
+  {
+    "nombre": "una cita de varias líneas es un solo bloque",
+    "md": "> primera\n> segunda\n>tercera\n\nfuera",
+    "parece": true,
+    "html": "<blockquote>primera<br>segunda<br>tercera</blockquote><p>fuera</p>"
+  },
+  {
+    "nombre": "el código va literal y escapado, sin marcas dentro",
+    "md": "```go\nif a < b && **c** {\n  return\n}\n```\ntras",
+    "parece": true,
+    "html": "<pre>if a &lt; b &amp;&amp; **c** {<br>  return<br>}</pre><p>tras</p>"
+  },
+  {
+    "nombre": "un bloque de código sin cerrar llega hasta el final",
+    "md": "# Código\n```\nsin cerrar",
+    "parece": true,
+    "html": "<h1>Código</h1><pre>sin cerrar</pre>"
+  },
+  {
+    "nombre": "marcas en línea: negrita, cursiva, tachado, código y anidadas",
+    "md": "# Marcas\n- **a** __b__ *c* _d_ ~~e~~ `f*g*`\n- *it **neg** it*",
+    "parece": true,
+    "html": "<h1>Marcas</h1><ul><li><b>a</b> <b>b</b> <i>c</i> <i>d</i> <s>e</s> <code>f*g*</code></li><li><i>it <b>neg</b> it</i></li></ul>"
+  },
+  {
+    "nombre": "lo que no cierra o no marca se queda como estaba",
+    "md": "- 3 * 4 * 5\n- snake_case_name y **sin cerrar\n- `",
+    "parece": true,
+    "html": "<ul><li>3 * 4 * 5</li><li>snake_case_name y **sin cerrar</li><li>`</li></ul>"
+  },
+  {
+    "nombre": "enlaces solo http(s); lo demás queda como texto",
+    "md": "- [Sytue](https://sytue.eu/a?b=1&c=\"2\") y [**negrita**](http://x.eu)\n- [malo](javascript:alert(1)) [rel](/ruta)",
+    "parece": true,
+    "html": "<ul><li><a href=\"https://sytue.eu/a?b=1&amp;c=&quot;2&quot;\">Sytue</a> y <a href=\"http://x.eu\"><b>negrita</b></a></li><li>[malo](javascript:alert(1)) [rel](/ruta)</li></ul>"
+  },
+  {
+    "nombre": "el HTML dentro del Markdown sale escapado",
+    "md": "# <img src=x onerror=alert(1)>\n- <script>alert(1)</script>",
+    "parece": true,
+    "html": "<h1>&lt;img src=x onerror=alert(1)&gt;</h1><ul><li>&lt;script&gt;alert(1)&lt;/script&gt;</li></ul>"
+  },
+  {
+    "nombre": "saltos de Windows y sangrías",
+    "md": "## Lista\r\n  - con sangría\r\n\t- con tabulador\r\n",
+    "parece": true,
+    "html": "<h2>Lista</h2><ul><li>con sangría</li><li>con tabulador</li></ul>"
+  }
+]

@@ -19,6 +19,15 @@ func passwordPolicyJSON(p domain.PasswordPolicy) map[string]any {
 	return map[string]any{"min_length": p.MinLength, "require_complexity": p.RequireComplexity}
 }
 
+// mePasswordPolicyJSON es la política EFECTIVA que /me enseña a la propia
+// persona: la más estricta de sus organizaciones (EffectivePasswordPolicyForUser,
+// la misma que se aplica al cambiarla) y con el suelo duro ya puesto, porque es
+// lo que la pantalla va a prometer. Distinta de passwordPolicyJSON, que es la
+// configuración de UNA org tal como la escribe el admin.
+func mePasswordPolicyJSON(p domain.PasswordPolicy) map[string]any {
+	return map[string]any{"min_length": p.EffectiveMinLength(), "require_complexity": p.RequireComplexity}
+}
+
 // handleGetPasswordPolicy — GET /api/v1/admin/org/password-policy.
 func (s *Server) handleGetPasswordPolicy(w http.ResponseWriter, r *http.Request) {
 	org, err := s.activeOrg(r)

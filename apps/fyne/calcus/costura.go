@@ -39,6 +39,12 @@ type modelo struct {
 // hoja es una `SheetData` tal y como se ESCRIBE: solo con los mapas que tienen algo,
 // como la web (un documento viejo {name, cells} sale igual que entró).
 type hoja struct {
+	// La identidad de la hoja, de sus filas y de sus columnas (anclas.go).
+	ID       string                `json:"id,omitempty"`
+	RowIDs   []anclaID             `json:"rowIds,omitempty"`  //nolint:tagliatelle // el nombre lo fija la web
+	RowBase  int                   `json:"rowBase,omitempty"` //nolint:tagliatelle // el nombre lo fija la web
+	ColIDs   []anclaID             `json:"colIds,omitempty"`  //nolint:tagliatelle // el nombre lo fija la web
+	ColBase  int                   `json:"colBase,omitempty"` //nolint:tagliatelle // el nombre lo fija la web
 	Name     string                `json:"name"`
 	TabColor string                `json:"tabColor,omitempty"` //nolint:tagliatelle // el nombre lo fija la web
 	Cells    map[string]string     `json:"cells"`
@@ -52,24 +58,31 @@ type hoja struct {
 	Protect     *Proteccion          `json:"protect,omitempty"`
 	Pivots      []analisis.Dinamica  `json:"pivots,omitempty"`
 	Scenarios   []analisis.Escenario `json:"scenarios,omitempty"`
-	RowGroups   []analisis.Grupo     `json:"rowGroups,omitempty"` //nolint:tagliatelle // el nombre lo fija la web
-	ColGroups   []analisis.Grupo     `json:"colGroups,omitempty"` //nolint:tagliatelle // el nombre lo fija la web
+	RowGroups   []analisis.Grupo     `json:"rowGroups,omitempty"`  //nolint:tagliatelle // el nombre lo fija la web
+	ColGroups   []analisis.Grupo     `json:"colGroups,omitempty"`  //nolint:tagliatelle // el nombre lo fija la web
+	HiddenRows  []analisis.Tramo     `json:"hiddenRows,omitempty"` //nolint:tagliatelle // el nombre lo fija la web
+	HiddenCols  []analisis.Tramo     `json:"hiddenCols,omitempty"` //nolint:tagliatelle // el nombre lo fija la web
 	// Los objetos de la hoja (`objetos.go` y `tablas.go`).
 	Sparklines []Minigrafico  `json:"sparklines,omitempty"`
 	Tables     []TablaFmt     `json:"tables,omitempty"`
 	Charts     []Grafico      `json:"charts,omitempty"`
 	Slicers    []Segmentacion `json:"slicers,omitempty"`
-	// Las medidas personalizadas de la web (`colWidths`, `rowHeights`: px de maqueta). Este
-	// lienzo no las pinta (la rejilla es de medida fija), pero las conserva al guardar.
+	// Las medidas personalizadas de la web (`colWidths`, `rowHeights`: px de maqueta), que
+	// la rejilla pinta y que se cambian arrastrando el borde de la cabecera.
 	ColWidths  map[string]float64 `json:"colWidths,omitempty"`  //nolint:tagliatelle // el nombre lo fija la web
 	RowHeights map[string]float64 `json:"rowHeights,omitempty"` //nolint:tagliatelle // el nombre lo fija la web
-	// Las celdas combinadas (`merges`: rangos A1): tampoco se pintan, pero se conservan.
+	// Las celdas combinadas (`merges`: rangos A1), que la rejilla pinta (fusiones.go).
 	Merges []string `json:"merges,omitempty"`
 }
 
 // hojaLeida es una `SheetData` tal y como se LEE: el formato llega sin sanear, y se
 // sanea igual que `sanitizeSheet` (lo que la web descartaría, aquí también).
 type hojaLeida struct {
+	ID       any                     `json:"id"`
+	RowIDs   json.RawMessage         `json:"rowIds"`  //nolint:tagliatelle // el nombre lo fija la web
+	RowBase  any                     `json:"rowBase"` //nolint:tagliatelle // el nombre lo fija la web
+	ColIDs   json.RawMessage         `json:"colIds"`  //nolint:tagliatelle // el nombre lo fija la web
+	ColBase  any                     `json:"colBase"` //nolint:tagliatelle // el nombre lo fija la web
 	Name     string                  `json:"name"`
 	TabColor string                  `json:"tabColor"` //nolint:tagliatelle // el nombre lo fija la web
 	Cells    map[string]string       `json:"cells"`
@@ -84,8 +97,10 @@ type hojaLeida struct {
 	Protect     any                 `json:"protect"`
 	Pivots      []any               `json:"pivots"`
 	Scenarios   []any               `json:"scenarios"`
-	RowGroups   any                 `json:"rowGroups"` //nolint:tagliatelle // el nombre lo fija la web
-	ColGroups   any                 `json:"colGroups"` //nolint:tagliatelle // el nombre lo fija la web
+	RowGroups   any                 `json:"rowGroups"`  //nolint:tagliatelle // el nombre lo fija la web
+	ColGroups   any                 `json:"colGroups"`  //nolint:tagliatelle // el nombre lo fija la web
+	HiddenRows  any                 `json:"hiddenRows"` //nolint:tagliatelle // el nombre lo fija la web
+	HiddenCols  any                 `json:"hiddenCols"` //nolint:tagliatelle // el nombre lo fija la web
 	Sparklines  []minigraficoCrudo  `json:"sparklines"`
 	Tables      []tablaCruda        `json:"tables"`
 	Charts      []graficoCrudo      `json:"charts"`
@@ -100,8 +115,9 @@ type hojaLeida struct {
 var (
 	clavesModelo = map[string]bool{"active": true, "sheets": true, "protect": true, "names": true}
 	clavesHoja   = map[string]bool{
+		"id": true, "rowIds": true, "rowBase": true, "colIds": true, "colBase": true,
 		"name": true, "tabColor": true, "cells": true, "formats": true, "styles": true, "freeze": true, "condFormats": true,
-		"validations": true, "autofilter": true, "protect": true, "rowGroups": true, "colGroups": true, "pivots": true, "scenarios": true,
+		"validations": true, "autofilter": true, "protect": true, "rowGroups": true, "colGroups": true, "hiddenRows": true, "hiddenCols": true, "pivots": true, "scenarios": true,
 		"sparklines": true, "tables": true, "charts": true, "slicers": true, "colWidths": true, "rowHeights": true, "merges": true,
 	}
 )
@@ -121,16 +137,14 @@ func (c *Lienzo) Objeto() fyne.CanvasObject { return c }
 // después. Así que aquí se dice «no» a todo lo que no sepamos reescribir EXACTAMENTE,
 // y el cromo enseña la franja de solo lectura. Hoy se dice «no» a:
 //
-//   - cualquier clave del JSON que no sea `active`/`sheets` (libro) o `name`/`cells`
-//     (hoja): formatos de número, estilos, formato condicional, gráficos, tablas,
-//     validaciones, paneles congelados, protección, esquema…;
+//   - cualquier clave del JSON que no esté en `clavesModelo` (libro) o `clavesHoja`
+//     (hoja): lo que la web añada mañana y este lienzo no sepa volver a escribir;
 //   - cualquier celda cuyo HTML no sea el envoltorio canónico de la web —alineación,
 //     negrita y cursiva alrededor de texto escapado— (ver `celdaEntendida`): un
 //     `<span>`, un `<br>` o una entidad que `stripHtml` no decodifica es algo que la
 //     web pinta de una manera y lee de otra, y reescribirlo sería adivinar;
-//   - cualquier referencia fuera de A1:Z100, que es la rejilla que la web declara
-//     (`COLS`/`ROWS`). Serializar recorre esa rejilla, así que una celda de más allá
-//     se perdería al guardar.
+//   - cualquier referencia fuera de los límites de Excel (`MaxColumnas` × `MaxFilas`,
+//     A..XFD × 1.048.576), que no es una celda que se pueda escribir.
 //
 // Un contenido vacío es un libro nuevo, y ese sí se entiende.
 //
@@ -251,6 +265,10 @@ func (c *Lienzo) poner(m leido) {
 // reglas y los paneles, saneado como `sanitizeSheet`.
 func (l *Libro) cargarHoja(i int, h hojaLeida) {
 	dest := &l.f.hojas[i]
+	if id, ok := h.ID.(string); ok {
+		dest.id = id
+	}
+	dest.filasA, dest.colsA = ejeLeido(h.RowIDs, h.RowBase), ejeLeido(h.ColIDs, h.ColBase)
 	for ref, valor := range h.Cells {
 		if k, ok := celdaDe(ref); ok {
 			l.CargarEn(i, k.C, k.F, valor)
@@ -281,7 +299,7 @@ func (l *Libro) cargarHoja(i int, h hojaLeida) {
 		}
 	}
 	if h.Freeze != nil {
-		dest.fijas = Fijas{Cols: clamp(enteroJS(h.Freeze.Cols), Columnas-1), Rows: clamp(enteroJS(h.Freeze.Rows), Filas-1)}
+		dest.fijas = Fijas{Cols: clamp(enteroJS(h.Freeze.Cols), MaxColumnas-1), Rows: clamp(enteroJS(h.Freeze.Rows), MaxFilas-1)}
 	}
 	if h.Autofilter != nil {
 		dest.filtro = h.Autofilter.sanear()
@@ -324,11 +342,19 @@ func cargarAnalisis(dest *hojaLibro, h hojaLeida) {
 		dest.pestana = h.TabColor
 	}
 	// `sanitizeGroups`: vacío es «sin esquema» y no se guarda.
-	if g := analisis.SanearGrupos(h.RowGroups, Filas); len(g) > 0 {
+	if g := analisis.SanearGrupos(h.RowGroups, MaxFilas); len(g) > 0 {
 		dest.grupFilas = g
 	}
-	if g := analisis.SanearGrupos(h.ColGroups, Columnas); len(g) > 0 {
+	if g := analisis.SanearGrupos(h.ColGroups, MaxColumnas); len(g) > 0 {
 		dest.grupCols = g
+	}
+	// `sanitizeSpans`, contra los límites de la web (no contra esta rejilla): lo oculto
+	// más allá de la fila 100 se conserva igual que se conservan los anchos.
+	if t := analisis.SanearTramos(h.HiddenRows, MaxFilas); len(t) > 0 {
+		dest.ocultFilas = t
+	}
+	if t := analisis.SanearTramos(h.HiddenCols, MaxColumnas); len(t) > 0 {
+		dest.ocultCols = t
 	}
 	for _, crudo := range h.Scenarios {
 		// `sanitizeScenario`, sin repetir nombre.
@@ -432,13 +458,16 @@ func enLaRejilla(ref string) bool {
 	if err != nil {
 		return false
 	}
-	return r.Col >= 0 && r.Col < Columnas && r.Row >= 0 && r.Row < Filas
+	return r.Col >= 0 && r.Col < MaxColumnas && r.Row >= 0 && r.Row < MaxFilas
 }
 
 // serializar es la hoja como la escribe la web: las celdas siempre, y los mapas de
 // formato y los paneles solo si tienen algo.
 func (h hojaLibro) serializar() hoja {
 	out := hoja{Name: h.nombre, TabColor: h.pestana, Cells: make(map[string]string, len(h.celdas))}
+	out.ID = h.id
+	out.RowIDs, out.RowBase = h.filasA.escribir()
+	out.ColIDs, out.ColBase = h.colsA.escribir()
 	for k, v := range h.celdas {
 		out.Cells[Ref(k.C, k.F)] = v
 	}
@@ -460,6 +489,7 @@ func (h hojaLibro) serializar() hoja {
 	}
 	out.CondFormats, out.Validations, out.Autofilter, out.Protect = h.condiciones, h.validaciones, h.filtro, h.proteccion
 	out.RowGroups, out.ColGroups, out.Pivots, out.Scenarios = h.grupFilas, h.grupCols, h.dinamicas, h.escenarios
+	out.HiddenRows, out.HiddenCols = h.ocultFilas, h.ocultCols
 	out.Sparklines, out.Tables, out.Charts, out.Slicers = h.minis, h.tablas, h.graficos, h.segs
 	out.ColWidths, out.RowHeights, out.Merges = h.anchos, h.altos, h.fusiones
 	return out

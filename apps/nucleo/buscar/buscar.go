@@ -31,8 +31,6 @@ var sueltas = strings.NewReplacer(
 	"ß", "ss", "æ", "ae", "œ", "oe", "ø", "o", "ł", "l", "đ", "d", "ð", "d", "þ", "th", "ı", "i",
 )
 
-var sinMarcas = transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
-
 // Plegar devuelve s en minúsculas y sin diacríticos. No recorta espacios: eso es cosa
 // de quien lee la caja de búsqueda.
 func Plegar(s string) string {
@@ -40,6 +38,9 @@ func Plegar(s string) string {
 		return strings.ToLower(s)
 	}
 	s = sueltas.Replace(strings.ToLower(s))
+	// A Chain retains mutable transform state. Each concurrent account/search
+	// owns its transformer; sharing one can corrupt text or panic.
+	sinMarcas := transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
 	out, _, err := transform.String(sinMarcas, s)
 	if err != nil {
 		return s

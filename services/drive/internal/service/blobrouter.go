@@ -215,6 +215,20 @@ func (r *blobRouter) Get(ctx context.Context, t tenancy.Tenant, key string) (io.
 	return b.Get(ctx, t, key)
 }
 
+// GetRaw preserves the same location-pinned selection as Get and never falls
+// back to a provider whose raw byte contract is unavailable.
+func (r *blobRouter) GetRaw(ctx context.Context, t tenancy.Tenant, key string) (io.ReadCloser, error) {
+	b, err := r.pick(ctx, t, key)
+	if err != nil {
+		return nil, err
+	}
+	raw, ok := b.(objectstore.RawBlobReader)
+	if !ok {
+		return nil, objectstore.ErrRawUnsupported
+	}
+	return raw.GetRaw(ctx, t, key)
+}
+
 func (r *blobRouter) Delete(ctx context.Context, t tenancy.Tenant, key string) error {
 	b, err := r.pick(ctx, t, key)
 	if err != nil {

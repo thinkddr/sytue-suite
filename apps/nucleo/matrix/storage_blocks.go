@@ -6,32 +6,19 @@ package matrix
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
-	"errors"
 	"io"
 	"net/http"
 	"sync"
 
-	"maunium.net/go/mautrix/crypto/attachment"
-
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage/filesdk"
 )
 
-// StorageBlock is PRIVATE manifest data. Its Matrix descriptor contains a key:
-// persist it only inside an encrypted Record or the encrypted local cache, never
-// in the ciphertext gateway's metadata or a server-side task argument.
-type StorageBlock struct {
-	Scope      storage.Scope            `json:"scope"`
-	ObjectID   string                   `json:"object_id"`
-	RevisionID string                   `json:"revision_id"`
-	Part       int                      `json:"part"`
-	Blob       storage.BlobReceipt      `json:"blob"`
-	File       attachment.EncryptedFile `json:"matrix_file"`
-}
+// StorageBlock uses the shared maintained SDK codec; keys remain private manifest data.
+type StorageBlock = filesdk.Block
 
 func (c *Client) storageBlockScope(ctx context.Context) (storage.Scope, error) {
 	c.stateMu.RLock()
@@ -78,42 +65,11 @@ func uploadStorageBlock(ctx context.Context, gateway *api.Drive, scope storage.S
 }
 
 func storageBytes(source io.Reader, size int64) ([]byte, error) {
-	if source == nil || size < 0 || size > storage.MaxCipherBlockBytes {
-		return nil, storage.ErrRecord
-	}
-	data, err := io.ReadAll(io.LimitReader(source, size+1))
-	if err != nil || int64(len(data)) != size {
-		clear(data)
-		return nil, errors.Join(storage.ErrRecord, err)
-	}
-	return data, nil
+	return filesdk.ReadBlockSource(source, size)
 }
 
 func prepareStorageBlock(scope storage.Scope, object, revision string, part int, source io.Reader, size int64) (StorageBlock, []byte, error) {
-	if !storage.Identifier(object) || !storage.Identifier(revision) || part < 0 {
-		return StorageBlock{}, nil, storage.ErrRecord
-	}
-	data, err := storageBytes(source, size)
-	if err != nil {
-		return StorageBlock{}, nil, err
-	}
-	file := attachment.NewEncryptedFile()
-	file.EncryptInPlace(data)
-	hash, err := base64.RawStdEncoding.Strict().DecodeString(file.Hashes.SHA256)
-	if err != nil || len(hash) != 32 {
-		clear(data)
-		return StorageBlock{}, nil, storage.ErrRecord
-	}
-	block := StorageBlock{
-		Scope: scope, ObjectID: object, RevisionID: revision, Part: part,
-		Blob: storage.BlobReceipt{ID: rand.Text(), Product: scope.Product, SizeBytes: size, SHA256: hex.EncodeToString(hash)},
-		File: attachment.EncryptedFile{Key: file.Key, InitVector: file.InitVector, Hashes: file.Hashes, Version: file.Version},
-	}
-	if err := block.validate(scope, object, revision, part); err != nil {
-		clear(data)
-		return StorageBlock{}, nil, err
-	}
-	return block, data, nil
+	return filesdk.PrepareBlock(scope, object, revision, part, source, size)
 }
 
 func putPreparedStorageBlock(ctx context.Context, gateway *api.Drive, block StorageBlock, data []byte) error {
@@ -130,7 +86,7 @@ func putPreparedStorageBlock(ctx context.Context, gateway *api.Drive, block Stor
 	if len(data) == 0 {
 		body = http.NoBody
 	}
-	receipt, err := gateway.PutCipherBlob(ctx, block.Scope.Product, block.Blob.ID, body, int64(len(data)))
+	receipt, err := gateway.PutCipherBlob(ctx, block.Scope, block.Blob.ID, body, int64(len(data)))
 	if err != nil {
 		return err
 	}
@@ -164,17 +120,6 @@ func (r *storageCipherReader) Close() error {
 	return nil
 }
 
-func (b StorageBlock) validate(scope storage.Scope, object, revision string, part int) error {
-	if !scope.Valid() || b.File.Version != "v2" || b.Scope != scope || b.ObjectID != object || b.RevisionID != revision || b.Part != part || part < 0 || !storage.Identifier(object) || !storage.Identifier(revision) || !b.Blob.Valid(scope.Product, b.Blob.ID) {
-		return storage.ErrRecord
-	}
-	hash, err := base64.RawStdEncoding.Strict().DecodeString(b.File.Hashes.SHA256)
-	if err != nil || len(hash) != 32 || hex.EncodeToString(hash) != b.Blob.SHA256 {
-		return storage.ErrRecord
-	}
-	return b.File.PrepareForDecryption()
-}
-
 // DownloadStorageBlock authenticates the entire bounded ciphertext block before
 // returning plaintext. Substitution across object, revision, scope or position is
 // rejected before making a request; no unauthenticated bytes reach a viewer.
@@ -198,10 +143,10 @@ func downloadStorageBlock(ctx context.Context, gateway *api.Drive, scope storage
 	if gateway == nil {
 		return nil, storage.ErrRecord
 	}
-	if validationErr := block.validate(scope, object, revision, part); validationErr != nil {
+	if validationErr := block.Validate(scope, object, revision, part); validationErr != nil {
 		return nil, validationErr
 	}
-	body, err := gateway.ReadCipherBlob(ctx, scope.Product, block.Blob.ID)
+	body, err := gateway.ReadCipherBlob(ctx, scope, block.Blob.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +160,7 @@ func downloadStorageBlock(ctx context.Context, gateway *api.Drive, scope storage
 		clear(data)
 		return nil, ErrIdentity
 	}
-	if decryptErr := block.File.DecryptInPlace(data); decryptErr != nil {
+	if decryptErr := filesdk.DecryptBlockInPlace(scope, object, revision, part, block, data); decryptErr != nil {
 		clear(data)
 		return nil, decryptErr
 	}

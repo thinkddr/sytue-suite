@@ -112,7 +112,7 @@ export type AppCatalogs<EN extends Record<string, MessageEntry>> = {
  */
 export function createAppTranslator<EN extends Record<string, MessageEntry>>(
   appCatalogs: AppCatalogs<EN>,
-): (locale: Locale) => (key: keyof EN & string, vars?: Vars) => string {
+): (locale: Locale) => (key: (keyof EN & string) | MessageKey, vars?: Vars) => string {
   // UNA `t` POR IDIOMA, memoizada. Devolvía una closure NUEVA en cada llamada, y
   // como los componentes hacen `const t = useT(locale)` en el cuerpo del render,
   // `t` cambiaba de identidad en cada render.
@@ -127,19 +127,28 @@ export function createAppTranslator<EN extends Record<string, MessageEntry>>(
   // La memoización es segura y no guarda estado de petición: los catálogos son
   // estáticos y la traducción es pura (mismo idioma y misma clave ⇒ mismo texto),
   // así que dos llamadas con el mismo idioma pueden compartir la misma función.
-  const porIdioma = new Map<Locale, (key: keyof EN & string, vars?: Vars) => string>();
+  const porIdioma = new Map<
+    Locale,
+    (key: (keyof EN & string) | MessageKey, vars?: Vars) => string
+  >();
   return (locale) => {
     const memo = porIdioma.get(locale);
     if (memo) return memo;
-    const t = (key: keyof EN & string, vars?: Vars): string => {
+    const t = (key: (keyof EN & string) | MessageKey, vars?: Vars): string => {
       // Doble red, y no por gusto: un catálogo de app que no cubra el idioma
       // activo tiraba la PÁGINA ENTERA con «undefined is not an object» desde el
       // render del servidor —así se cayó Sytue DevX— y una clave que aún no se
       // ha traducido hacía lo mismo. Una interfaz a medio traducir es un defecto;
       // una pantalla en blanco es una caída.
       const catalog = appCatalogs[locale] ?? appCatalogs[DEFAULT_LOCALE];
-      const entry = catalog?.[key] ?? appCatalogs[DEFAULT_LOCALE]?.[key];
-      if (entry === undefined) return key;
+      const appKey = key as keyof EN & string;
+      const entry = catalog?.[appKey] ?? appCatalogs[DEFAULT_LOCALE]?.[appKey];
+      // The native translator composes Common + app in the same order: app
+      // meanings win, shared chrome needs no copied entries in each product.
+      if (entry === undefined)
+        return Object.hasOwn(catalogs[DEFAULT_LOCALE], key)
+          ? translate(locale, key as MessageKey, vars)
+          : key;
       const template = typeof entry === 'string' ? entry : selectPlural(locale, entry, vars);
       return interpolate(locale, template, vars);
     };
@@ -181,7 +190,7 @@ export function documentLocale(): Locale {
  */
 export async function loadAppTranslator<EN extends Record<string, MessageEntry>>(
   cargadores: Record<string, () => Promise<unknown>>,
-): Promise<(locale: Locale) => (key: keyof EN & string, vars?: Vars) => string> {
+): Promise<(locale: Locale) => (key: (keyof EN & string) | MessageKey, vars?: Vars) => string> {
   const locale = documentLocale();
   // Idioma que la app aún no tiene: se baja el inglés, que es lo que pintó el
   // servidor. Sin esto no había cargador, y la isla hidrataba con las claves en

@@ -574,7 +574,7 @@ function JobSection({
         <Card class="mb-4">
           <CardBody class="p-0">
             <EmptyState
-              illustration={<Icon name="clock" size={24} />}
+              icon="clock"
               title={t('functions.noImages.title')}
               description={t('tasks.job.noImages.desc')}
               action={
@@ -743,11 +743,7 @@ function TaskList({
     return (
       <Card>
         <CardBody class="p-0">
-          <EmptyState
-            illustration={<Icon name="clock" size={24} />}
-            title={emptyTitle}
-            description={emptyDesc}
-          />
+          <EmptyState icon="clock" title={emptyTitle} description={emptyDesc} />
         </CardBody>
       </Card>
     );
@@ -893,7 +889,7 @@ function WorkerSection({
         <Card class="mb-4">
           <CardBody class="p-0">
             <EmptyState
-              illustration={<Icon name="clock" size={24} />}
+              icon="clock"
               title={t('functions.noImages.title')}
               description={t('tasks.worker.noImages.desc')}
               action={

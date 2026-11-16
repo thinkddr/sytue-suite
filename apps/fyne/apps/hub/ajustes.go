@@ -22,16 +22,20 @@ import (
 // topbar, la entrada 5,25 por debajo del título y la primera sección 21 más abajo.
 // Cada sección es una `Card` con `shadow-sm`: 1 de borde, 14 de relleno y el `h2` de
 // 15,75/22,75 arriba, con `gap-4` (14) hasta lo de dentro.
+//
+// El marco y las secciones son `ui.MarcoAjustes` y `ui.SeccionAjustes` (§2.8: la
+// configuración guiada no se reimplementa por app). Los nombres de aquí se quedan para
+// las cabeceras de «Dispositivos», que colocan a mano el progreso del asistente.
 const (
-	// AnchoAjustes es el `max-w-5xl`: 64rem con el rem de 14.
-	AnchoAjustes float32 = 64 * tema.Rem
+	// AnchoAjustes es el `max-w-5xl`.
+	AnchoAjustes = ui.AnchoMarcoAjustes
 	// MargenAjustesY es el `py-6`, y también el `mt-6` y el `gap-6` entre secciones.
-	MargenAjustesY float32 = 6 * 0.25 * tema.Rem
+	MargenAjustesY = ui.MargenMarcoAjustesY
 	// MargenAjustesX es el `px-4` de la caja; desde `sm:` pasa a `px-6` (MargenX).
-	MargenAjustesX float32 = 4 * 0.25 * tema.Rem
+	MargenAjustesX = ui.MargenMarcoAjustesX
 	// RellenoSeccion es el `p-4` del `CardBody`, y HuecoSeccion su `gap-4`.
-	RellenoSeccion float32 = 4 * 0.25 * tema.Rem
-	HuecoSeccion   float32 = 4 * 0.25 * tema.Rem
+	RellenoSeccion = ui.RellenoSeccionAjustes
+	HuecoSeccion   = ui.HuecoSeccionAjustes
 )
 
 // Los interlineados de estas pantallas que no son los de la escala: `leading-relaxed`
@@ -44,63 +48,10 @@ var (
 
 // CajaAjustes es dónde empieza y cuánto mide la caja de un `SettingsShell` para un
 // ancho de ventana. El `sm:` mide la VENTANA con el rem de 16, como todos los cortes.
-func CajaAjustes(ventana float32) (x, ancho float32) {
-	margen := MargenAjustesX
-	if ventana >= ui.CorteSM {
-		margen = MargenX
-	}
-	caja := min(ventana, AnchoAjustes)
-	return (ventana-caja)/2 + margen, max(caja-2*margen, 0)
-}
+func CajaAjustes(ventana float32) (x, ancho float32) { return ui.CajaAjustes(ventana) }
 
 // InteriorSeccion es lo que le queda a lo de dentro de una sección de ese ancho.
-func InteriorSeccion(ancho float32) float32 {
-	return max(ancho-2*(tema.Borde+RellenoSeccion), 0)
-}
-
-// seccion es una `SettingsSection` sin descripción ni acciones: la tarjeta con su
-// sombra y el `h2`. Lo de dentro lo coloca quien la usa.
-type seccion struct {
-	sombra *ui.Sombra
-	caja   *ui.Caja
-	titulo *ui.Parrafo
-}
-
-func nuevaSeccion(v tema.Variante, titulo string) *seccion {
-	return &seccion{
-		// `shadow-sm`, la misma que miden las tarjetas del lanzador.
-		sombra: ui.NuevaSombra(tema.SombraSM, RadioTarjeta()),
-		caja:   ui.NuevaCaja(tema.Color("surface", v), tema.Color("border", v), RadioTarjeta()),
-		titulo: ui.NuevoParrafo(titulo, ui.EscalonTitulo(4), ui.PesoTitulo(4), "text", v),
-	}
-}
-
-func (s *seccion) objetos() []fyne.CanvasObject {
-	return append(append([]fyne.CanvasObject{s.sombra.Objeto()}, s.caja.Objetos()...), s.titulo)
-}
-
-// altoTitulo es el `h2` repartido al interior, más el `gap-4` que lo separa del resto.
-func (s *seccion) altoTitulo(ancho float32) float32 {
-	return ui.AltoParrafo(s.titulo, InteriorSeccion(ancho)) + HuecoSeccion
-}
-
-// alto es la tarjeta entera con un cuerpo de `cuerpo` de alto bajo el título.
-func (s *seccion) alto(ancho, cuerpo float32) float32 {
-	return 2*(tema.Borde+RellenoSeccion) + s.altoTitulo(ancho) + cuerpo
-}
-
-// colocar pone la tarjeta y su título, y devuelve dónde empieza el cuerpo.
-func (s *seccion) colocar(x, y, ancho, cuerpo float32) (cx, cy float32) {
-	alto := s.alto(ancho, cuerpo)
-	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
-	s.sombra.Ajustar(fyne.NewPos(x, y), fyne.NewSize(ancho, alto), v)
-	ui.MoverCaja(s.caja, fyne.NewPos(x, y), fyne.NewSize(ancho, alto))
-	cx, cy = x+tema.Borde+RellenoSeccion, y+tema.Borde+RellenoSeccion
-	interior := InteriorSeccion(ancho)
-	s.titulo.Move(fyne.NewPos(cx, cy))
-	s.titulo.Resize(fyne.NewSize(interior, ui.AltoParrafo(s.titulo, interior)))
-	return cx, cy + s.altoTitulo(ancho)
-}
+func InteriorSeccion(ancho float32) float32 { return ui.InteriorSeccionAjustes(ancho) }
 
 // ponerParrafo pone un párrafo a ese ancho y devuelve dónde acaba; con `mover` a
 // false solo mide.
@@ -115,18 +66,6 @@ func ponerObjeto(o fyne.CanvasObject, x, y float32, t fyne.Size, mover bool) flo
 		o.Resize(t)
 	}
 	return y + t.Height
-}
-
-// ponerSeccion mide el cuerpo de una sección en seco, coloca la tarjeta con ese alto y
-// luego el cuerpo dentro, en una columna de `max-w-2xl`. Devuelve dónde acaba.
-func ponerSeccion(s *seccion, x, y, ancho float32, mover bool, cuerpo func(x, y, col float32, mover bool) float32) float32 {
-	col := min(InteriorSeccion(ancho), AnchoIntro)
-	alto := cuerpo(0, 0, col, false)
-	if mover {
-		cx, cy := s.colocar(x, y, ancho, alto)
-		cuerpo(cx, cy, col, true)
-	}
-	return y + s.alto(ancho, alto)
 }
 
 // ---- La acción principal de estas pantallas ----

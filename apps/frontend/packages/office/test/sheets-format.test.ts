@@ -291,9 +291,25 @@ test('shiftRefs: refs de eje entero desplazan SOLO su eje (sin #REF! fantasma)',
 
 test('selectionStats: cuenta lo ocupado, suma y promedia solo los números', () => {
   // Recuento incluye el texto (criterio Excel); la aritmética, solo los números.
-  expect(selectionStats([1, 2, 3, 'texto', ''])).toEqual({ count: 4, sum: 6, avg: 2 });
-  // Un error o un booleano ocupan celda pero no entran en suma ni promedio.
-  expect(selectionStats([10, ERR.DIV0, true, ''])).toEqual({ count: 3, sum: 10, avg: 10 });
+  expect(selectionStats([1, 2, 3, 'texto', ''])).toEqual({
+    count: 4,
+    sum: 6,
+    avg: 2,
+    numbers: 3,
+    min: 1,
+    max: 3,
+  });
+  // Un error o un booleano ocupan celda pero no entran en suma, promedio, mínimo ni máximo.
+  expect(selectionStats([10, ERR.DIV0, true, ''])).toEqual({
+    count: 3,
+    sum: 10,
+    avg: 10,
+    numbers: 1,
+    min: 10,
+    max: 10,
+  });
+  // Mínimo y máximo con negativos, aunque el primero sea el mayor.
+  expect(selectionStats([5, -2, 'x', 0])).toMatchObject({ numbers: 3, min: -2, max: 5 });
   // Sin un solo número no hay nada que resumir: la barra no pinta el bloque.
   expect(selectionStats(['a', 'b'])).toBeNull();
   expect(selectionStats([])).toBeNull();

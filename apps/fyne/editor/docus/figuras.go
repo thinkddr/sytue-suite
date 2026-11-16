@@ -97,6 +97,9 @@ func (f *Folio) figuraActiva(clase string) *rico.Ilustracion {
 // medidaFigura es la caja de la figura en un ancho: `width: Wpx; max-width: 100%` y el
 // SVG a lo ancho con `height: auto`, que guarda la proporción del viewBox.
 func medidaFigura(il *rico.Ilustracion, ancho float32) (w, h float32) {
+	if il.Atomico != nil {
+		return medidaAtomico(il.Atomico, ancho)
+	}
 	nw, nh := float32(rico.AnchoGrafico), float32(rico.AltoGrafico)
 	switch {
 	case il.Forma != nil:
@@ -116,6 +119,9 @@ const escalaRaster = 2
 // encima, el texto de la forma o los rótulos del gráfico, que `oksvg` no pinta.
 func (f *Folio) pintarFigura(objs []fyne.CanvasObject, c caja, ox, oy, z float32, usadas map[string]*canvas.Image) []fyne.CanvasObject {
 	il := c.b.Ilustracion
+	if il.Atomico != nil {
+		return f.pintarAtomico(objs, c, ox, oy, z, usadas)
+	}
 	w, h := medidaFigura(il, c.ancho)
 	pos := fyne.NewPos(ox+(c.izq+(c.ancho-w)/2)*z, oy+c.y*z)
 	var svg []byte

@@ -41,6 +41,14 @@ test('el id acota el panel desplazable sin incluir cabecera ni pie', () => {
     const scroll = nav?.querySelector<HTMLElement>('[data-sidebar-scroll]');
     expect(nav?.tagName).toBe('NAV');
     expect(scroll?.classList.contains('overflow-y-auto')).toBe(true);
+    // Solo en vertical, también el pie (MAIL-15): nada de barra horizontal en el lateral.
+    const pie = nav?.querySelector<HTMLElement>('.sytue-sidebar-footer');
+    for (const panel of [scroll, pie]) {
+      expect(panel?.classList.contains('overflow-x-hidden')).toBe(true);
+      expect(
+        [...(panel?.classList ?? [])].some((c) => /^overflow-(x-)?(auto|scroll)$/.test(c)),
+      ).toBe(false);
+    }
     expect(scroll?.querySelector('li')?.textContent).toBe('Canal del proyecto');
     expect(scroll?.querySelector('button')?.textContent).toBe('Canal del proyecto');
     expect(scroll?.textContent).not.toContain('Crear canal');
@@ -200,9 +208,10 @@ test('el botón de la cabecera toma el aro blanco del cromo, y solo él', () => 
   expect(boton.parentElement!.classList.contains(regla)).toBe(true);
 });
 
-test('la acción del carril mide 24 px de verdad, con la raíz a 14', () => {
-  // `h-6` son 1.5rem = 21 px en esta suite: es lo que medía en producción. El suelo
-  // de WCAG 2.5.8 va en px para que ninguna raíz lo baje.
+test('la acción del carril mide 24 px de verdad, con cualquier base de letra', () => {
+  // `h-6` son 1.5rem: 24 px con la base de letra de la suite, y 21 cuando 1 rem eran
+  // 14 px, que es lo que medía en producción. El suelo de WCAG 2.5.8 va en px para
+  // que ninguna raíz lo baje.
   expect(SIDEBAR_ACTION_CLASS).toContain('min-h-[24px]');
   expect(SIDEBAR_ACTION_CLASS).toContain('min-w-[24px]');
 });
@@ -373,4 +382,42 @@ test('un item que no es rama no anuncia nada desplegable', () => {
     render(null, host);
     host.remove();
   }
+});
+
+test('plegado, el rótulo sale como ayuda visible al enfocar, no como `title`', async () => {
+  const host = mount(
+    <ul>
+      <SidebarItem collapsed label="Entrada" href="/mail/inbox" />
+    </ul>,
+  );
+  try {
+    const enlace = host.querySelector('a')!;
+    // Un `title` no se ve con el teclado ni con el dedo (WCAG 1.4.13).
+    expect(enlace.hasAttribute('title')).toBe(false);
+    // Sin envoltorio: el <li> sigue teniendo el enlace como hijo directo.
+    expect(enlace.parentElement?.tagName).toBe('LI');
+    enlace.focus();
+    const fin = Date.now() + 2000;
+    while (!document.querySelector('[role="tooltip"]') && Date.now() < fin) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    const ayuda = document.querySelector<HTMLElement>('[role="tooltip"]');
+    expect(ayuda?.textContent).toBe('Entrada');
+    expect(enlace.getAttribute('aria-describedby')).toBe(ayuda!.id);
+    enlace.blur();
+  } finally {
+    render(null, host);
+    host.remove();
+  }
+});
+
+test('desplegado, el `title` sigue cubriendo el rótulo recortado', () => {
+  const host = mount(
+    <ul>
+      <SidebarItem label="Entrada" href="/mail/inbox" />
+    </ul>,
+  );
+  expect(host.querySelector('a')!.getAttribute('title')).toBe('Entrada');
+  render(null, host);
+  host.remove();
 });

@@ -52,7 +52,7 @@ func (p *Pantalla) montarEquipos() {
 			go p.cargarUnidad()
 			return
 		}
-		if TipoVista(el) != "" {
+		if TipoVista(el, false) != "" {
 			p.pedirVistaEquipo(el)
 			return
 		}
@@ -413,7 +413,7 @@ func (p *Pantalla) pedirVistaEquipo(el Elemento) {
 		return
 	}
 	id := q.Abierta.ID
-	p.abrirVista(el, func(ctx context.Context) (io.ReadCloser, error) { return p.svc.DownloadTeamDrive(ctx, id, el.ID) },
+	p.abrirVista(el, false, func(ctx context.Context) (io.ReadCloser, error) { return p.svc.DownloadTeamDrive(ctx, id, el.ID) },
 		func() { go p.descargarDeEquipo(el) })
 }
 

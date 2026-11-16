@@ -6,7 +6,6 @@
  *    (POST /api/import-vcard → `text/vcard`), que la entiende: así una foto
  *    binaria de vCard 3.0 se ve igual que en la app nativa.
  */
-import { parseVcard } from '@sytue/api-clients/contacts';
 import { importCard } from './contactsApi.js';
 
 /** Descarga una o varias vCards como un único .vcf (attachment) en el navegador. */
@@ -54,16 +53,12 @@ export function exportFilename(name: string): string {
 }
 
 /**
- * Las tarjetas de un .vcf, TAL CUAL, sin las que no traen nombre (FN: parseVcard
- * las marca como '(Sin nombre)'). Aquí no se interpreta nada más: lo demás lo lee
- * el servicio. Es el `Tarjetas` de la app nativa.
+ * Las tarjetas de un .vcf, TAL CUAL. El servicio decide si cada una tiene un
+ * nombre válido: también acepta el nombre estructurado N cuando FN está vacío.
+ * Así una tarjeta que el servicio rechaza cuenta como fallo y no desaparece.
  */
 export function tarjetasDe(text: string): string[] {
-  const cards = text.match(/BEGIN:VCARD[\s\S]*?END:VCARD/gi) ?? [];
-  return cards.filter((card) => {
-    const { fullName } = parseVcard(card);
-    return !!fullName && fullName !== '(Sin nombre)';
-  });
+  return text.match(/BEGIN:VCARD[\s\S]*?END:VCARD/gi) ?? [];
 }
 
 /**

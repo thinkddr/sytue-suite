@@ -2,20 +2,21 @@
 package service
 
 import (
+	"bytes"
 	"context"
-	"regexp"
+	"encoding/json"
+	"time"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/recoverywrap"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
+	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/rooms/internal/domain"
+	"git.sytue.eu/sytue/one/services/rooms/internal/store"
 )
 
-// recoveryKeyShape es la forma de una clave de recuperación de Matrix: base58 en
-// grupos de cuatro separados por espacios (~59 caracteres). Se deja holgura, pero
-// nada que no sea esa forma entra en la custodia.
-var recoveryKeyShape = regexp.MustCompile(`^[1-9A-HJ-NP-Za-km-z]{4}( [1-9A-HJ-NP-Za-km-z]{1,4}){8,24}$`)
-
-// MatrixRecoveryKey devuelve la clave de recuperación que el servicio custodia
-// para quien pregunta (ADR 0081). La identidad sale del token OIDC: nadie puede
-// pedir la de otra persona.
+// MatrixRecoveryKey devuelve la clave de recuperación que ADR 0081 custodiaba con
+// la KEK. Solo sirve a la transición de ADR 0082: el cliente la usa una vez, la
+// envuelve en el dispositivo y, al guardar el envoltorio, la copia con KEK se borra.
 func (s *Service) MatrixRecoveryKey(ctx context.Context, actor string) (string, error) {
 	if err := s.matrixNativeActor(ctx, actor); err != nil {
 		return "", err
@@ -23,14 +24,90 @@ func (s *Service) MatrixRecoveryKey(ctx context.Context, actor string) (string, 
 	return s.pstore.MatrixRecoveryKey(ctx, actor)
 }
 
-// StoreMatrixRecoveryKey custodia la clave que el navegador acaba de generar al
-// configurar o restablecer el cifrado. La sustituye si ya había una.
-func (s *Service) StoreMatrixRecoveryKey(ctx context.Context, actor, key string) error {
-	if !recoveryKeyShape.MatchString(key) {
-		return domain.ErrInvalidInput
+// StoreMatrixRecoveryKey ya no guarda nada: ninguna clave nueva entra en custodia
+// legible por el operador (ADR 0082).
+func (s *Service) StoreMatrixRecoveryKey(context.Context, string, string) error {
+	return domain.ErrRecoveryEscrowRetired
+}
+
+// MatrixRecoveryAccount elige la cuenta de Matrix de un envoltorio. Sin producto
+// es `@sytue_<sub>` (Rooms). Con producto, la identidad heredada es esa misma
+// cuenta; la aislada es la de ese producto en la organización de la petición, la
+// misma que entrega BootstrapMatrixStorageForIdentity.
+type MatrixRecoveryAccount struct {
+	Product         string
+	IdentityVersion storage.IdentityVersion
+}
+
+func (a MatrixRecoveryAccount) resolve(ctx context.Context) (store.MatrixRecoveryAccount, error) {
+	if a.Product == "" {
+		if a.IdentityVersion != 0 {
+			return store.MatrixRecoveryAccount{}, domain.ErrInvalidInput
+		}
+		return store.MatrixRecoveryAccount{}, nil
+	}
+	version := a.IdentityVersion.Normalized()
+	if !domain.StorageProduct(a.Product) || !version.Valid() {
+		return store.MatrixRecoveryAccount{}, domain.ErrInvalidInput
+	}
+	if version == storage.LegacyIdentity {
+		return store.MatrixRecoveryAccount{}, nil
+	}
+	return store.MatrixRecoveryAccount{Tenant: tenancy.MustFrom(ctx).Slug, Product: a.Product}, nil
+}
+
+// MatrixRecoveryWrappers es la respuesta de GET /matrix/recovery-wrappers.
+type MatrixRecoveryWrappers struct {
+	Wrappers     []recoverywrap.Wrapper `json:"wrappers"`
+	LegacyEscrow bool                   `json:"legacy_escrow"`
+}
+
+// MatrixRecoveryWrappers devuelve los envoltorios de esa cuenta de quien pregunta.
+// La identidad sale del token OIDC y pasa la misma comprobación que el bootstrap
+// de Matrix y el de almacenamiento: nadie lee los de otra persona ni los de una
+// organización que no es suya. Aunque los leyera, no los podría abrir.
+func (s *Service) MatrixRecoveryWrappers(ctx context.Context, actor string, account MatrixRecoveryAccount) (MatrixRecoveryWrappers, error) {
+	scope, err := account.resolve(ctx)
+	if err != nil {
+		return MatrixRecoveryWrappers{}, err
 	}
 	if err := s.matrixNativeActor(ctx, actor); err != nil {
-		return err
+		return MatrixRecoveryWrappers{}, err
 	}
-	return s.pstore.PutMatrixRecoveryKey(ctx, actor, key)
+	rows, legacy, err := s.pstore.MatrixRecoveryWrappers(ctx, actor, scope)
+	if err != nil {
+		return MatrixRecoveryWrappers{}, err
+	}
+	out := MatrixRecoveryWrappers{Wrappers: make([]recoverywrap.Wrapper, 0, len(rows)), LegacyEscrow: legacy}
+	for _, row := range rows {
+		var w recoverywrap.Wrapper
+		if json.Unmarshal(row.Wrapper, &w) != nil || w.Validate() != nil {
+			continue
+		}
+		w.ID, w.CreatedAt = row.ID, row.CreatedAt.UTC().Format(time.RFC3339)
+		out.Wrappers = append(out.Wrappers, w)
+	}
+	return out, nil
+}
+
+// PutMatrixRecoveryWrapper guarda el envoltorio que el dispositivo acaba de hacer.
+// Solo comprueba su forma (parámetros mínimos de Argon2id incluidos): abrirlo no
+// puede, porque la clave nunca sale del dispositivo.
+func (s *Service) PutMatrixRecoveryWrapper(ctx context.Context, actor string, account MatrixRecoveryAccount, wrapper recoverywrap.Wrapper) (string, error) {
+	wrapper.ID, wrapper.CreatedAt = "", ""
+	if err := wrapper.Validate(); err != nil {
+		return "", domain.ErrInvalidInput
+	}
+	scope, err := account.resolve(ctx)
+	if err != nil {
+		return "", err
+	}
+	if err := s.matrixNativeActor(ctx, actor); err != nil {
+		return "", err
+	}
+	var raw bytes.Buffer
+	if err := json.NewEncoder(&raw).Encode(wrapper); err != nil {
+		return "", err
+	}
+	return s.pstore.PutMatrixRecoveryWrapper(ctx, actor, scope, wrapper.Kind, wrapper.CredentialID, wrapper.KeyID, bytes.TrimSpace(raw.Bytes()))
 }

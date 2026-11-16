@@ -3,8 +3,7 @@
  * probarla sin DOM: el filtrado por tokens es la única lógica no trivial de
  * CommandPalette (el teclado y el índice activo los lleva `PaletaDeComandos`). docs/CONVENTIONS.md §14.
  */
-import { type IconName } from '@sytue/ui';
-import { plegar } from '@sytue/i18n';
+import { filterCommands, type IconName } from '@sytue/ui';
 
 /**
  * Grupo de la paleta, YA TRADUCIDO. Es texto visible y además entra en el
@@ -27,19 +26,5 @@ export interface PaletteCommand {
   run: () => void | Promise<void>;
 }
 
-/**
- * Filtra por tokens: sin distinción de mayúsculas, cada palabra de la consulta
- * debe aparecer como subcadena en label + keywords + grupo (AND). Preserva el
- * orden de entrada (que ya viene agrupado). Consulta vacía → todos.
- */
-export function filterCommands<T extends { label: string; keywords?: string; group: string }>(
-  commands: T[],
-  query: string,
-): T[] {
-  const tokens = plegar(query).split(/\s+/).filter(Boolean);
-  if (tokens.length === 0) return commands;
-  return commands.filter((c) => {
-    const hay = plegar(`${c.label} ${c.keywords ?? ''} ${c.group}`);
-    return tokens.every((t) => hay.includes(t));
-  });
-}
+/** El filtrado vive en @sytue/ui, junto a la paleta: lo comparte con Sytue Admin. */
+export { filterCommands };

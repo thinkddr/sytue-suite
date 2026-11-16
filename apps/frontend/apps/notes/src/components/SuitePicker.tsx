@@ -161,8 +161,9 @@ export function SuitePicker({ t, origen, onClose, onPick }: Props): JSX.Element 
         ) : error ? (
           <div class="grid h-full place-items-center p-4 text-center">
             <EmptyState
+              compact
               title={t('picker.failed')}
-              illustration={<Icon name="warning" size={36} class="text-danger-text" />}
+              tone="error"
               action={
                 <Button variant="secondary" size="sm" onClick={() => void cargar({ path, q })}>
                   {t('common.retry')}
@@ -172,7 +173,7 @@ export function SuitePicker({ t, origen, onClose, onPick }: Props): JSX.Element 
           </div>
         ) : (items?.length ?? 0) === 0 ? (
           <div class="grid h-full place-items-center p-4">
-            <p class="text-text-muted text-base">{t('picker.empty')}</p>
+            <EmptyState compact title={t('picker.empty')} />
           </div>
         ) : (
           <>

@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -32,6 +33,76 @@ func TestNotaCifradaIncluyeDatosAuxiliaresSinCopiaPublica(t *testing.T) {
 	claro, _, err := AbrirContenidoNota(key, Note{ContentCipher: in.ContentCipher, Data: json.RawMessage(`{"client_id":"opaque","carry_count":5}`)})
 	if err != nil || claro.Title != "secret title" || !bytes.Contains(claro.Data, []byte("private.pdf")) || !bytes.Contains(claro.Data, []byte(`"carry_count":5`)) {
 		t.Fatalf("restauración: %+v, %v", claro, err)
+	}
+}
+
+func TestCifrarV2RechazaEnlacesSelladosSinModificarEntrada(t *testing.T) {
+	key := bytes.Repeat([]byte{7}, 32)
+	for _, links := range []json.RawMessage{json.RawMessage(`[]`), json.RawMessage(`[{"future":9007199254740993}]`)} {
+		in := NoteInput{Title: "original", Data: json.RawMessage(`{"private":"keep"}`)}
+		before, _ := json.Marshal(in)
+		if err := CifrarContenidoNotaConEnlaces(key, &in, links); err == nil {
+			t.Fatal("v2 accepted existing encrypted links")
+		}
+		after, _ := json.Marshal(in)
+		if !bytes.Equal(before, after) {
+			t.Fatal("refused write modified its input")
+		}
+	}
+}
+
+func TestCifrarV2RechazaEnlacesEnClaroSinModificarEntrada(t *testing.T) {
+	key := bytes.Repeat([]byte{7}, 32)
+	in := NoteInput{Title: "original", Links: []NoteLink{{TargetKind: "docs_document", TargetID: "private-id", Label: "secret"}}}
+	before, _ := json.Marshal(in)
+	if err := CifrarContenidoNota(key, &in); err == nil {
+		t.Fatal("v2 accepted links outside the envelope")
+	}
+	after, _ := json.Marshal(in)
+	if !bytes.Equal(before, after) {
+		t.Fatal("refused write modified the original")
+	}
+}
+
+func TestRechazaWALLegadoCifradoAntesDeHTTP(t *testing.T) {
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { calls++; w.WriteHeader(http.StatusNoContent) }))
+	defer srv.Close()
+	client := NewNotes(srv.URL, nil, srv.Client())
+	in := NoteInput{CipherVersion: 2, ContentCipher: "encv1:synthetic", Links: []NoteLink{{TargetKind: "docs_document", TargetID: "private"}}}
+	if _, err := client.CreateNote(t.Context(), "book", in); !errors.Is(err, ErrDatosCifradosNotas) {
+		t.Fatal("create accepted unsafe legacy input", err)
+	}
+	if _, err := client.UpdateNote(t.Context(), "note", "book", in); !errors.Is(err, ErrDatosCifradosNotas) {
+		t.Fatal("update accepted unsafe legacy input", err)
+	}
+	if calls != 0 {
+		t.Fatal("unsafe legacy input reached HTTP", calls)
+	}
+}
+
+func TestRechazaDatosPrivadosYMetadatosAmbiguosAntesDeHTTP(t *testing.T) {
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { calls++; w.WriteHeader(http.StatusNoContent) }))
+	defer srv.Close()
+	client := NewNotes(srv.URL, nil, srv.Client())
+	inputs := []NoteInput{
+		{Content: string([]byte{0xff})},
+		{CipherVersion: 2, ContentCipher: "encv1:x", Title: "private"},
+		{CipherVersion: 2, ContentCipher: "encv1:x", Data: json.RawMessage(`{"attachment":"private"}`)},
+		{CipherVersion: 2, ContentCipher: "encv1:x", Data: json.RawMessage(`{"client_id":"a","client_id":"b"}`)},
+		{CipherVersion: 2, ContentCipher: "encv1:x", ExpectedCrypto: json.RawMessage(`{"secret":"private"}`)},
+	}
+	for _, in := range inputs {
+		if _, err := client.CreateNote(t.Context(), "book", in); !errors.Is(err, ErrDatosCifradosNotas) {
+			t.Fatal("unsafe input accepted", err)
+		}
+		if _, err := client.UpdateNote(t.Context(), "note", "book", in); !errors.Is(err, ErrDatosCifradosNotas) {
+			t.Fatal("unsafe update accepted", err)
+		}
+	}
+	if calls != 0 {
+		t.Fatal("unsafe input reached HTTP", calls)
 	}
 }
 
@@ -189,6 +260,52 @@ func TestDatoNuloHistoricoExigeMigrarSinDestruirElSobre(t *testing.T) {
 		claro, migrar, err := AbrirContenidoNota(key, Note{ContentCipher: cipher, Data: data})
 		if err != nil || !migrar || claro.Title != "kept" {
 			t.Fatal("NULL queda bloqueado sin ruta de migración")
+		}
+	}
+}
+
+func TestSobreDeEnlacesPreservaCamposFuturosYEstadoLegado(t *testing.T) {
+	key := bytes.Repeat([]byte{11}, 32)
+	for _, raw := range []string{"", "[]", `[{"target_kind":"doc","target_id":"s1","label":"privado","future":9007199254740993}]`} {
+		// "" es el sobre legado SIN enlaces: LinksJSON nil. json.RawMessage("") no es nil
+		// (es lo mismo que json.RawMessage{}, que se rechaza más abajo).
+		var links json.RawMessage
+		if raw != "" {
+			links = json.RawMessage(raw)
+		}
+		cipher, err := EmpaquetarNota(key, NotaEnClaro{Title: "title", LinksJSON: links})
+		if err != nil {
+			t.Fatal(err)
+		}
+		out, err := DesempaquetarNota(key, cipher)
+		if err != nil || string(out.LinksJSON) != raw {
+			t.Fatalf("links: %q, %v", out.LinksJSON, err)
+		}
+	}
+	if _, err := EmpaquetarNota(key, NotaEnClaro{LinksJSON: json.RawMessage{}}); err == nil {
+		t.Fatal("empty links JSON accepted")
+	}
+	invalidUTF8 := append([]byte(`[{"label":"`), 0xff)
+	invalidUTF8 = append(invalidUTF8, []byte(`"}]`)...)
+	if _, err := EmpaquetarNota(key, NotaEnClaro{LinksJSON: invalidUTF8}); err == nil {
+		t.Fatal("invalid UTF-8 accepted")
+	}
+	for _, raw := range []string{"null", "{}", "[null]", "[1]"} {
+		if _, err := EmpaquetarNota(key, NotaEnClaro{LinksJSON: json.RawMessage(raw)}); err == nil {
+			t.Fatalf("accepted %q", raw)
+		}
+	}
+	tooLarge := json.RawMessage(`[{"future":"` + strings.Repeat("x", 13<<20) + `"}]`)
+	if _, err := EmpaquetarNota(key, NotaEnClaro{LinksJSON: tooLarge}); err == nil {
+		t.Fatal("over-limit encrypted links accepted")
+	}
+	for _, raw := range []string{`{"links_json":null}`, `{"links_json":""}`, `{"links_json":"[null]"}`} {
+		cipher, err := CifrarTextoNotas(key, raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := DesempaquetarNota(key, cipher); err == nil {
+			t.Fatalf("accepted %s", raw)
 		}
 	}
 }

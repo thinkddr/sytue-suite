@@ -275,6 +275,7 @@ func run() error {
 	mediaSvc.SetDocumentEncryptionReady(cfg.EncryptedDocumentCalls)
 	svc.SetCallMediaTransport(mediaSvc)
 	go svc.RunCallEncryptionExpiry(ctx)
+	go svc.RunMatrixPublicationReconciliation(ctx)
 	// «Llamar desde el documento»: la ACL de Sytue Docs decide quién entra a esas salas.
 	if g := mediaservice.NewCalendarClient(mediaCfg.CalendarURL); g != nil {
 		mediaSvc.SetCalendarGate(g)

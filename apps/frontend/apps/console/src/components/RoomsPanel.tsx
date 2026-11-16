@@ -27,6 +27,7 @@ import {
   Table,
   ToastProvider,
   useToast,
+  Stat,
 } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import { useT, type T } from '../i18n/index.js';
@@ -40,16 +41,6 @@ interface Props {
   stats: RoomsStats | null;
   /** Motivo por el que no hay datos: 403 sin rol, 502 si Rooms no contesta. */
   problema?: number | undefined;
-}
-
-/** Una cifra del resumen. Se pinta aunque valga 0: «ninguno» también es dato. */
-function Cifra({ valor, etiqueta }: { valor: number; etiqueta: string }) {
-  return (
-    <div class="border-border bg-surface-raised rounded-lg border px-4 py-3">
-      <div class="text-2xl font-semibold tabular-nums">{valor}</div>
-      <div class="text-text-muted text-xs">{etiqueta}</div>
-    </div>
-  );
 }
 
 function Inner({ channels, stats, problema, locale, t }: Props & { t: T }) {
@@ -110,10 +101,10 @@ function Inner({ channels, stats, problema, locale, t }: Props & { t: T }) {
     <div class="flex flex-col gap-6">
       {stats && (
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Cifra valor={stats.channels} etiqueta={t('rooms.stat.channels')} />
-          <Cifra valor={stats.private} etiqueta={t('rooms.stat.private')} />
-          <Cifra valor={stats.archived} etiqueta={t('rooms.stat.archived')} />
-          <Cifra valor={stats.teams} etiqueta={t('rooms.stat.teams')} />
+          <Stat label={t('rooms.stat.channels')} value={stats.channels} />
+          <Stat label={t('rooms.stat.private')} value={stats.private} />
+          <Stat label={t('rooms.stat.archived')} value={stats.archived} />
+          <Stat label={t('rooms.stat.teams')} value={stats.teams} />
         </div>
       )}
 

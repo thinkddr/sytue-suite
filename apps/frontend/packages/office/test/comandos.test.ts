@@ -76,7 +76,7 @@ describe('cada fila del registro', () => {
       expect(typeof def.telemetry).toBe('boolean');
       if (def.selection !== undefined) expect(['table', 'image']).toContain(def.selection);
       for (const a of def.shortcuts ?? []) {
-        expect(a.keys).toMatch(/^Ctrl\+(Shift\+)?(Alt\+)?[A-Z0-9]$/);
+        expect(a.keys).toMatch(/^Ctrl\+(Shift\+)?(Alt\+)?[A-Z0-9[\].,\\]$/);
       }
     });
   }
@@ -148,6 +148,51 @@ describe('atajos', () => {
     expect(comandoDelAtajo(tecla('c', { ctrlKey: true }), 'document')).toBeNull();
     // Subrayado no es un comando de la rejilla (allí es un estilo de celda).
     expect(comandoDelAtajo(tecla('u', { ctrlKey: true }), 'spreadsheet')).toBeNull();
+  });
+
+  test('los atajos de Google Docs', () => {
+    const doc = (key: string, mods: Partial<Pulsacion> = {}) =>
+      comandoDelAtajo(tecla(key, { ctrlKey: true, ...mods }), 'document');
+    expect(doc('L', { shiftKey: true })).toEqual({ id: 'alignLeft' });
+    expect(doc('E', { shiftKey: true })).toEqual({ id: 'alignCenter' });
+    expect(doc('R', { shiftKey: true })).toEqual({ id: 'alignRight' });
+    expect(doc('J', { shiftKey: true })).toEqual({ id: 'alignJustify' });
+    expect(doc('1', { altKey: true })).toEqual({ id: 'heading', value: 'h1' });
+    expect(doc('0', { altKey: true })).toEqual({ id: 'heading', value: 'p' });
+    expect(doc(']')).toEqual({ id: 'indent' });
+    expect(doc('[')).toEqual({ id: 'outdent' });
+    expect(doc('.')).toEqual({ id: 'superscript' });
+    expect(doc(',')).toEqual({ id: 'subscript' });
+    expect(doc('\\')).toEqual({ id: 'clearFormat' });
+    expect(doc('k')).toEqual({ id: 'insertLink' });
+    // En la caja de Diapos se pregunta igual, con 'document'; en la rejilla no existen.
+    expect(
+      comandoDelAtajo(tecla('L', { ctrlKey: true, shiftKey: true }), 'spreadsheet'),
+    ).toBeNull();
+  });
+
+  test('con Mayús o con ⌥ casa la tecla por su posición, nunca con AltGr', () => {
+    const doc = (key: string, code: string, mods: Partial<Pulsacion>) =>
+      comandoDelAtajo(tecla(key, { code, ...mods }), 'document');
+    // Ctrl+Mayús+7 escribe «/» en un teclado español y «&» en uno inglés.
+    expect(doc('/', 'Digit7', { ctrlKey: true, shiftKey: true })).toEqual({ id: 'listNumber' });
+    expect(doc('*', 'Digit8', { metaKey: true, shiftKey: true })).toEqual({ id: 'listBullet' });
+    // ⌘⌥1 en un Mac escribe «¡».
+    expect(doc('¡', 'Digit1', { metaKey: true, altKey: true })).toEqual({
+      id: 'heading',
+      value: 'h1',
+    });
+    // AltGr+2 (Ctrl+Alt en Windows) es la «@» del teclado español: se escribe, no titula.
+    expect(doc('@', 'Digit2', { ctrlKey: true, altKey: true })).toBeNull();
+    // Las letras van por `key`: la tecla de la B en un teclado Dvorak (code KeyN) es la B.
+    expect(doc('x', 'KeyB', { ctrlKey: true })).toBeNull();
+  });
+
+  test('ningún atajo pisa los del marco: guardar, buscar, imprimir, el zoom y la hoja de atajos', () => {
+    const marco = ['Ctrl+S', 'Ctrl+F', 'Ctrl+P', 'Ctrl+H', 'Ctrl+0', 'Ctrl+=', 'Ctrl+-', 'Ctrl+/'];
+    for (const id of IDS) {
+      for (const a of COMANDOS[id].shortcuts ?? []) expect(marco).not.toContain(a.keys);
+    }
   });
 
   test('aria-keyshortcuts nombra Control y Meta', () => {

@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"image"
 	"log/slog"
 	"net/url"
 	"slices"
@@ -18,16 +17,13 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
-	"golang.org/x/text/collate"
 
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/buscar"
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
-
-	"git.sytue.eu/sytue/one/apps/fyne/agenda"
-	"git.sytue.eu/sytue/one/apps/fyne/ui"
 )
 
 // App es Sytue Contacts con datos: la Pantalla, que solo sabe pintarse, y lo único de
@@ -41,6 +37,8 @@ type App struct {
 	cancelarVida        context.CancelFunc
 	generacion          uint64
 	cerrada             bool
+	trabajos            int
+	trabajosTerminados  chan struct{}
 	organizacionEnCurso bool
 	cargaLibretas       uint64
 	cargaContactos      uint64
@@ -75,12 +73,15 @@ type App struct {
 	// lanza DESDE el relleno de la lista, que no admite que se la vuelva a refrescar
 	// dentro: el guardián lo encola y lo corre después.
 	enFondoFila func(func())
+	// enUIFoto hands completed reads back to the UI; tests can hold this handoff.
+	enUIFoto func(func())
 
 	todos []api.Contact // los de la libreta activa, ya ordenados
-	// fotos son las fotos traídas, por UID limpio; fotosPedidas, las que ya se han
-	// pedido (tengan o no), con el etag de la tarjeta con que se pidieron.
-	fotos        map[string]image.Image
-	fotosPedidas map[string]string
+	// La caché pertenece al ID de contacto y a la revisión de su tarjeta.
+	fotos         map[string]fotoGuardada
+	fotosPedidas  map[string]peticionFoto
+	secuenciaFoto uint64
+	turnosFoto    chan struct{}
 	// pedido es el contacto que pidió un enlace, hasta que su libreta carga; y
 	// libretaPedida, su libreta si el enlace llegó antes que las libretas.
 	pedido, libretaPedida string
@@ -107,18 +108,19 @@ type App struct {
 // antes de entrar.
 func NuevaApp(t *i18n.Translator, svc *api.Contacts) *App {
 	a := &App{
-		Pantalla:    &Pantalla{T: t},
-		svc:         svc,
-		avisos:      ui.NuevaPilaAvisos(),
-		Plazo:       30 * time.Second,
-		enFondo:     func(f func()) { go f() },
-		enFondoFila: func(f func()) { go f() },
-		favoritos:   map[string]bool{},
-		destacando:  map[string]bool{},
-		marcados:    map[string]bool{},
-		escrituras:  map[string]*ui.Dialogo{},
+		Pantalla:   &Pantalla{T: t},
+		svc:        svc,
+		avisos:     ui.NuevaPilaAvisos(),
+		Plazo:      30 * time.Second,
+		favoritos:  map[string]bool{},
+		destacando: map[string]bool{},
+		marcados:   map[string]bool{},
+		escrituras: map[string]*ui.Dialogo{},
+		turnosFoto: make(chan struct{}, 2),
 	}
-	a.fotos, a.fotosPedidas = map[string]image.Image{}, map[string]string{}
+	a.enFondo, a.enFondoFila = a.lanzar, a.lanzar
+	a.enUIFoto = fyne.Do
+	a.fotos, a.fotosPedidas = map[string]fotoGuardada{}, map[string]peticionFoto{}
 	a.enganchar()
 	return a
 }
@@ -170,10 +172,6 @@ func (a *App) repintar() {
 	a.raiz.Refresh()
 }
 
-func (a *App) ctx() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(a.capturar().ctx, a.Plazo)
-}
-
 func (a *App) abridor() api.Abridor {
 	if a.Abridor != nil {
 		return a.Abridor
@@ -196,7 +194,7 @@ func (a *App) enganchar() {
 	p.AlBuscar = func(s string) { p.Busqueda = s; a.repintar() }
 	p.AlElegirLibreta = func(b api.AddressBook) {
 		scope := a.capturar()
-		a.enFondo(func() { a.abrirLibretaEn(scope, b) })
+		a.programarEn(scope, func(scope cargaContacts) { a.abrirLibretaEn(scope, b) })
 	}
 	p.AlElegirEtiqueta = func(id string) {
 		// Pulsar la etiqueta activa quita el filtro.
@@ -221,19 +219,19 @@ func (a *App) enganchar() {
 		p.Busqueda, p.EtiquetaActiva, p.SoloDestacados = "", "", false
 		a.repintar()
 	}
-	p.AlReintentar = func() { a.enFondo(a.Cargar) }
+	p.AlReintentar = a.IniciarCarga
 	p.Refresco.Actualizar = a.recargarActiva
 	p.Refresco.Puede = func() bool {
 		return a.svc != nil && p.Activa != nil && !a.cerrada && a.vida != nil && a.vida.Err() == nil && !p.SinConexion &&
-			(p.Estado == agenda.Exito || p.Estado == agenda.Vacia) && len(p.Lote) == 0 && !p.DetalleAbierto
+			(p.Estado == ui.EstadoExito || p.Estado == ui.EstadoVacia) && len(p.Lote) == 0 && !p.DetalleAbierto
 	}
 	p.Refresco.Revision = func() uint64 { return a.cargaContactos }
-	p.AlReintentarLibretas = func() { a.enFondo(a.Cargar) }
-	p.AlReintentarEtiquetas = func() { a.enFondo(a.cargarEtiquetas) }
+	p.AlReintentarLibretas = a.IniciarCarga
+	p.AlReintentarEtiquetas = func() { a.programar(a.cargarEtiquetasEn) }
 	p.AlEnviarCorreo = a.enviarCorreo
 	p.AlReunion = a.reunion
 	p.AlCopiar = a.copiar
-	p.AlExportar = func(c api.Contact) { a.enFondo(func() { a.exportar(c) }) }
+	p.AlExportar = func(c api.Contact) { a.programar(func(scope cargaContacts) { a.exportar(scope, c) }) }
 	p.AlAbrirEnlace = a.abrirEnlace
 	p.AlEtiquetar = a.etiquetar
 	p.AlCrearContacto = func() { a.abrirFormulario(nil) }
@@ -254,7 +252,8 @@ func (a *App) enganchar() {
 	p.AlQuitarFoto = a.quitarFoto
 	p.FotoDe = a.fotoDeFila
 	p.AlSubirFoto = func(c api.Contact) {
-		a.fotoDeUnFichero(func(uri string) { a.ponerFoto(c, uri) })
+		scope := a.capturar()
+		a.fotoDeUnFicheroEn(scope, func(uri string) { a.ponerFotoEn(scope, c, uri) })
 	}
 	p.AlImportarVcard = func() { a.elegirEImportar([]string{".vcf"}, a.importarVCard) }
 	p.AlImportarCSV = func() { a.elegirEImportar([]string{".csv"}, a.importarCSV) }
@@ -288,17 +287,122 @@ func (a *App) lienzo() fyne.Canvas {
 	return fyne.CurrentApp().Driver().CanvasForObject(a.raiz)
 }
 
-// Atajo es el de la web para crear: la «n» sola, fuera de un campo de texto y sin
-// nada abierto encima (`esAtajoDeApp`). Lo engancha la ventana con SetOnTypedRune, que
-// en Fyne solo llega cuando no hay nada enfocado: el «fuera de un campo» sale solo.
+// Atajo atiende las letras sueltas de la web (`hojaDeAtajos.ts`): las de Google Contacts.
+// Lo engancha la ventana con SetOnTypedRune, que en Fyne solo llega cuando no hay nada
+// enfocado —el «fuera de un campo» de `esAtajoDeApp` sale solo— o cuando lo que tiene
+// el foco lo deja subir, como la fila de la lista (`FilaContacto.TypedRune`). Con algo
+// abierto encima no hace nada: el teclado es de la capa.
+//
+//	n  nuevo contacto       j/k  siguiente / anterior   /  al buscador
+//	e  editar               s    destacar                x  marcar
+//	?  la hoja de atajos
+//
+// e, s y x actúan sobre la fila enfocada; sin ella, sobre la ficha abierta.
 func (a *App) Atajo(r rune) {
 	c := a.lienzo()
-	if r != 'n' || c == nil || c.Overlays().Top() != nil {
+	if c == nil || c.Overlays().Top() != nil {
 		return
 	}
-	if p := a.Pantalla; p.Activa != nil && !p.SinConexion {
-		a.abrirFormulario(nil)
+	p := a.Pantalla
+	escribe := p.Activa != nil && !p.SinConexion
+	switch r {
+	case 'n':
+		if escribe {
+			a.abrirFormulario(nil)
+		}
+	case '?':
+		a.verAtajos(c)
+	case '/':
+		p.EnfocarBuscador()
+	case 'j', 'k':
+		a.moverCursor(r == 'j')
+	case 'e':
+		if o := a.objetivoDeAtajo(); o != nil && escribe {
+			a.abrirFormulario(o)
+		}
+	case 's':
+		if o := a.objetivoDeAtajo(); o != nil && escribe {
+			a.destacar(*o)
+		}
+	case 'x':
+		if o := a.objetivoDeAtajo(); o != nil && p.AlMarcar != nil {
+			p.AlMarcar(o.ID)
+		}
 	}
+}
+
+// indiceAbierto es la posición de la ficha abierta en la lista filtrada, o -1.
+func (a *App) indiceAbierto() int {
+	p := a.Pantalla
+	if p.Seleccionado == nil {
+		return -1
+	}
+	return slices.IndexFunc(p.Contactos, func(c api.Contact) bool { return c.ID == p.Seleccionado.ID })
+}
+
+// objetivoDeAtajo es sobre quién actúan e, s y x: la fila con el foco; si no, la ficha
+// abierta, aunque el filtro la haya sacado de la lista.
+func (a *App) objetivoDeAtajo() *api.Contact {
+	p := a.Pantalla
+	if i := p.FilaEnfocada(); i >= 0 {
+		c := p.Contactos[i]
+		return &c
+	}
+	if p.Seleccionado == nil {
+		return nil
+	}
+	c := *p.Seleccionado
+	return &c
+}
+
+// moverCursor es j/k. Desde la fila enfocada o la ficha abierta, a la siguiente o la
+// anterior; sin ninguna de las dos, la primera pulsación aterriza en el cursor en vez de
+// saltárselo (como Gmail). Con una ficha abierta la ficha sigue al cursor: leer una
+// libreta de corrido es pulsar j una y otra vez, sin Intro entre medias.
+func (a *App) moverCursor(siguiente bool) {
+	p := a.Pantalla
+	total := len(p.Contactos)
+	if total == 0 {
+		return
+	}
+	base, desde := p.FilaEnfocada(), true
+	if base < 0 {
+		base = a.indiceAbierto()
+	}
+	if base < 0 {
+		base, desde = p.CursorFila(), false
+	}
+	destino := base
+	switch {
+	case desde && siguiente:
+		destino = min(base+1, total-1)
+	case desde:
+		destino = max(base-1, 0)
+	}
+	if p.Seleccionado != nil && p.Contactos[destino].ID != p.Seleccionado.ID {
+		a.elegir(p.Contactos[destino])
+	}
+	p.IrAFila(destino)
+}
+
+// verAtajos abre la hoja de «?» (`ui.MostrarHojaAtajos`), con los dos grupos y el orden
+// de la web.
+func (a *App) verAtajos(c fyne.Canvas) {
+	p := a.Pantalla
+	fila := func(clave string, teclas ...string) ui.AtajoDeTeclado {
+		return ui.AtajoDeTeclado{Teclas: teclas, Descripcion: p.t(clave, nil)}
+	}
+	ui.MostrarHojaAtajos(c, p.t("shortcuts.title", nil), p.t("common.close", nil), []ui.GrupoDeAtajos{
+		{Titulo: p.t("shortcuts.group.move", nil), Atajos: []ui.AtajoDeTeclado{
+			fila("shortcuts.next", "j", "↓"), fila("shortcuts.prev", "k", "↑"),
+			fila("shortcuts.first", p.t("shortcuts.keyHome", nil)), fila("shortcuts.last", p.t("shortcuts.keyEnd", nil)),
+			fila("shortcuts.open", "↵"), fila("list.search", "/"),
+		}},
+		{Titulo: p.t("shortcuts.group.actions", nil), Atajos: []ui.AtajoDeTeclado{
+			fila("nav.newContact", "n"), fila("shortcuts.edit", "e"), fila("shortcuts.star", "s"),
+			fila("shortcuts.select", "x"), fila("shortcuts.help", "?"),
+		}},
+	})
 }
 
 // abrirFormulario abre `ContactModal` para crear (nil) o editar un contacto, y lo
@@ -308,26 +412,29 @@ func (a *App) abrirFormulario(c *api.Contact) *formulario {
 	if lienzo == nil || a.svc == nil || p.Activa == nil {
 		return nil
 	}
+	scope := a.capturar()
 	libreta := *p.Activa
 	f := p.nuevoFormulario(c)
 	if c != nil {
 		f.fotoActual = a.fotoDe(*c)
 	}
 	if a.ElegirFichero != nil {
-		f.subirFoto = a.fotoDeUnFichero
+		f.subirFoto = func(listo func(string)) { a.fotoDeUnFicheroEn(scope, listo) }
 	}
 	if a.IA != nil {
 		idioma := string(p.locale())
 		f.alAsistir = func(texto string, listo func(api.FichaPropuesta, bool)) {
-			a.enFondo(func() { a.pedirFicha(texto, idioma, listo) })
+			a.programarEn(scope, func(scope cargaContacts) { a.pedirFicha(scope, texto, idioma, listo) })
 		}
 	}
 	f.alGuardar = func(in api.ContactInput, listo func(error)) {
 		fotoNueva, quitarFoto := f.fotoNueva, f.fotoQuitada && f.fotoActual != nil
-		a.enFondo(func() { a.guardarContacto(libreta, c, in, fotoNueva, quitarFoto, listo) })
+		a.programarEn(scope, func(scope cargaContacts) { a.guardarContacto(scope, libreta, c, in, fotoNueva, quitarFoto, listo) })
 	}
 	if c != nil {
-		f.alBorrar = func(listo func(error)) { a.enFondo(func() { a.borrarContacto(libreta, *c, listo) }) }
+		f.alBorrar = func(listo func(error)) {
+			a.programarEn(scope, func(scope cargaContacts) { a.borrarContacto(scope, libreta, *c, listo) })
+		}
 	}
 	a.mostrarEscritura("contacto", f.dialogo(lienzo), lienzo)
 	return f
@@ -341,8 +448,11 @@ const plazoIA = 130 * time.Second
 // Sytue AI abre a las apps nativas. Sale lo pegado y nada más, igual que en la web, y el
 // servicio lo manda a su modelo en Scaleway (UE) sin anonimizar. Bloquea: en segundo
 // plano; `listo` llega en el hilo de la interfaz.
-func (a *App) pedirFicha(texto, idioma string, listo func(api.FichaPropuesta, bool)) {
-	ctx, fin := context.WithTimeout(context.Background(), plazoIA)
+func (a *App) pedirFicha(scope cargaContacts, texto, idioma string, listo func(api.FichaPropuesta, bool)) {
+	if !a.vigente(scope) {
+		return
+	}
+	ctx, fin := context.WithTimeout(scope.ctx, plazoIA)
 	defer fin()
 	bruto, err := a.IA.Asistir(ctx, api.PeticionIA{
 		Accion: "ficha", Tipo: "contact", Instruccion: api.InstruccionFicha, Contexto: texto,
@@ -355,7 +465,11 @@ func (a *App) pedirFicha(texto, idioma string, listo func(api.FichaPropuesta, bo
 	} else {
 		ficha, ok = api.LeerFicha(bruto)
 	}
-	fyne.Do(func() { listo(ficha, ok) })
+	fyne.Do(func() {
+		if a.vigente(scope) {
+			listo(ficha, ok)
+		}
+	})
 }
 
 // ConImportar engancha «Trae tus contactos» (`ImportData domains={['contacts']}`, la
@@ -387,7 +501,13 @@ func (a *App) mostrarEscritura(clase string, d *ui.Dialogo, lienzo fyne.Canvas) 
 // es el `useConnectivity` de la web.
 func (a *App) Conexion(red *offline.Monitor) {
 	a.red = red
-	red.Subscribe(func(e offline.State) { fyne.Do(func() { a.conexion(e != offline.Offline) }) })
+	red.Subscribe(func(e offline.State) {
+		fyne.Do(func() {
+			if a.abierta() {
+				a.conexion(e != offline.Offline)
+			}
+		})
+	})
 }
 
 // sinRed dice si el monitor ve la red caída.
@@ -411,25 +531,28 @@ func (a *App) conexion(hay bool) {
 		clear(a.marcados)
 	}
 	a.repintar()
-	if hay && p.Estado == agenda.SinConexion {
-		a.enFondo(a.Cargar)
+	if hay && p.Estado == ui.EstadoSinConexion {
+		a.IniciarCarga()
 	}
 }
 
 // estadoDeFallo es el estado de una carga que no ha llegado: sin red, el suyo.
 func (a *App) estadoDeFallo() Estado {
 	if a.sinRed() {
-		return agenda.SinConexion
+		return ui.EstadoSinConexion
 	}
-	return agenda.Error
+	return ui.EstadoError
 }
 
 // guardarContacto crea (c nil) o actualiza el contacto y, después, su foto. Bloquea:
 // en segundo plano.
-func (a *App) guardarContacto(libreta api.AddressBook, c *api.Contact, in api.ContactInput,
+func (a *App) guardarContacto(scope cargaContacts, libreta api.AddressBook, c *api.Contact, in api.ContactInput,
 	fotoNueva string, quitarFoto bool, listo func(error),
 ) {
-	ctx, fin := a.ctx()
+	if !a.vigente(scope) {
+		return
+	}
+	ctx, fin := context.WithTimeout(scope.ctx, a.Plazo)
 	var err error
 	var guardado api.Contact
 	if c == nil {
@@ -442,7 +565,7 @@ func (a *App) guardarContacto(libreta api.AddressBook, c *api.Contact, in api.Co
 	// hasta ahora. Si falla, la ficha ya está guardada: se avisa aparte.
 	var errFoto error
 	if err == nil && guardado.UID != "" && (fotoNueva != "" || quitarFoto) {
-		ctx, fin := a.ctx()
+		ctx, fin := context.WithTimeout(scope.ctx, a.Plazo)
 		if fotoNueva != "" {
 			errFoto = a.svc.SetPhoto(ctx, guardado.UID, fotoNueva)
 		} else {
@@ -451,6 +574,9 @@ func (a *App) guardarContacto(libreta api.AddressBook, c *api.Contact, in api.Co
 		fin()
 	}
 	fyne.Do(func() {
+		if !a.vigente(scope) {
+			return
+		}
 		if errFoto != nil {
 			slog.Warn("contactos: no se pudo guardar la foto", "error", errFoto)
 			a.avisar(ui.AvisoPeligro, "photo.updateFailed", "")
@@ -466,18 +592,24 @@ func (a *App) guardarContacto(libreta api.AddressBook, c *api.Contact, in api.Co
 		}
 		listo(err)
 		if err == nil {
-			a.olvidarFoto(guardado.UID)
-			a.recargar(libreta)
+			a.olvidarFoto(guardado.ID)
+			a.recargarEn(scope, libreta)
 		}
 	})
 }
 
 // borrarContacto lo manda a la papelera. Bloquea: en segundo plano.
-func (a *App) borrarContacto(libreta api.AddressBook, c api.Contact, listo func(error)) {
-	ctx, fin := a.ctx()
+func (a *App) borrarContacto(scope cargaContacts, libreta api.AddressBook, c api.Contact, listo func(error)) {
+	if !a.vigente(scope) {
+		return
+	}
+	ctx, fin := context.WithTimeout(scope.ctx, a.Plazo)
 	err := a.svc.Delete(ctx, c.ID)
 	fin()
 	fyne.Do(func() {
+		if !a.vigente(scope) {
+			return
+		}
 		if err != nil {
 			slog.Warn("contactos: no se pudo eliminar", "error", err)
 			a.avisar(ui.AvisoPeligro, "form.deleteFailed", "common.tryAgainSoon")
@@ -489,27 +621,33 @@ func (a *App) borrarContacto(libreta api.AddressBook, c api.Contact, listo func(
 		}
 		listo(err)
 		if err == nil {
-			a.recargar(libreta)
+			a.recargarEn(scope, libreta)
 		}
 	})
 }
 
 // recargar es el `reload` de la web: suelta la selección, enseña el esqueleto y trae
 // la libreta otra vez. La ficha sigue al dato fresco (ver cargarContactos).
-func (a *App) recargar(b api.AddressBook) {
+func (a *App) recargar(b api.AddressBook) { a.recargarEn(a.capturar(), b) }
+
+func (a *App) recargarEn(scope cargaContacts, b api.AddressBook) {
+	if !a.vigente(scope) {
+		return
+	}
 	clear(a.marcados)
-	a.Pantalla.Estado = agenda.Cargando
+	a.Pantalla.Estado = ui.EstadoCargando
 	a.repintar()
-	a.enFondo(func() { a.cargarContactos(b) })
+	a.programarEn(scope, func(scope cargaContacts) { a.cargarContactosEn(scope, b) })
 }
 
 // Cargar trae las libretas, abre la primera y, a la vez, los destacados, que son de
 // la persona y no de la libreta. Bloquea: se llama en segundo plano.
-func (a *App) Cargar() {
+func (a *App) Cargar() { a.cargarEn(a.capturar()) }
+
+func (a *App) cargarEn(scope cargaContacts) {
 	if a.svc == nil {
 		return
 	}
-	scope := a.capturar()
 	if !a.vigente(scope) {
 		return
 	}
@@ -523,7 +661,7 @@ func (a *App) Cargar() {
 		a.Pantalla.CargandoLibretas, a.Pantalla.ErrorLibretas = true, false
 		// A refresh of the same account keeps its current contact and form.
 		if a.Pantalla.Activa == nil {
-			a.Pantalla.Estado = agenda.Cargando
+			a.Pantalla.Estado = ui.EstadoCargando
 		}
 		if d := a.Pantalla.Importar; d != nil {
 			if a.importadorCargado {
@@ -535,9 +673,8 @@ func (a *App) Cargar() {
 		}
 		a.repintar()
 	})
-	a.enFondo(func() { a.cargarFavoritosEn(scope) })
 	ctx, fin := context.WithTimeout(scope.ctx, a.Plazo)
-	libretas, err := a.svc.AddressBooks(ctx)
+	libretas, err := a.libretasRefrescadas(ctx, sec > 1)
 	fin()
 	var abrir, refrescar *api.AddressBook
 	adoptada := false
@@ -555,14 +692,25 @@ func (a *App) Cargar() {
 	if !adoptada || !a.vigente(scope) || err != nil {
 		return
 	}
+	a.programarEn(scope, func(scope cargaContacts) { a.cargarFavoritosEn(scope) })
 	if abrir != nil {
 		a.abrirLibretaEn(scope, *abrir)
 	} else if refrescar != nil {
-		a.enFondo(func() { a.cargarEtiquetasEn(scope) })
+		a.programarEn(scope, func(scope cargaContacts) { a.cargarEtiquetasEn(scope) })
 		a.cargarContactosEn(scope, *refrescar)
 	}
 	// Personal contacts are useful before the optional organization import starts.
-	a.enFondo(func() { a.sincronizarOrganizacionEn(scope) })
+	a.programarEn(scope, func(scope cargaContacts) { a.sincronizarOrganizacionEn(scope) })
+}
+
+func (a *App) libretasRefrescadas(ctx context.Context, refresh bool) ([]api.AddressBook, error) {
+	// Initial mount uses the repository already authenticated by PrivateApplication.
+	if refresh {
+		if err := a.svc.RefreshPrivateData(ctx); err != nil {
+			return nil, err
+		}
+	}
+	return a.svc.AddressBooks(ctx)
 }
 
 // recibirLibretas runs on the UI and preserves a selection on same-identity refresh.
@@ -601,7 +749,7 @@ func (a *App) recibirLibretas(scope cargaContacts, sec uint64, libretas []api.Ad
 	}
 	first := libretaInicial(libretas)
 	if first == nil {
-		p.Estado = agenda.Exito
+		p.Estado = ui.EstadoExito
 	}
 	return first
 }
@@ -672,12 +820,16 @@ func (a *App) Vaciar() {
 	p := a.Pantalla
 	a.todos = nil
 	clear(a.favoritos)
+	clear(a.destacando)
 	clear(a.marcados)
 	clear(a.fotos)
 	clear(a.fotosPedidas)
 	p.Libretas, p.Activa, p.Etiquetas, p.Seleccionado = nil, nil, nil, nil
 	p.Busqueda, p.EtiquetaActiva, p.SoloDestacados = "", "", false
-	p.Estado = agenda.Cargando
+	p.ImportOcupado, p.Importando, p.LoteOcupado, p.EtiquetaOcupada = false, "", false, ""
+	p.CargandoLibretas, p.ErrorLibretas, p.CargandoEtiquetas, p.ErrorEtiquetas = false, false, false, false
+	p.DetalleAbierto = false
+	p.Estado = ui.EstadoCargando
 	a.repintar()
 }
 
@@ -698,8 +850,6 @@ func libretaInicial(libretas []api.AddressBook) *api.AddressBook {
 // abrirLibreta la activa y trae sus contactos y sus etiquetas. Cambiar de libreta
 // suelta la ficha, el filtro de etiqueta (las etiquetas son de cada libreta) y la
 // selección.
-func (a *App) abrirLibreta(b api.AddressBook) { a.abrirLibretaEn(a.capturar(), b) }
-
 func (a *App) abrirLibretaEn(scope cargaContacts, b api.AddressBook) {
 	fyne.DoAndWait(func() {
 		if !a.vigente(scope) {
@@ -709,19 +859,20 @@ func (a *App) abrirLibretaEn(scope cargaContacts, b api.AddressBook) {
 		p.Activa, p.Seleccionado, p.EtiquetaActiva = &b, nil, ""
 		p.DetalleAbierto = false
 		clear(a.marcados)
-		p.Estado = agenda.Cargando
+		p.Estado = ui.EstadoCargando
 		a.repintar()
 	})
 	if !a.vigente(scope) {
 		return
 	}
-	a.enFondo(func() { a.cargarEtiquetasEn(scope) })
+	a.programarEn(scope, func(scope cargaContacts) { a.cargarEtiquetasEn(scope) })
 	a.cargarContactosEn(scope, b)
 }
 
-func (a *App) cargarContactos(b api.AddressBook) { a.cargarContactosEn(a.capturar(), b) }
-
 func (a *App) cargarContactosEn(scope cargaContacts, b api.AddressBook) {
+	if !a.vigente(scope) {
+		return
+	}
 	var sec uint64
 	fyne.DoAndWait(func() {
 		if a.vigente(scope) {
@@ -744,7 +895,7 @@ func (a *App) cargarContactosEn(scope cargaContacts, b api.AddressBook) {
 			return
 		}
 		ordenar(lista, p.locale())
-		a.todos, p.Estado = lista, agenda.Exito
+		a.todos, p.Estado = lista, ui.EstadoExito
 		if p.Seleccionado != nil {
 			p.Seleccionado = buscarPorID(lista, p.Seleccionado.ID)
 		}
@@ -752,8 +903,6 @@ func (a *App) cargarContactosEn(scope cargaContacts, b api.AddressBook) {
 		a.abrirPedido()
 	})
 }
-
-func (a *App) cargarEtiquetas() { a.cargarEtiquetasEn(a.capturar()) }
 
 func (a *App) cargarEtiquetasEn(scope cargaContacts) {
 	var libreta string
@@ -787,9 +936,10 @@ func (a *App) cargarEtiquetasEn(scope cargaContacts) {
 
 // cargarFavoritos trae los destacados. Si falla, se sigue sin ellos: la web tampoco
 // dice nada, porque la agenda sin estrellas sigue sirviendo.
-func (a *App) cargarFavoritos() { a.cargarFavoritosEn(a.capturar()) }
-
 func (a *App) cargarFavoritosEn(scope cargaContacts) {
+	if !a.vigente(scope) {
+		return
+	}
 	ctx, fin := context.WithTimeout(scope.ctx, a.Plazo)
 	uids, err := a.svc.Favorites(ctx)
 	fin()
@@ -828,6 +978,11 @@ func (a *App) volcar() {
 		}
 	}
 	p.Contactos = filtrar(a.todos, p.Busqueda, miembros, p.EtiquetaActiva != "", p.SoloDestacados, a.favoritos)
+	// Sin filtro, la lista va por cabeceras A–Z y lo que no empieza por letra, al final:
+	// el cursor y j/k recorren lo que se ve, en el orden en que se ve.
+	if p.ConCabeceras() {
+		p.Contactos = porInicial(p.Contactos, p.locale())
+	}
 	p.CumpleanosPronto = cumpleanosEn(a.todos, time.Now(), 30)
 	// ponytail: se recalcula en cada repintado (cada tecla del buscador). Es O(n) por
 	// claves; con una libreta de miles, recalcularlo solo al cargar.
@@ -899,7 +1054,7 @@ func soloDigitos(s string) string {
 
 // ordenar es el `localeCompare(…, intlTag(locale))` de la web.
 func ordenar(lista []api.Contact, l i18n.Locale) {
-	c := collate.New(l.Tag())
+	c := cotejador(l)
 	slices.SortStableFunc(lista, func(x, y api.Contact) int {
 		return c.CompareString(x.DisplayName(), y.DisplayName())
 	})
@@ -917,6 +1072,11 @@ func buscarPorID(lista []api.Contact, id string) *api.Contact {
 // elegir abre la ficha de un contacto. En ventana estrecha, además, la trae delante.
 func (a *App) elegir(c api.Contact) {
 	a.Pantalla.Seleccionado = &c
+	// El cursor sigue a la ficha abierta (clic, cumpleaños, enlace): el tabulador entra
+	// en la lista por el contacto que se está viendo, no por el primero.
+	if i := a.indiceAbierto(); i >= 0 {
+		a.Pantalla.Cursor = i
+	}
 	a.Pantalla.DetalleAbierto = true
 	a.repintar()
 	a.traerFoto(c)
@@ -938,6 +1098,7 @@ func (a *App) marcarTodo() {
 // destacar pone o quita la estrella. OPTIMISTA, como la web: la estrella cambia al
 // pulsar y, si el servicio dice que no, vuelve atrás y se avisa.
 func (a *App) destacar(c api.Contact) {
+	scope := a.capturar()
 	uid := api.CleanUID(c.UID)
 	// Mientras va la petición de ESE contacto, otro toque no hace nada: es el `busy` de
 	// FavoriteToggle. Sin esto, un doble toque en la estrella de la fila lanzaba
@@ -950,14 +1111,17 @@ func (a *App) destacar(c api.Contact) {
 	nuevo := !a.favoritos[uid]
 	a.ponerFavorito(uid, nuevo)
 	a.repintar()
-	a.enFondo(func() {
-		ctx, fin := a.ctx()
+	a.programarEn(scope, func(scope cargaContacts) {
+		ctx, fin := context.WithTimeout(scope.ctx, a.Plazo)
 		err := a.svc.SetFavorite(ctx, uid, nuevo)
 		fin()
 		if err != nil {
 			slog.Warn("contactos: no se pudo destacar", "error", err)
 		}
 		fyne.Do(func() {
+			if !a.vigente(scope) {
+				return
+			}
 			delete(a.destacando, uid)
 			if err == nil {
 				return
@@ -1041,8 +1205,8 @@ func (a *App) abrirEnlace(destino string) {
 // ponytail: no avisa al terminar. La web tampoco —la descarga la enseña el navegador— y
 // aquí no hay clave de catálogo para «guardado en Descargas». Si hiciera falta, la
 // clave se escribe en la web primero.
-func (a *App) exportar(c api.Contact) {
-	a.guardarVCards(NombreExportacion(c.DisplayName()), []api.Contact{c})
+func (a *App) exportar(scope cargaContacts, c api.Contact) {
+	a.guardarVCards(scope, NombreExportacion(c.DisplayName()), []api.Contact{c})
 }
 
 // guardarVCards deja en Descargas, con ese nombre, las vCards de esos contactos una
@@ -1052,7 +1216,10 @@ func (a *App) exportar(c api.Contact) {
 //
 // Van en UNA petición por tanda (`/contacts/batch/vcard`): la web ya tiene las tarjetas
 // porque lista por CardDAV, y la API REST no las da en el listado.
-func (a *App) guardarVCards(nombre string, cs []api.Contact) {
+func (a *App) guardarVCards(scope cargaContacts, nombre string, cs []api.Contact) {
+	if !a.vigente(scope) {
+		return
+	}
 	// Una petición por tanda de TandaVCard, no una por contacto: una etiqueta de
 	// trescientos eran trescientos GET seguidos, y uno que fallara cortaba los demás.
 	ids := make([]string, len(cs))
@@ -1062,7 +1229,7 @@ func (a *App) guardarVCards(nombre string, cs []api.Contact) {
 	var todo bytes.Buffer
 	var err error
 	for tanda := range slices.Chunk(ids, api.TandaVCard) {
-		ctx, fin := a.ctx()
+		ctx, fin := context.WithTimeout(scope.ctx, a.Plazo)
 		var tarjetas []byte
 		tarjetas, err = a.svc.BatchVCard(ctx, tanda)
 		fin()
@@ -1076,12 +1243,16 @@ func (a *App) guardarVCards(nombre string, cs []api.Contact) {
 		// exportación): un .vcf vacío guardado en silencio parecería una exportación hecha.
 		err = errExportacionVacia
 	}
-	if err == nil {
+	if err == nil && a.vigente(scope) {
 		err = a.guardarDescarga(nombre, todo.Bytes())
 	}
 	if err != nil {
 		slog.Warn("contactos: no se pudo exportar", "error", err)
-		fyne.Do(func() { a.avisar(ui.AvisoPeligro, "common.actionFailed", "common.tryAgainSoon") })
+		fyne.Do(func() {
+			if a.vigente(scope) {
+				a.avisar(ui.AvisoPeligro, "common.actionFailed", "common.tryAgainSoon")
+			}
+		})
 	}
 }
 
@@ -1107,17 +1278,18 @@ func (a *App) exportarLibreta() {
 	if !strings.HasSuffix(nombre, ".vcf") {
 		nombre += ".vcf"
 	}
-	a.enFondo(func() { a.guardarVCards(nombre, todos) })
+	a.programar(func(scope cargaContacts) { a.guardarVCards(scope, nombre, todos) })
 }
 
 // exportarCSV es «Exportar CSV»: TODOS los contactos de la persona, de todas sus
 // libretas, con el nombre de fichero que pone el servicio.
 func (a *App) exportarCSV() {
-	a.enFondo(func() {
-		ctx, fin := a.ctx()
+	scope := a.capturar()
+	a.programarEn(scope, func(scope cargaContacts) {
+		ctx, fin := context.WithTimeout(scope.ctx, a.Plazo)
 		nombre, csv, err := a.svc.ExportCSV(ctx)
 		fin()
-		if err == nil {
+		if err == nil && a.vigente(scope) {
 			if nombre == "" {
 				nombre = strings.TrimSuffix(a.Pantalla.t("io.exportFilename", nil), ".vcf") + ".csv"
 			}
@@ -1125,7 +1297,11 @@ func (a *App) exportarCSV() {
 		}
 		if err != nil {
 			slog.Warn("contactos: no se pudo exportar el CSV", "error", err)
-			fyne.Do(func() { a.avisar(ui.AvisoPeligro, "common.actionFailed", "common.tryAgainSoon") })
+			fyne.Do(func() {
+				if a.vigente(scope) {
+					a.avisar(ui.AvisoPeligro, "common.actionFailed", "common.tryAgainSoon")
+				}
+			})
 		}
 	})
 }
@@ -1162,19 +1338,28 @@ func NombreExportacion(nombre string) string {
 // pulsar y vuelve atrás si el servicio dice que no. El PUT sustituye la pertenencia
 // entera, así que se manda la lista completa de miembros.
 func (a *App) etiquetar(g api.ContactGroup, c api.Contact) {
+	scope := a.capturar()
 	p := a.Pantalla
+	if p.EtiquetaOcupada != "" {
+		return
+	}
 	antes := slices.Clone(p.Etiquetas)
 	miembros := slices.DeleteFunc(slices.Clone(g.Members), func(u string) bool { return u == c.UID })
 	if len(miembros) == len(g.Members) {
 		miembros = append(miembros, c.UID)
 	}
 	a.ponerMiembros(g.ID, miembros)
+	p.EtiquetaOcupada = g.ID
 	a.repintar()
-	a.enFondo(func() {
-		ctx, fin := a.ctx()
+	a.programarEn(scope, func(scope cargaContacts) {
+		ctx, fin := context.WithTimeout(scope.ctx, a.Plazo)
 		guardado, err := a.svc.RenameGroup(ctx, g.ID, g.Name, miembros)
 		fin()
 		fyne.Do(func() {
+			if !a.vigente(scope) {
+				return
+			}
+			p.EtiquetaOcupada = ""
 			if err != nil {
 				slog.Warn("contactos: no se pudo etiquetar", "error", err)
 				p.Etiquetas = antes
@@ -1201,6 +1386,7 @@ func (a *App) ponerMiembros(id string, miembros []string) {
 // servicio hace `uid = ANY`), y después la libreta, los destacados y las etiquetas otra
 // vez. Mientras va, los botones de la barra se apagan (`disabled={busy}`).
 func (a *App) lote(que AccionLote, sel []api.Contact, g *api.ContactGroup) {
+	scope := a.capturar()
 	p := a.Pantalla
 	if a.svc == nil || len(sel) == 0 || p.LoteOcupado {
 		return
@@ -1242,11 +1428,14 @@ func (a *App) lote(que AccionLote, sel []api.Contact, g *api.ContactGroup) {
 	}
 	p.LoteOcupado = true
 	a.repintar()
-	a.enFondo(func() {
-		ctx, fin := a.ctx()
+	a.programarEn(scope, func(scope cargaContacts) {
+		ctx, fin := context.WithTimeout(scope.ctx, a.Plazo)
 		err := hacer(ctx)
 		fin()
 		fyne.Do(func() {
+			if !a.vigente(scope) {
+				return
+			}
 			p.LoteOcupado = false
 			if err != nil {
 				slog.Warn("contactos: la acción en lote ha fallado", "error", err)
@@ -1260,16 +1449,21 @@ func (a *App) lote(que AccionLote, sel []api.Contact, g *api.ContactGroup) {
 			} else {
 				a.avisos.Notificar(ui.NuevoAviso(ui.AvisoExito, exito, ""))
 			}
-			a.recargarTodo()
-			a.enFondo(a.cargarEtiquetas)
+			a.recargarTodoEn(scope)
+			a.programarEn(scope, a.cargarEtiquetasEn)
 		})
 	})
 }
 
 // elegirEImportar abre el selector y, con lo elegido, importa en segundo plano.
-func (a *App) elegirEImportar(extensiones []string, importar func([]byte)) {
+func (a *App) elegirEImportar(extensiones []string, importar func(cargaContacts, []byte)) {
 	if a.ElegirFichero == nil || a.svc == nil || a.Pantalla.ImportOcupado {
 		return
 	}
-	a.ElegirFichero(extensiones, func(datos []byte) { a.enFondo(func() { importar(datos) }) })
+	scope := a.capturar()
+	a.ElegirFichero(extensiones, func(datos []byte) {
+		if a.vigente(scope) {
+			a.programarEn(scope, func(scope cargaContacts) { importar(scope, datos) })
+		}
+	})
 }

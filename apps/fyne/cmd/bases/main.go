@@ -12,6 +12,7 @@
 // Para VERLA hace falta una máquina con pantalla. Lo que corre en cualquier sitio, sin
 // servidor gráfico, es `go test ./apps/bases/...`, que pinta las mismas pantallas con el
 // pintor de software.
+// paridad-web: apps/frontend/apps/bases/src/pages/auth/matrix/callback.astro
 package main
 
 import (
@@ -23,6 +24,7 @@ import (
 	"fyne.io/fyne/v2/app"
 
 	"git.sytue.eu/sytue/one/apps/fyne/apps/bases"
+	"git.sytue.eu/sytue/one/apps/fyne/cifrado"
 	"git.sytue.eu/sytue/one/apps/fyne/editor"
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/sesion"
@@ -30,7 +32,9 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	privateBases "git.sytue.eu/sytue/one/apps/nucleo/bases"
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
+	mx "git.sytue.eu/sytue/one/apps/nucleo/matrix"
 )
 
 func main() {
@@ -58,42 +62,78 @@ func main() {
 	w.SetPadded(false)
 	w.Resize(fyne.NewSize(1280, 800))
 
-	p := bases.NuevaPantalla(t, api.NewBases(s.URL("bases"), s.Sesion, s.ClienteConAviso(nil)), w)
 	// El widget nativo lo lee su propia Fuente, sin depender de la pantalla, y se
 	// vuelve a publicar tras cada escritura del cliente de arriba (ClienteConAviso).
 	s.PublicadorWidget(s.FuenteWidget(t))
-	// «Toda la organización» al compartir es la de la sesión.
-	p.Org = s.Sesion.Organizacion
-	// El enlace de un formulario público es de la WEB (lo abre quien no tiene cuenta):
-	// host y prefijo, y nunca la organización.
-	p.URLPublica = func(ruta string) string { return api.AppURL(s.Apex(), "bases", "", ruta) }
-	// Exportar deja el fichero donde el sistema guarda las descargas.
-	p.Guardar = func(nombre string, r io.Reader) (string, error) {
-		carpeta, err := ficheros.Carpeta()
-		if err != nil {
-			return "", err
-		}
-		return ficheros.Guardar(carpeta, nombre, r)
-	}
+
+	var current *bases.Pantalla
+	var pendingBase, pendingTabla, pendingRegistro string
+
+	private, err := cifrado.NewPrivateApplication(cifrado.PrivateApplicationConfig[*privateBases.Repository]{
+		Suite:       s,
+		Application: a,
+		Window:      w,
+		Product:     "bases",
+		Translate:   func(key string) string { return t.T(key, nil) },
+		Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*privateBases.Repository], error) {
+			return basesPlan(ctx, resources, s)
+		},
+		//nolint:contextcheck // The presenter retains its own mounted lifetime, not this short mount request.
+		Mount: func(_ context.Context, resources *cifrado.Resources[*mx.Client], repository *privateBases.Repository) (cifrado.ApplicationView, error) {
+			facade, err := api.NewBases(s.URL("bases"), resources.HTTP(), nil).WithPrivateData(repository)
+			if err != nil {
+				return cifrado.ApplicationView{}, err
+			}
+			p := bases.NuevaPantalla(t, facade, w)
+			organization := resources.PrivateStorageScope().Tenant
+			p.Org = func() string { return organization }
+			// Quien mira, para contar «Tú» en la actividad de la base.
+			subject := resources.PrivateStorageScope().Subject
+			p.Yo = func() string { return subject }
+			p.URLPublica = func(ruta string) string { return api.AppURL(s.Apex(), "bases", "", ruta) }
+			p.Guardar = func(nombre string, r io.Reader) (string, error) {
+				carpeta, err := ficheros.Carpeta()
+				if err != nil {
+					return "", err
+				}
+				return ficheros.Guardar(carpeta, nombre, r)
+			}
+			p.Elegir = editor.ElegirDelSistema
+			current = p
+			p.Arrancar()
+			if pendingBase != "" {
+				id, tabla, registro := pendingBase, pendingTabla, pendingRegistro
+				pendingBase, pendingTabla, pendingRegistro = "", "", ""
+				p.AbrirEnlace(id, tabla, registro)
+			}
+			return cifrado.ApplicationView{
+				Object: p.Objeto(),
+				Detach: func() {
+					if current == p {
+						current = nil
+					}
+				},
+			}, nil
+		},
+	})
+
 	// Adjuntos e importar un CSV: el selector del sistema (en el móvil, el que pone la
 	// sesión) o soltar los ficheros sobre la ventana. El texto soltado (un bloque copiado
 	// de una hoja de cálculo) se pega en la celda sobre la que cae.
-	p.Elegir = editor.ElegirDelSistema
-	w.SetOnDropped(p.Soltado)
-	soltar.AlArrastrar(w, p.Arrastrando)
-	soltar.AlSoltar(w, func(x soltar.Soltado) { p.SoltarTexto(x.Texto, x.Posicion) })
-
-	// Sin nadie dentro, la barra enseña «Iniciar sesión»; al entrar —aquí o en otra app
-	// de la suite— se pide la lista.
-	// conEscena: hasta que corre lo de CuandoHayaEscena, el AlCambiar solo apunta quién
-	// está. El cambio retenido sin escena llega justo antes, y cargar en los dos sitios
-	// pedía la lista dos veces (sesion.CuandoHayaEscena).
-	dentro, conEscena := s.Estado().Dentro(), false
-	s.AlCambiar(func(e sesion.Estado) {
-		if e.Dentro() && !dentro && conEscena {
-			p.Arrancar()
+	w.SetOnDropped(func(pos fyne.Position, uris []fyne.URI) {
+		if current != nil {
+			current.Soltado(pos, uris)
 		}
-		dentro = e.Dentro()
+	})
+	soltar.AlArrastrar(w, func(activa bool) {
+		if current != nil {
+			current.Arrastrando(activa)
+		}
+	})
+	soltar.AlSoltar(w, func(x soltar.Soltado) {
+		if current != nil {
+			current.SoltarTexto(x.Texto, x.Posicion)
+		}
 	})
 
 	// Un enlace a una base llega como `sytue-bases:/bases/base/<id>` (o su dirección
@@ -104,18 +144,27 @@ func main() {
 		case !ok:
 			s.NoEncontrado()
 		case base != "":
-			fyne.Do(func() { p.Abrir(base) })
+			tabla, registro := bases.RegistroDeEnlace(u)
+			fyne.Do(func() {
+				if current != nil {
+					current.AbrirEnlace(base, tabla, registro)
+				} else {
+					pendingBase, pendingTabla, pendingRegistro = base, tabla, registro
+				}
+			})
 		}
 	})
 
-	w.SetContent(ui.NuevaBarraSuite(t, s, iconos.Bases).Montar(p.Objeto()))
-	// Con interfaz: lanzada por iOS solo para el widget no se pide la lista.
-	s.CuandoHayaEscena(func() {
-		conEscena = true
-		if dentro {
-			p.Arrancar()
-		}
-	})
+	if err != nil {
+		w.SetContent(ui.NuevoVacio(t.T("matrix.failed", nil), ""))
+	} else {
+		w.SetContent(ui.NuevaBarraSuite(t, s, iconos.Bases).Montar(private.Objeto()))
+		w.SetOnClosed(private.Close)
+		// Con interfaz: lanzada por iOS solo para el widget no se pide la lista.
+		s.CuandoHayaEscena(func() {
+			private.Start()
+		})
+	}
 	s.Arrancar(context.Background())
 	w.ShowAndRun()
 }

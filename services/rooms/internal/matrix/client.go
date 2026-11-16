@@ -19,12 +19,14 @@ import (
 
 	"github.com/google/uuid"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/rooms/internal/domain"
 )
 
 type Config struct {
 	InternalURL, HomeserverURL, ServerName, SSOProviderID, AdminToken string
+	PublicationSecret                                                 string
 }
 
 type Client struct {
@@ -132,11 +134,15 @@ func (c *Client) SetAccountAccess(ctx context.Context, subject, status string) e
 	if status != "active" && status != "suspended" && status != "deleted" {
 		return domain.ErrInvalidInput
 	}
-	err = c.call(ctx, http.MethodPut, "/_synapse/admin/v1/suspend/"+url.PathEscape(mxid), map[string]bool{"suspend": status != "active"}, nil)
-	if errors.Is(err, domain.ErrNotFound) {
-		return nil
+	if err := c.setUserAccess(ctx, mxid, status != "active"); err != nil {
+		return err
 	}
-	return err
+	// A global reactivation does not reopen storage in removed organizations.
+	// Each scoped account resumes only under its fresh tenant identity gate.
+	if status != "active" {
+		return c.RevokeStorageAccess(ctx, subject, "")
+	}
+	return nil
 }
 
 type IdentityGate interface {
@@ -154,17 +160,22 @@ func (c *Client) EnsureUser(ctx context.Context, subject string) (string, error)
 		return "", domain.ErrMatrixUnavailable
 	}
 	err = c.identityGate.WithMatrixIdentity(ctx, subject, func(ctx context.Context) error {
-		if _, ok := c.users.Load(mxid); ok {
-			return nil
-		}
-		body := map[string]any{"external_ids": []map[string]string{{"auth_provider": c.cfg.SSOProviderID, "external_id": subject}}, "logout_devices": false}
-		if err := c.call(ctx, http.MethodPut, "/_synapse/admin/v2/users/"+url.PathEscape(mxid), body, nil); err != nil {
-			return err
-		}
-		c.users.Store(mxid, true)
-		return nil
+		return c.provisionUser(ctx, mxid, c.cfg.SSOProviderID, subject)
 	})
 	return mxid, err
+}
+
+// Called only while the Sytue identity gate is held by the caller.
+func (c *Client) provisionUser(ctx context.Context, mxid, provider, external string) error {
+	if _, ok := c.users.Load(mxid); ok {
+		return nil
+	}
+	body := map[string]any{"external_ids": []map[string]string{{"auth_provider": provider, "external_id": external}}, "logout_devices": false}
+	if err := c.call(ctx, http.MethodPut, "/_synapse/admin/v2/users/"+url.PathEscape(mxid), body, nil); err != nil {
+		return err
+	}
+	c.users.Store(mxid, true)
+	return nil
 }
 
 type stateEvent struct {
@@ -272,16 +283,28 @@ func (c *Client) EnsureDraftRoom(ctx context.Context, tenant, subject, room stri
 // EnsureStorageRoom provisions only routing and membership. The controller is
 // excluded from key sharing by the clients, just as in encrypted Rooms channels.
 func (c *Client) EnsureStorageRoom(ctx context.Context, tenant, subject, product, room string) (string, error) {
+	return c.EnsureStorageRoomPolicy(ctx, tenant, subject, product, room, false)
+}
+
+// EnsureStorageRoomPolicy is also used by bootstrap after a durable cutover
+// fence: reauthentication must not grant old clients write access again.
+func (c *Client) EnsureStorageRoomPolicy(ctx context.Context, tenant, subject, product, room string, readOnly bool) (string, error) {
 	if !domain.StorageProduct(product) {
 		return "", domain.ErrInvalidInput
 	}
 	if _, err := c.UserID(subject); err != nil {
 		return "", err
 	}
-	return c.ensureRoom(ctx, "storage_"+product+"_"+tenant+"_"+subject, room, []string{subject}, false)
+	return c.ensureRoom(ctx, "storage_"+product+"_"+tenant+"_"+subject, room, []string{subject}, readOnly)
 }
 
 func (c *Client) ensureRoom(ctx context.Context, local, room string, subjects []string, archived bool) (string, error) {
+	return c.ensureRoomWithPolicy(ctx, local, room, archived, func(ctx context.Context, room string) error {
+		return c.Reconcile(ctx, room, subjects, archived, true)
+	})
+}
+
+func (c *Client) ensureRoomWithPolicy(ctx context.Context, local, room string, archived bool, reconcile func(context.Context, string) error) (string, error) {
 	if room == "" {
 		var resolved struct {
 			RoomID string `json:"room_id"`
@@ -311,7 +334,7 @@ func (c *Client) ensureRoom(ctx context.Context, local, room string, subjects []
 	if !modernRoomID.MatchString(room) && (!strings.HasPrefix(room, "!") || !strings.HasSuffix(room, ":"+c.cfg.ServerName) || strings.ContainsAny(room, "\r\n\x00")) {
 		return "", domain.ErrMatrixUnavailable
 	}
-	if err := c.Reconcile(ctx, room, subjects, archived, true); err != nil {
+	if err := reconcile(ctx, room); err != nil {
 		return "", err
 	}
 	return room, nil
@@ -435,6 +458,10 @@ func (c *Client) Reconcile(ctx context.Context, room string, subjects []string, 
 	if err != nil {
 		return err
 	}
+	return c.reconcilePolicy(ctx, room, p, desired, archived, invite)
+}
+
+func (c *Client) reconcilePolicy(ctx context.Context, room string, p roomPolicy, desired map[string]bool, archived, invite bool) error {
 	extras, missing := c.memberChanges(p, desired, invite)
 	policyOK := c.validPowers(p.Powers, archived, p.Version)
 	controllerJoined := p.Members[c.controller()] == "join"
@@ -456,6 +483,20 @@ func (c *Client) ValidateEvent(ctx context.Context, ref domain.MatrixEventRef, s
 	if err != nil {
 		return err
 	}
+	return c.validateEncryptedEvent(ctx, ref, mxid)
+}
+
+// ValidateStorageEvent checks the isolated sender, never a human account with
+// the same subject and never the private encrypted payload.
+func (c *Client) ValidateStorageEvent(ctx context.Context, ref domain.MatrixEventRef, scope storage.Scope) error {
+	mxid, err := c.StorageUserID(scope)
+	if err != nil {
+		return err
+	}
+	return c.validateEncryptedEvent(ctx, ref, mxid)
+}
+
+func (c *Client) validateEncryptedEvent(ctx context.Context, ref domain.MatrixEventRef, mxid string) error {
 	if !strings.HasPrefix(ref.EventID, "$") || len(ref.EventID) > 1024 || strings.ContainsAny(ref.EventID, "\r\n\x00") {
 		return domain.ErrInvalidInput
 	}

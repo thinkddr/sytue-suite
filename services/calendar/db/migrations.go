@@ -6,12 +6,18 @@
 // embed debe vivir junto a los ficheros: //go:embed no admite rutas con "..".
 package db
 
-import "embed"
+import (
+	"embed"
+
+	"git.sytue.eu/sytue/one/platform/pkg/pg"
+)
 
 // Migrations contiene los ficheros db/migrations/*.sql embebidos.
 //
 //go:embed migrations/*.sql
-var Migrations embed.FS
+var migrationFiles embed.FS
+
+var Migrations = pg.WithScopeAdmissionDDL(pg.WithScopeBoundMergeDDL(pg.WithPrivateIngressDDL(migrationFiles)))
 
 // MigrationsDir es la subcarpeta dentro de Migrations con los .sql.
 const MigrationsDir = "migrations"

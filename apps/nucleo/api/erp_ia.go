@@ -211,9 +211,16 @@ func (e *ERP) CrearAcciones(ctx context.Context, pasos []ERPPasoPlan) (ERPCreado
 
 // ERPRelleno son los campos que Sytue AI ha leído de un texto, y el nombre de las
 // relaciones que ha encontrado. No se ha guardado nada.
+//
+// La lectura de una factura (el asistente de facturas) añade lo demás: el contacto que
+// se propone crear, el número que la factura traía y, si ya entró antes, el registro
+// existente, que es lo que manda saltar a adjuntar en vez de duplicarla.
 type ERPRelleno struct {
-	Data      map[string]any    `json:"data"`
-	Etiquetas map[string]string `json:"etiquetas"`
+	Data         map[string]any    `json:"data"`
+	Etiquetas    map[string]string `json:"etiquetas"`
+	Contacto     map[string]any    `json:"contacto,omitempty"`
+	NumeroOrigen string            `json:"numero_origen,omitempty"`
+	Existente    *ERPRegistro      `json:"existente,omitempty"`
 }
 
 // RellenarFicha lee un texto pegado y devuelve los campos de una ficha de `modelo`
@@ -228,5 +235,16 @@ func (e *ERP) RellenarFichaPDF(ctx context.Context, modelo string, pdf []byte) (
 	r := e.pedir("/"+url.PathEscape(modelo)+"/ia/rellenar", nil)
 	r.Method, r.Body = http.MethodPost, pdf
 	r.Header.Set("Content-Type", "application/pdf")
+	return JSON[ERPRelleno](ctx, e.c, r)
+}
+
+// LeerFacturaXML lee una factura electrónica de proveedor (Facturae, UBL o CII) y
+// prepara una factura recibida para revisar (`POST /api/v1/factura_compra/asistencia/leer`).
+// No crea nada: ni la factura ni el contacto. Solo vale para recibidas: un XML de venta
+// ya emitido no se vuelve a emitir desde aquí.
+func (e *ERP) LeerFacturaXML(ctx context.Context, xml []byte) (ERPRelleno, error) {
+	r := e.pedir("/"+ERPFacturaCompra+"/asistencia/leer", nil)
+	r.Method, r.Body = http.MethodPost, xml
+	r.Header.Set("Content-Type", "application/xml")
 	return JSON[ERPRelleno](ctx, e.c, r)
 }

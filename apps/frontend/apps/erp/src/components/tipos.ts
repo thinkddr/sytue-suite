@@ -119,6 +119,25 @@ export interface Asiento {
   apuntes?: Apunte[] | null;
 }
 
+/**
+ * Un movimiento del libro de cierres. `hasta` es la última fecha CERRADA tras el
+ * movimiento —llega como instante RFC 3339, se mira solo el día—; sin ella, la
+ * reapertura dejó el libro abierto entero.
+ */
+export interface MovimientoCierre {
+  hasta?: string | null;
+  accion: 'cierre' | 'reapertura';
+  motivo?: string;
+  por?: string;
+  en: string;
+}
+
+/** `GET contabilidad/cierre`: vacío, el libro está abierto entero. */
+export interface EstadoCierre {
+  cerrado_hasta: string;
+  historial: MovimientoCierre[] | null;
+}
+
 /** Una fila del sumas y saldos. */
 export interface SaldoCuenta {
   cuenta: string;
@@ -294,6 +313,36 @@ export interface MisPermisos {
   modulos: Record<string, NivelPermiso>;
   /** Módulos en los que ya ha pedido editar (la franja dice «Petición enviada»). */
   pedidos?: string[];
+}
+
+/** En qué punto está una solicitud de aprobación. */
+export type EstadoAprobacion = 'pendiente' | 'aprobada' | 'rechazada';
+
+/**
+ * Solicitud de una segunda persona para un documento que pasa del umbral de su
+ * módulo. Importe y divisa quedan congelados al pedirla (los calcula el servicio).
+ */
+export interface Aprobacion {
+  id: string;
+  modelo: string;
+  registro_id: string;
+  /** Céntimos enteros. */
+  importe: number;
+  moneda: string;
+  estado: EstadoAprobacion;
+  solicitada_por: string;
+  solicitada_en: string;
+  creada_por?: string;
+  resuelta_por?: string;
+  resuelta_en?: string;
+  motivo?: string;
+}
+
+/** Umbral de aprobación de un módulo, en céntimos. */
+export interface Umbral {
+  modulo: string;
+  importe: number;
+  moneda: string;
 }
 
 /** Tarea con vencimiento sobre un registro (las «actividades» de Odoo). */

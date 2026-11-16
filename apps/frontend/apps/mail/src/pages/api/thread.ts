@@ -9,6 +9,10 @@
  * conversación (Papelera y Spam quedan fuera salvo que estés en ellas). Sin
  * paginación —un hilo son decenas de mensajes y el servicio impone un tope—.
  * Owner-scoped: un hilo ajeno sale vacío (el servicio filtra por cuenta + RLS).
+ *
+ * Con los mensajes va el estado del hilo: `muted` (silenciado) y `snoozedUntil`
+ * (hasta cuándo está pospuesto, o null), que el lector enseña y usa para decidir
+ * qué ofrecer.
  */
 import type { APIRoute } from 'astro';
 import { getApiSession } from '../../lib/session.js';
@@ -18,6 +22,8 @@ export const prerender = false;
 
 interface ThreadResponse {
   messages?: unknown[];
+  muted?: boolean;
+  snoozed_until?: string | null;
 }
 
 export const GET: APIRoute = async (ctx) => {
@@ -39,7 +45,11 @@ export const GET: APIRoute = async (ctx) => {
       ...toEmailSummary(m as never),
       mailboxId: (m as { mailbox_id?: string }).mailbox_id ?? '',
     }));
-    return json({ emails });
+    return json({
+      emails,
+      muted: body.muted === true,
+      snoozedUntil: body.snoozed_until ?? null,
+    });
   } catch {
     return json({ error: 'mail_error' }, 502);
   }

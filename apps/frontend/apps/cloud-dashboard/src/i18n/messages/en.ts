@@ -82,14 +82,6 @@ export const en = {
   'palette.group.navigation': 'Navigation',
   'palette.group.actions': 'Actions',
   'palette.group.projects': 'Projects',
-  'palette.dialog': 'Command palette',
-  'palette.inputLabel': 'Search commands, projects and actions',
-  'palette.placeholder': 'Search or jump to…',
-  'palette.results': 'Results',
-  'palette.noResults': 'No results for “{query}”.',
-  'palette.hint.move': 'move',
-  'palette.hint.open': 'open',
-  'palette.hint.close': 'close',
   'palette.createProject': 'Create project',
   'palette.createProject.keywords': 'new repository connect deploy git',
   'palette.redeploy': 'Redeploy',
@@ -347,6 +339,24 @@ export const en = {
   'domains.dns.txtValue': 'TXT · value',
   'domains.dns.after':
     'We check every few minutes. Once your DNS has propagated, the domain switches to verified and the certificate is issued on its own.',
+  'domains.check': 'Check now',
+  'domains.check.ok.title': 'Domain verified',
+  'domains.check.ok.desc':
+    'The TXT record is in place and {host} points to Sytue. The certificate is being issued now.',
+  'domains.check.txtMissing.title': 'TXT record not found',
+  'domains.check.txtMissing.desc':
+    'We could not find {record}. Create it with the value above; if you just did, DNS can take a few minutes to propagate.',
+  'domains.check.txtMismatch.title': 'The TXT record has a different value',
+  'domains.check.txtMismatch.desc':
+    '{record} exists, but its value is not this domain’s token. Replace it with the value above.',
+  'domains.check.cname.title': 'Verified, but traffic goes elsewhere',
+  'domains.check.cname.desc':
+    '{host} points to {found}. Point its CNAME to {expected}: the certificate will not be issued until it does.',
+  'domains.check.cname.descNone':
+    '{host} does not resolve yet. Point its CNAME to {expected}: the certificate will not be issued until it does.',
+  'domains.check.tooSoon': 'Wait a few seconds before checking again.',
+  'domains.check.fail': 'Could not check the domain. Try again.',
+  'domains.check.demo': 'In demo mode there is no DNS to check.',
   'domains.deleted': 'Domain removed',
   'domains.deleted.desc': '{host} no longer serves traffic in this project.',
   'domains.delete.fail': 'Could not remove the domain',
@@ -674,15 +684,9 @@ export const en = {
   'tasks.confirm.body': '{name} stops running from now on. Nothing already run is undone.',
 
   // ---- Copiar un valor ----
-  'copy.secret': 'secret',
   'copy.manage': 'Manage',
   'copy.manageLabel': 'Manage {label} in Environment variables',
   'copy.copy': 'Copy',
-  'copy.copyLabel': 'Copy {label}',
-  'copy.copied': 'Copied',
-  'copy.copied.desc': '{label} copied to the clipboard.',
-  'copy.fail': 'Could not copy',
-  'copy.fail.desc': 'Copy the value manually.',
 
   // ---- Facturación ----
   'billing.subtitle':
@@ -888,6 +892,55 @@ export const en = {
   'tplw.create.fail': 'The project could not be created',
   'tplw.demo': 'No control plane connected',
   'tplw.demo.desc': 'Nothing has been created. Try again once the backend is available.',
+  'npw.subtitle': 'From your repository to a live address, one step at a time.',
+  'npw.step.origin': 'Source',
+  'npw.step.origin.heading': 'Where does your code live?',
+  'npw.step.origin.desc':
+    'Paste the address of your Git repository. We look inside it to fill in the rest for you.',
+  'npw.step.configure': 'Configure',
+  'npw.step.configure.heading': 'Name it and check how it is built',
+  'npw.step.configure.desc':
+    'The name becomes its web address. The build settings come from your repository: change them only if they are wrong.',
+  'npw.step.variables': 'Variables',
+  'npw.step.variables.heading': 'Does your app need any variables?',
+  'npw.step.variables.desc':
+    'API keys, database addresses… Add them now and the first deploy already has them. You can also add them later.',
+  'npw.vars.add': 'Add variable',
+  'npw.vars.skip': 'Continue without variables',
+  'npw.vars.empty': 'No variables yet. That is fine if your app does not need any.',
+  'npw.vars.keyLabel': 'Key of variable {n}',
+  'npw.vars.valueLabel': 'Value of variable {n}',
+  'npw.vars.remove': 'Remove variable {n}',
+  'npw.vars.duplicate': 'This key appears more than once: keep only one.',
+  'npw.vars.scope':
+    'They apply to production and previews. You can narrow each one down later in Variables.',
+  'npw.review.vars': 'Variables',
+  'npw.review.vars.none': 'None for now',
+  'npw.review.deploy.value':
+    'Starts as soon as the project is created, and you can follow it here.',
+  'npw.review.order': 'In this order',
+  'npw.review.order.desc':
+    'We create the project, save its variables and start the first deploy. If a step fails, we stop there and tell you why; nothing already done is lost.',
+  'npw.step.deploy': 'Deploy',
+  'npw.task.project': 'Create the project',
+  'npw.task.vars': 'Save the variables ({done} of {total})',
+  'npw.task.deploy': 'Start the first deploy',
+  'npw.task.build': 'Build and publish',
+  'npw.task.build.status': 'Build and publish: {status}',
+  'npw.task.state.pending': 'pending',
+  'npw.task.state.running': 'in progress',
+  'npw.task.state.done': 'done',
+  'npw.task.state.failed': 'failed',
+  'npw.fail.vars': 'Could not save {key}',
+  'npw.fail.deploy': 'The first deploy could not start',
+  'npw.fail.keep': 'The project already exists: trying again continues from here.',
+  'npw.logs.title': 'Build log',
+  'npw.logs.waiting': 'Waiting for the build to start…',
+  'npw.result.ready': 'Your app is online',
+  'npw.result.ready.desc': 'It answers at {url}.',
+  'npw.result.error': 'The build failed',
+  'npw.result.error.desc':
+    'The last lines of the log usually say what is missing. Fix it and push a commit, or redeploy from the project.',
 
   // ---- Monitorización: sondas de uptime ----
   'monitoring.subtitle':

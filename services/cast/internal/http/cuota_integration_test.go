@@ -41,7 +41,7 @@ func TestQuotaHTTPPreservesInternalExternalAndUnknownStorage(t *testing.T) {
 			defer drive.Close()
 			svc := service.New(service.Deps{Store: store.New(database.Pool), Cuota: cuota.New(drive.URL, ""), Firmante: media.New("test-key")})
 			handler := &Handlers{svc: svc}
-			req := httptest.NewRequest(http.MethodGet, "/api/v1/quota", nil)
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/quota", http.NoBody)
 			req.Header.Set("Authorization", "Bearer token-for-test")
 			req = req.WithContext(authn.Into(req.Context(), authn.Claims{Subject: "reader", Tenant: "acme"}))
 			response := httptest.NewRecorder()

@@ -194,13 +194,20 @@ func TestElSelectorDeCuentaGuardaElColorDeLaSuite(t *testing.T) {
 func TestElMenuDeCuentaEsElDeAccountMenuTsx(t *testing.T) {
 	menu := webref.Read(t, "apps/frontend/packages/shell/src/AccountMenu.tsx")
 	idioma := webref.Read(t, "apps/frontend/packages/ui/src/components/LanguageSelect.tsx")
+	seg := webref.Read(t, "apps/frontend/packages/ui/src/components/SegmentedControl.tsx")
 	for _, c := range []struct{ fuente, donde, trozo, porque string }{
 		{menu, "AccountMenu.tsx", `<div class="w-68">`, "el ancho del contenido del menú: 272"},
 		{menu, "AccountMenu.tsx", `class="flex flex-col gap-2 px-2.5 py-2"`, "la banda de preferencias: filas a 8 y su relleno"},
 		{menu, "AccountMenu.tsx", `class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2"`, "la fila: rótulo a la izquierda, grupo a la derecha, y baja si no cabe"},
-		{menu, "AccountMenu.tsx", `class="bg-bg-subtle flex flex-wrap rounded-md p-0.5"`, "el carril del grupo, que también envuelve"},
-		{menu, "AccountMenu.tsx", `'sytue-focus-ring rounded-control flex items-center gap-1.5 px-2 py-1 text-xs font-medium`, "una opción, con el hueco de su muestra"},
-		{menu, "AccountMenu.tsx", `class="size-2.5 rounded-full"`, "la muestra de color"},
+		{menu, "AccountMenu.tsx", `<SegmentedControl
+        size="sm"`, "el grupo es el SegmentedControl pequeño de @sytue/ui"},
+		{seg, "SegmentedControl.tsx", `'bg-bg-subtle rounded-md p-0.5'`, "el carril del grupo"},
+		{seg, "SegmentedControl.tsx", `? 'flex flex-wrap'`, "en la talla pequeña el carril envuelve"},
+		{seg, "SegmentedControl.tsx", `boton: 'h-6 rounded-control',
+    texto: 'text-xs font-medium',
+    margen: 'px-2',`, "una opción pequeña: 24 de alto, `text-xs` medio y `px-2`"},
+		{seg, "SegmentedControl.tsx", `'flex items-center justify-center gap-1.5'`, "el hueco de la muestra hasta el rótulo"},
+		{seg, "SegmentedControl.tsx", `'size-2.5 shrink-0 rounded-full'`, "la muestra de color"},
 		{menu, "AccountMenu.tsx", `const APARIENCIAS = ['light', 'translucent', 'dark', 'system'] as const;`, "las apariencias y su orden"},
 		{menu, "AccountMenu.tsx", `conOrg ? [SEGUIR, ...valores] : valores`, "«Organización» delante, y solo con organización"},
 		{idioma, "LanguageSelect.tsx", `'flex items-center justify-between gap-3'`, "el idioma en una línea"},
@@ -277,7 +284,7 @@ func TestElSegmentadoDelMenuDiceCualEstaElegida(t *testing.T) {
 			menu := tema.Color("menu-surface", v)
 			img := pintaSobre(t, menu, g.MinSize().Width+2*margen, g.MinSize().Height+2*margen, g)
 			// En el relleno de arriba de cada opción (`py-1`), donde no llega el rótulo.
-			sitios, _ := g.reparto()
+			sitios, _, _ := g.reparto()
 			en := func(i int) color.NRGBA {
 				return px(img, int((margen+sitios[i].X+g.anchoOpcion(i)/2)*escala), int((margen+sitios[i].Y+2)*escala))
 			}

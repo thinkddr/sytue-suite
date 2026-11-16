@@ -1,10 +1,10 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 import { expect, test } from 'bun:test';
-import { createClient } from 'matrix-js-sdk';
+import { createClient, Direction } from 'matrix-js-sdk';
 import { DeviceVerificationStatus } from 'matrix-js-sdk/lib/crypto-api';
-import { privateDeviceFetch } from './private-policy.js';
+import { privateDeviceFetch, matrixLifetimeFetch } from './private-policy.js';
 import { SuiteMatrix, type MatrixRecoveryUI, type MatrixSessionAdapter } from './client.js';
-import { validateBootstrap, type MatrixBootstrap } from './types.js';
+import { validateBootstrap, matrixStorePrefix, type MatrixBootstrap } from './types.js';
 
 const approved = new DeviceVerificationStatus({ localVerified: true, crossSigningVerified: false });
 const unapproved = new DeviceVerificationStatus({
@@ -35,6 +35,42 @@ const bootstrap: MatrixBootstrap = {
   storage_room_id: '!private:matrix.test',
   storage_room_ids: ['!private:matrix.test'],
 };
+
+test('isolated account metadata cannot borrow legacy or foreign recovery stores', async () => {
+  const isolated: MatrixBootstrap = {
+    ...bootstrap,
+    storage_identity_version: 2,
+    matrix_user_id: `@sytue_storage_drive_acme_${bootstrap.actor}:matrix.test`,
+  };
+  expect(validateBootstrap(isolated).storage_identity_version).toBe(2);
+  expect(matrixStorePrefix(isolated, 'DEVICE')).not.toBe(matrixStorePrefix(bootstrap, 'DEVICE'));
+  for (const invalid of [
+    { ...isolated, matrix_user_id: own },
+    { ...isolated, storage_product: 'mail' },
+    { ...isolated, tenant: 'other' },
+    { ...isolated, actor: 'another-person' },
+    { ...isolated, storage_product: undefined },
+    { ...isolated, storage_identity_version: 1 },
+    ...[3, -1, '2', null].map((version) => ({ ...isolated, storage_identity_version: version })),
+  ])
+    expect(() => validateBootstrap(invalid as MatrixBootstrap)).toThrow('matrix_identity');
+  const ui: MatrixRecoveryUI = {
+    saveRecoveryKey: async () => {},
+    readRecoveryKey: async () => '',
+    authenticate: async () => {},
+  };
+  const adapter: MatrixSessionAdapter = {
+    readSession: async () => ({
+      user_id: own,
+      device_id: 'LEGACY',
+      access_token: 'artificial',
+      storage_scope: { tenant: 'acme', subject: bootstrap.actor, product: 'drive' },
+    }),
+    forgetSession: async () => {},
+    refreshBootstrap: async () => isolated,
+  };
+  await expect(SuiteMatrix.open(isolated, ui, adapter)).rejects.toThrow('matrix_identity');
+});
 
 test('private key batches reach only concrete verified devices of the owner', async () => {
   const sent: Request[] = [];
@@ -150,10 +186,13 @@ test('closing a private client while trust is checked prevents queued key delive
   const trust = new Promise<DeviceVerificationStatus | null>((resolve) => {
     release = resolve;
   });
-  const send = (async () => {
-    posts++;
-    return new Response('{}');
-  }) as typeof fetch;
+  const send: typeof fetch = Object.assign(
+    async () => {
+      posts++;
+      return new Response('{}');
+    },
+    { preconnect: () => {} },
+  );
   const fetcher = privateDeviceFetch(
     'https://matrix.test',
     own,
@@ -170,10 +209,13 @@ test('closing a private client while trust is checked prevents queued key delive
 
 test('unknown key routes, plaintext room keys, malformed batches and foreign origins fail closed', async () => {
   let posts = 0;
-  const send = (async () => {
-    posts++;
-    return new Response('{}');
-  }) as typeof fetch;
+  const send: typeof fetch = Object.assign(
+    async () => {
+      posts++;
+      return new Response('{}');
+    },
+    { preconnect: () => {} },
+  );
   const fetcher = privateDeviceFetch(
     'https://matrix.test',
     own,
@@ -222,4 +264,117 @@ test('private bootstraps and sessions cannot reuse a legacy Rooms device or anot
     { ...bootstrap, tenant: 'acme\0foreign' },
   ])
     expect(() => validateBootstrap(invalid)).toThrow('matrix_identity');
+});
+
+test('device lifetime cancels ordinary Matrix response bodies and preserves request cancellation', async () => {
+  const lifetime = new AbortController(),
+    caller = new AbortController();
+  let calls = 0;
+  let signal: AbortSignal | undefined;
+  const fetcher = privateDeviceFetch(
+    'https://matrix.test',
+    own,
+    async () => approved,
+    () => false,
+    (async (input, init) => {
+      calls++;
+      signal = new Request(input, init).signal;
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            signal!.addEventListener('abort', () => controller.error(signal!.reason), {
+              once: true,
+            });
+          },
+        }),
+      );
+    }) as typeof fetch,
+    lifetime.signal,
+  );
+  const response = await fetcher('https://matrix.test/_matrix/client/v3/sync', {
+    signal: caller.signal,
+  });
+  const body = response.text();
+  caller.abort(new Error('caller stopped'));
+  await expect(body).rejects.toThrow('caller stopped');
+  const second = await fetcher('https://matrix.test/_matrix/client/v3/sync');
+  const secondBody = second.text();
+  lifetime.abort(new Error('device stopped'));
+  await expect(secondBody).rejects.toThrow('device stopped');
+  await expect(fetcher(target, put())).rejects.toThrow('device stopped');
+  expect(calls).toBe(2);
+});
+
+test('maintained Matrix HTTP recognizes lifetime abort as cancellation without wrapping it as a connection failure', async () => {
+  const lifetime = new AbortController();
+  let began!: () => void;
+  const started = new Promise<void>((resolve) => {
+    began = resolve;
+  });
+  const fetcher = privateDeviceFetch(
+    'https://matrix.test',
+    own,
+    async () => approved,
+    () => false,
+    (async (input, init) => {
+      const signal = new Request(input, init).signal;
+      began();
+      return new Promise<Response>((_resolve, reject) =>
+        signal.addEventListener(
+          'abort',
+          () => reject(signal.reason instanceof Error ? signal.reason : new Error('cancelled')),
+          { once: true },
+        ),
+      );
+    }) as typeof fetch,
+    lifetime.signal,
+  );
+  const sdk = createClient({
+    baseUrl: 'https://matrix.test',
+    userId: own,
+    deviceId: 'ARTIFICIAL',
+    accessToken: 'artificial-only',
+    fetchFn: fetcher,
+    disableVoip: true,
+  });
+  const pending = sdk.whoami();
+  await started;
+  lifetime.abort();
+  await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+  sdk.stopClient();
+});
+
+test('Rooms history requests use the device lifetime without retrying a revoked read', async () => {
+  const lifetime = new AbortController();
+  let began!: () => void;
+  const started = new Promise<void>((resolve) => {
+    began = resolve;
+  });
+  let calls = 0;
+  const sdk = createClient({
+    baseUrl: 'https://matrix.test',
+    userId: own,
+    deviceId: 'ROOMS_HISTORY',
+    accessToken: 'artificial-only',
+    disableVoip: true,
+    fetchFn: matrixLifetimeFetch(lifetime.signal, (async (input, init) => {
+      calls++;
+      const request = new Request(input, init);
+      expect(new URL(request.url).pathname).toBe(
+        '/_matrix/client/v3/rooms/!history%3Amatrix.test/messages',
+      );
+      began();
+      return new Promise<Response>((_resolve, reject) =>
+        request.signal.addEventListener('abort', () => reject(request.signal.reason), {
+          once: true,
+        }),
+      );
+    }) as typeof fetch),
+  });
+  const pending = sdk.createMessagesRequest('!history:matrix.test', null, 100, Direction.Backward);
+  await started;
+  lifetime.abort();
+  await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+  expect(calls).toBe(1);
+  sdk.stopClient();
 });

@@ -26,8 +26,9 @@ export const peerColor = (id: string): string => {
   return `var(--sytue-avatar-${(h % AVATAR_COUNT) + 1})`;
 };
 
-/** Nombre visible de un peer (reserva si viene vacío); se pinta como texto. */
-export const peerName = (name: string): string => name.trim() || 'Colaborador';
+/** Nombre visible de un peer; si viene vacío, `reserva` (`header.peerUnnamed`, la misma
+ *  clave que usa Docus en Fyne). Se pinta como texto. */
+export const peerName = (name: string, reserva: string): string => name.trim() || reserva;
 
 /** Clave de posición para reiniciar la animación de la etiqueta al MOVERSE el
  *  peer (misma clave = misma posición = etiqueta que sigue desvaneciéndose). */

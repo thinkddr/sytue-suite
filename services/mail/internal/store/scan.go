@@ -88,7 +88,7 @@ func scanMessageRow(s scanner, extra ...any) (domain.Message, error) {
 		&m.ID, &m.Tenant, &m.AccountID, &m.MailboxID, &m.ThreadID, &uid,
 		&m.MessageID, &m.InReplyTo, &m.Subject, &m.FromAddr, &m.FromName,
 		&m.To, &m.Cc, &m.Bcc, &m.ReplyTo, &m.Snippet, &m.BlobKey, &m.SizeBytes,
-		&m.Flags, &m.HasAttach, &spf, &dkim, &dmarc, &m.ReceivedAt, &sentAt,
+		&m.Flags, &m.HasAttach, &spf, &dkim, &dmarc, &m.ReceivedAt, &sentAt, &m.UnsnoozedAt,
 	}, extra...)
 	if err := s.Scan(dest...); err != nil {
 		return m, err

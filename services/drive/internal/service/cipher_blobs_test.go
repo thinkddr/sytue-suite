@@ -14,10 +14,11 @@ import (
 )
 
 type memoryCipherBlobs struct {
-	blob      domain.CipherBlob
-	tombstone bool
-	createErr error
-	completed bool
+	blob              domain.CipherBlob
+	tombstone         bool
+	createErr         error
+	commitBeforeError bool
+	completed         bool
 }
 
 func (m *memoryCipherBlobs) CipherBlob(context.Context, string, string) (domain.CipherBlob, error) {
@@ -29,6 +30,9 @@ func (m *memoryCipherBlobs) CipherBlob(context.Context, string, string) (domain.
 
 func (m *memoryCipherBlobs) CreateCipherBlob(_ context.Context, b domain.CipherBlob) (domain.CipherBlob, error) {
 	if m.createErr != nil {
+		if m.commitBeforeError {
+			m.blob = b
+		}
 		return domain.CipherBlob{}, m.createErr
 	}
 	m.blob = b
@@ -59,6 +63,7 @@ func TestCipherBlobRetriesCompensationsAndIndependentBlockLimit(t *testing.T) {
 	if err != nil || saved.ID != id || string(blobs.putBody) != ciphertext {
 		t.Fatal("cipher block did not reach storage", err)
 	}
+	blobs.getBody = ciphertext
 	if _, err = s.PutCipherBlob(ctx, "mail", id, int64(len(ciphertext)), strings.NewReader(ciphertext)); err != nil {
 		t.Fatal("lost receipt could not be retried", err)
 	}
@@ -67,15 +72,36 @@ func TestCipherBlobRetriesCompensationsAndIndependentBlockLimit(t *testing.T) {
 	}
 	records.blob = domain.CipherBlob{}
 	records.createErr = domain.ErrQuotaExceeded
-	if _, err = s.PutCipherBlob(ctx, "mail", id, 3, strings.NewReader("abc")); !errors.Is(err, domain.ErrQuotaExceeded) || len(blobs.delKeys) != 1 {
-		t.Fatal("failed commit leaked upload", err)
+	if _, err = s.PutCipherBlob(ctx, "mail", id, 3, strings.NewReader("abc")); !errors.Is(err, domain.ErrQuotaExceeded) || len(blobs.delKeys) != 0 {
+		t.Fatal("failed commit should retain the upload reservation", err)
 	}
 	records.createErr = nil
-	if _, err = s.PutCipherBlob(ctx, "mail", id, 2, strings.NewReader("abc")); !errors.Is(err, ErrUploadSizeMismatch) || len(blobs.delKeys) != 2 {
+	if _, err = s.PutCipherBlob(ctx, "mail", id, 2, strings.NewReader("abc")); !errors.Is(err, ErrUploadSizeMismatch) || len(blobs.delKeys) != 1 {
 		t.Fatal("declared length silently truncated ciphertext", err)
 	}
 	if _, err = s.PutCipherBlob(tenantCtx(t), "mail", id, 3, strings.NewReader("abc")); !errors.Is(err, domain.ErrPermission) {
 		t.Fatal("unidentified upload", err)
+	}
+}
+
+func TestCipherBlobLostCommitResponsePreservesCommittedCiphertext(t *testing.T) {
+	ctx := store.WithOwner(tenantCtx(t), "alice")
+	id := strings.Repeat("A", 26)
+	blobs := &fakeBlobs{}
+	records := &memoryCipherBlobs{createErr: errBoom, commitBeforeError: true}
+	s := newSvc(&fakeStore{quota: domain.Quota{LimitBytes: 1 << 20}}, blobs, nil)
+	s.cipher = records
+
+	if _, err := s.PutCipherBlob(ctx, "mail", id, 3, strings.NewReader("abc")); !errors.Is(err, errBoom) {
+		t.Fatal("lost commit response should be reported", err)
+	}
+	if records.blob.ID != id || len(blobs.delKeys) != 0 {
+		t.Fatal("uncertain commit deleted ciphertext referenced by the committed row")
+	}
+	blobs.getBody = "abc"
+	records.createErr = nil
+	if saved, err := s.PutCipherBlob(ctx, "mail", id, 3, strings.NewReader("abc")); err != nil || saved.StorageKey != records.blob.StorageKey || len(blobs.delKeys) != 0 {
+		t.Fatal("retry could not recover the committed block", err)
 	}
 }
 

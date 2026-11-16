@@ -3,7 +3,10 @@
 
 package config
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // clearDocsEnv limpia todas las variables que Load puede leer, para que los
 // tests sean deterministas frente al entorno del CI.
@@ -18,6 +21,7 @@ func clearDocsEnv(t *testing.T) {
 		"SYTUE_DOCS_S3_BUCKET", "SYTUE_DOCS_SNAPSHOT_INLINE_LIMIT",
 		"SYTUE_DOCS_SECRET_ENC_KEY", "SYTUE_DOCS_DRAGONFLY_URL",
 		"SYTUE_DOCS_INTEGRATIONS_URL",
+		"SYTUE_DOCS_RESOURCE_SOURCE_SECRET", "SYTUE_DOCS_RESOURCE_SESSION_SECRET",
 	} {
 		t.Setenv(k, "")
 	}
@@ -144,5 +148,33 @@ func TestLoadSecretEncKey(t *testing.T) {
 	t.Setenv("SYTUE_DOCS_SECRET_ENC_KEY", "no-es-base64-válido!!!")
 	if _, err := Load(); err == nil {
 		t.Fatal("Load() debe fallar con base64 inválido")
+	}
+}
+
+func TestResourceSourceCredentialsArePairedAndCanonical(t *testing.T) {
+	for _, test := range []struct {
+		name, source, session string
+		wantOK                bool
+	}{
+		{"off", "", "", true},
+		{"source-only", strings.Repeat("a", 64), "", false},
+		{"session-only", "", strings.Repeat("b", 64), false},
+		{"invalid-source", "invalid", strings.Repeat("b", 64), false},
+		{"invalid-session", strings.Repeat("a", 64), strings.Repeat("B", 64), false},
+		{"configured", strings.Repeat("a", 64), strings.Repeat("b", 64), true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			clearDocsEnv(t)
+			t.Setenv("SYTUE_DOCS_DATABASE_URL", "postgres://localhost/docs")
+			t.Setenv("SYTUE_DOCS_RESOURCE_SOURCE_SECRET", test.source)
+			t.Setenv("SYTUE_DOCS_RESOURCE_SESSION_SECRET", test.session)
+			got, err := Load()
+			if (err == nil) != test.wantOK {
+				t.Fatal("resource source configuration state", test.name, err)
+			}
+			if err == nil && (got.ResourceSourceSecret != test.source || got.ResourceSessionSecret != test.session) {
+				t.Fatal("canonical prefixed source credentials were not loaded")
+			}
+		})
 	}
 }

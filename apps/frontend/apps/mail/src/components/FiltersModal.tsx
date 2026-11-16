@@ -26,14 +26,8 @@ import {
   useToast,
 } from '@sytue/ui';
 import type { IconName, WizardStep } from '@sytue/ui';
-import {
-  listFilters,
-  saveFilter,
-  deleteFilter,
-  type Mailbox,
-  type MailFilter,
-  type MailFilterInput,
-} from '../client/mailApi.js';
+import { type Mailbox, type MailFilter, type MailFilterInput } from '../client/mailApi.js';
+import { usePrivateMailApi } from '../client/privateMailApi.js';
 import { formatList, type Locale } from '@sytue/i18n';
 import { useT, type MailMessageKey } from '../i18n/index.js';
 import { mailboxLabel } from './utils.js';
@@ -76,6 +70,15 @@ function draftValid(d: Draft): boolean {
 }
 
 /**
+ * Destinos de «Mover a…» de una regla: cualquier carpeta salvo Borradores/Enviados
+ * (mover correo entrante ahí no tiene sentido) y «Pospuestos»: lo que entra ahí sin
+ * posponerlo no tiene fecha de vuelta y se quedaría para siempre.
+ */
+export function destinosDeRegla<M extends { role?: string | undefined }>(mailboxes: M[]): M[] {
+  return mailboxes.filter((m) => m.role !== 'drafts' && m.role !== 'sent' && m.role !== 'snoozed');
+}
+
+/**
  * Destinos con nombre propio: cada uno es una consecuencia que se entiende sola.
  * Solo CLAVES: el texto lo resuelve la `t` del componente (el mapa es de módulo y
  * no puede llevar cadenas ya traducidas).
@@ -109,6 +112,7 @@ export function FiltersModal({
   initial,
 }: Props): JSX.Element | null {
   const t = useT(locale);
+  const { listFilters, saveFilter, deleteFilter } = usePrivateMailApi();
   const toast = useToast();
   const [filters, setFilters] = useState<MailFilter[]>([]);
   const [loading, setLoading] = useState(false);
@@ -139,9 +143,7 @@ export function FiltersModal({
     }
   }, [open, initial]);
 
-  // Destinos de «Mover a…»: cualquier carpeta salvo Borradores/Enviados (mover
-  // correo entrante ahí no tiene sentido).
-  const moveTargets = mailboxes.filter((m) => m.role !== 'drafts' && m.role !== 'sent');
+  const moveTargets = destinosDeRegla(mailboxes);
   // Carpetas con consecuencia propia (Archivo/Spam/Papelera) → su tarjeta; el resto
   // caen en «Moverlo a otra carpeta» con un desplegable.
   const roleTargets = moveTargets.flatMap((m) => {
@@ -162,7 +164,7 @@ export function FiltersModal({
     return () => {
       active = false;
     };
-  }, [open, reload]);
+  }, [open, reload, listFilters]);
 
   function mailboxName(id: string): string {
     const mb = mailboxes.find((m) => m.id === id);
@@ -506,7 +508,7 @@ export function FiltersModal({
             <EmptyState
               title={t('rules.emptyTitle')}
               description={t('rules.emptyDescription')}
-              illustration={<Icon name="settings" size={32} />}
+              icon="settings"
               action={
                 <Button variant="primary" leadingIcon={<Icon name="plus" />} onClick={startWizard}>
                   {t('rules.emptyAction')}

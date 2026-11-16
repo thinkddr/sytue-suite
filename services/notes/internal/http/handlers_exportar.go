@@ -45,7 +45,7 @@ func (h *Handlers) ExportNotebook(w http.ResponseWriter, r *http.Request) {
 		))
 		return
 	}
-	nb, notas, err := h.store.ExportNotebook(r.Context(), id, sub(r))
+	nb, notas, err := h.store.ExportNotebook(r.Context(), id, sub(r), formato)
 	if err != nil {
 		httpx.Fail(w, r, traducir(err))
 		return
@@ -216,8 +216,16 @@ func leerVolcado(w http.ResponseWriter, r *http.Request) (domain.Notebook, []dom
 		return domain.Notebook{}, nil, err
 	}
 
-	nb, notas, err := domain.LeerNativo(datos)
+	// Además del `.onex`, Markdown (suelto o en ZIP: Obsidian, Bear, Apple Notas,
+	// Notion) y Evernote (.enex). `?name=` es el nombre del fichero: da título al
+	// cuaderno, que el contenido de esos formatos no trae. El `.onex` se lee con
+	// la validación estricta de transferencia (LeerNativoTransferencia).
+	nb, notas, err := domain.LeerImportable(datos, r.URL.Query().Get("name"))
 	if err != nil {
+		if errors.Is(err, domain.ErrEncryptedMigrationRequired) {
+			httpx.Fail(w, r, traducir(err))
+			return domain.Notebook{}, nil, err
+		}
 		// Los dos motivos se dicen por separado: «esto no es un volcado nuestro»
 		// —el caso de un .onex de OneNote, que es binario y comparte extensión— y
 		// «es más nuevo que esta instalación» piden cosas distintas a quien lo
@@ -229,8 +237,12 @@ func leerVolcado(w http.ResponseWriter, r *http.Request) (domain.Notebook, []dom
 			return domain.Notebook{}, nil, err
 		}
 		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage(
-			"This file is not a Sytue Notepads backup (.onex).",
+			"This file cannot be imported. Use a Sytue Notepads backup (.onex), Markdown (.md or .zip) or Evernote (.enex).",
 		))
+		return domain.Notebook{}, nil, err
+	}
+	if err := domain.ValidateBackupUpload(nb, notas); err != nil {
+		httpx.Fail(w, r, traducir(err))
 		return domain.Notebook{}, nil, err
 	}
 	return nb, notas, nil

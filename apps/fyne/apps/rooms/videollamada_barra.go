@@ -11,6 +11,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/widget"
 
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/llamada"
@@ -35,6 +36,8 @@ var (
 	AnchoPanelLlamada = tema.Espacio(72)
 	// DuracionReaccion es `REACCION_MS`: lo que se ve una reacción antes de irse.
 	DuracionReaccion = 4 * time.Second
+	// DuracionCopiado es lo que dice «Copiado» tras copiar el enlace (los 2 s de la web).
+	DuracionCopiado = 2 * time.Second
 )
 
 // MensajeChat es una línea del chat de la llamada: un mensaje del canal.
@@ -79,11 +82,17 @@ type extrasLlamada struct {
 	Fallo string
 	// AlCopiarEnlace copia el enlace de la reunión; AlDispositivos abre su diálogo.
 	AlCopiarEnlace, AlDispositivos func()
+	// Ventana es la de la llamada, para la pantalla completa; nil, no se ofrece.
+	Ventana fyne.Window
+	// Esperar programa la vuelta de «Copiado» a «Copiar enlace»; nil, se queda.
+	Esperar func(time.Duration, func()) (parar func())
 
 	sinPalabra     map[string]bool
 	reacciones     []reaccionEnVuelo
 	grabPendiente  bool
 	enlaceCopiado  bool
+	pararCopiado   func()
+	aviso          *AvisoSolo
 	entradaChat    *ui.Entrada
 	menuReacciones *ui.Menu
 	menuMas        *ui.Menu
@@ -278,14 +287,7 @@ func (v *VistaLlamada) elementosMas() []fyne.CanvasObject {
 		out = append(out, ui.NuevoElementoMenu(t.T("meet.devices", nil), iconos.Ninguno, v.AlDispositivos))
 	}
 	if v.AlCopiarEnlace != nil {
-		rotulo := t.T("meet.copyLink", nil)
-		if v.enlaceCopiado {
-			rotulo = t.T("meet.linkCopied", nil)
-		}
-		out = append(out, ui.NuevoElementoMenu(rotulo, iconos.Ninguno, func() {
-			v.AlCopiarEnlace()
-			v.enlaceCopiado = true
-		}))
+		out = append(out, ui.NuevoElementoMenu(v.rotuloCopiar(), iconos.Ninguno, v.CopiarEnlace))
 	}
 	// La vista: mosaico u orador (el último que habló en grande).
 	modo := t.T("meet.layoutSpeaker", nil)
@@ -298,6 +300,13 @@ func (v *VistaLlamada) elementosMas() []fyne.CanvasObject {
 		mano = t.T("meet.lowerHand", nil)
 	}
 	out = append(out, ui.NuevoElementoMenu(mano, iconos.Ninguno, v.AlternarMano))
+	if v.ofrecePantallaCompleta() {
+		completa := t.T("meet.fullscreen", nil)
+		if v.PantallaCompleta() {
+			completa = t.T("meet.exitFullscreen", nil)
+		}
+		out = append(out, ui.NuevoElementoMenu(completa, iconos.Ninguno, v.AlternarPantallaCompleta))
+	}
 	if v.Modera {
 		if v.Mod.Grabar != nil {
 			grabar := t.T("meet.startRecording", nil)
@@ -503,4 +512,231 @@ func (v *VistaLlamada) flotantes() fyne.CanvasObject {
 		objs = append(objs, ui.NuevoRotulo(r.emoji, tema.Texto2XL, ui.Normal, "neutral-0"))
 	}
 	return container.New(ui.Fila{Hueco: tema.Espacio(2)}, objs...)
+}
+
+// ---- Copiar el enlace y la pantalla completa ----
+
+// rotuloCopiar es «Copiar enlace», o «Copiado» justo después de copiarlo.
+func (v *VistaLlamada) rotuloCopiar() string {
+	if v.enlaceCopiado {
+		return v.T.T("meet.linkCopied", nil)
+	}
+	return v.T.T("meet.copyLink", nil)
+}
+
+// CopiarEnlace copia el enlace de la reunión y lo dice en el rótulo durante
+// DuracionCopiado, como `copyLink` de la web: es el mismo para el «…» y para el aviso de
+// la sala vacía.
+func (v *VistaLlamada) CopiarEnlace() {
+	if v.AlCopiarEnlace == nil {
+		return
+	}
+	v.AlCopiarEnlace()
+	v.enlaceCopiado = true
+	if v.pararCopiado != nil {
+		v.pararCopiado() // dos copias seguidas: cuentan los 2 s desde la última
+		v.pararCopiado = nil
+	}
+	if v.Esperar != nil {
+		v.pararCopiado = v.Esperar(DuracionCopiado, func() {
+			v.enlaceCopiado, v.pararCopiado = false, nil
+			v.Refresh()
+		})
+	}
+	v.Refresh()
+}
+
+// ofrecePantallaCompleta: en un teléfono la ventana de la llamada ya es la pantalla
+// entera, así que la entrada no significaría nada.
+func (v *VistaLlamada) ofrecePantallaCompleta() bool {
+	return v.Ventana != nil && !ui.EsMovil()
+}
+
+// PantallaCompleta dice si la ventana de la llamada ocupa la pantalla.
+func (v *VistaLlamada) PantallaCompleta() bool {
+	return v.Ventana != nil && v.Ventana.FullScreen()
+}
+
+// AlternarPantallaCompleta es «Pantalla completa» y «Salir de pantalla completa». En la
+// web es la del elemento de la llamada; aquí, la de su ventana, que es lo mismo.
+func (v *VistaLlamada) AlternarPantallaCompleta() {
+	if !v.ofrecePantallaCompleta() {
+		return
+	}
+	v.Ventana.SetFullScreen(!v.Ventana.FullScreen())
+	v.Refresh()
+}
+
+// Tecla son los atajos de la ventana: F11 alterna la pantalla completa y Escape la deja,
+// como el navegador. Escape sin pantalla completa no hace nada: colgar con una tecla
+// suelta sería un resbalón caro.
+func (v *VistaLlamada) Tecla(k *fyne.KeyEvent) {
+	if k == nil {
+		return
+	}
+	switch k.Name {
+	case fyne.KeyF11:
+		v.AlternarPantallaCompleta()
+	case fyne.KeyEscape:
+		if v.PantallaCompleta() {
+			v.AlternarPantallaCompleta()
+		}
+	default:
+		// El resto de teclas no son atajos de la ventana de la llamada.
+	}
+}
+
+// avisoSala es «Todavía no hay nadie más aquí» con su «Copiar enlace»: solo cuando la
+// única tesela es la propia, que es cuando invitar es lo siguiente que se quiere hacer.
+func (v *VistaLlamada) avisoSala(vr tema.Variante) fyne.CanvasObject {
+	if len(v.teselas) != 1 {
+		return nil
+	}
+	if v.aviso == nil {
+		v.aviso = NuevoAvisoSolo(v.T.T("meet.aloneInvite", nil), vr)
+	}
+	v.aviso.Variante = vr
+	v.aviso.Boton = nil
+	if v.AlCopiarEnlace != nil {
+		b := ui.NuevoBoton(v.rotuloCopiar(), v.CopiarEnlace).Con(ui.Secundario, ui.TallaSM)
+		if v.enlaceCopiado {
+			b = b.ConIcono(iconos.Tic, 16)
+		}
+		v.aviso.Boton = b
+	}
+	v.aviso.Refresh()
+	return v.aviso
+}
+
+// AvisoSolo es la caja del aviso de la sala vacía: `rounded-lg border bg-neutral-900
+// px-4 py-2 text-sm text-neutral-300 shadow-md`, con el texto y el botón en fila si caben
+// y, si no (`flex-wrap`), el botón debajo, los dos centrados.
+type AvisoSolo struct {
+	widget.BaseWidget
+	Texto    string
+	Boton    *ui.Boton // nil: no hay enlace que copiar
+	Variante tema.Variante
+}
+
+var (
+	_ fyne.Widget     = (*AvisoSolo)(nil)
+	_ fyne.Accessible = (*AvisoSolo)(nil)
+)
+
+// NuevoAvisoSolo crea el aviso con su texto.
+func NuevoAvisoSolo(texto string, vr tema.Variante) *AvisoSolo {
+	a := &AvisoSolo{Texto: texto, Variante: vr}
+	a.ExtendBaseWidget(a)
+	return a
+}
+
+// AccessibilityLabel es el texto del aviso.
+func (a *AvisoSolo) AccessibilityLabel() string { return a.Texto }
+
+// AccessibilityRole implementa fyne.Accessible.
+func (a *AvisoSolo) AccessibilityRole() fyne.AccessibleRole { return fyne.AccessibleRoleText }
+
+// Medidas del aviso: `px-4 py-2 gap-x-3 gap-y-2`.
+var (
+	aireXAviso  = tema.Espacio(4)
+	aireYAviso  = tema.Espacio(2)
+	huecoXAviso = tema.Espacio(3)
+	huecoYAviso = tema.Espacio(2)
+)
+
+// EnFila dice si el texto y el botón caben en una fila con `ancho` disponible.
+func (a *AvisoSolo) EnFila(ancho float32) bool {
+	return a.anchoFila() <= ancho
+}
+
+func (a *AvisoSolo) anchoFila() float32 {
+	w := 2*aireXAviso + ui.Medir(a.Texto, tema.TextoSM, ui.Normal).Width
+	if a.Boton != nil {
+		w += huecoXAviso + a.Boton.MinSize().Width
+	}
+	return w
+}
+
+// Medida es el tamaño del aviso con `ancho` disponible como mucho.
+func (a *AvisoSolo) Medida(ancho float32) fyne.Size {
+	var boton fyne.Size
+	if a.Boton != nil {
+		boton = a.Boton.MinSize()
+	}
+	if a.EnFila(ancho) {
+		return fyne.NewSize(a.anchoFila(), 2*aireYAviso+max(tema.TextoSM.Linea, boton.Height))
+	}
+	alto := 2*aireYAviso + ui.AltoParrafo(a.parrafo(), max(ancho-2*aireXAviso, 0))
+	if a.Boton != nil {
+		alto += huecoYAviso + boton.Height
+	}
+	return fyne.NewSize(ancho, alto)
+}
+
+func (a *AvisoSolo) parrafo() *ui.Parrafo {
+	p := ui.NuevoParrafo(a.Texto, tema.TextoSM, ui.Normal, "neutral-300", a.Variante)
+	p.Alineacion = fyne.TextAlignCenter
+	return p
+}
+
+// CreateRenderer compone la caja, su sombra, el texto y el botón.
+func (a *AvisoSolo) CreateRenderer() fyne.WidgetRenderer {
+	r := &avisoSoloRenderer{a: a, sombra: ui.NuevaSombra(tema.SombraMD, tema.RadioLG)}
+	r.caja = ui.NuevaCaja(tema.Color("neutral-900", a.Variante), conAlfa(tema.Color("neutral-0", a.Variante), 0x1a), tema.RadioLG)
+	r.texto = a.parrafo()
+	r.Refresh()
+	return r
+}
+
+type avisoSoloRenderer struct {
+	a       *AvisoSolo
+	sombra  *ui.Sombra
+	caja    *ui.Caja
+	texto   *ui.Parrafo
+	objetos []fyne.CanvasObject
+}
+
+func (r *avisoSoloRenderer) MinSize() fyne.Size           { return r.a.Medida(r.a.anchoFila()) }
+func (r *avisoSoloRenderer) Objects() []fyne.CanvasObject { return r.objetos }
+func (r *avisoSoloRenderer) Destroy()                     {}
+
+func (r *avisoSoloRenderer) Layout(t fyne.Size) {
+	a := r.a
+	r.sombra.Ajustar(fyne.Position{}, t, a.Variante)
+	r.caja.Redimensionar(t)
+	var boton fyne.Size
+	if a.Boton != nil {
+		boton = a.Boton.MinSize()
+	}
+	if a.EnFila(t.Width) {
+		ancho := ui.Medir(a.Texto, tema.TextoSM, ui.Normal).Width
+		r.texto.Move(fyne.NewPos(aireXAviso, (t.Height-tema.TextoSM.Linea)/2))
+		r.texto.Resize(fyne.NewSize(ancho, tema.TextoSM.Linea))
+		if a.Boton != nil {
+			a.Boton.Move(fyne.NewPos(aireXAviso+ancho+huecoXAviso, (t.Height-boton.Height)/2))
+			a.Boton.Resize(boton)
+		}
+		return
+	}
+	dentro := max(t.Width-2*aireXAviso, 0)
+	alto := ui.AltoParrafo(r.texto, dentro)
+	r.texto.Move(fyne.NewPos(aireXAviso, aireYAviso))
+	r.texto.Resize(fyne.NewSize(dentro, alto))
+	if a.Boton != nil {
+		a.Boton.Move(fyne.NewPos((t.Width-boton.Width)/2, aireYAviso+alto+huecoYAviso))
+		a.Boton.Resize(boton)
+	}
+}
+
+func (r *avisoSoloRenderer) Refresh() {
+	a := r.a
+	r.caja.Pintar(tema.Color("neutral-900", a.Variante), conAlfa(tema.Color("neutral-0", a.Variante), 0x1a))
+	r.texto.Texto, r.texto.Tinta = a.Texto, tema.Color("neutral-300", a.Variante)
+	r.texto.Refresh()
+	r.objetos = append([]fyne.CanvasObject{r.sombra.Objeto()}, r.caja.Objetos()...)
+	r.objetos = append(r.objetos, r.texto)
+	if a.Boton != nil {
+		r.objetos = append(r.objetos, a.Boton)
+	}
+	r.Layout(a.Size())
 }

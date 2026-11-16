@@ -203,6 +203,72 @@ export function indiceEn(pos: readonly number[], x: number): number {
   return lo;
 }
 
+/* ---------- Redimensionar a mano: arrastrar el borde, doble clic o valor exacto ---------- */
+
+/**
+ * Lo que pide el comando `colwidth`/`rowheight`: un número de px de maqueta, `'auto'`
+ * (autoajuste) o nada válido (null). Se acepta «120», «120px» o «120,5»: es lo que la
+ * gente teclea en el cuadro de «Ancho de columna…».
+ */
+export function leerMedida(valor: string | undefined): number | 'auto' | null {
+  const v = (valor ?? '').trim().toLowerCase();
+  if (v === 'auto') return 'auto';
+  const m = /^(\d+(?:[.,]\d+)?)\s*(?:px)?$/.exec(v);
+  if (!m) return null;
+  const n = Number(m[1]!.replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Mapa de medidas con `indices` puestos a `px` (null = volver a la de serie). La medida se
+ * redondea y se acota a MEDIDA_MIN..tope; la que coincide con la de serie BORRA su clave,
+ * para que el modelo siga guardando solo lo que se aparta (y la coedición, que fusiona por
+ * clave, no arrastre ruido). Devuelve undefined si no queda ninguna.
+ */
+export function conMedidas(
+  medidas: Readonly<Record<string, number>> | undefined,
+  indices: readonly number[],
+  px: number | null,
+  serie: number,
+  tope: number = ANCHO_MAX,
+): Record<string, number> | undefined {
+  const out: Record<string, number> = { ...medidas };
+  const m = px === null ? serie : Math.min(tope, Math.max(MEDIDA_MIN, Math.round(px)));
+  for (const i of indices) {
+    if (m === serie) delete out[String(i)];
+    else out[String(i)] = m;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/** Aire a cada lado del texto en una celda (el `px-1` de la rejilla más el borde). */
+export const AIRE_AJUSTE = 10;
+
+/**
+ * Ancho de autoajuste de una columna a partir de lo que miden sus textos (px, ya medidos
+ * con `measureText`): el más ancho más el aire, acotado. Una columna vacía vuelve a la de
+ * serie, como el doble clic de Excel sobre una columna sin datos.
+ */
+export function anchoAjustado(anchos: readonly number[], serie: number): number {
+  let max = 0;
+  for (const a of anchos) if (Number.isFinite(a) && a > max) max = a;
+  if (max <= 0) return serie;
+  return Math.min(ANCHO_MAX, Math.max(MEDIDA_MIN, Math.ceil(max + AIRE_AJUSTE)));
+}
+
+/**
+ * Alto de autoajuste de una fila a partir de los tamaños de letra (pt) de sus celdas: la
+ * línea de la letra mayor (×4/3 a px, interlineado 1,3) más el aire; nunca por debajo de la
+ * de serie. Sin tamaños propios vuelve a la de serie (no se mide el texto ajustado en
+ * varias líneas: la rejilla no lo pinta así todavía).
+ */
+export function altoAjustado(tamanosPt: readonly number[], serie: number): number {
+  let max = 0;
+  for (const t of tamanosPt) if (Number.isFinite(t) && t > max) max = t;
+  if (max <= 0) return serie;
+  return Math.min(ALTO_MAX, Math.max(serie, Math.ceil(((max * 4) / 3) * 1.3 + 6)));
+}
+
 /**
  * `tramo` para posiciones acumuladas (medidas propias): [desde, hasta) de índices visibles
  * que cubre la ventana [inicio, inicio + largo), con el mismo margen de unidades y

@@ -10,7 +10,7 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import { Button, Select, Skeleton, Switch, cx } from '@sytue/ui';
+import { Button, Select, Skeleton, Switch, cx, EmptyState } from '@sytue/ui';
 import { intlTag, type Locale } from '@sytue/i18n';
 import { suggestSlots, type FreeSlot } from '../client/calendarApi.js';
 import type { T } from '../i18n/index.js';
@@ -175,14 +175,18 @@ export function FindTimePanel({
           <Skeleton height="1.75rem" width="70%" />
         </div>
       ) : error ? (
-        <div class="flex items-center justify-between gap-2">
-          <span class="text-text-subtle text-sm">{t('findTime.error')}</span>
-          <Button variant="secondary" size="sm" onClick={() => setReloadKey((k) => k + 1)}>
-            {t('common.retry')}
-          </Button>
-        </div>
+        <EmptyState
+          compact
+          tone="error"
+          title={t('findTime.error')}
+          action={
+            <Button variant="secondary" size="sm" onClick={() => setReloadKey((k) => k + 1)}>
+              {t('common.retry')}
+            </Button>
+          }
+        />
       ) : starts.length === 0 ? (
-        <p class="text-text-subtle py-2 text-sm">{t('findTime.empty')}</p>
+        <EmptyState compact title={t('findTime.empty')} />
       ) : (
         <ul class="flex flex-col gap-2">
           {[...groups.entries()].map(([day, times]) => (

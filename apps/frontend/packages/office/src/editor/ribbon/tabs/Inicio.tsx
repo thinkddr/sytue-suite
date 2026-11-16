@@ -8,21 +8,27 @@
  * reflejando ctx.fmt (getFormatState) vía aria-pressed / value.
  */
 import type { JSX } from 'preact';
-import { useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { formatNumber, type Locale } from '@sytue/i18n';
 import type { DocsKey } from '../../../i18n';
 import type { EditorContext } from '../../types';
+import { useT } from '../../context';
+import { EditorIcon } from '../../icons';
+import { alternarBrocha, brochaArmada, desarmarBrocha, oirBrocha } from '../../brocha';
+import { MODOS_MAYUSCULAS, type ModoMayusculas } from '../../mayusculas';
 import { useDesborda } from '../banda';
 import { FUENTES } from '../../valores';
 import {
   CONTENT_PALETTE,
   HIGHLIGHT_PALETTE,
+  POPOVER_SHELL,
   RibbonButton,
   RibbonColorSwatch,
   RibbonGroup,
   RibbonSelect,
   RibbonSeparator,
   useBloqueado,
+  usePopover,
 } from '../primitives';
 
 /* Misma receta de foco visible que primitives.tsx (regla de oro §0.6). */
@@ -122,6 +128,91 @@ function StyleChip(props: {
       >
         AaBb
       </span>
+    </div>
+  );
+}
+
+/* ---------- Copiar formato y Cambiar mayúsculas (grupo Fuente) ---------- */
+
+/** La brocha (brocha.ts): pulsada mientras está armada, con el rótulo que dice qué hacer. */
+function BrochaButton(): JSX.Element {
+  const t = useT();
+  const [armada, setArmada] = useState(brochaArmada);
+  useEffect(() => oirBrocha(() => setArmada(brochaArmada())), []);
+  // Al cerrar el documento (o dejar de pintarse la cinta de Inicio) no queda armada a
+  // escondidas sobre un folio que ya no enseña su botón.
+  useEffect(() => desarmarBrocha, []);
+  return (
+    <RibbonButton
+      commandId="formatPainter"
+      icon="formatPainter"
+      label={t(armada ? 'format.painterOn' : 'format.painter')}
+      active={armada}
+      onAction={alternarBrocha}
+    />
+  );
+}
+
+const ROTULO_MAYUSCULAS: Record<ModoMayusculas, DocsKey> = {
+  sentence: 'format.case.sentence',
+  lower: 'format.case.lower',
+  upper: 'format.case.upper',
+  title: 'format.case.title',
+};
+
+const MENU_ITEM =
+  'text-text hover:bg-bg-subtle flex h-8 w-full items-center rounded-sm px-2 text-left text-sm ' +
+  'pointer-coarse:h-auto pointer-coarse:min-h-[max(44px,2.75rem)] ' +
+  FOCUS_RING;
+
+/** «Cambiar mayúsculas y minúsculas»: el botón «Aa» y sus cuatro transformaciones. Cada
+ *  opción se escribe como queda («MAYÚSCULAS», «minúsculas»…), como en Word: el rótulo
+ *  ES la muestra. */
+function CambiarMayusculasMenu({ ctx }: { ctx: EditorContext }): JSX.Element {
+  const { t } = ctx;
+  const bloqueado = useBloqueado('changeCase');
+  const { open, setOpen, rootRef } = usePopover();
+  const label = t('format.changeCase');
+  return (
+    <div ref={rootRef} class="relative">
+      <button
+        type="button"
+        class={
+          'text-text-muted inline-flex h-7 w-7 items-center justify-center rounded-sm ' +
+          'hover:bg-bg-subtle hover:text-text aria-expanded:bg-selected aria-expanded:text-text ' +
+          'disabled:pointer-events-none disabled:opacity-40 ' +
+          FOCUS_RING
+        }
+        aria-label={label}
+        title={label}
+        aria-haspopup="true"
+        aria-expanded={open}
+        disabled={bloqueado}
+        onMouseDown={(e) => e.preventDefault()} // no robar la selección del lienzo (§5)
+        onClick={() => setOpen((v) => !v)}
+      >
+        <EditorIcon name="changeCase" />
+      </button>
+      {open && (
+        // Grupo de botones y no `role="menu"`, como los demás popovers de la cinta: un menú
+        // ARIA promete flechas y foco itinerante, y aquí se recorre con Tab.
+        <div role="group" aria-label={label} class={`${POPOVER_SHELL} left-0 w-64 p-1`}>
+          {MODOS_MAYUSCULAS.map((modo) => (
+            <button
+              key={modo}
+              type="button"
+              class={MENU_ITEM}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                setOpen(false);
+                ctx.exec('changeCase', modo);
+              }}
+            >
+              {t(ROTULO_MAYUSCULAS[modo])}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -236,6 +327,14 @@ export function InicioTab({ ctx }: { ctx: EditorContext }): JSX.Element {
           icon="clearFormat"
           onAction={() => exec('clearFormat')}
         />
+        {/* Copiar formato y Cambiar mayúsculas: solo en el documento (el registro los da
+            por suyos); la caja de Diapos tiene su propia pestaña de Inicio. */}
+        {ctx.kind === 'document' && (
+          <>
+            <BrochaButton />
+            <CambiarMayusculasMenu ctx={ctx} />
+          </>
+        )}
       </RibbonGroup>
 
       <RibbonSeparator />
@@ -277,6 +376,14 @@ export function InicioTab({ ctx }: { ctx: EditorContext }): JSX.Element {
           active={fmt.number}
           onAction={() => exec('listNumber')}
         />
+        {ctx.kind === 'document' && (
+          <RibbonButton
+            commandId="listCheck"
+            icon="listCheck"
+            active={fmt.checklist}
+            onAction={() => exec('listCheck')}
+          />
+        )}
         <RibbonButton commandId="outdent" icon="outdent" onAction={() => exec('outdent')} />
         <RibbonButton commandId="indent" icon="indent" onAction={() => exec('indent')} />
         <RibbonSelect

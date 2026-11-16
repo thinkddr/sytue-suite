@@ -4,21 +4,25 @@ package chathttp
 import (
 	"net/http"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
+
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 )
 
 func (h *Handlers) MatrixNativeStart(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Challenge string `json:"code_challenge"`
-		Product   string `json:"product"`
-		Method    string `json:"code_challenge_method"`
+		NativeConsumer  string                  `json:"native_consumer"`
+		IdentityVersion storage.IdentityVersion `json:"identity_version"`
+		Challenge       string                  `json:"code_challenge"`
+		Product         string                  `json:"product"`
+		Method          string                  `json:"code_challenge_method"`
 	}
 	if err := httpx.DecodeJSON(w, r, &req); err != nil {
 		httpx.Fail(w, r, err)
 		return
 	}
 	actor, _ := caller(r)
-	result, err := h.svc.StartMatrixNative(r.Context(), actor, req.Challenge, req.Method, req.Product)
+	result, err := h.svc.StartMatrixNativeForConsumer(r.Context(), actor, req.Challenge, req.Method, req.Product, req.NativeConsumer, req.IdentityVersion)
 	if err != nil {
 		httpx.Fail(w, r, toAPIError(err))
 		return
@@ -59,20 +63,23 @@ func (h *Handlers) MatrixNativeAccept(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) MatrixNativeFinish(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		State    string `json:"state"`
-		Ticket   string `json:"ticket"`
-		Verifier string `json:"code_verifier"`
+		NativeConsumer  string                  `json:"native_consumer"`
+		State           string                  `json:"state"`
+		Ticket          string                  `json:"ticket"`
+		Verifier        string                  `json:"code_verifier"`
+		Product         string                  `json:"product"`
+		IdentityVersion storage.IdentityVersion `json:"identity_version"`
 	}
 	if err := httpx.DecodeJSON(w, r, &req); err != nil {
 		httpx.Fail(w, r, err)
 		return
 	}
 	actor, _ := caller(r)
-	token, err := h.svc.FinishMatrixNative(r.Context(), actor, req.State, req.Ticket, req.Verifier)
+	token, err := h.svc.FinishMatrixNativeForConsumer(r.Context(), actor, req.State, req.Ticket, req.Verifier, req.Product, req.NativeConsumer, req.IdentityVersion)
 	if err != nil {
 		httpx.Fail(w, r, toAPIError(err))
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	httpx.JSON(w, r, http.StatusOK, map[string]string{"login_token": token})
+	httpx.JSON(w, r, http.StatusOK, map[string]any{"login_token": token, "identity_version": req.IdentityVersion.Normalized(), "native_consumer": req.NativeConsumer})
 }

@@ -45,3 +45,22 @@ test('buildMergeInput: respeta la elección de nombre y hereda organización del
   expect(merged.fullName).toBe('Ana López');
   expect(merged.organization).toBe('ACME');
 });
+
+test('buildMergeInput: con el nombre del perdedor manda su N (no queda el N viejo del superviviente)', () => {
+  const survivor = contact({
+    uid: 'a',
+    fullName: 'Ana',
+    vcard: 'BEGIN:VCARD\r\nFN:Ana\r\nN:Vieja;Ana;;;\r\nEND:VCARD\r\n',
+  });
+  const loser = contact({
+    uid: 'b',
+    fullName: 'Ana López',
+    vcard: 'BEGIN:VCARD\r\nFN:Ana López\r\nN:López;Ana;;;\r\nEND:VCARD\r\n',
+  });
+  const conPerdedor = buildMergeInput(survivor, loser, { fullName: 'Ana López' });
+  expect(conPerdedor.lastName).toBe('López');
+  expect(conPerdedor.firstName).toBe('Ana');
+  // Con el nombre del superviviente no se manda N: se conserva el de su vCard.
+  const conSuperviviente = buildMergeInput(survivor, loser);
+  expect('lastName' in conSuperviviente).toBe(false);
+});

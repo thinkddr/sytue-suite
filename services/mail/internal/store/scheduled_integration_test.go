@@ -42,7 +42,7 @@ func TestScheduledSendReleaseAndIdempotency(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
-	acc := seedAccount(t, ctx, st, "ada@sytue.eu")
+	acc := seedAccount(ctx, t, st, "ada@sytue.eu")
 
 	future := time.Now().Add(time.Hour)
 	id, err := st.EnqueueHeld(ctx, heldMsg(acc), future, domain.HoldScheduled)
@@ -99,7 +99,7 @@ func TestScheduledCancelBeforeRelease(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
-	acc := seedAccount(t, ctx, st, "ada@sytue.eu")
+	acc := seedAccount(ctx, t, st, "ada@sytue.eu")
 
 	id, _ := st.EnqueueHeld(ctx, heldMsg(acc), time.Now().Add(time.Hour), domain.HoldScheduled)
 
@@ -127,7 +127,7 @@ func TestScheduledReschedule(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
-	acc := seedAccount(t, ctx, st, "ada@sytue.eu")
+	acc := seedAccount(ctx, t, st, "ada@sytue.eu")
 
 	id, _ := st.EnqueueHeld(ctx, heldMsg(acc), time.Now().Add(time.Hour), domain.HoldScheduled)
 
@@ -153,7 +153,7 @@ func TestUndoSendCancelWithinWindow(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
-	acc := seedAccount(t, ctx, st, "ada@sytue.eu")
+	acc := seedAccount(ctx, t, st, "ada@sytue.eu")
 
 	// Deshacer = fila retenida con release a unos segundos; no aparece en programados.
 	id, _ := st.EnqueueHeld(ctx, heldMsg(acc), time.Now().Add(10*time.Second), domain.HoldUndo)
@@ -174,8 +174,8 @@ func TestScheduledOwnerIsolation(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
-	accA := seedAccount(t, ctx, st, "ada@sytue.eu")
-	accB := seedAccount(t, ctx, st, "bob@sytue.eu")
+	accA := seedAccount(ctx, t, st, "ada@sytue.eu")
+	accB := seedAccount(ctx, t, st, "bob@sytue.eu")
 
 	future := time.Now().Add(time.Hour)
 	id, _ := st.EnqueueHeld(ctx, heldMsg(accA), future, domain.HoldScheduled)

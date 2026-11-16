@@ -13,8 +13,6 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/widget"
-
-	"git.sytue.eu/sytue/one/apps/nucleo/sistema"
 )
 
 // Gif pinta un GIF ANIMADO, que `canvas.Image` no sabe hacer (se queda en el primer
@@ -27,9 +25,9 @@ import (
 //   - Fuera de la pantalla no avanza: si el widget no está en un lienzo o está oculto,
 //     el reloj se salta el fotograma sin tocar la textura. Al destruirse el renderer, el
 //     reloj se para del todo.
-//   - Con «menos movimiento» (`SinMovimiento` o el ajuste del sistema) enseña el primer
-//     fotograma y no arranca reloj ninguno: es el `prefers-reduced-motion` de la web, que
-//     el navegador aplica a los GIF igual que a las animaciones CSS en Safari y Firefox.
+//   - Con «menos movimiento» (MenosMovimiento) enseña el primer fotograma y no arranca
+//     reloj ninguno: es el `prefers-reduced-motion` de la web, que el navegador aplica a
+//     los GIF igual que a las animaciones CSS en Safari y Firefox.
 //
 // ponytail: fotogramas compuestos en memoria (ancho×alto×4 por fotograma). Para los GIF
 // del catálogo —unos cientos de KiB— es nada; uno de 500 fotogramas a 1080p pediría
@@ -112,7 +110,7 @@ func ComponerGif(g *gif.GIF) ([]image.Image, []time.Duration) {
 
 // animado dice si hay algo que mover.
 func (w *Gif) animado() bool {
-	return len(w.fotogramas) > 1 && !SinMovimiento && !sistema.MenosMovimiento()
+	return len(w.fotogramas) > 1 && !MenosMovimiento()
 }
 
 // CreateRenderer pinta el primer fotograma y arranca el reloj si toca.

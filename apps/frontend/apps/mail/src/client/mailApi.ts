@@ -5,8 +5,16 @@
  * access token nunca toca el navegador para el correo (solo la shell lo usa para
  * el Hub). Reexporta los tipos del SDK @sytue/api-clients para coherencia.
  */
-import type { Mailbox, EmailSummary, EmailAddress, MessageBody } from '@sytue/api-clients';
-import type { MailFilter, MailFilterInput } from '@sytue/api-clients/mail';
+import type {
+  Mailbox,
+  EmailSummary,
+  EmailAddress,
+  MessageBody as SharedMessageBody,
+} from '@sytue/api-clients';
+import type {
+  MailFilter as SharedMailFilter,
+  MailFilterInput as SharedMailFilterInput,
+} from '@sytue/api-clients/mail';
 /*
  * `withBase` en la vuelta al login: la app se sirve bajo su prefijo en el dominio
  * de organización (`<org>.sytue.eu/mail`, `/calendar`…), y ahí `/auth/login` a pelo
@@ -17,7 +25,17 @@ import type { MailFilter, MailFilterInput } from '@sytue/api-clients/mail';
 import { withBase } from '@sytue/ui';
 import { dominioDeLogo } from '../lib/dominioRemitente.js';
 
-export type { Mailbox, EmailSummary, EmailAddress, MessageBody, MailFilter, MailFilterInput };
+export type { Mailbox, EmailSummary, EmailAddress };
+export interface MessageBody extends SharedMessageBody {
+  attachments?: AttachmentMeta[];
+  release?: () => void;
+}
+export interface MailFilter extends SharedMailFilter {
+  revision?: string;
+}
+export interface MailFilterInput extends SharedMailFilterInput {
+  revision?: string;
+}
 
 /** Adjunto saliente tal como viaja del navegador al BFF (bytes en base64). */
 export interface OutgoingAttachmentInput {
@@ -37,6 +55,7 @@ export interface AttachmentMeta {
   cid?: string;
   /** Mandada para verse dentro del mensaje (`Content-Disposition: inline`). */
   inline?: boolean;
+  url?: string;
 }
 
 async function getJson<T>(url: string): Promise<T> {
@@ -181,6 +200,32 @@ export async function searchContacts(query: string): Promise<ContactSuggestion[]
   }
 }
 
+/**
+ * ¿Está ya esa dirección en Contacts? El id de su ficha, o null. Best-effort: si
+ * Contacts no contesta, null, y el lector ofrece «Añadir» (el alta no duplica).
+ */
+export async function contactoDelRemitente(email: string): Promise<string | null> {
+  try {
+    const res = await fetch(`/api/contacts?email=${encodeURIComponent(email.trim())}`, {
+      credentials: 'include',
+      headers: { accept: 'application/json' },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { id?: string | null };
+    return data.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** «Añadir a Contactos»: crea la ficha (o devuelve la que ya había) y da su id. */
+export function anadirAContactos(
+  name: string,
+  email: string,
+): Promise<{ id: string; created: boolean }> {
+  return postJson('/api/contacts', { name, email });
+}
+
 export function setSeen(emailId: string, seen: boolean): Promise<{ ok: boolean }> {
   return postJson('/api/seen', { emailId, seen });
 }
@@ -209,15 +254,24 @@ export function batchMove(ids: string[], mailboxId: string): Promise<{ moved: nu
 }
 
 /**
- * Marca leído/no leído (o destaca) un LOTE de correos en UNA operación. `keyword`
- * es el keyword JMAP ($seen/$flagged); el servicio lo traduce al flag IMAP.
+ * Marca leído/no leído (o destaca, o marca respondido) un LOTE de correos en UNA
+ * operación. `keyword` es el keyword JMAP ($seen/$flagged/$answered); el servicio lo
+ * traduce al flag IMAP.
  */
 export function batchSetFlag(
   ids: string[],
-  keyword: '$seen' | '$flagged',
+  keyword: '$seen' | '$flagged' | '$answered',
   add: boolean,
 ): Promise<{ updated: number }> {
   return postJson('/api/batch', { ids, flag: keyword, add });
+}
+
+/**
+ * «Marcar todo como leído» de una carpeta: lo hace el servicio sobre el buzón
+ * entero, no solo sobre la página que la lista tiene cargada.
+ */
+export function markMailboxRead(mailboxId: string): Promise<{ updated: number }> {
+  return postJson('/api/batch', { readAllIn: mailboxId });
 }
 
 /**
@@ -241,8 +295,76 @@ export interface EmailChange extends EmailSummary {
  * la vista decida qué mezclar (Papelera/Spam fuera salvo estando en ellas).
  * Owner-scoped en el servicio: un hilo ajeno devuelve lista vacía.
  */
-export function listThreadEmails(threadId: string): Promise<{ emails: EmailChange[] }> {
+export function listThreadEmails(threadId: string): Promise<{
+  emails: EmailChange[];
+  /** El hilo está silenciado: sus respuestas nuevas van al Archivo. */
+  muted?: boolean;
+  /** Hasta cuándo está pospuesto (ISO), o null. */
+  snoozedUntil?: string | null;
+}> {
   return getJson(`/api/thread?threadId=${encodeURIComponent(threadId)}`);
+}
+
+// ---- Posponer y silenciar una conversación ----
+
+/**
+ * Si este cliente pospone y silencia. El servicio sí; el modo privado no (sus hilos
+ * los guarda cifrados el núcleo y no hay quien los despierte en el servidor), y su
+ * API (`privateMailApi.ts`) lo dice con un `false` para que MailApp no ofrezca nada.
+ */
+export const admitePosponer: boolean = true;
+
+/** Una conversación pospuesta: vuelve a Recibidos, sin leer, en `until` (ISO). */
+export interface Snooze {
+  threadId: string;
+  until: string;
+}
+
+/**
+ * Por qué el servicio no pospuso, cuando la pantalla lo sabe explicar: fecha fuera
+ * de rango (entre un minuto y un año), nada en Recibidos que posponer, o que ya no
+ * estaba pospuesta. 'other' es la red o un fallo del servicio.
+ */
+export type SnoozeFailure = 'invalid' | 'nothing' | 'gone' | 'other';
+
+/** Traduce el error de posponer a algo que se pueda contar. */
+export function motivoDePosponer(err: unknown): SnoozeFailure {
+  if (!(err instanceof MailHttpError)) return 'other';
+  if (err.code === 'nothing_to_snooze') return 'nothing';
+  if (err.code === 'invalid_snooze' || err.status === 400) return 'invalid';
+  if (err.status === 404) return 'gone';
+  return 'other';
+}
+
+/** Las conversaciones pospuestas de la cuenta, la que vuelve antes primero. */
+export async function listSnoozes(): Promise<{ snoozes: Snooze[] }> {
+  const { snoozes } = await getJson<{ snoozes?: Snooze[] }>('/api/snooze');
+  return { snoozes: snoozes ?? [] };
+}
+
+/**
+ * Pospone la conversación hasta `until` (o le cambia la fecha si ya lo estaba): lo
+ * que tenga en Recibidos pasa a «Pospuestos». Lanza `MailHttpError` (ver
+ * `motivoDePosponer`) si no se pospone.
+ */
+export function snoozeThread(threadId: string, until: Date): Promise<{ snooze: Snooze }> {
+  return postJson('/api/snooze', { threadId, until: until.toISOString() });
+}
+
+/** Devuelve ya a Recibidos una conversación pospuesta. Lanza si no se puede. */
+export function unsnoozeThread(threadId: string): Promise<{ ok: boolean }> {
+  return postJson('/api/snooze', { threadId, cancel: true });
+}
+
+/**
+ * Silencia la conversación (lo que tenga en Recibidos se archiva y lo que llegue
+ * irá al Archivo) o deja de silenciarla. Lanza si el servidor no lo guarda.
+ */
+export function muteThread(
+  threadId: string,
+  muted: boolean,
+): Promise<{ muted: boolean; archived: number }> {
+  return postJson('/api/mute', { threadId, muted });
 }
 
 /**
@@ -281,6 +403,7 @@ export function unsubscribe(emailId: string): Promise<{ status: 'ok' | 'sent' | 
 }
 
 export interface SendInput {
+  draftId?: string | undefined;
   to: EmailAddress[];
   cc?: EmailAddress[] | undefined;
   /** Copia oculta (CCO/BCC): recibe el correo pero no aparece en las cabeceras. */
@@ -348,10 +471,13 @@ export function rescheduleScheduled(
 }
 
 export interface DraftInput {
+  from?: string | undefined;
   /** Presente al actualizar un borrador ya guardado (reemplazo). */
   id?: string | undefined;
   to: EmailAddress[];
   cc?: EmailAddress[] | undefined;
+  /** Copia oculta: se guarda con el borrador para que vuelva al reabrirlo. */
+  bcc?: EmailAddress[] | undefined;
   subject: string;
   textBody: string;
   /** Formato enriquecido del cuerpo (negrita, listas, imágenes incrustadas…). */
@@ -374,6 +500,7 @@ export function saveDraft(input: DraftInput): Promise<{ id: string }> {
 export interface DraftReadResult {
   to: string;
   cc: string;
+  bcc?: string;
   subject: string;
   textBody: string;
   htmlBody: string;
@@ -394,6 +521,18 @@ export async function deleteDraft(id: string): Promise<void> {
 }
 
 /** Cuerpo completo (texto y HTML) de un correo leído; el sobre solo trae extracto. */
+/**
+ * Contesta la invitación iMIP del correo `emailId` (D-MAIL-04): el BFF relee su
+ * iCalendar del mensaje y Calendar lo guarda con la respuesta y avisa a quien
+ * organiza. `replySent` dice si el aviso salió por correo.
+ */
+export function responderInvitacion(
+  emailId: string,
+  partstat: 'ACCEPTED' | 'TENTATIVE' | 'DECLINED',
+): Promise<{ uid: string; partstat: string; replySent: boolean }> {
+  return postJson('/api/invitacion', { emailId, partstat });
+}
+
 export function getMessageBody(emailId: string): Promise<MessageBody> {
   return getJson(`/api/body?emailId=${encodeURIComponent(emailId)}`);
 }
@@ -589,6 +728,7 @@ export function deleteAlias(id: string): Promise<{ ok: boolean }> {
 
 /** Config de fuera-de-oficina. Fechas en ISO 8601 (vacías = sin límite). */
 export interface Vacation {
+  revision?: string | undefined;
   enabled: boolean;
   subject: string;
   body: string;
@@ -605,6 +745,9 @@ export function getVacation(): Promise<Vacation> {
 
 /** Uso de almacenamiento de la cuenta: bytes usados y cuota total. */
 export interface StorageQuota {
+  externalUsedBytes?: number;
+  pendingDeleteBytes?: number;
+  ciphertextBytes?: number;
   usedBytes: number;
   quotaBytes: number;
 }
@@ -642,6 +785,164 @@ export function getSignature(): Promise<{ signature: string }> {
  */
 export function saveSignature(signature: string): Promise<{ ok: boolean }> {
   return postJson('/api/signature', { signature });
+}
+
+// ---- Ventana de deshacer el envío ----
+
+/** Las ventanas que se ofrecen, en segundos (las de Gmail). El servicio no acepta otras. */
+export const UNDO_SEND_OPTIONS = [5, 10, 20, 30] as const;
+export type UndoSendSeconds = (typeof UNDO_SEND_OPTIONS)[number];
+/** La que había antes de poder elegirla, y la que se usa mientras no se sabe la guardada. */
+export const DEFAULT_UNDO_SEND: UndoSendSeconds = 10;
+
+/** Lo que llega del servidor, reducido a una opción válida: lo demás, la de por defecto. */
+export function normalizarUndoSend(valor: unknown): UndoSendSeconds {
+  return (UNDO_SEND_OPTIONS as readonly unknown[]).includes(valor)
+    ? (valor as UndoSendSeconds)
+    : DEFAULT_UNDO_SEND;
+}
+
+/** Lee la ventana de deshacer de la cuenta (vive en el servidor, no en el navegador). */
+export async function getUndoSend(): Promise<UndoSendSeconds> {
+  const { seconds } = await getJson<{ seconds?: number }>('/api/undo-send');
+  return normalizarUndoSend(seconds);
+}
+
+/** Guarda la ventana de deshacer. Lanza si el servidor no la guarda: quien llame avisa. */
+export function saveUndoSend(seconds: UndoSendSeconds): Promise<{ ok: boolean }> {
+  return postJson('/api/undo-send', { seconds });
+}
+
+// ---- Lectura: auto-avance, gestos y remitentes de confianza ----
+
+/**
+ * A dónde va el lector cuando la conversación abierta sale de la vista (archivarla,
+ * tirarla, moverla): a la siguiente de la lista (la más antigua), a la anterior (la
+ * más reciente) o de vuelta a la lista.
+ */
+export const AUTO_ADVANCE_OPTIONS = ['older', 'newer', 'list'] as const;
+export type AutoAdvance = (typeof AUTO_ADVANCE_OPTIONS)[number];
+
+/** Lo que hace deslizar una fila de la lista con el dedo. */
+export const SWIPE_OPTIONS = ['archive', 'trash', 'read', 'none'] as const;
+export type SwipeAction = (typeof SWIPE_OPTIONS)[number];
+
+export interface ReadingPrefs {
+  autoAdvance: AutoAdvance;
+  swipeRight: SwipeAction;
+  swipeLeft: SwipeAction;
+}
+
+/** Las de una cuenta que nunca las tocó (las del servicio), y las que se usan sin red. */
+export const DEFAULT_READING_PREFS: ReadingPrefs = {
+  autoAdvance: 'older',
+  swipeRight: 'archive',
+  swipeLeft: 'trash',
+};
+
+/** Lo que llega del servidor, reducido a opciones válidas: lo demás, lo de por defecto. */
+export function normalizarReadingPrefs(valor: unknown): ReadingPrefs {
+  const v = (valor ?? {}) as Record<string, unknown>;
+  const de = <T extends string>(opciones: readonly T[], x: unknown, def: T): T =>
+    (opciones as readonly unknown[]).includes(x) ? (x as T) : def;
+  return {
+    autoAdvance: de(AUTO_ADVANCE_OPTIONS, v['autoAdvance'], DEFAULT_READING_PREFS.autoAdvance),
+    swipeRight: de(SWIPE_OPTIONS, v['swipeRight'], DEFAULT_READING_PREFS.swipeRight),
+    swipeLeft: de(SWIPE_OPTIONS, v['swipeLeft'], DEFAULT_READING_PREFS.swipeLeft),
+  };
+}
+
+/** Lee las preferencias de lectura de la cuenta (viven en el servidor). */
+export async function getReadingPrefs(): Promise<ReadingPrefs> {
+  return normalizarReadingPrefs(await getJson<unknown>('/api/reading-prefs'));
+}
+
+/** Guarda las preferencias de lectura. Lanza si el servidor no las guarda: quien llame avisa. */
+export function saveReadingPrefs(prefs: ReadingPrefs): Promise<{ ok: boolean }> {
+  return postJson('/api/reading-prefs', prefs);
+}
+
+/**
+ * Normaliza una dirección como la guarda el servicio (`domain.NormalizarRemitente`):
+ * sin espacios alrededor y en minúsculas. Sirve para comparar el remitente de un
+ * mensaje con la lista de confianza.
+ */
+export function normalizarRemitente(address: string): string {
+  return address.trim().toLowerCase();
+}
+
+/** Los remitentes de confianza de la cuenta, normalizados y por orden alfabético. */
+export async function listTrustedSenders(): Promise<string[]> {
+  const { senders } = await getJson<{ senders?: string[] }>('/api/trusted-senders');
+  return senders ?? [];
+}
+
+/** Confía en un remitente; devuelve la dirección como quedó guardada. Lanza si no se guarda. */
+export async function addTrustedSender(address: string): Promise<string> {
+  const r = await postJson<{ address?: string }>('/api/trusted-senders', { address });
+  return r.address ?? normalizarRemitente(address);
+}
+
+/** Deja de confiar en un remitente. Lanza si no se quita. */
+export function removeTrustedSender(address: string): Promise<{ ok: boolean }> {
+  return postJson('/api/trusted-senders', { address, remove: true });
+}
+
+// ---- Plantillas de respuesta ----
+
+/** Una plantilla de respuesta: un texto con nombre que el redactor inserta. Texto plano. */
+export interface ReplyTemplate {
+  id: string;
+  name: string;
+  body: string;
+  updatedAt: string;
+}
+
+/** Topes del servicio (domain.TemplateNameMax / TemplateBodyMaxBytes / TemplatesPorCuenta). */
+export const TEMPLATE_NAME_MAX = 100;
+export const TEMPLATE_BODY_MAX_BYTES = 16 * 1024;
+export const TEMPLATES_MAX = 100;
+
+/**
+ * Por qué el servicio rechazó guardar una plantilla, cuando la pantalla lo sabe
+ * explicar: nombre repetido, tope de plantillas, texto no válido o que ya no existe.
+ * 'other' es la red o un fallo del servicio.
+ */
+export type TemplateFailure = 'exists' | 'limit' | 'invalid' | 'gone' | 'other';
+
+/** Traduce el error de una escritura de plantillas a algo que se pueda contar. */
+export function motivoDePlantilla(err: unknown): TemplateFailure {
+  if (!(err instanceof MailHttpError)) return 'other';
+  if (err.code === 'template_exists') return 'exists';
+  if (err.code === 'template_limit') return 'limit';
+  if (err.status === 400) return 'invalid';
+  if (err.status === 404) return 'gone';
+  return 'other';
+}
+
+/** Las plantillas de la cuenta, por nombre. */
+export async function listTemplates(): Promise<{ templates: ReplyTemplate[] }> {
+  const { templates } = await getJson<{ templates?: ReplyTemplate[] }>('/api/templates');
+  return { templates: templates ?? [] };
+}
+
+/** Crea una plantilla. Lanza `MailHttpError` (ver `motivoDePlantilla`) si no se guarda. */
+export function createTemplate(name: string, body: string): Promise<{ template: ReplyTemplate }> {
+  return postJson('/api/templates', { name, body });
+}
+
+/** Cambia el nombre y el texto de una plantilla. Lanza si no se guarda. */
+export function updateTemplate(
+  id: string,
+  name: string,
+  body: string,
+): Promise<{ template: ReplyTemplate }> {
+  return postJson('/api/templates', { id, name, body });
+}
+
+/** Borra una plantilla. Lanza si no se borra. */
+export function deleteTemplate(id: string): Promise<{ ok: boolean }> {
+  return postJson('/api/templates', { id, delete: true });
 }
 
 // ---- Buzones compartidos + delegación ----

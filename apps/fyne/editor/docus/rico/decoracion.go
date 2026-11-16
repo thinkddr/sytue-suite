@@ -12,6 +12,8 @@ import (
 
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
+
+	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
 // La DECORACIÓN de la página de «Disposición» (`pagedecor.ts` y `setColumns` de exec.ts),
@@ -176,7 +178,7 @@ var (
 		"data-text", "data-image", "contenteditable", "aria-hidden", "style",
 	}
 	atributosBorde  = []string{"data-sytue-page-border", "data-style", "data-width", "data-color", "contenteditable", "aria-hidden", "style"}
-	atributosPagina = []string{"data-sytue-page", "data-width", "data-height", "data-margins", "data-color", "contenteditable", "aria-hidden"}
+	atributosPagina = []string{"data-sytue-page", "data-width", "data-height", "data-margins", "data-color", "data-lang", "contenteditable", "aria-hidden"}
 )
 
 // entenderCapa apunta lo que impide editar una capa: que no cuelgue del folio, que lleve
@@ -284,11 +286,13 @@ func (d *Documento) PonerBorde(b *BordePagina) {
 
 // PaginaDoc es la página que guarda el documento (la capa `data-sytue-page` de `pagedecor.ts`,
 // la que escribe el importador de .docx): tamaño y márgenes (arriba, derecha, abajo,
-// izquierda) en px, y el color del papel («#RRGGBB», o "" para el blanco).
+// izquierda) en px, el color del papel («#RRGGBB», o "" para el blanco) y el idioma del
+// documento (`data-lang`, uno de los 26 de la suite, o "" para el de la interfaz).
 type PaginaDoc struct {
 	Ancho, Alto float32
 	Margenes    [4]float32
 	Color       string
+	Idioma      string
 }
 
 // PaginaDe es la página del documento, o nil si no la guarda. Lo que no se entiende vale lo
@@ -316,6 +320,10 @@ func (d *Documento) PaginaDe() *PaginaDoc {
 	if c := atributo(n, "data-color"); c != "" {
 		p.Color = hexSeguro(c, "")
 	}
+	// Un idioma que no es de la suite no se entiende, como en `leerPagina`.
+	if l := atributo(n, "data-lang"); i18n.IsLocale(l) {
+		p.Idioma = l
+	}
 	return p
 }
 
@@ -337,6 +345,10 @@ func (d *Documento) PonerPaginaDoc(p *PaginaDoc) {
 	}
 	if p.Color != "" {
 		attrs = append(attrs, html.Attribute{Key: "data-color", Val: p.Color})
+	}
+	// Detrás del color, como `paginaHtml`: el mismo HTML que la web.
+	if i18n.IsLocale(p.Idioma) {
+		attrs = append(attrs, html.Attribute{Key: "data-lang", Val: p.Idioma})
 	}
 	attrs = append(attrs, html.Attribute{Key: "contenteditable", Val: "false"}, html.Attribute{Key: "aria-hidden", Val: "true"})
 	d.ponerCapa(esPaginaDoc, elemento("div", attrs...))

@@ -7,6 +7,8 @@ import (
 	"context"
 	"slices"
 	"strings"
+
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 )
 
 // UpdateBindings accepts only another authenticated bootstrap for this identity.
@@ -17,13 +19,23 @@ func (c *Client) UpdateBindings(next Bootstrap) error {
 	if c.closed.Load() {
 		return ErrClosed
 	}
-	if next.StorageProduct != c.cfg.Bootstrap.StorageProduct || (next.StorageProduct != "" && !validStorageBindings(next)) || next.ControllerUserID != c.cfg.Bootstrap.ControllerUserID || next.Actor != c.cfg.Subject || next.Tenant != c.cfg.Tenant || next.MatrixUserID != c.cfg.Bootstrap.MatrixUserID || strings.TrimRight(next.HomeserverURL, "/") != c.cfg.Bootstrap.HomeserverURL || next.Encryption != c.cfg.Bootstrap.Encryption {
+	if c.cfg.ResourceProduct != "" {
+		return ErrIdentity
+	}
+	if next.StorageIdentityVersion.Normalized() != c.cfg.Bootstrap.StorageIdentityVersion.Normalized() || next.StorageProduct != c.cfg.Bootstrap.StorageProduct || (next.StorageProduct != "" && !validStorageBindings(next)) || next.ControllerUserID != c.cfg.Bootstrap.ControllerUserID || next.Actor != c.cfg.Subject || next.Tenant != c.cfg.Tenant || next.MatrixUserID != c.cfg.Bootstrap.MatrixUserID || strings.TrimRight(next.HomeserverURL, "/") != c.cfg.Bootstrap.HomeserverURL || next.Encryption != c.cfg.Bootstrap.Encryption {
 		return ErrIdentity
 	}
 	next.Channels = slices.Clone(next.Channels)
 	next.DraftRoomIDs = slices.Clone(next.DraftRoomIDs)
 	next.StorageRoomIDs = slices.Clone(next.StorageRoomIDs)
-	c.cfg.Bootstrap = next
+	// Identity fields are immutable after construction. Replacing the entire
+	// struct would also write those fields while private-key lookups read them.
+	c.cfg.Bootstrap.Channels = next.Channels
+	c.cfg.Bootstrap.DraftRoomID = next.DraftRoomID
+	c.cfg.Bootstrap.DraftRoomIDs = next.DraftRoomIDs
+	c.cfg.Bootstrap.StorageRoomID = next.StorageRoomID
+	c.cfg.Bootstrap.StorageRoomIDs = next.StorageRoomIDs
+	c.cfg.Bootstrap.SSOProviderID = next.SSOProviderID
 	return nil
 }
 
@@ -64,4 +76,12 @@ func (c *Client) WaitReady(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+// StorageIdentityVersion lets application initialization distinguish a verified
+// isolated catalog from the historical SQL import path. It exposes no secrets.
+func (c *Client) StorageIdentityVersion() storage.IdentityVersion {
+	c.stateMu.RLock()
+	defer c.stateMu.RUnlock()
+	return c.cfg.Bootstrap.StorageIdentityVersion.Normalized()
 }

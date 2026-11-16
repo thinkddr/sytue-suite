@@ -104,3 +104,26 @@ func TestElSelectorDeAvatarSoloAbreDesdeLaCamara(t *testing.T) {
 		t.Fatal("la cámara no abre el menú")
 	}
 }
+
+// La portada de una tarjeta redondeada: el trozo del centro a la proporción pedida, con las
+// esquinas de ARRIBA transparentes y las de abajo enteras (la tarjeta sigue debajo).
+func TestRecorteRedondeadoArriba(t *testing.T) {
+	rojo := color.NRGBA{R: 220, A: 255}
+	img := image.NewNRGBA(image.Rect(0, 0, 200, 100))
+	for y := range 100 {
+		for x := range 200 {
+			img.SetNRGBA(x, y, rojo)
+		}
+	}
+	rec := RecorteRedondeadoArriba(img, 40, 30, 4) // 4:3 → 133×100, radio 4 de 40 → 13 px
+	if b := rec.Bounds(); b.Dx() != 133 || b.Dy() != 100 {
+		t.Fatalf("el recorte mide %v y es el 4:3 del centro", b)
+	}
+	alfa := func(x, y int) uint32 { _, _, _, a := rec.At(x, y).RGBA(); return a }
+	if alfa(0, 0) != 0 || alfa(132, 0) != 0 || alfa(2, 2) != 0 {
+		t.Errorf("las esquinas de arriba asoman: alfa %d, %d, %d", alfa(0, 0), alfa(132, 0), alfa(2, 2))
+	}
+	if alfa(0, 99) != 0xffff || alfa(132, 99) != 0xffff || alfa(66, 0) != 0xffff || alfa(66, 50) != 0xffff {
+		t.Error("lo de fuera de las esquinas de arriba se queda entero")
+	}
+}

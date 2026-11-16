@@ -4,6 +4,7 @@
 package calendario
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -90,7 +91,7 @@ func TestElEnlaceDeUnEventoVaASuDia(t *testing.T) {
 	test.NewTempApp(t)
 	p := &Pantalla{T: traductor(t), Cursor: time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC), Zona: time.UTC, Vista: VistaMes}
 	a := NuevaApp(p, api.NewCalendars(srv.URL, nil, nil))
-	a.lanzar = func(f func()) { f() }
+	a.lanzar = func(f func(context.Context)) bool { f(a.vida); return true }
 	a.enUI = func(f func()) { f() }
 	a.AtenderEnlace(&url.URL{Scheme: "sytue-calendar", Path: "/calendar/events/" + id})
 	if pedidas != 1 || p.Vista != VistaDia || p.Cursor.Day() != 5 || p.Cursor.Month() != time.March {

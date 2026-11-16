@@ -277,3 +277,151 @@ func Desagrupar(cajas []Caja, ids []string) []Caja {
 	}
 	return out
 }
+
+// ---- Guías inteligentes (ajuste magnético al arrastrar) ----
+
+// Ancla de una caja en un eje: borde inicial, centro o borde final (`AnclaGuia`).
+const (
+	anclaIni    = "ini"
+	anclaCentro = "centro"
+	anclaFin    = "fin"
+)
+
+var anclasGuia = []string{anclaIni, anclaCentro, anclaFin}
+
+// Guia es `Guia`: línea vertical (eje "x", en la abscisa Pos, de Desde a Hasta en y)
+// u horizontal (eje "y"). Solo de vista: nunca se guarda en el modelo.
+type Guia struct {
+	Eje   string  `json:"eje"`
+	Pos   float64 `json:"pos"`
+	Desde float64 `json:"desde"`
+	Hasta float64 `json:"hasta"`
+}
+
+// AjusteGuias es `AjusteGuias`: corrección a sumar al delta y guías visibles.
+type AjusteGuias struct {
+	DX     float64 `json:"dx"`
+	DY     float64 `json:"dy"`
+	Lineas []Guia  `json:"lineas"`
+}
+
+func enAncla(ini, lado float64, a string) float64 {
+	switch a {
+	case anclaIni:
+		return ini
+	case anclaCentro:
+		return ini + lado/2
+	}
+	return ini + lado
+}
+
+// epsGuia absorbe el ruido de coma flotante al comparar distancias a las guías.
+const epsGuia = 1e-6
+
+// proyeccionGuia lee una caja en el eje e: posición y lado en ese eje, y posición y
+// lado en el otro (por donde se extiende la línea guía).
+func proyeccionGuia(e string, r rect) (p, lado, q, ladoQ float64) {
+	if e == "x" {
+		return r.x, r.w, r.y, r.h
+	}
+	return r.y, r.h, r.x, r.w
+}
+
+// mejorAjusteGuia es la corrección más pequeña en el eje e que pega alguna ancla
+// propia de mov a un borde o centro de los objetivos, dentro de tol (+Inf si no hay).
+// En empate gana el primero: el lienzo, luego otros en su orden y la primera ancla.
+func mejorAjusteGuia(e string, mov rect, objetivos []rect, tol float64, propias []string) float64 {
+	mp, ml, _, _ := proyeccionGuia(e, mov)
+	mejor := math.Inf(1)
+	for _, o := range objetivos {
+		op, ol, _, _ := proyeccionGuia(e, o)
+		for _, ao := range anclasGuia {
+			t := enAncla(op, ol, ao)
+			for _, am := range propias {
+				d := t - enAncla(mp, ml, am)
+				if math.Abs(d) <= tol+epsGuia && math.Abs(d) < math.Abs(mejor)-epsGuia {
+					mejor = d
+				}
+			}
+		}
+	}
+	return mejor
+}
+
+// coincideAncla dice si t cae sobre alguna ancla propia de la caja ya corregida.
+func coincideAncla(t, mp, ml float64, propias []string) bool {
+	for _, am := range propias {
+		if math.Abs(t-enAncla(mp, ml, am)) <= epsGuia*1000 {
+			return true
+		}
+	}
+	return false
+}
+
+// lineasDeGuia son las guías del eje e sobre fin (mov ya corregido en los dos ejes,
+// para que la línea llegue a donde queda la caja): una por posición, con la extensión
+// que cubre fin y todos los objetivos que coinciden, ordenadas por posición.
+func lineasDeGuia(e string, fin rect, objetivos []rect, propias []string) []Guia {
+	mp, ml, mq, mlq := proyeccionGuia(e, fin)
+	var lineas []Guia
+	idx := map[float64]int{}
+	for _, o := range objetivos {
+		op, ol, oq, olq := proyeccionGuia(e, o)
+		for _, ao := range anclasGuia {
+			t := r3(enAncla(op, ol, ao))
+			if !coincideAncla(t, mp, ml, propias) {
+				continue
+			}
+			desde, hasta := r3(min(oq, mq)), r3(max(oq+olq, mq+mlq))
+			if i, ok := idx[t]; ok {
+				lineas[i].Desde, lineas[i].Hasta = min(lineas[i].Desde, desde), max(lineas[i].Hasta, hasta)
+				continue
+			}
+			idx[t] = len(lineas)
+			lineas = append(lineas, Guia{Eje: e, Pos: t, Desde: desde, Hasta: hasta})
+		}
+	}
+	sort.SliceStable(lineas, func(i, j int) bool { return lineas[i].Pos < lineas[j].Pos })
+	return lineas
+}
+
+// correccionEnEje es la corrección del eje e (+Inf si no pega). propias vacías son
+// las tres anclas.
+func correccionEnEje(e string, mov rect, objetivos []rect, tol float64, propias []string) float64 {
+	if len(propias) == 0 {
+		propias = anclasGuia
+	}
+	return mejorAjusteGuia(e, mov, objetivos, tol, propias)
+}
+
+// lineasEnEje son las guías del eje e (ninguna si no pegó).
+func lineasEnEje(e string, fin rect, objetivos []rect, corr float64, propias []string) []Guia {
+	if math.IsInf(corr, 1) {
+		return nil
+	}
+	if len(propias) == 0 {
+		propias = anclasGuia
+	}
+	return lineasDeGuia(e, fin, objetivos, propias)
+}
+
+// sinInf es la corrección, o 0 si no pegó.
+func sinInf(corr float64) float64 {
+	if math.IsInf(corr, 1) {
+		return 0
+	}
+	return corr
+}
+
+// guiasDeAjuste es el espejo de `guiasDeAjuste` (@sytue/escena, organizar.ts): misma
+// salida para los vectores de testdata/guias.vectores.json. anclasX/anclasY vacías
+// son las tres anclas.
+func guiasDeAjuste(mov rect, otros []rect, lienzo rect, tolX, tolY float64, anclasX, anclasY []string) AjusteGuias {
+	objetivos := append([]rect{lienzo}, otros...)
+	cx := correccionEnEje("x", mov, objetivos, tolX, anclasX)
+	cy := correccionEnEje("y", mov, objetivos, tolY, anclasY)
+	fin := rect{mov.x + sinInf(cx), mov.y + sinInf(cy), mov.w, mov.h}
+	lx := lineasEnEje("x", fin, objetivos, cx, anclasX)
+	ly := lineasEnEje("y", fin, objetivos, cy, anclasY)
+	return AjusteGuias{DX: r3(sinInf(cx)), DY: r3(sinInf(cy)), Lineas: append(append([]Guia{}, lx...), ly...)}
+}

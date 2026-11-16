@@ -97,12 +97,22 @@ func factorDeAnimacion(ruta string) (float64, bool) {
 // portalPideMenosMovimiento lee `reduced-motion` del portal de ajustes. Sin portal o sin
 // la clave (versiones anteriores a que existiera), no pide nada.
 func portalPideMenosMovimiento(conn *dbus.Conn) bool {
+	return portalApariencia(conn, "reduced-motion") == 1
+}
+
+// portalApariencia lee una clave numérica de `org.freedesktop.appearance` del portal de
+// ajustes. Sin portal, sin la clave o con otro tipo, devuelve 0, que en todas las de ese
+// espacio es «sin preferencia».
+func portalApariencia(conn *dbus.Conn, clave string) uint32 {
 	ctx, parar := context.WithTimeout(context.Background(), 2*time.Second)
 	defer parar()
 	var v dbus.Variant
 	err := conn.Object("org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop").
 		CallWithContext(ctx, "org.freedesktop.portal.Settings.ReadOne", 0,
-			"org.freedesktop.appearance", "reduced-motion").Store(&v)
+			"org.freedesktop.appearance", clave).Store(&v)
 	n, _ := v.Value().(uint32)
-	return err == nil && n == 1
+	if err != nil {
+		return 0
+	}
+	return n
 }

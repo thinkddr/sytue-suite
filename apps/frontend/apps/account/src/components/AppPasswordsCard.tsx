@@ -7,11 +7,16 @@
  * sin copiarla es perderla —y hay que revocar y crear otra—. La pantalla obliga a
  * confirmar antes de quitarla de en medio, igual que con los códigos de
  * recuperación.
+ *
+ * Revocar también es irreversible —el cliente que la use deja de entrar al
+ * momento—, así que se confirma nombrándola, y si el servicio lo rechaza se dice.
  */
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { Button, Card, DataFlow, EmptyState, FieldGroup, Input } from '@sytue/ui';
+import { Button, Card, DataFlow, EmptyState, FieldGroup, Input, useConfirm } from '@sytue/ui';
 import type { T } from '../i18n/index.js';
+import { primeraLectura } from '../lib/primeraLectura.js';
+import { FilasCargando } from './FilasCargando.js';
 
 interface AppPassword {
   id: string;
@@ -25,11 +30,19 @@ export function AppPasswordsCard({ t, locale }: { t: T; locale: string }): JSX.E
   const [etiqueta, setEtiqueta] = useState('');
   const [creada, setCreada] = useState<{ label: string; password: string } | null>(null);
   const [error, setError] = useState(false);
+  // Separado de `error` (la CARGA): un alta o una revocación que fallan no son
+  // «no se ha podido cargar», y antes lo decían así.
+  const [falloAccion, setFalloAccion] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const { confirmar, dialogo } = useConfirm();
 
-  async function cargar(): Promise<void> {
+  // `inicial`: la del montaje se comparte con la revisión de seguridad.
+  async function cargar(inicial = false): Promise<void> {
+    setError(false);
     try {
-      const res = await fetch('/api/app-passwords');
+      const res = await (inicial
+        ? primeraLectura('/api/app-passwords')
+        : fetch('/api/app-passwords'));
       if (!res.ok) throw new Error(String(res.status));
       const datos = (await res.json()) as { app_passwords?: AppPassword[] };
       setLista(datos.app_passwords ?? []);
@@ -40,12 +53,13 @@ export function AppPasswordsCard({ t, locale }: { t: T; locale: string }): JSX.E
   }
 
   useEffect(() => {
-    void cargar();
+    void cargar(true);
   }, []);
 
   async function crear(e: Event): Promise<void> {
     e.preventDefault();
     setEnviando(true);
+    setFalloAccion(false);
     try {
       const res = await fetch('/api/app-passwords', {
         method: 'POST',
@@ -58,14 +72,28 @@ export function AppPasswordsCard({ t, locale }: { t: T; locale: string }): JSX.E
       setEtiqueta('');
       await cargar();
     } catch {
-      setError(true);
+      setFalloAccion(true);
     } finally {
       setEnviando(false);
     }
   }
 
-  async function revocar(id: string): Promise<void> {
-    await fetch(`/api/app-passwords/${id}`, { method: 'DELETE' });
+  async function revocar(p: AppPassword): Promise<void> {
+    const ok = await confirmar({
+      mensaje: t('app_passwords.revoke_confirm', {
+        label: p.label || t('app_passwords.unnamed'),
+      }),
+      confirmLabel: t('app_passwords.revoke'),
+      tone: 'danger',
+    });
+    if (!ok) return;
+    setFalloAccion(false);
+    try {
+      const res = await fetch(`/api/app-passwords/${p.id}`, { method: 'DELETE' });
+      if (!res.ok) setFalloAccion(true);
+    } catch {
+      setFalloAccion(true);
+    }
     await cargar();
   }
 
@@ -75,15 +103,29 @@ export function AppPasswordsCard({ t, locale }: { t: T; locale: string }): JSX.E
   };
 
   return (
-    <Card class="mb-6 break-inside-avoid">
+    <Card id="contrasenas-app">
       <div class="flex flex-col gap-4 p-4 sm:p-5">
         <h2 class="text-lg font-semibold">{t('app_passwords.title')}</h2>
         <p class="text-text-muted text-xs">{t('app_passwords.hint')}</p>
         {/* El cliente de correo que la use lee el buzón y envía como la persona. */}
         <DataFlow compact incoming={['mail']} outgoing={['mail']} />
 
-        {error && <p class="text-danger text-sm">{t('app_passwords.failed')}</p>}
-        {!error && lista === null && <p class="text-text-muted text-sm">{t('common.loading')}</p>}
+        {error && (
+          <div role="alert" class="flex items-center justify-between gap-3">
+            <p class="text-danger-text text-sm">{t('app_passwords.failed')}</p>
+            <Button variant="ghost" onClick={() => void cargar()}>
+              {t('common.retry')}
+            </Button>
+          </div>
+        )}
+        {falloAccion && (
+          <p role="alert" class="text-danger-text text-sm">
+            {t('security.failed')}
+          </p>
+        )}
+        {!error && lista === null && (
+          <FilasCargando etiqueta={t('common.loading')} accion="boton" />
+        )}
         {!error && lista?.length === 0 && !creada && (
           <EmptyState title={t('app_passwords.empty')} />
         )}
@@ -114,7 +156,14 @@ export function AppPasswordsCard({ t, locale }: { t: T; locale: string }): JSX.E
                     : t('app_passwords.never_used')}
                 </p>
               </div>
-              <Button variant="ghost" onClick={() => void revocar(p.id)}>
+              {/* El texto visible es el verbo; el nombre accesible dice CUÁL. */}
+              <Button
+                variant="ghost"
+                aria-label={t('app_passwords.revoke_named', {
+                  label: p.label || t('app_passwords.unnamed'),
+                })}
+                onClick={() => void revocar(p)}
+              >
                 {t('app_passwords.revoke')}
               </Button>
             </li>
@@ -141,6 +190,7 @@ export function AppPasswordsCard({ t, locale }: { t: T; locale: string }): JSX.E
           </div>
         </form>
       </div>
+      {dialogo}
     </Card>
   );
 }

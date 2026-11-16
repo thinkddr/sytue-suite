@@ -101,6 +101,8 @@ func (p *Pantalla) filtrosBusqueda(alCambiar func()) (fila fyne.CanvasObject, fi
 }
 
 // abrirBusqueda abre el buscador. `alAbrir` lleva al día de un resultado.
+//
+//nolint:gocognit // el buscador con sus filtros y resultados es un único diálogo, como el de la web.
 func (a *App) abrirBusqueda() {
 	lienzo := a.lienzo()
 	if lienzo == nil {
@@ -119,15 +121,19 @@ func (a *App) abrirBusqueda() {
 		// consulta son los filtros con los que se pidió la primera página, con su
 		// tramo ya fijado: «Cargar más» pide la siguiente de ESA consulta. Recalcular
 		// «Próximos» con la hora de ahora movería `from` bajo el mismo cursor.
-		consulta     api.FiltroBusqueda
-		secuencia    int
-		cargando     bool
-		fallo        bool
-		temporizador *time.Timer
-		pintar       func()
+		consulta         api.FiltroBusqueda
+		secuencia        int
+		cargando         bool
+		fallo            bool
+		cancelarBusqueda context.CancelFunc
+		pintar           func()
 	)
 	pintar = func() {
 		zona.Objects = []fyne.CanvasObject{p.cuerpoBusqueda(strings.TrimSpace(campo.Texto()), resultados, cursor, cargando, fallo, func(ev api.Event) {
+			secuencia++
+			if cancelarBusqueda != nil {
+				cancelarBusqueda()
+			}
 			d.Cerrar()
 			a.irAlDia(inicioResultado(ev, p.zona()))
 		}, func() {
@@ -135,8 +141,8 @@ func (a *App) abrirBusqueda() {
 			sec := secuencia
 			// El cursor se copia en el hilo de la UI, que es quien lo escribe.
 			q, f, desde := strings.TrimSpace(campo.Texto()), consulta, cursor
-			a.lanzar(func() {
-				ctx, parar := context.WithTimeout(context.Background(), plazo)
+			a.lanzar(func(vida context.Context) {
+				ctx, parar := context.WithTimeout(vida, plazo)
 				defer parar()
 				b, err := a.Cal.SearchEventsFiltrada(ctx, q, f, PaginaBusqueda, desde)
 				a.enUI(func() {
@@ -160,8 +166,8 @@ func (a *App) abrirBusqueda() {
 	buscar = func(q string) {
 		secuencia++
 		sec := secuencia
-		if temporizador != nil {
-			temporizador.Stop()
+		if cancelarBusqueda != nil {
+			cancelarBusqueda()
 		}
 		if len([]rune(q)) < MinBusqueda || a.Cal == nil {
 			resultados, cursor, fallo, cargando = nil, "", false, false
@@ -172,22 +178,35 @@ func (a *App) abrirBusqueda() {
 		pintar()
 		f := filtro() // en el hilo de la UI: los selectores son suyos
 		consulta = f
-		temporizador = time.AfterFunc(EsperaBusqueda, func() {
-			a.lanzar(func() {
-				ctx, parar := context.WithTimeout(context.Background(), plazo)
-				defer parar()
-				b, err := a.Cal.SearchEventsFiltrada(ctx, q, f, PaginaBusqueda, "")
-				a.enUI(func() {
-					if sec != secuencia {
-						return // llegó una búsqueda más nueva
-					}
-					cargando = false
-					fallo = err != nil
-					resultados, cursor = b.Events, b.Siguiente
-					pintar()
-				})
+		vidaBusqueda, cancelar := context.WithCancel(a.vida)
+		cancelarBusqueda = cancelar
+		if !a.lanzar(func(vida context.Context) {
+			defer cancelar()
+			// La búsqueda termina tanto al cambiar el texto como al drenar el gate.
+			detener := context.AfterFunc(vida, cancelar)
+			defer detener()
+			temporizador := time.NewTimer(EsperaBusqueda)
+			defer temporizador.Stop()
+			select {
+			case <-vidaBusqueda.Done():
+				return
+			case <-temporizador.C:
+			}
+			ctx, parar := context.WithTimeout(vidaBusqueda, plazo)
+			defer parar()
+			b, err := a.Cal.SearchEventsFiltrada(ctx, q, f, PaginaBusqueda, "")
+			a.enUI(func() {
+				if sec != secuencia {
+					return // llegó una búsqueda más nueva
+				}
+				cargando = false
+				fallo = err != nil
+				resultados, cursor = b.Events, b.Siguiente
+				pintar()
 			})
-		})
+		}) {
+			cancelar()
+		}
 	}
 	campo.AlCambiar(func(s string) { buscar(strings.TrimSpace(s)) })
 	pintar()
@@ -196,12 +215,12 @@ func (a *App) abrirBusqueda() {
 	d.Foco = campo
 	d.AlCerrar = func() {
 		secuencia++ // una respuesta que llegue ya no pinta nada
-		if temporizador != nil {
-			temporizador.Stop()
+		if cancelarBusqueda != nil {
+			cancelarBusqueda()
 		}
 		d.Cerrar()
 	}
-	d.Mostrar(lienzo)
+	a.mostrarDialogo(d, lienzo)
 }
 
 // irAlDia es `onOpenResult`: el calendario va al día y a la vista de día.
@@ -303,7 +322,7 @@ var (
 func (p *Pantalla) nuevoResultado(ev api.Event, alPulsar func()) *resultado {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	cal, hay := p.calendarioDe(ev.CalendarID)
-	tinta := colorDe("#2787d8") // `var(--sytue-primary-500)` si no hay calendario
+	tinta := hexCrudo("#2787d8") // `var(--sytue-primary-500)` si no hay calendario
 	if hay {
 		tinta = colorDe(cal.Color)
 	}

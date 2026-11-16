@@ -218,7 +218,29 @@ func (p *EditorPlano) Texto() string { return p.Text }
 // celda para seguir escribiendo.
 func (p *EditorPlano) PonerTexto(s string) {
 	p.SetText(s)
-	p.CursorColumn = len([]rune(s))
+	p.PonerCursor(len([]rune(s)))
+}
+
+// PonerCursor deja el cursor a `runas` runas del principio del texto, que es lo que lee
+// `CursorTextOffset`.
+//
+// No basta con `CursorColumn`: en el de varias líneas que reparte, la fila y la columna
+// de `widget.Entry` son las de la línea VISUAL, y dónde corta cada una solo lo sabe él.
+// Lo que sí da es dónde EMPIEZA cada fila (`CursorTextOffset` con la columna a cero), y
+// una fila que no existe empieza en cero; así que se avanza fila a fila mientras empiece
+// antes del destino. En el de una línea la primera vuelta ya sale.
+func (p *EditorPlano) PonerCursor(runas int) {
+	runas = min(max(runas, 0), len([]rune(p.Text)))
+	fila, inicio := 0, 0
+	for f := 1; ; f++ {
+		p.CursorRow, p.CursorColumn = f, 0
+		b := p.CursorTextOffset()
+		if b <= inicio || b > runas {
+			break
+		}
+		fila, inicio = f, b
+	}
+	p.CursorRow, p.CursorColumn = fila, runas-inicio
 }
 
 // AlCambiar se llama con el texto nuevo en cada pulsación.

@@ -55,9 +55,15 @@ const HTMLRegla = `<hr>`
 //
 // ponytail: Chromium parte la lista en dos si se inserta en medio; aquí va detrás.
 func (d *Documento) InsertarHTML(bloques []Bloque, i, pos int, fragmento string) (Lugar, bool) {
+	l, _, ok := d.insertarHTML(bloques, i, pos, fragmento)
+	return l, ok
+}
+
+// insertarHTML es [Documento.InsertarHTML], y además devuelve los nodos insertados.
+func (d *Documento) insertarHTML(bloques []Bloque, i, pos int, fragmento string) (Lugar, []*html.Node, bool) {
 	nodos, err := html.ParseFragment(strings.NewReader(fragmento), cuerpo())
 	if err != nil || len(nodos) == 0 {
-		return Lugar{}, false
+		return Lugar{}, nil, false
 	}
 	padre, antes := d.raiz, (*html.Node)(nil)
 	var sobra *html.Node
@@ -95,7 +101,8 @@ func (d *Documento) InsertarHTML(bloques []Bloque, i, pos int, fragmento string)
 	if sobra != nil {
 		sobra.Parent.RemoveChild(sobra)
 	}
-	return d.primeroDesde(nodos[0])
+	l, ok := d.primeroDesde(nodos[0])
+	return l, nodos, ok
 }
 
 func superiorDe(n *html.Node) *html.Node {
@@ -179,6 +186,63 @@ func (e *Edicion) InsertarEnlace(desde, hasta int, href, texto string) {
 	e.runas = slices.Concat(e.runas[:desde], nuevo, e.runas[hasta:])
 	e.hayPendiente = false
 	e.reescribir()
+}
+
+// PegarEnLinea mete en `pos` el párrafo de un [Pegado] en línea: cada runa con su formato
+// encima del de donde se pega, como el texto que se teclea ahí. Lo que va dentro de un
+// enlace pegado pierde el enlace de alrededor (uno no va dentro de otro). Devuelve
+// cuántas runas entran; 0 si el fragmento no es un párrafo.
+func (e *Edicion) PegarEnLinea(pos int, fragmento string) int {
+	bs := Parse(fragmento).Bloques()
+	if len(bs) != 1 || bs[0].Tipo != Parrafo || bs[0].Celda != nil {
+		return 0
+	}
+	pegado := bs[0].Editar()
+	pos = max(0, min(pos, len(e.runas)))
+	base := e.hereda(pos)
+	sinEnlace := slices.DeleteFunc(slices.Clone(base), func(n *html.Node) bool { return n.DataAtom == atom.A })
+	cadenas := make([][]*html.Node, len(pegado.runas))
+	for k, c := range pegado.cadenas {
+		debajo := base
+		if slices.ContainsFunc(c, func(n *html.Node) bool { return n.DataAtom == atom.A }) {
+			debajo = sinEnlace
+		}
+		cadenas[k] = slices.Concat(debajo, c)
+	}
+	e.cadenas = slices.Concat(e.cadenas[:pos], cadenas, e.cadenas[pos:])
+	e.runas = slices.Concat(e.runas[:pos], pegado.runas, e.runas[pos:])
+	e.hayPendiente = false
+	e.reescribir()
+	return len(pegado.runas)
+}
+
+// PegarBloques mete los bloques de un [Pegado] en la posición `pos` del bloque i, como
+// [Documento.InsertarHTML], y devuelve el lugar del ÚLTIMO bloque de texto pegado, que es
+// donde se queda el cursor (al final de lo pegado, como en cualquier editor).
+func (d *Documento) PegarBloques(bloques []Bloque, i, pos int, fragmento string) (Lugar, bool) {
+	primero, nodos, ok := d.insertarHTML(bloques, i, pos, fragmento)
+	if !ok {
+		return Lugar{}, false
+	}
+	// Lo pegado son los nodos insertados, y no lo demás que sea nuevo: al pegar en medio
+	// de un párrafo, la cola que queda tras partirlo también es un nodo nuevo, y el cursor
+	// no va al final de ella.
+	nuevos := make(map[*html.Node]bool, len(nodos))
+	for _, n := range nodos {
+		nuevos[n] = true
+	}
+	tras := d.Bloques()
+	for k := len(tras) - 1; k >= 0; k-- {
+		b := tras[k]
+		n := b.cont
+		if n == nil || n.DataAtom == atom.Body {
+			n = b.primero
+		}
+		if b.Tipo.EsTexto() && n != nil && nuevos[superiorDe(n)] {
+			return b.Lugar, true
+		}
+	}
+	return primero, true
 }
 
 // ---- las órdenes de tabla (`tableOp`, `mergeCells`, `splitCell`, `setCellProp`) ----

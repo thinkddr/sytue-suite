@@ -83,12 +83,16 @@ type contactStore interface {
 
 // Handlers agrupa los manejadores de la API REST de Contacts.
 type Handlers struct {
-	store contactStore
-	cfg   config.Config
+	source privateSourceService
+	store  contactStore
+	cfg    config.Config
 }
 
 // toAPIError traduce errores de dominio a *httpx.Error canónicos.
 func toAPIError(err error) error {
+	if result := privateSourceAPIError(err); result != nil {
+		return result
+	}
 	switch {
 	case err == nil:
 		return nil
@@ -108,6 +112,8 @@ func toAPIError(err error) error {
 		return httpx.ErrBadRequest.WithMessage("Invalid vCard.")
 	case errors.Is(err, domain.ErrInvalidCSV):
 		return httpx.ErrBadRequest.WithMessage("Unrecognised CSV: use an export from Google Contacts or Outlook.")
+	case errors.Is(err, domain.ErrCSVTooManyContacts):
+		return httpx.ErrBadRequest.WithMessage("CSV exceeds the limit of 50,000 contacts.")
 	case errors.Is(err, domain.ErrDefaultImmutable):
 		return httpx.ErrBadRequest.WithMessage("The default address book cannot be deleted.")
 	default:
@@ -276,11 +282,15 @@ type contactRequest struct {
 	Title           string           `json:"title,omitempty"`
 	Nickname        string           `json:"nickname,omitempty"`
 	Note            string           `json:"note,omitempty"`
-	Birthday        string           `json:"birthday,omitempty"` // RFC3339 o YYYY-MM-DD
+	Birthday        string           `json:"birthday,omitempty"`         // RFC3339 o YYYY-MM-DD
+	BirthdayNoYear  string           `json:"birthday_no_year,omitempty"` // --MM-DD; se ignora si va birthday
 	PhotoURL        string           `json:"photo_url,omitempty"`
 	Emails          []emailRequest   `json:"emails,omitempty"`
 	Phones          []phoneRequest   `json:"phones,omitempty"`
 	Addresses       []addressRequest `json:"addresses,omitempty"`
+	URLs            []domain.URL     `json:"urls,omitempty"`
+	Related         []domain.Related `json:"related,omitempty"`
+	Anniversary     string           `json:"anniversary,omitempty"` // RFC3339 o YYYY-MM-DD
 }
 
 type emailRequest struct {
@@ -334,6 +344,12 @@ func (req contactRequest) toContact() (domain.Contact, error) {
 			return domain.Contact{}, domain.ErrInvalidContact
 		}
 		c.Birthday = &t
+	} else if strings.TrimSpace(req.BirthdayNoYear) != "" {
+		s, err := domain.NormalizeBirthdayNoYear(req.BirthdayNoYear)
+		if err != nil {
+			return domain.Contact{}, domain.ErrInvalidContact
+		}
+		c.BirthdayNoYear = s
 	}
 	for _, e := range req.Emails {
 		if strings.TrimSpace(e.Email) == "" {
@@ -372,10 +388,47 @@ func (req contactRequest) toContact() (domain.Contact, error) {
 		}
 		c.Addresses = append(c.Addresses, addr)
 	}
+	if err := req.enlaces(&c); err != nil {
+		return domain.Contact{}, err
+	}
 	ensureOnePrimaryEmails(c.Emails)
 	ensureOnePrimaryPhones(c.Phones)
 	ensureOnePrimaryAddresses(c.Addresses)
 	return c, nil
+}
+
+// enlaces lleva al contacto el aniversario, los sitios web y las personas
+// relacionadas, validados (aparte de toContact para que cada función se lea entera).
+func (req contactRequest) enlaces(c *domain.Contact) error {
+	if req.Anniversary != "" {
+		t, err := parseDate(req.Anniversary)
+		if err != nil {
+			return domain.ErrInvalidContact
+		}
+		c.Anniversary = &t
+	}
+	// Una fila vacía es el hueco que deja el editor, no un error; uno mal escrito sí.
+	for _, u := range req.URLs {
+		if strings.TrimSpace(u.URL) == "" {
+			continue
+		}
+		v, err := domain.NormalizeURL(u.URL)
+		if err != nil {
+			return err
+		}
+		c.URLs = append(c.URLs, domain.URL{URL: v, Type: domain.NormalizeURLType(u.Type)})
+	}
+	for _, r := range req.Related {
+		if strings.TrimSpace(r.Name) == "" {
+			continue
+		}
+		n, err := domain.NormalizeRelated(r.Name)
+		if err != nil {
+			return err
+		}
+		c.Related = append(c.Related, domain.Related{Name: n, Type: domain.NormalizeRelatedType(r.Type)})
+	}
+	return nil
 }
 
 // ListContacts lista los contactos de una libreta (?limit=).

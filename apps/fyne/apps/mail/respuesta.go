@@ -39,12 +39,20 @@ type Borrador struct {
 	// ellos el mensaje se agrupa bien en cualquier otro cliente.
 	EnRespuestaA string
 	Referencias  []string
+	// Responde es el id del correo de Sytue al que se contesta («Responder» y
+	// «Responder a todos», no un reenvío): cuando el envío sale, ese correo se marca
+	// `\Answered`, que es lo que Thunderbird o el iPhone leen.
+	Responde string
+	// Copia es la copia local de este redactor en el equipo (copialocal.go), o vacía si
+	// aún no tiene. Viaja con el borrador para que reabrirlo —al volver a la cuenta,
+	// al deshacer un envío— siga escribiendo en la misma y no deje otra huérfana.
+	Copia string `json:"-"`
 }
 
 // ConContenido dice si hay algo que perder: sin nada escrito, cerrar no guarda ni
 // pregunta (`hasContent`).
 func (b Borrador) ConContenido() bool {
-	return strings.TrimSpace(b.Para+b.Cc+b.Cco+b.Asunto+b.Cuerpo) != ""
+	return strings.TrimSpace(b.Para+b.Cc+b.Cco+b.Asunto+b.Cuerpo+b.HTML) != "" || len(b.Adjuntos) > 0 || len(b.Drive) > 0
 }
 
 // Los prefijos NO se traducen: son los que entienden todos los clientes de correo, y
@@ -97,7 +105,7 @@ func BorradorDeRespuesta(t *i18n.Translator, l i18n.Locale, m Mensaje, modo Resp
 		b.EnRespuestaA, b.Referencias = "", nil // un reenvío empieza hilo
 		return b
 	}
-	b.Asunto = asunto
+	b.Asunto, b.Responde = asunto, m.ID
 	if !prefijoRe.MatchString(asunto) {
 		b.Asunto = "Re: " + asunto
 	}

@@ -36,7 +36,7 @@ import (
 // cortafuegos que `editor.Contexto.Mandar` pone a la cinta, aplicado a lo que la cinta
 // no ve: los botones del carril, la mini-barra y las teclas.
 
-// Medidas de SlidesCanvas.tsx, con el rem de 14.
+// Medidas de SlidesCanvas.tsx, con el rem de 16.
 var (
 	// AltoMiniBarra es el `h-9` de la mini-barra, con su `border-b` dentro.
 	AltoMiniBarra = tema.Espacio(9)
@@ -98,6 +98,8 @@ var transiciones = []struct{ ID, Clave string }{
 type Editor struct {
 	ctx *editor.Contexto
 	m   *Modelo
+	// noEntendido es por qué la última carga no se deja editar (vacío si se deja).
+	noEntendido []string
 
 	activa int
 	// abajo es `bottom`: el panel bajo el escenario —notas, animaciones, datos del
@@ -132,6 +134,19 @@ type Editor struct {
 	// Idioma es el de la sesión: da el separador decimal de los números de la cinta
 	// (`formatNumber(locale, …)` en la web).
 	Idioma i18n.Locale
+	// Almacen recuerda, por persona, el tamaño de las notas del moderador al presentar.
+	Almacen Almacen
+
+	// Propietario dice si quien edita es el dueño de la presentación: solo él toca lo
+	// bloqueado (`esPropietario` de la web). Lo pone quien abre, ANTES de Cargar. La
+	// contraseña que también lo permite se presenta en la web: aquí no hay panel.
+	Propietario bool
+	// base es el modelo tal como quedó tras el último cambio aceptado, para comparar lo
+	// bloqueado (`stateRef.current.model` de la web). Solo se lleva cuando hay algo que
+	// vigilar —protegida y sin ser el dueño—: copiar el modelo en cada letra de las notas
+	// no se paga en las demás. ultimoAviso espacia el aviso de «bloqueado».
+	base        *Modelo
+	ultimoAviso time.Time
 
 	// AlCambiar se llama tras cada cambio al documento. Es de quien guarda: aquí no se
 	// sabe si el documento vive en el servicio o en un fichero.
@@ -170,6 +185,10 @@ type Editor struct {
 	notas       *panelNotas
 	avisos      *ui.PilaAvisos
 	menuDiapos  *ui.Menu
+	// alt es el campo «Texto alternativo» de la mini-barra con una imagen elegida
+	// (alt.go). Se crea una vez y se reutiliza en cada recomposición: así la mini-barra
+	// se puede rehacer mientras se escribe sin quitarle el foco ni el cursor.
+	alt campoAlt
 }
 
 var _ editor.Lienzo = (*Editor)(nil)
@@ -196,8 +215,23 @@ func NuevoEditor(ctx *editor.Contexto) *Editor {
 	e.zona = container.New(&zonaDiapo{e: e})
 	e.deslizZona = container.NewVScroll(e.zona)
 	e.raiz = container.New(&disposicionDiapos{e: e}, e.carril, e.deslizZona)
+	// La hoja de atajos del editor acaba con las teclas de presentar, con la pestaña
+	// delante para que «Navegar» no se lea como algo del editor (`propiosDe` de la web).
+	if ctx != nil && ctx.AtajosPropios == nil {
+		ctx.AtajosPropios = func() []ui.GrupoDeAtajos { return GruposDeAtajosPropios(ctx) }
+	}
 	e.recomponer()
 	return e
+}
+
+// GruposDeAtajosPropios son las teclas de presentar como apartados de la hoja de atajos
+// del editor: «Presentar › Navegar», «Presentar › Pantalla».
+func GruposDeAtajosPropios(ctx *editor.Contexto) []ui.GrupoDeAtajos {
+	grupos := GruposDeTeclasPresentando(func(c string, v i18nVars) string { return ctx.Traducir(c, v) })
+	for i := range grupos {
+		grupos[i].Titulo = ctx.Traducir("ribbon.tab.present") + " › " + grupos[i].Titulo
+	}
+	return grupos
 }
 
 // t traduce una clave sin variables.
@@ -302,28 +336,37 @@ func (e *Editor) Objeto() fyne.CanvasObject { return e.raiz }
 // sobrescribiría con el primer cambio, y un documento que no sabemos leer no se pisa.
 func (e *Editor) Cargar(contenido string) bool {
 	entendido := true
-	e.aviso = ""
+	e.aviso, e.noEntendido = "", nil
 	switch m, err := Leer([]byte(contenido)); {
 	case contenido == "":
 		e.m = ModeloVacio(e.t)
 	case err != nil:
-		e.m, entendido = ModeloVacio(e.t), false
+		e.m, entendido, e.noEntendido = ModeloVacio(e.t), false, []string{"json"}
 		e.avisar("slides.msg.readFailed", "slides.msg.readFailed.detail")
 	case len(m.Diapos) == 0:
 		e.m = ModeloVacio(e.t)
 		e.avisar("slides.msg.readFailed", "slides.msg.readFailed.detail")
 	default:
 		e.m, entendido = m, m.Fiel([]byte(contenido))
+		if !entendido {
+			e.noEntendido = m.NoFiel([]byte(contenido))
+		}
 		if faltan := m.NoPintado(); len(faltan) > 0 {
 			e.aviso = Resumen(faltan, e.t)
 		}
 	}
 	e.activa, e.patron, e.diseno, e.selCon = 0, false, "", ""
 	e.sel, e.extra, e.escribiendo, e.escenario.Oculta = "", nil, nil, ""
+	e.base = nil
+	e.anotarBase()
 	e.escenario.M = e.m
 	e.recomponer()
 	return entendido
 }
+
+// NoEntendido es por qué la última carga se abrió en solo lectura: las rutas del JSON
+// que no se conservarían («protect»…), o «json» si no se pudo leer. Vacío si se edita.
+func (e *Editor) NoEntendido() []string { return slices.Clone(e.noEntendido) }
 
 // Serializar es el modelo para guardar.
 func (e *Editor) Serializar() string {
@@ -369,7 +412,11 @@ func (e *Editor) cambiar(f func(), repintar bool) {
 	if e.ctx.SoloLectura {
 		return
 	}
+	activa := e.activa
 	f()
+	if e.vetado(activa) {
+		return
+	}
 	antes := e.ctx.Guardado
 	e.ctx.Guardado = editor.Sucio
 	if repintar {
@@ -428,9 +475,23 @@ func (e *Editor) Duplicar() {
 	}, true)
 }
 
+// AlternarOculta es `toggleHidden`: oculta o vuelve a enseñar al presentar la
+// diapositiva `i` (Ctrl/⌘+Mayús+H o el botón del pie del carril). No en el patrón, que
+// no es una diapositiva.
+func (e *Editor) AlternarOculta(i int) {
+	if e.patron {
+		return
+	}
+	e.cambiar(func() { e.m.AlternarOculta(i) }, true)
+}
+
 // Eliminar es `deleteSlide`: pregunta antes y siempre deja una.
 func (e *Editor) Eliminar() {
 	if e.ctx.SoloLectura || len(e.m.Diapos) <= 1 {
+		return
+	}
+	if e.diapoFija() { // no se pregunta lo que no se va a poder hacer
+		e.avisarProtegido()
 		return
 	}
 	c := fyne.CurrentApp().Driver().CanvasForObject(e.raiz)
@@ -544,6 +605,7 @@ func (e *Editor) variante() tema.Variante {
 // recompone sus cajas él solo, y el área de notas no puede perder el cursor).
 func (e *Editor) recomponer() {
 	e.activa = min(max(e.activa, 0), max(len(e.m.Diapos)-1, 0))
+	e.confirmarAltAjeno()
 	// Lo elegido que ya no existe —se borró, se deshizo, cambió la disposición— se suelta.
 	if e.sel != "" && e.m.caja(e.objetivo(), e.sel) == nil {
 		e.sel, e.extra = "", nil
@@ -737,6 +799,8 @@ func (e *Editor) controlesSeleccion() []fyne.CanvasObject {
 	}
 	var objs []fyne.CanvasObject
 	switch p.Tipo {
+	case "image":
+		objs = append(objs, editor.Divisor(), e.campoAltPara(*p))
 	case "shape":
 		objs = append(objs, editor.Divisor())
 		if p.Forma != "line" && p.Forma != "arrow" {
@@ -1061,6 +1125,7 @@ func (c *carrilDiapos) rehacer() {
 		t := NuevaMiniatura(e.m, i, e.Elegir)
 		t.Activa, t.Variante = i == e.activa, e.variante()
 		t.AlMover = func(hasta int) { e.Mover(i, hasta) }
+		t.AlOcultar = func() { e.AlternarOculta(i) }
 		t.AlAtajo = e.ctx.AtajoDelEditor
 		t.Rotulo = func(clave string, n, total int) string {
 			return e.ctx.Traducir(clave, i18n.Vars{"n": n, "total": total})
@@ -1073,9 +1138,12 @@ func (c *carrilDiapos) rehacer() {
 	ro := e.ctx.SoloLectura
 	nueva := editor.NuevoBotonCinta(iconos.EdMas, e.t("slides.new"), e.NuevaDiapositiva)
 	dup := editor.NuevoBotonCinta(iconos.EdDiapoNueva, e.t("slides.duplicate"), e.Duplicar)
+	ocultar := editor.NuevoBotonCinta(iconos.EdEyeOff, e.t("slides.hideSlide"), func() { e.AlternarOculta(e.activa) })
+	ocultar.Activo = e.activa < len(e.m.Diapos) && e.m.Diapos[e.activa].EstaOculta()
+	ocultar.Inerte = ro || e.patron
 	borrar := editor.NuevoBotonCinta(iconos.EdPapelera, e.t("slides.delete"), e.Eliminar)
 	nueva.Inerte, dup.Inerte, borrar.Inerte = ro, ro, ro || len(e.m.Diapos) <= 1
-	c.pie = []fyne.CanvasObject{nueva, dup, borrar}
+	c.pie = []fyne.CanvasObject{nueva, dup, ocultar, borrar}
 	c.Refresh()
 }
 
@@ -1230,7 +1298,7 @@ func (p *panelNotas) sincronizar() {
 		p.area.SetText(d.Notas)
 		p.area.OnChanged = onc
 	}
-	p.area.SoloLectura(p.e.ctx.SoloLectura)
+	p.area.SoloLectura(p.e.ctx.SoloLectura || p.e.diapoFija())
 	p.Refresh()
 }
 
@@ -1330,14 +1398,9 @@ func (banda) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	}
 }
 
-// colorLienzo es `--editor-canvas-bg`: el fondo sobre el que flota el papel. Va literal
-// porque no es un token de la paleta compartida, es del editor.
-func colorLienzo(v tema.Variante) color.NRGBA {
-	if v == tema.Oscuro {
-		return color.NRGBA{R: 0x18, G: 0x1A, B: 0x1C, A: 255}
-	}
-	return color.NRGBA{R: 0xE9, G: 0xE6, B: 0xDD, A: 255}
-}
+// colorLienzo es `--editor-canvas-bg`: el fondo sobre el que flota el papel. No es un
+// token de la paleta compartida, es del editor, y lo define [editor.ColorMesa].
+func colorLienzo(v tema.Variante) color.NRGBA { return editor.ColorMesa(v) }
 
 // ---- «Editar patrón» ----
 

@@ -170,6 +170,12 @@ func EnlaceTareas(publicURL, org string) string {
 	return enlace(publicURL, org, "/erp/", url.Values{"vista": {"tareas"}})
 }
 
+// EnlaceAprobacionesERP abre la cola de aprobaciones del ERP (`ErpApp.tsx` lee
+// `?vista=`): donde quien puede aprobar resuelve lo que pasa del umbral.
+func EnlaceAprobacionesERP(publicURL, org string) string {
+	return enlace(publicURL, org, "/erp/", url.Values{"vista": {"aprobaciones"}})
+}
+
 // EnlacePages abre Sytue Web en `ruta`, relativa a la app y con su consulta si la
 // lleva («site/<id>», «site/<id>?tab=orders»): los avisos de pedidos, formularios,
 // dominios y exportaciones de la tienda de una organización.

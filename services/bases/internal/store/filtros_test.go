@@ -76,3 +76,37 @@ func TestConstruirConsultaPorDefecto(t *testing.T) {
 		t.Errorf("%+v", q)
 	}
 }
+
+// La búsqueda libre recorre los campos con texto, viaja como parámetro y no mira
+// enlaces, adjuntos ni casillas; sin campos buscables no casa nada.
+func TestConstruirConsultaBusqueda(t *testing.T) {
+	veneno := `'; DROP TABLE bases; --`
+	campos := []domain.Campo{
+		{ID: "f-texto", Kind: domain.TipoTexto},
+		{ID: "f-num", Kind: domain.TipoNumero},
+		{ID: "f-check", Kind: domain.TipoCasilla},
+		{ID: "f-link", Kind: domain.TipoRelacion},
+	}
+	q := construirConsulta(campos, domain.ConfigVista{Search: veneno})
+	if strings.Contains(q.where, "DROP") || strings.Count(q.where, "position(") != 2 {
+		t.Fatalf("búsqueda mal construida: %s", q.where)
+	}
+	if !slicesContiene(q.args, "f-texto") || !slicesContiene(q.args, "f-num") || slicesContiene(q.args, "f-link") || slicesContiene(q.args, "f-check") {
+		t.Errorf("campos buscados inesperados: %v", q.args)
+	}
+	if q := construirConsulta(campos[3:], domain.ConfigVista{Search: "x"}); q.where != " AND false" {
+		t.Errorf("sin campos buscables debería no casar nada: %q", q.where)
+	}
+	if q := construirConsulta(campos, domain.ConfigVista{Search: "  "}); q.where != "" {
+		t.Errorf("una búsqueda en blanco no filtra: %q", q.where)
+	}
+}
+
+func slicesContiene(xs []any, v any) bool {
+	for _, x := range xs {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}

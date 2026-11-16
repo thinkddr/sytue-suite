@@ -25,8 +25,8 @@ func TestStorageUsageSumAndOwnerScope(t *testing.T) {
 	ctx := tenantCtx("acme")
 
 	// Dos cuentas del MISMO tenant: aísla el alcance por CUENTA (no solo por tenant).
-	accA := seedAccount(t, ctx, st, "ada@sytue.eu")
-	accB := seedAccount(t, ctx, st, "bob@sytue.eu")
+	accA := seedAccount(ctx, t, st, "ada@sytue.eu")
+	accB := seedAccount(ctx, t, st, "bob@sytue.eu")
 	inboxA, err := st.MailboxByRole(ctx, accA.ID, domain.RoleInbox)
 	if err != nil {
 		t.Fatalf("MailboxByRole A: %v", err)
@@ -37,22 +37,22 @@ func TestStorageUsageSumAndOwnerScope(t *testing.T) {
 	}
 
 	// Recién creadas: uso cero.
-	if u := usage(t, ctx, st, "sub-ada@sytue.eu"); u != 0 {
+	if u := usage(ctx, t, st, "sub-ada@sytue.eu"); u != 0 {
 		t.Fatalf("uso inicial A = %d, quiero 0", u)
 	}
 
 	// seedMessage inserta con SizeBytes=100. Tres en A, dos en B.
-	m1 := seedMessage(t, ctx, st, accA, inboxA.ID, "Uno", "a@x.eu", nil)
-	seedMessage(t, ctx, st, accA, inboxA.ID, "Dos", "b@x.eu", nil)
-	seedMessage(t, ctx, st, accA, inboxA.ID, "Tres", "c@x.eu", nil)
-	seedMessage(t, ctx, st, accB, inboxB.ID, "B-uno", "d@x.eu", nil)
-	seedMessage(t, ctx, st, accB, inboxB.ID, "B-dos", "e@x.eu", nil)
+	m1 := seedMessage(ctx, t, st, accA, inboxA.ID, "Uno", "a@x.eu", nil)
+	seedMessage(ctx, t, st, accA, inboxA.ID, "Dos", "b@x.eu", nil)
+	seedMessage(ctx, t, st, accA, inboxA.ID, "Tres", "c@x.eu", nil)
+	seedMessage(ctx, t, st, accB, inboxB.ID, "B-uno", "d@x.eu", nil)
+	seedMessage(ctx, t, st, accB, inboxB.ID, "B-dos", "e@x.eu", nil)
 
 	// Suma correcta y OWNER-SCOPED: A cuenta solo lo suyo (3×100), no lo de B.
-	if u := usage(t, ctx, st, "sub-ada@sytue.eu"); u != 300 {
+	if u := usage(ctx, t, st, "sub-ada@sytue.eu"); u != 300 {
 		t.Fatalf("uso A = %d, quiero 300 (suma de A, sin contar B)", u)
 	}
-	if u := usage(t, ctx, st, "sub-bob@sytue.eu"); u != 200 {
+	if u := usage(ctx, t, st, "sub-bob@sytue.eu"); u != 200 {
 		t.Fatalf("uso B = %d, quiero 200", u)
 	}
 
@@ -60,17 +60,17 @@ func TestStorageUsageSumAndOwnerScope(t *testing.T) {
 	if err := st.DeleteMessage(ctx, accA.ID, m1.ID); err != nil {
 		t.Fatalf("DeleteMessage: %v", err)
 	}
-	if u := usage(t, ctx, st, "sub-ada@sytue.eu"); u != 200 {
+	if u := usage(ctx, t, st, "sub-ada@sytue.eu"); u != 200 {
 		t.Fatalf("uso A tras borrar = %d, quiero 200", u)
 	}
-	if u := usage(t, ctx, st, "sub-bob@sytue.eu"); u != 200 {
+	if u := usage(ctx, t, st, "sub-bob@sytue.eu"); u != 200 {
 		t.Fatalf("borrar en A alteró el uso de B: %d", u)
 	}
 }
 
 // usage lee accounts.used_bytes de una cuenta por su subject (lo que expone el
 // endpoint de cuota). quota_bytes es el sembrado por seedAccount (1 GiB).
-func usage(t *testing.T, ctx context.Context, st *store.Store, subject string) int64 {
+func usage(ctx context.Context, t *testing.T, st *store.Store, subject string) int64 {
 	t.Helper()
 	acc, err := st.AccountBySubject(ctx, subject)
 	if err != nil {

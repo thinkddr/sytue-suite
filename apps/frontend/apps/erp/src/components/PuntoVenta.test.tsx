@@ -20,7 +20,12 @@ if (typeof document === 'undefined') GlobalRegistrator.register();
 const almacen = new Map<string, unknown>();
 const clave = (cuenta: string, espacio: string, id: string) =>
   JSON.stringify([cuenta, espacio, id]);
+// El resto del módulo queda el de verdad: `mock.module` vale para todo el proceso de
+// `bun test`, y otros ficheros (los que pintan `@sytue/shell`) necesitan sus demás
+// exportaciones, como `isNativeShell`.
+const offlineReal = { ...(await import('@sytue/offline')) };
 void mock.module('@sytue/offline', () => ({
+  ...offlineReal,
   readOfflineValue: async <T,>(cuenta: string, espacio: string, id: string): Promise<T | null> => {
     const valor = almacen.get(clave(cuenta, espacio, id));
     return valor === undefined ? null : (structuredClone(valor) as T);
@@ -320,13 +325,13 @@ test('al remontar se recupera el cobro pendiente, sin exponerlo a otra cuenta', 
 });
 
 test('un 422 permite corregir la cesta y cobrar con un UUID nuevo', async () => {
-  respuestasCobro.push(json(422, { error: { code: 'validation', message: 'Precio actualizado' } }));
+  respuestasCobro.push(json(422, { error: { code: 'unprocessable', message: 'Price changed' } }));
   await montar();
   await anadirProducto();
   await enviar();
   await esperar(
     () =>
-      document.querySelector('[role="alert"]')?.textContent === 'Precio actualizado' &&
+      document.querySelector('[role="alert"]')?.textContent === t('error.code.unprocessable') &&
       !obtener<HTMLButtonElement>('.erp-tpv-product').disabled,
   );
   expect(almacen.size).toBe(0);

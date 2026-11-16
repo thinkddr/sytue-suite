@@ -76,6 +76,7 @@ func TestNotificationsLifecycle(t *testing.T) {
 	ctx := tenantCtx("acme")
 
 	const sub = "user-1"
+	ctx = domain.ConBuzonesPersonales(ctx, sub, nil, time.Now())
 
 	// Crear tres notificaciones para el mismo usuario.
 	var created []domain.Notification
@@ -229,6 +230,8 @@ func TestTenantIsolation(t *testing.T) {
 	// las organizaciones). Sus avisos la siguen de una organización a otra (ADR 0053,
 	// TestAvisosDeLaPersona); lo que sigue aislado por organización es la presencia.
 	const sub = "user-shared"
+	ctxA = domain.ConBuzonesPersonales(ctxA, sub, nil, time.Now())
+	ctxB = domain.ConBuzonesPersonales(ctxB, "otra", nil, time.Now())
 
 	// Tenant A crea una notificacion y registra presencia.
 	nA, err := st.CreateNotification(ctxA, sampleNotification(sub, "solo-a"))
@@ -354,6 +357,37 @@ func TestNotificationPrefs(t *testing.T) {
 		t.Fatalf("la misma regla no puede duplicarse: %+v", prefs)
 	}
 
+	// Volver a permitir un tipo sin el origen callado no deja contra-regla: si quedara,
+	// callar después el origen entero dejaría pasar ese tipo sin decirlo.
+	if err := st.SetNotificationPref(ctx, sub,
+		domain.NotificationPref{Source: domain.SourceDrive, Kind: "comment", Muted: false}); err != nil {
+		t.Fatalf("SetNotificationPref(permitir tipo): %v", err)
+	}
+	if prefs, _ = st.ListNotificationPrefs(ctx, sub); len(prefs) != 0 {
+		t.Fatalf("permitir un tipo sin el origen callado debe BORRAR su regla, quedan %+v", prefs)
+	}
+	// Con el origen callado, sí: es la excepción «todo menos esto».
+	for _, p := range []domain.NotificationPref{
+		{Source: domain.SourceDrive, Muted: true},
+		{Source: domain.SourceDrive, Kind: "comment", Muted: false},
+	} {
+		if err := st.SetNotificationPref(ctx, sub, p); err != nil {
+			t.Fatalf("SetNotificationPref(%v): %v", p, err)
+		}
+	}
+	prefs, _ = st.ListNotificationPrefs(ctx, sub)
+	if len(prefs) != 2 || domain.Muted(prefs, domain.SourceDrive, "comment") {
+		t.Fatalf("la contra-regla de un origen callado debe guardarse: %+v", prefs)
+	}
+	// Y volver a permitir el origen se la lleva: ya no contradice nada.
+	if err := st.SetNotificationPref(ctx, sub,
+		domain.NotificationPref{Source: domain.SourceDrive, Muted: false}); err != nil {
+		t.Fatalf("SetNotificationPref(permitir origen): %v", err)
+	}
+	if prefs, _ = st.ListNotificationPrefs(ctx, sub); len(prefs) != 0 {
+		t.Fatalf("permitir el origen debe borrar sus contra-reglas, quedan %+v", prefs)
+	}
+
 	// Otro tenant no ve nada de este (RLS).
 	otros, err := st.ListNotificationPrefs(tenantCtx("otra"), sub)
 	if err != nil {
@@ -376,7 +410,11 @@ func TestAvisosDeLaPersona(t *testing.T) {
 	acme, globex := tenantCtx("acme"), tenantCtx("globex")
 	// El contexto que arma el handler con el token: la organización y los buzones personales.
 	sesion := func(org context.Context, personales ...string) context.Context {
-		return domain.ConBuzonesPersonales(org, personales, time.Now())
+		subject := "bea"
+		if len(personales) > 0 {
+			subject = personales[0]
+		}
+		return domain.ConBuzonesPersonales(org, subject, personales, time.Now())
 	}
 
 	// Bea es de globex y comenta en un documento de acme: su aviso vive en acme.
@@ -417,7 +455,7 @@ func TestAvisosDeLaPersona(t *testing.T) {
 		"otra persona de la misma organización": {sesion(acme, "ana", "mail:ana@acme.test"), []string{"ana", "mail:ana@acme.test"}},
 		"otra persona de otra organización":     {sesion(globex, "carla", "mail:carla@globex.test"), []string{"carla", "mail:carla@globex.test"}},
 		"un token sin buzones":                  {sesion(globex), nil},
-		"un token sin buzones en la anfitriona": {acme, []string{}},
+		"un token sin buzones en la anfitriona": {domain.ConBuzonesPersonales(acme, "ana", nil, time.Now()), []string{}},
 	}
 	for nombre, v := range ajenas {
 		t.Run(nombre+" no lo lee ni lo marca", func(t *testing.T) {

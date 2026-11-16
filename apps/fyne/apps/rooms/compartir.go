@@ -29,7 +29,7 @@ import (
 // Medido en `rooms/compartir.ancho.json` (1280×800, rem 14): 69 elementos, la columna
 // centrada a `max-w-xl` con `p-6` y `gap-4`.
 var (
-	// AnchoCompartir es el `max-w-xl` de la columna: 36rem con el rem de 14.
+	// AnchoCompartir es el `max-w-xl` de la columna: 36rem, 576 px.
 	AnchoCompartir float32 = 36 * tema.Rem
 	// CanalonCompartir es su `p-6` y HuecoCompartir su `gap-4`.
 	CanalonCompartir = tema.Espacio(6)

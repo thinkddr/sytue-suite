@@ -35,7 +35,7 @@ import (
 func authDataConCredencial(t *testing.T, rpID string, credID, cose []byte) []byte {
 	t.Helper()
 	h := sha256.Sum256([]byte(rpID))
-	b := make([]byte, 37)
+	b := make([]byte, 37, 37+16+2+len(credID)+len(cose))
 	copy(b[0:32], h[:])
 	// UP (presencia) + AT (credencial adjunta): sin los dos, el handler rechaza.
 	b[32] = 0x01 | 0x40
@@ -52,32 +52,14 @@ func authDataConCredencial(t *testing.T, rpID string, credID, cose []byte) []byt
 // coseES256 serializa una clave pública P-256 en el mapa COSE mínimo.
 func coseES256Test(t *testing.T, pub *ecdsa.PublicKey) []byte {
 	t.Helper()
-	x := pub.X.FillBytes(make([]byte, 32))
-	y := pub.Y.FillBytes(make([]byte, 32))
-	var b []byte
-	b = append(b, 0xa5)             // mapa de 5
-	b = append(b, 0x01, 0x02)       // kty: EC2
-	b = append(b, 0x03, 0x26)       // alg: ES256 (-7)
-	b = append(b, 0x20, 0x01)       // crv: P-256
-	b = append(b, 0x21, 0x58, 0x20) // x: bytes(32)
-	b = append(b, x...)             //
-	b = append(b, 0x22, 0x58, 0x20) // y: bytes(32)
-	return append(b, y...)          //
+	return coseKeyES256(t, pub)
 }
 
 // attestationNone envuelve el authData en un attestationObject CBOR con
 // fmt="none", que es lo que manda un autenticador cuando no se pide attestation
 // (y es lo que pide este servidor).
 func attestationNone(authData []byte) []byte {
-	var b []byte
-	b = append(b, 0xa3) // mapa de 3
-	b = append(b, 0x63, 'f', 'm', 't')
-	b = append(b, 0x64, 'n', 'o', 'n', 'e')
-	b = append(b, 0x67, 'a', 't', 't', 'S', 't', 'm', 't')
-	b = append(b, 0xa0) // mapa vacío
-	b = append(b, 0x68, 'a', 'u', 't', 'h', 'D', 'a', 't', 'a')
-	// bytes(n) con longitud de dos octetos: authData siempre pasa de 255.
-	b = append(b, 0x59)
+	b := []byte{0xa3, 0x63, 'f', 'm', 't', 0x64, 'n', 'o', 'n', 'e', 0x67, 'a', 't', 't', 'S', 't', 'm', 't', 0xa0, 0x68, 'a', 'u', 't', 'h', 'D', 'a', 't', 'a', 0x59}
 	var lon [2]byte
 	binary.BigEndian.PutUint16(lon[:], uint16(len(authData)))
 	b = append(b, lon[:]...)

@@ -187,6 +187,7 @@ function Pagina({ locale, user, wsBase, inicial, fallo }: Props): JSX.Element {
               poster={poster}
               duracionMs={play.duration_ms ?? v.duration_ms}
               titulo={v.title}
+              reanudar={user && !enDirecto ? { persona: user.id, video: v.id } : null}
               alVideo={(el) => {
                 elVideo.current = el;
               }}

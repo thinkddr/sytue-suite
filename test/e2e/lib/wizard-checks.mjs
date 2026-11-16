@@ -103,3 +103,14 @@ export async function assertWizardAccessibility({ page }, selector = '[role="dia
   const report = await new AxeBuilder({ page }).include(selector).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
   expect(report.violations.filter((violation) => ['serious', 'critical'].includes(violation.impact)).map((violation) => ({ id: violation.id, help: violation.help, nodes: violation.nodes.map((node) => node.target) }))).toEqual([]);
 }
+
+/**
+ * El aviso de error que pinta el propio diálogo. Desde DS-03 (863cd2fd2) cada diálogo
+ * lleva además, montadas y vacías, las regiones vivas de los avisos (`role="alert"` y
+ * `role="status"` con `aria-live`), para que el lector anuncie un aviso aunque
+ * `aria-modal` deje fuera lo que hay en `body`. `getByRole('alert')` a secas ve las dos
+ * y el modo estricto de Playwright falla; esto deja solo la que no es región viva.
+ */
+export function errorDelDialogo(dialog) {
+  return dialog.getByRole('alert').and(dialog.locator(':not([aria-live])'));
+}

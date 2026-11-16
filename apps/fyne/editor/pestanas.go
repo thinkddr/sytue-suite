@@ -16,12 +16,11 @@ import (
 
 // Las pestañas GENÉRICAS de la cinta: las que los tres productos comparten.
 //
-// Lo que NO está aquí está en el informe: la web tiene trece pestañas y esta ola cablea
-// las tres comunes y la de Docus. Bibliografía, correspondencia, notas al final, campos
-// de formulario y consultas a datos externos no entran — el criterio fue «lo que una
-// persona usa de verdad al escribir un documento» y, sobre todo, que el cromo y el
-// lienzo salgan clavados antes que trece pestañas a medias. Las pestañas que hay y dónde
-// se ven las dice la taxonomía común con la web (`office.Pestanas`).
+// Las pestañas que hay y dónde se ven las dice la taxonomía común con la web
+// (`office.Pestanas`), y cada producto cuadra las suyas con la web por IGUALDAD
+// (`CotejarPestanas`). Lo que falta DENTRO de ellas no se apunta aquí: se mide comando a
+// comando contra el registro (`ComandosSinControl`, en el `paridad_test.go` de cada
+// producto), con su motivo.
 
 // Grupos arma la banda de una pestaña. Es pública porque la usan las pestañas PROPIAS
 // de cada producto, que viven en su paquete.
@@ -88,8 +87,8 @@ func abs(n int) int {
 	return n
 }
 
-// cuerpoVista es la pestaña «Vista» (`Vista.tsx`, §6.3): zoom, qué se enseña, pantalla
-// completa y el tema del lienzo.
+// cuerpoVista es la pestaña «Vista» (`Vista.tsx`, §6.3): zoom, qué se enseña (con la hoja
+// de atajos, `atajosayuda.go`), pantalla completa y el tema del lienzo.
 //
 // Y el grupo «Macros» (`macros.go`), con el que acaba la pestaña como en la web.
 func cuerpoVista(c *Contexto) fyne.CanvasObject {
@@ -128,7 +127,10 @@ func cuerpoVista(c *Contexto) fyne.CanvasObject {
 		c.refrescar()
 	})
 	ajustes.Activo = c.Ajustes
-	mostrar = append(mostrar, ajustes)
+	// La hoja de atajos: lo mismo que Ctrl/Cmd+/, para quien no sabe que existe.
+	atajos := NuevoBotonCinta(iconos.EdTeclado, c.Traducir("view.shortcuts"), c.Atajos)
+	atajos.Inerte = c.Atajos == nil
+	mostrar = append(mostrar, ajustes, atajos)
 
 	completa := NuevoBotonCinta(iconos.EdCompleta, c.Traducir("view.fullscreen"), nil)
 	if c.PantallaCompleta != nil {

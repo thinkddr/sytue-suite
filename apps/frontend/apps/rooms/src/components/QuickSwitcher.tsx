@@ -6,7 +6,7 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import { Input, Modal, cx } from '@sytue/ui';
+import { Input, Modal, cx, EmptyState } from '@sytue/ui';
 import type { Channel } from '../client/chatApi.js';
 import { ordenarCanales } from '../client/conmutador.js';
 import type { T } from '../i18n/index.js';
@@ -79,7 +79,7 @@ export function QuickSwitcher({
           }}
         />
         {filas.length === 0 ? (
-          <p class="text-text-muted px-1 py-2 text-sm">{t('switcher.empty')}</p>
+          <EmptyState compact icon="search" title={t('switcher.empty')} />
         ) : (
           <ul
             id="rooms-switcher-list"

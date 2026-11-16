@@ -42,9 +42,13 @@ func (a *App) engancharPeticiones() {
 			SinPermiso: true,
 			YaPedida:   func(context.Context) (bool, error) { return pedida, nil },
 			Recomponer: a.pintar,
-			Fallo:      func(texto string) { a.avisos.Notificar(ui.NuevoAviso(ui.AvisoPeligro, texto, "")) },
-			T:          p.t,
-			Concedido:  "calendar.access.granted", Recurso: c.ID,
+			Fallo: func(texto string) {
+				if a.vida.Err() == nil {
+					a.avisos.Notificar(ui.NuevoAviso(ui.AvisoPeligro, texto, ""))
+				}
+			},
+			T:         p.t,
+			Concedido: "calendar.access.granted", Recurso: c.ID,
 			AlConceder: a.cargarCalendarios,
 		})
 	}

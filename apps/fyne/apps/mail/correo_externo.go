@@ -5,6 +5,7 @@ package mail
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/mail"
 	"slices"
@@ -221,6 +222,39 @@ func (b *Buzon) plegarRama(clave string) {
 		b.P.Menu.Ramas = map[string]bool{}
 	}
 	b.P.Menu.Ramas[clave] = !b.P.Menu.Ramas[clave]
+	b.P.Refrescar()
+}
+
+// prefCuentasAbiertas es cómo dejó la persona cada cuenta externa en el lateral, en
+// este dispositivo (`CUENTAS_KEY` de ExternalAccountsSection.tsx): un objeto JSON de
+// instancia a abierta.
+const prefCuentasAbiertas = "mail_cuentas_abiertas"
+
+// cuentasRecordadas lee prefCuentasAbiertas; lo que no se entienda, como si no hubiera.
+func cuentasRecordadas() map[string]bool {
+	out := map[string]bool{}
+	if a := fyne.CurrentApp(); a != nil {
+		_ = json.Unmarshal([]byte(a.Preferences().String(prefCuentasAbiertas)), &out)
+	}
+	return out
+}
+
+// ponerCuenta deja la cuenta `id` abierta o plegada y lo recuerda.
+func (b *Buzon) ponerCuenta(id string, abierta bool) {
+	if b.P.Menu.CuentasAbiertas == nil {
+		b.P.Menu.CuentasAbiertas = map[string]bool{}
+	}
+	b.P.Menu.CuentasAbiertas[id] = abierta
+	if a := fyne.CurrentApp(); a != nil {
+		if datos, err := json.Marshal(b.P.Menu.CuentasAbiertas); err == nil {
+			a.Preferences().SetString(prefCuentasAbiertas, string(datos))
+		}
+	}
+}
+
+// plegarCuenta pliega o despliega una cuenta externa del lateral.
+func (b *Buzon) plegarCuenta(id string) {
+	b.ponerCuenta(id, !b.P.Menu.cuentaAbierta(id))
 	b.P.Refrescar()
 }
 
@@ -459,7 +493,7 @@ func (c *correoExterno) abrirCuenta(a api.ExternalMailAccount) {
 	c.cerrar()
 	// Su rama se despliega, aunque se hubiera plegado: la Entrada que se va a elegir
 	// tiene que verse elegida (`reveal` de ExternalAccountsSection).
-	delete(b.P.Menu.Ramas, claveCuenta(a.InstanceID))
+	b.ponerCuenta(a.InstanceID, true)
 	b.ElegirExterna(a.InstanceID, "")
 }
 

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/nucleo/webref"
 )
 
@@ -62,6 +63,30 @@ func TestLosGlifosSonLosDeLaWeb(t *testing.T) {
 		}
 		if strings.Join(suyas, " | ") != strings.Join(mias, " | ") {
 			t.Errorf("%s no es el de la web:\n  web:  %v\n  aquí: %v", nombre, suyas, mias)
+		}
+	}
+}
+
+// TestNingunGlifoPropioRepiteUnNombreDelComun es el espejo del guardián de la web
+// (`glifos-al-comun.test.ts`): `trash`, `download`, `link`, `lock` o `users` son del
+// catálogo compartido y Drive los pinta con SU ruta, no con una copia con otro trazado.
+//
+// VISTO EN ROJO (2026-11-13): con `"trash": glifoPapelera` de vuelta en `glifosWeb`, el
+// test nombra «trash».
+func TestNingunGlifoPropioRepiteUnNombreDelComun(t *testing.T) {
+	for clave := range glifosWeb {
+		if _, es := iconos.Comun(clave); es {
+			t.Errorf("%q es un icono del catálogo compartido: se pinta con su ruta, no con una propia", clave)
+		}
+	}
+	delComun := map[string]string{
+		"upload": glifoSubir, "download": glifoDescargar, "link": glifoEnlace, "clock": glifoReloj,
+		"trash": glifoPapelera, "mail": glifoCorreo, "users": glifoUsuarios, "lock": glifoCandado,
+	}
+	for clave, cuerpo := range delComun {
+		i, es := iconos.Comun(clave)
+		if !es || strings.Join(figuras(cuerpo), "") != strings.Join(figuras(`<path d="`+i.Ruta()+`" />`), "") {
+			t.Errorf("%q no es el dibujo del catálogo compartido: %s", clave, cuerpo)
 		}
 	}
 }

@@ -39,11 +39,22 @@ component: pgbouncer
 replicaCount: 2
 
 image:
-  # Imagen comunitaria de PgBouncer (alpine, arranca no-root). >= 1.21
-  # obligatorio (prepared statements en transaction mode); se fija 1.25.x.
+  # PgBouncer de CloudNativePG (proyecto de la CNCF): Debian trixie con el
+  # pgbouncer de PGDG, reconstruida cada pocos días con los paquetes del sistema
+  # al día. >= 1.21 obligatorio (prepared statements en transaction mode).
+  #
+  # Hasta el 2026-11-16 era `edoburu/pgbouncer` (Alpine): 79 CVE HIGH en libpq,
+  # musl y zlib que Alpine ya había arreglado y la imagen no recogía porque no se
+  # reconstruye al ritmo de su base. Esta sí, y la etiqueta lleva el sello de la
+  # construcción (`X.Y.Z-AAAAMMDDhhmm-trixie`), que es lo que mira el escaneo
+  # para saber si hay una más nueva.
+  #
+  # Lo que el chart da por hecho de la imagen, y esta cumple: `/bin/sh` (el
+  # arranque genera databases.ini) y `pgbouncer` en el PATH. Usuario, config,
+  # socket y ficheros los pone el chart, no la imagen.
   # Upstream para desarrollo; values-prod usa el mirror privado de Scaleway.
-  repository: edoburu/pgbouncer
-  tag: "v1.25.2-p0@sha256:488422e38cff912895d0d65d8963fcd306e6ac589a724398b6eb8e294e94d624"
+  repository: ghcr.io/cloudnative-pg/pgbouncer
+  tag: "1.26.1-202611121015-trixie@sha256:6c91fd7383b8b098bc0c3b71dba4e98bd568c0d301b9fc66027fbc23259c6a7d"
   pullPolicy: IfNotPresent
   useGlobalRegistry: false
 

@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/webref"
 )
@@ -102,7 +103,7 @@ func TestUpdateNoteNoPierdeNada(t *testing.T) {
 // Los nombres JSON son los del SERVICIO, no los que se recuerden: el escritorio Fyne leía
 // `body` y el servicio escribe `content`.
 func TestLosCamposSonLosDelServicio(t *testing.T) {
-	dominio := webref.Read(t, "services/notes/internal/domain/domain.go")
+	dominio := notesServiceModelContract(t)
 	for _, campo := range []string{
 		`json:"content,omitempty"`, `json:"content_cipher,omitempty"`, `json:"notebook_id"`, `json:"note_count"`,
 		`json:"group_id,omitempty"`, `json:"target_kind"`, `json:"pinned"`, `json:"checked"`,
@@ -131,7 +132,7 @@ func TestGestosDeNotaPeganDondeToca(t *testing.T) {
 		case "/api/v1/notes/n1/move":
 			_ = json.NewDecoder(r.Body).Decode(&cuerpoMover)
 		case "/api/v1/notes/trash":
-			_, _ = io.WriteString(w, `{"notes":[{"id":"n9","title":"Vieja"}]}`)
+			_, _ = io.WriteString(w, `{"notes":[{"id":"n9","title":"Vieja","notebook_title":"Viaje","deleted_at":"2026-11-12T10:00:00Z","purge_at":"2026-12-12T10:00:00Z"}],"retention_days":30}`)
 			return
 		case "/api/v1/tags":
 			_, _ = io.WriteString(w, `{"tags":[{"id":"t1","name":"Prioridad","states":[{"id":"s1","tag_id":"t1","name":"Alta","color":"#f00"}]}]}`)
@@ -170,6 +171,11 @@ func TestGestosDeNotaPeganDondeToca(t *testing.T) {
 	if err != nil || len(papelera) != 1 || papelera[0].ID != "n9" {
 		t.Fatalf("ListTrash = %v, %v", papelera, err)
 	}
+	// La fila de la papelera trae de qué cuaderno viene y cuándo se vaciará.
+	if p := papelera[0]; p.NotebookTitle != "Viaje" || p.PurgeAt == nil ||
+		!p.PurgeAt.Equal(time.Date(2026, 12, 12, 10, 0, 0, 0, time.UTC)) || p.DeletedAt.IsZero() {
+		t.Fatalf("ListTrash no trae cuaderno ni caducidad: %+v", p)
+	}
 	etiquetas, err := n.ListTags(ctx)
 	if err != nil || len(etiquetas) != 1 || len(etiquetas[0].States) != 1 || etiquetas[0].States[0].Name != "Alta" {
 		t.Fatalf("ListTags = %v, %v", etiquetas, err)
@@ -201,7 +207,7 @@ func TestGestosDeNotaPeganDondeToca(t *testing.T) {
 
 // Los nombres de las etiquetas y de la papelera son los del servicio.
 func TestEtiquetasYPapeleraSiguenAlServicio(t *testing.T) {
-	dominio := webref.Read(t, "services/notes/internal/domain/domain.go")
+	dominio := notesServiceModelContract(t)
 	for _, campo := range []string{`json:"tag_id"`, `json:"state_id"`, `json:"states,omitempty"`, `json:"shortcut,omitempty"`} {
 		if !strings.Contains(dominio, campo) {
 			t.Errorf("services/notes ya no declara %s: revisar internal/api/notes.go", campo)
@@ -343,10 +349,10 @@ func TestColocarYEtiquetarPeganDondeToca(t *testing.T) {
 // TestImportarUnVolcadoMiraAntesYCreaDespues: la vista previa y la importación mandan el
 // fichero TAL CUAL a sus dos rutas y entienden lo que contestan.
 func TestImportarUnVolcadoMiraAntesYCreaDespues(t *testing.T) {
-	const volcado = `{"formato":"sytue-notepads","notebook":{"title":"Mudanza"}}`
+	const volcado = `{"formato":"sytue.notepads","version":1,"notebook":{"title":"Mudanza"},"notas":[]}`
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cuerpo, _ := io.ReadAll(r.Body)
-		if string(cuerpo) != volcado || r.Method != http.MethodPost {
+		if string(cuerpo) != volcado || r.Method != http.MethodPost || r.URL.Query().Get("name") != "Mudanza.onex" {
 			t.Errorf("llega %s %q", r.Method, cuerpo)
 		}
 		switch r.URL.Path {
@@ -361,11 +367,11 @@ func TestImportarUnVolcadoMiraAntesYCreaDespues(t *testing.T) {
 	}))
 	defer srv.Close()
 	notas := NewNotes(srv.URL, nil, nil)
-	vp, err := notas.PreviewNotebook(context.Background(), []byte(volcado))
+	vp, err := notas.PreviewNotebook(context.Background(), []byte(volcado), "Mudanza.onex")
 	if err != nil || vp.Notebook.Title != "Mudanza" || len(vp.Notas) != 1 || vp.Descartadas != 1 {
 		t.Errorf("la vista previa es %+v, %v", vp, err)
 	}
-	im, err := notas.ImportNotebook(context.Background(), []byte(volcado))
+	im, err := notas.ImportNotebook(context.Background(), []byte(volcado), "Mudanza.onex")
 	if err != nil || im.Notebook.ID != "c9" || im.Importadas != 3 || im.Descartadas != 1 {
 		t.Errorf("la importación es %+v, %v", im, err)
 	}
@@ -473,4 +479,13 @@ func TestDiasDelDiarioSiguenAlServicio(t *testing.T) {
 			t.Errorf("el servicio ya no tiene %s en DailyDay", campo)
 		}
 	}
+}
+
+func notesServiceModelContract(t *testing.T) string {
+	t.Helper()
+	aliases := map[string]string{}
+	for _, name := range []string{"Note", "Notebook", "NoteInput", "NotebookInput", "NoteLink", "NoteState", "Tag", "TagState", "TagInput", "TagStateInput"} {
+		aliases[name] = name
+	}
+	return sharedServiceModelContract(t, "services/notes/internal/domain/domain.go", "git.sytue.eu/sytue/one/apps/nucleo/notes/model", aliases, nil, "apps/nucleo/notes/model/domain.go")
 }

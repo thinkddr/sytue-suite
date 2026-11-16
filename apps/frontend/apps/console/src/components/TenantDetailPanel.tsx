@@ -14,6 +14,7 @@ import {
   Icon,
   Table,
   SectionHeader,
+  Stat,
 } from '@sytue/ui';
 import type { TableColumn } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
@@ -124,32 +125,10 @@ export default function TenantDetailPanel({
         </a>
 
         <div class="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <Card raised={false}>
-            <CardBody>
-              <p class="text-text-muted text-sm">{t('nav.users')}</p>
-              <p class="sytue-h3 text-text mt-1 tabular-nums">{tenant.userCount}</p>
-            </CardBody>
-          </Card>
-          <Card raised={false}>
-            <CardBody>
-              <p class="text-text-muted text-sm">{t('nav.groups')}</p>
-              <p class="sytue-h3 text-text mt-1 tabular-nums">{groups.length}</p>
-            </CardBody>
-          </Card>
-          <Card raised={false}>
-            <CardBody>
-              <p class="text-text-muted text-sm">{t('tenants.mailDomain')}</p>
-              <p class="text-text mt-1 truncate font-mono text-base" title={tenant.mailDomain}>
-                {tenant.mailDomain}
-              </p>
-            </CardBody>
-          </Card>
-          <Card raised={false}>
-            <CardBody>
-              <p class="text-text-muted text-sm">{t('tenants.region')}</p>
-              <p class="text-text mt-1 text-base">fr-par · UE</p>
-            </CardBody>
-          </Card>
+          <Stat label={t('nav.users')} value={tenant.userCount} />
+          <Stat label={t('nav.groups')} value={groups.length} />
+          <Stat label={t('tenants.mailDomain')} value={tenant.mailDomain} />
+          <Stat label={t('tenants.region')} value="fr-par · UE" />
         </div>
 
         <Card class="mb-4">
@@ -166,7 +145,7 @@ export default function TenantDetailPanel({
                 <EmptyState
                   title={t('tenants.detail.usersEmptyTitle')}
                   description={t('tenants.detail.usersEmptyDescription')}
-                  illustration={<Icon name="user" size={28} />}
+                  icon="user"
                 />
               }
             />
@@ -182,7 +161,7 @@ export default function TenantDetailPanel({
               <EmptyState
                 title={t('tenants.detail.groupsEmptyTitle')}
                 description={t('tenants.detail.groupsEmptyDescription')}
-                illustration={<Icon name="users" size={28} />}
+                icon="users"
               />
             </CardBody>
           ) : (

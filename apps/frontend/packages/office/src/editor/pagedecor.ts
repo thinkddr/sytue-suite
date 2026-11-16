@@ -21,6 +21,7 @@
  *
  * Ejecutar el self-test: cd apps/frontend && bun test packages/office/test/pagedecor.test.ts
  */
+import { isLocale } from '@sytue/i18n';
 import type { DocsKey } from '../i18n';
 import { PAGE_W, PAGE_H } from './canvas/metrics';
 import type { PageSetup } from './types';
@@ -28,7 +29,10 @@ import type { PageSetup } from './types';
 /* ---------- La página del documento: tamaño, márgenes y color del papel ----------
  * Viven en una capa vacía al principio del folio, `div[data-sytue-page]`, con todo en px
  * en sus `data-*`. La escriben la cinta (Disposición), rico y el importador de .docx, y la
- * lee la exportación. Sin capa, la página es la de siempre: A4 vertical con 96 px. */
+ * lee la exportación. Sin capa, la página es la de siempre: A4 vertical con 96 px.
+ * También guarda el IDIOMA del documento (`data-lang`, uno de los 26 de la suite): es del
+ * documento y no de quien lo abre, y el folio lo lleva como `lang` para que el corrector
+ * del navegador use ese diccionario. Sin él, el folio va en el idioma de la interfaz. */
 
 export type PageSizeId = 'a4' | 'carta' | 'legal';
 
@@ -49,6 +53,7 @@ export const PAGINA_POR_DEFECTO: PageSetup = {
   width: undefined,
   height: undefined,
   margins: undefined,
+  lang: undefined,
 };
 
 /** Ancho y alto del folio, ya orientados. */
@@ -70,12 +75,16 @@ export function paginaHtml(p: PageSetup): string {
   const { w, h } = medidasPagina(p);
   const m = margenesPagina(p);
   const d = PAGINA_POR_DEFECTO;
-  if (w === PAGE_W && h === PAGE_H && m.every((x) => x === d.margin) && !p.color) return '';
+  const lang = isLocale(p.lang) ? p.lang : undefined;
+  if (w === PAGE_W && h === PAGE_H && m.every((x) => x === d.margin) && !p.color && !lang)
+    return '';
   const color =
     p.color && /^#[0-9a-f]{6}$/i.test(p.color) ? ` data-color="${p.color.toUpperCase()}"` : '';
+  // Detrás del color y en este orden: es el mismo HTML que escribe rico (PonerPaginaDoc).
+  const idioma = lang ? ` data-lang="${lang}"` : '';
   return (
     `<div data-sytue-page="" data-width="${redondo(w)}" data-height="${redondo(h)}" ` +
-    `data-margins="${m.map(redondo).join(' ')}"${color} contenteditable="false" aria-hidden="true"></div>`
+    `data-margins="${m.map(redondo).join(' ')}"${color}${idioma} contenteditable="false" aria-hidden="true"></div>`
   );
 }
 
@@ -112,6 +121,9 @@ export function leerPagina(el: Element | null): PageSetup {
   }
   const color = el.getAttribute('data-color');
   if (color && /^#[0-9a-f]{6}$/i.test(color)) p.color = color.toUpperCase();
+  // Un idioma que no es de la suite no se entiende: el folio va en el de la interfaz.
+  const lang = el.getAttribute('data-lang');
+  if (isLocale(lang)) p.lang = lang;
   return p;
 }
 

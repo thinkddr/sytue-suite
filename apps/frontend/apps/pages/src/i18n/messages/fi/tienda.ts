@@ -176,15 +176,10 @@ export const tienda = {
   'store.mode_test_help':
     'Simuloidut maksut palveluntarjoajan testiavaimilla. Ketään ei veloiteta.',
   'store.mode_live_help': 'Asiakkaiden oikeat maksut tuotantoavaimilla.',
-  'store.webhook_title': 'Vaihe 1: webhook-osoite',
   'store.webhook_help': 'Liitä tämä osoite palvelun {nombre} hallintapaneeliin.',
   'store.webhook_label': 'Webhook-osoite',
   'store.webhook_error':
     'Webhook-osoitetta ei voitu hakea. Sulje valintaikkuna ja yritä uudelleen.',
-  'store.copy': 'Kopioi',
-  'store.copied': 'Osoite kopioitu.',
-  'store.credentials_title': 'Valtuustiedot',
-  'store.credentials_step': 'Vaihe 2: valtuustiedot',
   'store.f_api_key': 'API-avain',
   'store.f_api_key_mode': 'API-avain ({modo})',
   'store.f_profile_id': 'Profiilitunnus (valinnainen)',
@@ -202,6 +197,48 @@ export const tienda = {
   'store.gateway_save': 'Tallenna ja testaa',
   'store.gateway_saved': 'Maksupalvelu {nombre} testattu ja tallennettu.',
   'store.gateway_save_error': 'Maksupalvelun valtuustietoja ei voitu vahvistaa.',
+  'store.wz_progress': 'Maksunvälittäjän yhdistämisen vaiheet',
+  'store.wz_step_mode': 'Tila',
+  'store.wz_step_webhook': 'Webhook',
+  'store.wz_step_keys': 'Avaimet',
+  'store.wz_step_check': 'Tarkista',
+  'store.wz_step_done': 'Valmis',
+  'store.wz_mode_heading': 'Testimaksut vai oikeat maksut?',
+  'store.wz_mode_desc':
+    'Aloita testitilassa; kun kaikki toimii, avaa ohjattu toiminto uudelleen ja valitse tuotantotila.',
+  'store.wz_webhook_heading': 'Kerro palvelulle {nombre}, minne maksuilmoitukset lähetetään',
+  'store.wz_keys_heading': 'Palvelun {nombre} avaimet',
+  'store.wz_keys_desc':
+    'Salaiset avaimet tallennetaan sinetöityinä eikä niitä näytetä enää: muuta avainta kirjoittamalla se uudelleen.',
+  'store.wz_keys_rejected': '{nombre} ei hyväksynyt näitä avaimia',
+  'store.wz_check_heading': 'Tarkista ja tallenna',
+  'store.wz_check_desc':
+    'Sytue Web testaa avaimet palvelussa {nombre} ennen kuin maksunvälittäjä otetaan käyttöön. Mitään ei tallenneta ennen kuin testi onnistuu.',
+  'store.wz_secret_hidden': 'Kirjoitettu (piilotettu)',
+  'store.wz_empty_value': 'Ei annettu',
+  'store.wz_done_heading': '{nombre} on valmis',
+  'store.wz_finish': 'Sulje',
+  'store.hint_mollie_api_key':
+    'Mollie: Developers › API keys. Testiavaimet alkavat test_ ja tuotantoavaimet live_.',
+  'store.hint_mollie_profile':
+    'Mollie: Settings › Website profiles. Se alkaa pfl_; jätä tyhjäksi, niin käytetään oletusprofiilia.',
+  'store.hint_adyen_api_key':
+    'Adyen Customer Area: Developers › API credentials › tunnuksesi › API key.',
+  'store.hint_adyen_merchant':
+    'Adyen Customer Area, ylhäällä tilin valitsimessa: kauppiastili, ei yritystili.',
+  'store.hint_adyen_hmac': 'Adyen: Developers › Webhooks › webhookisi › Security › HMAC key.',
+  'store.hint_adyen_live_prefix':
+    'Adyen (tuotanto): Developers › API URLs. Se on osoitteen osa ennen -checkout-live.',
+  'store.hint_redsys_merchant':
+    'Pankkisi antaa sen virtuaalisen maksupäätteen sopimuksen mukana; se näkyy myös Redsysin hallintaportaalissa.',
+  'store.hint_redsys_terminal':
+    'Redsysin hallintaportaalissa kauppiaskoodin vieressä. Yleensä se on 1.',
+  'store.hint_redsys_secret':
+    'Redsysin hallintaportaalissa: kauppiaan tiedot › SHA-256-avain. Testi- ja tuotantoavain ovat eri.',
+  'store.hint_stripe_secret':
+    'Stripe: Developers › API keys › Secret key. Se alkaa sk_test_ tai sk_live_.',
+  'store.hint_stripe_webhook':
+    'Stripe: Developers › Webhooks › päätepisteesi › Signing secret. Se alkaa whsec_.',
   'orders.subtitle': 'Verkkosivustollasi tehdyt tilaukset ja ostokset.',
   'orders.count': { one: '{count} tilaus', other: '{count} tilausta' },
   'orders.loading': 'Ladataan tilauksia',

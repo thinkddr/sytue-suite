@@ -19,6 +19,7 @@ import type { Locale } from '@sytue/i18n';
 import {
   Button,
   ChoiceCard,
+  CopyField,
   DataFlow,
   EmptyState,
   FieldHint,
@@ -32,7 +33,7 @@ import {
   type DataCategory,
   type WizardStep,
 } from '@sytue/ui';
-import { useT, type PortalMessageKey, type T } from '../i18n/index.js';
+import { useT, type PortalMessageKey } from '../i18n/index.js';
 import { r } from '../lib/rutas.js';
 
 /** Coordenadas públicas que publica Sytue ID (mismas que la autoconfiguración). */
@@ -127,7 +128,6 @@ function Inner({ email, endpoints, locale }: Props): JSX.Element {
       });
     }
   }
-  const onCopy = (what: PortalMessageKey) => (value: string) => void copy(value, what);
 
   /**
    * «Configurar Thunderbird/Outlook/en Android»: crea una contraseña de aplicación con el
@@ -173,18 +173,8 @@ function Inner({ email, endpoints, locale }: Props): JSX.Element {
               {t('devices.oneClick.onceBody')}
             </InlineHelp>
             <div class="flex flex-col gap-2">
-              <CopyRow
-                t={t}
-                label={t('devices.desktop.emailLabel')}
-                value={email}
-                onCopy={onCopy('devices.copied.address')}
-              />
-              <CopyRow
-                t={t}
-                label={t('devices.oneClick.passwordLabel')}
-                value={c.password}
-                onCopy={onCopy('devices.copied.password')}
-              />
+              <CopyField label={t('devices.desktop.emailLabel')} value={email} />
+              <CopyField label={t('devices.oneClick.passwordLabel')} value={c.password} />
               <p class="text-text-muted text-sm">{t(`devices.oneClick.next.${p}`)}</p>
             </div>
           </>
@@ -257,61 +247,21 @@ function Inner({ email, endpoints, locale }: Props): JSX.Element {
 
   const mailValues = (
     <div class="flex flex-col gap-2">
-      <CopyRow
-        t={t}
-        label={t('devices.mail.address')}
-        value={email}
-        onCopy={onCopy('devices.copied.address')}
-      />
-      <CopyRow
-        t={t}
-        label={t('devices.mail.imapHost')}
-        value={imap.host}
-        onCopy={onCopy('devices.copied.imap')}
-      />
+      <CopyField label={t('devices.mail.address')} value={email} />
+      <CopyField label={t('devices.mail.imapHost')} value={imap.host} />
       {/* El puerto es un identificador, no una cantidad: nunca lleva separador de millares. */}
-      <CopyRow
-        t={t}
-        label={t('devices.mail.imapPort')}
-        value={String(imap.port)}
-        onCopy={onCopy('devices.copied.port')}
-      />
-      <CopyRow
-        t={t}
-        label={t('devices.mail.smtpHost')}
-        value={smtp.host}
-        onCopy={onCopy('devices.copied.smtp')}
-      />
-      <CopyRow
-        t={t}
-        label={t('devices.mail.smtpPort')}
-        value={String(smtp.port)}
-        onCopy={onCopy('devices.copied.port')}
-      />
+      <CopyField label={t('devices.mail.imapPort')} value={String(imap.port)} />
+      <CopyField label={t('devices.mail.smtpHost')} value={smtp.host} />
+      <CopyField label={t('devices.mail.smtpPort')} value={String(smtp.port)} />
       <FieldHint>{t('devices.mail.hint')}</FieldHint>
     </div>
   );
 
   const davValues = (
     <div class="flex flex-col gap-2">
-      <CopyRow
-        t={t}
-        label={t('devices.dav.caldav')}
-        value={caldavUrl}
-        onCopy={onCopy('devices.copied.url')}
-      />
-      <CopyRow
-        t={t}
-        label={t('devices.dav.carddav')}
-        value={carddavUrl}
-        onCopy={onCopy('devices.copied.url')}
-      />
-      <CopyRow
-        t={t}
-        label={t('devices.dav.user')}
-        value={email}
-        onCopy={onCopy('devices.copied.address')}
-      />
+      <CopyField label={t('devices.dav.caldav')} value={caldavUrl} />
+      <CopyField label={t('devices.dav.carddav')} value={carddavUrl} />
+      <CopyField label={t('devices.dav.user')} value={email} />
     </div>
   );
 
@@ -386,12 +336,7 @@ function Inner({ email, endpoints, locale }: Props): JSX.Element {
               </Step>
             </ol>
             <div class="flex flex-col gap-2">
-              <CopyRow
-                t={t}
-                label={t('devices.desktop.emailLabel')}
-                value={email}
-                onCopy={onCopy('devices.copied.address')}
-              />
+              <CopyField label={t('devices.desktop.emailLabel')} value={email} />
             </div>
             <InlineHelp tone="warning" title={t('devices.desktop.notFoundTitle')}>
               {t('devices.desktop.notFoundBody')}
@@ -465,18 +410,8 @@ function Inner({ email, endpoints, locale }: Props): JSX.Element {
               </Step>
             </ol>
             <div class="flex flex-col gap-2">
-              <CopyRow
-                t={t}
-                label={t('devices.drive.urlLabel')}
-                value={webdavUrl}
-                onCopy={onCopy('devices.copied.drive')}
-              />
-              <CopyRow
-                t={t}
-                label={t('devices.dav.user')}
-                value={email}
-                onCopy={onCopy('devices.copied.address')}
-              />
+              <CopyField label={t('devices.drive.urlLabel')} value={webdavUrl} />
+              <CopyField label={t('devices.dav.user')} value={email} />
             </div>
             <InlineHelp tone="info" title={t('devices.drive.expectTitle')}>
               {t('devices.drive.expectBody')}
@@ -502,13 +437,7 @@ function Inner({ email, endpoints, locale }: Props): JSX.Element {
                 traducirla mal es media integración que falla en silencio. */}
             <div class="flex flex-col gap-2">
               {COMPAT_BASES.map((b) => (
-                <CopyRow
-                  key={b.label}
-                  t={t}
-                  label={b.label}
-                  value={b.url}
-                  onCopy={onCopy('devices.copied.apiBase')}
-                />
+                <CopyField key={b.label} label={b.label} value={b.url} />
               ))}
             </div>
             <InlineHelp tone="info" title={t('devices.apis.expectTitle')}>
@@ -667,32 +596,6 @@ function Step({
         <p class="text-text-muted mt-0.5 text-sm leading-snug">{children}</p>
       </div>
     </li>
-  );
-}
-
-/** Valor con botón de copiar: el usuario nunca teclea un servidor a mano. */
-function CopyRow({
-  t,
-  label,
-  value,
-  onCopy,
-}: {
-  /** `t` ya atada al idioma negociado en el servidor; llega desde la isla raíz. */
-  t: T;
-  label: string;
-  value: string;
-  onCopy: (value: string) => void;
-}): JSX.Element {
-  return (
-    <div class="border-border bg-surface flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
-      {/* `min-w-0` + `break-words`: en alemán la etiqueta es ~30 % más larga y no
-          puede empujar al valor ni al botón fuera de la fila. */}
-      <span class="sytue-meta w-full shrink-0 break-words sm:w-52 sm:min-w-0">{label}</span>
-      <code class="text-text min-w-0 flex-1 font-mono text-xs break-all">{value || '—'}</code>
-      <Button variant="ghost" size="sm" disabled={!value} onClick={() => onCopy(value)}>
-        {t('devices.copy')}
-      </Button>
-    </div>
   );
 }
 

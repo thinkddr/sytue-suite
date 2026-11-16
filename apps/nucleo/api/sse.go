@@ -19,21 +19,36 @@ import (
 // Lo usan los flujos del Hub y de Mail: dos lectores escritos a mano acabarían leyendo
 // distinto el mismo protocolo.
 func leerSSE(r io.Reader, cada func(evento, datos string)) error {
+	return leerSSEConID(r, func(_, evento, datos string) {
+		if evento != "" || datos != "" {
+			cada(evento, datos)
+		}
+	})
+}
+
+// leerSSEConID es leerSSE con el `id:` de cada evento: `cada` recibe el último que ha
+// llegado (como el `lastEventId` de `EventSource`, sigue valiendo para los eventos que no
+// traen el suyo) y también los bloques que SOLO traen `id:`, que es como Bases deja el
+// cursor al día sin disparar nada. Con ese id se reanuda al reconectar (`Last-Event-ID`).
+func leerSSEConID(r io.Reader, cada func(id, evento, datos string)) error {
 	lector := bufio.NewScanner(r)
 	// Un evento es un aviso, no un adjunto: 1 MiB es de sobra y es el tope que impide
 	// que un cuerpo mal formado —una línea que no acaba nunca— se coma la memoria de un
 	// teléfono.
 	lector.Buffer(make([]byte, 0, 4<<10), 1<<20)
-	var evento, datos string
+	var id, evento, datos string
+	conID := false
 	for lector.Scan() {
 		linea := lector.Text()
 		switch {
 		case linea == "": // fin del evento: se despacha lo acumulado
-			if evento != "" || datos != "" {
-				cada(evento, datos)
+			if evento != "" || datos != "" || conID {
+				cada(id, evento, datos)
 			}
-			evento, datos = "", ""
+			evento, datos, conID = "", "", false
 		case strings.HasPrefix(linea, ":"): // comentario (latido)
+		case strings.HasPrefix(linea, "id:"):
+			id, conID = strings.TrimSpace(strings.TrimPrefix(linea, "id:")), true
 		case strings.HasPrefix(linea, "event:"):
 			evento = strings.TrimSpace(strings.TrimPrefix(linea, "event:"))
 		case strings.HasPrefix(linea, "data:"):

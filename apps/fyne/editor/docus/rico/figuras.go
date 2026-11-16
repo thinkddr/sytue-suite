@@ -24,22 +24,26 @@ import (
 // export. Aquí el SVG de dentro no se lee: la figura se pinta desde sus `data-*` y vuelve
 // al árbol tal cual. Al insertarla o cambiarla se hornea el mismo SVG que la web.
 
-// Ilustracion es lo que lleva un bloque [Figura]: una forma, un gráfico o un diagrama,
-// uno de los tres.
+// Ilustracion es lo que lleva un bloque [Figura]: una forma, un gráfico, un diagrama o
+// un bloque atómico de la web (un dibujo o un informe incrustado), uno de los cuatro.
 type Ilustracion struct {
 	Forma   *Forma
 	Grafico *Grafico
 	Smart   *SmartArt
+	Atomico *Atomico
 	nodo    *html.Node
 }
 
-// Clase es la de la figura, la de su `data-*`: "shape", "chart" o "smartart".
+// Clase es la de la figura, la de su `data-*`: "shape", "chart", "smartart", o la del
+// bloque atómico ([ClaseDibujo], [ClaseEmbed]).
 func (il *Ilustracion) Clase() string {
 	switch {
 	case il.Grafico != nil:
 		return "chart"
 	case il.Smart != nil:
 		return "smartart"
+	case il.Atomico != nil:
+		return il.Atomico.Clase
 	}
 	return "shape"
 }
@@ -170,22 +174,37 @@ func cadenaJS(v any) string {
 	return "[object Object]" // ponytail: un objeto o una lista dentro de una celda, como `String({})`
 }
 
-// esFigura dice si n es la figura de una forma o de un gráfico.
+// esFigura dice si n es la figura de una forma, de un gráfico o de un diagrama, o uno de
+// los bloques atómicos de la web ([esAtomico]): todos van como un bloque [Figura] cuyo
+// interior vuelve tal cual y no se lee.
 func esFigura(n *html.Node) bool {
 	return n.Type == html.ElementNode && n.DataAtom == atom.Figure && n.Namespace == "" &&
-		(tieneAtributo(n, "data-shape") || tieneAtributo(n, "data-chart") || tieneAtributo(n, "data-smartart"))
+		(tieneAtributo(n, "data-shape") || tieneAtributo(n, "data-chart") || tieneAtributo(n, "data-smartart")) ||
+		esAtomico(n)
 }
 
 // entenderFigura: la figura va suelta en el folio o en unas columnas, que es donde la deja
-// `insertHTML`; en una lista o una celda se pintaría de otra forma y no se entiende.
+// `insertHTML`; en una lista o una celda se pintaría de otra forma y no se entiende. El
+// motivo de un bloque atómico lleva su marca para que la franja diga QUÉ es (un dibujo, un
+// informe) y no «parte de su contenido».
 func entenderFigura(n *html.Node, motivos map[string]bool) {
 	if p := n.Parent; p == nil || p.DataAtom != atom.Body && !esColumnas(p) {
-		motivos["<figure> dentro de otro"] = true
+		switch {
+		case tieneAtributo(n, marcaDibujo):
+			motivos["figure["+marcaDibujo+"] dentro de otro"] = true
+		case esAtomico(n):
+			motivos["div["+marcaEmbed+"] dentro de otro"] = true
+		default:
+			motivos["<figure> dentro de otro"] = true
+		}
 	}
 }
 
 func figuraDe(n *html.Node) *Ilustracion {
 	a := func(k string) string { return atributo(n, k) }
+	if esAtomico(n) {
+		return &Ilustracion{Atomico: atomicoDe(n), nodo: n}
+	}
 	if tieneAtributo(n, "data-shape") {
 		f := SanearForma(a("data-shape-type"), a("data-w"), a("data-h"), a("data-fill"), a("data-stroke"), a("data-text"))
 		return &Ilustracion{Forma: &f, nodo: n}

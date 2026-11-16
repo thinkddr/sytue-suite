@@ -22,7 +22,6 @@ var pendientesDeParidad = map[string]string{
 	"aiPanel":       "web: el registro lo da para la presentación, pero el panel Asistente se abre desde el carril y no desde la cinta",
 	"iafill":        "web: id heredado de «escribir con IA»; el panel Asistente del carril lo cubre",
 	"scriptsManage": "los scripts de documento (administrar y ejecutar scripts) no tienen todavía control en la cinta nativa; llegaron a la web con el registro de comandos de scripts",
-	"grafico":       "web: insertar un gráfico en la presentación no tiene botón en la cinta de la web (los gráficos de la hoja se llevan a una diapositiva por otra vía)",
 }
 
 // TestLaCintaDeDiaposTieneTodosLosComandosDeLaPresentacion: cada comando del registro

@@ -13,20 +13,32 @@ import (
 
 	mxcrypto "maunium.net/go/mautrix/crypto"
 	"maunium.net/go/mautrix/crypto/olm"
+	"maunium.net/go/mautrix/crypto/ssss"
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 )
 
+type storageOwnerUnicodeVector struct {
+	Room   string            `json:"room"`
+	Record storage.Record    `json:"record"`
+	Digest string            `json:"digest"`
+	Proof  storageOwnerProof `json:"proof"`
+}
+
 type storageInteropVector struct {
-	Artificial bool                       `json:"artificial"`
-	Generator  string                     `json:"generator"`
-	Scope      storage.Scope              `json:"scope"`
-	Entries    []storage.RecordEntry      `json:"entries"`
-	Sessions   []mxcrypto.ExportedSession `json:"sessions"`
-	Events     []*event.Event             `json:"events"`
-	Heads      []string                   `json:"heads"`
+	OwnerKey     []byte                     `json:"owner_key"`
+	OwnerKeyID   string                     `json:"owner_key_id"`
+	OwnerProofs  []storageOwnerProof        `json:"owner_proofs"`
+	OwnerUnicode storageOwnerUnicodeVector  `json:"owner_unicode"`
+	Artificial   bool                       `json:"artificial"`
+	Generator    string                     `json:"generator"`
+	Scope        storage.Scope              `json:"scope"`
+	Entries      []storage.RecordEntry      `json:"entries"`
+	Sessions     []mxcrypto.ExportedSession `json:"sessions"`
+	Events       []*event.Event             `json:"events"`
+	Heads        []string                   `json:"heads"`
 }
 
 // Opt-in regeneration exports ONLY disposable keys made by this test. These
@@ -74,6 +86,22 @@ func TestStorageGoVectorBridge(t *testing.T) {
 		rec := storage.Record{Version: 1, Scope: scope, ObjectID: "object", RevisionID: revision, Role: "index", Previous: parents, Payload: payload}
 		vector.Entries = append(vector.Entries, storage.RecordEntry{Reference: storage.Reference{RoomID: string(room), EventID: "$" + revision}, Record: rec})
 	}
+	ownerKey, err := ssss.NewKey("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clear(ownerKey.Key)
+	vector.OwnerKey, vector.OwnerKeyID = bytes.Clone(ownerKey.Key), ownerKey.ID
+	unicodeRoom, unicodeRecord := artificialOwnerRecord()
+	unicodeProof, err := sealStorageOwnerRecord(unicodeRoom, unicodeRecord, ownerKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unicodeDigest, err := storage.RecordDigest(unicodeRoom, unicodeRecord)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vector.OwnerUnicode = storageOwnerUnicodeVector{Room: unicodeRoom, Record: unicodeRecord, Digest: unicodeDigest, Proof: unicodeProof}
 	for _, entry := range vector.Entries {
 		if entry.Record.Validate(scope) != nil {
 			t.Fatal("invalid native record")
@@ -86,6 +114,11 @@ func TestStorageGoVectorBridge(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		proof, err := sealStorageOwnerRecord(entry.Reference.RoomID, entry.Record, ownerKey)
+		if err != nil {
+			t.Fatal(err)
+		}
+		vector.OwnerProofs = append(vector.OwnerProofs, proof)
 		vector.Events = append(vector.Events, &event.Event{ID: id.EventID(entry.Reference.EventID), RoomID: room, Sender: own, Type: event.EventEncrypted, Timestamp: 1792152000000, Content: event.Content{Parsed: &event.EncryptedEventContent{Algorithm: id.AlgorithmMegolmV1, SenderKey: account.IdentityKey(), SessionID: outbound.ID(), MegolmCiphertext: cipher}}})
 	}
 	if output := os.Getenv("SYTUE_STORAGE_GO_VECTOR_OUT"); output != "" {
@@ -114,6 +147,22 @@ func TestStorageRustVectorDecodesWithoutRoundingPrivateRecords(t *testing.T) {
 
 func verifyStorageVector(t *testing.T, vector storageInteropVector) {
 	t.Helper()
+	if len(vector.OwnerKey) != 32 || !ownerKeyID(vector.OwnerKeyID) || len(vector.OwnerProofs) != len(vector.Entries) {
+		t.Fatal("missing artificial independent SSSS owner proofs")
+	}
+	owner := &ssss.Key{ID: vector.OwnerKeyID, Key: vector.OwnerKey}
+	for i, entry := range vector.Entries {
+		if err := verifyStorageOwnerRecord(entry.Reference.RoomID, entry.Record, vector.OwnerProofs[i], owner); err != nil {
+			t.Fatal("independent SDK owner proof failed", err)
+		}
+	}
+	unicodeDigest, err := storage.RecordDigest(vector.OwnerUnicode.Room, vector.OwnerUnicode.Record)
+	if err != nil || unicodeDigest != vector.OwnerUnicode.Digest {
+		t.Fatal("cross-SDK Unicode checksum changed", err)
+	}
+	if err := verifyStorageOwnerRecord(vector.OwnerUnicode.Room, vector.OwnerUnicode.Record, vector.OwnerUnicode.Proof, owner); err != nil {
+		t.Fatal("cross-SDK Unicode proof failed", err)
+	}
 	var indexes []storage.RecordEntry
 	for i, encrypted := range vector.Events {
 		if encrypted.Type != event.EventEncrypted {

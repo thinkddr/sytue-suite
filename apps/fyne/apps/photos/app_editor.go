@@ -31,6 +31,8 @@ type estadoEditor struct {
 	foto             api.Photo
 	volver           string // la carpeta de Drive de la que se vino; vacía, la galería
 	receta, guardada api.Receta
+	base             string
+	pendiente        *api.EdicionPhotos
 	original         image.Image
 	claveGeo         string
 	fuente           *image.NRGBA
@@ -78,11 +80,18 @@ func (a *App) AbrirEditor(f api.Photo, volver string) {
 	for _, tipo := range Deslizadores {
 		lo, hi := rangoAjuste(tipo)
 		m := ui.NuevoDeslizador(lo, hi, 0, func(x float64) {
+			if !e.editable() {
+				a.pintarEditor()
+				return
+			}
 			e.receta = conValor(e.receta, tipo, x)
 			a.pintarEditor()
 		}).Con(a.v.Traduce(claveAjuste(tipo)))
 		// `onDblClick`: el doble clic devuelve el ajuste a 0 (y quita su paso).
 		m.AlDobleClic = func() {
+			if !e.editable() {
+				return
+			}
 			m.Valor = 0
 			e.receta = conValor(e.receta, tipo, 0)
 			a.pintarEditor()
@@ -116,7 +125,11 @@ func (a *App) AbrirEditor(f api.Photo, volver string) {
 	a.cargarEditor(e)
 }
 
-func (e *estadoEditor) sucia() bool { return !e.receta.Igual(e.guardada) }
+func (e *estadoEditor) sucia() bool { return e.pendiente != nil || !e.receta.Igual(e.guardada) }
+
+func (e *estadoEditor) editable() bool {
+	return e.original != nil && !e.cargando && !e.guardando && e.pendiente == nil
+}
 
 // cargarEditor trae, a la vez, la receta guardada y la previa del ORIGINAL. La derivada
 // vigente lleva la receta horneada, y volver a aplicársela enseñaría cada ajuste dos
@@ -130,11 +143,15 @@ func (a *App) cargarEditor(e *estadoEditor) {
 		c, fin := ctx(vida)
 		defer fin()
 		var receta api.Receta
+		var pendiente *api.EdicionPhotos
 		var original image.Image
 		errReceta := make(chan error, 1)
 		go func() {
 			var err error
 			receta, err = a.cli.LeerReceta(c, e.foto.ID)
+			if err == nil {
+				pendiente, err = a.cli.EdicionPendiente(c, e.foto.ID)
+			}
 			errReceta <- err
 		}()
 		cuerpo, err := a.cli.VariantDe(c, e.foto.ID, api.PhotoPreview, api.RecetaVacia().Huella())
@@ -161,6 +178,11 @@ func (a *App) cargarEditor(e *estadoEditor) {
 				return
 			}
 			e.original, e.receta, e.guardada = original, receta, receta.Clonar()
+			e.base, e.pendiente = receta.Huella(), pendiente
+			if pendiente != nil {
+				e.receta, e.base = pendiente.Receta.Clonar(), pendiente.Base
+				e.aviso = a.v.Traduce("editor.saveFailed")
+			}
 			a.pintarEditor()
 		})
 	})
@@ -223,7 +245,7 @@ func (a *App) pintarEditor() {
 	e.hayMarco = e.lienzo.Marco != nil && e.lienzo.Marco.W > 0.01
 	d := Editor{
 		Foto: e.foto, Receta: e.receta, Sucia: e.sucia(), Lienzo: e.lienzo,
-		Cargando: e.cargando, Guardando: e.guardando, Aviso: e.aviso,
+		Cargando: e.cargando, Guardando: e.guardando, Pendiente: e.pendiente != nil, Aviso: e.aviso,
 		VolverDrive: e.volver != "", PestanaIA: e.pestanaIA,
 		Comparar:   e.comparar,
 		Recortando: e.recortando, HayMarco: e.hayMarco,
@@ -235,15 +257,23 @@ func (a *App) pintarEditor() {
 		AlGuardar:  a.guardarEdicion,
 		AlComparar: a.alternarComparar,
 		AlAjuste: func(tipo string, v float64) {
+			if !e.editable() {
+				return
+			}
 			e.receta = conValor(e.receta, tipo, v)
 			a.pintarEditor()
 		},
-		AlPestana:     func(ia bool) { e.pestanaIA = ia; a.pintarEditor() },
-		AlRecortar:    a.alternarRecorte,
-		AlGirar:       func() { a.anyadirPaso(api.PasoReceta{Tipo: api.PasoGiro, Params: map[string]float64{"grados": 90}}) },
-		AlEspejoH:     func() { a.anyadirPaso(api.PasoReceta{Tipo: api.PasoEspejo, Eje: "h"}) },
-		AlEspejoV:     func() { a.anyadirPaso(api.PasoReceta{Tipo: api.PasoEspejo, Eje: "v"}) },
-		AlRestablecer: func() { e.receta = api.RecetaVacia(); a.pintarEditor() },
+		AlPestana:  func(ia bool) { e.pestanaIA = ia; a.pintarEditor() },
+		AlRecortar: a.alternarRecorte,
+		AlGirar:    func() { a.anyadirPaso(api.PasoReceta{Tipo: api.PasoGiro, Params: map[string]float64{"grados": 90}}) },
+		AlEspejoH:  func() { a.anyadirPaso(api.PasoReceta{Tipo: api.PasoEspejo, Eje: "h"}) },
+		AlEspejoV:  func() { a.anyadirPaso(api.PasoReceta{Tipo: api.PasoEspejo, Eje: "v"}) },
+		AlRestablecer: func() {
+			if e.editable() {
+				e.receta = api.RecetaVacia()
+				a.pintarEditor()
+			}
+		},
 		AlProporcion: func(p float64) {
 			e.proporcion = p
 			e.lienzo.AjustarProporcion(p)
@@ -262,7 +292,7 @@ func (a *App) pintarEditor() {
 
 // anyadirPaso añade un paso de geometría (girar, espejar).
 func (a *App) anyadirPaso(p api.PasoReceta) {
-	if e := a.ed; e != nil && !e.cargando {
+	if e := a.ed; e != nil && e.editable() {
 		e.receta = conPaso(e.receta, p)
 		a.pintarEditor()
 	}
@@ -271,7 +301,7 @@ func (a *App) anyadirPaso(p api.PasoReceta) {
 // deshacerEditor quita el último paso.
 func (a *App) deshacerEditor() {
 	e := a.ed
-	if e == nil || len(e.receta.Pasos) == 0 {
+	if e == nil || !e.editable() || len(e.receta.Pasos) == 0 {
 		return
 	}
 	c := e.receta.Clonar()
@@ -298,7 +328,7 @@ func (a *App) alternarComparar() {
 // olvida.
 func (a *App) alternarRecorte() {
 	e := a.ed
-	if e == nil || e.cargando {
+	if e == nil || !e.editable() {
 		return
 	}
 	e.recortando = !e.recortando
@@ -309,7 +339,7 @@ func (a *App) alternarRecorte() {
 // aplicarRecorte añade el recorte si el marco tiene tamaño (más del 1 % en cada lado).
 func (a *App) aplicarRecorte() {
 	e := a.ed
-	if e == nil {
+	if e == nil || !e.editable() {
 		return
 	}
 	if m := e.lienzo.Marco; m != nil && m.W > 0.01 && m.H > 0.01 {
@@ -331,16 +361,25 @@ func (a *App) cancelarRecorte() {
 // guardarEdicion manda la receta ENTERA. La galería verá lo editado al volver a pedirla.
 func (a *App) guardarEdicion() {
 	e := a.ed
-	if e == nil || e.guardando || a.cli == nil || !e.sucia() {
+	if e == nil || e.cargando || e.original == nil || e.guardando || a.cli == nil || !e.sucia() {
 		return
 	}
 	e.guardando = true
 	a.pintarEditor()
 	receta, gen := e.receta.Clonar(), a.gen
+	base := e.base
 	a.enSesion(func(vida context.Context) {
 		c, fin := ctx(vida)
 		defer fin()
-		huella, err := a.cli.GuardarReceta(c, e.foto.ID, receta)
+		huella, err := a.cli.GuardarRecetaDesde(c, e.foto.ID, receta, base)
+		var pendiente *api.EdicionPhotos
+		if err != nil {
+			var pendingErr error
+			pendiente, pendingErr = a.cli.EdicionPendiente(c, e.foto.ID)
+			if pendingErr != nil {
+				pendiente = &api.EdicionPhotos{Receta: receta.Clonar(), Base: base}
+			}
+		}
 		//nolint:contextcheck // Sólo reconstruye UI; los eventos futuros capturan la vida de cuenta en enSesion.
 		a.hilo(gen, func() {
 			if a.ed != e {
@@ -348,8 +387,10 @@ func (a *App) guardarEdicion() {
 			}
 			e.guardando = false
 			if err != nil {
+				e.pendiente = pendiente
 				e.aviso = a.v.Traduce("editor.saveFailed")
 			} else {
+				e.base, e.pendiente = huella, nil
 				e.guardada, e.aviso = receta, a.v.Traduce("editor.saved")
 				// Lo que la galería y el visor tenían de esta foto ya no es lo que el
 				// servicio sirve.
@@ -369,7 +410,7 @@ func (a *App) guardarEdicion() {
 // propone a la receta: el recorte como un paso más y cada ajuste en su deslizador.
 func (a *App) editarConIA(accion string) {
 	e := a.ed
-	if e == nil || e.iaCargando || a.cli == nil {
+	if e == nil || !e.editable() || e.iaCargando || a.cli == nil {
 		return
 	}
 	peticion := strings.TrimSpace(e.peticion.Texto())
@@ -394,6 +435,9 @@ func (a *App) editarConIA(accion string) {
 				return
 			}
 			e.iaCargando = false
+			if !e.editable() {
+				return
+			}
 			if err != nil {
 				e.iaError = a.v.Traduce("editor.aiFailed")
 				a.pintarEditor()

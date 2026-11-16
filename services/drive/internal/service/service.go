@@ -21,11 +21,14 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/events"
@@ -647,7 +650,7 @@ func (s *Service) PurgeFolder(ctx context.Context, id uuid.UUID) error {
 // maxZipFiles acota el nº de ficheros que puede reunir un ZIP de selección/carpeta
 // (defensa contra árboles gigantes). ponytail: cota por NÚMERO de ficheros; añadir
 // una cota por tamaño total (sumar ZipEntry.Size) si algún tenant la necesita.
-const maxZipFiles = 5000
+const maxZipFiles = storage.MaxDriveZipFiles
 
 // BatchMove reubica N ficheros y N carpetas bajo targetFolderID en UNA operación
 // (delega en el store: `id = ANY`, sin N+1) y emite un evento resumen. Gateado por
@@ -698,11 +701,18 @@ func (s *Service) StreamZip(ctx context.Context, w io.Writer, entries []ZipEntry
 	if err != nil {
 		return err
 	}
+	names := make([]string, len(entries))
+	for i, e := range entries {
+		names[i] = sanitizeZipPath(e.Path)
+	}
+	if err := storage.UniqueDriveZipNames(names); err != nil {
+		return fmt.Errorf("service: nombres del zip: %w", err)
+	}
 	zw := zip.NewWriter(w)
-	for _, e := range entries {
-		name := sanitizeZipPath(e.Path)
+	for i, e := range entries {
+		name := names[i]
 		if name == "" {
-			continue // sin ningún segmento válido: se omite (defensivo)
+			continue
 		}
 		rc, err := s.blobs.Get(ctx, t, e.StorageKey)
 		if err != nil {
@@ -728,28 +738,11 @@ func (s *Service) StreamZip(ctx context.Context, w io.Writer, entries []ZipEntry
 // sanitizeZipPath convierte una ruta relativa (segmentos separados por '/') en el
 // nombre de una entrada de ZIP SEGURA contra path traversal: normaliza '\'→'/',
 // descarta segmentos vacíos, '.' y '..' (nunca escapa hacia arriba ni es absoluta) y
-// neutraliza caracteres de control restantes. Los nombres ya pasan domain.ValidName
+// neutraliza caracteres de control y prefijos de unidad de Windows. Los nombres
+// ya pasan domain.ValidName
 // (sin '/'/'..'/control) al crearse; esto es defensa en profundidad sobre datos
 // heredados. Devuelve "" si no queda ningún segmento válido.
-func sanitizeZipPath(p string) string {
-	p = strings.ReplaceAll(p, "\\", "/")
-	segs := strings.Split(p, "/")
-	out := make([]string, 0, len(segs))
-	for _, seg := range segs {
-		seg = strings.TrimSpace(seg)
-		if seg == "" || seg == "." || seg == ".." {
-			continue
-		}
-		seg = strings.Map(func(r rune) rune {
-			if r < 0x20 || r == 0x7f {
-				return '_'
-			}
-			return r
-		}, seg)
-		out = append(out, seg)
-	}
-	return strings.Join(out, "/")
-}
+func sanitizeZipPath(p string) string { return storage.DriveZipPath(p) }
 
 // ---------------------------------------------------------------------------
 // Historial de versiones
@@ -886,10 +879,13 @@ type FilePage struct {
 	NextCursor string
 }
 
-// ListFilesPage lista los ficheros de una carpeta con paginación keyset. El
-// cursor es un token opaco devuelto por la página anterior (vacío = inicio).
-func (s *Service) ListFilesPage(ctx context.Context, folderID uuid.UUID, cursor string, limit int) (FilePage, error) {
-	after, err := decodeFileCursor(cursor)
+// ListFilesPage lista los ficheros de una carpeta con paginación keyset en el
+// orden pedido (el cero-valor es por nombre, ascendente). El cursor es un token
+// opaco devuelto por la página anterior (vacío = inicio) y lleva dentro su orden:
+// pedir la página siguiente con otro orden es una entrada inválida, porque la
+// clave del cursor no tendría sentido en el orden nuevo.
+func (s *Service) ListFilesPage(ctx context.Context, folderID uuid.UUID, orden store.OrdenFicheros, cursor string, limit int) (FilePage, error) {
+	after, err := cursorEnOrden(cursor, orden)
 	if err != nil {
 		return FilePage{}, err
 	}
@@ -904,10 +900,70 @@ func (s *Service) ListFilesPage(ctx context.Context, folderID uuid.UUID, cursor 
 	return out, nil
 }
 
+// cursorEnOrden decodifica el token y comprueba que se emitió para el orden
+// pedido; sin token devuelve el inicio de ese orden.
+func cursorEnOrden(token string, orden store.OrdenFicheros) (store.FileCursor, error) {
+	orden = orden.Normalizado()
+	after, err := decodeFileCursor(token)
+	if err != nil {
+		return store.FileCursor{}, err
+	}
+	if after.IsZero() {
+		return store.FileCursor{Orden: orden}, nil
+	}
+	if after.Orden.Normalizado() != orden {
+		return store.FileCursor{}, domain.ErrInvalidName
+	}
+	return after, nil
+}
+
+// OrdenarCarpetas ordena las subcarpetas (que llegan por nombre ascendente y sin
+// paginar) en el orden pedido para los ficheros, para que la lista entera siga
+// una sola regla. Las carpetas no tienen tamaño: en ese orden se quedan por
+// nombre ascendente, como en cualquier gestor de ficheros.
+func OrdenarCarpetas(carpetas []domain.Folder, orden store.OrdenFicheros) {
+	switch orden.Normalizado().Campo {
+	case store.OrdenModificado:
+		// Estable: a igual fecha manda el nombre, que es el orden de llegada.
+		slices.SortStableFunc(carpetas, func(a, b domain.Folder) int {
+			if orden.Desc {
+				return b.UpdatedAt.Compare(a.UpdatedAt)
+			}
+			return a.UpdatedAt.Compare(b.UpdatedAt)
+		})
+	case store.OrdenNombre:
+		// La intercalación del nombre es la de PostgreSQL: se invierte lo que
+		// llega en vez de volver a comparar en Go con otra regla.
+		if orden.Desc {
+			slices.Reverse(carpetas)
+		}
+	case store.OrdenTamano:
+		// Sin tamaño: se quedan por nombre ascendente, como llegan.
+	}
+}
+
 // encodeFileCursor serializa un cursor keyset a un token opaco URL-safe. El
 // formato es interno (JSON base64); el cliente lo trata como una cadena opaca.
+// La fecha viaja en microsegundos, la precisión de timestamptz: con menos, el
+// predicado keyset repetiría o saltaría ficheros de la misma fecha truncada.
 func encodeFileCursor(c store.FileCursor) string {
-	b, err := json.Marshal(cursorWire{N: c.NameLower, I: c.ID.String()})
+	w := cursorWire{N: c.NameLower, I: c.ID.String()}
+	o := c.Orden.Normalizado()
+	if o.Campo != store.OrdenNombre {
+		w.O = string(o.Campo)
+	}
+	w.D = o.Desc
+	switch o.Campo {
+	case store.OrdenModificado:
+		w.T = c.UpdatedAt.UnixMicro()
+		w.N = ""
+	case store.OrdenTamano:
+		w.S = c.SizeBytes
+		w.N = ""
+	case store.OrdenNombre:
+		// La clave es el nombre en minúsculas, que ya va en `n`.
+	}
+	b, err := json.Marshal(w)
 	if err != nil {
 		return ""
 	}
@@ -916,6 +972,8 @@ func encodeFileCursor(c store.FileCursor) string {
 
 // decodeFileCursor invierte encodeFileCursor. Un token vacío es la primera
 // página; un token corrupto es una entrada inválida (no un fallo de servidor).
+// Un token anterior al orden en el servicio (sin `o` ni `d`) es por nombre
+// ascendente, que era el único orden.
 func decodeFileCursor(token string) (store.FileCursor, error) {
 	if token == "" {
 		return store.FileCursor{}, nil
@@ -932,13 +990,30 @@ func decodeFileCursor(token string) (store.FileCursor, error) {
 	if err != nil {
 		return store.FileCursor{}, domain.ErrInvalidName
 	}
-	return store.FileCursor{NameLower: w.N, ID: id}, nil
+	sentido := ""
+	if w.D {
+		sentido = "desc"
+	}
+	orden, err := store.ParseOrdenFicheros(w.O, sentido)
+	if err != nil {
+		return store.FileCursor{}, domain.ErrInvalidName
+	}
+	c := store.FileCursor{Orden: orden, NameLower: w.N, SizeBytes: w.S, ID: id}
+	if orden.Campo == store.OrdenModificado {
+		c.UpdatedAt = time.UnixMicro(w.T).UTC()
+	}
+	return c, nil
 }
 
-// cursorWire es la forma serializada de un FileCursor (claves cortas).
+// cursorWire es la forma serializada de un FileCursor (claves cortas). Solo
+// viaja la clave del orden en curso.
 type cursorWire struct {
-	N string `json:"n"`
+	N string `json:"n,omitempty"`
 	I string `json:"i"`
+	O string `json:"o,omitempty"`
+	D bool   `json:"d,omitempty"`
+	T int64  `json:"t,omitempty"`
+	S int64  `json:"s,omitempty"`
 }
 
 // ---------------------------------------------------------------------------

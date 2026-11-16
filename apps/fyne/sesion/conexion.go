@@ -15,9 +15,13 @@ import (
 	"strings"
 	"sync"
 
+	"fyne.io/fyne/v2"
+
 	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/notas"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 )
 
 // ErrSoloLectura es lo que recibe quien intenta escribir con `SYTUE_SOLO_LECTURA`.
@@ -96,10 +100,16 @@ func (s *Suite) Conexion(producto string, privadas ...string) (*offline.Monitor,
 	var err error
 	t.Store, err = Almacen()
 	if err != nil {
-		// Sin almacén no hay caché ni, por tanto, dueño al que guardarla: el transporte
-		// deja pasar todo tal cual y el monitor se queda en «hay red».
+		// El transporte pasa la red sin caché mientras no haya almacén. El resolver
+		// permite adoptar el journal verificado tras completar la recuperación.
 		slog.Warn("sin caché para trabajar sin conexión", "producto", producto, "error", err)
-		t.Owner = nil
+	}
+	initial := t.Store
+	t.ResolveStore = func(context.Context) (*offline.Store, error) {
+		if current := s.cacheAlmacen.Load(); current != nil {
+			return current.store, nil
+		}
+		return initial, nil
 	}
 	return red, &http.Client{Transport: t}
 }
@@ -124,7 +134,7 @@ func Almacen() (*offline.Store, error) {
 }
 
 func AlmacenConContexto(ctx context.Context) (*offline.Store, error) {
-	dir, err := directorioAlmacen()
+	dir, err := directorioAlmacenActivo(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -140,23 +150,58 @@ func directorioAlmacen() (string, error) {
 }
 
 func contarAlmacen(espacios ...string) (int, error) {
-	dir, err := directorioAlmacen()
+	return contarAlmacenCon(context.Background(), espacios...)
+}
+
+func contarAlmacenCon(ctx context.Context, espacios ...string) (int, error) {
+	dir, err := directorioAlmacenActivo(ctx)
 	if err != nil {
 		return 0, err
 	}
 	return offline.CountDirectory(dir, espacios...)
 }
 
-// vaciarAlmacen quita del disco, al cerrar sesión, TODO lo que las apps guardaron para
-// trabajar sin conexión, de todas las cuentas que hayan pasado por este equipo: la caché
-// de respuestas y también la cola y los borradores de Notepads, de los que ya se ha
-// avisado antes de salir (NAT-08, ver notepads.go). Es lo que hace la web.
-func (s *Suite) vaciarAlmacen() {
-	dir, err := directorioAlmacen()
-	if err == nil {
-		err = offline.ClearDirectory(dir)
-	}
+// vaciarAlmacen removes disposable responses and legacy drafts after logout.
+// Durable private journals and source stages of every account remain protected;
+// explicit current-scope discard is a separate action under its exclusive lease.
+func (s *Suite) vaciarAlmacenCon(ctx context.Context) error {
+	dir, err := s.directorioCacheActual(ctx)
 	if err != nil {
-		slog.Warn("sesion: la caché sin conexión no se ha podido vaciar al cerrar sesión", "error", err)
+		return err
 	}
+	moved, err := s.cacheReubicada(ctx)
+	if err != nil {
+		return err
+	}
+	namespaces := storage.AllPrivateJournalNamespaces()
+	if moved {
+		namespaces = append(namespaces, notas.EspacioCapturas, notas.EspacioBorradores)
+	}
+	for _, product := range storage.Products() {
+		namespaces = append(namespaces, storage.PrivateStagingNamespaces(product)...)
+	}
+	return offline.ClearDirectoryKeepingContext(ctx, dir, namespaces...)
+}
+
+func directorioAlmacenActivo(ctx context.Context) (string, error) {
+	source, err := directorioAlmacen()
+	if err != nil || !almacenAplicacionSeparado {
+		return source, err
+	}
+	app, err := productoAplicacionNativa(fyne.CurrentApp())
+	if err != nil {
+		return "", err
+	}
+	target, err := directorioAlmacenAplicacion(app)
+	if err != nil {
+		return "", err
+	}
+	retired, err := offline.JournalRelocationRetired(ctx, source, target)
+	if err != nil {
+		return "", err
+	}
+	if retired {
+		return target, nil
+	}
+	return source, nil
 }

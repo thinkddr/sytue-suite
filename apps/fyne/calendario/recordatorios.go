@@ -61,13 +61,13 @@ var (
 )
 
 // sondearRecordatorios es el `poll` de la web; se reprograma solo.
-func (a *App) sondearRecordatorios() {
+func (a *App) sondearRecordatorios(vida context.Context) {
 	if a.Cal == nil {
 		return
 	}
 	espera := IntervaloRecordatorios
 	for {
-		ctx, parar := context.WithTimeout(context.Background(), plazo)
+		ctx, parar := context.WithTimeout(vida, plazo)
 		lista, err := a.Cal.Reminders(ctx)
 		parar()
 		a.enUI(func() { a.llegaronRecordatorios(lista, err) })
@@ -76,7 +76,13 @@ func (a *App) sondearRecordatorios() {
 		} else {
 			espera = IntervaloRecordatorios
 		}
-		time.Sleep(espera)
+		t := time.NewTimer(espera)
+		select {
+		case <-vida.Done():
+			t.Stop()
+			return
+		case <-t.C:
+		}
 	}
 }
 

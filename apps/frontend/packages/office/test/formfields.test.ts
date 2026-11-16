@@ -7,10 +7,13 @@
  *  - parseOptions: «a | b | c» → lista (recorta, sin vacíos ni duplicados).
  *  - coerceFieldValue: valida/normaliza un valor por tipo (casilla, desplegable, texto).
  *  - extractFormAnswers / answersToText: {nombre→valor} de un HTML con campos.
+ * Los vectores de apps/fyne/editor/docus/rico/testdata/formularios.json los recorre
+ * también la app nativa (rico/formularios_test.go): «Ver respuestas» lista lo mismo.
  * Sin DOM (bun corre sin navegador). Ejecutar:
  *   cd apps/frontend && bun test packages/office/test/formfields.test.ts
  */
 import { expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
 import {
   answersToText,
   buildFormFieldHtml,
@@ -18,6 +21,7 @@ import {
   extractFormAnswers,
   parseOptions,
 } from '../src/editor/formfields';
+import type { FormAnswer, FormFieldType } from '../src/editor/formfields';
 
 test('buildFormFieldHtml: markup por tipo', () => {
   expect(buildFormFieldHtml({ type: 'text', name: 'Nombre', placeholder: 'Tu nombre' })).toBe(
@@ -142,4 +146,36 @@ test('extractFormAnswers: no confunde atributos prefijados con campos reales', (
   expect(extractFormAnswers('<span other-data-formfield="text" data-name="x">no</span>')).toEqual(
     [],
   );
+});
+
+// Los vectores COMPARTIDOS con Go (rico/formularios_test.go): las mismas opciones, los
+// mismos valores validados y las mismas respuestas en la web y en Fyne.
+const vectores = JSON.parse(
+  readFileSync(
+    new URL('../../../../fyne/editor/docus/rico/testdata/formularios.json', import.meta.url),
+    'utf8',
+  ),
+) as {
+  opciones: { crudo: string; opciones: string[] }[];
+  valores: { tipo: FormFieldType; crudo: string; opciones?: string[]; valor: string | null }[];
+  respuestas: { nombre: string; html: string; respuestas: FormAnswer[]; texto: string }[];
+};
+
+test('vectores compartidos con la app nativa', () => {
+  expect(vectores.respuestas.length).toBeGreaterThanOrEqual(8);
+  for (const { crudo, opciones } of vectores.opciones) {
+    expect(parseOptions(crudo)).toEqual(opciones);
+  }
+  for (const { tipo, crudo, opciones, valor } of vectores.valores) {
+    expect({ tipo, crudo, valor: coerceFieldValue(tipo, crudo, opciones) }).toEqual({
+      tipo,
+      crudo,
+      valor,
+    });
+  }
+  for (const { nombre, html, respuestas, texto } of vectores.respuestas) {
+    const got = extractFormAnswers(html);
+    expect({ nombre, got }).toEqual({ nombre, got: respuestas });
+    expect({ nombre, texto: answersToText(got) }).toEqual({ nombre, texto });
+  }
 });

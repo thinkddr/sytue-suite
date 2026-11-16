@@ -59,3 +59,25 @@
   --color-selected: var(--sytue-selected);
   color: var(--sytue-text);
 }
+
+/* Filas o columnas ocultas a mano justo antes de esta cabecera: una raya doble en el borde,
+   como en cualquier hoja, para que se sepa dónde están y que se pueden volver a mostrar. */
+.sytue-grid-head-tras-ocultas::before {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  border-color: var(--sytue-border-strong);
+  border-style: double;
+}
+.sytue-grid-head-tras-ocultas[role='columnheader']::before {
+  top: 0;
+  bottom: 0;
+  left: -2px;
+  border-width: 0 0 0 3px;
+}
+.sytue-grid-head-tras-ocultas[role='rowheader']::before {
+  left: 0;
+  right: 0;
+  top: -2px;
+  border-width: 3px 0 0;
+}

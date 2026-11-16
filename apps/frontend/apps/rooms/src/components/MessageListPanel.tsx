@@ -14,7 +14,8 @@
  */
 import type { JSX } from 'preact';
 import { Avatar, Button, Icon, Skeleton, useToast, IconButton } from '@sytue/ui';
-import { formatDateTime, type Locale } from '@sytue/i18n';
+import type { Locale } from '@sytue/i18n';
+import { whenLabel } from '../lib/fechas.js';
 import { messageLink, type ChatMessage } from '../client/chatApi.js';
 import type { T } from '../i18n/index.js';
 import { copyToClipboard } from '../lib/clipboard.js';
@@ -47,15 +48,6 @@ interface Props {
   /** Idioma activo (formato de fecha/hora) y traductor ya atado a él. */
   locale: Locale;
   t: T;
-}
-
-function timeLabel(locale: Locale, iso: string): string {
-  return formatDateTime(locale, iso, {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 }
 
 export function MessageListPanel({
@@ -176,7 +168,7 @@ export function MessageListPanel({
                       >
                         {m.author.name}
                       </span>
-                      <span class="sytue-meta shrink-0">{timeLabel(locale, m.createdAt)}</span>
+                      <span class="sytue-meta shrink-0">{whenLabel(locale, m.createdAt)}</span>
                       {channelNames?.[m.channelId] ? (
                         <span
                           class="sytue-meta shrink-0 truncate"

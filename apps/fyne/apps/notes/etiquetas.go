@@ -6,6 +6,7 @@ package notes
 import (
 	"context"
 	"errors"
+	"image/color"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -16,6 +17,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/tokens"
 )
 
 // Paridad web: TagsModal.tsx —el editor de etiquetas CON ESTADO—, el desplegable
@@ -25,17 +27,26 @@ import (
 // cada estado puede llevar un atajo de un carácter: con una nota seleccionada, pulsarlo
 // aplica el estado. Es lo que hace que etiquetar cincuenta notas sea rápido.
 
-// ColoresEtiqueta es la paleta de TagsModal.tsx. El primero es el de un estado nuevo.
-var ColoresEtiqueta = []string{"#b0413a", "#8a6a1e", "#16794a", "#0e7490", "#1c58d9", "#86198f", "#565b62"}
+// ColoresEtiqueta son los `COLORES` de TagsModal.tsx: los tonos que estrena cada estado
+// nuevo, por turno, de la paleta de colores de usuario. El primero es el de un estado
+// nuevo. Las muestras ofrecen la paleta entera.
+var ColoresEtiqueta = func() []string {
+	ids := []string{"red", "brass", "green", "cyan", "blue", "plum", "slate"}
+	out := make([]string, len(ids))
+	for i, id := range ids {
+		out[i] = colorPorID(id)
+	}
+	return out
+}()
 
-// Medidas del editor, de la hoja con el rem de 14.
+// Medidas del editor, de la hoja con el rem de 16.
 //
-//	fila de estado     `flex items-center gap-1.5`                      5,25
-//	icono y atajo      `w-14` y `w-12`                                  49 y 42
-//	muestras           `h-5 w-5 rounded-full`, `gap-1`, `ring-offset-1` 17,5, 3,5, 1
-//	quitar             `rounded p-1` alrededor de un icono de 14        21
-//	fila de la lista   `rounded-md border px-2.5 py-2`, `gap-2`         8,75, 7, 7
-//	pastilla           `rounded-full px-2 py-0.5 text-sm`               7, 1,75
+//	fila de estado     `flex items-center gap-1.5`                      6
+//	icono y atajo      `w-14` y `w-12`                                  56 y 48
+//	muestras           `h-5 w-5 rounded-full`, `gap-1`, `ring-offset-1` 20, 4, 1
+//	quitar             `rounded p-1` alrededor de un icono de 14        22
+//	fila de la lista   `rounded-md border px-2.5 py-2`, `gap-2`         10, 8, 8
+//	pastilla           `rounded-full px-2 py-0.5 text-sm`               8, 2
 const (
 	HuecoFilaEstado   = 1.5 * 0.25 * tema.Rem
 	AnchoEmojiEstado  = 14 * 0.25 * tema.Rem
@@ -158,11 +169,11 @@ func (p *Pantalla) listaEtiquetas(editar func(*borradorEtiqueta), repintar func(
 			borrar := ui.NuevoBoton(t("common.delete", nil), func() {
 				p.confirmar(t("tags.delete", nil), t("tags.deleteConfirm", i18n.Vars{"name": tag.Name}),
 					t("common.delete", nil), func() {
-						go func() {
+						p.iniciar(func() {
 							if p.borrarEtiqueta(tag.ID) == nil {
-								enHilo(repintar)
+								p.enHilo(repintar)
 							}
-						}()
+						})
 					})
 			}).Con(ui.Fantasma, ui.TallaXS)
 			estados := container.New(ui.FilaAuto{Hueco: tema.Espacio(1), Derecha: len(pastillas), Partir: true, SaltoFila: tema.Espacio(1)}, pastillas...)
@@ -192,7 +203,7 @@ func pastillaEstado(s api.TagState, v tema.Variante) fyne.CanvasObject {
 	if s.Emoji != "" {
 		rotulo = s.Emoji + " " + s.Name
 	}
-	fondo := hexO(s.Color, tema.Color("primary", v))
+	fondo := tonoO(s.Color, tema.Color("primary", v))
 	caja := ui.NuevaCaja(fondo, fondo, tema.RadioPill)
 	dentro := container.New(ui.Margen{Izq: PXPastilla, Der: PXPastilla, Arr: PYPastilla, Abj: PYPastilla},
 		lineaTok(rotulo, tema.TextoSM, ui.Normal, "on-primary", v))
@@ -219,7 +230,7 @@ func (p *Pantalla) formEtiqueta(b *borradorEtiqueta, ancho float32, repintar, ce
 
 	filas := make([]fyne.CanvasObject, 0, len(b.estados))
 	for i := range b.estados {
-		filas = append(filas, p.filaEstado(b, i, repintar, v))
+		filas = append(filas, p.filaEstado(b, i, repintar))
 	}
 
 	guardar := ui.NuevoBoton(t("common.save", nil), nil)
@@ -230,16 +241,16 @@ func (p *Pantalla) formEtiqueta(b *borradorEtiqueta, ancho float32, repintar, ce
 		}
 		guardar.Cargando = true
 		guardar.Refresh()
-		go func() {
+		p.iniciar(func() {
 			err := p.guardarEtiqueta(b.id, in)
-			enHilo(func() {
+			p.enHilo(func() {
 				guardar.Cargando = false
 				guardar.Refresh()
 				if err == nil {
 					cerrar()
 				}
 			})
-		}()
+		})
 	}
 	cancelar := ui.NuevoBoton(t("common.cancel", nil), cerrar).Con(ui.Fantasma, ui.TallaMD)
 	añadir := ui.NuevoBoton(t("tags.addState", nil), func() { b.añadirEstado(); repintar() }).
@@ -263,7 +274,7 @@ func (p *Pantalla) formEtiqueta(b *borradorEtiqueta, ancho float32, repintar, ce
 //
 // ponytail: `text-center` en el icono y el atajo no se hace —`widget.Entry` no alinea al
 // centro sin reescribirlo— y el texto va a la izquierda de su caja.
-func (p *Pantalla) filaEstado(b *borradorEtiqueta, i int, repintar func(), v tema.Variante) fyne.CanvasObject {
+func (p *Pantalla) filaEstado(b *borradorEtiqueta, i int, repintar func()) fyne.CanvasObject {
 	t := p.tr.T
 	s := &b.estados[i]
 	emoji := campoCorto("", s.Emoji, 4, AnchoEmojiEstado, func(x string) { s.Emoji = x })
@@ -272,18 +283,17 @@ func (p *Pantalla) filaEstado(b *borradorEtiqueta, i int, repintar func(), v tem
 	nombre.AlCambiar(func(x string) { s.Name = x })
 	atajo := campoCorto("", s.Shortcut, 1, AnchoAtajoEstado, func(x string) { s.Shortcut = x })
 
-	muestras := make([]fyne.CanvasObject, 0, len(ColoresEtiqueta))
-	for _, hex := range ColoresEtiqueta {
-		m := NuevaMuestra(hexO(hex, tema.Color("primary", v)), LadoMuestraEstado, HuecoMuestraEst, hex,
+	muestras := make([]fyne.CanvasObject, 0, len(tokens.PaletaDeUsuario))
+	for _, c := range tokens.PaletaDeUsuario {
+		hex := c.Valor
+		m := NuevaMuestra(c.NRGBA(), LadoMuestraEstado, HuecoMuestraEst, t(c.Clave(), nil),
 			func() { s.Color = hex; repintar() })
-		m.Activa = strings.EqualFold(s.Color, hex)
+		m.Activa = tonoO(s.Color, color.NRGBA{}) == c.NRGBA()
 		muestras = append(muestras, m)
 	}
-	colores := container.New(ui.Fila{Hueco: conCeldaTactil(muestras, 1*0.25*tema.Rem)}, muestras...)
+	hm := conCeldaTactil(muestras, 1*0.25*tema.Rem)
+	colores := container.New(ui.FilaAuto{Hueco: hm, Derecha: len(muestras), Partir: true, SaltoFila: hm}, muestras...)
 	piezas := []fyne.CanvasObject{emoji, nombre, atajo}
-	if !p.enTelefono() {
-		piezas = append(piezas, colores)
-	}
 	if len(b.estados) > 1 {
 		quitar := ui.NuevoBotonIcono(iconos.Cerrar, t("common.delete", nil), func() {
 			b.estados = append(b.estados[:i:i], b.estados[i+1:]...)
@@ -296,13 +306,11 @@ func (p *Pantalla) filaEstado(b *borradorEtiqueta, i int, repintar func(), v tem
 		piezas = append(piezas, quitar)
 	}
 	fila := container.New(&filaElastica{hueco: HuecoFilaEstado, elastico: 1}, piezas...)
-	if !p.enTelefono() {
-		return fila
-	}
-	// En el teléfono, los colores bajan a su línea, bajo el nombre (`max-md:order-last
-	// basis-full`): en una, el nombre del estado se quedaba en 28 y no se leía.
+	// Los colores bajan a su línea, bajo el nombre (`order-last basis-full`): en una, el
+	// nombre del estado se quedaba en 28 en el teléfono, y con los doce tonos de la
+	// paleta de usuario, también en el diálogo de escritorio.
 	return container.New(ui.Columna{Hueco: HuecoFilaEstado}, fila,
-		container.New(ui.Margen{Izq: AnchoEmojiEstado + HuecoFilaEstado}, container.New(ui.Fila{}, colores)))
+		container.New(ui.Margen{Izq: AnchoEmojiEstado + HuecoFilaEstado}, colores))
 }
 
 // campoCorto es un `<Input maxLength>` de ancho fijo: el icono de un estado (4) y su
@@ -363,7 +371,7 @@ func (p *Pantalla) releerEtiquetas(ctx context.Context) {
 	if err != nil {
 		return
 	}
-	enHilo(func() { p.etiquetas = tags; p.Repintar() })
+	p.enHilo(func() { p.etiquetas = tags; p.Repintar() })
 }
 
 // errSinServicio es una escritura pedida sin servicio o sin red: no se hace nada, y

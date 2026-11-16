@@ -11,7 +11,7 @@
  * —solo al abrir la ficha de alguien— y porque mantiene su propio estado de red.
  */
 import { useEffect, useState } from 'preact/hooks';
-import { Badge, Button, Icon, Input, useToast } from '@sytue/ui';
+import { Badge, Button, Icon, Input, useToast, EmptyState } from '@sytue/ui';
 import type { T } from '../i18n/index.js';
 import type { OrgMailbox } from '../lib/admin.js';
 
@@ -106,7 +106,7 @@ export default function UserMailboxes({ userId, t }: Props) {
               <Badge tone="success">{t('users.mailbox.primary')}</Badge>
             </div>
           ) : (
-            <p class="text-text-muted text-sm">{t('users.mailbox.none')}</p>
+            <EmptyState compact title={t('users.mailbox.none')} />
           )}
 
           {alias.map((a) => (

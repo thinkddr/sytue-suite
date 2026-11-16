@@ -17,6 +17,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	localpdf "git.sytue.eu/sytue/one/apps/nucleo/pdf"
 )
 
 // # El BFF de CertiPDF, en el cliente
@@ -55,6 +57,9 @@ type PDFRespuesta struct {
 // la respuesta entera. Un rechazo llega como [*Error], con su código en el cuerpo
 // ([PDFPideClave], [PDFMensaje]).
 func (p *PDF) Motor(ctx context.Context, ruta string, campos map[string]string, partes []PDFParte, docs ...PDFFichero) (PDFRespuesta, error) {
+	if p.drive.data != nil {
+		return p.localMotor(ctx, ruta, campos, partes, docs...)
+	}
 	r, err := formularioPDFCon(ruta, campos, partes, docs...)
 	if err != nil {
 		return PDFRespuesta{}, err
@@ -71,8 +76,8 @@ func (p *PDF) Motor(ctx context.Context, ruta string, campos map[string]string, 
 }
 
 // PDFMaxPNGPorLote es el tope de páginas por lote en PNG del servicio
-// (`maxPaginasPNGPorLote`): una A4 a ×2 son 8 MiB de mapa de bits mientras se dibuja.
-const PDFMaxPNGPorLote = 8
+// compartido: una A4 a ×2 son 8 MiB de mapa de bits mientras se dibuja.
+const PDFMaxPNGPorLote = localpdf.MaxPNGViewPages
 
 // RenderPNG dibuja un LOTE de páginas («1-4») RASTERIZADAS. Devuelve número de página →
 // PNG; una página que el motor no supo dibujar no está en el mapa, y el lote sigue.
@@ -272,12 +277,13 @@ func (p *PDF) Aplicar(ctx context.Context, original File, doc PDFFichero, clave 
 			sufijo = c.Op
 		}
 		out.Fichero, err = p.GuardarCopia(ctx, original, sufijo, r.Datos)
-		return out, err
+	} else {
+		out.Fichero, err = p.drive.ReplaceFile(ctx, original, "application/pdf", bytes.NewReader(r.Datos), int64(len(r.Datos)))
 	}
-	// Subir con el MISMO nombre a la misma carpeta sustituye el fichero, y Drive guarda
-	// la versión anterior en su historial.
-	out.Fichero, err = p.drive.Upload(ctx, original.FolderID, original.Name, "application/pdf",
-		bytes.NewReader(r.Datos), int64(len(r.Datos)))
+	if err != nil && p.drive.data != nil {
+		clear(out.Datos)
+		return PDFAplicado{}, err
+	}
 	return out, err
 }
 

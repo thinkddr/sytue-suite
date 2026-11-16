@@ -26,6 +26,8 @@ export interface ConfirmarOpciones {
   titulo?: string;
   /** Rótulo del botón que confirma. Un verbo. */
   confirmLabel: string;
+  /** Rótulo del botón que no confirma; por defecto, «Cancelar». */
+  cancelLabel?: string;
   /** `danger` para lo que destruye, archiva o desconecta. */
   tone?: 'primary' | 'danger';
 }
@@ -69,6 +71,7 @@ export function useConfirm(): {
       onConfirm={() => cerrar(true)}
       title={pendiente?.titulo ?? pendiente?.confirmLabel ?? ''}
       confirmLabel={pendiente?.confirmLabel ?? ''}
+      {...(pendiente?.cancelLabel ? { cancelLabel: pendiente.cancelLabel } : {})}
       {...(pendiente?.tone ? { tone: pendiente.tone } : {})}
     >
       <p class="text-text text-sm leading-relaxed">{pendiente?.mensaje ?? ''}</p>

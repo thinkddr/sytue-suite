@@ -14,9 +14,9 @@ import (
 // ---- «Mover cuaderno a…» -----------------------------------------------------------
 //
 // Es el `destinosDeCuaderno`/`moverCuadernoA` de client/cuadernos.ts: cambiar un
-// cuaderno de padre, o sacarlo a la raíz, sin arrastrar. La web lo ofrece en el «…» de
-// cada fila del árbol y en el de la página; aquí, en el «…» de la página, que es donde
-// Fyne tiene los ajustes del cuaderno abierto.
+// cuaderno de padre, o sacarlo a la raíz, sin arrastrar. Las dos superficies lo ofrecen
+// en el «…» de cada fila del árbol (aquí también con clic derecho o pulsación larga) y
+// en el de la página.
 
 // ramaDe es el cuaderno y todo lo que cuelga de él, a cualquier nivel.
 func ramaDe(cs []Cuaderno, id string) map[string]bool {
@@ -97,7 +97,7 @@ func (p *Pantalla) dialogoMoverCuaderno(c Cuaderno) {
 			d.Cerrar()
 			in, ok := entradaMoverCuaderno(p.cuadernos, c, padre)
 			if ok {
-				lanzar(func() error { return p.guardarCuadernoCon(c.ID, in, "move.failed") })
+				p.lanzar(func() error { return p.guardarCuadernoCon(c.ID, in, "move.failed", false) })
 			}
 		}
 	}

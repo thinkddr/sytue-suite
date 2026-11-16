@@ -7,7 +7,7 @@
  */
 import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
-import { Button, EmptyState, Icon } from '@sytue/ui';
+import { Button, EmptyState } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import type { SytueUser } from '@sytue/auth';
 import { useT, type T } from '../i18n/index.js';
@@ -70,7 +70,7 @@ export function ChannelApp({
             <Cabecera t={t} locale={locale} conSesion={user !== null} datos={datos} />
             {datos.videos.length === 0 ? (
               <EmptyState
-                illustration={<Icon name="video" size={48} />}
+                icon="video"
                 title={t('channel.empty.title')}
                 description={t('channel.empty.description')}
               />

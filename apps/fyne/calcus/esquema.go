@@ -6,6 +6,8 @@ package calcus
 import (
 	"encoding/json"
 	"fmt"
+	"iter"
+	"maps"
 	"math"
 	"slices"
 
@@ -31,18 +33,48 @@ const (
 func (l *Libro) GruposFilas() []analisis.Grupo { return l.h().grupFilas }
 func (l *Libro) GruposCols() []analisis.Grupo  { return l.h().grupCols }
 
-// ColumnasOcultas son las del detalle de un grupo de columnas contraído; nil si ninguna.
+// ColumnasOcultas son las del detalle de un grupo de columnas contraído y las ocultas a
+// mano; nil si ninguna.
 func (l *Libro) ColumnasOcultas() []bool {
 	var out []bool
-	for c := range analisis.Ocultas(l.h().grupCols) {
-		if c < Columnas {
+	marcar := func(c int) {
+		if c < MaxColumnas {
 			if out == nil {
-				out = make([]bool, Columnas)
+				out = make([]bool, MaxColumnas)
 			}
 			out[c] = true
 		}
 	}
+	for c := range analisis.Ocultas(l.h().grupCols) {
+		marcar(c)
+	}
+	for _, t := range l.h().ocultCols {
+		for c := max(t.Start, 0); c <= t.End && c < MaxColumnas; c++ {
+			marcar(c)
+		}
+	}
 	return out
+}
+
+// sumarTramos añade a `unidades` las de los tramos (hasta `tope`) que no estén ya, sin
+// pasar por un mapa de todas: ocultar hasta el final de la hoja es un millón de filas.
+func sumarTramos(unidades []int, ts []analisis.Tramo, tope int) []int {
+	if len(ts) == 0 {
+		return unidades
+	}
+	ya := make(map[int]bool, len(unidades))
+	for _, u := range unidades {
+		ya[u] = true
+	}
+	for _, t := range ts {
+		for u := max(t.Start, 0); u <= t.End && u < tope; u++ {
+			if !ya[u] {
+				ya[u] = true
+				unidades = append(unidades, u)
+			}
+		}
+	}
+	return unidades
 }
 
 // sincronizarOcultas le cuenta al motor qué filas no se ven en cada hoja, que es lo que
@@ -65,6 +97,7 @@ func (l *Libro) sincronizarOcultas() {
 		for f := range analisis.Ocultas(h.grupFilas) {
 			manuales = append(manuales, f)
 		}
+		manuales = sumarTramos(manuales, h.ocultFilas, MaxFilas)
 		slices.Sort(manuales)
 		if len(filtradas)+len(manuales) > 0 {
 			l.ocultas.listas[h.nombre] = [2][]int{filtradas, manuales}
@@ -98,9 +131,9 @@ func (l *Libro) Esquema(valor string, c1, f1, c2, f2 int) (cambio, sinRango bool
 		return false, false
 	}
 	h := l.h()
-	grupos, tope, a, b := h.grupFilas, Filas, f1, f2
+	grupos, tope, a, b := h.grupFilas, MaxFilas, f1, f2
 	if req.Axis == "col" {
-		grupos, tope, a, b = h.grupCols, Columnas, c1, c2
+		grupos, tope, a, b = h.grupCols, MaxColumnas, c1, c2
 	}
 	var nuevos []analisis.Grupo
 	switch req.Op {
@@ -154,10 +187,10 @@ func (l *Libro) Subtotales(valor string, rotulos func(clave string, vars i18n.Va
 		return analisis.ResultadoSubtotal{}, analisis.PeticionSubtotal{}, "invalid"
 	}
 	r, ok := formula.ParseRangeRef(req.Range)
-	if !ok || r.C1 >= Columnas || r.R1 >= Filas {
+	if !ok || r.C1 >= MaxColumnas || r.R1 >= MaxFilas {
 		return analisis.ResultadoSubtotal{}, analisis.PeticionSubtotal{}, "invalid"
 	}
-	c2 := min(r.C2, Columnas-1)
+	c2 := min(r.C2, MaxColumnas-1)
 	grupo, fn := 0, "sum"
 	if !req.Remove {
 		grupo, fn = enteroJS(req.GroupCol), req.Fn
@@ -167,7 +200,7 @@ func (l *Libro) Subtotales(valor string, rotulos func(clave string, vars i18n.Va
 	}
 	p := analisis.PeticionSubtotal{
 		C1: r.C1, F1: r.R1, C2: c2, F2: r.R2, ColGrupo: r.C1 + grupo, Fn: analisis.Agregacion(fn),
-		Quitar: req.Remove, Filas: Filas, UltimaUsada: -1,
+		Quitar: req.Remove, Filas: MaxFilas, UltimaUsada: -1,
 		RotuloTotal: rotulos("sheet.total", nil), RotuloGrande: rotulos("sheet.total.grand", nil),
 		RotuloDe: func(k string) string { return rotulos("sheet.total.of", i18n.Vars{"key": k}) },
 	}
@@ -206,12 +239,18 @@ func (l *Libro) aplicarSubtotales(res analisis.ResultadoSubtotal) {
 	h := l.h()
 	viejas, formatos, estilos := h.celdas, h.formatos, h.estilos
 	h.celdas, h.formatos, h.estilos = map[Celda]string{}, map[Celda]FormatoNum{}, map[Celda]Estilo{}
-	for a, de := range res.Desde {
-		if de < 0 {
-			continue
+	// Las celdas por fila, en una pasada: el resultado trae una entrada por cada fila de
+	// la hoja (hasta 1.048.576) y mirar en cada una todas sus columnas posibles serían
+	// miles de millones de consultas a los mapas para mover unas pocas celdas.
+	porFila := map[int][]Celda{}
+	for _, m := range []iter.Seq[Celda]{maps.Keys(viejas), maps.Keys(formatos), maps.Keys(estilos)} {
+		for k := range m {
+			porFila[k.F] = append(porFila[k.F], k)
 		}
-		for c := range Columnas {
-			k, n := Celda{C: c, F: de}, Celda{C: c, F: a}
+	}
+	for a, de := range res.Desde {
+		for _, k := range porFila[de] {
+			n := Celda{C: k.C, F: a}
 			if v, ok := viejas[k]; ok {
 				h.celdas[n] = v
 			}
@@ -233,7 +272,7 @@ func (l *Libro) aplicarSubtotales(res analisis.ResultadoSubtotal) {
 	l.restaurar(l.f)
 }
 
-// mandarEsquema ejecuta `outline` y `subtotal`. false si no es uno de ellos.
+// mandarEsquema ejecuta `outline`, `subtotal` y `hide`. false si no es uno de ellos.
 func (c *Lienzo) mandarEsquema(cmd editor.Comando, valor string, c1, f1, c2, f2 int) bool {
 	r := c.Rejilla
 	switch cmd {
@@ -249,6 +288,8 @@ func (c *Lienzo) mandarEsquema(cmd editor.Comando, valor string, c1, f1, c2, f2 
 			c.AlAviso(ui.AvisoInfo, c.t("sheet.msg.pickRange", nil), c.t(det, nil))
 		}
 		return cambio
+	case CmdOcultar:
+		return c.mandarOcultar(valor, c1, f1, c2, f2)
 	case CmdSubtotal:
 		res, p, fallo := c.Libro.Subtotales(valor, c.t)
 		switch fallo {

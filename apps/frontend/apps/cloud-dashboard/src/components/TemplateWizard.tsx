@@ -37,6 +37,7 @@ import {
   type ReviewItem,
   type WizardStep,
   Checkbox,
+  CopyField,
 } from '@sytue/ui';
 import { formatList, type Locale } from '@sytue/i18n';
 import type { TemplateApplied } from '@sytue/api-clients';
@@ -46,40 +47,12 @@ import type { StarterTemplate } from '../lib/cloud.js';
 import { BffError, postBff } from '../lib/bff-client.js';
 import { errorMessage, useT, type T } from '../i18n/index.js';
 import { r } from '../lib/rutas.js';
-import { CopyField } from './CopyField.js';
-
-/** Etiqueta DNS: es el subdominio público, así que el formato no es negociable. */
-const SLUG_RE = /^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$/;
+import { FRAMEWORK_NAME, SLUG_RE, toSlug } from '../lib/nuevo-proyecto.js';
 
 /** El control-plane acepta https:// o SSH scp-like (git@host:cuenta/repo). */
 function validRepo(url: string): boolean {
   return url.startsWith('https://') || url.startsWith('git@');
 }
-
-/**
- * Propone la dirección a partir del nombre. Se quitan los acentos en vez de
- * rechazar el nombre: quien escribe «Mi Tienda Rápida» no tiene por qué saber que
- * un subdominio no admite tildes.
- */
-function toSlug(name: string): string {
-  return name
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .slice(0, 40)
-    .replace(/^-+|-+$/g, '');
-}
-
-/** Nombres propios de stack: no se traducen. Solo «estático» es una palabra. */
-const FRAMEWORK_NAME: Record<string, string> = {
-  astro: 'Astro',
-  next: 'Next.js',
-  preact: 'Preact',
-  node: 'Node',
-  sveltekit: 'SvelteKit',
-  go: 'Go',
-};
 
 function frameworkLabel(t: T, fw: string): string {
   if (!fw) return t('templates.autoDetect');
@@ -671,14 +644,21 @@ function Done({ t, locale, applied }: { t: T; locale: Locale; applied: TemplateA
       </section>
 
       {applied.webhook_secret ? (
-        <section class="border-warning bg-warning-bg rounded-lg border p-4">
-          <h3 class="text-warning-text text-sm font-semibold">{t('projects.hook.once')}</h3>
-          <p class="text-text-muted mt-1 text-sm leading-relaxed">{t('projects.hook.once.desc')}</p>
+        <InlineHelp tone="warning" live="off" title={t('projects.hook.once')} titleAs="h3">
+          <p>{t('projects.hook.once.desc')}</p>
           <div class="mt-3 flex flex-col gap-3">
-            <CopyField t={t} label={t('projects.hook.url')} value={applied.webhook_url ?? ''} />
-            <CopyField t={t} label={t('projects.hook.secret')} value={applied.webhook_secret} />
+            <CopyField
+              labelWidth="stacked"
+              label={t('projects.hook.url')}
+              value={applied.webhook_url ?? ''}
+            />
+            <CopyField
+              labelWidth="stacked"
+              label={t('projects.hook.secret')}
+              value={applied.webhook_secret}
+            />
           </div>
-        </section>
+        </InlineHelp>
       ) : null}
 
       <div class="border-border-subtle flex flex-wrap items-center gap-3 border-t pt-4">

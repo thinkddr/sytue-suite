@@ -32,12 +32,13 @@ replicaCount: 1
 image:
   # Tag FIJA (nunca `latest`) y con digest: una cache que cambia de version sola
   # en un rollout es un fallo dificil de atribuir.
-  repository: docker.dragonflydb.io/dragonflydb/dragonfly
+  # Reconstruida con los paquetes de Ubuntu ya parcheados (deploy/upstream-reconstruidas/dragonfly).
+  repository: ghcr.io/thinkddr/upstream-dragonfly
   # 1.40.0 es el mínimo por CVE-2026-62357 (`CMS.INITBYDIM`, escritura fuera de
   # límites sin autenticar, afecta a < 1.40). El digest fija la imagen revisada.
-  tag: v1.40.2
+  tag: v1.40.2-sytue.1
   # Índice multi-arquitectura, conservado byte a byte en el espejo de producción.
-  digest: "sha256:18afa43e911f1dff18c7d1eb452361876d9702bb1cdff5c5d75c69617a4065c9"
+  digest: "sha256:d98b0b9f6e5e1f672cb8de268ba90859b472c1e68bedc8ec0b8ad268c1440556"
   pullPolicy: IfNotPresent
   # false por defecto, como pgbouncer y livekit: fuera de produccion se tira del
   # origen. En produccion, `values-prod.yaml` lo pone a true Y reescribe

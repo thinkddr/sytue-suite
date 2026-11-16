@@ -5,7 +5,6 @@ package controller
 
 import (
 	"context"
-	"crypto/subtle"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -1185,26 +1184,12 @@ const challengeLabel = "_sytue-challenge."
 // certificado (el ClusterIssuer usa HTTP-01, que exige que el host resuelva a
 // nuestro ingress), de modo que un dominio verificado pero sin apuntar se queda en
 // `verified` reintentando el TLS, sin conceder nada.
-func (p *KubePlatform) VerifyDomain(ctx context.Context, hostname, token, _ string) (bool, error) {
-	token = strings.TrimSpace(token)
-	if token == "" {
-		// Sin token no hay reto que satisfacer: fail-closed (nunca se verifica solo).
-		return false, nil
-	}
-	records, err := p.resolver.LookupTXT(ctx, challengeLabel+strings.TrimSuffix(hostname, "."))
-	if err != nil {
-		// NXDOMAIN o DNS sin propagar todavía: sigue pendiente, no es un fallo duro.
-		return false, nil //nolint:nilerr // se reintenta en el siguiente ciclo.
-	}
-	for _, rec := range records {
-		// Algunos resolvers/proveedores devuelven el valor entrecomillado.
-		if subtle.ConstantTimeCompare(
-			[]byte(strings.Trim(strings.TrimSpace(rec), `"`)), []byte(token),
-		) == 1 {
-			return true, nil
-		}
-	}
-	return false, nil
+//
+// Devuelve además el MOTIVO (ver checkDomainDNS): el bucle solo mira Verified,
+// pero el «Comprobar ahora» del panel enseña el motivo para que el cliente sepa
+// qué registro tocar.
+func (p *KubePlatform) VerifyDomain(ctx context.Context, hostname, token, ingressTarget string) (domain.DomainCheck, error) {
+	return checkDomainDNS(ctx, p.resolver, hostname, token, ingressTarget), nil
 }
 
 // EnsureTLS aplica el Certificate de cert-manager para el hostname y devuelve si

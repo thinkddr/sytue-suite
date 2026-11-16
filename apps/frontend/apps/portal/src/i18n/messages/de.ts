@@ -51,6 +51,7 @@ export const de: AppCatalog<typeof en> = {
     'Was zuletzt in Ihren E-Mails, Dateien, Dokumenten, Terminen und Räumen passiert ist.',
   'activity.today': 'Heute',
   'activity.yesterday': 'Gestern',
+  'activity.emptyTitle': 'Noch keine Aktivität',
   'activity.empty':
     'Noch nichts Aktuelles. Sobald Sie Sytue nutzen, erscheint hier, woran Sie arbeiten.',
   'activity.failedTitle': 'Aktivitäten konnten nicht geladen werden',
@@ -64,6 +65,7 @@ export const de: AppCatalog<typeof en> = {
   // --- Benachrichtigungen (Sytue Hub) ------------------------------------
   'inbox.overline': 'Benachrichtigungen',
   'inbox.heading': 'Benachrichtigungen',
+  'inbox.trayUnread': 'Benachrichtigungen ({count})',
   'inbox.intro': 'Alles, was Ihnen die Suite zu sagen hat, an einer Stelle.',
   'inbox.all': 'Alle',
   'inbox.unreadFilter': { one: '{count} ungelesen', other: '{count} ungelesen' },
@@ -84,6 +86,53 @@ export const de: AppCatalog<typeof en> = {
   'inbox.prefsTitle': 'Was Sie erhalten möchten',
   'inbox.prefsBody':
     'Wenn Sie ein Produkt ausschalten, benachrichtigt es Sie weder hier noch per E-Mail. Sie können es jederzeit wieder einschalten.',
+  'inbox.prefsScopeOrg':
+    'Diese Regeln gelten für Ihre Benachrichtigungen in {org}; jede Organisation, der Sie angehören, hat ihre eigenen.',
+  'inbox.prefsScopePersonal':
+    'Diese Regeln gelten für die Benachrichtigungen Ihres persönlichen Kontos.',
+  'inbox.prefsGroup.communication': 'Kommunikation',
+  'inbox.prefsGroup.files': 'Dateien und Dokumente',
+  'inbox.prefsGroup.business': 'Geschäft',
+  'inbox.prefsGroup.publishing': 'Veröffentlichen',
+  'inbox.prefsGroup.suite': 'Suite',
+  'inbox.prefsSource.integrations': 'Integrationen',
+  'inbox.prefsLoading': 'Ihre Einstellungen werden geladen…',
+  'inbox.prefsLoadError': 'Ihre Einstellungen konnten nicht geladen werden',
+  'inbox.prefsLoadErrorBody':
+    'Ohne sie wissen wir nicht, was Sie ausgeschaltet haben, daher lässt sich noch nichts ändern. Versuchen Sie es in ein paar Sekunden erneut.',
+  'inbox.prefsSaveError':
+    'Die Änderung konnte nicht gespeichert werden und wurde zurückgesetzt. Versuchen Sie es erneut.',
+  'inbox.prefsAlwaysOn': 'Zu Ihrer Sicherheit immer aktiv',
+  'inbox.prefsKindsToggle': 'Nach Art',
+  'inbox.prefsKindsOf': '{app}-Benachrichtigungen nach Art',
+  'inbox.prefsKindCritical': 'Immer aktiv: Hier müssen Sie handeln',
+  'inbox.prefsKind.messages': 'Neue E-Mails',
+  'inbox.prefsKind.directMessages': 'Direktnachrichten',
+  'inbox.prefsKind.mentions': 'Erwähnungen',
+  'inbox.prefsKind.invitations': 'Einladungen',
+  'inbox.prefsKind.reports': 'Inhaltsmeldungen',
+  'inbox.prefsKind.reminders': 'Erinnerungen',
+  'inbox.prefsKind.accessRequests': 'Zugriffsanfragen',
+  'inbox.prefsKind.accessGranted': 'Ihnen gewährter Zugriff',
+  'inbox.prefsKind.shared': 'Mit Ihnen geteilt',
+  'inbox.prefsKind.comments': 'Kommentare',
+  'inbox.prefsKind.quota': 'Speicher fast voll',
+  'inbox.prefsKind.signatureRequests': 'Signaturanfragen',
+  'inbox.prefsKind.signatureUpdates': 'Stand Ihrer Signaturanfragen',
+  'inbox.prefsKind.albumChanges': 'Änderungen an Ihren Alben',
+  'inbox.prefsKind.tasks': 'Ihnen zugewiesene Aufgaben',
+  'inbox.prefsKind.approvals': 'Genehmigungsanfragen',
+  'inbox.prefsKind.transfers': 'An Sie übertragene Datenbanken',
+  'inbox.prefsKind.orders': 'Neue Bestellungen',
+  'inbox.prefsKind.forms': 'Formularnachrichten',
+  'inbox.prefsKind.domains': 'Domainstatus',
+  'inbox.prefsKind.exports': 'Fertige Exporte',
+  'inbox.prefsKind.settingsChanges': 'Geänderte Einstellungen',
+  'inbox.prefsKind.storeIncidents': 'Störungen im Shop',
+  'inbox.prefsKind.withdrawals': 'Widerrufe',
+  'inbox.prefsKind.live': 'Livestreams',
+  'inbox.prefsKind.deploys': 'Bereitstellungen',
+  'inbox.prefsKind.updates': 'App-Updates',
 
   // --- Lanzador ----------------------------------------------------------
   'launcher.heading': 'Ihre Anwendungen',
@@ -96,6 +145,9 @@ export const de: AppCatalog<typeof en> = {
   'launcher.appAria': '{name} — {description}',
   'launcher.servedBy': '{description} · {app}',
   'launcher.disabled': 'Deaktiviert',
+  'launcher.orgOnlyReason': 'Nur für Organisationen: Ihr Konto ist persönlich.',
+  'launcher.orgOnlyHelp': 'Mehr erfahren',
+  'launcher.orgOnlyHelpAria': 'Mehr über {name} erfahren',
 
   'product.mail': 'E-Mail',
   'product.drive': 'Dateien und Zusammenarbeit',
@@ -121,6 +173,7 @@ export const de: AppCatalog<typeof en> = {
   'storage.connectDescription': 'Google Drive, OneDrive, Dropbox, WebDAV und weitere.',
 
   'recent.heading': 'Zuletzt in der gesamten Suite',
+  'recent.tray': 'Zuletzt verwendet',
   'recent.viewAll': 'Alle anzeigen',
   'recent.loading': 'Ihre letzten Aktivitäten werden geladen…',
   'recent.errorTitle': 'Ihre Aktivitäten konnten nicht geladen werden',
@@ -729,8 +782,29 @@ export const de: AppCatalog<typeof en> = {
   'today.unavailable': 'Der Kalender ist gerade nicht erreichbar.',
   'today.allDay': 'Ganztägig',
   'today.untitled': '(ohne Titel)',
+  'today.now': 'Jetzt',
+  'today.next': 'Als Nächstes',
+  'today.more': '+{count} weitere im Kalender',
+  'today.partial':
+    'Einige Kalender haben nicht geantwortet: Die Übersicht ist eventuell unvollständig.',
   'today.unread': { one: '1 ungelesene E-Mail', other: '{count} ungelesene E-Mails' },
   'today.inboxZero': 'Posteingang auf dem Laufenden',
+
+  // --- Primeros pasos de la portada ------------------------------------
+  'firstSteps.title': 'Erste Schritte',
+  'firstSteps.hide': 'Ausblenden',
+  'firstSteps.hideAria': 'Erste Schritte ausblenden',
+  'firstSteps.mfa.title': 'Zwei-Schritt-Verifizierung aktivieren',
+  'firstSteps.mfa.body':
+    'Ein Code oder Sicherheitsschlüssel zusätzlich zum Passwort hält andere fern.',
+  'firstSteps.recovery.title': 'Eine Möglichkeit zur Kontowiederherstellung hinzufügen',
+  'firstSteps.recovery.body':
+    'Eine zweite E-Mail-Adresse oder Handynummer, falls du dein Passwort vergisst.',
+  'firstSteps.photo.title': 'Profilfoto hinzufügen',
+  'firstSteps.photo.body':
+    'Damit dich deine Kolleginnen und Kollegen in Mails, Chats und Meetings erkennen.',
+  'firstSteps.install.title': 'Sytue One installieren',
+  'firstSteps.install.body': 'Die Apps für deinen Computer und dein Handy, mit Benachrichtigungen.',
   'launcher.quickActions': 'Schnellzugriff',
   'launcher.recentAll': 'Zuletzt in der gesamten Suite',
   'launcher.activityError': 'Ihre Aktivität konnte nicht geladen werden',

@@ -75,6 +75,14 @@ func (s *Store) ClaimAndPurgeExpiredTrash(ctx context.Context, cutoff time.Time,
 				  FROM files fi
 				  JOIN legal_holds h ON h.tenant = fi.tenant AND h.released_at IS NULL
 				       AND (h.subject IS NULL OR h.subject = fi.owner_sub)
+                UNION
+                SELECT fi.tenant,fi.folder_id AS id FROM files fi
+                  JOIN drive_private_storage_states s ON s.tenant=fi.tenant AND s.owner_sub=fi.owner_sub AND s.mode<>'legacy'
+                 WHERE fi.team_drive_id IS NULL AND fi.channel_id IS NULL
+                UNION
+                SELECT f.tenant,f.id FROM folders f
+                  JOIN drive_private_storage_states s ON s.tenant=f.tenant AND s.owner_sub=f.owner_sub AND s.mode<>'legacy'
+                 WHERE f.team_drive_id IS NULL AND f.channel_id IS NULL
 				UNION
 				SELECT c.tenant, c.parent_id AS id
 				  FROM folders c
@@ -101,6 +109,8 @@ func (s *Store) ClaimAndPurgeExpiredTrash(ctx context.Context, cutoff time.Time,
 			files, err = claimRows(ctx, tx, `
 				SELECT fi.tenant, fi.id FROM files fi
 				 WHERE fi.deleted_at IS NOT NULL AND fi.deleted_at < $1
+                   AND (fi.team_drive_id IS NOT NULL OR fi.channel_id IS NOT NULL OR NOT EXISTS(
+                       SELECT 1 FROM drive_private_storage_states s WHERE s.tenant=fi.tenant AND s.owner_sub=fi.owner_sub AND s.mode<>'legacy'))
 				   AND NOT EXISTS (
 				         SELECT 1 FROM folders p
 				          WHERE p.tenant = fi.tenant AND p.id = fi.folder_id AND p.deleted_at IS NOT NULL)

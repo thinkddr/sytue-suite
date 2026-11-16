@@ -307,7 +307,7 @@ function DeploymentsInner({ project, deployments, live: initialLive, locale, err
       <CardBody class="p-0">
         {rows.length === 0 ? (
           <EmptyState
-            illustration={<Icon name="rocket" size={24} />}
+            icon="rocket"
             title={t('deployments.empty.title')}
             description={t('deployments.empty.desc')}
             action={

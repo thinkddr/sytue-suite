@@ -920,8 +920,7 @@ func (s *Server) arrancarFusion(r *http.Request, sourceID, targetID string) (sto
 		return store.OrgMerge{}, err
 	}
 	s.auditPlatform(r, "platform.merge.requested", source.ID, source.Slug+" → "+target.Slug)
-	//nolint:contextcheck // runMerge corre en segundo plano con contexto propio a propósito.
-	s.runMerge(m.ID, source.Slug, target.Slug, source.ID, target.ID)
+	s.wakeMergeRunner()
 	return m, nil
 }
 
@@ -949,19 +948,18 @@ func (s *Server) handlePlatformResumeMerge(w http.ResponseWriter, r *http.Reques
 		httpx.Fail(w, r, httpx.ErrConflict.WithMessage("Only a pending or failed merge can be resumed."))
 		return
 	}
-	source, err := s.store.GetOrgByID(r.Context(), m.SourceOrgID)
+	_, err = s.store.GetOrgByID(r.Context(), m.SourceOrgID)
 	if err != nil {
 		httpx.Fail(w, r, httpx.ErrInternal.Wrap(err))
 		return
 	}
-	target, err := s.store.GetOrgByID(r.Context(), m.TargetOrgID)
+	_, err = s.store.GetOrgByID(r.Context(), m.TargetOrgID)
 	if err != nil {
 		httpx.Fail(w, r, httpx.ErrInternal.Wrap(err))
 		return
 	}
 	s.auditPlatform(r, "platform.merge.resumed", m.SourceOrgID, m.ID)
-	//nolint:contextcheck // runMerge corre en segundo plano con contexto propio a propósito.
-	s.runMerge(m.ID, source.Slug, target.Slug, m.SourceOrgID, m.TargetOrgID)
+	s.wakeMergeRunner()
 	httpx.JSON(w, r, http.StatusAccepted, mergeWire(m))
 }
 

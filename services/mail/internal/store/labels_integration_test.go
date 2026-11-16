@@ -27,11 +27,11 @@ func TestLabelsCRUDApplyAndFilter(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
-	acc := seedAccount(t, ctx, st, "ada@sytue.eu")
+	acc := seedAccount(ctx, t, st, "ada@sytue.eu")
 	inbox, _ := st.MailboxByRole(ctx, acc.ID, domain.RoleInbox)
 
-	m1 := seedMessage(t, ctx, st, acc, inbox.ID, "Uno", "a@x.eu", nil)
-	m2 := seedMessage(t, ctx, st, acc, inbox.ID, "Dos", "b@x.eu", []string{domain.FlagSeen})
+	m1 := seedMessage(ctx, t, st, acc, inbox.ID, "Uno", "a@x.eu", nil)
+	m2 := seedMessage(ctx, t, st, acc, inbox.ID, "Dos", "b@x.eu", []string{domain.FlagSeen})
 
 	// Crear una etiqueta.
 	work, err := st.CreateLabel(ctx, acc.ID, "Trabajo", "brass")
@@ -160,8 +160,8 @@ func TestLabelOwnerIsolation(t *testing.T) {
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
 
-	ada := seedAccount(t, ctx, st, "ada@sytue.eu")
-	bob := seedAccount(t, ctx, st, "bob@sytue.eu") // MISMO tenant, otra cuenta
+	ada := seedAccount(ctx, t, st, "ada@sytue.eu")
+	bob := seedAccount(ctx, t, st, "bob@sytue.eu") // MISMO tenant, otra cuenta
 	adaInbox, _ := st.MailboxByRole(ctx, ada.ID, domain.RoleInbox)
 	bobInbox, _ := st.MailboxByRole(ctx, bob.ID, domain.RoleInbox)
 
@@ -169,8 +169,8 @@ func TestLabelOwnerIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateLabel(ada): %v", err)
 	}
-	bobMsg := seedMessage(t, ctx, st, bob, bobInbox.ID, "de Bob", "x@y.eu", nil)
-	adaMsg := seedMessage(t, ctx, st, ada, adaInbox.ID, "de Ada", "z@y.eu", nil)
+	bobMsg := seedMessage(ctx, t, st, bob, bobInbox.ID, "de Bob", "x@y.eu", nil)
+	adaMsg := seedMessage(ctx, t, st, ada, adaInbox.ID, "de Ada", "z@y.eu", nil)
 
 	// Bob NO puede aplicar la etiqueta de Ada (etiqueta ajena => ErrNotFound).
 	if err := st.ApplyLabel(ctx, bob.ID, adaLabel.ID, []uuid.UUID{bobMsg.ID}, true); !errors.Is(err, domain.ErrNotFound) {

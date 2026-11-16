@@ -5,20 +5,16 @@ package rooms
 
 import (
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/widget"
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 )
 
 // Los dos esqueletos de Rooms: el del carril mientras llegan los canales y el del
-// historial mientras llegan los mensajes. Los bloques son `ui.Esqueleto`, con su pulso;
-// lo que es de Rooms es CUÁNTOS hay y con qué geometría, que es la de la fila real a
-// la que sustituyen —sin eso el layout salta al llegar los datos—.
-//
-// Son widgets y no un contenedor por el `aria-busy` con su `sr-only`: en la web los
-// bloques son `aria-hidden` y quien anuncia la carga es el contenedor. Aquí lo anuncia
-// el `AccessibilityLabel`.
+// historial mientras llegan los mensajes. Los dos son `ui.FilasEsqueleto`, con un solo
+// latido y un solo anuncio (el `aria-busy` con su `sr-only` de la web); lo que es de
+// Rooms es CUÁNTAS filas hay y con qué geometría, que es la de la fila real a la que
+// sustituyen —sin eso el layout salta al llegar los datos—.
 
 // Medidas del esqueleto del carril (`ChatApp.tsx`): tres `h-9 rounded-md
 // bg-sidebar-hover` en una columna `gap-1 px-0.5`. HOJA.
@@ -48,167 +44,71 @@ var (
 		ArribaEsqueletoTexto+2*AltoEsqueletoTexto+HuecoEsqueletoTexto)
 )
 
-// EsqueletoCanales son los tres bloques del carril.
-type EsqueletoCanales struct {
-	widget.BaseWidget
-
-	// Nombre es lo que se anuncia: «Cargando canales…», ya traducido.
-	Nombre string
-
-	bloques []fyne.CanvasObject
+// NuevoEsqueletoCanales son los tres bloques del carril: filas sin delantero de una
+// sola barra a todo el ancho, teñidas para el cromo oscuro.
+func NuevoEsqueletoCanales(nombre string) *ui.FilasEsqueleto {
+	return ui.NuevasFilasEsqueleto(CuantosEsqueletoCanal, ui.SinDelantero, 1).ConReceta(ui.RecetaEsqueleto{
+		Alto:  AltoEsqueletoCanal,
+		Hueco: HuecoEsqueletoCanal,
+		Izq:   MargenEsqueletoCanal,
+		Der:   MargenEsqueletoCanal,
+		Rayas: []ui.RayaEsqueleto{{Alto: AltoEsqueletoCanal}},
+	}).ConRotulo(nombre).SobreCromo()
 }
 
-var _ fyne.Widget = (*EsqueletoCanales)(nil)
+// MedidaEsqueletoCanales es lo que ocupa de alto.
+func MedidaEsqueletoCanales() fyne.Size { return NuevoEsqueletoCanales("").MinSize() }
 
-// NuevoEsqueletoCanales crea los tres bloques.
-func NuevoEsqueletoCanales(nombre string) *EsqueletoCanales {
-	e := &EsqueletoCanales{Nombre: nombre}
-	e.ExtendBaseWidget(e)
-	return e
-}
-
-// AccessibilityLabel es el `sr-only` con `role="status"`.
-func (e *EsqueletoCanales) AccessibilityLabel() string { return e.Nombre }
-
-// AccessibilityRole implementa fyne.Accessible.
-func (e *EsqueletoCanales) AccessibilityRole() fyne.AccessibleRole {
-	return fyne.AccessibleRoleText
-}
-
-// MedidaEsqueletoCanales es lo que ocupa de alto. Es la única cuenta.
-func MedidaEsqueletoCanales() fyne.Size {
-	n := float32(CuantosEsqueletoCanal)
-	return fyne.NewSize(0, n*AltoEsqueletoCanal+(n-1)*HuecoEsqueletoCanal)
-}
-
-// CreateRenderer monta los bloques, teñidos para el cromo oscuro.
-func (e *EsqueletoCanales) CreateRenderer() fyne.WidgetRenderer {
-	e.bloques = nil
-	for range CuantosEsqueletoCanal {
-		e.bloques = append(e.bloques, ui.NuevoEsqueleto(0, AltoEsqueletoCanal).SobreCromo())
-	}
-	r := &esqCanalesRenderer{e: e}
-	r.Refresh()
-	return r
-}
-
-type esqCanalesRenderer struct{ e *EsqueletoCanales }
-
-func (r *esqCanalesRenderer) MinSize() fyne.Size           { return MedidaEsqueletoCanales() }
-func (r *esqCanalesRenderer) Objects() []fyne.CanvasObject { return r.e.bloques }
-func (r *esqCanalesRenderer) Destroy()                     {}
-
-func (r *esqCanalesRenderer) Layout(t fyne.Size) {
-	y := float32(0)
-	for _, b := range r.e.bloques {
-		b.Move(fyne.NewPos(MargenEsqueletoCanal, y))
-		b.Resize(fyne.NewSize(max(t.Width-2*MargenEsqueletoCanal, 0), AltoEsqueletoCanal))
-		y += AltoEsqueletoCanal + HuecoEsqueletoCanal
-	}
-}
-
-func (r *esqCanalesRenderer) Refresh() { r.Layout(r.e.Size()) }
-
-// EsqueletoMensajes son las cinco filas del historial. El hilo usa la misma pieza con
-// dos filas y otros aires (`NuevoEsqueletoHilo`).
-type EsqueletoMensajes struct {
-	widget.BaseWidget
-
-	// Nombre es lo que se anuncia: «Cargando mensajes…», ya traducido.
-	Nombre string
-	// Partes es el ancho de cada barra de texto; AnchoNombre, el de la del nombre.
-	Partes      []float32
-	AnchoNombre float32
-	// Arriba es el aire de encima de todo, Aire el de antes de cada fila y Canalon el
-	// de los lados. SinAireArriba quita el Aire de la PRIMERA fila, que es lo que hace
-	// un `gap` frente a un `mt`.
+// RecetaMensajes es la geometría de las filas del historial: el cuadro, y a su derecha
+// (`flex-1`) la barra del nombre, de ancho fijo, y la del texto, que es una parte de esa
+// columna. Arriba es el aire de encima de todo, Aire el de antes de cada fila y Canalon
+// el de los lados; SinAireArriba quita el Aire de la PRIMERA fila, que es lo que hace un
+// `gap` frente a un `mt`.
+type RecetaMensajes struct {
+	Partes                []float32
+	AnchoNombre           float32
 	Arriba, Aire, Canalon float32
 	SinAireArriba         bool
-
-	bloques []fyne.CanvasObject
 }
 
-var _ fyne.Widget = (*EsqueletoMensajes)(nil)
+// Filas monta la receta como `ui.FilasEsqueleto`, una fila por parte.
+func (m RecetaMensajes) Filas(nombre string) *ui.FilasEsqueleto {
+	encima := m.Arriba
+	if !m.SinAireArriba {
+		encima += m.Aire
+	}
+	return ui.NuevasFilasEsqueleto(len(m.Partes), ui.DelanteroTesela, 2).ConReceta(ui.RecetaEsqueleto{
+		Alto:           altoFilaEsqueletoMensaje,
+		Hueco:          m.Aire,
+		Encima:         encima,
+		Izq:            m.Canalon,
+		Der:            m.Canalon,
+		Delantero:      fyne.NewSize(LadoEsqueletoAvatar, LadoEsqueletoAvatar),
+		HuecoDelantero: HuecoEsqueletoMensaje,
+		Rayas: []ui.RayaEsqueleto{
+			{Alto: AltoEsqueletoTexto, Ancho: m.AnchoNombre},
+			{Alto: AltoEsqueletoTexto, Partes: m.Partes},
+		},
+		HuecoRayas: HuecoEsqueletoTexto,
+		Arriba:     true,
+		BajaRayas:  ArribaEsqueletoTexto,
+	}).ConRotulo(nombre)
+}
 
-// NuevoEsqueletoMensajes crea las cinco filas.
-func NuevoEsqueletoMensajes(nombre string) *EsqueletoMensajes {
-	e := &EsqueletoMensajes{
-		Nombre: nombre, Partes: PartesEsqueletoMensajes, AnchoNombre: AnchoEsqueletoNombre,
+// recetaHistorial son las cinco filas del historial.
+func recetaHistorial() RecetaMensajes {
+	return RecetaMensajes{
+		Partes: PartesEsqueletoMensajes, AnchoNombre: AnchoEsqueletoNombre,
 		Arriba: ArribaEsqueletoMensajes, Aire: AireEsqueletoMensaje,
 	}
-	e.ExtendBaseWidget(e)
-	return e
 }
 
-// aireDe es el aire de antes de la fila i.
-func (e *EsqueletoMensajes) aireDe(i int) float32 {
-	if i == 0 && e.SinAireArriba {
-		return 0
-	}
-	return e.Aire
-}
-
-// AccessibilityLabel es el `sr-only` con `role="status"`.
-func (e *EsqueletoMensajes) AccessibilityLabel() string { return e.Nombre }
-
-// AccessibilityRole implementa fyne.Accessible.
-func (e *EsqueletoMensajes) AccessibilityRole() fyne.AccessibleRole {
-	return fyne.AccessibleRoleText
+// NuevoEsqueletoMensajes son las cinco filas del historial. El hilo usa la misma
+// receta con otras filas y otros aires (`NuevoEsqueletoHilo`).
+func NuevoEsqueletoMensajes(nombre string) *ui.FilasEsqueleto {
+	return recetaHistorial().Filas(nombre)
 }
 
 // MedidaEsqueletoMensajes es lo que ocupa de alto el del historial, sin el `py-3` de
 // abajo, que no empuja nada.
-func MedidaEsqueletoMensajes() fyne.Size {
-	return NuevoEsqueletoMensajes("").medida()
-}
-
-// medida es la única cuenta: la usan MinSize y MedidaEsqueletoMensajes.
-func (e *EsqueletoMensajes) medida() fyne.Size {
-	alto := e.Arriba
-	for i := range e.Partes {
-		alto += e.aireDe(i) + altoFilaEsqueletoMensaje
-	}
-	return fyne.NewSize(0, alto)
-}
-
-// CreateRenderer monta un cuadro y dos barras por fila.
-func (e *EsqueletoMensajes) CreateRenderer() fyne.WidgetRenderer {
-	e.bloques = nil
-	for range e.Partes {
-		e.bloques = append(e.bloques,
-			ui.NuevoEsqueleto(LadoEsqueletoAvatar, LadoEsqueletoAvatar),
-			ui.NuevoEsqueleto(e.AnchoNombre, AltoEsqueletoTexto),
-			ui.NuevoEsqueleto(0, AltoEsqueletoTexto))
-	}
-	r := &esqMensajesRenderer{e: e}
-	r.Refresh()
-	return r
-}
-
-type esqMensajesRenderer struct{ e *EsqueletoMensajes }
-
-func (r *esqMensajesRenderer) MinSize() fyne.Size           { return r.e.medida() }
-func (r *esqMensajesRenderer) Objects() []fyne.CanvasObject { return r.e.bloques }
-func (r *esqMensajesRenderer) Destroy()                     {}
-
-// Layout reparte las filas. La barra del texto es un porcentaje de la columna que
-// queda a la derecha del cuadro (`flex-1`), no del historial entero.
-func (r *esqMensajesRenderer) Layout(t fyne.Size) {
-	e := r.e
-	y := e.Arriba
-	columna := max(t.Width-2*e.Canalon-LadoEsqueletoAvatar-HuecoEsqueletoMensaje, 0)
-	x := e.Canalon + LadoEsqueletoAvatar + HuecoEsqueletoMensaje
-	for i, parte := range e.Partes {
-		y += e.aireDe(i)
-		cuadro, nombre, texto := e.bloques[3*i], e.bloques[3*i+1], e.bloques[3*i+2]
-		cuadro.Move(fyne.NewPos(e.Canalon, y))
-		cuadro.Resize(fyne.NewSize(LadoEsqueletoAvatar, LadoEsqueletoAvatar))
-		nombre.Move(fyne.NewPos(x, y+ArribaEsqueletoTexto))
-		nombre.Resize(fyne.NewSize(min(e.AnchoNombre, columna), AltoEsqueletoTexto))
-		texto.Move(fyne.NewPos(x, y+ArribaEsqueletoTexto+AltoEsqueletoTexto+HuecoEsqueletoTexto))
-		texto.Resize(fyne.NewSize(columna*parte, AltoEsqueletoTexto))
-		y += altoFilaEsqueletoMensaje
-	}
-}
-
-func (r *esqMensajesRenderer) Refresh() { r.Layout(r.e.Size()) }
+func MedidaEsqueletoMensajes() fyne.Size { return NuevoEsqueletoMensajes("").MinSize() }

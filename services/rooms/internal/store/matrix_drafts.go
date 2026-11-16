@@ -6,6 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/storage"
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 	"git.sytue.eu/sytue/one/services/rooms/internal/domain"
@@ -14,26 +15,48 @@ import (
 // EnsureMatrixDraftRooms serializes with identity lifecycle changes. The server
 // stores only references: draft content and keys stay in Matrix clients.
 func (s *Store) EnsureMatrixDraftRooms(ctx context.Context, subject string, provision func(context.Context, string) (string, error)) ([]string, error) {
-	return s.ensureMatrixPrivateRooms(ctx, subject, "", provision)
+	return s.ensureMatrixPrivateRooms(ctx, subject, "", storage.LegacyIdentity, func(ctx context.Context, room string, _ bool) (string, error) { return provision(ctx, room) })
 }
 
 // EnsureMatrixStorageRooms shares the identity gate and lifecycle of drafts,
 // with a separate namespace so old clients cannot mistake object data for drafts.
 func (s *Store) EnsureMatrixStorageRooms(ctx context.Context, subject, product string, provision func(context.Context, string) (string, error)) ([]string, error) {
-	if !domain.StorageProduct(product) {
+	return s.EnsureMatrixStorageRoomsForIdentity(ctx, subject, product, storage.LegacyIdentity, provision)
+}
+
+func (s *Store) EnsureMatrixStorageRoomsForIdentity(ctx context.Context, subject, product string, version storage.IdentityVersion, provision func(context.Context, string) (string, error)) ([]string, error) {
+	if !version.Valid() || !domain.StorageProduct(product) {
 		return nil, domain.ErrInvalidInput
 	}
-	return s.ensureMatrixPrivateRooms(ctx, subject, product, provision)
+	return s.EnsureMatrixStorageRoomsWithPolicy(ctx, subject, product, version, func(ctx context.Context, room string, readOnly bool) (string, error) {
+		if readOnly {
+			return "", domain.ErrConflict
+		}
+		return provision(ctx, room)
+	})
+}
+
+// EnsureMatrixStorageRoomsWithPolicy prevents a bootstrap from reopening a
+// retained source. Older callbacks that cannot honor read-only fail closed.
+func (s *Store) EnsureMatrixStorageRoomsWithPolicy(ctx context.Context, subject, product string, version storage.IdentityVersion, provision func(context.Context, string, bool) (string, error)) ([]string, error) {
+	if !version.Valid() || !domain.StorageProduct(product) || provision == nil {
+		return nil, domain.ErrInvalidInput
+	}
+	return s.ensureMatrixPrivateRooms(ctx, subject, product, version, provision)
 }
 
 //nolint:gocognit // serialized private-room provisioning retains the identity gate and RLS transaction.
-func (s *Store) ensureMatrixPrivateRooms(ctx context.Context, subject, product string, provision func(context.Context, string) (string, error)) ([]string, error) {
+func (s *Store) ensureMatrixPrivateRooms(ctx context.Context, subject, product string, version storage.IdentityVersion, provision func(context.Context, string, bool) (string, error)) ([]string, error) {
 	tenant := tenancy.MustFrom(ctx)
 	selectRooms := `SELECT room_id FROM matrix_draft_rooms WHERE tenant=$1 AND subject=$2 ORDER BY created_at DESC,room_id`
 	insertRoom := `INSERT INTO matrix_draft_rooms(tenant,subject,room_id) VALUES($1,$2,$3)`
 	if product != "" {
 		selectRooms = `SELECT room_id FROM matrix_storage_rooms WHERE tenant=$1 AND subject=$2 AND product=$3 ORDER BY created_at DESC,room_id`
 		insertRoom = `INSERT INTO matrix_storage_rooms(tenant,subject,room_id,product) VALUES($1,$2,$3,$4)`
+	}
+	if version == storage.IsolatedIdentity {
+		selectRooms = `SELECT room_id FROM matrix_storage_isolated_rooms WHERE tenant=$1 AND subject=$2 AND product=$3 ORDER BY created_at DESC,room_id`
+		insertRoom = `INSERT INTO matrix_storage_isolated_rooms(tenant,subject,room_id,product) VALUES($1,$2,$3,$4)`
 	}
 	rooms := []string{}
 	err := s.enMantenimientoDe(ctx, func(tx pgx.Tx, _ string) error {
@@ -45,6 +68,10 @@ func (s *Store) ensureMatrixPrivateRooms(ctx context.Context, subject, product s
 			}
 			if denied {
 				return domain.ErrForbidden
+			}
+			source, err := privateRoomSource(ctx, tx, storage.Scope{Tenant: tenant.Slug, Subject: subject, Product: product}, version)
+			if err != nil {
+				return err
 			}
 			args := []any{tenant.Slug, subject}
 			if product != "" {
@@ -67,8 +94,11 @@ func (s *Store) ensureMatrixPrivateRooms(ctx context.Context, subject, product s
 			if err != nil {
 				return err
 			}
+			if !privateRoomSourceMatches(source, rooms) {
+				return domain.ErrConflict
+			}
 			if len(rooms) == 0 {
-				room, err := provision(ctx, "")
+				room, err := provision(ctx, "", false)
 				if err != nil {
 					return err
 				}
@@ -83,7 +113,7 @@ func (s *Store) ensureMatrixPrivateRooms(ctx context.Context, subject, product s
 				return nil
 			}
 			for _, room := range rooms {
-				if _, err := provision(ctx, room); err != nil {
+				if _, err := provision(ctx, room, source.frozen); err != nil {
 					return err
 				}
 			}
@@ -101,7 +131,8 @@ func (s *Store) revokeMatrixPrivateRooms(ctx context.Context, subject, tenant st
 	var bindings []matrixPrivateBinding
 	if err := s.pool.InMaintenanceTx(ctx, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `SELECT tenant,room_id,'matrix_draft_rooms' FROM matrix_draft_rooms WHERE subject=$1 AND ($2='' OR tenant=$2)
- UNION ALL SELECT tenant,room_id,'matrix_storage_rooms' FROM matrix_storage_rooms WHERE subject=$1 AND ($2='' OR tenant=$2) ORDER BY room_id`, subject, tenant)
+ UNION ALL SELECT tenant,room_id,'matrix_storage_rooms' FROM matrix_storage_rooms WHERE subject=$1 AND ($2='' OR tenant=$2)
+ UNION ALL SELECT tenant,room_id,'matrix_storage_isolated_rooms' FROM matrix_storage_isolated_rooms WHERE subject=$1 AND ($2='' OR tenant=$2) ORDER BY room_id`, subject, tenant)
 		if err != nil {
 			return err
 		}
@@ -126,7 +157,7 @@ func (s *Store) revokeMatrixPrivateRooms(ctx context.Context, subject, tenant st
 }
 
 func (s *Store) revokeMatrixPrivateRoom(ctx context.Context, subject string, b matrixPrivateBinding) error {
-	if b.table != "matrix_draft_rooms" && b.table != "matrix_storage_rooms" {
+	if b.table != "matrix_draft_rooms" && b.table != "matrix_storage_rooms" && b.table != "matrix_storage_isolated_rooms" {
 		return domain.ErrInvalidInput
 	}
 	return s.pool.InMaintenanceTx(ctx, func(tx pgx.Tx) error {
@@ -136,6 +167,9 @@ func (s *Store) revokeMatrixPrivateRoom(ctx context.Context, subject string, b m
 		query := `SELECT room_id FROM matrix_draft_rooms WHERE room_id=$1 AND tenant=$2 AND subject=$3 FOR UPDATE`
 		if b.table == "matrix_storage_rooms" {
 			query = `SELECT room_id FROM matrix_storage_rooms WHERE room_id=$1 AND tenant=$2 AND subject=$3 FOR UPDATE`
+		}
+		if b.table == "matrix_storage_isolated_rooms" {
+			query = `SELECT room_id FROM matrix_storage_isolated_rooms WHERE room_id=$1 AND tenant=$2 AND subject=$3 FOR UPDATE`
 		}
 		var room string
 		if err := tx.QueryRow(ctx, query, b.room, b.tenant, subject).Scan(&room); err != nil {
@@ -153,4 +187,32 @@ func (s *Store) revokeMatrixPrivateRoom(ctx context.Context, subject string, b m
 		}
 		return s.matrixGate.Reconcile(ctx, room, nil, false, false)
 	})
+}
+
+// LegacyMatrixStorageRooms is a migration source, never a new writable target.
+func (s *Store) LegacyMatrixStorageRooms(ctx context.Context, subject, product string) ([]string, error) {
+	if !domain.StorageProduct(product) {
+		return nil, domain.ErrInvalidInput
+	}
+	if err := s.MatrixActorAllowed(ctx, subject); err != nil {
+		return nil, err
+	}
+	rooms := []string{}
+	tenant := tenancy.MustFrom(ctx)
+	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `SELECT room_id FROM matrix_storage_rooms WHERE tenant=$1 AND subject=$2 AND product=$3 ORDER BY created_at DESC,room_id`, tenant.Slug, subject, product)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var room string
+			if err := rows.Scan(&room); err != nil {
+				return err
+			}
+			rooms = append(rooms, room)
+		}
+		return rows.Err()
+	})
+	return rooms, err
 }

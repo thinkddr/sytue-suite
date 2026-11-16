@@ -23,7 +23,7 @@ import (
 
 // LA BARRA DEL CUADERNO, medida en producción el 2026-09-21.
 //
-//	franja        min-h-12 → 42 de alto mínimo, `px-4 py-2 gap-2`, filete abajo   hoja
+//	franja        min-h-12 → 48 de alto mínimo, `px-4 py-2 gap-2`, filete abajo   hoja
 //	título        text-lg 15,75/22,75 peso 600                                    MEDIDO
 //	filtro        21 × 182 (`max-w-52`), `px-1.5`                                 MEDIDO
 //	desplegables  28 de alto, `px-3`, 11,38/15,75 peso 600, radio 6, borde 1      MEDIDO
@@ -269,7 +269,7 @@ func (b *Barra) menuMas() *ui.Menu {
 			for _, st := range tag.States {
 				e := ui.NuevoElementoMenu(tag.Name+": "+st.Name, iconos.Ninguno, func() { llamar1(b.AlFiltroEstado, st.ID) })
 				e.Marcada = b.FiltroEstado == st.ID
-				e.PuntoColor, e.TamIcono = hexO(st.Color, color.NRGBA{}), ui.LadoPuntoMenu
+				e.PuntoColor, e.TamIcono = tonoO(st.Color, color.NRGBA{}), ui.LadoPuntoMenu
 				es = append(es, e)
 			}
 		}

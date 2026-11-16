@@ -49,7 +49,7 @@ func sinRol(ctx context.Context, sub string) context.Context {
 // seedTeamChannel crea un team y un canal, con el creador como admin. El slug es
 // "canal" y no "general" a propósito: CreateTeam siembra ya los canales por defecto
 // del team (#general y #aleatorio), así que reusar su slug daría ErrConflict.
-func seedTeamChannel(t *testing.T, ctx context.Context, st *store.Store, creator string, kind domain.ChannelKind) (domain.Team, domain.Channel) {
+func seedTeamChannel(ctx context.Context, t *testing.T, st *store.Store, creator string, kind domain.ChannelKind) (domain.Team, domain.Channel) {
 	t.Helper()
 	tm, err := st.CreateTeam(ctx, store.NewTeamRecord{
 		Slug: "eq", Name: "Equipo", CreatedBy: creator, CreatorName: "Creador",
@@ -71,7 +71,7 @@ func TestChatFlowAndThread(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
 
-	_, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	_, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 
 	root, err := st.CreateMessage(ctx, store.NewMessageRecord{
 		ChannelID: ch.ID, AuthorSub: "alice", AuthorName: "Alice", Body: "hola equipo",
@@ -156,7 +156,7 @@ func TestMessageKeysetPagination(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
 
-	_, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	_, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 
 	const total = 12
 	for i := 0; i < total; i++ {
@@ -203,7 +203,7 @@ func TestListOwnMessages(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
 
-	tm, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	tm, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 	if err := st.AddTeamMember(ctx, tm.ID, "alice", "bob", "Bob", domain.RoleMember); err != nil {
 		t.Fatalf("AddTeamMember: %v", err)
 	}
@@ -264,7 +264,7 @@ func TestChatTenantIsolation(t *testing.T) {
 	ctxA := tenantCtx("tenant-a")
 	ctxB := tenantCtx("tenant-b")
 
-	_, chA := seedTeamChannel(t, ctxA, st, "alice", domain.ChannelPublic)
+	_, chA := seedTeamChannel(ctxA, t, st, "alice", domain.ChannelPublic)
 	msgA, err := st.CreateMessage(ctxA, store.NewMessageRecord{ChannelID: chA.ID, AuthorSub: "alice", Body: "secreto de A"})
 	if err != nil {
 		t.Fatalf("A CreateMessage: %v", err)
@@ -287,7 +287,7 @@ func TestUnreadMentions(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
 
-	tm, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	tm, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 	if err := st.AddTeamMember(ctx, tm.ID, "alice", "bob", "Bob", domain.RoleMember); err != nil {
 		t.Fatalf("AddTeamMember: %v", err)
 	}

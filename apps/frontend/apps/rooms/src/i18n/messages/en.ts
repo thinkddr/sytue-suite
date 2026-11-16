@@ -22,12 +22,7 @@
 import type { MessageEntry } from '@sytue/i18n';
 
 export const en = {
-  'matrix.verifyPeopleFirst':
-    'Verify the people in this conversation before sending your first message.',
-
-  'matrix.verifyPerson': 'Verify a person',
-  'matrix.choosePerson': 'Choose someone in this channel',
-
+  'matrix.notYetEncrypted': 'Not available yet in end-to-end encrypted conversations.',
   'external.title': 'External channels',
   'external.body':
     'Read and reply in Slack, Teams and Google Chat. The provider processes these messages; they do not use Rooms E2E encryption.',
@@ -48,7 +43,6 @@ export const en = {
     'Disconnect {provider}? Rooms will lose access to this account. Messages will remain with the provider.',
   'external.sendUnconfirmed':
     'Sending could not be confirmed. Check recent messages before sending again.',
-  'matrix.notices': 'Third-party licences',
 
   // --- App ----------------------------------------------------------------
   'app.name': 'Sytue Rooms',
@@ -56,16 +50,11 @@ export const en = {
 
   // --- Acciones comunes ---------------------------------------------------
   'action.add': 'Add',
-  'action.back': 'Back',
-  'action.cancel': 'Cancel',
   'action.clear': 'Clear',
-  'action.close': 'Close',
   'action.closeEsc': 'Close (Esc)',
   'action.closeNamed': 'Close {name}',
-  'action.copy': 'Copy',
   'action.create': 'Create',
   'action.delete': 'Delete',
-  'action.done': 'Done',
   'action.download': 'Download',
   'action.edit': 'Edit',
   'action.hide': 'Hide',
@@ -82,7 +71,6 @@ export const en = {
 
   // --- Estados y errores genéricos ----------------------------------------
   'state.error': 'Error',
-  'state.loading': 'Loading…',
   'state.uploading': 'Uploading…',
   'error.checkConnection': 'Check your connection and try again.',
   'error.loadFailed': 'This could not be loaded.',
@@ -101,6 +89,12 @@ export const en = {
   // Se anuncia solo mientras dura la llamada; el estado propio no se toca.
   'presence.inCall': '📞 In a call',
   'presence.offline': 'Offline',
+  'person.openProfile': "View {name}'s profile",
+  'person.email': 'Email',
+  'person.localTimeLabel': 'Local time',
+  'person.localTime': '{time} local time',
+  'person.message': 'Message',
+  'person.call': 'Call',
   'status.yours': 'Your status',
   'status.yoursIs': 'Your status: {state}',
   'status.yoursWithCustom': 'Your status: {state} · {status}',
@@ -113,6 +107,8 @@ export const en = {
   'shortcuts.group.move': 'Move around',
   'shortcuts.group.write': 'Write',
   'shortcuts.switcher': 'Go to a channel',
+  'shortcuts.nextChannel': 'Previous or next channel',
+  'shortcuts.nextUnread': 'Previous or next channel with unread messages',
   'shortcuts.close': 'Close whatever is open',
   'shortcuts.help': 'Show this list',
   'shortcuts.editLast': 'Edit your last message (empty box)',
@@ -226,6 +222,10 @@ export const en = {
   'channel.saved': 'Saved',
   'channel.files': 'Channel files',
   'channel.scheduledMessages': 'Scheduled messages',
+  'channel.scheduleMeeting': 'Schedule meeting',
+  'channel.meetingTitle': 'Meeting · #{name}',
+  'channel.meetingDescription': 'Conversation: {link}',
+  'dm.meetingTitle': 'Meeting with {name}',
   'channel.scheduled': 'Scheduled',
   'dm.peopleCount': { one: '{count} person', other: '{count} people' },
   'dm.youAnd': 'You, {name}',
@@ -262,6 +262,10 @@ export const en = {
   'createChannel.privateHelp': 'Only invited people can see it.',
   'createChannel.topicHelp': 'Optional. What this channel is for.',
   'createChannel.topicPlaceholder': 'What is this channel about?',
+  'createChannel.people': 'People',
+  'createChannel.peopleHelp': 'Optional. People from other organisations get an invitation.',
+  'createChannel.membersMissing':
+    'The channel was created, but these people could not be added: {names}',
   'createChannel.duplicate': 'A channel with that name already exists.',
   'createChannel.invalidName': 'That name is not valid. Use letters, numbers and hyphens.',
   'createChannel.forbidden': 'You do not have permission to create channels.',
@@ -327,6 +331,7 @@ export const en = {
   'composer.dateAndTime': 'Date and time',
   'composer.customDateTime': 'Pick a date and time…',
   'key.enter': 'Enter',
+  'key.shift': 'Shift',
   'composer.hintSend': 'to send',
   'composer.hintMention': 'to mention',
   'composer.hintEmoji': 'for emoji',
@@ -450,9 +455,15 @@ export const en = {
   'message.noneYet': 'No messages yet',
   'message.channelStart': 'This is the start of #{channel}',
   'message.writeFirst': 'Write the first message to get the conversation going.',
+  'message.introCreatedBy': '{name} created this channel on {date}.',
+  'message.introCreatedByYou': 'You created this channel on {date}.',
+  'message.introSomeone': 'Someone',
+  'message.introDm': 'Conversation with {name}',
+  'message.introDmStart': 'This is the beginning of your direct message history with {name}.',
   'message.newMessages': 'New messages',
   'message.jumpToUnread': 'Jump to unread',
   'message.goToRecent': 'Go to recent messages',
+  'message.newBelow': { one: '{count} new message', other: '{count} new messages' },
   'message.fromLink': 'Message opened from a link',
   'message.moreActions': 'More actions',
   'message.bot': 'BOT',
@@ -521,6 +532,10 @@ export const en = {
   'thread.newReplies': { one: '{count} new reply', other: '{count} new replies' },
   'thread.replyPlaceholder': 'Reply…',
   'thread.replyAria': 'Write a reply in the thread',
+  'thread.alsoToChannel': 'Also send to #{channel}',
+  'thread.repliedInThread': 'Replied in a thread',
+  'thread.viewThread': 'View thread',
+  'thread.lastReply': 'Last reply {when}',
   'thread.follow': 'Follow thread',
   'thread.followShort': 'Follow',
   'thread.followHint': 'Get notified about new replies',
@@ -545,8 +560,16 @@ export const en = {
   'search.busy': 'Searching…',
   'search.failed': 'Search failed',
   'search.failedRetry': 'The search could not be run.',
+  'search.unavailable': 'Not available with encryption',
+  'search.encryptedTitle': 'Encrypted messages can’t be searched yet',
+  'search.encryptedBody':
+    'Encrypted messages can only be read on your devices, so the server can’t search them yet.',
   'search.noResults': 'No results',
   'search.resultCount': { one: '{count} result', other: '{count} results' },
+  'search.localScope': {
+    one: 'searched the last {count} message on this device',
+    other: 'searched the last {count} messages on this device',
+  },
 
   // --- Panel de miembros --------------------------------------------------
   'members.title': 'Members',
@@ -650,6 +673,10 @@ export const en = {
   'notify.dndEnd': 'Do not disturb: end',
   'notify.push': 'Push notifications',
   'notify.pushHelp': 'Receive notifications with Rooms closed on this device.',
+  'notify.sound': 'Sound',
+  'notify.soundHelp': 'Plays on this device when a message arrives that you are not looking at.',
+  'notify.soundDirect': 'Direct messages and mentions',
+  'notify.soundOthers': 'Other messages',
   'notify.failed': 'The settings could not be saved.',
   'notification.mentionedIn': '{name} mentioned you in #{channel}',
   'notification.mentioned': '{name} mentioned you',
@@ -1047,38 +1074,11 @@ export const en = {
     'Sign in with the same Rooms account you used in the app, then try again.',
 
   // Device encryption, verification and recovery.
-  'matrix.title': 'End-to-end encryption',
-  'matrix.subtitle':
-    'Messages and files are encrypted on your devices. Only verified devices can read them.',
-  'matrix.connect': 'Set up this device',
-  'matrix.setup': 'Create recovery key',
-  'matrix.recover': 'Use recovery key',
-  'matrix.verify': 'Verify with another device',
-  'matrix.saveTitle': 'Save your recovery key',
-  'matrix.saveBody': 'You’ll need it if you lose access to your verified devices.',
-  'matrix.saved': 'I saved the recovery key',
-  'matrix.recoveryKey': 'Recovery key',
-  'matrix.recoverBody': 'Enter the recovery key you saved. It stays on this device.',
-  'matrix.compare': 'Compare these emoji on both devices.',
-  'matrix.match': 'They match',
-  'matrix.mismatch': 'They don’t match',
-  'matrix.waiting': 'Waiting for the other device…',
-  'matrix.incoming': 'Verify this device',
-  'matrix.devices': 'Your devices',
-  'matrix.revoke': 'Sign out device',
-  'matrix.trusted': 'Device verified',
-  'matrix.failed': 'Encryption could not be set up. Try again.',
   'matrix.legacy': 'Earlier message · not end-to-end encrypted',
+  'matrix.originalDeviceRequired':
+    'Open Rooms on a previously verified device to recover this message, then try again.',
   'matrix.unreadable': 'This device can’t decrypt this message.',
   'matrix.unsupported': 'This action is not available for encrypted messages.',
-  'matrix.auth': 'Confirm your identity',
-  'matrix.authContinue': 'I’ve completed sign-in',
-  'matrix.reset': 'I’ve forgotten my recovery key',
-  'matrix.resetAction': 'Reset encryption',
-  'matrix.resetBody':
-    'A new recovery key will be created. Earlier encrypted messages will only stay readable on devices that already have them, and you will need to verify your other devices and your contacts again.',
-  'matrix.resetUnderstood': 'I understand I may lose access to earlier encrypted messages',
-  'matrix.tab': 'Rooms is open in another tab. Close it to use this device here.',
   'matrix.identityUnverified': 'Identity not verified',
   'matrix.senderUnverified': 'The sender cannot be verified on this device',
   'external.teamsMeeting.body':
@@ -1090,4 +1090,8 @@ export const en = {
   'external.teamsMeeting.unknown':
     'The meeting may have been created. Check Teams before creating another.',
   'external.teamsMeeting.extend': 'Your existing chat permissions will stay enabled.',
+  'nativeResource.title': 'Connect {app}',
+  'nativeResource.description':
+    'Connect this app to your account in {tenant}. Your existing access permissions stay in place.',
+  'nativeResource.approve': 'Connect',
 } satisfies Record<string, MessageEntry>;

@@ -98,3 +98,26 @@ func TestVaciarFototecaNoAceptaDescargaAnteriorNiConservaErrores(t *testing.T) {
 		t.Fatal("cache reset retained data or accepted an old worker")
 	}
 }
+
+func TestCerrarRetiraElPresentadorSinReabrirloNiConservarImagenes(t *testing.T) {
+	a, _ := appDePrueba(t, &servicioFalso{fotos: fotosDelServicio(3), porPagina: 3})
+	a.CambiarSesion("ada/acme")
+	a.v.Teca.Poner("private", []byte("private image"))
+	var queued []func()
+	a.lanzar = func(work func()) { queued = append(queued, work) }
+	ran := false
+	a.enSesion(func(context.Context) { ran = true })
+	lifetime := a.vida
+	a.Cerrar()
+	a.Cerrar()
+	a.CambiarSesion("grace/acme")
+	a.Arrancar()
+	a.AlVolver()
+	queued[0]()
+	a.v.Teca.mu.Lock()
+	retained := len(a.v.Teca.crudas) + len(a.v.Teca.pintadas)
+	a.v.Teca.mu.Unlock()
+	if lifetime.Err() != context.Canceled || a.vida != lifetime || ran || retained != 0 || !a.cerrada {
+		t.Fatal("retired presenter revived work or retained plaintext image")
+	}
+}

@@ -235,7 +235,7 @@ func (a *API) listSharedMessages(w http.ResponseWriter, r *http.Request) {
 	next := ""
 	if len(msgs) == limit {
 		last := msgs[len(msgs)-1]
-		next = formatCursor(last.ReceivedAt, last.ID)
+		next = formatCursor(last.FechaDeOrden(), last.ID)
 	}
 	httpx.JSON(w, r, http.StatusOK, map[string]any{"messages": msgs, "limit": limit, "next_cursor": next})
 }

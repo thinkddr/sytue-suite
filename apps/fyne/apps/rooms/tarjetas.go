@@ -134,6 +134,9 @@ type VistaTarjeta struct {
 	Tarjeta *Tarjeta
 	// AlVotar marca o retira un valor; nil, la tarjeta es de solo lectura.
 	AlVotar func(valor string, poner bool)
+	// Cifrado es la conversación cifrada de extremo a extremo: la tarjeta se pinta en
+	// solo lectura y dice por qué (`matrix.unsupported`). Manda sobre AlVotar.
+	Cifrado bool
 	// Ahora decide si la tarea va fuera de plazo.
 	Ahora func() time.Time
 
@@ -161,7 +164,11 @@ func (t *Tarjeta) Visible() bool {
 
 // MedidaTarjeta es lo que ocupa a ese ancho, con su `mt-1.5`.
 func MedidaTarjeta(v *VistaTarjeta, ancho float32) fyne.Size {
+	// A ESE ancho: la nota del cifrado se reparte en líneas y su alto depende de él.
+	previo := v.ancho
+	v.ancho = ancho
 	c := v.construir()
+	v.ancho = previo
 	return fyne.NewSize(ancho, AireCajaTarjeta+c.MinSize().Height)
 }
 
@@ -195,6 +202,9 @@ func (r *vistaTarjetaRenderer) Refresh() {
 func (v *VistaTarjeta) construir() *fyne.Container {
 	tm := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	t, c := v.T, v.Tarjeta
+	if !DisponibleConCifrado(AccionVotar, v.Cifrado) {
+		v.AlVotar = nil
+	}
 	var dentro fyne.CanvasObject
 	if c.Tipo == "task" {
 		dentro = v.tarea()
@@ -221,6 +231,10 @@ func (v *VistaTarjeta) construir() *fyne.Container {
 		}
 		dentro = container.New(ui.Columna{Hueco: HuecoOpciones},
 			append(filas, ui.NuevoRotulo(pie, escalonMeta, ui.Normal, "text-subtle"))...)
+	}
+	if v.Cifrado {
+		nota := ui.NuevoParrafo(t.T("matrix.unsupported", nil), escalonMeta, ui.Normal, "text-subtle", tm).A(max(v.ancho-2*RellenoCajaTarjeta, 0))
+		dentro = container.New(ui.Columna{Hueco: AireCajaTarjeta}, dentro, nota)
 	}
 	caja := ui.NuevaCaja(tema.Color("surface-sunken", tm), tema.Color("border", tm), tema.RadioMD)
 	return container.New(enCaja{caja}, append(caja.Objetos(),
@@ -367,9 +381,10 @@ func (r *opcionEncuestaRenderer) Layout(t fyne.Size) {
 // ---- En la Sala: votar y crear ----
 
 // Votar es `handleCardVote`: el recuento se pinta ya con mi voto y se ajusta al que dé
-// el servicio; si falla, vuelve el de antes.
+// el servicio; si falla, vuelve el de antes. Con cifrado no se vota: el servicio no
+// cuenta votos de un mensaje que no puede leer (cifrado.go).
 func (sa *Sala) Votar(m Mensaje, valor string, poner bool) {
-	if m.Tarjeta == nil || m.Enviando || m.Fallido {
+	if m.Tarjeta == nil || m.Enviando || m.Fallido || !sa.puede(AccionVotar) {
 		return
 	}
 	antes := slices.Clone(m.Tarjeta.Votos)
@@ -393,6 +408,14 @@ func (sa *Sala) Votar(m Mensaje, valor string, poner bool) {
 			}
 			aplicar(vuelta)
 		})
+}
+
+// notaMenuNoDisponible es la línea del menú «+» bajo encuesta y tarea apagadas: el
+// `sytue-meta w-0 min-w-full px-1.5 pt-0.5 pb-1` de Composer.tsx, repartida al ancho
+// mínimo del menú para no ensancharlo.
+func notaMenuNoDisponible(texto string) fyne.CanvasObject {
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	return notaNoDisponible(texto, ui.MinAnchoMenu-2*(tema.Borde+tema.Espacio(1)), v)
 }
 
 // Los límites de CardComposerModal.
@@ -598,10 +621,14 @@ func (sa *Sala) MenuMas(disparador fyne.CanvasObject) {
 	if len(es) > 0 {
 		es = append(es, ui.NuevoSeparadorMenu())
 	}
-	es = append(es,
-		ui.NuevoElementoMenu(t.T("card.newPoll", nil), iconos.Grafico, func() { sa.NuevaTarjeta("poll") }),
-		ui.NuevoElementoMenu(t.T("card.newTask", nil), iconos.Tic, func() { sa.NuevaTarjeta("task") }),
-	)
+	encuesta := ui.NuevoElementoMenu(t.T("card.newPoll", nil), iconos.Grafico, func() { sa.NuevaTarjeta("poll") })
+	tarea := ui.NuevoElementoMenu(t.T("card.newTask", nil), iconos.Tic, func() { sa.NuevaTarjeta("task") })
+	encuesta.Inerte, tarea.Inerte = !sa.puede(AccionEncuesta), !sa.puede(AccionTarea)
+	es = append(es, encuesta, tarea)
+	// Apagadas y no escondidas: así se sabe que existen y por qué no se pueden usar aquí.
+	if encuesta.Inerte || tarea.Inerte {
+		es = append(es, notaMenuNoDisponible(t.T("matrix.notYetEncrypted", nil)))
+	}
 	_, conEmoji := sa.S.(EmojiPropio)
 	if _, conDrive := sa.Ficheros.(DriveOrganizacion); conEmoji && conDrive {
 		gif := ui.NuevoElementoMenu(t.T("gif.title", nil), iconos.Ninguno, sa.AbrirGif)

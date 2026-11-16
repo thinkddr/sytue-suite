@@ -504,12 +504,11 @@ export function ShareModal({
               {t('share.linksWarn')}
             </InlineHelp>
             {fresh?.token ? (
-              <div class="border-warning bg-warning-bg mt-1 rounded-md border p-2.5" role="alert">
-                <p class="text-warning-text text-xs font-semibold">{t('share.linkOnce')}</p>
-                <code class="border-border bg-surface text-text mt-1.5 block truncate rounded border px-2 py-1 text-xs">
+              <InlineHelp tone="warning" live="alert" class="mt-1" title={t('share.linkOnce')}>
+                <code class="border-border bg-surface text-text block truncate rounded border px-2 py-1 text-xs">
                   {shareUrl(fresh.token)}
                 </code>
-              </div>
+              </InlineHelp>
             ) : null}
             {shares.some((s) => !s.revoked_at) ? (
               <ul class="mt-1 flex flex-col gap-1">

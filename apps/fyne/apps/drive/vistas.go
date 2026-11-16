@@ -59,6 +59,9 @@ type VistaPlana struct {
 	HayMas, CargandoMas bool
 	Desconectado        bool
 	Ventana             float32
+	// Ahora es desde cuándo se cuentan los tramos de «Recientes»; se inyecta en los
+	// tests y en las capturas. Cero es la hora del sistema.
+	Ahora time.Time
 
 	AlAbrir      func(Elemento)
 	AlEstrella   func(el Elemento, quiere bool)
@@ -115,9 +118,24 @@ func (p *VistaPlana) cuerpo(v tema.Variante, m metaSeccion) fyne.CanvasObject {
 		return centrar(problemaVista(p.tr, p.Fase, m.error, p.AlReintentar, v), v)
 	case Exito:
 	}
-	filas := make([]fyne.CanvasObject, 0, len(p.Elementos)+1)
-	for _, el := range p.Elementos {
-		filas = append(filas, p.fila(el))
+	filas := make([]fyne.CanvasObject, 0, len(p.Elementos)+5)
+	if p.Seccion == Recientes {
+		// «Recientes» va en tramos con su rótulo; «Destacados» no tiene orden de fecha
+		// que partir y va de un tirón.
+		ahora := p.Ahora
+		if ahora.IsZero() {
+			ahora = time.Now()
+		}
+		for _, tramo := range AgruparPorFecha(p.Elementos, ahora) {
+			filas = append(filas, rotuloTramo(p.t(claveGrupo[tramo.Grupo]), v))
+			for _, el := range tramo.Elementos {
+				filas = append(filas, p.fila(el))
+			}
+		}
+	} else {
+		for _, el := range p.Elementos {
+			filas = append(filas, p.fila(el))
+		}
 	}
 	if p.HayMas {
 		filas = append(filas, pieCargarMas(p.tr, p.CargandoMas, p.AlCargarMas, v))
@@ -155,7 +173,8 @@ func (p *VistaPlana) fila(el Elemento) *FilaPlana {
 	f.Extension, f.Carpeta = Extension(el.Nombre), el.Carpeta
 	f.Meta = metaPlana(p.tr, p.loc, el, true)
 	elemento := el
-	if !el.Carpeta && p.AlAbrir != nil {
+	// Una carpeta también abre: era texto muerto, y se veía igual que algo que se pulsa.
+	if p.AlAbrir != nil {
 		f.AlAbrir = func() { p.AlAbrir(elemento) }
 	}
 	marcada := p.Favoritos[el.ID]
@@ -171,7 +190,7 @@ func (p *VistaPlana) fila(el Elemento) *FilaPlana {
 		}
 	}
 	mas := BotonFila{
-		Cuerpo: glifoMas, Tinta: "text-muted", TintaEncima: "text",
+		Cuerpo: glifoMas, Tinta: "text-muted", TintaEncima: "text", Menu: true,
 		Rotulo: p.tr.T("action.menu", i18n.Vars{"name": el.Nombre}),
 	}
 	mas.AlPulsar = func(d fyne.CanvasObject) {
@@ -489,43 +508,11 @@ func (d *VistaDocumentos) cuerpo(v tema.Variante) fyne.CanvasObject {
 	return container.NewStack(canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)), d.desplazable)
 }
 
-// esqueleto son las cinco filas de carga: la caja de `h-9 w-9` (31,5) y una raya de
-// `h-4 w-1/3`, dentro del `px-3` de la lista y del `px-3 py-2 gap-3` de cada fila.
+// esqueleto son las cinco filas de carga, las comunes (`SkeletonRows`): la tesela de 36
+// —la misma que la fila de verdad, así que al llegar los documentos nada salta— y una
+// raya, con el filete de cada fila, dentro del `px-3` de la lista.
 func (d *VistaDocumentos) esqueleto(v tema.Variante) fyne.CanvasObject {
-	hijos := make([]fyne.CanvasObject, 0, 1+2*FilasEsqueletoDocs)
-	hijos = append(hijos, canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)))
-	filas := make([][2]*ui.Esqueleto, 0, FilasEsqueletoDocs)
-	for range FilasEsqueletoDocs {
-		caja, raya := ui.NuevoEsqueleto(LadoCajaEsqueletoDocs, LadoCajaEsqueletoDocs), ui.NuevoEsqueleto(0, tema.Espacio(4))
-		filas = append(filas, [2]*ui.Esqueleto{caja, raya})
-		hijos = append(hijos, caja, raya)
-	}
-	return container.New(&esqueletoDocs{filas: filas}, hijos...)
-}
-
-// LadoCajaEsqueletoDocs es el `h-9 w-9` de la caja del esqueleto: 31,5, no los 36 de la
-// tesela de verdad. Por eso las filas de carga miden 46,5 y no 50.
-const LadoCajaEsqueletoDocs = 9 * 0.25 * tema.Rem
-
-type esqueletoDocs struct{ filas [][2]*ui.Esqueleto }
-
-var _ fyne.Layout = (*esqueletoDocs)(nil)
-
-func (e *esqueletoDocs) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(0, 0) }
-
-func (e *esqueletoDocs) Layout(objs []fyne.CanvasObject, t fyne.Size) {
-	objs[0].Move(fyne.NewPos(0, 0))
-	objs[0].Resize(t)
-	x := 2 * CanalonLista
-	// `w-1/3` del contenido de la fila: el ancho menos el `px-3` de la lista y el suyo.
-	tercio := max(t.Width-4*CanalonLista, 0) / 3
-	alto := 2*ui.AltoFila + LadoCajaEsqueletoDocs + tema.Borde
-	for i, f := range e.filas {
-		y := float32(i) * alto
-		centro := func(h float32) float32 { return y + (alto-tema.Borde-h)/2 }
-		f[0].Move(fyne.NewPos(x, centro(LadoCajaEsqueletoDocs)))
-		f[0].Resize(fyne.NewSize(LadoCajaEsqueletoDocs, LadoCajaEsqueletoDocs))
-		f[1].Move(fyne.NewPos(x+LadoCajaEsqueletoDocs+HuecoFilaPlana, centro(tema.Espacio(4))))
-		f[1].Resize(fyne.NewSize(tercio, tema.Espacio(4)))
-	}
+	filas := ui.NuevasFilasEsqueleto(FilasEsqueletoDocs, ui.DelanteroTesela, 1)
+	filas.Margen, filas.Filete = CanalonLista, true
+	return container.NewStack(canvas.NewRectangle(tema.Color(ui.FondoHoja(), v)), container.NewVScroll(filas))
 }

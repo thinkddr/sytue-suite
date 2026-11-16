@@ -5,7 +5,7 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { Button, Modal, Spinner, EmptyState, InlineHelp, Illustration, useToast } from '@sytue/ui';
+import { Button, Modal, Spinner, EmptyState, InlineHelp, useToast } from '@sytue/ui';
 import { formatDateTime, type Locale } from '@sytue/i18n';
 import { nombreDeOrganizacion } from '@sytue/shell';
 import {
@@ -113,7 +113,7 @@ export function InvitationsModal({ t, locale, open, onClose, onCountChange }: Pr
         <EmptyState
           title={t('invitations.emptyTitle')}
           description={t('invitations.emptyDescription')}
-          illustration={<Illustration name="emptyCalendar" />}
+          spot="emptyCalendar"
         />
       ) : (
         <div class="flex flex-col gap-4">

@@ -61,7 +61,7 @@ func key(tenant, subject string) string {
 // Dragonfly escribe una clave con TTL (que expira sola => offline, la misma
 // semántica que derivedState en PostgreSQL); si Dragonfly no responde degrada
 // al UPSERT original.
-func (s *Service) Heartbeat(ctx context.Context, subject string, state domain.PresenceState, status string) error {
+func (s *Service) Heartbeat(ctx context.Context, subject string, state domain.PresenceState, status, zona string) error {
 	if state == "" {
 		state = domain.StateOnline
 	}
@@ -71,9 +71,14 @@ func (s *Service) Heartbeat(ctx context.Context, subject string, state domain.Pr
 	if len(status) > 140 {
 		return domain.ErrInvalidInput
 	}
+	// Una zona que Go no conoce se descarta en vez de rechazar el latido: la
+	// presencia importa más que la hora, y un navegador viejo puede mandar algo raro.
+	if !ZonaValida(zona) {
+		zona = ""
+	}
 	if s.cache != nil {
 		b, err := json.Marshal(domain.Presence{
-			Subject: subject, State: state, Status: status, LastSeen: time.Now().UTC(),
+			Subject: subject, State: state, Status: status, TimeZone: zona, LastSeen: time.Now().UTC(),
 		})
 		if err != nil {
 			return err
@@ -85,6 +90,16 @@ func (s *Service) Heartbeat(ctx context.Context, subject string, state domain.Pr
 		log.From(ctx).Warn("presencia: Dragonfly no responde, degradando a PostgreSQL", "error", err)
 	}
 	return s.store.Heartbeat(ctx, subject, state, status)
+}
+
+// ZonaValida dice si `zona` es una zona IANA que se puede guardar: corta y
+// cargable. "Local" no vale: sería la del servidor, que no es la de nadie.
+func ZonaValida(zona string) bool {
+	if zona == "" || len(zona) > 64 || zona == "Local" {
+		return false
+	}
+	_, err := time.LoadLocation(zona)
+	return err == nil
 }
 
 // Offline marca al usuario como offline (logout/cierre de pestaña). Con

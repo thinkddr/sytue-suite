@@ -37,6 +37,24 @@ func WithOwner(ctx context.Context, ownerSub string) context.Context {
 	return context.WithValue(ctx, ownerCtxKey{}, ownerSub)
 }
 
+// conservarAmbosKey marca una subida que NO sustituye: ver ConservarAmbos.
+type conservarAmbosKey struct{}
+
+// ConservarAmbos pide que la subida que va en `ctx` no sustituya a un fichero con el
+// mismo nombre en la carpeta: se guarda como «IMG_0001 (2).jpg», y el de antes sigue
+// donde estaba. Es lo que necesita quien sube fotos —en un teléfono «IMG_0001.jpg» se
+// repite, y sustituir es perder una foto en la galería—; quien guarda un documento
+// quiere lo de siempre, una versión nueva del mismo fichero.
+func ConservarAmbos(ctx context.Context) context.Context {
+	return context.WithValue(ctx, conservarAmbosKey{}, true)
+}
+
+// PideConservarAmbos dice si la subida de `ctx` pidió ConservarAmbos.
+func PideConservarAmbos(ctx context.Context) bool {
+	v, _ := ctx.Value(conservarAmbosKey{}).(bool)
+	return v
+}
+
 // OwnerFrom devuelve el identificador de la persona cuyo ámbito personal («Mi
 // unidad») se consulta: primero el fijado con WithOwner y, si no lo hay, el
 // Subject de authn.FromContext.
@@ -731,6 +749,23 @@ func createFileTx(ctx context.Context, tx pgx.Tx, tenant string, teamDriveID *uu
 	default:
 		return domain.File{}, err
 	}
+	if exists && PideConservarAmbos(ctx) {
+		// Ni sustitución ni versión: un nombre libre en la misma carpeta, en la misma
+		// transacción. Si otra subida gana la carrera, el índice único lo convierte en
+		// ErrConflict al insertar, como en una copia.
+		libre, e := uniqueUploadName(rec.Name, func(cand string) (bool, error) {
+			var hay bool
+			err := tx.QueryRow(ctx,
+				`SELECT EXISTS (SELECT 1 FROM files WHERE tenant=$1 AND `+ambitoSQL+` AND folder_id=$2
+				 AND lower(name)=lower($3) AND deleted_at IS NULL)`,
+				tenant, rec.FolderID, cand).Scan(&hay)
+			return hay, err
+		})
+		if e != nil {
+			return domain.File{}, e
+		}
+		rec.Name, exists = libre, false
+	}
 
 	// Cuota por bytes lógicos, sin contar lo que vive en el bucket de terceros del
 	// tenant (mig 0022): ni lo nuevo si va fuera, ni lo viejo si ya estaba fuera.
@@ -884,6 +919,22 @@ func uniqueCopyName(base string, exists func(name string) (bool, error)) (string
 		}
 	}
 	return "", domain.ErrConflict
+}
+
+// uniqueUploadName es uniqueCopyName para una subida que conserva la que había:
+// «IMG_0001 (2).jpg», con el número ANTES de la extensión, que es lo que hacen los
+// sistemas de ficheros y lo que deja abrir el fichero con su aplicación.
+func uniqueUploadName(name string, exists func(name string) (bool, error)) (string, error) {
+	ext := ""
+	if i := strings.LastIndexByte(name, '.'); i > 0 && len(name)-i <= 16 {
+		ext = name[i:] // «.bashrc» no tiene extensión; «a.b c d…» tampoco es una
+	}
+	base := strings.TrimSuffix(name, ext)
+	cand, err := uniqueCopyName(base, func(b string) (bool, error) { return exists(b + ext) })
+	if err != nil {
+		return "", err
+	}
+	return cand + ext, nil
 }
 
 // copyBase antepone el prefijo de copia («Copia de …», paridad Google Drive) al
@@ -1837,18 +1888,103 @@ func markOrphanedBlobs(ctx context.Context, tx pgx.Tx, tenant string, deleted []
 	return nil
 }
 
+// CampoOrden es la columna por la que se ordena el listado de ficheros de una
+// carpeta. El cero-valor es el nombre, el orden de siempre: así los llamadores que
+// no saben de órdenes (Graph, exportación, enlaces públicos) no cambian.
+type CampoOrden string
+
+const (
+	OrdenNombre     CampoOrden = "nombre"
+	OrdenModificado CampoOrden = "modificado"
+	OrdenTamano     CampoOrden = "tamano"
+)
+
+// OrdenFicheros es el orden pedido para el listado de ficheros de una carpeta.
+// Se ordena en el servicio, y no en el cliente, porque los ficheros llegan
+// paginados: ordenar en el cliente solo ordenaría lo ya cargado.
+type OrdenFicheros struct {
+	Campo CampoOrden
+	// Desc invierte el sentido (de mayor a menor). El desempate por id sigue al
+	// sentido para que el recorrido del índice sea uno solo, hacia atrás.
+	Desc bool
+}
+
+// Normalizado devuelve el orden con el campo explícito (el vacío es el nombre),
+// para poder comparar órdenes con ==.
+func (o OrdenFicheros) Normalizado() OrdenFicheros {
+	if o.Campo == "" {
+		o.Campo = OrdenNombre
+	}
+	return o
+}
+
+// ParseOrdenFicheros interpreta `?orden=` y `?sentido=`. Vacíos son nombre y
+// ascendente; cualquier otro valor es un error, para que una errata del cliente
+// no se convierta en silencio en un orden distinto del pedido.
+func ParseOrdenFicheros(campo, sentido string) (OrdenFicheros, error) {
+	var o OrdenFicheros
+	switch CampoOrden(campo) {
+	case "", OrdenNombre:
+		o.Campo = OrdenNombre
+	case OrdenModificado, OrdenTamano:
+		o.Campo = CampoOrden(campo)
+	default:
+		return OrdenFicheros{}, fmt.Errorf("store: orden desconocido %q", campo)
+	}
+	switch sentido {
+	case "", "asc":
+	case "desc":
+		o.Desc = true
+	default:
+		return OrdenFicheros{}, fmt.Errorf("store: sentido desconocido %q", sentido)
+	}
+	return o, nil
+}
+
 // FileCursor es la clave de continuación de una paginación keyset de ficheros.
-// Ordena por (lower(name), id) ascendente, estable y sin OFFSET (CONVENTIONS
-// §0.8: paginación keyset, sin N+1). El cero-valor significa "primera página".
+// Ordena por (columna del orden, id), estable y sin OFFSET (CONVENTIONS §0.8:
+// paginación keyset, sin N+1). Sin ID significa "primera página" en ese orden.
 type FileCursor struct {
+	// Orden es el orden del listado; la página siguiente debe pedirse en el mismo.
+	Orden OrdenFicheros
 	// NameLower es lower(name) del último fichero de la página anterior.
 	NameLower string
-	// ID desempata nombres iguales (case-insensitive) de forma determinista.
+	// UpdatedAt y SizeBytes son la clave del último fichero en los órdenes por
+	// fecha y por tamaño (solo se usa la del orden en curso).
+	UpdatedAt time.Time
+	SizeBytes int64
+	// ID desempata claves iguales de forma determinista.
 	ID uuid.UUID
 }
 
 // IsZero indica que el cursor apunta al inicio (primera página).
-func (c FileCursor) IsZero() bool { return c.ID == uuid.Nil && c.NameLower == "" }
+func (c FileCursor) IsZero() bool { return c.ID == uuid.Nil }
+
+// cursorTras devuelve el cursor que sigue al fichero f en el orden o.
+func cursorTras(o OrdenFicheros, f domain.File) FileCursor {
+	return FileCursor{
+		Orden:     o,
+		NameLower: strings.ToLower(f.Name),
+		UpdatedAt: f.UpdatedAt,
+		SizeBytes: f.SizeBytes,
+		ID:        f.ID,
+	}
+}
+
+// claveOrdenSQL da la expresión SQL de la columna del orden y el valor del cursor
+// con el que compararla. Cada una tiene su índice (tenant, folder_id, columna[, id])
+// WHERE deleted_at IS NULL: el del nombre es files_unique_name_in_folder (0001) y
+// los de fecha y tamaño, los de la migración 0035.
+func claveOrdenSQL(c FileCursor) (string, any) {
+	switch c.Orden.Campo {
+	case OrdenModificado:
+		return "updated_at", c.UpdatedAt
+	case OrdenTamano:
+		return "size_bytes", c.SizeBytes
+	default:
+		return "lower(name)", c.NameLower
+	}
+}
 
 // FilePage es una página de ficheros con el cursor para pedir la siguiente.
 type FilePage struct {
@@ -1857,8 +1993,9 @@ type FilePage struct {
 	Next *FileCursor
 }
 
-// ListFilesPage lista ficheros vivos de una carpeta con paginación keyset por
-// (lower(name), id). Devuelve hasta `limit` ficheros y, si hay más, el cursor de
+// ListFilesPage lista ficheros vivos de una carpeta con paginación keyset en el
+// orden que lleva el cursor (after.Orden; el cero-valor es (lower(name), id)
+// ascendente). Devuelve hasta `limit` ficheros y, si hay más, el cursor de
 // continuación. Evita OFFSET (coste O(n)) usando la clave compuesta indexada.
 func (s *Store) ListFilesPage(ctx context.Context, folderID uuid.UUID, after FileCursor, limit int) (FilePage, error) {
 	t := tenancy.MustFrom(ctx)
@@ -1900,17 +2037,30 @@ func listFilesPageTx(ctx context.Context, tx pgx.Tx, tenant string, folderID uui
 		}
 		return FilePage{}, err
 	}
-	// Predicado keyset: (lower(name), id) > (cursor.NameLower, cursor.ID).
-	// El comparador de tuplas de PostgreSQL da un recorrido estable del índice
-	// folders/files (tenant, folder_id, lower(name)). Pedimos limit+1 para
-	// saber si existe una página siguiente sin un COUNT extra.
+	// Predicado keyset: (columna, id) > (cursor) en ascendente, < en descendente.
+	// El comparador de tuplas de PostgreSQL da un recorrido estable del índice de
+	// la columna (hacia atrás en descendente). La primera página no lleva
+	// predicado. Pedimos limit+1 para saber si existe una página siguiente sin un
+	// COUNT extra.
+	orden := after.Orden.Normalizado()
+	after.Orden = orden
+	col, valor := claveOrdenSQL(after)
+	cmp, dir := ">", "ASC"
+	if orden.Desc {
+		cmp, dir = "<", "DESC"
+	}
+	args := []any{tenant, folderID, limit + 1}
+	keyset := ""
+	if !after.IsZero() {
+		keyset = ` AND (` + col + `, id) ` + cmp + ` ($4, $5)`
+		args = append(args, valor, after.ID)
+	}
 	rows, err := tx.Query(ctx,
 		`SELECT `+fileCols+` FROM files
-		 WHERE tenant=$1 AND `+ambitoSQL+` AND folder_id=$2 AND deleted_at IS NULL AND `+channelScopeSQL+`
-		   AND (lower(name), id) > ($3, $4)
-		 ORDER BY lower(name), id
-		 LIMIT $5`,
-		tenant, folderID, after.NameLower, after.ID, limit+1)
+		 WHERE tenant=$1 AND `+ambitoSQL+` AND folder_id=$2 AND deleted_at IS NULL AND `+channelScopeSQL+keyset+`
+		 ORDER BY `+col+` `+dir+`, id `+dir+`
+		 LIMIT $3`,
+		args...)
 	if err != nil {
 		return FilePage{}, fmt.Errorf("store: listar ficheros paginado: %w", err)
 	}
@@ -1926,9 +2076,9 @@ func listFilesPageTx(ctx context.Context, tx pgx.Tx, tenant string, folderID uui
 		return FilePage{}, err
 	}
 	if len(page.Files) > limit {
-		last := page.Files[limit-1]
+		next := cursorTras(orden, page.Files[limit-1])
 		page.Files = page.Files[:limit]
-		page.Next = &FileCursor{NameLower: strings.ToLower(last.Name), ID: last.ID}
+		page.Next = &next
 	}
 	return page, nil
 }

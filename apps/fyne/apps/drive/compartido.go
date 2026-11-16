@@ -27,10 +27,9 @@ import (
 // revocado mientras se mira contesta 404 sin decir que exista: eso es «ya no tienes
 // acceso», con su botón para volver.
 //
-// Abrir un fichero lo DESCARGA: la web lo previsualiza en su visor, y las apps nativas
-// de cada formato abren ficheros de TU unidad por id, no de la de otra persona.
-//
-// ponytail: sin vista previa. Llega con el visor de texto de Drive, el día que lo haya.
+// Abrir un texto o una imagen ráster lo enseña en la vista previa de Drive (como el
+// visor de la web), con su «Descargar»; lo demás se DESCARGA: las apps nativas de cada
+// formato abren ficheros de TU unidad por id, no de la de otra persona.
 
 // VistaCompartido es la sección «Compartido conmigo».
 type VistaCompartido struct {

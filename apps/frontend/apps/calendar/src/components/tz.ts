@@ -59,6 +59,17 @@ function wallParts(at: Date, tz: string): WallParts {
 }
 
 /**
+ * Reloj-de-pared de `at` en la zona `tz` como DATE-TIME local de iCalendar
+ * (`yyyymmddThhmmss`, sin Z), que es como el SDK CalDAV entrega un DTSTART con
+ * TZID. Una zona que `Intl` no conoce lanza (RangeError): quien llama decide.
+ */
+export function wallClockIcal(at: Date, tz: string): string {
+  const p = wallParts(at, tz);
+  const n = (v: number, w = 2) => String(v).padStart(w, '0');
+  return `${n(p.year, 4)}${n(p.month)}${n(p.day)}T${n(p.hour)}${n(p.minute)}${n(p.second)}`;
+}
+
+/**
  * Offset de `tz` en el instante `at`, en minutos al ESTE de UTC (Madrid verano
  * = +120; Nueva York invierno = −300). Compara el reloj-de-pared de la zona con
  * el mismo reloj leído como UTC.

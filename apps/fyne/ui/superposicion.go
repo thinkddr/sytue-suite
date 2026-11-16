@@ -46,6 +46,19 @@ type Descartable interface {
 	Descartar()
 }
 
+// OlvidarSuperposiciones removes every layer when its identity is discarded.
+// This is not a user dismissal: an old account's non-dismissible dialog must not
+// remain visible over the next account's screen.
+func OlvidarSuperposiciones(c fyne.Canvas) {
+	if c == nil {
+		return
+	}
+	c.Unfocus()
+	for top := c.Overlays().Top(); top != nil; top = c.Overlays().Top() {
+		c.Overlays().Remove(top)
+	}
+}
+
 // Descartar cierra la capa de más arriba del lienzo y dice si había alguna.
 //
 // # Por qué esto es una función y no un manejador de Escape
@@ -334,12 +347,18 @@ func (v *Velo) Tapped(*fyne.PointEvent) {
 // Entrar arranca `sytue-fade-in`: 150 ms de 0 a la opacidad del token.
 //
 // El driver de pruebas de Fyne llama a `Tick(1)` y punto, así que en un guardián el
-// velo sale directamente a su color final y la animación no falsea ninguna medida.
+// velo sale directamente a su color final y la animación no falsea ninguna medida. Con
+// «menos movimiento» sale así también en la app.
 func (v *Velo) Entrar() {
 	if !v.Opaco || v.fondo == nil {
 		return
 	}
 	variante := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	if MenosMovimiento() {
+		v.fondo.FillColor = ColorVelo(variante, 1)
+		canvas.Refresh(v.fondo)
+		return
+	}
 	a := fyne.NewAnimation(DuracionFundido, func(p float32) {
 		v.fondo.FillColor = ColorVelo(variante, p)
 		canvas.Refresh(v.fondo)

@@ -109,18 +109,64 @@ func (s *Store) ListDocuments(ctx context.Context, subj domain.Subject, f domain
 	if f.Limit <= 0 || f.Limit > 200 {
 		f.Limit = 50
 	}
-	beforeAt, beforeID := cursorDe(f)
+	var cursorA, cursorB any
+	if f.ByTitle {
+		cursorA, cursorB = cursorTituloDe(f)
+	} else {
+		cursorA, cursorB = cursorDe(f)
+	}
 	out := make([]domain.Document, 0, f.Limit)
 	err := s.tenantTx(ctx, func(tx pgx.Tx) error {
-		// ponytail: el filtro de destacados ($7) no tiene índice GIN sobre starred_by.
-		// Se aplica DESPUÉS de la verja de permisos (owner/permiso/tenant), que ya deja
-		// un puñado de filas por persona; si un tenant llega a decenas de miles de
-		// documentos visibles por usuario, el arreglo es
-		// CREATE INDEX ... ON documents USING gin (starred_by).
-		const q = `
+		rows, err := tx.Query(ctx, consultaLista(f.ByTitle),
+			subj.Sub, subj.Groups, subj.Tenant,
+			string(f.Kind), f.OwnerSub, f.Query, f.StarredOnly, cursorA, cursorB, f.Limit,
+			f.SourceRef, string(f.Scope))
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var d domain.Document
+			// La secuencia de la miniatura solo viaja en la lista (la portada); el resto de
+			// lecturas de un documento no la necesita.
+			if err := rows.Scan(&d.ID, &d.Tenant, &d.Kind, &d.Title, &d.OwnerSub, &d.Seq,
+				&d.SnapshotID, &d.StarredBy, &d.CreatedAt, &d.UpdatedAt, &d.DeletedAt, &d.SourceRef,
+				&d.MiniaturaSeq); err != nil {
+				return err
+			}
+			out = append(out, d)
+		}
+		return rows.Err()
+	})
+	if err != nil {
+		return nil, fmt.Errorf("store: listar documentos: %w", err)
+	}
+	return out, nil
+}
+
+// consultaLista es la consulta del listado en uno de sus dos órdenes. Solo cambian
+// el tipo del cursor ($8) y el ORDER BY; el resto (verja de permisos y filtros) es
+// el mismo texto para que no diverjan.
+//
+// ponytail: el filtro de destacados ($7) no tiene índice GIN sobre starred_by, y el
+// orden por título no tiene índice sobre plegar(title). Ambos se aplican DESPUÉS de
+// la verja de permisos (owner/permiso/tenant), que ya deja un puñado de filas por
+// persona; si un tenant llega a decenas de miles de documentos visibles por usuario,
+// el arreglo es CREATE INDEX ... ON documents USING gin (starred_by) y otro btree
+// sobre (plegar(title) COLLATE "C", id).
+func consultaLista(porTitulo bool) string {
+	// COLLATE "C": orden por bytes = orden por puntos de código, el mismo que
+	// strings.Compare en Go, que es con lo que se mezclan los de fuera.
+	cursor := `(d.updated_at, d.id) < ($8::timestamptz, $9::uuid)
+			ORDER BY d.updated_at DESC, d.id DESC`
+	if porTitulo {
+		cursor = `(plegar(d.title) COLLATE "C", d.id) > (plegar($8::text) COLLATE "C", $9::uuid)
+			ORDER BY plegar(d.title) COLLATE "C", d.id`
+	}
+	return `
 			SELECT d.id, d.tenant, d.kind, d.title, d.owner_sub, d.seq,
 			       d.snapshot_id, d.starred_by, d.created_at, d.updated_at, d.deleted_at,
-			       coalesce(d.source_ref, '')
+			       coalesce(d.source_ref, ''), d.thumbnail_seq
 			FROM documents d
 			WHERE d.deleted_at IS NULL
 			  AND (
@@ -141,30 +187,9 @@ func (s *Store) ListDocuments(ctx context.Context, subj domain.Subject, f domain
 			  AND ($6 = '' OR plegar(d.title) LIKE '%' || plegar($6) || '%')
 			  AND (NOT $7::bool OR d.starred_by @> ARRAY[$1]::text[])
 			  AND ($11 = '' OR d.source_ref = $11)
-			  AND (d.updated_at, d.id) < ($8::timestamptz, $9::uuid)
-			ORDER BY d.updated_at DESC, d.id DESC
+			  AND ($12 = '' OR ($12 = 'mine' AND d.owner_sub = $1) OR ($12 = 'shared' AND d.owner_sub <> $1))
+			  AND ` + cursor + `
 			LIMIT $10`
-		rows, err := tx.Query(ctx, q,
-			subj.Sub, subj.Groups, subj.Tenant,
-			string(f.Kind), f.OwnerSub, f.Query, f.StarredOnly, beforeAt, beforeID, f.Limit,
-			f.SourceRef)
-		if err != nil {
-			return err
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var d domain.Document
-			if err := scanDocumentRows(rows, &d); err != nil {
-				return err
-			}
-			out = append(out, d)
-		}
-		return rows.Err()
-	})
-	if err != nil {
-		return nil, fmt.Errorf("store: listar documentos: %w", err)
-	}
-	return out, nil
 }
 
 // RenameDocument cambia el título y actualiza updated_at.
@@ -247,6 +272,15 @@ func scanDocumentRows(rows pgx.Rows, d *domain.Document) error {
 
 // querierFromTx asegura que el tx implementa pg.Querier (uso interno/eventos).
 var _ pg.Querier = pgx.Tx(nil)
+
+// cursorTituloDe es el cursor del orden por título: primera página = (”, uuid
+// cero), que deja pasar todo salvo un imposible título vacío con id cero.
+func cursorTituloDe(f domain.ListFilter) (string, string) {
+	if f.TitleCursor == nil {
+		return "", "00000000-0000-0000-0000-000000000000"
+	}
+	return f.TitleCursor.Title, f.TitleCursor.ID
+}
 
 // cursorDe es el cursor keyset de una lista: primera página = (futuro, uuid máximo)
 // —todo pasa y la consulta es una sola forma sargable, sin OR con parámetros—. Con

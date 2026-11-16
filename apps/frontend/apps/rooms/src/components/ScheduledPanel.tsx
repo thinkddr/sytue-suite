@@ -10,8 +10,9 @@
  * abierto sigue en la lista hasta recargar (llega al canal por WS igualmente).
  */
 import type { JSX } from 'preact';
-import { EmptyState, Illustration, Avatar, Button, Icon, Skeleton, IconButton } from '@sytue/ui';
-import { formatDateTime, type Locale } from '@sytue/i18n';
+import { EmptyState, Avatar, Button, Icon, Skeleton, IconButton } from '@sytue/ui';
+import type { Locale } from '@sytue/i18n';
+import { whenLabel } from '../lib/fechas.js';
 import type { ScheduledMessage } from '../client/chatApi.js';
 import type { T } from '../i18n/index.js';
 import { MessageBody } from './MessageBody.js';
@@ -31,16 +32,6 @@ interface Props {
   /** Idioma activo (formato de fecha/hora) y traductor ya atado a él. */
   locale: Locale;
   t: T;
-}
-
-/** Etiqueta legible de un instante ISO (fecha + hora local, en el idioma del usuario). */
-function whenLabel(locale: Locale, iso: string): string {
-  return formatDateTime(locale, iso, {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 }
 
 /** ISO 8601 -> valor de <input type=datetime-local> (hora local, sin zona). */
@@ -119,11 +110,7 @@ export function ScheduledPanel({
             ))}
           </div>
         ) : scheduled.length === 0 ? (
-          <EmptyState
-            class="py-4"
-            title={t('scheduled.empty')}
-            illustration={<Illustration name="emptyChat" size={96} />}
-          />
+          <EmptyState class="py-4" title={t('scheduled.empty')} spot="emptyChat" />
         ) : (
           scheduled.map((m) => (
             <div key={m.id} class="border-border flex gap-3 border-b px-4 py-3 last:border-b-0">

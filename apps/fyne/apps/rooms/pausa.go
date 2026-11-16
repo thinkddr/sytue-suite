@@ -114,6 +114,8 @@ func (sa *Sala) EnPrimerPlano() {
 		return
 	}
 	sa.cargarPausa()
+	// Al volver se pregunta YA: es cuando la franja vuelve a estar a la vista.
+	sa.refrescarLlamadaActiva()
 }
 
 // PausarAvisos pausa con esa duración, o reanuda con "". La pausa se apunta cuando el

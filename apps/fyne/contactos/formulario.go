@@ -23,7 +23,8 @@ import (
 
 // El formulario de crear y editar un contacto (`ContactModal.tsx`): un diálogo `md`
 // con la vista previa arriba, el nombre, los correos y los teléfonos con su etiqueta y
-// su principal, las direcciones, el cumpleaños, la organización y la nota.
+// su principal, las direcciones, el cumpleaños, la organización, el cargo, el apodo y la
+// nota.
 //
 //	cuerpo      `flex flex-col gap-4`                                        hoja
 //	previa      `flex items-center gap-3 border-b pb-4`, avatar `lg` (48)    hoja
@@ -88,7 +89,33 @@ var (
 	}
 	// «Otra» y no «Otro»: en español el adjetivo concuerda con «dirección».
 	tiposDireccion = []tipoOpcion{{"home", "type.home"}, {"work", "type.work"}, {"other", "type.otherAddress"}}
+	tiposWeb       = []tipoOpcion{{"home", "type.home"}, {"work", "type.work"}, {"other", "type.other"}}
+	// RELATED (RFC 6350 §6.6.6): los tipos que la gente usa. «Otra» no lleva TYPE.
+	tiposRelacion = []tipoOpcion{
+		{"spouse", "relation.spouse"},
+		{"child", "relation.child"},
+		{"parent", "relation.parent"},
+		{"sibling", "relation.sibling"},
+		{"friend", "relation.friend"},
+		{"co-worker", "relation.coworker"},
+		{"emergency", "relation.emergency"},
+		{"", "relation.other"},
+	}
 )
+
+// indiceRelacion es la posición del tipo de relación, o la de «Otra».
+func indiceRelacion(tipo string) int {
+	for i, o := range tiposRelacion {
+		if strings.EqualFold(o.valor, tipo) {
+			return i
+		}
+	}
+	return len(tiposRelacion) - 1
+}
+
+// webValida es la comprobación mínima de un sitio web: sin espacios y con un punto o un
+// esquema. La de verdad (solo http y https) la hace el servicio.
+var webValida = regexp.MustCompile(`^\S*(\.|://)\S*$`)
 
 // indiceTipo es `normalizeType`: la posición de la etiqueta en la lista, o la de
 // «other» si la vCard trae una que el editor no ofrece.
@@ -130,11 +157,14 @@ type formulario struct {
 	correos, telefonos                 []*filaValor
 	principalCorreo, principalTelefono int
 	direcciones                        []*filaDireccion
-	cumple, org                        *ui.Entrada
+	webs, relacionados                 []*filaValor
+	cumple, aniversario, org, cargo    *ui.Entrada
+	apodo                              *ui.Entrada
 	nota                               *ui.AreaTexto
 
 	errNombre        string
 	errCorreo        int // la fila del primer correo mal escrito, o -1
+	errWeb           int // la del primer sitio web mal escrito, o -1
 	confirmarBorrado bool
 
 	avatar   *ui.Avatar
@@ -147,7 +177,7 @@ type formulario struct {
 	// subirFoto abre el selector de imágenes; nil: «Subir una foto…» apagada.
 	subirFoto                      func(listo func(dataURI string))
 	previaNombre, previaOrg        *canvas.Text
-	textoOrg                       string // lo que va en previaOrg, sin recortar
+	textoOrg                       string // «Cargo · Empresa» de previaOrg, sin recortar
 	previaCont                     *fyne.Container
 	borrar, cancelar, guardarBoton *ui.Boton
 
@@ -168,10 +198,13 @@ type formulario struct {
 // nuevoFormulario prepara el diálogo para un contacto (nil: uno nuevo), con una fila
 // vacía de correo y otra de teléfono si no tiene ninguno, como la web.
 func (p *Pantalla) nuevoFormulario(c *api.Contact) *formulario {
-	f := &formulario{p: p, contacto: c, errCorreo: -1}
+	f := &formulario{p: p, contacto: c, errCorreo: -1, errWeb: -1}
 	f.nombre = ui.NuevaEntrada(p.t("form.fullNamePlaceholder", nil))
 	f.org = ui.NuevaEntrada(p.t("form.organizationPlaceholder", nil))
+	f.cargo = ui.NuevaEntrada(p.t("form.titlePlaceholder", nil))
+	f.apodo = ui.NuevaEntrada(p.t("form.nicknamePlaceholder", nil))
 	f.cumple = ui.CampoFecha(ui.CampoMD)
+	f.aniversario = ui.CampoFecha(ui.CampoMD)
 	f.nota = ui.NuevaAreaTexto(p.t("form.notePlaceholder", nil))
 	f.nota.Filas = FilasNota
 
@@ -180,6 +213,8 @@ func (p *Pantalla) nuevoFormulario(c *api.Contact) *formulario {
 	if c != nil {
 		f.nombre.PonerTexto(c.FormattedName)
 		f.org.PonerTexto(c.Organization)
+		f.cargo.PonerTexto(c.Title)
+		f.apodo.PonerTexto(c.Nickname)
 		f.nota.PonerTexto(c.Note)
 		if c.Birthday != nil {
 			f.cumple.PonerTexto(ui.EscribirFecha(*c.Birthday))
@@ -187,6 +222,16 @@ func (p *Pantalla) nuevoFormulario(c *api.Contact) *formulario {
 		correos, tels = c.Emails, c.Phones
 		for _, a := range c.Addresses {
 			f.direcciones = append(f.direcciones, f.nuevaDireccion(a))
+		}
+		if c.Anniversary != nil {
+			f.aniversario.PonerTexto(ui.EscribirFecha(*c.Anniversary))
+		}
+		for _, u := range c.URLs {
+			f.webs = append(f.webs, f.nuevaFila(tiposWeb, indiceTipo(u.Type, tiposWeb), u.URL, "form.websitePlaceholder"))
+		}
+		for _, r := range c.Related {
+			fila := f.nuevaFila(tiposRelacion, indiceRelacion(r.Type), r.Name, "form.relatedPlaceholder")
+			f.relacionados = append(f.relacionados, fila)
 		}
 	}
 	for i, e := range correos {
@@ -218,12 +263,15 @@ func (p *Pantalla) nuevoFormulario(c *api.Contact) *formulario {
 		f.pintarPrevia()
 	})
 	f.org.AlCambiar(func(string) { f.pintarPrevia() })
-	f.cumple.AlCambiar(func(string) {
-		if f.cumple.Invalida {
-			f.cumple.Invalida = false
-			f.cumple.Refresh()
-		}
-	})
+	f.cargo.AlCambiar(func(string) { f.pintarPrevia() })
+	for _, fecha := range []*ui.Entrada{f.cumple, f.aniversario} {
+		fecha.AlCambiar(func(string) {
+			if fecha.Invalida {
+				fecha.Invalida = false
+				fecha.Refresh()
+			}
+		})
+	}
 	return f
 }
 
@@ -235,8 +283,8 @@ func (f *formulario) nuevaFila(ops []tipoOpcion, tipo int, valor, marca string) 
 	x.tipo.Elegida, x.tipo.Ancho = tipo, AnchoTipo
 	x.valor.PonerTexto(valor)
 	x.valor.AlCambiar(func(string) {
-		if f.errCorreo >= 0 {
-			f.errCorreo = -1
+		if f.errCorreo >= 0 || f.errWeb >= 0 {
+			f.errCorreo, f.errWeb = -1, -1
 			f.rehacer()
 		}
 	})
@@ -312,10 +360,18 @@ func (f *formulario) rehacer() {
 		x.valor.Invalida = i == f.errCorreo
 		x.valor.Refresh()
 	}
+	for i, x := range f.webs {
+		x.valor.Invalida = i == f.errWeb
+		x.valor.Refresh()
+	}
 	f.nombre.Refresh()
 	var errCorreo string
 	if f.errCorreo >= 0 {
 		errCorreo = f.p.t("form.emailInvalid", nil)
+	}
+	var errWeb string
+	if f.errWeb >= 0 {
+		errWeb = f.p.t("form.websiteInvalid", nil)
 	}
 	f.cuerpo.Objects = []fyne.CanvasObject{f.previa()}
 	// El asistente va ARRIBA porque es el atajo a la ficha entera: se pega la firma, se
@@ -325,16 +381,28 @@ func (f *formulario) rehacer() {
 	}
 	f.cuerpo.Objects = append(f.cuerpo.Objects,
 		ui.GrupoCampo(f.p.t("form.fullName", nil), true, f.nombre, "", f.errNombre),
-		f.listaValores("field.email", &f.correos, &f.principalCorreo, tiposCorreo,
-			"form.emailPlaceholder", "form.addEmail", "form.removeEmail", errCorreo),
-		f.listaValores("field.phone", &f.telefonos, &f.principalTelefono, tiposTel,
-			"form.phonePlaceholder", "form.addPhone", "form.removePhone", ""),
+		f.listaValores("field.email", &f.correos, &f.principalCorreo, tiposCorreo, rotulosLista{
+			marca: "form.emailPlaceholder", anadir: "form.addEmail", quitar: "form.removeEmail",
+			tipo: "form.emailTypeLabel", valor: "form.emailLabel",
+		}, errCorreo),
+		f.listaValores("field.phone", &f.telefonos, &f.principalTelefono, tiposTel, rotulosLista{
+			marca: "form.phonePlaceholder", anadir: "form.addPhone", quitar: "form.removePhone",
+			tipo: "form.phoneTypeLabel", valor: "form.phoneLabel",
+		}, ""),
 		f.listaDirecciones(),
-		// ponytail: sin la ayuda de `form.birthdayPartial`. La web la enseña cuando la
-		// vCard trae un cumpleaños SIN año, y la API REST no lo da (el servicio lo
-		// descarta al proyectar, ver cumpleanos.go): aquí nunca se sabe que lo hay.
-		ui.GrupoCampo(f.p.t("field.birthday", nil), false, f.cumple, "", ""),
+		f.listaValores("field.website", &f.webs, nil, tiposWeb, rotulosLista{
+			marca: "form.websitePlaceholder", anadir: "form.addWebsite", quitar: "form.removeWebsite",
+			tipo: "form.websiteTypeLabel", valor: "form.websiteLabel",
+		}, errWeb),
+		ui.GrupoCampo(f.p.t("field.birthday", nil), false, f.cumple, f.ayudaCumple(), ""),
+		ui.GrupoCampo(f.p.t("field.anniversary", nil), false, f.aniversario, "", ""),
+		f.listaValores("field.related", &f.relacionados, nil, tiposRelacion, rotulosLista{
+			marca: "form.relatedPlaceholder", anadir: "form.addRelated", quitar: "form.removeRelated",
+			tipo: "form.relatedTypeLabel", valor: "form.relatedLabel",
+		}, ""),
 		ui.GrupoCampo(f.p.t("field.organization", nil), false, f.org, "", ""),
+		ui.GrupoCampo(f.p.t("field.title", nil), false, f.cargo, "", ""),
+		ui.GrupoCampo(f.p.t("field.nickname", nil), false, f.apodo, "", ""),
 		ui.GrupoCampo(f.p.t("field.note", nil), false, f.nota, "", ""),
 	)
 	f.cuerpo.Refresh()
@@ -343,12 +411,12 @@ func (f *formulario) rehacer() {
 
 // asistente es `AsistenteFicha`: pegar una firma de correo y que la ficha salga
 // rellena. NO GUARDA NADA: rellena el formulario y ahí se queda, para revisarlo.
-//
-// ponytail: el `aria-label` del área («Pega una firma o una tarjeta») no llega al
-// lector de pantalla: `ui.AreaTexto` no es `fyne.Accessible` todavía (ver listaValores).
+// El área se anuncia con el `aria-label` de la web («Pega una firma o una tarjeta»), no
+// con su marca de agua, que es un ejemplo largo.
 func (f *formulario) asistente() fyne.CanvasObject {
 	if f.ia == nil {
 		f.ia = ui.NuevaAreaTexto(f.p.t("form.aiPlaceholder", nil))
+		f.ia.Rotulo = f.p.t("form.ai", nil)
 		f.ia.Filas = FilasAsistente
 		f.rellenar = ui.NuevoBoton(f.p.t("form.aiFill", nil), f.pedirFicha).
 			Con(ui.Secundario, ui.TallaSM).ConIcono(iconos.IA, IconoAsistente)
@@ -505,7 +573,7 @@ func (f *formulario) pintarPrevia() {
 	f.selector.TieneFoto = f.avatar.Foto != nil
 	f.selector.Refresh()
 	f.previaNombre.Text = nombre
-	f.textoOrg = strings.TrimSpace(f.org.Texto())
+	f.textoOrg = lineaCargo(f.cargo.Texto(), f.org.Texto())
 	f.previaOrg.Color = tema.Color("text-muted", v)
 	if f.textoOrg == "" {
 		f.textoOrg, f.previaOrg.Color = f.p.t("form.preview", nil), tema.Color("text-subtle", v)
@@ -570,21 +638,29 @@ func botonQuitar(rotulo string, alPulsar func()) *ui.Boton {
 	return b
 }
 
-// listaValores es `ValueList`: las filas de correos o de teléfonos.
+// rotulosLista son las claves de catálogo de una `ValueList`: la marca de agua, los
+// botones y los `aria-label` de cada fila (`typeLabelKey` y `valueLabelKey` en la web).
+type rotulosLista struct {
+	marca, anadir, quitar, tipo, valor string
+}
+
+// listaValores es `ValueList`: las filas de correos, teléfonos, sitios web o personas
+// relacionadas. Sin `principal` (los dos últimos) no hay «Principal».
 //
-// ponytail: los `aria-label` de cada control («Etiqueta del correo 1», «Correo 1») no
-// llegan al lector de pantalla: `ui.Selector` y `ui.Entrada` no son `fyne.Accessible`
-// todavía. Cuando lo sean, las claves `form.*TypeLabel` y `form.*Label` ya están.
+// Cada control lleva el `aria-label` con su índice («Etiqueta del correo 2», «Correo
+// 2»). Se pone en cada repintado y no al crear la fila porque al quitar una las de
+// detrás cambian de número.
 func (f *formulario) listaValores(leyenda string, lista *[]*filaValor, principal *int, ops []tipoOpcion,
-	marca, anadir, rotuloQuitar, err string,
+	r rotulosLista, err string,
 ) fyne.CanvasObject {
 	filas := *lista
 	hijos := make([]fyne.CanvasObject, 0, len(filas)+2)
 	for i, x := range filas {
 		indice := i
 		vars := i18n.Vars{"index": i + 1}
+		x.tipo.Rotulo, x.valor.Rotulo = f.p.t(r.tipo, vars), f.p.t(r.valor, vars)
 		piezas := []fyne.CanvasObject{x.tipo, x.valor}
-		if len(filas) > 1 {
+		if principal != nil && len(filas) > 1 {
 			radio := ui.NuevoRadio(f.p.t("form.primary", nil), func(bool) {
 				*principal = indice
 				f.rehacer()
@@ -592,14 +668,14 @@ func (f *formulario) listaValores(leyenda string, lista *[]*filaValor, principal
 			radio.Marcada = *principal == i
 			piezas = append(piezas, radio)
 		}
-		piezas = append(piezas, botonQuitar(f.p.t(rotuloQuitar, vars), func() { f.quitarFila(lista, indice, principal) }))
+		piezas = append(piezas, botonQuitar(f.p.t(r.quitar, vars), func() { f.quitarFila(lista, indice, principal) }))
 		hijos = append(hijos, container.New(&filaFlexible{Hueco: HuecoFieldset, Crece: 1, Base: BaseValor}, piezas...))
 	}
 	if err != "" {
 		hijos = append(hijos, ui.LineaError(err))
 	}
-	hijos = append(hijos, botonAnadir(f.p.t(anadir, nil), func() {
-		*lista = append(*lista, f.nuevaFila(ops, 0, "", marca))
+	hijos = append(hijos, botonAnadir(f.p.t(r.anadir, nil), func() {
+		*lista = append(*lista, f.nuevaFila(ops, 0, "", r.marca))
 		f.rehacer()
 	}))
 	return fieldset(f.leyenda(leyenda), hijos...)
@@ -609,8 +685,9 @@ func (f *formulario) listaValores(leyenda string, lista *[]*filaValor, principal
 // primera; si iba detrás, baja uno.
 func (f *formulario) quitarFila(lista *[]*filaValor, i int, principal *int) {
 	*lista = append((*lista)[:i:i], (*lista)[i+1:]...)
-	f.errCorreo = -1
+	f.errCorreo, f.errWeb = -1, -1
 	switch {
+	case principal == nil:
 	case *principal == i:
 		*principal = 0
 	case *principal > i:
@@ -620,12 +697,17 @@ func (f *formulario) quitarFila(lista *[]*filaValor, i int, principal *int) {
 }
 
 // listaDirecciones es `AddressList`: cada dirección en su caja, sin ninguna al crear.
+// Como en listaValores, los `aria-label` llevan el índice y se renuevan al repintar.
 func (f *formulario) listaDirecciones() fyne.CanvasObject {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	hijos := make([]fyne.CanvasObject, 0, len(f.direcciones)+1)
 	for i, x := range f.direcciones {
 		indice := i
 		vars := i18n.Vars{"index": i + 1}
+		x.tipo.Rotulo = f.p.t("form.addressTypeLabel", vars)
+		x.calle.Rotulo, x.ciudad.Rotulo = f.p.t("form.streetLabel", vars), f.p.t("form.cityLabel", vars)
+		x.region.Rotulo, x.cp.Rotulo = f.p.t("form.regionLabel", vars), f.p.t("form.postalCodeLabel", vars)
+		x.pais.Rotulo = f.p.t("form.countryLabel", vars)
 		quitar := botonQuitar(f.p.t("form.removeAddress", vars), func() {
 			f.direcciones = append(f.direcciones[:indice:indice], f.direcciones[indice+1:]...)
 			f.rehacer()
@@ -699,6 +781,16 @@ func (f *formulario) guardar() {
 	})
 }
 
+// ayudaCumple es la ayuda del campo de fecha cuando el contacto guarda un cumpleaños
+// SIN año: el `form.birthdayPartial` de ContactModal.tsx. El campo no puede enseñarlo
+// (pide día, mes y año), así que la ayuda dice que está y cómo se cambia.
+func (f *formulario) ayudaCumple() string {
+	if f.contacto == nil || f.contacto.Birthday != nil || f.contacto.BirthdayNoYear == "" {
+		return ""
+	}
+	return f.p.t("form.birthdayPartial", nil)
+}
+
 // entrada es `handleSave` hasta la petición: valida el nombre, la forma de los correos
 // y la fecha, y arma el contacto ENTERO. Al editar parte de `Contact.Input`, porque el
 // PUT sustituye el contacto y lo que no vaya se pierde (apellidos, cargo, foto…).
@@ -712,30 +804,31 @@ func (f *formulario) entrada() (api.ContactInput, bool) {
 	if nombre == "" {
 		f.errNombre = f.p.t("form.nameRequired", nil)
 	}
-	f.errCorreo = -1
-	for i, x := range f.correos {
-		if v := strings.TrimSpace(x.valor.Texto()); v != "" && !correoValido.MatchString(v) {
-			f.errCorreo = i
-			break
-		}
-	}
+	f.errCorreo = primeraInvalida(f.correos, correoValido)
+	f.errWeb = primeraInvalida(f.webs, webValida)
 	cumple, vacia, fechaOK := ui.LeerFecha(f.cumple.Texto(), time.UTC)
 	// ponytail: una fecha mal tecleada solo pone el borde en rojo: el catálogo no tiene
 	// frase para ello porque en la web el `<input type="date">` no deja escribirla.
 	f.cumple.Invalida = !vacia && !fechaOK
 	f.cumple.Refresh()
+	aniv, sinAniv, anivOK := ui.LeerFecha(f.aniversario.Texto(), time.UTC)
+	f.aniversario.Invalida = !sinAniv && !anivOK
+	f.aniversario.Refresh()
 	f.rehacer()
-	if f.errNombre != "" || f.errCorreo >= 0 || f.cumple.Invalida {
+	if f.errNombre != "" || f.errCorreo >= 0 || f.errWeb >= 0 || f.cumple.Invalida || f.aniversario.Invalida {
 		return in, false
 	}
 
 	in.FormattedName, in.Organization, in.Note = nombre, strings.TrimSpace(f.org.Texto()), f.nota.Texto()
+	in.Title, in.Nickname = strings.TrimSpace(f.cargo.Texto()), strings.TrimSpace(f.apodo.Texto())
 	if strings.TrimSpace(in.Note) == "" {
 		in.Note = ""
 	}
+	// Un cumpleaños sin año no cabe en el campo de fecha: se conserva mientras no se
+	// elija una fecha, que lo sustituye (`form.birthdayPartial`), como en la web.
 	in.Birthday = ""
 	if !vacia {
-		in.Birthday = cumple.Format(time.DateOnly)
+		in.Birthday, in.BirthdayNoYear = cumple.Format(time.DateOnly), ""
 	}
 	in.Emails = nil
 	for _, x := range tipados(f.correos, f.principalCorreo, tiposCorreo) {
@@ -745,6 +838,11 @@ func (f *formulario) entrada() (api.ContactInput, bool) {
 	for _, x := range tipados(f.telefonos, f.principalTelefono, tiposTel) {
 		in.Phones = append(in.Phones, api.ContactPhone{Phone: x.valor, Type: x.tipo, IsPrimary: x.principal})
 	}
+	in.Anniversary = ""
+	if !sinAniv {
+		in.Anniversary = aniv.Format(time.DateOnly)
+	}
+	in.URLs, in.Related = f.enlaces()
 	in.Addresses = nil
 	for _, d := range f.direcciones {
 		a := api.ContactAddress{
@@ -758,6 +856,32 @@ func (f *formulario) entrada() (api.ContactInput, bool) {
 		}
 	}
 	return in, true
+}
+
+// primeraInvalida es la primera fila con un valor que no casa con la forma esperada,
+// o -1: el error se pinta solo debajo de esa, como en la web.
+func primeraInvalida(filas []*filaValor, forma *regexp.Regexp) int {
+	for i, x := range filas {
+		if v := strings.TrimSpace(x.valor.Texto()); v != "" && !forma.MatchString(v) {
+			return i
+		}
+	}
+	return -1
+}
+
+// enlaces son los sitios web y las personas relacionadas con valor, en su orden.
+func (f *formulario) enlaces() (urls []api.ContactURL, rel []api.ContactRelated) {
+	for _, x := range f.webs {
+		if v := strings.TrimSpace(x.valor.Texto()); v != "" {
+			urls = append(urls, api.ContactURL{URL: v, Type: tiposWeb[x.tipo.Elegida].valor})
+		}
+	}
+	for _, x := range f.relacionados {
+		if v := strings.TrimSpace(x.valor.Texto()); v != "" {
+			rel = append(rel, api.ContactRelated{Name: v, Type: tiposRelacion[x.tipo.Elegida].valor})
+		}
+	}
+	return urls, rel
 }
 
 // tipados es `toDetailed`: las filas con valor, con exactamente un principal (el

@@ -38,7 +38,7 @@ func TestTOTPSecretEncryptedAtRest(t *testing.T) {
 	st := store.NewWithCipher(h.Pool, cipher)
 	ctx := context.Background()
 
-	u := seedUser(t, ctx, st, "totp-enc@sytue.eu")
+	u := seedUser(ctx, t, st, "totp-enc@sytue.eu")
 	secret := []byte("0123456789abcdefghij") // 20 bytes, como un secreto TOTP real
 	if err := st.UpsertTOTPSecret(ctx, nil, u.ID, secret, true); err != nil {
 		t.Fatalf("UpsertTOTPSecret: %v", err)
@@ -71,7 +71,7 @@ func TestTOTPSecretEncryptedAtRest(t *testing.T) {
 // regeneración (invalida los anteriores).
 func TestRecoveryCodesLifecycle(t *testing.T) {
 	st, ctx := newStore(t)
-	u := seedUser(t, ctx, st, "rc@sytue.eu")
+	u := seedUser(ctx, t, st, "rc@sytue.eu")
 
 	_, hashes, err := domain.NewRecoveryCodes()
 	if err != nil {

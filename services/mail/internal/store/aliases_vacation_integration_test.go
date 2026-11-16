@@ -28,8 +28,8 @@ func TestAliasCRUDResolutionAndUniqueness(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
-	acc := seedAccount(t, ctx, st, "ada@sytue.eu")
-	other := seedAccount(t, ctx, st, "bob@sytue.eu")
+	acc := seedAccount(ctx, t, st, "ada@sytue.eu")
+	other := seedAccount(ctx, t, st, "bob@sytue.eu")
 
 	// Crear un alias de la cuenta de Ada.
 	al, err := st.CreateAlias(ctx, acc.ID, "ventas@sytue.eu")
@@ -93,9 +93,9 @@ func TestAliasUniquenessCrossTenant(t *testing.T) {
 	st := store.New(h.Pool)
 
 	ctxA := tenantCtx("acme")
-	accA := seedAccount(t, ctxA, st, "ada@sytue.eu")
+	accA := seedAccount(ctxA, t, st, "ada@sytue.eu")
 	ctxB := tenantCtx("globex")
-	accB := seedAccount(t, ctxB, st, "otra@sytue.eu")
+	accB := seedAccount(ctxB, t, st, "otra@sytue.eu")
 
 	// Tenant B no puede aliasar la PRIMARIA de una cuenta de tenant A (cross-tenant).
 	if _, err := st.CreateAlias(ctxB, accB.ID, "ada@sytue.eu"); !errors.Is(err, domain.ErrAliasExists) {
@@ -114,7 +114,7 @@ func TestVacationSetGetAndDedupe(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
-	acc := seedAccount(t, ctx, st, "ada@sytue.eu")
+	acc := seedAccount(ctx, t, st, "ada@sytue.eu")
 
 	// Sin configurar => desactivada (cero-valor, no error).
 	if v, err := st.GetVacation(ctx, acc.ID); err != nil || v.Enabled {
@@ -175,8 +175,8 @@ func TestMoveAccountAddress(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
-	acc := seedAccount(t, ctx, st, "ada@acme.sytue.eu")
-	otra := seedAccount(t, ctx, st, "bob@acme.sytue.eu")
+	acc := seedAccount(ctx, t, st, "ada@acme.sytue.eu")
+	otra := seedAccount(ctx, t, st, "bob@acme.sytue.eu")
 
 	movida, err := st.MoveAccountAddress(ctx, acc, "ada@acme.eu")
 	if err != nil {
@@ -226,7 +226,7 @@ func TestMoveAccountAddress(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListAliases: %v", err)
 	}
-	var direcciones []string
+	direcciones := make([]string, 0, len(alias))
 	for _, a := range alias {
 		direcciones = append(direcciones, a.Address)
 	}

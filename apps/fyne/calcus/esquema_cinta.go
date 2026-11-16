@@ -78,9 +78,9 @@ func (l *Libro) TextosRango(texto string) ([][]string, bool) {
 		return nil, false
 	}
 	var out [][]string
-	for f := r.R1; f <= min(r.R2, Filas-1); f++ {
+	for f := r.R1; f <= min(r.R2, MaxFilas-1); f++ {
 		fila := []string{}
-		for c := r.C1; c <= min(r.C2, Columnas-1); c++ {
+		for c := r.C1; c <= min(r.C2, MaxColumnas-1); c++ {
 			fila = append(fila, l.textoFiltro(c, f))
 		}
 		out = append(out, fila)

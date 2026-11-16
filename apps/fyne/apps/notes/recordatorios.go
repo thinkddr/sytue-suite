@@ -121,11 +121,15 @@ func (p *Pantalla) ponerRecordatorios(m map[string]api.NoteReminder) {
 
 // cargarRecordatorios pide los míos. Sin ellos la app sigue: solo falta el indicador.
 func (p *Pantalla) cargarRecordatorios() {
+	ctx, cancel := p.ctx()
+	defer cancel()
+	p.cargarRecordatoriosConContexto(ctx)
+}
+
+func (p *Pantalla) cargarRecordatoriosConContexto(ctx context.Context) {
 	if p.svc == nil || !p.hayRed() {
 		return
 	}
-	ctx, cancelar := p.ctx()
-	defer cancelar()
 	rs, err := p.svc.ListReminders(ctx)
 	if err != nil {
 		return
@@ -134,12 +138,15 @@ func (p *Pantalla) cargarRecordatorios() {
 	for _, r := range rs {
 		m[r.NoteID] = r
 	}
-	enHilo(func() { p.ponerRecordatorios(m); p.Repintar() })
+	p.enHilo(func() { //nolint:contextcheck // Rendering installs future actions that use the retained presenter lifetime.
+		p.ponerRecordatorios(m)
+		p.Repintar()
+	})
 }
 
 // guardarRecordatorio pone (con `in`) o quita (nil) mi recordatorio en una nota.
 func (p *Pantalla) guardarRecordatorio(nota string, in *api.NoteReminderInput) error {
-	ctx, cancelar := context.WithTimeout(context.Background(), p.Plazo)
+	ctx, cancelar := p.ctx()
 	defer cancelar()
 	var r api.NoteReminder
 	var err error
@@ -148,7 +155,7 @@ func (p *Pantalla) guardarRecordatorio(nota string, in *api.NoteReminderInput) e
 	} else {
 		err = p.svc.DeleteReminder(ctx, nota)
 	}
-	enHilo(func() {
+	p.enHilo(func() {
 		if err != nil {
 			p.fallo("reminder.failed", err)
 			return
@@ -253,14 +260,14 @@ func (p *Pantalla) dialogoRecordatorio(n Nota) {
 			return
 		}
 		d.Cerrar()
-		lanzar(func() error { return p.guardarRecordatorio(n.ID, &in) })
+		p.lanzar(func() error { return p.guardarRecordatorio(n.ID, &in) })
 	}).Con(ui.Primario, ui.TallaMD)
 	cancelar := ui.NuevoBoton(t("common.cancel", nil), func() { d.Cerrar() }).Con(ui.Fantasma, ui.TallaMD)
 	var quitar fyne.CanvasObject
 	if tiene {
 		quitar = ui.NuevoBoton(t("reminder.remove", nil), func() {
 			d.Cerrar()
-			lanzar(func() error { return p.guardarRecordatorio(n.ID, nil) })
+			p.lanzar(func() error { return p.guardarRecordatorio(n.ID, nil) })
 		}).Con(ui.Fantasma, ui.TallaMD)
 	}
 	acciones := sinNil([]fyne.CanvasObject{quitar})

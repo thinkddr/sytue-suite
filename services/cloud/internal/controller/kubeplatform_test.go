@@ -582,7 +582,8 @@ func TestVerifyDomainExigeTXT(t *testing.T) {
 		// CNAME y A apuntan al ingress, pero no hay TXT: es exactamente el caso del
 		// secuestro por DNS colgante y debe quedarse pendiente.
 		p.resolver = fakeResolverStub{}
-		ok, err := p.VerifyDomain(context.Background(), host, token, "ingress.sytue.eu")
+		check, err := p.VerifyDomain(context.Background(), host, token, "ingress.sytue.eu")
+		ok := check.Verified
 		if err != nil {
 			t.Fatalf("VerifyDomain: %v", err)
 		}
@@ -594,7 +595,8 @@ func TestVerifyDomainExigeTXT(t *testing.T) {
 	t.Run("TXT correcto verifica", func(t *testing.T) {
 		p, _ := newTestPlatform()
 		p.resolver = txtResolverStub{want: "_sytue-challenge." + host, txt: []string{token}}
-		ok, err := p.VerifyDomain(context.Background(), host, token, "ingress.sytue.eu")
+		check, err := p.VerifyDomain(context.Background(), host, token, "ingress.sytue.eu")
+		ok := check.Verified
 		if err != nil {
 			t.Fatalf("VerifyDomain: %v", err)
 		}
@@ -606,7 +608,8 @@ func TestVerifyDomainExigeTXT(t *testing.T) {
 	t.Run("token de OTRO dominio no verifica", func(t *testing.T) {
 		p, _ := newTestPlatform()
 		p.resolver = txtResolverStub{want: "_sytue-challenge." + host, txt: []string{"sytue-verify=de-otro"}}
-		ok, _ := p.VerifyDomain(context.Background(), host, token, "ingress.sytue.eu")
+		check, _ := p.VerifyDomain(context.Background(), host, token, "ingress.sytue.eu")
+		ok := check.Verified
 		if ok {
 			t.Error("un TXT con otro token no puede verificar")
 		}
@@ -615,7 +618,8 @@ func TestVerifyDomainExigeTXT(t *testing.T) {
 	t.Run("valor entrecomillado por el proveedor DNS", func(t *testing.T) {
 		p, _ := newTestPlatform()
 		p.resolver = txtResolverStub{want: "_sytue-challenge." + host, txt: []string{`"` + token + `"`}}
-		ok, _ := p.VerifyDomain(context.Background(), host, token, "ingress.sytue.eu")
+		check, _ := p.VerifyDomain(context.Background(), host, token, "ingress.sytue.eu")
+		ok := check.Verified
 		if !ok {
 			t.Error("debe tolerar el valor entre comillas")
 		}
@@ -625,7 +629,8 @@ func TestVerifyDomainExigeTXT(t *testing.T) {
 		p, _ := newTestPlatform()
 		// Un TXT vacío publicado por el atacante no debe colar si no hay reto.
 		p.resolver = txtResolverStub{want: "_sytue-challenge." + host, txt: []string{""}}
-		ok, _ := p.VerifyDomain(context.Background(), host, "", "ingress.sytue.eu")
+		check, _ := p.VerifyDomain(context.Background(), host, "", "ingress.sytue.eu")
+		ok := check.Verified
 		if ok {
 			t.Error("sin token emitido no puede haber verificación")
 		}
@@ -634,7 +639,8 @@ func TestVerifyDomainExigeTXT(t *testing.T) {
 	t.Run("DNS sin propagar sigue pendiente, no falla", func(t *testing.T) {
 		p, _ := newTestPlatform()
 		p.resolver = txtResolverStub{err: errors.New("NXDOMAIN")}
-		ok, err := p.VerifyDomain(context.Background(), host, token, "ingress.sytue.eu")
+		check, err := p.VerifyDomain(context.Background(), host, token, "ingress.sytue.eu")
+		ok := check.Verified
 		if err != nil {
 			t.Fatalf("un DNS sin propagar no es un error duro: %v", err)
 		}

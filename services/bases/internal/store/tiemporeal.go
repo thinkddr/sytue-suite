@@ -343,7 +343,7 @@ func aplicarCelda(ctx context.Context, tx pgx.Tx, a domain.Actor, base, tabla, r
 			return false, err
 		}
 	} else {
-		parcial, err := domain.ValidarParcial(campos, map[string]json.RawMessage{c.FieldID: c.Value})
+		parcial, err := domain.ValidarParcial(domain.ConRetiradas(campos, actual), map[string]json.RawMessage{c.FieldID: c.Value})
 		if err != nil {
 			return false, err
 		}

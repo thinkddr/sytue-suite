@@ -8,7 +8,9 @@ package bases
 import (
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -28,7 +30,10 @@ type Base struct {
 	Tablas   []api.BasesTable
 	Activa   string
 	Cargando bool
-	Fallo    string
+	// irA es la tabla y el registro que pide abrir un enlace (el aviso de un
+	// comentario): la ficha y sus comentarios se abren cuando llega la tabla.
+	irA   struct{ tabla, registro string }
+	Fallo string
 	// Estado es lo último que ha pasado (el `role="status"` de la web): un registro
 	// añadido, qué registros se ven tras cargar otra ventana, un valor pisado, dónde ha
 	// quedado lo exportado. En la web solo lo oye un lector de pantalla; aquí se lee.
@@ -44,6 +49,11 @@ type Base struct {
 	// registros, en rejilla).
 	Vistas  []api.BasesView
 	VistaID string
+	// lectura es la búsqueda y el orden de un momento encima de la vista (lectura.go);
+	// busqueda, su campo, el mismo entre repintados, y espera, el reloj de lo tecleado.
+	lectura  lectura
+	busqueda *ui.Entrada
+	espera   *time.Timer
 	// opciones y etiquetas son los registros de cada tabla enlazada, por id de tabla.
 	opciones  map[string][]opcion
 	etiquetas map[string]map[string]string
@@ -60,6 +70,13 @@ type Base struct {
 	enlaceNuevo   string
 	enlaceCopiado bool
 	falloEnlaces  string
+
+	// portadas son las miniaturas de la vista de galería (galeria.go).
+	portadas portadas
+	// rt es el tiempo real de la base (tiemporeal.go); nil sin servicio. propias son las
+	// operaciones de celda lanzadas desde aquí, para no volver a pedir su eco.
+	rt      *enVivo
+	propias opsPropias
 }
 
 // tabla es la tabla activa, o nil.
@@ -73,13 +90,23 @@ func (b *Base) tabla() *api.BasesTable {
 }
 
 // Abrir abre una base por su id y pide su estructura.
-func (p *Pantalla) Abrir(id string) {
+func (p *Pantalla) Abrir(id string) { p.AbrirEnlace(id, "", "") }
+
+// AbrirEnlace abre una base y, si llegan, la tabla y el registro de un aviso de
+// comentario (`?table=&record=`): la ficha de ese registro con su hilo abierto. Si la
+// tabla no se ve, se queda en la primera, como en la web.
+func (p *Pantalla) AbrirEnlace(id, tabla, registro string) {
+	p.dejarDeSeguir(p.abierta)
 	p.abierta = &Base{
 		ID: id, Cargando: true, vent: sinVentanas(),
 		opciones: map[string][]opcion{}, etiquetas: map[string]map[string]string{}, cupo: ui.NuevaEntrada(""),
 	}
 	p.abierta.cupo.Rotulo, p.abierta.cupo.Ancho = p.t("formlink.cupo"), 8*tema.Rem
 	p.abierta.cupo.PonerTexto("500")
+	if tabla != "" && registro != "" {
+		p.abierta.irA.tabla, p.abierta.irA.registro = tabla, registro
+	}
+	p.seguir(p.abierta)
 	p.Repintar()
 	p.cargarEstructura()
 }
@@ -117,13 +144,7 @@ func (p *Pantalla) cargarEstructura() {
 				return
 			}
 			b.Datos, b.Tablas, b.Fallo = datos, tablas, ""
-			activa := b.Activa
-			if b.tabla() == nil {
-				activa = ""
-				if len(tablas) > 0 {
-					activa = tablas[0].ID
-				}
-			}
+			activa := b.tablaInicial()
 			if activa != b.Activa || b.rejilla == nil {
 				p.elegirTabla(activa)
 				return
@@ -132,6 +153,23 @@ func (p *Pantalla) cargarEstructura() {
 			p.Repintar()
 		})
 	})
+}
+
+// tablaInicial es la tabla que se abre al llegar la estructura: la del enlace si se
+// ve, la activa si sigue existiendo, o la primera. Un enlace a una tabla que no se ve
+// se olvida, para no abrir la ficha de otro registro.
+func (b *Base) tablaInicial() string {
+	if slices.ContainsFunc(b.Tablas, func(t api.BasesTable) bool { return t.ID == b.irA.tabla }) {
+		return b.irA.tabla
+	}
+	b.irA.tabla, b.irA.registro = "", ""
+	if b.tabla() != nil {
+		return b.Activa
+	}
+	if len(b.Tablas) > 0 {
+		return b.Tablas[0].ID
+	}
+	return ""
 }
 
 // hacer lanza una escritura y, si falla, enseña su mensaje en la base abierta.
@@ -221,6 +259,8 @@ func (p *Pantalla) objetoBase(v tema.Variante) fyne.CanvasObject {
 			borrar.Peligro = true
 			menu := []fyne.CanvasObject{
 				ui.NuevoElementoMenu(p.t("base.rename"), iconos.Lapiz, p.renombrarBase),
+				ui.NuevoElementoMenu(p.t("base.editDescription"), iconos.Ninguno, p.editarDescripcion),
+				ui.NuevoElementoMenu(p.t("activity.open"), iconos.Reloj, func() { p.abrirActividad() }),
 				ui.NuevoElementoMenu(p.t("table.add"), iconos.Mas, p.nuevaTabla),
 			}
 			if p.Elegir != nil {
@@ -233,9 +273,15 @@ func (p *Pantalla) objetoBase(v tema.Variante) fyne.CanvasObject {
 		container.New(ui.Fila{}, volver),
 		container.New(extremos{Hueco: tema.Espacio(2), Centro: true}, linea...))
 	hijos := []fyne.CanvasObject{cabecera}
+	if d := strings.TrimSpace(b.Datos.Description); d != "" {
+		// `line-clamp-3 max-w-3xl`: la descripción, bajo el nombre.
+		hijos = append(hijos, ui.NuevoParrafo(d, tema.TextoSM, ui.Normal, "text-muted", v).
+			A(min(p.anchoContenido(), 48*tema.Rem)).Recortado(3))
+	}
 	if b.Fallo != "" {
 		hijos = append(hijos, alerta(b.Fallo, v))
 	}
+	hijos = append(hijos, p.objetoEnVivo(b, v)...)
 	// Arriba, con el fallo: al pie de una rejilla de cien filas no lo vería nadie.
 	if b.Estado != "" {
 		hijos = append(hijos, ui.NuevoParrafo(b.Estado, tema.TextoSM, ui.Normal, "text-muted", v).A(p.anchoContenido()))
@@ -244,15 +290,15 @@ func (p *Pantalla) objetoBase(v tema.Variante) fyne.CanvasObject {
 	case b.Cargando:
 		hijos = append(hijos, ui.NuevoEsqueleto(0, 12*tema.Rem))
 	case len(b.Tablas) == 0:
-		hijos = append(hijos, ui.NuevoRotulo(p.t("base.noTables"), tema.TextoSM, ui.Normal, "text-muted"))
+		// Sin tablas, añadir la primera (o importarla) es lo único que hay que hacer: va
+		// a la vista, y no solo en el menú.
+		vc := vacioDe(sinTablas, permisos{esquema: puedeEsquema(b.Datos.Role), escribir: puedeEscribir(b.Datos.Role)}, false)
+		hijos = append(hijos, p.vacioGuiado(vc, map[accionVacio]func(){
+			crearTabla:  p.nuevaTabla,
+			importarCsv: p.importarCSV,
+		}, false))
 	default:
 		hijos = append(hijos, container.New(ui.Columna{Hueco: tema.Espacio(4)}, p.pestanasDeTablas(), p.objetoTabla(v)))
-	}
-	// Sin tablas, añadir la primera es lo único que hay que hacer: va a la vista, y no
-	// solo en el menú.
-	if !b.Cargando && len(b.Tablas) == 0 && puedeEsquema(b.Datos.Role) {
-		anadir := ui.NuevoBoton(p.t("table.add"), p.nuevaTabla).ConIcono(iconos.Mas, 16)
-		hijos = append(hijos, container.New(ui.Fila{Hueco: tema.Espacio(2)}, anadir))
 	}
 	if b.Recalculando {
 		hijos = append(hijos, ui.NuevoRotulo(p.t("grid.recalculating"), tema.TextoSM, ui.Normal, "text-muted"))

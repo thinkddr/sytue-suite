@@ -48,3 +48,39 @@ func RangoDePeriodo(p string, hoy time.Time) (desde, hasta string) {
 	}
 	return "", ""
 }
+
+// PropuestaCierre es una fecha que se propone al cerrar el libro, con su rótulo.
+type PropuestaCierre struct {
+	Clave string // mesAnterior, trimestreAnterior o anioAnterior
+	Hasta string // YYYY-MM-DD
+}
+
+// rotuloPropuesta es `ROTULO_PROPUESTA`.
+var rotuloPropuesta = map[string]string{
+	"mesAnterior":       "close.endOfLastMonth",
+	"trimestreAnterior": "close.endOfLastQuarter",
+	"anioAnterior":      "close.endOfLastYear",
+}
+
+// PropuestasDeCierre es `propuestasDeCierre`: el último día del mes, del trimestre y del
+// año ya acabados —nunca después de hoy—. Las que coinciden (las tres en enero) salen
+// una vez, con el rótulo de la más amplia, que es lo que se está cerrando de verdad.
+func PropuestasDeCierre(hoy time.Time) []PropuestaCierre {
+	a, m := hoy.Year(), hoy.Month()
+	todas := []PropuestaCierre{
+		{"mesAnterior", iso(hoy, a, m, 0)},
+		{"trimestreAnterior", iso(hoy, a, m-(m-1)%3, 0)},
+		{"anioAnterior", iso(hoy, a, time.January, 0)},
+	}
+	var out []PropuestaCierre
+	for i, p := range todas {
+		repetida := false
+		for _, q := range todas[i+1:] {
+			repetida = repetida || q.Hasta == p.Hasta
+		}
+		if !repetida {
+			out = append(out, p)
+		}
+	}
+	return out
+}

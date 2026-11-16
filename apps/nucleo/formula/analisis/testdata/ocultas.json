@@ -1,0 +1,35 @@
+{
+  "_": "Vectores COMPARTIDOS de las filas y columnas ocultas a mano (`hiddenRows`, `hiddenCols`). Los leen la web (packages/office/test/sheets-ocultas-vectores.test.ts, contra sheets/ocultas.ts) y Go (ocultas_test.go). Unidades 0-based; un tramo es {start, end} con los dos extremos dentro. En `ocultar`, `esperado` null = no se puede (dejaría la rejilla sin nada a la vista).",
+  "casos": [
+    { "nombre": "sanear: ordena y junta los que se tocan", "op": "sanear", "max": 100, "crudo": [{ "start": 5, "end": 6 }, { "start": 1, "end": 2 }, { "start": 3, "end": 3 }], "esperado": [{ "start": 1, "end": 3 }, { "start": 5, "end": 6 }] },
+    { "nombre": "sanear: junta los que se solapan", "op": "sanear", "max": 100, "crudo": [{ "start": 2, "end": 8 }, { "start": 4, "end": 5 }, { "start": 7, "end": 10 }], "esperado": [{ "start": 2, "end": 10 }] },
+    { "nombre": "sanear: recorta a la rejilla y descarta lo que no vale", "op": "sanear", "max": 10, "crudo": [{ "start": -3, "end": 1 }, { "start": 8, "end": 40 }, { "start": 12, "end": 14 }, { "start": 5, "end": 4 }, { "start": "a", "end": 2 }, { "end": 3 }, 7, null], "esperado": [{ "start": 0, "end": 1 }, { "start": 8, "end": 9 }] },
+    { "nombre": "sanear: trunca los decimales y lee números en texto", "op": "sanear", "max": 100, "crudo": [{ "start": 2.7, "end": "4" }], "esperado": [{ "start": 2, "end": 4 }] },
+    { "nombre": "sanear: no es una lista", "op": "sanear", "max": 100, "crudo": { "start": 1, "end": 2 }, "esperado": [] },
+
+    { "nombre": "ocultar: en una hoja sin nada oculto", "op": "ocultar", "max": 100, "tramos": [], "a": 3, "b": 5, "esperado": [{ "start": 3, "end": 5 }] },
+    { "nombre": "ocultar: al revés también vale", "op": "ocultar", "max": 100, "tramos": [], "a": 5, "b": 3, "esperado": [{ "start": 3, "end": 5 }] },
+    { "nombre": "ocultar: se junta con el de al lado", "op": "ocultar", "max": 100, "tramos": [{ "start": 1, "end": 2 }, { "start": 6, "end": 6 }], "a": 3, "b": 5, "esperado": [{ "start": 1, "end": 6 }] },
+    { "nombre": "ocultar: recorta a la rejilla", "op": "ocultar", "max": 10, "tramos": [], "a": 8, "b": 20, "esperado": [{ "start": 8, "end": 9 }] },
+    { "nombre": "ocultar: todo menos una se puede", "op": "ocultar", "max": 10, "tramos": [], "a": 1, "b": 9, "esperado": [{ "start": 1, "end": 9 }] },
+    { "nombre": "ocultar: todas de golpe no", "op": "ocultar", "max": 10, "tramos": [], "a": 0, "b": 9, "esperado": null },
+    { "nombre": "ocultar: la última que quedaba no", "op": "ocultar", "max": 10, "tramos": [{ "start": 0, "end": 4 }, { "start": 6, "end": 9 }], "a": 5, "b": 5, "esperado": null },
+    { "nombre": "ocultar: lo que cae fuera de la rejilla no deja nada a la vista", "op": "ocultar", "max": 10, "tramos": [{ "start": 12, "end": 14 }], "a": 0, "b": 9, "esperado": null },
+
+    { "nombre": "mostrar: lo oculto dentro de la selección", "op": "mostrar", "tramos": [{ "start": 3, "end": 5 }], "a": 2, "b": 6, "esperado": [] },
+    { "nombre": "mostrar: parte un tramo", "op": "mostrar", "tramos": [{ "start": 2, "end": 9 }], "a": 4, "b": 6, "esperado": [{ "start": 2, "end": 3 }, { "start": 7, "end": 9 }] },
+    { "nombre": "mostrar: deja lo de fuera de la selección", "op": "mostrar", "tramos": [{ "start": 1, "end": 1 }, { "start": 4, "end": 4 }, { "start": 9, "end": 12 }], "a": 3, "b": 10, "esperado": [{ "start": 1, "end": 1 }, { "start": 11, "end": 12 }] },
+    { "nombre": "mostrar: sin nada dentro, el bloque de encima (la fila 1 oculta)", "op": "mostrar", "tramos": [{ "start": 0, "end": 2 }, { "start": 7, "end": 8 }], "a": 3, "b": 3, "esperado": [{ "start": 7, "end": 8 }] },
+    { "nombre": "mostrar: sin nada dentro, el bloque de debajo", "op": "mostrar", "tramos": [{ "start": 5, "end": 6 }], "a": 4, "b": 4, "esperado": [] },
+    { "nombre": "mostrar: sin nada dentro ni al lado, nada", "op": "mostrar", "tramos": [{ "start": 5, "end": 6 }], "a": 1, "b": 2, "esperado": [{ "start": 5, "end": 6 }] },
+
+    { "nombre": "mover: insertar delante desplaza", "op": "mover", "max": 100, "tramos": [{ "start": 3, "end": 4 }], "desde": 1, "cantidad": 1, "esperado": [{ "start": 4, "end": 5 }] },
+    { "nombre": "mover: insertar detrás no toca", "op": "mover", "max": 100, "tramos": [{ "start": 3, "end": 4 }], "desde": 5, "cantidad": 1, "esperado": [{ "start": 3, "end": 4 }] },
+    { "nombre": "mover: insertar dentro parte y deja lo nuevo a la vista", "op": "mover", "max": 100, "tramos": [{ "start": 3, "end": 5 }], "desde": 4, "cantidad": 1, "esperado": [{ "start": 3, "end": 3 }, { "start": 5, "end": 6 }] },
+    { "nombre": "mover: lo que se sale de la rejilla se pierde", "op": "mover", "max": 10, "tramos": [{ "start": 8, "end": 9 }], "desde": 0, "cantidad": 1, "esperado": [{ "start": 9, "end": 9 }] },
+    { "nombre": "mover: borrar delante sube", "op": "mover", "max": 100, "tramos": [{ "start": 6, "end": 7 }], "desde": 1, "cantidad": -2, "esperado": [{ "start": 4, "end": 5 }] },
+    { "nombre": "mover: borrar lo oculto lo quita", "op": "mover", "max": 100, "tramos": [{ "start": 3, "end": 4 }], "desde": 2, "cantidad": -4, "esperado": [] },
+    { "nombre": "mover: borrar un trozo lo recorta", "op": "mover", "max": 100, "tramos": [{ "start": 3, "end": 8 }], "desde": 5, "cantidad": -2, "esperado": [{ "start": 3, "end": 6 }] },
+    { "nombre": "mover: borrar lo que separa dos los junta", "op": "mover", "max": 100, "tramos": [{ "start": 1, "end": 2 }, { "start": 4, "end": 5 }], "desde": 3, "cantidad": -1, "esperado": [{ "start": 1, "end": 4 }] }
+  ]
+}

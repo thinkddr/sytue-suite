@@ -316,3 +316,221 @@ test('pending operations freeze mutable input and cannot report completion after
   abort.abort();
   await expect(repository.catalog(abort.signal)).rejects.toThrow();
 });
+
+test('binding is immutable and real history preserves empty-index pages and scanned counts', async () => {
+  const transport = new Memory();
+  const target = { room_id: room, device_id: 'DEVICE' };
+  const repository = new StorageRepository(scope, {
+    ...transport,
+    rooms: transport.rooms,
+    publication: target,
+    assertOpen: transport.assertOpen,
+    read: transport.read,
+    put: transport.put,
+    history: transport.history,
+  });
+  const binding = repository.binding();
+  expect(Object.isFrozen(binding)).toBe(true);
+  expect(Object.isFrozen(binding.rooms)).toBe(true);
+  expect(Object.isFrozen(binding.scope)).toBe(true);
+  expect(Object.isFrozen(binding.target)).toBe(true);
+  transport.rooms.push('!foreign:matrix.test');
+  target.room_id = '!foreign:matrix.test';
+  expect(binding.rooms).toEqual([room]);
+  expect(binding.target?.room_id).toBe(room);
+  transport.pages.set(JSON.stringify([room, null]), {
+    entries: [],
+    scanned: 4,
+    next: 'opaque-real-token',
+  });
+  const first = await repository.catalogHistory(room, null, 10);
+  expect(first).toEqual({ entries: [], scanned: 4, next: 'opaque-real-token' });
+  transport.pages.set(JSON.stringify([room, 'opaque-real-token']), {
+    entries: [entry('base')],
+    scanned: 7,
+    next: null,
+  });
+  expect(
+    (await repository.catalogHistory(room, 'opaque-real-token', 10)).entries[0]?.reference.event_id,
+  ).toBe('$base');
+  for (const page of [
+    { entries: [], scanned: 0, next: 'loop' },
+    { entries: [], scanned: 11, next: null },
+    { entries: [], scanned: 1, next: 'opaque-real-token' },
+    {
+      entries: [{ ...entry('base'), reference: ref('base', '!foreign:matrix.test') }],
+      scanned: 1,
+      next: null,
+    },
+  ]) {
+    transport.pages.set(JSON.stringify([room, 'opaque-real-token']), page);
+    await expect(repository.catalogHistory(room, 'opaque-real-token', 10)).rejects.toThrow();
+  }
+  await expect(repository.catalogHistory('!foreign:matrix.test', null, 10)).rejects.toThrow();
+});
+
+test('history cannot complete after cancellation or SDK lease revocation', async () => {
+  const transport = new Memory(),
+    repository = new StorageRepository(scope, transport);
+  let entered!: () => void, release!: () => void;
+  const ready = new Promise<void>((resolve) => {
+      entered = resolve;
+    }),
+    held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+  transport.history = async () => {
+    entered();
+    await held;
+    return { entries: [entry('base')], scanned: 1, next: null };
+  };
+  const abort = new AbortController();
+  const pending = repository.catalogHistory(room, null, 10, abort.signal);
+  await ready;
+  abort.abort();
+  release();
+  await expect(pending).rejects.toThrow();
+  transport.closed = true;
+  await expect(repository.catalogHistory(room, null, 10)).rejects.toThrow('closed');
+});
+
+test('publication views pin the original authority and retain per-call cancellation without rebinding the base repository', async () => {
+  const transport = new Memory() as Memory & StorageRecordTransport;
+  Object.assign(transport, { publication: { room_id: room, device_id: 'DEVICE' } });
+  transport.prepare = async (signal) => {
+    signal.throwIfAborted();
+  };
+  const record = createStorageRecord(scope, 'object', 'rev', 'content', bytes('{}'));
+  const lifetime = new AbortController(),
+    operation = new AbortController();
+  const calls: string[] = [];
+  const target = { room_id: room, device_id: 'DEVICE' };
+  transport.putAuthorized = async (txn, input, destination, policy, signal) => {
+    if (!signal) throw new Error('lost operation signal');
+    expect(signal.aborted).toBe(false);
+    expect(destination).toEqual({ room_id: room, device_id: 'DEVICE' });
+    await policy.authorize(txn, destination, signal);
+    return transport.put(txn, input);
+  };
+  const base = new StorageRepository(scope, transport);
+  const supplied = {
+    target,
+    signal: lifetime.signal,
+    assertOpen: () => lifetime.signal.throwIfAborted(),
+    authorize: async (txn: string, _target: unknown, signal: AbortSignal) => {
+      calls.push(txn);
+      signal.throwIfAborted();
+      if (txn === 'cancelled') {
+        operation.abort();
+        signal.throwIfAborted();
+      }
+    },
+  };
+  const view = base.withPublicationPolicy(supplied);
+  target.room_id = '!substituted:matrix.test';
+  supplied.authorize = async () => {
+    throw new Error('substituted authority');
+  };
+  await view.putRecord('first', record);
+  expect(calls).toEqual(['first']);
+  await expect(
+    view.putRecord('foreign', record, undefined, {
+      room_id: '!foreign:matrix.test',
+      device_id: 'DEVICE',
+    }),
+  ).rejects.toThrow();
+  await expect(view.putRecord('cancelled', record, operation.signal)).rejects.toThrow();
+  expect(transport.posts).toBe(1);
+  await base.putRecord('independent', record);
+  expect(transport.posts).toBe(2);
+  expect(calls).toEqual(['first', 'cancelled']);
+  lifetime.abort();
+  await expect(view.putRecord('late', record)).rejects.toThrow();
+  expect(transport.posts).toBe(2);
+  expect(() => view.withPublicationPolicy(supplied)).toThrow();
+});
+
+test('a publication policy never downgrades to an ordinary transport without an authorization boundary', () => {
+  const transport = new Memory() as Memory & StorageRecordTransport;
+  Object.assign(transport, { publication: { room_id: room, device_id: 'DEVICE' } });
+  const base = new StorageRepository(scope, transport),
+    controller = new AbortController();
+  expect(() =>
+    base.withPublicationPolicy({
+      target: { room_id: room, device_id: 'DEVICE' },
+      signal: controller.signal,
+      assertOpen: () => {},
+      authorize: async () => {},
+    }),
+  ).toThrow('unsupported');
+});
+
+// Metadata witnesses exercise the raw transport boundary only. They grant no
+// SDK provenance or atomic visibility; the consuming Go validator owns both.
+test('raw catalog forwards exact index bytes and leaves legacy object parsing strict', async () => {
+  const transport = new Memory(),
+    repository = new StorageRepository(scope, transport);
+  const original = entry('prepared');
+  const body = bytes(
+    '{"kind":"org.sytue.object.prepared.v1","batch_id":"batch","ordinal":0,"commit":' +
+      JSON.stringify(decodeStorageObject(original, scope).commit) +
+      '}',
+  );
+  const prepared = {
+    reference: original.reference,
+    record: createStorageRecord(scope, 'object', 'prepared', 'index', body),
+  };
+  const content = {
+    reference: ref('ignored_content'),
+    record: createStorageRecord(scope, 'object', 'content', 'content', bytes(precise)),
+  };
+  transport.pages.set(JSON.stringify([room, null]), {
+    entries: [prepared, content],
+    scanned: 3,
+    next: 'next-real-token',
+  });
+  const raw = await repository.rawCatalogHistory(room, null, 100);
+  expect(raw.scanned).toBe(3);
+  expect(raw.next).toBe('next-real-token');
+  expect(raw.entries.length).toBe(1);
+  expect(raw.entries[0]!.record.payload).toBe(prepared.record.payload);
+  expect(new TextDecoder().decode(storageJSONBytes(raw.entries[0]!.record.payload))).toBe(
+    new TextDecoder().decode(body),
+  );
+  await expect(repository.catalogHistory(room, null, 100)).rejects.toThrow();
+  transport.pages.set(JSON.stringify([room, 'next-real-token']), {
+    entries: [entry('ordinary')],
+    scanned: 1,
+    next: null,
+  });
+  expect((await repository.catalogHistory(room, 'next-real-token', 100)).entries.length).toBe(1);
+});
+
+test('raw catalog preserves scope, room, cursor and late-close cancellation fences', async () => {
+  for (const fault of ['scope', 'room', 'cursor', 'scanned', 'closed', 'cancel']) {
+    const transport = new Memory(),
+      repository = new StorageRepository(scope, transport),
+      controller = new AbortController();
+    const value = entry('ordinary');
+    if (fault === 'scope')
+      value.record = { ...value.record, scope: { ...scope, subject: 'foreign' } };
+    if (fault === 'room') value.reference = ref('ordinary', '!foreign:matrix.test');
+    transport.history = async () => {
+      if (fault === 'closed') transport.closed = true;
+      if (fault === 'cancel') controller.abort();
+      return {
+        entries: [value],
+        scanned: fault === 'scanned' ? 0 : 1,
+        next: fault === 'cursor' ? 'again' : null,
+      };
+    };
+    await expect(
+      repository.rawCatalogHistory(
+        room,
+        fault === 'cursor' ? 'again' : null,
+        100,
+        controller.signal,
+      ),
+    ).rejects.toThrow();
+  }
+});

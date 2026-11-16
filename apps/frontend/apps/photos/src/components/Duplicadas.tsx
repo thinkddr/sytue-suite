@@ -11,7 +11,7 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { Button, Checkbox, EmptyState, Icon, Illustration, Spinner, cx } from '@sytue/ui';
+import { Button, Checkbox, EmptyState, Icon, cx } from '@sytue/ui';
 import type { SytueUser } from '@sytue/auth';
 import type { Locale } from '@sytue/i18n';
 import {
@@ -26,10 +26,14 @@ import {
   type GrupoRepetido,
 } from '../client/photosApi.js';
 import { useT } from '../i18n/index.js';
+import { conAvisos, FalloDeCarga, useAvisoDeFallo } from './Fallo.js';
 import { Marco } from './Marco.js';
 import { Nav } from './Nav.js';
+import { EsqueletoDuplicadas } from './Esqueletos.js';
 
-export function Duplicadas({
+export const Duplicadas = conAvisos(Repetidas);
+
+function Repetidas({
   locale,
   user,
   hubBaseUrl,
@@ -40,7 +44,10 @@ export function Duplicadas({
 }): JSX.Element {
   const t = useT(locale);
   const [grupos, setGrupos] = useState<GrupoRepetido[] | null>(null);
+  // `error` es el aviso de un lote a medias, ya traducido; `fallo`, la carga que no llegó.
   const [error, setError] = useState('');
+  const [fallo, setFallo] = useState<unknown>(null);
+  const avisarFallo = useAvisoDeFallo(locale);
   const [aviso, setAviso] = useState('');
   const [trabajando, setTrabajando] = useState(false);
   const [ajustes, setAjustes] = useState<AjustesOrganizacion | null>(null);
@@ -52,16 +59,18 @@ export function Duplicadas({
       const nuevos = await guardarAjustesOrganizacion(excluir);
       setAjustes(nuevos);
     } catch (e) {
-      setError(String(e));
+      avisarFallo(e);
     } finally {
       setGuardandoAjustes(false);
     }
   };
 
+  const cargar = () => {
+    setFallo(null);
+    duplicadas().then(setGrupos).catch(setFallo);
+  };
   useEffect(() => {
-    duplicadas()
-      .then(setGrupos)
-      .catch((e) => setError(String(e)));
+    cargar();
     obtenerAjustesOrganizacion()
       .then(setAjustes)
       .catch(() => {});
@@ -81,7 +90,7 @@ export function Duplicadas({
       setAviso(t('dup.done', { count: bien }));
       if (bien < sobran.length) setError(t('gallery.trashFailed', { count: sobran.length - bien }));
     } catch (e) {
-      setError(String(e));
+      avisarFallo(e);
     } finally {
       setTrabajando(false);
     }
@@ -118,14 +127,16 @@ export function Duplicadas({
           </p>
         ) : null}
 
-        {grupos === null ? (
-          <Spinner />
+        {fallo !== null ? (
+          <FalloDeCarga locale={locale} fallo={fallo} alReintentar={cargar} />
+        ) : grupos === null ? (
+          <EsqueletoDuplicadas />
         ) : grupos.length === 0 ? (
           <EmptyState
             class="flex-1"
             title={t('dup.empty.title')}
             description={t('dup.empty.description')}
-            illustration={<Illustration name="emptyPhotos" />}
+            spot="emptyPhotos"
           />
         ) : (
           <>

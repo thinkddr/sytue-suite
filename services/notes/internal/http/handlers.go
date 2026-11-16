@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/notes/model"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
@@ -25,8 +26,9 @@ import (
 
 // Handlers sirve la API REST de Sytue Notepads sobre el store.
 type Handlers struct {
-	store *store.Store
-	cfg   config.Config
+	store     *store.Store
+	migration privateNotesSource
+	cfg       config.Config
 	// hub avisa de las peticiones de edición (peticiones.go). nil: sin aviso.
 	hub *hubnotify.Client
 	// avisados frena el aviso de «compartido contigo»: uno por recurso y persona cada
@@ -48,6 +50,10 @@ func sub(r *http.Request) string {
 // que no existe y uno al que no se tiene acceso se contestan IGUAL (404): decir
 // «existe pero no puedes» ya filtra la existencia.
 func traducir(err error) error {
+	err = store.PrivateStorageError(err)
+	if mapped := privateNotesAPIError(err); mapped != nil {
+		return mapped
+	}
 	switch {
 	case errors.Is(err, domain.ErrNotFound), errors.Is(err, domain.ErrForbidden):
 		return httpx.ErrNotFound.Wrap(err)
@@ -61,10 +67,14 @@ func traducir(err error) error {
 		return httpx.NewError(http.StatusConflict, "encrypted_client_upgrade_required", "Update the application before editing encrypted notes.").Wrap(err)
 	case errors.Is(err, domain.ErrBackendWriteUpgrade):
 		return httpx.NewError(http.StatusServiceUnavailable, "notes_backend_upgrade_required", "Notes needs a backend update before changes can be saved. Your existing notes are preserved.").Wrap(err)
+	case errors.Is(err, model.ErrEncryptedBackupReview):
+		return httpx.NewError(http.StatusConflict, "encrypted_backup_review_required", "This backup requires recovery on an authorized device. Its original is unchanged.").Wrap(err)
 	case errors.Is(err, domain.ErrEncryptedMigrationRequired):
 		return httpx.NewError(http.StatusConflict, "encrypted_content_migration_required", "Unlock and migrate the encrypted note before editing it.").Wrap(err)
 	case errors.Is(err, domain.ErrNoteChanged):
 		return httpx.NewError(http.StatusConflict, "note_changed", "The note changed. Reload it before migrating.").Wrap(err)
+	case errors.Is(err, domain.ErrNoteEditConflict):
+		return httpx.NewError(http.StatusConflict, "note_edit_conflict", "The note was saved from another device. Choose which version to keep.").Wrap(err)
 	case errors.Is(err, domain.ErrNotebookCryptoChanged):
 		return httpx.NewError(http.StatusConflict, "notebook_crypto_changed", "The notebook encryption changed. Unlock it again before migrating.").Wrap(err)
 	case errors.Is(err, domain.ErrNotePageTooLarge):
@@ -393,17 +403,37 @@ func (h *Handlers) papelera(w http.ResponseWriter, r *http.Request, fn func(cont
 	httpx.NoContent(w)
 }
 
-// ListTrash lista la papelera de quien pregunta.
+// ListTrash lista la papelera de quien pregunta: cada nota con su cuaderno y cuándo
+// se vaciará sola, y `retention_days` (0 = la purga está apagada).
 func (h *Handlers) ListTrash(w http.ResponseWriter, r *http.Request) {
 	notes, err := h.store.ListTrash(r.Context(), sub(r), limiteDeQuery(r, 100))
 	if err != nil {
 		httpx.Fail(w, r, traducir(err))
 		return
 	}
+	httpx.JSON(w, r, http.StatusOK, respuestaPapelera(notes, h.cfg.TrashRetention))
+}
+
+// respuestaPapelera pone a cada nota su `purge_at` con la misma cuenta que la purga
+// (`deleted_at + retention`, retencion.go) para que el cliente no tenga que conocer el
+// plazo ni rehacerla: si el plazo cambia, cambia aquí y en ningún sitio más.
+func respuestaPapelera(notes []domain.TrashedNote, retention time.Duration) map[string]any {
 	if notes == nil {
-		notes = []domain.Note{}
+		notes = []domain.TrashedNote{}
 	}
-	httpx.JSON(w, r, http.StatusOK, map[string]any{"notes": notes})
+	for i := range notes {
+		notes[i].PurgeAt = nil
+		if retention > 0 && !notes[i].Held {
+			cuando := notes[i].DeletedAt.Add(retention)
+			notes[i].PurgeAt = &cuando
+		}
+	}
+	// Días ENTEROS hacia arriba: un plazo de 36 h no se anuncia como «1 día».
+	dias := 0
+	if retention > 0 {
+		dias = int((retention + 24*time.Hour - 1) / (24 * time.Hour))
+	}
+	return map[string]any{"notes": notes, "retention_days": dias}
 }
 
 // ---------------------------------------------------------------------------

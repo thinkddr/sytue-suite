@@ -525,6 +525,36 @@ type OrgUser struct {
 	Location      string
 }
 
+// FiltroUsuarios acota el directorio a uno de los estados que la portada de la
+// consola cuenta como «hay que mirarlo». Los valores son los nombres de los
+// recuentos de /admin/insights (without_mfa, suspended, unverified_email): el
+// aviso enlaza al filtro con la misma palabra con la que lo cuenta.
+type FiltroUsuarios string
+
+// Filtros del directorio. Vacío = sin filtro.
+const (
+	FiltroSinMFA       FiltroUsuarios = "without_mfa"
+	FiltroSuspendidos  FiltroUsuarios = "suspended"
+	FiltroSinVerificar FiltroUsuarios = "unverified_email"
+)
+
+// condicionFiltro es el predicado SQL de cada filtro sobre `users u`. Es la
+// MISMA expresión con la que OrgInsightsFor cuenta: si el aviso dice «3 personas
+// sin verificación en dos pasos» y el enlace lleva a una lista de 5 —porque una
+// cuenta mira solo las activas y la otra no—, el aviso deja de creerse.
+var condicionFiltro = map[FiltroUsuarios]string{
+	FiltroSinMFA:       `u.status = 'active' AND NOT u.mfa_enabled`,
+	FiltroSuspendidos:  `u.status = 'suspended'`,
+	FiltroSinVerificar: `u.status = 'active' AND NOT u.email_verified`,
+}
+
+// FiltroUsuariosValido dice si `f` es un filtro que el directorio entiende. El
+// vacío también lo es: es «sin filtro».
+func FiltroUsuariosValido(f FiltroUsuarios) bool {
+	_, ok := condicionFiltro[f]
+	return ok || f == ""
+}
+
 // ListOrgUsersPage lista los usuarios miembros de una organización ordenados por
 // (created_at, id) DESC con paginación keyset — WHERE (created_at, id) < ($ts, $id),
 // sin OFFSET; el índice users_created_at_id_desc_idx (0007) sirve el ORDER BY y
@@ -538,9 +568,17 @@ type OrgUser struct {
 // respuesta vacía. El keyset sigue valiendo con el filtro puesto: el orden no
 // cambia, solo se recorren menos filas.
 //
+// `filtro` acota a un estado (FiltroUsuarios; vacío = todos). Va en el servidor
+// por lo mismo que `q`: «quién no tiene segundo factor» sobre las cincuenta
+// primeras filas no es la respuesta, es una muestra. Un filtro desconocido es un
+// error de quien llama, no una lista entera: ErrInvalidInput.
+//
 // Endpoint admin de Console. El listado SCIM usa ListUsers (startIndex/count,
 // RFC 7644) y NO debe tocarse.
-func (s *Store) ListOrgUsersPage(ctx context.Context, orgID, q string, after *UserCursor, limit int) ([]OrgUser, bool, error) {
+func (s *Store) ListOrgUsersPage(ctx context.Context, orgID, q string, filtro FiltroUsuarios, after *UserCursor, limit int) ([]OrgUser, bool, error) {
+	if !FiltroUsuariosValido(filtro) {
+		return nil, false, domain.ErrInvalidInput
+	}
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
@@ -562,6 +600,9 @@ func (s *Store) ListOrgUsersPage(ctx context.Context, orgID, q string, after *Us
 	if term := strings.TrimSpace(q); term != "" {
 		args = append(args, "%"+escapeLike(term)+"%")
 		conds = append(conds, fmt.Sprintf(`u.search_text LIKE plegar($%d) ESCAPE '\'`, len(args)))
+	}
+	if c := condicionFiltro[filtro]; c != "" {
+		conds = append(conds, "("+c+")")
 	}
 	where := ""
 	if len(conds) > 0 {

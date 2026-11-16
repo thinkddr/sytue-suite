@@ -9,6 +9,7 @@
  * El secreto solo se ESCRIBE (nunca vuelve). Solo @sytue/ui. Graphite & Brass.
  */
 import { useState, useEffect } from 'preact/hooks';
+import { accionPedida } from '../lib/paleta.js';
 import {
   Badge,
   Button,
@@ -25,6 +26,7 @@ import {
   ToastProvider,
   useToast,
   ConfirmDialog,
+  cx,
 } from '@sytue/ui';
 import { formatDateTime, formatList, formatNumber, type Locale } from '@sytue/i18n';
 import AppMap from './AppMap.js';
@@ -184,6 +186,11 @@ function Inner({ locale, catalog, instances, live, productChoices }: AppsPanelPr
   const [items, setItems] = useState<ConnectedInstance[]>(instances);
   const [choices, setChoices] = useState<ProductChoice[]>(productChoices);
   const [wizard, setWizard] = useState<{ open: boolean; app?: CatalogApp }>({ open: false });
+  // Llegada desde la paleta ⌘K (`?accion=`): se abre al montar y no en el estado
+  // inicial, para que el HTML del servidor y la hidratación coincidan.
+  useEffect(() => {
+    if (accionPedida('conectar-app')) setWizard({ open: true });
+  }, []);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmDel, setConfirmDel] = useState<ConnectedInstance | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<ConnectedInstance | null>(null);
@@ -261,7 +268,7 @@ function Inner({ locale, catalog, instances, live, productChoices }: AppsPanelPr
       setBusyId(null);
     }
   }
-  const [runs, setRuns] = useState<Record<string, SyncRun | 'loading' | 'error'>>({});
+  const [runs, setRuns] = useState<Record<string, SyncRun | 'loading' | 'none' | 'error'>>({});
 
   // Tras cambiar quién sirve un producto se relee el mapa entero en vez de parchear el
   // estado local: activar o desactivar una conexión también lo altera, y reconstruirlo
@@ -356,8 +363,10 @@ function Inner({ locale, catalog, instances, live, productChoices }: AppsPanelPr
       const res = (await fetch(`/api/admin/apps/instances/${inst.id}/sync-runs?limit=1`).then(
         (r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))),
       )) as { sync_runs?: SyncRun[] };
+      // Sin pasadas no es un fallo: antes las dos cosas se decían «aún no hay
+      // sincronizaciones», y un servicio caído se leía como una app recién conectada.
       const last = res.sync_runs?.[0];
-      setRuns((r) => ({ ...r, [inst.id]: last ?? 'error' }));
+      setRuns((r) => ({ ...r, [inst.id]: last ?? 'none' }));
     } catch {
       setRuns((r) => ({ ...r, [inst.id]: 'error' }));
     }
@@ -448,7 +457,7 @@ function Inner({ locale, catalog, instances, live, productChoices }: AppsPanelPr
             <EmptyState
               title={t('apps.empty.title')}
               description={t('apps.empty.description')}
-              illustration={<Icon name="globe" size={28} />}
+              icon="globe"
               action={
                 <Button
                   variant="primary"
@@ -482,8 +491,11 @@ function Inner({ locale, catalog, instances, live, productChoices }: AppsPanelPr
                         </p>
                         {run === 'loading' ? (
                           <p class="sytue-meta mt-1">{t('common.loading')}</p>
-                        ) : run === 'error' ? (
-                          <p class="sytue-meta mt-1">{t('apps.runs.none')}</p>
+                        ) : run === 'error' || run === 'none' ? (
+                          // Una línea de estado dentro de la tarjeta, no un vacío de panel.
+                          <p class={cx('sytue-meta mt-1', run === 'error' && 'text-danger-text')}>
+                            {run === 'error' ? t('apps.runs.failed') : t('apps.runs.none')}
+                          </p>
                         ) : run ? (
                           <p class="sytue-meta mt-1">
                             {t('apps.runs.last', {
@@ -584,7 +596,7 @@ function Inner({ locale, catalog, instances, live, productChoices }: AppsPanelPr
             <EmptyState
               title={t('apps.catalog.emptyTitle')}
               description={t('apps.catalog.emptyDescription')}
-              illustration={<Icon name="globe" size={28} />}
+              icon="globe"
             />
           </Card>
         ) : available.length === 0 ? (

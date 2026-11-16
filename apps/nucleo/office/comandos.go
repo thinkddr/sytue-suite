@@ -4,9 +4,11 @@
 package office
 
 import (
+	"bytes"
 	_ "embed"
 	"encoding/json"
 	"slices"
+	"strings"
 	"sync"
 )
 
@@ -94,6 +96,33 @@ func Comandos() map[string]Comando {
 	return out
 }
 
+// orden son los ids en el orden del JSON, que es el de la web (`Object.keys(COMANDOS)`):
+// lo que se enseña en lista (la hoja de atajos) tiene que salir igual en las dos, y un
+// mapa de Go no tiene orden.
+var orden = sync.OnceValue(func() []string {
+	dec := json.NewDecoder(bytes.NewReader(datosComandos))
+	if t, err := dec.Token(); err != nil || t != json.Delim('{') {
+		panic("invalid Office command registry")
+	}
+	var ids []string
+	for dec.More() {
+		t, err := dec.Token()
+		id, ok := t.(string)
+		if err != nil || !ok {
+			panic("invalid Office command registry")
+		}
+		var fila json.RawMessage
+		if err := dec.Decode(&fila); err != nil {
+			panic("invalid Office command registry")
+		}
+		ids = append(ids, id)
+	}
+	return ids
+})
+
+// IDsEnOrden devuelve los ids del registro en el orden en que están escritos (el de la web).
+func IDsEnOrden() []string { return slices.Clone(orden()) }
+
 // BuscarComando devuelve la fila de un comando, o false si el registro no la tiene.
 func BuscarComando(id string) (Comando, bool) {
 	c, ok := comandos()[id]
@@ -157,4 +186,67 @@ func BuscarPestana(id string) (Pestana, int, bool) {
 		}
 	}
 	return Pestana{}, -1, false
+}
+
+// ComandoDelAtajo es `comandoDelAtajo` de la web (`editor/comandos.ts`): el comando y el
+// valor que dispara la combinación `teclas` en un lienzo de ese tipo, o false. `teclas` va
+// escrita como en el registro («Ctrl+Shift+L», «Ctrl+Alt+1», «Ctrl+]»), con «Ctrl» por la
+// tecla de atajos del sistema (⌘ en un Mac); la última tecla no distingue mayúsculas.
+//
+// Como en la web, el texto editable (folio, caja de Diapos) pregunta con [Documento], y los
+// atajos marcados `canvas` no se devuelven: los atiende el propio editor (su historial).
+// Recorre las filas en orden de id para que el resultado no dependa del de un mapa (el
+// registro ya prohíbe dos filas con la misma combinación en un tipo).
+func ComandoDelAtajo(teclas, kind string) (id, valor string, ok bool) {
+	pedido, bien := leerTeclas(teclas)
+	if !bien {
+		return "", "", false
+	}
+	filas := comandos()
+	ids := make([]string, 0, len(filas))
+	for id := range filas {
+		ids = append(ids, id)
+	}
+	slices.Sort(ids)
+	for _, id := range ids {
+		c := filas[id]
+		if !c.Existe(kind) {
+			continue
+		}
+		for _, a := range c.Shortcuts {
+			if a.Canvas {
+				continue
+			}
+			if t, ok := leerTeclas(a.Keys); ok && t == pedido {
+				return id, a.Value, true
+			}
+		}
+	}
+	return "", "", false
+}
+
+// teclas es una combinación leída: los modificadores y la tecla, en minúsculas.
+type teclas struct {
+	shift, alt bool
+	tecla      string
+}
+
+// leerTeclas lee «Ctrl+Shift+X»; sin «Ctrl» no es un atajo de comando.
+func leerTeclas(s string) (teclas, bool) {
+	partes := strings.Split(s, "+")
+	if len(partes) < 2 || partes[0] != "Ctrl" {
+		return teclas{}, false
+	}
+	t := teclas{tecla: strings.ToLower(partes[len(partes)-1])}
+	for _, m := range partes[1 : len(partes)-1] {
+		switch m {
+		case "Shift":
+			t.shift = true
+		case "Alt":
+			t.alt = true
+		default:
+			return teclas{}, false
+		}
+	}
+	return t, t.tecla != ""
 }

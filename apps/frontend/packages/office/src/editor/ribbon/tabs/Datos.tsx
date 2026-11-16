@@ -335,6 +335,7 @@ export function DatosTab(): JSX.Element {
           icon="close"
           onAction={() => dispatchSheetCommand('delcol')}
         />
+        <HideShowMenu />
       </RibbonGroup>
 
       <RibbonSeparator />
@@ -508,6 +509,74 @@ function TextToColumnsMenu(): JSX.Element {
               </button>
             ))}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Ocultar y mostrar filas o columnas (sheets/ocultas.ts) ----------
+ * El «Ocultar y mostrar» del botón Formato de cualquier hoja: cuatro órdenes sobre la
+ * selección. «Mostrar» abarca lo oculto que haya dentro de la selección o, si no hay nada,
+ * el bloque que la toca: así se recupera la fila 1, que no hay forma de rodear. */
+
+const HIDE_SHOW_ITEMS: { axis: 'row' | 'col'; op: 'hide' | 'show'; key: DocsKey }[] = [
+  { axis: 'row', op: 'hide', key: 'data.hideRows' },
+  { axis: 'row', op: 'show', key: 'data.showRows' },
+  { axis: 'col', op: 'hide', key: 'data.hideCols' },
+  { axis: 'col', op: 'show', key: 'data.showCols' },
+];
+
+const HIDE_SHOW_ITEM =
+  'flex w-full items-center rounded-sm px-2.5 py-1.5 text-left text-sm text-text ' +
+  'hover:bg-bg-subtle focus-visible:bg-bg-subtle focus-visible:outline-none';
+
+function HideShowMenu(): JSX.Element {
+  const bloqueado = useBloqueado('hide');
+  const t = useT();
+  const { open, setOpen, rootRef } = usePopover();
+  return (
+    <div ref={rootRef} class="relative">
+      <button
+        type="button"
+        class={
+          'disabled:pointer-events-none disabled:opacity-40 ' +
+          'text-text-muted inline-flex h-7 w-7 items-center justify-center rounded-sm ' +
+          'hover:bg-bg-subtle hover:text-text aria-expanded:bg-selected aria-expanded:text-text ' +
+          FOCUS_RING
+        }
+        aria-label={t('data.hideShow')}
+        title={t('data.hideShow')}
+        aria-haspopup="true"
+        aria-expanded={open}
+        disabled={bloqueado}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => setOpen(!open)}
+      >
+        <EditorIcon name="eye" />
+      </button>
+      {open && (
+        <div
+          role="group"
+          aria-label={t('data.hideShow')}
+          class={`${POPOVER_SHELL} left-0 w-48 p-1`}
+        >
+          {HIDE_SHOW_ITEMS.flatMap((it, i) => [
+            ...(i === 2 ? [<div key="sep" aria-hidden="true" class="bg-border my-1 h-px" />] : []),
+            <button
+              key={it.key}
+              type="button"
+              class={HIDE_SHOW_ITEM}
+              // La selección de la rejilla es lo que se oculta: el foco no se le quita.
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                dispatchSheetCommand('hide', JSON.stringify({ axis: it.axis, op: it.op }));
+                setOpen(false);
+              }}
+            >
+              {t(it.key)}
+            </button>,
+          ])}
         </div>
       )}
     </div>

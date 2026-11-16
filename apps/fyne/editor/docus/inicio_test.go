@@ -192,14 +192,14 @@ func TestLaPestanaInsertarEsLaDeLaWeb(t *testing.T) {
 	f := folioCon(t, `<p>x</p><table><tbody><tr><td>a</td></tr></tbody></table>`)
 	f.mover(punto{0, 0}, false)
 	quiero := "insert.table insert.image blocks.shapes blocks.chart smartart.insertOrEdit insert.link insert.horizontalRule insert.pageBreak insert.symbol " +
-		"insert.header insert.footer insert.pageNumber insert.differentFirstPage insert.comment"
+		"insert.header insert.footer insert.pageNumber insert.differentFirstPage form.fill form.responses insert.comment"
 	if got := strings.Join(botones(f), " "); got != quiero {
 		t.Errorf("Insertar fuera de una tabla:\n  hay     %s\n  quería  %s", got, quiero)
 	}
 	f.mover(punto{1, 0}, false)
 	quiero = "insert.table table.rowAbove table.rowBelow table.colLeft table.colRight sheet.merge table.splitCell " +
 		"table.cellColor selector table.delete insert.image blocks.shapes blocks.chart smartart.insertOrEdit insert.link insert.horizontalRule insert.pageBreak insert.symbol " +
-		"insert.header insert.footer insert.pageNumber insert.differentFirstPage insert.comment"
+		"insert.header insert.footer insert.pageNumber insert.differentFirstPage form.fill form.responses insert.comment"
 	if got := strings.Join(botones(f), " "); got != quiero {
 		t.Errorf("Insertar dentro de una tabla:\n  hay     %s\n  quería  %s", got, quiero)
 	}

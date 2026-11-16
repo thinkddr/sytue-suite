@@ -207,6 +207,8 @@ type Config struct {
 	// RoomsURL es la raíz interna de Sytue Rooms, a donde se publica. Sin ella el correo
 	// a canal queda apagado aunque haya dominio: no habría a quién entregar.
 	RoomsURL string
+	// Dedicated Rooms authority credential; never the Hub notification secret.
+	RoomsInternalSecret string
 	// CalendarURL es la raíz interna de Sytue Calendar, a donde se pasan los REPLY de
 	// las invitaciones que contestan por correo (iMIP). Vacía: se quedan en el buzón.
 	CalendarURL string
@@ -309,6 +311,7 @@ func Load() (Config, error) {
 		InboundWebhookToken:   l.Get("INBOUND_WEBHOOK_TOKEN"),
 		ChannelMailDomain:     l.Get("CHANNEL_MAIL_DOMAIN"),
 		RoomsURL:              l.Get("ROOMS_URL"),
+		RoomsInternalSecret:   l.Get("ROOMS_INTERNAL_SECRET"),
 		CalendarURL:           l.Get("CALENDAR_INTERNAL_URL"),
 		AliasSistema:          l.GetCSV("MAIL_SYSTEM_ALIASES"),
 		MaxInboundPerMinPerIP: l.GetIntDefault("MAX_INBOUND_PER_MIN_PER_IP", 60),

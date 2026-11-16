@@ -1,0 +1,3 @@
+-- SPDX-License-Identifier: Apache-2.0
+-- Public SDK historical capture and pre-epoch cancellation race fence.
+-- sytue:resource-roster-evidence-v1

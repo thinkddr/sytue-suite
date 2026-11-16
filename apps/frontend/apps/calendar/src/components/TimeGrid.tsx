@@ -14,9 +14,9 @@ import type { Locale } from '@sytue/i18n';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { cx, usePointerDrag, useToast } from '@sytue/ui';
 import type { GridEvent } from './CalendarGrid.js';
-import { eventInstant, parseTzid, isToday, timeLabel } from './dates.js';
+import { eventInstant, parseTzid, isToday, isoWeek, timeLabel } from './dates.js';
 import { DiaDeSemana } from './DiaDeSemana.js';
-import { parseRecurrence } from '../lib/ical.js';
+import { tieneRepeticion } from '../lib/ical.js';
 import {
   dayMinutes,
   layoutTimed,
@@ -62,6 +62,15 @@ interface Props {
   onCreateRange: (start: Date, end: Date) => void;
   /** Persistir un mover/redimensionar; el llamador recarga al terminar. */
   onMoveResize: (event: GridEvent, start: Date, end: Date) => Promise<void>;
+  /**
+   * Jornada laboral [inicio, fin) en horas: la rejilla se abre en su comienzo y las
+   * horas de fuera se atenúan. Por defecto, de 9 a 18.
+   */
+  jornada?: readonly [number, number] | undefined;
+  /** Minutos del evento que nace de un clic sin arrastre. Por defecto, una hora. */
+  duracion?: number | undefined;
+  /** Número de semana ISO en la esquina de la cabecera (vista semana). */
+  numeroSemana?: boolean | undefined;
 }
 
 interface TimedBlock {
@@ -133,6 +142,9 @@ export function TimeGrid({
   onSelectEvent,
   onCreateRange,
   onMoveResize,
+  jornada = [9, 18],
+  duracion = 60,
+  numeroSemana = false,
 }: Props): JSX.Element {
   const t = useT(locale);
   const toast = useToast();
@@ -160,7 +172,7 @@ export function TimeGrid({
         start: eventInstant(ev.start, tz),
         end: ev.end ? eventInstant(ev.end, tz) : null,
         allDay: /^\d{8}$/.test(ev.start),
-        recurring: Boolean(ev.ical && parseRecurrence(ev.ical)),
+        recurring: tieneRepeticion(ev.ical),
       };
     });
     return days.map((day) => {
@@ -216,11 +228,12 @@ export function TimeGrid({
     setPending(null);
   }, [events]);
 
-  // Al abrir, encuadra la franja laboral: hoy → hora actual; si no, 08:00.
+  // Al abrir, encuadra la franja laboral: hoy → hora actual; si no, una hora antes
+  // del comienzo de la jornada (por defecto, las 08:00).
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const focusMin = days.some(isToday) ? currentMinutes() : 8 * 60;
+    const focusMin = days.some(isToday) ? currentMinutes() : (jornada[0] - 1) * 60;
     el.scrollTop = Math.max(0, (focusMin - 60) * PX_PER_MIN);
     // Solo al montar; navegar de semana conserva el desplazamiento.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -330,8 +343,8 @@ export function TimeGrid({
       const lo = Math.min(d.anchorMin, d.curMin);
       const hi = Math.max(d.anchorMin, d.curMin);
       const day = days[d.dayIdx]!;
-      // Clic sin arrastre → evento de 1 h; arrastre → el rango pintado.
-      const endMin = hi - lo < snap ? Math.min(DAY_MINUTES, lo + 60) : hi;
+      // Clic sin arrastre → evento de la duración de los ajustes; arrastre → el rango pintado.
+      const endMin = hi - lo < snap ? Math.min(DAY_MINUTES, lo + duracion) : hi;
       onCreateRange(dateAtMinute(day, lo), dateAtMinute(day, endMin));
       return;
     }
@@ -364,7 +377,7 @@ export function TimeGrid({
             que pasan por debajo («07:00») se leían a través, encima de «15 min». */}
         <div class="sytue-glass-surface bg-surface sticky top-0 z-30">
           <div class="border-border flex border-b">
-            <div class="flex w-14 shrink-0 items-center justify-center">
+            <div class="flex w-14 shrink-0 flex-col items-center justify-center">
               <button
                 type="button"
                 onClick={() => setSnap((s) => (s === SNAP_MIN ? 30 : SNAP_MIN))}
@@ -377,6 +390,12 @@ export function TimeGrid({
               >
                 {t('grid.snapValue', { count: snap })}
               </button>
+              {numeroSemana && days[0] ? (
+                <span data-numero-semana="" class="sytue-meta-dense tabular-nums">
+                  <span aria-hidden="true">{isoWeek(days[0])}</span>
+                  <span class="sr-only">{t('grid.weekNumber', { week: isoWeek(days[0]) })}</span>
+                </span>
+              ) : null}
             </div>
             <div
               class="grid flex-1"
@@ -480,6 +499,24 @@ export function TimeGrid({
                 }}
                 onPointerDown={(e) => startCreate(e, di)}
               >
+                {/* Fuera de la jornada, la columna se atenúa: no se puede pulsar
+                    distinto, solo se lee qué horas son de trabajo. */}
+                {jornada[0] > 0 ? (
+                  <div
+                    aria-hidden="true"
+                    data-fuera-de-jornada=""
+                    class="bg-bg-subtle/50 pointer-events-none absolute inset-x-0 top-0"
+                    style={{ height: `${jornada[0] * HOUR_PX}px` }}
+                  />
+                ) : null}
+                {jornada[1] < 24 ? (
+                  <div
+                    aria-hidden="true"
+                    data-fuera-de-jornada=""
+                    class="bg-bg-subtle/50 pointer-events-none absolute inset-x-0 bottom-0"
+                    style={{ top: `${jornada[1] * HOUR_PX}px` }}
+                  />
+                ) : null}
                 {timed.map((block) =>
                   block.event.href === activeHref ? null : (
                     <EventBlock

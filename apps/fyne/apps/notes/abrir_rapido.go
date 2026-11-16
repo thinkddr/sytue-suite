@@ -136,7 +136,7 @@ func (p *Pantalla) abrirIrA() {
 				ctx, cancelar := p.ctx()
 				defer cancelar()
 				r, err := p.svc.Search(ctx, consulta, maxIrA, false)
-				fyne.Do(func() {
+				p.enHilo(func() {
 					if mia != vuelta || err != nil {
 						return
 					}

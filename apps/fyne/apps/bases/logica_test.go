@@ -181,6 +181,44 @@ func TestLaConfiguracionDeUnaVista(t *testing.T) {
 }
 
 // TestElFocoDeLaRejillaSeMueveComoUnGrid (espejo de lib/rejilla.test.ts).
+// Editar una vista: el borrador de lo guardado vuelve a dar lo guardado (espejo de
+// `lib/vistas.test.ts`), sin perder los filtros y órdenes que el diálogo no enseña salvo
+// los de un campo que ya no existe.
+func TestElBorradorDeUnaVistaGuardada(t *testing.T) {
+	campos := []api.BasesField{
+		{ID: "n", Kind: api.BasesKindText},
+		{ID: "p", Kind: api.BasesKindNumber},
+		{ID: "e", Kind: api.BasesKindSelect, Choices: []string{"Alta"}},
+		{ID: "c", Kind: api.BasesKindCheckbox},
+	}
+	for _, cfg := range []api.BasesViewConfig{
+		{Filters: []api.BasesFilter{{Field: "p", Op: "gte", Value: 10.5}}, Sort: []api.BasesSort{{Field: "p", Dir: "desc"}}},
+		{Filters: []api.BasesFilter{{Field: "c", Op: "eq", Value: false}}},
+		{Filters: []api.BasesFilter{{Field: "e", Op: "empty"}}},
+		{Filters: []api.BasesFilter{{Field: "p", Op: "gt", Value: 1.0}, {Field: "e", Op: "eq", Value: "Alta"}}, Sort: []api.BasesSort{{Field: "e", Dir: "asc"}, {Field: "p", Dir: "desc"}}},
+		{},
+	} {
+		b := borradorDeVista(api.BasesView{Name: "Mía", Kind: api.BasesGrid, Config: cfg}, campos)
+		got, ok := configDeBorrador(b, campos)
+		if !ok || b.nombre != "Mía" || !reflect.DeepEqual(got, cfg) {
+			t.Errorf("%+v: vuelve %+v, %v", cfg, got, ok)
+		}
+	}
+	borrado := api.BasesViewConfig{Filters: []api.BasesFilter{{Field: "p", Op: "empty"}, {Field: "ya-no", Op: "empty"}}, Sort: []api.BasesSort{{Field: "n", Dir: "asc"}, {Field: "ya-no", Dir: "asc"}}}
+	got, _ := configDeBorrador(borradorDeVista(api.BasesView{Kind: api.BasesGrid, Config: borrado}, campos), campos)
+	if quiero := (api.BasesViewConfig{Filters: borrado.Filters[:1], Sort: borrado.Sort[:1]}); !reflect.DeepEqual(got, quiero) {
+		t.Errorf("lo de un campo borrado no se suelta: %+v", got)
+	}
+	k := borradorDeVista(api.BasesView{Kind: api.BasesKanban, Config: api.BasesViewConfig{GroupBy: "e"}}, campos)
+	if got, ok := configDeBorrador(k, campos); !ok || got.GroupBy != "e" {
+		t.Errorf("tablero: %+v, %v", got, ok)
+	}
+	// Un formulario sin lista pide todos los que admite: se abre con todos marcados.
+	if f := borradorDeVista(api.BasesView{Kind: api.BasesForm}, campos); !slices.Equal(f.campos, []string{"n", "p", "e", "c"}) {
+		t.Errorf("formulario sin lista: %v", f.campos)
+	}
+}
+
 func TestElFocoDeLaRejillaSeMueveComoUnGrid(t *testing.T) {
 	casos := []struct {
 		tecla  string
@@ -242,5 +280,48 @@ func TestLaFormulaSeGuardaPorIds(t *testing.T) {
 	quiero := []string{"{Precio}", "{Cantidad}", "{Líneas}", "{Líneas.Importe}", "{Ver. 2}"}
 	if got := referenciasDeFormula(propios, tablas); !slices.Equal(got, quiero) {
 		t.Errorf("referencias = %v, quiero %v", got, quiero)
+	}
+}
+
+// TestLaFormulaDeUnCampoSeEditaConNombres (espejo de lib/formulas.test.ts): la guardada se
+// enseña con los nombres de ahora, se envía con ids solo si cambia, y se sabe qué
+// fórmulas usan un campo antes de intentar borrarlo.
+func TestLaFormulaDeUnCampoSeEditaConNombres(t *testing.T) {
+	lineas := api.BasesTable{ID: "t2", Name: "Líneas", Fields: []api.BasesField{
+		{ID: "i", TableID: "t2", Name: "Importe", Kind: api.BasesKindNumber},
+		{ID: "e", TableID: "t2", Name: "Con IVA", Kind: api.BasesKindFormula, Formula: "{i} * 1.21"},
+	}}
+	propios := []api.BasesField{
+		{ID: "p", TableID: "t1", Name: "Precio", Kind: api.BasesKindNumber},
+		{ID: "l", TableID: "t1", Name: "Líneas", Kind: api.BasesKindLink, LinkTableID: "t2"},
+		{ID: "s", TableID: "t1", Name: "Suma", Kind: api.BasesKindFormula, Formula: `SUM({l.i}) + {p} + {zz} & "{p}"`},
+	}
+	tablas := []api.BasesTable{{ID: "t1", Name: "Pedidos", Fields: propios}, lineas}
+
+	if got, quiero := formulaANombres(propios[2].Formula, propios, tablas), `SUM({Líneas.Importe}) + {Precio} + {zz} & "{p}"`; got != quiero {
+		t.Errorf("formulaANombres = %q, quiero %q", got, quiero)
+	}
+	if _, _, cambia := formulaEditada(`SUM({Líneas.Importe}) + {Precio} + {zz} & "{p}"`, propios[2], propios, tablas); cambia {
+		t.Error("la misma fórmula (con un id roto que no se resuelve) se enviaría")
+	}
+	if ids, ok, cambia := formulaEditada("{Precio} * 2", propios[2], propios, tablas); !ok || !cambia || ids != "{p} * 2" {
+		t.Errorf("formulaEditada = %q, %v, %v", ids, ok, cambia)
+	}
+	if _, ok, cambia := formulaEditada("{Precio} * 2", api.BasesField{Formula: "{p} * 2"}, propios, tablas); !ok || cambia {
+		t.Error("una fórmula que no cambia se enviaría")
+	}
+	if _, _, cambia := formulaEditada("   ", propios[2], propios, tablas); cambia {
+		t.Error("una fórmula vacía se enviaría")
+	}
+
+	if got := formulasQueUsan(propios[0], tablas); !slices.Equal(got, []string{"Suma"}) {
+		t.Errorf("formulasQueUsan(Precio) = %v", got)
+	}
+	// Importe lo usan la suma de Pedidos (por el enlace) y Con IVA, de su propia tabla.
+	if got := formulasQueUsan(lineas.Fields[0], tablas); !slices.Equal(got, []string{"Pedidos.Suma", "Con IVA"}) {
+		t.Errorf("formulasQueUsan(Importe) = %v", got)
+	}
+	if got := formulasQueUsan(propios[2], tablas); len(got) != 0 {
+		t.Errorf("nadie usa Suma y dice %v", got)
 	}
 }

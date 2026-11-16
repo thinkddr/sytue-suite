@@ -6,7 +6,7 @@ package contactos
 import (
 	"testing"
 
-	"git.sytue.eu/sytue/one/apps/fyne/agenda"
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
 
@@ -25,7 +25,7 @@ func TestGestoRefrescoContactsConservaFiltrosYRespetaEdicion(t *testing.T) {
 	if p.Busqueda != "Ana" || !p.SoloDestacados || r.Revision() == before {
 		t.Fatal("pull discarded filters or did not reload the active address book")
 	}
-	p.Estado = agenda.Vacia
+	p.Estado = ui.EstadoVacia
 	if !r.Puede() {
 		t.Fatal("empty address book cannot refresh")
 	}

@@ -110,6 +110,12 @@ func (p PasoReceta) EsDeGeometria() bool {
 
 // LeerReceta trae la receta vigente de una foto.
 func (p *Photos) LeerReceta(ctx context.Context, id string) (Receta, error) {
+	if p.data != nil {
+		if recipes, ok := p.data.(PhotosRecipeData); ok {
+			return recipes.LeerReceta(ctx, id)
+		}
+		return Receta{}, ErrPrivatePhotosOperation
+	}
 	r, err := JSON[struct {
 		Recipe Receta `json:"recipe"`
 	}](ctx, p.c, Request{Path: "/assets/" + url.PathEscape(id) + "/recipe"})
@@ -125,6 +131,18 @@ func (p *Photos) LeerReceta(ctx context.Context, id string) (Receta, error) {
 // GuardarReceta manda la receta ENTERA y devuelve la huella con la que el servicio
 // nombra las derivadas nuevas.
 func (p *Photos) GuardarReceta(ctx context.Context, id string, r Receta) (string, error) {
+	return p.GuardarRecetaDesde(ctx, id, r, "")
+}
+
+// GuardarRecetaDesde keeps the observed base fixed across private retries.
+// The legacy service retains its existing recipe payload.
+func (p *Photos) GuardarRecetaDesde(ctx context.Context, id string, r Receta, base string) (string, error) {
+	if p.data != nil {
+		if recipes, ok := p.data.(PhotosRecipeData); ok {
+			return recipes.GuardarRecetaDesde(ctx, id, r, base)
+		}
+		return "", ErrPrivatePhotosOperation
+	}
 	cuerpo, err := json.Marshal(map[string]any{"recipe": r})
 	if err != nil {
 		return "", err
@@ -136,4 +154,15 @@ func (p *Photos) GuardarReceta(ctx context.Context, id string, r Receta) (string
 		Header: http.Header{"Content-Type": {"application/json"}},
 	})
 	return g.Fingerprint, err
+}
+
+// EdicionPendiente reads a durable private attempt without resuming it.
+func (p *Photos) EdicionPendiente(ctx context.Context, id string) (*EdicionPhotos, error) {
+	if p.data == nil {
+		return nil, nil //nolint:nilnil // Legacy HTTP has no private durable attempt to recover.
+	}
+	if recipes, ok := p.data.(PhotosRecipeData); ok {
+		return recipes.EdicionPendiente(ctx, id)
+	}
+	return nil, ErrPrivatePhotosOperation
 }

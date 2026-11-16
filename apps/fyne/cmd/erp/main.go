@@ -10,6 +10,7 @@
 // Para VERLA hace falta una máquina con pantalla; el piloto no la tiene. Lo que sí
 // corre en cualquier sitio, sin CGO y sin servidor gráfico, es `go test ./apps/erp/...`,
 // que pinta lo mismo con el pintor de software y compara los píxeles contra lo medido.
+// paridad-web: apps/frontend/apps/erp/src/pages/auth/matrix/callback.astro
 package main
 
 import (
@@ -26,12 +27,15 @@ import (
 	"fyne.io/fyne/v2/app"
 
 	"git.sytue.eu/sytue/one/apps/fyne/apps/erp"
+	"git.sytue.eu/sytue/one/apps/fyne/cifrado"
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/sesion"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	privateERP "git.sytue.eu/sytue/one/apps/nucleo/erp"
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
+	mx "git.sytue.eu/sytue/one/apps/nucleo/matrix"
 )
 
 func main() {
@@ -53,49 +57,9 @@ func main() {
 		panic(err) // el catálogo va embebido: si falla, es un error de compilación
 	}
 
-	// El cliente va con la sesión compartida: si ya se entró desde otra de las trece
-	// apps, el token está en el llavero y la primera carga ya trae datos. Sin nadie
-	// dentro, la carga falla y se pinta el estado de error —con su «Reintentar»—, que
-	// es lo honesto; en cuanto se entra desde el menú de cuenta, se vuelve a pedir todo.
-	p := erp.NuevaPantalla(t, api.NewERP(s.URL("erp"), s.Sesion, s.ClienteConAviso(nil), string(l)), nil)
 	// El widget nativo lo lee su propia Fuente, sin depender de la pantalla, y se
 	// vuelve a publicar tras cada escritura del cliente de arriba (ClienteConAviso).
 	s.PublicadorWidget(s.FuenteWidget(t))
-	// Subir documentos e importar CSV usan el selector de ficheros DEL SISTEMA, como el
-	// `<input type="file">` de la web.
-	switch runtime.GOOS {
-	case "js":
-	default:
-		p.ElegirFicheros = elegirFicheros
-	}
-	// El correo que pide una factura se escribe en Sytue Mail: por su esquema, o en la
-	// web si la app no está instalada.
-	p.AbrirApp = func(producto, ruta string) { _ = api.AbrirEn(a, s.Apex(), producto, s.Sesion.Organizacion(), ruta) }
-	// El saludo de la portada lleva el nombre de Sytue ID, que el estado transversal no
-	// trae (solo el `sub`): es la misma ficha que pide el menú de cuenta.
-	saludar := func() {
-		go func() {
-			ctx, cancelar := context.WithTimeout(context.Background(), 15*time.Second)
-			defer cancelar()
-			if yo, err := api.NewAccount(s.URL("id"), s.Sesion, nil).Me(ctx); err == nil {
-				nombre := yo.Name
-				if nombre == "" {
-					nombre = yo.Email
-				}
-				fyne.Do(func() { p.PonerNombre(nombre) })
-			}
-		}()
-	}
-	// conEscena: hasta que corre lo de CuandoHayaEscena, el AlCambiar solo apunta quién
-	// está (sesion.CuandoHayaEscena).
-	dentro, conEscena := s.Estado().Dentro(), false
-	s.AlCambiar(func(e sesion.Estado) {
-		if e.Dentro() && !dentro && conEscena {
-			p.Arrancar()
-			saludar()
-		}
-		dentro = e.Dentro()
-	})
 
 	// El título de la ventana es el NOMBRE DEL PRODUCTO y sale de `FyneApp.toml`, no
 	// del catálogo: una marca no se traduce y no tiene clave en la web.
@@ -106,29 +70,103 @@ func main() {
 	w := a.NewWindow(nombre)
 	w.SetPadded(false)
 	barra := ui.NuevaBarraSuite(t, s, iconos.ERP)
-	w.SetContent(barra.Montar(p.Objeto()))
-	p.Atajos(w.Canvas(), barra)
 	w.Resize(fyne.NewSize(1280, 744))
-	// Con interfaz: lanzada por iOS solo para el widget no se pide nada.
-	s.CuandoHayaEscena(func() {
-		conEscena = true
-		p.Arrancar()
-		if dentro {
-			saludar()
-		}
-	})
-	// El aviso de una tarea asignada abre la vista de tareas (`?vista=tareas`), como la
-	// web.
-	s.AlAbrirURL(func(u *url.URL) {
+
+	var current *erp.Pantalla
+	var pendingURL *url.URL
+
+	atenderURL := func(p *erp.Pantalla, u *url.URL) {
 		if m, ok := api.LeerPeticionERP(u); ok {
-			fyne.Do(func() { p.AtenderPeticion(m) }) // el aviso de una petición de edición
+			p.AtenderPeticion(m)
 		} else if v, ok := api.LeerVista(u); ok {
-			if slices.Contains([]string{erp.VistaTareas, erp.VistaLibro, erp.VistaBalance, erp.VistaObligaciones, erp.VistaBanco}, v) {
-				fyne.Do(func() { p.IrA(v) })
+			if slices.Contains([]string{erp.VistaTareas, erp.VistaAprobaciones, erp.VistaLibro, erp.VistaBalance, erp.VistaObligaciones, erp.VistaBanco}, v) {
+				p.IrA(v)
 			}
 		} else if strings.Trim(strings.TrimPrefix(u.Path, "/erp"), "/") != "" || strings.Trim(u.Opaque, "/") != "" {
-			s.NoEncontrado() // con un receptor apuntado, la sesión ya no sabe qué no es de nadie
+			s.NoEncontrado()
 		}
+	}
+
+	private, err := cifrado.NewPrivateApplication(cifrado.PrivateApplicationConfig[*privateERP.Repository]{
+		Suite:       s,
+		Application: a,
+		Window:      w,
+		Product:     "erp",
+		Translate:   func(key string) string { return t.T(key, nil) },
+		Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*privateERP.Repository], error) {
+			return erpPlan(ctx, resources, s, string(l))
+		},
+		//nolint:contextcheck // The presenter retains its own mounted lifetime, not this short mount request.
+		Mount: func(_ context.Context, resources *cifrado.Resources[*mx.Client], repository *privateERP.Repository) (cifrado.ApplicationView, error) {
+			facade, err := api.NewERP(s.URL("erp"), resources.HTTP(), nil, string(l)).WithPrivateData(repository)
+			if err != nil {
+				return cifrado.ApplicationView{}, err
+			}
+			p := erp.NuevaPantalla(t, facade, nil)
+			switch runtime.GOOS {
+			case "js":
+			default:
+				p.ElegirFicheros = elegirFicheros
+			}
+			organization := resources.PrivateStorageScope().Tenant
+			// Quien ha entrado: la cola de aprobaciones no le ofrece aprobar lo suyo.
+			subject := resources.PrivateStorageScope().Subject
+			p.Yo = func() string { return subject }
+			p.AbrirApp = func(producto, ruta string) { _ = api.AbrirEn(a, s.Apex(), producto, organization, ruta) }
+			p.Atajos(w.Canvas(), barra)
+			current = p
+			p.Arrancar()
+			go func() {
+				ctx, cancelar := context.WithTimeout(resources.Context(), 15*time.Second)
+				defer cancelar()
+				if yo, err := api.NewAccount(s.URL("id"), resources.HTTP(), nil).Me(ctx); err == nil {
+					nombreCuenta := yo.Name
+					if nombreCuenta == "" {
+						nombreCuenta = yo.Email
+					}
+					fyne.Do(func() {
+						if current == p {
+							p.PonerNombre(nombreCuenta)
+						}
+					})
+				}
+			}()
+			if u := pendingURL; u != nil {
+				pendingURL = nil
+				atenderURL(p, u)
+			}
+			return cifrado.ApplicationView{
+				Object: p.Objeto(),
+				Detach: func() {
+					if current == p {
+						current = nil
+					}
+				},
+			}, nil
+		},
+	})
+
+	if err != nil {
+		w.SetContent(ui.NuevoVacio(t.T("matrix.failed", nil), ""))
+	} else {
+		w.SetContent(barra.Montar(private.Objeto()))
+		w.SetOnClosed(private.Close)
+		// Con interfaz: lanzada por iOS solo para el widget no se pide nada.
+		s.CuandoHayaEscena(func() {
+			private.Start()
+		})
+	}
+
+	// El aviso de una tarea asignada abre la vista de tareas (`?vista=tareas`), y el de
+	// una aprobación pedida, la cola (`?vista=aprobaciones`), como la web.
+	s.AlAbrirURL(func(u *url.URL) {
+		fyne.Do(func() {
+			if current != nil {
+				atenderURL(current, u)
+			} else {
+				pendingURL = u
+			}
+		})
 	})
 	s.Arrancar(context.Background())
 	w.ShowAndRun()

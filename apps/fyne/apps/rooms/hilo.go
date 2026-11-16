@@ -27,12 +27,12 @@ import (
 // los demás —búsqueda, miembros, fijados, guardados, programados, reuniones— usan el
 // mismo hueco.
 //
-// Medidas de la HOJA (`ThreadPanel.tsx`, rem 14):
+// Medidas de la HOJA (`ThreadPanel.tsx`, rem 16):
 //
-//	panel      `w-[var(--rooms-rhs-width)]` = 22rem = **308** · `border-l` · `bg-surface`
-//	cabecera   `h-14` (49) `bg-header` `px-4`, título `text-md` semi y «#canal» `text-xs` al 80 %
+//	panel      `w-[var(--rooms-rhs-width)]` = 22rem = **352** · `border-l` · `bg-surface`
+//	cabecera   `h-14` (56) `bg-header` `px-4`, título `text-md` semi y «#canal» `text-xs` al 80 %
 //	seguir     `h-8 px-2.5 gap-1.5 rounded-md text-sm font-medium`, glifo de 16
-//	cerrar     `IconButton size="lg" tone="header"`: 28, aspa de 18
+//	cerrar     `IconButton size="lg" tone="header"`: 32, aspa de 18
 //	cuerpo     `py-2`; la raíz con `border-b pb-1`; el separador `my-2 px-4 gap-3`
 //	fila       `flex gap-3 px-4 py-2`
 var (
@@ -68,19 +68,53 @@ type PanelHilo struct {
 	// Compositor es la caja de contestar, sin prioridad ni programar (en la web, sin
 	// `advanced`) y con su propia marca de agua.
 	Compositor *Compositor
+	// Cifrado es la conversación cifrada: las tarjetas, en solo lectura con su nota.
+	Cifrado bool
+	// TambienAlCanal es la casilla «Enviar también a #canal» de debajo de la caja: la
+	// respuesta se verá además en el feed. Se cambia con PonerTambienAlCanal.
+	TambienAlCanal bool
 
 	AlSeguir     func()
 	AlCerrar     func()
 	AlReintentar func()
 
+	// Las acciones de cada mensaje del hilo, raíz y respuestas: las mismas que en el
+	// canal (`AccionesDelHilo` de ThreadPanel.tsx). AlReaccionar conmuta una reacción
+	// (las rápidas de la barra y los chips), AlEmojis abre el selector colgando de su
+	// botón y Menu da las entradas del «…». Sin ellas la fila no lleva barra ni «+».
+	AlReaccionar func(Mensaje, string)
+	AlEmojis     func(Mensaje, fyne.CanvasObject)
+	Menu         func(Mensaje) []fyne.CanvasObject
+	// EditandoID es el mensaje del hilo que se está editando en línea, o "".
+	EditandoID        string
+	AlGuardarEdicion  func(Mensaje, string)
+	AlCancelarEdicion func()
+
 	fondo, filete *canvas.Rectangle
 	cabecera      *CabeceraPanel
 	seguir        *BotonBanda
 	cuerpo        fyne.CanvasObject
-	objetos       []fyne.CanvasObject
+	// casilla es «Enviar también a #canal»; vive lo que el panel, como la caja.
+	casilla *ui.Eleccion
+	objetos []fyne.CanvasObject
+	// filas son las de la raíz y las respuestas tal como se pintaron la última vez.
+	filas []*FilaMensaje
+	// borrador y reenfocar guardan, mientras el cuerpo se rehace, lo escrito en la caja
+	// de editar y si tenía el foco: el hilo se relee con cada evento del canal y sin
+	// esto una reacción ajena borraba la edición a medias.
+	borrador  *string
+	reenfocar bool
 }
 
 var _ fyne.Widget = (*PanelHilo)(nil)
+
+// La fila de «Enviar también a #canal» (`ThreadPanel.tsx`): `flex min-h-8 items-center
+// gap-2 px-4 pb-2 text-sm`, debajo de la caja de contestar. HOJA.
+var (
+	CanalonCasillaHilo = tema.Espacio(4)
+	AbajoCasillaHilo   = tema.Espacio(2)
+	MinCasillaHilo     = tema.Espacio(8)
+)
 
 // NuevoPanelHilo crea el panel con su caja de contestar.
 func NuevoPanelHilo(t *i18n.Translator, l i18n.Locale) *PanelHilo {
@@ -88,9 +122,29 @@ func NuevoPanelHilo(t *i18n.Translator, l i18n.Locale) *PanelHilo {
 	c.Sencillo = true
 	c.MarcaDeAgua, c.Rotulo = t.T("thread.replyPlaceholder", nil), t.T("thread.replyAria", nil)
 	p := &PanelHilo{T: t, Locale: l, Compositor: c, Estado: Cargando}
+	p.casilla = ui.NuevaCasilla("", func(si bool) { p.TambienAlCanal = si })
+	p.casilla.Escalon = tema.TextoSM
 	p.ExtendBaseWidget(p)
 	c.AlCambiarAlto = p.Refresh
 	return p
+}
+
+// PonerTambienAlCanal marca o desmarca «Enviar también a #canal».
+func (p *PanelHilo) PonerTambienAlCanal(si bool) {
+	p.TambienAlCanal = si
+	p.casilla.Marcada = si
+	p.casilla.Refresh()
+}
+
+// conCasilla dice si va la fila de la casilla: como en la web, solo sabiendo el canal.
+func (p *PanelHilo) conCasilla() bool { return p.NombreCanal != "" }
+
+// altoCasilla es lo que ocupa esa fila, o cero si no va.
+func (p *PanelHilo) altoCasilla() float32 {
+	if !p.conCasilla() {
+		return 0
+	}
+	return max(MinCasillaHilo, p.casilla.MinSize().Height+AbajoCasillaHilo)
 }
 
 // AccessibilityLabel es el `aria-label` del `<aside>`.
@@ -129,14 +183,27 @@ func (p *PanelHilo) construir(v tema.Variante) {
 		t.T("thread.close", nil), p.AlCerrar, ui.NuevaPista(pista, p.seguir))
 	p.cuerpo = p.construirCuerpo(v)
 	p.objetos = []fyne.CanvasObject{p.fondo, p.cuerpo, p.Compositor, p.cabecera, p.filete}
+	if p.conCasilla() {
+		p.casilla.Etiqueta = t.T("thread.alsoToChannel", i18n.Vars{"channel": p.NombreCanal})
+		p.casilla.Marcada = p.TambienAlCanal
+		p.objetos = append(p.objetos, p.casilla)
+	}
 }
 
 // construirCuerpo es la raíz, el separador y las respuestas, o el esqueleto o el
 // aviso de error en su lugar.
 func (p *PanelHilo) construirCuerpo(v tema.Variante) fyne.CanvasObject {
 	t := p.T
-	raiz := NuevaFilaMensaje(t, p.Locale, p.Raiz, false, nil)
-	raiz.EnHilo = true
+	p.borrador, p.reenfocar = nil, false
+	if f := p.Fila(p.EditandoID); f != nil && f.edicion != nil && f.edicion.area != nil {
+		texto := f.edicion.Texto()
+		p.borrador = &texto
+		if c := fyne.CurrentApp().Driver().CanvasForObject(p); c != nil {
+			p.reenfocar = c.Focused() == fyne.Focusable(f.edicion.area)
+		}
+	}
+	p.filas = p.filas[:0]
+	raiz := p.fila(p.Raiz)
 	cosas := []fyne.CanvasObject{
 		hueco(ArribaCuerpoHilo),
 		NuevoBloqueRaiz(raiz),
@@ -153,14 +220,62 @@ func (p *PanelHilo) construirCuerpo(v tema.Variante) fyne.CanvasObject {
 		cosas = append(cosas, NuevoEsqueletoHilo(t.T("thread.loading", nil)))
 	default:
 		for _, m := range p.Respuestas {
-			f := NuevaFilaMensaje(t, p.Locale, m, false, nil)
-			f.EnHilo = true
-			cosas = append(cosas, f)
+			cosas = append(cosas, p.fila(m))
 		}
 	}
 	cosas = append(cosas, hueco(ArribaCuerpoHilo))
 	_ = v
 	return container.NewVScroll(container.New(ui.Columna{}, cosas...))
+}
+
+// fila crea la fila de un mensaje del hilo con sus acciones.
+func (p *PanelHilo) fila(m Mensaje) *FilaMensaje {
+	f := NuevaFilaMensaje(p.T, p.Locale, m, false, p.AlReaccionar)
+	f.EnHilo, f.Cifrado = true, p.Cifrado
+	f.AlEmojis, f.Menu = p.AlEmojis, p.Menu
+	if m.ID != "" && m.ID == p.EditandoID {
+		f.Editando, f.AlGuardarEdicion, f.AlCancelarEdicion = true, p.AlGuardarEdicion, p.AlCancelarEdicion
+		f.borradorEdicion = p.borrador
+	}
+	p.filas = append(p.filas, f)
+	return f
+}
+
+// Fila es la fila pintada de ese mensaje del hilo, o nil.
+func (p *PanelHilo) Fila(id string) *FilaMensaje {
+	for _, f := range p.filas {
+		if f.Mensaje.ID == id {
+			return f
+		}
+	}
+	return nil
+}
+
+// EnfocarAcciones devuelve el foco a la barra de acciones de ese mensaje, de donde se
+// abrió la edición: al cerrarla, la caja desaparece y el foco no puede caer a ninguna
+// parte (design.md §2.6). Es lo que hace la web al volver al «…» de la fila.
+func (p *PanelHilo) EnfocarAcciones(id string) {
+	f := p.Fila(id)
+	if f == nil || f.barra == nil {
+		return
+	}
+	if c := fyne.CurrentApp().Driver().CanvasForObject(p); c != nil {
+		c.Focus(f.barra)
+	}
+}
+
+// EnfocarEdicion pasa el foco a la caja de editar del mensaje que se edita.
+func (p *PanelHilo) EnfocarEdicion() {
+	f := p.Fila(p.EditandoID)
+	if f == nil {
+		return
+	}
+	if f.edicion == nil {
+		f.Refresh() // la caja nace con el renderizador de la fila
+	}
+	if f.edicion != nil {
+		f.edicion.Enfocar()
+	}
 }
 
 type panelHiloRenderer struct {
@@ -181,7 +296,8 @@ func (r *panelHiloRenderer) Objects() []fyne.CanvasObject {
 func (r *panelHiloRenderer) Destroy() {}
 
 func (r *panelHiloRenderer) altoMinimo(ancho float32) float32 {
-	return AltoCabecera + AltoFilaMensaje(false) + r.p.Compositor.medidaPara(max(ancho-tema.Borde, 0)).Height
+	return AltoCabecera + AltoFilaMensaje(false) + r.p.Compositor.medidaPara(max(ancho-tema.Borde, 0)).Height +
+		r.p.altoCasilla()
 }
 
 // Layout: el filete a la izquierda (`border-l`), la cabecera arriba, la caja de
@@ -191,7 +307,11 @@ func (r *panelHiloRenderer) Layout(t fyne.Size) {
 	p.fondo.Resize(t)
 	p.filete.Move(fyne.NewPos(0, 0))
 	p.filete.Resize(fyne.NewSize(tema.Borde, t.Height))
-	r.flujo.repartir(t, []fyne.CanvasObject{p.cabecera, p.cuerpo, p.Compositor})
+	objetos := []fyne.CanvasObject{p.cabecera, p.cuerpo, p.Compositor}
+	if p.conCasilla() {
+		objetos = append(objetos, p.casilla)
+	}
+	r.flujo.repartir(t, objetos)
 }
 
 func (r *panelHiloRenderer) colocarContenido(t fyne.Size) {
@@ -199,11 +319,19 @@ func (r *panelHiloRenderer) colocarContenido(t fyne.Size) {
 	x, ancho := tema.Borde, max(t.Width-tema.Borde, 0)
 	p.cabecera.Move(fyne.NewPos(x, 0))
 	p.cabecera.Resize(fyne.NewSize(ancho, AltoCabecera))
+	casilla := p.altoCasilla()
 	alto := p.Compositor.medidaPara(ancho).Height
-	p.Compositor.Move(fyne.NewPos(x, max(t.Height-alto, AltoCabecera)))
+	p.Compositor.Move(fyne.NewPos(x, max(t.Height-casilla-alto, AltoCabecera)))
 	p.Compositor.Resize(fyne.NewSize(ancho, alto))
 	p.cuerpo.Move(fyne.NewPos(x, AltoCabecera))
-	p.cuerpo.Resize(fyne.NewSize(ancho, max(t.Height-AltoCabecera-alto, 0)))
+	p.cuerpo.Resize(fyne.NewSize(ancho, max(t.Height-AltoCabecera-alto-casilla, 0)))
+	if casilla > 0 {
+		// `items-center` en lo que queda sobre el `pb-2`, sin pasar del canalón.
+		m := p.casilla.MinSize()
+		w := min(m.Width, max(ancho-2*CanalonCasillaHilo, 0))
+		p.casilla.Move(fyne.NewPos(x+CanalonCasillaHilo, t.Height-casilla+(casilla-AbajoCasillaHilo-m.Height)/2))
+		p.casilla.Resize(fyne.NewSize(w, m.Height))
+	}
 }
 
 // Refresh rehace el panel y lo deja abajo del todo: el hilo es corto y se lee por el
@@ -219,6 +347,10 @@ func (r *panelHiloRenderer) Refresh() {
 	r.Layout(p.Size())
 	if s, ok := p.cuerpo.(*container.Scroll); ok {
 		s.ScrollToBottom()
+	}
+	if p.reenfocar {
+		p.reenfocar = false
+		p.EnfocarEdicion()
 	}
 	p.Compositor.Refresh()
 }
@@ -636,13 +768,17 @@ func (r *avisoHiloRenderer) Layout(fyne.Size) {
 
 func (r *avisoHiloRenderer) Refresh() { r.Layout(r.a.Size()) }
 
-// NuevoEsqueletoHilo son las dos filas de «cargando» del hilo: `flex flex-col gap-3
-// px-4 py-2`, cuadro de `2rem` y barras de `6rem` y del 60 y 45 %.
-func NuevoEsqueletoHilo(nombre string) *EsqueletoMensajes {
-	e := NuevoEsqueletoMensajes(nombre)
-	e.Partes, e.AnchoNombre = []float32{0.60, 0.45}, 6*tema.Rem
-	e.Arriba, e.Aire, e.SinAireArriba, e.Canalon = tema.Espacio(2), tema.Espacio(3), true, CanalonFilaHilo
-	return e
+// NuevoEsqueletoHilo son las filas de «cargando» del hilo: `flex flex-col gap-3
+// px-4 py-2`, cuadro de `2rem` y barras de `6rem` y, sin partes, del 60 y 45 %. Los
+// paneles que cargan tres piden las suyas.
+func NuevoEsqueletoHilo(nombre string, partes ...float32) *ui.FilasEsqueleto {
+	if len(partes) == 0 {
+		partes = []float32{0.60, 0.45}
+	}
+	return RecetaMensajes{
+		Partes: partes, AnchoNombre: 6 * tema.Rem,
+		Arriba: tema.Espacio(2), Aire: tema.Espacio(3), SinAireArriba: true, Canalon: CanalonFilaHilo,
+	}.Filas(nombre)
 }
 
 // hueco es un espacio en blanco de ese alto, para una `ui.Columna`.
@@ -657,19 +793,37 @@ func hueco(alto float32) fyne.CanvasObject {
 // AltoEnlaceHilo es `py-0.5 text-xs`: 14 más 3,5. HOJA.
 var AltoEnlaceHilo = tema.TextoXS.Linea + 2*tema.Espacio(0.5)
 
-// EnlaceHilo es el botón de «N respuestas» de la tira de un mensaje: `rounded-control
+// Los avatares del indicador (`IndicadorHilo.tsx`): `Avatar size="xs"` (24 px) solapados
+// con `-space-x-1.5` y separados por su `ring-2 ring-surface`. Con ellos, el botón crece
+// a 24 más el `py-0.5`. HOJA.
+var (
+	SolapeAvataresHilo          = tema.Espacio(1.5)
+	AroAvatarHilo       float32 = 2
+	AltoEnlaceHiloCaras         = ui.MedidaAvatar(ui.AvatarXS).Height + 2*tema.Espacio(0.5)
+)
+
+// EnlaceHilo es el botón del indicador de hilo de la tira de un mensaje: `rounded-control
 // text-primary-text hover:bg-selected inline-flex items-center gap-1 px-1.5 py-0.5
-// text-xs font-medium`, con el chevron de 12 delante.
+// text-xs font-medium`. Delante, los avatares de quienes respondieron más recientemente
+// o, sin ellos, el chevron de 12; detrás de «N respuestas», «Última respuesta hace…» en
+// `text-text-muted font-normal`.
 type EnlaceHilo struct {
 	ui.Pulsable
 	Rotulo string
+	// Avatares son los nombres de quienes respondieron, el más reciente primero; Ultima,
+	// el «Última respuesta hace 5 min» ya escrito, o "".
+	Avatares []string
+	Ultima   string
 	// alEncima avisa a la fila: sobre el enlace el mensaje sigue «encima».
 	alEncima func(bool)
 
 	aro     *ui.Aro
 	caja    *ui.Caja
 	glifo   *iconos.Dibujo
+	aros    []*canvas.Circle
+	caras   []*ui.Avatar
 	texto   *canvas.Text
+	ultima  *canvas.Text
 	objetos []fyne.CanvasObject
 }
 
@@ -680,6 +834,16 @@ func NuevoEnlaceHilo(rotulo string, alPulsar func()) *EnlaceHilo {
 	e := &EnlaceHilo{Rotulo: rotulo}
 	e.Nombre, e.AlPulsar = rotulo, alPulsar
 	e.ExtendBaseWidget(e)
+	return e
+}
+
+// ConIndicador le pone los avatares y la última respuesta. El nombre accesible es el
+// texto (la cuenta y la hora): los avatares son decorativos, como su `aria-hidden`.
+func (e *EnlaceHilo) ConIndicador(avatares []string, ultima string) *EnlaceHilo {
+	e.Avatares, e.Ultima = avatares, ultima
+	if ultima != "" {
+		e.Nombre = e.Rotulo + " " + ultima
+	}
 	return e
 }
 
@@ -699,10 +863,31 @@ func (e *EnlaceHilo) MouseOut() {
 	}
 }
 
-// MedidaEnlaceHilo es lo que ocupa. Es la única cuenta.
+// MedidaEnlaceHilo es lo que ocupa el enlace sin indicador.
 func MedidaEnlaceHilo(rotulo string) fyne.Size {
-	return fyne.NewSize(2*tema.Espacio(1.5)+iconos.TallaXXS+tema.Espacio(1)+
-		ui.Medir(rotulo, tema.TextoXS, ui.Medio).Width, AltoEnlaceHilo)
+	return (&EnlaceHilo{Rotulo: rotulo}).Medida()
+}
+
+// anchoCaras es lo que ocupan los avatares solapados, o cero sin ellos.
+func anchoCaras(n int) float32 {
+	if n == 0 {
+		return 0
+	}
+	lado := ui.MedidaAvatar(ui.AvatarXS).Width
+	return lado + float32(n-1)*(lado-SolapeAvataresHilo)
+}
+
+// Medida es lo que ocupa. Es la única cuenta.
+func (e *EnlaceHilo) Medida() fyne.Size {
+	delante, alto := iconos.TallaXXS, AltoEnlaceHilo
+	if len(e.Avatares) > 0 {
+		delante, alto = anchoCaras(len(e.Avatares)), AltoEnlaceHiloCaras
+	}
+	ancho := 2*tema.Espacio(1.5) + delante + tema.Espacio(1) + ui.Medir(e.Rotulo, tema.TextoXS, ui.Medio).Width
+	if e.Ultima != "" {
+		ancho += tema.Espacio(1) + ui.Medir(e.Ultima, tema.TextoXS, ui.Normal).Width
+	}
+	return fyne.NewSize(ancho, alto)
 }
 
 // CreateRenderer compone la píldora.
@@ -710,10 +895,25 @@ func (e *EnlaceHilo) CreateRenderer() fyne.WidgetRenderer {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	e.aro = ui.NuevoAro(tema.Forma("radius-control"), ui.SinHueco, v)
 	e.caja = ui.NuevaCaja(color.NRGBA{}, color.NRGBA{}, tema.Forma("radius-control"))
-	e.glifo = iconos.Trazo(iconos.ChevronDerecha, iconos.TallaXXS, "primary-text", v)
 	e.texto = ui.Texto(e.Rotulo, tema.TextoXS, ui.Medio, tema.Color("primary-text", v))
 	e.objetos = append(e.aro.Objetos(), e.caja.Objetos()...)
-	e.objetos = append(e.objetos, e.glifo.Objeto(), e.texto)
+	if len(e.Avatares) == 0 {
+		e.glifo = iconos.Trazo(iconos.ChevronDerecha, iconos.TallaXXS, "primary-text", v)
+		e.objetos = append(e.objetos, e.glifo.Objeto())
+	}
+	// Cada avatar va detrás de su aro y delante del anterior: el orden del DOM, en el
+	// que el siguiente pisa al anterior y el aro los separa.
+	for _, n := range e.Avatares {
+		a := canvas.NewCircle(tema.Color("surface", v))
+		c := ui.NuevoAvatar(n).Con(ui.AvatarXS)
+		e.aros, e.caras = append(e.aros, a), append(e.caras, c)
+		e.objetos = append(e.objetos, a, c)
+	}
+	e.objetos = append(e.objetos, e.texto)
+	if e.Ultima != "" {
+		e.ultima = ui.Texto(e.Ultima, tema.TextoXS, ui.Normal, tema.Color("text-muted", v))
+		e.objetos = append(e.objetos, e.ultima)
+	}
 	r := &enlaceHiloRenderer{e: e}
 	r.Refresh()
 	return r
@@ -721,7 +921,7 @@ func (e *EnlaceHilo) CreateRenderer() fyne.WidgetRenderer {
 
 type enlaceHiloRenderer struct{ e *EnlaceHilo }
 
-func (r *enlaceHiloRenderer) MinSize() fyne.Size           { return MedidaEnlaceHilo(r.e.Rotulo) }
+func (r *enlaceHiloRenderer) MinSize() fyne.Size           { return r.e.Medida() }
 func (r *enlaceHiloRenderer) Objects() []fyne.CanvasObject { return r.e.objetos }
 func (r *enlaceHiloRenderer) Destroy()                     {}
 
@@ -730,8 +930,25 @@ func (r *enlaceHiloRenderer) Layout(t fyne.Size) {
 	e.aro.Colocar(t)
 	e.caja.Redimensionar(t)
 	x := tema.Espacio(1.5)
-	e.glifo.Colocar(x, (t.Height-iconos.TallaXXS)/2, iconos.TallaXXS)
-	ui.ColocarTexto(e.texto, tema.TextoXS, x+iconos.TallaXXS+tema.Espacio(1), (t.Height-tema.TextoXS.Linea)/2)
+	if e.glifo != nil {
+		e.glifo.Colocar(x, (t.Height-iconos.TallaXXS)/2, iconos.TallaXXS)
+		x += iconos.TallaXXS
+	}
+	lado := ui.MedidaAvatar(ui.AvatarXS).Width
+	for i, c := range e.caras {
+		cx := x + float32(i)*(lado-SolapeAvataresHilo)
+		cy := (t.Height - lado) / 2
+		e.aros[i].Move(fyne.NewPos(cx-AroAvatarHilo, cy-AroAvatarHilo))
+		e.aros[i].Resize(fyne.NewSize(lado+2*AroAvatarHilo, lado+2*AroAvatarHilo))
+		c.Move(fyne.NewPos(cx, cy))
+		c.Resize(fyne.NewSize(lado, lado))
+	}
+	x += anchoCaras(len(e.caras)) + tema.Espacio(1)
+	ui.ColocarTexto(e.texto, tema.TextoXS, x, (t.Height-tema.TextoXS.Linea)/2)
+	if e.ultima != nil {
+		x += ui.Medir(e.Rotulo, tema.TextoXS, ui.Medio).Width + tema.Espacio(1)
+		ui.ColocarTexto(e.ultima, tema.TextoXS, x, (t.Height-tema.TextoXS.Linea)/2)
+	}
 }
 
 func (r *enlaceHiloRenderer) Refresh() {
@@ -744,8 +961,18 @@ func (r *enlaceHiloRenderer) Refresh() {
 	e.caja.Pintar(fondo, color.NRGBA{})
 	e.aro.Ver(e.Enfocado())
 	e.aro.Pintar(v)
-	e.glifo.Tenir("primary-text", v)
+	if e.glifo != nil {
+		e.glifo.Tenir("primary-text", v)
+	}
+	for _, a := range e.aros {
+		a.FillColor = tema.Color("surface", v)
+		a.Refresh()
+	}
 	e.texto.Color = tema.Color("primary-text", v)
 	e.texto.Refresh()
+	if e.ultima != nil {
+		e.ultima.Color = tema.Color("text-muted", v)
+		e.ultima.Refresh()
+	}
 	r.Layout(e.Size())
 }

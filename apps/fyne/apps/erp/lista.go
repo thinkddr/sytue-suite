@@ -41,13 +41,13 @@ import (
 
 // Medidas del cuerpo de la lista.
 const (
-	// AnchoContenidoLista es `max-w-5xl` con el rem de 14. Medido con su `px-6`: 854.
+	// AnchoContenidoLista es `max-w-5xl`: 1024 con el rem de 16.
 	AnchoContenidoLista float32 = 64 * tema.Rem
 	// MargenLista es el `px-6`/`py-6` del contenido.
 	MargenLista float32 = 6 * 0.25 * tema.Rem
 	// SeparaBloques es el `space-y-4` entre cabecera, filtros, cuerpo y pie.
 	SeparaBloques float32 = 4 * 0.25 * tema.Rem
-	// AnchoBuscador es el `w-44` del campo de búsqueda. Medido: 154.
+	// AnchoBuscador es el `w-44` del campo de búsqueda: 176.
 	AnchoBuscador float32 = 11 * tema.Rem
 	// PildoraPX y PildoraPY son el `px-3 py-1` de una píldora de filtro.
 	PildoraPX float32 = 3 * 0.25 * tema.Rem
@@ -142,6 +142,9 @@ type Lista struct {
 	// hay selector del sistema y no se pinta. Importando es la carga en curso.
 	AlImportar func()
 	Importando bool
+	// AlAsistenteFacturas abre el asistente de facturas; nil, no se ofrece (fuera de
+	// facturación, en la papelera o sin permiso para crear facturas).
+	AlAsistenteFacturas func()
 	// AlNueva abre la ficha en blanco; AlDuplicar, la copia de una fila.
 	AlNueva    func()
 	AlDuplicar func(Registro)
@@ -339,7 +342,36 @@ func (l *Lista) Objeto(v tema.Variante) fyne.CanvasObject {
 	for _, b := range p.bloques {
 		hijos = append(hijos, b.obj)
 	}
-	return container.New(p, hijos...)
+	pag := container.New(p, hijos...)
+	if l.AlAsistenteFacturas == nil {
+		return pag
+	}
+	// El `<Button variant="secondary">` del asistente, a su ancho.
+	b := ui.NuevoBoton(l.t("invoiceAssist.title"), l.AlAsistenteFacturas).Con(ui.Secundario, ui.TallaMD)
+	return container.New(&conAsistente{boton: b, lista: pag}, b, pag)
+}
+
+// conAsistente es el `<div class="px-6 pt-4">` del botón del asistente de facturas.
+// En la web va FUERA del `max-w-5xl` de la lista, pegado a la izquierda de `main`: en
+// una ventana ancha, metido en la columna centrada quedaba cientos de puntos a la
+// derecha de donde lo pinta el navegador.
+type conAsistente struct{ boton, lista fyne.CanvasObject }
+
+var _ fyne.Layout = (*conAsistente)(nil)
+
+// alto es el del `<div>`: su `pt-4` (SeparaBloques es ese mismo 1 rem) y el botón.
+func (c *conAsistente) alto() float32 { return SeparaBloques + c.boton.MinSize().Height }
+
+func (c *conAsistente) MinSize([]fyne.CanvasObject) fyne.Size {
+	return fyne.NewSize(0, c.alto()+c.lista.MinSize().Height)
+}
+
+func (c *conAsistente) Layout(_ []fyne.CanvasObject, t fyne.Size) {
+	c.boton.Move(fyne.NewPos(MargenLista, SeparaBloques))
+	c.boton.Resize(c.boton.MinSize())
+	y := c.alto()
+	c.lista.Move(fyne.NewPos(0, y))
+	c.lista.Resize(fyne.NewSize(t.Width, max(t.Height-y, c.lista.MinSize().Height)))
 }
 
 // bandaAviso es el `<p class="bg-danger-bg text-danger-text mx-6 mt-4">` de arriba de
@@ -648,7 +680,7 @@ func (l *Lista) cuerpo(v tema.Variante, ancho float32) (fyne.CanvasObject, float
 	rs := l.registros()
 	switch {
 	case l.Fase == Cargando && len(rs) == 0:
-		return centrado(ui.NuevaRueda(22, "text-muted", v), AltoEsqueleto), AltoEsqueleto
+		return l.esqueletoLista(v, ancho)
 	case l.Fase == Prohibida:
 		// Con un 403 `sin_permiso` la lista no está vacía, es que no se puede ver: el
 		// estado vacío de la suite con el candado de 32 en `text-subtle`, las dos claves
@@ -740,9 +772,6 @@ func (l *Lista) pie(v tema.Variante) (fyne.CanvasObject, float32) {
 // PiePT es el `mt-4` del `<footer>`: se SUMA al `space-y-4` porque el pie es el último
 // hijo y su margen no se funde con nada.
 const PiePT float32 = 4 * 0.25 * tema.Rem
-
-// AltoEsqueleto es el `py-16` de la rueda de carga sobre su lado de 22.
-const AltoEsqueleto float32 = 2*(16*0.25*tema.Rem) + 22
 
 // estadoVacio envuelve un `ui.Vacio` con el alto que él mismo declara para este ancho:
 // los estados no ocupan lo mismo y el layout tiene que saberlo antes de colocar el pie.

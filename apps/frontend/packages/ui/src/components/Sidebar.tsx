@@ -11,6 +11,7 @@ import { useT } from '@sytue/i18n/preact';
 import { cx } from '../lib/cx.js';
 import { Badge } from './Badge.js';
 import { Icon } from './Icon.js';
+import { Tooltip } from './Tooltip.js';
 
 export interface SidebarProps {
   /** Identifica el panel de navegación, también al acotar gestos a este carril. */
@@ -71,13 +72,19 @@ export function Sidebar({
           el cristal; alineados, la primera letra de «Redactar» cae bajo la marca
           de arriba en vez de medio centímetro a su izquierda.
 
-          Con `px-2` eran 7px reales —la raíz de la suite está en 14px— y el
+          Con `px-2` eran 7px reales —cuando 1 rem eran 14 px; hoy serían 8— y el
           barrido lo sacó en SEIS apps a la vez, todas con la misma medida porque
           todas montan este componente: «Redactar», «Mi unidad», «Nuevo
           contacto», «Hilos», «Buscar notas» y «Plataforma». */}
       {/* `relative`: es un panel que desplaza, y lo que lleva dentro se ancla a él y no
           al documento (ver la nota del `main` de AdminShell). */}
-      <div data-sidebar-scroll class="relative min-h-0 flex-1 overflow-y-auto px-4 py-2">
+      {/* `overflow-x-hidden`: el lateral solo desplaza en vertical. Con `overflow-y-auto`
+          a secas el eje x pasa a `auto` (CSS no deja `visible` frente a un eje que
+          desplaza), y una dirección o un rótulo sin `min-w-0` abría una barra horizontal. */}
+      <div
+        data-sidebar-scroll
+        class="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-2"
+      >
         {children}
       </div>
       {/* `empty:hidden`: el pie de Calendar y Contacts es `<ImportData>`, que no pinta nada
@@ -91,7 +98,7 @@ export function Sidebar({
           desplaza por dentro cuando no cabe, y lo suyo sigue siendo pulsable; en una
           ventana normal no cabe a propósito y no cambia nada. */}
       {footer ? (
-        <div class="sytue-sidebar-footer border-chrome-border max-h-[60%] min-h-0 overflow-y-auto border-t px-4 py-2 empty:hidden">
+        <div class="sytue-sidebar-footer border-chrome-border max-h-[60%] min-h-0 overflow-x-hidden overflow-y-auto border-t px-4 py-2 empty:hidden">
           {footer}
         </div>
       ) : null}
@@ -226,6 +233,21 @@ export interface SidebarItemProps {
   toggleLabel?: string;
   /** Solo con `expanded`: los items que cuelgan de este, que se pintan si está abierto. */
   children?: ComponentChildren;
+  /**
+   * Solo con `expanded`: lo que cuelga va con `ml-3` en vez de `ml-7`. Es la cuenta de
+   * correo externa con sus carpetas: en el cajón del teléfono la sangría hasta el
+   * rótulo se comía el ancho del rótulo y del contador, y la rama ya se distingue por
+   * su icono y su chevron.
+   */
+  compactChildren?: boolean;
+  /**
+   * El rótulo en UNA línea y, si no cabe, con los puntos suspensivos EN MEDIO,
+   * conservando entero el final desde la última «@»: una dirección de correo partida
+   * en dos líneas o cortada por el dominio («…@outlook.co») ya no dice de qué cuenta
+   * es. Sin «@», `truncate` de siempre. El rótulo entero sigue en el `title` y en el
+   * nombre accesible. Es `RecorteEnMedio` de `ui.FilaLateral` en Fyne.
+   */
+  middleTruncate?: boolean;
 }
 
 export function SidebarItem({
@@ -243,6 +265,8 @@ export function SidebarItem({
   onToggle,
   toggleLabel,
   children,
+  compactChildren = false,
+  middleTruncate = false,
 }: SidebarItemProps): JSX.Element {
   // Con `onToggle` la fila es un destino y el triángulo, su propio botón.
   const toggle = expanded !== undefined && onToggle !== undefined && !collapsed;
@@ -260,7 +284,7 @@ export function SidebarItem({
           del correo» en cinco más (medido en el frontal a los 260 px del menú,
           2026-09-22)—. `min-w-0` sigue siendo imprescindible: sin él el rótulo
           empuja el icono y el contador fuera del menú. */}
-      {!collapsed ? <span class="line-clamp-2 min-w-0 flex-1 break-words">{label}</span> : null}
+      {!collapsed ? <ItemLabel label={label} middle={middleTruncate} /> : null}
       {!collapsed && count ? <Badge count>{count}</Badge> : null}
       {/* El chevron de la rama: el mismo `-rotate-90` del rótulo plegable de la
           sección, para que «abierto» se lea igual en todo el carril. */}
@@ -302,41 +326,69 @@ export function SidebarItem({
   );
   // Solo el rótulo. Aquí se añadía « (próximamente)» a los desactivados, en castellano
   // para los 26 idiomas; que no se puede pulsar ya lo dicen `aria-disabled` y la opacidad.
-  const titleAttr = label;
+  // Plegado, el rótulo no se ve: lo dice una ayuda visible a la derecha, que también
+  // sale con el foco del teclado (un `title` no). Desplegado basta el `title` para el
+  // rótulo recortado.
+  const titleAttr = collapsed ? undefined : label;
+  const conAyuda = (control: JSX.Element): JSX.Element =>
+    collapsed ? (
+      <Tooltip label={label} placement="right">
+        {control}
+      </Tooltip>
+    ) : (
+      control
+    );
+  // Una rama se pliega también con las flechas, como un `treeitem`: → despliega y ←
+  // pliega; la que no cambia nada no hace nada. Intro y Espacio siguen siendo pulsar.
+  const plegar = branch ? onClick : toggle ? onToggle : undefined;
+  const onKeyDown = plegar
+    ? (e: KeyboardEvent) => {
+        if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+        e.preventDefault();
+        // `onClick` recibe el evento del teclado: quien lo usa solo lo pasa de largo.
+        if ((e.key === 'ArrowRight') !== expanded) plegar(e as unknown as MouseEvent);
+      }
+    : undefined;
   return (
     // `relative` solo cuando hay acción: posicionar por defecto cambiaría el
     // contexto de apilamiento de todos los items de la suite sin necesidad.
     <li class={cx((action || toggle) && !collapsed && 'relative')}>
-      {href ? (
-        <a
-          href={href}
-          aria-current={active && ariaCurrent ? 'page' : undefined}
-          aria-disabled={disabled ? 'true' : undefined}
-          title={titleAttr}
-          class={className}
-          onClick={disabled ? (e) => e.preventDefault() : onClick}
-        >
-          {content}
-        </a>
-      ) : (
-        <button
-          type="button"
-          aria-current={active && ariaCurrent ? 'page' : undefined}
-          aria-disabled={disabled ? 'true' : undefined}
-          aria-expanded={branch ? expanded : undefined}
-          data-mantiene-nav={branch ? true : undefined}
-          disabled={disabled}
-          title={titleAttr}
-          class={cx(className, 'w-full text-left')}
-          onClick={onClick}
-        >
-          {content}
-        </button>
-      )}
+      {href
+        ? conAyuda(
+            <a
+              href={href}
+              aria-current={active && ariaCurrent ? 'page' : undefined}
+              aria-disabled={disabled ? 'true' : undefined}
+              title={titleAttr}
+              class={className}
+              onClick={disabled ? (e) => e.preventDefault() : onClick}
+            >
+              {content}
+            </a>,
+          )
+        : conAyuda(
+            <button
+              type="button"
+              aria-current={active && ariaCurrent ? 'page' : undefined}
+              aria-disabled={disabled ? 'true' : undefined}
+              aria-expanded={branch ? expanded : undefined}
+              data-mantiene-nav={branch ? true : undefined}
+              disabled={disabled}
+              title={titleAttr}
+              class={cx(className, 'w-full text-left')}
+              onClick={onClick}
+              onKeyDown={onKeyDown}
+            >
+              {content}
+            </button>,
+          )}
       {/* `ml-7`: el hueco del icono (`h-5 w-5`) y el `gap-2`, así el icono de lo que
           cuelga cae bajo el rótulo de su rama. */}
       {hijos.length > 0 ? (
-        <ul role="group" class="mt-0.5 ml-7 flex flex-col gap-0.5">
+        <ul
+          role="group"
+          class={cx('mt-0.5 flex flex-col gap-0.5', compactChildren ? 'ml-3' : 'ml-7')}
+        >
           {hijos}
         </ul>
       ) : null}
@@ -369,6 +421,23 @@ export function SidebarItem({
         <span class="absolute top-1/2 right-1 -translate-y-1/2">{action}</span>
       ) : null}
     </li>
+  );
+}
+
+/**
+ * El rótulo de `SidebarItem`. Hasta DOS líneas y después puntos suspensivos; con
+ * `middle`, una línea con los puntos en medio y el dominio entero: la cabeza encoge
+ * (`min-w-0 truncate`) y la cola no, salvo que no quepa ni con dos letras delante.
+ */
+function ItemLabel({ label, middle }: { label: string; middle: boolean }): JSX.Element {
+  const at = middle ? label.lastIndexOf('@') : -1;
+  if (!middle) return <span class="line-clamp-2 min-w-0 flex-1 break-words">{label}</span>;
+  if (at <= 0) return <span class="min-w-0 flex-1 truncate">{label}</span>;
+  return (
+    <span class="flex min-w-0 flex-1 whitespace-nowrap">
+      <span class="min-w-0 truncate">{label.slice(0, at)}</span>
+      <span class="max-w-[calc(100%-2ch)] shrink-0 truncate">{label.slice(at)}</span>
+    </span>
   );
 }
 

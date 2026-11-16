@@ -835,14 +835,37 @@ func (h *Handlers) RellenarFicha(w http.ResponseWriter, r *http.Request) {
 	}
 	data, relaciones := ia.FichaDe(m, vista, texto)
 	etiquetas := map[string]string{}
+	claims, autenticada := authn.FromContext(r.Context())
+	if !autenticada || claims.Subject == "" {
+		httpx.Fail(w, r, errSinPermiso)
+		return
+	}
+	var solicitudes []store.RelacionIA
 	for clave, nombre := range relaciones {
-		campo, _ := campoDe(m, clave)
-		pag, err := h.store.Listar(r.Context(), store.Filtro{Modelo: campo.Modelo, Texto: nombre, Limite: 1})
-		if err != nil || len(pag.Registros) == 0 {
+		campo, ok := campoDe(m, clave)
+		if !ok || campo.Tipo != catalogo.TipoRelacion || len(nombre) > maxTextoFicha {
 			continue
 		}
-		reg := pag.Registros[0]
-		data[clave], etiquetas[reg.ID] = reg.ID, cmp.Or(reg.Etiqueta, reg.Ref)
+		destino, ok := h.cat.Modelo(campo.Modelo)
+		if !ok || destino.Modulo == "" {
+			continue
+		}
+		solicitudes = append(solicitudes, store.RelacionIA{Campo: clave, Modelo: campo.Modelo, Modulo: destino.Modulo, Nombre: nombre})
+	}
+	// Recheck even without relations: a failed permission read cannot authorize
+	// any response. Candidates and permissions share one statement snapshot.
+	resueltas, origenPermitido, err := h.store.ResolverRelacionesIA(r.Context(), claims.Subject, claims.Roles, m.Modulo, solicitudes)
+	if err != nil {
+		log.From(r.Context()).Warn("sytue ai: no se pudieron autorizar relaciones", "error", err)
+		httpx.Fail(w, r, httpx.ErrUnavailable)
+		return
+	}
+	if !origenPermitido {
+		httpx.Fail(w, r, errSinPermiso)
+		return
+	}
+	for clave, relacion := range resueltas {
+		data[clave], etiquetas[relacion.ID] = relacion.ID, relacion.Etiqueta
 	}
 	httpx.JSON(w, r, http.StatusOK, map[string]any{"data": data, "etiquetas": etiquetas})
 }

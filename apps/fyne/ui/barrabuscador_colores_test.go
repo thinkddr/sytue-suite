@@ -124,7 +124,7 @@ func TestElBuscadorDeLaBarraPintaLoQueLaWeb(t *testing.T) {
 				if !hayTinta(img, lupa, web.lupa, 3) {
 					t.Errorf("la lupa no tiene ni un píxel de %s", aHex(web.lupa))
 				}
-				// El texto empieza en `pl-9` (31,5 con el rem de 14).
+				// El texto empieza en `pl-9` (36 con el rem de 16).
 				letra := image.Rect(x0+int(30*escala), y0+2, x0+int(140*escala), y1-2)
 				if estado == "texto" {
 					if !hayTinta(img, letra, web.texto, 3) {

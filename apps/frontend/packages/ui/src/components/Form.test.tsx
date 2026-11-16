@@ -32,7 +32,7 @@ test('sin talla, el Input es el control de formulario de siempre (h-9)', () => {
 test('`sm` es el control de cromo denso: 24 px y letra pequeña', () => {
   const host = montar(<Input size="sm" />);
   const cls = host.querySelector('input')!.className;
-  // `min-h-[24px]` y no solo `h-6`: `h-6` son 1,5 rem, 21 px con la raíz a 14.
+  // `min-h-[24px]` y no solo `h-6`: `h-6` son 1,5 rem, y con 1 rem en 14 px eran 21.
   expect(cls).toContain('min-h-[24px]');
   expect(cls).toContain('text-xs');
   // Y NO arrastra el tamaño del control grande: dos utilidades de tamaño de letra en el

@@ -29,7 +29,7 @@ func TestIncomingWebhookLifecycleAndTokenLookup(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
-	_, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	_, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 
 	plain, hash, _ := domain.NewOpaqueToken()
 	w, err := st.CreateIncomingWebhook(ctx, ch.ID, "alice", "CI", "", hash)
@@ -89,7 +89,7 @@ func TestIncomingWebhookAdminOnly(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
-	tm, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	tm, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 	// bob es miembro normal del team (no admin del canal).
 	if err := st.AddTeamMember(ctx, tm.ID, "alice", "bob", "Bob", domain.RoleMember); err != nil {
 		t.Fatalf("AddTeamMember: %v", err)
@@ -104,7 +104,7 @@ func TestOutgoingWebhookCRUDAndCandidates(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool, testCipher(t))
 	ctx := tenantCtx("acme")
-	_, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	_, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 
 	w, err := st.CreateOutgoingWebhook(ctx, &ch.ID, "alice", "https://example.com/hook", "vtok", "sytue", "c2VjcmV0bw==", []string{"deploy"})
 	if err != nil {
@@ -163,7 +163,7 @@ func TestBotLifecycleTokenAndChannelMembership(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool, nil)
 	ctx := comoAdmin(tenantCtx("acme"), "alice") // alice: admin de la organización
-	_, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	_, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 
 	plain, hash, _ := domain.NewBotToken()
 	bot, err := st.CreateBot(ctx, "Deployer", hash, "alice")
@@ -215,8 +215,8 @@ func TestIntegrationsTenantIsolation(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	acme := tenantCtx("acme")
 	globex := tenantCtx("globex")
-	_, chA := seedTeamChannel(t, acme, st, "alice", domain.ChannelPublic)
-	seedTeamChannel(t, globex, st, "gwen", domain.ChannelPublic)
+	_, chA := seedTeamChannel(acme, t, st, "alice", domain.ChannelPublic)
+	seedTeamChannel(globex, t, st, "gwen", domain.ChannelPublic)
 
 	_, hash, _ := domain.NewOpaqueToken()
 	if _, err := st.CreateIncomingWebhook(acme, chA.ID, "alice", "CI", "", hash); err != nil {

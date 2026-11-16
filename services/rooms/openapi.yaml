@@ -1426,6 +1426,21 @@ components:
           type: array
           items: { $ref: "#/components/schemas/Reaction" }
         reply_count: { type: integer }
+        last_reply_at:
+          type: string
+          format: date-time
+          description: "Última respuesta del hilo (solo raíces con respuestas, en el feed y en el hilo)."
+        thread_participants:
+          type: array
+          description: "Hasta 3 personas que respondieron más recientemente, para los avatares del indicador de hilo."
+          items:
+            type: object
+            properties:
+              sub: { type: string }
+              name: { type: string }
+        also_in_channel:
+          type: boolean
+          description: "Respuesta de hilo que también se ve en el feed del canal («También enviar al canal»)."
         edited_at: { type: string, format: date-time, nullable: true }
         created_at: { type: string, format: date-time }
         priority:
@@ -1450,6 +1465,9 @@ components:
           enum: [normal, important, urgent]
           description: "Prioridad del mensaje (Ola 12; por defecto normal)."
         requires_ack: { type: boolean, description: "Pide acuse de recibo a los lectores." }
+        also_in_channel:
+          type: boolean
+          description: "Solo en /messages/{id}/replies: la respuesta se ve además en el feed del canal. Se ignora en un mensaje raíz."
         send_at:
           type: string
           format: date-time

@@ -7,6 +7,7 @@
   "block.short": "Estä",
   "card.untitledOwner": "Tuntematon nimi",
   "card.watch": "Katso {title}",
+  "card.watched": "Katsottu {percent} %",
   "channel.count": {
     "one": "{count} julkinen video",
     "other": "{count} julkista videota"
@@ -153,7 +154,12 @@
   "player.qualityAuto": "Automaattinen",
   "player.qualityAutoNow": "Automaattinen ({quality})",
   "player.region": "Videosoitin",
+  "player.restart": "Aloita alusta",
+  "player.resumedAt": "Jatkuu kohdasta {time}",
   "player.seek": "Kohta",
+  "player.speed": "Nopeus",
+  "player.speedNormal": "Normaali",
+  "player.speedNow": "Nopeus {rate}",
   "player.unmute": "Äänet päälle",
   "player.volume": "Äänenvoimakkuus",
   "quality.approximate": "Karkea arvio: videon kestoa ei vielä tiedetä.",

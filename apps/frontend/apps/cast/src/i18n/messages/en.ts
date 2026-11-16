@@ -94,6 +94,8 @@ export const en = {
   'player.unmute': 'Unmute',
   'player.volume': 'Volume',
   'player.seek': 'Position',
+  'player.restart': 'Start from the beginning',
+  'player.resumedAt': 'Continuing from {time}',
   'player.fullscreen': 'Full screen',
   'player.exitFullscreen': 'Exit full screen',
   'player.pip': 'Picture in picture',
@@ -275,6 +277,7 @@ export const en = {
   'share.restricted': 'Only people who can already watch it will be able to open this link.',
 
   'card.watch': 'Watch {title}',
+  'card.watched': '{percent}% watched',
   'card.untitledOwner': 'Unknown author',
 
   'embed.watchOn': 'Watch on Sytue Cast',
@@ -316,6 +319,9 @@ export const en = {
   'player.quality': 'Quality',
   'player.qualityAuto': 'Auto',
   'player.qualityAutoNow': 'Auto ({quality})',
+  'player.speed': 'Speed',
+  'player.speedNormal': 'Normal',
+  'player.speedNow': 'Speed {rate}',
   'player.pipBack': 'Back to the main window',
   'player.pipClose': 'Close picture-in-picture',
   'player.pipActive': 'Playing in picture-in-picture.',

@@ -173,15 +173,10 @@ export const tienda = {
   'store.mode_test_help':
     'Simuleeritud maksed teenusepakkuja testvõtmetega. Kelleltki raha ei võeta.',
   'store.mode_live_help': 'Klientide pärismaksed toodanguvõtmetega.',
-  'store.webhook_title': '1. samm: veebihaagi (webhook) aadress',
   'store.webhook_help': 'Kleepige see aadress teenuse {nombre} töölauale.',
   'store.webhook_label': 'Veebihaagi aadress',
   'store.webhook_error':
     'Veebihaagi aadressi ei õnnestunud hankida. Sulgege dialoog ja proovige uuesti.',
-  'store.copy': 'Kopeeri',
-  'store.copied': 'Aadress on kopeeritud.',
-  'store.credentials_title': 'Mandaadid',
-  'store.credentials_step': '2. samm: mandaadid',
   'store.f_api_key': 'API-võti',
   'store.f_api_key_mode': 'API-võti ({modo})',
   'store.f_profile_id': 'Profiili ID (valikuline)',
@@ -199,6 +194,48 @@ export const tienda = {
   'store.gateway_save': 'Salvesta ja testi',
   'store.gateway_saved': 'Maksevärav {nombre} on testitud ja salvestatud.',
   'store.gateway_save_error': 'Maksevärava mandaate ei õnnestunud kinnitada.',
+  'store.wz_progress': 'Makselahenduse ühendamise sammud',
+  'store.wz_step_mode': 'Režiim',
+  'store.wz_step_webhook': 'Webhook',
+  'store.wz_step_keys': 'Võtmed',
+  'store.wz_step_check': 'Kontrolli',
+  'store.wz_step_done': 'Valmis',
+  'store.wz_mode_heading': 'Testmaksed või päris maksed?',
+  'store.wz_mode_desc':
+    'Alusta testrežiimis; kui kõik töötab, ava see viisard uuesti ja vali päris režiim.',
+  'store.wz_webhook_heading': 'Ütle teenusele {nombre}, kuhu makseteateid saata',
+  'store.wz_keys_heading': 'Sinu teenuse {nombre} võtmed',
+  'store.wz_keys_desc':
+    'Salajased võtmed salvestatakse pitseeritult ja neid ei näidata enam kunagi: võtme muutmiseks sisesta see uuesti.',
+  'store.wz_keys_rejected': '{nombre} ei aktsepteerinud neid võtmeid',
+  'store.wz_check_heading': 'Kontrolli ja salvesta',
+  'store.wz_check_desc':
+    'Sytue Web proovib võtmeid teenuses {nombre} enne makselahenduse sisselülitamist. Midagi ei salvestata enne, kui proov õnnestub.',
+  'store.wz_secret_hidden': 'Sisestatud (peidetud)',
+  'store.wz_empty_value': 'Pole määratud',
+  'store.wz_done_heading': '{nombre} on valmis',
+  'store.wz_finish': 'Lõpeta',
+  'store.hint_mollie_api_key':
+    'Mollies: Developers › API keys. Testvõtmed algavad test_ ja päris võtmed live_.',
+  'store.hint_mollie_profile':
+    'Mollies: Settings › Website profiles. See algab pfl_; jäta tühjaks, et kasutada vaikeprofiili.',
+  'store.hint_adyen_api_key':
+    'Adyen Customer Areas: Developers › API credentials › sinu volitus › API key.',
+  'store.hint_adyen_merchant':
+    'Adyen Customer Areas, ülal kontovalijas: kaupmehe konto, mitte ettevõtte konto.',
+  'store.hint_adyen_hmac': 'Adyenis: Developers › Webhooks › sinu webhook › Security › HMAC key.',
+  'store.hint_adyen_live_prefix':
+    'Adyenis (päris): Developers › API URLs. See on aadressi osa enne -checkout-live.',
+  'store.hint_redsys_merchant':
+    'Selle annab sulle pank koos virtuaalse makseterminali lepinguga; see on ka Redsysi haldusportaalis.',
+  'store.hint_redsys_terminal':
+    'Redsysi haldusportaalis kaupmehe koodi kõrval. Tavaliselt on see 1.',
+  'store.hint_redsys_secret':
+    'Redsysi haldusportaalis: kaupmehe andmed › SHA-256 võti. Test- ja päris võti on erinevad.',
+  'store.hint_stripe_secret':
+    'Stripe’is: Developers › API keys › Secret key. See algab sk_test_ või sk_live_.',
+  'store.hint_stripe_webhook':
+    'Stripe’is: Developers › Webhooks › sinu lõpp-punkt › Signing secret. See algab whsec_.',
   'orders.subtitle': 'Teie veebisaidil tehtud tellimused ja ostud.',
   'orders.count': { one: '{count} tellimus', other: '{count} tellimust' },
   'orders.loading': 'Tellimuste laadimine',

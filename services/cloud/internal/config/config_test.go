@@ -256,3 +256,29 @@ func TestUseKubeRunner(t *testing.T) {
 		})
 	}
 }
+
+// En producción, sin lista explícita, DevX admite a la organización que opera la
+// plataforma (`corporate`) y a nadie más; en particular, no a `sytue`, su nombre
+// antiguo, que ya está libre para cualquiera.
+func TestTenantAllowedPorDefectoEsLaOrganizacionDeLaPlataforma(t *testing.T) {
+	setRequiredEnv(t)
+	t.Setenv("SYTUE_ENV", "prod")
+	cfg, err := Load(DefaultAPIPort)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	cfg.Env = pcfg.EnvProd
+	if !cfg.TenantAllowed("corporate") {
+		t.Fatal("la organización de la plataforma (corporate) debe poder entrar en DevX")
+	}
+	for _, otro := range []string{"sytue", "acme"} {
+		if cfg.TenantAllowed(otro) {
+			t.Fatalf("%q no debe entrar en DevX mientras esté cerrado a terceros", otro)
+		}
+	}
+	// Una lista vacía tampoco abre la puerta: cae en la misma organización.
+	cfg.TenantsPermitidos = nil
+	if !cfg.TenantAllowed("corporate") || cfg.TenantAllowed("sytue") {
+		t.Fatal("con la lista vacía solo debe entrar corporate")
+	}
+}

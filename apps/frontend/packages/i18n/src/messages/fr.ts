@@ -7,7 +7,60 @@
 import type { Catalog } from './catalog.js';
 
 export const fr: Catalog = {
+  'matrix.reset': 'Je n’ai pas d’autre appareil',
+  'matrix.resetAction': 'Réinitialiser le chiffrement',
+  'matrix.resetBody':
+    'Le chiffrement de ton compte sera réinitialisé. Les anciens messages chiffrés ne resteront lisibles que sur les appareils qui les ont déjà, et tu devras vérifier à nouveau tes autres appareils et tes contacts.',
+  'matrix.resetUnderstood': 'Je comprends que je peux perdre l’accès aux anciens messages chiffrés',
+  'matrix.unknownKey':
+    'Ce compte a été chiffré avant que Sytue ne protège sa clé avec ta connexion. Vérifie cet appareil depuis un autre sur lequel tu es déjà connecté.',
+  'matrix.unlockTitle': 'Ouvrir tes données chiffrées',
+  'matrix.unlockBody':
+    'Confirme que c’est bien toi avec ta clé d’accès ou ton mot de passe Sytue. La vérification a lieu sur cet appareil : personne d’autre ne peut ouvrir tes données.',
+  'matrix.protectTitle': 'Protéger tes données chiffrées',
+  'matrix.protectBody':
+    'Choisis comment tu ouvriras tes données chiffrées sur tes autres appareils : avec ta clé d’accès ou ton mot de passe Sytue. Toi seul pourras les ouvrir.',
+  'matrix.usePasskey': 'Utiliser une clé d’accès',
+  'matrix.usePassword': 'Utiliser le mot de passe',
+  'matrix.password': 'Mot de passe Sytue',
+  'matrix.passwordConfirm': 'Répète le mot de passe',
+  'matrix.passwordMismatch': 'Les mots de passe ne correspondent pas.',
+  'matrix.unlockWrong': 'Cela n’a pas fonctionné. Réessaie.',
+  'matrix.passkeyUnsupported':
+    'Cette clé d’accès ne peut pas ouvrir les données chiffrées. Utilise ton mot de passe.',
+  // Device verification and recovery shared by the suite.
+  'matrix.allowStorageTitle': 'Autoriser le traitement chiffré',
+  'matrix.allowStorageBody':
+    'Autorisez cet appareil vérifié à traiter les nouvelles données chiffrées de cette app.',
+  'matrix.allowStorageAction': 'Autoriser cet appareil',
+  'matrix.choosePerson': 'Choisissez une personne de ce canal',
+  'matrix.notices': 'Licences tierces',
+  'action.cancel': 'Annuler',
+  'action.done': 'Terminé',
+  'matrix.auth': 'Confirme ton identité',
+  'matrix.authContinue': 'Je me suis connecté',
+  'matrix.compare': 'Compare ces émojis sur les deux appareils.',
+  'matrix.connect': 'Configurer cet appareil',
+  'matrix.devices': 'Tes appareils',
+  'matrix.failed': 'Le chiffrement n’a pas pu être configuré. Réessaie.',
+  'matrix.incoming': 'Vérifier cet appareil',
+  'matrix.match': 'Ils correspondent',
+  'matrix.mismatch': 'Ils ne correspondent pas',
+  'matrix.revoke': 'Déconnecter l’appareil',
+  'matrix.subtitle':
+    'Les messages et fichiers sont chiffrés sur tes appareils. Seuls les appareils vérifiés peuvent les lire.',
+  'matrix.tab': 'Rooms est ouvert dans un autre onglet. Ferme-le pour utiliser cet appareil ici.',
+  'matrix.title': 'Chiffrement de bout en bout',
+  'matrix.trusted': 'Appareil vérifié',
+  'matrix.verify': 'Vérifier avec un autre appareil',
+  'matrix.verifyPeopleFirst':
+    'Vérifiez les personnes de cette conversation avant d’envoyer votre premier message.',
+  'matrix.verifyPerson': 'Vérifier une personne',
+  'matrix.waiting': 'En attente de l’autre appareil…',
+  'state.loading': 'Chargement…',
+
   'action.retry': 'Réessayer',
+  'account.connectFailed': 'Impossible de connecter ce compte.',
   'error.connection': 'Vérifiez votre connexion et réessayez.',
 
   'ui.save': 'Enregistrer',
@@ -20,6 +73,7 @@ export const fr: Catalog = {
   'ui.mainNav': 'Navigation principale',
   'ui.openNav': 'Ouvrir la navigation',
   'ui.closeNav': 'Fermer la navigation',
+  'ui.settingsIndex': 'Sections de cette page',
   'ui.backToList': 'Revenir à la liste',
   'ui.suiteOpen': 'Sytue : applications, recherche, notifications et compte',
   'ui.suiteClose': 'Revenir à l’application',
@@ -30,6 +84,14 @@ export const fr: Catalog = {
 
   'ui.bulk.region': 'Actions sur la sélection',
   'ui.bulk.clear': 'Effacer la sélection',
+
+  'ui.copy.copy': 'Copier',
+  'ui.copy.copyLabel': 'Copier {label}',
+  'ui.copy.copied': 'Copié',
+  'ui.copy.copiedLabel': 'Copié : {label}',
+  'ui.copy.failed': 'Impossible de copier. Sélectionnez la valeur et copiez-la manuellement.',
+  'ui.copy.secret': 'secret',
+  'ui.migas.ocultas': 'Afficher les dossiers masqués',
 
   'ui.wizard.back': 'Retour',
   'ui.wizard.next': 'Continuer',
@@ -43,6 +105,13 @@ export const fr: Catalog = {
   'shell.appSwitcher': 'Sytue One — applications de la suite',
   'shell.apps': 'Applications Sytue One',
   'shell.shortcutHint': 'Raccourci : {keys}',
+  'shell.shortcuts.title': 'Raccourcis clavier',
+  'shell.shortcuts.group': 'Toute la suite',
+  'shell.shortcuts.search': 'Rechercher dans Sytue One',
+  'shell.shortcuts.help': 'Afficher cette liste',
+  'shell.shortcuts.close': 'Fermer une boîte de dialogue ou un menu',
+  'shell.shortcuts.contextMenu': 'Ouvrir le menu contextuel',
+  'shell.shortcuts.key.shift': 'Maj',
   'shell.launchAtLogin': 'Ouvrir à l’ouverture de session',
   'shell.mountDrive': 'Connecter Drive à cet ordinateur',
   'shell.update.check': 'Rechercher des mises à jour',
@@ -69,6 +138,10 @@ export const fr: Catalog = {
   'shell.lock.reasonNotebook': 'ouvrir votre carnet chiffré',
   'shell.lock.faceIdUsage':
     'Sytue utilise Face ID pour déverrouiller votre session à l’ouverture de l’app.',
+  'shell.photos.libraryUsage':
+    'Sytue lit les photos et vidéos de cet appareil pour les sauvegarder dans votre Sytue Drive.',
+  'shell.photos.libraryAddUsage':
+    'Sytue enregistre dans votre photothèque les photos que vous téléchargez.',
   'shell.widgets.wake': 'Mettre à jour les widgets quand l’app est fermée',
   'shell.widgets.wakeHelp':
     'Quand quelque chose change chez vous, Sytue réveille l’app avec une notification Apple vide pour qu’elle actualise son widget. Apple voit quelle app et quand, jamais ce qui a changé.',
@@ -126,6 +199,13 @@ export const fr: Catalog = {
   'search.kind.contact': 'contacts',
   'search.kind.note': 'notes',
   'search.kind.channel': 'canaux',
+  'suitePalette.dialog': 'Aller à ou rechercher',
+  'suitePalette.input': 'Rechercher ou aller à',
+  'suitePalette.placeholder': 'Rechercher dans Sytue One ou aller à…',
+  'suitePalette.typeToSearch': 'Saisissez du texte pour rechercher dans tout Sytue One',
+  'suitePalette.hint.move': 'déplacer',
+  'suitePalette.hint.open': 'ouvrir',
+  'suitePalette.hint.close': 'fermer',
 
   'notifications.title': 'Notifications',
   'notifications.viewAll': 'Voir toutes les notifications',
@@ -169,6 +249,9 @@ export const fr: Catalog = {
   'notifications.kind.docs.signature.requested': '{actor} vous demande de signer « {name} »',
   'notifications.kind.docs.signature.completed': '{actor} a signé « {name} »',
   'notifications.kind.docs.signature.declined': '{actor} a refusé de signer « {name} »',
+  'notifications.kind.docs.signature.expired': 'La demande de signature de « {name} » a expiré',
+  'notifications.kind.docs.signature.reminder':
+    '{actor} attend toujours votre signature sur « {name} »',
   'notifications.kind.docs.access.granted':
     '{actor} vous a donné l’accès en modification à « {name} »',
   'notifications.kind.erp.task.assigned': '{actor} vous a attribué « {title} »',
@@ -216,6 +299,18 @@ export const fr: Catalog = {
   'account.color.petroleo': 'Pétrole',
   'account.color.cobalto': 'Bleu cobalt',
   'account.color.app': 'Par app',
+  'userColor.red': 'Rouge',
+  'userColor.clay': 'Orange',
+  'userColor.brass': 'Ocre',
+  'userColor.sage': 'Olive',
+  'userColor.green': 'Vert',
+  'userColor.teal': 'Sarcelle',
+  'userColor.cyan': 'Pétrole',
+  'userColor.blue': 'Bleu',
+  'userColor.indigo': 'Indigo',
+  'userColor.plum': 'Violet',
+  'userColor.rose': 'Rose',
+  'userColor.slate': 'Gris',
   'account.forma': 'Forme',
   'account.forma.marco': 'Cadre',
   'account.forma.carril': 'Rail',
@@ -327,6 +422,7 @@ export const fr: Catalog = {
     'Cette feuille est protégée : ses cellules ne peuvent pas être modifiées tant qu’elle n’est pas déprotégée.',
   'readOnly.password': 'Mot de passe',
   'notifications.kind.erp.access.requested': '{actor} demande à modifier « {name} »',
+  'notifications.kind.erp.approval.requested': '{actor} vous demande d’approuver « {name} »',
   'notifications.kind.erp.access.granted':
     '{actor} vous a donné l’accès en modification à « {name} »',
   'readOnly.module': 'Lecture seule dans « {name} » : vous pouvez consulter, mais pas modifier.',
@@ -412,4 +508,7 @@ export const fr: Catalog = {
     'Pour ouvrir « {name} », le fichier sera téléversé sur votre compte Sytue One.',
   'localFile.confirmUpload.remember': 'Mémoriser mon choix sur cet appareil',
   'localFile.confirmUpload.confirm': 'Téléverser et ouvrir',
+  'action.back': 'Retour',
+  'action.close': 'Fermer',
+  'action.copy': 'Copier',
 };

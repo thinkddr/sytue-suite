@@ -211,8 +211,10 @@ HEX sueltos**. Así respetan light/dark automáticamente al heredar las variable
 embebido en el DOM para que las custom properties cascadeen.
 
 > **Excepción — superficies de marca fijas.** El hero (`hero-suite.svg`) y las imágenes
-> de `branding/og/` viven sobre azul profundo de marca **independiente del tema** (igual
-> que `sytue-one-white.svg`), por lo que embeben los hexes de marca a propósito. No son
+> de `branding/og/` viven sobre el grafito de marca **independiente del tema** (igual
+> que `sytue-one-white.svg`), por lo que embeben los hexes de marca a propósito: campo
+> `#1a1d21`, el símbolo de `logo/sytue-mark.svg` tal cual y el latón como único acento.
+> `arte-de-marca.test.ts` (en `@sytue/ui`) falla si alguna se sale de esa paleta. No son
 > el patrón general; toda ilustración de producto usa roles.
 
 ### 8.3 Catálogo

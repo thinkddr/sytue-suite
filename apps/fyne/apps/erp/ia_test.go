@@ -110,7 +110,7 @@ func TestElInformeMideLoDeLaWeb(t *testing.T) {
 	_, rejilla = x.Objeto(tema.Claro, 676)
 	cerca(t, "la rejilla del panel", rejilla, 412)
 
-	puntos := []PuntoBarras{{"jun", 1200}, {"jul", 0}, {"ago", 2450.5}, {"sept", 4406.96}}
+	puntos := []PuntoBarras{{Rotulo: "jun", Valor: 1200}, {Rotulo: "jul"}, {Rotulo: "ago", Valor: 2450.5}, {Rotulo: "sept", Valor: 4406.96}}
 	pos, tam := geometriaBarras(puntos, 442)
 	for i, quiero := range []float32{33, 1, 67, 120} {
 		cerca(t, "el alto de una barra", tam[i].Height, quiero)

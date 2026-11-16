@@ -12,6 +12,7 @@
 // Para VERLA hace falta una máquina con pantalla. Lo que corre en cualquier sitio, sin
 // CGO y sin servidor gráfico, es `go test ./apps/drive/...`, que pinta lo mismo con el
 // pintor de software y compara los píxeles.
+// paridad-web: apps/frontend/apps/drive/src/pages/auth/matrix/callback.astro
 package main
 
 import (
@@ -26,19 +27,26 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/storage"
 
 	"git.sytue.eu/sytue/one/apps/fyne/apps/drive"
 	"git.sytue.eu/sytue/one/apps/fyne/catalogos"
+	"git.sytue.eu/sytue/one/apps/fyne/cifrado"
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/sesion"
+	"git.sytue.eu/sytue/one/apps/fyne/soltar"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/auth"
 	"git.sytue.eu/sytue/one/apps/nucleo/documentos"
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	mx "git.sytue.eu/sytue/one/apps/nucleo/matrix"
 	"git.sytue.eu/sytue/one/apps/nucleo/sistema"
+	privateStorage "git.sytue.eu/sytue/one/apps/nucleo/storage"
 )
 
 // Medidas de la ventana al abrir: el ancho canónico de la suite y un alto que deja ver
@@ -70,94 +78,290 @@ func main() {
 	w := a.NewWindow("Sytue Drive")
 	w.SetPadded(false)
 
-	// El cliente lleva la sesión COMPARTIDA: el mismo puntero que renueva el token para
-	// las trece apps. Sin sesión la pantalla no pide nada y enseña cómo entrar, que es
-	// lo que hace la web al redirigir al inicio de sesión.
-	// Sin conexión, solo lectura: la caché «red primero» y su monitor son de la sesión.
 	red, cliente := s.Conexion("drive", drive.SinGuardarSinConexion...)
-	p := drive.NuevaPantalla(tr, api.NewDrive(s.URL("drive"), s.Sesion, s.ClienteConAviso(cliente)), red, w)
 	// El widget nativo lo lee su propia Fuente (la raíz y la cuota), SIN la caché de
 	// trabajar sin conexión, y se vuelve a publicar tras cada escritura de Drive.
 	s.PublicadorWidget(s.FuenteWidget(tr))
-	p.Docs = api.NewDocs(s.URL("docs"), s.Sesion, cliente)
-	p.Directorio = api.NewDirectorio(s.URL("id"), s.Sesion, cliente)
-	p.Grupos = s.Sesion.Grupos
-	p.IA = api.NewIA(s.URL("ai"), s.Sesion, nil)
-	integraciones := api.NewIntegraciones(s.URL("integrations"), s.Sesion, nil)
-	p.ConIntegraciones(integraciones)
-	p.AutorizarApp = func(ctx context.Context, plantilla, instancia string) (string, error) {
-		return s.AutorizarApp(ctx, integraciones, plantilla, instancia, "native-storage")
+	slot := container.NewStack()
+	cryptoT := func(key string) string { return tr.T(key, nil) }
+	store, storeErr := ajustes.Carpeta()
+	nuevoPanel := func() *cifrado.Panel {
+		panel := &cifrado.Panel{
+			Base:   mx.Config{SytueApex: s.Apex(), StoreDir: filepath.Join(store, "drive-matrix"), DeviceName: "Sytue Drive · " + runtime.GOOS},
+			Lienzo: w.Canvas, Traducir: cryptoT,
+			Copiar: func(text string) { a.Clipboard().SetContent(text) },
+			Abrir:  func(target string) error { return api.AbrirFuera(a, target) },
+		}
+		if storeErr != nil {
+			panel.Base.StoreDir = ""
+		}
+		return panel
 	}
-	p.AutorizarAppNueva = func(ctx context.Context, plantilla string) (string, error) {
-		return s.AutorizarAppNueva(ctx, integraciones, plantilla, "native-storage")
-	}
-	p.AutorizarNube = func(ctx context.Context, proveedor string) (string, error) {
-		return s.AutorizarNube(ctx, integraciones, proveedor)
-	}
-	p.Apex = s.Apex()
-	p.Org = s.Sesion.Organizacion
-	p.Entrar = func() error { return s.Entrar(context.Background()) }
 	abrirSistema := s.AbrirDriveEnSistema
 	if archivos := conectarArchivos(s); archivos != nil {
 		abrirSistema = func() error { return archivos.abrir(s.AbrirDriveEnSistema) }
 	}
-	p.ConfigurarSistema = func() { configurarSistema(s, tr, w, abrirSistema) }
-	montarSelector(w, p)
-	identidadImportador := ""
-	var pararImportador context.CancelFunc
-	actualizarImportador := func(e sesion.Estado) {
-		actual := ""
-		if e.Dentro() {
-			actual = s.URL("id") + "\x00" + e.Sujeto + "\x00" + s.Sesion.Organizacion()
-		}
-		if actual == identidadImportador {
-			return
-		}
-		identidadImportador = actual
-		if pararImportador != nil {
-			pararImportador()
-		}
-		p.PararImportador()
-		if actual != "" {
-			vida, parar := context.WithCancel(context.Background())
-			pararImportador = parar
-			p.IniciarImportador(vida)
+	var control *drivePrivado
+	notify := func(error) {
+		// Keep provider details and private source names out of notices/logs.
+		if control != nil && control.pantalla != nil {
+			control.pantalla.AvisarCifrado(cryptoT("matrix.failed"))
+		} else if control != nil {
+			view := ui.NuevoVacio(cryptoT("matrix.failed"), "")
+			view.Accion = ui.NuevoBoton(tr.T("action.retry", nil), func() {
+				if c := control.ciclo; c != nil {
+					control.preparar(c.ctx)
+				} else if control.mostrar != nil {
+					control.mostrar()
+				}
+			})
+			slot.Objects = []fyne.CanvasObject{view}
+			slot.Refresh()
 		}
 	}
-	// conEscena: hasta que corre lo de CuandoHayaEscena, el AlCambiar no toca la
-	// pantalla; la escena la arranca con la sesión de ese momento (sesion.CuandoHayaEscena).
+	control = &drivePrivado{
+		avisar:    notify,
+		identidad: func() (auth.IdentitySnapshot, bool) { return s.Sesion.SnapshotIdentity(), s.Estado().Dentro() },
+		bloqueado: func(dentro bool) {
+			ui.AlAtras(w.Canvas(), nil)
+			if dentro {
+				view := ui.NuevoVacio(cryptoT("matrix.title"), cryptoT("matrix.subtitle"))
+				view.Accion = ui.NuevoBoton(cryptoT("matrix.connect"), func() {
+					if control.mostrar != nil {
+						control.mostrar()
+					}
+				})
+				slot.Objects = []fyne.CanvasObject{view}
+			} else {
+				view := ui.NuevoVacio(tr.T("account.signedOutTitle", nil), tr.T("account.signedOutDescription", nil))
+				view.Accion = ui.NuevoBoton(tr.T("account.signIn", nil), func() { go func() { _ = s.Entrar(context.Background()) }() })
+				slot.Objects = []fyne.CanvasObject{view}
+			}
+			slot.Refresh()
+		},
+		montar: func(ctx context.Context, repo repositorioPrivado) (*drive.Pantalla, error) {
+			bound, err := cifrado.SessionHTTP(ctx)
+			if err != nil {
+				return nil, err
+			}
+			account := api.NewDrive(s.URL("drive"), bound, nil)
+			data, err := account.WithPrivateData(repo)
+			if err != nil {
+				return nil, err
+			}
+			// UI handlers acquire their request context from screen.Vida below.
+			screen := drive.NuevaPantalla(tr, data, red, w) //nolint:contextcheck // The presenter retains ctx as Vida; UI callbacks do not accept contexts.
+			screen.Cuenta = account
+			screen.Vida = ctx
+			screen.Directorio = api.NewDirectorio(s.URL("id"), bound, cliente)
+			screen.Grupos = s.Sesion.Grupos
+			// «Combinar PDF» con la misma fachada privada que la pantalla: los PDF se
+			// leen del repositorio cifrado y se unen en el dispositivo, como en CertiPDF.
+			if pdf, err := api.NewPDF(s.URL("docs"), s.URL("drive"), bound, nil).WithPrivateDrive(repo); err == nil {
+				screen.ConPDF(pdf)
+			}
+			integraciones := api.NewIntegraciones(s.URL("integrations"), bound, nil)
+			// Connections use consent; legacy server-side file import stays inactive.
+			screen.AutorizarApp = func(ctx context.Context, template, instance string) (string, error) {
+				return s.AutorizarApp(ctx, integraciones, template, instance, "native-storage")
+			}
+			screen.AutorizarAppNueva = func(ctx context.Context, template string) (string, error) {
+				return s.AutorizarAppNueva(ctx, integraciones, template, "native-storage")
+			}
+			screen.AutorizarNube = func(ctx context.Context, provider string) (string, error) {
+				return s.AutorizarNube(ctx, integraciones, provider)
+			}
+			screen.Apex = s.Apex()
+			screen.Org = func() string { return repo.PrivateStorageScope().Tenant }
+			screen.Entrar = func() error { return s.Entrar(ctx) }
+			screen.ConfigurarSistema = func() { configurarSistema(s, tr, w, abrirSistema) } //nolint:contextcheck // The OS configuration dialog owns a separate interactive lifetime.
+			montarSelector(w, screen)
+			slot.Objects = []fyne.CanvasObject{screen.Objeto()} //nolint:contextcheck // UI callbacks use screen.Vida, already bound to ctx.
+			slot.Refresh()
+			go func() {
+				if runtime.GOOS == "ios" && sistema.ArchivosDisponible() {
+					return
+				}
+				err := documentos.Servir(ctx, data, documentos.Textos{Titulo: a.Metadata().Name, SinApp: tr.T("shell.documentsProvider.openApp", nil)})
+				if err != nil && !errors.Is(err, documentos.ErrNoDisponible) && ctx.Err() == nil {
+					slog.Warn("drive: private document provider unavailable")
+				}
+			}()
+			screen.Arrancar(true) //nolint:contextcheck // Requests use screen.Vida; Arrancar is a UI lifecycle operation.
+			return screen, nil
+		},
+	}
+	var cierreAnterior <-chan struct{}
+	control.iniciar = func(ctx context.Context, ready func(context.Context, repositorioPrivado, func(context.Context) error)) error {
+		legacy, isolated := nuevoPanel(), nuevoPanel()
+		control.panel = isolated
+		control.instalar() //nolint:contextcheck // UI events retain the original presenter's c.ctx; installing callbacks starts no request.
+		failed := func(err error) {
+			if ctx.Err() == nil {
+				notify(err)
+			}
+		}
+		legacy.Avisar = func(string) { failed(api.ErrPrivateDriveOperation) }
+		isolated.Avisar = legacy.Avisar
+		login := func(ctx context.Context, cfg mx.Config) (*mx.Client, error) {
+			bound, err := cifrado.SessionHTTP(ctx)
+			if err != nil {
+				return nil, err
+			}
+			broker := api.NewRooms(s.URL("rooms"), bound, nil)
+			if runtime.GOOS == "ios" || runtime.GOOS == "android" {
+				return mx.LoginNative(ctx, cfg, broker, s.MatrixBrowserReturn)
+			}
+			return mx.Login(ctx, cfg, func(target string) error {
+				opened := make(chan error, 1)
+				fyne.Do(func() { opened <- api.AbrirFuera(a, target) })
+				select {
+				case err := <-opened:
+					return err
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			})
+		}
+		legacy.Login, isolated.Login = login, login
+		factory, err := cifrado.NewNativeFactory(s, "drive")
+		if err != nil {
+			return err
+		}
+		var repository repositorioPrivado
+		consent := cifrado.NewIngressConsent(s.URL("rooms"))
+		panels, err := cifrado.NewStoragePanels(cifrado.StoragePanelsConfig{
+			Legacy: legacy, Isolated: isolated, Factory: factory,
+			State: func(ctx context.Context, scope privateStorage.Scope) (privateStorage.IdentityCutoverState, error) {
+				bound, err := cifrado.SessionHTTP(ctx)
+				if err != nil {
+					return privateStorage.IdentityCutoverState{}, err
+				}
+				return api.NewRooms(s.URL("rooms"), bound, nil).MatrixStorageMigration(ctx, scope)
+			},
+			Bootstrap: func(ctx context.Context, version privateStorage.IdentityVersion) (mx.Bootstrap, error) {
+				bound, err := cifrado.SessionHTTP(ctx)
+				if err != nil {
+					return mx.Bootstrap{}, err
+				}
+				return api.NewRooms(s.URL("rooms"), bound, nil).MatrixStorageBootstrapForIdentity(ctx, "drive", version)
+			},
+			Ready: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) {
+				if repository != nil {
+					ready(ctx, repository, resources.Check)
+					return
+				}
+				control.autorizarAlmacen(ctx, func(ctx context.Context) error { return consent.BeforeOpenPanel(ctx, resources, isolated) }, func() {
+					var err error
+					repository, err = cifrado.NewDriveRepository(ctx, resources, s.URL("drive"), s.URL("rooms"))
+					if err != nil {
+						failed(err)
+						return
+					}
+					ready(ctx, repository, resources.Check)
+				})
+			},
+			Failed: failed,
+		})
+		if err != nil {
+			return err
+		}
+		previous := cierreAnterior
+		started := false
+		start := func(startContext context.Context) {
+			if ctx.Err() != nil {
+				return
+			}
+			if previous != nil {
+				select {
+				case <-previous:
+				default:
+					return
+				}
+			}
+			if err := panels.Start(startContext); err != nil {
+				failed(err)
+				return
+			}
+			started = true
+		}
+		control.reintentar = func() {
+			if started {
+				panels.Retry()
+			} else {
+				start(s.Sesion.WithAuthorizationIntent(ctx))
+			}
+		}
+		control.mostrar = func() {
+			if started {
+				panels.Show()
+			} else {
+				control.reintentar()
+			}
+		}
+		control.cerrarPaneles = func(drain func()) { //nolint:contextcheck // UI teardown cancels both device lifetimes; the joined cleanup deliberately outlives that cancellation.
+			panels.Invalidate()
+			legacy.AlCerrar = func() func() { return drain }
+			isolated.AlCerrar = legacy.AlCerrar
+			legacy.Cerrar()
+			isolated.Cerrar()
+			closed := make(chan struct{})
+			cierreAnterior = closed
+			go func() { //nolint:contextcheck // Teardown joins both SDKs after the view was cancelled; native keys and journals remain persisted.
+				if previous != nil {
+					<-previous
+				}
+				_ = legacy.Retire(context.Background())
+				_ = isolated.Retire(context.Background())
+				close(closed)
+			}()
+		}
+		intent := s.Sesion.WithAuthorizationIntent(ctx)
+		if previous != nil {
+			go func() {
+				select {
+				case <-previous:
+					fyne.Do(func() { start(intent) })
+				case <-ctx.Done():
+				}
+			}()
+		} else {
+			start(intent)
+		}
+		return nil
+	}
 	conEscena := false
 	s.AlCambiar(func(e sesion.Estado) {
-		actualizarImportador(e)
-		if conEscena {
-			p.Sesion(e.Dentro())
+		if !conEscena {
+			return
 		}
+		// Observe intermediate logout/account events even when credentials moved again
+		// before this UI callback runs (A -> B -> A).
+		if control.dentro && (!e.Dentro() || e.Sujeto != control.cuenta.Subject) {
+			control.cerrar()
+			control.dentro = false
+		}
+		control.cambiar()
 	})
-
-	// Arrastrar ficheros del sistema a la ventana los sube a la carpeta abierta, como
-	// soltarlos sobre el explorador de la web.
-	w.SetOnDropped(func(_ fyne.Position, uris []fyne.URI) { p.Subir(rutasLocales(uris)) })
-	// «u» y «n» sueltas, como en la web. El lienzo solo las recibe si no hay nada
+	w.SetOnDropped(func(_ fyne.Position, uris []fyne.URI) {
+		control.cuandoLista(func(p *drive.Pantalla) { p.Subir(rutasLocales(uris)) })
+	})
+	// «Suelta para subir aquí» mientras se arrastran por encima. Es solo el aviso: donde
+	// el sistema no avisa (Wayland) la subida al soltar funciona igual.
+	soltar.AlArrastrar(w, func(activa bool) {
+		control.cuandoLista(func(p *drive.Pantalla) { p.Arrastrando(activa) })
+	})
+	// Los atajos de la web (`lib/atajos.ts`): el lienzo solo los recibe si no hay nada
 	// enfocado —o sea, fuera de un campo—; y con un diálogo o un menú encima, no.
-	w.Canvas().SetOnTypedRune(func(r rune) {
-		if w.Canvas().Overlays().Top() == nil {
-			p.Atajo(r)
-		}
-	})
-
-	w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.Drive).Montar(p.Objeto()))
+	drive.EngancharAtajos(w.Canvas(), control.cuandoLista, control.siLista)
+	w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.Drive).Montar(slot))
 	w.Resize(fyne.NewSize(anchoInicial, altoInicial))
-	w.SetOnClosed(func() {
-		if pararImportador != nil {
-			pararImportador()
-		}
-		p.PararImportador()
-	})
+	w.SetOnClosed(control.cerrar)
 	// Con interfaz: lanzada por iOS solo para el widget, ni importador ni explorador.
 	s.CuandoHayaEscena(func() {
 		conEscena = true
-		actualizarImportador(s.Estado())
-		p.Arrancar(s.Estado().Dentro())
+		control.bloqueado(false)
+		control.cambiar()
 	})
 	s.RutaPropia(func(u *url.URL) bool {
 		if u == nil {
@@ -191,81 +395,69 @@ func main() {
 		if u == nil {
 			return
 		}
-		if u.Query().Get("open-system") == "1" && strings.Trim(u.Path, "/") == "" && u.Host == "" {
-			go func() {
-				if err := abrirSistema(); err != nil {
-					slog.Warn("drive: no se pudo abrir en el sistema", "error", err)
-				}
-			}()
-			return
-		}
-		if u.Query().Get("connect-storage") == "1" && strings.Trim(u.Path, "/") == "" && u.Host == "" {
-			fyne.Do(p.AbrirAlmacenamiento)
-		} else if carpeta, fichero, ok := drive.DestinoDeEnlace(u); ok {
-			fyne.Do(func() { p.IrAEnlace(carpeta, fichero, func() { s.NoEncontrado() }) })
-		} else if id, ok := api.LeerPeticionDrive(u); ok {
-			fyne.Do(func() { p.AtenderPeticion(id) }) // el aviso de una petición de edición
-		} else if id, ok := api.LeerCompartido(u); ok {
-			fyne.Do(func() { p.AbrirCompartido(id) }) // el aviso de «compartido contigo»
-		} else if sec, ok := drive.SeccionDeEnlace(u); ok {
-			fyne.Do(func() { p.IrASeccion(sec) })
-		} else if u.Scheme == "file" || u.Scheme == "content" || (u.Scheme == "" && filepath.IsAbs(u.Path)) {
-			go func() {
-				uriStr := u.String()
-				if u.Scheme == "" {
-					uriStr = "file://" + u.Path
-				}
-				uri, err := storage.ParseURI(uriStr)
-				if err != nil {
-					return
-				}
-				r, err := storage.Reader(uri)
-				if err != nil {
-					return
-				}
-				nombre := uri.Name()
-				var tam int64 = -1
-				if u.Scheme == "file" || (u.Scheme == "" && u.Path != "") {
-					cleanPath := filepath.Clean(u.Path)
-					//nolint:gosec // G703: Intencionalmente inspecciona el tamaño del fichero elegido por el usuario.
-					if fi, err := os.Stat(cleanPath); err == nil {
-						tam = fi.Size()
-						if nombre == "" {
-							nombre = fi.Name()
-						}
+		control.cuandoLista(func(p *drive.Pantalla) {
+			if u.Query().Get("open-system") == "1" && strings.Trim(u.Path, "/") == "" && u.Host == "" {
+				go func() {
+					if err := abrirSistema(); err != nil {
+						slog.Warn("drive: no se pudo abrir en el sistema", "error", err)
 					}
-				}
-				if nombre == "" {
-					nombre = "archivo"
-				}
-				entrada := drive.Fluido(nombre, tam, r)
-				fyne.Do(func() {
-					p.SubirEntradas([]drive.Entrada{entrada})
-				})
-			}()
-		} else if strings.Trim(u.Path, "/") != "" || strings.Trim(u.Opaque, "/") != "" {
-			s.NoEncontrado() // con un receptor apuntado, la sesión ya no sabe qué no es de nadie
-		}
-	})
-	s.Arrancar(context.Background())
-	// Los textos del proveedor de documentos de Android y la carpeta sincronizada de iOS.
-	// Con el cliente EN LÍNEA: lo que otra app guarda aquí tiene que llegar a Drive, no a
-	// la caché sin conexión.
-	// En iOS, la copia en «En mi iPhone» sobra donde está la extensión: serían dos Drive.
-	// Con interfaz: lanzada por iOS solo para el widget no se sincroniza nada.
-	s.CuandoHayaEscena(func() {
-		go func() {
-			if runtime.GOOS == "ios" && sistema.ArchivosDisponible() {
+				}()
 				return
 			}
-			err := documentos.Servir(context.Background(), api.NewDrive(s.URL("drive"), s.Sesion, nil), documentos.Textos{
-				Titulo: a.Metadata().Name, SinApp: tr.T("shell.documentsProvider.openApp", nil),
-			})
-			if err != nil && !errors.Is(err, documentos.ErrNoDisponible) {
-				slog.Warn("drive: el proveedor de documentos de Android no arranca", "error", err)
+			if u.Query().Get("connect-storage") == "1" && strings.Trim(u.Path, "/") == "" && u.Host == "" {
+				fyne.Do(p.AbrirAlmacenamiento)
+			} else if carpeta, fichero, ok := drive.DestinoDeEnlace(u); ok {
+				fyne.Do(func() { p.IrAEnlace(carpeta, fichero, func() { s.NoEncontrado() }) })
+			} else if id, ok := api.LeerPeticionDrive(u); ok {
+				fyne.Do(func() { p.AtenderPeticion(id) }) // el aviso de una petición de edición
+			} else if id, ok := api.LeerCompartido(u); ok {
+				fyne.Do(func() { p.AbrirCompartido(id) }) // el aviso de «compartido contigo»
+			} else if sec, ok := drive.SeccionDeEnlace(u); ok {
+				fyne.Do(func() { p.IrASeccion(sec) })
+			} else if u.Scheme == "file" || u.Scheme == "content" || (u.Scheme == "" && filepath.IsAbs(u.Path)) {
+				go func() {
+					uriStr := u.String()
+					if u.Scheme == "" {
+						uriStr = "file://" + u.Path
+					}
+					uri, err := storage.ParseURI(uriStr)
+					if err != nil {
+						return
+					}
+					r, err := storage.Reader(uri)
+					if err != nil {
+						return
+					}
+					nombre := uri.Name()
+					var tam int64 = -1
+					if u.Scheme == "file" || (u.Scheme == "" && u.Path != "") {
+						cleanPath := filepath.Clean(u.Path)
+						//nolint:gosec // G703: Intencionalmente inspecciona el tamaño del fichero elegido por el usuario.
+						if fi, err := os.Stat(cleanPath); err == nil {
+							tam = fi.Size()
+							if nombre == "" {
+								nombre = fi.Name()
+							}
+						}
+					}
+					if nombre == "" {
+						nombre = "archivo"
+					}
+					entrada := drive.Fluido(nombre, tam, r)
+					fyne.Do(func() {
+						if p.Vida != nil && p.Vida.Err() != nil {
+							_ = r.Close()
+							return
+						}
+						p.SubirEntradas([]drive.Entrada{entrada})
+					})
+				}()
+			} else if strings.Trim(u.Path, "/") != "" || strings.Trim(u.Opaque, "/") != "" {
+				s.NoEncontrado() // con un receptor apuntado, la sesión ya no sabe qué no es de nadie
 			}
-		}()
+		})
 	})
+	s.Arrancar(context.Background())
 	ejecutarDrive(a, w, s, tr)
 }
 

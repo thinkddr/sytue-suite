@@ -124,6 +124,19 @@ type vectores struct {
 			Sale json.RawMessage
 		}
 	} `json:"moverObjetos"` //nolint:tagliatelle // el nombre lo fija la web
+	ReferenciasAjenas struct {
+		Hojas []json.RawMessage
+		Casos []struct {
+			Hoja int
+			D    struct {
+				Eje             string
+				Desde, Cantidad int
+				Tope            int
+				Hoja            string
+			}
+			Sale json.RawMessage
+		}
+	} `json:"referenciasAjenas"` //nolint:tagliatelle // el nombre lo fija la web
 	Minigraficos struct {
 		Geometria []struct {
 			Valores []float64
@@ -239,7 +252,7 @@ func TestVectoresDeTablas(t *testing.T) {
 	}
 	for _, c := range v.Tablas.Crecer {
 		ct, _ := compilarTabla(c.Tabla)
-		r, ok := crecerPorEdicion(ct, c.C, c.F, Columnas-1, Filas-1)
+		r, ok := crecerPorEdicion(ct, c.C, c.F, MinColumnas-1, MinFilas-1) // los topes con los que calcus.ts saca los vectores (25, 99)
 		if ok != (c.Sale != nil) || (ok && (r.C1 != c.Sale.C1 || r.R1 != c.Sale.R1 || r.C2 != c.Sale.C2 || r.R2 != c.Sale.R2)) {
 			t.Errorf("expandRangeForEdit(%s, %d, %d) = %v %v, la web dice %v", c.Tabla.Range, c.C, c.F, r, ok, c.Sale)
 		}
@@ -469,15 +482,57 @@ func TestVectoresDeMoverObjetos(t *testing.T) {
 		}
 		h := nuevaHoja(leida.Name)
 		cargarObjetos(&h, leida)
+		cargarAnalisis(&h, leida)
 		h.filtro = leida.Autofilter.sanear()
+		for _, cr := range leida.CondFormats {
+			if r, ok := cr.sanear(); ok {
+				h.condiciones = append(h.condiciones, r)
+			}
+		}
+		for _, vc := range leida.Validations {
+			if v, ok := vc.sanear(); ok {
+				h.validaciones = append(h.validaciones, v)
+			}
+		}
 		d := formula.Desplazamiento{Filas: c.D.Eje == "fila", Desde: c.D.Desde, Cantidad: c.D.Cantidad, Tope: c.D.Tope}
 		moverObjetos(&h, d)
-		got := hoja{Tables: h.tablas, Sparklines: h.minis, Charts: h.graficos, Slicers: h.segs, Autofilter: h.filtro}
+		got := hoja{
+			Tables: h.tablas, Sparklines: h.minis, Charts: h.graficos, Slicers: h.segs, Autofilter: h.filtro,
+			CondFormats: h.condiciones, Validations: h.validaciones, RowGroups: h.grupFilas, ColGroups: h.grupCols,
+			Merges: h.fusiones, ColWidths: h.anchos, RowHeights: h.altos,
+		}
 		m, _ := comoJSON(t, got).(map[string]any)
 		delete(m, "name")
 		delete(m, "cells")
 		if want := crudoJSON(c.Sale); !reflect.DeepEqual(m, want) {
 			t.Errorf("moverObjetos(%+v):\n  aquí:   %v\n  la web: %v", c.D, m, want)
+		}
+	}
+}
+
+// TestVectoresDeReferenciasAjenas: insertar o borrar filas y columnas en una hoja
+// reescribe las fórmulas de las OTRAS que la citan —celdas, formato condicional y
+// validaciones, respetando la protección— igual que la web.
+func TestVectoresDeReferenciasAjenas(t *testing.T) {
+	v := leerVectores(t)
+	if len(v.ReferenciasAjenas.Casos) == 0 {
+		t.Fatal("calcus.json no trae la sección «referenciasAjenas»")
+	}
+	for _, c := range v.ReferenciasAjenas.Casos {
+		// La hoja del desplazamiento delante, para que el libro sea de verdad.
+		contenido := `{"active":0,"sheets":[{"name":"Otra hoja","cells":{}},` +
+			string(v.ReferenciasAjenas.Hojas[c.Hoja]) + `]}`
+		l := libroDePrueba(t, contenido).Libro
+		d := formula.Desplazamiento{
+			Filas: c.D.Eje == "fila", Desde: c.D.Desde, Cantidad: c.D.Cantidad, Tope: c.D.Tope, Hoja: c.D.Hoja,
+		}
+		moverReferenciasAjenas(&l.f.hojas[1], d)
+		h := l.f.hojas[1].serializar()
+		got := hoja{Cells: h.Cells, CondFormats: h.CondFormats, Validations: h.Validations}
+		m, _ := comoJSON(t, got).(map[string]any)
+		delete(m, "name")
+		if want := crudoJSON(c.Sale); !reflect.DeepEqual(m, want) {
+			t.Errorf("moverReferenciasAjenas(hoja %d, %+v):\n  aquí:   %v\n  la web: %v", c.Hoja, c.D, m, want)
 		}
 	}
 }

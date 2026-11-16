@@ -27,7 +27,7 @@ Comparar y `md` para el resto. Los botones van DENTRO del cuerpo, como en la web
 var nombreDialogo = map[Dialogo]string{
 	DialogoOrganizar: "organizar", DialogoHerramientas: "herramientas", DialogoCapas: "capas",
 	DialogoComparar: "comparar", DialogoProteger: "proteger", DialogoFirmar: "firmar",
-	DialogoPedirFirma: "pedirFirma",
+	DialogoPedirFirma: "pedirFirma", DialogoVersiones: "versiones",
 }
 
 // dialogoAbierto es el diálogo que se ve: su Modal y cómo se pinta su cuerpo, que se
@@ -77,6 +77,8 @@ func (p *Pantalla) abrirDialogo(d Dialogo) {
 		a.pintar = nuevoDialogoFirmar(a).vista
 	case DialogoPedirFirma:
 		a.pintar = nuevoDialogoPedirFirma(a).vista
+	case DialogoVersiones:
+		a.pintar = nuevoDialogoVersiones(a).vista
 	case SinDialogo:
 		return
 	}

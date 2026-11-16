@@ -46,7 +46,7 @@ func TestAccountDeviceTrust(t *testing.T) {
 	}
 
 	pedir := func(conDispositivo bool, origen string) int {
-		r := httptest.NewRequest(http.MethodPost, "/account/devices/trust", nil)
+		r := httptest.NewRequest(http.MethodPost, "/account/devices/trust", http.NoBody)
 		r.AddCookie(&http.Cookie{Name: sessionCookieName, Value: token})
 		if conDispositivo {
 			r.AddCookie(&http.Cookie{Name: deviceCookieName, Value: domain.SignDeviceCookie(l.srv.deviceKey, secreto)})

@@ -87,3 +87,9 @@ type tamFijo struct{ tam fyne.Size }
 
 func (f tamFijo) MinSize([]fyne.CanvasObject) fyne.Size { return f.tam }
 func (tamFijo) Layout([]fyne.CanvasObject, fyne.Size)   {}
+
+// Colocados agrupa objetos ya colocados a mano en un contenedor que declara `tam` como su
+// medida mínima: lo que necesita un desplazador para saber cuánto hay debajo.
+func Colocados(tam fyne.Size, objs ...fyne.CanvasObject) *fyne.Container {
+	return container.New(tamFijo{tam}, objs...)
+}

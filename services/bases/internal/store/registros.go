@@ -34,6 +34,19 @@ type PaginaRegistros struct {
 // página anterior (cursor.go). Toda consulta lleva LIMIT y ninguna OFFSET: una página
 // profunda cuesta lo que una primera.
 func (s *Store) ListarRegistros(ctx context.Context, a domain.Actor, tabla, vista string, limite int, cursor string) (PaginaRegistros, error) {
+	return s.ListarRegistrosCon(ctx, a, tabla, vista, limite, cursor, LecturaAdHoc{})
+}
+
+// LecturaAdHoc es lo que una lectura pide además de la vista sin guardarlo: una búsqueda
+// libre y un orden que sustituye al de la vista. Se resuelve en el servidor para que
+// buscar u ordenar abarque toda la tabla y no solo la ventana ya cargada.
+type LecturaAdHoc struct {
+	Search string
+	Sort   []domain.Orden // vacío = el de la vista
+}
+
+// ListarRegistrosCon es ListarRegistros con búsqueda y orden de un momento.
+func (s *Store) ListarRegistrosCon(ctx context.Context, a domain.Actor, tabla, vista string, limite int, cursor string, extra LecturaAdHoc) (PaginaRegistros, error) {
 	if limite <= 0 {
 		limite = domain.PaginaPorDefecto
 	}
@@ -62,6 +75,10 @@ func (s *Store) ListarRegistros(ctx context.Context, a domain.Actor, tabla, vist
 				return errNoFilas(err)
 			}
 			_ = json.Unmarshal(raw, &cfg)
+		}
+		cfg.Search = extra.Search
+		if len(extra.Sort) > 0 {
+			cfg.Sort = extra.Sort
 		}
 		if out.Records, out.NextCursor, err = leerRegistros(ctx, tx, a, tabla, out.Fields, cfg, limite, cursor); err != nil {
 			return err
@@ -309,7 +326,7 @@ func (s *Store) ActualizarRegistro(ctx context.Context, a domain.Actor, registro
 		if err != nil {
 			return err
 		}
-		parcial, err := domain.ValidarParcial(campos, data)
+		parcial, err := domain.ValidarParcial(domain.ConRetiradas(campos, actual), data)
 		if err != nil {
 			return err
 		}

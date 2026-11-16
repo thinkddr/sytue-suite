@@ -30,7 +30,7 @@ func tenantCtx(slug string) context.Context {
 	return tenancy.Into(context.Background(), tenancy.Tenant{Slug: slug})
 }
 
-func seedAccount(t *testing.T, ctx context.Context, st *store.Store, addr string) domain.Account {
+func seedAccount(ctx context.Context, t *testing.T, st *store.Store, addr string) domain.Account {
 	t.Helper()
 	acc, err := st.EnsureAccount(ctx, "sub-"+addr, addr, "Test", 1<<30)
 	if err != nil {
@@ -39,7 +39,7 @@ func seedAccount(t *testing.T, ctx context.Context, st *store.Store, addr string
 	return acc
 }
 
-func seedMessage(t *testing.T, ctx context.Context, st *store.Store, acc domain.Account, mbox uuid.UUID, subject, from string, flags []string) domain.Message {
+func seedMessage(ctx context.Context, t *testing.T, st *store.Store, acc domain.Account, mbox uuid.UUID, subject, from string, flags []string) domain.Message {
 	t.Helper()
 	m := &domain.Message{
 		AccountID:  acc.ID,
@@ -64,7 +64,7 @@ func TestMailMigrationsAndProvisioning(t *testing.T) {
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
 
-	acc := seedAccount(t, ctx, st, "ada@sytue.eu")
+	acc := seedAccount(ctx, t, st, "ada@sytue.eu")
 	boxes, err := st.ListMailboxes(ctx, acc.ID)
 	if err != nil {
 		t.Fatalf("ListMailboxes: %v", err)
@@ -108,14 +108,14 @@ func TestInsertAndSearch(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
-	acc := seedAccount(t, ctx, st, "ada@sytue.eu")
+	acc := seedAccount(ctx, t, st, "ada@sytue.eu")
 	inbox, err := st.MailboxByRole(ctx, acc.ID, domain.RoleInbox)
 	if err != nil {
 		t.Fatalf("MailboxByRole: %v", err)
 	}
 
-	m1 := seedMessage(t, ctx, st, acc, inbox.ID, "Factura mensual", "billing@proveedor.eu", nil)
-	m2 := seedMessage(t, ctx, st, acc, inbox.ID, "Reunión de equipo", "jefe@sytue.eu", []string{domain.FlagSeen})
+	m1 := seedMessage(ctx, t, st, acc, inbox.ID, "Factura mensual", "billing@proveedor.eu", nil)
+	m2 := seedMessage(ctx, t, st, acc, inbox.ID, "Reunión de equipo", "jefe@sytue.eu", []string{domain.FlagSeen})
 
 	// UID incremental por buzón.
 	if m1.UID == 0 || m2.UID <= m1.UID {
@@ -196,14 +196,14 @@ func TestCopyMoveAndMailboxOps(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
-	acc := seedAccount(t, ctx, st, "ada@sytue.eu")
+	acc := seedAccount(ctx, t, st, "ada@sytue.eu")
 	inbox, _ := st.MailboxByRole(ctx, acc.ID, domain.RoleInbox)
 
 	custom, err := st.CreateMailbox(ctx, acc.ID, nil, "Proyectos")
 	if err != nil {
 		t.Fatalf("CreateMailbox: %v", err)
 	}
-	m := seedMessage(t, ctx, st, acc, inbox.ID, "hola", "x@y.eu", nil)
+	m := seedMessage(ctx, t, st, acc, inbox.ID, "hola", "x@y.eu", nil)
 
 	// COPY duplica a otra carpeta con UID nuevo.
 	newUID, err := st.CopyMessage(ctx, m.ID, custom.ID)
@@ -249,7 +249,7 @@ func TestOutboundQueue(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
-	acc := seedAccount(t, ctx, st, "ada@sytue.eu")
+	acc := seedAccount(ctx, t, st, "ada@sytue.eu")
 
 	o := &domain.OutboundMessage{
 		AccountID:  acc.ID,
@@ -284,7 +284,7 @@ func TestFiltersCRUDAndApply(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
-	acc := seedAccount(t, ctx, st, "ada@sytue.eu")
+	acc := seedAccount(ctx, t, st, "ada@sytue.eu")
 	boletines, err := st.CreateMailbox(ctx, acc.ID, nil, "Boletines")
 	if err != nil {
 		t.Fatalf("CreateMailbox: %v", err)
@@ -358,7 +358,7 @@ func TestFiltersCRUDAndApply(t *testing.T) {
 func TestFilterTenantIsolation(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
-	acc := seedAccount(t, tenantCtx("acme"), st, "ada@sytue.eu")
+	acc := seedAccount(tenantCtx("acme"), t, st, "ada@sytue.eu")
 	if _, err := st.CreateFilter(tenantCtx("acme"), acc.ID, domain.Filter{
 		MatchFrom: "x@y", MarkRead: true, Enabled: true,
 	}); err != nil {
@@ -378,7 +378,7 @@ func TestTenantIsolation(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 
-	accA := seedAccount(t, tenantCtx("acme"), st, "ada@sytue.eu")
+	accA := seedAccount(tenantCtx("acme"), t, st, "ada@sytue.eu")
 	// El tenant "other" no ve la cuenta de "acme".
 	if _, err := st.AccountBySubject(tenantCtx("other"), "sub-ada@sytue.eu"); !errors.Is(err, domain.ErrNotFound) {
 		t.Fatalf("aislamiento RLS roto: %v", err)

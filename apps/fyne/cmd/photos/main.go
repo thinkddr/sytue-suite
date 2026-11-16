@@ -11,13 +11,16 @@
 // CGO y sin servidor gráfico, es `go test ./apps/photos/...`, que pinta las mismas
 // pantallas con el pintor de software y comprueba los píxeles —y que con
 // `SYTUE_CAPTURA=/ruta` deja las capturas en disco—.
+// paridad-web: apps/frontend/apps/photos/src/pages/auth/matrix/callback.astro
 package main
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"net/url"
+	"os"
+	"path/filepath"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -28,8 +31,6 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/soltar"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
-	"git.sytue.eu/sytue/one/apps/nucleo/api"
-	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
@@ -40,7 +41,7 @@ const (
 )
 
 func main() {
-	a := app.New()
+	a := app.NewWithID("eu.sytue.photos")
 	a.Settings().SetTheme(tema.Sytue{})
 
 	// La sesión, la apariencia y el idioma son TRANSVERSALES a las trece apps: esto lo
@@ -54,113 +55,80 @@ func main() {
 	w.Resize(fyne.NewSize(anchoInicial, altoInicial))
 
 	tr := traductor(s.Idioma())
-	cli := api.NewPhotos(s.URL("photos"), s.Sesion, s.ClienteConAviso(nil))
 	// El widget nativo lo lee su propia Fuente, sin depender de la pantalla, y se
 	// vuelve a publicar tras cada escritura del cliente de arriba (ClienteConAviso).
 	s.PublicadorWidget(s.FuenteWidget(tr))
-	teca, grande := photos.NuevaFototeca(), photos.NuevaFototeca()
-	grande.Variante = photos.VarianteGrande
 
-	v := photos.Vista{
-		T: tr, Teca: teca, TecaGrande: grande, Ventana: anchoInicial,
-		Variante: tema.De(a.Settings().ThemeVariant()),
-	}
-	p := photos.Nueva(cli, v, w)
-	p.Drive = api.NewDrive(s.URL("drive"), s.Sesion, nil)
-	p.IA = api.NewIA(s.URL("ai"), s.Sesion, nil)
-	// Compartir un álbum con alguien y decir quién me compartió uno: Sytue ID.
-	p.Directorio = api.NewDirectorio(s.URL("id"), s.Sesion, nil)
-	p.AlEntrar = func() { go func() { _ = s.Entrar(context.Background()) }() }
-	p.AbrirWeb = func(destino string) {
-		_ = api.AbrirFuera(a, destino)
-	}
-	// Solo compone el enlace del álbum PÚBLICO (`/p/<token>`), que va sin org a
-	// propósito (ADR 0056): es para quien no tiene sesión, como en la web.
-	p.WebDe = func(ruta string) string { return api.AppURL(s.Apex(), "photos", "", ruta) }
-	// La vuelta a Drive desde el editor, en cambio, es de la sesión: canónica con org.
-	org := s.Sesion.Organizacion
-	p.AbrirApp = func(producto, ruta string) { _ = api.AbrirEn(a, s.Apex(), producto, org(), ruta) }
-	p.Elegir = func() ([]string, error) { return ficheros.ElegirImagenes(tr.T("gallery.add", nil)) }
-	p.Guardar = func(nombre string, datos []byte) (string, error) {
-		carpeta, err := ficheros.Carpeta()
-		if err != nil {
-			return "", err
-		}
-		return ficheros.Guardar(carpeta, nombre, bytes.NewReader(datos))
-	}
-
-	// Las dos cachés piden por la misma puerta; la grande, con la huella de la receta
-	// de las fotos que se han girado en esta sesión.
-	teca.Pedir = func(ctx context.Context, id, variante string) ([]byte, error) {
-		return leer(cli.Variant(ctx, id, variante))
-	}
-	grande.Pedir = func(ctx context.Context, id, variante string) ([]byte, error) {
-		return leer(cli.VariantDe(ctx, id, variante, p.Huella(id)))
-	}
-
-	// Entrar o salir en esta app o en otra de las doce vuelve a pedir la pantalla: la
-	// que había era de otra sesión (o de ninguna).
-	identidad := func(e sesion.Estado) string {
-		if !e.Dentro() {
-			return ""
-		}
-		return s.URL("id") + "\x00" + e.Sujeto + "\x00" + s.Sesion.Organizacion()
-	}
-	p.CambiarSesion(identidad(s.Estado()))
-	s.AlCambiar(func(e sesion.Estado) { p.CambiarSesion(identidad(e)) })
-
-	// Un álbum compartido llega como `sytue-photos:/p/{token}` (o su dirección web, si el
-	// sistema se la da a la app): se enseña aquí, sin sesión, como la página `/p/` de la
-	// web. Es ruta PROPIA: no es la página «no encontrada». Un token que no existe, sí.
-	p.NoEncontrado = s.NoEncontrado
-	s.RutaPropia(func(u *url.URL) bool {
-		return photos.TokenDeEnlace(u) != "" || photos.AlbumDeEnlace(u) != "" || photos.AlbumPropioDeEnlace(u) != ""
-	})
-	s.AlAbrirURL(func(u *url.URL) {
-		if token := photos.TokenDeEnlace(u); token != "" {
-			fyne.Do(func() { p.AbrirPublico(token) })
-		}
-		// El aviso «X ha compartido un álbum contigo» (`photos.shared`).
-		if album := photos.AlbumDeEnlace(u); album != "" {
-			fyne.Do(func() { p.AbrirCompartido(album) })
-		}
-		// «X ha añadido fotos a tu álbum» (`photos.album.added`).
-		if album := photos.AlbumPropioDeEnlace(u); album != "" {
-			fyne.Do(func() { p.AbrirAlbum(album) })
-		}
-	})
-
-	// Una imagen pulsada en Drive llega como `sytue-photos:/photos/abrir?file=…&volver=…`:
-	// se indexa (es idempotente y no copia nada: el original sigue en Drive) y se abre en
-	// el EDITOR, que es a donde lleva `/abrir` en la web; su «Volver» devuelve a la
-	// carpeta de Drive. Si algo falla, la sesión la manda a la web; si el servicio dice
-	// que no está, a la página «no encontrada».
-	//nolint:contextcheck // el editor vive más que la petición que lo abrió
-	s.AlAbrirFichero("photos", func(ctx context.Context, ap api.Apertura) error {
-		cuenta := identidad(s.Estado())
-		f, err := cli.Indexar(ctx, ap.Ref.ID)
-		if err != nil {
-			return err
-		}
-		fyne.Do(func() {
-			if cuenta == identidad(s.Estado()) {
-				p.AbrirEditor(f, ap.Volver)
+	host, err := newPhotosStorage(s, a, w, tr)
+	if err != nil {
+		w.SetContent(ui.NuevoVacio(tr.T("matrix.failed", nil), ""))
+	} else {
+		s.RutaPropia(func(u *url.URL) bool {
+			return photos.TokenDeEnlace(u) != "" || photos.AlbumDeEnlace(u) != "" || photos.AlbumPropioDeEnlace(u) != ""
+		})
+		s.AlAbrirURL(func(u *url.URL) {
+			fyne.Do(func() {
+				current := host.presenter.Load()
+				if current == nil {
+					return
+				}
+				if token := photos.TokenDeEnlace(u); token != "" {
+					current.app.AbrirPublico(token)
+				}
+				if album := photos.AlbumDeEnlace(u); album != "" {
+					current.app.AbrirCompartido(album)
+				}
+				if album := photos.AlbumPropioDeEnlace(u); album != "" {
+					current.app.AbrirAlbum(album)
+				}
+			})
+		})
+		s.AlAbrirFichero("photos", host.OpenDriveFile)
+		soltar.AlArrastrar(w, func(active bool) {
+			if current := host.presenter.Load(); current != nil {
+				current.app.Arrastrando(active)
 			}
 		})
-		return nil
-	})
-
-	// «Suelta para añadir» mientras se arrastran ficheros por encima de la ventana.
-	soltar.AlArrastrar(w, p.Arrastrando)
-
-	w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.Photos).Montar(p.Objeto()))
-	s.AlFondo(p.AlFondo)
-	s.AlVolver(p.AlVolver)
-	w.SetOnClosed(p.AlFondo)
-	// Con interfaz: lanzada por iOS solo para el widget no se pide la fototeca.
-	s.CuandoHayaEscena(p.Arrancar)
+		s.AlFondo(func() {
+			if current := host.presenter.Load(); current != nil {
+				current.app.AlFondo()
+			}
+		})
+		s.AlVolver(func() {
+			if current := host.presenter.Load(); current != nil {
+				current.app.AlVolver()
+			}
+		})
+		w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.Photos).Montar(host.slot))
+		w.SetOnClosed(host.Close)
+		// Con interfaz: lanzada por iOS solo para el widget no se pide la fototeca, ni se
+		// toca la galería del sistema.
+		s.CuandoHayaEscena(func() {
+			host.photos.Start()
+		})
+	}
 	s.Arrancar(context.Background())
 	w.ShowAndRun()
+}
+
+// guardarEnGaleria deja los bytes en un fichero temporal y de ahí en la galería del
+// sistema, que pide un fichero.
+func guardarEnGaleria(p *photos.App, nombre string, datos []byte) error {
+	f, err := os.CreateTemp("", "sytue-guardar-*"+filepath.Ext(nombre))
+	if err != nil {
+		return err
+	}
+	defer func() { _ = os.Remove(f.Name()) }()
+	_, err = f.Write(datos)
+	if cerrar := f.Close(); err == nil {
+		err = cerrar
+	}
+	if err != nil {
+		return err
+	}
+	c, fin := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer fin()
+	return p.GuardarEnGaleria(c, f.Name(), nombre)
 }
 
 // leer trae entera una variante: la Fototeca guarda los bytes, no el flujo.

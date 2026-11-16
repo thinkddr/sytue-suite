@@ -38,7 +38,7 @@ func searchEvent(calID uuid.UUID, uid, summary, description, location string, st
 	}
 }
 
-func mustCal(t *testing.T, st *store.Store, ctx context.Context, owner, name string) domain.Calendar {
+func mustCal(ctx context.Context, t *testing.T, st *store.Store, owner, name string) domain.Calendar {
 	t.Helper()
 	c, err := st.CreateCalendar(ctx, store.NewCalendar{OwnerSub: owner, Name: name, DisplayName: name})
 	if err != nil {
@@ -52,7 +52,7 @@ func TestSearchEventsByFields(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
-	cal := mustCal(t, st, ctx, "u-1", "trabajo")
+	cal := mustCal(ctx, t, st, "u-1", "trabajo")
 
 	base := time.Date(2026, 7, 1, 9, 0, 0, 0, time.UTC)
 	if _, _, err := st.CreateEvent(ctx, searchEvent(cal.ID, "e-title", "Planificación trimestral", "", "", base)); err != nil {
@@ -104,8 +104,8 @@ func TestSearchEventsRangeAndCalendar(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
-	work := mustCal(t, st, ctx, "u-1", "trabajo")
-	home := mustCal(t, st, ctx, "u-1", "personal")
+	work := mustCal(ctx, t, st, "u-1", "trabajo")
+	home := mustCal(ctx, t, st, "u-1", "personal")
 
 	jul := time.Date(2026, 7, 15, 9, 0, 0, 0, time.UTC)
 	sep := time.Date(2026, 9, 15, 9, 0, 0, 0, time.UTC)
@@ -151,7 +151,7 @@ func TestSearchEventsRecurringOnce(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
-	cal := mustCal(t, st, ctx, "u-1", "trabajo")
+	cal := mustCal(ctx, t, st, "u-1", "trabajo")
 
 	in := searchEvent(cal.ID, "rec-1", "Daily standup", "", "", time.Date(2026, 7, 1, 9, 0, 0, 0, time.UTC))
 	in.RRule = "FREQ=DAILY;COUNT=30"
@@ -176,8 +176,8 @@ func TestSearchEventsOwnerIsolation(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
-	calA := mustCal(t, st, ctx, "u-1", "cal-a")
-	calB := mustCal(t, st, ctx, "u-2", "cal-b")
+	calA := mustCal(ctx, t, st, "u-1", "cal-a")
+	calB := mustCal(ctx, t, st, "u-2", "cal-b")
 
 	base := time.Date(2026, 7, 1, 9, 0, 0, 0, time.UTC)
 	if _, _, err := st.CreateEvent(ctx, searchEvent(calA.ID, "a-1", "Secreto de Ana", "", "", base)); err != nil {
@@ -211,7 +211,7 @@ func TestSearchEventsKeyset(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
-	cal := mustCal(t, st, ctx, "u-1", "trabajo")
+	cal := mustCal(ctx, t, st, "u-1", "trabajo")
 
 	const total = 7
 	base := time.Date(2026, 7, 1, 9, 0, 0, 0, time.UTC)

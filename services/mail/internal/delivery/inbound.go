@@ -17,7 +17,6 @@ import (
 	"log/slog"
 	"net"
 	"net/mail"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -44,18 +43,22 @@ var ErrRejectedPolicy = errors.New("delivery: rechazado por política DMARC")
 
 // Inbound entrega correo entrante del MX a los buzones locales.
 type Inbound struct {
-	store         *store.Store
-	blobs         *objectstore.Client
-	resolver      auth.Resolver
-	autoSender    autoSender
-	logger        *slog.Logger
-	channels      *ChannelBridge
-	calendario    *PuenteCalendario
-	hubNotifier   *hubnotify.Client
-	mailPublicURL string
+	store          *store.Store
+	blobs          blobs.Almacen
+	privateObjects objectstore.PrivateIngressObjects
+	resolver       auth.Resolver
+	autoSender     autoSender
+	logger         *slog.Logger
+	channels       *ChannelBridge
+	calendario     *PuenteCalendario
+	hubNotifier    *hubnotify.Client
+	mailPublicURL  string
+	// authservID firma la cabecera Authentication-Results que el MX antepone
+	// (RFC 8601): el FQDN del MTA.
+	authservID string
 
 	maxBytes int64
-	// Cupos de la recepción: cuántas a la vez (disco) y cuántos bytes en memoria. Ver
+	// Cupos de la recepción: cuántas a la vez y cuántos bytes en memoria. Ver
 	// recibir y cupos.
 	recepciones *semaphore.Weighted
 	memoria     *semaphore.Weighted
@@ -79,6 +82,8 @@ type InboundConfig struct {
 	Calendario    *PuenteCalendario
 	HubNotifier   *hubnotify.Client
 	MailPublicURL string
+	// AuthServID es el nombre del MX en la cabecera Authentication-Results.
+	AuthServID string
 }
 
 // NewInbound construye el entregador entrante. `auto` despacha las autorespuestas
@@ -87,12 +92,17 @@ func NewInbound(st *store.Store, objetos *objectstore.Client, resolver auth.Reso
 	if resolver == nil {
 		resolver = net.DefaultResolver
 	}
+	var privateObjects objectstore.PrivateIngressObjects
+	if objetos != nil {
+		privateObjects = objetos
+	}
 	return &Inbound{
-		store: st, blobs: objetos, resolver: resolver, autoSender: auto, logger: logger,
+		store: st, blobs: objetos, privateObjects: privateObjects, resolver: resolver, autoSender: auto, logger: logger,
 		channels:      cfg.Channels,
 		calendario:    cfg.Calendario,
 		hubNotifier:   cfg.HubNotifier,
 		mailPublicURL: cfg.MailPublicURL,
+		authservID:    cfg.AuthServID,
 		maxBytes:      cfg.MaxBytes,
 		verifySPF:     cfg.VerifySPF,
 		verifyDKIM:    cfg.VerifyDKIM,
@@ -146,7 +156,7 @@ func (in *Inbound) Deliver(ctx context.Context, msg InboundMessage) error {
 		return err
 	}
 	defer soltar()
-	seccion := func() *io.SectionReader { return io.NewSectionReader(r, 0, r.Size()) }
+	seccion := r.section
 
 	env, err := mime.ParseSobre(seccion(), r.Size())
 	if err != nil {
@@ -166,6 +176,14 @@ func (in *Inbound) Deliver(ctx context.Context, msg InboundMessage) error {
 			return ErrRejectedPolicy
 		}
 	}
+	// Lo que se guarda lleva delante el veredicto de este MX (RFC 8601): los
+	// clientes IMAP y el .eml descargado lo ven igual que el lector web, que lo
+	// lee de la base. Va antes que cualquier cabecera del remitente, que es lo
+	// que la RFC pide para distinguir el nuestro de uno falsificado más abajo.
+	cabecera := auth.CabeceraAuthenticationResults(in.authservID, spf, dkimRes, dmarc.Result,
+		domainOf(msg.MailFrom), domainOf(env.FromAddr))
+	r.SectionReader = conPrefijo(cabecera, r.SectionReader)
+
 	junk := in.enforceDMARC && dmarc.Result == auth.ResultFail &&
 		(dmarc.Disposition == "quarantine" || dmarc.Disposition == "reject")
 
@@ -179,11 +197,11 @@ func (in *Inbound) Deliver(ctx context.Context, msg InboundMessage) error {
 	// UN objeto por mensaje y organización, compartido por todos sus buzones que
 	// lo reciban (ver internal/blobs).
 	claves := map[string]string{}
-	guardar := func(ctx context.Context, t tenancy.Tenant) (string, error) {
+	guardar := func(ctx context.Context, t tenancy.Tenant, registry blobs.Registro) (string, error) {
 		if k, ok := claves[t.Slug]; ok {
 			return k, nil
 		}
-		k, err := blobs.GuardarMensajeDesde(ctx, in.store, in.blobs, t, seccion(), r.Size())
+		k, err := blobs.GuardarMensajeDesde(ctx, registry, in.blobs, t, seccion(), r.Size())
 		if err != nil {
 			return "", fmt.Errorf("delivery: guardar blob: %w", err)
 		}
@@ -191,73 +209,121 @@ func (in *Inbound) Deliver(ctx context.Context, msg InboundMessage) error {
 		return k, nil
 	}
 	for _, rcpt := range msg.Recipients {
-		if err := in.deliverTo(ctx, rcpt, seccion, r.Size(), guardar, env, junk, msg.MailFrom, autoEligible, dmarc.Alineado); err != nil {
+		if err := in.deliverTo(ctx, rcpt, r, guardar, env, junk, msg.MailFrom, autoEligible, dmarc.Alineado); err != nil {
 			return err // el MX devolverá 4xx y el remitente reintentará todo el lote
 		}
 	}
 	return nil
 }
 
-// Cupos de la recepción (COM-06). Los dos acotan lo que un remitente cualquiera —el MX
-// no pide credenciales— puede hacerle gastar al pod.
+// inboundBody retains one admitted RAM allocation. Independent sections let
+// MIME, DKIM, channel/iMIP adapters and blob uploads stream without copying the
+// complete message. Only the synchronous private seal borrows the original view;
+// release clears the complete reserved allocation, including after errors.
+type inboundBody struct {
+	*io.SectionReader
+	raw []byte
+}
+
+func (b *inboundBody) section() *io.SectionReader {
+	return io.NewSectionReader(b.SectionReader, 0, b.Size())
+}
+
+// Cupos de recepción (COM-06): el MX admite remitentes sin credenciales, por lo
+// que la memoria se reserva antes de leer. El presupuesto compartido equivale al
+// máximo configurado (50 MiB por defecto); nunca se escribe MIME en /tmp.
 const (
-	// recepcionesALaVez acota el DISCO: cada recepción en curso ocupa hasta maxBytes
-	// en /tmp. Con el tope de 50 MB son 800 MB, por debajo del sizeLimit del chart.
-	// ponytail: cupo global; por IP si un remitente lento llega a acapararlo.
 	recepcionesALaVez = 16
-	// esperaDeMemoria es lo que un mensaje ya recibido aguarda su turno de memoria
-	// antes de contestar 451: menos que los 10 min que el remitente espera el 250,
-	// para que no reintente algo que acabaríamos entregando (duplicado).
-	esperaDeMemoria = 2 * time.Minute
+	esperaDeMemoria   = 2 * time.Minute
 )
 
-// errOcupado: no hay hueco ahora. El MX lo traduce a 451 y el remitente reintenta.
 var errOcupado = errors.New("delivery: demasiadas recepciones a la vez")
 
-// recibir lee el mensaje SIN tenerlo en memoria mientras llega y devuelve un
-// SectionReader sobre el fichero temporal (ya desenlazado de /tmp para no dejar
-// ficheros huérfanos en el directorio), de modo que el parseo MIME, la verificación
-// DKIM y la subida de blobs trabajen en flujo desde el fichero dentro del presupuesto
-// compartido (COM-06).
-//
-// soltar cierra el fichero temporal y devuelve su cuota al presupuesto; se llama al
-// acabar de procesar.
-func (in *Inbound) recibir(ctx context.Context, cuerpo io.Reader) (r *io.SectionReader, soltar func(), err error) {
+// receiveCapacity only trusts readers whose exact remaining extent is owned by
+// the standard library. Arbitrary Len methods cannot reduce admission: an
+// untrusted reader could otherwise claim zero and return an unbounded body.
+func receiveCapacity(body io.Reader, limit int64) int64 {
+	switch reader := body.(type) {
+	case *bytes.Reader:
+		return min(int64(reader.Len()), limit)
+	case *strings.Reader:
+		return min(int64(reader.Len()), limit)
+	default:
+		return limit
+	}
+}
+
+type inboundContextReader struct {
+	ctx  context.Context
+	body io.Reader
+}
+
+func (r inboundContextReader) Read(out []byte) (int, error) {
+	if err := r.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return r.body.Read(out)
+}
+
+// recibir reserves the entire allocation before reading or parsing. Unknown
+// lengths reserve the maximum; known bounded readers allow small messages to
+// coexist. io.ReadFull never grows the allocation beyond that reservation. The
+// single-byte overflow probe adds fixed overhead, bounded by recepcionesALaVez.
+func (in *Inbound) recibir(ctx context.Context, cuerpo io.Reader) (result *inboundBody, soltar func(), err error) {
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
+	if cuerpo == nil || in.maxBytes <= 0 {
+		return nil, nil, domain.ErrMessageTooLarge
+	}
 	recepciones, memoria := in.cupos()
 	if !recepciones.TryAcquire(1) {
 		return nil, nil, errOcupado
 	}
 	defer recepciones.Release(1)
 
-	f, err := os.CreateTemp("", "sytue-mail-entrante-*")
-	if err != nil {
-		return nil, nil, fmt.Errorf("delivery: abrir temporal: %w", err)
-	}
-	_ = os.Remove(f.Name())
-	cerrarEnError := true
-	defer func() {
-		if cerrarEnError {
-			_ = f.Close()
-		}
-	}()
-	n, err := io.Copy(f, io.LimitReader(cuerpo, in.maxBytes+1))
-	if err != nil {
-		return nil, nil, fmt.Errorf("delivery: leer cuerpo: %w", err)
-	}
-	if n > in.maxBytes {
-		return nil, nil, domain.ErrMessageTooLarge
-	}
-
+	capacity := receiveCapacity(cuerpo, in.maxBytes)
 	espera, cancelar := context.WithTimeout(ctx, esperaDeMemoria)
 	defer cancelar()
-	if err := memoria.Acquire(espera, n); err != nil {
-		return nil, nil, fmt.Errorf("%w: sin memoria libre para %d bytes", errOcupado, n)
+	if err := memoria.Acquire(espera, capacity); err != nil {
+		return nil, nil, fmt.Errorf("%w: sin memoria libre: %w", errOcupado, err)
 	}
-	cerrarEnError = false
-	return io.NewSectionReader(f, 0, n), sync.OnceFunc(func() {
-		_ = f.Close()
-		memoria.Release(n)
-	}), nil
+	raw := make([]byte, int(capacity))
+	allocated := raw
+	var once sync.Once
+	release := func() { once.Do(func() { clear(allocated); memoria.Release(capacity) }) }
+	success := false
+	defer func() {
+		if !success {
+			release()
+		}
+	}()
+
+	stop := func() bool { return true }
+	if closer, ok := cuerpo.(io.ReadCloser); ok {
+		stop = context.AfterFunc(ctx, func() { _ = closer.Close() })
+	}
+	defer stop()
+	reader := inboundContextReader{ctx: ctx, body: cuerpo}
+	n, readErr := io.ReadFull(reader, raw)
+	if readErr != nil && !errors.Is(readErr, io.EOF) && !errors.Is(readErr, io.ErrUnexpectedEOF) {
+		return nil, nil, fmt.Errorf("delivery: leer cuerpo: %w", errors.Join(readErr, ctx.Err()))
+	}
+	if readErr == nil {
+		var excess [1]byte
+		if count, readErr := io.ReadFull(reader, excess[:]); count != 0 {
+			clear(excess[:])
+			return nil, nil, domain.ErrMessageTooLarge
+		} else if readErr != nil && !errors.Is(readErr, io.EOF) {
+			return nil, nil, fmt.Errorf("delivery: leer cuerpo: %w", errors.Join(readErr, ctx.Err()))
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
+	raw = raw[:n]
+	success = true
+	return &inboundBody{SectionReader: io.NewSectionReader(bytes.NewReader(raw), 0, int64(n)), raw: raw}, release, nil
 }
 
 // cupos crea los dos presupuestos al primer uso, para que un Inbound literal (los
@@ -373,7 +439,8 @@ func rescatarAngulos(valor string) string {
 
 // fromAutenticado: el `From:` quedó autenticado por SPF o DKIM alineados. Solo
 // entonces se pasa a Calendar la respuesta a una invitación que traiga el correo.
-func (in *Inbound) deliverTo(ctx context.Context, rcpt string, seccion func() *io.SectionReader, size int64, guardar func(context.Context, tenancy.Tenant) (string, error), env domain.Message, junk bool, envelopeFrom string, autoEligible, fromAutenticado bool) error {
+func (in *Inbound) deliverTo(ctx context.Context, rcpt string, body *inboundBody, guardar func(context.Context, tenancy.Tenant, blobs.Registro) (string, error), env domain.Message, junk bool, envelopeFrom string, autoEligible, fromAutenticado bool) error {
+	seccion, size := body.section, body.Size()
 	// Correo a un canal de Sytue Rooms: no hay buzón que abrir. Va antes del lookup
 	// porque esa dirección no existe en la tabla de cuentas ni de alias.
 	if token, ok := in.channels.Token(rcpt); ok {
@@ -400,36 +467,47 @@ func (in *Inbound) deliverTo(ctx context.Context, rcpt string, seccion func() *i
 	if junk {
 		role = domain.RoleJunk
 	}
-	mailbox, err := in.store.MailboxByRole(tctx, resolved.AccountID, role)
-	if err != nil {
-		return fmt.Errorf("delivery: localizar buzón destino: %w", err)
-	}
-	blobKey, err := guardar(tctx, t)
-	if err != nil {
+	var m domain.Message
+	silenciado := false
+	private, err := in.store.AdmitInbound(tctx, resolved, role, func(admission *store.InboundLegacyAdmission) error {
+		mailbox, err := admission.Mailbox(tctx, role)
+		if err != nil {
+			return fmt.Errorf("delivery: localizar buzón destino: %w", err)
+		}
+		blobKey, err := guardar(tctx, t, admission)
+		if err != nil {
+			return err
+		}
+		m = env
+		m.AccountID = resolved.AccountID
+		m.MailboxID = mailbox.ID
+		m.BlobKey = blobKey
+		m.SizeBytes = size
+		// Reglas de usuario: solo sobre correo legítimo (el spam va a Junk sin filtrar).
+		if junk {
+			return admission.Insert(tctx, &m)
+		}
+		if err := in.applyAdmittedFilters(tctx, admission, &m); err != nil {
+			return err
+		}
+		// Lo legítimo entra por InsertEntrante, que mira el hilo antes de decidir:
+		// la respuesta a una conversación silenciada va al Archivo, y la de una
+		// pospuesta la devuelve a la Entrada. El spam no pasa por ahí: un hilo de
+		// Spam no se silencia ni se pospone.
+		silenciado, err = admission.InsertEntrante(tctx, &m)
 		return err
+	})
+	if err != nil {
+		return fmt.Errorf("delivery: admitir destinatario: %w", err)
 	}
-
-	m := env // copia del sobre por destinatario
-	m.AccountID = resolved.AccountID
-	m.MailboxID = mailbox.ID
-	m.BlobKey = blobKey
-	m.SizeBytes = size
-
-	// Reglas de usuario: solo sobre correo legítimo (el spam va a Junk sin filtrar).
-	// Pueden mover el mensaje a otra carpeta y/o marcarlo leído/destacado ANTES de
-	// persistir el sobre, de modo que se inserte ya en su buzón final con su UID.
-	if !junk {
-		in.applyFilters(tctx, resolved.AccountID, &m)
-	}
-	if err := in.store.InsertMessage(tctx, &m); err != nil {
-		// Sin compensación en S3: el blob es compartido (otros buzones pueden
-		// usarlo) y, sin referencias, lo recoge el barrido de huérfanos.
-		return fmt.Errorf("delivery: persistir sobre: %w", err)
+	if private != nil {
+		return in.persistPrivateInbound(tctx, *private, body.raw)
 	}
 
 	// Notificar a Hub/cliente (nuevo correo) vía outbox de eventos sobre Postgres.
-	// El correo que va a Spam no suena en la campana: sería avisar del spam.
-	in.publishDelivered(tctx, resolved.Tenant, resolved.AccountID, resolved.Subject, m, !junk)
+	// El correo que va a Spam no suena en la campana: sería avisar del spam. El de
+	// una conversación silenciada tampoco: silenciarla es pedir justo eso.
+	in.publishDelivered(tctx, resolved.Tenant, resolved.AccountID, resolved.Subject, m, !junk && !silenciado)
 	// La respuesta a una invitación de Calendar, si la trae (y no es spam).
 	if !junk {
 		in.calendario.PasarReader(tctx, resolved.Tenant, env, seccion(), fromAutenticado)
@@ -444,19 +522,17 @@ func (in *Inbound) deliverTo(ctx context.Context, rcpt string, seccion func() *i
 	return nil
 }
 
-// applyFilters evalúa las reglas activas de la cuenta contra el mensaje entrante
-// y aplica la primera que casa (mover de carpeta / marcar leído/destacado).
-// Best-effort: si la consulta de reglas falla, se entrega sin filtrar (nunca se
-// pierde ni se retiene el correo por un fallo de esta capa de conveniencia).
-func (in *Inbound) applyFilters(ctx context.Context, accountID uuid.UUID, m *domain.Message) {
-	filters, err := in.store.ListActiveFilters(ctx, accountID)
+// applyAdmittedFilters uses the admitted transaction. A database failure returns
+// a temporary SMTP error; no partially committed plaintext message is accepted.
+func (in *Inbound) applyAdmittedFilters(ctx context.Context, admission *store.InboundLegacyAdmission, m *domain.Message) error {
+	filters, err := admission.Filters(ctx)
 	if err != nil {
-		in.logger.Warn("inbound: cargar reglas de filtrado fallido", "error", err)
-		return
+		return err
 	}
-	if dest := domain.ApplyInbound(filters, m); dest != nil {
-		m.MailboxID = *dest
+	if destination := domain.ApplyInbound(filters, m); destination != nil {
+		m.MailboxID = *destination
 	}
+	return nil
 }
 
 func (in *Inbound) publishDelivered(ctx context.Context, tenant string, accountID uuid.UUID, recipientSubject string, m domain.Message, campana bool) {
@@ -531,4 +607,33 @@ func lastIndexByte(s string, b byte) int {
 		}
 	}
 	return -1
+}
+
+// conPrefijo devuelve un SectionReader que lee `prefijo` y luego `r`, sin copiar el
+// mensaje: sigue siendo un fichero temporal en flujo (COM-06).
+func conPrefijo(prefijo string, r *io.SectionReader) *io.SectionReader {
+	p := strings.NewReader(prefijo)
+	return io.NewSectionReader(lectorConcatenado{p, r, p.Size()}, 0, p.Size()+r.Size())
+}
+
+type lectorConcatenado struct {
+	a, b io.ReaderAt
+	n    int64
+}
+
+func (l lectorConcatenado) ReadAt(buf []byte, off int64) (int, error) {
+	leidos := 0
+	if off < l.n {
+		k, err := l.a.ReadAt(buf, off)
+		leidos = k
+		if err != nil && err != io.EOF {
+			return k, err
+		}
+		if k == len(buf) {
+			return k, nil
+		}
+		buf, off = buf[k:], l.n
+	}
+	k, err := l.b.ReadAt(buf, off-l.n)
+	return leidos + k, err
 }

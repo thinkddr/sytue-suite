@@ -101,6 +101,34 @@ func TestPaginaPorCursor(t *testing.T) {
 	esperar(t, err, domain.ErrNoExiste, "cursor en otra organización")
 }
 
+// Buscar y ordenar de un momento abarcan toda la tabla, no la primera página, y se
+// pagina con ellos igual que con una vista guardada.
+func TestBusquedaYOrdenAdHoc(t *testing.T) {
+	e := nuevo(t)
+	for i := 0; i < 30; i++ {
+		e.registro(ana, e.tabl.ID, map[string]json.RawMessage{
+			e.txt.ID: json.RawMessage(fmt.Sprintf(`"Fila %d %s"`, i, map[bool]string{true: "AGUJA", false: "paja"}[i%10 == 7])),
+			e.num.ID: json.RawMessage(fmt.Sprint(i)),
+		})
+	}
+	extra := LecturaAdHoc{Search: "aguja", Sort: []domain.Orden{{Field: e.num.ID, Dir: "desc"}}}
+	var nums []string
+	cur := ""
+	for {
+		pag, err := e.s.ListarRegistrosCon(e.ctx, ana, e.tabl.ID, "", 1, cur, extra)
+		e.ok(err)
+		for _, r := range pag.Records {
+			nums = append(nums, string(r.Data[e.num.ID]))
+		}
+		if cur = pag.NextCursor; cur == "" {
+			break
+		}
+	}
+	if strings.Join(nums, ",") != "27,17,7" {
+		t.Errorf("búsqueda y orden de un momento: %v, quería 27,17,7", nums)
+	}
+}
+
 // Estable aunque la tabla cambie entre dos páginas: borrar justo el registro en el que
 // se quedó el cursor no rompe la lectura ni repite (un OFFSET sí se habría corrido).
 func TestCursorEstableAnteCambios(t *testing.T) {

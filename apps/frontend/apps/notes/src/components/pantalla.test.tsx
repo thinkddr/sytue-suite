@@ -80,7 +80,7 @@ const nota = {
 type Propia = (method: string, path: string) => Promise<Response> | Response | undefined;
 type Llamada = { method: string; path: string; body?: unknown };
 
-function montar(propia?: Propia): Llamada[] {
+function montar(propia?: Propia, notaInicial?: string): Llamada[] {
   const llamadas: Llamada[] = [];
   browser.happyDOM.setURL('https://notes.invalid/notes');
   globalThis.fetch = (async (input, init) => {
@@ -118,6 +118,7 @@ function montar(propia?: Propia): Llamada[] {
       publicBase="https://notes.invalid/notes"
       locale="en"
       notebookInicial="nb"
+      notaInicial={notaInicial}
     />,
     host,
   );
@@ -144,6 +145,62 @@ async function elegirDelMenu(item: string) {
     .find((e) => e.textContent === item)!
     .click();
 }
+
+test('al cargar, el menú y el cuaderno enseñan su forma en gris, y luego las notas', async () => {
+  let soltarCuadernos: () => void = () => {};
+  const cuadernos = new Promise<void>((r) => {
+    soltarCuadernos = r;
+  });
+  let soltarNotas: () => void = () => {};
+  const notas = new Promise<void>((r) => {
+    soltarNotas = r;
+  });
+  montar((_method, path) => {
+    if (path.includes('/notebooks/nb/notes'))
+      return notas.then(() => Response.json({ notes: [nota] }));
+    if (path.includes('/api/notebooks'))
+      return cuadernos.then(() =>
+        Response.json({ notebooks: [nb('nb', 'Home'), nb('nb2', 'Work')] }),
+      );
+    return undefined;
+  });
+  // Los cuadernos del menú: filas tintadas, no un hueco.
+  await until(() => Boolean(host?.querySelector('[data-esqueleto="cuadernos"]')));
+  expect(host!.querySelector('[data-esqueleto="cuadernos"]')?.getAttribute('aria-busy')).toBe(
+    'true',
+  );
+  soltarCuadernos();
+  // El cuaderno en lista: filas con la columna de lectura, ninguna rueda.
+  await until(() => Boolean(host?.querySelector('[data-esqueleto="filas"]')));
+  expect(host!.querySelector('[data-esqueleto="cuadernos"]')).toBeNull();
+  const zona = host!.querySelector('[data-esqueleto="filas"]');
+  expect(zona?.getAttribute('aria-busy')).toBe('true');
+  expect(zona?.querySelector('.animate-spin')).toBeNull();
+  expect(host!.textContent).not.toContain('Shopping list');
+  soltarNotas();
+  await until(() => Boolean(host?.textContent?.includes('Shopping list')));
+  expect(host!.querySelector('[data-esqueleto]')).toBeNull();
+});
+
+test('en árbol, la nota abierta desde un enlace carga como hoja, no como «elige una nota»', async () => {
+  let soltarNotas: () => void = () => {};
+  const notas = new Promise<void>((r) => {
+    soltarNotas = r;
+  });
+  montar((_method, path) => {
+    if (path.includes('/notebooks/nb/notes'))
+      return notas.then(() => Response.json({ notes: [nota] }));
+    if (path.includes('/api/notebooks'))
+      return Response.json({ notebooks: [{ ...nb('nb', 'Home'), layout: 'tree' }] });
+    return undefined;
+  }, 'n');
+  // VISTO EN ROJO: sin el cambio sale «Pick a note» hasta que llega la nota.
+  await until(() => Boolean(host?.querySelector('[data-esqueleto="hoja"]')));
+  expect(host!.textContent).not.toContain('Pick a note');
+  soltarNotas();
+  await until(() => Boolean(host?.textContent?.includes('Shopping list')));
+  expect(host!.querySelector('[data-esqueleto="hoja"]')).toBeNull();
+});
 
 test('eliminar una nota avisa «enviada a la papelera» y «Deshacer» la restaura', async () => {
   const llamadas = montar();

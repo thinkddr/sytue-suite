@@ -55,6 +55,7 @@ func (s *Store) EncolarCalidadesPendientes(ctx context.Context, limite int) (int
 			INSERT INTO transcode_jobs (tenant, video_id, kind)
 			SELECT tenant, id, 'qualities' FROM videos
 			 WHERE deleted_at IS NULL AND status = 'ready'
+               AND NOT public.sytue_private_storage_frozen('public.cast_private_storage_states'::regclass,tenant,owner_sub)
 			   AND webm_key IS NOT NULL AND webm_qualities IS NULL
 			   AND NOT EXISTS (SELECT 1 FROM transcode_jobs j
 			                    WHERE j.video_id = videos.id AND j.kind = 'qualities' AND j.status = 'failed')

@@ -6,6 +6,7 @@ package search
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -166,6 +167,74 @@ func TestSearchPaginaElAgregado(t *testing.T) {
 	p9, _ := svc.Search(context.Background(), "t", domain.SearchQuery{Text: "x", Limit: 2, Offset: 99})
 	if len(p9.Hits) != 0 || p9.HasMore {
 		t.Fatalf("pasado el final debe venir vacío: %v", titles(p9.Hits))
+	}
+}
+
+// limiteStub devuelve tantos hits como le pidan (hasta los que tiene) y anota el
+// límite más alto que recibió: así se ve lo que el Hub pide a cada servicio.
+type limiteStub struct {
+	src    domain.Source
+	n      int
+	pedido *int
+}
+
+func (s limiteStub) Source() domain.Source { return s.src }
+func (s limiteStub) Search(_ context.Context, _, _ string, limit int) ([]domain.SearchHit, error) {
+	*s.pedido = max(*s.pedido, limit)
+	out := make([]domain.SearchHit, 0, min(limit, s.n))
+	for i := range min(limit, s.n) {
+		out = append(out, hit(s.src, "file", fmt.Sprintf("%s-%d", s.src, i), 0.5, ""))
+	}
+	return out, nil
+}
+
+func (s limiteStub) Recent(context.Context, string, int) ([]domain.SearchHit, error) {
+	return nil, nil
+}
+
+// La web pide en UNA petición todas las páginas que enseña (`limit = páginas × 20`):
+// el tamaño de página del agregado ya no se acota al máximo POR ORIGEN, pero a cada
+// servicio se le siguen pidiendo como mucho 20. Antes `limit=200` devolvía 20 y la
+// web tenía que lanzar una búsqueda federada por página.
+func TestSearchPaginaGrandeEnUnaPeticion(t *testing.T) {
+	fuentes := domain.AllSources() // trece: 20 de cada uno pasan de 200
+	pedidos := make([]int, len(fuentes))
+	stubs := make([]connectors.Searcher, 0, len(fuentes))
+	for i, src := range fuentes {
+		stubs = append(stubs, limiteStub{src: src, n: 50, pedido: &pedidos[i]})
+	}
+	svc := New(connectors.NewRegistry(stubs...), time.Second, 20)
+
+	resp, err := svc.Search(context.Background(), "t", domain.SearchQuery{Text: "x", Limit: 200})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(resp.Hits) != 200 || !resp.HasMore || resp.Total != 20*len(fuentes) {
+		t.Fatalf("limit=200: %d hits de %d, hasMore=%v; quiero 200 del agregado", len(resp.Hits), resp.Total, resp.HasMore)
+	}
+	for i, p := range pedidos {
+		if p > 20 {
+			t.Fatalf("a %s se le pidieron %d, el máximo por origen es 20", fuentes[i], p)
+		}
+	}
+
+	// La página del agregado tiene tope: 20 × 10.
+	resp, _ = svc.Search(context.Background(), "t", domain.SearchQuery{Text: "x", Limit: 9999})
+	if len(resp.Hits) != 200 {
+		t.Fatalf("limit=9999: %d hits, el tope de página es 200", len(resp.Hits))
+	}
+
+	// Un limit desmesurado no dispara lo que se pide a cada servicio.
+	pedido := 0
+	svc = New(connectors.NewRegistry(limiteStub{src: domain.SourceDrive, n: 500, pedido: &pedido}), time.Second, 50)
+	resp, _ = svc.Search(context.Background(), "t", domain.SearchQuery{Text: "x", Limit: 9999})
+	if len(resp.Hits) != 50 || pedido != 50 {
+		t.Fatalf("limit=9999: %d hits, pedidos %d al origen; quiero 50 y 50", len(resp.Hits), pedido)
+	}
+	// Sin limit, la página es la de siempre: el máximo por origen.
+	resp, _ = svc.Search(context.Background(), "t", domain.SearchQuery{Text: "x"})
+	if len(resp.Hits) != 50 {
+		t.Fatalf("sin limit: %d hits, quiero 50", len(resp.Hits))
 	}
 }
 

@@ -37,7 +37,7 @@ const SLIDES_EXTS = new Set(['odp', 'pptx', 'otp', 'potx', 'key']);
  * luego rechaza el fichero es peor que no ofrecerla: parece que ha funcionado.
  */
 export function appQueAbre(
-  kind: 'image' | 'pdf' | 'text' | 'office' | null,
+  kind: 'image' | 'pdf' | 'text' | 'office' | 'video' | 'audio' | null,
   opciones: { conMiniatura: boolean; conEditor: boolean; ext?: string },
 ): AppQueAbre | null {
   if (kind === 'pdf') return 'pdf';

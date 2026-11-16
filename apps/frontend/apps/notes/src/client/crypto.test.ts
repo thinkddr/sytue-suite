@@ -76,3 +76,39 @@ test('lo descifrado sale saneado, con las casillas de las tareas', async () => {
   const t = await desempaquetar(key, await empaquetar(key, { title: 't', content: tareas }));
   expect(t?.content).toBe(tareas);
 });
+
+// These fields are codec-only until the service prevents legacy overwrites.
+test('future encrypted links preserve absent, empty and lossless unknown fields', async () => {
+  const { key } = await nuevosParametros('long password for test');
+  for (const links_json of [
+    undefined,
+    '[]',
+    '[{"target_kind":"doc","target_id":"s1","label":"private","future":9007199254740993}]',
+  ]) {
+    const input = { title: 't', content: '', ...(links_json === undefined ? {} : { links_json }) };
+    const cipher = await empaquetar(key, input);
+    expect(cipher).not.toContain('private');
+    expect((await desempaquetar(key, cipher))?.links_json).toBe(links_json);
+  }
+  for (const links_json of [
+    '',
+    'null',
+    '{}',
+    '[null]',
+    '[1]',
+    `[{"label":"${String.fromCharCode(0xd800)}"}]`,
+  ]) {
+    await expect(empaquetar(key, { title: '', content: '', links_json })).rejects.toThrow();
+  }
+  await expect(
+    empaquetar(key, {
+      title: '',
+      content: '',
+      links_json: `[{"future":"${'x'.repeat(13 << 20)}"}]`,
+    }),
+  ).rejects.toThrow();
+  for (const invalid of [null, '', '[null]']) {
+    const cipher = await cifrarTexto(key, JSON.stringify({ links_json: invalid }));
+    expect(await desempaquetar(key, cipher)).toBeNull();
+  }
+});

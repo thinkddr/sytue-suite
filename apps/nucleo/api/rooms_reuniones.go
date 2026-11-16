@@ -253,6 +253,25 @@ func (r *Rooms) KnockChannel(ctx context.Context, canal string) error {
 	return r.KnockMeeting(ctx, sala.ID, "")
 }
 
+// LlamadaActiva cuenta quién está dentro de la llamada de un canal ahora mismo: el
+// `activeCall` de `lib/meet.ts` de la web. Busca la sala por su origen SIN crearla
+// (mirar no puede convocar una llamada) y cuenta los presentes. Sin sala (404) no hay
+// llamada: 0 y sin error, que es el caso de casi todos los canales casi siempre.
+func (r *Rooms) LlamadaActiva(ctx context.Context, canal string) (int, error) {
+	sala, err := JSON[RoomsMeeting](ctx, r.c, Request{
+		Path:  "/rooms/by-source",
+		Query: url.Values{"kind": {"chat"}, "ref_id": {canal}},
+	})
+	if err != nil {
+		if EsNoEncontrado(err) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	presentes, err := r.MeetingParticipants(ctx, sala.ID)
+	return len(presentes), err
+}
+
 // PostCall anota la llamada en el historial del canal: el mensaje de sistema
 // `type=call` con el cuerpo vacío que la web publica al empezar o unirse
 // (`postCallMessage`). La tarjeta llega a todos por el canal en vivo.

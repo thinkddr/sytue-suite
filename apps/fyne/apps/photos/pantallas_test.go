@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -224,13 +225,23 @@ func pantallasDePrueba(fotos []api.Photo, base Vista) map[string]func(Vista) fyn
 			})
 		},
 		"albumes": func(v Vista) fyne.CanvasObject {
-			return PantallaAlbumes(v, Albumes{Lista: []api.Album{album, album, album}})
+			// Uno con enlace público, para ver la insignia «Compartido» sobre la portada.
+			compartido := album
+			compartido.ID, compartido.Shared = "a2", true
+			return PantallaAlbumes(v, Albumes{Lista: []api.Album{album, compartido, album}})
 		},
 		"album": func(v Vista) fyne.CanvasObject {
 			return PantallaAlbum(v, AlbumAbierto{Album: album, Fotos: fotos})
 		},
 		"papelera": func(v Vista) fyne.CanvasObject {
-			return PantallaPapelera(v, Papelera{Fotos: fotos[:8]})
+			// Con su plazo, como la devuelve el servicio: cada una a unos días de la purga.
+			ahora := time.Date(2026, 11, 9, 12, 0, 0, 0, time.UTC)
+			enPapelera := slices.Clone(fotos[:8])
+			for i := range enPapelera {
+				purga := ahora.Add(time.Duration(i*4) * 24 * time.Hour)
+				enPapelera[i].PurgeAt = &purga
+			}
+			return PantallaPapelera(v, Papelera{Fotos: enPapelera, Retencion: 30, Ahora: ahora})
 		},
 		"repetidas": func(v Vista) fyne.CanvasObject {
 			return PantallaRepetidas(v, Repetidas{Grupos: [][]api.Photo{fotos[:3], fotos[3:5]}})
@@ -598,6 +609,52 @@ func TestElAreaDeLaPeticionMideLoDeLaWeb(t *testing.T) {
 	}
 }
 
+// TestLosFondosSonLosNeutrosDeLaWeb: cada fondo del lienzo, el borde de su muestra y los
+// cuadros del damero son el mismo escalón de la escala de neutros que pinta
+// `fondoLienzo.ts`, y siguen al color de la suite: con cobalto, el claro ya no es el de
+// petróleo. Los literales de la paleta antigua (el crema y el grafito) no vuelven.
+func TestLosFondosSonLosNeutrosDeLaWeb(t *testing.T) {
+	web := webref.Read(t, "apps/frontend/apps/photos/src/lib/fondoLienzo.ts")
+	for _, viejo := range []string{"#faf9f6", "#131619", "#ffffff", "rgba("} {
+		if strings.Contains(web, viejo) {
+			t.Errorf("fondoLienzo.ts vuelve a tener el literal %q", viejo)
+		}
+	}
+	casos := []struct {
+		nombre string
+		got    func() color.NRGBA
+		token  string
+		web    string
+	}{
+		{"crema", FondoCrema.colorFondo, "neutral-100", "backgroundColor: 'var(--sytue-neutral-100)'"},
+		{"blanco", FondoBlanco.colorFondo, "neutral-0", "backgroundColor: 'var(--sytue-neutral-0)'"},
+		{"oscuro", FondoOscuro.colorFondo, "neutral-900", "backgroundColor: 'var(--sytue-neutral-900)'"},
+		{"damero", FondoDamero.colorFondo, "neutral-0", "'border-neutral-300 bg-neutral-0 bg-["},
+		{"cuadros del lienzo", func() color.NRGBA { return pintarDameroCon(2, 1, 1).NRGBAAt(1, 0) }, "neutral-200", "repeating-conic-gradient(var(--sytue-neutral-200) 0% 25%"},
+		{"cuadros de la muestra", cuadroDamero, "neutral-300", "repeating-conic-gradient(var(--sytue-neutral-300)_0%_25%"},
+		{"borde de la muestra clara", func() color.NRGBA { return bordeMuestra(FondoCrema) }, "neutral-300", "'border-neutral-300 bg-neutral-100'"},
+		{"borde de la muestra oscura", func() color.NRGBA { return bordeMuestra(FondoOscuro) }, "neutral-700", "'border-neutral-700 bg-neutral-900'"},
+	}
+	t.Cleanup(func() { tema.ElegirColor("") })
+	for _, paleta := range []string{"", "cobalto"} {
+		tema.ElegirColor(paleta)
+		for _, c := range casos {
+			if !strings.Contains(web, c.web) {
+				t.Errorf("%s: la web ya no dice %q", c.nombre, c.web)
+			}
+			if got, want := c.got(), tema.Color(c.token, tema.Claro); got != want {
+				t.Errorf("%s con el color %q: %v, quería --sytue-%s %v", c.nombre, paleta, got, c.token, want)
+			}
+		}
+	}
+	tema.ElegirColor("cobalto")
+	cobalto := FondoCrema.colorFondo()
+	tema.ElegirColor("")
+	if cobalto == FondoCrema.colorFondo() {
+		t.Error("el fondo claro no sigue al color de la suite")
+	}
+}
+
 // TestElMenuDeFondosLlevaSuMuestra: delante de cada fondo, `h-3 w-3 rounded-full
 // border` con su relleno y su borde, y en el damero sus cuadros de 3 px recortados al
 // círculo: el de arriba en el centro, pintado; el hueco de la esquina, del fondo; y el
@@ -609,9 +666,9 @@ func TestElMenuDeFondosLlevaSuMuestra(t *testing.T) {
 		want color.NRGBA
 	}{
 		{FondoOscuro, 5.25, 5.25, FondoOscuro.colorFondo()},
-		{FondoOscuro, 5.25, 0.75, bordeMuestra[FondoOscuro]},
+		{FondoOscuro, 5.25, 0.75, bordeMuestra(FondoOscuro)},
 		{FondoCrema, 5.25, 5.25, FondoCrema.colorFondo()},
-		{FondoDamero, 5.5, 2.5, cuadroDamero},
+		{FondoDamero, 5.5, 2.5, cuadroDamero()},
 		{FondoDamero, 2.5, 2.5, FondoDamero.colorFondo()},
 		{FondoDamero, 5.25, 5.25, FondoDamero.colorFondo()},
 		{FondoDamero, 10.5, 11.5, blanco}, // a más de 6 del centro: fuera, aunque caiga en un cuadro
@@ -631,7 +688,7 @@ func TestLaMuestraElegidaCreceUnDiezPorCiento(t *testing.T) {
 		elegida bool
 		want    color.NRGBA
 	}{
-		{true, bordeMuestra[FondoOscuro]},
+		{true, bordeMuestra(FondoOscuro)},
 		{false, blanco},
 	} {
 		m := NuevaMuestraFondo(v, FondoOscuro, c.elegida, nil)
@@ -942,5 +999,84 @@ func TestEnElTelefonoLaBarraDeSeleccionEsUnaFila(t *testing.T) {
 	}
 	if movil, escritorio := alto(393), alto(1280); movil != escritorio {
 		t.Errorf("a 393 px la barra mide %v y en el escritorio %v: se ha partido", movil, escritorio)
+	}
+}
+
+// textosDePantalla son los textos que se ven en el árbol: los de `canvas.Text`, los de
+// cada párrafo y los del estado vacío. Solo baja por contenedores: los widgets de la
+// suite guardan su texto en un campo, y así no hace falta montar sus renderers.
+func textosDePantalla(o fyne.CanvasObject) []string {
+	var out []string
+	switch x := o.(type) {
+	case *fyne.Container:
+		for _, h := range x.Objects {
+			out = append(out, textosDePantalla(h)...)
+		}
+	case *fcanvas.Text:
+		out = append(out, x.Text)
+	case *ui.Parrafo:
+		out = append(out, x.Texto)
+	case *ui.Vacio:
+		out = append(out, x.Titulo, x.Descripcion)
+	}
+	return out
+}
+
+// TestLaPapeleraDiceCuandoSeBorraCadaFoto: cada tesela lleva «Se borrará en N días»
+// con la fecha de purga que puso el servicio, «hoy» el último día y nada si la foto no
+// la trae; y el plazo de la papelera se dice una vez encima de las fotos.
+func TestLaPapeleraDiceCuandoSeBorraCadaFoto(t *testing.T) {
+	v := vistaDePrueba(t, nil)
+	ahora := time.Date(2026, 11, 9, 12, 0, 0, 0, time.UTC)
+	en5, pasada := ahora.Add(5*24*time.Hour), ahora.Add(-time.Hour)
+	fotos := fotosDePrueba(3)
+	fotos[0].PurgeAt, fotos[1].PurgeAt = &en5, &pasada
+	p := PantallaPapelera(v, Papelera{Fotos: fotos, Retencion: 30, Ahora: ahora})
+	p.Resize(fyne.NewSize(1200, 2000))
+
+	textos := textosDePantalla(p)
+	for _, quiero := range []string{
+		"Se borrará en 5 días", "Se borrará hoy",
+		"Las fotos que quites de la galería se quedan aquí 30 días y hasta entonces se pueden restaurar.",
+	} {
+		if !slices.Contains(textos, quiero) {
+			t.Errorf("falta %q en la papelera: %q", quiero, textos)
+		}
+	}
+	n := 0
+	for _, x := range textos {
+		if strings.HasPrefix(x, "Se borrará") {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Errorf("%d teselas dicen cuándo se borran y solo dos tienen fecha", n)
+	}
+}
+
+// TestLaPapeleraVaciaDiceElPlazo: vacía, el estado vacío cuenta cuánto se queda lo que
+// llegue; sin retención (papelera que no caduca) se queda el texto de siempre, que no
+// promete ningún plazo.
+func TestLaPapeleraVaciaDiceElPlazo(t *testing.T) {
+	v := vistaDePrueba(t, nil)
+	v.Estado = Vacia
+	con := textosDePantalla(PantallaPapelera(v, Papelera{Fotos: []api.Photo{}, Retencion: 30}))
+	if !slices.Contains(con, "Las fotos que quites de la galería se quedan aquí 30 días y hasta entonces se pueden restaurar.") {
+		t.Errorf("la papelera vacía no dice el plazo: %q", con)
+	}
+	sin := textosDePantalla(PantallaPapelera(v, Papelera{Fotos: []api.Photo{}}))
+	if !slices.Contains(sin, v.Traduce("trash.empty.description")) {
+		t.Errorf("sin retención no queda el texto de siempre: %q", sin)
+	}
+}
+
+// TestElPlazoSeRecortaEnUnaTeselaEstrecha: en una foto vertical del teléfono no cabe la
+// frase entera, y se recorta con «…» en vez de salirse de la foto.
+func TestElPlazoSeRecortaEnUnaTeselaEstrecha(t *testing.T) {
+	c := nuevoPlazoSobreFoto("Se borrará en 30 días")
+	c.Resize(fyne.NewSize(60, 80))
+	txt := c.Objects[len(c.Objects)-1].(*fcanvas.Text)
+	if !strings.HasSuffix(txt.Text, "…") || txt.Position().X+txt.Size().Width > 60 {
+		t.Errorf("en 60 px quedó %q de %v de ancho en x=%v", txt.Text, txt.Size().Width, txt.Position().X)
 	}
 }

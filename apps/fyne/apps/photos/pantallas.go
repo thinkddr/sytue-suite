@@ -6,6 +6,8 @@ package photos
 import (
 	"image/color"
 	"slices"
+	"strconv"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -77,6 +79,10 @@ type Lote struct {
 	MarcandoFavoritas bool
 
 	AlNuevoAlbum, AlDescribir, AlParar, AlParecidas, AlDescargar, AlTirar func()
+	// AlSistema guarda lo marcado en la galería del sistema (`ClaveSistema` es su rótulo:
+	// «Añadir a Fotos», «Guardar en Imágenes»); nil, este equipo no lo ofrece.
+	AlSistema    func()
+	ClaveSistema string
 	// AlFavoritas es el corazón: marca lo que falte o, si todas lo son, las quita.
 	AlFavoritas func()
 	AlAnyadirA  func(api.Album)
@@ -97,6 +103,11 @@ type Galeria struct {
 	Busqueda string
 	// SoloFavoritas es el filtro: cambia la pestaña activa y los textos del vacío.
 	SoloFavoritas bool
+	// Anyos son los años con fotos, Anyo al que se saltó (0, «Recientes») y AlAnyo
+	// lo que hace pulsar uno: la barra para saltar a una fecha.
+	Anyos  []api.TimelineYear
+	Anyo   int
+	AlAnyo func(int)
 	// EnSeleccion es el modo selección; Seleccion, lo marcado.
 	EnSeleccion bool
 	Seleccion   map[string]bool
@@ -110,6 +121,10 @@ type Galeria struct {
 	Cargando bool
 	// Subiendo inertiza «Añadir fotos» mientras dura una subida.
 	Subiendo bool
+	// AlCopia abre el diálogo de la copia de seguridad (la nube de la barra); nil, este
+	// dispositivo no tiene galería del sistema y no se ofrece. Copiando la marca en curso.
+	AlCopia  func()
+	Copiando bool
 	// Ampliar ofrece «Buscar también con otras palabras»: solo cuando la búsqueda literal
 	// no encontró NADA, y Ampliando lo inertiza mientras Sytue AI contesta.
 	Ampliar, Ampliando bool
@@ -119,8 +134,11 @@ type Galeria struct {
 	SinResultados    string
 	AlBorrarBusqueda func()
 
-	AlAbrir     func(api.Photo)
-	AlAlternar  func(api.Photo)
+	AlAbrir    func(api.Photo)
+	AlAlternar func(api.Photo)
+	// AlMantener es mantener pulsada una tesela fuera del modo selección: entra en él
+	// con esa foto marcada. Nil, el gesto no hace nada (los álbumes, «parecidas»).
+	AlMantener  func(api.Photo)
 	AlFavorita  func(api.Photo)
 	AlIr        func(Seccion)
 	AlAnyadir   func()
@@ -163,19 +181,7 @@ func PantallaGaleria(v Vista, d Galeria) *fyne.Container {
 	if v.Ventana < ui.CorteSM {
 		campo, elastico = buscador, 2
 	}
-	// UNA acción rellena en la barra —«Añadir fotos»— y las demás de fantasma con su
-	// icono: «Seleccionar» era otro botón relleno del mismo peso.
-	derecha := []fyne.CanvasObject{campo}
-	if d.Busqueda != "" && hayFotos && !d.EnSeleccion {
-		derecha = append(derecha,
-			ui.NuevoBoton(v.Traduce("gallery.likeTheseResults"), d.AlComoEstas).Con(ui.Fantasma, ui.TallaMD).ConIcono(iconos.Imagen, 0))
-	}
-	if hayFotos && !d.EnSeleccion {
-		derecha = append(derecha,
-			ui.NuevoBoton(v.Traduce("gallery.select"), d.AlSeleccionar).Con(ui.Fantasma, ui.TallaMD).ConIcono(iconos.Tic, 0))
-	}
-	derecha = append(derecha, botonAnyadir(v, d, false))
-	arriba := append([]fyne.CanvasObject{Nav(v, activa, d.AlIr)}, derecha...)
+	arriba := append([]fyne.CanvasObject{Nav(v, activa, d.AlIr)}, accionesBarra(v, d, campo, hayFotos)...)
 	// `flex flex-wrap gap-2` con `mb-4` en cada hijo: entre fila y fila, 14 + 7.
 	fila := container.New(ui.FilaAuto{
 		Hueco: tema.Espacio(2), Derecha: 1, Partir: true,
@@ -190,6 +196,13 @@ func PantallaGaleria(v Vista, d Galeria) *fyne.Container {
 		}
 		bloques = append(bloques, ui.Bloque{Obj: barra, Margen: SeparacionBloque})
 	}
+	// Solo mirando la línea entera: con una búsqueda o una selección en marcha, saltar
+	// de año descolocaría lo que se está haciendo.
+	if d.Busqueda == "" && !d.EnSeleccion {
+		if b := BarraDeAnyos(v, d.Anyos, d.Anyo, d.AlAnyo); b != nil {
+			bloques = append(bloques, ui.Bloque{Obj: b, Margen: SeparacionBloque})
+		}
+	}
 	if e := avisoGaleria(v, d); e != nil {
 		bloques = append(bloques, ui.Bloque{Obj: e, Margen: SeparacionBloque})
 	}
@@ -200,9 +213,10 @@ func PantallaGaleria(v Vista, d Galeria) *fyne.Container {
 	}
 	vacio := EstadoVacio(v, vacioTitulo, vacioTexto, botonAnyadir(v, d, true))
 	if v.Estado == Cargando {
-		// La web no enseña un estado de carga aparte: pinta la cabecera y el centinela
-		// del final, que es donde gira la rueda también con la galería vacía.
-		bloques = append(bloques, ui.Bloque{Obj: centinela(v, true)})
+		// La primera carga: la cabecera de arriba y, debajo, el esqueleto de un mes con
+		// sus filas al alto de fila de la galería (`<EsqueletoFilas mes>`). La rueda del
+		// centinela queda para las páginas siguientes, con fotos encima.
+		bloques = append(bloques, ui.Bloque{Obj: EsqueletoFilas(v, TeselasEsqueletoGaleria, true), Margen: SeparacionMes})
 		return Envolver(v, true, ui.PilaBloques(bloques...))
 	}
 	if cuerpo := CuerpoDeEstado(v, vacio); cuerpo != nil {
@@ -221,15 +235,71 @@ func PantallaGaleria(v Vista, d Galeria) *fyne.Container {
 		bloques = append(bloques, ui.Bloque{Obj: vacioDeBusqueda(v, d), Margen: SeparacionSeccion})
 	}
 
+	var teselas []fyne.CanvasObject
 	for _, g := range d.Grupos {
 		cab, rej := cabeceraMes(v, g, d), rejillaDeFotos(v, g.Fotos, d)
 		if d.AlMes != nil {
 			d.AlMes(cab, rej, g)
 		}
+		teselas = append(teselas, rej.Objects...)
 		bloques = append(bloques, ui.Bloque{Obj: cab}, ui.Bloque{Obj: rej, Margen: SeparacionMes})
 	}
+	enlazarFlechas(v, teselas)
 	bloques = append(bloques, ui.Bloque{Obj: centinela(v, d.Cargando)})
 	return Envolver(v, true, ui.PilaBloques(bloques...))
+}
+
+// BarraDeAnyos es `BarraDeAnyos.tsx`: «Recientes» y un botón por año, el elegido en
+// secundario y los demás de fantasma. Por debajo de `md`, UNA fila que se desliza de lado
+// como la nav (`max-md:flex-nowrap max-md:overflow-x-auto`); por encima, `flex-wrap`:
+// una Fila sin partir sumaba el ancho de todos los años al mínimo de la ventana, y con
+// quince años de galería no se podía estrechar. nil con menos de dos años: no hay adónde
+// saltar.
+func BarraDeAnyos(v Vista, anyos []api.TimelineYear, activo int, alElegir func(int)) fyne.CanvasObject {
+	if len(anyos) < 2 {
+		return nil
+	}
+	boton := func(texto string, anyo int) *ui.Boton {
+		variante := ui.Fantasma
+		if anyo == activo {
+			variante = ui.Secundario
+		}
+		return ui.NuevoBoton(texto, func() {
+			if alElegir != nil {
+				alElegir(anyo)
+			}
+		}).Con(variante, ui.TallaSM)
+	}
+	hijos := []fyne.CanvasObject{boton(v.Traduce("gallery.latest"), 0)}
+	for _, a := range anyos {
+		hijos = append(hijos, boton(strconv.Itoa(a.Year), a.Year))
+	}
+	if v.Ventana >= ui.CorteMD {
+		// El ancho de la caja de la galería, para que el mínimo sea el del flujo YA
+		// partido: la pila de bloques suma mínimos y, sin él, contaría una sola línea.
+		_, ancho := CajaGaleria(v.Ventana)
+		return container.New(ui.Flujo{Hueco: tema.Espacio(1), Ancho: ancho}, hijos...)
+	}
+	return deslizable(container.New(ui.Fila{Hueco: tema.Espacio(1)}, hijos...))
+}
+
+// accionesBarra son los mandos de la derecha de la fila de arriba, tras el buscador. UNA
+// acción rellena —«Añadir fotos»— y las demás de fantasma con su icono: «Seleccionar» era
+// otro botón relleno del mismo peso.
+func accionesBarra(v Vista, d Galeria, campo fyne.CanvasObject, hayFotos bool) []fyne.CanvasObject {
+	derecha := []fyne.CanvasObject{campo}
+	if d.Busqueda != "" && hayFotos && !d.EnSeleccion {
+		derecha = append(derecha,
+			ui.NuevoBoton(v.Traduce("gallery.likeTheseResults"), d.AlComoEstas).Con(ui.Fantasma, ui.TallaMD).ConIcono(iconos.Imagen, 0))
+	}
+	if hayFotos && !d.EnSeleccion {
+		derecha = append(derecha,
+			ui.NuevoBoton(v.Traduce("gallery.select"), d.AlSeleccionar).Con(ui.Fantasma, ui.TallaMD).ConIcono(iconos.Tic, 0))
+	}
+	if d.AlCopia != nil {
+		derecha = append(derecha, botonCopia(v, d))
+	}
+	return append(derecha, botonAnyadir(v, d, false))
 }
 
 // vacioDeBusqueda es el `EmptyState` de una búsqueda sin aciertos: la ilustración
@@ -263,6 +333,20 @@ func botonAnyadir(v Vista, d Galeria, siempreConRotulo bool) *ui.Boton {
 	b := ui.NuevoBoton(v.Traduce("gallery.add"), d.AlAnyadir).Con(ui.Primario, ui.TallaMD).ConIcono(iconos.Mas, 0)
 	b.Inerte = d.Subiendo
 	if !siempreConRotulo && v.Ventana < ui.CorteSM {
+		b.Rotulo, b.Texto = b.Texto, ""
+	}
+	return b
+}
+
+// botonCopia es la nube de la copia de seguridad: de fantasma, como «Seleccionar», y
+// solo con el icono en un teléfono. Mientras sube, el icono es el de subir.
+func botonCopia(v Vista, d Galeria) *ui.Boton {
+	icono := iconos.Nube
+	if d.Copiando {
+		icono = iconos.Subir
+	}
+	b := ui.NuevoBoton(v.Traduce("backup.title"), d.AlCopia).Con(ui.Fantasma, ui.TallaMD).ConIcono(icono, 0)
+	if v.Ventana < ui.CorteSM {
 		b.Rotulo, b.Texto = b.Texto, ""
 	}
 	return b
@@ -456,9 +540,11 @@ func barraSeleccion(v Vista, d Galeria) fyne.CanvasObject {
 		// El mismo icono que «Fotos parecidas» en el visor: es la misma pregunta.
 		boton("gallery.moreLikeThese", iconos.Imagen, l.AlParecidas),
 		boton("gallery.downloadSelected", iconos.Descargar, l.AlDescargar),
-		filete(v),
-		tirar,
 	)
+	if l.AlSistema != nil {
+		hijos = append(hijos, boton(l.ClaveSistema, iconos.Dispositivo, l.AlSistema))
+	}
+	hijos = append(hijos, filete(v), tirar)
 	// El recuento lleva `mr-auto`: lo que le sigue va empujado a la derecha. Por debajo
 	// de `md` es una fila que se desplaza de lado (`FILA_UNICA_EN_MOVIL`): partida en
 	// dos, la cabecera del mes pegada (TopeBajoBarra) quedaba debajo de la segunda.
@@ -518,7 +604,21 @@ func rejillaDeFotos(v Vista, fotos []api.Photo, d Galeria) *fyne.Container {
 	for i, f := range fotos {
 		hijos[i] = teselaDe(v, f, d)
 	}
+	enlazarFlechas(v, hijos)
 	return container.New(filasDe(v, fotos), hijos...)
+}
+
+// enlazarFlechas hace que las flechas recorran `teselas` (Miniaturas) por su sitio en
+// pantalla: es el `alTeclearEnGaleria` de la web. La galería lo vuelve a llamar con las
+// de TODOS los meses, para que ↓ en la última fila de uno baje al siguiente.
+func enlazarFlechas(v Vista, teselas []fyne.CanvasObject) {
+	for i, o := range teselas {
+		if m, ok := o.(*Miniatura); ok {
+			m.AlFlecha = func(tecla fyne.KeyName) bool {
+				return ui.MoverFocoEnRejilla(teselas, i, tecla, v.Desplaza)
+			}
+		}
+	}
 }
 
 func teselaDe(v Vista, f api.Photo, d Galeria) *Miniatura {
@@ -539,6 +639,9 @@ func teselaDe(v Vista, f api.Photo, d Galeria) *Miniatura {
 		if d.AlAbrir != nil {
 			d.AlAbrir(f)
 		}
+	}
+	if d.AlMantener != nil {
+		m.AlMantener = func() { d.AlMantener(f) }
 	}
 	if d.AlFavorita != nil {
 		clave := "gallery.favorite"
@@ -598,6 +701,10 @@ type Albumes struct {
 	ExcluidaLoteIA       bool
 	PuedeGestionarLoteIA bool
 	AlExcluirLoteIA      func(bool)
+
+	// Orden es el de las tarjetas; el valor cero es «recientes», el del servicio.
+	Orden     OrdenAlbum
+	AlOrdenar func(OrdenAlbum)
 
 	AlAbrir   func(api.Album)
 	AlIr      func(Seccion)
@@ -671,13 +778,20 @@ func PantallaAlbumes(v Vista, d Albumes) *fyne.Container {
 	bloques = append(bloques, ui.Bloque{Obj: ui.PilaBloques(seccion...), Margen: SeparacionSeccion})
 
 	vacio := EstadoVacio(v, "albums.empty.title", "albums.empty.description", nil)
-	if cuerpo := CuerpoDeEstado(v, vacio); cuerpo != nil {
+	if cuerpo := CuerpoConEsqueleto(v, vacio, func() *Ocupado {
+		return EsqueletoAlbumes(v, TarjetasEsqueleto, tema.Espacio(6))
+	}); cuerpo != nil {
 		bloques = append(bloques, ui.Bloque{Obj: cuerpo})
 		return Envolver(v, false, ui.PilaBloques(bloques...))
 	}
 
-	tarjetas := make([]fyne.CanvasObject, len(d.Lista))
-	for i, a := range d.Lista {
+	lista := OrdenarAlbumes(d.Lista, d.Orden, v.T.Locale())
+	// Con un solo álbum no hay nada que ordenar: el selector solo sería ruido.
+	if len(lista) > 1 {
+		bloques = append(bloques, ui.Bloque{Obj: SelectorOrdenAlbumes(v, d.Orden, d.AlOrdenar), Margen: tema.Espacio(3)})
+	}
+	tarjetas := make([]fyne.CanvasObject, len(lista))
+	for i, a := range lista {
 		tarjetas[i] = TarjetaAlbum(v, a, d.AlAbrir)
 	}
 	r := ui.RejillaAlbumes()
@@ -780,7 +894,7 @@ func PantallaAlbum(v Vista, d AlbumAbierto) *fyne.Container {
 	if d.Error != "" {
 		bloques = append(bloques, ui.Bloque{Obj: ParrafoEn(d.Error, tema.TextoSM, ui.Normal, "danger-text", v.Variante), Margen: SeparacionBloque})
 	}
-	if cuerpo := CuerpoDeEstado(v, EstadoVacio(v, "albums.empty.title", "albums.empty.description", nil)); cuerpo != nil {
+	if cuerpo := CuerpoConEsqueleto(v, EstadoVacio(v, "albums.empty.title", "albums.empty.description", nil), esqueletoDeFilas(v)); cuerpo != nil {
 		bloques = append(bloques, ui.Bloque{Obj: cuerpo})
 		return Envolver(v, false, ui.PilaBloques(bloques...))
 	}
@@ -898,7 +1012,32 @@ func compartirO(a api.Album) string {
 	return "album.share"
 }
 
-// TarjetaAlbum es una portada 4:3, con el título y el recuento debajo.
+// SelectorOrdenAlbumes es «Ordenar por» con su rótulo visible, empujado a la derecha:
+// la `<label>` con el `<Select size="sm">` de la web. El rótulo es también el nombre
+// accesible del selector, que si no anunciaría solo el valor elegido.
+func SelectorOrdenAlbumes(v Vista, o OrdenAlbum, alOrdenar func(OrdenAlbum)) fyne.CanvasObject {
+	rotulo := v.Traduce("albums.sort.label")
+	opciones := make([]string, len(OrdenesAlbum))
+	for i, x := range OrdenesAlbum {
+		opciones[i] = v.Traduce("albums.sort." + string(x))
+	}
+	sel := ui.NuevoSelector(opciones, func(i int) {
+		if alOrdenar != nil {
+			alOrdenar(OrdenesAlbum[i])
+		}
+	}).Con(ui.CampoSM)
+	sel.Rotulo = rotulo
+	// El `CAMPO_TACTIL` de la web: con el dedo, 44 de alto.
+	sel.Alto = ui.SueloTactil(ui.MedidaSelector(ui.CampoSM, 0).Height)
+	sel.Elegida = max(slices.Index(OrdenesAlbum, o), 0)
+	return container.New(ui.FilaAuto{Hueco: tema.Espacio(2), Derecha: 0},
+		ParrafoEn(rotulo, tema.TextoXS, ui.Normal, "text-muted", v.Variante), sel)
+}
+
+// TarjetaAlbum es una portada 4:3, con el título y el recuento debajo. Si el álbum
+// tiene enlace público lo dice con la insignia «Compartido» sobre la portada: que un
+// enlace siga vivo es lo primero que hay que poder ver al repasar los álbumes. Va
+// encima de la portada y no en el pie para no cambiar el alto de la tarjeta.
 func TarjetaAlbum(v Vista, a api.Album, alAbrir func(api.Album)) fyne.CanvasObject {
 	teca := v.Teca
 	if a.CoverAssetID == "" {
@@ -916,10 +1055,18 @@ func TarjetaAlbum(v Vista, a api.Album, alAbrir func(api.Album)) fyne.CanvasObje
 	}
 	titulo := ParrafoEn(a.Title, tema.TextoSM, ui.SemiNegrita, "text", v.Variante)
 	cuenta := ParrafoEn(Recuento(v, "albums.count", a.Count), tema.TextoXS, ui.Normal, "text-muted", v.Variante)
-	return container.New(tarjetaAlbumLayout{titulo: a.Title}, cubierta, titulo, cuenta)
+	objs := []fyne.CanvasObject{cubierta, titulo, cuenta}
+	// Tono `info` y no `primary`: el relleno de `primary` (`selected`) es translúcido
+	// y sobre una portada la insignia desaparecía; el de `info` es opaco en los dos temas.
+	if a.Shared {
+		objs = append(objs, ui.NuevaInsignia(v.Traduce("album.shared"), ui.InsigniaInfo))
+	}
+	return container.New(tarjetaAlbumLayout{titulo: a.Title}, objs...)
 }
 
-// tarjetaAlbumLayout: portada 4:3 a todo el ancho, `mt-2` y las dos líneas.
+// tarjetaAlbumLayout: portada 4:3 a todo el ancho, `mt-2` y las dos líneas. Un cuarto
+// objeto, la insignia, va en la esquina de la portada (`absolute start-2 top-2`) y se
+// pinta encima porque va el último.
 type tarjetaAlbumLayout struct{ titulo string }
 
 var _ fyne.Layout = tarjetaAlbumLayout{}
@@ -950,7 +1097,14 @@ func (l tarjetaAlbumLayout) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	objs[1].Resize(fyne.NewSize(t.Width, tema.TextoSM.Linea))
 	objs[2].Move(fyne.NewPos(0, y+tema.TextoSM.Linea))
 	objs[2].Resize(fyne.NewSize(t.Width, tema.TextoXS.Linea))
+	if len(objs) > 3 {
+		m := objs[3].MinSize()
+		objs[3].Move(fyne.NewPos(margenInsigniaAlbum, margenInsigniaAlbum))
+		objs[3].Resize(fyne.NewSize(min(m.Width, t.Width-2*margenInsigniaAlbum), m.Height))
+	}
 }
+
+const margenInsigniaAlbum = 2 * 0.25 * tema.Rem // `start-2 top-2`
 
 // ---- Papelera ----
 
@@ -958,6 +1112,11 @@ func (l tarjetaAlbumLayout) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 type Papelera struct {
 	Fotos        []api.Photo
 	Aviso, Error string
+	// Retencion son los días que pasa una foto aquí antes de borrarse para siempre; 0,
+	// la organización no caduca la papelera y no se promete ninguna fecha.
+	Retencion int
+	// Ahora es el instante desde el que se cuentan los días; cero, el reloj.
+	Ahora time.Time
 
 	AlIr                  func(Seccion)
 	AlVaciar              func()
@@ -981,13 +1140,27 @@ func PantallaPapelera(v Vista, d Papelera) *fyne.Container {
 		bloques = append(bloques, ui.Bloque{Obj: ParrafoEn(d.Error, tema.TextoSM, ui.Normal, "danger-text", v.Variante), Margen: SeparacionBloque})
 	}
 	vacio := EstadoVacio(v, "trash.empty.title", "trash.empty.description", nil)
-	if cuerpo := CuerpoDeEstado(v, vacio); cuerpo != nil {
+	if d.Retencion > 0 {
+		vacio = ui.NuevoVacio(v.Traduce("trash.empty.title"), v.T.T("trash.retention", i18n.Vars{"count": d.Retencion}))
+		vacio.Ilustracion = iconos.Pintar(iconos.VacioFotos, v.Variante).A(AnchoIlustracion).Objeto()
+	}
+	if cuerpo := CuerpoConEsqueleto(v, vacio, esqueletoDeFilas(v)); cuerpo != nil {
 		bloques = append(bloques, ui.Bloque{Obj: cuerpo})
 		return Envolver(v, false, ui.PilaBloques(bloques...))
 	}
+	// El plazo, dicho una vez para toda la papelera, ENCIMA del aviso como en la web.
+	// Solo con fotos a la vista: vacía ya lo dice su estado vacío, y no se repite.
+	if d.Retencion > 0 && len(d.Fotos) > 0 {
+		plazo := ui.NuevoParrafo(v.T.T("trash.retention", i18n.Vars{"count": d.Retencion}), tema.TextoSM, ui.Normal, "text-muted", v.Variante)
+		bloques = slices.Insert(bloques, 1, bloqueLargo(plazo, 0))
+	}
+	ahora := d.Ahora
+	if ahora.IsZero() {
+		ahora = time.Now()
+	}
 	hijos := make([]fyne.CanvasObject, len(d.Fotos))
 	for i, f := range d.Fotos {
-		hijos[i] = teselaPapelera(v, f, d)
+		hijos[i] = teselaPapelera(v, f, d, ahora)
 	}
 	bloques = append(bloques, ui.Bloque{Obj: container.New(filasDe(v, d.Fotos), hijos...)})
 	return Envolver(v, false, ui.PilaBloques(bloques...))
@@ -997,7 +1170,7 @@ func PantallaPapelera(v Vista, d Papelera) *fyne.Container {
 // (`IconButton tone="media" size="sm"`), que abre el menú con «Restaurar» y «Borrar para
 // siempre». Eran dos botones de icono en cada tesela, que con el dedo no caben en una
 // foto vertical. Su nombre es el de la foto: es el menú DE esa foto.
-func teselaPapelera(v Vista, f api.Photo, d Papelera) fyne.CanvasObject {
+func teselaPapelera(v Vista, f api.Photo, d Papelera, ahora time.Time) fyne.CanvasObject {
 	m := NuevaMiniatura(f, v.Teca)
 	m.Atenuada, m.SinMarcas, m.Filete, m.Rotulo = true, true, true, f.Name
 	var mando *MandoSobreFoto
@@ -1015,7 +1188,48 @@ func teselaPapelera(v Vista, f api.Photo, d Papelera) fyne.CanvasObject {
 		purgar.Peligro = true
 		mostrarMenu(f.Name, mando, []fyne.CanvasObject{restaurar, purgar})
 	})
-	return container.New(esquinaAbajo{}, m, mando)
+	tesela := container.New(esquinaAbajo{}, m, mando)
+	dias, ok := f.DiasParaPurga(ahora)
+	if !ok {
+		return tesela
+	}
+	texto := v.T.T("trash.purgesIn", i18n.Vars{"count": dias})
+	if dias == 0 {
+		texto = v.Traduce("trash.purgesToday")
+	}
+	return container.NewStack(tesela, nuevoPlazoSobreFoto(texto))
+}
+
+// plazoSobreFoto es «Se borrará en N días» arriba a la izquierda de la tesela de la
+// papelera (abajo a la derecha va su menú): `absolute inset-x-1 top-1` con la píldora
+// `rounded-sm bg-black/60 px-1.5 py-0.5 text-xs font-medium text-white`. Es el par de
+// todo lo que va sobre una foto (`negro60`/`blanco`). En una tesela estrecha se
+// recorta con «…», como el `truncate` de la web.
+type plazoSobreFoto struct {
+	completo string
+	caja     *ui.Caja
+	texto    *canvas.Text
+}
+
+func nuevoPlazoSobreFoto(s string) *fyne.Container {
+	p := &plazoSobreFoto{completo: s, caja: ui.NuevaCaja(negro60, color.NRGBA{}, tema.RadioSM)}
+	p.texto = ui.Texto(s, tema.TextoXS, ui.Medio, blanco)
+	return container.New(p, append(p.caja.Objetos(), p.texto)...)
+}
+
+var (
+	rellenoPlazoX float32 = 1.5 * 0.25 * tema.Rem
+	rellenoPlazoY float32 = 0.5 * 0.25 * tema.Rem
+)
+
+func (p *plazoSobreFoto) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.Size{} }
+
+func (p *plazoSobreFoto) Layout(_ []fyne.CanvasObject, t fyne.Size) {
+	margen := tema.Espacio(1)
+	cabe := max(t.Width-2*margen-2*rellenoPlazoX, 0)
+	ancho := ui.Truncar(p.texto, p.completo, tema.TextoXS, ui.Medio, cabe)
+	ui.MoverCaja(p.caja, fyne.NewPos(margen, margen), fyne.NewSize(ancho+2*rellenoPlazoX, tema.TextoXS.Linea+2*rellenoPlazoY))
+	ui.ColocarTexto(p.texto, tema.TextoXS, margen+rellenoPlazoX, margen+rellenoPlazoY)
 }
 
 // esquinaAbajo pone el primer hijo a toda la caja y el segundo a `right-1 bottom-1`.
@@ -1081,7 +1295,7 @@ func PantallaRepetidas(v Vista, d Repetidas) *fyne.Container {
 		bloques = append(bloques, ui.Bloque{Obj: ParrafoEn(d.Error, tema.TextoSM, ui.Normal, "danger-text", v.Variante), Margen: SeparacionBloque})
 	}
 	vacio := EstadoVacio(v, "dup.empty.title", "dup.empty.description", nil)
-	if cuerpo := CuerpoDeEstado(v, vacio); cuerpo != nil {
+	if cuerpo := CuerpoConEsqueleto(v, vacio, func() *Ocupado { return EsqueletoRepetidas(v, GruposEsqueletoRepetidas) }); cuerpo != nil {
 		bloques = append(bloques, ui.Bloque{Obj: cuerpo})
 		return Envolver(v, false, ui.PilaBloques(bloques...))
 	}
@@ -1230,7 +1444,7 @@ func PantallaEncontradas(v Vista, d Encontradas) *fyne.Container {
 		}
 	}
 	vacio := EstadoVacio(v, vacioTitulo, vacioTexto, nil)
-	if cuerpo := CuerpoDeEstado(v, vacio); cuerpo != nil {
+	if cuerpo := CuerpoConEsqueleto(v, vacio, esqueletoDeFilas(v)); cuerpo != nil {
 		bloques = append(bloques, ui.Bloque{Obj: cuerpo})
 		return Envolver(v, false, ui.PilaBloques(bloques...))
 	}
@@ -1251,7 +1465,7 @@ func PantallaPublica(v Vista, titulo string, cuantas int, fotos []api.Photo, alA
 			Margen: SeparacionSeccion,
 		},
 	}
-	if cuerpo := CuerpoDeEstado(v, EstadoVacio(v, "gallery.empty.title", "gallery.empty.description", nil)); cuerpo != nil {
+	if cuerpo := CuerpoConEsqueleto(v, EstadoVacio(v, "gallery.empty.title", "gallery.empty.description", nil), esqueletoDeFilas(v)); cuerpo != nil {
 		bloques = append(bloques, ui.Bloque{Obj: cuerpo})
 		return envolverSobre(v, "bg", false, ui.PilaBloques(bloques...))
 	}
@@ -1279,12 +1493,13 @@ func PantallaPublica(v Vista, titulo string, cuantas int, fotos []api.Photo, alA
 // El tamaño real es el de la variante (2048 de lado mayor como mucho), no el de la foto:
 // el navegador enseña a su tamaño la imagen que abre, y lo que abre es la «grande».
 func VisorPublico(v Vista, f api.Photo, aTamanyoReal bool, alZoom func()) fyne.CanvasObject {
-	return visorSuelto(v, f, aTamanyoReal, alZoom, nil, nil)
+	return visorSuelto(v, f, fondoSuelta.colorFondo(), aTamanyoReal, alZoom, nil, nil)
 }
 
-// visorSuelto es la foto sola sobre el fondo del navegador, con las flechas y el
-// deslizamiento del visor si hay foto a los lados (el de un álbum compartido conmigo).
-func visorSuelto(v Vista, f api.Photo, aTamanyoReal bool, alZoom, anterior, siguiente func()) fyne.CanvasObject {
+// visorSuelto es la foto sola sobre fondo (el del navegador con una imagen abierta sola,
+// o el `bg` del visor en un álbum compartido conmigo), con las flechas y el
+// deslizamiento del visor si hay foto a los lados.
+func visorSuelto(v Vista, f api.Photo, fondo color.Color, aTamanyoReal bool, alZoom, anterior, siguiente func()) fyne.CanvasObject {
 	if w, h := float32(f.Width), float32(f.Height); w > 0 && h > 0 {
 		k := min(1, 2048/max(w, h))
 		f.Width, f.Height = int(w*k+0.5), int(h*k+0.5)
@@ -1301,7 +1516,7 @@ func visorSuelto(v Vista, f api.Photo, aTamanyoReal bool, alZoom, anterior, sigu
 		}))
 	}
 	cuerpo := escenario(v, container.New(zonaVisor{lienzo: l, real: aTamanyoReal, ventana: v.Ventana}, objs...), aTamanyoReal, anterior, siguiente, fyne.Position{}, nil)
-	return container.NewStack(canvas.NewRectangle(fondoSuelta.colorFondo()), cuerpo)
+	return container.NewStack(canvas.NewRectangle(fondo), cuerpo)
 }
 
 // ---- Utilidades ----

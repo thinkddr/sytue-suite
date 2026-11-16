@@ -6,8 +6,9 @@
 //
 // No es una app de la suite ni la va a ser. Existe para dos cosas: que `cmd/demo` se
 // pueda abrir en una máquina con pantalla y se VEA, y que `demo_test.go` la capture sin
-// servidor gráfico y compruebe los píxeles. Cuando el catálogo de widgets crezca, esta
-// pantalla crece con él y sigue siendo el sitio donde se mira si algo se ha torcido.
+// servidor gráfico y compruebe los píxeles. El catálogo de widgets entero se enseña en
+// el muestrario (`muestrario.go`), una sección por familia, y su guardián no deja que un
+// constructor nuevo de `ui` se quede fuera sin decir por qué.
 package pantalla
 
 import (

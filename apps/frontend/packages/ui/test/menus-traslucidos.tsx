@@ -200,6 +200,18 @@ render(
           </section>
           <Card tone="slate">
             <Opciones contexto="tarjeta" />
+            {/* La ayuda va en portal al body —fuera de la tarjeta— salvo que su control
+                esté en un <dialog>: entonces va a ese diálogo. Un <dialog> DENTRO de una
+                tarjeta de color es el único camino por el que una ayuda queda bajo
+                `.sytue-card-tone`, y donde la guarda `:not(.sytue-tooltip-surface)` de
+                appearance.css evita que herede la tinta de su propio fondo. */}
+            <dialog open aria-label="Diálogo de tarjeta" style={{ position: 'static' }}>
+              <Tooltip label="Ayuda de diálogo en tarjeta" placement="bottom">
+                <button type="button" class="text-text">
+                  Ayuda de diálogo en tarjeta
+                </button>
+              </Tooltip>
+            </dialog>
           </Card>
         </main>
       )}

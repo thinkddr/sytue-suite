@@ -147,6 +147,13 @@ func TestValidarConfig(t *testing.T) {
 	if _, err := ValidarConfig(VistaKanban, ConfigVista{GroupBy: "s"}, campos); err != nil {
 		t.Errorf("tablero por selección: %v", err)
 	}
+	// La galería se configura como la rejilla: filtros y orden, sin agrupar.
+	if _, err := ValidarConfig(VistaGaleria, bien[0], campos); err != nil {
+		t.Errorf("galería con filtro y orden: %v", err)
+	}
+	if _, err := ValidarConfig(VistaGaleria, ConfigVista{GroupBy: "t"}, campos); err == nil {
+		t.Error("la galería tampoco agrupa por un campo que no es de selección")
+	}
 	if _, err := ValidarConfig("gantt", ConfigVista{}, campos); err == nil {
 		t.Error("tipo de vista desconocido")
 	}
@@ -163,5 +170,46 @@ func TestAcotar(t *testing.T) {
 	}
 	if Acotar(nil) != nil {
 		t.Error("nil")
+	}
+}
+
+func TestValidarOpciones(t *testing.T) {
+	got, err := ValidarOpciones([]string{"  Alta ", "Baja", "Media"})
+	if err != nil || strings.Join(got, "|") != "Alta|Baja|Media" {
+		t.Errorf("opciones limpias en su orden: %v %v", got, err)
+	}
+	for _, malas := range [][]string{nil, {}, {"a", " a"}, {""}, {strings.Repeat("x", MaxLongOpcion+1)}} {
+		if _, err := ValidarOpciones(malas); err == nil {
+			t.Errorf("%q debería no valer", malas)
+		}
+	}
+}
+
+// Una opción retirada que el registro ya tiene se puede volver a escribir (o
+// conservar junto a otras en una múltiple); una retirada que no tenía, no.
+func TestConRetiradas(t *testing.T) {
+	sel := Campo{ID: "s", Name: "Estado", Kind: TipoSeleccion, Choices: []string{"nuevo"}}
+	mul := Campo{ID: "m", Name: "Etiquetas", Kind: TipoMultiple, Choices: []string{"a", "b"}}
+	campos := []Campo{sel, mul}
+	actual := []byte(`{"s":"viejo","m":["a","z"]}`)
+	tol := ConRetiradas(campos, actual)
+
+	if _, err := ValidarParcial(campos, map[string]json.RawMessage{"m": json.RawMessage(`["a","b","z"]`)}); err == nil {
+		t.Fatal("sin tolerar, la opción retirada no vale (si no, el test no prueba nada)")
+	}
+	if _, err := ValidarParcial(tol, map[string]json.RawMessage{"m": json.RawMessage(`["a","b","z"]`)}); err != nil {
+		t.Errorf("añadir «b» conservando la retirada «z»: %v", err)
+	}
+	if _, err := ValidarParcial(tol, map[string]json.RawMessage{"s": json.RawMessage(`"viejo"`)}); err != nil {
+		t.Errorf("reescribir el mismo valor retirado: %v", err)
+	}
+	if _, err := ValidarParcial(tol, map[string]json.RawMessage{"s": json.RawMessage(`"otro"`)}); err == nil {
+		t.Error("una opción que no existe ni tenía el registro no debería valer")
+	}
+	if _, err := ValidarParcial(tol, map[string]json.RawMessage{"m": json.RawMessage(`["y"]`)}); err == nil {
+		t.Error("una retirada que el registro no tenía no debería valer")
+	}
+	if len(sel.Choices) != 1 || len(mul.Choices) != 2 {
+		t.Error("ConRetiradas no debe tocar los campos originales")
 	}
 }

@@ -7,6 +7,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
 
 type blockedAgenda struct {
@@ -14,10 +16,10 @@ type blockedAgenda struct {
 	release chan struct{}
 }
 
-func (a *blockedAgenda) Hoy(context.Context, time.Time, time.Time) ([]EventoDeHoy, error) {
+func (a *blockedAgenda) Hoy(context.Context, time.Time, time.Time) (api.AgendaDeHoy, error) {
 	a.started <- "calendar"
 	<-a.release
-	return nil, nil
+	return api.AgendaDeHoy{}, nil
 }
 
 func (a *blockedAgenda) SinLeer(context.Context) (int, error) {

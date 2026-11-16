@@ -3,7 +3,7 @@
 import { createReportDirectory, writeReport } from './lib/report-output.mjs';
 import { chromium } from 'playwright';
 import { expect as baseExpect } from '@playwright/test';
-import { assertWizardLayout as layout, assertWizardAccessibility as accessible, describeWizardState, openWizardFixture } from './lib/wizard-checks.mjs';
+import { assertWizardLayout as layout, assertWizardAccessibility as accessible, describeWizardState, errorDelDialogo, openWizardFixture } from './lib/wizard-checks.mjs';
 import { mkdirSync } from 'node:fs';
 
 const expect = baseExpect.configure({ timeout: 15000 });
@@ -296,7 +296,7 @@ try {
     await screenshot(ui, 'webdav-form-desktop');
     await accessible(ui);
     await save.click();
-    await expect(ui.dialog.getByRole('alert')).toContainText('Connection refused');
+    await expect(errorDelDialogo(ui.dialog)).toContainText('Connection refused');
     ui.state.saveFailure = false;
     await save.click();
     await expect(ui.dialog).toHaveCount(0);
@@ -336,7 +336,7 @@ try {
   await scenario('disconnect-conflict-preserves-storage', async (ui) => {
     await ui.page.getByRole('button', { name: 'documents', exact: true }).click();
     await ui.page.getByRole('button', { name: 'Disconnect', exact: true }).click();
-    await expect(ui.dialog.getByRole('alert')).toContainText('There are still files');
+    await expect(errorDelDialogo(ui.dialog)).toContainText('There are still files');
     expect(ui.state.storage.connected).toBe(true);
     ui.state.deleteConflict = false;
     await ui.page.getByRole('button', { name: 'Disconnect', exact: true }).click();

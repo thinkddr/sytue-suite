@@ -119,6 +119,9 @@ type Historial struct {
 	AlAcusar func(Mensaje)
 	// AlVotar marca o retira un valor de la tarjeta de un mensaje.
 	AlVotar func(Mensaje, string, bool)
+	// Cifrado dice si la conversación va cifrada: tarjetas y acuses en solo lectura,
+	// con la nota de por qué (cifrado.go). Nil: sin cifrar.
+	Cifrado func() bool
 	// AdjuntosDe cablea la vista de los adjuntos de un mensaje: sus miniaturas y sus
 	// acciones.
 	AdjuntosDe func(Mensaje, *VistaAdjuntos)
@@ -141,16 +144,42 @@ type Historial struct {
 	// principio llama a AlCargarAnteriores, que es el `onLoadOlder` de la web.
 	HayAnteriores, CargandoAnteriores bool
 	AlCargarAnteriores                func()
+	// Inicio es el bloque del principio del canal (`InicioDelCanal`): va encima del
+	// primer mensaje cuando ya no quedan anteriores y, con el canal vacío, en el sitio
+	// del estado vacío. Nil, el estado vacío de siempre.
+	Inicio *InicioCanal
+
+	// SaltoUsado dice que ya se ha pulsado «Saltar a no leído» con este separador: el
+	// `jumpUsed` de la web. Lo apaga SaltarANoLeidos y lo vuelve a encender la sala
+	// cuando el separador cambia (otro canal, otra ventana).
+	SaltoUsado bool
 
 	cuerpo  fyne.CanvasObject
 	fondo   *canvas.Rectangle
 	pildora *PildoraCargando
-	objetos []fyne.CanvasObject
+	// salto es el botón flotante «Saltar a no leído», con su `shadow-sm`.
+	salto       *ui.Boton
+	sombraSalto *ui.Sombra
+	// bajar es la píldora «↓ N mensajes nuevos» de abajo, y nuevosAbajo lo ajeno que
+	// ha llegado al final mientras se leía más arriba. anteriores son los ID del
+	// pintado anterior: lo que viene detrás del último que sigue es lo llegado.
+	bajar       *ui.Boton
+	sombraBajar *ui.Sombra
+	nuevosAbajo map[string]bool
+	anteriores  []string
+	colocando   bool
+	objetos     []fyne.CanvasObject
 	// primero y altoAntes son el primer mensaje y el alto del contenido del último
 	// pintado: si el primero cambia, se han añadido mensajes ARRIBA y la vista se
 	// desplaza lo mismo que han crecido, para no moverse de lo que se leía.
 	primero   string
 	altoAntes float32
+	// borrador y reenfocar guardan, mientras la lista se rehace, lo escrito en la caja de
+	// editar y si tenía el foco: el historial se repinta con cada mensaje, reacción o
+	// escritura ajena, y sin esto la edición a medias volvía al texto original (y perdía
+	// el cursor). Es lo mismo que hace el panel del hilo.
+	borrador  *string
+	reenfocar bool
 }
 
 var _ fyne.Widget = (*Historial)(nil)
@@ -176,6 +205,18 @@ func (h *Historial) CreateRenderer() fyne.WidgetRenderer {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	h.fondo = canvas.NewRectangle(tema.Color("surface", v))
 	h.pildora = NuevaPildoraCargando(h.T.T("message.loadingOlder", nil))
+	// `<Button size="sm" variant="primary" leadingIcon={<Glifo … size={14} />}>`: el
+	// primario tiñe el glifo con la tinta de su rótulo, así que el token da igual.
+	h.salto = ui.NuevoBoton(h.T.T("message.jumpToUnread", nil), h.SaltarANoLeidos).
+		Con(ui.Primario, ui.TallaSM)
+	h.salto.Glifo, h.salto.TamIcono = dibujo(glifoSaltarNoLeido, 14, "text", v), 14
+	h.sombraSalto = ui.NuevaSombra(tema.SombraSM, tema.Forma("radius-control"))
+	// `<Button size="sm" variant="secondary" leadingIcon={<Glifo … size={14} />}>`: el
+	// secundario de la casa también va sobre `primary`, y el glifo, que el botón no
+	// tiñe en esa variante, va en la tinta de su rótulo, `on-primary`.
+	h.bajar = ui.NuevoBoton("", h.IrAlFinal).Con(ui.Secundario, ui.TallaSM)
+	h.bajar.Glifo, h.bajar.TamIcono = dibujo(glifoAbajo, 14, "on-primary", v), 14
+	h.sombraBajar = ui.NuevaSombra(tema.SombraSM, tema.Forma("radius-control"))
 	h.cuerpo = nil // lo construye Refresh, que así sabe que es la primera vez
 	r := &historialRenderer{h: h}
 	r.Refresh()
@@ -201,6 +242,10 @@ func (h *Historial) construir() fyne.CanvasObject {
 	case SinPermiso:
 		return ui.NuevoVacio(t.T("empty.pickChannel", nil), t.T("empty.pickChannelHelp", nil))
 	case Vacio:
+		if h.Inicio != nil {
+			return container.NewVScroll(container.New(&columnaHistorial{},
+				NuevoBloqueInicio(t, h.Locale, *h.Inicio, true)))
+		}
 		// El título es el principio del canal y no «aún no hay mensajes»: la web
 		// cambió a esto porque un canal recién creado no está vacío, está empezando.
 		titulo := t.T("message.noneYet", nil)
@@ -213,7 +258,21 @@ func (h *Historial) construir() fyne.CanvasObject {
 	case Listo:
 	}
 
-	filas := make([]fyne.CanvasObject, 0, 2*len(h.Mensajes))
+	sc := container.NewVScroll(container.New(&columnaHistorial{}, h.filas()...))
+	sc.OnScrolled = func(p fyne.Position) { h.alDesplazar(sc, p) }
+	return sc
+}
+
+// filas son las del historial con mensajes: separadores, mensajes, tarjetas de llamada
+// y, arriba del todo, el inicio del canal.
+func (h *Historial) filas() []fyne.CanvasObject {
+	t := h.T
+	filas := make([]fyne.CanvasObject, 0, 2*len(h.Mensajes)+1)
+	// Arriba del todo, solo con el historial agotado: mientras quede una página
+	// anterior, lo de arriba no es el principio.
+	if h.Inicio != nil && !h.HayAnteriores {
+		filas = append(filas, NuevoBloqueInicio(t, h.Locale, *h.Inicio, false))
+	}
 	ahora := h.Ahora()
 	for i, m := range h.Mensajes {
 		if CambiaElDia(h.Mensajes, i) {
@@ -231,19 +290,27 @@ func (h *Historial) construir() fyne.CanvasObject {
 		f := NuevaFilaMensaje(h.T, h.Locale, m, Agrupado(h.Mensajes, i), h.AlReaccionar)
 		f.AlAbrirHilo, f.Menu, f.AlEmojis, f.AlAcusar = h.AlAbrirHilo, h.Menu, h.AlEmojis, h.AlAcusar
 		f.AlVotar, f.AdjuntosDe, f.EnlacesDe = h.AlVotar, h.AdjuntosDe, h.EnlacesDe
+		f.Cifrado = h.Cifrado != nil && h.Cifrado()
 		f.Resaltada = m.ID != "" && m.ID == h.Resaltado
 		if m.ID != "" && m.ID == h.EditandoID {
 			f.Editando, f.AlGuardarEdicion, f.AlCancelarEdicion = true, h.AlGuardarEdicion, h.AlCancelarEdicion
+			f.borradorEdicion = h.borrador
 		}
 		filas = append(filas, f)
 	}
-	sc := container.NewVScroll(container.New(&columnaHistorial{}, filas...))
-	sc.OnScrolled = func(p fyne.Position) {
-		if p.Y < UmbralAnteriores && h.HayAnteriores && !h.CargandoAnteriores && h.AlCargarAnteriores != nil {
-			h.AlCargarAnteriores()
-		}
+	return filas
+}
+
+// alDesplazar es el `onScroll` de la lista.
+func (h *Historial) alDesplazar(sc *container.Scroll, p fyne.Position) {
+	if p.Y < UmbralAnteriores && h.HayAnteriores && !h.CargandoAnteriores && h.AlCargarAnteriores != nil {
+		h.AlCargarAnteriores()
 	}
-	return sc
+	// Bajar a mano hasta el final también da lo nuevo por visto. Mientras Refresh
+	// coloca la lista nueva, que nace al fondo y luego vuelve a su sitio, no.
+	if len(h.nuevosAbajo) > 0 && !h.colocando && alFondo(sc) {
+		h.olvidarNuevos()
+	}
 }
 
 type historialRenderer struct{ h *Historial }
@@ -290,6 +357,19 @@ func (r *historialRenderer) Layout(t fyne.Size) {
 	m := r.h.pildora.MinSize()
 	r.h.pildora.Move(fyne.NewPos((t.Width-m.Width)/2, tema.Espacio(2)))
 	r.h.pildora.Resize(m)
+	// «Saltar a no leído» ocupa el mismo hueco: `absolute inset-x-0 top-2 flex
+	// justify-center`.
+	b := r.h.salto.MinSize()
+	pos := fyne.NewPos((t.Width-b.Width)/2, tema.Espacio(2))
+	r.h.salto.Move(pos)
+	r.h.salto.Resize(b)
+	r.h.sombraSalto.Ajustar(pos, b, tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
+	// «↓ N mensajes nuevos»: `absolute inset-x-0 bottom-2 flex justify-center`.
+	b = r.h.bajar.MinSize()
+	pos = fyne.NewPos((t.Width-b.Width)/2, t.Height-tema.Espacio(2)-b.Height)
+	r.h.bajar.Move(pos)
+	r.h.bajar.Resize(b)
+	r.h.sombraBajar.Ajustar(pos, b, tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
 }
 
 func (r *historialRenderer) colocarMensajes(s *container.Scroll, tam fyne.Size) {
@@ -347,10 +427,26 @@ func (r *historialRenderer) Refresh() {
 		antes = s.Offset
 		pegado = alFondo(s)
 	}
+	h.contarNuevos(pegado)
+	h.colocando = true
+	defer func() { h.colocando = false }()
+	h.guardarEdicion()
 	h.cuerpo = h.construir()
 	h.objetos = []fyne.CanvasObject{h.fondo, h.cuerpo}
 	if h.CargandoAnteriores {
 		h.objetos = append(h.objetos, h.pildora)
+	} else if h.VeSaltoNoLeidos() {
+		// Cede el hueco a la píldora: `showJump && !loadingOlder`.
+		h.sombraSalto.Objeto().Show()
+		h.salto.Show()
+		h.objetos = append(h.objetos, h.sombraSalto.Objeto(), h.salto)
+	}
+	if n := h.NuevosAbajo(); n > 0 {
+		h.bajar.Texto = h.T.T("message.newBelow", i18n.Vars{"count": n})
+		h.bajar.Refresh()
+		h.sombraBajar.Objeto().Show()
+		h.bajar.Show()
+		h.objetos = append(h.objetos, h.sombraBajar.Objeto(), h.bajar)
 	}
 	r.Layout(h.Size())
 	primero := ""
@@ -375,6 +471,140 @@ func (r *historialRenderer) Refresh() {
 		h.altoAntes = alto
 	}
 	h.primero = primero
+	h.devolverFocoEdicion()
+}
+
+// LlegadosAbajo es `llegadosAbajo` de `lib/nuevosAbajo.ts`. `anteriores` son los ID
+// del pintado anterior; el ancla es el último mensaje de `ms` que ya estaba en él, y lo
+// que va detrás es lo llegado, salvo lo propio (lo que una escribe ya lo ha visto) y lo
+// que aún va de camino. Anclar en el último que SIGUE y no en el último que había hace
+// que borrar el del final no tire la cuenta. `ok` es falso si no queda ninguno de los
+// anteriores: la lista es OTRA (otro canal, la ventana de un permalink) y la cuenta
+// vuelve a empezar en vez de sumar como nuevo un canal entero. Un prepend de historial
+// no mueve el ancla y no da nada; la lista capada pierde por arriba y cuenta bien.
+func LlegadosAbajo(ms []Mensaje, anteriores []string) (ids []string, ok bool) {
+	if len(anteriores) == 0 {
+		return nil, true
+	}
+	previos := make(map[string]bool, len(anteriores))
+	for _, id := range anteriores {
+		previos[id] = true
+	}
+	i := len(ms) - 1
+	for i >= 0 && !previos[ms[i].ID] {
+		i--
+	}
+	if i < 0 {
+		return nil, false
+	}
+	for _, m := range ms[i+1:] {
+		if !m.Mio && !m.Enviando && m.ID != "" {
+			ids = append(ids, m.ID)
+		}
+	}
+	return ids, true
+}
+
+// contarNuevos apunta lo ajeno llegado al final si la vista NO estaba abajo: estando
+// abajo, la vista ya lo sigue y no hay nada que avisar. Con un mensaje resaltado
+// tampoco: el foco es el mensaje enlazado. Y con «Ir a mensajes recientes» (la sala
+// viendo historial) no llega nada al final, así que manda aquella barra.
+func (h *Historial) contarNuevos(pegado bool) {
+	var ids []string
+	if h.Estado == Listo {
+		ids = make([]string, 0, len(h.Mensajes))
+		for _, m := range h.Mensajes {
+			ids = append(ids, m.ID)
+		}
+	}
+	llegados, ok := LlegadosAbajo(h.Mensajes, h.anteriores)
+	if h.Estado != Listo {
+		ok = false // el esqueleto o un vacío: lo que se contaba era de la lista anterior
+	}
+	h.anteriores = ids
+	if !ok || pegado {
+		h.nuevosAbajo = nil
+		return
+	}
+	if h.Resaltado != "" || len(llegados) == 0 {
+		return
+	}
+	if h.nuevosAbajo == nil {
+		h.nuevosAbajo = map[string]bool{}
+	}
+	for _, id := range llegados {
+		h.nuevosAbajo[id] = true
+	}
+}
+
+// NuevosAbajo es cuántos mensajes ajenos esperan abajo («↓ N mensajes nuevos»). Lo
+// borrado mientras tanto ya no está esperando y no cuenta.
+func (h *Historial) NuevosAbajo() int {
+	if len(h.nuevosAbajo) == 0 || h.Estado != Listo {
+		return 0
+	}
+	n := 0
+	for _, m := range h.Mensajes {
+		if h.nuevosAbajo[m.ID] {
+			n++
+		}
+	}
+	return n
+}
+
+// IrAlFinal es la pulsación de «↓ N mensajes nuevos»: baja al final y la retira.
+func (h *Historial) IrAlFinal() {
+	h.olvidarNuevos()
+	if s, ok := h.cuerpo.(*container.Scroll); ok {
+		s.ScrollToBottom()
+	}
+}
+
+// olvidarNuevos retira la píldora sin rehacer la lista, que movería la vista.
+func (h *Historial) olvidarNuevos() {
+	h.nuevosAbajo = nil
+	if h.bajar != nil {
+		h.bajar.Hide()
+		h.sombraBajar.Objeto().Hide()
+	}
+}
+
+// VeSaltoNoLeidos dice si toca el botón «Saltar a no leído»: hay lista con separador
+// de «Nuevos mensajes», no se ha usado aún y no está la píldora de «cargando
+// anteriores», que va en el mismo sitio y manda.
+func (h *Historial) VeSaltoNoLeidos() bool {
+	return h.Estado == Listo && h.IndiceNoLeidos >= 0 && h.IndiceNoLeidos < len(h.Mensajes) &&
+		!h.SaltoUsado && !h.CargandoAnteriores
+}
+
+// SaltarANoLeidos lleva la vista al separador de «Nuevos mensajes», con él arriba del
+// todo (el `scrollToIndex(unreadIndex, { align: 'start' })` de la web), y retira el
+// botón. Lo esconde en vez de rehacer la lista: rehacerla movería la vista que se
+// acaba de colocar.
+func (h *Historial) SaltarANoLeidos() {
+	if h.IndiceNoLeidos < 0 {
+		return
+	}
+	h.SaltoUsado = true
+	if h.salto != nil {
+		h.salto.Hide()
+		h.sombraSalto.Objeto().Hide()
+	}
+	s, ok := h.cuerpo.(*container.Scroll)
+	if !ok {
+		return
+	}
+	c, ok := s.Content.(*fyne.Container)
+	if !ok {
+		return
+	}
+	for _, o := range c.Objects {
+		if sep, es := o.(*Separador); es && sep.Acento {
+			s.Offset.Y = max(0, min(sep.Position().Y, c.MinSize().Height-s.Size().Height))
+			s.Refresh()
+			return
+		}
+	}
 }
 
 // centrar trae la fila resaltada al medio de la vista.
@@ -397,6 +627,66 @@ func (h *Historial) centrarFila(s *container.Scroll, es func(*FilaMensaje) bool)
 		}
 	}
 	return nil
+}
+
+// filaEditando es la fila pintada del mensaje que se edita, con su caja ya montada, o nil.
+func (h *Historial) filaEditando() *FilaMensaje {
+	s, ok := h.cuerpo.(*container.Scroll)
+	if !ok || h.EditandoID == "" {
+		return nil
+	}
+	c, ok := s.Content.(*fyne.Container)
+	if !ok {
+		return nil
+	}
+	for _, o := range c.Objects {
+		if f, fila := o.(*FilaMensaje); fila && f.Editando && f.Mensaje.ID == h.EditandoID && f.edicion != nil && f.edicion.area != nil {
+			return f
+		}
+	}
+	return nil
+}
+
+// guardarEdicion apunta lo escrito en la caja de editar antes de rehacer la lista.
+func (h *Historial) guardarEdicion() {
+	h.borrador, h.reenfocar = nil, false
+	f := h.filaEditando()
+	if f == nil {
+		return
+	}
+	texto := f.edicion.Texto()
+	h.borrador = &texto
+	if c := fyne.CurrentApp().Driver().CanvasForObject(h); c != nil {
+		h.reenfocar = c.Focused() == fyne.Focusable(f.edicion.area)
+	}
+}
+
+// devolverFocoEdicion vuelve a poner el cursor en la caja de editar rehecha si lo tenía
+// antes, sin mover la vista.
+func (h *Historial) devolverFocoEdicion() {
+	if !h.reenfocar {
+		return
+	}
+	h.reenfocar = false
+	s, ok := h.cuerpo.(*container.Scroll)
+	if !ok {
+		return
+	}
+	c, ok := s.Content.(*fyne.Container)
+	if !ok {
+		return
+	}
+	for _, o := range c.Objects {
+		if f, fila := o.(*FilaMensaje); fila && f.Editando {
+			if f.edicion == nil {
+				f.Refresh() // la caja nace con el renderizador de la fila
+			}
+			if l := fyne.CurrentApp().Driver().CanvasForObject(h); l != nil && f.edicion != nil && f.edicion.area != nil {
+				l.Focus(f.edicion.area)
+			}
+			return
+		}
+	}
 }
 
 // EnfocarEdicion trae a la vista la fila que se está editando y pone el cursor en su
@@ -493,7 +783,7 @@ func MedidaFilaMensaje(f *FilaMensaje, ancho float32) fyne.Size {
 	if f.Editando {
 		alto += MedidaEdicion(f.filasEdicion()).Height
 	} else {
-		alto += f.altoPrioridad() + f.altoCuerpo(ancho)
+		alto += f.altoEnHilo() + f.altoPrioridad() + f.altoCuerpo(ancho)
 		if f.editadoAparte(ancho) {
 			alto += tema.TextoBase.Linea
 		}
@@ -517,8 +807,9 @@ type FilaMensaje struct {
 	Locale   i18n.Locale
 	Mensaje  Mensaje
 	Agrupada bool
-	// EnHilo es la fila del panel del hilo: otros aires, sin agrupar y sin tira de
-	// reacciones, que en la web viven solo en el histórico del canal.
+	// EnHilo es la fila del panel del hilo: otros aires, sin agrupar, sin «N
+	// respuestas» y con la barra de acciones en su sitio del hilo (`-top-2 right-3`).
+	// Las reacciones y el «…» son los mismos que en el canal (`AccionesDeMensaje.tsx`).
 	EnHilo bool
 
 	AlReaccionar func(Mensaje, string)
@@ -528,6 +819,8 @@ type FilaMensaje struct {
 	AlAcusar func(Mensaje)
 	// AlVotar vota en la tarjeta del mensaje; nil, de solo lectura.
 	AlVotar func(Mensaje, string, bool)
+	// Cifrado es la conversación cifrada: la tarjeta y el acuse, en solo lectura.
+	Cifrado bool
 	// AdjuntosDe cablea la vista de sus adjuntos; EnlacesDe da las tarjetas de sus
 	// enlaces.
 	AdjuntosDe func(Mensaje, *VistaAdjuntos)
@@ -550,10 +843,15 @@ type FilaMensaje struct {
 	hijos     int
 	barra     *BarraMensaje
 	edicion   *Edicion
-	anillo    *ui.Aro
+	// borradorEdicion, si no es nil, es el texto con que nace la caja de editar en vez
+	// del cuerpo: lo que se llevaba escrito cuando un repintado rehízo la fila.
+	borradorEdicion *string
+	anillo          *ui.Aro
 
 	editado    *canvas.Text
 	enlaceHilo *EnlaceHilo
+	// enHilo es «Respondió en un hilo · Ver el hilo» sobre una respuesta difundida.
+	enHilo *LineaEnHilo
 	// prioridad es la píldora de encima del texto y acuse, la fila de debajo; tarjeta,
 	// la encuesta o la tarea bajo el texto.
 	prioridad *Pildora
@@ -635,7 +933,7 @@ func (f *FilaMensaje) pintarHover() {
 	switch {
 	case f.Resaltada:
 		f.fondo.FillColor = tokens.SobreSRGB(tema.Color("selected", v), tema.Color("surface", v))
-	case f.conHover() && !f.focoBarra && !f.EnHilo, f.encima && !f.EnHilo:
+	case f.conHover() && !f.focoBarra, f.encima:
 		// El fondo es `group-hover`: el foco en la barra la enciende, pero no tiñe.
 		f.fondo.FillColor = tema.Color("bg-subtle", v)
 	}
@@ -690,7 +988,7 @@ const LadoGlifoSiguiendo float32 = 12
 // «Siguiendo», `mt-1 flex flex-wrap items-center gap-1`—, o cero si no hay tira.
 func (f *FilaMensaje) altoTira() float32 {
 	alto := float32(0)
-	if len(f.Mensaje.Reacciones) > 0 && !f.EnHilo {
+	if len(f.Mensaje.Reacciones) > 0 {
 		alto = AltoReaccion
 		if f.AlEmojis != nil {
 			alto = AltoMasReaccion
@@ -698,6 +996,9 @@ func (f *FilaMensaje) altoTira() float32 {
 	}
 	if f.conEnlaceHilo() || f.conSiguiendo() {
 		alto = max(alto, AltoEnlaceHilo) // «Siguiendo» lleva el mismo `px-1.5 py-0.5 text-xs`
+	}
+	if f.conEnlaceHilo() && len(f.Mensaje.Participantes) > 0 {
+		alto = max(alto, AltoEnlaceHiloCaras) // los avatares del indicador lo agrandan
 	}
 	return alto
 }
@@ -811,6 +1112,9 @@ func (f *FilaMensaje) CreateRenderer() fyne.WidgetRenderer {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	f.fondo = canvas.NewRectangle(color.NRGBA{})
 	f.fondo.CornerRadius = tema.RadioMD
+	if f.EnHilo {
+		f.fondo.CornerRadius = 0 // la fila del hilo es `hover:bg-bg-subtle` sin `rounded-md`
+	}
 	// El anillo del mensaje enlazado es el `ring-2 ring-primary` de la hoja: un aro de
 	// 2 px pegado a la caja, que es lo que dibuja `ui.Aro` sin hueco.
 	f.anillo = ui.NuevoAroCon("primary", tema.RadioMD, ui.SinHueco, v)
@@ -841,6 +1145,7 @@ func (f *FilaMensaje) CreateRenderer() fyne.WidgetRenderer {
 			f.objetos = append(f.objetos, f.insignia)
 		}
 	}
+	f.montarLineaEnHilo()
 	if f.Mensaje.Prioridad != Normal && !f.EnHilo {
 		f.prioridad = NuevaPildoraPrioridad(f.T, f.Mensaje.Prioridad)
 		f.objetos = append(f.objetos, f.prioridad)
@@ -856,9 +1161,6 @@ func (f *FilaMensaje) CreateRenderer() fyne.WidgetRenderer {
 		f.objetos = append(f.objetos, f.editado)
 	}
 	for _, r := range f.Mensaje.Reacciones {
-		if f.EnHilo {
-			break
-		}
 		p := NuevaReaccion(f.T, r, func() {
 			if f.AlReaccionar != nil {
 				f.AlReaccionar(f.Mensaje, r.Emoji)
@@ -879,7 +1181,8 @@ func (f *FilaMensaje) CreateRenderer() fyne.WidgetRenderer {
 	if f.conEnlaceHilo() {
 		f.enlaceHilo = NuevoEnlaceHilo(
 			f.T.T("thread.replyCountInThread", i18n.Vars{"count": f.Mensaje.Respuestas}),
-			func() { f.AlAbrirHilo(f.Mensaje) })
+			func() { f.AlAbrirHilo(f.Mensaje) }).
+			ConIndicador(f.Mensaje.Participantes, f.rotuloUltimaRespuesta())
 		f.enlaceHilo.alEncima = f.hijoEncima
 		f.objetos = append(f.objetos, f.enlaceHilo)
 	}
@@ -902,6 +1205,7 @@ func (f *FilaMensaje) CreateRenderer() fyne.WidgetRenderer {
 			votar = func(valor string, poner bool) { f.AlVotar(f.Mensaje, valor, poner) }
 		}
 		f.tarjeta = NuevaVistaTarjeta(f.T, f.Locale, f.Mensaje.Tarjeta, votar)
+		f.tarjeta.Cifrado = f.Cifrado
 		f.objetos = append(f.objetos, f.tarjeta)
 	}
 	if f.EnlacesDe != nil && !f.EnHilo {
@@ -909,15 +1213,7 @@ func (f *FilaMensaje) CreateRenderer() fyne.WidgetRenderer {
 		f.objetos = append(f.objetos, f.enlaces...)
 	}
 	f.montarAcuse()
-	if f.Editando {
-		f.edicion = NuevaEdicion(f.T, f.Mensaje.Cuerpo,
-			func(s string) {
-				if f.AlGuardarEdicion != nil {
-					f.AlGuardarEdicion(f.Mensaje, s)
-				}
-			}, f.AlCancelarEdicion)
-		f.objetos = append(f.objetos, f.edicion)
-	}
+	f.montarEdicion()
 	f.montarBarra()
 	r := &filaMensajeRenderer{f: f}
 	r.Refresh()
@@ -948,7 +1244,11 @@ func (r *filaMensajeRenderer) Layout(t fyne.Size) {
 	f.anillo.ColocarEn(fyne.NewPos(0, margen), fyne.NewSize(t.Width, max(t.Height-margen, 0)))
 	if f.barra != nil {
 		m := f.barra.MinSize()
-		f.barra.Move(fyne.NewPos(t.Width-DerechaBarraMensaje-m.Width, margen-ArribaBarraMensaje))
+		arriba, derecha := ArribaBarraMensaje, DerechaBarraMensaje
+		if f.EnHilo {
+			arriba, derecha = ArribaBarraHilo, DerechaBarraHilo
+		}
+		f.barra.Move(fyne.NewPos(t.Width-derecha-m.Width, margen-arriba))
 		f.barra.Resize(m)
 	}
 
@@ -988,12 +1288,22 @@ func (r *filaMensajeRenderer) Layout(t fyne.Size) {
 		if f.prioridad != nil {
 			f.prioridad.Hide()
 		}
+		if f.enHilo != nil {
+			f.enHilo.Hide()
+		}
 		m := MedidaEdicion(f.edicion.filas())
 		f.edicion.Move(fyne.NewPos(x, y))
 		f.edicion.Resize(fyne.NewSize(f.cabe(t.Width), m.Height))
 		y += m.Height
 		r.colocarAcuse(x, r.colocarTira(x, y))
 		return
+	}
+	if f.enHilo != nil {
+		m := f.enHilo.MinSize()
+		f.enHilo.Show()
+		f.enHilo.Move(fyne.NewPos(x, y))
+		f.enHilo.Resize(fyne.NewSize(min(m.Width, f.cabe(t.Width)), m.Height))
+		y += m.Height + AireLineaEnHilo
 	}
 	if f.prioridad != nil {
 		m := MedidaPildora(f.prioridad)
@@ -1109,11 +1419,31 @@ func (r *filaMensajeRenderer) Refresh() {
 	r.Layout(f.Size())
 }
 
+// montarEdicion pone la caja de editar en la fila que se edita, con el texto del
+// mensaje o el borrador que se llevaba escrito antes de rehacerla.
+func (f *FilaMensaje) montarEdicion() {
+	if !f.Editando {
+		return
+	}
+	original := f.Mensaje.Cuerpo
+	if f.borradorEdicion != nil {
+		original = *f.borradorEdicion
+	}
+	f.edicion = NuevaEdicion(f.T, original,
+		func(s string) {
+			if f.AlGuardarEdicion != nil {
+				f.AlGuardarEdicion(f.Mensaje, s)
+			}
+		}, f.AlCancelarEdicion)
+	f.objetos = append(f.objetos, f.edicion)
+}
+
 // montarBarra pone la barra de acciones, escondida hasta el `hover`. Va la ÚLTIMA de
 // los objetos para pintarse encima de la fila, y sale por arriba de ella como el
-// `-top-3.5` de la web. Las filas del hilo no la llevan (`ThreadPanel.tsx`).
+// `-top-3.5` de la web; en el hilo, `-top-2 right-3` y sin «Responder en un hilo»,
+// que ya se está en él (`ThreadPanel.tsx`).
 func (f *FilaMensaje) montarBarra() {
-	if f.EnHilo || f.Mensaje.Enviando || f.Mensaje.Fallido ||
+	if f.Mensaje.Enviando || f.Mensaje.Fallido ||
 		(f.AlReaccionar == nil && f.AlAbrirHilo == nil && f.Menu == nil) {
 		return
 	}

@@ -5,14 +5,14 @@
 # Fuentes únicas de apps/nucleo/office/ y su copia para el build web:
 #   catalog.json   -> packages/config/src/office-catalog.json         (descargas)
 #   comandos.json  -> packages/office/src/editor/comandos.json              (registro de comandos de la cinta)
-#   comandos.json  -> services/docs/internal/domain/comandos.json        (qué comandos admite un script; el servicio lo embebe)
+#   comandos.json  -> apps/nucleo/office/model/comandos.json        (qué comandos admite un script; el servicio lo embebe)
 #   pestanas.json  -> packages/office/src/editor/pestanas.json              (taxonomía de pestañas de la cinta)
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 pares=(
   "apps/nucleo/office/catalog.json:apps/frontend/packages/config/src/office-catalog.json"
   "apps/nucleo/office/comandos.json:apps/frontend/packages/office/src/editor/comandos.json"
-  "apps/nucleo/office/comandos.json:services/docs/internal/domain/comandos.json"
+  "apps/nucleo/office/comandos.json:apps/nucleo/office/model/comandos.json"
   "apps/nucleo/office/pestanas.json:apps/frontend/packages/office/src/editor/pestanas.json"
 )
 modo="${1:-}"

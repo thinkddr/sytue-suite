@@ -163,19 +163,83 @@ function atributo(nodo: DefaultTreeAdapterMap['element'], nombre: string): strin
   return nodo.attrs.find((a) => a.name === nombre)?.value ?? null;
 }
 
-function copiar(nodos: readonly NodoHtml[], destino: Node, doc: Document): void {
+function clases(nodo: DefaultTreeAdapterMap['element']): string[] {
+  return (atributo(nodo, 'class') ?? '').split(/\s+/).filter(Boolean);
+}
+
+function esElemento(nodo: NodoHtml): nodo is DefaultTreeAdapterMap['element'] {
+  return 'tagName' in nodo;
+}
+
+/** Lo que quien pega admite además de la lista blanca común. */
+export interface OpcionesDePegado {
+  /**
+   * Las tareas de Sytue Notes: `<div class="task-row">` con su casilla. Solo para el
+   * editor que las sabe pintar; de la casilla se copia el `checked` y nada más.
+   */
+  tareas?: boolean;
+}
+
+/** La primera casilla (`<input type="checkbox">`) dentro de la fila, a cualquier profundidad. */
+function buscarCasilla(nodos: readonly NodoHtml[]): DefaultTreeAdapterMap['element'] | null {
+  for (const nodo of nodos) {
+    if (!esElemento(nodo)) continue;
+    if (
+      nodo.tagName.toLowerCase() === 'input' &&
+      (atributo(nodo, 'type') ?? '').toLowerCase() === 'checkbox'
+    )
+      return nodo;
+    const dentro = buscarCasilla(nodo.childNodes);
+    if (dentro) return dentro;
+  }
+  return null;
+}
+
+/** La casilla de una tarea, rehecha: tipo y marcada, ningún otro atributo. */
+function casilla(el: DefaultTreeAdapterMap['element'], doc: Document): Element {
+  const nueva = doc.createElement('input');
+  nueva.setAttribute('type', 'checkbox');
+  if (el.attrs.some((a) => a.name === 'checked')) nueva.setAttribute('checked', '');
+  return nueva;
+}
+
+function copiar(
+  nodos: readonly NodoHtml[],
+  destino: Node,
+  doc: Document,
+  opciones: OpcionesDePegado,
+): void {
   for (const nodo of nodos) {
     if ('value' in nodo) {
       destino.appendChild(doc.createTextNode(nodo.value));
       continue;
     }
-    if (!('tagName' in nodo)) continue;
+    if (!esElemento(nodo)) continue;
     const etiqueta = nodo.tagName.toLowerCase();
+    if (opciones.tareas && etiqueta === 'div' && clases(nodo).includes('task-row')) {
+      const fila = doc.createElement('div');
+      fila.setAttribute('class', 'task-row');
+      const caja = buscarCasilla(nodo.childNodes);
+      if (caja) fila.appendChild(casilla(caja, doc));
+      // La forma del editor: casilla, espacio y el texto en su `<span>`, que es de donde
+      // lo lee al marcarla. Si el origen no lo traía, el texto es el resto de la fila.
+      fila.appendChild(doc.createTextNode(' '));
+      const texto = doc.createElement('span');
+      const span = nodo.childNodes.find(
+        (h): h is DefaultTreeAdapterMap['element'] =>
+          esElemento(h) && h.tagName.toLowerCase() === 'span',
+      );
+      copiar((span ?? nodo).childNodes, texto, doc, opciones);
+      if (texto.firstChild?.nodeType === 3)
+        texto.firstChild.textContent = (texto.firstChild.textContent ?? '').trimStart();
+      fila.appendChild(texto);
+      destino.appendChild(fila);
+      continue;
+    }
     if (FUERA.has(etiqueta)) continue;
     if (VACIAS.has(etiqueta)) {
       // El salto que Safari añade al final de lo copiado no es del texto.
-      const clases = (atributo(nodo, 'class') ?? '').split(/\s+/);
-      if (!clases.includes('Apple-interchange-newline'))
+      if (!clases(nodo).includes('Apple-interchange-newline'))
         destino.appendChild(doc.createElement(etiqueta));
       continue;
     }
@@ -197,18 +261,19 @@ function copiar(nodos: readonly NodoHtml[], destino: Node, doc: Document): void 
       dentro.appendChild(nuevo);
       dentro = nuevo;
     }
-    copiar(nodo.childNodes, dentro, doc);
+    copiar(nodo.childNodes, dentro, doc, opciones);
   }
 }
 
 /**
  * El HTML de un pegado, listo para `insertHTML` en un editor: la estructura del
- * origen, el estilo del destino. Vacío si no queda texto.
+ * origen, el estilo del destino. Vacío si no queda texto. Se parsea con `parse5`
+ * (sin DOMParser ni regex de saneado) y se reconstruye con la lista blanca.
  */
-export function pegadoConFormato(html: string): string {
+export function pegadoConFormato(html: string, opciones: OpcionesDePegado = {}): string {
   if (!html || typeof document === 'undefined') return '';
   const doc = document.implementation.createHTMLDocument('');
   const caja = doc.createElement('div');
-  copiar(parseFragment(html).childNodes, caja, doc);
+  copiar(parseFragment(html).childNodes, caja, doc, opciones);
   return caja.textContent?.trim() ? caja.innerHTML.trim() : '';
 }

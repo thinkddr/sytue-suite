@@ -26,7 +26,11 @@ func (p *Pantalla) refrescoNotas() ui.RefrescoLista {
 			c := p.activo
 			p.lienzo.Fase = Cargando
 			p.Repintar()
-			go p.cargarNotas(c)
+			{
+				notaFuncion := p.cargarNotas
+				notaArgumento0 := c
+				p.iniciar(func() { notaFuncion(notaArgumento0) })
+			}
 		},
 	}
 }

@@ -153,6 +153,49 @@
   padding-left: 1.5em;
   list-style: revert;
 }
+/* Lista de casillas (canvas/casillas.ts): sin viñeta; la casilla va en su sitio, en el
+   margen de la lista, como ::before del elemento (un clic ahí la marca). Hecha: con la
+   marca de latón y el texto atenuado y tachado, como en Google Docs. */
+.sytue-page ul[data-checklist] {
+  list-style: none;
+  padding-left: 1.75em;
+}
+.sytue-page ul[data-checklist] > li {
+  position: relative;
+}
+.sytue-page ul[data-checklist] > li::before {
+  content: '';
+  position: absolute;
+  left: -1.6em;
+  top: 0.3em;
+  box-sizing: border-box;
+  width: 0.95em;
+  height: 0.95em;
+  border: 1.5px solid #475569;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.sytue-page ul[data-checklist] > li[data-checked='1']::before {
+  border-color: var(--sytue-primary-700);
+  background: var(--sytue-primary-700);
+}
+/* El tic: un ángulo de dos bordes girado, dentro de la casilla. */
+.sytue-page ul[data-checklist] > li[data-checked='1']::after {
+  content: '';
+  position: absolute;
+  left: -1.29em;
+  top: 0.42em;
+  width: 0.3em;
+  height: 0.55em;
+  border: solid var(--editor-page-bg);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+.sytue-page ul[data-checklist] > li[data-checked='1'] {
+  color: #6e7379; /* 4,7:1 sobre el folio blanco: atenuado, pero se lee (AA) */
+  text-decoration: line-through;
+}
 .sytue-page a {
   /* Enlace sobre papel blanco: escalón 700 del latón (≈ 6.9:1 AA sobre blanco).
      NO usar --sytue-primary-text: en dark vira a latón claro e invisibiliza el
@@ -233,6 +276,12 @@
    imágenes ancladas «detrás del texto», que la necesita por lo mismo. */
 .sytue-page {
   isolation: isolate;
+}
+
+/* ---- «Copiar formato» armado (brocha.ts): el puntero dice que lo siguiente que se
+   seleccione recibe el formato copiado. Sin color propio: es el cursor del sistema. ---- */
+.sytue-page[data-brocha] {
+  cursor: copy;
 }
 
 /* ---- Campos de formulario rellenables (fichas inline sobrias). ---- */

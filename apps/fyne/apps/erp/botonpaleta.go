@@ -30,9 +30,9 @@ type BotonPaleta struct {
 
 	// Rotulo es el texto de la izquierda («Ir a…»).
 	Rotulo string
-	// Atajo es la tecla de la derecha, y es DECORACIÓN: en la web va en un `<kbd>` con
-	// `aria-hidden`, porque el nombre accesible ya la nombra sin depender de que se
-	// entienda el símbolo.
+	// Atajo es la tecla de la derecha, y es DECORACIÓN: en la web es la `<Kbd
+	// tone="chrome">` (aquí `ui.TeclaCromo`), escondida al lector porque el nombre
+	// accesible ya la nombra sin depender de que se entienda el símbolo.
 	Atajo string
 }
 
@@ -59,11 +59,15 @@ func radioBotonCajon() float32 { return tema.Forma("radius-control") }
 // rectángulo lleno por debajo del relleno, así que el velo se compone aquí sobre el
 // color del carril.
 func fondoBotonCajon(encima bool, v tema.Variante) color.NRGBA {
-	velo := "sidebar-hover-bg"
+	return sobre(tema.Color(veloBotonCajon(encima), v), tema.Color("sidebar-bg", v))
+}
+
+// veloBotonCajon es el token del velo: `chrome-hover` en reposo, `chrome-active` encima.
+func veloBotonCajon(encima bool) string {
 	if encima {
-		velo = "sidebar-active-bg"
+		return "sidebar-active-bg"
 	}
-	return sobre(tema.Color(velo, v), tema.Color("sidebar-bg", v))
+	return "sidebar-hover-bg"
 }
 
 var _ fyne.Widget = (*BotonPaleta)(nil)
@@ -77,12 +81,20 @@ func NuevoBotonPaleta(rotulo, atajo, nombre string, alPulsar func()) *BotonPalet
 	return b
 }
 
-// MedidaBotonPaleta es rótulo + atajo con su `px-3`, por los 31,75 de alto.
+// MedidaBotonPaleta es rótulo + tecla con su `px-3`, por los 31,75 de alto.
 func MedidaBotonPaleta(b *BotonPaleta) fyne.Size {
 	ancho := ui.Medir(b.Rotulo, tema.TextoSM, ui.Normal).Width +
-		ui.Medir(b.Atajo, tema.TextoXS, ui.Normal).Width +
+		ui.MedidaTecla(teclaPaleta(b.Atajo)).Width +
 		2*BotonPaletaPX + tema.Espacio(2)
 	return fyne.NewSize(ancho, AltoBotonPaleta)
+}
+
+// teclaPaleta es la tecla del cromo posada sobre el botón: lo que se ve por dentro es
+// su `bg-chrome-hover`, el velo del carril compuesto sobre él (ver fondoBotonCajon).
+func teclaPaleta(atajo string) *ui.Tecla {
+	k := ui.TeclaCromo(atajo)
+	k.Fondo, k.Debajo = veloBotonCajon(false), "sidebar-bg"
+	return k
 }
 
 // CreateRenderer construye caja, rótulo y tecla.
@@ -93,7 +105,7 @@ func (b *BotonPaleta) CreateRenderer() fyne.WidgetRenderer {
 		aro:   ui.NuevoAroCon("sidebar-focus", radioBotonCajon(), ui.SinHueco, v).Abierto(),
 		caja:  ui.NuevaCaja(tema.Color("sidebar-bg", v), ui.BordeSobre("sidebar-border", "sidebar-bg", v), radioBotonCajon()),
 		texto: ui.Texto(b.Rotulo, tema.TextoSM, ui.Normal, tema.Color("sidebar-fg-muted", v)),
-		tecla: ui.Texto(b.Atajo, tema.TextoXS, ui.Normal, tema.Color("sidebar-fg-muted", v)),
+		tecla: teclaPaleta(b.Atajo),
 	}
 	r.objetos = append(r.aro.Objetos(), r.caja.Objetos()...)
 	r.objetos = append(r.objetos, r.texto, r.tecla)
@@ -102,11 +114,12 @@ func (b *BotonPaleta) CreateRenderer() fyne.WidgetRenderer {
 }
 
 type botonPaletaRenderer struct {
-	b            *BotonPaleta
-	aro          *ui.Aro
-	caja         *ui.Caja
-	texto, tecla *canvas.Text
-	objetos      []fyne.CanvasObject
+	b       *BotonPaleta
+	aro     *ui.Aro
+	caja    *ui.Caja
+	texto   *canvas.Text
+	tecla   *ui.Tecla
+	objetos []fyne.CanvasObject
 }
 
 func (r *botonPaletaRenderer) MinSize() fyne.Size           { return MedidaBotonPaleta(r.b) }
@@ -116,10 +129,10 @@ func (r *botonPaletaRenderer) Destroy()                     {}
 func (r *botonPaletaRenderer) Layout(t fyne.Size) {
 	r.aro.Colocar(t)
 	r.caja.Redimensionar(t)
-	anchoTecla := ui.Medir(r.b.Atajo, tema.TextoXS, ui.Normal).Width
-	ui.ColocarTexto(r.tecla, tema.TextoXS,
-		t.Width-BotonPaletaPX-anchoTecla, (t.Height-tema.TextoXS.Linea)/2)
-	cabe := max(t.Width-2*BotonPaletaPX-anchoTecla-tema.Espacio(2), 0)
+	k := ui.MedidaTecla(r.tecla)
+	r.tecla.Resize(k)
+	r.tecla.Move(fyne.NewPos(t.Width-BotonPaletaPX-k.Width, (t.Height-k.Height)/2))
+	cabe := max(t.Width-2*BotonPaletaPX-k.Width-tema.Espacio(2), 0)
 	ui.Truncar(r.texto, r.b.Rotulo, tema.TextoSM, ui.Normal, cabe)
 	ui.ColocarTexto(r.texto, tema.TextoSM, BotonPaletaPX, (t.Height-tema.TextoSM.Linea)/2)
 }
@@ -138,9 +151,9 @@ func (r *botonPaletaRenderer) Refresh() {
 	r.caja.Pintar(fondoBotonCajon(r.b.Encima(), v), ui.BordeSobre("sidebar-border", "sidebar-bg", v))
 	r.texto.Color = tinta
 	r.texto.Refresh()
-	// La tecla NO sigue al rótulo: en la hoja se queda en `text-sidebar-fg-muted`
-	// también al pasar el ratón.
-	r.tecla.Color = tema.Color("sidebar-fg-muted", v)
+	// La tecla NO sigue al rótulo: se queda en su tinta del cromo también al pasar el
+	// ratón. Lo que sí sigue es lo que se ve por dentro, que es el fondo del botón.
+	r.tecla.Fondo = veloBotonCajon(r.b.Encima())
 	r.tecla.Refresh()
 }
 

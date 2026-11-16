@@ -12,6 +12,15 @@ import type { AppCatalog } from '@sytue/i18n';
 import type { en } from './en.js';
 
 export const de: AppCatalog<typeof en> = {
+  // Transient SMTP disclosure; English fallback where not yet translated.
+  'privateMail.smtpConsentTitle': 'Send outside Sytue',
+  'privateMail.smtpConsentBody':
+    'Your stored copy and attachments stay encrypted. To deliver this message, Sytue and the recipient’s mail server will process its content. SMTP does not provide end-to-end encryption.',
+  'privateMail.smtpConsentConfirm': 'Allow and send',
+  'privateMail.deliveryUncertain':
+    'Delivery could not be confirmed. We kept the message. Check its status before sending it again.',
+  'privateMail.queuedBody': 'The message will be sent while this app is open and connected.',
+
   // --- Comunes ------------------------------------------------------------
   'common.retry': 'Erneut versuchen',
   'common.cancel': 'Abbrechen',
@@ -37,6 +46,8 @@ export const de: AppCatalog<typeof en> = {
   'folder.trash': 'Papierkorb',
   'folder.junk': 'Spam',
   'folder.archive': 'Archiv',
+  'folder.outbox': 'Postausgang',
+  'folder.snoozed': 'Zurückgestellt',
 
   // --- Barra lateral ------------------------------------------------------
   'nav.compose': 'Verfassen',
@@ -72,6 +83,11 @@ export const de: AppCatalog<typeof en> = {
   'shortcuts.send': 'Die Nachricht senden, die du schreibst',
   'shortcuts.archive': 'Archivieren',
   'shortcuts.trash': 'In den Papierkorb',
+  'shortcuts.spam': 'Als Spam markieren',
+  'shortcuts.markRead': 'Als gelesen markieren',
+  'shortcuts.markUnread': 'Als ungelesen markieren',
+  'shortcuts.undo': 'Letzte Verschiebung rückgängig machen',
+  'shortcuts.key.shift': 'Umschalt',
   'shortcuts.star': 'Markieren',
   'shortcuts.select': 'Unterhaltung auswählen',
   'shortcuts.clearSelection': 'Auswahl aufheben',
@@ -103,6 +119,70 @@ export const de: AppCatalog<typeof en> = {
   'smime.anchorFailed': 'Das Zertifikat konnte nicht heruntergeladen werden',
   'nav.vacation': 'Abwesenheitsnotiz',
   'nav.mailClients': 'E-Mail-Programme',
+  'settings.title': 'Mail-Einstellungen',
+  'settings.description':
+    'Wie Ihre E-Mails geschrieben, sortiert und geteilt werden. Jeder Abschnitt sagt, was er ändert, bevor Sie etwas anfassen.',
+  'settings.writingTitle': 'Schreiben und Antworten',
+  'settings.signatureDescription':
+    'Wird am Ende jeder neuen Nachricht und jeder Antwort eingefügt.',
+  'settings.signatureOn': 'Eingerichtet',
+  'settings.signatureOff': 'Nicht eingerichtet',
+  'settings.vacationDescription':
+    'Antwortet automatisch, während Sie weg sind, einmal pro Absender.',
+  'settings.undoSendTitle': 'Senden rückgängig machen',
+  'settings.undoSendDescription':
+    'Wie lange Sie eine Nachricht nach dem Klick auf „Senden“ noch zurückholen können.',
+  'settings.undoSendOption': '{count} s',
+  'settings.undoSendSaved': 'Zeitfenster zum Rückgängigmachen gespeichert',
+  'settings.readingSaved': 'Leseeinstellungen gespeichert',
+  'settings.readingTitle': 'Lesen',
+  'settings.autoAdvanceTitle': 'Nach dem Archivieren oder Löschen',
+  'settings.autoAdvanceDescription':
+    'Was sich öffnet, wenn die gelesene Unterhaltung den Ordner verlässt.',
+  'settings.autoAdvanceOlder': 'Nächste (ältere) Unterhaltung öffnen',
+  'settings.autoAdvanceNewer': 'Vorherige (neuere) Unterhaltung öffnen',
+  'settings.autoAdvanceList': 'Zurück zur Liste',
+  'settings.swipeRightTitle': 'Nach rechts wischen',
+  'settings.swipeLeftTitle': 'Nach links wischen',
+  'settings.swipeDescription':
+    'Was das Wischen über eine Unterhaltung in der Liste auf Smartphone oder Tablet bewirkt.',
+  'settings.swipeArchive': 'Archivieren',
+  'settings.swipeTrash': 'In den Papierkorb verschieben',
+  'settings.swipeRead': 'Als gelesen oder ungelesen markieren',
+  'settings.swipeNone': 'Nichts',
+  'settings.trustedSendersTitle': 'Vertrauenswürdige Absender',
+  'settings.trustedSendersDescription':
+    'Bilder dieser Absender werden ohne Nachfrage angezeigt. Sie werden weiterhin über Sytue geladen, sodass der Absender nicht sieht, wo Sie sind.',
+  'settings.trustedSendersEmpty':
+    'Noch keine. Öffnen Sie eine Nachricht mit blockierten Bildern und wählen Sie „Von diesem Absender immer anzeigen“.',
+  'settings.trustedSendersRemove': 'Entfernen',
+  'settings.trustedSendersRemoveFor': '{address} nicht mehr vertrauen',
+  'settings.templatesTitle': 'Antwortvorlagen',
+  'settings.templatesDescription':
+    'Texte, die Sie oft schreiben, bereit zum Einfügen in jede Nachricht.',
+  'settings.addressesTitle': 'Adressen und Zugriff',
+  'settings.aliasesDescription':
+    'Weitere Adressen, die in dieses Postfach zustellen und von denen Sie senden können.',
+  'settings.sharedDescription':
+    'Postfächer, die Sie mit Ihrem Team teilen, und Personen, die in Ihrem Namen lesen oder senden dürfen.',
+  'settings.sortingTitle': 'Sortieren',
+  'settings.rulesDescription':
+    'Regeln auf dem Server, die eingehende E-Mails ablegen, beschriften oder weiterleiten, auch bei geschlossener App.',
+  'settings.securityTitle': 'Signierte E-Mails (S/MIME)',
+  'settings.securityDescription':
+    'Ihre E-Mails werden signiert versendet. Mit diesen beiden Optionen zeigen andere Programme sie als vertrauenswürdig an.',
+  'settings.anchorDescription':
+    'Einmal auf jedem Gerät installieren, damit von Ihrer Organisation signierte E-Mails als vertrauenswürdig erscheinen.',
+  'settings.identityDescription':
+    'Mit einem Zertifikat einer öffentlichen Stelle statt mit dem Ihrer Organisation signieren.',
+  'settings.clientsTitle': 'Andere E-Mail-Programme',
+  'settings.mailClientsDescription':
+    'Thunderbird, Outlook, Apple Mail oder Ihr Telefon melden sich mit einem App-Passwort an, das Sie in Sytue ID erstellen.',
+  'settings.edit': 'Bearbeiten',
+  'settings.manage': 'Verwalten',
+  'settings.download': 'Herunterladen',
+  'settings.install': 'Installieren',
+  'settings.openId': 'Sytue ID öffnen',
   'nav.loadingFolders': 'Ordner werden geladen',
   'nav.foldersError': 'Ordner konnten nicht geladen werden.',
   'nav.foldersEmpty': 'Keine Ordner verfügbar.',
@@ -187,6 +267,12 @@ export const de: AppCatalog<typeof en> = {
   'error.move': 'Verschieben in {folder} nicht möglich',
   'error.label': 'Das Label konnte nicht geändert werden',
   'error.signature': 'Die Signatur konnte nicht gespeichert werden. Bitte erneut versuchen.',
+  'error.undoSendSettings':
+    'Das Zeitfenster zum Rückgängigmachen konnte nicht gespeichert werden. Bitte erneut versuchen.',
+  'error.trustedSender':
+    'Ihre vertrauenswürdigen Absender konnten nicht aktualisiert werden. Bitte versuchen Sie es erneut.',
+  'error.readingSettings':
+    'Die Leseeinstellungen konnten nicht gespeichert werden. Bitte versuchen Sie es erneut.',
   'error.undoSend': 'Das Senden konnte nicht rückgängig gemacht werden',
   'error.undoSendGone': 'Zu spät zum Rückgängigmachen: Die Nachricht ist bereits raus',
   'undo.done': 'Senden rückgängig gemacht',
@@ -199,6 +285,11 @@ export const de: AppCatalog<typeof en> = {
   'list.fallbackName': 'Mail',
   'list.searchResults': 'Suchergebnisse',
   'list.resultCount': { one: '{count} Treffer', other: '{count} Treffer' },
+  'list.markAllRead': 'Alle als gelesen markieren',
+  'list.markedAllRead': {
+    one: '{count} Nachricht als gelesen markiert',
+    other: '{count} Nachrichten als gelesen markiert',
+  },
   'list.unreadCount': { one: '{count} ungelesen', other: '{count} ungelesen' },
   'list.conversationCount': { one: '{count} Konversation', other: '{count} Konversationen' },
   'list.searchPlaceholder': 'Mail durchsuchen',
@@ -206,6 +297,15 @@ export const de: AppCatalog<typeof en> = {
   'list.searchHint':
     'Operatoren: from:, to:, subject:, has:attachment, is:unread, is:starred, after:2026-01-31, before:2026-03-01. Für mehrere Wörter Anführungszeichen verwenden.',
   'list.clearSearch': 'Suche löschen',
+  'list.searchOptions': 'Suchoptionen',
+  'list.searchFrom': 'Von',
+  'list.searchTo': 'An',
+  'list.searchSubject': 'Betreff',
+  'list.searchWords': 'Enthält die Wörter',
+  'list.searchSince': 'Ab',
+  'list.searchUntil': 'Bis',
+  'list.searchApply': 'Suchen',
+  'list.searchReset': 'Felder leeren',
   'filter.group': 'Schnellfilter',
   'filter.unread': 'Ungelesen',
   'filter.starred': 'Markiert',
@@ -234,6 +334,7 @@ export const de: AppCatalog<typeof en> = {
   'list.noPreview': 'Keine Vorschau',
   'list.rowActions': 'Aktionen für „{subject}“',
   'list.attachment': 'Anhang',
+  'list.answered': 'Beantwortet',
   'list.loadingMore': 'Weitere Konversationen werden geladen',
   'list.loadingMoreShort': 'Mehr wird geladen…',
 
@@ -263,10 +364,56 @@ export const de: AppCatalog<typeof en> = {
   'reader.labelApplied': 'Zugewiesen. ',
   'reader.moveToFolder': 'In anderen Ordner verschieben',
   'reader.createRule': 'Regel für diese Adresse erstellen',
+  'snooze.action': 'Zurückstellen',
+  'snooze.change': 'Zeitpunkt ändern',
+  'snooze.laterToday': 'Später heute',
+  'snooze.tomorrow': 'Morgen',
+  'snooze.weekend': 'Dieses Wochenende',
+  'snooze.nextWeek': 'Nächste Woche',
+  'snooze.custom': 'Datum und Uhrzeit wählen…',
+  'snooze.customTitle': 'Zurückstellen bis',
+  'snooze.dateTime': 'Datum und Uhrzeit',
+  'snooze.confirm': 'Zurückstellen',
+  'snooze.invalid':
+    'Wähle ein Datum und eine Uhrzeit zwischen einer Minute und einem Jahr ab jetzt',
+  'snooze.done': 'Zurückgestellt bis {date}',
+  'snooze.nothing': 'Nur Unterhaltungen im Posteingang lassen sich zurückstellen',
+  'snooze.failed': 'Die Unterhaltung konnte nicht zurückgestellt werden',
+  'snooze.banner': 'Zurückgestellt bis {date}. Dann kommt sie ungelesen in den Posteingang zurück.',
+  'snooze.unsnooze': 'Zurück in den Posteingang',
+  'snooze.unsnoozed': 'Zurück im Posteingang',
+  'snooze.unsnoozeFailed': 'Die Unterhaltung konnte nicht in den Posteingang zurückgeholt werden',
+  'snooze.returned': 'Zurückgestellt · zurück seit {date}',
+  'mute.action': 'Unterhaltung stummschalten',
+  'mute.unmute': 'Stummschaltung aufheben',
+  'mute.done': 'Unterhaltung stummgeschaltet. Neue Antworten landen im Archiv.',
+  'mute.undone': 'Stummschaltung aufgehoben',
+  'mute.failed': 'Die Unterhaltung konnte nicht geändert werden',
+  'mute.banner':
+    'Diese Unterhaltung ist stummgeschaltet: Neue Antworten gehen direkt ins Archiv, ohne Benachrichtigung.',
+  'reader.block': '{sender} blockieren',
+  'reader.blocked': '{sender} blockiert: E-Mails dieser Adresse landen im Spam',
+  'reader.blockFailed': 'Absender konnte nicht blockiert werden',
+  'reader.searchFromSender': 'E-Mails dieser Person suchen',
+  'reader.addToContacts': 'Zu Sytue Contacts hinzufügen',
+  'reader.viewInContacts': 'In Sytue Contacts ansehen',
+  'reader.addedToContacts': 'Zu Sytue Contacts hinzugefügt',
+  'reader.addToContactsFailed': 'Konnte nicht zu Sytue Contacts hinzugefügt werden',
+  'reader.viewContact': 'Ansehen',
   'reader.moreActions': 'Weitere Aktionen',
+  'reader.newer': 'Neuere Unterhaltung',
+  'reader.older': 'Ältere Unterhaltung',
+  'reader.print': 'Drucken',
+  'reader.printFailed': 'Die Unterhaltung konnte nicht gedruckt werden',
   'reader.conversationLabels': 'Labels der Konversation',
   'reader.removeLabel': 'Label {label} entfernen',
+  'reader.senderVerified': 'Verifiziert',
+  'reader.senderWarning':
+    'Wir konnten nicht bestätigen, dass diese Nachricht wirklich von {domain} stammt. Seien Sie vorsichtig mit Links und Anhängen.',
+  'reader.from': 'Von: {address}',
   'reader.to': 'An: {addresses}',
+  'reader.cc': 'Cc: {addresses}',
+  'reader.bcc': 'Bcc: {addresses}',
   'reader.attachments': 'Anhänge',
   'reader.attachmentCount': { one: 'Anhang · {count}', other: 'Anhänge · {count}' },
   'reader.download': '{name} herunterladen',
@@ -280,6 +427,20 @@ export const de: AppCatalog<typeof en> = {
   'reader.downloadFailedDescription':
     '„{name}“ konnte nicht in Ihrem Download-Ordner gespeichert werden. Prüfen Sie, ob genug Speicherplatz frei ist, und versuchen Sie es erneut.',
   'reader.hasAttachments': 'Diese Nachricht enthält Anhänge.',
+  'reader.invite.label': 'Einladung',
+  'reader.invite.untitled': 'Termin ohne Titel',
+  'reader.invite.organizer': 'Organisiert von {name}',
+  'reader.invite.question': 'Nehmen Sie teil?',
+  'reader.invite.yes': 'Ja',
+  'reader.invite.maybe': 'Vielleicht',
+  'reader.invite.no': 'Nein',
+  'reader.invite.accepted': 'Sie nehmen teil. Der Termin ist in Ihrem Kalender.',
+  'reader.invite.tentative':
+    'Sie nehmen vielleicht teil. Der Termin steht als vorläufig in Ihrem Kalender.',
+  'reader.invite.declined': 'Sie haben abgesagt. Der Termin steht als abgelehnt in Ihrem Kalender.',
+  'reader.invite.replyNotSent': 'Der Organisator konnte nicht per E-Mail benachrichtigt werden.',
+  'reader.invite.failed': 'Ihre Antwort konnte nicht gesendet werden',
+  'reader.invite.allDay': 'Ganztägig',
   'reader.loadingBody': 'Nachricht wird geladen…',
   'reader.plainTextOnly':
     'Wird als reiner Text angezeigt. Die ursprüngliche Formatierung wird hier nicht dargestellt.',
@@ -287,7 +448,12 @@ export const de: AppCatalog<typeof en> = {
   'reader.frameTitle': 'Nachrichteninhalt',
   'reader.remoteContentBlocked': 'Externe Bilder sind zum Schutz Ihrer Privatsphäre blockiert.',
   'reader.remoteContentShow': 'Bilder anzeigen',
+  'reader.remoteContentAlways': 'Von diesem Absender immer anzeigen',
+  'reader.remoteContentAlwaysFor': 'Bilder von {address} immer anzeigen',
+  'reader.trustedSenderAdded': 'Bilder von {address} werden immer angezeigt',
   'reader.quoteHeader': 'Am {date} schrieb {name}:',
+  'reader.showQuoted': 'Zitierten Text anzeigen',
+  'reader.hideQuoted': 'Zitierten Text ausblenden',
   'reader.unknownSender': 'Unbekannt',
 
   // --- Acciones en lote ----------------------------------------------------
@@ -330,6 +496,8 @@ export const de: AppCatalog<typeof en> = {
   'compose.formatting': 'Textformatierung',
   'compose.attachFromDevice': 'Von diesem Gerät anhängen',
   'compose.attachFromDrive': 'Aus Drive anhängen',
+  'compose.templates': 'Vorlagen',
+  'compose.templatesEmpty': 'Noch keine Vorlagen. Legen Sie sie in den Mail-Einstellungen an.',
   'compose.attachFailed': 'Der Anhang konnte nicht gelesen werden',
   'compose.pastedImageDropped': 'Das eingefügte Bild wurde nicht übernommen',
   'compose.pastedImagesDropped': 'Die eingefügten Bilder wurden nicht übernommen',
@@ -344,6 +512,8 @@ export const de: AppCatalog<typeof en> = {
   'compose.draftSaved': 'Entwurf gespeichert',
   'compose.draftSavedOffline': 'Entwurf auf diesem Gerät gespeichert',
   'compose.draftRestoredOffline': 'Lokaler Entwurf wiederhergestellt',
+  'compose.draftAttachmentsNotKept':
+    'Große Anhänge wurden auf diesem Gerät nicht gespeichert: Hänge sie vor dem Senden erneut an.',
   'compose.draftFailed': 'Der Entwurf konnte nicht gespeichert werden',
   'compose.discardTitle': 'Entwurf verwerfen?',
   'compose.discardConfirm': 'Verwerfen',
@@ -423,6 +593,40 @@ export const de: AppCatalog<typeof en> = {
   'signature.title': 'Signatur',
   'signature.help': 'Sie wird an neue Nachrichten und Antworten angehängt.',
   'signature.placeholder': 'Vorname Nachname\nRolle · Sytue',
+  'templates.whatTitle': 'Wofür Vorlagen da sind',
+  'templates.whatBody':
+    'Schreiben Sie einmal, was Sie immer wieder antworten (Öffnungszeiten, ein Dankeschön, wie man den Support erreicht), und fügen Sie es beim Schreiben über die Schaltfläche „Vorlagen“ ein. Sie werden in Ihrem Konto gespeichert und sind deshalb auf jedem Gerät dieselben.',
+  'templates.yoursTitle': 'Ihre Vorlagen',
+  'templates.loading': 'Vorlagen werden geladen',
+  'templates.loadError': 'Die Vorlagen konnten nicht geladen werden.',
+  'templates.emptyTitle': 'Noch keine Vorlagen',
+  'templates.emptyDescription':
+    'Legen Sie unten die erste an; sie erscheint dann beim Schreiben im Menü „Vorlagen“.',
+  'templates.newTitle': 'Neue Vorlage',
+  'templates.editTitle': 'Vorlage bearbeiten',
+  'templates.namePlaceholder': 'Öffnungszeiten',
+  'templates.nameHint': 'So erscheint sie beim Schreiben im Menü „Vorlagen“.',
+  'templates.nameDuplicate': 'Sie haben bereits eine Vorlage mit diesem Namen.',
+  'templates.body': 'Text',
+  'templates.bodyPlaceholder':
+    'Guten Tag,\n\nwir sind montags bis freitags von 9:00 bis 14:00 Uhr für Sie da.',
+  'templates.bodyHint': 'Unformatierter Text. Er wird an der Cursorposition eingefügt.',
+  'templates.add': 'Vorlage hinzufügen',
+  'templates.edit': '{name} bearbeiten',
+  'templates.delete': '{name} löschen',
+  'templates.confirmDelete': 'Diese Vorlage löschen?',
+  'templates.created': 'Vorlage angelegt',
+  'templates.saved': 'Vorlage gespeichert',
+  'templates.deleted': 'Vorlage gelöscht',
+  'templates.errorLimit':
+    'Sie haben das Limit von 100 Vorlagen erreicht. Löschen Sie eine, um eine weitere hinzuzufügen.',
+  'templates.errorInvalid':
+    'Die Vorlage konnte nicht gespeichert werden: Prüfen Sie Name und Länge.',
+  'templates.errorGone': 'Diese Vorlage gibt es nicht mehr.',
+  'templates.errorSave':
+    'Die Vorlage konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.',
+  'templates.errorDelete':
+    'Die Vorlage konnte nicht gelöscht werden. Bitte versuchen Sie es erneut.',
 
   // --- Cuota de almacenamiento ---------------------------------------------
   'storage.title': 'Speicher',
@@ -496,16 +700,6 @@ export const de: AppCatalog<typeof en> = {
   'labels.confirmDelete': 'Label löschen?',
   'labels.deleteLabel': 'Label {label} löschen',
   'labels.deleteShort': 'Label löschen',
-
-  // --- Colores de etiqueta ---------------------------------------------------
-  'colour.slate': 'Schiefer',
-  'colour.brass': 'Messing',
-  'colour.sage': 'Salbei',
-  'colour.clay': 'Lehm',
-  'colour.blue': 'Blau',
-  'colour.plum': 'Pflaume',
-  'colour.teal': 'Petrol',
-  'colour.rose': 'Rosé',
 
   // --- Alias -----------------------------------------------------------------
   'aliases.title': 'E-Mail-Aliase',

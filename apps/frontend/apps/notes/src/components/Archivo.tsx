@@ -7,11 +7,10 @@
  * del árbol sin borrarse). La lista de resultados es la de la búsqueda.
  */
 import type { JSX } from 'preact';
-import { Button } from '@sytue/ui';
+import { Button, Resaltado, EmptyState } from '@sytue/ui';
 import type { Notebook, NoteHit } from '@sytue/api-clients';
 import type { T } from '../i18n/index.js';
 import { Glyph } from './glyphs.js';
-import { Resaltado } from './Resaltado.js';
 
 /**
  * Filas de notas de varios cuadernos: título y fragmento, y lleva a la nota. Con
@@ -78,14 +77,14 @@ export function ListaDeHits({
   );
 }
 
-/** Una página sin nada: su título y una frase en voz baja, sin ilustración. */
+/** Una página sin nada: su título y el vacío compacto de la suite, sin ilustración. */
 function Vacia({ titulo, frase }: { titulo: string; frase: string }): JSX.Element {
   return (
     <div class="notes-col notes-page">
       <div class="notes-page-head">
         <h2 class="notes-page-title">{titulo}</h2>
       </div>
-      <p class="text-text-subtle text-base">{frase}</p>
+      <EmptyState compact title={frase} />
     </div>
   );
 }

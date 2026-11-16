@@ -12,9 +12,12 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/test"
 
+	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 )
 
 func cuadernoDe(id, padre string, pos int, soloLectura bool) Cuaderno {
@@ -171,4 +174,170 @@ func TestMoverCuadernoQueFallaLoDiceComoLaWeb(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatalf("no ha salido el aviso %q", quiero)
+}
+
+// pantallaDelArbol monta la pantalla con «a» abierto y «hijo» colgando de él SIN abrir,
+// que es el caso que obligaba a abrir un cuaderno para poder moverlo.
+func pantallaDelArbol(t *testing.T, srv *httptest.Server) (*Pantalla, fyne.Window) {
+	t.Helper()
+	w := test.NewWindow(nil)
+	t.Cleanup(w.Close)
+	p := NuevaPantalla(trInterno(t), "es", api.NewNotes(srv.URL, nil, nil), nil, w)
+	w.SetContent(p.Objeto())
+	w.Resize(fyne.NewSize(1280, 800))
+	p.Yo = func() string { return "ada" }
+	p.cuadernos = []Cuaderno{
+		cuadernoDe("a", "", 1024, false), cuadernoDe("hijo", "a", 1024, false),
+		cuadernoDe("b", "", 2048, false),
+	}
+	p.activo = p.cuadernos[0]
+	p.lateral.Fase = Exito
+	fyne.DoAndWait(p.Repintar)
+	return p, w
+}
+
+// masDeFila es el «…» de la fila de un cuaderno del árbol.
+func masDeFila(t *testing.T, p *Pantalla, id string) (*ui.FilaLateral, *ui.BotonIcono) {
+	t.Helper()
+	var f *ui.FilaLateral
+	fyne.DoAndWait(func() { f = p.lateral.filasCuaderno[id] })
+	if f == nil {
+		t.Fatalf("el árbol no pinta la fila de %q", id)
+	}
+	var mas *ui.BotonIcono
+	recorrerInterno(f.Rama.Cola, func(x fyne.CanvasObject) {
+		if b, ok := x.(*ui.BotonIcono); ok && b.Rotulo == p.tr.T("notebook.settings", nil) {
+			mas = b
+		}
+	})
+	if mas == nil {
+		t.Fatalf("la fila de %q no lleva el «…»", id)
+	}
+	return f, mas
+}
+
+// elementosDelMenu son los textos del menú abierto encima de todo.
+func elementosDelMenu(w fyne.Window) []string {
+	var out []string
+	recorrerInterno(w.Canvas().Overlays().Top(), func(x fyne.CanvasObject) {
+		if e, ok := x.(*ui.ElementoMenu); ok {
+			out = append(out, e.Texto)
+		}
+	})
+	return out
+}
+
+// TestElMasDeLaFilaMueveUnCuadernoSinAbrirlo: el «…» de la fila de un cuaderno que NO
+// está abierto ofrece lo mismo que la web —nuevo dentro, mover, ajustes— y «Mover
+// cuaderno a…» manda el PUT sin pasar por abrirlo. VISTO EN ROJO con los dos botones
+// de antes: la fila no tenía «…» ni menú.
+func TestElMasDeLaFilaMueveUnCuadernoSinAbrirlo(t *testing.T) {
+	falso := &servicioFalso{respuesta: map[string]string{
+		"PUT /notebooks/hijo": `{"id":"hijo","title":"HIJO","owner_sub":"ada"}`,
+	}}
+	srv := httptest.NewServer(falso)
+	t.Cleanup(srv.Close)
+	p, w := pantallaDelArbol(t, srv)
+
+	_, mas := masDeFila(t, p, "hijo")
+	test.Tap(mas)
+	tr := p.tr.T
+	quiero := []string{tr("notebook.newChild", nil), tr("notebook.moveTo", nil), tr("notebook.settings", nil)}
+	if got := elementosDelMenu(w); !slices.Equal(got, quiero) {
+		t.Fatalf("el «…» de la fila ofrece %q; quiero %q", got, quiero)
+	}
+	recorrerInterno(w.Canvas().Overlays().Top(), func(x fyne.CanvasObject) {
+		if e, ok := x.(*ui.ElementoMenu); ok && e.Texto == tr("notebook.moveTo", nil) {
+			test.Tap(e)
+		}
+	})
+	raiz := tr("notebook.toRoot", nil)
+	if !slices.Contains(textosInternos(w.Canvas().Overlays().Top()), raiz) {
+		t.Fatal("«Mover cuaderno a…» no ha abierto el diálogo de destinos")
+	}
+	recorrerInterno(w.Canvas().Overlays().Top(), func(x fyne.CanvasObject) {
+		if o, ok := x.(*Opcion); ok && slices.Contains(textosInternos(o), raiz) {
+			test.Tap(o)
+		}
+	})
+	esperarVeces(t, falso, "PUT /notebooks/hijo", 1)
+	if cuerpo := falso.ultima(t, "PUT /notebooks/hijo"); cuerpo["parent_id"] != nil {
+		t.Fatalf("el PUT lleva %v; quiero el cuaderno en la raíz", cuerpo)
+	}
+	// Mover no abre: el abierto sigue siendo el que estaba, como en la web.
+	esperarVeces(t, falso, "GET /notebooks", 1)
+	var activo string
+	fyne.DoAndWait(func() { activo = p.activo.ID })
+	if activo != "a" {
+		t.Fatalf("mover «hijo» ha abierto %q; el abierto tenía que seguir siendo «a»", activo)
+	}
+}
+
+// TestElClicDerechoDeLaFilaAbreSuMenu: el clic derecho (y la pulsación larga, que Fyne
+// entrega igual) abre el mismo menú que el «…». VISTO EN ROJO sin `AlPulsarSecundario`.
+func TestElClicDerechoDeLaFilaAbreSuMenu(t *testing.T) {
+	srv := httptest.NewServer(&servicioFalso{})
+	t.Cleanup(srv.Close)
+	p, w := pantallaDelArbol(t, srv)
+
+	f, _ := masDeFila(t, p, "b")
+	test.TapSecondary(f)
+	if got := elementosDelMenu(w); !slices.Contains(got, p.tr.T("notebook.moveTo", nil)) {
+		t.Fatalf("el clic derecho de la fila ofrece %q", got)
+	}
+}
+
+// TestElMasDeLaFilaNoMueveNiUnDiaNiSinRed: con las mismas condiciones que el de la
+// página, un día del diario y una pantalla sin red no ofrecen «Mover cuaderno a…»; las
+// otras dos entradas siguen. VISTO EN ROJO ofreciéndolo siempre.
+func TestElMasDeLaFilaNoMueveNiUnDiaNiSinRed(t *testing.T) {
+	srv := httptest.NewServer(&servicioFalso{})
+	t.Cleanup(srv.Close)
+	p, w := pantallaDelArbol(t, srv)
+	tr := p.tr.T
+
+	// «a» es un día del diario CON hijos, que es como un día propio sigue en el árbol.
+	p.cuadernos[0].Crudo.DailyDate = "2026-11-08"
+	fyne.DoAndWait(p.Repintar)
+	_, mas := masDeFila(t, p, "a")
+	test.Tap(mas)
+	got := elementosDelMenu(w)
+	if slices.Contains(got, tr("notebook.moveTo", nil)) || !slices.Contains(got, tr("notebook.settings", nil)) {
+		t.Fatalf("el «…» de un día del diario ofrece %q", got)
+	}
+	fyne.DoAndWait(func() { w.Canvas().Overlays().Remove(w.Canvas().Overlays().Top()) })
+
+	p.red = &offline.Monitor{}
+	p.red.Report(offline.Offline)
+	fyne.DoAndWait(p.Repintar)
+	_, mas = masDeFila(t, p, "hijo")
+	test.Tap(mas)
+	if got := elementosDelMenu(w); slices.Contains(got, tr("notebook.moveTo", nil)) {
+		t.Fatalf("sin red el «…» ofrece %q", got)
+	}
+}
+
+// TestLaFilaDelCuadernoNoSaltaAlPasarElRaton: el «…» cuenta para la medida aunque esté
+// oculto, así que enseñarlo no cambia ni el alto ni el ancho de la cola. VISTO EN ROJO
+// midiendo con `ui.Fila`, que se salta lo oculto.
+func TestLaFilaDelCuadernoNoSaltaAlPasarElRaton(t *testing.T) {
+	srv := httptest.NewServer(&servicioFalso{})
+	t.Cleanup(srv.Close)
+	p, _ := pantallaDelArbol(t, srv)
+
+	f, _ := masDeFila(t, p, "b")
+	var antes, cola fyne.Size
+	fyne.DoAndWait(func() { antes, cola = ui.MedidaFilaLateral(f), f.Rama.Cola.MinSize() })
+	if f.Rama.ColaAlPasar.Visible() && !ui.EsTactil() {
+		t.Fatal("el «…» se ve en reposo")
+	}
+	f.MouseIn(&desktop.MouseEvent{})
+	var despues, colaDespues fyne.Size
+	fyne.DoAndWait(func() { despues, colaDespues = ui.MedidaFilaLateral(f), f.Rama.Cola.MinSize() })
+	if !f.Rama.ColaAlPasar.Visible() {
+		t.Fatal("al pasar el ratón no aparece el «…»")
+	}
+	if antes != despues || cola != colaDespues {
+		t.Fatalf("la fila salta al pasar el ratón: %v → %v (cola %v → %v)", antes, despues, cola, colaDespues)
+	}
 }

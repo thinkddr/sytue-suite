@@ -23,8 +23,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lestrrat-go/jwx/v2/jwt"
-
 	"git.sytue.eu/sytue/one/platform/pkg/pg"
 	"git.sytue.eu/sytue/one/platform/pkg/pgtest"
 	"git.sytue.eu/sytue/one/services/id/db"
@@ -46,7 +44,7 @@ func hashOf(s string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func seedUser(t *testing.T, ctx context.Context, st *store.Store, email string) domain.User {
+func seedUser(ctx context.Context, t *testing.T, st *store.Store, email string) domain.User {
 	t.Helper()
 	u, err := st.CreateUser(ctx, nil, domain.User{Email: email, EmailVerified: true, Name: "Ada"})
 	if err != nil {
@@ -86,7 +84,7 @@ func TestSCIMProvisioning(t *testing.T) {
 	}
 
 	// Paginación + filtro userName eq (SCIM ListResponse).
-	seedUser(t, ctx, st, "bob@sytue.eu")
+	seedUser(ctx, t, st, "bob@sytue.eu")
 	users, total, err := st.ListUsers(ctx, "ada@sytue.eu", 0, 50)
 	if err != nil {
 		t.Fatalf("ListUsers(filter): %v", err)
@@ -130,9 +128,9 @@ func TestOrgMembershipTenancy(t *testing.T) {
 		t.Fatalf("slug duplicado = %v, quiero ErrConflict", err)
 	}
 
-	owner := seedUser(t, ctx, st, "owner@sytue.eu")
-	member := seedUser(t, ctx, st, "member@sytue.eu")
-	outsider := seedUser(t, ctx, st, "outsider@sytue.eu")
+	owner := seedUser(ctx, t, st, "owner@sytue.eu")
+	member := seedUser(ctx, t, st, "member@sytue.eu")
+	outsider := seedUser(ctx, t, st, "outsider@sytue.eu")
 
 	if err := st.UpsertMembership(ctx, nil, domain.Membership{OrgID: org.ID, UserID: owner.ID, Role: domain.RoleMember}); err != nil {
 		t.Fatalf("UpsertMembership: %v", err)
@@ -174,7 +172,7 @@ func TestListOrgUsersPageKeyset(t *testing.T) {
 	base := time.Date(2026, 7, 1, 10, 0, 0, 0, time.UTC)
 	mk := func(email string, at time.Time, o domain.Organization) domain.User {
 		t.Helper()
-		u := seedUser(t, ctx, st, email)
+		u := seedUser(ctx, t, st, email)
 		// created_at determinista (con empates provocados) para fijar el orden.
 		if _, err := st.DB().Exec(ctx, `UPDATE users SET created_at=$2 WHERE id=$1`, u.ID, at); err != nil {
 			t.Fatalf("fijar created_at(%s): %v", email, err)
@@ -199,7 +197,7 @@ func TestListOrgUsersPageKeyset(t *testing.T) {
 	want := []string{hi.ID, lo.ID, u2.ID, u1.ID}
 
 	// Página 1 (limit 3): los tres más recientes y more=true.
-	p1, more, err := st.ListOrgUsersPage(ctx, org.ID, "", nil, 3)
+	p1, more, err := st.ListOrgUsersPage(ctx, org.ID, "", "", nil, 3)
 	if err != nil || !more || len(p1) != 3 {
 		t.Fatalf("página 1 = (%d, more=%v, %v), quiero (3, true, nil)", len(p1), more, err)
 	}
@@ -215,13 +213,13 @@ func TestListOrgUsersPageKeyset(t *testing.T) {
 	// Página 2 desde el cursor (created_at, id) del último visto: el resto, sin
 	// duplicados ni huecos, y more=false al agotar.
 	last := p1[len(p1)-1]
-	p2, more, err := st.ListOrgUsersPage(ctx, org.ID, "", &store.UserCursor{CreatedAt: last.CreatedAt, ID: last.ID}, 3)
+	p2, more, err := st.ListOrgUsersPage(ctx, org.ID, "", "", &store.UserCursor{CreatedAt: last.CreatedAt, ID: last.ID}, 3)
 	if err != nil || more || len(p2) != 1 || p2[0].ID != want[3] {
 		t.Fatalf("página 2 = (%d, more=%v, %v), quiero solo %s", len(p2), more, err, want[3])
 	}
 
 	// La org ajena solo ve a su miembro (aislamiento multi-tenant).
-	pa, more, err := st.ListOrgUsersPage(ctx, otra.ID, "", nil, 50)
+	pa, more, err := st.ListOrgUsersPage(ctx, otra.ID, "", "", nil, 50)
 	if err != nil || more || len(pa) != 1 || pa[0].Email != "ajena@sytue.eu" {
 		t.Fatalf("org ajena = (%d, more=%v, %v)", len(pa), more, err)
 	}
@@ -240,7 +238,7 @@ func TestListOrgUsersPageBusqueda(t *testing.T) {
 	base := time.Date(2026, 7, 1, 10, 0, 0, 0, time.UTC)
 	mk := func(email, nombre string, at time.Time, o domain.Organization) domain.User {
 		t.Helper()
-		u := seedUser(t, ctx, st, email)
+		u := seedUser(ctx, t, st, email)
 		if _, err := st.DB().Exec(ctx,
 			`UPDATE users SET created_at=$2, name=$3 WHERE id=$1`, u.ID, at, nombre); err != nil {
 			t.Fatalf("fijar fila(%s): %v", email, err)
@@ -262,7 +260,7 @@ func TestListOrgUsersPageBusqueda(t *testing.T) {
 	// Por apellido y por trozo de correo, en la PRIMERA página pese a ser la más
 	// antigua de las treinta y una.
 	for _, term := range []string{"pérez", "MARISA.PEREZ@ACME", "isa.per"} {
-		got, more, err := st.ListOrgUsersPage(ctx, org.ID, term, nil, 10)
+		got, more, err := st.ListOrgUsersPage(ctx, org.ID, term, "", nil, 10)
 		if err != nil {
 			t.Fatalf("q=%q: %v", term, err)
 		}
@@ -273,7 +271,7 @@ func TestListOrgUsersPageBusqueda(t *testing.T) {
 
 	// Un '%' es texto, no comodín: si se colara sin escapar, esto devolvería las
 	// treinta y una filas de la organización.
-	got, _, err := st.ListOrgUsersPage(ctx, org.ID, "%", nil, 50)
+	got, _, err := st.ListOrgUsersPage(ctx, org.ID, "%", "", nil, 50)
 	if err != nil {
 		t.Fatalf("q=%%: %v", err)
 	}
@@ -282,7 +280,7 @@ func TestListOrgUsersPageBusqueda(t *testing.T) {
 	}
 
 	// Y la búsqueda no salta a otra organización aunque el nombre coincida.
-	got, _, err = st.ListOrgUsersPage(ctx, org.ID, "marisa", nil, 50)
+	got, _, err = st.ListOrgUsersPage(ctx, org.ID, "marisa", "", nil, 50)
 	if err != nil {
 		t.Fatalf("q=marisa: %v", err)
 	}
@@ -297,7 +295,7 @@ func TestListOrgUsersPageBusqueda(t *testing.T) {
 func TestAuthCodeOneShot(t *testing.T) {
 	st, ctx := newStore(t)
 	org, _ := st.CreateOrg(ctx, nil, domain.Organization{Slug: "acme", Name: "Acme"})
-	user := seedUser(t, ctx, st, "ada@sytue.eu")
+	user := seedUser(ctx, t, st, "ada@sytue.eu")
 	now := time.Now().UTC()
 
 	code := domain.AuthCode{
@@ -360,7 +358,7 @@ func TestAuthCodeOneShot(t *testing.T) {
 // (chain) para cortar el replay (RFC 6819 / OAuth security BCP).
 func TestRefreshTokenRotationAndReuse(t *testing.T) {
 	st, ctx := newStore(t)
-	user := seedUser(t, ctx, st, "ada@sytue.eu")
+	user := seedUser(ctx, t, st, "ada@sytue.eu")
 	now := time.Now().UTC()
 
 	rt1 := domain.RefreshToken{
@@ -496,7 +494,6 @@ func TestSigningKeysAndTokenAudience(t *testing.T) {
 	if _, err := oidc.Verify(raw, testIssuer, resourceAud, set2); err != nil {
 		t.Fatalf("Verify(token pre-rotación tras rotar): %v", err)
 	}
-	_ = jwt.Token(tok)
 }
 
 // TestSessionAndAuditPersistence cubre la persistencia de sesión SSO (por hash),
@@ -504,7 +501,7 @@ func TestSigningKeysAndTokenAudience(t *testing.T) {
 func TestSessionAndAuditPersistence(t *testing.T) {
 	st, ctx := newStore(t)
 	org, _ := st.CreateOrg(ctx, nil, domain.Organization{Slug: "acme", Name: "Acme"})
-	user := seedUser(t, ctx, st, "ada@sytue.eu")
+	user := seedUser(ctx, t, st, "ada@sytue.eu")
 	now := time.Now().UTC()
 
 	sid, err := st.InsertSession(ctx, nil, domain.Session{
@@ -557,8 +554,8 @@ func TestSessionAndAuditPersistence(t *testing.T) {
 // (encadenan RevokeRefreshTokensForSession).
 func TestSessionDevicesListAndRevoke(t *testing.T) {
 	st, ctx := newStore(t)
-	ada := seedUser(t, ctx, st, "ada@sytue.eu")
-	eve := seedUser(t, ctx, st, "eve@sytue.eu")
+	ada := seedUser(ctx, t, st, "ada@sytue.eu")
+	eve := seedUser(ctx, t, st, "eve@sytue.eu")
 	now := time.Now().UTC()
 
 	mkSession := func(tok, userID string, at time.Time) string {
@@ -674,5 +671,100 @@ func TestSessionDevicesListAndRevoke(t *testing.T) {
 	list, err = st.ListSessionsForUser(ctx, ada.ID, hashOf("ada-actual"))
 	if err != nil || len(list) != 1 || !list[0].Current {
 		t.Fatalf("listado tras revocar = (%d, %v)", len(list), err)
+	}
+}
+
+// TestListOrgUsersPageFiltros cubre el filtro de estado del directorio: que
+// recorra TODA la organización y no la primera página (la persona buscada es la
+// más antigua), que se combine con `q` y con el cursor, que no cruce a otra
+// organización y que un filtro desconocido sea un error y no la lista entera.
+func TestListOrgUsersPageFiltros(t *testing.T) {
+	st, ctx := newStore(t)
+
+	org, _ := st.CreateOrg(ctx, nil, domain.Organization{Slug: "acme", Name: "Acme"})
+	otra, _ := st.CreateOrg(ctx, nil, domain.Organization{Slug: "otra", Name: "Otra"})
+	base := time.Date(2026, 7, 1, 10, 0, 0, 0, time.UTC)
+	mk := func(email string, at time.Time, o domain.Organization, set string) domain.User {
+		t.Helper()
+		u := seedUser(ctx, t, st, email)
+		if _, err := st.DB().Exec(ctx,
+			`UPDATE users SET created_at=$2, mfa_enabled=true WHERE id=$1`, u.ID, at); err != nil {
+			t.Fatalf("fijar fila(%s): %v", email, err)
+		}
+		// Las variaciones van aparte: en el mismo SET, `mfa_enabled` dos veces es un error.
+		if set != "" {
+			if _, err := st.DB().Exec(ctx, `UPDATE users SET `+set[2:]+` WHERE id=$1`, u.ID); err != nil {
+				t.Fatalf("variar fila(%s): %v", email, err)
+			}
+		}
+		if err := st.UpsertMembership(ctx, nil, domain.Membership{OrgID: o.ID, UserID: u.ID, Role: domain.RoleMember}); err != nil {
+			t.Fatalf("UpsertMembership(%s): %v", email, err)
+		}
+		return u
+	}
+	// Las tres a buscar son las MÁS ANTIGUAS; detrás, treinta en regla.
+	sinMFA := mk("sinmfa@acme.eu", base, org, `, mfa_enabled=false`)
+	suspendida := mk("fuera@acme.eu", base.Add(time.Second), org, `, status='suspended', mfa_enabled=false`)
+	sinVerificar := mk("sinverificar@acme.eu", base.Add(2*time.Second), org, `, email_verified=false`)
+	otraSinMFA := mk("otra.sinmfa@acme.eu", base.Add(3*time.Second), org, `, mfa_enabled=false`)
+	for i := range 30 {
+		mk(fmt.Sprintf("enregla%02d@acme.eu", i), base.Add(time.Duration(i+1)*time.Minute), org, "")
+	}
+	mk("ajena@otra.eu", base.Add(time.Hour), otra, `, mfa_enabled=false, status='suspended', email_verified=false`)
+
+	ids := func(us []store.OrgUser) []string {
+		out := make([]string, 0, len(us))
+		for _, u := range us {
+			out = append(out, u.ID)
+		}
+		return out
+	}
+	casos := []struct {
+		filtro store.FiltroUsuarios
+		quiero []string // en el orden del listado: created_at DESC
+	}{
+		// La suspendida no tiene MFA, pero no cuenta: ya no entra.
+		{store.FiltroSinMFA, []string{otraSinMFA.ID, sinMFA.ID}},
+		{store.FiltroSuspendidos, []string{suspendida.ID}},
+		{store.FiltroSinVerificar, []string{sinVerificar.ID}},
+	}
+	for _, c := range casos {
+		got, more, err := st.ListOrgUsersPage(ctx, org.ID, "", c.filtro, nil, 10)
+		if err != nil {
+			t.Fatalf("filtro=%s: %v", c.filtro, err)
+		}
+		if more || fmt.Sprint(ids(got)) != fmt.Sprint(c.quiero) {
+			t.Errorf("filtro=%s = %v (more=%v), quiero %v", c.filtro, ids(got), more, c.quiero)
+		}
+	}
+
+	// Con `q` a la vez: los dos predicados se suman, no se pisan.
+	got, _, err := st.ListOrgUsersPage(ctx, org.ID, "otra.sin", store.FiltroSinMFA, nil, 10)
+	if err != nil || fmt.Sprint(ids(got)) != fmt.Sprint([]string{otraSinMFA.ID}) {
+		t.Errorf("filtro+q = %v (%v), quiero solo %s", ids(got), err, otraSinMFA.ID)
+	}
+
+	// Con el cursor: la segunda página sigue filtrada.
+	p1, more, err := st.ListOrgUsersPage(ctx, org.ID, "", store.FiltroSinMFA, nil, 1)
+	if err != nil || !more || len(p1) != 1 {
+		t.Fatalf("página 1 filtrada = (%d, more=%v, %v)", len(p1), more, err)
+	}
+	p2, more, err := st.ListOrgUsersPage(ctx, org.ID, "", store.FiltroSinMFA,
+		&store.UserCursor{CreatedAt: p1[0].CreatedAt, ID: p1[0].ID}, 1)
+	if err != nil || more || len(p2) != 1 || p2[0].ID != sinMFA.ID {
+		t.Errorf("página 2 filtrada = %v (more=%v, %v), quiero solo %s", ids(p2), more, err, sinMFA.ID)
+	}
+
+	// Los recuentos de la portada cuentan con el mismo predicado.
+	in, err := st.OrgInsightsFor(ctx, org.ID, time.Now())
+	if err != nil {
+		t.Fatalf("OrgInsightsFor: %v", err)
+	}
+	if in.SinMFA != 2 || in.Suspendidos != 1 || in.SinVerificar != 1 {
+		t.Errorf("recuentos = %+v, quiero 2 sin MFA, 1 suspendida y 1 sin verificar", in)
+	}
+
+	if _, _, err := st.ListOrgUsersPage(ctx, org.ID, "", "todos", nil, 10); !errors.Is(err, domain.ErrInvalidInput) {
+		t.Errorf("filtro desconocido: err=%v, quiero ErrInvalidInput", err)
 	}
 }

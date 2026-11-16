@@ -175,15 +175,22 @@
   margin-inline: -0.5rem;
   margin-bottom: -0.5rem;
   border-radius: var(--radius-sm);
-  background: rgba(244, 246, 250, 0.96);
-  color: #202833;
+  /* La etiqueta va sobre la foto: necesita un fondo casi opaco en TODOS los temas.
+     `--sytue-surface` no vale, porque en el traslúcido es un velo del 66 % y la foto
+     se transparentaría bajo el nombre; `surface-raised` es opaca en claro, grafito
+     y traslúcido, y conmuta a oscuro con su tinta. */
+  background: color-mix(in srgb, var(--sytue-surface-raised) 96%, transparent);
+  color: var(--sytue-text);
 }
 .erp-tpv-product-with-image .erp-tpv-product-name {
   margin-block: 0 0.5rem;
 }
 .erp-tpv-product-with-image .erp-tpv-product-code {
-  background: #f4f6fa;
-  color: #485465;
+  /* El código va FUERA de la etiqueta, directamente sobre la foto: `bg-subtle` es un
+     velo del 26 % en el traslúcido y la foto se vería bajo la tinta apagada. Lleva la
+     misma superficie opaca que la etiqueta. */
+  background: color-mix(in srgb, var(--sytue-surface-raised) 96%, transparent);
+  color: var(--sytue-text-muted);
 }
 .erp-tpv-product-image-action {
   position: absolute;

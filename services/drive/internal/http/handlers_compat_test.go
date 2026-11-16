@@ -608,11 +608,11 @@ func (s *isolatedSvc) ListSubfolders(ctx context.Context, id uuid.UUID) ([]domai
 	return s.fakeSvc.ListSubfolders(ctx, id)
 }
 
-func (s *isolatedSvc) ListFilesPage(ctx context.Context, id uuid.UUID, cursor string, limit int) (service.FilePage, error) {
+func (s *isolatedSvc) ListFilesPage(ctx context.Context, id uuid.UUID, orden store.OrdenFicheros, cursor string, limit int) (service.FilePage, error) {
 	if !s.owns(ctx) {
 		return service.FilePage{}, nil
 	}
-	return s.fakeSvc.ListFilesPage(ctx, id, cursor, limit)
+	return s.fakeSvc.ListFilesPage(ctx, id, orden, cursor, limit)
 }
 
 func (s *isolatedSvc) Recent(ctx context.Context, cursor string, limit int) (service.RecentPage, error) {

@@ -53,7 +53,7 @@ const diaAntiguo = "2024-03-05"
 // backdate mueve un mensaje en el tiempo: la BD pone now() al insertar y no hay API
 // para elegir created_at, así que el test de fechas lo ajusta por SQL directo (dentro
 // de una tx con app.tenant fijado, o RLS lo rechazaría).
-func backdate(t *testing.T, ctx context.Context, h *pgtest.Harness, id uuid.UUID, day string) {
+func backdate(ctx context.Context, t *testing.T, h *pgtest.Harness, id uuid.UUID, day string) {
 	t.Helper()
 	at, err := time.Parse("2006-01-02", day)
 	if err != nil {
@@ -72,7 +72,7 @@ func TestSearchEngine(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
 
-	tm, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	tm, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 	// bob es miembro del team: ve el canal público, NO el privado de carol.
 	for _, sub := range []string{"bob", "carol"} {
 		if err := st.AddTeamMember(ctx, tm.ID, "alice", sub, sub, domain.RoleMember); err != nil {
@@ -99,7 +99,7 @@ func TestSearchEngine(t *testing.T) {
 	post(ch.ID, "alice", bAdjunto, domain.Attachment{FileID: uuid.New(), Name: "contrato.pdf"})
 	guardado := post(ch.ID, "alice", bGuardado)
 	fijado := post(ch.ID, "alice", bFijado)
-	backdate(t, ctx, h, post(ch.ID, "alice", bAntiguo).ID, diaAntiguo)
+	backdate(ctx, t, h, post(ch.ID, "alice", bAntiguo).ID, diaAntiguo)
 
 	// Guardado por BOB (los guardados son por-usuario) y fijado en el canal.
 	if err := st.SaveMessage(ctx, guardado.ID, "bob"); err != nil {

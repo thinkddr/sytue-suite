@@ -69,6 +69,7 @@ import { mentionsWholeChannel } from '../lib/mentions.js';
 import { abreEdicionUltimo } from '../lib/editarUltimo.js';
 import { aplicarFormato, marcaDeAtajo, type MarcaFormato } from '../lib/formato.js';
 import { formatSchedule, schedulePresets, toLocalValue } from '../lib/schedule.js';
+import { disponibleConCifrado } from '../lib/cifrado.js';
 import {
   parseCommand,
   commandAutocompleteQuery,
@@ -124,6 +125,12 @@ interface Props {
    * `advanced` no aparecen ni el botón «!» ni el reloj de programar.
    */
   advanced?: boolean;
+  /**
+   * La conversación va cifrada de extremo a extremo. Programar, encuesta, tarea y pedir
+   * acuse siguen A LA VISTA pero desactivados, con una línea que dice por qué
+   * (`lib/cifrado.ts`): el servicio no ve el mensaje y no puede guardarlos ni contarlos.
+   */
+  cifrado?: boolean;
   /**
    * Abre el modal de apps e integraciones (webhooks entrantes/salientes + bots) desde
    * el menú «+». El estado vive en el padre (ChatApp), que ya monta el modal. Ausente
@@ -247,7 +254,7 @@ const MARCAS_DE_BARRA: ReadonlyArray<readonly [MarcaFormato, IconName, MessageKe
 
 /** Entrada de un popover del composer (atajo de programación / fecha personalizada). */
 const POPOVER_ITEM =
-  'flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-sm text-text transition-colors duration-150 hover:bg-bg-subtle focus-visible:bg-bg-subtle focus-visible:outline-none';
+  'flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-sm text-text transition-colors duration-150 hover:bg-bg-subtle focus-visible:bg-bg-subtle focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50';
 
 /** Fila de opción con control nativo dentro de un popover (radio / casilla). */
 const POPOVER_OPTION =
@@ -255,6 +262,10 @@ const POPOVER_OPTION =
 
 /** Rótulo de sección dentro de un popover del composer. */
 const POPOVER_LABEL = 'mb-1 px-1.5 sytue-overline text-text-muted';
+
+/** La línea que explica por qué una opción está apagada (cifrado de extremo a extremo).
+ *  `w-0 min-w-full`: se reparte al ancho del panel sin ensancharlo. */
+const NOTA_NO_DISPONIBLE = 'sytue-meta w-0 min-w-full px-1.5 pt-0.5 pb-1';
 
 /** Límite de subida por fichero: el mismo que declara el BFF (`pages/api/upload.ts`),
  *  para avisar aquí en vez de gastar la subida entera y recibir un 413.
@@ -399,6 +410,7 @@ export function Composer({
   placeholder,
   ariaLabel,
   advanced = false,
+  cifrado = false,
   onSend,
   onCommand,
   remoteCommands,
@@ -487,6 +499,13 @@ export function Composer({
   // Base de ids de las opciones de envío (grupo de radios de prioridad y control de
   // fecha): única por instancia — canal e hilo conviven y no deben compartir grupo.
   const optsId = useId();
+  // Lo que el cifrado deja hacer (`lib/cifrado.ts`), y el id de la línea que explica lo
+  // que no: los mandos apagados la citan en `aria-describedby`.
+  const puedeProgramar = disponibleConCifrado('programar', cifrado);
+  const puedeEncuesta = disponibleConCifrado('encuesta', cifrado);
+  const puedeTarea = disponibleConCifrado('tarea', cifrado);
+  const puedePedirAcuse = disponibleConCifrado('pedirAcuse', cifrado);
+  const notaCifradoId = useId();
 
   function notifyTyping(text: string): void {
     if (!onTyping || networkDisabled || !text.trim()) return;
@@ -710,9 +729,9 @@ export function Composer({
     if (advanced) {
       opts = {
         ...(priority !== 'normal' ? { priority } : {}),
-        ...(requiresAck ? { requiresAck: true } : {}),
+        ...(requiresAck && puedePedirAcuse ? { requiresAck: true } : {}),
         // datetime-local es hora LOCAL; new Date lo interpreta como tal → ISO en UTC.
-        ...(scheduleAt ? { sendAt: new Date(scheduleAt).toISOString() } : {}),
+        ...(scheduleAt && puedeProgramar ? { sendAt: new Date(scheduleAt).toISOString() } : {}),
       };
       if (Object.keys(opts).length === 0) opts = undefined;
     }
@@ -1198,6 +1217,8 @@ export function Composer({
                       <MenuItem
                         size="sm"
                         icon={<Icon name="chart" size={16} />}
+                        disabled={!puedeEncuesta}
+                        {...(puedeEncuesta ? {} : { 'aria-describedby': `${notaCifradoId}-mas` })}
                         onClick={() => {
                           close();
                           setCardKind('poll');
@@ -1208,6 +1229,8 @@ export function Composer({
                       <MenuItem
                         size="sm"
                         icon={<Icon name="check" size={16} />}
+                        disabled={!puedeTarea}
+                        {...(puedeTarea ? {} : { 'aria-describedby': `${notaCifradoId}-mas` })}
                         onClick={() => {
                           close();
                           setCardKind('task');
@@ -1215,6 +1238,13 @@ export function Composer({
                       >
                         {t('card.newTask')}
                       </MenuItem>
+                      {/* Apagadas y no escondidas: así se sabe que existen y por qué no
+                        se pueden usar aquí. */}
+                      {puedeEncuesta && puedeTarea ? null : (
+                        <p id={`${notaCifradoId}-mas`} class={NOTA_NO_DISPONIBLE}>
+                          {t('matrix.notYetEncrypted')}
+                        </p>
+                      )}
                     </>
                   ) : null}
                   <MenuItem
@@ -1342,14 +1372,26 @@ export function Composer({
 
                   <div class="bg-border-subtle my-1.5 h-px" role="separator" />
 
-                  <label class={POPOVER_OPTION}>
+                  <label
+                    class={cx(
+                      POPOVER_OPTION,
+                      !puedePedirAcuse && 'cursor-default opacity-50 hover:bg-transparent',
+                    )}
+                  >
                     <Checkbox
-                      checked={requiresAck}
+                      checked={requiresAck && puedePedirAcuse}
+                      disabled={!puedePedirAcuse}
+                      {...(puedePedirAcuse ? {} : { 'aria-describedby': `${notaCifradoId}-acuse` })}
                       onChange={(e) => setRequiresAck(e.currentTarget.checked)}
                       class="accent-primary h-4 w-4 shrink-0"
                     />
                     {t('composer.requestAckLong')}
                   </label>
+                  {puedePedirAcuse ? null : (
+                    <p id={`${notaCifradoId}-acuse`} class={NOTA_NO_DISPONIBLE}>
+                      {t('matrix.notYetEncrypted')}
+                    </p>
+                  )}
                 </div>
               </Popover>
             ) : null}
@@ -1382,12 +1424,23 @@ export function Composer({
                 {(close) => (
                   <div class="w-60">
                     <p class={POPOVER_LABEL}>{t('composer.sendLater')}</p>
+                    {/* Programar lo guarda el servicio, que con cifrado no ve el texto:
+                      los atajos se quedan a la vista, apagados, bajo el porqué. */}
+                    {puedeProgramar ? null : (
+                      <p id={`${notaCifradoId}-programar`} class={NOTA_NO_DISPONIBLE}>
+                        {t('matrix.notYetEncrypted')}
+                      </p>
+                    )}
                     {/* Atajos RELATIVOS calculados en cliente: nada de calendario del
                       sistema mientras no se pida expresamente. */}
                     {schedulePresets().map((p) => (
                       <button
                         key={p.value}
                         type="button"
+                        disabled={!puedeProgramar}
+                        {...(puedeProgramar
+                          ? {}
+                          : { 'aria-describedby': `${notaCifradoId}-programar` })}
                         onClick={() => {
                           setScheduleAt(p.value);
                           setCustomDate(false);
@@ -1426,6 +1479,10 @@ export function Composer({
                     ) : (
                       <button
                         type="button"
+                        disabled={!puedeProgramar}
+                        {...(puedeProgramar
+                          ? {}
+                          : { 'aria-describedby': `${notaCifradoId}-programar` })}
                         onClick={() => {
                           setMinFecha(toLocalValue(Date.now()));
                           setCustomDate(true);

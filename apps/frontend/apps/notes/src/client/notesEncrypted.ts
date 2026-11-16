@@ -82,6 +82,10 @@ export async function cifrarContenidoNota(
   content: string,
   original?: ClaroDeNota,
 ): Promise<NoteInput> {
+  // A v2 write cannot safely carry a v3 link envelope: older writers can erase
+  // it and the server's v3 migration/CAS contract is not available yet.
+  if (original?.links_json !== undefined || (base.links?.length ?? 0) > 0)
+    throw new Error('notes: encrypted links require v3');
   const privateData = datosPrivados(base.data);
   let claro: ClaroDeNota = { title, content, data: privateData };
   if (original?.data_json !== undefined) {
@@ -133,6 +137,8 @@ export async function migrarNotasCifradas(
   for (const n of lista) {
     if (!io.current()) return;
     const { claro, migrar } = await abrirContenidoNota(key, n, false);
+    if (claro.links_json !== undefined || (n.links?.length ?? 0) > 0)
+      throw new Error('notes: encrypted links require v3');
     if (!migrar) continue;
     let inCipher: NoteInput;
     if (n.data_json !== undefined) {
@@ -172,6 +178,7 @@ export async function migrarNotasCifradas(
         { data: claro.data ?? {} },
         claro.title,
         claro.content,
+        claro,
       );
     }
     if (!io.current()) return;

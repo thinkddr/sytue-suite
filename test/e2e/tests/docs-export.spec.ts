@@ -10,7 +10,7 @@
 // Test 2 (contenido): el fichero incluye el texto escrito. Está marcado
 // test.fixme porque DEPENDE DE UN REBUILD del servicio Go `docs`: el exportador
 // leía el modelo RGA/celdas en vez del registro doc:html del editor y salía
-// vacío; el arreglo está en services/docs/internal/domain/export.go (go build +
+// vacío; el arreglo está en apps/nucleo/office/model/export.go (go build +
 // go test verdes) pero el contenedor en marcha aún corre el binario viejo.
 import { readFileSync, statSync } from 'node:fs';
 import { expect, test, type APIRequestContext } from '@playwright/test';
@@ -34,7 +34,12 @@ const CASOS = [
   { item: /^HTML$/, ext: 'html', mime: 'text/html', zip: false },
   { item: /^Markdown$/, ext: 'md', mime: 'text/markdown', zip: false },
   { item: /^ODF/, ext: 'odt', mime: 'application/vnd.oasis.opendocument.text', zip: true },
-  { item: /^OOXML/, ext: 'docx', mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', zip: true },
+  {
+    item: /^OOXML/,
+    ext: 'docx',
+    mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    zip: true,
+  },
 ] as const;
 
 test.describe('Sytue Docs — exportar/descargar', () => {
@@ -56,7 +61,9 @@ test.describe('Sytue Docs — exportar/descargar', () => {
       await expect(trigger).toBeEnabled();
       await trigger.click();
 
-      const item = page.getByRole('menu', { name: 'Descargar' }).getByRole('menuitem', { name: caso.item });
+      const item = page
+        .getByRole('menu', { name: 'Descargar' })
+        .getByRole('menuitem', { name: caso.item });
       const [download, resp] = await Promise.all([
         page.waitForEvent('download'),
         page.waitForResponse(
@@ -69,7 +76,9 @@ test.describe('Sytue Docs — exportar/descargar', () => {
       // El BFF hace de proxy del blob con Content-Disposition attachment + MIME real.
       expect(resp.status(), `${caso.ext}: status`).toBe(200);
       const headers = resp.headers();
-      expect(headers['content-disposition'] ?? '', `${caso.ext}: disposition`).toContain('attachment');
+      expect(headers['content-disposition'] ?? '', `${caso.ext}: disposition`).toContain(
+        'attachment',
+      );
       expect(headers['content-type'] ?? '', `${caso.ext}: content-type`).toContain(caso.mime);
 
       // El navegador baja el fichero con el nombre y la extensión correctos…
@@ -82,7 +91,9 @@ test.describe('Sytue Docs — exportar/descargar', () => {
       const buf = readFileSync(ruta);
       expect(statSync(ruta).size, `${caso.ext}: fichero vacío`).toBeGreaterThan(0);
       if (caso.zip) {
-        expect(buf.subarray(0, 2).toString('latin1'), `${caso.ext}: no es un ZIP válido`).toBe('PK');
+        expect(buf.subarray(0, 2).toString('latin1'), `${caso.ext}: no es un ZIP válido`).toBe(
+          'PK',
+        );
       } else {
         expect(buf.toString('utf8').toLowerCase(), `${caso.ext}: no parece del formato`).toContain(
           caso.ext === 'html' ? '<!doctype html>' : '#',
@@ -128,7 +139,10 @@ test.describe('Sytue Docs — exportar/descargar', () => {
     await page.getByRole('button', { name: 'Descargar' }).click();
     const [download] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByRole('menu', { name: 'Descargar' }).getByRole('menuitem', { name: /^HTML$/ }).click(),
+      page
+        .getByRole('menu', { name: 'Descargar' })
+        .getByRole('menuitem', { name: /^HTML$/ })
+        .click(),
     ]);
     const ruta = await download.path();
     expect(readFileSync(ruta, 'utf8')).toContain(MARCA);

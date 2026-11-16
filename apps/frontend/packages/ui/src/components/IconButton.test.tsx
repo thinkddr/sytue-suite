@@ -64,8 +64,8 @@ test('la talla mínima es 24 px, el suelo de WCAG 2.5.8', () => {
       <svg />
     </IconButton>,
   );
-  // `h-6` son 21 px con la raíz a 14: lo que da los 24 es el suelo en px. Mirar
-  // `h-6` aquí dejaba pasar justo el fallo que el test decía vigilar.
+  // `h-6` son 1.5rem y bajan de 24 con una base de letra menor: lo que da los 24 es el
+  // suelo en px. Mirar `h-6` aquí dejaba pasar justo el fallo que el test decía vigilar.
   expect(host.querySelector('button')!.className).toContain('min-h-[24px]');
   expect(host.querySelector('button')!.className).toContain('min-w-[24px]');
   render(null, host);

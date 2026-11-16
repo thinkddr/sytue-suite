@@ -27,7 +27,7 @@
 // nadie los cruce por accidente —el mismo sitio donde el ERP declara su solo-lectura—:
 //
 //  1. **No hay criptografía en este paquete.** Ni una línea. Firmar un PDF lo hace el
-//     motor del servicio (`services/docs/internal/domain/pdfsign.go`) o la aplicación
+//     motor del servicio (`apps/nucleo/pdf/pdfsign.go`) o la aplicación
 //     OFICIAL del país de quien firma ([HerramientasNacionales]). Esta vista enseña lo
 //     que la firma DECLARA y si cubre el fichero entero; eso no es verificarla, y la
 //     pantalla lo dice con esas palabras (`pdf.signatures.disclaimer`).

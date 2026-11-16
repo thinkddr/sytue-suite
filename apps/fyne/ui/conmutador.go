@@ -13,7 +13,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 )
 
-// El carril y el pomo de `Switch` en Form.tsx, en píxeles con el rem de 14.
+// El carril y el pomo de `Switch` en Form.tsx, en píxeles con el rem de 16.
 var (
 	// AnchoCarril es el `w-9` del carril.
 	AnchoCarril = tema.Espacio(9)

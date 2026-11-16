@@ -11,25 +11,16 @@
  * WS:         /api/v1/ws  (ws://)
  */
 import { HttpClient, type AuthProvider } from '../core/http.js';
-import { isCipherStorageProduct, type CipherStorageProduct } from '../drive/index.js';
 
-/** Server-authenticated mapping. No message keys or Matrix credentials cross the BFF. */
-export interface MatrixBootstrapMetadata {
-  actor: string;
-  tenant: string;
-  homeserver_url: string;
-  sso_provider_id: string;
-  matrix_user_id: string;
-  controller_user_id?: string;
-  channels: { channel_id: string; matrix_room_id: string }[];
-  encryption: 'm.megolm.v1.aes-sha2';
-  draft_room_id?: string;
-  draft_room_ids?: string[];
-  storage_product?: CipherStorageProduct;
-  storage_room_id?: string;
-  storage_room_ids?: string[];
-  source_url?: string;
-}
+import { createStorageRootService } from './storage-authority.js';
+import { isStorageProduct } from '@sytue/config/matrix';
+import type {
+  MatrixBootstrapMetadata,
+  MatrixStorageProduct,
+  MatrixStorageScope,
+  StorageRootService,
+} from '@sytue/config/matrix';
+export type { MatrixBootstrapMetadata } from '@sytue/config/matrix';
 
 export interface ChatOptions {
   /** URL base, p.ej. https://rooms.sytue.eu */
@@ -55,6 +46,39 @@ export interface FreeGifPage {
 }
 
 export type ChannelType = 'public' | 'private' | 'direct' | 'group';
+
+/** Matrix account of a wrapped recovery key (ADR 0082); omitted is the Rooms account. */
+export type MatrixRecoveryAccount = { product?: string; identity_version?: 1 | 2 };
+export type MatrixRecoveryWrapperKDF =
+  | { alg: 'argon2id'; m: number; t: number; p: number; salt: string }
+  | { alg: 'webauthn-prf-hkdf-sha256'; prf_salt: string };
+/** Opaque to the service: format in docs/architecture.md, vectors in apps/nucleo/recoverywrap/testdata. */
+export type MatrixRecoveryWrapper = {
+  id?: string;
+  v: 1;
+  kind: 'password' | 'passkey';
+  key_id: string;
+  credential_id: string;
+  kdf: MatrixRecoveryWrapperKDF;
+  nonce: string;
+  ciphertext: string;
+  created_at?: string;
+};
+
+function recoveryAccountQuery(
+  account: MatrixRecoveryAccount | undefined,
+): Record<string, string | number> | Error {
+  if (!account?.product) {
+    return account?.identity_version === undefined
+      ? {}
+      : new RangeError('A storage identity version needs a product');
+  }
+  if (!isStorageProduct(account.product)) return new RangeError('Invalid storage product');
+  const v = account.identity_version;
+  if (v !== undefined && v !== 1 && v !== 2)
+    return new RangeError('Invalid storage identity version');
+  return { product: account.product, ...(v !== undefined ? { identity_version: v } : {}) };
+}
 
 export interface Channel {
   id: string;
@@ -152,28 +176,48 @@ export class ChatClient {
     });
   }
 
+  /** Bound once to the host's captured owner/product; no token or recovery material. */
+  storageRootAuthority(scope: MatrixStorageScope): StorageRootService {
+    return createStorageRootService(
+      this.http,
+      scope,
+      '/matrix/storage/' + scope.product + '/authority',
+    );
+  }
+
   /** Authenticated Matrix identity and channel mappings; never returns credentials. */
   matrixBootstrap(signal?: AbortSignal): Promise<MatrixBootstrapMetadata> {
     return this.http.json({ path: '/matrix/bootstrap', ...(signal ? { signal } : {}) });
   }
 
-  /** Per-product private Matrix storage room bindings; never returns credentials or keys. */
+  /** Private product rooms; the product is fixed by the host app, never a free return URL. */
   matrixStorageBootstrap(
-    product: CipherStorageProduct,
+    product: MatrixStorageProduct,
     signal?: AbortSignal,
+    identityVersion?: 1 | 2,
   ): Promise<MatrixBootstrapMetadata> {
-    if (!isCipherStorageProduct(product)) {
+    if (identityVersion !== undefined && identityVersion !== 1 && identityVersion !== 2) {
+      return Promise.reject(new RangeError('Invalid storage identity version'));
+    }
+    if (!isStorageProduct(product)) {
       return Promise.reject(new RangeError('Invalid storage product'));
     }
     return this.http.json({
       path: '/matrix/storage/bootstrap',
-      query: { product },
+      query: {
+        product,
+        ...(identityVersion !== undefined ? { identity_version: identityVersion } : {}),
+      },
       maxResponseBytes: 65536,
       ...(signal ? { signal } : {}),
     });
   }
 
-  /** Recovery key held for the signed-in person (ADR 0081); 404 when there is none yet. */
+  /**
+   * Legacy KEK copy of the Rooms account's recovery key (ADR 0081). Transition only
+   * (ADR 0082): read once, wrap on the device, then putMatrixRecoveryWrapper deletes it.
+   * 404 when there is none.
+   */
   matrixRecoveryKey(signal?: AbortSignal): Promise<{ recovery_key: string }> {
     return this.http.json({
       path: '/matrix/recovery-key',
@@ -182,16 +226,70 @@ export class ChatClient {
     });
   }
 
-  /** Stores or replaces the signed-in person's recovery key (ADR 0081). */
+  /**
+   * Retired by ADR 0082: the service answers 410 (`recovery_key_escrow_retired`).
+   * @deprecated Wrap the key on the device and use putMatrixRecoveryWrapper.
+   */
   storeMatrixRecoveryKey(recoveryKey: string): Promise<void> {
     return this.http.postJson('/matrix/recovery-key', { recovery_key: recoveryKey });
+  }
+
+  /**
+   * Device-wrapped recovery keys of one Matrix account (ADR 0082). No account is the
+   * Rooms account; `{ product, identity_version: 2 }` is that product's isolated
+   * storage account in the request's organization. `legacy_escrow` is true only for
+   * the Rooms account while its ADR 0081 KEK copy still exists.
+   */
+  matrixRecoveryWrappers(
+    account?: MatrixRecoveryAccount,
+    signal?: AbortSignal,
+  ): Promise<{ wrappers: MatrixRecoveryWrapper[]; legacy_escrow: boolean }> {
+    const query = recoveryAccountQuery(account);
+    if (query instanceof Error) return Promise.reject(query);
+    return this.http.json({
+      path: '/matrix/recovery-wrappers',
+      query,
+      headers: { 'cache-control': 'no-store' },
+      maxResponseBytes: 65536,
+      ...(signal ? { signal } : {}),
+    });
+  }
+
+  /**
+   * Stores one wrapper made on this device (upsert per kind and passkey). The service
+   * drops the account's wrappers of any other key_id and, for Rooms, the KEK copy.
+   */
+  putMatrixRecoveryWrapper(
+    wrapper: MatrixRecoveryWrapper,
+    account?: MatrixRecoveryAccount,
+  ): Promise<{ id: string }> {
+    const query = recoveryAccountQuery(account);
+    if (query instanceof Error) return Promise.reject(query);
+    const body: Partial<MatrixRecoveryWrapper> = { ...wrapper };
+    delete body.id;
+    delete body.created_at;
+    return this.http.json({
+      method: 'PUT',
+      path: '/matrix/recovery-wrappers',
+      query,
+      body: JSON.stringify(body),
+      headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+    });
   }
 
   startMatrixNative(input: {
     code_challenge: string;
     code_challenge_method: 'S256';
     product?: string;
-  }): Promise<{ authorize_url: string; state: string; product?: string }> {
+    native_consumer?: string;
+    identity_version?: 1 | 2;
+  }): Promise<{
+    authorize_url: string;
+    state: string;
+    product?: string;
+    native_consumer?: string;
+    identity_version?: 1 | 2;
+  }> {
     return this.http.postJson('/matrix/native/start', input);
   }
   previewMatrixNative(state: string): Promise<{
@@ -200,22 +298,35 @@ export class ChatClient {
     actor: string;
     tenant: string;
     product?: string;
+    purpose?: string;
+    resource_approved?: boolean;
+    native_consumer?: string;
+    identity_version?: 1 | 2;
     homeserver_url?: string;
     sso_provider_id?: string;
   }> {
     return this.http.json({ path: '/matrix/native/preview', query: { state } });
   }
-  acceptMatrixNative(input: {
-    state: string;
-    login_token: string;
-  }): Promise<{ ticket: string; redirect_url: string; product?: string }> {
+  approveMatrixResourceNative(state: string): Promise<{ approved: boolean }> {
+    return this.http.postJson('/matrix/native/approve', { state });
+  }
+  acceptMatrixNative(input: { state: string; login_token: string }): Promise<{
+    ticket: string;
+    redirect_url: string;
+    product?: string;
+    native_consumer?: string;
+    identity_version?: 1 | 2;
+  }> {
     return this.http.postJson('/matrix/native/accept', input);
   }
   finishMatrixNative(input: {
     state: string;
     ticket: string;
     code_verifier: string;
-  }): Promise<{ login_token: string }> {
+    product?: string;
+    native_consumer?: string;
+    identity_version?: 1 | 2;
+  }): Promise<{ login_token: string; native_consumer?: string; identity_version?: 1 | 2 }> {
     return this.http.postJson('/matrix/native/finish', input);
   }
 

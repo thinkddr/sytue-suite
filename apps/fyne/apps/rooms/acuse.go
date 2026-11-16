@@ -142,6 +142,10 @@ func (f *FilaMensaje) montarAcuse() {
 	switch {
 	case m.Acusado:
 		f.acuse = append(f.acuse, NuevaPildora(t.T("ack.done", nil), "success-bg", "", "success-text", false))
+	case !DisponibleConCifrado(AccionConfirmarAcuse, f.Cifrado):
+		// El acuse lo suma el servicio, que no ve el mensaje cifrado: sin el botón, y
+		// diciendo por qué en vez de fallar al pulsarlo.
+		f.acuse = append(f.acuse, ui.NuevoRotulo(t.T("matrix.unsupported", nil), escalonMeta, ui.Normal, "text-subtle"))
 	case f.AlAcusar != nil:
 		f.acuse = append(f.acuse, ui.NuevoBoton(t.T("ack.confirm", nil), func() { f.AlAcusar(f.Mensaje) }).
 			Con(ui.Secundario, ui.TallaSM))

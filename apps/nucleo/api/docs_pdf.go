@@ -17,6 +17,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	localpdf "git.sytue.eu/sytue/one/apps/nucleo/pdf"
 )
 
 // PDF es el cliente de Sytue certiDocs, y habla con DOS servicios porque certiDocs no
@@ -231,6 +233,12 @@ func NombrePDF(crudo string) string {
 // Renombrar cambia el nombre de un PDF. La extensión se conserva: sin ella el fichero
 // desaparecería de la lista, que es por donde se le reconoce.
 func (p *PDF) Renombrar(ctx context.Context, id, nombre string) (File, error) {
+	if p.drive.data != nil {
+		if err := p.drive.Rename(ctx, DriveFile, id, NombrePDF(nombre)); err != nil {
+			return File{}, err
+		}
+		return p.drive.File(ctx, id)
+	}
 	cuerpo, err := json.Marshal(map[string]string{"name": NombrePDF(nombre)})
 	if err != nil {
 		return File{}, err
@@ -243,17 +251,40 @@ func (p *PDF) Renombrar(ctx context.Context, id, nombre string) (File, error) {
 
 // Eliminar manda el PDF a la papelera de Drive: se recupera desde allí.
 func (p *PDF) Eliminar(ctx context.Context, id string) error {
-	resp, err := p.drive.c.Do(ctx, Request{Method: http.MethodDelete, Path: "/files/" + url.PathEscape(id)})
-	if err != nil {
-		return err
-	}
-	return resp.Body.Close()
+	return p.drive.Delete(ctx, DriveFile, id)
 }
 
 // Descargar trae el PDF a memoria, que es donde el motor lo necesita: cada operación lo
 // vuelve a mandar entero. Uno mayor que el tope del motor no se llega a bajar entero.
 func (p *PDF) Descargar(ctx context.Context, id string) ([]byte, error) {
 	cuerpo, err := p.drive.Download(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cuerpo.Close() }()
+	datos, err := io.ReadAll(io.LimitReader(cuerpo, PDFMaxBytes+1))
+	if err == nil && len(datos) > PDFMaxBytes {
+		err = ErrPDFGrande
+	}
+	return datos, err
+}
+
+// Versiones es una página del historial del PDF en Drive, la actual primero, y el cursor
+// de la siguiente ("" si no hay más). Cada cambio que se guarda deja el estado anterior
+// como versión: es el «deshacer» que el visor no tiene.
+func (p *PDF) Versiones(ctx context.Context, id, cursor string) ([]DriveVersion, string, error) {
+	return p.drive.Versions(ctx, id, cursor)
+}
+
+// RestaurarVersion hace actual una versión archivada del PDF. No se pierde nada: lo que
+// había pasa a ser una versión más. Quien solo puede ver el fichero recibe un 403.
+func (p *PDF) RestaurarVersion(ctx context.Context, id string, n int) error {
+	return p.drive.RestoreVersion(ctx, id, n)
+}
+
+// DescargarVersion trae a memoria una versión ARCHIVADA, con el mismo tope que Descargar.
+func (p *PDF) DescargarVersion(ctx context.Context, id string, n int) ([]byte, error) {
+	cuerpo, err := p.drive.DownloadVersion(ctx, id, n)
 	if err != nil {
 		return nil, err
 	}
@@ -341,7 +372,7 @@ type PDFPermisos struct {
 
 // PDFContenido es todo lo que se sabe del documento, de una sola llamada.
 type PDFContenido struct {
-	// Paginas se corta en las 500 primeras (`maxPaginasIndexadas`); Total no.
+	// Paginas contiene la lista completa; los extractos tienen un presupuesto acotado.
 	Paginas     []PDFPagina    `json:"paginas"`
 	Total       int            `json:"total"`
 	Indice      []PDFMarcador  `json:"indice"`
@@ -356,16 +387,14 @@ type PDFContenido struct {
 
 // PDFFragmento es un trozo de texto con su sitio, en coordenadas del PDF (origen abajo a
 // la izquierda).
-type PDFFragmento struct {
-	Texto  string  `json:"texto"`
-	X      float64 `json:"x"`
-	Y      float64 `json:"y"`
-	Tamano float64 `json:"tamano"`
-}
+type PDFFragmento = localpdf.TextSpan
 
 // Contenido lee el documento: páginas, índice, adjuntos, comentarios, campos, firmas,
 // permisos y metadatos. `clave` es la contraseña de apertura, o "".
 func (p *PDF) Contenido(ctx context.Context, doc PDFFichero, clave string) (PDFContenido, error) {
+	if p.drive.data != nil {
+		return p.localContent(ctx, doc, clave)
+	}
 	r, err := formularioPDF("/pdf/content", map[string]string{"clave": clave}, doc)
 	if err != nil {
 		return PDFContenido{}, err
@@ -376,6 +405,18 @@ func (p *PDF) Contenido(ctx context.Context, doc PDFFichero, clave string) (PDFC
 // Texto devuelve el texto de cada página, que es lo que alimenta la lectura y la búsqueda.
 // Una página sin texto —un escaneo— viene vacía.
 func (p *PDF) Texto(ctx context.Context, doc PDFFichero, clave string) ([][]PDFFragmento, error) {
+	if p.drive.data != nil {
+		response, err := p.localView(ctx, "/pdf/text", map[string]string{"clave": clave}, doc)
+		if err != nil {
+			return nil, err
+		}
+		defer clear(response.Datos)
+		var out struct {
+			Paginas [][]PDFFragmento `json:"paginas"`
+		}
+		err = json.Unmarshal(response.Datos, &out)
+		return out.Paginas, err
+	}
 	r, err := formularioPDF("/pdf/text", map[string]string{"clave": clave}, doc)
 	if err != nil {
 		return nil, err
@@ -389,6 +430,10 @@ func (p *PDF) Texto(ctx context.Context, doc PDFFichero, clave string) ([][]PDFF
 // Render devuelve UNA página dibujada en SVG, con las fuentes del documento dentro: está
 // pensada para que la pinte un navegador. `escala` 1 son 72 ppp; el `viewBox` va en puntos.
 func (p *PDF) Render(ctx context.Context, doc PDFFichero, pagina int, escala float64, clave string) (string, error) {
+	if p.drive.data != nil {
+		response, err := p.localView(ctx, "/pdf/render", map[string]string{"pagina": strconv.Itoa(pagina), "escala": strconv.FormatFloat(escala, 'f', -1, 64), "clave": clave}, doc)
+		return string(response.Datos), err
+	}
 	r, err := formularioPDF("/pdf/render", map[string]string{
 		"pagina": strconv.Itoa(pagina), "escala": strconv.FormatFloat(escala, 'f', -1, 64), "clave": clave,
 	}, doc)
@@ -417,6 +462,9 @@ const (
 // nada. `paginas` es la lista 1-based que ve la persona («1,3,5-8»), en el ORDEN dado;
 // `grados` solo cuenta al rotar; PDFCombinar une `docs` tal y como llegan.
 func (p *PDF) Paginas(ctx context.Context, operacion, paginas string, grados int, clave string, docs ...PDFFichero) ([]byte, error) {
+	if p.drive.data != nil {
+		return p.localPages(ctx, operacion, paginas, grados, clave, docs...)
+	}
 	campos := map[string]string{"op": operacion, "paginas": paginas, "clave": clave}
 	if operacion == PDFRotar {
 		campos["grados"] = strconv.Itoa(grados)

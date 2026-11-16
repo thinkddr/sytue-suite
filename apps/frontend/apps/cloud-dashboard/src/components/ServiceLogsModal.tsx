@@ -14,7 +14,7 @@
  * Solo @sytue/ui. §14.
  */
 import { useState } from 'preact/hooks';
-import { Button, Modal, Icon, EmptyState, useToast } from '@sytue/ui';
+import { Button, Modal, EmptyState, useToast } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import type { ServiceLogLine } from '../lib/cloud.js';
 import { useT } from '../i18n/index.js';
@@ -85,7 +85,7 @@ export default function ServiceLogsModal({ serviceId, serviceName, locale }: Pro
           <p class="text-text-muted py-8 text-center text-base">{t('svclogs.loading')}</p>
         ) : lines.length === 0 ? (
           <EmptyState
-            illustration={<Icon name="audit" size={24} />}
+            icon="audit"
             title={t('svclogs.empty.title')}
             description={live ? t('svclogs.empty.desc') : t('svclogs.empty.demo')}
           />

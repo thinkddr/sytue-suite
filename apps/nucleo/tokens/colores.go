@@ -74,6 +74,9 @@ type pedido struct {
 	carril     bool
 	// papel es el cromo «papel» (`data-cromo='papel'`): lo elige la app, no la persona.
 	papel bool
+	// masContraste es el `prefers-contrast: more` de la web: lo pide la persona al
+	// sistema y lo pregunta quien monta la app (sistema.MasContraste).
+	masContraste bool
 }
 
 // Se resuelve una vez, al cargar el paquete. Si la hoja trae algo que no se sabe leer,
@@ -160,6 +163,24 @@ func ElegirCromo(nombre string) bool {
 	defer eleccion.Unlock()
 	eleccion.papel = nombre == CromoPapel
 	return ponerEnVigor()
+}
+
+// ElegirMasContraste aplica, o quita, el bloque `@media (prefers-contrast: more)` de las
+// hojas: todo borde pasa al contorno de control, el texto sutil al atenuado, el velo de
+// los diálogos tapa más y el traslúcido deja de ser velo. Lo dice quien monta la app con
+// lo que responde el sistema (sistema.MasContraste); devuelve si ha cambiado algo.
+func ElegirMasContraste(si bool) bool {
+	eleccion.Lock()
+	defer eleccion.Unlock()
+	eleccion.masContraste = si
+	return ponerEnVigor()
+}
+
+// EsMasContraste dice si está en vigor el bloque de «más contraste».
+func EsMasContraste() bool {
+	eleccion.Lock()
+	defer eleccion.Unlock()
+	return eleccion.masContraste
 }
 
 // EsPapel dice si el cromo en vigor es «papel». Lo pregunta lo que la hoja no pinta con
@@ -392,6 +413,9 @@ func parseCrudasDe(apertura string, p pedido, hojas ...string) ([variantes]map[s
 		decl, err := apilar(limpias, bloque, delColor, delApp)
 		if err == nil {
 			apilarForma(decl, limpias, p.carril, bloque == traslucidoElegido)
+			if p.masContraste {
+				apilarMasContraste(decl, limpias, p.carril, bloque == traslucidoElegido)
+			}
 			if p.papel {
 				apilarBloque(decl, limpias, cromoPapel)
 			}
@@ -459,6 +483,29 @@ const (
 // La puerta del cromo «papel». En la hoja pesa tres atributos para ganar al carril de cada
 // color en cualquier tema, y por eso aquí va la ÚLTIMA: después de la forma.
 const cromoPapel = ":root[data-cromo='papel']:is([data-theme], :not([data-theme])) {"
+
+// Las puertas de «más contraste» (`@media (prefers-contrast: more)`), al final de
+// colors.css y tras la forma en appearance.css. Pesan tres atributos, como el cromo
+// «papel», y van antes que él en la cascada: por eso aquí se apilan después de la forma y
+// antes del papel. El navegador las abre dentro de su `@media`; aquí, al pedirlas.
+const (
+	masContraste                = ":root:is([data-theme], :not([data-theme])):is([data-color], :not([data-color])) {"
+	masContrasteTraslucido      = ":root[data-theme='translucent']:is([data-color], :not([data-color])) {"
+	masContrasteMarcoTraslucido = ":root[data-theme='translucent']:not([data-forma='carril']) {"
+)
+
+// apilarMasContraste añade los bloques de «más contraste» que valen para la forma y el
+// tema: el común, y en el traslúcido los que lo vuelven opaco.
+func apilarMasContraste(decl map[string]string, hojas []string, carril, traslucido bool) {
+	apilarBloque(decl, hojas, masContraste)
+	if !traslucido {
+		return
+	}
+	apilarBloque(decl, hojas, masContrasteTraslucido)
+	if !carril {
+		apilarBloque(decl, hojas, masContrasteMarcoTraslucido)
+	}
+}
 
 // apilarBloque añade lo que declara un bloque que solo trae alguna de las hojas.
 func apilarBloque(decl map[string]string, hojas []string, apertura string) {

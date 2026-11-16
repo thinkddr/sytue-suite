@@ -12,6 +12,15 @@ import type { AppCatalog } from '@sytue/i18n';
 import type { en } from './en.js';
 
 export const fr: AppCatalog<typeof en> = {
+  // Transient SMTP disclosure; English fallback where not yet translated.
+  'privateMail.smtpConsentTitle': 'Send outside Sytue',
+  'privateMail.smtpConsentBody':
+    'Your stored copy and attachments stay encrypted. To deliver this message, Sytue and the recipient’s mail server will process its content. SMTP does not provide end-to-end encryption.',
+  'privateMail.smtpConsentConfirm': 'Allow and send',
+  'privateMail.deliveryUncertain':
+    'Delivery could not be confirmed. We kept the message. Check its status before sending it again.',
+  'privateMail.queuedBody': 'The message will be sent while this app is open and connected.',
+
   // --- Comunes ------------------------------------------------------------
   'common.retry': 'Réessayer',
   'common.cancel': 'Annuler',
@@ -37,6 +46,8 @@ export const fr: AppCatalog<typeof en> = {
   'folder.trash': 'Corbeille',
   'folder.junk': 'Indésirables',
   'folder.archive': 'Archives',
+  'folder.outbox': "Boîte d'envoi",
+  'folder.snoozed': 'En attente',
 
   // --- Barra lateral ------------------------------------------------------
   'nav.compose': 'Nouveau message',
@@ -72,6 +83,11 @@ export const fr: AppCatalog<typeof en> = {
   'shortcuts.send': 'Envoyer le message en cours',
   'shortcuts.archive': 'Archiver',
   'shortcuts.trash': 'Mettre à la corbeille',
+  'shortcuts.spam': 'Marquer comme indésirable',
+  'shortcuts.markRead': 'Marquer comme lu',
+  'shortcuts.markUnread': 'Marquer comme non lu',
+  'shortcuts.undo': 'Annuler le dernier déplacement',
+  'shortcuts.key.shift': 'Maj',
   'shortcuts.star': 'Marquer',
   'shortcuts.select': 'Sélectionner la conversation',
   'shortcuts.clearSelection': 'Effacer la sélection',
@@ -102,6 +118,70 @@ export const fr: AppCatalog<typeof en> = {
   'smime.anchorFailed': 'Le certificat n’a pas pu être téléchargé',
   'nav.vacation': 'Réponse d’absence',
   'nav.mailClients': 'Clients de messagerie',
+  'settings.title': 'Paramètres de Mail',
+  'settings.description':
+    'Comment votre courrier est rédigé, trié et partagé. Chaque section indique ce qu’elle change avant que vous ne touchiez à quoi que ce soit.',
+  'settings.writingTitle': 'Rédaction et réponses',
+  'settings.signatureDescription':
+    'Ajoutée à la fin de chaque nouveau message et de chaque réponse.',
+  'settings.signatureOn': 'Définie',
+  'settings.signatureOff': 'Non définie',
+  'settings.vacationDescription':
+    'Répond automatiquement pendant votre absence, une fois par expéditeur.',
+  'settings.undoSendTitle': 'Annuler l’envoi',
+  'settings.undoSendDescription':
+    'Le temps dont vous disposez pour récupérer un message après avoir cliqué sur Envoyer.',
+  'settings.undoSendOption': '{count} s',
+  'settings.undoSendSaved': 'Délai d’annulation enregistré',
+  'settings.readingSaved': 'Réglages de lecture enregistrés',
+  'settings.readingTitle': 'Lecture',
+  'settings.autoAdvanceTitle': 'Après l’archivage ou la suppression',
+  'settings.autoAdvanceDescription':
+    'Ce qui s’ouvre quand la conversation que vous lisez quitte le dossier.',
+  'settings.autoAdvanceOlder': 'Ouvrir la suivante (plus ancienne)',
+  'settings.autoAdvanceNewer': 'Ouvrir la précédente (plus récente)',
+  'settings.autoAdvanceList': 'Revenir à la liste',
+  'settings.swipeRightTitle': 'Balayer vers la droite',
+  'settings.swipeLeftTitle': 'Balayer vers la gauche',
+  'settings.swipeDescription':
+    'Ce que fait le balayage d’une conversation de la liste sur téléphone ou tablette.',
+  'settings.swipeArchive': 'Archiver',
+  'settings.swipeTrash': 'Mettre à la corbeille',
+  'settings.swipeRead': 'Marquer comme lue ou non lue',
+  'settings.swipeNone': 'Rien',
+  'settings.trustedSendersTitle': 'Expéditeurs de confiance',
+  'settings.trustedSendersDescription':
+    'Les images de ces expéditeurs s’affichent sans demander. Elles passent toujours par Sytue : l’expéditeur ne peut pas savoir où vous êtes.',
+  'settings.trustedSendersEmpty':
+    'Aucun pour l’instant. Ouvrez un message aux images bloquées et choisissez « Toujours afficher pour cet expéditeur ».',
+  'settings.trustedSendersRemove': 'Retirer',
+  'settings.trustedSendersRemoveFor': 'Ne plus faire confiance à {address}',
+  'settings.templatesTitle': 'Modèles de réponse',
+  'settings.templatesDescription':
+    'Les textes que vous écrivez souvent, prêts à insérer dans n’importe quel message.',
+  'settings.addressesTitle': 'Adresses et accès',
+  'settings.aliasesDescription':
+    'D’autres adresses qui livrent dans cette boîte et depuis lesquelles vous pouvez envoyer.',
+  'settings.sharedDescription':
+    'Les boîtes que vous partagez avec votre équipe et les personnes qui peuvent lire ou envoyer en votre nom.',
+  'settings.sortingTitle': 'Tri',
+  'settings.rulesDescription':
+    'Des règles côté serveur qui classent, étiquettent ou transfèrent le courrier entrant, même application fermée.',
+  'settings.securityTitle': 'Courrier signé (S/MIME)',
+  'settings.securityDescription':
+    'Votre courrier part signé. Ces deux options permettent aux autres logiciels de l’afficher comme fiable.',
+  'settings.anchorDescription':
+    'Installez-le une fois sur chaque appareil pour que le courrier signé par votre organisation apparaisse comme fiable.',
+  'settings.identityDescription':
+    'Signez avec un certificat d’une autorité publique plutôt qu’avec celui de votre organisation.',
+  'settings.clientsTitle': 'Autres logiciels de messagerie',
+  'settings.mailClientsDescription':
+    'Thunderbird, Outlook, Apple Mail ou votre téléphone se connectent avec un mot de passe d’application, à créer dans Sytue ID.',
+  'settings.edit': 'Modifier',
+  'settings.manage': 'Gérer',
+  'settings.download': 'Télécharger',
+  'settings.install': 'Installer',
+  'settings.openId': 'Ouvrir Sytue ID',
   'nav.loadingFolders': 'Chargement des dossiers',
   'nav.foldersError': 'Impossible de charger les dossiers.',
   'nav.foldersEmpty': 'Aucun dossier disponible.',
@@ -185,6 +265,10 @@ export const fr: AppCatalog<typeof en> = {
   'error.move': 'Impossible de déplacer vers {folder}',
   'error.label': 'Impossible de modifier le libellé',
   'error.signature': 'Impossible d’enregistrer la signature. Réessayez.',
+  'error.undoSendSettings': 'Impossible d’enregistrer le délai d’annulation. Réessayez.',
+  'error.trustedSender':
+    'Impossible de mettre à jour vos expéditeurs de confiance. Veuillez réessayer.',
+  'error.readingSettings': 'Impossible d’enregistrer les réglages de lecture. Veuillez réessayer.',
   'error.undoSend': 'Impossible d’annuler l’envoi du message',
   'error.undoSendGone': 'Trop tard pour annuler : le message est déjà parti',
   'undo.done': 'Envoi annulé',
@@ -197,6 +281,11 @@ export const fr: AppCatalog<typeof en> = {
   'list.fallbackName': 'Courrier',
   'list.searchResults': 'Résultats de recherche',
   'list.resultCount': { one: '{count} résultat', other: '{count} résultats' },
+  'list.markAllRead': 'Tout marquer comme lu',
+  'list.markedAllRead': {
+    one: '{count} message marqué comme lu',
+    other: '{count} messages marqués comme lus',
+  },
   'list.unreadCount': { one: '{count} non lu', other: '{count} non lus' },
   'list.conversationCount': { one: '{count} conversation', other: '{count} conversations' },
   'list.searchPlaceholder': 'Rechercher un message',
@@ -204,6 +293,15 @@ export const fr: AppCatalog<typeof en> = {
   'list.searchHint':
     'Opérateurs : from:, to:, subject:, has:attachment, is:unread, is:starred, after:2026-01-31, before:2026-03-01. Utilisez des guillemets pour plusieurs mots.',
   'list.clearSearch': 'Effacer la recherche',
+  'list.searchOptions': 'Options de recherche',
+  'list.searchFrom': 'De',
+  'list.searchTo': 'À',
+  'list.searchSubject': 'Objet',
+  'list.searchWords': 'Contient les mots',
+  'list.searchSince': 'À partir du',
+  'list.searchUntil': 'Jusqu’au',
+  'list.searchApply': 'Rechercher',
+  'list.searchReset': 'Vider les champs',
   'filter.group': 'Filtres rapides',
   'filter.unread': 'Non lus',
   'filter.starred': 'Suivis',
@@ -230,6 +328,7 @@ export const fr: AppCatalog<typeof en> = {
   'list.noPreview': 'Aucun aperçu',
   'list.rowActions': 'Actions pour « {subject} »',
   'list.attachment': 'Pièce jointe',
+  'list.answered': 'Répondu',
   'list.loadingMore': 'Chargement d’autres conversations',
   'list.loadingMoreShort': 'Chargement…',
 
@@ -259,10 +358,58 @@ export const fr: AppCatalog<typeof en> = {
   'reader.labelApplied': 'Appliqué. ',
   'reader.moveToFolder': 'Déplacer vers un autre dossier',
   'reader.createRule': 'Créer une règle pour cette adresse',
+  'snooze.action': 'Mettre en attente',
+  'snooze.change': 'Modifier l’heure',
+  'snooze.laterToday': 'Plus tard aujourd’hui',
+  'snooze.tomorrow': 'Demain',
+  'snooze.weekend': 'Ce week-end',
+  'snooze.nextWeek': 'La semaine prochaine',
+  'snooze.custom': 'Choisir la date et l’heure…',
+  'snooze.customTitle': 'Mettre en attente jusqu’au',
+  'snooze.dateTime': 'Date et heure',
+  'snooze.confirm': 'Mettre en attente',
+  'snooze.invalid':
+    'Choisissez une date et une heure comprises entre une minute et un an à partir de maintenant',
+  'snooze.done': 'En attente jusqu’au {date}',
+  'snooze.nothing':
+    'Seules les conversations de la boîte de réception peuvent être mises en attente',
+  'snooze.failed': 'La conversation n’a pas pu être mise en attente',
+  'snooze.banner':
+    'En attente jusqu’au {date}. Elle reviendra alors dans la boîte de réception, non lue.',
+  'snooze.unsnooze': 'Remettre dans la boîte de réception',
+  'snooze.unsnoozed': 'Remise dans la boîte de réception',
+  'snooze.unsnoozeFailed': 'La conversation n’a pas pu être remise dans la boîte de réception',
+  'snooze.returned': 'En attente · revenu le {date}',
+  'mute.action': 'Ignorer la conversation',
+  'mute.unmute': 'Ne plus ignorer',
+  'mute.done': 'Conversation ignorée. Les nouvelles réponses iront dans les archives.',
+  'mute.undone': 'La conversation n’est plus ignorée',
+  'mute.failed': 'La conversation n’a pas pu être modifiée',
+  'mute.banner':
+    'Cette conversation est ignorée : les nouvelles réponses vont directement dans les archives, sans notification.',
+  'reader.block': 'Bloquer {sender}',
+  'reader.blocked': '{sender} bloqué : ses e-mails iront dans les spams',
+  'reader.blockFailed': 'Impossible de bloquer cet expéditeur',
+  'reader.searchFromSender': 'Rechercher les e-mails de cette personne',
+  'reader.addToContacts': 'Ajouter à Sytue Contacts',
+  'reader.viewInContacts': 'Voir dans Sytue Contacts',
+  'reader.addedToContacts': 'Ajouté à Sytue Contacts',
+  'reader.addToContactsFailed': 'Impossible d’ajouter à Sytue Contacts',
+  'reader.viewContact': 'Voir',
   'reader.moreActions': 'Plus d’actions',
+  'reader.newer': 'Conversation plus récente',
+  'reader.older': 'Conversation plus ancienne',
+  'reader.print': 'Imprimer',
+  'reader.printFailed': 'Impossible d’imprimer la conversation',
   'reader.conversationLabels': 'Libellés de la conversation',
   'reader.removeLabel': 'Retirer le libellé {label}',
+  'reader.senderVerified': 'Vérifié',
+  'reader.senderWarning':
+    "Nous n'avons pas pu vérifier que ce message provient réellement de {domain}. Méfiez-vous de ses liens et pièces jointes.",
+  'reader.from': 'De : {address}',
   'reader.to': 'À : {addresses}',
+  'reader.cc': 'Cc : {addresses}',
+  'reader.bcc': 'Cci : {addresses}',
   'reader.attachments': 'Pièces jointes',
   'reader.attachmentCount': { one: 'Pièce jointe · {count}', other: 'Pièces jointes · {count}' },
   'reader.download': 'Télécharger {name}',
@@ -276,6 +423,20 @@ export const fr: AppCatalog<typeof en> = {
   'reader.downloadFailedDescription':
     '« {name} » n’a pas pu être enregistré dans votre dossier Téléchargements. Vérifiez qu’il reste de l’espace libre et réessayez.',
   'reader.hasAttachments': 'Ce message contient des pièces jointes.',
+  'reader.invite.label': 'Invitation',
+  'reader.invite.untitled': 'Événement sans titre',
+  'reader.invite.organizer': 'Organisé par {name}',
+  'reader.invite.question': 'Vous participez ?',
+  'reader.invite.yes': 'Oui',
+  'reader.invite.maybe': 'Peut-être',
+  'reader.invite.no': 'Non',
+  'reader.invite.accepted': 'Vous participez. L’événement est dans votre agenda.',
+  'reader.invite.tentative':
+    'Vous participerez peut-être. Il figure dans votre agenda comme provisoire.',
+  'reader.invite.declined': 'Vous avez refusé. Il figure dans votre agenda comme refusé.',
+  'reader.invite.replyNotSent': 'L’organisateur n’a pas pu être prévenu par e-mail.',
+  'reader.invite.failed': 'Votre réponse n’a pas pu être envoyée',
+  'reader.invite.allDay': 'Toute la journée',
   'reader.loadingBody': 'Chargement du message…',
   'reader.plainTextOnly': 'Affiché en texte brut. La mise en forme d’origine n’apparaît pas ici.',
   'reader.noTextContent': 'Ce message ne contient pas de texte.',
@@ -283,7 +444,12 @@ export const fr: AppCatalog<typeof en> = {
   'reader.remoteContentBlocked':
     'Les images distantes sont bloquées pour protéger votre vie privée.',
   'reader.remoteContentShow': 'Afficher les images',
+  'reader.remoteContentAlways': 'Toujours afficher pour cet expéditeur',
+  'reader.remoteContentAlwaysFor': 'Toujours afficher les images de {address}',
+  'reader.trustedSenderAdded': 'Les images de {address} seront toujours affichées',
   'reader.quoteHeader': 'Le {date}, {name} a écrit :',
+  'reader.showQuoted': 'Afficher le texte cité',
+  'reader.hideQuoted': 'Masquer le texte cité',
   'reader.unknownSender': 'Inconnu',
 
   // --- Acciones en lote ----------------------------------------------------
@@ -326,6 +492,8 @@ export const fr: AppCatalog<typeof en> = {
   'compose.formatting': 'Mise en forme du texte',
   'compose.attachFromDevice': 'Joindre depuis cet appareil',
   'compose.attachFromDrive': 'Joindre depuis Drive',
+  'compose.templates': 'Modèles',
+  'compose.templatesEmpty': 'Aucun modèle pour l’instant. Créez-les dans les paramètres de Mail.',
   'compose.attachFailed': 'Impossible de lire la pièce jointe',
   'compose.pastedImageDropped': 'L’image collée n’a pas été incluse',
   'compose.pastedImagesDropped': 'Les images collées n’ont pas été incluses',
@@ -340,6 +508,8 @@ export const fr: AppCatalog<typeof en> = {
   'compose.draftSaved': 'Brouillon enregistré',
   'compose.draftSavedOffline': 'Brouillon enregistré sur cet appareil',
   'compose.draftRestoredOffline': 'Brouillon local restauré',
+  'compose.draftAttachmentsNotKept':
+    'Les pièces jointes volumineuses n’ont pas été conservées sur cet appareil : joignez-les de nouveau avant l’envoi.',
   'compose.draftFailed': 'Impossible d’enregistrer le brouillon',
   'compose.discardTitle': 'Abandonner le brouillon ?',
   'compose.discardConfirm': 'Abandonner',
@@ -419,6 +589,37 @@ export const fr: AppCatalog<typeof en> = {
   'signature.title': 'Signature',
   'signature.help': 'Elle est ajoutée à la fin des nouveaux messages et des réponses.',
   'signature.placeholder': 'Prénom Nom\nFonction · Sytue',
+  'templates.whatTitle': 'À quoi servent les modèles',
+  'templates.whatBody':
+    'Écrivez une fois ce que vous répondez sans cesse (vos horaires, un remerciement, comment joindre le support) et insérez-le pendant la rédaction avec le bouton Modèles. Ils sont enregistrés dans votre compte : ce sont les mêmes sur tous vos appareils.',
+  'templates.yoursTitle': 'Vos modèles',
+  'templates.loading': 'Chargement des modèles',
+  'templates.loadError': 'Impossible de charger les modèles.',
+  'templates.emptyTitle': 'Aucun modèle pour l’instant',
+  'templates.emptyDescription':
+    'Créez le premier ci-dessous : il apparaîtra dans le menu Modèles pendant la rédaction.',
+  'templates.newTitle': 'Nouveau modèle',
+  'templates.editTitle': 'Modifier le modèle',
+  'templates.namePlaceholder': 'Horaires d’ouverture',
+  'templates.nameHint': 'C’est ainsi qu’il apparaît dans le menu Modèles pendant la rédaction.',
+  'templates.nameDuplicate': 'Vous avez déjà un modèle portant ce nom.',
+  'templates.body': 'Texte',
+  'templates.bodyPlaceholder':
+    'Bonjour,\n\nNous vous accueillons du lundi au vendredi, de 9 h à 14 h.',
+  'templates.bodyHint': 'Texte brut. Il est inséré à l’emplacement du curseur.',
+  'templates.add': 'Ajouter le modèle',
+  'templates.edit': 'Modifier {name}',
+  'templates.delete': 'Supprimer {name}',
+  'templates.confirmDelete': 'Supprimer ce modèle ?',
+  'templates.created': 'Modèle créé',
+  'templates.saved': 'Modèle enregistré',
+  'templates.deleted': 'Modèle supprimé',
+  'templates.errorLimit':
+    'Vous avez atteint la limite de 100 modèles. Supprimez-en un pour en ajouter un autre.',
+  'templates.errorInvalid': 'Impossible d’enregistrer le modèle : vérifiez son nom et sa longueur.',
+  'templates.errorGone': 'Ce modèle n’existe plus.',
+  'templates.errorSave': 'Impossible d’enregistrer le modèle. Veuillez réessayer.',
+  'templates.errorDelete': 'Impossible de supprimer le modèle. Veuillez réessayer.',
 
   // --- Cuota de almacenamiento ---------------------------------------------
   'storage.title': 'Stockage',
@@ -492,16 +693,6 @@ export const fr: AppCatalog<typeof en> = {
   'labels.confirmDelete': 'Supprimer le libellé ?',
   'labels.deleteLabel': 'Supprimer le libellé {label}',
   'labels.deleteShort': 'Supprimer le libellé',
-
-  // --- Colores de etiqueta ---------------------------------------------------
-  'colour.slate': 'Ardoise',
-  'colour.brass': 'Laiton',
-  'colour.sage': 'Sauge',
-  'colour.clay': 'Argile',
-  'colour.blue': 'Bleu',
-  'colour.plum': 'Prune',
-  'colour.teal': 'Sarcelle',
-  'colour.rose': 'Rose',
 
   // --- Alias -----------------------------------------------------------------
   'aliases.title': 'Alias d’adresse e-mail',

@@ -7,14 +7,12 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
-	"math"
 	"net/http"
-	"regexp"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/office/ancla"
 	"git.sytue.eu/sytue/one/platform/pkg/authn"
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
@@ -92,7 +90,7 @@ func (h *Handler) createComment(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("The comment cannot be empty."))
 		return
 	}
-	if motivo := validarAncla(req.Anchor); motivo != "" {
+	if motivo := ancla.Validar(req.Anchor); motivo != "" {
 		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage(motivo))
 		return
 	}
@@ -205,11 +203,26 @@ type importedComment struct {
 	Quote    string `json:"quote"`
 	Anchored bool   `json:"anchored"`
 	Resolved bool   `json:"resolved"`
+	// Cell es la celda de un comentario de una hoja (.xlsx/.ods): su ancla.
+	Cell *celdaImportada `json:"cell,omitempty"`
 }
 
-// idMarca es el id de un <mark data-comment-id>: hex, porque el editor lo usa sin escapar en
-// un selector.
-var idMarca = regexp.MustCompile(`^[0-9a-f]{1,64}$`)
+// celdaImportada es el ancla de un comentario de una celda: la hoja (su id) y la identidad de su
+// fila y de su columna (sheets/anclas.ts), más la referencia que se ve.
+type celdaImportada struct {
+	Hoja string `json:"hoja"`
+	Fila string `json:"fila"`
+	Col  string `json:"col"`
+	Text string `json:"text"`
+}
+
+// anclaDeCelda es el ancla de un comentario de una celda importado, o nil si no es válida.
+func anclaDeCelda(c *celdaImportada) map[string]string {
+	if c == nil {
+		return nil
+	}
+	return ancla.DeCelda(c.Hoja, c.Fila, c.Col, c.Text)
+}
 
 // maxComentariosImportados acota lo que se guarda de una vez de un fichero.
 const maxComentariosImportados = 1000
@@ -272,7 +285,7 @@ func (h *Handler) importComments(w http.ResponseWriter, r *http.Request) {
 // guarda (vacío, id de marca no válido o su padre no se guardó).
 func (h *Handler) guardarImportado(r *http.Request, sub string, c importedComment, guardado map[string]string) (string, error) {
 	body := strings.TrimSpace(validation.TruncateRunes(c.Text, 20000))
-	if body == "" || (c.Anchored && !idMarca.MatchString(c.ID)) {
+	if body == "" || (c.Anchored && !ancla.EsMarca(c.ID)) {
 		return "", nil
 	}
 	p := domain.CreateCommentParams{DocumentID: docID(r), AuthorSub: sub, Body: body}
@@ -286,6 +299,8 @@ func (h *Handler) guardarImportado(r *http.Request, sub string, c importedCommen
 	anchor := map[string]string{"text": validation.TruncateRunes(c.Quote, 1000)}
 	if c.Anchored {
 		anchor["mark"] = c.ID
+	} else if celda := anclaDeCelda(c.Cell); celda != nil && c.ParentID == "" {
+		anchor = celda
 	}
 	p.Anchor, _ = json.Marshal(anchor)
 	saved, err := h.store.CreateComment(r.Context(), p)
@@ -298,65 +313,4 @@ func (h *Handler) guardarImportado(r *http.Request, sub string, c importedCommen
 		}
 	}
 	return saved.ID, nil
-}
-
-// maxAncla acota el ancla de un comentario: es JSON libre del cliente y se devuelve a todos
-// los lectores del documento.
-const maxAncla = 4096
-
-var reIDAncla = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
-
-// validarAncla comprueba el ancla de un comentario y devuelve el motivo del rechazo, o "" si vale.
-// Vacía o `null` es un comentario sin ancla; el resto ha de ser un objeto pequeño. Si lleva
-// `dibujo` (un comentario sobre un dibujo de Docus) se valida su forma: `{dibujo, nodo | x,y,
-// text}`, con `nodo` el id de una forma de la escena o (x, y) una coordenada del lienzo, nunca las
-// dos cosas. Las demás anclas (`{mark, text}`) no se interpretan aquí.
-func validarAncla(raw json.RawMessage) string {
-	if len(raw) == 0 || string(raw) == "null" {
-		return ""
-	}
-	if len(raw) > maxAncla {
-		return "The comment anchor is too large."
-	}
-	var a map[string]json.RawMessage
-	if json.Unmarshal(raw, &a) != nil {
-		return "The comment anchor must be an object."
-	}
-	if _, ok := a["dibujo"]; !ok {
-		return ""
-	}
-	for _, k := range []string{"dibujo", "nodo"} {
-		if v, ok := a[k]; ok {
-			var s string
-			if json.Unmarshal(v, &s) != nil || !reIDAncla.MatchString(s) {
-				return "The comment anchor has an invalid " + k + "."
-			}
-		}
-	}
-	_, conNodo := a["nodo"]
-	_, conX := a["x"]
-	_, conY := a["y"]
-	if conX != conY || (conNodo && conX) {
-		return "The comment anchor must have a node or a point, not both."
-	}
-	return validarCoordenadasAncla(a)
-}
-
-// validarCoordenadasAncla comprueba `x`, `y` y `text` de un ancla de dibujo.
-func validarCoordenadasAncla(a map[string]json.RawMessage) string {
-	for _, k := range []string{"x", "y"} {
-		if v, ok := a[k]; ok {
-			var f float64
-			if json.Unmarshal(v, &f) != nil || math.IsNaN(f) || math.IsInf(f, 0) || math.Abs(f) > 1e6 {
-				return "The comment anchor has an invalid " + k + "."
-			}
-		}
-	}
-	if v, ok := a["text"]; ok {
-		var s string
-		if json.Unmarshal(v, &s) != nil || utf8.RuneCountInString(s) > 300 {
-			return "The comment anchor has an invalid text."
-		}
-	}
-	return ""
 }

@@ -14,19 +14,17 @@ import { bff, toBffContext } from '../lib/auth';
 import { canonicaConOrg, returnToCanonico } from '@sytue/config';
 import { hubClient } from '../lib/hub';
 import {
+  buscarPaginas,
   cargaSinNovedad,
   enlaceCargarMas,
   groupBySource,
   hayMas,
   idResultado,
-  paginasHastaElFallo,
   paginasPedidas,
-  POR_PAGINA,
   totalAMostrar,
-  unirPaginas,
 } from '../lib/search';
 import { r } from '../lib/rutas.js';
-import { appForKey, Button, Icon, ProductIcon } from '@sytue/ui';
+import { appForKey, Button, EmptyState, Icon, ProductIcon } from '@sytue/ui';
 import AvisoOrigenesCaidos from '../components/AvisoOrigenesCaidos.astro';
 import type { SearchResult } from '@sytue/api-clients';
 
@@ -63,39 +61,25 @@ let failed = false;
 let fallidos: { source: string; error: string }[] = [];
 let total = 0;
 // «Cargar más»: cuántas páginas se enseñan (`?paginas=`) y si quedan más en el Hub.
-const pedidas = paginasPedidas(Astro.url.searchParams.get('paginas'));
-// Las que se enseñan: si una del medio falla, se corta ahí (ver `paginasHastaElFallo`).
-let paginas = pedidas;
+let paginas = paginasPedidas(Astro.url.searchParams.get('paginas'));
 let mas = false;
 // El último «Cargar más» no trajo nada nuevo: se dice junto al botón (ver abajo).
 let sinNovedad = false;
 if (q) {
   try {
-    const hub = hubClient(session.tokens.accessToken);
-    // Una petición por página, en paralelo: el Hub acota `limit` a su máximo, así que
-    // la única forma de llegar a la página N es su `offset`.
-    const hasta = paginasHastaElFallo(
-      await Promise.allSettled(
-        Array.from({ length: pedidas }, (_, i) =>
-          hub.search(q, undefined, { limit: POR_PAGINA, offset: i * POR_PAGINA }),
-        ),
-      ),
-    );
-    if (!hasta) {
-      // Degradación elegante: ni la primera página -> estado de error con reintento.
-      failed = true;
-    } else {
-      const res = unirPaginas(hasta.paginas);
-      paginas = hasta.paginas.length;
-      results = res.results;
-      fallidos = res.fallidos;
-      // Sin nada más en el Hub, lo enseñado es todo: nada de «39 de 40» sin botón.
-      total = totalAMostrar(res, paginas);
-      // Una página que falló deja «Cargar más» para pedirla otra vez.
-      mas = hasta.cortada || hayMas(res, paginas);
-      sinNovedad = mas && cargaSinNovedad(hasta);
-    }
+    // Todas las páginas que se enseñan en UNA búsqueda federada (ver `buscarPaginas`).
+    const busqueda = await buscarPaginas(hubClient(session.tokens.accessToken), q, paginas);
+    const { res } = busqueda;
+    paginas = busqueda.paginas;
+    results = res.results;
+    fallidos = res.fallidos;
+    // Sin nada más en el Hub, lo enseñado es todo: nada de «39 de 40» sin botón.
+    total = totalAMostrar(res, paginas);
+    // Un «Cargar más» que falló deja el botón para pedirlo otra vez.
+    mas = busqueda.cortada || hayMas(res, paginas);
+    sinNovedad = mas && cargaSinNovedad(busqueda);
   } catch {
+    // Degradación elegante: ni la primera página -> estado de error con reintento.
     failed = true;
   }
 }
@@ -163,7 +147,7 @@ const t = useT(Astro.locals.locale);
       </div>
     ) : results.length === 0 ? (
       <div class="flex flex-col gap-3">
-        <p class="text-text-muted text-base">{t('search.empty', { query: q })}</p>
+        <EmptyState icon="search" title={t('search.empty', { query: q })} />
         {/* Aquí es donde más importa: sin este aviso, «no hay resultados» es una
               afirmación falsa cuando el único origen que los tenía no contestó. */}
         {fallidos.length > 0 ? <AvisoOrigenesCaidos fallidos={fallidos} t={t} /> : null}

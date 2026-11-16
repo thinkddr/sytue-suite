@@ -378,6 +378,54 @@ func TestSnapshotAndVersion(t *testing.T) {
 	}
 }
 
+// TestListaMiosCompartidosYPorTitulo: «Míos» deja lo propio, «Compartidos conmigo» lo
+// ajeno visible por la ACL, y el orden por título pagina A→Z sin acentos.
+func TestListaMiosCompartidosYPorTitulo(t *testing.T) {
+	st := newStore(t)
+	ctx := tenantCtx("acme")
+	crear := func(titulo, dueno string) *domain.Document {
+		d, _, err := st.CreateDocument(ctx, domain.CreateDocumentParams{Kind: domain.KindDocument, Title: titulo, OwnerSub: dueno})
+		if err != nil {
+			t.Fatalf("CreateDocument: %v", err)
+		}
+		return d
+	}
+	crear("Diario", "user-bob")
+	crear("Álbum", "user-bob")
+	ajeno := crear("Balance", "user-ada")
+	if err := st.UpsertPermission(ctx, ajeno.ID, domain.Permission{
+		PrincipalKind: domain.PrincipalUser, PrincipalID: "user-bob", Role: domain.RoleViewer, GrantedBy: "user-ada",
+	}); err != nil {
+		t.Fatalf("UpsertPermission: %v", err)
+	}
+	bob := domain.Subject{Sub: "user-bob", Tenant: "acme"}
+	titulos := func(f domain.ListFilter) []string {
+		docs, err := st.ListDocuments(ctx, bob, f)
+		if err != nil {
+			t.Fatalf("ListDocuments(%+v): %v", f, err)
+		}
+		var out []string
+		for _, d := range docs {
+			out = append(out, d.Title)
+		}
+		return out
+	}
+	if got := titulos(domain.ListFilter{Scope: domain.ScopeShared}); fmt.Sprint(got) != "[Balance]" {
+		t.Fatalf("compartidos: %v", got)
+	}
+	if got := titulos(domain.ListFilter{Scope: domain.ScopeMine, ByTitle: true}); fmt.Sprint(got) != "[Álbum Diario]" {
+		t.Fatalf("míos por título: %v", got)
+	}
+	primera, _ := st.ListDocuments(ctx, bob, domain.ListFilter{ByTitle: true, Limit: 2})
+	if len(primera) != 2 || primera[0].Title != "Álbum" || primera[1].Title != "Balance" {
+		t.Fatalf("primera página por título: %+v", primera)
+	}
+	ult := primera[1]
+	if got := titulos(domain.ListFilter{ByTitle: true, TitleCursor: &domain.TitleCursor{Title: ult.Title, ID: ult.ID}}); fmt.Sprint(got) != "[Diario]" {
+		t.Fatalf("segunda página por título: %v", got)
+	}
+}
+
 // TestPermissionsAndListing cubre la ACL: conceder/actualizar/revocar permisos, y
 // que ListDocuments incluya documentos compartidos vía entrada de tenant.
 func TestPermissionsAndListing(t *testing.T) {

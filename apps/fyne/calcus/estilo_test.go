@@ -78,10 +78,10 @@ func TestLosComandosDeFormatoSonLosDeLaWeb(t *testing.T) {
 		t.Errorf("deshecho todo el formato, B1 conserva %+v", e)
 	}
 
-	// Combinar junta el texto en la esquina de arriba a la izquierda.
+	// «Combinar contenido» junta el texto en la esquina de arriba a la izquierda.
 	r.Seleccionar(0, 0, false)
 	r.Seleccionar(1, 0, true)
-	c.Mandar(CmdCombinar, "")
+	c.Mandar(CmdCombinar, "content")
 	if got := c.Libro.Crudo(0, 0); got != "1234.5 x" || c.Libro.Crudo(1, 0) != "" {
 		t.Errorf("combinar A1:B1 deja %q y %q", got, c.Libro.Crudo(1, 0))
 	}
@@ -252,15 +252,15 @@ func TestLosAtajosDeLaWeb(t *testing.T) {
 func TestLasCabecerasSeleccionanLaColumnaYLaFila(t *testing.T) {
 	r := rejillaDePrueba(500, 200)
 	r.Tapped(&fyne.PointEvent{Position: fyne.NewPos(AnchoCabecera+AnchoCelda*2+10, 10)}) // cabecera C
-	if c1, f1, c2, f2 := r.Rango(); c1 != 2 || c2 != 2 || f1 != 0 || f2 != Filas-1 {
+	if c1, f1, c2, f2 := r.Rango(); c1 != 2 || c2 != 2 || f1 != 0 || f2 != MinFilas-1 {
 		t.Errorf("clicar la cabecera C selecciona %d,%d..%d,%d", c1, f1, c2, f2)
 	}
 	r.Tapped(&fyne.PointEvent{Position: fyne.NewPos(10, AltoCelda*4+10)}) // cabecera de la fila 4
-	if c1, f1, c2, f2 := r.Rango(); c1 != 0 || c2 != Columnas-1 || f1 != 3 || f2 != 3 {
+	if c1, f1, c2, f2 := r.Rango(); c1 != 0 || c2 != MinColumnas-1 || f1 != 3 || f2 != 3 {
 		t.Errorf("clicar la cabecera 4 selecciona %d,%d..%d,%d", c1, f1, c2, f2)
 	}
 	r.Tapped(&fyne.PointEvent{Position: fyne.NewPos(10, 10)})
-	if c1, f1, c2, f2 := r.Rango(); c1 != 0 || f1 != 0 || c2 != Columnas-1 || f2 != Filas-1 {
+	if c1, f1, c2, f2 := r.Rango(); c1 != 0 || f1 != 0 || c2 != MinColumnas-1 || f2 != MinFilas-1 {
 		t.Errorf("clicar la esquina selecciona %d,%d..%d,%d", c1, f1, c2, f2)
 	}
 	// Arrastre de B2 a C3, con la selección en otra parte (a la vista: si la rejilla se

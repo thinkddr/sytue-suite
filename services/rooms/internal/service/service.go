@@ -18,6 +18,8 @@ import (
 
 	"github.com/google/uuid"
 
+	roomsearch "git.sytue.eu/sytue/one/apps/nucleo/rooms/search"
+
 	"git.sytue.eu/sytue/one/platform/pkg/cache"
 	"git.sytue.eu/sytue/one/platform/pkg/events"
 	"git.sytue.eu/sytue/one/platform/pkg/hubnotify"
@@ -110,6 +112,8 @@ type dataStore interface {
 	DeleteMessage(ctx context.Context, id uuid.UUID, actor string) (uuid.UUID, error)
 	SearchMessages(ctx context.Context, teamID uuid.UUID, subject, query string, limit int) ([]domain.Message, error)
 	SearchAll(ctx context.Context, subject, query string, limit int) ([]domain.Message, error)
+	SearchIdentityActive(context.Context, string) (bool, error)
+	MessageMetadata(context.Context, string, *roomsearch.Position, int, []uuid.UUID) ([]roomsearch.Metadata, error)
 	AddReaction(ctx context.Context, messageID uuid.UUID, subject, emoji string) (uuid.UUID, error)
 	RemoveReaction(ctx context.Context, messageID uuid.UUID, subject, emoji string) (uuid.UUID, error)
 	SetCardVote(ctx context.Context, messageID uuid.UUID, subject, value string) (uuid.UUID, []domain.CardVote, error)
@@ -175,7 +179,7 @@ func New(cfg config.Config, st *Store, pub EventPublisher, files Attachments) *S
 	if cfg.HubBaseURL != "" && cfg.HubInternalSecret != "" {
 		notifier = hubnotify.New(cfg.HubBaseURL, cfg.HubInternalSecret)
 	}
-	mc := matrixclient.New(matrixclient.Config{InternalURL: cfg.MatrixInternalURL, HomeserverURL: cfg.MatrixHomeserverURL, ServerName: cfg.MatrixServerName, SSOProviderID: cfg.MatrixSSOProviderID, AdminToken: cfg.MatrixAdminToken})
+	mc := matrixclient.New(matrixclient.Config{InternalURL: cfg.MatrixInternalURL, HomeserverURL: cfg.MatrixHomeserverURL, ServerName: cfg.MatrixServerName, SSOProviderID: cfg.MatrixSSOProviderID, AdminToken: cfg.MatrixAdminToken, PublicationSecret: cfg.MatrixPublicationSecret})
 	if st != nil {
 		st.SetMatrixGate(mc)
 		st.SetCallMatrixGate(mc)
@@ -756,6 +760,9 @@ type PostMessageInput struct {
 	// CUERPO sigue mandando (pregunta/título), así que una tarjeta nunca sustituye
 	// al texto: lo acompaña.
 	Card *domain.Card
+	// AlsoInChannel publica una respuesta de hilo también en el feed del canal
+	// («También enviar al canal»). Solo cuenta con ParentID.
+	AlsoInChannel bool
 }
 
 // PostMessage valida y publica un mensaje, resolviendo adjuntos de Drive y
@@ -819,6 +826,8 @@ func (s *Service) PostMessage(ctx context.Context, in PostMessageInput) (domain.
 		Priority:    in.Priority,
 		RequiresAck: in.RequiresAck,
 		Card:        card,
+
+		AlsoInChannel: in.ParentID != nil && in.AlsoInChannel,
 	})
 	if err != nil {
 		return domain.Message{}, err

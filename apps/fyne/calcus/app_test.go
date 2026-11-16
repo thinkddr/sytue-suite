@@ -41,6 +41,10 @@ type servicioHojas struct {
 	ops     []string
 	creados []string // los cuerpos de las altas
 	orden   []string // guardados y exportaciones, en el orden en que llegan
+	// comentados son los cuerpos de los comentarios que llegan; hilos, la lista que da el
+	// servicio (vacío: la de siempre).
+	comentados []string
+	hilos      string
 }
 
 func (s *servicioHojas) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -73,6 +77,18 @@ func (s *servicioHojas) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		s.orden = append(s.orden, "guardar")
 		_, _ = io.WriteString(w, `{"seq":4}`)
+	case "GET /api/v1/documents/h1/comments":
+		if s.hilos != "" {
+			_, _ = io.WriteString(w, s.hilos)
+			return
+		}
+		_, _ = io.WriteString(w, `{"comments":[`+
+			`{"id":"c1","body":"Revisa el total","author_name":"Ana","created_at":"2026-01-02T10:00:00Z"},`+
+			`{"id":"c2","parent_id":"c1","body":"Hecho","author_name":"Luis","created_at":"2026-01-02T11:00:00Z"}]}`)
+	case "POST /api/v1/documents/h1/comments":
+		cuerpo, _ := io.ReadAll(r.Body)
+		s.comentados = append(s.comentados, string(cuerpo))
+		_, _ = io.WriteString(w, `{"comment":{"id":"c3","body":"x"}}`)
 	case "GET /api/v1/documents":
 		_, _ = io.WriteString(w, `{"documents":[]}`)
 	case "POST /api/v1/documents/h1/exports":
@@ -248,7 +264,7 @@ func TestLaCintaDeCalcusEsLaDeLaWeb(t *testing.T) {
 		return out
 	}
 	vis := r.Visibles(editor.Hoja)
-	if got := strings.Join(grupos(vis[0].Cuerpo(ctx)), ","); got != "group.font,group.alignment,group.number,group.styles,group.merge" {
+	if got := strings.Join(grupos(vis[0].Cuerpo(ctx)), ","); got != "group.font,group.alignment,group.number,group.styles,group.merge,group.cells" {
 		t.Errorf("los grupos de Inicio son %s", got)
 	}
 	quiero := "group.externalData,group.sortFilter,settings.table,names.group,group.tools,group.cells,slides.box.chart," +
@@ -391,5 +407,35 @@ func TestDescargarUnaHojaGuardaAntesYDejaElFichero(t *testing.T) {
 	}
 	if ab.ctx.Exportando != "" || ab.ctx.Guardado != editor.Limpio || ab.ctx.GuardarVersion == nil {
 		t.Errorf("tras descargar: exportando %q, chip %v", ab.ctx.Exportando, ab.ctx.Guardado)
+	}
+}
+
+// TestCalcusTieneElPanelDeComentarios: el carril de la hoja enseña los hilos del servicio
+// —antes, el vacío genérico— y «Comentar» manda el comentario de la hoja.
+func TestCalcusTieneElPanelDeComentarios(t *testing.T) {
+	s := &servicioHojas{rol: "commenter", hoja: `{"active":0,"sheets":[{"name":"Datos","cells":{}}]}`}
+	a := appDePrueba(t, s)
+	a.AbrirID("h1", "")
+	ab := a.abierto
+	if ab.ctx.NuevoComentario == nil {
+		t.Error("quien puede comentar no tiene «Nuevo comentario»")
+	}
+	if ab.ctx.Paneles(editor.PanelComentarios) == nil || ab.comentarios == nil {
+		t.Fatal("Calcus no monta el panel de comentarios")
+	}
+	raices, resp := editor.Hilos(ab.comentarios.Lista())
+	if len(raices) != 1 || raices[0].ID != "c1" || len(resp["c1"]) != 1 {
+		t.Fatalf("los hilos: %+v %+v", raices, resp)
+	}
+	ab.lz.Rejilla.Seleccionar(1, 4, false)
+	a.comentar(ab, "  Cuadra  ", ab.lz.AnclaActiva())
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	// Pegado a la celda activa, con el id que la web deduce de la hoja sin id.
+	if len(s.comentados) != 1 || s.comentados[0] != `{"anchor":{"hoja":"h:Datos","fila":"t4","col":"t1","text":"B5"},"body":"Cuadra"}` {
+		t.Errorf("lo comentado: %v", s.comentados)
+	}
+	if ab.ctx.Panel != editor.PanelComentarios {
+		t.Error("tras comentar no se abre el panel de comentarios")
 	}
 }

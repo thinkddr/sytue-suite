@@ -1250,6 +1250,33 @@ paths:
       responses:
         "204": { description: Eliminado }
 
+  /domains/{id}/verify:
+    parameters:
+      - { $ref: "#/components/parameters/IdPath" }
+    post:
+      tags: [domains]
+      operationId: verifyDomain
+      summary: Comprobar ahora el DNS de un dominio propio
+      description: >
+        Comprueba en el momento el TXT de propiedad (_sytue-challenge.<host>) y a
+        dónde apunta el hostname, sin esperar al bucle del controlador, y devuelve
+        el motivo exacto. Si el TXT es correcto, el dominio pasa a `verified` en la
+        misma petición. Una comprobación cada 10 s por dominio (429 con
+        Retry-After); un dominio caducado (`failed`) da 409.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  domain: { $ref: "#/components/schemas/Domain" }
+                  check: { $ref: "#/components/schemas/DomainCheck" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+
   /projects/{id}/env:
     parameters:
       - { $ref: "#/components/parameters/IdPath" }
@@ -3487,6 +3514,20 @@ components:
         is_primary: { type: boolean }
         created_at: { type: string, format: date-time }
         verified_at: { type: string, format: date-time }
+
+    DomainCheck:
+      type: object
+      description: >
+        Resultado de comprobar el DNS de un dominio propio. `verified` dice si la
+        propiedad está probada (TXT correcto); `reason` dice qué falta:
+        txt_ausente (no hay TXT), txt_distinto (el TXT tiene otro valor),
+        cname_distinto (propiedad probada, pero el host no apunta al ingress y el
+        certificado no se emitirá hasta que apunte) u ok.
+      properties:
+        verified: { type: boolean }
+        reason: { type: string, enum: [ok, txt_ausente, txt_distinto, cname_distinto] }
+        expected: { type: string, description: Destino al que debe apuntar el host. }
+        found: { type: string, description: A dónde apunta hoy (CNAME o IP); vacío si no resuelve. }
 
     UptimeCheck:
       type: object

@@ -13,6 +13,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/widget"
 
@@ -63,13 +64,46 @@ var (
 // Tipografía: la ventana hereda el `line-height` del cuerpo (22 con rem 16) y solo cambia el
 // tamaño de letra, salvo en el párrafo de notas, que lleva 1,5.
 var (
-	letraCuerpo     = tema.TextoBase.Linea
-	escTiempo       = tema.Escalon{Tam: tema.Texto2XL.Tam, Linea: letraCuerpo}
-	escBase         = tema.Escalon{Tam: tema.TextoBase.Tam, Linea: letraCuerpo}
-	escPequeno      = tema.Escalon{Tam: tema.TextoXS.Tam, Linea: letraCuerpo}
-	escRotulo       = tema.Escalon{Tam: tema.Texto2XS.Tam, Linea: letraCuerpo}
-	escNotasModerad = tema.Escalon{Tam: tema.TextoMD.Tam, Linea: tema.TextoMD.Tam * 1.5}
+	letraCuerpo = tema.TextoBase.Linea
+	escTiempo   = tema.Escalon{Tam: tema.Texto2XL.Tam, Linea: letraCuerpo}
+	escBase     = tema.Escalon{Tam: tema.TextoBase.Tam, Linea: letraCuerpo}
+	escPequeno  = tema.Escalon{Tam: tema.TextoXS.Tam, Linea: letraCuerpo}
+	escRotulo   = tema.Escalon{Tam: tema.Texto2XS.Tam, Linea: letraCuerpo}
 )
+
+// Tamaños de las notas con A−/A+ (`NOTES_SIZES` de la web): la escala de la suite de
+// `text-sm` a `text-2xl`, con el `line-height: 1.5` del párrafo. El de siempre es `md`.
+var (
+	tamNotas = []struct {
+		nombre string
+		tam    float32
+	}{
+		{"sm", tema.TextoSM.Tam},
+		{"base", tema.TextoBase.Tam},
+		{"md", tema.TextoMD.Tam},
+		{"lg", tema.TextoLG.Tam},
+		{"xl", tema.TextoXL.Tam},
+		{"2xl", tema.Texto2XL.Tam},
+	}
+	tamNotasPorDefecto = 2
+)
+
+// ClaveTamNotas es donde se recuerda el tamaño de las notas: la misma clave y los mismos
+// valores (`sm` … `2xl`) que el `localStorage` de la web.
+const ClaveTamNotas = "sytue.slides.notesSize"
+
+// Almacen guarda lo que la web deja en `localStorage`, por persona; lo cumple
+// `sesion.PorPersona`. Sin él, el tamaño de las notas dura lo que la presentación.
+type Almacen interface {
+	Leer(clave string) string
+	Poner(clave, valor string)
+}
+
+// escNotas es el escalón del párrafo de notas en el tamaño `i`.
+func escNotas(i int) tema.Escalon {
+	t := tamNotas[i].tam
+	return tema.Escalon{Tam: t, Linea: t * 1.5}
+}
 
 // cadaSegundo llama a `f` en el hilo de la interfaz una vez por segundo hasta que se
 // llama a lo que devuelve. Es una variable para que las pruebas no dejen relojes vivos.
@@ -95,7 +129,8 @@ var cadaSegundo = func(f func()) (parar func()) {
 // estado propio de navegación: pinta la posición de la presentación y le manda los
 // gestos, como hace la web con sus `onPrev`/`onNext`.
 //
-// ponytail: las notas que no caben en su franja se cortan (`overflow: auto` no está).
+// Las notas que no caben en su franja se desplazan (el `overflow: auto` de la web), y su
+// tamaño se cambia con A−/A+.
 type Moderador struct {
 	widget.BaseWidget
 
@@ -103,6 +138,8 @@ type Moderador struct {
 	idioma i18n.Locale
 	inicio time.Time
 	ahora  func() time.Time
+	// tamNotas es el índice en `tamNotas` del tamaño de las notas.
+	tamNotas int
 	// AlVolver, si no es nil, es tocar la diapositiva actual: en un teléfono, donde la
 	// vista va en la misma ventana que la presentación, es volver a ella.
 	AlVolver func()
@@ -127,10 +164,53 @@ func (m *Moderador) Tapped(e *fyne.PointEvent) {
 
 // NuevoModerador monta la vista de la presentación `p`, con el cronómetro a cero.
 func NuevoModerador(p *Presentacion, idioma i18n.Locale) *Moderador {
-	m := &Moderador{p: p, idioma: idioma, ahora: time.Now}
+	m := &Moderador{p: p, idioma: idioma, ahora: time.Now, tamNotas: tamNotasPorDefecto}
+	if p.tamNotas > 0 {
+		m.tamNotas = p.tamNotas - 1
+	} else if p.Almacen != nil {
+		guardado := p.Almacen.Leer(ClaveTamNotas)
+		for i, t := range tamNotas {
+			if t.nombre == guardado {
+				m.tamNotas = i
+			}
+		}
+	}
 	m.inicio = m.ahora()
 	m.ExtendBaseWidget(m)
 	return m
+}
+
+// TamNotas es el tamaño de las notas, con los nombres de la web (`sm` … `2xl`).
+func (m *Moderador) TamNotas() string { return tamNotas[m.tamNotas].nombre }
+
+// CambiarTamNotas sube (`d > 0`) o baja un escalón el tamaño de las notas, con topes, y
+// lo recuerda para la próxima vez; el de siempre no se guarda, como en la web.
+func (m *Moderador) CambiarTamNotas(d int) {
+	i := min(max(m.tamNotas+sign(d), 0), len(tamNotas)-1)
+	if i == m.tamNotas {
+		return
+	}
+	m.tamNotas = i
+	m.p.tamNotas = i + 1
+	if a := m.p.Almacen; a != nil {
+		if i == tamNotasPorDefecto {
+			a.Poner(ClaveTamNotas, "")
+		} else {
+			a.Poner(ClaveTamNotas, tamNotas[i].nombre)
+		}
+	}
+	m.Refresh()
+}
+
+func sign(d int) int {
+	switch {
+	case d > 0:
+		return 1
+	case d < 0:
+		return -1
+	default:
+		return 0
+	}
 }
 
 // Reiniciar pone el cronómetro a cero (el botón «Reiniciar»).
@@ -176,7 +256,13 @@ func (m *Moderador) CreateRenderer() fyne.WidgetRenderer {
 		anterior: nuevoBotonModerador("← "+p.t("nav.previous", nil), false, func() { p.Avanzar(-1) }),
 		siguien:  nuevoBotonModerador(p.t("nav.nextItem", nil)+" →", false, func() { p.Avanzar(1) }),
 		terminar: nuevoBotonModerador(p.t("slides.presenter.end", nil), true, p.salir),
+		menos:    nuevoBotonModerador("A−", true, func() { m.CambiarTamNotas(-1) }),
+		mas:      nuevoBotonModerador("A+", true, func() { m.CambiarTamNotas(1) }),
+		notasDe:  -1,
 	}
+	r.menos.etiqueta = p.t("slides.presenter.notesSmaller", nil)
+	r.mas.etiqueta = p.t("slides.presenter.notesLarger", nil)
+	r.desplaza = container.NewVScroll(ui.Colocados(fyne.Size{}))
 	for i := range r.rayas {
 		r.rayas[i] = canvas.NewRectangle(rayaModerador)
 	}
@@ -208,9 +294,16 @@ type moderadorRenderer struct {
 	tamFin                      fyne.Size
 	notas                       []*canvas.Text
 	reinicia, anterior, siguien *botonModerador
-	terminar                    *botonModerador
-	diapo, paso                 int
-	haySiguiente, listo         bool
+	terminar, menos, mas        *botonModerador
+	// desplaza es la franja de notas que se desplaza, con las líneas dentro. Las
+	// líneas solo se rehacen si cambia lo que dicen (diapositiva, tamaño o ancho): el
+	// reloj repinta la vista cada segundo y rehacerlas movería lo que se está leyendo.
+	desplaza            *container.Scroll
+	notasDe             int
+	notasTam            int
+	notasAncho          float32
+	diapo, paso         int
+	haySiguiente, listo bool
 }
 
 func (r *moderadorRenderer) MinSize() fyne.Size { return fyne.NewSize(1, 1) }
@@ -229,9 +322,7 @@ func (r *moderadorRenderer) Objects() []fyne.CanvasObject {
 		objs = append(objs, r.marcoFin, r.fin)
 	}
 	objs = append(objs, r.rotNotas.Objetos()...)
-	for _, t := range r.notas {
-		objs = append(objs, t)
-	}
+	objs = append(objs, r.menos, r.mas, r.desplaza)
 	return append(objs, r.anterior, r.siguien, r.pista, r.terminar)
 }
 
@@ -253,9 +344,11 @@ func (r *moderadorRenderer) Refresh() {
 		r.listo, r.diapo, r.paso = true, p.Diapo, p.Paso
 		r.actual.Indice, r.actual.Paso = p.Diapo, p.Paso
 		r.actual.Refresh()
-		r.haySiguiente = p.Diapo < p.ultima()
+		// La que vendrá al avanzar: una oculta no sale en la pantalla, ni aquí.
+		sig := SiguienteVisible(Saltables(p.M.Diapos), p.Diapo, 1)
+		r.haySiguiente = sig != SinDestino
 		if r.haySiguiente {
-			r.siguiente.Indice, r.siguiente.Paso = p.Diapo+1, 0
+			r.siguiente.Indice, r.siguiente.Paso = sig, 0
 			r.siguiente.Refresh()
 		}
 	}
@@ -324,8 +417,22 @@ func (r *moderadorRenderer) Layout(t fyne.Size) {
 	// Notas: el rótulo y el párrafo, o «Sin notas…» en gris y más pequeño.
 	raya(r.rayas[1], 0, yNotas, t.Width)
 	yr := yNotas + 1 + arribaNotas
-	r.rotNotas.Colocar(x0, yr)
-	r.colocarNotas(x0, yr+letraCuerpo+margenNotas, ancho, yPie)
+	// El rótulo y los A−/A+ en una fila (`align-items: center`): la fila mide lo que el
+	// más alto de los dos, y el texto empieza debajo.
+	tb := r.menos.MinSize()
+	filaNotas := max(letraCuerpo, tb.Height)
+	r.rotNotas.Colocar(x0, yr+(filaNotas-letraCuerpo)/2)
+	xb := t.Width - margenModerador - 2*tb.Width - margenNotas
+	for _, b := range []*botonModerador{r.menos, r.mas} {
+		b.Move(fyne.NewPos(xb, yr+(filaNotas-tb.Height)/2))
+		b.Resize(tb)
+		xb += tb.Width + margenNotas
+	}
+	r.menos.apagado = r.m.tamNotas == 0
+	r.mas.apagado = r.m.tamNotas == len(tamNotas)-1
+	r.menos.Refresh()
+	r.mas.Refresh()
+	r.colocarNotas(x0, yr+filaNotas+margenNotas, ancho, yPie-arribaNotas)
 
 	// Pie: los dos botones, la pista y «Terminar», repartidos con `space-between`.
 	raya(r.rayas[2], 0, yPie, t.Width)
@@ -345,24 +452,37 @@ func (r *moderadorRenderer) Layout(t fyne.Size) {
 	ui.ColocarTexto(r.pista, escPequeno, izq+libre/2, yb+(alto-letraCuerpo)/2)
 }
 
-// colocarNotas reparte las notas en líneas del ancho de la franja y pinta las que
-// caben por encima del pie.
+// colocarNotas reparte las notas en líneas del ancho de la franja, en el tamaño elegido,
+// dentro del desplazador que va de `y` a `tope`: todas, quepan o no.
 func (r *moderadorRenderer) colocarNotas(x, y, ancho, tope float32) {
-	d := r.m.p.M.Diapos[r.m.p.Diapo]
+	p := r.m.p
+	r.desplaza.Move(fyne.NewPos(x, y))
+	r.desplaza.Resize(fyne.NewSize(ancho, max(tope-y, 0)))
+	if p.Diapo == r.notasDe && r.m.tamNotas == r.notasTam && ancho == r.notasAncho {
+		return
+	}
+	if p.Diapo != r.notasDe {
+		r.desplaza.Offset = fyne.Position{} // otra diapositiva: sus notas, desde arriba
+	}
+	r.notasDe, r.notasTam, r.notasAncho = p.Diapo, r.m.tamNotas, ancho
+	d := p.M.Diapos[p.Diapo]
+	e := escNotas(r.m.tamNotas)
+	c, lineas := blancoModerador, ui.Lineas(d.Notas, e, ui.Normal, ancho)
+	if strings.TrimSpace(d.Notas) == "" || len(lineas) == 0 {
+		e, c, lineas = escBase, grisModerador, []string{p.t("slides.presenter.noNotes", nil)}
+	}
 	r.notas = r.notas[:0]
-	e, c, lineas := escNotasModerad, blancoModerador, ui.Lineas(d.Notas, escNotasModerad, ui.Normal, ancho)
-	if d.Notas == "" || len(lineas) == 0 || (len(lineas) == 1 && lineas[0] == "") {
-		e, c, lineas = escBase, grisModerador, []string{r.m.p.t("slides.presenter.noNotes", nil)}
-	}
+	objs := make([]fyne.CanvasObject, 0, len(lineas))
+	yl := float32(0)
 	for _, l := range lineas {
-		if y+e.Linea > tope {
-			break
-		}
 		txt := ui.Texto(l, e, ui.Normal, c)
-		ui.ColocarTexto(txt, e, x, y)
+		ui.ColocarTexto(txt, e, 0, yl)
 		r.notas = append(r.notas, txt)
-		y += e.Linea
+		objs = append(objs, txt)
+		yl += e.Linea
 	}
+	r.desplaza.Content = ui.Colocados(fyne.NewSize(ancho, yl), objs...)
+	r.desplaza.Refresh()
 }
 
 func raya(r *canvas.Rectangle, x, y, ancho float32) {
@@ -399,6 +519,11 @@ type botonModerador struct {
 	texto    string
 	fantasma bool
 	alPulsar func()
+	// etiqueta, si no está vacía, es lo que oye el lector de pantalla en vez del texto
+	// (el `aria-label` de A− y A+).
+	etiqueta string
+	// apagado es el `disabled` del botón: atenuado y sin hacer nada (A− y A+ en sus topes).
+	apagado bool
 }
 
 var (
@@ -420,14 +545,25 @@ func (b *botonModerador) estilo() (e tema.Escalon, c color.NRGBA, px, py float32
 }
 
 func (b *botonModerador) Tapped(*fyne.PointEvent) {
-	if b.alPulsar != nil {
+	if b.alPulsar != nil && !b.apagado {
 		b.alPulsar()
 	}
 }
 
-func (b *botonModerador) Cursor() desktop.Cursor { return desktop.PointerCursor }
+func (b *botonModerador) Cursor() desktop.Cursor {
+	if b.apagado {
+		return desktop.DefaultCursor
+	}
+	return desktop.PointerCursor
+}
 
-func (b *botonModerador) AccessibilityLabel() string             { return b.texto }
+func (b *botonModerador) AccessibilityLabel() string {
+	if b.etiqueta != "" {
+		return b.etiqueta
+	}
+	return b.texto
+}
+
 func (b *botonModerador) AccessibilityRole() fyne.AccessibleRole { return fyne.AccessibleRoleButton }
 
 // La cara web de Figtree está limitada por unicode-range: ← y → los pinta la
@@ -509,5 +645,18 @@ func (r *botonModeradorRenderer) Objects() []fyne.CanvasObject {
 	}
 	return objetos
 }
-func (r *botonModeradorRenderer) Refresh() { canvas.Refresh(r.b) }
+
+func (r *botonModeradorRenderer) Refresh() {
+	// `opacity: 0.4` del botón apagado, sobre el texto y el borde.
+	_, c, _, _ := r.b.estilo()
+	borde := rayaModerador
+	if r.b.apagado {
+		c, borde = conAlfa(c, 0.4), conAlfa(borde, 0.4)
+	}
+	r.texto.Color, r.borde.StrokeColor = c, borde
+	if r.flecha != nil {
+		r.flecha.Color = c
+	}
+	canvas.Refresh(r.b)
+}
 func (r *botonModeradorRenderer) Destroy() {}

@@ -7,6 +7,7 @@ import {
   assertWizardLayout as layout,
   assertWizardAccessibility as accessible,
   describeWizardState,
+  errorDelDialogo,
   openWizardFixture,
 } from './lib/wizard-checks.mjs';
 import { mkdirSync } from 'node:fs';
@@ -297,7 +298,7 @@ try {
       await expect(
         ui.dialog.getByRole('heading', { name: 'Choose the channels', exact: true }),
       ).toBeVisible();
-      await expect(ui.dialog.getByRole('alert')).toContainText(
+      await expect(errorDelDialogo(ui.dialog)).toContainText(
         'The connection could not be completed.',
       );
       await expect(ui.dialog.getByRole('button', { name: 'Continue', exact: true })).toBeDisabled();
@@ -313,7 +314,7 @@ try {
     async (ui) => {
       await openWizard(ui, 'slack-rooms');
       await ui.dialog.getByRole('button', { name: 'Continue in Slack', exact: true }).click();
-      await expect(ui.dialog.getByRole('alert')).toContainText('Access was not granted.');
+      await expect(errorDelDialogo(ui.dialog)).toContainText('Access was not granted.');
       expect(
         ui.state.requests.filter((request) => request.body?.action === 'connect-bridge'),
       ).toHaveLength(0);
@@ -330,7 +331,7 @@ try {
     async (ui) => {
       await openWizard(ui, 'google-chat');
       await ui.dialog.getByRole('button', { name: 'Continue in Google Chat', exact: true }).click();
-      await expect(ui.dialog.getByRole('alert')).toContainText(
+      await expect(errorDelDialogo(ui.dialog)).toContainText(
         'The connection could not be completed.',
       );
       expect(ui.state.visits).toEqual([]);
@@ -348,7 +349,7 @@ try {
       await openWizard(ui, 'slack-rooms');
       await reviewBridge(ui);
       await ui.dialog.getByRole('button', { name: 'Connect channels', exact: true }).click();
-      await expect(ui.dialog.getByRole('alert')).toContainText(
+      await expect(errorDelDialogo(ui.dialog)).toContainText(
         'The connection could not be completed.',
       );
       expect(ui.state.bridges).toHaveLength(0);
@@ -432,7 +433,7 @@ try {
         .getByRole('status')
         .filter({ hasText: 'Disconnect Google Chat?' });
       await confirmation.getByRole('button', { name: 'Disconnect', exact: true }).click();
-      await expect(ui.dialog.getByRole('alert')).toContainText(
+      await expect(errorDelDialogo(ui.dialog)).toContainText(
         'The connection could not be completed.',
       );
       await expect(ui.dialog.getByText('Connected', { exact: true })).toBeVisible();

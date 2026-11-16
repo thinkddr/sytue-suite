@@ -1,0 +1,3 @@
+-- SPDX-License-Identifier: Apache-2.0
+-- Versioned shared opaque body storage, following the Scope-bound contract.
+-- sytue:private-ingress-bodies-v1

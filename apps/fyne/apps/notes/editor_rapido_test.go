@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/driver/desktop"
+	"fyne.io/fyne/v2/test"
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
@@ -253,5 +255,101 @@ func esperarRuta(t *testing.T, falso *servicioFalso, ruta string) {
 	for i := 0; i < 200 && !slices.Contains(falso.rutas(), ruta); i++ {
 		fyne.DoAndWait(func() {})
 		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// velosDeBusqueda cuenta, en lo que pinta la zona, los velos de todas las coincidencias y
+// los de la actual, por su color.
+func velosDeBusqueda(t *testing.T, ed *EditorNota) (todas, actual int) {
+	t.Helper()
+	r := test.WidgetRenderer(ed.zona).(*zonaRenderer)
+	r.Layout(fyne.NewSize(400, 200))
+	cTodas, cActual := coloresBuscar(tema.De(fyne.CurrentApp().Settings().ThemeVariant()))
+	for _, o := range r.objetos {
+		if rc, ok := o.(*canvas.Rectangle); ok {
+			switch rc.FillColor {
+			case cTodas:
+				todas++
+			case cActual:
+				actual++
+			}
+		}
+	}
+	return todas, actual
+}
+
+// TestBuscarEnLaNotaPintaTodas: como los `::highlight` de la web, buscar «caja» en una
+// nota con tres pinta tres velos, la actual en el tono subido y sin el tinte de
+// selección encima; Intro mueve el destacado, escribir con la barra abierta recuenta, y
+// cerrar quita los velos dejando la selección.
+//
+// VISTO EN ROJO (2026-11-09): sin velosBuscar la zona no pinta ningún velo.
+func TestBuscarEnLaNotaPintaTodas(t *testing.T) {
+	ed := NuevoEditorNota(trInterno(t), Leer("<p>Una caja y otra Caja</p><p>la última cája</p>"), "")
+	ed.abrirBuscador()
+	ed.buscador.campo.PonerTexto("caja")
+	ed.buscarEnNota("caja", 0)
+	if todas, actual := velosDeBusqueda(t, ed); todas != 2 || actual != 1 {
+		t.Fatalf("pinta %d velos y %d de la actual; quería 2 y 1", todas, actual)
+	}
+	r := test.WidgetRenderer(ed.zona).(*zonaRenderer)
+	if s := r.seleccion(tema.Claro); len(s) != 0 {
+		t.Errorf("la actual lleva además el tinte de selección: %d rectángulos", len(s))
+	}
+	ed.buscador.campo.AlTeclear(&fyne.KeyEvent{Name: fyne.KeyReturn})
+	if ed.buscador.i != 1 {
+		t.Fatalf("Intro deja la actual en %d", ed.buscador.i)
+	}
+	if todas, actual := velosDeBusqueda(t, ed); todas != 2 || actual != 1 {
+		t.Errorf("tras Intro pinta %d y %d", todas, actual)
+	}
+	// Escribir en el cuerpo con la barra abierta: la tercera deja de serlo.
+	ed.ancla, ed.cur = Pos{1, 0}, Pos{1, len([]rune(ed.doc.Bloques[1].Texto()))}
+	ed.escribir("nada")
+	if got := ed.buscador.cuenta.Text; got != "2 de 2" {
+		t.Errorf("tras escribir la cuenta dice %q", got)
+	}
+	if todas, actual := velosDeBusqueda(t, ed); todas+actual != 2 {
+		t.Errorf("tras escribir pinta %d velos", todas+actual)
+	}
+	ed.buscarEnNota("caja", 0)
+	ed.cerrarBuscador()
+	if todas, actual := velosDeBusqueda(t, ed); todas+actual != 0 {
+		t.Errorf("cerrar deja %d velos", todas+actual)
+	}
+	if got := ed.Seleccionado(); got != "caja" {
+		t.Errorf("cerrar deja seleccionado %q", got)
+	}
+}
+
+// TestBuscarEnLaNotaSeVeSobreLosFondos: en un bloque de código o en un `<code>` en línea
+// el fondo propio no tapa el velo (la web pinta los `::highlight` por encima de los
+// fondos); antes la coincidencia actual, que tampoco lleva tinte, quedaba invisible.
+//
+// VISTO EN ROJO (2026-11-09): con los velos detrás de toda la prosa, el fondo del bloque
+// de código y el del `<code>` se pintaban después.
+func TestBuscarEnLaNotaSeVeSobreLosFondos(t *testing.T) {
+	ed := NuevoEditorNota(trInterno(t), Leer("<pre><code>una caja</code></pre><p>otra <code>caja</code></p>"), "")
+	ed.abrirBuscador()
+	ed.buscador.campo.PonerTexto("caja")
+	ed.buscarEnNota("caja", 0)
+	r := test.WidgetRenderer(ed.zona).(*zonaRenderer)
+	r.Layout(fyne.NewSize(400, 200))
+	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
+	cTodas, cActual := coloresBuscar(v)
+	ultimoVelo, velos := -1, 0
+	for i, o := range r.objetos {
+		if rc, ok := o.(*canvas.Rectangle); ok && (rc.FillColor == cTodas || rc.FillColor == cActual) {
+			ultimoVelo, velos = i, velos+1
+		}
+	}
+	if velos != 2 {
+		t.Fatalf("pinta %d velos; quería 2", velos)
+	}
+	fondo := tema.Color("bg-subtle", v)
+	for i, o := range r.objetos {
+		if rc, ok := o.(*canvas.Rectangle); ok && rc.FillColor == fondo && i > ultimoVelo {
+			t.Errorf("un fondo de la prosa (objeto %d) se pinta encima de los velos (último en %d)", i, ultimoVelo)
+		}
 	}
 }

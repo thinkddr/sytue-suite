@@ -30,7 +30,7 @@ func TestScheduledDuePublishesOnce(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
-	_, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	_, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 
 	// Programar en el pasado (ya vencido): el drenaje debe recogerlo.
 	if _, err := st.CreateScheduled(ctx, store.NewScheduledRecord{
@@ -89,7 +89,7 @@ func TestScheduledFutureNotClaimed(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
-	_, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	_, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 
 	sm, err := st.CreateScheduled(ctx, store.NewScheduledRecord{
 		ChannelID: ch.ID, AuthorSub: "alice", AuthorName: "Alice",
@@ -121,7 +121,7 @@ func TestMessageAckCountAndIdempotent(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
-	tm, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	tm, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 	for _, sub := range []string{"bob", "carol"} {
 		if err := st.AddTeamMember(ctx, tm.ID, "alice", sub, sub, domain.RoleMember); err != nil {
 			t.Fatalf("AddTeamMember %s: %v", sub, err)
@@ -152,12 +152,12 @@ func TestMessageAckCountAndIdempotent(t *testing.T) {
 	}
 
 	// La lectura agrega AckCount y marca Acked per-visor (bob confirmó).
-	bobView := findMessage(t, listMsgs(t, st, ctx, ch.ID, "bob"), m.ID)
+	bobView := findMessage(t, listMsgs(ctx, t, st, ch.ID, "bob"), m.ID)
 	if bobView.AckCount != 2 || !bobView.Acked {
 		t.Fatalf("bob ve AckCount=%d Acked=%v, quiero 2/true", bobView.AckCount, bobView.Acked)
 	}
 	// carol NO confirmó: ve el conteo agregado pero Acked=false (per-visor).
-	carolView := findMessage(t, listMsgs(t, st, ctx, ch.ID, "carol"), m.ID)
+	carolView := findMessage(t, listMsgs(ctx, t, st, ch.ID, "carol"), m.ID)
 	if carolView.AckCount != 2 || carolView.Acked {
 		t.Fatalf("carol ve AckCount=%d Acked=%v, quiero 2/false", carolView.AckCount, carolView.Acked)
 	}
@@ -172,7 +172,7 @@ func TestMessageAckCountAndIdempotent(t *testing.T) {
 	}
 }
 
-func listMsgs(t *testing.T, st *store.Store, ctx context.Context, channelID uuid.UUID, subject string) []domain.Message {
+func listMsgs(ctx context.Context, t *testing.T, st *store.Store, channelID uuid.UUID, subject string) []domain.Message {
 	t.Helper()
 	msgs, err := st.ListMessages(ctx, channelID, subject, store.MessagePage{})
 	if err != nil {

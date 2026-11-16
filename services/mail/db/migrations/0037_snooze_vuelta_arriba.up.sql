@@ -1,0 +1,25 @@
+-- SPDX-License-Identifier: Apache-2.0
+-- Copyright (c) 2026 Daniel Delgado Ramos
+--
+-- LO POSPUESTO VUELVE ARRIBA, como en Gmail. Hasta 0036 un hilo que volvía de
+-- «Pospuestos» al vencer ocupaba su sitio cronológico en Recibidos (el de su fecha
+-- de llegada), varias páginas más abajo: posponer servía para olvidarse de él, no
+-- para que apareciera cuando tocaba.
+--
+-- `unsnoozed_at` es cuándo volvió el mensaje de «Pospuestos» al vencer la fecha (la
+-- del posponer, no la del barrido). Las listas ordenan por la FECHA DE ORDEN,
+-- COALESCE(unsnoozed_at, received_at): lo que no se pospuso nunca sigue en su sitio
+-- y lo devuelto sube a la hora de vuelta. `received_at` no se toca: es la fecha de
+-- llegada que enseña el lector, la que usan IMAP, la búsqueda por fechas y el
+-- e-discovery.
+--
+-- Columna NULLable sin DEFAULT: añadirla no reescribe la tabla.
+--
+-- El índice del listado de carpeta pasa a ordenar por la fecha de orden (expresión),
+-- para que el cursor keyset siga siendo O(1) por página. NO va aquí: `messages` es la
+-- tabla más grande de Mail y un CREATE INDEX normal bloquea sus escrituras (el correo
+-- que entra, marcar leído, mover…) mientras lo construye. Va CONCURRENTLY en la 0038 y
+-- la retirada del índice de 0001 en la 0039, cada uno solo en su fichero porque
+-- CONCURRENTLY no admite transacción (el patrón de la 0008 del Hub).
+
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS unsnoozed_at timestamptz;

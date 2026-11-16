@@ -33,6 +33,7 @@ import (
 	temafyne "fyne.io/fyne/v2/theme"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/fuentes"
+	"git.sytue.eu/sytue/one/apps/nucleo/sistema"
 	"git.sytue.eu/sytue/one/apps/nucleo/tokens"
 )
 
@@ -176,7 +177,14 @@ func ColorElegido() string { return tokens.ColorElegido() }
 // Deja esa forma también como la de quien NO ha elegido: un test que abre una sesión
 // aplica los ajustes de su carpeta vacía, y sin esto devolvería la forma de la casa a
 // todos los que corrieran después.
+//
+// Y deja el sistema SIN «menos movimiento» ni «más contraste» (sistema.FijarMenosMovimiento
+// y sistema.FijarMasContraste), por lo mismo: lo que pinta un test no puede depender de si
+// quien lo corre tiene activado «Reducir movimiento» o «Aumentar contraste»; el test que
+// mira ese caso lo fija él.
 func FormaDeLosGuardianes() {
+	sistema.FijarMenosMovimiento(false)
+	sistema.FijarMasContraste(false)
 	formaSinElegir = os.Getenv("SYTUE_FORMA")
 	if formaSinElegir == "" {
 		formaSinElegir = tokens.FormaCarril
@@ -198,6 +206,12 @@ func ElegirCromo(nombre string) bool { return tokens.ElegirCromo(nombre) }
 
 // EsPapel dice si el cromo en vigor es «papel».
 func EsPapel() bool { return tokens.EsPapel() }
+
+// ElegirMasContraste aplica, o quita, el «más contraste» de la hoja (`prefers-contrast:
+// more` en la web): todo borde al contorno de control, el texto sutil al atenuado y el
+// traslúcido sin velos. Lo llama la sesión con lo que responde sistema.MasContraste, como
+// el navegador consulta el ajuste del sistema. Devuelve si ha cambiado algo, como Elegir.
+func ElegirMasContraste(si bool) bool { return tokens.ElegirMasContraste(si) }
 
 // AppElegida devuelve el producto en vigor para poder restaurar su apariencia.
 func AppElegida() string { return tokens.AppElegida() }

@@ -7,6 +7,7 @@ package notes
 // pantalla que ya porta notes.go; no es una pantalla aparte del inventario.
 
 import (
+	"errors"
 	"html"
 	"image/color"
 	"regexp"
@@ -25,6 +26,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	colaNotas "git.sytue.eu/sytue/one/apps/nucleo/notas"
 )
 
 var atajoFinal = regexp.MustCompile(`(^|\s)(dd|tt) $`)
@@ -148,11 +150,11 @@ func (p *Pantalla) abrirDia(date string) {
 	p.abriendoDia = true
 	p.Repintar()
 	carry := date == time.Now().Format(time.DateOnly)
-	go func() {
+	p.iniciar(func() {
 		ctx, cancelar := p.ctx()
 		defer cancelar()
 		nb, err := p.svc.DailyNotebook(ctx, date, title, carry)
-		enHilo(func() {
+		p.enHilo(func() {
 			p.abriendoDia = false
 			if err != nil {
 				p.fallo("error.loadFailed", err)
@@ -161,9 +163,9 @@ func (p *Pantalla) abrirDia(date string) {
 			}
 			p.filtro, p.filtroEstado = "", ""
 			p.abrirCuaderno(DeCuaderno(nb))
-			go p.cargarCuadernos()
+			p.iniciar(p.cargarCuadernos)
 		})
-	}()
+	})
 }
 
 // enUnaLinea es la captura como la enseña su campo, que es de UNA línea: cada salto, un
@@ -201,7 +203,7 @@ func (p *Pantalla) enviar(texto string, cuantas int) {
 	campo, id, tipo := p.campoCaptura, p.activo.ID, p.tipoCaptura
 	p.guardandoCaptura = true
 	p.Repintar()
-	go func() {
+	p.iniciar(func() {
 		hechas := 0
 		for i, linea := range lineas[:min(len(lineas), cuantas, MaxLineasPegadas)] {
 			in, ok := capturaRapida(linea, tipo)
@@ -211,7 +213,7 @@ func (p *Pantalla) enviar(texto string, cuantas int) {
 			if ok {
 				_ = p.crearEn(in, id, func() { salio = true })
 			}
-			fyne.DoAndWait(func() {
+			p.enHiloEsperar(func() {
 				if salio {
 					hechas++
 					seguir = p.quedanEnCaptura(campo, id, texto, lineas, i)
@@ -221,14 +223,14 @@ func (p *Pantalla) enviar(texto string, cuantas int) {
 				break
 			}
 		}
-		enHilo(func() {
+		p.enHilo(func() {
 			p.guardandoCaptura = false
 			if hechas > 0 && p.activo.ID == id {
 				p.enfoque = "all"
 			}
 			p.Repintar()
 		})
-	}()
+	})
 }
 
 // quedanEnCaptura deja en la captura las líneas que siguen a la `i`, que acaba de salir,
@@ -524,6 +526,7 @@ func (s *subrayado) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	objs[1].Resize(fyne.NewSize(t.Width, t.Height-2*s.py-tema.Borde))
 }
 
+//nolint:gocyclo // un bloque por sección opcional del diario.
 func (p *Pantalla) enfoquesDiarios(v tema.Variante, interior float32) []ui.Bloque {
 	t := p.tr.T
 	cuentas := map[string]int{"all": len(p.notas)}
@@ -567,12 +570,22 @@ func (p *Pantalla) enfoquesDiarios(v tema.Variante, interior float32) []ui.Bloqu
 	items := make([]fyne.CanvasObject, 0, 6)
 	for _, foco := range []string{"all", "pending", "done", "pinned"} {
 		items = append(items, segmento(t(claves[foco], nil), strconv.Itoa(cuentas[foco]), enfoque == foco, v,
-			func() { p.cerrarEditor(); p.enfoque = foco; p.Repintar() }))
+			func() {
+				p.cerrarEditor()
+				if p.edicion != nil {
+					return
+				}
+				p.enfoque = foco
+				p.Repintar()
+			}))
 	}
 	derecha := len(items)
 	if total > 0 {
 		ocultar := ui.NuevoBotonIcono(iconos.Ojo, t("daily.hideFinished", nil), func() {
 			p.cerrarEditor()
+			if p.edicion != nil {
+				return
+			}
 			p.ocultarTerminadas = !p.ocultarTerminadas
 			fyne.CurrentApp().Preferences().SetBool(clavePrefOcultarTerminadas, p.ocultarTerminadas)
 			p.Repintar()
@@ -627,8 +640,8 @@ func (p *Pantalla) atajoDiario(a string) bool {
 }
 
 // EnfocarCaptura es el ⌘K que la barra de la suite cede (`CederAtajoSi`): con un día
-// abierto lleva a la captura; si no, o si la captura ya tiene el foco, el buscador.
-func (p *Pantalla) EnfocarCaptura() bool { return p.atajoDiario("capture") }
+// abierto lleva a la captura; si no, o si la captura ya tiene el foco, la paleta de la suite.
+func (p *Pantalla) EnfocarCaptura() bool { return p.vigente() && p.atajoDiario("capture") }
 
 // nuevoCampoCaptura es el campo sin caja de la captura: Intro guarda, `dd`/`tt` se
 // expanden al teclearlos, pegar varias líneas hace una nota por línea y la línea de
@@ -654,17 +667,27 @@ func (p *Pantalla) nuevoCampoCaptura() *ui.Entrada {
 	// Pegando, el campo cambia a medias (con espacios donde iban los saltos): eso no es
 	// lo que lleva la captura, y `pegarEnCaptura` lo pone enseguida.
 	pegando := false
+	reponiendo := false
 	campo.AlPegar = func(s string) bool {
 		pegando = true
 		defer func() { pegando = false }()
 		return p.pegarEnCaptura(campo, s)
 	}
 	campo.AlCambiar(func(s string) {
+		if reponiendo {
+			return
+		}
 		// Lo que el campo enseña de la captura no es un cambio: es ponerCaptura.
 		if !pegando && s != enUnaLinea(p.capturaTexto) {
-			x := expandirCaptura(p.capturaTexto, s, time.Now())
+			previo := p.capturaTexto
+			x := expandirCaptura(previo, s, time.Now())
+			if err := p.guardarBorradorConError(id, x); errors.Is(err, colaNotas.ErrLocalAdmission) {
+				reponiendo = true
+				campo.PonerTextoAlFinal(enUnaLinea(previo))
+				reponiendo = false
+				return
+			}
 			p.capturaTexto = x
-			p.guardarBorrador(id, x)
 			if x != s {
 				campo.PonerTextoAlFinal(x)
 				return
@@ -706,7 +729,7 @@ func (p *Pantalla) menuPlantillas() *ui.Menu {
 			}
 			in := api.NoteInput{Kind: "text", Title: t("template."+plantilla, nil), Content: contenidoPlantilla(plantilla, p.tr)}
 			id := p.activo.ID
-			lanzar(func() error {
+			p.lanzar(func() error {
 				return p.crearEn(in, id, func() {
 					if p.activo.ID == id {
 						p.enfoque = "all"

@@ -9,7 +9,7 @@ import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { Button, DataFlow, FieldGroup, Input, Modal, describedBy, useToast } from '@sytue/ui';
 import { subscribeIcs } from '../client/calendarApi.js';
-import { CALENDAR_PALETTE, ColorSwatches } from './CalendarModal.js';
+import { COLOR_SUSCRIPCION, ColorSwatches } from './CalendarModal.js';
 import type { T } from '../i18n/index.js';
 
 interface Props {
@@ -30,7 +30,7 @@ export function SubscribeModal({ t, open, onClose, onSaved }: Props): JSX.Elemen
   const toast = useToast();
   const [url, setUrl] = useState('');
   const [name, setName] = useState('');
-  const [color, setColor] = useState(CALENDAR_PALETTE[7]!.value); // Ciruela (calendar)
+  const [color, setColor] = useState(COLOR_SUSCRIPCION);
   const [busy, setBusy] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
 
@@ -38,7 +38,7 @@ export function SubscribeModal({ t, open, onClose, onSaved }: Props): JSX.Elemen
     if (!open) return;
     setUrl('');
     setName('');
-    setColor(CALENDAR_PALETTE[7]!.value);
+    setColor(COLOR_SUSCRIPCION);
     setUrlError(null);
   }, [open]);
 
@@ -130,13 +130,7 @@ export function SubscribeModal({ t, open, onClose, onSaved }: Props): JSX.Elemen
           <span id="sub-color-label" class="text-text text-sm font-semibold">
             {t('common.colour')}
           </span>
-          <ColorSwatches
-            t={t}
-            value={color}
-            onChange={setColor}
-            idPrefix="sub-color"
-            labelledBy="sub-color-label"
-          />
+          <ColorSwatches t={t} value={color} onChange={setColor} labelledBy="sub-color-label" />
         </div>
       </div>
     </Modal>

@@ -15,3 +15,4 @@ export * from './organizacion.js';
 export * from './office.js';
 export * from './altcha.js';
 export * from './viewport.js';
+export * from './paleta-usuario.js';

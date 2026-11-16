@@ -74,7 +74,9 @@ beforeEach(() => {
     if (url.pathname === '/api/adjuntos' && init?.method === 'POST') {
       subidas++;
       return subidas === 1
-        ? response(500, { error: { message: 'Adjunto no disponible' } })
+        ? response(413, {
+            error: { code: 'adjunto_grande', message: 'The file is larger than 10 MB.' },
+          })
         : response(200, { tareas_hechas: 0 });
     }
     if (url.pathname === '/api/adjuntos') return response(200, { adjuntos: [] });
@@ -149,7 +151,8 @@ test('fallar el adjunto conserva la factura creada y solo reintenta subir el ori
   expect(formularios).toBe(1);
   await pulsar(boton(t('docs.upload')));
   await esperar(
-    () => document.querySelector('[role="alert"]')?.textContent === 'Adjunto no disponible',
+    () =>
+      document.querySelector('[role="alert"]')?.textContent === t('error.code.attachmentTooLarge'),
   );
   await pulsar(boton(t('docs.upload')));
   await esperar(

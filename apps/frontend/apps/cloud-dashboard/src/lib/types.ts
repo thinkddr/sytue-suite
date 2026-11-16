@@ -143,6 +143,19 @@ export interface Domain {
   primary?: boolean;
 }
 
+/**
+ * Resultado de «Comprobar ahora» un dominio propio, tal cual lo da el
+ * control-plane: si la propiedad está probada y el MOTIVO exacto de lo que falta.
+ */
+export interface DomainCheckResult {
+  verified: boolean;
+  reason: 'ok' | 'txt_ausente' | 'txt_distinto' | 'cname_distinto';
+  /** Destino al que debe apuntar el host (el ingress). */
+  expected?: string;
+  /** A dónde apunta hoy; ausente si no resuelve. */
+  found?: string;
+}
+
 export interface EnvVar {
   key: string;
   /** Valor enmascarado (los secretos nunca se devuelven en claro). */

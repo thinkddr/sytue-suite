@@ -105,12 +105,12 @@ export function SeenGlyph({ size = 16 }: { size?: number }): JSX.Element {
   );
 }
 
-/** Flecha a la derecha sobre una base (reenviar a otro canal). */
+/** Flecha a la derecha con la cola que baja (reenviar a otro canal). El mismo
+ *  dibujo que `forward` de Sytue Mail: reenviar es reenviar en las dos apps. */
 export function ForwardGlyph({ size = 16 }: { size?: number }): JSX.Element {
   return (
     <Glifo size={size}>
-      <polyline points="15 17 20 12 15 7" />
-      <path d="M4 18v-2a4 4 0 0 1 4-4h13" />
+      <path d="M14.5 6l5 5-5 5M19.5 11H10a5.5 5.5 0 0 0-5.5 5.5V18" />
     </Glifo>
   );
 }
@@ -146,7 +146,7 @@ export function StarGlyph({
 }): JSX.Element {
   return (
     <Glifo size={size} fill={filled ? 'currentColor' : undefined}>
-      <path d="M12 3.5l2.6 5.27 5.82.85-4.21 4.1.99 5.79L12 17.77 6.8 19.5l.99-5.79-4.21-4.1 5.82-.85L12 3.5Z" />
+      <path d="M12 3.6L14.4 9.3L20.6 9.8L15.9 13.9L17.3 19.9L12 16.7L6.7 19.9L8.1 13.9L3.4 9.8L9.6 9.3Z" />
     </Glifo>
   );
 }
@@ -197,7 +197,7 @@ export function ClockGlyph({ size = 16 }: { size?: number }): JSX.Element {
 export function ClipGlyph({ size = 16 }: { size?: number }): JSX.Element {
   return (
     <Glifo size={size}>
-      <path d="M21.44 11.05 12.25 20.24a5 5 0 0 1-7.07-7.07l9.19-9.19a3 3 0 0 1 4.24 4.24l-9.2 9.19a1 1 0 0 1-1.41-1.41l8.48-8.49" />
+      <path d="M6.75 10v5a5.25 5.25 0 0 0 10.5 0V7a3.5 3.5 0 0 0-7 0v8.5a1.75 1.75 0 0 0 3.5 0V9" />
     </Glifo>
   );
 }
@@ -261,7 +261,7 @@ export function UploadGlyph({ size = 16 }: { size?: number }): JSX.Element {
 export function FolderGlyph({ size = 16 }: { size?: number }): JSX.Element {
   return (
     <Glifo size={size}>
-      <path d="M3 7a2 2 0 0 1 2-2h3.5l2 2.5H19a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
+      <path d="M3.5 6.5A1.5 1.5 0 0 1 5 5h4.4l2 2.5H19a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 19.5H5a1.5 1.5 0 0 1-1.5-1.5ZM3.5 10.5h17" />
     </Glifo>
   );
 }
@@ -270,8 +270,7 @@ export function FolderGlyph({ size = 16 }: { size?: number }): JSX.Element {
 export function FileGlyph({ size = 16 }: { size?: number }): JSX.Element {
   return (
     <Glifo size={size}>
-      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z" />
-      <path d="M14 3v5h5" />
+      <path d="M13.5 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8.5ZM13.5 3.5V8.5h5" />
     </Glifo>
   );
 }

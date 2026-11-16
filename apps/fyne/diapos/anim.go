@@ -65,7 +65,7 @@ func AnimsDe(c Caja) []Anim {
 		// Los puntos solo valen en la trayectoria personalizada; las demás derivan su
 		// geometría del tipo.
 		if a.Tipo == "motion-custom" {
-			limpia.Puntos = a.Puntos
+			limpia.Puntos = sanearPuntos(a.Puntos)
 		}
 		fuera = append(fuera, limpia)
 	}
@@ -219,7 +219,8 @@ func PresenteEn(suyas []Planeada, paso int) bool {
 // Avanzar es `presentAdvance`: la siguiente posición (diapositiva, paso) al avanzar
 // (dir 1) o retroceder (dir −1). Avanzar revela el paso siguiente y, agotados, salta a
 // la próxima en su paso 0; retroceder oculta el último paso o vuelve a la anterior YA
-// construida. Con topes en los dos extremos.
+// construida. Las ocultas se saltan en los dos sentidos (ocultas.go); estando en una, se
+// sale de ella con normalidad. Con topes en los dos extremos.
 func Avanzar(diapos []Diapo, diapo, paso, dir int) (int, int) {
 	ultima := len(diapos) - 1
 	if ultima < 0 {
@@ -228,20 +229,21 @@ func Avanzar(diapos []Diapo, diapo, paso, dir int) (int, int) {
 	cur := min(max(diapo, 0), ultima)
 	pasos := Pasos(diapos[cur])
 	s := min(max(paso, 0), pasos)
+	ocultas := Saltables(diapos)
 	if dir > 0 {
-		switch {
-		case s < pasos:
+		if s < pasos {
 			return cur, s + 1
-		case cur < ultima:
-			return cur + 1, 0
+		}
+		if n := SiguienteVisible(ocultas, cur, 1); n != SinDestino {
+			return n, 0
 		}
 		return cur, s
 	}
-	switch {
-	case s > 0:
+	if s > 0 {
 		return cur, s - 1
-	case cur > 0:
-		return cur - 1, Pasos(diapos[cur-1])
+	}
+	if a := SiguienteVisible(ocultas, cur, -1); a != SinDestino {
+		return a, Pasos(diapos[a])
 	}
 	return cur, 0
 }

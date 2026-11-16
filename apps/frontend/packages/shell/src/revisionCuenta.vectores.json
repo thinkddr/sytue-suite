@@ -1,0 +1,910 @@
+{
+  "version": 1,
+  "nota": "Revisión de seguridad de una cuenta y sus «Primeros pasos». Cada caso son los datos que llegan de Sytue ID (null o ausente: no ha llegado) y lo que debe salir. La web los recorre en revisionCuenta.test.ts y el espejo Go en apps/nucleo/api/revision_cuenta_test.go: un cambio de criterio en un lado sin el otro sale en rojo.",
+  "revision": [
+    {
+      "nombre": "todo en orden: cinco puntos y ninguno en aviso",
+      "datos": {
+        "me": {
+          "mfa_enabled": true,
+          "recovery_email": "otra@example.eu"
+        },
+        "passkeys": [],
+        "sesiones": [
+          {
+            "current": true
+          }
+        ],
+        "dispositivos": [
+          {
+            "trusted": true,
+            "last_seen": "2026-11-07T12:00:00.000Z"
+          }
+        ],
+        "contrasenasApp": [
+          {
+            "created_at": "2025-10-06T12:00:00.000Z",
+            "last_used_at": "2026-10-31T12:00:00.000Z"
+          }
+        ],
+        "ahora": "2026-11-10T12:00:00.000Z"
+      },
+      "esperado": [
+        {
+          "clave": "dos_pasos",
+          "estado": "ok",
+          "ancla": "#seguridad",
+          "cuantos": 0
+        },
+        {
+          "clave": "recuperacion",
+          "estado": "ok",
+          "ancla": "#recuperacion",
+          "cuantos": 0
+        },
+        {
+          "clave": "sesiones",
+          "estado": "ok",
+          "ancla": "#sesiones",
+          "cuantos": 0
+        },
+        {
+          "clave": "contrasenas_app",
+          "estado": "ok",
+          "ancla": "#contrasenas-app",
+          "cuantos": 0
+        },
+        {
+          "clave": "dispositivos",
+          "estado": "ok",
+          "ancla": "#dispositivos",
+          "cuantos": 0
+        }
+      ]
+    },
+    {
+      "nombre": "sin verificación ni llave: aviso que lleva a #seguridad",
+      "datos": {
+        "me": {
+          "mfa_enabled": false,
+          "recovery_email": "otra@example.eu"
+        },
+        "passkeys": [],
+        "sesiones": [
+          {
+            "current": true
+          }
+        ],
+        "dispositivos": [
+          {
+            "trusted": true,
+            "last_seen": "2026-11-07T12:00:00.000Z"
+          }
+        ],
+        "contrasenasApp": [
+          {
+            "created_at": "2025-10-06T12:00:00.000Z",
+            "last_used_at": "2026-10-31T12:00:00.000Z"
+          }
+        ],
+        "ahora": "2026-11-10T12:00:00.000Z"
+      },
+      "esperado": [
+        {
+          "clave": "dos_pasos",
+          "estado": "aviso",
+          "ancla": "#seguridad",
+          "cuantos": 1
+        },
+        {
+          "clave": "recuperacion",
+          "estado": "ok",
+          "ancla": "#recuperacion",
+          "cuantos": 0
+        },
+        {
+          "clave": "sesiones",
+          "estado": "ok",
+          "ancla": "#sesiones",
+          "cuantos": 0
+        },
+        {
+          "clave": "contrasenas_app",
+          "estado": "ok",
+          "ancla": "#contrasenas-app",
+          "cuantos": 0
+        },
+        {
+          "clave": "dispositivos",
+          "estado": "ok",
+          "ancla": "#dispositivos",
+          "cuantos": 0
+        }
+      ]
+    },
+    {
+      "nombre": "sin verificación pero con una passkey: bien",
+      "datos": {
+        "me": {
+          "mfa_enabled": false,
+          "recovery_email": "otra@example.eu"
+        },
+        "passkeys": [
+          {
+            "id": "k"
+          }
+        ],
+        "sesiones": [
+          {
+            "current": true
+          }
+        ],
+        "dispositivos": [
+          {
+            "trusted": true,
+            "last_seen": "2026-11-07T12:00:00.000Z"
+          }
+        ],
+        "contrasenasApp": [
+          {
+            "created_at": "2025-10-06T12:00:00.000Z",
+            "last_used_at": "2026-10-31T12:00:00.000Z"
+          }
+        ],
+        "ahora": "2026-11-10T12:00:00.000Z"
+      },
+      "esperado": [
+        {
+          "clave": "dos_pasos",
+          "estado": "ok",
+          "ancla": "#seguridad",
+          "cuantos": 0
+        },
+        {
+          "clave": "recuperacion",
+          "estado": "ok",
+          "ancla": "#recuperacion",
+          "cuantos": 0
+        },
+        {
+          "clave": "sesiones",
+          "estado": "ok",
+          "ancla": "#sesiones",
+          "cuantos": 0
+        },
+        {
+          "clave": "contrasenas_app",
+          "estado": "ok",
+          "ancla": "#contrasenas-app",
+          "cuantos": 0
+        },
+        {
+          "clave": "dispositivos",
+          "estado": "ok",
+          "ancla": "#dispositivos",
+          "cuantos": 0
+        }
+      ]
+    },
+    {
+      "nombre": "sin correo ni móvil de recuperación (un espacio no cuenta): aviso",
+      "datos": {
+        "me": {
+          "mfa_enabled": true,
+          "recovery_email": " "
+        },
+        "passkeys": [],
+        "sesiones": [
+          {
+            "current": true
+          }
+        ],
+        "dispositivos": [
+          {
+            "trusted": true,
+            "last_seen": "2026-11-07T12:00:00.000Z"
+          }
+        ],
+        "contrasenasApp": [
+          {
+            "created_at": "2025-10-06T12:00:00.000Z",
+            "last_used_at": "2026-10-31T12:00:00.000Z"
+          }
+        ],
+        "ahora": "2026-11-10T12:00:00.000Z"
+      },
+      "esperado": [
+        {
+          "clave": "dos_pasos",
+          "estado": "ok",
+          "ancla": "#seguridad",
+          "cuantos": 0
+        },
+        {
+          "clave": "recuperacion",
+          "estado": "aviso",
+          "ancla": "#recuperacion",
+          "cuantos": 1
+        },
+        {
+          "clave": "sesiones",
+          "estado": "ok",
+          "ancla": "#sesiones",
+          "cuantos": 0
+        },
+        {
+          "clave": "contrasenas_app",
+          "estado": "ok",
+          "ancla": "#contrasenas-app",
+          "cuantos": 0
+        },
+        {
+          "clave": "dispositivos",
+          "estado": "ok",
+          "ancla": "#dispositivos",
+          "cuantos": 0
+        }
+      ]
+    },
+    {
+      "nombre": "con solo el móvil de recuperación: bien",
+      "datos": {
+        "me": {
+          "mfa_enabled": true,
+          "phone": "+34600000000"
+        },
+        "passkeys": [],
+        "sesiones": [
+          {
+            "current": true
+          }
+        ],
+        "dispositivos": [
+          {
+            "trusted": true,
+            "last_seen": "2026-11-07T12:00:00.000Z"
+          }
+        ],
+        "contrasenasApp": [
+          {
+            "created_at": "2025-10-06T12:00:00.000Z",
+            "last_used_at": "2026-10-31T12:00:00.000Z"
+          }
+        ],
+        "ahora": "2026-11-10T12:00:00.000Z"
+      },
+      "esperado": [
+        {
+          "clave": "dos_pasos",
+          "estado": "ok",
+          "ancla": "#seguridad",
+          "cuantos": 0
+        },
+        {
+          "clave": "recuperacion",
+          "estado": "ok",
+          "ancla": "#recuperacion",
+          "cuantos": 0
+        },
+        {
+          "clave": "sesiones",
+          "estado": "ok",
+          "ancla": "#sesiones",
+          "cuantos": 0
+        },
+        {
+          "clave": "contrasenas_app",
+          "estado": "ok",
+          "ancla": "#contrasenas-app",
+          "cuantos": 0
+        },
+        {
+          "clave": "dispositivos",
+          "estado": "ok",
+          "ancla": "#dispositivos",
+          "cuantos": 0
+        }
+      ]
+    },
+    {
+      "nombre": "cuenta las sesiones de otros equipos, las contraseñas sin uso y los dispositivos dormidos",
+      "datos": {
+        "me": {
+          "mfa_enabled": true,
+          "recovery_email": "otra@example.eu"
+        },
+        "passkeys": [],
+        "sesiones": [
+          {
+            "current": true
+          },
+          {
+            "current": false
+          },
+          {}
+        ],
+        "dispositivos": [
+          {
+            "trusted": true,
+            "last_seen": "2026-08-02T12:00:00.000Z"
+          },
+          {
+            "trusted": true,
+            "current": true,
+            "last_seen": "2026-08-02T12:00:00.000Z"
+          },
+          {
+            "trusted": false,
+            "last_seen": "2026-01-14T12:00:00.000Z"
+          }
+        ],
+        "contrasenasApp": [
+          {
+            "created_at": "2026-04-24T12:00:00.000Z",
+            "last_used_at": "2026-08-11T12:00:00.000Z"
+          },
+          {
+            "created_at": "2026-07-13T12:00:00.000Z",
+            "last_used_at": null
+          },
+          {
+            "created_at": "2026-11-05T12:00:00.000Z",
+            "last_used_at": null
+          }
+        ],
+        "ahora": "2026-11-10T12:00:00.000Z"
+      },
+      "esperado": [
+        {
+          "clave": "dos_pasos",
+          "estado": "ok",
+          "ancla": "#seguridad",
+          "cuantos": 0
+        },
+        {
+          "clave": "recuperacion",
+          "estado": "ok",
+          "ancla": "#recuperacion",
+          "cuantos": 0
+        },
+        {
+          "clave": "sesiones",
+          "estado": "aviso",
+          "ancla": "#sesiones",
+          "cuantos": 2
+        },
+        {
+          "clave": "contrasenas_app",
+          "estado": "aviso",
+          "ancla": "#contrasenas-app",
+          "cuantos": 2
+        },
+        {
+          "clave": "dispositivos",
+          "estado": "aviso",
+          "ancla": "#dispositivos",
+          "cuantos": 1
+        }
+      ]
+    },
+    {
+      "nombre": "sin fechas no hay nada olvidado",
+      "datos": {
+        "me": {
+          "mfa_enabled": true,
+          "recovery_email": "otra@example.eu"
+        },
+        "passkeys": [],
+        "sesiones": [
+          {
+            "current": true
+          }
+        ],
+        "dispositivos": [
+          {
+            "trusted": true
+          }
+        ],
+        "contrasenasApp": [{}],
+        "ahora": "2026-11-10T12:00:00.000Z"
+      },
+      "esperado": [
+        {
+          "clave": "dos_pasos",
+          "estado": "ok",
+          "ancla": "#seguridad",
+          "cuantos": 0
+        },
+        {
+          "clave": "recuperacion",
+          "estado": "ok",
+          "ancla": "#recuperacion",
+          "cuantos": 0
+        },
+        {
+          "clave": "sesiones",
+          "estado": "ok",
+          "ancla": "#sesiones",
+          "cuantos": 0
+        },
+        {
+          "clave": "contrasenas_app",
+          "estado": "ok",
+          "ancla": "#contrasenas-app",
+          "cuantos": 0
+        },
+        {
+          "clave": "dispositivos",
+          "estado": "ok",
+          "ancla": "#dispositivos",
+          "cuantos": 0
+        }
+      ]
+    },
+    {
+      "nombre": "sin datos, sin avisos inventados",
+      "datos": {
+        "ahora": "2026-11-10T12:00:00.000Z"
+      },
+      "esperado": []
+    },
+    {
+      "nombre": "sin /me ni dispositivos solo salen sesiones y contraseñas",
+      "datos": {
+        "me": null,
+        "passkeys": [],
+        "sesiones": [
+          {
+            "current": true
+          }
+        ],
+        "dispositivos": null,
+        "contrasenasApp": [
+          {
+            "created_at": "2025-10-06T12:00:00.000Z",
+            "last_used_at": "2026-10-31T12:00:00.000Z"
+          }
+        ],
+        "ahora": "2026-11-10T12:00:00.000Z"
+      },
+      "esperado": [
+        {
+          "clave": "sesiones",
+          "estado": "ok",
+          "ancla": "#sesiones",
+          "cuantos": 0
+        },
+        {
+          "clave": "contrasenas_app",
+          "estado": "ok",
+          "ancla": "#contrasenas-app",
+          "cuantos": 0
+        }
+      ]
+    },
+    {
+      "nombre": "sin verificación y sin saber de las passkeys: no se avisa (podría tener llave)",
+      "datos": {
+        "me": {
+          "mfa_enabled": false,
+          "recovery_email": "otra@example.eu"
+        },
+        "passkeys": null,
+        "sesiones": [
+          {
+            "current": true
+          }
+        ],
+        "dispositivos": [
+          {
+            "trusted": true,
+            "last_seen": "2026-11-07T12:00:00.000Z"
+          }
+        ],
+        "contrasenasApp": [
+          {
+            "created_at": "2025-10-06T12:00:00.000Z",
+            "last_used_at": "2026-10-31T12:00:00.000Z"
+          }
+        ],
+        "ahora": "2026-11-10T12:00:00.000Z"
+      },
+      "esperado": [
+        {
+          "clave": "recuperacion",
+          "estado": "ok",
+          "ancla": "#recuperacion",
+          "cuantos": 0
+        },
+        {
+          "clave": "sesiones",
+          "estado": "ok",
+          "ancla": "#sesiones",
+          "cuantos": 0
+        },
+        {
+          "clave": "contrasenas_app",
+          "estado": "ok",
+          "ancla": "#contrasenas-app",
+          "cuantos": 0
+        },
+        {
+          "clave": "dispositivos",
+          "estado": "ok",
+          "ancla": "#dispositivos",
+          "cuantos": 0
+        }
+      ]
+    },
+    {
+      "nombre": "con la verificación encendida las passkeys dan igual",
+      "datos": {
+        "me": {
+          "mfa_enabled": true,
+          "recovery_email": "otra@example.eu"
+        },
+        "passkeys": null,
+        "sesiones": [
+          {
+            "current": true
+          }
+        ],
+        "dispositivos": [
+          {
+            "trusted": true,
+            "last_seen": "2026-11-07T12:00:00.000Z"
+          }
+        ],
+        "contrasenasApp": [
+          {
+            "created_at": "2025-10-06T12:00:00.000Z",
+            "last_used_at": "2026-10-31T12:00:00.000Z"
+          }
+        ],
+        "ahora": "2026-11-10T12:00:00.000Z"
+      },
+      "esperado": [
+        {
+          "clave": "dos_pasos",
+          "estado": "ok",
+          "ancla": "#seguridad",
+          "cuantos": 0
+        },
+        {
+          "clave": "recuperacion",
+          "estado": "ok",
+          "ancla": "#recuperacion",
+          "cuantos": 0
+        },
+        {
+          "clave": "sesiones",
+          "estado": "ok",
+          "ancla": "#sesiones",
+          "cuantos": 0
+        },
+        {
+          "clave": "contrasenas_app",
+          "estado": "ok",
+          "ancla": "#contrasenas-app",
+          "cuantos": 0
+        },
+        {
+          "clave": "dispositivos",
+          "estado": "ok",
+          "ancla": "#dispositivos",
+          "cuantos": 0
+        }
+      ]
+    }
+  ],
+  "primerosPasos": [
+    {
+      "nombre": "con verificación, recuperación, foto, un dispositivo e instalada: no queda nada",
+      "datos": {
+        "me": {
+          "mfa_enabled": true,
+          "recovery_email": "otra@example.eu",
+          "has_avatar": true
+        },
+        "passkeys": [],
+        "contrasenasApp": [
+          {
+            "id": "thunderbird"
+          }
+        ],
+        "instalada": true
+      },
+      "esperado": []
+    },
+    {
+      "nombre": "cuenta recién creada: los cinco, en orden",
+      "datos": {
+        "me": {
+          "mfa_enabled": false,
+          "has_avatar": false
+        },
+        "passkeys": [],
+        "contrasenasApp": [],
+        "instalada": false
+      },
+      "esperado": [
+        {
+          "clave": "dos_pasos",
+          "destino": "cuenta",
+          "ruta": "#seguridad"
+        },
+        {
+          "clave": "recuperacion",
+          "destino": "cuenta",
+          "ruta": "#recuperacion"
+        },
+        {
+          "clave": "foto",
+          "destino": "cuenta",
+          "ruta": "#perfil"
+        },
+        {
+          "clave": "dispositivos",
+          "destino": "portal",
+          "ruta": "/dispositivos"
+        },
+        {
+          "clave": "instalar",
+          "destino": "portal",
+          "ruta": "/descargas"
+        }
+      ]
+    },
+    {
+      "nombre": "cuenta recién creada en una app instalada: sin «instalar»",
+      "datos": {
+        "me": {
+          "mfa_enabled": false,
+          "has_avatar": false
+        },
+        "passkeys": [],
+        "contrasenasApp": [],
+        "instalada": true
+      },
+      "esperado": [
+        {
+          "clave": "dos_pasos",
+          "destino": "cuenta",
+          "ruta": "#seguridad"
+        },
+        {
+          "clave": "recuperacion",
+          "destino": "cuenta",
+          "ruta": "#recuperacion"
+        },
+        {
+          "clave": "foto",
+          "destino": "cuenta",
+          "ruta": "#perfil"
+        },
+        {
+          "clave": "dispositivos",
+          "destino": "portal",
+          "ruta": "/dispositivos"
+        }
+      ]
+    },
+    {
+      "nombre": "sin código: solo la verificación",
+      "datos": {
+        "me": {
+          "mfa_enabled": false,
+          "recovery_email": "otra@example.eu",
+          "has_avatar": true
+        },
+        "passkeys": [],
+        "contrasenasApp": [
+          {
+            "id": "thunderbird"
+          }
+        ],
+        "instalada": true
+      },
+      "esperado": [
+        {
+          "clave": "dos_pasos",
+          "destino": "cuenta",
+          "ruta": "#seguridad"
+        }
+      ]
+    },
+    {
+      "nombre": "una passkey cumple la verificación",
+      "datos": {
+        "me": {
+          "mfa_enabled": false,
+          "recovery_email": "otra@example.eu",
+          "has_avatar": true
+        },
+        "passkeys": [
+          {
+            "id": "k"
+          }
+        ],
+        "contrasenasApp": [
+          {
+            "id": "thunderbird"
+          }
+        ],
+        "instalada": true
+      },
+      "esperado": []
+    },
+    {
+      "nombre": "con solo el móvil de recuperación también está cumplida",
+      "datos": {
+        "me": {
+          "mfa_enabled": true,
+          "phone": "+34600000000",
+          "has_avatar": true
+        },
+        "passkeys": [],
+        "contrasenasApp": [
+          {
+            "id": "thunderbird"
+          }
+        ],
+        "instalada": true
+      },
+      "esperado": []
+    },
+    {
+      "nombre": "sin /me, passkeys ni contraseñas no se pide nada",
+      "datos": {
+        "me": null,
+        "passkeys": null,
+        "contrasenasApp": null,
+        "instalada": true
+      },
+      "esperado": []
+    },
+    {
+      "nombre": "sin saber de las passkeys no se pide la verificación",
+      "datos": {
+        "me": {
+          "mfa_enabled": false,
+          "recovery_email": "otra@example.eu",
+          "has_avatar": true
+        },
+        "passkeys": null,
+        "contrasenasApp": [
+          {
+            "id": "thunderbird"
+          }
+        ],
+        "instalada": true
+      },
+      "esperado": []
+    },
+    {
+      "nombre": "un /me sin has_avatar no es «sin foto»",
+      "datos": {
+        "me": {
+          "mfa_enabled": true,
+          "recovery_email": "a@b.eu"
+        },
+        "passkeys": [],
+        "contrasenasApp": [
+          {
+            "id": "thunderbird"
+          }
+        ],
+        "instalada": true
+      },
+      "esperado": []
+    },
+    {
+      "nombre": "foto, dispositivos e instalar pendientes",
+      "datos": {
+        "me": {
+          "mfa_enabled": true,
+          "recovery_email": "otra@example.eu",
+          "has_avatar": false
+        },
+        "passkeys": [],
+        "contrasenasApp": [],
+        "instalada": false
+      },
+      "esperado": [
+        {
+          "clave": "foto",
+          "destino": "cuenta",
+          "ruta": "#perfil"
+        },
+        {
+          "clave": "dispositivos",
+          "destino": "portal",
+          "ruta": "/dispositivos"
+        },
+        {
+          "clave": "instalar",
+          "destino": "portal",
+          "ruta": "/descargas"
+        }
+      ]
+    },
+    {
+      "nombre": "con un dispositivo conectado desaparece ese paso",
+      "datos": {
+        "me": {
+          "mfa_enabled": true,
+          "recovery_email": "otra@example.eu",
+          "has_avatar": false
+        },
+        "passkeys": [],
+        "contrasenasApp": [
+          {
+            "id": "x"
+          }
+        ],
+        "instalada": false
+      },
+      "esperado": [
+        {
+          "clave": "foto",
+          "destino": "cuenta",
+          "ruta": "#perfil"
+        },
+        {
+          "clave": "instalar",
+          "destino": "portal",
+          "ruta": "/descargas"
+        }
+      ]
+    },
+    {
+      "nombre": "instalada desaparece «instalar»",
+      "datos": {
+        "me": {
+          "mfa_enabled": true,
+          "recovery_email": "otra@example.eu",
+          "has_avatar": false
+        },
+        "passkeys": [],
+        "contrasenasApp": [],
+        "instalada": true
+      },
+      "esperado": [
+        {
+          "clave": "foto",
+          "destino": "cuenta",
+          "ruta": "#perfil"
+        },
+        {
+          "clave": "dispositivos",
+          "destino": "portal",
+          "ruta": "/dispositivos"
+        }
+      ]
+    },
+    {
+      "nombre": "con verificación, recuperación y foto no hay tarjeta aunque falte conectar o instalar",
+      "datos": {
+        "me": {
+          "mfa_enabled": true,
+          "recovery_email": "otra@example.eu",
+          "has_avatar": true
+        },
+        "passkeys": [],
+        "contrasenasApp": [],
+        "instalada": false
+      },
+      "esperado": []
+    },
+    {
+      "nombre": "sin /me no hay tarjeta aunque falte conectar o instalar",
+      "datos": {
+        "me": null,
+        "passkeys": [],
+        "contrasenasApp": [],
+        "instalada": false
+      },
+      "esperado": []
+    }
+  ]
+}

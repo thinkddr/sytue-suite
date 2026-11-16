@@ -27,6 +27,7 @@ import {
   ToastProvider,
   useToast,
   ConfirmDialog,
+  Stat,
 } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import { useT, type ConsoleMessageKey as MessageKey, type T } from '../i18n/index.js';
@@ -877,17 +878,6 @@ function PlatformAudit({
   );
 }
 
-function StatCard({ label, value }: { label: string; value: number | string }) {
-  return (
-    <Card>
-      <CardBody>
-        <p class="sy-stat__label">{label}</p>
-        <p class="sy-stat__value">{value}</p>
-      </CardBody>
-    </Card>
-  );
-}
-
 function Inner({
   locale,
   usage,
@@ -1212,15 +1202,15 @@ function Inner({
             id: 'usage',
             label: t('platform.tab.usage'),
             content: usage ? (
-              <div class="sy-stats">
-                <StatCard label={t('platform.usage.orgs')} value={usage.orgs} />
-                <StatCard label={t('platform.usage.orgsActive')} value={usage.orgs_active} />
-                <StatCard label={t('platform.usage.orgsSuspended')} value={usage.orgs_suspended} />
-                <StatCard label={t('platform.usage.users')} value={usage.users_active} />
-                <StatCard label={t('platform.usage.users30d')} value={usage.users_active_30d} />
-                <StatCard label={t('platform.usage.seatsSold')} value={usage.seats_purchased} />
-                <StatCard label={t('platform.usage.seatsGranted')} value={usage.seats_granted} />
-                <StatCard label={t('platform.usage.subs')} value={usage.subscriptions_active} />
+              <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                <Stat label={t('platform.usage.orgs')} value={usage.orgs} />
+                <Stat label={t('platform.usage.orgsActive')} value={usage.orgs_active} />
+                <Stat label={t('platform.usage.orgsSuspended')} value={usage.orgs_suspended} />
+                <Stat label={t('platform.usage.users')} value={usage.users_active} />
+                <Stat label={t('platform.usage.users30d')} value={usage.users_active_30d} />
+                <Stat label={t('platform.usage.seatsSold')} value={usage.seats_purchased} />
+                <Stat label={t('platform.usage.seatsGranted')} value={usage.seats_granted} />
+                <Stat label={t('platform.usage.subs')} value={usage.subscriptions_active} />
               </div>
             ) : (
               <EmptyState title={t('platform.error.unavailable')} />
@@ -1550,7 +1540,7 @@ function OrgDetailModal({
             </div>
           </div>
 
-          <h4 class="sy-stat__label">{t('platform.detail.grants')}</h4>
+          <h4 class="text-text-muted text-sm">{t('platform.detail.grants')}</h4>
           {fallo ? (
             <EmptyState title={t('platform.error.unavailable')} />
           ) : grants === null ? (

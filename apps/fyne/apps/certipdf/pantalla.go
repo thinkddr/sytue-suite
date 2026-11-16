@@ -186,6 +186,7 @@ func NuevaPantalla(tv TraductorVars) *Pantalla {
 	}
 	p.barra.AlPanel = func(v bool) { p.PanelAbierto = v; p.Recomponer() }
 	p.barra.AlPulsarDialogo = p.abrirDialogo
+	p.barra.AlDescargar, p.barra.AlImprimir = p.descargar, p.imprimir
 	return p
 }
 
@@ -216,7 +217,9 @@ func (p *Pantalla) recomponer() {
 		b.Total = c.Total
 		// `puedeAnotar` de `Barra.tsx`, literal.
 		b.PuedeAnotar = c.Permisos.Anotar || !c.Permisos.SoloConClaveDeDueno
+		b.PuedeImprimir = puedeImprimir(c.Permisos)
 	}
+	b.SinImpresion = sinImpresion()
 	b.Pagina, b.Zoom, b.Ajuste, b.DosPaginas = p.PaginaActual, p.Zoom, p.Ajuste, p.DosPaginas
 	b.Trabajando, b.PanelAbierto, b.Ancho = p.Trabajando, p.PanelAbierto, p.ancho
 	b.AlNuevo, b.AlAbrir = p.AlCrear, p.AlElegir

@@ -178,7 +178,7 @@ func TestLosNombresSiguenASusCeldas(t *testing.T) {
 	if n := l.Nombres(); len(n) != 2 {
 		t.Errorf("borrar la hoja se lleva su nombre de hoja: %+v", n)
 	}
-	d := formula.Desplazamiento{Filas: true, Desde: 2, Cantidad: -2, Tope: Filas}
+	d := formula.Desplazamiento{Filas: true, Desde: 2, Cantidad: -2, Tope: MaxFilas}
 	if got := moverNombres([]Nombre{{Name: "X", Ref: "H!$B$3:$B$4"}}, "H", "H", d)[0].Ref; !strings.Contains(got, formula.RefRota) {
 		t.Errorf("lo borrado entero pasa a #¡REF!: %q", got)
 	}

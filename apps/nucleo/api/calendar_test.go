@@ -203,7 +203,7 @@ func TestCompartidosConmigo(t *testing.T) {
 }
 
 func TestLosCamposDeCalendarSonLosDelServicio(t *testing.T) {
-	dominio := webref.Read(t, "services/calendar/internal/domain/domain.go")
+	dominio := calendarServiceModelContract(t)
 	for _, campo := range []string{
 		`json:"dtstart"`, `json:"dtend"`, `json:"all_day"`, `json:"calendar_id"`, `json:"display_name"`, `json:"read_only"`, `json:"is_default"`, `json:"rrule,omitempty"`,
 		`json:"classification"`, `json:"transp"`, `json:"rdate,omitempty"`, `json:"exdate,omitempty"`, `json:"recurrence_id,omitempty"`, `json:"attendees,omitempty"`,
@@ -221,7 +221,7 @@ func TestLosCamposDeCalendarSonLosDelServicio(t *testing.T) {
 		!strings.Contains(compartir, "`json:\"shared_by\"`") {
 		t.Error("services/calendar ya no manda permission/shared_by en shared-with-me: revisar SharedWithMe")
 	}
-	if permisos := webref.Read(t, "services/calendar/internal/domain/share.go"); !strings.Contains(permisos, `PermReader SharePermission = "reader"`) ||
+	if permisos := calendarServiceModelContract(t); !strings.Contains(permisos, `PermReader SharePermission = "reader"`) ||
 		!strings.Contains(permisos, `PermWriter SharePermission = "writer"`) {
 		t.Error("services/calendar cambió los nombres de los permisos: revisar PermisoLeer y PermisoEditar")
 	}
@@ -255,21 +255,26 @@ func TestLosCamposDeCalendarSonLosDelServicio(t *testing.T) {
 			t.Errorf("services/calendar ya no monta %s", ruta)
 		}
 	}
-	// El PUT borra la fila MAESTRA y la inserta de nuevo: por eso el evento vuelve con otro
-	// id, y por eso sustituir la excepción de una serie (recurrence_id) pisaría la serie.
-	if almacen := webref.Read(t, "services/calendar/internal/store/events.go"); !strings.Contains(almacen, "DELETE FROM events WHERE tenant=$1 AND object_id=$2 AND recurrence_id IS NULL") {
-		t.Error("services/calendar ya no sustituye la fila maestra en el PUT: revisar UpdateEvent y quién puede editarse en apps/calendar")
+	// El PUT actualiza la fila MAESTRA en sitio (conserva el id: D-CAL-02) y siempre la
+	// maestra: por eso sustituir la excepción de una serie (recurrence_id) pisaría la serie.
+	if almacen := webref.Read(t, "services/calendar/internal/store/events.go"); !strings.Contains(almacen, "ev, err = updateMasterRow(ctx, tx, t.Slug, objID, in)") ||
+		!strings.Contains(almacen, "WHERE tenant=$1 AND object_id=$2 AND recurrence_id IS NULL AND deleted_at IS NULL") {
+		t.Error("services/calendar ya no actualiza la fila maestra en el PUT: revisar UpdateEvent y quién puede editarse en apps/calendar")
 	}
 	// Los días completos son flotantes en UTC: Instance.Day depende de ello.
-	if zona := webref.Read(t, "services/calendar/internal/domain/tz.go"); !strings.Contains(zona, "if allDay {\n\t\treturn time.UTC") {
+	if zona := webref.Read(t, "apps/nucleo/calendar/event/tz.go"); !strings.Contains(zona, "if allDay {\n\t\treturn time.UTC") {
 		t.Error("services/calendar ya no guarda los días completos en UTC: revisar Instance.Day")
+	}
+	if backend := webref.Read(t, "services/calendar/internal/domain/domain.go"); !strings.Contains(backend, "return event.Location(tzid, allDay)") {
+		t.Error("services/calendar ya no usa la zona del modelo compartido")
 	}
 }
 
 // TestLoQueFaltabaDeCalendar: buscar, contestar desde el evento, recortar una serie,
 // refrescar una suscripción y exportarla, con las rutas y los cuerpos del servicio.
 func TestLoQueFaltabaDeCalendar(t *testing.T) {
-	var partstat, recorte map[string]any
+	var partstat, porUID, recorte map[string]any
+	var rutaUID string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method + " " + r.URL.Path {
 		case "GET /api/v1/events/search":
@@ -280,6 +285,11 @@ func TestLoQueFaltabaDeCalendar(t *testing.T) {
 		case "PUT /api/v1/events/e1/attendees/partstat":
 			datos, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(datos, &partstat)
+			_, _ = io.WriteString(w, `{}`)
+		case "PUT /api/v1/events/u1@calendar.sytue.eu/attendees/partstat":
+			rutaUID = r.URL.EscapedPath()
+			datos, _ := io.ReadAll(r.Body)
+			_ = json.Unmarshal(datos, &porUID)
 			_, _ = io.WriteString(w, `{}`)
 		case "POST /api/v1/calendars/c1/amend-recurrence":
 			datos, _ := io.ReadAll(r.Body)
@@ -310,6 +320,11 @@ func TestLoQueFaltabaDeCalendar(t *testing.T) {
 	}
 	if err := c.SetPartStat(ctx, "e1", AsistenciaQuiza); err != nil || partstat["partstat"] != "TENTATIVE" {
 		t.Errorf("partstat: %v, %v", partstat, err)
+	}
+	// Por UID, el UID va también en el cuerpo: es lo que el servicio mira primero.
+	if err := c.ResponderPorUID(ctx, "u1@calendar.sytue.eu", AsistenciaNo); err != nil ||
+		porUID["uid"] != "u1@calendar.sytue.eu" || porUID["partstat"] != "DECLINED" {
+		t.Errorf("partstat por UID: %v (%s), %v", porUID, rutaUID, err)
 	}
 	inst := time.Date(2026, 9, 21, 8, 0, 0, 0, time.UTC)
 	if err := c.AmendRecurrence(ctx, "c1", "u1", inst, RecorteHasta); err != nil ||
@@ -374,7 +389,7 @@ func TestCompartirUnCalendario(t *testing.T) {
 	if err := c.RevokeShare(ctx, "c1", "s1"); err != nil {
 		t.Errorf("revocar: %v", err)
 	}
-	if s := webref.Read(t, "services/calendar/internal/domain/share.go"); !strings.Contains(s, "`json:\"grantee_email,omitempty\"`") ||
+	if s := calendarServiceModelContract(t); !strings.Contains(s, "`json:\"grantee_email,omitempty\"`") ||
 		!strings.Contains(s, `PermManage SharePermission = "manage"`) {
 		t.Error("services/calendar cambió cómo nombra a quién se comparte o el permiso de llevar la agenda")
 	}
@@ -421,6 +436,13 @@ func TestLosRecordatoriosDelEvento(t *testing.T) {
 	if err := json.Unmarshal([]byte(`{"id":"e2"}`), &suelto); err != nil || suelto.Reminders != nil {
 		t.Fatalf("un evento sin recordatorios en el JSON: %v %v", suelto.Reminders, err)
 	}
+}
+
+func calendarServiceModelContract(t *testing.T) string {
+	t.Helper()
+	aliases := map[string]string{"Calendar": "Calendar", "CalendarObject": "CalendarObject", "Event": "Event", "EventInput": "Input", "EventStatus": "Status", "Classification": "Classification", "Transparency": "Transparency", "Attendee": "Attendee", "Invitation": "Invitation", "InvitationStatus": "InvitationStatus", "SharePermission": "SharePermission", "CalendarShare": "CalendarShare"}
+	constants := map[string]string{"InvAccepted": "InvAccepted", "InvTentative": "InvTentative", "InvDeclined": "InvDeclined", "PermReader": "PermReader", "PermWriter": "PermWriter", "PermManage": "PermManage"}
+	return sharedServiceModelContract(t, "services/calendar/internal/domain/domain.go", "git.sytue.eu/sytue/one/apps/nucleo/calendar/event", aliases, constants, "apps/nucleo/calendar/event/domain.go", "apps/nucleo/calendar/event/share.go")
 }
 
 // TestLaBusquedaFiltraPorCalendarioYPeriodo: los filtros del buscador viajan como los

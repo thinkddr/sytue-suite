@@ -13,14 +13,12 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
 
-	"git.sytue.eu/sytue/one/apps/nucleo/api"
-	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
-
-	"git.sytue.eu/sytue/one/apps/fyne/agenda"
 	"git.sytue.eu/sytue/one/apps/fyne/catalogos"
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
 // Guardianes de Sytue Contacts: clases de ContactsApp.tsx y AppShell.tsx con la
@@ -114,18 +112,18 @@ func TestLosSeisEstadosSePintan(t *testing.T) {
 		nombre string
 		e      Estado
 	}{
-		{"carga", agenda.Cargando},
-		{"vacio", agenda.Vacia},
-		{"error", agenda.Error},
-		{"sin-conexion", agenda.SinConexion},
-		{"sin-permiso", agenda.SinPermiso},
-		{"exito", agenda.Exito},
+		{"carga", ui.EstadoCargando},
+		{"vacio", ui.EstadoVacia},
+		{"error", ui.EstadoError},
+		{"sin-conexion", ui.EstadoSinConexion},
+		{"sin-permiso", ui.EstadoSinPermiso},
+		{"exito", ui.EstadoExito},
 	} {
 		t.Run(c.nombre, func(t *testing.T) {
 			p := pantallaDeMuestra(t)
 			p.Estado = c.e
-			p.SinConexion = c.e == agenda.SinConexion
-			if c.e == agenda.Vacia {
+			p.SinConexion = c.e == ui.EstadoSinConexion
+			if c.e == ui.EstadoVacia {
 				p.Contactos = nil
 			}
 			img := pintar(t, p)

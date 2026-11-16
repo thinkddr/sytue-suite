@@ -19,9 +19,9 @@ import {
   IconButton,
   MenuItem,
   useToast,
-  Illustration,
   type ImageErrorCode,
   Glifo,
+  Tag,
 } from '@sytue/ui';
 import { appUrl } from '@sytue/config';
 import { intlTag, type Locale } from '@sytue/i18n';
@@ -34,9 +34,11 @@ import {
   type Contact,
   type ContactGroup,
 } from '../client/contactsApi.js';
-import { parseVcardDetails, type PostalAddress, type TypedValue } from '../lib/vcard.js';
+import { cumpleanosDe, formatearCumpleanos } from '../client/cumpleanos.js';
+import { parseVcardDetails, roleLine, type PostalAddress, type TypedValue } from '../lib/vcard.js';
 import { downloadVcf, exportFilename, hasEmbeddedPhoto } from '../client/vcard.js';
 import { correoPrincipal } from '../client/seleccion.js';
+import { InteraccionesRecientes } from './InteraccionesRecientes.js';
 
 /** Código de fallo de imagen -> clave de catálogo. */
 const PHOTO_ERROR_KEY: Record<ImageErrorCode, ContactsMessageKey> = {
@@ -67,6 +69,31 @@ function typeLabel(t: T, type: string, isAddress = false): string {
   return key ? t(key) : type;
 }
 
+/** Tipo de relación (RELATED) -> clave de catálogo (los que ofrece el editor). */
+const RELATION_KEY: Record<string, ContactsMessageKey> = {
+  spouse: 'relation.spouse',
+  child: 'relation.child',
+  parent: 'relation.parent',
+  sibling: 'relation.sibling',
+  friend: 'relation.friend',
+  'co-worker': 'relation.coworker',
+  emergency: 'relation.emergency',
+};
+
+/** Como `typeLabel`: un tipo que el editor no ofrece se enseña tal cual; sin tipo, ''. */
+function relationLabel(t: T, type: string): string {
+  const key = RELATION_KEY[type.toLowerCase()];
+  return key ? t(key) : type;
+}
+
+/** Aniversario YYYY-MM-DD en fecha larga del idioma (sin desfase de zona horaria). */
+function formatDateLong(iso: string, tag: string): string {
+  const [y = 1970, m = 1, d = 1] = iso.split('-').map(Number);
+  return new Intl.DateTimeFormat(tag, { dateStyle: 'long', timeZone: 'UTC' }).format(
+    new Date(Date.UTC(y, m - 1, d)),
+  );
+}
+
 /** Principal primero (orden estable), para listar correos y teléfonos en la ficha. */
 function primaryFirst<V extends { primary?: boolean | undefined }>(list: V[]): V[] {
   return [...list].sort((a, b) => Number(b.primary ?? false) - Number(a.primary ?? false));
@@ -77,21 +104,6 @@ function addressLines(a: PostalAddress): string[] {
   return [a.street, [a.postalCode, a.city].filter(Boolean).join(' '), a.region, a.country]
     .map((line) => (line ?? '').trim())
     .filter(Boolean);
-}
-
-/**
- * Cumpleaños en el formato del idioma. La fecha se construye por partes y no con
- * `new Date('1990-05-04')`, que es medianoche UTC: al oeste de Greenwich eso se
- * pinta como el día 3.
- */
-function formatBirthday(iso: string, locale: Locale): string {
-  const [y, m, d] = iso.split('-').map(Number);
-  if (!y || !m || !d) return iso;
-  return new Intl.DateTimeFormat(intlTag(locale), {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(new Date(y, m - 1, d));
 }
 
 interface Props {
@@ -151,6 +163,10 @@ export function ContactDetail({
   // Dirección, cumpleaños, nota y la etiqueta de cada correo/teléfono viven en la
   // vCard cruda: el proyectado del SDK solo trae los valores planos, así que sin
   // leerla aquí la ficha no enseñaba nada de lo que el editor sí deja escribir.
+  // El cumpleaños se lee con `cumpleanosDe`, el mismo lector de «Próximos
+  // cumpleaños»: así un BDAY sin año (`--MM-DD`), que la lista ya cuenta, también
+  // sale en la ficha, y lo que una no enseña la otra tampoco.
+  const cumpleanos = useMemo(() => (contact ? cumpleanosDe(contact.vcard) : null), [contact]);
   const details = useMemo(
     () => (contact ? parseVcardDetails(contact.vcard) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -165,7 +181,7 @@ export function ContactDetail({
         class="h-full"
         title={t('detail.emptyTitle')}
         description={t('detail.emptyDescription')}
-        illustration={<Illustration name="emptyContacts" />}
+        spot="emptyContacts"
         action={
           onCreate ? (
             <Button
@@ -196,6 +212,7 @@ export function ContactDetail({
   };
 
   const emails = primaryFirst(details.emails);
+  const role = roleLine(details.title, contact.organization);
   const phones = primaryFirst(details.phones);
   // El de «Enviar correo a todos»: una sola regla del principal para los dos botones.
   const primaryEmail = correoPrincipal(contact);
@@ -221,7 +238,7 @@ export function ContactDetail({
 
   return (
     <div class="mx-auto w-full max-w-3xl p-4 sm:p-6 lg:p-8">
-      {/* Cabecera de identidad: avatar + nombre + organización + acciones. */}
+      {/* Cabecera de identidad: avatar + nombre + «Cargo · Empresa» + acciones. */}
       <header class="flex flex-col gap-4 sm:flex-row sm:items-center">
         <ContactPhoto t={t} contact={contact} onChanged={onChanged} editable={!readOnly} />
         <div class="min-w-0 flex-1">
@@ -229,9 +246,9 @@ export function ContactDetail({
           <h2 class="sytue-h2 text-text truncate" title={contact.fullName}>
             {contact.fullName}
           </h2>
-          {contact.organization ? (
-            <p class="text-text-muted mt-0.5 truncate text-base" title={contact.organization}>
-              {contact.organization}
+          {role ? (
+            <p class="text-text-muted mt-0.5 truncate text-base" title={role}>
+              {role}
             </p>
           ) : null}
         </div>
@@ -374,8 +391,13 @@ export function ContactDetail({
               {contact.organization ?? '—'}
             </span>
           </Field>
-          {/* Dirección, cumpleaños y nota SOLO si los hay: una ficha con tres
+          {/* Apodo, dirección, web, fechas, relaciones y nota SOLO si los hay: una ficha con tres
               guiones de más no informa de nada (Apple/Google tampoco los pintan). */}
+          {details.nickname ? (
+            <Field label={t('field.nickname')}>
+              <span class="text-text break-words">{details.nickname}</span>
+            </Field>
+          ) : null}
           {details.addresses.length ? (
             <Field label={t('field.address')}>
               <div class="flex flex-col gap-2">
@@ -403,9 +425,50 @@ export function ContactDetail({
               </div>
             </Field>
           ) : null}
-          {details.birthday ? (
+          {details.urls.length ? (
+            <Field label={t('field.website')}>
+              <div class="flex flex-col gap-1">
+                {details.urls.map((u, i) => (
+                  <TypedRow
+                    key={`${u.value}-${i}`}
+                    t={t}
+                    value={u}
+                    onCopy={() => void copiar(u.value, 'detail.websiteCopied')}
+                  >
+                    {/* Solo http(s) llega aquí (parseVcardDetails): abrirlo es seguro. */}
+                    <a
+                      href={u.value}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class={`${linkClass} text-primary-text`}
+                    >
+                      {u.value}
+                    </a>
+                  </TypedRow>
+                ))}
+              </div>
+            </Field>
+          ) : null}
+          {cumpleanos ? (
             <Field label={t('field.birthday')}>
-              <span class="text-text">{formatBirthday(details.birthday, locale)}</span>
+              <span class="text-text">{formatearCumpleanos(cumpleanos, intlTag(locale))}</span>
+            </Field>
+          ) : null}
+          {details.anniversary ? (
+            <Field label={t('field.anniversary')}>
+              <span class="text-text">{formatDateLong(details.anniversary, intlTag(locale))}</span>
+            </Field>
+          ) : null}
+          {details.related.length ? (
+            <Field label={t('field.related')}>
+              <ul class="flex flex-col gap-1">
+                {details.related.map((r, i) => (
+                  <li key={`${r.value}-${i}`} class="flex flex-wrap items-baseline gap-x-2">
+                    <span class="text-text break-words">{r.value}</span>
+                    {r.type ? <span class="sytue-meta">{relationLabel(t, r.type)}</span> : null}
+                  </li>
+                ))}
+              </ul>
             </Field>
           ) : null}
           {details.note.trim() ? (
@@ -419,6 +482,7 @@ export function ContactDetail({
           </Field>
         </dl>
       </Card>
+      <InteraccionesRecientes t={t} locale={locale} emails={emails.map((e) => e.value)} />
     </div>
   );
 }
@@ -466,27 +530,20 @@ function GroupChips({
   return (
     <div class="flex flex-wrap items-center gap-1.5">
       {memberOf.length === 0 ? <span class="text-text-subtle">{t('detail.noLabels')}</span> : null}
-      {memberOf.map((g) => (
-        <span
-          key={g.id}
-          class="border-border bg-bg-subtle text-text inline-flex items-center gap-1 rounded-full border py-0.5 pr-1 pl-2.5 text-sm"
-        >
-          <span class="max-w-48 truncate" title={g.name}>
+      {memberOf.map((g) =>
+        onToggle ? (
+          <Tag
+            key={g.id}
+            onRemove={() => void toggle(g)}
+            removeLabel={t('detail.removeLabel', { label: g.name })}
+            removeDisabled={busyId !== null}
+          >
             {g.name}
-          </span>
-          {onToggle ? (
-            <button
-              type="button"
-              aria-label={t('detail.removeLabel', { label: g.name })}
-              disabled={busyId !== null}
-              class="text-text-muted hover:bg-border hover:text-text sytue-focus-ring rounded-control grid h-5 w-5 place-items-center transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50"
-              onClick={() => void toggle(g)}
-            >
-              <Icon name="close" size={12} />
-            </button>
-          ) : null}
-        </span>
-      ))}
+          </Tag>
+        ) : (
+          <Tag key={g.id}>{g.name}</Tag>
+        ),
+      )}
       {onToggle ? (
         <Dropdown
           label={t('detail.addLabel')}
@@ -538,12 +595,15 @@ export function FavoriteToggle({
   active,
   onToggle,
   row = false,
+  tabIndex,
 }: {
   t: T;
   contact: Contact;
   active: boolean;
   onToggle: (contact: Contact) => Promise<void>;
   row?: boolean;
+  /** En la lista, -1 salvo en la fila del cursor: una parada de Tab por lista, no por contacto. */
+  tabIndex?: number;
 }): JSX.Element {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
@@ -576,6 +636,10 @@ export function FavoriteToggle({
         }
         aria-pressed={active}
         disabled={busy}
+        tabIndex={tabIndex}
+        // El atajo «s» pulsa ESTE botón: así el aviso de error y el «ocupado» son los
+        // del clic, sin copiarlos en el manejador de teclado.
+        data-estrella-contacto={contact.href}
         class={
           active
             ? 'text-warning-text! hover:text-warning-text!'
@@ -592,6 +656,7 @@ export function FavoriteToggle({
     <button
       type="button"
       aria-pressed={active}
+      data-estrella-contacto={contact.href}
       aria-label={active ? t('detail.unstar') : t('detail.star')}
       disabled={busy}
       class={`sytue-focus-ring-inset rounded-control grid h-9 w-9 place-items-center border transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50 ${
@@ -609,7 +674,7 @@ export function FavoriteToggle({
 function StarGlyph({ filled, size = 18 }: { filled: boolean; size?: number }): JSX.Element {
   return (
     <Glifo
-      d="M12 2.5l2.9 5.9 6.5.95-4.7 4.58 1.11 6.47L12 17.9l-5.81 3.06 1.11-6.47-4.7-4.58 6.5-.95L12 2.5z"
+      d="M12 3.6L14.4 9.3L20.6 9.8L15.9 13.9L17.3 19.9L12 16.7L6.7 19.9L8.1 13.9L3.4 9.8L9.6 9.3Z"
       size={size}
       fill={filled ? 'currentColor' : undefined}
     />
@@ -720,7 +785,8 @@ function TypedRow({
 }
 
 /** El aviso de cada cosa que la ficha copia. */
-type CopiedKey = 'detail.emailCopied' | 'detail.phoneCopied' | 'detail.addressCopied';
+type CopiedKey =
+  'detail.emailCopied' | 'detail.phoneCopied' | 'detail.addressCopied' | 'detail.websiteCopied';
 
 /**
  * CopyValue — copiar un correo, un teléfono o una dirección con un clic, sin

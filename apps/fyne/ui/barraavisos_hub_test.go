@@ -17,6 +17,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
 
+	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 )
@@ -267,5 +268,31 @@ func TestLaCampanaEnseñaElCorreoSinLeer(t *testing.T) {
 	a.cargar(context.Background(), false)
 	if tit := primera(); tit != "" {
 		t.Fatalf("sin saber el correo sale la fila %q", tit)
+	}
+}
+
+// TestElContadorSinLeerSeAvisaAlHub: el Hub pone «Avisos (3)» en su menú de la bandeja
+// del sistema con lo que cuenta la campana. Se avisa enseguida, en cada cambio, y no
+// cuando el número sigue igual (cada aviso rehace el menú del sistema entero).
+func TestElContadorSinLeerSeAvisaAlHub(t *testing.T) {
+	b := NuevaBarraSuite(traductorPrueba(t), nil, iconos.One)
+	t.Cleanup(b.Parar)
+	var mu sync.Mutex
+	var oidos []int
+	b.AlCambiarSinLeer(func(n int) { mu.Lock(); oidos = append(oidos, n); mu.Unlock() })
+	poner := func(n int) {
+		b.avisos.mu.Lock()
+		b.avisos.sinLeer = n
+		b.avisos.mu.Unlock()
+		b.avisos.refrescar()
+	}
+	poner(3)
+	poner(3)
+	poner(0)
+	fyne.DoAndWait(func() {})
+	mu.Lock()
+	defer mu.Unlock()
+	if fmt.Sprint(oidos) != "[0 3 0]" {
+		t.Errorf("avisos del contador = %v, quiero [0 3 0]", oidos)
 	}
 }

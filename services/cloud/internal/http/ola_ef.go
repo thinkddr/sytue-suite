@@ -4,6 +4,7 @@
 package cloudhttp
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,6 +15,7 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
 	"git.sytue.eu/sytue/one/services/cloud/internal/domain"
+	"git.sytue.eu/sytue/one/services/cloud/internal/service"
 )
 
 // CancelBuild cancela una build en cola o en curso.
@@ -54,6 +56,27 @@ func (h *Handlers) PatchDomain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("No changes requested."))
+}
+
+// VerifyDomain comprueba AHORA el DNS de un dominio propio y contesta con el
+// motivo exacto (`check.reason`): txt_ausente, txt_distinto, cname_distinto u ok.
+// Si el TXT es correcto el dominio sale ya verificado en `domain`. Tope: una
+// comprobación cada diez segundos por dominio (429 con Retry-After).
+func (h *Handlers) VerifyDomain(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("Invalid domain id."))
+		return
+	}
+	d, check, err := h.svc.VerifyDomainNow(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, domain.ErrTooSoon) {
+			w.Header().Set("Retry-After", strconv.Itoa(int(service.DomainCheckInterval/time.Second)))
+		}
+		httpx.Fail(w, r, toAPIError(err))
+		return
+	}
+	httpx.JSON(w, r, http.StatusOK, map[string]any{"domain": d, "check": check})
 }
 
 // ListStorageObjects lista objetos del bucket del proyecto.

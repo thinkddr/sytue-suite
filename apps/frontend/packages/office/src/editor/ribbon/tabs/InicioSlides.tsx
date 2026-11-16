@@ -123,6 +123,11 @@ const ALIGN_ITEMS: { op: string; key: DocsKey }[] = [
   { op: 'align-vmiddle', key: 'align.vmiddle' },
   { op: 'align-bottom', key: 'align.bottom' },
 ];
+const ROTATE_ITEMS: { op: string; key: DocsKey }[] = [
+  { op: 'rot-right', key: 'slides.rotate.right' },
+  { op: 'rot-left', key: 'slides.rotate.left' },
+  { op: 'rot-reset', key: 'slides.rotate.reset' },
+];
 const DIST_ITEMS: { op: string; key: DocsKey }[] = [
   { op: 'dist-h', key: 'slides.distribute.h' },
   { op: 'dist-v', key: 'slides.distribute.v' },
@@ -224,6 +229,10 @@ function OrganizarMenu(): JSX.Element {
           <div class={MENU_HEAD}>{t('slides.arrange.distribute')}</div>
           {DIST_ITEMS.map((it) => (
             <Item key={it.op} op={it.op} label={t(it.key)} enabled={canDist} run={run} />
+          ))}
+          <div class={MENU_HEAD}>{t('slides.arrange.rotate')}</div>
+          {ROTATE_ITEMS.map((it) => (
+            <Item key={it.op} op={it.op} label={t(it.key)} enabled={canOrder} run={run} />
           ))}
           <div aria-hidden="true" class="bg-border my-1 h-px" />
           <Item op="group" label={t('slides.group')} enabled={canGroup} run={run} />

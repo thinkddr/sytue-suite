@@ -75,3 +75,44 @@ func TestBuzonesPersonalesSinElCorreoDeEntrar(t *testing.T) {
 		t.Errorf("sin sub hay destinatarios: %v", d)
 	}
 }
+
+// Una regla vieja que silenciaba Sytue ID (de antes de que el Hub la rechazara) no
+// calla los avisos de seguridad: se entregan siempre.
+func TestMutedNuncaCallaLosAvisosDeSeguridad(t *testing.T) {
+	prefs := []NotificationPref{{Source: SourceID, Muted: true}, {Source: SourceID, Kind: "login", Muted: true}}
+	if Muted(prefs, SourceID, "") || Muted(prefs, SourceID, "login") {
+		t.Fatal("un aviso de Sytue ID quedó silenciado")
+	}
+	if Silenciable(SourceID) || !Silenciable(SourceMail) {
+		t.Fatal("Silenciable no distingue Sytue ID del resto")
+	}
+}
+
+// Los tipos críticos (un cobro duplicado, un desistimiento, una denuncia) se entregan
+// aunque haya una regla que los nombre o se haya callado el origen entero; los demás
+// tipos del mismo origen sí se callan.
+func TestMutedNuncaCallaLosTiposCriticos(t *testing.T) {
+	prefs := []NotificationPref{
+		{Source: SourcePages, Muted: true},
+		{Source: SourcePages, Kind: "pages.withdrawal.requested", Muted: true},
+		{Source: SourceRooms, Kind: "rooms.report", Muted: true},
+	}
+	for _, c := range []struct {
+		source Source
+		kind   string
+	}{
+		{SourcePages, "pages.payment.duplicated"},
+		{SourcePages, "pages.withdrawal.requested"},
+		{SourceRooms, "rooms.report"},
+	} {
+		if Muted(prefs, c.source, c.kind) {
+			t.Errorf("el aviso crítico %s quedó silenciado", c.kind)
+		}
+	}
+	if !Muted(prefs, SourcePages, "pages.form.received") {
+		t.Error("callar Sytue Web ya no calla sus formularios")
+	}
+	if !TipoCritico("cast.report") || TipoCritico("cast.live") || TipoCritico("") {
+		t.Error("TipoCritico no distingue los críticos del resto")
+	}
+}

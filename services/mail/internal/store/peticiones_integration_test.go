@@ -23,8 +23,8 @@ func TestPedirYConcederAccesoAUnBuzonCompartido(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool)
 	ctx := tenantCtx("acme")
-	ada := seedAccount(t, ctx, st, "ada@sytue.eu")
-	ben := seedAccount(t, ctx, st, "ben@sytue.eu")
+	ada := seedAccount(ctx, t, st, "ada@sytue.eu")
+	ben := seedAccount(ctx, t, st, "ben@sytue.eu")
 	shared, err := st.EnsureSharedMailbox(ctx, "soporte@sytue.eu", "Soporte", 1<<30, ada.Subject)
 	if err != nil {
 		t.Fatal(err)

@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"maunium.net/go/mautrix/crypto/ssss"
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
 
@@ -45,6 +46,7 @@ func TestEncryptedSendAndAttachmentSurviveRestart(t *testing.T) {
 	accountData := map[string]json.RawMessage{}
 	var backupVersion json.RawMessage
 	var keyBackup json.RawMessage
+	var rejectBackup bool
 	var crossSigning map[string]json.RawMessage
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
@@ -86,6 +88,11 @@ func TestEncryptedSendAndAttachmentSurviveRestart(t *testing.T) {
 			}
 		case strings.HasSuffix(r.URL.Path, "/room_keys/keys"):
 			if r.Method == http.MethodPut {
+				if rejectBackup {
+					w.WriteHeader(http.StatusBadRequest)
+					_, _ = io.WriteString(w, `{"errcode":"M_BAD_JSON","error":"artificial unavailable key backup"}`)
+					return
+				}
 				keyBackup, _ = io.ReadAll(r.Body)
 				_, _ = io.WriteString(w, `{"count":1,"etag":"one"}`)
 			} else {
@@ -178,9 +185,45 @@ func TestEncryptedSendAndAttachmentSurviveRestart(t *testing.T) {
 	if err != nil || recovery == "" {
 		t.Fatalf("bootstrap recovery: %v", err)
 	}
+	pendingSetup, setupErr := c.readRecoverySetup()
+	if setupErr != nil || pendingSetup == nil {
+		t.Fatal("missing durable recovery setup", setupErr)
+	}
+	seeds := c.crypto.Machine().ExportCrossSigningKeys()
+	if !bytes.Equal(seeds.MasterKey, pendingSetup.Seeds.MasterKey) || !bytes.Equal(seeds.SelfSigningKey, pendingSetup.Seeds.SelfSigningKey) || !bytes.Equal(seeds.UserSigningKey, pendingSetup.Seeds.UserSigningKey) {
+		t.Fatal("clearing the journal envelope corrupted SDK-owned seeds")
+	}
+	pendingSetup.clear()
+	if _, pendingErr := c.SendText(context.Background(), "!room:matrix.test", "must wait for recovery acknowledgment"); !errors.Is(pendingErr, ErrRecoveryRequired) {
+		t.Fatal("unacknowledged recovery admitted application data", pendingErr)
+	}
+	if repeated, repeatErr := c.BootstrapRecovery(context.Background(), nil); repeatErr != nil || repeated != recovery {
+		t.Fatal("unacknowledged recovery changed on retry", repeatErr)
+	}
+	if err = c.AcknowledgeRecoverySetup(context.Background()); err != nil {
+		t.Fatal("recovery acknowledgment failed", err)
+	}
 	if _, err = c.BootstrapRecovery(context.Background(), nil); !errors.Is(err, ErrRecoveryExists) {
 		t.Fatalf("existing identity was replaced: %v", err)
 	}
+	mu.Lock()
+	rejectBackup = true
+	mu.Unlock()
+	if _, err := c.SendText(t.Context(), "!room:matrix.test", "must not publish before recoverable backup"); err == nil {
+		t.Fatal("Rooms published while its session backup failed")
+	}
+	mu.Lock()
+	if len(sendPaths) != 0 {
+		t.Fatal("Rooms published before its session was backed up")
+	}
+	rejectBackup = false
+	mu.Unlock()
+	testRoomsRotationWhileBackingUp(t, c, "!room:matrix.test")
+	mu.Lock()
+	if len(sendPaths) != 0 {
+		t.Fatal("Rooms published ciphertext under a retired membership session")
+	}
+	mu.Unlock()
 	secret := "Artificial Go → JS encrypted message · Áé🙂"
 	ref, err := c.SendText(context.Background(), "!room:matrix.test", secret)
 	if err != nil {
@@ -193,7 +236,7 @@ func TestEncryptedSendAndAttachmentSurviveRestart(t *testing.T) {
 		t.Fatal("server received plaintext or no encrypted event")
 	}
 	// The application record bound must include the maintained codec's expansion,
-	// not merely the size of plaintext JSON. Reserve 8 KiB for the server PDU.
+	// not merely the size of plaintext JSON. Reserve 6 KiB for the server PDU.
 	recordScope := storage.Scope{Tenant: strings.Repeat("t", 63), Subject: strings.Repeat("s", 255), Product: "drive"}
 	record := storage.Record{Version: 1, Scope: recordScope, ObjectID: strings.Repeat("o", 128), RevisionID: strings.Repeat("r", 128), Role: "content"}
 	low, high := 0, storage.MaxRecordBytes
@@ -207,13 +250,24 @@ func TestEncryptedSendAndAttachmentSurviveRestart(t *testing.T) {
 		}
 	}
 	record.Payload = []byte(`"` + strings.Repeat("x", low) + `"`)
-	maxContent := map[string]any{"msgtype": "m.text", "body": "", "org.sytue.storage": record}
+	ownerKey, err := ssss.NewKey("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clear(ownerKey.Key)
+	// Printable key IDs can require JSON escaping; budget the largest supported one.
+	ownerKey.ID = strings.Repeat("<", 255)
+	ownerProof, err := sealStorageOwnerRecord("!room:matrix.test", record, ownerKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	maxContent := map[string]any{"msgtype": "m.text", "body": "", "org.sytue.storage": record, "org.sytue.storage_auth": ownerProof}
 	maxCipher, err := c.crypto.Encrypt(t.Context(), "!room:matrix.test", event.EventMessage, maxContent)
 	if err != nil {
 		t.Fatal(err)
 	}
 	maxWire, err := json.Marshal(maxCipher)
-	if err != nil || len(maxWire) > 56<<10 || bytes.Contains(maxWire, []byte(record.ObjectID)) {
+	if err != nil || len(maxWire) > 58<<10 || bytes.Contains(maxWire, []byte(record.ObjectID)) {
 		t.Fatal("maximum private record exceeds the Matrix envelope budget", len(maxWire), err)
 	}
 	t.Logf("maximum storage record: encrypted event content=%d bytes", len(maxWire))
@@ -455,6 +509,16 @@ func TestEncryptedSendAndAttachmentSurviveRestart(t *testing.T) {
 	encrypted.ID = "$envelope"
 	encrypted.Content = event.Content{VeryRaw: envelopeWire}
 	_ = encrypted.Content.ParseRaw(encrypted.Type)
+	// Sessions restored from backup re-read the wire event to prove its session;
+	// the fake homeserver serves the exact event it received (same id and time,
+	// so Megolm's replay check recognises it as the same message).
+	envelopeEvent, marshalErr := json.Marshal(map[string]any{"event_id": "$envelope", "room_id": "!room:matrix.test", "sender": encrypted.Sender, "origin_server_ts": encrypted.Timestamp, "type": "m.room.encrypted", "content": json.RawMessage(envelopeWire)})
+	if marshalErr != nil {
+		t.Fatal(marshalErr)
+	}
+	mu.Lock()
+	readEvents["$envelope"] = envelopeEvent
+	mu.Unlock()
 	envelope, err := c.crypto.Decrypt(t.Context(), encrypted)
 	if err != nil {
 		t.Fatal(err)

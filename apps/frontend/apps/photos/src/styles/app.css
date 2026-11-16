@@ -67,6 +67,9 @@
     border-radius: inherit;
     outline: 1px solid var(--sytue-border-subtle);
     outline-offset: -1px;
+    /* Mantener pulsada una foto empieza a seleccionar (useLongPress): en iOS, sin
+       esto, el mismo gesto saca encima el menú de «Guardar imagen». */
+    -webkit-touch-callout: none;
   }
   /* Los cortes `sm` y `xl` de la casa. */
   @media (min-width: 40rem) {

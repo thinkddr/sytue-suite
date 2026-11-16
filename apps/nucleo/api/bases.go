@@ -21,7 +21,10 @@ import (
 //
 // El permiso lo decide SIEMPRE el servicio: el rol que devuelve sirve para pintar la
 // interfaz, no para autorizar.
-type Bases struct{ c *Client }
+type Bases struct {
+	c       *Client
+	private BasesData
+}
 
 // NewBases crea el cliente sobre la raíz del servicio (ServiceURL(apex, "bases")).
 func NewBases(servicio string, s Session, h *http.Client) *Bases {
@@ -48,13 +51,19 @@ const (
 	BasesKindLink        = "link"
 	BasesKindFormula     = "formula"
 	BasesKindAttachment  = "attachment"
+	BasesKindURL         = "url"
+	BasesKindEmail       = "email"
+	BasesKindPhone       = "phone"
+	BasesKindCurrency    = "currency"
+	BasesKindRating      = "rating"
 )
 
 // Los tipos de vista.
 const (
-	BasesGrid   = "grid"
-	BasesKanban = "kanban"
-	BasesForm   = "form"
+	BasesGrid    = "grid"
+	BasesKanban  = "kanban"
+	BasesForm    = "form"
+	BasesGallery = "gallery"
 )
 
 // BasesBase es una base.
@@ -81,8 +90,10 @@ type BasesField struct {
 	LinkTableID string   `json:"link_table_id,omitempty"`
 	// Formula y Result solo en un campo de fórmula: la expresión (referencias por id) y
 	// el tipo de su resultado (`number` o `text`).
-	Formula  string `json:"formula,omitempty"`
-	Result   string `json:"result,omitempty"`
+	Formula string `json:"formula,omitempty"`
+	Result  string `json:"result,omitempty"`
+	// Currency solo en un campo de moneda: su código ISO 4217 (EUR, USD…).
+	Currency string `json:"currency,omitempty"`
 	Position int    `json:"position"`
 }
 
@@ -177,6 +188,21 @@ type BasesPermission struct {
 	CreatedAt      time.Time `json:"created_at"`
 }
 
+// BasesAuditEntry es una entrada de la traza de una base (`GET /bases/{id}/audit`, solo
+// el propietario). Before y After son lo que guardó el servicio para esa acción: un
+// objeto con `name`, una lista de ids, un valor… se leen según Action.
+type BasesAuditEntry struct {
+	ID       int64           `json:"id"`
+	TableID  string          `json:"table_id,omitempty"`
+	RecordID string          `json:"record_id,omitempty"`
+	FieldID  string          `json:"field_id,omitempty"`
+	Actor    string          `json:"actor"`
+	Action   string          `json:"action"`
+	Before   json.RawMessage `json:"before,omitempty"`
+	After    json.RawMessage `json:"after,omitempty"`
+	At       time.Time       `json:"at"`
+}
+
 // BasesGrant es lo que se manda al conceder: a una persona por `Email`, a un grupo por
 // `PrincipalID`, a alguien de fuera por `Query` (su @usuario o su dirección).
 type BasesGrant struct {
@@ -209,6 +235,8 @@ type BasesNewField struct {
 	LinkTableID string   `json:"link_table_id,omitempty"`
 	Formula     string   `json:"formula,omitempty"`
 	Result      string   `json:"result,omitempty"`
+	// Currency solo en un campo de moneda; sin él, el servicio pone EUR.
+	Currency string `json:"currency,omitempty"`
 }
 
 // BasesCell es una operación de celda: el valor (o los enlaces) y lo que se veía.
@@ -224,6 +252,22 @@ type BasesCellResult struct {
 	Record   BasesRecord `json:"record"`
 	Conflict bool        `json:"conflict"`
 	Replayed bool        `json:"replayed"`
+}
+
+// BasesComment es un comentario de un registro. Los hilos son de un nivel: una respuesta
+// lleva el `ParentID` de su raíz. Una raíz borrada que tiene respuestas llega como
+// lápida (`Deleted`), sin texto ni autor. `CanDelete` solo decide si se PINTA el botón:
+// el borrado lo vuelve a autorizar el servicio.
+type BasesComment struct {
+	ID         string    `json:"id"`
+	RecordID   string    `json:"record_id"`
+	ParentID   string    `json:"parent_id,omitempty"`
+	AuthorSub  string    `json:"author_sub"`
+	AuthorName string    `json:"author_name,omitempty"`
+	Body       string    `json:"body"`
+	CreatedAt  time.Time `json:"created_at"`
+	CanDelete  bool      `json:"can_delete"`
+	Deleted    bool      `json:"deleted,omitempty"`
 }
 
 // BasesRealtimeVersion es la versión del contrato de tiempo real que habla este cliente.
@@ -267,61 +311,116 @@ type nombreYDescripcion struct {
 
 // ListBases son las bases a las que se tiene acceso.
 func (b *Bases) ListBases(ctx context.Context) ([]BasesBase, error) {
+	if b.private != nil {
+		return b.private.ListBases(ctx)
+	}
 	return basesJSON[[]BasesBase](ctx, b, http.MethodGet, "/bases", nil)
 }
 
 // CreateBase crea una base, de la que quien llama es propietario.
 func (b *Bases) CreateBase(ctx context.Context, nombre string) (BasesBase, error) {
+	if b.private != nil {
+		return b.private.CreateBase(ctx, nombre)
+	}
 	return basesJSON[BasesBase](ctx, b, http.MethodPost, "/bases", nombreYDescripcion{Name: nombre})
 }
 
 // GetBase lee una base. Quien solo accede a alguna tabla recibe un 404.
 func (b *Bases) GetBase(ctx context.Context, id string) (BasesBase, error) {
+	if b.private != nil {
+		return b.private.GetBase(ctx, id)
+	}
 	return basesJSON[BasesBase](ctx, b, http.MethodGet, "/bases/"+url.PathEscape(id), nil)
 }
 
 // UpdateBase cambia el nombre y la descripción (solo el propietario).
 func (b *Bases) UpdateBase(ctx context.Context, id, nombre, descripcion string) error {
+	if b.private != nil {
+		return b.private.UpdateBase(ctx, id, nombre, descripcion)
+	}
 	return b.sinCuerpo(ctx, http.MethodPatch, "/bases/"+url.PathEscape(id), nombreYDescripcion{nombre, descripcion})
 }
 
 // DeleteBase borra la base con sus tablas y registros (solo el propietario).
 func (b *Bases) DeleteBase(ctx context.Context, id string) error {
+	if b.private != nil {
+		return b.private.DeleteBase(ctx, id)
+	}
 	return b.sinCuerpo(ctx, http.MethodDelete, "/bases/"+url.PathEscape(id), nil)
 }
 
 // ListTables son las tablas de una base que quien llama puede leer.
 func (b *Bases) ListTables(ctx context.Context, base string) ([]BasesTable, error) {
+	if b.private != nil {
+		return b.private.ListTables(ctx, base)
+	}
 	return basesJSON[[]BasesTable](ctx, b, http.MethodGet, "/bases/"+url.PathEscape(base)+"/tables", nil)
 }
 
 // CreateTable crea una tabla (solo el propietario).
 func (b *Bases) CreateTable(ctx context.Context, base, nombre string) (BasesTable, error) {
+	if b.private != nil {
+		return b.private.CreateTable(ctx, base, nombre)
+	}
 	return basesJSON[BasesTable](ctx, b, http.MethodPost, "/bases/"+url.PathEscape(base)+"/tables", map[string]string{"name": nombre})
 }
 
 // RenameTable renombra una tabla.
 func (b *Bases) RenameTable(ctx context.Context, tabla, nombre string) error {
+	if b.private != nil {
+		return b.private.RenameTable(ctx, tabla, nombre)
+	}
 	return b.sinCuerpo(ctx, http.MethodPatch, "/tables/"+url.PathEscape(tabla), map[string]string{"name": nombre})
 }
 
 // DeleteTable borra una tabla y sus registros.
 func (b *Bases) DeleteTable(ctx context.Context, tabla string) error {
+	if b.private != nil {
+		return b.private.DeleteTable(ctx, tabla)
+	}
 	return b.sinCuerpo(ctx, http.MethodDelete, "/tables/"+url.PathEscape(tabla), nil)
 }
 
 // CreateField añade un campo a una tabla.
 func (b *Bases) CreateField(ctx context.Context, tabla string, campo BasesNewField) (BasesField, error) {
+	if b.private != nil {
+		return b.private.CreateField(ctx, tabla, campo)
+	}
 	return basesJSON[BasesField](ctx, b, http.MethodPost, "/tables/"+url.PathEscape(tabla)+"/fields", campo)
 }
 
 // RenameField renombra un campo.
 func (b *Bases) RenameField(ctx context.Context, campo, nombre string) error {
+	if b.private != nil {
+		return b.private.RenameField(ctx, campo, nombre)
+	}
 	return b.sinCuerpo(ctx, http.MethodPatch, "/fields/"+url.PathEscape(campo), map[string]string{"name": nombre})
+}
+
+// SetFieldFormula cambia la expresión de un campo de fórmula (referencias por id, como
+// la guarda el servicio, que la valida y recalcula la tabla). El tipo del resultado no
+// cambia: el servicio no lo deja cambiar por aquí.
+func (b *Bases) SetFieldFormula(ctx context.Context, campo, formula string) error {
+	return b.sinCuerpo(ctx, http.MethodPatch, "/fields/"+url.PathEscape(campo), map[string]string{"formula": formula})
+}
+
+// SetFieldChoices sustituye las opciones de un campo de selección, en ese orden. Una
+// opción que se quita no se borra de los registros: se queda como «retirada».
+func (b *Bases) SetFieldChoices(ctx context.Context, campo string, opciones []string) error {
+	return b.sinCuerpo(ctx, http.MethodPatch, "/fields/"+url.PathEscape(campo), map[string][]string{"choices": opciones})
+}
+
+// ReorderFields fija el orden de TODOS los campos de una tabla. Si no son exactamente
+// los de la tabla (otra persona añadió o borró uno), el servicio contesta 409.
+func (b *Bases) ReorderFields(ctx context.Context, tabla string, campos []string) error {
+	return b.sinCuerpo(ctx, http.MethodPut, "/tables/"+url.PathEscape(tabla)+"/field-order", map[string][]string{"fields": campos})
 }
 
 // DeleteField borra un campo y sus valores.
 func (b *Bases) DeleteField(ctx context.Context, campo string) error {
+	if b.private != nil {
+		return b.private.DeleteField(ctx, campo)
+	}
 	return b.sinCuerpo(ctx, http.MethodDelete, "/fields/"+url.PathEscape(campo), nil)
 }
 
@@ -329,7 +428,33 @@ func (b *Bases) DeleteField(ctx context.Context, campo string) error {
 // `NextCursor` de la anterior, `vista` una vista guardada (su filtro y su orden los
 // ejecuta el servicio) y `limite` el tamaño de página. Vacíos o cero, no se mandan.
 func (b *Bases) ListRecords(ctx context.Context, tabla, vista, cursor string, limite int) (BasesRecordPage, error) {
+	return b.ListRecordsCon(ctx, tabla, vista, cursor, limite, BasesLectura{})
+}
+
+// BasesLectura es lo que una lectura pide además de la vista SIN guardarlo en ella: una
+// búsqueda libre (`q`) y un orden (`sort`, `campo:asc|desc` separados por comas) que
+// sustituye al de la vista. Los resuelve el servicio sobre la tabla entera.
+type BasesLectura struct {
+	Q, Sort string
+}
+
+// ListRecordsCon es ListRecords con búsqueda y orden de un momento; lo vacío no se manda.
+func (b *Bases) ListRecordsCon(ctx context.Context, tabla, vista, cursor string, limite int, l BasesLectura) (BasesRecordPage, error) {
+	if b.private != nil {
+		// La búsqueda y el orden de un momento los resuelve el servicio sobre la tabla
+		// en claro; los datos privados no salen del dispositivo para eso.
+		if l.Q != "" || l.Sort != "" {
+			return BasesRecordPage{}, ErrPrivateBasesOperation
+		}
+		return b.private.ListRecords(ctx, tabla, vista, cursor, limite)
+	}
 	q := url.Values{}
+	if l.Q != "" {
+		q.Set("q", l.Q)
+	}
+	if l.Sort != "" {
+		q.Set("sort", l.Sort)
+	}
 	if vista != "" {
 		q.Set("view", vista)
 	}
@@ -344,6 +469,9 @@ func (b *Bases) ListRecords(ctx context.Context, tabla, vista, cursor string, li
 
 // CreateRecord crea un registro.
 func (b *Bases) CreateRecord(ctx context.Context, tabla string, datos map[string]any, enlaces map[string][]string) (BasesRecord, error) {
+	if b.private != nil {
+		return b.private.CreateRecord(ctx, tabla, datos, enlaces)
+	}
 	if datos == nil {
 		datos = map[string]any{}
 	}
@@ -356,6 +484,9 @@ func (b *Bases) CreateRecord(ctx context.Context, tabla string, datos map[string
 
 // GetRecord lee un registro.
 func (b *Bases) GetRecord(ctx context.Context, registro string) (BasesRecord, error) {
+	if b.private != nil {
+		return b.private.GetRecord(ctx, registro)
+	}
 	return basesJSON[BasesRecord](ctx, b, http.MethodGet, "/records/"+url.PathEscape(registro), nil)
 }
 
@@ -363,6 +494,9 @@ func (b *Bases) GetRecord(ctx context.Context, registro string) (BasesRecord, er
 // distintas no se estorban; en la misma gana quien escribe después y `Conflict` lo
 // dice. `op` (UUID) hace la operación idempotente.
 func (b *Bases) WriteCell(ctx context.Context, registro, campo string, celda BasesCell, op string) (BasesCellResult, error) {
+	if b.private != nil {
+		return b.private.WriteCell(ctx, registro, campo, celda, op)
+	}
 	// `expected` viaja SIEMPRE, también cuando es null: es lo que se veía en la celda.
 	cuerpo := map[string]any{"expected": celda.Expected}
 	if celda.Links != nil {
@@ -386,6 +520,9 @@ func (b *Bases) WriteCell(ctx context.Context, registro, campo string, celda Bas
 // DeleteRecord borra un registro. `forzar` quita además los enlaces que apuntan a él
 // (solo el propietario); sin él, un registro enlazado contesta 409 `referenced`.
 func (b *Bases) DeleteRecord(ctx context.Context, registro string, forzar bool) error {
+	if b.private != nil {
+		return b.private.DeleteRecord(ctx, registro, forzar)
+	}
 	ruta := "/records/" + url.PathEscape(registro)
 	if forzar {
 		ruta += "?force=true"
@@ -393,30 +530,73 @@ func (b *Bases) DeleteRecord(ctx context.Context, registro string, forzar bool) 
 	return b.sinCuerpo(ctx, http.MethodDelete, ruta, nil)
 }
 
+// ListComments son los comentarios de un registro, planos y en orden (los lee quien lee
+// el registro).
+func (b *Bases) ListComments(ctx context.Context, registro string) ([]BasesComment, error) {
+	return basesJSON[[]BasesComment](ctx, b, http.MethodGet, "/records/"+url.PathEscape(registro)+"/comments", nil)
+}
+
+// CreateComment comenta un registro (rol comentarista o superior). `padre` no vacío
+// responde a un comentario raíz.
+func (b *Bases) CreateComment(ctx context.Context, registro, cuerpo, padre string) (BasesComment, error) {
+	pedido := map[string]string{"body": cuerpo}
+	if padre != "" {
+		pedido["parent_id"] = padre
+	}
+	return basesJSON[BasesComment](ctx, b, http.MethodPost, "/records/"+url.PathEscape(registro)+"/comments", pedido)
+}
+
+// DeleteComment borra un comentario: quien lo escribió o quien modera.
+func (b *Bases) DeleteComment(ctx context.Context, comentario string) error {
+	return b.sinCuerpo(ctx, http.MethodDelete, "/comments/"+url.PathEscape(comentario), nil)
+}
+
 // ListViews son las vistas guardadas de una tabla.
 func (b *Bases) ListViews(ctx context.Context, tabla string) ([]BasesView, error) {
+	if b.private != nil {
+		return b.private.ListViews(ctx, tabla)
+	}
 	return basesJSON[[]BasesView](ctx, b, http.MethodGet, "/tables/"+url.PathEscape(tabla)+"/views", nil)
 }
 
 // CreateView guarda una vista.
 func (b *Bases) CreateView(ctx context.Context, tabla, nombre, tipo string, cfg BasesViewConfig) (BasesView, error) {
+	if b.private != nil {
+		return b.private.CreateView(ctx, tabla, nombre, tipo, cfg)
+	}
 	return basesJSON[BasesView](ctx, b, http.MethodPost, "/tables/"+url.PathEscape(tabla)+"/views",
 		map[string]any{"name": nombre, "kind": tipo, "config": cfg})
 }
 
+// UpdateView cambia el nombre y la configuración de una vista guardada. El tipo no se
+// cambia (el servicio no lo admite): de él cuelgan los enlaces de formulario y las conexiones.
+func (b *Bases) UpdateView(ctx context.Context, vista, nombre string, cfg BasesViewConfig) (BasesView, error) {
+	return basesJSON[BasesView](ctx, b, http.MethodPatch, "/views/"+url.PathEscape(vista),
+		map[string]any{"name": nombre, "config": cfg})
+}
+
 // DeleteView borra una vista.
 func (b *Bases) DeleteView(ctx context.Context, vista string) error {
+	if b.private != nil {
+		return b.private.DeleteView(ctx, vista)
+	}
 	return b.sinCuerpo(ctx, http.MethodDelete, "/views/"+url.PathEscape(vista), nil)
 }
 
 // ListFormLinks son los enlaces públicos de una vista de formulario.
 func (b *Bases) ListFormLinks(ctx context.Context, vista string) ([]BasesFormLink, error) {
+	if b.private != nil {
+		return b.private.ListFormLinks(ctx, vista)
+	}
 	return basesJSON[[]BasesFormLink](ctx, b, http.MethodGet, "/views/"+url.PathEscape(vista)+"/form-links", nil)
 }
 
 // CreateFormLink crea un enlace público (solo el propietario). Su `Token` no se puede
 // volver a leer. `maximo` cero deja el del servicio.
 func (b *Bases) CreateFormLink(ctx context.Context, vista string, maximo int) (BasesFormLink, error) {
+	if b.private != nil {
+		return b.private.CreateFormLink(ctx, vista, maximo)
+	}
 	cuerpo := map[string]int{}
 	if maximo > 0 {
 		cuerpo["max_responses"] = maximo
@@ -426,27 +606,68 @@ func (b *Bases) CreateFormLink(ctx context.Context, vista string, maximo int) (B
 
 // RevokeFormLink cierra un enlace público al instante.
 func (b *Bases) RevokeFormLink(ctx context.Context, enlace string) error {
+	if b.private != nil {
+		return b.private.RevokeFormLink(ctx, enlace)
+	}
 	return b.sinCuerpo(ctx, http.MethodDelete, "/form-links/"+url.PathEscape(enlace), nil)
 }
 
 // ListPermissions es quién tiene acceso a la base (solo el propietario).
 func (b *Bases) ListPermissions(ctx context.Context, base string) ([]BasesPermission, error) {
+	if b.private != nil {
+		return b.private.ListPermissions(ctx, base)
+	}
 	return basesJSON[[]BasesPermission](ctx, b, http.MethodGet, "/bases/"+url.PathEscape(base)+"/permissions", nil)
 }
 
 // GrantPermission concede acceso. 422 `not_a_member` si la dirección no es de la
 // organización; 422 `is_member` si el «externo» resulta ser de la propia.
 func (b *Bases) GrantPermission(ctx context.Context, base string, g BasesGrant) (BasesPermission, error) {
+	if b.private != nil {
+		return b.private.GrantPermission(ctx, base, g)
+	}
 	return basesJSON[BasesPermission](ctx, b, http.MethodPost, "/bases/"+url.PathEscape(base)+"/permissions", g)
 }
 
 // RevokePermission retira un acceso.
 func (b *Bases) RevokePermission(ctx context.Context, base, permiso string) error {
+	if b.private != nil {
+		return b.private.RevokePermission(ctx, base, permiso)
+	}
 	return b.sinCuerpo(ctx, http.MethodDelete, "/bases/"+url.PathEscape(base)+"/permissions/"+url.PathEscape(permiso), nil)
+}
+
+// ListAudit es la traza de la base, de la más reciente a la más antigua (solo el
+// propietario). antes > 0 pide las anteriores a esa entrada; limite <= 0 deja el del
+// servicio.
+func (b *Bases) ListAudit(ctx context.Context, base string, antes int64, limite int) ([]BasesAuditEntry, error) {
+	if b.private != nil {
+		// La traza la escribe el servicio sobre las bases en claro: una base privada no
+		// tiene allí ni registros ni traza que enseñar.
+		return nil, ErrPrivateBasesOperation
+	}
+	q := url.Values{}
+	if antes > 0 {
+		q.Set("before", strconv.FormatInt(antes, 10))
+	}
+	if limite > 0 {
+		q.Set("limit", strconv.Itoa(limite))
+	}
+	resp, err := b.c.Do(ctx, Request{Path: "/bases/" + url.PathEscape(base) + "/audit", Query: q})
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	var out []BasesAuditEntry
+	err = json.NewDecoder(resp.Body).Decode(&out)
+	return out, err
 }
 
 // MyGroups son los grupos de quien llama, para ofrecerlos al compartir.
 func (b *Bases) MyGroups(ctx context.Context) ([]string, error) {
+	if b.private != nil {
+		return b.private.MyGroups(ctx)
+	}
 	r, err := basesJSON[struct {
 		Groups []string `json:"groups"`
 	}](ctx, b, http.MethodGet, "/groups", nil)
@@ -456,12 +677,18 @@ func (b *Bases) MyGroups(ctx context.Context) ([]string, error) {
 // TransferBase da la propiedad a otra persona de la organización, por su dirección.
 // Quien llama queda como editor.
 func (b *Bases) TransferBase(ctx context.Context, base, email string) error {
+	if b.private != nil {
+		return b.private.TransferBase(ctx, base, email)
+	}
 	return b.sinCuerpo(ctx, http.MethodPost, "/bases/"+url.PathEscape(base)+"/transfer", map[string]string{"email": email})
 }
 
 // Export baja una tabla entera en `csv` o `json`. Cerrar el cuerpo es cosa de quien
 // llama. Los campos de enlace salen con sus valores, no con ids.
 func (b *Bases) Export(ctx context.Context, tabla, formato string) (io.ReadCloser, error) {
+	if b.private != nil {
+		return b.private.Export(ctx, tabla, formato)
+	}
 	resp, err := b.c.Do(ctx, Request{Path: "/tables/" + url.PathEscape(tabla) + "/export", Query: url.Values{"format": {formato}}})
 	if err != nil {
 		return nil, err
@@ -496,6 +723,16 @@ func (b *Bases) UploadAttachment(ctx context.Context, registro, campo, nombre st
 // DownloadAttachment baja un adjunto. Cerrar el cuerpo es cosa de quien llama.
 func (b *Bases) DownloadAttachment(ctx context.Context, registro, adjunto string) (io.ReadCloser, error) {
 	resp, err := b.c.Do(ctx, Request{Path: "/records/" + url.PathEscape(registro) + "/attachments/" + url.PathEscape(adjunto)})
+	if err != nil {
+		return nil, err
+	}
+	return resp.Body, nil
+}
+
+// DownloadThumb baja la miniatura de un adjunto de imagen (la portada de una tarjeta de
+// galería): nunca el original, que puede pesar 20 MB. Cerrar el cuerpo es cosa de quien llama.
+func (b *Bases) DownloadThumb(ctx context.Context, registro, adjunto string) (io.ReadCloser, error) {
+	resp, err := b.c.Do(ctx, Request{Path: "/records/" + url.PathEscape(registro) + "/attachments/" + url.PathEscape(adjunto) + "/thumb"})
 	if err != nil {
 		return nil, err
 	}

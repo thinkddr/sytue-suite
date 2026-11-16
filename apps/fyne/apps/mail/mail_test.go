@@ -7,7 +7,6 @@ import (
 	"image/color"
 	"image/png"
 	"os"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +17,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/tokens"
 	"git.sytue.eu/sytue/one/apps/nucleo/webref"
 )
 
@@ -323,45 +323,32 @@ func TestElLectorVacioEsElMedido(t *testing.T) {
 	}
 }
 
-// TestElColorDeUnaEtiquetaEsElDeLaWeb ata la paleta de etiquetas a `utils.ts`, que es
-// la que tiene que coincidir con `domain.LabelColors` del backend. Ocho colores que
-// no son tokens del tema: si alguien los reescribe «a juego», dejan de casar con los
-// del servidor y la misma etiqueta sale de dos colores.
+// TestElColorDeUnaEtiquetaEsElDeLaWeb ata los colores de etiqueta a `utils.ts`: los dos
+// salen de la paleta de colores de usuario (en la web, `PALETA_DE_USUARIO`; aquí, su
+// espejo `tokens.PaletaDeUsuario`, que compara su propio test), y los ids tienen que
+// coincidir con `domain.LabelColors` del backend. Las ocho etiquetas de antes guardan sus
+// tokens de siempre y se pintan con el tono nuevo; un token desconocido, neutro.
 func TestElColorDeUnaEtiquetaEsElDeLaWeb(t *testing.T) {
 	fuente := webref.Read(t, "apps/frontend/apps/mail/src/components/utils.ts")
-	i := strings.Index(fuente, "LABEL_COLORS: Record<string, string> = {")
-	if i < 0 {
-		t.Fatal("utils.ts ya no declara LABEL_COLORS: el espejo hay que rehacerlo")
+	if !strings.Contains(fuente, "LABEL_COLOR_TOKENS: readonly string[] = PALETA_DE_USUARIO.map((c) => c.id)") ||
+		!strings.Contains(fuente, "return colorDeUsuario(color) ??") {
+		t.Fatal("utils.ts ya no saca los colores de etiqueta de la paleta de usuario: el espejo hay que rehacerlo")
 	}
-	j := strings.Index(fuente[i:], "};")
-	re := regexp.MustCompile(`(\w+):\s*'#([0-9a-fA-F]{6})'`)
-	web := map[string]color.NRGBA{}
-	for _, m := range re.FindAllStringSubmatch(fuente[i:i+j], -1) {
-		var r, g, b uint8
-		for k, dst := range []*uint8{&r, &g, &b} {
-			dst2 := dst
-			*dst2 = uint8(hex(m[2][2*k])<<4 | hex(m[2][2*k+1]))
-		}
-		web[m[1]] = color.NRGBA{R: r, G: g, B: b, A: 255}
+	if len(ColoresEtiqueta) != len(tokens.PaletaDeUsuario) {
+		t.Fatalf("%d colores de etiqueta y la paleta tiene %d", len(ColoresEtiqueta), len(tokens.PaletaDeUsuario))
 	}
-	if len(web) != len(coloresEtiqueta) {
-		t.Errorf("la web declara %d colores de etiqueta y aquí hay %d", len(web), len(coloresEtiqueta))
-	}
-	for k, quiero := range web {
-		if got := coloresEtiqueta[k]; got != quiero {
-			t.Errorf("la etiqueta %q es %v en la web y %v aquí", k, quiero, got)
+	for i, c := range tokens.PaletaDeUsuario {
+		if ColoresEtiqueta[i] != c.ID || ColorEtiqueta(c.ID, tema.Claro) != c.NRGBA() {
+			t.Errorf("el tono %q no es el de la paleta", c.ID)
 		}
 	}
-}
-
-func hex(c byte) int {
-	switch {
-	case c >= '0' && c <= '9':
-		return int(c - '0')
-	case c >= 'a' && c <= 'f':
-		return int(c-'a') + 10
+	// `brass` pintaba #9a7b3f; ahora, el ocre de la paleta.
+	if ColorEtiqueta("brass", tema.Claro) != (color.NRGBA{R: 0x94, G: 0x6a, B: 0x10, A: 255}) {
+		t.Error("una etiqueta de antes no se pinta con su tono nuevo")
 	}
-	return int(c-'A') + 10
+	if ColorEtiqueta("neon", tema.Claro) != tema.Color("border-strong", tema.Claro) {
+		t.Error("un token desconocido no cae en el neutro")
+	}
 }
 
 // TestAgruparPorHiloEsGroupByThread: el orden lo fija el mensaje más reciente, un

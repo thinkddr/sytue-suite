@@ -50,14 +50,13 @@ import {
   cx,
   useConfirm,
   useToast,
-  Illustration,
   esAtajoDeApp,
   enCampoDeTexto,
   haySuperposicionAbierta,
   withBase,
 } from '@sytue/ui';
 import { esCuentaPersonal, type SytueUser } from '@sytue/auth';
-import { MARCA_ORG, RE_SLUG_ORG, rutaConOrg } from '@sytue/config';
+import { MARCA_ORG, RE_SLUG_ORG, colorDeUsuario, rutaConOrg } from '@sytue/config';
 import { contiene, translate, type Locale } from '@sytue/i18n';
 import type {
   Note,
@@ -67,6 +66,7 @@ import type {
   NotebookInput,
   Reminder,
   Tag,
+  TrashedNote,
 } from '@sytue/api-clients';
 import { useT } from '../i18n/index.js';
 import {
@@ -92,16 +92,29 @@ import { MoverNotaModal } from './MoverNotaModal.js';
 import { RecordatorioModal } from './RecordatorioModal.js';
 import { ORDENES, esOrden, ordenarNotas, type Orden } from '../client/orden.js';
 import { BacklinksPanel } from './BacklinksPanel.js';
+import { NoteInfo } from './NoteInfo.js';
+import { VersionesNota, type ClaroDeVersion } from './VersionesNota.js';
 import { NotasSoloLectura } from './PublicNotebook.js';
+import { EsqueletoCuadernos } from './Esqueletos.js';
 import { NoteTree } from './NoteTree.js';
 import { PanelCompartidas } from './Compartidas.js';
+import { PanelPapelera } from './Papelera.js';
 import type { Captura } from '../client/captura.js';
 import { sincronizarEnlaces, type DestinoInterno } from '../client/enlaces.js';
 import { Historial, type Accion } from '../client/historial.js';
 import type { FuentesDeEnlace } from './LinkTool.js';
+import { EncryptedBackupUnavailable } from '../client/onexGuard.js';
 import { principioDe, type VistaPrevia } from './VistaPreviaEnlace.js';
 import { AbrirRapido } from './AbrirRapido.js';
 import { PassphraseDialog } from './PassphraseDialog.js';
+import { ConflictoNota, type VersionDeNota } from './ConflictoNota.js';
+import {
+  Versiones,
+  conVersion,
+  datosDeCopia,
+  esConflicto,
+  mismoContenido,
+} from '../client/conflicto.js';
 import { SuitePicker } from './SuitePicker.js';
 import { TagsModal } from './TagsModal.js';
 import { Glyph, type GlyphName } from './glyphs.js';
@@ -239,6 +252,22 @@ interface OpcionesDeAccion {
   fusion?: string;
 }
 
+/** Un guardado que ha chocado con el de otro dispositivo, a la espera de decidir. */
+interface ConflictoAbierto {
+  id: string;
+  notebookId: string;
+  kind: 'text' | 'todo';
+  /** La nota de pantalla sobre la que se editó. */
+  vista: Note;
+  /** Lo de aquí, listo para mandar (cifrado si el cuaderno lo está). */
+  input: NoteInput;
+  /** Lo de aquí, en claro. */
+  mia: { title: string; content: string; data: Record<string, unknown> };
+  /** La versión del servidor, y su texto en claro. */
+  otra: Note;
+  otraClaro: VersionDeNota;
+}
+
 export function NotesApp(props: Props): JSX.Element {
   // The view consumes the shell providers; a new identity also clears pending notices and drafts.
   return (
@@ -316,7 +345,7 @@ function NotesView({
   const [estadoBusqueda, setEstadoBusqueda] = useState<EstadoBusqueda>('listo');
   // La respuesta de una búsqueda vieja no pisa la de la última.
   const ultimaBusqueda = useRef(0);
-  const [papelera, setPapelera] = useState<Note[]>([]);
+  const [papelera, setPapelera] = useState<TrashedNote[]>([]);
   const [fijadas, setFijadas] = useState<api.NoteHit[] | null>(null);
   // Los #hashtags de las notas, y la consulta con la que se abre «Buscar notas»
   // (vacía desde la barra lateral, `#plan` al pulsar un hashtag).
@@ -406,6 +435,8 @@ function NotesView({
   } | null>(null);
   const [notaAEtiquetar, setNotaAEtiquetar] = useState<Note | null>(null);
   const [notaConEnlaces, setNotaConEnlaces] = useState<Note | null>(null);
+  const [notaConInfo, setNotaConInfo] = useState<Note | null>(null);
+  const [notaConVersiones, setNotaConVersiones] = useState<Note | null>(null);
   // Mis recordatorios, por nota: el indicador de cada fila y el diálogo que los pone.
   const [recordatorios, setRecordatorios] = useState<Record<string, Reminder>>({});
   const [notaARecordar, setNotaARecordar] = useState<Note | null>(null);
@@ -432,14 +463,34 @@ function NotesView({
     moverACuaderno: (note: Note, destino: Notebook, opts?: OpcionesDeAccion) => void;
     borrar: (id: string, opts?: OpcionesDeAccion) => void;
   } | null>(null);
-  // Lo que trae un `.onex` antes de decidir si entra. Guarda el volcado crudo
-  // porque es lo que se importa: la vista es un ensayo, no la fuente.
+  // Lo que trae un `.onex` (o un Markdown, un ZIP, un `.enex`) antes de decidir
+  // si entra. Guarda el fichero crudo porque es lo que se importa: la vista es un
+  // ensayo, no la fuente.
   const [vistaPrevia, setVistaPrevia] = useState<{
-    volcado: string;
+    volcado: Uint8Array<ArrayBuffer>;
+    nombre: string;
     notebook: Notebook;
     notas: Note[];
     descartadas: number;
   } | null>(null);
+  const [importacionIncierta, setImportacionIncierta] = useState<{
+    vista: NonNullable<typeof vistaPrevia>;
+    revisada: boolean;
+  } | null>(null);
+  const importacionInciertaRef = useRef<typeof importacionIncierta>(null);
+  const [importando, setImportando] = useState(false);
+  const importacionEnCurso = useRef(false);
+  const importacionVigente = useRef(true);
+  const generacionVistaPrevia = useRef(0);
+  useEffect(() => {
+    const vigente = importacionVigente;
+    const generacion = generacionVistaPrevia;
+    vigente.current = true;
+    return () => {
+      vigente.current = false;
+      generacion.current++;
+    };
+  }, []);
   const [notaACompartir, setNotaACompartir] = useState<Note | null>(null);
 
   const bloqueado = Boolean(activo?.encrypted && !clave);
@@ -449,11 +500,15 @@ function NotesView({
   // Persona y organización: ver claveAlmacen. `user.id` sigue siendo el `sub` para owner_sub.
   const almacen = claveAlmacen(user.id, user.tenant);
   const [cola, setCola] = useState<CapturaPendiente[]>([]);
+  const [errorCola, setErrorCola] = useState(false);
   const refrescarCola = useCallback(
     () =>
       pendientes(almacen)
-        .then(setCola)
-        .catch(() => undefined),
+        .then((entries) => {
+          setCola(entries);
+          setErrorCola(false);
+        })
+        .catch(() => setErrorCola(typeof indexedDB !== 'undefined')),
     [almacen],
   );
   // La versión más reciente: la llaman efectos e intervalos montados antes.
@@ -733,6 +788,42 @@ function NotesView({
   );
 
   const edicionesRef = useRef(new Map<string, { notice?: string }>());
+
+  // --- Conflictos: la misma nota guardada desde otro dispositivo (ConflictoNota) ---
+  const versiones = useRef(new Versiones());
+  const [conflicto, setConflicto] = useState<ConflictoAbierto | null>(null);
+  const [resolviendo, setResolviendo] = useState(false);
+  const [reinicios, setReinicios] = useState<Record<string, number>>({});
+  // Las notas cuya tarjeta se está cerrando por «Ver la otra»: su editor guarda al
+  // desmontarse lo que tenía escrito, y eso es justo lo que se acaba de descartar.
+  const descartando = useRef(new Set<string>());
+  useEffect(() => setConflicto(null), [activo?.id, cryptoScope]);
+
+  /** La versión del servidor de la nota, y su texto en claro para enseñarla. */
+  const leerOtra = useCallback(
+    async (
+      cuaderno: string,
+      id: string,
+    ): Promise<{ otra: Note; otraClaro: VersionDeNota } | null> => {
+      const otra = (await api.listNotes(cuaderno)).find((n) => n.id === id);
+      if (!otra) return null;
+      let otraClaro: VersionDeNota = { title: otra.title ?? '', content: otra.content ?? '' };
+      const k = claveRef.current;
+      if (otra.content_cipher) {
+        otraClaro = { title: '', content: '' };
+        if (k) {
+          try {
+            const { claro: c } = await abrirContenidoNota(k, otra);
+            otraClaro = { title: c.title, content: c.content };
+          } catch {
+            /* Si no se abre, se enseña vacía: decidir sigue siendo posible. */
+          }
+        }
+      }
+      return { otra, otraClaro };
+    },
+    [],
+  );
   useLayoutEffect(
     () => () => {
       for (const edit of edicionesRef.current.values()) {
@@ -746,6 +837,7 @@ function NotesView({
     async (id: string, patch: ParcheDeNota, opts: OpcionesDeAccion = {}) => {
       const note = notes.find((n) => n.id === id);
       if (!note || !activo || migrando || (activo.encrypted && !claro[id])) return;
+      if (patch.content !== undefined && descartando.current.has(id)) return;
       const scope = cryptoScope;
       const previa = edicionesRef.current.get(id);
       if (previa?.notice) toast.dismiss(previa.notice);
@@ -835,88 +927,123 @@ function NotesView({
       }
 
       let pendiente = false;
-      const guardar = async () => {
-        if (!current() || pendiente) return;
-        pendiente = true;
-        try {
-          const actualizada = await api.updateNote(id, activo.id, input);
-          if (!current()) return;
-          setNotes((prev) => prev.map((n) => (n.id === id ? actualizada : n)));
-          // Una tarea que repite, recién hecha (o deshecha): el servicio ha creado (o
-          // retirado) la siguiente y le ha mudado los recordatorios, sean de quien sean.
-          // Se traen las dos cosas.
-          if (actualizada.repeated_into) {
-            const lista = await api.listNotes(activo.id);
+      const guardar = () =>
+        versiones.current.enCola(id, async () => {
+          if (!current() || pendiente) return;
+          pendiente = true;
+          try {
+            // Se manda la versión sobre la que se editó: si otro dispositivo ha guardado
+            // entretanto, el servicio no la pisa y responde 409.
+            const base = versiones.current.base(note);
+            let actualizada: Note;
+            try {
+              actualizada = await api.updateNote(id, activo.id, conVersion(input, base));
+            } catch (error) {
+              if (!esConflicto(error)) throw error;
+              const leida = await leerOtra(activo.id, id);
+              if (!leida) throw error;
+              if (!mismoContenido(base, leida.otra)) {
+                // Un conflicto de verdad: se pregunta. Lo escrito sigue en pantalla.
+                if (!current()) return;
+                if (intento.notice) toast.dismiss(intento.notice);
+                edicionesRef.current.delete(id);
+                setConflicto({
+                  id,
+                  notebookId: activo.id,
+                  kind: (patch.kind ?? note.kind) === 'todo' ? 'todo' : 'text',
+                  vista: note,
+                  input,
+                  mia: {
+                    title: titulo,
+                    content: contenido,
+                    data: patch.data ?? enClaro?.data ?? note.data ?? {},
+                  },
+                  ...leida,
+                });
+                return;
+              }
+              // Lo otro no tocó nada de lo que se guarda aquí (se movió la nota, por
+              // ejemplo): no hay nada que preguntar, se guarda sobre la versión nueva.
+              actualizada = await api.updateNote(id, activo.id, conVersion(input, leida.otra));
+            }
+            versiones.current.guardada(note, actualizada);
             if (!current()) return;
-            setNotes(lista);
-            cargarRecordatorios();
+            setNotes((prev) => prev.map((n) => (n.id === id ? actualizada : n)));
+            // Una tarea que repite, recién hecha (o deshecha): el servicio ha creado (o
+            // retirado) la siguiente y le ha mudado los recordatorios, sean de quien sean.
+            // Se traen las dos cosas.
+            if (actualizada.repeated_into) {
+              const lista = await api.listNotes(activo.id);
+              if (!current()) return;
+              setNotes(lista);
+              cargarRecordatorios();
+            }
+            if (opts.historial !== false) {
+              // Lo que había ANTES, para volver: título y contenido en claro (que en
+              // un cuaderno cifrado viven en `claro`) y las tres marcas.
+              const previo: ParcheDeNota = {
+                ...(patch.kind === undefined ? {} : { kind: note.kind as 'text' | 'todo' }),
+                title: enClaro?.title ?? note.title ?? '',
+                content: enClaro?.content ?? note.content ?? '',
+                checked: note.checked,
+                ...(cancelled === undefined ? {} : { cancelled: Boolean(note.cancelled_at) }),
+                pinned: note.pinned,
+                collapsed: note.collapsed,
+                data: enClaro?.data ?? note.data ?? {},
+              };
+              historial.current.registrar(
+                {
+                  etiqueta: t('history.edit'),
+                  deshacer: () => ultimas.current?.editar(id, previo, { historial: false }),
+                  rehacer: () => ultimas.current?.editar(id, patch, { historial: false }),
+                },
+                opts.fusion,
+              );
+              tocarHistorial();
+            }
+            if (intento.notice) toast.dismiss(intento.notice);
+            edicionesRef.current.delete(id);
+          } catch (error) {
+            if (!current()) return;
+            // Una conversión que no llega se deshace entera: su título y su texto salen del
+            // tipo nuevo, y en el de antes no se leerían como lo que eran.
+            if (patch.kind !== undefined) {
+              setNotes((prev) => prev.map((n) => (n.id === id ? note : n)));
+              if (activo.encrypted && enClaro) setClaro((prev) => ({ ...prev, [id]: enClaro }));
+            } else {
+              // Keep the unsaved text and attachments in memory; only saved metadata rolls back.
+              setNotes((prev) =>
+                prev.map((n) => {
+                  if (n.id !== id) return n;
+                  const draft = activo.encrypted
+                    ? {
+                        ...note,
+                        ...limpiar({ content_cipher: input.content_cipher, data: input.data }),
+                      }
+                    : {
+                        ...note,
+                        title: titulo,
+                        content: contenido,
+                        ...limpiar({ data: patch.data ?? note.data }),
+                      };
+                  if (activo.encrypted || patch.data !== undefined) delete draft.data_json;
+                  return draft;
+                }),
+              );
+            }
+            if (intento.notice) toast.dismiss(intento.notice);
+            intento.notice = toast.notify({
+              tone: 'danger',
+              title: t('note.saveFailed'),
+              // Only a missing route is known not to have accepted this write.
+              ...(error instanceof api.NotesApiError && error.status === 404
+                ? { action: { label: t('common.retry'), onClick: () => void guardar() } }
+                : {}),
+            });
+          } finally {
+            pendiente = false;
           }
-          if (opts.historial !== false) {
-            // Lo que había ANTES, para volver: título y contenido en claro (que en
-            // un cuaderno cifrado viven en `claro`) y las tres marcas.
-            const previo: ParcheDeNota = {
-              ...(patch.kind === undefined ? {} : { kind: note.kind as 'text' | 'todo' }),
-              title: enClaro?.title ?? note.title ?? '',
-              content: enClaro?.content ?? note.content ?? '',
-              checked: note.checked,
-              ...(cancelled === undefined ? {} : { cancelled: Boolean(note.cancelled_at) }),
-              pinned: note.pinned,
-              collapsed: note.collapsed,
-              data: enClaro?.data ?? note.data ?? {},
-            };
-            historial.current.registrar(
-              {
-                etiqueta: t('history.edit'),
-                deshacer: () => ultimas.current?.editar(id, previo, { historial: false }),
-                rehacer: () => ultimas.current?.editar(id, patch, { historial: false }),
-              },
-              opts.fusion,
-            );
-            tocarHistorial();
-          }
-          if (intento.notice) toast.dismiss(intento.notice);
-          edicionesRef.current.delete(id);
-        } catch (error) {
-          if (!current()) return;
-          // Una conversión que no llega se deshace entera: su título y su texto salen del
-          // tipo nuevo, y en el de antes no se leerían como lo que eran.
-          if (patch.kind !== undefined) {
-            setNotes((prev) => prev.map((n) => (n.id === id ? note : n)));
-            if (activo.encrypted && enClaro) setClaro((prev) => ({ ...prev, [id]: enClaro }));
-          } else {
-            // Keep the unsaved text and attachments in memory; only saved metadata rolls back.
-            setNotes((prev) =>
-              prev.map((n) => {
-                if (n.id !== id) return n;
-                const draft = activo.encrypted
-                  ? {
-                      ...note,
-                      ...limpiar({ content_cipher: input.content_cipher, data: input.data }),
-                    }
-                  : {
-                      ...note,
-                      title: titulo,
-                      content: contenido,
-                      ...limpiar({ data: patch.data ?? note.data }),
-                    };
-                if (activo.encrypted || patch.data !== undefined) delete draft.data_json;
-                return draft;
-              }),
-            );
-          }
-          if (intento.notice) toast.dismiss(intento.notice);
-          intento.notice = toast.notify({
-            tone: 'danger',
-            title: t('note.saveFailed'),
-            // Only a missing route is known not to have accepted this write.
-            ...(error instanceof api.NotesApiError && error.status === 404
-              ? { action: { label: t('common.retry'), onClick: () => void guardar() } }
-              : {}),
-          });
-        } finally {
-          pendiente = false;
-        }
-      };
+        });
       await guardar();
     },
     [
@@ -931,7 +1058,79 @@ function NotesView({
       migrando,
       cryptoScope,
       clave,
+      leerOtra,
     ],
+  );
+
+  /** «Quedarme con la mía»: lo de aquí, sobre la versión del otro. */
+  const quedarmeConLaMia = useCallback(async () => {
+    const c = conflicto;
+    if (!c || resolviendo) return;
+    setResolviendo(true);
+    try {
+      const hecha = await versiones.current.enCola(c.id, () =>
+        api.updateNote(c.id, c.notebookId, conVersion(c.input, c.otra)),
+      );
+      versiones.current.guardada(c.vista, hecha);
+      // Un guardado de esta nota que esperase en la cola ya no es el vigente: no sale.
+      edicionesRef.current.delete(c.id);
+      if (activeId.current === c.notebookId)
+        setNotes((prev) => prev.map((n) => (n.id === c.id ? hecha : n)));
+      setConflicto(null);
+    } catch (err) {
+      // Un tercero ha vuelto a guardar mientras se decidía: se enseña la de ahora.
+      const leida = esConflicto(err) ? await leerOtra(c.notebookId, c.id).catch(() => null) : null;
+      if (leida) setConflicto((x) => (x && x.id === c.id ? { ...x, ...leida } : x));
+      else toast.notify({ tone: 'danger', title: t('note.saveFailed') });
+    } finally {
+      setResolviendo(false);
+    }
+  }, [conflicto, resolviendo, leerOtra, toast, t]);
+
+  /** «Ver la otra»: la del otro pasa a ser la nota; lo de aquí se descarta. */
+  const adoptarLaOtra = useCallback((c: ConflictoAbierto) => {
+    descartando.current.add(c.id);
+    // Preact pinta en una microtarea: el desmontaje del editor ya ha pasado.
+    setTimeout(() => descartando.current.delete(c.id), 0);
+    versiones.current.olvidar(c.id);
+    edicionesRef.current.delete(c.id);
+    if (activeId.current === c.notebookId)
+      setNotes((prev) => prev.map((n) => (n.id === c.id ? c.otra : n)));
+    setReinicios((r) => ({ ...r, [c.id]: (r[c.id] ?? 0) + 1 }));
+    setConflicto(null);
+  }, []);
+
+  /** «Guardar las dos»: la del otro se queda en la nota y la de aquí, en una nueva. */
+  const guardarLasDos = useCallback(async () => {
+    const c = conflicto;
+    if (!c || resolviendo) return;
+    setResolviendo(true);
+    adoptarLaOtra(c);
+    try {
+      const hecha = await crearNota(
+        c.kind,
+        { data: datosDeCopia(c.mia.data) },
+        t('conflict.copyTitle', { title: c.mia.title.trim() || t('note.untitled') }),
+        c.mia.content,
+      );
+      if (hecha) toast.notify({ tone: 'success', title: t('conflict.keptBoth') });
+    } finally {
+      setResolviendo(false);
+    }
+  }, [conflicto, resolviendo, adoptarLaOtra, crearNota, toast, t]);
+
+  /**
+   * Volver a una versión del historial: un guardado normal con su texto y sus datos, que
+   * cifra si toca, avisa si otro dispositivo guardó entretanto y queda en el «Deshacer».
+   * El editor se vuelve a montar para enseñarla (como al adoptar la otra en un conflicto).
+   */
+  const restaurarVersion = useCallback(
+    async (nota: Note, v: ClaroDeVersion) => {
+      await editarNota(nota.id, { title: v.title, content: v.content, data: v.data });
+      setReinicios((r) => ({ ...r, [nota.id]: (r[nota.id] ?? 0) + 1 }));
+      toast.notify({ tone: 'success', title: t('versions.restored') });
+    },
+    [editarNota, toast, t],
   );
 
   const guardarRecordatorio = useCallback(
@@ -1240,12 +1439,39 @@ function NotesView({
   // devuelve el ensayo saneado, no el fichero— y se decide viéndolo.
   const importar = useCallback(
     async (fichero: File) => {
+      if (importacionEnCurso.current || importacionInciertaRef.current) return;
+      const generacion = ++generacionVistaPrevia.current;
       try {
-        const volcado = await fichero.text();
-        const vista = await api.previsualizarVolcado(volcado);
-        setVistaPrevia({ volcado, ...vista });
-      } catch {
-        toast.notify({ tone: 'danger', title: t('import.failed') });
+        if (fichero.size > 32 * 1024 * 1024) throw new Error('backup too large');
+        // El fichero viaja en bytes, sin pasarlo a texto: un ZIP es binario. Se lee
+        // una vez y se guarda tal cual: lo que se previsualiza es lo que se importa.
+        const volcado = new Uint8Array(await fichero.arrayBuffer());
+        const nombre = fichero.name;
+        if (
+          !importacionVigente.current ||
+          importacionEnCurso.current ||
+          importacionInciertaRef.current ||
+          generacionVistaPrevia.current !== generacion
+        )
+          return;
+        const vista = await api.previsualizarVolcado(volcado, nombre);
+        if (
+          importacionVigente.current &&
+          !importacionEnCurso.current &&
+          !importacionInciertaRef.current &&
+          generacionVistaPrevia.current === generacion
+        )
+          setVistaPrevia({ volcado, nombre, ...vista });
+      } catch (err) {
+        if (importacionVigente.current && generacionVistaPrevia.current === generacion)
+          toast.notify({
+            tone: 'danger',
+            title: t(
+              err instanceof EncryptedBackupUnavailable
+                ? 'crypto.migrationFailed'
+                : 'import.failed',
+            ),
+          });
       }
     },
     [toast, t],
@@ -1253,11 +1479,25 @@ function NotesView({
 
   const confirmarImportacion = useCallback(async () => {
     const vp = vistaPrevia;
-    if (!vp) return;
+    if (
+      !vp ||
+      importacionEnCurso.current ||
+      (importacionInciertaRef.current &&
+        (!importacionInciertaRef.current.revisada ||
+          importacionInciertaRef.current.vista.volcado !== vp.volcado))
+    )
+      return;
+    importacionEnCurso.current = true;
+    generacionVistaPrevia.current++;
+    setImportando(true);
     setVistaPrevia(null);
     try {
-      const r = await api.importarVolcado(vp.volcado);
+      const r = await api.importarVolcado(vp.volcado, vp.nombre);
+      if (!importacionVigente.current) return;
+      importacionInciertaRef.current = null;
+      setImportacionIncierta(null);
       await cargarArbol();
+      if (!importacionVigente.current) return;
       setActivo(r.notebook);
       setVista('notebook');
       // Lo descartado se dice SIEMPRE que lo haya: una importación que se come
@@ -1275,7 +1515,17 @@ function NotesView({
             : t('import.done', { count: r.importadas }),
       });
     } catch {
-      toast.notify({ tone: 'danger', title: t('import.failed') });
+      if (!importacionVigente.current) return;
+      // A failed response can follow a partial or complete remote import. Keep
+      // the exact source and require a deliberate review before another attempt.
+      const incierta = { vista: vp, revisada: false };
+      importacionInciertaRef.current = incierta;
+      setImportacionIncierta(incierta);
+      void cargarArbol();
+      toast.notify({ tone: 'warning', title: t('import.resultUnknown') });
+    } finally {
+      importacionEnCurso.current = false;
+      if (importacionVigente.current) setImportando(false);
     }
   }, [vistaPrevia, cargarArbol, toast, t]);
 
@@ -1439,13 +1689,13 @@ function NotesView({
       if (!sel) return;
       if (sel.para === 'compartir') {
         const nota = notaACompartir;
-        if (!nota || !activo) return;
+        if (!nota || !activo || activo.encrypted || nota.notebook_id !== activo.id) return;
         void api
           .compartirEnSala({
             channel_id: elegido.id,
             notebook_id: activo.id,
             note_id: nota.id,
-            title: claro[nota.id]?.title ?? nota.title ?? '',
+            title: nota.title ?? '',
           })
           .then(() =>
             toast.notify({ tone: 'success', title: t('share.sent', { channel: elegido.name }) }),
@@ -1471,7 +1721,7 @@ function NotesView({
         elegido.name,
       );
     },
-    [selector, notaACompartir, activo, claro, crearNota, toast, t],
+    [selector, notaACompartir, activo, crearNota, toast, t],
   );
 
   // --- Vista ---------------------------------------------------------------
@@ -1685,6 +1935,8 @@ function NotesView({
     async (x: api.Task, patch: { checked?: boolean; cancelled?: boolean }) => {
       const checked = patch.cancelled ? false : (patch.checked ?? x.checked);
       try {
+        if (x.content_cipher && (x.links?.length ?? 0) > 0)
+          throw new Error('notes: encrypted links require v3');
         const actualizada = await api.updateNote(x.id, x.notebook_id, {
           kind: x.kind,
           title: x.title ?? '',
@@ -1931,9 +2183,7 @@ function NotesView({
     void cargarArbol();
   };
 
-  // Al montar, al volver la red y cada 30 s mientras quede algo: `online` dice que
-  // hay wifi, no que el servicio conteste.
-  const quedan = cola.some((c) => !c.rechazada);
+  // La cola se sigue mostrando mientras el replay está pausado.
   useEffect(() => {
     void refrescarCola();
     if (typeof BroadcastChannel === 'undefined') return;
@@ -1944,10 +2194,7 @@ function NotesView({
   useEffect(() => {
     if (offline) return;
     void vaciarRef.current();
-    if (!quedan) return;
-    const reloj = setInterval(() => void vaciarRef.current(), 30_000);
-    return () => clearInterval(reloj);
-  }, [offline, quedan]);
+  }, [offline]);
 
   // Soltar una nota sobre un cuaderno del árbol la lleva allí: desde la lista de notas
   // de la barra lateral y desde el asa de una nota del lienzo, con dedo o ratón.
@@ -2091,8 +2338,9 @@ function NotesView({
               <span class="sr-only">{t('import.label')}</span>
               <input
                 type="file"
-                accept=".onex,application/vnd.sytue.notepads+json,application/json"
+                accept=".onex,.md,.markdown,.txt,.zip,.enex,application/vnd.sytue.notepads+json,application/json,text/markdown,application/zip"
                 class="sr-only"
+                disabled={importando || importacionIncierta !== null}
                 onChange={(e) => {
                   const input = e.currentTarget;
                   const f = input.files?.[0];
@@ -2111,7 +2359,9 @@ function NotesView({
             tiene que ser <li>: un <ul> suelto dentro de otro es HTML inválido y
             los lectores de pantalla dejan de contar los elementos. */}
         <li>
-          {cargandoArbol ? null : errorArbol ? (
+          {cargandoArbol ? (
+            <EsqueletoCuadernos />
+          ) : errorArbol ? (
             <p class="text-sidebar-fg-muted px-2 text-base">{t('error.loadFailed')}</p>
           ) : (
             <NotebookTree
@@ -2390,6 +2640,44 @@ function NotesView({
   return (
     <>
       {dialogo}
+      {importacionIncierta ? (
+        <div
+          role="alert"
+          class="text-warning-text flex flex-wrap items-center gap-2 px-4 py-2 text-sm"
+        >
+          <span>{t('import.resultUnknown')}</span>
+          <Button
+            variant="ghost"
+            size="xs"
+            disabled={importando}
+            onClick={() => void cargarArbol()}
+          >
+            {t('import.reviewNotebooks')}
+          </Button>
+          <Button
+            variant="ghost"
+            size="xs"
+            disabled={importando}
+            onClick={() => {
+              generacionVistaPrevia.current++;
+              const revisada = { ...importacionIncierta, revisada: true };
+              importacionInciertaRef.current = revisada;
+              setImportacionIncierta(revisada);
+              setVistaPrevia(importacionIncierta.vista);
+            }}
+          >
+            {t('import.reviewedReopen')}
+          </Button>
+        </div>
+      ) : null}
+      {cola.length > 0 || errorCola ? (
+        <div role="status" class="text-text-muted flex items-center gap-2 px-4 py-2 text-sm">
+          <span>{t(errorCola ? 'note.saveFailed' : 'capture.replayPaused')}</span>
+          <Button variant="ghost" size="xs" onClick={() => void refrescarCola()}>
+            {t('common.retry')}
+          </Button>
+        </div>
+      ) : null}
       {migrando ? (
         <p role="status" class="text-text-muted px-4 py-2 text-sm">
           {t(migracion?.estado === 'failed' ? 'crypto.migrationFailed' : 'crypto.migrating')}
@@ -2412,6 +2700,7 @@ function NotesView({
                   t={t}
                   locale={locale}
                   notes={notasVisibles}
+                  cargando={cargandoNotas}
                   claro={claro}
                   bloqueado={bloqueado}
                   soloLectura={offline || activo?.read_only === true || migrando}
@@ -2441,12 +2730,18 @@ function NotesView({
                     : {})}
                   {...(activo && !activo.encrypted ? { onExport: setNotaAExportar } : {})}
                   onTogglePin={(n) => void editarNota(n.id, { pinned: !n.pinned })}
-                  onShare={(n) => {
-                    setNotaACompartir(n);
-                    setSelector({ origen: 'rooms', para: 'compartir' });
-                  }}
+                  {...(activo && !activo.encrypted
+                    ? {
+                        onShare: (n: Note) => {
+                          setNotaACompartir(n);
+                          setSelector({ origen: 'rooms', para: 'compartir' });
+                        },
+                      }
+                    : {})}
                   onTags={setNotaAEtiquetar}
                   onBacklinks={setNotaConEnlaces}
+                  onInfo={setNotaConInfo}
+                  onVersions={setNotaConVersiones}
                   onDelete={borrarNota}
                   onIcon={setNotaAConfigurarIcono}
                   recordatorios={recordatorios}
@@ -2545,7 +2840,10 @@ function NotesView({
                       void abrirDia(d);
                     }}
                   />
-                ) : enArbol && !notaSeleccionada ? (
+                ) : enArbol && !notaSeleccionada && !(cargandoNotas && seleccionada) ? (
+                  // Abierta desde un enlace o una tarea, la nota elegida aún no ha
+                  // llegado: la hoja en gris (la carga del lienzo), no «elige una nota»
+                  // para saltar a la nota un instante después. Como `lienzo.go`.
                   <div class="grid h-full place-items-center p-6">
                     {/* Como el panel vacío de Mail y de Contacts: la ilustración de la
                         casa, no un glifo de 40, y el botón de crear que la frase ofrece
@@ -2553,7 +2851,7 @@ function NotesView({
                     <EmptyState
                       title={t('tree.pick')}
                       description={t('tree.pickHint')}
-                      illustration={<Illustration name="emptyNotes" />}
+                      spot="emptyNotes"
                       action={
                         <Button
                           variant="primary"
@@ -2571,6 +2869,7 @@ function NotesView({
                     // Bloquear o cambiar de ámbito retira también la sesión local
                     // y los rangos del editor, aunque el foco siga en una herramienta.
                     key={`${cryptoScope}:${bloqueado}`}
+                    reinicios={reinicios}
                     t={t}
                     // En árbol el panel principal es UNA nota a todo el ancho: la
                     // disposición de lista con una sola nota es exactamente eso, y
@@ -2608,12 +2907,18 @@ function NotesView({
                       : {})}
                     {...(activo && !activo.encrypted ? { onExport: setNotaAExportar } : {})}
                     onTogglePin={(n) => void editarNota(n.id, { pinned: !n.pinned })}
-                    onShare={(n) => {
-                      setNotaACompartir(n);
-                      setSelector({ origen: 'rooms', para: 'compartir' });
-                    }}
+                    {...(activo && !activo.encrypted
+                      ? {
+                          onShare: (n: Note) => {
+                            setNotaACompartir(n);
+                            setSelector({ origen: 'rooms', para: 'compartir' });
+                          },
+                        }
+                      : {})}
                     onTags={setNotaAEtiquetar}
                     onBacklinks={setNotaConEnlaces}
+                    onInfo={setNotaConInfo}
+                    onVersions={setNotaConVersiones}
                     onNuevaDentro={(padre) => void crearNota('text', { group_id: padre.id })}
                     onSacar={(n) =>
                       moverNota(n.id, {
@@ -2752,7 +3057,7 @@ function NotesView({
               <EmptyState
                 title={t('empty.noNotebooks.title')}
                 description={t('empty.noNotebooks.body')}
-                illustration={<Illustration name="emptyNotes" />}
+                spot="emptyNotes"
                 action={
                   <Button onClick={() => setAjustes({ nb: null, parentId: null })}>
                     {t('sidebar.newNotebook')}
@@ -2981,17 +3286,67 @@ function NotesView({
         <BacklinksPanel t={t} note={notaConEnlaces} onClose={() => setNotaConEnlaces(null)} />
       ) : null}
 
+      {notaConInfo ? (
+        <NoteInfo
+          t={t}
+          locale={locale}
+          note={notaConInfo}
+          // Lo descifrado en memoria, si lo hay: una nota cifrada sin su claro no se
+          // cuenta (`null`), y el diálogo lo dice en vez de enseñar un cero.
+          titulo={claro[notaConInfo.id]?.title ?? notaConInfo.title ?? ''}
+          contenido={
+            claro[notaConInfo.id]?.content ??
+            (notaConInfo.content_cipher ? null : (notaConInfo.content ?? ''))
+          }
+          cuaderno={notebooks.find((c) => c.id === notaConInfo.notebook_id)?.title ?? ''}
+          onClose={() => setNotaConInfo(null)}
+        />
+      ) : null}
+
+      {notaConVersiones ? (
+        <VersionesNota
+          t={t}
+          locale={locale}
+          note={notaConVersiones}
+          clave={activo?.encrypted ? clave : null}
+          onRestaurar={(v) => restaurarVersion(notaConVersiones, v)}
+          onClose={() => setNotaConVersiones(null)}
+        />
+      ) : null}
+
+      {conflicto ? (
+        <ConflictoNota
+          t={t}
+          mia={conflicto.mia}
+          otra={conflicto.otraClaro}
+          ocupado={resolviendo}
+          onMia={() => void quedarmeConLaMia()}
+          onOtra={() => adoptarLaOtra(conflicto)}
+          onLasDos={() => void guardarLasDos()}
+          onClose={() => setConflicto(null)}
+        />
+      ) : null}
+
       {vistaPrevia ? (
         <Modal
           open
           size="lg"
           title={t('import.label')}
-          onClose={() => setVistaPrevia(null)}
+          onClose={() => {
+            generacionVistaPrevia.current++;
+            setVistaPrevia(null);
+          }}
           footer={
             <>
               {/* «Cancelar» fantasma, como en `ConfirmDialog`: relleno, competía con
                   «Importar». */}
-              <Button variant="ghost" onClick={() => setVistaPrevia(null)}>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  generacionVistaPrevia.current++;
+                  setVistaPrevia(null);
+                }}
+              >
                 {t('common.cancel')}
               </Button>
               <Button onClick={() => void confirmarImportacion()}>{t('import.action')}</Button>
@@ -3174,7 +3529,7 @@ function BarraDeCuaderno({
               <span
                 aria-hidden="true"
                 class="inline-block h-2.5 w-2.5 rounded-full"
-                style={{ background: s.color }}
+                style={{ background: colorDeUsuario(s.color) ?? s.color }}
               />
             )
           }
@@ -3435,7 +3790,7 @@ function PanelBusqueda({
             {t('search.searching')}
           </p>
         ) : estado === 'fallo' ? null : resultados.length === 0 ? (
-          <p class="text-text-subtle text-base">{t('search.empty')}</p>
+          <EmptyState compact icon="search" title={t('search.empty')} />
         ) : (
           <p class="sytue-meta">{t('search.results', { count: resultados.length })}</p>
         )}
@@ -3454,67 +3809,6 @@ function PanelBusqueda({
       ) : estado === 'listo' && resultados.length > 0 ? (
         <ListaDeHits hits={resultados} consulta={buscada} onAbrir={onAbrir} />
       ) : null}
-    </div>
-  );
-}
-
-/** Papelera: restaurar o borrar del todo. */
-function PanelPapelera({
-  t,
-  notes,
-  onRestore,
-  onPurge,
-  onVaciar,
-}: {
-  t: ReturnType<typeof useT>;
-  notes: Note[];
-  onRestore: (id: string) => void;
-  onPurge: (id: string) => void;
-  /** Vaciar la papelera entera: lo que la gente viene a hacer aquí. */
-  onVaciar: () => void;
-}): JSX.Element {
-  if (notes.length === 0) {
-    return (
-      <div class="notes-col notes-page">
-        <div class="notes-page-head">
-          <h2 class="notes-page-title">{t('trash.title')}</h2>
-        </div>
-        <p class="text-text-subtle text-base">{t('trash.empty')}</p>
-      </div>
-    );
-  }
-  return (
-    <div class="notes-col notes-page">
-      <div class="notes-page-head">
-        <h2 class="notes-page-title">{t('trash.title')}</h2>
-        <Button size="sm" variant="ghost" onClick={onVaciar}>
-          {t('trash.emptyAll')}
-        </Button>
-      </div>
-      <ul class="notes-rows">
-        {notes.map((n) => (
-          <li key={n.id} class="notes-row items-center">
-            <span class="notes-stream-glyph mt-0!">
-              {n.kind === 'todo' ? (
-                <Glyph name="todo" size={14} />
-              ) : (
-                <span class="notes-stream-bullet" aria-hidden="true" />
-              )}
-            </span>
-            <span class="text-text min-w-0 flex-1 truncate text-base">
-              {n.title || resumenNota(n) || t('note.untitled')}
-            </span>
-            <span class="notes-row-actions">
-              <Button size="xs" variant="ghost" onClick={() => onRestore(n.id)}>
-                {t('trash.restore')}
-              </Button>
-              <Button size="xs" variant="ghost" onClick={() => onPurge(n.id)}>
-                {t('trash.purge')}
-              </Button>
-            </span>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }
@@ -3547,7 +3841,7 @@ function AplicarEtiquetas({
       }
     >
       {tags.length === 0 ? (
-        <p class="text-text-muted text-base">{t('tags.none')}</p>
+        <EmptyState compact icon="tag" title={t('tags.none')} />
       ) : (
         <ul class="grid gap-2.5">
           {tags.map((tag) => (
@@ -3562,7 +3856,11 @@ function AplicarEtiquetas({
                       type="button"
                       aria-pressed={marcado}
                       onClick={() => onSet(tag.id, marcado ? null : (s.id ?? null))}
-                      style={marcado ? { background: s.color, color: '#fff' } : undefined}
+                      style={
+                        marcado
+                          ? { background: colorDeUsuario(s.color) ?? s.color, color: '#fff' }
+                          : undefined
+                      }
                       class={cx(
                         'sytue-focus-ring rounded-control border px-2.5 py-1 text-base transition-colors duration-150',
                         marcado ? 'border-transparent' : 'border-border hover:bg-bg-subtle',

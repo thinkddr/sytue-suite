@@ -12,6 +12,7 @@
 import type { JSX } from 'preact';
 import { useT } from '@sytue/i18n/preact';
 import { Button } from './Button.js';
+import { Kbd } from './Kbd.js';
 import { Modal } from './Modal.js';
 
 export interface AtajoDeTeclado {
@@ -30,18 +31,22 @@ export function ShortcutsModal({
   title,
   groups,
   onClose,
+  container,
 }: {
   open: boolean;
   /** Título del diálogo; lo pone la app porque nombra a la app. */
   title: string;
   groups: GrupoDeAtajos[];
   onClose: () => void;
+  /** Dónde se monta (ver `ModalProps.container`). */
+  container?: Element | null | undefined;
 }): JSX.Element {
   const t = useT();
   return (
     <Modal
       open={open}
       onClose={onClose}
+      container={container}
       title={title}
       size="md"
       footer={
@@ -59,15 +64,13 @@ export function ShortcutsModal({
                 <div key={a.descripcion} class="flex items-center gap-4 py-1.5">
                   <dt class="flex shrink-0 items-center gap-1">
                     {a.teclas.map((tecla) => (
-                      <kbd
-                        key={tecla}
-                        // Una tecla se dibuja como una tecla: caja, borde y number
-                        // tabular. Con texto suelto, «j k» se lee como una palabra.
-                        class="border-border bg-bg-subtle text-text-muted inline-flex h-6 min-w-6 items-center justify-center rounded border px-1.5 font-mono text-xs"
-                      >
-                        {tecla}
-                      </kbd>
+                      // Una tecla se dibuja como una tecla: caja, borde y número
+                      // tabular. Con texto suelto, «j k» se lee como una palabra. `Kbd`
+                      // es decoración y se esconde al lector: el `sr-only` de abajo es
+                      // quien le nombra las teclas, para que el `<dt>` no quede vacío.
+                      <Kbd key={tecla}>{tecla}</Kbd>
                     ))}
+                    <span class="sr-only">{a.teclas.join(' ')}</span>
                   </dt>
                   <dd class="text-text min-w-0 flex-1 text-sm">{a.descripcion}</dd>
                 </div>

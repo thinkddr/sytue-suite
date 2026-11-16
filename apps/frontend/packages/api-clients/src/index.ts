@@ -18,6 +18,10 @@ export {
   HttpClient,
   HttpError,
   ResponseTooLargeError,
+  ResponseLengthError,
+  exactResponseLength,
+  hasExpectedResponseLengthHeaders,
+  validateResponseLengthHeaders,
   bearer,
   cuerpoDeError,
   upstreamStatus,
@@ -82,6 +86,7 @@ export {
   isCipherStorageProduct,
   isValidCipherBlobReceipt,
   nodeResource,
+  toFileVersion,
 } from './drive/index.js';
 export type {
   BffCipherBlobGateway,
@@ -89,7 +94,10 @@ export type {
   CipherStorageProduct,
   DriveOptions,
   DriveResource,
+  FileVersion,
+  FileVersionPage,
   RawNode,
+  RawVersion,
   ShareLink,
   CreateShareInput,
   TrashItem,
@@ -100,6 +108,8 @@ export { DocsClient, puedeEscribir } from './docs/index.js';
 export type {
   DocsOptions,
   DocKind,
+  DocListScope,
+  DocListSort,
   DocumentMeta,
   DocumentRole,
   CreateDocumentInput,
@@ -120,6 +130,7 @@ export type {
   NotebookLayout,
   Note,
   NoteInput,
+  NoteVersion,
   NoteCipherMigration,
   NoteKind,
   NoteVisibility,
@@ -137,6 +148,7 @@ export type {
   ReminderInput,
   Tag,
   TagState,
+  TrashedNote,
 } from './notes/index.js';
 
 // Sytue Mail (mail.sytue.eu — JMAP)
@@ -146,6 +158,7 @@ export {
   parseAttachments,
   parseDraftContent,
   parseMessageBody,
+  senderAuthDe,
 } from './mail/index.js';
 export type {
   MailOptions,
@@ -154,6 +167,8 @@ export type {
   Mailbox,
   MailboxSetError,
   EmailSummary,
+  SenderAuth,
+  AuthVerdict,
   EmailAddress,
   OutgoingEmail,
   OutgoingAttachment,
@@ -172,6 +187,8 @@ export type {
   CalDavOptions,
   Calendar,
   CalendarEvent,
+  InvitationPartStat,
+  ImportedInvitation,
 } from './calendar/index.js';
 
 // Sytue Contacts (contacts.sytue.eu — REST + CardDAV)
@@ -216,6 +233,7 @@ export type {
   Notification,
   NewNotification,
   NotificationPref,
+  NotificationSource,
   Intent,
 } from './hub/index.js';
 
@@ -233,6 +251,9 @@ export type {
   EnvScope,
   CloudDomain,
   DomainDnsInstructions,
+  DomainCheck,
+  DomainCheckReason,
+  VerifyDomainResult,
   AddDomainResult,
   CloudOrganization,
   UsageAggregate,
@@ -339,3 +360,7 @@ export type {
   ExternalMailPage,
   PendingMailConsent,
 } from './core/externalMail.js';
+
+export { createStorageRootService } from './chat/storage-authority.js';
+
+export { clientCoreProxy, roomsServiceBase } from './core/clientCore.js';

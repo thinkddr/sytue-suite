@@ -16,7 +16,7 @@
  */
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { Button, EmptyState, Icon, Illustration, Spinner, usePrompt } from '@sytue/ui';
+import { Button, EmptyState, Icon, usePrompt } from '@sytue/ui';
 import type { SytueUser } from '@sytue/auth';
 import type { Locale } from '@sytue/i18n';
 import {
@@ -33,11 +33,15 @@ import { RUTA } from '../lib/ruta.js';
 import { tituloSugerido } from '../lib/tituloAlbum.js';
 import { useT } from '../i18n/index.js';
 import { posicionVisor } from '../lib/posicionVisor.js';
+import { conAvisos, FalloDeCarga, useAvisoDeFallo } from './Fallo.js';
 import { Marco } from './Marco.js';
-import { Miniatura, Visor } from './PhotosApp.js';
+import { alTeclearEnGaleria, Miniatura, Visor } from './PhotosApp.js';
 import { Nav } from './Nav.js';
+import { EsqueletoFilas } from './Esqueletos.js';
 
-export function Similares({
+export const Similares = conAvisos(Parecidas);
+
+function Parecidas({
   locale,
   ids,
   user,
@@ -52,7 +56,10 @@ export function Similares({
   const [referencias, setReferencias] = useState<Foto[]>([]);
   const [fotos, setFotos] = useState<Foto[] | null>(null);
   const [abierta, setAbierta] = useState<number | null>(null);
-  const [error, setError] = useState('');
+  const [fallo, setFallo] = useState<unknown>(null);
+  // Reintentar vuelve a lanzar la misma consulta: el efecto depende de esta vuelta.
+  const [vuelta, setVuelta] = useState(0);
+  const avisarFallo = useAvisoDeFallo(locale);
   const [aviso, setAviso] = useState('');
   const { preguntar, dialogo: dialogoPreguntar } = usePrompt();
 
@@ -81,7 +88,7 @@ export function Similares({
       );
       setAviso(t('gallery.addedToAlbum', { count: fotos.length, title: album.title }));
     } catch (e) {
-      setError(String(e));
+      avisarFallo(e);
     }
   };
   // Una cadena y no el array: un array nuevo en cada render volvería a lanzar
@@ -89,6 +96,7 @@ export function Similares({
   const clave = ids.join(',');
 
   useEffect(() => {
+    setFallo(null);
     const lista = clave.split(',');
     const primera = lista[0] ?? '';
     // Solo las tres primeras para la cabecera: es para saber de qué se partió,
@@ -100,8 +108,8 @@ export function Similares({
         setReferencias(refs.filter((r): r is Foto => r !== null));
         setFotos(encontradas);
       })
-      .catch((e) => setError(String(e)));
-  }, [clave]);
+      .catch(setFallo);
+  }, [clave, vuelta]);
 
   const titulo = ids.length === 1 ? t('similar.title') : t('similar.titleMany');
 
@@ -149,14 +157,14 @@ export function Similares({
           </p>
         ) : null}
 
-        {error ? (
-          <p class="text-danger-text mb-4 text-sm" role="alert">
-            {error}
-          </p>
-        ) : null}
-
-        {fotos === null ? (
-          <Spinner />
+        {fallo !== null ? (
+          <FalloDeCarga
+            locale={locale}
+            fallo={fallo}
+            alReintentar={() => setVuelta((v) => v + 1)}
+          />
+        ) : fotos === null ? (
+          <EsqueletoFilas />
         ) : fotos.length === 0 ? (
           // Lista vacía NO es un fallo: o el lote todavía no ha mirado esas
           // fotos, o de verdad no hay nada que se les parezca. Decirlo con esas
@@ -165,10 +173,11 @@ export function Similares({
             class="flex-1"
             title={t('similar.empty.title')}
             description={t('similar.empty.description')}
-            illustration={<Illustration name="emptyPhotos" />}
+            spot="emptyPhotos"
           />
         ) : (
-          <ul class="filas">
+          // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- las teselas son los botones y las paradas de Tab; la lista solo recoge sus flechas
+          <ul class="filas" onKeyDown={alTeclearEnGaleria}>
             {fotos.map((f, i) => (
               <Miniatura key={f.id} foto={f} t={t} onOpen={() => setAbierta(i)} />
             ))}

@@ -102,11 +102,24 @@ func (s *Store) ListOrgMerges(ctx context.Context, limit int) ([]OrgMerge, error
 // así dos peticiones simultáneas de reanudación no lanzan dos procesos (la
 // segunda no encuentra fila que actualizar y recibe ErrNotFound).
 func (s *Store) StartOrgMerge(ctx context.Context, id string) error {
+	return s.startOrgMerge(ctx, id, false)
+}
+
+// StartOwnedOrgMerge can resume running only on the physical session that owns
+// this exact job. A timestamp or a disconnected lock-holder is never authority.
+func (s *Store) StartOwnedOrgMerge(ctx context.Context, id string) error {
+	if err := s.requireOrganizationOperation(id); err != nil {
+		return err
+	}
+	return s.startOrgMerge(ctx, id, true)
+}
+
+func (s *Store) startOrgMerge(ctx context.Context, id string, recoverRunning bool) error {
 	const sql = `UPDATE org_merges
 	             SET status = 'running', started_at = coalesce(started_at, now()),
 	                 error = '', updated_at = now()
-	             WHERE id = $1 AND status IN ('pending', 'failed')`
-	tag, err := s.DB().Exec(ctx, sql, id)
+	             WHERE id = $1 AND (status IN ('pending', 'failed') OR ($2 AND status='running'))`
+	tag, err := s.DB().Exec(ctx, sql, id, recoverRunning)
 	if err != nil {
 		return errf("StartOrgMerge", err)
 	}

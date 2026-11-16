@@ -64,6 +64,8 @@ function montar(onDialogo: (d: Dialogo) => void = () => undefined): HTMLElement 
       onDialogo={onDialogo}
       permisos={TODO}
       trabajando={false}
+      urlDescarga="/api/pdf-descargar?path=%2Fa.pdf"
+      onImprimir={nada}
       panelAbierto={false}
       onPanelAbierto={nada}
     />,
@@ -121,4 +123,21 @@ test('cada botón abre su diálogo, no el de al lado', async () => {
     (b as HTMLButtonElement).click();
   }
   expect(abiertos).toEqual(['firmar', 'pedirFirma', 'proteger']);
+});
+
+test('«Versiones» vive en Documento de Organizar y abre su diálogo', async () => {
+  const abiertos: Dialogo[] = [];
+  const host = montar((d) => abiertos.push(d));
+  const pestana = [...host.querySelectorAll('[role="tab"]')].find(
+    (x) => texto(x) === t('pdf.menu.organize'),
+  ) as HTMLButtonElement | undefined;
+  expect(pestana).toBeDefined();
+  pestana!.click();
+  await tick();
+  const boton = [...host.querySelectorAll('[role="tabpanel"] button')].find(
+    (b) => texto(b) === t('pdf.menu.versions'),
+  ) as HTMLButtonElement | undefined;
+  expect(boton).toBeDefined();
+  boton!.click();
+  expect(abiertos).toEqual(['versiones']);
 });

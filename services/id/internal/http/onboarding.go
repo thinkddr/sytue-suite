@@ -825,18 +825,40 @@ func (s *Server) handleOnboardingInvite(w http.ResponseWriter, r *http.Request) 
 		))
 		return
 	}
+	// El alta inicial invita en lote y no personaliza direcciones: con una lista
+	// de correos pegada de golpe no hay dónde elegir una por persona, y todas
+	// reciben el patrón por defecto.
+	sent, results := s.invitarEnLote(r, org, role, c.Subject, emails, bad, detallesAlta)
+	httpx.JSON(w, r, http.StatusOK, map[string]any{"sent": sent, "results": results})
+}
+
+// detallesAlta es lo que el alta inicial dice de cada estado. Va en español
+// porque es lo que el portal enseñaba ya; Sytue Admin usa los suyos
+// (detallesAdmin), en inglés como el resto de su API, y la consola los traduce
+// por el estado, no por este texto.
+var detallesAlta = map[string]string{
+	"invalid":        "No parece una dirección de correo.",
+	"already_member": "Ya forma parte de tu organización.",
+	"not_sent":       "No hemos podido enviar el correo. La invitación está creada: vuelve a intentarlo desde Sytue Admin.",
+	"failed":         "No se ha podido crear la invitación.",
+}
+
+// invitarEnLote invita una a una las direcciones ya separadas y devuelve el
+// resultado REAL de cada una (enviada / ya es miembro / no es un correo / no se
+// pudo enviar / falló), con las inválidas primero para que se vean arriba. Es la
+// misma invitación que la de una sola persona (inviteToOrg) y deja la misma
+// traza de auditoría; lo comparten el alta inicial y Sytue Admin para que «una
+// tanda» signifique lo mismo en los dos sitios. `detalles` pone el texto de cada
+// estado, que es lo único que cambia entre ellos.
+func (s *Server) invitarEnLote(r *http.Request, org domain.Organization, role domain.Role, inviterID string, emails, bad []string, detalles map[string]string) (int, []map[string]any) {
+	ctx := r.Context()
 	results := make([]map[string]any, 0, len(emails)+len(bad))
 	for _, e := range bad {
-		results = append(results, map[string]any{
-			"email": e, "status": "invalid", "detail": "No parece una dirección de correo.",
-		})
+		results = append(results, map[string]any{"email": e, "status": "invalid", "detail": detalles["invalid"]})
 	}
 	sent := 0
 	for _, email := range emails {
-		// El alta inicial invita en lote y no personaliza direcciones: con una lista
-		// de correos pegada de golpe no hay dónde elegir una por persona, y todas
-		// reciben el patrón por defecto.
-		exp, err := s.inviteToOrg(ctx, org, email, role, c.Subject, "", "")
+		exp, err := s.inviteToOrg(ctx, org, email, role, inviterID, "", "")
 		switch {
 		case err == nil:
 			sent++
@@ -844,26 +866,24 @@ func (s *Server) handleOnboardingInvite(w http.ResponseWriter, r *http.Request) 
 				"email": email, "status": "sent", "role": string(role),
 				"expires_at": exp.UTC().Format(time.RFC3339),
 			})
-			_ = s.store.Audit(ctx, nil, auditEntry(c.Subject, org.ID, "org.member.invited", email, r))
+			_ = s.store.Audit(ctx, nil, auditEntry(inviterID, org.ID, "org.member.invited", email, r))
 		case errors.Is(err, domain.ErrConflict):
 			results = append(results, map[string]any{
-				"email": email, "status": "already_member",
-				"detail": "Ya forma parte de tu organización.",
+				"email": email, "status": "already_member", "detail": detalles["already_member"],
 			})
 		case errors.Is(err, errMailNotSent):
-			s.log.ErrorContext(ctx, "enviar invitación del alta falló", "error", err, "org", org.Slug)
+			s.log.ErrorContext(ctx, "enviar invitación del lote falló", "error", err, "org", org.Slug)
 			results = append(results, map[string]any{
-				"email": email, "status": "not_sent",
-				"detail": "No hemos podido enviar el correo. La invitación está creada: vuelve a intentarlo desde Sytue Admin.",
+				"email": email, "status": "not_sent", "detail": detalles["not_sent"],
 			})
 		default:
-			s.log.ErrorContext(ctx, "invitación del alta falló", "error", err, "org", org.Slug)
+			s.log.ErrorContext(ctx, "invitación del lote falló", "error", err, "org", org.Slug)
 			results = append(results, map[string]any{
-				"email": email, "status": "failed", "detail": "No se ha podido crear la invitación.",
+				"email": email, "status": "failed", "detail": detalles["failed"],
 			})
 		}
 	}
-	httpx.JSON(w, r, http.StatusOK, map[string]any{"sent": sent, "results": results})
+	return sent, results
 }
 
 // --- Roles recomendados -----------------------------------------------------

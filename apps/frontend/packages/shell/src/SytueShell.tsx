@@ -40,6 +40,8 @@ import { GlobalSearch } from './GlobalSearch.js';
 import { AppSwitcher } from './AppSwitcher.js';
 import { NotificationCenter } from './NotificationCenter.js';
 import { AccountMenu } from './AccountMenu.js';
+import { ProveedorDePaleta } from './PaletaDeLaSuite.js';
+import { HojaDeAtajosDeLaSuite } from './HojaDeAtajos.js';
 
 export interface SytueShellProps {
   /** App actual (resalta su icono en el app switcher). */
@@ -340,7 +342,14 @@ export function SytueShell({
               ) : (
                 <BarraDeLaSuite showSearch={showSearch} alDestinos={setDestinos} />
               )}
-              <BarraUnicaContext.Provider value={barraUnica}>{children}</BarraUnicaContext.Provider>
+              {/* ⌘K: la paleta de la suite, con las capas que registre la app. */}
+              <ProveedorDePaleta hub={hub}>
+                <BarraUnicaContext.Provider value={barraUnica}>
+                  {children}
+                </BarraUnicaContext.Provider>
+              </ProveedorDePaleta>
+              {/* «?» en todas las apps: la hoja con los atajos de la app y los de la suite. */}
+              <HojaDeAtajosDeLaSuite />
             </div>
           </ShellContext.Provider>
         </ToastProvider>

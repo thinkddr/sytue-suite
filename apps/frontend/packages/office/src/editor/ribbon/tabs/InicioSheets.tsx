@@ -30,9 +30,10 @@ import {
   FIELD_CLASS as RIBBON_FIELD,
   useBloqueado,
 } from '../primitives';
-import { EditorIcon } from '../../icons';
+import { EditorIcon, type EditorIconName } from '../../icons';
 import {
   dispatchSheetCommand,
+  pedirMedidaDeHoja,
   readSheetState,
   subscribeSheetState,
 } from '../../sheets/SheetCanvas';
@@ -191,7 +192,25 @@ export function InicioSheetsTab({ ctx }: { ctx: EditorContext }): JSX.Element {
         <RibbonButton
           commandId="merge"
           icon="merge"
-          onAction={() => dispatchSheetCommand('merge')}
+          label={t('sheet.merge.center')}
+          onAction={() => dispatchSheetCommand('merge', 'center')}
+        />
+        <MergeMenu />
+      </RibbonGroup>
+
+      <RibbonSeparator />
+
+      {/* Medidas: el teclado llega aquí; el ratón, también al asa de las cabeceras. */}
+      <RibbonGroup label={t('group.cells')}>
+        <RibbonButton
+          commandId="colwidth"
+          icon="colWidth"
+          onAction={() => void pedirMedidaDeHoja('colwidth', st?.colWidth)}
+        />
+        <RibbonButton
+          commandId="rowheight"
+          icon="rowHeight"
+          onAction={() => void pedirMedidaDeHoja('rowheight', st?.rowHeight)}
         />
       </RibbonGroup>
 
@@ -200,6 +219,72 @@ export function InicioSheetsTab({ ctx }: { ctx: EditorContext }): JSX.Element {
       {/* Tema común y marca de la organización: la cabecera de la hoja. */}
       <TemaGroup ctx={ctx} />
     </>
+  );
+}
+
+/* ---------- Combinar: el botón combina y centra; el «▾», las otras tres ---------- */
+
+const MERGE_OPCIONES: { value: string; labelKey: DocsKey; icon: EditorIconName }[] = [
+  { value: 'center', labelKey: 'sheet.merge.center', icon: 'merge' },
+  { value: 'merge', labelKey: 'sheet.merge', icon: 'merge' },
+  { value: 'content', labelKey: 'sheet.merge.content', icon: 'merge' },
+  { value: 'unmerge', labelKey: 'sheet.unmerge', icon: 'splitCells' },
+];
+
+// Con el dedo, 44 de alto (como MenuItem de @sytue/ui): en el teléfono el popover de la
+// cinta no se convierte en hoja y las cuatro filas de 32 quedaban por debajo del objetivo.
+const MENU_ITEM =
+  'text-text hover:bg-bg-subtle flex h-8 w-full items-center gap-2 rounded-sm px-2 text-left ' +
+  'pointer-coarse:h-auto pointer-coarse:min-h-[max(44px,2.75rem)] ' +
+  'text-sm disabled:pointer-events-none disabled:opacity-40 ' +
+  FOCUS_RING;
+
+function MergeMenu(): JSX.Element {
+  const bloqueado = useBloqueado('merge');
+  const t = useT();
+  const { open, setOpen, rootRef } = usePopover();
+  return (
+    <div ref={rootRef} class="relative">
+      <button
+        type="button"
+        class={
+          'disabled:pointer-events-none disabled:opacity-40 ' +
+          'text-text-muted inline-flex h-7 w-5 items-center justify-center rounded-sm ' +
+          'hover:bg-bg-subtle hover:text-text aria-expanded:bg-selected aria-expanded:text-text ' +
+          FOCUS_RING
+        }
+        aria-label={t('sheet.merge.more')}
+        title={t('sheet.merge.more')}
+        aria-haspopup="true"
+        aria-expanded={open}
+        disabled={bloqueado}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => setOpen(!open)}
+      >
+        <EditorIcon name="chevronDown" />
+      </button>
+      {open && (
+        // Grupo de botones y no `role="menu"`, como los demás popovers de la cinta: un menú
+        // ARIA promete flechas, Inicio/Fin y foco itinerante, y aquí se recorre con Tab.
+        <div role="group" aria-label={t('group.merge')} class={`${POPOVER_SHELL} left-0 w-56 p-1`}>
+          {MERGE_OPCIONES.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              class={MENU_ITEM}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                setOpen(false);
+                dispatchSheetCommand('merge', o.value);
+              }}
+            >
+              <EditorIcon name={o.icon} />
+              {t(o.labelKey)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

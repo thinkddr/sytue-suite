@@ -71,6 +71,7 @@ type dataStore interface {
 	// Lote (multiselección) + delta incremental para el refresco en vivo.
 	SetFlagsBatch(ctx context.Context, accountID uuid.UUID, ids []uuid.UUID, flag string, add bool) (int, error)
 	MoveMessages(ctx context.Context, accountID uuid.UUID, ids []uuid.UUID, dest uuid.UUID) (int, error)
+	MarkMailboxRead(ctx context.Context, accountID, mailboxID uuid.UUID) (int, error)
 	Changes(ctx context.Context, accountID uuid.UUID, since time.Time, sinceID uuid.UUID, limit int) (changed []domain.Message, destroyed []uuid.UUID, lastTS time.Time, lastID uuid.UUID, hasMore bool, err error)
 	ListFilters(ctx context.Context, accountID uuid.UUID) ([]domain.Filter, error)
 	CreateFilter(ctx context.Context, accountID uuid.UUID, f domain.Filter) (domain.Filter, error)
@@ -93,6 +94,23 @@ type dataStore interface {
 	SetVacation(ctx context.Context, accountID uuid.UUID, v domain.Vacation) error
 	GetSignature(ctx context.Context, accountID uuid.UUID) (string, error)
 	SetSignature(ctx context.Context, accountID uuid.UUID, signature string) error
+	GetUndoSendSeconds(ctx context.Context, accountID uuid.UUID) (int, error)
+	SetUndoSendSeconds(ctx context.Context, accountID uuid.UUID, secs int) error
+	GetReadingPrefs(ctx context.Context, accountID uuid.UUID) (domain.ReadingPrefs, error)
+	SetReadingPrefs(ctx context.Context, accountID uuid.UUID, p domain.ReadingPrefs) error
+	ListTrustedSenders(ctx context.Context, accountID uuid.UUID) ([]string, error)
+	AddTrustedSender(ctx context.Context, accountID uuid.UUID, address string) (string, error)
+	RemoveTrustedSender(ctx context.Context, accountID uuid.UUID, address string) error
+	ListTemplates(ctx context.Context, accountID uuid.UUID) ([]domain.Template, error)
+	CreateTemplate(ctx context.Context, accountID uuid.UUID, name, body string) (domain.Template, error)
+	UpdateTemplate(ctx context.Context, accountID, id uuid.UUID, name, body string) (domain.Template, error)
+	DeleteTemplate(ctx context.Context, accountID, id uuid.UUID) error
+	// Posponer y silenciar conversaciones (ver snooze.go).
+	SnoozeThread(ctx context.Context, accountID, threadID uuid.UUID, until time.Time) (domain.Snooze, error)
+	UnsnoozeThread(ctx context.Context, accountID, threadID uuid.UUID) error
+	ListSnoozes(ctx context.Context, accountID uuid.UUID) ([]domain.Snooze, error)
+	ThreadState(ctx context.Context, accountID, threadID uuid.UUID) (domain.ThreadState, error)
+	MuteThread(ctx context.Context, accountID, threadID uuid.UUID, muted bool) (int, error)
 	// Buzones compartidos + delegación (ACL deny-by-default; ver shared.go).
 	ListAccessibleMailboxes(ctx context.Context, subject string) ([]domain.SharedMailbox, error)
 	GranteePermission(ctx context.Context, subject string, accountID uuid.UUID) (domain.Permission, error)
@@ -124,11 +142,14 @@ type outboundSubmitter interface {
 
 // API agrupa los handlers de la API JMAP/REST de Sytue Mail.
 type API struct {
-	cfg        config.Config
-	store      dataStore
-	compliance complianceStore // legal hold + eDiscovery (admin/owner de la org)
-	blobs      blobStore
-	outbound   outboundSubmitter
+	privateSource  privateSourceStore
+	privateIngress PrivateIngress
+	ingressQueue   httpx.PrivateIngressPort
+	cfg            config.Config
+	store          dataStore
+	compliance     complianceStore // legal hold + eDiscovery (admin/owner de la org)
+	blobs          blobStore
+	outbound       outboundSubmitter
 	// smime publica el ANCLA de la autoridad S/MIME de la organización. Interfaz
 	// y no el tipo concreto para no atar este paquete al de firma: aquí solo se
 	// sirve un certificado público, nada de claves.
@@ -156,7 +177,7 @@ func New(cfg config.Config, st *store.Store, blobs *objectstore.Client, out *del
 	// blobs/out pueden ser nil (dev sin S3); guardamos nil explícito en la
 	// interfaz para que las comprobaciones `== nil` de los handlers sigan siendo
 	// correctas (un puntero nil envuelto en interfaz no es == nil).
-	a := &API{cfg: cfg, store: st, compliance: st, outbound: out, logger: logger, peticiones: st, logos: logo.NuevaCache()}
+	a := &API{cfg: cfg, store: st, compliance: st, privateSource: st, outbound: out, logger: logger, peticiones: st, logos: logo.NuevaCache()}
 	if blobs != nil {
 		a.blobs = blobs
 	}
@@ -183,7 +204,8 @@ func (a *API) WithSMIME(s anclaSMIME) *API {
 // el widget de Mail (la Entrada y sus no leídos).
 var ajustesSinSenal = map[string]bool{
 	"drafts": true, "smime": true, "filters": true, "aliases": true,
-	"vacation": true, "signature": true, "delegation": true,
+	"vacation": true, "signature": true, "undo-send": true, "delegation": true,
+	"templates": true, "reading-prefs": true, "trusted-senders": true,
 }
 
 func sinSenalDeCambios(r *http.Request) bool {
@@ -245,6 +267,7 @@ func (a *API) Mount(r chi.Router, verifier *authn.Verifier) {
 		// cuota de ENVÍO por organización (mensajes/hora, destinatarios/día) es
 		// otra pieza y va aparte: esta no la sustituye.
 		pr.Use(httpx.RateLimit(httpx.RateLimitConfig{Limiter: apiLimiter, KeyFunc: authn.RateKey}))
+		pr.Use(a.guardLegacyPrivateMail)
 
 		// Sesión JMAP: capacidades + cuentas + URLs de API/descarga/subida.
 		pr.Get("/jmap/session", a.handleSession)
@@ -289,12 +312,21 @@ func (a *API) Mount(r chi.Router, verifier *authn.Verifier) {
 			ar.Get("/sender-logo", a.getSenderLogo)
 
 			ar.Get("/mailboxes/{mailboxID}/messages", a.listMessages)
+			// «Marcar todo como leído» de una carpeta, entera y no solo la página
+			// cargada: una operación de servidor por buzón. Ver batch.go.
+			ar.Post("/mailboxes/{mailboxID}/read_all", a.markMailboxRead)
 
 			// Hilo COMPLETO atravesando carpetas: lo que la vista de conversación
 			// no puede armar sola, porque la lista que pliega es de UNA carpeta y
 			// tu propia respuesta vive en Enviados. Sin paginación (tope duro en
 			// el store) y owner-scoped: un hilo ajeno sale vacío.
 			ar.Get("/threads/{threadID}/messages", a.listThreadMessages)
+			// Posponer (sale de Recibidos y vuelve en la fecha, sin leer) y silenciar
+			// (las respuestas nuevas van al Archivo) una conversación. Ver snooze.go.
+			ar.Get("/snoozes", a.listSnoozes)
+			ar.Put("/threads/{threadID}/snooze", a.snoozeThread)
+			ar.Delete("/threads/{threadID}/snooze", a.unsnoozeThread)
+			ar.Put("/threads/{threadID}/mute", a.muteThread)
 
 			// EL ANCLA DE LA AUTORIDAD S/MIME, para poder instalarla.
 			//
@@ -321,6 +353,11 @@ func (a *API) Mount(r chi.Router, verifier *authn.Verifier) {
 			// (connectors/mail.go) con el token de la persona. Existía en el Hub y
 			// NO aquí, así que Mail salía en cada búsqueda como «no ha respondido».
 			// Ruta estática: chi la prioriza sobre /messages/{messageID}.
+			a.privateIngressHandlers().Mount(ar)
+			ar.Get("/private-storage/migration", a.privateStorageState)
+			ar.Post("/private-storage/migration", a.beginPrivateStorage)
+			ar.Get("/private-storage/migration/{epoch}/rows", a.privateStoragePage)
+			ar.Get("/private-storage/migration/{epoch}/source/{kind}/{source}", a.privateStorageBody)
 			ar.Get("/messages/search", a.searchMessages)
 			ar.Get("/messages/{messageID}", a.getMessage)
 			ar.Get("/messages/{messageID}/raw", a.getMessageRaw)
@@ -350,6 +387,7 @@ func (a *API) Mount(r chi.Router, verifier *authn.Verifier) {
 			// Envío: encola un mensaje saliente (firma DKIM + cola Postgres). Admite
 			// diferir (send_at = programado, undo_seconds = ventana de deshacer).
 			ar.Post("/send", a.sendMessage)
+			a.MountPrivateSubmissions(ar)
 
 			// Diferidos: vista/gestión de programados (keyset) + editar hora + cancelar
 			// (undo y programado; reabre el contenido como borrador). Solo el dueño.
@@ -396,6 +434,25 @@ func (a *API) Mount(r chi.Router, verifier *authn.Verifier) {
 			// existía en otro equipo); ahora es una columna de la cuenta.
 			ar.Get("/signature", a.getSignature)
 			ar.Put("/signature", a.setSignature)
+
+			// Ventana de deshacer el envío (5/10/20/30 s), por cuenta. Ver undosend.go.
+			ar.Get("/undo-send", a.getUndoSend)
+			ar.Put("/undo-send", a.setUndoSend)
+
+			// Lectura: auto-avance tras archivar, gestos de la lista en el móvil y
+			// remitentes cuyas imágenes se enseñan sin preguntar. Ver lectura.go.
+			ar.Get("/reading-prefs", a.getReadingPrefs)
+			ar.Put("/reading-prefs", a.setReadingPrefs)
+			ar.Get("/trusted-senders", a.listTrustedSenders)
+			ar.Post("/trusted-senders", a.addTrustedSender)
+			ar.Delete("/trusted-senders", a.removeTrustedSender)
+
+			// Plantillas de respuesta del dueño: CRUD. El redactor las inserta donde
+			// está el cursor. Ver templates.go.
+			ar.Get("/templates", a.listTemplates)
+			ar.Post("/templates", a.createTemplate)
+			ar.Put("/templates/{templateID}", a.updateTemplate)
+			ar.Delete("/templates/{templateID}", a.deleteTemplate)
 
 			// Buzones compartidos (soporte@, ventas@) + delegación (asistente ↔
 			// directivo). La lista alimenta el sidebar y el selector «De»; leer

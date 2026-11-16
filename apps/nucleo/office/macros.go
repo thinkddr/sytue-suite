@@ -71,8 +71,10 @@ const (
 // NoReproducibles son los comandos que nunca se reproducen: deshacer y rehacer
 // corromperían la reproducción, «presentar» no es una edición, los de protección llevan la
 // CONTRASEÑA tecleada en su valor, y `extdata` lleva el id de una conexión de datos.
+// `formatPainter` (la brocha) pinta con el formato que había bajo el cursor al grabar, que
+// la macro no lleva: reproducida, armaría la brocha a ciegas.
 var NoReproducibles = map[string]bool{
-	"undo": true, "redo": true, "presentar": true,
+	"undo": true, "redo": true, "presentar": true, "formatPainter": true,
 	"protect": true, "unprotect": true, "protectbook": true, "unprotectbook": true,
 	"extdata": true,
 }
@@ -264,6 +266,7 @@ var valores = map[string]validador{
 	// Documento y diapositiva
 	"font": unoDe(fuentes...), "size": unoDe(tallas...), "color": color, "highlight": colorOTransparente,
 	"lineHeight": unoDe(interlineados...), "heading": unoDe(bloques...), "insertTable": conforme(reTabla),
+	"changeCase":  unoDe("sentence", "lower", "upper", "title"),
 	"insertImage": imagen, "insertLink": enlace, "tableCellBg": colorOTransparente,
 	"tableCellValign": unoDe(alineacionVert...),
 	// Hoja

@@ -61,7 +61,7 @@ var medidasCampo = [...]medidaCampo{
 		icono: 16, iconoX: tema.Espacio(3), texto: tema.TextoBase,
 	},
 	// `h-6 min-h-[24px] px-1.5 text-xs`, con icono `pl-7` y el icono en `left-1.5`. El
-	// alto son 24 px FIJOS: `h-6` a secas eran 21 con la raíz a 14 y la web le puso el
+	// alto son 24 px FIJOS: `h-6` a secas eran 21 cuando 1 rem medía 14 px y la web le puso el
 	// suelo de `Button xs` e `IconButton sm` (PR #841).
 	CampoSM: {
 		alto: LadoIconoSM, margen: tema.Espacio(1.5), margenIcono: tema.Espacio(7),
@@ -830,6 +830,9 @@ func (e *Entrada) Requerida() bool {
 
 // Contrasena pinta puntos en vez de letras (`type="password"`).
 func (e *Entrada) Contrasena(si bool) { e.editor.Password = si }
+
+// EsContrasena dice si pinta puntos: lo que mira quien vigila que un secreto no se vea.
+func (e *Entrada) EsContrasena() bool { return e.editor.Password }
 
 // Inerte es `disabled`: no responde y se pinta al 50 % de opacidad, como todo lo que
 // lleva `disabled:opacity-50` en la hoja.

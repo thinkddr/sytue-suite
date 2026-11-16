@@ -26,6 +26,7 @@ type pendingFileBlock struct {
 }
 
 type storageFileUpload struct {
+	Target       storage.PublicationTarget     `json:"target"`
 	Version      int                           `json:"v"`
 	Scope        storage.Scope                 `json:"scope"`
 	Request      StorageFileRequest            `json:"request"`
@@ -38,6 +39,7 @@ type storageFileUpload struct {
 	Pending      *pendingFileBlock             `json:"pending,omitempty"`
 	File         *storageFile                  `json:"file,omitempty"`
 	Published    *EventRef                     `json:"published,omitempty"`
+	Verified     bool                          `json:"verified,omitempty"`
 }
 
 func (s storageFileUpload) transaction(kind string, level, index int) string {
@@ -56,7 +58,10 @@ func (f storageFileIO) checkpoint(ctx context.Context, job string, state *storag
 }
 
 func (s storageFileUpload) validate(scope storage.Scope, request StorageFileRequest) error {
-	if s.Version != 1 || s.Scope != scope || s.Request.validate(scope) != nil || s.Next < 0 || s.Next > fileBlocks(request.SizeBytes) || !storage.Identifier(s.Salt) || !validFileHash(s.SourceSHA256) || !validFileHash(s.PrefixSHA256) {
+	if s.Version == 1 {
+		return ErrStoragePublicationMissing
+	}
+	if s.Version != 2 || !s.Target.Valid() || s.Scope != scope || s.Request.Validate(scope) != nil || s.Next < 0 || s.Next > fileBlocks(request.SizeBytes) || !storage.Identifier(s.Salt) || !validFileHash(s.SourceSHA256) || !validFileHash(s.PrefixSHA256) {
 		return storage.ErrRecord
 	}
 	original, _ := json.Marshal(s.Request)
@@ -81,7 +86,7 @@ func (s storageFileUpload) validate(scope storage.Scope, request StorageFileRequ
 func (s storageFileUpload) validatePending(scope storage.Scope, request StorageFileRequest) error {
 	if s.Pending != nil {
 		b := s.Pending.Block
-		if s.Next >= fileBlocks(request.SizeBytes) || !validFileHash(s.Pending.PlainSHA256) || b.Blob.SizeBytes != fileBlockBytes(request.SizeBytes, s.Next) || b.validate(scope, request.ObjectID, request.RevisionID, s.Next) != nil {
+		if s.Next >= fileBlocks(request.SizeBytes) || !validFileHash(s.Pending.PlainSHA256) || b.Blob.SizeBytes != fileBlockBytes(request.SizeBytes, s.Next) || b.Validate(scope, request.ObjectID, request.RevisionID, s.Next) != nil {
 			return storage.ErrRecord
 		}
 	}
@@ -90,10 +95,13 @@ func (s storageFileUpload) validatePending(scope storage.Scope, request StorageF
 
 func (s storageFileUpload) validatePrepared() error {
 	request := s.Request
+	if s.Verified && s.Published == nil {
+		return storage.ErrRecord
+	}
 	if s.File != nil && (s.Next != fileBlocks(request.SizeBytes) || s.Pending != nil) {
 		return storage.ErrRecord
 	}
-	if s.Published != nil && (s.File == nil || !validFileEvent(*s.Published)) {
+	if s.Published != nil && (s.File == nil || !validFileEvent(*s.Published) || s.Published.RoomID != s.Target.RoomID) {
 		return storage.ErrRecord
 	}
 	if s.File != nil {
@@ -143,14 +151,21 @@ func (f storageFileIO) exactSource(ctx context.Context, source io.ReaderAt, size
 	return nil
 }
 
-func (f storageFileIO) uploadState(ctx context.Context, job string, request StorageFileRequest, source io.ReaderAt) (storageFileUpload, error) {
+func (f storageFileIO) uploadState(ctx context.Context, job string, request StorageFileRequest, source io.ReaderAt, publication storagePublicationIO) (storageFileUpload, error) {
 	var state storageFileUpload
 	found, err := f.journal.Read(f.journalOwner(), storage.PendingUploadsNamespace, job, &state)
 	if err != nil {
 		return state, err
 	}
 	if found {
+		if f.expectedSourceSHA256 != "" && state.SourceSHA256 != f.expectedSourceSHA256 {
+			return state, ErrStorageSourceChanged
+		}
 		return state, state.validate(f.scope, request)
+	}
+	target, targetErr := publication.StoragePublicationTarget()
+	if targetErr != nil {
+		return state, targetErr
 	}
 	h := sha256.New()
 	if err := f.hashSource(ctx, source, request.SizeBytes, h); err != nil {
@@ -159,7 +174,10 @@ func (f storageFileIO) uploadState(ctx context.Context, job string, request Stor
 	if err := f.exactSource(ctx, source, request.SizeBytes); err != nil {
 		return state, err
 	}
-	state = storageFileUpload{Version: 1, Scope: f.scope, Request: request, Salt: rand.Text(), SourceSHA256: hex.EncodeToString(h.Sum(nil)), PrefixSHA256: digestBytes(nil)}
+	if f.expectedSourceSHA256 != "" && hex.EncodeToString(h.Sum(nil)) != f.expectedSourceSHA256 {
+		return state, ErrStorageSourceChanged
+	}
+	state = storageFileUpload{Version: 2, Target: target, Scope: f.scope, Request: request, Salt: rand.Text(), SourceSHA256: hex.EncodeToString(h.Sum(nil)), PrefixSHA256: digestBytes(nil)}
 	err = f.checkpoint(ctx, job, &state)
 	return state, err
 }
@@ -306,17 +324,26 @@ func (f storageFileIO) prepareFile(ctx context.Context, job string, state *stora
 }
 
 func (f storageFileIO) upload(ctx context.Context, job string, request StorageFileRequest, source io.ReaderAt) (EventRef, error) {
-	if f.gateway == nil || f.records == nil || !f.journal.Encrypted() || source == nil || !storage.Identifier(job) || request.validate(f.scope) != nil {
+	if f.gateway == nil || f.records == nil || !f.journal.Encrypted() || source == nil || !storage.Identifier(job) || request.Validate(f.scope) != nil || f.expectedSourceSHA256 != "" && !validFileHash(f.expectedSourceSHA256) {
 		return EventRef{}, storage.ErrRecord
 	}
 	request.Metadata = bytes.Clone(request.Metadata)
 	request.Previous = slices.Clone(request.Previous)
+	publication, ok := f.records.(storagePublicationIO)
+	if !ok {
+		return EventRef{}, storage.ErrRecord
+	}
 	var result EventRef
 	err := f.journal.Exclusive(ctx, f.journalOwner(), storage.PendingUploadsNamespace, job, func() error {
-		state, err := f.uploadState(ctx, job, request, source)
+		state, err := f.uploadState(ctx, job, request, source, publication)
 		if err != nil {
 			return err
 		}
+		if err := publication.CheckStoragePublicationTarget(state.Target); err != nil {
+			return err
+		}
+		f.records = pinnedStorageRecords{storageRecordIO: f.records, publication: publication, target: state.Target}
+		f.publicationCheck = func() error { return publication.CheckStoragePublicationTarget(state.Target) }
 		if err := f.prepareFile(ctx, job, &state, source); err != nil {
 			return err
 		}
@@ -335,12 +362,20 @@ func (f storageFileIO) upload(ctx context.Context, job string, request StorageFi
 			}
 		}
 		result = *state.Published
-		// Verify the stored replacement in full before retiring its pending journal.
-		// The caller still owns the original; this adapter never deletes it.
+		// A verified file is not yet an application commit. Retain its receipt so
+		// a crash before catalog publication cannot create a second file on retry.
+		state.Verified = false
+		if err := f.checkpoint(ctx, job, &state); err != nil {
+			return err
+		}
 		if _, err = f.download(ctx, result, request.ObjectID, request.RevisionID, io.Discard); err != nil {
 			return err
 		}
-		return f.journal.Delete(f.journalOwner(), storage.PendingUploadsNamespace, job)
+		state.Verified = true
+		if err := f.checkpoint(ctx, job, &state); err != nil {
+			return err
+		}
+		return f.guard(ctx)
 	})
 	return result, err
 }
@@ -348,6 +383,8 @@ func (f storageFileIO) upload(ctx context.Context, job string, request StorageFi
 // UploadStorageFile resumes through the existing encrypted offline store. It
 // writes each descriptor before network I/O, retains pending work on every error,
 // and verifies the complete encrypted replacement. Originals are never removed.
+// The completed journal remains until AcknowledgeStorageFile verifies the app's
+// immutable catalog commit points to this exact file and content revision.
 // Use an immutable ReaderAt revision; changed inputs fail rather than silently
 // reusing keys. Logout must cancel/wait for its device jobs before clearing cache.
 func (c *Client) UploadStorageFile(ctx context.Context, gateway *api.Drive, journal *offline.Store, job string, request StorageFileRequest, source io.ReaderAt) (EventRef, error) {
@@ -356,4 +393,39 @@ func (c *Client) UploadStorageFile(ctx context.Context, gateway *api.Drive, jour
 		return EventRef{}, err
 	}
 	return (storageFileIO{scope: scope, gateway: gateway, records: c, journal: journal, closed: c.closed.Load}).upload(ctx, job, request, source)
+}
+
+// storageFileTarget overrides only publication routing; the maintained uploader
+// still owns its encrypted journal, chunk keys, verification and acknowledgment.
+type storageFileTarget struct {
+	storageRecordIO
+	storagePublicationIO
+	target storage.PublicationTarget
+}
+
+func (s storageFileTarget) StoragePublicationTarget() (storage.PublicationTarget, error) {
+	return s.target, s.CheckStoragePublicationTarget(s.target)
+}
+
+func (s storageFileTarget) CheckStoragePublicationTarget(target storage.PublicationTarget) error {
+	if target != s.target {
+		return ErrIdentity
+	}
+	return s.storagePublicationIO.CheckStoragePublicationTarget(target)
+}
+
+// UploadStorageFileAt pins even the first publication to an application's
+// durable intent. A room rotation cannot redirect its initial manifest, and an
+// existing job at another endpoint is rejected before reading source bytes or
+// calling the blob provider. UploadStorageFile retains its historical behavior.
+func (c *Client) UploadStorageFileAt(ctx context.Context, gateway *api.Drive, journal *offline.Store, job string, target storage.PublicationTarget, request StorageFileRequest, source io.ReaderAt) (EventRef, error) {
+	if err := c.CheckStoragePublicationTarget(target); err != nil {
+		return EventRef{}, err
+	}
+	scope, err := c.storageBlockScope(ctx)
+	if err != nil {
+		return EventRef{}, err
+	}
+	records := storageFileTarget{storageRecordIO: c, storagePublicationIO: c, target: target}
+	return (storageFileIO{scope: scope, gateway: gateway, records: records, journal: journal, closed: c.closed.Load}).upload(ctx, job, request, source)
 }

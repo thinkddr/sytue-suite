@@ -37,8 +37,8 @@ const (
 )
 
 var (
-	// AnchoVistaRapida es el `w-72`: 18 rem de 14, 252. (El `WIDTH = 288` de la web es
-	// la reserva para medir antes de montar, no lo que mide.)
+	// AnchoVistaRapida es el `w-72`: 18rem, 288 con el rem de 16, lo mismo que la reserva
+	// `WIDTH = 288` con la que la web mide antes de montar.
 	AnchoVistaRapida = tema.Espacio(72)
 	rellenoRapida    = tema.Espacio(3.5)
 	ladoPuntoRapida  = tema.Espacio(2.5)
@@ -84,12 +84,12 @@ type AccionesVistaRapida struct {
 	Crecer     func()
 }
 
-// nuevaVistaRapida arma el panel de una ocurrencia. `invitado` es `meHanInvitado`: solo
-// entonces sale «¿Vas a ir?».
+// nuevaVistaRapida arma el panel de una ocurrencia. `respuesta` es `miRespuesta`: con
+// ella (no vacía) sale «¿Vas a ir?», con la respuesta dada marcada.
 //
 // Lo que devuelve es lo de DENTRO: la caja, el `p-3.5`, la sombra y la capa son de
 // `ui.MostrarEmergenteEn`, en `surface-raised`.
-func (p *Pantalla) nuevaVistaRapida(o Ocurrencia, invitado bool, a AccionesVistaRapida) fyne.CanvasObject {
+func (p *Pantalla) nuevaVistaRapida(o Ocurrencia, respuesta string, a AccionesVistaRapida) fyne.CanvasObject {
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	util := AnchoVistaRapida - 2*(rellenoRapida+tema.Borde)
 	titulo := resumenDe(o, p.t("event.untitled", nil))
@@ -147,20 +147,10 @@ func (p *Pantalla) nuevaVistaRapida(o Ocurrencia, invitado bool, a AccionesVista
 		})
 	}
 
-	if invitado && a.Responder != nil {
+	if respuesta != "" && a.Responder != nil {
 		botones := make([]fyne.CanvasObject, 0, 4)
 		botones = append(botones, textoXS(p.t("popover.respond", nil), "text-subtle", util, 1))
-		for _, r := range []struct {
-			clave, estado string
-			variante      ui.Variante
-		}{
-			{"popover.yes", "accepted", ui.Primario},
-			{"popover.maybe", "tentative", ui.Secundario},
-			{"popover.no", "declined", ui.Secundario},
-		} {
-			estado := r.estado
-			botones = append(botones, ui.NuevoBoton(p.t(r.clave, nil), func() { a.Responder(estado) }).Con(r.variante, ui.TallaSM))
-		}
+		botones = append(botones, p.botonesRespuesta(respuesta, ui.TallaSM, a.Responder)...)
 		hijos = append(hijos, seccionRapida(util, botones, true))
 	}
 	if o.SoloLectura {
@@ -181,6 +171,27 @@ func (p *Pantalla) nuevaVistaRapida(o Ocurrencia, invitado bool, a AccionesVista
 	// ponytail: el `aria-label` del diálogo («Detalles de …», `popover.details`) no se
 	// anuncia: la capa del emergente no es un objeto accesible con nombre.
 	return container.New(&anchoFijo{Ancho: util}, container.New(ui.Columna{}, hijos...))
+}
+
+// botonesRespuesta son los tres botones de «¿Vas a ir?» (Sí, Quizá, No), como
+// `aspectoRespuesta` de EventPopover.tsx: primario y con la marca ✓ solo el de la
+// respuesta dada, para que se vea qué contestaste; sin respuesta («pending»), los tres
+// secundarios, que un «Sí» primario se leería como «ya has dicho que sí».
+func (p *Pantalla) botonesRespuesta(respuesta string, talla ui.Talla, responder func(estado string)) []fyne.CanvasObject {
+	out := make([]fyne.CanvasObject, 0, 3)
+	for _, r := range []struct{ clave, estado string }{
+		{"popover.yes", "accepted"},
+		{"popover.maybe", "tentative"},
+		{"popover.no", "declined"},
+	} {
+		estado := r.estado
+		b := ui.NuevoBoton(p.t(r.clave, nil), func() { responder(estado) }).Con(ui.Secundario, talla)
+		if estado == respuesta {
+			b.Variante, b.Icono, b.TamIcono = ui.Primario, iconos.Tic, 16
+		}
+		out = append(out, b)
+	}
+	return out
 }
 
 // anchoFijo declara un ancho fijo y el alto de su hijo: el `w-72` menos el relleno.
@@ -264,7 +275,7 @@ func seccionRapida(util float32, hijos []fyne.CanvasObject, rotulada bool) fyne.
 	v := tema.De(fyne.CurrentApp().Settings().ThemeVariant())
 	filete := canvas.NewRectangle(tema.Color("border", v))
 	return container.New(&conFileteArriba{Arr: tema.Espacio(3), Pad: tema.Espacio(2.5)},
-		filete, container.New(&envolver{Hueco: espacio2, Ancho: util, PrimeroEntero: rotulada}, hijos...))
+		filete, container.New(ui.Flujo{Hueco: espacio2, Ancho: util, PrimeroEntero: rotulada}, hijos...))
 }
 
 // conFileteArriba es `mt-* border-t pt-*`: el primer hijo es el filete.
@@ -281,91 +292,6 @@ func (c *conFileteArriba) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 	y := c.Arr + tema.Borde + c.Pad
 	objs[1].Move(fyne.NewPos(0, y))
 	objs[1].Resize(fyne.NewSize(t.Width, max(t.Height-y, 0)))
-}
-
-// envolver es `flex flex-wrap items-center gap-*` con un ancho conocido: los hijos a su
-// medida, uno detrás de otro, y a la línea siguiente el que no quepa. Con PrimeroEntero,
-// el primero es `w-full`: ocupa su línea entera. Con Repartir, `justify-between`: lo que
-// sobra de cada línea va entre sus hijos.
-type envolver struct {
-	Hueco, Ancho            float32
-	PrimeroEntero, Repartir bool
-}
-
-// medida es lo que ocupa un hijo en su línea.
-func (e *envolver) medida(i int, o fyne.CanvasObject, ancho float32) fyne.Size {
-	m := o.MinSize()
-	if i == 0 && e.PrimeroEntero {
-		m.Width = ancho
-	}
-	return m
-}
-
-func (e *envolver) lineas(objs []fyne.CanvasObject, ancho float32) [][]fyne.CanvasObject {
-	var out [][]fyne.CanvasObject
-	fila := make([]fyne.CanvasObject, 0, len(objs))
-	x := float32(0)
-	for i, o := range objs {
-		w := e.medida(i, o, ancho).Width
-		if len(fila) > 0 && x+e.Hueco+w > ancho {
-			out, fila, x = append(out, fila), nil, 0
-		}
-		if len(fila) > 0 {
-			x += e.Hueco
-		}
-		fila = append(fila, o)
-		x += w
-	}
-	if len(fila) > 0 {
-		out = append(out, fila)
-	}
-	return out
-}
-
-func altoLinea(fila []fyne.CanvasObject) float32 {
-	h := float32(0)
-	for _, o := range fila {
-		h = max(h, o.MinSize().Height)
-	}
-	return h
-}
-
-func (e *envolver) MinSize(objs []fyne.CanvasObject) fyne.Size {
-	alto := float32(0)
-	for i, f := range e.lineas(objs, e.Ancho) {
-		if i > 0 {
-			alto += e.Hueco
-		}
-		alto += altoLinea(f)
-	}
-	return fyne.NewSize(e.Ancho, alto)
-}
-
-func (e *envolver) Layout(objs []fyne.CanvasObject, t fyne.Size) {
-	y := float32(0)
-	primero := true
-	for _, f := range e.lineas(objs, t.Width) {
-		h := altoLinea(f)
-		x, extra := float32(0), float32(0)
-		if e.Repartir && len(f) > 1 {
-			usado := e.Hueco * float32(len(f)-1)
-			for _, o := range f {
-				usado += o.MinSize().Width
-			}
-			extra = max(t.Width-usado, 0) / float32(len(f)-1)
-		}
-		for _, o := range f {
-			m := o.MinSize()
-			if primero && e.PrimeroEntero {
-				m.Width = t.Width
-			}
-			primero = false
-			o.Move(fyne.NewPos(x, y+(h-m.Height)/2))
-			o.Resize(m)
-			x += m.Width + e.Hueco + extra
-		}
-		y += h + e.Hueco
-	}
 }
 
 // botonUnirse es el enlace «Unirse» de la videollamada: no es un `Button` sino un `<a>`

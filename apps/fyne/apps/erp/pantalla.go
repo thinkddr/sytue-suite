@@ -47,11 +47,20 @@ type Pantalla struct {
 	// negocio ni cruza sesiones.
 	Recientes []string
 
-	menu    *Menu
-	lista   *Lista
-	inicio  *Bienvenida
-	paleta  *Paleta
-	abierta bool
+	menu   *Menu
+	lista  *Lista
+	inicio *Bienvenida
+	// paleta es la de la suite: la de la barra en cuanto la hay (`Atajos`) y, en una
+	// pantalla suelta (los guardianes), una propia. Ver paleta.go.
+	paleta      *ui.PaletaDeLaSuite
+	dejarPaleta func()
+	// pantallasPaleta son los destinos fijos del menú, que la paleta ofrece en «Ir a»;
+	// registrosPaleta, lo que contestó el servicio a `consultaRegistros`, y
+	// buscandoRegistros, que aún no ha contestado.
+	pantallasPaleta   []Destino
+	registrosPaleta   []Registro
+	consultaRegistros string
+	buscandoRegistros bool
 	// ficha es el panel del registro abierto; nil, ninguno.
 	ficha *Ficha
 	altas []*altaRapida
@@ -80,11 +89,20 @@ type Pantalla struct {
 	// menú.
 	TareasHoy int
 	tareas    *Tareas
-	libro     *Libro
+	// AprobacionesPendientes son las que quien mira puede resolver: la insignia de
+	// «Aprobaciones» en el menú. Las suyas esperan a otra persona y no cuentan.
+	AprobacionesPendientes int
+	aprob                  *Aprobaciones
+	// Yo devuelve el `sub` de quien ha entrado (nil o "", no se sabe): para no
+	// ofrecerle aprobar lo que pidió o creó.
+	Yo    func() string
+	libro *Libro
 	// oblig es la pantalla de Obligaciones y asistente el de arranque (nil, cerrado).
 	oblig     *Obligaciones
 	asistente *Asistente
 	banco     *Banco
+	// tpv es el punto de venta: vive lo que la pantalla, con su cesta.
+	tpv *TPV
 	// AbrirApp abre otra app de la suite por su esquema (o la web): el correo que pide
 	// una factura se escribe en Sytue Mail. nil, no se ofrece.
 	AbrirApp func(producto, ruta string)
@@ -103,6 +121,8 @@ type Pantalla struct {
 	// repintarIA repinta el diálogo de Sytue AI abierto (nil, ninguno): su cuerpo se
 	// reparte al ancho de la ventana.
 	repintarIA func()
+	// facturas es el asistente de facturas abierto (nil, ninguno).
+	facturas *AsistenteFacturas
 	// panelIA es el panel de Sytue AI abierto por última vez (para los guardianes).
 	panelIA *PanelIA
 	// scrollMain es el desplazador de `main`: se lleva lo vertical de lo que se desplaza
@@ -121,6 +141,10 @@ type Pantalla struct {
 	// mu guarda `cache` y `espera`: el reloj de la búsqueda dispara en otra rutina.
 	mu     sync.Mutex
 	espera *time.Timer
+	// esperaPaleta y cancelarPaleta son la búsqueda de registros de la paleta que
+	// espera a que se deje de teclear y la petición en vuelo.
+	esperaPaleta   *time.Timer
+	cancelarPaleta context.CancelFunc
 
 	// Ventana es el tamaño del lienzo. Decide el reparto del contenido y dónde cae la
 	// paleta.
@@ -152,12 +176,14 @@ func NuevaPantalla(tr *i18n.Translator, svc *api.ERP, red *offline.Monitor) *Pan
 		fondo:   func(f func()) { go f() },
 		avisos:  ui.NuevaPilaAvisos(),
 		tareas:  NuevaTareas(tr),
+		aprob:   NuevaAprobaciones(tr),
 		libro:   &Libro{tr: tr, loc: tr.Locale()},
 		oblig:   NuevaObligaciones(tr),
 		banco:   NuevoBanco(tr),
+		tpv:     NuevoTPV(tr),
 	}
-	p.paleta = NuevaPaleta(tr, nil)
 	p.enganchar()
+	p.usarPaleta(ui.NuevaPaletaDeLaSuite(tr))
 	return p
 }
 
@@ -232,11 +258,7 @@ func (p *Pantalla) marco() fyne.CanvasObject {
 		arm.CerrarCajon()
 	}
 	arm.Refresh()
-	capas := []fyne.CanvasObject{arm}
-	if p.abierta {
-		capas = append(capas, p.paleta.Objeto(v, p.Ventana))
-	}
-	return container.NewStack(append(capas, p.avisos)...)
+	return container.NewStack(arm, p.avisos)
 }
 
 // principal es `main` —desplazable, con el botón del cajón arriba en el móvil— y, a su
@@ -293,6 +315,20 @@ func (p *Pantalla) desplazadorMain() Desplazador {
 	return p.scrollMain
 }
 
+// objetoObligaciones es el calendario fiscal; sin perfil no hay calendario que enseñar
+// y lo que toca es el asistente.
+func (p *Pantalla) objetoObligaciones(v tema.Variante) fyne.CanvasObject {
+	if p.SabeOrg && p.Organizacion == nil {
+		return p.objetoAsistente(v)
+	}
+	o := p.oblig
+	o.Ventana, o.SoloLectura = p.Ventana.Width, !p.PuedeEscribir("obligaciones")
+	if p.Organizacion != nil {
+		o.Pais = p.Organizacion.Pais
+	}
+	return o.Objeto(v)
+}
+
 // vista es lo que ocupa el panel principal: la lista de un modelo, o la portada.
 func (p *Pantalla) vista(v tema.Variante) fyne.CanvasObject {
 	p.conFicheros()
@@ -300,6 +336,11 @@ func (p *Pantalla) vista(v tema.Variante) fyne.CanvasObject {
 	case VistaTareas:
 		p.tareas.Ventana = p.Ventana.Width
 		return p.tareas.Objeto(v)
+	case VistaAprobaciones:
+		a := p.aprob
+		a.Ventana, a.Yo = p.Ventana.Width, p.yo()
+		a.PuedeAprobar, a.PuedeAdministrar = p.PuedeAprobar(), p.PuedeUmbrales()
+		return a.Objeto(v)
 	case VistaLibro:
 		p.libro.Ventana = p.Ventana.Width
 		return p.libro.ObjetoLibro(v)
@@ -312,6 +353,8 @@ func (p *Pantalla) vista(v tema.Variante) fyne.CanvasObject {
 		b := p.banco
 		b.Ventana, b.SoloLectura = p.Ventana.Width, !p.PuedeEscribir("contabilidad")
 		return b.Objeto(v)
+	case VistaTPV:
+		return p.objetoTPV(v)
 	case VistaTablero:
 		if p.tablero != nil {
 			p.tablero.Ventana = p.Ventana.Width
@@ -319,19 +362,11 @@ func (p *Pantalla) vista(v tema.Variante) fyne.CanvasObject {
 			return p.tablero.Objeto(v)
 		}
 	case VistaObligaciones:
-		// Sin perfil no hay calendario que enseñar: lo que toca es el asistente.
-		if p.SabeOrg && p.Organizacion == nil {
-			return p.objetoAsistente(v)
-		}
-		o := p.oblig
-		o.Ventana, o.SoloLectura = p.Ventana.Width, !p.PuedeEscribir("obligaciones")
-		if p.Organizacion != nil {
-			o.Pais = p.Organizacion.Pais
-		}
-		return o.Objeto(v)
+		return p.objetoObligaciones(v)
 	}
 	if p.lista.Modelo.Clave != "" {
 		p.lista.Ventana = p.Ventana.Width
+		p.engancharAsistenteFacturas()
 		lista := p.lista.Objeto(v)
 		if p.lista.Modelo.Clave == api.ERPFacturaVenta && p.facturae() && !p.lista.Papelera && p.verifactu != nil {
 			return p.conTarjetaVF(v, lista)
@@ -376,9 +411,6 @@ func radioTarjeta() float32 { return tema.Forma("radius-card") }
 
 // carril arma el carril de iconos con los destinos de arriba del menú que llevan icono
 // —los mismos, con los mismos permisos— y, abajo, el buscador y Sytue AI.
-//
-// ponytail: falta el botón del TPV (`pos.title`), que en la web va entre Tareas y Banco:
-// el punto de venta no está portado y aquí no hay a dónde llevarlo.
 func (p *Pantalla) carril() *CarrilIconos {
 	c := &CarrilIconos{Arriba: []*AccionCarril{NuevaAccionCarril(iconos.Menu, p.t("nav.menu"), false, p.abrirCajon)}}
 	for _, d := range p.menu.Fijas {
@@ -427,6 +459,23 @@ func (p *Pantalla) rellenarMenu() {
 			AlPulsar: func() { p.IrA(VistaTareas) },
 		},
 	}
+	// Las aprobaciones las resuelve quien tiene `aprobar` en contabilidad y los umbrales
+	// los pone quien tiene `administrar`: a nadie más se le ofrece la cola, que para él
+	// sería una lista sin botones.
+	if p.PuedeAprobar() || p.PuedeUmbrales() {
+		m.Fijas = append(m.Fijas, Destino{
+			Rotulo: p.t("nav.approvals"), Activa: p.Vista == VistaAprobaciones, Contador: p.AprobacionesPendientes,
+			Nombre:   p.t("nav.approvals") + " — " + p.t("nav.approvalsWaiting", i18n.Vars{"count": p.AprobacionesPendientes}),
+			AlPulsar: func() { p.IrA(VistaAprobaciones) },
+		})
+	}
+	// El punto de venta, entre las aprobaciones y el banco, como en la web.
+	if p.VeTPV() {
+		m.Fijas = append(m.Fijas, Destino{
+			Rotulo: p.t("pos.title"), Activa: p.Vista == VistaTPV, AlPulsar: func() { p.IrA(VistaTPV) },
+			Icono: iconos.Recibo,
+		})
+	}
 	if p.PuedeLeer("contabilidad") {
 		m.Fijas = append(m.Fijas, Destino{
 			Rotulo: p.t("nav.bank"), Activa: p.Vista == VistaBanco, AlPulsar: func() { p.IrA(VistaBanco) },
@@ -446,32 +495,48 @@ func (p *Pantalla) rellenarMenu() {
 			Destino{Rotulo: p.t("nav.balance"), Activa: p.Vista == VistaBalance, AlPulsar: func() { p.IrA(VistaBalance) }},
 		)
 	}
+	// ⌘K lleva a las mismas pantallas que el menú, con sus mismas condiciones: la
+	// paleta no ofrece lo que el menú esconde.
+	p.pantallasPaleta = m.Fijas
+	if p.paleta != nil {
+		p.ponerCapaVistas()
+	}
 }
 
 // Las vistas que no son la lista de un modelo ni la portada.
 const (
 	VistaTareas       = "tareas"
+	VistaAprobaciones = "aprobaciones"
 	VistaLibro        = "libro"
 	VistaBalance      = "balance"
 	VistaObligaciones = "obligaciones"
 	VistaAsistente    = "onboarding"
 	VistaBanco        = "banco"
+	VistaTPV          = "tpv"
 )
 
-// IrA abre una de las vistas de arriba del menú y pide lo suyo.
-func (p *Pantalla) IrA(vista string) {
+// IrA abre una de las vistas de arriba del menú y pide lo suyo. La ficha solo se
+// pinta en la lista de un modelo: si tiene cambios sin guardar, pregunta antes.
+func (p *Pantalla) IrA(vista string) { p.dejarFicha(func() { p.irA(vista) }) }
+
+func (p *Pantalla) irA(vista string) {
 	p.pararEspera()
-	p.Vista, p.ficha, p.cajon, p.abierta = vista, nil, false, false
+	p.Vista, p.ficha, p.cajon = vista, nil, false
 	p.lista.Modelo = Modelo{}
 	switch vista {
 	case VistaTareas:
 		p.tareas.Lista = nil
 		p.cargarTareas()
+	case VistaAprobaciones:
+		p.aprob.Lista, p.aprob.Umbrales = nil, nil
+		p.cargarAprobaciones()
+		p.contarAprobaciones()
 	case VistaLibro:
 		// Cada pantalla abre sin corte, como en la web, que la monta de nuevo.
 		p.libro.Asientos, p.libro.Fallo, p.libro.Periodo = nil, "", ""
 		p.libro.AlPeriodo = p.cambiarPeriodo
 		p.cargarLibro()
+		p.prepararCierre()
 	case VistaBalance:
 		p.libro.Balance, p.libro.Fallo, p.libro.Periodo = nil, "", ""
 		p.libro.AlPeriodo = p.cambiarPeriodo
@@ -487,6 +552,8 @@ func (p *Pantalla) IrA(vista string) {
 	case VistaBanco:
 		p.banco.Datos, p.banco.Fallo, p.banco.pistas = nil, "", false
 		p.cargarBanco()
+	case VistaTPV:
+		p.cargarTPV()
 	}
 	p.Repintar()
 }
@@ -510,7 +577,11 @@ func (p *Pantalla) recordar(clave string) {
 // Los filtros NO pasan de un modelo a otro: los estados los declara CADA modelo, y
 // arrastrar «pagado» a una lista de vehículos pediría un estado que ese modelo no tiene
 // —el servicio contestaría 400 con un error que nadie sabría de dónde sale—.
-func (p *Pantalla) Abrir(m Modelo) {
+//
+// Cambiar de modelo cierra la ficha: si tiene cambios sin guardar, pregunta antes.
+func (p *Pantalla) Abrir(m Modelo) { p.dejarFicha(func() { p.abrir(m) }) }
+
+func (p *Pantalla) abrir(m Modelo) {
 	l := p.lista
 	p.pararEspera()
 	l.Modelo = m
@@ -520,7 +591,7 @@ func (p *Pantalla) Abrir(m Modelo) {
 	l.Total, l.SumaDinero, l.PorEstado = -1, 0, nil
 	l.CargandoMas = false
 	l.Marcadas = map[string]bool{}
-	p.abierta, p.cajon, p.ficha, p.Vista = false, false, nil, ""
+	p.cajon, p.ficha, p.Vista = false, nil, ""
 	// Lo de ESTE modelo, o nada: sin esto se quedaban en pantalla las filas del modelo
 	// anterior, pintadas con las columnas del nuevo, mientras llegaba la lista.
 	l.Pagina, l.HayMas, l.Aviso = Pagina{}, false, ""
@@ -551,10 +622,6 @@ func (p *Pantalla) enganchar() {
 	p.menu.AlPaleta = func() { p.cerrarCajon(); p.AbrirPaleta() }
 	p.menu.AlIA = func() { p.cerrarCajon(); p.AbrirIA() }
 	p.menu.AlCerrar = p.cerrarCajon
-
-	p.paleta.AlCerrar = p.CerrarPaleta
-	p.paleta.AlElegir = p.Abrir
-	p.paleta.AlMover = p.Repintar
 
 	l := p.lista
 	l.AlBuscar = p.buscar
@@ -596,6 +663,7 @@ func (p *Pantalla) enganchar() {
 	p.tareas.AlMias = func(mias bool) { p.tareas.Mias, p.tareas.Lista = mias, nil; p.Repintar(); p.cargarTareas() }
 	p.tareas.AlCerrar = p.cerrarTareaDeLista
 	p.tareas.AlAbrir = p.abrirRegistro
+	p.engancharAprobaciones()
 	o := p.oblig
 	o.AlCambio = p.Repintar
 	o.AlAnio = func(a int) { o.Anio = a; p.cargarObligaciones() }
@@ -612,31 +680,18 @@ func (p *Pantalla) enganchar() {
 	b.AlAbrirModelo = p.Abrir
 	b.AlPaleta = p.AbrirPaleta
 	b.AlVista = p.IrA
-	b.AlNuevaFicha = func(m Modelo) { p.Abrir(m); p.NuevaFicha(nil) }
+	b.AlNuevaFicha = func(m Modelo) { p.dejarFicha(func() { p.abrir(m); p.abrirFicha(nil, nil) }) }
 	b.AlCambiar = p.cambiarModulo
 	b.AlConfigurar = func() { p.IrA(VistaAsistente) }
 	b.AlBanco = func() { p.IrA(VistaBanco) }
 }
 
-// AbrirPaleta y CerrarPaleta son ⌘K y Escape.
-func (p *Pantalla) AbrirPaleta() {
-	p.paleta.Escribir("")
-	p.abierta = true
-	p.Repintar()
-	// El `autofocus` de la web: se abre para escribir.
-	if p.lienzo != nil {
-		p.lienzo.Focus(p.paleta.Campo())
-	}
-}
+// AbrirPaleta abre la paleta de la suite: la piden el botón «Ir a…» del carril, el del
+// cajón y el de la portada (⌘K lo atiende la barra). CerrarPaleta la retira.
+func (p *Pantalla) AbrirPaleta() { p.paleta.Abrir() }
 
 // CerrarPaleta la esconde sin elegir nada.
-func (p *Pantalla) CerrarPaleta() {
-	if !p.abierta {
-		return
-	}
-	p.abierta = false
-	p.Repintar()
-}
+func (p *Pantalla) CerrarPaleta() { p.paleta.Cerrar() }
 
 // EsperaBusqueda es lo que la web espera a que se deje de teclear antes de pedir la
 // lista: una lista por pulsación es una consulta por pulsación contra la base de datos
@@ -669,6 +724,56 @@ func (p *Pantalla) buscar(q string) {
 			if l.Busqueda == q {
 				p.pedirLista()
 			}
+		})
+	})
+}
+
+// EsperaBusquedaPaleta es el `ESPERA_BUSQUEDA_PALETA` de la web: los registros de la
+// paleta se piden cuando se deja de teclear, no con cada letra.
+const EsperaBusquedaPaleta = 200 * time.Millisecond
+
+// buscarEnPaleta pide al servicio los registros de lo escrito en la paleta. Suelta la
+// espera y la petición anteriores: una respuesta lenta de «ac» no debe llegar después
+// de la de «acme», y aunque llegara `Encontrados` la descarta.
+func (p *Pantalla) buscarEnPaleta(q string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.esperaPaleta != nil {
+		p.esperaPaleta.Stop()
+		p.esperaPaleta = nil
+	}
+	if p.cancelarPaleta != nil {
+		p.cancelarPaleta()
+		p.cancelarPaleta = nil
+	}
+	if len([]rune(q)) < MinimoBusquedaRegistros {
+		return
+	}
+	if p.svc == nil {
+		return
+	}
+	// La cancelación es de la consulta y el plazo, de la petición: si contara desde la
+	// tecla, la espera del antirrebote se comería parte del plazo.
+	ctx, cancelar := context.WithCancel(context.Background())
+	p.cancelarPaleta = cancelar
+	p.esperaPaleta = time.AfterFunc(EsperaBusquedaPaleta, func() {
+		pidiendo, fin := context.WithTimeout(ctx, p.Plazo)
+		regs, err := p.svc.Buscar(pidiendo, q, MaxRegistrosPaleta)
+		fin()
+		// Cancelada es abandonada: ya se escribió otra cosa o se cerró la paleta. Pero un
+		// plazo agotado SÍ tiene que llegar a la paleta, o se quedaría en «Buscando…».
+		if ctx.Err() != nil {
+			return
+		}
+		cancelar()
+		//nolint:contextcheck // la petición ya acabó; lo que sigue es pintar, y si lleva a abrir algo, eso abre su propio plazo
+		enHilo(func() {
+			// Una búsqueda que no llega no es un error que haya que contar: quedan las
+			// pantallas y las áreas, y la paleta sigue sirviendo para ir a ellas.
+			if err != nil {
+				regs = nil
+			}
+			p.encontrados(q, regs)
 		})
 	})
 }
@@ -746,6 +851,8 @@ func (p *Pantalla) cargarCatalogo() {
 		p.Catalogo = cat
 		if errPerm == nil {
 			p.Permisos, p.SabePermisos = permisos, true
+			// Con los permisos se sabe si hay cola de aprobaciones que contar.
+			p.contarAprobaciones()
 		}
 		switch {
 		case errOrg == nil:
@@ -756,11 +863,8 @@ func (p *Pantalla) cargarCatalogo() {
 		if errReq == nil {
 			p.Requisitos = &req
 		}
-		p.paleta.Modelos = p.Modelos()
-		p.paleta.Areas = map[string]string{}
-		for _, m := range cat.Modulos {
-			p.paleta.Areas[m.Clave] = m.Etiqueta
-		}
+		p.ponerCapaAreas()
+		p.ponerCapaRegistros()
 		p.Fase = FaseDe(err, p.hayRed(), len(cat.Modulos))
 		if p.Vista == "" && p.lista.Modelo.Clave == "" {
 			// Primera vez: sin perfil y sin ningún área encendida, lo que toca es el
@@ -835,7 +939,7 @@ func (p *Pantalla) traerLista(modelo, clave string, f api.ERPFiltro, visto bool)
 
 func (p *Pantalla) puedeRefrescarLista() bool {
 	l := p.lista
-	return p.svc != nil && p.hayRed() && p.Vista == "" && p.ficha == nil && !p.abierta && len(p.altas) == 0 &&
+	return p.svc != nil && p.hayRed() && p.Vista == "" && p.ficha == nil && !p.paleta.Abierta() && len(p.altas) == 0 &&
 		l.Modelo.Clave != "" && l.Fase != Cargando && !l.CargandoMas && !l.EnLote && len(l.Marcadas) == 0 && p.peticionesLista == 0
 }
 
@@ -945,14 +1049,11 @@ func (p *Pantalla) cargarEstadisticas(modelo string) {
 	})
 }
 
-// Atajos engancha el teclado de la web al lienzo de la ventana: ⌘K abre la paleta,
-// «/» lleva al buscador de la lista, «n» abre una ficha nueva y Escape cierra la
-// paleta.
+// Atajos engancha el teclado de la web al lienzo de la ventana: «/» lleva al buscador
+// de la lista, «n» abre una ficha nueva y «?» enseña todos los atajos (`atajos.go`).
 //
-// ⌘K es de la PALETA y no del buscador de la suite, igual que en la web: allí los dos
-// escuchan y el del ERP abre la paleta, que se queda el foco. Por eso se le quita a la
-// barra (`BarraSuite.CederAtajo`) en vez de registrarlo encima, que dependería de cuál
-// de los dos se enganchó el último.
+// ⌘K es de la barra, que abre la paleta de la SUITE: el ERP le pone sus capas
+// (`usarPaleta`) en vez de tener la suya, igual que en la web.
 //
 // Las teclas sueltas van por `SetOnTypedRune`, que Fyne solo dispara cuando NO hay
 // nada enfocado: es exactamente `esAtajoDeApp` de la web —teclear «/» en el nombre de
@@ -960,10 +1061,18 @@ func (p *Pantalla) cargarEstadisticas(modelo string) {
 func (p *Pantalla) Atajos(c fyne.Canvas, b *ui.BarraSuite) {
 	p.lienzo = c
 	if b != nil {
-		b.CederAtajo(p.AbrirPaleta)
+		p.usarPaleta(b.Paleta())
+	} else {
+		p.paleta.EnLienzo(c)
 	}
 	c.SetOnTypedRune(func(r rune) {
-		if p.lista.Modelo.Clave == "" || p.abierta {
+		// La hoja de atajos no depende de tener una lista abierta: se pide también
+		// desde la bienvenida, que es donde más falta hace.
+		if r == '?' {
+			p.verAtajos()
+			return
+		}
+		if p.lista.Modelo.Clave == "" || p.paleta.Abierta() {
 			return
 		}
 		switch r {
@@ -973,11 +1082,6 @@ func (p *Pantalla) Atajos(c fyne.Canvas, b *ui.BarraSuite) {
 			// «n» abre una ficha nueva, como en la web (y como allí, no con el foco en
 			// un campo: `SetOnTypedRune` solo llega sin nada enfocado).
 			p.NuevaFicha(nil)
-		}
-	})
-	c.SetOnTypedKey(func(k *fyne.KeyEvent) {
-		if k.Name == fyne.KeyEscape {
-			p.CerrarPaleta()
 		}
 	})
 	ui.AlAtras(c, p.atras)

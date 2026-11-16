@@ -9,7 +9,6 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"git.sytue.eu/sytue/one/platform/pkg/tenancy"
 )
@@ -26,7 +25,11 @@ func (p *Pool) InTxOpts(ctx context.Context, opts pgx.TxOptions, fn func(tx pgx.
 	return runInTx(ctx, p.Pool, opts, fn)
 }
 
-func runInTx(ctx context.Context, pool *pgxpool.Pool, opts pgx.TxOptions, fn func(tx pgx.Tx) error) (err error) {
+type transactionBeginner interface {
+	BeginTx(context.Context, pgx.TxOptions) (pgx.Tx, error)
+}
+
+func runInTx(ctx context.Context, pool transactionBeginner, opts pgx.TxOptions, fn func(tx pgx.Tx) error) (err error) {
 	tx, err := pool.BeginTx(ctx, opts)
 	if err != nil {
 		return fmt.Errorf("pg: begin tx: %w", err)
@@ -43,6 +46,10 @@ func runInTx(ctx context.Context, pool *pgxpool.Pool, opts pgx.TxOptions, fn fun
 			}
 		}
 	}()
+
+	if snapshotErr := BindScopeAdmissionSnapshot(ctx, tx); snapshotErr != nil {
+		return snapshotErr
+	}
 
 	if err = fn(tx); err != nil { //nolint:gocritic // sloppyReassign: err es el named return que lee el defer de rollback; := lo rompería.
 		return err

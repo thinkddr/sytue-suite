@@ -4,6 +4,7 @@
 package contactos
 
 import (
+	"cmp"
 	"slices"
 	"strings"
 
@@ -11,13 +12,11 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 
-	"git.sytue.eu/sytue/one/apps/nucleo/api"
-	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
-
-	"git.sytue.eu/sytue/one/apps/fyne/agenda"
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
 // La ficha de un contacto (`ContactDetail.tsx`): cabecera de identidad y, debajo, la
@@ -27,13 +26,13 @@ import (
 //	cabecera    `flex flex-col gap-4 sm:flex-row sm:items-center`        hoja
 //	avatar      `xl` (64)                                                hoja
 //	nombre      `.sytue-h2`: `text-2xl` (24,5/31,5) en NEGRITA            hoja
-//	organiz.    `mt-0.5 text-base text-text-muted`                       hoja
+//	cargo·org.  `mt-0.5 text-base text-text-muted`: «Cargo · Empresa»    hoja
 //	acciones    `flex gap-2`: ★ (31,5), Enviar correo, Editar, «⋯»        hoja
 //	tarjeta     `mt-6`, `Card` con `CardTitle` y el `<dl>` SIN CardBody   hoja
 //	fila de dl  `grid-cols-[6.5rem_1fr] gap-4 px-4 py-3`, y desde `sm:`  hoja
 //	            `[8rem_1fr]` y `px-6`; separadas por `divide-y`
 const (
-	// AnchoFicha es el `max-w-3xl` con el rem de 14.
+	// AnchoFicha es el `max-w-3xl`: 768 con el rem de 16.
 	AnchoFicha = 48 * tema.Rem
 	// HuecoIdentidad es el `gap-4` entre avatar, nombre y acciones.
 	HuecoIdentidad = 4 * 0.25 * tema.Rem
@@ -102,9 +101,9 @@ func (p *Pantalla) ficha() fyne.CanvasObject {
 		return container.NewVScroll(x)
 	}
 	c := *p.Seleccionado
-	cuerpo := agenda.EnColumna(0,
+	cuerpo := ui.EnColumna(0,
 		p.identidad(c, v),
-		agenda.Espaciador(MargenTarjetaFicha),
+		ui.Espaciador(MargenTarjetaFicha),
 		p.tarjetaDatos(c, v),
 	)
 	// `mx-auto w-full max-w-3xl p-*`: la ficha se centra y se acota.
@@ -132,13 +131,26 @@ func (p *Pantalla) anchoValor() float32 {
 	return max(p.anchoTarjeta()-2*tema.Borde-2*RellenoHCampo(p.Ventana)-ColumnaRotulo(p.Ventana)-HuecoCampo, 0)
 }
 
-// identidad es la cabecera: avatar, nombre y organización, y las acciones.
+// lineaCargo es `roleLine` de la web: «Cargo · Empresa» bajo el nombre, o el que haya
+// de los dos. Como Apple y Google, el cargo delante: dice quién es esa persona.
+func lineaCargo(cargo, org string) string {
+	var partes []string
+	for _, s := range []string{cargo, org} {
+		if s = strings.TrimSpace(s); s != "" {
+			partes = append(partes, s)
+		}
+	}
+	return strings.Join(partes, " · ")
+}
+
+// identidad es la cabecera: avatar, nombre, «Cargo · Empresa» y las acciones.
 func (p *Pantalla) identidad(c api.Contact, v tema.Variante) fyne.CanvasObject {
 	av := p.avatarDeFicha(c)
 	nombre := ui.Texto(c.DisplayName(), ui.EscalonTitulo(2), ui.PesoTitulo(2), tema.Color("text", v))
+	linea := lineaCargo(c.Title, c.Organization)
 	var org *canvas.Text
-	if c.Organization != "" {
-		org = ui.Texto(c.Organization, tema.TextoBase, ui.Normal, tema.Color("text-muted", v))
+	if linea != "" {
+		org = ui.Texto(linea, tema.TextoBase, ui.Normal, tema.Color("text-muted", v))
 	}
 	objs := []fyne.CanvasObject{av, nombre, p.accionesFicha(c)}
 	if org != nil {
@@ -146,7 +158,7 @@ func (p *Pantalla) identidad(c api.Contact, v tema.Variante) fyne.CanvasObject {
 	}
 	estrecha := p.Ventana > 0 && p.Ventana < ui.CorteSM
 	return container.New(&identidad{
-		nombre: nombre, org: org, completo: c.DisplayName(), orgCompleta: c.Organization, estrecha: estrecha,
+		nombre: nombre, org: org, completo: c.DisplayName(), orgCompleta: linea, estrecha: estrecha,
 	}, objs...)
 }
 
@@ -190,7 +202,7 @@ func (p *Pantalla) accionesFicha(c api.Contact) fyne.CanvasObject {
 		m.Mostrar(mas)
 	}
 	acciones = append(acciones, mas)
-	return agenda.EnFila(tema.Espacio(2), acciones...)
+	return ui.EnFila(tema.Espacio(2), acciones...)
 }
 
 // elementosMas es el menú «⋯»: reunión y copiar correo si hay correo, exportar
@@ -224,7 +236,7 @@ func (p *Pantalla) elementosMas(c api.Contact, correo string) []fyne.CanvasObjec
 }
 
 // tarjetaDatos es la `<Card>` con el `<dl>`: correo, teléfono, organización y, solo si
-// los hay, dirección, cumpleaños y nota; y siempre las etiquetas. Una ficha con tres
+// los hay, apodo, dirección, sitio web, cumpleaños, aniversario, relaciones y nota; y siempre las etiquetas. Una ficha con tres
 // guiones de más no informa de nada, que es por lo que la web tampoco los pinta.
 func (p *Pantalla) tarjetaDatos(c api.Contact, v tema.Variante) fyne.CanvasObject {
 	campos := []fyne.CanvasObject{
@@ -234,18 +246,32 @@ func (p *Pantalla) tarjetaDatos(c api.Contact, v tema.Variante) fyne.CanvasObjec
 			p.valoresTipados(telefonosTipados(c), "text", "tel:", "detail.phoneCopied"), v, false),
 		p.campo(p.t("field.organization", nil), textoORaya(c.Organization), v, false),
 	}
+	if apodo := strings.TrimSpace(c.Nickname); apodo != "" {
+		campos = append(campos, p.campo(p.t("field.nickname", nil), textoORaya(apodo), v, false))
+	}
 	if len(c.Addresses) > 0 {
 		campos = append(campos, p.campo(p.t("field.address", nil), p.direcciones(c.Addresses), v, false))
 	}
-	if c.Birthday != nil {
+	if webs := sitiosTipados(c); len(webs) > 0 {
+		campos = append(campos, p.campo(p.t("field.website", nil),
+			p.valoresTipados(webs, "primary-text", "", "detail.websiteCopied"), v, false))
+	}
+	if cumple := p.cumpleDeLaFicha(c); cumple != "" {
 		campos = append(campos, p.campo(p.t("field.birthday", nil),
-			ui.NuevoRotulo(i18n.FormatDateLong(p.locale(), *c.Birthday), tema.TextoBase, ui.Normal, "text"), v, false))
+			ui.NuevoRotulo(cumple, tema.TextoBase, ui.Normal, "text"), v, false))
+	}
+	if c.Anniversary != nil {
+		campos = append(campos, p.campo(p.t("field.anniversary", nil),
+			ui.NuevoRotulo(i18n.FormatDateLong(p.locale(), *c.Anniversary), tema.TextoBase, ui.Normal, "text"), v, false))
+	}
+	if len(c.Related) > 0 {
+		campos = append(campos, p.campo(p.t("field.related", nil), p.relacionados(c.Related), v, false))
 	}
 	if strings.TrimSpace(c.Note) != "" {
 		campos = append(campos, p.campo(p.t("field.note", nil), p.nota(c.Note, v), v, false))
 	}
 	campos = append(campos, p.campo(p.t("field.labels", nil), p.etiquetasDe(c), v, false))
-	t := ui.NuevaTarjeta(p.t("detail.infoTitle", nil), agenda.EnColumna(0, campos...))
+	t := ui.NuevaTarjeta(p.t("detail.infoTitle", nil), ui.EnColumna(0, campos...))
 	t.SinRelleno = true
 	return t
 }
@@ -291,6 +317,17 @@ func telefonosTipados(c api.Contact) []valorTipado {
 		}
 	}
 	return principalPrimero(vs)
+}
+
+// sitiosTipados son los sitios web, en su orden: no tienen principal.
+func sitiosTipados(c api.Contact) []valorTipado {
+	vs := make([]valorTipado, 0, len(c.URLs))
+	for _, u := range c.URLs {
+		if u.URL != "" {
+			vs = append(vs, valorTipado{valor: u.URL, tipo: cmp.Or(u.Type, "other")})
+		}
+	}
+	return vs
 }
 
 // correoPrincipal es el que abre «Enviar correo»: el marcado como principal, o el
@@ -342,7 +379,40 @@ func (p *Pantalla) valoresTipados(vs []valorTipado, token, esquema, copiado stri
 			enl, ui.NuevoRotulo(p.rotuloDeTipo(x.tipo, false), tema.TextoXS, ui.Normal, "text-subtle"),
 			p.botonCopiar(x.valor, x.valor, copiado)))
 	}
-	return agenda.EnColumna(HuecoValores, filas...)
+	return ui.EnColumna(HuecoValores, filas...)
+}
+
+// claveDeRelacion es la clave de catálogo de cada tipo de relación que ofrece el editor.
+var claveDeRelacion = map[string]string{
+	"spouse": "relation.spouse", "child": "relation.child", "parent": "relation.parent",
+	"sibling": "relation.sibling", "friend": "relation.friend", "co-worker": "relation.coworker",
+	"emergency": "relation.emergency",
+}
+
+// rotuloDeRelacion es como rotuloDeTipo: un tipo que el editor no ofrece («muse»,
+// «colleague») se enseña tal cual; sin tipo, sin rótulo.
+func (p *Pantalla) rotuloDeRelacion(tipo string) string {
+	if clave, ok := claveDeRelacion[strings.ToLower(tipo)]; ok {
+		return p.t(clave, nil)
+	}
+	return tipo
+}
+
+// relacionados son las personas relacionadas: el nombre y, a su lado, qué es del
+// contacto («Cónyuge»), en la misma línea base que los correos.
+func (p *Pantalla) relacionados(rs []api.ContactRelated) fyne.CanvasObject {
+	filas := make([]fyne.CanvasObject, 0, len(rs))
+	for _, r := range rs {
+		nombre := ui.NuevoRotulo(r.Name, tema.TextoBase, ui.Normal, "text")
+		rotulo := p.rotuloDeRelacion(r.Type)
+		if rotulo == "" {
+			filas = append(filas, nombre)
+			continue
+		}
+		filas = append(filas, container.New(filaTipada{},
+			nombre, ui.NuevoRotulo(rotulo, tema.TextoXS, ui.Normal, "text-subtle")))
+	}
+	return ui.EnColumna(HuecoValores, filas...)
 }
 
 // direcciones son las postales, cada una con su etiqueta encima y en líneas al estilo
@@ -362,9 +432,9 @@ func (p *Pantalla) direcciones(ds []api.ContactAddress) fyne.CanvasObject {
 		for _, l := range postales {
 			lineas = append(lineas, ui.NuevoRotulo(l, tema.TextoBase, ui.Normal, "text"))
 		}
-		bloques = append(bloques, agenda.EnColumna(0, lineas...))
+		bloques = append(bloques, ui.EnColumna(0, lineas...))
 	}
-	return agenda.EnColumna(HuecoDirecciones, bloques...)
+	return ui.EnColumna(HuecoDirecciones, bloques...)
 }
 
 // botonCopiar es `CopyValue`: el glifo de copiar, `sm` y apagado (`text-muted`),
@@ -416,12 +486,12 @@ func (p *Pantalla) nota(n string, v tema.Variante) fyne.CanvasObject {
 	var lineas []fyne.CanvasObject
 	for _, l := range strings.Split(strings.TrimSpace(n), "\n") {
 		if strings.TrimSpace(l) == "" {
-			lineas = append(lineas, agenda.Espaciador(tema.TextoBase.Linea))
+			lineas = append(lineas, ui.Espaciador(tema.TextoBase.Linea))
 			continue
 		}
 		lineas = append(lineas, ui.NuevoParrafo(l, tema.TextoBase, ui.Normal, "text", v).A(ancho))
 	}
-	return agenda.EnColumna(0, lineas...)
+	return ui.EnColumna(0, lineas...)
 }
 
 // etiquetasDe es `GroupChips`: las etiquetas del contacto como píldoras y el «Añadir»
@@ -436,17 +506,22 @@ func (p *Pantalla) etiquetasDe(c api.Contact) fyne.CanvasObject {
 		}
 	}
 	escribe := p.AlEtiquetar != nil && !p.SinConexion
+	ocupada := p.EtiquetaOcupada != ""
 	var hijos []fyne.CanvasObject
 	if len(miembro) == 0 {
 		hijos = append(hijos, ui.NuevoRotulo(p.t("detail.noLabels", nil), tema.TextoBase, ui.Normal, "text-subtle"))
 	}
 	for _, g := range miembro {
-		var quitar func()
+		chip := ui.NuevaEtiqueta(g.Name)
 		if escribe {
 			grupo := g
-			quitar = func() { p.AlEtiquetar(grupo, c) }
+			chip.ConAspa(p.t("detail.removeLabel", i18n.Vars{"label": g.Name}), func() { p.AlEtiquetar(grupo, c) })
+			// `removeDisabled={busyId !== null}`: mientras se guarda, ninguna aspa quita nada.
+			if ocupada {
+				chip.Aspa().Disable()
+			}
 		}
-		hijos = append(hijos, nuevoChip(g.Name, p.t("detail.removeLabel", i18n.Vars{"label": g.Name}), quitar))
+		hijos = append(hijos, chip)
 	}
 	if escribe {
 		anadir := ui.NuevoBoton(p.t("common.add", nil), nil).Con(ui.Fantasma, ui.TallaSM).ConIcono(iconos.Mas, 14)
@@ -455,13 +530,15 @@ func (p *Pantalla) etiquetasDe(c api.Contact) fyne.CanvasObject {
 			m.Rotulo, m.AlInicio = p.t("detail.addLabel", nil), true
 			m.Mostrar(anadir)
 		}
+		if ocupada {
+			anadir.Disable()
+		}
 		hijos = append(hijos, anadir)
 	}
-	// ponytail: las píldoras van en UNA fila; la web las deja envolver (`flex-wrap`).
-	// Con las dos o tres etiquetas que lleva un contacto caben de sobra en los 502 de
-	// la columna; con muchas, la última se sale. El relevo es un layout que reparta
-	// por filas y declare su alto por ancho, como `ui.Parrafo`.
-	return container.New(filaCentrada{Hueco: HuecoChips}, hijos...)
+	// `flex flex-wrap items-center`: con muchas etiquetas las píldoras bajan de fila en
+	// vez de salirse de la columna. Con el ancho de la columna `1fr` el mínimo es el del
+	// flujo YA partido, que es lo que hace crecer el alto de la fila del `<dl>`.
+	return container.New(ui.Flujo{Hueco: HuecoChips, Ancho: p.anchoValor()}, hijos...)
 }
 
 // menuAnadirEtiqueta son las etiquetas que el contacto aún no tiene, o el aviso de que
@@ -629,7 +706,7 @@ func (filetArriba) Layout(objs []fyne.CanvasObject, t fyne.Size) {
 // la ficha: avatar, bloque de texto que se lleva lo que sobra (y TRUNCA), y acciones
 // que no encogen. Por debajo de `sm:` se apilan.
 //
-// Objetos: avatar, nombre, acciones y, si la hay, organización.
+// Objetos: avatar, nombre, acciones y, si la hay, la línea «Cargo · Empresa».
 type identidad struct {
 	nombre, org           *canvas.Text
 	completo, orgCompleta string // lo que se trunca: el `Text` ya puede llevar la elipsis

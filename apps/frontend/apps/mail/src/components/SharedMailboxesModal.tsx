@@ -27,19 +27,8 @@ import {
   useToast,
 } from '@sytue/ui';
 import type { IconName } from '@sytue/ui';
-import {
-  listSharedMailboxes,
-  createSharedMailbox,
-  listGrants,
-  grantAccess,
-  revokeAccess,
-  listDelegation,
-  delegateAccess,
-  revokeDelegation,
-  type SharedMailbox,
-  type MailGrant,
-  type MailPermission,
-} from '../client/mailApi.js';
+import { type SharedMailbox, type MailGrant, type MailPermission } from '../client/mailApi.js';
+import { usePrivateMailApi } from '../client/privateMailApi.js';
 import type { Locale } from '@sytue/i18n';
 import { useT, type MailMessageKey, type T } from '../i18n/index.js';
 
@@ -150,6 +139,7 @@ export function SharedMailboxesModal({
   onClose,
 }: Props): JSX.Element | null {
   const t = useT(locale);
+  const { listSharedMailboxes, listDelegation } = usePrivateMailApi();
   const [shared, setShared] = useState<SharedMailbox[]>([]);
   const [delegates, setDelegates] = useState<MailGrant[]>([]);
   const [loading, setLoading] = useState(false);
@@ -177,7 +167,7 @@ export function SharedMailboxesModal({
     return () => {
       active = false;
     };
-  }, [open, reload]);
+  }, [open, reload, listSharedMailboxes, listDelegation]);
 
   function refreshAll(): void {
     setReload((n) => n + 1);
@@ -244,6 +234,7 @@ function DelegationSection({
   delegates: MailGrant[];
   onChanged: (list: MailGrant[]) => void;
 }): JSX.Element {
+  const { delegateAccess, revokeDelegation } = usePrivateMailApi();
   const toast = useToast();
   const [email, setEmail] = useState('');
   const [perm, setPerm] = useState<MailPermission>('read');
@@ -316,7 +307,7 @@ function DelegationSection({
         <EmptyState
           title={t('shared.delegateEmptyTitle')}
           description={t('shared.delegateEmptyDescription')}
-          illustration={<Icon name="lock" size={32} />}
+          icon="lock"
         />
       )}
       <div class="flex flex-col gap-3">
@@ -372,6 +363,7 @@ function SharedSection({
   onEdit: (m: SharedMailbox) => void;
   onCreated: () => void;
 }): JSX.Element {
+  const { createSharedMailbox } = usePrivateMailApi();
   const toast = useToast();
   const [address, setAddress] = useState('');
   const [name, setName] = useState('');
@@ -421,7 +413,7 @@ function SharedSection({
         <EmptyState
           title={t('shared.managedEmptyTitle')}
           description={t('shared.managedEmptyDescription')}
-          illustration={<Icon name="users" size={32} />}
+          icon="users"
         />
       )}
       <div class="flex flex-col gap-3">
@@ -480,6 +472,7 @@ function AclEditor({
   onBack: () => void;
   onChanged: () => void;
 }): JSX.Element {
+  const { listGrants, grantAccess, revokeAccess } = usePrivateMailApi();
   const toast = useToast();
   const [grants, setGrants] = useState<MailGrant[]>([]);
   const [loading, setLoading] = useState(false);
@@ -502,7 +495,7 @@ function AclEditor({
     return () => {
       active = false;
     };
-  }, [mailbox.accountId, reload]);
+  }, [mailbox.accountId, reload, listGrants]);
 
   async function handleAdd(): Promise<void> {
     const grantee = email.trim();
@@ -569,7 +562,7 @@ function AclEditor({
         <EmptyState
           title={t('shared.aclEmptyTitle')}
           description={t('shared.aclEmptyDescription')}
-          illustration={<Icon name="users" size={32} />}
+          icon="users"
         />
       ) : (
         <ul class="divide-border border-border flex flex-col divide-y rounded-md border">

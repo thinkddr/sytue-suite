@@ -7,6 +7,7 @@
  */
 import type { ComponentChildren, JSX } from 'preact';
 import { useId } from 'preact/hooks';
+import { InlineHelp } from '@sytue/ui';
 
 export interface SeccionProps {
   titulo: string;
@@ -33,11 +34,7 @@ export function Seccion({ titulo, descripcion, estrecha, children }: SeccionProp
   );
 }
 
-const TONOS = {
-  exito: 'bg-success-bg text-success-text',
-  error: 'bg-danger-bg text-danger-text',
-  info: 'bg-info-bg text-info-text',
-} as const;
+const TONOS = { exito: 'success', error: 'danger', info: 'info' } as const;
 
 export interface AvisoProps {
   tono: keyof typeof TONOS;
@@ -46,16 +43,15 @@ export interface AvisoProps {
 }
 
 /**
- * Mensaje en línea. El error es `role="alert"` (interrumpe) y el resto `role="status"` (espera su
- * turno): lo que cambia solo, y no solo con color, llega también al lector de pantalla.
+ * Mensaje en línea: la caja común (`InlineHelp`) con el vocabulario de la ficha. El error es
+ * `role="alert"` (interrumpe) y el resto `role="status"` (espera su turno): lo que cambia solo, y
+ * no solo con color, llega también al lector de pantalla. Por eso `live` va explícito: el tono
+ * `info`/`success` de la común calla por defecto, y aquí todos son la respuesta a una acción.
  */
 export function Aviso({ tono, class: cls, children }: AvisoProps): JSX.Element {
   return (
-    <p
-      role={tono === 'error' ? 'alert' : 'status'}
-      class={`${TONOS[tono]} rounded-md p-3 text-sm ${cls ?? ''}`}
-    >
+    <InlineHelp tone={TONOS[tono]} live={tono === 'error' ? 'alert' : 'status'} class={cls ?? ''}>
       {children}
-    </p>
+    </InlineHelp>
   );
 }

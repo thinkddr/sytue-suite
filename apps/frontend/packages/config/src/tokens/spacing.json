@@ -22,7 +22,7 @@
     "24": "6rem"
   },
   "radii": {
-    "$note": "Formas amables, de radio medio: md (9) para controles y lg (14) para tarjetas, paneles, menús y diálogos; radios compartidos en toda la suite.",
+    "$note": "Escala de esquinas compartida por toda la suite: sm (4) para botones (vía --radius-control) y lo menudo, md (9) para campos e ítems de menú, lg (14) para tarjetas, paneles, menús y diálogos. Los radios de forma (control, nav, card, row, sheet) se reparten en theme.css, «Tokens de forma».",
     "none": "0",
     "sm": "4px",
     "md": "9px",
@@ -40,7 +40,7 @@
     "md": "0 2px 4px rgba(14, 26, 20, 0.05), 0 12px 30px rgba(14, 26, 20, 0.13)",
     "lg": "0 16px 40px rgba(14, 26, 20, 0.16)",
     "xl": "0 24px 48px rgba(14, 26, 20, 0.2)",
-    "focus": "0 0 0 2px #0a8552",
+    "focus": "0 0 0 2px var(--sytue-focus-ring)",
     "dark": {
       "sm": "0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3)",
       "md": "0 12px 30px rgba(0, 0, 0, 0.55)",
@@ -63,16 +63,16 @@
     "contentGutter": "1.5rem"
   },
   "zIndex": {
-    "base": 0,
-    "dropdown": 1000,
+    "$note": "Cromo persistente (sticky, sidebar, topbar) por debajo y SOLO DESPUÉS lo transitorio (dropdown, popover, overlay, modal, toast, tooltip): un menú abierto desde la barra lateral no puede quedar detrás de ella. Es el orden de theme.css desde el 2026-09-15.",
     "sticky": 1020,
     "sidebar": 1030,
     "topbar": 1040,
-    "overlay": 1050,
-    "modal": 1060,
-    "popover": 1070,
-    "toast": 1080,
-    "tooltip": 1090
+    "dropdown": 1050,
+    "popover": 1060,
+    "overlay": 1070,
+    "modal": 1080,
+    "toast": 1090,
+    "tooltip": 1100
   },
   "motion": {
     "$note": "Transiciones rápidas y sobrias. Respeta prefers-reduced-motion.",
@@ -83,7 +83,6 @@
     },
     "easing": {
       "standard": "cubic-bezier(0.2, 0, 0, 1)",
-      "emphasized": "cubic-bezier(0.2, 0, 0, 1)",
       "exit": "cubic-bezier(0.4, 0, 1, 1)"
     }
   }

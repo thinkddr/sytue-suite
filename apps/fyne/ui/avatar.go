@@ -14,6 +14,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 
 	"git.sytue.eu/sytue/one/apps/fyne/tema"
@@ -21,7 +22,7 @@ import (
 )
 
 // TallaAvatar son las cinco tallas de Avatar.tsx. Son PÍXELES LITERALES en la web
-// (`sizePx`), así que el rem de 14 no los toca.
+// (`sizePx`), así que el rem no los toca.
 type TallaAvatar uint8
 
 // Las cinco tallas. El valor cero es `md`, como en la web.
@@ -205,6 +206,48 @@ func RecorteCircular(img image.Image) image.Image {
 	return fuera
 }
 
+// RecorteRedondeadoArriba es `object-cover` a la proporción ancho×alto con las dos esquinas
+// de ARRIBA redondeadas a `radio` (en las mismas unidades que ancho y alto) y lo de fuera
+// transparente: la portada de una tarjeta `rounded-lg overflow-hidden`, que en Fyne no
+// recorta a sus hijos. Sin esto la imagen asoma por fuera de la esquina de la tarjeta.
+func RecorteRedondeadoArriba(img image.Image, ancho, alto, radio float32) image.Image {
+	b := img.Bounds()
+	if ancho <= 0 || alto <= 0 || b.Empty() {
+		return img
+	}
+	// El trozo del centro con la proporción pedida (`object-cover`).
+	w, h := b.Dx(), b.Dy()
+	if float64(w)*float64(alto) > float64(h)*float64(ancho) {
+		w = max(1, int(float64(h)*float64(ancho)/float64(alto)+0.5))
+	} else {
+		h = max(1, int(float64(w)*float64(alto)/float64(ancho)+0.5))
+	}
+	x0, y0 := b.Min.X+(b.Dx()-w)/2, b.Min.Y+(b.Dy()-h)/2
+	// Una miniatura más pequeña que la tarjeta (a doble densidad) se amplía antes de
+	// recortar: con pocos píxeles la esquina no se podría redondear y asomaría igual.
+	ow, oh := w, h
+	if minimo := int(math.Ceil(float64(ancho) * 2)); ow < minimo {
+		ow, oh = minimo, max(1, int(float64(minimo)*float64(h)/float64(w)+0.5))
+	}
+	r := float64(radio) * float64(ow) / float64(ancho) // el radio en píxeles del recorte
+	fuera := image.NewNRGBA(image.Rect(0, 0, ow, oh))
+	for y := range oh {
+		for x := range ow {
+			c, _ := color.NRGBAModel.Convert(img.At(x0+x*w/ow, y0+y*h/oh)).(color.NRGBA)
+			if fy := float64(y) + 0.5; fy < r {
+				// Dentro de la franja de las esquinas: cobertura del círculo, con el borde
+				// suavizado medio píxel como RecorteCircular.
+				cx := min(max(float64(x)+0.5, r), float64(ow)-r)
+				dx, dy := float64(x)+0.5-cx, fy-r
+				cobertura := min(max(r-math.Sqrt(dx*dx+dy*dy)+0.5, 0), 1)
+				c.A = uint8(float64(c.A)*cobertura + 0.5)
+			}
+			fuera.SetNRGBA(x, y, c)
+		}
+	}
+	return fuera
+}
+
 // colorPresencia es el token del punto. Sin presencia no hay token que pedir
 // —`tokenPresencia[SinPresencia]` es "" y `tema.Color` entra en PÁNICO al pintar con un
 // nombre desconocido—, así que el punto escondido se queda del color neutro.
@@ -362,4 +405,32 @@ func (r *avatarRenderer) Refresh() {
 		o.Refresh()
 	}
 	r.Layout(r.a.Size())
+}
+
+// LogoEnLosa es el logo de una entidad suelto, a la medida que le den: la losa blanca
+// de radio 22 % con el filete de `border` y el logo entero con un 14 % de margen, que es
+// lo que pinta Avatar en modo Logo pero sin sus cinco tallas fijas. Lo lleva la cuenta
+// de correo externa en el menú lateral, en la caja de 17,5 de un glifo, y en la web es
+// el `<img>` con las mismas clases que el `logo` de Avatar.tsx.
+func LogoEnLosa(img image.Image, v tema.Variante) fyne.CanvasObject {
+	losa := canvas.NewRectangle(color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff})
+	losa.StrokeWidth, losa.StrokeColor = tema.Borde, tema.Color("border", v)
+	foto := canvas.NewImageFromImage(img)
+	foto.FillMode, foto.ScaleMode = canvas.ImageFillContain, canvas.ImageScaleSmooth
+	return container.New(logoEnLosa{losa}, losa, foto)
+}
+
+type logoEnLosa struct{ losa *canvas.Rectangle }
+
+func (logoEnLosa) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.Size{} }
+
+func (l logoEnLosa) Layout(objetos []fyne.CanvasObject, t fyne.Size) {
+	p := min(t.Width, t.Height)
+	x, y := (t.Width-p)/2, (t.Height-p)/2
+	l.losa.Move(fyne.NewPos(x, y))
+	l.losa.Resize(fyne.NewSize(p, p))
+	l.losa.CornerRadius = radioLogo * p
+	m := max(redondear(margenLogo*p), 1)
+	objetos[1].Move(fyne.NewPos(x+m, y+m))
+	objetos[1].Resize(fyne.NewSize(p-2*m, p-2*m))
 }

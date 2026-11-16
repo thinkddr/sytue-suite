@@ -71,7 +71,7 @@ func TestSCIMTokenDeUnaOrganizacionNoVeLaOtra(t *testing.T) {
 		}
 		crudo, _ := json.Marshal(out["Resources"])
 		var recursos []struct {
-			UserName string `json:"userName"`
+			UserName string `json:"userName"` //nolint:tagliatelle // RFC 7643 names this SCIM attribute userName.
 		}
 		_ = json.Unmarshal(crudo, &recursos)
 		got := make([]string, 0, len(recursos))

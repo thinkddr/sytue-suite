@@ -72,10 +72,11 @@ type Client struct {
 	bucket string
 	class  string
 	// remote es el backend remoto; nil = el mismo que mc.
-	remote  *minio.Client
-	rbucket string
-	rclass  string
-	local   map[string]bool
+	remote              *minio.Client
+	rbucket             string
+	rclass              string
+	local               map[string]bool
+	rawLocal, rawRemote bool
 }
 
 // New crea el cliente S3 y valida la configuración mínima.
@@ -90,7 +91,7 @@ func New(cfg Config) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := &Client{mc: mc, bucket: cfg.Bucket, class: cfg.StorageClass}
+	c := &Client{mc: mc, bucket: cfg.Bucket, class: cfg.StorageClass, rawLocal: rawHTTPTransport(cfg.Transport)}
 	if cfg.Remote != nil {
 		if cfg.Remote.Bucket == "" {
 			return nil, fmt.Errorf("objectstore: bucket vacío en el almacén remoto")
@@ -99,12 +100,77 @@ func New(cfg Config) (*Client, error) {
 			return nil, fmt.Errorf("almacén remoto: %w", err)
 		}
 		c.rbucket, c.rclass = cfg.Remote.Bucket, cfg.Remote.StorageClass
+		c.rawRemote = rawHTTPTransport(cfg.Remote.Transport)
 		c.local = make(map[string]bool, len(cfg.LocalTenants))
 		for _, slug := range cfg.LocalTenants {
 			c.local[slug] = true
 		}
 	}
 	return c, nil
+}
+
+// GetRaw bypasses Sytue's gzip metadata decoding. Identity suppresses Go's
+// transparent HTTP decompression even for the custom SSRF-safe transport.
+// Unknown RoundTrippers have no such contract and are rejected.
+func (c *Client) GetRaw(ctx context.Context, t tenancy.Tenant, key string) (io.ReadCloser, error) {
+	mc, bucket, _ := c.backend(t, key)
+	if (mc == c.mc && !c.rawLocal) || (mc == c.remote && mc != c.mc && !c.rawRemote) {
+		return nil, ErrRawUnsupported
+	}
+	work, cancel := context.WithCancel(ctx)
+	var opts minio.GetObjectOptions
+	opts.Set("Accept-Encoding", "identity")
+	obj, err := mc.GetObject(work, bucket, tenantKey(t, key), opts)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	// Do not Stat here: MinIO can return EOF from a cached zero-size HEAD
+	// without issuing the GET, which cannot prove the empty object exists.
+	return &rawS3Body{rawBody: rawBody{ReadCloser: obj, cancel: cancel}, object: obj}, nil
+}
+
+type rawS3Body struct {
+	rawBody
+	object  *minio.Object
+	read    int64
+	checked bool
+	err     error
+}
+
+func (b *rawS3Body) Read(p []byte) (int, error) {
+	if b.err != nil {
+		return 0, b.err
+	}
+	n, err := b.rawBody.Read(p)
+	if err != nil && n == 0 && b.read == 0 && isNotFound(err) {
+		b.err = ErrNotFound
+		return 0, b.err
+	}
+	if !b.checked && err != nil && !errors.Is(err, io.EOF) {
+		// Never expose bytes before the GET headers have been checked, even
+		// when the SDK reports a partial read and an error simultaneously.
+		b.err = err
+		return 0, err
+	}
+	if !b.checked && (err == nil || errors.Is(err, io.EOF)) {
+		// The first Read caused GET, so these headers describe GET, not a
+		// separate HEAD. Reject ambiguous transfer encodings before exposing bytes.
+		info, statErr := b.object.Stat()
+		if statErr != nil {
+			// EOF from Stat after an unknown-length GET must never become a
+			// successful empty object after bytes have already been read.
+			b.err = ErrRawUnsupported
+			return 0, b.err
+		}
+		if info.Headers == nil || !rawIdentityEncoding(info.Headers) {
+			b.err = ErrRawUnsupported
+			return 0, b.err
+		}
+		b.checked = true
+	}
+	b.read += int64(n)
+	return n, err
 }
 
 func cliente(cfg Config) (*minio.Client, error) {

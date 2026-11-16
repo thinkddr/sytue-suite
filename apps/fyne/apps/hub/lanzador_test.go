@@ -273,7 +273,7 @@ func TestLaPortadaEnSusSeisEstados(t *testing.T) {
 }
 
 // TestLaRejillaSigueLosCortesDeLaVentana: `sm:` y `lg:` miden la VENTANA y con el rem
-// inicial de 16, no la caja ni el rem de 14 de la suite.
+// inicial de 16, no la caja.
 func TestLaRejillaSigueLosCortesDeLaVentana(t *testing.T) {
 	for _, caso := range []struct {
 		ventana float32
@@ -352,7 +352,7 @@ func TestLaPortadaRespetaLoQueEligioLaOrganizacion(t *testing.T) {
 	if abiertas[len(abiertas)-1] != "https://app.holded.com" {
 		t.Errorf("pulsar Holded abre %v", abiertas[len(abiertas)-1])
 	}
-	quiero := sin + tema.TextoXS.Linea + MargenRotulo + AltoTeselaConectada(1) + MargenSeccion
+	quiero := sin + tema.TextoXS.Linea + MargenRotulo + AltoTesela(1) + MargenSeccion
 	if got := r.alto(ventana); !cerca(got, quiero) {
 		t.Errorf("con una conectada la portada mide %v y tiene que medir %v", got, quiero)
 	}
@@ -398,6 +398,8 @@ func finDelCuerpo(r *lanzadorRenderer) float32 {
 // más abajo.
 func TestLaPortadaDeMarcoEsBienvenidaYTablero(t *testing.T) {
 	web := webref.Read(t, "apps/frontend/apps/portal/src/components/Launcher.tsx")
+	// La tesela vive aparte desde que la desactivada dice por qué (D-PORT-05).
+	tesela := webref.Read(t, "apps/frontend/apps/portal/src/components/TeselaProducto.tsx")
 	reciente := webref.Read(t, "apps/frontend/apps/portal/src/lib/reciente.ts")
 	hoja := webref.Read(t, "apps/frontend/packages/config/src/theme.css")
 	for _, c := range []struct{ fuente, trozo, porque string }{
@@ -411,9 +413,9 @@ func TestLaPortadaDeMarcoEsBienvenidaYTablero(t *testing.T) {
 		{web, `marco:lg:grid-cols-[minmax(0,1.9fr)_minmax(260px,1fr)] marco:lg:items-start marco:lg:gap-4`, "las dos columnas del cuerpo y lo que las separa"},
 		{web, `class="marco:lg:last:mb-0 mb-8"`, "la última sección, sin margen en dos columnas"},
 		{web, `marco:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] marco:gap-2.5 marco:lg:grid-cols-3`, "la rejilla de apps"},
-		{web, `rounded-card flex h-full flex-col items-start gap-3 border p-4 transition-colors`, "la tesela, con el radio de tarjeta"},
-		{web, `'marco:flex-row marco:items-center marco:px-3 marco:py-2.5 marco:[&>span:first-child]:scale-105',`, "la tesela compacta"},
-		{web, `marco:line-clamp-1 line-clamp-2 text-sm leading-snug`, "la descripción, a una línea"},
+		{tesela, `rounded-card flex h-full flex-col items-start gap-3 border p-4 transition-colors`, "la tesela, con el radio de tarjeta"},
+		{tesela, `'marco:flex-row marco:items-center marco:px-3 marco:py-2.5 marco:[&>span:first-child]:scale-105',`, "la tesela compacta"},
+		{tesela, `marco:line-clamp-1 line-clamp-2 text-sm leading-snug`, "la descripción, a una línea"},
 		{web, `'marco:gap-2.5 marco:lg:grid-cols-1 grid items-start gap-6 lg:grid-cols-3',`, "«Hoy» y «Reciente», apiladas a 10"},
 		{web, `hover:bg-bg-subtle focus-visible:bg-bg-subtle marco:py-1 flex items-baseline gap-3 px-4 py-2 transition-colors duration-150`, "el evento, a 4"},
 		{web, `marco:py-2 flex items-center gap-3 border-t px-4 py-2.5 text-sm`, "el pie de correo, a 8"},
@@ -722,7 +724,7 @@ func TestConPocasAppsRecienteBajaASuColumna(t *testing.T) {
 	web := webref.Read(t, "apps/frontend/apps/portal/src/components/Launcher.tsx")
 	for _, trozo := range []string{
 		`const pocas = apps.length <= 6;`,
-		`<div class={cx('min-w-0', pocas && 'marco:lg:col-start-1 marco:lg:row-start-1')}>`,
+		`class={cx('min-w-0', pocas && 'marco:lg:col-start-1 marco:lg:row-start-1')}`,
 		`pocas && 'marco:lg:contents',`,
 		`pocas && 'marco:lg:col-start-2 marco:lg:row-span-2 marco:lg:row-start-1',`,
 		`pocas && 'marco:lg:col-start-1 marco:lg:row-start-2',`,
@@ -893,5 +895,43 @@ func TestLaRotacionDeFormaRecomponeElHubAntesDeMedir(t *testing.T) {
 		if (r.tAccesos == nil) != tema.EsMarco() || (r.tiraPildoras != nil) != tema.EsMarco() {
 			t.Fatalf("%s: el Hub conserva la composición de la forma anterior", forma)
 		}
+	}
+}
+
+// TestElVacioDeRecienteLlevaSuIlustracion: el EmptyState de «Reciente» lleva en la web
+// `spot="emptySearch"`, que es `<Illustration size={120}>`: el spot de 200×160 a 120 de
+// ancho y 96 de alto. Se mira en los píxeles, no solo en el árbol: un ráster sin tamaño
+// o un SVG que oksvg no entiende dejan la caja en blanco aunque el objeto esté.
+//
+// Visto en ROJO a mano: sin `Ilustracion` en `textosReciente` el vacío no tiene dibujo
+// y el test lo dice.
+func TestElVacioDeRecienteLlevaSuIlustracion(t *testing.T) {
+	l := lanzadorDePrueba(t)
+	l.Reciente.Estado, l.Reciente.Items = SinNada, nil
+	img, r := pinta(t, l, ventana)
+	guardar(t, img, "lanzador-vacio-ilustracion")
+	if r.avisoRec == nil || r.avisoRec.Ilustracion == nil {
+		t.Fatal("el vacío de «Reciente» va sin ilustración y la web pinta `emptySearch`")
+	}
+	il := r.avisoRec.Ilustracion
+	if s := il.Size(); s.Width != ui.LadoSpotVacio || s.Height != 96 {
+		t.Errorf("la ilustración mide %v × %v y en la web 120 × 96", s.Width, s.Height)
+	}
+	p := fyne.CurrentApp().Driver().AbsolutePositionForObject(il)
+	x0, y0 := int(p.X), int(p.Y)
+	fondo := func() [3]uint32 { c, g, b, _ := img.At(x0-4, y0-4).RGBA(); return [3]uint32{c, g, b} }()
+	tinta := 0
+	for y := y0; y < y0+96; y++ {
+		for x := x0; x < x0+120; x++ {
+			c, g, b, _ := img.At(x, y).RGBA()
+			if [3]uint32{c, g, b} != fondo {
+				tinta++
+			}
+		}
+	}
+	// El spot es line-art: trazos finos sobre transparente. Con un 3 % de la caja ya
+	// hay dibujo; una caja vacía da 0.
+	if tinta < 120*96*3/100 {
+		t.Errorf("en la caja de la ilustración solo hay %d píxeles pintados: no se ve", tinta)
 	}
 }

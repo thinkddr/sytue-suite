@@ -7,8 +7,11 @@
 import { describe, expect, test } from 'bun:test';
 import {
   buildAlarm,
+  buildRRule,
   buildVevent,
+  fundirVevent,
   guestPartstats,
+  miRespuesta,
   guestStatus,
   newUid,
   parseAlarms,
@@ -17,7 +20,12 @@ import {
   parseExdates,
   parseGuests,
   parseOrganizer,
+  parseRecurrence,
   parseReminders,
+  rruleCruda,
+  tieneRepeticion,
+  type Recurrence,
+  type Weekday,
 } from './ical.js';
 
 const ALARM_DISPLAY =
@@ -196,6 +204,18 @@ describe('invitados y su respuesta', () => {
     expect(guestStatus(undefined)).toBe('pending');
   });
 
+  test('miRespuesta: lo que contesté yo, por mi dirección entera', () => {
+    expect(miRespuesta(REUNION, 'Carla@Sytue.eu')).toBe('tentative');
+    expect(miRespuesta(REUNION, 'bob@example.com')).toBe('accepted');
+    expect(miRespuesta(REUNION, 'eva@sytue.eu')).toBe('pending');
+    // Quien organiza no es invitado de su propia reunión, ni lo es quien no figura,
+    // aunque su dirección esté DENTRO de la de otro («arla@sytue.eu» en «carla@…»).
+    expect(miRespuesta(REUNION, 'ada@sytue.eu')).toBeNull();
+    expect(miRespuesta(REUNION, 'arla@sytue.eu')).toBeNull();
+    expect(miRespuesta(REUNION, '')).toBeNull();
+    expect(miRespuesta(undefined, 'carla@sytue.eu')).toBeNull();
+  });
+
   test('guardar conserva la respuesta de quien ya contestó', () => {
     const partstats = guestPartstats(REUNION);
     expect(partstats).toEqual({
@@ -266,5 +286,331 @@ describe('invitados y su respuesta', () => {
     });
     expect(ics).toContain('PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:bob@example.com');
     expect(ics).not.toContain('X-MAL');
+  });
+});
+
+describe('fundirVevent: guardar no borra lo que el formulario no edita', () => {
+  // Una serie de Apple: regla con BYDAY (el formulario no la sabe editar), una
+  // excepción en el mismo recurso, propiedades que la web no enseña y un invitado
+  // con su CN y su ROLE.
+  const SERIE_APPLE =
+    [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Apple Inc.//macOS 15//EN',
+      'BEGIN:VTIMEZONE',
+      'TZID:Europe/Madrid',
+      'END:VTIMEZONE',
+      'BEGIN:VEVENT',
+      'UID:serie-1@icloud.com',
+      'DTSTAMP:20260101T000000Z',
+      'DTSTART:20261109T090000Z',
+      'DTEND:20261109T100000Z',
+      'RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR;WKST=MO',
+      'EXDATE:20261111T090000Z',
+      'SEQUENCE:3',
+      'SUMMARY;LANGUAGE=es:Diario de equipo',
+      'CLASS:PRIVATE',
+      'TRANSP:TRANSPARENT',
+      'CATEGORIES:Trabajo,Equipo',
+      'ATTACH;FMTTYPE=application/pdf:https://example.com/orden.pdf',
+      'X-APPLE-TRAVEL-ADVISORY-BEHAVIOR:AUTOMATIC',
+      'ORGANIZER;CN=Ada Lovelace:mailto:ada@example.com',
+      'ATTENDEE;CN=Grace Hopper;ROLE=OPT-PARTICIPANT;PARTSTAT=ACCEPTED:mailto:grace@exam',
+      ' ple.com',
+      ALARM_DISPLAY,
+      'END:VEVENT',
+      'BEGIN:VEVENT',
+      'UID:serie-1@icloud.com',
+      'RECURRENCE-ID:20261113T090000Z',
+      'DTSTART:20261113T110000Z',
+      'DTEND:20261113T120000Z',
+      'SUMMARY:Diario (movido)',
+      ALARM_EMAIL,
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n') + '\r\n';
+
+  /** Lo que manda el formulario al reabrir la serie y cambiar solo el título. */
+  const formulario = (extra: Partial<Parameters<typeof fundirVevent>[1]> = {}) => ({
+    uid: 'serie-1@icloud.com',
+    summary: 'Diario de equipo',
+    start: '2026-11-09T09:00:00Z',
+    end: '2026-11-09T10:00:00Z',
+    rruleRaw: 'FREQ=WEEKLY;BYDAY=MO,WE,FR;WKST=MO',
+    recurrenceUnchanged: true,
+    attendees: ['grace@example.com'],
+    organizer: 'yo@sytue.eu',
+    partstats: { 'grace@example.com': 'ACCEPTED' },
+    alarms: parseAlarms(SERIE_APPLE),
+    ...extra,
+  });
+
+  const maestroDe = (ics: string) => ics.split('BEGIN:VEVENT')[1]!.split('END:VEVENT')[0]!;
+
+  test('cambiar el título conserva la RRULE con BYDAY byte a byte', () => {
+    const ics = fundirVevent(SERIE_APPLE, formulario({ summary: 'Diario del equipo' }));
+    expect(ics).toContain('\r\nRRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR;WKST=MO\r\n');
+    expect(ics.match(/^RRULE:/gm)).toHaveLength(1);
+    expect(ics).toContain('SUMMARY:Diario del equipo');
+    expect(ics).not.toContain('SUMMARY;LANGUAGE=es:Diario de equipo');
+  });
+
+  test('lo que la web no edita se queda: CLASS, TRANSP, CATEGORIES, ATTACH, X-*, EXDATE', () => {
+    const ics = fundirVevent(SERIE_APPLE, formulario({ summary: 'Otro' }));
+    for (const linea of [
+      'CLASS:PRIVATE',
+      'TRANSP:TRANSPARENT',
+      'CATEGORIES:Trabajo,Equipo',
+      'ATTACH;FMTTYPE=application/pdf:https://example.com/orden.pdf',
+      'X-APPLE-TRAVEL-ADVISORY-BEHAVIOR:AUTOMATIC',
+      'EXDATE:20261111T090000Z',
+      'PRODID:-//Apple Inc.//macOS 15//EN',
+      'TZID:Europe/Madrid',
+    ]) {
+      expect(ics).toContain(`\r\n${linea}\r\n`);
+    }
+  });
+
+  test('la excepción de la serie (RECURRENCE-ID) y su VALARM siguen en el recurso', () => {
+    const ics = fundirVevent(SERIE_APPLE, formulario());
+    expect(ics.match(/^BEGIN:VEVENT/gm)).toHaveLength(2);
+    expect(ics).toContain('RECURRENCE-ID:20261113T090000Z\r\nDTSTART:20261113T110000Z');
+    expect(ics).toContain('SUMMARY:Diario (movido)');
+    // El aviso por correo es de la excepción: no se cuela en el maestro.
+    expect(maestroDe(ics)).not.toContain('ACTION:EMAIL');
+    expect(maestroDe(ics)).toContain('ACTION:DISPLAY');
+  });
+
+  test('el invitado conserva su CN y su ROLE, y el organizador no pasa a ser quien guarda', () => {
+    const ics = fundirVevent(SERIE_APPLE, formulario());
+    expect(ics).toContain(
+      'ATTENDEE;CN=Grace Hopper;ROLE=OPT-PARTICIPANT;PARTSTAT=ACCEPTED:mailto:grace@exam\r\n ple.com',
+    );
+    expect(ics).toContain('ORGANIZER;CN=Ada Lovelace:mailto:ada@example.com');
+    expect(ics).not.toContain('yo@sytue.eu');
+  });
+
+  test('un invitado nuevo entra con su línea, y quitar uno lo quita', () => {
+    const ics = fundirVevent(
+      SERIE_APPLE,
+      formulario({ attendees: ['linus@example.com'], partstats: {} }),
+    );
+    expect(ics).not.toContain('grace@exam');
+    expect(ics).toContain('PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:linus@example.com');
+  });
+
+  test('sin cambiar la hora no sube SEQUENCE; moverla sí', () => {
+    const igual = fundirVevent(SERIE_APPLE, formulario({ summary: 'Otro' }));
+    expect(igual).toContain('\r\nSEQUENCE:3\r\n');
+    expect(igual).toContain('\r\nDTSTART:20261109T090000Z\r\n');
+    const movida = fundirVevent(
+      SERIE_APPLE,
+      formulario({ start: '2026-11-09T10:00:00Z', end: '2026-11-09T11:00:00Z' }),
+    );
+    expect(movida).toContain('\r\nSEQUENCE:4\r\n');
+    expect(movida).toContain('\r\nDTSTART:20261109T100000Z\r\n');
+    expect(movida.match(/^SEQUENCE:/gm)).toHaveLength(1);
+  });
+
+  test('la misma hora escrita en otra zona no cuenta como cambio', () => {
+    const ics = fundirVevent(
+      SERIE_APPLE,
+      formulario({ start: '2026-11-09T10:00', end: '2026-11-09T11:00', tzid: 'Europe/Madrid' }),
+    );
+    expect(ics).toContain('\r\nDTSTART:20261109T090000Z\r\n');
+    expect(ics).toContain('\r\nSEQUENCE:3\r\n');
+  });
+
+  test('«No se repite» quita la RRULE (y sube SEQUENCE); otra regla la sustituye', () => {
+    const sin = fundirVevent(
+      SERIE_APPLE,
+      formulario({ rruleRaw: undefined, recurrenceUnchanged: false }),
+    );
+    expect(sin).not.toContain('RRULE:');
+    expect(sin).toContain('\r\nSEQUENCE:4\r\n');
+    const otra = fundirVevent(
+      SERIE_APPLE,
+      formulario({
+        rruleRaw: undefined,
+        recurrenceUnchanged: false,
+        recurrence: { freq: 'DAILY' },
+      }),
+    );
+    expect(otra).toContain('\r\nRRULE:FREQ=DAILY\r\n');
+    expect(otra.match(/^RRULE:/gm)).toHaveLength(1);
+  });
+
+  test('arrastrar un evento con CLASS:PRIVATE y una excepción conserva ambos', () => {
+    const ics = fundirVevent(SERIE_APPLE, {
+      uid: 'serie-1@icloud.com',
+      summary: 'Diario de equipo',
+      start: '2026-11-09T09:30:00Z',
+      end: '2026-11-09T10:30:00Z',
+      recurrenceUnchanged: true,
+      attendees: ['grace@example.com'],
+      organizer: 'yo@sytue.eu',
+      alarms: parseAlarms(SERIE_APPLE),
+    });
+    expect(ics).toContain('\r\nCLASS:PRIVATE\r\n');
+    // La serie se mueve media hora: la excepción y el EXDATE siguen a su ocurrencia.
+    // La excepción ya estaba movida a las 11:00 y ahí se queda.
+    expect(ics).toContain('RECURRENCE-ID:20261113T093000Z\r\nDTSTART:20261113T110000Z');
+    expect(ics).toContain('\r\nEXDATE:20261111T093000Z\r\n');
+    expect(ics).toContain('\r\nRRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR;WKST=MO\r\n');
+    expect(ics).toContain('\r\nSEQUENCE:4\r\n');
+  });
+
+  test('mover la serie mueve una excepción sin mover con ella, también en su TZID', () => {
+    const conTz = SERIE_APPLE.replace(
+      'RECURRENCE-ID:20261113T090000Z\r\nDTSTART:20261113T110000Z\r\nDTEND:20261113T120000Z',
+      'RECURRENCE-ID;TZID=Europe/Madrid:20261113T100000\r\n' +
+        'DTSTART;TZID=Europe/Madrid:20261113T100000\r\nDTEND;TZID=Europe/Madrid:20261113T110000',
+    );
+    const ics = fundirVevent(
+      conTz,
+      formulario({ start: '2026-11-09T10:00:00Z', end: '2026-11-09T11:00:00Z' }),
+    );
+    expect(ics).toContain(
+      'RECURRENCE-ID;TZID=Europe/Madrid:20261113T110000\r\n' +
+        'DTSTART;TZID=Europe/Madrid:20261113T110000\r\nDTEND;TZID=Europe/Madrid:20261113T120000',
+    );
+    expect(ics).toContain('SUMMARY:Diario (movido)');
+  });
+
+  test('con otra regla, o sin ella, las excepciones de la serie vieja se van', () => {
+    const otra = fundirVevent(
+      SERIE_APPLE,
+      formulario({
+        rruleRaw: undefined,
+        recurrenceUnchanged: false,
+        recurrence: { freq: 'DAILY' },
+      }),
+    );
+    expect(otra.match(/^BEGIN:VEVENT/gm)).toHaveLength(1);
+    expect(otra).not.toContain('RECURRENCE-ID');
+    expect(otra).toContain('\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n');
+    const sin = fundirVevent(
+      SERIE_APPLE,
+      formulario({ rruleRaw: undefined, recurrenceUnchanged: false }),
+    );
+    expect(sin).not.toContain('RECURRENCE-ID');
+  });
+
+  test('cambiar o quitar el color quita también el COLOR por nombre que traía', () => {
+    const conColor = SERIE_APPLE.replace(
+      'CLASS:PRIVATE',
+      'CLASS:PRIVATE\r\nX-APPLE-CALENDAR-COLOR:#FF0000\r\nCOLOR:red',
+    );
+    const igual = fundirVevent(conColor, formulario({ color: '#ff0000' }));
+    expect(igual).toContain('\r\nCOLOR:red\r\n');
+    expect(parseColor(fundirVevent(conColor, formulario()))).toBeUndefined();
+    expect(parseColor(fundirVevent(conColor, formulario({ color: '#00AA00' })))).toBe('#00AA00');
+    // Sin X-APPLE que lo acompañe, el COLOR por nombre no lo toca el formulario.
+    const soloNombre = SERIE_APPLE.replace('CLASS:PRIVATE', 'CLASS:PRIVATE\r\nCOLOR:red');
+    expect(fundirVevent(soloNombre, formulario())).toContain('\r\nCOLOR:red\r\n');
+  });
+
+  test('sin maestro reconocible, sale lo mismo que un evento nuevo', () => {
+    const input = { uid: 'nuevo@sytue.eu', summary: 'Nuevo', start: '2026-11-09T09:00:00Z' };
+    const sinDtstamp = (s: string) => s.replace(/^DTSTAMP:.*\r\n/m, '');
+    expect(sinDtstamp(fundirVevent('', input))).toBe(sinDtstamp(buildVevent(input)));
+  });
+});
+
+describe('reglas que el formulario no sabe editar', () => {
+  const con = (regla: string) =>
+    `BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:x\r\nDTSTART:20261109T090000Z\r\nRRULE:${regla}\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`;
+
+  test('rruleCruda devuelve la regla tal cual solo si parseRecurrence no la entiende', () => {
+    expect(rruleCruda(con('FREQ=MONTHLY;BYDAY=2MO'))).toBe('FREQ=MONTHLY;BYDAY=2MO');
+    expect(rruleCruda(con('FREQ=YEARLY;BYMONTH=3'))).toBe('FREQ=YEARLY;BYMONTH=3');
+    expect(rruleCruda(con('FREQ=WEEKLY;INTERVAL=2'))).toBeUndefined();
+    // Desde CAL-11 el formulario edita estas dos: ya no son «Personalizada».
+    expect(rruleCruda(con('FREQ=WEEKLY;BYDAY=MO,WE'))).toBeUndefined();
+    expect(rruleCruda(con('FREQ=YEARLY'))).toBeUndefined();
+    expect(rruleCruda('BEGIN:VEVENT\r\nUID:x\r\nEND:VEVENT')).toBeUndefined();
+  });
+
+  test('tieneRepeticion cuenta cualquier RRULE', () => {
+    expect(tieneRepeticion(con('FREQ=YEARLY;BYMONTH=3'))).toBe(true);
+    expect(tieneRepeticion(con('FREQ=DAILY'))).toBe(true);
+    expect(tieneRepeticion('BEGIN:VEVENT\r\nUID:x\r\nEND:VEVENT')).toBe(false);
+  });
+
+  test('buildVevent emite rruleRaw si no hay recurrence, y nunca una que abra otra línea', () => {
+    const base = { uid: 'r@sytue.eu', summary: 'R', start: '2026-11-09T09:00:00Z' };
+    expect(buildVevent({ ...base, rruleRaw: 'FREQ=YEARLY;BYMONTH=3' })).toContain(
+      '\r\nRRULE:FREQ=YEARLY;BYMONTH=3\r\n',
+    );
+    const mala = buildVevent({ ...base, rruleRaw: 'FREQ=DAILY\r\nCLASS:PUBLIC' });
+    expect(mala).not.toContain('RRULE:');
+    expect(mala).not.toContain('CLASS:PUBLIC');
+    expect(
+      buildVevent({ ...base, recurrence: { freq: 'DAILY' }, rruleRaw: 'FREQ=YEARLY' }),
+    ).toContain('RRULE:FREQ=DAILY\r\n');
+  });
+
+  test('parseAlarms solo lee los VALARM del maestro', () => {
+    const ics = `BEGIN:VEVENT\r\nUID:x\r\n${ALARM_DISPLAY}\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:x\r\nRECURRENCE-ID:20261113T090000Z\r\n${ALARM_EMAIL}\r\nEND:VEVENT\r\n`;
+    expect(parseAlarms(ics)).toEqual([ALARM_DISPLAY]);
+  });
+});
+
+/*
+ * Las reglas que el formulario sabe escribir y leer. Mismos vectores que
+ * TestLaReglaEsLaDeIcalTs en apps/fyne/calendario: las dos plataformas guardan la
+ * misma RRULE para la misma elección.
+ */
+describe('Repetir: cada año, cada día laborable y ciertos días (CAL-11)', () => {
+  const con = (regla: string) =>
+    `BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:x\r\nDTSTART:20261109T090000Z\r\nRRULE:${regla}\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`;
+
+  const vectores: [Recurrence, string][] = [
+    [{ freq: 'WEEKLY', byday: ['MO', 'TU', 'WE', 'TH', 'FR'] }, 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR'],
+    [
+      { freq: 'WEEKLY', interval: 2, byday: ['MO', 'WE'], count: 6 },
+      'FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE;COUNT=6',
+    ],
+    [{ freq: 'YEARLY' }, 'FREQ=YEARLY'],
+    [{ freq: 'YEARLY', until: '2030-12-31' }, 'FREQ=YEARLY;UNTIL=20301231T235959Z'],
+  ];
+
+  test('buildRRule escribe BYDAY y YEARLY', () => {
+    for (const [rec, regla] of vectores) expect(buildRRule(rec)).toBe(`RRULE:${regla}`);
+  });
+
+  test('parseRecurrence las lee de vuelta tal cual', () => {
+    for (const [rec, regla] of vectores) expect(parseRecurrence(con(regla))).toEqual(rec);
+  });
+
+  test('BYDAY sale ordenado de lunes a domingo, sin repetir ni valores ajenos', () => {
+    expect(buildRRule({ freq: 'WEEKLY', byday: ['FR', 'MO', 'FR'] })).toBe(
+      'RRULE:FREQ=WEEKLY;BYDAY=MO,FR',
+    );
+    expect(buildRRule({ freq: 'WEEKLY', byday: ['MO', 'XX\r\nCLASS:PUBLIC' as Weekday] })).toBe(
+      'RRULE:FREQ=WEEKLY;BYDAY=MO',
+    );
+    // BYDAY solo acompaña a una semanal.
+    expect(buildRRule({ freq: 'DAILY', byday: ['MO'] })).toBe('RRULE:FREQ=DAILY');
+    expect(parseRecurrence(con('FREQ=WEEKLY;BYDAY=we,MO;WKST=MO'))).toEqual({
+      freq: 'WEEKLY',
+      byday: ['MO', 'WE'],
+    });
+  });
+
+  test('lo que no sabe reescribir sin cambiarlo sigue siendo «Personalizada»', () => {
+    for (const regla of [
+      'FREQ=MONTHLY;BYDAY=2MO',
+      'FREQ=WEEKLY;BYDAY=1MO',
+      'FREQ=WEEKLY;BYDAY=MO;BYMONTH=3',
+      'FREQ=DAILY;BYDAY=MO,TU',
+      'FREQ=YEARLY;BYMONTH=3;BYMONTHDAY=8',
+      // Cada dos semanas con la semana empezando en domingo: sin WKST cambiaría.
+      'FREQ=WEEKLY;INTERVAL=2;BYDAY=MO;WKST=SU',
+    ]) {
+      expect(parseRecurrence(con(regla))).toBeNull();
+      expect(rruleCruda(con(regla))).toBe(regla);
+    }
   });
 });

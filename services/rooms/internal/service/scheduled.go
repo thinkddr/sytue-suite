@@ -28,6 +28,9 @@ type ScheduleMessageInput struct {
 	SendAt     time.Time
 	AuthorSub  string
 	AuthorName string
+	// AlsoInChannel («También enviar al canal») publica la respuesta, al vencer, también
+	// en el feed del canal. Solo vale con ParentID.
+	AlsoInChannel bool
 }
 
 // PostScheduled programa un mensaje para publicarse en SendAt (futuro). Valida el
@@ -55,6 +58,8 @@ func (s *Service) PostScheduled(ctx context.Context, in ScheduleMessageInput) (d
 		Body:       body,
 		FileIDs:    in.FileIDs,
 		SendAt:     in.SendAt,
+
+		AlsoInChannel: in.ParentID != nil && in.AlsoInChannel,
 	})
 }
 

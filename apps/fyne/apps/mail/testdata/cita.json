@@ -1,0 +1,101 @@
+{
+  "_": "El pliegue de la cita en los mensajes del hilo (MAIL-08): separarCita() en apps/frontend/apps/mail/src/components/utils.ts y en apps/fyne/apps/mail/cita.go. La cita es lo que va desde el separador de Outlook, o el bloque FINAL de líneas «>» con su atribución delante (la de reader.quoteHeader en cualquier idioma, partida o no en dos líneas). Si no queda nada nuevo no se pliega: cita vacía y el cuerpo es el texto tal cual.",
+  "casos": [
+    {
+      "nombre": "respuesta de Gmail en inglés, sin la coma de la plantilla",
+      "texto": "Thanks, see you Monday.\n\nOn Mon, Jan 5, 2026 at 10:00 AM Ana Ruiz <ana@example.eu> wrote:\n> Shall we meet?\n> Ana\n",
+      "cuerpo": "Thanks, see you Monday.",
+      "cita": "On Mon, Jan 5, 2026 at 10:00 AM Ana Ruiz <ana@example.eu> wrote:\n> Shall we meet?\n> Ana\n"
+    },
+    {
+      "nombre": "respuesta en castellano con la cabecera de Sytue",
+      "texto": "Perfecto, lo miro.\n\nEl 5 de enero de 2026, 10:00, Ana Ruiz escribió:\n> ¿Lo revisas?",
+      "cuerpo": "Perfecto, lo miro.",
+      "cita": "El 5 de enero de 2026, 10:00, Ana Ruiz escribió:\n> ¿Lo revisas?"
+    },
+    {
+      "nombre": "atribución partida en dos líneas",
+      "texto": "Hecho.\n\nOn Mon, Jan 5, 2026 at 10:00 AM Ana Ruiz <ana.ruiz@example.eu>\nwrote:\n\n> Hola\n>\n> > Más antiguo\n",
+      "cuerpo": "Hecho.",
+      "cita": "On Mon, Jan 5, 2026 at 10:00 AM Ana Ruiz <ana.ruiz@example.eu>\nwrote:\n\n> Hola\n>\n> > Más antiguo\n"
+    },
+    {
+      "nombre": "francés con el espacio antes de los dos puntos",
+      "texto": "Merci !\n\nLe 5 janv. 2026 à 10:00, Ana Ruiz a écrit :\n> Bonjour",
+      "cuerpo": "Merci !",
+      "cita": "Le 5 janv. 2026 à 10:00, Ana Ruiz a écrit :\n> Bonjour"
+    },
+    {
+      "nombre": "francés de Apple Mail, con el espacio de no separación antes de los dos puntos",
+      "texto": "Merci.\n\nLe 5 janv. 2026 à 10:00, Ana Ruiz <ana@example.eu> a écrit :\n\n> Bonjour\n",
+      "cuerpo": "Merci.",
+      "cita": "Le 5 janv. 2026 à 10:00, Ana Ruiz <ana@example.eu> a écrit :\n\n> Bonjour\n"
+    },
+    {
+      "nombre": "atribución con espacios de más y un tabulador",
+      "texto": "Vale.\n\nOn  Mon, Jan 5, 2026\tat 10:00   Ana Ruiz  wrote:\n> Hola",
+      "cuerpo": "Vale.",
+      "cita": "On  Mon, Jan 5, 2026\tat 10:00   Ana Ruiz  wrote:\n> Hola"
+    },
+    {
+      "nombre": "húngaro, con el remitente delante",
+      "texto": "Köszönöm.\n\nAna Ruiz ezt írta (2026. jan. 5. 10:00):\n> Szia",
+      "cuerpo": "Köszönöm.",
+      "cita": "Ana Ruiz ezt írta (2026. jan. 5. 10:00):\n> Szia"
+    },
+    {
+      "nombre": "cita sin línea de atribución",
+      "texto": "De acuerdo.\n> Lo dejamos para el lunes.\n> Ana",
+      "cuerpo": "De acuerdo.",
+      "cita": "> Lo dejamos para el lunes.\n> Ana"
+    },
+    {
+      "nombre": "separador de Outlook",
+      "texto": "Te lo reenvío firmado.\n\n-----Original Message-----\nFrom: Ana Ruiz\nSent: Monday, January 5, 2026 10:00\nSubject: Contrato\n\nAquí lo tienes.",
+      "cuerpo": "Te lo reenvío firmado.",
+      "cita": "-----Original Message-----\nFrom: Ana Ruiz\nSent: Monday, January 5, 2026 10:00\nSubject: Contrato\n\nAquí lo tienes."
+    },
+    {
+      "nombre": "respuestas intercaladas: solo se pliega el bloque final",
+      "texto": "> ¿Vienes el lunes?\nSí.\n> ¿Y el martes?\nTambién.\n\n> Un saludo,\n> Ana",
+      "cuerpo": "> ¿Vienes el lunes?\nSí.\n> ¿Y el martes?\nTambién.",
+      "cita": "> Un saludo,\n> Ana"
+    },
+    {
+      "nombre": "un mensaje que es solo cita no se pliega",
+      "texto": "On Mon, Jan 5, 2026, Ana Ruiz wrote:\n> Hola\n> Ana",
+      "cuerpo": "On Mon, Jan 5, 2026, Ana Ruiz wrote:\n> Hola\n> Ana",
+      "cita": ""
+    },
+    {
+      "nombre": "un reenvío desde el separador en la primera línea no se pliega",
+      "texto": "-----Original Message-----\nFrom: Ana Ruiz\n\nHola",
+      "cuerpo": "-----Original Message-----\nFrom: Ana Ruiz\n\nHola",
+      "cita": ""
+    },
+    {
+      "nombre": "sin cita, el texto queda entero",
+      "texto": "Hola Ana,\n\nTe veo el lunes.\n\nUn saludo",
+      "cuerpo": "Hola Ana,\n\nTe veo el lunes.\n\nUn saludo",
+      "cita": ""
+    },
+    {
+      "nombre": "una línea con dos puntos que no es atribución se queda en lo nuevo",
+      "texto": "Lo que dijiste:\n> El lunes",
+      "cuerpo": "Lo que dijiste:",
+      "cita": "> El lunes"
+    },
+    {
+      "nombre": "saltos de Windows",
+      "texto": "Vale.\r\n\r\nOn 5 Jan 2026, Ana wrote:\r\n> Hola\r\n",
+      "cuerpo": "Vale.",
+      "cita": "On 5 Jan 2026, Ana wrote:\n> Hola\n"
+    },
+    {
+      "nombre": "una línea de más de 256 caracteres no es atribución, aunque case",
+      "texto": "Vale.\nOn xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx wrote:\n> Hola",
+      "cuerpo": "Vale.\nOn xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx wrote:",
+      "cita": "> Hola"
+    }
+  ]
+}

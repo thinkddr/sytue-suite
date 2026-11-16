@@ -495,6 +495,11 @@ func TestHerramientasMandaLoDeLaWeb(t *testing.T) {
 // Figtree cargada y raíz de 16 px. Pestañas de 24 px; canvas de 510×158,625 por
 // width=480/height=148 con borde; la página ocupa w-16 (64 px). Aplicar sigue
 // desactivado mientras no haya firma.
+//
+// Desde CERT-03 debajo va «Posición» (`PosicionDeFirma`): leyenda de 16 + `mb-1.5`, la
+// rejilla de 2×2 a `gap-1` y la miniatura `w-20` de un A4 (80×113,203 en Chromium), a
+// `gap-3` de la fila de las casillas. El diálogo crece 147,203 y, centrado, sube la
+// mitad: lo de arriba se midió antes y se corrige con la cuenta de Chromium.
 func TestFirmarSeColocaComoEnLaWeb(t *testing.T) {
 	_, w, objs := dialogoDePrueba(t, DialogoFirmar)
 	defer w.Close()
@@ -508,17 +513,17 @@ func TestFirmarSeColocaComoEnLaWeb(t *testing.T) {
 			t.Fatalf("no está la pestaña «%s»", b.texto)
 		}
 		casiTexto(t, b.texto+" x", absoluta(a[0]).X, b.x)
-		cerca(t, b.texto+" y", absoluta(a[0]).Y, 223.1875) // con el pie, el panel sube 5,5
+		cerca(t, b.texto+" y", absoluta(a[0]).Y, 149.58594) // con el pie, el panel sube 5,5
 		cerca(t, b.texto+" alto", a[0].Size().Height, 24)
 	}
 	l, ok := primero[*lienzoFirma](objs)
 	if !ok {
 		t.Fatal("no está el lienzo")
 	}
-	cerca(t, "el lienzo y", absoluta(l).Y, 292.1875)
+	cerca(t, "el lienzo y", absoluta(l).Y, 218.58594)
 	cerca(t, "el lienzo ancho", l.Size().Width, 510)
 	cerca(t, "el lienzo alto", l.Size().Height, 158.625)
-	cerca(t, "«Borrar» y", absoluta(acc["Borrar y volver a empezar"][0]).Y, 458.8125)
+	cerca(t, "«Borrar» y", absoluta(acc["Borrar y volver a empezar"][0]).Y, 385.21094)
 	var pagina *ui.Entrada
 	var casillas []*casillaNativa
 	for _, o := range objs {
@@ -535,12 +540,13 @@ func TestFirmarSeColocaComoEnLaWeb(t *testing.T) {
 		t.Fatalf("la fila del recuadro no está: página %v, %d casillas", pagina != nil, len(casillas))
 	}
 	casiTexto(t, "la página x", absoluta(pagina).X, 823.21875)
-	cerca(t, "la página y", absoluta(pagina).Y, 486.8125)
+	cerca(t, "la página y", absoluta(pagina).Y, 413.21094)
 	cerca(t, "la página ancho", pagina.Size().Width, 64)
 	casiTexto(t, "la segunda casilla x", absoluta(casillas[1]).X, 573.01563)
-	cerca(t, "la primera casilla y", absoluta(casillas[0]).Y, 491.8125)
+	cerca(t, "la primera casilla y", absoluta(casillas[0]).Y, 418.21094)
+	selectorDePosicionComoLaWeb(t, objs, absoluta(pagina).Y+pagina.Size().Height+tema.Espacio(3), 385, 207, 32)
 	ap := botonesDe(objs)["Aplicar"]
-	cerca(t, "«Aplicar» y", absoluta(ap).Y, 593.8125)
+	cerca(t, "«Aplicar» y", absoluta(ap).Y, 667.41406)
 	if !ap.Inerte {
 		t.Error("sin firma, «Aplicar» tiene que estar apagado")
 	}
@@ -565,7 +571,7 @@ func TestFirmarMandaLoDeLaWeb(t *testing.T) {
 	if c.Op != "firmar" || len(trazos) != 1 || trazos[0][0] != [2]float64{56, 130} || trazos[0][1] != [2]float64{296, 56} {
 		t.Errorf("a mano se manda %+v", c)
 	}
-	if datos["rect"] != rectFirma || datos["pagina"] != 0 || datos["grosor"] != 1.6 {
+	if datos["rect"] != (Rect{56, 56, 296, 130}) || datos["pagina"] != 0 || datos["grosor"] != 1.6 {
 		t.Errorf("los datos son %+v", datos)
 	}
 	d.visible = false
@@ -579,7 +585,7 @@ func TestFirmarMandaLoDeLaWeb(t *testing.T) {
 	if c.Op != "firmar-certificado" || len(c.Partes) != 1 || c.Partes[0].Campo != "pkcs12" || c.Campos["clave_p12"] != "secreta" {
 		t.Errorf("con certificado se manda %+v", c)
 	}
-	if datos, _ = c.Datos.(map[string]any); datos["Rect"] != rectFirma || datos["Bloquear"] != false {
+	if datos, _ = c.Datos.(map[string]any); datos["Rect"] != (Rect{56, 56, 296, 130}) || datos["Bloquear"] != false {
 		t.Errorf("los datos del certificado son %+v", datos)
 	}
 }
@@ -608,6 +614,11 @@ func TestLosBotonesDelDialogoVanSobreSuPanel(t *testing.T) {
 // hoja: 360 de ancho, sin filetes a los lados y cuerpo de 312, apoyada abajo. Las
 // pestañas flex envuelven en dos o tres líneas (56 px) y las casillas en tres (48 px); el
 // canvas conserva width=480/height=148, incluido su borde: 312×97,578.
+//
+// Con «Posición» debajo (147,203 más), la hoja apoyada abajo sube eso entero. Las
+// opciones bajan al suelo táctil, `max(44px,2.75rem)`, en columnas de 108. La quinta,
+// «Dibujar en la página», va a lo ancho debajo (44 + 4): la rejilla pasa de 92 a 140, más
+// alta que la miniatura, y la hoja sube los 19,219 que le quedaban hasta su alto máximo.
 func TestFirmarAlEstrechoEsElDeLaWeb(t *testing.T) {
 	_, w, objs := dialogoA(t, DialogoFirmar, fyne.NewSize(360, 740))
 	defer w.Close()
@@ -622,14 +633,14 @@ func TestFirmarAlEstrechoEsElDeLaWeb(t *testing.T) {
 		}
 		casiTexto(t, b.texto+" x", absoluta(a[0]).X, b.x)
 		casiTexto(t, b.texto+" ancho", a[0].Size().Width, b.ancho)
-		cerca(t, b.texto+" y", absoluta(a[0]).Y, 280.42188) // con el pie, la hoja sube 19
+		cerca(t, b.texto+" y", absoluta(a[0]).Y, 113.99999) // con el pie y «Dibujar en la página», la hoja llega arriba
 		cerca(t, b.texto+" alto", a[0].Size().Height, 56)
 	}
 	l, ok := primero[*lienzoFirma](objs)
 	if !ok {
 		t.Fatal("no está el lienzo")
 	}
-	cerca(t, "el lienzo y", absoluta(l).Y, 397.42188)
+	cerca(t, "el lienzo y", absoluta(l).Y, 231)
 	// A 360 la hoja va a todo el ancho y sin filetes a los lados: el px-6 deja 312.
 	cerca(t, "el lienzo ancho", l.Size().Width, 312)
 	casiTexto(t, "el lienzo alto", l.Size().Height, 97.57813)
@@ -651,11 +662,47 @@ func TestFirmarAlEstrechoEsElDeLaWeb(t *testing.T) {
 	for i, c := range []struct{ x, ancho float32 }{{24, 89.1875}, {129.1875, 84.96875}} {
 		casiTexto(t, "la casilla x", absoluta(casillas[i]).X, c.x)
 		casiTexto(t, "la casilla ancho", casillas[i].Size().Width, c.ancho)
-		cerca(t, "la casilla y", absoluta(casillas[i]).Y, 531)
+		cerca(t, "la casilla y", absoluta(casillas[i]).Y, 364.57813)
 		cerca(t, "la casilla alto", casillas[i].Size().Height, 48)
 	}
 	casiTexto(t, "la página x", absoluta(pagina).X, 272)
-	cerca(t, "la página y", absoluta(pagina).Y, 542)
+	cerca(t, "la página y", absoluta(pagina).Y, 375.57813)
+	selectorDePosicionComoLaWeb(t, objs, absoluta(casillas[0]).Y+48+tema.Espacio(3), 24, 108, 44)
+}
+
+// selectorDePosicionComoLaWeb mide `PosicionDeFirma` contra Chromium: el fieldset
+// empieza en `arriba` (en x `izq`); la leyenda y su `mb-1.5` son 22; las opciones van en
+// dos columnas de `col` a `gap-1`, de `alto` cada una; y la miniatura de 80×113,203 a
+// `gap-3` de la rejilla, arriba del todo de la fila.
+func selectorDePosicionComoLaWeb(t *testing.T, objs []fyne.CanvasObject, arriba, izq, col, alto float32) {
+	t.Helper()
+	ops := posicionesDe(objs)
+	if len(ops) != 4 {
+		t.Fatalf("hay %d posiciones", len(ops))
+	}
+	y := arriba + 22
+	for i, o := range ops {
+		x := izq + float32(i%2)*(col+4)
+		cerca(t, o.Texto+" x", absoluta(o).X, x)
+		cerca(t, o.Texto+" y", absoluta(o).Y, y+float32(i/2)*(alto+4))
+		cerca(t, o.Texto+" ancho", o.Size().Width, col)
+		cerca(t, o.Texto+" alto", o.Size().Height, alto)
+	}
+	m, ok := primero[*miniaturaFirma](objs)
+	if !ok {
+		t.Fatal("no está la miniatura")
+	}
+	cerca(t, "la miniatura x", absoluta(m).X, izq+2*col+4+12)
+	cerca(t, "la miniatura y", absoluta(m).Y, y)
+	cerca(t, "la miniatura ancho", m.Size().Width, 80)
+	casiTexto(t, "la miniatura alto", m.Size().Height, 113.20313)
+	// El recuadro de siempre, [56 56 296 130] en un A4, sobre los 78×111,2 de dentro.
+	pos, tam := m.cajaRecuadro()
+	interior := m.Size().Height - 2
+	casiTexto(t, "el recuadro x", pos.X, 1+78*56/595.0)
+	casiTexto(t, "el recuadro y", pos.Y, 1+interior*712/842)
+	casiTexto(t, "el recuadro ancho", tam.Width, 78*240/595.0)
+	casiTexto(t, "el recuadro alto", tam.Height, interior*74/842)
 }
 
 // TestLosDialogosAlEstrechoSonLosDeLaWeb: Paneles.tsx real en Chromium a 360×740,

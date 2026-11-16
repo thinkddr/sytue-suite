@@ -4,7 +4,13 @@
 // con lo que .find()/.map() en el consumidor reventaba y la carga live caía a
 // seed (ids no-UUID), dejando el rollback inerte. Ejecutar: `bun test`.
 import { expect, test } from 'bun:test';
-import { CloudClient, type SizingAdvice, type Deployment, type ManagedService } from './index.js';
+import {
+  CloudClient,
+  type SizingAdvice,
+  type Deployment,
+  type ManagedService,
+  type DomainCheck,
+} from './index.js';
 
 /** CloudClient con un fetch inyectado que siempre responde `body` (200 JSON). */
 function clientReturning(body: unknown): CloudClient {
@@ -173,6 +179,43 @@ test('addDomain devuelve las instrucciones DNS completas, TXT incluido', async (
   expect(out.dns?.txt_record).toBe('_sytue-challenge.www.ejemplo.com');
   expect(out.dns?.txt_value).toBe('tok-abc123');
   expect(out.dns?.cname_target).toBe('ingress.sytue.eu');
+});
+
+test('verifyDomain llama a /domains/{id}/verify y DomainCheck declara los campos de Go', async () => {
+  // El motivo es todo el valor del botón: si el SDK leyera `motivo` donde Go
+  // manda `reason`, el panel diría «sin motivo» en silencio.
+  let llamada = '';
+  const c = new CloudClient({
+    baseUrl: 'https://cloud.test',
+    auth: { getAccessToken: () => 'tok' },
+    fetchImpl: (async (url: RequestInfo | URL, init?: RequestInit) => {
+      llamada = `${init?.method ?? 'GET'} ${String(url)}`;
+      return new Response(
+        JSON.stringify({
+          domain: { id: 'd1', project_id: 'p1', hostname: 'a.es', status: 'pending' },
+          check: { verified: false, reason: 'txt_ausente' },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }) as unknown as typeof fetch,
+  });
+  const out = await c.verifyDomain('d1');
+  expect(llamada).toBe('POST https://cloud.test/api/v1/domains/d1/verify');
+  expect(out.check.reason).toBe('txt_ausente');
+
+  const goSrc = await Bun.file(
+    `${import.meta.dir}/../../../../../../services/cloud/internal/domain/domain.go`,
+  ).text();
+  const struct = goSrc.match(/type DomainCheck struct \{([\s\S]*?)\n\}/)?.[1];
+  expect(struct).toBeTruthy();
+  const goFields = [...struct!.matchAll(/`json:"([^",]+)/g)].map((m) => m[1]!).sort();
+  const check: DomainCheck = {
+    verified: true,
+    reason: 'cname_distinto',
+    expected: 'ingress.sytue.eu',
+    found: 'otro.example',
+  };
+  expect(Object.keys(check).sort()).toEqual(goFields);
 });
 
 test('SizingAdvice declara EXACTAMENTE los campos que serializa Go', async () => {

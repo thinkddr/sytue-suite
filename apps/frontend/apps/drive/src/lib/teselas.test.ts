@@ -7,7 +7,8 @@
  * que se ve, Mayús + clic entre una tesela y una fila marcaría otros elementos.
  */
 import { expect, test } from 'bun:test';
-import { idsDelRango, partirEnTeselas, posicionEnLista } from './teselas';
+import { idsDelRango } from '@sytue/ui';
+import { partirEnTeselas, posicionEnLista } from './teselas';
 
 const el = (id: string, isDirectory = false) => ({ id, isDirectory });
 // Como lo manda el servicio: carpetas primero y, dentro de cada grupo, por nombre.

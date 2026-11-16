@@ -11,6 +11,7 @@
 // Para VERLA hace falta una máquina con pantalla. Lo que corre en cualquier sitio, sin
 // CGO y sin servidor gráfico, es `go test ./calendario/...`, que pinta lo mismo con el
 // pintor de software y comprueba los píxeles contra los números de producción.
+// paridad-web: apps/frontend/apps/calendar/src/pages/auth/matrix/callback.astro
 package main
 
 import (
@@ -23,11 +24,14 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 
+	"git.sytue.eu/sytue/one/apps/fyne/cifrado"
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/fyne/vinculados"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	privateCalendar "git.sytue.eu/sytue/one/apps/nucleo/calendar"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	mx "git.sytue.eu/sytue/one/apps/nucleo/matrix"
 
 	"git.sytue.eu/sytue/one/apps/fyne/calendario"
 	"git.sytue.eu/sytue/one/apps/fyne/catalogos"
@@ -57,120 +61,111 @@ func main() {
 		panic(err)
 	}
 
-	p := &calendario.Pantalla{T: t, Cursor: time.Now(), Vista: calendario.VistaMes}
-	// El primer pintado de un teléfono ya es el mes compacto: la ventana aún no se ha
-	// medido y, sin esto, asomaba la rejilla de escritorio un fotograma.
-	dev := a.Driver().Device()
-	p.Ventana = calendario.VentanaInicial(dev.IsMobile(), fyne.IsVertical(dev.Orientation()))
-	// La App es quien habla con el servicio; la Pantalla solo pinta. El cliente va con
-	// la sesión compartida de las trece apps: sin sesión, las cargas fallan y la
-	// pantalla lo dice con su estado de error, y al entrar se vuelve a pedir todo.
-	c := calendario.NuevaApp(p, api.NewCalendars(s.URL("calendar"), s.Sesion, s.ClienteConAviso(nil)))
 	// El widget nativo lo lee su propia Fuente: hoy y lo próximo de TODOS los
 	// calendarios, mire la pantalla el mes que mire, y se vuelve a publicar tras cada
 	// escritura del cliente de arriba (ClienteConAviso).
 	s.PublicadorWidget(s.FuenteWidget(t))
-	// La videollamada de un evento es una sala de Sytue Rooms ligada a su UID.
-	salas := api.NewRooms(s.URL("rooms"), s.Sesion, nil)
-	c.Salas = func(ctx context.Context, uid, titulo string) (string, error) {
-		return salas.SalaDeEvento(ctx, uid, titulo, s.URL("rooms"))
-	}
-	// El asistente del formulario propone un evento a partir de una frase.
-	c.Asistente = api.NewIA(s.URL("ai"), s.Sesion, nil).Asistir
-	// Las notas de Notepads que cuelgan de un evento, en su vista rápida. Se abren en
-	// la app de Notepads o, si no está instalada, en su web.
-	notas := api.NewNotes(s.URL("notes"), s.Sesion, nil)
-	c.Notas = func(ctx context.Context, uid string) ([]api.Note, error) {
-		return notas.LinkedNotes(ctx, "calendar_event", uid, 20)
-	}
-	c.AbrirNotas = func(ruta string) { _ = api.AbrirEn(a, s.Apex(), "notes", s.Sesion.Organizacion(), ruta) }
-	c.Apex = s.Apex()
-	c.ConImportar(api.NewIntegraciones(s.URL("integrations"), s.Sesion, nil))
-	c.AbrirEnlace = func(enlace string) {
-		u, err := url.Parse(enlace)
-		if err != nil {
-			return
-		}
-		// «Unirse» a una reunión de la suite la abre en la app de Rooms si está (su
-		// esquema), y si no en la web; un enlace de otro proveedor, en el navegador.
-		if _, esReunion := api.LeerReunion(s.Apex(), u); esReunion {
-			_ = api.AbrirURL(a, "rooms", enlace)
-			return
-		}
-		_ = api.AbrirFuera(a, enlace)
-	}
+	dev := a.Driver().Device()
+	ventanaInicial := calendario.VentanaInicial(dev.IsMobile(), fyne.IsVertical(dev.Orientation()))
+
 	w := a.NewWindow(t.T("page.title", nil))
 	w.SetPadded(false)
-	c.ConServiciosVinculados(vinculados.Nuevo(s, w, t, "calendar").Abrir)
-	w.SetContent(ui.NuevaBarraSuite(t, s, iconos.Calendar).Montar(c.Objeto()))
-	// Los atajos de una letra llegan al lienzo solo cuando NADA tiene el foco: un campo
-	// o un diálogo abierto se quedan su tecla, que es lo que hace `esAtajoDeApp`.
-	w.Canvas().SetOnTypedRune(func(r rune) {
-		if len(w.Canvas().Overlays().List()) == 0 {
-			c.Atajo(r)
-		}
-	})
 	w.Resize(fyne.NewSize(1280, 800))
-	// `sytue-calendar:?action=create&…` (crear desde un correo o desde una ficha de
-	// contacto), `?date=…` y `/events/<id>` (un evento del buscador de la suite).
-	// Llega también antes de arrancar el bucle (la URL de la línea de órdenes): va al
-	// hilo de la interfaz, que es donde se abre el formulario.
-	s.AlAbrirURL(func(u *url.URL) { fyne.Do(func() { c.AtenderEnlace(u) }) })
-	// Al ENTRAR —aquí o en otra de las trece apps— se vuelve a pedir todo. Solo cuando
-	// cambia quién ha entrado: `AlCambiar` avisa también del tema, del idioma y de la
-	// presencia, y recargar el calendario por cambiar a oscuro no tiene sentido.
-	quien := ""
-	var pararImportador context.CancelFunc
-	// El correo de quien ha entrado dice qué eventos son invitaciones que contestar.
-	cuenta := api.NewAccount(s.URL("id"), s.Sesion, nil)
-	pedirCorreo := func() {
-		go func() {
-			ctx, parar := context.WithTimeout(context.Background(), 15*time.Second)
-			defer parar()
-			if yo, err := cuenta.Me(ctx); err == nil {
-				fyne.Do(func() { c.Correo = yo.Email })
+
+	var current *calendario.App
+	enlaces := &enlacesIdentidad{
+		despachar: fyne.Do,
+		abrir: func(u *url.URL) {
+			if current != nil {
+				current.AtenderEnlace(u)
 			}
-			// Los roles del token dicen si sale «Gestionar salas y recursos»
-			// (`user.roles` con admin u owner en la web). Quien autoriza es el servicio.
-			if r, err := s.Sesion.Reclamos(ctx); err == nil {
-				fyne.Do(func() { c.PonerGestorRecursos(slices.Contains(r.Roles, "admin") || slices.Contains(r.Roles, "owner")) })
+		},
+	}
+	s.AlAbrirURL(enlaces.recibir)
+
+	mount := func(resources *cifrado.Resources[*mx.Client], repository *privateCalendar.Repository) (cifrado.ApplicationView, error) {
+		facade, err := api.NewCalendars(s.URL("calendar"), resources.HTTP(), nil).WithPrivateData(repository)
+		if err != nil {
+			return cifrado.ApplicationView{}, err
+		}
+		p := &calendario.Pantalla{T: t, Cursor: time.Now(), Vista: calendario.VistaMes, Ventana: ventanaInicial}
+		c := calendario.NuevaAppConVida(resources.Context(), p, facade)
+		salas := api.NewRooms(s.URL("rooms"), resources.HTTP(), nil)
+		c.Salas = func(ctx context.Context, uid, titulo string) (string, error) {
+			return salas.SalaDeEvento(ctx, uid, titulo, s.URL("rooms"))
+		}
+		organization := resources.PrivateStorageScope().Tenant
+		c.AbrirNotas = func(ruta string) { _ = api.AbrirEn(a, s.Apex(), "notes", organization, ruta) }
+		c.Apex = s.Apex()
+		c.AbrirEnlace = func(enlace string) {
+			u, err := url.Parse(enlace)
+			if err != nil {
+				return
 			}
-		}()
-	}
-	cambiar := func(e sesion.Estado) {
-		actual := ""
-		if e.Dentro() {
-			actual = s.URL("id") + "\x00" + e.Sujeto + "\x00" + s.Sesion.Organizacion()
+			if _, esReunion := api.LeerReunion(s.Apex(), u); esReunion {
+				_ = api.AbrirURL(a, "rooms", enlace)
+				return
+			}
+			_ = api.AbrirFuera(a, enlace)
 		}
-		if actual == quien {
-			return
-		}
-		quien = actual
-		if pararImportador != nil {
-			pararImportador()
-		}
-		c.PararImportador()
-		if actual != "" {
-			vida, parar := context.WithCancel(context.Background())
-			pararImportador = parar
-			c.IniciarImportador(vida)
-			c.Arrancar()
-			pedirCorreo()
-		}
-	}
-	s.AlCambiar(cambiar)
-	w.SetOnClosed(func() {
-		if pararImportador != nil {
-			pararImportador()
-		}
-		c.PararImportador()
-	})
-	// Con interfaz: lanzada por iOS solo para el widget no se pide nada ni se sondean los
-	// recordatorios. El widget lo lee su Fuente.
-	s.CuandoHayaEscena(func() {
-		cambiar(s.Estado())
+		c.ConServiciosVinculados(vinculados.Nuevo(s, w, t, "calendar").Abrir)
+		cuenta := api.NewAccount(s.URL("id"), resources.HTTP(), nil)
+		vida, parar := context.WithCancel(resources.Context())
+		vigente := func() bool { return resources.Check(vida) == nil && current == c }
+		pedirDatosCuenta(vida, vigente, func(ctx context.Context) (string, error) {
+			yo, err := cuenta.Me(ctx)
+			return yo.Email, err
+		}, func(ctx context.Context) (bool, error) {
+			r, err := s.Sesion.Reclamos(ctx)
+			return slices.Contains(r.Roles, "admin") || slices.Contains(r.Roles, "owner"), err
+		}, fyne.Do, func(correo string) { c.Correo = correo }, c.PonerGestorRecursos)
+		current = c
+		c.Arrancar()
 		c.Reloj()
+		enlaces.activar(vida, vigente)
+		return cifrado.ApplicationView{
+			Object: c.Objeto(),
+			Detach: func() {
+				parar()
+				enlaces.retirar()
+				c.Cerrar()
+				if current == c {
+					current = nil
+				}
+			},
+			Join: c.Join,
+		}, nil
+	}
+
+	private, err := cifrado.NewPrivateApplication(cifrado.PrivateApplicationConfig[*privateCalendar.Repository]{
+		Suite: s, Application: a, Window: w, Product: "calendar",
+		Translate: func(key string) string { return t.T(key, nil) },
+		Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*privateCalendar.Repository], error) {
+			return calendarPlan(ctx, resources, s)
+		},
+		Mount: func(_ context.Context, resources *cifrado.Resources[*mx.Client], repository *privateCalendar.Repository) (cifrado.ApplicationView, error) {
+			return mount(resources, repository) //nolint:contextcheck // Presenter retains its mounted resource lifetime; future UI gestures must not inherit the mount request.
+		},
 	})
+	if err != nil {
+		w.SetContent(ui.NuevoVacio(t.T("matrix.failed", nil), ""))
+	} else {
+		w.SetContent(ui.NuevaBarraSuite(t, s, iconos.Calendar).Montar(private.Objeto()))
+		w.Canvas().SetOnTypedRune(func(r rune) {
+			if len(w.Canvas().Overlays().List()) == 0 && current != nil {
+				current.Atajo(r)
+			}
+		})
+		w.SetOnClosed(func() {
+			enlaces.cerrar()
+			private.Close()
+		})
+		// Con interfaz: lanzada por iOS solo para el widget no se pide nada ni se sondean los
+		// recordatorios. El widget lo lee su Fuente.
+		s.CuandoHayaEscena(func() {
+			private.Start()
+		})
+	}
 	s.Arrancar(context.Background())
 	w.ShowAndRun()
 }

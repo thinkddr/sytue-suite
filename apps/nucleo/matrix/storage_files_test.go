@@ -5,8 +5,6 @@ package matrix
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -24,6 +22,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/auth/authtest"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 	"git.sytue.eu/sytue/one/apps/nucleo/storage"
+	"git.sytue.eu/sytue/one/apps/nucleo/storage/storagetest"
 )
 
 type patternedSource struct {
@@ -48,13 +47,39 @@ func (s patternedSource) ReadAt(out []byte, offset int64) (int, error) {
 }
 
 type fileRecordFixture struct {
+	target   storage.PublicationTarget
+	allowed  []string
+	loseRoot bool
 	records  map[EventRef]storage.Record
 	txns     map[string]EventRef
 	failRoot bool
 	losePage bool
 }
 
-func (m *fileRecordFixture) PutStorageRecord(_ context.Context, txn string, rec storage.Record) (EventRef, error) {
+func newFileRecordFixture() *fileRecordFixture {
+	return &fileRecordFixture{target: storage.PublicationTarget{RoomID: "!private:matrix.test", DeviceID: "DEVICE"}, allowed: []string{"!private:matrix.test", "!rotated:matrix.test"}}
+}
+
+func (m *fileRecordFixture) StoragePublicationTarget() (storage.PublicationTarget, error) {
+	return m.target, m.CheckStoragePublicationTarget(m.target)
+}
+
+func (m *fileRecordFixture) CheckStoragePublicationTarget(target storage.PublicationTarget) error {
+	if !target.Valid() || target.DeviceID != m.target.DeviceID || !slices.Contains(m.allowed, target.RoomID) {
+		return ErrIdentity
+	}
+	return nil
+}
+
+func (m *fileRecordFixture) PutStorageRecord(ctx context.Context, txn string, rec storage.Record) (EventRef, error) {
+	return m.PutStorageRecordAt(ctx, m.target, txn, rec)
+}
+
+func (m *fileRecordFixture) PutStorageRecordAt(_ context.Context, target storage.PublicationTarget, txn string, rec storage.Record) (EventRef, error) {
+	if err := m.CheckStoragePublicationTarget(target); err != nil {
+		return EventRef{}, err
+	}
+	txn = target.DeviceID + "\x00" + target.RoomID + "\x00" + txn
 	if m.records == nil {
 		m.records = map[EventRef]storage.Record{}
 		m.txns = map[string]EventRef{}
@@ -72,11 +97,15 @@ func (m *fileRecordFixture) PutStorageRecord(_ context.Context, txn string, rec 
 	if m.failRoot && payload.Kind == fileKind {
 		return EventRef{}, errors.New("interrupted root write")
 	}
-	ref := EventRef{RoomID: "!private:matrix.test", EventID: "$event" + strconv.Itoa(len(m.records)+1)}
+	ref := EventRef{RoomID: target.RoomID, EventID: "$event" + strconv.Itoa(len(m.records)+1)}
 	rec.Payload = bytes.Clone(rec.Payload)
 	rec.Previous = slices.Clone(rec.Previous)
 	m.records[ref] = rec
 	m.txns[txn] = ref
+	if m.loseRoot && payload.Kind == fileKind {
+		m.loseRoot = false
+		return ref, errors.New("lost root receipt")
+	}
 	if m.losePage && payload.Kind == filePageKind {
 		m.losePage = false
 		return ref, errors.New("lost page receipt")
@@ -92,54 +121,44 @@ func (m *fileRecordFixture) ReadStorageRecord(_ context.Context, ref EventRef, _
 }
 
 type fileGatewayFixture struct {
-	mu       sync.Mutex
-	data     map[string][]byte
-	puts     int
-	gets     int
-	loseNext bool
-	tamper   bool
+	product      string
+	mu           sync.Mutex
+	data         map[string][]byte
+	puts         int
+	gets         int
+	loseNext     bool
+	tamper       bool
+	policyScope  storage.Scope
+	labels       []api.EtiquetaDrive
+	policyStatus int
+	policyCalls  int
 }
 
 func (s *fileGatewayFixture) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/v1/cipher/blobs/drive/"), "/content")
-	if r.Method == http.MethodPut {
-		s.puts++
-		data, _ := io.ReadAll(r.Body)
-		if previous, exists := s.data[id]; exists && !bytes.Equal(previous, data) {
+	if r.URL.Path == "/api/v1/sensitivity-labels" && r.Method == http.MethodGet {
+		scope, err := storage.DecodeScopeHeader(r.Header.Get(storage.ScopeHeader))
+		if err != nil || scope != s.policyScope || r.Header.Get("Cache-Control") != "no-store" {
 			w.WriteHeader(http.StatusConflict)
 			return
 		}
-		if s.data == nil {
-			s.data = map[string][]byte{}
-		}
-		s.data[id] = data
-		if s.loseNext {
-			s.loseNext = false
-			w.WriteHeader(http.StatusServiceUnavailable)
+		s.policyCalls++
+		if s.policyStatus != 0 && s.policyStatus != http.StatusOK {
+			w.WriteHeader(s.policyStatus)
 			return
 		}
-		sum := sha256.Sum256(data)
-		_ = json.NewEncoder(w).Encode(storage.BlobReceipt{ID: id, Product: "drive", SizeBytes: int64(len(data)), SHA256: hex.EncodeToString(sum[:])})
+		_ = json.NewEncoder(w).Encode(map[string]any{"labels": s.labels})
 		return
 	}
-	s.gets++
-	data, ok := s.data[id]
-	if !ok {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	if s.tamper && len(data) > 0 {
-		data = bytes.Clone(data)
-		data[0] ^= 1
-	}
-	_, _ = w.Write(data)
+	state := storagetest.CipherState{Data: s.data, Puts: s.puts, Gets: s.gets, LoseNext: s.loseNext, Tamper: s.tamper}
+	storagetest.ServeCipherBlob(w, r, s.product, &state)
+	s.data, s.puts, s.gets, s.loseNext, s.tamper = state.Data, state.Puts, state.Gets, state.LoseNext, state.Tamper
 }
 
 func fileFixture(t *testing.T) (storageFileIO, *fileGatewayFixture, *fileRecordFixture, string) {
 	t.Helper()
-	gateway := &fileGatewayFixture{}
+	gateway := &fileGatewayFixture{product: "drive"}
 	server := httptest.NewServer(gateway)
 	t.Cleanup(server.Close)
 	directory := t.TempDir()
@@ -147,7 +166,7 @@ func fileFixture(t *testing.T) (storageFileIO, *fileGatewayFixture, *fileRecordF
 	if err != nil {
 		t.Fatal(err)
 	}
-	records := &fileRecordFixture{}
+	records := newFileRecordFixture()
 	return storageFileIO{scope: storage.Scope{Tenant: "acme", Subject: "alice", Product: "drive"}, gateway: api.NewDrive(server.URL, nil, server.Client()), records: records, journal: journal}, gateway, records, directory
 }
 
@@ -177,8 +196,8 @@ func TestStorageFilePagedRoundtripHasBoundedManifestsAndOpaqueProvider(t *testin
 	if err != nil || !bytes.Equal(got.Metadata, request.Metadata) {
 		t.Fatal("large file or exact metadata did not roundtrip", err)
 	}
-	if count, err := f.journal.Count(storage.PendingUploadsNamespace); err != nil || count != 0 {
-		t.Fatal("verified upload left pending work", count, err)
+	if count, err := f.journal.Count(storage.PendingUploadsNamespace); err != nil || count != 1 {
+		t.Fatal("verified file receipt was not retained for its catalog commit", count, err)
 	}
 	for id, data := range gateway.data {
 		if !storage.BlobID(id) || bytes.Contains(data, []byte("private content belongs")) {

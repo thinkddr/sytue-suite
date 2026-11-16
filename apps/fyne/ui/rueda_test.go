@@ -123,7 +123,7 @@ func pixelesPintados(img image.Image) int {
 // TestElBotonDeSoloIconoEsCuadrado son los `iconSizes` de Button.tsx: `h-N w-N p-0`, con
 // el suelo de 24 de `xs` en los DOS ejes (`min-h-[24px] min-w-[24px]`, WCAG 2.5.8).
 func TestElBotonDeSoloIconoEsCuadrado(t *testing.T) {
-	// Los números salen de la hoja con el rem de 14, escritos a mano.
+	// Los números salen de la hoja con el rem de 16, escritos a mano.
 	casos := []struct {
 		clase string
 		talla Talla

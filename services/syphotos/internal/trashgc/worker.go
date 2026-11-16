@@ -33,7 +33,7 @@ type Purger interface {
 // cuántas no pudo borrar; no devuelve error porque un fallo aquí no cambia lo
 // que hay que hacer: la fila ya se fue y lo que quede es caché huérfana.
 type Limpiador interface {
-	BorrarDerivadas(ctx context.Context, tenant string, activo uuid.UUID, huella string) int
+	BorrarDerivadas(ctx context.Context, tenant, owner string, activo uuid.UUID, huella string) int
 }
 
 // Worker purga la papelera caducada cada `interval`.
@@ -98,7 +98,7 @@ func (w *Worker) tick(ctx context.Context) {
 	fallos := 0
 	if w.limpiador != nil {
 		for _, p := range purgadas {
-			fallos += w.limpiador.BorrarDerivadas(ctx, p.Tenant, p.ID, p.Huella)
+			fallos += w.limpiador.BorrarDerivadas(ctx, p.Tenant, p.Owner, p.ID, p.Huella)
 		}
 	}
 	log.From(ctx).Info("papelera purgada", "fotos", len(purgadas), "derivadas sin borrar", fallos)

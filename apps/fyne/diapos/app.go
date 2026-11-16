@@ -18,6 +18,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/editor/docus"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 )
 
@@ -58,6 +59,9 @@ type App struct {
 	// Cast es «Presentar con Cast»: el cliente de Sytue Cast y cómo se abre su página de
 	// emisión (el `DocID` lo pone la app al abrir). Nil, sin esa orden en la cinta.
 	Cast *Cast
+	// Almacen guarda lo que la web deja en `localStorage` (el tamaño de las notas del
+	// moderador), por persona; lo cumple `sesion.PorPersona`. Nil, no se recuerda.
+	Almacen Almacen
 
 	portada *editor.Portada
 	avisos  *ui.PilaAvisos
@@ -94,6 +98,12 @@ func NuevaApp(t func(string, i18n.Vars) string, loc i18n.Locale, docs *api.Docs,
 	a.portada = editor.NuevaPortada(editor.Presentacion, t, loc, docs)
 	a.portada.Avisos = a.avisos
 	a.portada.AlAbrir = func(d api.Document) { a.AbrirID(d.ID, d.Title) }
+	a.portada.Carpeta = func() (string, error) {
+		if a.Carpeta == nil {
+			return ficheros.Carpeta()
+		}
+		return a.Carpeta()
+	}
 	a.raiz = container.NewStack(a.portada.Objeto(), a.avisos)
 	return a
 }
@@ -123,6 +133,14 @@ func (a *App) Contexto() *editor.Contexto {
 // Arrancar pide la primera página de la portada.
 func (a *App) Arrancar() {
 	editor.EngancharAtras(a.raiz, a.portada, func() bool { return a.abierta != nil }, a.Volver)
+	// La tesela comparte con el mismo panel que la cabecera; los enlaces los pone quien
+	// monta la app después de NuevaApp, así que se engancha aquí y no allí.
+	a.portada.Compartir = nil
+	if a.EnlaceDoc != nil {
+		a.portada.Compartir = func(d api.Document, desde fyne.CanvasObject) {
+			a.panelCompartir(d.ID, d.Title).Mostrar(desde)
+		}
+	}
 	a.portada.Cargar()
 }
 
@@ -185,6 +203,7 @@ func (a *App) nueva(titulo string) *abierta {
 	}
 	ed := NuevoEditor(ctx)
 	ed.Idioma = a.Idioma
+	ed.Almacen = a.Almacen
 	ed.ElegirImagen, ed.ElegirMedio = a.ElegirImagen, a.ElegirMedio
 	ctx.Lienzo = ed
 	ctx.Notificar = func(tono ui.TonoAviso, titulo string) { ed.Avisos().Notificar(ui.NuevoAviso(tono, titulo, "")) }
@@ -213,6 +232,8 @@ func (a *App) nueva(titulo string) *abierta {
 // y lo que se pulse en la portada.
 func (a *App) AbrirID(id, titulo string) {
 	ab := a.nueva(titulo)
+	// «Reintentar» del error vuelve a pedir la misma presentación.
+	ab.ctx.Reintentar = func() { a.AbrirID(id, titulo) }
 	if a.Slides == nil {
 		return
 	}
@@ -244,6 +265,13 @@ func (a *App) AbrirID(id, titulo string) {
 			if a.Cast != nil {
 				ab.ed.Cast = &Cast{Cliente: a.Cast.Cliente, DocID: id, Abrir: a.Cast.Abrir, Lanzar: a.lanzar}
 			}
+			ab.ctx.EnLaWeb = nil
+			if a.EnlaceDoc != nil {
+				enlace := a.EnlaceDoc(id)
+				ab.ctx.EnLaWeb = func() { _ = api.AbrirFuera(fyne.CurrentApp(), enlace) }
+			}
+			// Antes de cargar: el dueño toca lo bloqueado de una presentación protegida.
+			ab.ed.Propietario = ap.Rol == "owner"
 			a.poner(ab, ap.Titulo, ap.Contenido, ap.Escribir, func(modelo string) error {
 				c, cancelar := context.WithTimeout(context.Background(), a.Plazo)
 				defer cancelar()
@@ -316,13 +344,17 @@ func (a *App) archivo(ab *abierta, id string, escribe bool) {
 		}
 	}
 	if a.EnlaceDoc != nil {
-		ctx.Compartir = func(desde fyne.CanvasObject) {
-			(&editor.Compartir{
-				T: a.T, Svc: a.portada.Svc, ID: id, Titulo: ctx.Titulo,
-				Enlace: a.EnlaceDoc(id), EnlacePublico: a.EnlacePublico,
-				Avisos: a.avisos, Lanzar: a.lanzar, Plazo: a.Plazo, Dir: a.Directorio,
-			}).Mostrar(desde)
-		}
+		ctx.Compartir = func(desde fyne.CanvasObject) { a.panelCompartir(id, ctx.Titulo).Mostrar(desde) }
+	}
+}
+
+// panelCompartir es el panel de «Compartir» de un documento, el de la cabecera y el de
+// la tesela de la portada.
+func (a *App) panelCompartir(id, titulo string) *editor.Compartir {
+	return &editor.Compartir{
+		T: a.T, Svc: a.portada.Svc, ID: id, Titulo: titulo,
+		Enlace: a.EnlaceDoc(id), EnlacePublico: a.EnlacePublico,
+		Avisos: a.avisos, Lanzar: a.lanzar, Plazo: a.Plazo, Dir: a.Directorio,
 	}
 }
 
@@ -391,7 +423,13 @@ func (a *App) poner(ab *abierta, titulo, contenido string, escribir bool, guarda
 	entendido := ab.ed.Cargar(contenido)
 	ab.ctx.Titulo, ab.ctx.Estado, ab.ctx.Guardado = titulo, editor.Listo, editor.Limpio
 	ab.ctx.SoloLectura = !entendido || !escribir || guardar == nil
-	ab.ctx.MotivoSoloLectura = ""
+	// Con permiso y sin entenderla, la franja dice qué no sabe editar y lleva a la web; sin
+	// permiso, o sin dónde guardar (una conversión), la de siempre.
+	if !entendido && escribir && guardar != nil {
+		ab.ctx.NoSabeEditar("diapos", ab.ed.NoEntendido())
+	} else {
+		ab.ctx.SinMotivo()
+	}
 	a.titulo(titulo)
 	if ab.ctx.SoloLectura {
 		// Lo que no se puede guardar no arma reloj ni cuenta cambios.

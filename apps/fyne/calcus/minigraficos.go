@@ -164,8 +164,8 @@ func (l *Libro) valoresMinigrafico(rango string) []float64 {
 		return nil
 	}
 	var out []float64
-	for f := r.R1; f <= min(r.R2, Filas-1); f++ {
-		for c := r.C1; c <= min(r.C2, Columnas-1); c++ {
+	for f := r.R1; f <= min(r.R2, MaxFilas-1); f++ {
+		for c := r.C1; c <= min(r.C2, MaxColumnas-1); c++ {
 			x, _ := l.Valor(c, f).(float64)
 			if math.IsNaN(x) || math.IsInf(x, 0) {
 				x = 0

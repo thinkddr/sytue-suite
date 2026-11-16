@@ -7,9 +7,11 @@ package ficheros
 
 /*
 #cgo CFLAGS: -x objective-c
-#cgo LDFLAGS: -framework UIKit -framework Foundation -framework MobileCoreServices -framework CoreGraphics
+#cgo LDFLAGS: -framework UIKit -framework Foundation -framework MobileCoreServices -framework CoreGraphics -framework PhotosUI -framework UniformTypeIdentifiers
 #import <UIKit/UIKit.h>
 #import <MobileCoreServices/MobileCoreServices.h>
+#import <PhotosUI/PhotosUI.h>
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -228,6 +230,85 @@ static void sytue_elegir_ios(const char *exts_csv) {
 		[root presentViewController:picker animated:YES completion:nil];
 	});
 }
+
+// EL SELECTOR DE FOTOS (PHPicker): el de la app Fotos, con sus álbumes, y no el de
+// «Archivos». No pide permiso a la fototeca: la persona elige y el sistema da copias. Cada
+// foto se copia a una carpeta propia dentro de la temporal, con su nombre original
+// («IMG_0001.HEIC»), porque el fichero que da el sistema desaparece al volver del aviso.
+@interface SytueFotosDelegate : NSObject <PHPickerViewControllerDelegate>
+@end
+
+@implementation SytueFotosDelegate
+- (void)picker:(PHPickerViewController *)picker didFinishPicking:(NSArray<PHPickerResult *> *)results {
+	[picker dismissViewControllerAnimated:YES completion:nil];
+	NSString *tmpDir = [NSTemporaryDirectory() stringByAppendingPathComponent:[[NSUUID UUID] UUIDString]];
+	NSMutableArray<NSString *> *paths = [NSMutableArray array];
+	dispatch_group_t grupo = dispatch_group_create();
+	NSUInteger n = 0;
+	for (PHPickerResult *r in results) {
+		NSItemProvider *p = r.itemProvider;
+		NSString *tipo = nil;
+		for (NSString *t in p.registeredTypeIdentifiers) {
+			UTType *u = [UTType typeWithIdentifier:t];
+			if (u && [u conformsToType:UTTypeImage]) {
+				tipo = t;
+				break;
+			}
+		}
+		if (!tipo) continue;
+		NSString *sub = [tmpDir stringByAppendingPathComponent:[NSString stringWithFormat:@"%lu", (unsigned long)n++]];
+		NSString *sugerido = p.suggestedName;
+		dispatch_group_enter(grupo);
+		[p loadFileRepresentationForTypeIdentifier:tipo completionHandler:^(NSURL *url, NSError *error) {
+			if (url) {
+				NSString *nombre = url.lastPathComponent;
+				if (sugerido.length > 0 && url.pathExtension.length > 0) {
+					nombre = [sugerido stringByAppendingPathExtension:url.pathExtension];
+				}
+				NSFileManager *fm = [NSFileManager defaultManager];
+				[fm createDirectoryAtPath:sub withIntermediateDirectories:YES attributes:nil error:nil];
+				NSString *dest = [sub stringByAppendingPathComponent:nombre];
+				if ([fm copyItemAtURL:url toURL:[NSURL fileURLWithPath:dest] error:nil]) {
+					@synchronized (paths) {
+						[paths addObject:dest];
+					}
+				}
+			}
+			dispatch_group_leave(grupo);
+		}];
+	}
+	dispatch_group_notify(grupo, dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+		NSString *joined = nil;
+		@synchronized (paths) {
+			joined = [paths componentsJoinedByString:@"\n"];
+		}
+		sytue_elegir_ios_retorno((char *)[joined UTF8String]);
+	});
+}
+@end
+
+static SytueFotosDelegate *sytue_fotos_del = nil;
+
+static void sytue_elegir_fotos_ios(void) {
+	dispatch_async(dispatch_get_main_queue(), ^{
+		UIViewController *root = sytue_top_view_controller();
+		if (!root) {
+			sytue_elegir_ios_retorno(NULL);
+			return;
+		}
+		PHPickerConfiguration *conf = [[PHPickerConfiguration alloc] init];
+		conf.filter = [PHPickerFilter imagesFilter];
+		conf.selectionLimit = 0; // sin tope, como `multiple`
+		// El original (HEIC, RAW), no una conversión a JPEG.
+		conf.preferredAssetRepresentationMode = PHPickerConfigurationAssetRepresentationModeCurrent;
+		PHPickerViewController *picker = [[PHPickerViewController alloc] initWithConfiguration:conf];
+		if (!sytue_fotos_del) {
+			sytue_fotos_del = [[SytueFotosDelegate alloc] init];
+		}
+		picker.delegate = sytue_fotos_del;
+		[root presentViewController:picker animated:YES completion:nil];
+	});
+}
 */
 import "C"
 
@@ -255,6 +336,18 @@ func elegirMovilNativo(extensiones []string) ([]string, error) {
 	C.sytue_elegir_ios(ccsv)
 	rutas := <-ch
 	return rutas, nil
+}
+
+// elegirFotosNativo es [EnFotos] en iOS: el selector de la app Fotos. Comparte el canal
+// con el de documentos (los dos vuelven por `sytue_elegir_ios_retorno`), y por eso no se
+// pueden abrir dos a la vez.
+func elegirFotosNativo() ([]string, error) {
+	elegirMu.Lock()
+	ch := make(chan []string, 1)
+	elegirCanal = ch
+	elegirMu.Unlock()
+	C.sytue_elegir_fotos_ios()
+	return <-ch, nil
 }
 
 func imprimirMovil(ruta string) error {
@@ -302,4 +395,5 @@ func leerLocalSeguro(ruta string) ([]byte, error) {
 
 func init() {
 	EnElMovil = elegirMovilNativo
+	EnFotos = elegirFotosNativo
 }

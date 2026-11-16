@@ -86,8 +86,8 @@ test('parsePeerCursor: exige sub + posición válida; color derivado del sub', (
 });
 
 test('peerName: reserva cuando viene vacío', () => {
-  expect(peerName('  ')).toBe('Colaborador');
-  expect(peerName('Ada Lovelace')).toBe('Ada Lovelace');
+  expect(peerName('  ', 'Otra persona')).toBe('Otra persona');
+  expect(peerName('Ada Lovelace', 'Colaborador')).toBe('Ada Lovelace');
 });
 
 test('cursorPosKey: cambia al moverse, estable si no', () => {

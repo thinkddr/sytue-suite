@@ -83,6 +83,10 @@ export interface EventInput {
   alarms?: string[];
   /** EXDATE (tokens iCal) a arrastrar a una serie nueva al desgajar. */
   exdates?: string[];
+  /** RRULE tal cual (sin «RRULE:») de una serie que el formulario no sabe editar. */
+  rruleRaw?: string;
+  /** La repetición no se ha tocado: el BFF conserva la RRULE guardada byte a byte. */
+  recurrenceUnchanged?: boolean;
 }
 
 /** Invitacion de la bandeja de planificacion (iTIP), enriquecida por el BFF. */
@@ -268,11 +272,16 @@ export function listSharedWithMe(): Promise<{ calendars: Calendar[] }> {
   return getJson('/api/shared');
 }
 
+/**
+ * Las ocurrencias de un calendario en el rango, ya expandidas por el servicio (el
+ * mismo motor que Fyne). Sin `calendarId` vuelven los maestros sin expandir.
+ */
 export function listEvents(
-  calendarUrl: string,
+  cal: Pick<Calendar, 'url' | 'id'>,
   range?: { start: string; end?: string },
 ): Promise<{ events: CalendarEvent[] }> {
-  const params = new URLSearchParams({ calendarUrl });
+  const params = new URLSearchParams({ calendarUrl: cal.url });
+  if (cal.id) params.set('calendarId', cal.id);
   if (range?.start) params.set('start', range.start);
   if (range?.end) params.set('end', range.end);
   return getJson(`/api/events?${params.toString()}`);
@@ -291,7 +300,7 @@ export async function listEventsOf(
   const sinAcceso: Calendar[] = [];
   const pairs = await Promise.all(
     cals.map((c) =>
-      list(c.url, range).then(
+      list(c, range).then(
         ({ events }) => [c.url, events] as const,
         (e: unknown) => {
           if (!(e instanceof HttpError) || (e.status !== 403 && e.status !== 404)) throw e;
@@ -315,6 +324,11 @@ export function saveEvent(input: {
 
 export function deleteEvent(href: string): Promise<{ ok: boolean }> {
   return sendJson('DELETE', '/api/event', { href });
+}
+
+/** «Deshacer» un borrado: vuelve a escribir el .ics del evento en su mismo href. */
+export function restoreEvent(href: string, ical: string): Promise<{ ok: boolean; href: string }> {
+  return sendJson('PUT', '/api/event', { href, ical });
 }
 
 /** Hueco libre comun (instantes UTC RFC3339) devuelto por «buscar hueco». */

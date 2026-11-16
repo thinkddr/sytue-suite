@@ -153,7 +153,7 @@ func TestLaPAbreYCierraLaVentanaDelModerador(t *testing.T) {
 	for wm, _ := ventana(); wm != nil; wm, _ = ventana() {
 		wm.Close()
 	}
-	p := Presentar(referencia(t), 0, false, "es", traductor(t))
+	p := Presentar(referencia(t), 0, false, "es", traductor(t), nil)
 	if wm, _ := ventana(); wm != nil || p.Moderador {
 		t.Fatal("sin pedirlo no hay moderador")
 	}

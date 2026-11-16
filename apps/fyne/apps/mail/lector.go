@@ -27,6 +27,13 @@ import (
 // el botón de 94 × 28 en y = 530,75, todo centrado en x = 910. Lo pinta `ui.Vacio`,
 // que ya clava esa composición (`gap-3` más el `mt-2` de la acción).
 //
+// Aquel barrido se hizo SIN la ilustración, que entonces no se pintaba. Con el
+// `emptyMail` de 160 × 128 (`<Illustration>` a su `size` por defecto) el bloque crece
+// 128 + `mb-2` + `gap-3` = 145,5 y, centrado, todo baja la mitad: el spot arriba en
+// y = 368,75, el título en 514,25, la descripción en 547,5 y el botón en 603,5. Esas
+// cuatro son de origen «hoja» (las clases de EmptyState.tsx), no medidas: quien vuelva
+// a pasar la sonda, que las ate.
+//
 // El hilo abierto NO está medido, y aquí se dice: abrir una conversación marca el
 // correo como leído, o sea que escribe en producción, y la sonda de medidas no
 // escribe. Todos los números del hilo salen de las CLASES de `MessageReader.tsx`
@@ -88,9 +95,21 @@ type Lector struct {
 	CreandoEvento bool
 	// AlCompartirEnRooms es «Compartir en Rooms», en «Más acciones». Nil, no se ofrece.
 	AlCompartirEnRooms func(Mensaje)
+	// Silenciada y PospuestaHasta son el estado del hilo abierto (posponer.go): «Más
+	// acciones» ofrece deshacerlo y «Posponer» pasa a «Cambiar la fecha». Cero: ni
+	// silenciado ni pospuesto.
+	Silenciada     bool
+	PospuestaHasta time.Time
 	// botonEtiquetar y botonMover son los disparadores de los menús del triaje, que
 	// los atajos «l» y «v» pulsan. Nil cuando la cabecera no los lleva.
 	botonEtiquetar, botonMover *ui.Boton
+	// AlNavegar es «Más reciente» (`false`) y «Más antigua» (`true`) en la fila del
+	// asunto: lo que hacen j/k (`Buzon.moverCursor`), para quien lee con el dedo y no
+	// quiere volver a la lista. Nil, no hay botones. HayAnterior y HaySiguiente los
+	// encienden (apagados en los extremos) y CargandoSiguiente es la página siguiente
+	// en camino tras pulsar «Más antigua» en la última cargada.
+	AlNavegar                                    func(siguiente bool)
+	HayAnterior, HaySiguiente, CargandoSiguiente bool
 	// Los adjuntos y el pie de cada mensaje: descargar, guardar en Drive (nil: no se
 	// ofrece) y el original. Guardando son los adjuntos en camino a Drive, por
 	// `claveAdjunto`: su botón se apaga mientras tanto.
@@ -98,6 +117,9 @@ type Lector struct {
 	AlGuardarEnDrive   func(Mensaje, AdjuntoVisible)
 	AlOriginal         func(Mensaje)
 	Guardando          map[string]bool
+	// AlAbrirEnlace abre un enlace del cuerpo (`https://…` o `mailto:…`) al pulsarlo.
+	// Nil, los enlaces se pintan pero no se abren.
+	AlAbrirEnlace func(destino string)
 
 	AlResponder  func(Mensaje, Respuesta)
 	AlRedactar   func()
@@ -206,12 +228,19 @@ type lectorRenderer struct {
 	// barra son los botones de la cabecera y chips las etiquetas del hilo (nil sin
 	// ninguna); se rehacen solo cuando cambia su clave (ver `claveBarra`).
 	barra, chips *fyne.Container
-	clave        string
-	hilo         *hiloLayout
-	pila         *fyne.Container
-	desplaza     *container.Scroll
-	vacio        *ui.Vacio
-	objetos      []fyne.CanvasObject
+	// franjas son «Pospuesto hasta…» y «Silenciada» (posponer.go), entre la barra y
+	// los chips; se rehacen con la barra (el estado del hilo va en `claveBarra`).
+	franjas []*fyne.Container
+	// nav son los botones «Más reciente»/«Más antigua» de la fila del asunto; nil
+	// sin `AlNavegar`. Se rehacen con la barra (su estado va en `claveBarra`).
+	nav        *fyne.Container
+	clave      string
+	hilo       *hiloLayout
+	pila       *fyne.Container
+	desplaza   *container.Scroll
+	vacio      *ui.Vacio
+	marcaVacio marcaVacio // con qué se pintó `vacio`
+	objetos    []fyne.CanvasObject
 	// hiloID y nHilo dicen qué tarjetas hay montadas: rehacerlas cuesta, y solo
 	// cambian cuando cambia el hilo.
 	hiloID string
@@ -227,30 +256,48 @@ func (r *lectorRenderer) lineasAsunto(ancho float32) []string {
 	if r.cuenta.Visible() {
 		cabe -= ui.MedidaRotulo(r.cuenta).Width + HuecoAcciones
 	}
+	if r.nav != nil {
+		cabe -= r.nav.MinSize().Width + HuecoAcciones
+	}
 	return repartirPre(r.x.asunto(), ui.EscalonTitulo(3), ui.PesoTitulo(3), cabe)
 }
 
-// AltoCabeceraLector es el alto de la banda del asunto: `py-5`, las líneas del
-// `sytue-h3`, el `mt-4`, las filas de la barra, y con etiquetas el `mt-3` y sus filas
-// de chips; el `border-b` va dentro. Hoja.
-func AltoCabeceraLector(lineas int, barra, chips float32) float32 {
-	alto := 2*RellenoLector + float32(max(lineas, 1))*ui.EscalonTitulo(3).Linea + AireAcciones + barra + tema.Borde
+// AltoCabeceraLector es el alto de la banda del asunto: `py-5`, la fila del asunto, el
+// `mt-4`, las filas de la barra, y con etiquetas el `mt-3` y sus filas de chips; el
+// `border-b` va dentro. Hoja.
+func AltoCabeceraLector(lineas int, nav, barra, chips float32) float32 {
+	alto := 2*RellenoLector + AltoAsuntoLector(lineas, nav) + AireAcciones + barra + tema.Borde
 	if chips > 0 {
 		alto += AireChipsLector + chips
 	}
 	return alto
 }
 
+// AltoAsuntoLector es la fila del asunto: las líneas del `sytue-h3` o, si es más alto,
+// el botón `sm` de «Más reciente»/«Más antigua» (`self-start`, así que manda su alto
+// y no el de la línea: 28 contra los 24,5 de una línea).
+func AltoAsuntoLector(lineas int, nav float32) float32 {
+	return max(float32(max(lineas, 1))*ui.EscalonTitulo(3).Linea, nav)
+}
+
 func (r *lectorRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(2*MargenLector, AltoCabeceraLector(1, ui.MedidaBoton("", ui.TallaSM, 1).Height, 0))
+	return fyne.NewSize(2*MargenLector, AltoCabeceraLector(1, 0, ui.MedidaBoton("", ui.TallaSM, 1).Height, 0))
+}
+
+// altoNav es el de los botones de la fila del asunto; 0 si no los hay.
+func (r *lectorRenderer) altoNav() float32 {
+	if r.nav == nil {
+		return 0
+	}
+	return r.nav.MinSize().Height
 }
 
 // altos son los de la barra y los chips repartidos a lo que les deja el `px-6`.
 func (r *lectorRenderer) altos(ancho float32) (barra, chips float32) {
 	util := max(ancho-2*MargenLector, 0)
-	barra = altoFlujo(r.barra, util)
+	barra = ui.AltoFlujo(r.barra, util)
 	if r.chips != nil {
-		chips = altoFlujo(r.chips, util)
+		chips = ui.AltoFlujo(r.chips, util)
 	}
 	return barra, chips
 }
@@ -268,7 +315,8 @@ func (r *lectorRenderer) Layout(t fyne.Size) {
 	lineas := r.lineasAsunto(t.Width)
 	r.ponerTitulo(lineas)
 	altoBarra, altoChips := r.altos(t.Width)
-	alto := AltoCabeceraLector(len(lineas), altoBarra, altoChips)
+	util := max(t.Width-2*MargenLector, 0)
+	alto := AltoCabeceraLector(len(lineas), r.altoNav(), altoBarra, altoChips) + AltoFranjas(r.franjas, util)
 	r.banda.Move(fyne.NewPos(0, 0))
 	r.banda.Resize(fyne.NewSize(t.Width, alto))
 	r.filete.Move(fyne.NewPos(0, alto-tema.Borde))
@@ -277,21 +325,36 @@ func (r *lectorRenderer) Layout(t fyne.Size) {
 	for i, l := range r.titulo {
 		ui.ColocarTexto(l, ui.EscalonTitulo(3), MargenLector, RellenoLector+float32(i)*ui.EscalonTitulo(3).Linea)
 	}
+	derecha := t.Width - MargenLector
+	if r.nav != nil {
+		// `self-start`: arriba del todo, a la derecha de la cuenta.
+		m := r.nav.MinSize()
+		r.nav.Resize(m)
+		r.nav.Move(fyne.NewPos(derecha-m.Width, RellenoLector))
+		derecha -= m.Width + HuecoAcciones
+	}
 	if r.cuenta.Visible() {
 		// `items-baseline`: la cuenta se apoya en la línea base de la PRIMERA línea
 		// del asunto, no en el fondo de su caja.
 		m := ui.MedidaRotulo(r.cuenta)
 		r.cuenta.Resize(m)
-		r.cuenta.Move(fyne.NewPos(t.Width-MargenLector-m.Width,
+		r.cuenta.Move(fyne.NewPos(derecha-m.Width,
 			RellenoLector+lineaBase(ui.EscalonTitulo(3), ui.PesoTitulo(3))-lineaBase(tema.TextoSM, ui.Normal)))
 	}
 
-	util := max(t.Width-2*MargenLector, 0)
-	y := RellenoLector + float32(len(lineas))*ui.EscalonTitulo(3).Linea + AireAcciones
+	y := RellenoLector + AltoAsuntoLector(len(lineas), r.altoNav()) + AireAcciones
 	r.barra.Move(fyne.NewPos(MargenLector, y))
 	r.barra.Resize(fyne.NewSize(util, altoBarra))
+	y += altoBarra
+	for _, f := range r.franjas {
+		h := franjaLayout{}.alto(f.Objects, util)
+		y += AireChipsLector
+		f.Move(fyne.NewPos(MargenLector, y))
+		f.Resize(fyne.NewSize(util, h))
+		y += h
+	}
 	if r.chips != nil {
-		r.chips.Move(fyne.NewPos(MargenLector, y+altoBarra+AireChipsLector))
+		r.chips.Move(fyne.NewPos(MargenLector, y+AireChipsLector))
 		r.chips.Resize(fyne.NewSize(util, altoChips))
 	}
 
@@ -326,6 +389,12 @@ func (r *lectorRenderer) montar() {
 		r.objetos = append(r.objetos, l)
 	}
 	r.objetos = append(r.objetos, r.cuenta, r.barra)
+	for _, f := range r.franjas {
+		r.objetos = append(r.objetos, f)
+	}
+	if r.nav != nil {
+		r.objetos = append(r.objetos, r.nav)
+	}
 	if r.chips != nil {
 		r.objetos = append(r.objetos, r.chips)
 	}
@@ -340,6 +409,8 @@ func (r *lectorRenderer) ponerBarra() {
 		r.clave = k
 		r.barra = x.barra(angosta)
 		r.chips = x.chips()
+		r.franjas = x.franjas()
+		r.nav = x.navegacion()
 		r.montar()
 	}
 }
@@ -361,6 +432,12 @@ func (r *lectorRenderer) Refresh() {
 	}
 	if r.chips != nil {
 		verlo(r.chips, abierto)
+	}
+	if r.nav != nil {
+		verlo(r.nav, abierto)
+	}
+	for _, f := range r.franjas {
+		verlo(f, abierto)
 	}
 	for _, l := range r.titulo {
 		verlo(l, abierto)
@@ -412,6 +489,7 @@ func (r *lectorRenderer) ponerVacio() {
 	x, t := r.x, r.x.T
 	var titulo, desc string
 	var accion fyne.CanvasObject
+	marca := ilustracionDeEstado(x.Estado)
 	switch x.Estado {
 	case Error:
 		titulo = t.T("list.errorTitle", nil)
@@ -427,13 +505,15 @@ func (r *lectorRenderer) ponerVacio() {
 		// es «elige una conversación»: el cero del tipo es Cargando, y sin esto la
 		// pantalla recién abierta decía «cargando el mensaje…» para siempre.
 		if len(x.Conversacion.Mensajes) > 0 {
-			titulo = t.T("reader.loadingBody", nil)
+			// Cargando un hilo no es «no hay correo»: va sin dibujo, como el
+			// esqueleto de la web, que tampoco lo lleva.
+			titulo, marca = t.T("reader.loadingBody", nil), marcaVacio{}
 			break
 		}
 		fallthrough
 	case Vacio, Listo:
-		// MEDIDO: es el estado que producción enseñaba. Título en `sytue-h4`,
-		// descripción de dos líneas y el botón de 94 × 28 debajo.
+		// MEDIDO sin el spot (ver arriba): título en `sytue-h4`, descripción de dos
+		// líneas y el botón de 94 × 28 debajo. Con el `emptyMail` encima, hoja.
 		titulo = t.T("reader.emptyTitle", nil)
 		desc = t.T("reader.emptyDescription", nil)
 		if !x.SoloLectura {
@@ -442,7 +522,7 @@ func (r *lectorRenderer) ponerVacio() {
 			accion = b
 		}
 	}
-	if nuevo := ponerEstado(r.vacio, titulo, desc, accion); nuevo != r.vacio {
+	if nuevo := ponerEstado(r.vacio, &r.marcaVacio, titulo, desc, accion, marca); nuevo != r.vacio {
 		cambiar(r.objetos, r.vacio, nuevo)
 		r.vacio = nuevo
 	}

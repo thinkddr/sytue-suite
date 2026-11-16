@@ -66,6 +66,39 @@ func (s *Store) GetObjectByUID(ctx context.Context, calendarID uuid.UUID, uid st
 	return o, err
 }
 
+// ObjetosPorUID lista los recursos vivos de ese UID en TODOS los calendarios de la
+// organización: el del organizador y la copia de cada invitado comparten UID. No
+// filtra por acceso: lo hace quien llama (el servicio, con la verja de escritura),
+// porque aquí no se sabe quién pregunta.
+func (s *Store) ObjetosPorUID(ctx context.Context, uid string) ([]domain.CalendarObject, error) {
+	t := tenancy.MustFrom(ctx)
+	var out []domain.CalendarObject
+	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx,
+			`SELECT `+objectCols+` FROM calendar_objects
+			 WHERE tenant=$1 AND uid=$2 AND deleted_at IS NULL
+			   -- Por el índice (tenant, uid) de events: el único de calendar_objects
+			   -- empieza por el calendario y no sirve para buscar en todos.
+			   AND calendar_id IN (SELECT calendar_id FROM events
+			                        WHERE tenant=$1 AND uid=$2 AND deleted_at IS NULL)
+			 ORDER BY created_at, id`,
+			t.Slug, uid)
+		if err != nil {
+			return fmt.Errorf("store: objetos por UID: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			o, err := scanObject(rows, t.Slug)
+			if err != nil {
+				return err
+			}
+			out = append(out, o)
+		}
+		return rows.Err()
+	})
+	return out, err
+}
+
 // ListObjects lista todos los recursos vivos de un calendario (PROPFIND/REPORT).
 func (s *Store) ListObjects(ctx context.Context, calendarID uuid.UUID) ([]domain.CalendarObject, error) {
 	t := tenancy.MustFrom(ctx)

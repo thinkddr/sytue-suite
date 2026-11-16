@@ -1,12 +1,13 @@
 ---
 /* SPDX-License-Identifier: Apache-2.0 */
 // Pantallas reales para la comprobación remota con BFF sintético. La sesión de
-// producto sigue en AppLayout; este banco aislado no existe en producción.
+// producto sigue en AppLayout; este banco aislado no existe en producción. La galería
+// pasa por su puerta de almacenamiento privado real, con un dispositivo sintético.
 import '../../styles/app.css';
 import { APP_VIEWPORT } from '@sytue/config';
 import { basePathScript, themeInitScript } from '@sytue/ui';
 import type { SytueUser } from '@sytue/auth';
-import { PhotosApp } from '../../components/PhotosApp.js';
+import { PhotosAppBanco } from '../../components/dev/PhotosAppBanco.js';
 import { Albums } from '../../components/Albums.js';
 
 export const prerender = false;
@@ -39,7 +40,7 @@ const hubBaseUrl = `${Astro.url.origin}/photos/api/fixture-hub`;
     {Astro.url.searchParams.get('vista') === 'albums' ? (
       <Albums client:only="preact" user={usuario} locale="es" hubBaseUrl={hubBaseUrl} />
     ) : (
-      <PhotosApp client:only="preact" user={usuario} locale="es" hubBaseUrl={hubBaseUrl} />
+      <PhotosAppBanco client:only="preact" user={usuario} locale="es" hubBaseUrl={hubBaseUrl} />
     )}
   </body>
 </html>

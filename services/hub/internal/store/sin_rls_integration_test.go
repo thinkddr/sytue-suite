@@ -34,7 +34,11 @@ func TestSinRLSLosAvisosSonDeLaOrganizacionODeLaPersona(t *testing.T) {
 	st := storeSinRLS(t)
 	acme, globex := tenantCtx("acme"), tenantCtx("globex")
 	sesion := func(org context.Context, personales ...string) context.Context {
-		return domain.ConBuzonesPersonales(org, personales, time.Now())
+		subject := "bea"
+		if len(personales) > 0 {
+			subject = personales[0]
+		}
+		return domain.ConBuzonesPersonales(org, subject, personales, time.Now())
 	}
 
 	// Bea trabaja en globex. Tres avisos suyos viven en ACME: a su identidad, a su

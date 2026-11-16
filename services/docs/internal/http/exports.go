@@ -201,9 +201,10 @@ func cabecerasDeExportacion(h http.Header, contentType string) {
 }
 
 // commentsForExport son los comentarios del documento para los formatos que los llevan
-// (DOCX y ODT), con el nombre de su autor; los demás no los piden.
+// (DOCX y ODT, y las notas de las celdas de XLSX y ODS), con el nombre de su autor; los demás
+// no los piden.
 func (h *Handler) commentsForExport(r *http.Request, docID string, kind domain.Kind, format domain.BlobFormat) ([]domain.Comment, error) {
-	if kind != domain.KindDocument || (format != domain.FormatOOXML && format != domain.FormatODF) {
+	if (kind != domain.KindDocument && kind != domain.KindSpreadsheet) || (format != domain.FormatOOXML && format != domain.FormatODF) {
 		return nil, nil
 	}
 	comments, err := h.store.ListComments(r.Context(), docID, true)

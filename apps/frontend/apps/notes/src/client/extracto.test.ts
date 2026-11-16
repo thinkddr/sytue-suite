@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Daniel Delgado Ramos
 import { expect, test } from 'bun:test';
-import { extracto } from './extracto.js';
+import { readFileSync } from 'node:fs';
+import { estadisticas, extracto, textoDeNota, type Estadisticas } from './extracto.js';
 
 test('plain and empty previews preserve the existing contract', () => {
   expect(extracto('')).toBe('');
@@ -48,4 +49,30 @@ test('previews retain their length limit and ellipsis', () => {
   expect(extracto('abcdef', 5)).toBe('abcd…');
   expect(extracto('abcdef', 1)).toBe('…');
   expect(extracto('a'.repeat(100))).toBe('a'.repeat(71) + '…');
+});
+
+// Los vectores COMPARTIDOS con Go (apps/nucleo/htmltext/testdata/estadisticas.json, que
+// recorre htmltext_test.go): «Información» dice los mismos números en la web y en Fyne.
+const vectores = JSON.parse(
+  readFileSync(
+    new URL('../../../../../nucleo/htmltext/testdata/estadisticas.json', import.meta.url),
+    'utf8',
+  ),
+) as { casos: (Estadisticas & { nombre: string; texto: string })[] };
+
+test('statistics match the vectors shared with the native app', () => {
+  expect(vectores.casos.length).toBeGreaterThanOrEqual(10);
+  for (const { nombre, texto, ...esperado } of vectores.casos) {
+    expect({ nombre, ...estadisticas(texto) }).toEqual({ nombre, ...esperado });
+  }
+});
+
+test('statistics are computed on the plain text of the note, not its markup', () => {
+  expect(
+    estadisticas(textoDeNota('<ul><li>pan</li><li>leche</li></ul><p>y <b>café</b></p>')),
+  ).toEqual({
+    palabras: 4,
+    caracteres: 16,
+    minutos: 1,
+  });
 });

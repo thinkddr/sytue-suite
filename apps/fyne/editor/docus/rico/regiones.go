@@ -71,7 +71,7 @@ func objetoAlLeer(n *html.Node) bool {
 // el campo del número de página —que se pinta con el texto que le toque— o el enlace de
 // vuelta de una nota al final.
 func esObjeto(n *html.Node) bool {
-	return n != nil && (objetos[n.DataAtom] || n.Namespace != "" || esCampoPagina(n) || esVuelta(n) || esCita(n) || esCampoCombinacion(n))
+	return n != nil && (objetos[n.DataAtom] || n.Namespace != "" || esCampoPagina(n) || esVuelta(n) || esCita(n) || esCampoCombinacion(n) || esCampoFormulario(n))
 }
 
 // entenderRegion apunta lo que impide editar una región: que no cuelgue del folio (se

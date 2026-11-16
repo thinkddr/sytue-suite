@@ -24,6 +24,13 @@ export interface Foto {
   camera?: string;
   lens?: string;
   driveFileId: string;
+  /** Solo en la papelera: cuándo se llevó allí (ISO). */
+  deletedAt?: string;
+  /**
+   * Solo en la papelera: cuándo la borra para siempre el servicio (ISO). Ausente si
+   * la organización no caduca la papelera: entonces no hay fecha que prometer.
+   */
+  purgeAt?: string;
 }
 
 export interface PaginaFotos {

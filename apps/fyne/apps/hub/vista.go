@@ -19,6 +19,7 @@ import (
 	"fyne.io/fyne/v2/container"
 
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/nucleo/ajustes"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/auth"
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
@@ -36,12 +37,12 @@ type Federado interface {
 
 var _ Federado = (*api.Hub)(nil)
 
-// Agendable es lo que la tarjeta «Hoy» necesita: los eventos del día y los correos
-// sin leer. Son DOS servicios distintos y por eso es una interfaz y no `*api.Hub`: en
-// la web las pide el BFF con un `Promise.all` de dos `catch`, y cada mitad falla por
-// su lado.
+// Agendable es lo que la tarjeta «Hoy» necesita: la agenda del día (los eventos que
+// caben, cuántos hay y si falta algún calendario) y los correos sin leer. Son DOS
+// servicios distintos y por eso es una interfaz y no `*api.Hub`: en la web las pide el
+// BFF con un `Promise.all` de dos `catch`, y cada mitad falla por su lado.
 type Agendable interface {
-	Hoy(ctx context.Context, desde, hasta time.Time) (eventos []EventoDeHoy, err error)
+	Hoy(ctx context.Context, desde, hasta time.Time) (api.AgendaDeHoy, error)
 	SinLeer(ctx context.Context) (int, error)
 }
 
@@ -114,6 +115,14 @@ type Vista struct {
 	cuentasApps       *api.Integraciones
 	autorizarApp      func(context.Context, string, string) (string, error)
 	apex              string
+	// primerosPasos trae los pasos que quedan (api.Account.PrimerosPasos) e idBase es
+	// la raíz de Sytue ID, donde vive «Mi cuenta». pasosOcultos y ocultarPasos son el
+	// «Ocultar» guardado (ajustes); huellaPasos, la de quien ha entrado.
+	primerosPasos func(context.Context) ([]api.PasoPendiente, bool)
+	idBase        string
+	pasosOcultos  func(huella string) bool
+	ocultarPasos  func(huella string) error
+	huellaPasos   string
 
 	mu      sync.Mutex
 	destino Destino
@@ -134,6 +143,9 @@ type Vista struct {
 	// anterior dejaría mudo el de la nueva hasta su plazo.
 	generacionBusqueda  int
 	cargandoMasBusqueda bool
+
+	// alCambiarHoy vuelve a montar la bandeja del sistema ([Vista.AlCambiarHoy]).
+	alCambiarHoy func()
 
 	// AlMostrar avisa de que se ha cambiado de pantalla: la ventana pone su título.
 	AlMostrar func(Destino)
@@ -196,6 +208,9 @@ func NuevaVista(t *i18n.Translator, a fyne.App, ahora time.Time) *Vista {
 	v.lanzador.AlIr = v.Ir
 	v.lanzador.AlConectarAlmacen = v.conectarAlmacen
 	v.lanzador.AlConectarApps = v.conectarApp
+	v.lanzador.AlOcultarPasos = v.ocultarPrimerosPasos
+	v.lanzador.AlAbrirPaso = v.abrirPaso
+	v.pasosOcultos, v.ocultarPasos = ajustes.PrimerosPasosOcultos, ajustes.OcultarPrimerosPasos
 
 	v.actividad = NuevaActividad(t, ahora)
 	v.actividad.Estado = Cargando
@@ -666,6 +681,7 @@ func (v *Vista) cargarIntegraciones() {
 	defer cancelar()
 	if subs, err := v.integr.Sustituciones(ctx); err == nil {
 		v.enUI(func() { v.lanzador.Sustitutos = subs })
+		v.avisarHoy()
 	}
 	if apps, err := v.integr.MisApps(ctx); err == nil {
 		v.enUI(func() { v.lanzador.Conectadas = apps })
@@ -702,6 +718,7 @@ func (v *Vista) cargarCuenta() {
 		}
 	}
 	v.cargarAccesosConexiones(ctx, r)
+	v.cargarPrimerosPasos(ctx, r)
 	v.enUI(func() {
 		// El de pila: lo primero del nombre visible, como `index.astro` cuando la
 		// sesión no trae `given_name`.
@@ -714,6 +731,7 @@ func (v *Vista) cargarCuenta() {
 			apagados[clave] = r.EsCuentaPersonal()
 		}
 		v.lanzador.Apagados = apagados
+		v.avisos.Personal = r.EsCuentaPersonal()
 	})
 }
 
@@ -750,14 +768,17 @@ func (v *Vista) cargarAgenda() {
 	var errCorreo error
 	var lecturas sync.WaitGroup
 	lecturas.Go(func() { sinLeer, errCorreo = v.agenda.SinLeer(ctx) })
-	eventos, errEventos := v.agenda.Hoy(ctx, desde, hasta)
+	hoy, errEventos := v.agenda.Hoy(ctx, desde, hasta)
 	lecturas.Wait()
 	v.enUI(func() {
-		a := Agenda{Eventos: eventos, SinLeer: sinLeer, HayCorreo: errCorreo == nil}
+		a := Agenda{
+			Eventos: hoy.Eventos, Total: hoy.Total, Parcial: hoy.Parcial,
+			SinLeer: sinLeer, HayCorreo: errCorreo == nil,
+		}
 		switch e := EstadoDe(errEventos); {
 		case e != Listo:
 			a.Estado = e
-		case len(eventos) == 0:
+		case len(hoy.Eventos) == 0:
 			a.Estado = SinNada
 		default:
 			a.Estado = Listo
@@ -785,6 +806,7 @@ func (v *Vista) cargarReciente() {
 			v.lanzador.Reciente.Estado = Listo
 		}
 	})
+	v.avisarHoy()
 }
 
 // cargarActividad pide la actividad, con el filtro por producto si lo hay. El filtro

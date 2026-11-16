@@ -7,6 +7,8 @@
  * Cuerpo JSON (exactamente una acción):
  *   { ids:[…], moveTo: mailboxId }      → mover en lote
  *   { ids:[…], flag: '$seen', add }     → marcar leído/no leído (o $flagged) en lote
+ *   { readAllIn: mailboxId }            → «Marcar todo como leído» de una carpeta
+ *     ENTERA (también lo que la lista aún no ha paginado), sin ids.
  */
 import type { APIRoute } from 'astro';
 import { getApiSession } from '../../lib/session.js';
@@ -19,6 +21,7 @@ interface Payload {
   moveTo?: string;
   flag?: string;
   add?: boolean;
+  readAllIn?: string;
 }
 
 export const POST: APIRoute = async (ctx) => {
@@ -26,6 +29,19 @@ export const POST: APIRoute = async (ctx) => {
   if (!session) return json({ error: 'unauthenticated' }, 401);
 
   const body = (await ctx.request.json().catch(() => ({}))) as Payload;
+  if (typeof body.readAllIn === 'string' && body.readAllIn.length > 0) {
+    try {
+      const res = await mailPost(
+        session.accessToken,
+        `/api/v1/mailboxes/${encodeURIComponent(body.readAllIn)}/read_all`,
+        {},
+      );
+      if (!res.ok) return json({ error: 'mail_error', status: res.status }, 502);
+      return json(await res.json());
+    } catch {
+      return json({ error: 'mail_error' }, 502);
+    }
+  }
   if (!Array.isArray(body.ids) || body.ids.length === 0) {
     return json({ error: 'invalid_payload' }, 400);
   }

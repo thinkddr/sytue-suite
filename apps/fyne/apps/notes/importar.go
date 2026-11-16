@@ -4,7 +4,9 @@
 package notes
 
 import (
+	"errors"
 	"os"
+	"path/filepath"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -16,6 +18,7 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	"git.sytue.eu/sytue/one/apps/nucleo/htmltext"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/notes/model"
 )
 
 // Paridad web: «Importar una copia…» —`importar` y `confirmarImportacion` de
@@ -37,7 +40,7 @@ func (p *Pantalla) importar() {
 	if p.svc == nil || !p.hayRed() {
 		return
 	}
-	go func() {
+	p.iniciar(func() {
 		rutas, err := ficheros.Elegir()
 		if err != nil || len(rutas) == 0 {
 			return // cancelar el selector no es un error
@@ -53,17 +56,22 @@ func (p *Pantalla) importar() {
 		}
 		ctx, cancelar := p.ctx()
 		defer cancelar()
-		vp, err := p.svc.PreviewNotebook(ctx, volcado)
+		vp, err := p.svc.PreviewNotebook(ctx, volcado, filepath.Base(rutas[0]))
 		if err != nil {
-			p.avisar(ui.AvisoPeligro, p.tr.T("import.failed", nil), "")
+			key := "import.failed"
+			if errors.Is(err, model.ErrEncryptedBackupReview) {
+				key = "crypto.migrationFailed"
+			}
+			p.avisar(ui.AvisoPeligro, p.tr.T(key, nil), "")
 			return
 		}
-		enHilo(func() { p.dialogoImportar(volcado, vp) })
-	}()
+		nombre := filepath.Base(rutas[0])
+		p.enHilo(func() { p.dialogoImportar(volcado, nombre, vp) })
+	})
 }
 
 // dialogoImportar es el modal `lg` con el cuaderno tal como quedaría.
-func (p *Pantalla) dialogoImportar(volcado []byte, vp api.VistaPreviaVolcado) {
+func (p *Pantalla) dialogoImportar(volcado []byte, nombre string, vp api.VistaPreviaVolcado) {
 	if p.win == nil {
 		return
 	}
@@ -95,7 +103,11 @@ func (p *Pantalla) dialogoImportar(volcado []byte, vp api.VistaPreviaVolcado) {
 	importar := ui.NuevoBoton(t("import.action", nil), nil)
 	importar.AlPulsar = func() {
 		d.Cerrar()
-		go p.confirmarImportacion(volcado)
+		{
+			notaFuncion := p.confirmarImportacion
+			notaArgumento0, notaArgumento1 := volcado, nombre
+			p.iniciar(func() { notaFuncion(notaArgumento0, notaArgumento1) })
+		}
 	}
 	pie := container.New(ui.Fila{Hueco: ui.HuecoPieDialogo}, cancelar, importar)
 	d = ui.NuevoDialogo(t("import.label", nil), cuerpo).Con(ui.DialogoLG, pie)
@@ -142,16 +154,16 @@ func (p *Pantalla) notasSoloLectura(notas []Nota, v tema.Variante) fyne.CanvasOb
 // confirmarImportacion crea el cuaderno, lo abre y dice cuántas entraron, y SIEMPRE cuántas
 // se quedaron fuera: una importación que se come notas en silencio deja un hueco que se
 // descubre semanas después.
-func (p *Pantalla) confirmarImportacion(volcado []byte) {
+func (p *Pantalla) confirmarImportacion(volcado []byte, nombre string) {
 	ctx, cancelar := p.ctx()
 	defer cancelar()
-	r, err := p.svc.ImportNotebook(ctx, volcado)
+	r, err := p.svc.ImportNotebook(ctx, volcado, nombre)
 	if err != nil {
 		p.avisar(ui.AvisoPeligro, p.tr.T("import.failed", nil), "")
 		return
 	}
 	p.cargarCuadernos()
-	enHilo(func() {
+	p.enHilo(func() {
 		p.abrirCuaderno(DeCuaderno(r.Notebook))
 		if r.Descartadas > 0 {
 			p.avisos.Notificar(ui.NuevoAviso(ui.AvisoAdvertencia, p.tr.T("import.someSkipped",

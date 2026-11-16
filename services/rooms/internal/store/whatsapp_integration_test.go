@@ -27,7 +27,7 @@ func TestWhatsAppAccountAndChats(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool, testCipher(t))
 	ctx := comoAdmin(tenantCtx("acme"), "alice")
-	tm, _ := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	tm, _ := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 	if err := st.AddTeamMember(ctx, tm.ID, "alice", "bob", "Bob", domain.RoleMember); err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func TestWhatsAppPendingSetupLease(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool, testCipher(t))
 	ctx := comoAdmin(tenantCtx("acme"), "alice")
-	tm, _ := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	tm, _ := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 	a := domain.WhatsAppAccount{
 		TeamID: tm.ID, PhoneNumberID: "1234567890", InstanceID: "consent-instance",
 		AccessToken: "token", AppSecret: "secret", CreatedBy: "alice",

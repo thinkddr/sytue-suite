@@ -292,3 +292,31 @@ func textosEnCapa(w fyne.Window) string {
 	}
 	return b.String()
 }
+
+// TestLaVelocidadVaEnElMenuYSobreviveAlCambioDeCalidad: el menú de ajustes trae las
+// velocidades tras las calidades; elegir 1,5× la pone en el reproductor y cambiar de
+// calidad la conserva.
+func TestLaVelocidadVaEnElMenuYSobreviveAlCambioDeCalidad(t *testing.T) {
+	a, w, vaciar, _ := verConEscalera(t)
+	a.menuCalidad(a.visor.Objeto())
+	menu := textosEnCapa(w)
+	for _, quiero := range []string{"Automática", "0,5×", "Normal", "1,5×", "2×"} {
+		if !strings.Contains(menu, quiero) {
+			t.Errorf("el menú no tiene «%s»: %q", quiero, menu)
+		}
+	}
+	w.Canvas().Overlays().Remove(w.Canvas().Overlays().Top())
+	if v := a.reproductor.Velocidad(); v != 1 {
+		t.Fatalf("un vídeo empieza a %v×", v)
+	}
+	a.elegirVelocidad(1.5)
+	viejo := a.reproductor
+	if v := viejo.Velocidad(); v != 1.5 {
+		t.Fatalf("elegir 1,5× deja el reproductor a %v×", v)
+	}
+	a.elegirCalidad(360)
+	vaciar("el WebM de 360p", func() bool { return a.reproductor != viejo && a.reproductor != nil })
+	if v := a.reproductor.Velocidad(); v != 1.5 {
+		t.Errorf("tras cambiar de calidad la velocidad es %v×", v)
+	}
+}

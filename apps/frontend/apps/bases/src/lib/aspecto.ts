@@ -16,6 +16,11 @@ export const ICONO_DE_TIPO: Record<BasesFieldKind, IconName> = {
   link: 'link',
   formula: 'code',
   attachment: 'dosPaginas',
+  url: 'globe',
+  email: 'mail',
+  phone: 'device',
+  currency: 'receipt',
+  rating: 'corazon',
 };
 
 const TONOS_DE_OPCION: BadgeTone[] = ['primary', 'success', 'warning', 'accent', 'info', 'danger'];
@@ -33,5 +38,9 @@ export function tonoDeBase(id: string): CardTone {
 }
 
 export function esNumerico(campo: BasesField): boolean {
-  return campo.kind === 'number' || (campo.kind === 'formula' && campo.result === 'number');
+  return (
+    campo.kind === 'number' ||
+    campo.kind === 'currency' ||
+    (campo.kind === 'formula' && campo.result === 'number')
+  );
 }

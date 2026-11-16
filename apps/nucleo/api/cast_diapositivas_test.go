@@ -23,7 +23,7 @@ func TestCastDiapositivasHablaElCable(t *testing.T) {
 			_, _ = io.WriteString(w, `{"ref":"docs:d1","index":2,"total":9,"title":"Cierre","started_at":"2026-10-04T10:00:00Z","updated_at":"2026-10-04T10:05:00Z","marks":[{"at_ms":1500,"index":1,"title":"Plan"}]}`)
 		case "GET /api/v1/videos/v2/slides":
 			_, _ = io.WriteString(w, `{"presentation":null}`)
-		case "GET /api/v1/videos/v3/slides":
+		case "GET /api/v1/videos/v3/slides", "GET /api/v1/public/videos/v3/slides":
 			_, _ = io.WriteString(w, `{"presentation":{"index":0,"total":1,"title":"A","marks":[]}}`)
 		default:
 			t.Errorf("petición inesperada: %s %s", r.Method, r.URL.Path)
@@ -45,5 +45,9 @@ func TestCastDiapositivasHablaElCable(t *testing.T) {
 	}
 	if p, err := c.Diapositivas(ctx, "v3"); err != nil || p == nil || p.Title != "A" {
 		t.Errorf("con presentación: %+v, %v", p, err)
+	}
+	// Sin sesión, por la gemela pública.
+	if p, err := c.PublicDiapositivas(ctx, "v3"); err != nil || p == nil || p.Title != "A" {
+		t.Errorf("sin sesión: %+v, %v", p, err)
 	}
 }

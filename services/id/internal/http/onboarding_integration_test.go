@@ -107,7 +107,7 @@ func TestOnboarding_RecorridoOrganizacionCompleto(t *testing.T) {
 	}
 
 	// Paso 5 — roles recomendados con permisos REALES.
-	rr, out = l.do(t, http.MethodPost, "/api/v1/onboarding/roles", tok,
+	rr, _ = l.do(t, http.MethodPost, "/api/v1/onboarding/roles", tok,
 		map[string]any{"keys": []string{"soporte", "facturacion"}})
 	if rr.Code != http.StatusOK {
 		t.Fatalf("crear roles: status=%d cuerpo=%s", rr.Code, rr.Body)

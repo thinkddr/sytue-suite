@@ -68,7 +68,7 @@ func mintSAMLResponse(t *testing.T, key *rsa.PrivateKey, cert *x509.Certificate,
 	spMeta := &csaml.EntityDescriptor{EntityID: audience, SPSSODescriptors: []csaml.SPSSODescriptor{{}}}
 	req := &csaml.IdpAuthnRequest{
 		Now: now, IDP: idp,
-		HTTPRequest:             httptest.NewRequest(http.MethodPost, "https://idp.acme/sso", nil),
+		HTTPRequest:             httptest.NewRequest(http.MethodPost, "https://idp.acme/sso", http.NoBody),
 		Request:                 csaml.AuthnRequest{ID: requestID, IssueInstant: now, Version: "2.0"},
 		ServiceProviderMetadata: spMeta,
 		SPSSODescriptor:         &spMeta.SPSSODescriptors[0],

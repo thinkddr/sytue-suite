@@ -53,6 +53,7 @@ const (
 	EventServiceRun       = "cloud.service.run.requested"
 	EventDomainAdded      = "cloud.domain.added"
 	EventDomainRemoved    = "cloud.domain.removed"
+	EventDomainVerified   = "cloud.domain.verified"
 	EventBuildCanceled    = "cloud.build.canceled"
 )
 
@@ -87,6 +88,8 @@ type dataStore interface {
 	ListDomains(ctx context.Context, projectID uuid.UUID) ([]domain.Domain, error)
 	RemoveDomain(ctx context.Context, id uuid.UUID) (domain.Domain, error)
 	SetDomainPrimary(ctx context.Context, id uuid.UUID) (domain.Domain, error)
+	GetDomain(ctx context.Context, id uuid.UUID) (domain.Domain, error)
+	SetDomainStatus(ctx context.Context, tenant string, id uuid.UUID, status domain.DomainStatus) error
 	CancelBuild(ctx context.Context, id uuid.UUID) (jobName string, err error)
 	SetBuildJobName(ctx context.Context, tenant string, id uuid.UUID, jobName string) error
 	BuildStatus(ctx context.Context, tenant string, id uuid.UUID) (domain.BuildStatus, error)
@@ -166,6 +169,9 @@ type Service struct {
 	// (la tercera vía del alta, ver scaffold.go). NIL es un estado normal: sin
 	// credenciales de OAuth de la forja, esa vía no se ofrece.
 	forge *forge.Client
+	// domainCheck es el verificador DNS del «Comprobar ahora» de los dominios
+	// propios y su tope por dominio (domaincheck.go). NIL = la API no lo ofrece.
+	domainCheck domainCheckState
 }
 
 // UsarCache cablea la cache efímera compartida (nil la deshabilita).

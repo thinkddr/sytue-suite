@@ -269,9 +269,17 @@ type Message struct {
 	Attachments []Attachment `json:"attachments,omitempty"`
 	Reactions   []Reaction   `json:"reactions,omitempty"`
 	// ReplyCount es el número de respuestas en el hilo (solo en mensajes raíz).
-	ReplyCount int        `json:"reply_count,omitempty"`
-	EditedAt   *time.Time `json:"edited_at,omitempty"`
-	CreatedAt  time.Time  `json:"created_at"`
+	ReplyCount int `json:"reply_count,omitempty"`
+	// LastReplyAt y ThreadParticipants alimentan el indicador de hilo del canal
+	// («avatares · N respuestas · última respuesta hace 5 min»). Solo en raíces con
+	// respuestas; se AGREGAN al leer (una consulta por página, sin columna ni N+1).
+	LastReplyAt        *time.Time          `json:"last_reply_at,omitempty"`
+	ThreadParticipants []ThreadParticipant `json:"thread_participants,omitempty"`
+	// AlsoInChannel marca una respuesta de hilo que su autor quiso ver también en el
+	// canal («También enviar al canal»): aparece en el feed además de en el hilo.
+	AlsoInChannel bool       `json:"also_in_channel,omitempty"`
+	EditedAt      *time.Time `json:"edited_at,omitempty"`
+	CreatedAt     time.Time  `json:"created_at"`
 	// Priority es "normal" (por defecto), "important" o "urgente". Vacío = "normal".
 	Priority string `json:"priority,omitempty"`
 	// RequiresAck marca que el autor pide acuse de recibo explícito a los lectores.
@@ -296,6 +304,17 @@ type Message struct {
 	MentionsAll bool `json:"mentions_all,omitempty"`
 }
 
+// ThreadParticipant es una de las personas que han respondido en un hilo, para los
+// avatares del indicador del canal.
+type ThreadParticipant struct {
+	Sub  string `json:"sub"`
+	Name string `json:"name,omitempty"`
+}
+
+// MaxThreadParticipants es cuántos avatares lleva el indicador de hilo: los de quienes
+// respondieron más recientemente. Más no caben en la línea y no dicen más.
+const MaxThreadParticipants = 3
+
 // ScheduledMessage es un mensaje redactado para publicarse en un instante futuro
 // (SendAt). Un worker lo publica al vencer y borra la fila (Ola 12). ParentID no
 // nil = respuesta en hilo programada.
@@ -310,6 +329,9 @@ type ScheduledMessage struct {
 	FileIDs    []uuid.UUID `json:"file_ids,omitempty"`
 	SendAt     time.Time   `json:"send_at"`
 	CreatedAt  time.Time   `json:"created_at"`
+	// AlsoInChannel es «También enviar al canal» de una respuesta programada: al vencer
+	// se publica también en el feed del canal (Message.AlsoInChannel).
+	AlsoInChannel bool `json:"also_in_channel,omitempty"`
 }
 
 // Draft es un borrador de redacción del usuario: el texto que escribió y no envió

@@ -24,7 +24,10 @@
         "Team.ReadBasic.All",
         "Channel.ReadBasic.All",
         "ChannelMessage.Send"
-      ]
+      ],
+      "authorize_params": {
+        "prompt": "select_account"
+      }
     },
     "substitutes": [
       {

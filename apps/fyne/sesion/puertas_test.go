@@ -13,6 +13,8 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
+
+	"git.sytue.eu/sytue/one/apps/fyne/internal/testsource"
 )
 
 // TestSoloSeAbreConElSistemaPorSuPuerta: darle una dirección al sistema (`OpenURL`) y
@@ -36,6 +38,13 @@ func TestSoloSeAbreConElSistemaPorSuPuerta(t *testing.T) {
 			fuente, err := os.ReadFile(ruta)
 			if err != nil {
 				return err
+			}
+			supportOnly, err := testsource.IntegrationOnly(fuente)
+			if err != nil {
+				return err
+			}
+			if supportOnly {
+				return nil
 			}
 			for puerta, llamada := range puertas {
 				if strings.HasSuffix(filepath.ToSlash(abs), puerta) {

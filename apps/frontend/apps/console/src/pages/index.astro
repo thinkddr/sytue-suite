@@ -9,6 +9,7 @@ import { OrgColorCard, OrgFormaCard } from '../components/OrgAppearanceCard';
 import { requireSession, permsFromAccessToken } from '@sytue/auth/server';
 import { esCuentaPersonal } from '@sytue/auth';
 import { DEFAULT_COLOR, DEFAULT_FORMA } from '@sytue/ui';
+import { buildSetupSteps, loadSetupSources } from '../lib/primeros-pasos.js';
 import { firstSectionPath } from '../lib/sections.js';
 import { getBff, isPlatformSurface, toBffContext } from '../server/bff.js';
 import {
@@ -17,7 +18,6 @@ import {
   loadAudit,
   loadPasswordPolicy,
   loadOrgMailDomains,
-  loadInsights,
   buildMetrics,
 } from '../lib/admin.js';
 
@@ -57,7 +57,7 @@ if (redirectTo !== null) return Astro.redirect(redirectTo);
 
 const [
   { data: tenants },
-  { data: usersPage },
+  { data: usersPage, live: usersLive },
   { data: auditPage },
   { data: policy, live: policyLive },
   { data: orgDomain, live: domainLive },
@@ -68,10 +68,15 @@ const [
   loadPasswordPolicy(session),
   loadOrgMailDomains(session),
 ]);
-// Los avisos van en la misma tanda pero con su propio await: no comparten forma
-// con los demás (no llevan `data`/`live`) y mezclarlos en el destructuring de
-// arriba obligaría a un cast que oculta justo eso.
-const insights = await loadInsights(session);
+// Los avisos y la guía de primeros pasos van detrás: reutilizan los dominios y el
+// directorio de arriba y piden en paralelo, con plazo, lo que falta (avisos, SSO,
+// apps conectadas). Los avisos salen de la MISMA respuesta que la guía.
+const setup = await loadSetupSources(session, {
+  mailDomains: { live: domainLive, data: orgDomain },
+  users: { live: usersLive, data: usersPage.items.length },
+});
+const insights = setup.insights.data;
+const setupSteps = buildSetupSteps(setup);
 const metrics = buildMetrics(tenants, usersPage.items);
 
 // El idioma lo negoció el middleware; la isla lo recibe por props (nunca lo detecta).
@@ -87,13 +92,17 @@ const t = useT(locale);
     tenants={tenants}
     events={auditPage.items}
     insights={insights}
+    setupSteps={setupSteps}
   />
   {/* client:visible, no client:load: estas tres tarjetas van BAJO el panel y su
       HTML ya lo pinta el servidor con los datos de arriba, así que hidratarlas al
       cargar solo adelanta trabajo de CPU que nadie ve. El panel de arriba sí es
       client:load: es lo primero que se mira. */}
   <div class="grid gap-4 px-4 pb-4 lg:grid-cols-2">
-    <OrgDomainCard client:visible locale={locale} state={orgDomain} live={domainLive} />
+    {/* Ancla de los pasos «dominio» y «correo» de la guía de primeros pasos. */}
+    <div id="dominio" class="scroll-mt-4">
+      <OrgDomainCard client:visible locale={locale} state={orgDomain} live={domainLive} />
+    </div>
     <OrgLogoCard
       client:visible
       locale={locale}

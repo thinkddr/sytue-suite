@@ -173,15 +173,10 @@ export const tienda = {
   'store.mode_test_help':
     'Pagamenti simulati con le chiavi di test del provider. Non viene addebitato nulla.',
   'store.mode_live_help': 'Pagamenti reali della tua clientela con le chiavi di produzione.',
-  'store.webhook_title': 'Passaggio 1: indirizzo del webhook',
   'store.webhook_help': 'Incolla questo indirizzo nella dashboard di {nombre}.',
   'store.webhook_label': 'Indirizzo del webhook',
   'store.webhook_error':
     'Impossibile recuperare l’indirizzo del webhook. Chiudi la finestra e riprova.',
-  'store.copy': 'Copia',
-  'store.copied': 'Indirizzo copiato.',
-  'store.credentials_title': 'Credenziali',
-  'store.credentials_step': 'Passaggio 2: credenziali',
   'store.f_api_key': 'Chiave API',
   'store.f_api_key_mode': 'Chiave API ({modo})',
   'store.f_profile_id': 'ID profilo (facoltativo)',
@@ -199,6 +194,49 @@ export const tienda = {
   'store.gateway_save': 'Salva e verifica',
   'store.gateway_saved': 'Gateway {nombre} verificato e salvato.',
   'store.gateway_save_error': 'Impossibile convalidare le credenziali del gateway.',
+  'store.wz_progress': 'Passaggi per collegare il gateway',
+  'store.wz_step_mode': 'Modalità',
+  'store.wz_step_webhook': 'Webhook',
+  'store.wz_step_keys': 'Chiavi',
+  'store.wz_step_check': 'Verifica',
+  'store.wz_step_done': 'Fatto',
+  'store.wz_mode_heading': 'Pagamenti di prova o pagamenti reali?',
+  'store.wz_mode_desc':
+    'Inizia in modalità di prova; quando tutto funziona, riapri questa procedura e scegli la modalità reale.',
+  'store.wz_webhook_heading': 'Indica a {nombre} dove inviare gli avvisi di pagamento',
+  'store.wz_keys_heading': 'Le tue chiavi di {nombre}',
+  'store.wz_keys_desc':
+    'Le chiavi segrete vengono conservate sigillate e non si mostrano più: per cambiarne una, scrivila di nuovo.',
+  'store.wz_keys_rejected': '{nombre} non ha accettato queste chiavi',
+  'store.wz_check_heading': 'Verifica e salva',
+  'store.wz_check_desc':
+    'Sytue Web prova le chiavi con {nombre} prima di attivare il gateway. Non si salva nulla finché la prova non va a buon fine.',
+  'store.wz_secret_hidden': 'Inserita (nascosta)',
+  'store.wz_empty_value': 'Non indicato',
+  'store.wz_done_heading': '{nombre} è pronto',
+  'store.wz_finish': 'Termina',
+  'store.hint_mollie_api_key':
+    'In Mollie: Developers › API keys. Le chiavi di prova iniziano con test_ e quelle reali con live_.',
+  'store.hint_mollie_profile':
+    'In Mollie: Settings › Website profiles. Inizia con pfl_; lascialo vuoto per usare il profilo predefinito.',
+  'store.hint_adyen_api_key':
+    'Nella Customer Area di Adyen: Developers › API credentials › la tua credenziale › API key.',
+  'store.hint_adyen_merchant':
+    'Nella Customer Area di Adyen, nel selettore dell’account in alto: l’account esercente, non quello aziendale.',
+  'store.hint_adyen_hmac':
+    'In Adyen: Developers › Webhooks › il tuo webhook › Security › HMAC key.',
+  'store.hint_adyen_live_prefix':
+    'In Adyen (reale): Developers › API URLs. È la parte dell’indirizzo prima di -checkout-live.',
+  'store.hint_redsys_merchant':
+    'Te lo fornisce la tua banca con il contratto del POS virtuale; compare anche nel portale di amministrazione di Redsys.',
+  'store.hint_redsys_terminal':
+    'Nel portale di amministrazione di Redsys, accanto al codice esercente. Di solito è 1.',
+  'store.hint_redsys_secret':
+    'Nel portale di amministrazione di Redsys: dati dell’esercente › chiave SHA-256. Le chiavi di prova e reali sono diverse.',
+  'store.hint_stripe_secret':
+    'In Stripe: Developers › API keys › Secret key. Inizia con sk_test_ o sk_live_.',
+  'store.hint_stripe_webhook':
+    'In Stripe: Developers › Webhooks › il tuo endpoint › Signing secret. Inizia con whsec_.',
   'orders.subtitle': 'Ordini e acquisti effettuati sul tuo sito.',
   'orders.count': { one: '{count} ordine', many: '{count} ordini', other: '{count} ordini' },
   'orders.loading': 'Caricamento degli ordini',

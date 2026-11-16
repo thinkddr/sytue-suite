@@ -122,6 +122,20 @@ test('listEvents pide instancias por calendario y ordena por fecha', async () =>
   expect(llamadas.some((l) => l.path === '/events')).toBe(false);
 });
 
+test('listEventsDetallado dice qué calendarios no contestaron, sin tirar a los demás', async () => {
+  const { cliente } = clienteQueApunta({
+    '/calendars': { calendars: [{ id: 'c1' }, { id: 'roto' }] },
+    '/calendars/c1/instances': { instances: [{ event: CRUDO, start: CRUDO.dtstart }] },
+  });
+  const out = await cliente.listEventsDetallado({
+    from: '2026-09-09T00:00:00Z',
+    to: '2026-09-10T00:00:00Z',
+  });
+  expect(out.events.map((e) => e.id)).toEqual(['e1']);
+  expect(out.failed).toEqual(['roto']);
+  expect(out.calendars).toBe(2);
+});
+
 test('listCalendars lee { calendars } y marca el de por defecto', async () => {
   const { cliente } = clienteQueApunta({
     '/calendars': {
@@ -149,4 +163,30 @@ test('parseVevent solo da por enlace de reunión un CONFERENCE http(s)', () => {
   expect(con('data:text/html,<script>alert(1)</script>')).toBeUndefined();
   expect(con('zoommtg://zoom.us/join?confno=1')).toBeUndefined();
   expect(con('https://ok.example/a b')).toBeUndefined();
+});
+
+// D-MAIL-04: contestar desde el lector de Mail una invitación de fuera.
+test('importInvitation: manda el REQUEST y la respuesta, y traduce el resultado', async () => {
+  const { cliente, llamadas } = clienteQueApunta({
+    'POST /invitations/import': {
+      calendar_id: 'c-1',
+      uid: 'g-1@google.com',
+      attendee: 'ana@sytue.eu',
+      partstat: 'TENTATIVE',
+      reply_sent: true,
+    },
+  });
+  const r = await cliente.importInvitation('BEGIN:VCALENDAR', 'TENTATIVE');
+  expect(llamadas[0]).toEqual({
+    method: 'POST',
+    path: '/invitations/import',
+    body: { ics: 'BEGIN:VCALENDAR', partstat: 'TENTATIVE' },
+  });
+  expect(r).toEqual({
+    calendarId: 'c-1',
+    uid: 'g-1@google.com',
+    attendee: 'ana@sytue.eu',
+    partstat: 'TENTATIVE',
+    replySent: true,
+  });
 });

@@ -176,14 +176,9 @@ export const tienda = {
   'store.mode_test_help':
     'Simulēti maksājumi ar pakalpojumu sniedzēja testa atslēgām. Nauda netiek iekasēta.',
   'store.mode_live_help': 'Reāli maksājumi ar ražošanas atslēgām.',
-  'store.webhook_title': '1. solis: webhook adrese',
   'store.webhook_help': 'Ielīmējiet šo adresi {nombre} vadības panelī.',
   'store.webhook_label': 'Webhook adrese',
   'store.webhook_error': 'Webhook adresi neizdevās iegūt. Aizveriet logu un mēģiniet vēlreiz.',
-  'store.copy': 'Kopēt',
-  'store.copied': 'Adrese nokopēta.',
-  'store.credentials_title': 'Akreditācijas dati',
-  'store.credentials_step': '2. solis: akreditācijas dati',
   'store.f_api_key': 'API atslēga',
   'store.f_api_key_mode': 'API atslēga ({modo})',
   'store.f_profile_id': 'Profila ID (nav obligāts)',
@@ -201,6 +196,48 @@ export const tienda = {
   'store.gateway_save': 'Saglabāt un pārbaudīt',
   'store.gateway_saved': 'Vārteja {nombre} pārbaudīta un saglabāta.',
   'store.gateway_save_error': 'Vārtejas akreditācijas datus neizdevās apstiprināt.',
+  'store.wz_progress': 'Maksājumu vārtejas pievienošanas soļi',
+  'store.wz_step_mode': 'Režīms',
+  'store.wz_step_webhook': 'Webhook',
+  'store.wz_step_keys': 'Atslēgas',
+  'store.wz_step_check': 'Pārbaudīt',
+  'store.wz_step_done': 'Gatavs',
+  'store.wz_mode_heading': 'Testa vai īsti maksājumi?',
+  'store.wz_mode_desc':
+    'Sāciet testa režīmā; kad viss darbojas, atveriet šo vedni vēlreiz un izvēlieties īsto režīmu.',
+  'store.wz_webhook_heading': 'Norādiet {nombre}, kur sūtīt maksājumu paziņojumus',
+  'store.wz_keys_heading': 'Jūsu {nombre} atslēgas',
+  'store.wz_keys_desc':
+    'Slepenās atslēgas tiek glabātas aizzīmogotas un vairs netiek rādītas: lai mainītu atslēgu, ievadiet to vēlreiz.',
+  'store.wz_keys_rejected': '{nombre} nepieņēma šīs atslēgas',
+  'store.wz_check_heading': 'Pārbaudīt un saglabāt',
+  'store.wz_check_desc':
+    'Sytue Web pārbauda atslēgas pakalpojumā {nombre} pirms vārtejas ieslēgšanas. Nekas netiek saglabāts, kamēr pārbaude nav izdevusies.',
+  'store.wz_secret_hidden': 'Ievadīta (paslēpta)',
+  'store.wz_empty_value': 'Nav norādīts',
+  'store.wz_done_heading': '{nombre} ir gatavs',
+  'store.wz_finish': 'Pabeigt',
+  'store.hint_mollie_api_key':
+    'Mollie: Developers › API keys. Testa atslēgas sākas ar test_, bet īstās ar live_.',
+  'store.hint_mollie_profile':
+    'Mollie: Settings › Website profiles. Tas sākas ar pfl_; atstājiet tukšu, lai izmantotu noklusējuma profilu.',
+  'store.hint_adyen_api_key':
+    'Adyen Customer Area: Developers › API credentials › jūsu akreditācijas dati › API key.',
+  'store.hint_adyen_merchant':
+    'Adyen Customer Area augšējā konta izvēlnē: tirgotāja konts, nevis uzņēmuma konts.',
+  'store.hint_adyen_hmac': 'Adyen: Developers › Webhooks › jūsu webhook › Security › HMAC key.',
+  'store.hint_adyen_live_prefix':
+    'Adyen (īstais režīms): Developers › API URLs. Tā ir adreses daļa pirms -checkout-live.',
+  'store.hint_redsys_merchant':
+    'To jums izsniedz banka kopā ar virtuālā POS līgumu; tas redzams arī Redsys administrēšanas portālā.',
+  'store.hint_redsys_terminal':
+    'Redsys administrēšanas portālā blakus tirgotāja kodam. Parasti tas ir 1.',
+  'store.hint_redsys_secret':
+    'Redsys administrēšanas portālā: tirgotāja dati › SHA-256 atslēga. Testa un īstā atslēga atšķiras.',
+  'store.hint_stripe_secret':
+    'Stripe: Developers › API keys › Secret key. Tā sākas ar sk_test_ vai sk_live_.',
+  'store.hint_stripe_webhook':
+    'Stripe: Developers › Webhooks › jūsu galapunkts › Signing secret. Tas sākas ar whsec_.',
   'orders.subtitle': 'Jūsu vietnē veiktie pasūtījumi un pirkumi.',
   'orders.count': {
     zero: '{count} pasūtījumi',

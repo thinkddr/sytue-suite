@@ -178,6 +178,11 @@ func (sa *Sala) repintarCanalAbierto() {
 	if i := slices.IndexFunc(sa.canales, func(c api.RoomsChannel) bool { return c.ID == sa.abierto }); i >= 0 {
 		sa.P.Canal.Cabecera.Canal = sa.canalDe(sa.canales[i])
 		sa.P.Canal.Cabecera.Refresh()
+		// El inicio del historial enseña el tema y el propósito: que no se quede atrás.
+		if h := sa.P.Canal.Historial; h.Inicio != nil {
+			h.Inicio = sa.inicioCanal()
+			h.Refresh()
+		}
 	}
 	sa.P.Refrescar()
 }

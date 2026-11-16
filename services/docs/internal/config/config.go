@@ -14,6 +14,7 @@ import (
 
 	"git.sytue.eu/sytue/one/platform/pkg/config"
 	"git.sytue.eu/sytue/one/platform/pkg/objectstore"
+	"git.sytue.eu/sytue/one/platform/pkg/resourcepg"
 )
 
 // Config es la configuración completa del servicio Docs.
@@ -146,7 +147,9 @@ type Config struct {
 	// DriveInternalSecret es el secreto PROPIO de las dos puertas entre Docs y Drive
 	// de la papelera compartida (Drive mig 0027). Vacío, cada papelera va por su lado.
 	// Origen: SYTUE_DOCS_DRIVE_INTERNAL_SECRET.
-	DriveInternalSecret string
+	DriveInternalSecret   string
+	ResourceSourceSecret  string
+	ResourceSessionSecret string
 
 	// PublicURL es la raíz PÚBLICA de Sytue Docs (https://docs.sytue.eu), la que
 	// ve un navegador. La usa el catálogo WOPI para componer las URL con las que
@@ -220,23 +223,25 @@ func Load() (Config, error) {
 		S3LocalTenants: l.GetCSV("S3_LOCAL_TENANTS"),
 		S3Bucket:       l.GetDefault("S3_BUCKET", "docs-blobs"),
 
-		SnapshotInlineLimit: l.GetIntDefault("SNAPSHOT_INLINE_LIMIT", 256*1024),
-		DragonflyURL:        l.Get("DRAGONFLY_URL"),
-		DragonflyPassword:   l.Get("DRAGONFLY_PASSWORD"),
-		OCRURL:              l.Get("OCR_URL"),
-		OCRTimeout:          l.GetDurationDefault("OCR_TIMEOUT", 90*time.Second),
-		SelloURL:            l.Get("SELLO_URL"),
-		SelloPolitica:       l.Get("SELLO_POLITICA"),
-		SelloUsuario:        l.Get("SELLO_USUARIO"),
-		SelloClave:          l.Get("SELLO_CLAVE"),
-		SelloTimeout:        l.GetDurationDefault("SELLO_TIMEOUT", 20*time.Second),
-		IntegrationsURL:     l.GetDefault("INTEGRATIONS_URL", "http://integrations:8093"),
-		BasesURL:            l.GetDefault("BASES_URL", "http://bases:8102"),
-		DriveURL:            l.GetDefault("DRIVE_URL", "http://drive:8082"),
-		DriveTimeout:        l.GetDurationDefault("DRIVE_TIMEOUT", 15*time.Second),
-		DriveInternalSecret: l.SecretoOpcional(base.Env, "DRIVE_INTERNAL_SECRET", config.DevDocsDriveInternalSecret),
-		PublicURL:           l.GetDefault("PUBLIC_URL", ""),
-		WopiHosts:           splitLista(l.GetDefault("WOPI_ALLOWED_HOSTS", "")),
+		SnapshotInlineLimit:   l.GetIntDefault("SNAPSHOT_INLINE_LIMIT", 256*1024),
+		DragonflyURL:          l.Get("DRAGONFLY_URL"),
+		DragonflyPassword:     l.Get("DRAGONFLY_PASSWORD"),
+		OCRURL:                l.Get("OCR_URL"),
+		OCRTimeout:            l.GetDurationDefault("OCR_TIMEOUT", 90*time.Second),
+		SelloURL:              l.Get("SELLO_URL"),
+		SelloPolitica:         l.Get("SELLO_POLITICA"),
+		SelloUsuario:          l.Get("SELLO_USUARIO"),
+		SelloClave:            l.Get("SELLO_CLAVE"),
+		SelloTimeout:          l.GetDurationDefault("SELLO_TIMEOUT", 20*time.Second),
+		IntegrationsURL:       l.GetDefault("INTEGRATIONS_URL", "http://integrations:8093"),
+		BasesURL:              l.GetDefault("BASES_URL", "http://bases:8102"),
+		DriveURL:              l.GetDefault("DRIVE_URL", "http://drive:8082"),
+		DriveTimeout:          l.GetDurationDefault("DRIVE_TIMEOUT", 15*time.Second),
+		DriveInternalSecret:   l.SecretoOpcional(base.Env, "DRIVE_INTERNAL_SECRET", config.DevDocsDriveInternalSecret),
+		ResourceSourceSecret:  l.Get("RESOURCE_SOURCE_SECRET"),
+		ResourceSessionSecret: l.Get("RESOURCE_SESSION_SECRET"),
+		PublicURL:             l.GetDefault("PUBLIC_URL", ""),
+		WopiHosts:             splitLista(l.GetDefault("WOPI_ALLOWED_HOSTS", "")),
 	}
 
 	// Clave de cifrado de credenciales de conectores (base64 → 32 bytes AES-256).
@@ -268,6 +273,12 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("SYTUE_DOCS_SECRET_ENC_KEY es obligatoria en prod (AES-256)")
 	}
 
+	if (cfg.ResourceSourceSecret == "") != (cfg.ResourceSessionSecret == "") {
+		return Config{}, fmt.Errorf("resource source requires both internal source and session credentials")
+	}
+	if cfg.ResourceSessionSecret != "" && (!resourcepg.ValidSessionServiceSecret(cfg.ResourceSessionSecret) || !resourcepg.ValidSessionServiceSecret(cfg.ResourceSourceSecret)) {
+		return Config{}, fmt.Errorf("resource source credentials must be canonical 64-character hex")
+	}
 	if cfg.EncryptedDocumentCalls && (cfg.RoomsURL == "" || cfg.RoomsCallAccessSecret == "") {
 		return Config{}, fmt.Errorf("encrypted document calls require ROOMS_URL and ROOMS_CALL_ACCESS_SECRET")
 	}

@@ -9,7 +9,7 @@
  */
 import type { JSX } from 'preact';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { Badge, Button, EmptyState, Icon, Illustration, Spinner, cx, useToast } from '@sytue/ui';
+import { Badge, Button, EmptyState, Icon, Spinner, cx, useToast } from '@sytue/ui';
 import type { Locale } from '@sytue/i18n';
 import { formatDate } from '@sytue/i18n';
 import { api, consulta, mensajeDeError } from '../lib/api.js';
@@ -155,7 +155,7 @@ export function Tareas({
         <EmptyState
           title={t('tasks.allDone')}
           description={t('tasks.allDoneHint')}
-          illustration={<Illustration name="emptyCalendar" size={96} />}
+          spot="emptyCalendar"
         />
       ) : (
         grupos.map((g) => (

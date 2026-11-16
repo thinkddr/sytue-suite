@@ -20,10 +20,10 @@ import (
 func TestResolverDireccionesDeOrg(t *testing.T) {
 	st, ctx := newStore(t)
 	st.SetSuiteDomain("sytue.eu")
-	acme := orgConBuzones(t, ctx, st, "acme")
-	globex := orgConBuzones(t, ctx, st, "globex")
+	acme := orgConBuzones(ctx, t, st, "acme")
+	globex := orgConBuzones(ctx, t, st, "globex")
 	miembro := func(org domain.Organization, email, nombre string) domain.User {
-		u := usuarioConNombre(t, ctx, st, email, nombre, "Prueba")
+		u := usuarioConNombre(ctx, t, st, email, nombre, "Prueba")
 		if err := st.UpsertMembership(ctx, nil, domain.Membership{OrgID: org.ID, UserID: u.ID, Role: domain.RoleMember}); err != nil {
 			t.Fatal(err)
 		}
@@ -90,11 +90,11 @@ func TestResolverDireccionesDeOrg(t *testing.T) {
 func TestDuenosGlobales(t *testing.T) {
 	st, ctx := newStore(t)
 	st.SetSuiteDomain("sytue.eu")
-	acme := orgConBuzones(t, ctx, st, "acme")
-	globex := orgConBuzones(t, ctx, st, "globex")
-	initech := orgConBuzones(t, ctx, st, "initech")
+	acme := orgConBuzones(ctx, t, st, "acme")
+	globex := orgConBuzones(ctx, t, st, "globex")
+	initech := orgConBuzones(ctx, t, st, "initech")
 	miembro := func(org domain.Organization, email, nombre string) domain.User {
-		u := usuarioConNombre(t, ctx, st, email, nombre, "Global")
+		u := usuarioConNombre(ctx, t, st, email, nombre, "Global")
 		if err := st.UpsertMembership(ctx, nil, domain.Membership{OrgID: org.ID, UserID: u.ID, Role: domain.RoleMember}); err != nil {
 			t.Fatal(err)
 		}
@@ -145,7 +145,7 @@ func TestDuenosGlobales(t *testing.T) {
 
 	// Alguien que se da de alta con el buzón de Zoe como correo de entrar, sin
 	// verificarlo, no la deja sin avisos (no vuelve ambigua su dirección).
-	intruso := usuarioConNombre(t, ctx, st, "intruso@personal.example", "Intruso", "Global")
+	intruso := usuarioConNombre(ctx, t, st, "intruso@personal.example", "Intruso", "Global")
 	if _, err := st.DB().Exec(ctx, `UPDATE users SET email = $1, email_verified = false WHERE id = $2`, buzonZoe, intruso.ID); err != nil {
 		t.Fatal(err)
 	}

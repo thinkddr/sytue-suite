@@ -81,7 +81,7 @@ const (
 )
 
 // Los anchos MÁXIMOS de `sizes` en Modal.tsx. Van en px literales en la hoja
-// (`max-w-[400px]`), así que el rem de 14 no los toca. Por debajo de eso el panel es
+// (`max-w-[400px]`), así que el rem no los toca. Por debajo de eso el panel es
 // `w-full`.
 var anchosDialogo = [...]float32{
 	DialogoMD: 560,
@@ -836,6 +836,11 @@ func (d *Dialogo) Cerrar() {
 		detenerSeguimientoTeclado(c)
 	}
 }
+
+// Abierto dice si el diálogo está a la vista. Lo necesita quien lo abre con una tecla y
+// la recibe por otro sitio (la ventana del moderador de Diapos): mientras está abierto,
+// esa tecla lo cierra en vez de hacer lo suyo.
+func (d *Dialogo) Abierto() bool { return d.capa != nil }
 
 // Recolocar vuelve a medir el diálogo abierto y a centrarlo cuando su cuerpo cambia de
 // alto —una fila más, la línea de un error—: en la web lo hace el navegador, porque el

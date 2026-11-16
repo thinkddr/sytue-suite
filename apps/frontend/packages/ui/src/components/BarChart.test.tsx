@@ -97,3 +97,41 @@ test('una serie vacía dice que está vacía en vez de pintar un lienzo en blanc
   expect(host.querySelector('svg')).toBeNull();
   expect(host.textContent).toContain('Sin datos');
 });
+
+test('con rótulos de eje pinta uno bajo cada barra, sin anunciarlos dos veces', () => {
+  const host = mount(
+    <BarChart
+      points={[
+        { label: 'octubre de 2026', axisLabel: 'oct', value: 5 },
+        { label: 'noviembre de 2026', axisLabel: 'nov', value: 0 },
+      ]}
+      seriesLabel="facturación"
+    />,
+  );
+  const eje = host.querySelector('[data-bar-chart-axis]');
+  expect(eje?.getAttribute('aria-hidden')).toBe('true');
+  expect(Array.from(eje?.children ?? []).map((c) => c.textContent)).toEqual(['oct', 'nov']);
+  // El rótulo largo sigue en la tabla accesible.
+  expect(host.querySelector('tbody th')?.textContent).toBe('octubre de 2026');
+});
+
+test('sin rótulos de eje no hay fila de rótulos', () => {
+  const host = mount(<BarChart points={[{ label: 'a', value: 1 }]} seriesLabel="visitas" />);
+  expect(host.querySelector('[data-bar-chart-axis]')).toBeNull();
+});
+
+test('formatValue escribe los valores en la descripción, el título y la tabla', () => {
+  const host = mount(
+    <BarChart
+      points={[
+        { label: 'oct', value: 1.5 },
+        { label: 'nov', value: 2 },
+      ]}
+      seriesLabel="facturación"
+      formatValue={(v) => `${v.toFixed(2)} €`}
+    />,
+  );
+  expect(host.querySelector('svg')?.getAttribute('aria-label')).toBe('facturación: 3.50 €');
+  expect(host.querySelector('rect title')?.textContent).toBe('oct · 1.50 € facturación');
+  expect(host.querySelector('tbody td')?.textContent).toBe('1.50 €');
+});

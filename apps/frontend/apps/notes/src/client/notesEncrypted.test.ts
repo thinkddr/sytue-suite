@@ -26,6 +26,78 @@ function nota(extra: Partial<Note> = {}): Note {
     ...extra,
   };
 }
+test('v2 edits and migration refuse existing v3 links without changing their original', async () => {
+  const { key, params } = await nuevosParametros('test password');
+  const links = '[{"target_kind":"doc","target_id":"id","future":9007199254740993}]';
+  for (const links_json of [undefined, '[]', links]) {
+    const cipher = await empaquetar(key, {
+      title: 'before',
+      content: 'body',
+      ...(links_json === undefined ? {} : { links_json }),
+    });
+    const original = nota({ content_cipher: cipher, data: { client_id: 'capture' } });
+    const { claro } = await abrirContenidoNota(key, original);
+    const edit = cifrarContenidoNota(
+      key,
+      { data: claro.data ?? {} },
+      'after',
+      claro.content,
+      claro,
+    );
+    if (links_json === undefined) {
+      expect((await desempaquetar(key, (await edit).content_cipher!))?.links_json).toBeUndefined();
+    } else {
+      await expect(edit).rejects.toThrow();
+      expect((await desempaquetar(key, cipher))?.links_json).toBe(links_json);
+    }
+
+    const legacy = nota({ ...original, title: 'legacy title', data: {}, data_json: '{}' });
+    const writes: NoteCipherMigration[] = [];
+    const migration = migrarNotasCifradas(key, params, {
+      list: async () => [legacy],
+      current: () => true,
+      accept: () => {},
+      save: async (id, input) => {
+        writes.push(input);
+        return nota({ id });
+      },
+    });
+    if (links_json === undefined) {
+      await migration;
+      expect(writes).toHaveLength(1);
+      expect((await desempaquetar(key, writes[0]!.content_cipher))?.links_json).toBeUndefined();
+    } else {
+      await expect(migration).rejects.toThrow();
+      expect(writes).toHaveLength(0);
+    }
+  }
+});
+test('encrypted v2 refuses clear links before producing a request or accepting migration', async () => {
+  const { key, params } = await nuevosParametros('test password');
+  const links = [
+    { target_kind: 'docs_document' as const, target_id: 'private-id', label: 'secret' },
+  ];
+  await expect(cifrarContenidoNota(key, { links }, 'title', 'body')).rejects.toThrow();
+  const cipher = await empaquetar(key, { title: 'title', content: 'body' });
+  const original = nota({ content_cipher: cipher, data: {}, links });
+  const writes: NoteCipherMigration[] = [];
+  await expect(
+    migrarNotasCifradas(key, params, {
+      list: async () => [original],
+      current: () => true,
+      accept: () => {
+        throw new Error('accepted an unsafe migration');
+      },
+      save: async (id, input) => {
+        writes.push(input);
+        return nota({ id });
+      },
+    }),
+  ).rejects.toThrow();
+  expect(writes).toHaveLength(0);
+  expect(original.links).toEqual(links);
+  expect(original.content_cipher).toBe(cipher);
+});
 test('create/edit encrypt every auxiliary field, restore attachments and leave only opaque controls', async () => {
   const { key } = await nuevosParametros('test password');
   const data = {

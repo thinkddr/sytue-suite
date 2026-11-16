@@ -167,11 +167,21 @@ func (s *Store) RepetirAlCompletar(ctx context.Context, noteID uuid.UUID, ahora 
 	t := tenancy.MustFrom(ctx)
 	var nueva *domain.Note
 	err := s.inWriteTx(ctx, func(tx pgx.Tx) error {
+		if err := lockNoteTree(ctx, tx, t.Slug); err != nil {
+			return err
+		}
+		book, _, err := lockRecurrenceNotebooks(ctx, tx, t.Slug, noteID, false)
+		if err != nil {
+			return err
+		}
+		if book == uuid.Nil {
+			return nil
+		}
 		var ya bool
 		e := tx.QueryRow(ctx, `
 			SELECT COALESCE(data ? 'repeated_into', false) FROM notes
-			 WHERE tenant = $1 AND id = $2 AND kind = 'todo' AND checked AND deleted_at IS NULL
-			   FOR UPDATE`, t.Slug, noteID).Scan(&ya)
+			 WHERE tenant = $1 AND id = $2 AND notebook_id=$3 AND kind = 'todo' AND checked AND deleted_at IS NULL
+			   FOR UPDATE`, t.Slug, noteID, book).Scan(&ya)
 		if isNoRows(e) || ya {
 			return nil
 		}
@@ -200,6 +210,62 @@ func (s *Store) RepetirAlCompletar(ctx context.Context, noteID uuid.UUID, ahora 
 		return err
 	})
 	return nueva, err
+}
+
+// Call after lockNoteTree and before locking either note. Undo may refer to a
+// copy in another notebook; both notebooks are locked in a deterministic order.
+// The caller rechecks the note and reference after waiting for these locks.
+func lockRecurrenceNotebooks(ctx context.Context, tx pgx.Tx, tenant string, noteID uuid.UUID, includeCopy bool) (uuid.UUID, *uuid.UUID, error) {
+	var book uuid.UUID
+	var copyID *uuid.UUID
+	err := tx.QueryRow(ctx, `SELECT notebook_id,CASE WHEN $3 THEN (data->>'repeated_into')::uuid END
+		FROM notes WHERE tenant=$1 AND id=$2 AND deleted_at IS NULL`, tenant, noteID, includeCopy).Scan(&book, &copyID)
+	if isNoRows(err) {
+		return uuid.Nil, nil, nil
+	}
+	if err != nil {
+		return uuid.Nil, nil, err
+	}
+	books := []uuid.UUID{book}
+	var copyBook uuid.UUID
+	copyFound := false
+	if copyID != nil {
+		err := tx.QueryRow(ctx, `SELECT notebook_id FROM notes WHERE tenant=$1 AND id=$2`, tenant, *copyID).Scan(&copyBook)
+		if err != nil && !isNoRows(err) {
+			return uuid.Nil, nil, err
+		}
+		copyFound = err == nil
+		if copyFound && copyBook != book {
+			books = append(books, copyBook)
+		}
+	}
+	rows, err := tx.Query(ctx, `SELECT id FROM notebooks /* notes_recurrence_lock_books */ WHERE tenant=$1 AND id=ANY($2::uuid[]) ORDER BY id FOR UPDATE`, tenant, books)
+	if err != nil {
+		return uuid.Nil, nil, err
+	}
+	count := 0
+	for rows.Next() {
+		count++
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return uuid.Nil, nil, err
+	}
+	if count != len(books) {
+		return uuid.Nil, nil, domain.ErrNotFound
+	}
+	if copyID != nil {
+		var current uuid.UUID
+		err := tx.QueryRow(ctx, `SELECT notebook_id FROM notes WHERE tenant=$1 AND id=$2`, tenant, *copyID).Scan(&current)
+		if err != nil && !isNoRows(err) {
+			return uuid.Nil, nil, err
+		}
+		if (err == nil) != copyFound || copyFound && current != copyBook {
+			return uuid.Nil, nil, domain.ErrNoteChanged
+		}
+	}
+	return book, copyID, nil
 }
 
 // mudanza es un recordatorio que repite, ya con su próximo vencimiento, y si su dueña
@@ -291,16 +357,32 @@ func (s *Store) DeshacerRepeticion(ctx context.Context, noteID uuid.UUID) (*uuid
 	t := tenancy.MustFrom(ctx)
 	var retirada *uuid.UUID
 	err := s.inWriteTx(ctx, func(tx pgx.Tx) error {
+		if err := lockNoteTree(ctx, tx, t.Slug); err != nil {
+			return err
+		}
+		book, capturedCopy, err := lockRecurrenceNotebooks(ctx, tx, t.Slug, noteID, true)
+		if err != nil {
+			return err
+		}
+		if book == uuid.Nil {
+			return nil
+		}
 		var copia *uuid.UUID
 		e := tx.QueryRow(ctx, `
 			SELECT (data ->> 'repeated_into')::uuid FROM notes
-			 WHERE tenant = $1 AND id = $2 AND NOT checked AND deleted_at IS NULL
-			   FOR UPDATE`, t.Slug, noteID).Scan(&copia)
-		if isNoRows(e) || (e == nil && copia == nil) {
+			 WHERE tenant = $1 AND id = $2 AND notebook_id=$3 AND NOT checked AND deleted_at IS NULL
+			   FOR UPDATE`, t.Slug, noteID, book).Scan(&copia)
+		if isNoRows(e) {
 			return nil
 		}
 		if e != nil {
 			return e
+		}
+		if !mismoID(copia, capturedCopy) {
+			return domain.ErrNoteChanged
+		}
+		if copia == nil {
+			return nil
 		}
 		if _, err := tx.Exec(ctx, `UPDATE notes SET data = data - 'repeated_into' WHERE tenant = $1 AND id = $2`,
 			t.Slug, noteID); err != nil {
@@ -380,6 +462,9 @@ func (s *Store) ReclamarRecordatorios(ctx context.Context, ahora time.Time, limi
 			  JOIN notes n ON n.id = r.note_id
 			  JOIN notebooks nb ON nb.id = n.notebook_id
 			 WHERE r.fired_at IS NULL AND r.due_at <= $1
+ AND NOT sytue_private_storage_frozen('notes_private_storage_states'::regclass,r.tenant,r.owner_sub)
+ AND NOT sytue_private_storage_frozen('notes_private_storage_states'::regclass,n.tenant,n.owner_sub)
+ AND NOT sytue_private_storage_frozen('notes_private_storage_states'::regclass,nb.tenant,nb.owner_sub)
 			 ORDER BY r.due_at
 			 LIMIT $2
 			   FOR UPDATE OF r SKIP LOCKED`, ahora, limite)

@@ -145,6 +145,7 @@ export function SitiosApp({ locale, user, hubBaseUrl }: Props): JSX.Element {
           </div>
         ) : errorCarga ? (
           <EmptyState
+            tone="error"
             title={t('sites.load_error')}
             description={t('sites.load_error_help')}
             action={

@@ -55,6 +55,9 @@ type RoomsSend struct {
 	Priority    string     `json:"priority,omitempty"`
 	RequiresAck bool       `json:"requires_ack,omitempty"`
 	Card        *RoomsCard `json:"card,omitempty"`
+	// AlsoInChannel («También enviar al canal») solo cuenta en una respuesta: se ve
+	// además en el feed del canal.
+	AlsoInChannel bool `json:"also_in_channel,omitempty"`
 }
 
 // envio es el cuerpo de POST …/messages y …/replies.
@@ -82,6 +85,15 @@ func (r *Rooms) ReplyWith(ctx context.Context, raiz, texto string, o RoomsSend) 
 func (r *Rooms) Schedule(ctx context.Context, canal, texto string, fileIDs []string, cuando time.Time) (RoomsScheduled, error) {
 	return PostJSON[RoomsScheduled](ctx, r.c, "/channels/"+url.PathEscape(canal)+"/messages", envio{
 		Body: texto, RoomsSend: RoomsSend{FileIDs: fileIDs}, SendAt: cuando.UTC().Format(time.RFC3339Nano),
+	})
+}
+
+// ScheduleReply programa una respuesta en el hilo de `raiz` para `cuando`: el POST de
+// …/replies con `send_at`. Con `alCanal` («También enviar al canal») la respuesta se
+// publica, al vencer, también en el feed del canal.
+func (r *Rooms) ScheduleReply(ctx context.Context, raiz, texto string, fileIDs []string, cuando time.Time, alCanal bool) (RoomsScheduled, error) {
+	return PostJSON[RoomsScheduled](ctx, r.c, "/messages/"+url.PathEscape(raiz)+"/replies", envio{
+		Body: texto, RoomsSend: RoomsSend{FileIDs: fileIDs, AlsoInChannel: alCanal}, SendAt: cuando.UTC().Format(time.RFC3339Nano),
 	})
 }
 

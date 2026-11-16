@@ -21,8 +21,8 @@ import (
 )
 
 // TestSoloSinPermisoEsElCandado: un 403 con `sin_permiso` es el candado de «No tienes
-// acceso»; otro 403 es un fallo con el mensaje del servicio en la banda, que es
-// `esSinPermiso` de la web.
+// acceso»; otro 403 es un fallo con su motivo, traducido por el código, en la banda,
+// que es `esSinPermiso` de la web.
 //
 // VISTO EN ROJO (frontal, 2026-09-23): leyendo todo 403 como `Prohibida`, el de una
 // organización personal salía con el candado y sin decir por qué.
@@ -32,9 +32,9 @@ func TestSoloSinPermisoEsElCandado(t *testing.T) {
 	if f, aviso := FaseDeLista(sin, true, 0, tr); f != Prohibida || aviso != "" {
 		t.Errorf("sin_permiso: %v, %q; quiero el candado y sin banda", f, aviso)
 	}
-	otro := &api.Error{Status: http.StatusForbidden, Body: `{"error":{"code":"org_personal","message":"Personal accounts do not have an ERP."}}`}
-	if f, aviso := FaseDeLista(otro, true, 0, tr); f != Fallo || aviso != "Personal accounts do not have an ERP." {
-		t.Errorf("otro 403: %v, %q; quiero un fallo con el mensaje del servicio", f, aviso)
+	otro := &api.Error{Status: http.StatusForbidden, Body: `{"error":{"code":"forbidden","message":"You do not have permission to perform this action."}}`}
+	if f, aviso := FaseDeLista(otro, true, 0, tr); f != Fallo || aviso != tr.T("error.code.forbidden", nil) {
+		t.Errorf("otro 403: %v, %q; quiero un fallo con su motivo traducido", f, aviso)
 	}
 	if f, _ := FaseDeLista(errors.New("corte"), true, 0, tr); f != Fallo {
 		t.Errorf("un corte: %v", f)
@@ -63,7 +63,7 @@ func TestElSelectorDelLoteMideLoDeLaWeb(t *testing.T) {
 // VISTO EN ROJO (frontal, 2026-09-23): con el `Refresh` vacío de antes, el borde se
 // queda en `border` con el puntero encima.
 func TestLasTarjetasDeLaPortadaCambianDeBordeAlPasar(t *testing.T) {
-	o, _ := tarjetaKPI(tema.Claro, "Ventas", "4406,96 €", "Facturas", "", ui.InsigniaNeutra, 300, func() {})
+	o, _ := tarjetaKPI(tema.Claro, "Ventas", "4406,96 €", "Facturas", "", ui.InsigniaNeutra, 300, func() {}, false)
 	p, ok := o.(*PulsableCon)
 	if !ok || p.caja == nil {
 		t.Fatal("la tarjeta del resumen no lleva la caja de su fondo")

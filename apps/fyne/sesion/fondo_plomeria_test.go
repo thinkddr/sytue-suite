@@ -165,7 +165,9 @@ func permitidoAntesDeLaEscena(metodo string) bool {
 		"Montar", "Objeto", "Atajos", "Avisos", "Desplazable", "ClaveTitulo",
 		"CederAtajoSi", "CallarAvisosSi",
 		// enganches de cada producto, sin red: guardan lo que se les da
-		"Portada", "PonerAbrir", "ImportarAlAbrir", "Conexion", "CambiarSesion":
+		"Portada", "PonerAbrir", "ImportarAlAbrir", "Conexion", "CambiarSesion",
+		// la bandeja del Hub: lee lo ya cargado y apunta receptores; Refresh repinta el menú
+		"AccesosBandeja", "RecientesBandeja", "AlCambiarHoy", "AlCambiarSinLeer", "Refresh":
 		return true
 	}
 	// Con y Con…: las opciones de la vista del Hub y de la barra (ConDrive, ConCuenta…),

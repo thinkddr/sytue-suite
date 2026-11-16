@@ -77,7 +77,7 @@ func TestMessagesAroundWindow(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
-	_, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	_, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 
 	// 7 mensajes con created_at distintos (sleep breve garantiza el orden por keyset).
 	ids := make([]domain.Message, 0, 7)
@@ -131,7 +131,7 @@ func TestDMReceiptsAggregated(t *testing.T) {
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
 
-	tm, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	tm, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 	if err := st.AddTeamMember(ctx, tm.ID, "alice", "bob", "Bob", domain.RoleMember); err != nil {
 		t.Fatalf("AddTeamMember: %v", err)
 	}
@@ -191,7 +191,7 @@ func TestMessagesAroundResuelveUnaRespuestaPorSuRaiz(t *testing.T) {
 	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
 	st := store.New(h.Pool, nil)
 	ctx := tenantCtx("acme")
-	_, ch := seedTeamChannel(t, ctx, st, "alice", domain.ChannelPublic)
+	_, ch := seedTeamChannel(ctx, t, st, "alice", domain.ChannelPublic)
 
 	raiz, err := st.CreateMessage(ctx, store.NewMessageRecord{
 		ChannelID: ch.ID, AuthorSub: "alice", AuthorName: "Alice", Body: "arranca el hilo",

@@ -3,6 +3,11 @@
 
 //go:build darwin && !ios && !tienda
 
+// gocritic lee este fichero ya pasado por cgo y da avisos de otro código («dupImport»
+// de `C` y `unsafe`, «uncheckedInlineErr» de líneas desplazadas): se silencia en el
+// fichero, y el resto de linters sí lo miran.
+//
+//nolint:gocritic // cgo: los avisos no son de este fichero, ver arriba
 package auth
 
 /*
@@ -26,7 +31,7 @@ var puedeCompartirApple = sync.OnceValue(func() bool {
 })
 
 func cuentaCompartida(cuenta string) bool {
-	return enGrupoSuite(cuenta) && puedeCompartirApple()
+	return (enGrupoSuite(cuenta) || cuentaRecuperacionAlmacen(cuenta)) && puedeCompartirApple()
 }
 
 func cargarCuentaCompartida(cuenta string) (Tokens, error) {
@@ -50,7 +55,7 @@ func guardarCuentaCompartida(cuenta string, t Tokens) error {
 
 func leerSecretoCompartido(cuenta string) ([]byte, error) {
 	datos, err := leerDatosApple(cuenta, ajustes.GrupoSuite)
-	if err != nil || datos != nil {
+	if cuenta != CuentaBloqueo || err != nil || datos != nil {
 		return datos, err
 	}
 	// Conservar el testigo anterior de bloqueo después de actualizar el DMG.

@@ -10,6 +10,7 @@
 // Para VERLA hace falta una máquina con pantalla; el piloto no la tiene. Lo que sí
 // corre en cualquier sitio, sin CGO y sin servidor gráfico, es `go test ./editor/...`,
 // que pinta lo mismo con el pintor de software y compara los píxeles.
+// paridad-web: apps/frontend/apps/docus/src/pages/auth/matrix/callback.astro
 package main
 
 // La portada y la papelera son las de `editor` (portada.go, papelera.go), compartidas por
@@ -30,6 +31,7 @@ import (
 	"fyne.io/fyne/v2/app"
 
 	"git.sytue.eu/sytue/one/apps/fyne/catalogos"
+	"git.sytue.eu/sytue/one/apps/fyne/cifrado"
 	"git.sytue.eu/sytue/one/apps/fyne/editor"
 	"git.sytue.eu/sytue/one/apps/fyne/editor/docus"
 	"git.sytue.eu/sytue/one/apps/fyne/iconos"
@@ -40,6 +42,8 @@ import (
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	mx "git.sytue.eu/sytue/one/apps/nucleo/matrix"
+	"git.sytue.eu/sytue/one/apps/nucleo/office"
 )
 
 func main() {
@@ -49,6 +53,8 @@ func main() {
 	// La sesión, la apariencia y el idioma son TRANSVERSALES a las trece apps: esto lo
 	// lee de donde lo dejó la última que lo tocó. `Abrir` no habla con la red.
 	s := sesion.Abrir(a, "")
+	// Las macros grabadas son de quien ha entrado, como en la web (una clave por `sub`).
+	editor.Personal = s.PorPersona()
 	// El cromo «papel» de toda la suite (ADR 0080). Aquí y no en `sesion.Abrir`: las
 	// pruebas que abren sesión comprueban también el cromo de color.
 	tema.ElegirCromo(tema.CromoPapel)
@@ -66,10 +72,22 @@ func main() {
 	// título, como Calcus y Diapos. Antes decía «Edit — Sytue Docus» también en la portada.
 	w := a.NewWindow(a.Metadata().Name)
 	w.SetPadded(false)
-	// La portada y el editor hablan con el servicio con la sesión TRANSVERSAL: sin
-	// sesión, la portada lo dice y ofrece entrar; no se abre el navegador por sorpresa.
-	docs := api.NewDocs(s.URL("docs"), s.Sesion, s.ClienteConAviso(nil))
+	// La portada y el editor hablan con el repositorio privado cifrado; nunca se
+	// entrega un cliente HTTP en claro a la vista.
+	docs := api.NewPrivateDocs()
 	d := docus.NuevaApp(tr.T, tr.Locale(), docs)
+	setDocsClient := func(client *api.Docs) {
+		if client == nil {
+			client = api.NewPrivateDocs()
+		}
+		d.Svc = client
+		if p := d.Portada(); p != nil {
+			p.Svc = client
+		}
+		if d.AbrirArchivo != nil {
+			d.AbrirArchivo.Svc = client
+		}
+	}
 	d.Ventana = w                  // «Pantalla completa» de Vista
 	d.Reclamos = s.Sesion.Reclamos // quién firma las marcas del control de cambios
 	// Lo que copia «Compartir»: la página del documento en la web y la de un enlace
@@ -99,18 +117,44 @@ func main() {
 			}
 		}()
 	}
-	// Entrar o salir desde el menú de cuenta de ESTA o de otra app recarga la lista.
-	dentro := s.Estado().Dentro()
-	s.AlCambiar(func(e sesion.Estado) {
-		if e.Dentro() != dentro {
-			dentro = e.Dentro()
+	private, err := cifrado.NewPrivateApplication(cifrado.PrivateApplicationConfig[*office.Repository]{
+		Suite:       s,
+		Application: a,
+		Window:      w,
+		Product:     "docs",
+		Translate:   func(key string) string { return tr.T(key, nil) },
+		Build: func(ctx context.Context, resources *cifrado.Resources[*mx.Client]) (cifrado.ApplicationPlan[*office.Repository], error) {
+			return docusPlan(ctx, resources, s)
+		},
+		//nolint:contextcheck // The presenter retains its own mounted lifetime, not this short mount request.
+		Mount: func(_ context.Context, resources *cifrado.Resources[*mx.Client], repository *office.Repository) (cifrado.ApplicationView, error) {
+			facade, err := api.NewDocs(s.URL("docs"), resources.HTTP(), nil).WithPrivateData(repository)
+			if err != nil {
+				return cifrado.ApplicationView{}, err
+			}
+			setDocsClient(facade)
 			d.Arrancar()
-		}
+			return cifrado.ApplicationView{
+				Object: d.Objeto(),
+				Detach: func() {
+					setDocsClient(nil)
+				},
+			}, nil
+		},
 	})
-	w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.Docs).ConSinSesionPropia().Montar(d.Objeto()))
+	if err != nil {
+		w.SetContent(ui.NuevoVacio(tr.T("matrix.failed", nil), ""))
+	} else {
+		w.SetContent(ui.NuevaBarraSuite(tr, s, iconos.Docs).ConSinSesionPropia().Montar(private.Objeto()))
+		w.SetOnClosed(private.Close)
+	}
 	w.Resize(fyne.NewSize(1280, 800))
 	// Con interfaz: lanzada por iOS solo para el widget no se pide la portada.
-	s.CuandoHayaEscena(d.Arrancar)
+	s.CuandoHayaEscena(func() {
+		if private != nil {
+			private.Start()
+		}
+	})
 
 	// `sytue-docs:/docus/edit?id=…` es el documento del servicio, el mismo que abre la web:
 	// llega de «Abrir en la aplicación» del editor web, de la búsqueda y de los avisos.

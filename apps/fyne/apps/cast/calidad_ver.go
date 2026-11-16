@@ -222,29 +222,70 @@ func (a *App) medidoVisor(fyne.Size) {
 	})
 }
 
-// menuCalidad abre el menú colgado de su botón: «Automática» (con la que ha elegido) y
-// las calidades, con un tic en la elegida.
+// menuCalidad abre el menú de ajustes colgado de su botón: «Automática» (con la que
+// ha elegido) y las calidades si hay más de una, y después las velocidades, cada
+// sección con un tic en la elegida. La web tiene dos botones; aquí van en uno, el del
+// engranaje, que es donde los busca quien viene de cualquier otro reproductor.
 func (a *App) menuCalidad(disparador fyne.CanvasObject) {
 	qs := a.calidadesVer()
-	if len(qs) == 0 {
+	elementos := []fyne.CanvasObject{}
+	if len(qs) > 1 {
+		auto := a.v.Traduce("player.qualityAuto")
+		if a.ver.calidad == 0 && a.ver.enUso > 0 {
+			auto = a.v.Traduce("player.qualityAutoNow", i18n.Vars{"quality": Etiqueta(a.ver.enUso)})
+		}
+		e := ui.NuevoElementoMenu(auto, 0, func() { a.elegirCalidad(0) })
+		e.Marcada = a.ver.calidad == 0
+		elementos = append(elementos, e, ui.NuevoSeparadorMenu())
+		for _, q := range qs {
+			e := ui.NuevoElementoMenu(Etiqueta(q), 0, func() { a.elegirCalidad(q) })
+			e.Marcada = a.ver.calidad == q
+			elementos = append(elementos, e)
+		}
+	}
+	rotulo := a.v.Traduce("player.quality")
+	if r := a.deVer(); r != nil {
+		if len(elementos) > 0 {
+			elementos = append(elementos, ui.NuevoSeparadorMenu())
+		} else {
+			rotulo = a.v.Traduce("player.speed")
+		}
+		actual := r.Velocidad()
+		for _, v := range video.Velocidades {
+			e := ui.NuevoElementoMenu(a.textoVelocidad(v), 0, func() { a.elegirVelocidad(v) })
+			e.Rotulo = a.v.Traduce("player.speedNow", i18n.Vars{"rate": a.velocidadX(v)})
+			e.Marcada = actual == v
+			elementos = append(elementos, e)
+		}
+	}
+	if len(elementos) == 0 {
 		return
 	}
-	auto := a.v.Traduce("player.qualityAuto")
-	if a.ver.calidad == 0 && a.ver.enUso > 0 {
-		auto = a.v.Traduce("player.qualityAutoNow", i18n.Vars{"quality": Etiqueta(a.ver.enUso)})
-	}
-	elementos := []fyne.CanvasObject{}
-	e := ui.NuevoElementoMenu(auto, 0, func() { a.elegirCalidad(0) })
-	e.Marcada = a.ver.calidad == 0
-	elementos = append(elementos, e, ui.NuevoSeparadorMenu())
-	for _, q := range qs {
-		e := ui.NuevoElementoMenu(Etiqueta(q), 0, func() { a.elegirCalidad(q) })
-		e.Marcada = a.ver.calidad == q
-		elementos = append(elementos, e)
-	}
 	m := ui.NuevoMenu(elementos...)
-	m.Rotulo, m.Arriba = a.v.Traduce("player.quality"), true
+	m.Rotulo, m.Arriba = rotulo, true
 	m.Mostrar(disparador)
+}
+
+// velocidadX es «1,5×» en el idioma de la interfaz.
+func (a *App) velocidadX(v float64) string { return i18n.FormatNumber(a.v.T.Locale(), v) + "×" }
+
+// textoVelocidad es lo que pone el menú: «1,5×», y la normal con su nombre.
+func (a *App) textoVelocidad(v float64) string {
+	if v == 1 {
+		return a.v.Traduce("player.speedNormal")
+	}
+	return a.velocidadX(v)
+}
+
+// elegirVelocidad la pone en el reproductor del vídeo que se ve (el cambio de calidad
+// la conserva: relevar). El tic del menú y la duración ya la dicen: sin aviso, que a
+// cada pulsación sería ruido.
+func (a *App) elegirVelocidad(v float64) {
+	r := a.deVer()
+	if r == nil {
+		return
+	}
+	r.PonerVelocidad(v)
 }
 
 // elegirCalidad es lo que hace el menú: una calidad fija, o 0 para «Automática».
@@ -314,6 +355,7 @@ func (a *App) relevar(viejo *video.Reproductor, f *fuenteMedida, r *video.Reprod
 		vol = a.visor.volumen
 	}
 	r.Volumen(vol)
+	r.PonerVelocidad(viejo.Velocidad())
 	// El viejo se cierra ANTES de que el nuevo abra la tarjeta de sonido: dos a la vez
 	// sonarían encima el uno del otro un instante.
 	viejo.Cerrar()

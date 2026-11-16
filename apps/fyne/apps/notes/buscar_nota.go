@@ -4,6 +4,7 @@
 package notes
 
 import (
+	"image/color"
 	"strconv"
 
 	"fyne.io/fyne/v2"
@@ -23,9 +24,10 @@ import (
 // coincidencia en la que estaba. Con la regla de búsqueda de la suite: sin acentos ni
 // mayúsculas.
 //
-// La coincidencia actual se enseña como SELECCIÓN del cuerpo (que se pinta aunque el foco
-// esté en la caja); la web pinta además las demás con la API de resaltados de CSS.
-// ponytail: aquí solo se ve la actual; pintar todas pide un velo más en zonaRenderer.
+// Todas las coincidencias se pintan con un velo detrás del texto, como los `::highlight`
+// de la web (styles/app.css): el amarillo del `<mark>` para todas y uno más subido para
+// la actual. La actual es además la SELECCIÓN del cuerpo (lo que queda al cerrar), pero
+// mientras la barra está abierta no se tiñe encima: el velo ya la destaca, como en la web.
 
 type buscadorNota struct {
 	campo    *ui.Entrada
@@ -35,6 +37,21 @@ type buscadorNota struct {
 	barra    *fyne.Container
 	hallados [][2]Pos
 	i        int
+}
+
+// El tono de la coincidencia actual, que la hoja escribe a mano como el del `<mark>`
+// (prosa.go): `::highlight(sytue-buscar-actual)` en los dos temas.
+var (
+	buscarActualClaro  = color.NRGBA{R: 0xf5, G: 0xc4, B: 0x6b, A: 0xff}
+	buscarActualOscuro = color.NRGBA{R: 0xa3, G: 0x6a, B: 0x00, A: 0xff}
+)
+
+// coloresBuscar son el velo de todas las coincidencias y el de la actual.
+func coloresBuscar(v tema.Variante) (todas, actual color.NRGBA) {
+	if v == tema.Oscuro {
+		return resaltadoOscuro, buscarActualOscuro
+	}
+	return resaltadoClaro, buscarActualClaro
 }
 
 // coincidenciasDoc son las de q en el documento, en orden, bloque a bloque.
@@ -122,14 +139,7 @@ func (e *EditorNota) buscarEnNota(q string, i int) {
 		b.i = ((i % n) + n) % n
 		e.ancla, e.cur = b.hallados[b.i][0], b.hallados[b.i][1]
 	}
-	switch {
-	case n > 0:
-		b.cuenta.Text = e.tr.T("find.count", i18n.Vars{"current": strconv.Itoa(b.i + 1), "total": strconv.Itoa(n)})
-	case q != "":
-		b.cuenta.Text = e.tr.T("find.none", nil)
-	default:
-		b.cuenta.Text = ""
-	}
+	b.cuenta.Text = e.textoCuenta(q)
 	b.cuenta.Refresh()
 	b.barra.Refresh()
 	e.repintar()
@@ -137,6 +147,77 @@ func (e *EditorNota) buscarEnNota(q string, i int) {
 		_, arriba, alto := e.zona.cajaCursor()
 		e.AlMoverCursor(PYZonaEd+arriba, alto)
 	}
+}
+
+// rehacerHallados vuelve a buscar tras un cambio en el cuerpo con la barra abierta, para
+// que los velos sigan al texto; no mueve la selección (se está escribiendo).
+func (e *EditorNota) rehacerHallados() {
+	b := e.buscador
+	if b == nil {
+		return
+	}
+	q := b.campo.Texto()
+	b.hallados = coincidenciasDoc(e.doc, q)
+	b.i = min(b.i, max(len(b.hallados)-1, 0))
+	b.cuenta.Text = e.textoCuenta(q)
+	b.cuenta.Refresh()
+}
+
+// textoCuenta es «2 de 5», «Sin resultados» o nada si la caja está vacía.
+func (e *EditorNota) textoCuenta(q string) string {
+	b := e.buscador
+	switch n := len(b.hallados); {
+	case n > 0:
+		return e.tr.T("find.count", i18n.Vars{"current": strconv.Itoa(b.i + 1), "total": strconv.Itoa(n)})
+	case q != "":
+		return e.tr.T("find.none", nil)
+	default:
+		return ""
+	}
+}
+
+// actualSeleccionada dice si lo seleccionado es justo la coincidencia actual: entonces
+// no se tiñe de selección y se ve el velo de la actual.
+func (e *EditorNota) actualSeleccionada() bool {
+	b := e.buscador
+	if b == nil || len(b.hallados) == 0 {
+		return false
+	}
+	a, z := e.seleccion()
+	return a == b.hallados[b.i][0] && z == b.hallados[b.i][1]
+}
+
+// velosBuscar son los velos de las coincidencias, detrás del texto y de la selección.
+// Se reparten por bloque para recorrer las líneas una sola vez aunque la nota sea larga
+// y la búsqueda corta (una letra puede dar cientos).
+func (r *zonaRenderer) velosBuscar(v tema.Variante) []fyne.CanvasObject {
+	b := r.z.e.buscador
+	if b == nil || len(b.hallados) == 0 {
+		return nil
+	}
+	todas, actual := coloresBuscar(v)
+	porBloque := map[int][]int{}
+	for k, h := range b.hallados {
+		porBloque[h[0].B] = append(porBloque[h[0].B], k)
+	}
+	var out, delante []fyne.CanvasObject
+	for _, l := range r.z.maq.Lineas {
+		for _, k := range porBloque[l.Bloque] {
+			h := b.hallados[k]
+			desde, hasta := max(l.Desde, h[0].O), min(l.Hasta, h[1].O)
+			if hasta <= desde {
+				continue
+			}
+			x0, x1 := l.XDe(desde), l.XDe(hasta)
+			if k == b.i {
+				// La actual va la última para que nada la tape.
+				delante = append(delante, rect(actual, PXZonaEd+x0, PYZonaEd+l.Y, x1-x0, l.Alto, 0))
+				continue
+			}
+			out = append(out, rect(todas, PXZonaEd+x0, PYZonaEd+l.Y, x1-x0, l.Alto, 0))
+		}
+	}
+	return append(out, delante...)
 }
 
 // cerrarBuscador quita la barra y devuelve el foco al cuerpo con la coincidencia

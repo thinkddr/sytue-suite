@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /** Domain records carried INSIDE maintained Matrix encryption. No cipher or key exchange lives here. */
-import { isStorageProduct, type MatrixReference, type MatrixStorageScope } from './types.js';
+import { type MatrixReference, type MatrixStorageScope } from './types.js';
+import { isStorageText as text, isMatrixStorageScope } from '@sytue/config/matrix';
+export { isStorageIdentifier as storageIdentifier } from '@sytue/config/matrix';
+import { isStorageIdentifier as storageIdentifier } from '@sytue/config/matrix';
 
 export const maxStorageRecordBytes = 40 << 10;
 export const storageObjectKind = 'org.sytue.object.v1';
@@ -15,6 +18,17 @@ export interface StorageRecord {
   previous?: string[];
   /** Original UTF-8 JSON bytes in standard base64, matching Go []byte. Never parse/re-encode domain numbers. */
   payload: string;
+}
+/** Matrix idempotency is scoped to device and endpoint, not the transaction alone. */
+export interface StoragePublicationTarget {
+  room_id: string;
+  device_id: string;
+}
+export function storagePublicationTarget(value: unknown): StoragePublicationTarget {
+  const input = object(value);
+  const ref = storageReference({ room_id: input.room_id, event_id: '$validation' });
+  if (!text(input.device_id, 255) || /[\0\r\n\t ]/.test(input.device_id)) return fail();
+  return { room_id: ref.room_id, device_id: input.device_id };
 }
 export interface StorageContentPointer {
   kind: 'record' | 'file';
@@ -53,28 +67,9 @@ function object(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 const encoder = new TextEncoder();
-function text(value: unknown, maximum: number): value is string {
-  if (typeof value !== 'string' || value.length === 0 || encoder.encode(value).length > maximum)
-    return false;
-  for (const character of value) {
-    const unit = character.charCodeAt(0);
-    if (character.length === 1 && unit >= 0xd800 && unit <= 0xdfff) return false;
-  }
-  return true;
-}
-export function storageIdentifier(value: unknown): value is string {
-  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value);
-}
 export function storageScope(value: unknown): MatrixStorageScope {
-  const scope = object(value);
-  if (
-    !text(scope.tenant, 63) ||
-    !text(scope.subject, 255) ||
-    !isStorageProduct(scope.product) ||
-    /[\0\r\n\t]/.test(scope.tenant + scope.subject)
-  )
-    return fail();
-  return { tenant: scope.tenant, subject: scope.subject, product: scope.product };
+  if (!isMatrixStorageScope(value)) return fail();
+  return { tenant: value.tenant, subject: value.subject, product: value.product };
 }
 function matrixID(value: unknown, sigil: string): value is string {
   return (

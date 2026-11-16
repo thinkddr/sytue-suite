@@ -10,60 +10,49 @@
  * arranca abajo y mantiene el fondo estable; al acercarse al principio se pide
  * una pagina mas de historial (cursor `before` en ChatApp).
  */
-import type { JSX, RefObject } from 'preact';
+import type { ComponentChildren, JSX, RefObject } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import {
   Avatar,
   Skeleton,
   EmptyState,
-  Icon,
   Button,
   Toolbar,
   VirtualList,
   cx,
-  useToast,
   ConfirmDialog,
   Modal,
   Spinner,
-  Illustration,
   Glifo,
 } from '@sytue/ui';
 import type { VirtualListHandle } from '@sytue/ui';
-import { formatDate, formatDateTime, formatTime, type Locale } from '@sytue/i18n';
-import { appUrl, orgActual } from '@sytue/config';
-import {
-  messageLink,
-  messageReaders,
-  type ChatMessage,
-  type MessageReader,
-} from '../client/chatApi.js';
+import { formatDateTime, formatTime, type Locale } from '@sytue/i18n';
+import { dayLabel } from '../lib/fechas.js';
+import { messageReaders, type ChatMessage, type MessageReader } from '../client/chatApi.js';
 import type { T } from '../i18n/index.js';
 import { callEndedSeconds, formatCallDuration } from '../lib/call.js';
-import { copyToClipboard } from '../lib/clipboard.js';
 import { revelaPorToque } from '../lib/popover.js';
-import { reactedByLabel } from '../lib/reactions.js';
-import {
-  PinGlyph,
-  BookmarkGlyph,
-  CopyGlyph,
-  LinkGlyph,
-  UnreadGlyph,
-  ForwardGlyph,
-  EditGlyph,
-  TrashGlyph,
-  ThreadsGlyph,
-  SeenGlyph,
-  NoteGlyph,
-} from './glyphs.js';
+import { ThreadsGlyph } from './glyphs.js';
+import { PersonCard, type TarjetaContexto } from './PersonCard.js';
 import { MessageMenu, type MenuEntry } from './MessageMenu.js';
 import { BlockedFold } from './Moderation.js';
-import { MessageBody, EmojiToken, extractLinks } from './MessageBody.js';
+import { MessageBody, extractLinks } from './MessageBody.js';
 import { LinkPreview, MeetingLinkCard } from './LinkPreview.js';
 import { proveedorDeReunion } from '../lib/enlacesExternos.js';
 import { editandoYa } from '../lib/editarUltimo.js';
+import { llegadosAbajo } from '../lib/nuevosAbajo.js';
+import { disponibleConCifrado } from '../lib/cifrado.js';
 import { Attachments } from './Attachments.js';
 import { CardView } from './CardView.js';
-import { EmojiPickerButton } from './EmojiPicker.js';
+import { IndicadorHilo, RespondioEnHilo } from './IndicadorHilo.js';
+import {
+  AvisoDeEnvioFallido,
+  CajaDeEdicion,
+  FilaDeReacciones,
+  ReaccionesRapidas,
+  entradasDelMenu,
+  useCopiarConAviso,
+} from './AccionesDeMensaje.js';
 
 interface Props {
   messages: ChatMessage[];
@@ -116,6 +105,9 @@ interface Props {
   /** Marca o retira un valor de la tarjeta de un mensaje (votar una opción de la
    *  encuesta, dar por hecha la tarea). Ausente = tarjetas de solo lectura. */
   onCardVote?: (messageId: string, value: string, add: boolean) => void;
+  /** La conversación va cifrada de extremo a extremo: tarjetas y acuses en solo
+   *  lectura, con la nota de por qué (`lib/cifrado.ts`). */
+  cifrado?: boolean;
   /** Reenvía el mensaje a otro canal (abre el selector de destino en el padre). */
   onForward?: (message: ChatMessage) => void;
   /** Id del primer mensaje no leído: pinta el separador «Nuevos mensajes» ante él. */
@@ -131,38 +123,24 @@ interface Props {
   onLoadOlder?: () => void;
   /** Pagina anterior en vuelo: pildora «Cargando…» sobre la lista. */
   loadingOlder?: boolean;
+  /** Bloque del principio del canal (ROOM-13, `InicioDelCanal`). El padre lo pasa
+   *  solo cuando ya no queda historial anterior: va encima de la primera fila y, con
+   *  el canal vacío, ocupa el lugar del estado vacío. */
+  inicio?: ComponentChildren;
   /** Handle imperativo de la lista (ChatApp lo usa para el cap con isAtBottom). */
   handleRef?: RefObject<VirtualListHandle>;
+  /** Tarjeta de persona al pulsar el avatar o el nombre del autor (D-ROOM-04). */
+  tarjeta?: TarjetaContexto;
   /** Idioma activo (fechas y reloj) y traductor ya atado a él. */
   locale: Locale;
   t: T;
 }
-
-/** Reacciones rapidas de la barra de acciones (paridad Mattermost). */
-const QUICK_REACTIONS = ['👍', '❤️', '😄', '🎉'] as const;
 
 /** Altura estimada de una fila de mensaje (px); la real se mide del DOM. */
 const ESTIMATED_ROW_PX = 56;
 
 /** A menos de este scrollTop del principio se pide la pagina anterior. */
 const LOAD_OLDER_PX = 300;
-
-/**
- * Etiqueta del separador de día. «Hoy»/«Ayer» salen del catálogo; el resto es una
- * fecha larga formateada por `Intl` en el idioma del usuario. La mayúscula inicial
- * NO se fuerza: en alemán e inglés el día ya va en mayúscula y en español/francés/
- * italiano va en minúscula a propósito (capitalizarla a mano sería un error de
- * ortografía en tres de las cinco lenguas).
- */
-function dayLabel(locale: Locale, t: T, iso: string): string {
-  const d = new Date(iso);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  if (d.toDateString() === today.toDateString()) return t('day.today');
-  if (d.toDateString() === yesterday.toDateString()) return t('day.yesterday');
-  return formatDate(locale, d, { weekday: 'long', day: 'numeric', month: 'long' });
-}
 
 function timeLabel(locale: Locale, iso: string): string {
   return formatTime(locale, iso, { hour: '2-digit', minute: '2-digit' });
@@ -248,165 +226,45 @@ export function MessageView({
   onForward,
   onAck,
   onCardVote,
+  cifrado = false,
   unreadDividerId,
   highlightId,
   seen,
   onJoinCall,
   onLoadOlder,
   loadingOlder = false,
+  inicio,
   handleRef,
+  tarjeta,
   locale,
   t,
 }: Props): JSX.Element {
   // Handle propio si el padre no pide uno (el stick de abajo lo necesita).
   const ownHandle = useRef<VirtualListHandle>(null);
   const listHandle = handleRef ?? ownHandle;
-  const toast = useToast();
 
-  async function copyAndToast(text: string, okTitle: string): Promise<void> {
-    const ok = await copyToClipboard(text);
-    toast.notify(
-      ok ? { tone: 'success', title: okTitle } : { tone: 'danger', title: t('message.copyFailed') },
-    );
-  }
+  const copiar = useCopiarConAviso(t);
 
-  /** Construye las entradas del menú «…» de un mensaje (según estado y permisos). */
+  /** Entradas del menú «…» de un mensaje (las mismas que en el panel de hilo). */
   function menuItems(m: ChatMessage): MenuEntry[] {
-    const pinned = pinnedIds?.has(m.id) ?? false;
-    const saved = savedIds?.has(m.id) ?? false;
-    const items: MenuEntry[] = [];
-    if (onTogglePin) {
-      items.push({
-        key: 'pin',
-        label: pinned ? t('message.unpin') : t('message.pin'),
-        icon: <PinGlyph size={16} />,
-        onSelect: () => onTogglePin(m, pinned),
-      });
-    }
-    if (onToggleSave) {
-      items.push({
-        key: 'save',
-        label: saved ? t('message.unsave') : t('action.save'),
-        icon: <BookmarkGlyph size={16} />,
-        onSelect: () => onToggleSave(m, saved),
-      });
-    }
-    // «Seguir mensaje» (paridad Mattermost): solo en mensajes RAÍZ — el servicio
-    // rechaza seguir una respuesta (exige parent_id IS NULL).
-    if (onToggleFollow && !m.parentId) {
-      const following = followedIds?.has(m.id) ?? false;
-      items.push({
-        key: 'follow',
-        label: following ? t('thread.unfollowShort') : t('message.follow'),
-        icon: <ThreadsGlyph size={16} />,
-        onSelect: () => onToggleFollow(m, following),
-      });
-    }
-    items.push({
-      key: 'copy',
-      label: t('message.copyText'),
-      icon: <CopyGlyph size={16} />,
-      onSelect: () => void copyAndToast(m.body, t('message.copied')),
+    return entradasDelMenu(m, {
+      t,
+      copiar,
+      pinned: pinnedIds?.has(m.id) ?? false,
+      saved: savedIds?.has(m.id) ?? false,
+      following: followedIds?.has(m.id) ?? false,
+      blocked: blockedSubs?.has(m.author.id) ?? false,
+      onTogglePin,
+      onToggleSave,
+      onToggleFollow,
+      onForward,
+      onMarkUnread,
+      onReaders: (msg) => void abrirLectores(msg.id),
+      onEdit: onEdit ? startEdit : undefined,
+      onDelete: onDelete ? (msg) => confirmDelete(msg.id) : undefined,
+      onReport,
+      onToggleBlock,
     });
-    items.push({
-      key: 'link',
-      label: t('message.copyLink'),
-      icon: <LinkGlyph size={16} />,
-      onSelect: () => void copyAndToast(messageLink(m.channelId, m.id), t('message.linkCopied')),
-    });
-    // «Guardar en Notes»: abre Sytue Notepads con una nota nueva ya vinculada a este
-    // mensaje. NO se copia el texto al otro lado — se guarda la REFERENCIA, así
-    // que quien abra la nota sigue pasando por el permiso del canal.
-    //
-    // El host sale de `appDomains` (@sytue/config), que ya lo deriva del emisor
-    // OIDC del entorno: es lo mismo que hace el conmutador de aplicaciones, y
-    // ahorra bajar una URL más por props hasta aquí. La organización (ADR 0056)
-    // es la de la URL vista (`orgActual`): la referencia apunta al mensaje de
-    // ESTA organización, y en el navegador el evento siempre la tiene a mano.
-    items.push({
-      key: 'to-notes',
-      label: t('message.saveToNotes'),
-      icon: <NoteGlyph size={16} />,
-      onSelect: () => {
-        const rotulo = m.body.trim().slice(0, 120);
-        window.open(
-          `${appUrl('notes', '', orgActual('/rooms'))}/?link=room_message:${encodeURIComponent(m.id)}&label=${encodeURIComponent(rotulo)}`,
-          '_blank',
-          'noopener,noreferrer',
-        );
-      },
-    });
-    if (onForward) {
-      items.push({
-        key: 'forward',
-        label: t('message.forward'),
-        icon: <ForwardGlyph size={16} />,
-        onSelect: () => onForward(m),
-      });
-    }
-    if (onMarkUnread) {
-      items.push({
-        key: 'unread',
-        label: t('message.markUnread'),
-        icon: <UnreadGlyph size={16} />,
-        onSelect: () => onMarkUnread(m),
-      });
-    }
-    // «Visto por» solo en los PROPIOS: saber quién ha leído lo que escribió otro
-    // no ayuda a nadie a trabajar y sí convierte el chat en un panel de control
-    // sobre los compañeros.
-    if (m.mine) {
-      items.push({
-        key: 'readers',
-        label: t('message.readersTitle'),
-        icon: <SeenGlyph size={16} />,
-        onSelect: () => void abrirLectores(m.id),
-      });
-    }
-    if (m.mine && (onEdit || onDelete)) {
-      items.push('separator');
-      if (onEdit) {
-        items.push({
-          key: 'edit',
-          label: t('action.edit'),
-          icon: <EditGlyph size={16} />,
-          onSelect: () => startEdit(m),
-        });
-      }
-      if (onDelete) {
-        items.push({
-          key: 'delete',
-          label: t('action.delete'),
-          icon: <TrashGlyph size={16} />,
-          danger: true,
-          onSelect: () => confirmDelete(m.id),
-        });
-      }
-    }
-    // Denunciar y bloquear: solo sobre lo AJENO y de una persona (un bot no se
-    // bloquea: se quita la integración).
-    if (!m.mine && !m.isBot && (onReport || onToggleBlock)) {
-      const blocked = blockedSubs?.has(m.author.id) ?? false;
-      items.push('separator');
-      if (onReport) {
-        items.push({
-          key: 'report',
-          label: t('report.message'),
-          icon: <Icon name="warning" size={16} />,
-          danger: true,
-          onSelect: () => onReport(m),
-        });
-      }
-      if (onToggleBlock) {
-        items.push({
-          key: 'block',
-          label: t(blocked ? 'block.unblock' : 'block.block', { name: m.author.name }),
-          danger: !blocked,
-          onSelect: () => onToggleBlock(m, blocked),
-        });
-      }
-    }
-    return items;
   }
   // Mensajes de personas bloqueadas que se han abierto con «Mostrar».
   const [mostrados, setMostrados] = useState<ReadonlySet<string>>(new Set());
@@ -545,18 +403,45 @@ export function MessageView({
     first: undefined,
     last: undefined,
   });
+  // «↓ N mensajes nuevos»: ids ajenos llegados al final mientras se leía más arriba.
+  // Un Set y no un contador: el mismo mensaje puede volver a pasar por aquí (una
+  // edición, una reacción) y no debe sumar dos veces.
+  const [nuevosAbajo, setNuevosAbajo] = useState<ReadonlySet<string>>(() => new Set());
+  // Ids del pintado anterior: el ancla de lo llegado (ver `llegadosAbajo`).
+  const idsAnterioresRef = useRef<readonly string[]>([]);
   useEffect(() => {
     const first = messages[0]?.id;
     const last = messages[messages.length - 1]?.id;
     const prevEdges = edgeIdsRef.current;
     edgeIdsRef.current = { first, last };
+    const llegados = llegadosAbajo(messages, idsAnterioresRef.current);
+    idsAnterioresRef.current = messages.map((m) => m.id);
+    // Otra lista (otro canal, la ventana de un permalink): la cuenta era de la anterior.
+    if (llegados === null) setNuevosAbajo((s) => (s.size ? new Set() : s));
     // Mientras hay un mensaje resaltado (permalink / scroll-to-message), NO tires al
     // fondo: el foco es el mensaje enlazado, no el final de la ventana.
     if (highlightId) return;
     if (first !== prevEdges.first && last === prevEdges.last) return; // prepend
     const h = listHandle.current;
-    if (h?.isAtBottom()) h.scrollToBottom();
+    if (!h) return;
+    if (h.isAtBottom()) h.scrollToBottom();
+    else if (llegados?.length) {
+      setNuevosAbajo((s) => {
+        const n = new Set(s);
+        for (const id of llegados) n.add(id);
+        return n;
+      });
+    }
   }, [messages, listHandle, highlightId]);
+  // Lo borrado mientras tanto ya no está abajo esperando: no se cuenta.
+  const cuentaNuevos = useMemo(
+    () => (nuevosAbajo.size ? messages.filter((m) => nuevosAbajo.has(m.id)).length : 0),
+    [messages, nuevosAbajo],
+  );
+  function irAlFinal(): void {
+    listHandle.current?.scrollToBottom();
+    setNuevosAbajo(new Set());
+  }
 
   // Scroll-to-message (Ola 16): al fijarse un highlightId NUEVO, centra su fila en el
   // viewport (una sola vez por objetivo). El resalte visual lo pinta renderRow; el padre
@@ -624,7 +509,7 @@ export function MessageView({
         class="h-full flex-1"
         title={t('message.loadFailed')}
         description={t('error.checkConnection')}
-        illustration={<Icon name="danger" size={32} class="text-danger-text" />}
+        tone="error"
         action={
           onRetry ? (
             <Button size="sm" variant="secondary" onClick={onRetry}>
@@ -637,9 +522,15 @@ export function MessageView({
   }
 
   if (messages.length === 0) {
+    // Con el bloque del principio se ve lo mismo que cuando el canal tiene historia
+    // y se llega arriba del todo: quién lo creó, de qué va y qué se puede hacer. Va
+    // arriba, en el sitio de la primera fila, como en un canal con pocos mensajes.
+    if (inicio) {
+      return <div class="min-h-0 flex-1 overflow-y-auto px-4">{inicio}</div>;
+    }
     return (
       <EmptyState
-        illustration={<Illustration name="emptyChat" />}
+        spot="emptyChat"
         class="h-full flex-1"
         title={
           channelName ? t('message.channelStart', { channel: channelName }) : t('message.noneYet')
@@ -679,6 +570,7 @@ export function MessageView({
       const destacada = !ended && m.id === ultimaLlamadaId;
       return (
         <div class={cx(index === 0 && 'pt-3', index === messages.length - 1 && 'pb-3')}>
+          {index === 0 ? inicio : null}
           {showDay ? dayDivider(locale, t, m.createdAt) : null}
           {m.id === unreadDividerId ? unreadDivider(t) : null}
           {/* Solo la llamada ABIERTA es una tarjeta; las terminadas Y los «inició» de
@@ -744,6 +636,7 @@ export function MessageView({
       // pt/pb sustituyen al py-3 del contenedor: dentro de la fila medida, el
       // virtualizador calcula los offsets exactos (padding del scroller no).
       <div class={cx(index === 0 && 'pt-3', index === messages.length - 1 && 'pb-3')}>
+        {index === 0 ? inicio : null}
         {showDay ? dayDivider(locale, t, m.createdAt) : null}
         {m.id === unreadDividerId ? unreadDivider(t) : null}
 
@@ -771,30 +664,7 @@ export function MessageView({
               )}
               aria-label={t('composer.messageActions')}
             >
-              {onReact
-                ? QUICK_REACTIONS.map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      aria-label={t('reaction.with', { emoji })}
-                      onClick={() => onReact(m.id, emoji)}
-                      class="hover:bg-bg-subtle flex h-7 w-7 items-center justify-center rounded text-sm transition-colors duration-150"
-                    >
-                      {emoji}
-                    </button>
-                  ))
-                : null}
-              {/* Selector de emoji completo: reaccionar con cualquiera, no solo el set rápido. */}
-              {onReact ? (
-                <EmojiPickerButton
-                  onPick={(glyph) => onReact(m.id, glyph)}
-                  t={t}
-                  label={t('reaction.withAny')}
-                  title={t('reaction.react')}
-                  size={16}
-                  triggerClass="flex h-7 w-7 items-center justify-center rounded text-text-muted transition-colors duration-150 hover:bg-bg-subtle hover:text-text sytue-focus-ring"
-                />
-              ) : null}
+              {onReact ? <ReaccionesRapidas m={m} onReact={onReact} t={t} /> : null}
               {onOpenThread ? (
                 <button
                   type="button"
@@ -818,7 +688,18 @@ export function MessageView({
 
           <div class="w-9 shrink-0 pt-0.5">
             {!grouped ? (
-              <Avatar name={m.author.name} size="sm" />
+              tarjeta && !m.isBot ? (
+                <PersonCard
+                  sub={m.author.id}
+                  name={m.author.name}
+                  ctx={tarjeta}
+                  class="rounded-full"
+                >
+                  <Avatar name={m.author.name} size="sm" />
+                </PersonCard>
+              ) : (
+                <Avatar name={m.author.name} size="sm" />
+              )
             ) : (
               <span
                 // `pointer-coarse`: con el dedo el hover no llega nunca, y la hora de
@@ -846,12 +727,23 @@ export function MessageView({
           >
             {!grouped ? (
               <div class="flex min-w-0 items-baseline gap-2">
-                <span
-                  class="text-text min-w-0 truncate text-sm font-semibold"
-                  title={m.author.name}
-                >
-                  {m.author.name}
-                </span>
+                {tarjeta && !m.isBot ? (
+                  <PersonCard
+                    sub={m.author.id}
+                    name={m.author.name}
+                    ctx={tarjeta}
+                    class="text-text min-w-0 truncate text-sm font-semibold hover:underline"
+                  >
+                    {m.author.name}
+                  </PersonCard>
+                ) : (
+                  <span
+                    class="text-text min-w-0 truncate text-sm font-semibold"
+                    title={m.author.name}
+                  >
+                    {m.author.name}
+                  </span>
+                )}
                 {/* Badge «BOT» (Ola 15): TEXTO, no solo color (WCAG AA). Marca los
                     mensajes de webhooks/bots (integraciones). */}
                 {m.isBot ? (
@@ -868,35 +760,14 @@ export function MessageView({
               </div>
             ) : null}
             {editingId === m.id ? (
-              <div class="mt-0.5">
-                <textarea
-                  ref={cajaDeEdicion}
-                  aria-label={t('message.edit')}
-                  value={draft}
-                  autofocus
-                  rows={Math.min(6, draft.split('\n').length)}
-                  onInput={(e) => setDraft((e.target as HTMLTextAreaElement).value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      saveEdit(m.body);
-                    } else if (e.key === 'Escape') {
-                      e.preventDefault();
-                      cancelEdit();
-                    }
-                  }}
-                  class="border-border bg-surface text-text sytue-focus-ring w-full resize-none rounded-md border px-2.5 py-1.5 text-base outline-none"
-                />
-                <div class="mt-1 flex items-center gap-2">
-                  <Button size="sm" onClick={() => saveEdit(m.body)}>
-                    {t('action.save')}
-                  </Button>
-                  <Button size="sm" variant="secondary" onClick={cancelEdit}>
-                    {t('action.cancel')}
-                  </Button>
-                  <span class="sytue-meta">{t('message.editHint')}</span>
-                </div>
-              </div>
+              <CajaDeEdicion
+                valor={draft}
+                onInput={setDraft}
+                onGuardar={() => saveEdit(m.body)}
+                onCancelar={cancelEdit}
+                cajaRef={cajaDeEdicion}
+                t={t}
+              />
             ) : blockedSubs?.has(m.author.id) && !mostrados.has(m.id) ? (
               <BlockedFold t={t} onShow={() => setMostrados((prev) => new Set(prev).add(m.id))} />
             ) : (
@@ -910,8 +781,15 @@ export function MessageView({
                   <p class="text-text-muted mb-1 text-xs">{t('matrix.legacy')}</p>
                 ) : null}
                 {m.decryptionFailed ? (
-                  <p class="text-text-muted text-sm">{t('matrix.unreadable')}</p>
+                  <p class="text-text-muted text-sm">
+                    {t(
+                      m.requiresOriginalDevice
+                        ? 'matrix.originalDeviceRequired'
+                        : 'matrix.unreadable',
+                    )}
+                  </p>
                 ) : null}
+                <RespondioEnHilo m={m} {...(onOpenThread ? { onOpen: onOpenThread } : {})} t={t} />
                 {m.priority ? <div class="mb-0.5">{priorityBadge(t, m.priority)}</div> : null}
                 {m.body ? (
                   <p
@@ -947,6 +825,7 @@ export function MessageView({
                     card={m.card}
                     messageId={m.id}
                     {...(onCardVote && !m.pending && !m.failed ? { onVote: onCardVote } : {})}
+                    cifrado={cifrado}
                     locale={locale}
                     t={t}
                   />
@@ -969,81 +848,27 @@ export function MessageView({
             )}
 
             {/* Envio fallido: aviso con icono + reintento (nunca solo color). */}
-            {m.failed ? (
-              <p class="text-danger-text mt-0.5 flex items-center gap-1.5 text-xs">
-                <Icon name="warning" size={12} />
-                <span>{t('message.sendFailed')}</span>
-                {onResend ? (
-                  <button
-                    type="button"
-                    class="hover:text-text sytue-focus-ring rounded-sm font-semibold underline underline-offset-2 transition-colors duration-150"
-                    onClick={() => onResend(m)}
-                  >
-                    {t('action.retry')}
-                  </button>
-                ) : null}
-              </p>
-            ) : null}
+            {m.failed ? <AvisoDeEnvioFallido m={m} onResend={onResend} t={t} /> : null}
 
             {/* Fila de reacciones (chips) + indicador de hilo + «Siguiendo». */}
             {(m.reactions && m.reactions.length > 0) ||
             (m.replyCount ?? 0) > 0 ||
             followedIds?.has(m.id) ? (
               <div class="mt-1 flex flex-wrap items-center gap-1">
-                {(m.reactions ?? []).map((r) => {
-                  // «Quién reaccionó»: nombres de los reactores (tooltip nativo + etiqueta
-                  // accesible). Sin `subs` del servicio cae al emoji + conteo de siempre.
-                  const who = reactedByLabel(locale, t, r.emoji, r.subs, memberNames);
-                  return (
-                    <button
-                      key={r.emoji}
-                      type="button"
-                      aria-pressed={r.mine ? 'true' : 'false'}
-                      aria-label={t(r.mine ? 'reaction.removeMine' : 'reaction.add', {
-                        what: who ?? `${r.emoji} ${r.count}`,
-                      })}
-                      {...(who ? { title: who } : {})}
-                      onClick={() => onReact?.(m.id, r.emoji)}
-                      class={cx(
-                        'rounded-control sytue-focus-ring inline-flex items-center gap-1 border px-2 py-0.5 text-xs font-medium transition-colors duration-150',
-                        r.mine
-                          ? // Texto coloreado con el rol -text (AA sobre su tinte, §1.6);
-                            // el hover del borde tambien remapea bien en oscuro.
-                            'border-primary bg-selected text-primary-text hover:border-primary-text'
-                          : 'border-border bg-surface text-text-muted hover:border-border-strong hover:bg-bg-subtle',
-                      )}
-                    >
-                      <span aria-hidden="true">
-                        <EmojiToken token={r.emoji} />
-                      </span>
-                      <span>{r.count}</span>
-                    </button>
-                  );
-                })}
-                {/* «+» al final de las reacciones: añadir otra con cualquier emoji. */}
-                {onReact && (m.reactions?.length ?? 0) > 0 ? (
-                  <EmojiPickerButton
-                    onPick={(glyph) => onReact(m.id, glyph)}
-                    t={t}
-                    label={t('reaction.addOne')}
-                    title={t('reaction.addOne')}
-                    triggerClass="inline-flex h-6 items-center justify-center rounded-control border border-border bg-surface px-2 text-text-muted transition-colors duration-150 hover:border-border-strong hover:bg-bg-subtle sytue-focus-ring"
-                  >
-                    <span class="text-sm leading-none font-semibold" aria-hidden="true">
-                      +
-                    </span>
-                  </EmojiPickerButton>
-                ) : null}
-                {(m.replyCount ?? 0) > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => onOpenThread?.(m)}
-                    class="rounded-control text-primary-text hover:bg-selected sytue-focus-ring inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium transition-colors duration-150"
-                  >
-                    <Icon name="chevronRight" size={12} />
-                    {t('thread.replyCountInThread', { count: m.replyCount ?? 0 })}
-                  </button>
-                ) : null}
+                <FilaDeReacciones
+                  m={m}
+                  onReact={onReact}
+                  memberNames={memberNames}
+                  locale={locale}
+                  t={t}
+                />
+                {/* Indicador de hilo: avatares · N respuestas · última respuesta. */}
+                <IndicadorHilo
+                  m={m}
+                  {...(onOpenThread ? { onOpen: onOpenThread } : {})}
+                  locale={locale}
+                  t={t}
+                />
                 {/* «Siguiendo» (paridad Mattermost): TEXTO + icono, nunca solo color. */}
                 {followedIds?.has(m.id) ? (
                   <span
@@ -1065,6 +890,10 @@ export function MessageView({
                   <span class="rounded-pill bg-success-bg text-success-text inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium">
                     {t('ack.done')}
                   </span>
+                ) : !disponibleConCifrado('confirmarAcuse', cifrado) ? (
+                  // El acuse lo suma el servicio, que no ve el mensaje cifrado: sin el
+                  // botón, y diciendo por qué en vez de fallar al pulsarlo.
+                  <span class="sytue-meta">{t('matrix.unsupported')}</span>
                 ) : onAck ? (
                   <Button size="sm" variant="secondary" onClick={() => onAck(m)}>
                     {t('ack.confirm')}
@@ -1128,9 +957,31 @@ export function MessageView({
           // Cerca del principio: pide la pagina anterior (ChatApp la deduplica,
           // guarda el cursor `before` y evita vuelos concurrentes).
           if (e.currentTarget.scrollTop < LOAD_OLDER_PX) onLoadOlder?.();
+          // Bajar a mano hasta el final también da lo nuevo por visto.
+          if (nuevosAbajo.size && listHandle.current?.isAtBottom()) setNuevosAbajo(new Set());
         }}
         renderItem={renderRow}
       />
+      {/* «↓ N mensajes nuevos» (Slack, Teams, Element): flota abajo mientras se lee más
+          arriba y llega algo ajeno; lleva al final y se retira. role=status lo anuncia
+          sin robar el foco. Con la ventana de un permalink no aparece: entonces no se
+          anexa nada y manda la barra «Ir a mensajes recientes» de ChatApp. */}
+      <div
+        class="pointer-events-none absolute inset-x-0 bottom-2 z-10 flex justify-center"
+        role="status"
+      >
+        {cuentaNuevos > 0 ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            class="pointer-events-auto shadow-[var(--shadow-sm)]"
+            leadingIcon={<Glifo d="M12 5v14M6 13l6 6 6-6" size={14} />}
+            onClick={irAlFinal}
+          >
+            {t('message.newBelow', { count: cuentaNuevos })}
+          </Button>
+        ) : null}
+      </div>
       <ConfirmDialog
         open={borrando !== null}
         onClose={() => setBorrando(null)}

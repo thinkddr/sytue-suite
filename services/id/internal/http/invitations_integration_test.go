@@ -235,6 +235,80 @@ func TestInvitation_Authz(t *testing.T) {
 	}
 }
 
+// Invitar a VARIAS personas de una vez desde Sytue Admin: resultado por
+// dirección (enviada / ya es miembro / no es un correo), invitaciones reales
+// pendientes, owner que no se reparte, tope de 25 y el formato de una sola
+// dirección intacto.
+func TestInvitation_Batch(t *testing.T) {
+	l := newLiveServer(t)
+	l.srv.mailer = &captureMailer{}
+	org, admin := l.seedOrgAdmin(t, "acme")
+	l.addMember(t, org, "member@acme.test", domain.RoleMember)
+	adminTok := l.token(t, admin.ID, org.Slug, []string{"admin"})
+
+	rr, body := l.do(t, http.MethodPost, "/api/v1/admin/invitations", adminTok, map[string]any{
+		"emails": []string{"Ana@acme.test, luis@acme.test", "no-arroba", "member@acme.test"},
+		"role":   "billing",
+	})
+	if rr.Code != http.StatusOK {
+		t.Fatalf("tanda: status=%d cuerpo=%s", rr.Code, rr.Body)
+	}
+	if body["sent"] != float64(2) {
+		t.Fatalf("sent=%v, quiero 2", body["sent"])
+	}
+	estados := map[string]string{}
+	for _, it := range body["results"].([]any) {
+		m := it.(map[string]any)
+		estados[m["email"].(string)] = m["status"].(string)
+	}
+	want := map[string]string{
+		"ana@acme.test": "sent", "luis@acme.test": "sent",
+		"no-arroba": "invalid", "member@acme.test": "already_member",
+	}
+	for e, st := range want {
+		if estados[e] != st {
+			t.Fatalf("%s: estado=%q, quiero %q (todos: %v)", e, estados[e], st, estados)
+		}
+	}
+	pend, err := l.st.ListPendingInvitations(l.ctx, org.ID)
+	if err != nil || len(pend) != 2 {
+		t.Fatalf("pendientes=%d err=%v, quiero 2", len(pend), err)
+	}
+	for _, p := range pend {
+		if p.Role != string(domain.RoleBilling) {
+			t.Fatalf("%s invitado como %q, quiero billing", p.Email, p.Role)
+		}
+	}
+
+	// Owner no se reparte en lote, ni pidiéndolo un owner.
+	ownerTok := l.token(t, admin.ID, org.Slug, []string{"owner"})
+	rr, _ = l.do(t, http.MethodPost, "/api/v1/admin/invitations", ownerTok,
+		map[string]any{"emails": []string{"x@acme.test"}, "role": "owner"})
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("tanda de owners: status=%d, quiero 400", rr.Code)
+	}
+	// Tope: 26 direcciones se rechazan enteras.
+	muchas := make([]string, maxBatchInvites+1)
+	for i := range muchas {
+		muchas[i] = "p" + strings.Repeat("x", i+1) + "@acme.test"
+	}
+	rr, _ = l.do(t, http.MethodPost, "/api/v1/admin/invitations", adminTok,
+		map[string]any{"emails": muchas, "role": "member"})
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("26 direcciones: status=%d, quiero 400", rr.Code)
+	}
+	if pend, _ := l.st.ListPendingInvitations(l.ctx, org.ID); len(pend) != 2 {
+		t.Fatalf("un rechazo por tope no debe invitar a nadie: pendientes=%d", len(pend))
+	}
+
+	// Compatibilidad: una sola dirección sigue contestando 201 con su forma.
+	rr, body = l.do(t, http.MethodPost, "/api/v1/admin/invitations", adminTok,
+		map[string]string{"email": "sola@acme.test", "role": "member"})
+	if rr.Code != http.StatusCreated || body["email"] != "sola@acme.test" || body["expires_at"] == nil {
+		t.Fatalf("una sola dirección: status=%d cuerpo=%v", rr.Code, body)
+	}
+}
+
 // --- B) Cambiar rol / quitar miembro ---
 
 func TestMember_RoleChangeRevokesOnDemotion(t *testing.T) {

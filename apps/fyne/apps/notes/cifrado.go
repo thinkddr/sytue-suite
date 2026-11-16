@@ -71,14 +71,22 @@ var errBloqueado = errors.New("notes: el cuaderno cifrado está cerrado")
 // cifrar prepara el cuerpo de una nota para un cuaderno cifrado: título y contenido
 // viajan DENTRO del criptograma y las dos columnas van vacías (`conCifrado` de la web).
 // En un cuaderno sin cifrar no toca nada.
-func (p *Pantalla) cifrar(in *api.NoteInput) error {
+func (p *Pantalla) cifrarConOriginal(in *api.NoteInput, original string) error {
 	if !p.activo.Cifrado {
 		return nil
 	}
 	if p.clave == nil {
 		return errBloqueado
 	}
-	if err := api.CifrarContenidoNota(p.clave, in); err != nil {
+	var links json.RawMessage
+	if original != "" {
+		claro, err := api.DesempaquetarNota(p.clave, original)
+		if err != nil {
+			return err
+		}
+		links = claro.LinksJSON
+	}
+	if err := api.CifrarContenidoNotaConEnlaces(p.clave, in, links); err != nil {
 		return err
 	}
 	in.ExpectedCrypto = bytes.Clone(p.activo.Crudo.Crypto)
@@ -99,21 +107,22 @@ func (p *Pantalla) desbloquear() {
 		p.pedirContrasena(c, id, false)
 		return
 	}
-	go func() {
+	p.iniciar(func() {
 		if clave, recordada := p.conRecordada(c, id); clave != nil {
-			enHilo(func() {
+			defer clear(clave)
+			p.enHiloEsperar(func() {
 				if vigente() {
 					p.abrirCon(id, clave)
 				}
 			})
 		} else {
-			enHilo(func() {
+			p.enHilo(func() {
 				if vigente() {
 					p.pedirContrasena(c, id, recordada)
 				}
 			})
 		}
-	}()
+	})
 }
 
 // pedirContrasena es el diálogo de la contraseña. Con Recordar, lleva además la casilla
@@ -135,8 +144,9 @@ func (p *Pantalla) pedirContrasena(c api.NotesCrypto, id string, recordada bool)
 		if err != nil {
 			return err
 		}
+		defer clear(clave)
 		seguir := false
-		fyne.DoAndWait(func() { seguir = vigente() })
+		p.enHiloEsperar(func() { seguir = vigente() })
 		if !seguir {
 			clear(clave)
 			return context.Canceled
@@ -144,7 +154,7 @@ func (p *Pantalla) pedirContrasena(c api.NotesCrypto, id string, recordada bool)
 		if p.Recordar != nil {
 			p.recordarClave(id, clave, recordar.Load())
 		}
-		enHilo(func() {
+		p.enHiloEsperar(func() {
 			if vigente() {
 				p.abrirCon(id, clave)
 			} else {
@@ -190,6 +200,9 @@ func (p *Pantalla) olvidarClaveActiva() {
 func (p *Pantalla) bloquear() {
 	p.cancelarMigracion()
 	p.cerrarEditor()
+	if p.edicion != nil {
+		return
+	}
 	p.creando = false
 	p.olvidarClaveActiva()
 	p.bloqueado = p.activo.Cifrado
@@ -260,9 +273,9 @@ func (p *Pantalla) dialogoClave(crear bool, extra fyne.CanvasObject, probar func
 		ok.Cargando = true
 		ok.Refresh()
 		secreto := pass.Texto()
-		go func() {
+		p.iniciar(func() {
 			err := probar(secreto)
-			enHilo(func() {
+			p.enHilo(func() {
 				ok.Cargando = false
 				ok.Refresh()
 				if err != nil {
@@ -271,7 +284,7 @@ func (p *Pantalla) dialogoClave(crear bool, extra fyne.CanvasObject, probar func
 				}
 				d.Cerrar()
 			})
-		}()
+		})
 	}
 	ok.AlPulsar = enviar
 	intro := func(k *fyne.KeyEvent) bool {
@@ -304,7 +317,7 @@ func (p *Pantalla) cifrarCuaderno(listo func(crypto json.RawMessage)) {
 		}
 		// La clave NO se queda: como en la web, el cuaderno recién cifrado se abre
 		// cerrado y se desbloquea con la contraseña que se acaba de poner.
-		enHilo(func() { listo(crudo) })
+		p.enHilo(func() { listo(crudo) })
 		return nil
 	})
 }
@@ -336,6 +349,12 @@ func (p *Pantalla) cryptoVigente(epoch uint64, generacion string) bool {
 // ReiniciarSesion descarta también el claro y las respuestas pendientes al cambiar
 // la identidad adoptada por Suite, antes de cargar la cuenta nueva.
 func (p *Pantalla) ReiniciarSesion() {
+	if p.edicion != nil && p.edicion.bloqueoBorrador {
+		p.cerrarEditor()
+		if p.edicion != nil {
+			return
+		}
+	}
 	p.cerrarAjustes()
 	p.cancelarMigracion()
 	p.olvidarClaveActiva()
@@ -393,10 +412,14 @@ func (p *Pantalla) migrarContenido() {
 		return
 	}
 	p.migrando = true
-	ctx, cancel := context.WithCancel(context.Background())
+	phase, _ := p.contextoTrabajo()
+	ctx, cancel := context.WithCancel(phase)
 	p.migracionCancel = cancel
 	m := migracionNotas{pantalla: p, epoch: p.cryptoEpoch, cuaderno: p.activo.ID, generacion: p.generacionCrypto(), crypto: bytes.Clone(p.activo.Crudo.Crypto), clave: bytes.Clone(p.clave), contexto: ctx, cancelar: cancel}
-	go m.ejecutar()
+	if !p.iniciar(m.ejecutar) {
+		cancel()
+		clear(m.clave)
+	}
 }
 
 // vigente se evalúa exclusivamente en el hilo de la interfaz.
@@ -407,7 +430,7 @@ func (m *migracionNotas) vigente() bool {
 
 func (m *migracionNotas) puedeContinuar() bool {
 	seguir := false
-	fyne.DoAndWait(func() { seguir = m.vigente() })
+	m.pantalla.enHiloEsperar(func() { seguir = m.vigente() })
 	return seguir && m.contexto.Err() == nil
 }
 
@@ -421,7 +444,7 @@ func (m *migracionNotas) ejecutar() {
 	lista, err := m.pantalla.svc.ListNotesForEncryption(lectura, m.cuaderno)
 	cerrar()
 	if err == nil {
-		fyne.DoAndWait(func() {
+		m.pantalla.enHiloEsperar(func() {
 			if m.vigente() {
 				m.pantalla.notas = m.pantalla.deNotas(lista)
 			}
@@ -432,16 +455,22 @@ func (m *migracionNotas) ejecutar() {
 			}
 		}
 	}
-	enHilo(func() { m.terminar(err) })
+	m.pantalla.enHilo(func() { m.terminar(err) })
 }
 
 func (m *migracionNotas) migrarNota(n api.Note) error {
 	claro, needed, err := api.AbrirContenidoNota(m.clave, n)
-	if err != nil || !needed {
+	if err != nil {
 		return err
 	}
+	if len(n.Links) != 0 || claro.LinksJSON != nil {
+		return api.ErrDatosCifradosNotas
+	}
+	if !needed {
+		return nil
+	}
 	in := api.NoteInput{Title: claro.Title, Content: claro.Content, Data: claro.Data}
-	if err := api.CifrarContenidoNota(m.clave, &in); err != nil {
+	if err := api.CifrarContenidoNotaConEnlaces(m.clave, &in, claro.LinksJSON); err != nil {
 		return err
 	}
 	if !m.puedeContinuar() {
@@ -453,7 +482,7 @@ func (m *migracionNotas) migrarNota(n api.Note) error {
 	if err != nil {
 		return err
 	}
-	fyne.DoAndWait(func() { m.aceptar(n, nueva) })
+	m.pantalla.enHiloEsperar(func() { m.aceptar(n, nueva) })
 	return nil
 }
 

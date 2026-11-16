@@ -143,24 +143,32 @@ func sinPadreAjeno(nbs []domain.Notebook) {
 
 // GetNotebook devuelve un cuaderno si `sub` puede verlo.
 func (s *Store) GetNotebook(ctx context.Context, id uuid.UUID, sub string) (domain.Notebook, error) {
-	t := tenancy.MustFrom(ctx)
+	_ = tenancy.MustFrom(ctx)
 	var nb domain.Notebook
 	err := s.pool.InTenantTx(ctx, func(tx pgx.Tx) error {
-		row := tx.QueryRow(ctx, `
-			SELECT `+nbCols+`
-			  FROM notebooks nb
-			 WHERE nb.tenant = $1 AND nb.id = $2 AND nb.deleted_at IS NULL
-			   AND (nb.owner_sub = $3 OR nb.visibility IN ('organization','public')
-			        OR EXISTS (SELECT 1 FROM notebook_lectores l WHERE l.notebook_id = nb.id AND l.sujeto = $3)
-			        OR EXISTS (SELECT 1 FROM notebook_editores e WHERE e.notebook_id = nb.id AND e.sujeto = $3))`,
-			t.Slug, id, sub)
-		got, err := scanNotebook(row, t.Slug, sub)
-		if isNoRows(err) {
-			return domain.ErrNotFound
-		}
-		nb = got
+		var err error
+		nb, err = s.getNotebookTx(ctx, tx, id, sub)
 		return err
 	})
+	return nb, err
+}
+
+// getNotebookTx applies the same tenant and visibility rules in an existing
+// tenant transaction. The caller owns transaction scope and isolation.
+func (s *Store) getNotebookTx(ctx context.Context, tx pgx.Tx, id uuid.UUID, sub string) (domain.Notebook, error) {
+	t := tenancy.MustFrom(ctx)
+	row := tx.QueryRow(ctx, `
+		SELECT `+nbCols+`
+		  FROM notebooks nb
+		 WHERE nb.tenant = $1 AND nb.id = $2 AND nb.deleted_at IS NULL
+		   AND (nb.owner_sub = $3 OR nb.visibility IN ('organization','public')
+		        OR EXISTS (SELECT 1 FROM notebook_lectores l WHERE l.notebook_id = nb.id AND l.sujeto = $3)
+		        OR EXISTS (SELECT 1 FROM notebook_editores e WHERE e.notebook_id = nb.id AND e.sujeto = $3))`,
+		t.Slug, id, sub)
+	nb, err := scanNotebook(row, t.Slug, sub)
+	if isNoRows(err) {
+		return domain.Notebook{}, domain.ErrNotFound
+	}
 	return nb, err
 }
 
@@ -294,6 +302,9 @@ func (s *Store) ActualizarCuaderno(ctx context.Context, id uuid.UUID, sub string
 	}
 	var nb domain.Notebook
 	err := s.inWriteTx(ctx, func(tx pgx.Tx) error {
+		if err := lockNoteTree(ctx, tx, t.Slug); err != nil {
+			return err
+		}
 		visAntes, err := ajustesAdmisibles(ctx, tx, t.Slug, id, sub, administra, in)
 		if err != nil {
 			return err
@@ -427,6 +438,9 @@ func padreAdmisible(ctx context.Context, tx pgx.Tx, tenant string, id, padre uui
 func (s *Store) DeleteNotebook(ctx context.Context, id uuid.UUID, sub string) error {
 	t := tenancy.MustFrom(ctx)
 	return s.inWriteTx(ctx, func(tx pgx.Tx) error {
+		if err := lockNoteTree(ctx, tx, t.Slug); err != nil {
+			return err
+		}
 		// Solo el DUEÑO borra un cuaderno entero. Que un cuaderno de organización se
 		// escriba entre varios no significa que cualquiera pueda hacerlo desaparecer.
 		//

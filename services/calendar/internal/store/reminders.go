@@ -179,6 +179,7 @@ func (s *Store) ClaimDueReminders(ctx context.Context, now time.Time, limit int,
 			`SELECT id, tenant, owner_sub, event_id, uid, summary, dtstart, trigger_at, action
 			   FROM calendar_reminders
 			  WHERE fired_at IS NULL AND trigger_at <= $1
+			    AND NOT sytue_private_storage_frozen('calendar_private_storage_states'::regclass,tenant,owner_sub)
 			  ORDER BY trigger_at
 			  FOR UPDATE SKIP LOCKED
 			  LIMIT $2`, now.UTC(), limit)

@@ -102,12 +102,12 @@ export function describedBy(id: string, help?: string, error?: string): string |
 // ---- Input ----
 
 /**
- * `md` (31,5 px) es el control de formulario; `sm` (24 px) el de cromo denso —cinta del
+ * `md` (36 px) es el control de formulario; `sm` (24 px) el de cromo denso —cinta del
  * editor, barras de propiedades—, donde un `h-9` no cabe.
  *
- * Los 24 los pone `min-h-[24px]`, no `h-6`: con la raíz de la suite a 14 px, `h-6` son
- * 21. Así medía el filtro de notas de Notepads en producción (182×21, 2026-09-21), al
- * lado de botones de 28. Es el mismo suelo que `Button size="xs"` e `IconButton sm`.
+ * Los 24 los pone `min-h-[24px]`, no `h-6`: `h-6` son 1.5rem, y cuando 1 rem eran 14 px
+ * medían 21. Así medía el filtro de notas de Notepads en producción (182×21, 2026-09-21),
+ * al lado de botones de 28. Es el mismo suelo que `Button size="xs"` e `IconButton sm`.
  *
  * Sin esta talla, cada panel se escribía la suya: nueve `inputCls` locales con CUATRO
  * geometrías distintas, siete de ellas en el mismo fichero. Y como cada copia repetía

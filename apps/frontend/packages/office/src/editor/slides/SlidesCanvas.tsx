@@ -47,22 +47,33 @@ import {
   Icon,
   useListReorder,
   FOCUSABLE,
+  ShortcutsModal,
   useUltimo,
   useMobileBack,
   calcularArrastre,
   calcularRedimension,
   calcularLimitesArrastre,
 } from '@sytue/ui';
+import type { GrupoDeAtajos } from '@sytue/ui';
 import { saneaHtmlDeDocumento } from '@sytue/ui';
 import { bloquesDe } from '@sytue/ai';
 import { diapositivasDe, htmlDeCajas } from './iaslides.js';
+import {
+  PASO_GIRO,
+  anguloDelPuntero,
+  conGiro,
+  estiloGiro,
+  giroDe,
+  girarCajas,
+  redimensionarGirada,
+} from './girar.js';
 import { escapeHtml } from '../alphaindex.js';
 import { confirmarEnEditor } from '@sytue/ui';
 import { orgActual } from '@sytue/config';
+import type { Guia } from '@sytue/escena';
 import type {
   ConnectorEnd,
   ConnectorKind,
-  EditorCommand,
   EditorContext,
   MotionPoint,
   Slide,
@@ -95,6 +106,8 @@ import { EditorIcon } from '../icons';
 import type { EditorIconName } from '../icons';
 import { smartArtLayout } from './smartart';
 import { SubtitulosPanel } from './SubtitulosPanel';
+import { CampoAlt } from './CampoAlt';
+import { altDe, conAlt } from './textoAlt';
 import { CastDialog } from './CastDialog';
 import { avisador, posicionDe, urlDeEmision } from './cast';
 import { sanitizeTracks, trackLabel, trackLangs, trackSrc } from './subtitulos';
@@ -110,6 +123,8 @@ import {
 } from './proteger';
 import { AMBITO_DIAPOS, esPropietario, presentarClave, presentarNueva } from '../state/proteccion';
 import { DisenosBarra } from './DisenosBarra';
+import { leerRecorte, pegarRecorte, recortar, serializarRecorte } from './portapapeles';
+import type { RecorteDiapos } from './portapapeles';
 import {
   MAX_CUSTOM_THEMES,
   addCustomTheme,
@@ -139,6 +154,7 @@ import {
   boxAnims,
   boxFiringAtStep,
   boxPresentAtStep,
+  hiddenMask,
   migrateSlide,
   morphDelta,
   morphPairs,
@@ -147,6 +163,7 @@ import {
   motionPoints,
   motionRenderOrigin,
   motionRestOffset,
+  nextShown,
   normalizeAnimOrders,
   planByBox,
   presentAdvance,
@@ -162,8 +179,10 @@ import {
   groupBoxes,
   reorderZ,
   ungroupBoxes,
+  moverConGuias,
+  redimensionarConGuias,
 } from './organize';
-import type { AlignEdge, AlignRef, ZOrderOp } from './organize';
+import type { AlignEdge, AlignRef, ContextoGuias, ZOrderOp } from './organize';
 import {
   arrowHead,
   connectorRoute,
@@ -193,7 +212,7 @@ import {
 import { extractChartData, niceTicks } from '../sheets/Chart';
 import type { ChartData } from '../sheets/Chart';
 import { editorT } from '../../i18n';
-import { comandoDelAtajo } from '../comandos';
+import { atenderAtajoDeTexto } from '../canvas/atajos';
 import '../canvas/superficies.css';
 
 /* ---------- Comandos de la pestaña InicioSlides / Insertar / Vista ---------- */
@@ -242,6 +261,13 @@ const ALIGN_OPS: Record<string, AlignEdge> = {
   'align-top': 'top',
   'align-vmiddle': 'vmiddle',
   'align-bottom': 'bottom',
+};
+
+/** Girar: grados que se suman al giro de cada caja (null = enderezarla). */
+const GIRO_OPS: Record<string, number | null> = {
+  'rot-right': 90,
+  'rot-left': -90,
+  'rot-reset': null,
 };
 
 /** Resumen de la selección del lienzo montado para habilitar los comandos
@@ -538,6 +564,8 @@ export function stageHeight(size: SlideSize | undefined): number {
 /** Acento de edición del lienzo: latón de suite (como Docs/Datos). El color de
  *  producto (ocre) se reserva al tile del launcher, no al cromo de edición. */
 const ACCENT = 'var(--editor-select, var(--sytue-primary-500))';
+/** Distancia en px de pantalla a la que una caja arrastrada se pega a una guía. */
+const TOLERANCIA_GUIA_PX = 6;
 
 /** Techo del modelo serializado ANTES de aceptar una imagen: el op-body del
  * colab Go corta en 1 MiB (client.go, maxMessageBytes) y el mensaje que lo
@@ -858,25 +886,124 @@ export function sanitizeMediaSpec(raw: unknown): MediaSpec | null {
 }
 
 /** Destino de una tecla del modo presentación: índice destino (con topes),
- * 'exit' o null si la tecla no navega. Pura y exportada para bun test. */
-export function presentKeyTarget(key: string, idx: number, last: number): number | 'exit' | null {
+ * 'exit' o null si la tecla no navega. Pura y exportada para bun test.
+ *
+ * Es la tabla de PowerPoint y Keynote: ↓ e Intro avanzan como → y ↑ y Retroceso
+ * retroceden como ←, porque un mando de presentaciones manda unas u otras según la
+ * marca. Fyne repite esta misma tabla en `TeclaPresentando`.
+ *
+ * `hidden` (de `hiddenMask`) marca las diapositivas ocultas: las cuatro direcciones
+ * las saltan, también Inicio y Fin, que van a la primera y la última que se enseñan.
+ * Sin él, o sin ocultas, es la tabla de siempre. */
+export function presentKeyTarget(
+  key: string,
+  idx: number,
+  last: number,
+  hidden: readonly boolean[] = [],
+): number | 'exit' | null {
   switch (key) {
     case 'ArrowRight':
+    case 'ArrowDown':
     case ' ':
+    case 'Enter':
     case 'PageDown':
-      return Math.min(last, idx + 1);
+      return Math.min(last, nextShown(hidden, idx, 1) ?? (hidden.length > 0 ? idx : idx + 1));
     case 'ArrowLeft':
+    case 'ArrowUp':
+    case 'Backspace':
     case 'PageUp':
-      return Math.max(0, idx - 1);
+      return Math.max(0, nextShown(hidden, idx, -1) ?? (hidden.length > 0 ? idx : idx - 1));
     case 'Home':
-      return 0;
+      return nextShown(hidden, -1, 1) ?? 0;
     case 'End':
-      return last;
+      return Math.min(last, nextShown(hidden, hidden.length, -1) ?? last);
     case 'Escape':
       return 'exit';
     default:
       return null;
   }
+}
+
+/** Cifras que se recuerdan para «número + Intro»: con cuatro caben 9999 diapositivas,
+ *  y una cifra de más (un dedo que repite) no deja el número para siempre inservible. */
+const PRESENT_DIGITS_MAX = 4;
+
+/** «Número + Intro»: la diapositiva (0-based) que nombran las cifras tecleadas (1-based,
+ *  como las cuenta quien presenta), con tope en la última. Sin cifras o con un 0, null:
+ *  no hay diapositiva cero y adivinar una sería peor que no moverse. Pura. */
+export function slideFromDigits(digits: string, last: number): number | null {
+  if (!/^[0-9]+$/.test(digits)) return null;
+  const n = Number.parseInt(digits, 10);
+  if (n < 1) return null;
+  return Math.min(last, n - 1);
+}
+
+/** Lo que pide una tecla en el modo presentación. `advance` es granular (revela las
+ *  animaciones una a una); `go` salta a una diapositiva entera. */
+export type PresentCommand =
+  | { kind: 'advance'; dir: 1 | -1 }
+  | { kind: 'go'; to: number }
+  | { kind: 'exit' }
+  | { kind: 'notes' }
+  | { kind: 'presenter' }
+  | { kind: 'blank'; color: 'black' | 'white' }
+  | { kind: 'help' }
+  | { kind: 'resume' };
+
+/** Teclas que solo modifican a otra: «?» llega con Mayúsculas, y pulsar Mayúsculas no
+ *  puede devolver la pantalla negra ni borrar el número a medio teclear. */
+const PRESENT_MODIFIERS = new Set(['Shift', 'Control', 'Alt', 'AltGraph', 'Meta', 'CapsLock']);
+
+/** El teclado del modo presentación entero, puro para probarlo sin DOM: qué pide la
+ *  tecla y cómo queda el número a medio teclear (`digits`). Con la pantalla en negro o
+ *  en blanco (`blanked`), CUALQUIER tecla vuelve y no hace nada más, como en PowerPoint:
+ *  quien la apagó no quiere que la tecla con la que la enciende además pase de página.
+ *  Fyne lo reparte entre `Tecla` y `Runa` con la misma tabla. */
+export function presentCommand(
+  key: string,
+  s: { idx: number; last: number; digits: string; blanked: boolean; hidden?: readonly boolean[] },
+): { cmd: PresentCommand | null; digits: string } {
+  if (PRESENT_MODIFIERS.has(key)) return { cmd: null, digits: s.digits };
+  if (s.blanked) return { cmd: { kind: 'resume' }, digits: '' };
+  if (/^[0-9]$/.test(key)) {
+    return { cmd: null, digits: (s.digits + key).slice(-PRESENT_DIGITS_MAX) };
+  }
+  if (key === 'Enter' && s.digits !== '') {
+    const to = slideFromDigits(s.digits, s.last);
+    return { cmd: to === null ? null : { kind: 'go', to }, digits: '' };
+  }
+  switch (key) {
+    case 'ArrowRight':
+    case 'ArrowDown':
+    case ' ':
+    case 'Enter':
+      return { cmd: { kind: 'advance', dir: 1 }, digits: '' };
+    case 'ArrowLeft':
+    case 'ArrowUp':
+    case 'Backspace':
+      return { cmd: { kind: 'advance', dir: -1 }, digits: '' };
+    case 'n':
+    case 'N':
+      return { cmd: { kind: 'notes' }, digits: '' };
+    case 'p':
+    case 'P':
+      return { cmd: { kind: 'presenter' }, digits: '' };
+    case 'b':
+    case 'B':
+    case '.':
+      return { cmd: { kind: 'blank', color: 'black' }, digits: '' };
+    case 'w':
+    case 'W':
+    case ',':
+      return { cmd: { kind: 'blank', color: 'white' }, digits: '' };
+    case '?':
+    case 'h':
+    case 'H':
+      return { cmd: { kind: 'help' }, digits: '' };
+  }
+  const target = presentKeyTarget(key, s.idx, s.last, s.hidden);
+  if (target === null) return { cmd: null, digits: '' };
+  return { cmd: target === 'exit' ? { kind: 'exit' } : { kind: 'go', to: target }, digits: '' };
 }
 
 /** Duración transcurrida (ms) → «M:SS» o «H:MM:SS» para el cronómetro del
@@ -891,12 +1018,19 @@ export function fmtElapsed(ms: number): string {
 
 /** Índice destino (0-based, con topes) de un enlace de acción de caja al hacer
  *  clic en presentación; `null` si el destino no es válido. `idx`/`last` son la
- *  diapositiva actual y la última (0-based). Pura y exportada para bun test. */
-export function actionTarget(action: SlideLinkTarget, idx: number, last: number): number | null {
-  if (action === 'first') return 0;
-  if (action === 'last') return last;
-  if (action === 'next') return Math.min(last, idx + 1);
-  if (action === 'prev') return Math.max(0, idx - 1);
+ *  diapositiva actual y la última (0-based). Los destinos relativos saltan las
+ *  ocultas (`hidden`) como las teclas; el que nombra un número va a ella aunque esté
+ *  oculta, como «número + Intro». Pura y exportada para bun test. */
+export function actionTarget(
+  action: SlideLinkTarget,
+  idx: number,
+  last: number,
+  hidden: readonly boolean[] = [],
+): number | null {
+  if (action === 'first') return presentKeyTarget('Home', idx, last, hidden) as number;
+  if (action === 'last') return presentKeyTarget('End', idx, last, hidden) as number;
+  if (action === 'next') return presentKeyTarget('ArrowRight', idx, last, hidden) as number;
+  if (action === 'prev') return presentKeyTarget('ArrowLeft', idx, last, hidden) as number;
   // Número 1-based de diapositiva: fuera de rango = sin destino.
   return typeof action === 'number' && action >= 1 && action <= last + 1 ? action - 1 : null;
 }
@@ -915,6 +1049,34 @@ function actionLabel(t: DocsT, action: SlideLinkTarget): string {
     default:
       return t('slides.link.goTo', { n: action });
   }
+}
+
+/** Atajo de «Ocultar diapositiva», el de PowerPoint en Windows. */
+export const HIDE_SLIDE_KEYS = 'Ctrl+Shift+H';
+
+/** ¿Es el atajo de «Ocultar diapositiva»? Ctrl o Cmd, con Mayúsculas y sin Alt. */
+export function isHideSlideKey(e: {
+  key: string;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+}): boolean {
+  return (e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'h';
+}
+
+/** Alterna «oculta al presentar» en la diapositiva `i` sin mutar. El campo solo se
+ *  escribe cuando es `true` (JSON mínimo, como `hideMaster`); fuera de rango devuelve
+ *  el array original. Pura y exportada para bun test. */
+export function toggleSlideHidden(slides: Slide[], i: number): Slide[] {
+  if (i < 0 || i >= slides.length) return slides;
+  return slides.map((s, j) => {
+    if (j !== i) return s;
+    const ns = { ...s };
+    if (ns.hidden) delete ns.hidden;
+    else ns.hidden = true;
+    return ns;
+  });
 }
 
 /** Mueve la diapositiva `from` a la posición `to` sin mutar (misma identidad
@@ -1016,9 +1178,18 @@ export function slideChartData(chart: SlideChart): ChartData {
   );
 }
 
-/** Rótulo legible de una caja para el panel de animaciones. */
-function boxLabel(t: DocsT, b: SlideBox): string {
-  if (b.kind === 'image') return t('slides.box.image');
+/** Rótulo legible de una caja (panel de animaciones y `aria-label` del marco).
+ *  Exportado para test/slides-alt.test.ts. */
+export function boxLabel(t: DocsT, b: SlideBox): string {
+  if (b.kind === 'image') {
+    // Con texto alternativo, la imagen se nombra por lo que muestra y no por su tipo
+    // (marco del escenario y panel de animaciones), recortada como el texto de abajo.
+    const alt = altDe(b);
+    if (alt === '') return t('slides.box.image');
+    // Por caracteres y no por unidades UTF-16 (un emoji no se parte), como `rotuloAlt` de Fyne.
+    const cs = Array.from(alt);
+    return cs.length > 30 ? `${cs.slice(0, 29).join('')}…` : alt;
+  }
   if (b.kind === 'media')
     return t(b.mediaType === 'audio' ? 'slides.box.audio' : 'slides.box.video');
   if (b.kind === 'chart') return t('slides.box.chart');
@@ -1567,8 +1738,9 @@ function AudioConSubtitulos(props: {
 /** `sh` = alto efectivo del escenario (stageHeight): fija el aspecto del viewBox
  *  de gráfico/diagrama/forma para que no se deformen al cambiar de proporción.
  *  `present`: en el modo presentación los medios se pintan como reproductor real
- *  (<video>/<audio> con controles); en el escenario/miniaturas, como marcador. */
-function renderBox(
+ *  (<video>/<audio> con controles); en el escenario/miniaturas, como marcador.
+ *  Exportado para las pruebas (test/slides-alt.test.ts). */
+export function renderBox(
   t: DocsT,
   b: SlideBox,
   sh: number,
@@ -1579,7 +1751,7 @@ function renderBox(
     return (
       <img
         src={b.src ?? ''}
-        alt=""
+        alt={altDe(b)}
         draggable={false}
         class="pointer-events-none h-full w-full object-contain select-none"
       />
@@ -1770,9 +1942,22 @@ function renderBox(
   );
 }
 
-/** Posición/tamaño de la caja dentro del lienzo 16:9 (mismo estilo en todos los consumidores). */
-function boxPos(b: SlideBox): { left: string; top: string; width: string; height: string } {
-  return { left: `${b.x}%`, top: `${b.y}%`, width: `${b.w}%`, height: `${b.h}%` };
+/** Posición/tamaño de la caja dentro del lienzo 16:9 (mismo estilo en todos los
+ *  consumidores), con su giro alrededor del centro si lo lleva (slides/girar.ts). */
+function boxPos(b: SlideBox): {
+  left: string;
+  top: string;
+  width: string;
+  height: string;
+  rotate?: string;
+} {
+  return {
+    left: `${b.x}%`,
+    top: `${b.y}%`,
+    width: `${b.w}%`,
+    height: `${b.h}%`,
+    ...estiloGiro(b),
+  };
 }
 
 /** Style del morph (FLIP) de una caja emparejada: variables --m* (desfase en px
@@ -2020,15 +2205,57 @@ function PresenterSlide({
   );
 }
 
+/** Tamaños de letra de las notas en la vista del moderador (sus A− y A+, como en
+ *  PowerPoint o Keynote): la escala de tokens de `text-sm` a `text-2xl`. `md` es el de
+ *  siempre, el que había antes de poder cambiarlo. */
+export const NOTES_SIZES = ['sm', 'base', 'md', 'lg', 'xl', '2xl'] as const;
+export type NotesSize = (typeof NOTES_SIZES)[number];
+const NOTES_SIZE_DEFAULT: NotesSize = 'md';
+/* Por persona y no por presentación: es cuestión de la vista de quien presenta (y de su
+   pantalla), no del documento. La app nativa guarda el mismo valor con la misma clave. */
+const NOTES_SIZE_KEY = 'sytue.slides.notesSize';
+
+const isNotesSize = (v: unknown): v is NotesSize =>
+  typeof v === 'string' && (NOTES_SIZES as readonly string[]).includes(v);
+
+/** El tamaño guardado, o `md` si no hay, si es basura o si no hay almacenamiento. */
+export function readNotesSize(): NotesSize {
+  try {
+    const v = localStorage.getItem(NOTES_SIZE_KEY);
+    return isNotesSize(v) ? v : NOTES_SIZE_DEFAULT;
+  } catch {
+    return NOTES_SIZE_DEFAULT; // ventana privada o almacenamiento bloqueado
+  }
+}
+
+/** Lo recuerda para la próxima vez; el de siempre no se guarda (se borra). */
+export function saveNotesSize(s: NotesSize): void {
+  try {
+    if (s === NOTES_SIZE_DEFAULT) localStorage.removeItem(NOTES_SIZE_KEY);
+    else localStorage.setItem(NOTES_SIZE_KEY, s);
+  } catch {
+    // sin almacenamiento el tamaño dura lo que la presentación
+  }
+}
+
+/** Un escalón más grande (`d > 0`) o más pequeño, con topes en los extremos. */
+export function stepNotesSize(s: NotesSize, d: number): NotesSize {
+  const i = NOTES_SIZES.indexOf(s) + Math.sign(d);
+  return NOTES_SIZES[Math.min(Math.max(i, 0), NOTES_SIZES.length - 1)]!;
+}
+
 /** Contenido de la ventana del moderador (sin hooks: props puros → la principal
  *  la repinta con render() en cada cambio). */
-function PresenterView(props: {
+export function PresenterView(props: {
   model: SlidesModel;
   cur: number;
   step: number;
   elapsedMs: number;
   clock: string;
   winW: number;
+  /** Tamaño de letra de las notas y su cambio (A−: −1, A+: +1). */
+  notesSize: NotesSize;
+  onNotesSize: (d: number) => void;
   onPrev: () => void;
   onNext: () => void;
   onReset: () => void;
@@ -2037,7 +2264,9 @@ function PresenterView(props: {
   const t = useT();
   const last = props.model.slides.length - 1;
   const slide = props.model.slides[props.cur] ?? { id: '', boxes: [] };
-  const next = props.cur < last ? props.model.slides[props.cur + 1] : null;
+  // La que vendrá al avanzar: una oculta no sale en la pantalla, así que tampoco aquí.
+  const nextIdx = nextShown(hiddenMask(props.model.slides), props.cur, 1);
+  const next = nextIdx !== null && nextIdx <= last ? props.model.slides[nextIdx] : null;
   const previewW = Math.max(220, Math.min(560, Math.floor((props.winW - 72) / 2)));
   const sh = stageHeight(props.model.size);
 
@@ -2173,28 +2402,76 @@ function PresenterView(props: {
         style={{
           flex: '0 0 26%',
           minHeight: '92px',
-          overflow: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
           padding: '12px 20px',
           borderTop: `1px solid ${hair}`,
         }}
       >
-        <div style={caption}>{t('slides.notes')}</div>
-        {slide.notes && slide.notes.trim() !== '' ? (
-          <p
-            style={{
-              whiteSpace: 'pre-wrap',
-              lineHeight: 1.5,
-              fontSize: 'var(--text-md)',
-              margin: '6px 0 0',
-            }}
-          >
-            {slide.notes}
-          </p>
-        ) : (
-          <p style={{ color: muted, margin: '6px 0 0', fontSize: 'var(--text-base)' }}>
-            {t('slides.presenter.noNotes')}
-          </p>
-        )}
+        {/* El rótulo y los A−/A+ en una fila fija; solo el texto se desplaza debajo, así
+            que con unas notas largas los botones siguen a mano. */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '8px',
+          }}
+        >
+          <span style={caption}>{t('slides.notes')}</span>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            {(
+              [
+                [-1, 'A−', 'slides.presenter.notesSmaller'],
+                [1, 'A+', 'slides.presenter.notesLarger'],
+              ] as const
+            ).map(([d, glyph, key]) => {
+              const tope = stepNotesSize(props.notesSize, d) === props.notesSize;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  style={{
+                    ...btnGhost,
+                    opacity: tope ? 0.4 : 1,
+                    cursor: tope ? 'default' : 'pointer',
+                  }}
+                  aria-label={t(key)}
+                  title={t(key)}
+                  disabled={tope}
+                  onClick={() => props.onNotesSize(d)}
+                >
+                  {glyph}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        {/* `key`: al cambiar de diapositiva sus notas se leen desde arriba, no desde donde
+            se dejaron las de la anterior. */}
+        <div
+          key={props.cur}
+          data-presenter-notes
+          style={{ flex: '1 1 auto', minHeight: 0, overflow: 'auto', marginTop: '6px' }}
+        >
+          {slide.notes && slide.notes.trim() !== '' ? (
+            <p
+              data-notes-size={props.notesSize}
+              style={{
+                whiteSpace: 'pre-wrap',
+                lineHeight: 1.5,
+                fontSize: `var(--text-${props.notesSize})`,
+                margin: 0,
+              }}
+            >
+              {slide.notes}
+            </p>
+          ) : (
+            <p style={{ color: muted, margin: 0, fontSize: 'var(--text-base)' }}>
+              {t('slides.presenter.noNotes')}
+            </p>
+          )}
+        </div>
       </section>
 
       <footer
@@ -2300,6 +2577,26 @@ function Presentation(props: {
    *  la SIGUIENTE, notas y cronómetro, gobernada por ESTA ventana (mismo estado,
    *  sin BroadcastChannel). Se abre/cierra con P o al entrar por «Moderador». */
   const [presenterOn, setPresenterOn] = useState(props.presenter ?? false);
+  // Tamaño de las notas del moderador: vive aquí y no en su ventana, que es otra raíz
+  // de Preact repintada a cada tic y no conserva estado propio.
+  const [notesSize, setNotesSize] = useState<NotesSize>(readNotesSize);
+  const changeNotesSize = useCallback((d: number) => {
+    setNotesSize((s) => {
+      const n = stepNotesSize(s, d);
+      saveNotesSize(n);
+      return n;
+    });
+  }, []);
+  /** Pantalla negra (B o «.») o blanca (W o «,»): tapa la diapositiva para que el
+   *  público mire a quien habla; cualquier tecla o un clic la devuelven. */
+  const [blank, setBlank] = useState<'black' | 'white' | null>(null);
+  /** La lista de teclas («?» o H), en el diálogo de atajos de la suite. */
+  const [help, setHelp] = useState(false);
+  /** El visor ya montado, donde se abre la lista: a pantalla completa, un diálogo en
+   *  `body` no se vería. Estado y no el ref, porque se lee al pintar. */
+  const [rootEl, setRootEl] = useState<HTMLDivElement | null>(null);
+  /** Cifras de «número + Intro» a medio teclear. No se pintan: un ref basta. */
+  const digitsRef = useRef('');
   const presenterWinRef = useRef<Window | null>(null);
   /** Cronómetro del moderador: origen (ms) y «ahora» que refresca cada segundo. El
    *  reloj se lee una vez al montar (inicializador perezoso), no en cada render. */
@@ -2343,6 +2640,12 @@ function Presentation(props: {
     const n = presentAdvance(props.model.slides, cur, curStep, dir);
     go(n.slide, n.step, dir);
   };
+  /** ¿Lleva a algún sitio avanzar/retroceder? Con ocultas al final (o al principio) el
+   *  tope no es la última diapositiva, sino la última que se enseña. */
+  const canMove = (dir: 1 | -1): boolean => {
+    const n = presentAdvance(props.model.slides, cur, curStep, dir);
+    return n.slide !== cur || n.step !== curStep;
+  };
 
   const onKeyDown = (e: KeyboardEvent): void => {
     // Con el foco dentro de un reproductor, las teclas son SUYAS (espacio = pausa,
@@ -2350,32 +2653,25 @@ function Presentation(props: {
     // diapositiva a la vez. Escape sigue saliendo desde cualquier sitio.
     const tag = (e.target as HTMLElement | null)?.tagName;
     if ((tag === 'VIDEO' || tag === 'AUDIO') && e.key !== 'Escape') return;
-    if (e.key === 'n' || e.key === 'N') {
-      e.preventDefault(); // alterna las notas del ponente sin navegar
-      setShowNotes((v) => !v);
-      return;
-    }
-    if (e.key === 'p' || e.key === 'P') {
-      e.preventDefault(); // abre/cierra la vista del moderador (2.ª ventana)
-      setPresenterOn((v) => !v);
-      return;
-    }
-    // Avance/retroceso granular (revela animaciones): →/Espacio y ←.
-    if (e.key === 'ArrowRight' || e.key === ' ') {
-      e.preventDefault();
-      advance(1);
-      return;
-    }
-    if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      advance(-1);
+    // Intro y Espacio sobre un botón del visor (o del moderador) lo pulsan a él: desde
+    // que Intro avanza, si no, pulsar «Salir» con el teclado pasaba de diapositiva.
+    if (tag === 'BUTTON' && blank === null && (e.key === 'Enter' || e.key === ' ')) return;
+    // Con la lista de teclas abierta, el teclado es del diálogo (Escape, Tab y su
+    // botón). Desde la ventana del moderador no se llega a él: allí cualquier tecla
+    // lo cierra, o quien presenta con dos pantallas no podría quitarlo de la otra.
+    if (help) {
+      const target = e.target as Node | null;
+      if (target?.ownerDocument && target.ownerDocument !== document) {
+        e.preventDefault();
+        setHelp(false);
+      }
       return;
     }
     // Trap de Tab: mientras se presenta, tabular no debe llevar a la página de detrás.
     // El visor es `aria-modal`, así que prometerlo y no cumplirlo deja a quien navega con
     // teclado paseando por controles que no puede ver. Mismo selector que el `Modal` del
     // design system, para que «enfocable» signifique lo mismo en los dos sitios.
-    if (e.key === 'Tab') {
+    if (e.key === 'Tab' && blank === null) {
       const raiz = rootRef.current;
       const nodos = raiz ? Array.from(raiz.querySelectorAll<HTMLElement>(FOCUSABLE)) : [];
       // Sin nada enfocable dentro, Tab no lleva a ninguna parte: se queda en el visor.
@@ -2394,12 +2690,49 @@ function Presentation(props: {
       }
       return;
     }
-    // Saltos de diapositiva completa (AvPág/RePág/Inicio/Fin) y salida.
-    const target = presentKeyTarget(e.key, cur, last);
-    if (target === null) return;
+    // Con Ctrl, Alt o Cmd la tecla es de otro (copiar, cambiar de pestaña…): ni pasa de
+    // diapositiva ni enciende la pantalla.
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const { cmd, digits } = presentCommand(e.key, {
+      idx: cur,
+      last,
+      digits: digitsRef.current,
+      blanked: blank !== null,
+      hidden: hiddenMask(props.model.slides),
+    });
+    digitsRef.current = digits;
+    if (cmd === null) {
+      // Una cifra se apunta para «número + Intro»; que no la reciba nadie más.
+      if (/^[0-9]$/.test(e.key)) e.preventDefault();
+      return;
+    }
     e.preventDefault();
-    if (target === 'exit') props.onExit();
-    else go(target, 0, target >= cur ? 1 : -1); // un salto aterriza al inicio de la diapositiva
+    switch (cmd.kind) {
+      case 'advance': // granular: revela las animaciones una a una
+        advance(cmd.dir);
+        break;
+      case 'go': // un salto aterriza al inicio de la diapositiva
+        go(cmd.to, 0, cmd.to >= cur ? 1 : -1);
+        break;
+      case 'exit':
+        props.onExit();
+        break;
+      case 'notes': // alterna las notas del ponente sin navegar
+        setShowNotes((v) => !v);
+        break;
+      case 'presenter': // abre/cierra la vista del moderador (2.ª ventana)
+        setPresenterOn((v) => !v);
+        break;
+      case 'blank':
+        setBlank(cmd.color);
+        break;
+      case 'help':
+        setHelp(true);
+        break;
+      case 'resume':
+        setBlank(null);
+        break;
+    }
   };
 
   useEffect(() => {
@@ -2409,6 +2742,7 @@ function Presentation(props: {
     // quien navega con teclado tenía que recorrer la aplicación entera desde el
     // principio para volver a donde estaba. Mismo patrón que `Modal.tsx`.
     const previo = document.activeElement as HTMLElement | null;
+    setRootEl(el);
     el.focus();
     // Fullscreen API sobre el propio overlay; si el navegador la rechaza, el
     // overlay fijo ya cubre el viewport y todo funciona igual.
@@ -2506,6 +2840,8 @@ function Presentation(props: {
             minute: '2-digit',
           })}
           winW={w.innerWidth}
+          notesSize={notesSize}
+          onNotesSize={changeNotesSize}
           onPrev={() => advanceRef.current(-1)}
           onNext={() => advanceRef.current(1)}
           onReset={() => {
@@ -2517,7 +2853,18 @@ function Presentation(props: {
       </EditorI18nCtx.Provider>,
       w.document.body,
     );
-  }, [presenterOn, cur, curStep, now, props.model, t, advanceRef, onExitRef]);
+  }, [
+    presenterOn,
+    cur,
+    curStep,
+    now,
+    props.model,
+    t,
+    advanceRef,
+    onExitRef,
+    notesSize,
+    changeNotesSize,
+  ]);
 
   const anim =
     slide.transition === 'fade'
@@ -2559,8 +2906,16 @@ function Presentation(props: {
       class="sytue-safe-fullscreen fixed inset-0 flex items-center justify-center overflow-hidden outline-none"
       style={{ background: INK, zIndex: 'var(--z-modal)' }}
       onKeyDown={onKeyDown}
-      onMouseDown={(e) => e.preventDefault()} // el clic no roba el foco (teclado vivo)
-      onClick={() => advance(1)}
+      onMouseDown={(e) => {
+        if (!help) e.preventDefault(); // el clic no roba el foco (teclado vivo)
+      }}
+      onClick={() => {
+        // Con la lista abierta el clic es del diálogo (que vive dentro, por la pantalla
+        // completa); con la pantalla apagada, el clic la devuelve sin pasar de página.
+        if (help) return;
+        if (blank !== null) setBlank(null);
+        else advance(1);
+      }}
     >
       {/* key = remonta el envoltorio al cambiar de diapositiva → re-dispara la
        * animación CSS; la escala vive en el hijo para no pisar el transform. */}
@@ -2647,8 +3002,12 @@ function Presentation(props: {
             } else if (firing === null && (rest.dx !== 0 || rest.dy !== 0)) {
               motionStyle = { transform: `translate(${rest.dx * mulX}px, ${rest.dy * mulY}px)` };
             }
+            /* El giro va en una envoltura de dentro y no en la caja: el morph escala
+             * desde la esquina (transform-origin 0 0) y la caja girada sobre esa
+             * esquina saltaría de sitio durante la transición. */
+            const { rotate: _giro, ...pos } = boxPos(b);
             const style: CSSProperties = {
-              ...boxPos(b),
+              ...pos,
               ...(reveal && firing.delayMs > 0 ? { animationDelay: `${firing.delayMs}ms` } : {}),
               ...motionStyle,
               ...(morphSrc ? morphVars(morphSrc, b, sh) : {}),
@@ -2671,13 +3030,24 @@ function Presentation(props: {
                   hasAction
                     ? (e): void => {
                         e.stopPropagation();
-                        const t = actionTarget(b.action!, cur, last);
+                        const t = actionTarget(
+                          b.action!,
+                          cur,
+                          last,
+                          hiddenMask(props.model.slides),
+                        );
                         if (t !== null) go(t, 0, t >= cur ? 1 : -1);
                       }
                     : undefined
                 }
               >
-                {renderBox(t, b, sh, undefined, true)}
+                {b.rot ? (
+                  <div class="h-full w-full" style={estiloGiro(b)}>
+                    {renderBox(t, b, sh, undefined, true)}
+                  </div>
+                ) : (
+                  renderBox(t, b, sh, undefined, true)
+                )}
               </div>
             );
           })}
@@ -2726,23 +3096,90 @@ function Presentation(props: {
         <PresentButton
           icon="chevronLeft"
           label={t('nav.previous')}
-          disabled={cur === 0 && curStep === 0}
+          disabled={!canMove(-1)}
           onPress={() => advance(-1)}
         />
         <PresentButton
           icon="chevronRight"
           label={t('nav.nextItem')}
-          disabled={cur === last && curStep === steps}
+          disabled={!canMove(1)}
           onPress={() => advance(1)}
         />
         <PresentButton icon="close" label={t('slides.present.exit')} onPress={props.onExit} />
       </div>
+      {/* Pantalla negra o blanca: ENCIMA de todo lo del visor (notas y mandos
+       * incluidos), que lo que se quiere es que no se vea nada. Sin animar: se apaga
+       * para que el público deje de mirar, y un fundido llamaría la atención. */}
+      {blank !== null && (
+        <div
+          aria-hidden="true"
+          class="fixed inset-0"
+          style={{ background: blank === 'black' ? 'black' : 'white' }}
+        />
+      )}
+      <ShortcutsModal
+        open={help}
+        onClose={() => setHelp(false)}
+        container={rootEl}
+        title={t('slides.present.help.title')}
+        groups={presentShortcuts(t)}
+      />
       <p class="sr-only" aria-live="polite">
-        {t('slides.aria.slideOf', { n: cur + 1, total: last + 1 })}
-        {steps > 0 ? `, ${t('slides.present.step', { n: curStep, total: steps })}` : ''}
+        {blank === 'black'
+          ? t('slides.present.blackScreen')
+          : blank === 'white'
+            ? t('slides.present.whiteScreen')
+            : `${t('slides.aria.slideOf', { n: cur + 1, total: last + 1 })}${
+                steps > 0 ? `, ${t('slides.present.step', { n: curStep, total: steps })}` : ''
+              }`}
       </p>
     </div>
   );
+}
+
+/** La lista de «?»: las teclas del visor, con sus nombres en el idioma de quien
+ *  presenta («Intro», «AvPág»). El orden es el de lo que más se usa. Fyne la monta
+ *  igual en `GruposDeTeclasPresentando`. */
+export function presentShortcuts(t: DocsT): GrupoDeAtajos[] {
+  const k = (key: DocsKey): string => t(key);
+  return [
+    {
+      titulo: t('slides.present.help.navigate'),
+      atajos: [
+        {
+          teclas: ['→', '↓', k('slides.present.key.space'), k('slides.present.key.enter')],
+          descripcion: t('slides.present.help.next'),
+        },
+        {
+          teclas: ['←', '↑', k('slides.present.key.backspace')],
+          descripcion: t('slides.present.help.prev'),
+        },
+        {
+          teclas: [k('slides.present.key.pageDown'), k('slides.present.key.pageUp')],
+          descripcion: t('slides.present.help.jump'),
+        },
+        {
+          teclas: [k('slides.present.key.home'), k('slides.present.key.end')],
+          descripcion: t('slides.present.help.ends'),
+        },
+        {
+          teclas: [k('slides.present.key.number'), k('slides.present.key.enter')],
+          descripcion: t('slides.present.help.goTo'),
+        },
+      ],
+    },
+    {
+      titulo: t('slides.present.help.screen'),
+      atajos: [
+        { teclas: ['B', '.'], descripcion: t('slides.present.help.black') },
+        { teclas: ['W', ','], descripcion: t('slides.present.help.white') },
+        { teclas: ['N'], descripcion: t('slides.present.help.notes') },
+        { teclas: ['P'], descripcion: t('slides.present.help.presenter') },
+        { teclas: ['?', 'H'], descripcion: t('slides.present.help.keys') },
+        { teclas: [k('slides.present.key.esc')], descripcion: t('slides.present.exit') },
+      ],
+    },
+  ];
 }
 
 /* ---------- Componente ---------- */
@@ -2855,6 +3292,14 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
   useEffect(() => {
     setExtraSel((prev) => (prev.length ? [] : prev)); // cambia el primario ⇒ sin multiselección
   }, [selBox]);
+  /** Resto de la selección tras pegar varias cajas sueltas: llega a la vez que el primario
+   *  nuevo y este efecto va DESPUÉS del de arriba, así que las deja todas seleccionadas. */
+  const [extraTrasPegar, setExtraTrasPegar] = useState<string[] | null>(null);
+  useEffect(() => {
+    if (!extraTrasPegar) return;
+    setExtraSel(extraTrasPegar);
+    setExtraTrasPegar(null);
+  }, [extraTrasPegar]);
   useEffect(() => {
     setExtraSel((prev) => (prev.length ? [] : prev)); // cambia diapositiva/modo ⇒ sin multiselección
   }, [active, editingMaster]);
@@ -3380,6 +3825,15 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
         return ns;
       }),
     });
+  };
+
+  /** Oculta o vuelve a enseñar al presentar la diapositiva `i` (por defecto la activa). */
+  const toggleHidden = (i = stateRef.current.active): void => {
+    const cur = stateRef.current;
+    // Editando el patrón el botón del pie está inerte: el atajo sobre una miniatura
+    // tampoco cuenta (Fyne lo corta igual en `AlternarOculta`).
+    if (cur.ctx.soloLectura || editingMaster) return;
+    apply({ slides: toggleSlideHidden(cur.model.slides, i) });
   };
 
   /* ----- animaciones de una caja (fase Slides-Animación avanzada) ----- */
@@ -4029,6 +4483,137 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     setEditBox(null);
   };
 
+  /* ----- copiar, cortar, pegar y duplicar cajas (slides/portapapeles.ts) -----
+   * Van por los eventos `copy`/`cut`/`paste` del documento y no por el teclado: así
+   * escriben y leen el portapapeles del sistema sin pedir permiso, sirven también al
+   * menú del navegador y llegan entre dos presentaciones abiertas. */
+
+  /** Conectores del objetivo de edición (el patrón no tiene). */
+  const editTargetConnectors = (): SlideConnector[] => {
+    const cur = stateRef.current;
+    return cur.editingMaster ? [] : (cur.model.slides[cur.active]?.connectors ?? []);
+  };
+
+  /** La selección efectiva como recorte; null si no hay nada seleccionado. */
+  const recorteDeSeleccion = (): RecorteDiapos | null => {
+    const ids = effSelIds();
+    if (ids.length === 0) return null;
+    const r = recortar(editTargetBoxes(), editTargetConnectors(), ids);
+    return r.boxes.length > 0 ? r : null;
+  };
+
+  /** Pega el recorte en el objetivo de edición y deja lo pegado seleccionado. Respeta el
+   *  tope del op-body (imágenes `data:` grandes) y la protección (la rechaza `apply`). */
+  const pegarCajas = (r: RecorteDiapos): void => {
+    const cur = stateRef.current;
+    if (cur.ctx.soloLectura) return;
+    const conConectores = !cur.editingMaster;
+    const previos = editTargetConnectors();
+    const p = pegarRecorte(editTargetBoxes(), previos, r, {
+      nuevoId: () => crypto.randomUUID(),
+      conConectores,
+    });
+    // modelWithBoxes ya lleva los conectores que había: solo se suman los pegados.
+    const conectoresNuevos = JSON.stringify(p.connectors.slice(previos.length)).length;
+    if (JSON.stringify(modelWithBoxes(p.boxes)).length + conectoresNuevos > MODEL_MAX_CHARS) {
+      notify({
+        tone: 'warning',
+        title: t('slides.msg.pasteFailed'),
+        description: t('slides.msg.dupeFailed.detail'),
+      });
+      return;
+    }
+    const antes = cur.model;
+    if (conConectores) {
+      apply({
+        slides: cur.model.slides.map((s, i) => {
+          if (i !== cur.active) return s;
+          const ns: Slide = { ...s, boxes: p.boxes };
+          if (p.connectors.length > 0) ns.connectors = p.connectors;
+          else delete ns.connectors;
+          return ns;
+        }),
+      });
+    } else {
+      applyBoxes(() => p.boxes);
+    }
+    if (stateRef.current.model === antes) return; // rechazado (diapositiva protegida)
+    const [primera, ...resto] = p.ids;
+    if (!primera) return;
+    if (resto.length > 0) setExtraTrasPegar(resto);
+    setSelBox(primera);
+    setSelConn(null);
+    setEditBox(null);
+    stateRef.current = { ...stateRef.current, selBox: primera, extraSel: resto };
+    stageRef.current?.focus();
+  };
+
+  /** Ctrl+D: duplica la selección en la misma diapositiva (desplazada). */
+  const duplicarCajas = (): void => {
+    const r = recorteDeSeleccion();
+    if (r) pegarCajas(r);
+  };
+
+  /** Texto plano de un recorte (pegar cajas dentro de una caja en edición pega su texto).
+   *  DOMParser no ejecuta nada: solo se lee `textContent`. */
+  const textoDeRecorte = (r: RecorteDiapos): string =>
+    r.boxes
+      .map((b) =>
+        (new DOMParser().parseFromString(b.html, 'text/html').body.textContent ?? '').trim(),
+      )
+      .filter((x) => x !== '')
+      .join('\n');
+
+  /** ¿El foco está en el escenario o en el marco de una caja (no en un texto en edición)? */
+  const focoEnEscenario = (el: HTMLElement | null): boolean =>
+    !!el &&
+    (el === stageRef.current ||
+      (el.dataset['boxframe'] !== undefined && !!stageRef.current?.contains(el)));
+  /** ¿El foco está en una caja de texto en edición del escenario? */
+  const focoEnTexto = (el: HTMLElement | null): boolean =>
+    !!el && el.dataset['slidebox'] !== undefined && !!stageRef.current?.contains(el);
+
+  const onCopiarCajas = (e: ClipboardEvent, cortar: boolean): void => {
+    const el = document.activeElement as HTMLElement | null;
+    if (!focoEnEscenario(el) || !e.clipboardData) return; // texto en edición: lo nativo
+    const r = recorteDeSeleccion();
+    if (!r) return;
+    e.preventDefault();
+    e.clipboardData.setData('text/plain', serializarRecorte(r));
+    // En solo lectura cortar es copiar: lo que se lee se puede llevar, no quitar.
+    if (cortar && !stateRef.current.ctx.soloLectura) removeBoxes(r.boxes.map((b) => b.id));
+  };
+
+  const onPegarCajas = (e: ClipboardEvent): void => {
+    const el = document.activeElement as HTMLElement | null;
+    const r = leerRecorte(e.clipboardData?.getData('text/plain') ?? '');
+    if (!r) return; // otro contenido: lo de siempre
+    if (focoEnTexto(el)) {
+      // Dentro de un texto se pega texto, nunca cajas (ni su JSON).
+      e.preventDefault();
+      document.execCommand('insertText', false, textoDeRecorte(r));
+      return;
+    }
+    if (!focoEnEscenario(el)) return;
+    e.preventDefault();
+    pegarCajas(r);
+  };
+
+  const portapapelesRef = useUltimo({ onCopiarCajas, onPegarCajas });
+  useEffect(() => {
+    const copiar = (e: ClipboardEvent): void => portapapelesRef.current.onCopiarCajas(e, false);
+    const cortar = (e: ClipboardEvent): void => portapapelesRef.current.onCopiarCajas(e, true);
+    const pegar = (e: ClipboardEvent): void => portapapelesRef.current.onPegarCajas(e);
+    document.addEventListener('copy', copiar);
+    document.addEventListener('cut', cortar);
+    document.addEventListener('paste', pegar);
+    return () => {
+      document.removeEventListener('copy', copiar);
+      document.removeEventListener('cut', cortar);
+      document.removeEventListener('paste', pegar);
+    };
+  }, [portapapelesRef]);
+
   /* ----- organizar objetos (fase Slides-Organizar) ----- */
 
   /** Desplaza el conjunto `ids` como bloque (grupo/multiselección) por dx/dy en %,
@@ -4073,6 +4658,8 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
       applyBoxes((boxes) => distributeBoxes(boxes, ids, 'h'));
     } else if (op === 'dist-v') {
       applyBoxes((boxes) => distributeBoxes(boxes, ids, 'v'));
+    } else if (GIRO_OPS[op] !== undefined) {
+      applyBoxes((boxes) => girarCajas(boxes, ids, GIRO_OPS[op]!));
     }
   };
 
@@ -4280,28 +4867,85 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
 
   const dragRef = useRef<{
     boxId: string; // caja bajo el puntero
-    mode: 'mover' | 'redimensionar';
+    mode: 'mover' | 'redimensionar' | 'girar';
     x0: number;
     y0: number;
-    /** Cajas que se mueven (grupo/multiselección); al redimensionar, solo `boxId`. */
-    origs: { id: string; x: number; y: number; w: number; h: number }[];
+    /** Cajas que se mueven o giran (grupo/multiselección); al redimensionar, solo `boxId`. */
+    origs: { id: string; x: number; y: number; w: number; h: number; rot?: number }[];
+    /** Girar: centro en pantalla de la caja del asa y ángulo del puntero al empezar. */
+    centro?: { x: number; y: number };
+    ang0?: number;
     /** Topes del desplazamiento (mover): la envolvente del conjunto no sale del lienzo. */
     min: { x: number; y: number };
     max: { x: number; y: number };
   } | null>(null);
+  /** Guías inteligentes visibles durante el arrastre: solo de vista, nunca en el modelo. */
+  const [guias, setGuias] = useState<Guia[]>([]);
 
-  const snapRect = (b: SlideBox): { id: string; x: number; y: number; w: number; h: number } => ({
+  /** Contexto de las guías: las cajas que no se arrastran, ~6 px de pantalla de
+   *  tolerancia en cada eje y Alt para soltar sin ajuste (como Slides/Keynote). */
+  const contextoGuias = (e: PointerEvent, quietas: readonly { id: string }[]): ContextoGuias => {
+    const s = stateRef.current.scale;
+    const ids = new Set(quietas.map((q) => q.id));
+    return {
+      otros: editTargetBoxes().filter((b) => !ids.has(b.id)),
+      tolerancia: {
+        x: (TOLERANCIA_GUIA_PX / (STAGE_W * s)) * 100,
+        y: (TOLERANCIA_GUIA_PX / (stateRef.current.sh * s)) * 100,
+      },
+      sinAjuste: e.altKey,
+    };
+  };
+
+  const snapRect = (
+    b: SlideBox,
+  ): { id: string; x: number; y: number; w: number; h: number; rot?: number } => ({
     id: b.id,
     x: b.x,
     y: b.y,
     w: b.w,
     h: b.h,
+    rot: giroDe(b),
   });
 
-  const onHandleDown = (e: PointerEvent, box: SlideBox, mode: 'mover' | 'redimensionar'): void => {
+  /** Selección efectiva que arrastra la caja bajo el puntero: la multiselección o el
+   *  grupo si la caja pertenece; si no, ella sola. */
+  const cajasDelArrastre = (box: SlideBox): SlideBox[] => {
+    const boxesNow = editTargetBoxes();
+    const base = isSelected(box.id) ? explicitSel() : [box.id];
+    const moving = new Set(expandGroups(boxesNow, base));
+    moving.add(box.id); // la caja bajo el puntero siempre se mueve
+    return boxesNow.filter((b) => moving.has(b.id));
+  };
+
+  const onHandleDown = (
+    e: PointerEvent,
+    box: SlideBox,
+    mode: 'mover' | 'redimensionar' | 'girar',
+  ): void => {
     e.preventDefault();
     e.stopPropagation();
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    const handle = e.currentTarget as HTMLElement;
+    handle.setPointerCapture(e.pointerId);
+    if (mode === 'girar') {
+      /* El centro de la envolvente en pantalla ES el de la caja (gira sobre él), así
+       * vale con la caja ya girada y con el lienzo escalado. Cada caja de la selección
+       * gira lo mismo, cada una sobre su centro (como PowerPoint). */
+      const r = handle.parentElement!.getBoundingClientRect();
+      const centro = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      dragRef.current = {
+        boxId: box.id,
+        mode,
+        x0: e.clientX,
+        y0: e.clientY,
+        origs: cajasDelArrastre(box).map(snapRect),
+        min: { x: 0, y: 0 },
+        max: { x: 0, y: 0 },
+        centro,
+        ang0: anguloDelPuntero(centro, { x: e.clientX, y: e.clientY }),
+      };
+      return;
+    }
     if (mode === 'redimensionar') {
       // Redimensionar afecta solo a la caja bajo el puntero (sin escalado de grupo).
       dragRef.current = {
@@ -4316,11 +4960,7 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
       return;
     }
     // Mover: conjunto efectivo (multiselección/grupo si la caja pertenece), topado por su envolvente.
-    const boxesNow = editTargetBoxes();
-    const base = isSelected(box.id) ? explicitSel() : [box.id];
-    const moving = new Set(expandGroups(boxesNow, base));
-    moving.add(box.id); // la caja bajo el puntero siempre se mueve
-    const origs = boxesNow.filter((b) => moving.has(b.id)).map(snapRect);
+    const origs = cajasDelArrastre(box).map(snapRect);
     const bx = boundingBox(origs);
     const limites = calcularLimitesArrastre(bx);
     dragRef.current = {
@@ -4340,24 +4980,74 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     const s = stateRef.current.scale;
     const dxRaw = ((e.clientX - drag.x0) / (STAGE_W * s)) * 100;
     const dyRaw = ((e.clientY - drag.y0) / (stateRef.current.sh * s)) * 100;
-    if (drag.mode === 'mover') {
+    if (drag.mode === 'girar') {
+      const ancla = drag.origs.find((o) => o.id === drag.boxId) ?? drag.origs[0]!;
+      const delta =
+        anguloDelPuntero(drag.centro!, { x: e.clientX, y: e.clientY }) - (drag.ang0 ?? 0);
+      // Con Mayús, la caja del asa queda en múltiplos de 15° y las demás giran lo mismo.
+      const g0 = ancla.rot ?? 0;
+      const g = e.shiftKey ? Math.round((g0 + delta) / PASO_GIRO) * PASO_GIRO : g0 + delta;
+      const at = new Map(drag.origs.map((o) => [o.id, o]));
+      applyBoxes(
+        (boxes) =>
+          boxes.map((b) => {
+            const o = at.get(b.id);
+            return o ? conGiro(b, (o.rot ?? 0) + g - g0) : b;
+          }),
+        false,
+      );
+    } else if (drag.mode === 'mover') {
       // Un solo delta topado ⇒ el conjunto conserva sus posiciones relativas.
-      const { nuevasPosiciones } = calcularArrastre(drag.origs, dxRaw, dyRaw, drag.min, drag.max);
+      const { nuevasPosiciones, guias: g } = moverConGuias(
+        drag.origs,
+        dxRaw,
+        dyRaw,
+        drag.min,
+        drag.max,
+        contextoGuias(e, drag.origs),
+      );
+      setGuias(g);
       const at = new Map(nuevasPosiciones.map((o) => [o.id, { x: o.x, y: o.y }]));
       applyBoxes((boxes) => boxes.map((b) => ({ ...b, ...at.get(b.id) })), false);
     } else {
       const o = drag.origs[0]!;
-      const dim = calcularRedimension(o, dxRaw, dyRaw, 4, 100);
+      /* Girada, el arrastre se lleva a los ejes de la caja y la esquina opuesta se queda
+       * quieta (girar.ts); sin giro, el redimensionado de siempre con su tope al borde. */
+      const dim = o.rot
+        ? redimensionarGirada(
+            o,
+            (e.clientX - drag.x0) / s,
+            (e.clientY - drag.y0) / s,
+            STAGE_W,
+            stateRef.current.sh,
+          )
+        : redimensionarConGuiasVista(e, o, dxRaw, dyRaw);
       applyBoxes(
-        (boxes) => boxes.map((b) => (b.id === drag.boxId ? { ...b, w: dim.w, h: dim.h } : b)),
+        (boxes) =>
+          boxes.map((b) =>
+            b.id === drag.boxId ? { ...b, x: dim.x, y: dim.y, w: dim.w, h: dim.h } : b,
+          ),
         false,
       );
     }
   };
 
+  /** Redimensionado sin giro con guías; pinta las guías y devuelve la caja. */
+  const redimensionarConGuiasVista = (
+    e: PointerEvent,
+    o: { id: string; x: number; y: number; w: number; h: number },
+    dxRaw: number,
+    dyRaw: number,
+  ): { x: number; y: number; w: number; h: number } => {
+    const r = redimensionarConGuias(o, dxRaw, dyRaw, contextoGuias(e, [o]));
+    setGuias(r.guias);
+    return r.rect;
+  };
+
   const onHandleUp = (): void => {
     if (!dragRef.current) return;
     dragRef.current = null;
+    setGuias([]);
     // Un único commit al soltar (el autosave ya viene con debounce).
     stateRef.current.ctx.onContentInput(JSON.stringify(stateRef.current.model));
   };
@@ -4419,12 +5109,13 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
         stageRef.current?.focus();
       } else {
         // Texto de la caja: sus atajos son los de `exec` (registro de comandos).
-        const atajo = comandoDelAtajo(e, 'document');
-        if (atajo) {
-          e.preventDefault();
-          ctx.exec(atajo.id as EditorCommand, atajo.value);
-        }
+        atenderAtajoDeTexto(e, ctx);
       }
+      return;
+    }
+    if (isHideSlideKey(e) && !editingMaster) {
+      e.preventDefault(); // en Firefox abre el historial
+      toggleHidden();
       return;
     }
     // Conector seleccionado: Supr lo borra, Esc lo deselecciona (prioridad sobre
@@ -4445,7 +5136,10 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     if (!selBox || (target !== stageRef.current && target.dataset['boxframe'] === undefined))
       return;
     const b = editBoxes.find((x) => x.id === selBox);
-    if (e.key === 'Delete' || e.key === 'Backspace') {
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'd') {
+      e.preventDefault(); // sin él, el navegador guarda un marcador
+      duplicarCajas();
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
       removeBoxes(effSelIds()); // Supr borra la selección efectiva (caja/grupo/multiselección)
     } else if ((e.key === 'Enter' || e.key === 'F2') && b && (!b.kind || b.kind === 'text')) {
@@ -4543,9 +5237,10 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
 
           EN PÍXELES Y NO EN `rem`, igual que la miniatura: lo que va dentro se
           escala a THUMB_W píxeles, así que medir su caja en rem la ata al tamaño
-          de letra de la raíz. Con la raíz en 14 —un ajuste de accesibilidad
-          corriente, y el que tiene la suite— `w-40` daba 139px y `w-32` 112,
-          mientras el contenido seguía midiendo 128: cada miniatura recortaba
+          de letra de la raíz. Con la base de letra en
+          14 px —un ajuste de accesibilidad corriente, y el que tuvo la suite—
+          `w-40` daba 139px y `w-32` 112, mientras el contenido seguía
+          midiendo 128: cada miniatura recortaba
           16px del lado derecho de su diapositiva, medido en las tres ventanas de
           escritorio. Con la raíz en 16 esto vale exactamente lo mismo que antes.
 
@@ -4568,6 +5263,7 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
         >
           {model.slides.map((s, i) => {
             const vis = slideVisuals(model, s);
+            const oculta = s.hidden === true;
             return (
               <div key={s.id} {...slideOrder.itemProps(s.id)} class="group relative shrink-0">
                 <button
@@ -4581,9 +5277,11 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
                 </button>
                 {/* La miniatura representa el contenido, no el nombre del
                     control: el botón superpuesto se identifica por su número. */}
+                {/* Oculta: la miniatura se atenúa (sigue siendo editable) y su número sale
+                    tachado, como en PowerPoint y Google Slides. */}
                 <div
                   aria-hidden="true"
-                  class="pointer-events-none relative block shrink-0 overflow-hidden rounded-sm select-none [-webkit-user-select:none]"
+                  class={`pointer-events-none relative block shrink-0 overflow-hidden rounded-sm select-none [-webkit-user-select:none] ${oculta ? 'opacity-40' : ''}`}
                   style={{
                     ...visualsStyle(vis),
                     // Ancho y alto en las MISMAS unidades que la escala de dentro:
@@ -4621,13 +5319,21 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
                 <button
                   type="button"
                   class={`absolute inset-0 block h-full w-full overflow-hidden rounded-sm bg-transparent ${FOCUS_RING}`}
-                  aria-label={t('slides.aria.slideOf', { n: i + 1, total: model.slides.length })}
+                  aria-label={t(oculta ? 'slides.aria.slideOfHidden' : 'slides.aria.slideOf', {
+                    n: i + 1,
+                    total: model.slides.length,
+                  })}
                   aria-current={i === active ? 'true' : undefined}
                   title={t('slides.aria.dragHint', { n: i + 1 })}
                   /* Reordenar sin ratón: el arrastre del carril no existe para quien
                    * navega con teclado, y el orden de las diapositivas no es un
                    * adorno. Mismo atajo que PowerPoint y Google Slides. */
                   onKeyDown={(e) => {
+                    if (isHideSlideKey(e)) {
+                      e.preventDefault();
+                      toggleHidden(i);
+                      return;
+                    }
                     if (!(e.ctrlKey || e.metaKey) || !e.shiftKey) return;
                     const to = e.key === 'ArrowUp' ? i - 1 : e.key === 'ArrowDown' ? i + 1 : -1;
                     if (to < 0 || to >= model.slides.length) return;
@@ -4640,7 +5346,10 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
                     setEditBox(null);
                   }}
                 >
-                  <span class="bg-bg-subtle text-text-muted text-2xs absolute right-1 bottom-0.5 rounded-sm px-1 leading-4">
+                  <span
+                    class={`bg-bg-subtle text-text-muted text-2xs absolute right-1 bottom-0.5 rounded-sm px-1 leading-4 ${oculta ? 'line-through' : ''}`}
+                    data-oculta={oculta ? '' : undefined}
+                  >
                     {i + 1}
                   </span>
                 </button>
@@ -4651,6 +5360,14 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
         <div class="border-border flex shrink-0 items-center justify-center gap-1 border-t p-1 max-sm:border-t-0 max-sm:border-l">
           <RibbonButton icon="plus" label={t('slides.new')} onAction={() => addSlide()} />
           <RibbonButton icon="slideAdd" label={t('slides.duplicate')} onAction={duplicateSlide} />
+          <RibbonButton
+            icon="eyeOff"
+            label={t('slides.hideSlide')}
+            keys={HIDE_SLIDE_KEYS}
+            active={model.slides[active]?.hidden === true}
+            disabled={editingMaster || ctx.soloLectura}
+            onAction={() => toggleHidden()}
+          />
           <RibbonButton
             icon="trash"
             label={t('slides.delete')}
@@ -4773,6 +5490,22 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
                 label={t('shape.outline')}
                 color={selBoxObj.stroke ?? SHAPE_STROKE}
                 onPick={(c) => patchBox(selBoxObj.id, { stroke: c }, true)}
+              />
+            </>
+          )}
+          {/* Con una imagen seleccionada: su texto alternativo (también en el patrón: un
+              logotipo del patrón sale en todas las diapositivas y hay que describirlo). */}
+          {selBoxObj?.kind === 'image' && (
+            <>
+              <div aria-hidden="true" class="bg-border mx-1 h-5 w-px" />
+              <CampoAlt
+                box={selBoxObj}
+                onAlt={(id, alt, persist) =>
+                  applyBoxes(
+                    (boxes) => boxes.map((b) => (b.id === id ? conAlt(b, alt) : b)),
+                    persist,
+                  )
+                }
               />
             </>
           )}
@@ -5114,6 +5847,27 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
                           onPointerUp={onHandleUp}
                           onPointerCancel={onHandleUp}
                         />
+                        {/* Asa de giro: encima del de mover, unida al marco por un trazo
+                         * como en PowerPoint. Mayús = de 15 en 15°. Por teclado, el menú
+                         * «Organizar» gira 90° y endereza. */}
+                        <div
+                          aria-hidden="true"
+                          class="pointer-events-none absolute -top-6 left-1/2 h-3 w-px -translate-x-1/2"
+                          style={{ background: ACCENT }}
+                        />
+                        <div
+                          class="sytue-slide-handle absolute -top-8 left-1/2 h-2.5 w-2.5 -translate-x-1/2 cursor-grab rounded-full"
+                          style={{
+                            background: 'var(--editor-page-bg)',
+                            border: `1.5px solid ${ACCENT}`,
+                          }}
+                          title={t('slides.box.rotate')}
+                          data-asa-giro=""
+                          onPointerDown={(e) => onHandleDown(e, b, 'girar')}
+                          onPointerMove={onHandleMove}
+                          onPointerUp={onHandleUp}
+                          onPointerCancel={onHandleUp}
+                        />
                       </>
                     )}
                   </div>
@@ -5189,6 +5943,32 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
                   })}
                 </svg>
               )}
+              {/* Guías inteligentes del arrastre: 1 px de pantalla a cualquier zoom. */}
+              {guias.map((g) => (
+                <div
+                  key={`guia-${g.eje}-${g.pos}`}
+                  aria-hidden="true"
+                  data-guia={g.eje}
+                  class="pointer-events-none absolute"
+                  style={
+                    g.eje === 'x'
+                      ? {
+                          left: `${g.pos}%`,
+                          top: `${g.desde}%`,
+                          height: `${g.hasta - g.desde}%`,
+                          width: `${1 / scale}px`,
+                          background: ACCENT,
+                        }
+                      : {
+                          top: `${g.pos}%`,
+                          left: `${g.desde}%`,
+                          width: `${g.hasta - g.desde}%`,
+                          height: `${1 / scale}px`,
+                          background: ACCENT,
+                        }
+                  }
+                />
+              ))}
               {/* Cursores remotos: marco de color alrededor de las cajas que cada
                   peer tiene seleccionadas en esta diapositiva + etiqueta con su
                   nombre (contra-escalada para ser legible a cualquier zoom del
@@ -5221,7 +6001,7 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
                               transform: `scale(${1 / scale})`,
                             }}
                           >
-                            {peerName(pc.name)}
+                            {peerName(pc.name, t('header.peerUnnamed'))}
                           </span>
                         </div>
                       )),
@@ -5459,7 +6239,7 @@ export function SlidesCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
               {/* Los cuatro botones se llaman «Fila»/«Columna» en pantalla: sin
                   aria-label, un lector de pantalla anunciaba dos «Fila» iguales y
                   una de ellas borraba. Botones y celdas con suelo de 24 px: `h-6` son
-                  21 con la raíz a 14, y así medían en producción (2026-09-21). */}
+                  21 cuando 1 rem eran 14 px, y así medían en producción (2026-09-21). */}
               <div class="border-border flex shrink-0 items-center gap-1 border-t px-3 py-1">
                 <button
                   type="button"

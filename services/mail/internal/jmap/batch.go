@@ -6,6 +6,7 @@ package jmap
 import (
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
 	"git.sytue.eu/sytue/one/platform/pkg/httpx"
@@ -103,4 +104,26 @@ func parseUUIDs(raw []string) ([]uuid.UUID, error) {
 		ids = append(ids, id)
 	}
 	return ids, nil
+}
+
+// markMailboxRead marca como leído todo lo no leído de una carpeta («Marcar todo
+// como leído»). Es una operación de servidor por buzón, no un lote de ids, para que
+// alcance también a los mensajes que la lista aún no ha paginado.
+func (a *API) markMailboxRead(w http.ResponseWriter, r *http.Request) {
+	acc, err := a.account(r)
+	if err != nil {
+		httpx.Fail(w, r, err)
+		return
+	}
+	mbID, err := uuid.Parse(chi.URLParam(r, "mailboxID"))
+	if err != nil {
+		httpx.Fail(w, r, httpx.ErrBadRequest.WithMessage("Invalid mailbox id."))
+		return
+	}
+	n, err := a.store.MarkMailboxRead(r.Context(), acc.ID, mbID)
+	if err != nil {
+		httpx.Fail(w, r, mapErr(err))
+		return
+	}
+	httpx.JSON(w, r, http.StatusOK, map[string]any{"updated": n})
 }

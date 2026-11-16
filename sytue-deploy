@@ -858,6 +858,29 @@ esperar_salud() {
   done
 }
 
+# Compila en tandas: todo lo que no es app web de una vez y después las apps web
+# (Astro) de N en N. Compose las lanzaba todas a la vez y cada compilación de
+# Astro ronda 2-3 GB: medido, 18 en paralelo agotan 15 GB (exit 137). N sale de la
+# memoria de Docker, a ~3 GB por compilación.
+construir_por_tandas() {
+  local servicios web otros=() apps=() s mem n i
+  servicios="$(dc config --services 2>/dev/null)"
+  web=" $(sed -n 's/^  \([a-z0-9-]*\):$/\1/p' "${COMPOSE_DIR}/frontlite.yml" | tr '\n' ' ') "
+  for s in $servicios; do
+    case "$web" in *" $s "*) apps+=("$s") ;; *) otros+=("$s") ;; esac
+  done
+  mem="$(docker info --format '{{.MemTotal}}' 2>/dev/null || echo 0)"
+  n=$(( ${mem:-0} / 1024 / 1024 / 1024 / 3 ))
+  [ "$n" -ge 1 ] || n=1
+  if [ "${#otros[@]}" -gt 0 ]; then
+    DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 dc build "${otros[@]}"
+  fi
+  for ((i = 0; i < ${#apps[@]}; i += n)); do
+    info "Apps web $((i + 1))-$(( i + n < ${#apps[@]} ? i + n : ${#apps[@]} )) de ${#apps[@]}..."
+    DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 dc build "${apps[@]:i:n}"
+  done
+}
+
 sembrar_admin() {
   local _
   for _ in 1 2 3 4 5 6; do
@@ -1008,7 +1031,7 @@ instalar_compose() {
     info "Sin reconstruir (--no-build): se usan las imágenes ya construidas."
   else
     info "Construyendo las imágenes (servicios Go y apps web compiladas). La primera vez tarda (≈20-60 min según el equipo); después es incremental."
-    DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 dc build
+    construir_por_tandas
   fi
   info "Arrancando contenedores..."
   dc up -d --no-build --remove-orphans

@@ -498,12 +498,17 @@ services:
     build:
       <<: *go-build
       dockerfile: services/id/Dockerfile
-    <<: [*restart, *logging, *mem-go]
+    # 256m y no 128m: cada login calcula Argon2id con 64 MiB (domain/secret.go). Con
+    # 128m, un login a la vez que el healthcheck (otro proceso del mismo binario)
+    # acababa en OOM: el contenedor quedaba «unhealthy», Traefik retiraba su ruta
+    # y id.sytue.localhost respondía 404 a ratos. Producción le da 256Mi (Helm).
+    <<: [*restart, *logging, *mem-go-big]
     networks: [edge, backend]
     ports:
       - "127.0.0.1:8081:8081"
     environment:
       <<: *go-env
+      GOMEMLIMIT: 192MiB       # DEV-ONLY: ~75% de su mem_limit (256m)
       PORT: "8081"
       PUBLIC_URL: https://id.sytue.localhost
       # Sytue ID lee su config con prefijo SYTUE_ID_ (platform/pkg/config) y usa

@@ -1463,13 +1463,14 @@ services:
     <<: [*restart, *logging, *mem-go]
     profiles: ["full", "cloud"]
     networks: [backend]
-    # 8094: el 8093 es del Integration Gateway (CONVENTIONS §6) y los dos juntos
-    # en el perfil `full` chocaban al arrancar («port is already allocated»).
+    # 8103: el 8093 es del Integration Gateway y el 8094 del colector de
+    # Analytics (CONVENTIONS §6); con cualquiera de los dos, el perfil `full`
+    # no arrancaba («port is already allocated»).
     ports:
-      - "127.0.0.1:8094:8094"
+      - "127.0.0.1:8103:8103"
     environment:
       <<: *go-env
-      PORT: "8094"
+      PORT: "8103"
       DATABASE_URL: "postgres://${CLOUD_DB_USER:-sytue_cloud}:${CLOUD_DB_PASSWORD}@postgres:5432/${CLOUD_DB_NAME:-sytue_cloud}?sslmode=disable"
       SECRET_ENC_KEY: ${CLOUD_SECRET_ENC_KEY}
       S3_BUCKET: sytue-dev-build-cache

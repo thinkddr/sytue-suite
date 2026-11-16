@@ -278,6 +278,7 @@ de solo icono mantienen su proporción cuadrada y el mismo radio.
 | Sytue Analytics colector         | 8094           |     |                      |        |
 | Sytue Analytics API              | 8095           |     |                      |        |
 | Sytue OCR (interno, sin ingress) | 8096           |     |                      |        |
+| Sytue Cloud controller (interno) | 8103           |     |                      |        |
 | Sytue Cast (+WS del chat)        | 8099           |     |                      |        |
 | Sytue Bases                      | 8102           |     | bases                | 4337   |
 |                                  |                |     | docus                | 4338   |

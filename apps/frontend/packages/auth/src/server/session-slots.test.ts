@@ -536,3 +536,43 @@ test('login start bounds obsolete token cookies while preserving the active fall
   start.apply();
   expect((await slots.read(browser.request().ctx))?.session.generation).toBe(previous);
 });
+
+test('a session over the 4096-byte cookie limit is split, read back, shrunk and revoked whole', async () => {
+  const slots = new SessionSlots(SECRET, true, 3600),
+    browser = new BrowserCookies();
+  const login = browser.request();
+  const selected = await slots.begin(login.ctx);
+  const id = selected.candidate.id;
+  // Tokens del tamaño de los de Sytue ID con roles y buzones: la sesión sellada pasa de 4 KB.
+  const grande = session('alice', 'acme', id);
+  grande.tokens = { ...grande.tokens, accessToken: 'a'.repeat(3000), idToken: 'i'.repeat(2500) };
+  await slots.complete(login.ctx, id, grande);
+  login.apply();
+  const nombres = [...browser.values.keys()].filter((n) => n.includes('slot_' + id));
+  expect(nombres.length).toBeGreaterThan(1);
+  for (const n of nombres) expect(n.length + browser.values.get(n)!.length).toBeLessThan(4096);
+  expect((await slots.read(browser.request().ctx))?.session.tokens.idToken).toBe(
+    grande.tokens.idToken,
+  );
+
+  // Un refresco con tokens más cortos no puede dejar trozos viejos que corrompan la sesión.
+  const refresh = browser.request();
+  const actual = await slots.read(refresh.ctx);
+  await slots.persist(refresh.ctx, actual!, {
+    ...grande,
+    tokens: { ...grande.tokens, accessToken: 'b', idToken: 'c' },
+  });
+  refresh.apply();
+  expect([...browser.values.keys()].filter((n) => n.includes('slot_' + id))).toHaveLength(1);
+  expect((await slots.read(browser.request().ctx))?.session.tokens.accessToken).toBe('b');
+
+  // Y el cierre de sesión borra todos los trozos.
+  const grande2 = browser.request();
+  await slots.persist(grande2.ctx, (await slots.read(grande2.ctx))!, grande);
+  grande2.apply();
+  const logout = browser.request();
+  await slots.revokeCurrent(logout.ctx);
+  logout.apply();
+  expect([...browser.values.keys()].filter((n) => n.includes('slot_' + id))).toHaveLength(0);
+  expect(await slots.read(browser.request().ctx)).toBeNull();
+});

@@ -3,11 +3,76 @@
 **Autor:** Daniel Delgado Ramos ([thinkddr](https://github.com/thinkddr))  
 **Licencia:** [Apache-2.0](LICENSE) · **Repositorio público:** [github.com/thinkddr/sytue-suite](https://github.com/thinkddr/sytue-suite)
 
-**Sytue Suite** es una suite colaborativa, de productividad, gestión empresarial (ERP) y plataforma cloud (PaaS) **100 % europea y soberana**, desarrollada desde cero (*clean-room* sobre estándares abiertos) bajo licencia **Apache-2.0**.
-
-Reúne identidad (SSO/OIDC/MFA/Passkeys/SCIM), correo, almacenamiento en la nube, ofimática colaborativa (documentos, hojas de cálculo, presentaciones, bases de datos y edición/firma de PDF), galería de fotos, notas, calendario, contactos, mensajería y videollamadas en tiempo real, streaming de vídeo, creador de sitios web, ERP y plataforma PaaS bajo **una sola identidad, una sola estética y una sola experiencia**.
+**Sytue Suite** es una suite colaborativa, de productividad, gestión empresarial (ERP) y
+plataforma cloud (PaaS) **100 % europea y soberana**, desarrollada desde cero
+(*clean-room* sobre estándares abiertos) bajo licencia **Apache-2.0**: identidad y SSO,
+correo, archivos, documentos, hojas de cálculo, presentaciones, PDF, calendario,
+contactos, chat y videollamadas, notas, fotos, vídeo, creador de webs, bases de datos,
+ERP y PaaS, con **una sola cuenta y una sola experiencia**.
 
 ![Sytue One — portal de la suite](docs/capturas/web-one.webp)
+
+---
+
+## Instalar en 3 comandos
+
+Necesitas **Docker** (con 8 GB de memoria para la suite completa) y
+[**mkcert**](https://github.com/FiloSottile/mkcert#installation). Después:
+
+```bash
+git clone https://github.com/thinkddr/sytue-suite.git
+cd sytue-suite
+./sytue-deploy
+```
+
+Pulsa Enter en cada pregunta. El asistente comprueba los requisitos, genera todas las
+contraseñas y claves (ninguna viene en el repositorio), construye y arranca la suite, crea
+tu administrador y verifica que todo responde. Al terminar, entra en
+**https://one.sytue.localhost** con las credenciales que te muestra.
+
+Guía completa, credenciales, día a día y solución de problemas: **[`QUICKSTART.md`](QUICKSTART.md)**.
+
+---
+
+## Requisitos mínimos para desplegar en un servidor
+
+Hay dos formas de instalar, y cada una tiene su sitio:
+
+- **`./sytue-deploy`** (Docker Compose) monta la suite en **un solo equipo** bajo
+  `https://*.sytue.localhost`, escuchando solo en `127.0.0.1`. Sirve para probarla,
+  enseñarla o desarrollar; **no publica nada en Internet**.
+- **`./sytue-deploy --mode helm`** (Kubernetes) es la instalación para un **servidor
+  accesible con tu dominio**. Un único servidor con [k3s](https://k3s.io) basta para
+  empezar. Guía: [`docs/operations.md` §1.3](docs/operations.md#13-prod-en-scaleway-terraform--helm).
+
+| | Prueba en un equipo (Compose) | Servidor pequeño (k3s, 1 nodo) | Producción para clientes |
+| --- | --- | --- | --- |
+| **Para qué** | Evaluar y desarrollar | Uso propio o piloto con carga ligera | Servicio a terceros |
+| **CPU** | 4 núcleos | 6 núcleos x86-64 | 12–16 núcleos (24–32 recomendados) |
+| **RAM** | 8 GB asignados a Docker | 8 GB sin Sytue Cloud · 16 GB con Cloud | 64 GB ECC (128 GB recomendados) |
+| **Disco** | 30 GB libres (imágenes y caché de compilación) | 80 GB SSD; construye las imágenes en otra máquina | 2 × 1,92 TB NVMe enterprise en RAID 1 + backup en otro equipo |
+| **Sistema** | macOS, Linux o Windows con WSL 2 | Linux x86-64 (Debian 12 / Ubuntu 24.04 o similar) | Linux x86-64, nodo dedicado |
+| **Red** | Ninguna (todo local) | IPv4 pública fija, sin CGNAT | 1 Gbit/s simétrico, IPv4 fija (IPv6 recomendada) |
+
+Además, para un servidor:
+
+- **Kubernetes 1.31 o superior** con [cert-manager](https://cert-manager.io/docs/installation/)
+  instalado. En k3s, instálalo con `--disable traefik`: el chart trae su propio Traefik.
+- **Servicios externos**: PostgreSQL 16 o superior y almacenamiento compatible con S3
+  (pueden correr en la misma máquina), y un registro de imágenes donde publicar la suite.
+- **DNS**: un registro comodín `*.tu-dominio` (A/AAAA) apuntando al servidor. Para el
+  correo, además `MX`, el PTR (rDNS) de la IP hacia `mx.tu-dominio`, SPF, DKIM y DMARC.
+- **Puertos abiertos**: `80` y `443/TCP` (web y certificados); `25`, `465`, `587` y
+  `993/TCP` (correo; el proveedor debe permitir el 25); `3478/UDP`, `5349/TCP`, `7881/TCP`
+  y `7882/UDP` (videollamadas).
+- **Copias de seguridad** en un equipo distinto del servidor: un solo servidor es un
+  único punto de fallo, y RAID no sustituye a un backup.
+
+Las cifras del servidor pequeño son el suelo medido para que todo arranque sin quedarse
+sin memoria (en reposo, la suite sin Sytue Cloud ocupa unos 4,4 GB); cada compilación de
+Sytue Cloud pide 2 CPU y 4 GB más mientras dura. La capacidad real depende sobre todo de
+las videollamadas simultáneas, el volumen de correo y las compilaciones: mídela antes de
+comprometer un nivel de servicio.
 
 ---
 
@@ -43,172 +108,44 @@ Reúne identidad (SSO/OIDC/MFA/Passkeys/SCIM), correo, almacenamiento en la nube
 
 ---
 
-## Instalar en 3 comandos
+## Qué incluye
 
-Necesitas **Docker** (con 8 GB de memoria para la suite completa) y **mkcert**. Después:
-
-```bash
-git clone https://github.com/thinkddr/sytue-suite.git
-cd sytue-suite
-./sytue-deploy
-```
-
-Pulsa Enter en cada pregunta. El asistente comprueba los requisitos, genera todas las
-contraseñas y claves (ninguna viene en el repositorio), construye y arranca la suite, crea
-tu administrador y verifica que todo responde. Al terminar, entra en
-**https://one.sytue.localhost** con las credenciales que te muestra.
-
-Guía completa, credenciales, día a día y solución de problemas: **[`QUICKSTART.md`](QUICKSTART.md)**.
-Instalación en Kubernetes y referencia de variables: [`docs/operations.md`](docs/operations.md).
-
----
-
-## Integraciones y conectores con terceros
-
-El **Sytue Integration Gateway** (`services/integrations`) conecta la suite con medio centenar de servicios externos: Google Workspace, Microsoft 365, Slack, Zoom, GitHub, Jira, Salesforce, Dropbox, WhatsApp Business, buzones IMAP/POP3, proveedores SAML/OIDC y más. Todo el tráfico hacia terceros sale por él, con política por organización, y las credenciales de cada conexión se guardan **selladas con AES-256**: nunca en claro.
-
-> **Requisito:** el gateway se despliega con **Kubernetes/Helm**. El perfil de Docker Compose todavía no lo incluye, así que en Compose los conectores no están disponibles. El único proveedor externo de ese perfil es Sytue AI, que el asistente configura en el paso 3.
-
-### Activarlas paso a paso con el CLI
-
-```bash
-# Dentro del despliegue completo (paso 4 de 6 del asistente):
-./sytue-deploy --mode helm
-
-# O solo las integraciones, sobre un despliegue Helm ya existente (se puede repetir;
-# también `make deploy-integrations`):
-./sytue-deploy --integrations --domain suite.miempresa.eu
-```
-
-El asistente recorre tres niveles:
-
-1. **Base del gateway (automática).** Genera la KEK que sella las credenciales, el secreto del cliente `sytue-gateway` en Sytue ID y el secreto interno que comparte con Drive. Sin esta base el pod de integraciones no arranca. **Ninguna clave existente se rota al volver a ejecutarlo**: rotar la KEK dejaría ilegibles las credenciales ya guardadas.
-2. **Apps OAuth de plataforma (opcional, proveedor a proveedor).** Para cada proveedor te dice dónde registrar la app, qué opciones elegir y qué **URI de redirección** declarar, y después te pide el `client_id` y el `client_secret` (este sin mostrarlo en pantalla). Con una app de plataforma, cada organización conecta **con un clic**: solo aprueba la pantalla de permisos. Si no la registras, cada organización tendrá que registrar la suya (*BYO*).
-3. **El resto de conectores** (SAML, OIDC, IMAP/POP3, tokens de API) no necesita nada en el despliegue: los da de alta cada organización desde Sytue Admin.
-
-La URI de redirección es **la misma para todos los proveedores**:
-
-```
-https://integrations.<tu-dominio>/api/v1/oauth/callback
-```
-
-| Proveedor | Dónde se registra la app | Qué cubre |
+| Producto | Qué hace | Dirección |
 | --- | --- | --- |
-| Google | [Google Cloud Console → Credenciales](https://console.cloud.google.com/apis/credentials) · ID de cliente OAuth «Aplicación web» | Workspace, Drive, Gmail, Chat y Meet (una sola app) |
-| Microsoft | [Microsoft Entra → Registros de aplicaciones](https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade) · multiinquilino, redirección «Web» | Microsoft 365, Azure, OneDrive, Teams y Outlook (una sola app) |
-| Slack | [api.slack.com/apps](https://api.slack.com/apps) · desde manifiesto ([`integraciones-marketplace/slack`](integraciones-marketplace/slack)) | SSO/SCIM, canales y salas de Rooms |
-| Zoom | [Zoom App Marketplace](https://marketplace.zoom.us/develop/create) · «General App» | Reuniones |
-| GitHub | [New OAuth App](https://github.com/settings/applications/new) | Repositorios y migración |
-| Jira Cloud | [Atlassian Developer Console](https://developer.atlassian.com/console/myapps/) · OAuth 2.0 (3LO) | Jira y SSO de Atlassian |
-| Salesforce | Setup → App Manager → *Connected App* | CRM |
-| ServiceNow | System OAuth → *Application Registry* | Incidencias y servicios |
-| Dropbox | [Dropbox App Console](https://www.dropbox.com/developers/apps) | Almacenamiento conectado en Drive |
-| Business Central | Registro de app en Entra con la API de Dynamics 365 Business Central | ERP |
-| Databricks | Account console → *App connections* | Datos |
-| Yahoo Mail | [Yahoo Developer](https://developer.yahoo.com/apps/) | Buzones y migración |
-| WhatsApp Business | [Meta for Developers](https://developers.facebook.com/apps/) · app de tipo *Business* | Conversaciones en Rooms (webhook: `/api/v1/whatsapp/webhook`) |
+| **Sytue One** | Portal y lanzador de la suite | `one.<dominio>` |
+| **Sytue ID** | Identidad: SSO (OIDC/OAuth2), MFA, Passkeys, SCIM 2.0, acceso condicional | `id.<dominio>` |
+| **Sytue Admin** | Administración de la organización, políticas e integraciones | `admin.<dominio>` |
+| **Sytue Mail** | Correo con JMAP, IMAP, SMTP, DKIM y filtros Sieve | `mail.<dominio>` |
+| **Sytue Drive** | Archivos, carpetas, enlaces compartidos y WebDAV | `drive.<dominio>` |
+| **SyDocus · SyCalcus · SyDiapos · SyCertiPDF** | Documentos, hojas de cálculo, presentaciones y PDF con firma eIDAS | `docus.` · `calcus.` · `diapos.` · `certipdf.<dominio>` |
+| **Sytue Calendar · Contacts** | Calendarios (CalDAV, iMIP) y contactos (CardDAV) | `calendar.` · `contacts.<dominio>` |
+| **Sytue Rooms** | Chat por canales e hilos, cifrado de extremo a extremo y videollamadas | `rooms.<dominio>` |
+| **Sytue Notepads · Photos** | Notas sincronizadas y galería de fotos | `notes.` · `photos.<dominio>` |
+| **SyERP** | Facturación, contabilidad, inventario, TPV, RR. HH., proyectos y VeriFactu | `erp.<dominio>` |
+| **Sytue Cast** | Vídeo bajo demanda y directos (HLS) | `cast.<dominio>` |
+| **Sytue Web · Bases** | Creador de webs y tiendas; bases de datos colaborativas | `pages.` · `bases.<dominio>` |
+| **Sytue Cloud** | PaaS: despliegues desde Git, PostgreSQL y PostgREST, analítica sin cookies | `cloud.<dominio>` |
+| **Integration Gateway** | Conectores con Google, Microsoft 365, Slack, Zoom y ~50 servicios más (solo con Helm) | `admin.<dominio>/admin/apps` |
 
-### Qué genera y cómo se aplica
+Además, 15 aplicaciones nativas (Fyne) para macOS, Windows, Linux, Android e iOS en
+[`apps/fyne/`](apps/fyne/). Integraciones con terceros paso a paso:
+[`docs/operations.md` §1.12](docs/operations.md#112-integraciones).
 
-| Fichero (en `deploy/helm/`, fuera de Git) | Contenido |
-| --- | --- |
-| `integrations-oauth.tsv` · `integrations-oauth-clients.json` (0600) | Las apps OAuth registradas. El asistente las conserva al volver a ejecutarlo. |
-| `apply-integrations.sh` (0700) | Crea o completa los Secrets `sytue-integrations`, `sytue-integrations-platform-oauth`, `sytue-id-client-secrets` y `sytue-drive` (solo genera lo que falta) y reinicia los Deployments afectados. |
-| `values-integrations.yaml` | Activa `id.clientSecrets` para que Sytue ID dé de alta el cliente `sytue-gateway`. |
+**Stack**: Go (16 servicios, `services/`) · Astro + Preact (`apps/frontend/`) · Fyne ·
+PostgreSQL 18 con Row-Level Security · S3 · Dragonfly · LiveKit (WebRTC) · Traefik 3 +
+cert-manager. Versiones exactas en [`docs/CONVENTIONS.md` §3](docs/CONVENTIONS.md#3-versiones-y-stack--politica-ultima-estable--cadena-de-suministro).
+
+---
+
+## Comandos habituales
 
 ```bash
-bash deploy/helm/apply-secrets.sh          # si aún no lo has aplicado
-bash deploy/helm/apply-integrations.sh
-helm upgrade --install sytue-one deploy/helm/sytue-one -n sytue-prod \
-  -f deploy/helm/sytue-one/values.yaml \
-  -f deploy/helm/values-custom.yaml \
-  -f deploy/helm/values-integrations.yaml
-```
-
-### Conectar una organización
-
-Con la suite en marcha, un administrador de la organización entra en **Sytue Admin → Aplicaciones** (`https://admin.<tu-dominio>/admin/apps`), pulsa **Conectar** en la aplicación que quiera y aprueba los permisos en el proveedor. A partir de ahí, cada persona usa la conexión desde su app (Drive, Mail, Rooms…) sin copiar tokens ni webhooks. Para publicar las apps en las tiendas de Slack, Teams, Google Workspace o Zoom, consulta [`integraciones-marketplace/`](integraciones-marketplace/README.md).
-
----
-
-## Stack único y arquitectura
-
-`Go + Astro + Preact + Fyne + PostgreSQL`. Las versiones exactas del stack están fijadas en [`docs/CONVENTIONS.md` §3](docs/CONVENTIONS.md#3-versiones-y-stack--politica-ultima-estable--cadena-de-suministro).
-
-| Capa | Tecnología |
-| --- | --- |
-| **Backend** | **Go** — módulo único `git.sytue.eu/sytue/one`, 16 microservicios en `services/<svc>/cmd/<svc>` y librerías comunes en `platform/pkg/*` |
-| **Frontend Web** | **Astro + Preact** (*islands*), Bun, Tailwind v4, TypeScript estricto (`apps/frontend/`) |
-| **Apps Nativas** | **Fyne (Go)** — 15 aplicaciones nativas para Linux, macOS, Windows, Android e iOS/iPadOS (`apps/fyne/`) |
-| **Base de datos** | **PostgreSQL 18** — aislamiento multi-tenant con *Row-Level Security* (`ENABLE` + `FORCE RLS`), colas transaccionales y `LISTEN/NOTIFY` |
-| **Tiempo real / Caché** | **Dragonfly** — presencia efímera y *fan-out* de eventos |
-| **Almacenamiento S3** | **Object Storage S3** (MinIO en local / S3 en producción) para bloques y adjuntos |
-| **Medios WebRTC** | **LiveKit** (Apache-2.0) — SFU para videollamadas en *Sytue Rooms* y directos en *Sytue Cast* |
-| **Ingress / TLS** | **Traefik 3** + **cert-manager** (ACME / Let's Encrypt en prod, `mkcert` en local) |
-
----
-
-## Catálogo de productos
-
-| Producto | Descripción | Servicio Go | Puerto | Superficie Web |
-| --- | --- | --- | --- | --- |
-| **Sytue One** | Portal unificado y lanzador de la suite | `id` + `hub` | — | `one.<dominio>` |
-| **Sytue ID** | Proveedor de identidad nuclear (OIDC/OAuth2/PKCE, MFA, Passkeys, SCIM 2.0, Acceso Condicional) | `services/id` | `8081` | `id.<dominio>` |
-| **Sytue Drive** | Archivos en la nube, carpetas, enlaces compartidos y WebDAV | `services/drive` | `8082` | `drive.<dominio>` |
-| **SyDocus / SyCalcus / SyDiapos / SyCertiPDF** | Procesador de textos, hojas de cálculo, presentaciones y editor/firmador eIDAS de PDF | `services/docs` | `8083` | `docus.` / `calcus.` / `diapos.` / `certipdf.<dominio>` |
-| **Sytue Rooms** | Mensajería por canales, hilos, cifrado E2EE y videollamadas WebRTC | `services/rooms` | `8085` | `rooms.<dominio>` |
-| **Sytue Mail** | Servidor y webmail JMAP, IMAP, SMTP, DKIM y filtros Sieve | `services/mail` | `8086` | `mail.<dominio>` |
-| **Sytue Calendar** | Calendarios, eventos, invitaciones iMIP y CalDAV | `services/calendar` | `8087` | `calendar.<dominio>` |
-| **Sytue Contacts** | Agenda de contactos y grupos con CardDAV | `services/contacts` | `8088` | `contacts.<dominio>` |
-| **Sytue Notepads** | Notas rápidas y cuadernos sincronizados | `services/notes` | `8089` | `notes.<dominio>` |
-| **Sytue Cloud** | Plataforma PaaS (despliegues desde Git, bases de datos PostgreSQL y PostgREST) | `services/cloud` | `8090` | `cloud.<dominio>` |
-| **Sytue Hub** | Búsqueda global federada, notificaciones SSE, presencia e intents | `services/hub` | `8092` | `hub.<dominio>` |
-| **Integration Gateway** | Conectores salientes BYO-SaaS con auditoría de egress y DLP | `services/integrations` | `8093` | `admin.<dominio>` |
-| **Sytue Analytics** | Analítica web en primera parte sin cookies ni rastreadores | `services/analytics` | `8094` / `8095` | `cloud.<dominio>` |
-| **Sytue Photos** | Galería fotográfica con álbumes y línea temporal | `services/photos` | `8097` | `photos.<dominio>` |
-| **SyERP** | Facturación, contabilidad, inventario, TPV, RR. HH., proyectos y VeriFactu | `services/syerp` | `8098` | `erp.<dominio>` |
-| **Sytue Cast** | Vídeo bajo demanda y emisiones en directo (HLS) | `services/cast` | `8099` | `cast.<dominio>` |
-| **Sytue Web** | Creador visual de sitios web y tiendas online con exportación estática | `services/pages` | `8100` | `pages.<dominio>` |
-| **Sytue Bases** | Bases de datos relacionales colaborativas (tabla, kanban, calendario, formulario) | `services/bases` | `8102` | `bases.<dominio>` |
-| **Sytue Admin** | Consola de administración de organización, políticas e integraciones | `id` + `hub` | — | `admin.<dominio>` |
-
----
-
-## Estructura del monorepo
-
-```text
-sytue-suite/
-├── sytue-deploy              Asistente interactivo paso a paso de configuración y despliegue
-├── README.md  QUICKSTART.md  Makefile  .env.example  CONTRIBUTING.md  LICENSE  NOTICE
-├── go.mod  go.sum            Módulo único Go (git.sytue.eu/sytue/one)
-├── platform/pkg/             Librerías Go compartidas (authn, httpx, pg, events, crypto, objectstore...)
-├── services/                 16 microservicios Go independientes (cmd/<svc>/main.go + db/migrations)
-├── apps/
-│   ├── frontend/             Monorepo Bun (Astro + Preact): 22 apps web y 10 paquetes @sytue/*
-│   ├── fyne/                 15 aplicaciones nativas de escritorio y móvil en Go + Fyne
-│   └── mobile/               Clientes móviles complementarios
-├── deploy/
-│   ├── compose/              Entorno Docker Compose (docker-compose.yml, frontlite.yml, .env.example)
-│   └── helm/                 Umbrella chart de Kubernetes (sytue-one) y subcharts por servicio
-├── branding/                 Logos, iconos, ilustraciones y tokens de diseño (--sytue-*)
-└── docs/                     Documentación canónica (CONVENTIONS, architecture, operations, security...)
-```
-
----
-
-## Comandos habituales (`Makefile`)
-
-```bash
-make deploy        # Asistente interactivo paso a paso (./sytue-deploy)
-make dev-up        # Levanta el stack en Docker Compose (con certificados mkcert)
-make dev-seed      # Crea la organización y el usuario administrador inicial en Sytue ID
-make dev-app P=mail,drive,docs  # Levanta únicamente el núcleo + los perfiles indicados
-make dev-down      # Detiene los contenedores conservando los volúmenes
-make go-build      # Compila todos los servicios Go (go build ./...)
-make go-test       # Ejecuta los tests unitarios de Go
-make fe-install    # Sincroniza activos de marca e instala dependencias con Bun
-make fe-build      # Compila los paquetes y aplicaciones del frontend
-make helm-lint     # Valida los charts de Helm de Kubernetes
+./sytue-deploy     # instalar, actualizar o reparar (reutiliza tu configuración)
+make dev-ps        # estado de los servicios
+make dev-logs SVC=id  # logs de un servicio
+make dev-down      # parar (conserva los datos)
+make dev-up        # arrancar de nuevo
+make help          # todos los comandos (compilación, tests, Helm…)
 ```
 
 ---
@@ -217,15 +154,12 @@ make helm-lint     # Valida los charts de Helm de Kubernetes
 
 | Documento | Contenido |
 | --- | --- |
-| [`QUICKSTART.md`](QUICKSTART.md) | Guía rápida para configurar y levantar Sytue Suite en minutos |
-| [`docs/README.md`](docs/README.md) | Índice maestro de la documentación |
-| [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md) | **Contrato canónico**: stack, puertos, dominios, arquitectura compartida y licencias |
-| [`docs/operations.md`](docs/operations.md) | **Guía de despliegue y operación**: CLI `./sytue-deploy`, variables de entorno, Compose, Helm y backups |
-| [`docs/architecture.md`](docs/architecture.md) | Arquitectura C4, SSO, Shell+Hub, Cloud, Integration Gateway, SyERP y clientes nativos |
-| [`docs/security.md`](docs/security.md) | Seguridad y RGPD, modelo STRIDE, OWASP ASVS L2 y política *clean-room* |
-| [`docs/decisions.md`](docs/decisions.md) | Registro de decisiones de arquitectura (ADR) |
-| [`docs/design.md`](docs/design.md) | Dirección de arte y sistema de diseño (`@sytue/ui`) |
-| [`docs/roadmap.md`](docs/roadmap.md) | Estado del proyecto y hoja de ruta por producto |
+| [`QUICKSTART.md`](QUICKSTART.md) | Instalación paso a paso, credenciales y solución de problemas |
+| [`docs/operations.md`](docs/operations.md) | Despliegue (Compose y Helm), variables, integraciones, backups y operación |
+| [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md) | Contrato canónico: stack, puertos, dominios y licencias |
+| [`docs/architecture.md`](docs/architecture.md) | Arquitectura, SSO, Hub, Cloud, Integration Gateway y clientes nativos |
+| [`docs/security.md`](docs/security.md) | Seguridad, RGPD y política *clean-room* |
+| [`docs/README.md`](docs/README.md) | Índice de toda la documentación |
 
 ---
 

@@ -168,7 +168,10 @@ Cada microservicio Go dispone de su propia base de datos y rol de PostgreSQL ini
 ### 1.3 Despliegue en Kubernetes con Helm (avanzado)
 
 El chart `deploy/helm/sytue-one` no despliega PostgreSQL ni S3 y descarga las imágenes de
-`global.imageRegistry`. El asistente prepara todo lo demás:
+`global.imageRegistry`. Necesita Kubernetes 1.31+ con cert-manager ya instalado; trae su
+propio Traefik, así que en k3s instala el clúster con `--disable traefik`. Requisitos de
+hardware y red: [README § Requisitos mínimos](../README.md#requisitos-mínimos-para-desplegar-en-un-servidor).
+El asistente prepara todo lo demás:
 
 ```bash
 ./sytue-deploy --mode helm --domain suite.miempresa.eu
@@ -302,6 +305,76 @@ Sytue Drive permite conectar cuentas externas de almacenamiento mediante OAuth 2
 
 - Las credenciales de aplicación OAuth se configuran mediante variables de entorno en `services/drive` (`DRIVE_GOOGLE_CLIENT_ID` / `DRIVE_GOOGLE_CLIENT_SECRET`, `DRIVE_ONEDRIVE_CLIENT_ID` / `DRIVE_ONEDRIVE_CLIENT_SECRET`, `DRIVE_DROPBOX_CLIENT_ID` / `DRIVE_DROPBOX_CLIENT_SECRET`).
 - Los tokens de cada usuario se almacenan cifrados en reposo con AES-256-GCM.
+
+---
+
+<a id="112-integraciones"></a>
+
+### 1.12 Integraciones y conectores con terceros
+
+El **Sytue Integration Gateway** (`services/integrations`) conecta la suite con medio centenar de servicios externos: Google Workspace, Microsoft 365, Slack, Zoom, GitHub, Jira, Salesforce, Dropbox, WhatsApp Business, buzones IMAP/POP3, proveedores SAML/OIDC y más. Todo el tráfico hacia terceros sale por él, con política por organización, y las credenciales de cada conexión se guardan **selladas con AES-256**: nunca en claro.
+
+> **Requisito:** el gateway se despliega con **Kubernetes/Helm**. El perfil de Docker Compose todavía no lo incluye, así que en Compose los conectores no están disponibles. El único proveedor externo de ese perfil es Sytue AI, que el asistente configura en el paso 3.
+
+#### Activarlas paso a paso con el CLI
+
+```bash
+# Dentro del despliegue completo (paso 4 de 6 del asistente):
+./sytue-deploy --mode helm
+
+# O solo las integraciones, sobre un despliegue Helm ya existente (se puede repetir;
+# también `make deploy-integrations`):
+./sytue-deploy --integrations --domain suite.miempresa.eu
+```
+
+El asistente recorre tres niveles:
+
+1. **Base del gateway (automática).** Genera la KEK que sella las credenciales, el secreto del cliente `sytue-gateway` en Sytue ID y el secreto interno que comparte con Drive. Sin esta base el pod de integraciones no arranca. **Ninguna clave existente se rota al volver a ejecutarlo**: rotar la KEK dejaría ilegibles las credenciales ya guardadas.
+2. **Apps OAuth de plataforma (opcional, proveedor a proveedor).** Para cada proveedor te dice dónde registrar la app, qué opciones elegir y qué **URI de redirección** declarar, y después te pide el `client_id` y el `client_secret` (este sin mostrarlo en pantalla). Con una app de plataforma, cada organización conecta **con un clic**: solo aprueba la pantalla de permisos. Si no la registras, cada organización tendrá que registrar la suya (*BYO*).
+3. **El resto de conectores** (SAML, OIDC, IMAP/POP3, tokens de API) no necesita nada en el despliegue: los da de alta cada organización desde Sytue Admin.
+
+La URI de redirección es **la misma para todos los proveedores**:
+
+```
+https://integrations.<tu-dominio>/api/v1/oauth/callback
+```
+
+| Proveedor | Dónde se registra la app | Qué cubre |
+| --- | --- | --- |
+| Google | [Google Cloud Console → Credenciales](https://console.cloud.google.com/apis/credentials) · ID de cliente OAuth «Aplicación web» | Workspace, Drive, Gmail, Chat y Meet (una sola app) |
+| Microsoft | [Microsoft Entra → Registros de aplicaciones](https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade) · multiinquilino, redirección «Web» | Microsoft 365, Azure, OneDrive, Teams y Outlook (una sola app) |
+| Slack | [api.slack.com/apps](https://api.slack.com/apps) · desde manifiesto ([`integraciones-marketplace/slack`](../integraciones-marketplace/slack)) | SSO/SCIM, canales y salas de Rooms |
+| Zoom | [Zoom App Marketplace](https://marketplace.zoom.us/develop/create) · «General App» | Reuniones |
+| GitHub | [New OAuth App](https://github.com/settings/applications/new) | Repositorios y migración |
+| Jira Cloud | [Atlassian Developer Console](https://developer.atlassian.com/console/myapps/) · OAuth 2.0 (3LO) | Jira y SSO de Atlassian |
+| Salesforce | Setup → App Manager → *Connected App* | CRM |
+| ServiceNow | System OAuth → *Application Registry* | Incidencias y servicios |
+| Dropbox | [Dropbox App Console](https://www.dropbox.com/developers/apps) | Almacenamiento conectado en Drive |
+| Business Central | Registro de app en Entra con la API de Dynamics 365 Business Central | ERP |
+| Databricks | Account console → *App connections* | Datos |
+| Yahoo Mail | [Yahoo Developer](https://developer.yahoo.com/apps/) | Buzones y migración |
+| WhatsApp Business | [Meta for Developers](https://developers.facebook.com/apps/) · app de tipo *Business* | Conversaciones en Rooms (webhook: `/api/v1/whatsapp/webhook`) |
+
+#### Qué genera y cómo se aplica
+
+| Fichero (en `deploy/helm/`, fuera de Git) | Contenido |
+| --- | --- |
+| `integrations-oauth.tsv` · `integrations-oauth-clients.json` (0600) | Las apps OAuth registradas. El asistente las conserva al volver a ejecutarlo. |
+| `apply-integrations.sh` (0700) | Crea o completa los Secrets `sytue-integrations`, `sytue-integrations-platform-oauth`, `sytue-id-client-secrets` y `sytue-drive` (solo genera lo que falta) y reinicia los Deployments afectados. |
+| `values-integrations.yaml` | Activa `id.clientSecrets` para que Sytue ID dé de alta el cliente `sytue-gateway`. |
+
+```bash
+bash deploy/helm/apply-secrets.sh          # si aún no lo has aplicado
+bash deploy/helm/apply-integrations.sh
+helm upgrade --install sytue-one deploy/helm/sytue-one -n sytue-prod \
+  -f deploy/helm/sytue-one/values.yaml \
+  -f deploy/helm/values-custom.yaml \
+  -f deploy/helm/values-integrations.yaml
+```
+
+#### Conectar una organización
+
+Con la suite en marcha, un administrador de la organización entra en **Sytue Admin → Aplicaciones** (`https://admin.<tu-dominio>/admin/apps`), pulsa **Conectar** en la aplicación que quiera y aprueba los permisos en el proveedor. A partir de ahí, cada persona usa la conexión desde su app (Drive, Mail, Rooms…) sin copiar tokens ni webhooks. Para publicar las apps en las tiendas de Slack, Teams, Google Workspace o Zoom, consulta [`integraciones-marketplace/`](../integraciones-marketplace/README.md).
 
 ---
 

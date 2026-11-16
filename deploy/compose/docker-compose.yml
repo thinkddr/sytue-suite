@@ -130,6 +130,17 @@ x-frontend-env: &frontend-env
   SYTUE_CHAT_WS_URL: wss://rooms-api.sytue.localhost/ws
   SYTUE_LIVEKIT_URL: wss://rooms-sfu.sytue.localhost
 
+# Entrypoint de las apps web en dev: arranca el relé de loopback y después el
+# entrypoint de la imagen. Bun resuelve cualquier *.localhost a 127.0.0.1 sin
+# preguntar al DNS de Docker, así que el BFF no llegaba a https://id.sytue.localhost
+# (ECONNREFUSED en cada login). El relé (apps/frontend/dev-loopback-relay.mjs,
+# montado en /app) reenvía 127.0.0.1:443 del contenedor a Traefik tal cual.
+x-frontend-entrypoint: &frontend-entrypoint
+  - /bin/sh
+  - -c
+  - 'bun /app/dev-loopback-relay.mjs & exec /usr/local/bin/sytue-dev-entrypoint.sh "$$@"'
+  - sytue-dev
+
 networks:
   # Red de borde: solo lo que Traefik enruta vive aquí.
   edge:
@@ -1501,6 +1512,7 @@ services:
     <<: [*restart, *logging]
     profiles: ["full", "portal"]
     networks: [edge, backend]
+    entrypoint: *frontend-entrypoint
     command: ["bun", "run", "--filter", "@sytue/portal", "dev", "--host", "0.0.0.0", "--port", "4321"]
     ports: ["127.0.0.1:4321:4321"]
     environment:
@@ -1584,12 +1596,33 @@ services:
       - "traefik.http.routers.portal.entrypoints=websecure"
       - "traefik.http.routers.portal.tls=true"
       - "traefik.http.services.portal.loadbalancer.server.port=4321"
+      # Como en producción (charts/sytue-frontend/templates/ingress.yaml): la app vive
+      # bajo su base de Astro (/one), pero el BFF emite /auth y /api en absoluto y
+      # Sytue ID devuelve el login a <host>/auth/callback. Esas rutas entran con el
+      # prefijo añadido; la raíz del host redirige a la portada. Prioridades 50/60:
+      # por encima del router de la app y por debajo de los backends de Go (100).
+      - "traefik.http.routers.portal-bff.rule=Host(`one.sytue.localhost`) && (PathPrefix(`/auth`) || PathPrefix(`/api`))"
+      - "traefik.http.routers.portal-bff.entrypoints=websecure"
+      - "traefik.http.routers.portal-bff.tls=true"
+      - "traefik.http.routers.portal-bff.priority=50"
+      - "traefik.http.routers.portal-bff.service=portal"
+      - "traefik.http.routers.portal-bff.middlewares=portal-bff-prefijo"
+      - "traefik.http.middlewares.portal-bff-prefijo.addprefix.prefix=/one"
+      - "traefik.http.routers.portal-raiz.rule=Host(`one.sytue.localhost`) && Path(`/`)"
+      - "traefik.http.routers.portal-raiz.entrypoints=websecure"
+      - "traefik.http.routers.portal-raiz.tls=true"
+      - "traefik.http.routers.portal-raiz.priority=60"
+      - "traefik.http.routers.portal-raiz.service=portal"
+      - "traefik.http.routers.portal-raiz.middlewares=portal-raiz-portada"
+      - "traefik.http.middlewares.portal-raiz-portada.redirectregex.regex=^https?://([^/]+)/?(\\?.*)?$$"
+      - "traefik.http.middlewares.portal-raiz-portada.redirectregex.replacement=https://$${1}/one/$${2}"
 
   console:
     build: *frontend-build
     <<: [*restart, *logging]
     profiles: ["full", "console"]
     networks: [edge, backend]
+    entrypoint: *frontend-entrypoint
     command: ["bun", "run", "--filter", "@sytue/app-console", "dev", "--host", "0.0.0.0", "--port", "4322"]
     ports: ["127.0.0.1:4322:4322"]
     environment:
@@ -1626,12 +1659,33 @@ services:
       - "traefik.http.middlewares.console-to-admin.redirectregex.regex=^https?://console.sytue.localhost/(.*)"
       - "traefik.http.middlewares.console-to-admin.redirectregex.replacement=https://admin.sytue.localhost/$${1}"
       - "traefik.http.middlewares.console-to-admin.redirectregex.permanent=true"
+      # Como en producción (charts/sytue-frontend/templates/ingress.yaml): la app vive
+      # bajo su base de Astro (/admin), pero el BFF emite /auth y /api en absoluto y
+      # Sytue ID devuelve el login a <host>/auth/callback. Esas rutas entran con el
+      # prefijo añadido; la raíz del host redirige a la portada. Prioridades 50/60:
+      # por encima del router de la app y por debajo de los backends de Go (100).
+      - "traefik.http.routers.console-bff.rule=Host(`admin.sytue.localhost`) && (PathPrefix(`/auth`) || PathPrefix(`/api`))"
+      - "traefik.http.routers.console-bff.entrypoints=websecure"
+      - "traefik.http.routers.console-bff.tls=true"
+      - "traefik.http.routers.console-bff.priority=50"
+      - "traefik.http.routers.console-bff.service=admin-web"
+      - "traefik.http.routers.console-bff.middlewares=console-bff-prefijo"
+      - "traefik.http.middlewares.console-bff-prefijo.addprefix.prefix=/admin"
+      - "traefik.http.routers.console-raiz.rule=Host(`admin.sytue.localhost`) && Path(`/`)"
+      - "traefik.http.routers.console-raiz.entrypoints=websecure"
+      - "traefik.http.routers.console-raiz.tls=true"
+      - "traefik.http.routers.console-raiz.priority=60"
+      - "traefik.http.routers.console-raiz.service=admin-web"
+      - "traefik.http.routers.console-raiz.middlewares=console-raiz-portada"
+      - "traefik.http.middlewares.console-raiz-portada.redirectregex.regex=^https?://([^/]+)/?(\\?.*)?$$"
+      - "traefik.http.middlewares.console-raiz-portada.redirectregex.replacement=https://$${1}/admin/$${2}"
 
   cloud-dashboard:
     build: *frontend-build
     <<: [*restart, *logging]
     profiles: ["full", "cloud"]
     networks: [edge, backend]
+    entrypoint: *frontend-entrypoint
     command: ["bun", "run", "--filter", "@sytue/app-cloud-dashboard", "dev", "--host", "0.0.0.0", "--port", "4323"]
     ports: ["127.0.0.1:4323:4323"]
     environment:
@@ -1653,12 +1707,33 @@ services:
       - "traefik.http.routers.cloud.entrypoints=websecure"
       - "traefik.http.routers.cloud.tls=true"
       - "traefik.http.services.cloud.loadbalancer.server.port=4323"
+      # Como en producción (charts/sytue-frontend/templates/ingress.yaml): la app vive
+      # bajo su base de Astro (/cloud), pero el BFF emite /auth y /api en absoluto y
+      # Sytue ID devuelve el login a <host>/auth/callback. Esas rutas entran con el
+      # prefijo añadido; la raíz del host redirige a la portada. Prioridades 50/60:
+      # por encima del router de la app y por debajo de los backends de Go (100).
+      - "traefik.http.routers.cloud-dashboard-bff.rule=Host(`cloud.sytue.localhost`) && (PathPrefix(`/auth`) || PathPrefix(`/api`))"
+      - "traefik.http.routers.cloud-dashboard-bff.entrypoints=websecure"
+      - "traefik.http.routers.cloud-dashboard-bff.tls=true"
+      - "traefik.http.routers.cloud-dashboard-bff.priority=50"
+      - "traefik.http.routers.cloud-dashboard-bff.service=cloud"
+      - "traefik.http.routers.cloud-dashboard-bff.middlewares=cloud-dashboard-bff-prefijo"
+      - "traefik.http.middlewares.cloud-dashboard-bff-prefijo.addprefix.prefix=/cloud"
+      - "traefik.http.routers.cloud-dashboard-raiz.rule=Host(`cloud.sytue.localhost`) && Path(`/`)"
+      - "traefik.http.routers.cloud-dashboard-raiz.entrypoints=websecure"
+      - "traefik.http.routers.cloud-dashboard-raiz.tls=true"
+      - "traefik.http.routers.cloud-dashboard-raiz.priority=60"
+      - "traefik.http.routers.cloud-dashboard-raiz.service=cloud"
+      - "traefik.http.routers.cloud-dashboard-raiz.middlewares=cloud-dashboard-raiz-portada"
+      - "traefik.http.middlewares.cloud-dashboard-raiz-portada.redirectregex.regex=^https?://([^/]+)/?(\\?.*)?$$"
+      - "traefik.http.middlewares.cloud-dashboard-raiz-portada.redirectregex.replacement=https://$${1}/cloud/$${2}"
 
   www:
     build: *frontend-build
     <<: [*restart, *logging]
     profiles: ["full", "www"]
     networks: [edge, backend]
+    entrypoint: *frontend-entrypoint
     command: ["bun", "run", "--filter", "@sytue/app-www", "dev", "--host", "0.0.0.0", "--port", "4324"]
     ports: ["127.0.0.1:4324:4324"]
     environment: *frontend-env
@@ -1675,6 +1750,7 @@ services:
     <<: [*restart, *logging]
     profiles: ["full", "mail"]
     networks: [edge, backend]
+    entrypoint: *frontend-entrypoint
     command: ["bun", "run", "--filter", "@sytue/mail", "dev", "--host", "0.0.0.0", "--port", "4325"]
     ports: ["127.0.0.1:4325:4325"]
     environment:
@@ -1692,12 +1768,33 @@ services:
       - "traefik.http.routers.mail-web.entrypoints=websecure"
       - "traefik.http.routers.mail-web.tls=true"
       - "traefik.http.services.mail-web.loadbalancer.server.port=4325"
+      # Como en producción (charts/sytue-frontend/templates/ingress.yaml): la app vive
+      # bajo su base de Astro (/mail), pero el BFF emite /auth y /api en absoluto y
+      # Sytue ID devuelve el login a <host>/auth/callback. Esas rutas entran con el
+      # prefijo añadido; la raíz del host redirige a la portada. Prioridades 50/60:
+      # por encima del router de la app y por debajo de los backends de Go (100).
+      - "traefik.http.routers.mail-web-bff.rule=Host(`mail.sytue.localhost`) && (PathPrefix(`/auth`) || PathPrefix(`/api`))"
+      - "traefik.http.routers.mail-web-bff.entrypoints=websecure"
+      - "traefik.http.routers.mail-web-bff.tls=true"
+      - "traefik.http.routers.mail-web-bff.priority=50"
+      - "traefik.http.routers.mail-web-bff.service=mail-web"
+      - "traefik.http.routers.mail-web-bff.middlewares=mail-web-bff-prefijo"
+      - "traefik.http.middlewares.mail-web-bff-prefijo.addprefix.prefix=/mail"
+      - "traefik.http.routers.mail-web-raiz.rule=Host(`mail.sytue.localhost`) && Path(`/`)"
+      - "traefik.http.routers.mail-web-raiz.entrypoints=websecure"
+      - "traefik.http.routers.mail-web-raiz.tls=true"
+      - "traefik.http.routers.mail-web-raiz.priority=60"
+      - "traefik.http.routers.mail-web-raiz.service=mail-web"
+      - "traefik.http.routers.mail-web-raiz.middlewares=mail-web-raiz-portada"
+      - "traefik.http.middlewares.mail-web-raiz-portada.redirectregex.regex=^https?://([^/]+)/?(\\?.*)?$$"
+      - "traefik.http.middlewares.mail-web-raiz-portada.redirectregex.replacement=https://$${1}/mail/$${2}"
 
   drive-web:
     build: *frontend-build
     <<: [*restart, *logging]
     profiles: ["full", "drive"]
     networks: [edge, backend]
+    entrypoint: *frontend-entrypoint
     command: ["bun", "run", "--filter", "@sytue/drive", "dev", "--host", "0.0.0.0", "--port", "4326"]
     ports: ["127.0.0.1:4326:4326"]
     environment:
@@ -1715,12 +1812,33 @@ services:
       - "traefik.http.routers.drive-web.entrypoints=websecure"
       - "traefik.http.routers.drive-web.tls=true"
       - "traefik.http.services.drive-web.loadbalancer.server.port=4326"
+      # Como en producción (charts/sytue-frontend/templates/ingress.yaml): la app vive
+      # bajo su base de Astro (/drive), pero el BFF emite /auth y /api en absoluto y
+      # Sytue ID devuelve el login a <host>/auth/callback. Esas rutas entran con el
+      # prefijo añadido; la raíz del host redirige a la portada. Prioridades 50/60:
+      # por encima del router de la app y por debajo de los backends de Go (100).
+      - "traefik.http.routers.drive-web-bff.rule=Host(`drive.sytue.localhost`) && (PathPrefix(`/auth`) || PathPrefix(`/api`))"
+      - "traefik.http.routers.drive-web-bff.entrypoints=websecure"
+      - "traefik.http.routers.drive-web-bff.tls=true"
+      - "traefik.http.routers.drive-web-bff.priority=50"
+      - "traefik.http.routers.drive-web-bff.service=drive-web"
+      - "traefik.http.routers.drive-web-bff.middlewares=drive-web-bff-prefijo"
+      - "traefik.http.middlewares.drive-web-bff-prefijo.addprefix.prefix=/drive"
+      - "traefik.http.routers.drive-web-raiz.rule=Host(`drive.sytue.localhost`) && Path(`/`)"
+      - "traefik.http.routers.drive-web-raiz.entrypoints=websecure"
+      - "traefik.http.routers.drive-web-raiz.tls=true"
+      - "traefik.http.routers.drive-web-raiz.priority=60"
+      - "traefik.http.routers.drive-web-raiz.service=drive-web"
+      - "traefik.http.routers.drive-web-raiz.middlewares=drive-web-raiz-portada"
+      - "traefik.http.middlewares.drive-web-raiz-portada.redirectregex.regex=^https?://([^/]+)/?(\\?.*)?$$"
+      - "traefik.http.middlewares.drive-web-raiz-portada.redirectregex.replacement=https://$${1}/drive/$${2}"
 
   calendar-web:
     build: *frontend-build
     <<: [*restart, *logging]
     profiles: ["full", "calendar"]
     networks: [edge, backend]
+    entrypoint: *frontend-entrypoint
     command: ["bun", "run", "--filter", "@sytue/calendar", "dev", "--host", "0.0.0.0", "--port", "4327"]
     ports: ["127.0.0.1:4327:4327"]
     environment:
@@ -1742,12 +1860,33 @@ services:
       - "traefik.http.routers.calendar-web.entrypoints=websecure"
       - "traefik.http.routers.calendar-web.tls=true"
       - "traefik.http.services.calendar-web.loadbalancer.server.port=4327"
+      # Como en producción (charts/sytue-frontend/templates/ingress.yaml): la app vive
+      # bajo su base de Astro (/calendar), pero el BFF emite /auth y /api en absoluto y
+      # Sytue ID devuelve el login a <host>/auth/callback. Esas rutas entran con el
+      # prefijo añadido; la raíz del host redirige a la portada. Prioridades 50/60:
+      # por encima del router de la app y por debajo de los backends de Go (100).
+      - "traefik.http.routers.calendar-web-bff.rule=Host(`calendar.sytue.localhost`) && (PathPrefix(`/auth`) || PathPrefix(`/api`))"
+      - "traefik.http.routers.calendar-web-bff.entrypoints=websecure"
+      - "traefik.http.routers.calendar-web-bff.tls=true"
+      - "traefik.http.routers.calendar-web-bff.priority=50"
+      - "traefik.http.routers.calendar-web-bff.service=calendar-web"
+      - "traefik.http.routers.calendar-web-bff.middlewares=calendar-web-bff-prefijo"
+      - "traefik.http.middlewares.calendar-web-bff-prefijo.addprefix.prefix=/calendar"
+      - "traefik.http.routers.calendar-web-raiz.rule=Host(`calendar.sytue.localhost`) && Path(`/`)"
+      - "traefik.http.routers.calendar-web-raiz.entrypoints=websecure"
+      - "traefik.http.routers.calendar-web-raiz.tls=true"
+      - "traefik.http.routers.calendar-web-raiz.priority=60"
+      - "traefik.http.routers.calendar-web-raiz.service=calendar-web"
+      - "traefik.http.routers.calendar-web-raiz.middlewares=calendar-web-raiz-portada"
+      - "traefik.http.middlewares.calendar-web-raiz-portada.redirectregex.regex=^https?://([^/]+)/?(\\?.*)?$$"
+      - "traefik.http.middlewares.calendar-web-raiz-portada.redirectregex.replacement=https://$${1}/calendar/$${2}"
 
   contacts-web:
     build: *frontend-build
     <<: [*restart, *logging]
     profiles: ["full", "contacts"]
     networks: [edge, backend]
+    entrypoint: *frontend-entrypoint
     command: ["bun", "run", "--filter", "@sytue/contacts", "dev", "--host", "0.0.0.0", "--port", "4328"]
     ports: ["127.0.0.1:4328:4328"]
     environment:
@@ -1765,12 +1904,33 @@ services:
       - "traefik.http.routers.contacts-web.entrypoints=websecure"
       - "traefik.http.routers.contacts-web.tls=true"
       - "traefik.http.services.contacts-web.loadbalancer.server.port=4328"
+      # Como en producción (charts/sytue-frontend/templates/ingress.yaml): la app vive
+      # bajo su base de Astro (/contacts), pero el BFF emite /auth y /api en absoluto y
+      # Sytue ID devuelve el login a <host>/auth/callback. Esas rutas entran con el
+      # prefijo añadido; la raíz del host redirige a la portada. Prioridades 50/60:
+      # por encima del router de la app y por debajo de los backends de Go (100).
+      - "traefik.http.routers.contacts-web-bff.rule=Host(`contacts.sytue.localhost`) && (PathPrefix(`/auth`) || PathPrefix(`/api`))"
+      - "traefik.http.routers.contacts-web-bff.entrypoints=websecure"
+      - "traefik.http.routers.contacts-web-bff.tls=true"
+      - "traefik.http.routers.contacts-web-bff.priority=50"
+      - "traefik.http.routers.contacts-web-bff.service=contacts-web"
+      - "traefik.http.routers.contacts-web-bff.middlewares=contacts-web-bff-prefijo"
+      - "traefik.http.middlewares.contacts-web-bff-prefijo.addprefix.prefix=/contacts"
+      - "traefik.http.routers.contacts-web-raiz.rule=Host(`contacts.sytue.localhost`) && Path(`/`)"
+      - "traefik.http.routers.contacts-web-raiz.entrypoints=websecure"
+      - "traefik.http.routers.contacts-web-raiz.tls=true"
+      - "traefik.http.routers.contacts-web-raiz.priority=60"
+      - "traefik.http.routers.contacts-web-raiz.service=contacts-web"
+      - "traefik.http.routers.contacts-web-raiz.middlewares=contacts-web-raiz-portada"
+      - "traefik.http.middlewares.contacts-web-raiz-portada.redirectregex.regex=^https?://([^/]+)/?(\\?.*)?$$"
+      - "traefik.http.middlewares.contacts-web-raiz-portada.redirectregex.replacement=https://$${1}/contacts/$${2}"
 
   notes-web:
     build: *frontend-build
     <<: [*restart, *logging]
     profiles: ["full", "notes"]
     networks: [edge, backend]
+    entrypoint: *frontend-entrypoint
     command: ["bun", "run", "--filter", "@sytue/notes", "dev", "--host", "0.0.0.0", "--port", "4331"]
     ports: ["127.0.0.1:4331:4331"]
     environment:
@@ -1801,12 +1961,33 @@ services:
       - "traefik.http.routers.notes-web.entrypoints=websecure"
       - "traefik.http.routers.notes-web.tls=true"
       - "traefik.http.services.notes-web.loadbalancer.server.port=4331"
+      # Como en producción (charts/sytue-frontend/templates/ingress.yaml): la app vive
+      # bajo su base de Astro (/notes), pero el BFF emite /auth y /api en absoluto y
+      # Sytue ID devuelve el login a <host>/auth/callback. Esas rutas entran con el
+      # prefijo añadido; la raíz del host redirige a la portada. Prioridades 50/60:
+      # por encima del router de la app y por debajo de los backends de Go (100).
+      - "traefik.http.routers.notes-web-bff.rule=Host(`notes.sytue.localhost`) && (PathPrefix(`/auth`) || PathPrefix(`/api`))"
+      - "traefik.http.routers.notes-web-bff.entrypoints=websecure"
+      - "traefik.http.routers.notes-web-bff.tls=true"
+      - "traefik.http.routers.notes-web-bff.priority=50"
+      - "traefik.http.routers.notes-web-bff.service=notes-web"
+      - "traefik.http.routers.notes-web-bff.middlewares=notes-web-bff-prefijo"
+      - "traefik.http.middlewares.notes-web-bff-prefijo.addprefix.prefix=/notes"
+      - "traefik.http.routers.notes-web-raiz.rule=Host(`notes.sytue.localhost`) && Path(`/`)"
+      - "traefik.http.routers.notes-web-raiz.entrypoints=websecure"
+      - "traefik.http.routers.notes-web-raiz.tls=true"
+      - "traefik.http.routers.notes-web-raiz.priority=60"
+      - "traefik.http.routers.notes-web-raiz.service=notes-web"
+      - "traefik.http.routers.notes-web-raiz.middlewares=notes-web-raiz-portada"
+      - "traefik.http.middlewares.notes-web-raiz-portada.redirectregex.regex=^https?://([^/]+)/?(\\?.*)?$$"
+      - "traefik.http.middlewares.notes-web-raiz-portada.redirectregex.replacement=https://$${1}/notes/$${2}"
 
   erp-web:
     build: *frontend-build
     <<: [*restart, *logging]
     profiles: ["full", "erp"]
     networks: [edge, backend]
+    entrypoint: *frontend-entrypoint
     command: ["bun", "run", "--filter", "@sytue/erp", "dev", "--host", "0.0.0.0", "--port", "4334"]
     ports: ["127.0.0.1:4334:4334"]
     environment:
@@ -1826,12 +2007,33 @@ services:
       - "traefik.http.routers.erp-web.entrypoints=websecure"
       - "traefik.http.routers.erp-web.tls=true"
       - "traefik.http.services.erp-web.loadbalancer.server.port=4334"
+      # Como en producción (charts/sytue-frontend/templates/ingress.yaml): la app vive
+      # bajo su base de Astro (/erp), pero el BFF emite /auth y /api en absoluto y
+      # Sytue ID devuelve el login a <host>/auth/callback. Esas rutas entran con el
+      # prefijo añadido; la raíz del host redirige a la portada. Prioridades 50/60:
+      # por encima del router de la app y por debajo de los backends de Go (100).
+      - "traefik.http.routers.erp-web-bff.rule=Host(`erp.sytue.localhost`) && (PathPrefix(`/auth`) || PathPrefix(`/api`))"
+      - "traefik.http.routers.erp-web-bff.entrypoints=websecure"
+      - "traefik.http.routers.erp-web-bff.tls=true"
+      - "traefik.http.routers.erp-web-bff.priority=50"
+      - "traefik.http.routers.erp-web-bff.service=erp-web"
+      - "traefik.http.routers.erp-web-bff.middlewares=erp-web-bff-prefijo"
+      - "traefik.http.middlewares.erp-web-bff-prefijo.addprefix.prefix=/erp"
+      - "traefik.http.routers.erp-web-raiz.rule=Host(`erp.sytue.localhost`) && Path(`/`)"
+      - "traefik.http.routers.erp-web-raiz.entrypoints=websecure"
+      - "traefik.http.routers.erp-web-raiz.tls=true"
+      - "traefik.http.routers.erp-web-raiz.priority=60"
+      - "traefik.http.routers.erp-web-raiz.service=erp-web"
+      - "traefik.http.routers.erp-web-raiz.middlewares=erp-web-raiz-portada"
+      - "traefik.http.middlewares.erp-web-raiz-portada.redirectregex.regex=^https?://([^/]+)/?(\\?.*)?$$"
+      - "traefik.http.middlewares.erp-web-raiz-portada.redirectregex.replacement=https://$${1}/erp/$${2}"
 
   cast-web:
     build: *frontend-build
     <<: [*restart, *logging]
     profiles: ["full", "cast"]
     networks: [edge, backend]
+    entrypoint: *frontend-entrypoint
     command: ["bun", "run", "--filter", "@sytue/cast", "dev", "--host", "0.0.0.0", "--port", "4335"]
     ports: ["127.0.0.1:4335:4335"]
     environment:
@@ -1854,12 +2056,33 @@ services:
       - "traefik.http.routers.cast-web.entrypoints=websecure"
       - "traefik.http.routers.cast-web.tls=true"
       - "traefik.http.services.cast-web.loadbalancer.server.port=4335"
+      # Como en producción (charts/sytue-frontend/templates/ingress.yaml): la app vive
+      # bajo su base de Astro (/cast), pero el BFF emite /auth y /api en absoluto y
+      # Sytue ID devuelve el login a <host>/auth/callback. Esas rutas entran con el
+      # prefijo añadido; la raíz del host redirige a la portada. Prioridades 50/60:
+      # por encima del router de la app y por debajo de los backends de Go (100).
+      - "traefik.http.routers.cast-web-bff.rule=Host(`cast.sytue.localhost`) && (PathPrefix(`/auth`) || PathPrefix(`/api`))"
+      - "traefik.http.routers.cast-web-bff.entrypoints=websecure"
+      - "traefik.http.routers.cast-web-bff.tls=true"
+      - "traefik.http.routers.cast-web-bff.priority=50"
+      - "traefik.http.routers.cast-web-bff.service=cast-web"
+      - "traefik.http.routers.cast-web-bff.middlewares=cast-web-bff-prefijo"
+      - "traefik.http.middlewares.cast-web-bff-prefijo.addprefix.prefix=/cast"
+      - "traefik.http.routers.cast-web-raiz.rule=Host(`cast.sytue.localhost`) && Path(`/`)"
+      - "traefik.http.routers.cast-web-raiz.entrypoints=websecure"
+      - "traefik.http.routers.cast-web-raiz.tls=true"
+      - "traefik.http.routers.cast-web-raiz.priority=60"
+      - "traefik.http.routers.cast-web-raiz.service=cast-web"
+      - "traefik.http.routers.cast-web-raiz.middlewares=cast-web-raiz-portada"
+      - "traefik.http.middlewares.cast-web-raiz-portada.redirectregex.regex=^https?://([^/]+)/?(\\?.*)?$$"
+      - "traefik.http.middlewares.cast-web-raiz-portada.redirectregex.replacement=https://$${1}/cast/$${2}"
 
   pages-web:
     build: *frontend-build
     <<: [*restart, *logging]
     profiles: ["full", "pages"]
     networks: [edge, backend]
+    entrypoint: *frontend-entrypoint
     command: ["bun", "run", "--filter", "@sytue/pages", "dev", "--host", "0.0.0.0", "--port", "4336"]
     ports: ["127.0.0.1:4336:4336"]
     environment:
@@ -1879,12 +2102,33 @@ services:
       - "traefik.http.routers.pages-web.entrypoints=websecure"
       - "traefik.http.routers.pages-web.tls=true"
       - "traefik.http.services.pages-web.loadbalancer.server.port=4336"
+      # Como en producción (charts/sytue-frontend/templates/ingress.yaml): la app vive
+      # bajo su base de Astro (/web), pero el BFF emite /auth y /api en absoluto y
+      # Sytue ID devuelve el login a <host>/auth/callback. Esas rutas entran con el
+      # prefijo añadido; la raíz del host redirige a la portada. Prioridades 50/60:
+      # por encima del router de la app y por debajo de los backends de Go (100).
+      - "traefik.http.routers.pages-web-bff.rule=Host(`web.sytue.localhost`) && (PathPrefix(`/auth`) || PathPrefix(`/api`))"
+      - "traefik.http.routers.pages-web-bff.entrypoints=websecure"
+      - "traefik.http.routers.pages-web-bff.tls=true"
+      - "traefik.http.routers.pages-web-bff.priority=50"
+      - "traefik.http.routers.pages-web-bff.service=pages-web"
+      - "traefik.http.routers.pages-web-bff.middlewares=pages-web-bff-prefijo"
+      - "traefik.http.middlewares.pages-web-bff-prefijo.addprefix.prefix=/web"
+      - "traefik.http.routers.pages-web-raiz.rule=Host(`web.sytue.localhost`) && Path(`/`)"
+      - "traefik.http.routers.pages-web-raiz.entrypoints=websecure"
+      - "traefik.http.routers.pages-web-raiz.tls=true"
+      - "traefik.http.routers.pages-web-raiz.priority=60"
+      - "traefik.http.routers.pages-web-raiz.service=pages-web"
+      - "traefik.http.routers.pages-web-raiz.middlewares=pages-web-raiz-portada"
+      - "traefik.http.middlewares.pages-web-raiz-portada.redirectregex.regex=^https?://([^/]+)/?(\\?.*)?$$"
+      - "traefik.http.middlewares.pages-web-raiz-portada.redirectregex.replacement=https://$${1}/web/$${2}"
 
   bases-web:
     build: *frontend-build
     <<: [*restart, *logging]
     profiles: ["full", "bases"]
     networks: [edge, backend]
+    entrypoint: *frontend-entrypoint
     command: ["bun", "run", "--filter", "@sytue/bases", "dev", "--host", "0.0.0.0", "--port", "4337"]
     ports: ["127.0.0.1:4337:4337"]
     environment:
@@ -1903,6 +2147,26 @@ services:
       - "traefik.http.routers.bases-web.entrypoints=websecure"
       - "traefik.http.routers.bases-web.tls=true"
       - "traefik.http.services.bases-web.loadbalancer.server.port=4337"
+      # Como en producción (charts/sytue-frontend/templates/ingress.yaml): la app vive
+      # bajo su base de Astro (/bases), pero el BFF emite /auth y /api en absoluto y
+      # Sytue ID devuelve el login a <host>/auth/callback. Esas rutas entran con el
+      # prefijo añadido; la raíz del host redirige a la portada. Prioridades 50/60:
+      # por encima del router de la app y por debajo de los backends de Go (100).
+      - "traefik.http.routers.bases-web-bff.rule=Host(`bases.sytue.localhost`) && (PathPrefix(`/auth`) || PathPrefix(`/api`))"
+      - "traefik.http.routers.bases-web-bff.entrypoints=websecure"
+      - "traefik.http.routers.bases-web-bff.tls=true"
+      - "traefik.http.routers.bases-web-bff.priority=50"
+      - "traefik.http.routers.bases-web-bff.service=bases-web"
+      - "traefik.http.routers.bases-web-bff.middlewares=bases-web-bff-prefijo"
+      - "traefik.http.middlewares.bases-web-bff-prefijo.addprefix.prefix=/bases"
+      - "traefik.http.routers.bases-web-raiz.rule=Host(`bases.sytue.localhost`) && Path(`/`)"
+      - "traefik.http.routers.bases-web-raiz.entrypoints=websecure"
+      - "traefik.http.routers.bases-web-raiz.tls=true"
+      - "traefik.http.routers.bases-web-raiz.priority=60"
+      - "traefik.http.routers.bases-web-raiz.service=bases-web"
+      - "traefik.http.routers.bases-web-raiz.middlewares=bases-web-raiz-portada"
+      - "traefik.http.middlewares.bases-web-raiz-portada.redirectregex.regex=^https?://([^/]+)/?(\\?.*)?$$"
+      - "traefik.http.middlewares.bases-web-raiz-portada.redirectregex.replacement=https://$${1}/bases/$${2}"
 
   # La ofimática con una app por producto (2026-10-12, ADR 0076): el mismo paquete
   # (@sytue/office) con su host, su prefijo y su client OIDC (migración 0111 de Sytue ID).
@@ -1911,6 +2175,7 @@ services:
     <<: [*restart, *logging]
     profiles: ["full", "docs", "docus"]
     networks: [edge, backend]
+    entrypoint: *frontend-entrypoint
     command: ["bun", "run", "--filter", "@sytue/docus", "dev", "--host", "0.0.0.0", "--port", "4338"]
     ports: ["127.0.0.1:4338:4338"]
     environment:
@@ -1929,6 +2194,26 @@ services:
       - "traefik.http.routers.docus-web.entrypoints=websecure"
       - "traefik.http.routers.docus-web.tls=true"
       - "traefik.http.services.docus-web.loadbalancer.server.port=4338"
+      # Como en producción (charts/sytue-frontend/templates/ingress.yaml): la app vive
+      # bajo su base de Astro (/docus), pero el BFF emite /auth y /api en absoluto y
+      # Sytue ID devuelve el login a <host>/auth/callback. Esas rutas entran con el
+      # prefijo añadido; la raíz del host redirige a la portada. Prioridades 50/60:
+      # por encima del router de la app y por debajo de los backends de Go (100).
+      - "traefik.http.routers.docus-web-bff.rule=Host(`docus.sytue.localhost`) && (PathPrefix(`/auth`) || PathPrefix(`/api`))"
+      - "traefik.http.routers.docus-web-bff.entrypoints=websecure"
+      - "traefik.http.routers.docus-web-bff.tls=true"
+      - "traefik.http.routers.docus-web-bff.priority=50"
+      - "traefik.http.routers.docus-web-bff.service=docus-web"
+      - "traefik.http.routers.docus-web-bff.middlewares=docus-web-bff-prefijo"
+      - "traefik.http.middlewares.docus-web-bff-prefijo.addprefix.prefix=/docus"
+      - "traefik.http.routers.docus-web-raiz.rule=Host(`docus.sytue.localhost`) && Path(`/`)"
+      - "traefik.http.routers.docus-web-raiz.entrypoints=websecure"
+      - "traefik.http.routers.docus-web-raiz.tls=true"
+      - "traefik.http.routers.docus-web-raiz.priority=60"
+      - "traefik.http.routers.docus-web-raiz.service=docus-web"
+      - "traefik.http.routers.docus-web-raiz.middlewares=docus-web-raiz-portada"
+      - "traefik.http.middlewares.docus-web-raiz-portada.redirectregex.regex=^https?://([^/]+)/?(\\?.*)?$$"
+      - "traefik.http.middlewares.docus-web-raiz-portada.redirectregex.replacement=https://$${1}/docus/$${2}"
 
   # La ofimática con una app por producto (2026-10-12, ADR 0076): el mismo paquete
   # (@sytue/office) con su host, su prefijo y su client OIDC (migración 0111 de Sytue ID).
@@ -1937,6 +2222,7 @@ services:
     <<: [*restart, *logging]
     profiles: ["full", "docs", "calcus"]
     networks: [edge, backend]
+    entrypoint: *frontend-entrypoint
     command: ["bun", "run", "--filter", "@sytue/calcus", "dev", "--host", "0.0.0.0", "--port", "4339"]
     ports: ["127.0.0.1:4339:4339"]
     environment:
@@ -1955,6 +2241,26 @@ services:
       - "traefik.http.routers.calcus-web.entrypoints=websecure"
       - "traefik.http.routers.calcus-web.tls=true"
       - "traefik.http.services.calcus-web.loadbalancer.server.port=4339"
+      # Como en producción (charts/sytue-frontend/templates/ingress.yaml): la app vive
+      # bajo su base de Astro (/calcus), pero el BFF emite /auth y /api en absoluto y
+      # Sytue ID devuelve el login a <host>/auth/callback. Esas rutas entran con el
+      # prefijo añadido; la raíz del host redirige a la portada. Prioridades 50/60:
+      # por encima del router de la app y por debajo de los backends de Go (100).
+      - "traefik.http.routers.calcus-web-bff.rule=Host(`calcus.sytue.localhost`) && (PathPrefix(`/auth`) || PathPrefix(`/api`))"
+      - "traefik.http.routers.calcus-web-bff.entrypoints=websecure"
+      - "traefik.http.routers.calcus-web-bff.tls=true"
+      - "traefik.http.routers.calcus-web-bff.priority=50"
+      - "traefik.http.routers.calcus-web-bff.service=calcus-web"
+      - "traefik.http.routers.calcus-web-bff.middlewares=calcus-web-bff-prefijo"
+      - "traefik.http.middlewares.calcus-web-bff-prefijo.addprefix.prefix=/calcus"
+      - "traefik.http.routers.calcus-web-raiz.rule=Host(`calcus.sytue.localhost`) && Path(`/`)"
+      - "traefik.http.routers.calcus-web-raiz.entrypoints=websecure"
+      - "traefik.http.routers.calcus-web-raiz.tls=true"
+      - "traefik.http.routers.calcus-web-raiz.priority=60"
+      - "traefik.http.routers.calcus-web-raiz.service=calcus-web"
+      - "traefik.http.routers.calcus-web-raiz.middlewares=calcus-web-raiz-portada"
+      - "traefik.http.middlewares.calcus-web-raiz-portada.redirectregex.regex=^https?://([^/]+)/?(\\?.*)?$$"
+      - "traefik.http.middlewares.calcus-web-raiz-portada.redirectregex.replacement=https://$${1}/calcus/$${2}"
 
   # La ofimática con una app por producto (2026-10-12, ADR 0076): el mismo paquete
   # (@sytue/office) con su host, su prefijo y su client OIDC (migración 0111 de Sytue ID).
@@ -1963,6 +2269,7 @@ services:
     <<: [*restart, *logging]
     profiles: ["full", "docs", "diapos"]
     networks: [edge, backend]
+    entrypoint: *frontend-entrypoint
     command: ["bun", "run", "--filter", "@sytue/diapos", "dev", "--host", "0.0.0.0", "--port", "4340"]
     ports: ["127.0.0.1:4340:4340"]
     environment:
@@ -1981,6 +2288,26 @@ services:
       - "traefik.http.routers.diapos-web.entrypoints=websecure"
       - "traefik.http.routers.diapos-web.tls=true"
       - "traefik.http.services.diapos-web.loadbalancer.server.port=4340"
+      # Como en producción (charts/sytue-frontend/templates/ingress.yaml): la app vive
+      # bajo su base de Astro (/diapos), pero el BFF emite /auth y /api en absoluto y
+      # Sytue ID devuelve el login a <host>/auth/callback. Esas rutas entran con el
+      # prefijo añadido; la raíz del host redirige a la portada. Prioridades 50/60:
+      # por encima del router de la app y por debajo de los backends de Go (100).
+      - "traefik.http.routers.diapos-web-bff.rule=Host(`diapos.sytue.localhost`) && (PathPrefix(`/auth`) || PathPrefix(`/api`))"
+      - "traefik.http.routers.diapos-web-bff.entrypoints=websecure"
+      - "traefik.http.routers.diapos-web-bff.tls=true"
+      - "traefik.http.routers.diapos-web-bff.priority=50"
+      - "traefik.http.routers.diapos-web-bff.service=diapos-web"
+      - "traefik.http.routers.diapos-web-bff.middlewares=diapos-web-bff-prefijo"
+      - "traefik.http.middlewares.diapos-web-bff-prefijo.addprefix.prefix=/diapos"
+      - "traefik.http.routers.diapos-web-raiz.rule=Host(`diapos.sytue.localhost`) && Path(`/`)"
+      - "traefik.http.routers.diapos-web-raiz.entrypoints=websecure"
+      - "traefik.http.routers.diapos-web-raiz.tls=true"
+      - "traefik.http.routers.diapos-web-raiz.priority=60"
+      - "traefik.http.routers.diapos-web-raiz.service=diapos-web"
+      - "traefik.http.routers.diapos-web-raiz.middlewares=diapos-web-raiz-portada"
+      - "traefik.http.middlewares.diapos-web-raiz-portada.redirectregex.regex=^https?://([^/]+)/?(\\?.*)?$$"
+      - "traefik.http.middlewares.diapos-web-raiz-portada.redirectregex.replacement=https://$${1}/diapos/$${2}"
 
   # La ofimática con una app por producto (2026-10-12, ADR 0076): el mismo paquete
   # (@sytue/office) con su host, su prefijo y su client OIDC (migración 0111 de Sytue ID).
@@ -1989,6 +2316,7 @@ services:
     <<: [*restart, *logging]
     profiles: ["full", "docs", "certipdf"]
     networks: [edge, backend]
+    entrypoint: *frontend-entrypoint
     command: ["bun", "run", "--filter", "@sytue/certipdf", "dev", "--host", "0.0.0.0", "--port", "4341"]
     ports: ["127.0.0.1:4341:4341"]
     environment:
@@ -2007,12 +2335,33 @@ services:
       - "traefik.http.routers.certipdf-web.entrypoints=websecure"
       - "traefik.http.routers.certipdf-web.tls=true"
       - "traefik.http.services.certipdf-web.loadbalancer.server.port=4341"
+      # Como en producción (charts/sytue-frontend/templates/ingress.yaml): la app vive
+      # bajo su base de Astro (/certipdf), pero el BFF emite /auth y /api en absoluto y
+      # Sytue ID devuelve el login a <host>/auth/callback. Esas rutas entran con el
+      # prefijo añadido; la raíz del host redirige a la portada. Prioridades 50/60:
+      # por encima del router de la app y por debajo de los backends de Go (100).
+      - "traefik.http.routers.certipdf-web-bff.rule=Host(`certipdf.sytue.localhost`) && (PathPrefix(`/auth`) || PathPrefix(`/api`))"
+      - "traefik.http.routers.certipdf-web-bff.entrypoints=websecure"
+      - "traefik.http.routers.certipdf-web-bff.tls=true"
+      - "traefik.http.routers.certipdf-web-bff.priority=50"
+      - "traefik.http.routers.certipdf-web-bff.service=certipdf-web"
+      - "traefik.http.routers.certipdf-web-bff.middlewares=certipdf-web-bff-prefijo"
+      - "traefik.http.middlewares.certipdf-web-bff-prefijo.addprefix.prefix=/certipdf"
+      - "traefik.http.routers.certipdf-web-raiz.rule=Host(`certipdf.sytue.localhost`) && Path(`/`)"
+      - "traefik.http.routers.certipdf-web-raiz.entrypoints=websecure"
+      - "traefik.http.routers.certipdf-web-raiz.tls=true"
+      - "traefik.http.routers.certipdf-web-raiz.priority=60"
+      - "traefik.http.routers.certipdf-web-raiz.service=certipdf-web"
+      - "traefik.http.routers.certipdf-web-raiz.middlewares=certipdf-web-raiz-portada"
+      - "traefik.http.middlewares.certipdf-web-raiz-portada.redirectregex.regex=^https?://([^/]+)/?(\\?.*)?$$"
+      - "traefik.http.middlewares.certipdf-web-raiz-portada.redirectregex.replacement=https://$${1}/certipdf/$${2}"
 
   rooms-web:
     build: *frontend-build
     <<: [*restart, *logging]
     profiles: ["full", "rooms"]
     networks: [edge, backend]
+    entrypoint: *frontend-entrypoint
     command: ["bun", "run", "--filter", "@sytue/rooms", "dev", "--host", "0.0.0.0", "--port", "4330"]
     ports: ["127.0.0.1:4330:4330"]
     environment:
@@ -2056,3 +2405,23 @@ services:
       - "traefik.http.middlewares.chat-to-rooms.redirectregex.regex=^https?://chat.sytue.localhost/(.*)"
       - "traefik.http.middlewares.chat-to-rooms.redirectregex.replacement=https://rooms.sytue.localhost/$${1}"
       - "traefik.http.middlewares.chat-to-rooms.redirectregex.permanent=true"
+      # Como en producción (charts/sytue-frontend/templates/ingress.yaml): la app vive
+      # bajo su base de Astro (/rooms), pero el BFF emite /auth y /api en absoluto y
+      # Sytue ID devuelve el login a <host>/auth/callback. Esas rutas entran con el
+      # prefijo añadido; la raíz del host redirige a la portada. Prioridades 50/60:
+      # por encima del router de la app y por debajo de los backends de Go (100).
+      - "traefik.http.routers.rooms-web-bff.rule=Host(`rooms.sytue.localhost`) && (PathPrefix(`/auth`) || PathPrefix(`/api`))"
+      - "traefik.http.routers.rooms-web-bff.entrypoints=websecure"
+      - "traefik.http.routers.rooms-web-bff.tls=true"
+      - "traefik.http.routers.rooms-web-bff.priority=50"
+      - "traefik.http.routers.rooms-web-bff.service=rooms-web"
+      - "traefik.http.routers.rooms-web-bff.middlewares=rooms-web-bff-prefijo"
+      - "traefik.http.middlewares.rooms-web-bff-prefijo.addprefix.prefix=/rooms"
+      - "traefik.http.routers.rooms-web-raiz.rule=Host(`rooms.sytue.localhost`) && Path(`/`)"
+      - "traefik.http.routers.rooms-web-raiz.entrypoints=websecure"
+      - "traefik.http.routers.rooms-web-raiz.tls=true"
+      - "traefik.http.routers.rooms-web-raiz.priority=60"
+      - "traefik.http.routers.rooms-web-raiz.service=rooms-web"
+      - "traefik.http.routers.rooms-web-raiz.middlewares=rooms-web-raiz-portada"
+      - "traefik.http.middlewares.rooms-web-raiz-portada.redirectregex.regex=^https?://([^/]+)/?(\\?.*)?$$"
+      - "traefik.http.middlewares.rooms-web-raiz-portada.redirectregex.replacement=https://$${1}/rooms/$${2}"

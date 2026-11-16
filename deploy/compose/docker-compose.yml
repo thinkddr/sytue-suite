@@ -278,6 +278,12 @@ services:
       CLOUD_DB_NAME: ${CLOUD_DB_NAME:-sytue_cloud}
       CLOUD_DB_USER: ${CLOUD_DB_USER:-sytue_cloud}
       CLOUD_DB_PASSWORD: ${CLOUD_DB_PASSWORD}
+      # Sytue Analytics: el init crea su rol con esta contraseña. Sin ella el
+      # script de init aborta a mitad («ANALYTICS_DB_PASSWORD: parameter not
+      # set») y PostgreSQL no lo repite al reiniciar: la base no llega a existir.
+      ANALYTICS_DB_NAME: ${ANALYTICS_DB_NAME:-sytue_analytics}
+      ANALYTICS_DB_USER: ${ANALYTICS_DB_USER:-sytue_analytics}
+      ANALYTICS_DB_PASSWORD: ${ANALYTICS_DB_PASSWORD}
       POSTGREST_ROLE: ${POSTGREST_ROLE:-authenticator}
       POSTGREST_ROLE_PASSWORD: ${POSTGREST_ROLE_PASSWORD}
     volumes:

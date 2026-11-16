@@ -59,25 +59,28 @@ deploy-integrations: ## Asistente de integraciones y conectores con terceros (./
 # Desarrollo LOCAL (Docker Compose en deploy/compose)
 # =============================================================================
 .PHONY: dev-up
-dev-up: ## Levanta toda la suite en local (TLS mkcert + servicios Go + frontends)
-	@# Lee COMPOSE_PROFILES del .env (por defecto `full` = suite completa, como siempre).
-	@# Sin .env, lo genera el asistente con secretos aleatorios (nunca un ejemplo vacío).
+dev-up: ## Levanta toda la suite en local con las apps web COMPILADAS (~2-3 GB de RAM)
+	@# Lee COMPOSE_PROFILES del .env (por defecto `full` = suite completa).
+	@# Apps web compiladas (frontlite.yml): ~80 MiB cada una en vez de 0,6-0,9 GiB con
+	@# `astro dev` (medido: 11,4 GiB las 18). Para recarga en caliente: dev-up-caliente
+	@# (toda la suite) o dev-app P=<perfil> (una app).
 	@test -f $(COMPOSE_DIR)/.env || $(ROOT_DIR)/sytue-deploy --mode compose --yes --only-config
 	@$(MAKE) dev-certs
 	@# BuildKit es obligatorio (los Dockerfile Go usan `RUN --mount=type=cache`). En
 	@# entornos sin el plugin `docker buildx`, `up --build` cae al builder legacy y
 	@# falla; por eso se SEPARA el build (con DOCKER_BUILDKIT) del up.
-	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 $(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml build
-	$(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml up -d
-
-.PHONY: dev-up-built
-dev-up-built: ## Suite COMPLETA en modo COMPILADO (SSR runtime, ~1.2 GB vs ~4.8 GB de dev; sin HMR)
-	@# Cada frontend se sirve compilado (target runtime, ~80 MB) en vez de astro dev
-	@# (~450 MB). Representativo de prod. Para desarrollar UNA app con HMR usa dev-app.
-	@test -f $(COMPOSE_DIR)/.env || $(ROOT_DIR)/sytue-deploy --mode compose --yes --only-config
-	@$(MAKE) dev-certs
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 $(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml -f $(COMPOSE_DIR)/frontlite.yml build
 	$(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml -f $(COMPOSE_DIR)/frontlite.yml up -d
+
+.PHONY: dev-up-built
+dev-up-built: dev-up ## Alias de dev-up (las apps compiladas ya son el modo por defecto)
+
+.PHONY: dev-up-caliente
+dev-up-caliente: ## Toda la suite con `astro dev` y recarga en caliente (~12 GB de RAM)
+	@test -f $(COMPOSE_DIR)/.env || $(ROOT_DIR)/sytue-deploy --mode compose --yes --only-config
+	@$(MAKE) dev-certs
+	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 $(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml build
+	$(COMPOSE) -f $(COMPOSE_DIR)/docker-compose.yml up -d
 
 .PHONY: dev-app
 dev-app: ## Solo núcleo + apps concretas (DEV, cabe en 8 GB): make dev-app P=docs,mail

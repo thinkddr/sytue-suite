@@ -498,7 +498,15 @@ modo_integraciones() {
 # ---------------------------------------------------------------------------
 # Modo local: Docker Compose
 # ---------------------------------------------------------------------------
-dc() { docker compose --project-directory "$COMPOSE_DIR" -f "$COMPOSE_FILE" "$@"; }
+# Ficheros de Compose: el base y las apps web compiladas (frontlite.yml), que
+# gastan ~80 MiB cada una frente a 0,6-0,9 GiB con `astro dev`. El modo servidor
+# añade los suyos (ver instalar_servidor).
+COMPOSE_FILES=("$COMPOSE_FILE" "${COMPOSE_DIR}/frontlite.yml")
+dc() {
+  local args=() f
+  for f in "${COMPOSE_FILES[@]}"; do args+=(-f "$f"); done
+  docker compose --project-directory "$COMPOSE_DIR" "${args[@]}" "$@"
+}
 
 # Valor de una variable del .env (sin interpretar el fichero como shell).
 env_get() { [ -f "$ENV_FILE" ] && sed -n "s/^$1=//p" "$ENV_FILE" | tail -1 || true; }
@@ -932,7 +940,7 @@ instalar_compose() {
   if [ "$NO_BUILD" -eq 1 ]; then
     info "Sin reconstruir (--no-build): se usan las imágenes ya construidas."
   else
-    info "Construyendo las imágenes. La primera vez tarda (≈15-40 min según el equipo); después es incremental."
+    info "Construyendo las imágenes (servicios Go y apps web compiladas). La primera vez tarda (≈20-60 min según el equipo); después es incremental."
     DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 dc build
   fi
   info "Arrancando contenedores..."

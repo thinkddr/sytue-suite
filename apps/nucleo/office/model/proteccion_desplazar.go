@@ -223,11 +223,15 @@ func lineas(cel map[string]string, est map[string]estilo, filas bool) (map[int]m
 }
 
 // hojaEnLineas es una hoja (la previa o la nueva) ya agrupada, con los rangos que la
-// persona tiene concedidos en ella.
+// persona tiene concedidos en ella. `forma`, en la previa, compara los valores con
+// holgura: dos que dan la misma forma pueden venir uno del otro, y lo que los distingue
+// lo comprueba exactamente quien la pone (las fórmulas de la propia hoja reescritas con
+// el desplazamiento, proteccion_propia.go). Sin ella, los valores se comparan tal cual.
 type hojaEnLineas struct {
 	l      map[int]map[int]celdaHoja
-	rangos rangosEditables
+	rangos RangosEditables
 	filas  bool
+	forma  func(string) string
 }
 
 // editable: ¿puede la persona escribir en la posición `o` de la línea `ln`?
@@ -236,9 +240,9 @@ func (h hojaEnLineas) editable(ln, o int) bool {
 		return true
 	}
 	if h.filas {
-		return h.rangos.contieneCelda(o, ln)
+		return h.rangos.Contiene(o, ln)
 	}
-	return h.rangos.contieneCelda(ln, o)
+	return h.rangos.Contiene(ln, o)
 }
 
 // lineaCoincide: ¿puede la línea `ln` del modelo nuevo venir de la `lp` del previo?
@@ -252,7 +256,7 @@ func lineaCoincide(prev, nuevo hojaEnLineas, lp, ln int) bool {
 		if p.abierta != q.abierta || p.oculta != q.oculta {
 			return false
 		}
-		if p.valor == q.valor {
+		if p.valor == q.valor || (prev.forma != nil && prev.forma(p.valor) == prev.forma(q.valor)) {
 			return true
 		}
 		return (lp <= 0 || prev.editable(lp, o)) && nuevo.editable(ln, o)
@@ -270,16 +274,6 @@ func lineaCoincide(prev, nuevo hojaEnLineas, lp, ln int) bool {
 	return true
 }
 
-// contieneCelda es `contiene` con la celda ya leída.
-func (rs rangosEditables) contieneCelda(col, fila int) bool {
-	for _, r := range rs {
-		if (r.c1 == 0 || (col >= r.c1 && col <= r.c2)) && (r.f1 == 0 || (fila >= r.f1 && fila <= r.f2)) {
-			return true
-		}
-	}
-	return false
-}
-
 // otrosDesplazados es lo que, además de los rangos y del contenido, tiene que explicar
 // el MISMO desplazamiento de la hoja protegida: sus tablas dinámicas
 // (proteccion_dinamicas.go). Sus bordes (base uno) dan candidatos a la búsqueda.
@@ -292,8 +286,9 @@ type otrosDesplazados interface {
 // explica una inserción o un borrado con su permiso concedido (ver arriba). pp y np son
 // el `protect` previo y el nuevo; p y n, la hoja. Con `otros`, el mismo desplazamiento
 // tiene que explicarlos también (los rangos pueden no haber cambiado: entonces tienen
-// que seguir donde ese desplazamiento los deja).
-func rangosHojaMovidos(p, n, pp, np map[string]json.RawMessage, quien Subject, otros otrosDesplazados) bool {
+// que seguir donde ese desplazamiento los deja). Con `forma`, los valores de las líneas
+// se comparan con esa holgura y `otros` comprueba exactamente lo que deja pasar.
+func rangosHojaMovidos(p, n, pp, np map[string]json.RawMessage, quien Subject, otros otrosDesplazados, forma func(string) string) bool {
 	previos, ok1 := rangosCrudos(pp["ranges"])
 	nuevos, ok2 := rangosCrudos(np["ranges"])
 	pc, ok3 := celdas(p)
@@ -310,21 +305,114 @@ func rangosHojaMovidos(p, n, pp, np map[string]json.RawMessage, quien Subject, o
 		if !okp || !okn {
 			return false
 		}
-		prev := hojaEnLineas{l: lp, rangos: viejos, filas: filas}
+		prev := hojaEnLineas{l: lp, rangos: viejos, filas: filas, forma: forma}
 		nuevo := hojaEnLineas{l: ln, rangos: nuevosQuien, filas: filas}
+		var cl *comparacionLineas // lo que no depende del desplazamiento, al hacer falta
 		for _, cant := range candidatas(lp, ln, previos, nuevos, filas, otros) {
 			for _, signo := range []int{1, -1} {
 				d := desplazamiento{filas: filas, n: signo * cant}
 				if !dice(pp, d.permiso(), true) {
 					continue
 				}
-				if buscarDesde(d, prev, nuevo, previos, nuevos, otros) {
+				if cl == nil {
+					cl = compararLineas(prev, nuevo, d.tope())
+				}
+				if buscarDesde(d, cl, previos, nuevos, otros) {
 					return true
 				}
 			}
 		}
 	}
 	return false
+}
+
+// comparacionLineas es lo que buscarDesde comparte entre los candidatos de un eje: lo
+// que no depende del desplazamiento. Quedarse o ser nueva solo puede fallar en una línea
+// con algo, antes o después, así que eso se mira una vez; moverse, en cada candidato.
+type comparacionLineas struct {
+	prev, nuevo hojaEnLineas
+	// hi: la primera línea que no puede quedarse donde estaba (el tope si ninguna); el
+	// desplazamiento empieza en ella o antes.
+	hi int
+	// nuevasMal: las líneas, en orden, que no pueden ser recién insertadas.
+	nuevasMal []int
+	// las líneas con algo, de la última a la primera.
+	clavesNuevo, clavesPrev []int
+}
+
+func compararLineas(prev, nuevo hojaEnLineas, tope int) *comparacionLineas {
+	cl := &comparacionLineas{prev: prev, nuevo: nuevo, hi: tope}
+	descendentes := func(l map[int]map[int]celdaHoja) []int {
+		out := make([]int, 0, len(l))
+		for k := range l {
+			out = append(out, k)
+		}
+		slices.Sort(out)
+		slices.Reverse(out)
+		return out
+	}
+	cl.clavesNuevo, cl.clavesPrev = descendentes(nuevo.l), descendentes(prev.l)
+	todas := append(slices.Clone(cl.clavesNuevo), cl.clavesPrev...)
+	slices.Sort(todas)
+	for _, k := range slices.Compact(todas) {
+		if !lineaCoincide(prev, nuevo, k, k) {
+			cl.hi = k // la primera: las de encima ya no importan
+			break
+		}
+	}
+	for _, k := range slices.Backward(cl.clavesNuevo) {
+		if !lineaCoincide(prev, nuevo, 0, k) {
+			cl.nuevasMal = append(cl.nuevasMal, k)
+		}
+	}
+	return cl
+}
+
+// loMover es el primer comienzo posible de d según las líneas que se mueven: cada línea
+// desde el comienzo (más lo insertado) tiene que venir de la suya. Basta con la última
+// que no puede: se recorren de la última a la primera y se para en ella.
+func (cl *comparacionLineas) loMover(d desplazamiento) int {
+	tope := d.tope()
+	i, j := 0, 0
+	for i < len(cl.clavesNuevo) || j < len(cl.clavesPrev) {
+		// La siguiente línea, de mayor a menor, entre las que tienen algo después y las
+		// que lo reciben de antes al moverse.
+		k := -1
+		if i < len(cl.clavesNuevo) {
+			k = cl.clavesNuevo[i]
+		}
+		if j < len(cl.clavesPrev) {
+			if movida := cl.clavesPrev[j] + d.n; movida > tope {
+				j++
+				continue
+			} else if movida >= k {
+				if movida == k {
+					i++
+				}
+				k = movida
+				j++
+			} else {
+				i++
+			}
+		} else {
+			i++
+		}
+		if k < 1 {
+			break
+		}
+		// Lo que llega de fuera de la rejilla llega vacío: una línea que nadie tiene.
+		origen := k - d.n
+		if origen < 1 || origen > tope {
+			origen = -1
+		}
+		if !lineaCoincide(cl.prev, cl.nuevo, origen, k) {
+			if d.n > 0 {
+				return max(1, k-d.n+1) // moverse vale desde comienzo+n
+			}
+			return k + 1 // al borrar, moverse vale desde el comienzo
+		}
+	}
+	return 1
 }
 
 // candidatas son las cantidades de filas (o columnas) que vale la pena probar: lo que
@@ -390,58 +478,23 @@ const (
 // d.n. El contenido acota un intervalo de comienzos posibles (cada línea solo puede
 // quedarse, moverse o ser nueva); los rangos, dentro de él, solo cambian de resultado en
 // sus bordes, así que basta con probar esos puntos.
-//
-//nolint:gocognit,gocyclo // los tres modos de cada línea y el cruce con los rangos, juntos.
-func buscarDesde(d desplazamiento, prev, nuevo hojaEnLineas, previos, nuevos []map[string]json.RawMessage, otros otrosDesplazados) bool {
-	tope := d.tope()
+func buscarDesde(d desplazamiento, cl *comparacionLineas, previos, nuevos []map[string]json.RawMessage, otros otrosDesplazados) bool {
 	m := abs(d.n)
-	// Líneas en las que algún modo puede fallar: las que tienen algo en el modelo nuevo
-	// y las que reciben algo del previo quedándose o moviéndose.
-	relevantes := map[int]bool{}
-	for k := range nuevo.l {
-		relevantes[k] = true
-	}
-	for k := range prev.l {
-		relevantes[k] = true
-		if k+d.n >= 1 && k+d.n <= tope {
-			relevantes[k+d.n] = true
-		}
-	}
-	lo, hi := 1, tope
-	var nuevasMal []int
-	for k := range relevantes {
-		if !lineaCoincide(prev, nuevo, k, k) {
-			hi = min(hi, k) // quedarse vale solo antes del comienzo: este va en el tramo
-		}
-		// Lo que llega de fuera de la rejilla llega vacío: una línea que nadie tiene.
-		origen := k - d.n
-		if origen < 1 || origen > tope {
-			origen = -1
-		}
-		if !lineaCoincide(prev, nuevo, origen, k) {
-			if d.n > 0 {
-				lo = max(lo, k-d.n+1) // moverse vale desde comienzo+n
-			} else {
-				lo = max(lo, k+1) // al borrar, moverse vale desde el comienzo
-			}
-		}
-		if d.n > 0 && !lineaCoincide(prev, nuevo, 0, k) {
-			nuevasMal = append(nuevasMal, k)
-		}
-	}
+	lo, hi := cl.loMover(d), cl.hi
 	if lo > hi {
 		return false
+	}
+	var nuevasMal []int
+	if d.n > 0 {
+		nuevasMal = cl.nuevasMal
 	}
 	valido := func(r int) bool {
 		if r < lo || r > hi {
 			return false
 		}
-		for _, f := range nuevasMal {
-			if f >= r && f < r+m {
-				return false
-			}
-		}
-		return true
+		// Ninguna de las que no pueden ser nuevas en lo insertado.
+		i, _ := slices.BinarySearch(nuevasMal, r)
+		return i == len(nuevasMal) || nuevasMal[i] >= r+m
 	}
 	cand := []int{lo}
 	for _, f := range nuevasMal {

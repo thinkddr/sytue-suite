@@ -9468,6 +9468,652 @@
       }
     ]
   },
+  "propiaHoja": {
+    "hojas": [
+      {
+        "name": "Ventas",
+        "cells": {
+          "B1": "7"
+        }
+      },
+      {
+        "name": "Datos",
+        "cells": {
+          "A1": "1",
+          "A2": "2",
+          "A3": "3",
+          "A4": "4",
+          "A5": "5",
+          "A10": "<b>=SUM(A1:A5)</b>",
+          "B1": "=A3*2",
+          "B2": "=Datos!A4+$A$5",
+          "B3": "=SUM(A:A)",
+          "C1": "libre",
+          "C4": "=A4",
+          "D1": "=Ventas!B1"
+        },
+        "styles": {
+          "C1": {
+            "locked": false
+          },
+          "C4": {
+            "hidden": true
+          }
+        },
+        "protect": {
+          "insertRows": true,
+          "deleteRows": true,
+          "insertCols": true,
+          "deleteCols": true,
+          "ranges": [
+            {
+              "ref": "A4:A5",
+              "users": ["ana"]
+            }
+          ]
+        },
+        "pivots": [
+          {
+            "name": "TD1",
+            "source": "A1:A5",
+            "anchor": "F1",
+            "range": "F1:G3",
+            "rows": [
+              {
+                "field": 0
+              }
+            ],
+            "cols": [],
+            "values": [
+              {
+                "field": 0,
+                "fn": "sum"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Resumen",
+        "cells": {
+          "A1": "=Datos!A10",
+          "A2": "=Datos!A1"
+        },
+        "protect": {}
+      }
+    ],
+    "casos": [
+      {
+        "hoja": 1,
+        "d": {
+          "eje": "fila",
+          "desde": 2,
+          "cantidad": 1,
+          "tope": 1048576,
+          "hoja": "Datos"
+        },
+        "sale": [
+          {
+            "name": "Ventas",
+            "cells": {
+              "B1": "7"
+            }
+          },
+          {
+            "name": "Datos",
+            "cells": {
+              "A1": "1",
+              "A2": "2",
+              "A4": "3",
+              "A5": "4",
+              "A6": "5",
+              "A11": "<b>=SUM(A1:A6)</b>",
+              "B1": "=A4*2",
+              "B2": "=Datos!A5+$A$6",
+              "B4": "=SUM(A:A)",
+              "C1": "libre",
+              "C5": "=A5",
+              "D1": "=Ventas!B1"
+            },
+            "styles": {
+              "C1": {
+                "locked": false
+              },
+              "C5": {
+                "hidden": true
+              }
+            },
+            "protect": {
+              "insertRows": true,
+              "deleteRows": true,
+              "insertCols": true,
+              "deleteCols": true,
+              "ranges": [
+                {
+                  "ref": "A5:A6",
+                  "users": ["ana"]
+                }
+              ]
+            },
+            "pivots": [
+              {
+                "name": "TD1",
+                "source": "A1:A6",
+                "anchor": "F1",
+                "range": "F1:G4",
+                "rows": [
+                  {
+                    "field": 0
+                  }
+                ],
+                "cols": [],
+                "values": [
+                  {
+                    "field": 0,
+                    "fn": "sum"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "Resumen",
+            "cells": {
+              "A1": "=Datos!A11",
+              "A2": "=Datos!A1"
+            },
+            "protect": {}
+          }
+        ]
+      },
+      {
+        "hoja": 1,
+        "d": {
+          "eje": "fila",
+          "desde": 0,
+          "cantidad": 1,
+          "tope": 1048576,
+          "hoja": "Datos"
+        },
+        "sale": [
+          {
+            "name": "Ventas",
+            "cells": {
+              "B1": "7"
+            }
+          },
+          {
+            "name": "Datos",
+            "cells": {
+              "A2": "1",
+              "A3": "2",
+              "A4": "3",
+              "A5": "4",
+              "A6": "5",
+              "A11": "<b>=SUM(A2:A6)</b>",
+              "B2": "=A4*2",
+              "B3": "=Datos!A5+$A$6",
+              "B4": "=SUM(A:A)",
+              "C2": "libre",
+              "C5": "=A5",
+              "D2": "=Ventas!B1"
+            },
+            "styles": {
+              "C2": {
+                "locked": false
+              },
+              "C5": {
+                "hidden": true
+              }
+            },
+            "protect": {
+              "insertRows": true,
+              "deleteRows": true,
+              "insertCols": true,
+              "deleteCols": true,
+              "ranges": [
+                {
+                  "ref": "A5:A6",
+                  "users": ["ana"]
+                }
+              ]
+            },
+            "pivots": [
+              {
+                "name": "TD1",
+                "source": "A2:A6",
+                "anchor": "F2",
+                "range": "F2:G4",
+                "rows": [
+                  {
+                    "field": 0
+                  }
+                ],
+                "cols": [],
+                "values": [
+                  {
+                    "field": 0,
+                    "fn": "sum"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "Resumen",
+            "cells": {
+              "A1": "=Datos!A11",
+              "A2": "=Datos!A2"
+            },
+            "protect": {}
+          }
+        ]
+      },
+      {
+        "hoja": 1,
+        "d": {
+          "eje": "fila",
+          "desde": 1,
+          "cantidad": -1,
+          "tope": 1048576,
+          "hoja": "Datos"
+        },
+        "sale": [
+          {
+            "name": "Ventas",
+            "cells": {
+              "B1": "7"
+            }
+          },
+          {
+            "name": "Datos",
+            "cells": {
+              "A1": "1",
+              "A2": "3",
+              "A3": "4",
+              "A4": "5",
+              "A9": "<b>=SUM(A1:A4)</b>",
+              "B1": "=A2*2",
+              "B2": "=SUM(A:A)",
+              "C1": "libre",
+              "C3": "=A3",
+              "D1": "=Ventas!B1"
+            },
+            "styles": {
+              "C1": {
+                "locked": false
+              },
+              "C3": {
+                "hidden": true
+              }
+            },
+            "protect": {
+              "insertRows": true,
+              "deleteRows": true,
+              "insertCols": true,
+              "deleteCols": true,
+              "ranges": [
+                {
+                  "ref": "A3:A4",
+                  "users": ["ana"]
+                }
+              ]
+            },
+            "pivots": [
+              {
+                "name": "TD1",
+                "source": "A1:A4",
+                "anchor": "F1",
+                "range": "F1:G2",
+                "rows": [
+                  {
+                    "field": 0
+                  }
+                ],
+                "cols": [],
+                "values": [
+                  {
+                    "field": 0,
+                    "fn": "sum"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "Resumen",
+            "cells": {
+              "A1": "=Datos!A9",
+              "A2": "=Datos!A1"
+            },
+            "protect": {}
+          }
+        ]
+      },
+      {
+        "hoja": 1,
+        "d": {
+          "eje": "fila",
+          "desde": 2,
+          "cantidad": -2,
+          "tope": 1048576,
+          "hoja": "Datos"
+        },
+        "sale": [
+          {
+            "name": "Ventas",
+            "cells": {
+              "B1": "7"
+            }
+          },
+          {
+            "name": "Datos",
+            "cells": {
+              "A1": "1",
+              "A2": "2",
+              "A3": "5",
+              "A8": "<b>=SUM(A1:A3)</b>",
+              "B1": "=#¡REF!*2",
+              "B2": "=#¡REF!+$A$3",
+              "C1": "libre",
+              "D1": "=Ventas!B1"
+            },
+            "styles": {
+              "C1": {
+                "locked": false
+              }
+            },
+            "protect": {
+              "insertRows": true,
+              "deleteRows": true,
+              "insertCols": true,
+              "deleteCols": true,
+              "ranges": [
+                {
+                  "ref": "A3",
+                  "users": ["ana"]
+                }
+              ]
+            },
+            "pivots": [
+              {
+                "name": "TD1",
+                "source": "A1:A3",
+                "anchor": "F1",
+                "range": "F1:G2",
+                "rows": [
+                  {
+                    "field": 0
+                  }
+                ],
+                "cols": [],
+                "values": [
+                  {
+                    "field": 0,
+                    "fn": "sum"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "Resumen",
+            "cells": {
+              "A1": "=Datos!A8",
+              "A2": "=Datos!A1"
+            },
+            "protect": {}
+          }
+        ]
+      },
+      {
+        "hoja": 1,
+        "d": {
+          "eje": "fila",
+          "desde": 20,
+          "cantidad": 1,
+          "tope": 1048576,
+          "hoja": "Datos"
+        },
+        "sale": [
+          {
+            "name": "Ventas",
+            "cells": {
+              "B1": "7"
+            }
+          },
+          {
+            "name": "Datos",
+            "cells": {
+              "A1": "1",
+              "A2": "2",
+              "A3": "3",
+              "A4": "4",
+              "A5": "5",
+              "A10": "<b>=SUM(A1:A5)</b>",
+              "B1": "=A3*2",
+              "B2": "=Datos!A4+$A$5",
+              "B3": "=SUM(A:A)",
+              "C1": "libre",
+              "C4": "=A4",
+              "D1": "=Ventas!B1"
+            },
+            "styles": {
+              "C1": {
+                "locked": false
+              },
+              "C4": {
+                "hidden": true
+              }
+            },
+            "protect": {
+              "insertRows": true,
+              "deleteRows": true,
+              "insertCols": true,
+              "deleteCols": true,
+              "ranges": [
+                {
+                  "ref": "A4:A5",
+                  "users": ["ana"]
+                }
+              ]
+            },
+            "pivots": [
+              {
+                "name": "TD1",
+                "source": "A1:A5",
+                "anchor": "F1",
+                "range": "F1:G3",
+                "rows": [
+                  {
+                    "field": 0
+                  }
+                ],
+                "cols": [],
+                "values": [
+                  {
+                    "field": 0,
+                    "fn": "sum"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "Resumen",
+            "cells": {
+              "A1": "=Datos!A10",
+              "A2": "=Datos!A1"
+            },
+            "protect": {}
+          }
+        ]
+      },
+      {
+        "hoja": 1,
+        "d": {
+          "eje": "columna",
+          "desde": 0,
+          "cantidad": 1,
+          "tope": 16384,
+          "hoja": "Datos"
+        },
+        "sale": [
+          {
+            "name": "Ventas",
+            "cells": {
+              "B1": "7"
+            }
+          },
+          {
+            "name": "Datos",
+            "cells": {
+              "B1": "1",
+              "B2": "2",
+              "B3": "3",
+              "B4": "4",
+              "B5": "5",
+              "B10": "<b>=SUM(B1:B5)</b>",
+              "C1": "=B3*2",
+              "C2": "=Datos!B4+$B$5",
+              "C3": "=SUM(B:B)",
+              "D1": "libre",
+              "D4": "=B4",
+              "E1": "=Ventas!B1"
+            },
+            "styles": {
+              "D1": {
+                "locked": false
+              },
+              "D4": {
+                "hidden": true
+              }
+            },
+            "protect": {
+              "insertRows": true,
+              "deleteRows": true,
+              "insertCols": true,
+              "deleteCols": true,
+              "ranges": [
+                {
+                  "ref": "B4:B5",
+                  "users": ["ana"]
+                }
+              ]
+            },
+            "pivots": [
+              {
+                "name": "TD1",
+                "source": "B1:B5",
+                "anchor": "G1",
+                "range": "G1:H3",
+                "rows": [
+                  {
+                    "field": 0
+                  }
+                ],
+                "cols": [],
+                "values": [
+                  {
+                    "field": 0,
+                    "fn": "sum"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "Resumen",
+            "cells": {
+              "A1": "=Datos!B10",
+              "A2": "=Datos!B1"
+            },
+            "protect": {}
+          }
+        ]
+      },
+      {
+        "hoja": 1,
+        "d": {
+          "eje": "columna",
+          "desde": 1,
+          "cantidad": -1,
+          "tope": 16384,
+          "hoja": "Datos"
+        },
+        "sale": [
+          {
+            "name": "Ventas",
+            "cells": {
+              "B1": "7"
+            }
+          },
+          {
+            "name": "Datos",
+            "cells": {
+              "A1": "1",
+              "A2": "2",
+              "A3": "3",
+              "A4": "4",
+              "A5": "5",
+              "A10": "<b>=SUM(A1:A5)</b>",
+              "B1": "libre",
+              "B4": "=A4",
+              "C1": "=Ventas!B1"
+            },
+            "styles": {
+              "B1": {
+                "locked": false
+              },
+              "B4": {
+                "hidden": true
+              }
+            },
+            "protect": {
+              "insertRows": true,
+              "deleteRows": true,
+              "insertCols": true,
+              "deleteCols": true,
+              "ranges": [
+                {
+                  "ref": "A4:A5",
+                  "users": ["ana"]
+                }
+              ]
+            },
+            "pivots": [
+              {
+                "name": "TD1",
+                "source": "A1:A5",
+                "anchor": "E1",
+                "range": "E1:F3",
+                "rows": [
+                  {
+                    "field": 0
+                  }
+                ],
+                "cols": [],
+                "values": [
+                  {
+                    "field": 0,
+                    "fn": "sum"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "Resumen",
+            "cells": {
+              "A1": "=Datos!A10",
+              "A2": "=Datos!A1"
+            },
+            "protect": {}
+          }
+        ]
+      }
+    ]
+  },
   "funciones": {
     "datos": {
       "A1": 1,

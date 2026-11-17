@@ -94,14 +94,17 @@ type hojaAjena struct {
 	// mueve y, por efecto sobre ellos, si las deja como llegan (como celdaQueCambia).
 	dinExtremos [2][]int
 	dinHechas   map[efecto]bool
+	// propia: con un permiso estructural concedido, lo que hace falta para explicarla con
+	// un desplazamiento de ella misma (proteccion_propia.go); nil sin él o sin necesitarlo.
+	propia *hojaPropia
 }
 
 // necesitaAlgo: su contenido o sus dinámicas solo se explican con el desplazamiento.
-func (h *hojaAjena) necesitaAlgo() bool { return h.necesita || h.din.necesita }
+func (h *hojaAjena) necesitaAlgo() bool { return h.necesita || h.din.necesita || h.propia != nil }
 
 // anotar guarda una hoja protegida ya comprobada en todo lo demás.
-func (a *ajenasLibro) anotar(nombre string, pc, nc map[string]string, bloqueada func(string) bool, relajado, necesita bool, din dinamicasHoja) {
-	h := &hojaAjena{nombre: nombre, pc: pc, nc: nc, bloqueada: bloqueada, relajado: relajado, necesita: necesita, din: din}
+func (a *ajenasLibro) anotar(nombre string, pc, nc map[string]string, bloqueada func(string) bool, relajado, necesita bool, din dinamicasHoja, propia *hojaPropia) {
+	h := &hojaAjena{nombre: nombre, pc: pc, nc: nc, bloqueada: bloqueada, relajado: relajado, necesita: necesita, din: din, propia: propia}
 	if necesita {
 		for ref := range union(pc, nc) {
 			if pc[ref] != nc[ref] && bloqueada(ref) {
@@ -131,9 +134,18 @@ func (a *ajenasLibro) resolver() string {
 	if len(necesitan) > maxHojasAjenas {
 		return rechazo
 	}
-	hoja, ok := hojaQueSeMueve(necesitan)
+	hoja, propia, ok := hojaQueSeMueve(necesitan)
 	if !ok {
 		return rechazo
+	}
+	if propia != nil {
+		// La que se mueve es una de ellas: sus propias reglas, y las demás con el mismo.
+		otras := slices.DeleteFunc(slices.Clone(necesitan), func(h *hojaAjena) bool { return h == propia })
+		b := &busqueda{a: a, hoja: hoja, real: a.nombreDe(hoja), necesitan: otras}
+		if !b.explicaPropia(propia) {
+			return rechazo
+		}
+		return ""
 	}
 	b := &busqueda{a: a, hoja: hoja, real: a.nombreDe(hoja), necesitan: necesitan}
 	if !b.explica() {
@@ -221,36 +233,60 @@ func hojasLlamadas(l *libro, hoja string) []map[string]json.RawMessage {
 // cambian. Un desplazamiento solo reescribe las referencias a SU hoja, así que una celda
 // que cambia en dos hojas, en las suyas propias o fuera de las referencias no la explica
 // ninguno; y todas tienen que cambiar en la misma, porque el desplazamiento es uno.
-func hojaQueSeMueve(necesitan []*hojaAjena) (string, bool) {
-	hoja := ""
+//
+// Lo que no explica otra hoja puede explicarlo la propia, si tiene concedido mover sus
+// celdas (proteccion_propia.go): entonces es ella la que se mueve, y se devuelve. Solo
+// una: dos hojas que se mueven son dos desplazamientos.
+func hojaQueSeMueve(necesitan []*hojaAjena) (hoja string, propia *hojaAjena, ok bool) {
 	for _, h := range necesitan {
-		for i, ref := range h.cambian {
-			if i >= maxCeldasAjenas {
-				break
-			}
-			dif, ok := hojaQueCambia(h.pc[ref], h.nc[ref])
-			if !ok || (hoja != "" && !strings.EqualFold(hoja, dif)) {
-				return "", false
-			}
-			hoja = dif
+		dif, citada := "", false
+		if h.propia == nil || !h.propia.soloPropia {
+			dif, citada = h.hojaCitada()
 		}
-		if h.din.necesita {
-			dif, ok := h.din.hojaCitada(h.nombre)
-			if !ok || (hoja != "" && !strings.EqualFold(hoja, dif)) {
-				return "", false
+		if !citada || strings.EqualFold(dif, h.nombre) {
+			if h.propia == nil || propia != nil {
+				return "", nil, false
 			}
-			hoja = dif
+			propia, dif = h, h.nombre
 		}
+		if hoja != "" && !strings.EqualFold(hoja, dif) {
+			return "", nil, false
+		}
+		hoja = dif
 	}
 	if hoja == "" || formula.EsDeOtroLibro(hoja) {
-		return "", false
+		return "", nil, false
 	}
 	for _, h := range necesitan {
-		if strings.EqualFold(h.nombre, hoja) {
-			return "", false // sus propias referencias no se explican con otra hoja
+		if h != propia && strings.EqualFold(h.nombre, hoja) {
+			return "", nil, false // sus propias referencias no se explican con otra hoja
 		}
 	}
-	return hoja, true
+	return hoja, propia, true
+}
+
+// hojaCitada es la única hoja cuyas referencias cambian en sus celdas bloqueadas que
+// cambian y de la que leen sus dinámicas que cambian; false si no hay una sola.
+func (h *hojaAjena) hojaCitada() (string, bool) {
+	hoja := ""
+	for i, ref := range h.cambian {
+		if i >= maxCeldasAjenas {
+			break
+		}
+		dif, ok := hojaQueCambia(h.pc[ref], h.nc[ref])
+		if !ok || (hoja != "" && !strings.EqualFold(hoja, dif)) {
+			return "", false
+		}
+		hoja = dif
+	}
+	if h.din.necesita {
+		dif, ok := h.din.hojaCitada(h.nombre)
+		if !ok || (hoja != "" && !strings.EqualFold(hoja, dif)) {
+			return "", false
+		}
+		hoja = dif
+	}
+	return hoja, hoja != ""
 }
 
 // hojaQueCambia: la única hoja cuyas referencias (en orden) difieren entre las dos

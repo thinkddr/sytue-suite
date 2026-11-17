@@ -366,6 +366,9 @@ type EstadoCinta struct {
 	// Protegida y ProtegidoLibro, con si piden contraseña para quitarlas.
 	Protegida, ProtegidoLibro bool
 	ConClave, ConClaveLibro   bool
+	// Rangos son las referencias de los rangos editables de la hoja protegida
+	// (`protectRanges`), que el panel de la protección enseña.
+	Rangos []string
 	// Tabla es la tabla con formato que cubre la celda ancla (`table`), o nil.
 	Tabla *TablaFmt
 	// Seleccion es el rango en A1 (`selection`), con el que se prellenan los paneles.
@@ -380,10 +383,13 @@ func (c *Lienzo) Estado() EstadoCinta {
 		Autofiltro: c.Libro.Autofiltro() != nil,
 	}
 	if p := c.Libro.Proteccion(); p != nil {
-		e.Protegida, e.ConClave = true, p.Password != ""
+		e.Protegida, e.ConClave = true, p.HasPassword
+		for _, g := range p.Ranges {
+			e.Rangos = append(e.Rangos, g.Ref)
+		}
 	}
 	if p := c.Libro.ProteccionLibro(); p != nil {
-		e.ProtegidoLibro, e.ConClaveLibro = true, p.Password != ""
+		e.ProtegidoLibro, e.ConClaveLibro = true, p.HasPassword
 	}
 	if t, i := c.Libro.TablaEn(s.C, s.F); i >= 0 {
 		e.Tabla = &t

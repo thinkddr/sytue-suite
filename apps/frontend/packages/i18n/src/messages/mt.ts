@@ -12,20 +12,10 @@ export const mt: Catalog = {
   'matrix.resetUnderstood': 'Nifhem li nista’ nitlef l-aċċess għall-messaġġi kriptati ta’ qabel',
   'matrix.unknownKey':
     'Dan il-kont ġie kriptat qabel ma Sytue pproteġiet iċ-ċavetta tiegħu bid-dħul tiegħek. Ivverifika dan it-tagħmir minn ieħor fejn diġà dħalt.',
-  'matrix.unlockTitle': 'Iftaħ id-data kriptata tiegħek',
-  'matrix.unlockBody':
-    'Ikkonferma li int b’ċ-ċavetta tad-dħul jew bil-password ta’ Sytue tiegħek. Il-verifika ssir fuq dan it-tagħmir: ħadd ieħor ma jista’ jiftaħ id-data tiegħek.',
-  'matrix.protectTitle': 'Ipproteġi d-data kriptata tiegħek',
-  'matrix.protectBody':
-    'Agħżel kif se tiftaħ id-data kriptata fuq it-tagħmir l-ieħor tiegħek: b’ċ-ċavetta tad-dħul jew bil-password ta’ Sytue. Int biss tkun tista’ tiftaħha.',
-  'matrix.usePasskey': 'Uża ċ-ċavetta tad-dħul',
-  'matrix.usePassword': 'Uża l-password',
-  'matrix.password': 'Password ta’ Sytue',
-  'matrix.passwordConfirm': 'Erġa’ ikteb il-password',
-  'matrix.passwordMismatch': 'Il-passwords ma jaqblux.',
-  'matrix.unlockWrong': 'Ma ħadimx. Erġa’ pprova.',
-  'matrix.passkeyUnsupported':
-    'Din iċ-ċavetta tad-dħul ma tistax tiftaħ data kriptata. Uża l-password tiegħek.',
+  'matrix.unlocking': 'Qed tinfetaħ id-data kriptata tiegħek…',
+  'matrix.signIn': 'Idħol f’Sytue ID',
+  'matrix.signInBody':
+    'Id-dħul tiegħek f’Sytue ID jiftaħ id-data kriptata tiegħek f’dan it-tagħmir. Erġa’ idħol bil-password jew biċ-ċavetta tad-dħul tiegħek biex tiftaħha hawn.',
   // Device verification and recovery shared by the suite.
   'matrix.allowStorageTitle': 'Ħalli l-ipproċessar kriptat',
   'matrix.allowStorageBody':

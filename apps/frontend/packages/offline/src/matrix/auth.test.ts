@@ -3,6 +3,7 @@ import { expect, test } from 'bun:test';
 import { MatrixBrowserAuth, type MatrixSessionStore, type MatrixSSOBrowser } from './auth.js';
 import { prefijoDeApp } from '@sytue/config/tokens';
 import {
+  CifradoDesactivado,
   matrixStorePrefix,
   type MatrixBootstrap,
   type MatrixSession,
@@ -508,4 +509,16 @@ test('isolated storage SSO preserves exact identity version, nonce, user and sep
   legacy.state.bootstrap = f.state.bootstrap;
   await expect(legacy.auth.complete()).rejects.toThrow('matrix_identity');
   expect(legacy.state.logins).toHaveLength(0);
+});
+
+test('un BFF sin el complemento de cifrado E2E se distingue de un fallo: CifradoDesactivado', async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = (async () => Response.json({ cifrado: 'desactivado' })) as typeof fetch;
+  try {
+    const auth = new MatrixBrowserAuth({ storageProduct: 'notes', deviceName: 'Artificial' });
+    const error = await auth.refreshBootstrap().catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(CifradoDesactivado);
+  } finally {
+    globalThis.fetch = original;
+  }
 });

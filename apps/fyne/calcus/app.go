@@ -7,6 +7,8 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
+	"net/http"
 	"net/url"
 	"strings"
 	"sync"
@@ -18,8 +20,10 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/editor"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/api"
+	"git.sytue.eu/sytue/one/apps/nucleo/auth"
 	"git.sytue.eu/sytue/one/apps/nucleo/ficheros"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/office/model"
 	"git.sytue.eu/sytue/one/apps/nucleo/offline"
 )
 
@@ -58,6 +62,10 @@ type App struct {
 	AlTitulo func(string)
 	// IA es la consulta a Sytue AI del relleno con IA. nil: el botón no sale.
 	IA ConsultaIA
+	// Reclamos dice quién ha entrado: su `sub` desbloquea las celdas de sus rangos
+	// editables en una hoja protegida (`fijarYo` de la web). nil, o sin sesión: nadie, y
+	// ningún rango concede nada.
+	Reclamos func(context.Context) (auth.Reclamos, error)
 }
 
 // abierto es el documento que hay en el editor.
@@ -454,14 +462,17 @@ func (a *App) cargar(ab *abierto) {
 	// Los hilos abiertos marcan sus celdas desde el principio, con el panel cerrado, como en
 	// la web (`ctx.comments`). Sin ellos el libro se abre igual, sin marcas.
 	var hilos []api.DocComment
+	var yo string
 	if err == nil {
 		hilos, _ = a.Svc.Comments(c, ab.id, false)
+		yo = a.yo(c)
 	}
 	hayRed := a.Red == nil || a.Red.State() != offline.Offline
 	fyne.Do(func() {
 		if a.abierto != ab {
 			return // se cerró mientras llegaba
 		}
+		ab.lz.Libro.FijarYo(yo)
 		if err != nil {
 			ab.ctx.Estado = editor.EstadoDe(err, hayRed, 1)
 			// Como en la web (`status === 'error'`), un fallo al abrir cede la
@@ -477,6 +488,18 @@ func (a *App) cargar(ab *abierto) {
 	})
 }
 
+// yo es el `sub` de quien ha entrado, o "" si no se sabe.
+func (a *App) yo(c context.Context) string {
+	if a.Reclamos == nil {
+		return ""
+	}
+	r, err := a.Reclamos(c)
+	if err != nil {
+		return ""
+	}
+	return r.Sub
+}
+
 // poner enseña el documento y engancha el guardado. Lo que el lienzo no entiende entero
 // se abre CERRADO —y la franja lo dice—; lo que el permiso no deja escribir, también.
 func (a *App) poner(ab *abierto, titulo, rol string, cont api.DocContent) {
@@ -485,6 +508,7 @@ func (a *App) poner(ab *abierto, titulo, rol string, cont api.DocContent) {
 	ctx.Titulo = titulo
 	a.titulo(titulo)
 	entendido := ab.lz.Cargar(cont.Value)
+	ab.lz.Libro.FijarAjeno(rol != "owner") // `fijarPropietario` de la web
 	ultimo := ab.lz.Serializar()
 	ab.mu.Lock()
 	ab.cola, ab.ultimo = nil, ultimo // lo de antes se basaba en otro libro
@@ -606,8 +630,10 @@ func (a *App) guardar(ab *abierto) error {
 	huboCola := false
 	for {
 		var modelo string
+		var sobre model.Proteccion
 		deCola := false
 		fyne.DoAndWait(func() {
+			sobre = ab.lz.Libro.Sobre()
 			ab.mu.Lock()
 			if len(ab.cola) > 0 {
 				modelo, deCola = ab.cola[0], true
@@ -636,10 +662,15 @@ func (a *App) guardar(ab *abierto) error {
 		ab.contador++
 		dot := api.DocDot{Actor: ab.actor, Counter: ab.contador}
 		ab.mu.Unlock()
-		nuevo, err := a.guardarModelo(ab, modelo, base, dot)
+		nuevo, err := a.guardarModelo(ab, modelo, base, dot, sobre)
+		if codigo := rechazoProteccion(err); codigo != "" {
+			a.adoptarServidor(ab, codigo)
+			return nil
+		}
 		if err != nil {
 			return err
 		}
+		fyne.DoAndWait(func() { ab.lz.Libro.OlvidarSobre(sobre) })
 		ab.mu.Lock()
 		ab.base = nuevo
 		if deCola && len(ab.cola) > 0 && ab.cola[0] == modelo {
@@ -652,11 +683,60 @@ func (a *App) guardar(ab *abierto) error {
 	}
 }
 
-// guardarModelo es un guardado, con su plazo.
-func (a *App) guardarModelo(ab *abierto, modelo string, base api.DocContent, dot api.DocDot) (api.DocContent, error) {
+// guardarModelo es un guardado, con su plazo y las contraseñas de protección tecleadas
+// (`sobre`), que viajan aparte del modelo.
+func (a *App) guardarModelo(ab *abierto, modelo string, base api.DocContent, dot api.DocDot, sobre model.Proteccion) (api.DocContent, error) {
 	c, cancelar := context.WithTimeout(context.Background(), a.Plazo)
 	defer cancelar()
+	c = model.ConProteccion(c, &sobre)
 	return a.Svc.SaveChecked(c, ab.id, ab.ctx.Tipo.ClaveContenido(), modelo, base, dot, false)
+}
+
+// rechazoProteccion es el código del 403 con el que el servidor rechaza un cambio por la
+// protección de hoja o libro («protected» o «protection_password»), o "" si no es eso.
+func rechazoProteccion(err error) string {
+	var e *api.Error
+	if !errors.As(err, &e) || e.Status != http.StatusForbidden {
+		return ""
+	}
+	if c := e.Code(); c == "protected" || c == "protection_password" {
+		return c
+	}
+	return ""
+}
+
+// adoptarServidor es el de `useDocument` de la web: el servidor rechazó el cambio por la
+// protección, así que lo que el lienzo enseña ya no es el documento. Se olvida lo
+// tecleado y lo pendiente (se basaba en ello), se vuelve a lo que tiene el servidor y se
+// dice por qué: con una contraseña que no es, «Contraseña incorrecta».
+func (a *App) adoptarServidor(ab *abierto, codigo string) {
+	c, cancelar := context.WithTimeout(context.Background(), a.Plazo)
+	defer cancelar()
+	cont, err := a.Svc.Content(c, ab.id, ab.ctx.Tipo.ClaveContenido())
+	fyne.DoAndWait(func() {
+		l := ab.lz.Libro
+		l.OlvidarSobre(l.Sobre())
+		ab.mu.Lock()
+		ab.cola = nil
+		ab.mu.Unlock()
+		if err == nil && a.abierto == ab {
+			// Cargar avisa de un cambio; no es del usuario y no se vuelve a guardar. Los
+			// ganchos de estructura son de quien guarda: Cargar rehace el libro sin ellos.
+			alCambiar, antes, tras := ab.lz.AlCambiar, l.AntesDeEstructura, l.TrasEstructura
+			ab.lz.AlCambiar = nil
+			ab.lz.Cargar(cont.Value)
+			ab.lz.AlCambiar, l.AntesDeEstructura, l.TrasEstructura = alCambiar, antes, tras
+			ab.mu.Lock()
+			ab.base, ab.ultimo, ab.guardados = cont, ab.lz.Serializar(), ab.cambios
+			ab.mu.Unlock()
+			ab.marco.Recomponer()
+		}
+		titulo := "sheet.msg.protectedSheet"
+		if codigo == "protection_password" {
+			titulo = "sheet.msg.wrongPassword"
+		}
+		ab.lz.avisar2(ui.AvisoAdvertencia, titulo, "sheet.msg.protectionDenied")
+	})
 }
 
 // renombrar programa el cambio de título tras la pausa de la web. Un título en blanco

@@ -34,6 +34,7 @@
     "@sytue/i18n": "workspace:*",
     "@tanstack/virtual-core": "3.19.8",
     "clsx": "2.1.1",
+    "parse5": "8.0.1",
     "preact": "10.29.8",
     "tailwindcss": "4.3.3"
   },

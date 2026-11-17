@@ -73,6 +73,8 @@ func main() {
 	sala.AlCambiarDatos = s.AvisarWidget
 	store, storeErr := ajustes.Carpeta()
 	secure = rooms.NuevoCifrado(sala, base, mx.Config{SytueApex: s.Apex(), StoreDir: filepath.Join(store, "rooms-matrix"), DeviceName: "Sytue Rooms · " + runtime.GOOS}, func(target string) error { return api.AbrirFuera(a, target) })
+	// La clave de desbloqueo de Sytue ID abre el cifrado sin preguntar (ADR 0084).
+	secure.ConSesion(s)
 	if storeErr != nil {
 		secure.Base.StoreDir = ""
 	}

@@ -45,6 +45,14 @@ test('el HTML pasa a texto con sus saltos y sin marcado', () => {
   expect(htmlATexto('<table><tr><td>a</td></tr></table>')).toBe('a');
 });
 
+test('htmlATexto ignora marcado malformado, plantillas y comentarios repetidos en tiempo lineal', () => {
+  expect(htmlATexto('<<script>script>alert(1)</script>fin')).toBe('<fin');
+  expect(htmlATexto('a<!--oculto--><template>no</template><noscript>no</noscript>b')).toBe('ab');
+  expect(htmlATexto('<p>uno   \t</p><p>dos</p>')).toBe('uno\ndos');
+  const muchosComentarios = '<!--'.repeat(4000) + 'fin-->hola';
+  expect(htmlATexto(muchosComentarios)).toBe('hola');
+});
+
 // --- pegar con formato: estructura del origen, estilo del destino -------------
 
 test('conserva títulos, negrita, cursiva, listas y enlaces, sin el estilo del origen', () => {

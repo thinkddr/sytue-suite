@@ -51,12 +51,13 @@ export type ChannelType = 'public' | 'private' | 'direct' | 'group';
 export type MatrixRecoveryAccount = { product?: string; identity_version?: 1 | 2 };
 export type MatrixRecoveryWrapperKDF =
   | { alg: 'argon2id'; m: number; t: number; p: number; salt: string }
-  | { alg: 'webauthn-prf-hkdf-sha256'; prf_salt: string };
+  | { alg: 'webauthn-prf-hkdf-sha256'; prf_salt: string }
+  | { alg: 'sytue-id-unlock-hkdf-sha256'; hint: string };
 /** Opaque to the service: format in docs/architecture.md, vectors in apps/nucleo/recoverywrap/testdata. */
 export type MatrixRecoveryWrapper = {
   id?: string;
   v: 1;
-  kind: 'password' | 'passkey';
+  kind: 'sytue-id' | 'password' | 'passkey';
   key_id: string;
   credential_id: string;
   kdf: MatrixRecoveryWrapperKDF;
@@ -258,13 +259,21 @@ export class ChatClient {
   /**
    * Stores one wrapper made on this device (upsert per kind and passkey). The service
    * drops the account's wrappers of any other key_id and, for Rooms, the KEK copy.
+   * With `retireOlder` (a `sytue-id` wrapper the device has just checked it opens),
+   * the account's ADR 0082 wrappers of that key go in the same transaction (ADR 0085).
    */
   putMatrixRecoveryWrapper(
     wrapper: MatrixRecoveryWrapper,
     account?: MatrixRecoveryAccount,
+    options: { retireOlder?: boolean } = {},
   ): Promise<{ id: string }> {
     const query = recoveryAccountQuery(account);
     if (query instanceof Error) return Promise.reject(query);
+    if (options.retireOlder) {
+      if (wrapper.kind !== 'sytue-id')
+        return Promise.reject(new RangeError('Only a sytue-id wrapper retires the older ones'));
+      query.retire_older = 1;
+    }
     const body: Partial<MatrixRecoveryWrapper> = { ...wrapper };
     delete body.id;
     delete body.created_at;

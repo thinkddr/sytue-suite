@@ -22,7 +22,6 @@ import (
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
 	mx "git.sytue.eu/sytue/one/apps/nucleo/matrix"
-	"git.sytue.eu/sytue/one/apps/nucleo/recoverywrap"
 )
 
 func panelEn(t *testing.T, width float32) (*Panel, fyne.Window) {
@@ -115,54 +114,60 @@ func esperarLibre(t *testing.T, c *Panel) {
 	t.Fatal("la operación no terminó")
 }
 
-// ADR 0082: ningún estado del panel enseña, pide ni deja copiar la clave de
-// recuperación. Crear pide la contraseña dos veces; desbloquear, una; una clave
-// desconocida, solo verificar con otro dispositivo.
-func TestElPanelNuncaEnsenaNiPideLaClaveDeRecuperacion(t *testing.T) {
+// ADR 0084: ningún estado del panel enseña, pide ni deja copiar la clave de
+// recuperación, y ninguno pide una contraseña: sin clave de desbloqueo solo ofrece
+// volver a entrar en Sytue ID; una clave desconocida, solo verificar con otro
+// dispositivo.
+func TestElPanelNuncaEnsenaNiPideNingunaClave(t *testing.T) {
 	c, w := panelEn(t, 320)
 	c.ctx = t.Context()
 	c.client = &mx.Client{} // Solo pinta: ninguna operación llega al SDK.
 	defer func() { c.client = nil; c.Cerrar() }()
 	c.AbrirPanel()
 	for _, tc := range []struct {
-		name    string
-		paso    Paso
-		status  mx.VerificationStatus
-		entries int
+		name   string
+		paso   Paso
+		status mx.VerificationStatus
+		busy   bool
+		texto  string
 	}{
-		{"recovery-create-mobile", PasoCrear, mx.VerificationStatus{}, 2},
-		{"recovery-unlock-mobile", PasoDesbloquear, mx.VerificationStatus{HasIdentity: true}, 1},
-		{"recovery-unknown-mobile", PasoVerificar, mx.VerificationStatus{HasIdentity: true}, 0},
-		{"recovery-protect-mobile", PasoProteger, mx.VerificationStatus{HasIdentity: true, Verified: true}, 2},
+		{"recovery-unlocking-mobile", PasoDesbloquear, mx.VerificationStatus{HasIdentity: true}, true, "matrix.unlocking"},
+		{"recovery-signin-mobile", PasoIniciarSesion, mx.VerificationStatus{HasIdentity: true}, false, "matrix.signInBody"},
+		{"recovery-unknown-mobile", PasoVerificar, mx.VerificationStatus{HasIdentity: true}, false, "matrix.unknownKey"},
+		{"recovery-retry-mobile", PasoCrear, mx.VerificationStatus{}, false, "matrix.failed"},
 	} {
 		c.diag = Diagnostico{Paso: tc.paso, Status: tc.status, clave: "ARTIFICIAL RECOVERY KEY", claveID: "k"}
-		c.status = tc.status
+		c.status, c.busy = tc.status, tc.busy
 		c.pintar()
 		capturarPanel(t, w, tc.name)
+		found := false
 		for _, text := range textos(c) {
 			if text == "ARTIFICIAL RECOVERY KEY" {
 				t.Fatalf("%s: el panel enseña la clave", tc.name)
 			}
+			found = found || text == c.t(tc.texto)
 		}
-		for _, key := range []string{"matrix.recover", "matrix.recoveryKey", "matrix.saved", "action.copy"} {
+		if !found {
+			t.Fatalf("%s: falta %q en %q", tc.name, tc.texto, textos(c))
+		}
+		for _, key := range []string{"matrix.recover", "matrix.recoveryKey", "matrix.saved", "action.copy", "matrix.usePassword"} {
 			for _, text := range textos(c) {
 				if text == c.t(key) {
 					t.Fatalf("%s: el panel ofrece %q", tc.name, key)
 				}
 			}
 		}
-		if got := len(entradas(c)); got != tc.entries {
-			t.Fatalf("%s: %d entradas; quiero %d", tc.name, got, tc.entries)
-		}
-		for _, e := range entradas(c) {
-			if label := e.AccessibilityLabel(); label != c.t("matrix.password") && label != c.t("matrix.passwordConfirm") {
-				t.Fatalf("%s: una entrada pide %q", tc.name, e.AccessibilityLabel())
-			}
+		if got := len(entradas(c)); got != 0 {
+			t.Fatalf("%s: %d entradas; aquí no se teclea nada", tc.name, got)
 		}
 		if c.dialog.NoDescartable {
 			t.Fatalf("%s: el panel no se puede cerrar", tc.name)
 		}
 	}
+	c.busy = false
+	c.diag, c.status = Diagnostico{Paso: PasoIniciarSesion}, mx.VerificationStatus{HasIdentity: true}
+	c.pintar()
+	boton(t, c, "matrix.signIn")
 	// La clave desconocida lo explica y solo ofrece verificar (y, en Rooms, restablecer).
 	c.diag, c.status = Diagnostico{Paso: PasoVerificar}, mx.VerificationStatus{HasIdentity: true}
 	c.pintar()
@@ -171,6 +176,14 @@ func TestElPanelNuncaEnsenaNiPideLaClaveDeRecuperacion(t *testing.T) {
 	}
 	boton(t, c, "matrix.verify")
 	boton(t, c, "matrix.reset")
+	// Restablecer: casilla obligatoria y ninguna contraseña.
+	c.Restablecer()
+	if got := len(entradas(c)); got != 0 {
+		t.Fatalf("restablecer pide %d entradas", got)
+	}
+	if !boton(t, c, "matrix.resetAction").Inerte {
+		t.Fatal("restablecer sin marcar la casilla")
+	}
 	// En una cuenta de almacenamiento restablecer no existe (ErrResetUnsupported).
 	c.Base.Bootstrap.StorageProduct = "drive"
 	c.pintar()
@@ -181,9 +194,40 @@ func TestElPanelNuncaEnsenaNiPideLaClaveDeRecuperacion(t *testing.T) {
 	}
 }
 
-// Si la custodia falla al crear, el panel sigue bloqueado y en el mismo paso (se
-// puede reintentar) y los datos no se abren. Las contraseñas tecleadas se borran
-// y dos que no coinciden ni llegan a usarse.
+// Sin la clave de desbloqueo, el único botón vuelve a Sytue ID (con los parámetros
+// de los envoltorios de la ADR 0082) y, al volver, el panel revisa otra vez solo.
+func TestIniciarSesionVuelveASytueIDYRevisaSolo(t *testing.T) {
+	c, _ := panelEn(t, 320)
+	c.ctx = t.Context()
+	c.client = &mx.Client{}
+	defer func() { c.client = nil; c.Cerrar() }()
+	pedidas := make(chan string, 1)
+	c.IniciarSesion = func(_ context.Context, legado string) error {
+		pedidas <- legado
+		return errors.New("artificial: el navegador no volvió")
+	}
+	c.diag = Diagnostico{Paso: PasoIniciarSesion, Legado: "p.EBESExQVFhcYGRobHB0eHw"}
+	c.status = mx.VerificationStatus{HasIdentity: true}
+	c.AbrirPanel()
+	boton(t, c, "matrix.signIn").AlPulsar()
+	select {
+	case got := <-pedidas:
+		if got != "p.EBESExQVFhcYGRobHB0eHw" {
+			t.Fatalf("legado = %q", got)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("no se volvió a Sytue ID")
+	}
+	esperarLibre(t, c)
+	// Si no volvió, sigue ofreciendo lo mismo y no se abre nada.
+	boton(t, c, "matrix.signIn")
+	if c.Verificado() {
+		t.Fatal("se abrió sin clave")
+	}
+}
+
+// Si la custodia falla, el panel sigue bloqueado y en el mismo paso (se puede
+// reintentar) y los datos no se abren; sin clave de desbloqueo, pide volver a entrar.
 func TestUnaCustodiaFallidaDejaElPanelBloqueadoYReintentable(t *testing.T) {
 	c, _ := panelEn(t, 320)
 	c.ctx = t.Context()
@@ -193,13 +237,6 @@ func TestUnaCustodiaFallidaDejaElPanelBloqueadoYReintentable(t *testing.T) {
 	c.AlLista = func(context.Context) { ready++ }
 	c.diag, c.status = Diagnostico{Paso: PasoCrear}, mx.VerificationStatus{}
 	c.AbrirPanel()
-	fields := entradas(c)
-	fields[0].PonerTexto("una")
-	fields[1].PonerTexto("otra")
-	boton(t, c, "matrix.usePassword").AlPulsar()
-	if c.busy || c.notice != "matrix.passwordMismatch" || fields[0].Texto() != "" || fields[1].Texto() != "" {
-		t.Fatal("dos contraseñas distintas se usaron o se quedaron en pantalla")
-	}
 	var used string
 	c.custodiar(func(_ context.Context, _ *mx.Client, _ Custodia) (Diagnostico, bool, error) {
 		used = "llamado"
@@ -209,57 +246,30 @@ func TestUnaCustodiaFallidaDejaElPanelBloqueadoYReintentable(t *testing.T) {
 	if used == "" || c.diag.Paso != PasoCrear || c.status.Verified || ready != 0 || c.Verificado() {
 		t.Fatalf("tras el fallo: paso=%v verificado=%v ready=%d", c.diag.Paso, c.status.Verified, ready)
 	}
-	boton(t, c, "matrix.usePassword") // se puede reintentar
-	// Una contraseña equivocada al desbloquear lo dice y no cambia de paso.
-	c.diag = Diagnostico{Paso: PasoDesbloquear, Status: mx.VerificationStatus{HasIdentity: true}}
-	c.status = c.diag.Status
-	c.pintar()
+	boton(t, c, "action.retry") // se puede reintentar
 	c.custodiar(func(context.Context, *mx.Client, Custodia) (Diagnostico, bool, error) {
-		return Diagnostico{}, false, recoverywrap.ErrWrongSecret
+		return Diagnostico{}, false, ErrSinDesbloqueo
 	})
 	esperarLibre(t, c)
-	if c.notice != "matrix.unlockWrong" || c.unlockFailures != 1 || c.diag.Paso != PasoDesbloquear || ready != 0 {
-		t.Fatalf("contraseña equivocada: notice=%q fallos=%d paso=%v", c.notice, c.unlockFailures, c.diag.Paso)
+	if c.diag.Paso != PasoIniciarSesion || ready != 0 {
+		t.Fatalf("sin clave de desbloqueo: paso=%v", c.diag.Paso)
 	}
+	boton(t, c, "matrix.signIn")
 }
 
-// Proteger una clave en un dispositivo ya verificado no abre los datos hasta que
-// la persona la envuelve o lo deja para luego; dejarlo para luego olvida la clave.
-func TestProtegerBloqueaHastaEnvolverODejarloParaLuego(t *testing.T) {
-	c, _ := panelEn(t, 320)
-	c.ctx = t.Context()
-	c.client = &mx.Client{}
-	defer func() { c.client = nil; c.Cerrar() }()
-	ready := 0
-	c.AlLista = func(context.Context) { ready++ }
-	c.status = mx.VerificationStatus{HasIdentity: true, Verified: true}
-	c.diag = Diagnostico{Paso: PasoProteger, Status: c.status, clave: claveDePrueba, claveID: "k"}
-	c.AbrirPanel()
-	c.lista()
-	if ready != 0 || c.Verificado() || c.Ocultar() {
-		t.Fatal("una clave sin envolver abrió los datos o cerró el panel")
-	}
-	boton(t, c, "action.cancel").AlPulsar()
-	if ready != 1 || c.diag.clave != "" || c.diag.Paso != PasoListo {
-		t.Fatal("dejarlo para luego no abrió los datos o no olvidó la clave")
-	}
-}
-
-func TestClosingThePanelErasesPasswordInputs(t *testing.T) {
+func TestClosingThePanelForgetsTheDiagnosis(t *testing.T) {
 	c, _ := panelEn(t, 320)
 	c.ctx, c.cancel = context.WithCancel(t.Context())
 	ctx := c.ctx
 	c.client = &mx.Client{}
-	c.diag, c.status = Diagnostico{Paso: PasoDesbloquear}, mx.VerificationStatus{HasIdentity: true}
+	c.diag, c.status = Diagnostico{Paso: PasoProteger, clave: "ARTIFICIAL KEY", claveID: "k"}, mx.VerificationStatus{HasIdentity: true}
 	c.AbrirPanel()
-	field := c.key
-	field.PonerTexto("ARTIFICIAL UNSENT PASSWORD")
 	c.verifyUser = "@old-peer:matrix.test"
 	c.authWait = make(chan bool, 1)
 	c.client = nil
 	c.Cerrar()
-	if ctx.Err() == nil || field.Texto() != "" || c.key != nil || c.verifyUser != "" || c.authWait != nil || c.dialog != nil || c.diag.Paso != PasoListo {
-		t.Fatal("closed panel retained device inputs or verification peer")
+	if ctx.Err() == nil || c.diag.clave != "" || c.verifyUser != "" || c.authWait != nil || c.dialog != nil || c.diag.Paso != PasoListo {
+		t.Fatal("closed panel retained device state or verification peer")
 	}
 }
 

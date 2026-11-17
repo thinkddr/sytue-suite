@@ -1,0 +1,26 @@
+# Configuración dinámica de Traefik en el modo servidor único.
+# - Con Let's Encrypt, los certificados los emite el resolver ACME (estático).
+# - Con TLS «interno» (red local o pruebas), ./sytue-deploy deja un certificado en
+#   traefik/certs/servidor.pem (mkcert) que se usa por defecto.
+tls:
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /etc/traefik/certs/servidor.pem
+        keyFile: /etc/traefik/certs/servidor-key.pem
+  options:
+    default:
+      minVersion: VersionTLS12
+      sniStrict: false
+http:
+  middlewares:
+    sytue-secure-headers:
+      headers:
+        frameDeny: false
+        browserXssFilter: true
+        contentTypeNosniff: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+    sytue-compress:
+      compress: {}

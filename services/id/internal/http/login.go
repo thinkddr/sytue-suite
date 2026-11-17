@@ -57,10 +57,11 @@ func (s *Server) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 				`<button type="submit">`+html.EscapeString(i18n.T(loc, "mfa.verify"))+`</button></form>`+
 				passkeyBlockHTML(loc)+
 				`<p class="alt"><a class="btn-link" href="`+html.EscapeString(back)+`">`+html.EscapeString(i18n.T(loc, "login.back"))+`</a></p>`+
-				`<script>`+loginScript+`</script>`)))
+				e2eScriptsLogin(false)+`<script>`+loginScript+`</script>`)))
 		return
 	}
-	_, _ = w.Write([]byte(loginPage(loc, i18n.T(loc, "login.title"), loginFormHTML(loc, safeReturn, "", "", s.captchaEnLogin()))))
+	cspConWasm(w)
+	_, _ = w.Write([]byte(loginPage(loc, i18n.T(loc, "login.title"), loginFormHTML(loc, safeReturn, "", "", s.captchaEnLogin(), s.passkeyPrimero(r)))))
 }
 
 // emailFieldAttrs son los atributos del campo de identidad de TODOS los
@@ -130,7 +131,12 @@ func (s *Server) testBypassOK(r *http.Request, email string) bool {
 // aviso de error opcional encima. Lo comparten el GET /login/ y los reintentos
 // tras un fallo (loginFail): el estado de error conserva el propio formulario
 // como acción de reintento. safeReturn y safeEmail llegan ya escapados.
-func loginFormHTML(loc, safeReturn, safeEmail, errMsg string, conCaptcha bool) string {
+//
+// Con `passkeyPrimero` (quien entró por última vez en este navegador tiene una
+// passkey que abre su cifrado, ADR 0085) la passkey va ARRIBA, como la forma
+// principal de entrar, y la contraseña queda debajo como respaldo: sigue entrando
+// y desbloqueando igual.
+func loginFormHTML(loc, safeReturn, safeEmail, errMsg string, conCaptcha, passkeyPrimero bool) string {
 	esc := html.EscapeString
 	b := `<p class="sub">` + esc(i18n.T(loc, "login.subtitle")) + `</p>`
 	if errMsg != "" {
@@ -144,6 +150,9 @@ func loginFormHTML(loc, safeReturn, safeEmail, errMsg string, conCaptcha bool) s
 	captchaBox := ""
 	if conCaptcha {
 		captchaBox = captchaHTML(loc, "/login/captcha")
+	}
+	if passkeyPrimero {
+		b += passkeyFirstHTML(loc) + `<div class="or">` + esc(i18n.T(loc, "common.or")) + `</div>`
 	}
 	return b + `<form method="post" action="/login/">` +
 		`<input type="hidden" name="return_to" value="` + safeReturn + `">` +
@@ -160,8 +169,8 @@ func loginFormHTML(loc, safeReturn, safeEmail, errMsg string, conCaptcha bool) s
 		esc(withReturnTo("/forgot-password", html.UnescapeString(safeReturn))) +
 		`">` + esc(i18n.T(loc, "login.forgot")) + `</a></p>` + captchaBox +
 		`<button type="submit">` + esc(i18n.T(loc, "common.continue")) + `</button></form>` +
-		passkeyBlockHTML(loc) + ssoLinkHTML(loc, safeReturn) + signupLinkHTML(loc, safeReturn) +
-		`<script>` + emailFieldScript + `</script><script>` + loginScript + `</script>`
+		passkeyAlFinal(loc, passkeyPrimero) + ssoLinkHTML(loc, safeReturn) + signupLinkHTML(loc, safeReturn) +
+		`<script>` + emailFieldScript + `</script>` + e2eScriptsLogin(true) + `<script>` + loginScript + `</script>`
 }
 
 // withReturnTo cuelga ?return_to= de una ruta INTERNA del IdP cuando hay viaje
@@ -198,26 +207,65 @@ func passkeyBlockHTML(loc string) string {
 		`<p class="pk-err" id="passkey-err" role="alert" hidden></p>`
 }
 
+// passkeyFirstHTML es el botón de passkey como forma principal de entrar: el mismo
+// botón y el mismo guion (loginScript), arriba y con el aspecto del botón principal.
+// Oculto hasta que el guion confirma que el navegador sabe WebAuthn: sin él, el
+// formulario de contraseña sigue siendo la única forma, como siempre.
+func passkeyFirstHTML(loc string) string {
+	return `<button type="button" id="passkey-btn" class="pk-btn pk-first" hidden data-err="` +
+		html.EscapeString(i18n.T(loc, "login.passkey_failed")) + `">` +
+		`<svg viewBox="0 0 16 16" fill="none" aria-hidden="true">` +
+		`<circle cx="5.75" cy="5.75" r="3" stroke="currentColor" stroke-width="1.5"/>` +
+		`<path d="M8 8l5 5m-1.25-1.25L13 10.5M13 13l1.25-1.25" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>` +
+		`</svg>` + html.EscapeString(i18n.T(loc, "login.passkey")) + `</button>` +
+		`<p class="pk-err" id="passkey-err" role="alert" hidden></p>`
+}
+
+// passkeyAlFinal es el bloque de passkey debajo del formulario, salvo que ya vaya
+// arriba (passkeyFirstHTML): nunca dos botones con el mismo id.
+func passkeyAlFinal(loc string, passkeyPrimero bool) string {
+	if passkeyPrimero {
+		return ""
+	}
+	return passkeyBlockHTML(loc)
+}
+
 // loginScript maneja la ceremonia de login por passkey (navigator.credentials.get)
 // sin dependencias: detecta soporte, revela el botón, negocia begin/finish y navega
 // al destino que devuelve el servidor. Su sha256 entra en la CSP (script-src), sin
 // 'unsafe-inline'; si se edita, la CSP se recalcula sola (ver cspScriptHashes).
+//
+// Con el desbloqueo del cifrado (ADR 0084, e2e/login.js) pide además la extensión
+// PRF y guarda en este navegador la KEK que sale de ella ANTES de abrir la sesión:
+// el relevo la usará al volver a la app. Sin ese guion, el acceso es el de siempre.
 const loginScript = `(function(){` +
 	`var b=document.getElementById('passkey-btn');` +
 	`if(!b||!window.PublicKeyCredential||!navigator.credentials||!navigator.credentials.get){return;}` +
-	`b.hidden=false;var err=document.getElementById('passkey-err');` +
-	`function fail(m){if(err){err.textContent=m;err.hidden=false;}b.disabled=false;}` +
+	`b.hidden=false;var err=document.getElementById('passkey-err');var E=window.SytueE2E;var auto=null;` +
+	`function fail(m){if(err){err.textContent=m;err.hidden=false;}b.disabled=false;if(E){E.store.del('pending').catch(function(){});}}` +
 	`function d(s){s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4){s+='=';}var x=atob(s),a=new Uint8Array(x.length),i=0;for(;i<x.length;i++){a[i]=x.charCodeAt(i);}return a.buffer;}` +
 	`function e(buf){var a=new Uint8Array(buf),s='',i=0;for(;i<a.length;i++){s+=String.fromCharCode(a[i]);}return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}` +
+	`function rt(){return (document.querySelector('input[name=return_to]')||{}).value||'';}` +
+	// Una ceremonia entera: reto, get (con la PRF del desbloqueo), la KEK guardada
+	// ANTES de abrir la sesión, finish y a donde diga el servidor.
+	`function go(em,opts){return fetch('/login/webauthn/begin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:em})}).then(function(r){if(!r.ok){throw 0;}return r.json();}).then(function(o){` +
+	`var pk={challenge:d(o.challenge),rpId:o.rpId,timeout:o.timeout,userVerification:o.userVerification,allowCredentials:(o.allowCredentials||[]).map(function(c){return{type:'public-key',id:d(c.id)};})};` +
+	`return (E?E.withPRF(pk).catch(function(){return pk;}):Promise.resolve(pk)).then(function(pk){opts.publicKey=pk;return navigator.credentials.get(opts);});` +
+	`}).then(function(c){return (E?E.rememberPasskey(c).catch(function(){}):Promise.resolve()).then(function(){var a=c.response;return fetch('/login/webauthn/finish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:c.id,rawId:e(c.rawId),type:c.type,response:{authenticatorData:e(a.authenticatorData),clientDataJSON:e(a.clientDataJSON),signature:e(a.signature),userHandle:a.userHandle?e(a.userHandle):''},return_to:rt()})});});})` +
+	`.then(function(r){if(!r.ok){throw 0;}return r.json();}).then(function(o){window.location=o.redirect||'/';});}` +
 	`b.addEventListener('click',function(){` +
+	`if(auto){auto.abort();auto=null;}` +
 	`if(err){err.hidden=true;}b.disabled=true;` +
-	`var em=(document.getElementById('email')||{}).value||'';` +
-	`var rt=(document.querySelector('input[name=return_to]')||{}).value||'';` +
-	`fetch('/login/webauthn/begin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:em})}).then(function(r){if(!r.ok){throw 0;}return r.json();}).then(function(o){` +
-	`return navigator.credentials.get({publicKey:{challenge:d(o.challenge),rpId:o.rpId,timeout:o.timeout,userVerification:o.userVerification,allowCredentials:(o.allowCredentials||[]).map(function(c){return{type:'public-key',id:d(c.id)};})}});` +
-	`}).then(function(c){var a=c.response;return fetch('/login/webauthn/finish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:c.id,rawId:e(c.rawId),type:c.type,response:{authenticatorData:e(a.authenticatorData),clientDataJSON:e(a.clientDataJSON),signature:e(a.signature),userHandle:a.userHandle?e(a.userHandle):''},return_to:rt})});})` +
-	`.then(function(r){if(!r.ok){throw 0;}return r.json();}).then(function(o){window.location=o.redirect||'/';}).catch(function(){fail(b.dataset.err);});` +
-	`});})();`
+	`go((document.getElementById('email')||{}).value||'',{}).catch(function(){fail(b.dataset.err);});` +
+	`});` +
+	// Passkey preferida (ADR 0085): donde el navegador lo permite, el campo de
+	// identidad ofrece también las passkeys de este dispositivo en el autocompletado
+	// (mediación condicional). Si la persona escribe su contraseña, no pasa nada.
+	`var em=document.getElementById('email');` +
+	`if(em&&window.AbortController&&PublicKeyCredential.isConditionalMediationAvailable){PublicKeyCredential.isConditionalMediationAvailable().then(function(ok){` +
+	`if(!ok){return;}em.setAttribute('autocomplete','username webauthn');auto=new AbortController();` +
+	`return go('',{mediation:'conditional',signal:auto.signal});}).catch(function(){});}` +
+	`})();`
 
 // alertHTML es el aviso de error accesible de las páginas del IdP (icono + texto).
 func alertHTML(msg string) string {
@@ -303,6 +351,8 @@ var loginCSS = coloresCSS + appearanceCSS + fmt.Sprintf(":root{--radius-control:
 	`.or{display:flex;align-items:center;gap:12px;margin:20px 0 0;color:var(--muted);font-size:12px}.or::before,.or::after{content:"";flex:1;height:1px;background:var(--border)}` +
 	`.pk-btn{margin-top:16px;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:11px 16px;font:inherit;font-weight:600;color:var(--text);background:transparent;border:1px solid var(--border-2);border-radius:var(--radius-control);cursor:pointer;transition:background .15s,border-color .15s}` +
 	`.pk-btn:hover{background:var(--bg);border-color:var(--brand)}.pk-btn:focus-visible{outline:none;box-shadow:0 0 0 2px var(--ring)}.pk-btn svg{width:16px;height:16px;flex:none}` +
+	// La passkey como forma principal (ADR 0085): el aspecto del botón de enviar.
+	`.pk-btn.pk-first{margin-top:4px;color:var(--sytue-on-primary);background:var(--brand);border-color:var(--brand)}.pk-btn.pk-first:hover{background:var(--brand-h);border-color:var(--brand-h)}.pk-btn.pk-first:active{background:var(--brand-a)}` +
 	`.pk-err{margin:12px 0 0;padding:10px 12px;border-radius:10px;background:var(--danger-bg);color:var(--danger);font-size:14px;line-height:1.45}` +
 	`.altcha-box{margin-top:16px;padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:10px;user-select:none}` +
 	`.altcha-lbl{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:500;color:var(--text);margin:0}` +
@@ -675,6 +725,7 @@ func (s *Server) credencialFallida(w http.ResponseWriter, r *http.Request, email
 func (s *Server) loginFail(w http.ResponseWriter, r *http.Request, msg string) {
 	loc := i18n.From(r)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	cspConWasm(w)
 	w.WriteHeader(http.StatusUnauthorized)
 	safeReturn := html.EscapeString(r.Form.Get("return_to"))
 	safeEmail := html.EscapeString(domain.NormalizeLogin(r.Form.Get("email")))
@@ -682,7 +733,7 @@ func (s *Server) loginFail(w http.ResponseWriter, r *http.Request, msg string) {
 	// encuentra, así que un mensaje literal de algún llamante antiguo se sigue
 	// mostrando en vez de desaparecer.
 	_, _ = w.Write([]byte(loginPage(loc, i18n.T(loc, "login.title"),
-		loginFormHTML(loc, safeReturn, safeEmail, i18n.T(loc, msg), s.captchaEnLogin()))))
+		loginFormHTML(loc, safeReturn, safeEmail, i18n.T(loc, msg), s.captchaEnLogin(), s.passkeyPrimero(r)))))
 }
 
 func redirectAfterLogin(w http.ResponseWriter, r *http.Request, returnTo string) {

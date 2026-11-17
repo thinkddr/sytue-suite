@@ -5,6 +5,7 @@ package auth
 
 import (
 	"context"
+	"crypto/ecdh"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -13,12 +14,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"git.sytue.eu/sytue/one/apps/nucleo/recoverywrap"
 )
 
 // Los clientes OIDC de las apps nativas, los dos PÚBLICOS y sin secreto —un binario
@@ -115,15 +119,29 @@ func (o *OIDC) descubrir(ctx context.Context) error {
 	return nil
 }
 
+// PeticionLogin cambia un inicio de sesión (ADR 0084). Prompt "login" obliga a meter la
+// clave en Sytue ID aunque la sesión del navegador siga viva: es como el cifrado de este
+// dispositivo consigue la clave de desbloqueo que le falta. Legado son los parámetros
+// públicos (sal, entrada PRF) de los envoltorios de la ADR 0082 que la página de inicio
+// de sesión debe abrir también.
+type PeticionLogin struct {
+	Prompt string
+	Legado string
+}
+
 // Login hace el flujo completo —Authorization Code + PKCE con redirect al loopback,
 // como `gcloud auth login`— y BLOQUEA hasta que el navegador vuelve, ctx se cancela o
 // pasan tres minutos. Se llama desde una goroutine, nunca desde Layout.
-func (o *OIDC) Login(ctx context.Context) (Tokens, error) {
+func (o *OIDC) Login(ctx context.Context) (Tokens, error) { return o.LoginCon(ctx, PeticionLogin{}) }
+
+// LoginCon es Login con una PeticionLogin.
+func (o *OIDC) LoginCon(ctx context.Context, p PeticionLogin) (Tokens, error) {
 	if err := o.descubrir(ctx); err != nil {
 		return Tokens{}, err
 	}
 	secreto := secretoDeDispositivo()
-	autorizar, verifier, state := o.autorizar(redirectURI, secreto)
+	entrega := claveDeEntrega()
+	autorizar, verifier, state := o.autorizar(redirectURI, secreto, entrega, p)
 
 	// Keep the registered fixed OIDC redirect while sharing the listener lifecycle
 	// and browser return handling with other native SSO clients.
@@ -143,7 +161,8 @@ func (o *OIDC) Login(ctx context.Context) (Tokens, error) {
 	if err != nil {
 		return Tokens{}, err
 	}
-	return o.canjear(ctx, code, verifier, redirectURI, secreto)
+	t, err := o.canjear(ctx, code, verifier, redirectURI, secreto)
+	return conDesbloqueo(t, entrega, query.Get("sytue_unlock")), err
 }
 
 // LoginEsquema es el login del MÓVIL: RFC 8252 §7.1. Ahí no hay puerto que escuchar —una
@@ -156,6 +175,11 @@ func (o *OIDC) Login(ctx context.Context) (Tokens, error) {
 // escribe en una ventana cuyo dominio y cuyo candado se ven, y la sesión que ya hubiera
 // con Sytue ID se reutiliza.
 func (o *OIDC) LoginEsquema(ctx context.Context, redirect string) (Tokens, error) {
+	return o.LoginEsquemaCon(ctx, redirect, PeticionLogin{})
+}
+
+// LoginEsquemaCon es LoginEsquema con una PeticionLogin.
+func (o *OIDC) LoginEsquemaCon(ctx context.Context, redirect string, p PeticionLogin) (Tokens, error) {
 	if err := o.descubrir(ctx); err != nil {
 		return Tokens{}, err
 	}
@@ -174,7 +198,8 @@ func (o *OIDC) LoginEsquema(ctx context.Context, redirect string) (Tokens, error
 	}()
 
 	secreto := secretoDeDispositivo()
-	autorizar, verifier, state := o.autorizar(redirect, secreto)
+	entrega := claveDeEntrega()
+	autorizar, verifier, state := o.autorizar(redirect, secreto, entrega, p)
 	if err := o.Open(autorizar); err != nil {
 		return Tokens{}, fmt.Errorf("auth: no se pudo abrir el navegador: %w", err)
 	}
@@ -184,7 +209,8 @@ func (o *OIDC) LoginEsquema(ctx context.Context, redirect string) (Tokens, error
 		if err != nil {
 			return Tokens{}, err
 		}
-		return o.canjear(ctx, code, verifier, redirect, secreto)
+		t, err := o.canjear(ctx, code, verifier, redirect, secreto)
+		return conDesbloqueo(t, entrega, q.Get("sytue_unlock")), err
 	case <-ctx.Done():
 		return Tokens{}, ctx.Err()
 	case <-time.After(esperaLogin):
@@ -216,10 +242,52 @@ func (o *OIDC) Vuelta(u *url.URL) bool {
 	return true
 }
 
+// legadoValido es la forma de `sytue_legacy`: parámetros públicos en base64url
+// separados por puntos y virgulillas, nada más.
+func legadoValido(v string) bool {
+	if v == "" || len(v) > 800 {
+		return false
+	}
+	for _, c := range v {
+		if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '-' && c != '_' && c != '.' && c != '~' {
+			return false
+		}
+	}
+	return true
+}
+
+// claveDeEntrega es la clave efímera con la que el relevo de Sytue ID cifra la clave de
+// desbloqueo para ESTE inicio de sesión (ADR 0084). Vive en memoria hasta que vuelve el
+// navegador. Sin ella se entra igual, sin desbloqueo.
+func claveDeEntrega() *ecdh.PrivateKey {
+	priv, err := recoverywrap.NewDeliveryKey()
+	if err != nil {
+		return nil
+	}
+	return priv
+}
+
+// conDesbloqueo abre la entrega que trae la vuelta del navegador y la acepta solo si es
+// de la persona de los tokens recién canjeados. Una entrega que falta, rota o de otra
+// persona no impide entrar: el cifrado pedirá volver a Sytue ID.
+func conDesbloqueo(t Tokens, entrega *ecdh.PrivateKey, blob string) Tokens {
+	if entrega == nil || blob == "" || t.Subject == "" {
+		return t
+	}
+	d, err := recoverywrap.OpenDelivery(entrega, blob)
+	if err != nil || d.Sub != t.Subject {
+		slog.Warn("auth: la entrega de la clave de desbloqueo no es válida para esta sesión")
+		return t
+	}
+	t.Desbloqueo = &Desbloqueo{Clave: d.Key, Legado: d.Legacy}
+	return t
+}
+
 // autorizar compone la URL de /authorize y devuelve con qué hay que comprobar la vuelta:
 // el verificador de PKCE (RFC 7636) y el `state`. Con secreto de dispositivo, lleva su
-// hash (NAT-02, ver secretoDeDispositivo).
-func (o *OIDC) autorizar(redirect, secretoDispositivo string) (destino, verifier, state string) {
+// hash (NAT-02, ver secretoDeDispositivo). Con clave de entrega, pide a Sytue ID el
+// relevo del desbloqueo (ADR 0084).
+func (o *OIDC) autorizar(redirect, secretoDispositivo string, entrega *ecdh.PrivateKey, p PeticionLogin) (destino, verifier, state string) {
 	verifier, state = aleatorio(32), aleatorio(16)
 	reto := sha256.Sum256([]byte(verifier))
 	q := url.Values{
@@ -237,6 +305,15 @@ func (o *OIDC) autorizar(redirect, secretoDispositivo string) (destino, verifier
 	if secretoDispositivo != "" {
 		suma := sha256.Sum256([]byte(secretoDispositivo))
 		q.Set("sytue_device", base64.RawURLEncoding.EncodeToString(suma[:]))
+	}
+	if entrega != nil {
+		q.Set("sytue_unlock_key", recoverywrap.DeliveryPublic(entrega))
+	}
+	if p.Prompt == "login" {
+		q.Set("prompt", "login")
+	}
+	if legadoValido(p.Legado) {
+		q.Set("sytue_legacy", p.Legado)
 	}
 	destino = o.endpoints.Authorization + "?" + q.Encode()
 	return destino, verifier, state

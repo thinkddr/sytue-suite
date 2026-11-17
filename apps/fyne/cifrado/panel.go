@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -44,9 +45,20 @@ type Panel struct {
 	// background cleanup. SDK key teardown and the next open wait for that cleanup.
 	AlCerrar func() func()
 	Personas func() []Persona
-	// Custodio guarda la clave de recuperación envuelta con la contraseña de la
-	// persona (ADR 0082). La cuenta la elige el bootstrap de este panel.
-	Custodio            CustodioClave
+	// Custodio guarda la clave de recuperación envuelta con la clave de desbloqueo de
+	// la persona (ADR 0084). La cuenta la elige el bootstrap de este panel.
+	Custodio CustodioClave
+	// Desbloqueo da la clave de desbloqueo que trajo el inicio de sesión en Sytue ID
+	// (con la sesión, compartida entre las apps nativas) y lo que abre los envoltorios
+	// de la ADR 0082; vacía si este dispositivo no la tiene. ConSesion la conecta.
+	Desbloqueo func() Material
+	// OlvidarLegado retira de la sesión lo que abría los envoltorios de la ADR 0082 una
+	// vez pasados al tipo nuevo.
+	OlvidarLegado func(context.Context)
+	// IniciarSesion vuelve a entrar en Sytue ID pidiendo la clave (prompt=login), y con
+	// `legado` los envoltorios de la ADR 0082 que abrir. Es la ÚNICA forma de
+	// desbloquear que ofrece este panel: aquí no se teclea nada.
+	IniciarSesion       func(ctx context.Context, legado string) error
 	Licencias           string
 	Base                mx.Config
 	Login               func(context.Context, mx.Config) (*mx.Client, error)
@@ -65,10 +77,7 @@ type Panel struct {
 	status              mx.VerificationStatus
 	txn                 id.VerificationTransactionID
 	verifyUser          string
-	key, confirm        *ui.Entrada
 	diag                Diagnostico
-	unlockFailures      int
-	notice              string
 	comparison          string
 	verificationWaiting bool
 	authWait            chan bool
@@ -174,10 +183,49 @@ func (c *Panel) custodia() Custodia {
 	return Custodia{Servicio: c.Custodio, Cuenta: account}
 }
 
-// revisar decide el paso de este dispositivo sin pedir nada: recuperarlo con la
-// copia de ADR 0081, pedir la contraseña, crear el cifrado o verificar con otro.
+// resolver hace lo que pide el diagnóstico con la clave de desbloqueo (Resolver) y
+// lo que eso arrastra en este panel: la recuperación nativa de Drive tras crear y
+// retirar lo que abría los envoltorios de la ADR 0082 tras pasarlos al tipo nuevo.
+func (c *Panel) resolver(job context.Context, client *mx.Client, custodia Custodia, diag Diagnostico, native bool) (Diagnostico, error) {
+	creating := diag.Paso == PasoCrear
+	m := c.material()
+	defer m.Borrar()
+	diag, err := Resolver(job, client, custodia, diag, m, c.uia(job, client))
+	if err != nil {
+		return diag, err
+	}
+	// ADR 0085: con el `sytue-id` comprobado aquí, los envoltorios de la 0082 sobran.
+	if diag.Paso == PasoListo && custodia.Servicio != nil {
+		if _, err := RetirarViejos(job, client, custodia, m); err != nil {
+			slog.Warn("cifrado: no se pudieron retirar los envoltorios de la ADR 0082", "error", err)
+		}
+	}
+	if creating && native && diag.Paso != PasoIniciarSesion {
+		if err := client.SyncNativeRecovery(job); err != nil {
+			return diag, err
+		}
+	}
+	if diag.migrado && c.OlvidarLegado != nil {
+		c.OlvidarLegado(job)
+	}
+	diag.Status, err = c.recoveryStatus(job, client)
+	return diag, err
+}
+
+// material es la clave de desbloqueo de la sesión, si este dispositivo la tiene.
+func (c *Panel) material() Material {
+	if c.Desbloqueo == nil {
+		return Material{}
+	}
+	return c.Desbloqueo()
+}
+
+// revisar decide el paso de este dispositivo y lo hace sin pedir nada (ADR 0084):
+// recuperarlo con la clave de desbloqueo de Sytue ID (o con la copia de la ADR 0081),
+// crear el cifrado, o, si falta la clave, ofrecer volver a entrar en Sytue ID.
 func (c *Panel) revisar(ctx context.Context, generation uint64, client *mx.Client, wait bool) {
 	custodia := c.custodia()
+	native := c.nativeRecovery
 	c.runWork(ctx, generation, false, func(job context.Context, worker *PanelWorkers) {
 		var err error
 		if wait {
@@ -189,6 +237,9 @@ func (c *Panel) revisar(ctx context.Context, generation uint64, client *mx.Clien
 		}
 		if err == nil && (!diag.Status.Verified || diag.Status.RecoverySetupPending || custodia.Servicio != nil) {
 			diag, err = Diagnosticar(job, client, custodia)
+		}
+		if err == nil && custodia.Servicio != nil {
+			diag, err = c.resolver(job, client, custodia, diag, native)
 		}
 		accepted := job.Err() == nil
 		fyne.Do(func() { //nolint:contextcheck // Fyne actions resume with the device lifecycle context stored in c.ctx.
@@ -286,12 +337,6 @@ func (c *Panel) cerrar(revoke bool) {
 		}()
 	}
 	c.mu.Unlock()
-	for _, entry := range []*ui.Entrada{c.key, c.confirm} {
-		if entry != nil {
-			entry.PonerTexto("")
-		}
-	}
-	c.key, c.confirm = nil, nil
 	if c.body != nil {
 		c.body.Objects = nil
 	}
@@ -300,7 +345,6 @@ func (c *Panel) cerrar(revoke bool) {
 	}
 	c.diag.olvidar()
 	c.diag = Diagnostico{}
-	c.unlockFailures, c.notice = 0, ""
 	c.comparison = ""
 	c.verificationWaiting = false
 	c.status = mx.VerificationStatus{}
@@ -440,13 +484,14 @@ func (c *Panel) pintar() {
 				return client.CancelVerification(ctx, c.txn, false)
 			}, nil)
 		}))
+	case c.busy && c.client != nil && !c.status.Verified:
+		c.body.Add(c.parrafo(c.t("matrix.unlocking")))
 	case c.busy:
 		c.body.Add(c.parrafo(c.t("matrix.waiting")))
-	case c.client != nil && c.diag.Paso == PasoProteger:
-		c.formularioContrasena("matrix.protectTitle", "matrix.protectBody", true, c.proteger)
-		later := c.boton("action.cancel", c.dejarParaLuego)
-		later.Variante = ui.Secundario
-		c.footer.Add(later)
+	case c.client != nil && c.diag.Paso == PasoIniciarSesion:
+		// Nada que teclear aquí: la clave se mete en Sytue ID, en el navegador.
+		c.body.Add(c.parrafo(c.t("matrix.signInBody")))
+		c.footer.Add(c.boton("matrix.signIn", c.iniciarSesion))
 	case c.status.Verified && !c.status.RecoverySetupPending:
 		c.body.Add(c.parrafo(c.t("matrix.trusted")))
 		c.footer.Add(c.boton("matrix.devices", c.dispositivos))
@@ -457,11 +502,10 @@ func (c *Panel) pintar() {
 		c.footer.Add(c.boton("matrix.notices", c.licencias))
 	case c.client == nil:
 		c.footer.Add(c.boton("matrix.connect", c.conectar))
-	case c.diag.Paso == PasoDesbloquear:
-		c.formularioContrasena("matrix.unlockTitle", "matrix.unlockBody", false, c.desbloquear)
-		c.botonVerificar()
-	case c.diag.Paso == PasoCrear:
-		c.formularioContrasena("matrix.protectTitle", "matrix.protectBody", true, c.crear)
+	case c.diag.Paso == PasoDesbloquear || c.diag.Paso == PasoCrear:
+		// Solo queda aquí si abrir o crear falló (red, servicio): se reintenta igual.
+		c.body.Add(c.parrafo(c.t("matrix.failed")))
+		c.footer.Add(c.boton("action.retry", c.Recuperar))
 	default:
 		// La cuenta tiene una clave que el servicio no conoce: nadie la teclea.
 		// Queda verificar este dispositivo desde otro (y, en Rooms, restablecer).
@@ -480,45 +524,6 @@ func (c *Panel) botonVerificar() {
 	verify := c.boton("matrix.verify", c.verificar)
 	verify.Variante = ui.Secundario
 	c.footer.Add(verify)
-}
-
-// formularioContrasena pide la contraseña de Sytue (dos veces si va a envolver una
-// clave: un error al teclearla dejaría la clave sin abrir en otros dispositivos).
-// Lo tecleado se borra al enviarlo y al cerrar el panel.
-func (c *Panel) formularioContrasena(title, body string, confirm bool, submit func(password string)) {
-	c.body.Objects = []fyne.CanvasObject{c.parrafo(c.t(title)), c.parrafo(c.t(body))}
-	if c.notice != "" {
-		c.body.Add(c.parrafo(c.t(c.notice)))
-	}
-	c.key = ui.NuevaEntrada(c.t("matrix.password"))
-	c.key.Contrasena(true)
-	c.body.Add(c.key)
-	c.confirm = nil
-	if confirm {
-		c.confirm = ui.NuevaEntrada(c.t("matrix.passwordConfirm"))
-		c.confirm.Contrasena(true)
-		c.body.Add(c.confirm)
-	}
-	key, repeated := c.key, c.confirm
-	c.footer.Add(c.boton("matrix.usePassword", func() {
-		password := key.Texto()
-		again := password
-		if repeated != nil {
-			again = repeated.Texto()
-			repeated.PonerTexto("")
-		}
-		key.PonerTexto("")
-		if password == "" {
-			return
-		}
-		if again != password {
-			c.notice = "matrix.passwordMismatch"
-			c.pintar()
-			return
-		}
-		c.notice = ""
-		submit(password)
-	}))
 }
 
 // custodiar corre una operación de la custodia y vuelve a decidir el paso.
@@ -550,14 +555,13 @@ func (c *Panel) custodiar(fn func(context.Context, *mx.Client, Custodia) (Diagno
 			}
 			c.busy = false
 			switch {
-			case contrasenaErronea(err):
-				c.unlockFailures++
-				c.notice = "matrix.unlockWrong"
+			case errors.Is(err, ErrSinDesbloqueo):
+				c.diag.Paso = PasoIniciarSesion
 			case err != nil:
 				c.fallo()
 			default:
 				c.diag.olvidar()
-				c.diag, c.status, c.notice = diag, diag.Status, ""
+				c.diag, c.status = diag, diag.Status
 			}
 			c.pintar() //nolint:contextcheck // UI rendering installs future actions scoped to the device lifecycle.
 			c.lista()
@@ -565,51 +569,36 @@ func (c *Panel) custodiar(fn func(context.Context, *mx.Client, Custodia) (Diagno
 	})
 }
 
-// desbloquear abre la clave con la contraseña. Si antes falló alguna, lo normal
-// es que la persona haya cambiado su contraseña de Sytue y haya tecleado la
-// anterior: entonces se pide la actual para volver a envolver la clave.
-func (c *Panel) desbloquear(password string) {
-	envoltorios, failures := c.diag.Envoltorios, c.unlockFailures
-	c.custodiar(func(ctx context.Context, client *mx.Client, _ Custodia) (Diagnostico, bool, error) {
-		key, err := Desbloquear(ctx, client, envoltorios, password)
-		if err != nil || failures == 0 {
-			return Diagnostico{}, false, err
-		}
-		status, err := c.recoveryStatus(ctx, client)
-		if err != nil {
-			return Diagnostico{}, false, err
-		}
-		keyID, err := client.DefaultRecoveryKeyID(ctx)
-		return conClave(Diagnostico{Status: status}, keyID, key), true, err
+// iniciarSesion vuelve a entrar en Sytue ID para traer la clave de desbloqueo a este
+// dispositivo (la persona mete allí su clave) y, al volver, desbloquea solo.
+func (c *Panel) iniciarSesion() {
+	if c.busy || c.IniciarSesion == nil {
+		return
+	}
+	client, err := c.Cliente(c.ctx)
+	if err != nil {
+		c.fallo()
+		return
+	}
+	c.busy = true
+	c.pintar() //nolint:contextcheck // UI rendering installs future actions scoped to the device lifecycle.
+	ctx, generation, legado := c.ctx, c.generation, c.diag.Legado
+	c.runWork(ctx, generation, false, func(job context.Context, worker *PanelWorkers) {
+		err := c.IniciarSesion(job, legado)
+		accepted := job.Err() == nil
+		fyne.Do(func() { //nolint:contextcheck // Fyne actions resume with the device lifecycle context stored in c.ctx.
+			if generation != c.generation || !accepted || !c.workCurrent(ctx, worker) {
+				return
+			}
+			if err != nil {
+				c.busy = false
+				c.fallo()
+				c.pintar() //nolint:contextcheck // UI rendering installs future actions scoped to the device lifecycle.
+				return
+			}
+			c.revisar(ctx, generation, client, false)
+		})
 	})
-}
-
-func (c *Panel) crear(password string) {
-	native := c.nativeRecovery
-	c.custodiar(func(ctx context.Context, client *mx.Client, custodia Custodia) (Diagnostico, bool, error) {
-		err := Crear(ctx, client, custodia, password, c.uia(ctx, client))
-		if err == nil && native {
-			err = client.SyncNativeRecovery(ctx)
-		}
-		return Diagnostico{}, false, err
-	})
-}
-
-func (c *Panel) proteger(password string) {
-	diag := c.diag
-	c.custodiar(func(ctx context.Context, client *mx.Client, custodia Custodia) (Diagnostico, bool, error) {
-		return Diagnostico{}, false, Proteger(ctx, client, custodia, diag, password)
-	})
-}
-
-// dejarParaLuego cierra la petición de proteger la clave: el dispositivo ya está
-// verificado; se volverá a pedir la próxima vez que se abra el cifrado.
-func (c *Panel) dejarParaLuego() {
-	c.diag.olvidar()
-	c.diag.Paso = PasoListo
-	c.notice = ""
-	c.pintar()
-	c.lista()
 }
 
 func (c *Panel) fallo() {
@@ -690,48 +679,31 @@ func (c *Panel) operar(fn func(context.Context, *mx.Client) error, after func())
 
 // Restablecer es «No tengo otro dispositivo» (solo Rooms): un paso de
 // confirmación con la advertencia y una casilla obligatoria antes del botón de
-// peligro, igual que el modal de la web, y la contraseña con la que se envolverá
-// la clave nueva. La clave nueva se guarda envuelta antes de publicarla y no se
-// enseña. Lo destructivo nunca va a un solo clic.
+// peligro, igual que el modal de la web. La clave nueva se envuelve con la clave de
+// desbloqueo de Sytue ID antes de publicarla y no se enseña; aquí no se teclea nada.
+// Lo destructivo nunca va a un solo clic.
 func (c *Panel) Restablecer() {
 	var accion *ui.Boton
 	understood := ui.NuevaCasilla(c.t("matrix.resetUnderstood"), func(marcada bool) {
 		accion.Inerte = c.busy || !marcada
 		accion.Refresh()
 	})
-	c.key = ui.NuevaEntrada(c.t("matrix.password"))
-	c.key.Contrasena(true)
-	c.confirm = ui.NuevaEntrada(c.t("matrix.passwordConfirm"))
-	c.confirm.Contrasena(true)
-	key, repeated := c.key, c.confirm
 	accion = c.boton("matrix.resetAction", func() {
-		password, again := key.Texto(), repeated.Texto()
-		if !understood.Marcada || password == "" {
+		if !understood.Marcada {
 			return
 		}
-		key.PonerTexto("")
-		repeated.PonerTexto("")
-		if again != password {
-			c.notice = "matrix.passwordMismatch"
-			c.Restablecer()
-			return
-		}
-		c.notice = ""
 		c.custodiar(func(ctx context.Context, client *mx.Client, custodia Custodia) (Diagnostico, bool, error) {
-			return Diagnostico{}, false, Restablecer(ctx, client, custodia, password, c.uia(ctx, client))
+			m := c.material()
+			defer m.Borrar()
+			return Diagnostico{}, false, Restablecer(ctx, client, custodia, m, c.uia(ctx, client))
 		})
 	})
 	accion.Variante = ui.Peligro
 	accion.Inerte = true
 	understood.Escalon = tema.TextoSM
 	understood.AnchoEtiqueta = c.anchoTexto()
-	c.body.Objects = []fyne.CanvasObject{c.parrafo(c.t("matrix.resetBody")), understood, c.parrafo(c.t("matrix.protectBody"))}
-	if c.notice != "" {
-		c.body.Add(c.parrafo(c.t(c.notice)))
-	}
-	c.body.Add(key)
-	c.body.Add(repeated)
-	back := c.boton("action.back", func() { c.notice = ""; c.pintar() })
+	c.body.Objects = []fyne.CanvasObject{c.parrafo(c.t("matrix.resetBody")), understood}
+	back := c.boton("action.back", c.pintar)
 	back.Variante = ui.Secundario
 	c.footer.Objects = []fyne.CanvasObject{accion, back}
 	c.actualizar()

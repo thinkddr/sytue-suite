@@ -49,6 +49,12 @@ type Server struct {
 	// efectivo con N réplicas es N×burst, aceptable para ese endpoint).
 	loginLimiter httpx.RateLimiter
 	tokenLimiter httpx.RateLimiter
+	// envelopeLimiter limita la subida de sobres del desbloqueo (PUT /e2e/envelopes,
+	// ADR 0084 y 0085) por cliente, con su propio cubo: subir sobres (alta de varias
+	// passkeys, empezar de cero) no gasta el presupuesto anti-fuerza-bruta del inicio
+	// de sesión, ni al revés. Exige sesión, así que no es un oráculo de contraseñas;
+	// frena a quien con una sesión machaque la tabla.
+	envelopeLimiter httpx.RateLimiter
 	// acctLimiter limita intentos por cuenta (email), para frenar la fuerza bruta
 	// distribuida (muchas IP contra una misma cuenta) que un límite por IP no cubre.
 	acctLimiter httpx.RateLimiter
@@ -92,6 +98,11 @@ type Server struct {
 	// nativas (NAT-02): sin él, una página ajena podría enlazar la autorización ya
 	// consentida. Derivada de la KEK con su etiqueta, como las de arriba.
 	consentKey []byte
+	// unlockSaltKey inventa la sal del sobre de contraseña de quien aún no tiene
+	// sobre y de las direcciones sin cuenta (desbloqueo.go, ADR 0084): estable
+	// entre réplicas y reinicios, y derivada de la KEK con su etiqueta, como las
+	// de arriba.
+	unlockSaltKey []byte
 
 	// captcha genera y verifica los retos ALTCHA PoW para altas de cuentas.
 	captcha *altcha.Verifier
@@ -152,6 +163,10 @@ func NewServer(cfg Config, logger *slog.Logger, st *store.Store, km *oidc.KeyMan
 		// credential-stuffing / fuerza bruta de contraseñas). Compartido entre
 		// réplicas (Postgres): un límite por proceso se multiplicaría por N.
 		loginLimiter: pg.NewRateLimiter(st.DB(), pg.RateLimiterConfig{PerSecond: 10.0 / 60.0, Burst: 10}),
+		// Sobres del desbloqueo: 20/min por cliente con ráfaga de 20. Un inicio de
+		// sesión sube uno como mucho; dar de alta passkeys o empezar de cero, uno por
+		// cada una. Compartido entre réplicas, como el de login.
+		envelopeLimiter: pg.NewRateLimiter(st.DB(), pg.RateLimiterConfig{PerSecond: 20.0 / 60.0, Burst: 20}),
 		// Token endpoint: 60 req/min por IP con ráfaga de 30 (protege canje de
 		// código, refresh, client_credentials y el registro dinámico de clients
 		// sin ahogar el tráfico legítimo). Compartido entre réplicas (Postgres)
@@ -188,6 +203,7 @@ func NewServer(cfg Config, logger *slog.Logger, st *store.Store, km *oidc.KeyMan
 		resetKey:       deriveResetKey(cfg.KeyEncryptionKey),
 		deviceKey:      deriveDeviceKey(cfg.KeyEncryptionKey),
 		consentKey:     deriveConsentKey(cfg.KeyEncryptionKey),
+		unlockSaltKey:  deriveUnlockSaltKey(cfg.KeyEncryptionKey),
 		captcha:        altcha.New(deriveCaptchaKey(cfg.KeyEncryptionKey), altcha.ConRepeticiones(st.RegistrarCaptchaResuelto)),
 		loginBypassKey: cfg.LoginBypassKey,
 		resolver:       net.DefaultResolver,
@@ -242,6 +258,14 @@ func deriveConsentKey(kek []byte) []byte {
 	return h[:]
 }
 
+// deriveUnlockSaltKey deriva de la KEK la clave con la que se inventan las sales
+// del desbloqueo (ADR 0084). Con la KEK que cambie, cambian solo las de quien aún
+// no tiene sobre: las de un sobre guardado van dentro de él.
+func deriveUnlockSaltKey(kek []byte) []byte {
+	h := sha256.Sum256(append([]byte("sytue-id/e2e-unlock-salt/v1\x00"), kek...))
+	return h[:]
+}
+
 // deriveCaptchaKey deriva la clave HMAC de los retos ALTCHA PoW de la KEK con su
 // etiqueta de dominio (separación de claves: NO firma con la de reseteo ni con la
 // de dispositivo ni con la de cifrado). En prod la KEK es obligatoria; en dev/test,
@@ -289,6 +313,9 @@ func oauth2RateKey(r *http.Request) string { return rateKeyPorCliente("oauth2:",
 // conecta: con aquel, un atacante estrenaba bucket en cada intento poniendo una
 // cabecera distinta, y el tope de 10/min no frenaba absolutamente nada.
 func loginRateKey(r *http.Request) string { return rateKeyPorCliente("login-ip:", r) }
+
+// envelopeRateKey es el cubo de PUT /e2e/envelopes: el cliente, con prefijo propio.
+func envelopeRateKey(r *http.Request) string { return rateKeyPorCliente("e2e-envelopes:", r) }
 
 // conProxiesDeConfianza deja la lista de proxies de confianza en el contexto de
 // cada petición. Va lo PRIMERO del router: de ella depende clientIP, y clientIP
@@ -406,6 +433,14 @@ func (s *Server) Router() http.Handler {
 		r.With(loginRL).Post("/account/delete", s.handleAccountDeletePost)
 
 		// --- OAuth2 / OIDC ---
+		// El desbloqueo del cifrado (ADR 0084): el relevo guarda aquí los sobres
+		// que cierra en el navegador, y las apps web leen la clave por el puente.
+		envelopeRL := httpx.RateLimit(httpx.RateLimitConfig{Limiter: s.envelopeLimiter, KeyFunc: envelopeRateKey})
+		r.With(envelopeRL).Put("/e2e/envelopes", s.handleUnlockEnvelopePut)
+		r.Get("/e2e/bridge", s.handleUnlockBridge)
+		r.Get("/e2e/passkey", s.handleUnlockPasskeyEnroll)
+		r.Get("/e2e/cuenta", s.handleUnlockBridgeCuenta)
+
 		r.Route("/oauth2", func(r chi.Router) {
 			r.Get("/authorize", s.handleAuthorize)  // Authorization Code + PKCE
 			r.Post("/authorize", s.handleAuthorize) // consentimiento
@@ -438,6 +473,8 @@ func (s *Server) Router() http.Handler {
 			// sesión) y rate-limitada como el login por contraseña.
 			r.With(loginRL).Post("/webauthn/begin", s.handleWebAuthnLoginBegin)
 			r.With(loginRL).Post("/webauthn/finish", s.handleWebAuthnLoginFinish)
+			// La sal pública del sobre de la clave de desbloqueo (ADR 0084).
+			r.With(loginRL).Post("/unlock/salt", s.handleUnlockSalt)
 			// Enrutado por dominio de email hacia el IdP corporativo ("Entrar con tu
 			// organización"). GET pinta el formulario; POST resuelve el provider por
 			// dominio y redirige a su flujo (rate-limitado, sin sesión).

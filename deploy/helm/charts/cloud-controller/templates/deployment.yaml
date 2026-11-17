@@ -45,6 +45,9 @@ spec:
           # Nombres de env = services/cloud/internal/config/config.go (Config compartida;
           # el controller reconcilia workload). Secretos por secretKeyRef.
           env:
+            # Runtime Go atado a los limites del pod (helper sytue.goRuntimeEnv del umbrella):
+            # GOMAXPROCS=techo(limits.cpu); GO.Values.resources.limits.memoryLIMIT=~85% de limits.memory.
+            {{- include "sytue.goRuntimeEnv" (dict "container" "controller" "memLimit" .Values.resources.limits.memory) | nindent 12 }}
             {{- include "sytue.logCollectorEnv" . | nindent 12 }}
             {{- if (.Values.global).otlp }}
             {{- if (.Values.global).otlp.endpoint }}

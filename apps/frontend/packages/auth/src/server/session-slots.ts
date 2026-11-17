@@ -71,6 +71,10 @@ export function sessionChangedResponse(): Response {
 /** Tokens are stored under an immutable original slot. Only login START writes
  * the selected intent; callbacks and refreshes can never replace a later login.
  * Tombstones are separate cookies, so an old refresh cannot erase revocation. */
+/** Caracteres de sesión sellada por cookie: deja margen al nombre (~90) bajo 4096. */
+const SLOT_CHUNK = 3800;
+const SLOT_MAX_CHUNKS = 4;
+
 export class SessionSlots {
   readonly selectionCookie: string;
   readonly legacyCookie: string;
@@ -93,6 +97,43 @@ export class SessionSlots {
   }
   private slotCookie(id: string): string {
     return this.name('slot_' + id);
+  }
+  // LA SESIÓN EN TROZOS. Un navegador descarta en silencio una cookie cuyo nombre
+  // y valor pasen de 4096 bytes, y la sesión sellada (usuario + tres tokens) ronda
+  // ese tamaño: con la cuenta de administración de desarrollo medía 4144 y el
+  // callback devolvía al login una y otra vez, sin ningún error que lo dijera. Por
+  // encima de SLOT_CHUNK caracteres se reparte en `<slot>`, `<slot>.1`, `<slot>.2`…;
+  // por debajo es una sola cookie con el nombre de siempre, así que las sesiones ya
+  // abiertas se siguen leyendo.
+  private readSlot(jar: CookieJar, id: string): string | undefined {
+    const base = this.slotCookie(id);
+    const first = jar.get(base)?.value;
+    if (!first) return undefined;
+    let value = first;
+    for (let i = 1; i < SLOT_MAX_CHUNKS; i++) {
+      const part = jar.get(`${base}.${i}`)?.value;
+      if (!part) break;
+      value += part;
+    }
+    return value;
+  }
+  private writeSlot(ctx: BffContext, id: string, value: string): void {
+    const base = this.slotCookie(id);
+    const parts: string[] = [];
+    for (let i = 0; i < value.length; i += SLOT_CHUNK) parts.push(value.slice(i, i + SLOT_CHUNK));
+    if (parts.length > SLOT_MAX_CHUNKS) throw Error('session too large');
+    parts.forEach((part, i) => ctx.cookies.set(i === 0 ? base : `${base}.${i}`, part, this.attrs));
+    // Un trozo de una sesión anterior más larga se concatenaría con la nueva.
+    for (let i = parts.length; i < SLOT_MAX_CHUNKS; i++)
+      if (ctx.cookies.get(`${base}.${i}`))
+        ctx.cookies.delete(`${base}.${i}`, { path: '/', secure: this.secure });
+  }
+  private deleteSlot(ctx: BffContext, id: string): void {
+    const base = this.slotCookie(id);
+    ctx.cookies.delete(base, { path: '/', secure: this.secure });
+    for (let i = 1; i < SLOT_MAX_CHUNKS; i++)
+      if (ctx.cookies.get(`${base}.${i}`))
+        ctx.cookies.delete(`${base}.${i}`, { path: '/', secure: this.secure });
   }
   private revoked(jar: CookieJar, id: string): boolean {
     return jar.get(this.name('revoked_' + id))?.value === '1';
@@ -137,7 +178,7 @@ export class SessionSlots {
   }
   private async readRef(ctx: BffContext, ref: SessionSlotRef): Promise<SytueSession | null> {
     if (this.revoked(ctx.cookies, ref.id)) return null;
-    const cookie = ctx.cookies.get(this.slotCookie(ref.id))?.value;
+    const cookie = this.readSlot(ctx.cookies, ref.id);
     if (cookie) {
       const stored = await unseal<StoredSlot>(cookie, this.secret);
       return stored?.v === 1 && stored.slot === ref.id && sessionValue(stored.session)
@@ -172,7 +213,7 @@ export class SessionSlots {
         this.completed(ctx.cookies, selected.candidate.id) ||
         !this.cancelled(ctx.cookies, selected.candidate.id)
       ) {
-        const cookie = ctx.cookies.get(this.slotCookie(selected.candidate.id))?.value;
+        const cookie = this.readSlot(ctx.cookies, selected.candidate.id);
         if (cookie) {
           const session = await this.readRef(ctx, selected.candidate);
           return session ? { ref: selected.candidate, session, selection: selected } : null;
@@ -237,7 +278,7 @@ export class SessionSlots {
   ): Promise<void> {
     if (!reference(captured.ref) || !sessionValue(session)) throw Error('invalid session slot');
     const stored: StoredSlot = { v: 1, slot: captured.ref.id, session };
-    ctx.cookies.set(this.slotCookie(captured.ref.id), await seal(stored, this.secret), this.attrs);
+    this.writeSlot(ctx, captured.ref.id, await seal(stored, this.secret));
   }
   async complete(ctx: BffContext, id: string, session: SytueSession): Promise<void> {
     if (!isSessionGeneration(id) || session.generation !== id)
@@ -268,7 +309,7 @@ export class SessionSlots {
     if (active) ids.add(active.ref.id);
     for (const id of ids) {
       ctx.cookies.set(this.name('revoked_' + id), '1', this.attrs);
-      ctx.cookies.delete(this.slotCookie(id), { path: '/', secure: this.secure });
+      this.deleteSlot(ctx, id);
     }
     // Never touch a selected pointer in a logout response. A newer login may
     // already own it by the time this response reaches the browser.

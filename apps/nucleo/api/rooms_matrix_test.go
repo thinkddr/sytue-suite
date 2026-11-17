@@ -307,3 +307,36 @@ func TestMatrixRecoveryKeyErrorsAreNotEmpty(t *testing.T) {
 		t.Fatal("unavailable wrappers read as none")
 	}
 }
+
+// Retirar los envoltorios de la 0082 (ADR 0085) es un guardado del `sytue-id` con
+// `retire_older=1`; con otro tipo ni se pide.
+func TestRetirarLosViejosEsUnGuardadoDelSytueIDConRetireOlder(t *testing.T) {
+	const key = "EsTb 1234 5678 9ABC DEFG HJKL MNPQ RSTU VWXY Zabc defg hijk"
+	unlock, _ := recoverywrap.NewUnlockKey()
+	nuevo, err := recoverywrap.WrapSytueID(unlock, "@sytue_storage_drive_acme_a:x", "kid", key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	viejo, err := recoverywrap.WrapPassword("contraseña", "@sytue_storage_drive_acme_a:x", "kid", key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var queries []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		queries = append(queries, r.Method+" "+r.URL.RawQuery)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{"id": "w1"})
+	}))
+	defer server.Close()
+	client := NewRooms(server.URL, sesionFija("sytue-session"), server.Client())
+	isolated := MatrixRecoveryAccount{Product: "drive", IdentityVersion: storage.IsolatedIdentity}
+	if _, err := client.PutMatrixRecoveryWrapperRetiringOlder(t.Context(), isolated, viejo); err == nil {
+		t.Fatal("un envoltorio de la 0082 pidió retirar los demás")
+	}
+	if id, err := client.PutMatrixRecoveryWrapperRetiringOlder(t.Context(), isolated, nuevo); err != nil || id != "w1" {
+		t.Fatalf("retirar = %q, %v", id, err)
+	}
+	if want := []string{"PUT identity_version=2&product=drive&retire_older=1"}; strings.Join(queries, "|") != strings.Join(want, "|") {
+		t.Fatalf("queries = %q; want %q", queries, want)
+	}
+}

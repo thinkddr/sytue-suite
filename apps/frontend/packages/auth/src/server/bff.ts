@@ -296,6 +296,19 @@ export function createBff(opts: BffOptions) {
       // Sytue ID a autenticar de nuevo aunque la sesión SSO siga viva, y el token que
       // vuelve lleva un `auth_time` fresco.
       if (ctx.url.searchParams.get('reauth') === '1') url.searchParams.set('max_age', '0');
+      // El desbloqueo del cifrado (ADR 0084): Sytue ID acaba la autorización en el
+      // relevo, que deja en este navegador la clave de desbloqueo que la persona
+      // acaba de sacar de su contraseña o su passkey. `unlock=1` lo pide la puerta
+      // del cifrado cuando a este dispositivo le falta: `prompt=login` hace que la
+      // persona meta su clave EN SYTUE ID aunque la sesión siga viva, y `legacy`
+      // lleva los parámetros públicos de sus envoltorios de la ADR 0082.
+      url.searchParams.set('sytue_unlock', '1');
+      if (ctx.url.searchParams.get('unlock') === '1') {
+        url.searchParams.set('prompt', 'login');
+        const legacy = ctx.url.searchParams.get('legacy');
+        if (legacy && /^[A-Za-z0-9_.~-]{1,800}$/.test(legacy))
+          url.searchParams.set('sytue_legacy', legacy);
+      }
       // Cookie de estado efimera (30 min: la gente tarda en el formulario del IdP),
       // host-only, httpOnly. Si aun asi caduca, el callback reinicia el flujo.
       ctx.cookies.set(slots.stateCookie(state.intent), sealed, {

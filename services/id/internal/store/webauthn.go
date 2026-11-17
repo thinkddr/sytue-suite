@@ -110,12 +110,21 @@ func (s *Store) DeleteCredentialForUser(ctx context.Context, q pg.Querier, userI
 	if q == nil {
 		q = s.DB()
 	}
-	tag, err := q.Exec(ctx, `DELETE FROM webauthn_credentials
-		WHERE id = $1 AND user_id = $2`, credentialID, userID)
+	// Con la passkey se va su sobre de la clave de desbloqueo (ADR 0084): ya nadie
+	// puede abrirlo, y dejarlo solo ocupa una de las plazas de la persona.
+	var borradas int
+	err := q.QueryRow(ctx, `WITH borrada AS (
+			DELETE FROM webauthn_credentials WHERE id = $1 AND user_id = $2 RETURNING cred_id
+		), sobre AS (
+			DELETE FROM e2e_unlock_envelopes e USING borrada b
+			WHERE e.user_id = $2 AND e.kind = 'passkey'
+			  AND e.credential_id = rtrim(translate(replace(encode(b.cred_id, 'base64'), E'\n', ''), '+/', '-_'), '=')
+		)
+		SELECT count(*) FROM borrada`, credentialID, userID).Scan(&borradas)
 	if err != nil {
 		return false, errf("DeleteCredentialForUser", err)
 	}
-	return tag.RowsAffected() > 0, nil
+	return borradas > 0, nil
 }
 
 // RenameCredentialForUser cambia el nombre visible de una passkey (mismo guard

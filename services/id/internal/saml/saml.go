@@ -18,6 +18,7 @@
 package saml
 
 import (
+	"bytes"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
@@ -27,10 +28,15 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/beevik/etree"
 	csaml "github.com/crewjam/saml"
+	xrv "github.com/mattermost/xml-roundtrip-validator"
+	dsig "github.com/russellhaering/goxmldsig"
+	"github.com/russellhaering/goxmldsig/etreeutils"
 
 	"git.sytue.eu/sytue/one/services/id/internal/domain"
 )
@@ -186,19 +192,266 @@ func (s *SP) Authenticate(r *http.Request, requestIDs []string, p domain.Identit
 	return extractClaims(p, assertion), nil
 }
 
-// parseResponse llama a crewjam sin dejar que un pánico suyo tire la petición:
-// GO-2026-6909 (crewjam/saml ≤ v0.5.1, sin versión corregida) desreferencia la
-// assertion sin comprobar nil, p. ej. una firmada sin <saml:Subject>.
-func (s *SP) parseResponse(r *http.Request, requestIDs []string) (a *csaml.Assertion, err error) {
-	defer func() {
-		if rec := recover(); rec != nil {
-			a, err = nil, errors.New("respuesta SAML malformada")
+// parseResponse valida la SAML Response directamente sobre xrv + goxmldsig + etree
+// sin pasar por ServiceProvider.ParseResponse de crewjam: GO-2026-6909 (crewjam/saml
+// sin versión corregida en vuln.go.dev) desreferencia assertion.Issuer/Subject sin
+// comprobar nil y acepta NameID fuera del espacio de nombres SAML.
+func (s *SP) parseResponse(r *http.Request, requestIDs []string) (*csaml.Assertion, error) {
+	raw, err := base64.StdEncoding.DecodeString(r.PostForm.Get("SAMLResponse"))
+	if err != nil {
+		return nil, errors.New("SAMLResponse no es base64")
+	}
+	if err := xrv.Validate(bytes.NewReader(raw)); err != nil {
+		return nil, errors.New("respuesta SAML con XML inválido")
+	}
+	doc := etree.NewDocument()
+	if err := doc.ReadFromBytes(raw); err != nil || doc.Root() == nil {
+		return nil, errors.New("SAMLResponse ilegible")
+	}
+	certs, err := s.idpSigningCerts()
+	if err != nil {
+		return nil, err
+	}
+	now := csaml.TimeNow()
+	responseEl := doc.Root()
+	responseSigned, err := validateOptionalSignature(responseEl, certs)
+	if err != nil {
+		return nil, err
+	}
+	var reqURL url.URL
+	if r.URL != nil {
+		reqURL = *r.URL
+	}
+	if err := s.validateResponseEnvelope(responseEl, responseSigned, requestIDs, now, reqURL); err != nil {
+		return nil, err
+	}
+	assertionEls, err := findChildren(responseEl, nsAssertion, "Assertion")
+	if err != nil {
+		return nil, err
+	}
+	for _, assertionEl := range assertionEls {
+		if !responseSigned {
+			assertionSigned, sigErr := validateOptionalSignature(assertionEl, certs)
+			if sigErr != nil || !assertionSigned {
+				continue
+			}
 		}
-	}()
-	return s.inner.ParseResponse(r, requestIDs)
+		var assertion csaml.Assertion
+		if err := unmarshalElement(assertionEl, &assertion); err != nil {
+			continue
+		}
+		if err := s.validateVerifiedAssertion(&assertion, requestIDs, now); err != nil {
+			continue
+		}
+		return &assertion, nil
+	}
+	return nil, errors.New("respuesta SAML sin assertion válida")
 }
 
-const nsAssertion = "urn:oasis:names:tc:SAML:2.0:assertion"
+const (
+	nsAssertion      = "urn:oasis:names:tc:SAML:2.0:assertion"
+	nsDSig           = "http://www.w3.org/2000/09/xmldsig#"
+	cmSujetoPortador = "urn:oasis:names:tc:SAML:2.0:cm:bearer"
+)
+
+func (s *SP) idpSigningCerts() ([]*x509.Certificate, error) {
+	if s.inner == nil || s.inner.IDPMetadata == nil {
+		return nil, errors.New("sin metadata del IdP")
+	}
+	var certs []*x509.Certificate
+	for _, idpSSO := range s.inner.IDPMetadata.IDPSSODescriptors {
+		for _, kd := range idpSSO.KeyDescriptors {
+			if kd.Use != "" && kd.Use != "signing" {
+				continue
+			}
+			for _, certData := range kd.KeyInfo.X509Data.X509Certificates {
+				clean := certWS.ReplaceAllString(certData.Data, "")
+				der, err := base64.StdEncoding.DecodeString(clean)
+				if err != nil {
+					return nil, errors.New("certificado del IdP inválido")
+				}
+				cert, err := x509.ParseCertificate(der)
+				if err != nil {
+					return nil, errors.New("certificado del IdP ilegible")
+				}
+				certs = append(certs, cert)
+			}
+		}
+	}
+	if len(certs) == 0 {
+		return nil, errors.New("sin certificado de firma del IdP")
+	}
+	return certs, nil
+}
+
+func validateOptionalSignature(el *etree.Element, certs []*x509.Certificate) (bool, error) {
+	sigEl, err := findChild(el, nsDSig, "Signature")
+	if err != nil {
+		return false, err
+	}
+	if sigEl == nil {
+		return false, nil
+	}
+	store := dsig.MemoryX509CertificateStore{Roots: certs}
+	validationCtx := dsig.NewDefaultValidationContext(&store)
+	validationCtx.IdAttribute = "ID"
+	if csaml.Clock != nil {
+		validationCtx.Clock = csaml.Clock
+	}
+	if el.FindElement("./Signature/KeyInfo/X509Data/X509Certificate") == nil {
+		if sig := el.FindElement("./Signature"); sig != nil {
+			if keyInfo := sig.FindElement("KeyInfo"); keyInfo != nil {
+				sig.RemoveChild(keyInfo)
+			}
+		}
+	}
+	nsCtx, err := etreeutils.NSBuildParentContext(el)
+	if err != nil {
+		return false, err
+	}
+	nsCtx, err = nsCtx.SubContext(el)
+	if err != nil {
+		return false, err
+	}
+	detached, err := etreeutils.NSDetatch(nsCtx, el)
+	if err != nil {
+		return false, err
+	}
+	if _, err := validationCtx.Validate(detached); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (s *SP) validateResponseEnvelope(responseEl *etree.Element, responseSigned bool, requestIDs []string, now time.Time, currentURL url.URL) error {
+	var response csaml.Response
+	if err := unmarshalElement(responseEl, &response); err != nil {
+		return errors.New("respuesta SAML ilegible")
+	}
+	acs := s.inner.AcsURL.String()
+	if responseSigned || response.Destination != "" {
+		if response.Destination != currentURL.String() && response.Destination != acs {
+			return errors.New("el destino no coincide con el ACS")
+		}
+	}
+	if !s.inner.AllowIDPInitiated && !slices.Contains(requestIDs, response.InResponseTo) {
+		return errors.New("el InResponseTo es desconocido")
+	}
+	if response.IssueInstant.Add(csaml.MaxIssueDelay).Before(now) {
+		return errors.New("respuesta SAML expirada")
+	}
+	if response.Issuer != nil && response.Issuer.Value != s.inner.IDPMetadata.EntityID {
+		return errors.New("el emisor de la Response no coincide con el IdP")
+	}
+	if response.Status.StatusCode.Value != csaml.StatusSuccess {
+		return errors.New("estado SAML no exitoso")
+	}
+	return nil
+}
+
+func (s *SP) validateVerifiedAssertion(assertion *csaml.Assertion, requestIDs []string, now time.Time) error {
+	if assertion.IssueInstant.Add(csaml.MaxIssueDelay).Before(now) {
+		return errors.New("assertion expirada")
+	}
+	if assertion.Issuer.Value != s.inner.IDPMetadata.EntityID {
+		return errors.New("el emisor de la assertion no coincide con el IdP")
+	}
+	if assertion.Subject == nil || assertion.Conditions == nil {
+		return errors.New("assertion incompleta")
+	}
+	acs := s.inner.AcsURL.String()
+	hasBearer := false
+	for _, sc := range assertion.Subject.SubjectConfirmations {
+		if sc.Method == cmSujetoPortador {
+			hasBearer = true
+		}
+		if sc.SubjectConfirmationData == nil {
+			return errors.New("confirmación de sujeto sin datos")
+		}
+		if !s.inner.AllowIDPInitiated && !slices.Contains(requestIDs, sc.SubjectConfirmationData.InResponseTo) {
+			return errors.New("confirmación de sujeto con InResponseTo desconocido")
+		}
+		if sc.SubjectConfirmationData.Recipient != acs {
+			return errors.New("el destinatario de SubjectConfirmation no coincide con el ACS")
+		}
+		if sc.SubjectConfirmationData.NotOnOrAfter.Add(csaml.MaxClockSkew).Before(now) {
+			return errors.New("confirmación de sujeto expirada")
+		}
+	}
+	if !hasBearer {
+		return errors.New("assertion sin SubjectConfirmation bearer")
+	}
+	if assertion.Conditions.NotBefore.Add(-csaml.MaxClockSkew).After(now) ||
+		assertion.Conditions.NotOnOrAfter.Add(csaml.MaxClockSkew).Before(now) {
+		return errors.New("condiciones temporales fuera de ventana")
+	}
+	audience := s.inner.EntityID
+	if audience == "" {
+		audience = s.inner.MetadataURL.String()
+	}
+	for _, ar := range assertion.Conditions.AudienceRestrictions {
+		if ar.Audience.Value == audience {
+			return nil
+		}
+	}
+	return errors.New("la audiencia de la assertion no incluye al SP")
+}
+
+func findChildren(parentEl *etree.Element, childNS, childTag string) ([]*etree.Element, error) {
+	var rv []*etree.Element
+	for _, childEl := range parentEl.ChildElements() {
+		if childEl.Tag != childTag {
+			continue
+		}
+		ctx, err := etreeutils.NSBuildParentContext(childEl)
+		if err != nil {
+			return nil, err
+		}
+		ctx, err = ctx.SubContext(childEl)
+		if err != nil {
+			return nil, err
+		}
+		ns, err := ctx.LookupPrefix(childEl.Space)
+		if err != nil {
+			return nil, err
+		}
+		if ns == childNS {
+			rv = append(rv, childEl)
+		}
+	}
+	return rv, nil
+}
+
+func findChild(parentEl *etree.Element, childNS, childTag string) (*etree.Element, error) {
+	children, err := findChildren(parentEl, childNS, childTag)
+	if err != nil {
+		return nil, err
+	}
+	switch len(children) {
+	case 0:
+		return nil, nil //nolint:nilnil // ausencia legítima del elemento opcional.
+	case 1:
+		return children[0], nil
+	default:
+		return nil, errors.New("elemento XML duplicado")
+	}
+}
+
+func unmarshalElement(el *etree.Element, v any) error {
+	doc := etree.NewDocument()
+	root := el.Copy()
+	for _, childEl := range el.FindElements("//*") {
+		if ns := childEl.NamespaceURI(); ns != "" && childEl.Space != "" {
+			root.CreateAttr("xmlns:"+childEl.Space, ns)
+		}
+	}
+	doc.SetRoot(root)
+	buf, err := doc.WriteToBytes()
+	if err != nil {
+		return err
+	}
+	return xml.Unmarshal(buf, v)
+}
 
 // nameIDDelEspacioSAML cierra la otra mitad de GO-2026-6909. crewjam declara
 // Subject.NameID con la etiqueta a secas, así que encoding/xml lo rellena con un

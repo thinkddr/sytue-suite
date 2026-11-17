@@ -94,6 +94,7 @@ func main() {
 	c.EnlaceDoc = func(id string) string { return api.AppURL(s.Apex(), "sheets", org(), "edit?id="+url.QueryEscape(id)) }
 	c.EnlacePublico = func(token string) string { return api.AppURL(s.Apex(), "sheets", "", "s/"+url.PathEscape(token)) }
 	c.Directorio = api.NewDirectorio(s.URL("id"), s.Sesion, nil)
+	c.Reclamos = s.Sesion.Reclamos // quién edita: sus rangos editables de una hoja protegida
 	// «Rellenar con IA» va en directo al servicio de IA, por el ingress que el chart abre
 	// a las apps nativas; la web pasa por su BFF, que solo reenvía.
 	ia := api.NewIA(s.URL("ai"), s.Sesion, nil)

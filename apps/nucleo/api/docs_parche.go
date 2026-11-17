@@ -218,9 +218,11 @@ func mandarParche(ctx context.Context, c *Client, id, clave, base, valor, opID s
 	var cuerpo bytes.Buffer
 	enc := json.NewEncoder(&cuerpo)
 	enc.SetEscapeHTML(false) // cada «<» del texto de una caja serían seis bytes contra el tope del cuerpo
-	if err := enc.Encode(map[string]any{"ops": []any{map[string]any{
+	sobre := map[string]any{"ops": []any{map[string]any{
 		"kind": "patch", "key": clave, "op_id": opID, "base": baseSeq, "cambios": cambios,
-	}}}); err != nil {
+	}}}
+	ponerProteccion(ctx, sobre)
+	if err := enc.Encode(sobre); err != nil {
 		return parcheGuardado{}, err
 	}
 	r, err := JSON[struct {

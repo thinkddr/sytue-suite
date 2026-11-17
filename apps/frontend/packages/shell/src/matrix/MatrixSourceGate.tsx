@@ -5,7 +5,12 @@ import type { MatrixStorageProduct } from '@sytue/config/matrix';
 import { prefijoDeApp } from '@sytue/config/tokens';
 import type { Locale } from '@sytue/i18n';
 import { MatrixBrowserAuth } from '@sytue/offline/matrix/auth';
-import { MatrixSecurityError, SuiteMatrix, type MatrixBootstrap } from '@sytue/offline/matrix';
+import {
+  CifradoDesactivado,
+  MatrixSecurityError,
+  SuiteMatrix,
+  type MatrixBootstrap,
+} from '@sytue/offline/matrix';
 import { MatrixDeviceGate, type MatrixGateHost } from './MatrixDeviceGate.js';
 import { MatrixStorageFixtureContext } from './storage-fixture-context.js';
 
@@ -316,6 +321,29 @@ export function MatrixStorageGate({
     };
     return { kind: 'source' as const, host, legacyHost };
   }, [actor, tenant, product, basePath, deviceName, fixture]);
+  // ¿Despliegue sin el complemento de cifrado E2E? Se pregunta una vez al BFF de la
+  // app: si responde «desactivado», la app se muestra tal cual y trabaja con sus
+  // rutas en el servidor; si no, sigue el flujo cifrado de siempre (y sus errores).
+  const [cifrado, setCifrado] = useState<'comprobando' | 'activado' | 'desactivado'>(
+    fixture ? 'activado' : 'comprobando',
+  );
+  useEffect(() => {
+    if (fixture) return;
+    let vigente = true;
+    const bootstrap = gate.kind === 'device' ? gate.deviceHost.bootstrap : gate.host.bootstrap;
+    bootstrap().then(
+      () => vigente && setCifrado('activado'),
+      (error: unknown) =>
+        vigente && setCifrado(error instanceof CifradoDesactivado ? 'desactivado' : 'activado'),
+    );
+    return () => {
+      vigente = false;
+    };
+  }, [gate, fixture]);
+  if (cifrado === 'comprobando') return <></>;
+  // Una pantalla que necesita el cliente Matrix para pintarse (children como
+  // función) no tiene modo en claro: sigue por la puerta cifrada, que explica el fallo.
+  if (cifrado === 'desactivado' && typeof children !== 'function') return <>{children}</>;
   if (gate.kind === 'device') {
     return (
       <MatrixDeviceGate actor={actor} tenant={tenant} locale={locale} host={gate.deviceHost}>

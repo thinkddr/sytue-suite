@@ -3,20 +3,67 @@
  * SPDX-FileCopyrightText: (c) 2026 Daniel Delgado Ramos
  */
 
+import { parseFragment, type DefaultTreeAdapterMap } from 'parse5';
+
+type NodoHtml = DefaultTreeAdapterMap['childNode'];
+
+const NO_TEXTO = new Set(['head', 'title', 'style', 'script', 'template', 'noscript']);
+const FIN_DE_BLOQUE = new Set([
+  'p',
+  'div',
+  'li',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'blockquote',
+  'pre',
+  'tr',
+]);
+
+function quitarEspacioFinalDeLinea(linea: string): string {
+  let fin = linea.length;
+  while (fin > 0 && (linea[fin - 1] === ' ' || linea[fin - 1] === '\t')) fin--;
+  return fin === linea.length ? linea : linea.slice(0, fin);
+}
+
 /**
  * HTML → texto plano: `<br>` y los cierres de bloque pasan a saltos de línea y el
  * marcado se descarta. Lo que no es texto que se lee (`<style>`, `<script>`, la
- * cabecera) no entra. `DOMParser` da un documento inerte: no ejecuta ni carga nada.
+ * cabecera) no entra. Se parsea con `parse5` sin tocar el DOM ni usar regex de
+ * saneado.
  */
 export function htmlATexto(html: string): string {
-  const conSaltos = html
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(p|div|li|h[1-6]|blockquote|pre|tr)>/gi, '\n');
-  const doc = new DOMParser().parseFromString(conSaltos, 'text/html');
-  for (const n of doc.querySelectorAll('head, style, script, template, noscript')) n.remove();
-  return (doc.body?.textContent ?? '')
-    .replace(/ /g, ' ')
-    .replace(/[ \t]+\n/g, '\n')
+  const pendientes: (NodoHtml | string)[] = [...parseFragment(html).childNodes].reverse();
+  const partes: string[] = [];
+  while (pendientes.length) {
+    const nodo = pendientes.pop()!;
+    if (typeof nodo === 'string') {
+      partes.push(nodo);
+      continue;
+    }
+    if ('value' in nodo) {
+      partes.push(nodo.value);
+      continue;
+    }
+    if (!('tagName' in nodo)) continue;
+    const etiqueta = nodo.tagName.toLowerCase();
+    if (NO_TEXTO.has(etiqueta)) continue;
+    if (etiqueta === 'br') {
+      partes.push('\n');
+      continue;
+    }
+    if (FIN_DE_BLOQUE.has(etiqueta)) pendientes.push('\n');
+    for (let i = nodo.childNodes.length - 1; i >= 0; i--) pendientes.push(nodo.childNodes[i]!);
+  }
+  return partes
+    .join('')
+    .replaceAll('\u00a0', ' ')
+    .split('\n')
+    .map(quitarEspacioFinalDeLinea)
+    .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
@@ -112,6 +159,18 @@ function enlaceSeguro(href: string | null): string | null {
   }
 }
 
+function atributo(nodo: DefaultTreeAdapterMap['element'], nombre: string): string | null {
+  return nodo.attrs.find((a) => a.name === nombre)?.value ?? null;
+}
+
+function clases(nodo: DefaultTreeAdapterMap['element']): string[] {
+  return (atributo(nodo, 'class') ?? '').split(/\s+/).filter(Boolean);
+}
+
+function esElemento(nodo: NodoHtml): nodo is DefaultTreeAdapterMap['element'] {
+  return 'tagName' in nodo;
+}
+
 /** Lo que quien pega admite además de la lista blanca común. */
 export interface OpcionesDePegado {
   /**
@@ -121,33 +180,56 @@ export interface OpcionesDePegado {
   tareas?: boolean;
 }
 
+/** La primera casilla (`<input type="checkbox">`) dentro de la fila, a cualquier profundidad. */
+function buscarCasilla(nodos: readonly NodoHtml[]): DefaultTreeAdapterMap['element'] | null {
+  for (const nodo of nodos) {
+    if (!esElemento(nodo)) continue;
+    if (
+      nodo.tagName.toLowerCase() === 'input' &&
+      (atributo(nodo, 'type') ?? '').toLowerCase() === 'checkbox'
+    )
+      return nodo;
+    const dentro = buscarCasilla(nodo.childNodes);
+    if (dentro) return dentro;
+  }
+  return null;
+}
+
 /** La casilla de una tarea, rehecha: tipo y marcada, ningún otro atributo. */
-function casilla(el: Element, doc: Document): Element {
+function casilla(el: DefaultTreeAdapterMap['element'], doc: Document): Element {
   const nueva = doc.createElement('input');
   nueva.setAttribute('type', 'checkbox');
-  if (el.hasAttribute('checked')) nueva.setAttribute('checked', '');
+  if (el.attrs.some((a) => a.name === 'checked')) nueva.setAttribute('checked', '');
   return nueva;
 }
 
-function copiar(origen: Node, destino: Node, doc: Document, opciones: OpcionesDePegado): void {
-  for (const nodo of Array.from(origen.childNodes)) {
-    if (nodo.nodeType === 3) {
-      destino.appendChild(doc.createTextNode(nodo.textContent ?? ''));
+function copiar(
+  nodos: readonly NodoHtml[],
+  destino: Node,
+  doc: Document,
+  opciones: OpcionesDePegado,
+): void {
+  for (const nodo of nodos) {
+    if ('value' in nodo) {
+      destino.appendChild(doc.createTextNode(nodo.value));
       continue;
     }
-    if (nodo.nodeType !== 1) continue;
-    const el = nodo as Element;
-    const etiqueta = el.tagName.toLowerCase();
-    if (opciones.tareas && etiqueta === 'div' && el.classList.contains('task-row')) {
+    if (!esElemento(nodo)) continue;
+    const etiqueta = nodo.tagName.toLowerCase();
+    if (opciones.tareas && etiqueta === 'div' && clases(nodo).includes('task-row')) {
       const fila = doc.createElement('div');
       fila.setAttribute('class', 'task-row');
-      const caja = el.querySelector('input[type="checkbox" i]');
+      const caja = buscarCasilla(nodo.childNodes);
       if (caja) fila.appendChild(casilla(caja, doc));
       // La forma del editor: casilla, espacio y el texto en su `<span>`, que es de donde
       // lo lee al marcarla. Si el origen no lo traía, el texto es el resto de la fila.
       fila.appendChild(doc.createTextNode(' '));
       const texto = doc.createElement('span');
-      copiar(el.querySelector(':scope > span') ?? el, texto, doc, opciones);
+      const span = nodo.childNodes.find(
+        (h): h is DefaultTreeAdapterMap['element'] =>
+          esElemento(h) && h.tagName.toLowerCase() === 'span',
+      );
+      copiar((span ?? nodo).childNodes, texto, doc, opciones);
       if (texto.firstChild?.nodeType === 3)
         texto.firstChild.textContent = (texto.firstChild.textContent ?? '').trimStart();
       fila.appendChild(texto);
@@ -157,11 +239,11 @@ function copiar(origen: Node, destino: Node, doc: Document, opciones: OpcionesDe
     if (FUERA.has(etiqueta)) continue;
     if (VACIAS.has(etiqueta)) {
       // El salto que Safari añade al final de lo copiado no es del texto.
-      if (!el.classList.contains('Apple-interchange-newline'))
+      if (!clases(nodo).includes('Apple-interchange-newline'))
         destino.appendChild(doc.createElement(etiqueta));
       continue;
     }
-    const marcas = marcasDelEstilo(el.getAttribute('style') ?? '');
+    const marcas = marcasDelEstilo(atributo(nodo, 'style') ?? '');
     let base: string | undefined = ESTRUCTURA[etiqueta];
     // Google Docs envuelve TODO en `<b style="font-weight:normal">`.
     if (base === 'b' && marcas.negrita === false) base = undefined;
@@ -172,26 +254,26 @@ function copiar(origen: Node, destino: Node, doc: Document, opciones: OpcionesDe
     for (const capa of capas) {
       const nuevo = doc.createElement(capa);
       if (capa === 'a') {
-        const href = enlaceSeguro(el.getAttribute('href'));
+        const href = enlaceSeguro(atributo(nodo, 'href'));
         if (!href) continue;
         nuevo.setAttribute('href', href);
       }
       dentro.appendChild(nuevo);
       dentro = nuevo;
     }
-    copiar(el, dentro, doc, opciones);
+    copiar(nodo.childNodes, dentro, doc, opciones);
   }
 }
 
 /**
  * El HTML de un pegado, listo para `insertHTML` en un editor: la estructura del
- * origen, el estilo del destino. Vacío si no queda texto.
+ * origen, el estilo del destino. Vacío si no queda texto. Se parsea con `parse5`
+ * (sin DOMParser ni regex de saneado) y se reconstruye con la lista blanca.
  */
 export function pegadoConFormato(html: string, opciones: OpcionesDePegado = {}): string {
-  if (!html || typeof DOMParser === 'undefined') return '';
-  const origen = new DOMParser().parseFromString(html, 'text/html');
+  if (!html || typeof document === 'undefined') return '';
   const doc = document.implementation.createHTMLDocument('');
   const caja = doc.createElement('div');
-  copiar(origen.body, caja, doc, opciones);
+  copiar(parseFragment(html).childNodes, caja, doc, opciones);
   return caja.textContent?.trim() ? caja.innerHTML.trim() : '';
 }

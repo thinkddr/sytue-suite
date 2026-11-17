@@ -1,10 +1,11 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /**
- * Wrapping of a Matrix recovery key in the browser (ADR 0081, format v1). The service
+ * Wrapping of a Matrix recovery key in the browser (ADR 0082, format v1). The service
  * only ever stores the output; the wrap key never leaves this module.
  *
- *   password: ikm = Argon2id(password UTF-8, salt, t, m, p, 32 bytes, v0x13)
- *   passkey:  ikm = WebAuthn PRF `first` output (32 bytes)
+ *   sytue-id: ikm = the person's unlock key from their Sytue ID sign-in (ADR 0084)
+ *   password: ikm = Argon2id(password UTF-8, salt, t, m, p, 32 bytes, v0x13)  (ADR 0082)
+ *   passkey:  ikm = WebAuthn PRF `first` output (32 bytes)                       (ADR 0082)
  *   wrapKey  = HKDF-SHA256(ikm, salt = empty, info = "sytue-matrix-recovery-wrap-v1/<kind>", 32)
  *   AEAD     = AES-256-GCM, random 12-byte nonce, AAD =
  *              "sytue-matrix-recovery-wrap-v1" 0 kind 0 account 0 key_id 0 credential_id
@@ -18,12 +19,14 @@ export const recoveryWrapLabel = 'sytue-matrix-recovery-wrap-v1';
 
 export type RecoveryWrapperKDF =
   | { alg: 'argon2id'; m: number; t: number; p: number; salt: string }
-  | { alg: 'webauthn-prf-hkdf-sha256'; prf_salt: string };
+  | { alg: 'webauthn-prf-hkdf-sha256'; prf_salt: string }
+  /** `hint` is the public fingerprint of the unlock key it was sealed with. */
+  | { alg: 'sytue-id-unlock-hkdf-sha256'; hint: string };
 
 export interface RecoveryWrapper {
   id?: string;
   v: 1;
-  kind: 'password' | 'passkey';
+  kind: 'sytue-id' | 'password' | 'passkey';
   key_id: string;
   credential_id: string;
   kdf: RecoveryWrapperKDF;
@@ -32,8 +35,11 @@ export interface RecoveryWrapper {
   created_at?: string;
 }
 
-/** Password parameters for new wrappers: the service's floor. */
+/** Password parameters of the ADR 0082 wrappers: the service's floor. */
 export const passwordKDF = { m: 65536, t: 3, p: 1 } as const;
+
+/** Label of the unlock key derivations (ADR 0084, apps/nucleo/recoverywrap/desbloqueo.go). */
+export const unlockLabel = 'sytue-e2e-unlock-v1';
 
 const encoder = new TextEncoder();
 
@@ -171,4 +177,41 @@ export async function openRecoveryWrapper(
     throw new MatrixCustodyError('wrong');
   }
   return new TextDecoder('utf-8', { fatal: true }).decode(plain);
+}
+
+/** The public fingerprint of an unlock key (recoverywrap.Hint): which key sealed a wrapper. */
+export async function unlockHint(unlockKey: Uint8Array<ArrayBuffer>): Promise<string> {
+  const base = await crypto.subtle.importKey('raw', unlockKey, 'HKDF', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits(
+    {
+      name: 'HKDF',
+      hash: 'SHA-256',
+      salt: new Uint8Array(0),
+      info: encoder.encode(`${unlockLabel}/hint`),
+    },
+    base,
+    128,
+  );
+  return toBase64(new Uint8Array(bits));
+}
+
+/** Wraps a recovery key with the unlock key of the person's Sytue ID sign-in (ADR 0084). */
+export async function sealWithUnlockKey(input: {
+  unlockKey: Uint8Array<ArrayBuffer>;
+  account: string;
+  keyID: string;
+  recoveryKey: string;
+  /** Tests and vectors only. */
+  nonce?: Uint8Array<ArrayBuffer>;
+}): Promise<RecoveryWrapper> {
+  return sealRecoveryKey({
+    kind: 'sytue-id',
+    account: input.account,
+    keyID: input.keyID,
+    credentialID: '',
+    kdf: { alg: 'sytue-id-unlock-hkdf-sha256', hint: await unlockHint(input.unlockKey) },
+    ikm: input.unlockKey,
+    recoveryKey: input.recoveryKey,
+    ...(input.nonce ? { nonce: input.nonce } : {}),
+  });
 }

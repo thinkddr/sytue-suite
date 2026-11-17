@@ -143,7 +143,17 @@ func (h *Handlers) PutMatrixRecoveryWrapper(w http.ResponseWriter, r *http.Reque
 		httpx.Fail(w, r, err)
 		return
 	}
-	id, err := h.svc.PutMatrixRecoveryWrapper(r.Context(), actor, account, req)
+	put := h.svc.PutMatrixRecoveryWrapper
+	// `retire_older=1`: un envoltorio `sytue-id` que el dispositivo acaba de comprobar
+	// que abre, y en la misma transacción se retiran los de la ADR 0082 (ADR 0085).
+	if retiro := r.URL.Query()["retire_older"]; len(retiro) > 0 {
+		if len(retiro) != 1 || retiro[0] != "1" {
+			httpx.Fail(w, r, toAPIError(domain.ErrInvalidInput))
+			return
+		}
+		put = h.svc.PutMatrixRecoveryWrapperRetiringOlder
+	}
+	id, err := put(r.Context(), actor, account, req)
 	if err != nil {
 		httpx.Fail(w, r, toAPIError(err))
 		return

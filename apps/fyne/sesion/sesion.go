@@ -691,7 +691,20 @@ var ErrYaEntrando = errors.New("sesion: ya hay un inicio de sesión abierto en e
 // pedirla.
 func (s *Suite) Entrar(ctx context.Context) error { return s.entrar(ctx, nil) }
 
+// EntrarParaDesbloquear vuelve a entrar en Sytue ID pidiendo que la persona meta su
+// clave aunque la sesión del navegador siga viva (`prompt=login`): es como este
+// dispositivo consigue la clave de desbloqueo del cifrado que le falta (ADR 0084).
+// `legado` son los parámetros públicos de los envoltorios de la ADR 0082 que la página
+// de inicio de sesión debe abrir también. Nunca se pide nada dentro de la app.
+func (s *Suite) EntrarParaDesbloquear(ctx context.Context, legado string) error {
+	return s.entrarCon(ctx, nil, auth.PeticionLogin{Prompt: "login", Legado: legado})
+}
+
 func (s *Suite) entrar(ctx context.Context, transition *privateTransition) error {
+	return s.entrarCon(ctx, transition, auth.PeticionLogin{})
+}
+
+func (s *Suite) entrarCon(ctx context.Context, transition *privateTransition, peticion auth.PeticionLogin) error {
 	var (
 		nuevos auth.Tokens
 		err    error
@@ -740,9 +753,9 @@ func (s *Suite) entrar(ctx context.Context, transition *privateTransition) error
 		if esquema == "" {
 			return errors.New("sesion: FyneApp.toml no declara Development.esquema")
 		}
-		nuevos, err = s.oidc.LoginEsquema(ctx, esquema+"://auth/callback")
+		nuevos, err = s.oidc.LoginEsquemaCon(ctx, esquema+"://auth/callback", peticion)
 	} else {
-		nuevos, err = s.oidc.Login(ctx)
+		nuevos, err = s.oidc.LoginCon(ctx, peticion)
 		if err == nil {
 			aparecer(s.app)
 		}
@@ -893,6 +906,9 @@ func (s *Suite) salirClasicoConGuardia(ctx context.Context, guard func() error) 
 		s.privateTransitionActive = false
 		s.privateWorkMu.Unlock()
 	}()
+	// De quién son los dispositivos de Matrix que se cierran abajo: se lee antes de que
+	// el logout vacíe la sesión en memoria.
+	sujeto := s.Sesion.SnapshotIdentity().Subject
 	if guard != nil {
 		if err := guard(); err != nil {
 			return err
@@ -942,6 +958,10 @@ func (s *Suite) salirClasicoConGuardia(ctx context.Context, guard func() error) 
 		if err := s.vaciarAlmacenCon(ctx); err != nil {
 			return err
 		}
+		// Olvidar del llavero la sesión de un dispositivo de Matrix sin cerrarlo dejaba
+		// uno vivo en el homeserver por cada entrada (Mail, Hub, ERP…; solo Rooms lo
+		// cerraba): con su token, antes de olvidarlo, y sin esperar a un homeserver caído.
+		cerrarDispositivosMatrix(ctx, sujeto)
 		return errors.Join(auth.OlvidarSecretos("notes-"), auth.OlvidarSecretos("rooms-matrix-"))
 	})
 	if errCierre != nil {

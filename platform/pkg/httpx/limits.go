@@ -133,6 +133,11 @@ func CORS(cfg CORSConfig) func(http.Handler) http.Handler {
 	}
 }
 
+// OrigenPermitido es la MISMA regla de CORS para quien decide fuera del
+// middleware: el puente del desbloqueo de Sytue ID (ADR 0084) solo se deja
+// incrustar por un origen que pase aquí. Una regla, no dos copias que diverjan.
+func OrigenPermitido(origin string, allowed []string) bool { return originAllowed(origin, allowed) }
+
 func originAllowed(origin string, allowed []string) bool {
 	for _, a := range allowed {
 		if strings.EqualFold(a, origin) {

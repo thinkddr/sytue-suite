@@ -48,13 +48,14 @@ import type {
 import { startCollab, type CollabHandle } from './collab';
 import { fijarPropietario, fijarYo, olvidarProteccion, sobreProteccion } from './proteccion';
 import { cabeEnUnLote, claveLww, CoEdicion } from './coedicion';
-import { CoedicionModelo, type Registro } from './fusion';
+import { CoedicionModelo, mismoContenido, type Registro } from './fusion';
 import type { OpRGA } from './rga';
 import { hacerCopia } from '../../lib/copia';
 import {
   cacheLocalContent,
   cacheLocalTitle,
   cacheServerDocument,
+  confirmarEnCola,
   markContentSynced,
   markTitleSynced,
   readOfflineDocument,
@@ -235,6 +236,12 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
   const modeloRef = useRef<CoedicionModelo | null>(null);
   /** El parche en vuelo (hojas y presentaciones): su diff y su op_id, para reenviarlo igual. */
   const parcheRef = useRef<{ huella: string; opId: string } | null>(null);
+  /**
+   * Los op_id de los parches que ya salieron al salir de la página (`flush`), por su diff:
+   * si la página vuelve (la caché de atrás/adelante) y los manda por el camino normal, son
+   * los mismos parches y el servidor no los aplica dos veces.
+   */
+  const opIdsRef = useRef(new Map<string, string>());
   /** El servidor rechazó un parche (400): el resto de la sesión guarda el registro entero. */
   const sinParchesRef = useRef(false);
 
@@ -313,7 +320,10 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
         // lo repite); un diff distinto es otro parche, aunque la base sea la misma.
         const huella = JSON.stringify(cambios);
         const previo = parcheRef.current;
-        const opId = previo?.huella === huella ? previo.opId : crypto.randomUUID();
+        const opId =
+          previo?.huella === huella
+            ? previo.opId
+            : (opIdsRef.current.get(huella) ?? crypto.randomUUID());
         parcheRef.current = { huella, opId };
         const op = {
           kind: 'patch',
@@ -325,6 +335,7 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
         const proteccion = sobreProteccion();
         const confirmar = (seq: number, ops?: unknown[] | null): void => {
           parcheRef.current = null;
+          opIdsRef.current.delete(huella);
           const mio = ops
             ?.map((o) => (o as { op?: Record<string, unknown> }).op)
             .find((o) => o?.op_id === opId);
@@ -493,7 +504,8 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
             collabRef.current?.advance(data.seq, data.ops?.length ?? 0);
             lote.confirmar(data.seq, data.ops);
           }
-          if (colaRef.current[0] === value) colaRef.current.shift();
+          const deCola = colaRef.current[0] === value;
+          if (deCola) colaRef.current.shift();
           if (pendingRef.current === value && colaRef.current.length === 0) {
             pendingRef.current = null;
             setSave(pendingTitleRef.current === null ? 'saved' : 'dirty');
@@ -511,6 +523,17 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
             // Lo ajeno que entró en la fusión pasa al editor (y a la copia offline,
             // después de marcarla limpia: el servidor tiene la fusión, no `value`).
             adoptarModelo();
+          } else if (deCola && metaRef.current !== null) {
+            // El borrador local sigue sin guardar, pero ya parte de lo confirmado: al
+            // volver no se repite lo que el servidor tiene.
+            void confirmarEnCola(
+              userId,
+              metaRef.current.id,
+              value,
+              colaRef.current,
+              lamportRef.current,
+              lastSeqRef.current,
+            ).catch(() => undefined);
           }
           // Si se tecleó durante el vuelo, sigue 'dirty' y el debounce ya está rearmado.
           return true;
@@ -623,9 +646,14 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
       setSave('dirty');
       const meta = metaRef.current;
       if (meta !== null) {
-        void cacheLocalContent(userId, meta, next, lamportRef.current, lastSeqRef.current).catch(
-          () => undefined,
-        );
+        void cacheLocalContent(
+          userId,
+          meta,
+          next,
+          lamportRef.current,
+          lastSeqRef.current,
+          colaRef.current,
+        ).catch(() => undefined);
       }
       // Contador en vivo al teclear (no esperar al autosave debounced de 1,5s).
       setWords(countWords(next, kindRef.current));
@@ -710,29 +738,92 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
     [doSave, documentId, title],
   );
 
+  /**
+   * El cuerpo de POST /api/ops con varios guardados de una hoja o presentación que salen
+   * JUNTOS y en orden, al salir de la página, donde no hay a quién esperar para mandarlos
+   * de uno en uno: una operación por guardado, cada una sobre la anterior. El servicio
+   * las aplica en orden en la misma transacción y la protección de hojas valida cada una
+   * por separado (apps/nucleo/office/model/proteccion.go), así que cada cambio de
+   * estructura llega con su único desplazamiento. No toca el estado de la fusión: nada
+   * de esto está confirmado hasta un 2xx. null en documentos de texto o sin nada que
+   * mandar.
+   */
+  const cuerpoEnCadena = useCallback((valores: readonly string[]): string | null => {
+    const modelo = modeloRef.current;
+    if (modelo === null) return null;
+    const proteccion = sobreProteccion();
+    const extra = proteccion ? { proteccion } : {};
+    const cadena = sinParchesRef.current ? null : modelo.cadena(valores);
+    if (cadena !== null) {
+      const ops = cadena
+        .filter((cambios) => cambios.length > 0)
+        .map((cambios) => {
+          const huella = JSON.stringify(cambios);
+          // El parche que ya vuela, o que salió en otra salida, con su op_id: el servidor
+          // no aplica dos veces el mismo.
+          const previo = parcheRef.current;
+          const opId =
+            opIdsRef.current.get(huella) ??
+            (previo?.huella === huella ? previo.opId : crypto.randomUUID());
+          opIdsRef.current.set(huella, opId);
+          return { kind: 'patch', key: keyRef.current, op_id: opId, base: modelo.baseSeq, cambios };
+        });
+      return ops.length > 0 ? JSON.stringify({ ops, ...extra }) : null;
+    }
+    const ops = valores.map((v) => {
+      counterRef.current += 1;
+      lamportRef.current += 1;
+      const dot = { a: actorRef.current, c: counterRef.current };
+      return {
+        kind: 'set',
+        dot,
+        key: keyRef.current,
+        value: modelo.aEnviar(v),
+        lamport: lamportRef.current,
+      };
+    });
+    return JSON.stringify({ ops, base_seq: modelo.baseSeq, ...extra });
+  }, []);
+
   const flush = useCallback((): void => {
     const value = pendingRef.current;
     if (value === null || keyRef.current === '') return;
     clearTimeout(saveTimerRef.current);
+    const cola = colaRef.current;
     // sendBeacon sobrevive al pagehide y viaja con la cookie same-origin (§4.4).
     const meta = metaRef.current;
     if (meta !== null) {
-      void cacheLocalContent(userId, meta, value, lamportRef.current, lastSeqRef.current).catch(
-        () => undefined,
-      );
+      // Con la cola de cambios de estructura: lo que no llegue de abajo se repite al
+      // volver, de uno en uno (la carga la recupera).
+      void cacheLocalContent(
+        userId,
+        meta,
+        value,
+        lamportRef.current,
+        lastSeqRef.current,
+        cola,
+      ).catch(() => undefined);
     }
     // Offline: no fingir que sendBeacon guardó nada. Online se envía como
     // best-effort, pero el borrador permanece en IndexedDB hasta recibir un 2xx.
-    // ponytail: con cambios de estructura en cola, el beacon lleva lo último de una vez
-    // (no hay a quién esperar para mandarlos de uno en uno); en una hoja protegida con
-    // dos desplazamientos sin guardar el servidor lo rechaza, como antes de la cola.
-    if (navigator.onLine) {
-      navigator.sendBeacon(
-        `/api/ops?id=${eid}`,
-        new Blob([buildOpsBody(value).cuerpo], { type: 'application/json' }),
-      );
+    if (!navigator.onLine) return;
+    const beacon = (cuerpo: string): boolean =>
+      navigator.sendBeacon(`/api/ops?id=${eid}`, new Blob([cuerpo], { type: 'application/json' }));
+    // Con cambios de estructura sin confirmar —también el que vuela, que la salida puede
+    // cortar— cada uno va en su guardado, en orden, y lo pendiente detrás: en una hoja
+    // protegida el servidor solo reconoce un desplazamiento por guardado. Si no cabe todo
+    // (el navegador limita lo que sale al cerrar), lo que quepa desde el principio.
+    // ponytail: si el que vuela llega antes, el beacon con el registro entero choca con su
+    // base_seq (409) y no se aplica; no se pierde: la carga repite lo que falte.
+    const guardados =
+      cola.length === 0 || cola[cola.length - 1] === value ? [...cola] : [...cola, value];
+    for (let n = guardados.length; n > 1; n--) {
+      const cuerpo = cuerpoEnCadena(guardados.slice(0, n));
+      if (cuerpo === null) break;
+      if (beacon(cuerpo)) return;
     }
-  }, [eid, userId, buildOpsBody]);
+    beacon(buildOpsBody(guardados[0] ?? value).cuerpo);
+  }, [eid, userId, buildOpsBody, cuerpoEnCadena]);
 
   useEffect(() => {
     const onPageHide = (): void => flush();
@@ -1077,6 +1168,8 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
       let initialSeq: number;
       let contentDirty = false;
       let titleDirty = false;
+      /** Los cambios de estructura del borrador, cada uno en su guardado (offline.ts). */
+      let cola: string[] = [];
       /** Secuencia RGA materializada del servidor; sin ella se arranca en LWW. */
       let elementos: unknown = null;
       /** Hojas y presentaciones: el registro del servidor y el ancestro del editor. */
@@ -1119,9 +1212,25 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
         ancestro = contentDirty ? (cached?.base ?? null) : serverContent;
         initialLamport = Math.max(st.state.lamport, cached?.lamport ?? 0);
         initialSeq = Math.max(st.seq, cached?.seq ?? 0);
-        void cacheServerDocument(userId, serverMeta, serverContent, st.state.lamport, st.seq).catch(
-          () => undefined,
-        );
+        cola = contentDirty ? [...(cached?.cola ?? [])] : [];
+        // Lo que el servidor ya tenga de la cola —la salida de la página la mandó y llegó,
+        // entera o su principio— no se repite: el borrador sigue desde ahí.
+        let hecho = cola.length - 1;
+        while (hecho >= 0 && !mismoContenido(cola[hecho]!, serverContent)) hecho--;
+        if (hecho >= 0) {
+          ancestro = cola[hecho]!;
+          cola = cola.slice(hecho + 1);
+          if (cola.length === 0 && mismoContenido(initial, serverContent)) {
+            contentDirty = false;
+            initial = serverContent;
+            ancestro = serverContent;
+          }
+        }
+        void (
+          cached?.contentDirty === true && !contentDirty
+            ? markContentSynced(userId, serverMeta, serverContent, st.state.lamport, st.seq)
+            : cacheServerDocument(userId, serverMeta, serverContent, st.state.lamport, st.seq)
+        ).catch(() => undefined);
         const fromOfflineCache =
           metaRes.headers.get('x-sytue-offline') === 'cache' ||
           stateRes.headers.get('x-sytue-offline') === 'cache';
@@ -1134,6 +1243,7 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
         initialSeq = cached.seq;
         contentDirty = cached.contentDirty;
         titleDirty = cached.titleDirty;
+        cola = contentDirty ? [...(cached.cola ?? [])] : [];
         // Sin red: lo último que se supo del servidor es la copia limpia (o la base
         // del borrador); si ha cambiado, el primer guardado dará 409 y se relee.
         ancestro = contentDirty ? (cached.base ?? null) : cached.content;
@@ -1160,6 +1270,8 @@ export function useDocument(documentId: string, userId: string): UseDocumentResu
         meta.kind === 'document' ? null : new CoedicionModelo(servidor, initialSeq, ancestro);
       confirmedTitleRef.current = meta.title;
       pendingRef.current = contentDirty ? initial : null;
+      // Lo que va aparte, de uno en uno y delante de lo pendiente (doSave).
+      colaRef.current = contentDirty ? cola : [];
       pendingTitleRef.current = titleDirty ? meta.title : null;
 
       setDoc(meta);

@@ -1,18 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 import type { ComponentChildren, JSX } from 'preact';
 import type { StorageRootEnrollment, StorageRootService } from '@sytue/config/matrix';
-import { useCallback, useEffect, useId, useRef, useState } from 'preact/hooks';
-import {
-  Button,
-  Checkbox,
-  FieldGroup,
-  Icon,
-  IconButton,
-  Input,
-  Modal,
-  Spinner,
-  ToastProvider,
-} from '@sytue/ui';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { Button, Checkbox, Icon, IconButton, Modal, Spinner, ToastProvider } from '@sytue/ui';
 import { registerLogoutCleanup } from '@sytue/auth/client';
 import { I18nProvider } from '@sytue/i18n/preact';
 import { createTranslate, type Locale } from '@sytue/i18n';
@@ -29,8 +19,6 @@ import {
   MatrixCustodyError,
   MatrixSecurityError,
   type MatrixKeyCustody,
-  type MatrixUnlockFactor,
-  type MatrixUnlockMethod,
   type MatrixBootstrap,
   type MatrixDevice,
   type MatrixRecoveryUI,
@@ -65,27 +53,19 @@ export type MatrixGateMessage =
   | 'matrix.incoming'
   | 'matrix.match'
   | 'matrix.mismatch'
-  | 'matrix.passkeyUnsupported'
-  | 'matrix.password'
-  | 'matrix.passwordConfirm'
-  | 'matrix.passwordMismatch'
-  | 'matrix.protectBody'
-  | 'matrix.protectTitle'
   | 'matrix.reset'
   | 'matrix.resetAction'
   | 'matrix.resetBody'
   | 'matrix.resetUnderstood'
   | 'matrix.revoke'
+  | 'matrix.signIn'
+  | 'matrix.signInBody'
   | 'matrix.subtitle'
   | 'matrix.tab'
   | 'matrix.title'
   | 'matrix.trusted'
   | 'matrix.unknownKey'
-  | 'matrix.unlockBody'
-  | 'matrix.unlockTitle'
-  | 'matrix.unlockWrong'
-  | 'matrix.usePasskey'
-  | 'matrix.usePassword'
+  | 'matrix.unlocking'
   | 'matrix.verify'
   | 'matrix.verifyPeopleFirst'
   | 'matrix.verifyPerson'
@@ -98,9 +78,9 @@ export interface MatrixGateHost {
   begin: (bootstrap: MatrixBootstrap) => Promise<void>;
   session: MatrixSessionAdapter;
   /**
-   * Where the account's recovery key is kept, wrapped with the person's passkey or
-   * password (ADR 0081). Defaults to `session.custody`. Without one the gate creates
-   * nothing and offers only verification from another device.
+   * Where the account's recovery key is kept, wrapped with the unlock key of the
+   * person's Sytue ID sign-in (ADR 0084). Defaults to `session.custody`. Without one
+   * the gate creates nothing and offers only verification from another device.
    */
   custody?: MatrixKeyCustody;
   allowPeers?: boolean;
@@ -122,25 +102,66 @@ export interface MatrixGateHost {
 const openMatrix: NonNullable<MatrixGateHost['open']> = (bootstrap, ui, session) =>
   SuiteMatrix.open(bootstrap, ui, session);
 
-type PromptError =
-  'matrix.failed' | 'matrix.passkeyUnsupported' | 'matrix.passwordMismatch' | 'matrix.unlockWrong';
+const isRecovery = (failure: unknown): boolean =>
+  (failure instanceof MatrixSecurityError && failure.reason === 'recovery') ||
+  (failure instanceof MatrixCustodyError && failure.reason === 'wrong');
+const isSignIn = (failure: unknown): boolean =>
+  failure instanceof MatrixCustodyError && failure.reason === 'signin';
 
-function promptError(failure: unknown): PromptError | null {
-  if (!(failure instanceof MatrixCustodyError)) return 'matrix.failed';
-  switch (failure.reason) {
-    case 'wrong':
-      return 'matrix.unlockWrong';
-    case 'unsupported':
-      return 'matrix.passkeyUnsupported';
-    case 'cancelled':
-      return null;
-    default:
-      return 'matrix.failed';
+/**
+ * ADR 0085: a device verified before ADR 0084 (or one that opened an ADR 0082 wrapper
+ * from its own owner-key cache) already holds the account's recovery key. It wraps it
+ * for the Sytue ID sign-in itself, without asking anything; if this browser has no unlock
+ * key yet, it simply tries again the next time. The device already works either way.
+ */
+async function upgradeQuietly(
+  instance: SuiteMatrix,
+  custody: MatrixKeyCustody,
+  data: MatrixBootstrap,
+  signal: AbortSignal,
+): Promise<void> {
+  try {
+    const current = await instance.client.secretStorage.getDefaultKeyId();
+    if (!current || signal.aborted) return;
+    const state = await custody.state([current], signal);
+    if (state.methods.includes('sytue-id') || signal.aborted) return;
+    const held = await instance.heldRecoveryKey(current);
+    if (!held || signal.aborted) return;
+    await custody.wrap(
+      held,
+      { account: data.matrix_user_id, subject: data.actor, keyID: current },
+      signal,
+    );
+  } catch {
+    // Quietly: nothing here is needed for the device to work now.
   }
 }
 
-const isRecovery = (failure: unknown): boolean =>
-  failure instanceof MatrixSecurityError && failure.reason === 'recovery';
+/**
+ * ADR 0085: once the account's `sytue-id` wrapper is checked to open here, its ADR 0082
+ * wrappers (password, passkey) are retired, in the same transaction that stores it again.
+ * Quietly, like the upgrade above: nothing here is needed for the device to work.
+ */
+async function retireQuietly(
+  instance: SuiteMatrix,
+  custody: MatrixKeyCustody,
+  data: MatrixBootstrap,
+  signal: AbortSignal,
+): Promise<void> {
+  if (!custody.retireOlder) return;
+  try {
+    const current = await instance.client.secretStorage.getDefaultKeyId();
+    if (!current || signal.aborted) return;
+    const state = await custody.state([current], signal);
+    if (!state.methods.includes('sytue-id') || state.methods.length < 2 || signal.aborted) return;
+    await custody.retireOlder(
+      { account: data.matrix_user_id, subject: data.actor, keyID: current },
+      signal,
+    );
+  } catch {
+    // Quietly: the old wrappers stay until the next time.
+  }
+}
 
 export function MatrixDeviceGate({
   actor,
@@ -168,16 +189,10 @@ export function MatrixDeviceGate({
     [],
   );
   const [devices, setDevices] = useState<MatrixDevice[]>([]);
-  // ADR 0081: the recovery key is never shown or typed. The person confirms who they
-  // are with their passkey or password, and the key is wrapped or opened here.
-  const [prompt, setPrompt] = useState<{
-    mode: 'protect' | 'unlock';
-    methods: readonly MatrixUnlockMethod[];
-  } | null>(null);
-  const [promptFailure, setPromptFailure] = useState<PromptError | null>(null);
-  const [promptBusy, setPromptBusy] = useState(false);
-  const [password, setPassword] = useState('');
-  const [confirmation, setConfirmation] = useState('');
+  // ADR 0084: nothing is ever typed here. The unlock key comes from the person's Sytue
+  // ID sign-in in this browser; without it, the only way out is signing in there again
+  // (`older`: the public parameters of the account's ADR 0082 wrappers, if any).
+  const [signIn, setSignIn] = useState<{ older: string } | null>(null);
   // The account already had a key this service does not hold: verification only.
   const [manual, setManual] = useState(false);
   const [storageConsent, setStorageConsent] = useState<StorageRootEnrollment | null>(null);
@@ -195,17 +210,9 @@ export function MatrixDeviceGate({
   const [request, setRequest] = useState<VerificationRequest | null>(null);
   const [sas, setSas] = useState<ShowSasCallbacks | null>(null);
   const [phase, setPhase] = useState<VerificationPhase | null>(null);
-  const pendingPromptRef = useRef<{
-    submit: (factor: MatrixUnlockFactor) => Promise<void>;
-    reject: (error: Error) => void;
-  } | null>(null);
-  // The person closed the dialog: no error, nothing created, a retry is offered.
-  const dismissedRef = useRef(false);
   // The open device's recovery key, kept only while it is open. Never rendered.
   const keyRef = useRef<string | null>(null);
   const uiRef = useRef<MatrixRecoveryUI | null>(null);
-  const passwordID = useId();
-  const confirmationID = useId();
   const pendingAuthRef = useRef<{ resolve: () => void; reject: (error: Error) => void } | null>(
     null,
   );
@@ -215,6 +222,12 @@ export function MatrixDeviceGate({
   const preparedRef = useRef<{ client: SuiteMatrix; job: Promise<void> } | null>(null);
 
   const fail = useCallback((failure: unknown): void => {
+    // A device that needs the key later (an owner key it lost) and has no unlock key
+    // here: the way out is the Sytue ID sign-in, not an error.
+    if (isSignIn(failure)) {
+      setSignIn({ older: '' });
+      return;
+    }
     setError(
       failure instanceof MatrixSecurityError && failure.reason === 'locked'
         ? 'matrix.tab'
@@ -268,17 +281,20 @@ export function MatrixDeviceGate({
     [host],
   );
   /**
-   * No manual step (ADR 0081). An account without encryption gets a new key, wrapped
-   * with the person's passkey or password before it is published. An account whose
-   * key is wrapped opens with it. The Rooms account whose key the service still held
-   * (before wrapping) recovers with it once and wraps it. Any other account already
-   * has a key nobody here holds: only another device can verify this one.
+   * No manual step (ADR 0084). An account without encryption gets a new key, wrapped
+   * with the unlock key of the person's Sytue ID sign-in before it is published. An
+   * account whose key is wrapped opens with it, and the device verifies itself through
+   * cross-signing. A key still wrapped the ADR 0082 way (or held by the service, ADR
+   * 0081) opens once and is wrapped the new way. Without an unlock key in this browser
+   * the person is sent to sign in to Sytue ID; an account whose key nobody here holds
+   * can only be verified from another device.
    */
   const automatic = useCallback(
     async (instance: SuiteMatrix, signal: AbortSignal): Promise<void> => {
       const custody = host.custody ?? host.session.custody;
-      dismissedRef.current = false;
       setManual(false);
+      setSignIn(null);
+      let older = '';
       try {
         if (!custody) throw new MatrixSecurityError('recovery');
         if (!(await instance.client.secretStorage.hasKey())) {
@@ -287,8 +303,17 @@ export function MatrixDeviceGate({
         }
         const current = await instance.client.secretStorage.getDefaultKeyId();
         const state = await custody.state(current ? [current] : undefined, signal);
+        older = state.older;
         if (state.methods.length > 0) {
           await instance.recover();
+          // Opened with what the Sytue ID sign-in page computed for an ADR 0082
+          // wrapper: from now on it opens with the unlock key. Opened from this
+          // device's own cache instead: the same, quietly.
+          if (!state.methods.includes('sytue-id') && current) {
+            if (keyRef.current) await uiRef.current?.saveRecoveryKey(keyRef.current, current);
+            else await upgradeQuietly(instance, custody, instance.bootstrap, signal);
+          }
+          await retireQuietly(instance, custody, instance.bootstrap, signal);
           return;
         }
         const legacy = state.legacy ? await custody.legacyRecoveryKey(signal) : null;
@@ -298,7 +323,10 @@ export function MatrixDeviceGate({
         // Wrapping it also deletes the copy the service held.
         await uiRef.current?.saveRecoveryKey(legacy, current);
       } catch (failure) {
-        if (dismissedRef.current) return;
+        if (isSignIn(failure)) {
+          setSignIn({ older });
+          return;
+        }
         if (isRecovery(failure)) {
           keyRef.current = null;
           setManual(true);
@@ -320,7 +348,7 @@ export function MatrixDeviceGate({
       setReady(false);
       setVerified(false);
       setClient(null);
-      setPrompt(null);
+      setSignIn(null);
       setManual(false);
       keyRef.current = null;
       setAuthentication(null);
@@ -336,44 +364,13 @@ export function MatrixDeviceGate({
         setBootstrap(data);
         const lifecycle: { closed?: () => void } = {};
         const custody = host.custody ?? host.session.custody;
-        /** Opens the dialog; resolves once `run` succeeded with what the person gave. */
-        const ask = (
-          mode: 'protect' | 'unlock',
-          methods: readonly MatrixUnlockMethod[],
-          run: (factor: MatrixUnlockFactor) => Promise<void>,
-        ): Promise<void> =>
-          new Promise<void>((resolve, reject) => {
-            if (disposed || controller.signal.aborted) {
-              reject(new MatrixSecurityError('device'));
-              return;
-            }
-            pendingPromptRef.current?.reject(new MatrixSecurityError('device'));
-            const pending = {
-              submit: async (factor: MatrixUnlockFactor) => {
-                await run(factor);
-                if (pendingPromptRef.current !== pending) throw new MatrixSecurityError('device');
-                pendingPromptRef.current = null;
-                setPrompt(null);
-                resolve();
-              },
-              reject,
-            };
-            pendingPromptRef.current = pending;
-            setPromptFailure(null);
-            setPassword('');
-            setConfirmation('');
-            setPrompt({ mode, methods });
-          });
         const ui: MatrixRecoveryUI = {
           cancelPending: () => {
-            pendingPromptRef.current?.reject(new MatrixSecurityError('device'));
             pendingAuthRef.current?.reject(new MatrixSecurityError('device'));
             pendingRootRef.current?.reject(new MatrixSecurityError('device'));
             pendingRootRef.current = null;
             setStorageConsent(null);
-            pendingPromptRef.current = null;
             pendingAuthRef.current = null;
-            setPrompt(null);
             keyRef.current = null;
             setAuthentication(null);
             lifecycle.closed?.();
@@ -387,39 +384,26 @@ export function MatrixDeviceGate({
               pendingRootRef.current = { resolve, reject, request: value };
               setStorageConsent(value);
             }),
-          // A new key: wrapped and stored BEFORE the SDK publishes it. A failure
-          // stays in the dialog to retry; nothing is published meanwhile.
+          // A new key: wrapped with the unlock key and stored BEFORE the SDK publishes
+          // it. A failure publishes nothing; the retry uses the same flow.
           saveRecoveryKey: async (value, keyID) => {
             if (!custody) throw new MatrixSecurityError('recovery');
-            await ask(
-              'protect',
-              custody.passkeySupported() ? ['passkey', 'password'] : ['password'],
-              async (factor) => {
-                await custody.wrap(
-                  value,
-                  factor,
-                  { account: data.matrix_user_id, keyID },
-                  controller.signal,
-                );
-              },
+            await custody.wrap(
+              value,
+              { account: data.matrix_user_id, subject: data.actor, keyID },
+              controller.signal,
             );
             keyRef.current = value;
           },
-          // Opened with the passkey or password; the key itself is never asked for.
+          // Opened with the unlock key of the Sytue ID sign-in; never asked for.
           readRecoveryKey: async (keyIDs) => {
             const known = keyRef.current;
             if (known) return known;
             if (!custody) throw new MatrixSecurityError('recovery');
-            const state = await custody.state(keyIDs, controller.signal);
-            if (state.methods.length === 0) throw new MatrixSecurityError('recovery');
-            let opened = '';
-            await ask('unlock', state.methods, async (factor) => {
-              opened = await custody.unwrap(
-                factor,
-                { account: data.matrix_user_id, keyIDs },
-                controller.signal,
-              );
-            });
+            const opened = await custody.unwrap(
+              { account: data.matrix_user_id, subject: data.actor, keyIDs },
+              controller.signal,
+            );
             keyRef.current = opened;
             return opened;
           },
@@ -473,14 +457,12 @@ export function MatrixDeviceGate({
           setClient(null);
           liveClientRef.current = null;
           preparedRef.current = null;
-          pendingPromptRef.current?.reject(new MatrixSecurityError('device'));
           pendingAuthRef.current?.reject(new MatrixSecurityError('device'));
           pendingRootRef.current?.reject(new MatrixSecurityError('device'));
           pendingRootRef.current = null;
           setStorageConsent(null);
-          pendingPromptRef.current = null;
           pendingAuthRef.current = null;
-          setPrompt(null);
+          setSignIn(null);
           keyRef.current = null;
           setAuthentication(null);
           host.detach?.(instance);
@@ -507,6 +489,10 @@ export function MatrixDeviceGate({
         if (!(await refresh(instance)) && !disposed && liveClientRef.current === instance) {
           await automatic(instance, controller.signal);
           if (!disposed && liveClientRef.current === instance) await refresh(instance);
+        } else if (custody && !disposed && liveClientRef.current === instance) {
+          void upgradeQuietly(instance, custody, data, controller.signal).then(() =>
+            retireQuietly(instance, custody, data, controller.signal),
+          );
         }
       } catch (failure) {
         if (!disposed && !(failure instanceof MatrixSecurityError && failure.reason === 'login'))
@@ -525,14 +511,12 @@ export function MatrixDeviceGate({
       controller.abort();
       setReady(false);
       setBootstrap(null);
-      pendingPromptRef.current?.reject(new MatrixSecurityError('device'));
       pendingAuthRef.current?.reject(new MatrixSecurityError('device'));
       pendingRootRef.current?.reject(new MatrixSecurityError('device'));
       pendingRootRef.current = null;
       setStorageConsent(null);
-      pendingPromptRef.current = null;
       pendingAuthRef.current = null;
-      setPrompt(null);
+      setSignIn(null);
       keyRef.current = null;
       setAuthentication(null);
       setRequest(null);
@@ -638,29 +622,13 @@ export function MatrixDeviceGate({
       if (current()) setBusy(false);
     }
   }
-  /** What the person gave in the dialog: a wrong password just asks again. */
-  async function submitFactor(factor: MatrixUnlockFactor): Promise<void> {
-    const pending = pendingPromptRef.current;
-    if (!pending || promptBusy) return;
-    setPromptBusy(true);
-    setPromptFailure(null);
-    try {
-      await pending.submit(factor);
-    } catch (failure) {
-      if (pendingPromptRef.current === pending) setPromptFailure(promptError(failure));
-    } finally {
-      setPromptBusy(false);
-      setPassword('');
-      setConfirmation('');
-    }
-  }
   /** Retry: the automatic flow again on an unverified device. */
   function resume(instance: SuiteMatrix): Promise<void> {
     return operation(async () => {
       const lifetime = lifetimeRef.current;
       if (!lifetime) return;
-      // A verified device just prepares again: if it needs the key, it asks for the
-      // passkey or password itself (readRecoveryKey).
+      // A verified device just prepares again: if it needs the key, it opens it with
+      // the unlock key itself (readRecoveryKey).
       if (!verified) await automatic(instance, lifetime.signal);
     });
   }
@@ -692,8 +660,24 @@ export function MatrixDeviceGate({
       {busy ? (
         <p class="flex items-center gap-2" role="status">
           <Spinner size={18} />
-          {t('state.loading')}
+          {t(client && !verified ? 'matrix.unlocking' : 'state.loading')}
         </p>
+      ) : null}
+      {client && !busy && signIn ? (
+        <div class="flex flex-col gap-3">
+          <p class="text-text-muted text-sm">{t('matrix.signInBody')}</p>
+          <Button
+            onClick={() => {
+              const custody = host.custody ?? host.session.custody;
+              if (!custody) return;
+              window.location.assign(
+                custody.signInURL(window.location.pathname + window.location.search, signIn.older),
+              );
+            }}
+          >
+            {t('matrix.signIn')}
+          </Button>
+        </div>
       ) : null}
       {!client && bootstrap ? (
         <Button disabled={busy} onClick={() => void operation(() => host.begin(bootstrap))}>
@@ -819,7 +803,7 @@ export function MatrixDeviceGate({
           ) : null}
         </>
       ) : null}
-      {client && !ready && !busy && (error || (!verified && !manual)) ? (
+      {client && !ready && !busy && (error || (!verified && !manual && !signIn)) ? (
         <Button variant="secondary" disabled={busy} onClick={() => void resume(client)}>
           {t('action.retry')}
         </Button>
@@ -879,82 +863,6 @@ export function MatrixDeviceGate({
         <main class="mx-auto flex w-full max-w-xl flex-col p-6">{contents}</main>
       )}
       <Modal
-        open={bound && prompt !== null}
-        onClose={() => {
-          if (promptBusy) return;
-          dismissedRef.current = true;
-          pendingPromptRef.current?.reject(new MatrixSecurityError('recovery'));
-          pendingPromptRef.current = null;
-          setPrompt(null);
-          setPassword('');
-          setConfirmation('');
-        }}
-        title={t(prompt?.mode === 'protect' ? 'matrix.protectTitle' : 'matrix.unlockTitle')}
-      >
-        <div class="flex flex-col gap-4">
-          <p class="text-text-muted text-sm">
-            {t(prompt?.mode === 'protect' ? 'matrix.protectBody' : 'matrix.unlockBody')}
-          </p>
-          {prompt?.methods.includes('passkey') ? (
-            <Button disabled={promptBusy} onClick={() => void submitFactor({ kind: 'passkey' })}>
-              {t('matrix.usePasskey')}
-            </Button>
-          ) : null}
-          {prompt?.methods.includes('password') ? (
-            <form
-              class="flex flex-col gap-3"
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (prompt.mode === 'protect' && password !== confirmation) {
-                  setPromptFailure('matrix.passwordMismatch');
-                  return;
-                }
-                void submitFactor({ kind: 'password', password });
-              }}
-            >
-              <FieldGroup label={t('matrix.password')} htmlFor={passwordID}>
-                <Input
-                  id={passwordID}
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onInput={(event) => setPassword(event.currentTarget.value)}
-                />
-              </FieldGroup>
-              {prompt.mode === 'protect' ? (
-                <FieldGroup label={t('matrix.passwordConfirm')} htmlFor={confirmationID}>
-                  <Input
-                    id={confirmationID}
-                    type="password"
-                    autoComplete="current-password"
-                    value={confirmation}
-                    onInput={(event) => setConfirmation(event.currentTarget.value)}
-                  />
-                </FieldGroup>
-              ) : null}
-              <Button
-                type="submit"
-                variant={prompt.methods.includes('passkey') ? 'secondary' : 'primary'}
-                disabled={promptBusy || !password || (prompt.mode === 'protect' && !confirmation)}
-              >
-                {t('matrix.usePassword')}
-              </Button>
-            </form>
-          ) : null}
-          {promptFailure ? (
-            <p class="text-danger-text text-sm" role="alert">
-              {t(promptFailure)}
-            </p>
-          ) : null}
-          {promptBusy ? (
-            <p class="flex items-center gap-2" role="status">
-              <Spinner size={18} />
-              {t('state.loading')}
-            </p>
-          ) : null}
-        </div>
-      </Modal>
-      <Modal
         open={bound && resetting && client !== null}
         onClose={() => setResetting(false)}
         title={t('matrix.resetAction')}
@@ -971,9 +879,9 @@ export function MatrixDeviceGate({
             disabled={!understood || busy || !client}
             onClick={() => {
               if (!understood || !client) return;
-              // Closed first: the reset opens its own dialogs (protect the new key with
-              // the passkey or password, then confirm identity through the homeserver's
-              // re-authentication). The new key replaces the wrapped one.
+              // Closed first: the new key is wrapped with the unlock key on its own, and
+              // the reset only opens the homeserver's re-authentication. The new key
+              // replaces the wrapped one.
               setResetting(false);
               setUnderstood(false);
               void operation(() => client.resetRecovery());

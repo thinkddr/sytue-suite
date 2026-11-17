@@ -12,20 +12,10 @@ export const is: Catalog = {
   'matrix.resetUnderstood': 'Ég skil að ég gæti misst aðgang að eldri dulkóðuðum skilaboðum',
   'matrix.unknownKey':
     'Þessi reikningur var dulkóðaður áður en Sytue varði lykil hans með innskráningunni þinni. Staðfestu þetta tæki úr öðru tæki þar sem þú ert þegar skráð(ur) inn.',
-  'matrix.unlockTitle': 'Opnaðu dulkóðuðu gögnin þín',
-  'matrix.unlockBody':
-    'Staðfestu að þetta sért þú með aðgangslyklinum þínum eða Sytue-lykilorðinu þínu. Það er athugað á þessu tæki: enginn annar getur opnað gögnin þín.',
-  'matrix.protectTitle': 'Verndaðu dulkóðuðu gögnin þín',
-  'matrix.protectBody':
-    'Veldu hvernig þú opnar dulkóðuðu gögnin þín á öðrum tækjum: með aðgangslyklinum þínum eða Sytue-lykilorðinu þínu. Aðeins þú getur opnað þau.',
-  'matrix.usePasskey': 'Nota aðgangslykil',
-  'matrix.usePassword': 'Nota lykilorð',
-  'matrix.password': 'Sytue-lykilorð',
-  'matrix.passwordConfirm': 'Endurtaktu lykilorðið',
-  'matrix.passwordMismatch': 'Lykilorðin stemma ekki.',
-  'matrix.unlockWrong': 'Það tókst ekki. Reyndu aftur.',
-  'matrix.passkeyUnsupported':
-    'Þessi aðgangslykill getur ekki opnað dulkóðuð gögn. Notaðu lykilorðið þitt.',
+  'matrix.unlocking': 'Verið er að opna dulkóðuðu gögnin þín…',
+  'matrix.signIn': 'Skrá inn á Sytue ID',
+  'matrix.signInBody':
+    'Innskráning þín á Sytue ID opnar dulkóðuðu gögnin þín í þessu tæki. Skráðu þig aftur inn með lykilorðinu þínu eða aðgangslykli til að opna þau hér.',
   // Device verification and recovery shared by the suite.
   'matrix.allowStorageTitle': 'Leyfa dulkóðaða vinnslu',
   'matrix.allowStorageBody':

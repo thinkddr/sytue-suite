@@ -39,6 +39,10 @@ func (*fakeService) PutMatrixRecoveryWrapper(context.Context, string, service.Ma
 	return "", domain.ErrMatrixUnavailable
 }
 
+func (*fakeService) PutMatrixRecoveryWrapperRetiringOlder(context.Context, string, service.MatrixRecoveryAccount, recoverywrap.Wrapper) (string, error) {
+	return "", domain.ErrMatrixUnavailable
+}
+
 func (*fakeService) MatrixAccountAccess(context.Context, string, string, int64) error {
 	return domain.ErrMatrixUnavailable
 }

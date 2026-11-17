@@ -17,8 +17,10 @@ import (
 
 // ficheroDeParametros es la única lista de parámetros app.* que los roles de
 // servicio pueden fijar en sus funciones: la conceden el despliegue del piloto,
-// el compose de dev y el arnés de integración leyendo este fichero.
-const ficheroDeParametros = "deploy/helm/sql/conceder-parametros.sql"
+// el compose de dev y el arnés de integración leyendo este fichero. Vive en
+// deploy/compose para que llegue a la suite pública; el piloto la lee por el enlace
+// deploy/helm/sql/conceder-parametros.sql, que no es una copia.
+const ficheroDeParametros = "deploy/compose/postgres/conceder-parametros.sql"
 
 func TestParametrosFijados(t *testing.T) {
 	t.Parallel()
@@ -189,8 +191,10 @@ func TestLaListaDeParametrosNoSeCopia(t *testing.T) {
 			}
 			rel, _ := filepath.Rel(raiz, ruta)
 			rel = filepath.ToSlash(rel)
-			// La fuente, y los tests que comprueban que se usa la fuente.
-			if rel == ficheroDeParametros || strings.HasSuffix(rel, "_test.go") || strings.HasSuffix(rel, "-test.sh") {
+			// La fuente, los enlaces a ella (no son copias) y los tests que comprueban
+			// que se usa la fuente.
+			if rel == ficheroDeParametros || d.Type()&fs.ModeSymlink != 0 ||
+				strings.HasSuffix(rel, "_test.go") || strings.HasSuffix(rel, "-test.sh") {
 				return nil
 			}
 			switch filepath.Ext(rel) {

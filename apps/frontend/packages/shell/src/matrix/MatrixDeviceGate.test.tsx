@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
-import { expect, test } from 'bun:test';
+import { expect, spyOn, test } from 'bun:test';
 import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { CryptoEvent } from 'matrix-js-sdk/lib/crypto-api';
@@ -90,28 +90,52 @@ interface Account {
   keyID: string | null;
   key: string | null;
 }
-/** Synthetic service custody: wrappers by kind, the factor kept beside the key. */
+/**
+ * Synthetic service custody (ADR 0084): wrappers by kind, and whether this browser has
+ * the unlock key of the person's Sytue ID sign-in (`material`) and what Sytue ID
+ * computed for the ADR 0082 wrappers (`older`).
+ */
 function custodyFixture(account: Account) {
-  const wrappers = new Map<MatrixUnlockMethod, { keyID: string; key: string; password?: string }>();
+  const wrappers = new Map<MatrixUnlockMethod, { keyID: string; key: string }>();
   const log: string[] = [];
-  const control = { failWraps: 0, legacy: null as string | null };
+  const control = {
+    failWraps: 0,
+    legacy: null as string | null,
+    material: true,
+    older: false,
+    /** This device holds the key in its own owner-key cache (verified before ADR 0084). */
+    held: false,
+    subjects: [] as string[],
+    signIns: [] as { returnTo: string; older: string }[],
+  };
   const custody: MatrixKeyCustody = {
-    state: async (keyIDs) => ({
-      methods: [...wrappers.entries()]
+    state: async (keyIDs) => {
+      const methods = [...wrappers.entries()]
         .filter(([, w]) => !keyIDs || keyIDs.includes(w.keyID))
-        .map(([kind]) => kind),
-      legacy: control.legacy !== null,
-    }),
-    unwrap: async (factor, target) => {
-      const wrapper = wrappers.get(factor.kind);
+        .map(([kind]) => kind);
+      return {
+        methods,
+        legacy: control.legacy !== null,
+        older: !methods.includes('sytue-id') && methods.includes('password') ? 'p.SALT' : '',
+      };
+    },
+    unwrap: async (target) => {
+      control.subjects.push(target.subject);
+      if (!control.material) throw new MatrixCustodyError('signin');
+      const kind: MatrixUnlockMethod | undefined = wrappers.has('sytue-id')
+        ? 'sytue-id'
+        : control.older && wrappers.has('password')
+          ? 'password'
+          : undefined;
+      const wrapper = kind ? wrappers.get(kind) : undefined;
       if (!wrapper || (target.keyIDs && !target.keyIDs.includes(wrapper.keyID)))
-        throw new MatrixCustodyError('wrong');
-      if (factor.kind === 'password' && factor.password !== wrapper.password)
-        throw new MatrixCustodyError('wrong');
-      log.push(`unwrap ${factor.kind}`);
+        throw new MatrixCustodyError('signin');
+      log.push(`unwrap ${kind}`);
       return wrapper.key;
     },
-    wrap: async (key, factor, target) => {
+    wrap: async (key, target) => {
+      control.subjects.push(target.subject);
+      if (!control.material) throw new MatrixCustodyError('signin');
       if (control.failWraps > 0) {
         control.failWraps--;
         log.push('wrap failed');
@@ -119,16 +143,23 @@ function custodyFixture(account: Account) {
       }
       // The service drops wrappers of any other key ID, and the retired copy.
       for (const [kind, w] of wrappers) if (w.keyID !== target.keyID) wrappers.delete(kind);
-      wrappers.set(factor.kind, {
-        keyID: target.keyID,
-        key,
-        ...(factor.kind === 'password' ? { password: factor.password } : {}),
-      });
+      wrappers.set('sytue-id', { keyID: target.keyID, key });
       control.legacy = null;
-      log.push(`wrap ${factor.kind} ${target.keyID} hasKey=${account.hasKey}`);
+      log.push(`wrap ${target.keyID} hasKey=${account.hasKey}`);
+    },
+    // Mirrors BrowserKeyCustody: retires the ADR 0082 wrappers once the sytue-id one opens.
+    retireOlder: async (target) => {
+      const mine = wrappers.get('sytue-id');
+      if (!control.material || !mine || mine.keyID !== target.keyID) return false;
+      for (const kind of ['password', 'passkey'] as const) wrappers.delete(kind);
+      log.push('retire older');
+      return true;
     },
     legacyRecoveryKey: async () => control.legacy,
-    passkeySupported: () => true,
+    signInURL: (returnTo, older) => {
+      control.signIns.push({ returnTo, older });
+      return '/drive/auth/login?unlock=1';
+    },
   };
   return { custody, wrappers, log, control };
 }
@@ -137,14 +168,10 @@ function fixture() {
   const devices: ReturnType<typeof device>[] = [];
   let data = bootstrap();
   let initialTrust = true;
-  // By default an account whose key is wrapped with a password.
+  // By default an account whose key is wrapped with the unlock key (ADR 0084).
   const account: Account = { hasKey: true, keyID: 'KEY1', key: 'synthetic-recovery-key' };
   const vault = custodyFixture(account);
-  vault.wrappers.set('password', {
-    keyID: 'KEY1',
-    key: 'synthetic-recovery-key',
-    password: 'synthetic password',
-  });
+  vault.wrappers.set('sytue-id', { keyID: 'KEY1', key: 'synthetic-recovery-key' });
   // Synthetic lifecycle port only: these tests do not claim to verify cryptography.
   function device(value: MatrixBootstrap, ui: MatrixRecoveryUI) {
     const listeners = new Map<string, (...args: unknown[]) => void>();
@@ -199,8 +226,14 @@ function fixture() {
         vault.log.push('publish KEY-NEW');
         state.verified = true;
       },
+      // Mirrors SuiteMatrix: the owner-key cache of a device verified before answers
+      // the SDK itself; only without it does the SDK ask the host.
+      heldRecoveryKey: async (keyID: string) =>
+        vault.control.held && keyID === account.keyID ? account.key : null,
       recover: async () => {
-        const key = await ui.readRecoveryKey(account.keyID ? [account.keyID] : undefined);
+        const key = vault.control.held
+          ? account.key
+          : await ui.readRecoveryKey(account.keyID ? [account.keyID] : undefined);
         if (key !== account.key) throw new MatrixSecurityError('recovery');
         state.recovered = true;
         state.verified = true;
@@ -292,19 +325,11 @@ function expectNoKeyRendered() {
   expect(document.body.innerHTML).not.toMatch(/synthetic-(recovery|created|reset)-key/);
   expect(document.querySelector('code')).toBeNull();
 }
-async function typePassword(value: string, confirmation?: string) {
-  const fields = Array.from(
-    document.querySelectorAll<HTMLInputElement>('[role=dialog] input[type=password]'),
-  );
-  const values = confirmation === undefined ? [value] : [value, confirmation];
-  expect(fields).toHaveLength(values.length);
-  await act(() => {
-    fields.forEach((field, index) => {
-      field.value = values[index]!;
-      field.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-  });
-  await act(() => button('matrix.usePassword').click());
+/** ADR 0084: nothing to type, ever — no password, passkey or recovery key field. */
+function expectNothingAsked() {
+  expect(document.querySelector('input[type=password]')).toBeNull();
+  expect(document.querySelector('input:not([type=checkbox])')).toBeNull();
+  expect(findButton('matrix.verify')).toBeUndefined();
 }
 
 test('verified device waits for private application import before mounting children', async () => {
@@ -376,7 +401,7 @@ test('changing account hides old data and waits for its jobs before opening the 
   }
 });
 
-test('a verified device missing its private owner key reopens it with the password, never the key', async () => {
+test('a verified device missing its private owner key reopens it with the unlock key, asking nothing', async () => {
   const f = fixture();
   let attempts = 0;
   // Like the owner key cache: the first time it is unavailable, then it asks for the key.
@@ -390,37 +415,29 @@ test('a verified device missing its private owner key reopens it with the passwo
     await until(() => findButton('action.retry')?.disabled === false);
     expect(f.root.querySelector('[data-private]')).toBeNull();
     await act(() => button('action.retry').click());
-    await until(() => findButton('matrix.usePassword') !== undefined);
-    expect(document.querySelector('[role=dialog]')?.textContent).toContain('matrix.unlockBody');
-    await typePassword('synthetic password');
     await until(() => f.root.querySelector('[data-private]') !== null);
     expect(attempts).toBe(2);
+    expect(f.vault.log).toEqual(['unwrap sytue-id']);
+    expect(f.vault.control.subjects).toEqual([actor]);
+    expectNothingAsked();
     expectNoKeyRendered();
   } finally {
     await f.unmount();
   }
 });
 
-test('an account without encryption gets a key wrapped BEFORE it is published, and nothing to save', async () => {
+test('an account without encryption gets a key wrapped BEFORE it is published, asking nothing', async () => {
   const f = fixture();
   f.untrusted();
   Object.assign(f.account, { hasKey: false, keyID: null, key: null });
   f.vault.wrappers.clear();
   try {
     await f.mount();
-    // No button to press: the gate asks how to protect it straight away.
-    await until(() => findButton('matrix.usePassword') !== undefined);
-    expect(document.querySelector('[role=dialog]')?.textContent).toContain('matrix.protectBody');
-    expect(findButton('matrix.usePasskey')).toBeDefined();
-    expectNoKeyRendered();
-    expect(document.querySelector('input[type=checkbox]')).toBeNull();
-    // Two fields that must match: a typo here would lock the data out elsewhere.
-    await typePassword('synthetic password', 'synthetic passwort');
-    await until(() => document.body.textContent?.includes('matrix.passwordMismatch') === true);
-    expect(f.vault.log).toEqual([]);
-    await typePassword('synthetic password', 'synthetic password');
+    // No button to press and nothing to type: the Sytue ID sign-in is enough.
     await until(() => f.root.querySelector('[data-private]') !== null);
-    expect(f.vault.log).toEqual(['wrap password KEY-NEW hasKey=false', 'publish KEY-NEW']);
+    expect(f.vault.log).toEqual(['wrap KEY-NEW hasKey=false', 'publish KEY-NEW']);
+    expect(document.querySelector('[role=dialog]')).toBeNull();
+    expectNothingAsked();
     expectNoKeyRendered();
   } finally {
     await f.unmount();
@@ -435,84 +452,180 @@ test('a failed upload of the wrapped key publishes nothing and can be retried in
   f.vault.control.failWraps = 1;
   try {
     await f.mount();
-    await until(() => findButton('matrix.usePasskey') !== undefined);
-    await act(() => button('matrix.usePasskey').click());
     await until(() => document.body.textContent?.includes('matrix.failed') === true);
     // Still locked, the account untouched, and no key to fall back on.
     expect(f.account.hasKey).toBe(false);
     expect(f.root.querySelector('[data-private]')).toBeNull();
     expectNoKeyRendered();
-    await act(() => button('matrix.usePasskey').click());
-    await until(() => f.root.querySelector('[data-private]') !== null);
-    expect(f.vault.log).toEqual([
-      'wrap failed',
-      'wrap passkey KEY-NEW hasKey=false',
-      'publish KEY-NEW',
-    ]);
-  } finally {
-    await f.unmount();
-  }
-});
-
-test('closing the protection dialog creates nothing and leaves a retry', async () => {
-  const f = fixture();
-  f.untrusted();
-  Object.assign(f.account, { hasKey: false, keyID: null, key: null });
-  f.vault.wrappers.clear();
-  try {
-    await f.mount();
-    await until(() => findButton('matrix.usePassword') !== undefined);
-    await act(() => {
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    });
     await until(() => findButton('action.retry')?.disabled === false);
-    expect(f.account.hasKey).toBe(false);
-    expect(document.body.textContent?.includes('matrix.unknownKey')).toBe(false);
     await act(() => button('action.retry').click());
-    await until(() => findButton('matrix.usePassword') !== undefined);
+    await until(() => f.root.querySelector('[data-private]') !== null);
+    expect(f.vault.log).toEqual(['wrap failed', 'wrap KEY-NEW hasKey=false', 'publish KEY-NEW']);
   } finally {
     await f.unmount();
   }
 });
 
-test('a new device opens a wrapped key with the password; a wrong one just asks again', async () => {
+test('a new device opens the wrapped key with the unlock key and verifies itself, with no dialog', async () => {
   const f = fixture();
   f.untrusted();
   try {
     await f.mount();
-    await until(() => findButton('matrix.usePassword') !== undefined);
-    // Only the methods that have a wrapper are offered.
-    expect(findButton('matrix.usePasskey')).toBeUndefined();
-    await typePassword('not it');
-    await until(() => document.body.textContent?.includes('matrix.unlockWrong') === true);
-    expect(f.root.querySelector('[data-private]')).toBeNull();
-    await typePassword('not it either');
-    await until(() => !document.querySelector('[role=dialog] p[role=status]'));
-    expect(f.vault.log).toEqual([]);
-    await typePassword('synthetic password');
     await until(() => f.root.querySelector('[data-private]') !== null);
-    expect(f.vault.log).toEqual(['unwrap password']);
+    expect(f.devices[0]!.state.recovered).toBe(true);
+    expect(f.vault.log).toEqual(['unwrap sytue-id']);
+    expect(document.querySelector('[role=dialog]')).toBeNull();
+    expectNothingAsked();
     expectNoKeyRendered();
   } finally {
     await f.unmount();
   }
 });
 
-test('a new device opens a passkey-wrapped key with one tap', async () => {
+test('without an unlock key in this browser the only way out is signing in to Sytue ID', async () => {
+  const f = fixture();
+  f.untrusted();
+  f.vault.control.material = false;
+  const assign = spyOn(window.location, 'assign').mockImplementation(() => undefined);
+  try {
+    await f.mount();
+    await until(() => findButton('matrix.signIn') !== undefined);
+    expect(document.body.textContent).toContain('matrix.signInBody');
+    expect(f.root.querySelector('[data-private]')).toBeNull();
+    expect(findButton('action.retry')).toBeUndefined();
+    expectNothingAsked();
+    await act(() => button('matrix.signIn').click());
+    expect(assign).toHaveBeenCalledWith('/drive/auth/login?unlock=1');
+    expect(f.vault.control.signIns).toEqual([
+      { returnTo: window.location.pathname + window.location.search, older: '' },
+    ]);
+  } finally {
+    assign.mockRestore();
+    await f.unmount();
+  }
+});
+
+test('an ADR 0082 wrapper opens once with what Sytue ID computed, and moves to the unlock key', async () => {
   const f = fixture();
   f.untrusted();
   f.vault.wrappers.clear();
-  f.vault.wrappers.set('passkey', { keyID: 'KEY1', key: 'synthetic-recovery-key' });
+  f.vault.wrappers.set('password', { keyID: 'KEY1', key: 'synthetic-recovery-key' });
+  f.vault.control.material = false;
+  const assign = spyOn(window.location, 'assign').mockImplementation(() => undefined);
   try {
+    // First, without it: the sign-in carries the public parameters of the old wrapper.
     await f.mount();
-    await until(() => findButton('matrix.usePasskey') !== undefined);
-    expect(findButton('matrix.usePassword')).toBeUndefined();
-    await act(() => button('matrix.usePasskey').click());
-    await until(() => f.root.querySelector('[data-private]') !== null);
-    expect(f.vault.log).toEqual(['unwrap passkey']);
-  } finally {
+    await until(() => findButton('matrix.signIn') !== undefined);
+    await act(() => button('matrix.signIn').click());
+    expect(f.vault.control.signIns[0]?.older).toBe('p.SALT');
     await f.unmount();
+    // Back from the Sytue ID sign-in: opened and wrapped the new way, nothing asked.
+    const g = fixture();
+    g.untrusted();
+    g.vault.wrappers.clear();
+    g.vault.wrappers.set('password', { keyID: 'KEY1', key: 'synthetic-recovery-key' });
+    g.vault.control.older = true;
+    await g.mount();
+    await until(() => g.root.querySelector('[data-private]') !== null);
+    expect(g.vault.log).toEqual(['unwrap password', 'wrap KEY1 hasKey=true', 'retire older']);
+    // ADR 0085: once moved and checked, the old wrapper goes.
+    expect([...g.vault.wrappers.keys()]).toEqual(['sytue-id']);
+    expectNothingAsked();
+    await g.unmount();
+  } finally {
+    assign.mockRestore();
   }
+});
+
+test('a device verified under ADR 0082 moves to the unlock key with the key it already holds, asking nothing', async () => {
+  const f = fixture();
+  f.vault.wrappers.clear();
+  f.vault.wrappers.set('password', { keyID: 'KEY1', key: 'synthetic-recovery-key' });
+  f.vault.control.held = true;
+  await f.mount();
+  await until(() => f.vault.wrappers.has('sytue-id'));
+  expect(f.vault.wrappers.get('sytue-id')).toEqual({
+    keyID: 'KEY1',
+    key: 'synthetic-recovery-key',
+  });
+  // Nothing was opened through Sytue ID and nobody was sent to sign in.
+  expect(f.vault.log).not.toContain('unwrap password');
+  expect(f.vault.control.signIns).toEqual([]);
+  expect(findButton('matrix.signIn')).toBeUndefined();
+  await until(() => document.querySelector('[data-private="true"]') !== null);
+  expectNothingAsked();
+  expectNoKeyRendered();
+  await f.unmount();
+});
+
+test('the same device without an unlock key here keeps working and does not ask to sign in', async () => {
+  const f = fixture();
+  f.vault.wrappers.clear();
+  f.vault.wrappers.set('password', { keyID: 'KEY1', key: 'synthetic-recovery-key' });
+  f.vault.control.held = true;
+  f.vault.control.material = false;
+  await f.mount();
+  await until(() => document.querySelector('[data-private="true"]') !== null);
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 30));
+  });
+  expect(f.vault.wrappers.has('sytue-id')).toBe(false);
+  expect(findButton('matrix.signIn')).toBeUndefined();
+  expect(document.querySelector('[data-private="true"]')).not.toBeNull();
+  await f.unmount();
+});
+
+test('an unverified device that opens an ADR 0082 wrapper from its own cache moves it quietly', async () => {
+  const f = fixture();
+  f.untrusted();
+  f.vault.wrappers.clear();
+  f.vault.wrappers.set('password', { keyID: 'KEY1', key: 'synthetic-recovery-key' });
+  f.vault.control.held = true;
+  await f.mount();
+  await until(() => f.vault.wrappers.has('sytue-id'));
+  expect(f.devices[0]!.state.recovered).toBe(true);
+  expect(f.vault.control.signIns).toEqual([]);
+  expectNothingAsked();
+  await f.unmount();
+});
+
+test('once the unlock key opens the account, its ADR 0082 wrappers are retired, quietly', async () => {
+  const f = fixture();
+  f.vault.wrappers.set('password', { keyID: 'KEY1', key: 'synthetic-recovery-key' });
+  f.vault.wrappers.set('passkey', { keyID: 'KEY1', key: 'synthetic-recovery-key' });
+  await f.mount();
+  await until(() => f.vault.log.includes('retire older'));
+  expect([...f.vault.wrappers.keys()]).toEqual(['sytue-id']);
+  expectNothingAsked();
+  await f.unmount();
+});
+
+test('a device that just moved an ADR 0082 wrapper to the unlock key retires the old ones too', async () => {
+  const f = fixture();
+  f.untrusted();
+  f.vault.wrappers.clear();
+  f.vault.wrappers.set('password', { keyID: 'KEY1', key: 'synthetic-recovery-key' });
+  f.vault.control.held = true;
+  await f.mount();
+  await until(() => f.vault.log.includes('retire older'));
+  expect([...f.vault.wrappers.keys()]).toEqual(['sytue-id']);
+  await f.unmount();
+});
+
+test('without the unlock key here nothing is retired: the old wrapper is all that opens', async () => {
+  const f = fixture();
+  f.vault.wrappers.clear();
+  f.vault.wrappers.set('password', { keyID: 'KEY1', key: 'synthetic-recovery-key' });
+  f.vault.control.held = true;
+  f.vault.control.material = false;
+  await f.mount();
+  await until(() => document.querySelector('[data-private="true"]') !== null);
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 30));
+  });
+  expect([...f.vault.wrappers.keys()]).toEqual(['password']);
+  expect(f.vault.log).not.toContain('retire older');
+  await f.unmount();
 });
 
 test('a key the service does not hold offers only verification from another device', async () => {
@@ -541,14 +654,13 @@ test('the key the service used to hold opens Rooms silently and is wrapped once'
   f.vault.control.legacy = 'synthetic-recovery-key';
   try {
     await f.mount();
-    // Recovered without asking anything; then protected, which retires the old copy.
-    await until(() => findButton('matrix.usePassword') !== undefined);
-    expect(document.querySelector('[role=dialog]')?.textContent).toContain('matrix.protectBody');
-    expect(f.devices[0]!.state.recovered).toBe(true);
-    await typePassword('synthetic password', 'synthetic password');
+    // Recovered and wrapped with the unlock key without asking anything; that also
+    // retires the copy the service held.
     await until(() => f.root.querySelector('[data-private]') !== null);
-    expect(f.vault.log).toEqual(['wrap password KEY1 hasKey=true']);
+    expect(f.devices[0]!.state.recovered).toBe(true);
+    expect(f.vault.log).toEqual(['wrap KEY1 hasKey=true']);
     expect(f.vault.control.legacy).toBeNull();
+    expectNothingAsked();
     expectNoKeyRendered();
   } finally {
     await f.unmount();
@@ -575,19 +687,20 @@ test('private products neither enumerate peers nor accept verification from anot
   }
 });
 
-test('changing tenant masks an old recovery prompt while application cleanup is still pending', async () => {
+test('changing tenant masks an old sign-in request while application cleanup is still pending', async () => {
   const f = fixture(),
     drain = deferred();
   f.untrusted();
+  f.vault.control.material = false;
   f.host.close = async () => {
     await drain.promise;
   };
   try {
     await f.mount();
-    await until(() => f.devices.length === 1 && findButton('matrix.usePassword') !== undefined);
+    await until(() => f.devices.length === 1 && findButton('matrix.signIn') !== undefined);
     f.setData(bootstrap(actor, 'next-org'));
     await f.mount();
-    expect(findButton('matrix.usePassword')).toBeUndefined();
+    expect(findButton('matrix.signIn')).toBeUndefined();
     expect(document.querySelector('[role=dialog]')).toBeNull();
     drain.resolve();
     await until(() => f.devices.length === 2);
@@ -845,6 +958,8 @@ test('source gate retries a rejected SDK open only after its prior generation ha
 test('source gate cancels an unverified source SDK when the canonical device retires during recovery', async () => {
   const f = sourceFixture(true);
   f.old.untrusted();
+  // The source device waits for the Sytue ID sign-in: still in recovery when it retires.
+  f.old.vault.control.material = false;
   try {
     await f.mount();
     await until(() => f.old.devices.length === 1);
@@ -917,11 +1032,9 @@ test('Rooms without another device resets only after confirmation, and the new k
     await act(() => checkbox().click());
     expect(button('matrix.resetAction').disabled).toBe(false);
     await act(() => button('matrix.resetAction').click());
-    // The new key is protected (and the old wrappers replaced) before anything is reset.
-    await until(() => findButton('matrix.usePassword') !== undefined);
-    expect(f.devices[0]!.state.resets).toBe(0);
-    await typePassword('synthetic password', 'synthetic password');
-    // The homeserver's re-authentication comes before any key is replaced.
+    // The new key is wrapped with the unlock key (and the old wrappers replaced) before
+    // anything is reset; then the homeserver's re-authentication, before any key is
+    // replaced. No key, password or passkey is asked for.
     await until(() => findButton('matrix.authContinue') !== undefined);
     expect(f.devices[0]!.state.resets).toBe(0);
     expect(button('matrix.authContinue').disabled).toBe(true);
@@ -930,7 +1043,7 @@ test('Rooms without another device resets only after confirmation, and the new k
     await act(() => button('matrix.authContinue').click());
     await until(() => f.root.querySelector('[data-private]') !== null);
     expect(f.devices[0]!.state.resets).toBe(1);
-    expect(f.vault.log).toEqual(['wrap password KEY-RESET hasKey=true', 'publish KEY-RESET']);
+    expect(f.vault.log).toEqual(['wrap KEY-RESET hasKey=true', 'publish KEY-RESET']);
     expect([...f.vault.wrappers.values()].map((w) => w.keyID)).toEqual(['KEY-RESET']);
     expectNoKeyRendered();
   } finally {

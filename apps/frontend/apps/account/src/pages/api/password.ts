@@ -13,7 +13,7 @@ import { proxyId } from '../../lib/bff.js';
 export const prerender = false;
 
 export const POST: APIRoute = async (ctx) => {
-  let body: { current_password?: unknown; new_password?: unknown };
+  let body: { current_password?: unknown; new_password?: unknown; unlock_envelope?: unknown };
   try {
     body = (await ctx.request.json()) as typeof body;
   } catch {
@@ -23,10 +23,18 @@ export const POST: APIRoute = async (ctx) => {
   const nueva = typeof body.new_password === 'string' ? body.new_password : '';
   if (!actual || !nueva) return new Response(null, { status: 400 });
 
+  // El sobre del desbloqueo con la contraseña nueva (ADR 0085): texto cifrado que
+  // nadie abre sin ella; el servicio lo guarda solo si el cambio sale bien.
+  const sobre =
+    body.unlock_envelope && typeof body.unlock_envelope === 'object' ? body.unlock_envelope : null;
   const res = await proxyId(ctx, '/api/v1/me/password', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ current_password: actual, new_password: nueva }),
+    body: JSON.stringify({
+      current_password: actual,
+      new_password: nueva,
+      ...(sobre ? { unlock_envelope: sobre } : {}),
+    }),
   });
   if (res.ok) {
     for (const nombre of [SESSION_COOKIE, `__Host-${SESSION_COOKIE}`]) {

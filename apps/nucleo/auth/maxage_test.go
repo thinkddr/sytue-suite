@@ -13,13 +13,13 @@ import (
 func TestElLoginLlevaMaxAgeSoloSiSePide(t *testing.T) {
 	o := &OIDC{Issuer: "https://id.example"}
 	o.endpoints.Authorization = "https://id.example/oauth2/authorize"
-	destino, _, _ := o.autorizar("http://127.0.0.1:1/callback", "")
+	destino, _, _ := o.autorizar("http://127.0.0.1:1/callback", "", nil, PeticionLogin{})
 	u, _ := url.Parse(destino)
 	if u.Query().Has("max_age") {
 		t.Fatalf("sin pedirlo no va max_age: %s", destino)
 	}
 	o.MaxAge = 60
-	destino, _, _ = o.autorizar("http://127.0.0.1:1/callback", "")
+	destino, _, _ = o.autorizar("http://127.0.0.1:1/callback", "", nil, PeticionLogin{})
 	u, _ = url.Parse(destino)
 	if u.Query().Get("max_age") != "60" {
 		t.Fatalf("con el bloqueo, max_age=60: %s", destino)

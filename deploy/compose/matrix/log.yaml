@@ -1,0 +1,20 @@
+# Registro de Synapse en Compose: solo avisos y errores (como en producción).
+version: 1
+formatters:
+  plain:
+    format: '%(asctime)s %(levelname)s %(name)s %(message)s'
+handlers:
+  console:
+    class: logging.StreamHandler
+    formatter: plain
+loggers:
+  synapse.access.http:
+    level: WARNING
+  synapse.http.site:
+    level: WARNING
+  synapse.storage.SQL:
+    level: WARNING
+root:
+  level: WARNING
+  handlers: [console]
+disable_existing_loggers: false

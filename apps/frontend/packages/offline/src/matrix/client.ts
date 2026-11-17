@@ -20,7 +20,7 @@ import {
   type GeneratedSecretStorageKey,
   type VerificationRequest,
 } from 'matrix-js-sdk/lib/crypto-api';
-import { decodeRecoveryKey } from 'matrix-js-sdk/lib/crypto-api/recovery-key';
+import { decodeRecoveryKey, encodeRecoveryKey } from 'matrix-js-sdk/lib/crypto-api/recovery-key';
 import { SECRET_STORAGE_ALGORITHM_V1_AES } from 'matrix-js-sdk/lib/secret-storage';
 import { secureRandomString } from 'matrix-js-sdk/lib/randomstring';
 import {
@@ -43,7 +43,9 @@ import {
   type MatrixSessionDescriptor,
 } from './session-provenance.js';
 import { MatrixOwnerKeyCache } from './owner-key-cache.js';
+import { cryptoStoreKeyValues, initCryptoStore } from './crypto-store-key.js';
 import { acquireMatrixStore } from './lease.js';
+import { logoutMatrixDevice } from './device-logout.js';
 import { StorageJobs, storageWork } from './storage-jobs.js';
 import { SDKLifetimePair } from './sdk-lifetime.js';
 import { openSessionOwner, verifySessionOwner, type OpaqueSessionOwner } from '../session-owner.js';
@@ -265,6 +267,8 @@ export class SuiteMatrix {
     private readonly session?: MatrixSession,
     private readonly uploadCache?: EncryptedOfflineValues,
     private readonly storagePqCache?: EncryptedOfflineValues,
+    /** The sealed key of this device's SDK crypto store (ADR 0085), erased with it. */
+    private readonly cryptoStoreKeys?: EncryptedOfflineValues,
   ) {
     this.client = client;
     this.temporaryKeys = keys;
@@ -424,6 +428,7 @@ export class SuiteMatrix {
         },
       },
     });
+    const cryptoStoreKeys = cryptoStoreKeyValues(prefix, () => !network.closed);
     ownerKeys = new MatrixOwnerKeyCache(
       new EncryptedOfflineValues(prefix, 'matrix-owner-key-v1', () => !network.closed),
       keys,
@@ -435,7 +440,8 @@ export class SuiteMatrix {
       const who = await client.whoami();
       if (who.user_id !== bootstrap.matrix_user_id || who.device_id !== session.device_id)
         throw new MatrixSecurityError('identity');
-      await client.initRustCrypto({ useIndexedDB: true, cryptoDatabasePrefix: prefix });
+      // Encrypted at rest with a key nobody can read (ADR 0085).
+      await initCryptoStore(client, prefix, cryptoStoreKeys);
       const crypto = client.getCrypto();
       if (!crypto) throw new MatrixSecurityError('device');
       deviceCrypto = crypto;
@@ -484,6 +490,7 @@ export class SuiteMatrix {
         product
           ? new EncryptedOfflineValues(prefix, 'matrix-storage-pq-key-v1', () => !network.closed)
           : undefined,
+        cryptoStoreKeys,
       );
       verifiedSuiteOwners.add(suite);
       return suite;
@@ -725,6 +732,33 @@ export class SuiteMatrix {
       added.keyInfo,
       generated.privateKey,
     );
+  }
+  /**
+   * The recovery key of secret storage key `keyID` if this device already holds it (its
+   * owner-key cache, or the key it just used), without asking anyone; null otherwise. A
+   * device verified before ADR 0084 moves its account to the `sytue-id` wrapper with it
+   * (ADR 0085), so the person does not sign in again for it.
+   */
+  async heldRecoveryKey(keyID: string): Promise<string | null> {
+    if (this.closed) return null;
+    const found = await this.client.secretStorage.getKey(keyID).catch(() => null);
+    if (!found || !hasSecretStorageCheck(found[1])) return null;
+    const description = found[1];
+    let key: Uint8Array<ArrayBuffer> | null = this.temporaryKeys.get(keyID)?.slice() ?? null;
+    if (key && !(await this.client.secretStorage.checkKey(key, description))) {
+      key.fill(0);
+      key = null;
+    }
+    if (!key && this.ownerKeys) key = await this.ownerKeys.held(keyID, description);
+    if (!key || this.closed) {
+      key?.fill(0);
+      return null;
+    }
+    try {
+      return encodeRecoveryKey(key) ?? null;
+    } finally {
+      key.fill(0);
+    }
   }
   async recover(): Promise<void> {
     // A prepared sync does not guarantee that Rust has fetched our public
@@ -3447,15 +3481,20 @@ export class SuiteMatrix {
       this.close();
       try {
         await this.jobsClosing;
+        // Close this device on the homeserver with its own token BEFORE its session and
+        // keys are erased: afterwards nobody can, and a forgotten device that stays alive
+        // keeps receiving every room key. Bounded and never fatal; erasing continues.
+        if (this.session)
+          await logoutMatrixDevice(this.bootstrap.homeserver_url, this.session.access_token);
         const results = await Promise.allSettled([
           Promise.resolve().then(() => this.ownerKeys?.destroy()),
           Promise.resolve().then(() => this.uploadCache?.destroy()),
           Promise.resolve().then(() => this.storagePqCache?.destroy()),
           Promise.resolve().then(() => this.roomBackfillCache?.destroy()),
           Promise.resolve().then(() => this.adapter.forgetSession(this.bootstrap, this.session)),
-          Promise.resolve().then(() =>
-            this.client.clearStores({ cryptoDatabasePrefix: this.prefix }),
-          ),
+          Promise.resolve()
+            .then(() => this.client.clearStores({ cryptoDatabasePrefix: this.prefix }))
+            .then(() => this.cryptoStoreKeys?.destroy()),
         ]);
         const failures = results.filter((result) => result.status === 'rejected');
         if (failures.length)

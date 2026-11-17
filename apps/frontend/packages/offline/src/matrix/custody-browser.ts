@@ -1,27 +1,26 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /**
- * `MatrixKeyCustody` for the web apps: wrappers travel through the app's own BFF
- * (`<base>/api/matrix/recovery-wrappers`, shared handler in `@sytue/auth/server`) and
- * are wrapped and opened here with Web Crypto, hash-wasm's Argon2id and the WebAuthn
- * PRF extension of the person's Sytue ID passkey.
+ * `MatrixKeyCustody` for the web apps (ADR 0084, 0085): wrappers travel through the app's
+ * own BFF (`<base>/api/matrix/recovery-wrappers`, shared handler in `@sytue/auth/server`)
+ * and are wrapped and opened by the Sytue ID bridge, in Sytue ID's origin, with the unlock
+ * key that the person's Sytue ID sign-in left in this browser. This page never holds the
+ * unlock key: it gets the recovery key of its own account back, which the SDK needs anyway.
  */
 import {
   MatrixCustodyError,
   type MatrixCustodyState,
   type MatrixKeyCustody,
-  type MatrixUnlockFactor,
   type MatrixUnlockMethod,
 } from './custody.js';
+import { fromBase64, passwordKDF, toBase64Url, type RecoveryWrapper } from './recovery-wrap.js';
 import {
-  fromBase64,
-  openRecoveryWrapper,
-  passwordIKM,
-  passwordKDF,
-  sealRecoveryKey,
-  toBase64,
-  toBase64Url,
-  type RecoveryWrapper,
-} from './recovery-wrap.js';
+  forgetLegacyMaterial,
+  unwrapInBridge,
+  wrapInBridge,
+  type UnlockBridgeError,
+  type UnwrapResult,
+  type WrapResult,
+} from './unlock-bridge.js';
 
 const recoveryKeyShape = /^[1-9A-HJ-NP-Za-km-z]{4}(?: [1-9A-HJ-NP-Za-km-z]{1,4}){8,24}$/;
 
@@ -30,18 +29,63 @@ export interface BrowserKeyCustodyOptions {
   base: string;
   /** The product's isolated storage account (identity v2); otherwise the Rooms account. */
   isolated: boolean;
-  /** WebAuthn RP ID of Sytue ID (`WEBAUTHN_RP_ID`, the suite's apex domain). */
-  rpId: string;
+  /** Sytue ID (`https://id.<apex>`), whose bridge holds the unlock key. */
+  idOrigin: string;
   fetchImpl?: typeof fetch;
-  credentials?: Pick<CredentialsContainer, 'get'>;
+  /** Test seam; the Sytue ID bridge by default. */
+  bridge?: CustodyBridge;
 }
 
-interface PrfResults {
-  prf?: { results?: { first?: BufferSource } };
+/** What the custody asks of the Sytue ID bridge: operations, never the unlock key. */
+export interface CustodyBridge {
+  unwrap: (
+    subject: string,
+    input: { account: string; wrappers: readonly RecoveryWrapper[] },
+  ) => Promise<UnwrapResult>;
+  wrap: (
+    subject: string,
+    input: { account: string; keyID: string; recoveryKey: string },
+  ) => Promise<WrapResult>;
+  forgetLegacy: (subject: string) => Promise<void>;
+}
+
+function bridgeError(error: UnlockBridgeError): MatrixCustodyError {
+  // No answer from the bridge is what it always was: this browser cannot unlock, so the
+  // person signs in to Sytue ID again. `account` and `busy` refuse this request only: the
+  // person must not be sent to sign in for them.
+  if (error === 'signin' || error === 'unavailable') return new MatrixCustodyError('signin');
+  return new MatrixCustodyError(error === 'wrong' ? 'wrong' : 'unavailable');
+}
+
+/** The ADR 0082 wrappers the Sytue ID sign-in page can open (`sytue_legacy`). */
+function olderRequest(wrappers: readonly RecoveryWrapper[]): string {
+  const items: string[] = [];
+  for (const w of wrappers) {
+    if (
+      w.kind === 'password' &&
+      w.kdf.alg === 'argon2id' &&
+      w.kdf.m === passwordKDF.m &&
+      w.kdf.t === passwordKDF.t &&
+      w.kdf.p === passwordKDF.p
+    )
+      items.push('p.' + toBase64Url(fromBase64(w.kdf.salt)));
+    else if (w.kind === 'passkey' && w.kdf.alg === 'webauthn-prf-hkdf-sha256')
+      items.push('k.' + w.credential_id + '.' + toBase64Url(fromBase64(w.kdf.prf_salt)));
+  }
+  return items.slice(0, 4).join('~');
 }
 
 export class BrowserKeyCustody implements MatrixKeyCustody {
-  constructor(private readonly options: BrowserKeyCustodyOptions) {}
+  private readonly bridge: CustodyBridge;
+
+  constructor(private readonly options: BrowserKeyCustodyOptions) {
+    const idOrigin = options.idOrigin;
+    this.bridge = options.bridge ?? {
+      unwrap: (subject, input) => unwrapInBridge({ idOrigin, subject }, input),
+      wrap: (subject, input) => wrapInBridge({ idOrigin, subject }, input),
+      forgetLegacy: (subject) => forgetLegacyMaterial({ idOrigin, subject }),
+    };
+  }
 
   private url(path: string): string {
     return (
@@ -83,22 +127,6 @@ export class BrowserKeyCustody implements MatrixKeyCustody {
       legacy_escrow: body.legacy_escrow === true,
     };
   }
-  private credentials(): Pick<CredentialsContainer, 'get'> | undefined {
-    return (
-      this.options.credentials ??
-      (typeof navigator !== 'undefined' ? navigator.credentials : undefined)
-    );
-  }
-
-  passkeySupported(): boolean {
-    return (
-      this.options.credentials !== undefined ||
-      (typeof window !== 'undefined' &&
-        'PublicKeyCredential' in window &&
-        typeof navigator.credentials?.get === 'function')
-    );
-  }
-
   async state(
     keyIDs: readonly string[] | undefined,
     signal?: AbortSignal,
@@ -106,119 +134,81 @@ export class BrowserKeyCustody implements MatrixKeyCustody {
     const { wrappers, legacy_escrow } = await this.wrappers(signal);
     const usable = wrappers.filter((w) => !keyIDs || keyIDs.includes(w.key_id));
     const methods = new Set<MatrixUnlockMethod>(usable.map((w) => w.kind));
-    return { methods: [...methods], legacy: !this.options.isolated && legacy_escrow };
+    return {
+      methods: [...methods],
+      legacy: !this.options.isolated && legacy_escrow,
+      older: methods.has('sytue-id') ? '' : olderRequest(usable),
+    };
   }
 
   async unwrap(
-    factor: MatrixUnlockFactor,
-    target: { account: string; keyIDs: readonly string[] | undefined },
+    target: { account: string; subject: string; keyIDs: readonly string[] | undefined },
     signal?: AbortSignal,
   ): Promise<string> {
     const { wrappers } = await this.wrappers(signal);
-    const usable = wrappers.filter(
-      (w) => w.kind === factor.kind && (!target.keyIDs || target.keyIDs.includes(w.key_id)),
-    );
-    if (usable.length === 0) throw new MatrixCustodyError('wrong');
-    if (factor.kind === 'password') {
-      // Usually one; each has its own salt.
-      for (const wrapper of usable) {
-        if (wrapper.kdf.alg !== 'argon2id') continue;
-        const ikm = await passwordIKM(factor.password, wrapper.kdf);
-        try {
-          return checked(await openRecoveryWrapper(wrapper, target.account, ikm));
-        } catch (error) {
-          if (!(error instanceof MatrixCustodyError && error.reason === 'wrong')) throw error;
-        } finally {
-          ikm.fill(0);
-        }
-      }
-      throw new MatrixCustodyError('wrong');
-    }
-    const byCredential = new Map(usable.map((w) => [w.credential_id, w]));
-    const evalByCredential: Record<string, { first: BufferSource }> = {};
-    for (const wrapper of usable) {
-      if (wrapper.kdf.alg !== 'webauthn-prf-hkdf-sha256') continue;
-      evalByCredential[wrapper.credential_id] = { first: fromBase64(wrapper.kdf.prf_salt) };
-    }
-    const { credentialID, ikm } = await this.prf(
-      {
-        allowCredentials: [...byCredential.keys()].map((id) => ({
-          type: 'public-key' as const,
-          id: fromBase64(id),
-        })),
-        extensions: { prf: { evalByCredential } },
-      },
-      signal,
-    );
-    const wrapper = byCredential.get(credentialID);
-    try {
-      if (!wrapper) throw new MatrixCustodyError('wrong');
-      return checked(await openRecoveryWrapper(wrapper, target.account, ikm));
-    } finally {
-      ikm.fill(0);
-    }
+    const usable = wrappers.filter((w) => !target.keyIDs || target.keyIDs.includes(w.key_id));
+    const opened = await this.bridge
+      .unwrap(target.subject, { account: target.account, wrappers: usable })
+      .catch((): UnwrapResult => ({ ok: false, error: 'unavailable' }));
+    if (!opened.ok) throw bridgeError(opened.error);
+    return checked(opened.recoveryKey);
   }
 
   async wrap(
     recoveryKey: string,
-    factor: MatrixUnlockFactor,
-    target: { account: string; keyID: string },
+    target: { account: string; subject: string; keyID: string },
     signal?: AbortSignal,
   ): Promise<void> {
-    let wrapper: RecoveryWrapper;
-    if (factor.kind === 'password') {
-      const kdf = {
-        alg: 'argon2id' as const,
-        ...passwordKDF,
-        salt: toBase64(crypto.getRandomValues(new Uint8Array(16))),
-      };
-      const ikm = await passwordIKM(factor.password, kdf);
-      try {
-        wrapper = await sealRecoveryKey({
-          kind: 'password',
-          account: target.account,
-          keyID: target.keyID,
-          credentialID: '',
-          kdf,
-          ikm,
-          recoveryKey,
-        });
-      } finally {
-        ikm.fill(0);
-      }
-    } else {
-      const salt = crypto.getRandomValues(new Uint8Array(32));
-      // Any passkey of the person (discoverable): the one they pick is recorded.
-      const { credentialID, ikm } = await this.prf(
-        { extensions: { prf: { eval: { first: salt } } } },
-        signal,
-      );
-      try {
-        wrapper = await sealRecoveryKey({
-          kind: 'passkey',
-          account: target.account,
-          keyID: target.keyID,
-          credentialID,
-          kdf: { alg: 'webauthn-prf-hkdf-sha256', prf_salt: toBase64(salt) },
-          ikm,
-          recoveryKey,
-        });
-      } finally {
-        ikm.fill(0);
-      }
-    }
+    const sealed = await this.bridge
+      .wrap(target.subject, { account: target.account, keyID: target.keyID, recoveryKey })
+      .catch((): WrapResult => ({ ok: false, error: 'unavailable' }));
+    if (!sealed.ok) throw bridgeError(sealed.error);
     let response: Response;
     try {
       response = await this.fetch(this.url('/api/matrix/recovery-wrappers'), {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(wrapper),
+        body: JSON.stringify(sealed.wrapper),
         ...(signal ? { signal } : {}),
       });
     } catch {
       throw new MatrixCustodyError('unavailable');
     }
     if (!response.ok) throw new MatrixCustodyError('unavailable');
+    // Moved to the new kind: what opened the old wrappers is not needed any more.
+    if (sealed.legacy) await this.bridge.forgetLegacy(target.subject).catch(() => undefined);
+  }
+
+  async retireOlder(
+    target: { account: string; subject: string; keyID: string },
+    signal?: AbortSignal,
+  ): Promise<boolean> {
+    const { wrappers } = await this.wrappers(signal);
+    const ofKey = wrappers.filter((w) => w.key_id === target.keyID);
+    const current = ofKey.find((w) => w.kind === 'sytue-id');
+    if (!current || !ofKey.some((w) => w.kind !== 'sytue-id')) return false;
+    // Checked HERE first: that very wrapper opens to a recovery key with the unlock key.
+    const opened = await this.bridge
+      .unwrap(target.subject, { account: target.account, wrappers: [current] })
+      .catch((): UnwrapResult => ({ ok: false, error: 'unavailable' }));
+    if (!opened.ok || opened.kind !== 'sytue-id' || !recoveryKeyShape.test(opened.recoveryKey))
+      return false;
+    const body: Partial<RecoveryWrapper> = { ...current };
+    delete body.id;
+    delete body.created_at;
+    const url = this.url('/api/matrix/recovery-wrappers');
+    let response: Response;
+    try {
+      response = await this.fetch(url + (url.includes('?') ? '&' : '?') + 'retire_older=1', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+        ...(signal ? { signal } : {}),
+      });
+    } catch {
+      return false;
+    }
+    return response.ok;
   }
 
   async legacyRecoveryKey(signal?: AbortSignal): Promise<string | null> {
@@ -238,42 +228,14 @@ export class BrowserKeyCustody implements MatrixKeyCustody {
     }
   }
 
-  /** One WebAuthn assertion, used ONLY for its PRF output: no server verifies it. */
-  private async prf(
-    request: Pick<PublicKeyCredentialRequestOptions, 'allowCredentials' | 'extensions'>,
-    signal?: AbortSignal,
-  ): Promise<{ credentialID: string; ikm: Uint8Array<ArrayBuffer> }> {
-    const credentials = this.credentials();
-    if (!credentials) throw new MatrixCustodyError('unsupported');
-    let credential: Credential | null;
-    try {
-      credential = await credentials.get({
-        publicKey: {
-          challenge: crypto.getRandomValues(new Uint8Array(32)),
-          rpId: this.options.rpId,
-          userVerification: 'required',
-          ...request,
-        },
-        ...(signal ? { signal } : {}),
-      });
-    } catch (error) {
-      throw new MatrixCustodyError(
-        error instanceof DOMException && error.name === 'NotAllowedError'
-          ? 'cancelled'
-          : 'unsupported',
-      );
-    }
-    const assertion = credential as
-      (Credential & { rawId: ArrayBuffer; getClientExtensionResults: () => PrfResults }) | null;
-    const first = assertion?.getClientExtensionResults().prf?.results?.first;
-    if (!assertion || !first) throw new MatrixCustodyError('unsupported');
-    const view =
-      first instanceof ArrayBuffer
-        ? new Uint8Array(first)
-        : new Uint8Array(first.buffer, first.byteOffset, first.byteLength);
-    const bytes = view.slice();
-    if (bytes.length !== 32) throw new MatrixCustodyError('unsupported');
-    return { credentialID: toBase64Url(new Uint8Array(assertion.rawId)), ikm: bytes };
+  /**
+   * The app's own login (`/auth/login`) with `unlock=1`: its BFF asks Sytue ID for a
+   * fresh sign-in (`prompt=login`), which leaves the unlock key in this browser.
+   */
+  signInURL(returnTo: string, older: string): string {
+    const params = new URLSearchParams({ unlock: '1', returnTo });
+    if (older) params.set('legacy', older);
+    return `${this.options.base.replace(/\/$/, '')}/auth/login?${params.toString()}`;
   }
 }
 
@@ -287,13 +249,16 @@ function validWrapper(value: unknown): value is RecoveryWrapper {
   return (
     !!w &&
     w.v === 1 &&
-    (w.kind === 'password' || w.kind === 'passkey') &&
+    (w.kind === 'sytue-id' || w.kind === 'password' || w.kind === 'passkey') &&
     typeof w.key_id === 'string' &&
     typeof w.credential_id === 'string' &&
     typeof w.nonce === 'string' &&
     typeof w.ciphertext === 'string' &&
     !!w.kdf &&
-    ((w.kind === 'password' && w.kdf.alg === 'argon2id') ||
+    ((w.kind === 'sytue-id' &&
+      w.kdf.alg === 'sytue-id-unlock-hkdf-sha256' &&
+      typeof w.kdf.hint === 'string') ||
+      (w.kind === 'password' && w.kdf.alg === 'argon2id') ||
       (w.kind === 'passkey' && w.kdf.alg === 'webauthn-prf-hkdf-sha256'))
   );
 }

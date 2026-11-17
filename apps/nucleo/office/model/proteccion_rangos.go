@@ -23,35 +23,48 @@ import (
 // desbloquea nada. Las personas se guardan por su `sub` (la identidad que el servicio
 // ya resuelve), no por correo.
 
+// RangoEditable es un `ranges[i]` tal como lo guarda el modelo: el `RangoEditable` de
+// packages/office/src/editor/types.ts. Lo leen también los clientes nativos
+// (apps/fyne/calcus), que lo conservan al guardar y desbloquean con él las celdas de quien
+// edita: la regla de a quién se concede es esta, no una copia.
+type RangoEditable struct {
+	Ref    string   `json:"ref"`
+	Users  []string `json:"users,omitempty"`
+	Groups []string `json:"groups,omitempty"`
+}
+
+// ConcedidoA dice si el rango es de `quien`: por su sub o por uno de sus grupos. Sin sub
+// no hay concesión posible.
+func (r RangoEditable) ConcedidoA(quien Subject) bool {
+	if quien.Sub == "" {
+		return false
+	}
+	if slices.Contains(r.Users, quien.Sub) {
+		return true
+	}
+	for _, g := range r.Groups {
+		if slices.Contains(quien.Groups, g) {
+			return true
+		}
+	}
+	return false
+}
+
 // rangoEditable es un `ranges[i]` ya leído.
 type rangoEditable struct {
 	c1, f1, c2, f2 int // columnas y filas, 1-based; 0 en f* = columna entera, 0 en c* = fila entera
 }
 
-// rangosEditables son los rangos de una protección que aplican a una persona concreta.
-type rangosEditables []rangoEditable
+// RangosEditables son los rangos de una protección que aplican a una persona concreta,
+// ya leídos.
+type RangosEditables []rangoEditable
 
-// rangosDe devuelve los rangos de `protect` concedidos a `quien` (por su sub o por uno
-// de sus grupos). Sin sub no hay concesión posible.
-func rangosDe(protect map[string]json.RawMessage, quien Subject) rangosEditables {
-	if quien.Sub == "" {
-		return nil
-	}
-	var lista []struct {
-		Ref    string   `json:"ref"`
-		Users  []string `json:"users"`
-		Groups []string `json:"groups"`
-	}
-	if json.Unmarshal(protect["ranges"], &lista) != nil {
-		return nil
-	}
-	var out rangosEditables
+// RangosConcedidos son los de la lista concedidos a `quien`, ya leídos. Deny-by-default:
+// uno sin referencia válida no desbloquea nada.
+func RangosConcedidos(lista []RangoEditable, quien Subject) RangosEditables {
+	var out RangosEditables
 	for _, r := range lista {
-		concedido := slices.Contains(r.Users, quien.Sub)
-		for _, g := range r.Groups {
-			concedido = concedido || slices.Contains(quien.Groups, g)
-		}
-		if !concedido {
+		if !r.ConcedidoA(quien) {
 			continue
 		}
 		if rg, ok := leerRangoEditable(r.Ref); ok {
@@ -61,15 +74,30 @@ func rangosDe(protect map[string]json.RawMessage, quien Subject) rangosEditables
 	return out
 }
 
+// rangosDe devuelve los rangos de `protect` concedidos a `quien` (por su sub o por uno
+// de sus grupos). Sin sub no hay concesión posible.
+func rangosDe(protect map[string]json.RawMessage, quien Subject) RangosEditables {
+	if quien.Sub == "" {
+		return nil
+	}
+	var lista []RangoEditable
+	if json.Unmarshal(protect["ranges"], &lista) != nil {
+		return nil
+	}
+	return RangosConcedidos(lista, quien)
+}
+
 // contiene dice si la celda «A1» cae en alguno de los rangos.
-func (rs rangosEditables) contiene(ref string) bool {
+func (rs RangosEditables) contiene(ref string) bool {
 	if len(rs) == 0 {
 		return false
 	}
 	col, fila, ok := leerCelda(ref)
-	if !ok {
-		return false
-	}
+	return ok && rs.Contiene(col, fila)
+}
+
+// Contiene dice si la celda de esa columna y esa fila (1-based) cae en alguno.
+func (rs RangosEditables) Contiene(col, fila int) bool {
 	for _, r := range rs {
 		if (r.c1 == 0 || (col >= r.c1 && col <= r.c2)) && (r.f1 == 0 || (fila >= r.f1 && fila <= r.f2)) {
 			return true

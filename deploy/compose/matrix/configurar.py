@@ -4,7 +4,7 @@
 """homeserver.yaml de Synapse para Docker Compose (local, servidor único y todo en uno).
 
 Es la configuración de producción (deploy/helm/charts/matrix y
-deploy/private-production/bin/matrix-config.py) en un solo fichero: sin registro,
+el generador del despliegue privado) en un solo fichero: sin registro,
 sin federación ni directorio, cifrado por defecto en todas las salas, y Sytue ID
 como único proveedor de identidad (uno por producto con almacenamiento privado,
 cada uno con su usuario Matrix, como en producción).

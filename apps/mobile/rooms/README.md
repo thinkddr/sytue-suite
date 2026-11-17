@@ -1,50 +1,53 @@
-# Sytue Rooms — App movil (Capacitor 8)
+<a id="sytue-rooms--app-movil-capacitor-8"></a>
+# Sytue Rooms — Mobile app (Capacitor 8)
 
-Cascaron **nativo** de **Sytue Rooms** para **iOS y Android**. **Envuelve el PWA de
-Rooms** (`apps/frontend/apps/rooms`, servido en `https://rooms.sytue.eu`) en un webview
-nativo con [Capacitor](https://capacitorjs.com) (**MIT**) y le anade integracion
-movil: push, deep-links, status bar, splash, teclado, badge de no-leidos y back de
-Android. **No** reimplementa la UI — es un cliente de marca sobre el mismo PWA, igual
-que la app de escritorio de Rooms en Wails (retirada el 2026-09-23) y que la
-app de escritorio de Mattermost/Slack.
+**Native** shell of **Sytue Rooms** for **iOS and Android**. It **wraps the Rooms
+PWA** (`apps/frontend/apps/rooms`, served at `https://rooms.sytue.eu`) in a native
+webview with [Capacitor](https://capacitorjs.com) (**MIT**) and adds mobile
+integration: push, deep links, status bar, splash, keyboard, unread badge and the Android
+back button. It does **not** reimplement the UI — it is a branded client on top of the same PWA, just
+like the Rooms desktop app in Wails (retired on 2026-09-23) and like the
+Mattermost/Slack desktop app.
 
-> **Ubicacion.** `apps/mobile/` ya contiene (commit previo, otra sesion) el cascaron
-> Capacitor de **Sytue One** (la suite completa, `one.sytue.eu`, ADR-0024). Esta app
-> es un producto distinto — el cliente **de Rooms** (`rooms.sytue.eu`) — asi que vive
-> en `apps/mobile/rooms/` para **no** destruir ese trabajo y respetar «modulo
-> separado, sin tocar lo compartido». Era el espejo exacto de la app de Rooms de
-> escritorio en Wails, ya retirada. Si el objetivo fuera _reemplazar_ el shell Sytue
-> One por el de Rooms, muevela a la raiz de `apps/mobile/`.
+> **Location.** `apps/mobile/` already contains (earlier commit, another session) the
+> Capacitor shell of **Sytue One** (the full suite, `one.sytue.eu`, ADR-0024). This app
+> is a different product — the **Rooms** client (`rooms.sytue.eu`) — so it lives
+> in `apps/mobile/rooms/` in order **not** to destroy that work and to respect “separate
+> module, without touching what is shared”. It was the exact mirror of the Rooms desktop
+> app in Wails, now retired. If the goal were to _replace_ the Sytue
+> One shell with the Rooms one, move it to the root of `apps/mobile/`.
 
-Standalone **a proposito**: `package.json` propio con la CLI de Capacitor + plugins,
-**fuera** del workspace Bun del frontend (`apps/frontend`). `node_modules/`, `ios/` y
-`android/` estan en `.gitignore` (se generan).
+Standalone **on purpose**: its own `package.json` with the Capacitor CLI + plugins,
+**outside** the frontend's Bun workspace (`apps/frontend`). `node_modules/`, `ios/` and
+`android/` are in `.gitignore` (they are generated).
 
-## Integracion nativa
+<a id="integracion-nativa"></a>
+## Native integration
 
-| Funcion                   | Plugin (MIT)                    | Implementacion                                                                                                                                                                                                                                                                                                                    |
+| Feature                   | Plugin (MIT)                    | Implementation                                                                                                                                                                                                                                                                                                                    |
 | ------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Push**                  | `@capacitor/push-notifications` | Pide permiso, registra el token nativo (**FCM** Android / **APNs** iOS) y lo **POSTea** al backend (`POST {origen}/api/push/native`, cookie de sesion). Tap en la notificacion → deep-link al canal (`data.url`). En primer plano muestra banner (`presentationOptions`). **Sender FCM/APNs del backend: PENDIENTE** (ver abajo). |
-| **Deep-links**            | `@capacitor/app` (`appUrlOpen`) | `sytue-rooms://open?url=…` y universal links `https://rooms.sytue.eu/channels/x` → navega el webview a la ruta dentro del origen de Rooms.                                                                                                                                                                                        |
-| **Status bar**            | `@capacitor/status-bar`         | Grafito `#22262b` + texto claro (tokens Graphite & Brass), sin superponerse al contenido.                                                                                                                                                                                                                                         |
-| **Splash**                | `@capacitor/splash-screen`      | Marca sobre marfil/grafito; `launchAutoHide:false` → `native.js` la oculta cuando Rooms ha cargado (sin flash blanco).                                                                                                                                                                                                            |
-| **Teclado**               | `@capacitor/keyboard`           | `resize: 'native'` → el composer de chat sube con el teclado.                                                                                                                                                                                                                                                                     |
-| **Badge de no-leidos**    | `@capawesome/capacitor-badge`   | Cuenta de no-leidos en el icono de la app; se limpia al volver a primer plano. iOS ademas recibe el badge del payload APNs.                                                                                                                                                                                                       |
-| **Back (Android)**        | `@capacitor/app` (`backButton`) | Navega el historial del webview; si no puede, sale de la app.                                                                                                                                                                                                                                                                     |
-| **Puente webview↔nativo** | `www/native.js`                 | Lee no-leidos del titulo (Rooms prefija `(N)`) y expone `window.SytueNative` para que el PWA empuje no-leidos/foco.                                                                                                                                                                                                               |
+| **Push**                  | `@capacitor/push-notifications` | Requests permission, registers the native token (**FCM** Android / **APNs** iOS) and **POSTs** it to the backend (`POST {origen}/api/push/native`, session cookie). Tapping the notification → deep link to the channel (`data.url`). In the foreground it shows a banner (`presentationOptions`). **Backend FCM/APNs sender: PENDING** (see below). |
+| **Deep links**            | `@capacitor/app` (`appUrlOpen`) | `sytue-rooms://open?url=…` and universal links `https://rooms.sytue.eu/channels/x` → navigates the webview to the route within the Rooms origin.                                                                                                                                                                                  |
+| **Status bar**            | `@capacitor/status-bar`         | Graphite `#22262b` + light text (Graphite & Brass tokens), without overlapping the content.                                                                                                                                                                                                                                       |
+| **Splash**                | `@capacitor/splash-screen`      | Brand on ivory/graphite; `launchAutoHide:false` → `native.js` hides it once Rooms has loaded (no white flash).                                                                                                                                                                                                                    |
+| **Keyboard**              | `@capacitor/keyboard`           | `resize: 'native'` → the chat composer moves up with the keyboard.                                                                                                                                                                                                                                                                |
+| **Unread badge**          | `@capawesome/capacitor-badge`   | Unread count on the app icon; cleared when returning to the foreground. iOS also receives the badge from the APNs payload.                                                                                                                                                                                                        |
+| **Back (Android)**        | `@capacitor/app` (`backButton`) | Navigates the webview history; if it cannot, exits the app.                                                                                                                                                                                                                                                                       |
+| **Webview↔native bridge** | `www/native.js`                 | Reads unread counts from the title (Rooms prefixes `(N)`) and exposes `window.SytueNative` so the PWA can push unread counts/focus.                                                                                                                                                                                               |
 
-### El puente webview ↔ nativo (`www/native.js`)
+<a id="el-puente-webview--nativo-wwwnativejs"></a>
+### The webview ↔ native bridge (`www/native.js`)
 
-Toda la wiring corre **dentro del webview**, sobre la pagina de Rooms, desde
-`www/native.js`. Habla con el **puente global `window.Capacitor`** (que Capacitor
-inyecta **incluso en un origen remoto**) llamando a `window.Capacitor.Plugins.*`.
-**Seguridad:** no expone FS/exec/APIs peligrosas — solo lee no-leidos del titulo y
-**navega dentro del origen de Rooms** (deep-links a otros hosts se ignoran; los
-enlaces externos ya abren en el navegador del sistema por `server.allowNavigation`).
+All the wiring runs **inside the webview**, on top of the Rooms page, from
+`www/native.js`. It talks to the **global `window.Capacitor` bridge** (which Capacitor
+injects **even into a remote origin**) by calling `window.Capacitor.Plugins.*`.
+**Security:** it does not expose FS/exec/dangerous APIs — it only reads unread counts from the title and
+**navigates within the Rooms origin** (deep links to other hosts are ignored; external
+links already open in the system browser through `server.allowNavigation`).
 
-**Como el PWA detecta que corre en Capacitor:** `window.Capacitor?.isNativePlatform?.()`
-es `true`; `window.Capacitor.getPlatform()` da `'ios'` | `'android'`. Ademas, una vez
-cargado `native.js`, el PWA puede usar `window.SytueNative`:
+**How the PWA detects that it is running in Capacitor:** `window.Capacitor?.isNativePlatform?.()`
+is `true`; `window.Capacitor.getPlatform()` returns `'ios'` | `'android'`. In addition, once
+`native.js` has loaded, the PWA can use `window.SytueNative`:
 
 ```js
 if (window.SytueNative?.isNative) {
@@ -53,14 +56,14 @@ if (window.SytueNative?.isNative) {
 }
 ```
 
-**Como `native.js` llega al PWA remoto** (dos vias, no excluyentes):
+**How `native.js` reaches the remote PWA** (two routes, not mutually exclusive):
 
-1. **Inyeccion nativa (sin tocar el PWA — via por defecto).** Como Rooms es un
-   origen remoto, la capa nativa inyecta el script en cada carga (idempotente por el
-   guard `__sytueRoomsNative`), igual que la app de escritorio inyecta su puente.
-   **Estos snippets se aplican tras `npx cap add`** (necesitan Xcode/Android Studio):
+1. **Native injection (without touching the PWA — the default route).** Since Rooms is a
+   remote origin, the native layer injects the script on every load (idempotent thanks to the
+   `__sytueRoomsNative` guard), just as the desktop app injects its bridge.
+   **These snippets are applied after `npx cap add`** (they need Xcode/Android Studio):
 
-   - **iOS** — `ios/App/App/AppDelegate.swift`, en `application(_:didFinishLaunchingWithOptions:)`:
+   - **iOS** — `ios/App/App/AppDelegate.swift`, in `application(_:didFinishLaunchingWithOptions:)`:
 
      ```swift
      if let url = Bundle.main.url(forResource: "native", withExtension: "js",
@@ -74,62 +77,65 @@ if (window.SytueNative?.isNative) {
      }
      ```
 
-     `www/` se copia a `public/` dentro del bundle en `cap sync`, asi que
-     `native.js` esta disponible como recurso.
+     `www/` is copied to `public/` inside the bundle on `cap sync`, so
+     `native.js` is available as a resource.
 
-   - **Android** — `android/app/src/main/java/.../MainActivity.java`, engancha el
-     `WebViewClient.onPageFinished` (o un `bridge.eval(...)`) y evalua el asset:
+   - **Android** — `android/app/src/main/java/.../MainActivity.java`, hook
+     `WebViewClient.onPageFinished` (or a `bridge.eval(...)`) and evaluate the asset:
      ```java
      String js = new String(getAssets().open("public/native.js").readAllBytes(),
                             StandardCharsets.UTF_8);
      bridge.getWebView().post(() -> bridge.getWebView().evaluateJavascript(js, null));
      ```
 
-2. **Cooperacion del PWA (opcional, follow-up en `apps/frontend/apps/chat`).** El PWA
-   detecta Capacitor y carga/importa el cliente el mismo — sin inyeccion nativa. Es un
-   cambio en el repo del frontend (otra sesion), **fuera del alcance de esta ola**.
+2. **PWA cooperation (optional, follow-up in `apps/frontend/apps/chat`).** The PWA
+   detects Capacitor and loads/imports the client itself — without native injection. It is a
+   change in the frontend repo (another session), **out of scope for this wave**.
 
-> `native.js` es JS plano y **defensivo** (cada plugin va guardado; nunca lanza), por
-> lo que la misma via 1 o 2 funciona sin bundler y sin acoplar el PWA a Capacitor.
+> `native.js` is plain, **defensive** JS (every plugin is guarded; it never throws), so
+> the same route 1 or 2 works without a bundler and without coupling the PWA to Capacitor.
 
-## Configuracion de la URL de Rooms
+<a id="configuracion-de-la-url-de-rooms"></a>
+## Rooms URL configuration
 
-Mismo convenio `SYTUE_ROOMS_URL` que tenia la app de Rooms de escritorio (Wails):
+Same `SYTUE_ROOMS_URL` convention that the Rooms desktop app (Wails) had:
 
-| Origen                               | Valor                    |
+| Source                               | Value                    |
 | ------------------------------------ | ------------------------ |
-| `SYTUE_ROOMS_URL` (env, prioritaria) | cualquier URL http(s)    |
+| `SYTUE_ROOMS_URL` (env, takes priority) | any http(s) URL       |
 | Default                              | `https://rooms.sytue.eu` |
 
 ```bash
 SYTUE_ROOMS_URL=https://rooms.sytue.localhost npx cap run ios   # dev (Traefik + mkcert)
 ```
 
-`server.url` en `capacitor.config.ts` es la URL del PWA de Rooms;
-`server.allowNavigation` es una **lista cerrada de dos hosts**: el origen de Rooms y el de
-**Sytue ID**, derivado del mismo apex (`rooms.sytue.eu` → `id.sytue.eu`,
-`rooms.sytue.localhost` → `id.sytue.localhost`). Cualquier otro enlace abre en el
-navegador del sistema, sin arrastrar la sesion. En dev, instala la CA de mkcert
-(`mkcert -install`) para que el webview confie en el TLS local.
+`server.url` in `capacitor.config.ts` is the URL of the Rooms PWA;
+`server.allowNavigation` is a **closed list of two hosts**: the Rooms origin and the
+**Sytue ID** origin, derived from the same apex (`rooms.sytue.eu` → `id.sytue.eu`,
+`rooms.sytue.localhost` → `id.sytue.localhost`). Any other link opens in the
+system browser, without carrying the session along. In dev, install the mkcert CA
+(`mkcert -install`) so the webview trusts the local TLS.
 
-**Por que `id.*` tiene que estar.** Rooms manda al visitante sin sesion a `/auth/login`, y
-de ahi a `id.*/oauth/authorize` (OIDC + PKCE). Capacitor aplica `allowNavigation` tambien a
-las **redirecciones del servidor** —iOS en `WebViewDelegationHandler.decidePolicyFor`,
-Android en `shouldOverrideUrlLoading`—, no solo a los clics: con `id.*` fuera de la lista,
-el webview **cancela** la navegacion y la abre en el navegador del sistema. El usuario se
-autentica alli, la cookie se queda alli, y la app vuelve a empezar el mismo bucle en cada
-arranque. Es decir: **sin ese host el login es imposible**, no «incomodo».
+**Why `id.*` has to be there.** Rooms sends a visitor without a session to `/auth/login`, and
+from there to `id.*/oauth/authorize` (OIDC + PKCE). Capacitor applies `allowNavigation` to
+**server redirects** too (iOS in `WebViewDelegationHandler.decidePolicyFor`,
+Android in `shouldOverrideUrlLoading`), not just to clicks: with `id.*` off the list,
+the webview **cancels** the navigation and opens it in the system browser. The user
+authenticates there, the cookie stays there, and the app starts the same loop again on every
+launch. In other words: **without that host login is impossible**, not “inconvenient”.
 
-## Requisitos
+<a id="requisitos"></a>
+## Requirements
 
-- **Node** (LTS) o **Bun** — para la CLI de Capacitor.
-- **iOS:** **macOS + Xcode** (+ CocoaPods) y cuenta de Apple Developer para firmar/publicar.
-- **Android:** **Android Studio** + Android SDK (JDK 17), `ANDROID_HOME` configurado.
-- **ImageMagick** (`magick`) solo si regeneras iconos/splash (`scripts/gen-icons.sh`).
+- **Node** (LTS) or **Bun** — for the Capacitor CLI.
+- **iOS:** **macOS + Xcode** (+ CocoaPods) and an Apple Developer account to sign/publish.
+- **Android:** **Android Studio** + Android SDK (JDK 17), with `ANDROID_HOME` set.
+- **ImageMagick** (`magick`) only if you regenerate icons/splash (`scripts/gen-icons.sh`).
 
-## Comandos
+<a id="comandos"></a>
+## Commands
 
-Desde `apps/mobile/rooms/`:
+From `apps/mobile/rooms/`:
 
 ```bash
 npm install                 # @capacitor/* + plugins (gitignored)
@@ -150,54 +156,56 @@ npx cap open android        # abre Android Studio
 npx cap run ios | android   # build + deploy a simulador/dispositivo
 ```
 
-Tras `cap add`, aplica **una vez**:
+After `cap add`, apply **once**:
 
-- Los fragmentos de `native/` a `Info.plist` / `AndroidManifest.xml`.
-- Los snippets de inyeccion de `native.js` (§Puente, via 1).
-- La config de push por plataforma (§Push).
+- The `native/` fragments to `Info.plist` / `AndroidManifest.xml`.
+- The `native.js` injection snippets (§Bridge, route 1).
+- The per-platform push config (§Push).
 
-## Push — configuracion y estado del backend
+<a id="push--configuracion-y-estado-del-backend"></a>
+## Push — configuration and backend status
 
-**Cliente: HECHO** (`www/native.js`). Registra el token nativo y lo POStea:
+**Client: DONE** (`www/native.js`). It registers the native token and POSTs it:
 
 ```
 POST {origen-de-Rooms}/api/push/native      (cookie de sesion, credentials:include)
 Body: { "platform": "ios" | "android", "token": "<FCM/APNs token>" }
 ```
 
-Se eligio un **endpoint nuevo** para tokens nativos porque el de Web Push existente
-(`/api/push`, Ola 18) espera una **suscripcion RFC 8291** (`endpoint` + claves
-`p256dh`/`auth`), forma incompatible con un token FCM/APNs plano.
+A **new endpoint** was chosen for native tokens because the existing Web Push one
+(`/api/push`, Wave 18) expects an **RFC 8291 subscription** (`endpoint` + `p256dh`/`auth`
+keys), a shape incompatible with a plain FCM/APNs token.
 
-**Backend — PENDIENTE (no se toca `services/**` en esta ola):**
+**Backend — PENDING (`services/**` is not touched in this wave):**
 
-- **Endpoint** `POST /me/push/native` en `services/chat` (BFF `/api/push/native`) que
-  persista `{subject, platform, token}` (analogo a `domain.PushSubscription`, con
-  `token` en vez de `endpoint`/claves).
-- **Sender** que entregue via **FCM HTTP v1** (Android) y **APNs** (iOS), incluyendo
-  `data.url` (ruta del canal/mensaje) para el deep-link al tocar la notificacion.
-- **Credenciales necesarias** (secretos, **fuera de git**):
-  - **FCM:** cuenta de servicio de Firebase (`google-services.json` en la app +
-    JSON de service account en el backend), o server key legacy.
-  - **APNs:** clave `.p8` (Key ID + Team ID) o certificado `.p12`, y el `bundle id`
-    `eu.sytue.rooms`; entitlement `aps-environment` (development/production).
+- **Endpoint** `POST /me/push/native` in `services/chat` (BFF `/api/push/native`) that
+  persists `{subject, platform, token}` (analogous to `domain.PushSubscription`, with
+  `token` instead of `endpoint`/keys).
+- **Sender** that delivers via **FCM HTTP v1** (Android) and **APNs** (iOS), including
+  `data.url` (channel/message route) for the deep link when the notification is tapped.
+- **Required credentials** (secrets, **outside git**):
+  - **FCM:** Firebase service account (`google-services.json` in the app +
+    service account JSON in the backend), or a legacy server key.
+  - **APNs:** `.p8` key (Key ID + Team ID) or `.p12` certificate, and the `bundle id`
+    `eu.sytue.rooms`; `aps-environment` entitlement (development/production).
 
-Config de push en el proyecto nativo (tras `cap add`):
+Push config in the native project (after `cap add`):
 
-- **Android:** coloca `google-services.json` en `android/app/` (gitignored). El
-  plugin cablea FCM al `cap sync`.
-- **iOS:** en Xcode, capability **Push Notifications** (+ **Background Modes → Remote
-  notifications**); sube la clave APNs `.p8` a tu proveedor de envio.
+- **Android:** place `google-services.json` in `android/app/` (gitignored). The
+  plugin wires up FCM on `cap sync`.
+- **iOS:** in Xcode, the **Push Notifications** capability (+ **Background Modes → Remote
+  notifications**); upload the APNs `.p8` key to your delivery provider.
 
-## Deep-links y Universal Links
+<a id="deep-links-y-universal-links"></a>
+## Deep links and Universal Links
 
-- **Esquema `sytue-rooms://`** — registrado en `native/ios-Info.plist.additions.xml`
-  (`CFBundleURLTypes`) y `native/android-AndroidManifest.additions.xml`
-  (`<data android:scheme="sytue-rooms"/>`). Funciona sin configuracion de servidor.
-- **Universal / App Links** (`https://rooms.sytue.eu/...`) — requieren, **en el
-  dominio de Rooms** (servido por el BFF de `apps/frontend/apps/chat`, no por este
+- **`sytue-rooms://` scheme** — registered in `native/ios-Info.plist.additions.xml`
+  (`CFBundleURLTypes`) and `native/android-AndroidManifest.additions.xml`
+  (`<data android:scheme="sytue-rooms"/>`). Works without any server configuration.
+- **Universal / App Links** (`https://rooms.sytue.eu/...`) — require, **on the
+  Rooms domain** (served by the BFF of `apps/frontend/apps/chat`, not by this
   repo):
-  - **iOS:** `https://rooms.sytue.eu/.well-known/apple-app-site-association` (JSON, sin
+  - **iOS:** `https://rooms.sytue.eu/.well-known/apple-app-site-association` (JSON, no
     extension, `Content-Type: application/json`):
     ```json
     {
@@ -212,7 +220,7 @@ Config de push en el proyecto nativo (tras `cap add`):
       }
     }
     ```
-    - capability **Associated Domains** `applinks:rooms.sytue.eu` en Xcode.
+    - **Associated Domains** capability `applinks:rooms.sytue.eu` in Xcode.
   - **Android:** `https://rooms.sytue.eu/.well-known/assetlinks.json`:
     ```json
     [
@@ -226,51 +234,55 @@ Config de push en el proyecto nativo (tras `cap add`):
       }
     ]
     ```
-    - `android:autoVerify="true"` (ya en el fragmento del manifest).
+    - `android:autoVerify="true"` (already in the manifest fragment).
 
-## Build, firma y publicacion
+<a id="build-firma-y-publicacion"></a>
+## Build, signing and publishing
 
-Cada build produce el artefacto de **su** plataforma; exige el toolchain nativo.
+Each build produces the artifact for **its own** platform; it requires the native toolchain.
 
-- **iOS de este proyecto Capacitor:** no tiene un job de publicacion activo. El antiguo
-  `ios-apps` de `release-mobile.yml` se retiro el 2026-09-21; el flujo intermedio de
-  Codemagic tambien esta retirado. La app Rooms de Fyne se publica mediante
-  [`release-desktop.yml`](../../../.github/workflows/release-desktop.yml), que construye
-  `apps/fyne` y no este proyecto. Compilar manualmente este shell exige Xcode, firma y
-  capabilities propias; las instrucciones de Capacitor no describen los binarios actuales
-  de la suite. El flujo vigente se detalla en
+- **iOS for this Capacitor project:** it has no active publishing job. The old
+  `ios-apps` job in `release-mobile.yml` was retired on 2026-09-21; the interim
+  Codemagic flow is retired too. The Fyne Rooms app is published through
+  [`release-desktop.yml`](../../../.github/workflows/release-desktop.yml), which builds
+  `apps/fyne` and not this project. Building this shell manually requires Xcode, signing and
+  its own capabilities; the Capacitor instructions do not describe the suite's current
+  binaries. The current flow is detailed in
   [`docs/operations.md`](../../../docs/operations.md#xcode-cloud).
-- **Android (Play Store):** Android Studio → `Generate Signed Bundle (.aab)` con tu
-  keystore (gitignored); sube el `.aab` a Play Console. La huella SHA-256 de la clave
-  de firma (o de Play App Signing) debe coincidir con `assetlinks.json`.
+- **Android (Play Store):** Android Studio → `Generate Signed Bundle (.aab)` with your
+  keystore (gitignored); upload the `.aab` to Play Console. The SHA-256 fingerprint of the signing
+  key (or of Play App Signing) must match `assetlinks.json`.
 
-Certificados y cuentas de tienda → CI (ADR-0024). **Nada de secretos en git**
-(`.gitignore` cubre `*.p8`/`*.p12`/`*.keystore`/`google-services.json`/…).
+Certificates and store accounts → CI (ADR-0024). **No secrets in git**
+(`.gitignore` covers `*.p8`/`*.p12`/`*.keystore`/`google-services.json`/…).
 
-## Verificacion (en este entorno, macOS/arm64)
+<a id="verificacion-en-este-entorno-macosarm64"></a>
+## Verification (in this environment, macOS/arm64)
 
-Honesto — **el build nativo firmado NO se construye aqui** (exige Xcode / Android
-SDK). Lo verificable si se comprobo:
+To be honest — **the signed native build is NOT built here** (it requires Xcode / the Android
+SDK). What could be verified was checked:
 
-- `package.json` valido (JSON), `capacitor.config.ts` typechea (`tsc --noEmit`).
-- `www/native.js` valido (`node --check`) y su **logica pura** (parseo de no-leidos y
-  traduccion de deep-links) pasa el self-check (`node scripts/selfcheck.cjs`).
-- `www/index.html` es HTML valido.
-- Ver el reporte de la ola para el resultado exacto de `npm install` / `npx cap
---version` en este entorno.
+- `package.json` is valid (JSON), `capacitor.config.ts` typechecks (`tsc --noEmit`).
+- `www/native.js` is valid (`node --check`) and its **pure logic** (unread parsing and
+  deep-link translation) passes the self-check (`node scripts/selfcheck.cjs`).
+- `www/index.html` is valid HTML.
+- See the wave report for the exact result of `npm install` / `npx cap
+--version` in this environment.
 
-## Que queda para un artefacto publicable
+<a id="que-queda-para-un-artefacto-publicable"></a>
+## What remains for a publishable artifact
 
-1. `npx cap add ios/android` + aplicar los fragmentos de `native/` y los snippets de
-   inyeccion (§Puente) en una maquina con Xcode/Android SDK.
-2. **Backend push:** endpoint `/me/push/native` + **sender FCM/APNs** con credenciales.
-3. **Universal Links:** servir `apple-app-site-association` / `assetlinks.json` en el
-   dominio de Rooms.
-4. **Firmar y publicar** (Apple Developer / Play Console) — CI (ADR-0024).
-5. (Opcional) Cooperacion del PWA con `window.SytueNative` para no-leidos exactos sin
-   depender del parseo del titulo.
+1. `npx cap add ios/android` + apply the `native/` fragments and the injection
+   snippets (§Bridge) on a machine with Xcode/Android SDK.
+2. **Push backend:** `/me/push/native` endpoint + **FCM/APNs sender** with credentials.
+3. **Universal Links:** serve `apple-app-site-association` / `assetlinks.json` on the
+   Rooms domain.
+4. **Sign and publish** (Apple Developer / Play Console) — CI (ADR-0024).
+5. (Optional) PWA cooperation with `window.SytueNative` for exact unread counts without
+   relying on title parsing.
 
-## Estructura
+<a id="estructura"></a>
+## Structure
 
 ```
 apps/mobile/rooms/

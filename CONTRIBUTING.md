@@ -1,47 +1,51 @@
-# Contribuir a Sytue One
+<a id="contribuir-a-sytue-one"></a>
+# Contributing to Sytue One
 
-Gracias por contribuir. Sytue One es una suite **100 % UE y soberana**, reimplementada como
-**producto original** con licencia Apache-2.0 (clean-room sobre estándares abiertos). Antes
-de empezar, lee el contrato canónico [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md): es la
-**fuente de verdad** de nombres, dominios, puertos, versiones, clients OIDC y licencias.
-Cualquier cambio debe coincidir con él.
+Thank you for contributing. Sytue One is a **100% EU, sovereign** suite, reimplemented as an
+**original product** under the Apache-2.0 license (clean-room on open standards). Before
+you start, read the canonical contract [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md): it is the
+**source of truth** for names, domains, ports, versions, OIDC clients and licenses.
+Every change must match it.
 
-## Stack único
+<a id="stack-único"></a>
+## Single stack
 
-`Go + Astro + Preact + PostgreSQL` (+ S3 para blobs). **Backend 100 % Go** (módulo único
-`git.sytue.eu/sytue/one`, un binario por servicio). **Frontend** Astro + Preact. **Único
-datastore** PostgreSQL (estado, colas y caché). **Sin Redis/Valkey** y **sin ningún motor
-AGPL de terceros** (Keycloak, Nextcloud, OnlyOffice, Mattermost, Stalwart están fuera). La
-única app de terceros es **LiveKit** (Apache-2.0), SFU de medios de Sytue Meet.
+`Go + Astro + Preact + PostgreSQL` (+ S3 for blobs). **100% Go backend** (single module
+`git.sytue.eu/sytue/one`, one binary per service). **Frontend** Astro + Preact. **Single
+datastore** PostgreSQL (state, queues and cache). **No Redis/Valkey** and **no third-party
+AGPL engine at all** (Keycloak, Nextcloud, OnlyOffice, Mattermost, Stalwart are out). The
+only third-party app is **LiveKit** (Apache-2.0), the media SFU for Sytue Meet.
 
-**Las versiones no se citan aquí.** La política es **siempre la última estable** y los números
-vivos están en la tabla de
+**Versions are not quoted here.** The policy is **always the latest stable** and the live
+numbers are in the table in
 [`docs/CONVENTIONS.md` §3](docs/CONVENTIONS.md#3-versiones-y-stack--politica-ultima-estable--cadena-de-suministro),
-que es su fuente de verdad, y `make toolchain-check` comprueba que el entorno coincide. Este
-párrafo decía «Astro 5» y «PostgreSQL 16» cuando la tabla ya iba por 7 y por 18: un número
-repetido en prosa envejece sin que nadie lo note.
+which is their source of truth, and `make toolchain-check` checks that the environment matches. This
+paragraph used to say “Astro 5” and “PostgreSQL 16” when the table was already at 7 and 18: a number
+repeated in prose goes stale without anyone noticing.
 
-## Principios que rigen toda contribución
+<a id="principios-que-rigen-toda-contribución"></a>
+## Principles that govern every contribution
 
-1. **Diseño primero y transversal.** Usa los componentes de `@sytue/ui` y monta
-   `@sytue/shell`. No crees UI ad-hoc ni variantes de componentes.
-2. **El IdP es nuclear.** Toda autenticación pasa por **Sytue ID** (servicio Go propio) vía
-   OIDC + PKCE con BFF y cookie httpOnly `.sytue.eu`; cada servicio valida los JWT vía JWKS.
-   Ningún producto gestiona credenciales propias.
-3. **Integración seamless.** Reutiliza Sytue Hub (búsqueda, notificaciones, presencia,
-   intents) en lugar de duplicar integración.
-4. **100 % UE.** Solo regiones UE de Scaleway. No introduzcas dependencias de proveedores
-   US para datos personales.
-5. **Clean-room y licencia Apache-2.0.** El código de producto es **Apache-2.0, © 2026 Daniel Delgado
-   Ramos (thinkddr)**. Solo se permiten **dependencias de terceros permisivas**
-   (MIT/BSD/Apache-2.0/ISC/PostgreSQL/MPL-2.0); **prohibido** copiar/portar código AGPL/GPL o
-   _source-available_. Quien implementa trabaja desde RFCs/specs, **nunca** desde el código de
-   motores AGPL. Ver [`docs/security.md#4-politica-de-reimplementacion-clean-room`](docs/security.md#4-politica-de-reimplementacion-clean-room) y
+1. **Design first, and cross-cutting.** Use the `@sytue/ui` components and mount
+   `@sytue/shell`. Do not create ad-hoc UI or component variants.
+2. **The IdP is core.** All authentication goes through **Sytue ID** (in-house Go service) via
+   OIDC + PKCE with a BFF and an httpOnly `.sytue.eu` cookie; each service validates JWTs via JWKS.
+   No product manages its own credentials.
+3. **Seamless integration.** Reuse Sytue Hub (search, notifications, presence,
+   intents) instead of duplicating integration.
+4. **100% EU.** Only Scaleway EU regions. Do not introduce dependencies on US
+   providers for personal data.
+5. **Clean-room and Apache-2.0 license.** Product code is **Apache-2.0, © 2026 Daniel Delgado
+   Ramos (thinkddr)**. Only **permissive third-party dependencies** are allowed
+   (MIT/BSD/Apache-2.0/ISC/PostgreSQL/MPL-2.0); copying/porting AGPL/GPL or
+   _source-available_ code is **forbidden**. Implementers work from RFCs/specs, **never** from the code of
+   AGPL engines. See [`docs/security.md#4-politica-de-reimplementacion-clean-room`](docs/security.md#4-politica-de-reimplementacion-clean-room) and
    [`docs/security.md#5-licencias-propiedad-y-cumplimiento`](docs/security.md#5-licencias-propiedad-y-cumplimiento).
-6. **Seguridad y privacidad por defecto.** RLS multi-tenant, consultas parametrizadas,
-   deny-by-default, secretos solo en gestor de secretos (placeholders en git).
+6. **Security and privacy by default.** Multi-tenant RLS, parameterized queries,
+   deny-by-default, secrets only in a secrets manager (placeholders in git).
 
-## Entorno de desarrollo
+<a id="entorno-de-desarrollo"></a>
+## Development environment
 
 ```bash
 ./sytue-deploy       # genera deploy/compose/.env y levanta toda la suite (*.sytue.localhost)
@@ -54,13 +58,14 @@ make fe-install      # dependencias del frontend (Bun; versión en §3 de CONVEN
 make fe-dev          # apps Astro en caliente (4321-4331)
 ```
 
-Más detalle en el [README](README.md) y en [`docs/operations.md#1-runbook-de-operacion`](docs/operations.md#1-runbook-de-operacion).
+More detail in the [README](README.md) and in [`docs/operations.md#1-runbook-de-operacion`](docs/operations.md#1-runbook-de-operacion).
 
-### El editor y los gates tienen que decir lo mismo
+<a id="el-editor-y-los-gates-tienen-que-decir-lo-mismo"></a>
+### The editor and the gates have to say the same thing
 
-`.vscode/` no se versiona (los ajustes personales son personales), pero hay cuatro que no son
-gusto sino hechos del repositorio. Sin ellos el editor sale lleno de rojos y amarillos que
-la consola no ve, y se acaba desconfiando de los dos. En VS Code, `.vscode/settings.json`:
+`.vscode/` is not versioned (personal settings are personal), but there are four settings that are not
+a matter of taste but facts about the repository. Without them the editor fills up with red and yellow marks that
+the console does not see, and you end up distrusting both. In VS Code, `.vscode/settings.json`:
 
 ```jsonc
 {
@@ -79,66 +84,71 @@ la consola no ve, y se acaba desconfiando de los dos. En VS Code, `.vscode/setti
 }
 ```
 
-En otros editores, el equivalente: SDK de TypeScript del workspace, validación de CSS sin
-quejarse de at-rules desconocidas y etiqueta de build `integration` para el servidor de
-lenguaje de Go.
+In other editors, the equivalent: the workspace TypeScript SDK, CSS validation that does not
+complain about unknown at-rules, and the `integration` build tag for the Go
+language server.
 
-Y al revés: **si el editor marca algo que el gate no marca, suele faltar cobertura en el
-gate**, no sobrar razón al editor. Pasó con 139 ficheros de test (`49c0bd2d`): estaban
-fuera de los `include` de sus `tsconfig`, así que el editor los miraba y la consola no.
+And the other way round: **if the editor flags something the gate does not, it usually means the
+gate is missing coverage**, not that the editor is overreaching. It happened with 139 test files (`49c0bd2d`): they were
+outside the `include` of their `tsconfig`, so the editor checked them and the console did not.
 
-### La documentación no la formatea Prettier
+<a id="la-documentación-no-la-formatea-prettier"></a>
+### Documentation is not formatted by Prettier
 
-Los `.md` de la raíz y de `docs/` **quedan fuera de Prettier a propósito**, y no por
-descuido: reordena las tablas alineando cada celda, y con celdas de 300 caracteres —las hay
-a puñados— una sola fila se convierte en una línea de 500 que nadie lee en un diff.
-Cambiaría diez mil líneas sin mejorar una coma de lo que ve el lector.
+The `.md` files at the root and in `docs/` **are kept out of Prettier on purpose**, not by
+oversight: it reflows tables by aligning every cell, and with 300-character cells (there are
+plenty of them) a single row becomes a 500-character line that nobody reads in a diff.
+It would change ten thousand lines without improving a single comma of what the reader sees.
 
-Lo que sí se comprueba es lo que puede mentir: `make docs-links` verifica que **todos los
-enlaces internos llevan a algún sitio** —el fichero existe y el ancla existe dentro de él—.
-Entra en `make gates`. En una documentación que es la fuente de verdad, un enlace roto hace
-más daño que una tabla mal alineada.
+What is checked is what can lie: `make docs-links` verifies that **every
+internal link leads somewhere** (the file exists and the anchor exists inside it).
+It is part of `make gates`. In documentation that is the source of truth, a broken link does
+more harm than a misaligned table.
 
-## Convenciones de código
+<a id="convenciones-de-código"></a>
+## Code conventions
 
-- **Go:** módulo único `git.sytue.eu/sytue/one`; un binario por servicio
-  (`services/<svc>/cmd/<svc>`); capas `internal/{http,domain,store}`; errores envueltos;
-  `context` en todo I/O; `slog` para logs; migraciones versionadas; consultas
-  **parametrizadas** (sin SQL dinámico). `gofmt`, `go vet`, `golangci-lint`, tests
-  (`make go-fmt`, `make go-lint`, `make go-test`). Cabecera SPDX (`Apache-2.0`) y aviso de copyright por archivo.
-- **Frontend:** **TypeScript estricto**; **oxlint + Prettier** (`make lint`, `make fmt`);
-  ESLint solo cubre los `*.astro`, que oxlint todavía no parsea.
-  Nada de UI fuera de `@sytue/ui`.
-- **Terraform** formateado (`make tf-fmt`), módulos reutilizables, estado en backend S3
-  Scaleway.
-- **Documentación de producto en español**; identificadores de código en inglés.
-- Respeta la estructura del monorepo (§7 de CONVENTIONS.md). No dupliques utilidades que
-  ya viven en `platform/pkg/*` (Go) o en los paquetes `@sytue/*` (frontend).
+- **Go:** single module `git.sytue.eu/sytue/one`; one binary per service
+  (`services/<svc>/cmd/<svc>`); `internal/{http,domain,store}` layers; wrapped errors;
+  `context` on all I/O; `slog` for logs; versioned migrations;
+  **parameterized** queries (no dynamic SQL). `gofmt`, `go vet`, `golangci-lint`, tests
+  (`make go-fmt`, `make go-lint`, `make go-test`). SPDX header (`Apache-2.0`) and copyright notice in every file.
+- **Frontend:** **strict TypeScript**; **oxlint + Prettier** (`make lint`, `make fmt`);
+  ESLint only covers `*.astro` files, which oxlint does not parse yet.
+  No UI outside `@sytue/ui`.
+- **Terraform** formatted (`make tf-fmt`), reusable modules, state in a Scaleway S3
+  backend.
+- **Product documentation in English**; code identifiers in English. Some code comments and UI defaults are still in Spanish.
+- Respect the monorepo structure (§7 of CONVENTIONS.md). Do not duplicate utilities that
+  already live in `platform/pkg/*` (Go) or in the `@sytue/*` packages (frontend).
 
-## Flujo de trabajo
+<a id="flujo-de-trabajo"></a>
+## Workflow
 
-1. Crea una rama desde `main`: `feat/<área>-<descripción>` o `fix/<...>`.
-2. Haz cambios pequeños y enfocados; añade/actualiza documentación si procede.
-3. Ejecuta `make fmt` y `make lint` antes de subir.
-4. Abre un Pull Request describiendo el qué y el porqué, enlazando a la sección de
-   CONVENTIONS.md o al ADR relevante. Si introduces una decisión de arquitectura, añade un
-   ADR en [`docs/decisions.md`](docs/decisions.md).
-5. Asegúrate de que el cambio mantiene la **paridad dev/prod** y no rompe el contrato.
+1. Create a branch from `main`: `feat/<área>-<descripción>` or `fix/<...>`.
+2. Make small, focused changes; add/update documentation where appropriate.
+3. Run `make fmt` and `make lint` before pushing.
+4. Open a Pull Request describing the what and the why, linking to the relevant
+   CONVENTIONS.md section or ADR. If you introduce an architecture decision, add an
+   ADR in [`docs/decisions.md`](docs/decisions.md).
+5. Make sure the change keeps **dev/prod parity** and does not break the contract.
 
-## Definition of Done (resumen)
+<a id="definition-of-done-resumen"></a>
+## Definition of Done (summary)
 
-- Backend en Go; datos en PostgreSQL (multi-tenant por RLS); blobs en S3.
-- Monta `@sytue/shell` + usa `@sytue/ui` (si es superficie de usuario).
-- Autentica vía OIDC + PKCE contra Sytue ID, valida JWT por JWKS, cookie `.sytue.eu`.
-- Funciona en dev local y es desplegable en Scaleway (Helm/Terraform).
-- 100 % UE, sin secretos en git, **sin Redis/Valkey, sin dependencias AGPL**.
-- Documentación actualizada en español.
+- Backend in Go; data in PostgreSQL (multi-tenant via RLS); blobs in S3.
+- Mounts `@sytue/shell` + uses `@sytue/ui` (if it is a user-facing surface).
+- Authenticates via OIDC + PKCE against Sytue ID, validates JWTs via JWKS, `.sytue.eu` cookie.
+- Works in local dev and is deployable on Scaleway (Helm/Terraform).
+- 100% EU, no secrets in git, **no Redis/Valkey, no AGPL dependencies**.
+- Documentation updated in English.
 
-## Licencia de las contribuciones
+<a id="licencia-de-las-contribuciones"></a>
+## License of contributions
 
-Las **pull requests son bienvenidas** de cualquier persona. El único mantenedor es
-[@thinkddr](https://github.com/thinkddr) (Daniel Delgado Ramos): toda PR requiere su revisión y
-aprobación, y solo él puede fusionarla. Al contribuir aceptas que tu aportación se publica bajo
-**Apache-2.0** (© 2026 Daniel Delgado Ramos, ver [`LICENSE`](LICENSE)). No incluyas nunca secretos,
-credenciales ni valores reales de variables de entorno. Las vulnerabilidades se notifican por
-*Private vulnerability reporting*, no en issues públicas.
+**Pull requests are welcome** from anyone. The sole maintainer is
+[@thinkddr](https://github.com/thinkddr) (Daniel Delgado Ramos): every PR requires his review and
+approval, and only he can merge it. By contributing you agree that your contribution is published under
+**Apache-2.0** (© 2026 Daniel Delgado Ramos, see [`LICENSE`](LICENSE)). Never include secrets,
+credentials or real environment variable values. Vulnerabilities are reported through
+*Private vulnerability reporting*, not in public issues.

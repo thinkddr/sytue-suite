@@ -1,56 +1,62 @@
 # Sytue Hub (`services/hub`)
 
-Backend de **integración seamless** de la suite **Sytue One** (el "shell backend"
-que respalda a `@sytue/shell`). Reúne cuatro capacidades transversales sobre los
-servicios de producto, **sin** datos propios de negocio: **búsqueda federada**,
-**notificaciones unificadas**, **presencia** e **intents cross-app**.
+**Seamless integration** backend for the **Sytue One** suite (the "shell backend"
+that backs `@sytue/shell`). It brings together four cross-cutting capabilities on top of the
+product services, **without** business data of its own: **federated search**,
+**unified notifications**, **presence** and **cross-app intents**.
 
-Código Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr); dependencias de terceros solo permisivas
-(MIT/BSD/Apache). Clean-room sobre estándares abiertos (REST, **SSE** —
-WHATWG EventSource, **LISTEN/NOTIFY** de PostgreSQL). Sin motores AGPL; sin
+Code Apache-2.0 © 2026 Daniel Delgado Ramos (thinkddr); third-party dependencies are permissive only
+(MIT/BSD/Apache). Clean-room on open standards (REST, **SSE** —
+WHATWG EventSource, PostgreSQL **LISTEN/NOTIFY**). No AGPL engines; no
 Redis/Valkey.
 
-- **Puerto:** `8092` (HTTP) · **Subdominio:** `hub.sytue.eu`
-- **Datastore:** PostgreSQL (notificaciones, presencia, fan-out por LISTEN/NOTIFY)
-  — única fuente de verdad. **Sin Redis/Valkey.**
-- **Auth:** JWT de **Sytue ID** validado vía JWKS (`platform/pkg/authn`), client
-  OIDC `sytue-hub`.
-- **Multi-tenant:** aislamiento por **RLS** en PostgreSQL (`app.tenant`).
+- **Port:** `8092` (HTTP) · **Subdomain:** `hub.sytue.eu`
+- **Datastore:** PostgreSQL (notifications, presence, fan-out via LISTEN/NOTIFY)
+  — single source of truth. **No Redis/Valkey.**
+- **Auth:** **Sytue ID** JWT validated via JWKS (`platform/pkg/authn`), OIDC
+  client `sytue-hub`.
+- **Multi-tenant:** isolation through **RLS** in PostgreSQL (`app.tenant`).
 
-## Capacidades
+<a id="capacidades"></a>
+## Capabilities
 
-### Búsqueda federada
-Consulta en paralelo a **drive / mail / calendar / contacts / chat** mediante
-conectores tipados (`internal/connectors/*`), **en nombre del usuario** (propaga
-su Bearer JWT, de modo que cada servicio aplica su propia autorización). Cada
-conector traduce el modelo de su servicio al modelo **canónico** `SearchHit`
-(source, kind, id, title, snippet, url, icon, timestamp). Degrada con elegancia:
-un origen lento o caído se reporta como **error parcial** por origen sin romper la
-agregación; cada fan-out tiene su propio timeout.
+<a id="búsqueda-federada"></a>
+### Federated search
+Queries **drive / mail / calendar / contacts / chat** in parallel through
+typed connectors (`internal/connectors/*`), **on behalf of the user** (it forwards
+their Bearer JWT, so each service applies its own authorization). Each
+connector translates its service's model into the **canonical** `SearchHit` model
+(source, kind, id, title, snippet, url, icon, timestamp). It degrades gracefully:
+a slow or down source is reported as a per-source **partial error** without breaking the
+aggregation; each fan-out has its own timeout.
 
-### Notificaciones unificadas
-Avisos por usuario, **durables** en PostgreSQL, con reparto en **tiempo real** por
-**SSE** sobre **LISTEN/NOTIFY** (canal `sytue_hub_notifications`). La creación
-inserta y emite `pg_notify` en la **misma transacción** (el aviso solo viaja si la
-escritura hace commit). Un `Relay` por proceso escucha el canal y abanica a las
-suscripciones SSE locales filtrando por `(tenant, subject)`. Endpoints de listado
-(keyset), contador de no leídas, marcar leída / todas, y `GET .../stream` (SSE).
+<a id="notificaciones-unificadas"></a>
+### Unified notifications
+Per-user notices, **durable** in PostgreSQL, with **real-time** delivery via
+**SSE** over **LISTEN/NOTIFY** (channel `sytue_hub_notifications`). Creation
+inserts and emits `pg_notify` in the **same transaction** (the notice only travels if the
+write commits). One `Relay` per process listens on the channel and fans out to the
+local SSE subscriptions, filtering by `(tenant, subject)`. Endpoints for listing
+(keyset), unread count, mark read / mark all, and `GET .../stream` (SSE).
 
-### Presencia
-Heartbeat (upsert) por usuario; el estado **offline** se **deriva** al leer
-comparando `last_seen` con la **TTL** de presencia (no requiere job para "caer").
-Estado efímero en PostgreSQL (sin Redis/Valkey). Consulta agregada por lista de
-subjects para que el shell pinte indicadores de presencia.
+<a id="presencia"></a>
+### Presence
+Per-user heartbeat (upsert); the **offline** state is **derived** at read time
+by comparing `last_seen` with the presence **TTL** (no job is needed to "drop off").
+Ephemeral state in PostgreSQL (no Redis/Valkey). Aggregated query by list of
+subjects so the shell can paint presence indicators.
 
-### Intents cross-app
-Acciones que conectan dos productos y devuelven **deep-links** (el shell los
-abre; Hub **no** ejecuta la acción — el servicio destino aplica autorización y
-ejecución):
-- `attach-drive-to-mail` — borrador de Mail con ficheros de Drive adjuntos.
-- `create-event-from-mail` — compositor de Calendar prerellenado desde un correo.
-- `share-to-chat` — compartir un recurso (Drive/Mail/Calendar/Contacts) en Chat.
+<a id="intents-cross-app"></a>
+### Cross-app intents
+Actions that connect two products and return **deep links** (the shell
+opens them; Hub does **not** run the action — the target service applies authorization and
+execution):
+- `attach-drive-to-mail` — Mail draft with Drive files attached.
+- `create-event-from-mail` — Calendar composer prefilled from an email.
+- `share-to-chat` — share a resource (Drive/Mail/Calendar/Contacts) in Chat.
 
-## Estructura
+<a id="estructura"></a>
+## Structure
 
 ```
 services/hub/
@@ -70,43 +76,46 @@ services/hub/
 └── Dockerfile                   # multi-stage -> distroless (rootless)
 ```
 
-## API (resumen)
+<a id="api-resumen"></a>
+## API (summary)
 
-| Método | Ruta | Descripción |
+| Method | Route | Description |
 |---|---|---|
-| `GET`  | `/api/v1/search?q=&sources=&limit=` | Búsqueda federada |
-| `GET`  | `/api/v1/notifications` | Listar (keyset: `unread`, `before`, `limit`) |
-| `GET`  | `/api/v1/notifications/unread_count` | Contador de no leídas |
-| `POST` | `/api/v1/notifications` | Emitir (scope `notifications:write` para terceros) |
-| `GET`  | `/api/v1/notifications/stream` | Stream SSE en tiempo real |
-| `POST` | `/api/v1/notifications/{id}/read` | Marcar leída |
-| `POST` | `/api/v1/notifications/read_all` | Marcar todas leídas |
-| `GET`  | `/api/v1/presence?subjects=` | Consultar presencia |
+| `GET`  | `/api/v1/search?q=&sources=&limit=` | Federated search |
+| `GET`  | `/api/v1/notifications` | List (keyset: `unread`, `before`, `limit`) |
+| `GET`  | `/api/v1/notifications/unread_count` | Unread count |
+| `POST` | `/api/v1/notifications` | Emit (scope `notifications:write` for third parties) |
+| `GET`  | `/api/v1/notifications/stream` | Real-time SSE stream |
+| `POST` | `/api/v1/notifications/{id}/read` | Mark read |
+| `POST` | `/api/v1/notifications/read_all` | Mark all read |
+| `GET`  | `/api/v1/presence?subjects=` | Query presence |
 | `PUT`  | `/api/v1/presence` | Heartbeat |
-| `DELETE` | `/api/v1/presence` | Marcar offline |
-| `POST` | `/api/v1/intents` | Resolver intent -> deep-links |
-| `GET`  | `/healthz` · `/readyz` | Sondas |
+| `DELETE` | `/api/v1/presence` | Mark offline |
+| `POST` | `/api/v1/intents` | Resolve intent -> deep links |
+| `GET`  | `/healthz` · `/readyz` | Probes |
 
-## Configuración (variables de entorno)
+<a id="configuración-variables-de-entorno"></a>
+## Configuration (environment variables)
 
-| Variable | Defecto | Descripción |
+| Variable | Default | Description |
 |---|---|---|
-| `PORT` | `8092` | Puerto HTTP |
-| `DATABASE_URL` | — (obligatoria) | DSN PostgreSQL |
-| `OIDC_ISSUER` | `https://id.sytue.localhost` | Issuer de Sytue ID |
-| `OIDC_JWKS_URL` | derivada del issuer | Endpoint JWKS |
-| `OIDC_AUDIENCE` | `sytue-hub` | Audiencia esperada (client) |
-| `DRIVE_BASE_URL` … `CHAT_BASE_URL` | URLs internas de servicios | APIs upstream para la búsqueda |
-| `DRIVE_PUBLIC_URL` … `CHAT_PUBLIC_URL` | `https://*.sytue.localhost` | Bases de deep-links |
-| `SEARCH_TIMEOUT` | `2500ms` | Timeout por origen federado |
-| `SEARCH_LIMIT` | `20` | Máximo de resultados por origen |
-| `UPSTREAM_TIMEOUT` | `5s` | Timeout HTTP a upstreams |
-| `PRESENCE_TTL` | `45s` | Ventana de obsolescencia de presencia |
-| `NOTIFY_RETENTION` | `720h` | Retención de notificaciones leídas |
+| `PORT` | `8092` | HTTP port |
+| `DATABASE_URL` | — (required) | PostgreSQL DSN |
+| `OIDC_ISSUER` | `https://id.sytue.localhost` | Sytue ID issuer |
+| `OIDC_JWKS_URL` | derived from the issuer | JWKS endpoint |
+| `OIDC_AUDIENCE` | `sytue-hub` | Expected audience (client) |
+| `DRIVE_BASE_URL` … `CHAT_BASE_URL` | Internal service URLs | Upstream APIs for search |
+| `DRIVE_PUBLIC_URL` … `CHAT_PUBLIC_URL` | `https://*.sytue.localhost` | Deep-link bases |
+| `SEARCH_TIMEOUT` | `2500ms` | Timeout per federated source |
+| `SEARCH_LIMIT` | `20` | Maximum results per source |
+| `UPSTREAM_TIMEOUT` | `5s` | HTTP timeout to upstreams |
+| `PRESENCE_TTL` | `45s` | Presence staleness window |
+| `NOTIFY_RETENTION` | `720h` | Retention of read notifications |
 
-Sin secretos en el repo: todo por entorno / gestor de secretos.
+No secrets in the repo: everything via environment / secrets manager.
 
-## Ejecución
+<a id="ejecución"></a>
+## Running
 
 ```sh
 # Migraciones (también se aplican al arrancar)

@@ -1,6 +1,6 @@
 # AWS IAM Identity Center — SAML + SCIM
-1. Consola AWS → **IAM Identity Center → Settings → Add identity source → External IdP**... o más simple: deja AWS como IdP hacia Sytue.
-2. Copia a la ficha de Sytue Platform: tu **region** (p. ej. `eu-south-2`), el **saml_id** (el `samlprovider/…` del proveedor creado) y el **scim_endpoint** que AWS genera.
-3. Crea el **token SCIM** en AWS y pégalo en la ficha: el aprovisionamiento de usuarios/grupos va por ahí.
-4. Asigna al menos un permiso set a los usuarios sincronizados.
-**Verificar**: en AWS, la pestaña «Automated provisioning» queda en verde y aparecen los usuarios.
+1. AWS Console → **IAM Identity Center → Settings → Add identity source → External IdP**... or, more simply: keep AWS as the IdP towards Sytue.
+2. Copy to the Sytue Platform detail card: your **region** (e.g. `eu-south-2`), the **saml_id** (the `samlprovider/…` of the provider you created) and the **scim_endpoint** that AWS generates.
+3. Create the **SCIM token** in AWS and paste it into the detail card: user/group provisioning goes through it.
+4. Assign at least one permission set to the synced users.
+**Verify**: in AWS, the “Automated provisioning” tab turns green and the users appear.

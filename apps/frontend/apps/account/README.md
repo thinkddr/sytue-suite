@@ -1,80 +1,90 @@
-# Mi cuenta
+<a id="mi-cuenta"></a>
 
-Perfil, seguridad, dispositivos y accesos del propio usuario. Astro 7 + Preact,
-SSR para el BFF, sobre la API de Sytue ID.
+# My account
 
-## Por qué es una app y no una página de Sytue ID
+The user's own profile, security, devices and access. Astro 7 + Preact,
+SSR for the BFF, on top of the Sytue ID API.
 
-Esta pantalla se servía como HTML desde Go, sin bundler, así que no podía montar
-la Sytue Shell: se llegaba a ella y no había selector de aplicaciones ni salida
-hacia el resto de la suite.
+<a id="por-qué-es-una-app-y-no-una-página-de-sytue-id"></a>
 
-Replicar el selector en Go significaba duplicar el catálogo de productos
-—nombres, iconos, colores de catorce— en un segundo lenguaje. Ese duplicado
-diverge a la primera aplicación nueva, así que se movió la página aquí.
+## Why it is an app and not a Sytue ID page
 
-Los flujos de Sytue ID que **no** son la cuenta —login, OIDC, SAML— siguen en Go.
-Son pantallas sin navegación por diseño y no ganan nada con esto.
+This screen used to be served as HTML from Go, without a bundler, so it could not mount
+the Sytue Shell: you landed on it and there was no app switcher and no way out
+to the rest of the suite.
 
-## La API ya existía
+Replicating the switcher in Go meant duplicating the product catalog
+(names, icons, colors of fourteen products) in a second language. That duplicate
+drifts with the first new application, so the page was moved here.
 
-Sytue ID publica `/api/v1/me*` desde hace tiempo, con sus tests de integración, y
-hasta ahora **no tenía consumidor en `apps/`**: el navegador usaba las rutas HTML
-y el JSON quedaba para clientes nativos. Su propio código lo dice.
+The Sytue ID flows that are **not** the account (login, OIDC, SAML) remain in Go.
+They are screens without navigation by design and gain nothing from this.
 
-Así que esta app no inventa contrato: consume el que ya está.
+<a id="la-api-ya-existía"></a>
 
-| Sección        | API                                                                         |
-| -------------- | --------------------------------------------------------------------------- |
-| Perfil         | `GET /me`, `PATCH /me` (los siete campos, parcheo parcial)                  |
-| Contraseña     | `POST /me/password` (cierra TODAS las sesiones)                             |
-| Segundo factor | `POST /me/mfa/totp/{enroll,confirm,recovery-codes}`, `DELETE /me/mfa/totp`  |
-| Sesiones       | `GET /me/sessions`, `DELETE /me/sessions/{id}`, `DELETE /me/sessions`       |
-| Dispositivos   | `GET /me/devices`, `POST /me/devices/{id}/trust`, `DELETE /me/devices/{id}` |
+## The API already existed
+
+Sytue ID has published `/api/v1/me*` for a long time, with its integration tests, and
+until now it **had no consumer in `apps/`**: the browser used the HTML routes
+and the JSON was left for native clients. Its own code says so.
+
+So this app does not invent a contract: it consumes the one that already exists.
+
+| Section       | API                                                                         |
+| ------------- | --------------------------------------------------------------------------- |
+| Profile       | `GET /me`, `PATCH /me` (the seven fields, partial patching)                 |
+| Password      | `POST /me/password` (closes ALL sessions)                                   |
+| Second factor | `POST /me/mfa/totp/{enroll,confirm,recovery-codes}`, `DELETE /me/mfa/totp`  |
+| Sessions      | `GET /me/sessions`, `DELETE /me/sessions/{id}`, `DELETE /me/sessions`       |
+| Devices       | `GET /me/devices`, `POST /me/devices/{id}/trust`, `DELETE /me/devices/{id}` |
 
 | Passkeys | `GET /webauthn/credentials`, `DELETE /webauthn/credentials/{id}` |
-| Contraseñas de aplicación | `GET`, `POST /me/app-passwords`, `DELETE /me/app-passwords/{id}` |
+| App passwords | `GET`, `POST /me/app-passwords`, `DELETE /me/app-passwords/{id}` |
 
-El **alta** de passkeys no es una llamada más: `navigator.credentials.create()`
-abre un diálogo del navegador que habla con el autenticador (Touch ID, una llave
-USB, el móvil), así que esa parte vive en `src/lib/passkeys.ts` y el BFF solo
-pone el reto antes y verifica la attestation después.
+Passkey **registration** is not just another call: `navigator.credentials.create()`
+opens a browser dialog that talks to the authenticator (Touch ID, a USB
+key, the phone), so that part lives in `src/lib/passkeys.ts` and the BFF only
+sets the challenge beforehand and verifies the attestation afterwards.
 
-El perfil de configuración de Apple (`.mobileconfig`) es un **enlace** a Sytue ID
-y no un proxy: lo sirve exigiendo su COOKIE de sesión, no un bearer, y quien está
-en esta pantalla tiene sesión SSO allí por definición. En una navegación
-top-level la cookie `SameSite=Lax` viaja, así que el enlace descarga. Proxyarlo
-habría obligado a duplicar el generador del plist.
+The Apple configuration profile (`.mobileconfig`) is a **link** to Sytue ID
+and not a proxy: Sytue ID serves it requiring its session COOKIE, not a bearer, and whoever is
+on this screen has an SSO session there by definition. On a top-level
+navigation the `SameSite=Lax` cookie is sent, so the link downloads. Proxying it
+would have meant duplicating the plist generator.
 
-## Direcciones
+<a id="direcciones"></a>
 
-Canónica la de la organización, `https://<slug>.<dominio>/account`; su subdominio
-propio sirve el mismo prefijo. Client OIDC `sytue-account` (migración 0060).
+## Addresses
 
-**`id.<dominio>/account` redirige aquí**, al host de organización, que es la
-dirección canónica de la suite: mismas cookies, mismo idioma y mismo selector de
-aplicaciones. Solo cae al subdominio `account.<dominio>` cuando la sesión todavía
-no tiene organización.
+The canonical one is the organization's, `https://<slug>.<dominio>/account`; its own
+subdomain serves the same prefix. OIDC client `sytue-account` (migration 0060).
 
-La enciende `global.accountAppPath` del chart, y **vacía la apaga**: una
-instalación que no despliegue esta superficie y recibiera el 302 dejaría a su
-gente sin pantalla de cuenta —y sin forma de cambiar la contraseña—. Por eso es
-un valor y no una constante, y por eso el HTML de Go sigue en pie: es lo que
-responde donde la app no está, y el único camino de quien tenga esa pestaña
-abierta. Retirarlo es otro cambio, y con la app ya sirviéndose.
+**`id.<dominio>/account` redirects here**, to the organization host, which is the
+suite's canonical address: same cookies, same language and same app
+switcher. It only falls back to the `account.<dominio>` subdomain when the session does not
+have an organization yet.
 
-## Estado
+It is switched on by the chart's `global.accountAppPath`, and **leaving it empty switches it off**: an
+installation that does not deploy this surface and received the 302 would leave its
+people without an account screen (and without a way to change their password). That is why it is
+a value and not a constant, and why the Go HTML is still standing: it is what
+answers where the app is not deployed, and the only path for anyone who has that tab
+open. Removing it is a separate change, once the app is already being served.
 
-- [x] Armazón con la Shell y el selector de aplicaciones
-- [x] Perfil completo: nombre, nombre de pila, apellidos, puesto, departamento,
-      ubicación e idioma (el correo en solo lectura)
-- [x] Sesiones (cerrar una o todas menos la actual)
-- [x] Dispositivos (olvidar cualquiera, marcar de confianza el actual)
-- [x] Registrada en el chart y en el despliegue piloto
-- [x] Contraseña y segundo factor (TOTP, códigos de recuperación)
-- [x] Passkeys: listar y retirar (el alta, con el diálogo WebAuthn, va aparte)
-- [x] Contraseñas de aplicación (crear, listar y revocar)
-- [x] Perfil de configuración de Apple (enlace al IdP)
-- [x] Alta de passkeys (diálogo WebAuthn en el navegador)
-- [x] Redirección desde `id.<dominio>/account` (`global.accountAppPath`)
-- [ ] Retirada del HTML de Go, cuando la app lleve un tiempo sirviéndose
+<a id="estado"></a>
+
+## Status
+
+- [x] Scaffold with the Shell and the app switcher
+- [x] Full profile: name, given name, surnames, job title, department,
+      location and language (email read-only)
+- [x] Sessions (close one, or all except the current one)
+- [x] Devices (forget any, mark the current one as trusted)
+- [x] Registered in the chart and in the pilot deployment
+- [x] Password and second factor (TOTP, recovery codes)
+- [x] Passkeys: list and remove (registration, with the WebAuthn dialog, is separate)
+- [x] App passwords (create, list and revoke)
+- [x] Apple configuration profile (link to the IdP)
+- [x] Passkey registration (WebAuthn dialog in the browser)
+- [x] Redirect from `id.<dominio>/account` (`global.accountAppPath`)
+- [ ] Removal of the Go HTML, once the app has been serving for a while

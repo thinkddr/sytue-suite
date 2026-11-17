@@ -1,33 +1,37 @@
-# Guía de alta — Google Meet ⇄ Sytue
+<a id="guía-de-alta--google-meet--sytue"></a>
+# Setup guide — Google Meet ⇄ Sytue
 
-Tiempo: ~12 min. Permisos: Google Cloud Console de tu organización. Resultado:
-ver y abrir reuniones de Meet desde la agenda de la suite (solo lectura).
+Time: ~12 min. Permissions: your organization's Google Cloud Console. Result:
+view and open Meet meetings from the suite's calendar (read-only).
 
-> Nota honesta: la semilla de este conector llega con la ola de integraciones
-> de Meet; esta guía usa los scopes estándar de solo lectura y el callback del
-> gateway, que no cambian.
+> Honest note: this connector's seed arrives with the Meet integrations wave;
+> this guide uses the standard read-only scopes and the gateway callback,
+> which do not change.
 
-## 1. Proyecto y consentimiento
+<a id="1-proyecto-y-consentimiento"></a>
+## 1. Project and consent
 
-1. <https://console.cloud.google.com> → proyecto (o crea «Sytue Integration
-   Gateway»).
-2. «APIs & Services» → «Library» → habilita **Google Meet API** y **Google
+1. <https://console.cloud.google.com> → project (or create “Sytue Integration
+   Gateway”).
+2. “APIs & Services” → “Library” → enable the **Google Meet API** and the **Google
    Calendar API**.
-3. «OAuth consent screen»: declara los scopes de abajo.
+3. “OAuth consent screen”: declare the scopes below.
 
-## 2. Cliente OAuth
+<a id="2-cliente-oauth"></a>
+## 2. OAuth client
 
-1. «Credentials» → «OAuth client ID» → **Web application**.
+1. “Credentials” → “OAuth client ID” → **Web application**.
 2. Redirect URI:
    `https://integrations.sytue.eu/api/v1/oauth/callback`.
-3. Scopes delegados:
+3. Delegated scopes:
    - `https://www.googleapis.com/auth/meetings.space.readonly`
    - `https://www.googleapis.com/auth/calendar.readonly`
-4. Copia Client ID y Client secret.
+4. Copy the Client ID and Client secret.
 
-## 3. Conectar y verificar
+<a id="3-conectar-y-verificar"></a>
+## 3. Connect and verify
 
-1. Sytue Platform → Integraciones → «Google Meet» → pega las credenciales →
-   «Conectar».
-2. Abre la agenda de la suite: los eventos con conferencia de Meet muestran el
-   enlace «Unirse a Meet».
+1. Sytue Platform → Integrations → “Google Meet” → paste the credentials →
+   “Connect”.
+2. Open the suite's calendar: events with a Meet conference show the
+   «Unirse a Meet» (Join Meet) link.

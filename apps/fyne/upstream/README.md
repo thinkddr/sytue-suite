@@ -1,19 +1,24 @@
 # El parche de URL entrantes, listo para enviar a Fyne
 
-`apps/fyne/go.mod` reemplaza Fyne por `github.com/thinkddr/fyne/v2 v2.8.2-sytue.5`
+`apps/fyne/go.mod` reemplaza Fyne por `github.com/thinkddr/fyne/v2 v2.8.2-sytue.7`
 (alojado en GitHub desde el 2026-09-27; antes en git.gay, con las mismas ramas y tags)
 (ADR «URL entrante» en `docs/decisions.md`). Un fork es deuda: esta carpeta tiene lo que
 hace falta para quitarlo, que es que el parche entre aguas arriba.
 
-## Bucle por eventos en escritorio (2026-11-17, pendiente de etiqueta)
+## Bucle por eventos en escritorio (2026-11-17, `v2.8.2-sytue.7`)
 
-`0018-desktop-event-driven-loop.patch`, commit
-[`caa879f`](https://github.com/thinkddr/fyne/commit/caa879f9051c9c0ba6b82662ce50c64a00b921d0)
-en la rama `claude/sytue-suite-install-setup-39nq19` del fork, sobre `v2.8.2-sytue.6`.
-Todavía **no** tiene etiqueta, así que `go.mod` sigue en `v2.8.2-sytue.5`. Para usarlo:
-fusionar en `main` del fork, que pasen sus cinco flujos, etiquetar `v2.8.2-sytue.7` y
-subir la versión aquí, en `ci-desktop.yml`, `ci-mobile.yml`, `.github/tests/fyne-cli-test.sh`
-y `scripts/empaquetar-test.sh`.
+`0018-desktop-event-driven-loop.patch`: commit
+[`caa879f`](https://github.com/thinkddr/fyne/commit/caa879f9051c9c0ba6b82662ce50c64a00b921d0),
+etiquetado `v2.8.2-sytue.7` en `main` del fork sobre `v2.8.2-sytue.6`, que a su vez trae
+`RenderOffscreen` del driver de software. `apps/fyne/go.mod` lo usa desde el mismo día, y
+con él `ci-desktop.yml`, `ci-mobile.yml`, `.github/tests/fyne-cli-test.sh` y
+`scripts/empaquetar-test.sh`.
+
+`v2.8.2-sytue.7` se etiquetó antes de que terminara Static Analysis, que salió en rojo por
+un único aviso de estilo (staticcheck ST1022: el comentario de `WakeHook` debe empezar por
+su nombre). No cambia el comportamiento: los otros cuatro flujos están en verde. El
+arreglo, [`715ab78`](https://github.com/thinkddr/fyne/commit/715ab788ac20410c29cfe25547d13be9c0052a64),
+está en la rama del fork y entrará en `main` con la próxima etiqueta.
 
 **Qué arregla.** El driver GLFW atendía la entrada y pintaba con un reloj fijo de 60 Hz.
 Cada tecla, clic o resultado de red (`fyne.Do`) esperaba al siguiente tic: 8 ms de media

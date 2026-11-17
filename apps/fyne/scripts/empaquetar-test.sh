@@ -31,7 +31,7 @@ mal() {
   fallos=1
 }
 
-if ! grep -qx 'replace fyne.io/fyne/v2 => github.com/thinkddr/fyne/v2 v2.8.2-sytue.5' "$FYNE/go.mod"; then
+if ! grep -qx 'replace fyne.io/fyne/v2 => github.com/thinkddr/fyne/v2 v2.8.2-sytue.7' "$FYNE/go.mod"; then
   mal "apps/fyne debe usar el fork mantenido con URL entrantes y geometría UIKit de Fyne v2.8.2"
 fi
 

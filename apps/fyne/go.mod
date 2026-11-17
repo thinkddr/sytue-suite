@@ -159,7 +159,7 @@ replace git.sytue.eu/sytue/one/apps/nucleo => ../nucleo
 // móviles y geometría de la ventana UIKit al girar o redimensionar. El original
 // conserva BSD-3-Clause y las modificaciones Apache-2.0; parches y retirada en
 // upstream/README.md.
-replace fyne.io/fyne/v2 => github.com/thinkddr/fyne/v2 v2.8.2-sytue.7
+replace fyne.io/fyne/v2 => github.com/thinkddr/fyne/v2 v2.8.2-sytue.8
 
 // GLFW solo acepta FICHEROS soltados: su XDnD de X11 y su wl_data_device de Wayland
 // piden `text/uri-list` y nada más. El fork —el mismo commit que requiere Fyne, con un

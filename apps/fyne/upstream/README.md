@@ -1,7 +1,7 @@
 <a id="el-parche-de-url-entrantes-listo-para-enviar-a-fyne"></a>
 # The incoming URL patch, ready to send to Fyne
 
-`apps/fyne/go.mod` replaces Fyne with `github.com/thinkddr/fyne/v2 v2.8.2-sytue.7`
+`apps/fyne/go.mod` replaces Fyne with `github.com/thinkddr/fyne/v2 v2.8.2-sytue.8`
 (hosted on GitHub since 2026-09-27; previously on git.gay, with the same branches and tags)
 (the «URL entrante» (incoming URL) ADR in `docs/decisions.md`). A fork is debt: this folder holds what
 is needed to remove it, which is getting the patch accepted upstream.
@@ -20,7 +20,7 @@ with it `ci-desktop.yml`, `ci-mobile.yml`, `.github/tests/fyne-cli-test.sh` and
 a single style warning (staticcheck ST1022: the comment on `WakeHook` must start with
 its name). It does not change behavior: the other four workflows are green. The
 fix, [`715ab78`](https://github.com/thinkddr/fyne/commit/715ab788ac20410c29cfe25547d13be9c0052a64),
-is on the fork's branch and will reach `main` with the next tag.
+is `v2.8.2-sytue.8`, the version `apps/fyne/go.mod` uses.
 
 **What it fixes.** The GLFW driver handled input and painted on a fixed 60 Hz clock.
 Every key, click or network result (`fyne.Do`) waited for the next tick: 8 ms on average

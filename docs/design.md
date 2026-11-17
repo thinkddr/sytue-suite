@@ -162,7 +162,7 @@ shape block of `appearance.css`, always with role tokens.
 
 | Token                                              | Marco         | Carril      | What it governs                           |
 | -------------------------------------------------- | ------------- | ----------- | ----------------------------------------- |
-| `--radius-control` (`rounded-control`)             | 999 px        | 9 px        | Buttons, bar buttons                      |
+| `--radius-control` (`rounded-control`)             | 4 px          | 4 px        | Buttons, bar buttons                      |
 | `--radius-nav` (`rounded-nav`)                     | 999 px        | 9 px        | Side menu items                           |
 | `--radius-card` (`rounded-card`)                   | 16 px         | 14 px       | Cards                                     |
 | `--radius-row`                                     | 10 px         | 0           | Selected or hovered list row              |
@@ -171,6 +171,7 @@ shape block of `appearance.css`, always with role tokens.
 | `--sytue-nav-pad`                                  | 14 px         | 10 px       | Horizontal padding of the menu item       |
 | `--sytue-nav-indicator`                            | 0             | 3 px        | “You are here” bar                        |
 | `--sytue-nav-active-weight`                        | 650           | 500         | Weight of the active item                 |
+| `--sytue-rail-indicator`                           | 3 px          | 0           | Active bar of the icon rail               |
 | `--sytue-rail-item-bg` / `-fill`                   | no background | veil, amber | Idle icon of the icon rail                |
 | `--sytue-rail-active-bg` / `-fg`                   | veil          | solid       | Active icon of the icon rail              |
 | `--sytue-nav-active-bg` / `-fg`                    | veil          | veil        | Active item (see below)                   |

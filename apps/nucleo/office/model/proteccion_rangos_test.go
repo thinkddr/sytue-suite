@@ -32,7 +32,7 @@ func TestLeerRango(t *testing.T) {
 		if ok != c.ok {
 			t.Fatalf("%q: ok=%v, esperaba %v", c.ref, ok, c.ok)
 		}
-		rs := rangosEditables{r}
+		rs := RangosEditables{r}
 		for _, d := range c.deja {
 			if !rs.contiene(d) {
 				t.Fatalf("%q debería contener %s", c.ref, d)

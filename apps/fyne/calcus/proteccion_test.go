@@ -24,25 +24,26 @@ func avisosDe(lz *Lienzo) *[]string {
 }
 
 // TestLaProteccionSeLeeYSeEscribeComoEnLaWeb: la hoja y el libro protegidos ya no cierran
-// el documento; se sanean como `sanitizeProtection` —solo lo que difiere del defecto— y
-// vuelven a salir al guardar. Lo que no es un objeto no protege.
+// el documento; se sanean como `sanitizeProtection` —solo lo que difiere del defecto,
+// `hasPassword` incluido— y vuelven a salir al guardar. Una `password` dentro (la de un
+// cliente anterior) no es del modelo y no sale. Lo que no es un objeto no protege.
 func TestLaProteccionSeLeeYSeEscribeComoEnLaWeb(t *testing.T) {
 	lz := lienzoDePrueba()
-	doc := `{"active":0,"protect":{"password":"","x":1},"sheets":[{"name":"H","cells":{"A1":"1"},` +
-		`"protect":{"password":"k","selectCells":false,"formatCells":true,"sort":true,"insertRows":false,"otro":true}}]}`
+	doc := `{"active":0,"protect":{"password":"","hasPassword":true,"x":1},"sheets":[{"name":"H","cells":{"A1":"1"},` +
+		`"protect":{"password":"k","hasPassword":true,"selectCells":false,"formatCells":true,"sort":true,"insertRows":false,"otro":true}}]}`
 	if !lz.Cargar(doc) {
 		t.Fatal("un libro protegido tiene que abrirse para escribir")
 	}
 	p := lz.Libro.Proteccion()
-	if p == nil || p.Password != "k" || p.SelectCells == nil || *p.SelectCells || !p.FormatCells || !p.Sort || p.InsertRows {
+	if p == nil || !p.HasPassword || p.SelectCells == nil || *p.SelectCells || !p.FormatCells || !p.Sort || p.InsertRows {
 		t.Fatalf("la protección de la hoja se lee como %+v", p)
 	}
-	if lz.Libro.ProteccionLibro() == nil {
-		t.Fatal("el libro protegido no se lee")
+	if pl := lz.Libro.ProteccionLibro(); pl == nil || !pl.HasPassword {
+		t.Fatal("el libro protegido con contraseña no se lee")
 	}
 	g := lz.Serializar()
-	if !strings.Contains(g, `"protect":{"password":"k","selectCells":false,"formatCells":true,"sort":true}`) ||
-		!strings.Contains(g, `"protect":{}`) {
+	if !strings.Contains(g, `"protect":{"hasPassword":true,"selectCells":false,"formatCells":true,"sort":true}`) ||
+		!strings.Contains(g, `"protect":{"hasPassword":true}`) || strings.Contains(g, "password\"") {
 		t.Errorf("la protección no vuelve a salir como en la web: %s", g)
 	}
 	lz.Cargar(`{"active":0,"protect":true,"sheets":[{"name":"H","cells":{},"protect":null}]}`)
@@ -134,8 +135,10 @@ func TestSinSeleccionarCeldasSoloSeSeleccionaLoDesbloqueado(t *testing.T) {
 }
 
 // TestElLibroProtegidoNoCambiaSuEstructura: con el libro protegido no se añaden ni
-// borran hojas, y se dice; la contraseña equivocada no lo desprotege; y deshacer
-// devuelve la protección, que es parte del documento.
+// borran hojas, y se dice; la contraseña no entra en el modelo, sino en el sobre del
+// guardado; quien no es el propietario no lo desprotege sin teclearla (la verifica el
+// servidor: proteccion_clave_test.go); y deshacer devuelve la protección, que es parte
+// del documento.
 func TestElLibroProtegidoNoCambiaSuEstructura(t *testing.T) {
 	lz := lienzoDePrueba()
 	avisos := avisosDe(lz)
@@ -144,13 +147,20 @@ func TestElLibroProtegidoNoCambiaSuEstructura(t *testing.T) {
 	if len(lz.Libro.Hojas()) != 1 || len(*avisos) != 1 || (*avisos)[0] != "warning:sheet.msg.protectedBook" {
 		t.Errorf("con el libro protegido: %d hojas y avisos %v", len(lz.Libro.Hojas()), *avisos)
 	}
-	lz.Mandar(CmdDesprotegerLibro, "mal")
+	if g := lz.Serializar(); !strings.Contains(g, `"protect":{"hasPassword":true}`) || strings.Contains(g, `"k"`) {
+		t.Errorf("la contraseña entra en el modelo: %s", g)
+	}
+	if lz.Libro.Sobre().Nuevas["libro"] != "k" {
+		t.Error("la contraseña nueva no espera al guardado en el sobre")
+	}
+	lz.Libro.FijarAjeno(true)
+	lz.Mandar(CmdDesprotegerLibro, "")
 	if lz.Libro.ProteccionLibro() == nil || (*avisos)[1] != "warning:sheet.msg.wrongPassword" {
-		t.Error("la contraseña equivocada lo ha desprotegido, o no lo ha dicho")
+		t.Error("sin contraseña quien no es el propietario lo ha desprotegido, o no lo ha dicho")
 	}
 	lz.Mandar(CmdDesprotegerLibro, "k")
-	if lz.Libro.ProteccionLibro() != nil {
-		t.Fatal("la contraseña buena no lo desprotege")
+	if lz.Libro.ProteccionLibro() != nil || lz.Libro.Sobre().Clave != "k" {
+		t.Fatal("con la contraseña no se desprotege, o no se presenta al guardar")
 	}
 	lz.Deshacer(false)
 	if lz.Libro.ProteccionLibro() == nil {
@@ -199,7 +209,8 @@ func TestElPanelProtegerHojaProtege(t *testing.T) {
 		}
 	}
 	p := lz.Libro.Proteccion()
-	if p == nil || !p.Sort || p.Password != "k" || p.FormatCells || !lz.Estado().Protegida {
+	if p == nil || !p.Sort || !p.HasPassword || p.FormatCells || !lz.Estado().Protegida ||
+		lz.Libro.Sobre().Nuevas["hoja:"+lz.Libro.Hoja()] != "k" || strings.Contains(lz.Serializar(), `"k"`) {
 		t.Errorf("el panel protege con %+v", p)
 	}
 }

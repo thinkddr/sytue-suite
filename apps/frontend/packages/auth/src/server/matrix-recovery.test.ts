@@ -144,6 +144,44 @@ test('PUT passes the sytue-id wrapper of ADR 0084, and nothing extra in its kdf'
   }
 });
 
+test('a checked sytue-id wrapper retires the ADR 0082 ones: only it, and only when asked exactly', async () => {
+  const f = fixture();
+  const base = 'https://drive.sytue.invalid/drive/api/matrix/recovery-wrappers?identity_version=2';
+  const sytueID = {
+    v: 1,
+    kind: 'sytue-id',
+    key_id: 'K1',
+    credential_id: '',
+    kdf: { alg: 'sytue-id-unlock-hkdf-sha256', hint: 'Wy0QEL3fH/AUY/gTTh3gmQ==' },
+    nonce: 'cHFyc3R1dnd4eXp7',
+    ciphertext: 'GWRz0ee1TKLgjzg3JaE4SFFgrMF4UNwseJ3Y8TGX1wr5',
+  };
+  const ok = await f.call(f.routes.wrappers.PUT, base + '&retire_older=1', {
+    method: 'PUT',
+    body: JSON.stringify(sytueID),
+  });
+  expect(ok.status).toBe(200);
+  const upstream = new URL(f.state.requests[0]!.url);
+  expect(upstream.searchParams.get('retire_older')).toBe('1');
+  expect(upstream.searchParams.get('product')).toBe('drive');
+  // An older wrapper never retires anything, and no other value is taken for a yes.
+  for (const [query, body] of [
+    ['&retire_older=1', wrapper],
+    ['&retire_older=true', sytueID],
+    ['&retire_older=1&retire_older=1', sytueID],
+  ] as const) {
+    const refused = await f.call(f.routes.wrappers.PUT, base + query, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
+    expect(refused.status).toBe(400);
+  }
+  expect(f.state.requests).toHaveLength(1);
+  // A plain PUT never asks the service to retire anything.
+  await f.call(f.routes.wrappers.PUT, base, { method: 'PUT', body: JSON.stringify(sytueID) });
+  expect(new URL(f.state.requests[1]!.url).searchParams.has('retire_older')).toBe(false);
+});
+
 test('no session, no access', async () => {
   const f = fixture();
   f.state.session = null;

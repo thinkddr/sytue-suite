@@ -84,6 +84,16 @@ type Material struct {
 
 func (m Material) valido() bool { return len(m.Clave) == recoverywrap.UnlockKeyLen }
 
+// Borrar pone a cero esta copia de la clave y de lo que abría los envoltorios de la
+// ADR 0082 en cuanto el paso que la usaba acaba (ADR 0085): la sesión da una copia por
+// paso, y ninguna se queda en memoria más de lo que dura ese paso.
+func (m Material) Borrar() {
+	clear(m.Clave)
+	for _, l := range m.Legado {
+		clear(l.IKM)
+	}
+}
+
 // ErrSinDesbloqueo es crear, abrir o envolver sin la clave de desbloqueo de Sytue ID
 // (o sin lo que abre un envoltorio de la ADR 0082): toca volver a entrar en Sytue ID.
 var ErrSinDesbloqueo = errors.New("cifrado: falta la clave de desbloqueo de Sytue ID")
@@ -250,6 +260,51 @@ func Desbloquear(ctx context.Context, client Recuperable, envoltorios []recovery
 		return "", false, recoverywrap.ErrWrongSecret
 	}
 	return "", false, ErrSinDesbloqueo
+}
+
+// retiradorDeViejos es el servicio que sabe retirar los envoltorios de la ADR 0082
+// con el `sytue-id` comprobado (api.Rooms).
+type retiradorDeViejos interface {
+	PutMatrixRecoveryWrapperRetiringOlder(context.Context, api.MatrixRecoveryAccount, recoverywrap.Wrapper) (string, error)
+}
+
+// RetirarViejos retira los envoltorios de la ADR 0082 de la clave actual una vez que
+// ESTE dispositivo ha comprobado que su envoltorio `sytue-id` abre con la clave de
+// desbloqueo (ADR 0085): el servicio lo guarda otra vez y borra los viejos en la misma
+// transacción, así que la cuenta nunca se queda sin uno que abra. Dice si lo hizo.
+func RetirarViejos(ctx context.Context, client Recuperable, custodia Custodia, m Material) (bool, error) {
+	retirador, ok := custodia.Servicio.(retiradorDeViejos)
+	if !ok || !m.valido() {
+		return false, nil
+	}
+	keyID, err := client.DefaultRecoveryKeyID(ctx)
+	if err != nil || keyID == "" {
+		return false, err
+	}
+	stored, err := custodia.Servicio.MatrixRecoveryWrappers(ctx, custodia.Cuenta)
+	if err != nil {
+		return false, err
+	}
+	envoltorios := deLaClave(stored.Wrappers, keyID)
+	var actual *recoverywrap.Wrapper
+	viejos := false
+	for i, w := range envoltorios {
+		if w.Kind == recoverywrap.KindSytueID {
+			actual = &envoltorios[i]
+		} else {
+			viejos = true
+		}
+	}
+	if actual == nil || !viejos {
+		return false, nil
+	}
+	// Que no abra aquí no es un fallo: es que no toca retirar nada (otra clave de
+	// desbloqueo, la persona empezó de cero en otro sitio).
+	if _, err := recoverywrap.UnwrapSytueID(m.Clave, client.AccountUserID(), *actual); err != nil {
+		return false, nil //nolint:nilerr // no abrir aquí es la respuesta «no se retira», no un error.
+	}
+	_, err = retirador.PutMatrixRecoveryWrapperRetiringOlder(ctx, custodia.Cuenta, *actual)
+	return err == nil, err
 }
 
 // Crear configura el cifrado de la cuenta: la clave nueva se envuelve con la clave

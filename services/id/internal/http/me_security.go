@@ -11,6 +11,7 @@ package http
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
@@ -86,6 +87,9 @@ func (s *Server) changeUserPassword(r *http.Request, userID, current, newPasswor
 type changePasswordRequest struct {
 	CurrentPassword string `json:"current_password"`
 	NewPassword     string `json:"new_password"`
+	// UnlockEnvelope es el sobre de la clave de desbloqueo cerrado en el navegador
+	// con la contraseña nueva (ADR 0085). Opcional; se guarda solo si el cambio sale.
+	UnlockEnvelope json.RawMessage `json:"unlock_envelope,omitempty"`
 }
 
 // handleMePassword — POST /api/v1/me/password — cambia la contraseña del usuario
@@ -112,6 +116,7 @@ func (s *Server) handleMePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = s.store.Audit(r.Context(), nil, auditEntry(c.Subject, c.Tenant, "user.password.changed", "", r))
+	s.guardarSobreDeContrasena(r, c.Subject, c.Tenant, req.UnlockEnvelope)
 	s.avisarSeguridad(r.Context(), c.Tenant, c.Subject, "security.password.changed", nil)
 	httpx.JSON(w, r, http.StatusOK, map[string]any{"sessions_revoked": revoked})
 }

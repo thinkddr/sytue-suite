@@ -14,6 +14,10 @@
  *   app necesita igualmente. En la transición, también un envoltorio de la 0082.
  * - `sytue-e2e-wrap`: envuelve la clave de recuperación de una cuenta de la persona
  *   y devuelve el envoltorio (público: es lo que guarda Rooms).
+ * - `sytue-e2e-password`: solo para «Mi cuenta», el sobre de la contraseña nueva al
+ *   cambiarla, si la actual abre el sobre vigente; lo guarda el servidor con el
+ *   cambio. Quien sabe la contraseña actual ya podría abrir el sobre; quien no, no
+ *   consigue nada.
  *
  * Contesta SOLO a su ventana madre y SOLO si su origen es exactamente el que el
  * servidor validó y puso en la CSP de esta página (`frame-ancestors`): otro origen,
@@ -33,7 +37,8 @@
   var MAX_RECOVERY = 256;
   var RATE = 10;
 
-  // El host de la app de cada producto con cuenta aislada, si no se llama igual.
+  // El host de la app de cada producto con cuenta aislada (`appDomains` de
+  // @sytue/config): el suyo propio, si no se llama igual que el producto.
   var HOSTS = {
     docs: ["docus"],
     sheets: ["calcus"],
@@ -41,6 +46,39 @@
     pdf: ["certipdf"],
     hub: ["hub", "one"],
   };
+  // Los hosts propios de la suite (los de `appDomains` y los que quedaron de antes,
+  // como `docs.`, que hoy es solo la API). En uno de ellos vive una sola app, y solo
+  // la de ese producto opera su cuenta aislada. Un host de organización
+  // (`<organización>.<dominio>/drive`, `/mail`… a la vez) es UN origen para todas sus
+  // apps: lo que una puede, lo pueden todas, así que ahí no hay producto que atar.
+  var SUITE_HOSTS = [
+    "docs",
+    "sheets",
+    "slides",
+    "pdf",
+    "web",
+    "www",
+    "admin",
+    "cloud",
+    "account",
+    "id",
+    "hub",
+    "one",
+    "mail",
+    "drive",
+    "docus",
+    "calcus",
+    "diapos",
+    "certipdf",
+    "calendar",
+    "contacts",
+    "notes",
+    "photos",
+    "rooms",
+    "cast",
+    "erp",
+    "bases",
+  ];
 
   /**
    * ¿Puede la app de `origin` operar sobre `account` con la clave de `sub`?
@@ -67,6 +105,7 @@
     } catch (e) {
       return false;
     }
+    if (SUITE_HOSTS.indexOf(host) < 0) return true;
     return (HOSTS[iso[1]] || [iso[1]]).indexOf(host) >= 0;
   };
 
@@ -286,6 +325,14 @@
           m.type === "sytue-e2e-unwrap"
             ? E.bridgeUnwrap(m, t)
             : E.bridgeWrap(m, t);
+      } else if (m.type === "sytue-e2e-password" && cfg.password === true) {
+        // Solo «Mi cuenta» (el servidor lo dice en `password`): el sobre de la
+        // contraseña nueva, si la actual abre el vigente (ADR 0085).
+        op = E.passwordEnvelope({
+          sub: m.sub,
+          current: m.current,
+          next: m.next,
+        });
       } else if (m.type === "sytue-e2e-forget-legacy") {
         op = E.migrate()
           .then(function () {

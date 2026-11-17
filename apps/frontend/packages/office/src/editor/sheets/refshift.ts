@@ -48,6 +48,7 @@ import {
   shiftRefs,
 } from './format';
 import { moveSpans } from './ocultas';
+import { conEstructura } from './anclas';
 
 /** Lo que le pasa a la rejilla: un tramo que se abre o que se cierra. */
 export interface Desplazamiento {
@@ -588,6 +589,57 @@ export function moverObjetos(s: SheetData, d: Desplazamiento): SheetData {
     }
   }
   return out;
+}
+
+/**
+ * La hoja del desplazamiento entera, tal como la deja insertar o borrar filas o columnas
+ * en ella: cada celda, con su formato y su estilo, en su nueva posición (lo que cae en lo
+ * borrado o rebosa la rejilla se pierde), cada fórmula reescrita (`reescribirCelda`), sus
+ * objetos movidos (`moverObjetos`) y la identidad de sus filas o columnas
+ * (`conEstructura`, anclas.ts).
+ *
+ * Con la hoja PROTEGIDA se reescriben TODAS sus fórmulas, también las bloqueadas: seguir
+ * a su dato no es editarlas, y el servidor lo acepta de quien tiene concedido insertar o
+ * borrar cuando el cambio es exactamente este desplazamiento
+ * (apps/nucleo/office/model/proteccion_propia.go). Lo comprueba de punta a punta el
+ * vector `propiaHoja` de test/vectores/calcus.json.
+ */
+export function desplazarHoja(s: SheetData, d: Desplazamiento): SheetData {
+  const remap = <T>(src: Record<string, T> | undefined): Record<string, T> => {
+    const out: Record<string, T> = {};
+    if (!src) return out;
+    for (const ref in src) {
+      const rr = parseRangeRef(ref);
+      if (!rr) continue;
+      const c = moverColumna(rr.c1, d);
+      const r = moverFila(rr.r1, d);
+      if (c !== null && r !== null) out[`${indiceACol(c, 'A')}${r + 1}`] = src[ref]!;
+    }
+    return out;
+  };
+  const celdas = remap(s.cells);
+  for (const ref in celdas) celdas[ref] = reescribirCelda(celdas[ref]!, d, s.name);
+  const next: SheetData = {
+    ...moverObjetos(s, d),
+    cells: celdas,
+    ...conEstructura(s, d.eje, d.desde, d.cantidad),
+  };
+  const formats = remap(s.formats);
+  if (Object.keys(formats).length > 0) next.formats = formats;
+  else delete next.formats;
+  const styles = remap(s.styles);
+  if (Object.keys(styles).length > 0) next.styles = styles;
+  else delete next.styles;
+  return next;
+}
+
+/**
+ * Todas las hojas del libro tras el desplazamiento en la `i`: ella entera
+ * (`desplazarHoja`) y en las demás las fórmulas que la citan (`moverReferenciasAjenas`).
+ * Es lo que se guarda: un desplazamiento, el mismo para todo el libro.
+ */
+export function desplazarHojas(hojas: SheetData[], i: number, d: Desplazamiento): SheetData[] {
+  return hojas.map((x, j) => (j === i ? desplazarHoja(x, d) : moverReferenciasAjenas(x, d)));
 }
 
 /**

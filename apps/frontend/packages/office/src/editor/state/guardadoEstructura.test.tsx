@@ -10,24 +10,67 @@
  *
  * VISTO EN ROJO sin la cola de `useDocument`: las dos inserciones esperaban la pausa del
  * autoguardado y salían juntas en un único guardado con dos desplazamientos.
+ *
+ * Y al salir de la página (`flush`): VISTO EN ROJO sin la cadena, el beacon llevaba lo
+ * último de una vez —dos desplazamientos en un guardado, que el servidor rechaza en una
+ * hoja protegida— y el borrador local volvía como un único guardado.
  */
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
-import { afterEach, describe, expect, test } from 'bun:test';
+import { afterEach, describe, expect, mock, test } from 'bun:test';
 import { render } from 'preact';
 import { useLayoutEffect } from 'preact/hooks';
+import * as offlineReal from '@sytue/offline';
 import { ToastProvider } from '@sytue/ui';
 import { EditorI18nCtx } from '../context';
 import { docsT } from '../../i18n';
 import { conEstructura, estructuraDistinta } from '../sheets/anclas';
 import type { SheetModel } from '../types';
-import { useDocument, type UseDocumentResult } from './useDocument';
+import type { OfflineDocument } from './offline';
+import type { UseDocumentResult } from './useDocument';
 
 if (typeof document === 'undefined') GlobalRegistrator.register();
 
+/**
+ * El almacén local de recuperación (IndexedDB, que happy-dom no tiene) en memoria, solo
+ * para quien abre como DUENO: para los demás sigue el de verdad, que aquí falla y se
+ * ignora como siempre.
+ */
+const DUENO = 'u-salida';
+const memoria = new Map<string, unknown>();
+const reales = { ...offlineReal };
+mock.module('@sytue/offline', () => ({
+  ...reales,
+  readOfflineValue: <T,>(o: string, ns: string, id: string): Promise<T | null> =>
+    o === DUENO
+      ? Promise.resolve(structuredClone((memoria.get(`${ns}/${id}`) as T | undefined) ?? null))
+      : reales.readOfflineValue<T>(o, ns, id),
+  mutateOfflineValue: <T,>(
+    o: string,
+    ns: string,
+    id: string,
+    update: (previo: T | null) => T | null,
+  ): Promise<void> => {
+    if (o !== DUENO) return reales.mutateOfflineValue<T>(o, ns, id, update);
+    const k = `${ns}/${id}`;
+    const siguiente = update(structuredClone((memoria.get(k) as T | undefined) ?? null));
+    if (siguiente === null) memoria.delete(k);
+    else memoria.set(k, structuredClone(siguiente));
+    return Promise.resolve();
+  },
+}));
+const { useDocument } = await import('./useDocument');
+
+const borrador = (): OfflineDocument | undefined =>
+  memoria.get('docs.documents/h1') as OfflineDocument | undefined;
+
 const fetchOriginal = globalThis.fetch;
+const beaconOriginal = Object.getOwnPropertyDescriptor(navigator, 'sendBeacon');
 afterEach(() => {
   render(null, document.body);
   globalThis.fetch = fetchOriginal;
+  if (beaconOriginal) Object.defineProperty(navigator, 'sendBeacon', beaconOriginal);
+  else Reflect.deleteProperty(navigator, 'sendBeacon');
+  memoria.clear();
 });
 
 /** Espera a que se cumpla `cond` (el hook trabaja con promesas y efectos). */
@@ -107,12 +150,12 @@ function servicio(): { guardados: Guardado[]; estados: () => number } {
   return { guardados, estados: () => estados };
 }
 
-async function abrir(): Promise<{ doc: () => UseDocumentResult }> {
+async function abrir(usuario = 'u1'): Promise<{ doc: () => UseDocumentResult }> {
   // El resultado del hook sale por un efecto, no desde el render: oxlint
   // (react/globals, react/immutability) no deja tocar desde el render algo de fuera.
   const sonda: { actual: UseDocumentResult | null } = { actual: null };
   function Sonda(): null {
-    const resultado = useDocument('h1', 'u1');
+    const resultado = useDocument('h1', usuario);
     useLayoutEffect(() => {
       sonda.actual = resultado;
     });
@@ -211,6 +254,132 @@ describe('guardado de los cambios de estructura', () => {
     await hasta(() => doc().save === 'saved', 'el editor vuelve a lo del servidor');
     await pausa(30);
     expect(guardados).toHaveLength(1);
+  });
+});
+
+/** Los beacons de la salida: `cabe` dice si el navegador acepta cada uno. */
+function espiarBeacon(cabe: boolean): Blob[] {
+  const enviados: Blob[] = [];
+  Object.defineProperty(navigator, 'sendBeacon', {
+    configurable: true,
+    value: (_url: string, datos: Blob): boolean => {
+      if (cabe) enviados.push(datos);
+      return cabe;
+    },
+  });
+  return enviados;
+}
+
+interface Op {
+  kind: string;
+  key: string;
+  value?: string;
+  lamport?: number;
+}
+
+/** El servicio que contesta cada guardado enseguida, con el registro en `inicial`. */
+function servicioQueGuarda(inicial: SheetModel): { guardados: SheetModel[] } {
+  const guardados: SheetModel[] = [];
+  let seq = 5;
+  globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = String(input);
+    if (url.startsWith('/api/documents?')) {
+      return Promise.resolve(
+        Response.json({
+          document: { id: 'h1', kind: 'spreadsheet', title: 'Cuentas' },
+          role: 'editor',
+        }),
+      );
+    }
+    if (url.startsWith('/api/state?')) {
+      return Promise.resolve(
+        Response.json({
+          seq,
+          state: {
+            lamport: 5,
+            registers: {
+              'doc:sheet': { value: JSON.stringify(inicial), lamport: 5, dot: { a: 'srv', c: 5 } },
+            },
+            elements: null,
+          },
+        }),
+      );
+    }
+    if (url.startsWith('/api/ops?') && init?.method === 'POST') {
+      const { ops } = JSON.parse(String(init.body)) as { ops: Op[] };
+      for (const o of ops) {
+        if (o.kind === 'set' && o.key === 'doc:sheet') {
+          guardados.push(JSON.parse(String(o.value)) as SheetModel);
+        }
+      }
+      seq += ops.length;
+      return Promise.resolve(Response.json({ seq }));
+    }
+    if (url.startsWith('/api/collab?')) return Promise.resolve(new Response('', { status: 404 }));
+    return Promise.resolve(Response.json({}));
+  }) as typeof fetch;
+  return { guardados };
+}
+
+describe('al salir de la página con cambios de estructura sin guardar', () => {
+  const m1 = insertarFila(M0, 0);
+  const m2 = insertarFila(m1, 0);
+
+  /** Abre como DUENO, inserta dos filas (la primera queda en vuelo) y sale de la página. */
+  async function insertarDosYSalir(cabe: boolean): Promise<Blob[]> {
+    const { guardados } = servicio();
+    const { doc } = await abrir(DUENO);
+    const enviados = espiarBeacon(cabe);
+    doc().onContentInput(JSON.stringify(m1), true);
+    doc().onContentInput(JSON.stringify(m2), true);
+    await hasta(() => guardados.length === 1, 'la primera inserción vuela');
+    window.dispatchEvent(new Event('pagehide'));
+    await hasta(() => borrador()?.cola?.length === 2, 'el borrador guarda la cola');
+    return enviados;
+  }
+
+  test('el beacon lleva un guardado por desplazamiento, en orden', async () => {
+    const enviados = await insertarDosYSalir(true);
+    expect(enviados).toHaveLength(1);
+    const { ops } = JSON.parse(await enviados[0]!.text()) as { ops: Op[] };
+    const sets = ops.filter((o) => o.kind === 'set' && o.key === 'doc:sheet');
+    expect(sets.map((o) => JSON.parse(String(o.value)) as SheetModel)).toEqual([m1, m2]);
+    // El último gana el registro, y cada uno lleva un solo desplazamiento sobre el anterior.
+    expect(sets[1]!.lamport!).toBeGreaterThan(sets[0]!.lamport!);
+    expect(filas(m1)).toBe(filas(M0) + 1);
+    expect(filas(m2)).toBe(filas(m1) + 1);
+  });
+
+  test('si no cabe, el borrador guarda la cola y al volver sale de uno en uno', async () => {
+    expect(await insertarDosYSalir(false)).toHaveLength(0);
+    render(null, document.body);
+    // Al volver, el servidor no tiene nada de lo de antes.
+    const { guardados } = servicioQueGuarda(M0);
+    const { doc } = await abrir(DUENO);
+    await hasta(() => doc().save === 'saved', 'todo guardado');
+    expect(guardados).toEqual([m1, m2]);
+    expect(borrador()?.contentDirty).toBe(false);
+    expect(borrador()?.cola).toBeUndefined();
+  });
+
+  test('al volver no se repite lo que el servidor ya tiene', async () => {
+    await insertarDosYSalir(false);
+    render(null, document.body);
+    // La primera inserción sí llegó (la que volaba): solo sale la segunda.
+    const una = servicioQueGuarda(m1);
+    const doc = (await abrir(DUENO)).doc;
+    await hasta(() => doc().save === 'saved', 'todo guardado');
+    expect(una.guardados).toEqual([m2]);
+    render(null, document.body);
+    // Y con todo ya en el servidor, nada.
+    await insertarDosYSalir(false);
+    render(null, document.body);
+    const ninguna = servicioQueGuarda(m2);
+    const doc2 = (await abrir(DUENO)).doc;
+    await pausa(30);
+    expect(doc2().save).toBe('saved');
+    expect(ninguna.guardados).toEqual([]);
+    expect(borrador()?.contentDirty).toBe(false);
   });
 });
 

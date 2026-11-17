@@ -20,6 +20,7 @@
     "@sytue/auth": "workspace:*",
     "@sytue/config": "workspace:*",
     "@sytue/i18n": "workspace:*",
+    "@sytue/offline": "workspace:*",
     "@sytue/shell": "workspace:*",
     "@sytue/ui": "workspace:*",
     "astro": "catalog:",

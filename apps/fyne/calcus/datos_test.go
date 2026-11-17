@@ -142,7 +142,7 @@ func TestLaEstructuraMueveReglasEsquemaYCombinadas(t *testing.T) {
 // guardado entero. El esquema y las combinadas, que no gobierna ningún permiso, sí se mueven.
 func TestLaEstructuraNoTocaLasReglasDeUnaHojaProtegida(t *testing.T) {
 	l := libroDePrueba(t, libroConReglas).Libro
-	l.Proteger(&Proteccion{InsertRows: true})
+	l.Proteger(&Proteccion{InsertRows: true}, "")
 	l.Estructura("insrow", "above", 0, 0, 0, 0)
 	h := l.h()
 	if h.condiciones[0].Rango != "B2:B10" || h.validaciones[0].Rango != "B2:B10" {
@@ -151,7 +151,7 @@ func TestLaEstructuraNoTocaLasReglasDeUnaHojaProtegida(t *testing.T) {
 	if h.grupFilas[0].Start != 2 {
 		t.Errorf("el esquema no gobernado por permisos no baja: %+v", h.grupFilas)
 	}
-	l.Proteger(&Proteccion{InsertRows: true, Objects: true})
+	l.Proteger(&Proteccion{InsertRows: true, Objects: true}, "")
 	l.Estructura("insrow", "above", 0, 0, 0, 0)
 	if c := l.h().condiciones[0]; c.Rango != "B3:B11" {
 		t.Errorf("con el permiso de objetos concedido no se mueve: %+v", c)

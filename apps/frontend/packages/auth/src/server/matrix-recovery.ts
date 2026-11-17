@@ -182,8 +182,20 @@ export function rutasRecuperacionMatrix(options: {
     }
     const wrapper = wrapperDTO(parsed);
     if (!wrapper) return Response.json({ error: 'invalid_input' }, { status: 400, headers });
+    // ADR 0085: a `sytue-id` wrapper the browser has just checked it opens retires the
+    // account's ADR 0082 wrappers of that key, in the same transaction that stores it.
+    const retire = new URL(context.request.url).searchParams.getAll('retire_older');
+    if (
+      retire.length > 1 ||
+      (retire.length === 1 && (retire[0] !== '1' || wrapper.kind !== 'sytue-id'))
+    )
+      return Response.json({ error: 'invalid_input' }, { status: 400, headers });
     try {
-      const { id } = await client(session.accessToken).putMatrixRecoveryWrapper(wrapper, target);
+      const { id } = await client(session.accessToken).putMatrixRecoveryWrapper(
+        wrapper,
+        target,
+        retire.length === 1 ? { retireOlder: true } : {},
+      );
       return Response.json({ id }, { headers });
     } catch (error) {
       return unavailable(error);

@@ -242,6 +242,14 @@ function parsear(texto: string): { v: unknown } | null {
   }
 }
 
+/** ¿Dicen lo mismo dos contenidos guardados, aunque cambie el orden de sus claves? */
+export function mismoContenido(a: string, b: string): boolean {
+  if (a === b) return true;
+  const x = parsear(a);
+  const y = parsear(b);
+  return x !== null && y !== null && igual(x.v, y.v);
+}
+
 /** fusionar3 sobre los textos guardados; si alguno no parsea, manda lo propio. */
 export function fusionarTextos(base: string, mio: string, suyo: string): string {
   const b = parsear(base);
@@ -310,11 +318,28 @@ export class CoedicionModelo {
    * que no se deja decir así: ver `diferencias`).
    */
   cambios(local: string): Cambio[] | null {
+    return this.cadena([local])?.[0] ?? null;
+  }
+
+  /**
+   * Los cambios de varios guardados que salen juntos y en orden (al salir de la página,
+   * los cambios de estructura de una hoja, cada uno en su parche): del ancestro al
+   * primero, del primero al segundo… Sin tocar el estado, porque hasta que el servidor
+   * conteste nada de eso está confirmado. null si alguno no se deja decir así.
+   */
+  cadena(locales: readonly string[]): Cambio[][] | null {
     if (this.ancestro === null) return null;
-    const b = parsear(this.ancestro);
-    const m = parsear(local);
-    if (b === null || m === null) return null;
-    return diferencias(b.v, m.v);
+    let previo = parsear(this.ancestro);
+    const out: Cambio[][] = [];
+    for (const local of locales) {
+      const m = parsear(local);
+      if (previo === null || m === null) return null;
+      const c = diferencias(previo.v, m.v);
+      if (c === null) return null;
+      out.push(c);
+      previo = m;
+    }
+    return out;
   }
 
   /**

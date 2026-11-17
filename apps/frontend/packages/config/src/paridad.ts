@@ -234,7 +234,10 @@ export interface FuncionParidad {
 // 2026-11-16: +1 en las dos por «suite-paleta» (D-DS-02 y PEND-PALETA-FYNE): la paleta de la
 // suite con las capas de cada app llega a la web y a Fyne a la vez; en Fyne con sus tests del
 // driver y las capturas del pintor de software, falta verla en una ventana real.
-export const TOPE_DEUDA = { escritorio: 60, movil: 85 } as const;
+// 2026-11-17: +1 en las dos por «calcus-rangos-editables» (PEND-CALC-FYNE-RANGOS): los
+// rangos editables por persona de la web no tenían entrada; Fyne ya los conserva, los mueve
+// y los respeta, pero aún no deja definirlos al proteger la hoja.
+export const TOPE_DEUDA = { escritorio: 61, movil: 86 } as const;
 
 /**
  * DÓNDE SE CIERRA LA DEUDA. Una sola sección y no tres cadenas: las tres que
@@ -1400,6 +1403,23 @@ export const FUNCIONES_PARIDAD: FuncionParidad[] = [
     escritorio: 'si',
     movil: 'planificado',
     deuda: DEUDA_MOVIL,
+  },
+  {
+    id: 'calcus-rangos-editables',
+    nombre: 'Rangos editables por persona dentro de una hoja protegida',
+    producto: 'sheets',
+    web: true,
+    // La web los define al proteger la hoja (el rango y el correo de la persona, que el
+    // servidor traduce a su `sub`), los enseña con la hoja protegida, desbloquea sus
+    // celdas para esa persona y los mueve con sus filas y columnas; el servidor lo cumple
+    // (apps/nucleo/office/model/proteccion_rangos.go). Fyne (PEND-CALC-FYNE-RANGOS) los
+    // lee, los conserva al guardar, los mueve igual (vector `propiaHoja`), los enseña en
+    // «Proteger hoja» y deja escribir en sus celdas a quien se le concedieron, con la regla
+    // del servidor; aún no deja definirlos al proteger, y nadie lo ha visto en una ventana
+    // real.
+    escritorio: 'planificado',
+    movil: 'planificado',
+    deuda: DEUDA_AMBAS,
   },
   {
     id: 'diapos-editar',

@@ -70,9 +70,19 @@ def hacer_legible_publico(raiz):
             if ruta.is_symlink():
                 continue
             modo = ruta.stat().st_mode
-            minimo = 0o555 if stat.S_ISDIR(modo) or (modo & 0o100) else 0o444
-            if stat.S_IMODE(modo) & minimo != minimo:
-                os.chmod(ruta, stat.S_IMODE(modo) | minimo)
+            if stat.S_ISDIR(modo):
+                permisos = (stat.S_IMODE(modo) & 0o700) | 0o111
+            else:
+                minimo = 0o555 if modo & 0o100 else 0o444
+                permisos = stat.S_IMODE(modo) | minimo
+            if stat.S_IMODE(modo) != permisos:
+                os.chmod(ruta, permisos)
+
+
+def restringir_listado_publico(ruta):
+    permisos = stat.S_IMODE(ruta.stat().st_mode)
+    lectura_escritura = stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH | stat.S_IWOTH
+    os.chmod(ruta, (permisos & ~lectura_escritura) | stat.S_IXOTH)
 
 
 def abre_puente(ejecutable, puente):
@@ -114,7 +124,7 @@ def insertar(productos, host, destino, identidad, app, generador, incluir_widget
             if carpeta.is_symlink() or not carpeta.resolve().is_relative_to(host.resolve()):
                 raise ValueError("el contenido anidado debe quedar dentro del host")
             carpeta.mkdir(parents=True, exist_ok=True)
-            os.chmod(carpeta, 0o755)
+            restringir_listado_publico(carpeta)
         planes = []
         if incluir_widgets:
             planes.append(("Sytue-" + app["clave"] + "-Widgets.appex", app["id"] + ".widgets", "widgets",
@@ -138,9 +148,6 @@ def insertar(productos, host, destino, identidad, app, generador, incluir_widget
             shutil.copytree(productos / nombre, bundle, symlinks=True)
             perfil_destino = bundle / ("embedded.mobileprovision" if plataforma == "ios" else "Contents/embedded.provisionprofile")
             shutil.copyfile(perfil, perfil_destino)
-            # El árbol clonado del job Apple y su almacén privado son 0600; instalado
-            # pertenece a root y debe poder leerlo quien ejecuta la app (90255).
-            os.chmod(perfil_destino, 0o644)
             hacer_legible_publico(bundle)
             anidadas.append((bundle, derechos))
         puente = None
@@ -168,7 +175,7 @@ def insertar(productos, host, destino, identidad, app, generador, incluir_widget
             # SwiftSupport/iphoneos/iphoneos y disparaba el rechazo 90430 en Apple.
             # Tampoco se pasa --strip-bitcode (retirado en Xcode 16+).
             soporte_swift.mkdir(parents=True, exist_ok=True)
-            os.chmod(soporte_swift, 0o755)
+            restringir_listado_publico(soporte_swift)
             bibliotecas += ["--unsigned-destination", soporte_swift]
         else:
             bibliotecas += ["--Xcodesign", "--options=runtime", "--Xcodesign", "--timestamp"]
@@ -189,6 +196,13 @@ def insertar(productos, host, destino, identidad, app, generador, incluir_widget
         dylibs = sorted(p for p in frameworks.glob("*.dylib") if p.is_file() and not p.is_symlink())
         hacer_legible_publico(extensiones)
         hacer_legible_publico(frameworks)
+        restringir_listado_publico(extensiones)
+        restringir_listado_publico(frameworks)
+        # El perfil sólo lo necesita el proceso de instalación, que es root.
+        for bundle, _ in anidadas:
+            perfil = bundle / ("embedded.mobileprovision" if plataforma == "ios"
+                               else "Contents/embedded.provisionprofile")
+            os.chmod(perfil, 0o600)
         if plataforma == "ios" and soporte_swift.exists():
             dylibs_soporte = []
             for entrada in sorted(soporte_swift.rglob("*")):
@@ -206,6 +220,7 @@ def insertar(productos, host, destino, identidad, app, generador, incluir_widget
                                  + repr([p.name for p in dylibs_soporte]) + " != " + repr([p.name for p in dylibs]))
             if dylibs_soporte:
                 hacer_legible_publico(soporte_swift)
+                restringir_listado_publico(soporte_swift)
                 for dylib_soporte in dylibs_soporte:
                     ids_soporte[dylib_soporte.name] = identificador_firma(dylib_soporte)
             else:

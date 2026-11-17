@@ -42,6 +42,8 @@ export default defineConfig({
   server: { port: 4333, host: true },
   vite: {
     plugins: [tailwindcss()],
-    ssr: { noExternal: ['@sytue/ui', '@sytue/shell', '@sytue/auth', '@sytue/api-clients'] },
+    ssr: {
+      noExternal: ['@sytue/ui', '@sytue/shell', '@sytue/auth', '@sytue/api-clients', '@sytue/offline'],
+    },
   },
 });

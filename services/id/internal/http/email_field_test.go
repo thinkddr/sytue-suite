@@ -18,7 +18,7 @@ import (
 // por su organización ve el mismo campo duplicado.
 func TestLosTresFormulariosNormalizanElCampoDeIdentidad(t *testing.T) {
 	paginas := map[string]string{
-		"acceso":       loginFormHTML("es", "", "", "", false),
+		"acceso":       loginFormHTML("es", "", "", "", false, false),
 		"organización": ssoFormHTML("es", "", "", ""),
 	}
 	for nombre, html := range paginas {

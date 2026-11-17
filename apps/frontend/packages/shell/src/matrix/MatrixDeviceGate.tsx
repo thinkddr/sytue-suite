@@ -108,6 +108,61 @@ const isRecovery = (failure: unknown): boolean =>
 const isSignIn = (failure: unknown): boolean =>
   failure instanceof MatrixCustodyError && failure.reason === 'signin';
 
+/**
+ * ADR 0085: a device verified before ADR 0084 (or one that opened an ADR 0082 wrapper
+ * from its own owner-key cache) already holds the account's recovery key. It wraps it
+ * for the Sytue ID sign-in itself, without asking anything; if this browser has no unlock
+ * key yet, it simply tries again the next time. The device already works either way.
+ */
+async function upgradeQuietly(
+  instance: SuiteMatrix,
+  custody: MatrixKeyCustody,
+  data: MatrixBootstrap,
+  signal: AbortSignal,
+): Promise<void> {
+  try {
+    const current = await instance.client.secretStorage.getDefaultKeyId();
+    if (!current || signal.aborted) return;
+    const state = await custody.state([current], signal);
+    if (state.methods.includes('sytue-id') || signal.aborted) return;
+    const held = await instance.heldRecoveryKey(current);
+    if (!held || signal.aborted) return;
+    await custody.wrap(
+      held,
+      { account: data.matrix_user_id, subject: data.actor, keyID: current },
+      signal,
+    );
+  } catch {
+    // Quietly: nothing here is needed for the device to work now.
+  }
+}
+
+/**
+ * ADR 0085: once the account's `sytue-id` wrapper is checked to open here, its ADR 0082
+ * wrappers (password, passkey) are retired, in the same transaction that stores it again.
+ * Quietly, like the upgrade above: nothing here is needed for the device to work.
+ */
+async function retireQuietly(
+  instance: SuiteMatrix,
+  custody: MatrixKeyCustody,
+  data: MatrixBootstrap,
+  signal: AbortSignal,
+): Promise<void> {
+  if (!custody.retireOlder) return;
+  try {
+    const current = await instance.client.secretStorage.getDefaultKeyId();
+    if (!current || signal.aborted) return;
+    const state = await custody.state([current], signal);
+    if (!state.methods.includes('sytue-id') || state.methods.length < 2 || signal.aborted) return;
+    await custody.retireOlder(
+      { account: data.matrix_user_id, subject: data.actor, keyID: current },
+      signal,
+    );
+  } catch {
+    // Quietly: the old wrappers stay until the next time.
+  }
+}
+
 export function MatrixDeviceGate({
   actor,
   tenant,
@@ -252,9 +307,13 @@ export function MatrixDeviceGate({
         if (state.methods.length > 0) {
           await instance.recover();
           // Opened with what the Sytue ID sign-in page computed for an ADR 0082
-          // wrapper: from now on it opens with the unlock key.
-          if (!state.methods.includes('sytue-id') && keyRef.current && current)
-            await uiRef.current?.saveRecoveryKey(keyRef.current, current);
+          // wrapper: from now on it opens with the unlock key. Opened from this
+          // device's own cache instead: the same, quietly.
+          if (!state.methods.includes('sytue-id') && current) {
+            if (keyRef.current) await uiRef.current?.saveRecoveryKey(keyRef.current, current);
+            else await upgradeQuietly(instance, custody, instance.bootstrap, signal);
+          }
+          await retireQuietly(instance, custody, instance.bootstrap, signal);
           return;
         }
         const legacy = state.legacy ? await custody.legacyRecoveryKey(signal) : null;
@@ -430,6 +489,10 @@ export function MatrixDeviceGate({
         if (!(await refresh(instance)) && !disposed && liveClientRef.current === instance) {
           await automatic(instance, controller.signal);
           if (!disposed && liveClientRef.current === instance) await refresh(instance);
+        } else if (custody && !disposed && liveClientRef.current === instance) {
+          void upgradeQuietly(instance, custody, data, controller.signal).then(() =>
+            retireQuietly(instance, custody, data, controller.signal),
+          );
         }
       } catch (failure) {
         if (!disposed && !(failure instanceof MatrixSecurityError && failure.reason === 'login'))

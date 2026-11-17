@@ -179,6 +179,38 @@ export class BrowserKeyCustody implements MatrixKeyCustody {
     if (sealed.legacy) await this.bridge.forgetLegacy(target.subject).catch(() => undefined);
   }
 
+  async retireOlder(
+    target: { account: string; subject: string; keyID: string },
+    signal?: AbortSignal,
+  ): Promise<boolean> {
+    const { wrappers } = await this.wrappers(signal);
+    const ofKey = wrappers.filter((w) => w.key_id === target.keyID);
+    const current = ofKey.find((w) => w.kind === 'sytue-id');
+    if (!current || !ofKey.some((w) => w.kind !== 'sytue-id')) return false;
+    // Checked HERE first: that very wrapper opens to a recovery key with the unlock key.
+    const opened = await this.bridge
+      .unwrap(target.subject, { account: target.account, wrappers: [current] })
+      .catch((): UnwrapResult => ({ ok: false, error: 'unavailable' }));
+    if (!opened.ok || opened.kind !== 'sytue-id' || !recoveryKeyShape.test(opened.recoveryKey))
+      return false;
+    const body: Partial<RecoveryWrapper> = { ...current };
+    delete body.id;
+    delete body.created_at;
+    const url = this.url('/api/matrix/recovery-wrappers');
+    let response: Response;
+    try {
+      response = await this.fetch(url + (url.includes('?') ? '&' : '?') + 'retire_older=1', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+        ...(signal ? { signal } : {}),
+      });
+    } catch {
+      return false;
+    }
+    return response.ok;
+  }
+
   async legacyRecoveryKey(signal?: AbortSignal): Promise<string | null> {
     if (this.options.isolated) return null;
     try {

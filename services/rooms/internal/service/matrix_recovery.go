@@ -94,8 +94,20 @@ func (s *Service) MatrixRecoveryWrappers(ctx context.Context, actor string, acco
 // Solo comprueba su forma (parámetros mínimos de Argon2id incluidos): abrirlo no
 // puede, porque la clave nunca sale del dispositivo.
 func (s *Service) PutMatrixRecoveryWrapper(ctx context.Context, actor string, account MatrixRecoveryAccount, wrapper recoverywrap.Wrapper) (string, error) {
+	return s.putMatrixRecoveryWrapper(ctx, actor, account, wrapper, false)
+}
+
+// PutMatrixRecoveryWrapperRetiringOlder guarda un envoltorio `sytue-id` que el
+// dispositivo acaba de comprobar que abre y retira en la misma transacción los de la
+// ADR 0082 de esa clave (ADR 0085). Solo para `sytue-id`: es el que abre sin pedir
+// nada, y retirar los viejos con otro tipo dejaría la cuenta peor.
+func (s *Service) PutMatrixRecoveryWrapperRetiringOlder(ctx context.Context, actor string, account MatrixRecoveryAccount, wrapper recoverywrap.Wrapper) (string, error) {
+	return s.putMatrixRecoveryWrapper(ctx, actor, account, wrapper, true)
+}
+
+func (s *Service) putMatrixRecoveryWrapper(ctx context.Context, actor string, account MatrixRecoveryAccount, wrapper recoverywrap.Wrapper, retireOlder bool) (string, error) {
 	wrapper.ID, wrapper.CreatedAt = "", ""
-	if err := wrapper.Validate(); err != nil {
+	if err := wrapper.Validate(); err != nil || (retireOlder && wrapper.Kind != recoverywrap.KindSytueID) {
 		return "", domain.ErrInvalidInput
 	}
 	scope, err := account.resolve(ctx)
@@ -108,6 +120,9 @@ func (s *Service) PutMatrixRecoveryWrapper(ctx context.Context, actor string, ac
 	var raw bytes.Buffer
 	if err := json.NewEncoder(&raw).Encode(wrapper); err != nil {
 		return "", err
+	}
+	if retireOlder {
+		return s.pstore.PutMatrixRecoveryWrapperRetiringOlder(ctx, actor, scope, wrapper.KeyID, bytes.TrimSpace(raw.Bytes()))
 	}
 	return s.pstore.PutMatrixRecoveryWrapper(ctx, actor, scope, wrapper.Kind, wrapper.CredentialID, wrapper.KeyID, bytes.TrimSpace(raw.Bytes()))
 }

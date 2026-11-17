@@ -133,3 +133,15 @@ reason = "deepmerge 4.3.1 solo en tools/renovate/bun.lock (tooling de CI sobre c
 id = "GHSA-g3hv-75wg-m249"
 ignoreUntil = 2026-12-05
 reason = "minimatch 3.1.5 solo en tooling de lint/CI (eslint-plugin-jsx-a11y, rimraf de @lhci/cli y de Renovate) sin patrones de usuario; sin parche en la serie 3 y la 11 rompe su API por defecto"
+
+# picomatch 2.3.2 y 4.0.7 (GHSA-fc5q-39xc-vjpf, 2026-11): ReDoS con extglobs repetidos de
+# una sola rama (`+(*)`, `+(*a)`). Lo que controla el atacante es el PATRÓN glob. Aquí
+# picomatch solo compila patrones escritos en el propio repositorio: vite, rollup
+# (@rollup/pluginutils), tinyglobby/fdir, micromatch/anymatch del tooling y los helpers de
+# Astro, que en el servidor solo casan URL contra `remotePatterns` de su configuración.
+# Ningún servicio acepta un glob de un usuario. 4.0.7 es la última versión publicada
+# (FIXED VERSION: --) en los tres lockfiles (apps/frontend, tools/astro-fyne, tools/renovate).
+[[IgnoredVulns]]
+id = "GHSA-fc5q-39xc-vjpf"
+ignoreUntil = 2026-12-17
+reason = "picomatch solo compila patrones glob de la configuración del repositorio (vite, rollup, Astro, tooling); el aviso exige un patrón controlado por el atacante; sin versión corregida publicada"

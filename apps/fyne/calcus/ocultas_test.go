@@ -126,7 +126,7 @@ func TestSubtotalSeSaltaLasOcultasAMano(t *testing.T) {
 // TestOcultarConLaHojaProtegida va con el permiso de formato, como en la web.
 func TestOcultarConLaHojaProtegida(t *testing.T) {
 	lz := NuevoLienzo(NuevoLibro())
-	lz.Libro.Proteger(&Proteccion{})
+	lz.Libro.Proteger(&Proteccion{}, "")
 	lz.Rejilla.sel = Celda{C: 0, F: 3}
 	lz.Mandar(CmdOcultar, `{"axis":"row","op":"hide"}`)
 	if f, _ := lz.Libro.TramosOcultos(); f != nil {

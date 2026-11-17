@@ -498,7 +498,10 @@ try {
       await ui.dialog
         .getByRole("button", { name: "Send", exact: true })
         .click();
-      expect(ui.state.writes.at(-1).thread_id).toBe("own-1");
+      // El clic no espera a que la petición llegue al banco: se espera a la escritura.
+      await expect
+        .poll(() => ui.state.writes.at(-1)?.thread_id)
+        .toBe("own-1");
       await ui.dialog
         .getByRole("button", { name: "Close thread", exact: true })
         .click();
@@ -515,7 +518,7 @@ try {
       await expect(
         ui.dialog.getByText("Updated externally", { exact: true }),
       ).toHaveCount(0);
-      expect(ui.state.writes.at(-1)).toMatchObject({
+      await expect.poll(() => ui.state.writes.at(-1)).toMatchObject({
         action: "delete",
         message_id: "own-1",
       });

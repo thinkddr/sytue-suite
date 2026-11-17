@@ -59,28 +59,39 @@ const passkeysCSS = `.pk-list{margin:14px 0 0;padding:0;list-style:none}` +
 const passkeysScript = `(function(){` +
 	`var w=document.getElementById('pk-add');if(!w){return;}` +
 	`if(!window.PublicKeyCredential||!navigator.credentials||!navigator.credentials.create){return;}` +
-	`w.hidden=false;` +
+	`w.hidden=false;var E=window.SytueE2E;` +
 	`var b=document.getElementById('pk-go'),n=document.getElementById('pk-name'),e=document.getElementById('pk-err');` +
 	`function fail(m){if(e){e.textContent=m;e.hidden=false;}b.disabled=false;b.textContent=b.dataset.add;}` +
 	`function d(s){s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4){s+='=';}var x=atob(s),a=new Uint8Array(x.length),i=0;for(;i<x.length;i++){a[i]=x.charCodeAt(i);}return a.buffer;}` +
 	`function c(buf){var a=new Uint8Array(buf),s='',i=0;for(;i<a.length;i++){s+=String.fromCharCode(a[i]);}return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}` +
+	// ADR 0085: la passkey nueva desbloquea desde ya. Se pide la PRF al crearla; si
+	// el autenticador la da, su KEK (CryptoKey no extraíble) queda en el almacén
+	// para /e2e/passkey, que cierra con ella la clave de desbloqueo sin pedir nada
+	// más. Si no la da, esa página la pide una vez.
+	`function prf(cr){var x=cr.getClientExtensionResults?cr.getClientExtensionResults():{};var f=x&&x.prf&&x.prf.results&&x.prf.results.first;` +
+	`if(!E||!f){return Promise.resolve();}var raw=new Uint8Array(f.buffer||f).slice();` +
+	`return E.passkeyKEK(raw).then(function(k){return E.store.put('enroll',{v:2,cred:c(cr.rawId),kek:k,at:Date.now()});}).catch(function(){});}` +
 	`b.addEventListener('click',function(){` +
-	`if(e){e.hidden=true;}b.disabled=true;b.textContent=b.dataset.wait;` +
+	`if(e){e.hidden=true;}b.disabled=true;b.textContent=b.dataset.wait;var cr=null;` +
 	`fetch('/account/passkeys/begin',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})` +
 	`.then(function(r){if(!r.ok){throw 0;}return r.json();}).then(function(o){` +
+	`return (E?E.passkeyPRFInput():Promise.resolve(null)).then(function(first){` +
 	`var ex=(o.excludeCredentials||[]).map(function(k){return {type:k.type,id:d(k.id)};});` +
-	`return navigator.credentials.create({publicKey:{challenge:d(o.challenge),rp:o.rp,` +
+	`var pk={challenge:d(o.challenge),rp:o.rp,` +
 	`user:{id:d(o.user.id),name:o.user.name,displayName:o.user.displayName},` +
 	`pubKeyCredParams:o.pubKeyCredParams,timeout:o.timeout,attestation:o.attestation,` +
-	`excludeCredentials:ex,authenticatorSelection:o.authenticatorSelection}});` +
-	`}).then(function(cr){var a=cr.response;return fetch('/account/passkeys/finish',{method:'POST',` +
+	`excludeCredentials:ex,authenticatorSelection:o.authenticatorSelection};` +
+	`if(first){pk.extensions={prf:{eval:{first:first}}};}` +
+	`return navigator.credentials.create({publicKey:pk});});` +
+	`}).then(function(x){cr=x;return prf(cr);}).then(function(){var a=cr.response;return fetch('/account/passkeys/finish',{method:'POST',` +
 	`headers:{'Content-Type':'application/json'},body:JSON.stringify({id:cr.id,rawId:c(cr.rawId),type:cr.type,` +
 	`name:(n&&n.value)||'',attestationObject:c(a.attestationObject),clientDataJSON:c(a.clientDataJSON)})});})` +
-	`.then(function(r){if(!r.ok){throw 0;}window.location='/account?pk=ok#claves';})` +
+	`.then(function(r){if(!r.ok){throw 0;}var back='/account?pk=ok#claves';` +
+	`window.location=E?'/e2e/passkey?cred='+c(cr.rawId)+'&return_to='+encodeURIComponent(back):back;})` +
 	// Cada desenlace dice lo suyo. Cancelar el diálogo del sistema NO es un
 	// error del que haya que informar como si algo se hubiera roto, y «ya la
 	// tienes registrada» es la respuesta a la pregunta que se estaba haciendo.
-	`.catch(function(err){var k=err&&err.name;` +
+	`.catch(function(err){var k=err&&err.name;if(E){E.store.del('enroll').catch(function(){});}` +
 	`fail(k==='NotAllowedError'?b.dataset.cancel:(k==='InvalidStateError'?b.dataset.dup:b.dataset.err));});` +
 	`});})();`
 

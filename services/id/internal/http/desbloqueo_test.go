@@ -15,6 +15,7 @@ import (
 	"strings"
 	"testing"
 
+	"git.sytue.eu/sytue/one/apps/nucleo/recoverywrap"
 	pcfg "git.sytue.eu/sytue/one/platform/pkg/config"
 	"git.sytue.eu/sytue/one/services/id/internal/domain"
 )
@@ -207,4 +208,106 @@ func TestElCierreDeSesionOlvidaLaClaveDeDesbloqueo(t *testing.T) {
 		t.Fatal("el cierre no borra el almacén del desbloqueo")
 	}
 	guionesEnLaCSP(t, page, cspScriptHashes)
+}
+
+// Passkey preferida, contraseña de respaldo (ADR 0085): en un navegador donde la
+// última persona que entró tiene una passkey que abre su cifrado, la página ofrece
+// PRIMERO la passkey, como botón principal, y la contraseña debajo; sin esa señal,
+// la de siempre. En los dos casos hay un solo botón de passkey y el formulario de
+// contraseña sigue ahí.
+func TestLaPaginaDeInicioOfrecePrimeroLaPasskeySiLaCuentaLaTiene(t *testing.T) {
+	s := &Server{}
+	h := securityHeaders(Config{})(http.HandlerFunc(s.handleLoginForm))
+	pagina := func(cookie bool) string {
+		req := httptest.NewRequest(http.MethodGet, "/login/", http.NoBody)
+		if cookie {
+			req.AddCookie(&http.Cookie{Name: passkeyFirstCookie, Value: "1"})
+		}
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		guionesEnLaCSP(t, rec.Body.String(), rec.Header().Get("Content-Security-Policy"))
+		return rec.Body.String()
+	}
+	for _, c := range []struct {
+		cookie         bool
+		passkeyPrimero bool
+	}{{false, false}, {true, true}} {
+		p := pagina(c.cookie)
+		boton, form := strings.Index(p, `id="passkey-btn"`), strings.Index(p, `<form method="post" action="/login/">`)
+		if boton < 0 || form < 0 || strings.Count(p, `id="passkey-btn"`) != 1 || !strings.Contains(p, `name="password"`) {
+			t.Fatalf("cookie=%v: falta el botón, el formulario o hay dos botones", c.cookie)
+		}
+		if (boton < form) != c.passkeyPrimero || strings.Contains(p, `class="pk-btn pk-first"`) != c.passkeyPrimero {
+			t.Errorf("cookie=%v: passkey primero = %v, quiero %v", c.cookie, boton < form, c.passkeyPrimero)
+		}
+		// Y donde el navegador lo permite, la passkey en el autocompletado del campo.
+		if !strings.Contains(p, "mediation:'conditional'") || !strings.Contains(p, "'username webauthn'") {
+			t.Errorf("cookie=%v: sin mediación condicional", c.cookie)
+		}
+	}
+
+	// La señal la pone el relevo según los sobres de la persona: con uno de passkey,
+	// sí; con solo el de contraseña, se quita.
+	rec := httptest.NewRecorder()
+	s.recordarPasskeyPrimero(rec, []recoverywrap.Envelope{{Kind: recoverywrap.KindPassword}, {Kind: recoverywrap.KindPasskey}})
+	if c := rec.Result().Cookies(); len(c) != 1 || c[0].Value != "1" || !c[0].HttpOnly || c[0].MaxAge <= 0 {
+		t.Fatalf("con passkey: %+v", c)
+	}
+	rec = httptest.NewRecorder()
+	s.recordarPasskeyPrimero(rec, []recoverywrap.Envelope{{Kind: recoverywrap.KindPassword}})
+	if c := rec.Result().Cookies(); len(c) != 1 || c[0].MaxAge >= 0 {
+		t.Fatalf("sin passkey: %+v", c)
+	}
+}
+
+// /e2e/passkey solo vuelve a una ruta de Sytue ID o a una app de la suite: nunca a
+// otro sitio (sería una redirección abierta con la sesión).
+func TestLaPasskeyNuevaSoloVuelveALaSuite(t *testing.T) {
+	s := &Server{cfg: Config{Env: pcfg.EnvProd, Issuer: "https://id.sytue.eu"}}
+	for v, quiero := range map[string]string{
+		"/account?pk=ok#claves":                       "/account?pk=ok#claves",
+		"https://id.sytue.eu/account/seguridad?x=1#c": "/account/seguridad?x=1#c",
+		"https://account.sytue.eu/account":            "https://account.sytue.eu/account",
+		"https://mail.sytue.eu/mail/":                 "https://mail.sytue.eu/mail/",
+		"//evil.example/x":                            "",
+		"https://evil.example/":                       "",
+		"https://x.apps.sytue.eu/":                    "",
+		"/\\evil.example":                             "",
+		"javascript:alert(1)":                         "",
+		"https://a@mail.sytue.eu/":                    "",
+	} {
+		got, ok := s.vueltaDelAlta(v)
+		if (quiero == "") == ok || got != quiero {
+			t.Errorf("%q: %q %v; quiero %q", v, got, ok, quiero)
+		}
+	}
+}
+
+// El puente de «Mi cuenta» (su alias `account.<dominio>` y el del propio origen de
+// Sytue ID, /e2e/cuenta) es el único que rehace el sobre de contraseña: lleva
+// Argon2id y su CSP compila WebAssembly. El de cualquier otra app, no.
+func TestSoloElPuenteDeLaCuentaRehaceLaContrasena(t *testing.T) {
+	s := &Server{cfg: Config{Env: pcfg.EnvProd, Issuer: "https://id.sytue.eu"}}
+	pedir := func(h http.HandlerFunc, ruta string) (string, string) {
+		rec := httptest.NewRecorder()
+		securityHeaders(s.cfg)(h).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, ruta, http.NoBody))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: %d", ruta, rec.Code)
+		}
+		guionesEnLaCSP(t, rec.Body.String(), rec.Header().Get("Content-Security-Policy"))
+		return rec.Body.String(), rec.Header().Get("Content-Security-Policy")
+	}
+	page, csp := pedir(s.handleUnlockBridge, "/e2e/bridge?o="+url.QueryEscape("https://mail.sytue.eu"))
+	if strings.Contains(page, `"password":true`) || strings.Contains(page, "npmjs.com/package/hash-wasm") || strings.Contains(csp, "wasm") {
+		t.Error("el puente de Mail no debe poder rehacer la contraseña")
+	}
+	page, csp = pedir(s.handleUnlockBridge, "/e2e/bridge?o="+url.QueryEscape("https://account.sytue.eu"))
+	if !strings.Contains(page, `"password":true`) || !strings.Contains(page, "npmjs.com/package/hash-wasm") || !strings.Contains(csp, "'wasm-unsafe-eval'") {
+		t.Error("el puente del alias de «Mi cuenta» debe poder rehacer la contraseña")
+	}
+	page, csp = pedir(s.handleUnlockBridgeCuenta, "/e2e/cuenta")
+	if !strings.Contains(page, `"origin":"https://id.sytue.eu"`) || !strings.Contains(page, `"password":true`) ||
+		!strings.Contains(csp, "frame-ancestors 'self';") {
+		t.Errorf("/e2e/cuenta: %q", csp)
+	}
 }

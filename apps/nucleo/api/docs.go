@@ -20,6 +20,7 @@ import (
 	"unicode/utf8"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/coedicion"
+	officemodel "git.sytue.eu/sytue/one/apps/nucleo/office/model"
 )
 
 // Docs es el cliente de Sytue Docs (services/docs, `/api/v1`). Docus, Calcus y Diapos
@@ -478,6 +479,18 @@ func (d *Docs) Content(ctx context.Context, id, clave string) (DocContent, error
 	return c, nil
 }
 
+// ponerProteccion adjunta al cuerpo de POST …/ops las contraseñas de protección de hoja y
+// libro que lleve el contexto (officemodel.ConProteccion), como `proteccion`: el sobre que
+// manda la web (editor/state/proteccion.ts). Van FUERA de las operaciones para que la
+// contraseña no entre en el registro que se guarda y se sirve a todo lector; el servicio
+// la verifica contra su hash (officemodel.AplicarProteccion) y no la devuelve nunca.
+func ponerProteccion(ctx context.Context, cuerpo map[string]any) {
+	p := officemodel.ProteccionDe(ctx)
+	if p.Clave != "" || len(p.Nuevas) > 0 {
+		cuerpo["proteccion"] = p
+	}
+}
+
 type docOp struct {
 	Kind    string `json:"kind"`
 	Dot     DocDot `json:"dot"`
@@ -517,6 +530,7 @@ func (d *Docs) saveContentBase(ctx context.Context, id, clave, valor string, dot
 	if baseSeq > 0 {
 		cuerpo["base_seq"] = baseSeq
 	}
+	ponerProteccion(ctx, cuerpo)
 	out, err := PostJSON[struct {
 		Seq int64 `json:"seq"`
 	}](ctx, d.c, "/documents/"+url.PathEscape(id)+"/ops", cuerpo)
@@ -548,7 +562,9 @@ func (d *Docs) SaveCoedicion(ctx context.Context, id, clave, valor string, dot D
 		ops = append(ops, docOp{Kind: "set", Dot: dot, Key: coedicion.ClaveLWW(clave), Value: lamport, Lamport: lamport})
 	}
 	ops = append(ops, docOp{Kind: "set", Dot: dot, Key: clave, Value: valor, Lamport: lamport})
-	cuerpo, err := json.Marshal(map[string]any{"ops": ops})
+	sobre := map[string]any{"ops": ops}
+	ponerProteccion(ctx, sobre)
+	cuerpo, err := json.Marshal(sobre)
 	if err != nil {
 		return 0, err
 	}

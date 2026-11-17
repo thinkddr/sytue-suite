@@ -215,3 +215,30 @@ test('owner-key requests snapshot Matrix metadata before asynchronous validation
   available.owner.mac = 'invalid';
   expect((await pending)[1]).toEqual(f.key);
 });
+
+test('the key a device already holds is handed out only from its own cache, checked, and never asked for', async () => {
+  const f = await fixture(),
+    first = f.make();
+  // Nothing cached yet: nothing held, and nobody is asked.
+  expect(await first.held('owner', f.description)).toBeNull();
+  expect(f.asked()).toBe(0);
+  await first.get({ owner: f.description });
+  first.close();
+  const second = f.make(async () => {
+    throw new Error('held never asks');
+  });
+  const held = await second.held('owner', f.description);
+  expect(held).toEqual(f.key);
+  // A copy: wiping it does not touch the cache.
+  held!.fill(0);
+  expect(await second.held('owner', f.description)).toEqual(f.key);
+  // Another key ID, or a description the cached key does not match: nothing.
+  expect(await second.held('other', f.description)).toBeNull();
+  const otherDescription = {
+    algorithm: ownerProofAlgorithm,
+    ...(await calculateKeyCheck(crypto.getRandomValues(new Uint8Array(32)))),
+  };
+  expect(await second.held('owner', otherDescription)).toBeNull();
+  expect(f.asked()).toBe(1);
+  await second.destroy();
+});

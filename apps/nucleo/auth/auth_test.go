@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -574,6 +575,30 @@ func TestUnSecretoSeGuardaSeLeeYSeBorra(t *testing.T) {
 		if err := GuardarSecreto(mala, clave); err == nil {
 			t.Errorf("la cuenta %q se ha aceptado", mala)
 		}
+	}
+}
+
+// TestLasCuentasSeRecorrenPorPrefijo: CuentasCon da las cuentas guardadas de un prefijo
+// (por el índice) sin borrarlas, y OlvidarSecretos borra justo esas.
+func TestLasCuentasSeRecorrenPorPrefijo(t *testing.T) {
+	keyring.MockInit()
+	for _, c := range []string{"rooms-matrix-session-a", "rooms-matrix-master-a", "notes-x", "rooms-matrix-session-b"} {
+		if err := GuardarSecreto(c, []byte("x")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := CuentasCon("rooms-matrix-session-")
+	if err != nil || !slices.Equal(got, []string{"rooms-matrix-session-a", "rooms-matrix-session-b"}) {
+		t.Fatalf("CuentasCon = %v, %v", got, err)
+	}
+	if d, _ := LeerSecreto("rooms-matrix-session-a"); d == nil {
+		t.Fatal("recorrerlas las ha borrado")
+	}
+	if err := OlvidarSecretos("rooms-matrix-"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := CuentasCon(""); !slices.Equal(got, []string{"notes-x"}) {
+		t.Errorf("tras olvidar rooms-matrix- quedan %v; quiero solo notes-x", got)
 	}
 }
 

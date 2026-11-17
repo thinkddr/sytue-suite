@@ -81,7 +81,7 @@ var cspStyleHashes = func() string {
 var cspScriptHashes = func() string {
 	blocks := []string{
 		themeInitJS, loginScript, emailFieldScript, logoutSweepScript, passkeysScript, altchaScript,
-		e2eArgon2JS, e2eComunJS, e2eLoginJS, e2eRelayJS, e2eBridgeJS,
+		e2eArgon2JS, e2eComunJS, e2eLoginJS, e2eRelayJS, e2eBridgeJS, e2ePasskeyJS, e2eCuentaJS,
 	}
 	parts := make([]string, 0, len(blocks))
 	for _, b := range blocks {

@@ -33,11 +33,17 @@ import {
 } from '../../src/editor/sheets/format';
 import { chartView } from '../../src/editor/sheets/Chart';
 import type { ChartSpec, SheetData, Sparkline, SheetTable } from '../../src/editor/types';
-import { moverObjetos, moverReferenciasAjenas } from '../../src/editor/sheets/refshift';
+import {
+  desplazarHojas,
+  moverObjetos,
+  moverReferenciasAjenas,
+} from '../../src/editor/sheets/refshift';
 import {
   AIRE_AJUSTE,
   ALTO_MAX,
   ANCHO_MAX,
+  MAX_COLS,
+  MAX_ROWS,
   MEDIDA_MIN,
   acumulado,
   altoAjustado,
@@ -980,6 +986,66 @@ const DESPLAZAMIENTOS_AJENOS: Desplazamiento[] = [
   { eje: 'fila', desde: 0, cantidad: 1, tope: 100, hoja: 'Resumen' },
 ];
 
+/* ---------- Insertar o borrar en una hoja PROTEGIDA: sus propias fórmulas ---------- */
+
+/**
+ * «Datos», protegida con los permisos estructurales, con fórmulas bloqueadas que citan
+ * sus propias celdas (también con su nombre y con `$`), un rango editable, una tabla
+ * dinámica, una celda desbloqueada y otra oculta; «Resumen», protegida sin permisos, la
+ * cita. Lo que deja `desplazarHojas` —lo que guarda el lienzo— lo acepta el servidor de
+ * quien no es el propietario: lo comprueba
+ * apps/nucleo/office/model/proteccion_propia_vectores_test.go.
+ */
+const LIBRO_PROPIA: SheetData[] = [
+  { name: 'Ventas', cells: { B1: '7' } },
+  {
+    name: 'Datos',
+    cells: {
+      A1: '1',
+      A2: '2',
+      A3: '3',
+      A4: '4',
+      A5: '5',
+      A10: '<b>=SUM(A1:A5)</b>',
+      B1: '=A3*2',
+      B2: '=Datos!A4+$A$5',
+      B3: '=SUM(A:A)',
+      C1: 'libre',
+      C4: '=A4',
+      D1: '=Ventas!B1',
+    },
+    styles: { C1: { locked: false }, C4: { hidden: true } },
+    protect: {
+      insertRows: true,
+      deleteRows: true,
+      insertCols: true,
+      deleteCols: true,
+      ranges: [{ ref: 'A4:A5', users: ['ana'] }],
+    },
+    pivots: [
+      {
+        name: 'TD1',
+        source: 'A1:A5',
+        anchor: 'F1',
+        range: 'F1:G3',
+        rows: [{ field: 0 }],
+        cols: [],
+        values: [{ field: 0, fn: 'sum' }],
+      },
+    ],
+  },
+  { name: 'Resumen', cells: { A1: '=Datos!A10', A2: '=Datos!A1' }, protect: {} },
+];
+const DESPLAZAMIENTOS_PROPIOS: Desplazamiento[] = [
+  { eje: 'fila', desde: 2, cantidad: 1, tope: MAX_ROWS, hoja: 'Datos' },
+  { eje: 'fila', desde: 0, cantidad: 1, tope: MAX_ROWS, hoja: 'Datos' },
+  { eje: 'fila', desde: 1, cantidad: -1, tope: MAX_ROWS, hoja: 'Datos' },
+  { eje: 'fila', desde: 2, cantidad: -2, tope: MAX_ROWS, hoja: 'Datos' },
+  { eje: 'fila', desde: 20, cantidad: 1, tope: MAX_ROWS, hoja: 'Datos' },
+  { eje: 'columna', desde: 0, cantidad: 1, tope: MAX_COLS, hoja: 'Datos' },
+  { eje: 'columna', desde: 1, cantidad: -1, tope: MAX_COLS, hoja: 'Datos' },
+];
+
 /* ---------- Cálculo ---------- */
 
 /** Lo que dicen las funciones de la web de cada entrada. */
@@ -1093,6 +1159,18 @@ export function calcularVectores(): unknown {
           return { hoja, d, sale: { cells, condFormats, validations, pivots } };
         }),
       ),
+    },
+    propiaHoja: {
+      hojas: LIBRO_PROPIA,
+      casos: DESPLAZAMIENTOS_PROPIOS.map((d) => ({
+        hoja: 1,
+        d,
+        // Sin la identidad de filas y columnas (anclas.ts): la de las nuevas es aleatoria
+        // y el servidor no la mira.
+        sale: desplazarHojas(LIBRO_PROPIA, 1, d).map(
+          ({ rowIds: _f, rowBase: _fb, colIds: _c, colBase: _cb, ...h }) => h,
+        ),
+      })),
     },
     funciones: { datos: DATOS_FUNCIONES, casos: evaluarFunciones() },
     minigraficos: {

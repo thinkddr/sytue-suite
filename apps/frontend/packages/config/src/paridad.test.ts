@@ -80,7 +80,10 @@ test('cada deuda apunta a una sección que existe en el roadmap — NORMATIVO §
   // el slug del original como ancla explícita, y eso también es un sitio de verdad.
   const anclas = new Set([...roadmap.matchAll(/<a\s+id="([^"]+)"/g)].map((m) => m[1]));
   const slug = (t: string) =>
-    t.toLowerCase().replace(/[^\p{L}\p{N}\s_-]/gu, '').replace(/\s/g, '-');
+    t
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s_-]/gu, '')
+      .replace(/\s/g, '-');
   const colgadas: string[] = [];
   for (const f of FUNCIONES_PARIDAD) {
     for (const m of (f.deuda ?? '').matchAll(/docs\/roadmap\.md § (.+)/g)) {

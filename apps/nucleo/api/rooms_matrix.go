@@ -166,9 +166,26 @@ func (r *Rooms) MatrixRecoveryWrappers(ctx context.Context, account MatrixRecove
 // PutMatrixRecoveryWrapper guarda un envoltorio hecho en este dispositivo. El
 // servicio retira los de otra clave y, en la cuenta de Rooms, la copia con KEK.
 func (r *Rooms) PutMatrixRecoveryWrapper(ctx context.Context, account MatrixRecoveryAccount, wrapper recoverywrap.Wrapper) (string, error) {
+	return r.putMatrixRecoveryWrapper(ctx, account, wrapper, false)
+}
+
+// PutMatrixRecoveryWrapperRetiringOlder guarda un envoltorio `sytue-id` que este
+// dispositivo acaba de comprobar que abre y le pide al servicio que retire, en la
+// misma transacción, los de la ADR 0082 de esa clave (ADR 0085).
+func (r *Rooms) PutMatrixRecoveryWrapperRetiringOlder(ctx context.Context, account MatrixRecoveryAccount, wrapper recoverywrap.Wrapper) (string, error) {
+	if wrapper.Kind != recoverywrap.KindSytueID {
+		return "", recoverywrap.ErrInvalid
+	}
+	return r.putMatrixRecoveryWrapper(ctx, account, wrapper, true)
+}
+
+func (r *Rooms) putMatrixRecoveryWrapper(ctx context.Context, account MatrixRecoveryAccount, wrapper recoverywrap.Wrapper, retirar bool) (string, error) {
 	query, err := account.query()
 	if err != nil {
 		return "", err
+	}
+	if retirar {
+		query.Set("retire_older", "1")
 	}
 	wrapper.ID, wrapper.CreatedAt = "", ""
 	if err := wrapper.Validate(); err != nil {

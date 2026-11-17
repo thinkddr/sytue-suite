@@ -5,11 +5,34 @@ package pg
 
 import (
 	"context"
+	"math"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
+
+func TestClampMaxConns(t *testing.T) {
+	cases := []struct {
+		in   int
+		want int32
+	}{
+		{math.MinInt, 10},
+		{-1, 10},
+		{0, 10},
+		{1, 1},
+		{25, 25},
+		{4096, 4096},
+		{4097, 4096},
+		{math.MaxInt32, 4096},
+		{math.MaxInt, 4096},
+	}
+	for _, tc := range cases {
+		if got := clampMaxConns(tc.in); got != tc.want {
+			t.Errorf("clampMaxConns(%d) = %d, want %d", tc.in, got, tc.want)
+		}
+	}
+}
 
 func TestConnectEmptyDSN(t *testing.T) {
 	if _, err := Connect(context.Background(), Config{DSN: ""}); err == nil {

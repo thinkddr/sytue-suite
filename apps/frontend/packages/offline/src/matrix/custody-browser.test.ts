@@ -380,3 +380,61 @@ test('the retired service copy is offered only for the Rooms account', async () 
   expect(await isolated.state(undefined)).toEqual({ methods: [], legacy: false, older: '' });
   expect(await isolated.legacyRecoveryKey()).toBeNull();
 });
+
+test('once its sytue-id wrapper opens here, the ADR 0082 ones of that key are retired in one step', async () => {
+  const s = service();
+  const passwordVector = old.find((v) => v.wrapper.kind === 'password')!;
+  const id = sytueID('https://rooms.sytue.eu');
+  await id.e2e.saveUnlock(subject, unlockKey.slice());
+  const custody = new BrowserKeyCustody({
+    base: '/rooms',
+    isolated: false,
+    idOrigin,
+    fetchImpl: s.fetchImpl,
+    bridge: id.bridge,
+  });
+  const target = {
+    account: passwordVector.account,
+    subject,
+    keyID: passwordVector.wrapper.key_id,
+  };
+  s.stored.push(passwordVector.wrapper);
+  // Nothing to retire without a sytue-id wrapper: the old one is all the account has.
+  expect(await custody.retireOlder(target)).toBe(false);
+  await custody.wrap(key, target);
+  // A sytue-id wrapper that does not open here retires nothing either.
+  const other = sytueID('https://rooms.sytue.eu');
+  await other.e2e.saveUnlock(subject, new Uint8Array(32).fill(3));
+  const elsewhere = new BrowserKeyCustody({
+    base: '/rooms',
+    isolated: false,
+    idOrigin,
+    fetchImpl: s.fetchImpl,
+    bridge: other.bridge,
+  });
+  expect(await elsewhere.retireOlder(target)).toBe(false);
+  expect(s.requests.some((r) => r.url.includes('retire_older'))).toBe(false);
+  // Checked here: the same wrapper goes again, asking the service to retire the old ones.
+  expect(await custody.retireOlder(target)).toBe(true);
+  const retire = s.requests.find((r) => r.url.includes('retire_older=1'))!;
+  expect(retire.method).toBe('PUT');
+  expect(JSON.parse(retire.body!)).toMatchObject({ kind: 'sytue-id', key_id: target.keyID });
+  expect(retire.body).not.toContain('EsT3');
+  expectNoUnlockKey(id.received);
+}, 30_000);
+
+test('an app on its organisation host (acme.sytue.eu/drive) opens its own isolated account', async () => {
+  const s = service();
+  const id = sytueID('https://acme.sytue.eu');
+  await id.e2e.saveUnlock(subject, unlockKey.slice());
+  const custody = new BrowserKeyCustody({
+    base: '/drive',
+    isolated: true,
+    idOrigin,
+    fetchImpl: s.fetchImpl,
+    bridge: id.bridge,
+  });
+  await custody.wrap(key, { account, subject, keyID: 'K1' });
+  expect(await custody.unwrap({ account, subject, keyIDs: ['K1'] })).toBe(key);
+  expectNoUnlockKey(id.received);
+}, 30_000);

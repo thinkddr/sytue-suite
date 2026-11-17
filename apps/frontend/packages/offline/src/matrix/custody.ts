@@ -69,6 +69,15 @@ export interface MatrixKeyCustody {
     target: { account: string; subject: string; keyID: string },
     signal?: AbortSignal,
   ) => Promise<void>;
+  /**
+   * Retires the account's ADR 0082 wrappers of `keyID` once its `sytue-id` wrapper is
+   * checked to open here (ADR 0085), in the same transaction that stores it again: the
+   * account is never left without a wrapper that opens. Resolves whether it did.
+   */
+  retireOlder?: (
+    target: { account: string; subject: string; keyID: string },
+    signal?: AbortSignal,
+  ) => Promise<boolean>;
   /** Migration only: the key the service still holds from before wrapping, or null. */
   legacyRecoveryKey: (signal?: AbortSignal) => Promise<string | null>;
   /** Where to send the person to sign in to Sytue ID again to unlock this device. */

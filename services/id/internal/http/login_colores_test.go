@@ -33,7 +33,7 @@ func TestLoginLosColoresSonLosDeBranding(t *testing.T) {
 func TestLoginLaCSPAutorizaLaHojaServida(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h := securityHeaders(Config{Env: "prod"})(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(loginPage("es", "Entrar", loginFormHTML("es", "", "", "", false))))
+		_, _ = w.Write([]byte(loginPage("es", "Entrar", loginFormHTML("es", "", "", "", false, false))))
 	}))
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/login/", http.NoBody))
 

@@ -23,6 +23,8 @@ function aBuffer(s: string): ArrayBuffer {
   return a.buffer;
 }
 
+import { paginaDeLaPasskeyNueva } from './desbloqueo.js';
+
 /** ArrayBuffer → base64url (lo que devuelve el autenticador). */
 function aBase64Url(buf: ArrayBuffer): string {
   const a = new Uint8Array(buf);
@@ -91,6 +93,9 @@ export async function altaPasskey(nombre: string): Promise<FalloPasskey | null> 
         ...(o.authenticatorSelection !== undefined
           ? { authenticatorSelection: o.authenticatorSelection }
           : {}),
+        // Solo para saber si la passkey admite PRF (ADR 0085). Sin `eval`: aquí no
+        // sale ninguna salida de la PRF; la pide Sytue ID en su propia página.
+        extensions: { prf: {} },
       },
     })) as PublicKeyCredential | null;
     if (!cred) return 'error';
@@ -108,7 +113,18 @@ export async function altaPasskey(nombre: string): Promise<FalloPasskey | null> 
         clientDataJSON: aBase64Url(att.clientDataJSON),
       }),
     });
-    return fin.ok ? null : 'error';
+    if (!fin.ok) return 'error';
+    // ADR 0085: una passkey con PRF desbloquea desde ya. Sytue ID le hace su sobre
+    // en su página (pide la passkey una vez) y vuelve aquí.
+    const extensiones = (cred.getClientExtensionResults?.() ?? {}) as {
+      prf?: { enabled?: boolean };
+    };
+    const prf = extensiones.prf;
+    if (prf?.enabled === true) {
+      const destino = paginaDeLaPasskeyNueva(aBase64Url(cred.rawId), window.location.href);
+      if (destino) window.location.assign(destino);
+    }
+    return null;
   } catch (e) {
     const nombreErr = e instanceof Error ? e.name : '';
     if (nombreErr === 'NotAllowedError') return 'cancelado';

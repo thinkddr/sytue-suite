@@ -543,6 +543,11 @@ func contenidoHoja(nombre string, p, n, pp, np map[string]json.RawMessage, quien
 		return ErrProtegido
 	}
 	cambianRangos, cambianDinamicas := distinto(pp, np, "ranges"), distinto(p, n, "pivots")
+	formato := dice(pp, "formatCells", true)
+	relajado := false
+	for _, k := range permisosEstructurales {
+		relajado = relajado || dice(pp, k, true)
+	}
 	var propias otrosDesplazados
 	// Con un desplazamiento de la hoja, sus dinámicas quedan donde él las deja aunque no
 	// cambien: si las movía, tenían que llegar movidas. Y si no se leen, no se sabe.
@@ -553,17 +558,22 @@ func contenidoHoja(nombre string, p, n, pp, np map[string]json.RawMessage, quien
 		}
 		propias = dp
 	}
-	dinAjenas := false
-	if (cambianRangos || cambianDinamicas) && !rangosHojaMovidos(p, n, pp, np, quien, propias) {
-		if cambianRangos || ajenas == nil {
+	dinAjenas, pendiente := false, false
+	if (cambianRangos || cambianDinamicas) && !rangosHojaMovidos(p, n, pp, np, quien, propias, nil) {
+		switch {
+		case ajenas == nil:
 			return ErrProtegido
+		case relajado:
+			// Puede ser el desplazamiento de la propia hoja, que además reescribe sus
+			// fórmulas (y entonces sus celdas no llegan tal cual): lo decide `ajenas` con
+			// el mismo para todo el libro (proteccion_propia.go). Las dinámicas pueden
+			// seguir también a la hoja de la que leen.
+			pendiente, dinAjenas = true, !cambianRangos
+		case cambianRangos:
+			return ErrProtegido
+		default:
+			dinAjenas = true
 		}
-		dinAjenas = true
-	}
-	formato := dice(pp, "formatCells", true)
-	relajado := false
-	for _, k := range permisosEstructurales {
-		relajado = relajado || dice(pp, k, true)
 	}
 	pc, ok1 := celdas(p)
 	nc, ok2 := celdas(n)
@@ -609,7 +619,9 @@ func contenidoHoja(nombre string, p, n, pp, np map[string]json.RawMessage, quien
 	// otra hoja hayan seguido a su dato al insertar o borrar filas allí: se acepta solo
 	// si es EXACTAMENTE ese desplazamiento, el mismo para todas las hojas protegidas, y
 	// eso se decide al final con todas (proteccion_ajenas.go). Igual las tablas
-	// dinámicas que siguen a la hoja de la que leen.
+	// dinámicas que siguen a la hoja de la que leen, y, con un permiso estructural, las
+	// fórmulas de esta misma hoja que siguen a sus celdas al insertar o borrar aquí
+	// (proteccion_propia.go).
 	necesita := !celdasPermitidas(pc, nc, bloqueada, relajado)
 	if necesita && ajenas == nil {
 		return ErrProtegido
@@ -657,7 +669,11 @@ func contenidoHoja(nombre string, p, n, pp, np map[string]json.RawMessage, quien
 		}
 	}
 	if ajenas != nil {
-		ajenas.anotar(nombre, pc, nc, bloqueada, relajado, necesita, leerDinamicasHoja(p, n, dinAjenas))
+		var propia *hojaPropia
+		if relajado && (necesita || pendiente) {
+			propia = &hojaPropia{p: p, n: n, pp: pp, np: np, quien: quien, soloPropia: pendiente && cambianRangos}
+		}
+		ajenas.anotar(nombre, pc, nc, bloqueada, relajado, necesita, leerDinamicasHoja(p, n, dinAjenas), propia)
 	}
 	return nil
 }

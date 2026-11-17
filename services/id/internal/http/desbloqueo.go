@@ -49,6 +49,10 @@ var (
 	e2eRelayJS string
 	//go:embed e2e/bridge.js
 	e2eBridgeJS string
+	//go:embed e2e/passkey.js
+	e2ePasskeyJS string
+	//go:embed e2e/cuenta.js
+	e2eCuentaJS string
 	// e2eArgon2JS es la compilación de Argon2id de hash-wasm 4.12.0 (MIT), la misma
 	// versión que usan las apps web (packages/offline). Va copiada porque este
 	// servicio no tiene paso de empaquetado; la prueba
@@ -226,6 +230,37 @@ func (s *Server) handleUnlockEnvelopePut(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// guardarSobreDeContrasena guarda, tras un cambio de contraseña que YA salió bien,
+// el sobre que el navegador cerró con la contraseña nueva (ADR 0085): así la nueva
+// desbloquea desde ya en cualquier dispositivo, sin esperar al siguiente inicio de
+// sesión. Lo hace la página donde se cambia (o el puente de «Mi cuenta»), que solo
+// lo cierra si la contraseña actual abre el sobre vigente. Aquí solo se comprueba la
+// forma: un sobre de otra clave (otra huella) lo rechaza el almacén, y un fallo no
+// deshace el cambio de contraseña (el sobre se rehará al entrar, como antes).
+func (s *Server) guardarSobreDeContrasena(r *http.Request, userID, orgID string, raw []byte) {
+	if len(raw) == 0 {
+		return
+	}
+	var e recoverywrap.Envelope
+	if json.Unmarshal(raw, &e) != nil {
+		return
+	}
+	e.UpdatedAt = ""
+	if e.Validate() != nil || e.Kind != recoverywrap.KindPassword {
+		return
+	}
+	out, err := json.Marshal(e)
+	if err != nil {
+		return
+	}
+	hint := base64.StdEncoding.EncodeToString(e.Hint)
+	if err := s.store.PutUnlockEnvelope(r.Context(), userID, e.Kind, "", hint, out, false); err != nil {
+		s.log.WarnContext(r.Context(), "desbloqueo: el sobre de la contraseña nueva no se guardó; se rehará al entrar", "error", err)
+		return
+	}
+	_ = s.store.Audit(r.Context(), nil, auditEntry(userID, orgID, "e2e.unlock.envelope", e.Kind, r))
+}
+
 // claveDeEntrega valida el `sytue_unlock_key` de una app nativa: un punto P-256
 // sin comprimir en base64url. Una clave rota no pinta el relevo.
 func claveDeEntrega(v string) bool {
@@ -251,6 +286,38 @@ func quiereRelevo(req authzRequest, client domain.Client) (appKey string, ok boo
 		return "", false
 	}
 	return "", req.Unlock
+}
+
+// passkeyFirstCookie le dice a la página de inicio de sesión de ESTE navegador que
+// quien entró aquí por última vez tiene una passkey que abre su cifrado: la próxima
+// vez se le ofrece primero (ADR 0085). No identifica a nadie ni da acceso a nada:
+// es una preferencia de presentación, HttpOnly y solo de este origen.
+const passkeyFirstCookie = "sytue_passkey_first" //nolint:gosec // G101: es el NOMBRE de una cookie de presentación, no una credencial.
+
+// recordarPasskeyPrimero la pone si la persona tiene un sobre de passkey y la quita
+// si no. Entrar con la contraseña teniendo passkey no se bloquea: solo hace que la
+// siguiente vez se ofrezca la passkey primero.
+func (s *Server) recordarPasskeyPrimero(w http.ResponseWriter, envelopes []recoverywrap.Envelope) {
+	conPasskey := false
+	for _, e := range envelopes {
+		conPasskey = conPasskey || e.Kind == recoverywrap.KindPasskey
+	}
+	c := &http.Cookie{ //nolint:gosec // G124: Secure es config (CookieSecure); HttpOnly y SameSite=Lax fijos.
+		Name: secureCookieName(passkeyFirstCookie, s.cfg.CookieSecure), Path: "/",
+		HttpOnly: true, Secure: s.cfg.CookieSecure, SameSite: http.SameSiteLaxMode,
+	}
+	if conPasskey {
+		c.Value, c.MaxAge = "1", 365*24*60*60
+	} else {
+		c.MaxAge = -1
+	}
+	http.SetCookie(w, c)
+}
+
+// passkeyPrimero dice si la página de inicio de sesión ofrece primero la passkey.
+func (s *Server) passkeyPrimero(r *http.Request) bool {
+	c, err := s.requestCookie(r, passkeyFirstCookie)
+	return err == nil && c.Value == "1"
 }
 
 // relevoDatos es lo que el relevo necesita, en el propio documento. No lleva nada
@@ -304,6 +371,7 @@ func (s *Server) entregarCodigo(w http.ResponseWriter, r *http.Request, req auth
 		http.Redirect(w, r, destino, http.StatusFound)
 		return
 	}
+	s.recordarPasskeyPrimero(w, envelopes)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write([]byte(relevoPage(i18n.From(r), destino, string(raw))))
 }
@@ -369,23 +437,151 @@ func (s *Server) handleUnlockBridge(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	raw, err := json.Marshal(map[string]string{"origin": origen})
+	s.servirPuente(w, r, origen, origen, esOrigenDeCuenta(origen))
+}
+
+// handleUnlockBridgeCuenta — GET /e2e/cuenta — el mismo puente para «Mi cuenta»
+// servida en el propio origen de Sytue ID (id.<dominio>/account, riesgo R6 de
+// security.md): solo se deja incrustar por este mismo origen.
+func (s *Server) handleUnlockBridgeCuenta(w http.ResponseWriter, r *http.Request) {
+	origen := strings.TrimRight(s.cfg.Issuer, "/")
+	if u, err := url.Parse(origen); err != nil || u.Host == "" {
+		http.NotFound(w, r)
+		return
+	}
+	s.servirPuente(w, r, origen, "'self'", true)
+}
+
+// esOrigenDeCuenta: el alias global de «Mi cuenta» (`account.<dominio>`).
+func esOrigenDeCuenta(origen string) bool {
+	u, err := url.Parse(origen)
+	return err == nil && strings.HasPrefix(u.Hostname(), "account.")
+}
+
+// servirPuente pinta la página del puente. Con `contrasena` (solo «Mi cuenta», ADR
+// 0085) lleva además Argon2id y su CSP deja compilar WebAssembly, para rehacer el
+// sobre de contraseña al cambiarla; el resto de apps no lo tienen.
+func (s *Server) servirPuente(w http.ResponseWriter, _ *http.Request, origen, ancestros string, contrasena bool) {
+	cfg := map[string]any{"origin": origen}
+	argon, wasm := "", ""
+	if contrasena {
+		cfg["password"] = true
+		argon, wasm = `<script>`+e2eArgon2JS+`</script>`, "'wasm-unsafe-eval' "
+	}
+	raw, err := json.Marshal(cfg)
 	if err != nil {
-		httpx.Fail(w, r, httpx.ErrInternal.Wrap(err))
+		http.Error(w, "", http.StatusInternalServerError)
 		return
 	}
 	h := w.Header()
 	// La CSP general dice `frame-ancestors 'none'` y X-Frame-Options DENY: esta es
 	// la única página del IdP que vive en un iframe, y solo en el de ese origen.
 	h.Del("X-Frame-Options")
-	h.Set("Content-Security-Policy", "default-src 'none'; script-src "+cspScriptHashes+
-		"; connect-src 'none'; frame-ancestors "+origen+"; base-uri 'none'; form-action 'none'")
+	h.Set("Content-Security-Policy", "default-src 'none'; script-src "+wasm+cspScriptHashes+
+		"; connect-src 'none'; frame-ancestors "+ancestros+"; base-uri 'none'; form-action 'none'")
 	h.Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write([]byte(`<!doctype html><html><head><meta charset="utf-8"><meta name="robots" content="noindex">` +
 		`<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png">` +
 		`<title>Sytue ID</title></head><body>` +
 		`<script type="application/json" id="e2e-bridge">` + string(raw) + `</script>` +
-		`<script>` + e2eComunJS + `</script><script>` + e2eBridgeJS + `</script></body></html>`))
+		argon + `<script>` + e2eComunJS + `</script><script>` + e2eBridgeJS + `</script></body></html>`))
+}
+
+// vueltaDelAlta valida a dónde vuelve /e2e/passkey: una ruta de Sytue ID o una
+// URL de una app de la suite (la misma regla que el puente, con ruta y consulta).
+func (s *Server) vueltaDelAlta(v string) (string, bool) {
+	if strings.HasPrefix(v, "/") && !strings.HasPrefix(v, "//") && !strings.ContainsAny(v, "\\\r\n") {
+		return v, true
+	}
+	u, err := url.Parse(v)
+	if err != nil || u.User != nil || u.Host == "" {
+		return "", false
+	}
+	origen := u.Scheme + "://" + u.Host
+	if origen == strings.TrimRight(s.cfg.Issuer, "/") {
+		// «Mi cuenta» en el propio origen de Sytue ID: se vuelve por la ruta.
+		return u.RequestURI() + fragmento(u), true
+	}
+	if _, ok := s.origenDelPuente(origen); !ok {
+		return "", false
+	}
+	return u.String(), true
+}
+
+func fragmento(u *url.URL) string {
+	if u.Fragment == "" {
+		return ""
+	}
+	return "#" + u.EscapedFragment()
+}
+
+// passkeyDatos es lo que /e2e/passkey necesita: nada secreto.
+type passkeyDatos struct {
+	Sub  string `json:"sub"`
+	Cred string `json:"cred"`
+	RPID string `json:"rp_id"`
+	Next string `json:"next"`
+}
+
+// handleUnlockPasskeyEnroll — GET /e2e/passkey?cred=<id>&return_to=<url> — la
+// passkey recién dada de alta desbloquea desde ya (ADR 0085): en ESTE origen, el
+// guion cierra para ella la clave de desbloqueo que ya tiene el navegador y vuelve.
+// Sin sesión, con una passkey que no es de la persona o que ya tiene sobre, vuelve
+// sin más.
+func (s *Server) handleUnlockPasskeyEnroll(w http.ResponseWriter, r *http.Request) {
+	loc := i18n.From(r)
+	next, ok := s.vueltaDelAlta(r.URL.Query().Get("return_to"))
+	if !ok {
+		next = "/account"
+	}
+	sess, ok := s.currentSession(r)
+	cred := r.URL.Query().Get("cred")
+	if !ok || !validCredentialID(cred) {
+		http.Redirect(w, r, next, http.StatusFound)
+		return
+	}
+	creds, err := s.store.ListCredentialsForUser(r.Context(), sess.UserID)
+	suya := false
+	if err == nil {
+		for _, c := range creds {
+			suya = suya || b64u.EncodeToString(c.CredID) == cred
+		}
+	}
+	_, envelopes, err := s.unlockKDF(r, sess.UserID)
+	if !suya || err != nil {
+		http.Redirect(w, r, next, http.StatusFound)
+		return
+	}
+	for _, e := range envelopes {
+		if e.Kind == recoverywrap.KindPasskey && e.CredentialID == cred {
+			http.Redirect(w, r, next, http.StatusFound)
+			return
+		}
+	}
+	raw, err := json.Marshal(passkeyDatos{Sub: sess.UserID, Cred: cred, RPID: s.cfg.RPID, Next: next}) //nolint:gosec // G117: `cred` es el identificador PÚBLICO de la passkey, no un secreto.
+	if err != nil {
+		http.Redirect(w, r, next, http.StatusFound)
+		return
+	}
+	esc := html.EscapeString
+	t := func(k string) string { return esc(i18n.T(loc, k)) }
+	body := `<p class="sub" id="e2e-working" role="status">` + t("e2e.unlocking") + `</p>` +
+		`<noscript><p class="alt"><a class="btn-link" href="` + esc(next) + `">` + t("e2e.continue") + `</a></p></noscript>` +
+		`<section id="e2e-passkey-ask" hidden>` +
+		`<p class="sub">` + t("e2e.passkey_enroll_body") + `</p>` +
+		`<button type="button" id="e2e-passkey-go">` + t("e2e.passkey_enroll_action") + `</button>` +
+		`<p class="alt"><a class="btn-link" href="` + esc(next) + `">` + t("e2e.continue") + `</a></p>` +
+		`</section>` +
+		`<script type="application/json" id="e2e-passkey">` + string(raw) + `</script>` +
+		`<script>` + e2eComunJS + `</script><script>` + e2ePasskeyJS + `</script>`
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write([]byte(loginPage(loc, i18n.T(loc, "e2e.title"), body)))
+}
+
+// validCredentialID: un identificador de credencial en base64url sin relleno.
+func validCredentialID(v string) bool {
+	raw, err := b64u.DecodeString(v)
+	return err == nil && len(raw) > 0 && len(raw) <= 1024
 }
 
 // uriSinPrompt es la petición de autorización sin `prompt`: a donde vuelve el

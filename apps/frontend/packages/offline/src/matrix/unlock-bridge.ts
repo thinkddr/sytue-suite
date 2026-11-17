@@ -91,7 +91,11 @@ function ask(options: UnlockBridgeOptions, request: Record<string, unknown>): Pr
     frame.hidden = true;
     frame.setAttribute('aria-hidden', 'true');
     frame.tabIndex = -1;
-    frame.src = `${idOrigin}/e2e/bridge?o=${encodeURIComponent(win.location.origin)}`;
+    // «Mi cuenta» se sirve en el propio origen de Sytue ID: su puente es /e2e/cuenta.
+    frame.src =
+      win.location.origin === idOrigin
+        ? `${idOrigin}/e2e/cuenta`
+        : `${idOrigin}/e2e/bridge?o=${encodeURIComponent(win.location.origin)}`;
     doc.body.appendChild(frame);
   });
 }
@@ -166,4 +170,39 @@ export async function wrapInBridge(
 /** Drops what opens the ADR 0082 wrappers once they have been moved to the new kind. */
 export async function forgetLegacyMaterial(options: UnlockBridgeOptions): Promise<void> {
   await ask(options, { type: 'sytue-e2e-forget-legacy' });
+}
+
+export type PasswordEnvelopeResult =
+  { ok: true; envelope: Record<string, unknown> } | { ok: false; error: UnlockBridgeError };
+
+/**
+ * «Mi cuenta» only: the Sytue ID envelope of the unlock key for the NEW password, sealed
+ * in Sytue ID's origin when the CURRENT one opens the envelope this browser holds. It
+ * goes to the service with the password change, which keeps it only if the change
+ * succeeds: from then on the new password unlocks everywhere (ADR 0085). Anyone who
+ * knows the current password could open the envelope already; anyone else gets nothing.
+ */
+export async function passwordEnvelopeInBridge(
+  options: UnlockBridgeOptions,
+  input: { current: string; next: string },
+): Promise<PasswordEnvelopeResult> {
+  const answer = await ask(
+    { ...options, timeoutMs: options.timeoutMs ?? 30000 },
+    { type: 'sytue-e2e-password', current: input.current, next: input.next },
+  );
+  if (!answer.ok) return answer;
+  const envelope = answer.data.envelope as Record<string, unknown> | undefined;
+  if (
+    !envelope ||
+    envelope.v !== 1 ||
+    envelope.kind !== 'password' ||
+    envelope.credential_id !== '' ||
+    typeof envelope.hint !== 'string' ||
+    typeof envelope.nonce !== 'string' ||
+    typeof envelope.ciphertext !== 'string' ||
+    !envelope.kdf ||
+    typeof envelope.kdf !== 'object'
+  )
+    return { ok: false, error: 'unavailable' };
+  return { ok: true, envelope };
 }

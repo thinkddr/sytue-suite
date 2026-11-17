@@ -11,6 +11,7 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/nucleo/formula"
 	"git.sytue.eu/sytue/one/apps/nucleo/formula/analisis"
+	"git.sytue.eu/sytue/one/apps/nucleo/office/model"
 	"git.sytue.eu/sytue/one/apps/nucleo/office/nombrehoja"
 )
 
@@ -91,6 +92,17 @@ type Libro struct {
 	// rotulo traduce lo poco que el libro PINTA con palabras (el «Total» de la fila de
 	// totales). Lo pone el lienzo; sin él sale la clave.
 	rotulo func(clave string) string
+	// yo es quien edita (su `sub`, FijarYo): las celdas de sus rangos editables de una
+	// hoja protegida se le enseñan desbloqueadas (proteccion.go).
+	yo string
+	// ajeno: quien edita no es el propietario (FijarAjeno). Sin contraseña, solo el
+	// propietario quita una protección (`esPropietario` de la web). Un libro sin servicio
+	// es de quien lo tiene delante, así que el cero es «propietario».
+	ajeno bool
+	// sobre son las contraseñas de protección tecleadas que el servicio aún no ha
+	// recibido (`state/proteccion.ts` de la web): NUNCA entran en el modelo, viajan aparte
+	// con el guardado (Sobre).
+	sobre model.Proteccion
 	// AntesDeEstructura y TrasEstructura avisan de un cambio de estructura —insertar o
 	// borrar filas o columnas, o deshacerlo o rehacerlo—, con el libro aún sin cambiar y
 	// ya cambiado. Quien guarda los manda cada uno en SU guardado: en una hoja protegida

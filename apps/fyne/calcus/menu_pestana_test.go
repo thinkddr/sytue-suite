@@ -124,7 +124,7 @@ func TestLaPestanaSeManejaConElTeclado(t *testing.T) {
 // color salen inertes, como en Excel; y el ▾ no cambia la medida de las demás pestañas.
 func TestElMenuDeLaPestanaSeApagaConElLibroProtegido(t *testing.T) {
 	c := lienzoTraducido(t)
-	c.Libro.ProtegerLibro(&ProteccionLibro{})
+	c.Libro.ProtegerLibro(&ProteccionLibro{}, "")
 	w := test.NewTempWindow(t, c)
 	w.Resize(fyne.NewSize(560, 300))
 	c.Pestanas.Refresh()

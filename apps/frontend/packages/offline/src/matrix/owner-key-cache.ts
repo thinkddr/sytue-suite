@@ -195,6 +195,28 @@ export class MatrixOwnerKeyCache {
       key.fill(0);
     }
   }
+  /**
+   * The key this device already holds for `id` (in memory or in its sealed cache),
+   * checked against its description, without asking anyone; null otherwise. A copy the
+   * caller zeroes.
+   */
+  async held(
+    id: string,
+    description: SecretStorageKeyDescription,
+  ): Promise<Uint8Array<ArrayBuffer> | null> {
+    if (this.closed || !this.active() || !hasSecretStorageCheck(description)) return null;
+    await this.pending;
+    const retained = this.keys.get(id);
+    if (retained) return (await this.checkKey(retained, description)) ? retained.slice() : null;
+    const saved = await this.stored().catch(() => null);
+    if (!saved) return null;
+    try {
+      if (saved[0] !== id || !(await this.checkKey(saved[1], description))) return null;
+      return saved[1].slice();
+    } finally {
+      saved[1].fill(0);
+    }
+  }
   close(): void {
     this.closed = true;
     this.values.close();

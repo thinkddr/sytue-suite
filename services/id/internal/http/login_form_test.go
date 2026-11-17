@@ -31,7 +31,7 @@ func forgotPasswordHTML(t *testing.T) string {
 // uno diverge, el fallo reaparece solo en él y cuesta el doble de encontrar.
 func TestCampoDeIdentidadSinSenalesAmbiguas(t *testing.T) {
 	formularios := map[string]string{
-		"acceso":       loginFormHTML("es", "/", "", "", true),
+		"acceso":       loginFormHTML("es", "/", "", "", true, false),
 		"recuperación": forgotPasswordHTML(t),
 		"organización": ssoFormHTML("es", "/", "", ""),
 	}
@@ -160,7 +160,7 @@ func TestOlvidoDeContrasenaConservaElViaje(t *testing.T) {
 
 	// Sin viaje no se cuelga un ?return_to= vacío de ninguna de las dos páginas.
 	for nombre, pagina := range map[string]string{
-		"acceso":       loginFormHTML("es", "", "", "", false),
+		"acceso":       loginFormHTML("es", "", "", "", false, false),
 		"recuperación": forgotPasswordHTML(t),
 	} {
 		if strings.Contains(pagina, "return_to=") {

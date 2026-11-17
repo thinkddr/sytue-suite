@@ -77,11 +77,21 @@
      * Deja la clave en el almacén (si no estaba ya) y, para una app nativa, la
      * cifra para su clave efímera. `key` son bytes que esta función pone a cero.
      */
-    function deliver(key, legacy, stored) {
+    var serverPw = null;
+    envelopes.forEach(function (e) {
+      if (e.kind === "password") serverPw = e;
+    });
+    function deliver(key, legacy, stored, pwEnv) {
       var keep = [E.store.del("pending").catch(noop)];
       var record = Promise.resolve(stored);
       if (key && !stored) record = E.saveUnlock(cfg.sub, key);
-      keep.push(record);
+      // La copia del sobre de contraseña vigente: el que acaba de cerrarse, o el
+      // del servidor (ADR 0085, cambio de contraseña).
+      keep.push(
+        record.then(function () {
+          return E.keepPassword(cfg.sub, pwEnv || serverPw).catch(noop);
+        }),
+      );
       var native = !!(key && cfg.app_key);
       var ikms = Promise.all(
         (legacy || []).map(function (l) {
@@ -202,13 +212,15 @@
           return (
             stored ? storedBytes(stored) : Promise.resolve(E.random(32))
           ).then(function (key) {
+            var sealed = null;
             return sealFor(p, key, prfInput)
               .then(function (e) {
+                sealed = e;
                 return put(e, false);
               })
               .then(
                 function () {
-                  return deliver(key, legacy, stored);
+                  return deliver(key, legacy, stored, sealed);
                 },
                 function () {
                   // Una clave nueva que el servidor rechaza (otro dispositivo creó
@@ -227,13 +239,15 @@
             lost: true,
             startOver: function () {
               var key = E.random(32);
+              var sealed = null;
               return sealFor(p, key, prfInput)
                 .then(function (e) {
+                  sealed = e;
                   return put(e, true);
                 })
                 .then(
                   function () {
-                    return deliver(key, legacy, null);
+                    return deliver(key, legacy, null, sealed);
                   },
                   function (err) {
                     E.wipe(key);
@@ -257,6 +271,31 @@
     return r;
   }
 
+  /**
+   * A dónde vuelve el relevo: `auto` para salir solo y `manual` para el botón «Volver a
+   * la aplicación». La entrega nativa va en la URL (`sytue_unlock`).
+   *
+   * En Android, la vuelta a un esquema propio (`sytue-mail://auth/callback`) sale sola
+   * como `intent://…#Intent;scheme=…;end`: Chrome no siempre deja a una página abrir un
+   * esquema propio sin un gesto reciente, y el relevo ya ha esperado al cifrado; el
+   * intent es la forma que Chrome documenta para abrir una app. El botón lleva la URL
+   * del esquema tal cual, que con el gesto de la persona abre cualquier navegador. Sin
+   * `package`: si otra app registrara el mismo esquema, el código no le sirve sin el
+   * verificador PKCE y la entrega solo la abre la clave efímera de la app que la pidió.
+   */
+  E.returnTo = function (next, blob, ua) {
+    var url = next;
+    if (blob)
+      url += (url.indexOf("?") < 0 ? "?" : "&") + "sytue_unlock=" + blob;
+    var m = /^([a-z][a-z0-9+.-]*):\/\/([^#]*)$/i.exec(url);
+    if (!m || /^https?$/i.test(m[1]) || !/\bAndroid\b/.test(ua || ""))
+      return { auto: url, manual: url };
+    return {
+      auto: "intent://" + m[2] + "#Intent;scheme=" + m[1] + ";end",
+      manual: url,
+    };
+  };
+
   var doc = global.document;
   var el = doc && doc.getElementById("e2e-relay");
   if (!el) return;
@@ -266,16 +305,18 @@
   function go(blob) {
     if (gone) return;
     gone = true;
-    var url = cfg.next;
-    if (blob)
-      url += (url.indexOf("?") < 0 ? "?" : "&") + "sytue_unlock=" + blob;
-    if (link) link.href = url;
+    var to = E.returnTo(
+      cfg.next,
+      blob,
+      global.navigator ? global.navigator.userAgent : "",
+    );
+    if (link) link.href = to.manual;
     // Por si el navegador no deja salir solo hacia el esquema de una app móvil.
     global.setTimeout(function () {
       var manual = doc.getElementById("e2e-manual");
       if (manual) manual.hidden = false;
     }, 1500);
-    global.location.replace(url);
+    global.location.replace(to.auto);
   }
   var timer = global.setTimeout(function () {
     go("");

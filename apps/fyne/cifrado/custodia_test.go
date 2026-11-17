@@ -4,6 +4,7 @@
 package cifrado
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -329,5 +330,77 @@ func TestRestablecerEnvuelveAntesDePublicar(t *testing.T) {
 	}
 	if len(service.envoltorios) != 1 || service.envoltorios[0].KeyID != "k-reset" {
 		t.Fatalf("quedan envoltorios de la clave vieja: %+v", service.envoltorios)
+	}
+}
+
+// servicioQueRetira es Rooms con el guardado que retira los de la 0082 (api.Rooms).
+type servicioQueRetira struct {
+	servicioFalso
+	retiradas int
+}
+
+func (s *servicioQueRetira) PutMatrixRecoveryWrapperRetiringOlder(ctx context.Context, account api.MatrixRecoveryAccount, w recoverywrap.Wrapper) (string, error) {
+	if w.Kind != recoverywrap.KindSytueID {
+		return "", recoverywrap.ErrInvalid
+	}
+	if _, err := s.PutMatrixRecoveryWrapper(ctx, account, w); err != nil {
+		return "", err
+	}
+	kept := s.envoltorios[:0]
+	for _, old := range s.envoltorios {
+		if old.KeyID != w.KeyID || old.Kind == recoverywrap.KindSytueID {
+			kept = append(kept, old)
+		}
+	}
+	s.envoltorios = kept
+	s.retiradas++
+	return "w", nil
+}
+
+// Con el `sytue-id` comprobado AQUÍ, los envoltorios de la ADR 0082 de esa clave se
+// retiran (ADR 0085); sin él, o si no abre con la clave de este dispositivo, no se
+// toca nada: la cuenta nunca se queda sin uno que abra.
+func TestElSytueIDComprobadoRetiraLosEnvoltoriosDeLa0082(t *testing.T) {
+	m := material(t)
+	client := &clienteFalso{keyID: "k1", valida: claveDePrueba}
+	viejo := envoltorioViejo(t, "una contraseña", "k1", claveDePrueba)
+	servicio := &servicioQueRetira{servicioFalso: servicioFalso{envoltorios: []recoverywrap.Wrapper{viejo}}}
+	custodia := Custodia{Servicio: servicio, Cuenta: cuentaAislada}
+
+	// Solo el viejo: nada que retirar.
+	if hecho, err := RetirarViejos(t.Context(), client, custodia, m); err != nil || hecho {
+		t.Fatalf("sin sytue-id: %v %v", hecho, err)
+	}
+	// Un sytue-id de OTRA clave de desbloqueo: no se comprueba aquí, no se retira.
+	otra := material(t)
+	servicio.envoltorios = append(servicio.envoltorios, envoltorio(t, otra, "k1", claveDePrueba))
+	if hecho, _ := RetirarViejos(t.Context(), client, custodia, m); hecho || servicio.retiradas != 0 {
+		t.Fatal("se retiró con un sytue-id que no abre aquí")
+	}
+	// El de esta clave: abre, se guarda otra vez y se van los viejos.
+	servicio.envoltorios = []recoverywrap.Wrapper{viejo, envoltorio(t, m, "k1", claveDePrueba)}
+	if hecho, err := RetirarViejos(t.Context(), client, custodia, m); err != nil || !hecho {
+		t.Fatalf("con el sytue-id de esta clave: %v %v", hecho, err)
+	}
+	if len(servicio.envoltorios) != 1 || servicio.envoltorios[0].Kind != recoverywrap.KindSytueID {
+		t.Fatalf("quedan %d envoltorios; quiero solo el sytue-id", len(servicio.envoltorios))
+	}
+	// Un servicio que no sabe retirar (otra implementación) no rompe nada.
+	if hecho, err := RetirarViejos(t.Context(), client, Custodia{Servicio: &servicioFalso{envoltorios: []recoverywrap.Wrapper{viejo, envoltorio(t, m, "k1", claveDePrueba)}}}, m); err != nil || hecho {
+		t.Fatalf("servicio sin retiro: %v %v", hecho, err)
+	}
+}
+
+// Cada paso recibe su copia de la clave de desbloqueo y la pone a cero al acabar
+// (ADR 0085): ni la clave ni lo que abría los envoltorios de la 0082 se quedan en
+// memoria más de lo que dura el paso.
+func TestLaCopiaDeLaClaveSeBorraAlAcabarElPaso(t *testing.T) {
+	m := Material{
+		Clave:  bytes.Repeat([]byte{7}, 32),
+		Legado: []recoverywrap.LegacyIKM{{Kind: recoverywrap.KindPassword, IKM: bytes.Repeat([]byte{8}, 32)}},
+	}
+	m.Borrar()
+	if !bytes.Equal(m.Clave, make([]byte, 32)) || !bytes.Equal(m.Legado[0].IKM, make([]byte, 32)) {
+		t.Fatal("la copia de la clave sigue en memoria")
 	}
 }

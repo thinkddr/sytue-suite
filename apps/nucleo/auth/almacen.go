@@ -159,15 +159,31 @@ func apuntar(cuenta string, esta bool) error {
 // (`notes-…`) sobrevivían en el almacén y abrían los cuadernos a quien entrara después
 // con la misma cuenta del sistema (FYS-09).
 func OlvidarSecretos(prefijo string) error {
-	crudo, err := leerSecreto(cuentaIndice)
+	cuentas, err := CuentasCon(prefijo)
 	if err != nil {
 		return err
 	}
 	var errs []error
-	for _, c := range strings.Fields(string(crudo)) {
-		if strings.HasPrefix(c, prefijo) {
-			errs = append(errs, BorrarSecreto(c))
-		}
+	for _, c := range cuentas {
+		errs = append(errs, BorrarSecreto(c))
 	}
 	return errors.Join(errs...)
+}
+
+// CuentasCon devuelve las cuentas guardadas con GuardarSecreto que empiezan por
+// `prefijo`, por el índice: el almacén de cada sistema no deja listar lo que guarda.
+// Además de OlvidarSecretos, la usa quien tiene que recorrerlas sin borrarlas (los
+// dispositivos de Matrix que cierra la ventana real, `apps/fyne/herramientas/dispositivos`).
+func CuentasCon(prefijo string) ([]string, error) {
+	crudo, err := leerSecreto(cuentaIndice)
+	if err != nil {
+		return nil, err
+	}
+	var cuentas []string
+	for _, c := range strings.Fields(string(crudo)) {
+		if strings.HasPrefix(c, prefijo) {
+			cuentas = append(cuentas, c)
+		}
+	}
+	return cuentas, nil
 }

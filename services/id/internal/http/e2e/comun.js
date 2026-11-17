@@ -640,5 +640,135 @@
     });
   };
 
+  /**
+   * La copia del sobre de contraseña vigente (público: es lo que guarda Sytue ID)
+   * junto a la clave de `sub`, para poder rehacerlo en el momento de cambiar la
+   * contraseña comprobando antes la actual. Solo si es de la misma clave (huella).
+   */
+  E.keepPassword = function (sub, env) {
+    if (!env || env.kind !== "password") return Promise.resolve();
+    return E.load("auk:" + sub).then(function (rec) {
+      if (!rec || env.hint !== rec.hint) return undefined;
+      if (rec.pw && rec.pw.ciphertext === env.ciphertext) return undefined;
+      var next = {};
+      Object.keys(rec).forEach(function (k) {
+        next[k] = rec[k];
+      });
+      next.pw = {
+        v: env.v,
+        kind: env.kind,
+        credential_id: "",
+        kdf: env.kdf,
+        hint: env.hint,
+        nonce: env.nonce,
+        ciphertext: env.ciphertext,
+      };
+      return E.store.put("auk:" + sub, next);
+    });
+  };
+
+  /**
+   * El sobre de contraseña para la contraseña NUEVA, en el momento de cambiarla
+   * (ADR 0085): solo si la ACTUAL abre el sobre vigente de este navegador (quien la
+   * sabe ya podría abrirlo; quien no, no consigue nada), con la misma sal. La clave
+   * existe en bytes solo entre abrir uno y cerrar el otro. El servidor lo guarda
+   * únicamente si el cambio de contraseña sale bien.
+   */
+  E.passwordEnvelope = function (o) {
+    return E.load("auk:" + o.sub).then(function (rec) {
+      if (
+        !rec ||
+        !rec.pw ||
+        typeof o.current !== "string" ||
+        typeof o.next !== "string"
+      )
+        return { error: "signin" };
+      var kdf = rec.pw.kdf;
+      return passwordKEK(o.current, kdf)
+        .then(function (kek) {
+          return openEnvelope(kek, o.sub, rec.pw);
+        })
+        .then(
+          function (key) {
+            return passwordKEK(o.next, kdf)
+              .then(function (kek) {
+                return sealEnvelope({
+                  kek: kek,
+                  kind: "password",
+                  user: o.sub,
+                  cred: "",
+                  kdf: kdf,
+                  key: key,
+                });
+              })
+              .then(
+                function (env) {
+                  wipe(key);
+                  return { envelope: env };
+                },
+                function (err) {
+                  wipe(key);
+                  throw err;
+                },
+              );
+          },
+          function () {
+            return { error: "wrong" };
+          },
+        );
+    });
+  };
+
+  /**
+   * El sobre de una passkey recién dada de alta (ADR 0085): la clave de desbloqueo
+   * que ya tiene este navegador, cerrada con la KEK de la PRF de ESA passkey, y
+   * subida con la sesión. Así la passkey desbloquea desde ya en cualquier
+   * dispositivo, sin esperar a su primer uso. `kek` es la CryptoKey no extraíble de
+   * la PRF; devuelve false si este navegador no tiene la clave de `sub`.
+   */
+  E.enrollPasskey = function (o) {
+    var f = o.fetch || global.fetch.bind(global);
+    return Promise.all([E.load("auk:" + o.sub), passkeyPRFInput()]).then(
+      function (r) {
+        var rec = r[0];
+        if (!rec) return false;
+        return E.revealUnlock(o.sub, rec).then(function (key) {
+          return sealEnvelope({
+            kek: o.kek,
+            kind: "passkey",
+            user: o.sub,
+            cred: o.cred,
+            kdf: { alg: "webauthn-prf-hkdf-sha256", prf_salt: b64(r[1]) },
+            key: key,
+          })
+            .then(
+              function (env) {
+                wipe(key);
+                if (env.hint !== rec.hint) throw new Error("hint");
+                return f("/e2e/envelopes", {
+                  method: "PUT",
+                  credentials: "same-origin",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    envelope: env,
+                    reset: false,
+                    sub: o.sub,
+                  }),
+                });
+              },
+              function (err) {
+                wipe(key);
+                throw err;
+              },
+            )
+            .then(function (res) {
+              if (!res.ok) throw new Error("envelope");
+              return true;
+            });
+        });
+      },
+    );
+  };
+
   global.SytueE2E = E;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -5,11 +5,15 @@ package calcus
 
 import (
 	"encoding/json"
+	"maps"
+	"strings"
 	"time"
 
 	"git.sytue.eu/sytue/one/apps/fyne/editor"
 	"git.sytue.eu/sytue/one/apps/fyne/ui"
+	"git.sytue.eu/sytue/one/apps/nucleo/formula"
 	"git.sytue.eu/sytue/one/apps/nucleo/i18n"
+	"git.sytue.eu/sytue/one/apps/nucleo/office/model"
 )
 
 // La protección de hoja y de libro de la web (`SheetProtection`, `WorkbookProtection` y
@@ -17,34 +21,47 @@ import (
 // hoja protegida, una celda está BLOQUEADA salvo `locked: false`; y con el libro
 // protegido no se añaden, borran, renombran, duplican ni reordenan hojas.
 //
-// ponytail: la contraseña se coteja EN CLARO, como en la web y como en Excel: frena un
-// descuido, no a quien quiera saltársela. Para datos sensibles, al servidor.
+// La contraseña la cumple el SERVIDOR, como en la web: guarda solo su hash con sal
+// (model.HashClave, el esquema de OOXML) y verifica en model.AplicarProteccion quién
+// puede quitar o cambiar una protección. Por eso no entra NUNCA en el modelo —que se
+// guarda, se sirve a todo lector y queda en el historial—: el modelo lleva solo
+// `hasPassword`, que fija el servidor, y lo tecleado viaja aparte con el guardado
+// (Sobre, el `proteccion` de POST …/ops). Antes se guardaba en claro dentro de la hoja y
+// se cotejaba aquí, y `hasPassword` se perdía al leer: una hoja con contraseña puesta
+// desde la web se veía sin ella y se dejaba desproteger, y el servidor rechazaba luego
+// ese guardado a quien no era el propietario.
 
 // Proteccion es `SheetProtection`. Su PRESENCIA —aunque sea `{}`— es la hoja protegida,
 // y solo se guarda lo que difiere del valor por defecto: `selectCells` solo si es
 // false, y los permisos solo si están concedidos.
-//
-// La contraseña va en el documento, en claro, como en la web: es un cotejo para frenar
-// descuidos, no un secreto que guardar.
 type Proteccion struct {
 	// Los nombres los fija `SheetProtection` de la web, en camelCase.
-	Password    string `json:"password,omitempty"`
-	SelectCells *bool  `json:"selectCells,omitempty"` //nolint:tagliatelle // la web
-	FormatCells bool   `json:"formatCells,omitempty"` //nolint:tagliatelle // la web
-	InsertRows  bool   `json:"insertRows,omitempty"`  //nolint:tagliatelle // la web
-	DeleteRows  bool   `json:"deleteRows,omitempty"`  //nolint:tagliatelle // la web
-	InsertCols  bool   `json:"insertCols,omitempty"`  //nolint:tagliatelle // la web
-	DeleteCols  bool   `json:"deleteCols,omitempty"`  //nolint:tagliatelle // la web
-	Sort        bool   `json:"sort,omitempty"`
-	AutoFilter  bool   `json:"autoFilter,omitempty"` //nolint:tagliatelle // la web
-	Objects     bool   `json:"objects,omitempty"`
-	Scenarios   bool   `json:"scenarios,omitempty"`
+	//
+	// HasPassword lo fija el servidor: la protección tiene contraseña (su hash vive en el
+	// servicio y no vuelve al cliente). Se conserva tal cual al leer y al guardar.
+	HasPassword bool `json:"hasPassword,omitempty"` //nolint:tagliatelle // la web
+	// Ranges son los rangos editables por persona o grupo (`ranges`): sus celdas las
+	// puede escribir quien se nombra aunque estén bloqueadas. Son del modelo del
+	// servidor, que es quien los cumple (apps/nucleo/office/model/proteccion_rangos.go):
+	// perderlos al guardar es cambiar la protección, y a quien no es el propietario se le
+	// rechazaba el guardado entero.
+	Ranges      []model.RangoEditable `json:"ranges,omitempty"`
+	SelectCells *bool                 `json:"selectCells,omitempty"` //nolint:tagliatelle // la web
+	FormatCells bool                  `json:"formatCells,omitempty"` //nolint:tagliatelle // la web
+	InsertRows  bool                  `json:"insertRows,omitempty"`  //nolint:tagliatelle // la web
+	DeleteRows  bool                  `json:"deleteRows,omitempty"`  //nolint:tagliatelle // la web
+	InsertCols  bool                  `json:"insertCols,omitempty"`  //nolint:tagliatelle // la web
+	DeleteCols  bool                  `json:"deleteCols,omitempty"`  //nolint:tagliatelle // la web
+	Sort        bool                  `json:"sort,omitempty"`
+	AutoFilter  bool                  `json:"autoFilter,omitempty"` //nolint:tagliatelle // la web
+	Objects     bool                  `json:"objects,omitempty"`
+	Scenarios   bool                  `json:"scenarios,omitempty"`
 }
 
 // ProteccionLibro es `WorkbookProtection`: la estructura del libro, con contraseña
-// opcional.
+// opcional (`hasPassword`, como en la hoja).
 type ProteccionLibro struct {
-	Password string `json:"password,omitempty"`
+	HasPassword bool `json:"hasPassword,omitempty"` //nolint:tagliatelle // la web
 }
 
 // Permisos son los del cuadro «Proteger hoja», en su orden (`PROTECT_PERMS`): la clave
@@ -63,16 +80,14 @@ var Permisos = []struct {
 	{"scenarios", "data.perm.scenarios", func(p *Proteccion) *bool { return &p.Scenarios }},
 }
 
-// protegerDe es `sanitizeProtection`: nil si no es un objeto.
+// protegerDe es `sanitizeProtection`: nil si no es un objeto. Una `password` en el
+// objeto (la de un cliente anterior) no se lee: no es del modelo.
 func protegerDe(crudo any) *Proteccion {
 	m, ok := crudo.(map[string]any)
 	if !ok {
 		return nil
 	}
-	p := &Proteccion{FormatCells: m["formatCells"] == true}
-	if s, ok := m["password"].(string); ok {
-		p.Password = s
-	}
+	p := &Proteccion{HasPassword: m["hasPassword"] == true, FormatCells: m["formatCells"] == true, Ranges: rangosSaneados(m["ranges"])}
 	if m["selectCells"] == false {
 		no := false
 		p.SelectCells = &no
@@ -83,17 +98,48 @@ func protegerDe(crudo any) *Proteccion {
 	return p
 }
 
+// rangosSaneados es el `rangosSaneados` de la web: solo los rangos con una referencia que
+// se lee («B2» o «B2:D10», `parseRangeRef`) y alguien concedido, con la referencia en
+// mayúsculas y sin «$». nil si no queda ninguno: entonces `ranges` no se escribe.
+func rangosSaneados(crudo any) []model.RangoEditable {
+	lista, _ := crudo.([]any)
+	cadenas := func(v any) []string {
+		var out []string
+		xs, _ := v.([]any)
+		for _, x := range xs {
+			if s, ok := x.(string); ok && s != "" {
+				out = append(out, s)
+			}
+		}
+		return out
+	}
+	var out []model.RangoEditable
+	for _, x := range lista {
+		g, _ := x.(map[string]any)
+		ref, ok := g["ref"].(string)
+		if !ok {
+			continue
+		}
+		if _, ok := formula.ParseRangeRef(ref); !ok {
+			continue
+		}
+		users, groups := cadenas(g["users"]), cadenas(g["groups"])
+		if len(users)+len(groups) == 0 {
+			continue
+		}
+		ref = strings.ReplaceAll(strings.ToUpper(strings.TrimSpace(ref)), "$", "")
+		out = append(out, model.RangoEditable{Ref: ref, Users: users, Groups: groups})
+	}
+	return out
+}
+
 // protegerLibroDe es `sanitizeWorkbookProtection`.
 func protegerLibroDe(crudo any) *ProteccionLibro {
 	m, ok := crudo.(map[string]any)
 	if !ok {
 		return nil
 	}
-	p := &ProteccionLibro{}
-	if s, ok := m["password"].(string); ok {
-		p.Password = s
-	}
-	return p
+	return &ProteccionLibro{HasPassword: m["hasPassword"] == true}
 }
 
 // Proteccion es la de la hoja activa, o nil.
@@ -102,49 +148,142 @@ func (l *Libro) Proteccion() *Proteccion { return l.h().proteccion }
 // ProteccionLibro es la de la estructura del libro, o nil.
 func (l *Libro) ProteccionLibro() *ProteccionLibro { return l.f.proteccion }
 
-// Proteger protege la hoja activa (`protect`); Desproteger la desprotege si la
-// contraseña coincide (`unprotect`) y dice si lo ha hecho.
-func (l *Libro) Proteger(p *Proteccion) {
+// Proteger protege la hoja activa (`protect`) con la contraseña `clave` ("" sin ella):
+// en el modelo solo queda `hasPassword`; la contraseña sale con el próximo guardado
+// (`presentarNueva`).
+func (l *Libro) Proteger(p *Proteccion, clave string) {
+	if p == nil {
+		p = &Proteccion{}
+	}
+	if clave != "" {
+		p.HasPassword = true
+		l.presentarNueva(model.AmbitoHoja(l.h().nombre), clave)
+	}
 	l.anotar()
 	l.h().proteccion = p
 }
 
-func (l *Libro) Desproteger(clave string) bool {
+// Desproteger es `unprotect`: quita la protección de la hoja activa y presenta `clave`
+// con el próximo guardado, que es donde se verifica (model.AplicarProteccion). Aquí
+// solo se ahorra el viaje que el servidor va a rechazar seguro: quien no es el
+// propietario no quita una protección sin contraseña (ErrProtegido), ni una con
+// contraseña sin teclearla. false, y el motivo para el aviso, si no se quita.
+func (l *Libro) Desproteger(clave string) (bool, string) {
 	p := l.h().proteccion
 	if p == nil {
-		return true
+		return true, ""
 	}
-	if p.Password != "" && p.Password != clave {
-		return false
+	if motivo := l.puedeQuitar(p.HasPassword, clave); motivo != "" {
+		return false, motivo
 	}
+	l.sobre.Clave = clave
 	l.anotar()
 	l.h().proteccion = nil
-	return true
+	return true, ""
 }
 
-// ProtegerLibro y DesprotegerLibro son `protectbook` y `unprotectbook`.
-func (l *Libro) ProtegerLibro(p *ProteccionLibro) {
+// ProtegerLibro y DesprotegerLibro son `protectbook` y `unprotectbook`, con la misma
+// regla que la hoja.
+func (l *Libro) ProtegerLibro(p *ProteccionLibro, clave string) {
+	if p == nil {
+		p = &ProteccionLibro{}
+	}
+	if clave != "" {
+		p.HasPassword = true
+		l.presentarNueva(model.AmbitoLibro, clave)
+	}
 	l.anotar()
 	l.f.proteccion = p
 }
 
-func (l *Libro) DesprotegerLibro(clave string) bool {
+func (l *Libro) DesprotegerLibro(clave string) (bool, string) {
 	p := l.f.proteccion
 	if p == nil {
-		return true
+		return true, ""
 	}
-	if p.Password != "" && p.Password != clave {
-		return false
+	if motivo := l.puedeQuitar(p.HasPassword, clave); motivo != "" {
+		return false, motivo
 	}
+	l.sobre.Clave = clave
 	l.anotar()
 	l.f.proteccion = nil
-	return true
+	return true, ""
 }
 
-// desbloqueada es `canEditCell` con la hoja protegida: solo `locked: false`.
-func (l *Libro) desbloqueada(c, f int) bool {
+// puedeQuitar es la comprobación previa de `unprotect`: "" si el guardado puede llevarlo
+// al servidor, o la clave del título del aviso. El propietario siempre puede.
+func (l *Libro) puedeQuitar(conClave bool, clave string) string {
+	switch {
+	case !l.ajeno:
+		return ""
+	case !conClave:
+		return "sheet.msg.protectedSheet"
+	case clave == "":
+		return "sheet.msg.wrongPassword"
+	}
+	return ""
+}
+
+// presentarNueva es `presentarNueva`: la contraseña nueva de un ámbito sale en el
+// próximo guardado.
+func (l *Libro) presentarNueva(ambito, clave string) {
+	if l.sobre.Nuevas == nil {
+		l.sobre.Nuevas = map[string]string{}
+	}
+	l.sobre.Nuevas[ambito] = clave
+}
+
+// FijarAjeno dice que quien edita NO es el propietario del documento
+// (`fijarPropietario(false)` de la web).
+func (l *Libro) FijarAjeno(ajeno bool) { l.ajeno = ajeno }
+
+// Sobre es lo tecleado que aún no ha recibido el servidor (`sobreProteccion`), para el
+// próximo guardado: model.ConProteccion lo adjunta al contexto y api.Docs lo manda
+// como `proteccion`, fuera de las operaciones.
+func (l *Libro) Sobre() model.Proteccion {
+	return model.Proteccion{Clave: l.sobre.Clave, Nuevas: maps.Clone(l.sobre.Nuevas)}
+}
+
+// OlvidarSobre es `olvidarProteccion`: el servidor ya tiene `enviado` (o lo rechazó) y
+// no se guarda ni un instante más. Lo tecleado DESPUÉS de mandarlo se queda para el
+// guardado siguiente.
+func (l *Libro) OlvidarSobre(enviado model.Proteccion) {
+	if l.sobre.Clave == enviado.Clave {
+		l.sobre.Clave = ""
+	}
+	for k, v := range enviado.Nuevas {
+		if l.sobre.Nuevas[k] == v {
+			delete(l.sobre.Nuevas, k)
+		}
+	}
+}
+
+// FijarYo dice quién edita (su `sub`), como `fijarYo` de la web: las celdas de sus
+// rangos editables se le enseñan desbloqueadas. Sin nadie, ningún rango concede nada.
+func (l *Libro) FijarYo(sub string) { l.yo = sub }
+
+// misRangos es la parte de `estiloParaMi` que no depende de la celda: los rangos
+// editables de la hoja activa concedidos a quien edita, con la regla del servidor.
+//
+// ponytail: como en la web, solo por su `sub`. Los grupos están en la sesión del
+// servidor y el cliente no los ve: una celda concedida solo a un grupo se enseña
+// bloqueada aunque el servicio aceptaría escribirla.
+func (l *Libro) misRangos() model.RangosEditables {
+	p := l.Proteccion()
+	if p == nil {
+		return nil
+	}
+	return model.RangosConcedidos(p.Ranges, model.Subject{Sub: l.yo})
+}
+
+// desbloqueada es `canEditCell` con la hoja protegida sobre `estiloParaMi`: `locked:
+// false`, o una celda de un rango editable de quien edita.
+func (l *Libro) desbloqueada(c, f int) bool { return l.desbloqueadaCon(l.misRangos(), c, f) }
+
+// desbloqueadaCon es desbloqueada con los rangos ya leídos, para quien mira muchas celdas.
+func (l *Libro) desbloqueadaCon(mios model.RangosEditables, c, f int) bool {
 	b := l.Estilo(c, f).Bloqueada
-	return b != nil && !*b
+	return (b != nil && !*b) || mios.Contiene(c+1, f+1)
 }
 
 // FormulaOculta es `isFormulaHidden` con una fórmula dentro: hoja protegida, celda
@@ -170,9 +309,10 @@ func (l *Libro) rangoBloqueado(c1, f1, c2, f2 int) bool {
 	if l.Proteccion() == nil {
 		return false
 	}
+	mios := l.misRangos()
 	for f := f1; f <= f2; f++ {
 		for c := c1; c <= c2; c++ {
-			if !l.desbloqueada(c, f) {
+			if !l.desbloqueadaCon(mios, c, f) {
 				return true
 			}
 		}
@@ -253,25 +393,42 @@ func (c *Lienzo) mandarProteccion(cmd editor.Comando, valor string) bool {
 		return false
 	}
 	l := c.Libro
+	// La contraseña del comando NO entra en el modelo: va al sobre (Libro.Sobre).
+	clave := ""
+	if m, ok := crudo.(map[string]any); ok {
+		clave, _ = m["password"].(string)
+	}
 	switch cmd {
 	case CmdProteger:
-		l.Proteger(protegerDe(crudo))
+		l.Proteger(protegerDe(crudo), clave)
 		c.Rejilla.Cancelar() // cierra cualquier edición en curso
 	case CmdProtegerLibro:
-		l.ProtegerLibro(protegerLibroDe(crudo))
+		l.ProtegerLibro(protegerLibroDe(crudo), clave)
 	case CmdDesproteger:
-		if !l.Desproteger(valor) {
-			c.avisar2(ui.AvisoAdvertencia, "sheet.msg.wrongPassword", "sheet.msg.unprotectSheetFailed")
+		if ok, motivo := l.Desproteger(valor); !ok {
+			c.avisar2(ui.AvisoAdvertencia, motivo, detalleNoQuita(motivo, "sheet.msg.unprotectSheetFailed"))
 			return true
 		}
 	default:
-		if !l.DesprotegerLibro(valor) {
-			c.avisar2(ui.AvisoAdvertencia, "sheet.msg.wrongPassword", "sheet.msg.unprotectBookFailed")
+		if ok, motivo := l.DesprotegerLibro(valor); !ok {
+			if motivo == "sheet.msg.protectedSheet" {
+				motivo = "sheet.msg.protectedBook"
+			}
+			c.avisar2(ui.AvisoAdvertencia, motivo, detalleNoQuita(motivo, "sheet.msg.unprotectBookFailed"))
 			return true
 		}
 	}
 	c.trasCambio()
 	return true
+}
+
+// detalleNoQuita es el detalle del aviso de una protección que no se quita: sin
+// contraseña, el de la web (`protectionDenied`); con ella, el de la contraseña.
+func detalleNoQuita(motivo, conClave string) string {
+	if motivo == "sheet.msg.wrongPassword" {
+		return conClave
+	}
+	return "sheet.msg.protectionDenied"
 }
 
 // avisar2 enseña un aviso de dos claves del catálogo.

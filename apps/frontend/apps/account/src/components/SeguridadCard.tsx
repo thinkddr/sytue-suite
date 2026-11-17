@@ -34,6 +34,7 @@ import {
 import type { T } from '../i18n/index.js';
 import { primeraLectura } from '../lib/primeraLectura.js';
 import { altaPasskey, soportaPasskeys, type FalloPasskey } from '../lib/passkeys.js';
+import { sobreDeContrasena } from '../lib/desbloqueo.js';
 import {
   leerPolitica,
   requisitosPassword,
@@ -54,11 +55,16 @@ interface Passkey {
 export function SeguridadCard({
   t,
   mfaRequired = false,
+  sobreDeSeguridad = sobreDeContrasena,
 }: {
   t: T;
   mfaRequired?: boolean;
+  /** El sobre del desbloqueo para la contraseña nueva (ADR 0085); el puente de Sytue ID. */
+  sobreDeSeguridad?: typeof sobreDeContrasena;
 }): JSX.Element {
   const [mfa, setMfa] = useState<boolean | null>(null);
+  // El `sub` de Sytue ID: de quién es la clave de desbloqueo que rehace el puente.
+  const [sujeto, setSujeto] = useState('');
   const [error, setError] = useState('');
   // Separado de `error` para que `cargar` no dependa de `t`: con la traducción
   // dentro, el efecto de montaje la tenía como dependencia y se reejecutaba al
@@ -104,8 +110,9 @@ export function SeguridadCard({
     try {
       const res = await (inicial ? primeraLectura('/api/me') : fetch('/api/me'));
       if (!res.ok) throw new Error(String(res.status));
-      const datos = (await res.json()) as { mfa_enabled?: boolean; email?: string };
+      const datos = (await res.json()) as { mfa_enabled?: boolean; email?: string; id?: string };
       setMfa(Boolean(datos.mfa_enabled));
+      setSujeto(typeof datos.id === 'string' ? datos.id : '');
       setCuenta(typeof datos.email === 'string' ? datos.email : '');
       setPolitica(leerPolitica(datos));
       setFallo(false);
@@ -160,10 +167,17 @@ export function SeguridadCard({
     e.preventDefault();
     setEstadoPwd('enviando');
     setError('');
+    // ADR 0085: el sobre del desbloqueo con la contraseña nueva viaja con el cambio,
+    // y el servicio lo guarda solo si el cambio sale bien. Sin él, el cambio sigue.
+    const sobre = await sobreDeSeguridad(sujeto, actual, nueva);
     const res = await fetch('/api/password', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ current_password: actual, new_password: nueva }),
+      body: JSON.stringify({
+        current_password: actual,
+        new_password: nueva,
+        ...(sobre ? { unlock_envelope: sobre } : {}),
+      }),
     });
     if (!res.ok) {
       setError(await motivo(res));

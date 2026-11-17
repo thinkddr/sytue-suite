@@ -44,6 +44,7 @@ type chatService interface {
 	StoreMatrixRecoveryKey(context.Context, string, string) error
 	MatrixRecoveryWrappers(context.Context, string, service.MatrixRecoveryAccount) (service.MatrixRecoveryWrappers, error)
 	PutMatrixRecoveryWrapper(context.Context, string, service.MatrixRecoveryAccount, recoverywrap.Wrapper) (string, error)
+	PutMatrixRecoveryWrapperRetiringOlder(context.Context, string, service.MatrixRecoveryAccount, recoverywrap.Wrapper) (string, error)
 	MatrixAccountAccess(context.Context, string, string, int64) error
 	MatrixTenantAccess(context.Context, string, string, string, int64) error
 	EditMatrixMessage(context.Context, uuid.UUID, string, string, domain.MatrixEventRef) (domain.Message, error)

@@ -173,6 +173,8 @@ func (s *Server) handleAccount(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
+	// Argon2id del desbloqueo (e2e/cuenta.js): compilar WebAssembly y nada más.
+	cspConWasm(w)
 	_, _ = w.Write([]byte(accountPage(loc, i18n.T(loc, "account.title"), user.Name, user.Email, body)))
 }
 

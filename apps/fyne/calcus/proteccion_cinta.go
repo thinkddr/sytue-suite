@@ -5,6 +5,7 @@ package calcus
 
 import (
 	"encoding/json"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -72,6 +73,11 @@ func (lz *Lienzo) abrirProtegerHoja(c *editor.Contexto, disparador *editor.Boton
 			reabrir(&formProteger{})
 		}
 		filas = append(filas, titulo("data.protect.sheetProtected"))
+		if len(st.Rangos) > 0 {
+			// `sytue-meta-dense`: el rótulo pequeño y apagado, como el de los campos.
+			filas = append(filas, ui.NuevoParrafo(c.Traducir("data.protect.ranges")+": "+strings.Join(st.Rangos, ", "),
+				tema.Texto2XS, ui.Normal, "text-subtle", v))
+		}
 		if st.ConClave {
 			filas = append(filas, conEtiqueta(c.Traducir("data.password"), campoClave(f, desproteger)))
 		}
@@ -86,13 +92,13 @@ func (lz *Lienzo) abrirProtegerHoja(c *editor.Contexto, disparador *editor.Boton
 			permisos = append(permisos, casilla(p.Rotulo, *campo, func(si bool) { *campo = si }))
 		}
 		proteger := botonPop(c.Traducir("data.protectSheet"), false, func() {
-			p := f.permisos
-			p.Password, p.FormatCells = f.clave, f.formato
-			if f.sinSeleccion {
-				no := false
-				p.SelectCells = &no
+			// El comando es el de la web (`{ password, selectCells, … }`): la contraseña
+			// la aparta mandarProteccion y no entra en el modelo.
+			p := map[string]any{"password": f.clave, "formatCells": f.formato, "selectCells": !f.sinSeleccion}
+			for _, pm := range Permisos {
+				p[pm.Clave] = *pm.Campo(&f.permisos)
 			}
-			b, _ := json.Marshal(p) //nolint:gosec // la contraseña es un cotejo en claro, como en la web (ver Proteccion)
+			b, _ := json.Marshal(p)
 			c.Mandar(CmdProteger, string(b))
 			em.Cerrar()
 		})
@@ -137,7 +143,7 @@ func (lz *Lienzo) abrirProtegerLibro(c *editor.Contexto, disparador *editor.Boto
 			texto("data.protect.lockStructure", tema.Texto2XS, ui.Normal, "text-subtle"),
 			conEtiqueta(c.Traducir("data.passwordOptional"), campoClave(f, nil)),
 			anchoEntero(botonPop(c.Traducir("data.protectBook"), false, func() {
-				b, _ := json.Marshal(ProteccionLibro{Password: f.clave}) //nolint:gosec // ídem
+				b, _ := json.Marshal(map[string]string{"password": f.clave})
 				c.Mandar(CmdProtegerLibro, string(b))
 				em.Cerrar()
 			})))
@@ -176,7 +182,7 @@ func anchoEntero(b fyne.CanvasObject) fyne.CanvasObject { return container.NewSt
 // bloqueoPropio es la franja de la hoja protegida (`FranjaHojaProtegida.tsx`): el caso
 // (a) de la franja de solo lectura. La protección es de quien edita, así que «Editar»
 // la quita al momento, o pide antes la contraseña si la tiene; una contraseña que no es
-// la dice `mandarProteccion` con su aviso de siempre.
+// la rechaza el servidor al guardar, y `adoptarServidor` la devuelve y lo dice.
 func (lz *Lienzo) bloqueoPropio(c *editor.Contexto) (string, func()) {
 	st := lz.Estado()
 	if !st.Protegida {

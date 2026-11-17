@@ -102,6 +102,15 @@ interface E2E {
   load: (name: string) => Promise<Record<string, unknown> | null>;
   migrate: () => Promise<void>;
   accountAllowed: (origin: string, sub: string, account: string) => boolean;
+  passkeyEnroll: (cfg: Record<string, unknown>, opts?: Record<string, unknown>) => Promise<boolean>;
+  passwordEnvelope: (o: {
+    sub: string;
+    current: string;
+    next: string;
+  }) => Promise<{ envelope?: Envelope; error?: string }>;
+  keepPassword: (sub: string, env: Envelope) => Promise<void>;
+  returnTo: (next: string, blob: string, ua: string) => { auto: string; manual: string };
+  passwordChangeForm: (form: unknown, opts?: Record<string, unknown>) => void;
   PENDING_TTL: number;
 }
 interface RelayResult {
@@ -847,6 +856,16 @@ describe('bridge', () => {
       false,
     );
     expect(e2e.accountAllowed('https://mail.sytue.eu', sub, `@sytue_${sub}:sytue.eu`)).toBe(true);
+    // A host of an organisation serves every app under one origin (`acme.sytue.eu/drive`,
+    // `/mail`…): its apps open their isolated accounts there too.
+    expect(e2e.accountAllowed('https://acme.sytue.eu', sub, drive)).toBe(true);
+    expect(
+      e2e.accountAllowed('https://acme.sytue.eu', sub, `@sytue_storage_docs_acme_${sub}:x`),
+    ).toBe(true);
+    // Still only that person's accounts.
+    expect(e2e.accountAllowed('https://acme.sytue.eu', sub, '@sytue_storage_drive_acme_x:x')).toBe(
+      false,
+    );
     expect(e2e.accountAllowed('https://mail.sytue.eu', sub, `@sytue_${sub}x:sytue.eu`)).toBe(false);
 
     const { win, e2e: b, sent, message } = bridgeWindow();
@@ -907,5 +926,258 @@ describe('bridge', () => {
     win.parent = win;
     const e2e = load(win, 'comun.js', 'bridge.js');
     expect(e2e.bridge({ origin: 'https://mail.sytue.eu' }, win)).toBe(false);
+  });
+});
+
+describe('a new passkey unlocks from the moment it is added (ADR 0085)', () => {
+  const cfg = {
+    sub: vectors.user_id,
+    cred: vectors.credential_id,
+    rp_id: 'sytue.eu',
+    next: '/account?pk=ok',
+  };
+  /** The authenticator: it records what it is asked and answers with the vector PRF. */
+  function authenticator(prf: Uint8Array | null = unb64(vectors.prf_output)) {
+    const asked: Record<string, unknown>[] = [];
+    return {
+      asked,
+      credentials: {
+        get: async (options: { publicKey: Record<string, unknown> }) => {
+          asked.push(options.publicKey);
+          return {
+            getClientExtensionResults: () =>
+              prf ? { prf: { results: { first: prf.slice().buffer } } } : {},
+          };
+        },
+      },
+    };
+  }
+
+  test('the PRF given at creation seals the envelope right away, with no second touch', async () => {
+    const e2e = load(fakeWindow(), 'comun.js', 'passkey.js');
+    await e2e.saveUnlock(vectors.user_id, key.slice());
+    await e2e.store.put('enroll', {
+      v: 2,
+      cred: vectors.credential_id,
+      kek: await kekKey(passkeyKEK),
+      at: Date.now() - 1_000,
+    });
+    const a = authenticator();
+    const { f, calls } = recorder();
+    expect(await e2e.passkeyEnroll(cfg, { credentials: a.credentials, fetch: f })).toBe(true);
+    expect(a.asked).toEqual([]);
+    expect(calls.map((c) => c.url)).toEqual(['/e2e/envelopes']);
+    const body = JSON.parse(calls[0]!.body) as { envelope: Envelope; sub: string };
+    expect(body.sub).toBe(vectors.user_id);
+    expect(body.envelope).toMatchObject({ kind: 'passkey', credential_id: vectors.credential_id });
+    expect(
+      b64(await e2e.openEnvelope(await kekKey(passkeyKEK), vectors.user_id, body.envelope)),
+    ).toBe(vectors.unlock_key);
+    expectNoSecrets(calls, [key, passkeyKEK]);
+    // The KEK left by the creation is used once.
+    expect(await e2e.store.get('enroll')).toBeUndefined();
+    await expectSealedStore(e2e.store, [key, passkeyKEK]);
+  });
+
+  test('otherwise the passkey is asked once in Sytue ID, for that credential and with the PRF', async () => {
+    const e2e = load(fakeWindow(), 'comun.js', 'passkey.js');
+    await e2e.saveUnlock(vectors.user_id, key.slice());
+    const a = authenticator();
+    const { f, calls } = recorder();
+    expect(await e2e.passkeyEnroll(cfg, { credentials: a.credentials, fetch: f })).toBe(true);
+    expect(a.asked).toHaveLength(1);
+    const asked = a.asked[0] as {
+      rpId: string;
+      allowCredentials: { id: Uint8Array }[];
+      extensions: { prf: { eval: { first: Uint8Array } } };
+    };
+    expect(asked.rpId).toBe('sytue.eu');
+    expect(b64u(asked.allowCredentials[0]!.id)).toBe(vectors.credential_id);
+    expect(b64(asked.extensions.prf.eval.first)).toBe(vectors.prf_input);
+    const body = JSON.parse(calls[0]!.body) as { envelope: Envelope };
+    expect(
+      b64(await e2e.openEnvelope(await kekKey(passkeyKEK), vectors.user_id, body.envelope)),
+    ).toBe(vectors.unlock_key);
+  });
+
+  test('a browser without the unlock key, or an authenticator without PRF, uploads nothing', async () => {
+    const e2e = load(fakeWindow(), 'comun.js', 'passkey.js');
+    const a = authenticator();
+    const { f, calls } = recorder();
+    expect(await e2e.passkeyEnroll(cfg, { credentials: a.credentials, fetch: f })).toBe(false);
+    expect(a.asked).toEqual([]);
+    await e2e.saveUnlock(vectors.user_id, key.slice());
+    expect(
+      await e2e.passkeyEnroll(cfg, { credentials: authenticator(null).credentials, fetch: f }),
+    ).toBe(false);
+    expect(calls).toEqual([]);
+  });
+});
+
+describe('a password change re-seals the envelope at once (ADR 0085)', () => {
+  const now = 1_000_000_000;
+  const relayCfg = {
+    sub: vectors.user_id,
+    next: 'https://mail.sytue.eu/auth/callback?code=c&state=s',
+    app_key: '',
+    salt: passwordKDF.salt,
+    creds: [] as string[],
+    auth_age: 5_000,
+    hint: vectors.hint,
+    envelopes: [vectors.password_envelope],
+  };
+  /** A browser where the person signed in with their password: the relay kept a copy of the envelope. */
+  async function signedIn(...scripts: string[]) {
+    // The page checks that this browser has IndexedDB; the store itself is the test's.
+    const win = fakeWindow({ indexedDB: {} });
+    const e2e = load(win, 'comun.js', 'relay.js', ...scripts);
+    await e2e.store.put('pending', {
+      v: 2,
+      kind: 'password',
+      kek: await kekKey(passwordKEK),
+      kdf: passwordKDF,
+      legacy: [],
+      at: now - 10_000,
+    });
+    const { f } = recorder();
+    await e2e.relay(relayCfg, { fetch: f, now: () => now });
+    return { e2e, win };
+  }
+
+  test('the relay keeps the current password envelope (public) next to the key', async () => {
+    const { e2e } = await signedIn();
+    const rec = (await e2e.load('auk:' + vectors.user_id)) as { pw: Envelope };
+    expect(rec.pw).toMatchObject({
+      kind: 'password',
+      ciphertext: vectors.password_envelope.ciphertext,
+      hint: vectors.hint,
+    });
+    await expectSealedStore(e2e.store, [key, passwordKEK]);
+  });
+
+  test('only the current password gets an envelope for the new one, with the same salt', async () => {
+    const { e2e } = await signedIn();
+    const fresh = 'otra contraseña larga ñ€';
+    const wrong = await e2e.passwordEnvelope({
+      sub: vectors.user_id,
+      current: 'no es la actual',
+      next: fresh,
+    });
+    expect(wrong).toEqual({ error: 'wrong' });
+    const r = await e2e.passwordEnvelope({
+      sub: vectors.user_id,
+      current: vectors.password,
+      next: fresh,
+    });
+    expect(r.envelope!.kdf).toEqual(passwordKDF);
+    expect(r.envelope!.hint).toBe(vectors.hint);
+    const kek = await e2e.passwordKEK(fresh, passwordKDF);
+    expect(b64(await e2e.openEnvelope(kek, vectors.user_id, r.envelope!))).toBe(vectors.unlock_key);
+    // Without the copy (another person, a browser that never saw the password): nothing.
+    expect(
+      await e2e.passwordEnvelope({ sub: 'otra', current: vectors.password, next: fresh }),
+    ).toEqual({ error: 'signin' });
+  }, 30_000);
+
+  test('the bridge does it only for «Mi cuenta»', async () => {
+    const { e2e, win } = await signedIn('bridge.js');
+    const sent: { msg: Record<string, unknown> }[] = [];
+    const parent = { postMessage: (msg: Record<string, unknown>) => sent.push({ msg }) };
+    const ask = (password: boolean) => {
+      const frame = fakeWindow({ parent });
+      const b = load(frame, 'comun.js', 'bridge.js');
+      b.store = e2e.store;
+      b.bridge(
+        { origin: 'https://account.sytue.eu', ...(password ? { password: true } : {}) },
+        frame,
+      );
+      for (const fn of frame.listeners.message ?? [])
+        fn({
+          data: {
+            type: 'sytue-e2e-password',
+            id: password ? 'yes' : 'no',
+            sub: vectors.user_id,
+            current: vectors.password,
+            next: 'otra contraseña larga ñ€',
+          },
+          origin: 'https://account.sytue.eu',
+          source: parent,
+        });
+    };
+    void win;
+    ask(false);
+    ask(true);
+    for (let i = 0; i < 400 && !sent.some((s) => s.msg.id === 'yes'); i++)
+      await new Promise((r) => setTimeout(r, 25));
+    expect(sent.some((s) => s.msg.id === 'no')).toBe(false);
+    const out = sent.find((s) => s.msg.id === 'yes')!.msg as { ok: boolean; envelope: Envelope };
+    expect(out.ok).toBe(true);
+    expect(out.envelope.kind).toBe('password');
+  }, 30_000);
+
+  test('the Sytue ID account page sends the envelope with the change, and the change even without it', async () => {
+    const { e2e } = await signedIn('cuenta.js');
+    const handlers: Record<string, (e: unknown) => void> = {};
+    const fields: Record<string, { value: string; disabled?: boolean }> = {
+      'input[name=current_password]': { value: vectors.password },
+      'input[name=new_password]': { value: 'otra contraseña larga ñ€' },
+      'input[name=unlock_envelope]': { value: '' },
+      'button[type=submit]': { value: '' },
+    };
+    let submitted = 0;
+    const form = {
+      getAttribute: (n: string) => (n === 'data-sub' ? vectors.user_id : null),
+      addEventListener: (type: string, fn: (e: unknown) => void) => (handlers[type] = fn),
+      querySelector: (q: string) => fields[q] ?? null,
+    };
+    e2e.passwordChangeForm(form, { submit: () => submitted++ });
+    let prevented = false;
+    handlers.submit!({ defaultPrevented: false, preventDefault: () => (prevented = true) });
+    expect(prevented).toBe(true);
+    for (let i = 0; i < 400 && !submitted; i++) await new Promise((r) => setTimeout(r, 25));
+    expect(submitted).toBe(1);
+    const env = JSON.parse(fields['input[name=unlock_envelope]']!.value) as Envelope;
+    const kek = await e2e.passwordKEK('otra contraseña larga ñ€', passwordKDF);
+    expect(b64(await e2e.openEnvelope(kek, vectors.user_id, env))).toBe(vectors.unlock_key);
+  }, 30_000);
+});
+
+describe('the way back to a mobile app (ADR 0085)', () => {
+  const android =
+    'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36';
+  const iphone =
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1';
+  const next = 'sytue-mail://auth/callback?code=c0de&state=st4te';
+
+  test('on Android it leaves by itself as an intent to the app scheme, and the button keeps the scheme', () => {
+    const e2e = load(fakeWindow(), 'comun.js', 'relay.js');
+    const to = e2e.returnTo(next, 'B10B', android);
+    expect(to.auto).toBe(
+      'intent://auth/callback?code=c0de&state=st4te&sytue_unlock=B10B#Intent;scheme=sytue-mail;end',
+    );
+    expect(to.manual).toBe(next + '&sytue_unlock=B10B');
+  });
+
+  test('everywhere else, and for the web or the desktop loopback, the URL is left as it is', () => {
+    const e2e = load(fakeWindow(), 'comun.js', 'relay.js');
+    for (const [url, ua] of [
+      [next, iphone],
+      ['https://mail.sytue.eu/auth/callback?code=c', android],
+      ['http://127.0.0.1:8921/auth/callback?code=c', android],
+    ] as const) {
+      const to = e2e.returnTo(url, '', ua);
+      expect(to).toEqual({ auto: url, manual: url });
+    }
+    // A delivery is added with the right separator.
+    expect(e2e.returnTo('sytue://auth/callback', 'X', iphone).auto).toBe(
+      'sytue://auth/callback?sytue_unlock=X',
+    );
+  });
+
+  test('the relay page uses it for both ways back', () => {
+    const relay = source('relay.js');
+    expect(relay).toContain('E.returnTo(');
+    expect(relay).toContain('link.href = to.manual');
+    expect(relay).toContain('global.location.replace(to.auto)');
   });
 });

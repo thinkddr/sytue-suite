@@ -94,7 +94,8 @@ func accountPage(loc, title, name, email, body string) string {
 		`<div><h1>` + esc(nonEmpty(name, email)) + `</h1>` +
 		`<p class="acc-mail">` + esc(email) + `</p></div></div>` +
 		body +
-		`</main><script>` + passkeysScript + `</script></body></html>`
+		`</main><script>` + e2eArgon2JS + `</script><script>` + e2eComunJS + `</script><script>` + e2eCuentaJS + `</script>` +
+		`<script>` + passkeysScript + `</script></body></html>`
 }
 
 // brandHTML es la marca Sytue ID: la misma que el login, extraída para que las

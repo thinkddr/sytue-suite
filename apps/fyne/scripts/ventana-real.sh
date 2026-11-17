@@ -33,7 +33,13 @@
 # Ahora un clic puede acabar en cualquier botón y no pasa nada. Los pasos que NECESITAN
 # escribir —abrir un editor desde su plantilla— van marcados con `!` y solo corren con
 # `--escribe`, que además quita el solo lectura: quien lo pasa deja un documento por
-# editor en esa cuenta y le toca borrarlos (el guion lo recuerda al acabar).
+# editor en esa cuenta y le toca borrarlos (el guion lo recuerda al acabar). Lo que se
+# corta queda en el registro de cada app (`<app>.log`, «escritura cortada»).
+#
+# LA EXCEPCIÓN, EL DESBLOQUEO DEL CIFRADO. Con `SYTUE_PERMITIR_DESBLOQUEO=1` (lo pone solo
+# `ventana-real.yml`) las apps escriben además, y nada más, lo de una lista cerrada de
+# rutas: dar de alta su dispositivo de Matrix, verificarlo con las firmas cruzadas de la
+# cuenta, guardar el envoltorio de su clave y cerrar al final (`escriturasDelDesbloqueo`).
 #
 # Por eso mismo LA PRESENCIA NO ES DE FIAR en estas capturas: el latido que mantiene a la
 # cuenta «en línea» es un `PUT /presence` y no sale. La app solo enseña lo que el Hub ya
@@ -61,7 +67,10 @@
 # piloto), y su salida —la URL de vuelta— se deja en `$SALIDA/login-vuelta`. Con
 # `VENTANA_LOGIN="orden"` el guion la ejecuta él con la URL como argumento. La sesión se
 # guarda en un gnome-keyring propio de esta tirada, así que las otras doce ya entran
-# solas, y se borra al salir.
+# solas, y se borra al salir. Desde la ADR 0084 ese inicio de sesión trae también la clave
+# de desbloqueo del cifrado: la página de Sytue ID la deriva en el navegador y el RELEVO
+# la devuelve cifrada para la app en la vuelta (`sytue_unlock`), así que el guion de
+# Playwright espera a que el relevo navegue a la vuelta y no corta antes.
 #
 # EN EL CI lo corre `.github/workflows/ventana-real.yml` (a mano, `workflow_dispatch`) en
 # un runner del frontal con Xvfb y el GL de Mesa: siembra antes la cuenta con
@@ -69,14 +78,28 @@
 # Mail necesita enseñar, porque en solo lectura no se pueden crear desde aquí—, pasa
 # `VENTANA_LOGIN` con `ventana-real-login.mjs` y sube las capturas como artefacto.
 #
-# EL CIFRADO SE QUEDA FUERA, y con él el contenido de las apps cifradas. Cada tirada
-# estrena dispositivo (llavero y carpeta de usar y tirar) y las apps de cliente cifrado
-# —Mail, Hub y ERP, medido el 2026-11-17 en ventana-real 43985202886— se quedan en
-# «Cifrado de extremo a extremo · Configurar este dispositivo». Configurarlo da de alta un
-# dispositivo de Matrix en la cuenta, que es escribir, y el solo lectura lo corta antes
-# de la red. Lo que sí se ve: la barra de la suite, su paleta (⌘K) y los menús. Ver el
-# contenido pide una decisión del dueño (dejar escribir solo ese alta, o conservar un
-# dispositivo de la cuenta de auditoría entre tiradas); hasta entonces, no se intenta.
+# EL CIFRADO. Cada tirada estrena dispositivo (llavero y carpeta de usar y tirar) y las
+# apps de cliente cifrado —Mail, Hub y ERP, medido el 2026-11-17 en ventana-real
+# 43985202886— arrancan en «Cifrado de extremo a extremo · Configurar este dispositivo».
+# Con `VENTANA_LOGIN` y en X11, antes de las capturas de cada app de `VENTANA_CIFRADO`
+# (por omisión «mail hub erp») el guion pulsa ese botón si lo ve (mira dos píxeles del
+# botón del diálogo), y la app abre el SSO de Matrix en el navegador: `xdg-open` lo deja en
+# `$SALIDA/matrix-url` y `ventana-real-login.mjs --matrix` lo completa con la sesión de
+# Sytue ID que dejó el inicio de sesión (`VENTANA_NAVEGADOR`), sin teclear nada. Después
+# la app desbloquea sola con la clave de la sesión. Lo que se ve queda en
+# `<app>-cifradoN.png`, y lo que se paró en el navegador, en `login-<código>.png`. Al
+# salir, `herramientas/dispositivos` cierra en el homeserver los dispositivos de Matrix
+# que dio de alta la tirada (los lee de su llavero): la cuenta no los acumula.
+# Medido el 2026-11-17 (ventana-real 44147994834): el inicio de sesión y el alta del
+# dispositivo se completan en Mail, Hub y ERP (tres dispositivos, cerrados al acabar),
+# pero producción (v3.20.4) aún no sirve el relevo de la ADR 0084: la vuelta llega sin
+# la clave de desbloqueo y el cifrado no se abre hasta que se despliegue.
+#
+# LAS VUELTAS AL LOOPBACK. Cuando Sytue ID o Synapse devuelven con una redirección, el
+# navegador del guion de Playwright la sigue y se la lleva él a la app (Playwright no
+# enruta los saltos de una redirección); cuando la abre el guion del relevo, la ruta la
+# recoge y la entrega este guion. Por eso `entregar` da por buena una conexión rechazada:
+# la app ya cerró su escucha porque ya la tiene.
 #
 # Nada se queda encendido: el `trap` mata el servidor gráfico, el llavero y las apps.
 set -euo pipefail
@@ -156,6 +179,13 @@ if [ -z "$BIN" ]; then
   done
 fi
 
+# El cierre de los dispositivos de Matrix de la tirada, compilado AQUÍ: más abajo HOME es
+# un directorio vacío, sin la caché de Go.
+if [ "$sesion" = si ] && [ ! -x "$BIN/dispositivos" ]; then
+  (cd "$FYNE" && GOPRIVATE='github.com/thinkddr/*' go build -o "$BIN/dispositivos" ./herramientas/dispositivos) ||
+    echo "OJO: sin herramientas/dispositivos, los dispositivos de Matrix de la tirada se quedan abiertos" >&2
+fi
+
 # El llavero: Secret Service en una sesión de D-Bus propia, desbloqueado con una clave
 # de usar y tirar. Es donde `apps/nucleo/auth` guarda la sesión que comparten las quince.
 if [ -z "${VENTANA_DBUS:-}" ]; then
@@ -174,18 +204,31 @@ export HOME="$ENTORNO" XDG_CONFIG_HOME="$ENTORNO/config" XDG_DATA_HOME="$ENTORNO
   XDG_RUNTIME_DIR="$ENTORNO/run" PATH="$ENTORNO/bin:$PATH"
 mkdir -p "$XDG_CONFIG_HOME/sytue" "$XDG_DATA_HOME" "$ENTORNO/bin"
 chmod 700 "$XDG_RUNTIME_DIR" 2>/dev/null || mkdir -m 700 "$XDG_RUNTIME_DIR"
-rm -f "$SALIDA/login-url" "$SALIDA/login-vuelta" "$SALIDA/abiertas.txt"
+rm -f "$SALIDA/login-url" "$SALIDA/login-vuelta" "$SALIDA/matrix-url" "$SALIDA/abiertas.txt"
+# Lo que una app abre en el navegador. Los inicios de sesión se completan aparte y en
+# `abiertas.txt` solo se nombran: su URL lleva el state y la cuenta de Matrix.
 cat >"$ENTORNO/bin/xdg-open" <<EOF
 #!/bin/sh
-printf '%s\n' "\$1" >>"$SALIDA/abiertas.txt"
-case "\$1" in *id.*authorize*|*/authorize\?*) printf '%s\n' "\$1" >"$SALIDA/login-url" ;; esac
+case "\$1" in
+*id.*authorize*|*/authorize\?*) printf '%s\n' "\$1" >"$SALIDA/login-url"; echo "(inicio de sesión en Sytue ID)" >>"$SALIDA/abiertas.txt" ;;
+*/_matrix/client/*/login/sso/redirect*) printf '%s\n' "\$1" >"$SALIDA/matrix-url"; echo "(SSO de Matrix)" >>"$SALIDA/abiertas.txt" ;;
+*) printf '%s\n' "\$1" >>"$SALIDA/abiertas.txt" ;;
+esac
 EOF
 chmod +x "$ENTORNO/bin/xdg-open"
+# Para ventana-real-login.mjs: dónde deja la sesión del navegador el inicio de sesión
+# (la reutiliza el SSO de Matrix) y dónde fotografía lo que se pare en el navegador.
+export VENTANA_NAVEGADOR="$ENTORNO/navegador.json" VENTANA_DIAGNOSTICO="$SALIDA/$modo"
 
 pids=()
 limpiar() {
   for p in "${pids[@]}"; do kill "$p" 2>/dev/null || true; done
   wait 2>/dev/null || true
+  # Con las apps ya paradas y el llavero aún vivo: lo que la tirada dio de alta en Matrix
+  # se cierra con su propio token, pase lo que pase antes (también si algo falló).
+  if [ "$sesion" = si ] && [ -x "$BIN/dispositivos" ]; then
+    "$BIN/dispositivos" 2>&1 | tee -a "$SALIDA/$modo/resumen.txt" || true
+  fi
   rm -rf "$ENTORNO"
 }
 trap limpiar EXIT
@@ -511,8 +554,89 @@ entrar() { # espera la URL de login, la completa y vuelve a la app
   fi
   echo "login: esperando $SALIDA/login-vuelta" >&2
   for _ in $(seq 300); do [ -s "$SALIDA/login-vuelta" ] && break; sleep 1; done
-  curl -fsS -o /dev/null "$(cat "$SALIDA/login-vuelta")" || echo "login: la vuelta no entró" >&2
+  entregar "$(cat "$SALIDA/login-vuelta")" login
   rm -f "$SALIDA/login-url" "$SALIDA/login-vuelta"
+}
+# entregar <vuelta> <quién> — lleva a la app la vuelta que recogió el guion de Playwright.
+# Conexión rechazada (curl 7) es que el navegador ya se la llevó al seguir la redirección
+# y la app cerró su escucha (ver LAS VUELTAS AL LOOPBACK); otro fallo sí es un problema.
+entregar() {
+  local rc=0
+  curl -fsS -o /dev/null --max-time 20 "$1" 2>/dev/null || rc=$?
+  case "$rc" in
+  0) ;;
+  7) echo "$2: la vuelta ya la llevó el navegador a la app" >&2 ;;
+  *) echo "$2: la vuelta no entró en la app (curl $rc)" >&2 ;;
+  esac
+}
+# boton <captura> <x1> <x2> <y> — ¿hay un botón principal (el teal de la marca) en esos dos
+# puntos de la captura? Dos puntos y no uno: el botón del diálogo de cifrado mide 204 px y
+# a su izquierda puede haber otro botón teal (el de la vista sin diálogo, en 538–742).
+boton() {
+  local x
+  for x in "$2" "$3"; do
+    convert "$1" -format "%[pixel:p{$x,$4}]" info: 2>/dev/null |
+      awk -F'[(),]' '{ exit !($2 < 90 && $3 > $2 + 50 && $4 > $2 + 50) }' || return 1
+  done
+}
+# atender_navegador <segundos> — completa lo que la app abra en el navegador mientras
+# configura su cifrado: el SSO de Matrix del alta del dispositivo (con la sesión de Sytue
+# ID de la tirada) y, si pide volver a entrar, el inicio de sesión. Tras cada uno espera
+# un poco más por si viene otro. Devuelve 1 si en ese plazo no abrió nada.
+atender_navegador() {
+  local hecho=1 fin=$((SECONDS + $1)) vuelta
+  while [ "$SECONDS" -lt "$fin" ]; do
+    if [ -s "$SALIDA/matrix-url" ]; then
+      echo "cifrado: el SSO de Matrix del alta del dispositivo" >&2
+      if vuelta="$($VENTANA_LOGIN --matrix "$(cat "$SALIDA/matrix-url")")"; then
+        entregar "$vuelta" "cifrado (SSO de Matrix)"
+      fi
+      rm -f "$SALIDA/matrix-url"
+      hecho=0 fin=$((SECONDS + 15))
+    elif [ -s "$SALIDA/login-url" ]; then
+      echo "cifrado: la app vuelve a pedir el inicio de sesión en Sytue ID" >&2
+      if vuelta="$($VENTANA_LOGIN "$(cat "$SALIDA/login-url")")"; then
+        entregar "$vuelta" "cifrado (inicio de sesión)"
+      fi
+      rm -f "$SALIDA/login-url"
+      hecho=0 fin=$((SECONDS + 15))
+    fi
+    sleep 1
+  done
+  return "$hecho"
+}
+# desbloquear <app> <ventana> — «Configurar este dispositivo» (ver EL CIFRADO arriba), en
+# rondas: una app puede tener dos cuentas de Matrix que configurar (la de Rooms y la de
+# su producto), y cada una vuelve a sacar el diálogo. Las coordenadas son las del botón
+# del diálogo a 1280 de ancho (medido en ventana-real 43985202886); el diálogo va
+# centrado, así que con otro alto se mueve la mitad.
+desbloquear() {
+  [ -n "${VENTANA_LOGIN:-}" ] && [ "$sesion" = si ] && [ "$modo" = x11 ] || return 0
+  case " ${VENTANA_CIFRADO:-mail hub erp} " in *" $1 "*) ;; *) return 0 ;; esac
+  local ronda f altas=0 y=$((427 + (ALTO - 744) / 2))
+  medir "$2" 1280 "$ALTO"
+  for ronda in 1 2 3 4; do
+    f="$SALIDA/$modo/$1-cifrado$ronda.png"
+    capturar "$2" "$f"
+    if boton "$f" 697 880 "$y"; then
+      clic "$2" 792 "$y"
+      altas=$((altas + 1))
+      if ! atender_navegador 30; then
+        echo "$1: «Configurar este dispositivo» no abrió el navegador (ronda $ronda)" | tee -a "$SALIDA/$modo/resumen.txt"
+        break
+      fi
+      # El alta, la recuperación de la clave y la autoverificación del dispositivo.
+      sleep 25
+    elif boton "$f" 545 735 $((y + 18)); then
+      # El diálogo cerrado: el botón de la vista lo vuelve a abrir.
+      clic "$2" 640 $((y + 18))
+      sleep 3
+    else
+      break
+    fi
+  done
+  capturar "$2" "$SALIDA/$modo/$1-cifrado-fin.png"
+  echo "$1: «Configurar este dispositivo» pulsado $altas vez/veces, ver $1-cifrado*.png" | tee -a "$SALIDA/$modo/resumen.txt"
 }
 
 # Solo lectura salvo que se pida escribir (ver la cabecera).
@@ -535,6 +659,7 @@ for a in "${apps[@]}"; do
   fi
   entrar
   sleep 8 # los datos de producción
+  desbloquear "$a" "$w"
   mover "$w" 1279 743 # el puntero, en una esquina: en medio deja una fila «encima»
   for t in claro oscuro traslucido; do
     tema "$t"

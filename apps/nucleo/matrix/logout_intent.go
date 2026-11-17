@@ -8,10 +8,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 
-	"maunium.net/go/mautrix"
+	"git.sytue.eu/sytue/one/apps/nucleo/matrix/cierre"
 )
 
 var errNoLogoutIntent = errors.New("matrix: no pending logout")
@@ -97,21 +96,8 @@ func (c *Client) finishLogout(ctx context.Context, session credentials) error {
 	return nil
 }
 
+// logoutSession revoca con la plomería compartida (apps/nucleo/matrix/cierre), la
+// misma que usa el cierre de sesión de la suite para los demás dispositivos.
 func (c *Client) logoutSession(ctx context.Context, session credentials) error {
-	client, err := mautrix.NewClient(session.Homeserver, session.UserID, session.AccessToken)
-	if err != nil {
-		return err
-	}
-	client.DeviceID, client.Client, client.Log, client.UserAgent = session.DeviceID, c.cli.Client, c.cli.Log, c.cli.UserAgent
-	_, err = client.Logout(ctx)
-	var httpErr mautrix.HTTPError
-	if errors.Is(err, mautrix.MUnknownToken) && errors.As(err, &httpErr) && httpErr.IsStatus(http.StatusUnauthorized) && httpErr.RespError != nil {
-		// An expired/soft-logged-out session is not proof of device deletion.
-		value, present := httpErr.RespError.ExtraData["soft_logout"]
-		soft, valid := value.(bool)
-		if !present || (valid && !soft) {
-			return nil
-		}
-	}
-	return err
+	return cierre.Dispositivo(ctx, c.cli.Client, session.Homeserver, session.AccessToken)
 }

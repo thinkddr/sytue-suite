@@ -49,6 +49,12 @@ type Server struct {
 	// efectivo con N réplicas es N×burst, aceptable para ese endpoint).
 	loginLimiter httpx.RateLimiter
 	tokenLimiter httpx.RateLimiter
+	// envelopeLimiter limita la subida de sobres del desbloqueo (PUT /e2e/envelopes,
+	// ADR 0084 y 0085) por cliente, con su propio cubo: subir sobres (alta de varias
+	// passkeys, empezar de cero) no gasta el presupuesto anti-fuerza-bruta del inicio
+	// de sesión, ni al revés. Exige sesión, así que no es un oráculo de contraseñas;
+	// frena a quien con una sesión machaque la tabla.
+	envelopeLimiter httpx.RateLimiter
 	// acctLimiter limita intentos por cuenta (email), para frenar la fuerza bruta
 	// distribuida (muchas IP contra una misma cuenta) que un límite por IP no cubre.
 	acctLimiter httpx.RateLimiter
@@ -157,6 +163,10 @@ func NewServer(cfg Config, logger *slog.Logger, st *store.Store, km *oidc.KeyMan
 		// credential-stuffing / fuerza bruta de contraseñas). Compartido entre
 		// réplicas (Postgres): un límite por proceso se multiplicaría por N.
 		loginLimiter: pg.NewRateLimiter(st.DB(), pg.RateLimiterConfig{PerSecond: 10.0 / 60.0, Burst: 10}),
+		// Sobres del desbloqueo: 20/min por cliente con ráfaga de 20. Un inicio de
+		// sesión sube uno como mucho; dar de alta passkeys o empezar de cero, uno por
+		// cada una. Compartido entre réplicas, como el de login.
+		envelopeLimiter: pg.NewRateLimiter(st.DB(), pg.RateLimiterConfig{PerSecond: 20.0 / 60.0, Burst: 20}),
 		// Token endpoint: 60 req/min por IP con ráfaga de 30 (protege canje de
 		// código, refresh, client_credentials y el registro dinámico de clients
 		// sin ahogar el tráfico legítimo). Compartido entre réplicas (Postgres)
@@ -304,6 +314,9 @@ func oauth2RateKey(r *http.Request) string { return rateKeyPorCliente("oauth2:",
 // cabecera distinta, y el tope de 10/min no frenaba absolutamente nada.
 func loginRateKey(r *http.Request) string { return rateKeyPorCliente("login-ip:", r) }
 
+// envelopeRateKey es el cubo de PUT /e2e/envelopes: el cliente, con prefijo propio.
+func envelopeRateKey(r *http.Request) string { return rateKeyPorCliente("e2e-envelopes:", r) }
+
 // conProxiesDeConfianza deja la lista de proxies de confianza en el contexto de
 // cada petición. Va lo PRIMERO del router: de ella depende clientIP, y clientIP
 // lo consulta ya el middleware de rate-limiting.
@@ -422,8 +435,11 @@ func (s *Server) Router() http.Handler {
 		// --- OAuth2 / OIDC ---
 		// El desbloqueo del cifrado (ADR 0084): el relevo guarda aquí los sobres
 		// que cierra en el navegador, y las apps web leen la clave por el puente.
-		r.With(loginRL).Put("/e2e/envelopes", s.handleUnlockEnvelopePut)
+		envelopeRL := httpx.RateLimit(httpx.RateLimitConfig{Limiter: s.envelopeLimiter, KeyFunc: envelopeRateKey})
+		r.With(envelopeRL).Put("/e2e/envelopes", s.handleUnlockEnvelopePut)
 		r.Get("/e2e/bridge", s.handleUnlockBridge)
+		r.Get("/e2e/passkey", s.handleUnlockPasskeyEnroll)
+		r.Get("/e2e/cuenta", s.handleUnlockBridgeCuenta)
 
 		r.Route("/oauth2", func(r chi.Router) {
 			r.Get("/authorize", s.handleAuthorize)  // Authorization Code + PKCE

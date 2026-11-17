@@ -12,6 +12,7 @@
     "./matrix": "./src/matrix/index.ts",
     "./matrix/types": "./src/matrix/types.ts",
     "./matrix/auth": "./src/matrix/auth.ts",
+    "./matrix/unlock-bridge": "./src/matrix/unlock-bridge.ts",
     "./pqc/runtime": "./src/pqc/runtime.ts",
     "./session-owner": "./src/session-owner.ts",
     "./pqc/framing": "./src/pqc/host-codec.ts"

@@ -60,12 +60,14 @@ const securityCSS = `.sub-sec{margin:22px 0 0;font-size:13px;font-weight:600;col
 	`background:transparent;border:1px solid var(--border);border-radius:var(--radius-control);cursor:pointer;transition:background .15s,border-color .15s}` +
 	`.btn-danger:hover{background:var(--danger-bg);border-color:var(--danger)}.btn-danger:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ring)}`
 
-// passwordFormHTML es el formulario de cambio de contraseña (sin datos de usuario,
-// constante). autocomplete y minlength dan las pistas al navegador; la política y
-// la coincidencia las valida el servidor.
-func passwordFormHTML(loc string) string {
+// passwordFormHTML es el formulario de cambio de contraseña. autocomplete y
+// minlength dan las pistas al navegador; la política y la coincidencia las valida el
+// servidor. `sub` y el campo oculto son del desbloqueo del cifrado (ADR 0085,
+// e2e/cuenta.js): el sobre de la contraseña nueva viaja con el cambio.
+func passwordFormHTML(loc, sub string) string {
 	esc := html.EscapeString
-	return `<form method="post" action="/account/password" class="sec-form">` +
+	return `<form method="post" action="/account/password" class="sec-form" data-sub="` + esc(sub) + `">` +
+		`<input type="hidden" name="unlock_envelope" value="">` +
 		`<label for="sec-cur">` + esc(i18n.T(loc, "security.current_password")) + `</label>` +
 		`<input id="sec-cur" type="password" name="current_password" autocomplete="current-password" required>` +
 		`<label for="sec-new">` + esc(i18n.T(loc, "forgot.new_password")) + `</label>` +
@@ -97,7 +99,7 @@ func (s *Server) securitySectionHTML(r *http.Request, user domain.User) string {
 		b.WriteString(note)
 	}
 	b.WriteString(`<h3 class="sub-sec">` + html.EscapeString(i18n.T(loc, "security.password")) + `</h3>`)
-	b.WriteString(passwordFormHTML(loc))
+	b.WriteString(passwordFormHTML(loc, user.ID))
 	b.WriteString(`<h3 class="sub-sec">` + html.EscapeString(i18n.T(loc, "security.two_step")) + `</h3>`)
 	switch {
 	case s.totpConfirmed(r, user.ID):
@@ -269,6 +271,7 @@ func (s *Server) handleAccountPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = s.store.Audit(r.Context(), nil, auditEntry(sess.UserID, sess.OrgID, "user.password.changed", "", r))
+	s.guardarSobreDeContrasena(r, sess.UserID, sess.OrgID, []byte(r.Form.Get("unlock_envelope")))
 	s.avisarSeguridad(r.Context(), sess.OrgID, sess.UserID, "security.password.changed", nil)
 	accountRedirect(w, r, "pw_ok")
 }

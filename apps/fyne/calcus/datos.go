@@ -12,6 +12,7 @@ import (
 
 	"git.sytue.eu/sytue/one/apps/nucleo/formula"
 	"git.sytue.eu/sytue/one/apps/nucleo/formula/analisis"
+	"git.sytue.eu/sytue/one/apps/nucleo/office/model"
 )
 
 // Las operaciones de la pestaña Datos que tocan el libro: ordenar, quitar duplicados,
@@ -339,8 +340,8 @@ func moverReferenciasAjenas(h *hojaLibro, d formula.Desplazamiento) {
 // condicional, las validaciones, los gráficos, los minigráficos y las segmentaciones sin
 // `objects`; el autofiltro sin `autoFilter`—: el servidor lo veta
 // (services/docs/internal/domain/proteccion.go) y rechazaría el guardado entero, celdas
-// movidas incluidas. Los rangos editables (`protect.ranges`), que la web sí mueve, aquí
-// no se tocan porque `Proteccion` aún no los guarda.
+// movidas incluidas. Los rangos editables (`protect.ranges`) sí viajan con sus celdas
+// (`moverRangos`).
 //
 //nolint:gocognit // una rama por clase de objeto, como `moverObjetos` de refshift.ts
 func moverObjetos(h *hojaLibro, d formula.Desplazamiento) {
@@ -349,6 +350,7 @@ func moverObjetos(h *hojaLibro, d formula.Desplazamiento) {
 		return r, r != formula.RefRota
 	}
 	columna := func(c int) (int, bool) { return moverColumna(c, d) }
+	h.proteccion = moverRangos(h.proteccion, vivo)
 	moverEstructura(h, d, vivo)
 	h.tablas = moverTablas(h.tablas, vivo)
 	h.dinamicas = moverDinamicas(h, d, true)
@@ -387,6 +389,41 @@ func moverObjetos(h *hojaLibro, d formula.Desplazamiento) {
 		}
 	}
 	h.minis, h.graficos, h.segs = minis, graficos, segs
+}
+
+// moverRangos es la parte de `moverObjetos` de refshift.ts de los rangos editables
+// (`protect.ranges`): viajan con sus celdas aunque la hoja esté protegida. Si se quedaran
+// atrás, el rango de alguien pasaría a cubrir el contenido bloqueado que ha llegado a sus
+// filas y dejaría fuera parte del suyo. Crecen, encogen o desaparecen como cualquier
+// rango, y sin ninguno `ranges` no se escribe. El servidor lo acepta de quien no es el
+// propietario porque reproduce el mismo desplazamiento
+// (apps/nucleo/office/model/proteccion_desplazar.go).
+//
+// La protección es inmutable —la foto de deshacer la comparte—, así que se pone otra; y
+// la misma si ningún rango cambia.
+func moverRangos(p *Proteccion, vivo func(string) (string, bool)) *Proteccion {
+	if p == nil || len(p.Ranges) == 0 {
+		return p
+	}
+	cambia := false
+	var rangos []model.RangoEditable
+	for _, g := range p.Ranges {
+		r, ok := vivo(g.Ref)
+		if !ok {
+			cambia = true
+			continue
+		}
+		if r = compacto(r); r != g.Ref {
+			g.Ref, cambia = r, true
+		}
+		rangos = append(rangos, g)
+	}
+	if !cambia {
+		return p
+	}
+	q := *p
+	q.Ranges = rangos
+	return &q
 }
 
 // moverDinamicas es `moverDinamicas` de refshift.ts: el origen de cada tabla dinámica

@@ -10,7 +10,7 @@ email, files, documents, spreadsheets, presentations, PDF, calendar,
 contacts, chat and video calls, notes, photos, video, website builder, databases,
 ERP and PaaS, with **a single account and a single experience**.
 
-![Sytue One — portal de la suite](docs/capturas/web-one.webp)
+![Sytue One — suite portal](docs/capturas/web-one.webp)
 
 ---
 
@@ -109,7 +109,7 @@ committing to a service level.
 <a id="capturas-de-pantalla"></a>
 ## Screenshots
 
-> All screenshots use a demo organization with fictitious data (reserved domains `.test`/`.example`).
+> All screenshots use a demo organization with fictitious data (reserved domains `.test`/`.example`). The interface is shown in English; the demo content itself (emails, notes, file names) is in Spanish.
 
 <a id="aplicaciones-web"></a>
 ### Web applications
@@ -137,7 +137,7 @@ committing to a service level.
 | **Sytue Cast** | **Sytue Bases** |
 | ![Sytue Cast](docs/capturas/nativa-cast.png) | ![Sytue Bases](docs/capturas/nativa-bases.png) |
 | **Sytue Notepads** | **Mobile (iOS / Android): Mail and Rooms** |
-| ![Sytue Notepads](docs/capturas/nativa-notes.png) | <img src="docs/capturas/movil-mail.png" width="48%" alt="Sytue Mail móvil"> <img src="docs/capturas/movil-rooms.png" width="48%" alt="Sytue Rooms móvil"> |
+| ![Sytue Notepads](docs/capturas/nativa-notes.png) | <img src="docs/capturas/movil-mail.png" width="48%" alt="Sytue Mail on mobile"> <img src="docs/capturas/movil-rooms.png" width="48%" alt="Sytue Rooms on mobile"> |
 
 ---
 

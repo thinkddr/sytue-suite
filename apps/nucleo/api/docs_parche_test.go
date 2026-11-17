@@ -13,6 +13,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	officemodel "git.sytue.eu/sytue/one/apps/nucleo/office/model"
 )
 
 func TestDiferencias(t *testing.T) {
@@ -106,5 +108,17 @@ func TestSaveCheckedPorParche(t *testing.T) {
 	}
 	if strings.Contains(cuerpo, "base_seq") {
 		t.Errorf("un parche no manda base_seq: %s", cuerpo)
+	}
+	if strings.Contains(cuerpo, "proteccion") {
+		t.Errorf("sin contraseñas no hay sobre: %s", cuerpo)
+	}
+	// Las contraseñas de protección del contexto van en el sobre, FUERA de las ops, como
+	// el `proteccion` de la web: es lo único que el servidor verifica.
+	ctx := officemodel.ConProteccion(context.Background(), &officemodel.Proteccion{Clave: "vieja", Nuevas: map[string]string{"hoja:H": "nueva"}})
+	if _, err := d.SaveChecked(ctx, "d1", "doc:sheet", `{"sheets":[{"id":"h1","cells":{"A1":"y"}}]}`, base, DocDot{"gio", 2}, false); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(cuerpo, `"proteccion":{"password":"vieja","new":{"hoja:H":"nueva"}}`) {
+		t.Errorf("las contraseñas no van en el sobre: %s", cuerpo)
 	}
 }

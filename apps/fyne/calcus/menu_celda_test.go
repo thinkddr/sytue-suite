@@ -166,7 +166,7 @@ func TestLasCabecerasTienenSuVariante(t *testing.T) {
 // en el menú, pero inerte y diciendo por qué; copiar sigue vivo.
 func TestLaHojaProtegidaDejaLasOpcionesInertesConSuMotivo(t *testing.T) {
 	c, _ := lienzoConMenu(t)
-	c.Libro.Proteger(&Proteccion{Sort: true})
+	c.Libro.Proteger(&Proteccion{Sort: true}, "")
 	r := c.Rejilla
 	test.TapSecondaryAt(r, puntoCelda(r, 0, 0))
 	m := c.MenuContextual()

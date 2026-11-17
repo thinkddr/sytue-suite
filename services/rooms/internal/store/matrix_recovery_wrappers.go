@@ -78,7 +78,21 @@ func (s *Store) MatrixRecoveryWrappers(ctx context.Context, subject string, acco
 // almacenamiento (la clave cambió: ya no abren nada) y, en la cuenta de Rooms, la
 // copia con KEK de ADR 0081: desde aquí, nadie más que la persona puede leerla.
 func (s *Store) PutMatrixRecoveryWrapper(ctx context.Context, subject string, account MatrixRecoveryAccount, kind, credentialID, keyID string, wrapper []byte) (string, error) {
-	if !account.valid() || subject == "" || keyID == "" || len(wrapper) == 0 || (kind == "passkey") != (credentialID != "") {
+	return s.putMatrixRecoveryWrapper(ctx, subject, account, kind, credentialID, keyID, wrapper, false)
+}
+
+// PutMatrixRecoveryWrapperRetiringOlder es PutMatrixRecoveryWrapper de un envoltorio
+// `sytue-id` que el dispositivo ACABA DE COMPROBAR que abre, y que en la MISMA
+// transacción retira los envoltorios de la ADR 0082 (contraseña y passkey) de esa
+// misma clave (ADR 0085). La cuenta nunca se queda sin un envoltorio que abra: el que
+// sustituye a los viejos se guarda antes de borrarlos y en la misma transacción.
+func (s *Store) PutMatrixRecoveryWrapperRetiringOlder(ctx context.Context, subject string, account MatrixRecoveryAccount, keyID string, wrapper []byte) (string, error) {
+	return s.putMatrixRecoveryWrapper(ctx, subject, account, "sytue-id", "", keyID, wrapper, true)
+}
+
+func (s *Store) putMatrixRecoveryWrapper(ctx context.Context, subject string, account MatrixRecoveryAccount, kind, credentialID, keyID string, wrapper []byte, retireOlder bool) (string, error) {
+	if !account.valid() || subject == "" || keyID == "" || len(wrapper) == 0 || (kind == "passkey") != (credentialID != "") ||
+		(retireOlder && kind != "sytue-id") {
 		return "", domain.ErrInvalidInput
 	}
 	var id string
@@ -95,6 +109,11 @@ func (s *Store) PutMatrixRecoveryWrapper(ctx context.Context, subject string, ac
 			ON CONFLICT(subject,organizacion,product,kind,credential_id) DO UPDATE SET key_id=EXCLUDED.key_id, wrapper=EXCLUDED.wrapper, created_at=now()
 			RETURNING id::text`, subject, account.Tenant, account.Product, kind, credentialID, keyID, string(wrapper)).Scan(&id); err != nil {
 			return err
+		}
+		if retireOlder {
+			if _, err := tx.Exec(ctx, `DELETE FROM matrix_recovery_wrappers WHERE subject=$1 AND organizacion=$2 AND product=$3 AND key_id=$4 AND kind IN ('password','passkey')`, subject, account.Tenant, account.Product, keyID); err != nil {
+				return err
+			}
 		}
 		var count int
 		if err := tx.QueryRow(ctx, `SELECT count(*) FROM matrix_recovery_wrappers WHERE subject=$1 AND organizacion=$2 AND product=$3`, subject, account.Tenant, account.Product).Scan(&count); err != nil {

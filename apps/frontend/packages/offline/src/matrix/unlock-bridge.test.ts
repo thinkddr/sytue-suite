@@ -6,7 +6,12 @@
  * operations: it never receives (nor asks for) the unlock key.
  */
 import { expect, test } from 'bun:test';
-import { forgetLegacyMaterial, unwrapInBridge, wrapInBridge } from './unlock-bridge.js';
+import {
+  forgetLegacyMaterial,
+  passwordEnvelopeInBridge,
+  unwrapInBridge,
+  wrapInBridge,
+} from './unlock-bridge.js';
 import type { RecoveryWrapper } from './recovery-wrap.js';
 
 const idOrigin = 'https://id.sytue.eu';
@@ -17,6 +22,7 @@ type Listener = (event: MessageEvent) => void;
 function page(
   answer: (msg: Record<string, unknown>, reply: (data: unknown) => void) => void,
   version: number = 2,
+  origin: string = appOrigin,
 ) {
   const listeners = new Set<Listener>();
   const posted: { msg: Record<string, unknown>; target: string }[] = [];
@@ -25,7 +31,7 @@ function page(
     for (const fn of listeners) fn({ data, origin, source } as unknown as MessageEvent);
   };
   const win = {
-    location: { origin: appOrigin },
+    location: { origin },
     addEventListener: (_: string, fn: Listener) => listeners.add(fn),
     removeEventListener: (_: string, fn: Listener) => listeners.delete(fn),
   };
@@ -198,4 +204,51 @@ test('forgets the legacy material through the same bridge', async () => {
     doc: p.doc as never,
   });
   expect(p.posted[0]!.msg).toMatchObject({ type: 'sytue-e2e-forget-legacy', sub: 'ana' });
+});
+
+test("«Mi cuenta», in Sytue ID's own origin, asks its own bridge for the new password envelope", async () => {
+  const envelope = {
+    v: 1,
+    kind: 'password',
+    credential_id: '',
+    kdf: { alg: 'argon2id' },
+    hint: 'aGludA==',
+    nonce: 'bm9uY2U=',
+    ciphertext: 'Y2lwaGVy',
+  };
+  const p = page(
+    (msg, reply) => reply({ type: 'sytue-e2e-result', id: msg.id, ok: true, envelope }),
+    2,
+    idOrigin,
+  );
+  const got = await passwordEnvelopeInBridge(
+    { idOrigin, subject: 'ana', win: p.win as never, doc: p.doc as never },
+    { current: 'antes', next: 'después' },
+  );
+  expect(got).toEqual({ ok: true, envelope });
+  expect(p.frames[0]!.src).toBe(`${idOrigin}/e2e/cuenta`);
+  expect(p.posted[0]!.msg).toMatchObject({
+    type: 'sytue-e2e-password',
+    sub: 'ana',
+    current: 'antes',
+    next: 'después',
+  });
+  // Anything that is not a password envelope is not taken.
+  const bad = page(
+    (msg, reply) =>
+      reply({
+        type: 'sytue-e2e-result',
+        id: msg.id,
+        ok: true,
+        envelope: { ...envelope, kind: 'passkey' },
+      }),
+    2,
+    idOrigin,
+  );
+  expect(
+    await passwordEnvelopeInBridge(
+      { idOrigin, subject: 'ana', win: bad.win as never, doc: bad.doc as never },
+      { current: 'antes', next: 'después' },
+    ),
+  ).toEqual({ ok: false, error: 'unavailable' });
 });

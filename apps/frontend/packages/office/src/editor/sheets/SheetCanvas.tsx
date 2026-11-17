@@ -198,12 +198,7 @@ import {
   validationAt,
   validationMessage,
 } from './format';
-import {
-  moverObjetos,
-  moverReferenciasAjenas,
-  reescribirCelda,
-  type Desplazamiento,
-} from './refshift';
+import { desplazarHojas, type Desplazamiento } from './refshift';
 import {
   applyNameCommand,
   moverNombres,
@@ -260,7 +255,7 @@ import {
   tramoPorPosiciones,
   type Vista,
 } from './rejilla';
-import { conEstructura, estructuraDistinta } from './anclas';
+import { estructuraDistinta } from './anclas';
 import {
   combinarHoja,
   combinarPierdeDatos,
@@ -2939,37 +2934,12 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
     const s = cur.model.sheets[cur.model.active];
     if (!s) return;
     const rc = rectOf(cur.sel, cur.ext);
-    // Transforma la posición de una celda; null = se cae fuera de la rejilla.
-    let mapPos: (c: number, r: number) => Pos | null;
-    if (cmd === 'insrow') {
-      const at = value === 'below' ? rc.r2 + 1 : rc.r1;
-      mapPos = (c, r) => (r < at ? { c, r } : r + 1 < MAX_ROWS ? { c, r: r + 1 } : null);
-    } else if (cmd === 'delrow') {
-      const n = rc.r2 - rc.r1 + 1;
-      mapPos = (c, r) => (r < rc.r1 ? { c, r } : r <= rc.r2 ? null : { c, r: r - n });
-    } else if (cmd === 'inscol') {
-      const at = value === 'right' ? rc.c2 + 1 : rc.c1;
-      mapPos = (c, r) => (c < at ? { c, r } : c + 1 < MAX_COLS ? { c: c + 1, r } : null);
-    } else {
-      const n = rc.c2 - rc.c1 + 1;
-      mapPos = (c, r) => (c < rc.c1 ? { c, r } : c <= rc.c2 ? null : { c: c - n, r });
-    }
-    const remap = <T,>(src: Record<string, T> | undefined): Record<string, T> => {
-      const out: Record<string, T> = {};
-      if (!src) return out;
-      for (const ref in src) {
-        const rr = parseRangeRef(ref);
-        if (!rr) continue;
-        const p = mapPos(rr.c1, rr.r1);
-        if (p) out[refOf(p)] = src[ref]!;
-      }
-      return out;
-    };
     // Qué le pasa a la rejilla, para que las FÓRMULAS lo sepan. Antes no se
     // reescribían: insertar una fila movía los datos y dejaba `=SUMA(A1:A5)`
     // sumando cinco filas cuando ya eran seis. Ni error ni aviso — solo un
     // resultado que pasaba a estar mal, que es la peor forma de fallar que tiene
-    // una hoja de cálculo. Ver sheets/refshift.ts para las reglas.
+    // una hoja de cálculo. Ver sheets/refshift.ts para las reglas. Lo que rebosa el
+    // límite de la hoja se pierde.
     // `hoja`: solo se mueven las referencias que apuntan a esta hoja, estén donde estén.
     const desplazamiento: Desplazamiento = {
       hoja: s.name,
@@ -2986,34 +2956,19 @@ export function SheetCanvas({ ctx }: { ctx: EditorContext }): JSX.Element {
               }
             : { eje: 'columna', desde: rc.c1, cantidad: -(rc.c2 - rc.c1 + 1), tope: MAX_COLS }),
     };
-    const celdas = remap(s.cells);
-    for (const ref in celdas) celdas[ref] = reescribirCelda(celdas[ref]!, desplazamiento);
-    // Los objetos de la hoja —tablas, minigráficos, gráficos, segmentaciones, el
-    // autofiltro, el formato condicional, las validaciones, el esquema, las combinadas
-    // y los anchos y altos— siguen a sus celdas con las mismas reglas (refshift.ts).
-    const next: SheetData = {
-      ...moverObjetos(s, desplazamiento),
-      cells: celdas,
-      // La identidad de filas y columnas sigue a la estructura (sheets/anclas.ts).
-      ...conEstructura(s, desplazamiento.eje, desplazamiento.desde, desplazamiento.cantidad),
-    };
     vistas.mover(s.name, desplazamiento); // las vistas de filtro de cada persona, igual
-    const formats = remap(s.formats);
-    if (Object.keys(formats).length > 0) next.formats = formats;
-    else delete next.formats;
-    const styles = remap(s.styles);
-    if (Object.keys(styles).length > 0) next.styles = styles;
-    else delete next.styles;
-    // Y las fórmulas de las OTRAS hojas que la citan (`=Ventas!B4` en «Resumen») y
-    // los nombres definidos que apuntan a ella, igual (refshift.ts, nombres.ts).
+    // La hoja entera —sus celdas con su formato y su estilo, sus fórmulas, sus objetos
+    // (tablas, minigráficos, gráficos, segmentaciones, el autofiltro, el formato
+    // condicional, las validaciones, el esquema, las combinadas, los anchos y altos) y la
+    // identidad de filas y columnas— y las fórmulas de las OTRAS hojas que la citan
+    // (`=Ventas!B4` en «Resumen») siguen a sus celdas (`desplazarHojas`, refshift.ts); los
+    // nombres definidos que apuntan a ella, igual (nombres.ts).
     const first = cur.model.sheets[0]?.name ?? s.name;
     apply(
       withNames(
         {
           ...cur.model,
-          sheets: cur.model.sheets.map((x, i) =>
-            i === cur.model.active ? next : moverReferenciasAjenas(x, desplazamiento),
-          ),
+          sheets: desplazarHojas(cur.model.sheets, cur.model.active, desplazamiento),
         },
         moverNombres(cur.model.names, s.name, first, desplazamiento),
       ),

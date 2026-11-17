@@ -906,6 +906,9 @@ func (s *Suite) salirClasicoConGuardia(ctx context.Context, guard func() error) 
 		s.privateTransitionActive = false
 		s.privateWorkMu.Unlock()
 	}()
+	// De quién son los dispositivos de Matrix que se cierran abajo: se lee antes de que
+	// el logout vacíe la sesión en memoria.
+	sujeto := s.Sesion.SnapshotIdentity().Subject
 	if guard != nil {
 		if err := guard(); err != nil {
 			return err
@@ -955,6 +958,10 @@ func (s *Suite) salirClasicoConGuardia(ctx context.Context, guard func() error) 
 		if err := s.vaciarAlmacenCon(ctx); err != nil {
 			return err
 		}
+		// Olvidar del llavero la sesión de un dispositivo de Matrix sin cerrarlo dejaba
+		// uno vivo en el homeserver por cada entrada (Mail, Hub, ERP…; solo Rooms lo
+		// cerraba): con su token, antes de olvidarlo, y sin esperar a un homeserver caído.
+		cerrarDispositivosMatrix(ctx, sujeto)
 		return errors.Join(auth.OlvidarSecretos("notes-"), auth.OlvidarSecretos("rooms-matrix-"))
 	})
 	if errCierre != nil {

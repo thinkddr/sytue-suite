@@ -11,6 +11,7 @@ import {
   diferencias,
   fusionar3,
   igual,
+  mismoContenido,
   type Cambio,
   type Registro,
 } from './fusion.js';
@@ -372,6 +373,37 @@ function aplicar(raiz: Json, cambios: Cambio[]): Json {
 const slide = (id: string, ...cajas: [string, string][]): Json => ({
   id,
   boxes: cajas.map(([bid, html]) => ({ id: bid, html })),
+});
+
+test('cadena: varios guardados que salen juntos, cada parche sobre el anterior', () => {
+  const libroDe = (cells: Record<string, string>): Json => ({
+    sheets: [{ id: 'h1', name: 'H', cells }],
+  });
+  const base = libroDe({ A1: '1', A2: '2' });
+  const m1 = libroDe({ A1: '1', A3: '2' });
+  const m2 = libroDe({ A1: '1', A4: '2', B1: 'x' });
+  const modelo = new CoedicionModelo(
+    { valor: JSON.stringify(base), lamport: 1, dot: { a: 'srv', c: 1 } },
+    1,
+    JSON.stringify(base),
+  );
+  const cadena = modelo.cadena([JSON.stringify(m1), JSON.stringify(m2)]);
+  expect(cadena).toHaveLength(2);
+  // Aplicados en orden, como el servidor, dan cada guardado: el segundo sobre el primero.
+  const tras1 = aplicar(base, cadena![0]!);
+  expect(tras1).toEqual(m1);
+  expect(aplicar(tras1, cadena![1]!)).toEqual(m2);
+  // Y no toca el estado: hasta que el servidor conteste, nada está confirmado.
+  expect(modelo.cambios(JSON.stringify(m2))).toEqual(diferencias(base, m2));
+  // Un guardado que no se deja decir como parche deja la cadena entera en el registro.
+  expect(modelo.cadena([JSON.stringify(m1), '{"sheets":[{"name":"H"}]}'])).toBeNull();
+});
+
+test('mismoContenido: el mismo JSON aunque cambie el orden de las claves', () => {
+  expect(mismoContenido('{"a":1,"b":[1,2]}', '{"b":[1,2],"a":1}')).toBe(true);
+  expect(mismoContenido('{"a":1}', '{"a":2}')).toBe(false);
+  expect(mismoContenido('no es json', 'no es json')).toBe(true);
+  expect(mismoContenido('no es json', '{}')).toBe(false);
 });
 
 test('diferencias: una celda y una caja son un cambio cada una', () => {

@@ -471,6 +471,68 @@ describe('seguridad', () => {
     await esperar(() => document.body.textContent?.includes('aaaa-bbbb') ?? false);
     expect(regenerados()).toHaveLength(1);
   });
+
+  test('cambiar la contraseña manda el sobre del desbloqueo que cierra Sytue ID', async () => {
+    respuestas['GET /api/me'] = [200, { mfa_enabled: false, id: 'ana-sub' }];
+    respuestas['GET /api/passkeys'] = [200, { credentials: [] }];
+    respuestas['POST /api/password'] = [200, { sessions_revoked: 1 }];
+    const cuerpos: string[] = [];
+    const simulado = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === '/api/password') cuerpos.push(String(init?.body ?? ''));
+      return simulado(input, init);
+    }) as unknown as typeof fetch;
+    const pedidos: [string, string, string][] = [];
+    const sobre = { v: 1, kind: 'password', ciphertext: 'Y2lmcmFkbw==' };
+    await montar(
+      <SeguridadCard
+        t={t}
+        sobreDeSeguridad={async (sub, actual, nueva) => {
+          pedidos.push([sub, actual, nueva]);
+          return sobre;
+        }}
+      />,
+    );
+    await esperar(() => document.body.textContent?.includes(en['security.mfa.off']) ?? false);
+    await escribir('pwd-actual', 'la-de-antes-123');
+    await escribir('pwd-nueva', 'otra-mejor-456');
+    await act(async () => {
+      botonPorNombre(en['security.password.submit'])!.click();
+    });
+    await esperar(() => cuerpos.length === 1);
+    // El sobre lo cierra Sytue ID para ESTA persona con las dos contraseñas…
+    expect(pedidos).toEqual([['ana-sub', 'la-de-antes-123', 'otra-mejor-456']]);
+    // …y viaja con el cambio; el servicio lo guarda solo si el cambio sale bien.
+    expect(JSON.parse(cuerpos[0]!)).toEqual({
+      current_password: 'la-de-antes-123',
+      new_password: 'otra-mejor-456',
+      unlock_envelope: sobre,
+    });
+  });
+
+  test('sin sobre (otro navegador, sin clave aquí) la contraseña se cambia igual', async () => {
+    respuestas['GET /api/me'] = [200, { mfa_enabled: false, id: 'ana-sub' }];
+    respuestas['GET /api/passkeys'] = [200, { credentials: [] }];
+    respuestas['POST /api/password'] = [200, { sessions_revoked: 1 }];
+    const cuerpos: string[] = [];
+    const simulado = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === '/api/password') cuerpos.push(String(init?.body ?? ''));
+      return simulado(input, init);
+    }) as unknown as typeof fetch;
+    await montar(<SeguridadCard t={t} sobreDeSeguridad={async () => null} />);
+    await esperar(() => document.body.textContent?.includes(en['security.mfa.off']) ?? false);
+    await escribir('pwd-actual', 'la-de-antes-123');
+    await escribir('pwd-nueva', 'otra-mejor-456');
+    await act(async () => {
+      botonPorNombre(en['security.password.submit'])!.click();
+    });
+    await esperar(() => cuerpos.length === 1);
+    expect(JSON.parse(cuerpos[0]!)).toEqual({
+      current_password: 'la-de-antes-123',
+      new_password: 'otra-mejor-456',
+    });
+  });
 });
 
 describe('firma guardada', () => {

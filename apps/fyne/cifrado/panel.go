@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -187,9 +188,17 @@ func (c *Panel) custodia() Custodia {
 // retirar lo que abría los envoltorios de la ADR 0082 tras pasarlos al tipo nuevo.
 func (c *Panel) resolver(job context.Context, client *mx.Client, custodia Custodia, diag Diagnostico, native bool) (Diagnostico, error) {
 	creating := diag.Paso == PasoCrear
-	diag, err := Resolver(job, client, custodia, diag, c.material(), c.uia(job, client))
+	m := c.material()
+	defer m.Borrar()
+	diag, err := Resolver(job, client, custodia, diag, m, c.uia(job, client))
 	if err != nil {
 		return diag, err
+	}
+	// ADR 0085: con el `sytue-id` comprobado aquí, los envoltorios de la 0082 sobran.
+	if diag.Paso == PasoListo && custodia.Servicio != nil {
+		if _, err := RetirarViejos(job, client, custodia, m); err != nil {
+			slog.Warn("cifrado: no se pudieron retirar los envoltorios de la ADR 0082", "error", err)
+		}
 	}
 	if creating && native && diag.Paso != PasoIniciarSesion {
 		if err := client.SyncNativeRecovery(job); err != nil {
@@ -683,8 +692,9 @@ func (c *Panel) Restablecer() {
 		if !understood.Marcada {
 			return
 		}
-		m := c.material()
 		c.custodiar(func(ctx context.Context, client *mx.Client, custodia Custodia) (Diagnostico, bool, error) {
+			m := c.material()
+			defer m.Borrar()
 			return Diagnostico{}, false, Restablecer(ctx, client, custodia, m, c.uia(ctx, client))
 		})
 	})

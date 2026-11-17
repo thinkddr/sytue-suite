@@ -103,6 +103,8 @@ function custodyFixture(account: Account) {
     legacy: null as string | null,
     material: true,
     older: false,
+    /** This device holds the key in its own owner-key cache (verified before ADR 0084). */
+    held: false,
     subjects: [] as string[],
     signIns: [] as { returnTo: string; older: string }[],
   };
@@ -144,6 +146,14 @@ function custodyFixture(account: Account) {
       wrappers.set('sytue-id', { keyID: target.keyID, key });
       control.legacy = null;
       log.push(`wrap ${target.keyID} hasKey=${account.hasKey}`);
+    },
+    // Mirrors BrowserKeyCustody: retires the ADR 0082 wrappers once the sytue-id one opens.
+    retireOlder: async (target) => {
+      const mine = wrappers.get('sytue-id');
+      if (!control.material || !mine || mine.keyID !== target.keyID) return false;
+      for (const kind of ['password', 'passkey'] as const) wrappers.delete(kind);
+      log.push('retire older');
+      return true;
     },
     legacyRecoveryKey: async () => control.legacy,
     signInURL: (returnTo, older) => {
@@ -216,8 +226,14 @@ function fixture() {
         vault.log.push('publish KEY-NEW');
         state.verified = true;
       },
+      // Mirrors SuiteMatrix: the owner-key cache of a device verified before answers
+      // the SDK itself; only without it does the SDK ask the host.
+      heldRecoveryKey: async (keyID: string) =>
+        vault.control.held && keyID === account.keyID ? account.key : null,
       recover: async () => {
-        const key = await ui.readRecoveryKey(account.keyID ? [account.keyID] : undefined);
+        const key = vault.control.held
+          ? account.key
+          : await ui.readRecoveryKey(account.keyID ? [account.keyID] : undefined);
         if (key !== account.key) throw new MatrixSecurityError('recovery');
         state.recovered = true;
         state.verified = true;
@@ -511,13 +527,105 @@ test('an ADR 0082 wrapper opens once with what Sytue ID computed, and moves to t
     g.vault.control.older = true;
     await g.mount();
     await until(() => g.root.querySelector('[data-private]') !== null);
-    expect(g.vault.log).toEqual(['unwrap password', 'wrap KEY1 hasKey=true']);
-    expect([...g.vault.wrappers.keys()]).toContain('sytue-id');
+    expect(g.vault.log).toEqual(['unwrap password', 'wrap KEY1 hasKey=true', 'retire older']);
+    // ADR 0085: once moved and checked, the old wrapper goes.
+    expect([...g.vault.wrappers.keys()]).toEqual(['sytue-id']);
     expectNothingAsked();
     await g.unmount();
   } finally {
     assign.mockRestore();
   }
+});
+
+test('a device verified under ADR 0082 moves to the unlock key with the key it already holds, asking nothing', async () => {
+  const f = fixture();
+  f.vault.wrappers.clear();
+  f.vault.wrappers.set('password', { keyID: 'KEY1', key: 'synthetic-recovery-key' });
+  f.vault.control.held = true;
+  await f.mount();
+  await until(() => f.vault.wrappers.has('sytue-id'));
+  expect(f.vault.wrappers.get('sytue-id')).toEqual({
+    keyID: 'KEY1',
+    key: 'synthetic-recovery-key',
+  });
+  // Nothing was opened through Sytue ID and nobody was sent to sign in.
+  expect(f.vault.log).not.toContain('unwrap password');
+  expect(f.vault.control.signIns).toEqual([]);
+  expect(findButton('matrix.signIn')).toBeUndefined();
+  await until(() => document.querySelector('[data-private="true"]') !== null);
+  expectNothingAsked();
+  expectNoKeyRendered();
+  await f.unmount();
+});
+
+test('the same device without an unlock key here keeps working and does not ask to sign in', async () => {
+  const f = fixture();
+  f.vault.wrappers.clear();
+  f.vault.wrappers.set('password', { keyID: 'KEY1', key: 'synthetic-recovery-key' });
+  f.vault.control.held = true;
+  f.vault.control.material = false;
+  await f.mount();
+  await until(() => document.querySelector('[data-private="true"]') !== null);
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 30));
+  });
+  expect(f.vault.wrappers.has('sytue-id')).toBe(false);
+  expect(findButton('matrix.signIn')).toBeUndefined();
+  expect(document.querySelector('[data-private="true"]')).not.toBeNull();
+  await f.unmount();
+});
+
+test('an unverified device that opens an ADR 0082 wrapper from its own cache moves it quietly', async () => {
+  const f = fixture();
+  f.untrusted();
+  f.vault.wrappers.clear();
+  f.vault.wrappers.set('password', { keyID: 'KEY1', key: 'synthetic-recovery-key' });
+  f.vault.control.held = true;
+  await f.mount();
+  await until(() => f.vault.wrappers.has('sytue-id'));
+  expect(f.devices[0]!.state.recovered).toBe(true);
+  expect(f.vault.control.signIns).toEqual([]);
+  expectNothingAsked();
+  await f.unmount();
+});
+
+test('once the unlock key opens the account, its ADR 0082 wrappers are retired, quietly', async () => {
+  const f = fixture();
+  f.vault.wrappers.set('password', { keyID: 'KEY1', key: 'synthetic-recovery-key' });
+  f.vault.wrappers.set('passkey', { keyID: 'KEY1', key: 'synthetic-recovery-key' });
+  await f.mount();
+  await until(() => f.vault.log.includes('retire older'));
+  expect([...f.vault.wrappers.keys()]).toEqual(['sytue-id']);
+  expectNothingAsked();
+  await f.unmount();
+});
+
+test('a device that just moved an ADR 0082 wrapper to the unlock key retires the old ones too', async () => {
+  const f = fixture();
+  f.untrusted();
+  f.vault.wrappers.clear();
+  f.vault.wrappers.set('password', { keyID: 'KEY1', key: 'synthetic-recovery-key' });
+  f.vault.control.held = true;
+  await f.mount();
+  await until(() => f.vault.log.includes('retire older'));
+  expect([...f.vault.wrappers.keys()]).toEqual(['sytue-id']);
+  await f.unmount();
+});
+
+test('without the unlock key here nothing is retired: the old wrapper is all that opens', async () => {
+  const f = fixture();
+  f.vault.wrappers.clear();
+  f.vault.wrappers.set('password', { keyID: 'KEY1', key: 'synthetic-recovery-key' });
+  f.vault.control.held = true;
+  f.vault.control.material = false;
+  await f.mount();
+  await until(() => document.querySelector('[data-private="true"]') !== null);
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 30));
+  });
+  expect([...f.vault.wrappers.keys()]).toEqual(['password']);
+  expect(f.vault.log).not.toContain('retire older');
+  await f.unmount();
 });
 
 test('a key the service does not hold offers only verification from another device', async () => {

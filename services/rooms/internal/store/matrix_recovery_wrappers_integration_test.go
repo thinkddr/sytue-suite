@@ -144,3 +144,39 @@ func TestElEnvoltorioSytueIDEsUnoPorCuentaYConviveConLosDeLa0082(t *testing.T) {
 		t.Fatal("la tabla acepta un sytue-id con credencial")
 	}
 }
+
+// Con el envoltorio `sytue-id` comprobado, los de la ADR 0082 de esa clave se retiran
+// en la MISMA transacción que lo guarda (ADR 0085): la cuenta nunca se queda sin uno
+// que abra, los de otra cuenta no se tocan, y solo un `sytue-id` puede retirarlos.
+func TestElSytueIDComprobadoRetiraLosDeLa0082EnLaMismaTransaccion(t *testing.T) {
+	h := pgtest.New(t, db.Migrations, db.MigrationsDir)
+	cipher, err := keycrypto.New(bytes.Repeat([]byte{9}, keycrypto.KeyLen))
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := store.New(h.Pool, cipher)
+	acme := tenantCtx("acme")
+	rooms := store.MatrixRecoveryAccount{}
+	drive := store.MatrixRecoveryAccount{Tenant: "acme", Product: "drive"}
+	w := func(kind, keyID string) []byte {
+		return []byte(fmt.Sprintf(`{"v":1,"kind":%q,"key_id":%q}`, kind, keyID))
+	}
+	for _, account := range []store.MatrixRecoveryAccount{rooms, drive} {
+		if _, err := st.PutMatrixRecoveryWrapper(acme, "alice", account, "password", "", "k1", w("password", "k1")); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.PutMatrixRecoveryWrapper(acme, "alice", account, "passkey", "cred", "k1", w("passkey", "k1")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := st.PutMatrixRecoveryWrapperRetiringOlder(acme, "alice", rooms, "k1", w("sytue-id", "k1")); err != nil {
+		t.Fatal(err)
+	}
+	rows, _, _ := st.MatrixRecoveryWrappers(acme, "alice", rooms)
+	if len(rows) != 1 || !bytes.Contains(rows[0].Wrapper, []byte(`"sytue-id"`)) {
+		t.Fatalf("Rooms tras retirar: %d envoltorios; quiero solo el sytue-id", len(rows))
+	}
+	if rows, _, _ := st.MatrixRecoveryWrappers(acme, "alice", drive); len(rows) != 2 {
+		t.Fatalf("la cuenta aislada perdió sus envoltorios: %d", len(rows))
+	}
+}

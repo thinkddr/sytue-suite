@@ -167,13 +167,28 @@ type Tokens struct {
 // Desbloqueo es lo que el relevo de Sytue ID entrega a una app nativa al iniciar sesión,
 // cifrado para la clave efímera de ese inicio de sesión: la clave de desbloqueo de la
 // persona, con la que las apps abren su cifrado sin pedir nada, y lo que abre UNA vez
-// sus envoltorios de la ADR 0082. No se modifica: se sustituye.
+// sus envoltorios de la ADR 0082. No se modifica: se sustituye. La única excepción es
+// cerrar sesión, que pone a cero sus bytes en memoria (ADR 0085) cuando la sesión ya
+// no existe en ninguna parte.
 type Desbloqueo struct {
 	Clave  []byte
 	Legado []recoverywrap.LegacyIKM
 }
 
 func (d *Desbloqueo) valida() bool { return d != nil && len(d.Clave) == recoverywrap.UnlockKeyLen }
+
+// borrar pone a cero la clave y lo que abría los envoltorios de la ADR 0082. Go no
+// garantiza que no queden copias que el recolector haya movido, pero las que este
+// proceso controla no sobreviven al cierre de sesión.
+func (d *Desbloqueo) borrar() {
+	if d == nil {
+		return
+	}
+	clear(d.Clave)
+	for _, l := range d.Legado {
+		clear(l.IKM)
+	}
+}
 
 // nombreDeApariencia deja pasar solo un nombre de color o de forma: letras minúsculas, o
 // nada. Es la misma regla con la que la web lo lleva a una cookie.
@@ -469,6 +484,9 @@ func (s *Session) LogoutCon(ctx context.Context) error { return s.LogoutConGuard
 func (s *Session) LogoutConGuardia(ctx context.Context, guard, cleanup func() error) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	// La clave de desbloqueo de esta sesión: a cero cuando la sesión ya no exista en el
+	// almacén (ADR 0085). Si guardar falla, la sesión sigue y la clave también.
+	previo := s.tokens.Desbloqueo
 	if guard != nil {
 		if err := guard(); err != nil {
 			return err
@@ -494,6 +512,9 @@ func (s *Session) LogoutConGuardia(ctx context.Context, guard, cleanup func() er
 	}
 	if err := guardarTokens(Tokens{}, s.guardar); err != nil {
 		return err
+	}
+	if s.tokens.Desbloqueo != previo {
+		previo.borrar()
 	}
 	if cleanup != nil {
 		return cleanup()

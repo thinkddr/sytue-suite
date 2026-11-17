@@ -1263,7 +1263,7 @@ services:
       BASES_PUBLIC_URL: https://bases.sytue.localhost/bases
       # …y los PÚBLICOS, que son los que se abren al pulsar un resultado.
       DRIVE_PUBLIC_URL: https://drive.sytue.localhost/drive
-      MAIL_PUBLIC_URL: https://mail.sytue.localhost
+      MAIL_PUBLIC_URL: https://mail.sytue.localhost/mail
       CALENDAR_PUBLIC_URL: https://calendar.sytue.localhost/calendar
       CONTACTS_PUBLIC_URL: https://contacts.sytue.localhost/contacts
       NOTES_PUBLIC_URL: https://notes.sytue.localhost/notes

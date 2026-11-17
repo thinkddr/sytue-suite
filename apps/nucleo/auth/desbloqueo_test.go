@@ -124,10 +124,15 @@ func TestLaClaveDeDesbloqueoVaConLaSesion(t *testing.T) {
 	if _, legado := s.Desbloqueo(); len(legado) != 0 || len(guardados) != 1 || len(guardados[0].Desbloqueo.Legado) != 0 {
 		t.Fatal("el legado sigue")
 	}
+	enMemoria := s.tokens.Desbloqueo
 	if err := s.Logout(); err != nil {
 		t.Fatal(err)
 	}
 	if clave, _ := s.Desbloqueo(); clave != nil {
 		t.Fatal("la clave sobrevive al cierre de sesión")
+	}
+	// Y los bytes que tenía este proceso, a cero (ADR 0085).
+	if !bytes.Equal(enMemoria.Clave, make([]byte, 32)) {
+		t.Fatal("cerrar sesión deja la clave de desbloqueo en memoria")
 	}
 }

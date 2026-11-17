@@ -21,6 +21,14 @@ export interface OfflineDocument {
    * otros escribieron mientras tanto (state/fusion.ts). Ausente en copias viejas.
    */
   base?: string | undefined;
+  /**
+   * Con `contentDirty`: los cambios de estructura de una hoja (insertar o borrar filas o
+   * columnas) que van cada uno en SU guardado, en orden y antes que `content`; el primero
+   * parte de `base`. En una hoja protegida el servidor solo reconoce un desplazamiento
+   * por guardado, así que el borrador no se puede mandar de una vez: si al salir de la
+   * página no se pudieron mandar, se repiten así al volver (useDocument).
+   */
+  cola?: string[] | undefined;
   lamport: number;
   seq: number;
   contentDirty: boolean;
@@ -62,6 +70,7 @@ export async function cacheServerDocument(
     meta: previous?.titleDirty ? { ...meta, title: previous.meta.title } : meta,
     content: previous?.contentDirty ? previous.content : content,
     base: previous?.contentDirty ? previous.base : content,
+    cola: previous?.contentDirty ? previous.cola : undefined,
     lamport: Math.max(previous?.lamport ?? 0, lamport),
     seq: Math.max(previous?.seq ?? 0, seq),
     contentDirty: previous?.contentDirty ?? false,
@@ -70,13 +79,17 @@ export async function cacheServerDocument(
   }));
 }
 
-/** Persiste cada edición antes de intentar enviarla. */
+/**
+ * Persiste cada edición antes de intentar enviarla, con la cola de cambios de
+ * estructura que van aparte delante de ella (vacía: ninguno).
+ */
 export async function cacheLocalContent(
   ownerId: string,
   meta: DocumentMeta,
   content: string,
   lamport: number,
   seq: number,
+  cola: readonly string[] = [],
 ): Promise<void> {
   await mutate(ownerId, meta.id, (previous) => ({
     documentId: meta.id,
@@ -84,12 +97,39 @@ export async function cacheLocalContent(
     content,
     // La primera edición sin guardar fija la base: lo limpio que había antes.
     base: previous?.contentDirty ? previous.base : previous?.content,
+    cola: cola.length > 0 ? [...cola] : undefined,
     lamport: Math.max(previous?.lamport ?? 0, lamport),
     seq: Math.max(previous?.seq ?? 0, seq),
     contentDirty: true,
     titleDirty: previous?.titleDirty ?? false,
     cachedAt: Date.now(),
   }));
+}
+
+/**
+ * El servidor confirmó el primero de la cola, `base`: el borrador sigue sin guardar,
+ * pero ahora parte de él y lo que queda por mandar aparte es `cola`.
+ */
+export async function confirmarEnCola(
+  ownerId: string,
+  documentId: string,
+  base: string,
+  cola: readonly string[],
+  lamport: number,
+  seq: number,
+): Promise<void> {
+  await mutate(ownerId, documentId, (previous) =>
+    previous?.contentDirty
+      ? {
+          ...previous,
+          base,
+          cola: cola.length > 0 ? [...cola] : undefined,
+          lamport: Math.max(previous.lamport, lamport),
+          seq: Math.max(previous.seq, seq),
+          cachedAt: Date.now(),
+        }
+      : previous,
+  );
 }
 
 export async function markContentSynced(
@@ -104,6 +144,7 @@ export async function markContentSynced(
     meta: previous?.titleDirty ? { ...meta, title: previous.meta.title } : meta,
     content,
     base: content,
+    cola: undefined,
     lamport,
     seq,
     contentDirty: false,
@@ -122,6 +163,7 @@ export async function cacheLocalTitle(
     meta: { ...(previous?.meta ?? meta), title },
     content: previous?.content ?? '',
     base: previous?.base,
+    cola: previous?.cola,
     lamport: previous?.lamport ?? 0,
     seq: previous?.seq ?? 0,
     contentDirty: previous?.contentDirty ?? false,

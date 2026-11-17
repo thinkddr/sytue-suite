@@ -245,9 +245,9 @@ func (c *Lienzo) poner(m leido) {
 	}
 	// Se sustituye el CONTENIDO del libro y no el puntero: la rejilla, la barra y las
 	// pestañas lo tienen guardado, y un puntero nuevo las dejaría mirando el viejo.
-	rotulo := c.Libro.rotulo
+	rotulo, yo, ajeno := c.Libro.rotulo, c.Libro.yo, c.Libro.ajeno
 	*c.Libro = *NuevoLibroCon(nombres, clamp(m.activa, len(nombres)-1))
-	c.Libro.rotulo = rotulo
+	c.Libro.rotulo, c.Libro.yo, c.Libro.ajeno = rotulo, yo, ajeno
 	for i, h := range m.hojas {
 		c.Libro.cargarHoja(i, h)
 	}

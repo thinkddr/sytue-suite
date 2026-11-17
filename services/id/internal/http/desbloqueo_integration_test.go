@@ -17,6 +17,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"git.sytue.eu/sytue/one/apps/nucleo/recoverywrap"
 	"git.sytue.eu/sytue/one/services/id/internal/domain"
@@ -318,5 +319,109 @@ func TestPromptLoginObligaAEntrarSinBucle(t *testing.T) {
 	l.mux.ServeHTTP(rec, req)
 	if loc, _ := url.Parse(rec.Header().Get("Location")); rec.Code != http.StatusFound || loc.Host != "contacts.sytue.eu" {
 		t.Fatalf("la vuelta vuelve a pedir el inicio de sesión: %d %s", rec.Code, rec.Header().Get("Location"))
+	}
+}
+
+// El sobre de la contraseña nueva viaja con el cambio (ADR 0085) y Sytue ID lo
+// guarda SOLO si el cambio sale bien: con la contraseña actual equivocada, el sobre
+// vigente se queda como estaba.
+func TestElSobreDeLaContrasenaNuevaLlegaConElCambio(t *testing.T) {
+	l := newLiveServer(t)
+	org, err := l.st.CreateOrg(l.ctx, nil, domain.Organization{Slug: "acme", Name: "Acme"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const antigua, nueva = "Antigua-contrasena-1", "Nueva-contrasena-segura-2"
+	u := l.mkUser(t, "bea@acme.example", antigua)
+	if err := l.st.UpsertMembership(l.ctx, nil, domain.Membership{OrgID: org.ID, UserID: u.ID, Role: domain.RoleMember}); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := domain.GenerateToken(32)
+	now := time.Now()
+	if _, err := l.st.InsertSession(l.ctx, nil, domain.Session{
+		TokenHash: domain.HashToken(raw), UserID: u.ID, OrgID: org.ID,
+		AuthTime: now, AMR: []string{"pwd"}, UserAgent: "test", ExpiresAt: now.Add(time.Hour),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	sess := &http.Cookie{Name: sessionCookieName, Value: raw}
+	kdf := l.salDe(t, "bea@acme.example")
+	key, _ := recoverywrap.NewUnlockKey()
+	if rec := l.desbloqueoPeticion(t, http.MethodPut, "/e2e/envelopes", sess, map[string]any{"envelope": sobreDe(t, recoverywrap.KindPassword, u.ID, "", kdf, antigua, nil, key)}); rec.Code != http.StatusNoContent {
+		t.Fatalf("sobre inicial: %d", rec.Code)
+	}
+	nuevo, _ := json.Marshal(sobreDe(t, recoverywrap.KindPassword, u.ID, "", kdf, nueva, nil, key))
+	cambiar := func(actual string) {
+		form := url.Values{"current_password": {actual}, "new_password": {nueva}, "confirm_password": {nueva}, "unlock_envelope": {string(nuevo)}}
+		req := httptest.NewRequest(http.MethodPost, "/account/password", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Sec-Fetch-Site", "same-origin")
+		req.AddCookie(sess)
+		l.mux.ServeHTTP(httptest.NewRecorder(), req)
+	}
+	abre := func(password string) bool {
+		rows, err := l.st.UnlockEnvelopes(l.ctx, u.ID)
+		if err != nil || len(rows) != 1 {
+			t.Fatalf("sobres: %d %v", len(rows), err)
+		}
+		var e recoverywrap.Envelope
+		if err := json.Unmarshal(rows[0].Envelope, &e); err != nil {
+			t.Fatal(err)
+		}
+		kek, err := recoverywrap.EnvelopePasswordKEK(password, e.KDF)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = recoverywrap.OpenEnvelope(kek, u.ID, e)
+		return err == nil
+	}
+	cambiar("no-es-la-actual")
+	if !abre(antigua) || abre(nueva) {
+		t.Fatal("un cambio que no sale no puede tocar el sobre")
+	}
+	cambiar(antigua)
+	if !abre(nueva) || abre(antigua) {
+		t.Fatal("tras el cambio, el sobre debe abrir con la contraseña nueva")
+	}
+}
+
+// Subir sobres tiene su propio límite por cliente (ADR 0085): da para el uso real
+// (un sobre por inicio de sesión, uno por passkey, empezar de cero) sin gastar el
+// presupuesto anti-fuerza-bruta del inicio de sesión, y sigue cortando a quien con
+// una sesión machaque PUT /e2e/envelopes.
+func TestLosSobresTienenSuPropioLimiteYCortanElAbuso(t *testing.T) {
+	l := newLiveServer(t)
+	org, err := l.st.CreateOrg(l.ctx, nil, domain.Organization{Slug: "acme", Name: "Acme"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sess := l.memberSession(t, "ana@acme.example", org.ID)
+	stored, err := l.st.GetSessionByToken(l.ctx, domain.HashToken(sess.Value))
+	if err != nil {
+		t.Fatal(err)
+	}
+	kdf := l.salDe(t, "ana@acme.example")
+	key, _ := recoverywrap.NewUnlockKey()
+	sobre := map[string]any{"envelope": sobreDe(t, recoverywrap.KindPassword, stored.UserID, "", kdf, "contraseña", nil, key)}
+
+	// El uso real de un rato: más que la ráfaga del inicio de sesión (10), sin 429.
+	for i := range 12 {
+		if rec := l.desbloqueoPeticion(t, http.MethodPut, "/e2e/envelopes", sess, sobre); rec.Code != http.StatusNoContent {
+			t.Fatalf("sobre %d: %d", i+1, rec.Code)
+		}
+	}
+	// Y el inicio de sesión de ese mismo cliente no lo ha pagado.
+	l.salDe(t, "ana@acme.example")
+
+	// Machacarlo, sí se corta.
+	cortado := false
+	for range 40 {
+		if rec := l.desbloqueoPeticion(t, http.MethodPut, "/e2e/envelopes", sess, sobre); rec.Code == http.StatusTooManyRequests {
+			cortado = true
+			break
+		}
+	}
+	if !cortado {
+		t.Fatal("cuarenta sobres seguidos de una sesión no se cortan con 429")
 	}
 }

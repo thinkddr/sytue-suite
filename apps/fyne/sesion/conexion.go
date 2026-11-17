@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -35,13 +36,18 @@ var ErrSoloLectura = errors.New("sesion: solo lectura (SYTUE_SOLO_LECTURA), la p
 // botón y no se escribe nada.
 //
 // Deja pasar el POST al `/token` del IdP: el canje y la renovación de la sesión, sin los
-// que no hay ni lectura.
+// que no hay ni lectura. Con `desbloqueo` (SYTUE_PERMITIR_DESBLOQUEO=1, que solo pone
+// `ventana-real.yml`) deja pasar además las escrituras de escrituraDelDesbloqueo, y
+// ninguna otra.
 //
 // ponytail: solo HTTP. Un WebSocket ya abierto (el chat de Rooms, la edición de un
 // documento) sigue pudiendo escribir, pero para eso hace falta TECLEAR, no un clic; si
 // el recorrido llega a escribir dentro de un canal o de un documento, se corta aquí la
 // petición de `Upgrade`.
-type soloLectura struct{ base http.RoundTripper }
+type soloLectura struct {
+	base       http.RoundTripper
+	desbloqueo bool
+}
 
 func (s soloLectura) RoundTrip(r *http.Request) (*http.Response, error) {
 	switch r.Method {
@@ -52,21 +58,99 @@ func (s soloLectura) RoundTrip(r *http.Request) (*http.Response, error) {
 			return s.base.RoundTrip(r)
 		}
 	}
+	if s.desbloqueo && escrituraDelDesbloqueo(r.Method, r.URL.Path) {
+		slog.Info("SYTUE_PERMITIR_DESBLOQUEO: sale una escritura del desbloqueo", "metodo", r.Method, "host", r.URL.Host, "ruta", rutaSinIdentificadores(r.URL.Path))
+		return s.base.RoundTrip(r)
+	}
+	// Dicho en el registro de la app, que el CI sube con las capturas: lo que se corta
+	// es lo que explica una pantalla que se queda a medias.
+	slog.Warn("SYTUE_SOLO_LECTURA: escritura cortada", "metodo", r.Method, "host", r.URL.Host, "ruta", rutaSinIdentificadores(r.URL.Path))
+	// Un RoundTripper cierra el cuerpo también cuando no envía nada (net/http).
+	if r.Body != nil {
+		_ = r.Body.Close()
+	}
 	return nil, ErrSoloLectura
+}
+
+// escriturasDelDesbloqueo es la lista CERRADA de lo que se puede escribir en solo
+// lectura con SYTUE_PERMITIR_DESBLOQUEO=1: lo imprescindible para que el inicio de
+// sesión en Sytue ID desbloquee el cifrado en un dispositivo nuevo (ADR 0084) —dar de
+// alta el dispositivo de Matrix, verificarlo con las firmas cruzadas de la cuenta y
+// guardar su envoltorio— y para cerrar al acabar la sesión que se abrió. Método y ruta
+// exactos; donde va la cuenta de Matrix (`/user/{id}/…`), un segmento y nada más.
+//
+// Fuera, a propósito: mensajes a otros dispositivos (`sendToDevice`), reclamar claves de
+// un solo uso de otros (`keys/claim`), subir claves de salas a la copia
+// (`room_keys/keys`), cualquier otro dato de cuenta, el consentimiento de recepción y
+// raíces de almacenamiento, la presencia, las contraseñas de aplicación y todo el
+// contenido. Lo que una pantalla no pueda enseñar sin eso, no se enseña.
+var escriturasDelDesbloqueo = []struct {
+	metodo string
+	ruta   *regexp.Regexp
+}{
+	// Matrix: el alta del dispositivo (el canje del token de un solo uso del SSO), sus
+	// claves de dispositivo, la consulta de las de la cuenta (que se hace por POST) y el
+	// filtro sin el que el SDK no sincroniza.
+	{http.MethodPost, regexp.MustCompile(`^/_matrix/client/v3/login$`)},
+	{http.MethodPost, regexp.MustCompile(`^/_matrix/client/v3/keys/upload$`)},
+	{http.MethodPost, regexp.MustCompile(`^/_matrix/client/v3/keys/query$`)},
+	{http.MethodPost, regexp.MustCompile(`^/_matrix/client/v3/user/[^/]+/filter$`)},
+	// Las firmas cruzadas: la autoverificación del dispositivo y, en una cuenta que aún
+	// no las tiene, su alta con el almacén de secretos y la copia de claves.
+	{http.MethodPost, regexp.MustCompile(`^/_matrix/client/v3/keys/signatures/upload$`)},
+	{http.MethodPost, regexp.MustCompile(`^/_matrix/client/v3/keys/device_signing/upload$`)},
+	{http.MethodPut, regexp.MustCompile(`^/_matrix/client/v3/user/[^/]+/account_data/(m\.secret_storage\.default_key|m\.secret_storage\.key\.[A-Za-z0-9_-]+|m\.cross_signing\.(master|self_signing|user_signing)|m\.megolm_backup\.v1)$`)},
+	{http.MethodPost, regexp.MustCompile(`^/_matrix/client/v3/room_keys/version$`)},
+	// El envoltorio `sytue-id` de la clave de recuperación (Rooms, ADR 0084 y 0085).
+	{http.MethodPut, regexp.MustCompile(`^/api/v1/matrix/recovery-wrappers$`)},
+	// Cerrar al acabar: el dispositivo de Matrix y el refresh de Sytue ID.
+	{http.MethodPost, regexp.MustCompile(`^/_matrix/client/v3/logout$`)},
+	{http.MethodPost, regexp.MustCompile(`^/oauth2/revoke$`)},
+}
+
+func escrituraDelDesbloqueo(metodo, ruta string) bool {
+	for _, e := range escriturasDelDesbloqueo {
+		if e.metodo == metodo && e.ruta.MatchString(ruta) {
+			return true
+		}
+	}
+	return false
+}
+
+// rutaSinIdentificadores quita de una ruta lo que identifica a alguien o a algo (la
+// cuenta de Matrix, una sala, un id largo) para poder dejarla en el registro.
+func rutaSinIdentificadores(ruta string) string {
+	partes := strings.Split(ruta, "/")
+	for i, p := range partes {
+		if len(p) > 24 || strings.ContainsAny(p, "@!$:%=") {
+			partes[i] = "…"
+		}
+	}
+	return strings.Join(partes, "/")
 }
 
 var unaVezSoloLectura sync.Once
 
-// ponerSoloLectura envuelve el transporte por defecto, que es por donde salen todos los
-// clientes de la suite: los de `api` (http.DefaultClient), el de la caché «red primero»
-// y el de la sesión. Lo llama Abrir.
+// ponerSoloLectura envuelve los dos transportes por los que salen los clientes de la
+// suite: el por defecto (el de la sesión, el de OIDC y los que no eligen) y
+// api.Transporte, que es CLON del por defecto (FYS-11) y por el que van los de `api`, la
+// caché «red primero» de Conexion y Matrix. Hasta 2026-11-17 solo se envolvía el
+// primero, y desde FYS-11 (2026-10-15) las escrituras de `api` salían en las tiradas de
+// ventana real: el latido de presencia y la contraseña de aplicación con la que Drive
+// se conecta al sistema. Lo llama Abrir, antes de que se cree ningún cliente.
 func ponerSoloLectura() {
 	if os.Getenv("SYTUE_SOLO_LECTURA") == "" {
 		return
 	}
+	desbloqueo := os.Getenv("SYTUE_PERMITIR_DESBLOQUEO") == "1"
 	unaVezSoloLectura.Do(func() {
-		http.DefaultTransport = soloLectura{http.DefaultTransport}
-		slog.Warn("SYTUE_SOLO_LECTURA: esta app no envía ninguna escritura")
+		http.DefaultTransport = soloLectura{base: http.DefaultTransport, desbloqueo: desbloqueo}
+		api.Transporte = soloLectura{base: api.Transporte, desbloqueo: desbloqueo}
+		if desbloqueo {
+			slog.Warn("SYTUE_SOLO_LECTURA: esta app solo escribe lo del desbloqueo del cifrado (SYTUE_PERMITIR_DESBLOQUEO)")
+		} else {
+			slog.Warn("SYTUE_SOLO_LECTURA: esta app no envía ninguna escritura")
+		}
 	})
 }
 
